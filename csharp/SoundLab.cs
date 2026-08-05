@@ -1,0 +1,114 @@
+using Godot;
+
+namespace OperationSteelTide;
+
+public static class SoundLab
+{
+    private static AudioStreamWav MakeStream(float[] samples, int rate = 22050)
+    {
+        var bytes = new byte[samples.Length * 2];
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var value = (short)(Mathf.Clamp(samples[i], -1.0f, 1.0f) * short.MaxValue);
+            bytes[i * 2] = (byte)(value & 0xff);
+            bytes[i * 2 + 1] = (byte)((value >> 8) & 0xff);
+        }
+
+        return new AudioStreamWav
+        {
+            Format = AudioStreamWav.FormatEnum.Format16Bits,
+            MixRate = rate,
+            Stereo = false,
+            Data = bytes
+        };
+    }
+
+    public static AudioStreamWav Gunshot()
+    {
+        const int rate = 22050;
+        var samples = new float[(int)(rate * 0.28f)];
+        var rng = new RandomNumberGenerator { Seed = 77231 };
+        var low = 0.0f;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var t = (float)i / rate;
+            var envelope = Mathf.Exp(-t * 23.0f);
+            low = Mathf.Lerp(low, rng.RandfRange(-1.0f, 1.0f), 0.18f);
+            var crack = rng.RandfRange(-1.0f, 1.0f) * Mathf.Exp(-t * 70.0f);
+            var boom = Mathf.Sin(Mathf.Tau * (92.0f - t * 90.0f) * t) * envelope;
+            samples[i] = (crack * 0.78f + low * 0.42f + boom * 0.7f) * envelope;
+        }
+        return MakeStream(samples, rate);
+    }
+
+    public static AudioStreamWav ReloadClick()
+    {
+        const int rate = 22050;
+        var samples = new float[(int)(rate * 0.12f)];
+        var rng = new RandomNumberGenerator { Seed = 9921 };
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var t = (float)i / rate;
+            var pulse = Mathf.Exp(-Mathf.Abs(t - 0.015f) * 150.0f)
+                + 0.65f * Mathf.Exp(-Mathf.Abs(t - 0.075f) * 180.0f);
+            samples[i] = (rng.RandfRange(-1.0f, 1.0f) * 0.25f
+                + Mathf.Sin(Mathf.Tau * 1750.0f * t) * 0.3f) * pulse;
+        }
+        return MakeStream(samples, rate);
+    }
+
+    public static AudioStreamWav Explosion()
+    {
+        const int rate = 22050;
+        var samples = new float[(int)(rate * 0.7f)];
+        var rng = new RandomNumberGenerator { Seed = 122733 };
+        var low = 0.0f;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var t = (float)i / rate;
+            var envelope = Mathf.Exp(-t * 5.8f);
+            low = Mathf.Lerp(low, rng.RandfRange(-1.0f, 1.0f), 0.045f);
+            var thump = Mathf.Sin(Mathf.Tau * (58.0f - t * 25.0f) * t) * Mathf.Exp(-t * 7.5f);
+            samples[i] = (low * 1.35f + thump) * envelope * 0.75f;
+        }
+        return MakeStream(samples, rate);
+    }
+
+    public static AudioStreamWav EnemyShot()
+    {
+        var stream = Gunshot();
+        stream.MixRate = 18500;
+        return stream;
+    }
+
+    public static AudioStreamWav Footstep()
+    {
+        const int rate = 22050;
+        var samples = new float[(int)(rate * 0.13f)];
+        var rng = new RandomNumberGenerator { Seed = 48117 };
+        var low = 0.0f;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var t = (float)i / rate;
+            low = Mathf.Lerp(low, rng.RandfRange(-1.0f, 1.0f), 0.12f);
+            var impact = Mathf.Exp(-t * 38.0f);
+            var scrape = Mathf.Exp(-Mathf.Abs(t - 0.045f) * 65.0f);
+            samples[i] = (low * 0.75f * impact + rng.RandfRange(-0.25f, 0.25f) * scrape) * 0.42f;
+        }
+        return MakeStream(samples, rate);
+    }
+
+    public static AudioStreamWav CasingDrop()
+    {
+        const int rate = 22050;
+        var samples = new float[(int)(rate * 0.08f)];
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var t = (float)i / rate;
+            var envelope = Mathf.Exp(-t * 55.0f);
+            samples[i] = (Mathf.Sin(Mathf.Tau * 3100.0f * t) * 0.24f
+                + Mathf.Sin(Mathf.Tau * 1850.0f * t) * 0.16f) * envelope;
+        }
+        return MakeStream(samples, rate);
+    }
+}
