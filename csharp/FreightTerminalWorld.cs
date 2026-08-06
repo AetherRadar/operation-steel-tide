@@ -148,6 +148,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             CaptureExpandedMapFrame();
         }
+        else if (Array.Exists(args, value => value == "--validate-weapon-ui"))
+        {
+            ValidateWeaponUiFlow();
+        }
     }
 
     public override void _Process(double delta)
@@ -509,6 +513,7 @@ public partial class FreightTerminalWorld : Node3D
             MouseSensitivity = 0.00165f * _sensitivitySetting
         };
         AddChild(_player);
+        _hud.WeaponSlotRequested += _player.SelectWeapon;
         _player.HitConfirmed += OnHitConfirmed;
         _player.Died += OnPlayerDied;
         _hud.SetSettings(_sensitivitySetting, _qualitySetting, _fullscreenSetting, _languageSetting);
@@ -1390,10 +1395,40 @@ public partial class FreightTerminalWorld : Node3D
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = "muzzle_suppressor" });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Ammunition, Quantity = 48 });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 1 });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Weapon, Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 2) });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("helmet_heavy") });
         OpenPersonalBackpack();
-        await WaitFrames(5);
+        await WaitFrames(8);
         SaveViewportImage("res://backpack_validation.png");
-        GD.Print($"BACKPACK_CHECK open={_hud.IsLootVisible} items={_player.Backpack.Count} capacity={_player.BackpackCapacity} language={_languageSetting}");
+        _hud.ShowWeaponDetails(_player.EquippedWeapon);
+        await WaitFrames(5);
+        SaveViewportImage("res://weapon_detail_validation.png");
+        GD.Print($"BACKPACK_CHECK open={_hud.IsLootVisible} detail={_hud.IsWeaponDetailVisible} items={_player.Backpack.Count} capacity={_player.BackpackCapacity} language={_languageSetting}");
+        GetTree().Quit();
+    }
+
+    private async void ValidateWeaponUiFlow()
+    {
+        foreach (var enemy in _enemies)
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        await WaitFrames(5);
+        Input.ActionPress("weapon_cycle");
+        await WaitFrames(2);
+        Input.ActionRelease("weapon_cycle");
+        var cycledToKnife = _player.KnifeEquipped;
+        await WaitFrames(2);
+        Input.ActionPress("weapon_cycle");
+        await WaitFrames(2);
+        Input.ActionRelease("weapon_cycle");
+        var cycledToPrimary = !_player.KnifeEquipped;
+        OpenPersonalBackpack();
+        await WaitFrames(4);
+        _hud.ShowWeaponDetails(_player.EquippedWeapon);
+        await WaitFrames(2);
+        var detailsOpened = _hud.IsWeaponDetailVisible;
+        GD.Print($"WEAPON_UI_CHECK knife={cycledToKnife} primary={cycledToPrimary} details={detailsOpened} platform={_player.EquippedWeapon.Platform}");
         GetTree().Quit();
     }
 

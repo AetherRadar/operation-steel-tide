@@ -740,6 +740,10 @@ public partial class TacticalPlayer : CharacterBody3D
         {
             SwitchWeapon(true);
         }
+        else if (Input.IsActionJustPressed("weapon_cycle"))
+        {
+            CycleWeapon();
+        }
 
         if (Input.IsActionJustPressed("toggle_fire_mode") && !_knifeEquipped && !_isReloading && !_isPlating)
         {
@@ -803,7 +807,7 @@ public partial class TacticalPlayer : CharacterBody3D
         Hud?.SetEquipment(
             ArmorPlates,
             _knifeEquipped ? "KNIFE" : _automaticFire ? "AUTO" : "SEMI",
-            _knifeEquipped ? "TACTICAL KNIFE" : WeaponCatalog.Weapon(EquippedWeapon.Platform).Name);
+            EquippedWeapon.DisplayName(Hud?.CurrentLanguage ?? "en"));
         Hud?.SetAiming(_isAiming);
         Hud?.SetHeading(Mathf.RadToDeg(Rotation.Y) * -1.0f);
     }
@@ -1052,6 +1056,16 @@ public partial class TacticalPlayer : CharacterBody3D
             "optic_holo" => 44.0f,
             _ => 49.0f
         };
+    }
+
+    public void SelectWeapon(int slot)
+    {
+        SwitchWeapon(slot == 1);
+    }
+
+    public void CycleWeapon()
+    {
+        SwitchWeapon(!_knifeEquipped);
     }
 
     private void SwitchWeapon(bool useKnife)

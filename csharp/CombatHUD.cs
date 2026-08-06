@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -18,6 +19,7 @@ public partial class CombatHUD : CanvasLayer
     [Signal] public delegate void LootReturnRequestedEventHandler(string itemId);
     [Signal] public delegate void BackpackUseRequestedEventHandler(string itemId);
     [Signal] public delegate void LootClosedEventHandler();
+    [Signal] public delegate void WeaponSlotRequestedEventHandler(int slot);
 
     private Label _healthLabel = null!;
     private Label _armorLabel = null!;
@@ -25,6 +27,8 @@ public partial class CombatHUD : CanvasLayer
     private Label _reserveLabel = null!;
     private Label _grenadeLabel = null!;
     private Label _weaponModeLabel = null!;
+    private Button _primaryWeaponButton = null!;
+    private Button _knifeWeaponButton = null!;
     private Label _plateReserveLabel = null!;
     private Label _vitalCaption = null!;
     private Label _armorCaption = null!;
@@ -64,8 +68,8 @@ public partial class CombatHUD : CanvasLayer
     private Button _quitButton = null!;
     private Label _buildLabel = null!;
     private ColorRect _lootOverlay = null!;
-    private VBoxContainer _lootSourceList = null!;
-    private VBoxContainer _backpackList = null!;
+    private GridContainer _lootSourceList = null!;
+    private GridContainer _backpackList = null!;
     private LootDropZone _lootSourceZone = null!;
     private LootDropZone _backpackZone = null!;
     private LootDropZone _primarySlot = null!;
@@ -80,15 +84,28 @@ public partial class CombatHUD : CanvasLayer
     private Label _helmetSlotCaption = null!;
     private Label _armorSlotCaption = null!;
     private Label _packSlotCaption = null!;
+    private Label _backpackItemsCaption = null!;
     private Label _lootTitle = null!;
     private Label _lootStats = null!;
     private Label _lootSourceCaption = null!;
     private Label _backpackCaption = null!;
     private Button _lootCloseButton = null!;
+    private Button _primaryDetailButton = null!;
+    private WeaponPreviewControl _primaryWeaponPreview = null!;
+    private ColorRect _weaponDetailOverlay = null!;
+    private Label _weaponDetailTitle = null!;
+    private Label _weaponDetailStatsCaption = null!;
+    private Label _weaponDetailStats = null!;
+    private Label _weaponDetailPartsCaption = null!;
+    private GridContainer _weaponDetailParts = null!;
+    private WeaponPreviewControl _weaponDetailPreview = null!;
+    private WeaponBuild? _detailedWeapon;
     private IReadOnlyList<LootItem>? _shownLoot;
     private TacticalPlayer? _shownPlayer;
     private string _shownLootName = string.Empty;
     private bool _shownSourceAvailable;
+    private string _lastFireMode = "AUTO";
+    private string _lastWeaponName = "M4A1";
     private Tween? _hitTween;
     private Tween? _damageTween;
     private Tween? _crosshairTween;
@@ -107,7 +124,11 @@ public partial class CombatHUD : CanvasLayer
     {
         if (@event is InputEventKey key && key.Pressed && !key.Echo && key.Keycode == Key.Escape)
         {
-            if (IsLootVisible)
+            if (IsWeaponDetailVisible)
+            {
+                HideWeaponDetails();
+            }
+            else if (IsLootVisible)
             {
                 EmitSignal(SignalName.LootClosed);
             }
@@ -262,13 +283,14 @@ public partial class CombatHUD : CanvasLayer
         };
         status.AddChild(_staminaBar);
 
-        var weapon = Panel(root, Vector2.Zero, new Vector2(246, 92));
+        var weapon = Panel(root, Vector2.Zero, new Vector2(360, 100));
+        weapon.MouseFilter = Control.MouseFilterEnum.Pass;
         weapon.AnchorLeft = 1.0f;
         weapon.AnchorTop = 1.0f;
         weapon.AnchorRight = 1.0f;
         weapon.AnchorBottom = 1.0f;
-        weapon.OffsetLeft = -276;
-        weapon.OffsetTop = -124;
+        weapon.OffsetLeft = -390;
+        weapon.OffsetTop = -132;
         weapon.OffsetRight = -30;
         weapon.OffsetBottom = -32;
         _ammoLabel = Label("30", 42, new Color(0.95f, 0.98f, 0.95f));
@@ -277,11 +299,27 @@ public partial class CombatHUD : CanvasLayer
         _reserveLabel = Label("/ 150", 18, new Color(0.54f, 0.65f, 0.62f));
         _reserveLabel.Position = new Vector2(78, 23);
         weapon.AddChild(_reserveLabel);
+        var weaponSlots = new ButtonGroup();
+        _primaryWeaponButton = Button("1  M4A1", new Vector2(128, 9), new Vector2(112, 42));
+        _primaryWeaponButton.ToggleMode = true;
+        _primaryWeaponButton.ButtonGroup = weaponSlots;
+        _primaryWeaponButton.FocusMode = Control.FocusModeEnum.None;
+        _primaryWeaponButton.AddThemeFontSizeOverride("font_size", 12);
+        _primaryWeaponButton.Pressed += () => EmitSignal(SignalName.WeaponSlotRequested, 0);
+        weapon.AddChild(_primaryWeaponButton);
+        _knifeWeaponButton = Button("3  KNIFE", new Vector2(246, 9), new Vector2(90, 42));
+        _knifeWeaponButton.ToggleMode = true;
+        _knifeWeaponButton.ButtonGroup = weaponSlots;
+        _knifeWeaponButton.FocusMode = Control.FocusModeEnum.None;
+        _knifeWeaponButton.AddThemeFontSizeOverride("font_size", 12);
+        _knifeWeaponButton.Pressed += () => EmitSignal(SignalName.WeaponSlotRequested, 1);
+        weapon.AddChild(_knifeWeaponButton);
         _weaponModeLabel = PositionedLabel("M4A1   AUTO", 12, new Color(0.4f, 0.82f, 0.71f), 23, 62);
-        _weaponModeLabel.Size = new Vector2(118, 22);
+        _weaponModeLabel.Size = new Vector2(220, 22);
+        _weaponModeLabel.ClipText = true;
         weapon.AddChild(_weaponModeLabel);
         _grenadeLabel = Label("FRAG  x2", 13, new Color(0.78f, 0.83f, 0.8f));
-        _grenadeLabel.Position = new Vector2(148, 61);
+        _grenadeLabel.Position = new Vector2(260, 63);
         weapon.AddChild(_grenadeLabel);
 
         _crosshair = new Control();
@@ -480,29 +518,35 @@ public partial class CombatHUD : CanvasLayer
             SizeFlagsVertical = Control.SizeFlags.ExpandFill
         };
         _lootSourceZone.AddChild(sourceScroll);
-        _lootSourceList = new VBoxContainer
+        _lootSourceList = new GridContainer
         {
+            Columns = 2,
             MouseFilter = Control.MouseFilterEnum.Pass,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
         };
-        _lootSourceList.AddThemeConstantOverride("separation", 8);
+        _lootSourceList.AddThemeConstantOverride("h_separation", 8);
+        _lootSourceList.AddThemeConstantOverride("v_separation", 8);
         sourceScroll.AddChild(_lootSourceList);
 
         _lootStats = PositionedLabel("", 13, new Color(0.78f, 0.86f, 0.83f), 600, 126);
-        _lootStats.Size = new Vector2(590, 55);
+        _lootStats.Size = new Vector2(590, 42);
         _lootStats.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         panel.AddChild(_lootStats);
 
-        _primarySlot = BuildEquipmentSlot(panel, LootDropTarget.PrimaryWeapon, "PRIMARY WEAPON", new Vector2(600, 190), new Vector2(590, 108), new Color(0.34f, 0.86f, 0.7f), out _primarySlotCaption, out _primarySlotLabel);
-        _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(600, 308), new Vector2(188, 108), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel);
-        _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(801, 308), new Vector2(188, 108), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel);
-        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK", new Vector2(1002, 308), new Vector2(188, 108), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel);
+        _primarySlot = BuildPrimaryWeaponSlot(panel, new Vector2(600, 176), new Vector2(590, 124));
+        _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(600, 310), new Vector2(188, 104), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel);
+        _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(801, 310), new Vector2(188, 104), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel);
+        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK", new Vector2(1002, 310), new Vector2(188, 104), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel);
+
+        _backpackItemsCaption = PositionedLabel("PERSONAL BACKPACK", 12, new Color(0.43f, 0.72f, 0.96f), 600, 420);
+        _backpackItemsCaption.Size = new Vector2(590, 22);
+        panel.AddChild(_backpackItemsCaption);
 
         var backpackZone = new LootDropZone
         {
             Target = LootDropTarget.Backpack,
-            Position = new Vector2(600, 468),
-            Size = new Vector2(590, 210)
+            Position = new Vector2(600, 446),
+            Size = new Vector2(590, 232)
         };
         _backpackZone = backpackZone;
         _backpackZone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(new Color(0.32f, 0.62f, 0.92f)));
@@ -516,13 +560,68 @@ public partial class CombatHUD : CanvasLayer
             SizeFlagsVertical = Control.SizeFlags.ExpandFill
         };
         _backpackZone.AddChild(backpackScroll);
-        _backpackList = new VBoxContainer
+        _backpackList = new GridContainer
         {
+            Columns = 2,
             MouseFilter = Control.MouseFilterEnum.Pass,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
         };
-        _backpackList.AddThemeConstantOverride("separation", 8);
+        _backpackList.AddThemeConstantOverride("h_separation", 8);
+        _backpackList.AddThemeConstantOverride("v_separation", 8);
         backpackScroll.AddChild(_backpackList);
+
+        BuildWeaponDetailOverlay();
+    }
+
+    private LootDropZone BuildPrimaryWeaponSlot(Control parent, Vector2 position, Vector2 size)
+    {
+        var accent = new Color(0.34f, 0.86f, 0.7f);
+        var zone = new LootDropZone
+        {
+            Target = LootDropTarget.PrimaryWeapon,
+            Position = position,
+            Size = size
+        };
+        zone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(accent));
+        zone.Dropped += HandleLootDrop;
+        parent.AddChild(zone);
+        var box = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
+        box.AddThemeConstantOverride("separation", 1);
+        zone.AddChild(box);
+        var header = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        box.AddChild(header);
+        _primarySlotCaption = Label("PRIMARY WEAPON", 11, accent);
+        _primarySlotCaption.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _primarySlotCaption.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        header.AddChild(_primarySlotCaption);
+        _primaryDetailButton = new Button
+        {
+            Text = "DETAILS",
+            CustomMinimumSize = new Vector2(92, 25),
+            FocusMode = Control.FocusModeEnum.None
+        };
+        _primaryDetailButton.AddThemeFontSizeOverride("font_size", 11);
+        _primaryDetailButton.AddThemeColorOverride("font_color", accent);
+        _primaryDetailButton.Pressed += () =>
+        {
+            if (_shownPlayer is not null)
+            {
+                ShowWeaponDetails(_shownPlayer.EquippedWeapon);
+            }
+        };
+        header.AddChild(_primaryDetailButton);
+        _primaryWeaponPreview = new WeaponPreviewControl
+        {
+            CustomMinimumSize = new Vector2(520, 54),
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        box.AddChild(_primaryWeaponPreview);
+        _primarySlotLabel = Label("", 11, new Color(0.68f, 0.78f, 0.75f));
+        _primarySlotLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _primarySlotLabel.ClipText = true;
+        _primarySlotLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        box.AddChild(_primarySlotLabel);
+        return zone;
     }
 
     private LootDropZone BuildEquipmentSlot(
@@ -557,6 +656,144 @@ public partial class CombatHUD : CanvasLayer
         return zone;
     }
 
+    private void BuildWeaponDetailOverlay()
+    {
+        _weaponDetailOverlay = new ColorRect
+        {
+            Color = new Color(0.002f, 0.005f, 0.006f, 0.88f),
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            Visible = false
+        };
+        _weaponDetailOverlay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        _lootOverlay.AddChild(_weaponDetailOverlay);
+        var panel = new ColorRect
+        {
+            Color = new Color(0.026f, 0.035f, 0.035f, 0.995f),
+            Position = new Vector2(-430, -275),
+            Size = new Vector2(860, 550),
+            MouseFilter = Control.MouseFilterEnum.Stop
+        };
+        panel.SetAnchorsPreset(Control.LayoutPreset.Center);
+        _weaponDetailOverlay.AddChild(panel);
+        panel.AddChild(new ColorRect
+        {
+            Color = new Color(0.25f, 0.9f, 0.7f),
+            Position = Vector2.Zero,
+            Size = new Vector2(5, 550),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        });
+        _weaponDetailTitle = PositionedLabel("WEAPON DETAILS", 24, new Color(0.84f, 0.96f, 0.91f), 32, 24);
+        _weaponDetailTitle.Size = new Vector2(720, 36);
+        panel.AddChild(_weaponDetailTitle);
+        var close = Button("X", new Vector2(790, 20), new Vector2(42, 38));
+        close.TooltipText = "CLOSE";
+        close.Pressed += HideWeaponDetails;
+        panel.AddChild(close);
+
+        var previewBand = new ColorRect
+        {
+            Color = new Color(0.014f, 0.021f, 0.022f, 0.96f),
+            Position = new Vector2(32, 76),
+            Size = new Vector2(796, 148),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
+        panel.AddChild(previewBand);
+        _weaponDetailPreview = new WeaponPreviewControl
+        {
+            Position = new Vector2(20, 18),
+            Size = new Vector2(756, 112)
+        };
+        previewBand.AddChild(_weaponDetailPreview);
+
+        _weaponDetailStatsCaption = PositionedLabel("FINAL WEAPON STATS", 12, new Color(0.38f, 0.82f, 0.7f), 32, 242);
+        _weaponDetailStatsCaption.Size = new Vector2(796, 20);
+        panel.AddChild(_weaponDetailStatsCaption);
+        _weaponDetailStats = PositionedLabel("", 14, new Color(0.8f, 0.88f, 0.85f), 32, 268);
+        _weaponDetailStats.Size = new Vector2(796, 48);
+        _weaponDetailStats.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        panel.AddChild(_weaponDetailStats);
+        panel.AddChild(new ColorRect
+        {
+            Color = new Color(0.14f, 0.26f, 0.24f, 0.85f),
+            Position = new Vector2(32, 319),
+            Size = new Vector2(796, 1),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        });
+        _weaponDetailPartsCaption = PositionedLabel("FITTED COMPONENTS", 12, new Color(0.38f, 0.72f, 0.94f), 32, 334);
+        _weaponDetailPartsCaption.Size = new Vector2(796, 20);
+        panel.AddChild(_weaponDetailPartsCaption);
+        _weaponDetailParts = new GridContainer
+        {
+            Columns = 2,
+            Position = new Vector2(32, 360),
+            Size = new Vector2(796, 164),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
+        _weaponDetailParts.AddThemeConstantOverride("h_separation", 12);
+        _weaponDetailParts.AddThemeConstantOverride("v_separation", 5);
+        panel.AddChild(_weaponDetailParts);
+    }
+
+    public bool IsWeaponDetailVisible => IsInstanceValid(_weaponDetailOverlay) && _weaponDetailOverlay.Visible;
+
+    public void ShowWeaponDetails(WeaponBuild weapon)
+    {
+        if (!IsLootVisible)
+        {
+            return;
+        }
+        _detailedWeapon = weapon.Clone();
+        var stats = weapon.Stats();
+        var name = weapon.DisplayName(_language);
+        _weaponDetailTitle.Text = $"{Text("weapon_details", "WEAPON DETAILS")}  //  {name}";
+        _weaponDetailStatsCaption.Text = Text("final_stats", "FINAL WEAPON STATS");
+        _weaponDetailPartsCaption.Text = Text("fitted_parts", "FITTED COMPONENTS");
+        _weaponDetailPreview.Configure(weapon, new Color(0.32f, 0.9f, 0.7f));
+        _weaponDetailStats.Text = GameLocalization.IsChinese(_language)
+            ? $"伤害 {stats.Damage:0}     有效射程 {stats.EffectiveRange:0}m     后坐 {stats.Recoil:0.00}     操控 {stats.Handling:0.00}\n射速 {60.0f / stats.FireInterval:0} 发/分     弹匣 {stats.MagazineSize}     枪声半径 {stats.SoundRadius:0}m"
+            : $"DAMAGE {stats.Damage:0}     RANGE {stats.EffectiveRange:0}m     RECOIL {stats.Recoil:0.00}     HANDLING {stats.Handling:0.00}\nRATE {60.0f / stats.FireInterval:0} RPM     MAGAZINE {stats.MagazineSize}     REPORT RADIUS {stats.SoundRadius:0}m";
+
+        ClearRows(_weaponDetailParts);
+        foreach (var slot in Enum.GetValues<AttachmentSlot>())
+        {
+            var item = new VBoxContainer
+            {
+                CustomMinimumSize = new Vector2(388, 48),
+                MouseFilter = Control.MouseFilterEnum.Ignore
+            };
+            item.AddThemeConstantOverride("separation", 1);
+            var slotName = GameLocalization.IsChinese(_language)
+                ? WeaponCatalog.SlotChinese(slot)
+                : slot.ToString().ToUpperInvariant();
+            var slotLabel = Label(slotName, 10, new Color(0.36f, 0.72f, 0.92f));
+            slotLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
+            item.AddChild(slotLabel);
+            var value = Label("", 12, new Color(0.77f, 0.86f, 0.83f));
+            value.MouseFilter = Control.MouseFilterEnum.Ignore;
+            value.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            if (weapon.Attachments.TryGetValue(slot, out var partId))
+            {
+                var part = WeaponCatalog.Attachment(partId);
+                var partName = GameLocalization.IsChinese(_language) ? part.ChineseName : part.Name;
+                value.Text = $"{partName}  //  {part.EffectDetail(_language)}";
+            }
+            else
+            {
+                value.Text = Text("empty_slot", "EMPTY SLOT");
+                value.AddThemeColorOverride("font_color", new Color(0.43f, 0.5f, 0.48f));
+            }
+            item.AddChild(value);
+            _weaponDetailParts.AddChild(item);
+        }
+        _weaponDetailOverlay.Visible = true;
+    }
+
+    public void HideWeaponDetails()
+    {
+        _weaponDetailOverlay.Visible = false;
+        _detailedWeapon = null;
+    }
+
     public bool IsLootVisible => IsInstanceValid(_lootOverlay) && _lootOverlay.Visible;
 
     public void ShowLoot(string sourceName, IReadOnlyList<LootItem> items, TacticalPlayer player, bool sourceAvailable = true)
@@ -566,11 +803,15 @@ public partial class CombatHUD : CanvasLayer
         _shownPlayer = player;
         _shownSourceAvailable = sourceAvailable;
         _lootOverlay.Visible = true;
+        _weaponDetailOverlay.Visible = false;
+        _detailedWeapon = null;
         RefreshLootOverlay();
     }
 
     public void HideLoot()
     {
+        _weaponDetailOverlay.Visible = false;
+        _detailedWeapon = null;
         _lootOverlay.Visible = false;
         _shownLoot = null;
         _shownPlayer = null;
@@ -584,48 +825,61 @@ public partial class CombatHUD : CanvasLayer
             return;
         }
         _lootTitle.Text = $"{Text("field_inventory", "FIELD INVENTORY")}  //  {_shownLootName}";
-        _lootSourceCaption.Text = Text("searched_gear", "SEARCHED GEAR");
-        _backpackCaption.Text = $"{Text("equipped_backpack", "EQUIPPED / BACKPACK")}  {_shownPlayer.Backpack.Count}/{_shownPlayer.BackpackCapacity}";
+        var personalMode = !_shownSourceAvailable;
+        _lootSourceCaption.Text = personalMode
+            ? $"{Text("personal_backpack", "PERSONAL BACKPACK")}  {_shownPlayer.Backpack.Count}/{_shownPlayer.BackpackCapacity}"
+            : Text("searched_gear", "SEARCHED GEAR");
+        _backpackCaption.Text = personalMode
+            ? Text("equipped_loadout", "CURRENT LOADOUT")
+            : $"{Text("equipped_backpack", "EQUIPPED / BACKPACK")}  {_shownPlayer.Backpack.Count}/{_shownPlayer.BackpackCapacity}";
         _lootCloseButton.Text = Text("close", "CLOSE");
         _primarySlotCaption.Text = Text("primary_weapon", "PRIMARY WEAPON");
         _helmetSlotCaption.Text = Text("helmet", "HELMET");
         _armorSlotCaption.Text = Text("body_armor", "BODY ARMOR");
         _packSlotCaption.Text = Text("backpack", "BACKPACK");
+        _backpackItemsCaption.Text = Text("personal_backpack", "PERSONAL BACKPACK");
+        _primaryDetailButton.Text = Text("details", "DETAILS");
+        _primaryDetailButton.TooltipText = Text("weapon_details", "WEAPON DETAILS");
         _lootSourceZone.Enabled = _shownSourceAvailable;
+        _lootSourceZone.Visible = _shownSourceAvailable;
+        _backpackItemsCaption.Visible = _shownSourceAvailable;
+        _backpackZone.Position = _shownSourceAvailable ? new Vector2(600, 446) : new Vector2(32, 122);
+        _backpackZone.Size = _shownSourceAvailable ? new Vector2(590, 232) : new Vector2(548, 556);
 
         var stats = _shownPlayer.CurrentWeaponStats;
         var weaponName = _shownPlayer.EquippedWeapon.DisplayName(_language);
-        var partNames = new List<string>();
-        foreach (var partId in _shownPlayer.EquippedWeapon.Attachments.Values)
-        {
-            var part = WeaponCatalog.Attachment(partId);
-            partNames.Add(GameLocalization.IsChinese(_language) ? part.ChineseName : part.Name);
-        }
         _lootStats.Text = GameLocalization.IsChinese(_language)
-            ? $"当前主武器  {weaponName}\n伤害 {stats.Damage:0}   有效射程 {stats.EffectiveRange:0}m   后坐 {stats.Recoil:0.00}   操控 {stats.Handling:0.00}\n零件  {System.String.Join(" / ", partNames)}"
-            : $"EQUIPPED  {weaponName}\nDMG {stats.Damage:0}   RANGE {stats.EffectiveRange:0}m   RECOIL {stats.Recoil:0.00}   HANDLING {stats.Handling:0.00}\nPARTS  {System.String.Join(" / ", partNames)}";
-        _primarySlotLabel.Text = $"{weaponName}\n{(GameLocalization.IsChinese(_language) ? $"伤害 {stats.Damage:0}  射程 {stats.EffectiveRange:0}m" : $"DMG {stats.Damage:0}  RANGE {stats.EffectiveRange:0}m")}";
+            ? $"当前主武器  {weaponName}     伤害 {stats.Damage:0}     射程 {stats.EffectiveRange:0}m     操控 {stats.Handling:0.00}"
+            : $"EQUIPPED  {weaponName}     DMG {stats.Damage:0}     RANGE {stats.EffectiveRange:0}m     HANDLING {stats.Handling:0.00}";
+        _primaryWeaponPreview.Configure(_shownPlayer.EquippedWeapon, new Color(0.34f, 0.86f, 0.7f));
+        _primarySlotLabel.Text = GameLocalization.IsChinese(_language)
+            ? $"{weaponName}   //   后坐 {stats.Recoil:0.00}   弹匣 {stats.MagazineSize}"
+            : $"{weaponName}   //   RECOIL {stats.Recoil:0.00}   MAG {stats.MagazineSize}";
         _helmetSlotLabel.Text = _shownPlayer.EquippedHelmet.DisplayName(_language) + "\n" + _shownPlayer.EquippedHelmet.Detail(_language);
         _armorSlotLabel.Text = _shownPlayer.EquippedBodyArmor.DisplayName(_language) + "\n" + _shownPlayer.EquippedBodyArmor.Detail(_language);
         _packSlotLabel.Text = _shownPlayer.EquippedBackpack.DisplayName(_language) + "\n" + _shownPlayer.EquippedBackpack.Detail(_language);
 
         ClearRows(_lootSourceList);
+        _lootSourceList.Columns = 2;
         foreach (var item in _shownLoot)
         {
             _lootSourceList.AddChild(BuildLootCard(item, LootDragOrigin.Source));
         }
-        if (_shownLoot.Count == 0)
+        if (_shownLoot.Count == 0 && _shownSourceAvailable)
         {
+            _lootSourceList.Columns = 1;
             _lootSourceList.AddChild(Label(Text("empty", "EMPTY"), 15, new Color(0.48f, 0.54f, 0.52f)));
         }
 
         ClearRows(_backpackList);
+        _backpackList.Columns = 2;
         foreach (var item in _shownPlayer.Backpack)
         {
             _backpackList.AddChild(BuildLootCard(item, LootDragOrigin.Backpack));
         }
         if (_shownPlayer.Backpack.Count == 0)
         {
+            _backpackList.Columns = 1;
             _backpackList.AddChild(Label(Text("backpack_empty", "BACKPACK EMPTY"), 15, new Color(0.48f, 0.54f, 0.52f)));
         }
     }
@@ -649,7 +903,10 @@ public partial class CombatHUD : CanvasLayer
                 LootItemKind.Attachment => new Color(0.33f, 0.7f, 0.96f),
                 LootItemKind.Equipment => new Color(0.82f, 0.64f, 0.3f),
                 _ => new Color(0.55f, 0.62f, 0.58f)
-            });
+            },
+            item.Weapon,
+            Text("details", "DETAILS"));
+        card.DetailsRequested += ShowWeaponDetails;
         card.DoubleActivated += (itemId, cardOrigin) =>
         {
             if (cardOrigin == LootDragOrigin.Backpack)
@@ -791,7 +1048,7 @@ public partial class CombatHUD : CanvasLayer
         _quitButton = Button("EXIT TO DESKTOP", new Vector2(270, 401), new Vector2(210, 44));
         _quitButton.Pressed += () => EmitSignal(SignalName.QuitRequested);
         content.AddChild(_quitButton);
-        _buildLabel = PositionedLabel("FORWARD+  /  BUILD 0.7", 11, new Color(0.32f, 0.4f, 0.38f), 40, 477);
+        _buildLabel = PositionedLabel("FORWARD+  /  BUILD 0.8", 11, new Color(0.32f, 0.4f, 0.38f), 40, 477);
         _buildLabel.Size = new Vector2(440, 22);
         _buildLabel.HorizontalAlignment = HorizontalAlignment.Center;
         content.AddChild(_buildLabel);
@@ -831,7 +1088,12 @@ public partial class CombatHUD : CanvasLayer
         _qualitySelect.SetItemText(0, Text("performance", "Performance"));
         _qualitySelect.SetItemText(1, Text("balanced", "Balanced"));
         _qualitySelect.SetItemText(2, Text("cinematic", "Cinematic"));
+        UpdateWeaponSlotButtons();
         RefreshLootOverlay();
+        if (IsWeaponDetailVisible && _detailedWeapon is not null)
+        {
+            ShowWeaponDetails(_detailedWeapon);
+        }
     }
 
     private string Text(string key, string english) => GameLocalization.Get(key, _language, english);
@@ -850,6 +1112,8 @@ public partial class CombatHUD : CanvasLayer
     public void SetEquipment(int armorPlates, string fireMode, string weaponName = "M4A1")
     {
         _plateReserveLabel.Text = $"x{armorPlates}";
+        _lastFireMode = fireMode;
+        _lastWeaponName = weaponName;
         var mode = fireMode switch
         {
             "AUTO" => Text("auto", "AUTO"),
@@ -858,6 +1122,28 @@ public partial class CombatHUD : CanvasLayer
         };
         var displayWeapon = fireMode == "KNIFE" ? Text("tactical_knife", "TACTICAL KNIFE") : weaponName;
         _weaponModeLabel.Text = $"{displayWeapon}   {mode}";
+        UpdateWeaponSlotButtons();
+    }
+
+    private void UpdateWeaponSlotButtons()
+    {
+        if (!IsInstanceValid(_primaryWeaponButton) || !IsInstanceValid(_knifeWeaponButton))
+        {
+            return;
+        }
+        _primaryWeaponButton.Text = $"1  {CompactWeaponName(_lastWeaponName)}";
+        _knifeWeaponButton.Text = $"3  {Text("knife", "KNIFE")}";
+        _primaryWeaponButton.TooltipText = Text("select_primary", "SELECT PRIMARY WEAPON");
+        _knifeWeaponButton.TooltipText = Text("select_knife", "SELECT TACTICAL KNIFE");
+        _primaryWeaponButton.SetPressedNoSignal(_lastFireMode != "KNIFE");
+        _knifeWeaponButton.SetPressedNoSignal(_lastFireMode == "KNIFE");
+    }
+
+    private static string CompactWeaponName(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var compact = parts.Length == 0 ? name : parts[0];
+        return compact.Length <= 12 ? compact : compact[..12];
     }
 
     public void SetEquipmentAction(string action, float progress, bool active)

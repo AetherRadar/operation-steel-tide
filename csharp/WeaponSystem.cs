@@ -110,6 +110,46 @@ public sealed class AttachmentDefinition
     public int MagazineAdd { get; init; }
     public float SoundMultiplier { get; init; } = 1.0f;
     public float VisualScale { get; init; } = 1.0f;
+
+    public string EffectDetail(string language)
+    {
+        var effects = new List<string>();
+        var chinese = GameLocalization.IsChinese(language);
+        if (MathF.Abs(DamageAdd) > 0.01f)
+        {
+            effects.Add(chinese ? $"伤害 {DamageAdd:+0;-0}" : $"DMG {DamageAdd:+0;-0}");
+        }
+        if (MathF.Abs(RangeAdd) > 0.01f)
+        {
+            effects.Add(chinese ? $"射程 {RangeAdd:+0;-0}m" : $"RANGE {RangeAdd:+0;-0}m");
+        }
+        if (MathF.Abs(RecoilMultiplier - 1.0f) > 0.005f)
+        {
+            var change = (RecoilMultiplier - 1.0f) * 100.0f;
+            effects.Add(chinese ? $"后坐 {change:+0;-0}%" : $"RECOIL {change:+0;-0}%");
+        }
+        if (MathF.Abs(HandlingAdd) > 0.005f)
+        {
+            effects.Add(chinese ? $"操控 {HandlingAdd:+0.00;-0.00}" : $"HANDLING {HandlingAdd:+0.00;-0.00}");
+        }
+        if (MathF.Abs(FireIntervalMultiplier - 1.0f) > 0.005f)
+        {
+            var change = (FireIntervalMultiplier - 1.0f) * 100.0f;
+            effects.Add(chinese ? $"射击间隔 {change:+0;-0}%" : $"FIRE INTERVAL {change:+0;-0}%");
+        }
+        if (MagazineAdd != 0)
+        {
+            effects.Add(chinese ? $"弹匣 {MagazineAdd:+0;-0}" : $"MAG {MagazineAdd:+0;-0}");
+        }
+        if (MathF.Abs(SoundMultiplier - 1.0f) > 0.005f)
+        {
+            var change = (SoundMultiplier - 1.0f) * 100.0f;
+            effects.Add(chinese ? $"枪声 {change:+0;-0}%" : $"REPORT {change:+0;-0}%");
+        }
+        return effects.Count == 0
+            ? chinese ? "标准规格" : "STANDARD SPEC"
+            : string.Join("   ", effects);
+    }
 }
 
 public readonly record struct WeaponStats(
