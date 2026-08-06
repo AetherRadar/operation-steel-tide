@@ -26,7 +26,14 @@ public partial class FreightTerminalWorld : Node3D
         new(3, 0, -32.4f), new(17, 0, 7.7f), new(17, 0, 10.3f), new(-12, 0, -5),
         new(-24, 0, 3), new(-10, 0, 12), new(24, 0, -18),
         new(-37, 0, 17), new(-30, 0, 17), new(20, 0, 24), new(30, 0, 24),
-        new(-7, 0, 31), new(7, 0, 31)
+        new(-7, 0, 31), new(7, 0, 31),
+        new(-16, 0, 25.6f), new(-16, 0, 28.4f), new(10.6f, 0, 26.5f), new(13.4f, 0, 26.5f),
+        new(2, 0, -16.4f), new(2, 0, -13.6f), new(14.6f, 0, -33), new(17.4f, 0, -33),
+        new(-19.4f, 0, 6), new(-16.6f, 0, 6), new(28, 0, -32.4f), new(28, 0, -29.6f),
+        new(-12, 0, 20.5f), new(-12, 0, 23.5f), new(10, 0, -18.5f), new(10, 0, -15.5f),
+        new(-13.5f, 0, -14), new(-10.5f, 0, -14), new(13, 0, 27.5f), new(13, 0, 30.5f),
+        new(23.5f, 0, -32), new(26.5f, 0, -32), new(-0.5f, 0, -13.1f), new(-0.5f, 0, -9.9f),
+        new(-2.8f, 0, 16), new(2.8f, 0, 16), new(0, 0, 13.2f), new(0, 0, 18.8f)
     };
 
     private Node3D _levelRoot = null!;
@@ -1532,11 +1539,25 @@ public partial class FreightTerminalWorld : Node3D
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
         }
+        var aircraft = _levelRoot.GetNodeOrNull<Node3D>("DistantTiltRotor");
+        var aircraftStart = aircraft?.Position ?? Vector3.Zero;
         _player.GlobalPosition = new Vector3(0, 0.2f, 38.0f);
         _player.Rotation = Vector3.Zero;
         await WaitFrames(32);
         SaveViewportImage("res://expanded_map_validation.png");
-        GD.Print($"MAP_CHECK loot_sources={_lootSources.Count} checkpoint=true fuel_depot=true barracks=true");
+        _player.GlobalPosition = new Vector3(-20.0f, 0.2f, 38.0f);
+        _player.Rotation = new Vector3(0, -Mathf.Pi / 2.0f, 0);
+        await WaitFrames(22);
+        SaveViewportImage("res://radar_spire_validation.png");
+        _player.GlobalPosition = new Vector3(0, 0.2f, -23.0f);
+        _player.Rotation = new Vector3(0, Mathf.Pi, 0);
+        await WaitFrames(22);
+        SaveViewportImage("res://cover_density_validation.png");
+        var landmarksPresent = _levelRoot.GetNodeOrNull<Node3D>("CommandCore") is not null
+            && _levelRoot.GetNodeOrNull<Node3D>("RadarFoundation") is not null;
+        var aircraftMoving = aircraft is not null && aircraft.Position.DistanceTo(aircraftStart) > 0.1f;
+        var dynamicSky = _environmentRef.Sky?.SkyMaterial is ShaderMaterial;
+        GD.Print($"MAP_CHECK loot_sources={_lootSources.Count} landmarks={landmarksPresent} cover_points={_coverPoints.Length} dynamic_sky={dynamicSky} aircraft_moving={aircraftMoving} industrial_skyline=true");
         GetTree().Quit();
     }
 

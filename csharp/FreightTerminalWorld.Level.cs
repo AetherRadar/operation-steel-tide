@@ -101,16 +101,12 @@ public partial class FreightTerminalWorld
             FogHeightDensity = 0.035f,
             FogSkyAffect = 0.16f
         };
-        var skyMaterial = new ProceduralSkyMaterial
+        _environmentRef.Sky = new Sky
         {
-            SkyTopColor = new Color(0.055f, 0.16f, 0.28f),
-            SkyHorizonColor = new Color(0.46f, 0.61f, 0.68f),
-            GroundBottomColor = new Color(0.035f, 0.045f, 0.045f),
-            GroundHorizonColor = new Color(0.25f, 0.32f, 0.31f),
-            SunAngleMax = 5.0f,
-            SunCurve = 0.08f
+            SkyMaterial = BuildDynamicSkyMaterial(),
+            ProcessMode = Sky.ProcessModeEnum.Realtime,
+            RadianceSize = Sky.RadianceSizeEnum.Size256
         };
-        _environmentRef.Sky = new Sky { SkyMaterial = skyMaterial };
         SetIfSupported(_environmentRef, "glow_enabled", true);
         SetIfSupported(_environmentRef, "ssao_enabled", true);
         SetIfSupported(_environmentRef, "ssao_radius", 2.1f);
@@ -144,6 +140,87 @@ public partial class FreightTerminalWorld
             ShadowEnabled = false
         });
         AddDust();
+    }
+
+    private static ShaderMaterial BuildDynamicSkyMaterial()
+    {
+        var shader = new Shader
+        {
+            Code = @"shader_type sky;
+render_mode use_debanding;
+
+vec2 cloud_hash(vec2 point) {
+    vec2 projected = vec2(dot(point, vec2(127.1, 311.7)), dot(point, vec2(269.5, 183.3)));
+    return -1.0 + 2.0 * fract(sin(projected) * 43758.5453);
+}
+
+float gradient_noise(vec2 point) {
+    vec2 cell = floor(point);
+    vec2 local = fract(point);
+    vec2 smooth_local = local * local * local * (local * (local * 6.0 - 15.0) + 10.0);
+    float a = dot(cloud_hash(cell), local);
+    float b = dot(cloud_hash(cell + vec2(1.0, 0.0)), local - vec2(1.0, 0.0));
+    float c = dot(cloud_hash(cell + vec2(0.0, 1.0)), local - vec2(0.0, 1.0));
+    float d = dot(cloud_hash(cell + vec2(1.0, 1.0)), local - vec2(1.0, 1.0));
+    return 0.5 + 0.5 * mix(mix(a, b, smooth_local.x), mix(c, d, smooth_local.x), smooth_local.y);
+}
+
+float cloud_fbm(vec2 point) {
+    float value = 0.0;
+    float amplitude = 0.52;
+    mat2 turn = mat2(vec2(0.82, -0.57), vec2(0.57, 0.82));
+    for (int octave = 0; octave < 5; octave++) {
+        value += gradient_noise(point) * amplitude;
+        point = turn * point * 2.03 + vec2(4.7, 1.9);
+        amplitude *= 0.5;
+    }
+    return value;
+}
+
+void sky() {
+    float elevation = clamp(EYEDIR.y, 0.0, 1.0);
+    vec3 horizon = vec3(0.22, 0.46, 0.64);
+    vec3 zenith = vec3(0.025, 0.105, 0.29);
+    vec3 color = mix(horizon, zenith, pow(elevation, 0.62));
+    color += vec3(0.22, 0.17, 0.1) * pow(1.0 - elevation, 4.0);
+
+    vec3 sun_direction = normalize(vec3(-0.38, 0.62, -0.69));
+    float sun = max(dot(EYEDIR, sun_direction), 0.0);
+    color += vec3(1.0, 0.62, 0.3) * pow(sun, 18.0) * 0.42;
+    color += vec3(1.0, 0.86, 0.58) * pow(sun, 520.0) * 6.5;
+
+    if (EYEDIR.y > 0.0) {
+        vec2 cloud_plane = EYEDIR.xz / max(EYEDIR.y + 0.17, 0.22);
+        vec2 wind = vec2(TIME * 0.0032, TIME * 0.00125);
+        vec2 broad_point = cloud_plane * 0.96 + wind;
+        vec2 domain_warp = vec2(
+            cloud_fbm(broad_point + vec2(3.2, 8.7)),
+            cloud_fbm(broad_point + vec2(-7.1, 2.4))
+        ) - vec2(0.5);
+        float broad = cloud_fbm(broad_point + domain_warp * 2.25);
+        float detail = cloud_fbm(cloud_plane * 3.2 - wind * 0.47 + domain_warp * 1.15 + vec2(8.0, -3.0));
+        float field = broad * 0.6 + detail * 0.4;
+        float cloud_shadow_mask = smoothstep(0.43, 0.57, broad);
+        float cloud = smoothstep(0.505, 0.665, field);
+        float cloud_band = smoothstep(0.025, 0.13, EYEDIR.y) * (1.0 - smoothstep(0.72, 0.96, EYEDIR.y));
+        float lit_side = clamp(0.55 + EYEDIR.x * -0.24 + EYEDIR.z * -0.14, 0.0, 1.0);
+        vec3 cloud_shadow = vec3(0.27, 0.36, 0.41);
+        vec3 cloud_light = vec3(0.74, 0.79, 0.8);
+        vec3 cloud_color = mix(cloud_shadow, cloud_light, lit_side + elevation * 0.22);
+        color = mix(color, cloud_shadow, cloud_shadow_mask * cloud_band * 0.16);
+        color = mix(color, cloud_color, cloud * cloud_band * 0.52);
+
+        float cirrus = smoothstep(0.58, 0.77, cloud_fbm(EYEDIR.xz * 4.2 + wind * 0.36 + vec2(14.0, 5.0)));
+        cirrus *= smoothstep(0.34, 0.76, elevation) * 0.2;
+        color = mix(color, vec3(0.78, 0.84, 0.86), cirrus);
+    } else {
+        color = mix(vec3(0.035, 0.05, 0.052), vec3(0.23, 0.3, 0.3), clamp(EYEDIR.y + 1.0, 0.0, 1.0));
+    }
+
+    COLOR = color;
+}"
+        };
+        return new ShaderMaterial { Shader = shader };
     }
 
     private static void SetIfSupported(GodotObject target, string propertyName, Variant value)
@@ -233,6 +310,8 @@ public partial class FreightTerminalWorld
         BuildSecurityCheckpoint(concrete, steelDark, yellow);
         BuildFuelDepot(concrete, steel, steelDark, rust, yellow);
         BuildBarracks(concrete, interiorWall, interiorTrim, yellow);
+        BuildCantileverCommandHub(concrete, steel, steelDark, yellow);
+        BuildRadarSpire(concrete, steel, steelDark, yellow);
         BuildCover(concreteDark);
         BuildBackground(concreteDark, steel);
         AddPuddles();
@@ -610,7 +689,104 @@ public partial class FreightTerminalWorld
         }
     }
 
-    private void BuildCover(Godot.Material _)
+    private void BuildCantileverCommandHub(
+        Godot.Material concrete,
+        Godot.Material steel,
+        Godot.Material dark,
+        Godot.Material yellow)
+    {
+        var center = new Vector3(0.0f, 0, 16.0f);
+        var glass = Mat("command_glass", new Color(0.055f, 0.23f, 0.29f), 0.72f, 0.12f, new Color(0.025f, 0.14f, 0.18f));
+        var panel = PaintedMetal("command_panel", new Color(0.34f, 0.43f, 0.4f));
+        var beacon = Mat("command_beacon", new Color(0.76f, 0.19f, 0.055f), 0.2f, 0.24f, new Color(1.0f, 0.12f, 0.025f));
+
+        StaticBox("CommandCore", center + new Vector3(0, 4.25f, 0), new Vector3(2.15f, 8.5f, 2.15f), concrete);
+        foreach (var pylon in new (Vector3 Offset, Vector3 Rotation)[]
+        {
+            (new Vector3(-3.25f, 3.35f, -2.25f), new Vector3(-0.1f, 0, -0.12f)),
+            (new Vector3(3.25f, 3.35f, -2.25f), new Vector3(-0.1f, 0, 0.12f)),
+            (new Vector3(-3.25f, 3.35f, 2.25f), new Vector3(0.1f, 0, -0.12f)),
+            (new Vector3(3.25f, 3.35f, 2.25f), new Vector3(0.1f, 0, 0.12f))
+        })
+        {
+            StaticBox("CommandSplayedPylon", center + pylon.Offset, new Vector3(0.46f, 7.1f, 0.46f), steel, pylon.Rotation);
+        }
+
+        StaticBox("CommandPodFloor", center + new Vector3(0.8f, 7.35f, 0), new Vector3(10.8f, 0.38f, 7.3f), dark);
+        StaticBox("CommandPodRoof", center + new Vector3(1.4f, 10.2f, 0), new Vector3(12.2f, 0.32f, 7.8f), panel, new Vector3(0, 0, -0.025f));
+        StaticBox("CommandPodNorth", center + new Vector3(0.6f, 8.75f, -3.48f), new Vector3(10.6f, 2.55f, 0.22f), panel);
+        StaticBox("CommandPodSouth", center + new Vector3(0.6f, 8.75f, 3.48f), new Vector3(10.6f, 2.55f, 0.22f), panel);
+        StaticBox("CommandPodWest", center + new Vector3(-4.62f, 8.75f, 0), new Vector3(0.22f, 2.55f, 7.15f), panel);
+        StaticBox("CommandCantilever", center + new Vector3(6.25f, 8.65f, 0.35f), new Vector3(3.7f, 2.25f, 4.7f), dark, new Vector3(0, -0.08f, -0.035f));
+        MeshBox(_levelRoot, center + new Vector3(0.55f, 8.83f, -3.61f), new Vector3(9.7f, 1.12f, 0.055f), glass);
+        MeshBox(_levelRoot, center + new Vector3(0.55f, 8.83f, 3.61f), new Vector3(9.7f, 1.12f, 0.055f), glass);
+        MeshBox(_levelRoot, center + new Vector3(-4.75f, 8.83f, 0), new Vector3(0.055f, 1.12f, 5.8f), glass);
+        MeshBox(_levelRoot, center + new Vector3(8.12f, 8.75f, 0.35f), new Vector3(0.055f, 1.18f, 3.85f), glass, new Vector3(0, -0.08f, 0));
+
+        for (var side = -1; side <= 1; side += 2)
+        {
+            StaticBox("CommandBlastFin", center + new Vector3(side * 2.0f, 0.68f, 0), new Vector3(1.5f, 1.35f, 0.42f), concrete, new Vector3(0, side * 0.28f, 0));
+            StaticBox("CommandBlastFin", center + new Vector3(0, 0.68f, side * 2.0f), new Vector3(0.42f, 1.35f, 1.5f), concrete, new Vector3(0, side * 0.28f, 0));
+        }
+
+        StaticCylinder("CommandMast", center + new Vector3(1.2f, 13.0f, 0), 0.16f, 5.7f, steel);
+        _levelRoot.AddChild(new MeshInstance3D
+        {
+            Name = "CommandAntennaRing",
+            Position = center + new Vector3(1.2f, 12.3f, 0),
+            Mesh = new TorusMesh { InnerRadius = 1.38f, OuterRadius = 1.46f, Rings = 40, RingSegments = 8 },
+            MaterialOverride = yellow
+        });
+        MeshBox(_levelRoot, center + new Vector3(1.2f, 14.6f, 0), new Vector3(2.7f, 0.1f, 0.7f), steel, new Vector3(0.16f, 0.28f, 0));
+        MeshBox(_levelRoot, center + new Vector3(1.2f, 15.9f, 0), new Vector3(0.25f, 0.25f, 0.25f), beacon);
+        _levelRoot.AddChild(new OmniLight3D
+        {
+            Position = center + new Vector3(1.2f, 15.9f, 0),
+            LightColor = new Color(1.0f, 0.12f, 0.035f),
+            LightEnergy = 2.4f,
+            OmniRange = 5.0f,
+            ShadowEnabled = false
+        });
+    }
+
+    private void BuildRadarSpire(
+        Godot.Material concrete,
+        Godot.Material steel,
+        Godot.Material dark,
+        Godot.Material yellow)
+    {
+        var center = new Vector3(35.0f, 0, 33.0f);
+        var glass = Mat("radar_glass", new Color(0.045f, 0.18f, 0.23f), 0.82f, 0.08f, new Color(0.018f, 0.1f, 0.14f));
+        var beacon = Mat("radar_beacon", new Color(0.85f, 0.16f, 0.04f), 0.15f, 0.2f, new Color(1.0f, 0.09f, 0.02f));
+        StaticBox("RadarFoundation", center + new Vector3(0, 0.35f, 0), new Vector3(7.4f, 0.7f, 7.4f), concrete);
+        foreach (var leg in new (Vector3 Offset, Vector3 Rotation)[]
+        {
+            (new Vector3(-2.45f, 6.4f, -2.45f), new Vector3(-0.15f, 0, -0.15f)),
+            (new Vector3(2.45f, 6.4f, -2.45f), new Vector3(-0.15f, 0, 0.15f)),
+            (new Vector3(-2.45f, 6.4f, 2.45f), new Vector3(0.15f, 0, -0.15f)),
+            (new Vector3(2.45f, 6.4f, 2.45f), new Vector3(0.15f, 0, 0.15f))
+        })
+        {
+            StaticBox("RadarSplayedLeg", center + leg.Offset, new Vector3(0.42f, 12.7f, 0.42f), steel, leg.Rotation);
+        }
+        StaticCylinder("RadarOperationsPod", center + new Vector3(0, 13.1f, 0), 3.15f, 2.35f, dark);
+        StaticCylinder("RadarGlassBand", center + new Vector3(0, 13.25f, 0), 3.22f, 0.78f, glass);
+        StaticCylinder("RadarPodRoof", center + new Vector3(0, 14.4f, 0), 3.5f, 0.25f, yellow);
+        StaticCylinder("RadarMast", center + new Vector3(0, 19.0f, 0), 0.18f, 9.2f, steel);
+        StaticCylinder("RadarDish", center + new Vector3(0, 20.3f, 0), 2.6f, 0.2f, steel, new Vector3(Mathf.DegToRad(67), Mathf.DegToRad(-18), 0));
+        StaticBox("RadarReceiver", center + new Vector3(-0.5f, 21.15f, -0.72f), new Vector3(0.26f, 0.26f, 2.15f), dark, new Vector3(Mathf.DegToRad(28), Mathf.DegToRad(-18), 0));
+        MeshBox(_levelRoot, center + new Vector3(0, 24.0f, 0), new Vector3(0.28f, 0.28f, 0.28f), beacon);
+        _levelRoot.AddChild(new OmniLight3D
+        {
+            Position = center + new Vector3(0, 24.0f, 0),
+            LightColor = new Color(1.0f, 0.1f, 0.025f),
+            LightEnergy = 2.8f,
+            OmniRange = 6.5f,
+            ShadowEnabled = false
+        });
+    }
+
+    private void BuildCover(Godot.Material concrete)
     {
         const string barrierPath = "res://assets/models/concrete_road_barrier/concrete_road_barrier.gltf";
         var groups = new (Vector3 Center, float Angle, int Count)[]
@@ -620,7 +796,13 @@ public partial class FreightTerminalWorld
             (new Vector3(-4, 0.02f, -4), 0.1f, 3),
             (new Vector3(-4, 0.02f, -20), Mathf.Pi / 2, 3),
             (new Vector3(3, 0.02f, -31), -0.08f, 3),
-            (new Vector3(17, 0.02f, 9), 0, 2)
+            (new Vector3(17, 0.02f, 9), 0, 2),
+            (new Vector3(-16, 0.02f, 27), 0.18f, 3),
+            (new Vector3(12, 0.02f, 26.5f), Mathf.Pi / 2, 2),
+            (new Vector3(2, 0.02f, -15), -0.24f, 3),
+            (new Vector3(16, 0.02f, -33), Mathf.Pi / 2, 2),
+            (new Vector3(-18, 0.02f, 6), Mathf.Pi / 2, 2),
+            (new Vector3(28, 0.02f, -31), 0.05f, 2)
         };
         foreach (var group in groups)
         {
@@ -633,7 +815,13 @@ public partial class FreightTerminalWorld
         }
 
         const string cratePath = "res://assets/models/old_military_crate/old_military_crate.gltf";
-        var positions = new[] { new Vector3(-8, 0.02f, 29), new Vector3(7, 0.02f, 20), new Vector3(20, 0.02f, 4), new Vector3(19, 0.02f, -17), new Vector3(-8, 0.02f, -31) };
+        var positions = new[]
+        {
+            new Vector3(-8, 0.02f, 29), new Vector3(7, 0.02f, 20), new Vector3(20, 0.02f, 4),
+            new Vector3(19, 0.02f, -17), new Vector3(-8, 0.02f, -31), new Vector3(-19, 0.02f, 28),
+            new Vector3(11, 0.02f, -12), new Vector3(-12, 0.02f, -10), new Vector3(30, 0.02f, -33),
+            new Vector3(4, 0.02f, 27)
+        };
         for (var i = 0; i < positions.Length; i++)
         {
             ModelProp(cratePath, positions[i], i * 0.37f, 1.55f, new Vector3(0.82f, 0.42f, 0.68f), new Vector3(-0.06f, 0.21f, 0.1f));
@@ -642,24 +830,238 @@ public partial class FreightTerminalWorld
                 ModelProp(cratePath, positions[i] + new Vector3(0.08f, 0.65f, 0.02f), -0.28f + i * 0.2f, 1.42f, new Vector3(0.82f, 0.42f, 0.68f), new Vector3(-0.06f, 0.21f, 0.1f));
             }
         }
+
+        BuildHescoCluster(new Vector3(-12, 0, 22), 0.18f, 3);
+        BuildHescoCluster(new Vector3(10, 0, -17), -0.16f, 3);
+        BuildHescoCluster(new Vector3(-12, 0, -14), Mathf.Pi / 2, 2);
+        BuildHescoCluster(new Vector3(13, 0, 29), 0.08f, 2);
+        BuildHescoCluster(new Vector3(25, 0, -32), Mathf.Pi / 2, 3);
+        BuildPipeBundle(new Vector3(10.5f, 0, -28.5f));
+        BuildPipeBundle(new Vector3(-9.5f, 0, 27.0f));
+        BuildServiceTruck(new Vector3(-0.5f, 0, -11.5f), concrete);
+    }
+
+    private void BuildHescoCluster(Vector3 center, float yaw, int count)
+    {
+        var fill = Mat("hesco_fill", new Color(0.42f, 0.38f, 0.27f), 0.05f, 0.94f);
+        var cage = Mat("hesco_cage", new Color(0.21f, 0.24f, 0.21f), 0.78f, 0.38f);
+        for (var index = 0; index < count; index++)
+        {
+            var spacing = (index - (count - 1) * 0.5f) * 1.43f;
+            var position = center + Vector3.Right.Rotated(Vector3.Up, yaw) * spacing;
+            var body = StaticBox("HescoBarrier", position + Vector3.Up * 0.59f, new Vector3(1.34f, 1.18f, 0.92f), fill, new Vector3(0, yaw, 0));
+            foreach (var x in new[] { -0.63f, -0.31f, 0.0f, 0.31f, 0.63f })
+            {
+                MeshBox(body, new Vector3(x, 0, -0.47f), new Vector3(0.018f, 1.2f, 0.018f), cage);
+                MeshBox(body, new Vector3(x, 0, 0.47f), new Vector3(0.018f, 1.2f, 0.018f), cage);
+            }
+            foreach (var y in new[] { -0.55f, 0.0f, 0.55f })
+            {
+                MeshBox(body, new Vector3(0, y, -0.47f), new Vector3(1.36f, 0.018f, 0.018f), cage);
+                MeshBox(body, new Vector3(0, y, 0.47f), new Vector3(1.36f, 0.018f, 0.018f), cage);
+            }
+        }
+    }
+
+    private void BuildPipeBundle(Vector3 center)
+    {
+        var pipe = Mat("cover_pipe", new Color(0.13f, 0.19f, 0.18f), 0.84f, 0.34f);
+        var rim = Mat("cover_pipe_rim", new Color(0.34f, 0.16f, 0.08f), 0.62f, 0.58f);
+        foreach (var item in new (Vector3 Offset, float Radius)[]
+        {
+            (new Vector3(0, 0.32f, -0.38f), 0.31f),
+            (new Vector3(0, 0.32f, 0.38f), 0.31f),
+            (new Vector3(0, 0.84f, 0), 0.29f),
+            (new Vector3(0, 0.82f, 0.64f), 0.27f)
+        })
+        {
+            StaticCylinder("CoverPipe", center + item.Offset, item.Radius, 4.2f, pipe, new Vector3(0, 0, Mathf.Pi / 2));
+            MeshBox(_levelRoot, center + item.Offset + new Vector3(-2.12f, 0, 0), new Vector3(0.06f, item.Radius * 1.85f, item.Radius * 1.85f), rim);
+            MeshBox(_levelRoot, center + item.Offset + new Vector3(2.12f, 0, 0), new Vector3(0.06f, item.Radius * 1.85f, item.Radius * 1.85f), rim);
+        }
+    }
+
+    private void BuildServiceTruck(Vector3 center, Godot.Material concrete)
+    {
+        var body = PaintedMetal("service_truck", new Color(0.24f, 0.36f, 0.29f));
+        var dark = Mat("service_truck_dark", new Color(0.035f, 0.048f, 0.045f), 0.76f, 0.42f);
+        var glass = Mat("service_truck_glass", new Color(0.04f, 0.15f, 0.17f), 0.76f, 0.12f);
+        StaticBox("ServiceTruckChassis", center + new Vector3(0, 0.68f, 0), new Vector3(5.4f, 0.38f, 2.05f), dark);
+        StaticBox("ServiceTruckCab", center + new Vector3(1.7f, 1.45f, 0), new Vector3(1.75f, 1.55f, 1.95f), body);
+        StaticBox("ServiceTruckBed", center + new Vector3(-1.05f, 1.2f, 0), new Vector3(3.65f, 1.05f, 1.95f), body);
+        MeshBox(_levelRoot, center + new Vector3(2.59f, 1.66f, 0), new Vector3(0.04f, 0.72f, 1.52f), glass);
+        StaticBox("ServiceTruckBumper", center + new Vector3(2.85f, 0.62f, 0), new Vector3(0.34f, 0.34f, 2.2f), concrete);
+        foreach (var x in new[] { -1.75f, 1.72f })
+        {
+            foreach (var z in new[] { -1.02f, 1.02f })
+            {
+                StaticCylinder("ServiceTruckWheel", center + new Vector3(x, 0.55f, z), 0.48f, 0.26f, dark, new Vector3(Mathf.Pi / 2, 0, 0));
+            }
+        }
     }
 
     private void BuildBackground(Godot.Material concrete, Godot.Material steel)
     {
+        var distantGlass = Mat("distant_glass", new Color(0.035f, 0.12f, 0.15f), 0.72f, 0.16f, new Color(0.02f, 0.075f, 0.09f));
+        var skylineTrim = Mat("skyline_trim", new Color(0.24f, 0.29f, 0.28f), 0.72f, 0.42f);
+        var smokeStack = Mat("smoke_stack", new Color(0.28f, 0.24f, 0.2f), 0.58f, 0.68f);
+        var smokeTexture = BuildSmokeTexture();
         foreach (var item in new (Vector3 Position, Vector3 Size)[]
         {
             (new Vector3(-52, 8, -15), new Vector3(16, 16, 30)),
             (new Vector3(52, 11, -21), new Vector3(17, 22, 24)),
             (new Vector3(18, 7, -53), new Vector3(26, 14, 18)),
-            (new Vector3(-20, 10, -55), new Vector3(18, 20, 16))
+            (new Vector3(-20, 10, -55), new Vector3(18, 20, 16)),
+            (new Vector3(-61, 14, -38), new Vector3(13, 28, 15)),
+            (new Vector3(61, 16, 5), new Vector3(15, 32, 18)),
+            (new Vector3(34, 15, -61), new Vector3(18, 30, 13)),
+            (new Vector3(-42, 9, 57), new Vector3(24, 18, 16))
         })
         {
             MeshBox(_levelRoot, item.Position, item.Size, concrete);
+            MeshBox(_levelRoot, item.Position + new Vector3(0, item.Size.Y * 0.5f + 0.22f, 0), new Vector3(item.Size.X + 0.65f, 0.42f, item.Size.Z + 0.65f), skylineTrim);
+            if (Mathf.Abs(item.Position.X) > Mathf.Abs(item.Position.Z))
+            {
+                var facing = -Mathf.Sign(item.Position.X);
+                for (var y = 4.0f; y < item.Size.Y - 1.0f; y += 3.1f)
+                {
+                    MeshBox(_levelRoot, item.Position + new Vector3(facing * (item.Size.X * 0.5f + 0.025f), y - item.Size.Y * 0.5f, 0), new Vector3(0.04f, 0.62f, item.Size.Z * 0.72f), distantGlass);
+                }
+            }
+            else
+            {
+                var facing = -Mathf.Sign(item.Position.Z);
+                for (var y = 4.0f; y < item.Size.Y - 1.0f; y += 3.1f)
+                {
+                    MeshBox(_levelRoot, item.Position + new Vector3(0, y - item.Size.Y * 0.5f, facing * (item.Size.Z * 0.5f + 0.025f)), new Vector3(item.Size.X * 0.72f, 0.62f, 0.04f), distantGlass);
+                }
+            }
         }
         foreach (var x in new[] { -49.0f, 48.0f })
         {
             StaticCylinder("Tank", new Vector3(x, 6, 20), 5.5f, 12, steel);
+            StaticCylinder("TankUpper", new Vector3(x, 13.2f, 20), 4.6f, 2.4f, skylineTrim);
+            StaticCylinder("TankCrown", new Vector3(x, 14.65f, 20), 5.1f, 0.5f, steel);
         }
+
+        foreach (var stack in new[] { new Vector3(-57, 0, -25), new Vector3(57, 0, -8), new Vector3(45, 0, -58) })
+        {
+            StaticCylinder("DistantSmokeStack", stack + Vector3.Up * 12.5f, 0.82f, 25.0f, smokeStack);
+            for (var y = 4.0f; y <= 22.0f; y += 6.0f)
+            {
+                StaticCylinder("SmokeStackBand", stack + Vector3.Up * y, 0.9f, 0.38f, skylineTrim);
+            }
+            AddIndustrialSmoke(stack + Vector3.Up * 25.2f, smokeTexture);
+        }
+
+        foreach (var x in new[] { -32.0f, -21.0f, -10.0f, 1.0f })
+        {
+            MeshBox(_levelRoot, new Vector3(x, 15.2f, -64.0f), new Vector3(10.5f, 0.5f, 14.0f), steel, new Vector3(0, 0, x % 2 == 0 ? 0.24f : -0.24f));
+            MeshBox(_levelRoot, new Vector3(x, 7.8f, -64.0f), new Vector3(0.4f, 15.5f, 0.4f), skylineTrim);
+        }
+
+        MeshBox(_levelRoot, new Vector3(57.0f, 18.0f, -8.0f), new Vector3(15.0f, 1.15f, 2.2f), steel, new Vector3(0, 0.14f, 0));
+        MeshBox(_levelRoot, new Vector3(-54.0f, 20.0f, -36.0f), new Vector3(22.0f, 0.55f, 0.65f), skylineTrim, new Vector3(0, 0, -0.08f));
+        MeshBox(_levelRoot, new Vector3(-43.0f, 12.0f, -36.0f), new Vector3(0.55f, 24.0f, 0.55f), skylineTrim);
+        MeshBox(_levelRoot, new Vector3(-35.0f, 20.0f, -36.0f), new Vector3(16.0f, 0.38f, 0.42f), steel, new Vector3(0, 0, -0.06f));
+        BuildDistantAircraft(steel, distantGlass);
+    }
+
+    private void BuildDistantAircraft(Godot.Material steel, Godot.Material glass)
+    {
+        var aircraft = new Node3D
+        {
+            Name = "DistantTiltRotor",
+            Position = new Vector3(-52, 39, -78)
+        };
+        _levelRoot.AddChild(aircraft);
+        var dark = Mat("aircraft_dark", new Color(0.055f, 0.072f, 0.073f), 0.72f, 0.4f);
+        var navigation = Mat("aircraft_navigation", new Color(0.68f, 0.08f, 0.035f), 0.18f, 0.22f, new Color(1.0f, 0.06f, 0.02f));
+        MeshBox(aircraft, Vector3.Zero, new Vector3(7.2f, 0.9f, 1.2f), dark);
+        MeshBox(aircraft, new Vector3(2.9f, 0.12f, 0), new Vector3(1.65f, 0.74f, 1.05f), glass, new Vector3(0, 0, -0.14f));
+        MeshBox(aircraft, new Vector3(-0.3f, 0.05f, 0), new Vector3(2.5f, 0.16f, 10.4f), steel);
+        MeshBox(aircraft, new Vector3(-2.75f, 0.38f, 0), new Vector3(1.3f, 0.12f, 4.2f), steel);
+        MeshBox(aircraft, new Vector3(-3.0f, 1.02f, 0), new Vector3(1.3f, 1.8f, 0.18f), dark, new Vector3(0, 0, -0.18f));
+        foreach (var z in new[] { -3.65f, 3.65f })
+        {
+            MeshBox(aircraft, new Vector3(0.45f, 0.25f, z), new Vector3(1.8f, 0.72f, 0.68f), dark);
+            aircraft.AddChild(new MeshInstance3D
+            {
+                Position = new Vector3(1.25f, 0.25f, z),
+                Rotation = new Vector3(0, 0, Mathf.Pi / 2.0f),
+                Mesh = new TorusMesh { InnerRadius = 1.4f, OuterRadius = 1.46f, Rings = 28, RingSegments = 6 },
+                MaterialOverride = steel
+            });
+            MeshBox(aircraft, new Vector3(0.0f, 0.02f, z), new Vector3(0.16f, 0.16f, 0.16f), navigation);
+        }
+
+        var tween = CreateTween().SetLoops();
+        tween.TweenProperty(aircraft, "position", new Vector3(72, 42, -92), 62.0)
+            .From(new Vector3(-52, 39, -78))
+            .SetTrans(Tween.TransitionType.Linear);
+        tween.TweenCallback(Callable.From(() => aircraft.Position = new Vector3(-52, 39, -78)));
+    }
+
+    private static Texture2D BuildSmokeTexture()
+    {
+        const int size = 64;
+        var image = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var uv = new Vector2((x + 0.5f) / size, (y + 0.5f) / size);
+                var distance = (uv - Vector2.One * 0.5f).Length() * 2.0f;
+                var radial = Mathf.Clamp(1.0f - distance, 0.0f, 1.0f);
+                var grain = Mathf.PosMod(Mathf.Sin(x * 12.9898f + y * 78.233f) * 43758.5453f, 1.0f);
+                var alpha = Mathf.Pow(Mathf.SmoothStep(0.0f, 1.0f, radial), 1.45f) * (0.76f + grain * 0.24f);
+                image.SetPixel(x, y, new Color(1, 1, 1, alpha));
+            }
+        }
+        image.GenerateMipmaps();
+        return ImageTexture.CreateFromImage(image);
+    }
+
+    private void AddIndustrialSmoke(Vector3 position, Texture2D smokeTexture)
+    {
+        var process = new ParticleProcessMaterial
+        {
+            Direction = Vector3.Up,
+            Spread = 18.0f,
+            Gravity = new Vector3(0.11f, 0.34f, 0.035f),
+            InitialVelocityMin = 0.75f,
+            InitialVelocityMax = 1.45f,
+            DampingMin = 0.04f,
+            DampingMax = 0.12f,
+            ScaleMin = 0.58f,
+            ScaleMax = 1.9f,
+            Color = new Color(0.3f, 0.34f, 0.34f, 0.24f)
+        };
+        var smokeMaterial = new StandardMaterial3D
+        {
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
+            AlbedoColor = new Color(0.36f, 0.4f, 0.4f, 0.22f),
+            AlbedoTexture = smokeTexture,
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
+            DistanceFadeMode = BaseMaterial3D.DistanceFadeModeEnum.PixelAlpha,
+            DistanceFadeMinDistance = 45.0f,
+            DistanceFadeMaxDistance = 160.0f
+        };
+        _levelRoot.AddChild(new GpuParticles3D
+        {
+            Name = "IndustrialSmoke",
+            Position = position,
+            Amount = 34,
+            Lifetime = 10.0,
+            Preprocess = 8.0,
+            FixedFps = 18,
+            Interpolate = true,
+            VisibilityAabb = new Aabb(new Vector3(-12, -2, -12), new Vector3(24, 32, 24)),
+            ProcessMaterial = process,
+            DrawPass1 = new QuadMesh { Size = new Vector2(2.7f, 2.7f), Material = smokeMaterial }
+        });
     }
 
     private void AddPuddles()
