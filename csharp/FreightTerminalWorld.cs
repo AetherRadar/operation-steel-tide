@@ -1347,9 +1347,18 @@ public partial class FreightTerminalWorld : Node3D
         Input.ActionPress("weapon_melee");
         await WaitFrames(2);
         Input.ActionRelease("weapon_melee");
-        await WaitFrames(28);
+        await WaitFrames(24);
+        SaveViewportImage("res://knife_ready_validation.png");
+        Input.ActionPress("fire");
+        await WaitFrames(2);
+        Input.ActionRelease("fire");
+        await WaitFrames(4);
+        SaveViewportImage("res://knife_windup_validation.png");
+        await WaitFrames(8);
         SaveViewportImage("res://knife_validation.png");
-        GD.Print($"KNIFE_CHECK equipped={_player.KnifeEquipped} weapon={_player.EquippedWeapon.Platform}");
+        await WaitFrames(8);
+        SaveViewportImage("res://knife_followthrough_validation.png");
+        GD.Print($"KNIFE_CHECK equipped={_player.KnifeEquipped} weapon={_player.EquippedWeapon.Platform} direction=right_to_left_rising_slash");
         GetTree().Quit();
     }
 

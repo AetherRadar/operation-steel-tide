@@ -32,6 +32,7 @@ public partial class TacticalPlayer : CharacterBody3D
     private const float ProneSpeed = 1.65f;
     private const float Gravity = 22.0f;
     private const float ReloadDuration = 2.45f;
+    private const float KnifeAttackDuration = 0.64f;
 
     public float Health { get; private set; } = 100.0f;
     public EquipmentItem EquippedHelmet { get; private set; } = EquipmentCatalog.Create("helmet_light");
@@ -690,7 +691,7 @@ public partial class TacticalPlayer : CharacterBody3D
         MeshPart(_knifeRoot, new PrismMesh { Size = new Vector3(0.115f, 0.018f, 0.62f) }, new Vector3(0, 0, -0.42f), new Vector3(0, Mathf.Pi, 0), steel);
         MeshPart(_knifeRoot, Box(new Vector3(0.012f, 0.022f, 0.49f)), new Vector3(-0.052f, -0.004f, -0.39f), Vector3.Zero, edge);
         BuildTacticalHand(_knifeRoot, false, new Vector3(0.015f, -0.04f, 0.1f), new Vector3(0.04f, 0, 0), glove, gloveArmor);
-        BuildSleevedForearm(_knifeRoot, new Vector3(0.15f, -0.34f, 0.25f), new Vector3(-0.24f, 0, -0.28f), glove, gloveArmor);
+        BuildSleevedForearm(_knifeRoot, new Vector3(0.11f, -0.25f, 0.21f), new Vector3(-0.16f, 0, -0.24f), glove, gloveArmor);
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -1106,15 +1107,15 @@ public partial class TacticalPlayer : CharacterBody3D
         {
             return;
         }
-        _knifeTime = 0.56f;
-        _fireCooldown = 0.56f;
+        _knifeTime = KnifeAttackDuration;
+        _fireCooldown = KnifeAttackDuration;
         _knifeHitApplied = false;
     }
 
     private void UpdateKnifeAnimation(float delta)
     {
         var restingPosition = new Vector3(0.24f, -0.32f, -0.68f);
-        var restingRotation = new Vector3(-0.08f, -0.18f, -0.08f);
+        var restingRotation = new Vector3(0.1f, -0.18f, -0.08f);
         if (!_knifeEquipped || _knifeTime <= 0.0f)
         {
             _knifeRoot.Position = _knifeRoot.Position.Lerp(restingPosition, delta * 12.0f);
@@ -1122,14 +1123,34 @@ public partial class TacticalPlayer : CharacterBody3D
             return;
         }
 
-        var progress = 1.0f - _knifeTime / 0.56f;
-        var thrust = Mathf.Sin(progress * Mathf.Pi);
-        var slash = Mathf.Sin(progress * Mathf.Pi * 2.0f) * 0.22f;
-        var targetPosition = restingPosition + new Vector3(-0.17f * thrust, 0.12f * thrust, -0.42f * thrust);
-        var targetRotation = restingRotation + new Vector3(-0.7f * thrust, -0.85f * thrust, slash);
-        _knifeRoot.Position = _knifeRoot.Position.Lerp(targetPosition, delta * 24.0f);
-        _knifeRoot.Rotation = _knifeRoot.Rotation.Lerp(targetRotation, delta * 24.0f);
-        if (!_knifeHitApplied && progress >= 0.32f)
+        var progress = 1.0f - _knifeTime / KnifeAttackDuration;
+        var windupPosition = new Vector3(0.46f, -0.34f, -0.58f);
+        var windupRotation = new Vector3(0.2f, 0.18f, 0.54f);
+        var followPosition = new Vector3(-0.08f, 0.08f, -0.94f);
+        var followRotation = new Vector3(0.48f, -0.82f, -0.58f);
+        Vector3 targetPosition;
+        Vector3 targetRotation;
+        if (progress < 0.23f)
+        {
+            var phase = Mathf.SmoothStep(0.0f, 1.0f, progress / 0.23f);
+            targetPosition = restingPosition.Lerp(windupPosition, phase);
+            targetRotation = restingRotation.Lerp(windupRotation, phase);
+        }
+        else if (progress < 0.64f)
+        {
+            var phase = Mathf.SmoothStep(0.0f, 1.0f, (progress - 0.23f) / 0.41f);
+            targetPosition = windupPosition.Lerp(followPosition, phase);
+            targetRotation = windupRotation.Lerp(followRotation, phase);
+        }
+        else
+        {
+            var phase = Mathf.SmoothStep(0.0f, 1.0f, (progress - 0.64f) / 0.36f);
+            targetPosition = followPosition.Lerp(restingPosition, phase);
+            targetRotation = followRotation.Lerp(restingRotation, phase);
+        }
+        _knifeRoot.Position = targetPosition;
+        _knifeRoot.Rotation = targetRotation;
+        if (!_knifeHitApplied && progress >= 0.42f)
         {
             _knifeHitApplied = true;
             ResolveKnifeHit();
@@ -1138,15 +1159,25 @@ public partial class TacticalPlayer : CharacterBody3D
 
     private void ResolveKnifeHit()
     {
-        var from = _camera.GlobalPosition;
-        var to = from - _camera.GlobalBasis.Z * 2.55f;
+        var from = _camera.GlobalPosition + _camera.GlobalBasis.X * 0.3f - _camera.GlobalBasis.Y * 0.18f;
+        var to = _camera.GlobalPosition
+            - _camera.GlobalBasis.Z * 2.55f
+            - _camera.GlobalBasis.X * 0.22f
+            + _camera.GlobalBasis.Y * 0.18f;
         var query = PhysicsRayQueryParameters3D.Create(from, to);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
         query.CollideWithAreas = false;
         var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
         if (hit.Count == 0)
         {
-            return;
+            query = PhysicsRayQueryParameters3D.Create(_camera.GlobalPosition, _camera.GlobalPosition - _camera.GlobalBasis.Z * 2.4f);
+            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+            query.CollideWithAreas = false;
+            hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+            if (hit.Count == 0)
+            {
+                return;
+            }
         }
         var point = hit["position"].AsVector3();
         var target = hit["collider"].AsGodotObject();
