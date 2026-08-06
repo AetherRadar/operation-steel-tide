@@ -56,7 +56,9 @@ public readonly record struct SquadMemberView(
     float MaxHealth,
     bool IsHuman,
     bool IsDown,
-    SquadOrder Order);
+    SquadOrder Order,
+    float SkillCooldown,
+    float SkillCooldownDuration);
 
 public static class OperatorRoles
 {

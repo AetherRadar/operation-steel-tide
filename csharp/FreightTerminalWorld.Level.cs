@@ -133,7 +133,7 @@ public partial class FreightTerminalWorld
             LightColor = new Color(1.0f, 0.9f, 0.72f),
             LightEnergy = 1.25f,
             ShadowEnabled = true,
-            DirectionalShadowMaxDistance = 240.0f,
+            DirectionalShadowMaxDistance = 360.0f,
             DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel4Splits
         };
         AddChild(_sunLight);
@@ -276,7 +276,7 @@ void sky() {
         {
             Amount = 220,
             Lifetime = 9.0,
-            VisibilityAabb = new Aabb(new Vector3(-112, -2, -112), new Vector3(224, 20, 224)),
+            VisibilityAabb = new Aabb(new Vector3(-172, -2, -162), new Vector3(344, 48, 324)),
             ProcessMaterial = process,
             DrawPass1 = quad,
             Position = new Vector3(0, 4, MapCenterZ)
@@ -297,11 +297,16 @@ void sky() {
         var white = Mat("marking", new Color(0.72f, 0.75f, 0.69f), 0.05f, 0.72f);
 
         StaticBox("Ground", new Vector3(0, -0.55f, MapCenterZ), new Vector3(MapWidthMeters, 1, MapDepthMeters), asphalt);
-        StaticBox("NorthPerimeter", new Vector3(0, 1.25f, -170), new Vector3(MapWidthMeters, 3, 1), concreteDark);
-        StaticBox("WestPerimeter", new Vector3(-110, 1.25f, MapCenterZ), new Vector3(1, 3, MapDepthMeters), concreteDark);
-        StaticBox("EastPerimeter", new Vector3(110, 1.25f, MapCenterZ), new Vector3(1, 3, MapDepthMeters), concreteDark);
-        StaticBox("SouthPerimeterL", new Vector3(-58, 1.25f, 50), new Vector3(104, 3, 1), concreteDark);
-        StaticBox("SouthPerimeterR", new Vector3(58, 1.25f, 50), new Vector3(104, 3, 1), concreteDark);
+        var northBoundary = MapCenterZ - MapDepthMeters * 0.5f;
+        var southBoundary = MapCenterZ + MapDepthMeters * 0.5f;
+        var sideBoundary = MapWidthMeters * 0.5f;
+        var southWallWidth = (MapWidthMeters - 12.0f) * 0.5f;
+        var southWallCenter = 6.0f + southWallWidth * 0.5f;
+        StaticBox("NorthPerimeter", new Vector3(0, 1.25f, northBoundary), new Vector3(MapWidthMeters, 3, 1), concreteDark);
+        StaticBox("WestPerimeter", new Vector3(-sideBoundary, 1.25f, MapCenterZ), new Vector3(1, 3, MapDepthMeters), concreteDark);
+        StaticBox("EastPerimeter", new Vector3(sideBoundary, 1.25f, MapCenterZ), new Vector3(1, 3, MapDepthMeters), concreteDark);
+        StaticBox("SouthPerimeterL", new Vector3(-southWallCenter, 1.25f, southBoundary), new Vector3(southWallWidth, 3, 1), concreteDark);
+        StaticBox("SouthPerimeterR", new Vector3(southWallCenter, 1.25f, southBoundary), new Vector3(southWallWidth, 3, 1), concreteDark);
         for (var x = -35; x <= 35; x += 10)
         {
             MeshBox(_levelRoot, new Vector3(x, 0.012f, 5), new Vector3(0.12f, 0.025f, 7), white);
@@ -921,63 +926,15 @@ void sky() {
         var skylineTrim = Mat("skyline_trim", new Color(0.24f, 0.29f, 0.28f), 0.72f, 0.42f);
         var smokeStack = Mat("smoke_stack", new Color(0.28f, 0.24f, 0.2f), 0.58f, 0.68f);
         var smokeTexture = BuildSmokeTexture();
-        foreach (var item in new (Vector3 Position, Vector3 Size)[]
+        BuildResidentialCommunity(concrete, steel, distantGlass, skylineTrim);
+        foreach (var x in new[] { -158.0f, 158.0f })
         {
-            (new Vector3(-128, 10, -28), new Vector3(24, 20, 46)),
-            (new Vector3(132, 14, -72), new Vector3(27, 28, 54)),
-            (new Vector3(-78, 10, -190), new Vector3(42, 20, 25)),
-            (new Vector3(2, 14, -194), new Vector3(54, 28, 28)),
-            (new Vector3(92, 9, -191), new Vector3(34, 18, 26)),
-            (new Vector3(-138, 18, -118), new Vector3(18, 36, 24)),
-            (new Vector3(139, 21, -153), new Vector3(22, 42, 26)),
-            (new Vector3(-82, 11, 75), new Vector3(32, 22, 25)),
-            (new Vector3(-25, 17, 79), new Vector3(24, 34, 22)),
-            (new Vector3(35, 12, 77), new Vector3(38, 24, 26)),
-            (new Vector3(90, 19, 72), new Vector3(22, 38, 20))
-        })
-        {
-            MeshBox(_levelRoot, item.Position, item.Size, concrete);
-            MeshBox(_levelRoot, item.Position + new Vector3(0, item.Size.Y * 0.5f + 0.22f, 0), new Vector3(item.Size.X + 0.65f, 0.42f, item.Size.Z + 0.65f), skylineTrim);
-            var crownHeight = Mathf.Clamp(item.Size.Y * 0.16f, 2.4f, 6.0f);
-            MeshBox(
-                _levelRoot,
-                item.Position + Vector3.Up * (item.Size.Y * 0.5f + crownHeight * 0.5f + 0.42f),
-                new Vector3(item.Size.X * 0.52f, crownHeight, item.Size.Z * 0.58f),
-                steel);
-            if (Mathf.Abs(item.Position.X) > Mathf.Abs(item.Position.Z))
-            {
-                var facing = -Mathf.Sign(item.Position.X);
-                for (var y = 4.0f; y < item.Size.Y - 1.0f; y += 3.1f)
-                {
-                    MeshBox(_levelRoot, item.Position + new Vector3(facing * (item.Size.X * 0.5f + 0.025f), y - item.Size.Y * 0.5f, 0), new Vector3(0.04f, 0.62f, item.Size.Z * 0.72f), distantGlass);
-                }
-            }
-            else
-            {
-                var facing = -Mathf.Sign(item.Position.Z);
-                for (var y = 4.0f; y < item.Size.Y - 1.0f; y += 3.1f)
-                {
-                    MeshBox(_levelRoot, item.Position + new Vector3(0, y - item.Size.Y * 0.5f, facing * (item.Size.Z * 0.5f + 0.025f)), new Vector3(item.Size.X * 0.72f, 0.62f, 0.04f), distantGlass);
-                }
-            }
-            if (item.Size.Y >= 28.0f)
-            {
-                StaticCylinder(
-                    "SkylineAntenna",
-                    item.Position + Vector3.Up * (item.Size.Y * 0.5f + crownHeight + 3.2f),
-                    0.09f,
-                    6.4f,
-                    skylineTrim);
-            }
-        }
-        foreach (var x in new[] { -126.0f, 126.0f })
-        {
-            StaticCylinder("BackgroundTank", new Vector3(x, 7, -18), 6.5f, 14, steel);
-            StaticCylinder("BackgroundTankUpper", new Vector3(x, 15.2f, -18), 5.5f, 2.4f, skylineTrim);
-            StaticCylinder("BackgroundTankCrown", new Vector3(x, 16.65f, -18), 6.0f, 0.5f, steel);
+            StaticCylinder("BackgroundTank", new Vector3(x, 7, -88), 6.5f, 14, steel);
+            StaticCylinder("BackgroundTankUpper", new Vector3(x, 15.2f, -88), 5.5f, 2.4f, skylineTrim);
+            StaticCylinder("BackgroundTankCrown", new Vector3(x, 16.65f, -88), 6.0f, 0.5f, steel);
         }
 
-        foreach (var stack in new[] { new Vector3(-136, 0, -62), new Vector3(138, 0, -116), new Vector3(88, 0, -203) })
+        foreach (var stack in new[] { new Vector3(-160, 0, -205), new Vector3(160, 0, -210), new Vector3(122, 0, -213) })
         {
             StaticCylinder("DistantSmokeStack", stack + Vector3.Up * 12.5f, 0.82f, 25.0f, smokeStack);
             for (var y = 4.0f; y <= 22.0f; y += 6.0f)

@@ -381,7 +381,16 @@ public partial class FreightTerminalWorld
         }
         var views = new List<SquadMemberView>
         {
-            new("RAVEN", _player.Role, _player.Health, _player.MaxHealth, true, _player.IsDead, _squadOrder)
+            new(
+                "RAVEN",
+                _player.Role,
+                _player.Health,
+                _player.MaxHealth,
+                true,
+                _player.IsDead,
+                _squadOrder,
+                _player.SkillCooldownRemaining,
+                _player.SkillCooldownDuration)
         };
         views.AddRange(_squadMates
             .Where(IsInstanceValid)
@@ -393,7 +402,9 @@ public partial class FreightTerminalWorld
                 mate.MaxHealth,
                 mate.IsHumanProxy,
                 mate.IsDowned,
-                mate.Order)));
+                mate.Order,
+                mate.SkillCooldownRemaining,
+                mate.SkillCooldownDuration)));
         _hud.SetSquadRoster(views);
     }
 
@@ -729,6 +740,13 @@ public partial class FreightTerminalWorld
     {
         await ToSignal(GetTree().CreateTimer(0.45f), SceneTreeTimer.SignalName.Timeout);
         var defaultFollow = _squadMates.All(mate => mate.Order == SquadOrder.Follow);
+        var cooldownMate = _squadMates.First(mate => !mate.IsHumanProxy);
+        cooldownMate.SetSkillCooldownForDiagnostics(0.0f);
+        var firstAiSkill = cooldownMate.TriggerRoleAbility(_player.GlobalPosition);
+        var repeatedAiSkillBlocked = !cooldownMate.TriggerRoleAbility(_player.GlobalPosition);
+        var aiCooldownEnforced = firstAiSkill
+            && repeatedAiSkillBlocked
+            && cooldownMate.SkillCooldownRemaining > OperatorRoles.Spec(cooldownMate.Role).SkillCooldown;
         _player.ConfigureRole(OperatorRole.Medic);
         _player.SetHealthForDiagnostics(72.0f);
         var healthBefore = _player.Health;
@@ -757,7 +775,7 @@ public partial class FreightTerminalWorld
         await ToSignal(GetTree().CreateTimer(0.65f), SceneTreeTimer.SignalName.Timeout);
         var followMotion = follower.GlobalPosition.DistanceTo(_player.GlobalPosition) < followDistanceBefore - 0.5f;
 
-        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} default_follow={defaultFollow} follow_motion={followMotion} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
+        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
         GetTree().Quit();
     }
 
@@ -805,13 +823,18 @@ public partial class FreightTerminalWorld
         await ToSignal(GetTree().CreateTimer(2.2f), SceneTreeTimer.SignalName.Timeout);
         _squadNetwork.BroadcastShot(_player.GlobalPosition + Vector3.Up, _player.GlobalPosition - Vector3.Forward * 4.0f, -1, 0.0f);
         _squadNetwork.BroadcastAbility(OperatorRole.Assault, _player.GlobalPosition + Vector3.Up, -Vector3.Forward);
+        if (mode == "client")
+        {
+            _squadNetwork.BroadcastAbility(OperatorRole.Assault, _player.GlobalPosition + Vector3.Up, -Vector3.Forward);
+        }
         await ToSignal(GetTree().CreateTimer(mode == "host" ? 1.5f : 1.7f), SceneTreeTimer.SignalName.Timeout);
         var remoteHumans = _squadMates.Count(mate => IsInstanceValid(mate) && mate.IsHumanProxy);
-        GD.Print($"NETWORK_CHECK mode={mode} online={_squadNetwork.IsOnline} peers={_squadNetwork.ConnectedPeerCount} remote_humans={remoteHumans} remote_shots={_remoteNetworkShotCount} remote_abilities={_remoteNetworkAbilityCount} members={ActiveSquadCount} ai={AiSquadCount}");
+        var cooldownGate = _remoteNetworkAbilityCount == 1;
+        GD.Print($"NETWORK_CHECK mode={mode} online={_squadNetwork.IsOnline} peers={_squadNetwork.ConnectedPeerCount} remote_humans={remoteHumans} remote_shots={_remoteNetworkShotCount} remote_abilities={_remoteNetworkAbilityCount} cooldown_gate={cooldownGate} members={ActiveSquadCount} ai={AiSquadCount}");
         if (mode == "host")
         {
             await ToSignal(GetTree().CreateTimer(2.5f), SceneTreeTimer.SignalName.Timeout);
         }
-        GetTree().Quit();
+        GetTree().Quit(cooldownGate ? 0 : 2);
     }
 }

@@ -24,6 +24,7 @@ public partial class CombatHUD
     private Control _squadRoster = null!;
     private Label _squadRosterTitle = null!;
     private readonly Label[] _squadMemberLabels = new Label[4];
+    private readonly Label[] _squadSkillLabels = new Label[4];
     private readonly ProgressBar[] _squadHealthBars = new ProgressBar[4];
     private Control _classSkillRoot = null!;
     private Label _classSkillLabel = null!;
@@ -76,9 +77,14 @@ public partial class CombatHUD
             var y = 38 + i * 38;
             _squadMemberLabels[i] = Label($"{i + 1}  --", 12, new Color(0.68f, 0.76f, 0.73f));
             _squadMemberLabels[i].Position = new Vector2(16, y);
-            _squadMemberLabels[i].Size = new Vector2(220, 20);
+            _squadMemberLabels[i].Size = new Vector2(158, 20);
             _squadMemberLabels[i].ClipText = true;
             _squadRoster.AddChild(_squadMemberLabels[i]);
+            _squadSkillLabels[i] = Label("H READY", 10, new Color(0.45f, 0.88f, 0.74f));
+            _squadSkillLabels[i].Position = new Vector2(174, y + 1);
+            _squadSkillLabels[i].Size = new Vector2(60, 18);
+            _squadSkillLabels[i].HorizontalAlignment = HorizontalAlignment.Right;
+            _squadRoster.AddChild(_squadSkillLabels[i]);
             _squadHealthBars[i] = new ProgressBar
             {
                 Position = new Vector2(16, y + 22),
@@ -307,6 +313,7 @@ public partial class CombatHUD
             {
                 _squadMemberLabels[i].Text = $"{i + 1}  EMPTY";
                 _squadMemberLabels[i].AddThemeColorOverride("font_color", new Color(0.36f, 0.43f, 0.41f));
+                _squadSkillLabels[i].Text = string.Empty;
                 _squadHealthBars[i].Value = 0;
                 continue;
             }
@@ -317,9 +324,17 @@ public partial class CombatHUD
                 : i == 0 ? "YOU" : member.IsHuman ? "NET" : "AI";
             var health = Mathf.Max(0, Mathf.RoundToInt(member.Health));
             var down = member.IsDown ? (GameLocalization.IsChinese(_language) ? " 倒地" : " DOWN") : string.Empty;
-            _squadMemberLabels[i].Text = $"{i + 1}  {member.Callsign}  {role}  {source}  {health}{down}";
+            _squadMemberLabels[i].Text = $"{i + 1} {member.Callsign} {role} {source} {health}{down}";
             _squadMemberLabels[i].AddThemeColorOverride("font_color",
                 member.IsDown ? new Color(1.0f, 0.32f, 0.22f) : OperatorRoles.Spec(member.Role).Accent);
+            _squadSkillLabels[i].Text = member.SkillCooldown <= 0.05f
+                ? "H READY"
+                : $"H {Mathf.CeilToInt(member.SkillCooldown)}s";
+            _squadSkillLabels[i].AddThemeColorOverride(
+                "font_color",
+                member.SkillCooldown <= 0.05f
+                    ? OperatorRoles.Spec(member.Role).Accent
+                    : new Color(0.52f, 0.59f, 0.57f));
             _squadHealthBars[i].MaxValue = Mathf.Max(1.0f, member.MaxHealth);
             _squadHealthBars[i].Value = member.Health;
         }
