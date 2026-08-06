@@ -77,6 +77,7 @@ public partial class FreightTerminalWorld : Node3D
     private int _kills;
     private int _headshots;
     private int _reinforcementThreshold = 70;
+    private int _nextEnemyNetworkId;
     private float _threatLevel;
     private float _reinforcementCountdown;
     private bool _reinforcementPending;
@@ -94,6 +95,7 @@ public partial class FreightTerminalWorld : Node3D
         BuildEnvironment();
         BuildLevel();
         BuildHudAndPlayer();
+        BuildSquadSystem();
         SpawnLootCases();
         SpawnEnemies();
         SpawnExplosives();
@@ -186,10 +188,23 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateWeaponUiFlow();
         }
+        else if (Array.Exists(args, value => value == "--validate-squad"))
+        {
+            ValidateSquadFlow();
+        }
+        else if (Array.Exists(args, value => value == "--capture-squad"))
+        {
+            CaptureSquadFrame();
+        }
+        else if (Array.Exists(args, value => value == "--capture-squad-lobby"))
+        {
+            CaptureSquadLobbyFrame();
+        }
     }
 
     public override void _Process(double delta)
     {
+        UpdateSquad((float)delta);
         if (IsInstanceValid(_extractionMarker))
         {
             _extractionMarker.RotateY((float)delta * 0.35f);
@@ -472,6 +487,7 @@ public partial class FreightTerminalWorld : Node3D
                 _player.TakeDamage(maxDamage * 0.72f * (1.0f - distance / radius), position, source);
             }
         }
+        DamageSquadFromExplosion(position, radius, maxDamage, source);
         foreach (var barrel in _barrels.ToArray())
         {
             if (IsInstanceValid(barrel) && !barrel.Exploded && barrel.GlobalPosition.DistanceTo(position) < radius * 0.65f)
@@ -717,6 +733,7 @@ public partial class FreightTerminalWorld : Node3D
         var enemy = new EnemyOperator
         {
             Position = position,
+            NetworkId = _nextEnemyNetworkId++,
             Player = _player,
             Main = this,
             MissionDirector = _missionDirector,
@@ -769,6 +786,10 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OnPlayerDied()
     {
+        if (HandleLocalPlayerDowned())
+        {
+            return;
+        }
         _missionEnded = true;
         _missionDirector.CompleteMission(false, _kills, _headshots, _shotsFired, _shotsHit);
         _hud.ShowResult(false);

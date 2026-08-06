@@ -1,6 +1,6 @@
 [application]
 config/name="Operation Steel Tide"
-config/version="0.9.0"
+config/version="1.0.0"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.3", "C#", "Forward Plus")
 boot_splash/bg_color=Color(0.018, 0.024, 0.028, 1)
@@ -36,6 +36,10 @@ interact={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":70
 toggle_fire_mode={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":86)]}
 toggle_flashlight={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":84)]}
 use_plate={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":88)]}
+use_class_skill={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":72)]}
+squad_follow={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":4194332)]}
+squad_hold={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":4194333)]}
+squad_move={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":4194334)]}
 
 [rendering]
 renderer/rendering_method="forward_plus"
