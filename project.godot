@@ -1,6 +1,6 @@
 [application]
 config/name="Operation Steel Tide"
-config/version="0.8.1"
+config/version="0.9.0"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.3", "C#", "Forward Plus")
 boot_splash/bg_color=Color(0.018, 0.024, 0.028, 1)
