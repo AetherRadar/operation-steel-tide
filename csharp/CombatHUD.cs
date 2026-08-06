@@ -127,6 +127,10 @@ public partial class CombatHUD : CanvasLayer
 
     public override void _UnhandledInput(InputEvent @event)
     {
+        if (IsSquadLobbyVisible)
+        {
+            return;
+        }
         if (@event is InputEventKey key && key.Pressed && !key.Echo && key.Keycode == Key.Escape)
         {
             if (IsWeaponDetailVisible)
@@ -455,6 +459,7 @@ public partial class CombatHUD : CanvasLayer
         _stateOverlay.AddChild(_stateSubtitle);
         BuildPauseMenu(root);
         BuildLootOverlay(root);
+        BuildSquadHud(root);
     }
 
     private static Label PositionedLabel(string text, int size, Color color, float x, float y)
@@ -1093,7 +1098,7 @@ public partial class CombatHUD : CanvasLayer
         _quitButton = Button("EXIT TO DESKTOP", new Vector2(270, 401), new Vector2(210, 44));
         _quitButton.Pressed += () => EmitSignal(SignalName.QuitRequested);
         content.AddChild(_quitButton);
-        _buildLabel = PositionedLabel("FORWARD+  /  BUILD 0.9.0", 11, new Color(0.32f, 0.4f, 0.38f), 40, 477);
+        _buildLabel = PositionedLabel("FORWARD+  /  BUILD 1.0.0", 11, new Color(0.32f, 0.4f, 0.38f), 40, 477);
         _buildLabel.Size = new Vector2(440, 22);
         _buildLabel.HorizontalAlignment = HorizontalAlignment.Center;
         content.AddChild(_buildLabel);
@@ -1134,6 +1139,7 @@ public partial class CombatHUD : CanvasLayer
         _qualitySelect.SetItemText(1, Text("balanced", "Balanced"));
         _qualitySelect.SetItemText(2, Text("cinematic", "Cinematic"));
         UpdateWeaponSlotButtons();
+        RefreshSquadLanguage();
         RefreshLootOverlay();
         if (IsWeaponDetailVisible && _detailedWeapon is not null)
         {

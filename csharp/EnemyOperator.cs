@@ -13,6 +13,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     public FreightTerminalWorld? Main { get; set; }
     public MissionDirector? MissionDirector { get; set; }
     public float DetectionRange { get; set; } = 34.0f;
+    public int NetworkId { get; set; } = -1;
     public float Suspicion { get; private set; }
     public bool Alerted { get; private set; }
     public bool IsDead { get; private set; }
@@ -41,6 +42,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     private Vector3 _coverTarget;
     private float _coverTimer;
     private float _hitStun;
+    private ISquadCombatant? _combatTarget;
 
     private readonly RandomNumberGenerator _rng = new();
     private Node3D _bodyRoot = null!;
@@ -306,6 +308,12 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             return;
         }
+        _combatTarget = Main?.FindNearestFriendly(GlobalPosition) ?? Player;
+        if (_combatTarget is null || _combatTarget.CombatDead)
+        {
+            Velocity = Vector3.Zero;
+            return;
+        }
 
         var velocity = Velocity;
         if (!IsOnFloor())
@@ -318,7 +326,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         _patrolTimer -= dt;
         _hitStun = Mathf.Max(0.0f, _hitStun - dt);
 
-        var distance = GlobalPosition.DistanceTo(Player.GlobalPosition);
+        var distance = GlobalPosition.DistanceTo(_combatTarget.CombatNode.GlobalPosition);
         var hasSight = distance < DetectionRange && WithinViewCone() && HasLineOfSight();
         if (!Alerted)
         {
@@ -357,23 +365,23 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
     private bool HasLineOfSight()
     {
-        if (Player.IsDead)
+        if (_combatTarget is null || _combatTarget.CombatDead)
         {
             return false;
         }
         var from = GlobalPosition + Vector3.Up * 1.55f;
-        var to = Player.HitPoint(HitRegion.Torso);
+        var to = _combatTarget.HitPoint(HitRegion.Torso);
         var query = PhysicsRayQueryParameters3D.Create(from, to);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
         query.CollideWithAreas = false;
         var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        return hit.Count > 0 && hit["collider"].AsGodotObject() == Player;
+        return hit.Count > 0 && hit["collider"].AsGodotObject() == _combatTarget.CombatNode;
     }
 
     private bool WithinViewCone()
     {
         var eye = GlobalPosition + Vector3.Up * 1.5f;
-        var target = Player.HitPoint(HitRegion.Torso);
+        var target = (_combatTarget ?? Player).HitPoint(HitRegion.Torso);
         var direction = eye.DirectionTo(target);
         return (-GlobalBasis.Z).Dot(direction) > 0.42f;
     }
@@ -427,7 +435,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             return;
         }
 
-        var targetFlat = new Vector3(Player.GlobalPosition.X, GlobalPosition.Y, Player.GlobalPosition.Z);
+        var combatPosition = (_combatTarget ?? Player).CombatNode.GlobalPosition;
+        var targetFlat = new Vector3(combatPosition.X, GlobalPosition.Y, combatPosition.Z);
         if (GlobalPosition.DistanceTo(targetFlat) > 0.1f)
         {
             LookAt(targetFlat, Vector3.Up);
@@ -464,7 +473,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         Velocity = velocity;
         if (hasSight && distance < 52.0f && _fireTimer <= 0.0f)
         {
-            FireAtPlayer(distance);
+            FireAtSquad(distance);
         }
     }
 
@@ -503,7 +512,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             velocity.X = Mathf.MoveToward(velocity.X, 0.0f, delta * 12.0f);
             velocity.Z = Mathf.MoveToward(velocity.Z, 0.0f, delta * 12.0f);
             Velocity = velocity;
-            var targetFlat = new Vector3(Player.GlobalPosition.X, GlobalPosition.Y, Player.GlobalPosition.Z);
+            var combatPosition = (_combatTarget ?? Player).CombatNode.GlobalPosition;
+            var targetFlat = new Vector3(combatPosition.X, GlobalPosition.Y, combatPosition.Z);
             if (GlobalPosition.DistanceTo(targetFlat) > 0.1f)
             {
                 LookAt(targetFlat, Vector3.Up);
@@ -546,7 +556,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         _patrolTimer = _rng.RandfRange(4.0f, 8.0f);
     }
 
-    private void FireAtPlayer(float distance)
+    private void FireAtSquad(float distance)
     {
         var stats = CarriedWeapon.Stats();
         _fireTimer = _rng.RandfRange(stats.FireInterval * 3.2f, stats.FireInterval * 6.8f);
@@ -566,10 +576,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         var hitRegion = regionRoll < 0.12f
             ? HitRegion.Head
             : regionRoll < 0.78f ? HitRegion.Torso : HitRegion.Limbs;
-        var aimPoint = Player.HitPoint(hitRegion);
+        var target = _combatTarget ?? Player;
+        var aimPoint = target.HitPoint(hitRegion);
         if (_rng.Randf() < accuracy)
         {
-            Player.TakeDamage(stats.Damage * _rng.RandfRange(0.24f, 0.34f), aimPoint, this);
+            target.TakeCombatDamage(stats.Damage * _rng.RandfRange(0.24f, 0.34f), aimPoint, this);
         }
         else
         {
@@ -645,7 +656,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         if (_health > 0.0f && !_seekingCover && !_inCover && Main is not null
             && (_health < 76.0f || _rng.Randf() < 0.4f))
         {
-            var candidate = Main.FindCoverPoint(GlobalPosition, Player.GlobalPosition);
+            var threatPosition = (_combatTarget ?? Player).CombatNode.GlobalPosition;
+            var candidate = Main.FindCoverPoint(GlobalPosition, threatPosition);
             if (candidate.Y > -100.0f)
             {
                 _coverTarget = candidate;

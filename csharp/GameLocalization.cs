@@ -98,6 +98,17 @@ public static class GameLocalization
         ["armor_impact"] = "防弹衣吸收了冲击"
     };
 
+    static GameLocalization()
+    {
+        Chinese["squad_ready"] = "\u5c0f\u961f\u5df2\u5c31\u7eea  //  F1 \u8ddf\u968f  F2 \u6212\u5907  F3 \u79fb\u52a8  H \u6280\u80fd";
+        Chinese["medic_spray"] = "\u533b\u7597\u55b7\u96fe  //  \u4f24\u52bf\u5df2\u7a33\u5b9a";
+        Chinese["squad_revive"] = "\u533b\u7597\u55b7\u96fe  //  \u961f\u53cb\u5df2\u6551\u8d77";
+        Chinese["recon_scan"] = "\u8109\u51b2\u4fa6\u5bdf  //  \u654c\u4eba\u5df2\u6807\u8bb0";
+        Chinese["player_left"] = "\u961f\u53cb\u5df2\u65ad\u5f00  //  AI \u63a5\u7ba1\u69fd\u4f4d";
+        Chinese["player_downed"] = "\u4f60\u5df2\u5012\u5730  //  AI \u533b\u7597\u6b63\u5728\u6551\u63f4";
+        Chinese["player_revived"] = "\u5df2\u6551\u8d77  //  \u91cd\u8fd4\u6218\u6597";
+    }
+
     private static readonly Dictionary<string, string> ChineseObjectives = new()
     {
         ["DISABLE THE COMMUNICATIONS RELAY"] = "关闭通信中继",

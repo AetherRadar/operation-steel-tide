@@ -18,7 +18,7 @@ public enum HitRegion
 }
 
 [GlobalClass]
-public partial class TacticalPlayer : CharacterBody3D
+public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 {
     [Signal]
     public delegate void DiedEventHandler();
@@ -50,7 +50,7 @@ public partial class TacticalPlayer : CharacterBody3D
     public bool HasMovementIntent { get; private set; }
     public bool IsAiming => _isAiming;
     public bool IsReloading => _isReloading;
-    public float ReloadProgress => _isReloading ? 1.0f - _reloadTime / ReloadDuration : 0.0f;
+    public float ReloadProgress => _isReloading ? 1.0f - _reloadTime / _activeReloadDuration : 0.0f;
     public bool FlashlightOn => _flashlightOn;
     public string FireMode => _automaticFire ? "AUTO" : "SEMI";
     public WeaponBuild EquippedWeapon { get; private set; } = WeaponCatalog.StarterWeapon();
@@ -134,7 +134,9 @@ public partial class TacticalPlayer : CharacterBody3D
         BuildBody();
         BuildWeapon();
         BuildKnife();
+        BuildRoleDevices();
         ApplyWeaponBuildVisuals();
+        ConfigureRole(Role);
         Input.MouseMode = Input.MouseModeEnum.Captured;
         DisarmFireInput();
         DisarmMovementInput();
@@ -725,6 +727,12 @@ public partial class TacticalPlayer : CharacterBody3D
             return;
         }
 
+        UpdateRoleAbility(dt);
+        if (Input.IsActionJustPressed("use_class_skill"))
+        {
+            ActivateRoleAbility();
+        }
+
         _fireCooldown = Mathf.Max(0.0f, _fireCooldown - dt);
         _knifeTime = Mathf.Max(0.0f, _knifeTime - dt);
         if (!_fireInputArmed)
@@ -770,7 +778,7 @@ public partial class TacticalPlayer : CharacterBody3D
                 _flashlightOn ? "WEAPON LIGHT  //  ON" : "WEAPON LIGHT  //  OFF",
                 _flashlightOn ? new Color(0.72f, 0.9f, 1.0f) : new Color(0.55f, 0.65f, 0.63f));
         }
-        if (Input.IsActionJustPressed("use_plate"))
+        if (Input.IsActionJustPressed("use_plate") && !RoleActionBlocksWeapon)
         {
             StartPlate();
         }
@@ -784,20 +792,20 @@ public partial class TacticalPlayer : CharacterBody3D
                 FinishReload();
             }
         }
-        if (!_knifeEquipped && !_isPlating && Input.IsActionJustPressed("reload"))
+        if (!_knifeEquipped && !_isPlating && !RoleActionBlocksWeapon && Input.IsActionJustPressed("reload"))
         {
             StartReload();
         }
-        if (!_isPlating && Input.IsActionJustPressed("throw_grenade"))
+        if (!_isPlating && !RoleActionBlocksWeapon && Input.IsActionJustPressed("throw_grenade"))
         {
             ThrowGrenade();
         }
 
-        _isAiming = !_knifeEquipped && Input.IsActionPressed("aim") && !_isReloading && !_isPlating && _slideTime <= 0.0f;
+        _isAiming = !_knifeEquipped && !RoleActionBlocksWeapon && Input.IsActionPressed("aim") && !_isReloading && !_isPlating && _slideTime <= 0.0f;
         var fireRequested = _knifeEquipped
             ? Input.IsActionJustPressed("fire")
             : _automaticFire ? Input.IsActionPressed("fire") : Input.IsActionJustPressed("fire");
-        if (!_isPlating && _fireInputArmed && fireRequested && Input.MouseMode == Input.MouseModeEnum.Captured)
+        if (!_isPlating && !RoleActionBlocksWeapon && _fireInputArmed && fireRequested && Input.MouseMode == Input.MouseModeEnum.Captured)
         {
             if (_knifeEquipped)
             {
@@ -845,7 +853,8 @@ public partial class TacticalPlayer : CharacterBody3D
         var prone = _stance == PlayerStance.Prone;
         var sprinting = Input.IsActionPressed("sprint") && input.Y < -0.15f && !crouching && !prone
             && Stamina > 1.0f && !_isAiming;
-        var speed = prone ? ProneSpeed : crouching ? CrouchSpeed : sprinting ? SprintSpeed : WalkSpeed;
+        var speed = (prone ? ProneSpeed : crouching ? CrouchSpeed : sprinting ? SprintSpeed : WalkSpeed)
+            * RoleMovementMultiplier;
 
         if (_slideTime > 0.0f)
         {
@@ -1024,8 +1033,8 @@ public partial class TacticalPlayer : CharacterBody3D
         var targetFov = _isAiming ? AimFieldOfView() : _slideTime > 0.0f ? 84.0f : horizontalSpeed > 7.0f ? 82.0f : 76.0f;
         var handling = EquippedWeapon.Stats().Handling;
         _camera.Fov = Mathf.Lerp(_camera.Fov, targetFov, delta * (6.5f + handling * 5.0f));
-        _weaponRoot.Visible = !_knifeEquipped;
-        _knifeRoot.Visible = _knifeEquipped;
+        _weaponRoot.Visible = !_knifeEquipped && !RoleActionBlocksWeapon;
+        _knifeRoot.Visible = _knifeEquipped && !RoleActionBlocksWeapon;
         UpdateKnifeAnimation(delta);
         var targetPosition = _isAiming
             ? new Vector3(0.0f, -0.139f, -0.55f)
@@ -1196,7 +1205,7 @@ public partial class TacticalPlayer : CharacterBody3D
 
     public void Fire()
     {
-        if (_fireCooldown > 0.0f || _isReloading || _isPlating)
+        if (_fireCooldown > 0.0f || _isReloading || _isPlating || RoleActionBlocksWeapon)
         {
             return;
         }
@@ -1212,7 +1221,7 @@ public partial class TacticalPlayer : CharacterBody3D
 
         Ammo--;
         var stats = EquippedWeapon.Stats();
-        _fireCooldown = stats.FireInterval;
+        _fireCooldown = stats.FireInterval * RoleFireIntervalMultiplier;
         Main?.ReportGunshot(GlobalPosition, stats.SoundRadius);
         _gunAudio.PitchScale = _rng.RandfRange(0.94f, 1.06f);
         _gunAudio.Play();
@@ -1254,6 +1263,8 @@ public partial class TacticalPlayer : CharacterBody3D
         var end = to;
         var damagedTarget = false;
         var headshot = false;
+        var networkEnemyId = -1;
+        var networkDamage = 0.0f;
         if (hit.Count > 0)
         {
             end = hit["position"].AsVector3();
@@ -1264,7 +1275,9 @@ public partial class TacticalPlayer : CharacterBody3D
                 damagedTarget = true;
                 var distance = from.DistanceTo(end);
                 var falloff = Mathf.Lerp(1.0f, 0.52f, Mathf.Clamp(distance / maximumRange, 0.0f, 1.0f));
-                killed = enemy.TakeDamage(stats.Damage * falloff * _rng.RandfRange(0.94f, 1.06f), end, this);
+                networkEnemyId = enemy.NetworkId;
+                networkDamage = stats.Damage * falloff * _rng.RandfRange(0.94f, 1.06f);
+                killed = enemy.TakeDamage(networkDamage, end, this);
                 headshot = enemy.LastHitWasHeadshot;
                 EmitSignal(SignalName.HitConfirmed, killed, headshot, enemy.LastHitWasArmored);
             }
@@ -1278,6 +1291,7 @@ public partial class TacticalPlayer : CharacterBody3D
         }
 
         Main?.SpawnTracer(_muzzle.GlobalPosition, end, new Color(1.0f, 0.67f, 0.24f));
+        Main?.OnLocalPlayerShot(_muzzle.GlobalPosition, end, networkEnemyId, networkDamage);
         Main?.RecordShot(damagedTarget, headshot);
         var stanceRecoil = _stance switch
         {
@@ -1285,8 +1299,8 @@ public partial class TacticalPlayer : CharacterBody3D
             PlayerStance.Crouched => 0.82f,
             _ => 1.0f
         };
-        _recoilPitch -= _rng.RandfRange(0.012f, 0.021f) * stats.Recoil * (_isAiming ? 0.55f : 1.0f) * stanceRecoil;
-        _recoilSide += _rng.RandfRange(-0.018f, 0.018f) * stats.Recoil * stanceRecoil;
+        _recoilPitch -= _rng.RandfRange(0.012f, 0.021f) * stats.Recoil * (_isAiming ? 0.55f : 1.0f) * stanceRecoil * RoleRecoilMultiplier;
+        _recoilSide += _rng.RandfRange(-0.018f, 0.018f) * stats.Recoil * stanceRecoil * RoleRecoilMultiplier;
         var weaponPosition = _weaponRoot.Position;
         weaponPosition.Z += 0.055f;
         _weaponRoot.Position = weaponPosition;
@@ -1300,7 +1314,8 @@ public partial class TacticalPlayer : CharacterBody3D
             return;
         }
         _isReloading = true;
-        _reloadTime = ReloadDuration;
+        _activeReloadDuration = ReloadDuration * RoleReloadMultiplier;
+        _reloadTime = _activeReloadDuration;
         _reloadSoundStage = 0;
     }
 

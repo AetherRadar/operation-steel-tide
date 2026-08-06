@@ -1,7 +1,7 @@
 # Operation Steel Tide
 
-Operation Steel Tide is a tactical FPS prototype built with Godot 4.6 Forward+.
-The complete game client is C#, including the procedural world, player controller, weapons, enemy AI, HUD, effects, objectives, and backend integration. The local progression and mission service is Go.
+Operation Steel Tide is a four-operator tactical FPS prototype built with Godot 4.6 Forward+.
+The complete game client is C#, including LAN co-op, AI squadmates, three operator classes, the procedural world, player controller, weapons, enemy AI, HUD, effects, objectives, and backend integration. The local progression and mission service is Go.
 
 ## Run
 
@@ -32,9 +32,21 @@ go build -o ..\steel-tide-server.exe ./cmd/server
 - `G` throws a frag grenade; tap `F` to open or close nearby loot immediately, or hold `F` to operate an objective terminal
 - `V` switch between AUTO and SEMI, `T` toggle the weapon light
 - `X` apply a spare armor plate while stationary; movement, sprinting, firing, or damage interrupts it
+- `H` activates the selected class skill
+- `F1` orders AI squadmates to follow, `F2` orders them to hold their current positions, and `F3` sends them to the aimed world position
 - `Esc` opens pause/settings, where the interface can switch between English and Chinese; `Enter` redeploys after a failed mission
 
 Fire and movement input are armed only after their controls have returned to neutral after launch or refocus. This prevents the click used to launch the game, or a held movement key, from becoming an accidental shot or deployment exit.
+
+## Squad and LAN co-op
+
+Every deployment uses a four-operator squad. Choose Assault, Medic, or Recon on the deployment screen, then start with `LOCAL + AI`, host a LAN session, or enter the host address and join. Empty slots are immediately filled by AI; a connected player replaces one AI slot, and disconnecting hands that slot back to AI without restarting the mission. LAN sessions use ENet over UDP port `28960`, so the host may need to allow the game through the Windows firewall.
+
+- Assault has higher base health, movement speed, reload speed, and fire rate. `H` activates Combat Overdrive for a larger temporary movement, rate-of-fire, reload, and recoil-control boost.
+- Medic raises a visible trauma sprayer. Aim at an injured or downed squadmate and press `H` to heal or revive them; with no valid teammate in the spray cone, the medicine is applied to the Medic.
+- Recon raises a visible pulse scanner. Press `H` to reveal nearby hostiles through cover for ten seconds.
+
+AI squadmates follow by default, engage only after deployment protection ends and contact begins, fight nearby hostiles, and use their class abilities. AI Medics seek injured or downed friendlies even outside combat. The squad HUD shows all four health states, human/AI ownership, current order, class skill key, action state, and cooldown. LAN peers relay operator transform, role, health, class actions, visible gunfire, and player hit damage through the host.
 
 ## Mission flow
 
@@ -66,6 +78,8 @@ The Go backend provides three mission definitions, objective text, detection rul
 - `csharp/FreightTerminalWorld.cs`: mission runtime, combat effects, interactions, settings, and validation.
 - `csharp/FreightTerminalWorld.Level.cs`: procedural industrial level, PBR materials, lighting, props, and extraction zone.
 - `csharp/FreightTerminalWorld.Expansion.cs`: large-harbor districts, rail yard, tank farm, seawall, extraction beacon, and expanded cover/light dressing.
+- `csharp/FreightTerminalWorld.Squad.cs`: squad slots, AI fill, orders, class effects, co-op combat relay, and squad diagnostics.
+- `csharp/SquadNetwork.cs`, `SquadMate.cs`, and `SquadSystem.cs`: ENet session relay, friendly operator AI/models, and shared role definitions.
 - `csharp/TacticalPlayer.cs`, `EnemyOperator.cs`, and `CombatHUD.cs`: first-person combat, tactical AI, and interface.
 - `csharp/MissionDirector.cs`: deployment, infiltration, contact, combat, objectives, extraction, and result state machine.
 - `csharp/BackendClient.cs`: HTTP session and result persistence.
@@ -93,6 +107,12 @@ Godot_console.exe --path . -- --capture-expanded-map
 Godot_console.exe --path . -- --capture-extraction
 Godot_console.exe --path . -- --validate-large-map
 Godot_console.exe --path . -- --validate-weapon-ui
+Godot_console.exe --path . -- --validate-squad
+Godot_console.exe --path . -- --capture-squad-lobby
+Godot_console.exe --path . -- --capture-squad
+Godot_console.exe --headless --path . -- --validate-network-host
+Godot_console.exe --headless --path . -- --validate-network-client
 ```
 
 `--capture-deployment` waits 14 real seconds at spawn and prints health, armor, ammo, and phase. `--capture-ads` captures the centered reflex sight. `--capture-reload` freezes the seven-stage reload while the fresh magazine is moving into the magwell. `--capture-operator` isolates the detailed enemy model. `--capture-zh` checks the Chinese HUD and settings menu. `--capture-backpack` validates the Chinese personal item grid, 3D gear previews, and weapon detail modal, while `--capture-optics` captures all three optic models. `--validate-weapon-ui` verifies both cycle directions and detail opening. `--validate-loot` also verifies `F` closing and immediate movement restoration, alongside held-key gating, empty-source reopening, transfer, and weapon replacement. `--validate-corpse-loot` checks repeated body searches. `--validate-stance-armor` checks crouched ADS leaning, prone height, hit regions, and equipment durability. `--capture-expanded-map` captures the complete 220 m harbor, elevated landmarks, and denser cover lanes from three viewpoints while printing dimensions, enemy count, nine loot sources, extraction distance, sky state, and cover-point count. `--capture-extraction` captures the unlocked seawall beacon and pad. `--validate-large-map` checks all six districts, the remote extraction distance, marker unlock, and actual Area3D mission completion. `--validate-objectives` drives both terminals and verifies that C# enters `EXTRACTION` only after both operations complete. `--validate-reinforcements` forces confirmed combat and verifies the delayed QRF wave. `--validate-equipment` checks plating, fire mode, and weapon light state changes.
+`--validate-squad` checks four-member AI fill, physical default-follow movement, all three class effects, all three squad orders, and HUD state. The paired `--validate-network-host` and `--validate-network-client` diagnostics run a real host/client session and verify remote slot replacement, shot relay, and class-ability relay.
