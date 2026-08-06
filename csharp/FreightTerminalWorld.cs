@@ -24,7 +24,9 @@ public partial class FreightTerminalWorld : Node3D
         new(-4, 0, 19.6f), new(-4, 0, 22.4f), new(2.7f, 0, 10), new(5.3f, 0, 10),
         new(-4, 0, -5.4f), new(-4, 0, -2.6f), new(-5.3f, 0, -20), new(-2.7f, 0, -20),
         new(3, 0, -32.4f), new(17, 0, 7.7f), new(17, 0, 10.3f), new(-12, 0, -5),
-        new(-24, 0, 3), new(-10, 0, 12), new(24, 0, -18)
+        new(-24, 0, 3), new(-10, 0, 12), new(24, 0, -18),
+        new(-37, 0, 17), new(-30, 0, 17), new(20, 0, 24), new(30, 0, 24),
+        new(-7, 0, 31), new(7, 0, 31)
     };
 
     private Node3D _levelRoot = null!;
@@ -41,6 +43,8 @@ public partial class FreightTerminalWorld : Node3D
     private float _interactionProgress;
     private ILootSource? _lootSearchTarget;
     private ILootSource? _openLootSource;
+    private bool _personalBackpackOpen;
+    private bool _interactReleaseRequired;
     private int _enemiesRemaining;
     private int _shotsFired;
     private int _shotsHit;
@@ -135,6 +139,14 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--capture-optics"))
         {
             CaptureOpticsFrames();
+        }
+        else if (Array.Exists(args, value => value == "--validate-stance-armor"))
+        {
+            ValidateStanceAndArmorFlow();
+        }
+        else if (Array.Exists(args, value => value == "--capture-expanded-map"))
+        {
+            CaptureExpandedMapFrame();
         }
     }
 
@@ -484,6 +496,7 @@ public partial class FreightTerminalWorld : Node3D
         _hud.LanguageChanged += SetLanguage;
         _hud.LootTakeRequested += TakeLootItem;
         _hud.LootEquipRequested += EquipLootItem;
+        _hud.LootReturnRequested += ReturnBackpackItem;
         _hud.BackpackUseRequested += UseBackpackItem;
         _hud.LootClosed += CloseLoot;
 
@@ -513,7 +526,8 @@ public partial class FreightTerminalWorld : Node3D
                 English = "Warehouse armory case",
                 Chinese = "仓库军械箱",
                 Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 2),
-                Parts = new[] { "muzzle_suppressor", "optic_scope" }
+                Parts = new[] { "muzzle_suppressor", "optic_scope" },
+                Equipment = new[] { "armor_heavy" }
             },
             new
             {
@@ -522,7 +536,8 @@ public partial class FreightTerminalWorld : Node3D
                 English = "Customs office locker",
                 Chinese = "海关办公室枪柜",
                 Weapon = WeaponCatalog.Build(WeaponPlatform.M4A1, 1),
-                Parts = new[] { "optic_holo", "mag_extended" }
+                Parts = new[] { "optic_holo", "mag_extended" },
+                Equipment = new[] { "pack_heavy" }
             },
             new
             {
@@ -531,7 +546,38 @@ public partial class FreightTerminalWorld : Node3D
                 English = "Maintenance weapon chest",
                 Chinese = "维修间武器箱",
                 Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 1),
-                Parts = new[] { "muzzle_brake", "grip_vertical" }
+                Parts = new[] { "muzzle_brake", "grip_vertical" },
+                Equipment = new[] { "helmet_light" }
+            },
+            new
+            {
+                Position = new Vector3(5.0f, 0.42f, 33.2f),
+                Rotation = Mathf.Pi / 2.0f,
+                English = "Security checkpoint response locker",
+                Chinese = "安检站应急装备柜",
+                Weapon = WeaponCatalog.Build(WeaponPlatform.M4A1, 0),
+                Parts = new[] { "optic_micro", "mag_extended" },
+                Equipment = new[] { "helmet_heavy" }
+            },
+            new
+            {
+                Position = new Vector3(-34.0f, 0.02f, 18.0f),
+                Rotation = 0.0f,
+                English = "Fuel depot hazard locker",
+                Chinese = "燃料库危险品装备箱",
+                Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 1),
+                Parts = new[] { "barrel_cqb", "muzzle_brake" },
+                Equipment = new[] { "armor_carrier", "pack_assault" }
+            },
+            new
+            {
+                Position = new Vector3(25.0f, 0.02f, 21.5f),
+                Rotation = -Mathf.Pi / 2.0f,
+                English = "Barracks command locker",
+                Chinese = "营房指挥装备柜",
+                Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 1),
+                Parts = new[] { "stock_precision", "optic_holo" },
+                Equipment = new[] { "helmet_heavy", "armor_heavy" }
             }
         };
         foreach (var definition in cases)
@@ -548,7 +594,16 @@ public partial class FreightTerminalWorld : Node3D
             {
                 weaponCase.Loot.Add(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = part });
             }
+            foreach (var equipmentId in definition.Equipment)
+            {
+                weaponCase.Loot.Add(new LootItem
+                {
+                    Kind = LootItemKind.Equipment,
+                    Equipment = EquipmentCatalog.Create(equipmentId)
+                });
+            }
             weaponCase.Loot.Add(new LootItem { Kind = LootItemKind.Ammunition, Quantity = _rng.RandiRange(35, 65) });
+            weaponCase.Loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate });
             AddChild(weaponCase);
             _lootSources.Add(weaponCase);
         }
@@ -616,7 +671,7 @@ public partial class FreightTerminalWorld : Node3D
         return pickup;
     }
 
-    private void OnHitConfirmed(bool killed) => _hud.ShowHit(killed);
+    private void OnHitConfirmed(bool killed, bool headshot, bool armorHit) => _hud.ShowHit(killed, headshot, armorHit);
 
     private void OnPlayerDied()
     {
@@ -640,6 +695,10 @@ public partial class FreightTerminalWorld : Node3D
 
     private void UpdateInteraction(float delta)
     {
+        if (!Input.IsActionPressed("interact"))
+        {
+            _interactReleaseRequired = false;
+        }
         if (_hud.IsLootVisible)
         {
             return;
@@ -666,14 +725,13 @@ public partial class FreightTerminalWorld : Node3D
                 _lootSearchTarget = nearest;
                 _interactionProgress = 0.0f;
             }
-            _interactionProgress = Input.IsActionPressed("interact")
-                ? Mathf.Min(1.0f, _interactionProgress + delta / nearest.SearchDuration)
-                : Mathf.Max(0.0f, _interactionProgress - delta * 1.8f);
-            _player.SetSearchPose(Input.IsActionPressed("interact"), _interactionProgress);
-            var search = GameLocalization.Get("search", _languageSetting, "SEARCH");
-            _hud.SetInteraction($"{search}  //  {nearest.DisplayName(_languageSetting)}", _interactionProgress, true);
-            if (_interactionProgress >= 1.0f)
+            _interactionProgress = 0.0f;
+            _player.SetSearchPose(false);
+            var open = GameLocalization.Get("open_loot", _languageSetting, "OPEN");
+            _hud.SetInteraction($"{open}  //  {nearest.DisplayName(_languageSetting)}", -1.0f, true);
+            if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
             {
+                _interactReleaseRequired = true;
                 OpenLoot(nearest);
             }
             return;
@@ -687,6 +745,7 @@ public partial class FreightTerminalWorld : Node3D
     {
         _interactionProgress = 0.0f;
         _openLootSource = source;
+        _personalBackpackOpen = false;
         source.OnSearched();
         _player.UiLocked = true;
         _player.SetSearchPose(true, 1.0f);
@@ -694,30 +753,32 @@ public partial class FreightTerminalWorld : Node3D
         _player.DisarmMovementInput();
         Input.MouseMode = Input.MouseModeEnum.Visible;
         _hud.SetInteraction(string.Empty, 0.0f, false);
-        _hud.ShowLoot(source.DisplayName(_languageSetting), source.Loot, _player);
+        _hud.ShowLoot(source.DisplayName(_languageSetting), source.Loot, _player, true);
     }
 
     private void OpenPersonalBackpack()
     {
         _openLootSource = null;
+        _personalBackpackOpen = true;
         _player.UiLocked = true;
         _player.DisarmFireInput();
         _player.DisarmMovementInput();
         Input.MouseMode = Input.MouseModeEnum.Visible;
         var title = GameLocalization.IsChinese(_languageSetting) ? "个人背包" : "Personal backpack";
-        _hud.ShowLoot(title, System.Array.Empty<LootItem>(), _player);
+        _hud.ShowLoot(title, System.Array.Empty<LootItem>(), _player, false);
     }
 
     private void CloseLoot()
     {
-        if (!_hud.IsLootVisible)
+        if (_hud.IsLootVisible)
         {
-            return;
+            _hud.HideLoot();
         }
-        _hud.HideLoot();
         _openLootSource = null;
+        _personalBackpackOpen = false;
         _lootSearchTarget = null;
         _interactionProgress = 0.0f;
+        _interactReleaseRequired = Input.IsActionPressed("interact");
         _player.UiLocked = false;
         _player.SetSearchPose(false);
         _player.DisarmFireInput();
@@ -785,11 +846,33 @@ public partial class FreightTerminalWorld : Node3D
         }
     }
 
+    private void ReturnBackpackItem(string itemId)
+    {
+        if (_openLootSource is null)
+        {
+            return;
+        }
+        var index = _player.Backpack.FindIndex(item => item.Id == itemId);
+        if (index < 0)
+        {
+            return;
+        }
+        var returned = _player.Backpack[index];
+        _player.Backpack.RemoveAt(index);
+        _openLootSource.Loot.Add(returned);
+        RefreshLootView();
+    }
+
     private void RefreshLootView()
     {
         if (_openLootSource is not null)
         {
-            _hud.ShowLoot(_openLootSource.DisplayName(_languageSetting), _openLootSource.Loot, _player);
+            _hud.ShowLoot(_openLootSource.DisplayName(_languageSetting), _openLootSource.Loot, _player, true);
+        }
+        else if (_personalBackpackOpen && _hud.IsLootVisible)
+        {
+            var title = GameLocalization.IsChinese(_languageSetting) ? "个人背包" : "Personal backpack";
+            _hud.ShowLoot(title, System.Array.Empty<LootItem>(), _player, false);
         }
     }
 
@@ -811,7 +894,7 @@ public partial class FreightTerminalWorld : Node3D
         var action = _objectiveStage == 0
             ? GameLocalization.Get("disable_relay", _languageSetting, "DISABLE RELAY")
             : GameLocalization.Get("download_manifest", _languageSetting, "DOWNLOAD MANIFEST");
-        _interactionProgress = Input.IsActionPressed("interact")
+        _interactionProgress = Input.IsActionPressed("interact") && !_interactReleaseRequired
             ? Mathf.Min(1.0f, _interactionProgress + delta / 1.8f)
             : Mathf.Max(0.0f, _interactionProgress - delta * 1.6f);
         _hud.SetInteraction(action, _interactionProgress, true);
@@ -1191,22 +1274,64 @@ public partial class FreightTerminalWorld : Node3D
         _player.GlobalPosition = source.LootNode.GlobalPosition + new Vector3(0, 0.2f, 1.6f);
         _missionDirector.ExitDeploymentZone();
         await WaitFrames(8);
+        var openedAt = Time.GetTicksMsec();
         Input.ActionPress("interact");
         var deadline = Time.GetTicksMsec() + 2500;
         while (!_hud.IsLootVisible && Time.GetTicksMsec() < deadline)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         }
-        Input.ActionRelease("interact");
+        var immediateOpenMilliseconds = Time.GetTicksMsec() - openedAt;
         var item = source.Loot.Find(candidate => candidate.Kind == LootItemKind.Weapon);
         if (item is not null)
         {
             EquipLootItem(item.Id);
         }
+        var dragCandidate = source.Loot.Find(candidate => candidate.Kind != LootItemKind.Weapon);
+        var returnedToSource = false;
+        var dragDropRouted = false;
+        if (dragCandidate is not null)
+        {
+            var dragProbe = new LootDropZone { Target = LootDropTarget.Backpack };
+            dragProbe.Dropped += (itemId, origin, target) =>
+            {
+                dragDropRouted = origin == LootDragOrigin.Source && target == LootDropTarget.Backpack;
+                TakeLootItem(itemId);
+            };
+            var dragData = new Godot.Collections.Dictionary
+            {
+                ["item_id"] = dragCandidate.Id,
+                ["origin"] = (int)LootDragOrigin.Source,
+                ["kind"] = (int)dragCandidate.Kind,
+                ["slot"] = -1
+            };
+            if (dragProbe._CanDropData(Vector2.Zero, dragData))
+            {
+                dragProbe._DropData(Vector2.Zero, dragData);
+            }
+            dragProbe.Free();
+            ReturnBackpackItem(dragCandidate.Id);
+            returnedToSource = source.Loot.Exists(candidate => candidate.Id == dragCandidate.Id)
+                && !_player.Backpack.Exists(candidate => candidate.Id == dragCandidate.Id);
+        }
         await WaitFrames(4);
         var stats = _player.CurrentWeaponStats;
         SaveViewportImage("res://loot_validation.png");
-        GD.Print($"LOOT_CHECK open={_hud.IsLootVisible} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+        source.Loot.Clear();
+        CloseLoot();
+        await WaitFrames(5);
+        var heldInputBlocked = !_hud.IsLootVisible;
+        Input.ActionRelease("interact");
+        await WaitFrames(3);
+        Input.ActionPress("interact");
+        deadline = Time.GetTicksMsec() + 800;
+        while (!_hud.IsLootVisible && Time.GetTicksMsec() < deadline)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+        Input.ActionRelease("interact");
+        var reopenedEmpty = _hud.IsLootVisible && source.Loot.Count == 0;
+        GD.Print($"LOOT_CHECK open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} reopened_empty={reopenedEmpty} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         CloseLoot();
         await WaitFrames(24);
         SaveViewportImage("res://modular_weapon_validation.png");
@@ -1238,7 +1363,19 @@ public partial class FreightTerminalWorld : Node3D
         }
         await WaitFrames(4);
         SaveViewportImage("res://corpse_loot_validation.png");
-        GD.Print($"CORPSE_LOOT_CHECK dead={target.IsDead} open={_hud.IsLootVisible} weapon_visible={target.CarriedWeaponVisible} items={target.Loot.Count} equipped={_player.EquippedWeapon.Platform}");
+        var equipmentCount = target.Loot.FindAll(item => item.Kind == LootItemKind.Equipment).Count;
+        target.Loot.Clear();
+        CloseLoot();
+        await WaitFrames(3);
+        Input.ActionPress("interact");
+        deadline = Time.GetTicksMsec() + 800;
+        while (!_hud.IsLootVisible && Time.GetTicksMsec() < deadline)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+        Input.ActionRelease("interact");
+        var reopenedEmpty = _hud.IsLootVisible && target.Loot.Count == 0;
+        GD.Print($"CORPSE_LOOT_CHECK dead={target.IsDead} open={_hud.IsLootVisible} reopened_empty={reopenedEmpty} weapon_visible={target.CarriedWeaponVisible} equipment={equipmentCount} items={target.Loot.Count} equipped={_player.EquippedWeapon.Platform}");
         GetTree().Quit();
     }
 
@@ -1290,6 +1427,51 @@ public partial class FreightTerminalWorld : Node3D
         GetTree().Quit();
     }
 
+    private async void ValidateStanceAndArmorFlow()
+    {
+        foreach (var enemy in _enemies)
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        _missionDirector.ExitDeploymentZone();
+        var attacker = _enemies[0];
+        var crouched = _player.TrySetStance(PlayerStance.Crouched);
+        await WaitFrames(18);
+        var crouchHeight = _player.ViewHeight;
+        Input.ActionPress("aim");
+        Input.ActionPress("lean_left");
+        await WaitFrames(14);
+        var crouchLean = _player.IsAiming && _player.LeanAmount < -0.25f;
+        Input.ActionRelease("lean_left");
+        Input.ActionRelease("aim");
+        var prone = _player.TrySetStance(PlayerStance.Prone);
+        await WaitFrames(18);
+        var proneHeight = _player.ViewHeight;
+        var healthBefore = _player.Health;
+        var helmetBefore = _player.EquippedHelmet.Durability;
+        _player.TakeDamage(20.0f, _player.HitPoint(HitRegion.Head), attacker);
+        var helmetAfter = _player.EquippedHelmet.Durability;
+        var armorBefore = _player.EquippedBodyArmor.Durability;
+        _player.TakeDamage(20.0f, _player.HitPoint(HitRegion.Torso), attacker);
+        var armorAfter = _player.EquippedBodyArmor.Durability;
+        GD.Print($"STANCE_ARMOR_CHECK crouched={crouched} crouch_height={crouchHeight:0.00} crouch_lean_ads={crouchLean} prone={prone} prone_height={proneHeight:0.00} health_loss={healthBefore - _player.Health:0.0} helmet_loss={helmetBefore - helmetAfter:0.0} armor_loss={armorBefore - armorAfter:0.0}");
+        GetTree().Quit();
+    }
+
+    private async void CaptureExpandedMapFrame()
+    {
+        foreach (var enemy in _enemies)
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        _player.GlobalPosition = new Vector3(0, 0.2f, 38.0f);
+        _player.Rotation = Vector3.Zero;
+        await WaitFrames(32);
+        SaveViewportImage("res://expanded_map_validation.png");
+        GD.Print($"MAP_CHECK loot_sources={_lootSources.Count} checkpoint=true fuel_depot=true barracks=true");
+        GetTree().Quit();
+    }
+
     private async Task WaitFrames(int count)
     {
         for (var i = 0; i < count; i++)
@@ -1300,7 +1482,17 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SaveViewportImage(string path)
     {
+        if (DisplayServer.GetName() == "headless")
+        {
+            GD.Print($"CAPTURE_SKIPPED headless=true path={path}");
+            return;
+        }
         var image = GetViewport().GetTexture().GetImage();
+        if (image is null)
+        {
+            GD.Print($"CAPTURE_SKIPPED headless=true path={path}");
+            return;
+        }
         image.SavePng(path);
     }
 }

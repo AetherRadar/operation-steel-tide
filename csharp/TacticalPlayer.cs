@@ -3,6 +3,20 @@ using Godot;
 
 namespace OperationSteelTide;
 
+public enum PlayerStance
+{
+    Standing,
+    Crouched,
+    Prone
+}
+
+public enum HitRegion
+{
+    Head,
+    Torso,
+    Limbs
+}
+
 [GlobalClass]
 public partial class TacticalPlayer : CharacterBody3D
 {
@@ -10,16 +24,22 @@ public partial class TacticalPlayer : CharacterBody3D
     public delegate void DiedEventHandler();
 
     [Signal]
-    public delegate void HitConfirmedEventHandler(bool killed);
+    public delegate void HitConfirmedEventHandler(bool killed, bool headshot, bool armorHit);
 
     private const float WalkSpeed = 5.6f;
     private const float SprintSpeed = 8.8f;
     private const float CrouchSpeed = 3.1f;
+    private const float ProneSpeed = 1.65f;
     private const float Gravity = 22.0f;
     private const float ReloadDuration = 2.45f;
 
     public float Health { get; private set; } = 100.0f;
-    public float Armor { get; private set; } = 75.0f;
+    public EquipmentItem EquippedHelmet { get; private set; } = EquipmentCatalog.Create("helmet_light");
+    public EquipmentItem EquippedBodyArmor { get; private set; } = EquipmentCatalog.Create("armor_carrier");
+    public EquipmentItem EquippedBackpack { get; private set; } = EquipmentCatalog.Create("pack_assault");
+    public float Armor => EquippedBodyArmor.Definition.MaxDurability <= 0.0f
+        ? 0.0f
+        : EquippedBodyArmor.Durability / EquippedBodyArmor.Definition.MaxDurability * 100.0f;
     public float Stamina { get; private set; } = 100.0f;
     public int Ammo { get; private set; } = 30;
     public int ReserveAmmo { get; private set; } = 150;
@@ -34,7 +54,12 @@ public partial class TacticalPlayer : CharacterBody3D
     public string FireMode => _automaticFire ? "AUTO" : "SEMI";
     public WeaponBuild EquippedWeapon { get; private set; } = WeaponCatalog.StarterWeapon();
     public List<LootItem> Backpack { get; } = new();
-    public int BackpackCapacity => 12;
+    public int BackpackCapacity => 6 + EquippedBackpack.Definition.CapacityBonus;
+    public PlayerStance Stance => _stance;
+    public bool IsCrouched => _stance == PlayerStance.Crouched;
+    public bool IsProne => _stance == PlayerStance.Prone;
+    public float LeanAmount => _leanValue;
+    public float ViewHeight => IsInstanceValid(_head) ? _head.Position.Y : 0.0f;
     public bool KnifeEquipped => _knifeEquipped;
     public bool UiLocked { get; set; }
     public WeaponStats CurrentWeaponStats => EquippedWeapon.Stats();
@@ -67,6 +92,7 @@ public partial class TacticalPlayer : CharacterBody3D
     private float _leanValue;
     private float _knifeTime;
     private float _searchPose;
+    private PlayerStance _stance = PlayerStance.Standing;
 
     private Node3D _head = null!;
     private Camera3D _camera = null!;
@@ -800,16 +826,18 @@ public partial class TacticalPlayer : CharacterBody3D
         }
         HasMovementIntent = _movementInputArmed && input.LengthSquared() > 0.001f;
         var direction = (Transform.Basis * new Vector3(input.X, 0, input.Y)).Normalized();
-        var crouching = Input.IsActionPressed("crouch");
-        var sprinting = Input.IsActionPressed("sprint") && input.Y < -0.15f && !crouching
+        var horizontalSpeedBeforeMove = new Vector2(Velocity.X, Velocity.Z).Length();
+        UpdateStanceInput(horizontalSpeedBeforeMove);
+        var crouching = _stance == PlayerStance.Crouched;
+        var prone = _stance == PlayerStance.Prone;
+        var sprinting = Input.IsActionPressed("sprint") && input.Y < -0.15f && !crouching && !prone
             && Stamina > 1.0f && !_isAiming;
-        var speed = crouching ? CrouchSpeed : sprinting ? SprintSpeed : WalkSpeed;
+        var speed = prone ? ProneSpeed : crouching ? CrouchSpeed : sprinting ? SprintSpeed : WalkSpeed;
 
-        if (Input.IsActionJustPressed("crouch") && IsOnFloor()
-            && new Vector2(Velocity.X, Velocity.Z).Length() > 7.1f)
+        if (_slideTime > 0.0f)
         {
-            _slideTime = 0.72f;
-            _slideDirection = new Vector3(Velocity.X, 0, Velocity.Z).Normalized();
+            crouching = true;
+            prone = false;
         }
 
         var velocity = Velocity;
@@ -835,21 +863,22 @@ public partial class TacticalPlayer : CharacterBody3D
         {
             velocity.Y -= Gravity * delta;
         }
-        else if (Input.IsActionJustPressed("jump") && !crouching)
+        else if (Input.IsActionJustPressed("jump") && !crouching && !prone)
         {
             velocity.Y = 6.8f;
         }
         Velocity = velocity;
         MoveAndSlide();
 
-        var targetHeadY = crouching ? 1.18f : 1.57f;
+        var targetHeadY = prone ? 0.62f : crouching ? 1.16f : 1.57f;
+        var targetColliderHeight = prone ? 0.78f : crouching ? 1.2f : 1.75f;
         var headPosition = _head.Position;
         headPosition.Y = Mathf.Lerp(headPosition.Y, targetHeadY, delta * 12.0f);
         _head.Position = headPosition;
         var capsule = (CapsuleShape3D)_collider.Shape;
-        capsule.Height = Mathf.Lerp(capsule.Height, crouching ? 1.18f : 1.75f, delta * 12.0f);
+        capsule.Height = Mathf.Lerp(capsule.Height, targetColliderHeight, delta * 12.0f);
         var colliderPosition = _collider.Position;
-        colliderPosition.Y = Mathf.Lerp(colliderPosition.Y, crouching ? 0.6f : 0.88f, delta * 12.0f);
+        colliderPosition.Y = Mathf.Lerp(colliderPosition.Y, targetColliderHeight * 0.5f, delta * 12.0f);
         _collider.Position = colliderPosition;
 
         var horizontalSpeed = new Vector2(Velocity.X, Velocity.Z).Length();
@@ -870,6 +899,90 @@ public partial class TacticalPlayer : CharacterBody3D
         }
     }
 
+    private void UpdateStanceInput(float horizontalSpeed)
+    {
+        if (!IsOnFloor())
+        {
+            return;
+        }
+        if (Input.IsActionJustPressed("prone"))
+        {
+            TrySetStance(_stance == PlayerStance.Prone ? PlayerStance.Crouched : PlayerStance.Prone);
+            _slideTime = 0.0f;
+            return;
+        }
+        if (!Input.IsActionJustPressed("crouch"))
+        {
+            return;
+        }
+        if (_stance == PlayerStance.Standing && IsOnFloor() && horizontalSpeed > 7.1f)
+        {
+            _stance = PlayerStance.Crouched;
+            _slideTime = 0.72f;
+            _slideDirection = new Vector3(Velocity.X, 0, Velocity.Z).Normalized();
+            return;
+        }
+        var target = _stance switch
+        {
+            PlayerStance.Standing => PlayerStance.Crouched,
+            PlayerStance.Crouched => PlayerStance.Standing,
+            _ => PlayerStance.Crouched
+        };
+        TrySetStance(target);
+    }
+
+    public bool TrySetStance(PlayerStance target)
+    {
+        if (target == _stance)
+        {
+            return true;
+        }
+        if (StanceHeight(target) > StanceHeight(_stance) && !HasStanceClearance(StanceHeight(target)))
+        {
+            Hud?.ShowLocalizedMessage("stance_blocked", "NOT ENOUGH CLEARANCE", new Color(1.0f, 0.58f, 0.28f));
+            return false;
+        }
+        _stance = target;
+        if (_stance == PlayerStance.Prone)
+        {
+            _slideTime = 0.0f;
+        }
+        return true;
+    }
+
+    private bool HasStanceClearance(float targetHeight)
+    {
+        var currentHeight = StanceHeight(_stance);
+        var offsets = new[]
+        {
+            Vector3.Zero,
+            Vector3.Right * 0.28f,
+            Vector3.Left * 0.28f,
+            Vector3.Forward * 0.28f,
+            Vector3.Back * 0.28f
+        };
+        foreach (var offset in offsets)
+        {
+            var query = PhysicsRayQueryParameters3D.Create(
+                GlobalPosition + offset + Vector3.Up * (currentHeight - 0.08f),
+                GlobalPosition + offset + Vector3.Up * (targetHeight + 0.08f));
+            query.CollisionMask = 1;
+            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+            if (GetWorld3D().DirectSpaceState.IntersectRay(query).Count > 0)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static float StanceHeight(PlayerStance stance) => stance switch
+    {
+        PlayerStance.Prone => 0.78f,
+        PlayerStance.Crouched => 1.2f,
+        _ => 1.75f
+    };
+
     private void UpdateCameraAndWeapon(float delta)
     {
         _recoilPitch = Mathf.Lerp(_recoilPitch, 0.0f, delta * 11.0f);
@@ -882,7 +995,13 @@ public partial class TacticalPlayer : CharacterBody3D
         _bobTime = IsOnFloor() && horizontalSpeed > 0.5f
             ? _bobTime + delta * horizontalSpeed * 1.45f
             : Mathf.Lerp(_bobTime, 0.0f, delta * 3.0f);
-        var bobStrength = Mathf.Clamp(horizontalSpeed / SprintSpeed, 0.0f, 1.0f);
+        var stanceBob = _stance switch
+        {
+            PlayerStance.Prone => 0.22f,
+            PlayerStance.Crouched => 0.55f,
+            _ => 1.0f
+        };
+        var bobStrength = Mathf.Clamp(horizontalSpeed / SprintSpeed, 0.0f, 1.0f) * stanceBob;
         var bobOffset = new Vector3(
             Mathf.Sin(_bobTime * 0.9f) * 0.021f,
             Mathf.Abs(Mathf.Cos(_bobTime * 1.8f)) * 0.024f,
@@ -1012,12 +1131,12 @@ public partial class TacticalPlayer : CharacterBody3D
         if (target is EnemyOperator enemy)
         {
             var killed = enemy.TakeDamage(_rng.RandfRange(56.0f, 68.0f), point, this);
-            EmitSignal(SignalName.HitConfirmed, killed);
+            EmitSignal(SignalName.HitConfirmed, killed, enemy.LastHitWasHeadshot, enemy.LastHitWasArmored);
         }
         else if (target is ExplosiveBarrel barrel)
         {
             barrel.TakeDamage(24.0f, point, this);
-            EmitSignal(SignalName.HitConfirmed, false);
+            EmitSignal(SignalName.HitConfirmed, false, false, false);
         }
         Main?.SpawnImpact(point, hit["normal"].AsVector3());
     }
@@ -1060,7 +1179,13 @@ public partial class TacticalPlayer : CharacterBody3D
         Hud?.PulseCrosshair();
 
         var movingPenalty = Mathf.Clamp(new Vector2(Velocity.X, Velocity.Z).Length() / SprintSpeed, 0.0f, 1.0f);
-        var spread = (_isAiming ? 0.0015f : 0.0065f) + movingPenalty * 0.009f;
+        var stanceAccuracy = _stance switch
+        {
+            PlayerStance.Prone => 0.52f,
+            PlayerStance.Crouched => 0.76f,
+            _ => 1.0f
+        };
+        var spread = ((_isAiming ? 0.0015f : 0.0065f) + movingPenalty * 0.009f) * stanceAccuracy;
         var direction = -_camera.GlobalBasis.Z;
         direction += _camera.GlobalBasis.X * _rng.RandfRange(-spread, spread);
         direction += _camera.GlobalBasis.Y * _rng.RandfRange(-spread, spread);
@@ -1084,25 +1209,31 @@ public partial class TacticalPlayer : CharacterBody3D
             if (target is EnemyOperator enemy)
             {
                 damagedTarget = true;
-                headshot = end.Y > enemy.GlobalPosition.Y + 1.5f;
                 var distance = from.DistanceTo(end);
                 var falloff = Mathf.Lerp(1.0f, 0.52f, Mathf.Clamp(distance / maximumRange, 0.0f, 1.0f));
                 killed = enemy.TakeDamage(stats.Damage * falloff * _rng.RandfRange(0.94f, 1.06f), end, this);
-                EmitSignal(SignalName.HitConfirmed, killed);
+                headshot = enemy.LastHitWasHeadshot;
+                EmitSignal(SignalName.HitConfirmed, killed, headshot, enemy.LastHitWasArmored);
             }
             else if (target is ExplosiveBarrel barrel)
             {
                 damagedTarget = true;
                 barrel.TakeDamage(stats.Damage * _rng.RandfRange(0.94f, 1.06f), end, this);
-                EmitSignal(SignalName.HitConfirmed, false);
+                EmitSignal(SignalName.HitConfirmed, false, false, false);
             }
             Main?.SpawnImpact(end, hit["normal"].AsVector3());
         }
 
         Main?.SpawnTracer(_muzzle.GlobalPosition, end, new Color(1.0f, 0.67f, 0.24f));
         Main?.RecordShot(damagedTarget, headshot);
-        _recoilPitch -= _rng.RandfRange(0.012f, 0.021f) * stats.Recoil * (_isAiming ? 0.55f : 1.0f);
-        _recoilSide += _rng.RandfRange(-0.018f, 0.018f) * stats.Recoil;
+        var stanceRecoil = _stance switch
+        {
+            PlayerStance.Prone => 0.62f,
+            PlayerStance.Crouched => 0.82f,
+            _ => 1.0f
+        };
+        _recoilPitch -= _rng.RandfRange(0.012f, 0.021f) * stats.Recoil * (_isAiming ? 0.55f : 1.0f) * stanceRecoil;
+        _recoilSide += _rng.RandfRange(-0.018f, 0.018f) * stats.Recoil * stanceRecoil;
         var weaponPosition = _weaponRoot.Position;
         weaponPosition.Z += 0.055f;
         _weaponRoot.Position = weaponPosition;
@@ -1265,7 +1396,10 @@ public partial class TacticalPlayer : CharacterBody3D
         {
             return;
         }
-        Armor = Mathf.Min(100.0f, Armor + 40.0f);
+        var armorDefinition = EquippedBodyArmor.Definition;
+        EquippedBodyArmor.Durability = Mathf.Min(
+            armorDefinition.MaxDurability,
+            EquippedBodyArmor.Durability + armorDefinition.MaxDurability * 0.4f);
         ArmorPlates--;
         _isPlating = false;
         Hud?.SetEquipmentAction(string.Empty, 0.0f, false);
@@ -1348,6 +1482,39 @@ public partial class TacticalPlayer : CharacterBody3D
         {
             return null;
         }
+        if (item.Kind == LootItemKind.Equipment && item.Equipment is not null)
+        {
+            var incoming = item.Equipment;
+            if (incoming.Definition.Slot == EquipmentSlot.Backpack
+                && Backpack.Count > 6 + incoming.Definition.CapacityBonus)
+            {
+                Hud?.ShowLocalizedMessage("pack_too_small", "MOVE ITEMS BEFORE EQUIPPING THIS BACKPACK", new Color(1.0f, 0.48f, 0.28f));
+                return item;
+            }
+            var previous = incoming.Definition.Slot switch
+            {
+                EquipmentSlot.Helmet => EquippedHelmet,
+                EquipmentSlot.BodyArmor => EquippedBodyArmor,
+                EquipmentSlot.Backpack => EquippedBackpack,
+                _ => null
+            };
+            switch (incoming.Definition.Slot)
+            {
+                case EquipmentSlot.Helmet:
+                    EquippedHelmet = incoming.Clone();
+                    break;
+                case EquipmentSlot.BodyArmor:
+                    EquippedBodyArmor = incoming.Clone();
+                    break;
+                case EquipmentSlot.Backpack:
+                    EquippedBackpack = incoming.Clone();
+                    break;
+            }
+            Hud?.ShowLocalizedMessage("equipment_replaced", "EQUIPMENT REPLACED", new Color(0.84f, 0.7f, 0.34f));
+            return previous is null
+                ? null
+                : new LootItem { Kind = LootItemKind.Equipment, Equipment = previous.Clone() };
+        }
         return item;
     }
 
@@ -1396,7 +1563,24 @@ public partial class TacticalPlayer : CharacterBody3D
         Main.ThrowGrenade(_camera.GlobalPosition - _camera.GlobalBasis.Z * 0.7f, -_camera.GlobalBasis.Z, this);
     }
 
-    public bool TakeDamage(float amount, Vector3 _hitPosition = default, Node? _attacker = null)
+    public Vector3 HitPoint(HitRegion region)
+    {
+        var height = _stance switch
+        {
+            PlayerStance.Prone => 0.62f,
+            PlayerStance.Crouched => 1.16f,
+            _ => 1.57f
+        };
+        var y = region switch
+        {
+            HitRegion.Head => height,
+            HitRegion.Torso => height * 0.65f,
+            _ => Mathf.Max(0.22f, height * 0.27f)
+        };
+        return GlobalPosition + Vector3.Up * y;
+    }
+
+    public bool TakeDamage(float amount, Vector3 hitPosition = default, Node? attacker = null)
     {
         if (IsDead)
         {
@@ -1409,10 +1593,33 @@ public partial class TacticalPlayer : CharacterBody3D
 
         CancelPlate();
 
-        var absorbed = Mathf.Min(Armor, amount * 0.62f);
-        Armor -= absorbed;
-        Health -= amount - absorbed;
+        var region = attacker is EnemyOperator ? ResolveHitRegion(hitPosition) : HitRegion.Torso;
+        var adjustedDamage = region switch
+        {
+            HitRegion.Head => amount * 1.85f,
+            HitRegion.Limbs => amount * 0.72f,
+            _ => amount
+        };
+        var protectiveGear = region switch
+        {
+            HitRegion.Head => EquippedHelmet,
+            HitRegion.Torso => EquippedBodyArmor,
+            _ => null
+        };
+        var armorHit = protectiveGear is not null && protectiveGear.Durability > 0.0f;
+        if (protectiveGear is not null)
+        {
+            adjustedDamage = ApplyProtection(protectiveGear, adjustedDamage);
+        }
+        Health -= adjustedDamage;
         Hud?.ShowDamage();
+        if (armorHit)
+        {
+            Hud?.ShowLocalizedMessage(
+                region == HitRegion.Head ? "helmet_impact" : "armor_impact",
+                region == HitRegion.Head ? "HELMET ABSORBED IMPACT" : "BODY ARMOR ABSORBED IMPACT",
+                new Color(0.42f, 0.72f, 1.0f));
+        }
         if (Health <= 0.0f)
         {
             Health = 0.0f;
@@ -1422,5 +1629,33 @@ public partial class TacticalPlayer : CharacterBody3D
             return true;
         }
         return false;
+    }
+
+    private HitRegion ResolveHitRegion(Vector3 hitPosition)
+    {
+        var height = _stance switch
+        {
+            PlayerStance.Prone => 0.62f,
+            PlayerStance.Crouched => 1.16f,
+            _ => 1.57f
+        };
+        var localHeight = hitPosition.Y - GlobalPosition.Y;
+        if (localHeight >= height * 0.86f)
+        {
+            return HitRegion.Head;
+        }
+        return localHeight >= height * 0.4f ? HitRegion.Torso : HitRegion.Limbs;
+    }
+
+    private static float ApplyProtection(EquipmentItem equipment, float damage)
+    {
+        if (equipment.Durability <= 0.0f || equipment.Definition.Protection <= 0.0f)
+        {
+            return damage;
+        }
+        var durabilityRatio = equipment.Durability / equipment.Definition.MaxDurability;
+        var effectiveProtection = equipment.Definition.Protection * Mathf.Lerp(0.55f, 1.0f, durabilityRatio);
+        equipment.Durability = Mathf.Max(0.0f, equipment.Durability - damage * 0.58f);
+        return damage * (1.0f - effectiveProtection);
     }
 }

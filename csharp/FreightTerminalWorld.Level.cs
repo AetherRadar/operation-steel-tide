@@ -230,6 +230,9 @@ public partial class FreightTerminalWorld
         BuildLootRooms(concrete, interiorWall, interiorTrim, yellow);
         BuildContainerYard(steelDark);
         BuildCraneAndPipes(steel, steelDark, rust, yellow);
+        BuildSecurityCheckpoint(concrete, steelDark, yellow);
+        BuildFuelDepot(concrete, steel, steelDark, rust, yellow);
+        BuildBarracks(concrete, interiorWall, interiorTrim, yellow);
         BuildCover(concreteDark);
         BuildBackground(concreteDark, steel);
         AddPuddles();
@@ -491,6 +494,120 @@ public partial class FreightTerminalWorld
         }
         MeshBox(_levelRoot, new Vector3(22, 4.45f, 26.1f), new Vector3(32, 0.08f, 0.08f), yellow);
         MeshBox(_levelRoot, new Vector3(22, 4.45f, 27.9f), new Vector3(32, 0.08f, 0.08f), yellow);
+    }
+
+    private void BuildSecurityCheckpoint(
+        Godot.Material concrete,
+        Godot.Material dark,
+        Godot.Material yellow)
+    {
+        var booth = Mat("checkpoint_booth", new Color(0.32f, 0.38f, 0.35f), 0.32f, 0.66f);
+        var glass = Mat("checkpoint_glass", new Color(0.11f, 0.27f, 0.3f), 0.72f, 0.12f);
+        StaticBox("CheckpointIslandL", new Vector3(-7.2f, 0.2f, 33.0f), new Vector3(8.2f, 0.4f, 1.25f), concrete);
+        StaticBox("CheckpointIslandR", new Vector3(7.2f, 0.2f, 33.0f), new Vector3(8.2f, 0.4f, 1.25f), concrete);
+        StaticBox("CheckpointPostL", new Vector3(-3.35f, 2.0f, 30.0f), new Vector3(0.32f, 4.0f, 0.32f), dark);
+        StaticBox("CheckpointPostR", new Vector3(3.35f, 2.0f, 30.0f), new Vector3(0.32f, 4.0f, 0.32f), dark);
+        StaticBox("CheckpointHeader", new Vector3(0, 3.85f, 30.0f), new Vector3(7.0f, 0.32f, 0.42f), yellow);
+        StaticBox("CheckpointBooth", new Vector3(7.1f, 1.25f, 31.3f), new Vector3(3.3f, 2.5f, 3.0f), booth);
+        MeshBox(_levelRoot, new Vector3(5.42f, 1.55f, 31.3f), new Vector3(0.04f, 0.78f, 1.55f), glass);
+        MeshBox(_levelRoot, new Vector3(7.1f, 3.18f, 31.3f), new Vector3(3.8f, 0.18f, 3.5f), dark);
+        for (var side = -1; side <= 1; side += 2)
+        {
+            StaticBox(
+                "CheckpointBarrier",
+                new Vector3(side * 8.6f, 0.62f, 29.5f),
+                new Vector3(6.0f, 0.28f, 0.22f),
+                yellow,
+                new Vector3(0, 0, side * 0.08f));
+        }
+        _levelRoot.AddChild(new OmniLight3D
+        {
+            Position = new Vector3(0, 3.55f, 29.7f),
+            LightColor = new Color(0.72f, 0.9f, 1.0f),
+            LightEnergy = 1.8f,
+            OmniRange = 9.0f,
+            ShadowEnabled = false
+        });
+    }
+
+    private void BuildFuelDepot(
+        Godot.Material concrete,
+        Godot.Material steel,
+        Godot.Material dark,
+        Godot.Material rust,
+        Godot.Material yellow)
+    {
+        var center = new Vector3(-34.0f, 0, 14.0f);
+        StaticBox("FuelDepotPad", center + new Vector3(0, 0.08f, 0), new Vector3(13.5f, 0.16f, 10.5f), concrete);
+        foreach (var x in new[] { -37.2f, -31.4f })
+        {
+            StaticCylinder("FuelTank", new Vector3(x, 2.25f, 12.6f), 1.85f, 4.5f, steel);
+            MeshBox(_levelRoot, new Vector3(x, 4.55f, 12.6f), new Vector3(3.25f, 0.18f, 0.22f), yellow);
+            StaticCylinder("FuelValve", new Vector3(x, 1.0f, 10.6f), 0.18f, 1.0f, rust, new Vector3(Mathf.Pi / 2, 0, 0));
+        }
+        foreach (var x in new[] { -40.0f, -28.0f })
+        {
+            StaticBox("FuelCanopyPost", new Vector3(x, 2.5f, 17.7f), new Vector3(0.3f, 5.0f, 0.3f), dark);
+        }
+        StaticBox("FuelCanopy", new Vector3(-34.0f, 5.0f, 17.7f), new Vector3(12.4f, 0.28f, 3.8f), dark);
+        for (var z = 9; z <= 19; z += 2)
+        {
+            MeshBox(_levelRoot, new Vector3(-40.7f, 1.05f, z), new Vector3(0.08f, 2.1f, 1.15f), yellow);
+        }
+        StaticBox("FuelPipe", new Vector3(-34.2f, 0.8f, 17.0f), new Vector3(7.0f, 0.22f, 0.22f), rust);
+        _levelRoot.AddChild(new OmniLight3D
+        {
+            Position = center + new Vector3(0, 4.65f, 3.7f),
+            LightColor = new Color(1.0f, 0.68f, 0.32f),
+            LightEnergy = 2.2f,
+            OmniRange = 10.5f,
+            ShadowEnabled = false
+        });
+    }
+
+    private void BuildBarracks(
+        Godot.Material floor,
+        Godot.Material wall,
+        Godot.Material trim,
+        Godot.Material marker)
+    {
+        var center = new Vector3(25.0f, 0, 21.5f);
+        const float width = 17.0f;
+        const float depth = 7.4f;
+        const float height = 3.0f;
+        StaticBox("BarracksFloor", center + new Vector3(0, 0.06f, 0), new Vector3(width, 0.12f, depth), floor);
+        StaticBox("BarracksRoof", center + new Vector3(0, height, 0), new Vector3(width, 0.18f, depth), wall);
+        StaticBox("BarracksNorth", center + new Vector3(0, height * 0.5f, -depth * 0.5f), new Vector3(width, height, 0.18f), wall);
+        StaticBox("BarracksWest", center + new Vector3(-width * 0.5f, height * 0.5f, 0), new Vector3(0.18f, height, depth), wall);
+        StaticBox("BarracksEast", center + new Vector3(width * 0.5f, height * 0.5f, 0), new Vector3(0.18f, height, depth), wall);
+        StaticBox("BarracksSouthL", center + new Vector3(-5.15f, height * 0.5f, depth * 0.5f), new Vector3(6.7f, height, 0.18f), wall);
+        StaticBox("BarracksSouthR", center + new Vector3(5.15f, height * 0.5f, depth * 0.5f), new Vector3(6.7f, height, 0.18f), wall);
+        StaticBox("BarracksDoorHeader", center + new Vector3(0, 2.68f, depth * 0.5f), new Vector3(3.6f, 0.64f, 0.18f), wall);
+        foreach (var x in new[] { -2.8f, 2.8f })
+        {
+            StaticBox("BarracksPartitionA", center + new Vector3(x, 1.5f, -2.6f), new Vector3(0.14f, 3.0f, 2.2f), wall);
+            StaticBox("BarracksPartitionB", center + new Vector3(x, 1.5f, 2.15f), new Vector3(0.14f, 3.0f, 3.1f), wall);
+        }
+        var bunk = Mat("barracks_bunk", new Color(0.13f, 0.18f, 0.16f), 0.65f, 0.48f);
+        var bedding = Mat("barracks_bedding", new Color(0.28f, 0.34f, 0.27f), 0.02f, 0.96f);
+        foreach (var x in new[] { -6.0f, 0.0f, 6.0f })
+        {
+            StaticBox("BarracksBunk", center + new Vector3(x, 0.42f, -2.45f), new Vector3(2.2f, 0.16f, 0.82f), bunk);
+            MeshBox(_levelRoot, center + new Vector3(x, 0.56f, -2.45f), new Vector3(2.0f, 0.12f, 0.7f), bedding);
+            StaticBox("BarracksLocker", center + new Vector3(x + 0.95f, 0.85f, 1.9f), new Vector3(0.72f, 1.7f, 0.62f), trim);
+        }
+        MeshBox(_levelRoot, center + new Vector3(0, 2.56f, depth * 0.5f + 0.11f), new Vector3(2.5f, 0.15f, 0.04f), marker);
+        foreach (var x in new[] { -5.5f, 0.0f, 5.5f })
+        {
+            _levelRoot.AddChild(new OmniLight3D
+            {
+                Position = center + new Vector3(x, 2.65f, 0),
+                LightColor = new Color(0.84f, 0.93f, 0.86f),
+                LightEnergy = 1.25f,
+                OmniRange = 5.0f,
+                ShadowEnabled = false
+            });
+        }
     }
 
     private void BuildCover(Godot.Material _)

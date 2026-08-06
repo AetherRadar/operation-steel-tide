@@ -20,7 +20,7 @@ public partial class WeaponCase : StaticBody3D, ILootSource
     public string ChineseName { get; set; } = "武器箱";
     public List<LootItem> Loot { get; } = new();
     public Node3D LootNode => this;
-    public bool IsSearchable => Loot.Count > 0;
+    public bool IsSearchable => true;
     public float SearchDuration => 0.9f;
 
     private Node3D _lid = null!;

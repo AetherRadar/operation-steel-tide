@@ -26,7 +26,58 @@ public enum LootItemKind
     Weapon,
     Attachment,
     Ammunition,
-    ArmorPlate
+    ArmorPlate,
+    Equipment
+}
+
+public enum EquipmentSlot
+{
+    Helmet,
+    BodyArmor,
+    Backpack
+}
+
+public sealed class EquipmentDefinition
+{
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public required string ChineseName { get; init; }
+    public required EquipmentSlot Slot { get; init; }
+    public float Protection { get; init; }
+    public float MaxDurability { get; init; }
+    public int CapacityBonus { get; init; }
+}
+
+public sealed class EquipmentItem
+{
+    public required string DefinitionId { get; init; }
+    public float Durability { get; set; }
+
+    public EquipmentDefinition Definition => EquipmentCatalog.Definition(DefinitionId);
+
+    public EquipmentItem Clone() => new()
+    {
+        DefinitionId = DefinitionId,
+        Durability = Durability
+    };
+
+    public string DisplayName(string language) =>
+        GameLocalization.IsChinese(language) ? Definition.ChineseName : Definition.Name;
+
+    public string Detail(string language)
+    {
+        var definition = Definition;
+        var durability = $"{Durability:0}/{definition.MaxDurability:0}";
+        if (definition.Slot == EquipmentSlot.Backpack)
+        {
+            return GameLocalization.IsChinese(language)
+                ? $"容量 +{definition.CapacityBonus}  耐久 {durability}"
+                : $"CAPACITY +{definition.CapacityBonus}  DURABILITY {durability}";
+        }
+        return GameLocalization.IsChinese(language)
+            ? $"减伤 {definition.Protection * 100:0}%  耐久 {durability}"
+            : $"PROTECTION {definition.Protection * 100:0}%  DURABILITY {durability}";
+    }
 }
 
 public sealed class WeaponDefinition
@@ -129,6 +180,7 @@ public sealed class LootItem
     public LootItemKind Kind { get; init; }
     public WeaponBuild? Weapon { get; init; }
     public string AttachmentId { get; init; } = string.Empty;
+    public EquipmentItem? Equipment { get; init; }
     public int Quantity { get; set; } = 1;
 
     public string DisplayName(string language)
@@ -139,6 +191,7 @@ public sealed class LootItem
             LootItemKind.Attachment => LocalizedAttachment(language),
             LootItemKind.Ammunition => GameLocalization.IsChinese(language) ? $"步枪弹药 x{Quantity}" : $"Rifle ammunition x{Quantity}",
             LootItemKind.ArmorPlate => GameLocalization.IsChinese(language) ? $"复合护甲板 x{Quantity}" : $"Composite armor plate x{Quantity}",
+            LootItemKind.Equipment => Equipment?.DisplayName(language) ?? "Equipment",
             _ => "Item"
         };
     }
@@ -158,6 +211,10 @@ public sealed class LootItem
             var slot = GameLocalization.IsChinese(language) ? WeaponCatalog.SlotChinese(part.Slot) : part.Slot.ToString().ToUpperInvariant();
             return GameLocalization.IsChinese(language) ? $"{slot}零件，可安装至当前主武器" : $"{slot} part, installs on the equipped primary";
         }
+        if (Kind == LootItemKind.Equipment && Equipment is not null)
+        {
+            return Equipment.Detail(language);
+        }
         return GameLocalization.IsChinese(language) ? "可放入个人背包" : "Can be stored in the backpack";
     }
 
@@ -166,6 +223,53 @@ public sealed class LootItem
         var part = WeaponCatalog.Attachment(AttachmentId);
         return GameLocalization.IsChinese(language) ? part.ChineseName : part.Name;
     }
+}
+
+public static class EquipmentCatalog
+{
+    private static readonly Dictionary<string, EquipmentDefinition> Definitions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["helmet_light"] = new EquipmentDefinition
+        {
+            Id = "helmet_light", Name = "Light combat helmet", ChineseName = "轻型战术头盔",
+            Slot = EquipmentSlot.Helmet, Protection = 0.38f, MaxDurability = 55.0f
+        },
+        ["helmet_heavy"] = new EquipmentDefinition
+        {
+            Id = "helmet_heavy", Name = "Heavy composite helmet", ChineseName = "重型复合头盔",
+            Slot = EquipmentSlot.Helmet, Protection = 0.58f, MaxDurability = 85.0f
+        },
+        ["armor_carrier"] = new EquipmentDefinition
+        {
+            Id = "armor_carrier", Name = "Plate carrier", ChineseName = "插板式防弹衣",
+            Slot = EquipmentSlot.BodyArmor, Protection = 0.54f, MaxDurability = 100.0f
+        },
+        ["armor_heavy"] = new EquipmentDefinition
+        {
+            Id = "armor_heavy", Name = "Heavy assault armor", ChineseName = "重型突击护甲",
+            Slot = EquipmentSlot.BodyArmor, Protection = 0.68f, MaxDurability = 125.0f
+        },
+        ["pack_assault"] = new EquipmentDefinition
+        {
+            Id = "pack_assault", Name = "Assault backpack", ChineseName = "突击背包",
+            Slot = EquipmentSlot.Backpack, Protection = 0.0f, MaxDurability = 80.0f, CapacityBonus = 6
+        },
+        ["pack_heavy"] = new EquipmentDefinition
+        {
+            Id = "pack_heavy", Name = "Heavy expedition pack", ChineseName = "重型远征背包",
+            Slot = EquipmentSlot.Backpack, Protection = 0.0f, MaxDurability = 110.0f, CapacityBonus = 10
+        }
+    };
+
+    public static EquipmentDefinition Definition(string id) => Definitions[id];
+
+    public static EquipmentItem Create(string id)
+    {
+        var definition = Definition(id);
+        return new EquipmentItem { DefinitionId = id, Durability = definition.MaxDurability };
+    }
+
+    public static IReadOnlyCollection<EquipmentDefinition> All => Definitions.Values;
 }
 
 public static class WeaponCatalog

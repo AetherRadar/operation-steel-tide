@@ -15,6 +15,7 @@ public partial class CombatHUD : CanvasLayer
     [Signal] public delegate void LanguageChangedEventHandler(string language);
     [Signal] public delegate void LootTakeRequestedEventHandler(string itemId);
     [Signal] public delegate void LootEquipRequestedEventHandler(string itemId);
+    [Signal] public delegate void LootReturnRequestedEventHandler(string itemId);
     [Signal] public delegate void BackpackUseRequestedEventHandler(string itemId);
     [Signal] public delegate void LootClosedEventHandler();
 
@@ -65,6 +66,20 @@ public partial class CombatHUD : CanvasLayer
     private ColorRect _lootOverlay = null!;
     private VBoxContainer _lootSourceList = null!;
     private VBoxContainer _backpackList = null!;
+    private LootDropZone _lootSourceZone = null!;
+    private LootDropZone _backpackZone = null!;
+    private LootDropZone _primarySlot = null!;
+    private LootDropZone _helmetSlot = null!;
+    private LootDropZone _armorSlot = null!;
+    private LootDropZone _packSlot = null!;
+    private Label _primarySlotLabel = null!;
+    private Label _helmetSlotLabel = null!;
+    private Label _armorSlotLabel = null!;
+    private Label _packSlotLabel = null!;
+    private Label _primarySlotCaption = null!;
+    private Label _helmetSlotCaption = null!;
+    private Label _armorSlotCaption = null!;
+    private Label _packSlotCaption = null!;
     private Label _lootTitle = null!;
     private Label _lootStats = null!;
     private Label _lootSourceCaption = null!;
@@ -73,6 +88,7 @@ public partial class CombatHUD : CanvasLayer
     private IReadOnlyList<LootItem>? _shownLoot;
     private TacticalPlayer? _shownPlayer;
     private string _shownLootName = string.Empty;
+    private bool _shownSourceAvailable;
     private Tween? _hitTween;
     private Tween? _damageTween;
     private Tween? _crosshairTween;
@@ -415,8 +431,8 @@ public partial class CombatHUD : CanvasLayer
         var panel = new ColorRect
         {
             Color = new Color(0.025f, 0.032f, 0.033f, 0.98f),
-            Position = new Vector2(-580, -350),
-            Size = new Vector2(1160, 700)
+            Position = new Vector2(-610, -360),
+            Size = new Vector2(1220, 720)
         };
         panel.SetAnchorsPreset(Control.LayoutPreset.Center);
         _lootOverlay.AddChild(panel);
@@ -424,70 +440,131 @@ public partial class CombatHUD : CanvasLayer
         {
             Color = new Color(0.18f, 0.78f, 0.66f),
             Position = Vector2.Zero,
-            Size = new Vector2(5, 700)
+            Size = new Vector2(5, 720)
         });
 
         _lootTitle = PositionedLabel("FIELD INVENTORY", 25, new Color(0.83f, 0.96f, 0.91f), 38, 24);
-        _lootTitle.Size = new Vector2(820, 36);
+        _lootTitle.Size = new Vector2(940, 36);
         panel.AddChild(_lootTitle);
-        _lootCloseButton = Button("CLOSE", new Vector2(970, 22), new Vector2(150, 40));
+        _lootCloseButton = Button("CLOSE", new Vector2(1040, 22), new Vector2(150, 40));
         _lootCloseButton.Pressed += () => EmitSignal(SignalName.LootClosed);
         panel.AddChild(_lootCloseButton);
         panel.AddChild(new ColorRect
         {
             Color = new Color(0.18f, 0.32f, 0.29f, 0.9f),
             Position = new Vector2(38, 76),
-            Size = new Vector2(1082, 1)
+            Size = new Vector2(1142, 1)
         });
 
         _lootSourceCaption = PositionedLabel("SEARCHED GEAR", 14, new Color(0.43f, 0.88f, 0.73f), 40, 92);
-        _lootSourceCaption.Size = new Vector2(510, 26);
+        _lootSourceCaption.Size = new Vector2(540, 26);
         panel.AddChild(_lootSourceCaption);
-        _backpackCaption = PositionedLabel("EQUIPPED / BACKPACK", 14, new Color(0.43f, 0.72f, 0.96f), 610, 92);
-        _backpackCaption.Size = new Vector2(510, 26);
+        _backpackCaption = PositionedLabel("EQUIPPED / BACKPACK", 14, new Color(0.43f, 0.72f, 0.96f), 600, 92);
+        _backpackCaption.Size = new Vector2(590, 26);
         panel.AddChild(_backpackCaption);
 
+        _lootSourceZone = new LootDropZone
+        {
+            Target = LootDropTarget.Source,
+            Position = new Vector2(32, 122),
+            Size = new Vector2(548, 556)
+        };
+        _lootSourceZone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(new Color(0.22f, 0.85f, 0.68f)));
+        _lootSourceZone.Dropped += HandleLootDrop;
+        panel.AddChild(_lootSourceZone);
         var sourceScroll = new ScrollContainer
         {
-            Position = new Vector2(40, 126),
-            Size = new Vector2(510, 520),
-            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill
         };
-        panel.AddChild(sourceScroll);
+        _lootSourceZone.AddChild(sourceScroll);
         _lootSourceList = new VBoxContainer
         {
+            MouseFilter = Control.MouseFilterEnum.Pass,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
         };
         _lootSourceList.AddThemeConstantOverride("separation", 8);
         sourceScroll.AddChild(_lootSourceList);
 
-        _lootStats = PositionedLabel("", 15, new Color(0.78f, 0.86f, 0.83f), 610, 126);
-        _lootStats.Size = new Vector2(510, 116);
+        _lootStats = PositionedLabel("", 13, new Color(0.78f, 0.86f, 0.83f), 600, 126);
+        _lootStats.Size = new Vector2(590, 55);
         _lootStats.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         panel.AddChild(_lootStats);
 
+        _primarySlot = BuildEquipmentSlot(panel, LootDropTarget.PrimaryWeapon, "PRIMARY WEAPON", new Vector2(600, 190), new Vector2(590, 108), new Color(0.34f, 0.86f, 0.7f), out _primarySlotCaption, out _primarySlotLabel);
+        _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(600, 308), new Vector2(188, 108), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel);
+        _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(801, 308), new Vector2(188, 108), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel);
+        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK", new Vector2(1002, 308), new Vector2(188, 108), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel);
+
+        var backpackZone = new LootDropZone
+        {
+            Target = LootDropTarget.Backpack,
+            Position = new Vector2(600, 468),
+            Size = new Vector2(590, 210)
+        };
+        _backpackZone = backpackZone;
+        _backpackZone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(new Color(0.32f, 0.62f, 0.92f)));
+        _backpackZone.Dropped += HandleLootDrop;
+        panel.AddChild(_backpackZone);
         var backpackScroll = new ScrollContainer
         {
-            Position = new Vector2(610, 252),
-            Size = new Vector2(510, 394),
-            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill
         };
-        panel.AddChild(backpackScroll);
+        _backpackZone.AddChild(backpackScroll);
         _backpackList = new VBoxContainer
         {
+            MouseFilter = Control.MouseFilterEnum.Pass,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
         };
         _backpackList.AddThemeConstantOverride("separation", 8);
         backpackScroll.AddChild(_backpackList);
     }
 
+    private LootDropZone BuildEquipmentSlot(
+        Control parent,
+        LootDropTarget target,
+        string title,
+        Vector2 position,
+        Vector2 size,
+        Color accent,
+        out Label caption,
+        out Label content)
+    {
+        var zone = new LootDropZone
+        {
+            Target = target,
+            Position = position,
+            Size = size
+        };
+        zone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(accent));
+        zone.Dropped += HandleLootDrop;
+        parent.AddChild(zone);
+        var box = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        zone.AddChild(box);
+        caption = Label(title, 11, accent);
+        caption.MouseFilter = Control.MouseFilterEnum.Ignore;
+        box.AddChild(caption);
+        content = Label("", 12, new Color(0.78f, 0.86f, 0.83f));
+        content.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        content.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+        content.MouseFilter = Control.MouseFilterEnum.Ignore;
+        box.AddChild(content);
+        return zone;
+    }
+
     public bool IsLootVisible => IsInstanceValid(_lootOverlay) && _lootOverlay.Visible;
 
-    public void ShowLoot(string sourceName, IReadOnlyList<LootItem> items, TacticalPlayer player)
+    public void ShowLoot(string sourceName, IReadOnlyList<LootItem> items, TacticalPlayer player, bool sourceAvailable = true)
     {
         _shownLootName = sourceName;
         _shownLoot = items;
         _shownPlayer = player;
+        _shownSourceAvailable = sourceAvailable;
         _lootOverlay.Visible = true;
         RefreshLootOverlay();
     }
@@ -497,6 +574,7 @@ public partial class CombatHUD : CanvasLayer
         _lootOverlay.Visible = false;
         _shownLoot = null;
         _shownPlayer = null;
+        _shownSourceAvailable = false;
     }
 
     public void RefreshLootOverlay()
@@ -509,6 +587,11 @@ public partial class CombatHUD : CanvasLayer
         _lootSourceCaption.Text = Text("searched_gear", "SEARCHED GEAR");
         _backpackCaption.Text = $"{Text("equipped_backpack", "EQUIPPED / BACKPACK")}  {_shownPlayer.Backpack.Count}/{_shownPlayer.BackpackCapacity}";
         _lootCloseButton.Text = Text("close", "CLOSE");
+        _primarySlotCaption.Text = Text("primary_weapon", "PRIMARY WEAPON");
+        _helmetSlotCaption.Text = Text("helmet", "HELMET");
+        _armorSlotCaption.Text = Text("body_armor", "BODY ARMOR");
+        _packSlotCaption.Text = Text("backpack", "BACKPACK");
+        _lootSourceZone.Enabled = _shownSourceAvailable;
 
         var stats = _shownPlayer.CurrentWeaponStats;
         var weaponName = _shownPlayer.EquippedWeapon.DisplayName(_language);
@@ -521,11 +604,15 @@ public partial class CombatHUD : CanvasLayer
         _lootStats.Text = GameLocalization.IsChinese(_language)
             ? $"当前主武器  {weaponName}\n伤害 {stats.Damage:0}   有效射程 {stats.EffectiveRange:0}m   后坐 {stats.Recoil:0.00}   操控 {stats.Handling:0.00}\n零件  {System.String.Join(" / ", partNames)}"
             : $"EQUIPPED  {weaponName}\nDMG {stats.Damage:0}   RANGE {stats.EffectiveRange:0}m   RECOIL {stats.Recoil:0.00}   HANDLING {stats.Handling:0.00}\nPARTS  {System.String.Join(" / ", partNames)}";
+        _primarySlotLabel.Text = $"{weaponName}\n{(GameLocalization.IsChinese(_language) ? $"伤害 {stats.Damage:0}  射程 {stats.EffectiveRange:0}m" : $"DMG {stats.Damage:0}  RANGE {stats.EffectiveRange:0}m")}";
+        _helmetSlotLabel.Text = _shownPlayer.EquippedHelmet.DisplayName(_language) + "\n" + _shownPlayer.EquippedHelmet.Detail(_language);
+        _armorSlotLabel.Text = _shownPlayer.EquippedBodyArmor.DisplayName(_language) + "\n" + _shownPlayer.EquippedBodyArmor.Detail(_language);
+        _packSlotLabel.Text = _shownPlayer.EquippedBackpack.DisplayName(_language) + "\n" + _shownPlayer.EquippedBackpack.Detail(_language);
 
         ClearRows(_lootSourceList);
         foreach (var item in _shownLoot)
         {
-            _lootSourceList.AddChild(BuildLootRow(item, false));
+            _lootSourceList.AddChild(BuildLootCard(item, LootDragOrigin.Source));
         }
         if (_shownLoot.Count == 0)
         {
@@ -535,7 +622,7 @@ public partial class CombatHUD : CanvasLayer
         ClearRows(_backpackList);
         foreach (var item in _shownPlayer.Backpack)
         {
-            _backpackList.AddChild(BuildLootRow(item, true));
+            _backpackList.AddChild(BuildLootCard(item, LootDragOrigin.Backpack));
         }
         if (_shownPlayer.Backpack.Count == 0)
         {
@@ -543,34 +630,65 @@ public partial class CombatHUD : CanvasLayer
         }
     }
 
-    private Control BuildLootRow(LootItem item, bool backpackItem)
+    private Control BuildLootCard(LootItem item, LootDragOrigin origin)
     {
-        var row = new HBoxContainer { CustomMinimumSize = new Vector2(490, 72) };
-        var info = Label($"{item.DisplayName(_language)}\n{item.Detail(_language)}", 13, new Color(0.82f, 0.89f, 0.86f));
-        info.CustomMinimumSize = new Vector2(backpackItem ? 380 : 295, 68);
-        info.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        info.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        row.AddChild(info);
-        if (!backpackItem)
+        EquipmentSlot? slot = item.Kind == LootItemKind.Equipment && item.Equipment is not null
+            ? item.Equipment.Definition.Slot
+            : null;
+        var card = new LootDragCard();
+        card.Configure(
+            item.Id,
+            origin,
+            item.Kind,
+            slot,
+            item.DisplayName(_language),
+            item.Detail(_language),
+            item.Kind switch
+            {
+                LootItemKind.Weapon => new Color(0.32f, 0.9f, 0.7f),
+                LootItemKind.Attachment => new Color(0.33f, 0.7f, 0.96f),
+                LootItemKind.Equipment => new Color(0.82f, 0.64f, 0.3f),
+                _ => new Color(0.55f, 0.62f, 0.58f)
+            });
+        card.DoubleActivated += (itemId, cardOrigin) =>
         {
-            var take = new Button { Text = Text("take", "TAKE"), CustomMinimumSize = new Vector2(78, 44) };
-            take.Pressed += () => EmitSignal(SignalName.LootTakeRequested, item.Id);
-            row.AddChild(take);
-        }
-        var action = new Button
-        {
-            Text = backpackItem
-                ? Text("use_install", "USE / INSTALL")
-                : item.Kind is LootItemKind.Weapon or LootItemKind.Attachment
-                    ? Text("equip", "EQUIP")
-                    : Text("use", "USE"),
-            CustomMinimumSize = new Vector2(backpackItem ? 110 : 92, 44)
+            if (cardOrigin == LootDragOrigin.Backpack)
+            {
+                EmitSignal(SignalName.BackpackUseRequested, itemId);
+            }
+            else if (item.Kind is LootItemKind.Weapon or LootItemKind.Attachment or LootItemKind.Equipment)
+            {
+                EmitSignal(SignalName.LootEquipRequested, itemId);
+            }
+            else
+            {
+                EmitSignal(SignalName.LootTakeRequested, itemId);
+            }
         };
-        action.Pressed += () => EmitSignal(
-            backpackItem ? SignalName.BackpackUseRequested : SignalName.LootEquipRequested,
-            item.Id);
-        row.AddChild(action);
-        return row;
+        return card;
+    }
+
+    private void HandleLootDrop(string itemId, LootDragOrigin origin, LootDropTarget target)
+    {
+        switch (target)
+        {
+            case LootDropTarget.Backpack when origin == LootDragOrigin.Source:
+                EmitSignal(SignalName.LootTakeRequested, itemId);
+                break;
+            case LootDropTarget.Source when origin == LootDragOrigin.Backpack:
+                EmitSignal(SignalName.LootReturnRequested, itemId);
+                break;
+            default:
+                if (origin == LootDragOrigin.Source)
+                {
+                    EmitSignal(SignalName.LootEquipRequested, itemId);
+                }
+                else
+                {
+                    EmitSignal(SignalName.BackpackUseRequested, itemId);
+                }
+                break;
+        }
     }
 
     private static void ClearRows(Node parent)
@@ -673,7 +791,7 @@ public partial class CombatHUD : CanvasLayer
         _quitButton = Button("EXIT TO DESKTOP", new Vector2(270, 401), new Vector2(210, 44));
         _quitButton.Pressed += () => EmitSignal(SignalName.QuitRequested);
         content.AddChild(_quitButton);
-        _buildLabel = PositionedLabel("FORWARD+  /  BUILD 0.6", 11, new Color(0.32f, 0.4f, 0.38f), 40, 477);
+        _buildLabel = PositionedLabel("FORWARD+  /  BUILD 0.7", 11, new Color(0.32f, 0.4f, 0.38f), 40, 477);
         _buildLabel.Size = new Vector2(440, 22);
         _buildLabel.HorizontalAlignment = HorizontalAlignment.Center;
         content.AddChild(_buildLabel);
@@ -770,7 +888,11 @@ public partial class CombatHUD : CanvasLayer
         if (active)
         {
             _interactionLabel.Text = $"F   {action}";
-            _interactionBar.Value = Mathf.Clamp(progress, 0.0f, 1.0f);
+            _interactionBar.Visible = progress >= 0.0f;
+            if (_interactionBar.Visible)
+            {
+                _interactionBar.Value = Mathf.Clamp(progress, 0.0f, 1.0f);
+            }
         }
     }
 
@@ -828,13 +950,17 @@ public partial class CombatHUD : CanvasLayer
         }
     }
 
-    public void ShowHit(bool kill = false)
+    public void ShowHit(bool kill = false, bool headshot = false, bool armorHit = false)
     {
         if (_hitTween?.IsRunning() == true)
         {
             _hitTween.Kill();
         }
-        _hitmarker.Modulate = kill ? new Color(1.0f, 0.22f, 0.16f, 1.0f) : Colors.White;
+        _hitmarker.Modulate = kill
+            ? new Color(1.0f, 0.22f, 0.16f, 1.0f)
+            : headshot ? new Color(1.0f, 0.72f, 0.24f, 1.0f)
+            : armorHit ? new Color(0.38f, 0.72f, 1.0f, 1.0f)
+            : Colors.White;
         _hitTween = CreateTween();
         _hitTween.TweenProperty(_hitmarker, "modulate:a", 0.0f, 0.22f);
     }

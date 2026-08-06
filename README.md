@@ -25,11 +25,11 @@ go build -o ..\steel-tide-server.exe ./cmd/server
 
 ## Controls
 
-- `WASD` move, `Shift` sprint, `C` crouch or slide, `Space` jump
+- `WASD` move, `Shift` sprint, `C` toggles crouch or starts a slide while sprinting, `Z` toggles prone, `Space` jumps while standing
 - `Q`/mouse side button 1 leans left; `E`/mouse side button 2 leans right
 - `1` draws the primary weapon, `3` draws the tactical knife, and `Tab` opens the personal backpack
 - Left mouse fires or strikes with the knife, right mouse aims through the installed optic, and `R` performs a full magazine reload
-- `G` throw a frag grenade, `F` hold to operate a nearby objective terminal
+- `G` throws a frag grenade; tap `F` to open nearby loot immediately, or hold `F` to operate an objective terminal
 - `V` switch between AUTO and SEMI, `T` toggle the weapon light
 - `X` apply a spare armor plate while stationary; movement, sprinting, firing, or damage interrupts it
 - `Esc` opens pause/settings, where the interface can switch between English and Chinese; `Enter` redeploys after a failed mission
@@ -48,7 +48,9 @@ M4A1, AK-74N, and SCAR-L receivers accept separate optics, barrels, muzzle devic
 
 The first-person rig includes smooth custom-mesh tactical gloves with shaped palms, articulated fingers, thumbs, cuffs, and tapered sleeves. Pressing `3` draws a tactical knife with its own strike animation and close-range damage trace.
 
-Three secured loot rooms have distinct inventories and dressing: the warehouse armory favors SCAR-L and precision parts, the customs office favors M4A1 parts, and maintenance favors AK-74N recoil-control parts. Hold `F` to search a physical weapon case or a fallen operator. Corpses remain in the world and expose carried weapons, fitted parts, ammunition, and armor through a two-column inventory; taken gear moves into the 12-slot backpack, and replaced equipment returns to the searched inventory.
+Six loot locations have distinct inventories: the warehouse armory, customs office, maintenance room, security checkpoint, fuel depot, and barracks. Tap `F` to open a physical case or fallen operator immediately. The two-column field inventory supports drag-and-drop transfer and replacement for weapons, fitted parts, helmets, body armor, backpacks, ammunition, and plates. Empty cases and searched bodies can be reopened, replaced gear returns to its source, and backpack capacity changes with the equipped pack.
+
+Standing, crouched, and prone stances use different movement speed, camera and collision height, weapon stability, and footstep motion. Leaning and aiming remain available while crouched or prone. Hits are resolved as head, torso, or limb impacts: helmets protect the head, body armor protects the torso, protection falls with durability, and armor plates repair the currently equipped vest. Enemy equipment keeps its remaining durability when recovered from a body.
 
 Enemy operators use layered anatomical meshes with independent leg motion, helmet, goggles, headset, microphone, plate carrier, magazine pouches, radio, backpack, knee protection, gloves, boots, and a complete rifle silhouette. Their materials vary slightly per operator so a patrol does not read as a row of identical targets.
 
@@ -81,6 +83,8 @@ Godot_console.exe --path . -- --validate-loot
 Godot_console.exe --path . -- --validate-corpse-loot
 Godot_console.exe --path . -- --capture-backpack
 Godot_console.exe --path . -- --capture-optics
+Godot_console.exe --path . -- --validate-stance-armor
+Godot_console.exe --path . -- --capture-expanded-map
 ```
 
-`--capture-deployment` waits 14 real seconds at spawn and prints health, armor, ammo, and phase. `--capture-ads` captures the centered reflex sight. `--capture-reload` freezes the seven-stage reload while the fresh magazine is moving into the magwell. `--capture-operator` isolates the detailed enemy model. `--capture-zh` checks the Chinese HUD and settings menu. `--capture-backpack` validates the Chinese personal inventory, while `--capture-optics` captures all three optic models. `--validate-loot` and `--validate-corpse-loot` exercise case and body searching, weapon replacement, and fitted statistics. `--validate-objectives` drives both terminals and verifies that C# enters `EXTRACTION` only after both operations complete. `--validate-reinforcements` forces confirmed combat and verifies the delayed QRF wave. `--validate-equipment` checks plating, fire mode, and weapon light state changes.
+`--capture-deployment` waits 14 real seconds at spawn and prints health, armor, ammo, and phase. `--capture-ads` captures the centered reflex sight. `--capture-reload` freezes the seven-stage reload while the fresh magazine is moving into the magwell. `--capture-operator` isolates the detailed enemy model. `--capture-zh` checks the Chinese HUD and settings menu. `--capture-backpack` validates the Chinese personal inventory, while `--capture-optics` captures all three optic models. `--validate-loot` and `--validate-corpse-loot` exercise immediate opening, held-key gating, empty-source reopening, transfer, and weapon replacement. `--validate-stance-armor` checks crouched ADS leaning, prone height, hit regions, and equipment durability. `--capture-expanded-map` captures the checkpoint entrance and verifies all six loot sources. `--validate-objectives` drives both terminals and verifies that C# enters `EXTRACTION` only after both operations complete. `--validate-reinforcements` forces confirmed combat and verifies the delayed QRF wave. `--validate-equipment` checks plating, fire mode, and weapon light state changes.

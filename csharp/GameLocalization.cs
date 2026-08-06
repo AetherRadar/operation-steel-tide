@@ -63,6 +63,7 @@ public static class GameLocalization
         ["knife_ready"] = "战术刀已就绪",
         ["primary_ready"] = "主武器已就绪",
         ["search"] = "搜索",
+        ["open_loot"] = "打开",
         ["field_inventory"] = "战地装备管理",
         ["searched_gear"] = "目标随身装备",
         ["equipped_backpack"] = "当前装备 / 个人背包",
@@ -76,7 +77,16 @@ public static class GameLocalization
         ["backpack_full"] = "背包已满",
         ["item_stored"] = "物品已放入背包",
         ["part_installed"] = "武器零件已安装",
-        ["weapon_equipped"] = "主武器已替换"
+        ["weapon_equipped"] = "主武器已替换",
+        ["primary_weapon"] = "主武器",
+        ["helmet"] = "头盔",
+        ["body_armor"] = "防弹衣",
+        ["backpack"] = "背包",
+        ["equipment_replaced"] = "装备已替换",
+        ["pack_too_small"] = "请先腾空物品再更换此背包",
+        ["stance_blocked"] = "上方空间不足",
+        ["helmet_impact"] = "头盔吸收了冲击",
+        ["armor_impact"] = "防弹衣吸收了冲击"
     };
 
     private static readonly Dictionary<string, string> ChineseObjectives = new()

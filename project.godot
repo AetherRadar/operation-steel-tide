@@ -1,6 +1,6 @@
 [application]
 config/name="Operation Steel Tide"
-config/version="0.6.0"
+config/version="0.7.0"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.3", "C#", "Forward Plus")
 boot_splash/bg_color=Color(0.018, 0.024, 0.028, 1)
@@ -20,6 +20,7 @@ move_left={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":6
 move_right={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":68), Object(InputEventKey,"physical_keycode":4194321)]}
 sprint={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":4194325), Object(InputEventKey,"physical_keycode":16777237)]}
 crouch={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":67)]}
+prone={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":90)]}
 jump={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":32)]}
 lean_left={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":81), Object(InputEventMouseButton,"button_index":8)]}
 lean_right={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":69), Object(InputEventMouseButton,"button_index":9)]}

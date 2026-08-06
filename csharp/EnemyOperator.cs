@@ -17,9 +17,14 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     public bool Alerted { get; private set; }
     public bool IsDead { get; private set; }
     public WeaponBuild CarriedWeapon { get; private set; } = WeaponCatalog.Build(WeaponPlatform.M4A1, 0);
+    public EquipmentItem EquippedHelmet { get; private set; } = EquipmentCatalog.Create("helmet_light");
+    public EquipmentItem EquippedBodyArmor { get; private set; } = EquipmentCatalog.Create("armor_carrier");
+    public EquipmentItem EquippedBackpack { get; private set; } = EquipmentCatalog.Create("pack_assault");
+    public bool LastHitWasHeadshot { get; private set; }
+    public bool LastHitWasArmored { get; private set; }
     public List<LootItem> Loot { get; } = new();
     public Node3D LootNode => this;
-    public bool IsSearchable => IsDead && Loot.Count > 0;
+    public bool IsSearchable => IsDead;
     public float SearchDuration => 1.15f;
     public bool CarriedWeaponVisible => IsInstanceValid(_carriedWeaponRoot) && _carriedWeaponRoot.Visible;
 
@@ -94,6 +99,12 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             Loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate });
         }
+        EquippedHelmet = EquipmentCatalog.Create(_rng.Randf() < 0.24f ? "helmet_heavy" : "helmet_light");
+        EquippedBodyArmor = EquipmentCatalog.Create(_rng.Randf() < 0.22f ? "armor_heavy" : "armor_carrier");
+        EquippedBackpack = EquipmentCatalog.Create(_rng.Randf() < 0.18f ? "pack_heavy" : "pack_assault");
+        Loot.Add(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquippedHelmet });
+        Loot.Add(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquippedBodyArmor });
+        Loot.Add(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquippedBackpack });
     }
 
     private static StandardMaterial3D Material(Color color, float metallic = 0.0f, float roughness = 0.7f)
@@ -351,7 +362,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             return false;
         }
         var from = GlobalPosition + Vector3.Up * 1.55f;
-        var to = Player.GlobalPosition + Vector3.Up * 1.35f;
+        var to = Player.HitPoint(HitRegion.Torso);
         var query = PhysicsRayQueryParameters3D.Create(from, to);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
         query.CollideWithAreas = false;
@@ -362,7 +373,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     private bool WithinViewCone()
     {
         var eye = GlobalPosition + Vector3.Up * 1.5f;
-        var target = Player.GlobalPosition + Vector3.Up * 1.2f;
+        var target = Player.HitPoint(HitRegion.Torso);
         var direction = eye.DirectionTo(target);
         return (-GlobalBasis.Z).Dot(direction) > 0.42f;
     }
@@ -551,7 +562,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
         var rangeFactor = Mathf.Clamp(stats.EffectiveRange / 150.0f, 0.7f, 1.25f);
         var accuracy = Mathf.Clamp(0.86f - distance * 0.011f / rangeFactor, 0.24f, 0.8f);
-        var aimPoint = Player.GlobalPosition + Vector3.Up * 1.25f;
+        var regionRoll = _rng.Randf();
+        var hitRegion = regionRoll < 0.12f
+            ? HitRegion.Head
+            : regionRoll < 0.78f ? HitRegion.Torso : HitRegion.Limbs;
+        var aimPoint = Player.HitPoint(hitRegion);
         if (_rng.Randf() < accuracy)
         {
             Player.TakeDamage(stats.Damage * _rng.RandfRange(0.24f, 0.34f), aimPoint, this);
@@ -599,8 +614,29 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             Player = tacticalPlayer;
         }
-        var headshot = hitPosition.Y > GlobalPosition.Y + 1.5f;
-        _health -= amount * (headshot ? 2.25f : 1.0f);
+        var localHeight = hitPosition.Y - GlobalPosition.Y;
+        var region = localHeight > 1.48f
+            ? HitRegion.Head
+            : localHeight > 0.66f ? HitRegion.Torso : HitRegion.Limbs;
+        LastHitWasHeadshot = region == HitRegion.Head;
+        var adjustedDamage = region switch
+        {
+            HitRegion.Head => amount * 2.3f,
+            HitRegion.Limbs => amount * 0.72f,
+            _ => amount
+        };
+        var protectiveGear = region switch
+        {
+            HitRegion.Head => EquippedHelmet,
+            HitRegion.Torso => EquippedBodyArmor,
+            _ => null
+        };
+        LastHitWasArmored = protectiveGear is not null && protectiveGear.Durability > 0.0f;
+        if (protectiveGear is not null)
+        {
+            adjustedDamage = ApplyProtection(protectiveGear, adjustedDamage);
+        }
+        _health -= adjustedDamage;
         _hitStun = 0.14f;
         var original = _mainMaterial.AlbedoColor;
         _mainMaterial.AlbedoColor = new Color(0.62f, 0.12f, 0.07f);
@@ -622,6 +658,18 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             return true;
         }
         return false;
+    }
+
+    private static float ApplyProtection(EquipmentItem equipment, float damage)
+    {
+        if (equipment.Durability <= 0.0f || equipment.Definition.Protection <= 0.0f)
+        {
+            return damage;
+        }
+        var durabilityRatio = equipment.Durability / equipment.Definition.MaxDurability;
+        var effectiveProtection = equipment.Definition.Protection * Mathf.Lerp(0.55f, 1.0f, durabilityRatio);
+        equipment.Durability = Mathf.Max(0.0f, equipment.Durability - damage * 0.58f);
+        return damage * (1.0f - effectiveProtection);
     }
 
     private void Die()
