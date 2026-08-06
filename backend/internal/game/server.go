@@ -49,7 +49,7 @@ func defaultMissions() []Mission {
 			ID: "steel-tide-terminal", Name: "Operation Steel Tide", Map: "Qinhai Freight Terminal",
 			Briefing:   "Enter through the southern maintenance lane, identify patrol routes, then secure the terminal before extraction.",
 			Objectives: []string{"DISABLE THE COMMUNICATIONS RELAY", "RECOVER THE SHIPPING MANIFEST"},
-			EnemyCount: 9, SpawnProtectionSeconds: 12, BaseDetectionRange: 34,
+			EnemyCount: 20, SpawnProtectionSeconds: 12, BaseDetectionRange: 34,
 			ReinforcementThreshold: 70, RewardCredits: 1800, RewardXP: 950,
 		},
 		{

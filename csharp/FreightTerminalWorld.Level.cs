@@ -37,7 +37,12 @@ public partial class FreightTerminalWorld
         {
             return cached;
         }
-        var asset = id == "asphalt" ? "asphalt_03" : "concrete_floor";
+        var asset = id switch
+        {
+            "asphalt" => "asphalt_03",
+            "gravel" => "gravel_embedded_concrete",
+            _ => "concrete_floor"
+        };
         var root = $"res://assets/textures/{asset}";
         var material = new StandardMaterial3D
         {
@@ -132,7 +137,7 @@ public partial class FreightTerminalWorld
             LightColor = new Color(1.0f, 0.9f, 0.72f),
             LightEnergy = 1.25f,
             ShadowEnabled = true,
-            DirectionalShadowMaxDistance = 130.0f,
+            DirectionalShadowMaxDistance = 240.0f,
             DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel4Splits
         };
         AddChild(_sunLight);
@@ -163,7 +168,7 @@ public partial class FreightTerminalWorld
         var process = new ParticleProcessMaterial
         {
             EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box,
-            EmissionBoxExtents = new Vector3(38, 6, 38),
+            EmissionBoxExtents = new Vector3(108, 7, 108),
             Gravity = new Vector3(0.08f, 0.025f, 0.04f),
             InitialVelocityMin = 0.03f,
             InitialVelocityMax = 0.12f,
@@ -183,12 +188,12 @@ public partial class FreightTerminalWorld
         };
         AddChild(new GpuParticles3D
         {
-            Amount = 90,
+            Amount = 220,
             Lifetime = 9.0,
-            VisibilityAabb = new Aabb(new Vector3(-42, -2, -42), new Vector3(84, 18, 84)),
+            VisibilityAabb = new Aabb(new Vector3(-112, -2, -112), new Vector3(224, 20, 224)),
             ProcessMaterial = process,
             DrawPass1 = quad,
-            Position = new Vector3(0, 4, 0)
+            Position = new Vector3(0, 4, MapCenterZ)
         });
     }
 
@@ -205,12 +210,12 @@ public partial class FreightTerminalWorld
         var yellow = Mat("warning", new Color(0.74f, 0.51f, 0.055f), 0.22f, 0.55f);
         var white = Mat("marking", new Color(0.72f, 0.75f, 0.69f), 0.05f, 0.72f);
 
-        StaticBox("Ground", new Vector3(0, -0.55f, 0), new Vector3(86, 1, 86), asphalt);
-        StaticBox("NorthWall", new Vector3(0, 1.25f, -42), new Vector3(86, 3, 1), concreteDark);
-        StaticBox("WestWall", new Vector3(-42, 1.25f, 0), new Vector3(1, 3, 86), concreteDark);
-        StaticBox("EastWall", new Vector3(42, 1.25f, 0), new Vector3(1, 3, 86), concreteDark);
-        StaticBox("SouthWallL", new Vector3(-25, 1.25f, 42), new Vector3(34, 3, 1), concreteDark);
-        StaticBox("SouthWallR", new Vector3(25, 1.25f, 42), new Vector3(34, 3, 1), concreteDark);
+        StaticBox("Ground", new Vector3(0, -0.55f, MapCenterZ), new Vector3(MapWidthMeters, 1, MapDepthMeters), asphalt);
+        StaticBox("NorthPerimeter", new Vector3(0, 1.25f, -170), new Vector3(MapWidthMeters, 3, 1), concreteDark);
+        StaticBox("WestPerimeter", new Vector3(-110, 1.25f, MapCenterZ), new Vector3(1, 3, MapDepthMeters), concreteDark);
+        StaticBox("EastPerimeter", new Vector3(110, 1.25f, MapCenterZ), new Vector3(1, 3, MapDepthMeters), concreteDark);
+        StaticBox("SouthPerimeterL", new Vector3(-58, 1.25f, 50), new Vector3(104, 3, 1), concreteDark);
+        StaticBox("SouthPerimeterR", new Vector3(58, 1.25f, 50), new Vector3(104, 3, 1), concreteDark);
         for (var x = -35; x <= 35; x += 10)
         {
             MeshBox(_levelRoot, new Vector3(x, 0.012f, 5), new Vector3(0.12f, 0.025f, 7), white);
@@ -234,11 +239,12 @@ public partial class FreightTerminalWorld
         BuildFuelDepot(concrete, steel, steelDark, rust, yellow);
         BuildBarracks(concrete, interiorWall, interiorTrim, yellow);
         BuildCover(concreteDark);
+        BuildHarborExpansion(asphalt, concrete, concreteDark, steel, steelDark, rust, yellow, white);
         BuildBackground(concreteDark, steel);
         AddPuddles();
         AddLightPoles();
         BuildMissionTerminals();
-        BuildExtraction();
+        BuildExtraction(concrete, steelDark, yellow, white);
         _extractionMarker.Visible = false;
     }
 
@@ -648,17 +654,18 @@ public partial class FreightTerminalWorld
     {
         foreach (var item in new (Vector3 Position, Vector3 Size)[]
         {
-            (new Vector3(-52, 8, -15), new Vector3(16, 16, 30)),
-            (new Vector3(52, 11, -21), new Vector3(17, 22, 24)),
-            (new Vector3(18, 7, -53), new Vector3(26, 14, 18)),
-            (new Vector3(-20, 10, -55), new Vector3(18, 20, 16))
+            (new Vector3(-128, 10, -28), new Vector3(24, 20, 46)),
+            (new Vector3(132, 14, -72), new Vector3(27, 28, 54)),
+            (new Vector3(-78, 10, -190), new Vector3(42, 20, 25)),
+            (new Vector3(2, 14, -194), new Vector3(54, 28, 28)),
+            (new Vector3(92, 9, -191), new Vector3(34, 18, 26))
         })
         {
             MeshBox(_levelRoot, item.Position, item.Size, concrete);
         }
-        foreach (var x in new[] { -49.0f, 48.0f })
+        foreach (var x in new[] { -126.0f, 126.0f })
         {
-            StaticCylinder("Tank", new Vector3(x, 6, 20), 5.5f, 12, steel);
+            StaticCylinder("BackgroundTank", new Vector3(x, 7, -18), 6.5f, 14, steel);
         }
     }
 
@@ -704,39 +711,6 @@ public partial class FreightTerminalWorld
                 SpotRange = 23.0f,
                 SpotAngle = 48.0f,
                 ShadowEnabled = true
-            });
-        }
-    }
-
-    private void BuildExtraction()
-    {
-        var area = new Area3D
-        {
-            Name = "ExtractionZone",
-            Position = new Vector3(0, 0.08f, -37),
-            CollisionLayer = 0,
-            CollisionMask = 1
-        };
-        area.AddChild(new CollisionShape3D { Shape = new CylinderShape3D { Radius = 4.0f, Height = 1.0f } });
-        area.BodyEntered += OnExtractionEntered;
-        _levelRoot.AddChild(area);
-        _extractionMarker = new Node3D { Position = area.Position };
-        _levelRoot.AddChild(_extractionMarker);
-        var marker = new StandardMaterial3D
-        {
-            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-            AlbedoColor = new Color(0.08f, 0.82f, 0.58f, 0.12f),
-            EmissionEnabled = true,
-            Emission = new Color(0.08f, 0.82f, 0.58f),
-            EmissionEnergyMultiplier = 2.0f
-        };
-        foreach (var radius in new[] { 3.0f, 3.55f, 4.1f })
-        {
-            _extractionMarker.AddChild(new MeshInstance3D
-            {
-                Mesh = new TorusMesh { InnerRadius = radius, OuterRadius = radius + 0.035f, Rings = 48, RingSegments = 8 },
-                MaterialOverride = marker
             });
         }
     }

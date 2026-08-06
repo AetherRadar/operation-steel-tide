@@ -193,7 +193,10 @@ public partial class MissionDirector : Node
             ReinforcementThreshold,
             _online);
         EmitSignal(SignalName.PhaseChanged, _phase, _deploymentRemaining, _online);
-        EmitSignal(SignalName.ObjectiveChanged, _objectiveIndex, _objectives[_objectiveIndex], false);
+        var objective = _objectiveIndex < _objectives.Count
+            ? _objectives[_objectiveIndex]
+            : "REACH THE EXTRACTION ZONE";
+        EmitSignal(SignalName.ObjectiveChanged, _objectiveIndex, objective, _objectiveIndex >= _objectives.Count);
     }
 
     private void SetPhase(string phase)
