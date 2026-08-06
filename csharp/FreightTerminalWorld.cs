@@ -8,6 +8,12 @@ namespace OperationSteelTide;
 [GlobalClass]
 public partial class FreightTerminalWorld : Node3D
 {
+    private const float MapWidthMeters = 220.0f;
+    private const float MapDepthMeters = 220.0f;
+    private const float MapCenterZ = -60.0f;
+    private static readonly Vector3 DeploymentPoint = new(0, 0.2f, 42.0f);
+    private static readonly Vector3 ExtractionPoint = new(78.0f, 0.08f, -150.0f);
+
     private TacticalPlayer _player = null!;
     private CombatHUD _hud = null!;
     private MissionDirector _missionDirector = null!;
@@ -33,10 +39,23 @@ public partial class FreightTerminalWorld : Node3D
         new(-12, 0, 20.5f), new(-12, 0, 23.5f), new(10, 0, -18.5f), new(10, 0, -15.5f),
         new(-13.5f, 0, -14), new(-10.5f, 0, -14), new(13, 0, 27.5f), new(13, 0, 30.5f),
         new(23.5f, 0, -32), new(26.5f, 0, -32), new(-0.5f, 0, -13.1f), new(-0.5f, 0, -9.9f),
-        new(-2.8f, 0, 16), new(2.8f, 0, 16), new(0, 0, 13.2f), new(0, 0, 18.8f)
+        new(-2.8f, 0, 16), new(2.8f, 0, 16), new(0, 0, 13.2f), new(0, 0, 18.8f),
+        new(-96, 0, -63), new(-82, 0, -88), new(-66, 0, -111), new(-49, 0, -137),
+        new(-24, 0, -58), new(-13, 0, -76), new(18, 0, -70), new(34, 0, -101),
+        new(49, 0, -69), new(63, 0, -86), new(85, 0, -111), new(97, 0, -130),
+        new(29, 0, -132), new(48, 0, -151), new(68, 0, -136), new(91, 0, -145),
+        new(-80, 0, -73), new(-76, 0, -71), new(-60, 0, -103), new(-56, 0, -103),
+        new(-19, 0, -98), new(-15, 0, -98), new(60, 0, -84), new(64, 0, -80),
+        new(85, 0, -94), new(89, 0, -92), new(-76, 0, -148), new(-72, 0, -148),
+        new(5, 0, -147), new(9, 0, -145), new(80, 0, -142), new(84, 0, -140),
+        new(-17, 0, -115), new(73, 0, -90), new(-43, 0, -82), new(24, 0, -112),
+        new(-5.4f, 0, -69), new(-3.6f, 0, -69), new(3.8f, 0, -86), new(5.4f, 0, -86),
+        new(-5.4f, 0, -103), new(-3.6f, 0, -103), new(3.8f, 0, -120), new(5.4f, 0, -120),
+        new(-5.4f, 0, -136), new(-3.6f, 0, -136), new(3.8f, 0, -151), new(5.4f, 0, -151)
     };
 
     private Node3D _levelRoot = null!;
+    private Area3D _extractionArea = null!;
     private Node3D _extractionMarker = null!;
     private Godot.Environment _environmentRef = null!;
     private DirectionalLight3D _sunLight = null!;
@@ -154,6 +173,14 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--capture-expanded-map"))
         {
             CaptureExpandedMapFrame();
+        }
+        else if (Array.Exists(args, value => value == "--capture-extraction"))
+        {
+            CaptureExtractionFrame();
+        }
+        else if (Array.Exists(args, value => value == "--validate-large-map"))
+        {
+            ValidateLargeMapFlow();
         }
         else if (Array.Exists(args, value => value == "--validate-weapon-ui"))
         {
@@ -529,7 +556,7 @@ public partial class FreightTerminalWorld : Node3D
             Name = "Player",
             Main = this,
             Hud = _hud,
-            Position = new Vector3(0, 0.2f, 36),
+            Position = DeploymentPoint,
             MouseSensitivity = 0.00165f * _sensitivitySetting
         };
         AddChild(_player);
@@ -603,6 +630,36 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 1),
                 Parts = new[] { "stock_precision", "optic_holo" },
                 Equipment = new[] { "helmet_heavy", "armor_heavy" }
+            },
+            new
+            {
+                Position = new Vector3(-96.0f, 0.18f, -64.0f),
+                Rotation = 0.0f,
+                English = "Rail dispatch supply case",
+                Chinese = "\u94c1\u8def\u8c03\u5ea6\u5ba4\u8865\u7ed9\u7bb1",
+                Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 2),
+                Parts = new[] { "optic_scope", "stock_precision" },
+                Equipment = new[] { "pack_heavy" }
+            },
+            new
+            {
+                Position = new Vector3(25.0f, 0.18f, -88.0f),
+                Rotation = Mathf.Pi / 2.0f,
+                English = "Maintenance hangar tool cache",
+                Chinese = "\u7ef4\u4fee\u673a\u5e93\u5de5\u5177\u7bb1",
+                Weapon = WeaponCatalog.Build(WeaponPlatform.M4A1, 2),
+                Parts = new[] { "grip_vertical", "muzzle_suppressor" },
+                Equipment = new[] { "armor_carrier", "helmet_light" }
+            },
+            new
+            {
+                Position = new Vector3(44.0f, 0.22f, -146.0f),
+                Rotation = -Mathf.Pi / 2.0f,
+                English = "Seawall emergency locker",
+                Chinese = "\u6d77\u5824\u5e94\u6025\u88c5\u5907\u67dc",
+                Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 2),
+                Parts = new[] { "optic_holo", "mag_extended" },
+                Equipment = new[] { "armor_heavy", "pack_assault" }
             }
         };
         foreach (var definition in cases)
@@ -640,7 +697,13 @@ public partial class FreightTerminalWorld : Node3D
         {
             new Vector3(-12, 0.15f, 11), new Vector3(-22, 0.15f, 7), new Vector3(3, 0.15f, 2),
             new Vector3(20, 0.15f, 8), new Vector3(29, 0.15f, -10), new Vector3(-10, 0.15f, -17),
-            new Vector3(-28, 0.15f, -31), new Vector3(4, 0.15f, -32), new Vector3(20, 0.15f, -20)
+            new Vector3(-28, 0.15f, -31), new Vector3(4, 0.15f, -32), new Vector3(20, 0.15f, -20),
+            new Vector3(-91, 0.15f, -58), new Vector3(-76, 0.15f, -92),
+            new Vector3(-58, 0.15f, -126), new Vector3(-88, 0.15f, -146),
+            new Vector3(-12, 0.15f, -61), new Vector3(22, 0.15f, -81),
+            new Vector3(51, 0.15f, -68), new Vector3(82, 0.15f, -101),
+            new Vector3(34, 0.15f, -136), new Vector3(66, 0.15f, -132),
+            new Vector3(94, 0.15f, -145)
         };
         foreach (var position in positions)
         {
@@ -671,7 +734,13 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SpawnExplosives()
     {
-        foreach (var position in new[] { new Vector3(-6, 0, 18), new Vector3(-20, 0, -6), new Vector3(17, 0, -18), new Vector3(31, 0, 8), new Vector3(-30, 0, 28) })
+        foreach (var position in new[]
+        {
+            new Vector3(-6, 0, 18), new Vector3(-20, 0, -6), new Vector3(17, 0, -18),
+            new Vector3(31, 0, 8), new Vector3(-30, 0, 28), new Vector3(-82, 0, -74),
+            new Vector3(-52, 0, -119), new Vector3(17, 0, -93), new Vector3(55, 0, -72),
+            new Vector3(91, 0, -107), new Vector3(30, 0, -149), new Vector3(60, 0, -138)
+        })
         {
             var barrel = new ExplosiveBarrel { Main = this, Position = position };
             barrel.AddToGroup("explosives");
@@ -980,16 +1049,27 @@ public partial class FreightTerminalWorld : Node3D
         _reinforcementsDeployed = true;
         var spawnPoints = new[]
         {
-            new Vector3(-36, 0.15f, -30), new Vector3(36, 0.15f, -25),
-            new Vector3(-36, 0.15f, 24), new Vector3(36, 0.15f, 28)
+            new Vector3(-101, 0.15f, 38), new Vector3(101, 0.15f, 38),
+            new Vector3(-101, 0.15f, -55), new Vector3(101, 0.15f, -55),
+            new Vector3(-101, 0.15f, -156), new Vector3(101, 0.15f, -156)
         };
         Array.Sort(spawnPoints, (left, right) =>
-            right.DistanceSquaredTo(_player.GlobalPosition).CompareTo(left.DistanceSquaredTo(_player.GlobalPosition)));
-        for (var i = 0; i < 3; i++)
+            left.DistanceSquaredTo(_player.GlobalPosition).CompareTo(right.DistanceSquaredTo(_player.GlobalPosition)));
+        var deployed = 0;
+        foreach (var spawnPoint in spawnPoints)
         {
-            SpawnEnemy(spawnPoints[i], true);
+            if (spawnPoint.DistanceSquaredTo(_player.GlobalPosition) < 45.0f * 45.0f)
+            {
+                continue;
+            }
+            SpawnEnemy(spawnPoint, true);
+            deployed++;
+            if (deployed == 3)
+            {
+                break;
+            }
         }
-        _enemiesRemaining += 3;
+        _enemiesRemaining += deployed;
         _hud.SetEnemyCount(_enemiesRemaining);
         _hud.ShowLocalizedMessage("qrf_deployed", "QRF DEPLOYED  //  THREE CONTACTS", new Color(1.0f, 0.42f, 0.22f));
     }
@@ -1541,24 +1621,116 @@ public partial class FreightTerminalWorld : Node3D
         }
         var aircraft = _levelRoot.GetNodeOrNull<Node3D>("DistantTiltRotor");
         var aircraftStart = aircraft?.Position ?? Vector3.Zero;
-        _player.GlobalPosition = new Vector3(0, 0.2f, 38.0f);
-        _player.Rotation = Vector3.Zero;
-        await WaitFrames(32);
+        _player.ProcessMode = ProcessModeEnum.Disabled;
+        _hud.Visible = false;
+        _extractionMarker.Visible = true;
+        var overview = new Camera3D
+        {
+            Name = "ExpansionOverviewCamera",
+            Fov = 58.0f,
+            Far = 520.0f
+        };
+        AddChild(overview);
+        overview.GlobalPosition = new Vector3(0, 128.0f, 46.0f);
+        overview.LookAt(new Vector3(0, 0, -72.0f), Vector3.Up);
+        overview.MakeCurrent();
+        await WaitFrames(48);
         SaveViewportImage("res://expanded_map_validation.png");
-        _player.GlobalPosition = new Vector3(-20.0f, 0.2f, 38.0f);
-        _player.Rotation = new Vector3(0, -Mathf.Pi / 2.0f, 0);
+
+        overview.GlobalPosition = new Vector3(-20.0f, 18.0f, 38.0f);
+        overview.Fov = 52.0f;
+        overview.LookAt(new Vector3(35.0f, 12.0f, 33.0f), Vector3.Up);
         await WaitFrames(22);
         SaveViewportImage("res://radar_spire_validation.png");
-        _player.GlobalPosition = new Vector3(0, 0.2f, -23.0f);
-        _player.Rotation = new Vector3(0, Mathf.Pi, 0);
+
+        overview.GlobalPosition = new Vector3(-4.0f, 12.0f, -58.0f);
+        overview.Fov = 58.0f;
+        overview.LookAt(new Vector3(-5.0f, 1.8f, -124.0f), Vector3.Up);
         await WaitFrames(22);
         SaveViewportImage("res://cover_density_validation.png");
+
         var landmarksPresent = _levelRoot.GetNodeOrNull<Node3D>("CommandCore") is not null
             && _levelRoot.GetNodeOrNull<Node3D>("RadarFoundation") is not null;
         var aircraftMoving = aircraft is not null && aircraft.Position.DistanceTo(aircraftStart) > 0.1f;
         var dynamicSky = _environmentRef.Sky?.SkyMaterial is ShaderMaterial;
-        GD.Print($"MAP_CHECK loot_sources={_lootSources.Count} landmarks={landmarksPresent} cover_points={_coverPoints.Length} dynamic_sky={dynamicSky} aircraft_moving={aircraftMoving} industrial_skyline=true");
+        GD.Print($"MAP_CHECK width={MapWidthMeters:0} depth={MapDepthMeters:0} loot_sources={_lootSources.Count} hostiles={_enemiesRemaining} extraction_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} landmarks={landmarksPresent} cover_points={_coverPoints.Length} dynamic_sky={dynamicSky} aircraft_moving={aircraftMoving} industrial_skyline=true");
         GetTree().Quit();
+    }
+
+    private async void CaptureExtractionFrame()
+    {
+        foreach (var enemy in _enemies)
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        _missionDirector.ExitDeploymentZone();
+        while (_objectiveStage < _objectiveTerminals.Count)
+        {
+            _missionDirector.AdvanceObjective();
+        }
+        await WaitFrames(4);
+        _player.GlobalPosition = ExtractionPoint + new Vector3(0, 0.12f, 18.0f);
+        _player.Rotation = Vector3.Zero;
+        await WaitFrames(48);
+        SaveViewportImage("res://extraction_validation.png");
+        GD.Print($"EXTRACTION_CAPTURE position={ExtractionPoint} radius=7 beacon={_extractionMarker.Visible}");
+        GetTree().Quit();
+    }
+
+    private async void ValidateLargeMapFlow()
+    {
+        foreach (var enemy in _enemies)
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        var districtNames = new[]
+        {
+            "SouthOverflowYard",
+            "NorthernRailYard",
+            "MaintenanceDistrict",
+            "TankFarmDistrict",
+            "SeawallDistrict",
+            "ExtractionSite"
+        };
+        var districtsPresent = 0;
+        foreach (var districtName in districtNames)
+        {
+            if (_levelRoot.GetNodeOrNull<Node3D>(districtName) is not null)
+            {
+                districtsPresent++;
+            }
+        }
+
+        var extractionDistance = DeploymentPoint.DistanceTo(ExtractionPoint);
+        var markerInitiallyHidden = !_extractionMarker.Visible;
+        _missionDirector.ExitDeploymentZone();
+        while (_objectiveStage < _objectiveTerminals.Count)
+        {
+            _missionDirector.AdvanceObjective();
+        }
+        await WaitFrames(4);
+        var extractionUnlocked = _missionPhase == "EXTRACTION" && _extractionMarker.Visible;
+        _player.GlobalPosition = new Vector3(
+            _extractionArea.GlobalPosition.X,
+            0.2f,
+            _extractionArea.GlobalPosition.Z);
+        for (var i = 0; i < 8; i++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+
+        var completed = _missionEnded && _missionPhase == "COMPLETE";
+        var valid = districtsPresent == districtNames.Length
+            && extractionDistance > 190.0f
+            && markerInitiallyHidden
+            && extractionUnlocked
+            && completed;
+        GD.Print($"LARGE_MAP_CHECK valid={valid} size={MapWidthMeters:0}x{MapDepthMeters:0} districts={districtsPresent}/{districtNames.Length} extraction_distance={extractionDistance:0.0} hidden={markerInitiallyHidden} unlocked={extractionUnlocked} completed={completed}");
+        if (!valid)
+        {
+            GD.PushError("Large map validation failed.");
+        }
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private async Task WaitFrames(int count)

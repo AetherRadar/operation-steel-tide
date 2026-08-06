@@ -37,7 +37,12 @@ public partial class FreightTerminalWorld
         {
             return cached;
         }
-        var asset = id == "asphalt" ? "asphalt_03" : "concrete_floor";
+        var asset = id switch
+        {
+            "asphalt" => "asphalt_03",
+            "gravel" => "gravel_embedded_concrete",
+            _ => "concrete_floor"
+        };
         var root = $"res://assets/textures/{asset}";
         var material = new StandardMaterial3D
         {
@@ -128,7 +133,7 @@ public partial class FreightTerminalWorld
             LightColor = new Color(1.0f, 0.9f, 0.72f),
             LightEnergy = 1.25f,
             ShadowEnabled = true,
-            DirectionalShadowMaxDistance = 130.0f,
+            DirectionalShadowMaxDistance = 240.0f,
             DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel4Splits
         };
         AddChild(_sunLight);
@@ -205,13 +210,22 @@ void sky() {
         float cloud_band = smoothstep(0.025, 0.13, EYEDIR.y) * (1.0 - smoothstep(0.72, 0.96, EYEDIR.y));
         float lit_side = clamp(0.55 + EYEDIR.x * -0.24 + EYEDIR.z * -0.14, 0.0, 1.0);
         vec3 cloud_shadow = vec3(0.27, 0.36, 0.41);
-        vec3 cloud_light = vec3(0.74, 0.79, 0.8);
+        vec3 cloud_light = vec3(0.78, 0.84, 0.86);
         vec3 cloud_color = mix(cloud_shadow, cloud_light, lit_side + elevation * 0.22);
-        color = mix(color, cloud_shadow, cloud_shadow_mask * cloud_band * 0.16);
-        color = mix(color, cloud_color, cloud * cloud_band * 0.52);
+        color = mix(color, cloud_shadow, cloud_shadow_mask * cloud_band * 0.2);
+        color = mix(color, cloud_color, cloud * cloud_band * 0.64);
+
+        vec2 lower_plane = EYEDIR.xz / max(EYEDIR.y + 0.095, 0.14);
+        float lower_broad = cloud_fbm(lower_plane * 0.42 + wind * 1.7 + vec2(-11.0, 6.0));
+        float lower_detail = cloud_fbm(lower_plane * 1.25 - wind * 0.32 + vec2(2.0, 17.0));
+        float lower_field = lower_broad * 0.72 + lower_detail * 0.28;
+        float lower_cloud = smoothstep(0.525, 0.665, lower_field);
+        float lower_band = smoothstep(0.012, 0.055, elevation) * (1.0 - smoothstep(0.2, 0.39, elevation));
+        vec3 lower_color = mix(vec3(0.31, 0.4, 0.43), vec3(0.83, 0.86, 0.84), clamp(lit_side + 0.28, 0.0, 1.0));
+        color = mix(color, lower_color, lower_cloud * lower_band * 0.7);
 
         float cirrus = smoothstep(0.58, 0.77, cloud_fbm(EYEDIR.xz * 4.2 + wind * 0.36 + vec2(14.0, 5.0)));
-        cirrus *= smoothstep(0.34, 0.76, elevation) * 0.2;
+        cirrus *= smoothstep(0.28, 0.74, elevation) * 0.28;
         color = mix(color, vec3(0.78, 0.84, 0.86), cirrus);
     } else {
         color = mix(vec3(0.035, 0.05, 0.052), vec3(0.23, 0.3, 0.3), clamp(EYEDIR.y + 1.0, 0.0, 1.0));
@@ -240,7 +254,7 @@ void sky() {
         var process = new ParticleProcessMaterial
         {
             EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box,
-            EmissionBoxExtents = new Vector3(38, 6, 38),
+            EmissionBoxExtents = new Vector3(108, 7, 108),
             Gravity = new Vector3(0.08f, 0.025f, 0.04f),
             InitialVelocityMin = 0.03f,
             InitialVelocityMax = 0.12f,
@@ -260,12 +274,12 @@ void sky() {
         };
         AddChild(new GpuParticles3D
         {
-            Amount = 90,
+            Amount = 220,
             Lifetime = 9.0,
-            VisibilityAabb = new Aabb(new Vector3(-42, -2, -42), new Vector3(84, 18, 84)),
+            VisibilityAabb = new Aabb(new Vector3(-112, -2, -112), new Vector3(224, 20, 224)),
             ProcessMaterial = process,
             DrawPass1 = quad,
-            Position = new Vector3(0, 4, 0)
+            Position = new Vector3(0, 4, MapCenterZ)
         });
     }
 
@@ -282,12 +296,12 @@ void sky() {
         var yellow = Mat("warning", new Color(0.74f, 0.51f, 0.055f), 0.22f, 0.55f);
         var white = Mat("marking", new Color(0.72f, 0.75f, 0.69f), 0.05f, 0.72f);
 
-        StaticBox("Ground", new Vector3(0, -0.55f, 0), new Vector3(86, 1, 86), asphalt);
-        StaticBox("NorthWall", new Vector3(0, 1.25f, -42), new Vector3(86, 3, 1), concreteDark);
-        StaticBox("WestWall", new Vector3(-42, 1.25f, 0), new Vector3(1, 3, 86), concreteDark);
-        StaticBox("EastWall", new Vector3(42, 1.25f, 0), new Vector3(1, 3, 86), concreteDark);
-        StaticBox("SouthWallL", new Vector3(-25, 1.25f, 42), new Vector3(34, 3, 1), concreteDark);
-        StaticBox("SouthWallR", new Vector3(25, 1.25f, 42), new Vector3(34, 3, 1), concreteDark);
+        StaticBox("Ground", new Vector3(0, -0.55f, MapCenterZ), new Vector3(MapWidthMeters, 1, MapDepthMeters), asphalt);
+        StaticBox("NorthPerimeter", new Vector3(0, 1.25f, -170), new Vector3(MapWidthMeters, 3, 1), concreteDark);
+        StaticBox("WestPerimeter", new Vector3(-110, 1.25f, MapCenterZ), new Vector3(1, 3, MapDepthMeters), concreteDark);
+        StaticBox("EastPerimeter", new Vector3(110, 1.25f, MapCenterZ), new Vector3(1, 3, MapDepthMeters), concreteDark);
+        StaticBox("SouthPerimeterL", new Vector3(-58, 1.25f, 50), new Vector3(104, 3, 1), concreteDark);
+        StaticBox("SouthPerimeterR", new Vector3(58, 1.25f, 50), new Vector3(104, 3, 1), concreteDark);
         for (var x = -35; x <= 35; x += 10)
         {
             MeshBox(_levelRoot, new Vector3(x, 0.012f, 5), new Vector3(0.12f, 0.025f, 7), white);
@@ -313,11 +327,12 @@ void sky() {
         BuildCantileverCommandHub(concrete, steel, steelDark, yellow);
         BuildRadarSpire(concrete, steel, steelDark, yellow);
         BuildCover(concreteDark);
+        BuildHarborExpansion(asphalt, concrete, concreteDark, steel, steelDark, rust, yellow, white);
         BuildBackground(concreteDark, steel);
         AddPuddles();
         AddLightPoles();
         BuildMissionTerminals();
-        BuildExtraction();
+        BuildExtraction(concrete, steelDark, yellow, white);
         _extractionMarker.Visible = false;
     }
 
@@ -908,18 +923,27 @@ void sky() {
         var smokeTexture = BuildSmokeTexture();
         foreach (var item in new (Vector3 Position, Vector3 Size)[]
         {
-            (new Vector3(-52, 8, -15), new Vector3(16, 16, 30)),
-            (new Vector3(52, 11, -21), new Vector3(17, 22, 24)),
-            (new Vector3(18, 7, -53), new Vector3(26, 14, 18)),
-            (new Vector3(-20, 10, -55), new Vector3(18, 20, 16)),
-            (new Vector3(-61, 14, -38), new Vector3(13, 28, 15)),
-            (new Vector3(61, 16, 5), new Vector3(15, 32, 18)),
-            (new Vector3(34, 15, -61), new Vector3(18, 30, 13)),
-            (new Vector3(-42, 9, 57), new Vector3(24, 18, 16))
+            (new Vector3(-128, 10, -28), new Vector3(24, 20, 46)),
+            (new Vector3(132, 14, -72), new Vector3(27, 28, 54)),
+            (new Vector3(-78, 10, -190), new Vector3(42, 20, 25)),
+            (new Vector3(2, 14, -194), new Vector3(54, 28, 28)),
+            (new Vector3(92, 9, -191), new Vector3(34, 18, 26)),
+            (new Vector3(-138, 18, -118), new Vector3(18, 36, 24)),
+            (new Vector3(139, 21, -153), new Vector3(22, 42, 26)),
+            (new Vector3(-82, 11, 75), new Vector3(32, 22, 25)),
+            (new Vector3(-25, 17, 79), new Vector3(24, 34, 22)),
+            (new Vector3(35, 12, 77), new Vector3(38, 24, 26)),
+            (new Vector3(90, 19, 72), new Vector3(22, 38, 20))
         })
         {
             MeshBox(_levelRoot, item.Position, item.Size, concrete);
             MeshBox(_levelRoot, item.Position + new Vector3(0, item.Size.Y * 0.5f + 0.22f, 0), new Vector3(item.Size.X + 0.65f, 0.42f, item.Size.Z + 0.65f), skylineTrim);
+            var crownHeight = Mathf.Clamp(item.Size.Y * 0.16f, 2.4f, 6.0f);
+            MeshBox(
+                _levelRoot,
+                item.Position + Vector3.Up * (item.Size.Y * 0.5f + crownHeight * 0.5f + 0.42f),
+                new Vector3(item.Size.X * 0.52f, crownHeight, item.Size.Z * 0.58f),
+                steel);
             if (Mathf.Abs(item.Position.X) > Mathf.Abs(item.Position.Z))
             {
                 var facing = -Mathf.Sign(item.Position.X);
@@ -936,15 +960,24 @@ void sky() {
                     MeshBox(_levelRoot, item.Position + new Vector3(0, y - item.Size.Y * 0.5f, facing * (item.Size.Z * 0.5f + 0.025f)), new Vector3(item.Size.X * 0.72f, 0.62f, 0.04f), distantGlass);
                 }
             }
+            if (item.Size.Y >= 28.0f)
+            {
+                StaticCylinder(
+                    "SkylineAntenna",
+                    item.Position + Vector3.Up * (item.Size.Y * 0.5f + crownHeight + 3.2f),
+                    0.09f,
+                    6.4f,
+                    skylineTrim);
+            }
         }
-        foreach (var x in new[] { -49.0f, 48.0f })
+        foreach (var x in new[] { -126.0f, 126.0f })
         {
-            StaticCylinder("Tank", new Vector3(x, 6, 20), 5.5f, 12, steel);
-            StaticCylinder("TankUpper", new Vector3(x, 13.2f, 20), 4.6f, 2.4f, skylineTrim);
-            StaticCylinder("TankCrown", new Vector3(x, 14.65f, 20), 5.1f, 0.5f, steel);
+            StaticCylinder("BackgroundTank", new Vector3(x, 7, -18), 6.5f, 14, steel);
+            StaticCylinder("BackgroundTankUpper", new Vector3(x, 15.2f, -18), 5.5f, 2.4f, skylineTrim);
+            StaticCylinder("BackgroundTankCrown", new Vector3(x, 16.65f, -18), 6.0f, 0.5f, steel);
         }
 
-        foreach (var stack in new[] { new Vector3(-57, 0, -25), new Vector3(57, 0, -8), new Vector3(45, 0, -58) })
+        foreach (var stack in new[] { new Vector3(-136, 0, -62), new Vector3(138, 0, -116), new Vector3(88, 0, -203) })
         {
             StaticCylinder("DistantSmokeStack", stack + Vector3.Up * 12.5f, 0.82f, 25.0f, smokeStack);
             for (var y = 4.0f; y <= 22.0f; y += 6.0f)
@@ -954,16 +987,16 @@ void sky() {
             AddIndustrialSmoke(stack + Vector3.Up * 25.2f, smokeTexture);
         }
 
-        foreach (var x in new[] { -32.0f, -21.0f, -10.0f, 1.0f })
+        foreach (var x in new[] { -72.0f, -48.0f, -24.0f, 0.0f, 24.0f, 48.0f, 72.0f })
         {
-            MeshBox(_levelRoot, new Vector3(x, 15.2f, -64.0f), new Vector3(10.5f, 0.5f, 14.0f), steel, new Vector3(0, 0, x % 2 == 0 ? 0.24f : -0.24f));
-            MeshBox(_levelRoot, new Vector3(x, 7.8f, -64.0f), new Vector3(0.4f, 15.5f, 0.4f), skylineTrim);
+            MeshBox(_levelRoot, new Vector3(x, 17.2f, -207.0f), new Vector3(21.5f, 0.55f, 19.0f), steel, new Vector3(0, 0, x % 48.0f == 0 ? 0.22f : -0.22f));
+            MeshBox(_levelRoot, new Vector3(x, 8.8f, -207.0f), new Vector3(0.45f, 17.5f, 0.45f), skylineTrim);
         }
 
-        MeshBox(_levelRoot, new Vector3(57.0f, 18.0f, -8.0f), new Vector3(15.0f, 1.15f, 2.2f), steel, new Vector3(0, 0.14f, 0));
-        MeshBox(_levelRoot, new Vector3(-54.0f, 20.0f, -36.0f), new Vector3(22.0f, 0.55f, 0.65f), skylineTrim, new Vector3(0, 0, -0.08f));
-        MeshBox(_levelRoot, new Vector3(-43.0f, 12.0f, -36.0f), new Vector3(0.55f, 24.0f, 0.55f), skylineTrim);
-        MeshBox(_levelRoot, new Vector3(-35.0f, 20.0f, -36.0f), new Vector3(16.0f, 0.38f, 0.42f), steel, new Vector3(0, 0, -0.06f));
+        MeshBox(_levelRoot, new Vector3(130.0f, 22.0f, -72.0f), new Vector3(20.0f, 1.15f, 2.2f), steel, new Vector3(0, 0.14f, 0));
+        MeshBox(_levelRoot, new Vector3(-137.0f, 27.0f, -108.0f), new Vector3(28.0f, 0.6f, 0.72f), skylineTrim, new Vector3(0, 0, -0.08f));
+        MeshBox(_levelRoot, new Vector3(-124.0f, 14.0f, -108.0f), new Vector3(0.62f, 28.0f, 0.62f), skylineTrim);
+        MeshBox(_levelRoot, new Vector3(-112.0f, 27.0f, -108.0f), new Vector3(24.0f, 0.42f, 0.48f), steel, new Vector3(0, 0, -0.06f));
         BuildDistantAircraft(steel, distantGlass);
     }
 
@@ -1106,39 +1139,6 @@ void sky() {
                 SpotRange = 23.0f,
                 SpotAngle = 48.0f,
                 ShadowEnabled = true
-            });
-        }
-    }
-
-    private void BuildExtraction()
-    {
-        var area = new Area3D
-        {
-            Name = "ExtractionZone",
-            Position = new Vector3(0, 0.08f, -37),
-            CollisionLayer = 0,
-            CollisionMask = 1
-        };
-        area.AddChild(new CollisionShape3D { Shape = new CylinderShape3D { Radius = 4.0f, Height = 1.0f } });
-        area.BodyEntered += OnExtractionEntered;
-        _levelRoot.AddChild(area);
-        _extractionMarker = new Node3D { Position = area.Position };
-        _levelRoot.AddChild(_extractionMarker);
-        var marker = new StandardMaterial3D
-        {
-            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-            AlbedoColor = new Color(0.08f, 0.82f, 0.58f, 0.12f),
-            EmissionEnabled = true,
-            Emission = new Color(0.08f, 0.82f, 0.58f),
-            EmissionEnergyMultiplier = 2.0f
-        };
-        foreach (var radius in new[] { 3.0f, 3.55f, 4.1f })
-        {
-            _extractionMarker.AddChild(new MeshInstance3D
-            {
-                Mesh = new TorusMesh { InnerRadius = radius, OuterRadius = radius + 0.035f, Rings = 48, RingSegments = 8 },
-                MaterialOverride = marker
             });
         }
     }
