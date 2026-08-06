@@ -17,6 +17,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     public float Health { get; private set; }
     public float MaxHealth { get; private set; }
     public float SkillCooldownRemaining => _skillCooldown;
+    public float SkillCooldownDuration => OperatorRoles.Spec(Role).SkillCooldown * (IsHumanProxy ? 1.0f : 2.0f);
 
     public Node3D CombatNode => this;
     public bool CombatDead => IsDowned;
@@ -82,6 +83,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         FloorSnapLength = 0.35f;
         BuildOperator();
         ApplyRoleVisuals();
+        if (!IsHumanProxy)
+        {
+            _skillCooldown = SkillCooldownDuration * Mathf.Clamp(0.24f + SquadSlot * 0.11f, 0.35f, 0.62f);
+        }
         _remotePosition = GlobalPosition;
         _remoteRotation = Rotation;
     }
@@ -348,7 +353,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             return false;
         }
         var spec = OperatorRoles.Spec(Role);
-        _skillCooldown = spec.SkillCooldown;
+        _skillCooldown = SkillCooldownDuration;
         _skillEffectApplied = false;
         if (Role == OperatorRole.Assault)
         {

@@ -1098,7 +1098,7 @@ public partial class CombatHUD : CanvasLayer
         _quitButton = Button("EXIT TO DESKTOP", new Vector2(270, 401), new Vector2(210, 44));
         _quitButton.Pressed += () => EmitSignal(SignalName.QuitRequested);
         content.AddChild(_quitButton);
-        _buildLabel = PositionedLabel("FORWARD+  /  BUILD 1.0.0", 11, new Color(0.32f, 0.4f, 0.38f), 40, 477);
+        _buildLabel = PositionedLabel("FORWARD+  /  BUILD 1.1.0", 11, new Color(0.32f, 0.4f, 0.38f), 40, 477);
         _buildLabel.Size = new Vector2(440, 22);
         _buildLabel.HorizontalAlignment = HorizontalAlignment.Center;
         content.AddChild(_buildLabel);

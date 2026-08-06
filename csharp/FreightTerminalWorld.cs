@@ -8,8 +8,8 @@ namespace OperationSteelTide;
 [GlobalClass]
 public partial class FreightTerminalWorld : Node3D
 {
-    private const float MapWidthMeters = 220.0f;
-    private const float MapDepthMeters = 220.0f;
+    private const float MapWidthMeters = 340.0f;
+    private const float MapDepthMeters = 320.0f;
     private const float MapCenterZ = -60.0f;
     private static readonly Vector3 DeploymentPoint = new(0, 0.2f, 42.0f);
     private static readonly Vector3 ExtractionPoint = new(78.0f, 0.08f, -150.0f);
@@ -191,6 +191,14 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--validate-squad"))
         {
             ValidateSquadFlow();
+        }
+        else if (Array.Exists(args, value => value == "--validate-residential"))
+        {
+            ValidateResidentialCommunity();
+        }
+        else if (Array.Exists(args, value => value == "--capture-residential"))
+        {
+            CaptureResidentialCommunity();
         }
         else if (Array.Exists(args, value => value == "--capture-squad"))
         {
@@ -1138,7 +1146,7 @@ public partial class FreightTerminalWorld : Node3D
         if (IsInstanceValid(_sunLight))
         {
             _sunLight.ShadowEnabled = _qualitySetting >= 1;
-            _sunLight.DirectionalShadowMaxDistance = new[] { 55.0f, 90.0f, 130.0f }[_qualitySetting];
+            _sunLight.DirectionalShadowMaxDistance = new[] { 80.0f, 150.0f, 260.0f }[_qualitySetting];
         }
         SaveSettings();
     }
@@ -1648,12 +1656,12 @@ public partial class FreightTerminalWorld : Node3D
         var overview = new Camera3D
         {
             Name = "ExpansionOverviewCamera",
-            Fov = 58.0f,
-            Far = 520.0f
+            Fov = 62.0f,
+            Far = 680.0f
         };
         AddChild(overview);
-        overview.GlobalPosition = new Vector3(0, 128.0f, 46.0f);
-        overview.LookAt(new Vector3(0, 0, -72.0f), Vector3.Up);
+        overview.GlobalPosition = new Vector3(0, 325.0f, MapCenterZ);
+        overview.LookAt(new Vector3(0, 0, MapCenterZ), Vector3.Forward);
         overview.MakeCurrent();
         await WaitFrames(48);
         SaveViewportImage("res://expanded_map_validation.png");
@@ -1674,7 +1682,7 @@ public partial class FreightTerminalWorld : Node3D
             && _levelRoot.GetNodeOrNull<Node3D>("RadarFoundation") is not null;
         var aircraftMoving = aircraft is not null && aircraft.Position.DistanceTo(aircraftStart) > 0.1f;
         var dynamicSky = _environmentRef.Sky?.SkyMaterial is ShaderMaterial;
-        GD.Print($"MAP_CHECK width={MapWidthMeters:0} depth={MapDepthMeters:0} loot_sources={_lootSources.Count} hostiles={_enemiesRemaining} extraction_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} landmarks={landmarksPresent} cover_points={_coverPoints.Length} dynamic_sky={dynamicSky} aircraft_moving={aircraftMoving} industrial_skyline=true");
+        GD.Print($"MAP_CHECK width={MapWidthMeters:0} depth={MapDepthMeters:0} loot_sources={_lootSources.Count} hostiles={_enemiesRemaining} extraction_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} landmarks={landmarksPresent} cover_points={_coverPoints.Length} dynamic_sky={dynamicSky} aircraft_moving={aircraftMoving} residential_towers={ResidentialTowerCount} civilians={ResidentialCivilianCount}");
         GetTree().Quit();
     }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace OperationSteelTide;
@@ -22,6 +23,7 @@ public partial class SquadNetwork : Node
     public TacticalPlayer? LocalPlayer { get; set; }
 
     private ENetMultiplayerPeer? _peer;
+    private readonly Dictionary<long, ulong> _nextAbilityTimeByPeer = new();
     private float _snapshotTimer;
 
     public override void _Ready()
@@ -95,6 +97,7 @@ public partial class SquadNetwork : Node
         IsOnline = false;
         IsHost = false;
         _snapshotTimer = 0.0f;
+        _nextAbilityTimeByPeer.Clear();
     }
 
     public override void _Process(double delta)
@@ -184,6 +187,16 @@ public partial class SquadNetwork : Node
             return;
         }
         var sender = Multiplayer.GetRemoteSenderId();
+        if (!Enum.IsDefined(typeof(OperatorRole), role))
+        {
+            return;
+        }
+        var now = Time.GetTicksMsec();
+        if (_nextAbilityTimeByPeer.TryGetValue(sender, out var readyAt) && now < readyAt)
+        {
+            return;
+        }
+        _nextAbilityTimeByPeer[sender] = now + (ulong)(OperatorRoles.Spec((OperatorRole)role).SkillCooldown * 1000.0f);
         RemoteAbilityReceived?.Invoke(sender, (OperatorRole)role, origin, forward);
         Rpc(MethodName.ReceiveAbility, sender, role, origin, forward);
     }
@@ -230,6 +243,7 @@ public partial class SquadNetwork : Node
 
     private void OnPeerDisconnected(long peerId)
     {
+        _nextAbilityTimeByPeer.Remove(peerId);
         RemotePeerLeft?.Invoke(peerId);
         var connected = Mathf.Max(1, Multiplayer.GetPeers().Length + 1);
         SetStatus(IsHost
