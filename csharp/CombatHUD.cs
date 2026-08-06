@@ -29,6 +29,8 @@ public partial class CombatHUD : CanvasLayer
     private Label _weaponModeLabel = null!;
     private Button _primaryWeaponButton = null!;
     private Button _knifeWeaponButton = null!;
+    private InventoryModelPreview _primaryWeaponSlotPreview = null!;
+    private InventoryModelPreview _knifeSlotPreview = null!;
     private Label _plateReserveLabel = null!;
     private Label _vitalCaption = null!;
     private Label _armorCaption = null!;
@@ -91,21 +93,24 @@ public partial class CombatHUD : CanvasLayer
     private Label _backpackCaption = null!;
     private Button _lootCloseButton = null!;
     private Button _primaryDetailButton = null!;
-    private WeaponPreviewControl _primaryWeaponPreview = null!;
+    private InventoryModelPreview _primaryWeaponPreview = null!;
+    private InventoryModelPreview _helmetPreview = null!;
+    private InventoryModelPreview _armorPreview = null!;
+    private InventoryModelPreview _packPreview = null!;
     private ColorRect _weaponDetailOverlay = null!;
     private Label _weaponDetailTitle = null!;
     private Label _weaponDetailStatsCaption = null!;
     private Label _weaponDetailStats = null!;
     private Label _weaponDetailPartsCaption = null!;
     private GridContainer _weaponDetailParts = null!;
-    private WeaponPreviewControl _weaponDetailPreview = null!;
+    private InventoryModelPreview _weaponDetailPreview = null!;
     private WeaponBuild? _detailedWeapon;
     private IReadOnlyList<LootItem>? _shownLoot;
     private TacticalPlayer? _shownPlayer;
     private string _shownLootName = string.Empty;
     private bool _shownSourceAvailable;
     private string _lastFireMode = "AUTO";
-    private string _lastWeaponName = "M4A1";
+    private string _weaponPreviewSignature = string.Empty;
     private Tween? _hitTween;
     private Tween? _damageTween;
     private Tween? _crosshairTween;
@@ -283,14 +288,14 @@ public partial class CombatHUD : CanvasLayer
         };
         status.AddChild(_staminaBar);
 
-        var weapon = Panel(root, Vector2.Zero, new Vector2(360, 100));
+        var weapon = Panel(root, Vector2.Zero, new Vector2(420, 104));
         weapon.MouseFilter = Control.MouseFilterEnum.Pass;
         weapon.AnchorLeft = 1.0f;
         weapon.AnchorTop = 1.0f;
         weapon.AnchorRight = 1.0f;
         weapon.AnchorBottom = 1.0f;
-        weapon.OffsetLeft = -390;
-        weapon.OffsetTop = -132;
+        weapon.OffsetLeft = -450;
+        weapon.OffsetTop = -136;
         weapon.OffsetRight = -30;
         weapon.OffsetBottom = -32;
         _ammoLabel = Label("30", 42, new Color(0.95f, 0.98f, 0.95f));
@@ -300,26 +305,44 @@ public partial class CombatHUD : CanvasLayer
         _reserveLabel.Position = new Vector2(78, 23);
         weapon.AddChild(_reserveLabel);
         var weaponSlots = new ButtonGroup();
-        _primaryWeaponButton = Button("1  M4A1", new Vector2(128, 9), new Vector2(112, 42));
+        _primaryWeaponButton = Button(string.Empty, new Vector2(118, 7), new Vector2(174, 50));
         _primaryWeaponButton.ToggleMode = true;
         _primaryWeaponButton.ButtonGroup = weaponSlots;
         _primaryWeaponButton.FocusMode = Control.FocusModeEnum.None;
-        _primaryWeaponButton.AddThemeFontSizeOverride("font_size", 12);
         _primaryWeaponButton.Pressed += () => EmitSignal(SignalName.WeaponSlotRequested, 0);
         weapon.AddChild(_primaryWeaponButton);
-        _knifeWeaponButton = Button("3  KNIFE", new Vector2(246, 9), new Vector2(90, 42));
+        var primaryNumber = PositionedLabel("1", 12, new Color(0.66f, 0.78f, 0.74f), 7, 15);
+        primaryNumber.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _primaryWeaponButton.AddChild(primaryNumber);
+        _primaryWeaponSlotPreview = new InventoryModelPreview
+        {
+            Position = new Vector2(24, 3),
+            Size = new Vector2(142, 43)
+        };
+        _primaryWeaponSlotPreview.Configure(InventoryPreviewKind.Rifle, weapon: WeaponCatalog.StarterWeapon());
+        _primaryWeaponButton.AddChild(_primaryWeaponSlotPreview);
+        _knifeWeaponButton = Button(string.Empty, new Vector2(298, 7), new Vector2(98, 50));
         _knifeWeaponButton.ToggleMode = true;
         _knifeWeaponButton.ButtonGroup = weaponSlots;
         _knifeWeaponButton.FocusMode = Control.FocusModeEnum.None;
-        _knifeWeaponButton.AddThemeFontSizeOverride("font_size", 12);
         _knifeWeaponButton.Pressed += () => EmitSignal(SignalName.WeaponSlotRequested, 1);
         weapon.AddChild(_knifeWeaponButton);
+        var knifeNumber = PositionedLabel("3", 12, new Color(0.66f, 0.78f, 0.74f), 7, 15);
+        knifeNumber.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _knifeWeaponButton.AddChild(knifeNumber);
+        _knifeSlotPreview = new InventoryModelPreview
+        {
+            Position = new Vector2(22, 3),
+            Size = new Vector2(70, 43)
+        };
+        _knifeSlotPreview.Configure(InventoryPreviewKind.Knife);
+        _knifeWeaponButton.AddChild(_knifeSlotPreview);
         _weaponModeLabel = PositionedLabel("M4A1   AUTO", 12, new Color(0.4f, 0.82f, 0.71f), 23, 62);
-        _weaponModeLabel.Size = new Vector2(220, 22);
+        _weaponModeLabel.Size = new Vector2(280, 22);
         _weaponModeLabel.ClipText = true;
         weapon.AddChild(_weaponModeLabel);
         _grenadeLabel = Label("FRAG  x2", 13, new Color(0.78f, 0.83f, 0.8f));
-        _grenadeLabel.Position = new Vector2(260, 63);
+        _grenadeLabel.Position = new Vector2(332, 65);
         weapon.AddChild(_grenadeLabel);
 
         _crosshair = new Control();
@@ -534,9 +557,9 @@ public partial class CombatHUD : CanvasLayer
         panel.AddChild(_lootStats);
 
         _primarySlot = BuildPrimaryWeaponSlot(panel, new Vector2(600, 176), new Vector2(590, 124));
-        _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(600, 310), new Vector2(188, 104), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel);
-        _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(801, 310), new Vector2(188, 104), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel);
-        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK", new Vector2(1002, 310), new Vector2(188, 104), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel);
+        _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(600, 310), new Vector2(188, 104), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel, out _helmetPreview);
+        _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(801, 310), new Vector2(188, 104), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel, out _armorPreview);
+        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK", new Vector2(1002, 310), new Vector2(188, 104), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel, out _packPreview);
 
         _backpackItemsCaption = PositionedLabel("PERSONAL BACKPACK", 12, new Color(0.43f, 0.72f, 0.96f), 600, 420);
         _backpackItemsCaption.Size = new Vector2(590, 22);
@@ -610,11 +633,12 @@ public partial class CombatHUD : CanvasLayer
             }
         };
         header.AddChild(_primaryDetailButton);
-        _primaryWeaponPreview = new WeaponPreviewControl
+        _primaryWeaponPreview = new InventoryModelPreview
         {
             CustomMinimumSize = new Vector2(520, 54),
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
         };
+        _primaryWeaponPreview.Configure(InventoryPreviewKind.Rifle, weapon: WeaponCatalog.StarterWeapon());
         box.AddChild(_primaryWeaponPreview);
         _primarySlotLabel = Label("", 11, new Color(0.68f, 0.78f, 0.75f));
         _primarySlotLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
@@ -632,7 +656,8 @@ public partial class CombatHUD : CanvasLayer
         Vector2 size,
         Color accent,
         out Label caption,
-        out Label content)
+        out Label content,
+        out InventoryModelPreview preview)
     {
         var zone = new LootDropZone
         {
@@ -648,11 +673,26 @@ public partial class CombatHUD : CanvasLayer
         caption = Label(title, 11, accent);
         caption.MouseFilter = Control.MouseFilterEnum.Ignore;
         box.AddChild(caption);
-        content = Label("", 12, new Color(0.78f, 0.86f, 0.83f));
+        var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        box.AddChild(row);
+        preview = new InventoryModelPreview
+        {
+            CustomMinimumSize = new Vector2(62, 62),
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill
+        };
+        preview.Configure(target switch
+        {
+            LootDropTarget.Helmet => InventoryPreviewKind.Helmet,
+            LootDropTarget.BodyArmor => InventoryPreviewKind.BodyArmor,
+            _ => InventoryPreviewKind.Backpack
+        });
+        row.AddChild(preview);
+        content = Label("", 11, new Color(0.78f, 0.86f, 0.83f));
         content.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        content.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         content.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         content.MouseFilter = Control.MouseFilterEnum.Ignore;
-        box.AddChild(content);
+        row.AddChild(content);
         return zone;
     }
 
@@ -698,11 +738,12 @@ public partial class CombatHUD : CanvasLayer
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         panel.AddChild(previewBand);
-        _weaponDetailPreview = new WeaponPreviewControl
+        _weaponDetailPreview = new InventoryModelPreview
         {
             Position = new Vector2(20, 18),
             Size = new Vector2(756, 112)
         };
+        _weaponDetailPreview.Configure(InventoryPreviewKind.Rifle, weapon: WeaponCatalog.StarterWeapon());
         previewBand.AddChild(_weaponDetailPreview);
 
         _weaponDetailStatsCaption = PositionedLabel("FINAL WEAPON STATS", 12, new Color(0.38f, 0.82f, 0.7f), 32, 242);
@@ -748,7 +789,7 @@ public partial class CombatHUD : CanvasLayer
         _weaponDetailTitle.Text = $"{Text("weapon_details", "WEAPON DETAILS")}  //  {name}";
         _weaponDetailStatsCaption.Text = Text("final_stats", "FINAL WEAPON STATS");
         _weaponDetailPartsCaption.Text = Text("fitted_parts", "FITTED COMPONENTS");
-        _weaponDetailPreview.Configure(weapon, new Color(0.32f, 0.9f, 0.7f));
+        _weaponDetailPreview.Configure(InventoryPreviewKind.Rifle, weapon: weapon);
         _weaponDetailStats.Text = GameLocalization.IsChinese(_language)
             ? $"伤害 {stats.Damage:0}     有效射程 {stats.EffectiveRange:0}m     后坐 {stats.Recoil:0.00}     操控 {stats.Handling:0.00}\n射速 {60.0f / stats.FireInterval:0} 发/分     弹匣 {stats.MagazineSize}     枪声半径 {stats.SoundRadius:0}m"
             : $"DAMAGE {stats.Damage:0}     RANGE {stats.EffectiveRange:0}m     RECOIL {stats.Recoil:0.00}     HANDLING {stats.Handling:0.00}\nRATE {60.0f / stats.FireInterval:0} RPM     MAGAZINE {stats.MagazineSize}     REPORT RADIUS {stats.SoundRadius:0}m";
@@ -851,13 +892,16 @@ public partial class CombatHUD : CanvasLayer
         _lootStats.Text = GameLocalization.IsChinese(_language)
             ? $"当前主武器  {weaponName}     伤害 {stats.Damage:0}     射程 {stats.EffectiveRange:0}m     操控 {stats.Handling:0.00}"
             : $"EQUIPPED  {weaponName}     DMG {stats.Damage:0}     RANGE {stats.EffectiveRange:0}m     HANDLING {stats.Handling:0.00}";
-        _primaryWeaponPreview.Configure(_shownPlayer.EquippedWeapon, new Color(0.34f, 0.86f, 0.7f));
+        _primaryWeaponPreview.Configure(InventoryPreviewKind.Rifle, weapon: _shownPlayer.EquippedWeapon);
         _primarySlotLabel.Text = GameLocalization.IsChinese(_language)
             ? $"{weaponName}   //   后坐 {stats.Recoil:0.00}   弹匣 {stats.MagazineSize}"
             : $"{weaponName}   //   RECOIL {stats.Recoil:0.00}   MAG {stats.MagazineSize}";
         _helmetSlotLabel.Text = _shownPlayer.EquippedHelmet.DisplayName(_language) + "\n" + _shownPlayer.EquippedHelmet.Detail(_language);
         _armorSlotLabel.Text = _shownPlayer.EquippedBodyArmor.DisplayName(_language) + "\n" + _shownPlayer.EquippedBodyArmor.Detail(_language);
         _packSlotLabel.Text = _shownPlayer.EquippedBackpack.DisplayName(_language) + "\n" + _shownPlayer.EquippedBackpack.Detail(_language);
+        _helmetPreview.Configure(InventoryPreviewKind.Helmet, _shownPlayer.EquippedHelmet);
+        _armorPreview.Configure(InventoryPreviewKind.BodyArmor, _shownPlayer.EquippedBodyArmor);
+        _packPreview.Configure(InventoryPreviewKind.Backpack, _shownPlayer.EquippedBackpack);
 
         ClearRows(_lootSourceList);
         _lootSourceList.Columns = 2;
@@ -905,6 +949,7 @@ public partial class CombatHUD : CanvasLayer
                 _ => new Color(0.55f, 0.62f, 0.58f)
             },
             item.Weapon,
+            item.Equipment,
             Text("details", "DETAILS"));
         card.DetailsRequested += ShowWeaponDetails;
         card.DoubleActivated += (itemId, cardOrigin) =>
@@ -1048,7 +1093,7 @@ public partial class CombatHUD : CanvasLayer
         _quitButton = Button("EXIT TO DESKTOP", new Vector2(270, 401), new Vector2(210, 44));
         _quitButton.Pressed += () => EmitSignal(SignalName.QuitRequested);
         content.AddChild(_quitButton);
-        _buildLabel = PositionedLabel("FORWARD+  /  BUILD 0.8", 11, new Color(0.32f, 0.4f, 0.38f), 40, 477);
+        _buildLabel = PositionedLabel("FORWARD+  /  BUILD 0.8.1", 11, new Color(0.32f, 0.4f, 0.38f), 40, 477);
         _buildLabel.Size = new Vector2(440, 22);
         _buildLabel.HorizontalAlignment = HorizontalAlignment.Center;
         content.AddChild(_buildLabel);
@@ -1109,11 +1154,10 @@ public partial class CombatHUD : CanvasLayer
         _healthLabel.AddThemeColorOverride("font_color", health < 30 ? new Color(1.0f, 0.36f, 0.25f) : new Color(0.88f, 0.96f, 0.92f));
     }
 
-    public void SetEquipment(int armorPlates, string fireMode, string weaponName = "M4A1")
+    public void SetEquipment(int armorPlates, string fireMode, string weaponName = "M4A1", WeaponBuild? weaponBuild = null)
     {
         _plateReserveLabel.Text = $"x{armorPlates}";
         _lastFireMode = fireMode;
-        _lastWeaponName = weaponName;
         var mode = fireMode switch
         {
             "AUTO" => Text("auto", "AUTO"),
@@ -1122,7 +1166,29 @@ public partial class CombatHUD : CanvasLayer
         };
         var displayWeapon = fireMode == "KNIFE" ? Text("tactical_knife", "TACTICAL KNIFE") : weaponName;
         _weaponModeLabel.Text = $"{displayWeapon}   {mode}";
+        if (weaponBuild is not null)
+        {
+            UpdateWeaponPreview(weaponBuild);
+        }
         UpdateWeaponSlotButtons();
+    }
+
+    private void UpdateWeaponPreview(WeaponBuild weapon)
+    {
+        var signature = weapon.Platform.ToString();
+        foreach (var slot in Enum.GetValues<AttachmentSlot>())
+        {
+            if (weapon.Attachments.TryGetValue(slot, out var partId))
+            {
+                signature += $"|{slot}:{partId}";
+            }
+        }
+        if (signature == _weaponPreviewSignature)
+        {
+            return;
+        }
+        _weaponPreviewSignature = signature;
+        _primaryWeaponSlotPreview.Configure(InventoryPreviewKind.Rifle, weapon: weapon);
     }
 
     private void UpdateWeaponSlotButtons()
@@ -1131,19 +1197,10 @@ public partial class CombatHUD : CanvasLayer
         {
             return;
         }
-        _primaryWeaponButton.Text = $"1  {CompactWeaponName(_lastWeaponName)}";
-        _knifeWeaponButton.Text = $"3  {Text("knife", "KNIFE")}";
         _primaryWeaponButton.TooltipText = Text("select_primary", "SELECT PRIMARY WEAPON");
         _knifeWeaponButton.TooltipText = Text("select_knife", "SELECT TACTICAL KNIFE");
         _primaryWeaponButton.SetPressedNoSignal(_lastFireMode != "KNIFE");
         _knifeWeaponButton.SetPressedNoSignal(_lastFireMode == "KNIFE");
-    }
-
-    private static string CompactWeaponName(string name)
-    {
-        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var compact = parts.Length == 0 ? name : parts[0];
-        return compact.Length <= 12 ? compact : compact[..12];
     }
 
     public void SetEquipmentAction(string action, float progress, bool active)

@@ -161,6 +161,13 @@ public partial class TacticalPlayer : CharacterBody3D
         HasMovementIntent = false;
     }
 
+    public void RestoreMovementInput()
+    {
+        _movementInputArmed = true;
+        _movementReleaseTime = 0.0f;
+        HasMovementIntent = false;
+    }
+
     public void SetSearchPose(bool active, float progress = 0.0f)
     {
         _searchPose = active ? Mathf.Clamp(progress, 0.08f, 1.0f) : 0.0f;
@@ -807,7 +814,8 @@ public partial class TacticalPlayer : CharacterBody3D
         Hud?.SetEquipment(
             ArmorPlates,
             _knifeEquipped ? "KNIFE" : _automaticFire ? "AUTO" : "SEMI",
-            EquippedWeapon.DisplayName(Hud?.CurrentLanguage ?? "en"));
+            EquippedWeapon.DisplayName(Hud?.CurrentLanguage ?? "en"),
+            EquippedWeapon);
         Hud?.SetAiming(_isAiming);
         Hud?.SetHeading(Mathf.RadToDeg(Rotation.Y) * -1.0f);
     }
