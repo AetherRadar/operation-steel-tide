@@ -20,105 +20,6 @@ public enum LootDropTarget
 }
 
 [GlobalClass]
-public partial class WeaponPreviewControl : Control
-{
-    private WeaponBuild? _weapon;
-    private Color _accent = new(0.32f, 0.9f, 0.7f);
-
-    public void Configure(WeaponBuild weapon, Color accent)
-    {
-        _weapon = weapon.Clone();
-        _accent = accent;
-        QueueRedraw();
-    }
-
-    public override void _Ready()
-    {
-        MouseFilter = MouseFilterEnum.Ignore;
-        Resized += QueueRedraw;
-        QueueRedraw();
-    }
-
-    public override void _Draw()
-    {
-        if (_weapon is null || Size.X < 60.0f || Size.Y < 24.0f)
-        {
-            return;
-        }
-
-        var receiver = _weapon.Platform switch
-        {
-            WeaponPlatform.AK74 => new Color(0.24f, 0.27f, 0.25f),
-            WeaponPlatform.ScarL => new Color(0.42f, 0.38f, 0.29f),
-            _ => new Color(0.2f, 0.24f, 0.23f)
-        };
-        var furniture = _weapon.Platform == WeaponPlatform.AK74
-            ? new Color(0.31f, 0.21f, 0.13f)
-            : receiver.Lightened(0.12f);
-        var metal = new Color(0.48f, 0.55f, 0.53f);
-        var shadow = new Color(0, 0, 0, 0.58f);
-        var width = Size.X - 18.0f;
-        var centerY = Size.Y * 0.52f;
-        var stockScale = PartScale(AttachmentSlot.Stock);
-        var barrelScale = PartScale(AttachmentSlot.Barrel);
-        var magazineScale = PartScale(AttachmentSlot.Magazine);
-        var opticScale = PartScale(AttachmentSlot.Optic);
-        var gripScale = PartScale(AttachmentSlot.Grip);
-        var stockEnd = 14.0f + width * 0.17f * stockScale;
-        var receiverEnd = stockEnd + width * 0.26f;
-        var handguardEnd = receiverEnd + width * 0.21f;
-        var barrelEnd = Mathf.Min(Size.X - 16.0f, handguardEnd + width * 0.23f * barrelScale);
-
-        DrawLine(new Vector2(12, centerY + 3), new Vector2(barrelEnd + 4, centerY + 3), shadow, 12, true);
-        DrawLine(new Vector2(12, centerY), new Vector2(stockEnd + 5, centerY - 2), furniture, 11, true);
-        DrawRect(new Rect2(9, centerY - 12, 8, 25), furniture.Darkened(0.18f));
-        DrawRect(new Rect2(stockEnd, centerY - 12, receiverEnd - stockEnd, 23), receiver);
-        DrawRect(new Rect2(receiverEnd - 2, centerY - 9, handguardEnd - receiverEnd + 4, 17), furniture);
-        DrawLine(new Vector2(handguardEnd, centerY - 1), new Vector2(barrelEnd, centerY - 1), metal, 5, true);
-        DrawRect(new Rect2(stockEnd + 5, centerY - 15, receiverEnd - stockEnd - 9, 3), _accent.Darkened(0.25f));
-        DrawRect(new Rect2(receiverEnd + 2, centerY - 13, handguardEnd - receiverEnd - 2, 3), metal.Darkened(0.2f));
-
-        var magazineX = stockEnd + (receiverEnd - stockEnd) * 0.64f;
-        var magazineLength = Size.Y * 0.28f * magazineScale;
-        DrawLine(
-            new Vector2(magazineX, centerY + 6),
-            new Vector2(magazineX + (_weapon.Platform == WeaponPlatform.AK74 ? 6 : 2), centerY + 6 + magazineLength),
-            furniture.Darkened(0.08f),
-            10,
-            true);
-        DrawLine(new Vector2(stockEnd + 11, centerY + 7), new Vector2(stockEnd + 7, centerY + Size.Y * 0.22f), furniture, 8, true);
-
-        if (_weapon.Attachments.ContainsKey(AttachmentSlot.Grip))
-        {
-            var gripLength = Size.Y * 0.2f * gripScale;
-            DrawLine(new Vector2(receiverEnd + 18, centerY + 5), new Vector2(receiverEnd + 16, centerY + 5 + gripLength), furniture, 7, true);
-        }
-        if (_weapon.Attachments.ContainsKey(AttachmentSlot.Optic))
-        {
-            var opticWidth = 15.0f * opticScale;
-            var opticX = stockEnd + (receiverEnd - stockEnd) * 0.5f - opticWidth * 0.5f;
-            DrawRect(new Rect2(opticX, centerY - 24, opticWidth, 9), metal.Darkened(0.12f));
-            DrawRect(new Rect2(opticX + 3, centerY - 27, Mathf.Max(5, opticWidth - 6), 4), _accent.Darkened(0.18f));
-        }
-        if (_weapon.Attachments.ContainsKey(AttachmentSlot.Muzzle))
-        {
-            var muzzleScale = PartScale(AttachmentSlot.Muzzle);
-            DrawRect(new Rect2(barrelEnd - 1, centerY - 6, Mathf.Min(20, 10 * muzzleScale), 10), metal.Darkened(0.25f));
-        }
-
-        DrawCircle(new Vector2(stockEnd + 12, centerY - 2), 2.2f, _accent);
-        DrawCircle(new Vector2(receiverEnd - 8, centerY - 2), 1.6f, metal.Lightened(0.18f));
-    }
-
-    private float PartScale(AttachmentSlot slot)
-    {
-        return _weapon is not null && _weapon.Attachments.TryGetValue(slot, out var id)
-            ? WeaponCatalog.Attachment(id).VisualScale
-            : 1.0f;
-    }
-}
-
-[GlobalClass]
 public partial class LootItemIconControl : Control
 {
     private LootItemKind _kind;
@@ -204,6 +105,7 @@ public partial class LootDragCard : PanelContainer
         string detail,
         Color accent,
         WeaponBuild? weapon = null,
+        EquipmentItem? equipment = null,
         string detailAction = "DETAILS")
     {
         ItemId = itemId;
@@ -211,7 +113,7 @@ public partial class LootDragCard : PanelContainer
         ItemKind = itemKind;
         ItemSlot = itemSlot;
         DragTitle = title;
-        CustomMinimumSize = new Vector2(250, weapon is null ? 88 : 126);
+        CustomMinimumSize = new Vector2(250, weapon is not null ? 126 : equipment is not null ? 108 : 88);
         MouseFilter = MouseFilterEnum.Pass;
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
         AddThemeStyleboxOverride("panel", Style(new Color(0.055f, 0.067f, 0.067f, 0.96f), accent));
@@ -219,6 +121,11 @@ public partial class LootDragCard : PanelContainer
         if (weapon is not null)
         {
             BuildWeaponCard(title, detail, accent, weapon, detailAction);
+            return;
+        }
+        if (equipment is not null)
+        {
+            BuildEquipmentCard(title, detail, accent, equipment);
             return;
         }
 
@@ -282,8 +189,8 @@ public partial class LootDragCard : PanelContainer
         details.AddThemeColorOverride("font_color", accent);
         details.Pressed += () => DetailsRequested?.Invoke(weapon.Clone());
         header.AddChild(details);
-        var preview = new WeaponPreviewControl { CustomMinimumSize = new Vector2(220, 48), SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        preview.Configure(weapon, accent);
+        var preview = new InventoryModelPreview { CustomMinimumSize = new Vector2(220, 48), SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        preview.Configure(InventoryPreviewKind.Rifle, weapon: weapon);
         box.AddChild(preview);
         var detailLabel = new Label
         {
@@ -295,6 +202,59 @@ public partial class LootDragCard : PanelContainer
         detailLabel.AddThemeFontSizeOverride("font_size", 11);
         detailLabel.AddThemeColorOverride("font_color", new Color(0.57f, 0.68f, 0.65f));
         box.AddChild(detailLabel);
+    }
+
+    private void BuildEquipmentCard(string title, string detail, Color accent, EquipmentItem equipment)
+    {
+        var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Pass, SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        AddChild(row);
+        var preview = new InventoryModelPreview
+        {
+            CustomMinimumSize = new Vector2(86, 78),
+            SizeFlagsVertical = SizeFlags.ExpandFill
+        };
+        preview.Configure(equipment.Definition.Slot switch
+        {
+            EquipmentSlot.Helmet => InventoryPreviewKind.Helmet,
+            EquipmentSlot.BodyArmor => InventoryPreviewKind.BodyArmor,
+            _ => InventoryPreviewKind.Backpack
+        }, equipment);
+        row.AddChild(preview);
+        var text = new VBoxContainer
+        {
+            MouseFilter = MouseFilterEnum.Ignore,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ExpandFill
+        };
+        row.AddChild(text);
+        var name = new Label
+        {
+            Text = title,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            MouseFilter = MouseFilterEnum.Ignore,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill
+        };
+        name.AddThemeFontSizeOverride("font_size", 14);
+        name.AddThemeColorOverride("font_color", new Color(0.9f, 0.94f, 0.88f));
+        text.AddChild(name);
+        var separator = new ColorRect
+        {
+            CustomMinimumSize = new Vector2(100, 2),
+            Color = new Color(accent, 0.55f),
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        text.AddChild(separator);
+        var detailLabel = new Label
+        {
+            Text = detail,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            MouseFilter = MouseFilterEnum.Ignore,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ExpandFill
+        };
+        detailLabel.AddThemeFontSizeOverride("font_size", 11);
+        detailLabel.AddThemeColorOverride("font_color", new Color(0.61f, 0.7f, 0.66f));
+        text.AddChild(detailLabel);
     }
 
     public override Variant _GetDragData(Vector2 _atPosition)

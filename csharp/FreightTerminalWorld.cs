@@ -180,6 +180,19 @@ public partial class FreightTerminalWorld : Node3D
             }
             return;
         }
+        if (_hud.IsLootVisible)
+        {
+            if (!Input.IsActionPressed("interact"))
+            {
+                _interactReleaseRequired = false;
+            }
+            else if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
+            {
+                _interactReleaseRequired = true;
+                CloseLoot();
+                return;
+            }
+        }
 
         if (IsInstanceValid(_player) && _missionPhase == "DEPLOYMENT"
             && _player.HasMovementIntent && _player.GlobalPosition.Z < 31.0f)
@@ -787,7 +800,7 @@ public partial class FreightTerminalWorld : Node3D
         _player.UiLocked = false;
         _player.SetSearchPose(false);
         _player.DisarmFireInput();
-        _player.DisarmMovementInput();
+        _player.RestoreMovementInput();
         Input.MouseMode = Input.MouseModeEnum.Captured;
     }
 
@@ -1336,8 +1349,16 @@ public partial class FreightTerminalWorld : Node3D
         }
         Input.ActionRelease("interact");
         var reopenedEmpty = _hud.IsLootVisible && source.Loot.Count == 0;
-        GD.Print($"LOOT_CHECK open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} reopened_empty={reopenedEmpty} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
-        CloseLoot();
+        await WaitFrames(3);
+        Input.ActionPress("interact");
+        await WaitFrames(2);
+        var closedByInteract = !_hud.IsLootVisible;
+        Input.ActionRelease("interact");
+        Input.ActionPress("move_forward");
+        await WaitFrames(4);
+        var movementRestored = !_player.UiLocked && _player.HasMovementIntent;
+        Input.ActionRelease("move_forward");
+        GD.Print($"LOOT_CHECK open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         await WaitFrames(24);
         SaveViewportImage("res://modular_weapon_validation.png");
         GetTree().Quit();
@@ -1397,11 +1418,13 @@ public partial class FreightTerminalWorld : Node3D
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 1 });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Weapon, Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 2) });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("helmet_heavy") });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("armor_heavy") });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("pack_heavy") });
         OpenPersonalBackpack();
-        await WaitFrames(8);
+        await WaitFrames(30);
         SaveViewportImage("res://backpack_validation.png");
         _hud.ShowWeaponDetails(_player.EquippedWeapon);
-        await WaitFrames(5);
+        await WaitFrames(20);
         SaveViewportImage("res://weapon_detail_validation.png");
         GD.Print($"BACKPACK_CHECK open={_hud.IsLootVisible} detail={_hud.IsWeaponDetailVisible} items={_player.Backpack.Count} capacity={_player.BackpackCapacity} language={_languageSetting}");
         GetTree().Quit();
@@ -1415,13 +1438,14 @@ public partial class FreightTerminalWorld : Node3D
         }
         await WaitFrames(5);
         Input.ActionPress("weapon_cycle");
-        await WaitFrames(2);
+        await WaitFrames(4);
         Input.ActionRelease("weapon_cycle");
         var cycledToKnife = _player.KnifeEquipped;
-        await WaitFrames(2);
+        await WaitFrames(5);
         Input.ActionPress("weapon_cycle");
-        await WaitFrames(2);
+        await WaitFrames(4);
         Input.ActionRelease("weapon_cycle");
+        await WaitFrames(2);
         var cycledToPrimary = !_player.KnifeEquipped;
         OpenPersonalBackpack();
         await WaitFrames(4);
