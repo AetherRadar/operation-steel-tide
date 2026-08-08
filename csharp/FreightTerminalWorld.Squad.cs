@@ -18,6 +18,8 @@ public partial class FreightTerminalWorld
     private float _squadHudTimer;
     private float _allDownTimer;
     private float _localPlayerDownedTimer;
+    private Camera3D? _squadSpectatorCamera;
+    private SquadMate? _spectatedMate;
     private int _remoteNetworkShotCount;
     private int _remoteNetworkAbilityCount;
 
@@ -332,15 +334,19 @@ public partial class FreightTerminalWorld
         if (_localPlayerDowned)
         {
             UpdateLeaderReviveAi(delta);
-            var helpIncoming = _leaderReviver is not null && IsInstanceValid(_leaderReviver) && !_leaderReviver.IsDowned;
-            if (!helpIncoming)
+            if (_localPlayerDowned)
             {
-                // Bleed-out keeps running until a mate commits to the revive.
-                _localPlayerDownedTimer += delta;
-            }
-            if (_localPlayerDownedTimer >= 22.0f)
-            {
-                FailSquadMission();
+                UpdateSquadSpectatorCamera();
+                var helpIncoming = _leaderReviver is not null && IsInstanceValid(_leaderReviver) && !_leaderReviver.IsDowned;
+                if (!helpIncoming)
+                {
+                    // Bleed-out keeps running until a mate commits to the revive.
+                    _localPlayerDownedTimer += delta;
+                }
+                if (_localPlayerDownedTimer >= 22.0f)
+                {
+                    FailSquadMission();
+                }
             }
         }
     }
@@ -466,6 +472,102 @@ public partial class FreightTerminalWorld
         _leaderReviveChannel = 0.0f;
         _reviverStuckTime = 0.0f;
         _reviverSnapshotTimer = 0.0f;
+    }
+
+    private void BeginSquadMateView()
+    {
+        _spectatedMate = FindLivingSpectatorTarget();
+        if (_spectatedMate is null)
+        {
+            return;
+        }
+
+        if (_squadSpectatorCamera is null || !IsInstanceValid(_squadSpectatorCamera))
+        {
+            _squadSpectatorCamera = new Camera3D
+            {
+                Name = "SquadSpectatorCamera",
+                Fov = 76.0f,
+                Near = 0.04f
+            };
+            AddChild(_squadSpectatorCamera);
+        }
+
+        SnapSquadSpectatorCamera();
+        _squadSpectatorCamera.MakeCurrent();
+    }
+
+    private void UpdateSquadSpectatorCamera()
+    {
+        if (_squadSpectatorCamera is null || !IsInstanceValid(_squadSpectatorCamera))
+        {
+            BeginSquadMateView();
+            return;
+        }
+
+        if (_spectatedMate is null || !IsInstanceValid(_spectatedMate)
+            || _spectatedMate.IsDowned || _spectatedMate.IsBodyBag)
+        {
+            _spectatedMate = FindLivingSpectatorTarget();
+        }
+        if (_spectatedMate is null)
+        {
+            return;
+        }
+
+        SnapSquadSpectatorCamera();
+        if (!_squadSpectatorCamera.Current)
+        {
+            _squadSpectatorCamera.MakeCurrent();
+        }
+    }
+
+    private SquadMate? FindLivingSpectatorTarget()
+    {
+        return _squadMates
+            .Where(mate => IsInstanceValid(mate) && !mate.IsDowned && !mate.IsBodyBag)
+            .OrderBy(mate => mate.GlobalPosition.DistanceSquaredTo(_player.GlobalPosition))
+            .FirstOrDefault();
+    }
+
+    private void SnapSquadSpectatorCamera()
+    {
+        if (_squadSpectatorCamera is null || _spectatedMate is null
+            || !IsInstanceValid(_squadSpectatorCamera) || !IsInstanceValid(_spectatedMate))
+        {
+            return;
+        }
+
+        var basis = _spectatedMate.GlobalBasis.Orthonormalized();
+        var eyePosition = _spectatedMate.GlobalPosition
+            + Vector3.Up * 1.64f
+            - basis.Z * 0.28f;
+        _squadSpectatorCamera.GlobalTransform = new Transform3D(basis, eyePosition);
+    }
+
+    private void RestoreLocalPlayerView()
+    {
+        _spectatedMate = null;
+        var playerCamera = _player.GetNodeOrNull<Camera3D>("Head/CombatCamera");
+        playerCamera?.MakeCurrent();
+    }
+
+    private bool IsSquadMateViewCurrent =>
+        _squadSpectatorCamera is not null
+        && IsInstanceValid(_squadSpectatorCamera)
+        && GetViewport().GetCamera3D() == _squadSpectatorCamera
+        && _spectatedMate is not null
+        && IsInstanceValid(_spectatedMate)
+        && !_spectatedMate.IsDowned
+        && !_spectatedMate.IsBodyBag;
+
+    private bool IsLocalPlayerViewCurrent
+    {
+        get
+        {
+            var playerCamera = _player.GetNodeOrNull<Camera3D>("Head/CombatCamera");
+            return playerCamera is not null && GetViewport().GetCamera3D() == playerCamera;
+        }
     }
 
     private float _manualReviveProgress;
@@ -1069,6 +1171,7 @@ public partial class FreightTerminalWorld
         _localPlayerDownedTimer = 0.0f;
         _player.UiLocked = false;
         Input.MouseMode = Input.MouseModeEnum.Captured;
+        BeginSquadMateView();
         _hud.ShowDownedState(22.0f);
         _hud.ShowLocalizedMessage(
             "player_downed",
@@ -1085,6 +1188,7 @@ public partial class FreightTerminalWorld
         _player.DisarmFireInput();
         _player.RestoreMovementInput();
         Input.MouseMode = Input.MouseModeEnum.Captured;
+        RestoreLocalPlayerView();
         _hud.HideDownedState();
         _hud.ShowLocalizedMessage("player_revived", "REVIVED  //  BACK IN THE FIGHT", OperatorRoles.Spec(OperatorRole.Medic).Accent);
         ClearLeaderReviveAi();
@@ -1195,6 +1299,8 @@ public partial class FreightTerminalWorld
         }
         var reviverMate = _squadMates.FirstOrDefault(m => IsInstanceValid(m) && !m.IsHumanProxy && !m.IsDowned);
         var aiReviveOk = false;
+        var squadMateViewOnDown = false;
+        var playerViewAfterRevive = false;
         if (reviverMate is not null)
         {
             // Deterministic arena: spawns are dispersed per run, so stage both actors on open ground.
@@ -1209,13 +1315,17 @@ public partial class FreightTerminalWorld
                 _player.TakeCombatDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
             }
             var aiReviveDowned = _player.IsDead && _localPlayerDowned;
+            await WaitFrames(1);
+            squadMateViewOnDown = IsSquadMateViewCurrent;
             for (var second = 0; second < 16 && _player.IsDead; second++)
             {
                 await ToSignal(GetTree().CreateTimer(1.0f), SceneTreeTimer.SignalName.Timeout);
                 GD.Print($"AI_REVIVE_DBG s={second} dead={_player.IsDead} reviving={reviverMate.IsRevivingLeader} dist={reviverMate.GlobalPosition.DistanceTo(_player.GlobalPosition):0.0} matePos=({reviverMate.GlobalPosition.X:0.0},{reviverMate.GlobalPosition.Z:0.0}) assigned={_leaderReviver?.Callsign ?? "none"} channel={_leaderReviveChannel:0.00} stuck={_reviverStuckTime:0.0} downedFlag={_localPlayerDowned}");
             }
+            playerViewAfterRevive = IsLocalPlayerViewCurrent;
             aiReviveOk = aiReviveDowned && !_player.IsDead && _player.ReviveUsed
-                && !_localPlayerDowned && !reviverMate.IsRevivingLeader;
+                && !_localPlayerDowned && !reviverMate.IsRevivingLeader
+                && squadMateViewOnDown && playerViewAfterRevive;
         }
 
         _player.SetHealthForDiagnostics(10.0f);
@@ -1234,7 +1344,7 @@ public partial class FreightTerminalWorld
         var reviveOk = mateDowned && firstRevive && mateUp && bodyBagOk && secondReviveBlocked
             && playerDowned && playerFirstRevive && playerUp && playerSecondBlocked;
 
-        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} revive_once={reviveOk} ai_leader_revive={aiReviveOk} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
+        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} revive_once={reviveOk} ai_leader_revive={aiReviveOk} squad_view_on_down={squadMateViewOnDown} player_view_after_revive={playerViewAfterRevive} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
         GD.Print($"SQUAD_PASS valid={ActiveSquadCount >= 2 && roleFillOk && reviveOk && aiReviveOk}");
         GetTree().Quit(roleFillOk && reviveOk && aiReviveOk ? 0 : 2);
     }
