@@ -98,6 +98,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     private Vector3 _networkAbilityForward;
     private ILootSource? _lootHuntSource;
     private float _lootHuntCooldown;
+    private bool _revivingLeader;
+    private float _revivePoseBlend;
 
     public void Configure(
         FreightTerminalWorld main,
@@ -154,6 +156,31 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         Order = order;
         _orderPosition = order == SquadOrder.Follow ? GlobalPosition : position;
         UpdateLabel();
+    }
+
+    public bool IsRevivingLeader => _revivingLeader;
+
+    /// <summary>Task this mate with running to the downed leader and reviving them.</summary>
+    public void BeginLeaderRevive()
+    {
+        if (IsDowned || IsBodyBag || IsHumanProxy)
+        {
+            return;
+        }
+        _revivingLeader = true;
+    }
+
+    public void EndLeaderRevive()
+    {
+        _revivingLeader = false;
+        _revivePoseBlend = 0.0f;
+        if (IsInstanceValid(_rig))
+        {
+            _rig.Rotation = Vector3.Zero;
+            var position = _rig.Position;
+            position.Y = 0.0f;
+            _rig.Position = position;
+        }
     }
 
     public void SetRemoteState(OperatorRole role, Vector3 position, Vector3 rotation, float health, bool down)
@@ -242,6 +269,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             && GlobalPosition.DistanceTo(patient.CombatNode.GlobalPosition) > 5.5f)
         {
             destination = patient.CombatNode.GlobalPosition;
+        }
+        if (_revivingLeader)
+        {
+            destination = Leader.GlobalPosition;
         }
         MoveTowardDestination(destination, hostile, dt);
         ConsiderMedicSupport(patient);
@@ -388,6 +419,11 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     {
         if (!HasFireablePrimary || _weaponCooldown > 0.0f || _skillActionTime > 0.0f)
         {
+            return;
+        }
+        if (_revivingLeader && _revivePoseBlend > 0.5f)
+        {
+            // Kneeling revive channel: hold fire until back on the move.
             return;
         }
         var distance = GlobalPosition.DistanceTo(enemy.GlobalPosition);
@@ -765,7 +801,27 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             position.Y = Mathf.Lerp(position.Y, Mathf.Sin(_animationPhase * 2.0f) * 0.012f * Mathf.Clamp(speed, 0.0f, 1.0f), delta * 9.0f);
             _rig.Position = position;
         }
+        UpdateRevivePose(delta);
         UpdateHealthVisual();
+    }
+
+    private void UpdateRevivePose(float delta)
+    {
+        if (!_revivingLeader && _revivePoseBlend <= 0.0f)
+        {
+            return;
+        }
+        var kneeling = _revivingLeader && !IsDowned
+            && GlobalPosition.DistanceTo(Leader.GlobalPosition) < 2.4f;
+        _revivePoseBlend = Mathf.MoveToward(_revivePoseBlend, kneeling ? 1.0f : 0.0f, delta * 5.0f);
+        if (!IsInstanceValid(_rig))
+        {
+            return;
+        }
+        _rig.Rotation = new Vector3(0.52f * _revivePoseBlend, 0.0f, 0.0f);
+        var position = _rig.Position;
+        position.Y = Mathf.Lerp(position.Y, -0.22f * _revivePoseBlend, delta * 8.0f);
+        _rig.Position = position;
     }
 
     private void UpdateLabel()

@@ -817,11 +817,13 @@ void sky() {
             (new Vector3(4, 0.02f, 10), Mathf.Pi / 2, 2),
             (new Vector3(-4, 0.02f, -4), 0.1f, 3),
             (new Vector3(-4, 0.02f, -20), Mathf.Pi / 2, 3),
-            (new Vector3(3, 0.02f, -31), -0.08f, 3),
+            // Shifted east: the west edge used to clip the truck lane from spawn.
+            (new Vector3(4.8f, 0.02f, -31), -0.08f, 3),
             (new Vector3(17, 0.02f, 9), 0, 2),
             (new Vector3(-16, 0.02f, 27), 0.18f, 3),
             (new Vector3(12, 0.02f, 26.5f), Mathf.Pi / 2, 2),
-            (new Vector3(2, 0.02f, -15), -0.24f, 3),
+            // Keep the service-truck lane (x -2..1 from spawn -0.5,-11.5 heading -Z) clear.
+            (new Vector3(7.5f, 0.02f, -15), -0.24f, 3),
             (new Vector3(16, 0.02f, -33), Mathf.Pi / 2, 2),
             (new Vector3(-18, 0.02f, 6), Mathf.Pi / 2, 2),
             (new Vector3(28, 0.02f, -31), 0.05f, 2)
@@ -1132,11 +1134,14 @@ void sky() {
         return mesh;
     }
 
+    private int _modelPropCounter;
+
     private StaticBody3D ModelProp(string path, Vector3 position, float yaw, float scale, Vector3 collisionSize, Vector3 collisionOffset)
     {
+        // Duplicate sibling names get mangled to @Class@Id by Godot, so keep them unique.
         var body = new StaticBody3D
         {
-            Name = System.IO.Path.GetFileNameWithoutExtension(path),
+            Name = $"{System.IO.Path.GetFileNameWithoutExtension(path)}_{_modelPropCounter++}",
             Position = position,
             Rotation = new Vector3(0, yaw, 0),
             CollisionLayer = 1,

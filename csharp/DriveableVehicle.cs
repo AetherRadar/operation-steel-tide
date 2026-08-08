@@ -31,6 +31,8 @@ public partial class DriveableVehicle : CharacterBody3D
     private float _speed;
     private float _damageCooldown;
     private float _wheelSpin;
+    private float _blockTime;
+    private float _blockedToastCooldown;
     private MeshInstance3D[] _wheels = System.Array.Empty<MeshInstance3D>();
     private Color _bodyColor = new(0.24f, 0.36f, 0.29f);
 
@@ -202,8 +204,82 @@ public partial class DriveableVehicle : CharacterBody3D
         }
 
         Velocity = velocity;
+        var positionBeforeMove = GlobalPosition;
         MoveAndSlide();
         AlignToGround(dt);
+
+        // Stuck assist: low props (curbs, bins, stalls) must not silently wall the truck.
+        _blockedToastCooldown = Mathf.Max(0.0f, _blockedToastCooldown - dt);
+        var expectedMove = Mathf.Abs(_speed) * dt;
+        var actualMove = GlobalPosition.DistanceTo(positionBeforeMove);
+        if (Mathf.Abs(throttle) > 0.5f && expectedMove > 0.02f && actualMove < expectedMove * 0.35f)
+        {
+            _blockTime += dt;
+            if (_blockTime > 0.22f && TryCurbStep(Mathf.Sign(throttle)))
+            {
+                _blockTime = 0.0f;
+            }
+            else if (_blockTime > 0.75f && _blockedToastCooldown <= 0.0f)
+            {
+                _blockedToastCooldown = 3.0f;
+                Main?.ShowVehicleBlockedToast();
+            }
+        }
+        else
+        {
+            _blockTime = Mathf.Max(0.0f, _blockTime - dt * 3.0f);
+        }
+    }
+
+    /// <summary>
+    /// Climb low obstacles in the drive direction: probe for a walkable top surface
+    /// just ahead and lift the chassis onto it (curbs, bins, low crates).
+    /// </summary>
+    private bool TryCurbStep(float throttleSign)
+    {
+        if (!IsOnFloor())
+        {
+            return false;
+        }
+        var forward = -GlobalBasis.Z * Mathf.Sign(throttleSign);
+        forward.Y = 0.0f;
+        if (forward.LengthSquared() < 0.001f)
+        {
+            return false;
+        }
+        forward = forward.Normalized();
+        var space = GetWorld3D().DirectSpaceState;
+        // Probe just past the bumper at a few depths so thin props are not missed.
+        foreach (var probeDistance in new[] { 2.8f, 3.4f, 4.0f })
+        {
+            var origin = GlobalPosition + Vector3.Up * 0.82f + forward * probeDistance;
+            var downQuery = PhysicsRayQueryParameters3D.Create(origin, origin + Vector3.Down * 1.35f);
+            downQuery.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+            downQuery.CollisionMask = CollisionMask;
+            var hit = space.IntersectRay(downQuery);
+            if (hit.Count == 0)
+            {
+                continue;
+            }
+            var top = hit["position"].AsVector3();
+            var lift = top.Y - GlobalPosition.Y;
+            if (lift < 0.08f || lift > 0.62f)
+            {
+                continue;
+            }
+            var clearQuery = PhysicsRayQueryParameters3D.Create(top + Vector3.Up * 0.25f, top + Vector3.Up * 2.3f);
+            clearQuery.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+            clearQuery.CollisionMask = CollisionMask;
+            if (space.IntersectRay(clearQuery).Count > 0)
+            {
+                continue;
+            }
+            GlobalPosition = new Vector3(GlobalPosition.X, top.Y + 0.12f, GlobalPosition.Z);
+            Velocity = new Vector3(Velocity.X, 0.0f, Velocity.Z);
+            _speed *= 0.72f;
+            return true;
+        }
+        return false;
     }
 
     private void Coast(float dt)
