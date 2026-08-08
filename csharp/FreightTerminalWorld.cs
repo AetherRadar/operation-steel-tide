@@ -268,6 +268,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             CaptureResidentialCommunity();
         }
+        else if (Array.Exists(args, value => value == "--capture-skylinks"))
+        {
+            CaptureResidentialSkyLinks();
+        }
         else if (Array.Exists(args, value => value == "--capture-squad"))
         {
             CaptureSquadFrame();
@@ -999,7 +1003,31 @@ public partial class FreightTerminalWorld : Node3D
         {
             SpawnEnemy(position, false, teamId: 0);
         }
+        SpawnSkybridgeMarksmen();
         _enemiesRemaining = _enemies.Count;
+    }
+
+    private void SpawnSkybridgeMarksmen()
+    {
+        _residentialSkybridgeMarksmanCount = 0;
+        foreach (var post in _residentialSniperPosts)
+        {
+            var marksman = SpawnEnemy(
+                post.Position,
+                alerted: false,
+                teamId: 0,
+                initialWeapon: WeaponCatalog.Build(WeaponPlatform.M24, 2),
+                sentryMode: true,
+                detectionRange: 185.0f);
+            marksman.Name = $"SKYWAY_M24_{_residentialSkybridgeMarksmanCount + 1:00}";
+            var facing = post.FacingTarget;
+            facing.Y = marksman.GlobalPosition.Y;
+            if (marksman.GlobalPosition.DistanceSquaredTo(facing) > 0.1f)
+            {
+                marksman.LookAt(facing, Vector3.Up);
+            }
+            _residentialSkybridgeMarksmanCount++;
+        }
     }
 
     private void SpawnHostileOperatorSquads()
@@ -1040,7 +1068,13 @@ public partial class FreightTerminalWorld : Node3D
         _enemiesRemaining = _enemies.Count(e => IsInstanceValid(e) && !e.IsDead);
     }
 
-    private EnemyOperator SpawnEnemy(Vector3 position, bool alerted, int teamId = 0)
+    private EnemyOperator SpawnEnemy(
+        Vector3 position,
+        bool alerted,
+        int teamId = 0,
+        WeaponBuild? initialWeapon = null,
+        bool sentryMode = false,
+        float? detectionRange = null)
     {
         var enemy = new EnemyOperator
         {
@@ -1049,9 +1083,14 @@ public partial class FreightTerminalWorld : Node3D
             Player = _player,
             Main = this,
             MissionDirector = _missionDirector,
-            DetectionRange = _missionDetectionRange,
-            TeamId = teamId
+            DetectionRange = detectionRange ?? _missionDetectionRange,
+            TeamId = teamId,
+            SentryMode = sentryMode
         };
+        if (initialWeapon is not null)
+        {
+            enemy.ConfigureInitialLoadout(initialWeapon);
+        }
         AddChild(enemy);
         // Cold-start: only map garrison NPCs (team 0) keep firearms. Rival ops must loot guns.
         if (teamId > 0)
@@ -3175,8 +3214,74 @@ public partial class FreightTerminalWorld : Node3D
             }
         }
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+        var commonFloorGraph = new List<int>[ResidentialTowerSpecs.Length];
+        for (var index = 0; index < commonFloorGraph.Length; index++)
+        {
+            commonFloorGraph[index] = new List<int>();
+        }
+        foreach (var candidate in ResidentialSkyLinks)
+        {
+            if (!Array.Exists(candidate.Floors, value => value == 2))
+            {
+                continue;
+            }
+            commonFloorGraph[candidate.From].Add(candidate.To);
+            commonFloorGraph[candidate.To].Add(candidate.From);
+        }
+        var visited = new HashSet<int> { 0 };
+        var frontier = new Queue<int>();
+        frontier.Enqueue(0);
+        while (frontier.Count > 0)
+        {
+            var current = frontier.Dequeue();
+            foreach (var neighbor in commonFloorGraph[current])
+            {
+                if (visited.Add(neighbor))
+                {
+                    frontier.Enqueue(neighbor);
+                }
+            }
+        }
+        var ringConnected = visited.Count == ResidentialTowerSpecs.Length
+            && commonFloorGraph.All(neighbors => neighbors.Count >= 2);
+
+        var bridgeSightlineClear = new bool[_residentialSkybridgeCount];
+        var clearSightlines = _residentialSkybridgeSightlines.Count == _residentialSkybridgeCount * 2;
+        var blockedSightline = -1;
+        var blockedCollider = "none";
+        for (var sightlineIndex = 0; sightlineIndex < _residentialSkybridgeSightlines.Count; sightlineIndex++)
+        {
+            var sightline = _residentialSkybridgeSightlines[sightlineIndex];
+            var query = PhysicsRayQueryParameters3D.Create(sightline.From, sightline.To);
+            query.CollisionMask = 1;
+            query.CollideWithAreas = false;
+            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+            if (hit.Count == 0)
+            {
+                bridgeSightlineClear[sightline.BridgeIndex] = true;
+            }
+            else if (blockedSightline < 0)
+            {
+                blockedSightline = sightlineIndex;
+                blockedCollider = hit["collider"].AsGodotObject() is Node colliderNode ? colliderNode.Name : "unknown";
+            }
+        }
+        clearSightlines &= bridgeSightlineClear.All(value => value);
+        var expectedBridgeCount = ResidentialSkyLinks.Sum(candidate => candidate.Floors.Length);
+        var marksmenReady = _enemies.Count(enemy => IsInstanceValid(enemy)
+            && enemy.SentryMode
+            && enemy.HasFireablePrimary
+            && enemy.CarriedWeapon.Platform == WeaponPlatform.M24);
+        var architectureReady = _residentialSkybridgeCount == expectedBridgeCount
+            && _residentialSkybridgeWindowCount == expectedBridgeCount * 3
+            && _residentialSkybridgeFrameCount >= expectedBridgeCount * 4
+            && _residentialSniperPosts.Count >= 6
+            && marksmenReady == _residentialSkybridgeMarksmanCount
+            && marksmenReady >= 6;
+
         var link = ResidentialSkyLinks[0];
-        var floor = link.Floors[0];
+        const int floor = 2;
         var floorY = floor * ResidentialFloorHeight;
         var specA = ResidentialTowerSpecs[link.From];
         var specB = ResidentialTowerSpecs[link.To];
@@ -3184,10 +3289,16 @@ public partial class FreightTerminalWorld : Node3D
         var towerB = _residentialTowers[link.To];
         var sideA = ResidentialLinkSide(specA, specB);
         var sideB = ResidentialLinkSide(specB, specA);
-        var doorZA = ResidentialLinkDoorZ(specA, specB, sideA);
-        var doorZB = ResidentialLinkDoorZ(specB, specA, sideB);
-        _player.GlobalPosition = towerA.ToGlobal(new Vector3(sideA == 1 ? -2.2f : 2.2f, floorY + 0.3f, doorZA));
-        var target = towerB.ToGlobal(new Vector3(sideB == 1 ? -2.2f : 2.2f, floorY + 0.3f, doorZB));
+        var doorZA = _residentialLinkSlots[link.From][sideA].DoorZ;
+        var doorZB = _residentialLinkSlots[link.To][sideB].DoorZ;
+        var worldA = towerA.ToGlobal(ResidentialLinkAnchor(specA, sideA, floorY, doorZA));
+        var worldB = towerB.ToGlobal(ResidentialLinkAnchor(specB, sideB, floorY, doorZB));
+        var direction = worldA.DirectionTo(worldB);
+        direction.Y = 0.0f;
+        direction = direction.Normalized();
+        var walkHeight = Vector3.Up * 0.25f;
+        _player.GlobalPosition = worldA - direction * 2.0f + walkHeight;
+        var target = worldB + direction * 2.0f + walkHeight;
         _player.FaceWorldPointForDiagnostics(target);
         _player.RestoreMovementInput();
         for (var frame = 0; frame < 10; frame++)
@@ -3196,15 +3307,16 @@ public partial class FreightTerminalWorld : Node3D
         }
         var waypoints = new[]
         {
-            towerA.ToGlobal(new Vector3(sideA == 1 ? -14.5f : 14.5f, floorY + 0.3f, doorZA)),
-            towerB.ToGlobal(new Vector3(sideB == 1 ? -14.5f : 14.5f, floorY + 0.3f, doorZB)),
+            worldA + direction * 1.0f + walkHeight,
+            (worldA + worldB) * 0.5f + walkHeight,
+            worldB - direction * 1.0f + walkHeight,
             target
         };
         Input.ActionPress("move_forward");
         Input.ActionPress("sprint");
         foreach (var waypoint in waypoints)
         {
-            for (var frame = 0; frame < 500; frame++)
+            for (var frame = 0; frame < 650; frame++)
             {
                 _player.FaceWorldPointForDiagnostics(waypoint);
                 if (_player.GlobalPosition.DistanceTo(waypoint) < 1.6f)
@@ -3217,9 +3329,10 @@ public partial class FreightTerminalWorld : Node3D
         Input.ActionRelease("sprint");
         Input.ActionRelease("move_forward");
         var arrived = _player.GlobalPosition.DistanceTo(target) < 3.0f && Mathf.Abs(_player.GlobalPosition.Y - (floorY + 0.3f)) < 0.7f;
-        GD.Print($"SKYLINK_CHECK valid={arrived} dist={_player.GlobalPosition.DistanceTo(target):0.0} y={_player.GlobalPosition.Y:0.0} pos=({_player.GlobalPosition.X:0.0},{_player.GlobalPosition.Z:0.0}) target=({target.X:0.0},{target.Z:0.0})");
-        GD.Print($"SKYLINK_PASS valid={arrived}");
-        GetTree().Quit(arrived ? 0 : 2);
+        var valid = arrived && ringConnected && clearSightlines && architectureReady;
+        GD.Print($"SKYLINK_CHECK valid={valid} walk={arrived} ring_connected={ringConnected} towers={visited.Count}/{ResidentialTowerSpecs.Length} bridges={_residentialSkybridgeCount}/{expectedBridgeCount} windows={_residentialSkybridgeWindowCount} frames={_residentialSkybridgeFrameCount} sniper_los={clearSightlines} blocked_line={blockedSightline} blocker={blockedCollider} marksmen={marksmenReady} dist={_player.GlobalPosition.DistanceTo(target):0.0} y={_player.GlobalPosition.Y:0.0}");
+        GD.Print($"SKYLINK_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private async void ValidateVehicleDrive()

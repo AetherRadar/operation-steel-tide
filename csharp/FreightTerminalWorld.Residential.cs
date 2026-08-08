@@ -41,10 +41,19 @@ public partial class FreightTerminalWorld
     {
         new(7, 8, new[] { 2, 5 }),
         new(8, 9, new[] { 2, 5 }),
-        new(9, 10, new[] { 3, 6 }),
+        new(9, 10, new[] { 2, 6 }),
         new(2, 3, new[] { 2, 4 }),
-        new(3, 4, new[] { 2, 4 })
+        new(3, 4, new[] { 2, 4 }),
+        new(7, 0, new[] { 2, 4 }),
+        new(0, 5, new[] { 2, 4 }),
+        new(5, 2, new[] { 2, 5 }),
+        new(4, 6, new[] { 2, 4 }),
+        new(6, 1, new[] { 2, 6 }),
+        new(1, 10, new[] { 2, 5 })
     };
+
+    private readonly record struct ResidentialSniperPost(Vector3 Position, Vector3 FacingTarget);
+    private readonly record struct ResidentialSkybridgeSightline(int BridgeIndex, Vector3 From, Vector3 To);
 
     private static int ResidentialLinkSide(ResidentialTowerSpec from, ResidentialTowerSpec to)
     {
@@ -95,9 +104,15 @@ public partial class FreightTerminalWorld
     private readonly List<CivilianNpc> _civilians = new();
     private readonly List<Vector3> _residentialEntrances = new();
     private readonly List<Vector3> _residentialRooftops = new();
+    private readonly List<ResidentialSniperPost> _residentialSniperPosts = new();
+    private readonly List<ResidentialSkybridgeSightline> _residentialSkybridgeSightlines = new();
     private int _residentialFloorCount;
     private int _residentialStairFlightCount;
     private int _residentialRoofAccessCount;
+    private int _residentialSkybridgeCount;
+    private int _residentialSkybridgeWindowCount;
+    private int _residentialSkybridgeFrameCount;
+    private int _residentialSkybridgeMarksmanCount;
 
     public int ResidentialTowerCount => _residentialTowers.Count;
     public int ResidentialCivilianCount => _civilians.Count;
@@ -113,6 +128,12 @@ public partial class FreightTerminalWorld
         _levelRoot.AddChild(community);
         BuildResidentialRoads(community);
         _residentialLinkSlots.Clear();
+        _residentialSniperPosts.Clear();
+        _residentialSkybridgeSightlines.Clear();
+        _residentialSkybridgeCount = 0;
+        _residentialSkybridgeWindowCount = 0;
+        _residentialSkybridgeFrameCount = 0;
+        _residentialSkybridgeMarksmanCount = 0;
         foreach (var link in ResidentialSkyLinks)
         {
             var sideFrom = ResidentialLinkSide(ResidentialTowerSpecs[link.From], ResidentialTowerSpecs[link.To]);
@@ -1005,6 +1026,65 @@ public partial class FreightTerminalWorld
         GetTree().Quit();
     }
 
+    private async void CaptureResidentialSkyLinks()
+    {
+        foreach (var enemy in _enemies)
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        foreach (var mate in _squadMates)
+        {
+            mate.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        foreach (var civilian in _civilians)
+        {
+            civilian.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        _player.ProcessMode = ProcessModeEnum.Disabled;
+        _player.Visible = false;
+        _hud.Visible = false;
+
+        var link = ResidentialSkyLinks[5];
+        const int floor = 2;
+        var floorY = floor * ResidentialFloorHeight;
+        var specA = ResidentialTowerSpecs[link.From];
+        var specB = ResidentialTowerSpecs[link.To];
+        var towerA = _residentialTowers[link.From];
+        var towerB = _residentialTowers[link.To];
+        var sideA = ResidentialLinkSide(specA, specB);
+        var sideB = ResidentialLinkSide(specB, specA);
+        var doorZA = _residentialLinkSlots[link.From][sideA].DoorZ;
+        var doorZB = _residentialLinkSlots[link.To][sideB].DoorZ;
+        var worldA = towerA.ToGlobal(ResidentialLinkAnchor(specA, sideA, floorY, doorZA));
+        var worldB = towerB.ToGlobal(ResidentialLinkAnchor(specB, sideB, floorY, doorZB));
+        var direction = worldA.DirectionTo(worldB);
+        direction.Y = 0.0f;
+        direction = direction.Normalized();
+        var lateral = new Vector3(direction.Z, 0.0f, -direction.X);
+        var midpoint = (worldA + worldB) * 0.5f;
+
+        var camera = new Camera3D
+        {
+            Name = "SkylinkValidationCamera",
+            Fov = 67.0f,
+            Far = 620.0f
+        };
+        AddChild(camera);
+        camera.GlobalPosition = worldA + direction * 4.0f + Vector3.Up * 1.58f;
+        camera.LookAt(worldB + Vector3.Up * 1.42f, Vector3.Up);
+        camera.MakeCurrent();
+        await WaitFrames(24);
+        SaveViewportImage("res://skylink_interior_validation.png");
+
+        camera.GlobalPosition = midpoint + lateral * 24.0f + Vector3.Up * 13.5f;
+        camera.LookAt(midpoint + Vector3.Up * 1.4f, Vector3.Up);
+        camera.Fov = 61.0f;
+        await WaitFrames(24);
+        SaveViewportImage("res://skylink_exterior_validation.png");
+        GD.Print($"SKYLINK_CAPTURE bridges={_residentialSkybridgeCount} windows={_residentialSkybridgeWindowCount} frames={_residentialSkybridgeFrameCount} marksmen={_residentialSkybridgeMarksmanCount} paths=skylink_interior_validation.png,skylink_exterior_validation.png");
+        GetTree().Quit();
+    }
+
     private static Vector3 ResidentialLinkAnchor(ResidentialTowerSpec spec, int side, float floorY, float doorZ)
     {
         const float inset = 0.4f;
@@ -1023,9 +1103,13 @@ public partial class FreightTerminalWorld
         Godot.Material steel,
         Godot.Material glass)
     {
-        var shell = Mat("residential_skybridge_shell", new Color(0.42f, 0.46f, 0.47f), 0.05f, 0.85f);
-        var deck = Mat("residential_skybridge_deck", new Color(0.3f, 0.31f, 0.3f), 0.08f, 0.8f);
-        var glow = Mat("residential_skybridge_light", new Color(0.95f, 0.8f, 0.5f), 0.02f, 0.4f, new Color(0.95f, 0.6f, 0.25f));
+        var frame = Mat("residential_skybridge_frame", new Color(0.24f, 0.3f, 0.31f), 0.7f, 0.34f);
+        var sill = Mat("residential_skybridge_sill", new Color(0.37f, 0.42f, 0.42f), 0.18f, 0.68f);
+        var deck = Mat("residential_skybridge_deck", new Color(0.25f, 0.27f, 0.27f), 0.14f, 0.76f);
+        var window = Mat("residential_skybridge_window", new Color(0.055f, 0.24f, 0.29f, 0.28f), 0.16f, 0.08f);
+        window.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+        window.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+        var glow = Mat("residential_skybridge_light", new Color(0.82f, 0.92f, 0.91f), 0.08f, 0.28f, new Color(0.32f, 0.88f, 0.92f));
         foreach (var link in ResidentialSkyLinks)
         {
             var towerA = _residentialTowers[link.From];
@@ -1051,18 +1135,61 @@ public partial class FreightTerminalWorld
                     Rotation = new Vector3(0, Mathf.Atan2(delta.X, delta.Z), 0)
                 };
                 community.AddChild(bridge);
-                var span = length + 1.2f;
+                var span = length + 1.4f;
                 var mid = length * 0.5f;
-                ExpansionBox(bridge, "SkybridgeDeck", new Vector3(0, 0.05f, mid), new Vector3(2.6f, 0.12f, span), deck);
-                ExpansionBox(bridge, "SkybridgeRoof", new Vector3(0, 2.92f, mid), new Vector3(2.7f, 0.12f, span), shell);
-                ExpansionBox(bridge, "SkybridgeWallW", new Vector3(-1.32f, 0.85f, mid), new Vector3(0.08f, 1.5f, span - 1.8f), shell);
-                ExpansionBox(bridge, "SkybridgeWallE", new Vector3(1.32f, 0.85f, mid), new Vector3(0.08f, 1.5f, span - 1.8f), shell);
-                MeshBox(bridge, new Vector3(-1.32f, 2.1f, mid), new Vector3(0.05f, 1.0f, span * 0.8f), glass);
-                MeshBox(bridge, new Vector3(1.32f, 2.1f, mid), new Vector3(0.05f, 1.0f, span * 0.8f), glass);
-                for (var z = 1.5f; z < length - 1.0f; z += 6.0f)
+                var windowSpan = Mathf.Max(1.0f, length - 1.1f);
+                ExpansionBox(bridge, "SkybridgeDeck", new Vector3(0, 0.05f, mid), new Vector3(3.5f, 0.16f, span), deck);
+                ExpansionBox(bridge, "SkybridgeSillW", new Vector3(-1.69f, 0.39f, mid), new Vector3(0.14f, 0.68f, windowSpan), sill);
+                ExpansionBox(bridge, "SkybridgeSillE", new Vector3(1.69f, 0.39f, mid), new Vector3(0.14f, 0.68f, windowSpan), sill);
+
+                MeshBox(bridge, new Vector3(-1.69f, 1.76f, mid), new Vector3(0.045f, 2.08f, windowSpan), window).Name = "SkybridgeWindowW";
+                MeshBox(bridge, new Vector3(1.69f, 1.76f, mid), new Vector3(0.045f, 2.08f, windowSpan), window).Name = "SkybridgeWindowE";
+                MeshBox(bridge, new Vector3(0, 2.91f, mid), new Vector3(3.22f, 0.045f, windowSpan), window).Name = "SkybridgeWindowRoof";
+                _residentialSkybridgeWindowCount += 3;
+
+                MeshBox(bridge, new Vector3(-1.69f, 0.77f, mid), new Vector3(0.16f, 0.12f, windowSpan), frame).Name = "SkybridgeLowerRailW";
+                MeshBox(bridge, new Vector3(1.69f, 0.77f, mid), new Vector3(0.16f, 0.12f, windowSpan), frame).Name = "SkybridgeLowerRailE";
+                MeshBox(bridge, new Vector3(-1.58f, 2.89f, mid), new Vector3(0.16f, 0.16f, span), frame).Name = "SkybridgeRoofRailW";
+                MeshBox(bridge, new Vector3(1.58f, 2.89f, mid), new Vector3(0.16f, 0.16f, span), frame).Name = "SkybridgeRoofRailE";
+                MeshBox(bridge, new Vector3(0, 3.0f, mid), new Vector3(0.18f, 0.18f, span), frame).Name = "SkybridgeRoofSpine";
+
+                var frameIndex = 0;
+                for (var z = 0.65f; z < length - 0.35f; z += 7.5f)
                 {
-                    MeshBox(bridge, new Vector3(0, 2.8f, z), new Vector3(1.8f, 0.05f, 0.22f), glow);
+                    MeshBox(bridge, new Vector3(-1.69f, 1.8f, z), new Vector3(0.15f, 2.28f, 0.15f), frame).Name = $"SkybridgeRibW_{frameIndex}";
+                    MeshBox(bridge, new Vector3(1.69f, 1.8f, z), new Vector3(0.15f, 2.28f, 0.15f), frame).Name = $"SkybridgeRibE_{frameIndex}";
+                    MeshBox(bridge, new Vector3(0, 2.91f, z), new Vector3(3.45f, 0.15f, 0.18f), frame).Name = $"SkybridgeRibRoof_{frameIndex}";
+                    if (z + 7.1f < length)
+                    {
+                        MeshBox(bridge, new Vector3(-1.7f, 1.79f, z + 3.55f), new Vector3(0.07f, 0.09f, 7.42f), frame, new Vector3(0.29f, 0, 0)).Name = $"SkybridgeBraceW_{frameIndex}";
+                        MeshBox(bridge, new Vector3(1.7f, 1.79f, z + 3.55f), new Vector3(0.07f, 0.09f, 7.42f), frame, new Vector3(-0.29f, 0, 0)).Name = $"SkybridgeBraceE_{frameIndex}";
+                    }
+                    _residentialSkybridgeFrameCount++;
+                    frameIndex++;
                 }
+                for (var z = 3.8f; z < length - 1.2f; z += 8.0f)
+                {
+                    MeshBox(bridge, new Vector3(0, 2.78f, z), new Vector3(1.65f, 0.045f, 0.28f), glow).Name = $"SkybridgeLight_{z:0}";
+                }
+
+                foreach (var sightlineX in new[] { -0.82f, 0.82f })
+                {
+                    _residentialSkybridgeSightlines.Add(new ResidentialSkybridgeSightline(
+                        _residentialSkybridgeCount,
+                        bridge.ToGlobal(new Vector3(sightlineX, 1.52f, 2.2f)),
+                        bridge.ToGlobal(new Vector3(sightlineX, 1.52f, length - 2.2f))));
+                }
+                if (floor == 2 && length > 44.0f && _residentialSniperPosts.Count < 6)
+                {
+                    var fromEnd = _residentialSniperPosts.Count % 2 == 0;
+                    var postZ = length * (fromEnd ? 0.28f : 0.72f);
+                    var postX = fromEnd ? -0.68f : 0.68f;
+                    var facingZ = fromEnd ? length - 1.8f : 1.8f;
+                    _residentialSniperPosts.Add(new ResidentialSniperPost(
+                        bridge.ToGlobal(new Vector3(postX, 0.2f, postZ)),
+                        bridge.ToGlobal(new Vector3(-postX, 0.2f, facingZ))));
+                }
+                _residentialSkybridgeCount++;
             }
         }
     }

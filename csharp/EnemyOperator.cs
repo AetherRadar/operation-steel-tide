@@ -13,6 +13,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     public FreightTerminalWorld? Main { get; set; }
     public MissionDirector? MissionDirector { get; set; }
     public float DetectionRange { get; set; } = 34.0f;
+    public bool SentryMode { get; set; }
     public int NetworkId { get; set; } = -1;
     /// <summary>0 = legacy map NPC garrison. ≥1 = rival extraction squad team.</summary>
     public int TeamId { get; set; }
@@ -69,6 +70,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         }
     }
 
+    public void ConfigureInitialLoadout(WeaponBuild build)
+    {
+        _configuredLoadout = build.Clone();
+    }
+
     /// <summary>Production path: equip a weapon taken from a loot source (sets HasFireablePrimary).</summary>
     public bool EquipWeaponFromLoot(WeaponBuild build)
     {
@@ -107,11 +113,16 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     private float _noContactTimer;
     private bool _searchingLoot;
     private Vector3 _lootTarget;
+    private WeaponBuild? _configuredLoadout;
     /// <summary>How long without in-range contact before map NPCs start looting.</summary>
     private const float NpcLootIdleSeconds = 6.5f;
     /// <summary>Beyond this distance a living hostile is ignored for engagement (still exists on map).</summary>
-    private const float ContactAcquireRange = 48.0f;
-    private const float ContactAcquireRangeSq = ContactAcquireRange * ContactAcquireRange;
+    private const float DefaultContactAcquireRange = 48.0f;
+    private const float SniperContactAcquireRange = 185.0f;
+    private float CurrentContactAcquireRange => SentryMode || HasFireablePrimary && CarriedWeapon.Platform == WeaponPlatform.M24
+        ? SniperContactAcquireRange
+        : DefaultContactAcquireRange;
+    private float CurrentFireRange => CarriedWeapon.Platform == WeaponPlatform.M24 ? 175.0f : 52.0f;
 
     private readonly RandomNumberGenerator _rng = new();
     private Node3D _bodyRoot = null!;
@@ -166,8 +177,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     {
         var roll = _rng.Randf();
         var platform = roll < 0.55f ? WeaponPlatform.M4A1 : roll < 0.86f ? WeaponPlatform.AK74 : WeaponPlatform.ScarL;
-        var tier = _rng.Randf() < 0.16f ? 2 : _rng.Randf() < 0.52f ? 1 : 0;
-        CarriedWeapon = WeaponCatalog.Build(platform, tier);
+        var tier = _configuredLoadout is not null
+            ? 2
+            : _rng.Randf() < 0.16f ? 2 : _rng.Randf() < 0.52f ? 1 : 0;
+        CarriedWeapon = _configuredLoadout?.Clone() ?? WeaponCatalog.Build(platform, tier);
         var weaponGrade = LootGrades.FromTier(tier);
         Loot.Add(new LootItem { Kind = LootItemKind.Weapon, Weapon = CarriedWeapon.Clone(), Grade = weaponGrade });
         var availableParts = new List<AttachmentDefinition>(WeaponCatalog.AllAttachments);
@@ -305,6 +318,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             WeaponPlatform.AK74 => new Color(0.15f, 0.09f, 0.045f),
             WeaponPlatform.ScarL => new Color(0.3f, 0.25f, 0.17f),
+            WeaponPlatform.M24 => new Color(0.16f, 0.21f, 0.13f),
+            WeaponPlatform.MP5A5 => new Color(0.035f, 0.045f, 0.043f),
             _ => new Color(0.018f, 0.023f, 0.022f)
         };
         var gun = Material(gunColor, 0.88f, 0.25f);
@@ -347,9 +362,16 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
         _carriedWeaponRoot = new Node3D { Name = "CarriedWeapon" };
         _bodyRoot.AddChild(_carriedWeaponRoot);
+        var receiverWidth = CarriedWeapon.Platform switch
+        {
+            WeaponPlatform.ScarL => 0.16f,
+            WeaponPlatform.M24 => 0.15f,
+            WeaponPlatform.MP5A5 => 0.14f,
+            _ => 0.13f
+        };
         RigPart(
             _carriedWeaponRoot,
-            Box(new Vector3(CarriedWeapon.Platform == WeaponPlatform.ScarL ? 0.16f : 0.13f, 0.14f, carriedDefinition.ReceiverLength)),
+            Box(new Vector3(receiverWidth, 0.14f, carriedDefinition.ReceiverLength)),
             new Vector3(0, 1.23f, -0.22f - carriedDefinition.ReceiverLength * 0.5f),
             gun);
         RigPart(_carriedWeaponRoot, Box(new Vector3(0.16f, 0.13f, 0.22f)), new Vector3(0, 1.22f, -0.21f), gun);
@@ -459,23 +481,31 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
         if (!hasEngageTarget)
         {
-            // Unarmed operators (rivals + NPCs after strip) hunt weapons quickly; armed NPCs loot after idle timeout.
-            var lootIdle = HasFireablePrimary ? NpcLootIdleSeconds : 1.2f;
-            if (!_searchingLoot && !Alerted && _noContactTimer >= lootIdle && _lootSearchTimer <= 0.0f)
+            if (SentryMode)
             {
-                // Rivals only search when still unarmed; NPCs always may loot after timeout.
-                if (!HasFireablePrimary || !IsRivalSquad)
+                _searchingLoot = false;
+                HoldSentryPosition(dt);
+            }
+            else
+            {
+                // Unarmed operators (rivals + NPCs after strip) hunt weapons quickly; armed NPCs loot after idle timeout.
+                var lootIdle = HasFireablePrimary ? NpcLootIdleSeconds : 1.2f;
+                if (!_searchingLoot && !Alerted && _noContactTimer >= lootIdle && _lootSearchTimer <= 0.0f)
                 {
-                    BeginLootSearch();
+                    // Rivals only search when still unarmed; NPCs always may loot after timeout.
+                    if (!HasFireablePrimary || !IsRivalSquad)
+                    {
+                        BeginLootSearch();
+                    }
                 }
-            }
-            if (_searchingLoot)
-            {
-                UpdateLootSearch(dt);
-            }
-            else if (!Alerted)
-            {
-                Patrol(dt);
+                if (_searchingLoot)
+                {
+                    UpdateLootSearch(dt);
+                }
+                else if (!Alerted)
+                {
+                    Patrol(dt);
+                }
             }
             MoveAndSlide();
             AnimateBody(dt);
@@ -497,7 +527,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
                 var proximity = Mathf.Clamp(1.0f - distance / DetectionRange, 0.0f, 1.0f);
                 Suspicion = Mathf.Min(100.0f, Suspicion + dt * (18.0f + proximity * 58.0f));
             }
-            else if (distance < ContactAcquireRange * 0.65f)
+            else if (distance < CurrentContactAcquireRange * 0.65f)
             {
                 // Close contact without perfect LOS still builds pressure.
                 Suspicion = Mathf.Min(100.0f, Suspicion + dt * 22.0f);
@@ -531,6 +561,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             // Hostile exists but is still far — keep looting until they enter the contact bubble.
             UpdateLootSearch(dt);
         }
+        else if (SentryMode)
+        {
+            HoldSentryPosition(dt);
+        }
         else
         {
             Patrol(dt);
@@ -539,15 +573,25 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         AnimateBody(dt);
     }
 
+    private void HoldSentryPosition(float delta)
+    {
+        var stopped = Velocity;
+        stopped.X = Mathf.MoveToward(stopped.X, 0.0f, delta * 14.0f);
+        stopped.Z = Mathf.MoveToward(stopped.Z, 0.0f, delta * 14.0f);
+        Velocity = stopped;
+    }
+
     private void AcquireCombatTarget()
     {
         _combatTarget = null;
         _rawTarget = null;
+        var contactAcquireRange = CurrentContactAcquireRange;
+        var contactAcquireRangeSq = contactAcquireRange * contactAcquireRange;
         if (Main is null)
         {
             // Without a world, only lock the player if actually nearby.
             if (GodotObject.IsInstanceValid(Player) && !Player.IsDead
-                && GlobalPosition.DistanceSquaredTo(Player.GlobalPosition) <= ContactAcquireRangeSq)
+                && GlobalPosition.DistanceSquaredTo(Player.GlobalPosition) <= contactAcquireRangeSq)
             {
                 _combatTarget = Player;
                 _rawTarget = Player;
@@ -561,8 +605,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         ISquadCombatant? bestCombatant = null;
         var bestScore = float.PositiveInfinity;
         var acquireRangeSq = IsRivalSquad
-            ? ContactAcquireRangeSq * 1.35f * 1.35f
-            : ContactAcquireRangeSq;
+            ? contactAcquireRangeSq * 1.35f * 1.35f
+            : contactAcquireRangeSq;
         foreach (var candidate in Main.EnumerateHostileTargetsFor(this))
         {
             if (candidate is null || !GodotObject.IsInstanceValid(candidate))
@@ -781,6 +825,16 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
     private void UpdateStance(float delta, float distance, bool hasSight)
     {
+        if (SentryMode)
+        {
+            if (IsProne)
+            {
+                SetProne(false);
+            }
+            _seekingCover = false;
+            _inCover = false;
+            return;
+        }
         if (_stanceDecisionTimer > 0.0f)
         {
             if (IsProne && _proneTimer <= 0.0f)
@@ -889,6 +943,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
     private bool WithinViewCone()
     {
+        if (SentryMode)
+        {
+            return true;
+        }
         var eye = GlobalPosition + Vector3.Up * (IsProne ? 0.5f : 1.5f);
         var target = CurrentTargetPoint();
         var direction = eye.DirectionTo(target);
@@ -932,7 +990,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     private void Engage(float delta, float distance, bool hasSight)
     {
         // Cover movement can run, but never fully suppress shooting once a target is locked.
-        var holdingCover = UpdateCover(delta);
+        var holdingCover = !SentryMode && UpdateCover(delta);
         if (_hitStun > 0.0f)
         {
             var stunnedVelocity = Velocity;
@@ -940,7 +998,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             stunnedVelocity.Z = Mathf.MoveToward(stunnedVelocity.Z, 0.0f, delta * 18.0f);
             Velocity = stunnedVelocity;
             // Still allow return fire while stunned at reduced cadence.
-            if (_fireTimer <= 0.0f && distance < 28.0f && (hasSight || distance < 14.0f))
+            if (_fireTimer <= 0.0f && distance < CurrentFireRange && (hasSight || distance < 14.0f))
             {
                 if (_combatTarget is not null)
                 {
@@ -1000,7 +1058,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
         if (!holdingCover)
         {
-            var speed = IsProne ? 1.1f : distance > 19.0f ? 3.7f : 2.4f;
+            var speed = SentryMode ? 0.0f : IsProne ? 1.1f : distance > 19.0f ? 3.7f : 2.4f;
             if (IsRivalSquad)
             {
                 speed *= 1.08f;
@@ -1013,7 +1071,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         }
         // Fire when we have a live engage target in range. Prefer LOS, but still allow
         // close-range pressure shots so squads do not soft-lock when LOS is noisy.
-        var canFire = distance < 52.0f && _fireTimer <= 0.0f && (hasSight || distance < 18.0f);
+        var canFire = distance < CurrentFireRange && _fireTimer <= 0.0f && (hasSight || distance < 18.0f);
         if (canFire)
         {
             if (_combatTarget is not null)
@@ -1280,7 +1338,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         _mainMaterial.AlbedoColor = new Color(0.62f, 0.12f, 0.07f);
         CreateTween().TweenProperty(_mainMaterial, "albedo_color", original, 0.11f);
 
-        if (_health > 0.0f && !_seekingCover && !_inCover && Main is not null
+        if (_health > 0.0f && !SentryMode && !_seekingCover && !_inCover && Main is not null
             && (_health < 76.0f || _rng.Randf() < 0.4f))
         {
             var threatPosition = (_combatTarget ?? Player).CombatNode.GlobalPosition;
