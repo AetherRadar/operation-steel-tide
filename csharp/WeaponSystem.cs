@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Godot;
 
 namespace OperationSteelTide;
 
@@ -28,6 +29,68 @@ public enum LootItemKind
     Ammunition,
     ArmorPlate,
     Equipment
+}
+
+/// <summary>Extraction-style item rarity. Higher grade = higher sell value and brighter world glow.</summary>
+public enum LootGrade
+{
+    Common = 0,
+    Uncommon = 1,
+    Rare = 2,
+    Epic = 3,
+    Legendary = 4
+}
+
+public static class LootGrades
+{
+    public static Color GlowColor(LootGrade grade) => grade switch
+    {
+        LootGrade.Uncommon => new Color(0.28f, 0.92f, 0.42f),
+        LootGrade.Rare => new Color(0.28f, 0.55f, 1.0f),
+        LootGrade.Epic => new Color(0.72f, 0.32f, 1.0f),
+        LootGrade.Legendary => new Color(1.0f, 0.62f, 0.12f),
+        _ => new Color(0.72f, 0.76f, 0.74f)
+    };
+
+    public static string DisplayName(LootGrade grade, string language)
+    {
+        if (GameLocalization.IsChinese(language))
+        {
+            return grade switch
+            {
+                LootGrade.Uncommon => "优良",
+                LootGrade.Rare => "稀有",
+                LootGrade.Epic => "史诗",
+                LootGrade.Legendary => "传说",
+                _ => "普通"
+            };
+        }
+        return grade switch
+        {
+            LootGrade.Uncommon => "UNCOMMON",
+            LootGrade.Rare => "RARE",
+            LootGrade.Epic => "EPIC",
+            LootGrade.Legendary => "LEGENDARY",
+            _ => "COMMON"
+        };
+    }
+
+    public static int BaseValue(LootGrade grade) => grade switch
+    {
+        LootGrade.Uncommon => 120,
+        LootGrade.Rare => 320,
+        LootGrade.Epic => 780,
+        LootGrade.Legendary => 1600,
+        _ => 40
+    };
+
+    public static LootGrade FromTier(int tier) => tier switch
+    {
+        >= 3 => LootGrade.Legendary,
+        2 => LootGrade.Epic,
+        1 => LootGrade.Rare,
+        _ => LootGrade.Uncommon
+    };
 }
 
 public enum EquipmentSlot
@@ -222,40 +285,80 @@ public sealed class LootItem
     public string AttachmentId { get; init; } = string.Empty;
     public EquipmentItem? Equipment { get; init; }
     public int Quantity { get; set; } = 1;
+    public LootGrade Grade { get; init; } = LootGrade.Common;
 
     public string DisplayName(string language)
     {
-        return Kind switch
+        var gradeTag = LootGrades.DisplayName(Grade, language);
+        var core = Kind switch
         {
-            LootItemKind.Weapon => Weapon?.DisplayName(language) ?? "Weapon",
+            LootItemKind.Weapon => Weapon?.DisplayName(language) ?? (GameLocalization.IsChinese(language) ? "武器" : "Weapon"),
             LootItemKind.Attachment => LocalizedAttachment(language),
             LootItemKind.Ammunition => GameLocalization.IsChinese(language) ? $"步枪弹药 x{Quantity}" : $"Rifle ammunition x{Quantity}",
             LootItemKind.ArmorPlate => GameLocalization.IsChinese(language) ? $"复合护甲板 x{Quantity}" : $"Composite armor plate x{Quantity}",
-            LootItemKind.Equipment => Equipment?.DisplayName(language) ?? "Equipment",
-            _ => "Item"
+            LootItemKind.Equipment => Equipment?.DisplayName(language) ?? (GameLocalization.IsChinese(language) ? "装备" : "Equipment"),
+            _ => GameLocalization.IsChinese(language) ? "物品" : "Item"
         };
+        return GameLocalization.IsChinese(language) ? $"[{gradeTag}] {core}" : $"[{gradeTag}] {core}";
     }
 
     public string Detail(string language)
     {
+        var valueLine = GameLocalization.IsChinese(language)
+            ? $"估值 {UnitValue * Mathf.Max(1, Quantity)}"
+            : $"VALUE {UnitValue * Mathf.Max(1, Quantity)}";
         if (Kind == LootItemKind.Weapon && Weapon is not null)
         {
             var stats = Weapon.Stats();
             return GameLocalization.IsChinese(language)
-                ? $"伤害 {stats.Damage:0}  射程 {stats.EffectiveRange:0}m  后坐 {stats.Recoil:0.00}  操控 {stats.Handling:0.00}"
-                : $"DMG {stats.Damage:0}  RANGE {stats.EffectiveRange:0}m  RECOIL {stats.Recoil:0.00}  HANDLING {stats.Handling:0.00}";
+                ? $"伤害 {stats.Damage:0}  射程 {stats.EffectiveRange:0}m  后坐 {stats.Recoil:0.00}  操控 {stats.Handling:0.00}  {valueLine}"
+                : $"DMG {stats.Damage:0}  RANGE {stats.EffectiveRange:0}m  RECOIL {stats.Recoil:0.00}  HANDLING {stats.Handling:0.00}  {valueLine}";
         }
         if (Kind == LootItemKind.Attachment)
         {
             var part = WeaponCatalog.Attachment(AttachmentId);
             var slot = GameLocalization.IsChinese(language) ? WeaponCatalog.SlotChinese(part.Slot) : part.Slot.ToString().ToUpperInvariant();
-            return GameLocalization.IsChinese(language) ? $"{slot}零件，可安装至当前主武器" : $"{slot} part, installs on the equipped primary";
+            return GameLocalization.IsChinese(language)
+                ? $"{slot}零件，可安装至当前主武器  {valueLine}"
+                : $"{slot} part, installs on the equipped primary  {valueLine}";
         }
         if (Kind == LootItemKind.Equipment && Equipment is not null)
         {
-            return Equipment.Detail(language);
+            return Equipment.Detail(language) + "  " + valueLine;
         }
-        return GameLocalization.IsChinese(language) ? "可放入个人背包" : "Can be stored in the backpack";
+        return GameLocalization.IsChinese(language)
+            ? $"可放入个人背包  {valueLine}"
+            : $"Can be stored in the backpack  {valueLine}";
+    }
+
+    /// <summary>Single-unit sell value used by backpack total.</summary>
+    public int UnitValue
+    {
+        get
+        {
+            var baseValue = LootGrades.BaseValue(Grade);
+            return Kind switch
+            {
+                LootItemKind.Weapon => baseValue + (int)Grade * 180 + 200,
+                LootItemKind.Attachment => baseValue + 60,
+                LootItemKind.Equipment => baseValue + 90,
+                LootItemKind.ArmorPlate => 35 + (int)Grade * 25,
+                LootItemKind.Ammunition => 2 + (int)Grade,
+                _ => baseValue
+            };
+        }
+    }
+
+    public int StackValue => UnitValue * Mathf.Max(1, Quantity);
+
+    public static int TotalValue(IEnumerable<LootItem> items)
+    {
+        var total = 0;
+        foreach (var item in items)
+        {
+            total += item.StackValue;
+        }
+        return total;
     }
 
     private string LocalizedAttachment(string language)

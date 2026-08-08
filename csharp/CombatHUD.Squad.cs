@@ -23,9 +23,9 @@ public partial class CombatHUD
     private readonly Label[] _roleDescriptions = new Label[3];
     private Control _squadRoster = null!;
     private Label _squadRosterTitle = null!;
-    private readonly Label[] _squadMemberLabels = new Label[4];
-    private readonly Label[] _squadSkillLabels = new Label[4];
-    private readonly ProgressBar[] _squadHealthBars = new ProgressBar[4];
+    private readonly Label[] _squadMemberLabels = new Label[3];
+    private readonly Label[] _squadSkillLabels = new Label[3];
+    private readonly ProgressBar[] _squadHealthBars = new ProgressBar[3];
     private Control _classSkillRoot = null!;
     private Label _classSkillLabel = null!;
     private ProgressBar _classSkillBar = null!;
@@ -51,28 +51,28 @@ public partial class CombatHUD
         _squadRoster = new Control
         {
             Position = new Vector2(28, 72),
-            Size = new Vector2(250, 196),
+            Size = new Vector2(250, 158),
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         root.AddChild(_squadRoster);
         var background = new ColorRect
         {
             Color = new Color(0.01f, 0.018f, 0.02f, 0.78f),
-            Size = new Vector2(250, 196),
+            Size = new Vector2(250, 158),
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         _squadRoster.AddChild(background);
         background.AddChild(new ColorRect
         {
             Color = new Color(0.22f, 0.82f, 0.68f, 0.9f),
-            Size = new Vector2(3, 196),
+            Size = new Vector2(3, 158),
             MouseFilter = Control.MouseFilterEnum.Ignore
         });
-        _squadRosterTitle = Label("SQUAD  //  LOCAL + AI", 12, new Color(0.45f, 0.88f, 0.74f));
+        _squadRosterTitle = Label("SQUAD  //  3 OPERATORS", 12, new Color(0.45f, 0.88f, 0.74f));
         _squadRosterTitle.Position = new Vector2(16, 10);
         _squadRosterTitle.Size = new Vector2(218, 20);
         _squadRoster.AddChild(_squadRosterTitle);
-        for (var i = 0; i < 4; i++)
+        for (var i = 0; i < 3; i++)
         {
             var y = 38 + i * 38;
             _squadMemberLabels[i] = Label($"{i + 1}  --", 12, new Color(0.68f, 0.76f, 0.73f));
@@ -179,7 +179,7 @@ public partial class CombatHUD
         _squadLobbyTitle.Size = new Vector2(1040, 44);
         _squadLobbyTitle.HorizontalAlignment = HorizontalAlignment.Center;
         panel.AddChild(_squadLobbyTitle);
-        _squadLobbySubtitle = Label("SELECT YOUR CLASS  //  EMPTY SLOTS ARE FILLED BY AI", 14, new Color(0.48f, 0.65f, 0.61f));
+        _squadLobbySubtitle = Label("SELECT YOUR CLASS  //  3-OPERATOR SQUAD  //  AI FILLS THE OTHER TWO", 14, new Color(0.48f, 0.65f, 0.61f));
         _squadLobbySubtitle.Position = new Vector2(0, 78);
         _squadLobbySubtitle.Size = new Vector2(1040, 24);
         _squadLobbySubtitle.HorizontalAlignment = HorizontalAlignment.Center;

@@ -62,11 +62,37 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public float LeanAmount => _leanValue;
     public float ViewHeight => IsInstanceValid(_head) ? _head.Position.Y : 0.0f;
     public bool KnifeEquipped => _knifeEquipped;
+    /// <summary>False at cold-start extraction until a looted primary is equipped.</summary>
+    public bool HasFireablePrimary { get; private set; } = true;
     public bool UiLocked { get; set; }
+    public bool IsInVehicle => _vehicle is not null && GodotObject.IsInstanceValid(_vehicle);
+    public DriveableVehicle? CurrentVehicle => IsInVehicle ? _vehicle : null;
     public WeaponStats CurrentWeaponStats => EquippedWeapon.Stats();
     public float MouseSensitivity { get; set; } = 0.00165f;
     public FreightTerminalWorld? Main { get; set; }
     public CombatHUD? Hud { get; set; }
+
+    /// <summary>Extraction cold-start: knife only, no magazine — must loot a primary.</summary>
+    public void ApplyColdStartUnarmed()
+    {
+        HasFireablePrimary = false;
+        Ammo = 0;
+        ReserveAmmo = 0;
+        SwitchWeapon(true);
+        if (IsInstanceValid(_weaponRoot))
+        {
+            _weaponRoot.Visible = false;
+        }
+    }
+
+    /// <summary>Diagnostics: force a fireable primary for headless combat tests.</summary>
+    public void GrantFireablePrimaryForDiagnostics(WeaponBuild? build = null)
+    {
+        HasFireablePrimary = true;
+        EquipPrimary(build ?? WeaponCatalog.StarterWeapon());
+        Ammo = EquippedWeapon.Stats().MagazineSize;
+        ReserveAmmo = Mathf.Max(ReserveAmmo, 60);
+    }
 
     private bool _isReloading;
     private bool _isAiming;
@@ -77,6 +103,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private bool _knifeHitApplied;
     private bool _fireInputArmed;
     private bool _movementInputArmed;
+    private DriveableVehicle? _vehicle;
+    private bool _vehicleCameraFollow;
     private float _fireReleaseTime;
     private float _movementReleaseTime;
     private float _fireCooldown;
@@ -131,6 +159,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _rng.Randomize();
         CollisionLayer = 1;
         CollisionMask = 1 | 2;
+        // Thin stair treads (~0.13 m rise); generous snap helps the capsule mount each step.
+        FloorSnapLength = 0.95f;
+        FloorMaxAngle = Mathf.DegToRad(64.0f);
+        FloorConstantSpeed = true;
+        FloorStopOnSlope = false;
+        SafeMargin = 0.05f;
         BuildBody();
         BuildWeapon();
         BuildKnife();
@@ -169,6 +203,113 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _movementInputArmed = true;
         _movementReleaseTime = 0.0f;
         HasMovementIntent = false;
+    }
+
+    /// <summary>Diagnostics: yaw the body toward a world point so move_forward walks that way.</summary>
+    public void FaceWorldPointForDiagnostics(Vector3 worldPoint)
+    {
+        var flat = worldPoint - GlobalPosition;
+        flat.Y = 0.0f;
+        if (flat.LengthSquared() < 0.0001f)
+        {
+            return;
+        }
+        var yaw = Mathf.Atan2(-flat.X, -flat.Z);
+        Rotation = new Vector3(0.0f, yaw, 0.0f);
+        _pitch = 0.0f;
+        if (IsInstanceValid(_head))
+        {
+            _head.Rotation = Vector3.Zero;
+        }
+    }
+
+    public void EnterVehicle(DriveableVehicle vehicle, Node3D seat)
+    {
+        if (IsDead || vehicle.IsDestroyed)
+        {
+            return;
+        }
+
+        _vehicle = vehicle;
+        _vehicleCameraFollow = true;
+        Velocity = Vector3.Zero;
+        _isAiming = false;
+        _slideTime = 0.0f;
+        _stance = PlayerStance.Standing;
+        CollisionLayer = 0;
+        CollisionMask = 0;
+        _collider.Disabled = true;
+        GlobalPosition = seat.GlobalPosition;
+        Reparent(seat, keepGlobalTransform: false);
+        Position = Vector3.Zero;
+        Rotation = Vector3.Zero;
+        // Eye height in the cab (seat local space); look slightly down at the dash / road.
+        _head.Position = new Vector3(0.0f, 0.52f, 0.05f);
+        _pitch = Mathf.Clamp(_pitch * 0.35f, -0.28f, 0.18f);
+        _head.Rotation = new Vector3(_pitch, 0.0f, 0.0f);
+        if (IsInstanceValid(_weaponRoot))
+        {
+            _weaponRoot.Visible = false;
+        }
+        if (IsInstanceValid(_knifeRoot))
+        {
+            _knifeRoot.Visible = false;
+        }
+        Hud?.ShowLocalizedMessage("vehicle_entered", "VEHICLE  //  ENGAGED", new Color(0.55f, 0.92f, 0.68f));
+    }
+
+    public void ExitVehicle(Vector3 worldExitPoint, bool forced = false)
+    {
+        if (_vehicle is null)
+        {
+            return;
+        }
+
+        var world = Main;
+        _vehicle = null;
+        _vehicleCameraFollow = false;
+        if (GetParent() is not FreightTerminalWorld && world is not null)
+        {
+            Reparent(world, keepGlobalTransform: true);
+        }
+        else if (world is not null && GetParent() != world)
+        {
+            Reparent(world, keepGlobalTransform: true);
+        }
+
+        GlobalPosition = worldExitPoint;
+        CollisionLayer = 1;
+        CollisionMask = 1 | 2;
+        _collider.Disabled = false;
+        Velocity = Vector3.Zero;
+        _head.Position = new Vector3(0.0f, 1.57f, 0.0f);
+        if (IsInstanceValid(_weaponRoot))
+        {
+            _weaponRoot.Visible = !_knifeEquipped;
+        }
+        if (IsInstanceValid(_knifeRoot))
+        {
+            _knifeRoot.Visible = _knifeEquipped;
+        }
+        if (!IsDead)
+        {
+            RestoreMovementInput();
+        }
+        if (!forced && !IsDead)
+        {
+            Hud?.ShowLocalizedMessage("vehicle_exited", "VEHICLE  //  DISMOUNTED", new Color(0.7f, 0.82f, 0.78f));
+        }
+    }
+
+    /// <summary>Force leave any vehicle (death, mission end, destroy).</summary>
+    public void EjectFromVehicleIfAny()
+    {
+        if (!IsInVehicle || _vehicle is null)
+        {
+            return;
+        }
+
+        _vehicle.ExitDriver(forced: true);
     }
 
     public void SetSearchPose(bool active, float progress = 0.0f)
@@ -705,6 +846,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             return;
         }
 
+        if (IsInVehicle)
+        {
+            // Yaw is owned by the vehicle body while driving; only pitch the cabin view.
+            _pitch = Mathf.Clamp(_pitch - motion.Relative.Y * MouseSensitivity, -0.55f, 0.42f);
+            return;
+        }
+
         var rotation = Rotation;
         rotation.Y -= motion.Relative.X * MouseSensitivity;
         Rotation = rotation;
@@ -716,7 +864,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var dt = (float)delta;
         if (IsDead)
         {
-            Velocity = Vector3.Zero;
+            UpdateDownedCrawl(dt);
+            return;
+        }
+        if (IsInVehicle)
+        {
+            UpdateVehiclePassenger(dt);
             return;
         }
         if (UiLocked)
@@ -819,7 +972,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
         MovePlayer(dt);
         UpdateCameraAndWeapon(dt);
-        Hud?.SetStats(Health, Armor, Stamina, Ammo, ReserveAmmo, Grenades);
+        PushHudStats();
         Hud?.SetEquipment(
             ArmorPlates,
             _knifeEquipped ? "KNIFE" : _automaticFire ? "AUTO" : "SEMI",
@@ -827,6 +980,162 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             EquippedWeapon);
         Hud?.SetAiming(_isAiming);
         Hud?.SetHeading(Mathf.RadToDeg(Rotation.Y) * -1.0f);
+    }
+
+    private void UpdateVehiclePassenger(float delta)
+    {
+        Velocity = Vector3.Zero;
+        HasMovementIntent = false;
+        _isAiming = false;
+        _slideTime = 0.0f;
+        _fireCooldown = Mathf.Max(0.0f, _fireCooldown - delta);
+
+        if (_vehicle is null || !GodotObject.IsInstanceValid(_vehicle) || _vehicle.IsDestroyed)
+        {
+            if (_vehicle is not null)
+            {
+                ExitVehicle(GlobalPosition + GlobalBasis.X * 2.0f + Vector3.Up * 0.2f, forced: true);
+            }
+            return;
+        }
+
+        // Keep the rider seated; look pitch only. Weapons stay holstered in the cab.
+        Position = Vector3.Zero;
+        Rotation = Vector3.Zero;
+        var headPosition = _head.Position;
+        headPosition.Y = Mathf.Lerp(headPosition.Y, 0.52f, delta * 12.0f);
+        headPosition.Z = Mathf.Lerp(headPosition.Z, 0.05f, delta * 12.0f);
+        _head.Position = headPosition;
+        _head.Rotation = new Vector3(_pitch, 0.0f, 0.0f);
+        if (IsInstanceValid(_weaponRoot))
+        {
+            _weaponRoot.Visible = false;
+        }
+        if (IsInstanceValid(_knifeRoot))
+        {
+            _knifeRoot.Visible = false;
+        }
+
+        // Light cabin camera sway from vehicle speed (no full weapon bob).
+        if (IsInstanceValid(_camera))
+        {
+            var sway = Mathf.Sin(Time.GetTicksMsec() * 0.008f) * 0.004f;
+            _camera.Position = new Vector3(sway, 0.0f, 0.0f);
+            _camera.Fov = Mathf.Lerp(_camera.Fov, 72.0f, delta * 8.0f);
+        }
+
+        PushHudStats();
+        if (IsInstanceValid(_vehicle))
+        {
+            var ratio = _vehicle.Health / Mathf.Max(1.0f, _vehicle.MaxHealth);
+            Hud?.SetInteraction(
+                GameLocalization.IsChinese(Hud?.CurrentLanguage ?? "en")
+                    ? $"载具耐久  {(int)_vehicle.Health}  //  WASD驾驶  F下车"
+                    : $"VEHICLE HP  {(int)_vehicle.Health}  //  WASD DRIVE  F EXIT",
+                ratio,
+                true);
+        }
+    }
+
+    private void PushHudStats()
+    {
+        Hud?.SetStats(Health, Armor, Stamina, Ammo, ReserveAmmo, Grenades);
+    }
+
+    private void UpdateDownedCrawl(float delta)
+    {
+        // Soft prone crawl: slow drag while waiting for a teammate revive.
+        _stance = PlayerStance.Prone;
+        var targetHeadY = 0.42f;
+        var targetColliderHeight = 0.72f;
+        var headPosition = _head.Position;
+        headPosition.Y = Mathf.Lerp(headPosition.Y, targetHeadY, delta * 10.0f);
+        _head.Position = headPosition;
+        if (_collider.Shape is CapsuleShape3D capsule)
+        {
+            capsule.Height = Mathf.Lerp(capsule.Height, targetColliderHeight, delta * 10.0f);
+            var colliderPosition = _collider.Position;
+            colliderPosition.Y = Mathf.Lerp(colliderPosition.Y, targetColliderHeight * 0.5f, delta * 10.0f);
+            _collider.Position = colliderPosition;
+        }
+
+        if (IsInVehicle)
+        {
+            EjectFromVehicleIfAny();
+        }
+
+        var input = Input.GetVector("move_left", "move_right", "move_forward", "move_backward");
+        var direction = (Transform.Basis * new Vector3(input.X, 0, input.Y)).Normalized();
+        var velocity = Velocity;
+        velocity.X = Mathf.MoveToward(velocity.X, direction.X * CrawlSpeed, delta * 10.0f);
+        velocity.Z = Mathf.MoveToward(velocity.Z, direction.Z * CrawlSpeed, delta * 10.0f);
+        if (!IsOnFloor())
+        {
+            velocity.Y -= Gravity * delta;
+        }
+        else
+        {
+            velocity.Y = -0.15f;
+        }
+        Velocity = velocity;
+        MoveAndSlide();
+        TryStairStepUp(direction);
+        HasMovementIntent = input.LengthSquared() > 0.001f;
+        _isAiming = false;
+        Hud?.SetAiming(false);
+        PushHudStats();
+        if (IsInstanceValid(_camera))
+        {
+            _camera.Fov = Mathf.Lerp(_camera.Fov, 68.0f, delta * 6.0f);
+        }
+    }
+
+    /// <summary>
+    /// When walking into a low ledge (stair tread), snap the capsule onto it.
+    /// Thin discrete treads need this — default capsule cannot mount ~0.1 m plates alone.
+    /// </summary>
+    private void TryStairStepUp(Vector3 moveDirection)
+    {
+        if (!IsOnFloor() || moveDirection.LengthSquared() < 0.01f)
+        {
+            return;
+        }
+        const float maxStep = 0.28f;
+        var forward = moveDirection.Normalized();
+        // Probe a few distances ahead for the next tread top.
+        float bestLift = 0.0f;
+        Vector3 bestLand = GlobalPosition;
+        foreach (var dist in new[] { 0.28f, 0.42f, 0.55f })
+        {
+            var from = GlobalPosition + Vector3.Up * (maxStep + 0.12f) + forward * dist;
+            var to = from + Vector3.Down * (maxStep + 0.45f);
+            var query = PhysicsRayQueryParameters3D.Create(from, to);
+            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+            query.CollisionMask = 1;
+            query.CollideWithAreas = false;
+            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+            if (hit.Count == 0)
+            {
+                continue;
+            }
+            var land = hit["position"].AsVector3();
+            var lift = land.Y - GlobalPosition.Y;
+            if (lift > bestLift && lift <= maxStep)
+            {
+                bestLift = lift;
+                bestLand = land;
+            }
+        }
+        if (bestLift > 0.025f)
+        {
+            GlobalPosition = new Vector3(
+                GlobalPosition.X + forward.X * 0.1f,
+                bestLand.Y + 0.03f,
+                GlobalPosition.Z + forward.Z * 0.1f);
+            var v = Velocity;
+            v.Y = 0.0f;
+            Velocity = v;
+        }
     }
 
     private void MovePlayer(float delta)
@@ -891,6 +1200,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
         Velocity = velocity;
         MoveAndSlide();
+        TryStairStepUp(direction);
 
         var targetHeadY = prone ? 0.62f : crouching ? 1.16f : 1.57f;
         var targetColliderHeight = prone ? 0.78f : crouching ? 1.2f : 1.75f;
@@ -1195,10 +1505,30 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             var killed = enemy.TakeDamage(_rng.RandfRange(56.0f, 68.0f), point, this);
             EmitSignal(SignalName.HitConfirmed, killed, enemy.LastHitWasHeadshot, enemy.LastHitWasArmored);
         }
+        else if (target is CivilianNpc civilian)
+        {
+            var killed = civilian.TakeDamage(_rng.RandfRange(42.0f, 58.0f), point, this);
+            EmitSignal(SignalName.HitConfirmed, killed, false, false);
+        }
         else if (target is ExplosiveBarrel barrel)
         {
             barrel.TakeDamage(24.0f, point, this);
             EmitSignal(SignalName.HitConfirmed, false, false, false);
+        }
+        else if (target is DriveableVehicle vehicle)
+        {
+            var destroyed = vehicle.TakeDamage(40.0f, point, this);
+            EmitSignal(SignalName.HitConfirmed, destroyed, false, false);
+        }
+        else if (target is DestructibleAircraft aircraft)
+        {
+            var destroyed = aircraft.TakeDamage(48.0f, point, this);
+            EmitSignal(SignalName.HitConfirmed, destroyed, false, false);
+        }
+        else if (target is AircraftShell shell)
+        {
+            var destroyed = shell.TakeDamage(48.0f, point, this);
+            EmitSignal(SignalName.HitConfirmed, destroyed, false, false);
         }
         Main?.SpawnImpact(point, hit["normal"].AsVector3());
     }
@@ -1206,6 +1536,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public void Fire()
     {
         if (_fireCooldown > 0.0f || _isReloading || _isPlating || RoleActionBlocksWeapon)
+        {
+            return;
+        }
+        if (!HasFireablePrimary || _knifeEquipped)
         {
             return;
         }
@@ -1281,11 +1615,38 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 headshot = enemy.LastHitWasHeadshot;
                 EmitSignal(SignalName.HitConfirmed, killed, headshot, enemy.LastHitWasArmored);
             }
+            else if (target is CivilianNpc civilian)
+            {
+                damagedTarget = true;
+                var distance = from.DistanceTo(end);
+                var falloff = Mathf.Lerp(1.0f, 0.55f, Mathf.Clamp(distance / maximumRange, 0.0f, 1.0f));
+                killed = civilian.TakeDamage(stats.Damage * falloff * _rng.RandfRange(0.9f, 1.05f), end, this);
+                EmitSignal(SignalName.HitConfirmed, killed, false, false);
+            }
             else if (target is ExplosiveBarrel barrel)
             {
                 damagedTarget = true;
                 barrel.TakeDamage(stats.Damage * _rng.RandfRange(0.94f, 1.06f), end, this);
                 EmitSignal(SignalName.HitConfirmed, false, false, false);
+            }
+            else if (target is DriveableVehicle vehicle)
+            {
+                damagedTarget = true;
+                var destroyed = vehicle.TakeDamage(stats.Damage * _rng.RandfRange(0.9f, 1.1f), end, this);
+                EmitSignal(SignalName.HitConfirmed, destroyed, false, false);
+            }
+            else if (target is DestructibleAircraft aircraft)
+            {
+                damagedTarget = true;
+                var destroyed = aircraft.TakeDamage(stats.Damage * _rng.RandfRange(1.05f, 1.2f), end, this);
+                EmitSignal(SignalName.HitConfirmed, destroyed, false, false);
+            }
+            else if (target is AircraftShell shell)
+            {
+                damagedTarget = true;
+                // Slightly generous intercept damage so rifle fire can break shells in the air.
+                var destroyed = shell.TakeDamage(stats.Damage * _rng.RandfRange(1.15f, 1.35f), end, this);
+                EmitSignal(SignalName.HitConfirmed, destroyed, false, false);
             }
             Main?.SpawnImpact(end, hit["normal"].AsVector3());
         }
@@ -1518,6 +1879,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
         Backpack.Add(item);
         Hud?.ShowLocalizedMessage("item_stored", "ITEM STORED", new Color(0.42f, 0.9f, 0.68f));
+        Hud?.SetBackpackValuePlayer(this);
         return true;
     }
 
@@ -1613,6 +1975,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private void EquipPrimary(WeaponBuild build)
     {
         EquippedWeapon = build.Clone();
+        HasFireablePrimary = true;
         Ammo = EquippedWeapon.Stats().MagazineSize;
         _isReloading = false;
         ResetReloadRig();
@@ -1654,8 +2017,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             return true;
         }
-        if (Main?.IsPlayerProtected() == true)
+        // Deployment protection only blocks enemy AI during the protected spawn window.
+        // Headless combat checks and live fire still apply once the director leaves deployment.
+        if (Main?.IsPlayerProtected() == true && attacker is EnemyOperator)
         {
+            // Still allow damage once mission has left pure deployment (double-check phase via Main).
+            // Keep protection only while director reports protected.
             return false;
         }
 
@@ -1692,7 +2059,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             Health = 0.0f;
             IsDead = true;
-            Input.MouseMode = Input.MouseModeEnum.Visible;
+            EjectFromVehicleIfAny();
+            Velocity = Vector3.Zero;
+            _stance = PlayerStance.Prone;
+            // Keep mouse captured so the downed operator can crawl; mission fail unlocks it.
+            UiLocked = false;
+            Hud?.SetStats(0.0f, Armor, Stamina, Ammo, ReserveAmmo, Grenades);
             EmitSignal(SignalName.Died);
             return true;
         }

@@ -95,7 +95,28 @@ public static class GameLocalization
         ["pack_too_small"] = "请先腾空物品再更换此背包",
         ["stance_blocked"] = "上方空间不足",
         ["helmet_impact"] = "头盔吸收了冲击",
-        ["armor_impact"] = "防弹衣吸收了冲击"
+        ["armor_impact"] = "防弹衣吸收了冲击",
+        ["vehicle_entered"] = "载具  //  已上车",
+        ["vehicle_exited"] = "载具  //  已下车",
+        ["enter_vehicle"] = "上车",
+        ["exit_vehicle"] = "下车",
+        ["revive_exhausted"] = "救援次数已用尽  //  无法再次救起",
+        ["squad_revive"] = "救援完成  //  队友已稳定",
+        ["squadmate_kia"] = "队友阵亡  //  遗体袋可搜刮",
+        ["backpack_button"] = "TAB  背包",
+        ["backpack_value"] = "背包总估值",
+        ["grade_common"] = "普通",
+        ["grade_uncommon"] = "优良",
+        ["grade_rare"] = "稀有",
+        ["grade_epic"] = "史诗",
+        ["grade_legendary"] = "传说",
+        ["field_cache"] = "战地物资",
+        ["rival_squad"] = "敌对干员小队",
+        ["spawn_dispersed"] = "多点分散部署",
+        ["extract_rank_title"] = "撤离物资排名",
+        ["extract_rank_note"] = "遗体袋不计入队伍成绩",
+        ["cold_start_unarmed"] = "冷启动  //  需搜刮枪械",
+        ["civilian_down"] = "平民倒地  //  F 搜刮"
     };
 
     static GameLocalization()

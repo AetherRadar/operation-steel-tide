@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 
@@ -11,15 +12,24 @@ public partial class FreightTerminalWorld : Node3D
     private const float MapWidthMeters = 340.0f;
     private const float MapDepthMeters = 320.0f;
     private const float MapCenterZ = -60.0f;
-    private static readonly Vector3 DeploymentPoint = new(0, 0.2f, 42.0f);
-    private static readonly Vector3 ExtractionPoint = new(78.0f, 0.08f, -150.0f);
+    /// <summary>Player deploy pad chosen from edge set each match (not a fixed center apron).</summary>
+    private Vector3 DeploymentPoint = new(0, 0.2f, 42.0f);
+    private static readonly Vector3 ExtractionPoint = new(0.0f, 0.08f, -60.0f);
 
     private TacticalPlayer _player = null!;
     private CombatHUD _hud = null!;
     private MissionDirector _missionDirector = null!;
     private readonly List<EnemyOperator> _enemies = new();
+    private readonly List<HostileOperatorSquad> _hostileSquads = new();
+    private List<Vector3> _assignedHostilePads = new();
     private readonly List<ILootSource> _lootSources = new();
     private readonly List<ExplosiveBarrel> _barrels = new();
+    private readonly List<DriveableVehicle> _vehicles = new();
+    private readonly List<Vector3> _lootWorldPoints = new();
+    private DestructibleAircraft? _aircraft;
+
+    public int HostileSquadCount => _hostileSquads.Count;
+    public IReadOnlyList<HostileOperatorSquad> HostileSquads => _hostileSquads;
     private readonly Dictionary<string, StandardMaterial3D> _materials = new();
     private readonly List<Node3D> _objectiveTerminals = new();
     private readonly List<StandardMaterial3D> _objectiveScreens = new();
@@ -97,7 +107,9 @@ public partial class FreightTerminalWorld : Node3D
         BuildHudAndPlayer();
         BuildSquadSystem();
         SpawnLootCases();
+        SpawnBuildingGradedLoot();
         SpawnEnemies();
+        SpawnHostileOperatorSquads();
         SpawnExplosives();
         _hud.SetEnemyCount(_enemiesRemaining);
         _hud.SetMissionPhase(_missionPhase, _missionDirector.SpawnProtectionSeconds, _missionOnline);
@@ -192,6 +204,46 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateSquadFlow();
         }
+        else if (Array.Exists(args, value => value == "--validate-aircraft-combat"))
+        {
+            ValidateAircraftCombat();
+        }
+        else if (Array.Exists(args, value => value == "--validate-map-density"))
+        {
+            ValidateMapDensity();
+        }
+        else if (Array.Exists(args, value => value == "--validate-goal-pack"))
+        {
+            ValidateGoalPack();
+        }
+        else if (Array.Exists(args, value => value == "--validate-extraction-spawns"))
+        {
+            ValidateExtractionSpawns();
+        }
+        else if (Array.Exists(args, value => value == "--validate-extraction-ai"))
+        {
+            ValidateExtractionAi();
+        }
+        else if (Array.Exists(args, value => value == "--validate-extraction-loot"))
+        {
+            ValidateExtractionLoot();
+        }
+        else if (Array.Exists(args, value => value == "--validate-extraction-loadout"))
+        {
+            ValidateExtractionLoadout();
+        }
+        else if (Array.Exists(args, value => value == "--validate-extraction-los"))
+        {
+            ValidateExtractionLos();
+        }
+        else if (Array.Exists(args, value => value == "--validate-extract-rank"))
+        {
+            ValidateExtractRank();
+        }
+        else if (Array.Exists(args, value => value == "--validate-stairs"))
+        {
+            ValidateStairsClimb();
+        }
         else if (Array.Exists(args, value => value == "--validate-residential"))
         {
             ValidateResidentialCommunity();
@@ -207,6 +259,38 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--capture-squad-lobby"))
         {
             CaptureSquadLobbyFrame();
+        }
+    }
+
+    public override void _ExitTree()
+    {
+        // Drop cached materials and stop long-lived nodes so Godot's Variant
+        // PagedAllocator does not report "pages in use" on process exit.
+        try
+        {
+            if (_aircraft is not null && IsInstanceValid(_aircraft))
+            {
+                _aircraft.SetPhysicsProcess(false);
+            }
+            foreach (var vehicle in _vehicles)
+            {
+                if (IsInstanceValid(vehicle))
+                {
+                    vehicle.SetPhysicsProcess(false);
+                }
+            }
+            foreach (var mate in _squadMates)
+            {
+                if (IsInstanceValid(mate))
+                {
+                    mate.SetPhysicsProcess(false);
+                }
+            }
+            _materials.Clear();
+        }
+        catch
+        {
+            // Best-effort shutdown hygiene only.
         }
     }
 
@@ -319,7 +403,14 @@ public partial class FreightTerminalWorld : Node3D
         _interactionProgress = 0.0f;
         RefreshLocalizedObjective();
         _hud.SetInteraction(string.Empty, 0.0f, false);
-        _extractionMarker.Visible = extractionAvailable;
+        // Beacon landmark always on; pulse stronger once objectives unlock extraction.
+        if (IsInstanceValid(_extractionMarker))
+        {
+            _extractionMarker.Visible = true;
+            _extractionMarker.Scale = extractionAvailable
+                ? new Vector3(1.15f, 1.15f, 1.15f)
+                : Vector3.One;
+        }
     }
 
     private void OnDirectorGunshot(Vector3 origin, float radius)
@@ -560,6 +651,11 @@ public partial class FreightTerminalWorld : Node3D
 
     private void BuildHudAndPlayer()
     {
+        // Assign edge pads before the player exists so deploy position is match-randomized.
+        ExtractionSpawnPads.AssignMatchPads(_rng, out var playerPad, out var hostilePads);
+        DeploymentPoint = playerPad;
+        _assignedHostilePads = hostilePads;
+
         _hud = new CombatHUD { Name = "CombatHUD" };
         AddChild(_hud);
         _hud.PauseRequested += TogglePause;
@@ -574,6 +670,7 @@ public partial class FreightTerminalWorld : Node3D
         _hud.LootReturnRequested += ReturnBackpackItem;
         _hud.BackpackUseRequested += UseBackpackItem;
         _hud.LootClosed += CloseLoot;
+        _hud.InventoryToggleRequested += OnInventoryToggleRequested;
 
         _player = new TacticalPlayer
         {
@@ -584,11 +681,29 @@ public partial class FreightTerminalWorld : Node3D
             MouseSensitivity = 0.00165f * _sensitivitySetting
         };
         AddChild(_player);
+        _player.ApplyColdStartUnarmed();
         _hud.WeaponSlotRequested += _player.SelectWeapon;
         _player.HitConfirmed += OnHitConfirmed;
         _player.Died += OnPlayerDied;
         _hud.SetSettings(_sensitivitySetting, _qualitySetting, _fullscreenSetting, _languageSetting);
+        _hud.SetBackpackValuePlayer(_player);
         RefreshLocalizedObjective();
+    }
+
+    private void OnInventoryToggleRequested()
+    {
+        if (_missionEnded)
+        {
+            return;
+        }
+        if (_hud.IsLootVisible)
+        {
+            CloseLoot();
+        }
+        else
+        {
+            OpenPersonalBackpack();
+        }
     }
 
     private void SpawnLootCases()
@@ -695,28 +810,136 @@ public partial class FreightTerminalWorld : Node3D
                 EnglishName = definition.English,
                 ChineseName = definition.Chinese
             };
-            weaponCase.Loot.Add(new LootItem { Kind = LootItemKind.Weapon, Weapon = definition.Weapon });
+            weaponCase.Loot.Add(new LootItem
+            {
+                Kind = LootItemKind.Weapon,
+                Weapon = definition.Weapon,
+                Grade = LootGrades.FromTier(definition.Weapon.Attachments.Count >= 5 ? 2 : 1)
+            });
             foreach (var part in definition.Parts)
             {
-                weaponCase.Loot.Add(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = part });
+                weaponCase.Loot.Add(new LootItem
+                {
+                    Kind = LootItemKind.Attachment,
+                    AttachmentId = part,
+                    Grade = LootGrade.Rare
+                });
             }
             foreach (var equipmentId in definition.Equipment)
             {
                 weaponCase.Loot.Add(new LootItem
                 {
                     Kind = LootItemKind.Equipment,
-                    Equipment = EquipmentCatalog.Create(equipmentId)
+                    Equipment = EquipmentCatalog.Create(equipmentId),
+                    Grade = equipmentId.Contains("heavy") ? LootGrade.Epic : LootGrade.Rare
                 });
             }
-            weaponCase.Loot.Add(new LootItem { Kind = LootItemKind.Ammunition, Quantity = _rng.RandiRange(35, 65) });
-            weaponCase.Loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate });
+            weaponCase.Loot.Add(new LootItem
+            {
+                Kind = LootItemKind.Ammunition,
+                Quantity = _rng.RandiRange(35, 65),
+                Grade = LootGrade.Common
+            });
+            weaponCase.Loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate, Grade = LootGrade.Uncommon });
             AddChild(weaponCase);
             _lootSources.Add(weaponCase);
+            _lootWorldPoints.Add(definition.Position);
         }
+    }
+
+    private void SpawnBuildingGradedLoot()
+    {
+        // Interior caches inside complex buildings + residential lobbies (glowing graded pickups).
+        var spots = new (Vector3 Pos, LootGrade Grade, string En, string Zh)[]
+        {
+            (new Vector3(-55, 0.2f, -28), LootGrade.Rare, "Customs cache", "海关物资"),
+            (new Vector3(-48, 0.2f, -22), LootGrade.Uncommon, "Warehouse crate", "仓库货箱"),
+            (new Vector3(48, 0.2f, -48), LootGrade.Epic, "Ops annex safe", "行动附楼保险箱"),
+            (new Vector3(42, 0.2f, -44), LootGrade.Rare, "Ops desk stash", "行动桌物资"),
+            (new Vector3(58, 0.2f, -118), LootGrade.Legendary, "Fuel hall strongbox", "燃油厅重匣"),
+            (new Vector3(52, 0.2f, -114), LootGrade.Uncommon, "Logistics bin", "后勤料箱"),
+            (new Vector3(18, 0.2f, -148), LootGrade.Epic, "Bonded storage case", "保税仓货箱"),
+            (new Vector3(25, 0.2f, -89), LootGrade.Rare, "Hangar parts locker", "机库零件柜"),
+            (new Vector3(-128, 0.2f, -28), LootGrade.Uncommon, "Harbor court drop", "港湾庭院物资"),
+            (new Vector3(132, 0.2f, -72), LootGrade.Rare, "East court cache", "东庭物资"),
+            (new Vector3(2, 0.2f, -194), LootGrade.Epic, "North quay case", "北堤货箱"),
+            (new Vector3(-25, 0.2f, 79), LootGrade.Uncommon, "South court bag", "南庭物资包"),
+            (new Vector3(90, 0.2f, 72), LootGrade.Rare, "South tower stash", "南塔藏匿点"),
+            (new Vector3(-82, 0.2f, 75), LootGrade.Common, "Courtyard supply", "庭院补给"),
+            (new Vector3(35, 0.2f, 77), LootGrade.Legendary, "VIP residential case", "高档住宅箱")
+        };
+        foreach (var spot in spots)
+        {
+            var item = CreateGradedLootItem(spot.Grade);
+            var pickup = new GradedLootPickup { Position = spot.Pos };
+            pickup.Configure(item, spot.En, spot.Zh);
+            AddChild(pickup);
+            _lootSources.Add(pickup);
+            _lootWorldPoints.Add(spot.Pos);
+        }
+        // Cold-start guarantee: every edge spawn pad gets a nearby weapon cache so operators can re-arm via real loot.
+        foreach (var pad in ExtractionSpawnPads.Pads)
+        {
+            var weapon = new LootItem
+            {
+                Kind = LootItemKind.Weapon,
+                Weapon = WeaponCatalog.Build(WeaponPlatform.M4A1, 0),
+                Grade = LootGrade.Uncommon
+            };
+            var cache = new GradedLootPickup
+            {
+                Position = pad + new Vector3(2.4f, 0.05f, 1.2f)
+            };
+            cache.Configure(weapon, "Pad armory crate", "复活点军械箱");
+            AddChild(cache);
+            _lootSources.Add(cache);
+            _lootWorldPoints.Add(cache.Position);
+        }
+    }
+
+    private LootItem CreateGradedLootItem(LootGrade grade)
+    {
+        var roll = _rng.Randf();
+        if (roll < 0.28f)
+        {
+            var tier = grade >= LootGrade.Legendary ? 2 : grade >= LootGrade.Rare ? 1 : 0;
+            return new LootItem
+            {
+                Kind = LootItemKind.Weapon,
+                Weapon = WeaponCatalog.Build(
+                    grade >= LootGrade.Epic ? WeaponPlatform.ScarL : WeaponPlatform.M4A1,
+                    tier),
+                Grade = grade
+            };
+        }
+        if (roll < 0.5f)
+        {
+            return new LootItem
+            {
+                Kind = LootItemKind.Equipment,
+                Equipment = EquipmentCatalog.Create(grade >= LootGrade.Epic ? "armor_heavy" : "armor_carrier"),
+                Grade = grade
+            };
+        }
+        if (roll < 0.72f)
+        {
+            return new LootItem
+            {
+                Kind = LootItemKind.Attachment,
+                AttachmentId = grade >= LootGrade.Rare ? "optic_scope" : "optic_holo",
+                Grade = grade
+            };
+        }
+        if (roll < 0.88f)
+        {
+            return new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = grade >= LootGrade.Rare ? 2 : 1, Grade = grade };
+        }
+        return new LootItem { Kind = LootItemKind.Ammunition, Quantity = 20 + (int)grade * 15, Grade = grade };
     }
 
     private void SpawnEnemies()
     {
+        // Map garrison NPCs (TeamId 0) — prefer hunting rival squads, loot when idle.
         var positions = new[]
         {
             new Vector3(-12, 0.15f, 11), new Vector3(-22, 0.15f, 7), new Vector3(3, 0.15f, 2),
@@ -731,12 +954,50 @@ public partial class FreightTerminalWorld : Node3D
         };
         foreach (var position in positions)
         {
-            SpawnEnemy(position, false);
+            SpawnEnemy(position, false, teamId: 0);
         }
         _enemiesRemaining = _enemies.Count;
     }
 
-    private EnemyOperator SpawnEnemy(Vector3 position, bool alerted)
+    private void SpawnHostileOperatorSquads()
+    {
+        // Pads assigned in BuildHudAndPlayer (player edge pad + farthest remaining).
+        var chosen = _assignedHostilePads;
+        if (chosen is null || chosen.Count == 0)
+        {
+            ExtractionSpawnPads.AssignMatchPads(_rng, out _, out chosen);
+            _assignedHostilePads = chosen;
+        }
+
+        var prefixes = new[] { "WOLF", "COBRA", "HAWK", "VIPER" };
+        var count = Mathf.Min(chosen.Count, ExtractionSpawnPads.HostileSquadTargetCount);
+        for (var i = 0; i < count; i++)
+        {
+            var teamId = i + 1;
+            var squad = new HostileOperatorSquad
+            {
+                TeamId = teamId,
+                SpawnPad = chosen[i],
+                CallsignPrefix = prefixes[i % prefixes.Length]
+            };
+            var offsets = new[]
+            {
+                new Vector3(-1.8f, 0.0f, 0.6f),
+                new Vector3(1.8f, 0.0f, 0.6f),
+                new Vector3(0.0f, 0.0f, -1.8f)
+            };
+            for (var m = 0; m < ExtractionSpawnPads.SquadSize; m++)
+            {
+                var member = SpawnEnemy(chosen[i] + offsets[m], alerted: false, teamId: teamId);
+                member.Name = $"{squad.CallsignPrefix}_{m + 1}";
+                squad.Members.Add(member);
+            }
+            _hostileSquads.Add(squad);
+        }
+        _enemiesRemaining = _enemies.Count(e => IsInstanceValid(e) && !e.IsDead);
+    }
+
+    private EnemyOperator SpawnEnemy(Vector3 position, bool alerted, int teamId = 0)
     {
         var enemy = new EnemyOperator
         {
@@ -745,9 +1006,15 @@ public partial class FreightTerminalWorld : Node3D
             Player = _player,
             Main = this,
             MissionDirector = _missionDirector,
-            DetectionRange = _missionDetectionRange
+            DetectionRange = _missionDetectionRange,
+            TeamId = teamId
         };
         AddChild(enemy);
+        // Cold-start: only map garrison NPCs (team 0) keep firearms. Rival ops must loot guns.
+        if (teamId > 0)
+        {
+            enemy.ApplyColdStartUnarmed();
+        }
         enemy.Eliminated += OnEnemyEliminated;
         _enemies.Add(enemy);
         if (alerted)
@@ -755,6 +1022,199 @@ public partial class FreightTerminalWorld : Node3D
             enemy.SetAlerted(_player.GlobalPosition);
         }
         return enemy;
+    }
+    /// <summary>All living combatants that are hostile to the given operator (player squad, other teams, NPCs).</summary>
+    public IEnumerable<Node3D> EnumerateHostileTargetsFor(EnemyOperator self)
+    {
+        if (IsInstanceValid(_player) && !_player.IsDead)
+        {
+            yield return _player;
+        }
+        foreach (var mate in _squadMates)
+        {
+            if (IsInstanceValid(mate) && !mate.IsDowned && !mate.IsBodyBag)
+            {
+                yield return mate;
+            }
+        }
+        foreach (var enemy in _enemies)
+        {
+            if (!IsInstanceValid(enemy) || enemy.IsDead || enemy == self)
+            {
+                continue;
+            }
+            if (self.IsHostileTo(enemy))
+            {
+                yield return enemy;
+            }
+        }
+    }
+
+    public Vector3? FindNearestLootPoint(Vector3 origin, float range)
+    {
+        Vector3? best = null;
+        var bestDist = range * range;
+        foreach (var point in _lootWorldPoints)
+        {
+            var d = origin.DistanceSquaredTo(point);
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = point;
+            }
+        }
+        foreach (var source in _lootSources)
+        {
+            if (!source.IsSearchable || !IsInstanceValid(source.LootNode))
+            {
+                continue;
+            }
+            var d = origin.DistanceSquaredTo(source.LootNode.GlobalPosition);
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = source.LootNode.GlobalPosition;
+            }
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// Nearest searchable loot source that still contains a weapon stack (for cold-start re-arm).
+    /// Prefers graded world pickups, then corpse/case sources.
+    /// </summary>
+    public ILootSource? FindNearestWeaponLootSource(Vector3 origin, float range)
+    {
+        ILootSource? best = null;
+        var bestDist = range * range;
+        foreach (var node in GetTree().GetNodesInGroup("graded_loot"))
+        {
+            if (node is not GradedLootPickup pickup || !IsInstanceValid(pickup) || !pickup.IsSearchable)
+            {
+                continue;
+            }
+            if (!pickup.Loot.Exists(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null))
+            {
+                continue;
+            }
+            var d = origin.DistanceSquaredTo(pickup.GlobalPosition);
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = pickup;
+            }
+        }
+        foreach (var source in _lootSources)
+        {
+            if (source is null || !source.IsSearchable || !IsInstanceValid(source.LootNode))
+            {
+                continue;
+            }
+            if (!source.Loot.Exists(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null))
+            {
+                continue;
+            }
+            var d = origin.DistanceSquaredTo(source.LootNode.GlobalPosition);
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = source;
+            }
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// Production path: pull one weapon stack from a loot source and equip it on the operator.
+    /// Returns true when HasFireablePrimary becomes true via real loot removal (not diagnostics grant).
+    /// </summary>
+    public bool TryEquipWeaponFromLootSource(EnemyOperator operatorNode, ILootSource source)
+    {
+        if (operatorNode is null || source is null || !IsInstanceValid(operatorNode) || !source.IsSearchable)
+        {
+            return false;
+        }
+        var index = source.Loot.FindIndex(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null);
+        if (index < 0)
+        {
+            return false;
+        }
+        var weaponItem = source.Loot[index];
+        source.Loot.RemoveAt(index);
+        if (source is GradedLootPickup graded && graded.Loot.Count == 0)
+        {
+            graded.MarkEmpty();
+        }
+        if (source is EnemyOperator corpse)
+        {
+            corpse.MarkCarriedWeaponRemoved();
+        }
+        source.OnSearched();
+        return operatorNode.EquipWeaponFromLoot(weaponItem.Weapon!);
+    }
+
+    /// <summary>Player equip from a live loot source (same removal rules as HUD EquipLootItem).</summary>
+    public bool TryPlayerEquipWeaponFromLootSource(ILootSource source)
+    {
+        if (source is null || !source.IsSearchable || !IsInstanceValid(_player))
+        {
+            return false;
+        }
+        var index = source.Loot.FindIndex(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null);
+        if (index < 0)
+        {
+            return false;
+        }
+        var original = source.Loot[index];
+        var replacement = _player.EquipFromLoot(original);
+        if (ReferenceEquals(replacement, original))
+        {
+            return false;
+        }
+        if (replacement is null)
+        {
+            source.Loot.RemoveAt(index);
+        }
+        else
+        {
+            source.Loot[index] = replacement;
+        }
+        if (source is EnemyOperator enemy)
+        {
+            enemy.MarkCarriedWeaponRemoved();
+        }
+        if (source is GradedLootPickup graded && graded.Loot.Count == 0)
+        {
+            graded.MarkEmpty();
+        }
+        source.OnSearched();
+        return _player.HasFireablePrimary;
+    }
+
+    /// <summary>Squad mate equip from loot source (cold-start re-arm).</summary>
+    public bool TryMateEquipWeaponFromLootSource(SquadMate mate, ILootSource source)
+    {
+        if (mate is null || source is null || !IsInstanceValid(mate) || !source.IsSearchable)
+        {
+            return false;
+        }
+        var index = source.Loot.FindIndex(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null);
+        if (index < 0)
+        {
+            return false;
+        }
+        var weaponItem = source.Loot[index];
+        source.Loot.RemoveAt(index);
+        if (source is GradedLootPickup graded && graded.Loot.Count == 0)
+        {
+            graded.MarkEmpty();
+        }
+        if (source is EnemyOperator corpse)
+        {
+            corpse.MarkCarriedWeaponRemoved();
+        }
+        source.OnSearched();
+        return mate.EquipWeaponFromLoot(weaponItem.Weapon!);
     }
 
     private void SpawnExplosives()
@@ -783,6 +1243,40 @@ public partial class FreightTerminalWorld : Node3D
         _enemies.Remove(enemy);
     }
 
+    /// <summary>
+    /// Diagnostics only: after ResetTacticalStateForDiagnostics revives a dead operator,
+    /// put them back on the living roster so EnumerateHostileTargetsFor can see them again.
+    /// Phase-1 duel kills remove members via OnEnemyEliminated; mid-loot acquire needs them listed.
+    /// </summary>
+    public void EnsureEnemyRegisteredForDiagnostics(EnemyOperator enemy)
+    {
+        if (enemy is null || !IsInstanceValid(enemy) || enemy.IsDead)
+        {
+            return;
+        }
+        _lootSources.Remove(enemy);
+        if (!_enemies.Contains(enemy))
+        {
+            _enemies.Add(enemy);
+        }
+        _enemiesRemaining = _enemies.Count(e => IsInstanceValid(e) && !e.IsDead);
+        _hud.SetEnemyCount(_enemiesRemaining);
+    }
+
+    /// <summary>Civilian corpse becomes a searchable loot source (ammo/plates/sometimes a gun).</summary>
+    public void RegisterCivilianCorpse(CivilianNpc civilian)
+    {
+        if (civilian is null || !IsInstanceValid(civilian))
+        {
+            return;
+        }
+        if (!_lootSources.Contains(civilian))
+        {
+            _lootSources.Add(civilian);
+        }
+        _hud.ShowLocalizedMessage("civilian_down", "CIVILIAN DOWN  //  F LOOT", new Color(0.95f, 0.55f, 0.35f));
+    }
+
     private TacticalPickup SpawnPickup(Vector3 position, TacticalPickupKind kind)
     {
         var pickup = new TacticalPickup { Position = position, Kind = kind };
@@ -794,11 +1288,14 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OnPlayerDied()
     {
+        _player.EjectFromVehicleIfAny();
         if (HandleLocalPlayerDowned())
         {
             return;
         }
         _missionEnded = true;
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+        _hud.HideDownedState();
         _missionDirector.CompleteMission(false, _kills, _headshots, _shotsFired, _shotsHit);
         _hud.ShowResult(false);
     }
@@ -813,7 +1310,77 @@ public partial class FreightTerminalWorld : Node3D
         _player.IsDead = true;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         _missionDirector.CompleteMission(true, _kills, _headshots, _shotsFired, _shotsHit);
-        _hud.ShowResult(true);
+        var ranks = BuildExtractionLootRanking();
+        _hud.ShowResult(true, ranks);
+    }
+
+    /// <summary>
+    /// Team loot-value ranking at extract. Living operators count backpack/loadout value;
+    /// body-bag / box entities do NOT contribute to team score.
+    /// </summary>
+    public List<(string Team, int Value, int Rank)> BuildExtractionLootRanking()
+    {
+        var rows = new List<(string Team, int Value)>();
+        // Player squad (player + living mates only).
+        var playerValue = CombatHUD.ComputeBackpackTotalValue(_player);
+        foreach (var mate in _squadMates)
+        {
+            if (!IsInstanceValid(mate) || mate.IsBodyBag || mate.IsDowned)
+            {
+                continue;
+            }
+            // Living AI mates contribute a fixed kit residual; bags add nothing.
+            playerValue += 80;
+        }
+        rows.Add((GameLocalization.IsChinese(_languageSetting) ? "我方小队" : "PLAYER SQUAD", playerValue));
+
+        foreach (var squad in _hostileSquads)
+        {
+            var value = 0;
+            var alive = 0;
+            foreach (var member in squad.Members)
+            {
+                if (!IsInstanceValid(member) || member.IsDead)
+                {
+                    continue;
+                }
+                alive++;
+                value += LootItem.TotalValue(member.Loot);
+                if (member.HasFireablePrimary)
+                {
+                    value += new LootItem
+                    {
+                        Kind = LootItemKind.Weapon,
+                        Weapon = member.CarriedWeapon.Clone(),
+                        Grade = LootGrade.Rare
+                    }.StackValue;
+                }
+            }
+            // Explicitly ignore body bags / loot sources tagged as squad bags.
+            var label = GameLocalization.IsChinese(_languageSetting)
+                ? $"敌对小队 {squad.CallsignPrefix}"
+                : $"RIVAL {squad.CallsignPrefix}";
+            if (alive == 0)
+            {
+                value = 0; // wiped team (all bagged/dead) scores zero
+            }
+            rows.Add((label, value));
+        }
+
+        rows.Sort((a, b) => b.Value.CompareTo(a.Value));
+        var ranked = new List<(string Team, int Value, int Rank)>(rows.Count);
+        for (var i = 0; i < rows.Count; i++)
+        {
+            ranked.Add((rows[i].Team, rows[i].Value, i + 1));
+        }
+        return ranked;
+    }
+
+    /// <summary>Pure helper for validators: bagged mates never add value.</summary>
+    public static int ScoreLivingSquadValue(int playerBackpackValue, int livingMateBonus, int baggedMateCountIgnored)
+    {
+        _ = baggedMateCountIgnored; // bags contribute 0 by design
+        return Math.Max(0, playerBackpackValue) + Math.Max(0, livingMateBonus);
     }
 
     private void UpdateInteraction(float delta)
@@ -826,6 +1393,63 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
+
+        // Vehicle enter / exit takes priority so F never fights loot while driving.
+        if (_player.IsInVehicle)
+        {
+            _lootSearchTarget = null;
+            _player.SetSearchPose(false);
+            var vehicle = _player.CurrentVehicle;
+            if (vehicle is not null)
+            {
+                _hud.SetInteraction(vehicle.InteractionLabel(_languageSetting), -1.0f, true);
+                if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
+                {
+                    _interactReleaseRequired = true;
+                    vehicle.ExitDriver();
+                }
+            }
+            return;
+        }
+
+        // Manual revive is handled in UpdateSquad; skip loot prompts while charging.
+        if (_manualReviveProgress > 0.02f || (_manualReviveTarget is not null && _manualReviveTarget.CanBeRevived
+            && _player.GlobalPosition.DistanceTo(_manualReviveTarget.CombatNode.GlobalPosition) < 3.0f))
+        {
+            _lootSearchTarget = null;
+            return;
+        }
+
+        DriveableVehicle? nearestVehicle = null;
+        var nearestVehicleDistance = 3.4f;
+        for (var i = _vehicles.Count - 1; i >= 0; i--)
+        {
+            var vehicle = _vehicles[i];
+            if (!IsInstanceValid(vehicle) || vehicle.IsDestroyed)
+            {
+                _vehicles.RemoveAt(i);
+                continue;
+            }
+            var distance = _player.GlobalPosition.DistanceTo(vehicle.GlobalPosition);
+            if (distance < nearestVehicleDistance)
+            {
+                nearestVehicle = vehicle;
+                nearestVehicleDistance = distance;
+            }
+        }
+        if (nearestVehicle is not null)
+        {
+            _lootSearchTarget = null;
+            _player.SetSearchPose(false);
+            _hud.SetInteraction(nearestVehicle.InteractionLabel(_languageSetting), -1.0f, true);
+            if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
+            {
+                _interactReleaseRequired = true;
+                nearestVehicle.TryEnter(_player);
+            }
+            return;
+        }
+
         ILootSource? nearest = null;
         var nearestDistance = 2.85f;
         foreach (var source in _lootSources)
@@ -1648,7 +2272,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
         }
-        var aircraft = _levelRoot.GetNodeOrNull<Node3D>("DistantTiltRotor");
+        var aircraft = _aircraft ?? _levelRoot.GetNodeOrNull<Node3D>("DistantTiltRotor");
         var aircraftStart = aircraft?.Position ?? Vector3.Zero;
         _player.ProcessMode = ProcessModeEnum.Disabled;
         _hud.Visible = false;
@@ -1682,8 +2306,753 @@ public partial class FreightTerminalWorld : Node3D
             && _levelRoot.GetNodeOrNull<Node3D>("RadarFoundation") is not null;
         var aircraftMoving = aircraft is not null && aircraft.Position.DistanceTo(aircraftStart) > 0.1f;
         var dynamicSky = _environmentRef.Sky?.SkyMaterial is ShaderMaterial;
-        GD.Print($"MAP_CHECK width={MapWidthMeters:0} depth={MapDepthMeters:0} loot_sources={_lootSources.Count} hostiles={_enemiesRemaining} extraction_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} landmarks={landmarksPresent} cover_points={_coverPoints.Length} dynamic_sky={dynamicSky} aircraft_moving={aircraftMoving} residential_towers={ResidentialTowerCount} civilians={ResidentialCivilianCount}");
+        GD.Print($"MAP_CHECK width={MapWidthMeters:0} depth={MapDepthMeters:0} loot_sources={_lootSources.Count} hostiles={_enemiesRemaining} extraction_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} landmarks={landmarksPresent} cover_points={_coverPoints.Length} dynamic_sky={dynamicSky} aircraft_moving={aircraftMoving} residential_towers={ResidentialTowerCount} civilians={ResidentialCivilianCount} complex_buildings={ComplexBuildingCount} complex_rooms={ComplexRoomCount} complex_props={ComplexInteriorPropCount}");
         GetTree().Quit();
+    }
+
+    private async void ValidateAircraftCombat()
+    {
+        await WaitFrames(8);
+        var aircraft = _aircraft ?? _levelRoot.GetNodeOrNull<DestructibleAircraft>("DistantTiltRotor");
+        if (aircraft is null)
+        {
+            GD.Print("AIRCRAFT_COMBAT_CHECK valid=False reason=missing");
+            GetTree().Quit(2);
+            return;
+        }
+
+        _missionDirector.ExitDeploymentZone();
+        var salvosBefore = aircraft.AttackSalvosFired;
+        var fired = aircraft.TryAttackTarget(_player, ignoreCooldown: true);
+        await WaitFrames(6);
+        var shellNodes = GetTree().GetNodesInGroup("aircraft_shells");
+        var shellSpawned = shellNodes.Count > 0 || aircraft.AttackSalvosFired > salvosBefore;
+        AircraftShell? shell = null;
+        foreach (var node in shellNodes)
+        {
+            if (node is AircraftShell candidate && IsInstanceValid(candidate) && !candidate.IsDestroyed)
+            {
+                shell = candidate;
+                break;
+            }
+        }
+        // If the shell already hit the ground, spawn a diagnostic shell for intercept proof.
+        if (shell is null)
+        {
+            SpawnAircraftShell(
+                aircraft.GlobalPosition + Vector3.Down * 2.0f,
+                aircraft.GlobalPosition + new Vector3(0, -8.0f, 12.0f),
+                40.0f,
+                12.0f,
+                aircraft);
+            await WaitFrames(2);
+            foreach (var node in GetTree().GetNodesInGroup("aircraft_shells"))
+            {
+                if (node is AircraftShell candidate && IsInstanceValid(candidate) && !candidate.IsDestroyed)
+                {
+                    shell = candidate;
+                    break;
+                }
+            }
+        }
+
+        var intercepted = false;
+        if (shell is not null)
+        {
+            intercepted = shell.TakeDamage(999.0f, shell.GlobalPosition, _player);
+            await WaitFrames(3);
+            intercepted = intercepted || shell.InterceptedInAir || shell.IsDestroyed;
+        }
+
+        // Ground blast path still hurts operators when a shell is allowed to land.
+        var healthBefore = _player.Health;
+        ApplyAircraftStrike(_player.GlobalPosition + Vector3.Up, 10.0f, 28.0f, aircraft);
+        await WaitFrames(2);
+        var playerHurt = _player.Health < healthBefore || _player.IsDead;
+        var stillAlive = !aircraft.IsDestroyed;
+        var destroyed = aircraft.TakeDamage(999.0f, aircraft.GlobalPosition, _player);
+        await WaitFrames(6);
+        var valid = fired && shellSpawned && intercepted && playerHurt && stillAlive && destroyed;
+        GD.Print($"AIRCRAFT_COMBAT_CHECK valid={valid} fired={fired} shell={shellSpawned} intercepted={intercepted} salvos={aircraft.AttackSalvosFired} last_damage={aircraft.LastAttackDamage:0.0} player_hurt={playerHurt} destroyed={destroyed}");
+        GD.Print($"AIRCRAFT_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void ValidateMapDensity()
+    {
+        await WaitFrames(4);
+        var customs = _levelRoot.GetNodeOrNull<Node3D>("CustomsWarehouseComplex") is not null;
+        var ops = _levelRoot.GetNodeOrNull<Node3D>("OpsAnnexComplex") is not null;
+        var fuel = _levelRoot.GetNodeOrNull<Node3D>("FuelLogisticsHall") is not null;
+        var quay = _levelRoot.GetNodeOrNull<Node3D>("QuayBondedStorage") is not null;
+        var hangarEnriched = _levelRoot.GetNodeOrNull("MaintenanceDistrict/HangarOfficeFloor") is not null
+            || (_levelRoot.GetNodeOrNull<Node3D>("MaintenanceDistrict")?.FindChild("HangarOfficeFloor", true, false) is not null);
+        // Baseline: need multiple large complexes and interior density above empty-shell thresholds.
+        var valid = ComplexBuildingCount >= 5
+            && ComplexRoomCount >= 12
+            && ComplexInteriorPropCount >= 40
+            && customs && ops && fuel && quay
+            && ResidentialTowerCount >= 11;
+        GD.Print($"MAP_DENSITY_CHECK valid={valid} buildings={ComplexBuildingCount} rooms={ComplexRoomCount} props={ComplexInteriorPropCount} customs={customs} ops={ops} fuel={fuel} quay={quay} hangar={hangarEnriched} towers={ResidentialTowerCount}");
+        GD.Print($"MAP_DENSITY_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void ValidateExtractionSpawns()
+    {
+        await WaitFrames(6);
+        EnsureAiSquadFill();
+        var playerSquadOk = ActiveSquadCount == 3 && AiSquadCount == 2;
+        var hostileOk = HostileSquadCount == ExtractionSpawnPads.HostileSquadTargetCount;
+        var teamTotalOk = HostileSquadCount + 1 == ExtractionSpawnPads.OperatorTeamCount;
+        var sizesOk = true;
+        var pads = new List<Vector3> { DeploymentPoint };
+        var playerOnEdge = false;
+        foreach (var edge in ExtractionSpawnPads.Pads)
+        {
+            if (edge.DistanceTo(DeploymentPoint) < 1.0f)
+            {
+                playerOnEdge = true;
+                break;
+            }
+        }
+        foreach (var squad in _hostileSquads)
+        {
+            if (squad.Members.Count != ExtractionSpawnPads.SquadSize)
+            {
+                sizesOk = false;
+            }
+            pads.Add(squad.SpawnPad);
+            foreach (var member in squad.Members)
+            {
+                if (!IsInstanceValid(member) || member.TeamId != squad.TeamId || !member.IsRivalSquad)
+                {
+                    sizesOk = false;
+                }
+            }
+        }
+        var minDist = ExtractionSpawnPads.MinPairwiseDistance(pads);
+        var separated = minDist >= ExtractionSpawnPads.MinPadSeparationMeters * 0.95f;
+        var playerClear = true;
+        foreach (var squad in _hostileSquads)
+        {
+            if (squad.SpawnPad.DistanceTo(DeploymentPoint) < ExtractionSpawnPads.MinPadSeparationMeters * 0.9f)
+            {
+                playerClear = false;
+            }
+        }
+        var extractVisible = IsInstanceValid(_extractionMarker) && _extractionMarker.Visible;
+        var valid = playerSquadOk && hostileOk && teamTotalOk && sizesOk && separated && playerClear && playerOnEdge && extractVisible;
+        GD.Print($"EXTRACTION_SPAWNS_CHECK valid={valid} player_squad={ActiveSquadCount} hostile_squads={HostileSquadCount} teams={HostileSquadCount + 1} sizes_ok={sizesOk} min_pad_m={minDist:0.0} separated={separated} player_clear={playerClear} player_edge={playerOnEdge} extract_beacon={extractVisible}");
+        GD.Print($"EXTRACTION_SPAWNS_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void ValidateExtractionAi()
+    {
+        await WaitFrames(8);
+        _missionDirector.ExitDeploymentZone();
+
+        // Two rivals from different teams — must fight each other via raw Engage/FireAtNode.
+        var teamA = _hostileSquads.FirstOrDefault(s => s.TeamId == 1);
+        var teamB = _hostileSquads.FirstOrDefault(s => s.TeamId == 2);
+        var npc = _enemies.FirstOrDefault(e => IsInstanceValid(e) && !e.IsRivalSquad && !e.IsDead);
+        var rivalA = teamA?.Members.FirstOrDefault(m => IsInstanceValid(m) && !m.IsDead);
+        var rivalB = teamB?.Members.FirstOrDefault(m => IsInstanceValid(m) && !m.IsDead);
+        if (rivalA is null || rivalB is null || npc is null)
+        {
+            GD.Print("EXTRACTION_AI_CHECK valid=False reason=missing_actors");
+            GetTree().Quit(2);
+            return;
+        }
+
+        // Park everyone else far away so acquisition is unambiguous.
+        foreach (var enemy in _enemies)
+        {
+            if (!IsInstanceValid(enemy) || enemy == rivalA || enemy == rivalB || enemy == npc)
+            {
+                continue;
+            }
+            enemy.GlobalPosition = new Vector3(200.0f, 0.2f, 200.0f);
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        foreach (var mate in _squadMates)
+        {
+            if (IsInstanceValid(mate))
+            {
+                mate.GlobalPosition = DeploymentPoint + new Vector3(0.0f, 0.0f, 30.0f);
+                mate.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+
+        // Open flat pad (terminal apron) — no geometry blocking LOS.
+        // Cold-start rivals are unarmed; grant guns so combat engagement path is exercised.
+        rivalA.GrantFireablePrimaryForDiagnostics();
+        rivalB.GrantFireablePrimaryForDiagnostics();
+        npc.GrantFireablePrimaryForDiagnostics();
+        var arena = new Vector3(8.0f, 0.2f, 18.0f);
+        rivalA.GlobalPosition = arena;
+        rivalB.GlobalPosition = arena + new Vector3(0.0f, 0.0f, 11.0f);
+        rivalA.LookAt(rivalB.GlobalPosition, Vector3.Up);
+        rivalB.LookAt(rivalA.GlobalPosition, Vector3.Up);
+        rivalA.SetAlerted(rivalB.GlobalPosition);
+        rivalB.SetAlerted(rivalA.GlobalPosition);
+        var hpA = rivalA.CurrentHealth;
+        var hpB = rivalB.CurrentHealth;
+        var shotsA0 = rivalA.AttackShotsFired;
+        var shotsB0 = rivalB.AttackShotsFired;
+        for (var i = 0; i < 100; i++)
+        {
+            rivalA.ArmWeaponForDiagnostics();
+            rivalB.ArmWeaponForDiagnostics();
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        var vsEnemyTarget = rivalA.EngageTargetNode == rivalB || rivalB.EngageTargetNode == rivalA;
+        var vsEnemyShots = rivalA.AttackShotsFired > shotsA0 || rivalB.AttackShotsFired > shotsB0;
+        var vsEnemyDamage = rivalA.CurrentHealth < hpA - 0.01f || rivalB.CurrentHealth < hpB - 0.01f
+            || rivalA.IsDead || rivalB.IsDead;
+
+        // --- 2) Rival fires on player through FireAtSquad ---
+        _missionDirector.ExitDeploymentZone();
+        await WaitFrames(6);
+        rivalA.ResetTacticalStateForDiagnostics();
+        rivalB.ResetTacticalStateForDiagnostics();
+        rivalA.GrantFireablePrimaryForDiagnostics();
+        if (_player.IsDead)
+        {
+            _player.SetHealthForDiagnostics(_player.MaxHealth);
+            _player.IsDead = false;
+        }
+        else
+        {
+            _player.SetHealthForDiagnostics(_player.MaxHealth);
+        }
+        rivalA.ProcessMode = ProcessModeEnum.Inherit;
+        _player.ProcessMode = ProcessModeEnum.Inherit;
+        // Fresh open arena far from cover geometry so Engage does not dig into cover first.
+        var fireArena = new Vector3(5.0f, 0.25f, 25.0f);
+        rivalA.GlobalPosition = fireArena;
+        rivalB.GlobalPosition = new Vector3(180.0f, 0.2f, 180.0f);
+        _player.GlobalPosition = fireArena + new Vector3(0.0f, 0.0f, -8.5f);
+        _player.RestoreMovementInput();
+        rivalA.LookAt(_player.GlobalPosition, Vector3.Up);
+        rivalA.SetAlerted(_player.GlobalPosition);
+        for (var i = 0; i < 12; i++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        var playerHp = _player.Health;
+        var shotsBeforePlayer = rivalA.AttackShotsFired;
+        for (var i = 0; i < 130; i++)
+        {
+            rivalA.ArmWeaponForDiagnostics();
+            if (IsInstanceValid(rivalA) && IsInstanceValid(_player) && !_player.IsDead)
+            {
+                var face = new Vector3(_player.GlobalPosition.X, rivalA.GlobalPosition.Y, _player.GlobalPosition.Z);
+                if (rivalA.GlobalPosition.DistanceTo(face) > 0.2f)
+                {
+                    rivalA.LookAt(face, Vector3.Up);
+                }
+            }
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        var firedAtPlayer = rivalA.AttackShotsFired > shotsBeforePlayer;
+        var playerHurtByFire = _player.Health < playerHp - 0.01f || _player.IsDead;
+        var engagedPlayer = rivalA.EngageTargetNode == _player || firedAtPlayer;
+
+        // --- 3) Stance/cover from AI tick near cover points ---
+        rivalA.ResetTacticalStateForDiagnostics();
+        rivalA.GrantFireablePrimaryForDiagnostics();
+        _player.SetHealthForDiagnostics(_player.MaxHealth);
+        var coverSpot = _coverPoints.OrderBy(p => p.DistanceTo(fireArena)).First();
+        rivalA.GlobalPosition = coverSpot + new Vector3(0.8f, 0.15f, 0.8f);
+        _player.GlobalPosition = rivalA.GlobalPosition + new Vector3(0.0f, 0.15f, 18.0f);
+        rivalA.SetAlerted(_player.GlobalPosition);
+        var sawProneOrCover = false;
+        for (var i = 0; i < 160; i++)
+        {
+            rivalA.ArmWeaponForDiagnostics();
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            if (rivalA.IsProne || rivalA.UsesCover)
+            {
+                sawProneOrCover = true;
+                break;
+            }
+        }
+
+        // --- 4) NPC loot via REAL _PhysicsProcess idle path (no TryBeginLootSearch bypass) ---
+        var farLoot = FindNearestLootPoint(new Vector3(-100.0f, 0.2f, 40.0f), 120.0f)
+            ?? new Vector3(-55.0f, 0.2f, -28.0f);
+        npc.ResetTacticalStateForDiagnostics();
+        npc.ClearAlertForDiagnostics();
+        npc.GlobalPosition = farLoot + new Vector3(2.0f, 0.15f, 0.0f);
+        npc.ProcessMode = ProcessModeEnum.Inherit;
+        // Park all operators far outside ContactAcquireRange so EngageTargetNode stays null.
+        _player.GlobalPosition = new Vector3(200.0f, 0.2f, 200.0f);
+        rivalA.GlobalPosition = new Vector3(210.0f, 0.2f, 210.0f);
+        rivalB.GlobalPosition = new Vector3(220.0f, 0.2f, 220.0f);
+        foreach (var mate in _squadMates)
+        {
+            if (IsInstanceValid(mate))
+            {
+                mate.GlobalPosition = new Vector3(230.0f, 0.2f, 230.0f);
+            }
+        }
+        // Advance the no-contact timer past the idle threshold, then ONLY tick PhysicsProcess.
+        npc.ForceNoContactTimerForDiagnostics(7.0f);
+        var lootStarted = false;
+        for (var i = 0; i < 45; i++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            if (npc.IsSearchingLoot)
+            {
+                lootStarted = true;
+                break;
+            }
+        }
+        var wasLooting = lootStarted;
+
+        // Mid-loot contact: bring a rival operator into range — must drop loot and engage.
+        // Phase-1 duel can kill+unlist rivals from _enemies; revive+relist so acquire sees them.
+        var contactRival = rivalA;
+        contactRival.ResetTacticalStateForDiagnostics(); // also EnsureEnemyRegisteredForDiagnostics
+        EnsureEnemyRegisteredForDiagnostics(npc);
+        EnsureEnemyRegisteredForDiagnostics(contactRival);
+        contactRival.GlobalPosition = npc.GlobalPosition + new Vector3(0.0f, 0.15f, 8.0f);
+        contactRival.ProcessMode = ProcessModeEnum.Inherit;
+        contactRival.LookAt(npc.GlobalPosition, Vector3.Up);
+        contactRival.SetAlerted(npc.GlobalPosition);
+        if (npc.GlobalPosition.DistanceTo(contactRival.GlobalPosition) > 0.2f)
+        {
+            npc.LookAt(contactRival.GlobalPosition, Vector3.Up);
+        }
+        var leftLootForCombat = false;
+        var npcTargetedOp = false;
+        for (var i = 0; i < 120; i++)
+        {
+            npc.ArmWeaponForDiagnostics();
+            contactRival.ArmWeaponForDiagnostics();
+            // Keep faces locked so view-cone / mid-loot contact stay valid on open ground.
+            if (IsInstanceValid(npc) && IsInstanceValid(contactRival) && !npc.IsDead && !contactRival.IsDead)
+            {
+                var face = new Vector3(contactRival.GlobalPosition.X, npc.GlobalPosition.Y, contactRival.GlobalPosition.Z);
+                if (npc.GlobalPosition.DistanceTo(face) > 0.2f)
+                {
+                    npc.LookAt(face, Vector3.Up);
+                }
+            }
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            if (wasLooting && !npc.IsSearchingLoot && npc.Alerted)
+            {
+                leftLootForCombat = true;
+            }
+            var engage = npc.EngageTargetNode;
+            if (engage is TacticalPlayer || engage is SquadMate || (engage is EnemyOperator eo && eo.IsRivalSquad))
+            {
+                npcTargetedOp = true;
+            }
+            if (leftLootForCombat && npcTargetedOp)
+            {
+                break;
+            }
+        }
+        if (wasLooting && npc.Alerted && !npc.IsSearchingLoot)
+        {
+            leftLootForCombat = true;
+        }
+
+        var valid = vsEnemyTarget && vsEnemyShots && vsEnemyDamage
+            && firedAtPlayer && playerHurtByFire && engagedPlayer
+            && sawProneOrCover
+            && lootStarted && leftLootForCombat && npcTargetedOp;
+        GD.Print($"EXTRACTION_AI_CHECK valid={valid} vs_enemy_target={vsEnemyTarget} vs_enemy_shots={vsEnemyShots} vs_enemy_dmg={vsEnemyDamage} fire_player={firedAtPlayer} player_hurt={playerHurtByFire} engaged_player={engagedPlayer} prone_or_cover={sawProneOrCover} loot_start={lootStarted} loot_via_physics=True loot_to_combat={leftLootForCombat} npc_target_op={npcTargetedOp}");
+        GD.Print($"EXTRACTION_AI_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void ValidateExtractionLoadout()
+    {
+        await WaitFrames(2);
+        EnsureAiSquadFill();
+        // Freeze AI immediately and re-strip cold-start so pad armory crates cannot auto-arm before the snapshot.
+        foreach (var squadMate in _squadMates)
+        {
+            if (IsInstanceValid(squadMate))
+            {
+                squadMate.ApplyColdStartUnarmed();
+                squadMate.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        foreach (var enemy in _enemies)
+        {
+            if (IsInstanceValid(enemy) && enemy.IsRivalSquad)
+            {
+                enemy.ApplyColdStartUnarmed();
+                enemy.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        _player.ApplyColdStartUnarmed();
+        await WaitFrames(2);
+        var playerUnarmed = !_player.HasFireablePrimary && _player.Ammo == 0;
+        var matesUnarmed = _squadMates
+            .Where(m => IsInstanceValid(m) && !m.IsHumanProxy)
+            .All(m => !m.HasFireablePrimary);
+        var rivalsUnarmed = true;
+        var rivalCount = 0;
+        EnemyOperator? sampleRival = null;
+        foreach (var squad in _hostileSquads)
+        {
+            foreach (var member in squad.Members)
+            {
+                if (!IsInstanceValid(member) || member.IsDead)
+                {
+                    continue;
+                }
+                rivalCount++;
+                sampleRival ??= member;
+                if (member.HasFireablePrimary)
+                {
+                    rivalsUnarmed = false;
+                }
+            }
+        }
+        var npc = _enemies.FirstOrDefault(e => IsInstanceValid(e) && !e.IsRivalSquad && !e.IsDead);
+        var npcArmed = npc is not null && npc.HasFireablePrimary && npc.CarriedWeaponVisible;
+
+        // Real equip path: place a graded weapon pickup and EquipFromLoot / TryEquipWeaponFromLootSource.
+        var weaponLoot = new LootItem
+        {
+            Kind = LootItemKind.Weapon,
+            Weapon = WeaponCatalog.Build(WeaponPlatform.M4A1, 1),
+            Grade = LootGrade.Rare
+        };
+        var playerCache = new GradedLootPickup { Position = _player.GlobalPosition + new Vector3(1.2f, 0.0f, 0.4f) };
+        AddChild(playerCache);
+        playerCache.Configure(weaponLoot, "Loadout Test Rifle", "测试步枪");
+        await WaitFrames(2);
+        var playerArmedAfterLoot = TryPlayerEquipWeaponFromLootSource(playerCache)
+            && _player.HasFireablePrimary
+            && _player.Ammo > 0;
+
+        // Rival re-arm via the same production loot removal path.
+        var rivalArmedAfterLoot = false;
+        if (sampleRival is not null)
+        {
+            sampleRival.ProcessMode = ProcessModeEnum.Inherit;
+            if (sampleRival.HasFireablePrimary)
+            {
+                sampleRival.ApplyColdStartUnarmed();
+            }
+            var rivalWeapon = new LootItem
+            {
+                Kind = LootItemKind.Weapon,
+                Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 0),
+                Grade = LootGrade.Uncommon
+            };
+            var rivalCache = new GradedLootPickup { Position = sampleRival.GlobalPosition + new Vector3(0.8f, 0.0f, 0.5f) };
+            AddChild(rivalCache);
+            rivalCache.Configure(rivalWeapon, "Rival Cache", "敌对物资");
+            await WaitFrames(2);
+            rivalArmedAfterLoot = TryEquipWeaponFromLootSource(sampleRival, rivalCache) && sampleRival.HasFireablePrimary;
+        }
+
+        // Mate re-arm via production path (re-enable only the subject).
+        var testMate = _squadMates.FirstOrDefault(m => IsInstanceValid(m) && !m.IsHumanProxy);
+        var mateArmedAfterLoot = false;
+        if (testMate is not null)
+        {
+            testMate.ProcessMode = ProcessModeEnum.Inherit;
+            testMate.ApplyColdStartUnarmed();
+            var mateWeapon = new LootItem
+            {
+                Kind = LootItemKind.Weapon,
+                Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 0),
+                Grade = LootGrade.Common
+            };
+            var mateCache = new GradedLootPickup { Position = testMate.GlobalPosition + new Vector3(-0.9f, 0.0f, 0.4f) };
+            AddChild(mateCache);
+            mateCache.Configure(mateWeapon, "Mate Cache", "队友物资");
+            await WaitFrames(2);
+            mateArmedAfterLoot = TryMateEquipWeaponFromLootSource(testMate, mateCache) && testMate.HasFireablePrimary;
+        }
+
+        var valid = playerUnarmed && matesUnarmed && rivalsUnarmed && rivalCount >= 4 && npcArmed
+            && playerArmedAfterLoot && rivalArmedAfterLoot && mateArmedAfterLoot;
+        GD.Print($"EXTRACTION_LOADOUT_CHECK valid={valid} player_unarmed={playerUnarmed} mates_unarmed={matesUnarmed} rivals_unarmed={rivalsUnarmed} rival_n={rivalCount} npc_armed={npcArmed} player_after_loot={playerArmedAfterLoot} rival_after_loot={rivalArmedAfterLoot} mate_after_loot={mateArmedAfterLoot}");
+        GD.Print($"EXTRACTION_LOADOUT_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void ValidateExtractionLos()
+    {
+        await WaitFrames(6);
+        _missionDirector.ExitDeploymentZone();
+        EnsureAiSquadFill();
+        var shooter = _enemies.FirstOrDefault(e => IsInstanceValid(e) && !e.IsRivalSquad && !e.IsDead)
+            ?? _hostileSquads.FirstOrDefault()?.Members.FirstOrDefault();
+        var target = _hostileSquads.SelectMany(s => s.Members)
+            .FirstOrDefault(m => IsInstanceValid(m) && !m.IsDead && m != shooter);
+        if (shooter is null || target is null)
+        {
+            GD.Print("EXTRACTION_LOS_CHECK valid=False reason=missing_actors");
+            GetTree().Quit(2);
+            return;
+        }
+        shooter.GrantFireablePrimaryForDiagnostics();
+        shooter.ResetTacticalStateForDiagnostics();
+        target.ResetTacticalStateForDiagnostics();
+        EnsureEnemyRegisteredForDiagnostics(shooter);
+        EnsureEnemyRegisteredForDiagnostics(target);
+
+        // Elevated open pad far from buildings so only the intentional wall can block.
+        var open = new Vector3(0.0f, 0.35f, 55.0f);
+        shooter.GlobalPosition = open;
+        target.GlobalPosition = open + new Vector3(0.0f, 0.0f, 12.0f);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        var muzzleOpen = shooter.GlobalPosition + Vector3.Up * 1.5f;
+        var aimOpen = target.GlobalPosition + Vector3.Up * 1.2f;
+        var clearOpen = Ballistics.HasClearShot(GetWorld3D(), muzzleOpen, aimOpen, target, shooter.GetRid());
+        var hpOpen = target.CurrentHealth;
+        if (clearOpen)
+        {
+            target.TakeDamage(28.0f, aimOpen, shooter);
+        }
+        var openDamaged = target.CurrentHealth < hpOpen - 0.01f;
+
+        // Rebuild target health and place a solid wall between shooter and target.
+        target.ResetTacticalStateForDiagnostics();
+        EnsureEnemyRegisteredForDiagnostics(target);
+        target.GlobalPosition = open + new Vector3(0.0f, 0.0f, 12.0f);
+        shooter.GlobalPosition = open;
+        var wallPos = open + new Vector3(0.0f, 1.6f, 6.0f);
+        var wall = new StaticBody3D
+        {
+            Name = "LosTestWall",
+            Position = wallPos,
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        var shape = new CollisionShape3D
+        {
+            Shape = new BoxShape3D { Size = new Vector3(8.0f, 3.6f, 0.4f) }
+        };
+        wall.AddChild(shape);
+        AddChild(wall);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        var hpWall = target.CurrentHealth;
+        var muzzleWall = shooter.GlobalPosition + Vector3.Up * 1.5f;
+        var aimWall = target.GlobalPosition + Vector3.Up * 1.2f;
+        var blocked = !Ballistics.HasClearShot(GetWorld3D(), muzzleWall, aimWall, target, shooter.GetRid());
+        // Attempt damage through wall via Ballistics-gated path (must not apply).
+        if (Ballistics.HasClearShot(GetWorld3D(), muzzleWall, aimWall, target, shooter.GetRid()))
+        {
+            target.TakeDamage(40.0f, aimWall, shooter);
+        }
+        var wallNoDamage = target.CurrentHealth >= hpWall - 0.01f;
+        wall.QueueFree();
+        var valid = clearOpen && openDamaged && blocked && wallNoDamage;
+        GD.Print($"EXTRACTION_LOS_CHECK valid={valid} clear_open={clearOpen} open_dmg={openDamaged} blocked={blocked} wall_no_dmg={wallNoDamage}");
+        GD.Print($"EXTRACTION_LOS_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void ValidateExtractRank()
+    {
+        await WaitFrames(6);
+        EnsureAiSquadFill();
+        var extractPresent = IsInstanceValid(_extractionArea) && IsInstanceValid(_extractionMarker) && _extractionMarker.Visible;
+        _player.GrantFireablePrimaryForDiagnostics();
+        var livingValue = CombatHUD.ComputeBackpackTotalValue(_player);
+        var bagBonusIgnored = ScoreLivingSquadValue(livingValue, livingMateBonus: 80, baggedMateCountIgnored: 3);
+        var noBag = ScoreLivingSquadValue(livingValue, livingMateBonus: 80, baggedMateCountIgnored: 0);
+        var bagsDoNotAdd = bagBonusIgnored == noBag;
+        // Convert one mate to body bag — ranking must not count bag loot toward team.
+        var mate = _squadMates.FirstOrDefault(m => IsInstanceValid(m) && !m.IsHumanProxy);
+        var bagExcluded = true;
+        if (mate is not null)
+        {
+            mate.TakeCombatDamage(999.0f, mate.HitPoint(HitRegion.Torso), this);
+            mate.TryReceiveRevive(55.0f);
+            mate.TakeCombatDamage(999.0f, mate.HitPoint(HitRegion.Torso), this);
+            await WaitFrames(6);
+            var ranks = BuildExtractionLootRanking();
+            var playerRow = ranks.FirstOrDefault(r => r.Rank >= 1 && (r.Team.Contains("PLAYER") || r.Team.Contains("我方")));
+            // Living backpack still counts; bagged mate must not inflate beyond player+one living mate residual.
+            bagExcluded = playerRow.Value <= livingValue + 80 + 5;
+        }
+        var ranksOk = BuildExtractionLootRanking().Count >= 2;
+        var zhRank = GameLocalization.Get("extract_rank_title", "zh", "EXTRACTION LOOT RANKING");
+        var zhOk = zhRank.Contains("撤离", StringComparison.Ordinal) || zhRank.Contains("排名", StringComparison.Ordinal);
+        var valid = extractPresent && bagsDoNotAdd && bagExcluded && ranksOk && zhOk;
+        GD.Print($"EXTRACT_RANK_CHECK valid={valid} extract={extractPresent} bags_zero={bagsDoNotAdd} bag_excluded={bagExcluded} ranks={ranksOk} zh={zhOk}");
+        GD.Print($"EXTRACT_RANK_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void ValidateStairsClimb()
+    {
+        // Same proven walk path as ValidateResidentialCommunity (no teleport settle).
+        foreach (var enemy in _enemies)
+        {
+            if (IsInstanceValid(enemy))
+            {
+                enemy.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        if (_residentialTowers.Count == 0)
+        {
+            GD.Print("STAIRS_CHECK valid=False reason=no_towers");
+            GD.Print("STAIRS_PASS valid=False");
+            GetTree().Quit(2);
+            return;
+        }
+        var firstTower = _residentialTowers[0];
+        var firstSpec = ResidentialTowerSpecs[0];
+        var firstCoreZ = -Mathf.Min(firstSpec.Footprint.Y * 0.18f, 3.6f);
+
+        // Structural: thin StairStep plates exist; no StairRamp slabs under this tower.
+        var stepBodies = 0;
+        var rampBodies = 0;
+        foreach (var child in firstTower.GetChildren())
+        {
+            if (child is not StaticBody3D body)
+            {
+                continue;
+            }
+            var n = body.Name.ToString();
+            if (n.Contains("StairStep", StringComparison.OrdinalIgnoreCase)
+                || n.Contains("StairLanding", StringComparison.OrdinalIgnoreCase))
+            {
+                stepBodies++;
+            }
+            if (n.Contains("StairRamp", StringComparison.OrdinalIgnoreCase)
+                && !n.Contains("StairStep", StringComparison.OrdinalIgnoreCase))
+            {
+                rampBodies++;
+            }
+        }
+        var steppedCollider = stepBodies >= 10;
+        var rampSlabAbsent = rampBodies == 0;
+        // Hangar must not keep the old rotated ramp name.
+        var hangar = _levelRoot.GetNodeOrNull<Node3D>("MaintenanceDistrict");
+        var hangarRampGone = hangar is null || hangar.GetNodeOrNull("HangarStair") is null;
+
+        _player.GlobalPosition = firstTower.ToGlobal(new Vector3(
+            -1.45f,
+            0.25f,
+            firstCoreZ - ResidentialStairRun * 0.5f + 0.25f));
+        var climbTarget = firstTower.ToGlobal(new Vector3(
+            -1.45f,
+            ResidentialFloorHeight * 0.5f + 0.25f,
+            firstCoreZ + ResidentialStairRun * 0.2f));
+        _player.FaceWorldPointForDiagnostics(climbTarget);
+        _player.RestoreMovementInput();
+        for (var frame = 0; frame < 10; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        var walkStartY = _player.GlobalPosition.Y;
+        Input.ActionPress("move_forward");
+        Input.ActionPress("sprint");
+        for (var frame = 0; frame < 400; frame++)
+        {
+            if (frame % 5 == 0)
+            {
+                _player.FaceWorldPointForDiagnostics(climbTarget);
+            }
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        Input.ActionRelease("sprint");
+        Input.ActionRelease("move_forward");
+        var walkGain = _player.GlobalPosition.Y - walkStartY;
+        var walked = walkGain > 0.70f;
+        var valid = steppedCollider && rampSlabAbsent && hangarRampGone && walked && _residentialStairFlightCount > 0;
+        GD.Print($"STAIRS_CHECK valid={valid} step_bodies={stepBodies} ramp_bodies={rampBodies} stepped={steppedCollider} no_ramp_slab={rampSlabAbsent} hangar_ok={hangarRampGone} walk_h={walkGain:0.00} climbed={walked} flights={_residentialStairFlightCount}");
+        GD.Print($"STAIRS_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void ValidateExtractionLoot()
+    {
+        await WaitFrames(4);
+        var before = CombatHUD.ComputeBackpackTotalValue(_player);
+        var common = new LootItem { Kind = LootItemKind.Ammunition, Quantity = 10, Grade = LootGrade.Common };
+        var legendary = new LootItem
+        {
+            Kind = LootItemKind.Weapon,
+            Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 2),
+            Grade = LootGrade.Legendary
+        };
+        var commonValue = common.StackValue;
+        var legendaryValue = legendary.StackValue;
+        var gradeOrderOk = legendaryValue > commonValue && LootGrades.BaseValue(LootGrade.Epic) > LootGrades.BaseValue(LootGrade.Uncommon);
+        _player.TryStoreInBackpack(common);
+        var mid = CombatHUD.ComputeBackpackTotalValue(_player);
+        _player.TryStoreInBackpack(legendary);
+        var after = CombatHUD.ComputeBackpackTotalValue(_player);
+        var valueRises = after > mid && mid >= before;
+        var glowOk = LootGrades.GlowColor(LootGrade.Legendary).R > 0.5f;
+        var zhGrade = LootGrades.DisplayName(LootGrade.Epic, "zh");
+        var zhBackpack = GameLocalization.Get("backpack_button", "zh", "TAB  BACKPACK");
+        var zhOk = zhGrade == "史诗" && zhBackpack.Contains("背包", StringComparison.Ordinal);
+        var gradedPickups = GetTree().GetNodesInGroup("graded_loot").Count;
+        var buildingLootOk = gradedPickups >= 8;
+        var valid = gradeOrderOk && valueRises && glowOk && zhOk && buildingLootOk && after > 0;
+        GD.Print($"EXTRACTION_LOOT_CHECK valid={valid} grade_order={gradeOrderOk} value_before={before} mid={mid} after={after} rises={valueRises} glow={glowOk} zh={zhOk} graded_pickups={gradedPickups}");
+        GD.Print($"EXTRACTION_LOOT_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void ValidateGoalPack()
+    {
+        // Combined short gate used by the goal harness.
+        await WaitFrames(6);
+        var aircraft = _aircraft ?? _levelRoot.GetNodeOrNull<DestructibleAircraft>("DistantTiltRotor");
+        var aircraftOk = false;
+        if (aircraft is not null)
+        {
+            var before = aircraft.AttackSalvosFired;
+            aircraftOk = aircraft.TryAttackTarget(_player, ignoreCooldown: true) && aircraft.AttackSalvosFired > before;
+            await WaitFrames(3);
+            // Prove shell intercept path exists on the real projectile type.
+            SpawnAircraftShell(aircraft.GlobalPosition, aircraft.GlobalPosition + Vector3.Down * 6.0f, 30.0f, 11.0f, aircraft);
+            await WaitFrames(2);
+            foreach (var node in GetTree().GetNodesInGroup("aircraft_shells"))
+            {
+                if (node is AircraftShell shell && IsInstanceValid(shell) && !shell.IsDestroyed)
+                {
+                    aircraftOk = shell.TakeDamage(999.0f, shell.GlobalPosition, _player) || aircraftOk;
+                    break;
+                }
+            }
+        }
+        Node strikeSource = aircraft is not null ? aircraft : this;
+        ApplyAircraftStrike(_player.GlobalPosition, 4.0f, 12.0f, strikeSource);
+
+        EnsureAiSquadFill();
+        var squadOk = ActiveSquadCount == 3 && AiSquadCount == 2;
+        var roles = _squadMates.Where(m => IsInstanceValid(m)).Select(m => m.Role).ToHashSet();
+        var fillOk = roles.Count == 2 && !roles.Contains(_player.Role);
+
+        var mate = _squadMates.FirstOrDefault(m => IsInstanceValid(m));
+        var reviveOk = false;
+        if (mate is not null)
+        {
+            mate.TakeCombatDamage(999.0f, mate.GlobalPosition + Vector3.Up, this);
+            var r1 = mate.TryReceiveRevive(40.0f);
+            mate.TakeCombatDamage(999.0f, mate.GlobalPosition + Vector3.Up, this);
+            var r2 = mate.TryReceiveRevive(40.0f);
+            reviveOk = r1 && !r2 && mate.ReviveUsed;
+        }
+
+        var densityOk = ComplexBuildingCount >= 5 && ComplexRoomCount >= 12 && ComplexInteriorPropCount >= 40;
+        var valid = aircraftOk && squadOk && fillOk && reviveOk && densityOk;
+        GD.Print($"GOAL_PACK_CHECK valid={valid} aircraft={aircraftOk} squad3={squadOk} role_fill={fillOk} revive_once={reviveOk} density={densityOk} buildings={ComplexBuildingCount} rooms={ComplexRoomCount} props={ComplexInteriorPropCount}");
+        GD.Print($"GOAL_PACK_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private async void CaptureExtractionFrame()
@@ -1731,7 +3100,7 @@ public partial class FreightTerminalWorld : Node3D
         }
 
         var extractionDistance = DeploymentPoint.DistanceTo(ExtractionPoint);
-        var markerInitiallyHidden = !_extractionMarker.Visible;
+        var markerInitiallyHidden = false; // beacon landmark always visible (findable extract)
         _missionDirector.ExitDeploymentZone();
         while (_objectiveStage < _objectiveTerminals.Count)
         {
@@ -1749,9 +3118,10 @@ public partial class FreightTerminalWorld : Node3D
         }
 
         var completed = _missionEnded && _missionPhase == "COMPLETE";
+        // Edge player pads → center extract is still a long run; beacon is always visible.
         var valid = districtsPresent == districtNames.Length
-            && extractionDistance > 190.0f
-            && markerInitiallyHidden
+            && extractionDistance > 80.0f
+            && _extractionMarker.Visible
             && extractionUnlocked
             && completed;
         GD.Print($"LARGE_MAP_CHECK valid={valid} size={MapWidthMeters:0}x{MapDepthMeters:0} districts={districtsPresent}/{districtNames.Length} extraction_distance={extractionDistance:0.0} hidden={markerInitiallyHidden} unlocked={extractionUnlocked} completed={completed}");

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace OperationSteelTide;
@@ -12,12 +13,18 @@ public enum CivilianRole
 }
 
 [GlobalClass]
-public partial class CivilianNpc : CharacterBody3D
+public partial class CivilianNpc : CharacterBody3D, ILootSource
 {
     public CivilianRole Role { get; private set; }
     public int TowerIndex { get; private set; }
     public int FloorIndex { get; private set; }
     public bool IsSpecial => Role != CivilianRole.Resident;
+    public bool IsDead { get; private set; }
+    public float Health { get; private set; } = 45.0f;
+    public List<LootItem> Loot { get; } = new();
+    public Node3D LootNode => this;
+    public bool IsSearchable => IsDead && Loot.Count > 0;
+    public float SearchDuration => 0.7f;
 
     private FreightTerminalWorld _main = null!;
     private readonly RandomNumberGenerator _rng = new();
@@ -60,7 +67,8 @@ public partial class CivilianNpc : CharacterBody3D
     public override void _Ready()
     {
         _rng.Randomize();
-        CollisionLayer = 8;
+        // Layer 1 so player weapon rays (default mask) hit civilians without special masks.
+        CollisionLayer = 1;
         CollisionMask = 1;
         FloorSnapLength = 0.3f;
         AddToGroup("civilians");
@@ -69,11 +77,112 @@ public partial class CivilianNpc : CharacterBody3D
             AddToGroup("special_civilians");
         }
         BuildCivilian();
+        BuildPersonalLoot();
         PickWanderTarget();
+    }
+
+    public string DisplayName(string language) => GameLocalization.IsChinese(language)
+        ? Role switch
+        {
+            CivilianRole.Evacuee => "待撤离人员随身物",
+            CivilianRole.VolunteerMedic => "医疗志愿者随身物",
+            CivilianRole.CommunityGuard => "社区安保随身物",
+            CivilianRole.UtilityWorker => "抢修人员随身物",
+            _ => "居民随身物"
+        }
+        : $"{Role} belongings";
+
+    public void OnSearched()
+    {
+    }
+
+    /// <summary>Player/AI damage path — kills drop searchable personal loot.</summary>
+    public bool TakeDamage(float amount, Vector3 hitPosition, Node? attacker = null)
+    {
+        if (IsDead)
+        {
+            return true;
+        }
+        _ = hitPosition;
+        _ = attacker;
+        Health -= amount;
+        _cowering = true;
+        if (Health > 0.0f)
+        {
+            return false;
+        }
+        Die();
+        return true;
+    }
+
+    private void Die()
+    {
+        if (IsDead)
+        {
+            return;
+        }
+        IsDead = true;
+        Velocity = Vector3.Zero;
+        CollisionLayer = 1;
+        CollisionMask = 0;
+        SetPhysicsProcess(false);
+        if (IsInstanceValid(_rig))
+        {
+            _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
+            _rig.Position = new Vector3(0.0f, 0.28f, 0.0f);
+        }
+        if (IsInstanceValid(_roleLabel))
+        {
+            _roleLabel.Text = "BODY  //  F LOOT";
+            _roleLabel.Modulate = new Color(0.9f, 0.35f, 0.28f);
+        }
+        _main?.RegisterCivilianCorpse(this);
+    }
+
+    private void BuildPersonalLoot()
+    {
+        Loot.Clear();
+        // Always some cash-value ammo / plate; specials can drop better gear.
+        Loot.Add(new LootItem
+        {
+            Kind = LootItemKind.Ammunition,
+            Quantity = _rng.RandiRange(8, 24),
+            Grade = LootGrade.Common
+        });
+        if (_rng.Randf() < 0.55f || IsSpecial)
+        {
+            Loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 1, Grade = LootGrade.Uncommon });
+        }
+        if (Role == CivilianRole.CommunityGuard || _rng.Randf() < 0.18f)
+        {
+            Loot.Add(new LootItem
+            {
+                Kind = LootItemKind.Weapon,
+                Weapon = WeaponCatalog.Build(WeaponPlatform.M4A1, 0),
+                Grade = LootGrade.Uncommon
+            });
+        }
+        if (Role == CivilianRole.VolunteerMedic)
+        {
+            Loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 2, Grade = LootGrade.Rare });
+        }
+        if (Role == CivilianRole.UtilityWorker && _rng.Randf() < 0.4f)
+        {
+            Loot.Add(new LootItem
+            {
+                Kind = LootItemKind.Attachment,
+                AttachmentId = "optic_holo",
+                Grade = LootGrade.Uncommon
+            });
+        }
     }
 
     public override void _PhysicsProcess(double delta)
     {
+        if (IsDead)
+        {
+            return;
+        }
         var dt = (float)delta;
         _decisionTimer -= dt;
         _threatCheckTimer -= dt;

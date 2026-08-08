@@ -338,7 +338,9 @@ void sky() {
         AddLightPoles();
         BuildMissionTerminals();
         BuildExtraction(concrete, steelDark, yellow, white);
-        _extractionMarker.Visible = false;
+        // Landmark beacon stays visible from match start so extract is findable;
+        // zone completion still gates on objectives via OnExtractionEntered.
+        _extractionMarker.Visible = true;
     }
 
     private void BuildLootRooms(Godot.Material floor, Godot.Material wall, Godot.Material trim, Godot.Material marker)
@@ -903,21 +905,23 @@ void sky() {
 
     private void BuildServiceTruck(Vector3 center, Godot.Material concrete)
     {
-        var body = PaintedMetal("service_truck", new Color(0.24f, 0.36f, 0.29f));
-        var dark = Mat("service_truck_dark", new Color(0.035f, 0.048f, 0.045f), 0.76f, 0.42f);
-        var glass = Mat("service_truck_glass", new Color(0.04f, 0.15f, 0.17f), 0.76f, 0.12f);
-        StaticBox("ServiceTruckChassis", center + new Vector3(0, 0.68f, 0), new Vector3(5.4f, 0.38f, 2.05f), dark);
-        StaticBox("ServiceTruckCab", center + new Vector3(1.7f, 1.45f, 0), new Vector3(1.75f, 1.55f, 1.95f), body);
-        StaticBox("ServiceTruckBed", center + new Vector3(-1.05f, 1.2f, 0), new Vector3(3.65f, 1.05f, 1.95f), body);
-        MeshBox(_levelRoot, center + new Vector3(2.59f, 1.66f, 0), new Vector3(0.04f, 0.72f, 1.52f), glass);
-        StaticBox("ServiceTruckBumper", center + new Vector3(2.85f, 0.62f, 0), new Vector3(0.34f, 0.34f, 2.2f), concrete);
-        foreach (var x in new[] { -1.75f, 1.72f })
+        // concrete retained for call-site compatibility; body color carries the paint.
+        _ = concrete;
+        SpawnDriveableVehicle(center, "SERVICE TRUCK", new Color(0.24f, 0.36f, 0.29f), yaw: 0.0f);
+    }
+
+    private void SpawnDriveableVehicle(Vector3 center, string displayName, Color bodyColor, float yaw = 0.0f, float maxHealth = 180.0f)
+    {
+        var vehicle = new DriveableVehicle
         {
-            foreach (var z in new[] { -1.02f, 1.02f })
-            {
-                StaticCylinder("ServiceTruckWheel", center + new Vector3(x, 0.55f, z), 0.48f, 0.26f, dark, new Vector3(Mathf.Pi / 2, 0, 0));
-            }
-        }
+            Name = "DriveableVehicle",
+            Position = center,
+            Rotation = new Vector3(0, yaw, 0),
+            Main = this
+        };
+        vehicle.Configure(displayName, bodyColor, maxHealth);
+        _levelRoot.AddChild(vehicle);
+        _vehicles.Add(vehicle);
     }
 
     private void BuildBackground(Godot.Material concrete, Godot.Material steel)
@@ -959,37 +963,16 @@ void sky() {
 
     private void BuildDistantAircraft(Godot.Material steel, Godot.Material glass)
     {
-        var aircraft = new Node3D
+        _ = steel;
+        _ = glass;
+        var aircraft = new DestructibleAircraft
         {
             Name = "DistantTiltRotor",
-            Position = new Vector3(-52, 39, -78)
+            Position = new Vector3(-52, 39, -78),
+            Main = this
         };
         _levelRoot.AddChild(aircraft);
-        var dark = Mat("aircraft_dark", new Color(0.055f, 0.072f, 0.073f), 0.72f, 0.4f);
-        var navigation = Mat("aircraft_navigation", new Color(0.68f, 0.08f, 0.035f), 0.18f, 0.22f, new Color(1.0f, 0.06f, 0.02f));
-        MeshBox(aircraft, Vector3.Zero, new Vector3(7.2f, 0.9f, 1.2f), dark);
-        MeshBox(aircraft, new Vector3(2.9f, 0.12f, 0), new Vector3(1.65f, 0.74f, 1.05f), glass, new Vector3(0, 0, -0.14f));
-        MeshBox(aircraft, new Vector3(-0.3f, 0.05f, 0), new Vector3(2.5f, 0.16f, 10.4f), steel);
-        MeshBox(aircraft, new Vector3(-2.75f, 0.38f, 0), new Vector3(1.3f, 0.12f, 4.2f), steel);
-        MeshBox(aircraft, new Vector3(-3.0f, 1.02f, 0), new Vector3(1.3f, 1.8f, 0.18f), dark, new Vector3(0, 0, -0.18f));
-        foreach (var z in new[] { -3.65f, 3.65f })
-        {
-            MeshBox(aircraft, new Vector3(0.45f, 0.25f, z), new Vector3(1.8f, 0.72f, 0.68f), dark);
-            aircraft.AddChild(new MeshInstance3D
-            {
-                Position = new Vector3(1.25f, 0.25f, z),
-                Rotation = new Vector3(0, 0, Mathf.Pi / 2.0f),
-                Mesh = new TorusMesh { InnerRadius = 1.4f, OuterRadius = 1.46f, Rings = 28, RingSegments = 6 },
-                MaterialOverride = steel
-            });
-            MeshBox(aircraft, new Vector3(0.0f, 0.02f, z), new Vector3(0.16f, 0.16f, 0.16f), navigation);
-        }
-
-        var tween = CreateTween().SetLoops();
-        tween.TweenProperty(aircraft, "position", new Vector3(72, 42, -92), 62.0)
-            .From(new Vector3(-52, 39, -78))
-            .SetTrans(Tween.TransitionType.Linear);
-        tween.TweenCallback(Callable.From(() => aircraft.Position = new Vector3(-52, 39, -78)));
+        _aircraft = aircraft;
     }
 
     private static Texture2D BuildSmokeTexture()

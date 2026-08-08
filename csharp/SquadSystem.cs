@@ -27,11 +27,16 @@ public interface ISquadCombatant
 {
     Node3D CombatNode { get; }
     bool CombatDead { get; }
+    bool CombatDowned { get; }
+    bool ReviveUsed { get; }
+    bool CanBeRevived { get; }
     float CombatHealth { get; }
     float CombatMaxHealth { get; }
     Vector3 HitPoint(HitRegion region);
     bool TakeCombatDamage(float amount, Vector3 hitPosition, Node? attacker = null);
     void RestoreHealth(float amount);
+    /// <summary>Successful teammate revive. Returns false if revive-used or not downed.</summary>
+    bool TryReceiveRevive(float healAmount);
 }
 
 public readonly record struct OperatorRoleSpec(

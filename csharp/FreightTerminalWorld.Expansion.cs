@@ -4,6 +4,14 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    private int _complexBuildingCount;
+    private int _complexInteriorPropCount;
+    private int _complexRoomCount;
+
+    public int ComplexBuildingCount => _complexBuildingCount;
+    public int ComplexInteriorPropCount => _complexInteriorPropCount;
+    public int ComplexRoomCount => _complexRoomCount;
+
     private StandardMaterial3D ExpansionPbrMaterial(
         string id,
         string asset,
@@ -61,8 +69,315 @@ public partial class FreightTerminalWorld
         BuildMaintenanceDistrict(concrete, steel, steelDark, yellow, corrugated);
         BuildTankFarmDistrict(concrete, steel, steelDark, rust, yellow);
         BuildSeawallDistrict(concrete, steel, steelDark, yellow, white, corrugated);
+        BuildComplexDistrictBuildings(concrete, steel, steelDark, yellow, corrugated, rust);
         BuildExpansionCover(concreteDark);
         BuildExpansionLights();
+    }
+
+    private void BuildComplexDistrictBuildings(
+        Godot.Material concrete,
+        Godot.Material steel,
+        Godot.Material steelDark,
+        Godot.Material yellow,
+        Godot.Material corrugated,
+        Godot.Material rust)
+    {
+        var wood = Mat("complex_wood", new Color(0.28f, 0.18f, 0.1f), 0.05f, 0.82f);
+        var interior = Mat("complex_interior", new Color(0.48f, 0.5f, 0.46f), 0.02f, 0.9f);
+        var glass = Mat("complex_glass", new Color(0.08f, 0.18f, 0.2f, 0.35f), 0.2f, 0.12f);
+        if (glass is StandardMaterial3D glassMat)
+        {
+            glassMat.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+        }
+
+        // Large multi-room customs warehouse west of the rail spur.
+        BuildEnterableComplex(
+            "CustomsWarehouseComplex",
+            new Vector3(-55, 0, -28),
+            new Vector2(28, 22),
+            5.4f,
+            corrugated,
+            concrete,
+            steelDark,
+            wood,
+            interior,
+            yellow,
+            roomsX: 3,
+            roomsZ: 2);
+
+        // Multi-story operations annex near the north service road.
+        BuildEnterableComplex(
+            "OpsAnnexComplex",
+            new Vector3(48, 0, -48),
+            new Vector2(22, 18),
+            4.8f,
+            steel,
+            concrete,
+            steelDark,
+            wood,
+            interior,
+            yellow,
+            roomsX: 2,
+            roomsZ: 2,
+            floors: 2);
+
+        // Fuel logistics hall between tank farm and hangar approach.
+        BuildEnterableComplex(
+            "FuelLogisticsHall",
+            new Vector3(58, 0, -118),
+            new Vector2(26, 16),
+            5.0f,
+            corrugated,
+            concrete,
+            rust,
+            wood,
+            interior,
+            yellow,
+            roomsX: 3,
+            roomsZ: 1);
+
+        // Quay bonded storage near seawall approach — fills open quay ground.
+        BuildEnterableComplex(
+            "QuayBondedStorage",
+            new Vector3(18, 0, -148),
+            new Vector2(24, 14),
+            4.6f,
+            steelDark,
+            concrete,
+            steel,
+            wood,
+            interior,
+            yellow,
+            roomsX: 2,
+            roomsZ: 1);
+
+        // Enrich hangar with internal partitions and work bays.
+        EnrichHangarInterior(new Vector3(25, 0, -89), steel, steelDark, yellow, wood, interior);
+    }
+
+    private void BuildEnterableComplex(
+        string name,
+        Vector3 center,
+        Vector2 footprint,
+        float wallHeight,
+        Godot.Material exterior,
+        Godot.Material floorMat,
+        Godot.Material trim,
+        Godot.Material wood,
+        Godot.Material interior,
+        Godot.Material accent,
+        int roomsX,
+        int roomsZ,
+        int floors = 1)
+    {
+        var root = new Node3D { Name = name, Position = center };
+        _levelRoot.AddChild(root);
+        _complexBuildingCount++;
+
+        var width = footprint.X;
+        var depth = footprint.Y;
+        const float wallT = 0.22f;
+        const float doorW = 3.6f;
+        const float doorH = 2.7f;
+
+        // Stair well cutout on upper floors (west-south corner) so steps can reach the next level.
+        const float stairWellW = 2.4f;
+        const float stairWellD = 4.2f;
+        var stairWellX = -width * 0.35f;
+        var stairWellZ = depth * 0.5f - stairWellD * 0.5f - 0.4f;
+
+        for (var floor = 0; floor < floors; floor++)
+        {
+            var y0 = floor * (wallHeight + 0.2f);
+            // Floor slab with stair-well opening on floors above ground (and on ground if multi-story for continuity).
+            if (floors > 1 && floor > 0)
+            {
+                // Four-panel slab around the stair well (same pattern as residential).
+                var wellLeft = stairWellX - stairWellW * 0.5f;
+                var wellRight = stairWellX + stairWellW * 0.5f;
+                var wellSouth = stairWellZ + stairWellD * 0.5f;
+                var wellNorth = stairWellZ - stairWellD * 0.5f;
+                var halfW = width * 0.5f;
+                var halfD = depth * 0.5f;
+                // West strip
+                ExpansionBox(root, $"ComplexFloor_W{floor}", new Vector3((-halfW + wellLeft) * 0.5f, y0 + 0.06f, 0), new Vector3(wellLeft + halfW, 0.12f, depth), floorMat);
+                // East strip
+                ExpansionBox(root, $"ComplexFloor_E{floor}", new Vector3((wellRight + halfW) * 0.5f, y0 + 0.06f, 0), new Vector3(halfW - wellRight, 0.12f, depth), floorMat);
+                // North of well (between west/east)
+                var midW = stairWellW;
+                var northD = wellNorth + halfD;
+                if (northD > 0.3f)
+                {
+                    ExpansionBox(root, $"ComplexFloor_N{floor}", new Vector3(stairWellX, y0 + 0.06f, -halfD + northD * 0.5f), new Vector3(midW, 0.12f, northD), floorMat);
+                }
+                // South of well
+                var southD = halfD - wellSouth;
+                if (southD > 0.3f)
+                {
+                    ExpansionBox(root, $"ComplexFloor_S{floor}", new Vector3(stairWellX, y0 + 0.06f, wellSouth + southD * 0.5f), new Vector3(midW, 0.12f, southD), floorMat);
+                }
+            }
+            else
+            {
+                ExpansionBox(root, $"ComplexFloor_G{floor}", new Vector3(0, y0 + 0.06f, 0), new Vector3(width, 0.12f, depth), floorMat);
+            }
+            // North / west / east solid walls
+            ExpansionBox(root, "ComplexNorth", new Vector3(0, y0 + wallHeight * 0.5f, -depth * 0.5f), new Vector3(width, wallHeight, wallT), exterior);
+            ExpansionBox(root, "ComplexWest", new Vector3(-width * 0.5f, y0 + wallHeight * 0.5f, 0), new Vector3(wallT, wallHeight, depth), exterior);
+            ExpansionBox(root, "ComplexEast", new Vector3(width * 0.5f, y0 + wallHeight * 0.5f, 0), new Vector3(wallT, wallHeight, depth), exterior);
+            // South wall with doorway
+            var side = (width - doorW) * 0.5f;
+            ExpansionBox(root, "ComplexSouthL", new Vector3(-(doorW + side) * 0.5f, y0 + wallHeight * 0.5f, depth * 0.5f), new Vector3(side, wallHeight, wallT), exterior);
+            ExpansionBox(root, "ComplexSouthR", new Vector3((doorW + side) * 0.5f, y0 + wallHeight * 0.5f, depth * 0.5f), new Vector3(side, wallHeight, wallT), exterior);
+            ExpansionBox(root, "ComplexDoorHeader", new Vector3(0, y0 + doorH + (wallHeight - doorH) * 0.5f, depth * 0.5f), new Vector3(doorW, wallHeight - doorH, wallT), exterior);
+
+            // Interior room grid
+            var cellW = (width - 1.2f) / roomsX;
+            var cellD = (depth - 1.2f) / roomsZ;
+            for (var ix = 0; ix < roomsX; ix++)
+            {
+                for (var iz = 0; iz < roomsZ; iz++)
+                {
+                    _complexRoomCount++;
+                    var cx = -width * 0.5f + 0.6f + cellW * (ix + 0.5f);
+                    var cz = -depth * 0.5f + 0.6f + cellD * (iz + 0.5f);
+                    // Partitions with door gaps
+                    if (ix > 0)
+                    {
+                        ExpansionBox(root, "ComplexPartitionX", new Vector3(cx - cellW * 0.5f, y0 + wallHeight * 0.42f, cz), new Vector3(0.1f, wallHeight * 0.84f, cellD * 0.72f), interior);
+                    }
+                    if (iz > 0)
+                    {
+                        ExpansionBox(root, "ComplexPartitionZ", new Vector3(cx, y0 + wallHeight * 0.42f, cz - cellD * 0.5f), new Vector3(cellW * 0.72f, wallHeight * 0.84f, 0.1f), interior);
+                    }
+
+                    // Room props
+                    ExpansionBox(root, "ComplexDesk", new Vector3(cx - cellW * 0.18f, y0 + 0.42f, cz + cellD * 0.12f), new Vector3(Mathf.Min(1.8f, cellW * 0.45f), 0.12f, 0.7f), wood);
+                    ExpansionBox(root, "ComplexCabinet", new Vector3(cx + cellW * 0.28f, y0 + 0.85f, cz - cellD * 0.22f), new Vector3(0.7f, 1.5f, 0.45f), trim);
+                    ExpansionBox(root, "ComplexCrate", new Vector3(cx + cellW * 0.05f, y0 + 0.45f, cz + cellD * 0.28f), new Vector3(0.9f, 0.8f, 0.9f), accent);
+                    MeshBox(root, new Vector3(cx, y0 + wallHeight - 0.25f, cz), new Vector3(1.4f, 0.05f, 0.2f), accent);
+                    // Skip per-room lights (FPS).
+                    _complexInteriorPropCount += 4;
+                    root.AddChild(new Label3D
+                    {
+                        Position = new Vector3(cx, y0 + 1.7f, cz + cellD * 0.35f),
+                        Text = $"{name.ToUpperInvariant()}  R{ix + 1}{iz + 1}  F{floor + 1}",
+                        FontSize = 14,
+                        OutlineSize = 4,
+                        Modulate = new Color(0.75f, 0.88f, 0.8f),
+                        Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+                        VisibilityRangeEnd = 16.0f
+                    });
+                }
+            }
+
+            // One soft light per floor (not per room).
+            root.AddChild(new OmniLight3D
+            {
+                Name = $"ComplexFloorLight_F{floor}",
+                Position = new Vector3(0, y0 + wallHeight - 0.55f, 0),
+                LightColor = new Color(1.0f, 0.82f, 0.58f),
+                LightEnergy = 0.65f,
+                OmniRange = 14.0f,
+                ShadowEnabled = false,
+                DistanceFadeEnabled = true,
+                DistanceFadeBegin = 48.0f,
+                DistanceFadeLength = 16.0f
+            });
+            // Stair well for multi-floor complexes — discrete filled steps under the floor opening.
+            if (floor < floors - 1)
+            {
+                const int complexSteps = 12;
+                var rise = (wallHeight + 0.2f) / complexSteps;
+                var run = stairWellD / complexSteps;
+                for (var step = 0; step < complexSteps; step++)
+                {
+                    var topY = y0 + rise * (step + 1);
+                    var bodyH = Mathf.Max(0.16f, topY - y0);
+                    var sz = stairWellZ + stairWellD * 0.5f - run * (step + 0.5f);
+                    ExpansionBox(
+                        root,
+                        $"ComplexStairStep_F{floor}_{step}",
+                        new Vector3(stairWellX, y0 + bodyH * 0.5f, sz),
+                        new Vector3(stairWellW * 0.92f, bodyH, run * 1.08f),
+                        floorMat);
+                }
+                _complexInteriorPropCount += complexSteps;
+            }
+        }
+
+        var roofY = floors * (wallHeight + 0.2f);
+        ExpansionBox(root, "ComplexRoof", new Vector3(0, roofY, 0), new Vector3(width + 0.6f, 0.28f, depth + 0.6f), exterior);
+        ExpansionBox(root, "ComplexCanopy", new Vector3(0, 2.9f, depth * 0.5f + 1.1f), new Vector3(doorW + 1.4f, 0.14f, 2.2f), trim);
+        root.AddChild(new Label3D
+        {
+            Position = new Vector3(0, 3.4f, depth * 0.5f + 0.3f),
+            Text = name.Replace("Complex", "").ToUpperInvariant(),
+            FontSize = 26,
+            OutlineSize = 7,
+            Modulate = accent is StandardMaterial3D am ? am.AlbedoColor : new Color(0.9f, 0.75f, 0.2f),
+            Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+            VisibilityRangeEnd = 48.0f
+        });
+    }
+
+    private void EnrichHangarInterior(
+        Vector3 center,
+        Godot.Material steel,
+        Godot.Material steelDark,
+        Godot.Material yellow,
+        Godot.Material wood,
+        Godot.Material interior)
+    {
+        var hangar = _levelRoot.GetNodeOrNull<Node3D>("MaintenanceDistrict");
+        if (hangar is null)
+        {
+            return;
+        }
+
+        // Office mezzanine + tool cribs + parts cages inside the hangar volume.
+        // Mezzanine floor cut with stair opening on the west edge (no solid slab over steps).
+        var mezCenter = center + new Vector3(9.5f, 3.2f, -10);
+        const float mezW = 9.5f;
+        const float mezD = 10.5f;
+        const float mezStairW = 2.0f;
+        const float mezStairD = 3.6f;
+        // East main deck
+        ExpansionBox(hangar, "HangarOfficeFloor_E", mezCenter + new Vector3(mezStairW * 0.5f, 0, 0), new Vector3(mezW - mezStairW, 0.16f, mezD), steelDark);
+        // West strips north/south of stair well
+        ExpansionBox(hangar, "HangarOfficeFloor_WN", mezCenter + new Vector3(-(mezW - mezStairW) * 0.5f, 0, -mezStairD * 0.35f), new Vector3(mezStairW, 0.16f, mezD - mezStairD), steelDark);
+        ExpansionBox(hangar, "HangarOfficeWallA", center + new Vector3(9.5f, 4.4f, -15.1f), new Vector3(9.5f, 2.4f, 0.12f), interior);
+        ExpansionBox(hangar, "HangarOfficeWallB", center + new Vector3(5.0f, 4.4f, -10), new Vector3(0.12f, 2.4f, 10.5f), interior);
+        ExpansionBox(hangar, "HangarOfficeDesk", center + new Vector3(10.2f, 3.7f, -12.2f), new Vector3(3.2f, 0.14f, 1.1f), wood);
+        ExpansionBox(hangar, "HangarPartsCage", center + new Vector3(-10.5f, 1.4f, 6.5f), new Vector3(6.5f, 2.6f, 4.2f), steel);
+        ExpansionBox(hangar, "HangarToolCrib", center + new Vector3(10.0f, 1.2f, 8.0f), new Vector3(5.5f, 2.2f, 3.4f), steelDark);
+        for (var i = 0; i < 5; i++)
+        {
+            ExpansionBox(hangar, "HangarWorkBay", center + new Vector3(-6.0f + i * 3.1f, 0.55f, 2.0f), new Vector3(2.4f, 1.0f, 3.8f), yellow);
+            ExpansionBox(hangar, "HangarPartsShelf", center + new Vector3(-11.5f, 1.1f + (i % 3) * 0.55f, -6.0f + i * 1.4f), new Vector3(1.8f, 0.12f, 0.7f), wood);
+            _complexInteriorPropCount += 2;
+        }
+        // Discrete hangar mezzanine stairs (no rotated ramp slab).
+        const int hangarSteps = 14;
+        const float hangarRise = 3.2f;
+        var stepR = hangarRise / hangarSteps;
+        var stepRun = mezStairD / hangarSteps;
+        var stairOrigin = center + new Vector3(5.6f, 0.0f, -6.5f);
+        for (var step = 0; step < hangarSteps; step++)
+        {
+            var topY = stepR * (step + 1);
+            var bodyH = Mathf.Max(0.16f, topY);
+            var z = stairOrigin.Z + mezStairD * 0.5f - stepRun * (step + 0.5f);
+            ExpansionBox(
+                hangar,
+                $"HangarStairStep_{step}",
+                new Vector3(stairOrigin.X, bodyH * 0.5f, z),
+                new Vector3(mezStairW * 0.9f, bodyH, stepRun * 1.1f),
+                steel);
+        }
+        _complexRoomCount += 4;
+        _complexInteriorPropCount += 8 + hangarSteps;
+        _complexBuildingCount++;
     }
 
     private void BuildExpansionRoad(

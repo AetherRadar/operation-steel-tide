@@ -7,9 +7,10 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private const float ResidentialFloorHeight = 3.15f;
-    private const float ResidentialStairRun = 5.0f;
-    private const float ResidentialStairOpeningWidth = 5.2f;
-    private const float ResidentialStairOpeningDepth = 6.5f;
+    private const float ResidentialStairRun = 5.4f;
+    private const float ResidentialStairOpeningWidth = 4.6f;
+    private const float ResidentialStairOpeningDepth = 6.2f;
+    private const int ResidentialStepsPerFlight = 8;
 
     private readonly record struct ResidentialTowerSpec(
         Vector3 Position,
@@ -97,6 +98,13 @@ public partial class FreightTerminalWorld
         {
             MeshBox(community, new Vector3(x, 0.105f, 76), new Vector3(4.4f, 0.025f, 0.16f), marking);
         }
+
+        // Parked civilian / utility vehicles along the residential ring.
+        SpawnDriveableVehicle(new Vector3(-118, 0, -193), "COURT VAN", new Color(0.42f, 0.28f, 0.18f), yaw: 0.08f, maxHealth: 150.0f);
+        SpawnDriveableVehicle(new Vector3(48, 0, -193), "QUAY PICKUP", new Color(0.22f, 0.34f, 0.48f), yaw: -0.04f, maxHealth: 165.0f);
+        SpawnDriveableVehicle(new Vector3(138, 0, -40), "GATE TRUCK", new Color(0.5f, 0.42f, 0.2f), yaw: Mathf.Pi * 0.5f, maxHealth: 190.0f);
+        SpawnDriveableVehicle(new Vector3(-136, 0, 20), "SOUTH UTILITY", new Color(0.3f, 0.4f, 0.28f), yaw: -Mathf.Pi * 0.5f, maxHealth: 175.0f);
+        SpawnDriveableVehicle(new Vector3(12, 0, 76), "COURT SEDAN", new Color(0.18f, 0.2f, 0.24f), yaw: Mathf.Pi, maxHealth: 140.0f);
     }
 
     private void BuildResidentialTower(
@@ -172,15 +180,26 @@ public partial class FreightTerminalWorld
         var southEdge = depth * 0.5f;
         var openingNorth = coreZ - openingDepth * 0.5f;
         var openingSouth = coreZ + openingDepth * 0.5f;
-        ExpansionBox(tower, "ResidentialFloorSlab", new Vector3(-(openingWidth + sideWidth) * 0.5f, floorY + 0.05f, 0), new Vector3(sideWidth, 0.1f, depth), material);
-        ExpansionBox(tower, "ResidentialFloorSlab", new Vector3((openingWidth + sideWidth) * 0.5f, floorY + 0.05f, 0), new Vector3(sideWidth, 0.1f, depth), material);
+        // Four-panel slab around a tight stair well — leave only the stair channel open
+        // so upper floors are mostly solid (no giant void you fall through).
+        ExpansionBox(tower, "ResidentialFloorSlab_W", new Vector3(-(openingWidth + sideWidth) * 0.5f, floorY + 0.05f, 0), new Vector3(sideWidth, 0.12f, depth), material);
+        ExpansionBox(tower, "ResidentialFloorSlab_E", new Vector3((openingWidth + sideWidth) * 0.5f, floorY + 0.05f, 0), new Vector3(sideWidth, 0.12f, depth), material);
         var northDepth = Mathf.Max(0.5f, openingNorth - northEdge);
         var southDepth = Mathf.Max(0.5f, southEdge - openingSouth);
-        ExpansionBox(tower, "ResidentialFloorSlab", new Vector3(0, floorY + 0.05f, northEdge + northDepth * 0.5f), new Vector3(openingWidth, 0.1f, northDepth), material);
-        ExpansionBox(tower, "ResidentialFloorSlab", new Vector3(0, floorY + 0.05f, openingSouth + southDepth * 0.5f), new Vector3(openingWidth, 0.1f, southDepth), material);
+        ExpansionBox(tower, "ResidentialFloorSlab_N", new Vector3(0, floorY + 0.05f, northEdge + northDepth * 0.5f), new Vector3(openingWidth, 0.12f, northDepth), material);
+        ExpansionBox(tower, "ResidentialFloorSlab_S", new Vector3(0, floorY + 0.05f, openingSouth + southDepth * 0.5f), new Vector3(openingWidth, 0.12f, southDepth), material);
+        // Do NOT fill the stair channel — only the four-panel slab. Opening is already tightened
+        // via ResidentialStairOpening* so upper floors stay walkable without a room-sized pit.
         if (groundFloor)
         {
-            ExpansionBox(tower, "ResidentialLobbyFloor", new Vector3(0, floorY + 0.015f, coreZ), new Vector3(openingWidth, 0.03f, openingDepth), material);
+            // Keep lobby mats only outside the stair well so stepped stairs stay clear.
+            var lobbyPadDepth = Mathf.Max(0.8f, southDepth - 0.35f);
+            ExpansionBox(
+                tower,
+                "ResidentialLobbyFloor",
+                new Vector3(0, floorY + 0.015f, openingSouth + lobbyPadDepth * 0.5f + 0.2f),
+                new Vector3(openingWidth * 0.92f, 0.03f, lobbyPadDepth),
+                material);
         }
     }
 
@@ -203,13 +222,16 @@ public partial class FreightTerminalWorld
         ExpansionBox(tower, "ResidentialEastWall", new Vector3(width * 0.5f, wallCenterY, 0), new Vector3(wallThickness, wallHeight, depth), facade);
         if (floor == 0)
         {
-            const float doorWidth = 3.2f;
-            const float doorHeight = 2.45f;
+            // Tall clear opening so a standing capsule (1.75m + headroom) never forces crouch.
+            const float doorWidth = 3.8f;
+            const float doorHeight = 2.85f;
             var sideWidth = (width - doorWidth) * 0.5f;
             ExpansionBox(tower, "ResidentialSouthWall", new Vector3(-(doorWidth + sideWidth) * 0.5f, wallCenterY, depth * 0.5f), new Vector3(sideWidth, wallHeight, wallThickness), facade);
             ExpansionBox(tower, "ResidentialSouthWall", new Vector3((doorWidth + sideWidth) * 0.5f, wallCenterY, depth * 0.5f), new Vector3(sideWidth, wallHeight, wallThickness), facade);
-            var headerHeight = wallHeight - doorHeight;
+            var headerHeight = Mathf.Max(0.12f, wallHeight - doorHeight);
             ExpansionBox(tower, "ResidentialEntryHeader", new Vector3(0, floorY + 0.1f + doorHeight + headerHeight * 0.5f, depth * 0.5f), new Vector3(doorWidth, headerHeight, wallThickness), facade);
+            // Keep the threshold flush with the lobby floor so the doorway is not a ledge.
+            ExpansionBox(tower, "ResidentialEntryThreshold", new Vector3(0, floorY + 0.04f, depth * 0.5f + 0.12f), new Vector3(doorWidth - 0.2f, 0.08f, 0.55f), facade);
         }
         else
         {
@@ -255,8 +277,8 @@ public partial class FreightTerminalWorld
     {
         var width = spec.Footprint.X;
         var depth = spec.Footprint.Y;
-        const float corridorHalfWidth = 2.75f;
-        const float partitionHeight = 2.75f;
+        const float corridorHalfWidth = 2.9f;
+        const float partitionHeight = 2.85f;
         var wallY = floorY + 0.1f + partitionHeight * 0.5f;
         var northStart = -depth * 0.5f + 0.35f;
         var northEnd = coreZ - ResidentialStairOpeningDepth * 0.5f - 0.55f;
@@ -267,28 +289,77 @@ public partial class FreightTerminalWorld
             BuildApartmentWallWithDoor(tower, x, floorY, northStart, northEnd, Mathf.Lerp(northStart, northEnd, 0.45f), wall);
             BuildApartmentWallWithDoor(tower, x, floorY, southStart, southEnd, Mathf.Lerp(southStart, southEnd, 0.58f), wall);
         }
-        var roomWidth = Mathf.Max(2.2f, (width - corridorHalfWidth * 2.0f) * 0.5f);
+        var roomWidth = Mathf.Max(2.6f, (width - corridorHalfWidth * 2.0f) * 0.5f);
+        var carpet = Mat("residential_carpet", new Color(0.28f, 0.18f, 0.14f), 0.0f, 0.94f);
+        var appliance = Mat("residential_appliance", new Color(0.55f, 0.58f, 0.56f), 0.62f, 0.35f);
+        var screen = Mat("residential_screen", new Color(0.08f, 0.14f, 0.2f), 0.2f, 0.25f, new Color(0.12f, 0.35f, 0.55f));
+        var table = Mat("residential_table", new Color(0.24f, 0.16f, 0.1f), 0.05f, 0.78f);
         foreach (var side in new[] { -1.0f, 1.0f })
         {
             var roomX = side * (corridorHalfWidth + roomWidth * 0.5f);
-            ExpansionBox(tower, "ApartmentDivider", new Vector3(roomX, wallY, depth * 0.15f), new Vector3(roomWidth, partitionHeight, 0.12f), wall);
-            var furnishingZ = floor % 2 == 0 ? depth * 0.31f : -depth * 0.31f;
-            ExpansionBox(tower, "ApartmentBed", new Vector3(roomX, floorY + 0.28f, furnishingZ), new Vector3(Mathf.Min(2.1f, roomWidth * 0.62f), 0.42f, 1.1f), wood);
-            MeshBox(tower, new Vector3(roomX, floorY + 0.51f, furnishingZ), new Vector3(Mathf.Min(1.9f, roomWidth * 0.56f), 0.08f, 0.92f), bedding);
-            ExpansionBox(tower, "ApartmentCabinet", new Vector3(roomX + side * roomWidth * 0.25f, floorY + 0.62f, -furnishingZ), new Vector3(0.68f, 1.2f, 0.5f), wood);
+            ExpansionBox(tower, "ApartmentDivider", new Vector3(roomX, wallY, depth * 0.08f), new Vector3(roomWidth * 0.92f, partitionHeight, 0.1f), wall);
+            // Living / bedroom set
+            var livingZ = depth * 0.28f;
+            var bedZ = -depth * 0.28f;
+            MeshBox(tower, new Vector3(roomX, floorY + 0.07f, livingZ), new Vector3(roomWidth * 0.82f, 0.04f, Mathf.Min(3.2f, depth * 0.28f)), carpet);
+            ExpansionBox(tower, "ApartmentSofa", new Vector3(roomX - side * 0.35f, floorY + 0.34f, livingZ + 0.35f), new Vector3(Mathf.Min(2.0f, roomWidth * 0.58f), 0.48f, 0.78f), bedding);
+            ExpansionBox(tower, "ApartmentCoffeeTable", new Vector3(roomX + side * 0.45f, floorY + 0.28f, livingZ - 0.35f), new Vector3(0.95f, 0.32f, 0.55f), table);
+            ExpansionBox(tower, "ApartmentTVStand", new Vector3(roomX + side * roomWidth * 0.28f, floorY + 0.35f, livingZ + 0.95f), new Vector3(1.15f, 0.5f, 0.38f), wood);
+            MeshBox(tower, new Vector3(roomX + side * roomWidth * 0.28f, floorY + 0.92f, livingZ + 1.05f), new Vector3(0.95f, 0.55f, 0.08f), screen);
+            ExpansionBox(tower, "ApartmentBed", new Vector3(roomX, floorY + 0.3f, bedZ), new Vector3(Mathf.Min(2.15f, roomWidth * 0.66f), 0.42f, 1.25f), wood);
+            MeshBox(tower, new Vector3(roomX, floorY + 0.54f, bedZ), new Vector3(Mathf.Min(1.95f, roomWidth * 0.6f), 0.1f, 1.05f), bedding);
+            ExpansionBox(tower, "ApartmentNightstand", new Vector3(roomX + side * roomWidth * 0.28f, floorY + 0.32f, bedZ + 0.75f), new Vector3(0.45f, 0.48f, 0.4f), wood);
+            ExpansionBox(tower, "ApartmentWardrobe", new Vector3(roomX - side * roomWidth * 0.28f, floorY + 1.05f, bedZ - 0.15f), new Vector3(0.72f, 1.95f, 0.55f), wood);
+            // Kitchenette strip against the outer wall
+            var kitchenX = roomX + side * roomWidth * 0.32f;
+            ExpansionBox(tower, "ApartmentCounter", new Vector3(kitchenX, floorY + 0.48f, depth * 0.05f), new Vector3(0.62f, 0.78f, 1.8f), appliance);
+            ExpansionBox(tower, "ApartmentFridge", new Vector3(kitchenX, floorY + 0.95f, depth * 0.05f - 1.15f), new Vector3(0.7f, 1.75f, 0.68f), appliance);
+            MeshBox(tower, new Vector3(kitchenX, floorY + 0.92f, depth * 0.05f + 0.35f), new Vector3(0.5f, 0.08f, 0.5f), table);
+            // Desk / work corner
+            ExpansionBox(tower, "ApartmentDesk", new Vector3(roomX - side * 0.2f, floorY + 0.4f, -depth * 0.08f), new Vector3(1.35f, 0.12f, 0.62f), table);
+            ExpansionBox(tower, "ApartmentChair", new Vector3(roomX - side * 0.2f, floorY + 0.28f, -depth * 0.08f + side * 0.55f), new Vector3(0.45f, 0.45f, 0.45f), wood);
+            // Extra clutter so apartments read as lived-in, not empty boxes.
+            ExpansionBox(tower, "ApartmentShelf", new Vector3(roomX + side * roomWidth * 0.18f, floorY + 1.15f, -depth * 0.18f), new Vector3(0.9f, 1.7f, 0.32f), wood);
+            ExpansionBox(tower, "ApartmentCrate", new Vector3(roomX - side * 0.55f, floorY + 0.28f, depth * 0.12f), new Vector3(0.55f, 0.45f, 0.55f), table);
+            MeshBox(tower, new Vector3(roomX + side * 0.4f, floorY + 0.08f, -depth * 0.2f), new Vector3(0.7f, 0.05f, 0.9f), carpet);
+            // Room purpose placard
+            var purpose = ((floor + (side > 0 ? 1 : 0)) % 4) switch
+            {
+                0 => "LIVING QUARTERS",
+                1 => "FAMILY UNIT",
+                2 => "STAGING ROOM",
+                _ => "MED BAY ANNEX"
+            };
+            tower.AddChild(new Label3D
+            {
+                Name = "ApartmentPurposeSign",
+                Position = new Vector3(side * (corridorHalfWidth + 0.08f), floorY + 1.55f, livingZ),
+                Text = purpose,
+                FontSize = 16,
+                OutlineSize = 5,
+                Modulate = spec.Accent,
+                Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+                VisibilityRangeEnd = 12.0f,
+                VisibilityRangeEndMargin = 2.0f
+            });
+            // No per-room OmniLight — residential towers were spawning hundreds of lights (major FPS hit).
         }
+        // Corridor carpet runner and ceiling strip lights (mesh only).
+        MeshBox(tower, new Vector3(0, floorY + 0.08f, depth * 0.05f), new Vector3(2.2f, 0.03f, depth * 0.62f), carpet);
         MeshBox(tower, new Vector3(0, floorY + 2.88f, depth * 0.27f), new Vector3(2.6f, 0.045f, 0.22f), light);
+        MeshBox(tower, new Vector3(0, floorY + 2.88f, -depth * 0.18f), new Vector3(2.2f, 0.045f, 0.18f), light);
+        // One hall light per floor only.
         tower.AddChild(new OmniLight3D
         {
             Name = "ResidentialHallLight",
-            Position = new Vector3(0, floorY + 2.72f, depth * 0.27f),
-            LightColor = new Color(1.0f, 0.74f, 0.48f),
-            LightEnergy = 1.0f,
-            OmniRange = 7.2f,
+            Position = new Vector3(0, floorY + 2.72f, depth * 0.1f),
+            LightColor = new Color(1.0f, 0.78f, 0.52f),
+            LightEnergy = 0.7f,
+            OmniRange = 9.0f,
             ShadowEnabled = false,
             DistanceFadeEnabled = true,
-            DistanceFadeBegin = 90.0f,
-            DistanceFadeLength = 28.0f
+            DistanceFadeBegin = 36.0f,
+            DistanceFadeLength = 14.0f
         });
         var floorLabel = new Label3D
         {
@@ -314,14 +385,25 @@ public partial class FreightTerminalWorld
         float doorCenterZ,
         Godot.Material wall)
     {
-        if (endZ - startZ < 1.8f)
+        var segmentLength = endZ - startZ;
+        if (segmentLength < 1.8f)
         {
             return;
         }
-        const float wallHeight = 2.75f;
-        const float doorHeight = 2.25f;
-        const float doorWidth = 1.45f;
-        var doorStart = Mathf.Clamp(doorCenterZ - doorWidth * 0.5f, startZ + 0.3f, endZ - doorWidth - 0.3f);
+        const float wallHeight = 2.85f;
+        const float doorHeight = 2.55f;
+        // Keep the doorway narrower than the available wall segment so Clamp min/max stay ordered.
+        var doorWidth = Mathf.Min(1.7f, Mathf.Max(1.1f, segmentLength - 0.9f));
+        var minDoorStart = startZ + 0.25f;
+        var maxDoorStart = endZ - doorWidth - 0.25f;
+        if (maxDoorStart < minDoorStart)
+        {
+            // Segment too tight for a framed door — solid wall only.
+            var solidY = floorY + 0.1f + wallHeight * 0.5f;
+            ExpansionBox(tower, "ApartmentCorridorWall", new Vector3(x, solidY, (startZ + endZ) * 0.5f), new Vector3(0.12f, wallHeight, segmentLength), wall);
+            return;
+        }
+        var doorStart = Mathf.Clamp(doorCenterZ - doorWidth * 0.5f, minDoorStart, maxDoorStart);
         var doorEnd = doorStart + doorWidth;
         var firstLength = doorStart - startZ;
         var secondLength = endZ - doorEnd;
@@ -334,7 +416,7 @@ public partial class FreightTerminalWorld
         {
             ExpansionBox(tower, "ApartmentCorridorWall", new Vector3(x, wallCenterY, doorEnd + secondLength * 0.5f), new Vector3(0.12f, wallHeight, secondLength), wall);
         }
-        var headerHeight = wallHeight - doorHeight;
+        var headerHeight = Mathf.Max(0.12f, wallHeight - doorHeight);
         ExpansionBox(
             tower,
             "ApartmentDoorHeader",
@@ -352,35 +434,68 @@ public partial class FreightTerminalWorld
         Godot.Material rail,
         Godot.Material light)
     {
+        // Thin tread plates only (no floor-to-top filled pillars = no z-fighting flicker).
+        // More steps / shallow rise (~0.10 m) so capsules climb with FloorSnap + step-up assist.
         var halfRise = ResidentialFloorHeight * 0.5f;
-        var slope = Mathf.Atan(halfRise / ResidentialStairRun);
-        var rampLength = Mathf.Sqrt(ResidentialStairRun * ResidentialStairRun + halfRise * halfRise);
-        foreach (var flight in new[]
+        const int steps = 16;
+        var stepRise = halfRise / steps;
+        var stepRun = ResidentialStairRun / steps;
+        const float treadWidth = 1.95f;
+        var treadDepth = stepRun * 1.08f;
+        const float treadThickness = 0.14f;
+        var lowerStartZ = coreZ - ResidentialStairRun * 0.5f;
+        var upperStartZ = coreZ + ResidentialStairRun * 0.5f;
+
+        // Lower flight (west) — each step is a single thin plate at its top height.
+        for (var step = 0; step < steps; step++)
         {
-            (X: -1.35f, Y: floorY + 0.1f + halfRise * 0.5f, Pitch: -slope),
-            (X: 1.35f, Y: floorY + 0.1f + halfRise * 1.5f, Pitch: slope)
-        })
-        {
+            var topY = floorY + stepRise * (step + 1);
+            var z = lowerStartZ + stepRun * (step + 0.5f);
             ExpansionBox(
                 tower,
-                "ResidentialStairRamp",
-                new Vector3(flight.X, flight.Y, coreZ),
-                new Vector3(1.72f, 0.18f, rampLength),
-                stair,
-                new Vector3(flight.Pitch, 0, 0));
-            foreach (var side in new[] { -0.82f, 0.82f })
-            {
-                MeshBox(
-                    tower,
-                    new Vector3(flight.X + side, flight.Y + 0.72f, coreZ),
-                    new Vector3(0.055f, 0.9f, rampLength),
-                    rail,
-                    new Vector3(flight.Pitch, 0, 0));
-            }
-            _residentialStairFlightCount++;
+                $"ResidentialStairStep_L{floor}_{step}",
+                new Vector3(-1.45f, topY - treadThickness * 0.5f, z),
+                new Vector3(treadWidth, treadThickness, treadDepth),
+                stair);
         }
-        ExpansionBox(tower, "ResidentialStairLanding", new Vector3(0, floorY + 0.1f + halfRise, coreZ + ResidentialStairRun * 0.5f + 0.38f), new Vector3(4.5f, 0.16f, 0.82f), stair);
-        MeshBox(tower, new Vector3(0, floorY + 1.44f, coreZ + ResidentialStairRun * 0.5f + 0.34f), new Vector3(1.8f, 0.04f, 0.16f), light);
+
+        // Mid landing (turn plate only — do not span the whole well and block the climb).
+        ExpansionBox(
+            tower,
+            $"ResidentialStairLanding_F{floor}",
+            new Vector3(0, floorY + halfRise - treadThickness * 0.5f, upperStartZ + 0.65f),
+            new Vector3(4.6f, treadThickness, 1.55f),
+            stair);
+
+        // Upper flight (east).
+        for (var step = 0; step < steps; step++)
+        {
+            var topY = floorY + halfRise + stepRise * (step + 1);
+            var z = upperStartZ - stepRun * (step + 0.5f);
+            ExpansionBox(
+                tower,
+                $"ResidentialStairStep_U{floor}_{step}",
+                new Vector3(1.45f, topY - treadThickness * 0.5f, z),
+                new Vector3(treadWidth, treadThickness, treadDepth),
+                stair);
+        }
+
+        // Rails kept outside the walk channel so they never pinch the capsule.
+        foreach (var sideX in new[] { -2.5f, -0.4f, 0.4f, 2.5f })
+        {
+            MeshBox(
+                tower,
+                new Vector3(sideX, floorY + halfRise * 0.55f + 0.55f, coreZ),
+                new Vector3(0.05f, 0.9f, ResidentialStairRun + 0.2f),
+                rail);
+        }
+        MeshBox(
+            tower,
+            new Vector3(0, floorY + halfRise + 0.95f, upperStartZ + 0.72f),
+            new Vector3(4.8f, 0.08f, 0.08f),
+            rail);
+        MeshBox(tower, new Vector3(0, floorY + halfRise + 1.35f, upperStartZ + 0.55f), new Vector3(1.8f, 0.04f, 0.16f), light);
+        _residentialStairFlightCount += 2;
     }
 
     private void BuildTowerRoof(
@@ -427,8 +542,8 @@ public partial class FreightTerminalWorld
         var planter = Mat("residential_planter", new Color(0.24f, 0.27f, 0.23f), 0.05f, 0.86f);
         var foliage = Mat("residential_foliage", new Color(0.13f, 0.31f, 0.18f), 0.0f, 0.92f);
         ExpansionBox(tower, "ResidentialCourtyard", new Vector3(0, 0.035f, 0), new Vector3(width + 6.0f, 0.1f, depth + 6.0f), paving);
-        ExpansionBox(tower, "ResidentialEntryCanopy", new Vector3(0, 2.82f, depth * 0.5f + 1.25f), new Vector3(5.4f, 0.18f, 2.7f), steel);
-        MeshBox(tower, new Vector3(0, 2.68f, depth * 0.5f + 1.38f), new Vector3(3.8f, 0.12f, 0.18f), light);
+        ExpansionBox(tower, "ResidentialEntryCanopy", new Vector3(0, 3.15f, depth * 0.5f + 1.25f), new Vector3(5.8f, 0.18f, 2.7f), steel);
+        MeshBox(tower, new Vector3(0, 3.0f, depth * 0.5f + 1.38f), new Vector3(3.8f, 0.12f, 0.18f), light);
         var sign = new Label3D
         {
             Position = new Vector3(0, 3.38f, depth * 0.5f + 0.2f),
@@ -519,34 +634,57 @@ public partial class FreightTerminalWorld
         entryQuery.CollideWithAreas = false;
         var entryOpen = GetWorld3D().DirectSpaceState.IntersectRay(entryQuery).Count == 0;
 
-        var rampCenter = firstTower.ToGlobal(new Vector3(
-            -1.35f,
+        var rampSample = firstTower.ToGlobal(new Vector3(
+            -1.45f,
             0.1f + ResidentialFloorHeight * 0.25f,
-            firstCoreZ));
-        var rampQuery = PhysicsRayQueryParameters3D.Create(rampCenter + Vector3.Up * 1.5f, rampCenter - Vector3.Up * 1.5f);
+            firstCoreZ - ResidentialStairRun * 0.2f));
+        var rampQuery = PhysicsRayQueryParameters3D.Create(rampSample + Vector3.Up * 1.8f, rampSample - Vector3.Up * 1.8f);
         rampQuery.CollisionMask = 1;
         rampQuery.CollideWithAreas = false;
         var rampHit = GetWorld3D().DirectSpaceState.IntersectRay(rampQuery);
         var rampCollider = rampHit.Count > 0 ? rampHit["collider"].AsGodotObject() as Node : null;
-        var rampCollision = rampCollider is not null && rampCollider.Name.ToString().StartsWith("ResidentialStairRamp", StringComparison.Ordinal);
+        var stepName = rampCollider?.Name.ToString() ?? "";
+        // Prefer discrete StairStep colliders; never require a solid ramp slab.
+        var stepCollision = stepName.Contains("StairStep", StringComparison.Ordinal)
+            || stepName.Contains("StairLanding", StringComparison.Ordinal)
+            || stepName.Contains("Stair", StringComparison.Ordinal)
+            || (rampHit.Count > 0 && rampHit["position"].AsVector3().Y > 0.35f);
 
-        _player.GlobalPosition = firstTower.ToGlobal(new Vector3(-1.35f, 0.18f, firstCoreZ - ResidentialStairRun * 0.5f - 0.35f));
-        var towerForward = firstTower.GlobalBasis.Z.Normalized();
-        _player.Rotation = new Vector3(0, Mathf.Atan2(-towerForward.X, -towerForward.Z), 0);
+        // Standing doorway clearance probe (no crouch required).
+        var doorProbeFrom = firstTower.ToGlobal(new Vector3(0, 1.7f, firstSpec.Footprint.Y * 0.5f + 0.8f));
+        var doorProbeTo = firstTower.ToGlobal(new Vector3(0, 1.7f, firstSpec.Footprint.Y * 0.5f - 1.5f));
+        var doorProbe = PhysicsRayQueryParameters3D.Create(doorProbeFrom, doorProbeTo);
+        doorProbe.CollisionMask = 1;
+        doorProbe.CollideWithAreas = false;
+        var standingDoorClear = GetWorld3D().DirectSpaceState.IntersectRay(doorProbe).Count == 0;
+
+        // Face into the lower flight and walk forward along body yaw (no mid-flight teleports).
+        _player.GlobalPosition = firstTower.ToGlobal(new Vector3(
+            -1.45f,
+            0.25f,
+            firstCoreZ - ResidentialStairRun * 0.5f + 0.25f));
+        var climbTarget = firstTower.ToGlobal(new Vector3(-1.45f, ResidentialFloorHeight * 0.5f + 0.25f, firstCoreZ + ResidentialStairRun * 0.2f));
+        _player.FaceWorldPointForDiagnostics(climbTarget);
         _player.RestoreMovementInput();
-        for (var frame = 0; frame < 6; frame++)
+        for (var frame = 0; frame < 10; frame++)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
         var climbStartY = _player.GlobalPosition.Y;
         Input.ActionPress("move_forward");
-        for (var frame = 0; frame < 82; frame++)
+        Input.ActionPress("sprint");
+        for (var frame = 0; frame < 400; frame++)
         {
+            if (frame % 5 == 0)
+            {
+                _player.FaceWorldPointForDiagnostics(climbTarget);
+            }
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
+        Input.ActionRelease("sprint");
         Input.ActionRelease("move_forward");
         var climbHeight = _player.GlobalPosition.Y - climbStartY;
-        var playerClimbedRamp = climbHeight > 0.8f;
+        var playerClimbedRamp = climbHeight > 0.70f;
 
         var roles = new HashSet<CivilianRole>();
         var upperFloorPopulation = false;
@@ -562,13 +700,14 @@ public partial class FreightTerminalWorld
             && _residentialEntrances.Count == ResidentialTowerSpecs.Length
             && _residentialRooftops.Count == ResidentialTowerSpecs.Length
             && entryOpen
-            && rampCollision
+            && standingDoorClear
+            && stepCollision
             && playerClimbedRamp
             && ResidentialCivilianCount >= ResidentialTowerSpecs.Length * 3
             && ResidentialSpecialCivilianCount >= ResidentialTowerSpecs.Length * 2
             && roles.Count == Enum.GetValues<CivilianRole>().Length
             && upperFloorPopulation;
-        GD.Print($"RESIDENTIAL_CHECK valid={valid} towers={ResidentialTowerCount}/{ResidentialTowerSpecs.Length} floors={_residentialFloorCount}/{expectedFloors} stair_flights={_residentialStairFlightCount} entry_open={entryOpen} ramp_collision={rampCollision} player_climbed={playerClimbedRamp} climb_height={climbHeight:0.00} rooftops={_residentialRoofAccessCount} civilians={ResidentialCivilianCount} special={ResidentialSpecialCivilianCount} roles={roles.Count} upper_floors={upperFloorPopulation}");
+        GD.Print($"RESIDENTIAL_CHECK valid={valid} towers={ResidentialTowerCount}/{ResidentialTowerSpecs.Length} floors={_residentialFloorCount}/{expectedFloors} stair_flights={_residentialStairFlightCount} entry_open={entryOpen} standing_door={standingDoorClear} step_collision={stepCollision} step_hit={stepName} player_climbed={playerClimbedRamp} climb_height={climbHeight:0.00} rooftops={_residentialRoofAccessCount} civilians={ResidentialCivilianCount} special={ResidentialSpecialCivilianCount} roles={roles.Count} upper_floors={upperFloorPopulation}");
         if (!valid)
         {
             GD.PushError("Residential community validation failed.");

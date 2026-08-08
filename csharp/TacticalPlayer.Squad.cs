@@ -20,8 +20,12 @@ public partial class TacticalPlayer
 
     public Node3D CombatNode => this;
     public bool CombatDead => IsDead;
+    public bool CombatDowned => IsDead;
+    public bool ReviveUsed { get; private set; }
+    public bool CanBeRevived => IsDead && !ReviveUsed;
     public float CombatHealth => Health;
     public float CombatMaxHealth => MaxHealth;
+    public float CrawlSpeed => 1.15f;
 
     private Node3D _roleDeviceRoot = null!;
     private Node3D _medicSprayer = null!;
@@ -41,6 +45,7 @@ public partial class TacticalPlayer
         MaxHealth = spec.MaxHealth;
         Health = refillHealth ? MaxHealth : Mathf.Clamp(Health, 1.0f, MaxHealth);
         IsDead = false;
+        ReviveUsed = false;
         _skillCooldownRemaining = 0.0f;
         _skillActiveRemaining = 0.0f;
         _roleActionRemaining = 0.0f;
@@ -281,23 +286,37 @@ public partial class TacticalPlayer
         {
             return;
         }
-        var revived = IsDead;
-        Health = Mathf.Clamp(Health + amount, 0.0f, MaxHealth);
-        if (Health <= 0.0f)
+        // Healing while upright only — downed operators must go through TryReceiveRevive.
+        if (IsDead)
         {
             return;
         }
-        if (revived)
-        {
-            IsDead = false;
-            Main?.OnLocalPlayerRevived();
-        }
+        Health = Mathf.Clamp(Health + amount, 0.0f, MaxHealth);
         Hud?.SetStats(Health, Armor, Stamina, Ammo, ReserveAmmo, Grenades);
+    }
+
+    public bool TryReceiveRevive(float healAmount)
+    {
+        if (!IsDead || ReviveUsed || healAmount <= 0.0f)
+        {
+            return false;
+        }
+        ReviveUsed = true;
+        Health = Mathf.Clamp(healAmount, 1.0f, MaxHealth);
+        IsDead = false;
+        UiLocked = false;
+        _stance = PlayerStance.Crouched;
+        Main?.OnLocalPlayerRevived();
+        Hud?.SetStats(Health, Armor, Stamina, Ammo, ReserveAmmo, Grenades);
+        return true;
     }
 
     internal void SetHealthForDiagnostics(float value)
     {
         Health = Mathf.Clamp(value, 1.0f, MaxHealth);
         IsDead = false;
+        UiLocked = false;
     }
+
+    internal void SetReviveUsedForDiagnostics(bool used) => ReviveUsed = used;
 }

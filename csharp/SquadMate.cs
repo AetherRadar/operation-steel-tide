@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace OperationSteelTide;
@@ -14,15 +15,64 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     public bool IsHumanProxy { get; private set; }
     public long NetworkPeerId { get; private set; }
     public bool IsDowned { get; private set; }
+    public bool ReviveUsed { get; private set; }
+    /// <summary>Second death after revive budget is spent — converted to a lootable body bag.</summary>
+    public bool IsBodyBag { get; private set; }
     public float Health { get; private set; }
     public float MaxHealth { get; private set; }
     public float SkillCooldownRemaining => _skillCooldown;
     public float SkillCooldownDuration => OperatorRoles.Spec(Role).SkillCooldown * (IsHumanProxy ? 1.0f : 2.0f);
 
     public Node3D CombatNode => this;
-    public bool CombatDead => IsDowned;
+    public bool CombatDead => IsDowned || IsBodyBag;
+    public bool CombatDowned => IsDowned && !IsBodyBag;
+    public bool CanBeRevived => IsDowned && !ReviveUsed && !IsBodyBag;
     public float CombatHealth => Health;
     public float CombatMaxHealth => MaxHealth;
+    /// <summary>False at cold-start until the mate loots/equips a primary (player squad mirrors player).</summary>
+    public bool HasFireablePrimary { get; private set; } = true;
+
+    public void ApplyColdStartUnarmed()
+    {
+        HasFireablePrimary = false;
+        if (IsInstanceValid(_weapon))
+        {
+            _weapon.Visible = false;
+        }
+        // Also hide any late-added accent parts parented under the rifle root.
+        if (IsInstanceValid(_muzzle))
+        {
+            _muzzle.Visible = false;
+        }
+    }
+
+    public void GrantFireablePrimaryForDiagnostics()
+    {
+        HasFireablePrimary = true;
+        if (IsInstanceValid(_weapon))
+        {
+            _weapon.Visible = true;
+        }
+    }
+
+    /// <summary>Production path: equip a weapon taken from a world loot source.</summary>
+    public bool EquipWeaponFromLoot(WeaponBuild build)
+    {
+        if (build is null)
+        {
+            return false;
+        }
+        HasFireablePrimary = true;
+        if (IsInstanceValid(_weapon))
+        {
+            _weapon.Visible = true;
+        }
+        if (IsInstanceValid(_muzzle))
+        {
+            _muzzle.Visible = true;
+        }
+        return HasFireablePrimary;
+    }
 
     private readonly RandomNumberGenerator _rng = new();
     private Node3D _rig = null!;
@@ -46,6 +96,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     private bool _networkAbilityPending;
     private Vector3 _networkAbilityOrigin;
     private Vector3 _networkAbilityForward;
+    private ILootSource? _lootHuntSource;
+    private float _lootHuntCooldown;
 
     public void Configure(
         FreightTerminalWorld main,
@@ -67,6 +119,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         MaxHealth = spec.MaxHealth;
         Health = MaxHealth;
         _remoteHealth = MaxHealth;
+        ReviveUsed = false;
+        IsDowned = false;
         Order = SquadOrder.Follow;
         _orderPosition = Position;
         if (IsInsideTree())
@@ -144,19 +198,47 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             AnimateRig(dt);
             return;
         }
-        if (IsDowned || !GodotObject.IsInstanceValid(Leader))
+        if (!GodotObject.IsInstanceValid(Leader))
         {
             Velocity = Vector3.Zero;
             AnimateRig(dt);
             return;
         }
+        if (IsBodyBag)
+        {
+            Velocity = Vector3.Zero;
+            return;
+        }
+        if (IsDowned)
+        {
+            // First down: stay prone in place (no sliding human ragdoll crawl).
+            Velocity = Vector3.Zero;
+            if (!IsOnFloor())
+            {
+                Velocity = new Vector3(0.0f, -12.0f, 0.0f);
+                MoveAndSlide();
+            }
+            _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
+            UpdateLabel();
+            return;
+        }
 
         UpdateSkillAction(dt);
+        _lootHuntCooldown = Mathf.Max(0.0f, _lootHuntCooldown - dt);
         var candidate = Main.FindNearestEnemy(GlobalPosition, 58.0f);
         var hostile = candidate is not null && Main.CanSquadEngage(candidate) ? candidate : null;
         var patient = Role == OperatorRole.Medic ? Main.FindLowestFriendly(0.72f, true) : null;
+        // Cold-start: hunt a weapon cache before combat when still unarmed.
+        if (!HasFireablePrimary && Order != SquadOrder.Hold)
+        {
+            UpdateWeaponLootHunt(dt, hostile);
+        }
         var destination = ResolveDestination(hostile);
-        if (patient is not null && patient != this && Order != SquadOrder.Hold
+        if (!HasFireablePrimary && _lootHuntSource is not null && IsInstanceValid(_lootHuntSource.LootNode))
+        {
+            destination = _lootHuntSource.LootNode.GlobalPosition;
+        }
+        else if (patient is not null && patient != this && Order != SquadOrder.Hold
             && GlobalPosition.DistanceTo(patient.CombatNode.GlobalPosition) > 5.5f)
         {
             destination = patient.CombatNode.GlobalPosition;
@@ -170,6 +252,41 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
         MoveAndSlide();
         AnimateRig(dt);
+    }
+
+    private void UpdateWeaponLootHunt(float delta, EnemyOperator? hostile)
+    {
+        _ = delta;
+        // Break off loot hunt if a hostile is already on top of us.
+        if (hostile is not null && GlobalPosition.DistanceTo(hostile.GlobalPosition) < 14.0f)
+        {
+            return;
+        }
+        if (_lootHuntSource is null || !_lootHuntSource.IsSearchable || !IsInstanceValid(_lootHuntSource.LootNode))
+        {
+            if (_lootHuntCooldown > 0.0f)
+            {
+                return;
+            }
+            _lootHuntSource = Main.FindNearestWeaponLootSource(GlobalPosition, 70.0f);
+            _lootHuntCooldown = 1.5f;
+        }
+        if (_lootHuntSource is null || !IsInstanceValid(_lootHuntSource.LootNode))
+        {
+            return;
+        }
+        if (GlobalPosition.DistanceTo(_lootHuntSource.LootNode.GlobalPosition) < 1.8f)
+        {
+            if (Main.TryMateEquipWeaponFromLootSource(this, _lootHuntSource))
+            {
+                _lootHuntSource = null;
+            }
+            else
+            {
+                _lootHuntSource = null;
+                _lootHuntCooldown = 2.0f;
+            }
+        }
     }
 
     private void UpdateRemoteProxy(float delta)
@@ -269,7 +386,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
     private void TryFire(EnemyOperator enemy)
     {
-        if (_weaponCooldown > 0.0f || _skillActionTime > 0.0f)
+        if (!HasFireablePrimary || _weaponCooldown > 0.0f || _skillActionTime > 0.0f)
         {
             return;
         }
@@ -283,6 +400,21 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         var fireBoost = Role == OperatorRole.Assault && _overdriveTime > 0.0f ? 0.68f : 1.0f;
         _weaponCooldown = _rng.RandfRange(0.23f, 0.38f) * spec.FireIntervalMultiplier * fireBoost;
         var hitPoint = enemy.GlobalPosition + Vector3.Up * _rng.RandfRange(0.78f, 1.55f);
+        var muzzlePos = IsInstanceValid(_muzzle) ? _muzzle.GlobalPosition : GlobalPosition + Vector3.Up * 1.4f;
+        // Wallbang gate on the real damage path.
+        if (!Ballistics.HasClearShot(GetWorld3D(), muzzlePos, hitPoint, enemy, GetRid()))
+        {
+            var query = PhysicsRayQueryParameters3D.Create(muzzlePos, hitPoint);
+            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+            query.CollideWithAreas = false;
+            var blocked = GetWorld3D().DirectSpaceState.IntersectRay(query);
+            if (blocked.Count > 0)
+            {
+                hitPoint = blocked["position"].AsVector3();
+            }
+            Main.SpawnTracer(muzzlePos, hitPoint, new Color(0.34f, 0.78f, 1.0f));
+            return;
+        }
         var accuracy = Mathf.Clamp(0.91f - distance * 0.009f, 0.48f, 0.9f);
         if (_rng.Randf() < accuracy)
         {
@@ -292,7 +424,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             hitPoint += new Vector3(_rng.RandfRange(-1.4f, 1.4f), _rng.RandfRange(-0.7f, 1.2f), _rng.RandfRange(-1.4f, 1.4f));
         }
-        Main.SpawnTracer(_muzzle.GlobalPosition, hitPoint, new Color(0.34f, 0.78f, 1.0f));
+        Main.SpawnTracer(muzzlePos, hitPoint, new Color(0.34f, 0.78f, 1.0f));
         Main.ReportGunshot(GlobalPosition, 52.0f);
     }
 
@@ -439,8 +571,13 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
     public bool TakeCombatDamage(float amount, Vector3 hitPosition, Node? attacker = null)
     {
+        if (IsBodyBag)
+        {
+            return true;
+        }
         if (IsDowned)
         {
+            // Already waiting for revive — extra hits do not convert yet.
             return true;
         }
         var localHeight = hitPosition.Y - GlobalPosition.Y;
@@ -451,9 +588,17 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             return false;
         }
+
+        // Revive budget already spent → permanent KIA body bag (loot box), not a sliding body.
+        if (ReviveUsed)
+        {
+            ConvertToBodyBag();
+            return true;
+        }
+
         IsDowned = true;
         Velocity = Vector3.Zero;
-        _rig.Rotation = new Vector3(0.0f, 0.0f, Mathf.Pi / 2.0f);
+        _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
         UpdateLabel();
         Main.OnSquadMateDowned(this);
         return true;
@@ -461,23 +606,69 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
     public void RestoreHealth(float amount)
     {
-        if (amount <= 0.0f)
+        if (amount <= 0.0f || IsDowned || IsBodyBag)
         {
+            // Downed mates only recover through TryReceiveRevive.
             return;
         }
-        var revived = IsDowned;
         Health = Mathf.Clamp(Health + amount, 0.0f, MaxHealth);
-        if (Health <= 0.0f)
-        {
-            return;
-        }
-        if (revived)
-        {
-            IsDowned = false;
-            _rig.Rotation = Vector3.Zero;
-        }
         UpdateHealthVisual();
         UpdateLabel();
+    }
+
+    public bool TryReceiveRevive(float healAmount)
+    {
+        if (!IsDowned || ReviveUsed || IsBodyBag || healAmount <= 0.0f)
+        {
+            return false;
+        }
+        ReviveUsed = true;
+        IsDowned = false;
+        Health = Mathf.Clamp(healAmount, 1.0f, MaxHealth);
+        _rig.Rotation = Vector3.Zero;
+        UpdateHealthVisual();
+        UpdateLabel();
+        return true;
+    }
+
+    /// <summary>Force the permanent body-bag state (second down / diagnostics).</summary>
+    public void ConvertToBodyBag()
+    {
+        if (IsBodyBag)
+        {
+            return;
+        }
+        IsBodyBag = true;
+        IsDowned = true;
+        ReviveUsed = true;
+        Health = 0.0f;
+        Velocity = Vector3.Zero;
+        CollisionLayer = 0;
+        CollisionMask = 0;
+        if (IsInstanceValid(_rig))
+        {
+            _rig.Visible = false;
+        }
+        if (IsInstanceValid(_weapon))
+        {
+            _weapon.Visible = false;
+        }
+        if (IsInstanceValid(_roleDevice))
+        {
+            _roleDevice.Visible = false;
+        }
+        if (IsInstanceValid(_nameLabel))
+        {
+            _nameLabel.Visible = false;
+        }
+        if (IsInstanceValid(_healthFill))
+        {
+            _healthFill.Visible = false;
+        }
+        Main.SpawnSquadBodyBag(this);
+        Main.OnSquadMateKia(this);
+        SetPhysicsProcess(false);
+        QueueFree();
     }
 
     internal void SetSkillCooldownForDiagnostics(float value)
@@ -516,6 +707,9 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         Part(_weapon, Cylinder(0.025f, 0.48f), new Vector3(0.0f, 1.24f, -0.85f), gun, new Vector3(Mathf.Pi / 2.0f, 0.0f, 0.0f));
         _muzzle = new Marker3D { Position = new Vector3(0.0f, 1.24f, -1.1f) };
         _weapon.AddChild(_muzzle);
+        // Cold-start default: rifle mesh hidden until a real loot equip grants a primary.
+        HasFireablePrimary = false;
+        _weapon.Visible = false;
 
         _nameLabel = new Label3D
         {

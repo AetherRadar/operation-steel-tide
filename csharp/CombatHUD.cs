@@ -20,6 +20,7 @@ public partial class CombatHUD : CanvasLayer
     [Signal] public delegate void BackpackUseRequestedEventHandler(string itemId);
     [Signal] public delegate void LootClosedEventHandler();
     [Signal] public delegate void WeaponSlotRequestedEventHandler(int slot);
+    [Signal] public delegate void InventoryToggleRequestedEventHandler();
 
     private Label _healthLabel = null!;
     private Label _armorLabel = null!;
@@ -87,11 +88,14 @@ public partial class CombatHUD : CanvasLayer
     private Label _armorSlotCaption = null!;
     private Label _packSlotCaption = null!;
     private Label _backpackItemsCaption = null!;
+    private Label _backpackValueLabel = null!;
     private Label _lootTitle = null!;
     private Label _lootStats = null!;
     private Label _lootSourceCaption = null!;
     private Label _backpackCaption = null!;
     private Button _lootCloseButton = null!;
+    private Button _backpackHotkeyButton = null!;
+    private Label _backpackHotkeyValue = null!;
     private Button _primaryDetailButton = null!;
     private InventoryModelPreview _primaryWeaponPreview = null!;
     private InventoryModelPreview _helmetPreview = null!;
@@ -348,6 +352,19 @@ public partial class CombatHUD : CanvasLayer
         _grenadeLabel = Label("FRAG  x2", 13, new Color(0.78f, 0.83f, 0.8f));
         _grenadeLabel.Position = new Vector2(332, 65);
         weapon.AddChild(_grenadeLabel);
+
+        // Bottom-right backpack control: open inventory + live total value.
+        _backpackHotkeyButton = Button("TAB  BACKPACK", new Vector2(0, 0), new Vector2(210, 52));
+        _backpackHotkeyButton.SetAnchorsPreset(Control.LayoutPreset.BottomRight);
+        _backpackHotkeyButton.Position = new Vector2(-240, -198);
+        _backpackHotkeyButton.FocusMode = Control.FocusModeEnum.None;
+        _backpackHotkeyButton.AddThemeFontSizeOverride("font_size", 13);
+        _backpackHotkeyButton.Pressed += () => EmitSignal(SignalName.InventoryToggleRequested);
+        root.AddChild(_backpackHotkeyButton);
+        _backpackHotkeyValue = PositionedLabel("VALUE  0", 12, new Color(0.95f, 0.78f, 0.28f), 12, 28);
+        _backpackHotkeyValue.Size = new Vector2(186, 18);
+        _backpackHotkeyValue.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _backpackHotkeyButton.AddChild(_backpackHotkeyValue);
 
         _crosshair = new Control();
         _crosshair.SetAnchorsPreset(Control.LayoutPreset.Center);
@@ -931,6 +948,73 @@ public partial class CombatHUD : CanvasLayer
             _backpackList.Columns = 1;
             _backpackList.AddChild(Label(Text("backpack_empty", "BACKPACK EMPTY"), 15, new Color(0.48f, 0.54f, 0.52f)));
         }
+
+        var totalValue = ComputeBackpackTotalValue(_shownPlayer);
+        if (!IsInstanceValid(_backpackValueLabel))
+        {
+            _backpackValueLabel = PositionedLabel(string.Empty, 14, new Color(0.95f, 0.78f, 0.28f), 600, 690);
+            _backpackValueLabel.Size = new Vector2(590, 24);
+            if (_lootOverlay.GetChildCount() > 0 && _lootOverlay.GetChild(0) is Control panel)
+            {
+                panel.AddChild(_backpackValueLabel);
+            }
+        }
+        _backpackValueLabel.Text = GameLocalization.IsChinese(_language)
+            ? $"背包总估值  {totalValue}  //  枪械/装备/弹药合计"
+            : $"BACKPACK VALUE  {totalValue}  //  GUNS + GEAR + AMMO";
+        UpdateBackpackHotkey(_shownPlayer);
+    }
+
+    public void UpdateBackpackHotkey(TacticalPlayer? player)
+    {
+        if (!IsInstanceValid(_backpackHotkeyButton))
+        {
+            return;
+        }
+        _backpackHotkeyButton.Text = Text("backpack_button", "TAB  BACKPACK");
+        var value = player is null ? 0 : ComputeBackpackTotalValue(player);
+        if (IsInstanceValid(_backpackHotkeyValue))
+        {
+            _backpackHotkeyValue.Text = GameLocalization.IsChinese(_language)
+                ? $"估值  {value}"
+                : $"VALUE  {value}";
+        }
+    }
+
+    /// <summary>Shipped value path: equipped loadout + backpack stacks. Unarmed cold-start primaries add 0.</summary>
+    public static int ComputeBackpackTotalValue(TacticalPlayer player)
+    {
+        var total = LootItem.TotalValue(player.Backpack);
+        if (player.HasFireablePrimary)
+        {
+            total += new LootItem
+            {
+                Kind = LootItemKind.Weapon,
+                Weapon = player.EquippedWeapon.Clone(),
+                Grade = LootGrade.Rare
+            }.StackValue;
+        }
+        total += new LootItem
+        {
+            Kind = LootItemKind.Equipment,
+            Equipment = player.EquippedHelmet,
+            Grade = LootGrade.Uncommon
+        }.StackValue;
+        total += new LootItem
+        {
+            Kind = LootItemKind.Equipment,
+            Equipment = player.EquippedBodyArmor,
+            Grade = LootGrade.Rare
+        }.StackValue;
+        total += new LootItem
+        {
+            Kind = LootItemKind.Equipment,
+            Equipment = player.EquippedBackpack,
+            Grade = LootGrade.Uncommon
+        }.StackValue;
+        total += player.ReserveAmmo * 2;
+        total += player.ArmorPlates * 40;
+        return total;
     }
 
     private Control BuildLootCard(LootItem item, LootDragOrigin origin)
@@ -946,13 +1030,7 @@ public partial class CombatHUD : CanvasLayer
             slot,
             item.DisplayName(_language),
             item.Detail(_language),
-            item.Kind switch
-            {
-                LootItemKind.Weapon => new Color(0.32f, 0.9f, 0.7f),
-                LootItemKind.Attachment => new Color(0.33f, 0.7f, 0.96f),
-                LootItemKind.Equipment => new Color(0.82f, 0.64f, 0.3f),
-                _ => new Color(0.55f, 0.62f, 0.58f)
-            },
+            LootGrades.GlowColor(item.Grade),
             item.Weapon,
             item.Equipment,
             Text("details", "DETAILS"));
@@ -1138,6 +1216,10 @@ public partial class CombatHUD : CanvasLayer
         _qualitySelect.SetItemText(0, Text("performance", "Performance"));
         _qualitySelect.SetItemText(1, Text("balanced", "Balanced"));
         _qualitySelect.SetItemText(2, Text("cinematic", "Cinematic"));
+        if (IsInstanceValid(_backpackHotkeyButton))
+        {
+            _backpackHotkeyButton.Text = Text("backpack_button", "TAB  BACKPACK");
+        }
         UpdateWeaponSlotButtons();
         RefreshSquadLanguage();
         RefreshLootOverlay();
@@ -1158,7 +1240,13 @@ public partial class CombatHUD : CanvasLayer
         _reserveLabel.Text = $"/ {reserve:000}";
         _grenadeLabel.Text = $"{Text("grenade", "FRAG")}  x{grenades}";
         _healthLabel.AddThemeColorOverride("font_color", health < 30 ? new Color(1.0f, 0.36f, 0.25f) : new Color(0.88f, 0.96f, 0.92f));
+        if (_shownPlayer is not null)
+        {
+            UpdateBackpackHotkey(_shownPlayer);
+        }
     }
+
+    public void SetBackpackValuePlayer(TacticalPlayer player) => UpdateBackpackHotkey(player);
 
     public void SetEquipment(int armorPlates, string fireMode, string weaponName = "M4A1", WeaponBuild? weaponBuild = null)
     {
@@ -1365,20 +1453,58 @@ public partial class CombatHUD : CanvasLayer
         SetEquipmentAction(active ? Text(key, english) : string.Empty, progress, active);
     }
 
-    public void ShowResult(bool victory)
+    public void ShowResult(bool victory, IReadOnlyList<(string Team, int Value, int Rank)>? lootRanks = null)
     {
         _stateOverlay.Visible = true;
         if (victory)
         {
             _stateTitle.Text = Text("mission_complete", "MISSION COMPLETE");
             _stateTitle.AddThemeColorOverride("font_color", new Color(0.33f, 0.92f, 0.74f));
-            _stateSubtitle.Text = Text("terminal_secured", "FREIGHT TERMINAL SECURED");
+            if (lootRanks is { Count: > 0 })
+            {
+                var lines = new System.Text.StringBuilder();
+                lines.Append(Text("extract_rank_title", "EXTRACTION LOOT RANKING"));
+                foreach (var row in lootRanks)
+                {
+                    lines.Append('\n');
+                    lines.Append($"#{row.Rank}  {row.Team}  //  {row.Value}");
+                }
+                lines.Append('\n');
+                lines.Append(Text("extract_rank_note", "BODY BAGS EXCLUDED FROM TEAM SCORE"));
+                _stateSubtitle.Text = lines.ToString();
+            }
+            else
+            {
+                _stateSubtitle.Text = Text("terminal_secured", "FREIGHT TERMINAL SECURED");
+            }
         }
         else
         {
             _stateTitle.Text = Text("operator_down", "OPERATOR DOWN");
             _stateTitle.AddThemeColorOverride("font_color", new Color(1.0f, 0.27f, 0.18f));
             _stateSubtitle.Text = Text("press_enter", "PRESS ENTER TO REDEPLOY");
+        }
+    }
+
+    public void ShowDownedState(float reviveWindowSeconds = 15.0f)
+    {
+        _stateOverlay.Visible = true;
+        _stateTitle.Text = Text("operator_down", "OPERATOR DOWN");
+        _stateTitle.AddThemeColorOverride("font_color", new Color(1.0f, 0.27f, 0.18f));
+        var wait = GameLocalization.IsChinese(_language)
+            ? $"等待医疗救援  //  {Mathf.CeilToInt(reviveWindowSeconds)} 秒"
+            : $"AWAITING MEDIC  //  {Mathf.CeilToInt(reviveWindowSeconds)}s";
+        _stateSubtitle.Text = wait;
+    }
+
+    public void HideDownedState()
+    {
+        // Only clear the soft-down overlay; mission result screens stay up.
+        if (_stateOverlay.Visible
+            && (_stateSubtitle.Text.Contains("AWAITING MEDIC", StringComparison.Ordinal)
+                || _stateSubtitle.Text.Contains("等待医疗", StringComparison.Ordinal)))
+        {
+            _stateOverlay.Visible = false;
         }
     }
 }

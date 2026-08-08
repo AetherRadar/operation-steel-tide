@@ -66,8 +66,8 @@ public partial class FreightTerminalWorld
             _player.DisarmMovementInput();
             Input.MouseMode = Input.MouseModeEnum.Visible;
             _hud.ShowSquadLobby(GameLocalization.IsChinese(_languageSetting)
-                ? "\u672c\u5730\u5c0f\u961f  //  3 \u540d AI \u961f\u53cb\u5df2\u5c31\u7eea"
-                : "LOCAL SQUAD  //  THREE AI TEAMMATES READY");
+                ? "\u672c\u5730\u5c0f\u961f  //  3 \u4eba\u7f16\u5236  //  \u4f60\u9009\u804c\u4e1a\uff0cAI \u8865\u9f50\u5176\u4f59"
+                : "LOCAL SQUAD  //  3 OPERATORS  //  YOU PICK  //  AI FILLS THE REST");
         }
     }
 
@@ -122,7 +122,7 @@ public partial class FreightTerminalWorld
                 break;
             default:
                 _squadNetwork.Close();
-                _hud.SetSquadStatus("LOCAL SQUAD  //  1 HUMAN + 3 AI");
+                _hud.SetSquadStatus("LOCAL SQUAD  //  1 HUMAN + 2 AI");
                 break;
         }
         if (networkError != Error.Ok)
@@ -147,7 +147,8 @@ public partial class FreightTerminalWorld
         {
             return;
         }
-        for (var slot = 1; slot <= 3; slot++)
+        // Exactly two AI slots (total squad size 3 including the player).
+        for (var slot = 1; slot <= 2; slot++)
         {
             if (_squadMates.Any(mate => IsInstanceValid(mate) && mate.SquadSlot == slot))
             {
@@ -155,27 +156,44 @@ public partial class FreightTerminalWorld
             }
             SpawnSquadMate(slot, RoleForSlot(slot), false, 0);
         }
+        // Drop any legacy fourth/third AI if present.
+        for (var i = _squadMates.Count - 1; i >= 0; i--)
+        {
+            var mate = _squadMates[i];
+            if (!IsInstanceValid(mate))
+            {
+                _squadMates.RemoveAt(i);
+                continue;
+            }
+            if (mate.SquadSlot > 2 && !mate.IsHumanProxy)
+            {
+                mate.QueueFree();
+                _squadMates.RemoveAt(i);
+            }
+        }
     }
 
     private OperatorRole RoleForSlot(int slot)
     {
-        var complements = _player.Role switch
+        // AI always takes the two roles the player did not pick.
+        var remaining = new List<OperatorRole>();
+        foreach (OperatorRole role in Enum.GetValues<OperatorRole>())
         {
-            OperatorRole.Medic => new[] { OperatorRole.Assault, OperatorRole.Recon, OperatorRole.Medic },
-            OperatorRole.Recon => new[] { OperatorRole.Assault, OperatorRole.Medic, OperatorRole.Recon },
-            _ => new[] { OperatorRole.Medic, OperatorRole.Recon, OperatorRole.Assault }
-        };
-        return complements[Mathf.Clamp(slot - 1, 0, complements.Length - 1)];
+            if (role != _player.Role)
+            {
+                remaining.Add(role);
+            }
+        }
+        return remaining[Mathf.Clamp(slot - 1, 0, remaining.Count - 1)];
     }
 
     private SquadMate SpawnSquadMate(int slot, OperatorRole role, bool human, long peerId)
     {
-        var callsigns = new[] { "RAVEN", "ECHO", "VIPER", "NOMAD" };
+        var callsigns = new[] { "RAVEN", "ECHO", "VIPER" };
         var formation = slot switch
         {
             1 => new Vector3(-2.25f, 0.05f, 3.2f),
-            2 => new Vector3(2.25f, 0.05f, 3.2f),
-            _ => new Vector3(0.0f, 0.05f, 5.1f)
+            _ => new Vector3(2.25f, 0.05f, 3.2f)
         };
         var position = _player.GlobalPosition + _player.GlobalBasis.X * formation.X + _player.GlobalBasis.Z * formation.Z;
         var mate = new SquadMate
@@ -183,8 +201,11 @@ public partial class FreightTerminalWorld
             Name = human ? $"NetworkSquadmate_{peerId}" : $"AiSquadmate_{slot}",
             Position = position
         };
-        mate.Configure(this, _player, slot, role, callsigns[slot], human, peerId);
+        var sign = callsigns[Mathf.Clamp(slot, 0, callsigns.Length - 1)];
+        mate.Configure(this, _player, slot, role, sign, human, peerId);
         AddChild(mate);
+        // Player squad cold-start: no fireable primary until loot (mirrors player).
+        mate.ApplyColdStartUnarmed();
         mate.SetOrder(_squadOrder, _squadMovePoint);
         _squadMates.Add(mate);
         return mate;
@@ -203,7 +224,7 @@ public partial class FreightTerminalWorld
                 .Where(mate => IsInstanceValid(mate) && mate.IsHumanProxy)
                 .Select(mate => mate.SquadSlot)
                 .ToHashSet();
-            var slot = Enumerable.Range(1, 3).FirstOrDefault(value => !occupiedSlots.Contains(value));
+            var slot = Enumerable.Range(1, 2).FirstOrDefault(value => !occupiedSlots.Contains(value));
             if (slot == 0)
             {
                 return;
@@ -305,15 +326,118 @@ public partial class FreightTerminalWorld
         {
             FailSquadMission();
         }
+
+        // Hold-to-revive replaces the old auto-revive timer.
+        UpdateManualRevive(delta);
         if (_localPlayerDowned)
         {
             _localPlayerDownedTimer += delta;
-            if (_localPlayerDownedTimer >= 15.0f
-                && _squadMates.Any(mate => IsInstanceValid(mate) && !mate.IsDowned))
+            // Bleed-out if nobody revives within the window.
+            if (_localPlayerDownedTimer >= 22.0f)
             {
-                _player.RestoreHealth(32.0f);
+                FailSquadMission();
             }
         }
+    }
+
+    private float _manualReviveProgress;
+    private ISquadCombatant? _manualReviveTarget;
+
+    private void UpdateManualRevive(float delta)
+    {
+        if (!_squadDeployed || _missionEnded || !IsInstanceValid(_player))
+        {
+            return;
+        }
+
+        // Downed player cannot revive others.
+        if (_player.IsDead || _player.IsInVehicle || _hud.IsLootVisible)
+        {
+            CancelManualRevive();
+            return;
+        }
+
+        ISquadCombatant? target = null;
+        var best = 2.85f;
+        foreach (var friendly in FriendlyCombatants())
+        {
+            if (friendly == _player || !friendly.CanBeRevived)
+            {
+                continue;
+            }
+            var distance = _player.GlobalPosition.DistanceTo(friendly.CombatNode.GlobalPosition);
+            if (distance < best)
+            {
+                best = distance;
+                target = friendly;
+            }
+        }
+
+        if (target is null)
+        {
+            CancelManualRevive();
+            return;
+        }
+
+        var label = GameLocalization.IsChinese(_languageSetting)
+            ? "按住 F 救援队友"
+            : "HOLD F  //  REVIVE TEAMMATE";
+        if (!Input.IsActionPressed("interact") || _interactReleaseRequired)
+        {
+            _manualReviveProgress = Mathf.Max(0.0f, _manualReviveProgress - delta * 1.4f);
+            _manualReviveTarget = target;
+            _hud.SetInteraction(label, _manualReviveProgress > 0.02f ? _manualReviveProgress : -1.0f, true);
+            return;
+        }
+
+        if (!ReferenceEquals(_manualReviveTarget, target))
+        {
+            _manualReviveTarget = target;
+            _manualReviveProgress = 0.0f;
+        }
+
+        _manualReviveProgress = Mathf.Min(1.0f, _manualReviveProgress + delta / 2.6f);
+        _player.SetSearchPose(true, _manualReviveProgress);
+        _hud.SetInteraction(label, _manualReviveProgress, true);
+        if (_manualReviveProgress < 1.0f)
+        {
+            return;
+        }
+
+        var revived = target.TryReceiveRevive(62.0f);
+        _manualReviveProgress = 0.0f;
+        _manualReviveTarget = null;
+        _interactReleaseRequired = true;
+        _player.SetSearchPose(false);
+        if (revived)
+        {
+            if (ReferenceEquals(target, _player) || target is TacticalPlayer)
+            {
+                OnLocalPlayerRevived();
+            }
+            _hud.ShowLocalizedMessage(
+                "squad_revive",
+                "MANUAL REVIVE  //  TEAMMATE STABILIZED",
+                OperatorRoles.Spec(OperatorRole.Medic).Accent);
+            SpawnMedicSprayEffect(_player.GlobalPosition + Vector3.Up * 1.2f, target.HitPoint(HitRegion.Torso));
+        }
+        else
+        {
+            _hud.ShowLocalizedMessage(
+                "revive_exhausted",
+                "REVIVE EXHAUSTED  //  NO SECOND CHANCE",
+                new Color(1.0f, 0.42f, 0.28f));
+        }
+    }
+
+    private void CancelManualRevive()
+    {
+        if (_manualReviveProgress > 0.0f)
+        {
+            _player.SetSearchPose(false);
+        }
+        _manualReviveProgress = 0.0f;
+        _manualReviveTarget = null;
     }
 
     private void IssueSquadOrder(SquadOrder order)
@@ -540,17 +664,73 @@ public partial class FreightTerminalWorld
 
         target ??= source;
         var targetPoint = target.HitPoint(HitRegion.Torso);
-        var wasDown = target.CombatDead;
-        target.RestoreHealth(wasDown ? 58.0f : 44.0f);
-        if (target != source)
+        var wasDown = target.CombatDowned || target.CombatDead;
+        var revived = false;
+        if (wasDown)
+        {
+            // Medic spray still requires the once-per-life revive budget.
+            revived = target.TryReceiveRevive(58.0f);
+            if (revived && target is TacticalPlayer)
+            {
+                OnLocalPlayerRevived();
+            }
+        }
+        else
+        {
+            target.RestoreHealth(44.0f);
+        }
+        if (target != source && !source.CombatDead)
         {
             source.RestoreHealth(18.0f);
         }
         SpawnMedicSprayEffect(origin, targetPoint);
-        _hud.ShowLocalizedMessage(
-            wasDown ? "squad_revive" : "medic_spray",
-            wasDown ? "MEDIC SPRAY  //  SQUADMATE REVIVED" : "MEDIC SPRAY  //  TRAUMA STABILIZED",
-            OperatorRoles.Spec(OperatorRole.Medic).Accent);
+        if (wasDown && !revived)
+        {
+            _hud.ShowLocalizedMessage(
+                "revive_exhausted",
+                "REVIVE EXHAUSTED  //  NO SECOND CHANCE",
+                new Color(1.0f, 0.42f, 0.28f));
+        }
+        else
+        {
+            _hud.ShowLocalizedMessage(
+                wasDown ? "squad_revive" : "medic_spray",
+                wasDown ? "MEDIC SPRAY  //  SQUADMATE REVIVED" : "MEDIC SPRAY  //  TRAUMA STABILIZED",
+                OperatorRoles.Spec(OperatorRole.Medic).Accent);
+        }
+    }
+
+    public IEnumerable<Node3D> GetHostileAircraftTargets()
+    {
+        if (IsInstanceValid(_player) && !_player.IsDead)
+        {
+            yield return _player;
+        }
+        foreach (var mate in _squadMates)
+        {
+            if (IsInstanceValid(mate) && !mate.IsDowned)
+            {
+                yield return mate;
+            }
+        }
+    }
+
+    public void ApplyAircraftStrike(Vector3 impact, float radius, float damage, Node source)
+    {
+        foreach (var friendly in FriendlyCombatants())
+        {
+            if (!IsInstanceValid(friendly.CombatNode))
+            {
+                continue;
+            }
+            var distance = friendly.CombatNode.GlobalPosition.DistanceTo(impact);
+            if (distance > radius)
+            {
+                continue;
+            }
+            var falloff = 1.0f - distance / Mathf.Max(0.01f, radius);
+            friendly.TakeCombatDamage(damage * falloff, impact, source);
+        }
     }
 
     public void PerformReconScan(ISquadCombatant source, Vector3 origin)
@@ -698,19 +878,74 @@ public partial class FreightTerminalWorld
 
     public void OnSquadMateDowned(SquadMate mate)
     {
-        _hud.ShowLocalizedMessage("squadmate_down", $"{mate.Callsign} DOWN  //  MEDIC SUPPORT REQUESTED", new Color(1.0f, 0.34f, 0.22f));
+        _hud.ShowLocalizedMessage("squadmate_down", $"{mate.Callsign} DOWN  //  HOLD F TO REVIVE", new Color(1.0f, 0.34f, 0.22f));
+    }
+
+    public void OnSquadMateKia(SquadMate mate)
+    {
+        _hud.ShowLocalizedMessage(
+            "squadmate_kia",
+            $"{mate.Callsign} KIA  //  BODY BAG RECOVERABLE",
+            new Color(1.0f, 0.22f, 0.16f));
+    }
+
+    public void SpawnSquadBodyBag(SquadMate mate)
+    {
+        if (!IsInstanceValid(mate))
+        {
+            return;
+        }
+
+        var bag = new SquadBodyBag
+        {
+            Name = $"BodyBag_{mate.Callsign}",
+            Position = mate.GlobalPosition + Vector3.Up * 0.05f,
+            EnglishName = $"{mate.Callsign} body bag",
+            ChineseName = $"{mate.Callsign} 遗体袋"
+        };
+        // Light field kit left on the fallen operator.
+        bag.Loot.Add(new LootItem { Kind = LootItemKind.Ammunition, Quantity = 30 });
+        bag.Loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate });
+        if (_rng.Randf() < 0.45f)
+        {
+            bag.Loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate });
+        }
+        AddChild(bag);
+        _lootSources.Add(bag);
+        _squadMates.Remove(mate);
+    }
+
+    public void SpawnAircraftShell(Vector3 from, Vector3 to, float damage, float blastRadius, Node owner)
+    {
+        var shell = new AircraftShell
+        {
+            Name = "HostileAircraftShell",
+            Main = this,
+            OwnerAircraft = owner,
+            Position = from
+        };
+        AddChild(shell);
+        shell.Launch(from, to, damage, blastRadius);
     }
 
     private bool HandleLocalPlayerDowned()
     {
-        if (!_squadDeployed || !_squadMates.Any(mate => IsInstanceValid(mate) && !mate.IsDowned))
+        _player.EjectFromVehicleIfAny();
+        var livingMate = _squadMates.Any(mate => IsInstanceValid(mate) && !mate.IsDowned);
+        // Second life already used, or nobody left to revive → hard fail path.
+        if (_player.ReviveUsed || !_squadDeployed || !livingMate)
         {
             return false;
         }
         _localPlayerDowned = true;
         _localPlayerDownedTimer = 0.0f;
-        _player.UiLocked = true;
-        _hud.ShowLocalizedMessage("player_downed", "YOU ARE DOWN  //  AI MEDIC MOVING TO REVIVE", new Color(1.0f, 0.34f, 0.2f));
+        _player.UiLocked = false;
+        Input.MouseMode = Input.MouseModeEnum.Captured;
+        _hud.ShowDownedState(22.0f);
+        _hud.ShowLocalizedMessage(
+            "player_downed",
+            "YOU ARE DOWN  //  CRAWL  //  TEAMMATE HOLD F TO REVIVE",
+            new Color(1.0f, 0.34f, 0.2f));
         return true;
     }
 
@@ -722,6 +957,7 @@ public partial class FreightTerminalWorld
         _player.DisarmFireInput();
         _player.RestoreMovementInput();
         Input.MouseMode = Input.MouseModeEnum.Captured;
+        _hud.HideDownedState();
         _hud.ShowLocalizedMessage("player_revived", "REVIVED  //  BACK IN THE FIGHT", OperatorRoles.Spec(OperatorRole.Medic).Accent);
     }
 
@@ -732,6 +968,10 @@ public partial class FreightTerminalWorld
             return;
         }
         _missionEnded = true;
+        _localPlayerDowned = false;
+        _player.EjectFromVehicleIfAny();
+        _hud.HideDownedState();
+        Input.MouseMode = Input.MouseModeEnum.Visible;
         _missionDirector.CompleteMission(false, _kills, _headshots, _shotsFired, _shotsHit);
         _hud.ShowResult(false);
     }
@@ -775,8 +1015,65 @@ public partial class FreightTerminalWorld
         await ToSignal(GetTree().CreateTimer(0.65f), SceneTreeTimer.SignalName.Timeout);
         var followMotion = follower.GlobalPosition.DistanceTo(_player.GlobalPosition) < followDistanceBefore - 0.5f;
 
-        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
-        GetTree().Quit();
+        // 3-operator fill: player Assault → AI must be Medic + Recon (no third AI).
+        _player.ConfigureRole(OperatorRole.Assault, refillHealth: true);
+        EnsureAiSquadFill();
+        var aiRoles = _squadMates.Where(mate => IsInstanceValid(mate) && !mate.IsHumanProxy).Select(mate => mate.Role).OrderBy(role => role).ToArray();
+        var roleFillOk = ActiveSquadCount == 3
+            && AiSquadCount == 2
+            && aiRoles.Length == 2
+            && aiRoles.Contains(OperatorRole.Medic)
+            && aiRoles.Contains(OperatorRole.Recon)
+            && !aiRoles.Contains(OperatorRole.Assault);
+
+        // Leave deployment protection so live damage/down paths exercise shipped code.
+        _missionDirector.ExitDeploymentZone();
+        await WaitFrames(4);
+
+        // Downed crawl + revive-once.
+        var mate = _squadMates.First(m => IsInstanceValid(m) && !m.IsHumanProxy);
+        mate.TakeCombatDamage(999.0f, mate.HitPoint(HitRegion.Torso), this);
+        var mateDowned = mate.IsDowned && mate.CanBeRevived;
+        var holdBefore = mate.GlobalPosition;
+        for (var i = 0; i < 12; i++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        // First down must stay put (no sliding human crawl).
+        var mateCrawled = mate.IsDowned && mate.GlobalPosition.DistanceTo(holdBefore) < 0.35f;
+        var firstRevive = mate.TryReceiveRevive(55.0f);
+        var mateUp = !mate.IsDowned && firstRevive;
+        // Second down after revive → permanent body bag (not a sliding human).
+        var bagsBefore = GetTree().GetNodesInGroup("squad_body_bags").Count;
+        var lootBefore = _lootSources.Count;
+        mate.TakeCombatDamage(999.0f, mate.HitPoint(HitRegion.Torso), this);
+        await WaitFrames(4);
+        var bagsAfter = GetTree().GetNodesInGroup("squad_body_bags").Count;
+        var bodyBagOk = bagsAfter > bagsBefore
+            || _lootSources.Count > lootBefore
+            || _lootSources.Exists(source => source is SquadBodyBag);
+        // Mate is freed when converted; second revive is impossible by design.
+        var secondReviveBlocked = bodyBagOk || (IsInstanceValid(mate) && !mate.CanBeRevived);
+
+        _player.SetHealthForDiagnostics(10.0f);
+        _player.SetReviveUsedForDiagnostics(false);
+        _player.TakeDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
+        if (!_player.IsDead)
+        {
+            _player.TakeCombatDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
+        }
+        var playerDowned = _player.IsDead && _player.CanBeRevived;
+        var playerFirstRevive = _player.TryReceiveRevive(50.0f);
+        var playerUp = !_player.IsDead && playerFirstRevive && _player.ReviveUsed;
+        _player.TakeCombatDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
+        var playerSecondBlocked = _player.IsDead && !_player.CanBeRevived && !_player.TryReceiveRevive(50.0f) && _player.ReviveUsed;
+
+        var reviveOk = mateDowned && firstRevive && mateUp && bodyBagOk && secondReviveBlocked
+            && playerDowned && playerFirstRevive && playerUp && playerSecondBlocked;
+
+        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} revive_once={reviveOk} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
+        GD.Print($"SQUAD_PASS valid={ActiveSquadCount >= 2 && roleFillOk && reviveOk}");
+        GetTree().Quit(roleFillOk && reviveOk ? 0 : 2);
     }
 
     private async void CaptureSquadFrame()

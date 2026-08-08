@@ -14,10 +14,25 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     public MissionDirector? MissionDirector { get; set; }
     public float DetectionRange { get; set; } = 34.0f;
     public int NetworkId { get; set; } = -1;
+    /// <summary>0 = legacy map NPC garrison. ≥1 = rival extraction squad team.</summary>
+    public int TeamId { get; set; }
+    public bool IsRivalSquad => TeamId > 0;
+    public bool IsProne { get; private set; }
+    public bool UsesCover => _inCover || _seekingCover;
+    public bool IsSearchingLoot => _searchingLoot;
+    public float CurrentHealth => _health;
+    public int AttackShotsFired { get; private set; }
+    /// <summary>Live engage target node (player, squadmate, or other EnemyOperator).</summary>
+    public Node3D? EngageTargetNode =>
+        _combatTarget is not null && !_combatTarget.CombatDead
+            ? _combatTarget.CombatNode
+            : GodotObject.IsInstanceValid(_rawTarget) ? _rawTarget : null;
     public float Suspicion { get; private set; }
     public bool Alerted { get; private set; }
     public bool IsDead { get; private set; }
     public WeaponBuild CarriedWeapon { get; private set; } = WeaponCatalog.Build(WeaponPlatform.M4A1, 0);
+    /// <summary>False for rival cold-start operators until they loot a firearm. Map NPCs stay true.</summary>
+    public bool HasFireablePrimary { get; private set; } = true;
     public EquipmentItem EquippedHelmet { get; private set; } = EquipmentCatalog.Create("helmet_light");
     public EquipmentItem EquippedBodyArmor { get; private set; } = EquipmentCatalog.Create("armor_carrier");
     public EquipmentItem EquippedBackpack { get; private set; } = EquipmentCatalog.Create("pack_assault");
@@ -28,6 +43,48 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     public bool IsSearchable => IsDead;
     public float SearchDuration => 1.15f;
     public bool CarriedWeaponVisible => IsInstanceValid(_carriedWeaponRoot) && _carriedWeaponRoot.Visible;
+
+    /// <summary>Rival extraction cold-start: strip carried firearm mesh + remove weapon loot stacks.</summary>
+    public void ApplyColdStartUnarmed()
+    {
+        HasFireablePrimary = false;
+        MarkCarriedWeaponRemoved();
+        for (var i = Loot.Count - 1; i >= 0; i--)
+        {
+            if (Loot[i].Kind == LootItemKind.Weapon)
+            {
+                Loot.RemoveAt(i);
+            }
+        }
+    }
+
+    /// <summary>Diagnostics only: restore a fireable primary without consuming world loot.</summary>
+    public void GrantFireablePrimaryForDiagnostics(WeaponBuild? build = null)
+    {
+        HasFireablePrimary = true;
+        CarriedWeapon = (build ?? WeaponCatalog.Build(WeaponPlatform.M4A1, 0)).Clone();
+        if (IsInstanceValid(_carriedWeaponRoot))
+        {
+            _carriedWeaponRoot.Visible = true;
+        }
+    }
+
+    /// <summary>Production path: equip a weapon taken from a loot source (sets HasFireablePrimary).</summary>
+    public bool EquipWeaponFromLoot(WeaponBuild build)
+    {
+        if (build is null)
+        {
+            return false;
+        }
+        CarriedWeapon = build.Clone();
+        HasFireablePrimary = true;
+        if (IsInstanceValid(_carriedWeaponRoot))
+        {
+            _carriedWeaponRoot.Visible = true;
+        }
+        // Keep a clone on the corpse loot table only when already dead searchable.
+        return HasFireablePrimary;
+    }
 
     private float _health = 100.0f;
     private Vector3 _patrolOrigin;
@@ -43,6 +100,18 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     private float _coverTimer;
     private float _hitStun;
     private ISquadCombatant? _combatTarget;
+    private Node3D? _rawTarget;
+    private float _proneTimer;
+    private float _stanceDecisionTimer;
+    private float _lootSearchTimer;
+    private float _noContactTimer;
+    private bool _searchingLoot;
+    private Vector3 _lootTarget;
+    /// <summary>How long without in-range contact before map NPCs start looting.</summary>
+    private const float NpcLootIdleSeconds = 6.5f;
+    /// <summary>Beyond this distance a living hostile is ignored for engagement (still exists on map).</summary>
+    private const float ContactAcquireRange = 48.0f;
+    private const float ContactAcquireRangeSq = ContactAcquireRange * ContactAcquireRange;
 
     private readonly RandomNumberGenerator _rng = new();
     private Node3D _bodyRoot = null!;
@@ -66,9 +135,20 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         BuildOperator();
         _patrolOrigin = GlobalPosition;
         PickPatrolTarget();
+        if (IsRivalSquad)
+        {
+            AddToGroup("rival_operators");
+            DetectionRange = Mathf.Max(DetectionRange, 42.0f);
+        }
+        else
+        {
+            AddToGroup("map_npc_operators");
+        }
     }
 
-    public string DisplayName(string language) => GameLocalization.IsChinese(language) ? "敌方干员装备" : "Enemy operator gear";
+    public string DisplayName(string language) => GameLocalization.IsChinese(language)
+        ? (IsRivalSquad ? "敌对干员小队装备" : "敌方驻守干员装备")
+        : (IsRivalSquad ? "Rival squad gear" : "Enemy operator gear");
 
     public void OnSearched()
     {
@@ -88,25 +168,51 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         var platform = roll < 0.55f ? WeaponPlatform.M4A1 : roll < 0.86f ? WeaponPlatform.AK74 : WeaponPlatform.ScarL;
         var tier = _rng.Randf() < 0.16f ? 2 : _rng.Randf() < 0.52f ? 1 : 0;
         CarriedWeapon = WeaponCatalog.Build(platform, tier);
-        Loot.Add(new LootItem { Kind = LootItemKind.Weapon, Weapon = CarriedWeapon.Clone() });
+        var weaponGrade = LootGrades.FromTier(tier);
+        Loot.Add(new LootItem { Kind = LootItemKind.Weapon, Weapon = CarriedWeapon.Clone(), Grade = weaponGrade });
         var availableParts = new List<AttachmentDefinition>(WeaponCatalog.AllAttachments);
         for (var count = 0; count < (tier >= 2 ? 2 : 1); count++)
         {
             var part = availableParts[_rng.RandiRange(0, availableParts.Count - 1)];
-            Loot.Add(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = part.Id });
+            Loot.Add(new LootItem
+            {
+                Kind = LootItemKind.Attachment,
+                AttachmentId = part.Id,
+                Grade = tier >= 2 ? LootGrade.Rare : LootGrade.Uncommon
+            });
             availableParts.Remove(part);
         }
-        Loot.Add(new LootItem { Kind = LootItemKind.Ammunition, Quantity = _rng.RandiRange(20, 48) });
+        Loot.Add(new LootItem
+        {
+            Kind = LootItemKind.Ammunition,
+            Quantity = _rng.RandiRange(20, 48),
+            Grade = LootGrade.Common
+        });
         if (_rng.Randf() < 0.32f)
         {
-            Loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate });
+            Loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate, Grade = LootGrade.Uncommon });
         }
         EquippedHelmet = EquipmentCatalog.Create(_rng.Randf() < 0.24f ? "helmet_heavy" : "helmet_light");
         EquippedBodyArmor = EquipmentCatalog.Create(_rng.Randf() < 0.22f ? "armor_heavy" : "armor_carrier");
         EquippedBackpack = EquipmentCatalog.Create(_rng.Randf() < 0.18f ? "pack_heavy" : "pack_assault");
-        Loot.Add(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquippedHelmet });
-        Loot.Add(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquippedBodyArmor });
-        Loot.Add(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquippedBackpack });
+        Loot.Add(new LootItem
+        {
+            Kind = LootItemKind.Equipment,
+            Equipment = EquippedHelmet,
+            Grade = EquippedHelmet.Definition.Id.Contains("heavy") ? LootGrade.Rare : LootGrade.Uncommon
+        });
+        Loot.Add(new LootItem
+        {
+            Kind = LootItemKind.Equipment,
+            Equipment = EquippedBodyArmor,
+            Grade = EquippedBodyArmor.Definition.Id.Contains("heavy") ? LootGrade.Epic : LootGrade.Rare
+        });
+        Loot.Add(new LootItem
+        {
+            Kind = LootItemKind.Equipment,
+            Equipment = EquippedBackpack,
+            Grade = LootGrade.Uncommon
+        });
     }
 
     private static StandardMaterial3D Material(Color color, float metallic = 0.0f, float roughness = 0.7f)
@@ -308,13 +414,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             return;
         }
-        _combatTarget = Main?.FindNearestFriendly(GlobalPosition) ?? Player;
-        if (_combatTarget is null || _combatTarget.CombatDead)
-        {
-            Velocity = Vector3.Zero;
-            return;
-        }
 
+        AcquireCombatTarget();
         var velocity = Velocity;
         if (!IsOnFloor())
         {
@@ -325,12 +426,68 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         _repathTimer -= dt;
         _patrolTimer -= dt;
         _hitStun = Mathf.Max(0.0f, _hitStun - dt);
+        _proneTimer = Mathf.Max(0.0f, _proneTimer - dt);
+        _stanceDecisionTimer -= dt;
+        _lootSearchTimer -= dt;
 
-        var distance = GlobalPosition.DistanceTo(_combatTarget.CombatNode.GlobalPosition);
+        // Clear dead raw enemy targets (EnemyOperator is not ISquadCombatant).
+        if (_rawTarget is EnemyOperator rawEnemy && rawEnemy.IsDead)
+        {
+            _rawTarget = null;
+        }
+        if (_combatTarget is not null && _combatTarget.CombatDead)
+        {
+            _combatTarget = null;
+        }
+
+        var hasEngageTarget = EngageTargetNode is not null;
+        if (hasEngageTarget)
+        {
+            _noContactTimer = 0.0f;
+        }
+        else
+        {
+            _noContactTimer += dt;
+            if (Alerted && !IsRivalSquad)
+            {
+                // Drop stale alert when nothing is in contact range so loot can resume.
+                Alerted = false;
+                Suspicion = Mathf.Max(0.0f, Suspicion - dt * 25.0f);
+            }
+        }
+
+        if (!hasEngageTarget)
+        {
+            // Unarmed operators (rivals + NPCs after strip) hunt weapons quickly; armed NPCs loot after idle timeout.
+            var lootIdle = HasFireablePrimary ? NpcLootIdleSeconds : 1.2f;
+            if (!_searchingLoot && !Alerted && _noContactTimer >= lootIdle && _lootSearchTimer <= 0.0f)
+            {
+                // Rivals only search when still unarmed; NPCs always may loot after timeout.
+                if (!HasFireablePrimary || !IsRivalSquad)
+                {
+                    BeginLootSearch();
+                }
+            }
+            if (_searchingLoot)
+            {
+                UpdateLootSearch(dt);
+            }
+            else if (!Alerted)
+            {
+                Patrol(dt);
+            }
+            MoveAndSlide();
+            AnimateBody(dt);
+            return;
+        }
+
+        var distance = GlobalPosition.DistanceTo(CurrentTargetPosition());
         var hasSight = distance < DetectionRange && WithinViewCone() && HasLineOfSight();
+        // Mid-loot contact: any acquired hostile inside a hard contact bubble ends looting immediately.
+        var midLootContact = _searchingLoot && distance < 22.0f;
         if (!Alerted)
         {
-            if (MissionDirector?.IsDeploymentProtected() == true)
+            if (MissionDirector?.IsDeploymentProtected() == true && !IsRivalSquad)
             {
                 Suspicion = Mathf.Max(0.0f, Suspicion - dt * 40.0f);
             }
@@ -339,21 +496,39 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
                 var proximity = Mathf.Clamp(1.0f - distance / DetectionRange, 0.0f, 1.0f);
                 Suspicion = Mathf.Min(100.0f, Suspicion + dt * (18.0f + proximity * 58.0f));
             }
+            else if (distance < ContactAcquireRange * 0.65f)
+            {
+                // Close contact without perfect LOS still builds pressure.
+                Suspicion = Mathf.Min(100.0f, Suspicion + dt * 22.0f);
+            }
             else
             {
                 Suspicion = Mathf.Max(0.0f, Suspicion - dt * 13.0f);
             }
 
-            if (Suspicion >= 100.0f)
+            // Rivals press any in-range hostile; NPCs need sight/suspicion/close contact.
+            // Looting NPCs always flip to combat on mid-loot contact.
+            if (Suspicion >= 100.0f || hasSight || midLootContact
+                || (IsRivalSquad && hasEngageTarget)
+                || (!IsRivalSquad && distance < 16.0f))
             {
                 Alerted = true;
+                _searchingLoot = false;
                 MissionDirector?.RaiseConfirmedAlarm();
             }
         }
 
-        if (Alerted)
+        if (Alerted || hasSight || midLootContact)
         {
-            Engage(dt, distance, hasSight);
+            // Contact mid-loot always drops search and opens fire.
+            _searchingLoot = false;
+            UpdateStance(dt, distance, hasSight || midLootContact);
+            Engage(dt, distance, hasSight || midLootContact);
+        }
+        else if (_searchingLoot)
+        {
+            // Hostile exists but is still far — keep looting until they enter the contact bubble.
+            UpdateLootSearch(dt);
         }
         else
         {
@@ -363,25 +538,358 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         AnimateBody(dt);
     }
 
-    private bool HasLineOfSight()
+    private void AcquireCombatTarget()
     {
-        if (_combatTarget is null || _combatTarget.CombatDead)
+        _combatTarget = null;
+        _rawTarget = null;
+        if (Main is null)
+        {
+            // Without a world, only lock the player if actually nearby.
+            if (GodotObject.IsInstanceValid(Player) && !Player.IsDead
+                && GlobalPosition.DistanceSquaredTo(Player.GlobalPosition) <= ContactAcquireRangeSq)
+            {
+                _combatTarget = Player;
+                _rawTarget = Player;
+            }
+            return;
+        }
+
+        // Prefer living hostiles that are not on our team AND within contact range.
+        // Distant hostiles must not block NPC loot idle.
+        Node3D? bestNode = null;
+        ISquadCombatant? bestCombatant = null;
+        var bestScore = float.PositiveInfinity;
+        var acquireRangeSq = IsRivalSquad
+            ? ContactAcquireRangeSq * 1.35f * 1.35f
+            : ContactAcquireRangeSq;
+        foreach (var candidate in Main.EnumerateHostileTargetsFor(this))
+        {
+            if (candidate is null || !GodotObject.IsInstanceValid(candidate))
+            {
+                continue;
+            }
+            var distanceSq = GlobalPosition.DistanceSquaredTo(candidate.GlobalPosition);
+            if (distanceSq > acquireRangeSq)
+            {
+                continue;
+            }
+            // Rival squads heavily prefer player/other operators over distant noise.
+            var bias = 0.0f;
+            if (candidate is TacticalPlayer || candidate is SquadMate)
+            {
+                bias = IsRivalSquad ? -40.0f : -15.0f;
+            }
+            else if (candidate is EnemyOperator other && other.IsRivalSquad)
+            {
+                bias = -35.0f; // map NPCs prefer rival operator squads inside range
+            }
+            var score = distanceSq + bias;
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestNode = candidate;
+                if (candidate is ISquadCombatant combatant)
+                {
+                    bestCombatant = combatant;
+                }
+                else if (candidate is TacticalPlayer tp)
+                {
+                    bestCombatant = tp;
+                }
+                else if (candidate is SquadMate sm)
+                {
+                    bestCombatant = sm;
+                }
+                else
+                {
+                    bestCombatant = null;
+                }
+            }
+        }
+
+        if (bestCombatant is not null)
+        {
+            _combatTarget = bestCombatant;
+            _rawTarget = bestCombatant.CombatNode;
+        }
+        else if (bestNode is EnemyOperator enemyTarget)
+        {
+            // EnemyOperator is not ISquadCombatant — engage via raw node + FireAtNode.
+            _combatTarget = null;
+            _rawTarget = enemyTarget;
+        }
+        else if (bestNode is not null)
+        {
+            _rawTarget = bestNode;
+        }
+        // No fallback to infinitely-distant player — leave EngageTargetNode null so loot idle can run.
+    }
+
+    private ILootSource? _lootSourceTarget;
+
+    private void BeginLootSearch()
+    {
+        _lootSourceTarget = null;
+        // Prefer a weapon cache when unarmed (cold-start re-arm path).
+        if (!HasFireablePrimary)
+        {
+            var weaponSource = Main?.FindNearestWeaponLootSource(GlobalPosition, 90.0f);
+            if (weaponSource is not null && IsInstanceValid(weaponSource.LootNode))
+            {
+                _lootSourceTarget = weaponSource;
+                _searchingLoot = true;
+                _lootTarget = weaponSource.LootNode.GlobalPosition;
+                _lootSearchTimer = _rng.RandfRange(2.5f, 4.5f);
+                return;
+            }
+        }
+        var point = Main?.FindNearestLootPoint(GlobalPosition, 55.0f);
+        if (point is null)
+        {
+            // Retry later instead of spinning every frame.
+            _lootSearchTimer = _rng.RandfRange(3.0f, 6.0f);
+            return;
+        }
+        _searchingLoot = true;
+        _lootTarget = point.Value;
+        // Hold at the cache for a while before returning to patrol.
+        _lootSearchTimer = _rng.RandfRange(4.0f, 7.0f);
+    }
+
+    /// <summary>
+    /// Diagnostics only: force the no-contact timer past the idle threshold so the next
+    /// _PhysicsProcess tick can enter loot via the real BeginLootSearch path (not a bypass).
+    /// </summary>
+    public void ForceNoContactTimerForDiagnostics(float seconds)
+    {
+        _noContactTimer = Mathf.Max(0.0f, seconds);
+        _lootSearchTimer = 0.0f;
+        Alerted = false;
+        Suspicion = 0.0f;
+        _combatTarget = null;
+        _rawTarget = null;
+        _searchingLoot = false;
+    }
+
+    /// <summary>Zero fire cooldown so the next Engage tick can call the real FireAt* path immediately.</summary>
+    public void ArmWeaponForDiagnostics()
+    {
+        _fireTimer = 0.0f;
+        _stanceDecisionTimer = 0.0f;
+    }
+
+    /// <summary>Reset cover/prone/loot so headless scenarios start from a known AI state.</summary>
+    public void ResetTacticalStateForDiagnostics()
+    {
+        if (IsDead)
+        {
+            // Revive dead diagnostics subjects so multi-phase validators can reuse them.
+            IsDead = false;
+            CollisionLayer = 2;
+            CollisionMask = 1 | 2;
+            SetPhysicsProcess(true);
+            ProcessMode = ProcessModeEnum.Inherit;
+            if (IsInstanceValid(_bodyRoot))
+            {
+                _bodyRoot.Rotation = Vector3.Zero;
+                _bodyRoot.Position = Vector3.Zero;
+            }
+        }
+        _health = 100.0f;
+        _seekingCover = false;
+        _inCover = false;
+        _coverTimer = 0.0f;
+        _searchingLoot = false;
+        _lootSearchTimer = 0.0f;
+        _noContactTimer = 0.0f;
+        _hitStun = 0.0f;
+        _fireTimer = 0.0f;
+        _stanceDecisionTimer = 0.0f;
+        _proneTimer = 0.0f;
+        SetProne(false);
+        Suspicion = 0.0f;
+        Alerted = false;
+        _combatTarget = null;
+        _rawTarget = null;
+        // Phase-1 duel may have removed this unit from the world roster on death.
+        // Re-list so later validator phases (and AcquireCombatTarget) can see us again.
+        Main?.EnsureEnemyRegisteredForDiagnostics(this);
+    }
+
+    /// <summary>Clear alert so idle behaviors (loot search) can run on the real path.</summary>
+    public void ClearAlertForDiagnostics()
+    {
+        Alerted = false;
+        Suspicion = 0.0f;
+        _searchingLoot = false;
+        _seekingCover = false;
+        _inCover = false;
+        _noContactTimer = 0.0f;
+        _combatTarget = null;
+        _rawTarget = null;
+    }
+
+    private void UpdateLootSearch(float delta)
+    {
+        // Refresh target position if the source is still valid (pickups don't move, corpses might).
+        if (_lootSourceTarget is not null && GodotObject.IsInstanceValid(_lootSourceTarget.LootNode))
+        {
+            _lootTarget = _lootSourceTarget.LootNode.GlobalPosition;
+        }
+        var targetFlat = new Vector3(_lootTarget.X, GlobalPosition.Y, _lootTarget.Z);
+        if (GlobalPosition.DistanceTo(targetFlat) < 1.6f)
+        {
+            var stopped = Velocity;
+            stopped.X = 0.0f;
+            stopped.Z = 0.0f;
+            Velocity = stopped;
+            // At cache: if unarmed, claim a weapon from the real loot source (production path).
+            if (!HasFireablePrimary && Main is not null)
+            {
+                var source = _lootSourceTarget;
+                if (source is null || !source.IsSearchable)
+                {
+                    source = Main.FindNearestWeaponLootSource(GlobalPosition, 3.5f);
+                }
+                if (source is not null && Main.TryEquipWeaponFromLootSource(this, source))
+                {
+                    _searchingLoot = false;
+                    _lootSourceTarget = null;
+                    _lootSearchTimer = _rng.RandfRange(2.0f, 5.0f);
+                    return;
+                }
+            }
+            // "Searching" hold, then resume patrol.
+            if (_lootSearchTimer <= 0.0f)
+            {
+                _searchingLoot = false;
+                _lootSourceTarget = null;
+                _lootSearchTimer = _rng.RandfRange(10.0f, 18.0f);
+            }
+            return;
+        }
+        LookAt(targetFlat, Vector3.Up);
+        var direction = GlobalPosition.DirectionTo(targetFlat);
+        direction.Y = 0.0f;
+        var speed = HasFireablePrimary ? 2.6f : 3.4f; // unarmed hustle to the cache
+        var velocity = Velocity;
+        velocity.X = Mathf.MoveToward(velocity.X, direction.X * speed, delta * 10.0f);
+        velocity.Z = Mathf.MoveToward(velocity.Z, direction.Z * speed, delta * 10.0f);
+        Velocity = velocity;
+    }
+
+    private void UpdateStance(float delta, float distance, bool hasSight)
+    {
+        if (_stanceDecisionTimer > 0.0f)
+        {
+            if (IsProne && _proneTimer <= 0.0f)
+            {
+                SetProne(false);
+            }
+            return;
+        }
+        _stanceDecisionTimer = _rng.RandfRange(0.9f, 1.8f);
+        // Rivals prone more aggressively to break headshot lines; NPCs less so.
+        var proneChance = IsRivalSquad ? 0.72f : 0.28f;
+        var wantProne = (hasSight || distance < 28.0f)
+            && distance > 9.0f
+            && distance < 40.0f
+            && (_inCover || _rng.Randf() < proneChance);
+        if (wantProne && !IsProne)
+        {
+            SetProne(true);
+            _proneTimer = _rng.RandfRange(1.2f, 2.6f);
+        }
+        else if (IsProne && (distance < 7.0f || !hasSight && distance > 42.0f))
+        {
+            SetProne(false);
+        }
+        // Seek cover when mid-fight and a cover point is available.
+        if (IsRivalSquad && !_seekingCover && !_inCover && Main is not null && distance > 12.0f && _rng.Randf() < 0.55f)
+        {
+            var cover = Main.FindCoverPoint(GlobalPosition, CurrentTargetPosition());
+            if (cover.Y > -500.0f && cover.DistanceTo(GlobalPosition) < 22.0f)
+            {
+                _seekingCover = true;
+                _coverTarget = cover;
+            }
+        }
+    }
+
+    public void SetProne(bool prone)
+    {
+        IsProne = prone;
+        if (IsInstanceValid(_bodyRoot))
+        {
+            _bodyRoot.Position = new Vector3(0.0f, prone ? 0.22f : 0.0f, 0.0f);
+            _bodyRoot.Rotation = new Vector3(prone ? Mathf.Pi * 0.48f : 0.0f, 0.0f, 0.0f);
+        }
+    }
+
+    public bool IsHostileTo(EnemyOperator other)
+    {
+        if (other is null || other == this || other.IsDead)
         {
             return false;
         }
-        var from = GlobalPosition + Vector3.Up * 1.55f;
-        var to = _combatTarget.HitPoint(HitRegion.Torso);
+        return TeamId != other.TeamId;
+    }
+
+    private Vector3 CurrentTargetPoint()
+    {
+        if (_combatTarget is not null && !_combatTarget.CombatDead)
+        {
+            return _combatTarget.HitPoint(IsProne ? HitRegion.Limbs : HitRegion.Torso);
+        }
+        if (_rawTarget is not null && GodotObject.IsInstanceValid(_rawTarget))
+        {
+            return _rawTarget.GlobalPosition + Vector3.Up * (IsProne ? 0.45f : 1.2f);
+        }
+        return Player.HitPoint(HitRegion.Torso);
+    }
+
+    private Vector3 CurrentTargetPosition()
+    {
+        if (_combatTarget is not null)
+        {
+            return _combatTarget.CombatNode.GlobalPosition;
+        }
+        if (_rawTarget is not null && GodotObject.IsInstanceValid(_rawTarget))
+        {
+            return _rawTarget.GlobalPosition;
+        }
+        return Player.GlobalPosition;
+    }
+
+    private bool HasLineOfSight()
+    {
+        var targetNode = _combatTarget?.CombatNode ?? _rawTarget;
+        if (targetNode is null || !GodotObject.IsInstanceValid(targetNode))
+        {
+            return false;
+        }
+        if (_combatTarget is not null && _combatTarget.CombatDead)
+        {
+            return false;
+        }
+        var from = GlobalPosition + Vector3.Up * (IsProne ? 0.55f : 1.55f);
+        var to = CurrentTargetPoint();
         var query = PhysicsRayQueryParameters3D.Create(from, to);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
         query.CollideWithAreas = false;
         var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        return hit.Count > 0 && hit["collider"].AsGodotObject() == _combatTarget.CombatNode;
+        if (hit.Count == 0)
+        {
+            return false;
+        }
+        var collider = hit["collider"].AsGodotObject();
+        return collider == targetNode || collider is Node node && targetNode.IsAncestorOf(node);
     }
 
     private bool WithinViewCone()
     {
-        var eye = GlobalPosition + Vector3.Up * 1.5f;
-        var target = (_combatTarget ?? Player).HitPoint(HitRegion.Torso);
+        var eye = GlobalPosition + Vector3.Up * (IsProne ? 0.5f : 1.5f);
+        var target = CurrentTargetPoint();
         var direction = eye.DirectionTo(target);
         return (-GlobalBasis.Z).Dot(direction) > 0.42f;
     }
@@ -422,20 +930,30 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
     private void Engage(float delta, float distance, bool hasSight)
     {
-        if (UpdateCover(delta))
-        {
-            return;
-        }
+        // Cover movement can run, but never fully suppress shooting once a target is locked.
+        var holdingCover = UpdateCover(delta);
         if (_hitStun > 0.0f)
         {
             var stunnedVelocity = Velocity;
             stunnedVelocity.X = Mathf.MoveToward(stunnedVelocity.X, 0.0f, delta * 18.0f);
             stunnedVelocity.Z = Mathf.MoveToward(stunnedVelocity.Z, 0.0f, delta * 18.0f);
             Velocity = stunnedVelocity;
+            // Still allow return fire while stunned at reduced cadence.
+            if (_fireTimer <= 0.0f && distance < 28.0f && (hasSight || distance < 14.0f))
+            {
+                if (_combatTarget is not null)
+                {
+                    FireAtSquad(distance);
+                }
+                else if (_rawTarget is EnemyOperator stunnedRival && !stunnedRival.IsDead)
+                {
+                    FireAtNode(stunnedRival, distance);
+                }
+            }
             return;
         }
 
-        var combatPosition = (_combatTarget ?? Player).CombatNode.GlobalPosition;
+        var combatPosition = CurrentTargetPosition();
         var targetFlat = new Vector3(combatPosition.X, GlobalPosition.Y, combatPosition.Z);
         if (GlobalPosition.DistanceTo(targetFlat) > 0.1f)
         {
@@ -444,17 +962,21 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         var forward = -GlobalBasis.Z;
         var right = GlobalBasis.X;
         var desired = Vector3.Zero;
-        if (distance > 19.0f)
+        if (!IsProne)
         {
-            desired += forward;
-        }
-        else if (distance < 8.0f)
-        {
-            desired -= forward;
-        }
-        if (hasSight && distance < 32.0f)
-        {
-            desired += right * _strafeSign * 0.58f;
+            if (distance > 19.0f)
+            {
+                desired += forward;
+            }
+            else if (distance < 8.0f)
+            {
+                desired -= forward;
+            }
+            if (hasSight && distance < 32.0f)
+            {
+                // Strafe around cover edges instead of face-tanking.
+                desired += right * _strafeSign * 0.58f;
+            }
         }
         if (_repathTimer <= 0.0f)
         {
@@ -463,17 +985,44 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             {
                 _strafeSign *= -1.0f;
             }
+            // Rival squads periodically re-path to cover while under fire.
+            if (IsRivalSquad && hasSight && Main is not null && _rng.Randf() < 0.4f)
+            {
+                var cover = Main.FindCoverPoint(GlobalPosition, combatPosition);
+                if (cover.Y > -500.0f)
+                {
+                    _seekingCover = true;
+                    _coverTarget = cover;
+                }
+            }
         }
 
-        var speed = distance > 19.0f ? 3.7f : 2.4f;
-        var movement = desired.Normalized() * speed;
-        var velocity = Velocity;
-        velocity.X = Mathf.MoveToward(velocity.X, movement.X, delta * 11.0f);
-        velocity.Z = Mathf.MoveToward(velocity.Z, movement.Z, delta * 11.0f);
-        Velocity = velocity;
-        if (hasSight && distance < 52.0f && _fireTimer <= 0.0f)
+        if (!holdingCover)
         {
-            FireAtSquad(distance);
+            var speed = IsProne ? 1.1f : distance > 19.0f ? 3.7f : 2.4f;
+            if (IsRivalSquad)
+            {
+                speed *= 1.08f;
+            }
+            var movement = desired.LengthSquared() > 0.01f ? desired.Normalized() * speed : Vector3.Zero;
+            var velocity = Velocity;
+            velocity.X = Mathf.MoveToward(velocity.X, movement.X, delta * 11.0f);
+            velocity.Z = Mathf.MoveToward(velocity.Z, movement.Z, delta * 11.0f);
+            Velocity = velocity;
+        }
+        // Fire when we have a live engage target in range. Prefer LOS, but still allow
+        // close-range pressure shots so squads do not soft-lock when LOS is noisy.
+        var canFire = distance < 52.0f && _fireTimer <= 0.0f && (hasSight || distance < 18.0f);
+        if (canFire)
+        {
+            if (_combatTarget is not null)
+            {
+                FireAtSquad(distance);
+            }
+            else if (_rawTarget is EnemyOperator rival && !rival.IsDead)
+            {
+                FireAtNode(rival, distance);
+            }
         }
     }
 
@@ -558,8 +1107,101 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
     private void FireAtSquad(float distance)
     {
+        if (!HasFireablePrimary)
+        {
+            return;
+        }
+        if (_combatTarget is null)
+        {
+            if (_rawTarget is EnemyOperator rivalFallback && !rivalFallback.IsDead)
+            {
+                FireAtNode(rivalFallback, distance);
+            }
+            return;
+        }
+        BeginMuzzleFlash();
+        var stats = CarriedWeapon.Stats();
+        _fireTimer = _rng.RandfRange(stats.FireInterval * 2.4f, stats.FireInterval * 4.8f);
+        var rangeFactor = Mathf.Clamp(stats.EffectiveRange / 150.0f, 0.7f, 1.25f);
+        // Rivals are more accurate at medium range so multi-squad fights resolve.
+        var baseAcc = IsRivalSquad ? 0.97f : 0.9f;
+        var accuracy = Mathf.Clamp((IsProne ? baseAcc + 0.02f : baseAcc) - distance * 0.005f / rangeFactor, 0.55f, 0.98f);
+        var regionRoll = _rng.Randf();
+        var hitRegion = IsProne
+            ? HitRegion.Torso
+            : regionRoll < 0.12f ? HitRegion.Head : regionRoll < 0.78f ? HitRegion.Torso : HitRegion.Limbs;
+        var aimPoint = _combatTarget.HitPoint(hitRegion);
+        var muzzlePos = IsInstanceValid(_muzzle)
+            ? _muzzle.GlobalPosition
+            : GlobalPosition + Vector3.Up * (IsProne ? 0.55f : 1.45f);
+        var clear = Ballistics.HasClearShot(GetWorld3D(), muzzlePos, aimPoint, _combatTarget.CombatNode, GetRid());
+        if (clear && _rng.Randf() < accuracy)
+        {
+            _combatTarget.TakeCombatDamage(stats.Damage * _rng.RandfRange(0.32f, 0.48f), aimPoint, this);
+        }
+        else if (!clear)
+        {
+            // Tracer stops at the wall hit instead of ghosting through.
+            var query = PhysicsRayQueryParameters3D.Create(muzzlePos, aimPoint);
+            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+            query.CollideWithAreas = false;
+            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+            if (hit.Count > 0)
+            {
+                aimPoint = hit["position"].AsVector3();
+            }
+        }
+        else
+        {
+            // Near-miss still close enough for tracers; keep pressure high.
+            aimPoint += Scatter() * 0.35f;
+        }
+        if (IsInstanceValid(_muzzle))
+        {
+            Main?.SpawnTracer(_muzzle.GlobalPosition, aimPoint, new Color(1.0f, 0.34f, 0.13f));
+        }
+    }
+
+    private void FireAtNode(EnemyOperator rival, float distance)
+    {
+        if (!HasFireablePrimary)
+        {
+            return;
+        }
+        BeginMuzzleFlash();
         var stats = CarriedWeapon.Stats();
         _fireTimer = _rng.RandfRange(stats.FireInterval * 3.2f, stats.FireInterval * 6.8f);
+        var accuracy = Mathf.Clamp(0.9f - distance * 0.008f, 0.4f, 0.94f);
+        var aimPoint = rival.GlobalPosition + Vector3.Up * (rival.IsProne ? 0.45f : 1.2f);
+        var muzzlePos = IsInstanceValid(_muzzle)
+            ? _muzzle.GlobalPosition
+            : GlobalPosition + Vector3.Up * (IsProne ? 0.55f : 1.45f);
+        var clear = Ballistics.HasClearShot(GetWorld3D(), muzzlePos, aimPoint, rival, GetRid());
+        if (clear && _rng.Randf() < accuracy)
+        {
+            rival.TakeDamage(stats.Damage * _rng.RandfRange(0.28f, 0.4f), aimPoint, this);
+        }
+        else if (!clear)
+        {
+            var query = PhysicsRayQueryParameters3D.Create(muzzlePos, aimPoint);
+            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+            query.CollideWithAreas = false;
+            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+            if (hit.Count > 0)
+            {
+                aimPoint = hit["position"].AsVector3();
+            }
+        }
+        else
+        {
+            aimPoint += Scatter();
+        }
+        Main?.SpawnTracer(muzzlePos, aimPoint, new Color(1.0f, 0.45f, 0.18f));
+    }
+
+    private void BeginMuzzleFlash()
+    {
+        AttackShotsFired++;
         _shotAudio.PitchScale = _rng.RandfRange(0.88f, 1.08f);
         _shotAudio.Play();
         _muzzleLight.LightEnergy = 5.5f;
@@ -569,28 +1211,12 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         flash.TweenProperty(_muzzleLight, "light_energy", 0.0f, 0.05f);
         flash.Parallel().TweenProperty(_muzzleBloom, "scale", Vector3.One * 0.1f, 0.06f);
         flash.TweenCallback(Callable.From(() => _muzzleBloom.Visible = false));
-
-        var rangeFactor = Mathf.Clamp(stats.EffectiveRange / 150.0f, 0.7f, 1.25f);
-        var accuracy = Mathf.Clamp(0.86f - distance * 0.011f / rangeFactor, 0.24f, 0.8f);
-        var regionRoll = _rng.Randf();
-        var hitRegion = regionRoll < 0.12f
-            ? HitRegion.Head
-            : regionRoll < 0.78f ? HitRegion.Torso : HitRegion.Limbs;
-        var target = _combatTarget ?? Player;
-        var aimPoint = target.HitPoint(hitRegion);
-        if (_rng.Randf() < accuracy)
-        {
-            target.TakeCombatDamage(stats.Damage * _rng.RandfRange(0.24f, 0.34f), aimPoint, this);
-        }
-        else
-        {
-            aimPoint += new Vector3(
-                _rng.RandfRange(-1.9f, 1.9f),
-                _rng.RandfRange(-1.1f, 1.4f),
-                _rng.RandfRange(-1.9f, 1.9f));
-        }
-        Main?.SpawnTracer(_muzzle.GlobalPosition, aimPoint, new Color(1.0f, 0.34f, 0.13f));
     }
+
+    private Vector3 Scatter() => new(
+        _rng.RandfRange(-1.9f, 1.9f),
+        _rng.RandfRange(-1.1f, 1.4f),
+        _rng.RandfRange(-1.9f, 1.9f));
 
     private void AnimateBody(float delta)
     {
