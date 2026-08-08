@@ -29,7 +29,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     public bool CanBeRevived => IsDowned && !ReviveUsed && !IsBodyBag;
     public float CombatHealth => Health;
     public float CombatMaxHealth => MaxHealth;
-    /// <summary>False at cold-start until the mate loots and equips a primary.</summary>
+    /// <summary>AI operators deploy with a primary; diagnostics may temporarily strip it.</summary>
     public bool HasFireablePrimary { get; private set; } = true;
 
     public void ApplyColdStartUnarmed()
@@ -749,8 +749,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         Part(_weapon, Cylinder(0.025f, 0.48f), new Vector3(0.0f, 1.24f, -0.85f), gun, new Vector3(Mathf.Pi / 2.0f, 0.0f, 0.0f));
         _muzzle = new Marker3D { Position = new Vector3(0.0f, 1.24f, -1.1f) };
         _weapon.AddChild(_muzzle);
-        HasFireablePrimary = false;
-        _weapon.Visible = false;
+        HasFireablePrimary = true;
+        _weapon.Visible = true;
 
         _nameLabel = new Label3D
         {

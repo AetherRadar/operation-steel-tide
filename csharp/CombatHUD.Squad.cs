@@ -179,7 +179,7 @@ public partial class CombatHUD
         _squadLobbyTitle.Size = new Vector2(1040, 44);
         _squadLobbyTitle.HorizontalAlignment = HorizontalAlignment.Center;
         panel.AddChild(_squadLobbyTitle);
-        _squadLobbySubtitle = Label("SELECT YOUR CLASS  //  3-OPERATOR SQUAD  //  AI FILLS THE OTHER TWO", 14, new Color(0.48f, 0.65f, 0.61f));
+        _squadLobbySubtitle = Label("SELECT CLASS  //  PURCHASE KIT  //  AI TEAMMATES DEPLOY ARMED", 14, new Color(0.48f, 0.65f, 0.61f));
         _squadLobbySubtitle.Position = new Vector2(0, 78);
         _squadLobbySubtitle.Size = new Vector2(1040, 24);
         _squadLobbySubtitle.HorizontalAlignment = HorizontalAlignment.Center;
@@ -226,7 +226,7 @@ public partial class CombatHUD
             card.AddChild(_roleDescriptions[i]);
         }
         _roleButtons[0].ButtonPressed = true;
-
+        BuildDeploymentStore(panel);
 
         _squadSessionStatus = Label("LOCAL SQUAD  //  THREE AI TEAMMATES READY", 13, new Color(0.45f, 0.86f, 0.72f));
         _squadSessionStatus.Position = new Vector2(0, 612);
@@ -394,8 +394,8 @@ public partial class CombatHUD
         var chinese = GameLocalization.IsChinese(_language);
         _squadLobbyTitle.Text = chinese ? "小队部署" : "SQUAD DEPLOYMENT";
         _squadLobbySubtitle.Text = chinese
-            ? "\u9009\u62e9\u804c\u4e1a  //  \u7a7a\u4f4d\u81ea\u52a8\u7531 AI \u961f\u53cb\u8865\u9f50"
-            : "SELECT YOUR CLASS  //  EMPTY SLOTS ARE FILLED BY AI";
+            ? "\u9009\u62e9\u804c\u4e1a  //  \u8d2d\u4e70\u6574\u5907  //  AI \u961f\u53cb\u643a\u67aa\u51fa\u51fb"
+            : "SELECT CLASS  //  PURCHASE KIT  //  AI TEAMMATES DEPLOY ARMED";
         _localSquadButton.Text = chinese ? "单人 + AI" : "LOCAL + AI";
         _hostSquadButton.Text = chinese ? "创建局域网" : "HOST LAN";
         _joinSquadButton.Text = chinese ? "加入局域网" : "JOIN LAN";
@@ -407,5 +407,6 @@ public partial class CombatHUD
         }
         SetSquadOrder(_displayedOrder);
         RefreshClassSkillText();
+        RefreshDeploymentLanguage();
     }
 }

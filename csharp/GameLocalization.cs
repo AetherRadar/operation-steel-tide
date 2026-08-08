@@ -204,6 +204,18 @@ public static class GameLocalization
         Chinese["minimap_residential"] = "\u6f6e\u6c50\u4f4f\u533a";
         Chinese["minimap_command"] = "\u6307\u6325\u8231";
         Chinese["ammo_tier_tooltip"] = "\u5f39\u5323\u5185\u5f39\u836f\u7b49\u7ea7";
+        Chinese["loadout_scavenger"] = "\u641c\u7d22\u8005 / \u4ec5\u5200\u5177";
+        Chinese["loadout_m4a1"] = "M4A1 \u7a81\u51fb";
+        Chinese["loadout_mp5"] = "MP5A5 \u8fd1\u6218";
+        Chinese["loadout_m24"] = "M24 \u7cbe\u5bc6\u5c04\u624b";
+        Chinese["loadout_standard_armor"] = "\u6807\u51c6\u91ce\u6218\u88c5\u5907";
+        Chinese["loadout_heavy_armor"] = "\u91cd\u578b\u7a81\u51fb\u88c5\u5907";
+        Chinese["loadout_insufficient"] = "\u4f59\u989d\u4e0d\u8db3  //  \u8bf7\u9009\u62e9\u66f4\u4fbf\u5b9c\u7684\u6574\u5907";
+        Chinese["loadout_save_failed"] = "\u6863\u6848\u4fdd\u5b58\u5931\u8d25  //  \u5df2\u53d6\u6d88\u90e8\u7f72";
+        Chinese["extraction_bank"] = "\u5df2\u5b58\u5165\u64a4\u79bb\u4ef7\u503c";
+        Chinese["extraction_unbanked"] = "\u64a4\u79bb\u4ef7\u503c\u672a\u5165\u8d26";
+        Chinese["profile_balance"] = "\u4e0b\u5c40\u6574\u5907\u4f59\u989d";
+        Chinese["profile_save_warning"] = "\u6863\u6848\u4fdd\u5b58\u5931\u8d25  //  \u4ef7\u503c\u672a\u5b58\u5165";
     }
 
     private static readonly Dictionary<string, string> ChineseObjectives = new()

@@ -1483,7 +1483,12 @@ public partial class CombatHUD : CanvasLayer
         SetEquipmentAction(active ? Text(key, english) : string.Empty, progress, active);
     }
 
-    public void ShowResult(bool victory, IReadOnlyList<(string Team, int Value, int Rank)>? lootRanks = null)
+    public void ShowResult(
+        bool victory,
+        IReadOnlyList<(string Team, int Value, int Rank)>? lootRanks = null,
+        int extractedValue = 0,
+        int wallet = 0,
+        bool profileSaved = true)
     {
         _stateOverlay.Visible = true;
         if (victory)
@@ -1506,6 +1511,15 @@ public partial class CombatHUD : CanvasLayer
             else
             {
                 _stateSubtitle.Text = Text("terminal_secured", "FREIGHT TERMINAL SECURED");
+            }
+            var extractionLabel = profileSaved
+                ? Text("extraction_bank", "EXTRACTED VALUE BANKED")
+                : Text("extraction_unbanked", "EXTRACTED VALUE NOT BANKED");
+            _stateSubtitle.Text += $"\n{extractionLabel}  +{Mathf.Max(0, extractedValue)}";
+            _stateSubtitle.Text += $"\n{Text("profile_balance", "NEXT DEPLOYMENT BALANCE")}  {Mathf.Max(0, wallet)}";
+            if (!profileSaved)
+            {
+                _stateSubtitle.Text += $"\n{Text("profile_save_warning", "PROFILE SAVE FAILED  //  VALUE NOT BANKED")}";
             }
         }
         else

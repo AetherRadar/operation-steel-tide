@@ -96,7 +96,11 @@ public partial class FreightTerminalWorld
 
     private void OnSquadDeploymentRequested(int role, int mode, string address)
     {
-        if (_squadDeployed)
+        if (_squadDeployed || _deploymentPurchaseCommitted)
+        {
+            return;
+        }
+        if (!TryCommitSelectedDeployment())
         {
             return;
         }
@@ -114,6 +118,7 @@ public partial class FreightTerminalWorld
         _player.DisarmFireInput();
         _player.RestoreMovementInput();
         _squadDeployed = true;
+        EnsureDeploymentBaseline();
         _localPlayerDowned = false;
         _squadOrder = SquadOrder.Follow;
 
@@ -210,8 +215,6 @@ public partial class FreightTerminalWorld
         var sign = callsigns[Mathf.Clamp(slot, 0, callsigns.Length - 1)];
         mate.Configure(this, _player, slot, role, sign, human, peerId);
         AddChild(mate);
-        // Friendly AI follows the same cold-start rule as the player and must loot a rifle.
-        mate.ApplyColdStartUnarmed();
         mate.SetOrder(_squadOrder, _squadMovePoint);
         _squadMates.Add(mate);
         return mate;

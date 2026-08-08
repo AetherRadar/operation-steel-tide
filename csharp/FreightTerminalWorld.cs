@@ -101,6 +101,7 @@ public partial class FreightTerminalWorld : Node3D
     {
         _rng.Randomize();
         LoadSettings();
+        InitializeOperatorProgression();
         InitMissionDirector();
         BuildEnvironment();
         BuildLevel();
@@ -248,6 +249,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateTacticalHud();
         }
+        else if (Array.Exists(args, value => value == "--validate-progression"))
+        {
+            ValidateProgressionFlow();
+        }
         else if (Array.Exists(args, value => value == "--validate-backpack-tab"))
         {
             ValidateBackpackTab();
@@ -328,6 +333,7 @@ public partial class FreightTerminalWorld : Node3D
 
     public override void _ExitTree()
     {
+        CleanupOperatorProgression();
         // Drop cached materials and stop long-lived nodes so Godot's Variant
         // PagedAllocator does not report "pages in use" on process exit.
         try
@@ -751,6 +757,7 @@ public partial class FreightTerminalWorld : Node3D
 
         _hud = new CombatHUD { Name = "CombatHUD" };
         AddChild(_hud);
+        _hud.SetOperatorProfile(_operatorProfileStore.Profile);
         _hud.PauseRequested += TogglePause;
         _hud.RestartRequested += RestartMission;
         _hud.QuitRequested += () => GetTree().Quit();
@@ -1158,11 +1165,6 @@ public partial class FreightTerminalWorld : Node3D
             enemy.ConfigureInitialLoadout(initialWeapon);
         }
         AddChild(enemy);
-        // Rival extraction operators cold-start unarmed; map garrison NPCs keep firearms.
-        if (teamId > 0)
-        {
-            enemy.ApplyColdStartUnarmed();
-        }
         enemy.Eliminated += OnEnemyEliminated;
         _enemies.Add(enemy);
         if (alerted)
@@ -1469,7 +1471,8 @@ public partial class FreightTerminalWorld : Node3D
         Input.MouseMode = Input.MouseModeEnum.Visible;
         _missionDirector.CompleteMission(true, _kills, _headshots, _shotsFired, _shotsHit);
         var ranks = BuildExtractionLootRanking();
-        _hud.ShowResult(true, ranks);
+        var progression = CommitExtractionValue();
+        _hud.ShowResult(true, ranks, progression.ExtractedValue, progression.Wallet, progression.Saved);
     }
 
     /// <summary>
@@ -2969,12 +2972,11 @@ public partial class FreightTerminalWorld : Node3D
     {
         await WaitFrames(2);
         EnsureAiSquadFill();
-        // Freeze and re-strip actors so random early loot movement cannot affect the snapshot.
+        // Freeze actors so autonomous movement cannot affect the production-loadout snapshot.
         foreach (var squadMate in _squadMates)
         {
             if (IsInstanceValid(squadMate))
             {
-                squadMate.ApplyColdStartUnarmed();
                 squadMate.ProcessMode = ProcessModeEnum.Disabled;
             }
         }
@@ -2982,17 +2984,16 @@ public partial class FreightTerminalWorld : Node3D
         {
             if (IsInstanceValid(enemy) && enemy.IsRivalSquad)
             {
-                enemy.ApplyColdStartUnarmed();
                 enemy.ProcessMode = ProcessModeEnum.Disabled;
             }
         }
         _player.ApplyColdStartUnarmed();
         await WaitFrames(2);
         var playerUnarmed = !_player.HasFireablePrimary && _player.Ammo == 0;
-        var matesUnarmed = _squadMates
+        var matesArmed = _squadMates
             .Where(m => IsInstanceValid(m) && !m.IsHumanProxy)
-            .All(m => !m.HasFireablePrimary);
-        var rivalsUnarmed = true;
+            .All(m => m.HasFireablePrimary);
+        var rivalsArmed = true;
         var rivalCount = 0;
         EnemyOperator? sampleRival = null;
         foreach (var squad in _hostileSquads)
@@ -3005,9 +3006,9 @@ public partial class FreightTerminalWorld : Node3D
                 }
                 rivalCount++;
                 sampleRival ??= member;
-                if (member.HasFireablePrimary)
+                if (!member.HasFireablePrimary)
                 {
-                    rivalsUnarmed = false;
+                    rivalsArmed = false;
                 }
             }
         }
@@ -3071,9 +3072,9 @@ public partial class FreightTerminalWorld : Node3D
             mateArmedAfterLoot = TryMateEquipWeaponFromLootSource(testMate, mateCache) && testMate.HasFireablePrimary;
         }
 
-        var valid = playerUnarmed && matesUnarmed && rivalsUnarmed && rivalCount >= 4 && npcArmed
+        var valid = playerUnarmed && matesArmed && rivalsArmed && rivalCount >= 4 && npcArmed
             && playerArmedAfterLoot && rivalArmedAfterLoot && mateArmedAfterLoot;
-        GD.Print($"EXTRACTION_LOADOUT_CHECK valid={valid} player_unarmed={playerUnarmed} mates_unarmed={matesUnarmed} rivals_unarmed={rivalsUnarmed} rival_n={rivalCount} npc_armed={npcArmed} player_after_loot={playerArmedAfterLoot} rival_after_loot={rivalArmedAfterLoot} mate_after_loot={mateArmedAfterLoot}");
+        GD.Print($"EXTRACTION_LOADOUT_CHECK valid={valid} player_unarmed={playerUnarmed} mates_armed={matesArmed} rivals_armed={rivalsArmed} rival_n={rivalCount} npc_armed={npcArmed} player_after_loot={playerArmedAfterLoot} rival_after_loot={rivalArmedAfterLoot} mate_after_loot={mateArmedAfterLoot}");
         GD.Print($"EXTRACTION_LOADOUT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
