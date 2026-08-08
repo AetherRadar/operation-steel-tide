@@ -142,6 +142,23 @@ public static class GameLocalization
         Chinese["knife_skin_hazard"] = "\u8b66\u6212\u6761\u7eb9";
         Chinese["knife_skin_detail"] = "\u88c5\u5907\u540e\u6c38\u4e45\u66ff\u6362\u6218\u672f\u5200\u6d82\u88c5";
         Chinese["knife_skin_equipped"] = "\u6218\u672f\u5200\u6d82\u88c5\u5df2\u66ff\u6362";
+        Chinese["civilian_medic_aid"] = "\u533b\u7597\u6551\u52a9  //  \u4f24\u52bf\u5df2\u7a33\u5b9a";
+        Chinese["civilian_local_intel"] = "\u793e\u533a\u60c5\u62a5  //  \u654c\u4eba\u5df2\u6807\u8bb0";
+        Chinese["civilian_field_repair"] = "\u73b0\u573a\u62a2\u4fee  //  \u8f7d\u5177\u6216\u88c5\u5907\u5df2\u7ef4\u62a4";
+        Chinese["civilian_evac_supply"] = "\u64a4\u79bb\u7269\u8d44  //  \u5df2\u83b7\u5f97\u5f39\u836f";
+        Chinese["resident_supplies"] = "\u5c45\u6c11\u8865\u7ed9\u5df2\u83b7\u5f97";
+        Chinese["civilian_medic_request"] = "\u8bf7\u6c42\u533b\u7597\u6551\u52a9";
+        Chinese["civilian_guard_request"] = "\u8bf7\u6c42\u793e\u533a\u60c5\u62a5";
+        Chinese["civilian_repair_request"] = "\u8bf7\u6c42\u8f7d\u5177\u62a2\u4fee";
+        Chinese["civilian_evac_request"] = "\u8bf7\u6c42\u64a4\u79bb\u7269\u8d44";
+        Chinese["civilian_resident_request"] = "\u8bf7\u6c42\u5c45\u6c11\u8865\u7ed9";
+        Chinese["residential_cache_medical"] = "\u793e\u533a\u533b\u7597\u67dc";
+        Chinese["residential_cache_evac"] = "\u64a4\u79bb\u7269\u8d44\u67dc";
+        Chinese["residential_cache_workshop"] = "\u7ef4\u4fee\u5de5\u5177\u67dc";
+        Chinese["residential_cache_security"] = "\u793e\u533a\u5b89\u4fdd\u88c5\u5907\u67dc";
+        Chinese["residential_cache_smuggler"] = "\u9690\u85cf\u8fdd\u7981\u54c1\u7bb1";
+        Chinese["residential_cache_pantry"] = "\u793e\u533a\u50a8\u5907\u67dc";
+        Chinese["residential_cache_family"] = "\u5c45\u6c11\u5e94\u6025\u50a8\u5907";
     }
 
     private static readonly Dictionary<string, string> ChineseObjectives = new()

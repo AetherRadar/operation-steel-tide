@@ -136,6 +136,16 @@ public partial class DriveableVehicle : CharacterBody3D
         return true;
     }
 
+    public bool RestoreHealth(float amount)
+    {
+        if (IsDestroyed || amount <= 0.0f || Health >= MaxHealth)
+        {
+            return false;
+        }
+        Health = Mathf.Min(MaxHealth, Health + amount);
+        return true;
+    }
+
     public string InteractionLabel(string language)
     {
         if (IsDestroyed)

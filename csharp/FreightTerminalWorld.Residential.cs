@@ -6,6 +6,17 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    private enum ResidentialRoomArchetype
+    {
+        FamilyApartment,
+        MedicalClinic,
+        EvacuationShelter,
+        MaintenanceWorkshop,
+        CommunitySecurity,
+        SmugglerDen,
+        CommunityKitchen
+    }
+
     private const float ResidentialFloorHeight = 3.15f;
     private const float ResidentialStairRun = 5.4f;
     private const float ResidentialStairOpeningWidth = 5.6f;
@@ -106,6 +117,9 @@ public partial class FreightTerminalWorld
     private readonly List<Vector3> _residentialRooftops = new();
     private readonly List<ResidentialSniperPost> _residentialSniperPosts = new();
     private readonly List<ResidentialSkybridgeSightline> _residentialSkybridgeSightlines = new();
+    private readonly List<ResidentialSupplyCache> _residentialCaches = new();
+    private readonly HashSet<ResidentialRoomArchetype> _residentialRoomArchetypes = new();
+    private readonly int[] _residentialCacheCountByTower = new int[ResidentialTowerSpecs.Length];
     private int _residentialFloorCount;
     private int _residentialStairFlightCount;
     private int _residentialRoofAccessCount;
@@ -117,6 +131,7 @@ public partial class FreightTerminalWorld
     public int ResidentialTowerCount => _residentialTowers.Count;
     public int ResidentialCivilianCount => _civilians.Count;
     public int ResidentialSpecialCivilianCount => _civilians.FindAll(civilian => civilian.IsSpecial).Count;
+    public int ResidentialCacheCount => _residentialCaches.Count;
 
     private void BuildResidentialCommunity(
         Godot.Material concrete,
@@ -130,6 +145,9 @@ public partial class FreightTerminalWorld
         _residentialLinkSlots.Clear();
         _residentialSniperPosts.Clear();
         _residentialSkybridgeSightlines.Clear();
+        _residentialCaches.Clear();
+        _residentialRoomArchetypes.Clear();
+        Array.Clear(_residentialCacheCountByTower, 0, _residentialCacheCountByTower.Length);
         _residentialSkybridgeCount = 0;
         _residentialSkybridgeWindowCount = 0;
         _residentialSkybridgeFrameCount = 0;
@@ -327,7 +345,7 @@ public partial class FreightTerminalWorld
             var westSlot = linkSlots is not null && linkSlots.TryGetValue(1, out var westLink) && westLink.Floors.Contains(floor) ? westLink : null;
             var eastSlot = linkSlots is not null && linkSlots.TryGetValue(0, out var eastLink) && eastLink.Floors.Contains(floor) ? eastLink : null;
             BuildTowerFloorShell(tower, spec, floor, floorY, facade, glass, spec.Accent, westSlot, eastSlot);
-            BuildTowerInterior(tower, spec, floor, floorY, stairCoreZ, interiorWall, wood, bedding, warmLight, westSlot, eastSlot);
+            BuildTowerInterior(tower, spec, index, floor, floorY, stairCoreZ, interiorWall, wood, bedding, warmLight, westSlot, eastSlot);
             BuildTowerStairs(tower, floor, floorY, stairCoreZ, stair, trim, warmLight);
             _residentialFloorCount++;
         }
@@ -473,6 +491,7 @@ public partial class FreightTerminalWorld
     private void BuildTowerInterior(
         Node3D tower,
         ResidentialTowerSpec spec,
+        int towerIndex,
         int floor,
         float floorY,
         float coreZ,
@@ -504,9 +523,14 @@ public partial class FreightTerminalWorld
         var appliance = Mat("residential_appliance", new Color(0.55f, 0.58f, 0.56f), 0.62f, 0.35f);
         var screen = Mat("residential_screen", new Color(0.08f, 0.14f, 0.2f), 0.2f, 0.25f, new Color(0.12f, 0.35f, 0.55f));
         var table = Mat("residential_table", new Color(0.24f, 0.16f, 0.1f), 0.05f, 0.78f);
+        var featuredFloor = ShouldSpawnResidentialCache(spec, floor);
         foreach (var side in new[] { -1.0f, 1.0f })
         {
             var roomX = side * (corridorHalfWidth + roomWidth * 0.5f);
+            var archetype = featuredFloor
+                ? ResidentialRoomArchetypeFor(towerIndex, floor, side)
+                : ResidentialRoomArchetype.FamilyApartment;
+            _residentialRoomArchetypes.Add(archetype);
             ExpansionBox(tower, "ApartmentDivider", new Vector3(roomX, wallY, depth * 0.08f), new Vector3(roomWidth * 0.92f, partitionHeight, 0.1f), wall);
             // Living / bedroom set
             var livingZ = depth * 0.28f;
@@ -532,27 +556,33 @@ public partial class FreightTerminalWorld
             ExpansionBox(tower, "ApartmentShelf", new Vector3(roomX + side * roomWidth * 0.18f, floorY + 1.15f, -depth * 0.18f), new Vector3(0.9f, 1.7f, 0.32f), wood);
             ExpansionBox(tower, "ApartmentCrate", new Vector3(roomX - side * 0.55f, floorY + 0.28f, depth * 0.12f), new Vector3(0.55f, 0.45f, 0.55f), table);
             MeshBox(tower, new Vector3(roomX + side * 0.4f, floorY + 0.08f, -depth * 0.2f), new Vector3(0.7f, 0.05f, 0.9f), carpet);
-            // Room purpose placard
-            var purpose = ((floor + (side > 0 ? 1 : 0)) % 4) switch
+            if (featuredFloor)
             {
-                0 => "LIVING QUARTERS",
-                1 => "FAMILY UNIT",
-                2 => "STAGING ROOM",
-                _ => "MED BAY ANNEX"
-            };
+                BuildResidentialRoomTheme(tower, archetype, roomX, side, roomWidth, depth, floorY);
+            }
+            if (side > 0.0f && featuredFloor)
+            {
+                SpawnResidentialCache(
+                    tower,
+                    towerIndex,
+                    floor,
+                    archetype,
+                    new Vector3(roomX - side * roomWidth * 0.18f, floorY + 0.12f, -depth * 0.18f),
+                    side);
+            }
             tower.AddChild(new Label3D
             {
                 Name = "ApartmentPurposeSign",
                 Position = new Vector3(side * (corridorHalfWidth + 0.08f), floorY + 1.55f, livingZ),
-                Text = purpose,
+                Text = ResidentialRoomName(archetype),
                 FontSize = 16,
                 OutlineSize = 5,
-                Modulate = spec.Accent,
+                Modulate = ResidentialRoomColor(archetype),
                 Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
                 VisibilityRangeEnd = 12.0f,
                 VisibilityRangeEndMargin = 2.0f
             });
-            // No per-room OmniLight — residential towers were spawning hundreds of lights (major FPS hit).
+            // The single floor light below serves both rooms; per-room lights multiply too quickly across 96 floors.
         }
         // Corridor carpet runner and ceiling strip lights (mesh only).
         MeshBox(tower, new Vector3(0, floorY + 0.08f, depth * 0.05f), new Vector3(2.2f, 0.03f, depth * 0.62f), carpet);
@@ -571,10 +601,10 @@ public partial class FreightTerminalWorld
         tower.AddChild(new OmniLight3D
         {
             Name = "ResidentialHallLight",
-            Position = new Vector3(0, floorY + 2.72f, depth * 0.1f),
+            Position = new Vector3(0, floorY + 2.72f, featuredFloor ? -depth * 0.18f : depth * 0.1f),
             LightColor = new Color(1.0f, 0.78f, 0.52f),
-            LightEnergy = 0.7f,
-            OmniRange = 9.0f,
+            LightEnergy = featuredFloor ? 1.45f : 0.7f,
+            OmniRange = featuredFloor ? 16.0f : 9.0f,
             ShadowEnabled = false,
             DistanceFadeEnabled = true,
             DistanceFadeBegin = 36.0f,
@@ -593,6 +623,199 @@ public partial class FreightTerminalWorld
             VisibilityRangeEndMargin = 3.0f
         };
         tower.AddChild(floorLabel);
+    }
+
+    private static ResidentialRoomArchetype ResidentialRoomArchetypeFor(int towerIndex, int floor, float side)
+        => (ResidentialRoomArchetype)((towerIndex * 5 + floor * 2 + (side > 0.0f ? 1 : 0)) % 7);
+
+    private static string ResidentialRoomName(ResidentialRoomArchetype archetype) => archetype switch
+    {
+        ResidentialRoomArchetype.MedicalClinic => "COMMUNITY CLINIC",
+        ResidentialRoomArchetype.EvacuationShelter => "EVAC SHELTER",
+        ResidentialRoomArchetype.MaintenanceWorkshop => "MAINTENANCE FLAT",
+        ResidentialRoomArchetype.CommunitySecurity => "SECURITY POST",
+        ResidentialRoomArchetype.SmugglerDen => "SEALED TENANT UNIT",
+        ResidentialRoomArchetype.CommunityKitchen => "COMMUNITY KITCHEN",
+        _ => "FAMILY APARTMENT"
+    };
+
+    private static Color ResidentialRoomColor(ResidentialRoomArchetype archetype) => archetype switch
+    {
+        ResidentialRoomArchetype.MedicalClinic => new Color(0.3f, 0.94f, 0.62f),
+        ResidentialRoomArchetype.EvacuationShelter => new Color(1.0f, 0.65f, 0.22f),
+        ResidentialRoomArchetype.MaintenanceWorkshop => new Color(0.95f, 0.78f, 0.2f),
+        ResidentialRoomArchetype.CommunitySecurity => new Color(0.34f, 0.68f, 1.0f),
+        ResidentialRoomArchetype.SmugglerDen => new Color(0.92f, 0.34f, 0.24f),
+        ResidentialRoomArchetype.CommunityKitchen => new Color(0.54f, 0.82f, 0.38f),
+        _ => new Color(0.82f, 0.72f, 0.56f)
+    };
+
+    private void BuildResidentialRoomTheme(
+        Node3D tower,
+        ResidentialRoomArchetype archetype,
+        float roomX,
+        float side,
+        float roomWidth,
+        float depth,
+        float floorY)
+    {
+        var outerX = roomX + side * roomWidth * 0.27f;
+        var innerX = roomX - side * roomWidth * 0.2f;
+        var northZ = -depth * 0.31f;
+        var southZ = depth * 0.31f;
+        var accent = ResidentialRoomColor(archetype);
+        var accentMat = Mat($"residential_theme_{archetype}", accent * 0.65f, 0.08f, 0.72f);
+        var dark = Mat("residential_theme_dark", new Color(0.07f, 0.085f, 0.085f), 0.55f, 0.44f);
+        var pale = Mat("residential_theme_pale", new Color(0.66f, 0.7f, 0.66f), 0.08f, 0.82f);
+        var glow = Mat($"residential_theme_glow_{archetype}", accent, 0.04f, 0.3f, accent * 0.8f);
+
+        MeshBox(
+            tower,
+            new Vector3(roomX, floorY + 2.82f, -depth * 0.18f),
+            new Vector3(Mathf.Min(2.8f, roomWidth * 0.62f), 0.045f, 0.22f),
+            glow);
+        MeshBox(
+            tower,
+            new Vector3(roomX, floorY + 0.075f, -depth * 0.18f),
+            new Vector3(Mathf.Min(2.65f, roomWidth * 0.58f), 0.035f, 0.58f),
+            accentMat);
+
+        switch (archetype)
+        {
+            case ResidentialRoomArchetype.MedicalClinic:
+                ExpansionBox(tower, "ClinicCotN", new Vector3(innerX, floorY + 0.34f, northZ), new Vector3(1.9f, 0.45f, 0.72f), pale);
+                ExpansionBox(tower, "ClinicCotS", new Vector3(innerX, floorY + 0.34f, southZ), new Vector3(1.9f, 0.45f, 0.72f), pale);
+                MeshBox(tower, new Vector3(innerX, floorY + 0.61f, northZ), new Vector3(1.72f, 0.08f, 0.58f), accentMat);
+                MeshBox(tower, new Vector3(innerX, floorY + 0.61f, southZ), new Vector3(1.72f, 0.08f, 0.58f), accentMat);
+                ExpansionBox(tower, "ClinicScreen", new Vector3(outerX, floorY + 1.05f, northZ + 1.0f), new Vector3(0.08f, 1.8f, 1.65f), accentMat);
+                MeshBox(tower, new Vector3(outerX, floorY + 1.42f, southZ - 0.8f), new Vector3(0.08f, 0.48f, 0.48f), glow);
+                break;
+            case ResidentialRoomArchetype.EvacuationShelter:
+                foreach (var z in new[] { northZ, southZ })
+                {
+                    ExpansionBox(tower, "EvacBunkLow", new Vector3(innerX, floorY + 0.28f, z), new Vector3(1.95f, 0.34f, 0.72f), dark);
+                    ExpansionBox(tower, "EvacBunkHigh", new Vector3(innerX, floorY + 1.28f, z), new Vector3(1.95f, 0.2f, 0.72f), dark);
+                    MeshBox(tower, new Vector3(innerX, floorY + 0.5f, z), new Vector3(1.78f, 0.08f, 0.58f), accentMat);
+                    MeshBox(tower, new Vector3(innerX, floorY + 1.43f, z), new Vector3(1.78f, 0.08f, 0.58f), accentMat);
+                }
+                ExpansionBox(tower, "EvacLuggage", new Vector3(outerX, floorY + 0.35f, northZ + 1.1f), new Vector3(0.82f, 0.62f, 0.52f), accentMat);
+                ExpansionBox(tower, "EvacRationStack", new Vector3(outerX, floorY + 0.4f, southZ - 1.0f), new Vector3(0.9f, 0.72f, 0.72f), dark);
+                break;
+            case ResidentialRoomArchetype.MaintenanceWorkshop:
+                ExpansionBox(tower, "WorkshopBenchN", new Vector3(innerX, floorY + 0.48f, northZ), new Vector3(2.2f, 0.78f, 0.72f), dark);
+                ExpansionBox(tower, "WorkshopBenchS", new Vector3(innerX, floorY + 0.48f, southZ), new Vector3(2.2f, 0.78f, 0.72f), dark);
+                ExpansionBox(tower, "WorkshopLocker", new Vector3(outerX, floorY + 1.0f, northZ + 1.0f), new Vector3(0.75f, 1.8f, 0.58f), accentMat);
+                for (var pipe = -1; pipe <= 1; pipe++)
+                {
+                    MeshBox(tower, new Vector3(innerX + pipe * 0.34f, floorY + 1.18f, southZ - 0.1f), new Vector3(0.16f, 0.16f, 1.65f), pale);
+                }
+                MeshBox(tower, new Vector3(outerX, floorY + 1.55f, southZ - 0.9f), new Vector3(0.08f, 0.72f, 0.72f), glow);
+                break;
+            case ResidentialRoomArchetype.CommunitySecurity:
+                ExpansionBox(tower, "SecurityDesk", new Vector3(innerX, floorY + 0.48f, southZ - 0.45f), new Vector3(2.15f, 0.78f, 0.72f), dark);
+                for (var screenIndex = -1; screenIndex <= 1; screenIndex++)
+                {
+                    MeshBox(tower, new Vector3(innerX + screenIndex * 0.62f, floorY + 1.16f, southZ - 0.72f), new Vector3(0.5f, 0.4f, 0.06f), glow);
+                }
+                ExpansionBox(tower, "SecurityLocker", new Vector3(outerX, floorY + 1.0f, northZ), new Vector3(0.78f, 1.8f, 0.65f), accentMat);
+                ExpansionBox(tower, "SecurityShieldRack", new Vector3(innerX, floorY + 0.8f, northZ + 0.9f), new Vector3(1.6f, 1.35f, 0.18f), dark);
+                break;
+            case ResidentialRoomArchetype.SmugglerDen:
+                foreach (var offset in new[] { -0.75f, 0.0f, 0.75f })
+                {
+                    ExpansionBox(tower, "ContrabandCrate", new Vector3(innerX + offset, floorY + 0.36f, northZ), new Vector3(0.62f, 0.62f, 0.62f), dark);
+                }
+                ExpansionBox(tower, "SmugglerWorkbench", new Vector3(innerX, floorY + 0.5f, southZ), new Vector3(2.25f, 0.82f, 0.7f), accentMat);
+                MeshBox(tower, new Vector3(innerX, floorY + 0.96f, southZ), new Vector3(1.7f, 0.06f, 0.5f), glow);
+                MeshBox(tower, new Vector3(outerX, floorY + 1.3f, northZ + 1.1f), new Vector3(0.08f, 0.8f, 1.4f), accentMat);
+                break;
+            case ResidentialRoomArchetype.CommunityKitchen:
+                ExpansionBox(tower, "KitchenIslandN", new Vector3(innerX, floorY + 0.52f, northZ), new Vector3(2.25f, 0.86f, 0.82f), pale);
+                ExpansionBox(tower, "KitchenIslandS", new Vector3(innerX, floorY + 0.52f, southZ), new Vector3(2.25f, 0.86f, 0.82f), pale);
+                ExpansionBox(tower, "KitchenColdStore", new Vector3(outerX, floorY + 1.0f, northZ + 1.0f), new Vector3(0.86f, 1.82f, 0.72f), accentMat);
+                foreach (var z in new[] { -depth * 0.12f, depth * 0.18f })
+                {
+                    ExpansionBox(tower, "KitchenDiningTable", new Vector3(innerX, floorY + 0.42f, z), new Vector3(1.75f, 0.12f, 0.76f), dark);
+                }
+                break;
+            default:
+                ExpansionBox(tower, "FamilyDiningTable", new Vector3(innerX, floorY + 0.42f, southZ - 0.85f), new Vector3(1.65f, 0.12f, 0.82f), accentMat);
+                ExpansionBox(tower, "FamilyToyChest", new Vector3(outerX, floorY + 0.3f, northZ + 1.0f), new Vector3(0.75f, 0.48f, 0.58f), accentMat);
+                MeshBox(tower, new Vector3(outerX, floorY + 1.42f, southZ - 0.9f), new Vector3(0.08f, 0.68f, 0.9f), glow);
+                break;
+        }
+    }
+
+    private static bool ShouldSpawnResidentialCache(ResidentialTowerSpec spec, int floor)
+        => floor == 0 || floor == spec.Floors / 2 || floor == Mathf.Max(1, spec.Floors - 2);
+
+    private void SpawnResidentialCache(
+        Node3D tower,
+        int towerIndex,
+        int floor,
+        ResidentialRoomArchetype archetype,
+        Vector3 localPosition,
+        float side)
+    {
+        var kind = archetype switch
+        {
+            ResidentialRoomArchetype.MedicalClinic => ResidentialCacheKind.MedicalCabinet,
+            ResidentialRoomArchetype.EvacuationShelter => ResidentialCacheKind.EvacuationLocker,
+            ResidentialRoomArchetype.MaintenanceWorkshop => ResidentialCacheKind.WorkshopLocker,
+            ResidentialRoomArchetype.CommunitySecurity => ResidentialCacheKind.SecurityArmory,
+            ResidentialRoomArchetype.SmugglerDen => ResidentialCacheKind.SmugglerCache,
+            ResidentialRoomArchetype.CommunityKitchen => ResidentialCacheKind.CommunityPantry,
+            _ => ResidentialCacheKind.FamilyStash
+        };
+        var cache = new ResidentialSupplyCache
+        {
+            Name = $"ResidentialCache_T{towerIndex + 1:00}_F{floor + 1:00}_{kind}",
+            Position = localPosition,
+            Rotation = new Vector3(0, side * Mathf.Pi * 0.5f, 0)
+        };
+        cache.Configure(kind, towerIndex, floor, CreateResidentialCacheLoot(kind));
+        tower.AddChild(cache);
+        _residentialCaches.Add(cache);
+        _residentialCacheCountByTower[towerIndex]++;
+        _lootSources.Add(cache);
+        _lootWorldPoints.Add(cache.GlobalPosition);
+    }
+
+    private static List<LootItem> CreateResidentialCacheLoot(ResidentialCacheKind kind)
+    {
+        var loot = new List<LootItem>();
+        switch (kind)
+        {
+            case ResidentialCacheKind.MedicalCabinet:
+                loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 2, Grade = LootGrade.Rare });
+                loot.Add(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("helmet_light"), Grade = LootGrade.Uncommon });
+                break;
+            case ResidentialCacheKind.EvacuationLocker:
+                loot.Add(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Rifle, Quantity = 36, Grade = LootGrade.Uncommon });
+                loot.Add(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("pack_assault"), Grade = LootGrade.Rare });
+                break;
+            case ResidentialCacheKind.WorkshopLocker:
+                loot.Add(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = "grip_vertical", Grade = LootGrade.Rare });
+                loot.Add(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = "muzzle_brake", Grade = LootGrade.Uncommon });
+                break;
+            case ResidentialCacheKind.SecurityArmory:
+                loot.Add(new LootItem { Kind = LootItemKind.Weapon, Weapon = WeaponCatalog.Build(WeaponPlatform.MP5A5, 1), Grade = LootGrade.Rare });
+                loot.Add(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Smg, Quantity = 60, Grade = LootGrade.Uncommon });
+                break;
+            case ResidentialCacheKind.SmugglerCache:
+                loot.Add(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = "muzzle_suppressor", Grade = LootGrade.Epic });
+                loot.Add(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Sniper, Quantity = 18, Grade = LootGrade.Rare });
+                break;
+            case ResidentialCacheKind.CommunityPantry:
+                loot.Add(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Rifle, Quantity = 42, Grade = LootGrade.Common });
+                loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 1, Grade = LootGrade.Uncommon });
+                break;
+            default:
+                loot.Add(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Rifle, Quantity = 24, Grade = LootGrade.Common });
+                loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 1, Grade = LootGrade.Uncommon });
+                break;
+        }
+        return loot;
     }
 
     private void BuildApartmentWallWithDoor(
@@ -952,6 +1175,132 @@ public partial class FreightTerminalWorld
             GD.PushError("Residential community validation failed.");
         }
         GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void ValidateResidentialGameplay()
+    {
+        foreach (var enemy in _enemies)
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+        var expectedCaches = ResidentialTowerSpecs.Length * 3;
+        var cacheKinds = new HashSet<ResidentialCacheKind>();
+        var lootKinds = new HashSet<LootItemKind>();
+        var cachesRegistered = true;
+        var cachesStocked = true;
+        foreach (var cache in _residentialCaches)
+        {
+            cacheKinds.Add(cache.Kind);
+            cachesRegistered &= _lootSources.Contains(cache) && IsInstanceValid(cache);
+            cachesStocked &= cache.IsSearchable && cache.Loot.Count >= 2;
+            foreach (var item in cache.Loot)
+            {
+                lootKinds.Add(item.Kind);
+            }
+        }
+        var everyTowerStocked = true;
+        foreach (var count in _residentialCacheCountByTower)
+        {
+            everyTowerStocked &= count == 3;
+        }
+
+        var lootUiOpened = false;
+        if (_residentialCaches.Count > 0)
+        {
+            var firstCache = _residentialCaches[0];
+            _player.GlobalPosition = firstCache.GlobalPosition + Vector3.Up * 0.2f + Vector3.Forward * 1.4f;
+            OpenLoot(firstCache);
+            lootUiOpened = _hud.IsLootVisible && ReferenceEquals(_openLootSource, firstCache);
+            CloseLoot();
+        }
+
+        var assistanceRoles = new HashSet<CivilianRole>();
+        _player.SetHealthForDiagnostics(35.0f);
+        var healthBefore = _player.Health;
+        foreach (var role in Enum.GetValues<CivilianRole>())
+        {
+            var civilian = _civilians.Find(candidate => candidate.Role == role && candidate.CanOfferAssistance);
+            if (civilian is null)
+            {
+                continue;
+            }
+            if (role == CivilianRole.UtilityWorker && _vehicles.Count > 0)
+            {
+                var vehicle = _vehicles[0];
+                vehicle.GlobalPosition = civilian.GlobalPosition + new Vector3(2.0f, 0.0f, 0.0f);
+                vehicle.TakeDamage(70.0f, vehicle.GlobalPosition + Vector3.Up, this);
+            }
+            if (civilian.TryProvideAssistance(_player))
+            {
+                assistanceRoles.Add(role);
+            }
+        }
+        var medicHealed = _player.Health > healthBefore;
+
+        var valid = ResidentialCacheCount == expectedCaches
+            && everyTowerStocked
+            && _residentialRoomArchetypes.Count == Enum.GetValues<ResidentialRoomArchetype>().Length
+            && cacheKinds.Count == Enum.GetValues<ResidentialCacheKind>().Length
+            && lootKinds.Count >= 5
+            && cachesRegistered
+            && cachesStocked
+            && lootUiOpened
+            && assistanceRoles.Count == Enum.GetValues<CivilianRole>().Length
+            && medicHealed;
+        GD.Print($"RESIDENTIAL_GAMEPLAY_CHECK valid={valid} room_types={_residentialRoomArchetypes.Count}/7 caches={ResidentialCacheCount}/{expectedCaches} cache_types={cacheKinds.Count}/7 loot_types={lootKinds.Count} every_tower={everyTowerStocked} registered={cachesRegistered} stocked={cachesStocked} loot_ui={lootUiOpened} assistance_roles={assistanceRoles.Count}/5 medic_healed={medicHealed}");
+        GD.Print($"RESIDENTIAL_GAMEPLAY_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void CaptureResidentialGameplay()
+    {
+        foreach (var enemy in _enemies)
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        foreach (var mate in _squadMates)
+        {
+            mate.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        foreach (var civilian in _civilians)
+        {
+            civilian.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        _player.ProcessMode = ProcessModeEnum.Disabled;
+        _player.Visible = false;
+        _hud.Visible = false;
+
+        var camera = new Camera3D
+        {
+            Name = "ResidentialGameplayCamera",
+            Fov = 72.0f,
+            Far = 420.0f
+        };
+        AddChild(camera);
+        camera.MakeCurrent();
+
+        var clinicTower = _residentialTowers[0];
+        camera.GlobalPosition = clinicTower.ToGlobal(new Vector3(3.7f, 1.55f, -5.0f));
+        camera.LookAt(clinicTower.ToGlobal(new Vector3(7.2f, 0.95f, -10.5f)), Vector3.Up);
+        await WaitFrames(24);
+        SaveViewportImage("res://residential_clinic_validation.png");
+
+        const int shelterFloor = 4;
+        var shelterY = shelterFloor * ResidentialFloorHeight;
+        camera.GlobalPosition = clinicTower.ToGlobal(new Vector3(3.7f, shelterY + 1.55f, -5.0f));
+        camera.LookAt(clinicTower.ToGlobal(new Vector3(7.2f, shelterY + 0.95f, -10.5f)), Vector3.Up);
+        await WaitFrames(20);
+        SaveViewportImage("res://residential_shelter_validation.png");
+
+        var securityTower = _residentialTowers[2];
+        camera.GlobalPosition = securityTower.ToGlobal(new Vector3(3.7f, 1.55f, -2.5f));
+        camera.LookAt(securityTower.ToGlobal(new Vector3(10.5f, 1.05f, -5.5f)), Vector3.Up);
+        await WaitFrames(20);
+        SaveViewportImage("res://residential_security_validation.png");
+        GD.Print($"RESIDENTIAL_GAMEPLAY_CAPTURE caches={ResidentialCacheCount} room_types={_residentialRoomArchetypes.Count} paths=residential_clinic_validation.png,residential_shelter_validation.png,residential_security_validation.png");
+        GetTree().Quit();
     }
 
     private async void CaptureResidentialCommunity()

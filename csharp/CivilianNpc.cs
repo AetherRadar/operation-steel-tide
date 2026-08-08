@@ -20,6 +20,8 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
     public int FloorIndex { get; private set; }
     public bool IsSpecial => Role != CivilianRole.Resident;
     public bool IsDead { get; private set; }
+    public bool AssistanceUsed { get; private set; }
+    public bool CanOfferAssistance => !IsDead && !AssistanceUsed;
     public float Health { get; private set; } = 45.0f;
     public List<LootItem> Loot { get; } = new();
     public Node3D LootNode => this;
@@ -94,6 +96,84 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
 
     public void OnSearched()
     {
+    }
+
+    public string AssistanceLabel(string language)
+    {
+        var key = Role switch
+        {
+            CivilianRole.VolunteerMedic => "civilian_medic_request",
+            CivilianRole.CommunityGuard => "civilian_guard_request",
+            CivilianRole.UtilityWorker => "civilian_repair_request",
+            CivilianRole.Evacuee => "civilian_evac_request",
+            _ => "civilian_resident_request"
+        };
+        var english = Role switch
+        {
+            CivilianRole.VolunteerMedic => "REQUEST MEDICAL AID",
+            CivilianRole.CommunityGuard => "REQUEST LOCAL INTEL",
+            CivilianRole.UtilityWorker => "REQUEST FIELD REPAIR",
+            CivilianRole.Evacuee => "REQUEST EVAC SUPPLIES",
+            _ => "REQUEST RESIDENT SUPPLIES"
+        };
+        return GameLocalization.Get(key, language, english);
+    }
+
+    public bool TryProvideAssistance(TacticalPlayer player)
+    {
+        if (!CanOfferAssistance || player.IsDead)
+        {
+            return false;
+        }
+
+        var provided = false;
+        var messageKey = "resident_supplies";
+        var message = "RESIDENT SUPPLIES RECEIVED";
+        switch (Role)
+        {
+            case CivilianRole.VolunteerMedic:
+                var healthBefore = player.Health;
+                player.RestoreHealth(45.0f);
+                provided = player.Health > healthBefore || player.TryCollectArmorPlate() || player.TryCollectAmmo(12);
+                messageKey = "civilian_medic_aid";
+                message = "MEDICAL AID  //  CONDITION STABILIZED";
+                break;
+            case CivilianRole.CommunityGuard:
+                _main.PerformReconScan(player, GlobalPosition);
+                player.TryCollectAmmo(24);
+                provided = true;
+                messageKey = "civilian_local_intel";
+                message = "LOCAL INTEL  //  HOSTILES MARKED";
+                break;
+            case CivilianRole.UtilityWorker:
+                provided = _main.TryRepairNearestVehicle(GlobalPosition, 22.0f, 75.0f)
+                    || player.TryCollectArmorPlate()
+                    || player.TryCollectAmmo(18);
+                messageKey = "civilian_field_repair";
+                message = "FIELD REPAIR  //  VEHICLE OR KIT SERVICED";
+                break;
+            case CivilianRole.Evacuee:
+                provided = player.TryCollectAmmo(36) || player.TryCollectArmorPlate();
+                messageKey = "civilian_evac_supply";
+                message = "EVAC SUPPLIES  //  AMMUNITION RECOVERED";
+                break;
+            default:
+                provided = player.TryCollectAmmo(20) || player.TryCollectArmorPlate();
+                break;
+        }
+        if (!provided)
+        {
+            return false;
+        }
+
+        AssistanceUsed = true;
+        _decisionTimer = 5.0f;
+        if (IsInstanceValid(_roleLabel))
+        {
+            _roleLabel.Text = $"{RoleLabel()}  //  ASSISTED";
+        }
+        player.Hud?.ShowLocalizedMessage(messageKey, message, RoleColor());
+        return true;
     }
 
     /// <summary>Player/AI damage path — kills drop searchable personal loot.</summary>

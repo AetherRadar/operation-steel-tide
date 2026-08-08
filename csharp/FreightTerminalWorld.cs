@@ -264,9 +264,17 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateResidentialCommunity();
         }
+        else if (Array.Exists(args, value => value == "--validate-residential-gameplay"))
+        {
+            ValidateResidentialGameplay();
+        }
         else if (Array.Exists(args, value => value == "--capture-residential"))
         {
             CaptureResidentialCommunity();
+        }
+        else if (Array.Exists(args, value => value == "--capture-residential-gameplay"))
+        {
+            CaptureResidentialGameplay();
         }
         else if (Array.Exists(args, value => value == "--capture-skylinks"))
         {
@@ -450,6 +458,27 @@ public partial class FreightTerminalWorld : Node3D
             "vehicle_blocked",
             "VEHICLE BLOCKED  //  REVERSE TO BREAK FREE",
             new Color(1.0f, 0.62f, 0.3f));
+    }
+
+    public bool TryRepairNearestVehicle(Vector3 origin, float range, float amount)
+    {
+        DriveableVehicle? nearest = null;
+        var nearestDistanceSquared = range * range;
+        foreach (var vehicle in _vehicles)
+        {
+            if (!IsInstanceValid(vehicle) || vehicle.IsDestroyed || vehicle.Health >= vehicle.MaxHealth)
+            {
+                continue;
+            }
+            var distanceSquared = origin.DistanceSquaredTo(vehicle.GlobalPosition);
+            if (distanceSquared >= nearestDistanceSquared)
+            {
+                continue;
+            }
+            nearest = vehicle;
+            nearestDistanceSquared = distanceSquared;
+        }
+        return nearest is not null && nearest.RestoreHealth(amount);
     }
 
     public void ReportGunshot(Vector3 origin, float radius)
@@ -1532,6 +1561,35 @@ public partial class FreightTerminalWorld : Node3D
             return;
         }
 
+        CivilianNpc? nearestCivilian = null;
+        var nearestCivilianDistance = 2.85f;
+        foreach (var civilian in _civilians)
+        {
+            if (!IsInstanceValid(civilian) || !civilian.CanOfferAssistance)
+            {
+                continue;
+            }
+            var distance = _player.GlobalPosition.DistanceTo(civilian.GlobalPosition);
+            if (distance >= nearestCivilianDistance)
+            {
+                continue;
+            }
+            nearestCivilian = civilian;
+            nearestCivilianDistance = distance;
+        }
+        if (nearestCivilian is not null)
+        {
+            _lootSearchTarget = null;
+            _player.SetSearchPose(false);
+            _hud.SetInteraction($"{nearestCivilian.AssistanceLabel(_languageSetting)}  //  F", -1.0f, true);
+            if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
+            {
+                _interactReleaseRequired = true;
+                nearestCivilian.TryProvideAssistance(_player);
+            }
+            return;
+        }
+
         ILootSource? nearest = null;
         var nearestDistance = 2.85f;
         foreach (var source in _lootSources)
@@ -2139,6 +2197,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         }
+        var opened = _hud.IsLootVisible;
         var immediateOpenMilliseconds = Time.GetTicksMsec() - openedAt;
         var item = source.Loot.Find(candidate => candidate.Kind == LootItemKind.Weapon);
         if (item is not null)
@@ -2198,10 +2257,19 @@ public partial class FreightTerminalWorld : Node3D
         await WaitFrames(4);
         var movementRestored = !_player.UiLocked && _player.HasMovementIntent;
         Input.ActionRelease("move_forward");
-        GD.Print($"LOOT_CHECK open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+        var valid = opened
+            && immediateOpenMilliseconds <= 500
+            && heldInputBlocked
+            && dragDropRouted
+            && returnedToSource
+            && reopenedEmpty
+            && closedByInteract
+            && movementRestored;
+        GD.Print($"LOOT_CHECK valid={valid} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+        GD.Print($"LOOT_PASS valid={valid}");
         await WaitFrames(24);
         SaveViewportImage("res://modular_weapon_validation.png");
-        GetTree().Quit();
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private async void ValidateCorpseLootFlow()
