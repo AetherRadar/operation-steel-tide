@@ -240,6 +240,18 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateExtractRank();
         }
+        else if (Array.Exists(args, value => value == "--validate-backpack-tab"))
+        {
+            ValidateBackpackTab();
+        }
+        else if (Array.Exists(args, value => value == "--validate-skylinks"))
+        {
+            ValidateSkyLinks();
+        }
+        else if (Array.Exists(args, value => value == "--validate-vehicle-drive"))
+        {
+            ValidateVehicleDrive();
+        }
         else if (Array.Exists(args, value => value == "--validate-stairs"))
         {
             ValidateStairsClimb();
@@ -422,6 +434,14 @@ public partial class FreightTerminalWorld : Node3D
                 enemy.HearGunshot(origin, radius);
             }
         }
+    }
+
+    public void ShowVehicleBlockedToast()
+    {
+        _hud.ShowLocalizedMessage(
+            "vehicle_blocked",
+            "VEHICLE BLOCKED  //  REVERSE TO BREAK FREE",
+            new Color(1.0f, 0.62f, 0.3f));
     }
 
     public void ReportGunshot(Vector3 origin, float radius)
@@ -876,24 +896,6 @@ public partial class FreightTerminalWorld : Node3D
             AddChild(pickup);
             _lootSources.Add(pickup);
             _lootWorldPoints.Add(spot.Pos);
-        }
-        // Cold-start guarantee: every edge spawn pad gets a nearby weapon cache so operators can re-arm via real loot.
-        foreach (var pad in ExtractionSpawnPads.Pads)
-        {
-            var weapon = new LootItem
-            {
-                Kind = LootItemKind.Weapon,
-                Weapon = WeaponCatalog.Build(WeaponPlatform.M4A1, 0),
-                Grade = LootGrade.Uncommon
-            };
-            var cache = new GradedLootPickup
-            {
-                Position = pad + new Vector3(2.4f, 0.05f, 1.2f)
-            };
-            cache.Configure(weapon, "Pad armory crate", "复活点军械箱");
-            AddChild(cache);
-            _lootSources.Add(cache);
-            _lootWorldPoints.Add(cache.Position);
         }
     }
 
@@ -1907,6 +1909,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private async void CaptureAdsFrame()
     {
+        _player.GrantFireablePrimaryForDiagnostics();
         await WaitFrames(16);
         Input.ActionPress("aim");
         await WaitFrames(50);
@@ -1918,6 +1921,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private async void ValidateEquipmentFlow()
     {
+        _player.GrantFireablePrimaryForDiagnostics();
         foreach (var enemy in _enemies)
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
@@ -1956,6 +1960,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private async void CaptureReloadFrame()
     {
+        _player.GrantFireablePrimaryForDiagnostics();
         foreach (var enemy in _enemies)
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
@@ -2181,6 +2186,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private async void ValidateWeaponUiFlow()
     {
+        _player.GrantFireablePrimaryForDiagnostics();
         foreach (var enemy in _enemies)
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
@@ -2237,6 +2243,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private async void ValidateStanceAndArmorFlow()
     {
+        _player.GrantFireablePrimaryForDiagnostics();
         foreach (var enemy in _enemies)
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
@@ -2674,7 +2681,7 @@ public partial class FreightTerminalWorld : Node3D
     {
         await WaitFrames(2);
         EnsureAiSquadFill();
-        // Freeze AI immediately and re-strip cold-start so pad armory crates cannot auto-arm before the snapshot.
+        // Freeze AI immediately and re-strip cold-start before the snapshot.
         foreach (var squadMate in _squadMates)
         {
             if (IsInstanceValid(squadMate))
@@ -2901,6 +2908,13 @@ public partial class FreightTerminalWorld : Node3D
                 enemy.ProcessMode = ProcessModeEnum.Disabled;
             }
         }
+        foreach (var civilian in _civilians)
+        {
+            if (IsInstanceValid(civilian))
+            {
+                civilian.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         if (_residentialTowers.Count == 0)
         {
@@ -2943,11 +2957,11 @@ public partial class FreightTerminalWorld : Node3D
         _player.GlobalPosition = firstTower.ToGlobal(new Vector3(
             -1.45f,
             0.25f,
-            firstCoreZ - ResidentialStairRun * 0.5f + 0.25f));
+            firstCoreZ + ResidentialStairRun * 0.5f - 0.25f));
         var climbTarget = firstTower.ToGlobal(new Vector3(
             -1.45f,
             ResidentialFloorHeight * 0.5f + 0.25f,
-            firstCoreZ + ResidentialStairRun * 0.2f));
+            firstCoreZ - ResidentialStairRun * 0.2f));
         _player.FaceWorldPointForDiagnostics(climbTarget);
         _player.RestoreMovementInput();
         for (var frame = 0; frame < 10; frame++)
@@ -2972,6 +2986,172 @@ public partial class FreightTerminalWorld : Node3D
         var valid = steppedCollider && rampSlabAbsent && hangarRampGone && walked && _residentialStairFlightCount > 0;
         GD.Print($"STAIRS_CHECK valid={valid} step_bodies={stepBodies} ramp_bodies={rampBodies} stepped={steppedCollider} no_ramp_slab={rampSlabAbsent} hangar_ok={hangarRampGone} walk_h={walkGain:0.00} climbed={walked} flights={_residentialStairFlightCount}");
         GD.Print($"STAIRS_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void ValidateBackpackTab()
+    {
+        await WaitFrames(4);
+        var weaponsInBackpack = 0;
+        foreach (var item in _player.Backpack)
+        {
+            if (item.Kind == LootItemKind.Weapon)
+            {
+                weaponsInBackpack++;
+            }
+        }
+        var tabDown = new InputEventKey { Pressed = true, PhysicalKeycode = Key.Tab };
+        Input.ParseInputEvent(tabDown);
+        await WaitFrames(2);
+        var opened = _hud.IsLootVisible;
+        var tabUp = new InputEventKey { Pressed = false, PhysicalKeycode = Key.Tab };
+        Input.ParseInputEvent(tabUp);
+        GD.Print($"BACKPACK_TAB_CHECK opened={opened} backpack_items={_player.Backpack.Count} weapons={weaponsInBackpack} unarmed={!_player.HasFireablePrimary}");
+        GD.Print($"BACKPACK_TAB_PASS valid={opened && weaponsInBackpack == 0}");
+        GetTree().Quit(opened && weaponsInBackpack == 0 ? 0 : 2);
+    }
+
+    private async void ValidateSkyLinks()
+    {
+        foreach (var enemy in _enemies)
+        {
+            if (IsInstanceValid(enemy))
+            {
+                enemy.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        foreach (var civilian in _civilians)
+        {
+            if (IsInstanceValid(civilian))
+            {
+                civilian.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        var link = ResidentialSkyLinks[0];
+        var floor = link.Floors[0];
+        var floorY = floor * ResidentialFloorHeight;
+        var specA = ResidentialTowerSpecs[link.From];
+        var specB = ResidentialTowerSpecs[link.To];
+        var towerA = _residentialTowers[link.From];
+        var towerB = _residentialTowers[link.To];
+        var sideA = ResidentialLinkSide(specA, specB);
+        var sideB = ResidentialLinkSide(specB, specA);
+        var doorZA = ResidentialLinkDoorZ(specA, specB, sideA);
+        var doorZB = ResidentialLinkDoorZ(specB, specA, sideB);
+        _player.GlobalPosition = towerA.ToGlobal(new Vector3(sideA == 1 ? -2.2f : 2.2f, floorY + 0.3f, doorZA));
+        var target = towerB.ToGlobal(new Vector3(sideB == 1 ? -2.2f : 2.2f, floorY + 0.3f, doorZB));
+        _player.FaceWorldPointForDiagnostics(target);
+        _player.RestoreMovementInput();
+        for (var frame = 0; frame < 10; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        var waypoints = new[]
+        {
+            towerA.ToGlobal(new Vector3(sideA == 1 ? -14.5f : 14.5f, floorY + 0.3f, doorZA)),
+            towerB.ToGlobal(new Vector3(sideB == 1 ? -14.5f : 14.5f, floorY + 0.3f, doorZB)),
+            target
+        };
+        Input.ActionPress("move_forward");
+        Input.ActionPress("sprint");
+        foreach (var waypoint in waypoints)
+        {
+            for (var frame = 0; frame < 500; frame++)
+            {
+                _player.FaceWorldPointForDiagnostics(waypoint);
+                if (_player.GlobalPosition.DistanceTo(waypoint) < 1.6f)
+                {
+                    break;
+                }
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            }
+        }
+        Input.ActionRelease("sprint");
+        Input.ActionRelease("move_forward");
+        var arrived = _player.GlobalPosition.DistanceTo(target) < 3.0f && Mathf.Abs(_player.GlobalPosition.Y - (floorY + 0.3f)) < 0.7f;
+        GD.Print($"SKYLINK_CHECK valid={arrived} dist={_player.GlobalPosition.DistanceTo(target):0.0} y={_player.GlobalPosition.Y:0.0} pos=({_player.GlobalPosition.X:0.0},{_player.GlobalPosition.Z:0.0}) target=({target.X:0.0},{target.Z:0.0})");
+        GD.Print($"SKYLINK_PASS valid={arrived}");
+        GetTree().Quit(arrived ? 0 : 2);
+    }
+
+    private async void ValidateVehicleDrive()
+    {
+        await WaitFrames(4);
+        foreach (var enemy in _enemies)
+        {
+            if (IsInstanceValid(enemy))
+            {
+                enemy.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        foreach (var civilian in _civilians)
+        {
+            if (IsInstanceValid(civilian))
+            {
+                civilian.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+
+        var vehicle = _vehicles[0];
+        var forward = -vehicle.GlobalBasis.Z;
+        forward.Y = 0.0f;
+        forward = forward.Normalized();
+
+        // Synthetic low curb ahead: the truck must step up and drive over it.
+        var curb = new StaticBody3D
+        {
+            Name = "DriveCheckCurb",
+            Position = vehicle.GlobalPosition + forward * 14.0f + Vector3.Up * 0.2f,
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        curb.AddChild(new CollisionShape3D
+        {
+            Shape = new BoxShape3D { Size = new Vector3(8.0f, 0.4f, 1.2f) }
+        });
+        AddChild(curb);
+
+        _player.GlobalPosition = vehicle.GlobalPosition + vehicle.GlobalBasis.X * -2.6f
+            + Vector3.Up * 0.3f - vehicle.GlobalBasis.Z * 0.5f;
+        await WaitFrames(3);
+        var entered = vehicle.TryEnter(_player);
+        await WaitFrames(3);
+
+        var forwardStart = vehicle.GlobalPosition;
+        Input.ActionPress("move_forward");
+        Node3D? firstBlocker = null;
+        for (var frame = 0; frame < 300; frame++)
+        {
+            if (firstBlocker is null && vehicle.GetSlideCollisionCount() > 0
+                && vehicle.GetSlideCollision(0).GetCollider() is Node3D blockerNode
+                && blockerNode != _player
+                && vehicle.GetSlideCollision(0).GetNormal().Y < 0.5f)
+            {
+                firstBlocker = blockerNode;
+            }
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        Input.ActionRelease("move_forward");
+        var forwardDistance = vehicle.GlobalPosition.DistanceTo(forwardStart);
+        var curbCleared = (vehicle.GlobalPosition - curb.GlobalPosition).Dot(forward) > 0.0f;
+
+        // Isolated reverse check on open ground (the straight -Z run ends in the extraction pad).
+        vehicle.GlobalPosition = new Vector3(8.0f, 0.05f, -8.0f);
+        vehicle.Rotation = Vector3.Zero;
+        await WaitFrames(3);
+        var reverseStart = vehicle.GlobalPosition;
+        Input.ActionPress("move_backward");
+        for (var frame = 0; frame < 120; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        Input.ActionRelease("move_backward");
+        var reverseDistance = vehicle.GlobalPosition.DistanceTo(reverseStart);
+
+        var valid = entered && forwardDistance > 18.0f && curbCleared && reverseDistance > 3.0f;
+        GD.Print($"VEHICLE_DRIVE_CHECK entered={entered} forward={forwardDistance:0.00} curb_cleared={curbCleared} reverse={reverseDistance:0.00} blocker={(firstBlocker is null ? "none" : firstBlocker.Name)}");
+        GD.Print($"VEHICLE_DRIVE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
 
