@@ -189,7 +189,7 @@ public partial class DestructibleAircraft : StaticBody3D
         AttackSalvosFired++;
         _fireCooldown = FireCooldown;
 
-        // Physical shell: large ground blast, but players can shoot it down mid-air.
+        // Physical bomb: deliberately slow enough to dodge, but impossible to shoot down.
         Main.SpawnAircraftShell(muzzle, aim, damage, ShellBlastRadius, this);
         Main.SpawnTracer(muzzle, aim, new Color(1.0f, 0.4f, 0.12f));
         return true;

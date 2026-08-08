@@ -3,7 +3,7 @@ using Godot;
 namespace OperationSteelTide;
 
 /// <summary>
-/// Hostile aircraft rocket/shell. Large ground blast, but can be shot down in the air.
+/// Slow hostile aircraft bomb. It can be dodged, but weapon damage cannot interrupt it.
 /// </summary>
 [GlobalClass]
 public partial class AircraftShell : CharacterBody3D
@@ -17,8 +17,8 @@ public partial class AircraftShell : CharacterBody3D
     public bool DetonatedOnGround { get; private set; }
     public bool InterceptedInAir { get; private set; }
 
-    private const float Speed = 48.0f;
-    private const float MaxLifetime = 6.5f;
+    public const float TravelSpeed = 20.0f;
+    private const float MaxLifetime = 10.0f;
     private const float AirBurstRadius = 3.2f;
     private const float AirBurstDamageScale = 0.28f;
 
@@ -38,7 +38,8 @@ public partial class AircraftShell : CharacterBody3D
         BlastRadius = blastRadius;
         _life = 0.0f;
         _armed = true;
-        LookAt(GlobalPosition + _direction, Vector3.Up);
+        var up = Mathf.Abs(_direction.Dot(Vector3.Up)) > 0.98f ? Vector3.Forward : Vector3.Up;
+        LookAt(GlobalPosition + _direction, up);
     }
 
     public override void _Ready()
@@ -64,7 +65,7 @@ public partial class AircraftShell : CharacterBody3D
             return;
         }
 
-        var motion = _direction * Speed * dt;
+        var motion = _direction * TravelSpeed * dt;
         var hit = MoveAndCollide(motion);
         if (hit is not null)
         {
@@ -88,16 +89,9 @@ public partial class AircraftShell : CharacterBody3D
             return false;
         }
 
-        Health -= amount;
+        // Bomb casings are gameplay-invulnerable. Hits provide feedback without changing flight.
         Main?.SpawnImpact(hitPosition, -_direction);
-        if (Health > 0.0f)
-        {
-            return false;
-        }
-
-        InterceptedInAir = true;
-        Detonate(airBurst: true);
-        return true;
+        return false;
     }
 
     private void Detonate(bool airBurst)

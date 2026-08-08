@@ -2343,7 +2343,7 @@ public partial class FreightTerminalWorld : Node3D
                 break;
             }
         }
-        // If the shell already hit the ground, spawn a diagnostic shell for intercept proof.
+        // If the first bomb already landed, spawn a diagnostic bomb for invulnerability proof.
         if (shell is null)
         {
             SpawnAircraftShell(
@@ -2363,12 +2363,12 @@ public partial class FreightTerminalWorld : Node3D
             }
         }
 
-        var intercepted = false;
+        var uninterruptible = false;
         if (shell is not null)
         {
-            intercepted = shell.TakeDamage(999.0f, shell.GlobalPosition, _player);
+            var interrupted = shell.TakeDamage(999.0f, shell.GlobalPosition, _player);
             await WaitFrames(3);
-            intercepted = intercepted || shell.InterceptedInAir || shell.IsDestroyed;
+            uninterruptible = !interrupted && !shell.InterceptedInAir && !shell.IsDestroyed;
         }
 
         // Ground blast path still hurts operators when a shell is allowed to land.
@@ -2379,8 +2379,9 @@ public partial class FreightTerminalWorld : Node3D
         var stillAlive = !aircraft.IsDestroyed;
         var destroyed = aircraft.TakeDamage(999.0f, aircraft.GlobalPosition, _player);
         await WaitFrames(6);
-        var valid = fired && shellSpawned && intercepted && playerHurt && stillAlive && destroyed;
-        GD.Print($"AIRCRAFT_COMBAT_CHECK valid={valid} fired={fired} shell={shellSpawned} intercepted={intercepted} salvos={aircraft.AttackSalvosFired} last_damage={aircraft.LastAttackDamage:0.0} player_hurt={playerHurt} destroyed={destroyed}");
+        var slowEnoughToDodge = AircraftShell.TravelSpeed <= 22.0f;
+        var valid = fired && shellSpawned && uninterruptible && slowEnoughToDodge && playerHurt && stillAlive && destroyed;
+        GD.Print($"AIRCRAFT_COMBAT_CHECK valid={valid} fired={fired} shell={shellSpawned} uninterruptible={uninterruptible} speed={AircraftShell.TravelSpeed:0.0} salvos={aircraft.AttackSalvosFired} last_damage={aircraft.LastAttackDamage:0.0} player_hurt={playerHurt} destroyed={destroyed}");
         GD.Print($"AIRCRAFT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -3218,14 +3219,15 @@ public partial class FreightTerminalWorld : Node3D
             var before = aircraft.AttackSalvosFired;
             aircraftOk = aircraft.TryAttackTarget(_player, ignoreCooldown: true) && aircraft.AttackSalvosFired > before;
             await WaitFrames(3);
-            // Prove shell intercept path exists on the real projectile type.
+            // Prove the real projectile ignores weapon damage and continues flying.
             SpawnAircraftShell(aircraft.GlobalPosition, aircraft.GlobalPosition + Vector3.Down * 6.0f, 30.0f, 11.0f, aircraft);
             await WaitFrames(2);
             foreach (var node in GetTree().GetNodesInGroup("aircraft_shells"))
             {
                 if (node is AircraftShell shell && IsInstanceValid(shell) && !shell.IsDestroyed)
                 {
-                    aircraftOk = shell.TakeDamage(999.0f, shell.GlobalPosition, _player) || aircraftOk;
+                    var interrupted = shell.TakeDamage(999.0f, shell.GlobalPosition, _player);
+                    aircraftOk = aircraftOk && !interrupted && !shell.InterceptedInAir && !shell.IsDestroyed;
                     break;
                 }
             }
