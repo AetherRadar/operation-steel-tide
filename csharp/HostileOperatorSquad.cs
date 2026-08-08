@@ -129,6 +129,33 @@ public static class ExtractionSpawnPads
 public static class Ballistics
 {
     /// <summary>
+    /// Keep a visual muzzle from becoming a wallbang origin when the weapon model clips
+    /// through thin cover. The returned point stays just before the first solid surface.
+    /// </summary>
+    public static Vector3 ResolveShotOrigin(
+        World3D world,
+        Vector3 bodyOrigin,
+        Vector3 muzzleOrigin,
+        Rid excludeRid)
+    {
+        if (world is null || bodyOrigin.DistanceSquaredTo(muzzleOrigin) < 0.0001f)
+        {
+            return bodyOrigin;
+        }
+        var query = PhysicsRayQueryParameters3D.Create(bodyOrigin, muzzleOrigin);
+        query.Exclude = new Godot.Collections.Array<Rid> { excludeRid };
+        query.CollideWithAreas = false;
+        query.CollisionMask = 0xFFFFFFFF;
+        var hit = world.DirectSpaceState.IntersectRay(query);
+        if (hit.Count == 0)
+        {
+            return muzzleOrigin;
+        }
+        var direction = bodyOrigin.DirectionTo(muzzleOrigin);
+        return hit["position"].AsVector3() - direction * 0.04f;
+    }
+
+    /// <summary>
     /// True when a ray from muzzle to aim hits the intended target node (or a child collider)
     /// before any other solid body. World walls on the default physics layer stop the shot.
     /// </summary>

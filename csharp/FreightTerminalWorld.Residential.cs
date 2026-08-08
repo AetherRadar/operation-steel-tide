@@ -1254,6 +1254,181 @@ public partial class FreightTerminalWorld
         GetTree().Quit(valid ? 0 : 2);
     }
 
+    private async void ValidateResidentialCover()
+    {
+        var shooter = _enemies.Find(enemy => IsInstanceValid(enemy) && !enemy.IsDead);
+        if (shooter is null)
+        {
+            GD.Print("RESIDENTIAL_COVER_CHECK valid=False reason=missing_shooter");
+            GD.Print("RESIDENTIAL_COVER_PASS valid=False");
+            GetTree().Quit(2);
+            return;
+        }
+        foreach (var enemy in _enemies)
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        foreach (var mate in _squadMates)
+        {
+            mate.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        foreach (var civilian in _civilians)
+        {
+            civilian.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        // Keep the player's collision body registered so ballistic rays can hit it,
+        // while disabling movement/input updates for deterministic positioning.
+        _player.ProcessMode = ProcessModeEnum.Inherit;
+        _player.SetProcess(false);
+        _player.SetPhysicsProcess(false);
+        _missionDirector.ExitDeploymentZone();
+        shooter.GrantFireablePrimaryForDiagnostics();
+        shooter.ResetTacticalStateForDiagnostics();
+        shooter.ProcessMode = ProcessModeEnum.Disabled;
+        await WaitFrames(3);
+
+        string FirstShotHit(Vector3 from, Vector3 to)
+        {
+            var query = PhysicsRayQueryParameters3D.Create(from, to);
+            query.Exclude = new Godot.Collections.Array<Rid> { shooter.GetRid() };
+            query.CollideWithAreas = false;
+            query.CollisionMask = 0xFFFFFFFF;
+            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+            if (hit.Count == 0)
+            {
+                return "none";
+            }
+            var node = hit["collider"].AsGodotObject() as Node;
+            return node?.Name.ToString() ?? "unknown";
+        }
+
+        var sampleCount = 0;
+        var blockedSamples = 0;
+        string? firstLeak = null;
+        for (var towerIndex = 0; towerIndex < ResidentialTowerSpecs.Length; towerIndex++)
+        {
+            var tower = _residentialTowers[towerIndex];
+            var spec = ResidentialTowerSpecs[towerIndex];
+            var halfWidth = spec.Footprint.X * 0.5f;
+            var halfDepth = spec.Footprint.Y * 0.5f;
+            var fractions = new[] { -0.4f, 0.0f, 0.4f };
+
+            bool LinkDoorContains(int side, int floor, float z)
+            {
+                return _residentialLinkSlots.TryGetValue(towerIndex, out var sides)
+                    && sides.TryGetValue(side, out var slot)
+                    && slot.Floors.Contains(floor)
+                    && Mathf.Abs(z - slot.DoorZ) < 2.05f;
+            }
+
+            void Sample(Vector3 localFrom, Vector3 localTo, string label)
+            {
+                sampleCount++;
+                var query = PhysicsRayQueryParameters3D.Create(tower.ToGlobal(localFrom), tower.ToGlobal(localTo));
+                query.Exclude = new Godot.Collections.Array<Rid> { shooter.GetRid(), _player.GetRid() };
+                query.CollideWithAreas = false;
+                query.CollisionMask = 1;
+                if (GetWorld3D().DirectSpaceState.IntersectRay(query).Count > 0)
+                {
+                    blockedSamples++;
+                }
+                else
+                {
+                    firstLeak ??= $"T{towerIndex + 1:00}_{label}";
+                }
+            }
+
+            for (var floor = 0; floor < spec.Floors; floor++)
+            {
+                var y = floor * ResidentialFloorHeight + 1.3f;
+                foreach (var fraction in fractions)
+                {
+                    var x = spec.Footprint.X * fraction;
+                    Sample(
+                        new Vector3(x, y, -halfDepth - 1.4f),
+                        new Vector3(x, y, -halfDepth + 0.65f),
+                        $"F{floor + 1:00}_N_{fraction:0.0}");
+                    if (floor > 0 || Mathf.Abs(fraction) > 0.01f)
+                    {
+                        Sample(
+                            new Vector3(x, y, halfDepth + 1.4f),
+                            new Vector3(x, y, halfDepth - 0.65f),
+                            $"F{floor + 1:00}_S_{fraction:0.0}");
+                    }
+
+                    var z = spec.Footprint.Y * fraction;
+                    if (!LinkDoorContains(1, floor, z))
+                    {
+                        Sample(
+                            new Vector3(-halfWidth - 1.4f, y, z),
+                            new Vector3(-halfWidth + 0.65f, y, z),
+                            $"F{floor + 1:00}_W_{fraction:0.0}");
+                    }
+                    if (!LinkDoorContains(0, floor, z))
+                    {
+                        Sample(
+                            new Vector3(halfWidth + 1.4f, y, z),
+                            new Vector3(halfWidth - 0.65f, y, z),
+                            $"F{floor + 1:00}_E_{fraction:0.0}");
+                    }
+                }
+            }
+        }
+
+        // Reproduce the former exploit: the body stays outside while the long gun muzzle
+        // extends through the 0.2 m north facade into the room.
+        var testTower = _residentialTowers[0];
+        var testSpec = ResidentialTowerSpecs[0];
+        var northWall = -testSpec.Footprint.Y * 0.5f;
+        _player.SetHealthForDiagnostics(100.0f);
+        _player.GlobalPosition = testTower.ToGlobal(new Vector3(0, 0.18f, northWall + 1.6f));
+        shooter.GlobalPosition = testTower.ToGlobal(new Vector3(0, 0.18f, northWall - 0.48f));
+        shooter.LookAt(new Vector3(_player.GlobalPosition.X, shooter.GlobalPosition.Y, _player.GlobalPosition.Z), Vector3.Up);
+        await WaitFrames(2);
+        var wallAim = _player.HitPoint(HitRegion.Torso);
+        var rawWallHit = FirstShotHit(shooter.RawMuzzlePositionForDiagnostics, wallAim);
+        var safeWallHit = FirstShotHit(shooter.ResolvedShotOriginForDiagnostics, wallAim);
+        var rawMuzzleClear = Ballistics.HasClearShot(
+            GetWorld3D(),
+            shooter.RawMuzzlePositionForDiagnostics,
+            wallAim,
+            _player,
+            shooter.GetRid());
+        var originClamped = shooter.RawMuzzlePositionForDiagnostics.DistanceTo(shooter.ResolvedShotOriginForDiagnostics) > 0.08f;
+        var guardedBlocked = !shooter.HasClearBallisticPath(_player, wallAim);
+        var wallHealthBefore = _player.Health;
+        var wallArmorBefore = _player.Armor;
+        _player.TakeCombatDamage(48.0f, wallAim, shooter);
+        var wallNoDamage = Mathf.IsEqualApprox(_player.Health, wallHealthBefore)
+            && Mathf.IsEqualApprox(_player.Armor, wallArmorBefore);
+
+        // The same authoritative damage entry must still accept a genuinely open shot.
+        var open = new Vector3(0.0f, 45.0f, -60.0f);
+        shooter.GlobalPosition = open;
+        _player.GlobalPosition = open + new Vector3(0.0f, 0.0f, 12.0f);
+        shooter.LookAt(new Vector3(_player.GlobalPosition.X, shooter.GlobalPosition.Y, _player.GlobalPosition.Z), Vector3.Up);
+        _player.SetHealthForDiagnostics(100.0f);
+        await WaitFrames(2);
+        var openAim = _player.HitPoint(HitRegion.Torso);
+        var openHit = FirstShotHit(shooter.ResolvedShotOriginForDiagnostics, openAim);
+        var openClear = shooter.HasClearBallisticPath(_player, openAim);
+        var openHealthBefore = _player.Health;
+        _player.TakeCombatDamage(24.0f, openAim, shooter);
+        var openDamaged = _player.Health < openHealthBefore - 0.01f;
+
+        var facadesBlocked = sampleCount >= 900 && blockedSamples == sampleCount;
+        var valid = facadesBlocked
+            && rawMuzzleClear
+            && originClamped
+            && guardedBlocked
+            && wallNoDamage
+            && openClear
+            && openDamaged;
+        GD.Print($"RESIDENTIAL_COVER_CHECK valid={valid} facades={blockedSamples}/{sampleCount} leak={firstLeak ?? "none"} raw_muzzle_leaked={rawMuzzleClear} raw_hit={rawWallHit} safe_hit={safeWallHit} origin_clamped={originClamped} guarded_blocked={guardedBlocked} wall_no_damage={wallNoDamage} open_clear={openClear} open_hit={openHit} open_damaged={openDamaged} player_layer={_player.CollisionLayer}");
+        GD.Print($"RESIDENTIAL_COVER_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
     private async void CaptureResidentialGameplay()
     {
         foreach (var enemy in _enemies)

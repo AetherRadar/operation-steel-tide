@@ -278,7 +278,13 @@ public partial class TacticalPlayer
     }
 
     public bool TakeCombatDamage(float amount, Vector3 hitPosition, Node? attacker = null)
-        => TakeDamage(amount, hitPosition, attacker);
+    {
+        if (attacker is EnemyOperator enemy && !enemy.HasClearBallisticPath(this, hitPosition))
+        {
+            return false;
+        }
+        return TakeDamage(amount, hitPosition, attacker);
+    }
 
     public void RestoreHealth(float amount)
     {

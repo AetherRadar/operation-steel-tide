@@ -436,11 +436,13 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         var fireBoost = Role == OperatorRole.Assault && _overdriveTime > 0.0f ? 0.68f : 1.0f;
         _weaponCooldown = _rng.RandfRange(0.23f, 0.38f) * spec.FireIntervalMultiplier * fireBoost;
         var hitPoint = enemy.GlobalPosition + Vector3.Up * _rng.RandfRange(0.78f, 1.55f);
-        var muzzlePos = IsInstanceValid(_muzzle) ? _muzzle.GlobalPosition : GlobalPosition + Vector3.Up * 1.4f;
+        var bodyOrigin = GlobalPosition + Vector3.Up * 1.4f;
+        var muzzlePos = IsInstanceValid(_muzzle) ? _muzzle.GlobalPosition : bodyOrigin;
+        var shotOrigin = Ballistics.ResolveShotOrigin(GetWorld3D(), bodyOrigin, muzzlePos, GetRid());
         // Wallbang gate on the real damage path.
-        if (!Ballistics.HasClearShot(GetWorld3D(), muzzlePos, hitPoint, enemy, GetRid()))
+        if (!Ballistics.HasClearShot(GetWorld3D(), shotOrigin, hitPoint, enemy, GetRid()))
         {
-            var query = PhysicsRayQueryParameters3D.Create(muzzlePos, hitPoint);
+            var query = PhysicsRayQueryParameters3D.Create(shotOrigin, hitPoint);
             query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
             query.CollideWithAreas = false;
             var blocked = GetWorld3D().DirectSpaceState.IntersectRay(query);
@@ -448,7 +450,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             {
                 hitPoint = blocked["position"].AsVector3();
             }
-            Main.SpawnTracer(muzzlePos, hitPoint, new Color(0.34f, 0.78f, 1.0f));
+            Main.SpawnTracer(shotOrigin, hitPoint, new Color(0.34f, 0.78f, 1.0f));
             return;
         }
         var accuracy = Mathf.Clamp(0.91f - distance * 0.009f, 0.48f, 0.9f);
@@ -460,7 +462,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             hitPoint += new Vector3(_rng.RandfRange(-1.4f, 1.4f), _rng.RandfRange(-0.7f, 1.2f), _rng.RandfRange(-1.4f, 1.4f));
         }
-        Main.SpawnTracer(muzzlePos, hitPoint, new Color(0.34f, 0.78f, 1.0f));
+        Main.SpawnTracer(shotOrigin, hitPoint, new Color(0.34f, 0.78f, 1.0f));
         Main.ReportGunshot(GlobalPosition, 52.0f);
     }
 
@@ -610,6 +612,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         if (IsBodyBag)
         {
             return true;
+        }
+        if (attacker is EnemyOperator enemy && !enemy.HasClearBallisticPath(this, hitPosition))
+        {
+            return false;
         }
         if (IsDowned)
         {

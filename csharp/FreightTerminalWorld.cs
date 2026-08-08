@@ -268,6 +268,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateResidentialGameplay();
         }
+        else if (Array.Exists(args, value => value == "--validate-residential-cover"))
+        {
+            ValidateResidentialCover();
+        }
         else if (Array.Exists(args, value => value == "--capture-residential"))
         {
             CaptureResidentialCommunity();

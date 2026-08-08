@@ -941,6 +941,23 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         return collider == targetNode || collider is Node node && targetNode.IsAncestorOf(node);
     }
 
+    private Vector3 RawMuzzlePosition => IsInstanceValid(_muzzle)
+        ? _muzzle.GlobalPosition
+        : GlobalPosition + Vector3.Up * (IsProne ? 0.55f : 1.45f);
+
+    private Vector3 ResolveBallisticShotOrigin()
+    {
+        var bodyOrigin = GlobalPosition + Vector3.Up * (IsProne ? 0.55f : 1.45f);
+        return Ballistics.ResolveShotOrigin(GetWorld3D(), bodyOrigin, RawMuzzlePosition, GetRid());
+    }
+
+    internal bool HasClearBallisticPath(Node target, Vector3 aimPoint)
+        => GodotObject.IsInstanceValid(target)
+            && Ballistics.HasClearShot(GetWorld3D(), ResolveBallisticShotOrigin(), aimPoint, target, GetRid());
+
+    internal Vector3 RawMuzzlePositionForDiagnostics => RawMuzzlePosition;
+    internal Vector3 ResolvedShotOriginForDiagnostics => ResolveBallisticShotOrigin();
+
     private bool WithinViewCone()
     {
         if (SentryMode)
@@ -1190,10 +1207,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             ? HitRegion.Torso
             : regionRoll < 0.12f ? HitRegion.Head : regionRoll < 0.78f ? HitRegion.Torso : HitRegion.Limbs;
         var aimPoint = _combatTarget.HitPoint(hitRegion);
-        var muzzlePos = IsInstanceValid(_muzzle)
-            ? _muzzle.GlobalPosition
-            : GlobalPosition + Vector3.Up * (IsProne ? 0.55f : 1.45f);
-        var clear = Ballistics.HasClearShot(GetWorld3D(), muzzlePos, aimPoint, _combatTarget.CombatNode, GetRid());
+        var shotOrigin = ResolveBallisticShotOrigin();
+        var clear = Ballistics.HasClearShot(GetWorld3D(), shotOrigin, aimPoint, _combatTarget.CombatNode, GetRid());
         if (clear && _rng.Randf() < accuracy)
         {
             _combatTarget.TakeCombatDamage(stats.Damage * _rng.RandfRange(0.32f, 0.48f), aimPoint, this);
@@ -1201,7 +1216,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         else if (!clear)
         {
             // Tracer stops at the wall hit instead of ghosting through.
-            var query = PhysicsRayQueryParameters3D.Create(muzzlePos, aimPoint);
+            var query = PhysicsRayQueryParameters3D.Create(shotOrigin, aimPoint);
             query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
             query.CollideWithAreas = false;
             var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
@@ -1215,10 +1230,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             // Near-miss still close enough for tracers; keep pressure high.
             aimPoint += Scatter() * 0.35f;
         }
-        if (IsInstanceValid(_muzzle))
-        {
-            Main?.SpawnTracer(_muzzle.GlobalPosition, aimPoint, new Color(1.0f, 0.34f, 0.13f));
-        }
+        Main?.SpawnTracer(shotOrigin, aimPoint, new Color(1.0f, 0.34f, 0.13f));
     }
 
     private void FireAtNode(EnemyOperator rival, float distance)
@@ -1232,17 +1244,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         _fireTimer = _rng.RandfRange(stats.FireInterval * 3.2f, stats.FireInterval * 6.8f);
         var accuracy = Mathf.Clamp(0.9f - distance * 0.008f, 0.4f, 0.94f);
         var aimPoint = rival.GlobalPosition + Vector3.Up * (rival.IsProne ? 0.45f : 1.2f);
-        var muzzlePos = IsInstanceValid(_muzzle)
-            ? _muzzle.GlobalPosition
-            : GlobalPosition + Vector3.Up * (IsProne ? 0.55f : 1.45f);
-        var clear = Ballistics.HasClearShot(GetWorld3D(), muzzlePos, aimPoint, rival, GetRid());
+        var shotOrigin = ResolveBallisticShotOrigin();
+        var clear = Ballistics.HasClearShot(GetWorld3D(), shotOrigin, aimPoint, rival, GetRid());
         if (clear && _rng.Randf() < accuracy)
         {
             rival.TakeDamage(stats.Damage * _rng.RandfRange(0.28f, 0.4f), aimPoint, this);
         }
         else if (!clear)
         {
-            var query = PhysicsRayQueryParameters3D.Create(muzzlePos, aimPoint);
+            var query = PhysicsRayQueryParameters3D.Create(shotOrigin, aimPoint);
             query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
             query.CollideWithAreas = false;
             var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
@@ -1255,7 +1265,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             aimPoint += Scatter();
         }
-        Main?.SpawnTracer(muzzlePos, aimPoint, new Color(1.0f, 0.45f, 0.18f));
+        Main?.SpawnTracer(shotOrigin, aimPoint, new Color(1.0f, 0.45f, 0.18f));
     }
 
     private void BeginMuzzleFlash()
