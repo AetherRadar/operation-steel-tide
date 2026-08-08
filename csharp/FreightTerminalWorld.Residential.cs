@@ -8,8 +8,9 @@ public partial class FreightTerminalWorld
 {
     private const float ResidentialFloorHeight = 3.15f;
     private const float ResidentialStairRun = 5.4f;
-    private const float ResidentialStairOpeningWidth = 4.6f;
-    private const float ResidentialStairOpeningDepth = 6.2f;
+    private const float ResidentialStairOpeningWidth = 5.6f;
+    private const float ResidentialStairOpeningNorthDepth = 5.45f;
+    private const float ResidentialStairOpeningSouthDepth = 3.25f;
     private const int ResidentialStepsPerFlight = 8;
 
     private readonly record struct ResidentialTowerSpec(
@@ -82,7 +83,7 @@ public partial class FreightTerminalWorld
             _ => spec.Footprint.Y * 0.16f
         };
         var coreZ = -Mathf.Min(spec.Footprint.Y * 0.18f, 3.6f);
-        var southStart = coreZ + ResidentialStairOpeningDepth * 0.5f + 0.55f;
+        var southStart = coreZ + ResidentialStairOpeningSouthDepth + 0.55f;
         var southEnd = spec.Footprint.Y * 0.5f - 0.35f;
         // Keep the doorway in the furniture-free band of the apartment strip.
         var furnMin = spec.Footprint.Y * 0.15f + 0.6f;
@@ -330,22 +331,20 @@ public partial class FreightTerminalWorld
         var width = spec.Footprint.X;
         var depth = spec.Footprint.Y;
         var openingWidth = Mathf.Min(ResidentialStairOpeningWidth, width - 5.0f);
-        var openingDepth = ResidentialStairOpeningDepth;
         var sideWidth = (width - openingWidth) * 0.5f;
         var northEdge = -depth * 0.5f;
         var southEdge = depth * 0.5f;
-        var openingNorth = coreZ - openingDepth * 0.5f;
-        var openingSouth = coreZ + openingDepth * 0.5f;
-        // Four-panel slab around a tight stair well — leave only the stair channel open
-        // so upper floors are mostly solid (no giant void you fall through).
+        var openingNorth = coreZ - ResidentialStairOpeningNorthDepth;
+        var openingSouth = coreZ + ResidentialStairOpeningSouthDepth;
+        // The asymmetric four-panel opening preserves standing headroom over both flights
+        // and the deeper north turn platform without opening the rest of the floor.
         ExpansionBox(tower, "ResidentialFloorSlab_W", new Vector3(-(openingWidth + sideWidth) * 0.5f, floorY + 0.05f, 0), new Vector3(sideWidth, 0.12f, depth), material);
         ExpansionBox(tower, "ResidentialFloorSlab_E", new Vector3((openingWidth + sideWidth) * 0.5f, floorY + 0.05f, 0), new Vector3(sideWidth, 0.12f, depth), material);
         var northDepth = Mathf.Max(0.5f, openingNorth - northEdge);
         var southDepth = Mathf.Max(0.5f, southEdge - openingSouth);
         ExpansionBox(tower, "ResidentialFloorSlab_N", new Vector3(0, floorY + 0.05f, northEdge + northDepth * 0.5f), new Vector3(openingWidth, 0.12f, northDepth), material);
         ExpansionBox(tower, "ResidentialFloorSlab_S", new Vector3(0, floorY + 0.05f, openingSouth + southDepth * 0.5f), new Vector3(openingWidth, 0.12f, southDepth), material);
-        // Do NOT fill the stair channel — only the four-panel slab. Opening is already tightened
-        // via ResidentialStairOpening* so upper floors stay walkable without a room-sized pit.
+        // Do not fill the stair channel: the opening follows the full switchback shaft.
         if (groundFloor)
         {
             // Keep lobby mats only outside the stair well so stepped stairs stay clear.
@@ -469,8 +468,8 @@ public partial class FreightTerminalWorld
         const float partitionHeight = 2.85f;
         var wallY = floorY + 0.1f + partitionHeight * 0.5f;
         var northStart = -depth * 0.5f + 0.35f;
-        var northEnd = coreZ - ResidentialStairOpeningDepth * 0.5f - 0.55f;
-        var southStart = coreZ + ResidentialStairOpeningDepth * 0.5f + 0.55f;
+        var northEnd = coreZ - ResidentialStairOpeningNorthDepth - 0.55f;
+        var southStart = coreZ + ResidentialStairOpeningSouthDepth + 0.55f;
         var southEnd = depth * 0.5f - 0.35f;
         foreach (var x in new[] { -corridorHalfWidth, corridorHalfWidth })
         {
@@ -563,7 +562,7 @@ public partial class FreightTerminalWorld
         var floorLabel = new Label3D
         {
             Name = "ResidentialFloorSign",
-            Position = new Vector3(0, floorY + 1.65f, coreZ + ResidentialStairOpeningDepth * 0.5f + 1.15f),
+            Position = new Vector3(0, floorY + 1.65f, coreZ + ResidentialStairOpeningSouthDepth + 1.15f),
             Text = $"{spec.BlockName}  //  FLOOR {floor + 1:00}",
             FontSize = 22,
             OutlineSize = 6,
@@ -644,6 +643,11 @@ public partial class FreightTerminalWorld
         const float treadThickness = 0.14f;
         var lowerStartZ = coreZ - ResidentialStairRun * 0.5f;
         var upperStartZ = coreZ + ResidentialStairRun * 0.5f;
+        const float landingWidth = 5.16f;
+        const float landingDepth = 2.8f;
+        var landingSouthZ = lowerStartZ + 0.2f;
+        var landingNorthZ = landingSouthZ - landingDepth;
+        var landingCenterZ = (landingNorthZ + landingSouthZ) * 0.5f;
 
         // Lower flight (west) — each step is a single thin plate at its top height.
         for (var step = 0; step < steps; step++)
@@ -658,12 +662,12 @@ public partial class FreightTerminalWorld
                 stair);
         }
 
-        // Mid landing (turn plate only — do not span the whole well and block the climb).
+        // Full mid-level platform gives a standing player room to clear the first flight and turn.
         ExpansionBox(
             tower,
             $"ResidentialStairLanding_F{floor}",
-            new Vector3(0, floorY + halfRise - treadThickness * 0.5f, lowerStartZ - 0.65f),
-            new Vector3(4.6f, treadThickness, 1.55f),
+            new Vector3(0, floorY + halfRise - treadThickness * 0.5f, landingCenterZ),
+            new Vector3(landingWidth, treadThickness, landingDepth),
             stair);
 
         // Upper flight (east).
@@ -679,12 +683,18 @@ public partial class FreightTerminalWorld
                 stair);
         }
 
-        // Enclosed switchback core: center spine + shaft walls read as one compact stair volume.
+        // The center spine separates the flights but stops south of the open turn platform.
         var coreTop = floorY + ResidentialFloorHeight * 0.5f;
-        ExpansionBox(tower, $"ResidentialStairSpine_F{floor}", new Vector3(0, coreTop, coreZ), new Vector3(0.24f, ResidentialFloorHeight, ResidentialStairRun + 0.4f), stair);
-        ExpansionBox(tower, $"ResidentialStairShaftN_F{floor}", new Vector3(0, coreTop, lowerStartZ - 1.6f), new Vector3(5.44f, ResidentialFloorHeight, 0.12f), stair);
-        ExpansionBox(tower, $"ResidentialStairShaftW_F{floor}", new Vector3(-2.66f, coreTop, coreZ - 0.575f), new Vector3(0.12f, ResidentialFloorHeight, ResidentialStairRun + 1.93f), stair);
-        ExpansionBox(tower, $"ResidentialStairShaftE_F{floor}", new Vector3(2.66f, coreTop, coreZ - 0.575f), new Vector3(0.12f, ResidentialFloorHeight, ResidentialStairRun + 1.93f), stair);
+        var spineNorthZ = lowerStartZ + 0.65f;
+        var spineSouthZ = upperStartZ + 0.2f;
+        var shaftNorthZ = landingNorthZ - 0.06f;
+        var shaftSouthZ = upperStartZ + 0.45f;
+        var shaftCenterZ = (shaftNorthZ + shaftSouthZ) * 0.5f;
+        var shaftSideDepth = shaftSouthZ - shaftNorthZ - 0.12f;
+        ExpansionBox(tower, $"ResidentialStairSpine_F{floor}", new Vector3(0, coreTop, (spineNorthZ + spineSouthZ) * 0.5f), new Vector3(0.24f, ResidentialFloorHeight, spineSouthZ - spineNorthZ), stair);
+        ExpansionBox(tower, $"ResidentialStairShaftN_F{floor}", new Vector3(0, coreTop, shaftNorthZ), new Vector3(5.44f, ResidentialFloorHeight, 0.12f), stair);
+        ExpansionBox(tower, $"ResidentialStairShaftW_F{floor}", new Vector3(-2.66f, coreTop, shaftCenterZ), new Vector3(0.12f, ResidentialFloorHeight, shaftSideDepth), stair);
+        ExpansionBox(tower, $"ResidentialStairShaftE_F{floor}", new Vector3(2.66f, coreTop, shaftCenterZ), new Vector3(0.12f, ResidentialFloorHeight, shaftSideDepth), stair);
         const float shaftDoorHalf = 1.1f;
         var shaftSideWidth = 2.72f - shaftDoorHalf;
         ExpansionBox(tower, $"ResidentialStairShaftSW_F{floor}", new Vector3(-(shaftDoorHalf + shaftSideWidth * 0.5f), floorY + 0.1f + 1.275f, upperStartZ + 0.45f), new Vector3(shaftSideWidth, 2.55f, 0.12f), stair);
@@ -692,10 +702,10 @@ public partial class FreightTerminalWorld
         ExpansionBox(tower, $"ResidentialStairShaftSH_F{floor}", new Vector3(0, floorY + 0.1f + 2.55f + (ResidentialFloorHeight - 2.55f) * 0.5f, upperStartZ + 0.45f), new Vector3(shaftDoorHalf * 2.0f, Mathf.Max(0.12f, ResidentialFloorHeight - 2.55f), 0.12f), stair);
         MeshBox(
             tower,
-            new Vector3(0, floorY + halfRise + 0.95f, lowerStartZ - 0.72f),
-            new Vector3(4.8f, 0.08f, 0.08f),
+            new Vector3(0, floorY + halfRise + 0.95f, landingNorthZ + 0.08f),
+            new Vector3(5.0f, 0.08f, 0.08f),
             rail);
-        MeshBox(tower, new Vector3(0, floorY + halfRise + 1.35f, lowerStartZ - 0.55f), new Vector3(1.8f, 0.04f, 0.16f), light);
+        MeshBox(tower, new Vector3(0, floorY + halfRise + 1.35f, landingNorthZ + 0.08f), new Vector3(1.8f, 0.04f, 0.16f), light);
         _residentialStairFlightCount += 2;
     }
 
@@ -723,7 +733,7 @@ public partial class FreightTerminalWorld
             MeshBox(tower, rail.Position, rail.Size, trim);
         }
         ExpansionBox(tower, "RooftopUtilityRoom", new Vector3(width * 0.22f, roofY + 1.5f, -depth * 0.2f), new Vector3(Mathf.Min(5.0f, width * 0.3f), 3.0f, Mathf.Min(5.2f, depth * 0.3f)), steel);
-        MeshBox(tower, new Vector3(0, roofY + 0.3f, coreZ + ResidentialStairOpeningDepth * 0.5f + 0.5f), new Vector3(2.4f, 0.05f, 0.24f), light);
+        MeshBox(tower, new Vector3(0, roofY + 0.3f, coreZ + ResidentialStairOpeningSouthDepth + 0.5f), new Vector3(2.4f, 0.05f, 0.24f), light);
         if (spec.Floors >= 9)
         {
             ExpansionCylinder(tower, "ResidentialRoofAntenna", new Vector3(0, roofY + 4.2f, 0), 0.08f, 7.5f, trim);
@@ -963,7 +973,7 @@ public partial class FreightTerminalWorld
         SaveViewportImage("res://residential_interior_validation.png");
 
         var occupiedFloor = spec.Floors / 2;
-        var occupiedSouthStart = coreZ + ResidentialStairOpeningDepth * 0.5f + 0.55f;
+        var occupiedSouthStart = coreZ + ResidentialStairOpeningSouthDepth + 0.55f;
         var occupiedSouthEnd = spec.Footprint.Y * 0.5f - 0.35f;
         var occupiedDoorZ = Mathf.Lerp(occupiedSouthStart, occupiedSouthEnd, 0.58f);
         var capturedOccupant = _civilians.Find(civilian => civilian.TowerIndex == towerIndex

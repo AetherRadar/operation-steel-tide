@@ -2958,33 +2958,54 @@ public partial class FreightTerminalWorld : Node3D
             -1.45f,
             0.25f,
             firstCoreZ + ResidentialStairRun * 0.5f - 0.25f));
-        var climbTarget = firstTower.ToGlobal(new Vector3(
-            -1.45f,
-            ResidentialFloorHeight * 0.5f + 0.25f,
-            firstCoreZ - ResidentialStairRun * 0.2f));
-        _player.FaceWorldPointForDiagnostics(climbTarget);
         _player.RestoreMovementInput();
         for (var frame = 0; frame < 10; frame++)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
+        // Full ground -> floor-2 climb through the switchback core, waypoint by waypoint.
+        var waypoints = new (Vector3 Local, string Label)[]
+        {
+            (new Vector3(-1.45f, ResidentialFloorHeight * 0.5f + 0.25f, firstCoreZ - ResidentialStairRun * 0.5f - 1.0f), "landing_entry"),
+            (new Vector3(1.45f, ResidentialFloorHeight * 0.5f + 0.25f, firstCoreZ - ResidentialStairRun * 0.5f - 1.0f), "landing_turn"),
+            (new Vector3(1.45f, ResidentialFloorHeight + 0.25f, firstCoreZ + ResidentialStairRun * 0.5f - 0.3f), "upper_top"),
+            (new Vector3(0.0f, ResidentialFloorHeight + 0.25f, firstCoreZ + ResidentialStairRun * 0.5f + 1.6f), "floor2_corridor")
+        };
         var walkStartY = _player.GlobalPosition.Y;
+        var reachedIndex = -1;
         Input.ActionPress("move_forward");
         Input.ActionPress("sprint");
-        for (var frame = 0; frame < 400; frame++)
+        foreach (var (local, label) in waypoints)
         {
-            if (frame % 5 == 0)
+            var target = firstTower.ToGlobal(local);
+            var reached = false;
+            for (var frame = 0; frame < 500; frame++)
             {
-                _player.FaceWorldPointForDiagnostics(climbTarget);
+                if (frame % 5 == 0)
+                {
+                    _player.FaceWorldPointForDiagnostics(target);
+                }
+                if (_player.GlobalPosition.DistanceTo(target) < 0.75f)
+                {
+                    reached = true;
+                    break;
+                }
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             }
-            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            if (!reached)
+            {
+                var localPos = firstTower.ToLocal(_player.GlobalPosition);
+                GD.Print($"STAIRS_STALL waypoint={label} pos=({localPos.X:0.00},{localPos.Y:0.00},{localPos.Z:0.00})");
+                break;
+            }
+            reachedIndex++;
         }
         Input.ActionRelease("sprint");
         Input.ActionRelease("move_forward");
         var walkGain = _player.GlobalPosition.Y - walkStartY;
-        var walked = walkGain > 0.70f;
+        var walked = reachedIndex >= waypoints.Length - 1 && walkGain > ResidentialFloorHeight - 0.4f;
         var valid = steppedCollider && rampSlabAbsent && hangarRampGone && walked && _residentialStairFlightCount > 0;
-        GD.Print($"STAIRS_CHECK valid={valid} step_bodies={stepBodies} ramp_bodies={rampBodies} stepped={steppedCollider} no_ramp_slab={rampSlabAbsent} hangar_ok={hangarRampGone} walk_h={walkGain:0.00} climbed={walked} flights={_residentialStairFlightCount}");
+        GD.Print($"STAIRS_CHECK valid={valid} step_bodies={stepBodies} ramp_bodies={rampBodies} stepped={steppedCollider} no_ramp_slab={rampSlabAbsent} hangar_ok={hangarRampGone} walk_h={walkGain:0.00} reached={reachedIndex + 1}/{waypoints.Length} climbed={walked} flights={_residentialStairFlightCount}");
         GD.Print($"STAIRS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
