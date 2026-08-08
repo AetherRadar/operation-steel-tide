@@ -64,6 +64,11 @@ public partial class LootItemIconControl : Control
                 DrawRect(new Rect2(center.X - 10, center.Y - 8, 20, 15), _accent.Darkened(0.18f));
                 DrawCircle(center, 5, new Color(0.025f, 0.035f, 0.035f));
                 break;
+            case LootItemKind.KnifeSkin:
+                DrawLine(new Vector2(center.X - 15, center.Y + 13), new Vector2(center.X + 12, center.Y - 14), _accent, 7, true);
+                DrawLine(new Vector2(center.X - 18, center.Y + 16), new Vector2(center.X - 10, center.Y + 8), muted, 8, true);
+                DrawLine(new Vector2(center.X - 10, center.Y + 8), new Vector2(center.X - 4, center.Y + 14), _accent.Lightened(0.25f), 3, true);
+                break;
             case LootItemKind.Equipment when _slot == EquipmentSlot.Helmet:
                 DrawCircle(new Vector2(center.X, center.Y - 2), 14, muted);
                 DrawRect(new Rect2(center.X - 15, center.Y - 1, 30, 15), new Color(0.035f, 0.043f, 0.042f));

@@ -17,16 +17,22 @@ public partial class InventoryModelPreview : SubViewportContainer
     private InventoryPreviewKind _kind;
     private EquipmentItem? _equipment;
     private WeaponBuild? _weapon;
+    private string _knifeSkinId = KnifeSkinCatalog.DefaultId;
     private SubViewport? _viewport;
     private Node3D? _modelRoot;
     private Camera3D? _camera;
     private int _renderRevision;
 
-    public void Configure(InventoryPreviewKind kind, EquipmentItem? equipment = null, WeaponBuild? weapon = null)
+    public void Configure(
+        InventoryPreviewKind kind,
+        EquipmentItem? equipment = null,
+        WeaponBuild? weapon = null,
+        string knifeSkinId = KnifeSkinCatalog.DefaultId)
     {
         _kind = kind;
         _equipment = equipment?.Clone();
         _weapon = weapon?.Clone();
+        _knifeSkinId = knifeSkinId;
         if (IsInsideTree())
         {
             RebuildModel();
@@ -156,18 +162,27 @@ public partial class InventoryModelPreview : SubViewportContainer
         {
             WeaponPlatform.AK74 => new Color(0.19f, 0.2f, 0.18f),
             WeaponPlatform.ScarL => new Color(0.43f, 0.36f, 0.24f),
+            WeaponPlatform.M24 => new Color(0.18f, 0.24f, 0.17f),
+            WeaponPlatform.MP5A5 => new Color(0.055f, 0.065f, 0.06f),
             _ => new Color(0.12f, 0.15f, 0.145f)
         };
-        var furniture = platform == WeaponPlatform.AK74
-            ? new Color(0.35f, 0.19f, 0.09f)
-            : metal.Lightened(0.12f);
+        var furniture = platform switch
+        {
+            WeaponPlatform.AK74 => new Color(0.35f, 0.19f, 0.09f),
+            WeaponPlatform.M24 => new Color(0.2f, 0.31f, 0.18f),
+            _ => metal.Lightened(0.12f)
+        };
         var steel = new Color(0.44f, 0.5f, 0.48f);
-        Box(root, new Vector3(0.5f, 0.24f, 0.18f), new Vector3(0, 0, 0), metal, 0.55f);
-        Box(root, new Vector3(0.55f, 0.17f, 0.16f), new Vector3(-0.5f, 0.01f, 0), furniture, 0.25f);
-        Box(root, new Vector3(0.48f, 0.16f, 0.14f), new Vector3(0.49f, 0, 0), furniture, 0.28f);
-        Cylinder(root, 0.045f, 0.72f, new Vector3(1.08f, 0.01f, 0), new Vector3(0, 0, Mathf.Pi / 2), steel, 0.75f, 0.72f);
+        var definition = WeaponCatalog.Weapon(platform);
+        var receiverLength = definition.ReceiverLength;
+        var barrelLength = definition.BarrelLength;
+        Box(root, new Vector3(receiverLength, 0.24f, 0.18f), new Vector3(0, 0, 0), metal, 0.55f);
+        Box(root, new Vector3(Mathf.Max(0.3f, receiverLength * 1.05f), 0.17f, 0.16f), new Vector3(-receiverLength * 0.95f, 0.01f, 0), furniture, 0.25f);
+        Box(root, new Vector3(Mathf.Max(0.3f, barrelLength * 0.72f), 0.16f, 0.14f), new Vector3(receiverLength * 0.92f, 0, 0), furniture, 0.28f);
+        Cylinder(root, 0.045f, barrelLength, new Vector3(receiverLength * 0.8f + barrelLength * 0.55f, 0.01f, 0), new Vector3(0, 0, Mathf.Pi / 2), steel, 0.75f, 0.72f);
         Box(root, new Vector3(0.22f, 0.08f, 0.17f), new Vector3(-0.87f, 0, 0), furniture.Darkened(0.08f), 0.2f);
-        Box(root, new Vector3(0.16f, 0.44f, 0.15f), new Vector3(0.06f, -0.27f, 0), furniture.Darkened(0.06f), 0.18f, rotation: new Vector3(0, 0, platform == WeaponPlatform.AK74 ? -0.12f : 0.04f));
+        var magazineHeight = platform == WeaponPlatform.M24 ? 0.2f : platform == WeaponPlatform.MP5A5 ? 0.5f : 0.44f;
+        Box(root, new Vector3(0.16f, magazineHeight, 0.15f), new Vector3(0.06f, -magazineHeight * 0.58f, 0), furniture.Darkened(0.06f), 0.18f, rotation: new Vector3(0, 0, platform == WeaponPlatform.AK74 ? -0.12f : 0.04f));
         Box(root, new Vector3(0.13f, 0.32f, 0.13f), new Vector3(-0.2f, -0.25f, 0), furniture, 0.18f, rotation: new Vector3(0, 0, -0.18f));
         Box(root, new Vector3(0.36f, 0.045f, 0.18f), new Vector3(0.0f, 0.16f, 0), steel.Darkened(0.2f), 0.65f);
         if (_weapon?.Attachments.ContainsKey(AttachmentSlot.Optic) != false)
@@ -181,11 +196,12 @@ public partial class InventoryModelPreview : SubViewportContainer
         }
     }
 
-    private static void BuildKnife(Node3D root)
+    private void BuildKnife(Node3D root)
     {
-        var steel = new Color(0.58f, 0.64f, 0.63f);
-        var edge = new Color(0.84f, 0.9f, 0.88f);
-        var grip = new Color(0.055f, 0.07f, 0.065f);
+        var skin = KnifeSkinCatalog.Definition(_knifeSkinId);
+        var steel = skin.BladeColor;
+        var edge = skin.EdgeColor;
+        var grip = skin.GripColor;
         Box(root, new Vector3(1.0f, 0.16f, 0.065f), new Vector3(-0.36f, 0.02f, 0), steel, 0.9f, rotation: new Vector3(0, 0, -0.035f));
         Box(root, new Vector3(0.8f, 0.025f, 0.075f), new Vector3(-0.48f, -0.065f, 0.002f), edge, 0.95f);
         Box(root, new Vector3(0.09f, 0.38f, 0.09f), new Vector3(0.18f, 0, 0), steel.Darkened(0.25f), 0.75f);

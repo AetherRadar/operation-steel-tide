@@ -130,6 +130,18 @@ public static class GameLocalization
         Chinese["player_revived"] = "\u5df2\u6551\u8d77  //  \u91cd\u8fd4\u6218\u6597";
         Chinese["vehicle_blocked"] = "\u8f7d\u5177\u53d7\u963b  //  \u5012\u8f66\u8131\u56f0";
         Chinese["mate_reviving_you"] = "\u961f\u53cb\u6b63\u5728\u8d76\u6765\u6551\u63f4  //  \u575a\u6301\u4f4f";
+        Chinese["weapon_m24"] = "M24 \u7cbe\u786e\u5c04\u624b\u6b65\u67aa";
+        Chinese["weapon_mp5a5"] = "MP5A5 \u51b2\u950b\u67aa";
+        Chinese["ammo_rifle"] = "\u6b65\u67aa\u5f39\u836f";
+        Chinese["ammo_sniper"] = "7.62 \u6beb\u7c73\u7cbe\u786e\u5f39\u836f";
+        Chinese["ammo_smg"] = "9 \u6beb\u7c73\u51b2\u950b\u67aa\u5f39\u836f";
+        Chinese["knife_skin"] = "\u6218\u672f\u5200\u6d82\u88c5";
+        Chinese["knife_skin_carbon"] = "\u78b3\u7ea4\u9ed1";
+        Chinese["knife_skin_crimson"] = "\u8d64\u7ea2\u7535\u8def";
+        Chinese["knife_skin_arctic"] = "\u6781\u5730\u51b0\u6676";
+        Chinese["knife_skin_hazard"] = "\u8b66\u6212\u6761\u7eb9";
+        Chinese["knife_skin_detail"] = "\u88c5\u5907\u540e\u6c38\u4e45\u66ff\u6362\u6218\u672f\u5200\u6d82\u88c5";
+        Chinese["knife_skin_equipped"] = "\u6218\u672f\u5200\u6d82\u88c5\u5df2\u66ff\u6362";
     }
 
     private static readonly Dictionary<string, string> ChineseObjectives = new()

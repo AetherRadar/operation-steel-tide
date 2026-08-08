@@ -185,6 +185,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         Loot.Add(new LootItem
         {
             Kind = LootItemKind.Ammunition,
+            AmmoCaliber = WeaponCatalog.Weapon(CarriedWeapon.Platform).Caliber,
             Quantity = _rng.RandiRange(20, 48),
             Grade = LootGrade.Common
         });

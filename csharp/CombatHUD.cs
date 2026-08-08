@@ -116,6 +116,7 @@ public partial class CombatHUD : CanvasLayer
     private bool _shownSourceAvailable;
     private string _lastFireMode = "AUTO";
     private string _weaponPreviewSignature = string.Empty;
+    private string _knifePreviewSignature = string.Empty;
     private Tween? _hitTween;
     private Tween? _damageTween;
     private Tween? _crosshairTween;
@@ -1013,7 +1014,7 @@ public partial class CombatHUD : CanvasLayer
             Equipment = player.EquippedBackpack,
             Grade = LootGrade.Uncommon
         }.StackValue;
-        total += player.ReserveAmmo * 2;
+        total += player.TotalReserveAmmo * 2;
         total += player.ArmorPlates * 40;
         return total;
     }
@@ -1042,7 +1043,7 @@ public partial class CombatHUD : CanvasLayer
             {
                 EmitSignal(SignalName.BackpackUseRequested, itemId);
             }
-            else if (item.Kind is LootItemKind.Weapon or LootItemKind.Attachment or LootItemKind.Equipment)
+            else if (item.Kind is LootItemKind.Weapon or LootItemKind.Attachment or LootItemKind.Equipment or LootItemKind.KnifeSkin)
             {
                 EmitSignal(SignalName.LootEquipRequested, itemId);
             }
@@ -1249,7 +1250,13 @@ public partial class CombatHUD : CanvasLayer
 
     public void SetBackpackValuePlayer(TacticalPlayer player) => UpdateBackpackHotkey(player);
 
-    public void SetEquipment(int armorPlates, string fireMode, string weaponName = "M4A1", WeaponBuild? weaponBuild = null, bool hasPrimary = true)
+    public void SetEquipment(
+        int armorPlates,
+        string fireMode,
+        string weaponName = "M4A1",
+        WeaponBuild? weaponBuild = null,
+        bool hasPrimary = true,
+        string knifeSkinId = KnifeSkinCatalog.DefaultId)
     {
         _hasPrimary = hasPrimary;
         if (IsInstanceValid(_primaryWeaponPreview))
@@ -1273,6 +1280,11 @@ public partial class CombatHUD : CanvasLayer
         if (weaponBuild is not null)
         {
             UpdateWeaponPreview(weaponBuild);
+        }
+        if (_knifePreviewSignature != knifeSkinId)
+        {
+            _knifePreviewSignature = knifeSkinId;
+            _knifeSlotPreview.Configure(InventoryPreviewKind.Knife, knifeSkinId: knifeSkinId);
         }
         UpdateWeaponSlotButtons();
     }

@@ -43,7 +43,19 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         : EquippedBodyArmor.Durability / EquippedBodyArmor.Definition.MaxDurability * 100.0f;
     public float Stamina { get; private set; } = 100.0f;
     public int Ammo { get; private set; } = 30;
-    public int ReserveAmmo { get; private set; } = 150;
+    public int ReserveAmmo => AmmoReserveFor(CurrentAmmoCaliber);
+    public int TotalReserveAmmo
+    {
+        get
+        {
+            var total = 0;
+            foreach (var amount in _ammoReserves.Values)
+            {
+                total += amount;
+            }
+            return total;
+        }
+    }
     public int Grenades { get; private set; } = 2;
     public int ArmorPlates { get; private set; } = 2;
     public bool IsDead { get; set; }
@@ -62,6 +74,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public float LeanAmount => _leanValue;
     public float ViewHeight => IsInstanceValid(_head) ? _head.Position.Y : 0.0f;
     public bool KnifeEquipped => _knifeEquipped;
+    public string EquippedKnifeSkinId { get; private set; } = KnifeSkinCatalog.DefaultId;
+    public AmmoCaliber CurrentAmmoCaliber => WeaponCatalog.Weapon(EquippedWeapon.Platform).Caliber;
     /// <summary>False at cold-start extraction until a looted primary is equipped.</summary>
     public bool HasFireablePrimary { get; private set; } = true;
     public bool UiLocked { get; set; }
@@ -77,7 +91,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         HasFireablePrimary = false;
         Ammo = 0;
-        ReserveAmmo = 0;
+        foreach (var caliber in System.Enum.GetValues<AmmoCaliber>())
+        {
+            _ammoReserves[caliber] = 0;
+        }
         SwitchWeapon(true);
         if (IsInstanceValid(_weaponRoot))
         {
@@ -91,7 +108,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         HasFireablePrimary = true;
         EquipPrimary(build ?? WeaponCatalog.StarterWeapon());
         Ammo = EquippedWeapon.Stats().MagazineSize;
-        ReserveAmmo = Mathf.Max(ReserveAmmo, 60);
+        SetAmmoReserve(CurrentAmmoCaliber, Mathf.Max(ReserveAmmo, 60));
     }
 
     private bool _isReloading;
@@ -153,6 +170,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private AudioStreamPlayer3D _footstepAudio = null!;
     private CollisionShape3D _collider = null!;
     private readonly RandomNumberGenerator _rng = new();
+    private readonly Dictionary<AmmoCaliber, int> _ammoReserves = new()
+    {
+        [AmmoCaliber.Rifle] = 150,
+        [AmmoCaliber.Sniper] = 0,
+        [AmmoCaliber.Smg] = 0
+    };
 
     public override void _Ready()
     {
@@ -724,13 +747,18 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             WeaponPlatform.AK74 => new Color(0.12f, 0.105f, 0.075f),
             WeaponPlatform.ScarL => new Color(0.34f, 0.29f, 0.2f),
+            WeaponPlatform.M24 => new Color(0.16f, 0.19f, 0.17f),
+            WeaponPlatform.MP5A5 => new Color(0.025f, 0.032f, 0.03f),
             _ => new Color(0.045f, 0.052f, 0.05f)
         };
-        var furnitureColor = EquippedWeapon.Platform == WeaponPlatform.AK74
-            ? new Color(0.24f, 0.12f, 0.055f)
-            : EquippedWeapon.Platform == WeaponPlatform.ScarL
-                ? new Color(0.29f, 0.255f, 0.18f)
-                : new Color(0.18f, 0.17f, 0.13f);
+        var furnitureColor = EquippedWeapon.Platform switch
+        {
+            WeaponPlatform.AK74 => new Color(0.24f, 0.12f, 0.055f),
+            WeaponPlatform.ScarL => new Color(0.29f, 0.255f, 0.18f),
+            WeaponPlatform.M24 => new Color(0.18f, 0.24f, 0.16f),
+            WeaponPlatform.MP5A5 => new Color(0.055f, 0.065f, 0.06f),
+            _ => new Color(0.18f, 0.17f, 0.13f)
+        };
         var receiverMaterial = Material(receiverColor, 0.52f, 0.46f);
         var furnitureMaterial = Material(furnitureColor, 0.12f, 0.68f);
 
@@ -738,11 +766,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             WeaponPlatform.AK74 => new Vector3(0.14f, 0.16f, 0.52f),
             WeaponPlatform.ScarL => new Vector3(0.16f, 0.18f, 0.56f),
+            WeaponPlatform.M24 => new Vector3(0.145f, 0.16f, 0.64f),
+            WeaponPlatform.MP5A5 => new Vector3(0.14f, 0.17f, 0.36f),
             _ => new Vector3(0.13f, 0.15f, 0.46f)
         };
         _receiver.MaterialOverride = receiverMaterial;
         ((BoxMesh)_handguard.Mesh).Size = new Vector3(
-            EquippedWeapon.Platform == WeaponPlatform.ScarL ? 0.17f : 0.15f,
+            EquippedWeapon.Platform is WeaponPlatform.ScarL or WeaponPlatform.M24 ? 0.17f : 0.15f,
             0.12f,
             Mathf.Max(0.28f, barrelLength * 0.72f));
         _handguard.Position = new Vector3(0, 0.01f, -0.29f - barrelLength * 0.25f);
@@ -772,9 +802,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _stock.MaterialOverride = furnitureMaterial;
         _stock.Position = new Vector3(0, -0.01f, 0.25f + 0.13f * stockScale);
 
-        var magScale = stats.MagazineSize > 30 ? 1.24f : 1.0f;
-        ((BoxMesh)_magazine.Mesh).Size = new Vector3(0.09f, 0.26f * magScale, 0.14f);
-        ((BoxMesh)_spareMagazine.Mesh).Size = new Vector3(0.09f, 0.26f * magScale, 0.14f);
+        var magazineSize = EquippedWeapon.Platform switch
+        {
+            WeaponPlatform.M24 => new Vector3(0.085f, 0.15f, 0.13f),
+            WeaponPlatform.MP5A5 => new Vector3(0.075f, stats.MagazineSize > 30 ? 0.36f : 0.3f, 0.11f),
+            _ => new Vector3(0.09f, 0.26f * (stats.MagazineSize > 30 ? 1.24f : 1.0f), 0.14f)
+        };
+        ((BoxMesh)_magazine.Mesh).Size = magazineSize;
+        ((BoxMesh)_spareMagazine.Mesh).Size = magazineSize;
         _magazine.MaterialOverride = EquippedWeapon.Platform == WeaponPlatform.AK74 ? furnitureMaterial : receiverMaterial;
         _spareMagazine.MaterialOverride = _magazine.MaterialOverride;
         _magazine.Rotation = EquippedWeapon.Platform == WeaponPlatform.AK74
@@ -793,13 +828,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             : 0.0f;
         _opticRoot.Visible = opticScale > 0.0f;
         _opticRoot.Scale = Vector3.One;
-        _opticRoot.Position = new Vector3(0, opticId == "optic_scope" ? 0.225f : 0.205f, -0.25f);
+        _opticRoot.Position = new Vector3(0, opticId is "optic_scope" or "optic_sniper" ? 0.225f : 0.205f, -0.25f);
         _reflexSightModel.Visible = opticId == "optic_micro";
         _holoSightModel.Visible = opticId == "optic_holo";
-        _scopeSightModel.Visible = opticId == "optic_scope";
+        _scopeSightModel.Visible = opticId is "optic_scope" or "optic_sniper";
         _opticReticle.Position = opticId switch
         {
             "optic_scope" => new Vector3(0, 0, -0.255f),
+            "optic_sniper" => new Vector3(0, 0, -0.255f),
             "optic_holo" => new Vector3(0, 0, -0.078f),
             _ => new Vector3(0, 0, -0.052f)
         };
@@ -820,9 +856,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             Visible = false
         };
         _camera.AddChild(_knifeRoot);
-        var steel = Material(new Color(0.16f, 0.19f, 0.18f), 0.92f, 0.18f);
-        var edge = Material(new Color(0.5f, 0.55f, 0.53f), 0.96f, 0.08f);
-        var grip = Material(new Color(0.035f, 0.043f, 0.04f), 0.16f, 0.82f);
+        var skin = KnifeSkinCatalog.Definition(EquippedKnifeSkinId);
+        var steel = Material(skin.BladeColor, 0.92f, 0.18f);
+        var edge = Material(skin.EdgeColor, 0.96f, 0.08f);
+        var grip = Material(skin.GripColor, 0.16f, 0.82f);
         var glove = GloveFabric(new Color(0.115f, 0.13f, 0.108f));
         var gloveArmor = Material(new Color(0.022f, 0.03f, 0.028f), 0.15f, 0.72f);
         MeshPart(_knifeRoot, Box(new Vector3(0.09f, 0.09f, 0.3f)), new Vector3(0, 0, 0.08f), Vector3.Zero, grip);
@@ -914,7 +951,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             CycleWeapon();
         }
 
-        if (Input.IsActionJustPressed("toggle_fire_mode") && !_knifeEquipped && !_isReloading && !_isPlating)
+        if (Input.IsActionJustPressed("toggle_fire_mode")
+            && !_knifeEquipped
+            && !_isReloading
+            && !_isPlating
+            && WeaponCatalog.Weapon(EquippedWeapon.Platform).SupportsAutomatic)
         {
             _automaticFire = !_automaticFire;
             Hud?.ShowLocalizedMessage(
@@ -978,7 +1019,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             _knifeEquipped ? "KNIFE" : _automaticFire ? "AUTO" : "SEMI",
             EquippedWeapon.DisplayName(Hud?.CurrentLanguage ?? "en"),
             EquippedWeapon,
-            HasFireablePrimary);
+            HasFireablePrimary,
+            EquippedKnifeSkinId);
         Hud?.SetAiming(_isAiming);
         Hud?.SetHeading(Mathf.RadToDeg(Rotation.Y) * -1.0f);
     }
@@ -1382,6 +1424,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         return opticId switch
         {
             "optic_scope" => 29.0f,
+            "optic_sniper" => 17.0f,
             "optic_holo" => 44.0f,
             _ => 49.0f
         };
@@ -1689,7 +1732,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         var amount = Mathf.Min(EquippedWeapon.Stats().MagazineSize - Ammo, ReserveAmmo);
         Ammo += amount;
-        ReserveAmmo -= amount;
+        SetAmmoReserve(CurrentAmmoCaliber, ReserveAmmo - amount);
         _isReloading = false;
         ResetReloadRig();
     }
@@ -1851,14 +1894,29 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         Hud?.SetEquipmentAction(string.Empty, 0.0f, false);
     }
 
-    public bool TryCollectAmmo(int amount)
+    public int AmmoReserveFor(AmmoCaliber caliber) => _ammoReserves.TryGetValue(caliber, out var amount) ? amount : 0;
+
+    private void SetAmmoReserve(AmmoCaliber caliber, int amount)
     {
-        const int maxReserveAmmo = 210;
-        if (ReserveAmmo >= maxReserveAmmo)
+        _ammoReserves[caliber] = Mathf.Max(0, amount);
+    }
+
+    public bool TryCollectAmmo(int amount) => TryCollectAmmo(CurrentAmmoCaliber, amount);
+
+    public bool TryCollectAmmo(AmmoCaliber caliber, int amount)
+    {
+        var maxReserveAmmo = caliber switch
+        {
+            AmmoCaliber.Sniper => 60,
+            AmmoCaliber.Smg => 270,
+            _ => 210
+        };
+        var current = AmmoReserveFor(caliber);
+        if (current >= maxReserveAmmo)
         {
             return false;
         }
-        ReserveAmmo = Mathf.Min(maxReserveAmmo, ReserveAmmo + amount);
+        SetAmmoReserve(caliber, Mathf.Min(maxReserveAmmo, current + amount));
         Hud?.ShowLocalizedMessage("ammo_recovered", "AMMUNITION RECOVERED", new Color(0.42f, 0.9f, 0.64f));
         return true;
     }
@@ -1909,9 +1967,21 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             Hud?.ShowLocalizedMessage("part_installed", "WEAPON PART INSTALLED", new Color(0.42f, 0.9f, 0.72f));
             return previous;
         }
-        if (item.Kind == LootItemKind.Ammunition && TryCollectAmmo(item.Quantity))
+        if (item.Kind == LootItemKind.Ammunition && TryCollectAmmo(item.AmmoCaliber, item.Quantity))
         {
             return null;
+        }
+        if (item.Kind == LootItemKind.KnifeSkin && !string.IsNullOrEmpty(item.KnifeSkinId))
+        {
+            if (string.Equals(item.KnifeSkinId, EquippedKnifeSkinId, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return item;
+            }
+            var previousSkin = EquippedKnifeSkinId;
+            EquippedKnifeSkinId = item.KnifeSkinId;
+            RebuildKnife();
+            Hud?.ShowLocalizedMessage("knife_skin_equipped", "KNIFE FINISH EQUIPPED", new Color(0.88f, 0.42f, 0.34f));
+            return new LootItem { Kind = LootItemKind.KnifeSkin, KnifeSkinId = previousSkin, Grade = LootGrade.Uncommon };
         }
         if (item.Kind == LootItemKind.ArmorPlate && TryCollectArmorPlate())
         {
@@ -1981,12 +2051,24 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         EquippedWeapon = build.Clone();
         HasFireablePrimary = true;
+        _automaticFire = WeaponCatalog.Weapon(EquippedWeapon.Platform).SupportsAutomatic;
         Ammo = EquippedWeapon.Stats().MagazineSize;
         _isReloading = false;
         ResetReloadRig();
         ApplyWeaponBuildVisuals();
         SwitchWeapon(false);
         Hud?.ShowLocalizedMessage("weapon_equipped", "PRIMARY WEAPON EQUIPPED", new Color(0.4f, 0.86f, 0.7f));
+    }
+
+    private void RebuildKnife()
+    {
+        var visible = IsInstanceValid(_knifeRoot) && _knifeRoot.Visible;
+        if (IsInstanceValid(_knifeRoot))
+        {
+            _knifeRoot.QueueFree();
+        }
+        BuildKnife();
+        _knifeRoot.Visible = visible;
     }
 
     private void ThrowGrenade()

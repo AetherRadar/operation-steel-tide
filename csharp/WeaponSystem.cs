@@ -9,7 +9,16 @@ public enum WeaponPlatform
 {
     M4A1,
     AK74,
-    ScarL
+    ScarL,
+    M24,
+    MP5A5
+}
+
+public enum AmmoCaliber
+{
+    Rifle,
+    Sniper,
+    Smg
 }
 
 public enum AttachmentSlot
@@ -28,7 +37,8 @@ public enum LootItemKind
     Attachment,
     Ammunition,
     ArmorPlate,
-    Equipment
+    Equipment,
+    KnifeSkin
 }
 
 /// <summary>Extraction-style item rarity. Higher grade = higher sell value and brighter world glow.</summary>
@@ -148,6 +158,9 @@ public sealed class WeaponDefinition
     public required WeaponPlatform Platform { get; init; }
     public required string Name { get; init; }
     public required string ChineseName { get; init; }
+    public string LocalizationKey { get; init; } = string.Empty;
+    public AmmoCaliber Caliber { get; init; } = AmmoCaliber.Rifle;
+    public bool SupportsAutomatic { get; init; } = true;
     public float Damage { get; init; }
     public float EffectiveRange { get; init; }
     public float Recoil { get; init; }
@@ -266,15 +279,55 @@ public sealed class WeaponBuild
             MathF.Max(0.45f, recoil),
             Math.Clamp(handling, 0.35f, 1.25f),
             MathF.Max(0.065f, fireInterval),
-            Math.Max(10, magazineSize),
+            Math.Max(1, magazineSize),
             MathF.Max(12.0f, soundRadius));
     }
 
     public string DisplayName(string language)
     {
         var weapon = WeaponCatalog.Weapon(Platform);
-        return GameLocalization.IsChinese(language) ? weapon.ChineseName : weapon.Name;
+        return GameLocalization.IsChinese(language)
+            ? GameLocalization.Get(weapon.LocalizationKey, language, weapon.ChineseName)
+            : weapon.Name;
     }
+}
+
+public sealed class KnifeSkinDefinition
+{
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public required string LocalizationKey { get; init; }
+    public required Color BladeColor { get; init; }
+    public required Color EdgeColor { get; init; }
+    public required Color GripColor { get; init; }
+
+    public string DisplayName(string language) => GameLocalization.Get(LocalizationKey, language, Name);
+}
+
+public static class KnifeSkinCatalog
+{
+    public const string DefaultId = "knife_carbon";
+
+    private static readonly Dictionary<string, KnifeSkinDefinition> Definitions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [DefaultId] = Skin(DefaultId, "Carbon Black", "knife_skin_carbon", new Color(0.09f, 0.12f, 0.115f), new Color(0.48f, 0.58f, 0.56f), new Color(0.025f, 0.035f, 0.032f)),
+        ["knife_crimson"] = Skin("knife_crimson", "Crimson Circuit", "knife_skin_crimson", new Color(0.38f, 0.035f, 0.045f), new Color(1.0f, 0.24f, 0.16f), new Color(0.09f, 0.018f, 0.022f)),
+        ["knife_arctic"] = Skin("knife_arctic", "Arctic Glass", "knife_skin_arctic", new Color(0.22f, 0.58f, 0.72f), new Color(0.72f, 0.96f, 1.0f), new Color(0.055f, 0.13f, 0.17f)),
+        ["knife_hazard"] = Skin("knife_hazard", "Hazard Stripe", "knife_skin_hazard", new Color(0.72f, 0.52f, 0.04f), new Color(1.0f, 0.82f, 0.18f), new Color(0.08f, 0.075f, 0.025f))
+    };
+
+    public static KnifeSkinDefinition Definition(string id) => Definitions[id];
+    public static IReadOnlyCollection<KnifeSkinDefinition> All => Definitions.Values;
+
+    private static KnifeSkinDefinition Skin(string id, string name, string localizationKey, Color blade, Color edge, Color grip) => new()
+    {
+        Id = id,
+        Name = name,
+        LocalizationKey = localizationKey,
+        BladeColor = blade,
+        EdgeColor = edge,
+        GripColor = grip
+    };
 }
 
 public sealed class LootItem
@@ -284,6 +337,8 @@ public sealed class LootItem
     public WeaponBuild? Weapon { get; init; }
     public string AttachmentId { get; init; } = string.Empty;
     public EquipmentItem? Equipment { get; init; }
+    public AmmoCaliber AmmoCaliber { get; init; } = AmmoCaliber.Rifle;
+    public string KnifeSkinId { get; init; } = string.Empty;
     public int Quantity { get; set; } = 1;
     public LootGrade Grade { get; init; } = LootGrade.Common;
 
@@ -294,9 +349,12 @@ public sealed class LootItem
         {
             LootItemKind.Weapon => Weapon?.DisplayName(language) ?? (GameLocalization.IsChinese(language) ? "武器" : "Weapon"),
             LootItemKind.Attachment => LocalizedAttachment(language),
-            LootItemKind.Ammunition => GameLocalization.IsChinese(language) ? $"步枪弹药 x{Quantity}" : $"Rifle ammunition x{Quantity}",
+            LootItemKind.Ammunition => $"{WeaponCatalog.AmmoDisplayName(AmmoCaliber, language)} x{Quantity}",
             LootItemKind.ArmorPlate => GameLocalization.IsChinese(language) ? $"复合护甲板 x{Quantity}" : $"Composite armor plate x{Quantity}",
             LootItemKind.Equipment => Equipment?.DisplayName(language) ?? (GameLocalization.IsChinese(language) ? "装备" : "Equipment"),
+            LootItemKind.KnifeSkin => string.IsNullOrEmpty(KnifeSkinId)
+                ? GameLocalization.Get("knife_skin", language, "Knife finish")
+                : KnifeSkinCatalog.Definition(KnifeSkinId).DisplayName(language),
             _ => GameLocalization.IsChinese(language) ? "物品" : "Item"
         };
         return GameLocalization.IsChinese(language) ? $"[{gradeTag}] {core}" : $"[{gradeTag}] {core}";
@@ -326,6 +384,10 @@ public sealed class LootItem
         {
             return Equipment.Detail(language) + "  " + valueLine;
         }
+        if (Kind == LootItemKind.KnifeSkin && !string.IsNullOrEmpty(KnifeSkinId))
+        {
+            return GameLocalization.Get("knife_skin_detail", language, "Equips a permanent tactical knife finish") + "  " + valueLine;
+        }
         return GameLocalization.IsChinese(language)
             ? $"可放入个人背包  {valueLine}"
             : $"Can be stored in the backpack  {valueLine}";
@@ -344,6 +406,7 @@ public sealed class LootItem
                 LootItemKind.Equipment => baseValue + 90,
                 LootItemKind.ArmorPlate => 35 + (int)Grade * 25,
                 LootItemKind.Ammunition => 2 + (int)Grade,
+                LootItemKind.KnifeSkin => baseValue + 140,
                 _ => baseValue
             };
         }
@@ -436,6 +499,20 @@ public static class WeaponCatalog
             Platform = WeaponPlatform.ScarL, Name = "SCAR-L", ChineseName = "SCAR-L 特种步枪",
             Damage = 38, EffectiveRange = 175, Recoil = 1.14f, Handling = 0.7f,
             FireInterval = 0.115f, MagazineSize = 20, SoundRadius = 48, ReceiverLength = 0.55f, BarrelLength = 0.67f
+        },
+        [WeaponPlatform.M24] = new WeaponDefinition
+        {
+            Platform = WeaponPlatform.M24, Name = "M24 Precision Rifle", ChineseName = "M24",
+            LocalizationKey = "weapon_m24", Caliber = AmmoCaliber.Sniper, SupportsAutomatic = false,
+            Damage = 96, EffectiveRange = 320, Recoil = 2.35f, Handling = 0.43f,
+            FireInterval = 1.05f, MagazineSize = 5, SoundRadius = 78, ReceiverLength = 0.64f, BarrelLength = 0.92f
+        },
+        [WeaponPlatform.MP5A5] = new WeaponDefinition
+        {
+            Platform = WeaponPlatform.MP5A5, Name = "MP5A5 Submachine Gun", ChineseName = "MP5A5",
+            LocalizationKey = "weapon_mp5a5", Caliber = AmmoCaliber.Smg,
+            Damage = 24, EffectiveRange = 88, Recoil = 0.72f, Handling = 1.12f,
+            FireInterval = 0.067f, MagazineSize = 30, SoundRadius = 31, ReceiverLength = 0.36f, BarrelLength = 0.3f
         }
     };
 
@@ -444,6 +521,7 @@ public static class WeaponCatalog
         ["optic_micro"] = Part("optic_micro", "Micro reflex sight", "微型反射瞄具", AttachmentSlot.Optic, handling: 0.04f, visual: 0.82f),
         ["optic_holo"] = Part("optic_holo", "Holographic sight", "全息瞄具", AttachmentSlot.Optic, range: 6, handling: -0.02f, visual: 1.08f),
         ["optic_scope"] = Part("optic_scope", "4x combat optic", "四倍战斗瞄具", AttachmentSlot.Optic, range: 28, handling: -0.09f, visual: 1.28f),
+        ["optic_sniper"] = Part("optic_sniper", "8x precision optic", "8x", AttachmentSlot.Optic, range: 85, handling: -0.16f, visual: 1.55f),
         ["barrel_cqb"] = Part("barrel_cqb", "CQB barrel", "近战短枪管", AttachmentSlot.Barrel, damage: -2, range: -24, recoil: 1.12f, handling: 0.13f, visual: 0.72f),
         ["barrel_standard"] = Part("barrel_standard", "Service barrel", "制式枪管", AttachmentSlot.Barrel),
         ["barrel_marksman"] = Part("barrel_marksman", "Marksman barrel", "精确射手枪管", AttachmentSlot.Barrel, damage: 3, range: 38, recoil: 0.91f, handling: -0.12f, visual: 1.28f),
@@ -459,7 +537,15 @@ public static class WeaponCatalog
 
     public static WeaponDefinition Weapon(WeaponPlatform platform) => Weapons[platform];
     public static AttachmentDefinition Attachment(string id) => Attachments[id];
+    public static IReadOnlyCollection<WeaponDefinition> AllWeapons => Weapons.Values;
     public static IReadOnlyCollection<AttachmentDefinition> AllAttachments => Attachments.Values;
+
+    public static string AmmoDisplayName(AmmoCaliber caliber, string language) => caliber switch
+    {
+        AmmoCaliber.Sniper => GameLocalization.Get("ammo_sniper", language, "7.62 precision ammunition"),
+        AmmoCaliber.Smg => GameLocalization.Get("ammo_smg", language, "9 mm submachine-gun ammunition"),
+        _ => GameLocalization.Get("ammo_rifle", language, "Rifle ammunition")
+    };
 
     public static WeaponBuild StarterWeapon()
     {
@@ -475,6 +561,31 @@ public static class WeaponCatalog
     public static WeaponBuild Build(WeaponPlatform platform, int tier)
     {
         var build = new WeaponBuild { Platform = platform };
+        if (platform == WeaponPlatform.M24)
+        {
+            build.Attachments[AttachmentSlot.Barrel] = "barrel_marksman";
+            build.Attachments[AttachmentSlot.Optic] = "optic_sniper";
+            build.Attachments[AttachmentSlot.Stock] = "stock_precision";
+            build.Attachments[AttachmentSlot.Magazine] = "mag_standard";
+            if (tier >= 2)
+            {
+                build.Attachments[AttachmentSlot.Muzzle] = "muzzle_suppressor";
+            }
+            return build;
+        }
+        if (platform == WeaponPlatform.MP5A5)
+        {
+            build.Attachments[AttachmentSlot.Barrel] = "barrel_cqb";
+            build.Attachments[AttachmentSlot.Optic] = tier >= 1 ? "optic_holo" : "optic_micro";
+            build.Attachments[AttachmentSlot.Grip] = "grip_angled";
+            build.Attachments[AttachmentSlot.Stock] = "stock_light";
+            build.Attachments[AttachmentSlot.Magazine] = tier >= 1 ? "mag_extended" : "mag_standard";
+            if (tier >= 2)
+            {
+                build.Attachments[AttachmentSlot.Muzzle] = "muzzle_suppressor";
+            }
+            return build;
+        }
         build.Attachments[AttachmentSlot.Barrel] = tier >= 2 ? "barrel_marksman" : tier == 0 ? "barrel_cqb" : "barrel_standard";
         build.Attachments[AttachmentSlot.Optic] = tier >= 2 ? "optic_scope" : tier == 1 ? "optic_holo" : "optic_micro";
         build.Attachments[AttachmentSlot.Grip] = tier >= 1 ? "grip_vertical" : "grip_angled";

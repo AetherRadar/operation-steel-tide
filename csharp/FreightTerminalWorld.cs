@@ -200,6 +200,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateWeaponUiFlow();
         }
+        else if (Array.Exists(args, value => value == "--validate-arsenal"))
+        {
+            ValidateArsenalFlow();
+        }
         else if (Array.Exists(args, value => value == "--validate-squad"))
         {
             ValidateSquadFlow();
@@ -736,9 +740,10 @@ public partial class FreightTerminalWorld : Node3D
                 Rotation = 0.0f,
                 English = "Warehouse armory case",
                 Chinese = "仓库军械箱",
-                Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 2),
+                Weapon = WeaponCatalog.Build(WeaponPlatform.M24, 2),
                 Parts = new[] { "muzzle_suppressor", "optic_scope" },
-                Equipment = new[] { "armor_heavy" }
+                Equipment = new[] { "armor_heavy" },
+                KnifeSkin = "knife_crimson"
             },
             new
             {
@@ -748,7 +753,8 @@ public partial class FreightTerminalWorld : Node3D
                 Chinese = "海关办公室枪柜",
                 Weapon = WeaponCatalog.Build(WeaponPlatform.M4A1, 1),
                 Parts = new[] { "optic_holo", "mag_extended" },
-                Equipment = new[] { "pack_heavy" }
+                Equipment = new[] { "pack_heavy" },
+                KnifeSkin = string.Empty
             },
             new
             {
@@ -758,7 +764,8 @@ public partial class FreightTerminalWorld : Node3D
                 Chinese = "维修间武器箱",
                 Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 1),
                 Parts = new[] { "muzzle_brake", "grip_vertical" },
-                Equipment = new[] { "helmet_light" }
+                Equipment = new[] { "helmet_light" },
+                KnifeSkin = "knife_hazard"
             },
             new
             {
@@ -766,9 +773,10 @@ public partial class FreightTerminalWorld : Node3D
                 Rotation = Mathf.Pi / 2.0f,
                 English = "Security checkpoint response locker",
                 Chinese = "安检站应急装备柜",
-                Weapon = WeaponCatalog.Build(WeaponPlatform.M4A1, 0),
+                Weapon = WeaponCatalog.Build(WeaponPlatform.MP5A5, 1),
                 Parts = new[] { "optic_micro", "mag_extended" },
-                Equipment = new[] { "helmet_heavy" }
+                Equipment = new[] { "helmet_heavy" },
+                KnifeSkin = string.Empty
             },
             new
             {
@@ -778,7 +786,8 @@ public partial class FreightTerminalWorld : Node3D
                 Chinese = "燃料库危险品装备箱",
                 Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 1),
                 Parts = new[] { "barrel_cqb", "muzzle_brake" },
-                Equipment = new[] { "armor_carrier", "pack_assault" }
+                Equipment = new[] { "armor_carrier", "pack_assault" },
+                KnifeSkin = string.Empty
             },
             new
             {
@@ -788,7 +797,8 @@ public partial class FreightTerminalWorld : Node3D
                 Chinese = "营房指挥装备柜",
                 Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 1),
                 Parts = new[] { "stock_precision", "optic_holo" },
-                Equipment = new[] { "helmet_heavy", "armor_heavy" }
+                Equipment = new[] { "helmet_heavy", "armor_heavy" },
+                KnifeSkin = string.Empty
             },
             new
             {
@@ -798,7 +808,8 @@ public partial class FreightTerminalWorld : Node3D
                 Chinese = "\u94c1\u8def\u8c03\u5ea6\u5ba4\u8865\u7ed9\u7bb1",
                 Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 2),
                 Parts = new[] { "optic_scope", "stock_precision" },
-                Equipment = new[] { "pack_heavy" }
+                Equipment = new[] { "pack_heavy" },
+                KnifeSkin = "knife_arctic"
             },
             new
             {
@@ -808,7 +819,8 @@ public partial class FreightTerminalWorld : Node3D
                 Chinese = "\u7ef4\u4fee\u673a\u5e93\u5de5\u5177\u7bb1",
                 Weapon = WeaponCatalog.Build(WeaponPlatform.M4A1, 2),
                 Parts = new[] { "grip_vertical", "muzzle_suppressor" },
-                Equipment = new[] { "armor_carrier", "helmet_light" }
+                Equipment = new[] { "armor_carrier", "helmet_light" },
+                KnifeSkin = string.Empty
             },
             new
             {
@@ -818,7 +830,8 @@ public partial class FreightTerminalWorld : Node3D
                 Chinese = "\u6d77\u5824\u5e94\u6025\u88c5\u5907\u67dc",
                 Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 2),
                 Parts = new[] { "optic_holo", "mag_extended" },
-                Equipment = new[] { "armor_heavy", "pack_assault" }
+                Equipment = new[] { "armor_heavy", "pack_assault" },
+                KnifeSkin = string.Empty
             }
         };
         foreach (var definition in cases)
@@ -857,9 +870,24 @@ public partial class FreightTerminalWorld : Node3D
             weaponCase.Loot.Add(new LootItem
             {
                 Kind = LootItemKind.Ammunition,
-                Quantity = _rng.RandiRange(35, 65),
+                AmmoCaliber = WeaponCatalog.Weapon(definition.Weapon.Platform).Caliber,
+                Quantity = definition.Weapon.Platform switch
+                {
+                    WeaponPlatform.M24 => _rng.RandiRange(14, 24),
+                    WeaponPlatform.MP5A5 => _rng.RandiRange(55, 85),
+                    _ => _rng.RandiRange(35, 65)
+                },
                 Grade = LootGrade.Common
             });
+            if (!string.IsNullOrEmpty(definition.KnifeSkin))
+            {
+                weaponCase.Loot.Add(new LootItem
+                {
+                    Kind = LootItemKind.KnifeSkin,
+                    KnifeSkinId = definition.KnifeSkin,
+                    Grade = LootGrade.Epic
+                });
+            }
             weaponCase.Loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate, Grade = LootGrade.Uncommon });
             AddChild(weaponCase);
             _lootSources.Add(weaponCase);
@@ -908,9 +936,13 @@ public partial class FreightTerminalWorld : Node3D
             return new LootItem
             {
                 Kind = LootItemKind.Weapon,
-                Weapon = WeaponCatalog.Build(
-                    grade >= LootGrade.Epic ? WeaponPlatform.ScarL : WeaponPlatform.M4A1,
-                    tier),
+                Weapon = WeaponCatalog.Build(grade switch
+                {
+                    LootGrade.Legendary => WeaponPlatform.M24,
+                    LootGrade.Epic => WeaponPlatform.ScarL,
+                    LootGrade.Rare when _rng.Randf() < 0.45f => WeaponPlatform.MP5A5,
+                    _ => WeaponPlatform.M4A1
+                }, tier),
                 Grade = grade
             };
         }
@@ -936,7 +968,16 @@ public partial class FreightTerminalWorld : Node3D
         {
             return new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = grade >= LootGrade.Rare ? 2 : 1, Grade = grade };
         }
-        return new LootItem { Kind = LootItemKind.Ammunition, Quantity = 20 + (int)grade * 15, Grade = grade };
+        var caliber = grade >= LootGrade.Epic
+            ? AmmoCaliber.Sniper
+            : grade >= LootGrade.Rare && _rng.Randf() < 0.4f ? AmmoCaliber.Smg : AmmoCaliber.Rifle;
+        var quantity = caliber switch
+        {
+            AmmoCaliber.Sniper => 8 + (int)grade * 3,
+            AmmoCaliber.Smg => 35 + (int)grade * 18,
+            _ => 20 + (int)grade * 15
+        };
+        return new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = caliber, Quantity = quantity, Grade = grade };
     }
 
     private void SpawnEnemies()
@@ -2016,6 +2057,12 @@ public partial class FreightTerminalWorld : Node3D
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
         }
+        _player.EquipFromLoot(new LootItem
+        {
+            Kind = LootItemKind.KnifeSkin,
+            KnifeSkinId = "knife_crimson",
+            Grade = LootGrade.Epic
+        });
         await WaitFrames(10);
         Input.ActionPress("weapon_melee");
         await WaitFrames(2);
@@ -2031,7 +2078,7 @@ public partial class FreightTerminalWorld : Node3D
         SaveViewportImage("res://knife_validation.png");
         await WaitFrames(8);
         SaveViewportImage("res://knife_followthrough_validation.png");
-        GD.Print($"KNIFE_CHECK equipped={_player.KnifeEquipped} weapon={_player.EquippedWeapon.Platform} direction=right_to_left_rising_slash");
+        GD.Print($"KNIFE_CHECK equipped={_player.KnifeEquipped} skin={_player.EquippedKnifeSkinId} weapon={_player.EquippedWeapon.Platform} direction=right_to_left_rising_slash");
         GetTree().Quit();
     }
 
@@ -2169,6 +2216,8 @@ public partial class FreightTerminalWorld : Node3D
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = "optic_holo" });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = "muzzle_suppressor" });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Ammunition, Quantity = 48 });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Sniper, Quantity = 18, Grade = LootGrade.Epic });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.KnifeSkin, KnifeSkinId = "knife_arctic", Grade = LootGrade.Epic });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 1 });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Weapon, Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 2) });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("helmet_heavy") });
@@ -2209,6 +2258,82 @@ public partial class FreightTerminalWorld : Node3D
         var detailsOpened = _hud.IsWeaponDetailVisible;
         GD.Print($"WEAPON_UI_CHECK knife={cycledToKnife} primary={cycledToPrimary} details={detailsOpened} platform={_player.EquippedWeapon.Platform}");
         GetTree().Quit();
+    }
+
+    private async void ValidateArsenalFlow()
+    {
+        foreach (var enemy in _enemies)
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        await WaitFrames(4);
+
+        var sniper = WeaponCatalog.Build(WeaponPlatform.M24, 2);
+        var smg = WeaponCatalog.Build(WeaponPlatform.MP5A5, 1);
+        var sniperDefinition = WeaponCatalog.Weapon(WeaponPlatform.M24);
+        var smgDefinition = WeaponCatalog.Weapon(WeaponPlatform.MP5A5);
+        var catalogOk = WeaponCatalog.AllWeapons.Count >= 5
+            && sniperDefinition.Caliber == AmmoCaliber.Sniper
+            && !sniperDefinition.SupportsAutomatic
+            && sniper.Stats().MagazineSize == 5
+            && sniper.Stats().EffectiveRange >= 380.0f
+            && smgDefinition.Caliber == AmmoCaliber.Smg
+            && smgDefinition.SupportsAutomatic
+            && smg.Stats().FireInterval <= 0.08f;
+
+        _player.ApplyColdStartUnarmed();
+        _player.EquipFromLoot(new LootItem { Kind = LootItemKind.Weapon, Weapon = sniper, Grade = LootGrade.Legendary });
+        var sniperEquipped = _player.EquippedWeapon.Platform == WeaponPlatform.M24
+            && _player.CurrentAmmoCaliber == AmmoCaliber.Sniper
+            && _player.Ammo == 5;
+        _player.EquipFromLoot(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Rifle, Quantity = 30 });
+        var wrongCaliberSeparated = _player.ReserveAmmo == 0
+            && _player.AmmoReserveFor(AmmoCaliber.Rifle) == 30;
+        _player.EquipFromLoot(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Sniper, Quantity = 18 });
+        var sniperAmmoLoaded = _player.ReserveAmmo == 18;
+
+        var oldSkin = _player.EquippedKnifeSkinId;
+        var replacedSkin = _player.EquipFromLoot(new LootItem
+        {
+            Kind = LootItemKind.KnifeSkin,
+            KnifeSkinId = "knife_crimson",
+            Grade = LootGrade.Epic
+        });
+        var skinEquipped = _player.EquippedKnifeSkinId == "knife_crimson"
+            && replacedSkin?.Kind == LootItemKind.KnifeSkin
+            && replacedSkin.KnifeSkinId == oldSkin
+            && KnifeSkinCatalog.All.Count >= 4;
+
+        _player.EquipFromLoot(new LootItem { Kind = LootItemKind.Weapon, Weapon = smg, Grade = LootGrade.Rare });
+        var independentSmgReserve = _player.CurrentAmmoCaliber == AmmoCaliber.Smg
+            && _player.ReserveAmmo == 0
+            && _player.AmmoReserveFor(AmmoCaliber.Sniper) == 18;
+        _player.EquipFromLoot(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Smg, Quantity = 72 });
+        independentSmgReserve = independentSmgReserve && _player.ReserveAmmo == 72;
+
+        var worldM24 = false;
+        var worldMp5 = false;
+        var worldSniperAmmo = false;
+        var worldKnifeSkins = 0;
+        foreach (var source in _lootSources)
+        {
+            foreach (var item in source.Loot)
+            {
+                worldM24 |= item.Weapon?.Platform == WeaponPlatform.M24;
+                worldMp5 |= item.Weapon?.Platform == WeaponPlatform.MP5A5;
+                worldSniperAmmo |= item.Kind == LootItemKind.Ammunition && item.AmmoCaliber == AmmoCaliber.Sniper;
+                if (item.Kind == LootItemKind.KnifeSkin)
+                {
+                    worldKnifeSkins++;
+                }
+            }
+        }
+        var worldLootOk = worldM24 && worldMp5 && worldSniperAmmo && worldKnifeSkins >= 3;
+        var valid = catalogOk && sniperEquipped && wrongCaliberSeparated && sniperAmmoLoaded
+            && skinEquipped && independentSmgReserve && worldLootOk;
+        GD.Print($"ARSENAL_CHECK valid={valid} catalog={catalogOk} sniper={sniperEquipped} dedicated_ammo={wrongCaliberSeparated && sniperAmmoLoaded} smg={independentSmgReserve} skins={KnifeSkinCatalog.All.Count} world_m24={worldM24} world_mp5={worldMp5} world_sniper_ammo={worldSniperAmmo} world_skins={worldKnifeSkins}");
+        GD.Print($"ARSENAL_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private async void CaptureOpticsFrames()
