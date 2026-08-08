@@ -977,7 +977,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             ArmorPlates,
             _knifeEquipped ? "KNIFE" : _automaticFire ? "AUTO" : "SEMI",
             EquippedWeapon.DisplayName(Hud?.CurrentLanguage ?? "en"),
-            EquippedWeapon);
+            EquippedWeapon,
+            HasFireablePrimary);
         Hud?.SetAiming(_isAiming);
         Hud?.SetHeading(Mathf.RadToDeg(Rotation.Y) * -1.0f);
     }
@@ -1399,6 +1400,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private void SwitchWeapon(bool useKnife)
     {
         if (_knifeEquipped == useKnife || _isPlating)
+        {
+            return;
+        }
+        if (!useKnife && !HasFireablePrimary)
         {
             return;
         }

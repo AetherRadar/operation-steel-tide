@@ -31,6 +31,7 @@ public partial class CombatHUD : CanvasLayer
     private Button _primaryWeaponButton = null!;
     private Button _knifeWeaponButton = null!;
     private InventoryModelPreview _primaryWeaponSlotPreview = null!;
+    private bool _hasPrimary = true;
     private InventoryModelPreview _knifeSlotPreview = null!;
     private Label _plateReserveLabel = null!;
     private Label _vitalCaption = null!;
@@ -1248,8 +1249,17 @@ public partial class CombatHUD : CanvasLayer
 
     public void SetBackpackValuePlayer(TacticalPlayer player) => UpdateBackpackHotkey(player);
 
-    public void SetEquipment(int armorPlates, string fireMode, string weaponName = "M4A1", WeaponBuild? weaponBuild = null)
+    public void SetEquipment(int armorPlates, string fireMode, string weaponName = "M4A1", WeaponBuild? weaponBuild = null, bool hasPrimary = true)
     {
+        _hasPrimary = hasPrimary;
+        if (IsInstanceValid(_primaryWeaponPreview))
+        {
+            _primaryWeaponPreview.Visible = hasPrimary;
+        }
+        if (IsInstanceValid(_primaryDetailButton))
+        {
+            _primaryDetailButton.Disabled = !hasPrimary;
+        }
         _plateReserveLabel.Text = $"x{armorPlates}";
         _lastFireMode = fireMode;
         var mode = fireMode switch
@@ -1291,6 +1301,8 @@ public partial class CombatHUD : CanvasLayer
         {
             return;
         }
+        _primaryWeaponButton.Disabled = !_hasPrimary;
+        _primaryWeaponSlotPreview.Visible = _hasPrimary;
         _primaryWeaponButton.TooltipText = Text("select_primary", "SELECT PRIMARY WEAPON");
         _knifeWeaponButton.TooltipText = Text("select_knife", "SELECT TACTICAL KNIFE");
         _primaryWeaponButton.SetPressedNoSignal(_lastFireMode != "KNIFE");
