@@ -49,7 +49,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         get
         {
             var total = 0;
-            foreach (var amount in _ammoReserves.Values)
+            foreach (var amount in _gradedAmmoReserves.Values)
             {
                 total += amount;
             }
@@ -91,10 +91,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         HasFireablePrimary = false;
         Ammo = 0;
-        foreach (var caliber in System.Enum.GetValues<AmmoCaliber>())
-        {
-            _ammoReserves[caliber] = 0;
-        }
+        ResetAmmoReserves();
+        EnsureEmergencyMedicalLoadout();
         SwitchWeapon(true);
         if (IsInstanceValid(_weaponRoot))
         {
@@ -109,6 +107,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         EquipPrimary(build ?? WeaponCatalog.StarterWeapon());
         Ammo = EquippedWeapon.Stats().MagazineSize;
         SetAmmoReserve(CurrentAmmoCaliber, Mathf.Max(ReserveAmmo, 60));
+        _loadedAmmoGrade = LootGrade.Common;
     }
 
     private bool _isReloading;
@@ -170,13 +169,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private AudioStreamPlayer3D _footstepAudio = null!;
     private CollisionShape3D _collider = null!;
     private readonly RandomNumberGenerator _rng = new();
-    private readonly Dictionary<AmmoCaliber, int> _ammoReserves = new()
-    {
-        [AmmoCaliber.Rifle] = 150,
-        [AmmoCaliber.Sniper] = 0,
-        [AmmoCaliber.Smg] = 0
-    };
-
     public override void _Ready()
     {
         _rng.Randomize();
@@ -192,6 +184,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         BuildWeapon();
         BuildKnife();
         BuildRoleDevices();
+        BuildMedicalDevices();
         ApplyWeaponBuildVisuals();
         ConfigureRole(Role);
         Input.MouseMode = Input.MouseModeEnum.Captured;
@@ -254,6 +247,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
 
         _vehicle = vehicle;
+        CloseMedicalWheelWithoutUse();
+        CancelMedicalUse(false);
         _vehicleCameraFollow = true;
         Velocity = Vector3.Zero;
         _isAiming = false;
@@ -901,12 +896,20 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var dt = (float)delta;
         if (IsDead)
         {
+            CloseMedicalWheelWithoutUse();
+            CancelMedicalUse(false);
             UpdateDownedCrawl(dt);
             return;
         }
+        UpdateMedicalSystem(dt);
         if (IsInVehicle)
         {
             UpdateVehiclePassenger(dt);
+            return;
+        }
+        if (HandleMedicalWheelInput())
+        {
+            PushHudStats();
             return;
         }
         if (UiLocked)
@@ -938,15 +941,15 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             }
         }
 
-        if (Input.IsActionJustPressed("weapon_primary"))
+        if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_primary"))
         {
             SwitchWeapon(false);
         }
-        else if (Input.IsActionJustPressed("weapon_melee"))
+        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_melee"))
         {
             SwitchWeapon(true);
         }
-        else if (Input.IsActionJustPressed("weapon_cycle"))
+        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_cycle"))
         {
             CycleWeapon();
         }
@@ -955,6 +958,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             && !_knifeEquipped
             && !_isReloading
             && !_isPlating
+            && !MedicalActionBlocksWeapon
             && WeaponCatalog.Weapon(EquippedWeapon.Platform).SupportsAutomatic)
         {
             _automaticFire = !_automaticFire;
@@ -963,7 +967,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 _automaticFire ? "FIRE MODE  //  AUTO" : "FIRE MODE  //  SEMI",
                 new Color(0.42f, 0.9f, 0.73f));
         }
-        if (Input.IsActionJustPressed("toggle_flashlight") && !_knifeEquipped)
+        if (Input.IsActionJustPressed("toggle_flashlight") && !_knifeEquipped && !MedicalActionBlocksWeapon)
         {
             _flashlightOn = !_flashlightOn;
             _weaponLight.Visible = _flashlightOn;
@@ -972,7 +976,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 _flashlightOn ? "WEAPON LIGHT  //  ON" : "WEAPON LIGHT  //  OFF",
                 _flashlightOn ? new Color(0.72f, 0.9f, 1.0f) : new Color(0.55f, 0.65f, 0.63f));
         }
-        if (Input.IsActionJustPressed("use_plate") && !RoleActionBlocksWeapon)
+        if (Input.IsActionJustPressed("use_plate") && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon)
         {
             StartPlate();
         }
@@ -986,20 +990,20 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 FinishReload();
             }
         }
-        if (!_knifeEquipped && !_isPlating && !RoleActionBlocksWeapon && Input.IsActionJustPressed("reload"))
+        if (!_knifeEquipped && !_isPlating && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionJustPressed("reload"))
         {
             StartReload();
         }
-        if (!_isPlating && !RoleActionBlocksWeapon && Input.IsActionJustPressed("throw_grenade"))
+        if (!_isPlating && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionJustPressed("throw_grenade"))
         {
             ThrowGrenade();
         }
 
-        _isAiming = !_knifeEquipped && !RoleActionBlocksWeapon && Input.IsActionPressed("aim") && !_isReloading && !_isPlating && _slideTime <= 0.0f;
+        _isAiming = !_knifeEquipped && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionPressed("aim") && !_isReloading && !_isPlating && _slideTime <= 0.0f;
         var fireRequested = _knifeEquipped
             ? Input.IsActionJustPressed("fire")
             : _automaticFire ? Input.IsActionPressed("fire") : Input.IsActionJustPressed("fire");
-        if (!_isPlating && !RoleActionBlocksWeapon && _fireInputArmed && fireRequested && Input.MouseMode == Input.MouseModeEnum.Captured)
+        if (!_isPlating && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && _fireInputArmed && fireRequested && Input.MouseMode == Input.MouseModeEnum.Captured)
         {
             if (_knifeEquipped)
             {
@@ -1022,7 +1026,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             HasFireablePrimary,
             EquippedKnifeSkinId);
         Hud?.SetAiming(_isAiming);
-        Hud?.SetHeading(Mathf.RadToDeg(Rotation.Y) * -1.0f);
+        var heading = Mathf.RadToDeg(Rotation.Y) * -1.0f;
+        Hud?.SetHeading(heading);
+        Hud?.SetMinimapPlayer(GlobalPosition, heading);
     }
 
     private void UpdateVehiclePassenger(float delta)
@@ -1083,6 +1089,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private void PushHudStats()
     {
         Hud?.SetStats(Health, Armor, Stamina, Ammo, ReserveAmmo, Grenades);
+        Hud?.SetAmmoTier(CurrentAmmoGrade);
+        Hud?.SetMedicalInventory(this);
     }
 
     private void UpdateDownedCrawl(float delta)
@@ -1206,7 +1214,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var sprinting = Input.IsActionPressed("sprint") && input.Y < -0.15f && !crouching && !prone
             && Stamina > 1.0f && !_isAiming;
         var speed = (prone ? ProneSpeed : crouching ? CrouchSpeed : sprinting ? SprintSpeed : WalkSpeed)
-            * RoleMovementMultiplier;
+            * RoleMovementMultiplier
+            * MedicalMovementMultiplier;
 
         if (_slideTime > 0.0f)
         {
@@ -1231,8 +1240,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
 
         Stamina = sprinting
-            ? Mathf.Max(0.0f, Stamina - delta * 21.0f)
-            : Mathf.Min(100.0f, Stamina + delta * 14.0f);
+            ? Mathf.Max(0.0f, Stamina - delta * 21.0f * MedicalStaminaDrainMultiplier)
+            : Mathf.Min(100.0f, Stamina + delta * 14.0f * MedicalStaminaRecoveryMultiplier);
         if (!IsOnFloor())
         {
             velocity.Y -= Gravity * delta;
@@ -1360,11 +1369,15 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     private void UpdateCameraAndWeapon(float delta)
     {
+        UpdateDamageKick(delta);
         _recoilPitch = Mathf.Lerp(_recoilPitch, 0.0f, delta * 11.0f);
         _recoilSide = Mathf.Lerp(_recoilSide, 0.0f, delta * 13.0f);
         var leanInput = Input.GetActionStrength("lean_right") - Input.GetActionStrength("lean_left");
         _leanValue = Mathf.Lerp(_leanValue, _slideTime <= 0.0f ? leanInput : 0.0f, delta * 9.0f);
-        _head.Rotation = new Vector3(_pitch + _recoilPitch, 0.0f, _recoilSide * 0.22f + _leanValue * 0.13f);
+        _head.Rotation = new Vector3(
+            _pitch + _recoilPitch + _damageKickPitch,
+            0.0f,
+            _recoilSide * 0.22f + _leanValue * 0.13f + _damageKickRoll);
 
         var horizontalSpeed = new Vector2(Velocity.X, Velocity.Z).Length();
         _bobTime = IsOnFloor() && horizontalSpeed > 0.5f
@@ -1381,13 +1394,15 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             Mathf.Sin(_bobTime * 0.9f) * 0.021f,
             Mathf.Abs(Mathf.Cos(_bobTime * 1.8f)) * 0.024f,
             0.0f) * bobStrength;
-        _camera.Position = bobOffset + new Vector3(_leanValue * 0.17f, _slideTime > 0.0f ? -0.08f : 0.0f, 0.0f);
+        _camera.Position = bobOffset
+            + new Vector3(_leanValue * 0.17f, _slideTime > 0.0f ? -0.08f : 0.0f, 0.0f)
+            + _damageKickOffset;
 
         var targetFov = _isAiming ? AimFieldOfView() : _slideTime > 0.0f ? 84.0f : horizontalSpeed > 7.0f ? 82.0f : 76.0f;
         var handling = EquippedWeapon.Stats().Handling;
         _camera.Fov = Mathf.Lerp(_camera.Fov, targetFov, delta * (6.5f + handling * 5.0f));
-        _weaponRoot.Visible = !_knifeEquipped && !RoleActionBlocksWeapon;
-        _knifeRoot.Visible = _knifeEquipped && !RoleActionBlocksWeapon;
+        _weaponRoot.Visible = !_knifeEquipped && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
+        _knifeRoot.Visible = _knifeEquipped && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
         UpdateKnifeAnimation(delta);
         var targetPosition = _isAiming
             ? new Vector3(0.0f, -0.139f, -0.55f)
@@ -1583,7 +1598,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     public void Fire()
     {
-        if (_fireCooldown > 0.0f || _isReloading || _isPlating || RoleActionBlocksWeapon)
+        if (_fireCooldown > 0.0f || _isReloading || _isPlating || RoleActionBlocksWeapon || MedicalActionBlocksWeapon)
         {
             return;
         }
@@ -1658,8 +1673,15 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 var distance = from.DistanceTo(end);
                 var falloff = Mathf.Lerp(1.0f, 0.52f, Mathf.Clamp(distance / maximumRange, 0.0f, 1.0f));
                 networkEnemyId = enemy.NetworkId;
-                networkDamage = stats.Damage * falloff * _rng.RandfRange(0.94f, 1.06f);
-                killed = enemy.TakeDamage(networkDamage, end, this);
+                networkDamage = stats.Damage
+                    * falloff
+                    * _rng.RandfRange(0.94f, 1.06f)
+                    * AmmoTiers.DamageMultiplier(CurrentAmmoGrade);
+                killed = enemy.TakeDamage(
+                    networkDamage,
+                    end,
+                    this,
+                    AmmoTiers.ArmorPenetration(CurrentAmmoGrade));
                 headshot = enemy.LastHitWasHeadshot;
                 EmitSignal(SignalName.HitConfirmed, killed, headshot, enemy.LastHitWasArmored);
             }
@@ -1730,11 +1752,18 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     private void FinishReload()
     {
-        var amount = Mathf.Min(EquippedWeapon.Stats().MagazineSize - Ammo, ReserveAmmo);
+        var grade = Ammo > 0 && AmmoReserveFor(CurrentAmmoCaliber, _loadedAmmoGrade) > 0
+            ? _loadedAmmoGrade
+            : BestAmmoGrade(CurrentAmmoCaliber);
+        var amount = Mathf.Min(
+            EquippedWeapon.Stats().MagazineSize - Ammo,
+            AmmoReserveFor(CurrentAmmoCaliber, grade));
         Ammo += amount;
-        SetAmmoReserve(CurrentAmmoCaliber, ReserveAmmo - amount);
+        ConsumeAmmoReserve(CurrentAmmoCaliber, grade, amount);
+        _loadedAmmoGrade = grade;
         _isReloading = false;
         ResetReloadRig();
+        Hud?.SetAmmoTier(CurrentAmmoGrade);
     }
 
     private void UpdateReloadAnimation()
@@ -1846,7 +1875,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     private void StartPlate()
     {
-        if (_isPlating || _isReloading || ArmorPlates <= 0 || Armor >= 99.0f || IsDead)
+        if (_isPlating || _isReloading || MedicalActionBlocksWeapon || ArmorPlates <= 0 || Armor >= 99.0f || IsDead)
         {
             return;
         }
@@ -1894,16 +1923,28 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         Hud?.SetEquipmentAction(string.Empty, 0.0f, false);
     }
 
-    public int AmmoReserveFor(AmmoCaliber caliber) => _ammoReserves.TryGetValue(caliber, out var amount) ? amount : 0;
+    public int AmmoReserveFor(AmmoCaliber caliber)
+    {
+        var total = 0;
+        foreach (var grade in System.Enum.GetValues<LootGrade>())
+        {
+            total += AmmoReserveFor(caliber, grade);
+        }
+        return total;
+    }
 
     private void SetAmmoReserve(AmmoCaliber caliber, int amount)
     {
-        _ammoReserves[caliber] = Mathf.Max(0, amount);
+        foreach (var grade in System.Enum.GetValues<LootGrade>())
+        {
+            SetAmmoReserve(caliber, grade, 0);
+        }
+        SetAmmoReserve(caliber, LootGrade.Common, amount);
     }
 
-    public bool TryCollectAmmo(int amount) => TryCollectAmmo(CurrentAmmoCaliber, amount);
+    public bool TryCollectAmmo(int amount) => TryCollectAmmo(CurrentAmmoCaliber, amount, LootGrade.Common);
 
-    public bool TryCollectAmmo(AmmoCaliber caliber, int amount)
+    public bool TryCollectAmmo(AmmoCaliber caliber, int amount, LootGrade grade = LootGrade.Common)
     {
         var maxReserveAmmo = caliber switch
         {
@@ -1916,7 +1957,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             return false;
         }
-        SetAmmoReserve(caliber, Mathf.Min(maxReserveAmmo, current + amount));
+        var accepted = Mathf.Min(maxReserveAmmo - current, Mathf.Max(0, amount));
+        SetAmmoReserve(caliber, grade, AmmoReserveFor(caliber, grade) + accepted);
         Hud?.ShowLocalizedMessage("ammo_recovered", "AMMUNITION RECOVERED", new Color(0.42f, 0.9f, 0.64f));
         return true;
     }
@@ -1935,14 +1977,32 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     public bool TryStoreInBackpack(LootItem item)
     {
+        if (item.Kind == LootItemKind.Medical)
+        {
+            var existing = Backpack.Find(candidate => candidate.Kind == LootItemKind.Medical
+                && candidate.MedicalKind == item.MedicalKind
+                && candidate.Grade == item.Grade);
+            if (existing is not null)
+            {
+                existing.Quantity += Mathf.Max(1, item.Quantity);
+                Hud?.ShowLocalizedMessage("medical_recovered", "MEDICAL SUPPLIES RECOVERED", MedicalItems.Definition(item.MedicalKind).Accent);
+                Hud?.SetBackpackValuePlayer(this);
+                Hud?.SetMedicalInventory(this);
+                return true;
+            }
+        }
         if (Backpack.Count >= BackpackCapacity)
         {
             Hud?.ShowLocalizedMessage("backpack_full", "BACKPACK FULL", new Color(1.0f, 0.48f, 0.28f));
             return false;
         }
         Backpack.Add(item);
-        Hud?.ShowLocalizedMessage("item_stored", "ITEM STORED", new Color(0.42f, 0.9f, 0.68f));
+        Hud?.ShowLocalizedMessage(
+            item.Kind == LootItemKind.Medical ? "medical_recovered" : "item_stored",
+            item.Kind == LootItemKind.Medical ? "MEDICAL SUPPLIES RECOVERED" : "ITEM STORED",
+            item.Kind == LootItemKind.Medical ? MedicalItems.Definition(item.MedicalKind).Accent : new Color(0.42f, 0.9f, 0.68f));
         Hud?.SetBackpackValuePlayer(this);
+        Hud?.SetMedicalInventory(this);
         return true;
     }
 
@@ -1967,7 +2027,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             Hud?.ShowLocalizedMessage("part_installed", "WEAPON PART INSTALLED", new Color(0.42f, 0.9f, 0.72f));
             return previous;
         }
-        if (item.Kind == LootItemKind.Ammunition && TryCollectAmmo(item.AmmoCaliber, item.Quantity))
+        if (item.Kind == LootItemKind.Ammunition && TryCollectAmmo(item.AmmoCaliber, item.Quantity, item.Grade))
         {
             return null;
         }
@@ -2031,6 +2091,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             return false;
         }
         var item = Backpack[index];
+        if (item.Kind == LootItemKind.Medical)
+        {
+            return TryStartMedicalUse(item.MedicalKind);
+        }
         var replacement = EquipFromLoot(item);
         if (ReferenceEquals(replacement, item))
         {
@@ -2052,6 +2116,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         EquippedWeapon = build.Clone();
         HasFireablePrimary = true;
         _automaticFire = WeaponCatalog.Weapon(EquippedWeapon.Platform).SupportsAutomatic;
+        _loadedAmmoGrade = BestAmmoGrade(CurrentAmmoCaliber);
         Ammo = EquippedWeapon.Stats().MagazineSize;
         _isReloading = false;
         ResetReloadRig();
@@ -2073,7 +2138,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     private void ThrowGrenade()
     {
-        if (Grenades <= 0 || _isReloading || IsDead || Main is null)
+        if (Grenades <= 0 || _isReloading || MedicalActionBlocksWeapon || IsDead || Main is null)
         {
             return;
         }
@@ -2114,6 +2179,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
 
         CancelPlate();
+        CancelMedicalUse();
 
         var region = attacker is EnemyOperator ? ResolveHitRegion(hitPosition) : HitRegion.Torso;
         var adjustedDamage = region switch
@@ -2133,8 +2199,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             adjustedDamage = ApplyProtection(protectiveGear, adjustedDamage);
         }
+        var healthBefore = Health;
         Health -= adjustedDamage;
-        Hud?.ShowDamage();
+        var appliedDamage = Mathf.Min(healthBefore, Mathf.Max(0.0f, adjustedDamage));
+        ApplyIncomingDamageFeedback(appliedDamage, region, armorHit, attacker, hitPosition);
         if (armorHit)
         {
             Hud?.ShowLocalizedMessage(

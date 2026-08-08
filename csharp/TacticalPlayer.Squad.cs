@@ -60,7 +60,7 @@ public partial class TacticalPlayer
 
     public bool ActivateRoleAbility(bool broadcast = true)
     {
-        if (IsDead || UiLocked || _skillCooldownRemaining > 0.0f || _isReloading || _isPlating)
+        if (IsDead || UiLocked || MedicalActionBlocksWeapon || _skillCooldownRemaining > 0.0f || _isReloading || _isPlating)
         {
             return false;
         }

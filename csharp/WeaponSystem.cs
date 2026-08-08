@@ -38,7 +38,8 @@ public enum LootItemKind
     Ammunition,
     ArmorPlate,
     Equipment,
-    KnifeSkin
+    KnifeSkin,
+    Medical
 }
 
 /// <summary>Extraction-style item rarity. Higher grade = higher sell value and brighter world glow.</summary>
@@ -339,6 +340,7 @@ public sealed class LootItem
     public EquipmentItem? Equipment { get; init; }
     public AmmoCaliber AmmoCaliber { get; init; } = AmmoCaliber.Rifle;
     public string KnifeSkinId { get; init; } = string.Empty;
+    public MedicalItemKind MedicalKind { get; init; } = MedicalItemKind.Bandage;
     public int Quantity { get; set; } = 1;
     public LootGrade Grade { get; init; } = LootGrade.Common;
 
@@ -349,12 +351,13 @@ public sealed class LootItem
         {
             LootItemKind.Weapon => Weapon?.DisplayName(language) ?? (GameLocalization.IsChinese(language) ? "武器" : "Weapon"),
             LootItemKind.Attachment => LocalizedAttachment(language),
-            LootItemKind.Ammunition => $"{WeaponCatalog.AmmoDisplayName(AmmoCaliber, language)} x{Quantity}",
+            LootItemKind.Ammunition => $"{WeaponCatalog.AmmoDisplayName(AmmoCaliber, language)} T{(int)Grade + 1} x{Quantity}",
             LootItemKind.ArmorPlate => GameLocalization.IsChinese(language) ? $"复合护甲板 x{Quantity}" : $"Composite armor plate x{Quantity}",
             LootItemKind.Equipment => Equipment?.DisplayName(language) ?? (GameLocalization.IsChinese(language) ? "装备" : "Equipment"),
             LootItemKind.KnifeSkin => string.IsNullOrEmpty(KnifeSkinId)
                 ? GameLocalization.Get("knife_skin", language, "Knife finish")
                 : KnifeSkinCatalog.Definition(KnifeSkinId).DisplayName(language),
+            LootItemKind.Medical => $"{MedicalItems.DisplayName(MedicalKind, language)} x{Quantity}",
             _ => GameLocalization.IsChinese(language) ? "物品" : "Item"
         };
         return GameLocalization.IsChinese(language) ? $"[{gradeTag}] {core}" : $"[{gradeTag}] {core}";
@@ -388,6 +391,10 @@ public sealed class LootItem
         {
             return GameLocalization.Get("knife_skin_detail", language, "Equips a permanent tactical knife finish") + "  " + valueLine;
         }
+        if (Kind == LootItemKind.Medical)
+        {
+            return MedicalItems.EffectDescription(MedicalKind, language) + "  " + valueLine;
+        }
         return GameLocalization.IsChinese(language)
             ? $"可放入个人背包  {valueLine}"
             : $"Can be stored in the backpack  {valueLine}";
@@ -407,6 +414,7 @@ public sealed class LootItem
                 LootItemKind.ArmorPlate => 35 + (int)Grade * 25,
                 LootItemKind.Ammunition => 2 + (int)Grade,
                 LootItemKind.KnifeSkin => baseValue + 140,
+                LootItemKind.Medical => MedicalItems.Definition(MedicalKind).UnitValue + (int)Grade * 30,
                 _ => baseValue
             };
         }

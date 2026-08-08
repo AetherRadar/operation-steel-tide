@@ -127,11 +127,15 @@ public partial class FreightTerminalWorld
     private int _residentialSkybridgeWindowCount;
     private int _residentialSkybridgeFrameCount;
     private int _residentialSkybridgeMarksmanCount;
+    private int _residentialInfillModuleCount;
+    private int _residentialStairDetailCount;
 
     public int ResidentialTowerCount => _residentialTowers.Count;
     public int ResidentialCivilianCount => _civilians.Count;
     public int ResidentialSpecialCivilianCount => _civilians.FindAll(civilian => civilian.IsSpecial).Count;
     public int ResidentialCacheCount => _residentialCaches.Count;
+    public int ResidentialInfillModuleCount => _residentialInfillModuleCount;
+    public int ResidentialStairDetailCount => _residentialStairDetailCount;
 
     private void BuildResidentialCommunity(
         Godot.Material concrete,
@@ -152,6 +156,8 @@ public partial class FreightTerminalWorld
         _residentialSkybridgeWindowCount = 0;
         _residentialSkybridgeFrameCount = 0;
         _residentialSkybridgeMarksmanCount = 0;
+        _residentialInfillModuleCount = 0;
+        _residentialStairDetailCount = 0;
         foreach (var link in ResidentialSkyLinks)
         {
             var sideFrom = ResidentialLinkSide(ResidentialTowerSpecs[link.From], ResidentialTowerSpecs[link.To]);
@@ -184,6 +190,7 @@ public partial class FreightTerminalWorld
         {
             BuildResidentialTower(community, ResidentialTowerSpecs[index], index, concrete, steel, glass, trim);
         }
+        BuildResidentialGapInfill(community, concrete, steel, glass, trim);
         BuildResidentialSkyLinks(community, concrete, steel, glass);
     }
 
@@ -347,6 +354,7 @@ public partial class FreightTerminalWorld
             BuildTowerFloorShell(tower, spec, floor, floorY, facade, glass, spec.Accent, westSlot, eastSlot);
             BuildTowerInterior(tower, spec, index, floor, floorY, stairCoreZ, interiorWall, wood, bedding, warmLight, westSlot, eastSlot);
             BuildTowerStairs(tower, floor, floorY, stairCoreZ, stair, trim, warmLight);
+            BuildTowerStairDetails(tower, spec, index, floor, floorY, stairCoreZ, trim, warmLight);
             _residentialFloorCount++;
         }
         BuildTowerRoof(tower, spec, stairCoreZ, facade, steel, trim, warmLight);
@@ -787,32 +795,39 @@ public partial class FreightTerminalWorld
         switch (kind)
         {
             case ResidentialCacheKind.MedicalCabinet:
-                loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 2, Grade = LootGrade.Rare });
-                loot.Add(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("helmet_light"), Grade = LootGrade.Uncommon });
+                loot.Add(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.Bandage, Quantity = 3, Grade = LootGrade.Uncommon });
+                loot.Add(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.FieldMedkit, Quantity = 2, Grade = LootGrade.Rare });
+                loot.Add(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.Adrenaline, Quantity = 1, Grade = LootGrade.Epic });
                 break;
             case ResidentialCacheKind.EvacuationLocker:
                 loot.Add(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Rifle, Quantity = 36, Grade = LootGrade.Uncommon });
                 loot.Add(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("pack_assault"), Grade = LootGrade.Rare });
+                loot.Add(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.Bandage, Quantity = 2, Grade = LootGrade.Common });
                 break;
             case ResidentialCacheKind.WorkshopLocker:
                 loot.Add(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = "grip_vertical", Grade = LootGrade.Rare });
                 loot.Add(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = "muzzle_brake", Grade = LootGrade.Uncommon });
+                loot.Add(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.Bandage, Quantity = 1, Grade = LootGrade.Common });
                 break;
             case ResidentialCacheKind.SecurityArmory:
                 loot.Add(new LootItem { Kind = LootItemKind.Weapon, Weapon = WeaponCatalog.Build(WeaponPlatform.MP5A5, 1), Grade = LootGrade.Rare });
                 loot.Add(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Smg, Quantity = 60, Grade = LootGrade.Uncommon });
+                loot.Add(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.Adrenaline, Quantity = 1, Grade = LootGrade.Rare });
                 break;
             case ResidentialCacheKind.SmugglerCache:
                 loot.Add(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = "muzzle_suppressor", Grade = LootGrade.Epic });
                 loot.Add(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Sniper, Quantity = 18, Grade = LootGrade.Rare });
+                loot.Add(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.Adrenaline, Quantity = 2, Grade = LootGrade.Epic });
                 break;
             case ResidentialCacheKind.CommunityPantry:
                 loot.Add(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Rifle, Quantity = 42, Grade = LootGrade.Common });
                 loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 1, Grade = LootGrade.Uncommon });
+                loot.Add(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.FieldMedkit, Quantity = 1, Grade = LootGrade.Uncommon });
                 break;
             default:
                 loot.Add(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Rifle, Quantity = 24, Grade = LootGrade.Common });
                 loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 1, Grade = LootGrade.Uncommon });
+                loot.Add(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.Bandage, Quantity = 1, Grade = LootGrade.Common });
                 break;
         }
         return loot;
@@ -1158,6 +1173,8 @@ public partial class FreightTerminalWorld
         var valid = ResidentialTowerCount == ResidentialTowerSpecs.Length
             && _residentialFloorCount == expectedFloors
             && _residentialStairFlightCount == expectedFloors * 2
+            && _residentialStairDetailCount == expectedFloors
+            && _residentialInfillModuleCount == ResidentialTowerSpecs.Length * 4
             && _residentialRoofAccessCount == ResidentialTowerSpecs.Length
             && _residentialEntrances.Count == ResidentialTowerSpecs.Length
             && _residentialRooftops.Count == ResidentialTowerSpecs.Length
@@ -1169,7 +1186,7 @@ public partial class FreightTerminalWorld
             && ResidentialSpecialCivilianCount >= ResidentialTowerSpecs.Length * 2
             && roles.Count == Enum.GetValues<CivilianRole>().Length
             && upperFloorPopulation;
-        GD.Print($"RESIDENTIAL_CHECK valid={valid} towers={ResidentialTowerCount}/{ResidentialTowerSpecs.Length} floors={_residentialFloorCount}/{expectedFloors} stair_flights={_residentialStairFlightCount} entry_open={entryOpen} standing_door={standingDoorClear} step_collision={stepCollision} step_hit={stepName} player_climbed={playerClimbedRamp} climb_height={climbHeight:0.00} rooftops={_residentialRoofAccessCount} civilians={ResidentialCivilianCount} special={ResidentialSpecialCivilianCount} roles={roles.Count} upper_floors={upperFloorPopulation}");
+        GD.Print($"RESIDENTIAL_CHECK valid={valid} towers={ResidentialTowerCount}/{ResidentialTowerSpecs.Length} floors={_residentialFloorCount}/{expectedFloors} stair_flights={_residentialStairFlightCount} stair_details={_residentialStairDetailCount}/{expectedFloors} infill={_residentialInfillModuleCount}/{ResidentialTowerSpecs.Length * 4} entry_open={entryOpen} standing_door={standingDoorClear} step_collision={stepCollision} step_hit={stepName} player_climbed={playerClimbedRamp} climb_height={climbHeight:0.00} rooftops={_residentialRoofAccessCount} civilians={ResidentialCivilianCount} special={ResidentialSpecialCivilianCount} roles={roles.Count} upper_floors={upperFloorPopulation}");
         if (!valid)
         {
             GD.PushError("Residential community validation failed.");
@@ -1188,6 +1205,7 @@ public partial class FreightTerminalWorld
         var expectedCaches = ResidentialTowerSpecs.Length * 3;
         var cacheKinds = new HashSet<ResidentialCacheKind>();
         var lootKinds = new HashSet<LootItemKind>();
+        var everyCacheHasMedicine = true;
         var cachesRegistered = true;
         var cachesStocked = true;
         foreach (var cache in _residentialCaches)
@@ -1195,10 +1213,13 @@ public partial class FreightTerminalWorld
             cacheKinds.Add(cache.Kind);
             cachesRegistered &= _lootSources.Contains(cache) && IsInstanceValid(cache);
             cachesStocked &= cache.IsSearchable && cache.Loot.Count >= 2;
+            var cacheHasMedicine = false;
             foreach (var item in cache.Loot)
             {
                 lootKinds.Add(item.Kind);
+                cacheHasMedicine |= item.Kind == LootItemKind.Medical;
             }
+            everyCacheHasMedicine &= cacheHasMedicine;
         }
         var everyTowerStocked = true;
         foreach (var count in _residentialCacheCountByTower)
@@ -1243,7 +1264,9 @@ public partial class FreightTerminalWorld
             && everyTowerStocked
             && _residentialRoomArchetypes.Count == Enum.GetValues<ResidentialRoomArchetype>().Length
             && cacheKinds.Count == Enum.GetValues<ResidentialCacheKind>().Length
-            && lootKinds.Count >= 5
+            && lootKinds.Count >= 6
+            && lootKinds.Contains(LootItemKind.Medical)
+            && everyCacheHasMedicine
             && cachesRegistered
             && cachesStocked
             && lootUiOpened

@@ -354,6 +354,7 @@ public partial class CombatHUD : CanvasLayer
         _grenadeLabel = Label("FRAG  x2", 13, new Color(0.78f, 0.83f, 0.8f));
         _grenadeLabel.Position = new Vector2(332, 65);
         weapon.AddChild(_grenadeLabel);
+        BuildAmmoTierHud(weapon);
 
         // Bottom-right backpack control: open inventory + live total value.
         _backpackHotkeyButton = Button("TAB  BACKPACK", new Vector2(0, 0), new Vector2(210, 52));
@@ -449,13 +450,16 @@ public partial class CombatHUD : CanvasLayer
         _operationBanner = Label("OPERATION STEEL TIDE", 30, new Color(0.86f, 0.96f, 0.92f));
         _operationBanner.HorizontalAlignment = HorizontalAlignment.Center;
         _operationBanner.SetAnchorsPreset(Control.LayoutPreset.CenterTop);
-        _operationBanner.Position = new Vector2(-250, 145);
+        _operationBanner.Position = new Vector2(-250, 176);
         _operationBanner.Size = new Vector2(500, 50);
         root.AddChild(_operationBanner);
         var bannerTween = CreateTween();
         bannerTween.TweenInterval(2.0f);
         bannerTween.TweenProperty(_operationBanner, "modulate:a", 0.0f, 1.2f);
 
+        BuildIncomingDamageHud(root);
+        BuildMedicalHud(root);
+        BuildTacticalHud(root);
         _stateOverlay = new ColorRect
         {
             Color = new Color(0.005f, 0.009f, 0.011f, 0.86f),
@@ -473,8 +477,8 @@ public partial class CombatHUD : CanvasLayer
         _stateSubtitle = Label("FREIGHT TERMINAL SECURED", 17, new Color(0.68f, 0.75f, 0.72f));
         _stateSubtitle.HorizontalAlignment = HorizontalAlignment.Center;
         _stateSubtitle.SetAnchorsPreset(Control.LayoutPreset.Center);
-        _stateSubtitle.Position = new Vector2(-350, 7);
-        _stateSubtitle.Size = new Vector2(700, 40);
+        _stateSubtitle.Position = new Vector2(-450, 7);
+        _stateSubtitle.Size = new Vector2(900, 330);
         _stateOverlay.AddChild(_stateSubtitle);
         BuildPauseMenu(root);
         BuildLootOverlay(root);
@@ -1224,6 +1228,8 @@ public partial class CombatHUD : CanvasLayer
         }
         UpdateWeaponSlotButtons();
         RefreshSquadLanguage();
+        RefreshMedicalLanguage();
+        RefreshTacticalLanguage();
         RefreshLootOverlay();
         if (IsWeaponDetailVisible && _detailedWeapon is not null)
         {
@@ -1438,13 +1444,13 @@ public partial class CombatHUD : CanvasLayer
             .SetTrans(Tween.TransitionType.Expo).SetEase(Tween.EaseType.Out);
     }
 
-    public void ShowDamage()
+    public void ShowDamage(float strength = 0.58f)
     {
         if (_damageTween?.IsRunning() == true)
         {
             _damageTween.Kill();
         }
-        _damageMaterial.SetShaderParameter("strength", 0.58f);
+        _damageMaterial.SetShaderParameter("strength", Mathf.Clamp(strength, 0.0f, 1.0f));
         _damageTween = CreateTween();
         _damageTween.TweenProperty(_damageMaterial, "shader_parameter/strength", 0.0f, 0.55f);
     }

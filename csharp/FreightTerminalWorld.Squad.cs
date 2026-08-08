@@ -96,6 +96,10 @@ public partial class FreightTerminalWorld
 
     private void OnSquadDeploymentRequested(int role, int mode, string address)
     {
+        if (_squadDeployed)
+        {
+            return;
+        }
         DeploySquad((OperatorRole)role, (SquadSessionMode)mode, address);
     }
 
@@ -206,7 +210,7 @@ public partial class FreightTerminalWorld
         var sign = callsigns[Mathf.Clamp(slot, 0, callsigns.Length - 1)];
         mate.Configure(this, _player, slot, role, sign, human, peerId);
         AddChild(mate);
-        // Player squad cold-start: no fireable primary until loot (mirrors player).
+        // Friendly AI follows the same cold-start rule as the player and must loot a rifle.
         mate.ApplyColdStartUnarmed();
         mate.SetOrder(_squadOrder, _squadMovePoint);
         _squadMates.Add(mate);

@@ -98,6 +98,24 @@ public static class SoundLab
         return MakeStream(samples, rate);
     }
 
+    public static AudioStreamWav PlayerHit()
+    {
+        const int rate = 22050;
+        var samples = new float[(int)(rate * 0.34f)];
+        var rng = new RandomNumberGenerator { Seed = 948217 };
+        var lowNoise = 0.0f;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var t = (float)i / rate;
+            var impact = Mathf.Exp(-t * 16.0f);
+            var bodyThump = Mathf.Sin(Mathf.Tau * (72.0f - t * 46.0f) * t) * impact;
+            var armorCrack = Mathf.Sin(Mathf.Tau * 1680.0f * t) * Mathf.Exp(-t * 72.0f);
+            lowNoise = Mathf.Lerp(lowNoise, rng.RandfRange(-1.0f, 1.0f), 0.085f);
+            samples[i] = (bodyThump * 0.8f + armorCrack * 0.24f + lowNoise * 0.28f) * impact;
+        }
+        return MakeStream(samples, rate);
+    }
+
     public static AudioStreamWav CasingDrop()
     {
         const int rate = 22050;

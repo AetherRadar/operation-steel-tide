@@ -244,6 +244,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateExtractRank();
         }
+        else if (Array.Exists(args, value => value == "--validate-tactical-hud"))
+        {
+            ValidateTacticalHud();
+        }
         else if (Array.Exists(args, value => value == "--validate-backpack-tab"))
         {
             ValidateBackpackTab();
@@ -272,6 +276,18 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateResidentialCover();
         }
+        else if (Array.Exists(args, value => value == "--validate-residential-density"))
+        {
+            ValidateResidentialDensity();
+        }
+        else if (Array.Exists(args, value => value == "--validate-medical"))
+        {
+            ValidateMedicalSystem();
+        }
+        else if (Array.Exists(args, value => value == "--validate-hit-feedback"))
+        {
+            ValidateHitFeedback();
+        }
         else if (Array.Exists(args, value => value == "--capture-residential"))
         {
             CaptureResidentialCommunity();
@@ -284,6 +300,18 @@ public partial class FreightTerminalWorld : Node3D
         {
             CaptureResidentialSkyLinks();
         }
+        else if (Array.Exists(args, value => value == "--capture-residential-stairs"))
+        {
+            CaptureResidentialStairDetails();
+        }
+        else if (Array.Exists(args, value => value == "--capture-medical-wheel"))
+        {
+            CaptureMedicalWheel();
+        }
+        else if (Array.Exists(args, value => value == "--capture-hit-feedback"))
+        {
+            CaptureHitFeedback();
+        }
         else if (Array.Exists(args, value => value == "--capture-squad"))
         {
             CaptureSquadFrame();
@@ -291,6 +319,10 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--capture-squad-lobby"))
         {
             CaptureSquadLobbyFrame();
+        }
+        else if (Array.Exists(args, value => value == "--capture-tactical-hud"))
+        {
+            CaptureTacticalHud();
         }
     }
 
@@ -743,6 +775,7 @@ public partial class FreightTerminalWorld : Node3D
         };
         AddChild(_player);
         _player.ApplyColdStartUnarmed();
+        ConfigureTacticalMinimap();
         _hud.WeaponSlotRequested += _player.SelectWeapon;
         _player.HitConfirmed += OnHitConfirmed;
         _player.Died += OnPlayerDied;
@@ -1125,7 +1158,7 @@ public partial class FreightTerminalWorld : Node3D
             enemy.ConfigureInitialLoadout(initialWeapon);
         }
         AddChild(enemy);
-        // Cold-start: only map garrison NPCs (team 0) keep firearms. Rival ops must loot guns.
+        // Rival extraction operators cold-start unarmed; map garrison NPCs keep firearms.
         if (teamId > 0)
         {
             enemy.ApplyColdStartUnarmed();
@@ -1351,6 +1384,16 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OnEnemyEliminated(EnemyOperator enemy)
     {
+        if (enemy.LastDamageAttacker == _player)
+        {
+            _hud.ShowKnockdown(
+                enemy.OperatorCallsign(_languageSetting),
+                GameLocalization.Get("you", _languageSetting, "YOU"));
+        }
+        else if (enemy.LastDamageAttacker is SquadMate mate && _squadMates.Contains(mate))
+        {
+            _hud.ShowKnockdown(enemy.OperatorCallsign(_languageSetting), mate.Callsign);
+        }
         _lootSources.Add(enemy);
         _enemiesRemaining = Mathf.Max(0, _enemiesRemaining - 1);
         _kills++;
@@ -1731,6 +1774,14 @@ public partial class FreightTerminalWorld : Node3D
 
     private void UseBackpackItem(string itemId)
     {
+        var item = _player.Backpack.Find(candidate => candidate.Id == itemId);
+        if (item?.Kind == LootItemKind.Medical)
+        {
+            var kind = item.MedicalKind;
+            CloseLoot();
+            _player.TryStartMedicalUse(kind);
+            return;
+        }
         if (_player.UseBackpackItem(itemId))
         {
             RefreshLootView();
@@ -2918,7 +2969,7 @@ public partial class FreightTerminalWorld : Node3D
     {
         await WaitFrames(2);
         EnsureAiSquadFill();
-        // Freeze AI immediately and re-strip cold-start before the snapshot.
+        // Freeze and re-strip actors so random early loot movement cannot affect the snapshot.
         foreach (var squadMate in _squadMates)
         {
             if (IsInstanceValid(squadMate))
@@ -3000,12 +3051,12 @@ public partial class FreightTerminalWorld : Node3D
             rivalArmedAfterLoot = TryEquipWeaponFromLootSource(sampleRival, rivalCache) && sampleRival.HasFireablePrimary;
         }
 
-        // Mate re-arm via production path (re-enable only the subject).
+        // Mate re-arm via the production path. Keep the subject frozen so its
+        // autonomous loot hunt cannot consume the cache before this assertion.
         var testMate = _squadMates.FirstOrDefault(m => IsInstanceValid(m) && !m.IsHumanProxy);
         var mateArmedAfterLoot = false;
         if (testMate is not null)
         {
-            testMate.ProcessMode = ProcessModeEnum.Inherit;
             testMate.ApplyColdStartUnarmed();
             var mateWeapon = new LootItem
             {

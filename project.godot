@@ -36,6 +36,7 @@ interact={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":70
 toggle_fire_mode={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":86)]}
 toggle_flashlight={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":84)]}
 use_plate={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":88)]}
+medical_wheel={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":66)]}
 use_class_skill={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":72)]}
 squad_follow={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":4194332)]}
 squad_hold={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":4194333)]}

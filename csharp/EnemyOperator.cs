@@ -32,18 +32,30 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     public bool Alerted { get; private set; }
     public bool IsDead { get; private set; }
     public WeaponBuild CarriedWeapon { get; private set; } = WeaponCatalog.Build(WeaponPlatform.M4A1, 0);
-    /// <summary>False for rival cold-start operators until they loot a firearm. Map NPCs stay true.</summary>
+    /// <summary>False for rival cold-start operators until they loot a firearm. Map NPCs stay armed.</summary>
     public bool HasFireablePrimary { get; private set; } = true;
     public EquipmentItem EquippedHelmet { get; private set; } = EquipmentCatalog.Create("helmet_light");
     public EquipmentItem EquippedBodyArmor { get; private set; } = EquipmentCatalog.Create("armor_carrier");
     public EquipmentItem EquippedBackpack { get; private set; } = EquipmentCatalog.Create("pack_assault");
     public bool LastHitWasHeadshot { get; private set; }
     public bool LastHitWasArmored { get; private set; }
+    public Node? LastDamageAttacker { get; private set; }
     public List<LootItem> Loot { get; } = new();
     public Node3D LootNode => this;
     public bool IsSearchable => IsDead;
     public float SearchDuration => 1.15f;
     public bool CarriedWeaponVisible => IsInstanceValid(_carriedWeaponRoot) && _carriedWeaponRoot.Visible;
+
+    public string OperatorCallsign(string language)
+    {
+        if (IsRivalSquad)
+        {
+            return Name.ToString().Replace('_', '-');
+        }
+        return GameLocalization.IsChinese(language)
+            ? $"\u9a7b\u9632\u5e72\u5458-{NetworkId + 1:00}"
+            : $"GARRISON-{NetworkId + 1:00}";
+    }
 
     /// <summary>Rival extraction cold-start: strip carried firearm mesh + remove weapon loot stacks.</summary>
     public void ApplyColdStartUnarmed()
@@ -1309,13 +1321,18 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         _rightLegRig.Rotation = new Vector3(-stride, 0, 0);
     }
 
-    public bool TakeDamage(float amount, Vector3 hitPosition, Node? attacker = null)
+    public bool TakeDamage(
+        float amount,
+        Vector3 hitPosition,
+        Node? attacker = null,
+        float armorPenetration = 0.0f)
     {
         if (IsDead)
         {
             return true;
         }
         Alerted = true;
+        LastDamageAttacker = attacker;
         if (attacker is TacticalPlayer tacticalPlayer)
         {
             Player = tacticalPlayer;
@@ -1340,7 +1357,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         LastHitWasArmored = protectiveGear is not null && protectiveGear.Durability > 0.0f;
         if (protectiveGear is not null)
         {
-            adjustedDamage = ApplyProtection(protectiveGear, adjustedDamage);
+            adjustedDamage = ApplyProtection(protectiveGear, adjustedDamage, armorPenetration);
         }
         _health -= adjustedDamage;
         _hitStun = 0.14f;
@@ -1367,14 +1384,16 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         return false;
     }
 
-    private static float ApplyProtection(EquipmentItem equipment, float damage)
+    private static float ApplyProtection(EquipmentItem equipment, float damage, float armorPenetration)
     {
         if (equipment.Durability <= 0.0f || equipment.Definition.Protection <= 0.0f)
         {
             return damage;
         }
         var durabilityRatio = equipment.Durability / equipment.Definition.MaxDurability;
-        var effectiveProtection = equipment.Definition.Protection * Mathf.Lerp(0.55f, 1.0f, durabilityRatio);
+        var effectiveProtection = equipment.Definition.Protection
+            * Mathf.Lerp(0.55f, 1.0f, durabilityRatio)
+            * (1.0f - Mathf.Clamp(armorPenetration, 0.0f, 0.72f));
         equipment.Durability = Mathf.Max(0.0f, equipment.Durability - damage * 0.58f);
         return damage * (1.0f - effectiveProtection);
     }

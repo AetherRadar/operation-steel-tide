@@ -50,7 +50,7 @@ public partial class CombatHUD
     {
         _squadRoster = new Control
         {
-            Position = new Vector2(28, 72),
+            Position = new Vector2(28, 286),
             Size = new Vector2(250, 158),
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
@@ -164,9 +164,9 @@ public partial class CombatHUD
         _squadLobby.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         root.AddChild(_squadLobby);
 
-        var panel = new Control { Size = new Vector2(1040, 610) };
+        var panel = new Control { Size = new Vector2(1040, 760) };
         panel.SetAnchorsPreset(Control.LayoutPreset.Center);
-        panel.Position = new Vector2(-520, -305);
+        panel.Position = new Vector2(-520, -380);
         _squadLobby.AddChild(panel);
         panel.AddChild(new ColorRect
         {
@@ -227,32 +227,33 @@ public partial class CombatHUD
         }
         _roleButtons[0].ButtonPressed = true;
 
+
         _squadSessionStatus = Label("LOCAL SQUAD  //  THREE AI TEAMMATES READY", 13, new Color(0.45f, 0.86f, 0.72f));
-        _squadSessionStatus.Position = new Vector2(0, 428);
+        _squadSessionStatus.Position = new Vector2(0, 612);
         _squadSessionStatus.Size = new Vector2(1040, 24);
         _squadSessionStatus.HorizontalAlignment = HorizontalAlignment.Center;
         panel.AddChild(_squadSessionStatus);
-        _localSquadButton = Button("LOCAL + AI", new Vector2(22, 474), new Vector2(250, 48));
+        _localSquadButton = Button("LOCAL + AI", new Vector2(22, 648), new Vector2(250, 48));
         _localSquadButton.Pressed += () => RequestSquadDeployment(SquadSessionMode.Local);
         panel.AddChild(_localSquadButton);
-        _hostSquadButton = Button("HOST LAN", new Vector2(286, 474), new Vector2(220, 48));
+        _hostSquadButton = Button("HOST LAN", new Vector2(286, 648), new Vector2(220, 48));
         _hostSquadButton.Pressed += () => RequestSquadDeployment(SquadSessionMode.Host);
         panel.AddChild(_hostSquadButton);
         _squadAddress = new LineEdit
         {
             Text = "127.0.0.1",
             PlaceholderText = "HOST ADDRESS",
-            Position = new Vector2(520, 474),
+            Position = new Vector2(520, 648),
             Size = new Vector2(260, 48),
             ClearButtonEnabled = true
         };
         _squadAddress.AddThemeFontSizeOverride("font_size", 15);
         panel.AddChild(_squadAddress);
-        _joinSquadButton = Button("JOIN LAN", new Vector2(794, 474), new Vector2(224, 48));
+        _joinSquadButton = Button("JOIN LAN", new Vector2(794, 648), new Vector2(224, 48));
         _joinSquadButton.Pressed += () => RequestSquadDeployment(SquadSessionMode.Join);
         panel.AddChild(_joinSquadButton);
         var footer = Label("H CLASS SKILL    F1 FOLLOW    F2 HOLD    F3 MOVE TO AIM POINT", 12, new Color(0.42f, 0.56f, 0.53f));
-        footer.Position = new Vector2(0, 554);
+        footer.Position = new Vector2(0, 714);
         footer.Size = new Vector2(1040, 24);
         footer.HorizontalAlignment = HorizontalAlignment.Center;
         panel.AddChild(footer);
@@ -392,7 +393,9 @@ public partial class CombatHUD
         }
         var chinese = GameLocalization.IsChinese(_language);
         _squadLobbyTitle.Text = chinese ? "小队部署" : "SQUAD DEPLOYMENT";
-        _squadLobbySubtitle.Text = chinese ? "选择职业  //  空位自动由 AI 队友补齐" : "SELECT YOUR CLASS  //  EMPTY SLOTS ARE FILLED BY AI";
+        _squadLobbySubtitle.Text = chinese
+            ? "\u9009\u62e9\u804c\u4e1a  //  \u7a7a\u4f4d\u81ea\u52a8\u7531 AI \u961f\u53cb\u8865\u9f50"
+            : "SELECT YOUR CLASS  //  EMPTY SLOTS ARE FILLED BY AI";
         _localSquadButton.Text = chinese ? "单人 + AI" : "LOCAL + AI";
         _hostSquadButton.Text = chinese ? "创建局域网" : "HOST LAN";
         _joinSquadButton.Text = chinese ? "加入局域网" : "JOIN LAN";
