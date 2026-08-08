@@ -138,6 +138,28 @@ public partial class FreightTerminalWorld
         GetTree().Quit(valid ? 0 : 2);
     }
 
+    private async void ValidateDeploymentUi()
+    {
+        await WaitFrames(2);
+        _hud.ApplyDeploymentPresetForDiagnostics("overwatch");
+        await WaitFrames(1);
+
+        var selection = _hud.SelectedDeploymentLoadout;
+        var uiReady = _hud.DeploymentUiReady;
+        var presetCount = _hud.DeploymentPresetCount == 4;
+        var presetSelected = _hud.ActiveDeploymentPresetId == "overwatch";
+        var loadoutSelected = selection.WeaponId == "m24"
+            && selection.ArmorId == "standard"
+            && selection.AmmoGrade == LootGrade.Epic;
+        var cost = _hud.DeploymentSelectedCost == 11100;
+        var projectedBalance = _hud.DeploymentProjectedBalance == 6900;
+        var valid = uiReady && presetCount && presetSelected && loadoutSelected && cost && projectedBalance;
+
+        GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
+        GD.Print($"DEPLOYMENT_UI_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
     private static void TryDeleteProfile(string path)
     {
         try

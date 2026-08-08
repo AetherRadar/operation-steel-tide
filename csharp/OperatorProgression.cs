@@ -27,6 +27,14 @@ public sealed record DeploymentArmorOffer(
     string LocalizationKey,
     string EnglishName);
 
+public sealed record DeploymentPresetOffer(
+    string Id,
+    string WeaponId,
+    string ArmorId,
+    LootGrade AmmoGrade,
+    string LocalizationKey,
+    string EnglishName);
+
 public sealed record DeploymentLoadout(
     DeploymentLoadoutSelection Selection,
     WeaponBuild? Weapon,
@@ -91,6 +99,14 @@ public static class DeploymentCatalog
             "HEAVY ASSAULT KIT")
     };
 
+    public static readonly IReadOnlyList<DeploymentPresetOffer> Presets = new[]
+    {
+        new DeploymentPresetOffer("scavenger", "none", "standard", LootGrade.Common, "preset_scavenger", "SCAVENGER"),
+        new DeploymentPresetOffer("assault", "m4a1", "standard", LootGrade.Uncommon, "preset_assault", "ASSAULT"),
+        new DeploymentPresetOffer("breacher", "mp5a5", "heavy", LootGrade.Rare, "preset_breacher", "BREACHER"),
+        new DeploymentPresetOffer("overwatch", "m24", "standard", LootGrade.Epic, "preset_overwatch", "OVERWATCH")
+    };
+
     public static DeploymentWeaponOffer Weapon(string id)
     {
         foreach (var offer in Weapons)
@@ -113,6 +129,18 @@ public static class DeploymentCatalog
             }
         }
         return Armor[0];
+    }
+
+    public static DeploymentPresetOffer Preset(string id)
+    {
+        foreach (var preset in Presets)
+        {
+            if (string.Equals(preset.Id, id, StringComparison.OrdinalIgnoreCase))
+            {
+                return preset;
+            }
+        }
+        return Presets[0];
     }
 
     public static int AmmoPrice(LootGrade grade) => grade switch

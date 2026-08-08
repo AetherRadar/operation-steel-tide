@@ -19,7 +19,11 @@ public partial class CombatHUD
     private Button _localSquadButton = null!;
     private Button _hostSquadButton = null!;
     private Button _joinSquadButton = null!;
+    private Button _deploySquadButton = null!;
+    private Label _roleCaption = null!;
     private readonly Button[] _roleButtons = new Button[3];
+    private readonly Label[] _roleNameLabels = new Label[3];
+    private readonly Label[] _roleSkillLabels = new Label[3];
     private readonly Label[] _roleDescriptions = new Label[3];
     private Control _squadRoster = null!;
     private Label _squadRosterTitle = null!;
@@ -32,6 +36,7 @@ public partial class CombatHUD
     private Label _squadOrderLabel = null!;
     private readonly Button[] _orderButtons = new Button[3];
     private OperatorRole _selectedRole = OperatorRole.Assault;
+    private SquadSessionMode _selectedSessionMode = SquadSessionMode.Local;
     private OperatorRole _displayedRole = OperatorRole.Assault;
     private SquadOrder _displayedOrder = SquadOrder.Follow;
     private float _displayedCooldown;
@@ -157,33 +162,60 @@ public partial class CombatHUD
     {
         _squadLobby = new ColorRect
         {
-            Color = new Color(0.003f, 0.007f, 0.009f, 0.96f),
+            Color = new Color(0.002f, 0.006f, 0.007f, 0.985f),
             MouseFilter = Control.MouseFilterEnum.Stop,
             Visible = false
         };
         _squadLobby.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         root.AddChild(_squadLobby);
 
-        var panel = new Control { Size = new Vector2(1040, 760) };
+        var panel = new Control
+        {
+            Size = new Vector2(1180, 680),
+            Scale = Vector2.One * 1.5f
+        };
         panel.SetAnchorsPreset(Control.LayoutPreset.Center);
-        panel.Position = new Vector2(-520, -380);
+        panel.Position = new Vector2(-885, -510);
         _squadLobby.AddChild(panel);
         panel.AddChild(new ColorRect
         {
-            Position = new Vector2(0, 0),
-            Size = new Vector2(1040, 3),
+            Size = new Vector2(1180, 3),
             Color = new Color(0.22f, 0.85f, 0.69f)
         });
-        _squadLobbyTitle = Label("SQUAD DEPLOYMENT", 31, new Color(0.86f, 0.96f, 0.92f));
-        _squadLobbyTitle.Position = new Vector2(0, 28);
-        _squadLobbyTitle.Size = new Vector2(1040, 44);
-        _squadLobbyTitle.HorizontalAlignment = HorizontalAlignment.Center;
+        panel.AddChild(new ColorRect
+        {
+            Position = new Vector2(0, 72),
+            Size = new Vector2(1180, 1),
+            Color = new Color(0.13f, 0.22f, 0.2f, 0.8f),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        });
+        _squadLobbyTitle = Label("OPERATION LOADOUT", 28, new Color(0.86f, 0.96f, 0.92f));
+        _squadLobbyTitle.Position = new Vector2(18, 13);
+        _squadLobbyTitle.Size = new Vector2(470, 36);
         panel.AddChild(_squadLobbyTitle);
-        _squadLobbySubtitle = Label("SELECT CLASS  //  PURCHASE KIT  //  AI TEAMMATES DEPLOY ARMED", 14, new Color(0.48f, 0.65f, 0.61f));
-        _squadLobbySubtitle.Position = new Vector2(0, 78);
-        _squadLobbySubtitle.Size = new Vector2(1040, 24);
-        _squadLobbySubtitle.HorizontalAlignment = HorizontalAlignment.Center;
+        _squadLobbySubtitle = Label("STRIKE TEAM PREPARATION  //  HARBOR EXCLUSION ZONE", 11, new Color(0.48f, 0.65f, 0.61f));
+        _squadLobbySubtitle.Position = new Vector2(20, 48);
+        _squadLobbySubtitle.Size = new Vector2(520, 20);
         panel.AddChild(_squadLobbySubtitle);
+
+        var roleRail = new ColorRect
+        {
+            Position = new Vector2(0, 88),
+            Size = new Vector2(218, 468),
+            Color = new Color(0.008f, 0.014f, 0.016f, 0.94f),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
+        panel.AddChild(roleRail);
+        roleRail.AddChild(new ColorRect
+        {
+            Size = new Vector2(3, 468),
+            Color = new Color(0.32f, 0.84f, 0.7f),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        });
+        _roleCaption = Label("SELECT OPERATOR", 10, new Color(0.45f, 0.64f, 0.59f));
+        _roleCaption.Position = new Vector2(14, 12);
+        _roleCaption.Size = new Vector2(190, 18);
+        roleRail.AddChild(_roleCaption);
 
         var group = new ButtonGroup();
         var roles = new[] { OperatorRole.Assault, OperatorRole.Medic, OperatorRole.Recon };
@@ -191,72 +223,100 @@ public partial class CombatHUD
         {
             var role = roles[i];
             var spec = OperatorRoles.Spec(role);
-            var x = 22 + i * 340;
-            var card = new ColorRect
-            {
-                Position = new Vector2(x, 126),
-                Size = new Vector2(316, 280),
-                Color = new Color(0.018f, 0.027f, 0.03f, 0.95f),
-                MouseFilter = Control.MouseFilterEnum.Ignore
-            };
-            panel.AddChild(card);
-            card.AddChild(new ColorRect
-            {
-                Position = Vector2.Zero,
-                Size = new Vector2(316, 4),
-                Color = spec.Accent,
-                MouseFilter = Control.MouseFilterEnum.Ignore
-            });
-            var glyph = Label(role switch { OperatorRole.Medic => "+", OperatorRole.Recon => "\u25c9", _ => "\u25b2" }, 56, spec.Accent);
-            glyph.Position = new Vector2(0, 22);
-            glyph.Size = new Vector2(316, 70);
-            glyph.HorizontalAlignment = HorizontalAlignment.Center;
-            card.AddChild(glyph);
-            _roleButtons[i] = Button(spec.Name, new Vector2(24, 102), new Vector2(268, 50));
+            _roleButtons[i] = DeploymentSegment(new Vector2(12, 38 + i * 132), new Vector2(194, 120), spec.Accent);
             _roleButtons[i].ToggleMode = true;
             _roleButtons[i].ButtonGroup = group;
             _roleButtons[i].FocusMode = Control.FocusModeEnum.None;
             _roleButtons[i].Pressed += () => SelectSquadRole(role);
-            card.AddChild(_roleButtons[i]);
-            _roleDescriptions[i] = Label(spec.Description, 13, new Color(0.72f, 0.79f, 0.77f));
-            _roleDescriptions[i].Position = new Vector2(24, 168);
-            _roleDescriptions[i].Size = new Vector2(268, 76);
+            roleRail.AddChild(_roleButtons[i]);
+
+            var glyph = Label(role switch { OperatorRole.Medic => "+", OperatorRole.Recon => "\u25c9", _ => "\u25b2" }, 28, spec.Accent);
+            glyph.Position = new Vector2(12, 8);
+            glyph.Size = new Vector2(34, 36);
+            glyph.HorizontalAlignment = HorizontalAlignment.Center;
+            glyph.MouseFilter = Control.MouseFilterEnum.Ignore;
+            _roleButtons[i].AddChild(glyph);
+            _roleNameLabels[i] = Label(spec.Name, 14, spec.Accent.Lightened(0.15f));
+            _roleNameLabels[i].Position = new Vector2(54, 10);
+            _roleNameLabels[i].Size = new Vector2(128, 22);
+            _roleNameLabels[i].MouseFilter = Control.MouseFilterEnum.Ignore;
+            _roleButtons[i].AddChild(_roleNameLabels[i]);
+            _roleSkillLabels[i] = Label(spec.SkillName, 9, new Color(0.55f, 0.68f, 0.64f));
+            _roleSkillLabels[i].Position = new Vector2(54, 34);
+            _roleSkillLabels[i].Size = new Vector2(128, 18);
+            _roleSkillLabels[i].ClipText = true;
+            _roleSkillLabels[i].MouseFilter = Control.MouseFilterEnum.Ignore;
+            _roleButtons[i].AddChild(_roleSkillLabels[i]);
+            _roleDescriptions[i] = Label(spec.Description, 9, new Color(0.68f, 0.77f, 0.74f));
+            _roleDescriptions[i].Position = new Vector2(14, 61);
+            _roleDescriptions[i].Size = new Vector2(166, 50);
             _roleDescriptions[i].AutowrapMode = TextServer.AutowrapMode.WordSmart;
-            _roleDescriptions[i].HorizontalAlignment = HorizontalAlignment.Center;
-            card.AddChild(_roleDescriptions[i]);
+            _roleDescriptions[i].MouseFilter = Control.MouseFilterEnum.Ignore;
+            _roleButtons[i].AddChild(_roleDescriptions[i]);
         }
         _roleButtons[0].ButtonPressed = true;
         BuildDeploymentStore(panel);
 
-        _squadSessionStatus = Label("LOCAL SQUAD  //  THREE AI TEAMMATES READY", 13, new Color(0.45f, 0.86f, 0.72f));
-        _squadSessionStatus.Position = new Vector2(0, 612);
-        _squadSessionStatus.Size = new Vector2(1040, 24);
-        _squadSessionStatus.HorizontalAlignment = HorizontalAlignment.Center;
-        panel.AddChild(_squadSessionStatus);
-        _localSquadButton = Button("LOCAL + AI", new Vector2(22, 648), new Vector2(250, 48));
-        _localSquadButton.Pressed += () => RequestSquadDeployment(SquadSessionMode.Local);
-        panel.AddChild(_localSquadButton);
-        _hostSquadButton = Button("HOST LAN", new Vector2(286, 648), new Vector2(220, 48));
-        _hostSquadButton.Pressed += () => RequestSquadDeployment(SquadSessionMode.Host);
-        panel.AddChild(_hostSquadButton);
+        var sessionBand = new ColorRect
+        {
+            Position = new Vector2(0, 572),
+            Size = new Vector2(1180, 88),
+            Color = new Color(0.007f, 0.013f, 0.014f, 0.96f),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
+        panel.AddChild(sessionBand);
+        sessionBand.AddChild(new ColorRect
+        {
+            Size = new Vector2(1180, 1),
+            Color = new Color(0.18f, 0.3f, 0.27f),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        });
+        _squadSessionStatus = Label("LOCAL STRIKE TEAM  //  2 AI OPERATORS READY", 11, new Color(0.45f, 0.86f, 0.72f));
+        _squadSessionStatus.Position = new Vector2(16, 8);
+        _squadSessionStatus.Size = new Vector2(820, 20);
+        sessionBand.AddChild(_squadSessionStatus);
+
+        var sessionGroup = new ButtonGroup();
+        _localSquadButton = DeploymentSegment(new Vector2(16, 36), new Vector2(128, 38), new Color(0.32f, 0.9f, 0.68f));
+        _localSquadButton.Text = "LOCAL + AI";
+        _localSquadButton.ToggleMode = true;
+        _localSquadButton.ButtonGroup = sessionGroup;
+        _localSquadButton.Pressed += () => SelectSessionMode(SquadSessionMode.Local);
+        sessionBand.AddChild(_localSquadButton);
+        _hostSquadButton = DeploymentSegment(new Vector2(150, 36), new Vector2(128, 38), new Color(0.3f, 0.74f, 1.0f));
+        _hostSquadButton.Text = "HOST LAN";
+        _hostSquadButton.ToggleMode = true;
+        _hostSquadButton.ButtonGroup = sessionGroup;
+        _hostSquadButton.Pressed += () => SelectSessionMode(SquadSessionMode.Host);
+        sessionBand.AddChild(_hostSquadButton);
+        _joinSquadButton = DeploymentSegment(new Vector2(284, 36), new Vector2(128, 38), new Color(0.3f, 0.74f, 1.0f));
+        _joinSquadButton.Text = "JOIN LAN";
+        _joinSquadButton.ToggleMode = true;
+        _joinSquadButton.ButtonGroup = sessionGroup;
+        _joinSquadButton.Pressed += () => SelectSessionMode(SquadSessionMode.Join);
+        sessionBand.AddChild(_joinSquadButton);
+        _localSquadButton.ButtonPressed = true;
+
         _squadAddress = new LineEdit
         {
             Text = "127.0.0.1",
             PlaceholderText = "HOST ADDRESS",
-            Position = new Vector2(520, 648),
-            Size = new Vector2(260, 48),
+            Position = new Vector2(424, 36),
+            Size = new Vector2(236, 38),
             ClearButtonEnabled = true
         };
-        _squadAddress.AddThemeFontSizeOverride("font_size", 15);
-        panel.AddChild(_squadAddress);
-        _joinSquadButton = Button("JOIN LAN", new Vector2(794, 648), new Vector2(224, 48));
-        _joinSquadButton.Pressed += () => RequestSquadDeployment(SquadSessionMode.Join);
-        panel.AddChild(_joinSquadButton);
-        var footer = Label("H CLASS SKILL    F1 FOLLOW    F2 HOLD    F3 MOVE TO AIM POINT", 12, new Color(0.42f, 0.56f, 0.53f));
-        footer.Position = new Vector2(0, 714);
-        footer.Size = new Vector2(1040, 24);
-        footer.HorizontalAlignment = HorizontalAlignment.Center;
-        panel.AddChild(footer);
+        _squadAddress.AddThemeFontSizeOverride("font_size", 12);
+        sessionBand.AddChild(_squadAddress);
+        _deploySquadButton = Button("\u25b6  CONFIRM KIT & DEPLOY", new Vector2(866, 20), new Vector2(294, 56));
+        _deploySquadButton.AddThemeFontSizeOverride("font_size", 15);
+        _deploySquadButton.AddThemeColorOverride("font_color", new Color(0.03f, 0.08f, 0.065f));
+        _deploySquadButton.AddThemeColorOverride("font_hover_color", new Color(0.01f, 0.04f, 0.03f));
+        _deploySquadButton.AddThemeStyleboxOverride("normal", FlatStyle(new Color(0.33f, 0.88f, 0.69f), new Color(0.56f, 1.0f, 0.82f), 2));
+        _deploySquadButton.AddThemeStyleboxOverride("hover", FlatStyle(new Color(0.48f, 0.98f, 0.79f), Colors.White, 2));
+        _deploySquadButton.AddThemeStyleboxOverride("pressed", FlatStyle(new Color(0.23f, 0.72f, 0.55f), new Color(0.56f, 1.0f, 0.82f), 2));
+        _deploySquadButton.Pressed += RequestSquadDeployment;
+        sessionBand.AddChild(_deploySquadButton);
+        SelectSessionMode(SquadSessionMode.Local);
     }
 
     private void SelectSquadRole(OperatorRole role)
@@ -264,14 +324,57 @@ public partial class CombatHUD
         _selectedRole = role;
         var spec = OperatorRoles.Spec(role);
         _squadSessionStatus.Text = GameLocalization.IsChinese(_language)
-            ? $"已选择 {spec.ChineseName}  //  可单人带 AI 或加入局域网"
+            ? $"\u5df2\u9009\u62e9 {spec.ChineseName}  //  \u53ef\u5355\u4eba\u5e26 AI \u6216\u52a0\u5165\u5c40\u57df\u7f51"
             : $"{spec.Name} SELECTED  //  LOCAL AI OR LAN READY";
         _squadSessionStatus.AddThemeColorOverride("font_color", spec.Accent);
+        RefreshDeploymentStore();
     }
 
-    private void RequestSquadDeployment(SquadSessionMode mode)
+    private void SelectSessionMode(SquadSessionMode mode)
     {
-        SquadDeploymentRequested?.Invoke((int)_selectedRole, (int)mode, _squadAddress.Text.Trim());
+        _selectedSessionMode = mode;
+        _localSquadButton.SetPressedNoSignal(mode == SquadSessionMode.Local);
+        _hostSquadButton.SetPressedNoSignal(mode == SquadSessionMode.Host);
+        _joinSquadButton.SetPressedNoSignal(mode == SquadSessionMode.Join);
+        _squadAddress.Editable = mode != SquadSessionMode.Local;
+        _squadAddress.Modulate = mode == SquadSessionMode.Local
+            ? new Color(0.42f, 0.48f, 0.46f)
+            : Colors.White;
+        _squadSessionStatus.Text = mode switch
+        {
+            SquadSessionMode.Host => GameLocalization.IsChinese(_language)
+                ? "\u521b\u5efa\u5c40\u57df\u7f51\u5c0f\u961f  //  \u7a7a\u4f4d\u7531 AI \u8865\u9f50"
+                : "HOST LAN STRIKE TEAM  //  AI FILLS OPEN SLOTS",
+            SquadSessionMode.Join => GameLocalization.IsChinese(_language)
+                ? "\u52a0\u5165\u5c40\u57df\u7f51\u5c0f\u961f  //  \u8f93\u5165\u4e3b\u673a\u5730\u5740"
+                : "JOIN LAN STRIKE TEAM  //  ENTER HOST ADDRESS",
+            _ => GameLocalization.IsChinese(_language)
+                ? "\u672c\u5730\u7a81\u51fb\u5c0f\u961f  //  2 \u540d AI \u5e72\u5458\u5df2\u5c31\u7eea"
+                : "LOCAL STRIKE TEAM  //  2 AI OPERATORS READY"
+        };
+        RefreshSquadDeployAction();
+    }
+
+    private void RequestSquadDeployment()
+    {
+        SquadDeploymentRequested?.Invoke((int)_selectedRole, (int)_selectedSessionMode, _squadAddress.Text.Trim());
+    }
+
+    private void RefreshSquadDeployAction()
+    {
+        if (!IsInstanceValid(_deploySquadButton))
+        {
+            return;
+        }
+        var affordable = DeploymentProjectedBalance >= 0;
+        _deploySquadButton.Disabled = !affordable;
+        _deploySquadButton.Text = GameLocalization.IsChinese(_language)
+            ? affordable
+                ? $"\u25b6  \u786e\u8ba4\u6574\u5907\u5e76\u90e8\u7f72  //  {DeploymentSelectedCost}"
+                : "\u4f59\u989d\u4e0d\u8db3  //  \u8c03\u6574\u6574\u5907"
+            : affordable
+                ? $"\u25b6  CONFIRM KIT & DEPLOY  //  {DeploymentSelectedCost}"
+                : "INSUFFICIENT BALANCE  //  ADJUST KIT";
     }
 
     public void ShowSquadLobby(string status = "LOCAL SQUAD")
@@ -392,21 +495,27 @@ public partial class CombatHUD
             return;
         }
         var chinese = GameLocalization.IsChinese(_language);
-        _squadLobbyTitle.Text = chinese ? "小队部署" : "SQUAD DEPLOYMENT";
+        _squadLobbyTitle.Text = chinese ? "\u884c\u52a8\u6574\u5907" : "OPERATION LOADOUT";
         _squadLobbySubtitle.Text = chinese
-            ? "\u9009\u62e9\u804c\u4e1a  //  \u8d2d\u4e70\u6574\u5907  //  AI \u961f\u53cb\u643a\u67aa\u51fa\u51fb"
-            : "SELECT CLASS  //  PURCHASE KIT  //  AI TEAMMATES DEPLOY ARMED";
-        _localSquadButton.Text = chinese ? "单人 + AI" : "LOCAL + AI";
-        _hostSquadButton.Text = chinese ? "创建局域网" : "HOST LAN";
-        _joinSquadButton.Text = chinese ? "加入局域网" : "JOIN LAN";
+            ? "\u7a81\u51fb\u5c0f\u961f\u6574\u5907  //  \u6e2f\u533a\u5c01\u9501\u533a"
+            : "STRIKE TEAM PREPARATION  //  HARBOR EXCLUSION ZONE";
+        _roleCaption.Text = chinese ? "\u9009\u62e9\u5e72\u5458" : "SELECT OPERATOR";
+        _localSquadButton.Text = chinese ? "\u672c\u5730 + AI" : "LOCAL + AI";
+        _hostSquadButton.Text = chinese ? "\u521b\u5efa\u5c40\u57df\u7f51" : "HOST LAN";
+        _joinSquadButton.Text = chinese ? "\u52a0\u5165\u5c40\u57df\u7f51" : "JOIN LAN";
+        _squadAddress.PlaceholderText = chinese ? "\u4e3b\u673a\u5730\u5740" : "HOST ADDRESS";
         var roles = new[] { OperatorRole.Assault, OperatorRole.Medic, OperatorRole.Recon };
         for (var i = 0; i < roles.Length; i++)
         {
-            _roleButtons[i].Text = OperatorRoles.RoleName(roles[i], _language);
+            _roleButtons[i].Text = string.Empty;
+            _roleNameLabels[i].Text = OperatorRoles.RoleName(roles[i], _language);
+            _roleSkillLabels[i].Text = OperatorRoles.SkillName(roles[i], _language);
             _roleDescriptions[i].Text = OperatorRoles.Description(roles[i], _language);
         }
+        SelectSessionMode(_selectedSessionMode);
         SetSquadOrder(_displayedOrder);
         RefreshClassSkillText();
         RefreshDeploymentLanguage();
+        RefreshSquadDeployAction();
     }
 }

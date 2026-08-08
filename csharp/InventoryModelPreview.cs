@@ -8,7 +8,8 @@ public enum InventoryPreviewKind
     Knife,
     Helmet,
     BodyArmor,
-    Backpack
+    Backpack,
+    Operator
 }
 
 [GlobalClass]
@@ -17,6 +18,10 @@ public partial class InventoryModelPreview : SubViewportContainer
     private InventoryPreviewKind _kind;
     private EquipmentItem? _equipment;
     private WeaponBuild? _weapon;
+    private EquipmentItem? _helmet;
+    private EquipmentItem? _bodyArmor;
+    private EquipmentItem? _backpack;
+    private OperatorRole _role = OperatorRole.Assault;
     private string _knifeSkinId = KnifeSkinCatalog.DefaultId;
     private SubViewport? _viewport;
     private Node3D? _modelRoot;
@@ -27,12 +32,20 @@ public partial class InventoryModelPreview : SubViewportContainer
         InventoryPreviewKind kind,
         EquipmentItem? equipment = null,
         WeaponBuild? weapon = null,
-        string knifeSkinId = KnifeSkinCatalog.DefaultId)
+        string knifeSkinId = KnifeSkinCatalog.DefaultId,
+        OperatorRole role = OperatorRole.Assault,
+        EquipmentItem? helmet = null,
+        EquipmentItem? bodyArmor = null,
+        EquipmentItem? backpack = null)
     {
         _kind = kind;
         _equipment = equipment?.Clone();
         _weapon = weapon?.Clone();
         _knifeSkinId = knifeSkinId;
+        _role = role;
+        _helmet = helmet?.Clone();
+        _bodyArmor = bodyArmor?.Clone();
+        _backpack = backpack?.Clone();
         if (IsInsideTree())
         {
             RebuildModel();
@@ -45,7 +58,6 @@ public partial class InventoryModelPreview : SubViewportContainer
         Stretch = true;
         _viewport = new SubViewport
         {
-            Size = new Vector2I(320, 180),
             TransparentBg = true,
             OwnWorld3D = true,
             RenderTargetUpdateMode = SubViewport.UpdateMode.Always
@@ -94,7 +106,7 @@ public partial class InventoryModelPreview : SubViewportContainer
 
     private void RebuildModel()
     {
-        if (_modelRoot is null || _camera is null)
+        if (_modelRoot is null || _camera is null || _viewport is null)
         {
             return;
         }
@@ -104,7 +116,11 @@ public partial class InventoryModelPreview : SubViewportContainer
             child.QueueFree();
         }
         _modelRoot.Rotation = Vector3.Zero;
+        _modelRoot.Position = Vector3.Zero;
         _modelRoot.Scale = Vector3.One;
+        _camera.KeepAspect = _kind == InventoryPreviewKind.Operator
+            ? Camera3D.KeepAspectEnum.Height
+            : Camera3D.KeepAspectEnum.Width;
         switch (_kind)
         {
             case InventoryPreviewKind.Rifle:
@@ -132,6 +148,12 @@ public partial class InventoryModelPreview : SubViewportContainer
                 _camera.Size = 2.15f;
                 _modelRoot.RotationDegrees = new Vector3(-4, -18, 0);
                 break;
+            case InventoryPreviewKind.Operator:
+                BuildOperator(_modelRoot);
+                _camera.Size = 3.4f;
+                _modelRoot.Position = new Vector3(0, -1.34f, 0);
+                _modelRoot.RotationDegrees = new Vector3(0, -9, 0);
+                break;
         }
         RequestRender();
     }
@@ -152,6 +174,80 @@ public partial class InventoryModelPreview : SubViewportContainer
         if (revision == _renderRevision && IsInstanceValid(_viewport))
         {
             _viewport!.RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled;
+        }
+    }
+
+    private void BuildOperator(Node3D root)
+    {
+        var spec = OperatorRoles.Spec(_role);
+        var heavyArmor = _bodyArmor?.DefinitionId == "armor_heavy";
+        var heavyHelmet = _helmet?.DefinitionId == "helmet_heavy";
+        var heavyPack = _backpack?.DefinitionId == "pack_heavy";
+        var uniform = new Color(0.11f, 0.145f, 0.135f).Lerp(spec.Accent, 0.08f);
+        var fabric = heavyArmor ? new Color(0.19f, 0.2f, 0.15f) : new Color(0.13f, 0.18f, 0.16f);
+        var armor = heavyArmor ? new Color(0.22f, 0.24f, 0.18f) : new Color(0.08f, 0.115f, 0.105f);
+        var skin = new Color(0.42f, 0.29f, 0.21f);
+        var dark = new Color(0.035f, 0.045f, 0.042f);
+
+        Capsule(root, 0.25f, 0.94f, new Vector3(0, 1.46f, 0), uniform, 0.0f, 0.94f);
+        Box(root, new Vector3(0.66f, heavyArmor ? 0.76f : 0.65f, heavyArmor ? 0.34f : 0.27f),
+            new Vector3(0, 1.48f, 0.02f), armor, 0.16f, 0.74f);
+        Box(root, new Vector3(0.5f, 0.08f, 0.36f), new Vector3(0, 1.72f, 0.02f), fabric.Lightened(0.1f), 0.04f, 0.9f);
+        for (var pouch = -1; pouch <= 1; pouch++)
+        {
+            Box(root, new Vector3(0.18f, 0.22f, 0.12f), new Vector3(pouch * 0.2f, 1.2f, 0.2f),
+                fabric.Lightened(0.06f), 0.02f, 0.94f);
+        }
+
+        Capsule(root, 0.13f, 0.9f, new Vector3(-0.18f, 0.57f, 0), uniform.Darkened(0.04f), 0.0f, 0.95f,
+            new Vector3(0, 0, -0.03f));
+        Capsule(root, 0.13f, 0.9f, new Vector3(0.18f, 0.57f, 0), uniform.Darkened(0.04f), 0.0f, 0.95f,
+            new Vector3(0, 0, 0.03f));
+        Box(root, new Vector3(0.25f, 0.18f, 0.36f), new Vector3(-0.18f, 0.08f, 0.04f), dark, 0.1f, 0.7f);
+        Box(root, new Vector3(0.25f, 0.18f, 0.36f), new Vector3(0.18f, 0.08f, 0.04f), dark, 0.1f, 0.7f);
+
+        Capsule(root, 0.11f, 0.78f, new Vector3(-0.42f, 1.52f, 0.02f), uniform, 0.0f, 0.94f,
+            new Vector3(0, 0, -0.46f));
+        Capsule(root, 0.11f, 0.78f, new Vector3(0.42f, 1.52f, 0.02f), uniform, 0.0f, 0.94f,
+            new Vector3(0, 0, 0.46f));
+        Capsule(root, 0.095f, 0.57f, new Vector3(-0.47f, 1.22f, 0.21f), uniform.Darkened(0.04f), 0.0f, 0.94f,
+            new Vector3(0.28f, 0, 0.2f));
+        Capsule(root, 0.095f, 0.57f, new Vector3(0.47f, 1.22f, 0.21f), uniform.Darkened(0.04f), 0.0f, 0.94f,
+            new Vector3(0.28f, 0, -0.2f));
+        Sphere(root, 0.12f, 0.24f, new Vector3(-0.42f, 1.03f, 0.38f), dark, 0.05f, 0.76f);
+        Sphere(root, 0.12f, 0.24f, new Vector3(0.42f, 1.03f, 0.38f), dark, 0.05f, 0.76f);
+
+        Sphere(root, 0.23f, 0.46f, new Vector3(0, 2.23f, 0.01f), skin, 0.0f, 0.93f);
+        Sphere(root, heavyHelmet ? 0.31f : 0.285f, heavyHelmet ? 0.42f : 0.34f,
+            new Vector3(0, 2.39f, -0.005f), heavyHelmet ? new Color(0.27f, 0.25f, 0.17f) : fabric, 0.12f, 0.78f);
+        Box(root, new Vector3(0.48f, 0.12f, 0.12f), new Vector3(0, 2.27f, 0.22f), dark, 0.35f, 0.42f);
+        Box(root, new Vector3(0.12f, 0.13f, 0.05f), new Vector3(0, 2.48f, 0.27f), spec.Accent, 0.18f, 0.5f);
+
+        Box(root, new Vector3(heavyPack ? 0.72f : 0.58f, heavyPack ? 0.92f : 0.72f, 0.3f),
+            new Vector3(0, 1.43f, -0.27f), fabric.Darkened(0.04f), 0.02f, 0.95f);
+        Box(root, new Vector3(0.13f, 0.42f, 0.08f), new Vector3(-0.27f, 1.53f, 0.19f), spec.Accent.Darkened(0.2f), 0.02f, 0.82f);
+
+        if (_weapon is not null)
+        {
+            var weaponRoot = new Node3D
+            {
+                Position = new Vector3(0, 1.3f, 0.43f),
+                RotationDegrees = new Vector3(0, -4, -7),
+                Scale = Vector3.One * 0.66f
+            };
+            root.AddChild(weaponRoot);
+            BuildRifle(weaponRoot);
+        }
+        else
+        {
+            var knifeRoot = new Node3D
+            {
+                Position = new Vector3(0.24f, 1.18f, 0.4f),
+                RotationDegrees = new Vector3(0, 0, 72),
+                Scale = Vector3.One * 0.55f
+            };
+            root.AddChild(knifeRoot);
+            BuildKnife(knifeRoot);
         }
     }
 
@@ -280,6 +376,25 @@ public partial class InventoryModelPreview : SubViewportContainer
         Vector3? rotation = null)
     {
         return Part(parent, new BoxMesh { Size = size }, position, rotation ?? Vector3.Zero, color, metallic, roughness);
+    }
+
+    private static MeshInstance3D Capsule(
+        Node3D parent,
+        float radius,
+        float height,
+        Vector3 position,
+        Color color,
+        float metallic,
+        float roughness,
+        Vector3? rotation = null)
+    {
+        return Part(parent, new CapsuleMesh
+        {
+            Radius = radius,
+            Height = height,
+            RadialSegments = 18,
+            Rings = 8
+        }, position, rotation ?? Vector3.Zero, color, metallic, roughness);
     }
 
     private static MeshInstance3D Cylinder(

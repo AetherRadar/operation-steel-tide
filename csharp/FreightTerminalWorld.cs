@@ -253,6 +253,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateProgressionFlow();
         }
+        else if (Array.Exists(args, value => value == "--validate-deployment-ui"))
+        {
+            ValidateDeploymentUi();
+        }
         else if (Array.Exists(args, value => value == "--validate-backpack-tab"))
         {
             ValidateBackpackTab();
