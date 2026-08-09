@@ -370,26 +370,33 @@ public partial class FreightTerminalWorld
         }
         var firstTower = _residentialTowers[0];
         var firstSpec = ResidentialTowerSpecs[0];
-        var stairFaceBatches = 0;
+        var stairNosingBatches = 0;
         var stringerBatches = 0;
         var fasciaEndBatches = 0;
         var fasciaSideBatches = 0;
-        var landingGuardBatches = 0;
+        var landingGuardRailBatches = 0;
+        var landingGuardPostBatches = 0;
         var fittedStairInstances = true;
         var obsoleteColumnDetailsAbsent = true;
+        var fullHeightTreadFacesAbsent = true;
+        var solidLandingGuardPanelsAbsent = true;
+        var openTreadNosings = true;
         foreach (var child in firstTower.GetChildren())
         {
             var name = child.Name.ToString();
             obsoleteColumnDetailsAbsent &= !name.StartsWith("ResidentialStairRisers_", StringComparison.Ordinal)
                 && !name.StartsWith("ResidentialStairLandingPosts_", StringComparison.Ordinal);
+            fullHeightTreadFacesAbsent &= !name.StartsWith("ResidentialStairTreadFaces_", StringComparison.Ordinal);
+            solidLandingGuardPanelsAbsent &= !name.StartsWith("ResidentialStairLandingGuardPanels_", StringComparison.Ordinal);
             if (child is not MultiMeshInstance3D batch || batch.Multimesh is null)
             {
                 continue;
             }
-            if (name.StartsWith("ResidentialStairTreadFaces_", StringComparison.Ordinal))
+            if (name.StartsWith("ResidentialStairNosings_", StringComparison.Ordinal))
             {
-                stairFaceBatches++;
+                stairNosingBatches++;
                 fittedStairInstances &= batch.Multimesh.InstanceCount == ResidentialStepsPerFlight * 2;
+                openTreadNosings &= batch.Multimesh.Mesh is BoxMesh box && box.Size.Y <= 0.05f;
             }
             else if (name.StartsWith("ResidentialStairStringers_", StringComparison.Ordinal))
             {
@@ -406,19 +413,28 @@ public partial class FreightTerminalWorld
                 fasciaSideBatches++;
                 fittedStairInstances &= batch.Multimesh.InstanceCount == 2;
             }
-            else if (name.StartsWith("ResidentialStairLandingGuardPanels_", StringComparison.Ordinal))
+            else if (name.StartsWith("ResidentialStairLandingGuardRails_", StringComparison.Ordinal))
             {
-                landingGuardBatches++;
-                fittedStairInstances &= batch.Multimesh.InstanceCount == 1;
+                landingGuardRailBatches++;
+                fittedStairInstances &= batch.Multimesh.InstanceCount == 2;
+            }
+            else if (name.StartsWith("ResidentialStairLandingGuardPosts_", StringComparison.Ordinal))
+            {
+                landingGuardPostBatches++;
+                fittedStairInstances &= batch.Multimesh.InstanceCount == 7;
             }
         }
-        var fittedStairStructure = stairFaceBatches == firstSpec.Floors
+        var fittedStairStructure = stairNosingBatches == firstSpec.Floors
             && stringerBatches == firstSpec.Floors
             && fasciaEndBatches == firstSpec.Floors
             && fasciaSideBatches == firstSpec.Floors
-            && landingGuardBatches == firstSpec.Floors
+            && landingGuardRailBatches == firstSpec.Floors
+            && landingGuardPostBatches == firstSpec.Floors
             && fittedStairInstances
-            && obsoleteColumnDetailsAbsent;
+            && obsoleteColumnDetailsAbsent
+            && fullHeightTreadFacesAbsent
+            && solidLandingGuardPanelsAbsent
+            && openTreadNosings;
         var entryRay = PhysicsRayQueryParameters3D.Create(
             firstTower.ToGlobal(new Vector3(0, 1.65f, firstSpec.Footprint.Y * 0.5f + 2.8f)),
             firstTower.ToGlobal(new Vector3(0, 1.65f, firstSpec.Footprint.Y * 0.5f - 2.0f)));
@@ -434,7 +450,7 @@ public partial class FreightTerminalWorld
             && stairDetailNodes.Count == expectedFloors
             && fittedStairStructure
             && entryClear;
-        GD.Print($"RESIDENTIAL_DENSITY_CHECK valid={valid} modules={_residentialInfillModuleCount}/{expectedModules} grouped={infillNodes.Count} unique={uniqueNames.Count} collision={infillCollisionCorrect} stair_details={_residentialStairDetailCount}/{expectedFloors} grouped_stairs={stairDetailNodes.Count} stair_faces={stairFaceBatches}/{firstSpec.Floors} stringers={stringerBatches}/{firstSpec.Floors} fascia={fasciaEndBatches}+{fasciaSideBatches}/{firstSpec.Floors * 2} guard_panels={landingGuardBatches}/{firstSpec.Floors} old_columns_absent={obsoleteColumnDetailsAbsent} fitted_stairs={fittedStairStructure} entry_clear={entryClear}");
+        GD.Print($"RESIDENTIAL_DENSITY_CHECK valid={valid} modules={_residentialInfillModuleCount}/{expectedModules} grouped={infillNodes.Count} unique={uniqueNames.Count} collision={infillCollisionCorrect} stair_details={_residentialStairDetailCount}/{expectedFloors} grouped_stairs={stairDetailNodes.Count} nosings={stairNosingBatches}/{firstSpec.Floors} open_treads={openTreadNosings} old_face_panels_absent={fullHeightTreadFacesAbsent} stringers={stringerBatches}/{firstSpec.Floors} fascia={fasciaEndBatches}+{fasciaSideBatches}/{firstSpec.Floors * 2} guard_rails={landingGuardRailBatches}/{firstSpec.Floors} guard_posts={landingGuardPostBatches}/{firstSpec.Floors} solid_guard_panels_absent={solidLandingGuardPanelsAbsent} old_columns_absent={obsoleteColumnDetailsAbsent} fitted_stairs={fittedStairStructure} entry_clear={entryClear}");
         GD.Print($"RESIDENTIAL_DENSITY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

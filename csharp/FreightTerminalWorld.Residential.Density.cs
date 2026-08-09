@@ -216,7 +216,7 @@ public partial class FreightTerminalWorld
         var safetyRailTransforms = new List<Transform3D>(4);
         var balusterTransforms = new List<Transform3D>(28);
         var stringerTransforms = new List<Transform3D>(4);
-        var treadFaceTransforms = new List<Transform3D>(ResidentialStepsPerFlight * 2);
+        var treadNosingTransforms = new List<Transform3D>(ResidentialStepsPerFlight * 2);
 
         foreach (var flight in new[] { 0, 1 })
         {
@@ -250,11 +250,11 @@ public partial class FreightTerminalWorld
                 var z = flight == 0
                     ? upperStartZ - stepRun * step
                     : lowerStartZ + stepRun * step;
-                var y = flightBaseY + stepRise * (step + 0.5f);
-                treadFaceTransforms.Add(new Transform3D(Basis.Identity, new Vector3(centerX, y, z)));
+                var y = flightBaseY + stepRise * (step + 1) - 0.0225f;
+                treadNosingTransforms.Add(new Transform3D(Basis.Identity, new Vector3(centerX, y, z)));
             }
         }
-        AddResidentialStairDetailBatch(tower, $"ResidentialStairTreadFaces_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(ResidentialStairTreadWidth, stepRise + 0.025f, 0.055f), stairFace, treadFaceTransforms);
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairNosings_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(ResidentialStairTreadWidth, 0.045f, 0.065f), stairFace, treadNosingTransforms);
         AddResidentialStairDetailBatch(tower, $"ResidentialStairStringers_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.16f, 0.34f, flightLength + 0.08f), stringer, stringerTransforms);
         AddResidentialStairDetailBatch(tower, $"ResidentialStairHandrails_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.075f, 0.075f, flightLength + 0.12f), handrail, handrailTransforms);
         AddResidentialStairDetailBatch(tower, $"ResidentialStairSafetyRails_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.05f, 0.05f, flightLength + 0.04f), safety, safetyRailTransforms);
@@ -276,15 +276,31 @@ public partial class FreightTerminalWorld
         };
         AddResidentialStairDetailBatch(tower, $"ResidentialStairLandingFasciaEnds_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(landingWidth, 0.3f, 0.08f), stairFace, landingEndTransforms);
         AddResidentialStairDetailBatch(tower, $"ResidentialStairLandingFasciaSides_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.08f, 0.3f, landingDepth), stairFace, landingSideTransforms);
+        var landingGuardZ = landingNorth + 0.08f;
+        var landingGuardRailTransforms = new[]
+        {
+            new Transform3D(Basis.Identity, new Vector3(0, floorY + halfRise + 0.48f, landingGuardZ)),
+            new Transform3D(Basis.Identity, new Vector3(0, floorY + halfRise + 0.92f, landingGuardZ))
+        };
+        var landingGuardPostTransforms = new List<Transform3D>(7);
+        for (var post = 0; post <= 6; post++)
+        {
+            landingGuardPostTransforms.Add(new Transform3D(
+                Basis.Identity,
+                new Vector3(Mathf.Lerp(-2.43f, 2.43f, post / 6.0f), floorY + halfRise + 0.46f, landingGuardZ)));
+        }
         AddResidentialStairDetailBatch(
             tower,
-            $"ResidentialStairLandingGuardPanels_T{towerIndex + 1:00}_F{floor + 1:00}",
-            new Vector3(4.86f, 0.58f, 0.055f),
-            panel,
-            new[]
-            {
-                new Transform3D(Basis.Identity, new Vector3(0, floorY + halfRise + 0.5f, landingNorth + 0.08f))
-            });
+            $"ResidentialStairLandingGuardRails_T{towerIndex + 1:00}_F{floor + 1:00}",
+            new Vector3(4.86f, 0.055f, 0.055f),
+            handrail,
+            landingGuardRailTransforms);
+        AddResidentialStairDetailBatch(
+            tower,
+            $"ResidentialStairLandingGuardPosts_T{towerIndex + 1:00}_F{floor + 1:00}",
+            new Vector3(0.055f, 0.92f, 0.055f),
+            baluster,
+            landingGuardPostTransforms);
 
         // Compact wall plates and integrated light strips keep the landing readable without
         // introducing detached floor-height pipes or hanging posts.
