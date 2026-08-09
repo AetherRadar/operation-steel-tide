@@ -352,7 +352,7 @@ void sky() {
         BuildMissionTerminals();
         BuildExtraction(concrete, steelDark, yellow, white);
         // Landmark beacon stays visible from match start so extract is findable;
-        // zone completion still gates on objectives via OnExtractionEntered.
+        // The extraction beacon is always active; entering it starts the countdown immediately.
         _extractionMarker.Visible = true;
     }
 

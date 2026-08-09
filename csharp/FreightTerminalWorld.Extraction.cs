@@ -36,15 +36,6 @@ public partial class FreightTerminalWorld
         }
 
         _extractionPlayerInside = true;
-        if (_objectiveStage < _objectiveTerminals.Count)
-        {
-            _hud.ShowLocalizedMessage(
-                "extraction_locked",
-                "EXTRACTION LOCKED  //  COMPLETE THE MISSION OBJECTIVES FIRST",
-                new Color(1.0f, 0.62f, 0.24f));
-            return;
-        }
-
         BeginExtractionCountdown();
     }
 
@@ -72,16 +63,6 @@ public partial class FreightTerminalWorld
         _extractionPlayerInside = IsPlayerInsideExtractionZone();
         if (_missionEnded || _extractionDeparturePlaying)
         {
-            return;
-        }
-
-        var unlocked = _objectiveStage >= _objectiveTerminals.Count;
-        if (!unlocked)
-        {
-            if (_extractionCountdownActive)
-            {
-                CancelExtractionCountdown();
-            }
             return;
         }
 
@@ -126,6 +107,7 @@ public partial class FreightTerminalWorld
 
         _extractionCountdownActive = true;
         _extractionRemaining = ExtractionCountdownDuration;
+        _missionDirector.ExitDeploymentZone();
         _preExtractionSquadOrder = _squadOrder;
         _preExtractionSquadMovePoint = _squadMovePoint;
         _extractionAircraft?.BeginInbound();
@@ -310,13 +292,16 @@ public partial class FreightTerminalWorld
         }
 
         _objectiveStage = 0;
+        _missionDirector.ExitDeploymentZone();
+        _missionDirector.RaiseConfirmedAlarm();
         _player.GlobalPosition = ExtractionPoint + new Vector3(0, 0.12f, 1.0f);
         TryBeginExtractionSequence(_player);
-        var lockedGate = !_extractionCountdownActive;
-
-        _objectiveStage = _objectiveTerminals.Count;
-        _missionPhase = "EXTRACTION";
-        TryBeginExtractionSequence(_player);
+        var earlyCallPhase = _missionPhase;
+        var entryStartedImmediately = _extractionCountdownActive
+            && Mathf.IsEqualApprox(_extractionRemaining, ExtractionCountdownDuration)
+            && _hud.IsExtractionCountdownVisible
+            && !IsPlayerProtected();
+        var combatPhasePreserved = earlyCallPhase == "COMBAT";
         UpdateExtractionSequence(3.0f);
         var countdownStarted = _extractionCountdownActive
             && _extractionRemaining < ExtractionCountdownDuration
@@ -327,7 +312,8 @@ public partial class FreightTerminalWorld
         UpdateExtractionSequence(0.1f);
         var leaveReset = !_extractionCountdownActive
             && Mathf.IsEqualApprox(_extractionRemaining, ExtractionCountdownDuration)
-            && !_hud.IsExtractionCountdownVisible;
+            && !_hud.IsExtractionCountdownVisible
+            && _missionPhase == earlyCallPhase;
 
         _player.GlobalPosition = ExtractionPoint + new Vector3(0, 0.12f, 1.0f);
         TryBeginExtractionSequence(_player);
@@ -338,8 +324,9 @@ public partial class FreightTerminalWorld
         _skipExtractionCinematicForValidation = true;
         UpdateExtractionSequence(ExtractionCountdownDuration + 0.2f);
         var completed = _missionEnded && !_extractionCountdownActive && _extractionAircraft?.Phase == ExtractionAircraftPhase.Departing;
-        var valid = lockedGate && countdownStarted && aircraftInbound && leaveReset && aircraftArrived && boardingShown && completed;
-        GD.Print($"EXTRACTION_SEQUENCE_CHECK valid={valid} locked={lockedGate} countdown={countdownStarted} inbound={aircraftInbound} leave_reset={leaveReset} aircraft_arrived={aircraftArrived} boarding={boardingShown} completed={completed} duration={ExtractionCountdownDuration:0.0}");
+        var valid = entryStartedImmediately && countdownStarted && aircraftInbound
+            && combatPhasePreserved && leaveReset && aircraftArrived && boardingShown && completed;
+        GD.Print($"EXTRACTION_SEQUENCE_CHECK valid={valid} objective_free={entryStartedImmediately} combat_phase_preserved={combatPhasePreserved} countdown={countdownStarted} inbound={aircraftInbound} leave_reset={leaveReset} aircraft_arrived={aircraftArrived} boarding={boardingShown} completed={completed} duration={ExtractionCountdownDuration:0.0}");
         GD.Print($"EXTRACTION_SEQUENCE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

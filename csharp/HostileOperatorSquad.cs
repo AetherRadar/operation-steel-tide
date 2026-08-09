@@ -63,6 +63,7 @@ public static class ExtractionSpawnPads
     /// Large enough that ContactAcquireRange (~48 m) and open-apron fights cannot start at deploy.
     /// </summary>
     public const float MinPadSeparationMeters = 110.0f;
+    public const float MinPlayerHostileSeparationMeters = 130.0f;
 
     public const int OperatorTeamCount = 5;
     public const int HostileSquadTargetCount = 4;
@@ -98,6 +99,8 @@ public static class ExtractionSpawnPads
         var playerIndex = (int)(rng.Randi() % (uint)pool.Count);
         playerPad = pool[playerIndex];
         pool.RemoveAt(playerIndex);
+        var assignedPlayerPad = playerPad;
+        pool.RemoveAll(candidate => candidate.DistanceTo(assignedPlayerPad) < MinPlayerHostileSeparationMeters);
 
         hostilePads = new List<Vector3>(HostileSquadTargetCount);
         while (hostilePads.Count < HostileSquadTargetCount && pool.Count > 0)

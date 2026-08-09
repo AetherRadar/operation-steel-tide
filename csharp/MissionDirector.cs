@@ -31,6 +31,7 @@ public partial class MissionDirector : Node
     private string _sessionId = string.Empty;
     private string _phase = "DEPLOYMENT";
     private float _deploymentRemaining = 12.0f;
+    private bool _deploymentProtectionActive = true;
     private bool _online;
     private int _lastReportedSecond = -1;
     private double _missionStartedAt;
@@ -78,12 +79,13 @@ public partial class MissionDirector : Node
         }
     }
 
-    public bool IsDeploymentProtected() => _phase == "DEPLOYMENT";
+    public bool IsDeploymentProtected() => _deploymentProtectionActive;
 
     public string CurrentPhase() => _phase;
 
 	public void ExitDeploymentZone()
 	{
+		_deploymentProtectionActive = false;
 		if (_phase == "DEPLOYMENT")
 		{
 			SetPhase("INFILTRATION");
@@ -107,7 +109,11 @@ public partial class MissionDirector : Node
         }
     }
 
-    public void BeginExtraction() => SetPhase("EXTRACTION");
+    public void BeginExtraction()
+    {
+        _deploymentProtectionActive = false;
+        SetPhase("EXTRACTION");
+    }
 
     public void AdvanceObjective()
     {
@@ -139,6 +145,7 @@ public partial class MissionDirector : Node
             return;
         }
         _resultSubmitted = true;
+        _deploymentProtectionActive = false;
         SetPhase(success ? "COMPLETE" : "FAILED");
         if (_online && !string.IsNullOrEmpty(_sessionId) && _backend is not null)
         {
