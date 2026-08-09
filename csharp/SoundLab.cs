@@ -129,4 +129,26 @@ public static class SoundLab
         }
         return MakeStream(samples, rate);
     }
+
+    public static AudioStreamWav ExtractionRotorLoop()
+    {
+        const int rate = 22050;
+        var samples = new float[rate];
+        var rng = new RandomNumberGenerator { Seed = 442109 };
+        var wash = 0.0f;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var t = (float)i / rate;
+            var bladePulse = Mathf.Pow(0.5f + 0.5f * Mathf.Sin(Mathf.Tau * 18.0f * t), 5.0f);
+            wash = Mathf.Lerp(wash, rng.RandfRange(-1.0f, 1.0f), 0.018f);
+            samples[i] = Mathf.Sin(Mathf.Tau * 54.0f * t) * 0.22f
+                + Mathf.Sin(Mathf.Tau * 108.0f * t) * 0.1f
+                + wash * (0.12f + bladePulse * 0.16f);
+        }
+        var stream = MakeStream(samples, rate);
+        stream.LoopMode = AudioStreamWav.LoopModeEnum.Forward;
+        stream.LoopBegin = 0;
+        stream.LoopEnd = samples.Length;
+        return stream;
+    }
 }

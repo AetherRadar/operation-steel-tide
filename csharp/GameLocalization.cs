@@ -222,6 +222,14 @@ public static class GameLocalization
         Chinese["extraction_unbanked"] = "\u64a4\u79bb\u4ef7\u503c\u672a\u5165\u8d26";
         Chinese["profile_balance"] = "\u4e0b\u5c40\u6574\u5907\u4f59\u989d";
         Chinese["profile_save_warning"] = "\u6863\u6848\u4fdd\u5b58\u5931\u8d25  //  \u4ef7\u503c\u672a\u5b58\u5165";
+        Chinese["extraction_unlocked"] = "\u64a4\u79bb\u5df2\u5f00\u653e  //  \u8fdb\u5165\u7eff\u8272\u533a\u57df\u5e76\u575a\u5b88 12 \u79d2";
+        Chinese["extraction_locked"] = "\u64a4\u79bb\u70b9\u672a\u542f\u7528  //  \u5148\u5b8c\u6210\u4efb\u52a1\u76ee\u6807";
+        Chinese["extraction_inbound"] = "\u53cb\u519b\u503e\u8f6c\u65cb\u7ffc\u673a\u6b63\u5728\u8fdb\u573a";
+        Chinese["extraction_boarding"] = "\u63a5\u5e94\u673a\u5df2\u5c31\u4f4d  //  \u51c6\u5907\u767b\u673a";
+        Chinese["extraction_hold"] = "\u7559\u5728\u64a4\u79bb\u533a\u5185  //  \u79bb\u5f00\u5c06\u91cd\u7f6e\u5012\u8ba1\u65f6";
+        Chinese["extraction_squad"] = "\u5c0f\u961f\u5c31\u4f4d";
+        Chinese["extraction_aborted"] = "\u64a4\u79bb\u4e2d\u65ad  //  \u8fd4\u56de\u7eff\u8272\u533a\u57df\u91cd\u65b0\u547c\u53eb";
+        Chinese["extraction_departing"] = "\u5c0f\u961f\u767b\u673a\u5b8c\u6bd5  //  \u6b63\u5728\u8131\u79bb\u4ea4\u6218\u533a";
     }
 
     private static readonly Dictionary<string, string> ChineseObjectives = new()

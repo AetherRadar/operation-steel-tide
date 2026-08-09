@@ -116,6 +116,7 @@ Godot_console.exe --path . -- --capture-optics
 Godot_console.exe --path . -- --validate-stance-armor
 Godot_console.exe --path . -- --capture-expanded-map
 Godot_console.exe --path . -- --capture-extraction
+Godot_console.exe --path . -- --validate-extraction-sequence
 Godot_console.exe --path . -- --validate-large-map
 Godot_console.exe --path . -- --validate-weapon-ui
 Godot_console.exe --path . -- --validate-arsenal
@@ -146,6 +147,8 @@ Godot_console.exe --headless --path . -- --validate-network-client
 ```
 
 `--validate-deployment-ui` verifies the full operator preview, four quick-kit presets, selected weapon, armor and ammunition grade, kit cost, and projected post-deployment balance.
+
+`--validate-extraction-sequence` verifies the locked objective gate, 12-second hold, leave-zone reset, aircraft arrival, boarding state, and mission completion. `--capture-extraction` renders the live countdown and landed rescue tilt-rotor at the seawall pad.
 
 `--capture-deployment` waits 14 real seconds at spawn and prints health, armor, ammo, and phase. `--capture-ads` captures the centered reflex sight. `--capture-reload` freezes the seven-stage reload while the fresh magazine is moving into the magwell. `--capture-operator` isolates the detailed enemy model. `--capture-zh` checks the Chinese HUD and settings menu. `--capture-backpack` validates the Chinese personal item grid, 3D gear previews, caliber ammunition, knife finishes, and weapon detail modal, while `--capture-optics` captures all optic models. `--validate-weapon-ui` verifies both cycle directions and detail opening. `--validate-arsenal` verifies the M24 and MP5A5 catalogs, separated rifle/sniper/SMG reserves, forced-semi sniper behavior, knife-finish replacement, and world drops. `--validate-loot` also verifies `F` closing and immediate movement restoration, alongside held-key gating, empty-source reopening, transfer, and weapon replacement. `--validate-corpse-loot` checks repeated body searches. `--validate-stance-armor` checks crouched ADS leaning, prone height, hit regions, and equipment durability. `--capture-expanded-map` captures the complete 340 m x 320 m district and prints dimensions, enemy count, nine loot sources, extraction distance, sky state, cover-point count, residential towers, and civilians. `--capture-extraction` captures the unlocked seawall beacon and pad. `--validate-large-map` checks all six industrial districts, the remote extraction distance, marker unlock, and actual Area3D mission completion. `--validate-objectives` drives both terminals and verifies that C# enters `EXTRACTION` only after both operations complete. `--validate-reinforcements` forces confirmed combat and verifies the delayed QRF wave. `--validate-equipment` checks plating, fire mode, and weapon light state changes.
 

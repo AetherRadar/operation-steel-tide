@@ -460,6 +460,7 @@ public partial class CombatHUD : CanvasLayer
         BuildIncomingDamageHud(root);
         BuildMedicalHud(root);
         BuildTacticalHud(root);
+        BuildExtractionHud(root);
         _stateOverlay = new ColorRect
         {
             Color = new Color(0.005f, 0.009f, 0.011f, 0.86f),
@@ -1230,6 +1231,7 @@ public partial class CombatHUD : CanvasLayer
         RefreshSquadLanguage();
         RefreshMedicalLanguage();
         RefreshTacticalLanguage();
+        RefreshExtractionLanguage();
         RefreshLootOverlay();
         if (IsWeaponDetailVisible && _detailedWeapon is not null)
         {

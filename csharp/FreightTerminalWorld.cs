@@ -245,6 +245,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateExtractRank();
         }
+        else if (Array.Exists(args, value => value == "--validate-extraction-sequence"))
+        {
+            ValidateExtractionSequence();
+        }
         else if (Array.Exists(args, value => value == "--validate-tactical-hud"))
         {
             ValidateTacticalHud();
@@ -371,14 +375,20 @@ public partial class FreightTerminalWorld : Node3D
     public override void _Process(double delta)
     {
         UpdateSquad((float)delta);
+        UpdateExtractionSequence((float)delta);
         if (IsInstanceValid(_extractionMarker))
         {
             _extractionMarker.RotateY((float)delta * 0.35f);
-            var pulse = 1.0f + Mathf.Sin(Time.GetTicksMsec() * 0.003f) * 0.06f;
+            var baseScale = _missionPhase == "EXTRACTION" ? 1.12f : 0.94f;
+            if (IsExtractionCountdownActive)
+            {
+                baseScale = 1.24f;
+            }
+            var pulse = baseScale + Mathf.Sin(Time.GetTicksMsec() * 0.003f) * 0.06f;
             _extractionMarker.Scale = new Vector3(pulse, 1.0f, pulse);
         }
 
-        if (_missionEnded && Input.IsKeyPressed(Key.Enter))
+        if (_missionEnded && !IsExtractionDeparturePlaying && Input.IsKeyPressed(Key.Enter))
         {
             GetTree().ReloadCurrentScene();
             return;
@@ -484,6 +494,13 @@ public partial class FreightTerminalWorld : Node3D
             _extractionMarker.Scale = extractionAvailable
                 ? new Vector3(1.15f, 1.15f, 1.15f)
                 : Vector3.One;
+        }
+        if (extractionAvailable)
+        {
+            _hud.ShowLocalizedMessage(
+                "extraction_unlocked",
+                "EXTRACTION OPEN  //  ENTER THE GREEN ZONE AND HOLD FOR 12 SECONDS",
+                new Color(0.3f, 1.0f, 0.68f));
         }
     }
 
@@ -1466,17 +1483,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OnExtractionEntered(Node3D body)
     {
-        if (body != _player || _objectiveStage < _objectiveTerminals.Count || _missionEnded)
-        {
-            return;
-        }
-        _missionEnded = true;
-        _player.IsDead = true;
-        Input.MouseMode = Input.MouseModeEnum.Visible;
-        _missionDirector.CompleteMission(true, _kills, _headshots, _shotsFired, _shotsHit);
-        var ranks = BuildExtractionLootRanking();
-        var progression = CommitExtractionValue();
-        _hud.ShowResult(true, ranks, progression.ExtractedValue, progression.Wallet, progression.Saved);
+        TryBeginExtractionSequence(body);
     }
 
     /// <summary>
@@ -2068,6 +2075,20 @@ public partial class FreightTerminalWorld : Node3D
         foreach (var enemy in _enemies)
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        foreach (var squad in _hostileSquads)
+        {
+            foreach (var member in squad.Members)
+            {
+                if (IsInstanceValid(member))
+                {
+                    member.ProcessMode = ProcessModeEnum.Disabled;
+                }
+            }
+        }
+        if (IsInstanceValid(_aircraft))
+        {
+            _aircraft.SetPhysicsProcess(false);
         }
         _missionDirector.ExitDeploymentZone();
         for (var targetStage = 0; targetStage < _objectiveTerminals.Count; targetStage++)
@@ -3630,17 +3651,36 @@ public partial class FreightTerminalWorld : Node3D
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
         }
+        foreach (var squad in _hostileSquads)
+        {
+            foreach (var member in squad.Members)
+            {
+                if (IsInstanceValid(member))
+                {
+                    member.ProcessMode = ProcessModeEnum.Disabled;
+                }
+            }
+        }
+        if (IsInstanceValid(_aircraft))
+        {
+            _aircraft.SetPhysicsProcess(false);
+        }
         _missionDirector.ExitDeploymentZone();
         while (_objectiveStage < _objectiveTerminals.Count)
         {
             _missionDirector.AdvanceObjective();
         }
         await WaitFrames(4);
-        _player.GlobalPosition = ExtractionPoint + new Vector3(0, 0.12f, 18.0f);
-        _player.Rotation = Vector3.Zero;
-        await WaitFrames(48);
+        _hud.SetLanguage("zh");
+        _player.GlobalPosition = ExtractionPoint + new Vector3(-4.5f, 0.12f, 5.0f);
+        _player.Rotation = new Vector3(0, -0.48f, 0);
+        TryBeginExtractionSequence(_player);
+        _extractionAircraft?.ForceBoardingReadyForValidation();
+        _extractionRemaining = 5.8f;
+        UpdateExtractionHud();
+        await WaitFrames(18);
         SaveViewportImage("res://extraction_validation.png");
-        GD.Print($"EXTRACTION_CAPTURE position={ExtractionPoint} radius=7 beacon={_extractionMarker.Visible}");
+        GD.Print($"EXTRACTION_CAPTURE position={ExtractionPoint} radius=7 beacon={_extractionMarker.Visible} countdown={_extractionRemaining:0.0} aircraft={_extractionAircraft?.Phase}");
         GetTree().Quit();
     }
 
@@ -3649,6 +3689,20 @@ public partial class FreightTerminalWorld : Node3D
         foreach (var enemy in _enemies)
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        foreach (var squad in _hostileSquads)
+        {
+            foreach (var member in squad.Members)
+            {
+                if (IsInstanceValid(member))
+                {
+                    member.ProcessMode = ProcessModeEnum.Disabled;
+                }
+            }
+        }
+        if (IsInstanceValid(_aircraft))
+        {
+            _aircraft.SetPhysicsProcess(false);
         }
         var districtNames = new[]
         {
@@ -3686,14 +3740,20 @@ public partial class FreightTerminalWorld : Node3D
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
 
+        var areaStarted = _extractionCountdownActive;
+        _skipExtractionCinematicForValidation = true;
+        _extractionAircraft?.ForceBoardingReadyForValidation();
+        UpdateExtractionSequence(ExtractionCountdownDuration + 0.2f);
+        await WaitFrames(1);
         var completed = _missionEnded && _missionPhase == "COMPLETE";
         // Edge player pads → center extract is still a long run; beacon is always visible.
         var valid = districtsPresent == districtNames.Length
             && extractionDistance > 80.0f
             && _extractionMarker.Visible
             && extractionUnlocked
+            && areaStarted
             && completed;
-        GD.Print($"LARGE_MAP_CHECK valid={valid} size={MapWidthMeters:0}x{MapDepthMeters:0} districts={districtsPresent}/{districtNames.Length} extraction_distance={extractionDistance:0.0} hidden={markerInitiallyHidden} unlocked={extractionUnlocked} completed={completed}");
+        GD.Print($"LARGE_MAP_CHECK valid={valid} size={MapWidthMeters:0}x{MapDepthMeters:0} districts={districtsPresent}/{districtNames.Length} extraction_distance={extractionDistance:0.0} hidden={markerInitiallyHidden} unlocked={extractionUnlocked} area_started={areaStarted} completed={completed}");
         if (!valid)
         {
             GD.PushError("Large map validation failed.");

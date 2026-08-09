@@ -962,6 +962,7 @@ public partial class FreightTerminalWorld
             Shape = new CylinderShape3D { Radius = 7.0f, Height = 2.0f }
         });
         _extractionArea.BodyEntered += OnExtractionEntered;
+        _extractionArea.BodyExited += OnExtractionExited;
         site.AddChild(_extractionArea);
 
         var markerMaterial = new StandardMaterial3D
@@ -1023,6 +1024,7 @@ public partial class FreightTerminalWorld
         });
         ExpansionBox(site, "BeaconEquipmentShelter", new Vector3(-12.0f, 1.4f, 3.5f), new Vector3(4.6f, 2.8f, 5.6f), steel);
         MeshBox(site, new Vector3(-9.66f, 1.55f, 3.5f), new Vector3(0.05f, 1.55f, 2.6f), yellow);
+        BuildExtractionAircraft();
     }
 
     private StaticBody3D ExpansionBox(
