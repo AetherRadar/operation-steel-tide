@@ -4,13 +4,21 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    private readonly record struct ComplexLootPlacement(
+        Vector3 Position,
+        LootGrade Grade,
+        string EnglishName,
+        string ChineseName);
+
     private int _complexBuildingCount;
     private int _complexInteriorPropCount;
     private int _complexRoomCount;
+    private readonly System.Collections.Generic.List<ComplexLootPlacement> _complexLootPlacements = new();
 
     public int ComplexBuildingCount => _complexBuildingCount;
     public int ComplexInteriorPropCount => _complexInteriorPropCount;
     public int ComplexRoomCount => _complexRoomCount;
+    public int ComplexRoomLootCount => _complexLootPlacements.Count;
 
     private StandardMaterial3D ExpansionPbrMaterial(
         string id,
@@ -83,6 +91,7 @@ public partial class FreightTerminalWorld
         Godot.Material corrugated,
         Godot.Material rust)
     {
+        _complexLootPlacements.Clear();
         var wood = Mat("complex_wood", new Color(0.28f, 0.18f, 0.1f), 0.05f, 0.82f);
         var interior = Mat("complex_interior", new Color(0.48f, 0.5f, 0.46f), 0.02f, 0.9f);
         var glass = Mat("complex_glass", new Color(0.08f, 0.18f, 0.2f, 0.35f), 0.2f, 0.12f);
@@ -259,6 +268,17 @@ public partial class FreightTerminalWorld
                     MeshBox(root, new Vector3(cx, y0 + wallHeight - 0.25f, cz), new Vector3(1.4f, 0.05f, 0.2f), accent);
                     // Skip per-room lights (FPS).
                     _complexInteriorPropCount += 4;
+                    var lootGrade = (ix + iz + floor) % 5 == 0
+                        ? LootGrade.Rare
+                        : (ix + iz + floor) % 2 == 0 ? LootGrade.Uncommon : LootGrade.Common;
+                    var lootPosition = ix == 0 && iz > 0
+                        ? center + new Vector3(cx, y0 + 0.2f, cz)
+                        : center + new Vector3(cx - cellW * 0.18f, y0 + 0.52f, cz + cellD * 0.12f);
+                    _complexLootPlacements.Add(new ComplexLootPlacement(
+                        lootPosition,
+                        lootGrade,
+                        $"{name.Replace("Complex", string.Empty)} room supply",
+                        GameLocalization.Get("loot_complex_room", "zh", "Building room supply")));
                     root.AddChild(new Label3D
                     {
                         Position = new Vector3(cx, y0 + 1.7f, cz + cellD * 0.35f),
@@ -377,6 +397,21 @@ public partial class FreightTerminalWorld
                 steel);
         }
         _complexRoomCount += 4;
+        var hangarLoot = new[]
+        {
+            center + new Vector3(-10.5f, 0.2f, 9.1f),
+            center + new Vector3(10.0f, 0.2f, 10.2f),
+            center + new Vector3(9.8f, 3.82f, -12.2f),
+            center + new Vector3(-6.0f, 0.2f, 4.35f)
+        };
+        for (var index = 0; index < hangarLoot.Length; index++)
+        {
+            _complexLootPlacements.Add(new ComplexLootPlacement(
+                hangarLoot[index],
+                index == 2 ? LootGrade.Rare : LootGrade.Uncommon,
+                $"Hangar bay supply {index + 1}",
+                GameLocalization.Get("loot_hangar_bay", "zh", "Hangar bay supply")));
+        }
         _complexInteriorPropCount += 8 + hangarSteps;
         _complexBuildingCount++;
     }

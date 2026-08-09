@@ -286,6 +286,20 @@ public static class GameLocalization
         Chinese["backpack_storage"] = "\u80cc\u5305\u50a8\u7269\u683c";
         Chinese["drop_to_ground"] = "\u4e22\u5230\u5730\u9762";
         Chinese["active_loadout"] = "\u5f53\u524d\u6574\u5907";
+        Chinese["loot_complex_room"] = "\u5efa\u7b51\u5185\u8865\u7ed9";
+        Chinese["loot_hangar_bay"] = "\u673a\u5e93\u5de5\u4f4d\u8865\u7ed9";
+        Chinese["loot_rail_dispatch"] = "\u94c1\u8def\u8c03\u5ea6\u8865\u7ed9";
+        Chinese["loot_rail_manifest"] = "\u94c1\u8def\u8fd0\u5355\u5305";
+        Chinese["loot_rail_tool"] = "\u94c1\u8def\u5de5\u5177\u7bb1";
+        Chinese["loot_maintenance_bench"] = "\u7ef4\u4fee\u53f0\u5de5\u5177";
+        Chinese["loot_repair_bay"] = "\u7ef4\u4fee\u5de5\u4f4d\u8865\u7ed9";
+        Chinese["loot_tank_valve"] = "\u6cb9\u7f50\u9600\u95e8\u5de5\u5177";
+        Chinese["loot_tank_bund"] = "\u6cb9\u7f50\u533a\u8865\u7ed9";
+        Chinese["loot_seawall_shelter"] = "\u6d77\u5824\u503c\u5b88\u8865\u7ed9";
+        Chinese["loot_quay_rigging"] = "\u7801\u5934\u7d22\u5177\u7bb1";
+        Chinese["loot_quay_service"] = "\u7801\u5934\u7ef4\u62a4\u8865\u7ed9";
+        Chinese["loot_container_seal"] = "\u96c6\u88c5\u7bb1\u5c01\u6761\u5305";
+        Chinese["loot_overflow_tool"] = "\u6ea2\u51fa\u8d27\u573a\u5de5\u5177\u7bb1";
     }
 
     private static readonly Dictionary<string, string> ChineseObjectives = new()

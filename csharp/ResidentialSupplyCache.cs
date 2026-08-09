@@ -17,6 +17,8 @@ public enum ResidentialCacheKind
 [GlobalClass]
 public partial class ResidentialSupplyCache : StaticBody3D, ILootSource
 {
+    private static readonly Dictionary<Vector3, BoxMesh> SharedBoxMeshes = new();
+
     public ResidentialCacheKind Kind { get; private set; }
     public int TowerIndex { get; private set; }
     public int FloorIndex { get; private set; }
@@ -113,8 +115,8 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource
         var shell = Material(accent * 0.62f, 0.42f, 0.58f);
         var trim = Material(new Color(0.055f, 0.065f, 0.062f), 0.75f, 0.34f);
         var glow = Material(accent, 0.08f, 0.32f, true);
-        Part(this, new BoxMesh { Size = size }, center, shell);
-        Part(this, new BoxMesh { Size = new Vector3(size.X + 0.05f, 0.07f, size.Z + 0.04f) }, new Vector3(0, size.Y + 0.02f, 0), trim);
+        Part(this, SharedBox(size), center, shell);
+        Part(this, SharedBox(new Vector3(size.X + 0.05f, 0.07f, size.Z + 0.04f)), new Vector3(0, size.Y + 0.02f, 0), trim);
 
         _door = new Node3D
         {
@@ -124,23 +126,23 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource
         AddChild(_door);
         Part(
             _door,
-            new BoxMesh { Size = new Vector3(size.X - 0.08f, size.Y - 0.1f, 0.055f) },
+            SharedBox(new Vector3(size.X - 0.08f, size.Y - 0.1f, 0.055f)),
             new Vector3(size.X * 0.5f, 0, 0),
             shell);
         Part(
             _door,
-            new BoxMesh { Size = new Vector3(0.12f, 0.18f, 0.07f) },
+            SharedBox(new Vector3(0.12f, 0.18f, 0.07f)),
             new Vector3(size.X - 0.17f, 0, -0.03f),
             trim);
 
         if (Kind == ResidentialCacheKind.MedicalCabinet)
         {
-            Part(_door, new BoxMesh { Size = new Vector3(0.38f, 0.08f, 0.065f) }, new Vector3(size.X * 0.5f, 0, -0.04f), glow);
-            Part(_door, new BoxMesh { Size = new Vector3(0.08f, 0.38f, 0.065f) }, new Vector3(size.X * 0.5f, 0, -0.045f), glow);
+            Part(_door, SharedBox(new Vector3(0.38f, 0.08f, 0.065f)), new Vector3(size.X * 0.5f, 0, -0.04f), glow);
+            Part(_door, SharedBox(new Vector3(0.08f, 0.38f, 0.065f)), new Vector3(size.X * 0.5f, 0, -0.045f), glow);
         }
         else
         {
-            Part(_door, new BoxMesh { Size = new Vector3(size.X * 0.58f, 0.08f, 0.065f) }, new Vector3(size.X * 0.5f, size.Y * 0.2f, -0.04f), glow);
+            Part(_door, SharedBox(new Vector3(size.X * 0.58f, 0.08f, 0.065f)), new Vector3(size.X * 0.5f, size.Y * 0.2f, -0.04f), glow);
         }
 
         AddChild(new Label3D
@@ -176,6 +178,16 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource
             Emission = emission ? color : Colors.Black,
             EmissionEnergyMultiplier = emission ? 1.35f : 1.0f
         };
+    }
+
+    private static BoxMesh SharedBox(Vector3 size)
+    {
+        if (!SharedBoxMeshes.TryGetValue(size, out var mesh))
+        {
+            mesh = new BoxMesh { Size = size };
+            SharedBoxMeshes[size] = mesh;
+        }
+        return mesh;
     }
 
     private MeshInstance3D Part(Node parent, PrimitiveMesh mesh, Vector3 position, Godot.Material material)

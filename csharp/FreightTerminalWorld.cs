@@ -90,6 +90,8 @@ public partial class FreightTerminalWorld : Node3D
     private int _reinforcementThreshold = 70;
     private int _nextEnemyNetworkId;
     private int _nextDroppedLootId = 1;
+    private const int FixedBuildingLootPlacementCount = 27;
+    private int _buildingLootPickupCount;
     private float _threatLevel;
     private float _reinforcementCountdown;
     private bool _reinforcementPending;
@@ -219,6 +221,10 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--validate-map-density"))
         {
             ValidateMapDensity();
+        }
+        else if (Array.Exists(args, value => value == "--validate-district-network"))
+        {
+            ValidateDistrictNetwork();
         }
         else if (Array.Exists(args, value => value == "--validate-special-landmarks"))
         {
@@ -1049,6 +1055,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SpawnBuildingGradedLoot()
     {
+        _buildingLootPickupCount = 0;
         // Interior caches inside complex buildings + residential lobbies (glowing graded pickups).
         var spots = new (Vector3 Pos, LootGrade Grade, string En, string Zh)[]
         {
@@ -1068,14 +1075,51 @@ public partial class FreightTerminalWorld : Node3D
             (new Vector3(-82, 0.2f, 75), LootGrade.Common, "Courtyard supply", "庭院补给"),
             (new Vector3(35, 0.2f, 77), LootGrade.Legendary, "VIP residential case", "高档住宅箱")
         };
-        foreach (var spot in spots)
+        var districtSpots = new (Vector3 Pos, LootGrade Grade, string En, string Zh)[]
+        {
+            (new Vector3(-93.3f, 0.82f, -68.2f), LootGrade.Uncommon, "Rail dispatch cache", GameLocalization.Get("loot_rail_dispatch", "zh", "Rail dispatch cache")),
+            (new Vector3(-88.5f, 0.2f, -96.0f), LootGrade.Common, "Rail manifest pouch", GameLocalization.Get("loot_rail_manifest", "zh", "Rail manifest pouch")),
+            (new Vector3(-72.5f, 0.2f, -121.0f), LootGrade.Uncommon, "Rail tool bin", GameLocalization.Get("loot_rail_tool", "zh", "Rail tool bin")),
+            (new Vector3(16.0f, 0.96f, -99.0f), LootGrade.Uncommon, "Maintenance bench kit", GameLocalization.Get("loot_maintenance_bench", "zh", "Maintenance bench kit")),
+            (new Vector3(34.0f, 0.2f, -96.5f), LootGrade.Common, "Repair bay supply", GameLocalization.Get("loot_repair_bay", "zh", "Repair bay supply")),
+            (new Vector3(73.0f, 0.2f, -75.0f), LootGrade.Uncommon, "Tank valve kit", GameLocalization.Get("loot_tank_valve", "zh", "Tank valve kit")),
+            (new Vector3(73.0f, 0.2f, -108.0f), LootGrade.Common, "Tank bund cache", GameLocalization.Get("loot_tank_bund", "zh", "Tank bund cache")),
+            (new Vector3(44.0f, 0.22f, -145.0f), LootGrade.Uncommon, "Seawall shelter stock", GameLocalization.Get("loot_seawall_shelter", "zh", "Seawall shelter stock")),
+            (new Vector3(55.0f, 0.2f, -149.0f), LootGrade.Common, "Quay rigging kit", GameLocalization.Get("loot_quay_rigging", "zh", "Quay rigging kit")),
+            (new Vector3(80.0f, 0.2f, -148.0f), LootGrade.Uncommon, "Quay service cache", GameLocalization.Get("loot_quay_service", "zh", "Quay service cache")),
+            (new Vector3(-22.0f, 0.2f, -10.0f), LootGrade.Common, "Container seal stash", GameLocalization.Get("loot_container_seal", "zh", "Container seal stash")),
+            (new Vector3(-84.0f, 0.2f, 10.0f), LootGrade.Uncommon, "Overflow yard toolbox", GameLocalization.Get("loot_overflow_tool", "zh", "Overflow yard toolbox"))
+        };
+        var lootIndex = 0;
+        foreach (var spot in spots.Concat(districtSpots))
         {
             var item = CreateGradedLootItem(spot.Grade);
-            var pickup = new GradedLootPickup { Position = spot.Pos };
+            var pickup = new GradedLootPickup
+            {
+                Name = $"BuildingLoot_{++lootIndex:000}",
+                Position = spot.Pos
+            };
             pickup.Configure(item, spot.En, spot.Zh);
             AddChild(pickup);
             _lootSources.Add(pickup);
             _lootWorldPoints.Add(spot.Pos);
+            _buildingLootPickupCount++;
+        }
+        foreach (var placement in _complexLootPlacements)
+        {
+            var pickup = new GradedLootPickup
+            {
+                Name = $"BuildingLoot_{++lootIndex:000}",
+                Position = placement.Position
+            };
+            pickup.Configure(
+                CreateGradedLootItem(placement.Grade),
+                placement.EnglishName,
+                placement.ChineseName);
+            AddChild(pickup);
+            _lootSources.Add(pickup);
+            _lootWorldPoints.Add(placement.Position);
+            _buildingLootPickupCount++;
         }
     }
 
@@ -1306,6 +1350,10 @@ public partial class FreightTerminalWorld : Node3D
         var bestDist = range * range;
         foreach (var point in _lootWorldPoints)
         {
+            if (Mathf.Abs(point.Y - origin.Y) > 2.4f)
+            {
+                continue;
+            }
             var d = origin.DistanceSquaredTo(point);
             if (d < bestDist)
             {
@@ -1319,6 +1367,10 @@ public partial class FreightTerminalWorld : Node3D
             {
                 continue;
             }
+            if (Mathf.Abs(source.LootNode.GlobalPosition.Y - origin.Y) > 2.4f)
+            {
+                continue;
+            }
             var d = origin.DistanceSquaredTo(source.LootNode.GlobalPosition);
             if (d < bestDist)
             {
@@ -1327,6 +1379,78 @@ public partial class FreightTerminalWorld : Node3D
             }
         }
         return best;
+    }
+
+    private bool HasClearLootInteractionApproach(ILootSource source)
+    {
+        if (!source.IsSearchable || !IsInstanceValid(source.LootNode))
+        {
+            return false;
+        }
+
+        var space = GetWorld3D().DirectSpaceState;
+        var target = source.LootNode.GlobalPosition + Vector3.Up * 0.28f;
+        var playerShape = new CapsuleShape3D { Radius = 0.38f, Height = 1.75f };
+        var clearanceExclude = new Godot.Collections.Array<Rid>();
+        if (source.LootNode is CollisionObject3D collisionSource)
+        {
+            clearanceExclude.Add(collisionSource.GetRid());
+        }
+        var approachDirections = new[]
+        {
+            Vector3.Left,
+            Vector3.Right,
+            Vector3.Forward,
+            Vector3.Back,
+            (Vector3.Left + Vector3.Forward).Normalized(),
+            (Vector3.Left + Vector3.Back).Normalized(),
+            (Vector3.Right + Vector3.Forward).Normalized(),
+            (Vector3.Right + Vector3.Back).Normalized()
+        };
+        foreach (var approachDistance in new[] { 1.25f, 1.75f, 2.3f })
+        {
+            foreach (var direction in approachDirections)
+            {
+                var approach = source.LootNode.GlobalPosition + direction * approachDistance;
+                var floorQuery = PhysicsRayQueryParameters3D.Create(
+                    approach + Vector3.Up * 2.2f,
+                    approach + Vector3.Down * 2.2f);
+                floorQuery.CollisionMask = 1;
+                floorQuery.CollideWithAreas = false;
+                var floorHit = space.IntersectRay(floorQuery);
+                if (floorHit.Count == 0 || floorHit["normal"].AsVector3().Dot(Vector3.Up) < 0.65f)
+                {
+                    continue;
+                }
+
+                var feet = floorHit["position"].AsVector3() + Vector3.Up * 0.03f;
+                var clearanceQuery = new PhysicsShapeQueryParameters3D
+                {
+                    Shape = playerShape,
+                    Transform = new Transform3D(Basis.Identity, feet + Vector3.Up * 0.88f),
+                    CollisionMask = 1,
+                    CollideWithBodies = true,
+                    CollideWithAreas = false,
+                    Exclude = clearanceExclude
+                };
+                if (space.IntersectShape(clearanceQuery, 1).Count > 0)
+                {
+                    continue;
+                }
+
+                var sightQuery = PhysicsRayQueryParameters3D.Create(
+                    target + direction * approachDistance,
+                    target);
+                sightQuery.CollisionMask = 1;
+                sightQuery.CollideWithAreas = false;
+                var sightHit = space.IntersectRay(sightQuery);
+                if (sightHit.Count > 0 && sightHit["collider"].AsGodotObject() == source.LootNode)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /// <summary>
@@ -1347,6 +1471,10 @@ public partial class FreightTerminalWorld : Node3D
             {
                 continue;
             }
+            if (Mathf.Abs(pickup.GlobalPosition.Y - origin.Y) > 2.4f)
+            {
+                continue;
+            }
             var d = origin.DistanceSquaredTo(pickup.GlobalPosition);
             if (d < bestDist)
             {
@@ -1361,6 +1489,10 @@ public partial class FreightTerminalWorld : Node3D
                 continue;
             }
             if (!source.Loot.Exists(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null))
+            {
+                continue;
+            }
+            if (Mathf.Abs(source.LootNode.GlobalPosition.Y - origin.Y) > 2.4f)
             {
                 continue;
             }
@@ -2934,6 +3066,19 @@ public partial class FreightTerminalWorld : Node3D
         await WaitFrames(22);
         SaveViewportImage("res://cover_density_validation.png");
 
+        overview.GlobalPosition = new Vector3(-18.0f, 58.0f, 28.0f);
+        overview.Fov = 64.0f;
+        overview.LookAt(new Vector3(2.0f, 5.0f, -68.0f), Vector3.Up);
+        await WaitFrames(22);
+        SaveViewportImage("res://district_network_validation.png");
+
+        var stairHub = _districtRouteHubs.First(hub => hub.Id == "OpsGate");
+        overview.GlobalPosition = new Vector3(59.0f, 8.2f, -24.0f);
+        overview.Fov = 54.0f;
+        overview.LookAt((stairHub.StairStart + stairHub.DeckCenter) * 0.5f + Vector3.Up * 0.35f, Vector3.Up);
+        await WaitFrames(22);
+        SaveViewportImage("res://district_stair_validation.png");
+
         var landmarksPresent = _levelRoot.GetNodeOrNull<Node3D>("CommandCore") is not null
             && _levelRoot.GetNodeOrNull<Node3D>("RadarFoundation") is not null;
         var aircraftMoving = aircraft is not null && aircraft.Position.DistanceTo(aircraftStart) > 0.1f;
@@ -3018,19 +3163,41 @@ public partial class FreightTerminalWorld : Node3D
         var ops = _levelRoot.GetNodeOrNull<Node3D>("OpsAnnexComplex") is not null;
         var fuel = _levelRoot.GetNodeOrNull<Node3D>("FuelLogisticsHall") is not null;
         var quay = _levelRoot.GetNodeOrNull<Node3D>("QuayBondedStorage") is not null;
-        var hangarEnriched = _levelRoot.GetNodeOrNull("MaintenanceDistrict/HangarOfficeFloor") is not null
-            || (_levelRoot.GetNodeOrNull<Node3D>("MaintenanceDistrict")?.FindChild("HangarOfficeFloor", true, false) is not null);
+        var hangarEnriched = _levelRoot.GetNodeOrNull("MaintenanceDistrict/HangarOfficeFloor_E") is not null
+            || (_levelRoot.GetNodeOrNull<Node3D>("MaintenanceDistrict")?.FindChild("HangarOfficeFloor_E", true, false) is not null);
         var specialLandmarks = SpecialLandmarkCount == 4
             && SpecialLandmarkLootCount >= 28
             && SpecialLandmarkVerticalRouteCount >= 5;
+        var buildingLootReachable = 0;
+        var unreachableBuildingLoot = new List<string>();
+        foreach (var pickup in _lootSources.OfType<GradedLootPickup>())
+        {
+            if (!pickup.Name.ToString().StartsWith("BuildingLoot_", StringComparison.Ordinal))
+            {
+                continue;
+            }
+            if (HasClearLootInteractionApproach(pickup))
+            {
+                buildingLootReachable++;
+            }
+            else
+            {
+                unreachableBuildingLoot.Add(
+                    $"{pickup.Name}@({pickup.GlobalPosition.X:0.0},{pickup.GlobalPosition.Y:0.0},{pickup.GlobalPosition.Z:0.0})");
+            }
+        }
         // Baseline: need multiple large complexes and interior density above empty-shell thresholds.
         var valid = ComplexBuildingCount >= 5
             && ComplexRoomCount >= 12
             && ComplexInteriorPropCount >= 40
+            && ComplexRoomLootCount >= ComplexRoomCount
+            && _buildingLootPickupCount >= ComplexRoomCount + FixedBuildingLootPlacementCount
+            && buildingLootReachable == _buildingLootPickupCount
             && customs && ops && fuel && quay
+            && hangarEnriched
             && ResidentialTowerCount >= 11
             && specialLandmarks;
-        GD.Print($"MAP_DENSITY_CHECK valid={valid} buildings={ComplexBuildingCount} rooms={ComplexRoomCount} props={ComplexInteriorPropCount} customs={customs} ops={ops} fuel={fuel} quay={quay} hangar={hangarEnriched} towers={ResidentialTowerCount} special_landmarks={SpecialLandmarkCount} special_loot={SpecialLandmarkLootCount} vertical_routes={SpecialLandmarkVerticalRouteCount}");
+        GD.Print($"MAP_DENSITY_CHECK valid={valid} buildings={ComplexBuildingCount} rooms={ComplexRoomCount} room_loot={ComplexRoomLootCount}/{ComplexRoomCount} building_loot={_buildingLootPickupCount}/{ComplexRoomCount + FixedBuildingLootPlacementCount} reachable_loot={buildingLootReachable}/{_buildingLootPickupCount} unreachable={string.Join(';', unreachableBuildingLoot)} props={ComplexInteriorPropCount} customs={customs} ops={ops} fuel={fuel} quay={quay} hangar={hangarEnriched} towers={ResidentialTowerCount} special_landmarks={SpecialLandmarkCount} special_loot={SpecialLandmarkLootCount} vertical_routes={SpecialLandmarkVerticalRouteCount}");
         GD.Print($"MAP_DENSITY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

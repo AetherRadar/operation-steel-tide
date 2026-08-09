@@ -372,7 +372,7 @@ public partial class FreightTerminalWorld
             var eastSlot = linkSlots is not null && linkSlots.TryGetValue(0, out var eastLink) && eastLink.Floors.Contains(floor) ? eastLink : null;
             BuildTowerFloorShell(tower, spec, floor, floorY, facade, glassField, spec.Accent, westSlot, eastSlot);
             BuildTowerInterior(tower, spec, index, floor, floorY, stairCoreZ, interiorWall, wood, bedding, warmLight, westSlot, eastSlot);
-            BuildTowerStairs(tower, floor, floorY, stairCoreZ, stair, trim, warmLight);
+            BuildTowerStairs(tower, floor, floorY, stairCoreZ, stair, warmLight);
             BuildTowerStairDetails(tower, spec, index, floor, floorY, stairCoreZ, trim, warmLight);
             _residentialFloorCount++;
         }
@@ -590,7 +590,7 @@ public partial class FreightTerminalWorld
             {
                 BuildResidentialRoomTheme(tower, archetype, roomX, side, roomWidth, depth, floorY);
             }
-            if (side > 0.0f && featuredFloor)
+            if (side > 0.0f)
             {
                 SpawnResidentialCache(
                     tower,
@@ -910,7 +910,6 @@ public partial class FreightTerminalWorld
         float floorY,
         float coreZ,
         Godot.Material stair,
-        Godot.Material rail,
         Godot.Material light)
     {
         // Keep discrete treads for capsule and ballistic collisions, but register them on one
@@ -1015,13 +1014,6 @@ public partial class FreightTerminalWorld
         AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftSW_F{floor}", new Vector3(-(shaftDoorHalf + shaftSideWidth * 0.5f), floorY + 0.1f + 1.275f, upperStartZ + 0.45f), new Vector3(shaftSideWidth, 2.55f, 0.12f), stair);
         AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftSE_F{floor}", new Vector3(shaftDoorHalf + shaftSideWidth * 0.5f, floorY + 0.1f + 1.275f, upperStartZ + 0.45f), new Vector3(shaftSideWidth, 2.55f, 0.12f), stair);
         AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftSH_F{floor}", new Vector3(0, floorY + 0.1f + 2.55f + (ResidentialFloorHeight - 2.55f) * 0.5f, upperStartZ + 0.45f), new Vector3(shaftDoorHalf * 2.0f, Mathf.Max(0.12f, ResidentialFloorHeight - 2.55f), 0.12f), stair);
-        var landingRail = MeshBox(
-            tower,
-            new Vector3(0, floorY + halfRise + 0.95f, landingNorthZ + 0.08f),
-            new Vector3(5.0f, 0.08f, 0.08f),
-            rail);
-        landingRail.Name = $"ResidentialStairLandingRail_F{floor}";
-        RegisterMapDetailVisual(landingRail);
         var landingLight = MeshBox(tower, new Vector3(0, floorY + halfRise + 1.35f, landingNorthZ + 0.08f), new Vector3(1.8f, 0.04f, 0.16f), light);
         landingLight.Name = $"ResidentialStairLandingLight_F{floor}";
         RegisterMapDetailVisual(landingLight);
@@ -1330,17 +1322,24 @@ public partial class FreightTerminalWorld
         }
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
 
-        var expectedCaches = ResidentialTowerSpecs.Length * 3;
+        var expectedCaches = ResidentialTowerSpecs.Sum(spec => spec.Floors);
         var cacheKinds = new HashSet<ResidentialCacheKind>();
         var lootKinds = new HashSet<LootItemKind>();
+        var stockedFloors = new HashSet<(int Tower, int Floor)>();
         var everyCacheHasMedicine = true;
         var cachesRegistered = true;
         var cachesStocked = true;
+        var reachableCaches = 0;
         foreach (var cache in _residentialCaches)
         {
             cacheKinds.Add(cache.Kind);
+            stockedFloors.Add((cache.TowerIndex, cache.FloorIndex));
             cachesRegistered &= _lootSources.Contains(cache) && IsInstanceValid(cache);
             cachesStocked &= cache.IsSearchable && cache.Loot.Count >= 2;
+            if (HasClearLootInteractionApproach(cache))
+            {
+                reachableCaches++;
+            }
             var cacheHasMedicine = false;
             foreach (var item in cache.Loot)
             {
@@ -1350,10 +1349,19 @@ public partial class FreightTerminalWorld
             everyCacheHasMedicine &= cacheHasMedicine;
         }
         var everyTowerStocked = true;
-        foreach (var count in _residentialCacheCountByTower)
+        for (var towerIndex = 0; towerIndex < _residentialCacheCountByTower.Length; towerIndex++)
         {
-            everyTowerStocked &= count == 3;
+            everyTowerStocked &= _residentialCacheCountByTower[towerIndex] == ResidentialTowerSpecs[towerIndex].Floors;
         }
+        var expectedStockedFloors = new HashSet<(int Tower, int Floor)>();
+        for (var towerIndex = 0; towerIndex < ResidentialTowerSpecs.Length; towerIndex++)
+        {
+            for (var floor = 0; floor < ResidentialTowerSpecs[towerIndex].Floors; floor++)
+            {
+                expectedStockedFloors.Add((towerIndex, floor));
+            }
+        }
+        var everyFloorStocked = stockedFloors.SetEquals(expectedStockedFloors);
 
         var lootUiOpened = false;
         if (_residentialCaches.Count > 0)
@@ -1390,6 +1398,7 @@ public partial class FreightTerminalWorld
 
         var valid = ResidentialCacheCount == expectedCaches
             && everyTowerStocked
+            && everyFloorStocked
             && _residentialRoomArchetypes.Count == Enum.GetValues<ResidentialRoomArchetype>().Length
             && cacheKinds.Count == Enum.GetValues<ResidentialCacheKind>().Length
             && lootKinds.Count >= 6
@@ -1397,10 +1406,11 @@ public partial class FreightTerminalWorld
             && everyCacheHasMedicine
             && cachesRegistered
             && cachesStocked
+            && reachableCaches == expectedCaches
             && lootUiOpened
             && assistanceRoles.Count == Enum.GetValues<CivilianRole>().Length
             && medicHealed;
-        GD.Print($"RESIDENTIAL_GAMEPLAY_CHECK valid={valid} room_types={_residentialRoomArchetypes.Count}/7 caches={ResidentialCacheCount}/{expectedCaches} cache_types={cacheKinds.Count}/7 loot_types={lootKinds.Count} every_tower={everyTowerStocked} registered={cachesRegistered} stocked={cachesStocked} loot_ui={lootUiOpened} assistance_roles={assistanceRoles.Count}/5 medic_healed={medicHealed}");
+        GD.Print($"RESIDENTIAL_GAMEPLAY_CHECK valid={valid} room_types={_residentialRoomArchetypes.Count}/7 caches={ResidentialCacheCount}/{expectedCaches} stocked_floors={stockedFloors.Count}/{expectedCaches} reachable={reachableCaches}/{expectedCaches} cache_types={cacheKinds.Count}/7 loot_types={lootKinds.Count} every_tower={everyTowerStocked} every_floor={everyFloorStocked} registered={cachesRegistered} stocked={cachesStocked} loot_ui={lootUiOpened} assistance_roles={assistanceRoles.Count}/5 medic_healed={medicHealed}");
         GD.Print($"RESIDENTIAL_GAMEPLAY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

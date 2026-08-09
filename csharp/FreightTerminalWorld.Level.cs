@@ -347,6 +347,7 @@ void sky() {
         BuildCover(concreteDark);
         BuildHarborExpansion(asphalt, concrete, concreteDark, steel, steelDark, rust, yellow, white);
         BuildBackground(concreteDark, steel);
+        BuildInterdistrictRouteNetwork(concrete, steel, steelDark, yellow);
         AddPuddles();
         AddLightPoles();
         BuildMissionTerminals();
