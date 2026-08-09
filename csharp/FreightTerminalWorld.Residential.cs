@@ -1114,15 +1114,31 @@ public partial class FreightTerminalWorld
             VisibilityRangeEndMargin = 6.0f
         };
         tower.AddChild(sign);
+        var planterIndex = 0;
         foreach (var x in new[] { -width * 0.34f, width * 0.34f })
         {
-            ExpansionBox(tower, "CourtyardPlanter", new Vector3(x, 0.34f, depth * 0.5f + 1.75f), new Vector3(2.2f, 0.58f, 1.1f), planter);
+            ExpansionBox(tower, $"CourtyardPlanter_{planterIndex}", new Vector3(x, 0.34f, depth * 0.5f + 1.75f), new Vector3(2.2f, 0.58f, 1.1f), planter);
             tower.AddChild(new MeshInstance3D
             {
+                Name = $"CourtyardHedgeVisual_{planterIndex}",
                 Position = new Vector3(x, 1.02f, depth * 0.5f + 1.75f),
                 Mesh = new SphereMesh { Radius = 0.72f, Height = 1.15f, RadialSegments = 12, Rings = 6 },
                 MaterialOverride = foliage
             });
+            var hedgeCollider = new StaticBody3D
+            {
+                Name = $"CourtyardHedgeCollider_{planterIndex}",
+                Position = new Vector3(x, 1.0f, depth * 0.5f + 1.75f),
+                CollisionLayer = 1,
+                CollisionMask = 0
+            };
+            hedgeCollider.AddToGroup("courtyard_hedge_colliders");
+            hedgeCollider.AddChild(new CollisionShape3D
+            {
+                Shape = new BoxShape3D { Size = new Vector3(1.72f, 1.18f, 0.84f) }
+            });
+            tower.AddChild(hedgeCollider);
+            planterIndex++;
         }
         MeshBox(tower, new Vector3(-width * 0.28f, 0.52f, depth * 0.5f + 2.15f), new Vector3(2.5f, 0.14f, 0.52f), facade);
         MeshBox(tower, new Vector3(width * 0.28f, 0.52f, depth * 0.5f + 2.15f), new Vector3(2.5f, 0.14f, 0.52f), facade);
@@ -1251,6 +1267,29 @@ public partial class FreightTerminalWorld
         var climbHeight = _player.GlobalPosition.Y - climbStartY;
         var playerClimbedRamp = climbHeight > 0.70f;
 
+        var hedgeColliders = GetTree().GetNodesInGroup("courtyard_hedge_colliders");
+        var hedgeCollisionCount = 0;
+        foreach (var node in hedgeColliders)
+        {
+            if (node is not StaticBody3D hedge || !IsInstanceValid(hedge))
+            {
+                continue;
+            }
+            var axis = hedge.GlobalTransform.Basis.X.Normalized();
+            var hedgeQuery = PhysicsRayQueryParameters3D.Create(
+                hedge.GlobalPosition - axis * 1.5f,
+                hedge.GlobalPosition + axis * 1.5f);
+            hedgeQuery.CollisionMask = 1;
+            hedgeQuery.CollideWithAreas = false;
+            var hedgeHit = GetWorld3D().DirectSpaceState.IntersectRay(hedgeQuery);
+            if (hedgeHit.Count > 0 && hedgeHit["collider"].AsGodotObject() == hedge)
+            {
+                hedgeCollisionCount++;
+            }
+        }
+        var hedgesSolid = hedgeColliders.Count == ResidentialTowerSpecs.Length * 2
+            && hedgeCollisionCount == hedgeColliders.Count;
+
         var roles = new HashSet<CivilianRole>();
         var upperFloorPopulation = false;
         foreach (var civilian in _civilians)
@@ -1270,11 +1309,12 @@ public partial class FreightTerminalWorld
             && standingDoorClear
             && stepCollision
             && playerClimbedRamp
+            && hedgesSolid
             && ResidentialCivilianCount >= ResidentialTowerSpecs.Length * 3
             && ResidentialSpecialCivilianCount >= ResidentialTowerSpecs.Length * 2
             && roles.Count == Enum.GetValues<CivilianRole>().Length
             && upperFloorPopulation;
-        GD.Print($"RESIDENTIAL_CHECK valid={valid} towers={ResidentialTowerCount}/{ResidentialTowerSpecs.Length} floors={_residentialFloorCount}/{expectedFloors} stair_flights={_residentialStairFlightCount} stair_details={_residentialStairDetailCount}/{expectedFloors} infill={_residentialInfillModuleCount}/{ResidentialTowerSpecs.Length * 4} entry_open={entryOpen} standing_door={standingDoorClear} step_collision={stepCollision} step_hit={stepName} player_climbed={playerClimbedRamp} climb_height={climbHeight:0.00} rooftops={_residentialRoofAccessCount} civilians={ResidentialCivilianCount} special={ResidentialSpecialCivilianCount} roles={roles.Count} upper_floors={upperFloorPopulation}");
+        GD.Print($"RESIDENTIAL_CHECK valid={valid} towers={ResidentialTowerCount}/{ResidentialTowerSpecs.Length} floors={_residentialFloorCount}/{expectedFloors} stair_flights={_residentialStairFlightCount} stair_details={_residentialStairDetailCount}/{expectedFloors} infill={_residentialInfillModuleCount}/{ResidentialTowerSpecs.Length * 4} entry_open={entryOpen} standing_door={standingDoorClear} step_collision={stepCollision} step_hit={stepName} player_climbed={playerClimbedRamp} climb_height={climbHeight:0.00} hedges_solid={hedgesSolid} hedge_hits={hedgeCollisionCount}/{hedgeColliders.Count} rooftops={_residentialRoofAccessCount} civilians={ResidentialCivilianCount} special={ResidentialSpecialCivilianCount} roles={roles.Count} upper_floors={upperFloorPopulation}");
         if (!valid)
         {
             GD.PushError("Residential community validation failed.");
