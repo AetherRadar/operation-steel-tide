@@ -18,6 +18,7 @@ public partial class CombatHUD : CanvasLayer
     [Signal] public delegate void LootEquipRequestedEventHandler(string itemId);
     [Signal] public delegate void LootReturnRequestedEventHandler(string itemId);
     [Signal] public delegate void BackpackUseRequestedEventHandler(string itemId);
+    [Signal] public delegate void BackpackDropRequestedEventHandler(string itemId);
     [Signal] public delegate void LootClosedEventHandler();
     [Signal] public delegate void WeaponSlotRequestedEventHandler(int slot);
     [Signal] public delegate void InventoryToggleRequestedEventHandler();
@@ -76,6 +77,8 @@ public partial class CombatHUD : CanvasLayer
     private GridContainer _backpackList = null!;
     private LootDropZone _lootSourceZone = null!;
     private LootDropZone _backpackZone = null!;
+    private LootDropZone _groundDropZone = null!;
+    private ScrollContainer _backpackScroll = null!;
     private LootDropZone _primarySlot = null!;
     private LootDropZone _helmetSlot = null!;
     private LootDropZone _armorSlot = null!;
@@ -90,6 +93,7 @@ public partial class CombatHUD : CanvasLayer
     private Label _packSlotCaption = null!;
     private Label _backpackItemsCaption = null!;
     private Label _backpackValueLabel = null!;
+    private Label _groundDropCaption = null!;
     private Label _lootTitle = null!;
     private Label _lootStats = null!;
     private Label _lootSourceCaption = null!;
@@ -484,6 +488,7 @@ public partial class CombatHUD : CanvasLayer
         BuildPauseMenu(root);
         BuildLootOverlay(root);
         BuildSquadHud(root);
+        root.MoveChild(_lootOverlay, root.GetChildCount() - 1);
     }
 
     private static Label PositionedLabel(string text, int size, Color color, float x, float y)
@@ -513,6 +518,7 @@ public partial class CombatHUD : CanvasLayer
         {
             Color = new Color(0.004f, 0.007f, 0.008f, 0.91f),
             MouseFilter = Control.MouseFilterEnum.Stop,
+            ZIndex = 50,
             Visible = false
         };
         _lootOverlay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
@@ -521,8 +527,8 @@ public partial class CombatHUD : CanvasLayer
         var panel = new ColorRect
         {
             Color = new Color(0.025f, 0.032f, 0.033f, 0.98f),
-            Position = new Vector2(-610, -360),
-            Size = new Vector2(1220, 720)
+            Position = new Vector2(-900, -460),
+            Size = new Vector2(1800, 920)
         };
         panel.SetAnchorsPreset(Control.LayoutPreset.Center);
         _lootOverlay.AddChild(panel);
@@ -530,34 +536,34 @@ public partial class CombatHUD : CanvasLayer
         {
             Color = new Color(0.18f, 0.78f, 0.66f),
             Position = Vector2.Zero,
-            Size = new Vector2(5, 720)
+            Size = new Vector2(5, 920)
         });
 
         _lootTitle = PositionedLabel("FIELD INVENTORY", 25, new Color(0.83f, 0.96f, 0.91f), 38, 24);
-        _lootTitle.Size = new Vector2(940, 36);
+        _lootTitle.Size = new Vector2(1530, 36);
         panel.AddChild(_lootTitle);
-        _lootCloseButton = Button("CLOSE", new Vector2(1040, 22), new Vector2(150, 40));
+        _lootCloseButton = Button("CLOSE", new Vector2(1610, 22), new Vector2(160, 40));
         _lootCloseButton.Pressed += () => EmitSignal(SignalName.LootClosed);
         panel.AddChild(_lootCloseButton);
         panel.AddChild(new ColorRect
         {
             Color = new Color(0.18f, 0.32f, 0.29f, 0.9f),
             Position = new Vector2(38, 76),
-            Size = new Vector2(1142, 1)
+            Size = new Vector2(1732, 1)
         });
 
         _lootSourceCaption = PositionedLabel("SEARCHED GEAR", 14, new Color(0.43f, 0.88f, 0.73f), 40, 92);
-        _lootSourceCaption.Size = new Vector2(540, 26);
+        _lootSourceCaption.Size = new Vector2(1130, 26);
         panel.AddChild(_lootSourceCaption);
-        _backpackCaption = PositionedLabel("EQUIPPED / BACKPACK", 14, new Color(0.43f, 0.72f, 0.96f), 600, 92);
-        _backpackCaption.Size = new Vector2(590, 26);
+        _backpackCaption = PositionedLabel("EQUIPPED / BACKPACK", 14, new Color(0.43f, 0.72f, 0.96f), 1200, 92);
+        _backpackCaption.Size = new Vector2(570, 26);
         panel.AddChild(_backpackCaption);
 
         _lootSourceZone = new LootDropZone
         {
             Target = LootDropTarget.Source,
             Position = new Vector2(32, 122),
-            Size = new Vector2(548, 556)
+            Size = new Vector2(1138, 716)
         };
         _lootSourceZone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(new Color(0.22f, 0.85f, 0.68f)));
         _lootSourceZone.Dropped += HandleLootDrop;
@@ -572,7 +578,7 @@ public partial class CombatHUD : CanvasLayer
         _lootSourceZone.AddChild(sourceScroll);
         _lootSourceList = new GridContainer
         {
-            Columns = 2,
+            Columns = 4,
             MouseFilter = Control.MouseFilterEnum.Pass,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
         };
@@ -580,39 +586,39 @@ public partial class CombatHUD : CanvasLayer
         _lootSourceList.AddThemeConstantOverride("v_separation", 8);
         sourceScroll.AddChild(_lootSourceList);
 
-        _lootStats = PositionedLabel("", 13, new Color(0.78f, 0.86f, 0.83f), 600, 126);
-        _lootStats.Size = new Vector2(590, 42);
+        _lootStats = PositionedLabel("", 13, new Color(0.78f, 0.86f, 0.83f), 1200, 126);
+        _lootStats.Size = new Vector2(570, 42);
         _lootStats.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         panel.AddChild(_lootStats);
 
         BuildLootOperatorDisplay(panel);
-        _primarySlot = BuildPrimaryWeaponSlot(panel, new Vector2(600, 174), new Vector2(186, 154));
-        _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(600, 338), new Vector2(186, 124), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel, out _armorPreview);
-        _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(1010, 174), new Vector2(180, 104), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel, out _helmetPreview);
-        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK CONTAINER", new Vector2(1010, 390), new Vector2(180, 108), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel, out _packPreview);
+        _primarySlot = BuildPrimaryWeaponSlot(panel, new Vector2(1200, 174), new Vector2(184, 154));
+        _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(1200, 338), new Vector2(184, 124), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel, out _armorPreview);
+        _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(1610, 174), new Vector2(160, 104), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel, out _helmetPreview);
+        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK CONTAINER", new Vector2(1610, 390), new Vector2(160, 108), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel, out _packPreview);
 
-        _backpackItemsCaption = PositionedLabel("BACKPACK STORAGE", 12, new Color(0.43f, 0.72f, 0.96f), 600, 516);
-        _backpackItemsCaption.Size = new Vector2(590, 22);
+        _backpackItemsCaption = PositionedLabel("BACKPACK STORAGE", 12, new Color(0.43f, 0.72f, 0.96f), 1200, 516);
+        _backpackItemsCaption.Size = new Vector2(570, 22);
         panel.AddChild(_backpackItemsCaption);
 
         var backpackZone = new LootDropZone
         {
             Target = LootDropTarget.Backpack,
-            Position = new Vector2(600, 540),
-            Size = new Vector2(590, 138)
+            Position = new Vector2(1200, 540),
+            Size = new Vector2(570, 264)
         };
         _backpackZone = backpackZone;
         _backpackZone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(new Color(0.32f, 0.62f, 0.92f)));
         _backpackZone.Dropped += HandleLootDrop;
         panel.AddChild(_backpackZone);
-        var backpackScroll = new ScrollContainer
+        _backpackScroll = new ScrollContainer
         {
             HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
             MouseFilter = Control.MouseFilterEnum.Pass,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             SizeFlagsVertical = Control.SizeFlags.ExpandFill
         };
-        _backpackZone.AddChild(backpackScroll);
+        _backpackZone.AddChild(_backpackScroll);
         _backpackList = new GridContainer
         {
             Columns = 2,
@@ -621,7 +627,23 @@ public partial class CombatHUD : CanvasLayer
         };
         _backpackList.AddThemeConstantOverride("h_separation", 8);
         _backpackList.AddThemeConstantOverride("v_separation", 8);
-        backpackScroll.AddChild(_backpackList);
+        _backpackScroll.AddChild(_backpackList);
+
+        _groundDropZone = new LootDropZone
+        {
+            Target = LootDropTarget.Ground,
+            Position = new Vector2(32, 850),
+            Size = new Vector2(1738, 48)
+        };
+        _groundDropZone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(new Color(0.96f, 0.48f, 0.28f)));
+        _groundDropZone.Dropped += HandleLootDrop;
+        panel.AddChild(_groundDropZone);
+        _groundDropCaption = Label("DROP TO GROUND", 13, new Color(1.0f, 0.69f, 0.5f));
+        _groundDropCaption.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        _groundDropCaption.HorizontalAlignment = HorizontalAlignment.Center;
+        _groundDropCaption.VerticalAlignment = VerticalAlignment.Center;
+        _groundDropCaption.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _groundDropZone.AddChild(_groundDropCaption);
 
         BuildWeaponDetailOverlay();
     }
@@ -909,13 +931,14 @@ public partial class CombatHUD : CanvasLayer
         _armorSlotCaption.Text = Text("body_armor", "BODY ARMOR");
         _packSlotCaption.Text = Text("backpack_container", "BACKPACK CONTAINER");
         _backpackItemsCaption.Text = $"{Text("backpack_storage", "BACKPACK STORAGE")}  {_shownPlayer.Backpack.Count}/{_shownPlayer.BackpackCapacity}";
+        _groundDropCaption.Text = Text("drop_to_ground", "DROP TO GROUND");
         _primaryDetailButton.Text = Text("details", "DETAILS");
         _primaryDetailButton.TooltipText = Text("weapon_details", "WEAPON DETAILS");
         _lootSourceZone.Enabled = _shownSourceAvailable;
         _lootSourceZone.Visible = _shownSourceAvailable;
         _backpackItemsCaption.Visible = _shownSourceAvailable;
-        _backpackZone.Position = _shownSourceAvailable ? new Vector2(600, 540) : new Vector2(32, 122);
-        _backpackZone.Size = _shownSourceAvailable ? new Vector2(590, 138) : new Vector2(548, 556);
+        _backpackZone.Position = _shownSourceAvailable ? new Vector2(1200, 540) : new Vector2(32, 122);
+        _backpackZone.Size = _shownSourceAvailable ? new Vector2(570, 264) : new Vector2(1138, 716);
 
         var stats = _shownPlayer.CurrentWeaponStats;
         var weaponName = _shownPlayer.EquippedWeapon.DisplayName(_language);
@@ -943,7 +966,7 @@ public partial class CombatHUD : CanvasLayer
         _lootOperatorCaption.Text = $"{OperatorRoles.RoleName(_shownPlayer.Role, _language)}  //  {Text("active_loadout", "ACTIVE LOADOUT")}";
 
         ClearRows(_lootSourceList);
-        _lootSourceList.Columns = 2;
+        _lootSourceList.Columns = 4;
         foreach (var item in _shownLoot)
         {
             _lootSourceList.AddChild(BuildLootCard(item, LootDragOrigin.Source));
@@ -955,7 +978,7 @@ public partial class CombatHUD : CanvasLayer
         }
 
         ClearRows(_backpackList);
-        _backpackList.Columns = 2;
+        _backpackList.Columns = personalMode ? 4 : 2;
         foreach (var item in _shownPlayer.Backpack)
         {
             _backpackList.AddChild(BuildLootCard(item, LootDragOrigin.Backpack));
@@ -969,8 +992,8 @@ public partial class CombatHUD : CanvasLayer
         var totalValue = ComputeBackpackTotalValue(_shownPlayer);
         if (!IsInstanceValid(_backpackValueLabel))
         {
-            _backpackValueLabel = PositionedLabel(string.Empty, 14, new Color(0.95f, 0.78f, 0.28f), 600, 690);
-            _backpackValueLabel.Size = new Vector2(590, 24);
+            _backpackValueLabel = PositionedLabel(string.Empty, 14, new Color(0.95f, 0.78f, 0.28f), 1200, 812);
+            _backpackValueLabel.Size = new Vector2(570, 24);
             if (_lootOverlay.GetChildCount() > 0 && _lootOverlay.GetChild(0) is Control panel)
             {
                 panel.AddChild(_backpackValueLabel);
@@ -1079,6 +1102,9 @@ public partial class CombatHUD : CanvasLayer
                 break;
             case LootDropTarget.Source when origin == LootDragOrigin.Backpack:
                 EmitSignal(SignalName.LootReturnRequested, itemId);
+                break;
+            case LootDropTarget.Ground when origin == LootDragOrigin.Backpack:
+                EmitSignal(SignalName.BackpackDropRequested, itemId);
                 break;
             default:
                 if (origin == LootDragOrigin.Source)

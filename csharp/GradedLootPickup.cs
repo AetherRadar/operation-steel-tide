@@ -15,6 +15,10 @@ public partial class GradedLootPickup : StaticBody3D, ILootSource
     public string EnglishName { get; set; } = "Field cache";
     public string ChineseName { get; set; } = "战地物资";
 
+    public bool VisualReady => IsInstanceValid(_core) && _core.Visible
+        && IsInstanceValid(_glow) && _glow.Visible
+        && IsInstanceValid(_label) && _label.Visible;
+
     private OmniLight3D _glow = null!;
     private MeshInstance3D _core = null!;
     private Label3D _label = null!;

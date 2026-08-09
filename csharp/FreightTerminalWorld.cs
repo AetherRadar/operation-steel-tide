@@ -88,6 +88,7 @@ public partial class FreightTerminalWorld : Node3D
     private int _headshots;
     private int _reinforcementThreshold = 70;
     private int _nextEnemyNetworkId;
+    private int _nextDroppedLootId = 1;
     private float _threatLevel;
     private float _reinforcementCountdown;
     private bool _reinforcementPending;
@@ -812,6 +813,7 @@ public partial class FreightTerminalWorld : Node3D
         _hud.LootEquipRequested += EquipLootItem;
         _hud.LootReturnRequested += ReturnBackpackItem;
         _hud.BackpackUseRequested += UseBackpackItem;
+        _hud.BackpackDropRequested += DropBackpackItemToGround;
         _hud.LootClosed += CloseLoot;
         _hud.InventoryToggleRequested += OnInventoryToggleRequested;
 
@@ -1841,6 +1843,62 @@ public partial class FreightTerminalWorld : Node3D
         RefreshLootView();
     }
 
+    private void DropBackpackItemToGround(string itemId)
+    {
+        var index = _player.Backpack.FindIndex(item => item.Id == itemId);
+        if (index < 0)
+        {
+            return;
+        }
+
+        var item = _player.Backpack[index];
+        var pickup = new GradedLootPickup
+        {
+            Name = $"DroppedLoot{_nextDroppedLootId++}"
+        };
+        pickup.Configure(
+            item,
+            $"Dropped {item.DisplayName("en")}",
+            $"\u4e22\u5f03\u7269  {item.DisplayName("zh")}");
+        AddChild(pickup);
+        pickup.GlobalPosition = ResolveDroppedLootPosition();
+        if (!pickup.IsInsideTree())
+        {
+            pickup.QueueFree();
+            return;
+        }
+
+        _lootSources.Add(pickup);
+        _player.Backpack.RemoveAt(index);
+        RefreshLootView();
+    }
+
+    private Vector3 ResolveDroppedLootPosition()
+    {
+        var forward = -_player.GlobalBasis.Z;
+        forward.Y = 0.0f;
+        if (forward.LengthSquared() < 0.001f)
+        {
+            forward = Vector3.Forward;
+        }
+        forward = forward.Normalized();
+
+        var candidate = _player.GlobalPosition + forward * 1.35f;
+        var query = PhysicsRayQueryParameters3D.Create(
+            candidate + Vector3.Up * 1.6f,
+            candidate + Vector3.Down * 3.2f);
+        query.CollisionMask = 1;
+        query.CollideWithAreas = false;
+        query.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+        if (hit.TryGetValue("position", out var floorPosition))
+        {
+            return floorPosition.AsVector3() + Vector3.Up * 0.03f;
+        }
+        candidate.Y = _player.GlobalPosition.Y + 0.03f;
+        return candidate;
+    }
+
     private void RefreshLootView()
     {
         if (_openLootSource is not null)
@@ -2326,6 +2384,9 @@ public partial class FreightTerminalWorld : Node3D
         var dragCandidate = source.Loot.Find(candidate => candidate.Kind != LootItemKind.Weapon);
         var returnedToSource = false;
         var dragDropRouted = false;
+        var groundDropRouted = false;
+        var droppedRegistered = false;
+        var droppedVisible = false;
         if (dragCandidate is not null)
         {
             var dragProbe = new LootDropZone { Target = LootDropTarget.Backpack };
@@ -2349,6 +2410,39 @@ public partial class FreightTerminalWorld : Node3D
             ReturnBackpackItem(dragCandidate.Id);
             returnedToSource = source.Loot.Exists(candidate => candidate.Id == dragCandidate.Id)
                 && !_player.Backpack.Exists(candidate => candidate.Id == dragCandidate.Id);
+
+            TakeLootItem(dragCandidate.Id);
+            var groundProbe = new LootDropZone { Target = LootDropTarget.Ground };
+            groundProbe.Dropped += (itemId, origin, target) =>
+            {
+                groundDropRouted = origin == LootDragOrigin.Backpack && target == LootDropTarget.Ground;
+                DropBackpackItemToGround(itemId);
+            };
+            var equipmentSlot = dragCandidate.Kind == LootItemKind.Equipment && dragCandidate.Equipment is not null
+                ? (int)dragCandidate.Equipment.Definition.Slot
+                : -1;
+            var groundDragData = new Godot.Collections.Dictionary
+            {
+                ["item_id"] = dragCandidate.Id,
+                ["origin"] = (int)LootDragOrigin.Backpack,
+                ["kind"] = (int)dragCandidate.Kind,
+                ["slot"] = equipmentSlot
+            };
+            if (groundProbe._CanDropData(Vector2.Zero, groundDragData))
+            {
+                groundProbe._DropData(Vector2.Zero, groundDragData);
+            }
+            groundProbe.Free();
+            var droppedPickup = _lootSources
+                .OfType<GradedLootPickup>()
+                .FirstOrDefault(candidate => candidate.Loot.Exists(item => item.Id == dragCandidate.Id));
+            droppedRegistered = droppedPickup is not null
+                && _lootSources.Contains(droppedPickup)
+                && droppedPickup.IsSearchable
+                && !_player.Backpack.Exists(candidate => candidate.Id == dragCandidate.Id);
+            droppedVisible = droppedPickup is not null
+                && droppedPickup.VisualReady
+                && droppedPickup.GlobalPosition.DistanceTo(_player.GlobalPosition) <= 2.5f;
         }
         await WaitFrames(4);
         var stats = _player.CurrentWeaponStats;
@@ -2381,10 +2475,13 @@ public partial class FreightTerminalWorld : Node3D
             && heldInputBlocked
             && dragDropRouted
             && returnedToSource
+            && groundDropRouted
+            && droppedRegistered
+            && droppedVisible
             && reopenedEmpty
             && closedByInteract
             && movementRestored;
-        GD.Print($"LOOT_CHECK valid={valid} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+        GD.Print($"LOOT_CHECK valid={valid} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         GD.Print($"LOOT_PASS valid={valid}");
         await WaitFrames(24);
         SaveViewportImage("res://modular_weapon_validation.png");
@@ -3503,6 +3600,21 @@ public partial class FreightTerminalWorld : Node3D
     private async void ValidateBackpackTab()
     {
         await WaitFrames(4);
+        _player.EquipFromLoot(new LootItem
+        {
+            Kind = LootItemKind.Equipment,
+            Equipment = EquipmentCatalog.Create("pack_heavy"),
+            Grade = LootGrade.Rare
+        });
+        while (_player.Backpack.Count < _player.BackpackCapacity)
+        {
+            _player.TryStoreInBackpack(new LootItem
+            {
+                Kind = LootItemKind.Equipment,
+                Equipment = EquipmentCatalog.Create(_player.Backpack.Count % 2 == 0 ? "helmet_heavy" : "armor_heavy"),
+                Grade = LootGrade.Rare
+            });
+        }
         var weaponsInBackpack = 0;
         foreach (var item in _player.Backpack)
         {
@@ -3513,14 +3625,19 @@ public partial class FreightTerminalWorld : Node3D
         }
         var tabDown = new InputEventKey { Pressed = true, PhysicalKeycode = Key.Tab };
         Input.ParseInputEvent(tabDown);
-        await WaitFrames(2);
+        await WaitFrames(6);
         var opened = _hud.IsLootVisible;
         var tabUp = new InputEventKey { Pressed = false, PhysicalKeycode = Key.Tab };
         Input.ParseInputEvent(tabUp);
         var paperDollVisible = _hud.LootPaperDollReady;
         var backpackSlotSeparated = _hud.LootBackpackSlotSeparated;
-        var valid = opened && weaponsInBackpack == 0 && paperDollVisible && backpackSlotSeparated;
-        GD.Print($"BACKPACK_TAB_CHECK opened={opened} backpack_items={_player.Backpack.Count} weapons={weaponsInBackpack} unarmed={!_player.HasFireablePrimary} paper_doll={paperDollVisible} backpack_isolated={backpackSlotSeparated}");
+        var expanded = _hud.LootBackpackPanelExpanded;
+        var contentFits = _hud.LootBackpackContentFits;
+        var groundDropReady = _hud.LootGroundDropReady;
+        var atCapacity = _player.Backpack.Count == _player.BackpackCapacity;
+        var valid = opened && weaponsInBackpack == 0 && paperDollVisible && backpackSlotSeparated
+            && expanded && contentFits && groundDropReady && atCapacity;
+        GD.Print($"BACKPACK_TAB_CHECK opened={opened} backpack_items={_player.Backpack.Count} capacity={_player.BackpackCapacity} full={atCapacity} weapons={weaponsInBackpack} unarmed={!_player.HasFireablePrimary} paper_doll={paperDollVisible} backpack_isolated={backpackSlotSeparated} expanded={expanded} content_fits={contentFits} ground_drop={groundDropReady}");
         GD.Print($"BACKPACK_TAB_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

@@ -246,6 +246,7 @@ public static class GameLocalization
         Chinese["extraction_departing"] = "\u5c0f\u961f\u767b\u673a\u5b8c\u6bd5  //  \u6b63\u5728\u8131\u79bb\u4ea4\u6218\u533a";
         Chinese["backpack_container"] = "\u80cc\u5305\u5bb9\u5668";
         Chinese["backpack_storage"] = "\u80cc\u5305\u50a8\u7269\u683c";
+        Chinese["drop_to_ground"] = "\u4e22\u5230\u5730\u9762";
         Chinese["active_loadout"] = "\u5f53\u524d\u6574\u5907";
     }
 

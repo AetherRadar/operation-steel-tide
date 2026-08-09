@@ -10,6 +10,23 @@ public partial class CombatHUD
     public bool LootPaperDollReady
         => IsInstanceValid(_lootOperatorPreview) && _lootOperatorPreview.Visible;
 
+    public bool LootBackpackPanelExpanded
+        => !_shownSourceAvailable
+        && IsInstanceValid(_backpackZone)
+        && _backpackZone.Size.X >= 1100.0f
+        && _backpackZone.Size.Y >= 700.0f
+        && IsInstanceValid(_backpackList)
+        && _backpackList.Columns >= 4;
+
+    public bool LootBackpackContentFits
+        => IsInstanceValid(_backpackScroll)
+        && !_backpackScroll.GetVScrollBar().Visible;
+
+    public bool LootGroundDropReady
+        => IsInstanceValid(_groundDropZone)
+        && _groundDropZone.Visible
+        && _groundDropZone.Enabled;
+
     public bool LootBackpackSlotSeparated
     {
         get
@@ -38,7 +55,7 @@ public partial class CombatHUD
     {
         var frame = new Panel
         {
-            Position = new Vector2(796, 170),
+            Position = new Vector2(1390, 170),
             Size = new Vector2(210, 330),
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
@@ -77,10 +94,10 @@ public partial class CombatHUD
         _lootOperatorCaption.MouseFilter = Control.MouseFilterEnum.Ignore;
         frame.AddChild(_lootOperatorCaption);
 
-        AddLootConnector(parent, new Vector2(786, 246), new Vector2(10, 1), new Color(0.34f, 0.86f, 0.7f));
-        AddLootConnector(parent, new Vector2(786, 394), new Vector2(10, 1), new Color(0.35f, 0.68f, 0.94f));
-        AddLootConnector(parent, new Vector2(1006, 220), new Vector2(4, 1), new Color(0.84f, 0.66f, 0.3f));
-        AddLootConnector(parent, new Vector2(1006, 443), new Vector2(4, 1), new Color(0.62f, 0.55f, 0.86f));
+        AddLootConnector(parent, new Vector2(1384, 246), new Vector2(6, 1), new Color(0.34f, 0.86f, 0.7f));
+        AddLootConnector(parent, new Vector2(1384, 394), new Vector2(6, 1), new Color(0.35f, 0.68f, 0.94f));
+        AddLootConnector(parent, new Vector2(1600, 220), new Vector2(10, 1), new Color(0.84f, 0.66f, 0.3f));
+        AddLootConnector(parent, new Vector2(1600, 443), new Vector2(10, 1), new Color(0.62f, 0.55f, 0.86f));
     }
 
     private static void AddLootConnector(Control parent, Vector2 position, Vector2 size, Color color)
