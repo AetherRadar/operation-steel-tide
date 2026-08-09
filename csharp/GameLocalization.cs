@@ -183,6 +183,8 @@ public static class GameLocalization
         Chinese["medical_recovered"] = "\u627e\u5230\u533b\u7597\u7269\u8d44";
         Chinese["armor_plate"] = "\u590d\u5408\u62a4\u7532\u677f";
         Chinese["armor_plate_effect"] = "\u4fee\u590d\u5f53\u524d\u9632\u5f39\u8863  //  \u7b49\u7ea7\u8d8a\u9ad8\u4fee\u590d\u8d8a\u591a";
+        Chinese["applying_armor_cancel"] = "\u88c5\u914d\u62a4\u7532\u677f  //  X \u53d6\u6d88";
+        Chinese["armor_cancelled"] = "\u5df2\u53d6\u6d88\u88c5\u914d\u62a4\u7532\u677f";
         Chinese["stamina_exhausted"] = "\u4f53\u529b\u8017\u5c3d  //  \u6062\u590d\u5230\u5b89\u5168\u9608\u503c\u624d\u80fd\u7ee7\u7eed\u75be\u8dd1";
         Chinese["valuable_recovered"] = "\u8d35\u91cd\u7269\u8d44\u5df2\u6536\u597d";
         Chinese["valuable_coffee"] = "\u8fdb\u53e3\u5496\u5561\u7f50";

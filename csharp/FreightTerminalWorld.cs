@@ -2266,27 +2266,93 @@ public partial class FreightTerminalWorld : Node3D
     private async void ValidateEquipmentFlow()
     {
         _player.GrantFireablePrimaryForDiagnostics();
-        foreach (var enemy in _enemies)
-        {
-            enemy.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        DisableActorsForSurvivalDiagnostics();
         _missionDirector.ExitDeploymentZone();
-        _player.TakeDamage(30.0f);
+        _player.Backpack.RemoveAll(item => item.Kind == LootItemKind.ArmorPlate);
+        var plateStored = _player.TryStoreInBackpack(new LootItem
+        {
+            Kind = LootItemKind.ArmorPlate,
+            Quantity = 2,
+            Grade = LootGrade.Rare
+        });
+        _player.SetArmorForDiagnostics(20.0f);
+        Input.ActionRelease("move_forward");
+        Input.ActionRelease("use_plate");
+        await WaitFrames(3);
+
+        var fireModeBefore = _player.FireMode;
+        var flashlightBefore = _player.FlashlightOn;
         Input.ActionPress("toggle_fire_mode");
         await WaitFrames(2);
         Input.ActionRelease("toggle_fire_mode");
         Input.ActionPress("toggle_flashlight");
         await WaitFrames(2);
         Input.ActionRelease("toggle_flashlight");
+
+        var armorBefore = _player.Armor;
+        var platesBefore = _player.ArmorPlates;
         Input.ActionPress("use_plate");
+        await WaitFrames(2);
+        Input.ActionRelease("use_plate");
+        await WaitFrames(2);
+        var plateStarted = _player.IsPlateUseActiveForDiagnostics;
+        var cancelHintVisible = _hud.EquipmentCancelHintVisibleForDiagnostics;
+
+        Input.ActionPress("move_forward");
+        await WaitFrames(6);
+        var movementAllowed = _player.HasMovementIntent && _player.IsPlateUseActiveForDiagnostics;
+        Input.ActionRelease("move_forward");
+        await WaitFrames(2);
+
+        Input.ActionPress("use_plate");
+        await WaitFrames(2);
+        Input.ActionRelease("use_plate");
+        await WaitFrames(2);
+        var cancelledByKey = !_player.IsPlateUseActiveForDiagnostics
+            && _player.ArmorPlates == platesBefore
+            && Mathf.IsEqualApprox(_player.Armor, armorBefore);
+
+        Input.ActionPress("use_plate");
+        await WaitFrames(2);
+        Input.ActionRelease("use_plate");
+        var restarted = _player.IsPlateUseActiveForDiagnostics;
         var deadline = Time.GetTicksMsec() + 4000;
-        while (_player.ArmorPlates == 2 && Time.GetTicksMsec() < deadline)
+        while (_player.ArmorPlates == platesBefore && Time.GetTicksMsec() < deadline)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         }
-        Input.ActionRelease("use_plate");
-        GD.Print($"EQUIPMENT_CHECK plates={_player.ArmorPlates} armor={_player.Armor:0.0} mode={_player.FireMode} light={_player.FlashlightOn}");
-        GetTree().Quit();
+        var completed = !_player.IsPlateUseActiveForDiagnostics
+            && _player.ArmorPlates == platesBefore - 1
+            && _player.Armor > armorBefore;
+
+        var plateAction = InputMap.HasAction("use_plate");
+        var plateKeyBound = false;
+        if (plateAction)
+        {
+            foreach (var inputEvent in InputMap.ActionGetEvents("use_plate"))
+            {
+                if (inputEvent is InputEventKey key && key.PhysicalKeycode == Key.X)
+                {
+                    plateKeyBound = true;
+                    break;
+                }
+            }
+        }
+        var secondaryControlsWorked = _player.FireMode != fireModeBefore
+            && _player.FlashlightOn != flashlightBefore;
+        var valid = plateStored
+            && plateStarted
+            && cancelHintVisible
+            && movementAllowed
+            && cancelledByKey
+            && restarted
+            && completed
+            && plateAction
+            && plateKeyBound
+            && secondaryControlsWorked;
+        GD.Print($"EQUIPMENT_CHECK valid={valid} plate_started={plateStarted} movement_allowed={movementAllowed} cancel_hint={cancelHintVisible} cancelled_by_x={cancelledByKey} restarted={restarted} completed={completed} plates={platesBefore}->{_player.ArmorPlates} armor={armorBefore:0.0}->{_player.Armor:0.0} action={plateAction} key_x={plateKeyBound} mode={_player.FireMode} light={_player.FlashlightOn}");
+        GD.Print($"EQUIPMENT_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private async void ValidatePickupFlow()

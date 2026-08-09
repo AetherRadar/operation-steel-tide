@@ -1391,6 +1391,12 @@ public partial class CombatHUD : CanvasLayer
         _equipmentBar.Value = Mathf.Clamp(progress, 0.0f, 1.0f);
     }
 
+    internal bool EquipmentCancelHintVisibleForDiagnostics
+        => IsInstanceValid(_equipmentRoot)
+        && _equipmentRoot.Visible
+        && IsInstanceValid(_equipmentLabel)
+        && _equipmentLabel.Text.Contains("X", StringComparison.OrdinalIgnoreCase);
+
     public void SetEnemyCount(int count)
     {
         _enemiesLabel.Text = $"{Text("hostiles", "HOSTILES")}  {count:00}";

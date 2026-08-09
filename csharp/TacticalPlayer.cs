@@ -1004,7 +1004,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
         if (Input.IsActionJustPressed("use_plate") && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon)
         {
-            StartPlate();
+            if (_isPlating)
+            {
+                CancelPlate(notify: true);
+            }
+            else
+            {
+                StartPlate();
+            }
         }
 
         UpdatePlate(dt);
@@ -1241,11 +1248,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         UpdateStanceInput(horizontalSpeedBeforeMove);
         var crouching = _stance == PlayerStance.Crouched;
         var prone = _stance == PlayerStance.Prone;
-        var sprinting = Input.IsActionPressed("sprint") && input.Y < -0.15f && !crouching && !prone
+        var sprinting = Input.IsActionPressed("sprint") && input.Y < -0.15f && !crouching && !prone && !_isPlating
             && Stamina > 1.0f && !SprintRecoveryRequired && !_isAiming;
         var speed = (prone ? ProneSpeed : crouching ? CrouchSpeed : sprinting ? SprintSpeed : WalkSpeed)
             * RoleMovementMultiplier
-            * MedicalMovementMultiplier;
+            * MedicalMovementMultiplier
+            * (_isPlating ? 0.68f : 1.0f);
 
         if (_slideTime > 0.0f)
         {
@@ -1280,7 +1288,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             velocity.Y -= Gravity * delta;
         }
-        else if (Input.IsActionJustPressed("jump") && !crouching && !prone)
+        else if (Input.IsActionJustPressed("jump") && !crouching && !prone && !_isPlating)
         {
             velocity.Y = 6.8f;
         }
@@ -1998,7 +2006,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _plateTime = _plateDuration;
         _plateRepairFraction = ArmorPlateSupplies.RepairFraction(plate.Grade);
         _plateItemId = plate.Id;
-        Hud?.SetEquipmentActionLocalized("applying_armor", "APPLYING ARMOR", 0.0f, true);
+        Hud?.SetEquipmentActionLocalized("applying_armor_cancel", "APPLYING ARMOR  //  X CANCEL", 0.0f, true);
         return true;
     }
 
@@ -2008,14 +2016,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             return;
         }
-        var movement = Input.GetVector("move_left", "move_right", "move_forward", "move_backward");
-        if (movement.LengthSquared() > 0.02f || Input.IsActionPressed("fire") || Input.IsActionPressed("sprint"))
-        {
-            CancelPlate();
-            return;
-        }
         _plateTime -= delta;
-        Hud?.SetEquipmentActionLocalized("applying_armor", "APPLYING ARMOR", 1.0f - _plateTime / Mathf.Max(0.01f, _plateDuration), true);
+        Hud?.SetEquipmentActionLocalized("applying_armor_cancel", "APPLYING ARMOR  //  X CANCEL", 1.0f - _plateTime / Mathf.Max(0.01f, _plateDuration), true);
         if (_plateTime > 0.0f)
         {
             return;
@@ -2046,7 +2048,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         Hud?.ShowLocalizedMessage("armor_secured", "ARMOR PLATE SECURED", new Color(0.4f, 0.76f, 1.0f));
     }
 
-    private void CancelPlate()
+    private void CancelPlate(bool notify = false)
     {
         if (!_isPlating)
         {
@@ -2057,6 +2059,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _plateDuration = 0.0f;
         _plateItemId = string.Empty;
         Hud?.SetEquipmentAction(string.Empty, 0.0f, false);
+        if (notify)
+        {
+            Hud?.ShowLocalizedMessage("armor_cancelled", "ARMOR APPLICATION CANCELLED", new Color(1.0f, 0.58f, 0.3f));
+        }
     }
 
     public int AmmoReserveFor(AmmoCaliber caliber)
