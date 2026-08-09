@@ -244,6 +244,9 @@ public static class GameLocalization
         Chinese["extraction_squad"] = "\u5c0f\u961f\u5c31\u4f4d";
         Chinese["extraction_aborted"] = "\u64a4\u79bb\u4e2d\u65ad  //  \u8fd4\u56de\u7eff\u8272\u533a\u57df\u91cd\u65b0\u547c\u53eb";
         Chinese["extraction_departing"] = "\u5c0f\u961f\u767b\u673a\u5b8c\u6bd5  //  \u6b63\u5728\u8131\u79bb\u4ea4\u6218\u533a";
+        Chinese["backpack_container"] = "\u80cc\u5305\u5bb9\u5668";
+        Chinese["backpack_storage"] = "\u80cc\u5305\u50a8\u7269\u683c";
+        Chinese["active_loadout"] = "\u5f53\u524d\u6574\u5907";
     }
 
     private static readonly Dictionary<string, string> ChineseObjectives = new()

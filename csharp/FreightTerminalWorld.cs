@@ -2391,12 +2391,15 @@ public partial class FreightTerminalWorld : Node3D
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         }
         Input.ActionRelease("interact");
+        var opened = _hud.IsLootVisible;
         var weapon = target.Loot.Find(item => item.Kind == LootItemKind.Weapon);
         if (weapon is not null)
         {
             EquipLootItem(weapon.Id);
         }
         await WaitFrames(4);
+        var paperDollVisible = _hud.LootPaperDollReady;
+        var backpackSlotSeparated = _hud.LootBackpackSlotSeparated;
         SaveViewportImage("res://corpse_loot_validation.png");
         var equipmentCount = target.Loot.FindAll(item => item.Kind == LootItemKind.Equipment).Count;
         target.Loot.Clear();
@@ -2410,8 +2413,11 @@ public partial class FreightTerminalWorld : Node3D
         }
         Input.ActionRelease("interact");
         var reopenedEmpty = _hud.IsLootVisible && target.Loot.Count == 0;
-        GD.Print($"CORPSE_LOOT_CHECK dead={target.IsDead} open={_hud.IsLootVisible} reopened_empty={reopenedEmpty} weapon_visible={target.CarriedWeaponVisible} equipment={equipmentCount} items={target.Loot.Count} equipped={_player.EquippedWeapon.Platform}");
-        GetTree().Quit();
+        var valid = target.IsDead && opened && reopenedEmpty && !target.CarriedWeaponVisible
+            && paperDollVisible && backpackSlotSeparated;
+        GD.Print($"CORPSE_LOOT_CHECK valid={valid} dead={target.IsDead} open={opened} reopened_empty={reopenedEmpty} weapon_visible={target.CarriedWeaponVisible} equipment={equipmentCount} items={target.Loot.Count} paper_doll={paperDollVisible} backpack_isolated={backpackSlotSeparated} equipped={_player.EquippedWeapon.Platform}");
+        GD.Print($"CORPSE_LOOT_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private async void CaptureBackpackFrame()
@@ -3493,9 +3499,12 @@ public partial class FreightTerminalWorld : Node3D
         var opened = _hud.IsLootVisible;
         var tabUp = new InputEventKey { Pressed = false, PhysicalKeycode = Key.Tab };
         Input.ParseInputEvent(tabUp);
-        GD.Print($"BACKPACK_TAB_CHECK opened={opened} backpack_items={_player.Backpack.Count} weapons={weaponsInBackpack} unarmed={!_player.HasFireablePrimary}");
-        GD.Print($"BACKPACK_TAB_PASS valid={opened && weaponsInBackpack == 0}");
-        GetTree().Quit(opened && weaponsInBackpack == 0 ? 0 : 2);
+        var paperDollVisible = _hud.LootPaperDollReady;
+        var backpackSlotSeparated = _hud.LootBackpackSlotSeparated;
+        var valid = opened && weaponsInBackpack == 0 && paperDollVisible && backpackSlotSeparated;
+        GD.Print($"BACKPACK_TAB_CHECK opened={opened} backpack_items={_player.Backpack.Count} weapons={weaponsInBackpack} unarmed={!_player.HasFireablePrimary} paper_doll={paperDollVisible} backpack_isolated={backpackSlotSeparated}");
+        GD.Print($"BACKPACK_TAB_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private async void ValidateSkyLinks()

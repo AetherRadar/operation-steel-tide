@@ -585,20 +585,21 @@ public partial class CombatHUD : CanvasLayer
         _lootStats.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         panel.AddChild(_lootStats);
 
-        _primarySlot = BuildPrimaryWeaponSlot(panel, new Vector2(600, 176), new Vector2(590, 124));
-        _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(600, 310), new Vector2(188, 104), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel, out _helmetPreview);
-        _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(801, 310), new Vector2(188, 104), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel, out _armorPreview);
-        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK", new Vector2(1002, 310), new Vector2(188, 104), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel, out _packPreview);
+        BuildLootOperatorDisplay(panel);
+        _primarySlot = BuildPrimaryWeaponSlot(panel, new Vector2(600, 174), new Vector2(186, 154));
+        _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(600, 338), new Vector2(186, 124), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel, out _armorPreview);
+        _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(1010, 174), new Vector2(180, 104), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel, out _helmetPreview);
+        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK CONTAINER", new Vector2(1010, 390), new Vector2(180, 108), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel, out _packPreview);
 
-        _backpackItemsCaption = PositionedLabel("PERSONAL BACKPACK", 12, new Color(0.43f, 0.72f, 0.96f), 600, 420);
+        _backpackItemsCaption = PositionedLabel("BACKPACK STORAGE", 12, new Color(0.43f, 0.72f, 0.96f), 600, 516);
         _backpackItemsCaption.Size = new Vector2(590, 22);
         panel.AddChild(_backpackItemsCaption);
 
         var backpackZone = new LootDropZone
         {
             Target = LootDropTarget.Backpack,
-            Position = new Vector2(600, 446),
-            Size = new Vector2(590, 232)
+            Position = new Vector2(600, 540),
+            Size = new Vector2(590, 138)
         };
         _backpackZone = backpackZone;
         _backpackZone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(new Color(0.32f, 0.62f, 0.92f)));
@@ -664,7 +665,7 @@ public partial class CombatHUD : CanvasLayer
         header.AddChild(_primaryDetailButton);
         _primaryWeaponPreview = new InventoryModelPreview
         {
-            CustomMinimumSize = new Vector2(520, 54),
+            CustomMinimumSize = new Vector2(Mathf.Max(120.0f, size.X - 20.0f), 54),
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
         };
         _primaryWeaponPreview.Configure(InventoryPreviewKind.Rifle, weapon: WeaponCatalog.StarterWeapon());
@@ -901,20 +902,20 @@ public partial class CombatHUD : CanvasLayer
             : Text("searched_gear", "SEARCHED GEAR");
         _backpackCaption.Text = personalMode
             ? Text("equipped_loadout", "CURRENT LOADOUT")
-            : $"{Text("equipped_backpack", "EQUIPPED / BACKPACK")}  {_shownPlayer.Backpack.Count}/{_shownPlayer.BackpackCapacity}";
+            : $"{Text("equipped_loadout", "CURRENT LOADOUT")}  //  {Text("backpack_container", "BACKPACK CONTAINER")}";
         _lootCloseButton.Text = Text("close", "CLOSE");
         _primarySlotCaption.Text = Text("primary_weapon", "PRIMARY WEAPON");
         _helmetSlotCaption.Text = Text("helmet", "HELMET");
         _armorSlotCaption.Text = Text("body_armor", "BODY ARMOR");
-        _packSlotCaption.Text = Text("backpack", "BACKPACK");
-        _backpackItemsCaption.Text = Text("personal_backpack", "PERSONAL BACKPACK");
+        _packSlotCaption.Text = Text("backpack_container", "BACKPACK CONTAINER");
+        _backpackItemsCaption.Text = $"{Text("backpack_storage", "BACKPACK STORAGE")}  {_shownPlayer.Backpack.Count}/{_shownPlayer.BackpackCapacity}";
         _primaryDetailButton.Text = Text("details", "DETAILS");
         _primaryDetailButton.TooltipText = Text("weapon_details", "WEAPON DETAILS");
         _lootSourceZone.Enabled = _shownSourceAvailable;
         _lootSourceZone.Visible = _shownSourceAvailable;
         _backpackItemsCaption.Visible = _shownSourceAvailable;
-        _backpackZone.Position = _shownSourceAvailable ? new Vector2(600, 446) : new Vector2(32, 122);
-        _backpackZone.Size = _shownSourceAvailable ? new Vector2(590, 232) : new Vector2(548, 556);
+        _backpackZone.Position = _shownSourceAvailable ? new Vector2(600, 540) : new Vector2(32, 122);
+        _backpackZone.Size = _shownSourceAvailable ? new Vector2(590, 138) : new Vector2(548, 556);
 
         var stats = _shownPlayer.CurrentWeaponStats;
         var weaponName = _shownPlayer.EquippedWeapon.DisplayName(_language);
@@ -931,6 +932,15 @@ public partial class CombatHUD : CanvasLayer
         _helmetPreview.Configure(InventoryPreviewKind.Helmet, _shownPlayer.EquippedHelmet);
         _armorPreview.Configure(InventoryPreviewKind.BodyArmor, _shownPlayer.EquippedBodyArmor);
         _packPreview.Configure(InventoryPreviewKind.Backpack, _shownPlayer.EquippedBackpack);
+        _lootOperatorPreview.Configure(
+            InventoryPreviewKind.Operator,
+            weapon: _shownPlayer.HasFireablePrimary ? _shownPlayer.EquippedWeapon : null,
+            knifeSkinId: _shownPlayer.EquippedKnifeSkinId,
+            role: _shownPlayer.Role,
+            helmet: _shownPlayer.EquippedHelmet,
+            bodyArmor: _shownPlayer.EquippedBodyArmor,
+            backpack: _shownPlayer.EquippedBackpack);
+        _lootOperatorCaption.Text = $"{OperatorRoles.RoleName(_shownPlayer.Role, _language)}  //  {Text("active_loadout", "ACTIVE LOADOUT")}";
 
         ClearRows(_lootSourceList);
         _lootSourceList.Columns = 2;
