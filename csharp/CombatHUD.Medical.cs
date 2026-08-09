@@ -12,7 +12,7 @@ public partial class CombatHUD
     private Label _medicalWheelTitle = null!;
     private Label _medicalWheelHint = null!;
     private Label _medicalWheelVitals = null!;
-    private MedicalItemKind? _medicalConfirmed;
+    private FieldUseKind? _medicalConfirmed;
 
     public bool IsMedicalWheelVisible => IsInstanceValid(_medicalWheelOverlay) && _medicalWheelOverlay.Visible;
 
@@ -56,7 +56,7 @@ public partial class CombatHUD
         _medicalWheel.Confirmed += kind => _medicalConfirmed = kind;
         _medicalWheelOverlay.AddChild(_medicalWheel);
 
-        _medicalWheelTitle = Label("MEDICAL SELECTOR", 22, new Color(0.72f, 0.96f, 0.87f));
+        _medicalWheelTitle = Label("FIELD SUPPLY WHEEL", 22, new Color(0.72f, 0.96f, 0.87f));
         _medicalWheelTitle.HorizontalAlignment = HorizontalAlignment.Center;
         _medicalWheelTitle.SetAnchorsPreset(Control.LayoutPreset.Center);
         _medicalWheelTitle.Position = new Vector2(-280, -350);
@@ -68,12 +68,12 @@ public partial class CombatHUD
         _medicalWheelHint.Position = new Vector2(-280, 312);
         _medicalWheelHint.Size = new Vector2(560, 24);
         _medicalWheelOverlay.AddChild(_medicalWheelHint);
-        _medicalWheelVitals = Label("HP 100  //  STAMINA 100", 13, new Color(0.84f, 0.93f, 0.9f));
+        _medicalWheelVitals = Label("HP 100  //  ARM 100  //  STM 100", 13, new Color(0.84f, 0.93f, 0.9f));
         _medicalWheelVitals.HorizontalAlignment = HorizontalAlignment.Center;
         _medicalWheelVitals.VerticalAlignment = VerticalAlignment.Center;
         _medicalWheelVitals.SetAnchorsPreset(Control.LayoutPreset.Center);
-        _medicalWheelVitals.Position = new Vector2(-90, -28);
-        _medicalWheelVitals.Size = new Vector2(180, 56);
+        _medicalWheelVitals.Position = new Vector2(-90, -38);
+        _medicalWheelVitals.Size = new Vector2(180, 76);
         _medicalWheelVitals.MouseFilter = Control.MouseFilterEnum.Ignore;
         _medicalWheelOverlay.AddChild(_medicalWheelVitals);
     }
@@ -86,13 +86,13 @@ public partial class CombatHUD
         }
         _medicalConfirmed = null;
         _medicalWheel.Configure(_language, player);
-        _medicalWheelVitals.Text = $"HP {Mathf.CeilToInt(player.Health):000}\nSTM {Mathf.CeilToInt(player.Stamina):000}";
+        _medicalWheelVitals.Text = $"HP  {Mathf.CeilToInt(player.Health):000}\nARM {Mathf.CeilToInt(player.Armor):000}\nSTM {Mathf.CeilToInt(player.Stamina):000}";
         RefreshMedicalLanguage();
         _medicalWheelOverlay.Visible = true;
         return true;
     }
 
-    public bool TryTakeMedicalWheelConfirmation(out MedicalItemKind kind)
+    public bool TryTakeMedicalWheelConfirmation(out FieldUseKind kind)
     {
         if (_medicalConfirmed is null)
         {
@@ -105,7 +105,7 @@ public partial class CombatHUD
         return true;
     }
 
-    public bool CloseMedicalWheel(bool acceptHighlighted, out MedicalItemKind kind)
+    public bool CloseMedicalWheel(bool acceptHighlighted, out FieldUseKind kind)
     {
         kind = _medicalWheel.HighlightedKind;
         var accepted = acceptHighlighted && _medicalWheel.HighlightedAvailable;
@@ -132,8 +132,9 @@ public partial class CombatHUD
         var bandages = player.MedicalCount(MedicalItemKind.Bandage);
         var medkits = player.MedicalCount(MedicalItemKind.FieldMedkit);
         var adrenaline = player.MedicalCount(MedicalItemKind.Adrenaline);
-        var caption = Text("medical_hotkey", "B  MEDICAL");
-        _medicalStatusLabel.Text = $"{caption}  //  B{bandages}  +{medkits}  A{adrenaline}";
+        var plates = player.ArmorPlates;
+        var caption = Text("medical_hotkey", "B  FIELD SUPPLIES");
+        _medicalStatusLabel.Text = $"{caption}  //  B{bandages}  +{medkits}  A{adrenaline}  P{plates}";
         _medicalBoostLabel.Text = player.AdrenalineActive
             ? $"{Text("medical_boost", "ADRENALINE BOOST")}  {player.AdrenalineRemaining:0.0}s"
             : Text("medical_hold_hint", "HOLD B FOR RADIAL SELECT");
@@ -148,11 +149,13 @@ public partial class CombatHUD
         {
             return;
         }
-        _medicalWheelTitle.Text = Text("medical_selector", "MEDICAL SELECTOR");
+        _medicalWheelTitle.Text = Text("medical_selector", "FIELD SUPPLY WHEEL");
         _medicalWheelHint.Text = Text("medical_wheel_hint", "POINT + CLICK  //  RELEASE B TO USE");
     }
 
-    internal void SelectMedicalWheelForDiagnostics(MedicalItemKind kind) => _medicalWheel.SelectForDiagnostics(kind);
+    internal void SelectMedicalWheelForDiagnostics(FieldUseKind kind) => _medicalWheel.SelectForDiagnostics(kind);
+
+    internal void SelectMedicalWheelForDiagnostics(MedicalItemKind kind) => _medicalWheel.SelectForDiagnostics(FieldUseItems.FromMedical(kind));
 
     internal bool ConfirmMedicalWheelForDiagnostics() => _medicalWheel.ConfirmForDiagnostics();
 

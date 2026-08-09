@@ -36,6 +36,13 @@ public partial class TacticalPlayer
         return total;
     }
 
+    public int FieldUseCount(FieldUseKind kind)
+    {
+        return kind == FieldUseKind.ArmorPlate
+            ? ArmorPlates
+            : MedicalCount(FieldUseItems.ToMedical(kind));
+    }
+
     private void EnsureEmergencyMedicalLoadout()
     {
         if (MedicalCount(MedicalItemKind.Bandage) > 0)
@@ -51,6 +58,22 @@ public partial class TacticalPlayer
         });
         Hud?.SetBackpackValuePlayer(this);
         Hud?.SetMedicalInventory(this);
+    }
+
+    private void EnsureEmergencyArmorLoadout()
+    {
+        if (ArmorPlates > 0)
+        {
+            return;
+        }
+        TryStoreArmorPlate(LootGrade.Common, 2);
+    }
+
+    public bool TryStartFieldUse(FieldUseKind kind, string preferredItemId = "")
+    {
+        return kind == FieldUseKind.ArmorPlate
+            ? StartPlate(preferredItemId)
+            : TryStartMedicalUse(FieldUseItems.ToMedical(kind));
     }
 
     public bool TryStartMedicalUse(MedicalItemKind kind)
@@ -208,7 +231,7 @@ public partial class TacticalPlayer
             if (Hud.TryTakeMedicalWheelConfirmation(out var confirmed))
             {
                 FinishMedicalWheel();
-                TryStartMedicalUse(confirmed);
+                TryStartFieldUse(confirmed);
                 return true;
             }
             if (!Input.IsActionPressed("medical_wheel"))
@@ -217,11 +240,11 @@ public partial class TacticalPlayer
                 FinishMedicalWheel();
                 if (accepted)
                 {
-                    TryStartMedicalUse(highlighted);
+                    TryStartFieldUse(highlighted);
                 }
                 else
                 {
-                    Hud.ShowLocalizedMessage("medical_empty", "NO MEDICAL SUPPLIES", new Color(1.0f, 0.42f, 0.24f));
+                    Hud.ShowLocalizedMessage("field_supply_empty", "NO FIELD SUPPLIES", new Color(1.0f, 0.42f, 0.24f));
                 }
                 return true;
             }
@@ -362,5 +385,37 @@ public partial class TacticalPlayer
         return true;
     }
 
-    internal void SetStaminaForDiagnostics(float value) => Stamina = Mathf.Clamp(value, 0.0f, 100.0f);
+    internal void SetStaminaForDiagnostics(float value)
+    {
+        Stamina = Mathf.Clamp(value, 0.0f, 100.0f);
+        _sprintRecoveryRequired = Stamina <= 0.01f;
+        _sprintRecoveryDelay = _sprintRecoveryRequired ? SprintRecoveryDelay : 0.0f;
+    }
+
+    internal void AdvanceStaminaForDiagnostics(float delta, bool sprintRequested)
+    {
+        var sprinting = sprintRequested && Stamina > 1.0f && !SprintRecoveryRequired;
+        UpdateStaminaState(delta, sprinting);
+    }
+
+    internal float SprintRecoveryThresholdForDiagnostics => SprintRecoveryThreshold;
+
+    internal bool IsPlateUseActiveForDiagnostics => _isPlating;
+
+    internal void SetArmorForDiagnostics(float percent)
+    {
+        EquippedBodyArmor.Durability = EquippedBodyArmor.Definition.MaxDurability
+            * Mathf.Clamp(percent, 0.0f, 100.0f) / 100.0f;
+    }
+
+    internal bool CompletePlateUseForDiagnostics()
+    {
+        if (!_isPlating)
+        {
+            return false;
+        }
+        _plateTime = 0.0f;
+        UpdatePlate(0.0f);
+        return !_isPlating;
+    }
 }

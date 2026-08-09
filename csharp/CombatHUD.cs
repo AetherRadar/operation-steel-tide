@@ -1053,7 +1053,6 @@ public partial class CombatHUD : CanvasLayer
             Grade = LootGrade.Uncommon
         }.StackValue;
         total += player.TotalReserveAmmo * 2;
-        total += player.ArmorPlates * 40;
         return total;
     }
 
@@ -1289,6 +1288,16 @@ public partial class CombatHUD : CanvasLayer
         if (_shownPlayer is not null)
         {
             UpdateBackpackHotkey(_shownPlayer);
+        }
+    }
+
+    public void SetStaminaRecoveryState(bool recovering)
+    {
+        if (IsInstanceValid(_staminaBar))
+        {
+            _staminaBar.Modulate = recovering
+                ? new Color(1.0f, 0.55f, 0.22f)
+                : new Color(0.46f, 0.92f, 0.68f);
         }
     }
 

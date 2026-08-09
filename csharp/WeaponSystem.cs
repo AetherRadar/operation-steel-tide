@@ -39,7 +39,8 @@ public enum LootItemKind
     ArmorPlate,
     Equipment,
     KnifeSkin,
-    Medical
+    Medical,
+    Valuable
 }
 
 /// <summary>Extraction-style item rarity. Higher grade = higher sell value and brighter world glow.</summary>
@@ -341,6 +342,7 @@ public sealed class LootItem
     public AmmoCaliber AmmoCaliber { get; init; } = AmmoCaliber.Rifle;
     public string KnifeSkinId { get; init; } = string.Empty;
     public MedicalItemKind MedicalKind { get; init; } = MedicalItemKind.Bandage;
+    public ValuableItemKind ValuableKind { get; init; } = ValuableItemKind.CannedCoffee;
     public int Quantity { get; set; } = 1;
     public LootGrade Grade { get; init; } = LootGrade.Common;
 
@@ -358,6 +360,7 @@ public sealed class LootItem
                 ? GameLocalization.Get("knife_skin", language, "Knife finish")
                 : KnifeSkinCatalog.Definition(KnifeSkinId).DisplayName(language),
             LootItemKind.Medical => $"{MedicalItems.DisplayName(MedicalKind, language)} x{Quantity}",
+            LootItemKind.Valuable => $"{ValuableItems.DisplayName(ValuableKind, language)} x{Quantity}",
             _ => GameLocalization.IsChinese(language) ? "物品" : "Item"
         };
         return GameLocalization.IsChinese(language) ? $"[{gradeTag}] {core}" : $"[{gradeTag}] {core}";
@@ -395,6 +398,16 @@ public sealed class LootItem
         {
             return MedicalItems.EffectDescription(MedicalKind, language) + "  " + valueLine;
         }
+        if (Kind == LootItemKind.ArmorPlate)
+        {
+            var repair = ArmorPlateSupplies.RepairFraction(Grade) * 100.0f;
+            return GameLocalization.Get("armor_plate_effect", language, "REPAIRS EQUIPPED BODY ARMOR")
+                + $" {repair:0}%  //  {valueLine}";
+        }
+        if (Kind == LootItemKind.Valuable)
+        {
+            return ValuableItems.Detail(ValuableKind, language) + "  " + valueLine;
+        }
         return GameLocalization.IsChinese(language)
             ? $"可放入个人背包  {valueLine}"
             : $"Can be stored in the backpack  {valueLine}";
@@ -415,6 +428,7 @@ public sealed class LootItem
                 LootItemKind.Ammunition => 2 + (int)Grade,
                 LootItemKind.KnifeSkin => baseValue + 140,
                 LootItemKind.Medical => MedicalItems.Definition(MedicalKind).UnitValue + (int)Grade * 30,
+                LootItemKind.Valuable => ValuableItems.Definition(ValuableKind).BaseValue + baseValue,
                 _ => baseValue
             };
         }

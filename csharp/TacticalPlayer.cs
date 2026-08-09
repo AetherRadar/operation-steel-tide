@@ -33,6 +33,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private const float Gravity = 22.0f;
     private const float ReloadDuration = 2.45f;
     private const float KnifeAttackDuration = 0.64f;
+    private const float SprintRecoveryThreshold = 28.0f;
+    private const float SprintRecoveryDelay = 0.8f;
+    private const int MaxArmorPlates = 3;
 
     public float Health { get; private set; } = 100.0f;
     public EquipmentItem EquippedHelmet { get; private set; } = EquipmentCatalog.Create("helmet_light");
@@ -57,7 +60,21 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
     }
     public int Grenades { get; private set; } = 2;
-    public int ArmorPlates { get; private set; } = 2;
+    public int ArmorPlates
+    {
+        get
+        {
+            var total = 0;
+            foreach (var item in Backpack)
+            {
+                if (item.Kind == LootItemKind.ArmorPlate)
+                {
+                    total += Mathf.Max(0, item.Quantity);
+                }
+            }
+            return total;
+        }
+    }
     public bool IsDead { get; set; }
     public bool HasMovementIntent { get; private set; }
     public bool IsAiming => _isAiming;
@@ -79,6 +96,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     /// <summary>False at cold-start extraction until a looted primary is equipped.</summary>
     public bool HasFireablePrimary { get; private set; } = true;
     public bool UiLocked { get; set; }
+    public bool SprintRecoveryRequired => _sprintRecoveryRequired || _sprintRecoveryDelay > 0.0f;
     public bool IsInVehicle => _vehicle is not null && GodotObject.IsInstanceValid(_vehicle);
     public DriveableVehicle? CurrentVehicle => IsInVehicle ? _vehicle : null;
     public WeaponStats CurrentWeaponStats => EquippedWeapon.Stats();
@@ -93,6 +111,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         Ammo = 0;
         ResetAmmoReserves();
         EnsureEmergencyMedicalLoadout();
+        EnsureEmergencyArmorLoadout();
         SwitchWeapon(true);
         if (IsInstanceValid(_weaponRoot))
         {
@@ -127,6 +146,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private float _reloadTime;
     private int _reloadSoundStage;
     private float _plateTime;
+    private float _plateDuration;
+    private float _plateRepairFraction;
+    private string _plateItemId = string.Empty;
+    private bool _sprintRecoveryRequired;
+    private float _sprintRecoveryDelay;
     private float _pitch;
     private float _recoilPitch;
     private float _recoilSide;
@@ -1091,6 +1115,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private void PushHudStats()
     {
         Hud?.SetStats(Health, Armor, Stamina, Ammo, ReserveAmmo, Grenades);
+        Hud?.SetStaminaRecoveryState(SprintRecoveryRequired);
         Hud?.SetAmmoTier(CurrentAmmoGrade);
         Hud?.SetMedicalInventory(this);
     }
@@ -1217,7 +1242,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var crouching = _stance == PlayerStance.Crouched;
         var prone = _stance == PlayerStance.Prone;
         var sprinting = Input.IsActionPressed("sprint") && input.Y < -0.15f && !crouching && !prone
-            && Stamina > 1.0f && !_isAiming;
+            && Stamina > 1.0f && !SprintRecoveryRequired && !_isAiming;
         var speed = (prone ? ProneSpeed : crouching ? CrouchSpeed : sprinting ? SprintSpeed : WalkSpeed)
             * RoleMovementMultiplier
             * MedicalMovementMultiplier;
@@ -1250,9 +1275,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             velocity.Z = horizontal.Y;
         }
 
-        Stamina = sprinting
-            ? Mathf.Max(0.0f, Stamina - delta * 21.0f * MedicalStaminaDrainMultiplier)
-            : Mathf.Min(100.0f, Stamina + delta * 14.0f * MedicalStaminaRecoveryMultiplier);
+        UpdateStaminaState(delta, sprinting);
         if (!IsOnFloor())
         {
             velocity.Y -= Gravity * delta;
@@ -1381,6 +1404,39 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private static float SmoothFactor(float response, float delta)
     {
         return 1.0f - Mathf.Exp(-response * Mathf.Max(0.0f, delta));
+    }
+
+    private void UpdateStaminaState(float delta, bool sprinting)
+    {
+        if (sprinting)
+        {
+            Stamina = Mathf.Max(0.0f, Stamina - delta * 21.0f * MedicalStaminaDrainMultiplier);
+            if (Stamina <= 0.01f && !_sprintRecoveryRequired)
+            {
+                _sprintRecoveryRequired = true;
+                _sprintRecoveryDelay = SprintRecoveryDelay;
+                Hud?.ShowLocalizedMessage("stamina_exhausted", "STAMINA EXHAUSTED  //  RECOVER", new Color(1.0f, 0.62f, 0.24f));
+            }
+            return;
+        }
+
+        if (_sprintRecoveryDelay > 0.0f)
+        {
+            var recoveryDelta = Mathf.Max(0.0f, delta - _sprintRecoveryDelay);
+            _sprintRecoveryDelay = Mathf.Max(0.0f, _sprintRecoveryDelay - delta);
+            if (recoveryDelta <= 0.0f)
+            {
+                return;
+            }
+            delta = recoveryDelta;
+        }
+        Stamina = Mathf.Min(100.0f, Stamina + delta * 14.0f * MedicalStaminaRecoveryMultiplier);
+        if (_sprintRecoveryRequired
+            && _sprintRecoveryDelay <= 0.0f
+            && Stamina >= SprintRecoveryThreshold)
+        {
+            _sprintRecoveryRequired = false;
+        }
     }
 
     private void UpdateCameraAndWeapon(float delta)
@@ -1908,15 +1964,42 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         return t * t * (3.0f - 2.0f * t);
     }
 
-    private void StartPlate()
+    private bool StartPlate(string preferredItemId = "")
     {
         if (_isPlating || _isReloading || MedicalActionBlocksWeapon || ArmorPlates <= 0 || Armor >= 99.0f || IsDead)
         {
-            return;
+            return false;
         }
+        var plateIndex = !string.IsNullOrEmpty(preferredItemId)
+            ? Backpack.FindIndex(item => item.Id == preferredItemId && item.Kind == LootItemKind.ArmorPlate && item.Quantity > 0)
+            : -1;
+        if (plateIndex < 0)
+        {
+            for (var index = 0; index < Backpack.Count; index++)
+            {
+                var item = Backpack[index];
+                if (item.Kind != LootItemKind.ArmorPlate || item.Quantity <= 0)
+                {
+                    continue;
+                }
+                if (plateIndex < 0 || item.Grade < Backpack[plateIndex].Grade)
+                {
+                    plateIndex = index;
+                }
+            }
+        }
+        if (plateIndex < 0)
+        {
+            return false;
+        }
+        var plate = Backpack[plateIndex];
         _isPlating = true;
-        _plateTime = 2.4f;
+        _plateDuration = Mathf.Max(1.65f, 2.55f - (int)plate.Grade * 0.16f);
+        _plateTime = _plateDuration;
+        _plateRepairFraction = ArmorPlateSupplies.RepairFraction(plate.Grade);
+        _plateItemId = plate.Id;
         Hud?.SetEquipmentActionLocalized("applying_armor", "APPLYING ARMOR", 0.0f, true);
+        return true;
     }
 
     private void UpdatePlate(float delta)
@@ -1932,18 +2015,34 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             return;
         }
         _plateTime -= delta;
-        Hud?.SetEquipmentActionLocalized("applying_armor", "APPLYING ARMOR", 1.0f - _plateTime / 2.4f, true);
+        Hud?.SetEquipmentActionLocalized("applying_armor", "APPLYING ARMOR", 1.0f - _plateTime / Mathf.Max(0.01f, _plateDuration), true);
         if (_plateTime > 0.0f)
         {
+            return;
+        }
+        var plateIndex = Backpack.FindIndex(item => item.Id == _plateItemId && item.Kind == LootItemKind.ArmorPlate && item.Quantity > 0);
+        if (plateIndex < 0)
+        {
+            CancelPlate();
             return;
         }
         var armorDefinition = EquippedBodyArmor.Definition;
         EquippedBodyArmor.Durability = Mathf.Min(
             armorDefinition.MaxDurability,
-            EquippedBodyArmor.Durability + armorDefinition.MaxDurability * 0.4f);
-        ArmorPlates--;
+            EquippedBodyArmor.Durability + armorDefinition.MaxDurability * _plateRepairFraction);
+        var plate = Backpack[plateIndex];
+        plate.Quantity--;
+        if (plate.Quantity <= 0)
+        {
+            Backpack.RemoveAt(plateIndex);
+        }
         _isPlating = false;
+        _plateTime = 0.0f;
+        _plateDuration = 0.0f;
+        _plateItemId = string.Empty;
         Hud?.SetEquipmentAction(string.Empty, 0.0f, false);
+        Hud?.SetBackpackValuePlayer(this);
+        Hud?.SetMedicalInventory(this);
         Hud?.ShowLocalizedMessage("armor_secured", "ARMOR PLATE SECURED", new Color(0.4f, 0.76f, 1.0f));
     }
 
@@ -1955,6 +2054,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
         _isPlating = false;
         _plateTime = 0.0f;
+        _plateDuration = 0.0f;
+        _plateItemId = string.Empty;
         Hud?.SetEquipmentAction(string.Empty, 0.0f, false);
     }
 
@@ -1998,20 +2099,24 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         return true;
     }
 
-    public bool TryCollectArmorPlate()
+    public bool TryCollectArmorPlate(LootGrade grade = LootGrade.Uncommon, int quantity = 1)
     {
-        const int maxArmorPlates = 3;
-        if (ArmorPlates >= maxArmorPlates)
+        if (!TryStoreArmorPlate(grade, quantity))
         {
             return false;
         }
-        ArmorPlates++;
         Hud?.ShowLocalizedMessage("armor_recovered", "SPARE ARMOR RECOVERED", new Color(0.42f, 0.72f, 1.0f));
+        Hud?.SetBackpackValuePlayer(this);
+        Hud?.SetMedicalInventory(this);
         return true;
     }
 
     public bool TryStoreInBackpack(LootItem item)
     {
+        if (item.Kind == LootItemKind.ArmorPlate)
+        {
+            return TryCollectArmorPlate(item.Grade, Mathf.Max(1, item.Quantity));
+        }
         if (item.Kind == LootItemKind.Medical)
         {
             var existing = Backpack.Find(candidate => candidate.Kind == LootItemKind.Medical
@@ -2023,6 +2128,19 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 Hud?.ShowLocalizedMessage("medical_recovered", "MEDICAL SUPPLIES RECOVERED", MedicalItems.Definition(item.MedicalKind).Accent);
                 Hud?.SetBackpackValuePlayer(this);
                 Hud?.SetMedicalInventory(this);
+                return true;
+            }
+        }
+        if (item.Kind == LootItemKind.Valuable)
+        {
+            var existing = Backpack.Find(candidate => candidate.Kind == LootItemKind.Valuable
+                && candidate.ValuableKind == item.ValuableKind
+                && candidate.Grade == item.Grade);
+            if (existing is not null)
+            {
+                existing.Quantity += Mathf.Max(1, item.Quantity);
+                Hud?.ShowLocalizedMessage("valuable_recovered", "VALUABLE SECURED", LootGrades.GlowColor(item.Grade));
+                Hud?.SetBackpackValuePlayer(this);
                 return true;
             }
         }
@@ -2078,7 +2196,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             Hud?.ShowLocalizedMessage("knife_skin_equipped", "KNIFE FINISH EQUIPPED", new Color(0.88f, 0.42f, 0.34f));
             return new LootItem { Kind = LootItemKind.KnifeSkin, KnifeSkinId = previousSkin, Grade = LootGrade.Uncommon };
         }
-        if (item.Kind == LootItemKind.ArmorPlate && TryCollectArmorPlate())
+        if (item.Kind == LootItemKind.ArmorPlate && TryCollectArmorPlate(item.Grade, item.Quantity))
         {
             return null;
         }
@@ -2130,6 +2248,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             return TryStartMedicalUse(item.MedicalKind);
         }
+        if (item.Kind == LootItemKind.ArmorPlate)
+        {
+            return StartPlate(item.Id);
+        }
         var replacement = EquipFromLoot(item);
         if (ReferenceEquals(replacement, item))
         {
@@ -2143,6 +2265,33 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             Backpack[index] = replacement;
         }
+        return true;
+    }
+
+    private bool TryStoreArmorPlate(LootGrade grade, int quantity)
+    {
+        quantity = Mathf.Max(1, quantity);
+        if (ArmorPlates + quantity > MaxArmorPlates)
+        {
+            return false;
+        }
+        var existing = Backpack.Find(item => item.Kind == LootItemKind.ArmorPlate && item.Grade == grade);
+        if (existing is not null)
+        {
+            existing.Quantity += quantity;
+            return true;
+        }
+        if (Backpack.Count >= BackpackCapacity)
+        {
+            Hud?.ShowLocalizedMessage("backpack_full", "BACKPACK FULL", new Color(1.0f, 0.48f, 0.28f));
+            return false;
+        }
+        Backpack.Add(new LootItem
+        {
+            Kind = LootItemKind.ArmorPlate,
+            Quantity = quantity,
+            Grade = grade
+        });
         return true;
     }
 

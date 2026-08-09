@@ -6,22 +6,23 @@ namespace OperationSteelTide;
 
 public partial class MedicalWheelControl : Control
 {
-    public event Action<MedicalItemKind>? Confirmed;
+    public event Action<FieldUseKind>? Confirmed;
 
-    private static readonly MedicalItemKind[] ItemOrder =
+    private static readonly FieldUseKind[] ItemOrder =
     {
-        MedicalItemKind.Bandage,
-        MedicalItemKind.FieldMedkit,
-        MedicalItemKind.Adrenaline
+        FieldUseKind.Bandage,
+        FieldUseKind.FieldMedkit,
+        FieldUseKind.Adrenaline,
+        FieldUseKind.ArmorPlate
     };
 
-    private readonly Dictionary<MedicalItemKind, int> _counts = new();
+    private readonly Dictionary<FieldUseKind, int> _counts = new();
     private readonly Label[] _labels = new Label[ItemOrder.Length];
     private int _highlightedIndex;
     private bool _pointerInRing;
     private string _language = "en";
 
-    public MedicalItemKind HighlightedKind => ItemOrder[_highlightedIndex];
+    public FieldUseKind HighlightedKind => ItemOrder[_highlightedIndex];
     public bool HighlightedAvailable => Count(HighlightedKind) > 0;
 
     public override void _Ready()
@@ -54,7 +55,7 @@ public partial class MedicalWheelControl : Control
         _language = GameLocalization.IsChinese(language) ? "zh" : "en";
         foreach (var kind in ItemOrder)
         {
-            _counts[kind] = player.MedicalCount(kind);
+            _counts[kind] = player.FieldUseCount(kind);
         }
         _highlightedIndex = FirstAvailableIndex();
         _pointerInRing = false;
@@ -63,7 +64,7 @@ public partial class MedicalWheelControl : Control
         QueueRedraw();
     }
 
-    public int Count(MedicalItemKind kind) => _counts.TryGetValue(kind, out var count) ? count : 0;
+    public int Count(FieldUseKind kind) => _counts.TryGetValue(kind, out var count) ? count : 0;
 
     public override void _GuiInput(InputEvent @event)
     {
@@ -94,7 +95,7 @@ public partial class MedicalWheelControl : Control
         const int arcSteps = 18;
         for (var index = 0; index < ItemOrder.Length; index++)
         {
-            var definition = MedicalItems.Definition(ItemOrder[index]);
+            var definition = FieldUseItems.Definition(ItemOrder[index]);
             var available = Count(ItemOrder[index]) > 0;
             var selected = index == _highlightedIndex;
             var color = available ? definition.Accent : new Color(0.22f, 0.24f, 0.24f);
@@ -102,8 +103,9 @@ public partial class MedicalWheelControl : Control
                 ? color.Lightened(0.12f) with { A = 0.96f }
                 : color.Darkened(0.48f) with { A = available ? 0.88f : 0.72f };
             var centerAngle = SectorCenter(index);
-            var start = centerAngle - Mathf.Pi / 3.0f + 0.025f;
-            var end = centerAngle + Mathf.Pi / 3.0f - 0.025f;
+            var halfSector = Mathf.Tau / ItemOrder.Length * 0.5f;
+            var start = centerAngle - halfSector + 0.025f;
+            var end = centerAngle + halfSector - 0.025f;
             var points = new List<Vector2>(arcSteps * 2 + 2);
             for (var step = 0; step <= arcSteps; step++)
             {
@@ -126,7 +128,7 @@ public partial class MedicalWheelControl : Control
         DrawArc(center, innerRadius * 0.78f, 0, Mathf.Pi * 2.0f, 64, new Color(0.38f, 0.9f, 0.72f, 0.9f), 3.0f, true);
     }
 
-    internal void SelectForDiagnostics(MedicalItemKind kind)
+    internal void SelectForDiagnostics(FieldUseKind kind)
     {
         var index = Array.IndexOf(ItemOrder, kind);
         if (index < 0)
@@ -207,10 +209,10 @@ public partial class MedicalWheelControl : Control
         for (var index = 0; index < ItemOrder.Length; index++)
         {
             var kind = ItemOrder[index];
-            var definition = MedicalItems.Definition(kind);
+            var definition = FieldUseItems.Definition(kind);
             var count = Count(kind);
             var selected = index == _highlightedIndex;
-            _labels[index].Text = $"{definition.Glyph}  {MedicalItems.DisplayName(kind, _language)}\nx{count}\n{MedicalItems.EffectDescription(kind, _language)}";
+            _labels[index].Text = $"{definition.Glyph}  {FieldUseItems.DisplayName(kind, _language)}\nx{count}\n{FieldUseItems.EffectDescription(kind, _language)}";
             _labels[index].AddThemeColorOverride(
                 "font_color",
                 count <= 0
@@ -231,12 +233,7 @@ public partial class MedicalWheelControl : Control
         return 0;
     }
 
-    private static float SectorCenter(int index) => index switch
-    {
-        1 => Mathf.Pi / 6.0f,
-        2 => Mathf.Pi * 5.0f / 6.0f,
-        _ => -Mathf.Pi / 2.0f
-    };
+    private static float SectorCenter(int index) => -Mathf.Pi * 0.5f + index * Mathf.Tau / ItemOrder.Length;
 
     private static float AngularDistance(float a, float b)
     {

@@ -10,16 +10,41 @@ public partial class FreightTerminalWorld
     {
         DisableActorsForSurvivalDiagnostics();
         await WaitFrames(3);
-        _player.Backpack.RemoveAll(item => item.Kind == LootItemKind.Medical);
+        _player.Backpack.RemoveAll(item => item.Kind is LootItemKind.Medical or LootItemKind.ArmorPlate);
         _player.GrantMedicalItemForDiagnostics(MedicalItemKind.Bandage, 2);
         _player.GrantMedicalItemForDiagnostics(MedicalItemKind.FieldMedkit, 2);
         _player.GrantMedicalItemForDiagnostics(MedicalItemKind.Adrenaline, 2);
+        var plateStored = _player.TryStoreInBackpack(new LootItem
+        {
+            Kind = LootItemKind.ArmorPlate,
+            Quantity = 1,
+            Grade = LootGrade.Rare
+        });
+        var plateStacks = 0;
+        foreach (var item in _player.Backpack)
+        {
+            if (item.Kind == LootItemKind.ArmorPlate)
+            {
+                plateStacks++;
+            }
+        }
+        var plateInBackpack = plateStored
+            && plateStacks == 1
+            && _player.ArmorPlates == 1
+            && _player.FieldUseCount(FieldUseKind.ArmorPlate) == 1;
 
         var wheelOpened = _hud.OpenMedicalWheel(_player) && _hud.IsMedicalWheelVisible;
         _hud.SelectMedicalWheelForDiagnostics(MedicalItemKind.FieldMedkit);
         var wheelClicked = _hud.ConfirmMedicalWheelForDiagnostics();
         var wheelChoice = _hud.TryTakeMedicalWheelConfirmation(out var selected)
-            && selected == MedicalItemKind.FieldMedkit
+            && selected == FieldUseKind.FieldMedkit
+            && !_hud.IsMedicalWheelVisible;
+
+        var plateWheelOpened = _hud.OpenMedicalWheel(_player) && _hud.IsMedicalWheelVisible;
+        _hud.SelectMedicalWheelForDiagnostics(FieldUseKind.ArmorPlate);
+        var plateWheelClicked = _hud.ConfirmMedicalWheelForDiagnostics();
+        var plateWheelChoice = _hud.TryTakeMedicalWheelConfirmation(out var plateSelected)
+            && plateSelected == FieldUseKind.ArmorPlate
             && !_hud.IsMedicalWheelVisible;
 
         _player.SetHealthForDiagnostics(24.0f);
@@ -40,6 +65,19 @@ public partial class FreightTerminalWorld
             && _player.Stamina >= 99.0f
             && _player.Health > 45.0f
             && _player.MedicalCount(MedicalItemKind.Adrenaline) == adrenalineBefore - 1;
+
+        _player.SetArmorForDiagnostics(20.0f);
+        var armorBefore = _player.Armor;
+        var platesBefore = _player.ArmorPlates;
+        var plateStarted = _player.TryStartFieldUse(FieldUseKind.ArmorPlate);
+        var plateHeldUntilCompletion = plateStarted
+            && _player.IsPlateUseActiveForDiagnostics
+            && _player.ArmorPlates == platesBefore;
+        var plateCompleted = _player.CompletePlateUseForDiagnostics();
+        var plateRepaired = plateCompleted
+            && _player.Armor >= armorBefore + ArmorPlateSupplies.RepairFraction(LootGrade.Rare) * 100.0f - 0.1f
+            && _player.ArmorPlates == platesBefore - 1;
+        var emptyPlateBlocked = !_player.TryStartFieldUse(FieldUseKind.ArmorPlate);
 
         var beforeStack = _player.MedicalCount(MedicalItemKind.Bandage);
         var stackedA = _player.TryStoreInBackpack(new LootItem
@@ -95,6 +133,10 @@ public partial class FreightTerminalWorld
         var valid = wheelOpened
             && wheelClicked
             && wheelChoice
+            && plateWheelOpened
+            && plateWheelClicked
+            && plateWheelChoice
+            && plateInBackpack
             && medkitStarted
             && medkitBlockedWeapon
             && medkitCompleted
@@ -102,13 +144,166 @@ public partial class FreightTerminalWorld
             && adrenalineStarted
             && adrenalineCompleted
             && adrenalineApplied
+            && plateStarted
+            && plateHeldUntilCompletion
+            && plateRepaired
+            && emptyPlateBlocked
             && stackingWorked
             && allCachesCarryMedicine
             && medicalKinds.Count == Enum.GetValues<MedicalItemKind>().Length
             && wheelAction
             && wheelKeyBound;
-        GD.Print($"MEDICAL_CHECK valid={valid} wheel_open={wheelOpened} clicked={wheelClicked} choice={wheelChoice} medkit_started={medkitStarted} hands_busy={medkitBlockedWeapon} medkit_healed={medkitHealed} adrenaline_started={adrenalineStarted} adrenaline_active={adrenalineApplied} stacking={stackingWorked} cache_medicine={cacheMedicalCount} all_caches={allCachesCarryMedicine} medicine_types={medicalKinds.Count}/3 input_action={wheelAction} key_b={wheelKeyBound}");
+        GD.Print($"MEDICAL_CHECK valid={valid} wheel_open={wheelOpened} clicked={wheelClicked} choice={wheelChoice} plate_wheel={plateWheelOpened && plateWheelClicked && plateWheelChoice} plate_backpack={plateInBackpack} plate_started={plateStarted} plate_held={plateHeldUntilCompletion} plate_repaired={plateRepaired} plate_empty_blocked={emptyPlateBlocked} armor={armorBefore:0.0}->{_player.Armor:0.0} medkit_started={medkitStarted} hands_busy={medkitBlockedWeapon} medkit_healed={medkitHealed} adrenaline_started={adrenalineStarted} adrenaline_active={adrenalineApplied} stacking={stackingWorked} cache_medicine={cacheMedicalCount} all_caches={allCachesCarryMedicine} medicine_types={medicalKinds.Count}/3 input_action={wheelAction} key_b={wheelKeyBound}");
         GD.Print($"MEDICAL_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void ValidateStaminaRecovery()
+    {
+        DisableActorsForSurvivalDiagnostics();
+        _player.ProcessMode = ProcessModeEnum.Disabled;
+        await WaitFrames(2);
+
+        _player.SetStaminaForDiagnostics(2.0f);
+        var initiallyReady = !_player.SprintRecoveryRequired;
+        _player.AdvanceStaminaForDiagnostics(0.2f, true);
+        var exhausted = _player.Stamina <= 0.01f && _player.SprintRecoveryRequired;
+
+        _player.AdvanceStaminaForDiagnostics(0.4f, false);
+        var delayLocked = _player.Stamina <= 0.01f && _player.SprintRecoveryRequired;
+
+        _player.AdvanceStaminaForDiagnostics(0.4f, false);
+        var delayCompletedWithoutRecovery = _player.Stamina <= 0.01f && _player.SprintRecoveryRequired;
+
+        _player.AdvanceStaminaForDiagnostics(1.7f, false);
+        var thresholdLocked = _player.Stamina < _player.SprintRecoveryThresholdForDiagnostics
+            && _player.SprintRecoveryRequired;
+
+        _player.AdvanceStaminaForDiagnostics(0.3f, false);
+        var recovered = _player.Stamina >= _player.SprintRecoveryThresholdForDiagnostics
+            && !_player.SprintRecoveryRequired;
+        var staminaBeforeResume = _player.Stamina;
+        _player.AdvanceStaminaForDiagnostics(0.1f, true);
+        var sprintResumed = _player.Stamina < staminaBeforeResume && !_player.SprintRecoveryRequired;
+
+        var valid = initiallyReady
+            && exhausted
+            && delayLocked
+            && delayCompletedWithoutRecovery
+            && thresholdLocked
+            && recovered
+            && sprintResumed;
+        GD.Print($"STAMINA_CHECK valid={valid} initially_ready={initiallyReady} exhausted={exhausted} delay_locked={delayLocked} delay_no_regen={delayCompletedWithoutRecovery} threshold_locked={thresholdLocked} recovered={recovered} sprint_resumed={sprintResumed} threshold={_player.SprintRecoveryThresholdForDiagnostics:0.0} stamina={_player.Stamina:0.0}");
+        GD.Print($"STAMINA_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void ValidateLootVariety()
+    {
+        DisableActorsForSurvivalDiagnostics();
+        await WaitFrames(4);
+
+        var expectedKinds = Enum.GetValues<ValuableItemKind>().Length;
+        var expectedGrades = Enum.GetValues<LootGrade>().Length;
+        var definitionKinds = new HashSet<ValuableItemKind>();
+        var definitionGrades = new HashSet<LootGrade>();
+        var localizedDefinitions = true;
+        var minimumValueByGrade = new int[expectedGrades];
+        var maximumValueByGrade = new int[expectedGrades];
+        for (var index = 0; index < minimumValueByGrade.Length; index++)
+        {
+            minimumValueByGrade[index] = int.MaxValue;
+        }
+
+        foreach (var definition in ValuableItems.All)
+        {
+            definitionKinds.Add(definition.Kind);
+            definitionGrades.Add(definition.NativeGrade);
+            var englishName = ValuableItems.DisplayName(definition.Kind, "en");
+            var chineseName = ValuableItems.DisplayName(definition.Kind, "zh");
+            localizedDefinitions &= !string.IsNullOrWhiteSpace(englishName)
+                && !string.IsNullOrWhiteSpace(chineseName)
+                && !string.Equals(englishName, chineseName, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(ValuableItems.Detail(definition.Kind, "zh"));
+            var item = new LootItem
+            {
+                Kind = LootItemKind.Valuable,
+                ValuableKind = definition.Kind,
+                Grade = definition.NativeGrade
+            };
+            var gradeIndex = (int)definition.NativeGrade;
+            minimumValueByGrade[gradeIndex] = Math.Min(minimumValueByGrade[gradeIndex], item.UnitValue);
+            maximumValueByGrade[gradeIndex] = Math.Max(maximumValueByGrade[gradeIndex], item.UnitValue);
+        }
+
+        var separatedGradeValues = true;
+        for (var index = 1; index < expectedGrades; index++)
+        {
+            separatedGradeValues &= minimumValueByGrade[index] > maximumValueByGrade[index - 1];
+        }
+
+        var worldKinds = new HashSet<ValuableItemKind>();
+        var worldGrades = new HashSet<LootGrade>();
+        var valuableWorldPickups = 0;
+        var worldVisualsReady = true;
+        var nativeGradesMatch = true;
+        foreach (var source in _lootSources)
+        {
+            foreach (var item in source.Loot)
+            {
+                if (item.Kind != LootItemKind.Valuable)
+                {
+                    continue;
+                }
+                valuableWorldPickups++;
+                worldKinds.Add(item.ValuableKind);
+                worldGrades.Add(item.Grade);
+                nativeGradesMatch &= item.Grade == ValuableItems.Definition(item.ValuableKind).NativeGrade;
+                worldVisualsReady &= source is GradedLootPickup pickup && pickup.VisualReady;
+            }
+        }
+
+        _player.Backpack.RemoveAll(item => item.Kind == LootItemKind.Valuable);
+        var stackA = _player.TryStoreInBackpack(new LootItem
+        {
+            Kind = LootItemKind.Valuable,
+            ValuableKind = ValuableItemKind.SmartPhone,
+            Quantity = 1,
+            Grade = LootGrade.Uncommon
+        });
+        var stackB = _player.TryStoreInBackpack(new LootItem
+        {
+            Kind = LootItemKind.Valuable,
+            ValuableKind = ValuableItemKind.SmartPhone,
+            Quantity = 2,
+            Grade = LootGrade.Uncommon
+        });
+        var matchingStacks = 0;
+        var stackedQuantity = 0;
+        foreach (var item in _player.Backpack)
+        {
+            if (item.Kind == LootItemKind.Valuable
+                && item.ValuableKind == ValuableItemKind.SmartPhone
+                && item.Grade == LootGrade.Uncommon)
+            {
+                matchingStacks++;
+                stackedQuantity += item.Quantity;
+            }
+        }
+        var stackingWorked = stackA && stackB && matchingStacks == 1 && stackedQuantity == 3;
+
+        var valid = definitionKinds.Count == expectedKinds
+            && definitionGrades.Count == expectedGrades
+            && localizedDefinitions
+            && separatedGradeValues
+            && worldKinds.Count == expectedKinds
+            && worldGrades.Count == expectedGrades
+            && valuableWorldPickups >= expectedKinds
+            && nativeGradesMatch
+            && worldVisualsReady
+            && stackingWorked;
+        GD.Print($"LOOT_VARIETY_CHECK valid={valid} definitions={definitionKinds.Count}/{expectedKinds} grades={definitionGrades.Count}/{expectedGrades} localized={localizedDefinitions} value_bands={separatedGradeValues} world_kinds={worldKinds.Count}/{expectedKinds} world_grades={worldGrades.Count}/{expectedGrades} world_pickups={valuableWorldPickups} native_grades={nativeGradesMatch} visuals={worldVisualsReady} stacking={stackingWorked}");
+        GD.Print($"LOOT_VARIETY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
 
@@ -198,12 +393,14 @@ public partial class FreightTerminalWorld
     {
         DisableActorsForSurvivalDiagnostics();
         _player.ProcessMode = ProcessModeEnum.Disabled;
+        _player.Backpack.RemoveAll(item => item.Kind is LootItemKind.Medical or LootItemKind.ArmorPlate);
         _player.GrantMedicalItemForDiagnostics(MedicalItemKind.Bandage, 2);
         _player.GrantMedicalItemForDiagnostics(MedicalItemKind.FieldMedkit, 2);
         _player.GrantMedicalItemForDiagnostics(MedicalItemKind.Adrenaline, 2);
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 1, Grade = LootGrade.Epic });
         _hud.SetLanguage("zh");
         _hud.OpenMedicalWheel(_player);
-        _hud.SelectMedicalWheelForDiagnostics(MedicalItemKind.Adrenaline);
+        _hud.SelectMedicalWheelForDiagnostics(FieldUseKind.ArmorPlate);
         await WaitFrames(8);
         SaveViewportImage("res://medical_wheel_validation.png");
         GD.Print($"MEDICAL_WHEEL_CAPTURE path=medical_wheel_validation.png {_hud.MedicalWheelLayoutForDiagnostics()}");

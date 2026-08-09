@@ -60,6 +60,23 @@ public partial class LootItemIconControl : Control
                 DrawRect(new Rect2(center.X - 10, center.Y - 11, 20, 22), _accent.Darkened(0.16f));
                 DrawLine(new Vector2(center.X - 7, center.Y), new Vector2(center.X + 7, center.Y), _accent.Lightened(0.28f), 2, true);
                 break;
+            case LootItemKind.Medical:
+                DrawRect(new Rect2(center.X - 15, center.Y - 12, 30, 24), muted);
+                DrawRect(new Rect2(center.X - 3, center.Y - 9, 6, 18), _accent);
+                DrawRect(new Rect2(center.X - 10, center.Y - 3, 20, 6), _accent);
+                break;
+            case LootItemKind.Valuable:
+                var diamond = new[]
+                {
+                    new Vector2(center.X, center.Y - 16),
+                    new Vector2(center.X + 16, center.Y),
+                    new Vector2(center.X, center.Y + 16),
+                    new Vector2(center.X - 16, center.Y)
+                };
+                DrawColoredPolygon(diamond, muted);
+                DrawPolyline(new[] { diamond[0], diamond[1], diamond[2], diamond[3], diamond[0] }, _accent, 3.0f, true);
+                DrawCircle(center, 4.0f, _accent.Lightened(0.24f));
+                break;
             case LootItemKind.Attachment:
                 DrawRect(new Rect2(center.X - 16, center.Y + 7, 32, 5), muted);
                 DrawRect(new Rect2(center.X - 10, center.Y - 8, 20, 15), _accent.Darkened(0.18f));

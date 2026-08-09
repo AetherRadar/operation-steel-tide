@@ -110,6 +110,7 @@ public partial class FreightTerminalWorld : Node3D
         BuildSquadSystem();
         SpawnLootCases();
         SpawnBuildingGradedLoot();
+        SpawnCivilianValuableLoot();
         SpawnEnemies();
         SpawnHostileOperatorSquads();
         SpawnExplosives();
@@ -297,6 +298,14 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--validate-medical"))
         {
             ValidateMedicalSystem();
+        }
+        else if (Array.Exists(args, value => value == "--validate-stamina"))
+        {
+            ValidateStaminaRecovery();
+        }
+        else if (Array.Exists(args, value => value == "--validate-loot-variety"))
+        {
+            ValidateLootVariety();
         }
         else if (Array.Exists(args, value => value == "--validate-hit-feedback"))
         {
@@ -1052,7 +1061,7 @@ public partial class FreightTerminalWorld : Node3D
     private LootItem CreateGradedLootItem(LootGrade grade)
     {
         var roll = _rng.Randf();
-        if (roll < 0.28f)
+        if (roll < 0.22f)
         {
             var tier = grade >= LootGrade.Legendary ? 2 : grade >= LootGrade.Rare ? 1 : 0;
             return new LootItem
@@ -1068,7 +1077,7 @@ public partial class FreightTerminalWorld : Node3D
                 Grade = grade
             };
         }
-        if (roll < 0.5f)
+        if (roll < 0.42f)
         {
             return new LootItem
             {
@@ -1077,7 +1086,7 @@ public partial class FreightTerminalWorld : Node3D
                 Grade = grade
             };
         }
-        if (roll < 0.72f)
+        if (roll < 0.6f)
         {
             return new LootItem
             {
@@ -1086,9 +1095,30 @@ public partial class FreightTerminalWorld : Node3D
                 Grade = grade
             };
         }
-        if (roll < 0.88f)
+        if (roll < 0.72f)
         {
             return new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = grade >= LootGrade.Rare ? 2 : 1, Grade = grade };
+        }
+        if (roll < 0.82f)
+        {
+            return new LootItem
+            {
+                Kind = LootItemKind.Medical,
+                MedicalKind = grade >= LootGrade.Epic
+                    ? MedicalItemKind.Adrenaline
+                    : grade >= LootGrade.Rare ? MedicalItemKind.FieldMedkit : MedicalItemKind.Bandage,
+                Quantity = grade >= LootGrade.Rare ? 2 : 1,
+                Grade = grade
+            };
+        }
+        if (roll < 0.95f)
+        {
+            return new LootItem
+            {
+                Kind = LootItemKind.Valuable,
+                ValuableKind = ValuableItems.SelectForGrade(grade, (int)_rng.Randi()),
+                Grade = grade
+            };
         }
         var caliber = grade >= LootGrade.Epic
             ? AmmoCaliber.Sniper
@@ -1813,11 +1843,10 @@ public partial class FreightTerminalWorld : Node3D
     private void UseBackpackItem(string itemId)
     {
         var item = _player.Backpack.Find(candidate => candidate.Id == itemId);
-        if (item?.Kind == LootItemKind.Medical)
+        if (item?.Kind is LootItemKind.Medical or LootItemKind.ArmorPlate)
         {
-            var kind = item.MedicalKind;
             CloseLoot();
-            _player.TryStartMedicalUse(kind);
+            _player.UseBackpackItem(itemId);
             return;
         }
         if (_player.UseBackpackItem(itemId))
@@ -2542,16 +2571,19 @@ public partial class FreightTerminalWorld : Node3D
             enemy.ProcessMode = ProcessModeEnum.Disabled;
         }
         SetLanguage("zh");
-        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = "optic_holo" });
-        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = "muzzle_suppressor" });
-        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Ammunition, Quantity = 48 });
+        _player.Backpack.Clear();
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.Bandage, Quantity = 2, Grade = LootGrade.Common });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.FieldMedkit, Quantity = 1, Grade = LootGrade.Rare });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.Adrenaline, Quantity = 1, Grade = LootGrade.Epic });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 2, Grade = LootGrade.Rare });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Sniper, Quantity = 18, Grade = LootGrade.Epic });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.KnifeSkin, KnifeSkinId = "knife_arctic", Grade = LootGrade.Epic });
-        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 1 });
-        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Weapon, Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 2) });
-        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("helmet_heavy") });
-        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("armor_heavy") });
-        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("pack_heavy") });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Weapon, Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 2), Grade = LootGrade.Rare });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("armor_heavy"), Grade = LootGrade.Rare });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("pack_heavy"), Grade = LootGrade.Rare });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Valuable, ValuableKind = ValuableItemKind.CannedCoffee, Quantity = 2, Grade = LootGrade.Common });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Valuable, ValuableKind = ValuableItemKind.GraphicsCard, Grade = LootGrade.Rare });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Valuable, ValuableKind = ValuableItemKind.AntiqueClock, Grade = LootGrade.Legendary });
         OpenPersonalBackpack();
         await WaitFrames(30);
         SaveViewportImage("res://backpack_validation.png");

@@ -107,6 +107,7 @@ public partial class GradedLootPickup : StaticBody3D, ILootSource
         var color = LootGrades.GlowColor(Grade);
         if (IsInstanceValid(_core))
         {
+            _core.Mesh = BuildItemMesh();
             _core.MaterialOverride = new StandardMaterial3D
             {
                 AlbedoColor = color * 0.35f,
@@ -129,5 +130,45 @@ public partial class GradedLootPickup : StaticBody3D, ILootSource
                 ? LootGrades.DisplayName(Grade, "zh") + "  " + Loot[0].StackValue
                 : string.Empty;
         }
+    }
+
+    private PrimitiveMesh BuildItemMesh()
+    {
+        if (Loot.Count == 0)
+        {
+            return new BoxMesh { Size = new Vector3(0.48f, 0.28f, 0.34f) };
+        }
+        var item = Loot[0];
+        if (item.Kind == LootItemKind.Medical)
+        {
+            return item.MedicalKind == MedicalItemKind.Adrenaline
+                ? new CylinderMesh { TopRadius = 0.06f, BottomRadius = 0.06f, Height = 0.42f, RadialSegments = 12 }
+                : new BoxMesh
+                {
+                    Size = item.MedicalKind == MedicalItemKind.FieldMedkit
+                        ? new Vector3(0.5f, 0.3f, 0.38f)
+                        : new Vector3(0.38f, 0.16f, 0.28f)
+                };
+        }
+        if (item.Kind == LootItemKind.ArmorPlate)
+        {
+            return new BoxMesh { Size = new Vector3(0.38f, 0.46f, 0.08f) };
+        }
+        if (item.Kind == LootItemKind.Valuable)
+        {
+            return item.ValuableKind switch
+            {
+                ValuableItemKind.CannedCoffee or ValuableItemKind.DesignerPerfume or ValuableItemKind.AntiqueClock
+                    => new CylinderMesh { TopRadius = 0.13f, BottomRadius = 0.13f, Height = 0.34f, RadialSegments = 16 },
+                ValuableItemKind.CollectorCoin or ValuableItemKind.Wristwatch
+                    => new CylinderMesh { TopRadius = 0.16f, BottomRadius = 0.16f, Height = 0.06f, RadialSegments = 20 },
+                ValuableItemKind.SmartPhone or ValuableItemKind.EncryptedDrive
+                    => new BoxMesh { Size = new Vector3(0.25f, 0.05f, 0.42f) },
+                ValuableItemKind.VintageCamera
+                    => new BoxMesh { Size = new Vector3(0.42f, 0.3f, 0.24f) },
+                _ => new BoxMesh { Size = new Vector3(0.42f, 0.22f, 0.32f) }
+            };
+        }
+        return new BoxMesh { Size = new Vector3(0.48f, 0.28f, 0.34f) };
     }
 }
