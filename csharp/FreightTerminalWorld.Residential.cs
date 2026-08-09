@@ -891,8 +891,9 @@ public partial class FreightTerminalWorld
         Godot.Material rail,
         Godot.Material light)
     {
-        // Thin tread plates only (no floor-to-top filled pillars = no z-fighting flicker).
-        // More steps / shallow rise (~0.10 m) so capsules climb with FloorSnap + step-up assist.
+        // Keep discrete treads for capsule and ballistic collisions, but register them on one
+        // static body per floor instead of one body per part. Across 96 floors this removes
+        // thousands of broadphase bodies without changing the walkable surfaces.
         var halfRise = ResidentialFloorHeight * 0.5f;
         const int steps = 16;
         var stepRise = halfRise / steps;
@@ -907,22 +908,51 @@ public partial class FreightTerminalWorld
         var landingSouthZ = lowerStartZ + 0.2f;
         var landingNorthZ = landingSouthZ - landingDepth;
         var landingCenterZ = (landingNorthZ + landingSouthZ) * 0.5f;
+        var stairCollision = new StaticBody3D
+        {
+            Name = $"ResidentialStairCollision_F{floor}",
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        tower.AddChild(stairCollision);
 
-        // Lower flight (west) — each step is a single thin plate at its top height.
+        var stepMultiMesh = new MultiMesh
+        {
+            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+            Mesh = new BoxMesh { Size = new Vector3(treadWidth, treadThickness, treadDepth) },
+            InstanceCount = steps * 2
+        };
+        var stepVisual = new MultiMeshInstance3D
+        {
+            Name = $"ResidentialStairSteps_F{floor}",
+            Position = new Vector3(0, floorY, 0),
+            Multimesh = stepMultiMesh,
+            MaterialOverride = stair,
+            VisibilityRangeEnd = 82.0f,
+            VisibilityRangeEndMargin = 8.0f
+        };
+        tower.AddChild(stepVisual);
+        var visualIndex = 0;
+
+        // Lower flight (west) -- each step remains an independent collision surface.
         for (var step = 0; step < steps; step++)
         {
             var topY = floorY + stepRise * (step + 1);
             var z = upperStartZ - stepRun * (step + 0.5f);
-            ExpansionBox(
-                tower,
+            var position = new Vector3(-1.45f, topY - treadThickness * 0.5f, z);
+            AddResidentialStairCollision(
+                stairCollision,
                 $"ResidentialStairStep_L{floor}_{step}",
-                new Vector3(-1.45f, topY - treadThickness * 0.5f, z),
-                new Vector3(treadWidth, treadThickness, treadDepth),
-                stair);
+                position,
+                new Vector3(treadWidth, treadThickness, treadDepth));
+            stepMultiMesh.SetInstanceTransform(
+                visualIndex++,
+                new Transform3D(Basis.Identity, new Vector3(position.X, position.Y - floorY, position.Z)));
         }
 
         // Full mid-level platform gives a standing player room to clear the first flight and turn.
-        ExpansionBox(
+        AddResidentialStairPart(
+            stairCollision,
             tower,
             $"ResidentialStairLanding_F{floor}",
             new Vector3(0, floorY + halfRise - treadThickness * 0.5f, landingCenterZ),
@@ -934,12 +964,15 @@ public partial class FreightTerminalWorld
         {
             var topY = floorY + halfRise + stepRise * (step + 1);
             var z = lowerStartZ + stepRun * (step + 0.5f);
-            ExpansionBox(
-                tower,
+            var position = new Vector3(1.45f, topY - treadThickness * 0.5f, z);
+            AddResidentialStairCollision(
+                stairCollision,
                 $"ResidentialStairStep_U{floor}_{step}",
-                new Vector3(1.45f, topY - treadThickness * 0.5f, z),
-                new Vector3(treadWidth, treadThickness, treadDepth),
-                stair);
+                position,
+                new Vector3(treadWidth, treadThickness, treadDepth));
+            stepMultiMesh.SetInstanceTransform(
+                visualIndex++,
+                new Transform3D(Basis.Identity, new Vector3(position.X, position.Y - floorY, position.Z)));
         }
 
         // The center spine separates the flights but stops south of the open turn platform.
@@ -950,22 +983,57 @@ public partial class FreightTerminalWorld
         var shaftSouthZ = upperStartZ + 0.45f;
         var shaftCenterZ = (shaftNorthZ + shaftSouthZ) * 0.5f;
         var shaftSideDepth = shaftSouthZ - shaftNorthZ - 0.12f;
-        ExpansionBox(tower, $"ResidentialStairSpine_F{floor}", new Vector3(0, coreTop, (spineNorthZ + spineSouthZ) * 0.5f), new Vector3(0.24f, ResidentialFloorHeight, spineSouthZ - spineNorthZ), stair);
-        ExpansionBox(tower, $"ResidentialStairShaftN_F{floor}", new Vector3(0, coreTop, shaftNorthZ), new Vector3(5.44f, ResidentialFloorHeight, 0.12f), stair);
-        ExpansionBox(tower, $"ResidentialStairShaftW_F{floor}", new Vector3(-2.66f, coreTop, shaftCenterZ), new Vector3(0.12f, ResidentialFloorHeight, shaftSideDepth), stair);
-        ExpansionBox(tower, $"ResidentialStairShaftE_F{floor}", new Vector3(2.66f, coreTop, shaftCenterZ), new Vector3(0.12f, ResidentialFloorHeight, shaftSideDepth), stair);
+        AddResidentialStairPart(stairCollision, tower, $"ResidentialStairSpine_F{floor}", new Vector3(0, coreTop, (spineNorthZ + spineSouthZ) * 0.5f), new Vector3(0.24f, ResidentialFloorHeight, spineSouthZ - spineNorthZ), stair);
+        AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftN_F{floor}", new Vector3(0, coreTop, shaftNorthZ), new Vector3(5.44f, ResidentialFloorHeight, 0.12f), stair);
+        AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftW_F{floor}", new Vector3(-2.66f, coreTop, shaftCenterZ), new Vector3(0.12f, ResidentialFloorHeight, shaftSideDepth), stair);
+        AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftE_F{floor}", new Vector3(2.66f, coreTop, shaftCenterZ), new Vector3(0.12f, ResidentialFloorHeight, shaftSideDepth), stair);
         const float shaftDoorHalf = 1.1f;
         var shaftSideWidth = 2.72f - shaftDoorHalf;
-        ExpansionBox(tower, $"ResidentialStairShaftSW_F{floor}", new Vector3(-(shaftDoorHalf + shaftSideWidth * 0.5f), floorY + 0.1f + 1.275f, upperStartZ + 0.45f), new Vector3(shaftSideWidth, 2.55f, 0.12f), stair);
-        ExpansionBox(tower, $"ResidentialStairShaftSE_F{floor}", new Vector3(shaftDoorHalf + shaftSideWidth * 0.5f, floorY + 0.1f + 1.275f, upperStartZ + 0.45f), new Vector3(shaftSideWidth, 2.55f, 0.12f), stair);
-        ExpansionBox(tower, $"ResidentialStairShaftSH_F{floor}", new Vector3(0, floorY + 0.1f + 2.55f + (ResidentialFloorHeight - 2.55f) * 0.5f, upperStartZ + 0.45f), new Vector3(shaftDoorHalf * 2.0f, Mathf.Max(0.12f, ResidentialFloorHeight - 2.55f), 0.12f), stair);
-        MeshBox(
+        AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftSW_F{floor}", new Vector3(-(shaftDoorHalf + shaftSideWidth * 0.5f), floorY + 0.1f + 1.275f, upperStartZ + 0.45f), new Vector3(shaftSideWidth, 2.55f, 0.12f), stair);
+        AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftSE_F{floor}", new Vector3(shaftDoorHalf + shaftSideWidth * 0.5f, floorY + 0.1f + 1.275f, upperStartZ + 0.45f), new Vector3(shaftSideWidth, 2.55f, 0.12f), stair);
+        AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftSH_F{floor}", new Vector3(0, floorY + 0.1f + 2.55f + (ResidentialFloorHeight - 2.55f) * 0.5f, upperStartZ + 0.45f), new Vector3(shaftDoorHalf * 2.0f, Mathf.Max(0.12f, ResidentialFloorHeight - 2.55f), 0.12f), stair);
+        var landingRail = MeshBox(
             tower,
             new Vector3(0, floorY + halfRise + 0.95f, landingNorthZ + 0.08f),
             new Vector3(5.0f, 0.08f, 0.08f),
             rail);
-        MeshBox(tower, new Vector3(0, floorY + halfRise + 1.35f, landingNorthZ + 0.08f), new Vector3(1.8f, 0.04f, 0.16f), light);
+        landingRail.Name = $"ResidentialStairLandingRail_F{floor}";
+        landingRail.VisibilityRangeEnd = 82.0f;
+        landingRail.VisibilityRangeEndMargin = 8.0f;
+        var landingLight = MeshBox(tower, new Vector3(0, floorY + halfRise + 1.35f, landingNorthZ + 0.08f), new Vector3(1.8f, 0.04f, 0.16f), light);
+        landingLight.Name = $"ResidentialStairLandingLight_F{floor}";
+        landingLight.VisibilityRangeEnd = 82.0f;
+        landingLight.VisibilityRangeEndMargin = 8.0f;
         _residentialStairFlightCount += 2;
+    }
+
+    private static void AddResidentialStairCollision(
+        StaticBody3D body,
+        string name,
+        Vector3 position,
+        Vector3 size)
+    {
+        body.AddChild(new CollisionShape3D
+        {
+            Name = name,
+            Position = position,
+            Shape = new BoxShape3D { Size = size }
+        });
+    }
+
+    private static void AddResidentialStairPart(
+        StaticBody3D collisionBody,
+        Node3D visualParent,
+        string name,
+        Vector3 position,
+        Vector3 size,
+        Godot.Material material)
+    {
+        AddResidentialStairCollision(collisionBody, name, position, size);
+        var visual = MeshBox(visualParent, position, size, material);
+        visual.Name = name + "_Visual";
+        visual.VisibilityRangeEnd = 82.0f;
+        visual.VisibilityRangeEndMargin = 8.0f;
     }
 
     private void BuildTowerRoof(

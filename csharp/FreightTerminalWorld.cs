@@ -301,6 +301,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateHitFeedback();
         }
+        else if (Array.Exists(args, value => value == "--validate-performance"))
+        {
+            ValidateMapPerformance();
+        }
         else if (Array.Exists(args, value => value == "--capture-residential"))
         {
             CaptureResidentialCommunity();
@@ -3243,7 +3247,10 @@ public partial class FreightTerminalWorld : Node3D
 
         // Structural: thin StairStep plates exist; no StairRamp slabs under this tower.
         var stepBodies = 0;
+        var stepShapes = 0;
         var rampBodies = 0;
+        var rampShapes = 0;
+        var consolidatedBodies = 0;
         foreach (var child in firstTower.GetChildren())
         {
             if (child is not StaticBody3D body)
@@ -3256,14 +3263,37 @@ public partial class FreightTerminalWorld : Node3D
             {
                 stepBodies++;
             }
+            if (n.Contains("ResidentialStairCollision", StringComparison.OrdinalIgnoreCase))
+            {
+                consolidatedBodies++;
+            }
             if (n.Contains("StairRamp", StringComparison.OrdinalIgnoreCase)
                 && !n.Contains("StairStep", StringComparison.OrdinalIgnoreCase))
             {
                 rampBodies++;
             }
+            foreach (var bodyChild in body.GetChildren())
+            {
+                if (bodyChild is not CollisionShape3D shape)
+                {
+                    continue;
+                }
+                var shapeName = shape.Name.ToString();
+                if (shapeName.Contains("StairStep", StringComparison.OrdinalIgnoreCase)
+                    || shapeName.Contains("StairLanding", StringComparison.OrdinalIgnoreCase))
+                {
+                    stepShapes++;
+                }
+                if (shapeName.Contains("StairRamp", StringComparison.OrdinalIgnoreCase)
+                    && !shapeName.Contains("StairStep", StringComparison.OrdinalIgnoreCase))
+                {
+                    rampShapes++;
+                }
+            }
         }
-        var steppedCollider = stepBodies >= 10;
-        var rampSlabAbsent = rampBodies == 0;
+        var steppedCollider = stepShapes >= firstSpec.Floors * 32 || stepBodies >= firstSpec.Floors * 32;
+        var consolidated = consolidatedBodies == firstSpec.Floors;
+        var rampSlabAbsent = rampBodies == 0 && rampShapes == 0;
         // Hangar must not keep the old rotated ramp name.
         var hangar = _levelRoot.GetNodeOrNull<Node3D>("MaintenanceDistrict");
         var hangarRampGone = hangar is null || hangar.GetNodeOrNull("HangarStair") is null;
@@ -3318,8 +3348,8 @@ public partial class FreightTerminalWorld : Node3D
         Input.ActionRelease("move_forward");
         var walkGain = _player.GlobalPosition.Y - walkStartY;
         var walked = reachedIndex >= waypoints.Length - 1 && walkGain > ResidentialFloorHeight - 0.4f;
-        var valid = steppedCollider && rampSlabAbsent && hangarRampGone && walked && _residentialStairFlightCount > 0;
-        GD.Print($"STAIRS_CHECK valid={valid} step_bodies={stepBodies} ramp_bodies={rampBodies} stepped={steppedCollider} no_ramp_slab={rampSlabAbsent} hangar_ok={hangarRampGone} walk_h={walkGain:0.00} reached={reachedIndex + 1}/{waypoints.Length} climbed={walked} flights={_residentialStairFlightCount}");
+        var valid = steppedCollider && consolidated && rampSlabAbsent && hangarRampGone && walked && _residentialStairFlightCount > 0;
+        GD.Print($"STAIRS_CHECK valid={valid} step_bodies={stepBodies} step_shapes={stepShapes} consolidated_bodies={consolidatedBodies} consolidated={consolidated} ramp_bodies={rampBodies} ramp_shapes={rampShapes} stepped={steppedCollider} no_ramp_slab={rampSlabAbsent} hangar_ok={hangarRampGone} walk_h={walkGain:0.00} reached={reachedIndex + 1}/{waypoints.Length} climbed={walked} flights={_residentialStairFlightCount}");
         GD.Print($"STAIRS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
