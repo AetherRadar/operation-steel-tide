@@ -350,13 +350,13 @@ public partial class FreightTerminalWorld
             UpdateLeaderReviveAi(delta);
             if (_localPlayerDowned)
             {
-                UpdateSquadSpectatorCamera();
                 var helpIncoming = _leaderReviver is not null && IsInstanceValid(_leaderReviver) && !_leaderReviver.IsDowned;
                 if (!helpIncoming)
                 {
                     // Bleed-out keeps running until a mate commits to the revive.
                     _localPlayerDownedTimer += delta;
                 }
+                _hud.UpdateDownedState(22.0f - _localPlayerDownedTimer);
                 if (_localPlayerDownedTimer >= 22.0f)
                 {
                     FailSquadMission();
@@ -1185,12 +1185,8 @@ public partial class FreightTerminalWorld
         _localPlayerDownedTimer = 0.0f;
         _player.UiLocked = false;
         Input.MouseMode = Input.MouseModeEnum.Captured;
-        BeginSquadMateView();
+        RestoreLocalPlayerView();
         _hud.ShowDownedState(22.0f);
-        _hud.ShowLocalizedMessage(
-            "player_downed",
-            "YOU ARE DOWN  //  CRAWL  //  TEAMMATE MOVING TO REVIVE",
-            new Color(1.0f, 0.34f, 0.2f));
         return true;
     }
 
@@ -1313,7 +1309,8 @@ public partial class FreightTerminalWorld
         }
         var reviverMate = _squadMates.FirstOrDefault(m => IsInstanceValid(m) && !m.IsHumanProxy && !m.IsDowned);
         var aiReviveOk = false;
-        var squadMateViewOnDown = false;
+        var playerViewOnDown = false;
+        var downedBannerVisible = false;
         var playerViewAfterRevive = false;
         if (reviverMate is not null)
         {
@@ -1330,7 +1327,8 @@ public partial class FreightTerminalWorld
             }
             var aiReviveDowned = _player.IsDead && _localPlayerDowned;
             await WaitFrames(1);
-            squadMateViewOnDown = IsSquadMateViewCurrent;
+            playerViewOnDown = IsLocalPlayerViewCurrent;
+            downedBannerVisible = _hud.IsDownedBannerVisible;
             for (var second = 0; second < 16 && _player.IsDead; second++)
             {
                 await ToSignal(GetTree().CreateTimer(1.0f), SceneTreeTimer.SignalName.Timeout);
@@ -1339,7 +1337,7 @@ public partial class FreightTerminalWorld
             playerViewAfterRevive = IsLocalPlayerViewCurrent;
             aiReviveOk = aiReviveDowned && !_player.IsDead && _player.ReviveUsed
                 && !_localPlayerDowned && !reviverMate.IsRevivingLeader
-                && squadMateViewOnDown && playerViewAfterRevive;
+                && playerViewOnDown && downedBannerVisible && playerViewAfterRevive;
         }
 
         _player.SetHealthForDiagnostics(10.0f);
@@ -1358,7 +1356,7 @@ public partial class FreightTerminalWorld
         var reviveOk = mateDowned && firstRevive && mateUp && bodyBagOk && secondReviveBlocked
             && playerDowned && playerFirstRevive && playerUp && playerSecondBlocked;
 
-        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} revive_once={reviveOk} ai_leader_revive={aiReviveOk} squad_view_on_down={squadMateViewOnDown} player_view_after_revive={playerViewAfterRevive} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
+        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} revive_once={reviveOk} ai_leader_revive={aiReviveOk} player_view_on_down={playerViewOnDown} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
         GD.Print($"SQUAD_PASS valid={ActiveSquadCount >= 2 && roleFillOk && reviveOk && aiReviveOk}");
         GetTree().Quit(roleFillOk && reviveOk && aiReviveOk ? 0 : 2);
     }

@@ -46,6 +46,9 @@ public partial class CombatHUD : CanvasLayer
     private ColorRect _stateOverlay = null!;
     private Label _stateTitle = null!;
     private Label _stateSubtitle = null!;
+    private ColorRect _downedBanner = null!;
+    private Label _downedTitle = null!;
+    private Label _downedSubtitle = null!;
     private Label _compassLabel = null!;
     private Label _phaseLabel = null!;
     private Label _alertLabel = null!;
@@ -465,6 +468,7 @@ public partial class CombatHUD : CanvasLayer
         BuildMedicalHud(root);
         BuildTacticalHud(root);
         BuildExtractionHud(root);
+        BuildDownedBanner(root);
         _stateOverlay = new ColorRect
         {
             Color = new Color(0.005f, 0.009f, 0.011f, 0.86f),
@@ -489,6 +493,45 @@ public partial class CombatHUD : CanvasLayer
         BuildLootOverlay(root);
         BuildSquadHud(root);
         root.MoveChild(_lootOverlay, root.GetChildCount() - 1);
+    }
+
+    private void BuildDownedBanner(Control root)
+    {
+        _downedBanner = new ColorRect
+        {
+            Color = new Color(0.025f, 0.018f, 0.018f, 0.8f),
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Visible = false,
+            ZIndex = 20
+        };
+        _downedBanner.SetAnchorsPreset(Control.LayoutPreset.CenterBottom);
+        _downedBanner.Position = new Vector2(-330, -126);
+        _downedBanner.Size = new Vector2(660, 82);
+        root.AddChild(_downedBanner);
+        _downedBanner.AddChild(new ColorRect
+        {
+            Color = new Color(0.96f, 0.2f, 0.14f, 0.95f),
+            Position = Vector2.Zero,
+            Size = new Vector2(5, 82),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        });
+        _downedBanner.AddChild(new ColorRect
+        {
+            Color = new Color(0.96f, 0.2f, 0.14f, 0.72f),
+            Position = new Vector2(5, 0),
+            Size = new Vector2(655, 2),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        });
+        _downedTitle = Label("DOWNED", 22, new Color(1.0f, 0.38f, 0.28f));
+        _downedTitle.Position = new Vector2(22, 9);
+        _downedTitle.Size = new Vector2(616, 30);
+        _downedTitle.HorizontalAlignment = HorizontalAlignment.Center;
+        _downedBanner.AddChild(_downedTitle);
+        _downedSubtitle = Label("CRAWL TO COVER  //  AWAITING MEDIC", 13, new Color(0.9f, 0.88f, 0.84f));
+        _downedSubtitle.Position = new Vector2(22, 43);
+        _downedSubtitle.Size = new Vector2(616, 24);
+        _downedSubtitle.HorizontalAlignment = HorizontalAlignment.Center;
+        _downedBanner.AddChild(_downedSubtitle);
     }
 
     private static Label PositionedLabel(string text, int size, Color color, float x, float y)
@@ -1549,6 +1592,7 @@ public partial class CombatHUD : CanvasLayer
         int wallet = 0,
         bool profileSaved = true)
     {
+        _downedBanner.Visible = false;
         _stateOverlay.Visible = true;
         if (victory)
         {
@@ -1591,23 +1635,25 @@ public partial class CombatHUD : CanvasLayer
 
     public void ShowDownedState(float reviveWindowSeconds = 15.0f)
     {
-        _stateOverlay.Visible = true;
-        _stateTitle.Text = Text("operator_down", "OPERATOR DOWN");
-        _stateTitle.AddThemeColorOverride("font_color", new Color(1.0f, 0.27f, 0.18f));
-        var wait = GameLocalization.IsChinese(_language)
-            ? $"等待医疗救援  //  {Mathf.CeilToInt(reviveWindowSeconds)} 秒"
-            : $"AWAITING MEDIC  //  {Mathf.CeilToInt(reviveWindowSeconds)}s";
-        _stateSubtitle.Text = wait;
+        _downedBanner.Visible = true;
+        UpdateDownedState(reviveWindowSeconds);
+    }
+
+    public void UpdateDownedState(float reviveWindowSeconds)
+    {
+        if (!_downedBanner.Visible)
+        {
+            return;
+        }
+        _downedTitle.Text = Text("downed_title", "OPERATOR DOWNED");
+        _downedSubtitle.Text = $"{Text("downed_crawl", "CRAWL TO COVER")}  //  "
+            + $"{Text("downed_wait", "AWAITING MEDIC")}  {Mathf.CeilToInt(Mathf.Max(0.0f, reviveWindowSeconds))}s";
     }
 
     public void HideDownedState()
     {
-        // Only clear the soft-down overlay; mission result screens stay up.
-        if (_stateOverlay.Visible
-            && (_stateSubtitle.Text.Contains("AWAITING MEDIC", StringComparison.Ordinal)
-                || _stateSubtitle.Text.Contains("等待医疗", StringComparison.Ordinal)))
-        {
-            _stateOverlay.Visible = false;
-        }
+        _downedBanner.Visible = false;
     }
+
+    public bool IsDownedBannerVisible => IsInstanceValid(_downedBanner) && _downedBanner.Visible;
 }
