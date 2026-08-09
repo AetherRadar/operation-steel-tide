@@ -158,6 +158,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         BuildOperator();
         _patrolOrigin = GlobalPosition;
         PickPatrolTarget();
+        InitializePursuitState();
         if (IsRivalSquad)
         {
             AddToGroup("rival_operators");
@@ -450,6 +451,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             return;
         }
 
+        UpdatePursuitTimers(dt);
         AcquireCombatTarget();
         var velocity = Velocity;
         if (!IsOnFloor())
@@ -483,7 +485,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         else
         {
             _noContactTimer += dt;
-            if (Alerted && !IsRivalSquad)
+            if (Alerted && !IsRivalSquad && !IsPursuing)
             {
                 // Drop stale alert when nothing is in contact range so loot can resume.
                 Alerted = false;
@@ -497,6 +499,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             {
                 _searchingLoot = false;
                 HoldSentryPosition(dt);
+            }
+            else if (IsPursuing)
+            {
+                UpdateLostContactMovement(dt);
             }
             else
             {
@@ -552,7 +558,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             // Rivals press any in-range hostile; NPCs need sight/suspicion/close contact.
             // Looting NPCs always flip to combat on mid-loot contact.
             if (Suspicion >= 100.0f || hasSight || midLootContact
-                || (IsRivalSquad && hasEngageTarget)
+                || (IsRivalSquad && hasEngageTarget && distance < 24.0f)
                 || (!IsRivalSquad && distance < 16.0f))
             {
                 Alerted = true;
@@ -561,12 +567,24 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             }
         }
 
+        if (Alerted && hasSight)
+        {
+            RefreshVisiblePursuitContact();
+        }
+        else if (Alerted && !IsPursuing)
+        {
+            BeginPursuitFromCurrentTarget(shareContact: true);
+        }
+
         if (Alerted || hasSight || midLootContact)
         {
             // Contact mid-loot always drops search and opens fire.
             _searchingLoot = false;
-            UpdateStance(dt, distance, hasSight || midLootContact);
-            Engage(dt, distance, hasSight || midLootContact);
+            var combatDistance = hasSight
+                ? distance
+                : GlobalPosition.DistanceTo(CurrentPursuitDestination());
+            UpdateStance(dt, combatDistance, hasSight);
+            Engage(dt, combatDistance, hasSight);
         }
         else if (_searchingLoot)
         {
@@ -595,6 +613,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
     private void AcquireCombatTarget()
     {
+        var previousTarget = AssignedCombatTargetNode();
+        var retainPrevious = CanRetainPursuitTarget(previousTarget);
         _combatTarget = null;
         _rawTarget = null;
         var contactAcquireRange = CurrentContactAcquireRange;
@@ -607,6 +627,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             {
                 _combatTarget = Player;
                 _rawTarget = Player;
+            }
+            else if (retainPrevious)
+            {
+                AssignCombatTarget(previousTarget);
             }
             return;
         }
@@ -679,6 +703,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             _rawTarget = bestNode;
         }
+        if (retainPrevious && previousTarget is not null
+            && (bestNode is null || bestNode != previousTarget && bestScore > 18.0f * 18.0f))
+        {
+            AssignCombatTarget(previousTarget);
+        }
+        else if (bestNode != previousTarget && IsPursuing)
+        {
+            ClearPursuitMemory(clearTarget: false);
+        }
         // No fallback to infinitely-distant player — leave EngageTargetNode null so loot idle can run.
     }
 
@@ -726,6 +759,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         _combatTarget = null;
         _rawTarget = null;
         _searchingLoot = false;
+        ClearPursuitMemory(clearTarget: false);
     }
 
     /// <summary>Zero fire cooldown so the next Engage tick can call the real FireAt* path immediately.</summary>
@@ -768,6 +802,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         Alerted = false;
         _combatTarget = null;
         _rawTarget = null;
+        ResetPursuitStateForDiagnostics();
         // Phase-1 duel may have removed this unit from the world roster on death.
         // Re-list so later validator phases (and AcquireCombatTarget) can see us again.
         Main?.EnsureEnemyRegisteredForDiagnostics(this);
@@ -784,6 +819,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         _noContactTimer = 0.0f;
         _combatTarget = null;
         _rawTarget = null;
+        ClearPursuitMemory(clearTarget: false);
     }
 
     private void UpdateLootSearch(float delta)
@@ -874,7 +910,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         // Seek cover when mid-fight and a cover point is available.
         if (IsRivalSquad && !_seekingCover && !_inCover && Main is not null && distance > 12.0f && _rng.Randf() < 0.55f)
         {
-            var cover = Main.FindCoverPoint(GlobalPosition, CurrentTargetPosition());
+            var cover = Main.FindCoverPoint(GlobalPosition, CurrentThreatPosition(hasSight));
             if (cover.Y > -500.0f && cover.DistanceTo(GlobalPosition) < 22.0f)
             {
                 _seekingCover = true;
@@ -1000,6 +1036,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         if (distance < radius * 0.42f)
         {
             Alerted = true;
+            RememberInvestigationPoint(origin, CurrentPursuitDuration * 0.65f);
             MissionDirector?.RaiseConfirmedAlarm();
         }
     }
@@ -1013,13 +1050,12 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         Suspicion = 100.0f;
         Alerted = true;
         _patrolTarget = investigatePosition;
+        RememberInvestigationPoint(investigatePosition, CurrentPursuitDuration * 0.7f);
         _fireTimer = _rng.RandfRange(0.45f, 0.9f);
     }
 
     private void Engage(float delta, float distance, bool hasSight)
     {
-        // Cover movement can run, but never fully suppress shooting once a target is locked.
-        var holdingCover = !SentryMode && UpdateCover(delta);
         if (_hitStun > 0.0f)
         {
             var stunnedVelocity = Velocity;
@@ -1027,7 +1063,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             stunnedVelocity.Z = Mathf.MoveToward(stunnedVelocity.Z, 0.0f, delta * 18.0f);
             Velocity = stunnedVelocity;
             // Still allow return fire while stunned at reduced cadence.
-            if (_fireTimer <= 0.0f && distance < CurrentFireRange && (hasSight || distance < 14.0f))
+            if (_fireTimer <= 0.0f && distance < CurrentFireRange && hasSight)
             {
                 if (_combatTarget is not null)
                 {
@@ -1041,7 +1077,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             return;
         }
 
+        if (!hasSight)
+        {
+            UpdateLostContactMovement(delta);
+            return;
+        }
+
         var combatPosition = CurrentTargetPosition();
+        // Cover movement can run, but never fully suppress shooting once a target is locked.
+        var holdingCover = !SentryMode && UpdateCover(delta, combatPosition);
         var targetFlat = new Vector3(combatPosition.X, GlobalPosition.Y, combatPosition.Z);
         if (GlobalPosition.DistanceTo(targetFlat) > 0.1f)
         {
@@ -1087,7 +1131,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
         if (!holdingCover)
         {
-            var speed = SentryMode ? 0.0f : IsProne ? 1.1f : distance > 19.0f ? 3.7f : 2.4f;
+            var speed = SentryMode ? 0.0f : IsProne ? 1.1f : distance > 19.0f ? 5.2f : 2.4f;
             if (IsRivalSquad)
             {
                 speed *= 1.08f;
@@ -1114,7 +1158,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         }
     }
 
-    private bool UpdateCover(float delta)
+    private bool UpdateCover(float delta, Vector3 combatPosition)
     {
         if (_seekingCover)
         {
@@ -1149,7 +1193,6 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             velocity.X = Mathf.MoveToward(velocity.X, 0.0f, delta * 12.0f);
             velocity.Z = Mathf.MoveToward(velocity.Z, 0.0f, delta * 12.0f);
             Velocity = velocity;
-            var combatPosition = (_combatTarget ?? Player).CombatNode.GlobalPosition;
             var targetFlat = new Vector3(combatPosition.X, GlobalPosition.Y, combatPosition.Z);
             if (GlobalPosition.DistanceTo(targetFlat) > 0.1f)
             {
@@ -1337,6 +1380,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             Player = tacticalPlayer;
         }
+        RegisterDamageThreat(attacker);
         var localHeight = hitPosition.Y - GlobalPosition.Y;
         var region = localHeight > 1.48f
             ? HitRegion.Head
@@ -1368,7 +1412,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         if (_health > 0.0f && !SentryMode && !_seekingCover && !_inCover && Main is not null
             && (_health < 76.0f || _rng.Randf() < 0.4f))
         {
-            var threatPosition = (_combatTarget ?? Player).CombatNode.GlobalPosition;
+            var threatPosition = CurrentThreatPosition(hasSight: false);
             var candidate = Main.FindCoverPoint(GlobalPosition, threatPosition);
             if (candidate.Y > -100.0f)
             {
@@ -1405,6 +1449,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             return;
         }
         IsDead = true;
+        ClearPursuitMemory(clearTarget: true);
         CollisionLayer = 0;
         CollisionMask = 0;
         Velocity = Vector3.Zero;

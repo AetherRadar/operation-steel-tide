@@ -2842,13 +2842,15 @@ public partial class FreightTerminalWorld : Node3D
         var hpB = rivalB.CurrentHealth;
         var shotsA0 = rivalA.AttackShotsFired;
         var shotsB0 = rivalB.AttackShotsFired;
+        var sawVsEnemyTarget = false;
         for (var i = 0; i < 100; i++)
         {
             rivalA.ArmWeaponForDiagnostics();
             rivalB.ArmWeaponForDiagnostics();
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            sawVsEnemyTarget |= rivalA.EngageTargetNode == rivalB || rivalB.EngageTargetNode == rivalA;
         }
-        var vsEnemyTarget = rivalA.EngageTargetNode == rivalB || rivalB.EngageTargetNode == rivalA;
+        var vsEnemyTarget = sawVsEnemyTarget;
         var vsEnemyShots = rivalA.AttackShotsFired > shotsA0 || rivalB.AttackShotsFired > shotsB0;
         var vsEnemyDamage = rivalA.CurrentHealth < hpA - 0.01f || rivalB.CurrentHealth < hpB - 0.01f
             || rivalA.IsDead || rivalB.IsDead;
@@ -3002,11 +3004,117 @@ public partial class FreightTerminalWorld : Node3D
             leftLootForCombat = true;
         }
 
+        // --- 5) Pursuit memory, squad contact sharing, and local wall avoidance ---
+        var pursuitPair = teamA?.Members
+            .Where(member => IsInstanceValid(member))
+            .Take(2)
+            .ToArray()
+            ?? Array.Empty<EnemyOperator>();
+        var pursuitPairReady = pursuitPair.Length == 2;
+        var pursuitRetained = false;
+        var pursuitAdvanced = false;
+        var memoryStayedFrozen = false;
+        var squadContactShared = false;
+        var damageThreatLocked = false;
+        var wallFlanked = false;
+        if (pursuitPairReady)
+        {
+            var pursuer = pursuitPair[0];
+            var wingman = pursuitPair[1];
+            pursuer.ResetTacticalStateForDiagnostics();
+            wingman.ResetTacticalStateForDiagnostics();
+            pursuer.GrantFireablePrimaryForDiagnostics();
+            wingman.GrantFireablePrimaryForDiagnostics();
+            EnsureEnemyRegisteredForDiagnostics(pursuer);
+            EnsureEnemyRegisteredForDiagnostics(wingman);
+            foreach (var enemy in _enemies.ToArray())
+            {
+                if (!IsInstanceValid(enemy) || enemy == pursuer || enemy == wingman)
+                {
+                    continue;
+                }
+                enemy.GlobalPosition = new Vector3(205.0f, 0.2f, 205.0f);
+                enemy.ProcessMode = ProcessModeEnum.Disabled;
+            }
+            foreach (var mate in _squadMates)
+            {
+                if (IsInstanceValid(mate))
+                {
+                    mate.GlobalPosition = new Vector3(220.0f, 0.2f, 220.0f);
+                    mate.ProcessMode = ProcessModeEnum.Disabled;
+                }
+            }
+
+            _player.SetHealthForDiagnostics(_player.MaxHealth);
+            _player.IsDead = false;
+            _player.ProcessMode = ProcessModeEnum.Inherit;
+            _player.RestoreMovementInput();
+            var pursuitOrigin = new Vector3(8.0f, 0.25f, 18.0f);
+            var contactPoint = pursuitOrigin + new Vector3(0.0f, 0.0f, 10.0f);
+            pursuer.GlobalPosition = pursuitOrigin;
+            wingman.GlobalPosition = pursuitOrigin + new Vector3(-3.0f, 0.0f, -0.5f);
+            _player.GlobalPosition = contactPoint;
+            pursuer.ProcessMode = ProcessModeEnum.Inherit;
+            wingman.ProcessMode = ProcessModeEnum.Inherit;
+            pursuer.SentryMode = true;
+            wingman.SentryMode = true;
+            pursuer.LookAt(contactPoint, Vector3.Up);
+            wingman.LookAt(contactPoint, Vector3.Up);
+            var sharedBefore = wingman.SquadContactsReceived;
+            pursuer.TakeDamage(0.1f, pursuer.GlobalPosition + Vector3.Up, _player);
+            for (var i = 0; i < 18; i++)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            }
+            damageThreatLocked = pursuer.EngageTargetNode == _player && pursuer.IsPursuing;
+            squadContactShared = wingman.SquadContactsReceived > sharedBefore && wingman.IsPursuing;
+
+            pursuer.SentryMode = false;
+            pursuer.Velocity = Vector3.Zero;
+            wingman.ProcessMode = ProcessModeEnum.Disabled;
+            var pursuitStartPosition = pursuer.GlobalPosition;
+            var wallCenter = (pursuitStartPosition + contactPoint) * 0.5f;
+            var pursuitWall = new StaticBody3D
+            {
+                Name = "PursuitTestWall",
+                Position = new Vector3(wallCenter.X, 1.8f, wallCenter.Z),
+                CollisionLayer = 1,
+                CollisionMask = 0
+            };
+            pursuitWall.AddChild(new CollisionShape3D
+            {
+                Shape = new BoxShape3D { Size = new Vector3(3.4f, 3.6f, 0.45f) }
+            });
+            AddChild(pursuitWall);
+            _player.GlobalPosition = contactPoint + new Vector3(0.0f, 0.0f, 70.0f);
+            _player.ProcessMode = ProcessModeEnum.Disabled;
+            await WaitFrames(2);
+
+            var startDistance = pursuitStartPosition.DistanceTo(contactPoint);
+            var maxLateralOffset = 0.0f;
+            for (var i = 0; i < 210; i++)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                maxLateralOffset = Mathf.Max(
+                    maxLateralOffset,
+                    Mathf.Abs(pursuer.GlobalPosition.X - pursuitStartPosition.X));
+            }
+            var endDistance = pursuer.GlobalPosition.DistanceTo(contactPoint);
+            pursuitRetained = pursuer.IsPursuing && pursuer.EngageTargetNode == _player;
+            pursuitAdvanced = endDistance < startDistance - 1.5f;
+            memoryStayedFrozen = pursuer.LastKnownTargetPosition.DistanceTo(contactPoint) < 1.25f
+                && pursuer.LastKnownTargetPosition.DistanceTo(_player.GlobalPosition) > 50.0f;
+            wallFlanked = maxLateralOffset > 0.8f;
+            pursuitWall.QueueFree();
+        }
+
         var valid = vsEnemyTarget && vsEnemyShots && vsEnemyDamage
             && firedAtPlayer && playerHurtByFire && engagedPlayer
             && sawProneOrCover
-            && lootStarted && leftLootForCombat && npcTargetedOp;
-        GD.Print($"EXTRACTION_AI_CHECK valid={valid} vs_enemy_target={vsEnemyTarget} vs_enemy_shots={vsEnemyShots} vs_enemy_dmg={vsEnemyDamage} fire_player={firedAtPlayer} player_hurt={playerHurtByFire} engaged_player={engagedPlayer} prone_or_cover={sawProneOrCover} loot_start={lootStarted} loot_via_physics=True loot_to_combat={leftLootForCombat} npc_target_op={npcTargetedOp}");
+            && lootStarted && leftLootForCombat && npcTargetedOp
+            && pursuitPairReady && pursuitRetained && pursuitAdvanced
+            && memoryStayedFrozen && squadContactShared && damageThreatLocked && wallFlanked;
+        GD.Print($"EXTRACTION_AI_CHECK valid={valid} vs_enemy_target={vsEnemyTarget} vs_enemy_shots={vsEnemyShots} vs_enemy_dmg={vsEnemyDamage} fire_player={firedAtPlayer} player_hurt={playerHurtByFire} engaged_player={engagedPlayer} prone_or_cover={sawProneOrCover} loot_start={lootStarted} loot_via_physics=True loot_to_combat={leftLootForCombat} npc_target_op={npcTargetedOp} pursuit_pair={pursuitPairReady} pursuit_retained={pursuitRetained} pursuit_advanced={pursuitAdvanced} memory_frozen={memoryStayedFrozen} squad_shared={squadContactShared} damage_threat={damageThreatLocked} wall_flanked={wallFlanked}");
         GD.Print($"EXTRACTION_AI_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
