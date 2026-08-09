@@ -553,7 +553,7 @@ public partial class CombatHUD : CanvasLayer
         });
 
         _lootSourceCaption = PositionedLabel("SEARCHED GEAR", 14, new Color(0.43f, 0.88f, 0.73f), 40, 92);
-        _lootSourceCaption.Size = new Vector2(1130, 26);
+        _lootSourceCaption.Size = new Vector2(872, 26);
         panel.AddChild(_lootSourceCaption);
         _backpackCaption = PositionedLabel("EQUIPPED / BACKPACK", 14, new Color(0.43f, 0.72f, 0.96f), 1200, 92);
         _backpackCaption.Size = new Vector2(570, 26);
@@ -563,7 +563,7 @@ public partial class CombatHUD : CanvasLayer
         {
             Target = LootDropTarget.Source,
             Position = new Vector2(32, 122),
-            Size = new Vector2(1138, 716)
+            Size = new Vector2(880, 716)
         };
         _lootSourceZone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(new Color(0.22f, 0.85f, 0.68f)));
         _lootSourceZone.Dropped += HandleLootDrop;
@@ -578,7 +578,7 @@ public partial class CombatHUD : CanvasLayer
         _lootSourceZone.AddChild(sourceScroll);
         _lootSourceList = new GridContainer
         {
-            Columns = 4,
+            Columns = 3,
             MouseFilter = Control.MouseFilterEnum.Pass,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
         };
@@ -595,17 +595,17 @@ public partial class CombatHUD : CanvasLayer
         _primarySlot = BuildPrimaryWeaponSlot(panel, new Vector2(1200, 174), new Vector2(184, 154));
         _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(1200, 338), new Vector2(184, 124), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel, out _armorPreview);
         _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(1610, 174), new Vector2(160, 104), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel, out _helmetPreview);
-        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK CONTAINER", new Vector2(1610, 390), new Vector2(160, 108), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel, out _packPreview);
+        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK CONTAINER", new Vector2(1610, 326), new Vector2(160, 108), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel, out _packPreview);
 
-        _backpackItemsCaption = PositionedLabel("BACKPACK STORAGE", 12, new Color(0.43f, 0.72f, 0.96f), 1200, 516);
-        _backpackItemsCaption.Size = new Vector2(570, 22);
+        _backpackItemsCaption = PositionedLabel("BACKPACK STORAGE", 12, new Color(0.43f, 0.72f, 0.96f), 940, 484);
+        _backpackItemsCaption.Size = new Vector2(340, 22);
         panel.AddChild(_backpackItemsCaption);
 
         var backpackZone = new LootDropZone
         {
             Target = LootDropTarget.Backpack,
-            Position = new Vector2(1200, 540),
-            Size = new Vector2(570, 264)
+            Position = new Vector2(940, 510),
+            Size = new Vector2(830, 328)
         };
         _backpackZone = backpackZone;
         _backpackZone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(new Color(0.32f, 0.62f, 0.92f)));
@@ -937,8 +937,8 @@ public partial class CombatHUD : CanvasLayer
         _lootSourceZone.Enabled = _shownSourceAvailable;
         _lootSourceZone.Visible = _shownSourceAvailable;
         _backpackItemsCaption.Visible = _shownSourceAvailable;
-        _backpackZone.Position = _shownSourceAvailable ? new Vector2(1200, 540) : new Vector2(32, 122);
-        _backpackZone.Size = _shownSourceAvailable ? new Vector2(570, 264) : new Vector2(1138, 716);
+        _backpackZone.Position = _shownSourceAvailable ? new Vector2(940, 510) : new Vector2(32, 122);
+        _backpackZone.Size = _shownSourceAvailable ? new Vector2(830, 328) : new Vector2(1138, 716);
 
         var stats = _shownPlayer.CurrentWeaponStats;
         var weaponName = _shownPlayer.EquippedWeapon.DisplayName(_language);
@@ -966,7 +966,7 @@ public partial class CombatHUD : CanvasLayer
         _lootOperatorCaption.Text = $"{OperatorRoles.RoleName(_shownPlayer.Role, _language)}  //  {Text("active_loadout", "ACTIVE LOADOUT")}";
 
         ClearRows(_lootSourceList);
-        _lootSourceList.Columns = 4;
+        _lootSourceList.Columns = 3;
         foreach (var item in _shownLoot)
         {
             _lootSourceList.AddChild(BuildLootCard(item, LootDragOrigin.Source));
@@ -978,10 +978,10 @@ public partial class CombatHUD : CanvasLayer
         }
 
         ClearRows(_backpackList);
-        _backpackList.Columns = personalMode ? 4 : 2;
+        _backpackList.Columns = 4;
         foreach (var item in _shownPlayer.Backpack)
         {
-            _backpackList.AddChild(BuildLootCard(item, LootDragOrigin.Backpack));
+            _backpackList.AddChild(BuildLootCard(item, LootDragOrigin.Backpack, compact: _shownSourceAvailable));
         }
         if (_shownPlayer.Backpack.Count == 0)
         {
@@ -999,6 +999,11 @@ public partial class CombatHUD : CanvasLayer
                 panel.AddChild(_backpackValueLabel);
             }
         }
+        _backpackValueLabel.Position = _shownSourceAvailable ? new Vector2(1290, 484) : new Vector2(1200, 812);
+        _backpackValueLabel.Size = _shownSourceAvailable ? new Vector2(480, 22) : new Vector2(570, 24);
+        _backpackValueLabel.HorizontalAlignment = _shownSourceAvailable
+            ? HorizontalAlignment.Right
+            : HorizontalAlignment.Left;
         _backpackValueLabel.Text = GameLocalization.IsChinese(_language)
             ? $"背包总估值  {totalValue}  //  枪械/装备/弹药合计"
             : $"BACKPACK VALUE  {totalValue}  //  GUNS + GEAR + AMMO";
@@ -1056,7 +1061,7 @@ public partial class CombatHUD : CanvasLayer
         return total;
     }
 
-    private Control BuildLootCard(LootItem item, LootDragOrigin origin)
+    private Control BuildLootCard(LootItem item, LootDragOrigin origin, bool compact = false)
     {
         EquipmentSlot? slot = item.Kind == LootItemKind.Equipment && item.Equipment is not null
             ? item.Equipment.Definition.Slot
@@ -1072,7 +1077,8 @@ public partial class CombatHUD : CanvasLayer
             LootGrades.GlowColor(item.Grade),
             item.Weapon,
             item.Equipment,
-            Text("details", "DETAILS"));
+            Text("details", "DETAILS"),
+            compact);
         card.DetailsRequested += ShowWeaponDetails;
         card.DoubleActivated += (itemId, cardOrigin) =>
         {

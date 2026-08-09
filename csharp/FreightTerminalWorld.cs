@@ -2416,6 +2416,9 @@ public partial class FreightTerminalWorld : Node3D
         var groundDropRouted = false;
         var droppedRegistered = false;
         var droppedVisible = false;
+        var searchStorageExpanded = false;
+        var searchStorageFits = false;
+        var storageAtCapacity = false;
         if (dragCandidate is not null)
         {
             var dragProbe = new LootDropZone { Target = LootDropTarget.Backpack };
@@ -2473,7 +2476,26 @@ public partial class FreightTerminalWorld : Node3D
                 && droppedPickup.VisualReady
                 && droppedPickup.GlobalPosition.DistanceTo(_player.GlobalPosition) <= 2.5f;
         }
-        await WaitFrames(4);
+        _player.EquipFromLoot(new LootItem
+        {
+            Kind = LootItemKind.Equipment,
+            Equipment = EquipmentCatalog.Create("pack_heavy"),
+            Grade = LootGrade.Rare
+        });
+        while (_player.Backpack.Count < _player.BackpackCapacity)
+        {
+            _player.TryStoreInBackpack(new LootItem
+            {
+                Kind = LootItemKind.Equipment,
+                Equipment = EquipmentCatalog.Create(_player.Backpack.Count % 2 == 0 ? "helmet_heavy" : "armor_heavy"),
+                Grade = LootGrade.Rare
+            });
+        }
+        RefreshLootView();
+        await WaitFrames(6);
+        searchStorageExpanded = _hud.LootSearchStorageExpanded;
+        searchStorageFits = _hud.LootBackpackContentFits;
+        storageAtCapacity = _player.Backpack.Count == _player.BackpackCapacity;
         var stats = _player.CurrentWeaponStats;
         SaveViewportImage("res://loot_validation.png");
         source.Loot.Clear();
@@ -2507,10 +2529,13 @@ public partial class FreightTerminalWorld : Node3D
             && groundDropRouted
             && droppedRegistered
             && droppedVisible
+            && searchStorageExpanded
+            && searchStorageFits
+            && storageAtCapacity
             && reopenedEmpty
             && closedByInteract
             && movementRestored;
-        GD.Print($"LOOT_CHECK valid={valid} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+        GD.Print($"LOOT_CHECK valid={valid} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} storage_fits={searchStorageFits} storage_full={storageAtCapacity} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         GD.Print($"LOOT_PASS valid={valid}");
         await WaitFrames(24);
         SaveViewportImage("res://modular_weapon_validation.png");

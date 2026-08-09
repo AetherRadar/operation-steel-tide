@@ -129,18 +129,26 @@ public partial class LootDragCard : PanelContainer
         Color accent,
         WeaponBuild? weapon = null,
         EquipmentItem? equipment = null,
-        string detailAction = "DETAILS")
+        string detailAction = "DETAILS",
+        bool compact = false)
     {
         ItemId = itemId;
         Origin = origin;
         ItemKind = itemKind;
         ItemSlot = itemSlot;
         DragTitle = title;
-        CustomMinimumSize = new Vector2(250, weapon is not null ? 126 : equipment is not null ? 108 : 88);
+        CustomMinimumSize = compact
+            ? new Vector2(180, 68)
+            : new Vector2(250, weapon is not null ? 126 : equipment is not null ? 108 : 88);
         MouseFilter = MouseFilterEnum.Pass;
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
         AddThemeStyleboxOverride("panel", Style(new Color(0.055f, 0.067f, 0.067f, 0.96f), accent));
 
+        if (compact)
+        {
+            BuildCompactCard(title, detail, accent, itemKind, itemSlot, weapon, detailAction);
+            return;
+        }
         if (weapon is not null)
         {
             BuildWeaponCard(title, detail, accent, weapon, detailAction);
@@ -180,6 +188,82 @@ public partial class LootDragCard : PanelContainer
             SizeFlagsHorizontal = SizeFlags.ExpandFill
         };
         detailLabel.AddThemeFontSizeOverride("font_size", 12);
+        detailLabel.AddThemeColorOverride("font_color", new Color(0.57f, 0.68f, 0.65f));
+        text.AddChild(detailLabel);
+    }
+
+    private void BuildCompactCard(
+        string title,
+        string detail,
+        Color accent,
+        LootItemKind itemKind,
+        EquipmentSlot? itemSlot,
+        WeaponBuild? weapon,
+        string detailAction)
+    {
+        var row = new HBoxContainer
+        {
+            MouseFilter = MouseFilterEnum.Pass,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ExpandFill
+        };
+        row.AddThemeConstantOverride("separation", 5);
+        AddChild(row);
+
+        var icon = new LootItemIconControl { CustomMinimumSize = new Vector2(40, 44) };
+        icon.Configure(itemKind, itemSlot, accent);
+        row.AddChild(icon);
+
+        var text = new VBoxContainer
+        {
+            MouseFilter = MouseFilterEnum.Ignore,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ExpandFill
+        };
+        text.AddThemeConstantOverride("separation", 0);
+        row.AddChild(text);
+
+        var header = new HBoxContainer
+        {
+            MouseFilter = MouseFilterEnum.Pass,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill
+        };
+        text.AddChild(header);
+        var name = new Label
+        {
+            Text = title,
+            ClipText = true,
+            TooltipText = title,
+            MouseFilter = MouseFilterEnum.Ignore,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill
+        };
+        name.AddThemeFontSizeOverride("font_size", 12);
+        name.AddThemeColorOverride("font_color", new Color(0.89f, 0.95f, 0.92f));
+        header.AddChild(name);
+        if (weapon is not null)
+        {
+            var details = new Button
+            {
+                Text = "i",
+                CustomMinimumSize = new Vector2(24, 20),
+                FocusMode = FocusModeEnum.None,
+                TooltipText = detailAction
+            };
+            details.AddThemeFontSizeOverride("font_size", 11);
+            details.AddThemeColorOverride("font_color", accent);
+            details.Pressed += () => DetailsRequested?.Invoke(weapon.Clone());
+            header.AddChild(details);
+        }
+
+        var detailLabel = new Label
+        {
+            Text = detail,
+            ClipText = true,
+            TooltipText = detail,
+            MouseFilter = MouseFilterEnum.Ignore,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill
+        };
+        detailLabel.AddThemeFontSizeOverride("font_size", 10);
         detailLabel.AddThemeColorOverride("font_color", new Color(0.57f, 0.68f, 0.65f));
         text.AddChild(detailLabel);
     }
