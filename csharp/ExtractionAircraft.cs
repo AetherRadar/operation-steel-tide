@@ -92,6 +92,11 @@ public partial class ExtractionAircraft : Node3D
         }
     }
 
+    public void AdvanceForValidation(float delta)
+    {
+        AdvanceFlight(Mathf.Max(0.0f, delta));
+    }
+
     private void BeginDeparture(Vector3 target)
     {
         _departureStart = Position;
@@ -259,19 +264,6 @@ public partial class ExtractionAircraft : Node3D
             SpotAngle = 42.0f,
             ShadowEnabled = false
         });
-        _visual.AddChild(new Label3D
-        {
-            Name = "RescueCallsign",
-            Position = new Vector3(0, 0.46f, 2.55f),
-            Text = "RESCUE 07  /  FRIENDLY",
-            FontSize = 14,
-            OutlineSize = 4,
-            Modulate = new Color(0.42f, 1.0f, 0.68f),
-            Billboard = BaseMaterial3D.BillboardModeEnum.Disabled,
-            VisibilityRangeEnd = 95.0f,
-            VisibilityRangeEndMargin = 12.0f
-        });
-
         _dust = new Node3D { Name = "RotorWash", Position = new Vector3(0, -2.25f, 0) };
         _visual.AddChild(_dust);
         var dustMaterial = Material(new Color(0.55f, 0.52f, 0.43f, 0.22f), 0.0f, 1.0f);
