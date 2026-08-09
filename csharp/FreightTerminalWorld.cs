@@ -333,6 +333,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             CaptureHitFeedback();
         }
+        else if (Array.Exists(args, value => value == "--capture-glass"))
+        {
+            CaptureGlassBreak();
+        }
         else if (Array.Exists(args, value => value == "--capture-squad"))
         {
             CaptureSquadFrame();

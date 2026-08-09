@@ -332,14 +332,16 @@ public partial class FreightTerminalWorld
         community.AddChild(tower);
         _residentialTowers.Add(tower);
 
-        var facade = Mat(
-            $"residential_facade_{index % 5}",
+        var facade = ExpansionPbrMaterial(
+            $"residential_facade_pbr_{index % 5}",
+            "concrete_floor",
             new Color(
-                Mathf.Lerp(0.22f, spec.Accent.R, 0.4f),
-                Mathf.Lerp(0.24f, spec.Accent.G, 0.4f),
-                Mathf.Lerp(0.23f, spec.Accent.B, 0.4f)),
+                Mathf.Lerp(0.56f, spec.Accent.R, 0.18f),
+                Mathf.Lerp(0.58f, spec.Accent.G, 0.18f),
+                Mathf.Lerp(0.57f, spec.Accent.B, 0.18f)),
             0.03f,
-            0.88f);
+            0.88f,
+            0.3f);
         var interiorWall = Mat("residential_interior_wall", new Color(0.63f, 0.65f, 0.6f), 0.01f, 0.92f);
         var interiorFloor = Mat("residential_interior_floor", new Color(0.31f, 0.29f, 0.24f), 0.02f, 0.78f);
         var stair = Mat("residential_stair", new Color(0.39f, 0.42f, 0.4f), 0.12f, 0.76f);
@@ -373,6 +375,7 @@ public partial class FreightTerminalWorld
             _residentialFloorCount++;
         }
         glassField.Commit();
+        BuildTowerFacadeDetails(tower, spec, index, spec.Accent);
         BuildTowerRoof(tower, spec, stairCoreZ, facade, steel, trim, warmLight);
         _residentialRoofAccessCount++;
 

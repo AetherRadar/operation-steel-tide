@@ -5,6 +5,49 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    private async void CaptureGlassBreak()
+    {
+        await WaitFrames(6);
+        var field = GetTree().GetNodesInGroup(BreakableGlassField.GroupName)
+            .OfType<BreakableGlassField>()
+            .FirstOrDefault(candidate => candidate.PaneCount >= 2);
+        if (field is null || !field.TryGetIntactPaneRay(out var rayFrom, out var rayTo, out _))
+        {
+            GD.PushError("Glass capture could not find an intact pane.");
+            GetTree().Quit(2);
+            return;
+        }
+
+        foreach (var enemy in _enemies)
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        var center = (rayFrom + rayTo) * 0.5f;
+        var outward = center - field.GlobalPosition;
+        outward.Y = 0.0f;
+        outward = outward.LengthSquared() > 0.001f ? outward.Normalized() : center.DirectionTo(rayFrom);
+        rayFrom = center + outward * 1.2f;
+        rayTo = center - outward * 1.2f;
+        var standPosition = center + outward * 4.2f;
+        standPosition.Y = Mathf.Max(0.12f, center.Y - 1.57f);
+        _player.GlobalPosition = standPosition;
+        _player.FaceWorldPointForDiagnostics(center);
+        _player.GrantFireablePrimaryForDiagnostics();
+        await WaitFrames(3);
+
+        var shattered = BreakableGlassField.TryShatterAlongRay(
+            GetWorld3D(),
+            rayFrom,
+            rayTo,
+            30.0f,
+            rayFrom.DirectionTo(rayTo),
+            out var hitPosition);
+        await WaitFrames(2);
+        SaveViewportImage("res://glass_break_validation.png");
+        GD.Print($"GLASS_CAPTURE shattered={shattered} hit={hitPosition} path=glass_break_validation.png");
+        GetTree().Quit(shattered ? 0 : 2);
+    }
+
     private async void ValidateBreakableGlass()
     {
         await WaitFrames(6);
