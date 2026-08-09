@@ -131,6 +131,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private float _recoilPitch;
     private float _recoilSide;
     private float _bobTime;
+    private Vector3 _smoothedBobOffset;
+    private float _stairViewOffsetY;
     private float _footstepTimer;
     private float _slideTime;
     private Vector3 _slideDirection;
@@ -1179,10 +1181,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
         if (bestLift > 0.025f)
         {
+            var previousY = GlobalPosition.Y;
             GlobalPosition = new Vector3(
-                GlobalPosition.X + forward.X * 0.1f,
+                GlobalPosition.X + forward.X * 0.035f,
                 bestLand.Y + 0.03f,
-                GlobalPosition.Z + forward.Z * 0.1f);
+                GlobalPosition.Z + forward.Z * 0.035f);
+            var appliedLift = Mathf.Max(0.0f, GlobalPosition.Y - previousY);
+            _stairViewOffsetY = Mathf.Clamp(_stairViewOffsetY - appliedLift, -0.34f, 0.0f);
             var v = Velocity;
             v.Y = 0.0f;
             Velocity = v;
@@ -1235,8 +1240,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
         else
         {
-            velocity.X = Mathf.MoveToward(velocity.X, direction.X * speed, delta * 28.0f);
-            velocity.Z = Mathf.MoveToward(velocity.Z, direction.Z * speed, delta * 28.0f);
+            var horizontal = new Vector2(velocity.X, velocity.Z);
+            var targetHorizontal = new Vector2(direction.X, direction.Z) * speed;
+            var response = IsOnFloor()
+                ? input.LengthSquared() > 0.001f ? 34.0f : 43.0f
+                : 7.5f;
+            horizontal = horizontal.MoveToward(targetHorizontal, response * delta);
+            velocity.X = horizontal.X;
+            velocity.Z = horizontal.Y;
         }
 
         Stamina = sprinting
@@ -1257,12 +1268,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var targetHeadY = prone ? 0.62f : crouching ? 1.16f : 1.57f;
         var targetColliderHeight = prone ? 0.78f : crouching ? 1.2f : 1.75f;
         var headPosition = _head.Position;
-        headPosition.Y = Mathf.Lerp(headPosition.Y, targetHeadY, delta * 12.0f);
+        headPosition.Y = Mathf.Lerp(headPosition.Y, targetHeadY, SmoothFactor(12.0f, delta));
         _head.Position = headPosition;
         var capsule = (CapsuleShape3D)_collider.Shape;
-        capsule.Height = Mathf.Lerp(capsule.Height, targetColliderHeight, delta * 12.0f);
+        capsule.Height = Mathf.Lerp(capsule.Height, targetColliderHeight, SmoothFactor(12.0f, delta));
         var colliderPosition = _collider.Position;
-        colliderPosition.Y = Mathf.Lerp(colliderPosition.Y, targetColliderHeight * 0.5f, delta * 12.0f);
+        colliderPosition.Y = Mathf.Lerp(colliderPosition.Y, targetColliderHeight * 0.5f, SmoothFactor(12.0f, delta));
         _collider.Position = colliderPosition;
 
         var horizontalSpeed = new Vector2(Velocity.X, Velocity.Z).Length();
@@ -1367,40 +1378,50 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _ => 1.75f
     };
 
+    private static float SmoothFactor(float response, float delta)
+    {
+        return 1.0f - Mathf.Exp(-response * Mathf.Max(0.0f, delta));
+    }
+
     private void UpdateCameraAndWeapon(float delta)
     {
         UpdateDamageKick(delta);
-        _recoilPitch = Mathf.Lerp(_recoilPitch, 0.0f, delta * 11.0f);
-        _recoilSide = Mathf.Lerp(_recoilSide, 0.0f, delta * 13.0f);
+        _recoilPitch = Mathf.Lerp(_recoilPitch, 0.0f, SmoothFactor(11.0f, delta));
+        _recoilSide = Mathf.Lerp(_recoilSide, 0.0f, SmoothFactor(13.0f, delta));
         var leanInput = Input.GetActionStrength("lean_right") - Input.GetActionStrength("lean_left");
-        _leanValue = Mathf.Lerp(_leanValue, _slideTime <= 0.0f ? leanInput : 0.0f, delta * 9.0f);
+        _leanValue = Mathf.Lerp(_leanValue, _slideTime <= 0.0f ? leanInput : 0.0f, SmoothFactor(9.0f, delta));
         _head.Rotation = new Vector3(
             _pitch + _recoilPitch + _damageKickPitch,
             0.0f,
             _recoilSide * 0.22f + _leanValue * 0.13f + _damageKickRoll);
 
         var horizontalSpeed = new Vector2(Velocity.X, Velocity.Z).Length();
-        _bobTime = IsOnFloor() && horizontalSpeed > 0.5f
-            ? _bobTime + delta * horizontalSpeed * 1.45f
-            : Mathf.Lerp(_bobTime, 0.0f, delta * 3.0f);
+        var walking = IsOnFloor() && horizontalSpeed > 0.5f;
+        if (walking)
+        {
+            _bobTime += delta * horizontalSpeed * 1.45f;
+        }
         var stanceBob = _stance switch
         {
             PlayerStance.Prone => 0.22f,
             PlayerStance.Crouched => 0.55f,
             _ => 1.0f
         };
-        var bobStrength = Mathf.Clamp(horizontalSpeed / SprintSpeed, 0.0f, 1.0f) * stanceBob;
-        var bobOffset = new Vector3(
+        var bobStrength = walking ? Mathf.Clamp(horizontalSpeed / SprintSpeed, 0.0f, 1.0f) * stanceBob : 0.0f;
+        var targetBobOffset = new Vector3(
             Mathf.Sin(_bobTime * 0.9f) * 0.021f,
             Mathf.Abs(Mathf.Cos(_bobTime * 1.8f)) * 0.024f,
             0.0f) * bobStrength;
-        _camera.Position = bobOffset
+        _smoothedBobOffset = _smoothedBobOffset.Lerp(targetBobOffset, SmoothFactor(walking ? 14.0f : 18.0f, delta));
+        _stairViewOffsetY = Mathf.MoveToward(_stairViewOffsetY, 0.0f, delta * 1.7f);
+        _camera.Position = _smoothedBobOffset
+            + Vector3.Up * _stairViewOffsetY
             + new Vector3(_leanValue * 0.17f, _slideTime > 0.0f ? -0.08f : 0.0f, 0.0f)
             + _damageKickOffset;
 
         var targetFov = _isAiming ? AimFieldOfView() : _slideTime > 0.0f ? 84.0f : horizontalSpeed > 7.0f ? 82.0f : 76.0f;
         var handling = EquippedWeapon.Stats().Handling;
-        _camera.Fov = Mathf.Lerp(_camera.Fov, targetFov, delta * (6.5f + handling * 5.0f));
+        _camera.Fov = Mathf.Lerp(_camera.Fov, targetFov, SmoothFactor(6.5f + handling * 5.0f, delta));
         _weaponRoot.Visible = !_knifeEquipped && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
         _knifeRoot.Visible = _knifeEquipped && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
         UpdateKnifeAnimation(delta);
@@ -1419,12 +1440,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             targetPosition += new Vector3(0.22f, -0.34f, 0.12f);
         }
-        _weaponRoot.Position = _weaponRoot.Position.Lerp(targetPosition, delta * (_isAiming ? 7.5f + handling * 6.0f : 6.0f + handling * 3.0f));
+        _weaponRoot.Position = _weaponRoot.Position.Lerp(targetPosition, SmoothFactor(_isAiming ? 7.5f + handling * 6.0f : 6.0f + handling * 3.0f, delta));
         var weaponRotation = _weaponRoot.Rotation;
         var searchRoll = _searchPose > 0.0f ? -0.42f : 0.0f;
         var searchPitch = _searchPose > 0.0f ? 0.34f : 0.0f;
-        weaponRotation.Z = Mathf.Lerp(weaponRotation.Z, _isReloading ? -0.32f : searchRoll + _recoilSide * 0.35f, delta * 9.0f);
-        weaponRotation.X = Mathf.Lerp(weaponRotation.X, _isReloading ? -0.13f : searchPitch + _recoilPitch * 0.55f, delta * 9.0f);
+        weaponRotation.Z = Mathf.Lerp(weaponRotation.Z, _isReloading ? -0.32f : searchRoll + _recoilSide * 0.35f, SmoothFactor(9.0f, delta));
+        weaponRotation.X = Mathf.Lerp(weaponRotation.X, _isReloading ? -0.13f : searchPitch + _recoilPitch * 0.55f, SmoothFactor(9.0f, delta));
         _weaponRoot.Rotation = weaponRotation;
         _opticReticle.Visible = _isAiming && !_knifeEquipped;
         UpdateReloadAnimation();
