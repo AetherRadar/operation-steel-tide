@@ -745,16 +745,38 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
         var uniform = Mat(new Color(0.11f, 0.13f, 0.125f), 0.02f, 0.9f);
         var armor = Mat(new Color(0.045f, 0.058f, 0.058f), 0.35f, 0.55f);
+        var armorEdge = Mat(new Color(0.022f, 0.031f, 0.03f), 0.58f, 0.4f);
+        var fabric = Mat(new Color(0.16f, 0.145f, 0.1f), 0.0f, 0.94f);
         var skin = Mat(new Color(0.39f, 0.27f, 0.19f), 0.0f, 0.92f);
         var gun = Mat(new Color(0.025f, 0.032f, 0.032f), 0.8f, 0.28f);
+        var lens = Mat(new Color(0.025f, 0.2f, 0.21f), 0.62f, 0.08f);
         Part(_rig, Capsule(0.27f, 0.88f), new Vector3(0.0f, 1.08f, 0.0f), uniform);
         Part(_rig, Box(new Vector3(0.58f, 0.52f, 0.25f)), new Vector3(0.0f, 1.2f, 0.0f), armor);
+        Part(_rig, Box(new Vector3(0.52f, 0.46f, 0.16f)), new Vector3(0.0f, 1.2f, 0.19f), armorEdge);
+        Part(_rig, Box(new Vector3(0.4f, 0.14f, 0.27f)), new Vector3(0.0f, 0.91f, 0.01f), fabric);
+        for (var pouch = -1; pouch <= 1; pouch++)
+        {
+            Part(_rig, Box(new Vector3(0.13f, 0.17f, 0.1f)), new Vector3(pouch * 0.145f, 0.99f, -0.17f), fabric);
+        }
+        Part(_rig, Box(new Vector3(0.33f, 0.44f, 0.2f)), new Vector3(0.0f, 1.2f, 0.23f), armor);
+        Part(_rig, Box(new Vector3(0.035f, 0.36f, 0.035f)), new Vector3(0.14f, 1.57f, 0.25f), armorEdge, new Vector3(0.08f, 0.0f, 0.04f));
         Part(_rig, Capsule(0.15f, 0.34f), new Vector3(0.0f, 1.7f, 0.0f), skin);
+        Part(_rig, Box(new Vector3(0.28f, 0.12f, 0.055f)), new Vector3(0.0f, 1.67f, -0.145f), armorEdge);
+        Part(_rig, Box(new Vector3(0.34f, 0.07f, 0.075f)), new Vector3(0.0f, 1.75f, -0.16f), lens);
         Part(_rig, Box(new Vector3(0.42f, 0.08f, 0.3f)), new Vector3(0.0f, 1.79f, 0.0f), armor);
+        Part(_rig, Capsule(0.19f, 0.24f), new Vector3(0.0f, 1.84f, 0.01f), armor);
+        Part(_rig, Cylinder(0.052f, 0.08f), new Vector3(-0.18f, 1.72f, 0.0f), armorEdge, new Vector3(0.0f, 0.0f, Mathf.Pi / 2.0f));
+        Part(_rig, Cylinder(0.052f, 0.08f), new Vector3(0.18f, 1.72f, 0.0f), armorEdge, new Vector3(0.0f, 0.0f, Mathf.Pi / 2.0f));
         Part(_rig, Capsule(0.12f, 0.72f), new Vector3(-0.17f, 0.46f, 0.0f), uniform);
         Part(_rig, Capsule(0.12f, 0.72f), new Vector3(0.17f, 0.46f, 0.0f), uniform);
+        Part(_rig, Box(new Vector3(0.18f, 0.18f, 0.16f)), new Vector3(-0.17f, 0.56f, -0.09f), armor);
+        Part(_rig, Box(new Vector3(0.18f, 0.18f, 0.16f)), new Vector3(0.17f, 0.56f, -0.09f), armor);
+        Part(_rig, Box(new Vector3(0.18f, 0.14f, 0.3f)), new Vector3(-0.17f, 0.13f, -0.055f), gun);
+        Part(_rig, Box(new Vector3(0.18f, 0.14f, 0.3f)), new Vector3(0.17f, 0.13f, -0.055f), gun);
         Part(_rig, Capsule(0.1f, 0.58f), new Vector3(-0.33f, 1.22f, -0.12f), uniform, new Vector3(0.7f, 0.0f, -0.15f));
         Part(_rig, Capsule(0.1f, 0.58f), new Vector3(0.33f, 1.22f, -0.12f), uniform, new Vector3(0.7f, 0.0f, 0.15f));
+        Part(_rig, Box(new Vector3(0.19f, 0.16f, 0.19f)), new Vector3(-0.34f, 1.35f, -0.02f), armor);
+        Part(_rig, Box(new Vector3(0.19f, 0.16f, 0.19f)), new Vector3(0.34f, 1.35f, -0.02f), armor);
         Part(_weapon, Box(new Vector3(0.13f, 0.14f, 0.56f)), new Vector3(0.0f, 1.24f, -0.36f), gun);
         Part(_weapon, Box(new Vector3(0.1f, 0.24f, 0.13f)), new Vector3(0.0f, 1.07f, -0.35f), gun, new Vector3(-0.18f, 0.0f, 0.0f));
         Part(_weapon, Cylinder(0.025f, 0.48f), new Vector3(0.0f, 1.24f, -0.85f), gun, new Vector3(Mathf.Pi / 2.0f, 0.0f, 0.0f));
