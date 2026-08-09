@@ -919,7 +919,7 @@ public partial class FreightTerminalWorld
         var stepMultiMesh = new MultiMesh
         {
             TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
-            Mesh = new BoxMesh { Size = new Vector3(treadWidth, treadThickness, treadDepth) },
+            Mesh = SharedBoxMesh(new Vector3(treadWidth, treadThickness, treadDepth)),
             InstanceCount = steps * 2
         };
         var stepVisual = new MultiMeshInstance3D
@@ -932,6 +932,7 @@ public partial class FreightTerminalWorld
             VisibilityRangeEndMargin = 8.0f
         };
         tower.AddChild(stepVisual);
+        RegisterMapDetailVisual(stepVisual);
         var visualIndex = 0;
 
         // Lower flight (west) -- each step remains an independent collision surface.
@@ -998,12 +999,10 @@ public partial class FreightTerminalWorld
             new Vector3(5.0f, 0.08f, 0.08f),
             rail);
         landingRail.Name = $"ResidentialStairLandingRail_F{floor}";
-        landingRail.VisibilityRangeEnd = 82.0f;
-        landingRail.VisibilityRangeEndMargin = 8.0f;
+        RegisterMapDetailVisual(landingRail);
         var landingLight = MeshBox(tower, new Vector3(0, floorY + halfRise + 1.35f, landingNorthZ + 0.08f), new Vector3(1.8f, 0.04f, 0.16f), light);
         landingLight.Name = $"ResidentialStairLandingLight_F{floor}";
-        landingLight.VisibilityRangeEnd = 82.0f;
-        landingLight.VisibilityRangeEndMargin = 8.0f;
+        RegisterMapDetailVisual(landingLight);
         _residentialStairFlightCount += 2;
     }
 
@@ -1021,7 +1020,7 @@ public partial class FreightTerminalWorld
         });
     }
 
-    private static void AddResidentialStairPart(
+    private void AddResidentialStairPart(
         StaticBody3D collisionBody,
         Node3D visualParent,
         string name,
@@ -1032,8 +1031,7 @@ public partial class FreightTerminalWorld
         AddResidentialStairCollision(collisionBody, name, position, size);
         var visual = MeshBox(visualParent, position, size, material);
         visual.Name = name + "_Visual";
-        visual.VisibilityRangeEnd = 82.0f;
-        visual.VisibilityRangeEndMargin = 8.0f;
+        RegisterMapDetailVisual(visual);
     }
 
     private void BuildTowerRoof(

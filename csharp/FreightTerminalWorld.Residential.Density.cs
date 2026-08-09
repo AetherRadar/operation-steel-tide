@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace OperationSteelTide;
@@ -202,6 +203,9 @@ public partial class FreightTerminalWorld
         var panel = Mat("residential_stair_panel", new Color(0.12f, 0.17f, 0.18f), 0.38f, 0.55f);
         var safety = Mat("residential_stair_safety", new Color(0.88f, 0.54f, 0.16f), 0.05f, 0.5f, new Color(0.55f, 0.22f, 0.05f));
         var lowerCenterZ = (lowerStartZ + upperStartZ) * 0.5f;
+        var handrailTransforms = new List<Transform3D>(4);
+        var safetyRailTransforms = new List<Transform3D>(4);
+        var balusterTransforms = new List<Transform3D>(28);
 
         foreach (var flight in new[] { 0, 1 })
         {
@@ -212,8 +216,9 @@ public partial class FreightTerminalWorld
             foreach (var x in new[] { centerX - edge, centerX + edge })
             {
                 var y = floorY + (flight == 0 ? 0.78f : 2.35f);
-                MeshBox(tower, new Vector3(x, y, centerZ), new Vector3(0.075f, 0.075f, run + 0.25f), handrail, new Vector3(localAngle, 0, 0));
-                MeshBox(tower, new Vector3(x, y - 0.35f, centerZ), new Vector3(0.05f, 0.05f, run + 0.25f), safety, new Vector3(localAngle, 0, 0));
+                var railBasis = Basis.FromEuler(new Vector3(localAngle, 0, 0));
+                handrailTransforms.Add(new Transform3D(railBasis, new Vector3(x, y, centerZ)));
+                safetyRailTransforms.Add(new Transform3D(railBasis, new Vector3(x, y - 0.35f, centerZ)));
                 for (var post = 0; post <= 6; post++)
                 {
                     var t = post / 6.0f;
@@ -221,25 +226,36 @@ public partial class FreightTerminalWorld
                         ? Mathf.Lerp(upperStartZ - 0.35f, lowerStartZ + 0.35f, t)
                         : Mathf.Lerp(lowerStartZ + 0.35f, upperStartZ - 0.35f, t);
                     var top = y + sign * (t - 0.5f) * halfRise;
-                    MeshBox(tower, new Vector3(x, top - 0.38f, z), new Vector3(0.055f, 0.76f, 0.055f), baluster);
+                    balusterTransforms.Add(new Transform3D(Basis.Identity, new Vector3(x, top - 0.38f, z)));
                 }
             }
         }
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairHandrails_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.075f, 0.075f, run + 0.25f), handrail, handrailTransforms);
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairSafetyRails_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.05f, 0.05f, run + 0.25f), safety, safetyRailTransforms);
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairBalusters_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.055f, 0.76f, 0.055f), baluster, balusterTransforms);
 
         var landingNorth = lowerStartZ + 0.2f - 2.8f;
         var landingCenter = landingNorth + 1.4f;
         // Dense wall panels and cable risers make the shaft read as a maintained building,
         // while their visual-only meshes cannot create a new collision trap.
+        var panelTransforms = new List<Transform3D>(2);
+        var lightTransforms = new List<Transform3D>(2);
+        var landingSafetyTransforms = new List<Transform3D>(2);
         foreach (var x in new[] { -2.72f, 2.72f })
         {
-            MeshBox(tower, new Vector3(x, floorY + 1.35f, landingCenter), new Vector3(0.08f, 2.15f, 2.25f), panel);
-            MeshBox(tower, new Vector3(x + (x < 0 ? 0.05f : -0.05f), floorY + 2.35f, landingCenter), new Vector3(0.05f, 0.08f, 1.65f), light);
-            MeshBox(tower, new Vector3(x + (x < 0 ? 0.08f : -0.08f), floorY + 1.1f, landingCenter - 0.75f), new Vector3(0.055f, 0.72f, 0.055f), safety);
+            panelTransforms.Add(new Transform3D(Basis.Identity, new Vector3(x, floorY + 1.35f, landingCenter)));
+            lightTransforms.Add(new Transform3D(Basis.Identity, new Vector3(x + (x < 0 ? 0.05f : -0.05f), floorY + 2.35f, landingCenter)));
+            landingSafetyTransforms.Add(new Transform3D(Basis.Identity, new Vector3(x + (x < 0 ? 0.08f : -0.08f), floorY + 1.1f, landingCenter - 0.75f)));
         }
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairWallPanels_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.08f, 2.15f, 2.25f), panel, panelTransforms);
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairWallLights_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.05f, 0.08f, 1.65f), light, lightTransforms);
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairLandingPosts_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.055f, 0.72f, 0.055f), safety, landingSafetyTransforms);
+        var pipeTransforms = new List<Transform3D>(3);
         for (var pipe = -1; pipe <= 1; pipe++)
         {
-            MeshBox(tower, new Vector3(pipe * 0.18f, floorY + 1.52f, landingCenter + 1.0f), new Vector3(0.07f, 2.45f, 0.07f), baluster);
+            pipeTransforms.Add(new Transform3D(Basis.Identity, new Vector3(pipe * 0.18f, floorY + 1.52f, landingCenter + 1.0f)));
         }
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairRisers_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.07f, 2.45f, 0.07f), baluster, pipeTransforms);
         var locker = ExpansionBox(
             tower,
             $"ResidentialStairUtilityLocker_T{towerIndex + 1:00}_F{floor + 1:00}",
@@ -247,7 +263,9 @@ public partial class FreightTerminalWorld
             new Vector3(0.58f, 1.32f, 0.5f),
             panel);
         locker.AddToGroup("residential_stair_details");
-        MeshBox(locker, new Vector3(0, 0.0f, -0.27f), new Vector3(0.22f, 0.52f, 0.04f), safety);
+        var lockerAccent = MeshBox(locker, new Vector3(0, 0.0f, -0.27f), new Vector3(0.22f, 0.52f, 0.04f), safety);
+        lockerAccent.Name = $"ResidentialStairLockerAccent_T{towerIndex + 1:00}_F{floor + 1:00}";
+        RegisterMapDetailVisual(lockerAccent);
         tower.AddChild(new Label3D
         {
             Name = $"ResidentialStairFloorLabel_T{towerIndex + 1:00}_F{floor + 1:00}",
@@ -260,5 +278,33 @@ public partial class FreightTerminalWorld
             VisibilityRangeEnd = 16.0f
         });
         _residentialStairDetailCount++;
+    }
+
+    private MultiMeshInstance3D AddResidentialStairDetailBatch(
+        Node3D parent,
+        string name,
+        Vector3 size,
+        Godot.Material material,
+        IReadOnlyList<Transform3D> transforms)
+    {
+        var multiMesh = new MultiMesh
+        {
+            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+            Mesh = SharedBoxMesh(size),
+            InstanceCount = transforms.Count
+        };
+        for (var index = 0; index < transforms.Count; index++)
+        {
+            multiMesh.SetInstanceTransform(index, transforms[index]);
+        }
+        var visual = new MultiMeshInstance3D
+        {
+            Name = name,
+            Multimesh = multiMesh,
+            MaterialOverride = material
+        };
+        parent.AddChild(visual);
+        RegisterMapDetailVisual(visual);
+        return visual;
     }
 }

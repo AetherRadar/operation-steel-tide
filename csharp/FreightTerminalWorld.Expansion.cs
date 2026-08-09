@@ -1043,9 +1043,14 @@ public partial class FreightTerminalWorld
             CollisionLayer = 1,
             CollisionMask = 0
         };
-        body.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = size }, MaterialOverride = material });
+        var visual = new MeshInstance3D { Mesh = SharedBoxMesh(size), MaterialOverride = material };
+        body.AddChild(visual);
         body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } });
         parent.AddChild(body);
+        if (IsDistanceCulledBox(name))
+        {
+            RegisterMapDetailVisual(visual);
+        }
         return body;
     }
 

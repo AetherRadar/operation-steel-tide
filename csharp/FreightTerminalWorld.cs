@@ -1979,12 +1979,26 @@ public partial class FreightTerminalWorld : Node3D
             SetIfSupported(_environmentRef, "ssil_enabled", _qualitySetting >= 2);
             SetIfSupported(_environmentRef, "ssr_enabled", _qualitySetting >= 1);
             SetIfSupported(_environmentRef, "volumetric_fog_enabled", _qualitySetting >= 2);
+            if (_environmentRef.Sky is Sky sky)
+            {
+                sky.ProcessMode = _qualitySetting >= 2
+                    ? Sky.ProcessModeEnum.Realtime
+                    : Sky.ProcessModeEnum.Incremental;
+                sky.RadianceSize = new[]
+                {
+                    Sky.RadianceSizeEnum.Size64,
+                    Sky.RadianceSizeEnum.Size128,
+                    Sky.RadianceSizeEnum.Size256
+                }[_qualitySetting];
+            }
         }
+        GetViewport().Scaling3DScale = new[] { 0.74f, 0.88f, 1.0f }[_qualitySetting];
         if (IsInstanceValid(_sunLight))
         {
             _sunLight.ShadowEnabled = _qualitySetting >= 1;
             _sunLight.DirectionalShadowMaxDistance = new[] { 80.0f, 150.0f, 260.0f }[_qualitySetting];
         }
+        ApplyMapDetailQuality();
         SaveSettings();
     }
 

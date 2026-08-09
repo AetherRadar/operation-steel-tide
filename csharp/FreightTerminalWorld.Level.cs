@@ -1,9 +1,22 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    private static readonly Dictionary<Vector3, BoxMesh> SharedBoxMeshes = new();
+
+    private static BoxMesh SharedBoxMesh(Vector3 size)
+    {
+        if (!SharedBoxMeshes.TryGetValue(size, out var mesh))
+        {
+            mesh = new BoxMesh { Size = size };
+            SharedBoxMeshes[size] = mesh;
+        }
+        return mesh;
+    }
+
     private StandardMaterial3D Mat(
         string id,
         Color color,
@@ -1095,9 +1108,14 @@ void sky() {
             CollisionLayer = 1,
             CollisionMask = 0
         };
-        body.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = size }, MaterialOverride = material });
+        var visual = new MeshInstance3D { Mesh = SharedBoxMesh(size), MaterialOverride = material };
+        body.AddChild(visual);
         body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } });
         _levelRoot.AddChild(body);
+        if (IsDistanceCulledBox(name))
+        {
+            RegisterMapDetailVisual(visual);
+        }
         return body;
     }
 
@@ -1125,7 +1143,7 @@ void sky() {
     {
         var mesh = new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = size },
+            Mesh = SharedBoxMesh(size),
             Position = position,
             Rotation = rotation,
             MaterialOverride = material

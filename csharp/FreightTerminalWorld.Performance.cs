@@ -1,9 +1,13 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    private const string MapDetailVisualGroup = "map_detail_visuals";
+    private static readonly float[] MapDetailVisibilityRanges = { 34.0f, 58.0f, 84.0f };
+
     private struct MapRuntimeCounts
     {
         public int Nodes;
@@ -16,9 +20,77 @@ public partial class FreightTerminalWorld
         public int ResidentialStairBodies;
         public int ResidentialStairShapes;
         public int ResidentialStairVisuals;
+        public int MapDetailVisuals;
     }
 
-    private static void CountMapRuntimeNodes(Node node, ref MapRuntimeCounts counts, bool insideResidentialStair = false)
+    private static bool IsDistanceCulledBox(string name)
+    {
+        if (name.StartsWith("Apartment", System.StringComparison.Ordinal))
+        {
+            return !name.StartsWith("ApartmentDivider", System.StringComparison.Ordinal)
+                && !name.StartsWith("ApartmentCorridorWall", System.StringComparison.Ordinal)
+                && !name.StartsWith("ApartmentDoorHeader", System.StringComparison.Ordinal);
+        }
+        return name.StartsWith("Corridor", System.StringComparison.Ordinal)
+            || name.StartsWith("Clinic", System.StringComparison.Ordinal)
+            || name.StartsWith("Evac", System.StringComparison.Ordinal)
+            || name.StartsWith("Workshop", System.StringComparison.Ordinal)
+            || name.StartsWith("Security", System.StringComparison.Ordinal)
+            || name.StartsWith("Contraband", System.StringComparison.Ordinal)
+            || name.StartsWith("Smuggler", System.StringComparison.Ordinal)
+            || name.StartsWith("Kitchen", System.StringComparison.Ordinal)
+            || name.StartsWith("Family", System.StringComparison.Ordinal)
+            || name.StartsWith("ComplexDesk", System.StringComparison.Ordinal)
+            || name.StartsWith("ComplexCabinet", System.StringComparison.Ordinal)
+            || name.StartsWith("ComplexCrate", System.StringComparison.Ordinal)
+            || name.StartsWith("HangarWorkBay", System.StringComparison.Ordinal)
+            || name.StartsWith("HangarPartsShelf", System.StringComparison.Ordinal)
+            || name.StartsWith("MaintenanceBench", System.StringComparison.Ordinal)
+            || name.StartsWith("MaintenanceRack", System.StringComparison.Ordinal)
+            || name.StartsWith("RepairStand", System.StringComparison.Ordinal)
+            || name.StartsWith("BarracksBunk", System.StringComparison.Ordinal)
+            || name.StartsWith("BarracksLocker", System.StringComparison.Ordinal)
+            || name.StartsWith("WarehouseCrate", System.StringComparison.Ordinal)
+            || name.StartsWith("ArmoryBench", System.StringComparison.Ordinal)
+            || name.StartsWith("CustomsDesk", System.StringComparison.Ordinal)
+            || name.StartsWith("ResidentialInfillCrate", System.StringComparison.Ordinal);
+    }
+
+    private void RegisterMapDetailVisual(GeometryInstance3D visual)
+    {
+        visual.AddToGroup(MapDetailVisualGroup);
+        ConfigureMapDetailVisual(visual);
+    }
+
+    private void ConfigureMapDetailVisual(GeometryInstance3D visual)
+    {
+        visual.VisibilityRangeEnd = MapDetailVisibilityRanges[Mathf.Clamp(_qualitySetting, 0, 2)];
+        visual.VisibilityRangeEndMargin = _qualitySetting == 0 ? 4.0f : 8.0f;
+        visual.CastShadow = _qualitySetting >= 2
+            ? GeometryInstance3D.ShadowCastingSetting.On
+            : GeometryInstance3D.ShadowCastingSetting.Off;
+    }
+
+    private void ApplyMapDetailQuality()
+    {
+        if (!IsInsideTree())
+        {
+            return;
+        }
+        foreach (var node in GetTree().GetNodesInGroup(MapDetailVisualGroup))
+        {
+            if (node is GeometryInstance3D visual && IsInstanceValid(visual))
+            {
+                ConfigureMapDetailVisual(visual);
+            }
+        }
+    }
+
+    private static void CountMapRuntimeNodes(
+        Node node,
+        ref MapRuntimeCounts counts,
+        HashSet<ulong> boxMeshResources,
+        bool insideResidentialStair = false)
     {
         counts.Nodes++;
         if (node is StaticBody3D)
@@ -33,9 +105,18 @@ public partial class FreightTerminalWorld
         {
             counts.MeshInstances++;
         }
+        if (node is MeshInstance3D meshInstance && meshInstance.Mesh is BoxMesh boxMesh)
+        {
+            boxMeshResources.Add(boxMesh.GetInstanceId());
+        }
         if (node is MultiMeshInstance3D)
         {
             counts.MultiMeshInstances++;
+        }
+        if (node is MultiMeshInstance3D multiMeshInstance
+            && multiMeshInstance.Multimesh?.Mesh is BoxMesh multiBoxMesh)
+        {
+            boxMeshResources.Add(multiBoxMesh.GetInstanceId());
         }
         if (node is Label3D)
         {
@@ -44,6 +125,10 @@ public partial class FreightTerminalWorld
         if (node is Light3D)
         {
             counts.Lights++;
+        }
+        if (node.IsInGroup(MapDetailVisualGroup))
+        {
+            counts.MapDetailVisuals++;
         }
         var nodeName = node.Name.ToString();
         var insideStair = insideResidentialStair
@@ -67,7 +152,7 @@ public partial class FreightTerminalWorld
         {
             if (child is Node childNode)
             {
-                CountMapRuntimeNodes(childNode, ref counts, insideStair);
+                CountMapRuntimeNodes(childNode, ref counts, boxMeshResources, insideStair);
             }
         }
     }
@@ -77,7 +162,8 @@ public partial class FreightTerminalWorld
         // Let deferred collision registration settle before taking the deterministic count.
         await WaitFrames(4);
         var counts = new MapRuntimeCounts();
-        CountMapRuntimeNodes(this, ref counts);
+        var boxMeshResources = new HashSet<ulong>();
+        CountMapRuntimeNodes(this, ref counts, boxMeshResources);
         var expectedFloors = 0;
         foreach (var spec in ResidentialTowerSpecs)
         {
@@ -90,17 +176,48 @@ public partial class FreightTerminalWorld
         var stairCollisionReady = counts.ResidentialStairShapes >= expectedFloors * 32;
         var stairBodiesConsolidated = counts.ResidentialStairBodies <= expectedFloors * 2;
         var stairVisualsBatched = counts.MultiMeshInstances >= expectedFloors;
-        var nodeBudgetMet = counts.Nodes < 45000;
+        var expectedDetailRange = MapDetailVisibilityRanges[Mathf.Clamp(_qualitySetting, 0, 2)];
+        var detailQualityReady = true;
+        foreach (var node in GetTree().GetNodesInGroup(MapDetailVisualGroup))
+        {
+            if (node is not GeometryInstance3D visual)
+            {
+                detailQualityReady = false;
+                break;
+            }
+            detailQualityReady &= Mathf.IsEqualApprox(visual.VisibilityRangeEnd, expectedDetailRange)
+                && visual.CastShadow == (_qualitySetting >= 2
+                    ? GeometryInstance3D.ShadowCastingSetting.On
+                    : GeometryInstance3D.ShadowCastingSetting.Off);
+        }
+        var detailCullingReady = counts.MapDetailVisuals >= expectedFloors * 20 && detailQualityReady;
+        var nodeBudgetMet = counts.Nodes < 40000;
         var staticBodyBudgetMet = counts.StaticBodies < 7500;
+        var boxMeshBudgetMet = boxMeshResources.Count < 3000;
+        var expectedScale = new[] { 0.74f, 0.88f, 1.0f }[Mathf.Clamp(_qualitySetting, 0, 2)];
+        var qualityScaleReady = Mathf.IsEqualApprox(GetViewport().Scaling3DScale, expectedScale);
+        var expectedRadiance = new[]
+        {
+            Sky.RadianceSizeEnum.Size64,
+            Sky.RadianceSizeEnum.Size128,
+            Sky.RadianceSizeEnum.Size256
+        }[Mathf.Clamp(_qualitySetting, 0, 2)];
+        var skyQualityReady = _environmentRef.Sky is Sky sky
+            && sky.ProcessMode == (_qualitySetting >= 2 ? Sky.ProcessModeEnum.Realtime : Sky.ProcessModeEnum.Incremental)
+            && sky.RadianceSize == expectedRadiance;
         var valid = residentialReady
             && stairCollisionReady
             && stairBodiesConsolidated
             && stairVisualsBatched
+            && detailCullingReady
             && nodeBudgetMet
             && staticBodyBudgetMet
+            && boxMeshBudgetMet
+            && qualityScaleReady
+            && skyQualityReady
             && counts.CollisionShapes > 0
             && counts.MeshInstances > 0;
-        GD.Print($"PERFORMANCE_CHECK valid={valid} nodes={counts.Nodes} node_budget={nodeBudgetMet} static_bodies={counts.StaticBodies} static_budget={staticBodyBudgetMet} collision_shapes={counts.CollisionShapes} mesh_instances={counts.MeshInstances} multimesh_instances={counts.MultiMeshInstances} stair_batched={stairVisualsBatched} labels={counts.Labels} lights={counts.Lights} stair_bodies={counts.ResidentialStairBodies} stair_consolidated={stairBodiesConsolidated} stair_shapes={counts.ResidentialStairShapes} stair_visuals={counts.ResidentialStairVisuals} residential={residentialReady}");
+        GD.Print($"PERFORMANCE_CHECK valid={valid} nodes={counts.Nodes} node_budget={nodeBudgetMet} static_bodies={counts.StaticBodies} static_budget={staticBodyBudgetMet} collision_shapes={counts.CollisionShapes} mesh_instances={counts.MeshInstances} multimesh_instances={counts.MultiMeshInstances} box_mesh_resources={boxMeshResources.Count} box_mesh_budget={boxMeshBudgetMet} detail_visuals={counts.MapDetailVisuals} detail_culling={detailCullingReady} quality_scale={qualityScaleReady} sky_quality={skyQualityReady} stair_batched={stairVisualsBatched} labels={counts.Labels} lights={counts.Lights} stair_bodies={counts.ResidentialStairBodies} stair_consolidated={stairBodiesConsolidated} stair_shapes={counts.ResidentialStairShapes} stair_visuals={counts.ResidentialStairVisuals} residential={residentialReady}");
         GD.Print($"PERFORMANCE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
