@@ -58,9 +58,9 @@ public partial class EnemyOperator
 
     private Node3D? AssignedCombatTargetNode()
     {
-        if (_combatTarget is not null && !_combatTarget.CombatDead)
+        if (_combatTarget is not null)
         {
-            return _combatTarget.CombatNode;
+            return IsAttackableCombatant(_combatTarget) ? _combatTarget.CombatNode : null;
         }
         return _rawTarget is not null && GodotObject.IsInstanceValid(_rawTarget)
             ? _rawTarget
@@ -75,15 +75,18 @@ public partial class EnemyOperator
         }
         return target switch
         {
-            TacticalPlayer player => !player.IsDead,
-            SquadMate mate => !mate.IsDowned && !mate.IsBodyBag,
+            ISquadCombatant combatant => IsAttackableCombatant(combatant),
             EnemyOperator enemy => IsHostileTo(enemy),
             _ => false
         };
     }
 
     private bool CanRetainPursuitTarget(Node3D? target)
-        => IsPursuing && IsValidHostileTarget(target);
+        => IsPursuing
+            && IsValidHostileTarget(target)
+            && (target is not ISquadCombatant { CombatDowned: true }
+                || GlobalPosition.DistanceSquaredTo(target.GlobalPosition)
+                    <= DownedFinishAcquireRange * DownedFinishAcquireRange);
 
     private void AssignCombatTarget(Node3D? target)
     {

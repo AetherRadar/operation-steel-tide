@@ -37,6 +37,8 @@ public interface ISquadCombatant
     void RestoreHealth(float amount);
     /// <summary>Successful teammate revive. Returns false if revive-used or not downed.</summary>
     bool TryReceiveRevive(float healAmount);
+    /// <summary>Convert a currently revivable downed operator into the permanent KIA state.</summary>
+    bool TryFinishDowned(Node? attacker = null);
 }
 
 public readonly record struct OperatorRoleSpec(

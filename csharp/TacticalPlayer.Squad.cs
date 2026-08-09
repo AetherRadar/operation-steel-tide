@@ -317,6 +317,17 @@ public partial class TacticalPlayer
         return true;
     }
 
+    public bool TryFinishDowned(Node? attacker = null)
+    {
+        if (!CanBeRevived)
+        {
+            return false;
+        }
+        ReviveUsed = true;
+        Main?.OnLocalPlayerFinishedByHostile();
+        return true;
+    }
+
     internal void SetHealthForDiagnostics(float value)
     {
         Health = Mathf.Clamp(value, 1.0f, MaxHealth);

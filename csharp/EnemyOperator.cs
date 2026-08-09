@@ -23,10 +23,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     public bool IsSearchingLoot => _searchingLoot;
     public float CurrentHealth => _health;
     public int AttackShotsFired { get; private set; }
-    /// <summary>Live engage target node (player, squadmate, or other EnemyOperator).</summary>
+    /// <summary>Engage target node, including a revivable hostile waiting to be finished.</summary>
     public Node3D? EngageTargetNode =>
-        _combatTarget is not null && !_combatTarget.CombatDead
-            ? _combatTarget.CombatNode
+        _combatTarget is not null
+            ? IsAttackableCombatant(_combatTarget) ? _combatTarget.CombatNode : null
             : GodotObject.IsInstanceValid(_rawTarget) ? _rawTarget : null;
     public float Suspicion { get; private set; }
     public bool Alerted { get; private set; }
@@ -131,10 +131,19 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     /// <summary>Beyond this distance a living hostile is ignored for engagement (still exists on map).</summary>
     private const float DefaultContactAcquireRange = 48.0f;
     private const float SniperContactAcquireRange = 185.0f;
+    private const float DownedFinishAcquireRange = 22.0f;
+    private const float DownedFinishScorePenalty = 32.0f * 32.0f;
+    private const float DownedFinishLockSeconds = 1.5f;
     private float CurrentContactAcquireRange => SentryMode || HasFireablePrimary && CarriedWeapon.Platform == WeaponPlatform.M24
         ? SniperContactAcquireRange
         : DefaultContactAcquireRange;
     private float CurrentFireRange => CarriedWeapon.Platform == WeaponPlatform.M24 ? 175.0f : 52.0f;
+
+    private static bool IsAttackableCombatant(ISquadCombatant combatant)
+        => !combatant.CombatDead || combatant.CombatDowned && combatant.CanBeRevived;
+
+    private ISquadCombatant? _downedFinishTarget;
+    private float _downedFinishLockTimer;
 
     private readonly RandomNumberGenerator _rng = new();
     private Node3D _bodyRoot = null!;
@@ -453,6 +462,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
         UpdatePursuitTimers(dt);
         AcquireCombatTarget();
+        UpdateDownedFinishLock(dt);
         var velocity = Velocity;
         if (!IsOnFloor())
         {
@@ -472,9 +482,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             _rawTarget = null;
         }
-        if (_combatTarget is not null && _combatTarget.CombatDead)
+        if (_combatTarget is not null && !IsAttackableCombatant(_combatTarget))
         {
             _combatTarget = null;
+            _rawTarget = null;
         }
 
         var hasEngageTarget = EngageTargetNode is not null;
@@ -622,7 +633,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         if (Main is null)
         {
             // Without a world, only lock the player if actually nearby.
-            if (GodotObject.IsInstanceValid(Player) && !Player.IsDead
+            if (GodotObject.IsInstanceValid(Player) && IsAttackableCombatant(Player)
                 && GlobalPosition.DistanceSquaredTo(Player.GlobalPosition) <= contactAcquireRangeSq)
             {
                 _combatTarget = Player;
@@ -635,24 +646,31 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             return;
         }
 
-        // Prefer living hostiles that are not on our team AND within contact range.
-        // Distant hostiles must not block NPC loot idle.
+        // Prefer active hostiles within contact range. Revivable downed targets remain
+        // attackable at close range so operators can secure them before a rescue.
         Node3D? bestNode = null;
         ISquadCombatant? bestCombatant = null;
         var bestScore = float.PositiveInfinity;
         var acquireRangeSq = IsRivalSquad
             ? contactAcquireRangeSq * 1.35f * 1.35f
             : contactAcquireRangeSq;
-        foreach (var candidate in Main.EnumerateHostileTargetsFor(this))
+
+        void ConsiderCandidate(Node3D candidate)
         {
             if (candidate is null || !GodotObject.IsInstanceValid(candidate))
             {
-                continue;
+                return;
             }
             var distanceSq = GlobalPosition.DistanceSquaredTo(candidate.GlobalPosition);
             if (distanceSq > acquireRangeSq)
             {
-                continue;
+                return;
+            }
+            var candidateCombatant = candidate as ISquadCombatant;
+            if (candidateCombatant?.CombatDowned == true
+                && distanceSq > DownedFinishAcquireRange * DownedFinishAcquireRange)
+            {
+                return;
             }
             // Rival squads heavily prefer player/other operators over distant noise.
             var bias = 0.0f;
@@ -664,28 +682,26 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             {
                 bias = -35.0f; // map NPCs prefer rival operator squads inside range
             }
+            if (candidateCombatant?.CombatDowned == true)
+            {
+                bias += DownedFinishScorePenalty;
+            }
             var score = distanceSq + bias;
             if (score < bestScore)
             {
                 bestScore = score;
                 bestNode = candidate;
-                if (candidate is ISquadCombatant combatant)
-                {
-                    bestCombatant = combatant;
-                }
-                else if (candidate is TacticalPlayer tp)
-                {
-                    bestCombatant = tp;
-                }
-                else if (candidate is SquadMate sm)
-                {
-                    bestCombatant = sm;
-                }
-                else
-                {
-                    bestCombatant = null;
-                }
+                bestCombatant = candidateCombatant;
             }
+        }
+
+        foreach (var candidate in Main.EnumerateHostileTargetsFor(this))
+        {
+            ConsiderCandidate(candidate);
+        }
+        foreach (var candidate in Main.EnumerateDownedSquadTargets())
+        {
+            ConsiderCandidate(candidate);
         }
 
         if (bestCombatant is not null)
@@ -703,7 +719,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             _rawTarget = bestNode;
         }
-        if (retainPrevious && previousTarget is not null
+        var previousWasDowned = previousTarget is ISquadCombatant { CombatDowned: true };
+        if (retainPrevious && !previousWasDowned && previousTarget is not null
             && (bestNode is null || bestNode != previousTarget && bestScore > 18.0f * 18.0f))
         {
             AssignCombatTarget(previousTarget);
@@ -713,6 +730,23 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             ClearPursuitMemory(clearTarget: false);
         }
         // No fallback to infinitely-distant player — leave EngageTargetNode null so loot idle can run.
+    }
+
+    private void UpdateDownedFinishLock(float delta)
+    {
+        if (_combatTarget is not { CombatDowned: true, CanBeRevived: true })
+        {
+            _downedFinishTarget = null;
+            _downedFinishLockTimer = 0.0f;
+            return;
+        }
+        if (!ReferenceEquals(_downedFinishTarget, _combatTarget))
+        {
+            _downedFinishTarget = _combatTarget;
+            _downedFinishLockTimer = DownedFinishLockSeconds;
+            return;
+        }
+        _downedFinishLockTimer = Mathf.Max(0.0f, _downedFinishLockTimer - delta);
     }
 
     private ILootSource? _lootSourceTarget;
@@ -802,6 +836,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         Alerted = false;
         _combatTarget = null;
         _rawTarget = null;
+        _downedFinishTarget = null;
+        _downedFinishLockTimer = 0.0f;
         ResetPursuitStateForDiagnostics();
         // Phase-1 duel may have removed this unit from the world roster on death.
         // Re-list so later validator phases (and AcquireCombatTarget) can see us again.
@@ -940,7 +976,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
     private Vector3 CurrentTargetPoint()
     {
-        if (_combatTarget is not null && !_combatTarget.CombatDead)
+        if (_combatTarget is not null && IsAttackableCombatant(_combatTarget))
         {
             return _combatTarget.HitPoint(IsProne ? HitRegion.Limbs : HitRegion.Torso);
         }
@@ -971,7 +1007,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             return false;
         }
-        if (_combatTarget is not null && _combatTarget.CombatDead)
+        if (_combatTarget is not null && !IsAttackableCombatant(_combatTarget))
         {
             return false;
         }
@@ -1242,12 +1278,16 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             return;
         }
-        if (_combatTarget is null)
+        if (_combatTarget is null || !IsAttackableCombatant(_combatTarget))
         {
             if (_rawTarget is EnemyOperator rivalFallback && !rivalFallback.IsDead)
             {
                 FireAtNode(rivalFallback, distance);
             }
+            return;
+        }
+        if (_combatTarget.CombatDowned && _downedFinishLockTimer > 0.0f)
+        {
             return;
         }
         BeginMuzzleFlash();
@@ -1273,7 +1313,14 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         var clear = Ballistics.HasClearShot(GetWorld3D(), shotOrigin, aimPoint, _combatTarget.CombatNode, GetRid());
         if (clear && _rng.Randf() < accuracy)
         {
-            _combatTarget.TakeCombatDamage(stats.Damage * _rng.RandfRange(0.32f, 0.48f), aimPoint, this);
+            if (_combatTarget.CombatDowned)
+            {
+                _combatTarget.TryFinishDowned(this);
+            }
+            else
+            {
+                _combatTarget.TakeCombatDamage(stats.Damage * _rng.RandfRange(0.32f, 0.48f), aimPoint, this);
+            }
         }
         else if (!clear)
         {

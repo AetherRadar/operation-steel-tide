@@ -864,6 +864,26 @@ public partial class FreightTerminalWorld
         }
     }
 
+    /// <summary>Revivable player-squad targets that hostile operators may secure at close range.</summary>
+    public IEnumerable<Node3D> EnumerateDownedSquadTargets()
+    {
+        if (IsPlayerProtected())
+        {
+            yield break;
+        }
+        if (IsInstanceValid(_player) && _player.CombatDowned && _player.CanBeRevived)
+        {
+            yield return _player;
+        }
+        foreach (var mate in _squadMates)
+        {
+            if (IsInstanceValid(mate) && mate.CombatDowned && mate.CanBeRevived)
+            {
+                yield return mate;
+            }
+        }
+    }
+
     public void ApplyMedicSpray(ISquadCombatant source, Vector3 origin, Vector3 forward)
     {
         ISquadCombatant? target = null;
@@ -1204,6 +1224,15 @@ public partial class FreightTerminalWorld
         ClearLeaderReviveAi();
     }
 
+    public void OnLocalPlayerFinishedByHostile()
+    {
+        if (!_localPlayerDowned || !_player.IsDead)
+        {
+            return;
+        }
+        FailSquadMission();
+    }
+
     private void FailSquadMission()
     {
         if (_missionEnded)
@@ -1273,6 +1302,90 @@ public partial class FreightTerminalWorld
         // Leave deployment protection so live damage/down paths exercise shipped code.
         _missionDirector.ExitDeploymentZone();
         await WaitFrames(4);
+
+        // Hostile operators retain a nearby downed target, pause briefly, then secure it
+        // through the same ballistic fire path used during live combat.
+        var finishShooter = _enemies.FirstOrDefault(enemy => IsInstanceValid(enemy) && !enemy.IsDead);
+        var finishTarget = new SquadMate
+        {
+            Name = "DiagnosticFinishTarget",
+            Position = new Vector3(0.0f, 0.3f, 60.0f)
+        };
+        finishTarget.Configure(this, _player, 9, OperatorRole.Assault, "TARGET");
+        AddChild(finishTarget);
+        finishTarget.SetOrder(SquadOrder.Hold, finishTarget.GlobalPosition);
+        _squadMates.Add(finishTarget);
+        foreach (var enemy in _enemies)
+        {
+            if (!IsInstanceValid(enemy))
+            {
+                continue;
+            }
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+            if (enemy != finishShooter)
+            {
+                enemy.GlobalPosition = new Vector3(220.0f, 0.3f, 220.0f);
+            }
+        }
+        foreach (var squadMate in _squadMates)
+        {
+            if (!IsInstanceValid(squadMate) || squadMate == finishTarget)
+            {
+                continue;
+            }
+            squadMate.ProcessMode = ProcessModeEnum.Disabled;
+            squadMate.GlobalPosition = new Vector3(180.0f + squadMate.SquadSlot * 3.0f, 0.3f, 180.0f);
+        }
+        _player.GlobalPosition = new Vector3(180.0f, 0.3f, 190.0f);
+
+        var finishTargetDowned = finishTarget.TakeCombatDamage(
+            999.0f,
+            finishTarget.HitPoint(HitRegion.Torso),
+            this) && finishTarget.CombatDowned;
+        var finishTargetAcquired = false;
+        var finishLockHeld = false;
+        var finishShotFired = false;
+        var finishConverted = false;
+        if (finishShooter is not null)
+        {
+            finishShooter.ResetTacticalStateForDiagnostics();
+            finishShooter.GrantFireablePrimaryForDiagnostics();
+            finishShooter.SentryMode = true;
+            finishShooter.GlobalPosition = new Vector3(0.0f, 0.3f, 50.0f);
+            finishShooter.LookAt(finishTarget.GlobalPosition, Vector3.Up);
+            finishShooter.SetAlerted(finishTarget.GlobalPosition);
+            finishShooter.ProcessMode = ProcessModeEnum.Inherit;
+            var shotsBeforeFinish = finishShooter.AttackShotsFired;
+            for (var frame = 0; frame < 36; frame++)
+            {
+                finishShooter.ArmWeaponForDiagnostics();
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                finishTargetAcquired |= finishShooter.EngageTargetNode == finishTarget;
+            }
+            finishLockHeld = finishShooter.AttackShotsFired == shotsBeforeFinish;
+            var bagsBeforeFinish = GetTree().GetNodesInGroup("squad_body_bags").Count;
+            for (var frame = 0; frame < 120 && _squadMates.Contains(finishTarget); frame++)
+            {
+                finishShooter.ArmWeaponForDiagnostics();
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            }
+            finishShotFired = finishShooter.AttackShotsFired > shotsBeforeFinish;
+            finishConverted = !_squadMates.Contains(finishTarget)
+                && GetTree().GetNodesInGroup("squad_body_bags").Count > bagsBeforeFinish;
+            finishShooter.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        var aiFinishOk = finishTargetDowned
+            && finishTargetAcquired
+            && finishLockHeld
+            && finishShotFired
+            && finishConverted;
+        foreach (var squadMate in _squadMates)
+        {
+            if (IsInstanceValid(squadMate))
+            {
+                squadMate.ProcessMode = ProcessModeEnum.Inherit;
+            }
+        }
 
         // Downed crawl + revive-once.
         var mate = _squadMates.First(m => IsInstanceValid(m) && !m.IsHumanProxy);
@@ -1356,9 +1469,10 @@ public partial class FreightTerminalWorld
         var reviveOk = mateDowned && firstRevive && mateUp && bodyBagOk && secondReviveBlocked
             && playerDowned && playerFirstRevive && playerUp && playerSecondBlocked;
 
-        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} revive_once={reviveOk} ai_leader_revive={aiReviveOk} player_view_on_down={playerViewOnDown} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
-        GD.Print($"SQUAD_PASS valid={ActiveSquadCount >= 2 && roleFillOk && reviveOk && aiReviveOk}");
-        GetTree().Quit(roleFillOk && reviveOk && aiReviveOk ? 0 : 2);
+        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} revive_once={reviveOk} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} player_view_on_down={playerViewOnDown} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
+        var valid = ActiveSquadCount >= 2 && roleFillOk && reviveOk && aiFinishOk && aiReviveOk;
+        GD.Print($"SQUAD_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private async void CaptureSquadFrame()

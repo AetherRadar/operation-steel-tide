@@ -684,6 +684,16 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         return true;
     }
 
+    public bool TryFinishDowned(Node? attacker = null)
+    {
+        if (!CanBeRevived)
+        {
+            return false;
+        }
+        ConvertToBodyBag();
+        return true;
+    }
+
     /// <summary>Force the permanent body-bag state (second down / diagnostics).</summary>
     public void ConvertToBodyBag()
     {
