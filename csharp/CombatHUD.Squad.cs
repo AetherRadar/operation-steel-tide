@@ -191,11 +191,12 @@ public partial class CombatHUD
         });
         _squadLobbyTitle = Label("OPERATION LOADOUT", 28, new Color(0.86f, 0.96f, 0.92f));
         _squadLobbyTitle.Position = new Vector2(18, 13);
-        _squadLobbyTitle.Size = new Vector2(470, 36);
+        _squadLobbyTitle.Size = new Vector2(300, 36);
         panel.AddChild(_squadLobbyTitle);
-        _squadLobbySubtitle = Label("STRIKE TEAM PREPARATION  //  HARBOR EXCLUSION ZONE", 11, new Color(0.48f, 0.65f, 0.61f));
+        _squadLobbySubtitle = Label("STRIKE TEAM PREPARATION  //  FREIGHT TERMINAL", 11, new Color(0.48f, 0.65f, 0.61f));
         _squadLobbySubtitle.Position = new Vector2(20, 48);
-        _squadLobbySubtitle.Size = new Vector2(520, 20);
+        _squadLobbySubtitle.Size = new Vector2(300, 20);
+        _squadLobbySubtitle.ClipText = true;
         panel.AddChild(_squadLobbySubtitle);
 
         var roleRail = new ColorRect
@@ -367,12 +368,18 @@ public partial class CombatHUD
             return;
         }
         var affordable = DeploymentProjectedBalance >= 0;
-        _deploySquadButton.Disabled = !affordable;
+        var mapAvailable = DeploymentMapAvailable;
+        var deployable = affordable && mapAvailable;
+        _deploySquadButton.Disabled = !deployable;
         _deploySquadButton.Text = GameLocalization.IsChinese(_language)
-            ? affordable
+            ? !mapAvailable
+                ? "\u5730\u56fe\u672a\u89e3\u9501  //  \u8bf7\u9009\u62e9\u53ef\u7528\u5730\u56fe"
+                : affordable
                 ? $"\u25b6  \u786e\u8ba4\u6574\u5907\u5e76\u90e8\u7f72  //  {DeploymentSelectedCost}"
                 : "\u4f59\u989d\u4e0d\u8db3  //  \u8c03\u6574\u6574\u5907"
-            : affordable
+            : !mapAvailable
+                ? "MAP LOCKED  //  SELECT AN AVAILABLE OPERATION"
+                : affordable
                 ? $"\u25b6  CONFIRM KIT & DEPLOY  //  {DeploymentSelectedCost}"
                 : "INSUFFICIENT BALANCE  //  ADJUST KIT";
     }
@@ -496,9 +503,10 @@ public partial class CombatHUD
         }
         var chinese = GameLocalization.IsChinese(_language);
         _squadLobbyTitle.Text = chinese ? "\u884c\u52a8\u6574\u5907" : "OPERATION LOADOUT";
+        var selectedMap = DeploymentMapCatalog.Resolve(SelectedDeploymentMapId);
         _squadLobbySubtitle.Text = chinese
-            ? "\u7a81\u51fb\u5c0f\u961f\u6574\u5907  //  \u6e2f\u533a\u5c01\u9501\u533a"
-            : "STRIKE TEAM PREPARATION  //  HARBOR EXCLUSION ZONE";
+            ? $"\u7a81\u51fb\u5c0f\u961f\u6574\u5907  //  {Text(selectedMap.LocalizationKey, selectedMap.EnglishName)}"
+            : $"STRIKE TEAM PREPARATION  //  {Text(selectedMap.LocalizationKey, selectedMap.EnglishName)}";
         _roleCaption.Text = chinese ? "\u9009\u62e9\u5e72\u5458" : "SELECT OPERATOR";
         _localSquadButton.Text = chinese ? "\u672c\u5730 + AI" : "LOCAL + AI";
         _hostSquadButton.Text = chinese ? "\u521b\u5efa\u5c40\u57df\u7f51" : "HOST LAN";

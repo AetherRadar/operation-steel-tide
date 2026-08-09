@@ -22,9 +22,11 @@ public partial class FreightTerminalWorld
     private SquadMate? _spectatedMate;
     private int _remoteNetworkShotCount;
     private int _remoteNetworkAbilityCount;
+    private string _activeDeploymentMapId = DeploymentMapCatalog.FreightTerminalId;
 
     public int ActiveSquadCount => 1 + _squadMates.Count(mate => IsInstanceValid(mate));
     public int AiSquadCount => _squadMates.Count(mate => IsInstanceValid(mate) && !mate.IsHumanProxy);
+    public string ActiveDeploymentMapId => _activeDeploymentMapId;
 
     private void BuildSquadSystem()
     {
@@ -100,10 +102,15 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        if (!_hud.DeploymentMapAvailable)
+        {
+            return;
+        }
         if (!TryCommitSelectedDeployment())
         {
             return;
         }
+        _activeDeploymentMapId = _hud.SelectedDeploymentMapId;
         DeploySquad((OperatorRole)role, (SquadSessionMode)mode, address);
     }
 

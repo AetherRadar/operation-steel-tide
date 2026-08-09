@@ -7,7 +7,11 @@ using Godot;
 
 namespace OperationSteelTide;
 
-public sealed record DeploymentLoadoutSelection(string WeaponId, string ArmorId, LootGrade AmmoGrade);
+public sealed record DeploymentLoadoutSelection(
+    string WeaponId,
+    string ArmorId,
+    LootGrade AmmoGrade,
+    int AmmoQuantity = 0);
 
 public sealed record DeploymentWeaponOffer(
     string Id,
@@ -33,6 +37,12 @@ public sealed record DeploymentPresetOffer(
     string ArmorId,
     LootGrade AmmoGrade,
     string LocalizationKey,
+    string EnglishName,
+    int AmmoQuantity = 0);
+
+public sealed record DeploymentAmmoPackOffer(
+    int Quantity,
+    string LocalizationKey,
     string EnglishName);
 
 public sealed record DeploymentLoadout(
@@ -55,6 +65,7 @@ public sealed class OperatorProfileData
     public string LastWeaponId { get; set; } = "m4a1";
     public string LastArmorId { get; set; } = "standard";
     public LootGrade LastAmmoGrade { get; set; } = LootGrade.Uncommon;
+    public int LastAmmoQuantity { get; set; } = 90;
 
     public OperatorProfileData Clone() => new()
     {
@@ -65,7 +76,8 @@ public sealed class OperatorProfileData
         DeploymentCount = DeploymentCount,
         LastWeaponId = LastWeaponId,
         LastArmorId = LastArmorId,
-        LastAmmoGrade = LastAmmoGrade
+        LastAmmoGrade = LastAmmoGrade,
+        LastAmmoQuantity = LastAmmoQuantity
     };
 }
 
@@ -75,8 +87,18 @@ public static class DeploymentCatalog
     {
         new DeploymentWeaponOffer("none", null, 0, 0, 0, "loadout_scavenger", "SCAVENGER / KNIFE ONLY"),
         new DeploymentWeaponOffer("m4a1", WeaponPlatform.M4A1, 1, 4200, 90, "loadout_m4a1", "M4A1 ASSAULT"),
-        new DeploymentWeaponOffer("mp5a5", WeaponPlatform.MP5A5, 1, 3600, 150, "loadout_mp5", "MP5A5 CQB"),
-        new DeploymentWeaponOffer("m24", WeaponPlatform.M24, 2, 7800, 30, "loadout_m24", "M24 PRECISION")
+        new DeploymentWeaponOffer("ak74", WeaponPlatform.AK74, 1, 3900, 90, "loadout_ak74", "AK-74N ASSAULT"),
+        new DeploymentWeaponOffer("scarl", WeaponPlatform.ScarL, 2, 6200, 60, "loadout_scarl", "SCAR-L SPECIALIST"),
+        new DeploymentWeaponOffer("mp5a5", WeaponPlatform.MP5A5, 1, 3600, 120, "loadout_mp5", "MP5A5 CQB"),
+        new DeploymentWeaponOffer("m24", WeaponPlatform.M24, 2, 7800, 60, "loadout_m24", "M24 PRECISION")
+    };
+
+    public static readonly IReadOnlyList<DeploymentAmmoPackOffer> AmmoPacks = new[]
+    {
+        new DeploymentAmmoPackOffer(30, "ammo_pack_30", "30 ROUNDS"),
+        new DeploymentAmmoPackOffer(60, "ammo_pack_60", "60 ROUNDS"),
+        new DeploymentAmmoPackOffer(90, "ammo_pack_90", "90 ROUNDS"),
+        new DeploymentAmmoPackOffer(180, "ammo_pack_180", "180 ROUNDS")
     };
 
     public static readonly IReadOnlyList<DeploymentArmorOffer> Armor = new[]
@@ -101,10 +123,10 @@ public static class DeploymentCatalog
 
     public static readonly IReadOnlyList<DeploymentPresetOffer> Presets = new[]
     {
-        new DeploymentPresetOffer("scavenger", "none", "standard", LootGrade.Common, "preset_scavenger", "SCAVENGER"),
-        new DeploymentPresetOffer("assault", "m4a1", "standard", LootGrade.Uncommon, "preset_assault", "ASSAULT"),
-        new DeploymentPresetOffer("breacher", "mp5a5", "heavy", LootGrade.Rare, "preset_breacher", "BREACHER"),
-        new DeploymentPresetOffer("overwatch", "m24", "standard", LootGrade.Epic, "preset_overwatch", "OVERWATCH")
+        new DeploymentPresetOffer("scavenger", "none", "standard", LootGrade.Common, "preset_scavenger", "SCAVENGER", 0),
+        new DeploymentPresetOffer("assault", "m4a1", "standard", LootGrade.Uncommon, "preset_assault", "ASSAULT", 90),
+        new DeploymentPresetOffer("breacher", "mp5a5", "heavy", LootGrade.Rare, "preset_breacher", "BREACHER", 120),
+        new DeploymentPresetOffer("overwatch", "m24", "standard", LootGrade.Epic, "preset_overwatch", "OVERWATCH", 60)
     };
 
     public static DeploymentWeaponOffer Weapon(string id)
@@ -143,6 +165,40 @@ public static class DeploymentCatalog
         return Presets[0];
     }
 
+    public static DeploymentAmmoPackOffer AmmoPack(int quantity)
+    {
+        foreach (var pack in AmmoPacks)
+        {
+            if (pack.Quantity == quantity)
+            {
+                return pack;
+            }
+        }
+        return AmmoPacks[0];
+    }
+
+    public static int NormalizeAmmoQuantity(int quantity, int fallback)
+    {
+        if (quantity > 0)
+        {
+            foreach (var pack in AmmoPacks)
+            {
+                if (pack.Quantity == quantity)
+                {
+                    return quantity;
+                }
+            }
+        }
+        foreach (var pack in AmmoPacks)
+        {
+            if (pack.Quantity == fallback)
+            {
+                return fallback;
+            }
+        }
+        return AmmoPacks[0].Quantity;
+    }
+
     public static int AmmoPrice(LootGrade grade) => grade switch
     {
         LootGrade.Uncommon => 900,
@@ -152,19 +208,43 @@ public static class DeploymentCatalog
         _ => 450
     };
 
+    public static int AmmoPrice(LootGrade grade, AmmoCaliber caliber, int quantity)
+    {
+        if (quantity <= 0)
+        {
+            return 0;
+        }
+        var caliberMultiplier = caliber switch
+        {
+            AmmoCaliber.Sniper => 1.35f,
+            AmmoCaliber.Smg => 0.8f,
+            _ => 1.0f
+        };
+        var rawPrice = AmmoPrice(grade) * quantity / 90.0f * caliberMultiplier;
+        return Math.Max(50, (int)(Math.Round(rawPrice / 50.0f, MidpointRounding.AwayFromZero) * 50));
+    }
+
     public static DeploymentLoadout Resolve(DeploymentLoadoutSelection selection)
     {
         var weapon = Weapon(selection.WeaponId);
         var armor = ArmorKit(selection.ArmorId);
-        var ammoCost = weapon.Platform is null ? 0 : AmmoPrice(selection.AmmoGrade);
+        var quantity = weapon.Platform is null
+            ? 0
+            : NormalizeAmmoQuantity(selection.AmmoQuantity, weapon.ReserveAmmo);
+        var caliber = weapon.Platform is null
+            ? AmmoCaliber.Rifle
+            : WeaponCatalog.Weapon(weapon.Platform.Value).Caliber;
+        var ammoCost = weapon.Platform is null
+            ? 0
+            : AmmoPrice(selection.AmmoGrade, caliber, quantity);
         return new DeploymentLoadout(
-            new DeploymentLoadoutSelection(weapon.Id, armor.Id, selection.AmmoGrade),
+            new DeploymentLoadoutSelection(weapon.Id, armor.Id, selection.AmmoGrade, quantity),
             weapon.Platform is null ? null : WeaponCatalog.Build(weapon.Platform.Value, weapon.BuildTier),
             armor.HelmetId,
             armor.BodyArmorId,
             armor.BackpackId,
             selection.AmmoGrade,
-            weapon.ReserveAmmo,
+            quantity,
             weapon.Price + armor.Price + ammoCost);
     }
 }
@@ -204,6 +284,7 @@ public sealed class OperatorProfileStore
             Profile.LastWeaponId = loadout.Selection.WeaponId;
             Profile.LastArmorId = loadout.Selection.ArmorId;
             Profile.LastAmmoGrade = loadout.Selection.AmmoGrade;
+            Profile.LastAmmoQuantity = loadout.Selection.AmmoQuantity;
             if (!TrySave())
             {
                 Profile = previous;
@@ -248,6 +329,7 @@ public sealed class OperatorProfileStore
             profile.SuccessfulExtractions = Math.Max(0, profile.SuccessfulExtractions);
             profile.DeploymentCount = Math.Max(0, profile.DeploymentCount);
             profile.LastAmmoGrade = (LootGrade)Math.Clamp((int)profile.LastAmmoGrade, 0, 4);
+            profile.LastAmmoQuantity = Math.Max(0, profile.LastAmmoQuantity);
             return profile;
         }
         catch (Exception exception)

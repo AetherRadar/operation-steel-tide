@@ -57,7 +57,9 @@ AI squadmates follow by default, engage only after deployment protection ends an
 4. Confirmed combat builds a response level using the backend mission's reinforcement threshold. If it fills, a three-operator QRF enters after a seven-second radio warning. Disabling the relay raises the threshold and reduces accumulated response pressure.
 5. Completing both objectives enables the remote seawall extraction site. Follow the north service road through the rail yard and tank farm; the green beacon marks the final pad. Hostile kills improve rewards but are not required for extraction.
 
-The deployment lobby doubles as a persistent equipment market. Players spend an 18,000-credit starting balance on a primary, armor package, and one of five ammunition tiers; choosing the scavenger kit still supports a knife-only loot run. Friendly AI teammates and rival extraction operators deploy armed, while the player's purchased selection is applied only after the local profile is atomically saved. Successful extraction banks only value gained above the deployment baseline into `user://operator_profile.json`, preventing purchased gear from being credited back as profit.
+The deployment lobby doubles as a persistent equipment market. Players spend an 18,000-credit starting balance on one of five firearms (M4A1, AK-74N, SCAR-L, MP5A5, or M24), an armor package, one of five ammunition tiers, and a 30/60/90/180-round ammunition pack. Ammunition cost scales independently with grade, quantity, and caliber; choosing the scavenger kit still supports a knife-only loot run. Friendly AI teammates and rival extraction operators deploy armed, while the player's purchased selection is applied only after the local profile is atomically saved. Successful extraction banks only value gained above the deployment baseline into `user://operator_profile.json`, preventing purchased gear from being credited back as profit.
+
+The same lobby now includes a deployment-map selector. `MAP 01 // FREIGHT TERMINAL` is the current playable harbor operation. `MAP 02 // TIDAL PRISON` and `MAP 03 // ORBITAL COMPLEX` establish the next operation slots but remain visibly locked until their own world geometry and mission flows are implemented.
 
 The playable district is approximately 340 m x 320 m. The original freight terminal remains the deployment complex, while the expanded grounds add a rail yard with parked freight cars, a maintenance hangar, an overflow container yard, a four-tank fuel farm, a quay crane, and a seawall approach to extraction. Multiple rival three-operator squads spawn on separated pads across the map and fight the player, each other, and garrison NPCs; NPCs prefer hunting those squads and fall back to looting buildings when quiet. Graded loot (common→legendary) glows by rarity inside buildings; the bottom-right backpack control shows total inventory value (guns, gear, ammo). Chinese UI mode localizes the new backpack/grade strings. The new ground and corrugated-metal PBR surfaces are CC0 assets from Poly Haven; their source links are recorded in `assets/textures/LICENSE.md`.
 
@@ -88,7 +90,7 @@ The Go backend provides three mission definitions, objective text, detection rul
 - `csharp/FreightTerminalWorld.Residential.cs`: eleven enterable apartment towers, physical stairwells, rooftops, courtyards, occupants, and residential diagnostics.
 - `csharp/FreightTerminalWorld.Squad.cs`: squad slots, AI fill, orders, class effects, co-op combat relay, and squad diagnostics.
 - `csharp/FreightTerminalWorld.Tactical.cs`, `TacticalMinimap.cs`, and `AmmoTierSystem.cs`: minimap landmarks, knockdown feedback, graded ammunition, and tactical HUD diagnostics.
-- `csharp/FreightTerminalWorld.Economy.cs`, `OperatorProgression.cs`, and `CombatHUD.Deployment.cs`: atomic local profile persistence, deployment purchases, extraction banking, and market diagnostics.
+- `csharp/FreightTerminalWorld.Economy.cs`, `OperatorProgression.cs`, `DeploymentMaps.cs`, and `CombatHUD.Deployment.cs`: atomic local profile persistence, deployment purchases, map selection, extraction banking, and market diagnostics.
 - `csharp/SquadNetwork.cs`, `SquadMate.cs`, and `SquadSystem.cs`: ENet session relay, friendly operator AI/models, and shared role definitions.
 - `csharp/CivilianNpc.cs`: wandering and sheltering residents, evacuees, volunteers, guards, and utility workers.
 - `csharp/TacticalPlayer.cs`, `EnemyOperator.cs`, and `CombatHUD.cs`: first-person combat, tactical AI, and interface.
@@ -146,7 +148,7 @@ Godot_console.exe --headless --path . -- --validate-network-host
 Godot_console.exe --headless --path . -- --validate-network-client
 ```
 
-`--validate-deployment-ui` verifies the full operator preview, four quick-kit presets, selected weapon, armor and ammunition grade, kit cost, and projected post-deployment balance.
+`--validate-deployment-ui` verifies the full operator preview, six market entries, four quick-kit presets, four ammunition quantities, independent grade/quantity pricing, the three-slot map selector, locked-map rejection, kit cost, and projected post-deployment balance.
 
 `--validate-extraction-sequence` verifies the locked objective gate, 12-second hold, leave-zone reset, aircraft arrival, boarding state, and mission completion. `--capture-extraction` renders the live countdown and landed rescue tilt-rotor at the seawall pad.
 

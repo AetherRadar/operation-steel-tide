@@ -92,7 +92,7 @@ public partial class FreightTerminalWorld
         TryDeleteProfile(profilePath);
         TryDeleteProfile(profilePath + ".tmp");
 
-        var selection = new DeploymentLoadoutSelection("m24", "heavy", LootGrade.Rare);
+        var selection = new DeploymentLoadoutSelection("m24", "heavy", LootGrade.Rare, 60);
         var store = new OperatorProfileStore(profilePath);
         var purchase = store.TryCommitDeployment(selection, out var loadout, out _);
         var expectedCredits = OperatorProfileStore.StartingCredits - loadout.TotalCost;
@@ -100,7 +100,8 @@ public partial class FreightTerminalWorld
         var persisted = purchase
             && persistedStore.Profile.Credits == expectedCredits
             && persistedStore.Profile.DeploymentCount == 1
-            && persistedStore.Profile.LastWeaponId == "m24";
+            && persistedStore.Profile.LastWeaponId == "m24"
+            && persistedStore.Profile.LastAmmoQuantity == 60;
 
         _player.ApplyDeploymentLoadout(loadout);
         var playerEquipped = _player.HasFireablePrimary
@@ -147,15 +148,40 @@ public partial class FreightTerminalWorld
         var selection = _hud.SelectedDeploymentLoadout;
         var uiReady = _hud.DeploymentUiReady;
         var presetCount = _hud.DeploymentPresetCount == 4;
+        var weaponCount = DeploymentCatalog.Weapons.Count >= 6;
+        var ammoPackCount = _hud.DeploymentAmmoPackCount == 4;
         var presetSelected = _hud.ActiveDeploymentPresetId == "overwatch";
         var loadoutSelected = selection.WeaponId == "m24"
             && selection.ArmorId == "standard"
-            && selection.AmmoGrade == LootGrade.Epic;
-        var cost = _hud.DeploymentSelectedCost == 11100;
-        var projectedBalance = _hud.DeploymentProjectedBalance == 6900;
-        var valid = uiReady && presetCount && presetSelected && loadoutSelected && cost && projectedBalance;
+            && selection.AmmoGrade == LootGrade.Epic
+            && selection.AmmoQuantity == 60;
+        var expectedCost = DeploymentCatalog.Resolve(selection).TotalCost;
+        var cost = _hud.DeploymentSelectedCost == expectedCost;
+        var projectedBalance = _hud.DeploymentProjectedBalance == OperatorProfileStore.StartingCredits - expectedCost;
+        var quantityPricing = DeploymentCatalog.AmmoPrice(LootGrade.Rare, AmmoCaliber.Rifle, 30)
+            < DeploymentCatalog.AmmoPrice(LootGrade.Rare, AmmoCaliber.Rifle, 60)
+            && DeploymentCatalog.AmmoPrice(LootGrade.Rare, AmmoCaliber.Rifle, 60)
+            < DeploymentCatalog.AmmoPrice(LootGrade.Rare, AmmoCaliber.Rifle, 90)
+            && DeploymentCatalog.AmmoPrice(LootGrade.Rare, AmmoCaliber.Rifle, 90)
+            < DeploymentCatalog.AmmoPrice(LootGrade.Rare, AmmoCaliber.Rifle, 180);
+        var gradePricing = DeploymentCatalog.AmmoPrice(LootGrade.Common, AmmoCaliber.Rifle, 90)
+            < DeploymentCatalog.AmmoPrice(LootGrade.Uncommon, AmmoCaliber.Rifle, 90)
+            && DeploymentCatalog.AmmoPrice(LootGrade.Uncommon, AmmoCaliber.Rifle, 90)
+            < DeploymentCatalog.AmmoPrice(LootGrade.Rare, AmmoCaliber.Rifle, 90)
+            && DeploymentCatalog.AmmoPrice(LootGrade.Rare, AmmoCaliber.Rifle, 90)
+            < DeploymentCatalog.AmmoPrice(LootGrade.Epic, AmmoCaliber.Rifle, 90)
+            && DeploymentCatalog.AmmoPrice(LootGrade.Epic, AmmoCaliber.Rifle, 90)
+            < DeploymentCatalog.AmmoPrice(LootGrade.Legendary, AmmoCaliber.Rifle, 90);
+        var mapCatalog = _hud.DeploymentMapCount == 3
+            && _hud.SelectedDeploymentMapId == DeploymentMapCatalog.FreightTerminalId
+            && _hud.DeploymentMapAvailable;
+        _hud.ApplyDeploymentMapForDiagnostics("tidal_prison");
+        var lockedMapRejected = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.FreightTerminalId;
+        var valid = uiReady && presetCount && weaponCount && ammoPackCount && presetSelected
+            && loadoutSelected && cost && projectedBalance && quantityPricing && gradePricing
+            && mapCatalog && lockedMapRejected;
 
-        GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
+        GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} weapon_count={DeploymentCatalog.Weapons.Count} ammo_pack_count={_hud.DeploymentAmmoPackCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} quantity={selection.AmmoQuantity} quantity_pricing={quantityPricing} grade_pricing={gradePricing} map_count={_hud.DeploymentMapCount} selected_map={_hud.SelectedDeploymentMapId} map_available={_hud.DeploymentMapAvailable} locked_map_rejected={lockedMapRejected} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
         GD.Print($"DEPLOYMENT_UI_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

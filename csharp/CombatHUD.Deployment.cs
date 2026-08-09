@@ -13,6 +13,8 @@ public partial class CombatHUD
     private readonly Dictionary<string, Label> _deploymentArmorNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Label> _deploymentArmorDetails = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<LootGrade, Button> _deploymentAmmoButtons = new();
+    private readonly Dictionary<int, Button> _deploymentAmmoQuantityButtons = new();
+    private readonly Dictionary<string, Button> _deploymentMapButtons = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Button> _deploymentPresetButtons = new(StringComparer.OrdinalIgnoreCase);
     private readonly ProgressBar[] _deploymentMetricBars = new ProgressBar[3];
     private readonly Label[] _deploymentMetricLabels = new Label[3];
@@ -20,10 +22,13 @@ public partial class CombatHUD
     private Label _deploymentExtractedLabel = null!;
     private Label _deploymentCostLabel = null!;
     private Label _deploymentStatusLabel = null!;
+    private Label _deploymentMapCaption = null!;
+    private Label _deploymentMapStatusLabel = null!;
     private Label _deploymentPresetCaption = null!;
     private Label _deploymentWeaponCaption = null!;
     private Label _deploymentArmorCaption = null!;
     private Label _deploymentAmmoCaption = null!;
+    private Label _deploymentAmmoQuantityCaption = null!;
     private Label _deploymentOperatorName = null!;
     private Label _deploymentOperatorSkill = null!;
     private Label _deploymentGearReadout = null!;
@@ -33,19 +38,28 @@ public partial class CombatHUD
     private string _selectedWeaponId = "m4a1";
     private string _selectedArmorId = "standard";
     private LootGrade _selectedAmmoGrade = LootGrade.Uncommon;
+    private int _selectedAmmoQuantity = 90;
+    private string _selectedDeploymentMapId = DeploymentMapCatalog.FreightTerminalId;
     private string _deploymentError = string.Empty;
 
     public DeploymentLoadoutSelection SelectedDeploymentLoadout
-        => new(_selectedWeaponId, _selectedArmorId, _selectedAmmoGrade);
+        => new(_selectedWeaponId, _selectedArmorId, _selectedAmmoGrade, _selectedAmmoQuantity);
 
     public bool DeploymentUiReady => IsInstanceValid(_deploymentOperatorPreview)
         && _deploymentWeaponButtons.Count == DeploymentCatalog.Weapons.Count
         && _deploymentArmorButtons.Count == DeploymentCatalog.Armor.Count
-        && _deploymentAmmoButtons.Count == Enum.GetValues<LootGrade>().Length;
+        && _deploymentAmmoButtons.Count == Enum.GetValues<LootGrade>().Length
+        && _deploymentAmmoQuantityButtons.Count == DeploymentCatalog.AmmoPacks.Count
+        && _deploymentMapButtons.Count == DeploymentMapCatalog.Maps.Count;
     public int DeploymentPresetCount => _deploymentPresetButtons.Count;
+    public int DeploymentAmmoPackCount => _deploymentAmmoQuantityButtons.Count;
+    public int SelectedDeploymentAmmoQuantity => _selectedAmmoQuantity;
     public int DeploymentSelectedCost => DeploymentCatalog.Resolve(SelectedDeploymentLoadout).TotalCost;
     public int DeploymentProjectedBalance => _displayedProfile.Credits - DeploymentSelectedCost;
     public string ActiveDeploymentPresetId => MatchingPresetId();
+    public string SelectedDeploymentMapId => _selectedDeploymentMapId;
+    public int DeploymentMapCount => _deploymentMapButtons.Count;
+    public bool DeploymentMapAvailable => DeploymentMapCatalog.IsAvailable(_selectedDeploymentMapId);
 
     private void BuildDeploymentStore(Control panel)
     {
@@ -57,6 +71,32 @@ public partial class CombatHUD
 
     private void BuildDeploymentHeader(Control panel)
     {
+        _deploymentMapCaption = DeploymentCaption("DEPLOYMENT MAP", new Vector2(340, 7), new Vector2(290, 18));
+        panel.AddChild(_deploymentMapCaption);
+        var mapGroup = new ButtonGroup();
+        for (var index = 0; index < DeploymentMapCatalog.Maps.Count; index++)
+        {
+            var map = DeploymentMapCatalog.Maps[index];
+            var accent = map.Available
+                ? new Color(0.32f, 0.86f, 0.69f)
+                : new Color(0.3f, 0.38f, 0.37f);
+            var button = DeploymentSegment(new Vector2(340 + index * 99, 27), new Vector2(94, 37), accent);
+            button.ToggleMode = true;
+            button.ButtonGroup = mapGroup;
+            button.Disabled = !map.Available;
+            button.FocusMode = Control.FocusModeEnum.None;
+            button.Pressed += () => SelectDeploymentMap(map.Id);
+            button.TooltipText = $"{map.Code}  //  {map.EnglishName}\n{map.EnglishSubtitle}";
+            panel.AddChild(button);
+            _deploymentMapButtons[map.Id] = button;
+        }
+        _deploymentMapStatusLabel = Label(string.Empty, 9, new Color(0.5f, 0.68f, 0.63f));
+        _deploymentMapStatusLabel.Position = new Vector2(340, 65);
+        _deploymentMapStatusLabel.Size = new Vector2(290, 14);
+        _deploymentMapStatusLabel.ClipText = true;
+        _deploymentMapStatusLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
+        panel.AddChild(_deploymentMapStatusLabel);
+
         _deploymentCreditsLabel = Label("BALANCE  18000", 15, new Color(1.0f, 0.76f, 0.25f));
         _deploymentCreditsLabel.Position = new Vector2(648, 18);
         _deploymentCreditsLabel.Size = new Vector2(174, 24);
@@ -193,26 +233,26 @@ public partial class CombatHUD
         for (var index = 0; index < DeploymentCatalog.Weapons.Count; index++)
         {
             var offer = DeploymentCatalog.Weapons[index];
-            var position = new Vector2(16 + index % 2 * 257, 94 + index / 2 * 90);
+            var position = new Vector2(16 + index % 3 * 168, 94 + index / 3 * 76);
             BuildWeaponOfferCard(market, offer, position, weaponGroup);
         }
 
-        _deploymentArmorCaption = DeploymentCaption("PROTECTION", new Vector2(16, 275), new Vector2(220, 18));
+        _deploymentArmorCaption = DeploymentCaption("PROTECTION", new Vector2(16, 249), new Vector2(220, 18));
         market.AddChild(_deploymentArmorCaption);
         var armorGroup = new ButtonGroup();
         for (var index = 0; index < DeploymentCatalog.Armor.Count; index++)
         {
             var offer = DeploymentCatalog.Armor[index];
-            BuildArmorOfferCard(market, offer, new Vector2(16 + index * 257, 296), armorGroup);
+            BuildArmorOfferCard(market, offer, new Vector2(16 + index * 257, 270), armorGroup);
         }
 
-        _deploymentAmmoCaption = DeploymentCaption("AMMUNITION GRADE", new Vector2(16, 369), new Vector2(220, 18));
+        _deploymentAmmoCaption = DeploymentCaption("AMMUNITION GRADE  //  PRICE", new Vector2(16, 342), new Vector2(260, 18));
         market.AddChild(_deploymentAmmoCaption);
         var ammoGroup = new ButtonGroup();
         foreach (var grade in Enum.GetValues<LootGrade>())
         {
             var color = AmmoTiers.Color(grade);
-            var button = DeploymentSegment(new Vector2(16 + (int)grade * 99, 392), new Vector2(91, 48), color);
+            var button = DeploymentSegment(new Vector2(16 + (int)grade * 99, 363), new Vector2(91, 42), color);
             button.ToggleMode = true;
             button.ButtonGroup = ammoGroup;
             button.AddThemeColorOverride("font_pressed_color", color);
@@ -225,6 +265,26 @@ public partial class CombatHUD
             market.AddChild(button);
             _deploymentAmmoButtons[grade] = button;
         }
+
+        _deploymentAmmoQuantityCaption = DeploymentCaption("AMMO COUNT  //  PRICE", new Vector2(16, 412), new Vector2(260, 18));
+        market.AddChild(_deploymentAmmoQuantityCaption);
+        var quantityGroup = new ButtonGroup();
+        foreach (var pack in DeploymentCatalog.AmmoPacks)
+        {
+            var button = DeploymentSegment(new Vector2(16 + _deploymentAmmoQuantityButtons.Count * 123, 433), new Vector2(117, 38), new Color(0.35f, 0.72f, 1.0f));
+            button.ToggleMode = true;
+            button.ButtonGroup = quantityGroup;
+            button.FocusMode = Control.FocusModeEnum.None;
+            button.Pressed += () =>
+            {
+                _selectedAmmoQuantity = pack.Quantity;
+                ClearDeploymentError();
+                RefreshDeploymentStore();
+            };
+            button.TooltipText = Text(pack.LocalizationKey, pack.EnglishName);
+            market.AddChild(button);
+            _deploymentAmmoQuantityButtons[pack.Quantity] = button;
+        }
     }
 
     private void BuildWeaponOfferCard(Control parent, DeploymentWeaponOffer offer, Vector2 position, ButtonGroup group)
@@ -233,15 +293,20 @@ public partial class CombatHUD
         {
             WeaponPlatform.M24 => new Color(1.0f, 0.68f, 0.2f),
             WeaponPlatform.MP5A5 => new Color(0.3f, 0.76f, 1.0f),
+            WeaponPlatform.AK74 => new Color(0.84f, 0.68f, 0.34f),
+            WeaponPlatform.ScarL => new Color(0.75f, 0.86f, 0.42f),
             WeaponPlatform.M4A1 => new Color(0.31f, 0.9f, 0.64f),
             _ => new Color(0.58f, 0.64f, 0.62f)
         };
-        var button = DeploymentSegment(position, new Vector2(241, 82), accent);
+        var button = DeploymentSegment(position, new Vector2(163, 70), accent);
         button.ToggleMode = true;
         button.ButtonGroup = group;
         button.Pressed += () =>
         {
             _selectedWeaponId = offer.Id;
+            _selectedAmmoQuantity = offer.Platform is null
+                ? 0
+                : DeploymentCatalog.NormalizeAmmoQuantity(_selectedAmmoQuantity, offer.ReserveAmmo);
             ClearDeploymentError();
             RefreshDeploymentStore();
         };
@@ -250,24 +315,24 @@ public partial class CombatHUD
 
         var preview = new InventoryModelPreview
         {
-            Position = new Vector2(8, 7),
-            Size = new Vector2(96, 68)
+            Position = new Vector2(5, 6),
+            Size = new Vector2(52, 58)
         };
         preview.Configure(
             offer.Platform is null ? InventoryPreviewKind.Knife : InventoryPreviewKind.Rifle,
             weapon: offer.Platform is null ? null : WeaponCatalog.Build(offer.Platform.Value, offer.BuildTier));
         button.AddChild(preview);
 
-        var name = Label(string.Empty, 12, accent);
-        name.Position = new Vector2(108, 11);
-        name.Size = new Vector2(124, 22);
+        var name = Label(string.Empty, 10, accent);
+        name.Position = new Vector2(61, 8);
+        name.Size = new Vector2(96, 20);
         name.ClipText = true;
         name.MouseFilter = Control.MouseFilterEnum.Ignore;
         button.AddChild(name);
         _deploymentWeaponNames[offer.Id] = name;
-        var detail = Label(string.Empty, 10, new Color(0.61f, 0.7f, 0.67f));
-        detail.Position = new Vector2(108, 34);
-        detail.Size = new Vector2(124, 40);
+        var detail = Label(string.Empty, 8, new Color(0.61f, 0.7f, 0.67f));
+        detail.Position = new Vector2(61, 31);
+        detail.Size = new Vector2(96, 34);
         detail.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         detail.MouseFilter = Control.MouseFilterEnum.Ignore;
         button.AddChild(detail);
@@ -381,9 +446,13 @@ public partial class CombatHUD
     public void SetOperatorProfile(OperatorProfileData profile)
     {
         _displayedProfile = profile.Clone();
-        _selectedWeaponId = DeploymentCatalog.Weapon(profile.LastWeaponId).Id;
+        var weapon = DeploymentCatalog.Weapon(profile.LastWeaponId);
+        _selectedWeaponId = weapon.Id;
         _selectedArmorId = DeploymentCatalog.ArmorKit(profile.LastArmorId).Id;
         _selectedAmmoGrade = profile.LastAmmoGrade;
+        _selectedAmmoQuantity = weapon.Platform is null
+            ? 0
+            : DeploymentCatalog.NormalizeAmmoQuantity(profile.LastAmmoQuantity, weapon.ReserveAmmo);
         RefreshDeploymentStore();
     }
 
@@ -405,6 +474,23 @@ public partial class CombatHUD
         _selectedWeaponId = preset.WeaponId;
         _selectedArmorId = preset.ArmorId;
         _selectedAmmoGrade = preset.AmmoGrade;
+        _selectedAmmoQuantity = preset.WeaponId == "none"
+            ? 0
+            : DeploymentCatalog.NormalizeAmmoQuantity(preset.AmmoQuantity, DeploymentCatalog.Weapon(preset.WeaponId).ReserveAmmo);
+        ClearDeploymentError();
+        RefreshDeploymentStore();
+    }
+
+    public void ApplyDeploymentMapForDiagnostics(string id) => SelectDeploymentMap(id);
+
+    private void SelectDeploymentMap(string id)
+    {
+        var map = DeploymentMapCatalog.Resolve(id);
+        if (!map.Available)
+        {
+            return;
+        }
+        _selectedDeploymentMapId = map.Id;
         ClearDeploymentError();
         RefreshDeploymentStore();
     }
@@ -417,7 +503,8 @@ public partial class CombatHUD
         {
             if (preset.WeaponId == _selectedWeaponId
                 && preset.ArmorId == _selectedArmorId
-                && preset.AmmoGrade == _selectedAmmoGrade)
+                && preset.AmmoGrade == _selectedAmmoGrade
+                && preset.AmmoQuantity == _selectedAmmoQuantity)
             {
                 return preset.Id;
             }
@@ -463,6 +550,21 @@ public partial class CombatHUD
             button.SetPressedNoSignal(preset.Id == matchingPreset);
             button.Text = Text(preset.LocalizationKey, preset.EnglishName);
         }
+        var selectedMap = DeploymentMapCatalog.Resolve(_selectedDeploymentMapId);
+        foreach (var map in DeploymentMapCatalog.Maps)
+        {
+            var button = _deploymentMapButtons[map.Id];
+            button.SetPressedNoSignal(map.Id == selectedMap.Id);
+            button.Text = DeploymentMapButtonText(map);
+            button.TooltipText = $"{map.Code}  //  {Text(map.LocalizationKey, map.EnglishName)}\n{Text(map.SubtitleLocalizationKey, map.EnglishSubtitle)}";
+        }
+        _deploymentMapStatusLabel.Text = $"{selectedMap.Code}  //  {Text(selectedMap.LocalizationKey, selectedMap.EnglishName)}  //  {Text(selectedMap.SubtitleLocalizationKey, selectedMap.EnglishSubtitle)}";
+        if (IsInstanceValid(_squadLobbySubtitle))
+        {
+            _squadLobbySubtitle.Text = GameLocalization.IsChinese(_language)
+                ? $"\u7a81\u51fb\u5c0f\u961f\u6574\u5907  //  {Text(selectedMap.LocalizationKey, selectedMap.EnglishName)}"
+                : $"STRIKE TEAM PREPARATION  //  {Text(selectedMap.LocalizationKey, selectedMap.EnglishName)}";
+        }
         foreach (var offer in DeploymentCatalog.Weapons)
         {
             var selectedOffer = string.Equals(offer.Id, _selectedWeaponId, StringComparison.OrdinalIgnoreCase);
@@ -483,12 +585,34 @@ public partial class CombatHUD
                 selectedOffer ? new Color(0.9f, 1.0f, 0.95f) : new Color(0.62f, 0.75f, 0.7f));
             _deploymentArmorDetails[offer.Id].Text = ArmorOfferDetail(offer, chinese);
         }
+        var selectedCaliber = selected.Weapon is null
+            ? AmmoCaliber.Rifle
+            : WeaponCatalog.Weapon(selected.Weapon.Platform).Caliber;
         foreach (var grade in Enum.GetValues<LootGrade>())
         {
             var button = _deploymentAmmoButtons[grade];
             button.SetPressedNoSignal(grade == _selectedAmmoGrade);
-            button.Text = $"T{(int)grade + 1}\n{DeploymentCatalog.AmmoPrice(grade)}";
+            var price = selected.Weapon is null
+                ? 0
+                : DeploymentCatalog.AmmoPrice(grade, selectedCaliber, selected.ReserveAmmo);
+            button.Text = selected.Weapon is null
+                ? $"T{(int)grade + 1}\n--"
+                : $"T{(int)grade + 1}\n{price}";
             button.TooltipText = AmmoTiers.DisplayName(grade, _language);
+        }
+        foreach (var pack in DeploymentCatalog.AmmoPacks)
+        {
+            var button = _deploymentAmmoQuantityButtons[pack.Quantity];
+            button.SetPressedNoSignal(pack.Quantity == _selectedAmmoQuantity);
+            button.Disabled = selected.Weapon is null;
+            var price = selected.Weapon is null
+                ? 0
+                : DeploymentCatalog.AmmoPrice(_selectedAmmoGrade, selectedCaliber, pack.Quantity);
+            var label = Text(pack.LocalizationKey, pack.EnglishName);
+            button.Text = selected.Weapon is null ? $"{label}\n--" : $"{label}\n{price}";
+            button.TooltipText = selected.Weapon is null
+                ? Text("ammo_requires_weapon", "SELECT A PRIMARY WEAPON FIRST")
+                : $"{label}  //  {price} CREDITS";
         }
         RefreshDeploymentPreview(selected, armorOffer, chinese);
         RefreshSquadDeployAction();
@@ -560,14 +684,25 @@ public partial class CombatHUD
     {
         if (offer.Platform is null)
         {
-            return chinese ? $"\u96f6\u6210\u672c\n\u8fd1\u6218\u641c\u7d22" : "ZERO COST\nMELEE SCAVENGE";
+            return chinese ? "\u96f6\u6210\u672c\n\u8fd1\u6218\u641c\u7d22" : "ZERO COST\nMELEE SCAVENGE";
         }
         var build = WeaponCatalog.Build(offer.Platform.Value, offer.BuildTier);
         var stats = build.Stats();
-        var caliber = WeaponCatalog.AmmoDisplayName(WeaponCatalog.Weapon(offer.Platform.Value).Caliber, _language);
+        var caliber = WeaponCatalog.Weapon(offer.Platform.Value).Caliber;
+        var ammoPrice = DeploymentCatalog.AmmoPrice(_selectedAmmoGrade, caliber, _selectedAmmoQuantity);
         return chinese
-            ? $"{caliber}  //  {offer.Price}\n{stats.Damage:0}\u4f24\u5bb3  {stats.MagazineSize}\u53d1"
-            : $"{caliber}  //  {offer.Price}\n{stats.Damage:0} DMG  {stats.MagazineSize} RD";
+            ? $"{stats.Damage:0}\u4f24\u5bb3  {stats.MagazineSize}\u53d1\n\u67aa {offer.Price}  \u5f39\u836f {ammoPrice}"
+            : $"{stats.Damage:0} DMG  {stats.MagazineSize} RD\nGUN {offer.Price}  AMMO {ammoPrice}";
+    }
+
+    private string DeploymentMapButtonText(DeploymentMapOffer map)
+    {
+        var code = map.Code.Replace("MAP ", string.Empty, StringComparison.Ordinal);
+        if (map.Available)
+        {
+            return $"{code}\n{Text(map.LocalizationKey, map.EnglishName)}";
+        }
+        return $"{code}\n{Text("map_locked_short", "LOCKED")}";
     }
 
     private string ArmorOfferDetail(DeploymentArmorOffer offer, bool chinese)
@@ -602,7 +737,9 @@ public partial class CombatHUD
         _deploymentPresetCaption.Text = chinese ? "\u5feb\u901f\u6574\u5907" : "QUICK KITS";
         _deploymentWeaponCaption.Text = chinese ? "\u4e3b\u6b66\u5668\u5e02\u573a" : "PRIMARY MARKET";
         _deploymentArmorCaption.Text = chinese ? "\u9632\u62a4\u914d\u7f6e" : "PROTECTION";
-        _deploymentAmmoCaption.Text = chinese ? "\u5f39\u836f\u7b49\u7ea7" : "AMMUNITION GRADE";
+        _deploymentAmmoCaption.Text = chinese ? "\u5f39\u836f\u7b49\u7ea7  //  \u4ef7\u683c" : "AMMUNITION GRADE  //  PRICE";
+        _deploymentAmmoQuantityCaption.Text = chinese ? "\u5f39\u836f\u6570\u91cf  //  \u4ef7\u683c" : "AMMO COUNT  //  PRICE";
+        _deploymentMapCaption.Text = chinese ? "\u51fa\u51fb\u5730\u56fe" : "DEPLOYMENT MAP";
         RefreshDeploymentStore();
     }
 }
