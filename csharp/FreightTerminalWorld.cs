@@ -2836,9 +2836,21 @@ public partial class FreightTerminalWorld : Node3D
         var crouchLean = _player.IsAiming && _player.LeanAmount < -0.25f;
         Input.ActionRelease("lean_left");
         Input.ActionRelease("aim");
+        Input.ActionPress("jump");
+        await WaitFrames(2);
+        Input.ActionRelease("jump");
+        var crouchJumpedStanding = _player.Stance == PlayerStance.Standing && _player.Velocity.Y > 0.1f;
+        for (var frame = 0; frame < 100 && !_player.IsOnFloor(); frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
         var prone = _player.TrySetStance(PlayerStance.Prone);
         await WaitFrames(18);
         var proneHeight = _player.ViewHeight;
+        Input.ActionPress("jump");
+        await WaitFrames(2);
+        Input.ActionRelease("jump");
+        var proneJumpedStanding = _player.Stance == PlayerStance.Standing && _player.Velocity.Y > 0.1f;
         var healthBefore = _player.Health;
         var helmetBefore = _player.EquippedHelmet.Durability;
         _player.TakeDamage(20.0f, _player.HitPoint(HitRegion.Head), attacker);
@@ -2846,8 +2858,13 @@ public partial class FreightTerminalWorld : Node3D
         var armorBefore = _player.EquippedBodyArmor.Durability;
         _player.TakeDamage(20.0f, _player.HitPoint(HitRegion.Torso), attacker);
         var armorAfter = _player.EquippedBodyArmor.Durability;
-        GD.Print($"STANCE_ARMOR_CHECK crouched={crouched} crouch_height={crouchHeight:0.00} crouch_lean_ads={crouchLean} prone={prone} prone_height={proneHeight:0.00} health_loss={healthBefore - _player.Health:0.0} helmet_loss={helmetBefore - helmetAfter:0.0} armor_loss={armorBefore - armorAfter:0.0}");
-        GetTree().Quit();
+        var valid = crouched && crouchLean && crouchJumpedStanding && prone && proneJumpedStanding
+            && crouchHeight > proneHeight
+            && helmetAfter < helmetBefore
+            && armorAfter < armorBefore;
+        GD.Print($"STANCE_ARMOR_CHECK valid={valid} crouched={crouched} crouch_height={crouchHeight:0.00} crouch_lean_ads={crouchLean} crouch_jump_stand={crouchJumpedStanding} prone={prone} prone_height={proneHeight:0.00} prone_jump_stand={proneJumpedStanding} health_loss={healthBefore - _player.Health:0.0} helmet_loss={helmetBefore - helmetAfter:0.0} armor_loss={armorBefore - armorAfter:0.0}");
+        GD.Print($"STANCE_ARMOR_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private async void CaptureExpandedMapFrame()

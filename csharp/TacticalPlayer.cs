@@ -1246,6 +1246,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var direction = (Transform.Basis * new Vector3(input.X, 0, input.Y)).Normalized();
         var horizontalSpeedBeforeMove = new Vector2(Velocity.X, Velocity.Z).Length();
         UpdateStanceInput(horizontalSpeedBeforeMove);
+        var jumpPressed = Input.IsActionJustPressed("jump") && IsOnFloor() && !_isPlating;
+        if (jumpPressed && _stance != PlayerStance.Standing)
+        {
+            _slideTime = 0.0f;
+            TrySetStance(PlayerStance.Standing);
+        }
         var crouching = _stance == PlayerStance.Crouched;
         var prone = _stance == PlayerStance.Prone;
         var sprinting = Input.IsActionPressed("sprint") && input.Y < -0.15f && !crouching && !prone && !_isPlating
@@ -1288,7 +1294,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             velocity.Y -= Gravity * delta;
         }
-        else if (Input.IsActionJustPressed("jump") && !crouching && !prone && !_isPlating)
+        else if (jumpPressed && !crouching && !prone)
         {
             velocity.Y = 6.8f;
         }
