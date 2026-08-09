@@ -534,9 +534,13 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             _skillActionTime = spec.SkillDuration;
             _roleDevice.Visible = true;
-            if (_roleDevice.GlobalPosition.DistanceSquaredTo(focusPoint) > 0.01f)
+            var levelFocusPoint = new Vector3(
+                focusPoint.X,
+                _roleDevice.GlobalPosition.Y,
+                focusPoint.Z);
+            if (_roleDevice.GlobalPosition.DistanceSquaredTo(levelFocusPoint) > 0.01f)
             {
-                _roleDevice.LookAt(focusPoint, Vector3.Up);
+                _roleDevice.LookAt(levelFocusPoint, Vector3.Up);
             }
         }
         return true;
