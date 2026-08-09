@@ -219,6 +219,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateMapDensity();
         }
+        else if (Array.Exists(args, value => value == "--validate-special-landmarks"))
+        {
+            ValidateSpecialLandmarks();
+        }
         else if (Array.Exists(args, value => value == "--validate-goal-pack"))
         {
             ValidateGoalPack();
@@ -322,6 +326,10 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--capture-residential"))
         {
             CaptureResidentialCommunity();
+        }
+        else if (Array.Exists(args, value => value == "--capture-special-landmarks"))
+        {
+            CaptureSpecialLandmarks();
         }
         else if (Array.Exists(args, value => value == "--capture-residential-gameplay"))
         {
@@ -2458,10 +2466,15 @@ public partial class FreightTerminalWorld : Node3D
             enemy.ProcessMode = ProcessModeEnum.Disabled;
         }
         SetLanguage("zh");
-        var source = _lootSources[0];
-        _player.GlobalPosition = source.LootNode.GlobalPosition + new Vector3(0, 0.2f, 1.6f);
+        var source = _lootSources.OfType<WeaponCase>().First();
+        _player.GlobalPosition = source.LootNode.GlobalPosition + new Vector3(0, 0.2f, 0.85f);
         _missionDirector.ExitDeploymentZone();
-        await WaitFrames(8);
+        var targetDeadline = Time.GetTicksMsec() + 1000;
+        while (!ReferenceEquals(_lootSearchTarget, source) && Time.GetTicksMsec() < targetDeadline)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+        var targetMatched = ReferenceEquals(_lootSearchTarget, source);
         var openedAt = Time.GetTicksMsec();
         Input.ActionPress("interact");
         var deadline = Time.GetTicksMsec() + 2500;
@@ -2588,6 +2601,7 @@ public partial class FreightTerminalWorld : Node3D
         var movementRestored = !_player.UiLocked && _player.HasMovementIntent;
         Input.ActionRelease("move_forward");
         var valid = opened
+            && targetMatched
             && immediateOpenMilliseconds <= 500
             && heldInputBlocked
             && dragDropRouted
@@ -2601,7 +2615,7 @@ public partial class FreightTerminalWorld : Node3D
             && reopenedEmpty
             && closedByInteract
             && movementRestored;
-        GD.Print($"LOOT_CHECK valid={valid} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} storage_fits={searchStorageFits} storage_full={storageAtCapacity} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} storage_fits={searchStorageFits} storage_full={storageAtCapacity} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         GD.Print($"LOOT_PASS valid={valid}");
         await WaitFrames(24);
         SaveViewportImage("res://modular_weapon_validation.png");
@@ -2989,13 +3003,17 @@ public partial class FreightTerminalWorld : Node3D
         var quay = _levelRoot.GetNodeOrNull<Node3D>("QuayBondedStorage") is not null;
         var hangarEnriched = _levelRoot.GetNodeOrNull("MaintenanceDistrict/HangarOfficeFloor") is not null
             || (_levelRoot.GetNodeOrNull<Node3D>("MaintenanceDistrict")?.FindChild("HangarOfficeFloor", true, false) is not null);
+        var specialLandmarks = SpecialLandmarkCount == 4
+            && SpecialLandmarkLootCount >= 28
+            && SpecialLandmarkVerticalRouteCount >= 5;
         // Baseline: need multiple large complexes and interior density above empty-shell thresholds.
         var valid = ComplexBuildingCount >= 5
             && ComplexRoomCount >= 12
             && ComplexInteriorPropCount >= 40
             && customs && ops && fuel && quay
-            && ResidentialTowerCount >= 11;
-        GD.Print($"MAP_DENSITY_CHECK valid={valid} buildings={ComplexBuildingCount} rooms={ComplexRoomCount} props={ComplexInteriorPropCount} customs={customs} ops={ops} fuel={fuel} quay={quay} hangar={hangarEnriched} towers={ResidentialTowerCount}");
+            && ResidentialTowerCount >= 11
+            && specialLandmarks;
+        GD.Print($"MAP_DENSITY_CHECK valid={valid} buildings={ComplexBuildingCount} rooms={ComplexRoomCount} props={ComplexInteriorPropCount} customs={customs} ops={ops} fuel={fuel} quay={quay} hangar={hangarEnriched} towers={ResidentialTowerCount} special_landmarks={SpecialLandmarkCount} special_loot={SpecialLandmarkLootCount} vertical_routes={SpecialLandmarkVerticalRouteCount}");
         GD.Print($"MAP_DENSITY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -4147,6 +4165,10 @@ public partial class FreightTerminalWorld : Node3D
             "MaintenanceDistrict",
             "TankFarmDistrict",
             "SeawallDistrict",
+            "SalvageBazaar",
+            "TideglassConservatory",
+            "TidalObservatory",
+            "DrydockRepairCradle",
             "ExtractionSite"
         };
         var districtsPresent = 0;

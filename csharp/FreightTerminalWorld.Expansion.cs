@@ -69,6 +69,7 @@ public partial class FreightTerminalWorld
         BuildMaintenanceDistrict(concrete, steel, steelDark, yellow, corrugated);
         BuildTankFarmDistrict(concrete, steel, steelDark, rust, yellow);
         BuildSeawallDistrict(concrete, steel, steelDark, yellow, white, corrugated);
+        BuildSpecialLandmarks(concrete, steel, steelDark, rust, yellow, corrugated);
         BuildComplexDistrictBuildings(concrete, steel, steelDark, yellow, corrugated, rust);
         BuildExpansionCover(concreteDark);
         BuildExpansionLights();

@@ -16,7 +16,11 @@ public partial class FreightTerminalWorld
             new(new Vector3(23.5f, 0, -5.0f), "minimap_warehouse", "WAREHOUSE", new Color(0.66f, 0.72f, 0.7f)),
             new(new Vector3(35.0f, 0, 33.0f), "minimap_radar", "RADAR", new Color(0.82f, 0.45f, 1.0f)),
             new(new Vector3(-62.0f, 0, -116.0f), "minimap_residential", "RESIDENTIAL", new Color(0.42f, 0.72f, 1.0f)),
-            new(new Vector3(99.0f, 0, -114.0f), "minimap_command", "COMMAND", new Color(1.0f, 0.34f, 0.3f))
+            new(new Vector3(99.0f, 0, -114.0f), "minimap_command", "COMMAND", new Color(1.0f, 0.34f, 0.3f)),
+            new(new Vector3(-76.0f, 0, 4.0f), "minimap_bazaar", "SALVAGE MARKET", new Color(0.96f, 0.64f, 0.2f)),
+            new(new Vector3(113.0f, 0, 9.0f), "minimap_hydro", "TIDEGLASS", new Color(0.35f, 0.9f, 0.62f)),
+            new(new Vector3(-114.0f, 0, 43.0f), "minimap_observatory", "TIDE OBSERVATORY", new Color(0.44f, 0.74f, 1.0f)),
+            new(new Vector3(77.0f, 0, -151.0f), "minimap_drydock", "DRYDOCK", new Color(0.95f, 0.44f, 0.24f))
         };
         _hud.ConfigureMinimap(new Rect2(-170.0f, -220.0f, MapWidthMeters, MapDepthMeters), landmarks);
         _hud.SetMinimapPlayer(_player.GlobalPosition, 0.0f);
