@@ -301,6 +301,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateHitFeedback();
         }
+        else if (Array.Exists(args, value => value == "--validate-glass"))
+        {
+            ValidateBreakableGlass();
+        }
         else if (Array.Exists(args, value => value == "--validate-performance"))
         {
             ValidateMapPerformance();
@@ -691,6 +695,16 @@ public partial class FreightTerminalWorld : Node3D
     public void Explode(Vector3 position, float radius, float maxDamage, Node? source = null)
     {
         ReportGunshot(position, 70.0f);
+        var glassEffectBudget = 12;
+        foreach (var node in GetTree().GetNodesInGroup(BreakableGlassField.GroupName))
+        {
+            if (node is not BreakableGlassField glass || !IsInstanceValid(glass))
+            {
+                continue;
+            }
+            glass.ShatterWithinRadius(position, radius * 1.18f, glassEffectBudget, out var effectsUsed);
+            glassEffectBudget = Mathf.Max(0, glassEffectBudget - effectsUsed);
+        }
         foreach (var enemy in _enemies.ToArray())
         {
             if (IsInstanceValid(enemy) && !enemy.IsDead)

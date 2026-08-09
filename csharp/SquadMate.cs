@@ -439,6 +439,13 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         var bodyOrigin = GlobalPosition + Vector3.Up * 1.4f;
         var muzzlePos = IsInstanceValid(_muzzle) ? _muzzle.GlobalPosition : bodyOrigin;
         var shotOrigin = Ballistics.ResolveShotOrigin(GetWorld3D(), bodyOrigin, muzzlePos, GetRid());
+        BreakableGlassField.TryShatterAlongRay(
+            GetWorld3D(),
+            shotOrigin,
+            hitPoint,
+            12.0f,
+            shotOrigin.DirectionTo(hitPoint),
+            out _);
         // Wallbang gate on the real damage path.
         if (!Ballistics.HasClearShot(GetWorld3D(), shotOrigin, hitPoint, enemy, GetRid()))
         {

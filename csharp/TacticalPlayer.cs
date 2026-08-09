@@ -1546,6 +1546,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             - _camera.GlobalBasis.Z * 2.55f
             - _camera.GlobalBasis.X * 0.22f
             + _camera.GlobalBasis.Y * 0.18f;
+        BreakableGlassField.TryShatterAlongRay(
+            GetWorld3D(),
+            from,
+            to,
+            24.0f,
+            from.DirectionTo(to),
+            out _);
         var query = PhysicsRayQueryParameters3D.Create(from, to);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
         query.CollideWithAreas = false;
@@ -1653,6 +1660,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var from = _camera.GlobalPosition;
         var maximumRange = stats.EffectiveRange * 1.35f;
         var to = from + direction * maximumRange;
+        BreakableGlassField.TryShatterAlongRay(
+            GetWorld3D(),
+            from,
+            to,
+            stats.Damage * AmmoTiers.ArmorPenetration(CurrentAmmoGrade),
+            direction,
+            out _);
         var query = PhysicsRayQueryParameters3D.Create(from, to);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
         query.CollideWithAreas = false;

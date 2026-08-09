@@ -130,6 +130,25 @@ public static class SoundLab
         return MakeStream(samples, rate);
     }
 
+    public static AudioStreamWav GlassBreak()
+    {
+        const int rate = 22050;
+        var samples = new float[(int)(rate * 0.48f)];
+        var rng = new RandomNumberGenerator { Seed = 681421 };
+        var ringing = 0.0f;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var t = (float)i / rate;
+            var crack = rng.RandfRange(-1.0f, 1.0f) * Mathf.Exp(-t * 72.0f);
+            var scatter = rng.RandfRange(-1.0f, 1.0f) * Mathf.Exp(-t * 9.5f);
+            var chime = Mathf.Sin(Mathf.Tau * 2860.0f * t) * Mathf.Exp(-t * 13.0f)
+                + Mathf.Sin(Mathf.Tau * 4170.0f * t) * Mathf.Exp(-t * 18.0f) * 0.55f;
+            ringing = Mathf.Lerp(ringing, scatter, 0.28f);
+            samples[i] = crack * 0.82f + chime * 0.34f + ringing * 0.38f;
+        }
+        return MakeStream(samples, rate);
+    }
+
     public static AudioStreamWav ExtractionRotorLoop()
     {
         const int rate = 22050;

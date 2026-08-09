@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace OperationSteelTide;
@@ -118,6 +119,7 @@ public partial class FreightTerminalWorld
     private readonly List<ResidentialSniperPost> _residentialSniperPosts = new();
     private readonly List<ResidentialSkybridgeSightline> _residentialSkybridgeSightlines = new();
     private readonly List<ResidentialSupplyCache> _residentialCaches = new();
+    private readonly List<BreakableGlassField> _residentialGlassFields = new();
     private readonly HashSet<ResidentialRoomArchetype> _residentialRoomArchetypes = new();
     private readonly int[] _residentialCacheCountByTower = new int[ResidentialTowerSpecs.Length];
     private int _residentialFloorCount;
@@ -136,6 +138,8 @@ public partial class FreightTerminalWorld
     public int ResidentialCacheCount => _residentialCaches.Count;
     public int ResidentialInfillModuleCount => _residentialInfillModuleCount;
     public int ResidentialStairDetailCount => _residentialStairDetailCount;
+    public int ResidentialGlassPaneCount => _residentialGlassFields.Sum(field => field.PaneCount);
+    public int ResidentialBrokenGlassCount => _residentialGlassFields.Sum(field => field.ShatteredCount);
 
     private void BuildResidentialCommunity(
         Godot.Material concrete,
@@ -150,6 +154,7 @@ public partial class FreightTerminalWorld
         _residentialSniperPosts.Clear();
         _residentialSkybridgeSightlines.Clear();
         _residentialCaches.Clear();
+        _residentialGlassFields.Clear();
         _residentialRoomArchetypes.Clear();
         Array.Clear(_residentialCacheCountByTower, 0, _residentialCacheCountByTower.Length);
         _residentialSkybridgeCount = 0;
@@ -341,6 +346,16 @@ public partial class FreightTerminalWorld
         var warmLight = Mat("residential_warm_light", new Color(0.95f, 0.7f, 0.38f), 0.02f, 0.35f, new Color(0.95f, 0.55f, 0.22f));
         var wood = Mat("residential_wood", new Color(0.31f, 0.18f, 0.1f), 0.0f, 0.82f);
         var bedding = Mat("residential_bedding", new Color(0.22f, 0.38f, 0.45f), 0.0f, 0.9f);
+        var windowGlass = Mat("residential_breakable_glass", new Color(0.3f, 0.62f, 0.68f, 0.32f), 0.62f, 0.08f);
+        windowGlass.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+        windowGlass.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+        windowGlass.VertexColorUseAsAlbedo = true;
+        var windowFrame = Mat("residential_window_frame", new Color(0.13f, 0.17f, 0.17f), 0.68f, 0.3f);
+        var windowRecess = Mat("residential_window_recess", new Color(0.018f, 0.027f, 0.029f), 0.05f, 0.96f);
+        var glassField = new BreakableGlassField { Name = $"ResidentialGlass_T{index + 1:00}" };
+        tower.AddChild(glassField);
+        glassField.Configure(windowGlass, windowFrame, windowRecess, 112.0f);
+        _residentialGlassFields.Add(glassField);
         var stairCoreZ = -Mathf.Min(spec.Footprint.Y * 0.18f, 3.6f);
         var linkSlots = _residentialLinkSlots.TryGetValue(index, out var slotDict) ? slotDict : null;
 
@@ -351,12 +366,13 @@ public partial class FreightTerminalWorld
             BuildTowerFloorSlab(tower, spec, floorY, stairCoreZ, interiorFloor, floor == 0);
             var westSlot = linkSlots is not null && linkSlots.TryGetValue(1, out var westLink) && westLink.Floors.Contains(floor) ? westLink : null;
             var eastSlot = linkSlots is not null && linkSlots.TryGetValue(0, out var eastLink) && eastLink.Floors.Contains(floor) ? eastLink : null;
-            BuildTowerFloorShell(tower, spec, floor, floorY, facade, glass, spec.Accent, westSlot, eastSlot);
+            BuildTowerFloorShell(tower, spec, floor, floorY, facade, glassField, spec.Accent, westSlot, eastSlot);
             BuildTowerInterior(tower, spec, index, floor, floorY, stairCoreZ, interiorWall, wood, bedding, warmLight, westSlot, eastSlot);
             BuildTowerStairs(tower, floor, floorY, stairCoreZ, stair, trim, warmLight);
             BuildTowerStairDetails(tower, spec, index, floor, floorY, stairCoreZ, trim, warmLight);
             _residentialFloorCount++;
         }
+        glassField.Commit();
         BuildTowerRoof(tower, spec, stairCoreZ, facade, steel, trim, warmLight);
         _residentialRoofAccessCount++;
 
@@ -411,7 +427,7 @@ public partial class FreightTerminalWorld
         int floor,
         float floorY,
         Godot.Material facade,
-        Godot.Material glass,
+        BreakableGlassField glassField,
         Color accent,
         LinkSlot? linkWest,
         LinkSlot? linkEast)
@@ -442,25 +458,26 @@ public partial class FreightTerminalWorld
             ExpansionBox(tower, "ResidentialSouthWall", new Vector3(0, wallCenterY, depth * 0.5f), new Vector3(width, wallHeight, wallThickness), facade);
         }
 
-        var windowMaterial = Mat(
-            $"residential_window_{floor % 3}",
-            floor % 3 == 0 ? new Color(0.12f, 0.22f, 0.25f) : new Color(0.08f, 0.15f, 0.18f),
-            0.58f,
-            0.18f,
-            floor % 4 == 0 ? accent * 0.08f : default);
+        var windowTint = floor % 3 == 0
+            ? new Color(0.78f, 0.92f, 0.94f, 0.92f)
+            : new Color(0.58f, 0.76f, 0.8f, 0.84f);
+        if (floor % 4 == 0)
+        {
+            windowTint = windowTint.Lerp(new Color(accent.R, accent.G, accent.B, windowTint.A), 0.16f);
+        }
         var windowY = floorY + 1.66f;
         for (var x = -width * 0.5f + 2.1f; x <= width * 0.5f - 2.0f; x += 3.6f)
         {
-            MeshBox(tower, new Vector3(x, windowY, -depth * 0.5f - 0.105f), new Vector3(2.05f, 1.28f, 0.035f), windowMaterial);
+            glassField.AddPane(new Vector3(x, windowY, -depth * 0.5f - 0.105f), new Vector3(2.05f, 1.28f, 0.035f), windowTint);
             if (floor > 0 || Mathf.Abs(x) > 2.1f)
             {
-                MeshBox(tower, new Vector3(x, windowY, depth * 0.5f + 0.105f), new Vector3(2.05f, 1.28f, 0.035f), windowMaterial);
+                glassField.AddPane(new Vector3(x, windowY, depth * 0.5f + 0.105f), new Vector3(2.05f, 1.28f, 0.035f), windowTint);
             }
         }
         for (var z = -depth * 0.5f + 2.1f; z <= depth * 0.5f - 2.0f; z += 3.6f)
         {
-            MeshBox(tower, new Vector3(-width * 0.5f - 0.105f, windowY, z), new Vector3(0.035f, 1.28f, 2.05f), windowMaterial);
-            MeshBox(tower, new Vector3(width * 0.5f + 0.105f, windowY, z), new Vector3(0.035f, 1.28f, 2.05f), windowMaterial);
+            glassField.AddPane(new Vector3(-width * 0.5f - 0.105f, windowY, z), new Vector3(0.035f, 1.28f, 2.05f), windowTint);
+            glassField.AddPane(new Vector3(width * 0.5f + 0.105f, windowY, z), new Vector3(0.035f, 1.28f, 2.05f), windowTint);
         }
         if (floor > 0 && floor % 3 == 0)
         {
@@ -1722,6 +1739,7 @@ public partial class FreightTerminalWorld
         var window = Mat("residential_skybridge_window", new Color(0.055f, 0.24f, 0.29f, 0.28f), 0.16f, 0.08f);
         window.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
         window.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+        window.VertexColorUseAsAlbedo = true;
         var glow = Mat("residential_skybridge_light", new Color(0.82f, 0.92f, 0.91f), 0.08f, 0.28f, new Color(0.32f, 0.88f, 0.92f));
         foreach (var link in ResidentialSkyLinks)
         {
@@ -1748,6 +1766,10 @@ public partial class FreightTerminalWorld
                     Rotation = new Vector3(0, Mathf.Atan2(delta.X, delta.Z), 0)
                 };
                 community.AddChild(bridge);
+                var bridgeGlass = new BreakableGlassField { Name = "SkybridgeBreakableGlass" };
+                bridge.AddChild(bridgeGlass);
+                bridgeGlass.Configure(window, frame, null, 135.0f);
+                _residentialGlassFields.Add(bridgeGlass);
                 var span = length + 1.4f;
                 var mid = length * 0.5f;
                 var windowSpan = Mathf.Max(1.0f, length - 1.1f);
@@ -1755,9 +1777,11 @@ public partial class FreightTerminalWorld
                 ExpansionBox(bridge, "SkybridgeSillW", new Vector3(-1.69f, 0.39f, mid), new Vector3(0.14f, 0.68f, windowSpan), sill);
                 ExpansionBox(bridge, "SkybridgeSillE", new Vector3(1.69f, 0.39f, mid), new Vector3(0.14f, 0.68f, windowSpan), sill);
 
-                MeshBox(bridge, new Vector3(-1.69f, 1.76f, mid), new Vector3(0.045f, 2.08f, windowSpan), window).Name = "SkybridgeWindowW";
-                MeshBox(bridge, new Vector3(1.69f, 1.76f, mid), new Vector3(0.045f, 2.08f, windowSpan), window).Name = "SkybridgeWindowE";
-                MeshBox(bridge, new Vector3(0, 2.91f, mid), new Vector3(3.22f, 0.045f, windowSpan), window).Name = "SkybridgeWindowRoof";
+                var bridgeTint = new Color(0.72f, 0.94f, 0.97f, 0.9f);
+                bridgeGlass.AddPane(new Vector3(-1.69f, 1.76f, mid), new Vector3(0.045f, 2.08f, windowSpan), bridgeTint);
+                bridgeGlass.AddPane(new Vector3(1.69f, 1.76f, mid), new Vector3(0.045f, 2.08f, windowSpan), bridgeTint);
+                bridgeGlass.AddPane(new Vector3(0, 2.91f, mid), new Vector3(3.22f, 0.045f, windowSpan), bridgeTint);
+                bridgeGlass.Commit();
                 _residentialSkybridgeWindowCount += 3;
 
                 MeshBox(bridge, new Vector3(-1.69f, 0.77f, mid), new Vector3(0.16f, 0.12f, windowSpan), frame).Name = "SkybridgeLowerRailW";
