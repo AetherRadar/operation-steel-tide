@@ -194,68 +194,109 @@ public partial class FreightTerminalWorld
     {
         const float run = ResidentialStairRun;
         const float halfRise = ResidentialFloorHeight * 0.5f;
-        const float edge = 0.99f;
+        const float edge = ResidentialStairTreadWidth * 0.5f + 0.015f;
+        const float railHeight = 0.96f;
+        const float balusterHeight = 0.92f;
+        const float landingWidth = 5.16f;
+        const float landingDepth = 2.8f;
+        var stepRise = halfRise / ResidentialStepsPerFlight;
+        var stepRun = run / ResidentialStepsPerFlight;
+        var flightLength = Mathf.Sqrt(run * run + halfRise * halfRise);
         var angle = Mathf.Atan2(halfRise, run);
         var lowerStartZ = coreZ - run * 0.5f;
         var upperStartZ = coreZ + run * 0.5f;
         var handrail = Mat("residential_stair_handrail", new Color(0.22f, 0.29f, 0.29f), 0.72f, 0.28f);
         var baluster = Mat("residential_stair_baluster", new Color(0.46f, 0.51f, 0.48f), 0.4f, 0.46f);
         var panel = Mat("residential_stair_panel", new Color(0.12f, 0.17f, 0.18f), 0.38f, 0.55f);
+        var stairFace = Mat("residential_stair_face", new Color(0.28f, 0.32f, 0.31f), 0.18f, 0.74f);
+        var stringer = Mat("residential_stair_stringer", new Color(0.16f, 0.21f, 0.21f), 0.56f, 0.38f);
         var safety = Mat("residential_stair_safety", new Color(0.88f, 0.54f, 0.16f), 0.05f, 0.5f, new Color(0.55f, 0.22f, 0.05f));
         var lowerCenterZ = (lowerStartZ + upperStartZ) * 0.5f;
         var handrailTransforms = new List<Transform3D>(4);
         var safetyRailTransforms = new List<Transform3D>(4);
         var balusterTransforms = new List<Transform3D>(28);
+        var stringerTransforms = new List<Transform3D>(4);
+        var treadFaceTransforms = new List<Transform3D>(ResidentialStepsPerFlight * 2);
 
         foreach (var flight in new[] { 0, 1 })
         {
             var centerX = flight == 0 ? -1.45f : 1.45f;
-            var centerZ = flight == 0 ? lowerCenterZ : lowerCenterZ;
-            var sign = flight == 0 ? -1.0f : 1.0f;
+            var flightBaseY = floorY + (flight == 0 ? 0.0f : halfRise);
             var localAngle = flight == 0 ? angle : -angle;
+            var railCenterY = flightBaseY + halfRise * 0.5f + stepRise * 0.5f + railHeight;
+            var stringerCenterY = flightBaseY + halfRise * 0.5f + stepRise * 0.5f
+                - ResidentialStairTreadThickness - 0.08f;
+            var railBasis = Basis.FromEuler(new Vector3(localAngle, 0, 0));
             foreach (var x in new[] { centerX - edge, centerX + edge })
             {
-                var y = floorY + (flight == 0 ? 0.78f : 2.35f);
-                var railBasis = Basis.FromEuler(new Vector3(localAngle, 0, 0));
-                handrailTransforms.Add(new Transform3D(railBasis, new Vector3(x, y, centerZ)));
-                safetyRailTransforms.Add(new Transform3D(railBasis, new Vector3(x, y - 0.35f, centerZ)));
+                handrailTransforms.Add(new Transform3D(railBasis, new Vector3(x, railCenterY, lowerCenterZ)));
+                safetyRailTransforms.Add(new Transform3D(railBasis, new Vector3(x, railCenterY - 0.43f, lowerCenterZ)));
+                stringerTransforms.Add(new Transform3D(railBasis, new Vector3(x, stringerCenterY, lowerCenterZ)));
                 for (var post = 0; post <= 6; post++)
                 {
                     var t = post / 6.0f;
                     var z = flight == 0
-                        ? Mathf.Lerp(upperStartZ - 0.35f, lowerStartZ + 0.35f, t)
-                        : Mathf.Lerp(lowerStartZ + 0.35f, upperStartZ - 0.35f, t);
-                    var top = y + sign * (t - 0.5f) * halfRise;
-                    balusterTransforms.Add(new Transform3D(Basis.Identity, new Vector3(x, top - 0.38f, z)));
+                        ? Mathf.Lerp(upperStartZ - stepRun * 0.5f, lowerStartZ + stepRun * 0.5f, t)
+                        : Mathf.Lerp(lowerStartZ + stepRun * 0.5f, upperStartZ - stepRun * 0.5f, t);
+                    var stairSurfaceY = flightBaseY + Mathf.Lerp(stepRise, halfRise, t);
+                    balusterTransforms.Add(new Transform3D(
+                        Basis.Identity,
+                        new Vector3(x, stairSurfaceY + balusterHeight * 0.5f, z)));
                 }
             }
+
+            for (var step = 0; step < ResidentialStepsPerFlight; step++)
+            {
+                var z = flight == 0
+                    ? upperStartZ - stepRun * step
+                    : lowerStartZ + stepRun * step;
+                var y = flightBaseY + stepRise * (step + 0.5f);
+                treadFaceTransforms.Add(new Transform3D(Basis.Identity, new Vector3(centerX, y, z)));
+            }
         }
-        AddResidentialStairDetailBatch(tower, $"ResidentialStairHandrails_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.075f, 0.075f, run + 0.25f), handrail, handrailTransforms);
-        AddResidentialStairDetailBatch(tower, $"ResidentialStairSafetyRails_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.05f, 0.05f, run + 0.25f), safety, safetyRailTransforms);
-        AddResidentialStairDetailBatch(tower, $"ResidentialStairBalusters_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.055f, 0.76f, 0.055f), baluster, balusterTransforms);
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairTreadFaces_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(ResidentialStairTreadWidth, stepRise + 0.025f, 0.055f), stairFace, treadFaceTransforms);
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairStringers_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.16f, 0.34f, flightLength + 0.08f), stringer, stringerTransforms);
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairHandrails_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.075f, 0.075f, flightLength + 0.12f), handrail, handrailTransforms);
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairSafetyRails_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.05f, 0.05f, flightLength + 0.04f), safety, safetyRailTransforms);
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairBalusters_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.055f, balusterHeight, 0.055f), baluster, balusterTransforms);
 
         var landingNorth = lowerStartZ + 0.2f - 2.8f;
         var landingCenter = landingNorth + 1.4f;
-        // Dense wall panels and cable risers make the shaft read as a maintained building,
-        // while their visual-only meshes cannot create a new collision trap.
+        var landingSouth = landingNorth + landingDepth;
+        var landingFasciaY = floorY + halfRise - 0.15f;
+        var landingEndTransforms = new List<Transform3D>(2)
+        {
+            new(Basis.Identity, new Vector3(0, landingFasciaY, landingNorth + 0.04f)),
+            new(Basis.Identity, new Vector3(0, landingFasciaY, landingSouth - 0.04f))
+        };
+        var landingSideTransforms = new List<Transform3D>(2)
+        {
+            new(Basis.Identity, new Vector3(-landingWidth * 0.5f + 0.04f, landingFasciaY, landingCenter)),
+            new(Basis.Identity, new Vector3(landingWidth * 0.5f - 0.04f, landingFasciaY, landingCenter))
+        };
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairLandingFasciaEnds_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(landingWidth, 0.3f, 0.08f), stairFace, landingEndTransforms);
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairLandingFasciaSides_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.08f, 0.3f, landingDepth), stairFace, landingSideTransforms);
+        AddResidentialStairDetailBatch(
+            tower,
+            $"ResidentialStairLandingGuardPanels_T{towerIndex + 1:00}_F{floor + 1:00}",
+            new Vector3(4.86f, 0.58f, 0.055f),
+            panel,
+            new[]
+            {
+                new Transform3D(Basis.Identity, new Vector3(0, floorY + halfRise + 0.5f, landingNorth + 0.08f))
+            });
+
+        // Compact wall plates and integrated light strips keep the landing readable without
+        // introducing detached floor-height pipes or hanging posts.
         var panelTransforms = new List<Transform3D>(2);
         var lightTransforms = new List<Transform3D>(2);
-        var landingSafetyTransforms = new List<Transform3D>(2);
         foreach (var x in new[] { -2.72f, 2.72f })
         {
-            panelTransforms.Add(new Transform3D(Basis.Identity, new Vector3(x, floorY + 1.35f, landingCenter)));
-            lightTransforms.Add(new Transform3D(Basis.Identity, new Vector3(x + (x < 0 ? 0.05f : -0.05f), floorY + 2.35f, landingCenter)));
-            landingSafetyTransforms.Add(new Transform3D(Basis.Identity, new Vector3(x + (x < 0 ? 0.08f : -0.08f), floorY + 1.1f, landingCenter - 0.75f)));
+            panelTransforms.Add(new Transform3D(Basis.Identity, new Vector3(x, floorY + halfRise + 0.48f, landingCenter)));
+            lightTransforms.Add(new Transform3D(Basis.Identity, new Vector3(x + (x < 0 ? 0.05f : -0.05f), floorY + halfRise + 1.02f, landingCenter)));
         }
-        AddResidentialStairDetailBatch(tower, $"ResidentialStairWallPanels_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.08f, 2.15f, 2.25f), panel, panelTransforms);
+        AddResidentialStairDetailBatch(tower, $"ResidentialStairWallPanels_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.08f, 0.78f, 2.15f), panel, panelTransforms);
         AddResidentialStairDetailBatch(tower, $"ResidentialStairWallLights_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.05f, 0.08f, 1.65f), light, lightTransforms);
-        AddResidentialStairDetailBatch(tower, $"ResidentialStairLandingPosts_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.055f, 0.72f, 0.055f), safety, landingSafetyTransforms);
-        var pipeTransforms = new List<Transform3D>(3);
-        for (var pipe = -1; pipe <= 1; pipe++)
-        {
-            pipeTransforms.Add(new Transform3D(Basis.Identity, new Vector3(pipe * 0.18f, floorY + 1.52f, landingCenter + 1.0f)));
-        }
-        AddResidentialStairDetailBatch(tower, $"ResidentialStairRisers_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.07f, 2.45f, 0.07f), baluster, pipeTransforms);
         var locker = ExpansionBox(
             tower,
             $"ResidentialStairUtilityLocker_T{towerIndex + 1:00}_F{floor + 1:00}",

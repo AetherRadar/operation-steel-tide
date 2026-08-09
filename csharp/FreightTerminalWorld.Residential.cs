@@ -23,7 +23,9 @@ public partial class FreightTerminalWorld
     private const float ResidentialStairOpeningWidth = 5.6f;
     private const float ResidentialStairOpeningNorthDepth = 5.45f;
     private const float ResidentialStairOpeningSouthDepth = 3.25f;
-    private const int ResidentialStepsPerFlight = 8;
+    private const int ResidentialStepsPerFlight = 16;
+    private const float ResidentialStairTreadWidth = 1.95f;
+    private const float ResidentialStairTreadThickness = 0.14f;
 
     private readonly record struct ResidentialTowerSpec(
         Vector3 Position,
@@ -915,12 +917,12 @@ public partial class FreightTerminalWorld
         // static body per floor instead of one body per part. Across 96 floors this removes
         // thousands of broadphase bodies without changing the walkable surfaces.
         var halfRise = ResidentialFloorHeight * 0.5f;
-        const int steps = 16;
+        const int steps = ResidentialStepsPerFlight;
         var stepRise = halfRise / steps;
         var stepRun = ResidentialStairRun / steps;
-        const float treadWidth = 1.95f;
+        const float treadWidth = ResidentialStairTreadWidth;
         var treadDepth = stepRun * 1.08f;
-        const float treadThickness = 0.14f;
+        const float treadThickness = ResidentialStairTreadThickness;
         var lowerStartZ = coreZ - ResidentialStairRun * 0.5f;
         var upperStartZ = coreZ + ResidentialStairRun * 0.5f;
         const float landingWidth = 5.16f;

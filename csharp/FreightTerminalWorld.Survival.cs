@@ -370,6 +370,55 @@ public partial class FreightTerminalWorld
         }
         var firstTower = _residentialTowers[0];
         var firstSpec = ResidentialTowerSpecs[0];
+        var stairFaceBatches = 0;
+        var stringerBatches = 0;
+        var fasciaEndBatches = 0;
+        var fasciaSideBatches = 0;
+        var landingGuardBatches = 0;
+        var fittedStairInstances = true;
+        var obsoleteColumnDetailsAbsent = true;
+        foreach (var child in firstTower.GetChildren())
+        {
+            var name = child.Name.ToString();
+            obsoleteColumnDetailsAbsent &= !name.StartsWith("ResidentialStairRisers_", StringComparison.Ordinal)
+                && !name.StartsWith("ResidentialStairLandingPosts_", StringComparison.Ordinal);
+            if (child is not MultiMeshInstance3D batch || batch.Multimesh is null)
+            {
+                continue;
+            }
+            if (name.StartsWith("ResidentialStairTreadFaces_", StringComparison.Ordinal))
+            {
+                stairFaceBatches++;
+                fittedStairInstances &= batch.Multimesh.InstanceCount == ResidentialStepsPerFlight * 2;
+            }
+            else if (name.StartsWith("ResidentialStairStringers_", StringComparison.Ordinal))
+            {
+                stringerBatches++;
+                fittedStairInstances &= batch.Multimesh.InstanceCount == 4;
+            }
+            else if (name.StartsWith("ResidentialStairLandingFasciaEnds_", StringComparison.Ordinal))
+            {
+                fasciaEndBatches++;
+                fittedStairInstances &= batch.Multimesh.InstanceCount == 2;
+            }
+            else if (name.StartsWith("ResidentialStairLandingFasciaSides_", StringComparison.Ordinal))
+            {
+                fasciaSideBatches++;
+                fittedStairInstances &= batch.Multimesh.InstanceCount == 2;
+            }
+            else if (name.StartsWith("ResidentialStairLandingGuardPanels_", StringComparison.Ordinal))
+            {
+                landingGuardBatches++;
+                fittedStairInstances &= batch.Multimesh.InstanceCount == 1;
+            }
+        }
+        var fittedStairStructure = stairFaceBatches == firstSpec.Floors
+            && stringerBatches == firstSpec.Floors
+            && fasciaEndBatches == firstSpec.Floors
+            && fasciaSideBatches == firstSpec.Floors
+            && landingGuardBatches == firstSpec.Floors
+            && fittedStairInstances
+            && obsoleteColumnDetailsAbsent;
         var entryRay = PhysicsRayQueryParameters3D.Create(
             firstTower.ToGlobal(new Vector3(0, 1.65f, firstSpec.Footprint.Y * 0.5f + 2.8f)),
             firstTower.ToGlobal(new Vector3(0, 1.65f, firstSpec.Footprint.Y * 0.5f - 2.0f)));
@@ -383,8 +432,9 @@ public partial class FreightTerminalWorld
             && infillCollisionCorrect
             && _residentialStairDetailCount == expectedFloors
             && stairDetailNodes.Count == expectedFloors
+            && fittedStairStructure
             && entryClear;
-        GD.Print($"RESIDENTIAL_DENSITY_CHECK valid={valid} modules={_residentialInfillModuleCount}/{expectedModules} grouped={infillNodes.Count} unique={uniqueNames.Count} collision={infillCollisionCorrect} stair_details={_residentialStairDetailCount}/{expectedFloors} grouped_stairs={stairDetailNodes.Count} entry_clear={entryClear}");
+        GD.Print($"RESIDENTIAL_DENSITY_CHECK valid={valid} modules={_residentialInfillModuleCount}/{expectedModules} grouped={infillNodes.Count} unique={uniqueNames.Count} collision={infillCollisionCorrect} stair_details={_residentialStairDetailCount}/{expectedFloors} grouped_stairs={stairDetailNodes.Count} stair_faces={stairFaceBatches}/{firstSpec.Floors} stringers={stringerBatches}/{firstSpec.Floors} fascia={fasciaEndBatches}+{fasciaSideBatches}/{firstSpec.Floors * 2} guard_panels={landingGuardBatches}/{firstSpec.Floors} old_columns_absent={obsoleteColumnDetailsAbsent} fitted_stairs={fittedStairStructure} entry_clear={entryClear}");
         GD.Print($"RESIDENTIAL_DENSITY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
