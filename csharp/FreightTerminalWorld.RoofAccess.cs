@@ -38,12 +38,12 @@ public partial class FreightTerminalWorld
 
         // Core terminal buildings and the three secure rooms.
         AddRoofLadder("WarehouseRoof", "Warehouse", new Vector3(40.05f, 0.08f, -13.0f), new Vector3(37.8f, 9.24f, -13.0f), Vector3.Right, safety);
-        AddRoofLadder("ArmoryRoof", "Armory room", new Vector3(37.15f, 0.08f, -18.0f), new Vector3(35.45f, 3.34f, -18.0f), Vector3.Right, safety);
+        AddRoofLadder("ArmoryRoof", "Armory room", new Vector3(37.15f, 0.2f, -18.0f), new Vector3(35.45f, 3.34f, -18.0f), Vector3.Right, safety);
         AddRoofLadder("CustomsOfficeRoof", "Customs office", new Vector3(-38.45f, 0.08f, -11.0f), new Vector3(-36.75f, 3.34f, -11.0f), Vector3.Left, safety);
-        AddRoofLadder("MaintenanceRoomRoof", "Maintenance room", new Vector3(13.0f, 0.08f, 7.25f), new Vector3(13.0f, 3.34f, 9.05f), Vector3.Forward, safety);
+        AddRoofLadder("MaintenanceRoomRoof", "Maintenance room", new Vector3(13.0f, 0.2f, 7.25f), new Vector3(13.0f, 3.34f, 9.05f), Vector3.Forward, safety);
         AddRoofLadder("FuelCanopyRoof", "Fuel depot", new Vector3(-26.95f, 0.08f, 17.7f), new Vector3(-28.75f, 5.2f, 17.7f), Vector3.Right, safety);
         AddRoofLadder("BarracksRoof", "Barracks", new Vector3(34.45f, 0.08f, 21.0f), new Vector3(32.65f, 3.16f, 21.0f), Vector3.Right, safety);
-        AddRoofLadder("PipeCatwalk", "Utility catwalk", new Vector3(5.05f, 0.08f, 27.0f), new Vector3(6.85f, 3.4f, 27.0f), Vector3.Left, safety);
+        AddRoofLadder("PipeCatwalk", "Utility catwalk", new Vector3(5.45f, 0.08f, 27.0f), new Vector3(6.85f, 3.4f, 27.0f), Vector3.Left, safety);
         AddRoofLadder("CommandPodRoof", "Command hub", new Vector3(-5.65f, 0.08f, 14.6f), new Vector3(-3.75f, 10.48f, 14.6f), Vector3.Left, safety);
         AddRoofLadder("RadarPodRoof", "Radar spire", new Vector3(39.35f, 0.08f, 33.0f), new Vector3(37.35f, 14.68f, 33.0f), Vector3.Right, safety);
 
@@ -100,21 +100,21 @@ public partial class FreightTerminalWorld
         AddRoofLadder(
             "DrydockCraneRoof",
             "Drydock crane cab",
-            new Vector3(71.6f, 4.48f, -151.0f),
-            new Vector3(73.3f, 10.32f, -151.0f),
+            new Vector3(71.6f, 4.48f, -153.0f),
+            new Vector3(73.3f, 10.32f, -153.0f),
             Vector3.Left,
             safety);
         AddRoofAccessBridge(
             "DrydockCraneApproachBridge",
             new Vector3(66.6f, 4.38f, -151.0f),
-            new Vector3(71.6f, 4.38f, -151.0f),
+            new Vector3(71.6f, 4.38f, -153.0f),
             2.1f,
             steel);
         var craneRoofDeck = ExpansionBox(
             _roofAccessRoot,
             "DrydockCraneRoofAccessDeck",
-            new Vector3(77.0f, 10.15f, -151.0f),
-            new Vector3(9.0f, 0.14f, 3.2f),
+            new Vector3(77.0f, 10.15f, -151.4f),
+            new Vector3(9.0f, 0.14f, 4.8f),
             steel);
         craneRoofDeck.AddToGroup("roof_access_bridge");
 
@@ -384,6 +384,7 @@ public partial class FreightTerminalWorld
         var missingBottomFloors = new List<string>();
         var missingTopFloors = new List<string>();
         var blockedLandings = new List<string>();
+        var blockedPaths = new List<string>();
         var ladderGeometryCount = 0;
         foreach (var route in _roofAccessRoutes)
         {
@@ -402,7 +403,15 @@ public partial class FreightTerminalWorld
                 landingClearanceReady = false;
                 blockedLandings.Add(route.Id);
             }
-            if (route.Kind != VerticalAccessKind.Ladder || route.VisualRoot is null)
+            if (route.Kind != VerticalAccessKind.Ladder)
+            {
+                continue;
+            }
+            if (!_player.CanTraverseLadderPath(route.BottomFeet, route.TopFeet, route.Outward))
+            {
+                blockedPaths.Add($"{route.Id}:{_player.LadderPathBlockerForDiagnostics}");
+            }
+            if (route.VisualRoot is null)
             {
                 continue;
             }
@@ -411,21 +420,103 @@ public partial class FreightTerminalWorld
             visualReady &= visual is not null && instanceCount >= 5;
             ladderGeometryCount += instanceCount;
         }
+        var pathClearanceReady = blockedPaths.Count == 0;
 
         var representative = _roofAccessRoutes.First(route => route.Id == "WarehouseRoof");
         _player.GlobalPosition = representative.BottomFeet;
         _player.Velocity = Vector3.Zero;
+        _player.GrantFireablePrimaryForDiagnostics();
         _player.RestoreMovementInput();
+        Input.ActionRelease("interact");
+        Input.ActionRelease("move_forward");
+        Input.ActionRelease("move_backward");
+        Input.ActionRelease("move_right");
+        Input.ActionRelease("fire");
+        _interactReleaseRequired = false;
         await WaitFrames(2);
-        var mounted = _player.BeginLadderClimb(
+
+        Input.ActionPress("interact");
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        var mounted = _player.IsClimbingLadder;
+        Input.ActionRelease("interact");
+        await WaitFrames(2);
+        var startedLow = _player.GlobalPosition.Y < representative.TopFeet.Y - 4.0f;
+        var collisionActive = mounted && _player.HasActiveLadderCollisionForDiagnostics;
+        var ammoBefore = _player.Ammo;
+        var progressBefore = _player.LadderClimbProgress;
+        Input.ActionPress("move_forward");
+        for (var frame = 0; frame < 18; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        Input.ActionRelease("move_forward");
+        var climbedWithInput = _player.IsClimbingLadder
+            && _player.LadderClimbProgress > progressBefore + 0.035f;
+        var lateralAnchor = new Vector2(_player.GlobalPosition.X, _player.GlobalPosition.Z);
+        Input.ActionPress("move_right");
+        Input.ActionPress("fire");
+        for (var frame = 0; frame < 8; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        Input.ActionRelease("move_right");
+        Input.ActionRelease("fire");
+        var lateralBlocked = lateralAnchor.DistanceTo(new Vector2(
+            _player.GlobalPosition.X,
+            _player.GlobalPosition.Z)) < 0.025f;
+        var fireBlocked = _player.Ammo == ammoBefore;
+        var cancelY = _player.GlobalPosition.Y;
+        Input.ActionPress("interact");
+        await WaitFrames(2);
+        Input.ActionRelease("interact");
+        await WaitFrames(2);
+        var cancelledWithoutRemount = !_player.IsClimbingLadder;
+        var cancelledWithoutTeleport = Mathf.Abs(_player.GlobalPosition.Y - cancelY) < 0.75f
+            && _player.GlobalPosition.DistanceTo(representative.TopFeet) > 2.0f;
+        var collisionRestored = _player.HasActiveLadderCollisionForDiagnostics;
+
+        var remountReadyAfterCancel = await WaitForLadderRemountForDiagnostics();
+        _player.GlobalPosition = representative.BottomFeet;
+        _player.Velocity = Vector3.Zero;
+        var remounted = remountReadyAfterCancel && _player.BeginLadderClimb(
             representative.BottomFeet,
             representative.TopFeet,
             representative.Outward);
-        var startedLow = _player.GlobalPosition.Y < representative.TopFeet.Y - 4.0f;
-        _player.AdvanceLadderClimbForDiagnostics(30.0f);
-        await WaitFrames(2);
-        var reachedRoof = !_player.IsClimbingLadder
+        Input.ActionPress("move_forward");
+        for (var frame = 0; frame < 340 && _player.IsClimbingLadder; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        Input.ActionRelease("move_forward");
+        var climbedToRoof = remounted
+            && !_player.IsClimbingLadder
             && _player.GlobalPosition.DistanceTo(representative.TopFeet) < 0.8f;
+
+        var remountReadyAtTop = await WaitForLadderRemountForDiagnostics();
+        var mountedAtTop = remountReadyAtTop && _player.BeginLadderClimb(
+            representative.BottomFeet,
+            representative.TopFeet,
+            representative.Outward,
+            startAtTop: true);
+        Input.ActionPress("move_backward");
+        for (var frame = 0; frame < 340 && _player.IsClimbingLadder; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        Input.ActionRelease("move_backward");
+        var climbedDown = mountedAtTop
+            && !_player.IsClimbingLadder
+            && _player.GlobalPosition.DistanceTo(representative.BottomFeet) < 0.8f;
+        var downProgress = _player.LadderClimbProgress;
+        var downPosition = _player.GlobalPosition;
+        var downDistance = downPosition.DistanceTo(representative.BottomFeet);
+        var inputFlowReady = climbedWithInput
+            && lateralBlocked
+            && fireBlocked
+            && cancelledWithoutRemount
+            && cancelledWithoutTeleport
+            && climbedToRoof
+            && climbedDown;
 
         var expectedLadders = 26;
         var valid = _roofAccessRoot is not null
@@ -437,12 +528,25 @@ public partial class FreightTerminalWorld
             && bottomFloorReady
             && topFloorReady
             && landingClearanceReady
+            && pathClearanceReady
             && mounted
             && startedLow
-            && reachedRoof;
-        GD.Print($"ROOF_ACCESS_CHECK valid={valid} routes={_roofAccessRoutes.Count} ladders={FunctionalLadderCount}/{expectedLadders} residential={_residentialRoofAccessCount}/{ResidentialTowerSpecs.Length} coverage={coverageReady} visuals={visualReady} instances={ladderGeometryCount} bottom_floor={bottomFloorReady} missing_bottom={string.Join(',', missingBottomFloors)} top_floor={topFloorReady} missing_top={string.Join(',', missingTopFloors)} landing_clear={landingClearanceReady} blocked={string.Join(',', blockedLandings)} mounted={mounted} path_blocker={_player.LadderPathBlockerForDiagnostics} reached_roof={reachedRoof}");
+            && collisionActive
+            && collisionRestored
+            && inputFlowReady;
+        GD.Print($"ROOF_ACCESS_CHECK valid={valid} routes={_roofAccessRoutes.Count} ladders={FunctionalLadderCount}/{expectedLadders} residential={_residentialRoofAccessCount}/{ResidentialTowerSpecs.Length} coverage={coverageReady} visuals={visualReady} instances={ladderGeometryCount} bottom_floor={bottomFloorReady} missing_bottom={string.Join(',', missingBottomFloors)} top_floor={topFloorReady} missing_top={string.Join(',', missingTopFloors)} landing_clear={landingClearanceReady} blocked={string.Join(',', blockedLandings)} path_clear={pathClearanceReady} path_blocked={string.Join(',', blockedPaths)} mounted={mounted} collision={collisionActive}/{collisionRestored} input_up={climbedWithInput} lateral_blocked={lateralBlocked} fire_blocked={fireBlocked} cancel={cancelledWithoutRemount} no_teleport={cancelledWithoutTeleport} reached_roof={climbedToRoof} mounted_top={mountedAtTop} reached_ground={climbedDown} down_active={_player.IsClimbingLadder} down_progress={downProgress:0.000} down_pos={downPosition.X:0.00},{downPosition.Y:0.00},{downPosition.Z:0.00} down_distance={downDistance:0.00}");
         GD.Print($"ROOF_ACCESS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async System.Threading.Tasks.Task<bool> WaitForLadderRemountForDiagnostics()
+    {
+        var deadline = Time.GetTicksMsec() + 1000;
+        while (!_player.CanMountLadder && Time.GetTicksMsec() < deadline)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+        return _player.CanMountLadder;
     }
 
     private bool HasRoofAccessFloor(Vector3 feet, float downDistance)

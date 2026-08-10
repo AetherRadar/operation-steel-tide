@@ -449,11 +449,13 @@ public partial class FreightTerminalWorld
 
         foreach (var x in new[] { 3.1f, 3.9f })
         {
-            ExpansionBox(root, $"ObservatoryRoofLadderRail_{x:0.0}", new Vector3(x, 7.35f, 0), new Vector3(0.12f, 3.4f, 0.12f), steelDark);
+            var rail = ExpansionBox(root, $"ObservatoryRoofLadderRail_{x:0.0}", new Vector3(x, 7.35f, 0), new Vector3(0.12f, 3.4f, 0.12f), steelDark);
+            rail.AddToGroup("roof_access_ladder_geometry");
         }
         for (var rung = 0; rung < 7; rung++)
         {
-            ExpansionBox(root, $"ObservatoryRoofLadderRung_{rung:00}", new Vector3(3.5f, 5.95f + rung * 0.47f, 0), new Vector3(0.9f, 0.1f, 0.16f), cyan);
+            var rungBody = ExpansionBox(root, $"ObservatoryRoofLadderRung_{rung:00}", new Vector3(3.5f, 5.95f + rung * 0.47f, 0), new Vector3(0.9f, 0.1f, 0.16f), cyan);
+            rungBody.AddToGroup("roof_access_ladder_geometry");
         }
         AddSpecialVerticalRouteMarker(root, "ObservatoryRoofVerticalRoute");
 

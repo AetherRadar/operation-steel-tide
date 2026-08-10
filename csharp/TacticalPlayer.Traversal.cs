@@ -396,12 +396,16 @@ public partial class TacticalPlayer
             query.Transform = new Transform3D(
                 Basis.Identity,
                 feet + Vector3.Up * (clearanceHeight * 0.5f + 0.045f));
-            var hits = GetWorld3D().DirectSpaceState.IntersectShape(query, 4);
-            if (hits.Count > 0)
+            var hits = GetWorld3D().DirectSpaceState.IntersectShape(query, 16);
+            foreach (var hit in hits)
             {
-                var collider = hits[0].TryGetValue("collider", out var value)
+                var collider = hit.TryGetValue("collider", out var value)
                     ? value.AsGodotObject() as Node
                     : null;
+                if (collider?.IsInGroup("roof_access_ladder_geometry") == true)
+                {
+                    continue;
+                }
                 _ladderPathBlocker = $"{collider?.Name ?? "unknown"}@{distance:0.00}";
                 return false;
             }
