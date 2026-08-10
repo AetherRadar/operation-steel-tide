@@ -89,11 +89,14 @@ public partial class FreightTerminalWorld
         AddDistrictRouteLink(hubs, "CustomsGate", "RailGate", deck, guard, support, safety,
             DistrictRoutePoint(-75.0f, -14.0f), DistrictRoutePoint(-75.0f, -42.0f));
         AddDistrictRouteLink(hubs, "CustomsGate", "OpsGate", deck, guard, support, safety,
-            DistrictRoutePoint(-38.0f, -14.0f), DistrictRoutePoint(-38.0f, -36.0f), DistrictRoutePoint(20.0f, -36.0f));
+            DistrictRoutePoint(-38.0f, -14.0f), DistrictRoutePoint(-38.0f, -33.5f), DistrictRoutePoint(20.0f, -33.5f));
         AddDistrictRouteLink(hubs, "RailGate", "MaintenanceGate", deck, guard, support, safety,
             DistrictRoutePoint(-72.0f, -82.0f), DistrictRoutePoint(-24.0f, -90.0f),
-            DistrictRoutePoint(8.0f, -90.0f), DistrictRoutePoint(44.0f, -70.0f));
-        AddDistrictRouteLink(hubs, "OpsGate", "MaintenanceGate", deck, guard, support, safety);
+            DistrictRoutePoint(16.0f, -90.0f), DistrictRoutePoint(16.0f, -110.0f),
+            DistrictRoutePoint(44.0f, -110.0f), DistrictRoutePoint(44.0f, -70.0f));
+        AddDistrictRouteLink(hubs, "OpsGate", "MaintenanceGate", deck, guard, support, safety,
+            DistrictRoutePoint(62.0f, -34.0f), DistrictRoutePoint(62.0f, -62.0f),
+            DistrictRoutePoint(44.0f, -66.0f));
         AddDistrictRouteLink(hubs, "OpsGate", "TideglassGate", deck, guard, support, safety,
             DistrictRoutePoint(82.0f, -36.0f), DistrictRoutePoint(90.0f, -10.0f));
         AddDistrictRouteLink(hubs, "MaintenanceGate", "FuelGate", deck, guard, support, safety,
@@ -105,12 +108,11 @@ public partial class FreightTerminalWorld
         {
             AddDistrictRouteLink(hubs, "WestResidentialGateway", "BazaarGate", deck, guard, support, safety,
                 DistrictRoutePoint(-80.0f, -8.0f));
-            AddDistrictRouteLink(hubs, "WestResidentialGateway", "RailGate", deck, guard, support, safety,
-                DistrictRoutePoint(-110.0f, -44.0f));
+            AddDistrictRouteLink(hubs, "WestResidentialGateway", "RailGate", deck, guard, support, safety);
             AddDistrictRouteLink(hubs, "WestResidentialGateway", "CustomsGate", deck, guard, support, safety,
                 DistrictRoutePoint(-78.0f, -14.0f));
             AddDistrictRouteLink(hubs, "DrydockGate", "EastResidentialGateway", deck, guard, support, safety,
-                DistrictRoutePoint(94.0f, -112.0f), DistrictRoutePoint(92.0f, -84.0f));
+                DistrictRoutePoint(114.0f, -130.0f), DistrictRoutePoint(114.0f, -84.0f));
             AddDistrictRouteLink(hubs, "EastResidentialGateway", "OpsGate", deck, guard, support, safety,
                 DistrictRoutePoint(84.0f, -54.0f), DistrictRoutePoint(64.0f, -40.0f));
             AddDistrictRouteLink(hubs, "EastResidentialGateway", "TideglassGate", deck, guard, support, safety,
@@ -651,6 +653,63 @@ public partial class FreightTerminalWorld
             && _districtRouteSupportPositions.All(position =>
                 Mathf.Abs(position.X) >= 5.0f || position.Z > -7.0f || position.Z < -44.0f);
 
+        var routeBlockers = new HashSet<string>(StringComparer.Ordinal);
+        var clearanceHeight = 1.62f;
+        var routeClearanceShape = new CapsuleShape3D { Radius = 0.32f, Height = clearanceHeight };
+        var routeClearanceQuery = new PhysicsShapeQueryParameters3D
+        {
+            Shape = routeClearanceShape,
+            CollisionMask = 1,
+            CollideWithAreas = false,
+            CollideWithBodies = true,
+            Margin = 0.005f,
+            Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() }
+        };
+        foreach (var link in _districtRouteLinks)
+        {
+            for (var segment = 0; segment < link.Points.Length - 1; segment++)
+            {
+                var from = link.Points[segment];
+                var to = link.Points[segment + 1];
+                var samples = Mathf.Max(1, Mathf.CeilToInt(from.DistanceTo(to) / 1.2f));
+                for (var sample = 0; sample <= samples; sample++)
+                {
+                    var feet = from.Lerp(to, sample / (float)samples);
+                    feet.Y = DistrictRouteDeckHeight + DistrictRouteDeckThickness * 0.5f + 0.02f;
+                    routeClearanceQuery.Transform = new Transform3D(
+                        Basis.Identity,
+                        feet + Vector3.Up * (clearanceHeight * 0.5f + 0.04f));
+                    var hits = GetWorld3D().DirectSpaceState.IntersectShape(routeClearanceQuery, 12);
+                    foreach (var hit in hits)
+                    {
+                        var collider = hit.TryGetValue("collider", out var value)
+                            ? value.AsGodotObject() as Node
+                            : null;
+                        if (collider?.IsInGroup("district_route_collision") == true)
+                        {
+                            continue;
+                        }
+                        var blockerDescription = collider?.Name.ToString() ?? "unknown";
+                        if (collider is Node3D blocker3D)
+                        {
+                            blockerDescription += $"[{blocker3D.GlobalPosition.X:0.0},{blocker3D.GlobalPosition.Y:0.0},{blocker3D.GlobalPosition.Z:0.0}]";
+                            var shape = blocker3D.GetChildren().OfType<CollisionShape3D>().FirstOrDefault()?.Shape;
+                            if (shape is BoxShape3D box)
+                            {
+                                blockerDescription += $"box({box.Size.X:0.0},{box.Size.Y:0.0},{box.Size.Z:0.0})";
+                            }
+                            else if (shape is CylinderShape3D cylinder)
+                            {
+                                blockerDescription += $"cyl({cylinder.Radius:0.0},{cylinder.Height:0.0})";
+                            }
+                        }
+                        routeBlockers.Add($"{link.From}-{link.To}:{blockerDescription}@{feet.X:0.0},{feet.Z:0.0}");
+                    }
+                }
+            }
+        }
+        var routeClearanceReady = routeBlockers.Count == 0;
+
         var walkHub = _districtRouteHubs.First(hub => hub.Id == "OpsGate");
         _player.GlobalPosition = walkHub.StairStart - walkHub.StairDirection * 0.65f + Vector3.Up * 0.25f;
         _player.RestoreMovementInput();
@@ -691,8 +750,9 @@ public partial class FreightTerminalWorld
             && spawnClearanceReady
             && extractionAirspaceReady
             && truckClearanceReady
+            && routeClearanceReady
             && climbed;
-        GD.Print($"DISTRICT_NETWORK_CHECK valid={valid} hubs={DistrictRouteHubCount}/{expectedHubCount} links={DistrictRouteLinkCount}/{expectedMinimumLinks} connected={graphConnected} redundant={redundantRoutes} gateways={_districtRouteGatewayCount}/2 gateway_links={gatewayLinks} decks={_districtRouteDeckCount} deck_hits={deckHits}/{_districtRouteDeckSamples.Count} collisions={collisionNodes.Count} collision_ready={collisionReady} stairs={_districtRouteStairCount}/{expectedHubCount} stair_shapes={stairShapeCount} climb={climbed} climb_y={_player.GlobalPosition.Y - climbStartY:0.00} head_clear={headClearanceReady} supports={_districtRouteSupportCount} support_clear={supportClearanceReady} spawn_clear={spawnClearanceReady} extract_clear={extractionAirspaceReady} truck_clear={truckClearanceReady}");
+        GD.Print($"DISTRICT_NETWORK_CHECK valid={valid} hubs={DistrictRouteHubCount}/{expectedHubCount} links={DistrictRouteLinkCount}/{expectedMinimumLinks} connected={graphConnected} redundant={redundantRoutes} gateways={_districtRouteGatewayCount}/2 gateway_links={gatewayLinks} decks={_districtRouteDeckCount} deck_hits={deckHits}/{_districtRouteDeckSamples.Count} collisions={collisionNodes.Count} collision_ready={collisionReady} stairs={_districtRouteStairCount}/{expectedHubCount} stair_shapes={stairShapeCount} climb={climbed} climb_y={_player.GlobalPosition.Y - climbStartY:0.00} head_clear={headClearanceReady} route_clear={routeClearanceReady} route_blocked={string.Join(';', routeBlockers)} supports={_districtRouteSupportCount} support_clear={supportClearanceReady} spawn_clear={spawnClearanceReady} extract_clear={extractionAirspaceReady} truck_clear={truckClearanceReady}");
         GD.Print($"DISTRICT_NETWORK_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
