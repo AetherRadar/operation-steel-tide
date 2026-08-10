@@ -63,12 +63,12 @@ public partial class FreightTerminalWorld
         var paneIndex = -1;
         var rayReady = field is not null
             && field.TryGetIntactPaneRay(out rayFrom, out rayTo, out paneIndex);
-        var shattered = false;
+        var firstShotBlocked = false;
         var collisionDisabled = false;
-        var repeatIgnored = false;
+        var secondShotCleared = false;
         if (rayReady && field is not null)
         {
-            shattered = BreakableGlassField.TryShatterAlongRay(
+            firstShotBlocked = BreakableGlassField.TryShatterAlongRay(
                 GetWorld3D(),
                 rayFrom,
                 rayTo,
@@ -79,7 +79,7 @@ public partial class FreightTerminalWorld
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             collisionDisabled = field.IsPaneShattered(paneIndex)
                 && field.IsPaneCollisionDisabled(paneIndex);
-            repeatIgnored = !BreakableGlassField.TryShatterAlongRay(
+            secondShotCleared = !BreakableGlassField.TryShatterAlongRay(
                 GetWorld3D(),
                 rayFrom,
                 rayTo,
@@ -95,14 +95,14 @@ public partial class FreightTerminalWorld
         var framesComplete = frameInstances == paneCount * 5;
         var residentialTracked = ResidentialGlassPaneCount == paneCount;
         var valid = rayReady
-            && shattered
+            && firstShotBlocked
             && collisionDisabled
-            && repeatIgnored
+            && secondShotCleared
             && fieldsBatched
             && panesDense
             && framesComplete
             && residentialTracked;
-        GD.Print($"GLASS_CHECK valid={valid} fields={fields.Length} panes={paneCount} frames={frameInstances} ray_ready={rayReady} shattered={shattered} collision_disabled={collisionDisabled} repeat_ignored={repeatIgnored} batched={fieldsBatched} dense={panesDense} tracked={residentialTracked}");
+        GD.Print($"GLASS_CHECK valid={valid} fields={fields.Length} panes={paneCount} frames={frameInstances} ray_ready={rayReady} first_shot_blocked={firstShotBlocked} collision_disabled={collisionDisabled} second_shot_clear={secondShotCleared} batched={fieldsBatched} dense={panesDense} tracked={residentialTracked}");
         GD.Print($"GLASS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

@@ -1305,13 +1305,17 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             : regionRoll < 0.12f ? HitRegion.Head : regionRoll < 0.78f ? HitRegion.Torso : HitRegion.Limbs;
         var aimPoint = _combatTarget.HitPoint(hitRegion);
         var shotOrigin = ResolveBallisticShotOrigin();
-        BreakableGlassField.TryShatterAlongRay(
+        if (BreakableGlassField.TryShatterAlongRay(
             GetWorld3D(),
             shotOrigin,
             aimPoint,
             stats.Damage * 0.4f,
             shotOrigin.DirectionTo(aimPoint),
-            out _);
+            out var glassHitPosition))
+        {
+            Main?.SpawnTracer(shotOrigin, glassHitPosition, new Color(1.0f, 0.34f, 0.13f));
+            return;
+        }
         var clear = Ballistics.HasClearShot(GetWorld3D(), shotOrigin, aimPoint, _combatTarget.CombatNode, GetRid());
         if (clear && _rng.Randf() < accuracy)
         {
@@ -1356,13 +1360,17 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         var accuracy = Mathf.Clamp(0.9f - distance * 0.008f, 0.4f, 0.94f);
         var aimPoint = rival.GlobalPosition + Vector3.Up * (rival.IsProne ? 0.45f : 1.2f);
         var shotOrigin = ResolveBallisticShotOrigin();
-        BreakableGlassField.TryShatterAlongRay(
+        if (BreakableGlassField.TryShatterAlongRay(
             GetWorld3D(),
             shotOrigin,
             aimPoint,
             stats.Damage * 0.36f,
             shotOrigin.DirectionTo(aimPoint),
-            out _);
+            out var glassHitPosition))
+        {
+            Main?.SpawnTracer(shotOrigin, glassHitPosition, new Color(1.0f, 0.45f, 0.18f));
+            return;
+        }
         var clear = Ballistics.HasClearShot(GetWorld3D(), shotOrigin, aimPoint, rival, GetRid());
         if (clear && _rng.Randf() < accuracy)
         {

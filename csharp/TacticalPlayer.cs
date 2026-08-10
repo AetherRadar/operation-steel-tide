@@ -1672,13 +1672,16 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             - _camera.GlobalBasis.Z * 2.55f
             - _camera.GlobalBasis.X * 0.22f
             + _camera.GlobalBasis.Y * 0.18f;
-        BreakableGlassField.TryShatterAlongRay(
+        if (BreakableGlassField.TryShatterAlongRay(
             GetWorld3D(),
             from,
             to,
             24.0f,
             from.DirectionTo(to),
-            out _);
+            out _))
+        {
+            return;
+        }
         var query = PhysicsRayQueryParameters3D.Create(from, to);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
         query.CollideWithAreas = false;
@@ -1786,18 +1789,22 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var from = _camera.GlobalPosition;
         var maximumRange = stats.EffectiveRange * 1.35f;
         var to = from + direction * maximumRange;
-        BreakableGlassField.TryShatterAlongRay(
+        var glassBlocked = BreakableGlassField.TryShatterAlongRay(
             GetWorld3D(),
             from,
             to,
             stats.Damage * AmmoTiers.ArmorPenetration(CurrentAmmoGrade),
             direction,
-            out _);
-        var query = PhysicsRayQueryParameters3D.Create(from, to);
-        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        query.CollideWithAreas = false;
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        var end = to;
+            out var glassHitPosition);
+        var hit = new Godot.Collections.Dictionary();
+        if (!glassBlocked)
+        {
+            var query = PhysicsRayQueryParameters3D.Create(from, to);
+            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+            query.CollideWithAreas = false;
+            hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+        }
+        var end = glassBlocked ? glassHitPosition : to;
         var damagedTarget = false;
         var headshot = false;
         var networkEnemyId = -1;
