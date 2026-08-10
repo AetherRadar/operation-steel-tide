@@ -35,7 +35,7 @@ public partial class FreightTerminalWorld
         var orange = Mat("special_landmark_orange", new Color(0.92f, 0.38f, 0.08f), 0.34f, 0.4f, new Color(0.44f, 0.1f, 0.02f));
         var white = Mat("special_landmark_white", new Color(0.75f, 0.78f, 0.72f), 0.16f, 0.56f);
 
-        BuildSalvageBazaar(new Vector3(-76.0f, 0.0f, 4.0f), paving, timber, steel, steelDark, yellow, orange);
+        BuildSalvageBazaar(new Vector3(-76.0f, 0.0f, 4.0f), paving, yellow, orange);
         BuildTideglassConservatory(new Vector3(113.0f, 0.0f, 9.0f), paving, concrete, steel, steelDark, glass, cyan);
         BuildTidalObservatory(new Vector3(-114.0f, 0.0f, 43.0f), paving, concrete, steel, steelDark, rust, cyan);
         BuildDrydockRepairCradle(new Vector3(77.0f, 0.0f, -151.0f), paving, concrete, steel, steelDark, rust, yellow, corrugated, orange, white);
@@ -159,7 +159,7 @@ public partial class FreightTerminalWorld
             center,
             new Vector3(thickness, thickness, length),
             material,
-            new Vector3(angle, yaw, 0));
+            new Vector3(-angle, yaw, 0));
         visual.Name = name;
         RegisterMapDetailVisual(visual);
     }
@@ -171,22 +171,67 @@ public partial class FreightTerminalWorld
         Vector2 size,
         float height,
         Godot.Material roof,
-        Godot.Material post)
+        Godot.Material post,
+        float ridgeGap = 0.0f,
+        Godot.Material? underside = null,
+        Godot.Material? undersideRib = null)
     {
         var halfWidth = size.X * 0.5f;
-        var roofLength = Mathf.Sqrt(halfWidth * halfWidth + height * height);
-        var roofAngle = Mathf.Atan2(height, halfWidth);
+        var panelSpan = Mathf.Max(0.5f, halfWidth - ridgeGap * 0.5f);
+        var roofLength = Mathf.Sqrt(panelSpan * panelSpan + height * height);
+        var roofAngle = Mathf.Atan2(height, panelSpan);
         for (var side = -1; side <= 1; side += 2)
         {
-            var roofCenter = new Vector3(center.X + side * halfWidth * 0.5f, center.Y + height * 0.5f, center.Z);
+            var roofCenter = new Vector3(
+                center.X + side * (ridgeGap * 0.5f + panelSpan * 0.5f),
+                center.Y + height * 0.5f,
+                center.Z);
+            var rotation = new Vector3(0, 0, -side * roofAngle);
             var visual = MeshBox(
                 parent,
                 roofCenter,
                 new Vector3(roofLength, 0.14f, size.Y),
                 roof,
-                new Vector3(0, 0, -side * roofAngle));
+                rotation);
             visual.Name = $"{prefix}_Roof_{side}";
             RegisterMapDetailVisual(visual);
+
+            if (underside is not null)
+            {
+                var offset = new Vector3(
+                    -side * Mathf.Sin(roofAngle) * 0.12f,
+                    -Mathf.Cos(roofAngle) * 0.12f,
+                    0);
+                var lining = MeshBox(
+                    parent,
+                    roofCenter + offset,
+                    new Vector3(roofLength - 0.08f, 0.035f, size.Y - 0.16f),
+                    underside,
+                    rotation);
+                lining.Name = $"{prefix}_Underside_{side}";
+                lining.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+                lining.VisibilityRangeEnd = 82.0f;
+            }
+
+            if (undersideRib is not null)
+            {
+                for (var rib = 0; rib < 6; rib++)
+                {
+                    var offset = new Vector3(
+                        -side * Mathf.Sin(roofAngle) * 0.18f,
+                        -Mathf.Cos(roofAngle) * 0.18f,
+                        0);
+                    var ribVisual = MeshBox(
+                        parent,
+                        roofCenter + offset + Vector3.Back * Mathf.Lerp(-size.Y * 0.42f, size.Y * 0.42f, rib / 5.0f),
+                        new Vector3(roofLength, 0.08f, 0.09f),
+                        undersideRib,
+                        rotation);
+                    ribVisual.Name = $"{prefix}_UndersideRib_{side}_{rib:00}";
+                    ribVisual.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+                    ribVisual.VisibilityRangeEnd = 64.0f;
+                }
+            }
         }
         foreach (var x in new[] { -halfWidth + 0.2f, halfWidth - 0.2f })
         {
@@ -198,12 +243,24 @@ public partial class FreightTerminalWorld
     private void BuildSalvageBazaar(
         Vector3 position,
         Godot.Material paving,
-        Godot.Material timber,
-        Godot.Material steel,
-        Godot.Material steelDark,
         Godot.Material yellow,
         Godot.Material orange)
     {
+        var canopyRoof = PaintedMetal("special_landmark_bazaar_canopy", new Color(0.68f, 0.42f, 0.18f));
+        var canopyUnderside = PaintedMetal("special_landmark_bazaar_canopy_underside", new Color(0.58f, 0.64f, 0.6f));
+        var canopyRib = PaintedMetal("special_landmark_bazaar_canopy_rib", new Color(0.7f, 0.55f, 0.28f));
+        var stallTimber = PaintedMetal("special_landmark_bazaar_stall_timber", new Color(0.55f, 0.32f, 0.14f));
+        var stallSteel = PaintedMetal("special_landmark_bazaar_stall_steel", new Color(0.44f, 0.52f, 0.5f));
+        var deckSteel = PaintedMetal("special_landmark_bazaar_deck", new Color(0.48f, 0.54f, 0.52f));
+        var supportSteel = PaintedMetal("special_landmark_bazaar_support", new Color(0.34f, 0.4f, 0.4f));
+        ConfigureBazaarShadowFill(canopyRoof, new Color(0.07f, 0.035f, 0.012f), 0.34f);
+        ConfigureBazaarShadowFill(canopyUnderside, new Color(0.09f, 0.095f, 0.075f), 0.48f);
+        ConfigureBazaarShadowFill(canopyRib, new Color(0.08f, 0.055f, 0.02f), 0.4f);
+        ConfigureBazaarShadowFill(stallTimber, new Color(0.055f, 0.028f, 0.01f), 0.32f);
+        ConfigureBazaarShadowFill(stallSteel, new Color(0.055f, 0.065f, 0.06f), 0.38f);
+        ConfigureBazaarShadowFill(deckSteel, new Color(0.06f, 0.068f, 0.062f), 0.42f);
+        ConfigureBazaarShadowFill(supportSteel, new Color(0.04f, 0.05f, 0.05f), 0.38f);
+
         var root = CreateSpecialLandmarkRoot("SalvageBazaar", position, "SALVAGE BAZAAR", new Color(1.0f, 0.66f, 0.22f));
         ExpansionBox(root, "BazaarPaving", new Vector3(0, -0.02f, 0), new Vector3(25, 0.12f, 19), paving);
         var kiosks = new[]
@@ -217,21 +274,33 @@ public partial class FreightTerminalWorld
         for (var index = 0; index < kiosks.Length; index++)
         {
             var kiosk = kiosks[index];
-            var body = ExpansionBox(root, $"BazaarKiosk_{index:00}", kiosk + Vector3.Up * 0.62f, new Vector3(3.7f, 1.24f, 2.4f), index % 2 == 0 ? timber : steelDark);
+            var body = ExpansionBox(root, $"BazaarKiosk_{index:00}", kiosk + Vector3.Up * 0.62f, new Vector3(3.7f, 1.24f, 2.4f), index % 2 == 0 ? stallTimber : stallSteel);
             MeshBox(body, new Vector3(0, 0.68f, 0), new Vector3(3.95f, 0.12f, 2.58f), yellow).Name = $"BazaarKioskCounter_{index:00}";
             MeshBox(body, new Vector3(0, 1.36f, -1.08f), new Vector3(2.4f, 0.52f, 0.06f), orange).Name = $"BazaarKioskSign_{index:00}";
         }
 
-        AddSpecialCanopy(root, "BazaarCanopy", new Vector3(0, 3.0f, 0), new Vector2(18.0f, 13.5f), 2.4f, timber, steel);
-        ExpansionCylinder(root, "BazaarSignalMast", new Vector3(0, 4.8f, 0), 0.16f, 9.6f, steelDark);
+        AddSpecialCanopy(
+            root,
+            "BazaarCanopy",
+            new Vector3(0, 3.82f, 0),
+            new Vector2(17.0f, 12.2f),
+            2.15f,
+            canopyRoof,
+            supportSteel,
+            0.82f,
+            canopyUnderside,
+            canopyRib);
+        ExpansionCylinder(root, "BazaarSignalMast", new Vector3(0, 4.8f, 0), 0.16f, 9.6f, supportSteel);
         MeshBox(root, new Vector3(0, 9.75f, 0), new Vector3(2.2f, 0.18f, 0.18f), orange).Name = "BazaarSignalArm";
 
-        ExpansionBox(root, "BazaarAuctionDeck", new Vector3(0, 2.88f, -1.6f), new Vector3(7.8f, 0.28f, 5.4f), steel);
+        ExpansionBox(root, "BazaarAuctionDeck", new Vector3(0, 2.88f, -1.6f), new Vector3(7.8f, 0.28f, 5.4f), deckSteel);
         foreach (var x in new[] { -3.35f, 3.35f })
         {
-            ExpansionBox(root, $"BazaarDeckSupport_{x:0.0}", new Vector3(x, 1.45f, -1.6f), new Vector3(0.28f, 2.9f, 0.28f), steelDark);
+            ExpansionBox(root, $"BazaarDeckSupport_{x:0.0}", new Vector3(x, 1.45f, -1.6f), new Vector3(0.28f, 2.9f, 0.28f), supportSteel);
         }
-        AddSpecialSteps(root, "BazaarDeckStair", new Vector3(-2.35f, 0.08f, 2.8f), new Vector3(0, 0, -1), 2.8f, 5.8f, 2.68f, 8, steel);
+        MeshBox(root, new Vector3(0, 2.72f, 1.08f), new Vector3(7.9f, 0.1f, 0.1f), orange).Name = "BazaarAuctionDeckFrontTrim";
+        MeshBox(root, new Vector3(0, 2.72f, -4.28f), new Vector3(7.9f, 0.1f, 0.1f), orange).Name = "BazaarAuctionDeckBackTrim";
+        AddSpecialSteps(root, "BazaarDeckStair", new Vector3(-2.35f, 0.08f, 2.8f), new Vector3(0, 0, -1), 2.8f, 5.8f, 2.68f, 8, deckSteel);
         AddSpecialVerticalRouteMarker(root, "BazaarDeckVerticalRoute");
         AddSpecialSlopedRail(root, "BazaarDeckRailL", new Vector3(-3.55f, 0.9f, 3.1f), new Vector3(-3.55f, 3.72f, -2.1f), 0.12f, orange);
         AddSpecialSlopedRail(root, "BazaarDeckRailR", new Vector3(-1.15f, 0.9f, 3.1f), new Vector3(-1.15f, 3.72f, -2.1f), 0.12f, orange);
@@ -252,6 +321,13 @@ public partial class FreightTerminalWorld
             AddSpecialLoot(root, $"SpecialLoot_Bazaar_{index:00}", item.Position, item.Grade, item.Name, item.Name);
         }
         AddSpecialLabel(root, "BazaarDeckLabel", new Vector3(0, 3.4f, -1.6f), "AUCTION DECK  //  UP", new Color(1.0f, 0.77f, 0.35f));
+    }
+
+    private static void ConfigureBazaarShadowFill(StandardMaterial3D material, Color emission, float energy)
+    {
+        material.EmissionEnabled = true;
+        material.Emission = emission;
+        material.EmissionEnergyMultiplier = energy;
     }
 
     private void BuildTideglassConservatory(
@@ -484,6 +560,68 @@ public partial class FreightTerminalWorld
         AddSpecialLabel(root, "DrydockCatwalkLabel", new Vector3(0, 5.2f, 10.8f), "GANTRY ACCESS  //  BOTH SIDES", new Color(1.0f, 0.62f, 0.3f));
     }
 
+    private static MeshInstance3D? FindSpecialVisual(Node? node)
+    {
+        if (node is MeshInstance3D visual)
+        {
+            return visual;
+        }
+        if (node is null)
+        {
+            return null;
+        }
+        foreach (var child in node.GetChildren())
+        {
+            if (child is MeshInstance3D childVisual)
+            {
+                return childVisual;
+            }
+        }
+        return null;
+    }
+
+    private static float SpecialMaterialLuminance(Color color)
+    {
+        return color.R * 0.2126f + color.G * 0.7152f + color.B * 0.0722f;
+    }
+
+    private static bool HasReadableBazaarShadowMaterial(Node? node, float minimumAlbedo, float minimumEmission)
+    {
+        var visual = FindSpecialVisual(node);
+        if (visual?.MaterialOverride is not StandardMaterial3D material)
+        {
+            return false;
+        }
+        var emittedLuminance = material.EmissionEnabled
+            ? SpecialMaterialLuminance(material.Emission) * material.EmissionEnergyMultiplier
+            : 0.0f;
+        return SpecialMaterialLuminance(material.AlbedoColor) >= minimumAlbedo
+            && emittedLuminance >= minimumEmission;
+    }
+
+    private static float BazaarCanopyMinimumY(MeshInstance3D? visual)
+    {
+        if (visual?.Mesh is not BoxMesh box)
+        {
+            return float.NegativeInfinity;
+        }
+        var angle = visual.Rotation.Z;
+        var verticalExtent = Mathf.Abs(box.Size.X * Mathf.Sin(angle)) * 0.5f
+            + Mathf.Abs(box.Size.Y * Mathf.Cos(angle)) * 0.5f;
+        return visual.Position.Y - verticalExtent;
+    }
+
+    private static float BazaarCanopyRidgeGap(MeshInstance3D? left, MeshInstance3D? right)
+    {
+        if (left?.Mesh is not BoxMesh leftBox || right is null)
+        {
+            return float.NegativeInfinity;
+        }
+        var horizontalExtent = Mathf.Abs(leftBox.Size.X * Mathf.Cos(left.Rotation.Z)) * 0.5f
+            + Mathf.Abs(leftBox.Size.Y * Mathf.Sin(left.Rotation.Z)) * 0.5f;
+        return Mathf.Abs(right.Position.X - left.Position.X) - horizontalExtent * 2.0f;
+    }
+
     private async void ValidateSpecialLandmarks()
     {
         DisableActorsForSurvivalDiagnostics();
@@ -545,6 +683,21 @@ public partial class FreightTerminalWorld
             }
         }
         var routeNodes = GetTree().GetNodesInGroup("special_landmark_vertical_route");
+        var bazaar = _levelRoot.GetNodeOrNull<Node3D>("SalvageBazaar");
+        var bazaarRoofLeft = bazaar?.GetNodeOrNull<MeshInstance3D>("BazaarCanopy_Roof_-1");
+        var bazaarRoofRight = bazaar?.GetNodeOrNull<MeshInstance3D>("BazaarCanopy_Roof_1");
+        var bazaarLiningLeft = bazaar?.GetNodeOrNull<MeshInstance3D>("BazaarCanopy_Underside_-1");
+        var bazaarLiningRight = bazaar?.GetNodeOrNull<MeshInstance3D>("BazaarCanopy_Underside_1");
+        var bazaarCanopyClearance = Mathf.Min(
+            BazaarCanopyMinimumY(bazaarRoofLeft),
+            BazaarCanopyMinimumY(bazaarLiningLeft));
+        var bazaarCanopyGap = BazaarCanopyRidgeGap(bazaarRoofLeft, bazaarRoofRight);
+        var bazaarHeadClearance = bazaarCanopyClearance >= 3.64f
+            && BazaarCanopyMinimumY(bazaarLiningRight) >= 3.64f;
+        var bazaarLightGap = bazaarCanopyGap >= 0.68f;
+        var bazaarMaterialsReadable = HasReadableBazaarShadowMaterial(bazaarLiningLeft, 0.5f, 0.03f)
+            && HasReadableBazaarShadowMaterial(bazaar?.GetNodeOrNull("BazaarKiosk_01"), 0.42f, 0.018f)
+            && HasReadableBazaarShadowMaterial(bazaar?.GetNodeOrNull("BazaarAuctionDeck"), 0.46f, 0.02f);
         var valid = SpecialLandmarkCount == expected.Length
             && present == expected.Length
             && collisionReady
@@ -555,8 +708,11 @@ public partial class FreightTerminalWorld
             && lootRegistered
             && lootGrades.Count == Enum.GetValues<LootGrade>().Length
             && SpecialLandmarkVerticalRouteCount >= 5
-            && routeNodes.Count == SpecialLandmarkVerticalRouteCount;
-        GD.Print($"SPECIAL_LANDMARK_CHECK valid={valid} landmarks={SpecialLandmarkCount}/{expected.Length} present={present} collision={collisionReady} key_structures={keyStructuresReady} loot={SpecialLandmarkLootCount}/{lootNodes.Count} registered={lootRegistered} grades={lootGrades.Count} routes={SpecialLandmarkVerticalRouteCount}/{routeNodes.Count} spawn_clear={spawnClear} nearest_spawn={nearestSpawnDistance:0.0}");
+            && routeNodes.Count == SpecialLandmarkVerticalRouteCount
+            && bazaarHeadClearance
+            && bazaarLightGap
+            && bazaarMaterialsReadable;
+        GD.Print($"SPECIAL_LANDMARK_CHECK valid={valid} landmarks={SpecialLandmarkCount}/{expected.Length} present={present} collision={collisionReady} key_structures={keyStructuresReady} loot={SpecialLandmarkLootCount}/{lootNodes.Count} registered={lootRegistered} grades={lootGrades.Count} routes={SpecialLandmarkVerticalRouteCount}/{routeNodes.Count} spawn_clear={spawnClear} nearest_spawn={nearestSpawnDistance:0.0} bazaar_head_clear={bazaarHeadClearance} bazaar_clearance={bazaarCanopyClearance:0.00} bazaar_light_gap={bazaarLightGap} bazaar_gap={bazaarCanopyGap:0.00} bazaar_materials={bazaarMaterialsReadable}");
         GD.Print($"SPECIAL_LANDMARK_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -586,6 +742,12 @@ public partial class FreightTerminalWorld
         await WaitFrames(20);
         SaveViewportImage("res://special_landmark_bazaar_validation.png");
 
+        camera.GlobalPosition = new Vector3(-67.5f, 1.72f, 12.5f);
+        camera.Fov = 68.0f;
+        camera.LookAt(new Vector3(-76.0f, 3.0f, 2.0f), Vector3.Up);
+        await WaitFrames(20);
+        SaveViewportImage("res://special_landmark_bazaar_player_height_validation.png");
+
         camera.GlobalPosition = new Vector3(104.0f, 13.0f, -126.0f);
         camera.LookAt(new Vector3(77.0f, 3.2f, -151.0f), Vector3.Up);
         await WaitFrames(20);
@@ -600,7 +762,7 @@ public partial class FreightTerminalWorld
         camera.LookAt(new Vector3(-114.0f, 4.5f, 43.0f), Vector3.Up);
         await WaitFrames(20);
         SaveViewportImage("res://special_landmark_observatory_validation.png");
-        GD.Print($"SPECIAL_LANDMARK_CAPTURE landmarks={SpecialLandmarkCount} loot={SpecialLandmarkLootCount} routes={SpecialLandmarkVerticalRouteCount} overview=special_landmarks_overview_validation.png bazaar=special_landmark_bazaar_validation.png drydock=special_landmark_drydock_validation.png tideglass=special_landmark_tideglass_validation.png observatory=special_landmark_observatory_validation.png");
+        GD.Print($"SPECIAL_LANDMARK_CAPTURE landmarks={SpecialLandmarkCount} loot={SpecialLandmarkLootCount} routes={SpecialLandmarkVerticalRouteCount} overview=special_landmarks_overview_validation.png bazaar=special_landmark_bazaar_validation.png bazaar_player=special_landmark_bazaar_player_height_validation.png drydock=special_landmark_drydock_validation.png tideglass=special_landmark_tideglass_validation.png observatory=special_landmark_observatory_validation.png");
         GetTree().Quit();
     }
 }
