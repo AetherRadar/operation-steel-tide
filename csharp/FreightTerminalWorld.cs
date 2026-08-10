@@ -287,6 +287,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateSkyLinks();
         }
+        else if (Array.Exists(args, value => value == "--validate-skybridge-access"))
+        {
+            ValidateSkybridgeAccess();
+        }
         else if (Array.Exists(args, value => value == "--validate-vehicle-drive"))
         {
             ValidateVehicleDrive();
@@ -362,6 +366,10 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--capture-skylinks"))
         {
             CaptureResidentialSkyLinks();
+        }
+        else if (Array.Exists(args, value => value == "--capture-skybridge-access"))
+        {
+            CaptureSkybridgeAccess();
         }
         else if (Array.Exists(args, value => value == "--capture-residential-stairs"))
         {
@@ -4322,17 +4330,55 @@ public partial class FreightTerminalWorld : Node3D
         };
         Input.ActionPress("move_forward");
         Input.ActionPress("sprint");
+        var reachedWaypoints = 0;
         foreach (var waypoint in waypoints)
         {
+            var reachedWaypoint = false;
             for (var frame = 0; frame < 650; frame++)
             {
                 _player.FaceWorldPointForDiagnostics(waypoint);
                 if (_player.GlobalPosition.DistanceTo(waypoint) < 1.6f)
                 {
+                    reachedWaypoint = true;
                     break;
                 }
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             }
+            if (!reachedWaypoint)
+            {
+                var colliders = new List<string>();
+                for (var collisionIndex = 0; collisionIndex < _player.GetSlideCollisionCount(); collisionIndex++)
+                {
+                    var collision = _player.GetSlideCollision(collisionIndex);
+                    if (collision.GetCollider() is Node colliderNode)
+                    {
+                        var normal = collision.GetNormal();
+                        var position = collision.GetPosition();
+                        colliders.Add($"{colliderNode.Name}@n({normal.X:0.0},{normal.Y:0.0},{normal.Z:0.0})p({position.X:0.0},{position.Y:0.0},{position.Z:0.0})");
+                    }
+                }
+                var progress = (_player.GlobalPosition - worldA).Dot(direction);
+                var trace = PhysicsRayQueryParameters3D.Create(
+                    _player.GlobalPosition + Vector3.Up * 0.75f,
+                    waypoint + Vector3.Up * 0.75f);
+                trace.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+                trace.CollisionMask = 1;
+                trace.CollideWithAreas = false;
+                var traceHit = GetWorld3D().DirectSpaceState.IntersectRay(trace);
+                var traceCollider = traceHit.Count > 0 && traceHit["collider"].AsGodotObject() is Node traceNode
+                    ? traceNode.Name.ToString()
+                    : "none";
+                var contactBody = _player.GetSlideCollisionCount() > 0
+                    ? _player.GetSlideCollision(0).GetCollider() as StaticBody3D
+                    : null;
+                var contactShape = contactBody?.GetChildren().OfType<CollisionShape3D>().FirstOrDefault();
+                var contactLocal = contactBody is not null ? contactBody.ToLocal(_player.GlobalPosition) : Vector3.Zero;
+                var contactSize = contactShape?.Shape is BoxShape3D box ? box.Size : Vector3.Zero;
+                GD.Print($"SKYLINK_STALL waypoint={reachedWaypoints} dist={_player.GlobalPosition.DistanceTo(waypoint):0.0} progress={progress:0.0} player=({_player.GlobalPosition.X:0.0},{_player.GlobalPosition.Y:0.0},{_player.GlobalPosition.Z:0.0}) target=({waypoint.X:0.0},{waypoint.Y:0.0},{waypoint.Z:0.0}) trace={traceCollider} contact_local=({contactLocal.X:0.0},{contactLocal.Y:0.0},{contactLocal.Z:0.0}) contact_size=({contactSize.X:0.0},{contactSize.Y:0.0},{contactSize.Z:0.0}) health={_player.Health:0.0} dead={_player.IsDead} intent={_player.HasMovementIntent} stamina={_player.Stamina:0.0} velocity=({_player.Velocity.X:0.0},{_player.Velocity.Y:0.0},{_player.Velocity.Z:0.0}) colliders={string.Join(',', colliders)}");
+                SaveViewportImage("res://skylink_stall_validation.png");
+                break;
+            }
+            reachedWaypoints++;
         }
         Input.ActionRelease("sprint");
         Input.ActionRelease("move_forward");

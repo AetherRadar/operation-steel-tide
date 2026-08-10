@@ -247,12 +247,14 @@ public partial class FreightTerminalWorld
                 toSlot.Floors.Add(floor);
             }
         }
+        PlanResidentialSkybridgeAccesses();
         for (var index = 0; index < ResidentialTowerSpecs.Length; index++)
         {
             BuildResidentialTower(community, ResidentialTowerSpecs[index], index, concrete, steel, glass, trim);
         }
         BuildResidentialGapInfill(community, concrete, steel, glass, trim);
         BuildResidentialSkyLinks(community, concrete, steel, glass);
+        BuildResidentialSkybridgeAccessStairs();
     }
 
     private void BuildResidentialRoads(Node3D community)
@@ -2107,19 +2109,36 @@ public partial class FreightTerminalWorld
                 var span = length + 1.4f;
                 var mid = length * 0.5f;
                 var windowSpan = Mathf.Max(1.0f, length - 1.1f);
+                var startAccessSill = floor == 2
+                    && HasResidentialSkybridgeAccessEndpoint(link.From, link.To)
+                    ? ResidentialSkybridgeAccessSillSide(link.From, link.To, delta.Normalized(), doorZA)
+                    : 0;
+                var endAccessSill = floor == 2
+                    && HasResidentialSkybridgeAccessEndpoint(link.To, link.From)
+                    ? ResidentialSkybridgeAccessSillSide(link.To, link.From, delta.Normalized(), doorZB)
+                    : 0;
+                const float accessOpening = 4.0f;
+                var westStart = startAccessSill == -1 ? accessOpening : 0.55f;
+                var westEnd = length - (endAccessSill == -1 ? accessOpening : 0.55f);
+                var eastStart = startAccessSill == 1 ? accessOpening : 0.55f;
+                var eastEnd = length - (endAccessSill == 1 ? accessOpening : 0.55f);
+                var westSpan = Mathf.Max(1.0f, westEnd - westStart);
+                var eastSpan = Mathf.Max(1.0f, eastEnd - eastStart);
+                var westMid = (westStart + westEnd) * 0.5f;
+                var eastMid = (eastStart + eastEnd) * 0.5f;
                 ExpansionBox(bridge, "SkybridgeDeck", new Vector3(0, 0.05f, mid), new Vector3(3.5f, 0.16f, span), deck);
-                ExpansionBox(bridge, "SkybridgeSillW", new Vector3(-1.69f, 0.39f, mid), new Vector3(0.14f, 0.68f, windowSpan), sill);
-                ExpansionBox(bridge, "SkybridgeSillE", new Vector3(1.69f, 0.39f, mid), new Vector3(0.14f, 0.68f, windowSpan), sill);
+                ExpansionBox(bridge, "SkybridgeSillW", new Vector3(-1.69f, 0.39f, westMid), new Vector3(0.14f, 0.68f, westSpan), sill);
+                ExpansionBox(bridge, "SkybridgeSillE", new Vector3(1.69f, 0.39f, eastMid), new Vector3(0.14f, 0.68f, eastSpan), sill);
 
                 var bridgeTint = new Color(0.72f, 0.94f, 0.97f, 0.9f);
-                bridgeGlass.AddPane(new Vector3(-1.69f, 1.76f, mid), new Vector3(0.045f, 2.08f, windowSpan), bridgeTint);
-                bridgeGlass.AddPane(new Vector3(1.69f, 1.76f, mid), new Vector3(0.045f, 2.08f, windowSpan), bridgeTint);
+                bridgeGlass.AddPane(new Vector3(-1.69f, 1.76f, westMid), new Vector3(0.045f, 2.08f, westSpan), bridgeTint);
+                bridgeGlass.AddPane(new Vector3(1.69f, 1.76f, eastMid), new Vector3(0.045f, 2.08f, eastSpan), bridgeTint);
                 bridgeGlass.AddPane(new Vector3(0, 2.91f, mid), new Vector3(3.22f, 0.045f, windowSpan), bridgeTint);
                 bridgeGlass.Commit();
                 _residentialSkybridgeWindowCount += 3;
 
-                MeshBox(bridge, new Vector3(-1.69f, 0.77f, mid), new Vector3(0.16f, 0.12f, windowSpan), frame).Name = "SkybridgeLowerRailW";
-                MeshBox(bridge, new Vector3(1.69f, 0.77f, mid), new Vector3(0.16f, 0.12f, windowSpan), frame).Name = "SkybridgeLowerRailE";
+                MeshBox(bridge, new Vector3(-1.69f, 0.77f, westMid), new Vector3(0.16f, 0.12f, westSpan), frame).Name = "SkybridgeLowerRailW";
+                MeshBox(bridge, new Vector3(1.69f, 0.77f, eastMid), new Vector3(0.16f, 0.12f, eastSpan), frame).Name = "SkybridgeLowerRailE";
                 MeshBox(bridge, new Vector3(-1.58f, 2.89f, mid), new Vector3(0.16f, 0.16f, span), frame).Name = "SkybridgeRoofRailW";
                 MeshBox(bridge, new Vector3(1.58f, 2.89f, mid), new Vector3(0.16f, 0.16f, span), frame).Name = "SkybridgeRoofRailE";
                 MeshBox(bridge, new Vector3(0, 3.0f, mid), new Vector3(0.18f, 0.18f, span), frame).Name = "SkybridgeRoofSpine";
