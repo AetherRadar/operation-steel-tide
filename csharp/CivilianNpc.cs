@@ -44,6 +44,7 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
     private Node3D _leftLeg = null!;
     private Node3D _rightLeg = null!;
     private Label3D _roleLabel = null!;
+    private string _language = "en";
 
     public void Configure(
         FreightTerminalWorld main,
@@ -64,6 +65,12 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         _roamHalfExtents = roamHalfExtents;
         Position = _towerTransform * homeLocal;
         Rotation = new Vector3(0, towerTransform.Basis.GetEuler().Y, 0);
+    }
+
+    public void SetLanguage(string language)
+    {
+        _language = GameLocalization.IsChinese(language) ? "zh" : "en";
+        RefreshRoleLabel();
     }
 
     public override void _Ready()
@@ -168,10 +175,7 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
 
         AssistanceUsed = true;
         _decisionTimer = 5.0f;
-        if (IsInstanceValid(_roleLabel))
-        {
-            _roleLabel.Text = $"{RoleLabel()}  //  ASSISTED";
-        }
+        RefreshRoleLabel();
         player.Hud?.ShowLocalizedMessage(messageKey, message, RoleColor());
         return true;
     }
@@ -213,9 +217,9 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         }
         if (IsInstanceValid(_roleLabel))
         {
-            _roleLabel.Text = "BODY  //  F LOOT";
             _roleLabel.Modulate = new Color(0.9f, 0.35f, 0.28f);
         }
+        RefreshRoleLabel();
         _main?.RegisterCivilianCorpse(this);
     }
 
@@ -343,7 +347,7 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         _leftArm.Rotation = new Vector3(_cowering ? -1.1f : -stride * 0.7f, 0, 0.08f);
         _rightArm.Rotation = new Vector3(_cowering ? -1.1f : stride * 0.7f, 0, -0.08f);
         _rig.Position = new Vector3(0, Mathf.Lerp(_rig.Position.Y, _cowering ? -0.42f : 0.0f, delta * 6.0f), 0);
-        _roleLabel.Text = _cowering ? $"{RoleLabel()}  //  SHELTERING" : RoleLabel();
+        RefreshRoleLabel();
     }
 
     private void BuildCivilian()
@@ -377,8 +381,9 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
 
         _roleLabel = new Label3D
         {
+            Name = "CivilianRoleLabel",
             Position = new Vector3(0, 2.08f, 0),
-            Text = RoleLabel(),
+            Text = RoleStatusLabel(),
             FontSize = 19,
             OutlineSize = 6,
             Modulate = RoleColor(),
@@ -387,6 +392,7 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
             VisibilityRangeEnd = 24.0f,
             VisibilityRangeEndMargin = 4.0f
         };
+        _roleLabel.AddToGroup("residential_localized_labels");
         AddChild(_roleLabel);
     }
 
@@ -414,14 +420,48 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         }
     }
 
-    private string RoleLabel() => Role switch
+    private void RefreshRoleLabel()
     {
-        CivilianRole.Evacuee => "EVACUEE  /  \u5f85\u64a4\u79bb\u4eba\u5458",
-        CivilianRole.VolunteerMedic => "MEDICAL VOLUNTEER  /  \u533b\u7597\u5fd7\u613f\u8005",
-        CivilianRole.CommunityGuard => "COMMUNITY GUARD  /  \u793e\u533a\u5b89\u4fdd",
-        CivilianRole.UtilityWorker => "UTILITY WORKER  /  \u62a2\u4fee\u4eba\u5458",
-        _ => "RESIDENT  /  \u5c45\u6c11"
-    };
+        if (IsInstanceValid(_roleLabel))
+        {
+            _roleLabel.Text = RoleStatusLabel();
+        }
+    }
+
+    private string RoleStatusLabel()
+    {
+        if (IsDead)
+        {
+            return GameLocalization.Get("civilian_down", _language, "BODY  //  F LOOT");
+        }
+        var status = AssistanceUsed
+            ? GameLocalization.Get("civilian_status_assisted", _language, "ASSISTED")
+            : _cowering
+                ? GameLocalization.Get("civilian_status_sheltering", _language, "SHELTERING")
+                : string.Empty;
+        return string.IsNullOrEmpty(status) ? RoleLabel() : $"{RoleLabel()}  //  {status}";
+    }
+
+    private string RoleLabel()
+    {
+        var key = Role switch
+        {
+            CivilianRole.Evacuee => "civilian_role_evacuee",
+            CivilianRole.VolunteerMedic => "civilian_role_medic",
+            CivilianRole.CommunityGuard => "civilian_role_guard",
+            CivilianRole.UtilityWorker => "civilian_role_utility",
+            _ => "civilian_role_resident"
+        };
+        var english = Role switch
+        {
+            CivilianRole.Evacuee => "EVACUEE",
+            CivilianRole.VolunteerMedic => "MEDICAL VOLUNTEER",
+            CivilianRole.CommunityGuard => "COMMUNITY GUARD",
+            CivilianRole.UtilityWorker => "UTILITY WORKER",
+            _ => "RESIDENT"
+        };
+        return GameLocalization.Get(key, _language, english);
+    }
 
     private Color RoleColor() => Role switch
     {

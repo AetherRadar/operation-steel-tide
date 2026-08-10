@@ -26,6 +26,9 @@ public partial class FreightTerminalWorld
     private const int ResidentialStepsPerFlight = 16;
     private const float ResidentialStairTreadWidth = 1.95f;
     private const float ResidentialStairTreadThickness = 0.14f;
+    private const float ResidentialStairLandingWidth = 4.96f;
+    private const float ResidentialStairLandingDepth = 1.8f;
+    private const int ResidentialStairLandingSlatCount = 8;
 
     private readonly record struct ResidentialTowerSpec(
         Vector3 Position,
@@ -64,6 +67,16 @@ public partial class FreightTerminalWorld
         new(4, 6, new[] { 2, 4 }),
         new(6, 1, new[] { 2, 6 }),
         new(1, 10, new[] { 2, 5 })
+    };
+
+    private static readonly string[] ResidentialEnglishLabelTokens =
+    {
+        "COMMUNITY", "CLINIC", "EVAC", "SHELTER", "MAINTENANCE", "FLAT", "SECURITY", "POST",
+        "SEALED", "TENANT", "UNIT", "KITCHEN", "FAMILY", "APARTMENT", "FLOOR", "EXIT", "HARBOR",
+        "COURT", "NORTH", "QUAY", "SOUTH", "WEST", "EAST", "GATE", "TOWER", "MEDICAL", "SUPPLY",
+        "TOOLS", "CONCEALED", "RESERVE", "STASH", "RELAY", "HOLD", "UPLINK", "ONLINE", "ROOF",
+        "CACHE", "LOCKED", "UNLOCKED", "EVACUEE", "VOLUNTEER", "GUARD", "UTILITY", "WORKER",
+        "RESIDENT", "ASSISTED", "SHELTERING", "BODY", "LOOT"
     };
 
     private readonly record struct ResidentialSniperPost(Vector3 Position, Vector3 FacingTarget);
@@ -121,8 +134,10 @@ public partial class FreightTerminalWorld
     private readonly List<ResidentialSniperPost> _residentialSniperPosts = new();
     private readonly List<ResidentialSkybridgeSightline> _residentialSkybridgeSightlines = new();
     private readonly List<ResidentialSupplyCache> _residentialCaches = new();
+    private readonly List<ResidentialSearchableFurniture> _residentialFurniture = new();
     private readonly List<BreakableGlassField> _residentialGlassFields = new();
     private readonly HashSet<ResidentialRoomArchetype> _residentialRoomArchetypes = new();
+    private readonly List<Action<string>> _residentialLanguageRefreshers = new();
     private readonly int[] _residentialCacheCountByTower = new int[ResidentialTowerSpecs.Length];
     private int _residentialFloorCount;
     private int _residentialStairFlightCount;
@@ -133,15 +148,45 @@ public partial class FreightTerminalWorld
     private int _residentialSkybridgeMarksmanCount;
     private int _residentialInfillModuleCount;
     private int _residentialStairDetailCount;
+    private int _residentialFurnitureEventCount;
 
     public int ResidentialTowerCount => _residentialTowers.Count;
     public int ResidentialCivilianCount => _civilians.Count;
     public int ResidentialSpecialCivilianCount => _civilians.FindAll(civilian => civilian.IsSpecial).Count;
     public int ResidentialCacheCount => _residentialCaches.Count;
+    public int ResidentialFurnitureCount => _residentialFurniture.Count;
+    public int ResidentialFurnitureEventCount => _residentialFurnitureEventCount;
     public int ResidentialInfillModuleCount => _residentialInfillModuleCount;
     public int ResidentialStairDetailCount => _residentialStairDetailCount;
     public int ResidentialGlassPaneCount => _residentialGlassFields.Sum(field => field.PaneCount);
     public int ResidentialBrokenGlassCount => _residentialGlassFields.Sum(field => field.ShatteredCount);
+
+    private Label3D RegisterResidentialLocalizedLabel(Label3D label, Func<string, string> textProvider)
+    {
+        label.AddToGroup("residential_localized_labels");
+        RegisterResidentialLanguageRefresher(language =>
+        {
+            if (IsInstanceValid(label))
+            {
+                label.Text = textProvider(language);
+            }
+        });
+        return label;
+    }
+
+    private void RegisterResidentialLanguageRefresher(Action<string> refresher)
+    {
+        _residentialLanguageRefreshers.Add(refresher);
+        refresher(_languageSetting);
+    }
+
+    private void RefreshResidentialLocalization()
+    {
+        foreach (var refresher in _residentialLanguageRefreshers)
+        {
+            refresher(_languageSetting);
+        }
+    }
 
     private void BuildResidentialCommunity(
         Godot.Material concrete,
@@ -156,11 +201,13 @@ public partial class FreightTerminalWorld
         _residentialSniperPosts.Clear();
         _residentialSkybridgeSightlines.Clear();
         _residentialCaches.Clear();
+        _residentialFurniture.Clear();
         _residentialRelayStations.Clear();
         _relayCaches.Clear();
         _relayLootMarkers.Clear();
         _residentialGlassFields.Clear();
         _residentialRoomArchetypes.Clear();
+        _residentialFurnitureEventCount = 0;
         Array.Clear(_residentialCacheCountByTower, 0, _residentialCacheCountByTower.Length);
         _residentialSkybridgeCount = 0;
         _residentialSkybridgeWindowCount = 0;
@@ -308,16 +355,17 @@ public partial class FreightTerminalWorld
             MeshBox(community, new Vector3(arch.X, 2.6f, arch.Z - 8.6f), new Vector3(0.5f, 5.2f, 0.5f), lampPost);
             MeshBox(community, new Vector3(arch.X, 2.6f, arch.Z + 8.6f), new Vector3(0.5f, 5.2f, 0.5f), lampPost);
             MeshBox(community, new Vector3(arch.X, 5.3f, arch.Z), new Vector3(0.7f, 0.9f, 18.2f), lampPost);
-            community.AddChild(new Label3D
+            var districtName = arch.Name;
+            community.AddChild(RegisterResidentialLocalizedLabel(new Label3D
             {
+                Name = $"ResidentialDistrictSign_{districtName.Replace(" ", string.Empty)}",
                 Position = new Vector3(arch.X, 5.3f, arch.Z),
-                Text = arch.Name,
                 FontSize = 26,
                 OutlineSize = 7,
                 Modulate = new Color(0.9f, 0.7f, 0.4f),
                 Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
                 VisibilityRangeEnd = 70.0f
-            });
+            }, language => ResidentialBlockName(districtName, language)));
         }
     }
 
@@ -558,7 +606,7 @@ public partial class FreightTerminalWorld
         var roomWidth = Mathf.Max(2.6f, (width - corridorHalfWidth * 2.0f) * 0.5f);
         var carpet = Mat("residential_carpet", new Color(0.28f, 0.18f, 0.14f), 0.0f, 0.94f);
         var appliance = Mat("residential_appliance", new Color(0.55f, 0.58f, 0.56f), 0.62f, 0.35f);
-        var screen = Mat("residential_screen", new Color(0.08f, 0.14f, 0.2f), 0.2f, 0.25f, new Color(0.12f, 0.35f, 0.55f));
+        var screen = Mat("residential_screen", new Color(0.035f, 0.045f, 0.048f), 0.08f, 0.52f);
         var table = Mat("residential_table", new Color(0.24f, 0.16f, 0.1f), 0.05f, 0.78f);
         var featuredFloor = ShouldSpawnResidentialCache(spec, floor);
         foreach (var side in new[] { -1.0f, 1.0f })
@@ -572,6 +620,7 @@ public partial class FreightTerminalWorld
             // Living / bedroom set
             var livingZ = depth * 0.28f;
             var bedZ = -depth * 0.28f;
+            var furnitureKind = ResidentialFurnitureKindFor(towerIndex, floor, side, archetype, featuredFloor);
             MeshBox(tower, new Vector3(roomX, floorY + 0.07f, livingZ), new Vector3(roomWidth * 0.82f, 0.04f, Mathf.Min(3.2f, depth * 0.28f)), carpet);
             ExpansionBox(tower, "ApartmentSofa", new Vector3(roomX - side * 0.35f, floorY + 0.34f, livingZ + 0.35f), new Vector3(Mathf.Min(2.0f, roomWidth * 0.58f), 0.48f, 0.78f), bedding);
             ExpansionBox(tower, "ApartmentCoffeeTable", new Vector3(roomX + side * 0.45f, floorY + 0.28f, livingZ - 0.35f), new Vector3(0.95f, 0.32f, 0.55f), table);
@@ -579,16 +628,39 @@ public partial class FreightTerminalWorld
             MeshBox(tower, new Vector3(roomX + side * roomWidth * 0.28f, floorY + 0.92f, livingZ + 1.05f), new Vector3(0.95f, 0.55f, 0.08f), screen);
             ExpansionBox(tower, "ApartmentBed", new Vector3(roomX, floorY + 0.3f, bedZ), new Vector3(Mathf.Min(2.15f, roomWidth * 0.66f), 0.42f, 1.25f), wood);
             MeshBox(tower, new Vector3(roomX, floorY + 0.54f, bedZ), new Vector3(Mathf.Min(1.95f, roomWidth * 0.6f), 0.1f, 1.05f), bedding);
-            ExpansionBox(tower, "ApartmentNightstand", new Vector3(roomX + side * roomWidth * 0.28f, floorY + 0.32f, bedZ + 0.75f), new Vector3(0.45f, 0.48f, 0.4f), wood);
-            ExpansionBox(tower, "ApartmentWardrobe", new Vector3(roomX - side * roomWidth * 0.28f, floorY + 1.05f, bedZ - 0.15f), new Vector3(0.72f, 1.95f, 0.55f), wood);
+            if (furnitureKind != ResidentialFurnitureKind.Nightstand)
+            {
+                ExpansionBox(tower, "ApartmentNightstand", new Vector3(roomX + side * roomWidth * 0.28f, floorY + 0.32f, bedZ + 0.75f), new Vector3(0.45f, 0.48f, 0.4f), wood);
+            }
+            if (furnitureKind != ResidentialFurnitureKind.Wardrobe)
+            {
+                ExpansionBox(tower, "ApartmentWardrobe", new Vector3(roomX - side * roomWidth * 0.28f, floorY + 1.05f, bedZ - 0.15f), new Vector3(0.72f, 1.95f, 0.55f), wood);
+            }
             // Kitchenette strip against the outer wall
             var kitchenX = roomX + side * roomWidth * 0.32f;
             ExpansionBox(tower, "ApartmentCounter", new Vector3(kitchenX, floorY + 0.48f, depth * 0.05f), new Vector3(0.62f, 0.78f, 1.8f), appliance);
-            ExpansionBox(tower, "ApartmentFridge", new Vector3(kitchenX, floorY + 0.95f, depth * 0.05f - 1.15f), new Vector3(0.7f, 1.75f, 0.68f), appliance);
+            if (furnitureKind != ResidentialFurnitureKind.Refrigerator)
+            {
+                ExpansionBox(tower, "ApartmentFridge", new Vector3(kitchenX, floorY + 0.95f, depth * 0.05f - 1.15f), new Vector3(0.7f, 1.75f, 0.68f), appliance);
+            }
             MeshBox(tower, new Vector3(kitchenX, floorY + 0.92f, depth * 0.05f + 0.35f), new Vector3(0.5f, 0.08f, 0.5f), table);
             // Desk / work corner
             ExpansionBox(tower, "ApartmentDesk", new Vector3(roomX - side * 0.2f, floorY + 0.4f, -depth * 0.08f), new Vector3(1.35f, 0.12f, 0.62f), table);
             ExpansionBox(tower, "ApartmentChair", new Vector3(roomX - side * 0.2f, floorY + 0.28f, -depth * 0.08f + side * 0.55f), new Vector3(0.45f, 0.45f, 0.45f), wood);
+            SpawnResidentialFurniture(
+                tower,
+                towerIndex,
+                floor,
+                side,
+                archetype,
+                featuredFloor,
+                furnitureKind,
+                roomX,
+                roomWidth,
+                depth,
+                floorY,
+                bedZ,
+                kitchenX);
             // Extra clutter so apartments read as lived-in, not empty boxes.
             ExpansionBox(tower, "ApartmentShelf", new Vector3(roomX + side * roomWidth * 0.18f, floorY + 1.15f, -depth * 0.18f), new Vector3(0.9f, 1.7f, 0.32f), wood);
             ExpansionBox(tower, "ApartmentCrate", new Vector3(roomX - side * 0.55f, floorY + 0.28f, depth * 0.12f), new Vector3(0.55f, 0.45f, 0.55f), table);
@@ -597,7 +669,7 @@ public partial class FreightTerminalWorld
             {
                 BuildResidentialRoomTheme(tower, archetype, roomX, side, roomWidth, depth, floorY);
             }
-            if (side > 0.0f)
+            if (featuredFloor && side > 0.0f)
             {
                 SpawnResidentialCache(
                     tower,
@@ -607,18 +679,17 @@ public partial class FreightTerminalWorld
                     new Vector3(roomX - side * roomWidth * 0.18f, floorY + 0.12f, -depth * 0.18f),
                     side);
             }
-            tower.AddChild(new Label3D
+            tower.AddChild(RegisterResidentialLocalizedLabel(new Label3D
             {
                 Name = "ApartmentPurposeSign",
                 Position = new Vector3(side * (corridorHalfWidth + 0.08f), floorY + 1.55f, livingZ),
-                Text = ResidentialRoomName(archetype),
                 FontSize = 16,
                 OutlineSize = 5,
                 Modulate = ResidentialRoomColor(archetype),
                 Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
                 VisibilityRangeEnd = 12.0f,
                 VisibilityRangeEndMargin = 2.0f
-            });
+            }, language => ResidentialRoomName(archetype, language)));
             // The single floor light below serves both rooms; per-room lights multiply too quickly across 96 floors.
         }
         // Corridor carpet runner and ceiling strip lights (mesh only).
@@ -647,34 +718,69 @@ public partial class FreightTerminalWorld
             DistanceFadeBegin = 36.0f,
             DistanceFadeLength = 14.0f
         });
-        var floorLabel = new Label3D
+        var floorLabel = RegisterResidentialLocalizedLabel(new Label3D
         {
             Name = "ResidentialFloorSign",
             Position = new Vector3(0, floorY + 1.65f, coreZ + ResidentialStairOpeningSouthDepth + 1.15f),
-            Text = $"{spec.BlockName}  //  FLOOR {floor + 1:00}",
             FontSize = 22,
             OutlineSize = 6,
             Modulate = spec.Accent,
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             VisibilityRangeEnd = 18.0f,
             VisibilityRangeEndMargin = 3.0f
-        };
+        }, language => $"{ResidentialBlockName(spec.BlockName, language)}  //  {GameLocalization.Get("residential_floor", language, "FLOOR")} {floor + 1:00}");
         tower.AddChild(floorLabel);
     }
 
     private static ResidentialRoomArchetype ResidentialRoomArchetypeFor(int towerIndex, int floor, float side)
         => (ResidentialRoomArchetype)((towerIndex * 5 + floor * 2 + (side > 0.0f ? 1 : 0)) % 7);
 
-    private static string ResidentialRoomName(ResidentialRoomArchetype archetype) => archetype switch
+    private static string ResidentialRoomName(ResidentialRoomArchetype archetype, string language)
     {
-        ResidentialRoomArchetype.MedicalClinic => "COMMUNITY CLINIC",
-        ResidentialRoomArchetype.EvacuationShelter => "EVAC SHELTER",
-        ResidentialRoomArchetype.MaintenanceWorkshop => "MAINTENANCE FLAT",
-        ResidentialRoomArchetype.CommunitySecurity => "SECURITY POST",
-        ResidentialRoomArchetype.SmugglerDen => "SEALED TENANT UNIT",
-        ResidentialRoomArchetype.CommunityKitchen => "COMMUNITY KITCHEN",
-        _ => "FAMILY APARTMENT"
-    };
+        var key = archetype switch
+        {
+            ResidentialRoomArchetype.MedicalClinic => "residential_room_clinic",
+            ResidentialRoomArchetype.EvacuationShelter => "residential_room_evac_shelter",
+            ResidentialRoomArchetype.MaintenanceWorkshop => "residential_room_maintenance",
+            ResidentialRoomArchetype.CommunitySecurity => "residential_room_security",
+            ResidentialRoomArchetype.SmugglerDen => "residential_room_sealed_unit",
+            ResidentialRoomArchetype.CommunityKitchen => "residential_room_kitchen",
+            _ => "residential_room_family"
+        };
+        var english = archetype switch
+        {
+            ResidentialRoomArchetype.MedicalClinic => "COMMUNITY CLINIC",
+            ResidentialRoomArchetype.EvacuationShelter => "EVAC SHELTER",
+            ResidentialRoomArchetype.MaintenanceWorkshop => "MAINTENANCE FLAT",
+            ResidentialRoomArchetype.CommunitySecurity => "SECURITY POST",
+            ResidentialRoomArchetype.SmugglerDen => "SEALED TENANT UNIT",
+            ResidentialRoomArchetype.CommunityKitchen => "COMMUNITY KITCHEN",
+            _ => "FAMILY APARTMENT"
+        };
+        return GameLocalization.Get(key, language, english);
+    }
+
+    private static string ResidentialBlockName(string blockName, string language)
+    {
+        var key = blockName switch
+        {
+            "HARBOR COURT A" => "residential_block_harbor_a",
+            "HARBOR COURT B" => "residential_block_harbor_b",
+            "NORTH QUAY 1" => "residential_block_north_1",
+            "NORTH QUAY 2" => "residential_block_north_2",
+            "NORTH QUAY 3" => "residential_block_north_3",
+            "WEST GATE TOWER" => "residential_block_west_tower",
+            "EAST GATE TOWER" => "residential_block_east_tower",
+            "SOUTH COURT 1" => "residential_block_south_1",
+            "SOUTH COURT 2" => "residential_block_south_2",
+            "SOUTH COURT 3" => "residential_block_south_3",
+            "SOUTH COURT 4" => "residential_block_south_4",
+            "SOUTH COURT" => "residential_district_south",
+            "NORTH QUAY" => "residential_district_north",
+            _ => string.Empty
+        };
+        return string.IsNullOrEmpty(key) ? blockName : GameLocalization.Get(key, language, blockName);
+    }
 
     private static Color ResidentialRoomColor(ResidentialRoomArchetype archetype) => archetype switch
     {
@@ -686,6 +792,88 @@ public partial class FreightTerminalWorld
         ResidentialRoomArchetype.CommunityKitchen => new Color(0.54f, 0.82f, 0.38f),
         _ => new Color(0.82f, 0.72f, 0.56f)
     };
+
+    private static ResidentialFurnitureKind ResidentialFurnitureKindFor(
+        int towerIndex,
+        int floor,
+        float side,
+        ResidentialRoomArchetype archetype,
+        bool featuredFloor)
+    {
+        if (featuredFloor && archetype == ResidentialRoomArchetype.SmugglerDen)
+        {
+            return ResidentialFurnitureKind.Wardrobe;
+        }
+        if (featuredFloor && archetype == ResidentialRoomArchetype.CommunitySecurity)
+        {
+            return ResidentialFurnitureKind.DeskDrawers;
+        }
+        var selector = towerIndex * 7 + floor * 3 + (side > 0.0f ? 1 : 0);
+        return (ResidentialFurnitureKind)Mathf.PosMod(selector, Enum.GetValues<ResidentialFurnitureKind>().Length);
+    }
+
+    private static ResidentialRoomEventKind ResidentialRoomEventFor(
+        ResidentialRoomArchetype archetype,
+        bool featuredFloor)
+    {
+        if (!featuredFloor)
+        {
+            return ResidentialRoomEventKind.None;
+        }
+        return archetype switch
+        {
+            ResidentialRoomArchetype.SmugglerDen => ResidentialRoomEventKind.BoobyTrap,
+            ResidentialRoomArchetype.CommunitySecurity => ResidentialRoomEventKind.Alarm,
+            ResidentialRoomArchetype.MedicalClinic => ResidentialRoomEventKind.Intel,
+            ResidentialRoomArchetype.EvacuationShelter => ResidentialRoomEventKind.Alarm,
+            ResidentialRoomArchetype.MaintenanceWorkshop => ResidentialRoomEventKind.BoobyTrap,
+            ResidentialRoomArchetype.FamilyApartment => ResidentialRoomEventKind.Intel,
+            _ => ResidentialRoomEventKind.None
+        };
+    }
+
+    private void SpawnResidentialFurniture(
+        Node3D tower,
+        int towerIndex,
+        int floor,
+        float side,
+        ResidentialRoomArchetype archetype,
+        bool featuredFloor,
+        ResidentialFurnitureKind kind,
+        float roomX,
+        float roomWidth,
+        float depth,
+        float floorY,
+        float bedZ,
+        float kitchenX)
+    {
+        var localPosition = kind switch
+        {
+            ResidentialFurnitureKind.Refrigerator => new Vector3(kitchenX, floorY + 0.08f, depth * 0.05f - 1.15f),
+            ResidentialFurnitureKind.Wardrobe => new Vector3(roomX - side * roomWidth * 0.28f, floorY + 0.06f, bedZ - 0.15f),
+            ResidentialFurnitureKind.DeskDrawers => new Vector3(roomX - side * 0.2f, floorY + 0.08f, -depth * 0.08f - side * 0.72f),
+            _ => new Vector3(roomX + side * roomWidth * 0.28f, floorY + 0.08f, bedZ + 0.75f)
+        };
+        var eventKind = ResidentialRoomEventFor(archetype, featuredFloor);
+        var furniture = new ResidentialSearchableFurniture
+        {
+            Name = $"ResidentialFurniture_T{towerIndex + 1:00}_F{floor + 1:00}_S{(side > 0.0f ? 1 : 0)}_{kind}",
+            Position = localPosition,
+            Rotation = new Vector3(0, side < 0.0f ? 0.0f : Mathf.Pi, 0)
+        };
+        furniture.Configure(
+            kind,
+            eventKind,
+            towerIndex,
+            floor,
+            side > 0.0f ? 1 : -1,
+            CreateResidentialFurnitureLoot(kind, archetype, towerIndex, floor, side));
+        furniture.FirstSearched += OnResidentialFurnitureSearched;
+        tower.AddChild(furniture);
+        _residentialFurniture.Add(furniture);
+        _lootSources.Add(furniture);
+        _lootWorldPoints.Add(furniture.GlobalPosition);
+    }
 
     private void BuildResidentialRoomTheme(
         Node3D tower,
@@ -811,6 +999,7 @@ public partial class FreightTerminalWorld
             Rotation = new Vector3(0, side * Mathf.Pi * 0.5f, 0)
         };
         cache.Configure(kind, towerIndex, floor, CreateResidentialCacheLoot(kind));
+        RegisterResidentialLanguageRefresher(cache.SetLanguage);
         tower.AddChild(cache);
         _residentialCaches.Add(cache);
         _residentialCacheCountByTower[towerIndex]++;
@@ -931,8 +1120,8 @@ public partial class FreightTerminalWorld
         const float treadThickness = ResidentialStairTreadThickness;
         var lowerStartZ = coreZ - ResidentialStairRun * 0.5f;
         var upperStartZ = coreZ + ResidentialStairRun * 0.5f;
-        const float landingWidth = 5.16f;
-        const float landingDepth = 2.8f;
+        const float landingWidth = ResidentialStairLandingWidth;
+        const float landingDepth = ResidentialStairLandingDepth;
         var landingSouthZ = lowerStartZ + 0.2f;
         var landingNorthZ = landingSouthZ - landingDepth;
         var landingCenterZ = (landingNorthZ + landingSouthZ) * 0.5f;
@@ -979,14 +1168,13 @@ public partial class FreightTerminalWorld
                 new Transform3D(Basis.Identity, new Vector3(position.X, position.Y - floorY, position.Z)));
         }
 
-        // Full mid-level platform gives a standing player room to clear the first flight and turn.
-        AddResidentialStairPart(
+        // Keep one compact continuous collider for reliable turning, while the visible
+        // surface is built as open slats by BuildTowerStairDetails.
+        AddResidentialStairCollision(
             stairCollision,
-            tower,
             $"ResidentialStairLanding_F{floor}",
             new Vector3(0, floorY + halfRise - treadThickness * 0.5f, landingCenterZ),
-            new Vector3(landingWidth, treadThickness, landingDepth),
-            stair);
+            new Vector3(landingWidth, treadThickness, landingDepth));
 
         // Upper flight (east).
         for (var step = 0; step < steps; step++)
@@ -1101,17 +1289,17 @@ public partial class FreightTerminalWorld
         ExpansionBox(tower, "ResidentialCourtyard", new Vector3(0, 0.035f, 0), new Vector3(width + 6.0f, 0.1f, depth + 6.0f), paving);
         ExpansionBox(tower, "ResidentialEntryCanopy", new Vector3(0, 3.15f, depth * 0.5f + 1.25f), new Vector3(5.8f, 0.18f, 2.7f), steel);
         MeshBox(tower, new Vector3(0, 3.0f, depth * 0.5f + 1.38f), new Vector3(3.8f, 0.12f, 0.18f), light);
-        var sign = new Label3D
+        var sign = RegisterResidentialLocalizedLabel(new Label3D
         {
+            Name = $"ResidentialEntrySign_{spec.BlockName.Replace(" ", string.Empty)}",
             Position = new Vector3(0, 3.38f, depth * 0.5f + 0.2f),
-            Text = spec.BlockName,
             FontSize = 28,
             OutlineSize = 8,
             Modulate = spec.Accent,
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             VisibilityRangeEnd = 44.0f,
             VisibilityRangeEndMargin = 6.0f
-        };
+        }, language => ResidentialBlockName(spec.BlockName, language));
         tower.AddChild(sign);
         var planterIndex = 0;
         foreach (var x in new[] { -width * 0.34f, width * 0.34f })
@@ -1179,6 +1367,7 @@ public partial class FreightTerminalWorld
                 towerTransform,
                 localPosition,
                 new Vector2(Mathf.Min(1.8f, spec.Footprint.X * 0.08f), Mathf.Min(2.1f, spec.Footprint.Y * 0.08f)));
+            RegisterResidentialLanguageRefresher(civilian.SetLanguage);
             _levelRoot.AddChild(civilian);
             _civilians.Add(civilian);
         }
@@ -1321,6 +1510,41 @@ public partial class FreightTerminalWorld
         GetTree().Quit(valid ? 0 : 2);
     }
 
+    private (int Count, int Expected, bool Chinese, Label3D? EnglishLeak) CheckResidentialLocalization(int expectedCaches)
+    {
+        var labels = GetTree().GetNodesInGroup("residential_localized_labels")
+            .OfType<Label3D>()
+            .Where(IsInstanceValid)
+            .ToList();
+        var expected = ResidentialTowerSpecs.Sum(spec => spec.Floors) * 4
+            + expectedCaches
+            + ResidentialTowerSpecs.Length
+            + 2
+            + ResidentialCivilianCount
+            + ResidentialRelayStationCount * 2;
+        var chinese = labels.All(label =>
+            label.Text.Any(character => character >= '\u3400' && character <= '\u9fff'));
+        var englishLeak = labels.FirstOrDefault(label => ResidentialEnglishLabelTokens.Any(token =>
+            label.Text.Contains(token, StringComparison.OrdinalIgnoreCase)));
+        return (labels.Count, expected, chinese, englishLeak);
+    }
+
+    private async void ValidateResidentialLocalization()
+    {
+        foreach (var enemy in _enemies)
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        SetLanguage("zh");
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+        var (count, expected, chinese, englishLeak) = CheckResidentialLocalization(ResidentialCacheCount);
+        var valid = count == expected && chinese && englishLeak is null;
+        GD.Print($"RESIDENTIAL_LOCALIZATION_CHECK valid={valid} labels={count}/{expected} chinese={chinese} no_english={englishLeak is null} leak={englishLeak?.Text ?? "none"}");
+        GD.Print($"RESIDENTIAL_LOCALIZATION_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
     private async void ValidateResidentialGameplay()
     {
         foreach (var enemy in _enemies)
@@ -1329,7 +1553,9 @@ public partial class FreightTerminalWorld
         }
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
 
-        var expectedCaches = ResidentialTowerSpecs.Sum(spec => spec.Floors);
+        var expectedCaches = ResidentialTowerSpecs.Sum(spec => Enumerable.Range(0, spec.Floors)
+            .Count(floor => ShouldSpawnResidentialCache(spec, floor)));
+        var expectedFurniture = ResidentialTowerSpecs.Sum(spec => spec.Floors * 2);
         var cacheKinds = new HashSet<ResidentialCacheKind>();
         var lootKinds = new HashSet<LootItemKind>();
         var stockedFloors = new HashSet<(int Tower, int Floor)>();
@@ -1358,17 +1584,44 @@ public partial class FreightTerminalWorld
         var everyTowerStocked = true;
         for (var towerIndex = 0; towerIndex < _residentialCacheCountByTower.Length; towerIndex++)
         {
-            everyTowerStocked &= _residentialCacheCountByTower[towerIndex] == ResidentialTowerSpecs[towerIndex].Floors;
+            var spec = ResidentialTowerSpecs[towerIndex];
+            var expectedTowerCaches = Enumerable.Range(0, spec.Floors)
+                .Count(floor => ShouldSpawnResidentialCache(spec, floor));
+            everyTowerStocked &= _residentialCacheCountByTower[towerIndex] == expectedTowerCaches;
         }
         var expectedStockedFloors = new HashSet<(int Tower, int Floor)>();
         for (var towerIndex = 0; towerIndex < ResidentialTowerSpecs.Length; towerIndex++)
         {
             for (var floor = 0; floor < ResidentialTowerSpecs[towerIndex].Floors; floor++)
             {
-                expectedStockedFloors.Add((towerIndex, floor));
+                if (ShouldSpawnResidentialCache(ResidentialTowerSpecs[towerIndex], floor))
+                {
+                    expectedStockedFloors.Add((towerIndex, floor));
+                }
             }
         }
         var everyFloorStocked = stockedFloors.SetEquals(expectedStockedFloors);
+
+        var furnitureKinds = new HashSet<ResidentialFurnitureKind>();
+        var configuredEvents = new HashSet<ResidentialRoomEventKind>();
+        var furnitureRegistered = true;
+        var furnitureStocked = true;
+        var reachableFurniture = 0;
+        var furnitureReachability = new Dictionary<ResidentialFurnitureKind, (int Total, int Reachable)>();
+        foreach (var furniture in _residentialFurniture)
+        {
+            furnitureKinds.Add(furniture.Kind);
+            configuredEvents.Add(furniture.EventKind);
+            furnitureRegistered &= _lootSources.Contains(furniture) && IsInstanceValid(furniture);
+            furnitureStocked &= furniture.IsSearchable && furniture.Loot.Count >= 2 && furniture.SearchDuration >= 0.6f;
+            var reachable = HasClearLootInteractionApproach(furniture);
+            if (reachable)
+            {
+                reachableFurniture++;
+            }
+            furnitureReachability.TryGetValue(furniture.Kind, out var reachStats);
+            furnitureReachability[furniture.Kind] = (reachStats.Total + 1, reachStats.Reachable + (reachable ? 1 : 0));
+        }
 
         var lootUiOpened = false;
         if (_residentialCaches.Count > 0)
@@ -1378,6 +1631,17 @@ public partial class FreightTerminalWorld
             OpenLoot(firstCache);
             lootUiOpened = _hud.IsLootVisible && ReferenceEquals(_openLootSource, firstCache);
             CloseLoot();
+        }
+
+        var roomEventTriggered = false;
+        var eventFurniture = _residentialFurniture.FirstOrDefault(furniture => furniture.EventKind == ResidentialRoomEventKind.Intel);
+        if (eventFurniture is not null)
+        {
+            var eventsBefore = _residentialFurnitureEventCount;
+            eventFurniture.OnSearched();
+            eventFurniture.OnSearched();
+            roomEventTriggered = eventFurniture.EventTriggered
+                && _residentialFurnitureEventCount == eventsBefore + 1;
         }
 
         var assistanceRoles = new HashSet<CivilianRole>();
@@ -1404,6 +1668,7 @@ public partial class FreightTerminalWorld
         var medicHealed = _player.Health > healthBefore;
 
         var valid = ResidentialCacheCount == expectedCaches
+            && ResidentialFurnitureCount == expectedFurniture
             && everyTowerStocked
             && everyFloorStocked
             && _residentialRoomArchetypes.Count == Enum.GetValues<ResidentialRoomArchetype>().Length
@@ -1414,10 +1679,17 @@ public partial class FreightTerminalWorld
             && cachesRegistered
             && cachesStocked
             && reachableCaches == expectedCaches
+            && furnitureKinds.Count == Enum.GetValues<ResidentialFurnitureKind>().Length
+            && configuredEvents.Count >= 4
+            && furnitureRegistered
+            && furnitureStocked
+            && reachableFurniture == expectedFurniture
+            && roomEventTriggered
             && lootUiOpened
             && assistanceRoles.Count == Enum.GetValues<CivilianRole>().Length
             && medicHealed;
-        GD.Print($"RESIDENTIAL_GAMEPLAY_CHECK valid={valid} room_types={_residentialRoomArchetypes.Count}/7 caches={ResidentialCacheCount}/{expectedCaches} stocked_floors={stockedFloors.Count}/{expectedCaches} reachable={reachableCaches}/{expectedCaches} cache_types={cacheKinds.Count}/7 loot_types={lootKinds.Count} every_tower={everyTowerStocked} every_floor={everyFloorStocked} registered={cachesRegistered} stocked={cachesStocked} loot_ui={lootUiOpened} assistance_roles={assistanceRoles.Count}/5 medic_healed={medicHealed}");
+        var furnitureReachabilityText = string.Join(",", furnitureReachability.Select(pair => $"{pair.Key}={pair.Value.Reachable}/{pair.Value.Total}"));
+        GD.Print($"RESIDENTIAL_GAMEPLAY_CHECK valid={valid} room_types={_residentialRoomArchetypes.Count}/7 caches={ResidentialCacheCount}/{expectedCaches} stocked_floors={stockedFloors.Count}/{expectedCaches} cache_reachable={reachableCaches}/{expectedCaches} cache_types={cacheKinds.Count}/7 loot_types={lootKinds.Count} every_tower={everyTowerStocked} featured_floors={everyFloorStocked} registered={cachesRegistered} stocked={cachesStocked} furniture={ResidentialFurnitureCount}/{expectedFurniture} furniture_types={furnitureKinds.Count}/4 event_types={configuredEvents.Count}/4 furniture_registered={furnitureRegistered} furniture_stocked={furnitureStocked} furniture_reachable={reachableFurniture}/{expectedFurniture} furniture_by_kind={furnitureReachabilityText} event_once={roomEventTriggered} loot_ui={lootUiOpened} assistance_roles={assistanceRoles.Count}/5 medic_healed={medicHealed}");
         GD.Print($"RESIDENTIAL_GAMEPLAY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

@@ -112,6 +112,7 @@ public partial class FreightTerminalWorld
                     moduleMaterial,
                     trim,
                     utility);
+                RegisterResidentialLanguageRefresher(module.SetLanguage);
                 tower.AddChild(module);
                 module.AddToGroup("residential_infill");
                 _residentialRelayStations.Add(module);
@@ -174,8 +175,8 @@ public partial class FreightTerminalWorld
         const float edge = ResidentialStairTreadWidth * 0.5f + 0.015f;
         const float railHeight = 0.96f;
         const float balusterHeight = 0.92f;
-        const float landingWidth = 5.16f;
-        const float landingDepth = 2.8f;
+        const float landingWidth = ResidentialStairLandingWidth;
+        const float landingDepth = ResidentialStairLandingDepth;
         var stepRise = halfRise / ResidentialStepsPerFlight;
         var stepRun = run / ResidentialStepsPerFlight;
         var flightLength = Mathf.Sqrt(run * run + halfRise * halfRise);
@@ -237,22 +238,38 @@ public partial class FreightTerminalWorld
         AddResidentialStairDetailBatch(tower, $"ResidentialStairSafetyRails_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.05f, 0.05f, flightLength + 0.04f), safety, safetyRailTransforms);
         AddResidentialStairDetailBatch(tower, $"ResidentialStairBalusters_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.055f, balusterHeight, 0.055f), baluster, balusterTransforms);
 
-        var landingNorth = lowerStartZ + 0.2f - 2.8f;
-        var landingCenter = landingNorth + 1.4f;
-        var landingSouth = landingNorth + landingDepth;
-        var landingFasciaY = floorY + halfRise - 0.15f;
-        var landingEndTransforms = new List<Transform3D>(2)
+        var landingNorth = lowerStartZ + 0.2f - landingDepth;
+        var landingCenter = landingNorth + landingDepth * 0.5f;
+        const float landingSlatGap = 0.055f;
+        var landingSlatDepth = (landingDepth - landingSlatGap * (ResidentialStairLandingSlatCount - 1))
+            / ResidentialStairLandingSlatCount;
+        var landingSlatTransforms = new List<Transform3D>(ResidentialStairLandingSlatCount);
+        for (var slat = 0; slat < ResidentialStairLandingSlatCount; slat++)
         {
-            new(Basis.Identity, new Vector3(0, landingFasciaY, landingNorth + 0.04f)),
-            new(Basis.Identity, new Vector3(0, landingFasciaY, landingSouth - 0.04f))
-        };
-        var landingSideTransforms = new List<Transform3D>(2)
+            var z = landingNorth + landingSlatDepth * 0.5f + slat * (landingSlatDepth + landingSlatGap);
+            landingSlatTransforms.Add(new Transform3D(
+                Basis.Identity,
+                new Vector3(0, floorY + halfRise - ResidentialStairTreadThickness * 0.5f, z)));
+        }
+        AddResidentialStairDetailBatch(
+            tower,
+            $"ResidentialStairLandingSlats_T{towerIndex + 1:00}_F{floor + 1:00}",
+            new Vector3(landingWidth, ResidentialStairTreadThickness, landingSlatDepth),
+            stairFace,
+            landingSlatTransforms);
+        var landingSupportTransforms = new List<Transform3D>(3);
+        foreach (var x in new[] { -landingWidth * 0.5f + 0.12f, 0.0f, landingWidth * 0.5f - 0.12f })
         {
-            new(Basis.Identity, new Vector3(-landingWidth * 0.5f + 0.04f, landingFasciaY, landingCenter)),
-            new(Basis.Identity, new Vector3(landingWidth * 0.5f - 0.04f, landingFasciaY, landingCenter))
-        };
-        AddResidentialStairDetailBatch(tower, $"ResidentialStairLandingFasciaEnds_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(landingWidth, 0.3f, 0.08f), stairFace, landingEndTransforms);
-        AddResidentialStairDetailBatch(tower, $"ResidentialStairLandingFasciaSides_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.08f, 0.3f, landingDepth), stairFace, landingSideTransforms);
+            landingSupportTransforms.Add(new Transform3D(
+                Basis.Identity,
+                new Vector3(x, floorY + halfRise - ResidentialStairTreadThickness - 0.045f, landingCenter)));
+        }
+        AddResidentialStairDetailBatch(
+            tower,
+            $"ResidentialStairLandingSupports_T{towerIndex + 1:00}_F{floor + 1:00}",
+            new Vector3(0.12f, 0.09f, landingDepth - 0.08f),
+            stringer,
+            landingSupportTransforms);
         var landingGuardZ = landingNorth + 0.08f;
         var landingGuardRailTransforms = new[]
         {
@@ -300,17 +317,16 @@ public partial class FreightTerminalWorld
         var lockerAccent = MeshBox(locker, new Vector3(0, 0.0f, -0.27f), new Vector3(0.22f, 0.52f, 0.04f), safety);
         lockerAccent.Name = $"ResidentialStairLockerAccent_T{towerIndex + 1:00}_F{floor + 1:00}";
         RegisterMapDetailVisual(lockerAccent);
-        tower.AddChild(new Label3D
+        tower.AddChild(RegisterResidentialLocalizedLabel(new Label3D
         {
             Name = $"ResidentialStairFloorLabel_T{towerIndex + 1:00}_F{floor + 1:00}",
             Position = new Vector3(0, floorY + 2.18f, landingNorth + 0.2f),
-            Text = $"FLOOR {floor + 1:00}  //  EXIT {floor + 2:00}",
             FontSize = 15,
             OutlineSize = 5,
             Modulate = new Color(1.0f, 0.78f, 0.42f),
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             VisibilityRangeEnd = 16.0f
-        });
+        }, language => $"{GameLocalization.Get("residential_floor", language, "FLOOR")} {floor + 1:00}  //  {GameLocalization.Get("residential_exit", language, "EXIT")} {floor + 2:00}"));
         _residentialStairDetailCount++;
     }
 

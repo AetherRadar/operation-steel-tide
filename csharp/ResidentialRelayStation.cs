@@ -31,6 +31,7 @@ public partial class ResidentialRelayStation : StaticBody3D
     private Label3D _instructionLabel = null!;
     private Label3D _roofLabel = null!;
     private OmniLight3D _statusLight = null!;
+    private string _language = "en";
     private bool _configured;
     private float _pulseTime;
     private int _partCounter;
@@ -82,6 +83,12 @@ public partial class ResidentialRelayStation : StaticBody3D
         _configured = true;
     }
 
+    public void SetLanguage(string language)
+    {
+        _language = GameLocalization.IsChinese(language) ? "zh" : "en";
+        RefreshLabels();
+    }
+
     public override void _Ready()
     {
         CollisionLayer = 1;
@@ -125,10 +132,7 @@ public partial class ResidentialRelayStation : StaticBody3D
             _screenMaterial.Emission = color;
             _screenMaterial.EmissionEnergyMultiplier = IsActivating ? 2.1f : 1.25f;
         }
-        if (IsInstanceValid(_instructionLabel))
-        {
-            _instructionLabel.Text = IsActivating ? "UPLINK // HOLD F" : EnglishLabel + " // HOLD F";
-        }
+        RefreshLabels();
     }
 
     public void CancelActivation()
@@ -168,14 +172,13 @@ public partial class ResidentialRelayStation : StaticBody3D
         }
         if (IsInstanceValid(_instructionLabel))
         {
-            _instructionLabel.Text = "ONLINE // ROOF CACHE";
             _instructionLabel.Modulate = new Color(0.3f, 1.0f, 0.7f);
         }
         if (IsInstanceValid(_roofLabel))
         {
-            _roofLabel.Text = "ROOF CACHE // UNLOCKED";
             _roofLabel.Modulate = new Color(0.3f, 1.0f, 0.7f);
         }
+        RefreshLabels();
         return true;
     }
 
@@ -186,6 +189,7 @@ public partial class ResidentialRelayStation : StaticBody3D
         {
             _roofLabel.Visible = true;
         }
+        RefreshLabels();
     }
 
     public bool IsNearLadder(Vector3 position, float range = 2.65f)
@@ -300,26 +304,70 @@ public partial class ResidentialRelayStation : StaticBody3D
         {
             Name = "RelayInstructionLabel",
             Position = new Vector3(consoleX, 0.42f, FrontSign * 1.44f),
-            Text = EnglishLabel + " // HOLD F",
+            Text = InstructionLabelText(),
             FontSize = 13,
             OutlineSize = 5,
             Modulate = new Color(1.0f, 0.72f, 0.3f),
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             VisibilityRangeEnd = 22.0f
         };
+        _instructionLabel.AddToGroup("residential_localized_labels");
         AddChild(_instructionLabel);
         _roofLabel = new Label3D
         {
             Name = "RelayRoofLabel",
             Position = new Vector3(-0.54f, 2.04f, -FrontSign * 0.42f),
-            Text = "ROOF CACHE // LOCKED",
+            Text = RoofLabelText(),
             FontSize = 12,
             OutlineSize = 5,
             Modulate = new Color(1.0f, 0.62f, 0.22f),
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             VisibilityRangeEnd = 20.0f
         };
+        _roofLabel.AddToGroup("residential_localized_labels");
         AddChild(_roofLabel);
+    }
+
+    private void RefreshLabels()
+    {
+        if (IsInstanceValid(_instructionLabel))
+        {
+            _instructionLabel.Text = InstructionLabelText();
+        }
+        if (IsInstanceValid(_roofLabel))
+        {
+            _roofLabel.Text = RoofLabelText();
+        }
+    }
+
+    private string InstructionLabelText()
+    {
+        if (IsActivated)
+        {
+            return GameLocalization.Get("residential_relay_online", _language, "ONLINE // ROOF CACHE");
+        }
+        if (IsActivating)
+        {
+            return GameLocalization.Get("residential_relay_uplink", _language, "UPLINK // HOLD F");
+        }
+        return $"{RelayKindLabel()} // {GameLocalization.Get("residential_relay_hold", _language, "HOLD F")}";
+    }
+
+    private string RoofLabelText() => GameLocalization.Get(
+        IsActivated || CacheUnlocked ? "residential_roof_cache_unlocked" : "residential_roof_cache_locked",
+        _language,
+        IsActivated || CacheUnlocked ? "ROOF CACHE // UNLOCKED" : "ROOF CACHE // LOCKED");
+
+    private string RelayKindLabel()
+    {
+        var key = Kind switch
+        {
+            ResidentialRelayKind.Medical => "residential_relay_medical",
+            ResidentialRelayKind.Security => "residential_relay_security",
+            ResidentialRelayKind.Utility => "residential_relay_utility",
+            _ => "residential_relay_evac"
+        };
+        return GameLocalization.Get(key, _language, EnglishLabel);
     }
 
     private void AddGuardAlongZ(float x, float start, float end, Godot.Material material)

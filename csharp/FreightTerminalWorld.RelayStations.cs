@@ -308,6 +308,7 @@ public partial class FreightTerminalWorld
             Rotation = new Vector3(0, station.FrontSign > 0 ? Mathf.Pi : 0.0f, 0)
         };
         cache.Configure(kind, station.TowerIndex, -station.CornerIndex - 1, CreateResidentialCacheLoot(kind));
+        RegisterResidentialLanguageRefresher(cache.SetLanguage);
         station.AddChild(cache);
         _relayCaches.Add(cache);
         _lootSources.Add(cache);

@@ -28,6 +28,8 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource
     public float SearchDuration => 0.65f;
 
     private Node3D _door = null!;
+    private Label3D _label = null!;
+    private string _language = "en";
     private bool _opened;
     private int _partCounter;
 
@@ -38,6 +40,15 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource
         FloorIndex = floorIndex;
         Loot.Clear();
         Loot.AddRange(loot);
+    }
+
+    public void SetLanguage(string language)
+    {
+        _language = GameLocalization.IsChinese(language) ? "zh" : "en";
+        if (IsInstanceValid(_label))
+        {
+            _label.Text = CacheLabelText();
+        }
     }
 
     public override void _Ready()
@@ -145,26 +156,44 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource
             Part(_door, SharedBox(new Vector3(size.X * 0.58f, 0.08f, 0.065f)), new Vector3(size.X * 0.5f, size.Y * 0.2f, -0.04f), glow);
         }
 
-        AddChild(new Label3D
+        _label = new Label3D
         {
             Name = "CacheLabel",
             Position = new Vector3(0, size.Y + 0.28f, 0),
-            Text = Kind switch
-            {
-                ResidentialCacheKind.MedicalCabinet => "MEDICAL",
-                ResidentialCacheKind.EvacuationLocker => "EVAC SUPPLY",
-                ResidentialCacheKind.WorkshopLocker => "TOOLS",
-                ResidentialCacheKind.SecurityArmory => "SECURITY",
-                ResidentialCacheKind.SmugglerCache => "CONCEALED",
-                ResidentialCacheKind.CommunityPantry => "RESERVE",
-                _ => "STASH"
-            },
+            Text = CacheLabelText(),
             FontSize = 15,
             OutlineSize = 5,
             Modulate = accent,
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             VisibilityRangeEnd = 16.0f
-        });
+        };
+        _label.AddToGroup("residential_localized_labels");
+        AddChild(_label);
+    }
+
+    private string CacheLabelText()
+    {
+        var key = Kind switch
+        {
+            ResidentialCacheKind.MedicalCabinet => "residential_cache_label_medical",
+            ResidentialCacheKind.EvacuationLocker => "residential_cache_label_evac",
+            ResidentialCacheKind.WorkshopLocker => "residential_cache_label_tools",
+            ResidentialCacheKind.SecurityArmory => "residential_cache_label_security",
+            ResidentialCacheKind.SmugglerCache => "residential_cache_label_concealed",
+            ResidentialCacheKind.CommunityPantry => "residential_cache_label_reserve",
+            _ => "residential_cache_label_stash"
+        };
+        var english = Kind switch
+        {
+            ResidentialCacheKind.MedicalCabinet => "MEDICAL",
+            ResidentialCacheKind.EvacuationLocker => "EVAC SUPPLY",
+            ResidentialCacheKind.WorkshopLocker => "TOOLS",
+            ResidentialCacheKind.SecurityArmory => "SECURITY",
+            ResidentialCacheKind.SmugglerCache => "CONCEALED",
+            ResidentialCacheKind.CommunityPantry => "RESERVE",
+            _ => "STASH"
+        };
+        return GameLocalization.Get(key, _language, english);
     }
 
     private static StandardMaterial3D Material(Color color, float metallic, float roughness, bool emission = false)
