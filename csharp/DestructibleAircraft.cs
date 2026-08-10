@@ -10,6 +10,7 @@ public partial class DestructibleAircraft : StaticBody3D
     public float MaxHealth { get; private set; } = 240.0f;
     public bool IsDestroyed { get; private set; }
     public bool IsHostile { get; private set; } = true;
+    public bool SupplyDropReleased { get; private set; }
     public int AttackSalvosFired { get; private set; }
     public float LastAttackDamage { get; private set; }
 
@@ -84,7 +85,7 @@ public partial class DestructibleAircraft : StaticBody3D
 
     public bool TakeDamage(float amount, Vector3 hitPosition, Node? attacker = null)
     {
-        if (IsDestroyed || amount <= 0.0f)
+        if (IsDestroyed || (_falling && Health <= 0.0f) || amount <= 0.0f)
         {
             return false;
         }
@@ -232,10 +233,16 @@ public partial class DestructibleAircraft : StaticBody3D
 
         IsDestroyed = true;
         SetPhysicsProcess(false);
-        Main?.Explode(GlobalPosition + Vector3.Up * 1.2f, 14.0f, 160.0f, this);
+        var crashPosition = GlobalPosition;
+        Main?.Explode(crashPosition + Vector3.Up * 1.2f, 14.0f, 160.0f, this);
         _visual.Visible = false;
         _collider.Disabled = true;
         CollisionLayer = 0;
+        if (!SupplyDropReleased && Main is not null)
+        {
+            Main.SpawnAircraftSupplyDrop(crashPosition, GetRid());
+            SupplyDropReleased = true;
+        }
         QueueFree();
     }
 

@@ -374,6 +374,9 @@ public static class GameLocalization
         Chinese["climb_roof_reached"] = "\u5df2\u62b5\u8fbe\u5c4b\u9876";
         Chinese["climb_dismounted"] = "\u5df2\u8131\u79bb\u68af\u5b50";
         Chinese["climb_blocked"] = "\u68af\u5b50\u901a\u8def\u53d7\u963b";
+        Chinese["aircraft_supply_drop"] = "\u654c\u673a\u7a7a\u6295\u8865\u7ed9\u7bb1";
+        Chinese["aircraft_supply_label"] = "\u7a7a\u6295  //  \u9ad8\u4ef7\u503c\u8865\u7ed9";
+        Chinese["aircraft_supply_marked"] = "\u654c\u673a\u5df2\u51fb\u843d  //  \u7a7a\u6295\u8865\u7ed9\u5df2\u6807\u8bb0";
     }
 
     private static readonly Dictionary<string, string> ChineseObjectives = new()

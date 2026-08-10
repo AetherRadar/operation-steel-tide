@@ -2351,6 +2351,13 @@ public partial class FreightTerminalWorld : Node3D
         RefreshLocalizedObjective();
         RefreshLootView();
         RefreshResidentialLocalization();
+        foreach (var drop in _aircraftSupplyDrops)
+        {
+            if (IsInstanceValid(drop))
+            {
+                drop.SetLanguage(_languageSetting);
+            }
+        }
         SaveSettings();
     }
 
@@ -3219,11 +3226,60 @@ public partial class FreightTerminalWorld : Node3D
         await WaitFrames(2);
         var playerHurt = _player.Health < healthBefore || _player.IsDead;
         var stillAlive = !aircraft.IsDestroyed;
+        var salvosFired = aircraft.AttackSalvosFired;
+        var lastAttackDamage = aircraft.LastAttackDamage;
+        var dropsBefore = _aircraftSupplyDrops.Count(drop => IsInstanceValid(drop));
+        aircraft.GlobalPosition = new Vector3(22.0f, 1.3f, 42.0f);
         var destroyed = aircraft.TakeDamage(999.0f, aircraft.GlobalPosition, _player);
-        await WaitFrames(6);
+        var repeatDamageIgnored = !aircraft.TakeDamage(999.0f, aircraft.GlobalPosition, _player);
+        for (var frame = 0; frame < 45 && _aircraftSupplyDrops.Count(drop => IsInstanceValid(drop)) == dropsBefore; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        var dropsAfter = _aircraftSupplyDrops.Count(drop => IsInstanceValid(drop));
+        var supplyDrop = _aircraftSupplyDrops.LastOrDefault(drop => IsInstanceValid(drop));
+        var dropSpawnedOnce = dropsAfter == dropsBefore + 1;
+        var dropRegistered = supplyDrop is not null && _lootSources.Contains(supplyDrop);
+        var dropStocked = supplyDrop is not null
+            && supplyDrop.Loot.Count >= 7
+            && supplyDrop.Loot.Any(item => item.Kind == LootItemKind.Weapon && item.Grade >= LootGrade.Epic)
+            && supplyDrop.Loot.Any(item => item.Kind == LootItemKind.Equipment && item.Grade >= LootGrade.Epic)
+            && supplyDrop.Loot.Any(item => item.Kind == LootItemKind.Medical)
+            && supplyDrop.Loot.Any(item => item.Kind == LootItemKind.Valuable && item.Grade == LootGrade.Legendary);
+        var dropVisible = supplyDrop is not null
+            && supplyDrop.HasBeacon
+            && supplyDrop.VisualPartCount >= 12;
+        var dropGrounded = false;
+        var dropSearchable = false;
+        if (supplyDrop is not null)
+        {
+            var supportQuery = PhysicsRayQueryParameters3D.Create(
+                supplyDrop.GlobalPosition + Vector3.Up * 0.12f,
+                supplyDrop.GlobalPosition + Vector3.Down * 0.45f);
+            supportQuery.CollisionMask = 1;
+            supportQuery.CollideWithAreas = false;
+            supportQuery.Exclude = new Godot.Collections.Array<Rid> { supplyDrop.GetRid() };
+            dropGrounded = supplyDrop.GroundResolved
+                && GetWorld3D().DirectSpaceState.IntersectRay(supportQuery).Count > 0;
+            supplyDrop.OnSearched();
+            dropSearchable = supplyDrop.IsSearchable && supplyDrop.IsOpened;
+        }
         var slowEnoughToDodge = AircraftShell.TravelSpeed <= 22.0f;
-        var valid = fired && shellSpawned && uninterruptible && slowEnoughToDodge && playerHurt && stillAlive && destroyed;
-        GD.Print($"AIRCRAFT_COMBAT_CHECK valid={valid} fired={fired} shell={shellSpawned} uninterruptible={uninterruptible} speed={AircraftShell.TravelSpeed:0.0} salvos={aircraft.AttackSalvosFired} last_damage={aircraft.LastAttackDamage:0.0} player_hurt={playerHurt} destroyed={destroyed}");
+        var valid = fired
+            && shellSpawned
+            && uninterruptible
+            && slowEnoughToDodge
+            && playerHurt
+            && stillAlive
+            && destroyed
+            && repeatDamageIgnored
+            && dropSpawnedOnce
+            && dropRegistered
+            && dropStocked
+            && dropVisible
+            && dropGrounded
+            && dropSearchable;
+        GD.Print($"AIRCRAFT_COMBAT_CHECK valid={valid} fired={fired} shell={shellSpawned} uninterruptible={uninterruptible} speed={AircraftShell.TravelSpeed:0.0} salvos={salvosFired} last_damage={lastAttackDamage:0.0} player_hurt={playerHurt} destroyed={destroyed} repeat_ignored={repeatDamageIgnored} drop_once={dropSpawnedOnce} drop_registered={dropRegistered} drop_stocked={dropStocked} drop_visible={dropVisible} drop_grounded={dropGrounded} drop_searchable={dropSearchable}");
         GD.Print($"AIRCRAFT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
