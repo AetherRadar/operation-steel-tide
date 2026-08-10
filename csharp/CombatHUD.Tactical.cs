@@ -33,6 +33,7 @@ public partial class CombatHUD
         _combatFeed.Position = new Vector2(-370, 74);
         _combatFeed.AddThemeConstantOverride("separation", 6);
         root.AddChild(_combatFeed);
+        BuildWorldBossHud(root);
     }
 
     private void BuildAmmoTierHud(Control weaponPanel)
@@ -112,5 +113,6 @@ public partial class CombatHUD
             _minimap.SetLanguage(_language);
         }
         SetAmmoTier(_displayedAmmoGrade);
+        RefreshWorldBossHud();
     }
 }

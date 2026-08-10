@@ -24,7 +24,7 @@ public partial class EnemyOperator
     private Vector3 _pursuitProgressOrigin;
     private float _pursuitProgressTimer;
 
-    private float CurrentPursuitDuration => IsRivalSquad ? RivalPursuitSeconds : GarrisonPursuitSeconds;
+    private float CurrentPursuitDuration => IsWorldBoss ? 28.0f : IsRivalSquad ? RivalPursuitSeconds : GarrisonPursuitSeconds;
 
     private void InitializePursuitState()
     {

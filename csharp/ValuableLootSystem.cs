@@ -15,7 +15,8 @@ public enum ValuableItemKind
     CollectorCoin,
     GoldJewelry,
     EncryptedDrive,
-    AntiqueClock
+    AntiqueClock,
+    TideHunterTransponder
 }
 
 public readonly record struct ValuableItemDefinition(
@@ -42,7 +43,8 @@ public static class ValuableItems
         [ValuableItemKind.CollectorCoin] = Item(ValuableItemKind.CollectorCoin, "Commemorative gold coin", "valuable_coin", "valuable_coin_detail", "LIMITED MINTING  //  COLLECTOR DEMAND", 620, LootGrade.Epic),
         [ValuableItemKind.GoldJewelry] = Item(ValuableItemKind.GoldJewelry, "Gold jewelry case", "valuable_jewelry", "valuable_jewelry_detail", "PRECIOUS METAL SET  //  INTACT CLASPS", 720, LootGrade.Epic),
         [ValuableItemKind.EncryptedDrive] = Item(ValuableItemKind.EncryptedDrive, "Encrypted enterprise drive", "valuable_drive", "valuable_drive_detail", "CORPORATE DATA STORAGE  //  UNKNOWN CONTENTS", 790, LootGrade.Epic),
-        [ValuableItemKind.AntiqueClock] = Item(ValuableItemKind.AntiqueClock, "Antique marine clock", "valuable_clock", "valuable_clock_detail", "NUMBERED MARITIME ANTIQUE  //  MUSEUM GRADE", 1480, LootGrade.Legendary)
+        [ValuableItemKind.AntiqueClock] = Item(ValuableItemKind.AntiqueClock, "Antique marine clock", "valuable_clock", "valuable_clock_detail", "NUMBERED MARITIME ANTIQUE  //  MUSEUM GRADE", 1480, LootGrade.Legendary),
+        [ValuableItemKind.TideHunterTransponder] = Item(ValuableItemKind.TideHunterTransponder, "Tide Hunter transponder", "valuable_tidehunter", "valuable_tidehunter_detail", "ROAMING HUNTER IFF CORE  //  BOUNTY PROOF", 4800, LootGrade.Legendary)
     };
 
     private static readonly ValuableItemKind[][] GradePools =

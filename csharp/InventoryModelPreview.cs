@@ -268,6 +268,7 @@ public partial class InventoryModelPreview : SubViewportContainer
             WeaponPlatform.AK74 => new Color(0.19f, 0.2f, 0.18f),
             WeaponPlatform.ScarL => new Color(0.43f, 0.36f, 0.24f),
             WeaponPlatform.M24 => new Color(0.18f, 0.24f, 0.17f),
+            WeaponPlatform.AXMC => new Color(0.04f, 0.23f, 0.23f),
             WeaponPlatform.MP5A5 => new Color(0.055f, 0.065f, 0.06f),
             WeaponPlatform.M3A1 => new Color(0.24f, 0.28f, 0.26f),
             _ => new Color(0.12f, 0.15f, 0.145f)
@@ -276,6 +277,7 @@ public partial class InventoryModelPreview : SubViewportContainer
         {
             WeaponPlatform.AK74 => new Color(0.35f, 0.19f, 0.09f),
             WeaponPlatform.M24 => new Color(0.2f, 0.31f, 0.18f),
+            WeaponPlatform.AXMC => new Color(0.08f, 0.4f, 0.35f),
             WeaponPlatform.M3A1 => new Color(0.13f, 0.15f, 0.14f),
             _ => metal.Lightened(0.12f)
         };
@@ -288,7 +290,7 @@ public partial class InventoryModelPreview : SubViewportContainer
         Box(root, new Vector3(Mathf.Max(0.3f, barrelLength * 0.72f), 0.16f, 0.14f), new Vector3(receiverLength * 0.92f, 0, 0), furniture, 0.28f);
         Cylinder(root, 0.045f, barrelLength, new Vector3(receiverLength * 0.8f + barrelLength * 0.55f, 0.01f, 0), new Vector3(0, 0, Mathf.Pi / 2), steel, 0.75f, 0.72f);
         Box(root, new Vector3(platform == WeaponPlatform.M3A1 ? 0.3f : 0.22f, platform == WeaponPlatform.M3A1 ? 0.045f : 0.08f, 0.17f), new Vector3(platform == WeaponPlatform.M3A1 ? -0.65f : -0.87f, 0, 0), furniture.Darkened(0.08f), 0.2f);
-        var magazineHeight = platform == WeaponPlatform.M24 ? 0.2f : platform == WeaponPlatform.MP5A5 ? 0.5f : platform == WeaponPlatform.M3A1 ? 0.38f : 0.44f;
+        var magazineHeight = platform is WeaponPlatform.M24 or WeaponPlatform.AXMC ? 0.2f : platform == WeaponPlatform.MP5A5 ? 0.5f : platform == WeaponPlatform.M3A1 ? 0.38f : 0.44f;
         Box(root, new Vector3(0.16f, magazineHeight, 0.15f), new Vector3(0.06f, -magazineHeight * 0.58f, 0), furniture.Darkened(0.06f), 0.18f, rotation: new Vector3(0, 0, platform == WeaponPlatform.AK74 ? -0.12f : 0.04f));
         Box(root, new Vector3(0.13f, 0.32f, 0.13f), new Vector3(-0.2f, -0.25f, 0), furniture, 0.18f, rotation: new Vector3(0, 0, -0.18f));
         Box(root, new Vector3(0.36f, 0.045f, 0.18f), new Vector3(0.0f, 0.16f, 0), steel.Darkened(0.2f), 0.65f);

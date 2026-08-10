@@ -16,9 +16,13 @@ public partial class TacticalMinimap : Control
     private Vector3 _playerPosition;
     private float _headingDegrees;
     private string _language = "en";
+    private Vector3 _worldBossPosition;
+    private bool _worldBossVisible;
 
     public int LandmarkCount => _landmarks.Count;
     public Vector2 PlayerMapPosition => WorldToMap(_playerPosition);
+    public Vector2 WorldBossMapPosition => WorldToMap(_worldBossPosition);
+    public bool WorldBossVisible => _worldBossVisible;
 
     public TacticalMinimap()
     {
@@ -45,6 +49,13 @@ public partial class TacticalMinimap : Control
     {
         _playerPosition = position;
         _headingDegrees = headingDegrees;
+        QueueRedraw();
+    }
+
+    public void SetWorldBoss(Vector3 position, bool visible)
+    {
+        _worldBossPosition = position;
+        _worldBossVisible = visible;
         QueueRedraw();
     }
 
@@ -101,6 +112,23 @@ public partial class TacticalMinimap : Control
                 76,
                 9,
                 new Color(0.77f, 0.85f, 0.82f));
+        }
+
+        if (_worldBossVisible)
+        {
+            var boss = WorldToMap(_worldBossPosition);
+            var pulse = 7.0f + Mathf.Sin(Time.GetTicksMsec() * 0.008f) * 1.5f;
+            var bossColor = new Color(1.0f, 0.25f, 0.16f);
+            var diamond = new[]
+            {
+                boss + new Vector2(0, -6),
+                boss + new Vector2(6, 0),
+                boss + new Vector2(0, 6),
+                boss + new Vector2(-6, 0)
+            };
+            DrawColoredPolygon(diamond, bossColor);
+            DrawPolyline(new[] { diamond[0], diamond[1], diamond[2], diamond[3], diamond[0] }, Colors.White, 1.0f, true);
+            DrawCircle(boss, pulse, new Color(1.0f, 0.3f, 0.18f, 0.4f), false, 1.5f);
         }
 
         var player = WorldToMap(_playerPosition);

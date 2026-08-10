@@ -12,14 +12,16 @@ public enum WeaponPlatform
     ScarL,
     M24,
     MP5A5,
-    M3A1
+    M3A1,
+    AXMC
 }
 
 public enum AmmoCaliber
 {
     Rifle,
     Sniper,
-    Smg
+    Smg,
+    Magnum338
 }
 
 public enum AttachmentSlot
@@ -322,7 +324,8 @@ public static class KnifeSkinCatalog
         [DefaultId] = Skin(DefaultId, "Carbon Black", "knife_skin_carbon", new Color(0.09f, 0.12f, 0.115f), new Color(0.48f, 0.58f, 0.56f), new Color(0.025f, 0.035f, 0.032f)),
         ["knife_crimson"] = Skin("knife_crimson", "Crimson Circuit", "knife_skin_crimson", new Color(0.38f, 0.035f, 0.045f), new Color(1.0f, 0.24f, 0.16f), new Color(0.09f, 0.018f, 0.022f)),
         ["knife_arctic"] = Skin("knife_arctic", "Arctic Glass", "knife_skin_arctic", new Color(0.22f, 0.58f, 0.72f), new Color(0.72f, 0.96f, 1.0f), new Color(0.055f, 0.13f, 0.17f)),
-        ["knife_hazard"] = Skin("knife_hazard", "Hazard Stripe", "knife_skin_hazard", new Color(0.72f, 0.52f, 0.04f), new Color(1.0f, 0.82f, 0.18f), new Color(0.08f, 0.075f, 0.025f))
+        ["knife_hazard"] = Skin("knife_hazard", "Hazard Stripe", "knife_skin_hazard", new Color(0.72f, 0.52f, 0.04f), new Color(1.0f, 0.82f, 0.18f), new Color(0.08f, 0.075f, 0.025f)),
+        ["knife_tidehunter"] = Skin("knife_tidehunter", "Tide Hunter", "knife_skin_tidehunter", new Color(0.035f, 0.22f, 0.24f), new Color(0.18f, 1.0f, 0.82f), new Color(0.025f, 0.055f, 0.06f))
     };
 
     public static KnifeSkinDefinition Definition(string id) => Definitions[id];
@@ -554,6 +557,13 @@ public static class WeaponCatalog
             Damage = 96, EffectiveRange = 320, Recoil = 2.35f, Handling = 0.43f,
             FireInterval = 1.05f, MagazineSize = 5, SoundRadius = 78, ReceiverLength = 0.64f, BarrelLength = 0.92f
         },
+        [WeaponPlatform.AXMC] = new WeaponDefinition
+        {
+            Platform = WeaponPlatform.AXMC, Name = "AXMC .338 Long-Range Rifle", ChineseName = "AXMC .338",
+            LocalizationKey = "weapon_axmc", Caliber = AmmoCaliber.Magnum338, SupportsAutomatic = false,
+            Damage = 148, EffectiveRange = 560, Recoil = 3.1f, Handling = 0.35f,
+            FireInterval = 1.32f, MagazineSize = 5, SoundRadius = 96, ReceiverLength = 0.72f, BarrelLength = 1.05f
+        },
         [WeaponPlatform.MP5A5] = new WeaponDefinition
         {
             Platform = WeaponPlatform.MP5A5, Name = "MP5A5 Submachine Gun", ChineseName = "MP5A5",
@@ -575,6 +585,7 @@ public static class WeaponCatalog
         ["optic_micro"] = Part("optic_micro", "Micro reflex sight", "微型反射瞄具", AttachmentSlot.Optic, handling: 0.04f, visual: 0.82f),
         ["optic_holo"] = Part("optic_holo", "Holographic sight", "全息瞄具", AttachmentSlot.Optic, range: 6, handling: -0.02f, visual: 1.08f),
         ["optic_scope"] = Part("optic_scope", "4x combat optic", "四倍战斗瞄具", AttachmentSlot.Optic, range: 28, handling: -0.09f, visual: 1.28f),
+        ["optic_7x"] = Part("optic_7x", "7x tide precision optic", "\u4e03\u500d\u6f6e\u6c50\u7cbe\u5bc6\u7784\u5177", AttachmentSlot.Optic, range: 120, handling: -0.17f, visual: 1.62f),
         ["optic_sniper"] = Part("optic_sniper", "8x precision optic", "8x", AttachmentSlot.Optic, range: 85, handling: -0.16f, visual: 1.55f),
         ["barrel_cqb"] = Part("barrel_cqb", "CQB barrel", "近战短枪管", AttachmentSlot.Barrel, damage: -2, range: -24, recoil: 1.12f, handling: 0.13f, visual: 0.72f),
         ["barrel_standard"] = Part("barrel_standard", "Service barrel", "制式枪管", AttachmentSlot.Barrel),
@@ -596,6 +607,7 @@ public static class WeaponCatalog
 
     public static string AmmoDisplayName(AmmoCaliber caliber, string language) => caliber switch
     {
+        AmmoCaliber.Magnum338 => GameLocalization.Get("ammo_338", language, ".338 Magnum ammunition"),
         AmmoCaliber.Sniper => GameLocalization.Get("ammo_sniper", language, "7.62 precision ammunition"),
         AmmoCaliber.Smg => GameLocalization.Get("ammo_smg", language, "9 mm submachine-gun ammunition"),
         _ => GameLocalization.Get("ammo_rifle", language, "Rifle ammunition")
@@ -630,6 +642,18 @@ public static class WeaponCatalog
             if (tier >= 2)
             {
                 build.Attachments[AttachmentSlot.Muzzle] = "muzzle_suppressor";
+            }
+            return build;
+        }
+        if (platform == WeaponPlatform.AXMC)
+        {
+            build.Attachments[AttachmentSlot.Barrel] = "barrel_marksman";
+            build.Attachments[AttachmentSlot.Optic] = "optic_7x";
+            build.Attachments[AttachmentSlot.Stock] = "stock_precision";
+            build.Attachments[AttachmentSlot.Magazine] = "mag_standard";
+            if (tier >= 2)
+            {
+                build.Attachments[AttachmentSlot.Muzzle] = "muzzle_brake";
             }
             return build;
         }

@@ -227,6 +227,7 @@ public static class DeploymentCatalog
         }
         var caliberMultiplier = caliber switch
         {
+            AmmoCaliber.Magnum338 => 2.1f,
             AmmoCaliber.Sniper => 1.35f,
             AmmoCaliber.Smg => 0.8f,
             _ => 1.0f

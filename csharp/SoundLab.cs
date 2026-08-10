@@ -81,6 +81,24 @@ public static class SoundLab
         return stream;
     }
 
+    public static AudioStreamWav WorldBossPulse()
+    {
+        const int rate = 22050;
+        var samples = new float[(int)(rate * 0.82f)];
+        var rng = new RandomNumberGenerator { Seed = 338700 };
+        var lowNoise = 0.0f;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var t = (float)i / rate;
+            var envelope = Mathf.Exp(-t * 4.6f);
+            var sweep = Mathf.Sin(Mathf.Tau * (76.0f + t * 138.0f) * t) * envelope;
+            var ping = Mathf.Sin(Mathf.Tau * 940.0f * t) * Mathf.Exp(-t * 12.0f);
+            lowNoise = Mathf.Lerp(lowNoise, rng.RandfRange(-1.0f, 1.0f), 0.035f);
+            samples[i] = (sweep * 0.72f + ping * 0.22f + lowNoise * 0.2f) * envelope;
+        }
+        return MakeStream(samples, rate);
+    }
+
     public static AudioStreamWav Footstep()
     {
         const int rate = 22050;

@@ -811,6 +811,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.AK74 => new Color(0.12f, 0.105f, 0.075f),
             WeaponPlatform.ScarL => new Color(0.34f, 0.29f, 0.2f),
             WeaponPlatform.M24 => new Color(0.16f, 0.19f, 0.17f),
+            WeaponPlatform.AXMC => new Color(0.035f, 0.14f, 0.15f),
             WeaponPlatform.MP5A5 => new Color(0.025f, 0.032f, 0.03f),
             WeaponPlatform.M3A1 => new Color(0.17f, 0.2f, 0.185f),
             _ => new Color(0.045f, 0.052f, 0.05f)
@@ -820,6 +821,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.AK74 => new Color(0.24f, 0.12f, 0.055f),
             WeaponPlatform.ScarL => new Color(0.29f, 0.255f, 0.18f),
             WeaponPlatform.M24 => new Color(0.18f, 0.24f, 0.16f),
+            WeaponPlatform.AXMC => new Color(0.08f, 0.29f, 0.28f),
             WeaponPlatform.MP5A5 => new Color(0.055f, 0.065f, 0.06f),
             WeaponPlatform.M3A1 => new Color(0.105f, 0.12f, 0.11f),
             _ => new Color(0.18f, 0.17f, 0.13f)
@@ -832,13 +834,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.AK74 => new Vector3(0.14f, 0.16f, 0.52f),
             WeaponPlatform.ScarL => new Vector3(0.16f, 0.18f, 0.56f),
             WeaponPlatform.M24 => new Vector3(0.145f, 0.16f, 0.64f),
+            WeaponPlatform.AXMC => new Vector3(0.16f, 0.18f, 0.72f),
             WeaponPlatform.MP5A5 => new Vector3(0.14f, 0.17f, 0.36f),
             WeaponPlatform.M3A1 => new Vector3(0.135f, 0.155f, 0.34f),
             _ => new Vector3(0.13f, 0.15f, 0.46f)
         };
         _receiver.MaterialOverride = receiverMaterial;
         ((BoxMesh)_handguard.Mesh).Size = new Vector3(
-            EquippedWeapon.Platform is WeaponPlatform.ScarL or WeaponPlatform.M24
+            EquippedWeapon.Platform is WeaponPlatform.ScarL or WeaponPlatform.M24 or WeaponPlatform.AXMC
                 ? 0.17f
                 : EquippedWeapon.Platform == WeaponPlatform.M3A1 ? 0.13f : 0.15f,
             0.12f,
@@ -875,6 +878,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var magazineSize = EquippedWeapon.Platform switch
         {
             WeaponPlatform.M24 => new Vector3(0.085f, 0.15f, 0.13f),
+            WeaponPlatform.AXMC => new Vector3(0.1f, 0.18f, 0.15f),
             WeaponPlatform.MP5A5 => new Vector3(0.075f, stats.MagazineSize > 30 ? 0.36f : 0.3f, 0.11f),
             WeaponPlatform.M3A1 => new Vector3(0.075f, 0.3f, 0.11f),
             _ => new Vector3(0.09f, 0.26f * (stats.MagazineSize > 30 ? 1.24f : 1.0f), 0.14f)
@@ -899,13 +903,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             : 0.0f;
         _opticRoot.Visible = opticScale > 0.0f;
         _opticRoot.Scale = Vector3.One;
-        _opticRoot.Position = new Vector3(0, opticId is "optic_scope" or "optic_sniper" ? 0.225f : 0.205f, -0.25f);
+        _opticRoot.Position = new Vector3(0, opticId is "optic_scope" or "optic_7x" or "optic_sniper" ? 0.225f : 0.205f, -0.25f);
         _reflexSightModel.Visible = opticId == "optic_micro";
         _holoSightModel.Visible = opticId == "optic_holo";
-        _scopeSightModel.Visible = opticId is "optic_scope" or "optic_sniper";
+        _scopeSightModel.Visible = opticId is "optic_scope" or "optic_7x" or "optic_sniper";
         _opticReticle.Position = opticId switch
         {
             "optic_scope" => new Vector3(0, 0, -0.255f),
+            "optic_7x" => new Vector3(0, 0, -0.255f),
             "optic_sniper" => new Vector3(0, 0, -0.255f),
             "optic_holo" => new Vector3(0, 0, -0.078f),
             _ => new Vector3(0, 0, -0.052f)
@@ -1606,11 +1611,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         return opticId switch
         {
             "optic_scope" => 29.0f,
+            "optic_7x" => 19.0f,
             "optic_sniper" => 17.0f,
             "optic_holo" => 44.0f,
             _ => 49.0f
         };
     }
+
+    public float CurrentAimFieldOfView => AimFieldOfView();
 
     public void SelectWeapon(int slot)
     {
@@ -2195,6 +2203,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         var maxReserveAmmo = caliber switch
         {
+            AmmoCaliber.Magnum338 => 40,
             AmmoCaliber.Sniper => 60,
             AmmoCaliber.Smg => 270,
             _ => 210

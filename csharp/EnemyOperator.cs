@@ -48,6 +48,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
     public string OperatorCallsign(string language)
     {
+        if (IsWorldBoss)
+        {
+            return GameLocalization.Get("boss_name", language, "TIDE HUNTER");
+        }
         if (IsRivalSquad)
         {
             return Name.ToString().Replace('_', '-');
@@ -134,10 +138,18 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     private const float DownedFinishAcquireRange = 22.0f;
     private const float DownedFinishScorePenalty = 32.0f * 32.0f;
     private const float DownedFinishLockSeconds = 1.5f;
-    private float CurrentContactAcquireRange => SentryMode || HasFireablePrimary && CarriedWeapon.Platform == WeaponPlatform.M24
-        ? SniperContactAcquireRange
-        : DefaultContactAcquireRange;
-    private float CurrentFireRange => CarriedWeapon.Platform == WeaponPlatform.M24 ? 175.0f : 52.0f;
+    private bool UsesLongRangeRifle => CarriedWeapon.Platform is WeaponPlatform.M24 or WeaponPlatform.AXMC;
+    private float CurrentContactAcquireRange => IsWorldBoss
+        ? 240.0f
+        : SentryMode || HasFireablePrimary && UsesLongRangeRifle
+            ? SniperContactAcquireRange
+            : DefaultContactAcquireRange;
+    private float CurrentFireRange => CarriedWeapon.Platform switch
+    {
+        WeaponPlatform.AXMC => 235.0f,
+        WeaponPlatform.M24 => 175.0f,
+        _ => 52.0f
+    };
 
     private static bool IsAttackableCombatant(ISquadCombatant combatant)
         => !combatant.CombatDead || combatant.CombatDowned && combatant.CanBeRevived;
@@ -165,10 +177,18 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         FloorSnapLength = 0.35f;
         BuildLootInventory();
         BuildOperator();
+        if (IsWorldBoss)
+        {
+            BuildWorldBossVisuals();
+        }
         _patrolOrigin = GlobalPosition;
         PickPatrolTarget();
         InitializePursuitState();
-        if (IsRivalSquad)
+        if (IsWorldBoss)
+        {
+            AddToGroup("world_boss");
+        }
+        else if (IsRivalSquad)
         {
             AddToGroup("rival_operators");
             DetectionRange = Mathf.Max(DetectionRange, 42.0f);
@@ -179,9 +199,16 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         }
     }
 
-    public string DisplayName(string language) => GameLocalization.IsChinese(language)
+    public string DisplayName(string language)
+    {
+        if (IsWorldBoss)
+        {
+            return GameLocalization.Get("boss_loot", language, "Tide Hunter legendary gear");
+        }
+        return GameLocalization.IsChinese(language)
         ? (IsRivalSquad ? "敌对干员小队装备" : "敌方驻守干员装备")
-        : (IsRivalSquad ? "Rival squad gear" : "Enemy operator gear");
+            : (IsRivalSquad ? "Rival squad gear" : "Enemy operator gear");
+    }
 
     public void OnSearched()
     {
@@ -197,6 +224,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
     private void BuildLootInventory()
     {
+        if (IsWorldBoss)
+        {
+            BuildWorldBossLootInventory();
+            return;
+        }
         var roll = _rng.Randf();
         var platform = roll < 0.55f ? WeaponPlatform.M4A1 : roll < 0.86f ? WeaponPlatform.AK74 : WeaponPlatform.ScarL;
         var tier = _configuredLoadout is not null
@@ -341,6 +373,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             WeaponPlatform.AK74 => new Color(0.15f, 0.09f, 0.045f),
             WeaponPlatform.ScarL => new Color(0.3f, 0.25f, 0.17f),
             WeaponPlatform.M24 => new Color(0.16f, 0.21f, 0.13f),
+            WeaponPlatform.AXMC => new Color(0.035f, 0.23f, 0.22f),
             WeaponPlatform.MP5A5 => new Color(0.035f, 0.045f, 0.043f),
             WeaponPlatform.M3A1 => new Color(0.18f, 0.21f, 0.19f),
             _ => new Color(0.018f, 0.023f, 0.022f)
@@ -389,6 +422,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             WeaponPlatform.ScarL => 0.16f,
             WeaponPlatform.M24 => 0.15f,
+            WeaponPlatform.AXMC => 0.16f,
             WeaponPlatform.MP5A5 => 0.14f,
             WeaponPlatform.M3A1 => 0.135f,
             _ => 0.13f
@@ -465,6 +499,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         UpdatePursuitTimers(dt);
         AcquireCombatTarget();
         UpdateDownedFinishLock(dt);
+        UpdateWorldBossState(dt);
         var velocity = Velocity;
         if (!IsOnFloor())
         {
@@ -508,7 +543,12 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
         if (!hasEngageTarget)
         {
-            if (SentryMode)
+            if (IsWorldBoss)
+            {
+                _searchingLoot = false;
+                UpdateWorldBossPatrol(dt);
+            }
+            else if (SentryMode)
             {
                 _searchingLoot = false;
                 HoldSentryPosition(dt);
@@ -822,7 +862,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
                 _bodyRoot.Position = Vector3.Zero;
             }
         }
-        _health = 100.0f;
+        _health = MaxHealth;
         _seekingCover = false;
         _inCover = false;
         _coverTimer = 0.0f;
@@ -911,6 +951,16 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
     private void UpdateStance(float delta, float distance, bool hasSight)
     {
+        if (IsWorldBoss)
+        {
+            if (IsProne)
+            {
+                SetProne(false);
+            }
+            _seekingCover = false;
+            _inCover = false;
+            return;
+        }
         if (SentryMode)
         {
             if (IsProne)
@@ -1134,11 +1184,12 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         var desired = Vector3.Zero;
         if (!IsProne)
         {
-            if (distance > 19.0f)
+            var preferredRange = IsWorldBoss ? 62.0f : UsesLongRangeRifle ? 42.0f : 19.0f;
+            if (distance > preferredRange)
             {
                 desired += forward;
             }
-            else if (distance < 8.0f)
+            else if (distance < preferredRange * 0.48f)
             {
                 desired -= forward;
             }
@@ -1173,6 +1224,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             if (IsRivalSquad)
             {
                 speed *= 1.08f;
+            }
+            if (IsWorldBoss)
+            {
+                speed *= WorldBossMoveMultiplier;
             }
             var movement = desired.LengthSquared() > 0.01f ? desired.Normalized() * speed : Vector3.Zero;
             var velocity = Velocity;
@@ -1249,6 +1304,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
     private void Patrol(float delta)
     {
+        if (IsWorldBoss)
+        {
+            UpdateWorldBossPatrol(delta);
+            return;
+        }
         var targetFlat = new Vector3(_patrolTarget.X, GlobalPosition.Y, _patrolTarget.Z);
         var direction = GlobalPosition.DirectionTo(targetFlat);
         if (GlobalPosition.DistanceTo(targetFlat) < 1.1f || _patrolTimer <= 0.0f)
@@ -1267,6 +1327,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
     private void PickPatrolTarget()
     {
+        if (IsWorldBoss)
+        {
+            SelectNextWorldBossPatrolPoint();
+            return;
+        }
         _patrolTarget = _patrolOrigin + new Vector3(
             _rng.RandfRange(-4.0f, 4.0f),
             0.0f,
@@ -1294,10 +1359,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         }
         BeginMuzzleFlash();
         var stats = CarriedWeapon.Stats();
-        _fireTimer = _rng.RandfRange(stats.FireInterval * 2.4f, stats.FireInterval * 4.8f);
+        _fireTimer = _rng.RandfRange(stats.FireInterval * 2.4f, stats.FireInterval * 4.8f)
+            * (IsWorldBoss ? WorldBossFireCadenceMultiplier : 1.0f);
         var rangeFactor = Mathf.Clamp(stats.EffectiveRange / 150.0f, 0.7f, 1.25f);
         // Rivals are more accurate at medium range so multi-squad fights resolve.
-        var baseAcc = IsRivalSquad ? 0.97f : 0.9f;
+        var baseAcc = IsWorldBoss ? 0.95f : IsRivalSquad ? 0.97f : 0.9f;
         var accuracy = Mathf.Clamp((IsProne ? baseAcc + 0.02f : baseAcc) - distance * 0.005f / rangeFactor, 0.55f, 0.98f);
         var regionRoll = _rng.Randf();
         var hitRegion = IsProne
@@ -1313,7 +1379,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             shotOrigin.DirectionTo(aimPoint),
             out var glassHitPosition))
         {
-            Main?.SpawnTracer(shotOrigin, glassHitPosition, new Color(1.0f, 0.34f, 0.13f));
+            Main?.SpawnTracer(shotOrigin, glassHitPosition, CurrentTracerColor);
             return;
         }
         var clear = Ballistics.HasClearShot(GetWorld3D(), shotOrigin, aimPoint, _combatTarget.CombatNode, GetRid());
@@ -1345,7 +1411,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             // Near-miss still close enough for tracers; keep pressure high.
             aimPoint += Scatter() * 0.35f;
         }
-        Main?.SpawnTracer(shotOrigin, aimPoint, new Color(1.0f, 0.34f, 0.13f));
+        Main?.SpawnTracer(shotOrigin, aimPoint, CurrentTracerColor);
     }
 
     private void FireAtNode(EnemyOperator rival, float distance)
@@ -1356,7 +1422,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         }
         BeginMuzzleFlash();
         var stats = CarriedWeapon.Stats();
-        _fireTimer = _rng.RandfRange(stats.FireInterval * 3.2f, stats.FireInterval * 6.8f);
+        _fireTimer = _rng.RandfRange(stats.FireInterval * 3.2f, stats.FireInterval * 6.8f)
+            * (IsWorldBoss ? WorldBossFireCadenceMultiplier : 1.0f);
         var accuracy = Mathf.Clamp(0.9f - distance * 0.008f, 0.4f, 0.94f);
         var aimPoint = rival.GlobalPosition + Vector3.Up * (rival.IsProne ? 0.45f : 1.2f);
         var shotOrigin = ResolveBallisticShotOrigin();
@@ -1368,7 +1435,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             shotOrigin.DirectionTo(aimPoint),
             out var glassHitPosition))
         {
-            Main?.SpawnTracer(shotOrigin, glassHitPosition, new Color(1.0f, 0.45f, 0.18f));
+            Main?.SpawnTracer(shotOrigin, glassHitPosition, CurrentTracerColor);
             return;
         }
         var clear = Ballistics.HasClearShot(GetWorld3D(), shotOrigin, aimPoint, rival, GetRid());
@@ -1391,7 +1458,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         {
             aimPoint += Scatter();
         }
-        Main?.SpawnTracer(shotOrigin, aimPoint, new Color(1.0f, 0.45f, 0.18f));
+        Main?.SpawnTracer(shotOrigin, aimPoint, CurrentTracerColor);
     }
 
     private void BeginMuzzleFlash()
@@ -1475,6 +1542,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             adjustedDamage = ApplyProtection(protectiveGear, adjustedDamage, armorPenetration);
         }
         _health -= adjustedDamage;
+        OnWorldBossDamaged();
         _hitStun = 0.14f;
         var original = _mainMaterial.AlbedoColor;
         _mainMaterial.AlbedoColor = new Color(0.62f, 0.12f, 0.07f);

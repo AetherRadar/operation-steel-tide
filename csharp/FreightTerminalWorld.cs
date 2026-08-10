@@ -116,6 +116,7 @@ public partial class FreightTerminalWorld : Node3D
         SpawnCivilianValuableLoot();
         SpawnEnemies();
         SpawnHostileOperatorSquads();
+        SpawnWorldBoss();
         SpawnExplosives();
         _hud.SetEnemyCount(_enemiesRemaining);
         _hud.SetMissionPhase(_missionPhase, _missionDirector.SpawnProtectionSeconds, _missionOnline);
@@ -209,6 +210,10 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--validate-arsenal"))
         {
             ValidateArsenalFlow();
+        }
+        else if (Array.Exists(args, value => value == "--validate-boss"))
+        {
+            ValidateWorldBoss();
         }
         else if (Array.Exists(args, value => value == "--validate-squad"))
         {
@@ -394,6 +399,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             CaptureTacticalHud();
         }
+        else if (Array.Exists(args, value => value == "--capture-boss"))
+        {
+            CaptureWorldBoss();
+        }
     }
 
     public override void _ExitTree()
@@ -433,6 +442,7 @@ public partial class FreightTerminalWorld : Node3D
     {
         UpdateSquad((float)delta);
         UpdateExtractionSequence((float)delta);
+        UpdateWorldBossHud();
         if (IsInstanceValid(_extractionMarker))
         {
             _extractionMarker.RotateY((float)delta * 0.35f);
@@ -518,7 +528,9 @@ public partial class FreightTerminalWorld : Node3D
         {
             if (IsInstanceValid(enemy))
             {
-                enemy.DetectionRange = detectionRange;
+                enemy.DetectionRange = enemy.IsWorldBoss
+                    ? Mathf.Max(240.0f, enemy.DetectionRange)
+                    : detectionRange;
             }
         }
         _hud.SetMissionPhase(_missionPhase, _missionRemaining, _missionOnline);
@@ -2963,14 +2975,24 @@ public partial class FreightTerminalWorld : Node3D
         await WaitFrames(4);
 
         var sniper = WeaponCatalog.Build(WeaponPlatform.M24, 2);
+        var magnum = WeaponCatalog.Build(WeaponPlatform.AXMC, 3);
         var smg = WeaponCatalog.Build(WeaponPlatform.MP5A5, 1);
         var sniperDefinition = WeaponCatalog.Weapon(WeaponPlatform.M24);
+        var magnumDefinition = WeaponCatalog.Weapon(WeaponPlatform.AXMC);
         var smgDefinition = WeaponCatalog.Weapon(WeaponPlatform.MP5A5);
-        var catalogOk = WeaponCatalog.AllWeapons.Count >= 5
+        var hasSevenPowerOptic = magnum.Attachments.TryGetValue(AttachmentSlot.Optic, out var magnumOptic)
+            && magnumOptic == "optic_7x";
+        var catalogOk = WeaponCatalog.AllWeapons.Count >= 7
             && sniperDefinition.Caliber == AmmoCaliber.Sniper
             && !sniperDefinition.SupportsAutomatic
             && sniper.Stats().MagazineSize == 5
             && sniper.Stats().EffectiveRange >= 380.0f
+            && magnumDefinition.Caliber == AmmoCaliber.Magnum338
+            && !magnumDefinition.SupportsAutomatic
+            && magnum.Stats().MagazineSize == 5
+            && magnum.Stats().Damage >= 145.0f
+            && magnum.Stats().EffectiveRange >= 700.0f
+            && hasSevenPowerOptic
             && smgDefinition.Caliber == AmmoCaliber.Smg
             && smgDefinition.SupportsAutomatic
             && smg.Stats().FireInterval <= 0.08f;
@@ -3005,6 +3027,23 @@ public partial class FreightTerminalWorld : Node3D
         _player.EquipFromLoot(new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = AmmoCaliber.Smg, Quantity = 72 });
         independentSmgReserve = independentSmgReserve && _player.ReserveAmmo == 72;
 
+        _player.EquipFromLoot(new LootItem { Kind = LootItemKind.Weapon, Weapon = magnum, Grade = LootGrade.Legendary });
+        var magnumEquipped = _player.EquippedWeapon.Platform == WeaponPlatform.AXMC
+            && _player.CurrentAmmoCaliber == AmmoCaliber.Magnum338
+            && _player.ReserveAmmo == 0
+            && _player.Ammo == 5
+            && Mathf.IsEqualApprox(_player.CurrentAimFieldOfView, 19.0f)
+            && _player.AmmoReserveFor(AmmoCaliber.Sniper) == 18
+            && _player.AmmoReserveFor(AmmoCaliber.Smg) == 72;
+        _player.EquipFromLoot(new LootItem
+        {
+            Kind = LootItemKind.Ammunition,
+            AmmoCaliber = AmmoCaliber.Magnum338,
+            Quantity = 30,
+            Grade = LootGrade.Legendary
+        });
+        magnumEquipped = magnumEquipped && _player.ReserveAmmo == 30;
+
         var worldM24 = false;
         var worldMp5 = false;
         var worldSniperAmmo = false;
@@ -3023,9 +3062,13 @@ public partial class FreightTerminalWorld : Node3D
             }
         }
         var worldLootOk = worldM24 && worldMp5 && worldSniperAmmo && worldKnifeSkins >= 3;
+        var bossRewardReady = IsInstanceValid(_worldBoss)
+            && _worldBoss!.Loot.Any(item => item.Weapon?.Platform == WeaponPlatform.AXMC)
+            && _worldBoss.Loot.Any(item => item.Kind == LootItemKind.Attachment && item.AttachmentId == "optic_7x")
+            && _worldBoss.Loot.Any(item => item.Kind == LootItemKind.Ammunition && item.AmmoCaliber == AmmoCaliber.Magnum338);
         var valid = catalogOk && sniperEquipped && wrongCaliberSeparated && sniperAmmoLoaded
-            && skinEquipped && independentSmgReserve && worldLootOk;
-        GD.Print($"ARSENAL_CHECK valid={valid} catalog={catalogOk} sniper={sniperEquipped} dedicated_ammo={wrongCaliberSeparated && sniperAmmoLoaded} smg={independentSmgReserve} skins={KnifeSkinCatalog.All.Count} world_m24={worldM24} world_mp5={worldMp5} world_sniper_ammo={worldSniperAmmo} world_skins={worldKnifeSkins}");
+            && skinEquipped && independentSmgReserve && magnumEquipped && worldLootOk && bossRewardReady;
+        GD.Print($"ARSENAL_CHECK valid={valid} catalog={catalogOk} sniper={sniperEquipped} dedicated_ammo={wrongCaliberSeparated && sniperAmmoLoaded} smg={independentSmgReserve} magnum={magnumEquipped} optic_7x={hasSevenPowerOptic} ads_fov={_player.CurrentAimFieldOfView:0.0} skins={KnifeSkinCatalog.All.Count} world_m24={worldM24} world_mp5={worldMp5} world_sniper_ammo={worldSniperAmmo} world_skins={worldKnifeSkins} boss_reward={bossRewardReady}");
         GD.Print($"ARSENAL_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -3038,13 +3081,15 @@ public partial class FreightTerminalWorld : Node3D
         }
         var optics = new[]
         {
-            (Id: "optic_micro", File: "optic_micro_validation.png"),
-            (Id: "optic_holo", File: "optic_holo_validation.png"),
-            (Id: "optic_scope", File: "optic_scope_validation.png")
+            (Id: "optic_micro", File: "optic_micro_validation.png", Platform: WeaponPlatform.M4A1),
+            (Id: "optic_holo", File: "optic_holo_validation.png", Platform: WeaponPlatform.M4A1),
+            (Id: "optic_scope", File: "optic_scope_validation.png", Platform: WeaponPlatform.ScarL),
+            (Id: "optic_7x", File: "optic_7x_validation.png", Platform: WeaponPlatform.AXMC),
+            (Id: "optic_sniper", File: "optic_sniper_validation.png", Platform: WeaponPlatform.M24)
         };
         foreach (var optic in optics)
         {
-            var build = WeaponCatalog.Build(WeaponPlatform.M4A1, 1);
+            var build = WeaponCatalog.Build(optic.Platform, 3);
             build.Attachments[AttachmentSlot.Optic] = optic.Id;
             _player.EquipFromLoot(new LootItem { Kind = LootItemKind.Weapon, Weapon = build });
             await WaitFrames(28);
@@ -3055,7 +3100,7 @@ public partial class FreightTerminalWorld : Node3D
             var aiming = _player.IsAiming;
             Input.ActionRelease("aim");
             await WaitFrames(16);
-            GD.Print($"OPTIC_CHECK id={optic.Id} visible=true aiming={aiming} handling={_player.CurrentWeaponStats.Handling:0.00}");
+            GD.Print($"OPTIC_CHECK id={optic.Id} platform={optic.Platform} visible=true aiming={aiming} handling={_player.CurrentWeaponStats.Handling:0.00}");
         }
         GetTree().Quit();
     }
