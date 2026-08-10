@@ -820,6 +820,17 @@ public partial class FreightTerminalWorld
         return nearest;
     }
 
+    public IEnumerable<EnemyOperator> EnumerateSquadEnemies()
+    {
+        foreach (var enemy in _enemies)
+        {
+            if (IsInstanceValid(enemy) && !enemy.IsDead && CanSquadEngage(enemy))
+            {
+                yield return enemy;
+            }
+        }
+    }
+
     public bool CanSquadEngage(EnemyOperator enemy)
     {
         if (_missionDirector.IsDeploymentProtected())
@@ -1362,6 +1373,164 @@ public partial class FreightTerminalWorld
         _missionDirector.ExitDeploymentZone();
         await WaitFrames(4);
 
+        var combatMate = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && !mate.IsHumanProxy);
+        var combatEnemy = _enemies.FirstOrDefault(enemy => IsInstanceValid(enemy) && !enemy.IsDead && !enemy.IsWorldBoss)
+            ?? _enemies.FirstOrDefault(enemy => IsInstanceValid(enemy) && !enemy.IsDead);
+        var combatWallBlocked = false;
+        var combatTargetLocked = false;
+        var combatFlanked = false;
+        var combatSightRecovered = false;
+        var combatFired = false;
+        var combatDamaged = false;
+        var combatFacedMovement = false;
+        var closeRangeRetreat = false;
+        var closeRangeStrafe = false;
+        if (combatMate is not null && combatEnemy is not null)
+        {
+            foreach (var enemy in _enemies)
+            {
+                if (!IsInstanceValid(enemy))
+                {
+                    continue;
+                }
+                enemy.ProcessMode = ProcessModeEnum.Disabled;
+                if (enemy != combatEnemy)
+                {
+                    enemy.GlobalPosition = new Vector3(220.0f, 0.3f, 220.0f);
+                }
+            }
+            foreach (var squadMate in _squadMates)
+            {
+                if (!IsInstanceValid(squadMate))
+                {
+                    continue;
+                }
+                squadMate.ProcessMode = ProcessModeEnum.Disabled;
+                if (squadMate != combatMate)
+                {
+                    squadMate.GlobalPosition = new Vector3(205.0f, 0.3f, 205.0f);
+                }
+            }
+            _player.ProcessMode = ProcessModeEnum.Disabled;
+            _player.GlobalPosition = new Vector3(210.0f, 0.3f, 210.0f);
+
+            var combatOrigin = new Vector3(0.0f, 0.3f, 52.0f);
+            var combatTargetPosition = new Vector3(0.0f, 0.3f, 68.0f);
+            combatMate.GlobalPosition = combatOrigin;
+            combatMate.Velocity = Vector3.Zero;
+            combatMate.ResetCombatTacticsForDiagnostics();
+            combatMate.GrantFireablePrimaryForDiagnostics();
+            combatMate.SetOrder(SquadOrder.Move, combatOrigin);
+            combatEnemy.ResetTacticalStateForDiagnostics();
+            combatEnemy.GrantFireablePrimaryForDiagnostics();
+            combatEnemy.GlobalPosition = combatTargetPosition;
+            combatEnemy.SetAlerted(combatOrigin);
+            combatEnemy.ProcessMode = ProcessModeEnum.Inherit;
+            combatEnemy.SetPhysicsProcess(false);
+
+            var combatWall = new StaticBody3D
+            {
+                Name = "SquadCombatFlankWall",
+                Position = new Vector3(0.0f, 1.8f, 60.0f),
+                CollisionLayer = 1,
+                CollisionMask = 0
+            };
+            combatWall.AddChild(new CollisionShape3D
+            {
+                Shape = new BoxShape3D { Size = new Vector3(5.6f, 3.6f, 0.55f) }
+            });
+            AddChild(combatWall);
+            combatMate.ProcessMode = ProcessModeEnum.Inherit;
+            await WaitFrames(3);
+
+            combatWallBlocked = !combatMate.HasCombatLineOfSightForDiagnostics(combatEnemy);
+            var wallStart = combatMate.GlobalPosition;
+            var enemyHealthBefore = combatEnemy.CurrentHealth;
+            var shotsBeforeWall = combatMate.CombatShotsFired;
+            var maxWallLateral = 0.0f;
+            var movementFacingSamples = 0;
+            var coherentFacingSamples = 0;
+            for (var frame = 0; frame < 300 && !combatEnemy.IsDead; frame++)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                combatTargetLocked |= combatMate.CombatTargetForDiagnostics == combatEnemy;
+                combatSightRecovered |= combatMate.CombatHasSightForDiagnostics;
+                maxWallLateral = Mathf.Max(maxWallLateral, Mathf.Abs(combatMate.GlobalPosition.X - wallStart.X));
+                var planarVelocity = new Vector3(combatMate.Velocity.X, 0.0f, combatMate.Velocity.Z);
+                if (!combatMate.CombatHasSightForDiagnostics && planarVelocity.LengthSquared() > 0.16f)
+                {
+                    movementFacingSamples++;
+                    var forward = -combatMate.GlobalBasis.Z;
+                    forward.Y = 0.0f;
+                    if (forward.Normalized().Dot(planarVelocity.Normalized()) > 0.42f)
+                    {
+                        coherentFacingSamples++;
+                    }
+                }
+            }
+            var traceFrom = combatMate.GlobalPosition + Vector3.Up * 1.55f;
+            var traceTo = combatEnemy.GlobalPosition + Vector3.Up * 1.05f;
+            var traceQuery = PhysicsRayQueryParameters3D.Create(traceFrom, traceTo);
+            traceQuery.Exclude = new Godot.Collections.Array<Rid> { combatMate.GetRid() };
+            traceQuery.CollideWithAreas = false;
+            var traceHit = GetWorld3D().DirectSpaceState.IntersectRay(traceQuery);
+            var traceCollider = traceHit.Count > 0 && traceHit["collider"].AsGodotObject() is Node traceNode
+                ? traceNode.Name.ToString()
+                : "none";
+            var tracePosition = traceHit.Count > 0 ? traceHit["position"].AsVector3() : Vector3.Zero;
+            GD.Print($"SQUAD_COMBAT_WALL_TRACE pos=({combatMate.GlobalPosition.X:0.00},{combatMate.GlobalPosition.Z:0.00}) flank=({combatMate.CombatFlankPositionForDiagnostics.X:0.00},{combatMate.CombatFlankPositionForDiagnostics.Z:0.00}) lateral={maxWallLateral:0.00} sight={combatMate.CombatHasSightForDiagnostics} ray={traceCollider}@({tracePosition.X:0.00},{tracePosition.Z:0.00}) shots={combatMate.CombatShotsFired - shotsBeforeWall} switches={combatMate.CombatTargetSwitches} flank_n={combatMate.CombatFlankSelections} stuck={combatMate.CombatStuckRecoveries}");
+            combatFlanked = combatMate.CombatFlankSelections > 0 && maxWallLateral > 2.7f;
+            combatFired = combatMate.CombatShotsFired > shotsBeforeWall;
+            combatDamaged = combatEnemy.CurrentHealth < enemyHealthBefore - 0.01f || combatEnemy.IsDead;
+            combatFacedMovement = movementFacingSamples > 0
+                && coherentFacingSamples >= Mathf.CeilToInt(movementFacingSamples * 0.55f);
+
+            combatWall.QueueFree();
+            await WaitFrames(3);
+            combatEnemy.ResetTacticalStateForDiagnostics();
+            combatEnemy.GrantFireablePrimaryForDiagnostics();
+            EnsureEnemyRegisteredForDiagnostics(combatEnemy);
+            combatMate.GlobalPosition = combatOrigin;
+            combatMate.Velocity = Vector3.Zero;
+            combatMate.ResetCombatTacticsForDiagnostics();
+            combatMate.GrantFireablePrimaryForDiagnostics();
+            combatMate.SetOrder(SquadOrder.Move, combatOrigin);
+            combatEnemy.GlobalPosition = combatOrigin + new Vector3(0.0f, 0.0f, 5.0f);
+            combatEnemy.SetAlerted(combatOrigin);
+            combatEnemy.ProcessMode = ProcessModeEnum.Inherit;
+            combatEnemy.SetPhysicsProcess(false);
+            var closeStartDistance = combatMate.GlobalPosition.DistanceTo(combatEnemy.GlobalPosition);
+            var maxCloseDistance = closeStartDistance;
+            var maxCloseLateral = 0.0f;
+            combatMate.ProcessMode = ProcessModeEnum.Inherit;
+            for (var frame = 0; frame < 120 && !combatEnemy.IsDead; frame++)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                maxCloseDistance = Mathf.Max(
+                    maxCloseDistance,
+                    combatMate.GlobalPosition.DistanceTo(combatEnemy.GlobalPosition));
+                maxCloseLateral = Mathf.Max(
+                    maxCloseLateral,
+                    Mathf.Abs(combatMate.GlobalPosition.X - combatOrigin.X));
+            }
+            closeRangeRetreat = maxCloseDistance > closeStartDistance + 1.2f;
+            closeRangeStrafe = maxCloseLateral > 0.75f;
+            combatEnemy.ResetTacticalStateForDiagnostics();
+            combatEnemy.SetPhysicsProcess(true);
+            combatEnemy.ProcessMode = ProcessModeEnum.Disabled;
+            combatMate.ProcessMode = ProcessModeEnum.Disabled;
+            _player.ProcessMode = ProcessModeEnum.Inherit;
+        }
+        var combatAiOk = combatWallBlocked
+            && combatTargetLocked
+            && combatFlanked
+            && combatSightRecovered
+            && combatFired
+            && combatDamaged
+            && combatFacedMovement
+            && closeRangeRetreat
+            && closeRangeStrafe;
+
         // Hostile operators retain a nearby downed target, pause briefly, then secure it
         // through the same ballistic fire path used during live combat.
         var finishShooter = _enemies.FirstOrDefault(enemy => IsInstanceValid(enemy) && !enemy.IsDead);
@@ -1541,8 +1710,9 @@ public partial class FreightTerminalWorld
         var reviveOk = mateDowned && firstRevive && mateUp && bodyBagOk && secondReviveBlocked
             && playerDowned && playerFirstRevive && playerUp && playerSecondBlocked && secondDeathSpectate;
 
-        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} revive_once={reviveOk} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} player_view_on_down={playerViewOnDown} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} finished_spectate={finishedSpectateOk} immediate_view={finishedPlayerSpectate} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
-        var valid = ActiveSquadCount >= 2 && roleFillOk && reviveOk && aiFinishOk && aiReviveOk && finishedSpectateOk;
+        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} combat_ai={combatAiOk} wall_blocked={combatWallBlocked} target_lock={combatTargetLocked} flanked={combatFlanked} sight_recovered={combatSightRecovered} fired={combatFired} damaged={combatDamaged} faced_move={combatFacedMovement} close_retreat={closeRangeRetreat} close_strafe={closeRangeStrafe} revive_once={reviveOk} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} player_view_on_down={playerViewOnDown} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} finished_spectate={finishedSpectateOk} immediate_view={finishedPlayerSpectate} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
+        var valid = ActiveSquadCount >= 2 && roleFillOk && combatAiOk
+            && reviveOk && aiFinishOk && aiReviveOk && finishedSpectateOk;
         GD.Print($"SQUAD_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

@@ -425,13 +425,19 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
     private bool HasLineOfSight(EnemyOperator enemy)
     {
-        var from = _muzzle.GlobalPosition;
+        var from = GlobalPosition + Vector3.Up * 1.55f;
         var to = enemy.GlobalPosition + Vector3.Up * 1.05f;
         var query = PhysicsRayQueryParameters3D.Create(from, to);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
         query.CollideWithAreas = false;
         var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        return hit.Count > 0 && hit["collider"].AsGodotObject() == enemy;
+        if (hit.Count == 0)
+        {
+            return false;
+        }
+        var collider = hit["collider"].AsGodotObject();
+        return collider == enemy
+            || collider is Node node && (enemy.IsAncestorOf(node) || node.IsAncestorOf(enemy));
     }
 
     private void ConsiderRoleAbility(EnemyOperator hostile, bool hasSight)

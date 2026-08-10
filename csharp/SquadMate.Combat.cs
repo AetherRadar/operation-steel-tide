@@ -18,37 +18,49 @@ public partial class SquadMate
     private float _combatManeuverTimer;
     private float _combatCoverCommitment;
     private float _combatAvoidanceTimer;
+    private float _combatRecoveryTimer;
     private float _combatStrafeSign;
+    private float _combatFlankSide;
     private Vector3 _combatLastKnownPosition;
     private Vector3 _combatCoverPosition;
     private Vector3 _combatFlankPosition;
+    private Vector3 _combatRecoveryDirection;
+    private Vector3 _combatEngagementAnchor;
     private Vector3 _combatDesiredDirection;
     private Vector3 _combatProgressOrigin;
     private float _combatProgressTimer;
     private bool _combatMoveRequested;
     private bool _combatHasSight;
     private bool _combatHasCoverPosition;
+    private bool _combatHasEngagementAnchor;
     private int _burstShotsRemaining;
 
     public int CombatShotsFired { get; private set; }
     public int CombatTargetSwitches { get; private set; }
     public int CombatCoverSelections { get; private set; }
+    public int CombatFlankSelections { get; private set; }
     public int CombatStuckRecoveries { get; private set; }
     internal bool CombatHasSightForDiagnostics => _combatHasSight;
+    internal EnemyOperator? CombatTargetForDiagnostics => _combatTarget;
+    internal Vector3 CombatFlankPositionForDiagnostics => _combatFlankPosition;
 
     private void InitializeCombatTactics()
     {
         _combatStrafeSign = SquadSlot % 2 == 0 ? 1.0f : -1.0f;
+        _combatFlankSide = _combatStrafeSign;
         _combatProgressOrigin = GlobalPosition;
         _combatLastKnownPosition = GlobalPosition;
         _combatSightTimer = 0.0f;
         _combatTargetScanTimer = 0.0f;
         _combatManeuverTimer = 0.0f;
+        _combatRecoveryTimer = 0.0f;
         _combatHasSight = false;
+        _combatHasEngagementAnchor = false;
         _burstShotsRemaining = 0;
         CombatShotsFired = 0;
         CombatTargetSwitches = 0;
         CombatCoverSelections = 0;
+        CombatFlankSelections = 0;
         CombatStuckRecoveries = 0;
     }
 
@@ -58,6 +70,8 @@ public partial class SquadMate
         _combatCoverCommitment = 0.0f;
         _combatHasCoverPosition = false;
         _combatStrafeSign = SquadSlot % 2 == 0 ? 1.0f : -1.0f;
+        _combatFlankSide = _combatStrafeSign;
+        _combatRecoveryTimer = 0.0f;
         _burstShotsRemaining = 0;
         ResetMovementProgress();
     }
@@ -71,6 +85,7 @@ public partial class SquadMate
         _combatManeuverTimer = Mathf.Max(0.0f, _combatManeuverTimer - delta);
         _combatCoverCommitment = Mathf.Max(0.0f, _combatCoverCommitment - delta);
         _combatAvoidanceTimer = Mathf.Max(0.0f, _combatAvoidanceTimer - delta);
+        _combatRecoveryTimer = Mathf.Max(0.0f, _combatRecoveryTimer - delta);
 
         if (_combatThreatAge > 5.0f)
         {
@@ -105,12 +120,8 @@ public partial class SquadMate
         }
         else if (_combatTargetScanTimer <= 0.0f)
         {
-            candidate = Main.FindNearestEnemy(GlobalPosition, CombatAcquireRange);
+            candidate = SelectBestCombatCandidate();
             _combatTargetScanTimer = 0.42f + SquadSlot * 0.04f;
-            if (candidate is not null && (!Main.CanSquadEngage(candidate) || candidate.IsDead))
-            {
-                candidate = null;
-            }
         }
 
         if (candidate is not null && ShouldAdoptCombatTarget(candidate))
@@ -136,6 +147,14 @@ public partial class SquadMate
                 _combatLastKnownPosition = _combatTarget.GlobalPosition;
                 _combatMemoryRemaining = VisibleContactMemory;
             }
+            else
+            {
+                if (_combatTarget.IsScanned)
+                {
+                    _combatLastKnownPosition = _combatTarget.GlobalPosition;
+                    _combatMemoryRemaining = Mathf.Max(_combatMemoryRemaining, 3.0f);
+                }
+            }
         }
 
         if (!_combatHasSight && _combatMemoryRemaining <= 0.0f)
@@ -144,6 +163,61 @@ public partial class SquadMate
             return null;
         }
         return _combatTarget;
+    }
+
+    private EnemyOperator? SelectBestCombatCandidate()
+    {
+        EnemyOperator? best = null;
+        var bestScore = float.PositiveInfinity;
+        foreach (var candidate in Main.EnumerateSquadEnemies())
+        {
+            var distance = GlobalPosition.DistanceTo(candidate.GlobalPosition);
+            if (distance > CombatAcquireRange)
+            {
+                continue;
+            }
+            var score = CombatTargetScore(candidate, distance, HasLineOfSight(candidate));
+            if (score < bestScore)
+            {
+                bestScore = score;
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    private float CombatTargetScore(EnemyOperator candidate, float distance, bool visible)
+    {
+        var score = distance + Mathf.Abs(distance - PreferredCombatDistance()) * 0.16f;
+        if (visible)
+        {
+            score -= 13.0f;
+        }
+        else
+        {
+            score += 4.0f;
+        }
+        if (candidate == _combatTarget)
+        {
+            score -= 10.0f;
+        }
+        if (candidate == _combatThreat)
+        {
+            score -= 24.0f;
+        }
+        if (candidate.EngageTargetNode == this)
+        {
+            score -= 16.0f;
+        }
+        else if (candidate.EngageTargetNode == Leader)
+        {
+            score -= 8.0f;
+        }
+        if (candidate.IsScanned)
+        {
+            score -= 3.0f;
+        }
+        return score;
     }
 
     private bool ShouldAdoptCombatTarget(EnemyOperator candidate)
@@ -160,9 +234,11 @@ public partial class SquadMate
         {
             return true;
         }
-        var currentDistance = GlobalPosition.DistanceSquaredTo(_combatTarget.GlobalPosition);
-        var candidateDistance = GlobalPosition.DistanceSquaredTo(candidate.GlobalPosition);
-        return candidateDistance < currentDistance * (_combatHasSight ? 0.42f : 0.72f);
+        var currentDistance = GlobalPosition.DistanceTo(_combatTarget.GlobalPosition);
+        var candidateDistance = GlobalPosition.DistanceTo(candidate.GlobalPosition);
+        var currentScore = CombatTargetScore(_combatTarget, currentDistance, _combatHasSight);
+        var candidateScore = CombatTargetScore(candidate, candidateDistance, HasLineOfSight(candidate));
+        return candidateScore + 2.5f < currentScore;
     }
 
     private void AssignCombatTarget(EnemyOperator target, float memorySeconds)
@@ -173,6 +249,9 @@ public partial class SquadMate
             _burstShotsRemaining = 0;
             _combatHasCoverPosition = false;
             _combatManeuverTimer = 0.0f;
+            _combatFlankSide = SquadSlot % 2 == 0 ? 1.0f : -1.0f;
+            _combatEngagementAnchor = Leader.IsDead ? GlobalPosition : ResolveFormationDestination();
+            _combatHasEngagementAnchor = true;
         }
         _combatTarget = target;
         _combatLastKnownPosition = target.GlobalPosition;
@@ -187,6 +266,7 @@ public partial class SquadMate
         _combatMemoryRemaining = 0.0f;
         _combatHasCoverPosition = false;
         _combatCoverCommitment = 0.0f;
+        _combatHasEngagementAnchor = false;
         _burstShotsRemaining = 0;
     }
 
@@ -198,11 +278,17 @@ public partial class SquadMate
             2 => new Vector3(2.25f, 0.0f, 3.25f),
             _ => new Vector3(0.0f, 0.0f, 5.1f)
         };
-        return Order == SquadOrder.Follow
-            ? Leader.GlobalPosition
-                + Leader.GlobalBasis.X * formation.X
-                + Leader.GlobalBasis.Z * formation.Z
-            : _orderPosition;
+        if (Order != SquadOrder.Follow)
+        {
+            return _orderPosition;
+        }
+        if (Leader.IsDead && _combatHasEngagementAnchor)
+        {
+            return _combatEngagementAnchor;
+        }
+        return Leader.GlobalPosition
+            + Leader.GlobalBasis.X * formation.X
+            + Leader.GlobalBasis.Z * formation.Z;
     }
 
     private void UpdateTacticalMovement(
@@ -214,6 +300,8 @@ public partial class SquadMate
         var destination = anchorDestination;
         var anchorFlat = FlattenToCurrentHeight(anchorDestination);
         if (Order == SquadOrder.Follow
+            && hostile is null
+            && !Leader.IsDead
             && GlobalPosition.DistanceTo(Leader.GlobalPosition) > 42.0f)
         {
             GlobalPosition = anchorFlat + Vector3.Up * 0.35f;
@@ -231,10 +319,15 @@ public partial class SquadMate
             ? GlobalPosition.DirectionTo(flatDestination)
             : Vector3.Zero;
         desired.Y = 0.0f;
+        if (_combatRecoveryTimer > 0.0f && _combatRecoveryDirection.LengthSquared() > 0.01f)
+        {
+            desired = _combatRecoveryDirection;
+        }
         _combatMoveRequested = desired.LengthSquared() > 0.01f;
         if (_combatMoveRequested)
         {
             desired = AvoidObstacle(desired.Normalized());
+            desired = ApplySquadSeparation(desired);
         }
         _combatDesiredDirection = desired;
 
@@ -251,9 +344,10 @@ public partial class SquadMate
         velocity.Y = IsOnFloor() ? -0.2f : velocity.Y - 22.0f * delta;
         Velocity = velocity;
 
-        var facePoint = hostile is not null && IsInstanceValid(hostile)
-            && GlobalPosition.DistanceTo(hostile.GlobalPosition) < CombatAcquireRange
-                ? (_combatHasSight ? hostile.GlobalPosition : _combatLastKnownPosition)
+        var facePoint = hostile is not null && IsInstanceValid(hostile) && _combatHasSight
+            ? hostile.GlobalPosition
+            : _combatMoveRequested
+                ? GlobalPosition + desired
                 : flatDestination;
         FaceTacticalPoint(facePoint, delta);
     }
@@ -263,8 +357,8 @@ public partial class SquadMate
         var anchorLeash = Order switch
         {
             SquadOrder.Hold => 1.25f,
-            SquadOrder.Move => 8.0f,
-            _ => 15.0f
+            SquadOrder.Move => 14.0f,
+            _ => Leader.IsDead ? 36.0f : 24.0f
         };
         var enemyDistance = GlobalPosition.DistanceTo(hostile.GlobalPosition);
         if (Order == SquadOrder.Hold)
@@ -272,20 +366,18 @@ public partial class SquadMate
             return anchor;
         }
 
-        if (_combatManeuverTimer <= 0.0f)
+        if (_combatManeuverTimer <= 0.0f
+            || !_combatHasSight && GlobalPosition.DistanceTo(_combatFlankPosition) < 0.85f)
         {
             SelectCombatManeuver(anchor, anchorLeash, hostile, enemyDistance);
-            _combatManeuverTimer = 0.85f + SquadSlot * 0.13f;
+            _combatManeuverTimer = _combatHasSight
+                ? 0.85f + SquadSlot * 0.13f
+                : 2.35f;
         }
 
         if (_combatHasCoverPosition && _combatCoverCommitment > 0.0f)
         {
             return _combatCoverPosition;
-        }
-        if (!_combatHasSight && _combatMemoryRemaining > 0.0f
-            && IsInsideAnchorLeash(_combatLastKnownPosition, anchor, anchorLeash))
-        {
-            return _combatLastKnownPosition;
         }
         if (enemyDistance < PreferredCombatDistance() * 0.58f)
         {
@@ -310,8 +402,17 @@ public partial class SquadMate
         EnemyOperator hostile,
         float enemyDistance)
     {
-        var wantsCover = Health / Mathf.Max(1.0f, MaxHealth) < 0.72f
-            || (!_combatHasSight && _combatMemoryRemaining > 0.0f);
+        if (!_combatHasSight && _combatMemoryRemaining > 0.0f)
+        {
+            _combatHasCoverPosition = false;
+            _combatCoverCommitment = 0.0f;
+            _combatFlankPosition = SelectBlockedSightFlank(anchor, anchorLeash, hostile);
+            CombatFlankSelections++;
+            return;
+        }
+
+        var wantsCover = Health / Mathf.Max(1.0f, MaxHealth) < 0.58f
+            || _combatThreat is not null && _combatThreatAge < 1.8f;
         if (wantsCover)
         {
             var threatPosition = _combatHasSight ? hostile.GlobalPosition : _combatLastKnownPosition;
@@ -345,6 +446,99 @@ public partial class SquadMate
             - radial * radialDistance;
     }
 
+    private Vector3 SelectBlockedSightFlank(Vector3 anchor, float anchorLeash, EnemyOperator hostile)
+    {
+        var threat = hostile.IsScanned ? hostile.GlobalPosition : _combatLastKnownPosition;
+        var approach = GlobalPosition.DirectionTo(FlattenToCurrentHeight(threat));
+        approach.Y = 0.0f;
+        if (approach.LengthSquared() < 0.01f)
+        {
+            approach = -GlobalBasis.Z;
+        }
+        approach = approach.Normalized();
+        var right = new Vector3(-approach.Z, 0.0f, approach.X);
+        var preferredSide = _combatFlankSide;
+        var best = GlobalPosition + right * preferredSide * 2.8f;
+        var bestScore = float.NegativeInfinity;
+
+        foreach (var side in new[] { preferredSide, -preferredSide })
+        {
+            foreach (var lateralDistance in new[] { 3.2f, 5.0f, 7.0f })
+            {
+                foreach (var advanceDistance in new[] { 1.4f, 3.2f })
+                {
+                    var candidate = GlobalPosition
+                        + right * side * lateralDistance
+                        + approach * advanceDistance;
+                    candidate.Y = GlobalPosition.Y;
+                    if (!IsInsideAnchorLeash(candidate, anchor, anchorLeash)
+                        || !HasGroundSupport(candidate))
+                    {
+                        continue;
+                    }
+                    var travelDistance = GlobalPosition.DistanceTo(candidate);
+                    var travelDirection = GlobalPosition.DirectionTo(candidate);
+                    travelDirection.Y = 0.0f;
+                    var clearance = MeasureMovementClearance(
+                        travelDirection.Normalized(),
+                        Mathf.Min(travelDistance, 4.5f));
+                    if (clearance < Mathf.Min(1.15f, travelDistance * 0.52f))
+                    {
+                        continue;
+                    }
+                    var predictedSight = HasLineOfSightFrom(candidate, hostile);
+                    var score = clearance
+                        + (predictedSight ? 20.0f : 0.0f)
+                        + (side == preferredSide ? 0.8f : 0.0f)
+                        - travelDistance * 0.12f;
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        best = candidate;
+                        _combatFlankSide = side;
+                    }
+                }
+            }
+        }
+
+        if (bestScore > float.NegativeInfinity)
+        {
+            return best;
+        }
+        var leftClearance = MeasureMovementClearance(right, 3.0f);
+        var rightClearance = MeasureMovementClearance(-right, 3.0f);
+        _combatFlankSide = leftClearance >= rightClearance ? 1.0f : -1.0f;
+        var fallback = GlobalPosition + right * _combatFlankSide * 2.6f;
+        return IsInsideAnchorLeash(fallback, anchor, anchorLeash) ? fallback : anchor;
+    }
+
+    private bool HasLineOfSightFrom(Vector3 position, EnemyOperator hostile)
+    {
+        var from = position + Vector3.Up * 1.35f;
+        var to = hostile.GlobalPosition + Vector3.Up * 1.05f;
+        var query = PhysicsRayQueryParameters3D.Create(from, to);
+        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        query.CollideWithAreas = false;
+        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+        if (hit.Count == 0)
+        {
+            return false;
+        }
+        var collider = hit["collider"].AsGodotObject();
+        return collider == hostile
+            || collider is Node node && (hostile.IsAncestorOf(node) || node.IsAncestorOf(hostile));
+    }
+
+    private bool HasGroundSupport(Vector3 position)
+    {
+        var from = position + Vector3.Up * 0.8f;
+        var query = PhysicsRayQueryParameters3D.Create(from, position + Vector3.Down * 1.8f);
+        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        query.CollisionMask = 1;
+        query.CollideWithAreas = false;
+        return GetWorld3D().DirectSpaceState.IntersectRay(query).Count > 0;
+    }
+
     private float PreferredCombatDistance() => Role switch
     {
         OperatorRole.Recon => 20.0f,
@@ -369,7 +563,8 @@ public partial class SquadMate
         {
             return;
         }
-        var desiredYaw = GlobalTransform.LookingAt(point, Vector3.Up).Basis.GetEuler().Y;
+        var direction = GlobalPosition.DirectionTo(point);
+        var desiredYaw = Mathf.Atan2(-direction.X, -direction.Z);
         var rotation = Rotation;
         rotation.Y = Mathf.LerpAngle(rotation.Y, desiredYaw, delta * 7.0f);
         Rotation = rotation;
@@ -397,6 +592,35 @@ public partial class SquadMate
         return (desired * 0.22f + left * _combatStrafeSign).Normalized();
     }
 
+    private Vector3 ApplySquadSeparation(Vector3 desired)
+    {
+        var separation = Vector3.Zero;
+        foreach (var node in GetTree().GetNodesInGroup("player_squad_ai"))
+        {
+            if (node is not SquadMate mate
+                || mate == this
+                || mate.IsDowned
+                || mate.IsBodyBag
+                || !IsInstanceValid(mate))
+            {
+                continue;
+            }
+            var offset = GlobalPosition - mate.GlobalPosition;
+            offset.Y = 0.0f;
+            var distance = offset.Length();
+            if (distance < 0.05f || distance >= 2.4f)
+            {
+                continue;
+            }
+            separation += offset.Normalized() * (1.0f - distance / 2.4f);
+        }
+        if (separation.LengthSquared() < 0.001f)
+        {
+            return desired;
+        }
+        return (desired + separation * 0.85f).Normalized();
+    }
+
     private float MeasureMovementClearance(Vector3 direction, float maxDistance)
     {
         var from = GlobalPosition + Vector3.Up * 0.8f;
@@ -421,7 +645,18 @@ public partial class SquadMate
         if (_combatMoveRequested && progress < 0.24f)
         {
             _combatStrafeSign *= -1.0f;
+            _combatFlankSide *= -1.0f;
             _combatAvoidanceTimer = 1.25f;
+            var forward = _combatDesiredDirection.LengthSquared() > 0.01f
+                ? _combatDesiredDirection.Normalized()
+                : -GlobalBasis.Z;
+            var side = new Vector3(-forward.Z, 0.0f, forward.X) * _combatStrafeSign;
+            var sideClearance = MeasureMovementClearance(side, 2.2f);
+            var reverseClearance = MeasureMovementClearance(-forward, 1.8f);
+            _combatRecoveryDirection = sideClearance >= reverseClearance
+                ? (side - forward * 0.25f).Normalized()
+                : (-forward + side * 0.35f).Normalized();
+            _combatRecoveryTimer = 1.05f;
             _combatManeuverTimer = 0.0f;
             _combatHasCoverPosition = false;
             CombatStuckRecoveries++;
@@ -453,7 +688,36 @@ public partial class SquadMate
         _combatProgressOrigin = GlobalPosition;
         _combatProgressTimer = 0.0f;
         _combatAvoidanceTimer = 0.0f;
+        _combatRecoveryTimer = 0.0f;
+        _combatRecoveryDirection = Vector3.Zero;
         _combatMoveRequested = false;
         _combatDesiredDirection = Vector3.Zero;
+    }
+
+    internal bool HasCombatLineOfSightForDiagnostics(EnemyOperator hostile)
+        => IsInstanceValid(hostile) && !hostile.IsDead && HasLineOfSight(hostile);
+
+    internal void ResetCombatTacticsForDiagnostics()
+    {
+        ClearCombatTarget();
+        _combatThreat = null;
+        _combatThreatAge = 100.0f;
+        _combatTargetScanTimer = 0.0f;
+        _combatManeuverTimer = 0.0f;
+        _combatCoverCommitment = 0.0f;
+        _combatRecoveryTimer = 0.0f;
+        _combatStrafeSign = SquadSlot % 2 == 0 ? 1.0f : -1.0f;
+        _combatFlankSide = _combatStrafeSign;
+        _burstShotsRemaining = 0;
+        _weaponCooldown = 0.0f;
+        _skillActionTime = 0.0f;
+        Health = MaxHealth;
+        CombatShotsFired = 0;
+        CombatTargetSwitches = 0;
+        CombatCoverSelections = 0;
+        CombatFlankSelections = 0;
+        CombatStuckRecoveries = 0;
+        ResetMovementProgress();
+        UpdateHealthVisual();
     }
 }
