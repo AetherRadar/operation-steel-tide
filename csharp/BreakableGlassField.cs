@@ -12,6 +12,7 @@ public partial class BreakableGlassField : Area3D
 {
     public const uint GlassCollisionLayer = 1u << 7;
     public const string GroupName = "breakable_glass_fields";
+    public const string AudioGroupName = "glass_break_audio";
 
     private const float MinimumShatterDamage = 4.0f;
     private static readonly BoxMesh UnitBox = new() { Size = Vector3.One };
@@ -438,17 +439,38 @@ public partial class BreakableGlassField : Area3D
         root.AddChild(flash);
         flash.GlobalPosition = position + hitNormal * 0.04f;
 
-        var audio = new AudioStreamPlayer3D
+        var stream = _glassBreakSound ??= SoundLab.GlassBreak();
+        var pitch = 0.94f + (ShatteredCount % 5) * 0.025f;
+        var spatialAudio = new AudioStreamPlayer3D
         {
             Name = "GlassBreakAudio",
-            Stream = _glassBreakSound ??= SoundLab.GlassBreak(),
-            VolumeDb = -1.5f,
-            MaxDistance = 58.0f,
-            PitchScale = 0.94f + (ShatteredCount % 5) * 0.025f
+            Stream = stream,
+            VolumeDb = 3.0f,
+            UnitSize = 2.4f,
+            MaxDistance = 72.0f,
+            MaxDb = 5.0f,
+            PitchScale = pitch
         };
-        root.AddChild(audio);
-        audio.GlobalPosition = position;
-        audio.Play();
+        spatialAudio.AddToGroup(AudioGroupName);
+        root.AddChild(spatialAudio);
+        spatialAudio.GlobalPosition = position;
+        spatialAudio.Play();
+
+        AudioStreamPlayer? closeAudio = null;
+        var camera = GetViewport().GetCamera3D();
+        if (camera is not null && camera.GlobalPosition.DistanceTo(position) <= 30.0f)
+        {
+            closeAudio = new AudioStreamPlayer
+            {
+                Name = "GlassBreakCloseAudio",
+                Stream = stream,
+                VolumeDb = -0.5f,
+                PitchScale = pitch * 1.015f
+            };
+            closeAudio.AddToGroup(AudioGroupName);
+            root.AddChild(closeAudio);
+            closeAudio.Play();
+        }
 
         var tween = root.CreateTween().SetParallel(true);
         tween.TweenProperty(flash, "light_energy", 0.0f, 0.11f);
@@ -457,7 +479,8 @@ public partial class BreakableGlassField : Area3D
         {
             particles.QueueFree();
             flash.QueueFree();
-            audio.QueueFree();
+            spatialAudio.QueueFree();
+            closeAudio?.QueueFree();
         }));
     }
 }

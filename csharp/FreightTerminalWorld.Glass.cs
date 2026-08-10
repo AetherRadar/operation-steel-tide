@@ -66,6 +66,9 @@ public partial class FreightTerminalWorld
         var firstShotBlocked = false;
         var collisionDisabled = false;
         var secondShotCleared = false;
+        var audioTriggered = false;
+        var audioPlaying = false;
+        var closeAudioPlaying = false;
         if (rayReady && field is not null)
         {
             firstShotBlocked = BreakableGlassField.TryShatterAlongRay(
@@ -87,6 +90,35 @@ public partial class FreightTerminalWorld
                 rayFrom.DirectionTo(rayTo),
                 out _,
                 false);
+            if (field.TryGetIntactPaneRay(out var audioFrom, out var audioTo, out _))
+            {
+                var audioCenter = (audioFrom + audioTo) * 0.5f;
+                var listenerDirection = audioCenter.DirectionTo(audioFrom);
+                var listenerPosition = audioCenter + listenerDirection * 3.0f;
+                listenerPosition.Y = audioCenter.Y - 1.45f;
+                _player.GlobalPosition = listenerPosition;
+                _player.FaceWorldPointForDiagnostics(audioCenter);
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                audioTriggered = BreakableGlassField.TryShatterAlongRay(
+                    GetWorld3D(),
+                    audioFrom,
+                    audioTo,
+                    30.0f,
+                    audioFrom.DirectionTo(audioTo),
+                    out _,
+                    true);
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                audioPlaying = GetTree().GetNodesInGroup(BreakableGlassField.AudioGroupName)
+                    .Any(node => node switch
+                    {
+                        AudioStreamPlayer3D spatial => spatial.Playing && spatial.Stream?.GetLength() >= 0.6,
+                        AudioStreamPlayer close => close.Playing && close.Stream?.GetLength() >= 0.6,
+                        _ => false
+                    });
+                closeAudioPlaying = GetTree().GetNodesInGroup(BreakableGlassField.AudioGroupName)
+                    .OfType<AudioStreamPlayer>()
+                    .Any(audio => audio.Playing && audio.Stream?.GetLength() >= 0.6);
+            }
         }
 
         var fieldsBatched = fields.Length > 0
@@ -98,11 +130,14 @@ public partial class FreightTerminalWorld
             && firstShotBlocked
             && collisionDisabled
             && secondShotCleared
+            && audioTriggered
+            && audioPlaying
+            && closeAudioPlaying
             && fieldsBatched
             && panesDense
             && framesComplete
             && residentialTracked;
-        GD.Print($"GLASS_CHECK valid={valid} fields={fields.Length} panes={paneCount} frames={frameInstances} ray_ready={rayReady} first_shot_blocked={firstShotBlocked} collision_disabled={collisionDisabled} second_shot_clear={secondShotCleared} batched={fieldsBatched} dense={panesDense} tracked={residentialTracked}");
+        GD.Print($"GLASS_CHECK valid={valid} fields={fields.Length} panes={paneCount} frames={frameInstances} ray_ready={rayReady} first_shot_blocked={firstShotBlocked} collision_disabled={collisionDisabled} second_shot_clear={secondShotCleared} audio_triggered={audioTriggered} audio_playing={audioPlaying} close_audio={closeAudioPlaying} batched={fieldsBatched} dense={panesDense} tracked={residentialTracked}");
         GD.Print($"GLASS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

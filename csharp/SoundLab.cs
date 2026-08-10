@@ -133,18 +133,44 @@ public static class SoundLab
     public static AudioStreamWav GlassBreak()
     {
         const int rate = 22050;
-        var samples = new float[(int)(rate * 0.48f)];
+        var samples = new float[(int)(rate * 0.62f)];
         var rng = new RandomNumberGenerator { Seed = 681421 };
-        var ringing = 0.0f;
+        var shardTimes = new[] { 0.035f, 0.072f, 0.118f, 0.178f, 0.255f, 0.345f, 0.455f };
+        var peak = 0.0f;
         for (var i = 0; i < samples.Length; i++)
         {
             var t = (float)i / rate;
-            var crack = rng.RandfRange(-1.0f, 1.0f) * Mathf.Exp(-t * 72.0f);
-            var scatter = rng.RandfRange(-1.0f, 1.0f) * Mathf.Exp(-t * 9.5f);
-            var chime = Mathf.Sin(Mathf.Tau * 2860.0f * t) * Mathf.Exp(-t * 13.0f)
-                + Mathf.Sin(Mathf.Tau * 4170.0f * t) * Mathf.Exp(-t * 18.0f) * 0.55f;
-            ringing = Mathf.Lerp(ringing, scatter, 0.28f);
-            samples[i] = crack * 0.82f + chime * 0.34f + ringing * 0.38f;
+            var noise = rng.RandfRange(-1.0f, 1.0f);
+            var initialCrack = noise * Mathf.Exp(-t * 92.0f) * 1.35f;
+            var body = Mathf.Sin(Mathf.Tau * 760.0f * t) * Mathf.Exp(-t * 19.0f) * 0.42f;
+            var ring = (Mathf.Sin(Mathf.Tau * 2380.0f * t)
+                + Mathf.Sin(Mathf.Tau * 3610.0f * t) * 0.58f)
+                * Mathf.Exp(-t * 10.5f)
+                * 0.3f;
+            var shards = 0.0f;
+            for (var shard = 0; shard < shardTimes.Length; shard++)
+            {
+                var localTime = t - shardTimes[shard];
+                if (localTime < 0.0f)
+                {
+                    continue;
+                }
+                var decay = Mathf.Exp(-localTime * (34.0f + shard * 2.2f));
+                var frequency = 1180.0f + shard * 315.0f;
+                shards += (Mathf.Sin(Mathf.Tau * frequency * localTime) * 0.72f + noise * 0.55f)
+                    * decay
+                    * (1.0f - shard * 0.065f);
+            }
+            samples[i] = initialCrack + body + ring + shards * 0.54f;
+            peak = Mathf.Max(peak, Mathf.Abs(samples[i]));
+        }
+        if (peak > 0.001f)
+        {
+            var normalization = 0.94f / peak;
+            for (var i = 0; i < samples.Length; i++)
+            {
+                samples[i] *= normalization;
+            }
         }
         return MakeStream(samples, rate);
     }
