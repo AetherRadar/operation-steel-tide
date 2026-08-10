@@ -10,7 +10,9 @@ public partial class FreightTerminalWorld
         await WaitFrames(6);
         var field = GetTree().GetNodesInGroup(BreakableGlassField.GroupName)
             .OfType<BreakableGlassField>()
-            .FirstOrDefault(candidate => candidate.PaneCount >= 2);
+            .FirstOrDefault(candidate => candidate.Name.ToString().StartsWith(
+                "SkybridgeBreakableGlass",
+                System.StringComparison.Ordinal));
         if (field is null || !field.TryGetIntactPaneRay(out var rayFrom, out var rayTo, out _))
         {
             GD.PushError("Glass capture could not find an intact pane.");
@@ -23,9 +25,7 @@ public partial class FreightTerminalWorld
             enemy.ProcessMode = ProcessModeEnum.Disabled;
         }
         var center = (rayFrom + rayTo) * 0.5f;
-        var outward = center - field.GlobalPosition;
-        outward.Y = 0.0f;
-        outward = outward.LengthSquared() > 0.001f ? outward.Normalized() : center.DirectionTo(rayFrom);
+        var outward = center.DirectionTo(rayFrom);
         rayFrom = center + outward * 1.2f;
         rayTo = center - outward * 1.2f;
         var standPosition = center + outward * 4.2f;
@@ -35,17 +35,14 @@ public partial class FreightTerminalWorld
         _player.GrantFireablePrimaryForDiagnostics();
         await WaitFrames(3);
 
-        var shattered = BreakableGlassField.TryShatterAlongRay(
-            GetWorld3D(),
-            rayFrom,
-            rayTo,
-            30.0f,
-            rayFrom.DirectionTo(rayTo),
-            out var hitPosition);
+        var shatteredBefore = field.ShatteredCount;
+        _player.Fire();
         await WaitFrames(2);
+        var shattered = field.ShatteredCount > shatteredBefore;
+        var audioPlaying = _player.IsGlassBreakAudioPlaying;
         SaveViewportImage("res://glass_break_validation.png");
-        GD.Print($"GLASS_CAPTURE shattered={shattered} hit={hitPosition} path=glass_break_validation.png");
-        GetTree().Quit(shattered ? 0 : 2);
+        GD.Print($"GLASS_CAPTURE shattered={shattered} player_audio={audioPlaying} path=glass_break_validation.png");
+        GetTree().Quit(shattered && audioPlaying ? 0 : 2);
     }
 
     private async void ValidateBreakableGlass()
@@ -57,7 +54,9 @@ public partial class FreightTerminalWorld
             .ToArray();
         var paneCount = fields.Sum(field => field.PaneCount);
         var frameInstances = fields.Sum(field => field.FrameInstanceCount);
-        var field = fields.FirstOrDefault(candidate => candidate.PaneCount >= 2);
+        var field = fields.FirstOrDefault(candidate =>
+            candidate.PaneCount >= 2
+            && !candidate.Name.ToString().StartsWith("SkybridgeBreakableGlass", System.StringComparison.Ordinal));
         var rayFrom = Vector3.Zero;
         var rayTo = Vector3.Zero;
         var paneIndex = -1;
@@ -69,6 +68,8 @@ public partial class FreightTerminalWorld
         var audioTriggered = false;
         var audioPlaying = false;
         var closeAudioPlaying = false;
+        var skybridgeShot = false;
+        var playerAudioPlaying = false;
         if (rayReady && field is not null)
         {
             firstShotBlocked = BreakableGlassField.TryShatterAlongRay(
@@ -121,6 +122,34 @@ public partial class FreightTerminalWorld
             }
         }
 
+        var skybridgeField = fields.FirstOrDefault(candidate =>
+            candidate.Name.ToString().StartsWith("SkybridgeBreakableGlass", System.StringComparison.Ordinal)
+            && candidate.TryGetIntactPaneRay(out _, out _, out _));
+        var skybridgeReady = skybridgeField is not null;
+        var skybridgeFireAccepted = false;
+        var skybridgeCrosshair = false;
+        var skybridgeAlignment = -1.0f;
+        if (skybridgeField is not null
+            && skybridgeField.TryGetIntactPaneRay(out var skybridgeFrom, out var skybridgeTo, out _))
+        {
+            var skybridgeCenter = (skybridgeFrom + skybridgeTo) * 0.5f;
+            var skybridgeNormal = skybridgeCenter.DirectionTo(skybridgeFrom);
+            var playerPosition = skybridgeCenter + skybridgeNormal * 4.2f;
+            playerPosition.Y = skybridgeCenter.Y - 1.57f;
+            _player.ProcessMode = ProcessModeEnum.Disabled;
+            _player.GlobalPosition = playerPosition;
+            _player.AimCameraAtWorldPointForDiagnostics(skybridgeCenter);
+            _player.GrantFireablePrimaryForDiagnostics();
+            skybridgeAlignment = _player.DiagnosticCameraForward.Dot(
+                _player.DiagnosticCameraPosition.DirectionTo(skybridgeCenter));
+            skybridgeCrosshair = _player.HasGlassInCrosshairForDiagnostics();
+            var shatteredBefore = skybridgeField.ShatteredCount;
+            skybridgeFireAccepted = _player.FireForDiagnostics();
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            skybridgeShot = skybridgeField.ShatteredCount > shatteredBefore;
+            playerAudioPlaying = _player.IsGlassBreakAudioPlaying;
+        }
+
         var fieldsBatched = fields.Length > 0
             && fields.Length <= ResidentialTowerSpecs.Length + ResidentialSkyLinks.Sum(link => link.Floors.Length) + 2;
         var panesDense = paneCount >= 1200;
@@ -133,11 +162,13 @@ public partial class FreightTerminalWorld
             && audioTriggered
             && audioPlaying
             && closeAudioPlaying
+            && skybridgeShot
+            && playerAudioPlaying
             && fieldsBatched
             && panesDense
             && framesComplete
             && residentialTracked;
-        GD.Print($"GLASS_CHECK valid={valid} fields={fields.Length} panes={paneCount} frames={frameInstances} ray_ready={rayReady} first_shot_blocked={firstShotBlocked} collision_disabled={collisionDisabled} second_shot_clear={secondShotCleared} audio_triggered={audioTriggered} audio_playing={audioPlaying} close_audio={closeAudioPlaying} batched={fieldsBatched} dense={panesDense} tracked={residentialTracked}");
+        GD.Print($"GLASS_CHECK valid={valid} fields={fields.Length} panes={paneCount} frames={frameInstances} ray_ready={rayReady} first_shot_blocked={firstShotBlocked} collision_disabled={collisionDisabled} second_shot_clear={secondShotCleared} audio_triggered={audioTriggered} audio_playing={audioPlaying} close_audio={closeAudioPlaying} skybridge_ready={skybridgeReady} skybridge_crosshair={skybridgeCrosshair} skybridge_alignment={skybridgeAlignment:0.000} skybridge_fire={skybridgeFireAccepted} skybridge_shot={skybridgeShot} player_audio={playerAudioPlaying} batched={fieldsBatched} dense={panesDense} tracked={residentialTracked}");
         GD.Print($"GLASS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

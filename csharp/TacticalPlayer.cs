@@ -127,6 +127,31 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         Ammo = EquippedWeapon.Stats().MagazineSize;
         SetAmmoReserve(CurrentAmmoCaliber, Mathf.Max(ReserveAmmo, 60));
         _loadedAmmoGrade = LootGrade.Common;
+        _fireCooldown = 0.0f;
+        _isPlating = false;
+        _knifeEquipped = false;
+    }
+
+    public bool IsGlassBreakAudioPlaying => IsInstanceValid(_glassBreakAudio) && _glassBreakAudio.Playing;
+
+    public bool FireForDiagnostics()
+    {
+        var ammoBefore = Ammo;
+        Fire();
+        return Ammo < ammoBefore;
+    }
+
+    public Vector3 DiagnosticCameraPosition => IsInstanceValid(_camera) ? _camera.GlobalPosition : GlobalPosition;
+    public Vector3 DiagnosticCameraForward => IsInstanceValid(_camera) ? -_camera.GlobalBasis.Z : -GlobalBasis.Z;
+
+    public bool HasGlassInCrosshairForDiagnostics(float range = 12.0f)
+    {
+        var from = DiagnosticCameraPosition;
+        var query = PhysicsRayQueryParameters3D.Create(from, from + DiagnosticCameraForward * range);
+        query.CollisionMask = BreakableGlassField.GlassCollisionLayer;
+        query.CollideWithAreas = true;
+        query.CollideWithBodies = false;
+        return GetWorld3D().DirectSpaceState.IntersectRay(query).Count > 0;
     }
 
     private bool _isReloading;
@@ -192,6 +217,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private Marker3D _ejectMarker = null!;
     private AudioStreamPlayer3D _gunAudio = null!;
     private AudioStreamPlayer _reloadAudio = null!;
+    private AudioStreamPlayer _glassBreakAudio = null!;
     private AudioStreamPlayer3D _footstepAudio = null!;
     private CollisionShape3D _collider = null!;
     private readonly RandomNumberGenerator _rng = new();
@@ -263,6 +289,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         if (IsInstanceValid(_head))
         {
             _head.Rotation = Vector3.Zero;
+        }
+    }
+
+    public void AimCameraAtWorldPointForDiagnostics(Vector3 worldPoint)
+    {
+        if (IsInstanceValid(_camera) && _camera.GlobalPosition.DistanceSquaredTo(worldPoint) > 0.0001f)
+        {
+            _camera.LookAt(worldPoint, Vector3.Up);
         }
     }
 
@@ -582,6 +616,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _muzzle.AddChild(_gunAudio);
         _reloadAudio = new AudioStreamPlayer { Stream = SoundLab.ReloadClick(), VolumeDb = -8.0f };
         AddChild(_reloadAudio);
+        _glassBreakAudio = new AudioStreamPlayer
+        {
+            Name = "PlayerGlassBreakAudio",
+            Stream = SoundLab.GlassBreak(),
+            VolumeDb = 3.5f
+        };
+        AddChild(_glassBreakAudio);
         _footstepAudio = new AudioStreamPlayer3D
         {
             Stream = SoundLab.Footstep(),
@@ -1680,6 +1721,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             from.DirectionTo(to),
             out _))
         {
+            PlayLocalGlassBreak();
             return;
         }
         var query = PhysicsRayQueryParameters3D.Create(from, to);
@@ -1793,9 +1835,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             GetWorld3D(),
             from,
             to,
-            stats.Damage * AmmoTiers.ArmorPenetration(CurrentAmmoGrade),
+            stats.Damage * AmmoTiers.DamageMultiplier(CurrentAmmoGrade),
             direction,
             out var glassHitPosition);
+        if (glassBlocked)
+        {
+            PlayLocalGlassBreak();
+        }
         var hit = new Godot.Collections.Dictionary();
         if (!glassBlocked)
         {
@@ -1882,6 +1928,17 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var weaponPosition = _weaponRoot.Position;
         weaponPosition.Z += 0.055f;
         _weaponRoot.Position = weaponPosition;
+    }
+
+    private void PlayLocalGlassBreak()
+    {
+        if (!IsInstanceValid(_glassBreakAudio))
+        {
+            return;
+        }
+        _glassBreakAudio.Stop();
+        _glassBreakAudio.PitchScale = _rng.RandfRange(0.96f, 1.04f);
+        _glassBreakAudio.Play();
     }
 
     private void StartReload()
