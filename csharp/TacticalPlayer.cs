@@ -209,6 +209,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         BuildBody();
         BuildWeapon();
         BuildKnife();
+        BuildLadderViewModel();
         BuildRoleDevices();
         BuildMedicalDevices();
         ApplyWeaponBuildVisuals();
@@ -918,6 +919,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             _pitch = Mathf.Clamp(_pitch - motion.Relative.Y * MouseSensitivity, -0.55f, 0.42f);
             return;
         }
+        if (_isClimbingLadder)
+        {
+            _pitch = Mathf.Clamp(_pitch - motion.Relative.Y * MouseSensitivity, -0.55f, 0.42f);
+            return;
+        }
 
         var rotation = Rotation;
         rotation.Y -= motion.Relative.X * MouseSensitivity;
@@ -930,6 +936,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var dt = (float)delta;
         if (IsDead)
         {
+            if (_isClimbingLadder)
+            {
+                CancelLadderClimb(notify: false);
+            }
             CloseMedicalWheelWithoutUse();
             CancelMedicalUse(false);
             UpdateDownedCrawl(dt);
@@ -939,6 +949,16 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         if (IsInVehicle)
         {
             UpdateVehiclePassenger(dt);
+            return;
+        }
+        if (_isClimbingLadder)
+        {
+            UpdateLadderClimb(dt);
+            if (_isClimbingLadder)
+            {
+                UpdateCameraAndWeapon(dt);
+                PushHudStats();
+            }
             return;
         }
         if (HandleMedicalWheelInput())
@@ -1157,7 +1177,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             EjectFromVehicleIfAny();
         }
 
-        var input = Input.GetVector("move_left", "move_right", "move_forward", "move_backward");
+        var input = UiLocked
+            ? Vector2.Zero
+            : Input.GetVector("move_left", "move_right", "move_forward", "move_backward");
         var direction = (Transform.Basis * new Vector3(input.X, 0, input.Y)).Normalized();
         var velocity = Velocity;
         velocity.X = Mathf.MoveToward(velocity.X, direction.X * CrawlSpeed, delta * 10.0f);
@@ -1463,6 +1485,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     private void UpdateCameraAndWeapon(float delta)
     {
+        if (_isClimbingLadder)
+        {
+            UpdateLadderViewAnimation(delta);
+            return;
+        }
         UpdateDamageKick(delta);
         _recoilPitch = Mathf.Lerp(_recoilPitch, 0.0f, SmoothFactor(11.0f, delta));
         _recoilSide = Mathf.Lerp(_recoilSide, 0.0f, SmoothFactor(13.0f, delta));

@@ -290,6 +290,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateStairsClimb();
         }
+        else if (Array.Exists(args, value => value == "--validate-roof-access"))
+        {
+            ValidateRoofAccess();
+        }
         else if (Array.Exists(args, value => value == "--validate-residential"))
         {
             ValidateResidentialCommunity();
@@ -297,6 +301,10 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--validate-residential-gameplay"))
         {
             ValidateResidentialGameplay();
+        }
+        else if (Array.Exists(args, value => value == "--validate-residential-localization"))
+        {
+            ValidateResidentialLocalization();
         }
         else if (Array.Exists(args, value => value == "--validate-residential-cover"))
         {
@@ -353,6 +361,10 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--capture-residential-stairs"))
         {
             CaptureResidentialStairDetails();
+        }
+        else if (Array.Exists(args, value => value == "--capture-roof-access"))
+        {
+            CaptureRoofAccess();
         }
         else if (Array.Exists(args, value => value == "--capture-relay-station"))
         {
@@ -443,7 +455,7 @@ public partial class FreightTerminalWorld : Node3D
             GetTree().ReloadCurrentScene();
             return;
         }
-        if (!_missionEnded && Input.IsActionJustPressed("inventory"))
+        if (!_missionEnded && !_player.IsDead && Input.IsActionJustPressed("inventory"))
         {
             if (_hud.IsLootVisible)
             {
@@ -1698,6 +1710,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
+        if (TryBeginLocalPlayerElimination())
+        {
+            return;
+        }
         _missionEnded = true;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         _hud.HideDownedState();
@@ -1781,6 +1797,13 @@ public partial class FreightTerminalWorld : Node3D
 
     private void UpdateInteraction(float delta)
     {
+        if (_localPlayerEliminated)
+        {
+            _lootSearchTarget = null;
+            _player.SetSearchPose(false);
+            _hud.SetInteraction(string.Empty, 0.0f, false);
+            return;
+        }
         if (!Input.IsActionPressed("interact"))
         {
             _interactReleaseRequired = false;
@@ -1813,6 +1836,11 @@ public partial class FreightTerminalWorld : Node3D
             && _player.GlobalPosition.DistanceTo(_manualReviveTarget.CombatNode.GlobalPosition) < 3.0f))
         {
             _lootSearchTarget = null;
+            return;
+        }
+
+        if (TryHandleRoofAccessInteraction())
+        {
             return;
         }
 
@@ -1902,14 +1930,32 @@ public partial class FreightTerminalWorld : Node3D
                 _lootSearchTarget = nearest;
                 _interactionProgress = 0.0f;
             }
-            _interactionProgress = 0.0f;
-            _player.SetSearchPose(false);
-            var open = GameLocalization.Get("open_loot", _languageSetting, "OPEN");
-            _hud.SetInteraction($"{open}  //  {nearest.DisplayName(_languageSetting)}", -1.0f, true);
-            if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
+            if (nearest is ResidentialSearchableFurniture)
             {
-                _interactReleaseRequired = true;
-                OpenLoot(nearest);
+                var searching = Input.IsActionPressed("interact") && !_interactReleaseRequired;
+                _interactionProgress = searching
+                    ? Mathf.Min(1.0f, _interactionProgress + delta / nearest.SearchDuration)
+                    : Mathf.Max(0.0f, _interactionProgress - delta * 2.2f);
+                _player.SetSearchPose(_interactionProgress > 0.02f, _interactionProgress);
+                var search = GameLocalization.Get("search", _languageSetting, "SEARCH");
+                _hud.SetInteraction($"{search}  //  {nearest.DisplayName(_languageSetting)}", _interactionProgress, true);
+                if (_interactionProgress >= 1.0f)
+                {
+                    _interactReleaseRequired = true;
+                    OpenLoot(nearest);
+                }
+            }
+            else
+            {
+                _interactionProgress = 0.0f;
+                _player.SetSearchPose(false);
+                var open = GameLocalization.Get("open_loot", _languageSetting, "OPEN");
+                _hud.SetInteraction($"{open}  //  {nearest.DisplayName(_languageSetting)}", -1.0f, true);
+                if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
+                {
+                    _interactReleaseRequired = true;
+                    OpenLoot(nearest);
+                }
             }
             return;
         }
@@ -1924,6 +1970,13 @@ public partial class FreightTerminalWorld : Node3D
         _openLootSource = source;
         _personalBackpackOpen = false;
         source.OnSearched();
+        if (_player.IsDead)
+        {
+            _openLootSource = null;
+            _player.SetSearchPose(false);
+            _hud.SetInteraction(string.Empty, 0.0f, false);
+            return;
+        }
         _player.UiLocked = true;
         _player.SetSearchPose(true, 1.0f);
         _player.DisarmFireInput();
@@ -2297,6 +2350,7 @@ public partial class FreightTerminalWorld : Node3D
         _hud.SetMissionPhase(_missionPhase, _missionRemaining, _missionOnline);
         RefreshLocalizedObjective();
         RefreshLootView();
+        RefreshResidentialLocalization();
         SaveSettings();
     }
 
