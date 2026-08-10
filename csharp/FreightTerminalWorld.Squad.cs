@@ -837,7 +837,7 @@ public partial class FreightTerminalWorld
         {
             return false;
         }
-        return enemy.Alerted || _missionPhase is "CONTACT" or "COMBAT";
+        return enemy.IsWorldBoss || enemy.Alerted || _missionPhase is "CONTACT" or "COMBAT";
     }
 
     public ISquadCombatant? FindNearestFriendly(Vector3 origin)
