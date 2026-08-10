@@ -137,8 +137,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         CollisionLayer = 4;
         CollisionMask = 1;
         FloorSnapLength = 0.35f;
+        AddToGroup("player_squad_ai");
         BuildOperator();
         ApplyRoleVisuals();
+        InitializeCombatTactics();
         if (!IsHumanProxy)
         {
             _skillCooldown = SkillCooldownDuration * Mathf.Clamp(0.24f + SquadSlot * 0.11f, 0.35f, 0.62f);
@@ -155,6 +157,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
         Order = order;
         _orderPosition = order == SquadOrder.Follow ? GlobalPosition : position;
+        OnSquadOrderChanged();
         UpdateLabel();
     }
 
@@ -218,6 +221,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         _skillCooldown = Mathf.Max(0.0f, _skillCooldown - dt);
         _overdriveTime = Mathf.Max(0.0f, _overdriveTime - dt);
         _decisionTimer = Mathf.Max(0.0f, _decisionTimer - dt);
+        UpdateCombatTacticalTimers(dt);
 
         if (IsHumanProxy)
         {
@@ -252,36 +256,41 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
         UpdateSkillAction(dt);
         _lootHuntCooldown = Mathf.Max(0.0f, _lootHuntCooldown - dt);
-        var candidate = Main.FindNearestEnemy(GlobalPosition, 58.0f);
-        var hostile = candidate is not null && Main.CanSquadEngage(candidate) ? candidate : null;
+        var hostile = UpdateCombatTarget(dt);
         var patient = Role == OperatorRole.Medic ? Main.FindLowestFriendly(0.72f, true) : null;
         // Cold-start: hunt a weapon cache before combat when still unarmed.
         if (!HasFireablePrimary && Order != SquadOrder.Hold)
         {
             UpdateWeaponLootHunt(dt, hostile);
         }
-        var destination = ResolveDestination(hostile);
+        var destination = ResolveFormationDestination();
+        var objectivePriority = false;
         if (!HasFireablePrimary && _lootHuntSource is not null && IsInstanceValid(_lootHuntSource.LootNode))
         {
             destination = _lootHuntSource.LootNode.GlobalPosition;
+            objectivePriority = true;
         }
         else if (patient is not null && patient != this && Order != SquadOrder.Hold
             && GlobalPosition.DistanceTo(patient.CombatNode.GlobalPosition) > 5.5f)
         {
             destination = patient.CombatNode.GlobalPosition;
+            objectivePriority = hostile is null
+                || GlobalPosition.DistanceTo(hostile.GlobalPosition) > 14.0f;
         }
         if (_revivingLeader)
         {
             destination = Leader.GlobalPosition;
+            objectivePriority = true;
         }
-        MoveTowardDestination(destination, hostile, dt);
+        UpdateTacticalMovement(destination, hostile, objectivePriority, dt);
         ConsiderMedicSupport(patient);
         if (hostile is not null && !hostile.IsDead)
         {
             TryFire(hostile);
-            ConsiderRoleAbility(hostile);
+            ConsiderRoleAbility(hostile, _combatHasSight);
         }
         MoveAndSlide();
+        TrackTacticalMovement(dt);
         AnimateRig(dt);
     }
 
@@ -333,88 +342,6 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         UpdateHealthVisual();
     }
 
-    private Vector3 ResolveDestination(EnemyOperator? hostile)
-    {
-        var formation = SquadSlot switch
-        {
-            1 => new Vector3(-2.25f, 0.0f, 3.2f),
-            2 => new Vector3(2.25f, 0.0f, 3.25f),
-            _ => new Vector3(0.0f, 0.0f, 5.1f)
-        };
-        var followPoint = Leader.GlobalPosition + Leader.GlobalBasis.X * formation.X + Leader.GlobalBasis.Z * formation.Z;
-        var destination = Order == SquadOrder.Follow ? followPoint : _orderPosition;
-
-        if (hostile is not null && !hostile.IsDead)
-        {
-            var hostileDistance = GlobalPosition.DistanceTo(hostile.GlobalPosition);
-            var anchorDistance = hostile.GlobalPosition.DistanceTo(destination);
-            var leash = Order == SquadOrder.Follow ? 13.0f : 8.0f;
-            if (hostileDistance > 16.0f && anchorDistance < leash)
-            {
-                destination = hostile.GlobalPosition + hostile.GlobalBasis.Z * 11.0f;
-            }
-        }
-        return destination;
-    }
-
-    private void MoveTowardDestination(Vector3 destination, EnemyOperator? hostile, float delta)
-    {
-        var flatDestination = new Vector3(destination.X, GlobalPosition.Y, destination.Z);
-        var distance = GlobalPosition.DistanceTo(flatDestination);
-        if (Order == SquadOrder.Follow && GlobalPosition.DistanceTo(Leader.GlobalPosition) > 42.0f)
-        {
-            GlobalPosition = flatDestination + Vector3.Up * 0.35f;
-            distance = 0.0f;
-        }
-
-        var desired = distance > 0.75f ? GlobalPosition.DirectionTo(flatDestination) : Vector3.Zero;
-        if (desired.LengthSquared() > 0.01f)
-        {
-            desired = AvoidObstacle(desired);
-        }
-
-        var spec = OperatorRoles.Spec(Role);
-        var boost = Role == OperatorRole.Assault && _overdriveTime > 0.0f ? 1.22f : 1.0f;
-        var speed = (distance > 8.0f ? 5.4f : 3.8f) * spec.MovementMultiplier * boost;
-        if (_skillActionTime > 0.0f)
-        {
-            speed *= 0.45f;
-        }
-        var velocity = Velocity;
-        velocity.X = Mathf.MoveToward(velocity.X, desired.X * speed, delta * 15.0f);
-        velocity.Z = Mathf.MoveToward(velocity.Z, desired.Z * speed, delta * 15.0f);
-        velocity.Y = IsOnFloor() ? -0.2f : velocity.Y - 22.0f * delta;
-        Velocity = velocity;
-
-        var facePoint = hostile is not null && GlobalPosition.DistanceTo(hostile.GlobalPosition) < 48.0f
-            ? hostile.GlobalPosition
-            : flatDestination;
-        facePoint.Y = GlobalPosition.Y;
-        if (GlobalPosition.DistanceSquaredTo(facePoint) > 0.04f)
-        {
-            var desiredYaw = GlobalTransform.LookingAt(facePoint, Vector3.Up).Basis.GetEuler().Y;
-            var rotation = Rotation;
-            rotation.Y = Mathf.LerpAngle(rotation.Y, desiredYaw, delta * 7.0f);
-            Rotation = rotation;
-        }
-    }
-
-    private Vector3 AvoidObstacle(Vector3 desired)
-    {
-        var from = GlobalPosition + Vector3.Up * 0.8f;
-        var query = PhysicsRayQueryParameters3D.Create(from, from + desired * 1.4f);
-        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        if (hit.Count == 0)
-        {
-            return desired;
-        }
-        var side = new Vector3(-desired.Z, 0.0f, desired.X) * (SquadSlot % 2 == 0 ? 1.0f : -1.0f);
-        return (desired * 0.2f + side).Normalized();
-    }
-
     private void TryFire(EnemyOperator enemy)
     {
         if (!HasFireablePrimary || _weaponCooldown > 0.0f || _skillActionTime > 0.0f)
@@ -434,11 +361,29 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
         var spec = OperatorRoles.Spec(Role);
         var fireBoost = Role == OperatorRole.Assault && _overdriveTime > 0.0f ? 0.68f : 1.0f;
-        _weaponCooldown = _rng.RandfRange(0.23f, 0.38f) * spec.FireIntervalMultiplier * fireBoost;
-        var hitPoint = enemy.GlobalPosition + Vector3.Up * _rng.RandfRange(0.78f, 1.55f);
+        if (_burstShotsRemaining <= 0)
+        {
+            _burstShotsRemaining = Role switch
+            {
+                OperatorRole.Assault => _rng.RandiRange(3, 5),
+                OperatorRole.Recon => _rng.RandiRange(1, 2),
+                _ => _rng.RandiRange(2, 4)
+            };
+        }
+        _burstShotsRemaining--;
+        _weaponCooldown = (_burstShotsRemaining > 0
+            ? _rng.RandfRange(0.12f, 0.19f)
+            : _rng.RandfRange(0.42f, 0.72f)) * spec.FireIntervalMultiplier * fireBoost;
+        var targetVelocity = enemy.Velocity;
+        targetVelocity.Y = 0.0f;
+        var leadSeconds = Mathf.Clamp(distance / 180.0f, 0.04f, 0.22f);
+        var hitPoint = enemy.GlobalPosition
+            + targetVelocity * leadSeconds
+            + Vector3.Up * _rng.RandfRange(0.82f, 1.5f);
         var bodyOrigin = GlobalPosition + Vector3.Up * 1.4f;
         var muzzlePos = IsInstanceValid(_muzzle) ? _muzzle.GlobalPosition : bodyOrigin;
         var shotOrigin = Ballistics.ResolveShotOrigin(GetWorld3D(), bodyOrigin, muzzlePos, GetRid());
+        CombatShotsFired++;
         if (BreakableGlassField.TryShatterAlongRay(
             GetWorld3D(),
             shotOrigin,
@@ -489,7 +434,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         return hit.Count > 0 && hit["collider"].AsGodotObject() == enemy;
     }
 
-    private void ConsiderRoleAbility(EnemyOperator hostile)
+    private void ConsiderRoleAbility(EnemyOperator hostile, bool hasSight)
     {
         if (_skillCooldown > 0.0f || _skillActionTime > 0.0f || _decisionTimer > 0.0f)
         {
@@ -506,10 +451,16 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
                 }
                 break;
             case OperatorRole.Recon:
-                TriggerRoleAbility(hostile.GlobalPosition);
+                if (!hostile.IsScanned && (!hasSight || GlobalPosition.DistanceTo(hostile.GlobalPosition) > 18.0f))
+                {
+                    TriggerRoleAbility(hostile.GlobalPosition);
+                }
                 break;
             case OperatorRole.Assault:
-                TriggerRoleAbility(hostile.GlobalPosition);
+                if (hasSight && GlobalPosition.DistanceTo(hostile.GlobalPosition) < 32.0f)
+                {
+                    TriggerRoleAbility(hostile.GlobalPosition);
+                }
                 break;
         }
     }
@@ -633,6 +584,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             return false;
         }
+        if (attacker is EnemyOperator combatThreat && !combatThreat.IsDead)
+        {
+            RegisterCombatThreat(combatThreat);
+        }
         if (IsDowned)
         {
             // Already waiting for revive — extra hits do not convert yet.
@@ -656,6 +611,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
         IsDowned = true;
         Velocity = Vector3.Zero;
+        OnCombatIncapacitated();
         _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
         UpdateLabel();
         Main.OnSquadMateDowned(this);
@@ -683,6 +639,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         ReviveUsed = true;
         IsDowned = false;
         Health = Mathf.Clamp(healAmount, 1.0f, MaxHealth);
+        ResetMovementProgress();
         _rig.Rotation = Vector3.Zero;
         UpdateHealthVisual();
         UpdateLabel();
