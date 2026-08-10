@@ -13,8 +13,9 @@
 - 构建：`dotnet build OperationSteelTide.csproj`（必须 0 警告 0 错误）。
 - 诊断（Godot 控制台版）：
   `& "C:\Users\85730\Downloads\Godot_v4.6.3-stable_mono_win64\Godot_v4.6.3-stable_mono_win64\Godot_v4.6.3-stable_mono_win64_console.exe" --path . -- --validate-<name>`
-- 常用诊断：`stairs`、`skylinks`、`residential`、`squad`、`vehicle-drive`、`backpack-tab`、`loot`、`weapon-ui`、`equipment`、`pickup`、`corpse-loot`、`objectives`、`reinforcements`、`stance-armor`、`aircraft-combat`、`map-density`、`large-map`、`goal-pack`、`extraction-spawns`、`extraction-ai`、`extraction-loot`、`extraction-loadout`、`extraction-los`、`extract-rank`。
+- 常用诊断：`stairs`、`skylinks`、`residential`、`residential-gameplay`、`residential-localization`、`squad`、`vehicle-drive`、`backpack-tab`、`loot`、`weapon-ui`、`equipment`、`pickup`、`corpse-loot`、`objectives`、`reinforcements`、`stance-armor`、`aircraft-combat`、`map-density`、`large-map`、`goal-pack`、`extraction-spawns`、`extraction-ai`、`extraction-loot`、`extraction-loadout`、`extraction-los`、`extract-rank`。
 - 改动地图几何/碰撞后至少跑 `residential`、`stairs`、`skylinks`、`vehicle-drive`；改动小队/复活逻辑后跑 `squad`；改动 HUD/背包后跑 `backpack-tab`、`weapon-ui`、`loot`。
+- 改动住宅区可见文字或语言切换逻辑后至少跑 `residential-localization`。
 
 ## 代码约定 / Conventions
 
