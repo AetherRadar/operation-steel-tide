@@ -186,14 +186,56 @@ public partial class FreightTerminalWorld
         _player.AdvanceStaminaForDiagnostics(0.1f, true);
         var sprintResumed = _player.Stamina < staminaBeforeResume && !_player.SprintRecoveryRequired;
 
+        var wRearmed = _player.RearmMovementFromKeyForDiagnostics(Key.W);
+        var upRearmed = _player.RearmMovementFromKeyForDiagnostics(Key.Up);
+        var uiLockHeld = !_player.RearmMovementFromKeyForDiagnostics(Key.W, uiLocked: true);
+        var unrelatedKeyIgnored = !_player.RearmMovementFromKeyForDiagnostics(Key.R);
+
+        _player.ProcessMode = ProcessModeEnum.Inherit;
+        _player.UiLocked = false;
+        _player.Rotation = Vector3.Zero;
+        _player.GlobalPosition = new Vector3(12.0f, 18.0f, 12.0f);
+        _player.Velocity = Vector3.Zero;
+        _player.DisarmMovementInput();
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.W, Pressed = true });
+        for (var frame = 0; frame < 24; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.W, Pressed = false });
+        var wDistance = new Vector2(
+            _player.GlobalPosition.X - 12.0f,
+            _player.GlobalPosition.Z - 12.0f).Length();
+
+        _player.GlobalPosition = new Vector3(12.0f, 18.0f, 12.0f);
+        _player.Velocity = Vector3.Zero;
+        _player.DisarmMovementInput();
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Up, Pressed = true });
+        for (var frame = 0; frame < 24; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Up, Pressed = false });
+        var upDistance = new Vector2(
+            _player.GlobalPosition.X - 12.0f,
+            _player.GlobalPosition.Z - 12.0f).Length();
+        var physicalKeysMoved = wDistance > 0.2f
+            && upDistance > 0.2f
+            && Mathf.Abs(wDistance - upDistance) < 0.12f;
+
         var valid = initiallyReady
             && exhausted
             && delayLocked
             && delayCompletedWithoutRecovery
             && thresholdLocked
             && recovered
-            && sprintResumed;
-        GD.Print($"STAMINA_CHECK valid={valid} initially_ready={initiallyReady} exhausted={exhausted} delay_locked={delayLocked} delay_no_regen={delayCompletedWithoutRecovery} threshold_locked={thresholdLocked} recovered={recovered} sprint_resumed={sprintResumed} threshold={_player.SprintRecoveryThresholdForDiagnostics:0.0} stamina={_player.Stamina:0.0}");
+            && sprintResumed
+            && wRearmed
+            && upRearmed
+            && uiLockHeld
+            && unrelatedKeyIgnored
+            && physicalKeysMoved;
+        GD.Print($"STAMINA_CHECK valid={valid} initially_ready={initiallyReady} exhausted={exhausted} delay_locked={delayLocked} delay_no_regen={delayCompletedWithoutRecovery} threshold_locked={thresholdLocked} recovered={recovered} sprint_resumed={sprintResumed} movement_w={wRearmed} movement_up={upRearmed} movement_ui_lock={uiLockHeld} movement_unrelated={unrelatedKeyIgnored} movement_distance_w={wDistance:0.00} movement_distance_up={upDistance:0.00} threshold={_player.SprintRecoveryThresholdForDiagnostics:0.0} stamina={_player.Stamina:0.0}");
         GD.Print($"STAMINA_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
