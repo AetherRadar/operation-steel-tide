@@ -137,7 +137,6 @@ public static class GameLocalization
         Chinese["minimap_drydock"] = "\u8239\u575e\u7ef4\u4fee\u67b6";
         Chinese["vehicle_blocked"] = "\u8f7d\u5177\u53d7\u963b  //  \u5012\u8f66\u8131\u56f0";
         Chinese["mate_reviving_you"] = "\u961f\u53cb\u6b63\u5728\u8d76\u6765\u6551\u63f4  //  \u575a\u6301\u4f4f";
-        Chinese["player_eliminated_switching"] = "\u5e72\u5458\u5df2\u9635\u4ea1  //  \u5373\u5c06\u5207\u6362\u5230\u961f\u53cb\u89c6\u89d2";
         Chinese["spectating_teammate"] = "\u6b63\u5728\u89c2\u6218\u961f\u53cb";
         Chinese["weapon_m24"] = "M24 \u7cbe\u786e\u5c04\u624b\u6b65\u67aa";
         Chinese["weapon_mp5a5"] = "MP5A5 \u51b2\u950b\u67aa";

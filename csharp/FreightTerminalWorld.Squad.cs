@@ -19,10 +19,8 @@ public partial class FreightTerminalWorld
     private float _squadHudTimer;
     private float _allDownTimer;
     private float _localPlayerDownedTimer;
-    private float _spectatorTransitionTimer;
     private Camera3D? _squadSpectatorCamera;
     private SquadMate? _spectatedMate;
-    private const float SquadSpectatorTransitionDelay = 1.4f;
     private int _remoteNetworkShotCount;
     private int _remoteNetworkAbilityCount;
     private string _activeDeploymentMapId = DeploymentMapCatalog.FreightTerminalId;
@@ -131,7 +129,6 @@ public partial class FreightTerminalWorld
         EnsureDeploymentBaseline();
         _localPlayerDowned = false;
         _localPlayerEliminated = false;
-        _spectatorTransitionTimer = 0.0f;
         _squadOrder = SquadOrder.Follow;
 
         Error networkError = Error.Ok;
@@ -351,11 +348,7 @@ public partial class FreightTerminalWorld
 
         if (_localPlayerEliminated)
         {
-            _spectatorTransitionTimer += delta;
-            if (_spectatorTransitionTimer >= SquadSpectatorTransitionDelay)
-            {
-                UpdateSquadSpectatorCamera();
-            }
+            UpdateSquadSpectatorCamera();
             return;
         }
 
@@ -1255,7 +1248,6 @@ public partial class FreightTerminalWorld
         _localPlayerDowned = false;
         _localPlayerEliminated = true;
         _localPlayerDownedTimer = 0.0f;
-        _spectatorTransitionTimer = 0.0f;
         _spectatedMate = null;
         ClearLeaderReviveAi();
         _player.EjectFromVehicleIfAny();
@@ -1266,13 +1258,9 @@ public partial class FreightTerminalWorld
         _player.UiLocked = true;
         _player.DisarmFireInput();
         _player.DisarmMovementInput();
-        RestoreLocalPlayerView();
         _hud.HideDownedState();
         Input.MouseMode = Input.MouseModeEnum.Captured;
-        _hud.ShowLocalizedMessage(
-            "player_eliminated_switching",
-            "OPERATOR KIA  //  SWITCHING TO SQUADMATE",
-            new Color(1.0f, 0.34f, 0.22f));
+        BeginSquadMateView();
         return true;
     }
 
@@ -1281,7 +1269,6 @@ public partial class FreightTerminalWorld
         _localPlayerDowned = false;
         _localPlayerEliminated = false;
         _localPlayerDownedTimer = 0.0f;
-        _spectatorTransitionTimer = 0.0f;
         _player.UiLocked = false;
         _player.DisarmFireInput();
         _player.RestoreMovementInput();
@@ -1537,7 +1524,6 @@ public partial class FreightTerminalWorld
         var playerUp = !_player.IsDead && playerFirstRevive && _player.ReviveUsed;
         _player.TakeCombatDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
         var playerSecondBlocked = _player.IsDead && !_player.CanBeRevived && !_player.TryReceiveRevive(50.0f) && _player.ReviveUsed;
-        await ToSignal(GetTree().CreateTimer(SquadSpectatorTransitionDelay + 0.25f), SceneTreeTimer.SignalName.Timeout);
         var secondDeathSpectate = _localPlayerEliminated && IsSquadMateViewCurrent && !_missionEnded;
 
         _player.SetHealthForDiagnostics(10.0f);
@@ -1546,18 +1532,16 @@ public partial class FreightTerminalWorld
         _player.TakeDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
         var finishDowned = _player.IsDead && _localPlayerDowned && _player.CanBeRevived;
         var finishAccepted = _player.TryFinishDowned(this);
-        var deathViewHeldInitially = IsLocalPlayerViewCurrent && _localPlayerEliminated;
-        await ToSignal(GetTree().CreateTimer(SquadSpectatorTransitionDelay * 0.5f), SceneTreeTimer.SignalName.Timeout);
-        var deathViewHeldDuringDelay = IsLocalPlayerViewCurrent;
-        await ToSignal(GetTree().CreateTimer(SquadSpectatorTransitionDelay * 0.65f), SceneTreeTimer.SignalName.Timeout);
-        var finishedPlayerSpectate = IsSquadMateViewCurrent && _localPlayerEliminated && !_missionEnded;
+        var finishedPlayerSpectate = IsSquadMateViewCurrent
+            && _localPlayerEliminated
+            && !_missionEnded;
         var finishedSpectateOk = finishDowned && finishAccepted
-            && deathViewHeldInitially && deathViewHeldDuringDelay && finishedPlayerSpectate;
+            && finishedPlayerSpectate;
 
         var reviveOk = mateDowned && firstRevive && mateUp && bodyBagOk && secondReviveBlocked
             && playerDowned && playerFirstRevive && playerUp && playerSecondBlocked && secondDeathSpectate;
 
-        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} revive_once={reviveOk} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} player_view_on_down={playerViewOnDown} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} finished_spectate={finishedSpectateOk} delayed_view={deathViewHeldDuringDelay} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
+        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} revive_once={reviveOk} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} player_view_on_down={playerViewOnDown} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} finished_spectate={finishedSpectateOk} immediate_view={finishedPlayerSpectate} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
         var valid = ActiveSquadCount >= 2 && roleFillOk && reviveOk && aiFinishOk && aiReviveOk && finishedSpectateOk;
         GD.Print($"SQUAD_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
