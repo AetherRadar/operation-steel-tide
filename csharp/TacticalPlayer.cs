@@ -770,6 +770,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.ScarL => new Color(0.34f, 0.29f, 0.2f),
             WeaponPlatform.M24 => new Color(0.16f, 0.19f, 0.17f),
             WeaponPlatform.MP5A5 => new Color(0.025f, 0.032f, 0.03f),
+            WeaponPlatform.M3A1 => new Color(0.17f, 0.2f, 0.185f),
             _ => new Color(0.045f, 0.052f, 0.05f)
         };
         var furnitureColor = EquippedWeapon.Platform switch
@@ -778,6 +779,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.ScarL => new Color(0.29f, 0.255f, 0.18f),
             WeaponPlatform.M24 => new Color(0.18f, 0.24f, 0.16f),
             WeaponPlatform.MP5A5 => new Color(0.055f, 0.065f, 0.06f),
+            WeaponPlatform.M3A1 => new Color(0.105f, 0.12f, 0.11f),
             _ => new Color(0.18f, 0.17f, 0.13f)
         };
         var receiverMaterial = Material(receiverColor, 0.52f, 0.46f);
@@ -789,11 +791,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.ScarL => new Vector3(0.16f, 0.18f, 0.56f),
             WeaponPlatform.M24 => new Vector3(0.145f, 0.16f, 0.64f),
             WeaponPlatform.MP5A5 => new Vector3(0.14f, 0.17f, 0.36f),
+            WeaponPlatform.M3A1 => new Vector3(0.135f, 0.155f, 0.34f),
             _ => new Vector3(0.13f, 0.15f, 0.46f)
         };
         _receiver.MaterialOverride = receiverMaterial;
         ((BoxMesh)_handguard.Mesh).Size = new Vector3(
-            EquippedWeapon.Platform is WeaponPlatform.ScarL or WeaponPlatform.M24 ? 0.17f : 0.15f,
+            EquippedWeapon.Platform is WeaponPlatform.ScarL or WeaponPlatform.M24
+                ? 0.17f
+                : EquippedWeapon.Platform == WeaponPlatform.M3A1 ? 0.13f : 0.15f,
             0.12f,
             Mathf.Max(0.28f, barrelLength * 0.72f));
         _handguard.Position = new Vector3(0, 0.01f, -0.29f - barrelLength * 0.25f);
@@ -819,7 +824,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var stockScale = EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Stock, out var stockId)
             ? WeaponCatalog.Attachment(stockId).VisualScale
             : 1.0f;
-        ((BoxMesh)_stock.Mesh).Size = new Vector3(0.14f * stockScale, 0.13f * stockScale, 0.38f * stockScale);
+        ((BoxMesh)_stock.Mesh).Size = EquippedWeapon.Platform == WeaponPlatform.M3A1
+            ? new Vector3(0.055f, 0.055f, 0.34f)
+            : new Vector3(0.14f * stockScale, 0.13f * stockScale, 0.38f * stockScale);
         _stock.MaterialOverride = furnitureMaterial;
         _stock.Position = new Vector3(0, -0.01f, 0.25f + 0.13f * stockScale);
 
@@ -827,6 +834,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             WeaponPlatform.M24 => new Vector3(0.085f, 0.15f, 0.13f),
             WeaponPlatform.MP5A5 => new Vector3(0.075f, stats.MagazineSize > 30 ? 0.36f : 0.3f, 0.11f),
+            WeaponPlatform.M3A1 => new Vector3(0.075f, 0.3f, 0.11f),
             _ => new Vector3(0.09f, 0.26f * (stats.MagazineSize > 30 ? 1.24f : 1.0f), 0.14f)
         };
         ((BoxMesh)_magazine.Mesh).Size = magazineSize;

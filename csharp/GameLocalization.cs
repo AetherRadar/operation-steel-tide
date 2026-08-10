@@ -139,6 +139,10 @@ public static class GameLocalization
         Chinese["mate_reviving_you"] = "\u961f\u53cb\u6b63\u5728\u8d76\u6765\u6551\u63f4  //  \u575a\u6301\u4f4f";
         Chinese["weapon_m24"] = "M24 \u7cbe\u786e\u5c04\u624b\u6b65\u67aa";
         Chinese["weapon_mp5a5"] = "MP5A5 \u51b2\u950b\u67aa";
+        Chinese["weapon_m3a1"] = "M3A1 \u7b80\u6613\u51b2\u950b\u67aa";
+        Chinese["equipment_patrol_helmet"] = "\u5de1\u903b\u9632\u62a4\u76d4";
+        Chinese["equipment_patrol_armor"] = "\u8f6f\u8d28\u5de1\u903b\u62a4\u7532";
+        Chinese["equipment_patrol_pack"] = "\u5355\u80a9\u5de1\u903b\u5305";
         Chinese["ammo_rifle"] = "\u6b65\u67aa\u5f39\u836f";
         Chinese["ammo_sniper"] = "7.62 \u6beb\u7c73\u7cbe\u786e\u5f39\u836f";
         Chinese["ammo_smg"] = "9 \u6beb\u7c73\u51b2\u950b\u67aa\u5f39\u836f";
@@ -243,6 +247,7 @@ public static class GameLocalization
         Chinese["minimap_command"] = "\u6307\u6325\u8231";
         Chinese["ammo_tier_tooltip"] = "\u5f39\u5323\u5185\u5f39\u836f\u7b49\u7ea7";
         Chinese["loadout_scavenger"] = "\u641c\u7d22\u8005 / \u4ec5\u5200\u5177";
+        Chinese["loadout_m3a1"] = "M3A1 \u65b0\u624b\u51b2\u950b\u67aa";
         Chinese["loadout_m4a1"] = "M4A1 \u7a81\u51fb";
         Chinese["loadout_ak74"] = "AK-74N \u7a81\u51fb";
         Chinese["loadout_scarl"] = "SCAR-L \u7279\u79cd\u6b65\u67aa";
@@ -262,7 +267,9 @@ public static class GameLocalization
         Chinese["map_locked_short"] = "\u672a\u89e3\u9501";
         Chinese["loadout_standard_armor"] = "\u6807\u51c6\u91ce\u6218\u88c5\u5907";
         Chinese["loadout_heavy_armor"] = "\u91cd\u578b\u7a81\u51fb\u88c5\u5907";
+        Chinese["loadout_patrol_armor"] = "\u5de1\u903b\u7ea7\u8f7b\u578b\u62a4\u5177";
         Chinese["preset_scavenger"] = "\u8f7b\u88c5\u641c\u7d22";
+        Chinese["preset_recruit"] = "\u65b0\u624b\u4fdd\u969c";
         Chinese["preset_assault"] = "\u7a81\u51fb\u5957\u88c5";
         Chinese["preset_breacher"] = "\u7a81\u7834\u624b";
         Chinese["preset_overwatch"] = "\u8fdc\u7a0b\u76d1\u89c6";

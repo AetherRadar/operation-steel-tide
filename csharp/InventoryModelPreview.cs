@@ -181,19 +181,28 @@ public partial class InventoryModelPreview : SubViewportContainer
     {
         var spec = OperatorRoles.Spec(_role);
         var heavyArmor = _bodyArmor?.DefinitionId == "armor_heavy";
+        var patrolArmor = _bodyArmor?.DefinitionId == "armor_patrol";
         var heavyHelmet = _helmet?.DefinitionId == "helmet_heavy";
+        var patrolHelmet = _helmet?.DefinitionId == "helmet_patrol";
         var heavyPack = _backpack?.DefinitionId == "pack_heavy";
+        var patrolPack = _backpack?.DefinitionId == "pack_sling";
         var uniform = new Color(0.11f, 0.145f, 0.135f).Lerp(spec.Accent, 0.08f);
-        var fabric = heavyArmor ? new Color(0.19f, 0.2f, 0.15f) : new Color(0.13f, 0.18f, 0.16f);
-        var armor = heavyArmor ? new Color(0.22f, 0.24f, 0.18f) : new Color(0.08f, 0.115f, 0.105f);
+        var fabric = heavyArmor
+            ? new Color(0.19f, 0.2f, 0.15f)
+            : patrolArmor ? new Color(0.22f, 0.24f, 0.21f) : new Color(0.13f, 0.18f, 0.16f);
+        var armor = heavyArmor
+            ? new Color(0.22f, 0.24f, 0.18f)
+            : patrolArmor ? new Color(0.12f, 0.14f, 0.13f) : new Color(0.08f, 0.115f, 0.105f);
         var skin = new Color(0.42f, 0.29f, 0.21f);
         var dark = new Color(0.035f, 0.045f, 0.042f);
 
         Capsule(root, 0.25f, 0.94f, new Vector3(0, 1.46f, 0), uniform, 0.0f, 0.94f);
-        Box(root, new Vector3(0.66f, heavyArmor ? 0.76f : 0.65f, heavyArmor ? 0.34f : 0.27f),
-            new Vector3(0, 1.48f, 0.02f), armor, 0.16f, 0.74f);
-        Box(root, new Vector3(0.5f, 0.08f, 0.36f), new Vector3(0, 1.72f, 0.02f), fabric.Lightened(0.1f), 0.04f, 0.9f);
-        for (var pouch = -1; pouch <= 1; pouch++)
+        Box(root, new Vector3(patrolArmor ? 0.53f : 0.66f, heavyArmor ? 0.76f : patrolArmor ? 0.48f : 0.65f, heavyArmor ? 0.34f : patrolArmor ? 0.18f : 0.27f),
+            new Vector3(0, patrolArmor ? 1.43f : 1.48f, 0.02f), armor, patrolArmor ? 0.02f : 0.16f, patrolArmor ? 0.92f : 0.74f);
+        Box(root, new Vector3(patrolArmor ? 0.38f : 0.5f, 0.08f, patrolArmor ? 0.22f : 0.36f), new Vector3(0, patrolArmor ? 1.61f : 1.72f, 0.02f), fabric.Lightened(0.1f), 0.04f, 0.9f);
+        var firstPouch = patrolArmor ? 0 : -1;
+        var lastPouch = patrolArmor ? 0 : 1;
+        for (var pouch = firstPouch; pouch <= lastPouch; pouch++)
         {
             Box(root, new Vector3(0.18f, 0.22f, 0.12f), new Vector3(pouch * 0.2f, 1.2f, 0.2f),
                 fabric.Lightened(0.06f), 0.02f, 0.94f);
@@ -218,13 +227,13 @@ public partial class InventoryModelPreview : SubViewportContainer
         Sphere(root, 0.12f, 0.24f, new Vector3(0.42f, 1.03f, 0.38f), dark, 0.05f, 0.76f);
 
         Sphere(root, 0.23f, 0.46f, new Vector3(0, 2.23f, 0.01f), skin, 0.0f, 0.93f);
-        Sphere(root, heavyHelmet ? 0.31f : 0.285f, heavyHelmet ? 0.42f : 0.34f,
-            new Vector3(0, 2.39f, -0.005f), heavyHelmet ? new Color(0.27f, 0.25f, 0.17f) : fabric, 0.12f, 0.78f);
-        Box(root, new Vector3(0.48f, 0.12f, 0.12f), new Vector3(0, 2.27f, 0.22f), dark, 0.35f, 0.42f);
+        Sphere(root, heavyHelmet ? 0.31f : patrolHelmet ? 0.265f : 0.285f, heavyHelmet ? 0.42f : patrolHelmet ? 0.29f : 0.34f,
+            new Vector3(0, patrolHelmet ? 2.37f : 2.39f, -0.005f), heavyHelmet ? new Color(0.27f, 0.25f, 0.17f) : patrolHelmet ? new Color(0.25f, 0.27f, 0.24f) : fabric, patrolHelmet ? 0.02f : 0.12f, patrolHelmet ? 0.9f : 0.78f);
+        Box(root, new Vector3(patrolHelmet ? 0.38f : 0.48f, patrolHelmet ? 0.07f : 0.12f, 0.12f), new Vector3(0, 2.27f, 0.22f), dark, 0.35f, 0.42f);
         Box(root, new Vector3(0.12f, 0.13f, 0.05f), new Vector3(0, 2.48f, 0.27f), spec.Accent, 0.18f, 0.5f);
 
-        Box(root, new Vector3(heavyPack ? 0.72f : 0.58f, heavyPack ? 0.92f : 0.72f, 0.3f),
-            new Vector3(0, 1.43f, -0.27f), fabric.Darkened(0.04f), 0.02f, 0.95f);
+        Box(root, new Vector3(heavyPack ? 0.72f : patrolPack ? 0.43f : 0.58f, heavyPack ? 0.92f : patrolPack ? 0.55f : 0.72f, patrolPack ? 0.2f : 0.3f),
+            new Vector3(patrolPack ? 0.12f : 0, patrolPack ? 1.37f : 1.43f, -0.27f), fabric.Darkened(0.04f), 0.02f, 0.95f);
         Box(root, new Vector3(0.13f, 0.42f, 0.08f), new Vector3(-0.27f, 1.53f, 0.19f), spec.Accent.Darkened(0.2f), 0.02f, 0.82f);
 
         if (_weapon is not null)
@@ -260,12 +269,14 @@ public partial class InventoryModelPreview : SubViewportContainer
             WeaponPlatform.ScarL => new Color(0.43f, 0.36f, 0.24f),
             WeaponPlatform.M24 => new Color(0.18f, 0.24f, 0.17f),
             WeaponPlatform.MP5A5 => new Color(0.055f, 0.065f, 0.06f),
+            WeaponPlatform.M3A1 => new Color(0.24f, 0.28f, 0.26f),
             _ => new Color(0.12f, 0.15f, 0.145f)
         };
         var furniture = platform switch
         {
             WeaponPlatform.AK74 => new Color(0.35f, 0.19f, 0.09f),
             WeaponPlatform.M24 => new Color(0.2f, 0.31f, 0.18f),
+            WeaponPlatform.M3A1 => new Color(0.13f, 0.15f, 0.14f),
             _ => metal.Lightened(0.12f)
         };
         var steel = new Color(0.44f, 0.5f, 0.48f);
@@ -276,8 +287,8 @@ public partial class InventoryModelPreview : SubViewportContainer
         Box(root, new Vector3(Mathf.Max(0.3f, receiverLength * 1.05f), 0.17f, 0.16f), new Vector3(-receiverLength * 0.95f, 0.01f, 0), furniture, 0.25f);
         Box(root, new Vector3(Mathf.Max(0.3f, barrelLength * 0.72f), 0.16f, 0.14f), new Vector3(receiverLength * 0.92f, 0, 0), furniture, 0.28f);
         Cylinder(root, 0.045f, barrelLength, new Vector3(receiverLength * 0.8f + barrelLength * 0.55f, 0.01f, 0), new Vector3(0, 0, Mathf.Pi / 2), steel, 0.75f, 0.72f);
-        Box(root, new Vector3(0.22f, 0.08f, 0.17f), new Vector3(-0.87f, 0, 0), furniture.Darkened(0.08f), 0.2f);
-        var magazineHeight = platform == WeaponPlatform.M24 ? 0.2f : platform == WeaponPlatform.MP5A5 ? 0.5f : 0.44f;
+        Box(root, new Vector3(platform == WeaponPlatform.M3A1 ? 0.3f : 0.22f, platform == WeaponPlatform.M3A1 ? 0.045f : 0.08f, 0.17f), new Vector3(platform == WeaponPlatform.M3A1 ? -0.65f : -0.87f, 0, 0), furniture.Darkened(0.08f), 0.2f);
+        var magazineHeight = platform == WeaponPlatform.M24 ? 0.2f : platform == WeaponPlatform.MP5A5 ? 0.5f : platform == WeaponPlatform.M3A1 ? 0.38f : 0.44f;
         Box(root, new Vector3(0.16f, magazineHeight, 0.15f), new Vector3(0.06f, -magazineHeight * 0.58f, 0), furniture.Darkened(0.06f), 0.18f, rotation: new Vector3(0, 0, platform == WeaponPlatform.AK74 ? -0.12f : 0.04f));
         Box(root, new Vector3(0.13f, 0.32f, 0.13f), new Vector3(-0.2f, -0.25f, 0), furniture, 0.18f, rotation: new Vector3(0, 0, -0.18f));
         Box(root, new Vector3(0.36f, 0.045f, 0.18f), new Vector3(0.0f, 0.16f, 0), steel.Darkened(0.2f), 0.65f);
@@ -316,6 +327,16 @@ public partial class InventoryModelPreview : SubViewportContainer
     private void BuildHelmet(Node3D root)
     {
         var heavy = _equipment?.DefinitionId == "helmet_heavy";
+        var patrol = _equipment?.DefinitionId == "helmet_patrol";
+        if (patrol)
+        {
+            var patrolShell = new Color(0.25f, 0.28f, 0.25f);
+            Sphere(root, 0.5f, 0.58f, new Vector3(0, 0.08f, 0), patrolShell, 0.02f, 0.92f);
+            Box(root, new Vector3(0.62f, 0.07f, 0.34f), new Vector3(0, -0.2f, -0.17f), patrolShell.Darkened(0.08f), 0.02f);
+            Box(root, new Vector3(0.05f, 0.48f, 0.05f), new Vector3(-0.39f, -0.25f, 0.06f), patrolShell.Darkened(0.2f), 0.02f, rotation: new Vector3(0, 0, -0.2f));
+            Box(root, new Vector3(0.05f, 0.48f, 0.05f), new Vector3(0.39f, -0.25f, 0.06f), patrolShell.Darkened(0.2f), 0.02f, rotation: new Vector3(0, 0, 0.2f));
+            return;
+        }
         var shell = heavy ? new Color(0.28f, 0.25f, 0.16f) : new Color(0.22f, 0.27f, 0.21f);
         Sphere(root, 0.57f, 0.76f, new Vector3(0, 0.12f, 0), shell, 0.12f, 0.82f);
         Box(root, new Vector3(0.72f, 0.12f, 0.72f), new Vector3(0, -0.18f, 0.02f), shell.Darkened(0.08f), 0.1f);
@@ -329,6 +350,17 @@ public partial class InventoryModelPreview : SubViewportContainer
     private void BuildBodyArmor(Node3D root)
     {
         var heavy = _equipment?.DefinitionId == "armor_heavy";
+        var patrol = _equipment?.DefinitionId == "armor_patrol";
+        if (patrol)
+        {
+            var softArmor = new Color(0.16f, 0.19f, 0.17f);
+            Box(root, new Vector3(0.72f, 0.78f, 0.16f), Vector3.Zero, softArmor, 0.01f, 0.96f);
+            Box(root, new Vector3(0.42f, 0.06f, 0.2f), new Vector3(0, 0.37f, 0), softArmor.Lightened(0.12f), 0.01f);
+            Box(root, new Vector3(0.32f, 0.24f, 0.13f), new Vector3(0, -0.31f, -0.13f), softArmor.Lightened(0.08f), 0.01f);
+            Box(root, new Vector3(0.1f, 0.48f, 0.1f), new Vector3(-0.38f, 0.05f, 0), softArmor.Darkened(0.08f), 0.01f);
+            Box(root, new Vector3(0.1f, 0.48f, 0.1f), new Vector3(0.38f, 0.05f, 0), softArmor.Darkened(0.08f), 0.01f);
+            return;
+        }
         var fabric = heavy ? new Color(0.18f, 0.2f, 0.16f) : new Color(0.18f, 0.24f, 0.2f);
         var webbing = fabric.Lightened(0.14f);
         Box(root, new Vector3(0.88f, 1.05f, 0.25f), new Vector3(0, 0, 0), fabric, 0.05f, 0.95f);
@@ -351,6 +383,15 @@ public partial class InventoryModelPreview : SubViewportContainer
     private void BuildBackpack(Node3D root)
     {
         var heavy = _equipment?.DefinitionId == "pack_heavy";
+        var patrol = _equipment?.DefinitionId == "pack_sling";
+        if (patrol)
+        {
+            var sling = new Color(0.19f, 0.22f, 0.2f);
+            Box(root, new Vector3(0.68f, 0.74f, 0.28f), new Vector3(0.12f, -0.02f, 0), sling, 0.02f, 0.96f);
+            Box(root, new Vector3(0.54f, 0.2f, 0.33f), new Vector3(0.12f, -0.29f, -0.06f), sling.Lightened(0.1f), 0.02f);
+            Box(root, new Vector3(0.08f, 1.08f, 0.08f), new Vector3(-0.25f, 0.08f, 0.2f), sling.Lightened(0.14f), 0.02f, rotation: new Vector3(0, 0, -0.38f));
+            return;
+        }
         var fabric = heavy ? new Color(0.22f, 0.24f, 0.18f) : new Color(0.18f, 0.23f, 0.2f);
         var trim = fabric.Lightened(0.16f);
         Box(root, new Vector3(0.92f, 1.18f, 0.42f), new Vector3(0, 0, 0), fabric, 0.03f, 0.98f);

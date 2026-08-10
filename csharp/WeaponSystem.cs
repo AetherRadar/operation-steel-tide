@@ -11,7 +11,8 @@ public enum WeaponPlatform
     AK74,
     ScarL,
     M24,
-    MP5A5
+    MP5A5,
+    M3A1
 }
 
 public enum AmmoCaliber
@@ -117,6 +118,7 @@ public sealed class EquipmentDefinition
     public required string Id { get; init; }
     public required string Name { get; init; }
     public required string ChineseName { get; init; }
+    public string LocalizationKey { get; init; } = string.Empty;
     public required EquipmentSlot Slot { get; init; }
     public float Protection { get; init; }
     public float MaxDurability { get; init; }
@@ -136,8 +138,13 @@ public sealed class EquipmentItem
         Durability = Durability
     };
 
-    public string DisplayName(string language) =>
-        GameLocalization.IsChinese(language) ? Definition.ChineseName : Definition.Name;
+    public string DisplayName(string language)
+    {
+        var definition = Definition;
+        return GameLocalization.IsChinese(language)
+            ? GameLocalization.Get(definition.LocalizationKey, language, definition.ChineseName)
+            : definition.Name;
+    }
 
     public string Detail(string language)
     {
@@ -457,6 +464,24 @@ public static class EquipmentCatalog
 {
     private static readonly Dictionary<string, EquipmentDefinition> Definitions = new(StringComparer.OrdinalIgnoreCase)
     {
+        ["helmet_patrol"] = new EquipmentDefinition
+        {
+            Id = "helmet_patrol", Name = "Patrol protection cap", ChineseName = "Patrol protection cap",
+            LocalizationKey = "equipment_patrol_helmet",
+            Slot = EquipmentSlot.Helmet, Protection = 0.16f, MaxDurability = 32.0f
+        },
+        ["armor_patrol"] = new EquipmentDefinition
+        {
+            Id = "armor_patrol", Name = "Soft patrol vest", ChineseName = "Soft patrol vest",
+            LocalizationKey = "equipment_patrol_armor",
+            Slot = EquipmentSlot.BodyArmor, Protection = 0.28f, MaxDurability = 55.0f
+        },
+        ["pack_sling"] = new EquipmentDefinition
+        {
+            Id = "pack_sling", Name = "Sling field pack", ChineseName = "Sling field pack",
+            LocalizationKey = "equipment_patrol_pack",
+            Slot = EquipmentSlot.Backpack, Protection = 0.0f, MaxDurability = 42.0f, CapacityBonus = 3
+        },
         ["helmet_light"] = new EquipmentDefinition
         {
             Id = "helmet_light", Name = "Light combat helmet", ChineseName = "轻型战术头盔",
@@ -535,6 +560,13 @@ public static class WeaponCatalog
             LocalizationKey = "weapon_mp5a5", Caliber = AmmoCaliber.Smg,
             Damage = 24, EffectiveRange = 88, Recoil = 0.72f, Handling = 1.12f,
             FireInterval = 0.067f, MagazineSize = 30, SoundRadius = 31, ReceiverLength = 0.36f, BarrelLength = 0.3f
+        },
+        [WeaponPlatform.M3A1] = new WeaponDefinition
+        {
+            Platform = WeaponPlatform.M3A1, Name = "M3A1 Grease Gun", ChineseName = "M3A1 Grease Gun",
+            LocalizationKey = "weapon_m3a1", Caliber = AmmoCaliber.Smg,
+            Damage = 20, EffectiveRange = 68, Recoil = 1.25f, Handling = 0.82f,
+            FireInterval = 0.135f, MagazineSize = 30, SoundRadius = 34, ReceiverLength = 0.34f, BarrelLength = 0.26f
         }
     };
 
@@ -583,6 +615,12 @@ public static class WeaponCatalog
     public static WeaponBuild Build(WeaponPlatform platform, int tier)
     {
         var build = new WeaponBuild { Platform = platform };
+        if (platform == WeaponPlatform.M3A1)
+        {
+            build.Attachments[AttachmentSlot.Barrel] = "barrel_cqb";
+            build.Attachments[AttachmentSlot.Magazine] = "mag_standard";
+            return build;
+        }
         if (platform == WeaponPlatform.M24)
         {
             build.Attachments[AttachmentSlot.Barrel] = "barrel_marksman";

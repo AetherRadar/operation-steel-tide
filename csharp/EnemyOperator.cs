@@ -342,6 +342,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             WeaponPlatform.ScarL => new Color(0.3f, 0.25f, 0.17f),
             WeaponPlatform.M24 => new Color(0.16f, 0.21f, 0.13f),
             WeaponPlatform.MP5A5 => new Color(0.035f, 0.045f, 0.043f),
+            WeaponPlatform.M3A1 => new Color(0.18f, 0.21f, 0.19f),
             _ => new Color(0.018f, 0.023f, 0.022f)
         };
         var gun = Material(gunColor, 0.88f, 0.25f);
@@ -389,6 +390,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             WeaponPlatform.ScarL => 0.16f,
             WeaponPlatform.M24 => 0.15f,
             WeaponPlatform.MP5A5 => 0.14f,
+            WeaponPlatform.M3A1 => 0.135f,
             _ => 0.13f
         };
         RigPart(
