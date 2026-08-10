@@ -156,6 +156,9 @@ public partial class FreightTerminalWorld
         _residentialSniperPosts.Clear();
         _residentialSkybridgeSightlines.Clear();
         _residentialCaches.Clear();
+        _residentialRelayStations.Clear();
+        _relayCaches.Clear();
+        _relayLootMarkers.Clear();
         _residentialGlassFields.Clear();
         _residentialRoomArchetypes.Clear();
         Array.Clear(_residentialCacheCountByTower, 0, _residentialCacheCountByTower.Length);
@@ -165,6 +168,10 @@ public partial class FreightTerminalWorld
         _residentialSkybridgeMarksmanCount = 0;
         _residentialInfillModuleCount = 0;
         _residentialStairDetailCount = 0;
+        _relayActivationCount = 0;
+        _relayActivationInterruptedCount = 0;
+        _relayLastEnemyRevealCount = 0;
+        _relayLastLootRevealCount = 0;
         foreach (var link in ResidentialSkyLinks)
         {
             var sideFrom = ResidentialLinkSide(ResidentialTowerSpecs[link.From], ResidentialTowerSpecs[link.To]);

@@ -307,6 +307,13 @@ public static class GameLocalization
         Chinese["loot_quay_service"] = "\u7801\u5934\u7ef4\u62a4\u8865\u7ed9";
         Chinese["loot_container_seal"] = "\u96c6\u88c5\u7bb1\u5c01\u6761\u5305";
         Chinese["loot_overflow_tool"] = "\u6ea2\u51fa\u8d27\u573a\u5de5\u5177\u7bb1";
+        Chinese["relay_activate"] = "\u542f\u52a8\u793e\u533a\u4e2d\u7ee7  //  \u626b\u63cf\u5e76\u89e3\u9501\u5c4b\u9876\u8865\u7ed9";
+        Chinese["relay_climb"] = "\u6500\u722c\u4e2d\u7ee7\u7ad9\u5916\u68af";
+        Chinese["relay_descend"] = "\u4ece\u4e2d\u7ee7\u7ad9\u4e0b\u68af";
+        Chinese["relay_climbing"] = "\u6b63\u5728\u6500\u722c\u4e2d\u7ee7\u68af";
+        Chinese["relay_online"] = "\u4e2d\u7ee7\u5df2\u4e0a\u7ebf  //  \u5c4b\u9876\u8865\u7ed9\u5df2\u89e3\u9501";
+        Chinese["relay_interrupted"] = "\u4e2d\u7ee7\u8fde\u63a5\u5df2\u4e2d\u65ad";
+        Chinese["relay_unlocked"] = "\u4e2d\u7ee7\u5df2\u4e0a\u7ebf  //  \u654c\u4eba\u4e0e\u7269\u8d44\u5df2\u6807\u8bb0  //  \u5c4b\u9876\u8865\u7ed9\u5df2\u89e3\u9501";
     }
 
     private static readonly Dictionary<string, string> ChineseObjectives = new()

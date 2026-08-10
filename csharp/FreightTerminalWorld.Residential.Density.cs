@@ -25,14 +25,12 @@ public partial class FreightTerminalWorld
         var shellAlt = Mat("residential_infill_shell_alt", new Color(0.25f, 0.22f, 0.19f), 0.18f, 0.78f);
         var utility = Mat("residential_infill_utility", new Color(0.08f, 0.105f, 0.105f), 0.55f, 0.46f);
         var warning = Mat("residential_infill_warning", new Color(0.88f, 0.55f, 0.16f), 0.05f, 0.5f, new Color(0.72f, 0.28f, 0.06f));
-        var green = Mat("residential_infill_medical", new Color(0.22f, 0.76f, 0.48f), 0.08f, 0.55f, new Color(0.12f, 0.46f, 0.28f));
 
         for (var towerIndex = 0; towerIndex < _residentialTowers.Count; towerIndex++)
         {
             var tower = _residentialTowers[towerIndex];
             var spec = ResidentialTowerSpecs[towerIndex];
-            var accent = Mat($"residential_infill_accent_{towerIndex % 4}", spec.Accent * 0.72f, 0.12f, 0.68f);
-            BuildTowerCornerModules(tower, spec, towerIndex, shell, shellAlt, utility, warning, green, accent, trim);
+            BuildTowerCornerModules(tower, spec, towerIndex, shell, shellAlt, utility, trim);
             BuildTowerCourtyardDressing(tower, spec, towerIndex, paving, utility, warning, glass, concrete);
         }
 
@@ -85,9 +83,6 @@ public partial class FreightTerminalWorld
         Godot.Material shell,
         Godot.Material shellAlt,
         Godot.Material utility,
-        Godot.Material warning,
-        Godot.Material green,
-        Godot.Material accent,
         Godot.Material trim)
     {
         var width = spec.Footprint.X;
@@ -102,43 +97,25 @@ public partial class FreightTerminalWorld
                     1.18f,
                     sz * (depth * 0.5f + 1.25f));
                 var moduleMaterial = (towerIndex + cornerNumber) % 2 == 0 ? shell : shellAlt;
-                var module = ExpansionBox(
-                    tower,
-                    $"ResidentialInfill_T{towerIndex + 1:00}_C{cornerNumber:00}",
-                    corner,
-                    new Vector3(2.35f, 2.36f, 2.35f),
-                    moduleMaterial);
-                module.AddToGroup("residential_infill");
-                _residentialInfillModuleCount++;
-
-                // A shallow roof and a bright face marker give each annex a purpose at a glance.
-                MeshBox(module, new Vector3(0, 1.25f, 0), new Vector3(2.62f, 0.16f, 2.62f), trim);
-                var faceZ = sz > 0 ? -1.19f : 1.19f;
-                MeshBox(module, new Vector3(0, -0.05f, faceZ), new Vector3(1.3f, 1.8f, 0.035f), utility);
-                MeshBox(module, new Vector3(0, 0.18f, faceZ + (sz > 0 ? -0.03f : 0.03f)), new Vector3(0.78f, 0.08f, 0.05f), cornerNumber % 3 == 0 ? green : warning);
-                MeshBox(module, new Vector3(0, -0.44f, faceZ), new Vector3(0.72f, 0.05f, 0.05f), accent);
-
-                var ductX = sx > 0 ? -0.82f : 0.82f;
-                MeshBox(module, new Vector3(ductX, 0.18f, sz * 0.15f), new Vector3(0.14f, 1.9f, 0.14f), trim);
-                MeshBox(module, new Vector3(ductX, 0.98f, 0), new Vector3(0.75f, 0.13f, 0.13f), trim);
-                // Low crates sit outside the walking line and make the corner usable cover.
-                var crateOffset = new Vector3(sx * 1.55f, -0.78f, sz * 0.25f);
-                ExpansionBox(module, $"ResidentialInfillCrate_T{towerIndex + 1:00}_C{cornerNumber:00}", crateOffset, new Vector3(0.52f, 0.68f, 0.62f), accent);
-                MeshBox(module, crateOffset + new Vector3(0, 0.38f, 0), new Vector3(0.56f, 0.06f, 0.66f), warning);
-
-                tower.AddChild(new Label3D
+                var kind = (ResidentialRelayKind)((towerIndex + cornerNumber) % 4);
+                var module = new ResidentialRelayStation
                 {
-                    Name = $"ResidentialInfillLabel_T{towerIndex + 1:00}_C{cornerNumber:00}",
-                    Position = corner + new Vector3(0, 1.48f, sz * 0.08f),
-                    Text = cornerNumber % 3 == 0 ? "MEDICAL / RESERVE" : cornerNumber % 3 == 1 ? "UTILITY / TENANT" : "SECURITY / SERVICE",
-                    FontSize = 12,
-                    OutlineSize = 4,
-                    Modulate = cornerNumber % 3 == 0
-                        ? new Color(0.22f, 0.9f, 0.56f)
-                        : new Color(1.0f, 0.64f, 0.2f),
-                    Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-                    VisibilityRangeEnd = 18.0f
-                });
+                    Name = $"ResidentialInfill_T{towerIndex + 1:00}_C{cornerNumber:00}",
+                    Position = corner
+                };
+                module.Configure(
+                    kind,
+                    towerIndex,
+                    cornerNumber,
+                    sz > 0.0f ? 1 : -1,
+                    spec.Accent,
+                    moduleMaterial,
+                    trim,
+                    utility);
+                tower.AddChild(module);
+                module.AddToGroup("residential_infill");
+                _residentialRelayStations.Add(module);
+                _residentialInfillModuleCount++;
                 cornerNumber++;
             }
         }

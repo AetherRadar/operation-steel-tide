@@ -306,6 +306,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidateResidentialDensity();
         }
+        else if (Array.Exists(args, value => value == "--validate-relay-stations"))
+        {
+            ValidateRelayStations();
+        }
         else if (Array.Exists(args, value => value == "--validate-medical"))
         {
             ValidateMedicalSystem();
@@ -349,6 +353,10 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--capture-residential-stairs"))
         {
             CaptureResidentialStairDetails();
+        }
+        else if (Array.Exists(args, value => value == "--capture-relay-station"))
+        {
+            CaptureRelayStation();
         }
         else if (Array.Exists(args, value => value == "--capture-medical-wheel"))
         {
@@ -423,6 +431,11 @@ public partial class FreightTerminalWorld : Node3D
             }
             var pulse = baseScale + Mathf.Sin(Time.GetTicksMsec() * 0.003f) * 0.06f;
             _extractionMarker.Scale = new Vector3(pulse, 1.0f, pulse);
+        }
+
+        if (UpdateRelayClimb((float)delta))
+        {
+            return;
         }
 
         if (_missionEnded && !IsExtractionDeparturePlaying && Input.IsKeyPressed(Key.Enter))
@@ -1859,6 +1872,11 @@ public partial class FreightTerminalWorld : Node3D
                 _interactReleaseRequired = true;
                 nearestCivilian.TryProvideAssistance(_player);
             }
+            return;
+        }
+
+        if (UpdateRelayStationInteraction(delta))
+        {
             return;
         }
 
