@@ -92,8 +92,8 @@ public partial class FreightTerminalWorld
             DistrictRoutePoint(-38.0f, -14.0f), DistrictRoutePoint(-38.0f, -33.5f), DistrictRoutePoint(20.0f, -33.5f));
         AddDistrictRouteLink(hubs, "RailGate", "MaintenanceGate", deck, guard, support, safety,
             DistrictRoutePoint(-72.0f, -82.0f), DistrictRoutePoint(-24.0f, -90.0f),
-            DistrictRoutePoint(16.0f, -90.0f), DistrictRoutePoint(16.0f, -110.0f),
-            DistrictRoutePoint(44.0f, -110.0f), DistrictRoutePoint(44.0f, -70.0f));
+            DistrictRoutePoint(6.0f, -110.0f), DistrictRoutePoint(44.0f, -110.0f),
+            DistrictRoutePoint(44.0f, -70.0f));
         AddDistrictRouteLink(hubs, "OpsGate", "MaintenanceGate", deck, guard, support, safety,
             DistrictRoutePoint(62.0f, -34.0f), DistrictRoutePoint(62.0f, -62.0f),
             DistrictRoutePoint(44.0f, -66.0f));
@@ -112,7 +112,8 @@ public partial class FreightTerminalWorld
             AddDistrictRouteLink(hubs, "WestResidentialGateway", "CustomsGate", deck, guard, support, safety,
                 DistrictRoutePoint(-78.0f, -14.0f));
             AddDistrictRouteLink(hubs, "DrydockGate", "EastResidentialGateway", deck, guard, support, safety,
-                DistrictRoutePoint(114.0f, -130.0f), DistrictRoutePoint(114.0f, -84.0f));
+                DistrictRoutePoint(114.0f, -130.0f), DistrictRoutePoint(114.0f, -90.0f),
+                DistrictRoutePoint(99.0f, -90.0f));
             AddDistrictRouteLink(hubs, "EastResidentialGateway", "OpsGate", deck, guard, support, safety,
                 DistrictRoutePoint(84.0f, -54.0f), DistrictRoutePoint(64.0f, -40.0f));
             AddDistrictRouteLink(hubs, "EastResidentialGateway", "TideglassGate", deck, guard, support, safety,
