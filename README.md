@@ -83,6 +83,10 @@ Enemy operators use layered anatomical meshes with independent leg motion, helme
 
 The Go backend provides three mission definitions, objective text, detection rules, reinforcement thresholds, profiles, session persistence, XP, credits, and completion rewards. The C# `BackendClient` uses the service when available and falls back to a local mission when it is offline.
 
+Jumping while moving into collision-backed furniture or cover 0.3-1.1 meters high now vaults the player onto a clear top surface, including the yellow residential search furniture used to reach elevated glass access routes.
+
+Any accepted incoming hit immediately closes the active search or backpack view through the normal close path, restores movement, and recaptures the mouse. Weapon cards show directional damage, range, recoil, and handling comparisons; helmets, body armor, and backpacks show protection, durability, or capacity changes. Green and red comparison text communicates benefit at a glance, while arrows preserve the raw stat direction. Item borders and equipped-slot captions use the grade stored on each actual item, and weapon, attachment, knife, and equipment replacements preserve that grade when the old item returns to its source.
+
 ## Technical layout
 
 - `csharp/ClientBootstrap.cs`: C# client entry point.
@@ -116,6 +120,7 @@ Godot_console.exe --path . -- --capture-operator
 Godot_console.exe --path . -- --capture-zh
 Godot_console.exe --path . -- --capture-knife
 Godot_console.exe --path . -- --validate-loot
+Godot_console.exe --path . -- --validate-backpack-tab
 Godot_console.exe --path . -- --validate-corpse-loot
 Godot_console.exe --path . -- --capture-backpack
 Godot_console.exe --path . -- --capture-optics
