@@ -4242,6 +4242,7 @@ public partial class FreightTerminalWorld : Node3D
             (new Vector3(-1.45f, ResidentialFloorHeight * 0.5f + 0.25f, firstCoreZ - ResidentialStairRun * 0.5f - 1.0f), "landing_entry"),
             (new Vector3(1.45f, ResidentialFloorHeight * 0.5f + 0.25f, firstCoreZ - ResidentialStairRun * 0.5f - 1.0f), "landing_turn"),
             (new Vector3(1.45f, ResidentialFloorHeight + 0.25f, firstCoreZ + ResidentialStairRun * 0.5f - 0.3f), "upper_top"),
+            (new Vector3(1.45f, ResidentialFloorHeight + 0.25f, firstCoreZ + ResidentialStairRun * 0.5f + 0.75f), "upper_exit"),
             (new Vector3(0.0f, ResidentialFloorHeight + 0.25f, firstCoreZ + ResidentialStairRun * 0.5f + 1.6f), "floor2_corridor")
         };
         var walkStartY = _player.GlobalPosition.Y;
