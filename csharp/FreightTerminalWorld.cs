@@ -450,7 +450,7 @@ public partial class FreightTerminalWorld : Node3D
     {
         UpdateSquad((float)delta);
         UpdateExtractionSequence((float)delta);
-        UpdateWorldBossHud();
+        UpdateWorldBossTracking();
         if (IsInstanceValid(_extractionMarker))
         {
             _extractionMarker.RotateY((float)delta * 0.35f);

@@ -55,30 +55,19 @@ public partial class FreightTerminalWorld
             "boss_spawned",
             "ROGUE HUNTER ACTIVE  //  HOSTILE TO EVERY FACTION",
             new Color(0.18f, 1.0f, 0.76f));
-        UpdateWorldBossHud();
+        UpdateWorldBossTracking();
     }
 
-    private void UpdateWorldBossHud()
+    private void UpdateWorldBossTracking()
     {
         var active = IsInstanceValid(_worldBoss) && !_worldBoss!.IsDead;
         if (!active)
         {
-            _hud.SetWorldBossStatus(false, 0.0f, EnemyOperator.WorldBossMaxHealth, 1, 0.0f, false);
             _hud.SetMinimapWorldBoss(Vector3.Zero, false);
             return;
         }
 
-        var distance = IsInstanceValid(_player)
-            ? _player.GlobalPosition.DistanceTo(_worldBoss!.GlobalPosition)
-            : 0.0f;
-        _hud.SetWorldBossStatus(
-            true,
-            _worldBoss!.CurrentHealth,
-            _worldBoss.MaxHealth,
-            _worldBoss.WorldBossPhase,
-            distance,
-            _worldBoss.IsWorldBossPulseCharging);
-        _hud.SetMinimapWorldBoss(_worldBoss.GlobalPosition, true);
+        _hud.SetMinimapWorldBoss(_worldBoss!.GlobalPosition, true);
     }
 
     private void OnWorldBossEliminated(EnemyOperator boss)
@@ -88,7 +77,7 @@ public partial class FreightTerminalWorld
             return;
         }
         _worldBossDefeated = true;
-        UpdateWorldBossHud();
+        UpdateWorldBossTracking();
         _hud.ShowLocalizedMessage(
             "boss_defeated",
             "TIDE HUNTER ELIMINATED  //  LEGENDARY CACHE AVAILABLE",
@@ -249,12 +238,10 @@ public partial class FreightTerminalWorld
         var surgePhase = boss.WorldBossPhase == 2;
         boss.SetWorldBossHealthRatioForDiagnostics(0.25f);
         var riptidePhase = boss.WorldBossPhase == 3;
-        UpdateWorldBossHud();
-        var hudReady = _hud.WorldBossHudVisible
-            && _hud.WorldBossHudPhase == 3
-            && _hud.WorldBossHudHealthRatio > 0.2f
-            && _hud.WorldBossHudHealthRatio < 0.3f
-            && _hud.MinimapWorldBossVisible;
+        UpdateWorldBossTracking();
+        var topHudAbsent = _hud.FindChild("WorldBossHud", recursive: true, owned: false) is null;
+        var minimapTracked = _hud.MinimapWorldBossVisible;
+        var trackingReady = topHudAbsent && minimapTracked;
 
         var pulseDamagedFaction = false;
         if (garrison is not null)
@@ -276,13 +263,13 @@ public partial class FreightTerminalWorld
 
         boss.TakeDamage(5000.0f, boss.GlobalPosition + Vector3.Up, _player, 1.0f);
         await WaitFrames(2);
-        UpdateWorldBossHud();
+        UpdateWorldBossTracking();
+        var minimapCleared = !_hud.MinimapWorldBossVisible;
         var deathReady = boss.IsDead
             && boss.IsSearchable
             && _worldBossDefeated
             && _lootSources.Contains(boss)
-            && !_hud.WorldBossHudVisible
-            && !_hud.MinimapWorldBossVisible;
+            && minimapCleared;
         var valid = factionReady
             && allFactionTargets
             && arsenalReady
@@ -290,11 +277,11 @@ public partial class FreightTerminalWorld
             && patrolAdvances
             && surgePhase
             && riptidePhase
-            && hudReady
+            && trackingReady
             && pulseDamagedFaction
             && rewardsReady
             && deathReady;
-        GD.Print($"BOSS_CHECK valid={valid} faction={factionReady} all_targets={allFactionTargets} team={boss.TeamId} health={boss.MaxHealth:0} weapon={weapon.Platform} optic_7x={hasSevenPowerOptic} caliber={WeaponCatalog.Weapon(weapon.Platform).Caliber} route={boss.WorldBossPatrolRouteCount} span=({boss.WorldBossPatrolSpan.X:0},{boss.WorldBossPatrolSpan.Y:0}) patrol={patrolAdvances} surge={surgePhase} riptide={riptidePhase} hud={hudReady} pulse={pulseDamagedFaction} rewards={rewardsReady} reward_value={LootItem.TotalValue(boss.Loot)} corpse={deathReady}");
+        GD.Print($"BOSS_CHECK valid={valid} faction={factionReady} all_targets={allFactionTargets} team={boss.TeamId} health={boss.MaxHealth:0} weapon={weapon.Platform} optic_7x={hasSevenPowerOptic} caliber={WeaponCatalog.Weapon(weapon.Platform).Caliber} route={boss.WorldBossPatrolRouteCount} span=({boss.WorldBossPatrolSpan.X:0},{boss.WorldBossPatrolSpan.Y:0}) patrol={patrolAdvances} surge={surgePhase} riptide={riptidePhase} top_hud_absent={topHudAbsent} minimap_alive={minimapTracked} minimap_cleared={minimapCleared} tracking={trackingReady} pulse={pulseDamagedFaction} rewards={rewardsReady} reward_value={LootItem.TotalValue(boss.Loot)} corpse={deathReady}");
         GD.Print($"BOSS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -326,7 +313,7 @@ public partial class FreightTerminalWorld
         _player.ProcessMode = ProcessModeEnum.Disabled;
         _worldBoss!.GlobalPosition = new Vector3(-24.0f, 0.2f, -58.0f);
         _worldBoss!.SetWorldBossHealthRatioForDiagnostics(0.25f);
-        UpdateWorldBossHud();
+        UpdateWorldBossTracking();
 
         var camera = new Camera3D { Name = "WorldBossCaptureCamera", Fov = 52.0f, Far = 420.0f };
         AddChild(camera);
