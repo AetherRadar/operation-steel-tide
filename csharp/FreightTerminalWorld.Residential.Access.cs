@@ -145,7 +145,7 @@ public partial class FreightTerminalWorld
         var stairStartZ = platformNorthZ - ResidentialSkybridgeAccessRun;
         // Let the landing overlap the first bridge meters so the player capsule
         // does not catch an exposed deck edge at the facade transition.
-        var platformCenterX = wallX + sign * 1.55f;
+        var platformCenterX = wallX + sign * 1.0f;
         var root = new StaticBody3D
         {
             Name = $"SkybridgeAccess_T{towerIndex + 1:00}",
@@ -813,6 +813,24 @@ public partial class FreightTerminalWorld
         camera.LookAt(midpoint + access.ClimbDirection * 1.6f + Vector3.Up * 0.3f, Vector3.Up);
         camera.MakeCurrent();
         await WaitFrames(26);
+        foreach (var sample in new[]
+        {
+            new Vector2(330.0f, 483.0f),
+            new Vector2(430.0f, 450.0f),
+            new Vector2(478.0f, 425.0f)
+        })
+        {
+            var rayFrom = camera.ProjectRayOrigin(sample);
+            var rayTo = rayFrom + camera.ProjectRayNormal(sample) * 80.0f;
+            var query = PhysicsRayQueryParameters3D.Create(rayFrom, rayTo);
+            query.CollisionMask = 1;
+            query.CollideWithAreas = false;
+            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+            var collider = hit.Count > 0 ? hit["collider"].AsGodotObject() as Node : null;
+            var hitPosition = hit.Count > 0 ? hit["position"].AsVector3() : Vector3.Zero;
+            var hitLocal = _residentialTowers[access.TowerIndex].ToLocal(hitPosition);
+            GD.Print($"SKYBRIDGE_ACCESS_SCREEN_RAY screen=({sample.X:0},{sample.Y:0}) collider={collider?.Name ?? "none"} parent={collider?.GetParent()?.Name ?? "none"} access={ReferenceEquals(collider, access.Root)} hit=({hitPosition.X:0.00},{hitPosition.Y:0.00},{hitPosition.Z:0.00}) local=({hitLocal.X:0.00},{hitLocal.Y:0.00},{hitLocal.Z:0.00})");
+        }
         SaveViewportImage("res://skybridge_access_validation.png");
         GD.Print($"SKYBRIDGE_ACCESS_CAPTURE accesses={_residentialSkybridgeAccesses.Count} steps={_residentialSkybridgeAccesses.Sum(access => access.StepCount)} path=skybridge_access_validation.png");
         GetTree().Quit();
