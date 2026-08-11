@@ -23,7 +23,7 @@ public partial class CombatHUD
             var count = 0;
             foreach (var card in VisibleLootCards())
             {
-                if (card.ComparisonCount > 0)
+                if (card.RenderedComparisonCount > 0)
                 {
                     count++;
                 }
@@ -38,7 +38,7 @@ public partial class CombatHUD
         {
             foreach (var card in VisibleLootCards())
             {
-                if (card.HasUpgradeComparison)
+                if (card.RenderedHasUpgradeComparison)
                 {
                     return true;
                 }
@@ -53,7 +53,7 @@ public partial class CombatHUD
         {
             foreach (var card in VisibleLootCards())
             {
-                if (card.HasDowngradeComparison)
+                if (card.RenderedHasDowngradeComparison)
                 {
                     return true;
                 }
@@ -79,6 +79,123 @@ public partial class CombatHUD
         }
     }
 
+    public bool LootComparisonsFullyRendered
+    {
+        get
+        {
+            var found = false;
+            foreach (var card in VisibleLootCards())
+            {
+                if (card.ComparisonCount == 0)
+                {
+                    continue;
+                }
+                found = true;
+                if (card.RenderedComparisonCount != card.ComparisonCount)
+                {
+                    return false;
+                }
+            }
+            return found;
+        }
+    }
+
+    public bool LootCompactWeaponComparisonsFullyRendered
+    {
+        get
+        {
+            if (!_shownSourceAvailable)
+            {
+                return false;
+            }
+            foreach (var card in VisibleLootCards())
+            {
+                if (card.Origin == LootDragOrigin.Backpack && card.ItemKind == LootItemKind.Weapon)
+                {
+                    return card.ComparisonCount == 4 && card.RenderedComparisonCount == 4;
+                }
+            }
+            return false;
+        }
+    }
+
+    public bool LootCompactWeaponShowsBothDirections
+    {
+        get
+        {
+            if (!_shownSourceAvailable)
+            {
+                return false;
+            }
+            foreach (var card in VisibleLootCards())
+            {
+                if (card.Origin == LootDragOrigin.Backpack && card.ItemKind == LootItemKind.Weapon)
+                {
+                    return card.RenderedHasUpgradeComparison && card.RenderedHasDowngradeComparison;
+                }
+            }
+            return false;
+        }
+    }
+
+    public bool LootAttachmentComparisonRendered
+    {
+        get
+        {
+            foreach (var card in VisibleLootCards())
+            {
+                if (card.ItemKind == LootItemKind.Attachment)
+                {
+                    return card.ComparisonCount == 4 && card.RenderedComparisonCount == 4;
+                }
+            }
+            return false;
+        }
+    }
+
+    public bool LootEquippedGradeStylesConsistent
+    {
+        get
+        {
+            if (_shownPlayer is null)
+            {
+                return false;
+            }
+            var primaryValid = !_shownPlayer.HasFireablePrimary
+                || ZoneColorMatchesGrade(_primarySlot, _shownPlayer.EquippedWeaponGrade);
+            return primaryValid
+                && ZoneColorMatchesGrade(_helmetSlot, _shownPlayer.EquippedHelmetGrade)
+                && ZoneColorMatchesGrade(_armorSlot, _shownPlayer.EquippedBodyArmorGrade)
+                && ZoneColorMatchesGrade(_packSlot, _shownPlayer.EquippedBackpackGrade);
+        }
+    }
+
+    public bool LootEmptyPrimaryGradeHidden => _shownPlayer is { HasFireablePrimary: false }
+        && _primarySlotCaption.Text == Text("primary_weapon", "PRIMARY WEAPON");
+
+    public Vector2 LootSourceZoneSizeForDiagnostics => _lootSourceZone.Size;
+    public Vector2 LootBackpackZoneSizeForDiagnostics => _backpackZone.Size;
+    public bool LootSourceAvailableForDiagnostics => _shownSourceAvailable;
+    public string LootSourceCardWidthsForDiagnostics
+    {
+        get
+        {
+            var result = string.Empty;
+            if (!IsInstanceValid(_lootSourceList))
+            {
+                return result;
+            }
+            foreach (var child in _lootSourceList.GetChildren())
+            {
+                if (child is LootDragCard card)
+                {
+                    result += $"{card.ItemKind}:{card.Size.X:0}/{card.GetCombinedMinimumSize().X:0} ";
+                }
+            }
+            return result.TrimEnd();
+        }
+    }
+
     private IReadOnlyList<LootStatComparison> BuildLootComparisons(LootItem item)
     {
         var comparisons = new List<LootStatComparison>(4);
@@ -96,12 +213,20 @@ public partial class CombatHUD
                     LootComparisonTone.Upgrade));
                 return comparisons;
             }
-            var candidate = item.Weapon.Stats();
-            var equipped = _shownPlayer.CurrentWeaponStats;
-            AddComparison(comparisons, Text("stat_damage", "DMG"), candidate.Damage, equipped.Damage, true, "0");
-            AddComparison(comparisons, Text("stat_range", "RANGE"), candidate.EffectiveRange, equipped.EffectiveRange, true, "0", "m");
-            AddComparison(comparisons, Text("stat_recoil", "RECOIL"), candidate.Recoil, equipped.Recoil, false, "0.00");
-            AddComparison(comparisons, Text("stat_handling", "HANDLING"), candidate.Handling, equipped.Handling, true, "0.00");
+            AddWeaponComparisons(comparisons, item.Weapon.Stats(), _shownPlayer.CurrentWeaponStats);
+            return comparisons;
+        }
+
+        if (item.Kind == LootItemKind.Attachment && !string.IsNullOrEmpty(item.AttachmentId))
+        {
+            if (!_shownPlayer.HasFireablePrimary)
+            {
+                return comparisons;
+            }
+            var attachment = WeaponCatalog.Attachment(item.AttachmentId);
+            var candidate = _shownPlayer.EquippedWeapon.Clone();
+            candidate.Attachments[attachment.Slot] = attachment.Id;
+            AddWeaponComparisons(comparisons, candidate.Stats(), _shownPlayer.CurrentWeaponStats);
             return comparisons;
         }
 
@@ -160,11 +285,18 @@ public partial class CombatHUD
         {
             return;
         }
-        StyleEquippedSlot(
-            _primarySlot,
-            _primarySlotCaption,
-            Text("primary_weapon", "PRIMARY WEAPON"),
-            _shownPlayer.HasFireablePrimary ? _shownPlayer.EquippedWeaponGrade : LootGrade.Common);
+        if (_shownPlayer.HasFireablePrimary)
+        {
+            StyleEquippedSlot(
+                _primarySlot,
+                _primarySlotCaption,
+                Text("primary_weapon", "PRIMARY WEAPON"),
+                _shownPlayer.EquippedWeaponGrade);
+        }
+        else
+        {
+            StyleEmptyPrimarySlot();
+        }
         StyleEquippedSlot(
             _helmetSlot,
             _helmetSlotCaption,
@@ -188,6 +320,29 @@ public partial class CombatHUD
         zone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(color));
         caption.Text = $"{slotName}  //  {LootGrades.DisplayName(grade, _language)}";
         caption.AddThemeColorOverride("font_color", color);
+    }
+
+    private void StyleEmptyPrimarySlot()
+    {
+        var color = new Color(0.48f, 0.54f, 0.52f);
+        _primarySlot.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(color));
+        _primarySlotCaption.Text = Text("primary_weapon", "PRIMARY WEAPON");
+        _primarySlotCaption.AddThemeColorOverride("font_color", color);
+    }
+
+    private static bool ZoneColorMatchesGrade(LootDropZone zone, LootGrade grade)
+    {
+        var expected = new Color(LootGrades.GlowColor(grade), 0.75f);
+        return zone.GetThemeStylebox("panel") is StyleBoxFlat style
+            && ColorsMatch(style.BorderColor, expected);
+    }
+
+    private static bool ColorsMatch(Color actual, Color expected)
+    {
+        return Mathf.IsEqualApprox(actual.R, expected.R)
+            && Mathf.IsEqualApprox(actual.G, expected.G)
+            && Mathf.IsEqualApprox(actual.B, expected.B)
+            && Mathf.IsEqualApprox(actual.A, expected.A);
     }
 
     private IEnumerable<LootDragCard> VisibleLootCards()
@@ -236,5 +391,16 @@ public partial class CombatHUD
         var amount = Mathf.Abs(delta).ToString(numberFormat, CultureInfo.InvariantCulture);
         var tone = increased == higherIsBetter ? LootComparisonTone.Upgrade : LootComparisonTone.Downgrade;
         comparisons.Add(new LootStatComparison($"{arrow} {label} {sign}{amount}{suffix}", tone));
+    }
+
+    private void AddWeaponComparisons(
+        ICollection<LootStatComparison> comparisons,
+        WeaponStats candidate,
+        WeaponStats equipped)
+    {
+        AddComparison(comparisons, Text("stat_damage", "DMG"), candidate.Damage, equipped.Damage, true, "0");
+        AddComparison(comparisons, Text("stat_range", "RANGE"), candidate.EffectiveRange, equipped.EffectiveRange, true, "0", "m");
+        AddComparison(comparisons, Text("stat_recoil", "RECOIL"), candidate.Recoil, equipped.Recoil, false, "0.00");
+        AddComparison(comparisons, Text("stat_handling", "HANDLING"), candidate.Handling, equipped.Handling, true, "0.00");
     }
 }

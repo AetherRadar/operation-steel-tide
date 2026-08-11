@@ -104,8 +104,10 @@ public partial class FreightTerminalWorld
             && persistedStore.Profile.LastAmmoQuantity == 60;
 
         _player.ApplyDeploymentLoadout(loadout);
+        var expectedWeaponGrade = LootGrades.FromTier(DeploymentCatalog.Weapon(selection.WeaponId).BuildTier);
         var playerEquipped = _player.HasFireablePrimary
             && _player.EquippedWeapon.Platform == WeaponPlatform.M24
+            && _player.EquippedWeaponGrade == expectedWeaponGrade
             && _player.CurrentAmmoGrade == LootGrade.Rare
             && _player.AmmoReserveFor(_player.CurrentAmmoCaliber, LootGrade.Rare) == loadout.ReserveAmmo;
         var squadAiArmed = _squadMates
@@ -132,7 +134,7 @@ public partial class FreightTerminalWorld
 
         var valid = purchase && persisted && playerEquipped && squadAiArmed && rivalAiArmed
             && ammoTiers && minimap && extractSaved && insufficientRejected;
-        GD.Print($"PROGRESSION_CHECK valid={valid} purchase={purchase} persisted={persisted} player_equipped={playerEquipped} squad_ai_armed={squadAiArmed} rival_ai_armed={rivalAiArmed} ammo_tiers={ammoTiers} minimap={minimap} landmarks={_hud.MinimapLandmarkCount} extract_saved={extractSaved} insufficient_rejected={insufficientRejected}");
+        GD.Print($"PROGRESSION_CHECK valid={valid} purchase={purchase} persisted={persisted} player_equipped={playerEquipped} weapon_grade={_player.EquippedWeaponGrade}/{expectedWeaponGrade} squad_ai_armed={squadAiArmed} rival_ai_armed={rivalAiArmed} ammo_tiers={ammoTiers} minimap={minimap} landmarks={_hud.MinimapLandmarkCount} extract_saved={extractSaved} insufficient_rejected={insufficientRejected}");
         GD.Print($"PROGRESSION_PASS valid={valid}");
         TryDeleteProfile(profilePath);
         TryDeleteProfile(profilePath + ".tmp");
@@ -172,6 +174,7 @@ public partial class FreightTerminalWorld
             && _player.EquippedBodyArmor.DefinitionId == "armor_patrol"
             && _player.CurrentAmmoGrade == LootGrade.Common
             && _player.ReserveAmmo == 60;
+        var starterWeaponGrade = _player.EquippedWeaponGrade == LootGrades.FromTier(starterOffer.BuildTier);
 
         _hud.ApplyDeploymentPresetForDiagnostics("overwatch");
         await WaitFrames(1);
@@ -187,9 +190,13 @@ public partial class FreightTerminalWorld
             && selection.ArmorId == "standard"
             && selection.AmmoGrade == LootGrade.Epic
             && selection.AmmoQuantity == 60;
-        var expectedCost = DeploymentCatalog.Resolve(selection).TotalCost;
+        var selectedLoadout = DeploymentCatalog.Resolve(selection);
+        var expectedCost = selectedLoadout.TotalCost;
         var cost = _hud.DeploymentSelectedCost == expectedCost;
         var projectedBalance = _hud.DeploymentProjectedBalance == OperatorProfileStore.StartingCredits - expectedCost;
+        _player.ApplyDeploymentLoadout(selectedLoadout);
+        var selectedOffer = DeploymentCatalog.Weapon(selection.WeaponId);
+        var selectedWeaponGrade = _player.EquippedWeaponGrade == LootGrades.FromTier(selectedOffer.BuildTier);
         var quantityPricing = DeploymentCatalog.AmmoPrice(LootGrade.Rare, AmmoCaliber.Rifle, 30)
             < DeploymentCatalog.AmmoPrice(LootGrade.Rare, AmmoCaliber.Rifle, 60)
             && DeploymentCatalog.AmmoPrice(LootGrade.Rare, AmmoCaliber.Rifle, 60)
@@ -212,9 +219,10 @@ public partial class FreightTerminalWorld
         var valid = uiReady && presetCount && weaponCount && armorCount && ammoPackCount && presetSelected
             && loadoutSelected && cost && projectedBalance && quantityPricing && gradePricing
             && mapCatalog && lockedMapRejected && starterPresetSelected && freeStarter
-            && weakStarter && starterUpgradesPriced && starterEquipped;
+            && weakStarter && starterUpgradesPriced && starterEquipped
+            && starterWeaponGrade && selectedWeaponGrade;
 
-        GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} weapon_count={DeploymentCatalog.Weapons.Count} armor_count={DeploymentCatalog.Armor.Count} ammo_pack_count={_hud.DeploymentAmmoPackCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} quantity={selection.AmmoQuantity} quantity_pricing={quantityPricing} grade_pricing={gradePricing} map_count={_hud.DeploymentMapCount} selected_map={_hud.SelectedDeploymentMapId} map_available={_hud.DeploymentMapAvailable} locked_map_rejected={lockedMapRejected} starter_preset={starterPresetSelected} starter_free={freeStarter} starter_weak={weakStarter} starter_upgrades_priced={starterUpgradesPriced} starter_equipped={starterEquipped} starter_damage={starterLoadout.Weapon?.Stats().Damage:0} starter_armor={starterArmor.Protection * 100.0f:0} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
+        GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} weapon_count={DeploymentCatalog.Weapons.Count} armor_count={DeploymentCatalog.Armor.Count} ammo_pack_count={_hud.DeploymentAmmoPackCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} quantity={selection.AmmoQuantity} quantity_pricing={quantityPricing} grade_pricing={gradePricing} weapon_grades={starterWeaponGrade}/{selectedWeaponGrade} map_count={_hud.DeploymentMapCount} selected_map={_hud.SelectedDeploymentMapId} map_available={_hud.DeploymentMapAvailable} locked_map_rejected={lockedMapRejected} starter_preset={starterPresetSelected} starter_free={freeStarter} starter_weak={weakStarter} starter_upgrades_priced={starterUpgradesPriced} starter_equipped={starterEquipped} starter_damage={starterLoadout.Weapon?.Stats().Damage:0} starter_armor={starterArmor.Protection * 100.0f:0} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
         GD.Print($"DEPLOYMENT_UI_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

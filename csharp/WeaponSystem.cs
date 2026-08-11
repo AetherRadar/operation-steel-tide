@@ -383,8 +383,8 @@ public sealed class LootItem
             var part = WeaponCatalog.Attachment(AttachmentId);
             var slot = GameLocalization.IsChinese(language) ? WeaponCatalog.SlotChinese(part.Slot) : part.Slot.ToString().ToUpperInvariant();
             return GameLocalization.IsChinese(language)
-                ? $"{slot}零件，可安装至当前主武器  {valueLine}"
-                : $"{slot} part, installs on the equipped primary  {valueLine}";
+                ? $"{slot}零件  //  {part.EffectDetail(language)}  //  {valueLine}"
+                : $"{slot} PART  //  {part.EffectDetail(language)}  //  {valueLine}";
         }
         if (Kind == LootItemKind.Equipment && Equipment is not null)
         {

@@ -120,22 +120,37 @@ public partial class LootDragCard : PanelContainer
     public int ComparisonCount { get; private set; }
     public bool HasUpgradeComparison { get; private set; }
     public bool HasDowngradeComparison { get; private set; }
+    public int RenderedComparisonCount
+    {
+        get
+        {
+            var count = 0;
+            foreach (var label in _renderedComparisonLabels)
+            {
+                if (IsInstanceValid(label))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+    }
+    public bool RenderedHasUpgradeComparison => RenderedHasComparisonColor(ComparisonColor(LootComparisonTone.Upgrade));
+    public bool RenderedHasDowngradeComparison => RenderedHasComparisonColor(ComparisonColor(LootComparisonTone.Downgrade));
     public bool QualityColorMatchesGrade
     {
         get
         {
-            var expected = LootGrades.GlowColor(ItemGrade);
-            return Mathf.IsEqualApprox(_qualityAccent.R, expected.R)
-                && Mathf.IsEqualApprox(_qualityAccent.G, expected.G)
-                && Mathf.IsEqualApprox(_qualityAccent.B, expected.B)
-                && Mathf.IsEqualApprox(_qualityAccent.A, expected.A);
+            var expected = new Color(LootGrades.GlowColor(ItemGrade), 0.8f);
+            return GetThemeStylebox("panel") is StyleBoxFlat style
+                && ColorsMatch(style.BorderColor, expected);
         }
     }
 
     public event Action<string, LootDragOrigin>? DoubleActivated;
     public event Action<WeaponBuild>? DetailsRequested;
 
-    private Color _qualityAccent;
+    private readonly List<Label> _renderedComparisonLabels = new();
 
     public void Configure(
         string itemId,
@@ -158,10 +173,11 @@ public partial class LootDragCard : PanelContainer
         DragTitle = title;
         TooltipText = detail;
         ItemGrade = grade;
-        _qualityAccent = LootGrades.GlowColor(grade);
+        var accent = LootGrades.GlowColor(grade);
         ComparisonCount = comparisons?.Count ?? 0;
         HasUpgradeComparison = false;
         HasDowngradeComparison = false;
+        _renderedComparisonLabels.Clear();
         if (comparisons is not null)
         {
             foreach (var comparison in comparisons)
@@ -170,7 +186,6 @@ public partial class LootDragCard : PanelContainer
                 HasDowngradeComparison |= comparison.Tone == LootComparisonTone.Downgrade;
             }
         }
-        var accent = _qualityAccent;
         CustomMinimumSize = compact
             ? new Vector2(180, 68)
             : new Vector2(250, weapon is not null && ComparisonCount > 0
@@ -223,7 +238,7 @@ public partial class LootDragCard : PanelContainer
         var detailLabel = new Label
         {
             Text = detail,
-            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            AutowrapMode = TextServer.AutowrapMode.Arbitrary,
             MouseFilter = Control.MouseFilterEnum.Ignore,
             SizeFlagsHorizontal = SizeFlags.ExpandFill
         };
@@ -398,7 +413,7 @@ public partial class LootDragCard : PanelContainer
         var name = new Label
         {
             Text = title,
-            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            AutowrapMode = TextServer.AutowrapMode.Arbitrary,
             MouseFilter = MouseFilterEnum.Ignore,
             SizeFlagsHorizontal = SizeFlags.ExpandFill
         };
@@ -415,7 +430,7 @@ public partial class LootDragCard : PanelContainer
         var detailLabel = new Label
         {
             Text = detail,
-            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            AutowrapMode = TextServer.AutowrapMode.Arbitrary,
             MouseFilter = MouseFilterEnum.Ignore,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill
@@ -426,7 +441,7 @@ public partial class LootDragCard : PanelContainer
         AddComparisonGrid(text, comparisons, false);
     }
 
-    private static void AddComparisonGrid(
+    private void AddComparisonGrid(
         Control parent,
         IReadOnlyList<LootStatComparison>? comparisons,
         bool compact)
@@ -444,29 +459,51 @@ public partial class LootDragCard : PanelContainer
         grid.AddThemeConstantOverride("h_separation", compact ? 3 : 7);
         grid.AddThemeConstantOverride("v_separation", 1);
         parent.AddChild(grid);
-        var visibleCount = compact ? Math.Min(2, comparisons.Count) : comparisons.Count;
-        for (var index = 0; index < visibleCount; index++)
+        for (var index = 0; index < comparisons.Count; index++)
         {
             var comparison = comparisons[index];
-            var color = comparison.Tone switch
-            {
-                LootComparisonTone.Upgrade => new Color(0.27f, 0.94f, 0.5f),
-                LootComparisonTone.Downgrade => new Color(1.0f, 0.36f, 0.28f),
-                _ => new Color(0.55f, 0.64f, 0.61f)
-            };
+            var color = ComparisonColor(comparison.Tone);
             var label = new Label
             {
                 Text = comparison.Text,
                 ClipText = true,
                 TooltipText = comparison.Text,
-                CustomMinimumSize = new Vector2(compact ? 65 : 104, compact ? 13 : 16),
+                CustomMinimumSize = new Vector2(compact ? 65 : 84, compact ? 13 : 16),
                 MouseFilter = MouseFilterEnum.Ignore,
                 SizeFlagsHorizontal = SizeFlags.ExpandFill
             };
             label.AddThemeFontSizeOverride("font_size", compact ? 8 : 10);
             label.AddThemeColorOverride("font_color", color);
             grid.AddChild(label);
+            _renderedComparisonLabels.Add(label);
         }
+    }
+
+    private bool RenderedHasComparisonColor(Color expected)
+    {
+        foreach (var label in _renderedComparisonLabels)
+        {
+            if (IsInstanceValid(label) && ColorsMatch(label.GetThemeColor("font_color"), expected))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Color ComparisonColor(LootComparisonTone tone) => tone switch
+    {
+        LootComparisonTone.Upgrade => new Color(0.27f, 0.94f, 0.5f),
+        LootComparisonTone.Downgrade => new Color(1.0f, 0.36f, 0.28f),
+        _ => new Color(0.55f, 0.64f, 0.61f)
+    };
+
+    private static bool ColorsMatch(Color actual, Color expected)
+    {
+        return Mathf.IsEqualApprox(actual.R, expected.R)
+            && Mathf.IsEqualApprox(actual.G, expected.G)
+            && Mathf.IsEqualApprox(actual.B, expected.B)
+            && Mathf.IsEqualApprox(actual.A, expected.A);
     }
 
     public override Variant _GetDragData(Vector2 _atPosition)

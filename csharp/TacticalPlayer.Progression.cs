@@ -18,7 +18,8 @@ public partial class TacticalPlayer
             return;
         }
 
-        EquipPrimary(loadout.Weapon);
+        var weaponTier = DeploymentCatalog.Weapon(loadout.Selection.WeaponId).BuildTier;
+        EquipPrimary(loadout.Weapon, LootGrades.FromTier(weaponTier));
         _loadedAmmoGrade = loadout.AmmoGrade;
         SetAmmoReserve(CurrentAmmoCaliber, loadout.AmmoGrade, loadout.ReserveAmmo);
         Ammo = EquippedWeapon.Stats().MagazineSize;
