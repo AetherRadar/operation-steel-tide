@@ -4053,8 +4053,22 @@ public partial class FreightTerminalWorld : Node3D
         var consolidatedBodies = 0;
         var landingShapes = 0;
         var compactLandingShapes = 0;
+        var centerSpineShapes = 0;
+        var centerSpineVisuals = 0;
+        var innerGuardShapes = 0;
+        var floorSlabShapes = 0;
+        var intrudingFloorSlabs = 0;
+        var openingWidth = Mathf.Min(ResidentialStairOpeningWidth, firstSpec.Footprint.X - 5.0f);
+        var openingHalfWidth = openingWidth * 0.5f;
+        var openingNorth = firstCoreZ - ResidentialStairOpeningNorthDepth;
+        var openingSouth = firstCoreZ + ResidentialStairOpeningSouthDepth;
         foreach (var child in firstTower.GetChildren())
         {
+            var childName = child.Name.ToString();
+            if (childName.Contains("ResidentialStairSpine", StringComparison.OrdinalIgnoreCase))
+            {
+                centerSpineVisuals++;
+            }
             if (child is not StaticBody3D body)
             {
                 continue;
@@ -4095,10 +4109,36 @@ public partial class FreightTerminalWorld : Node3D
                         ? 1
                         : 0;
                 }
+                if (shapeName.Contains("ResidentialStairSpine", StringComparison.OrdinalIgnoreCase))
+                {
+                    centerSpineShapes++;
+                }
+                if (shapeName.Contains("ResidentialStairInnerGuard", StringComparison.OrdinalIgnoreCase))
+                {
+                    innerGuardShapes++;
+                }
                 if (shapeName.Contains("StairRamp", StringComparison.OrdinalIgnoreCase)
                     && !shapeName.Contains("StairStep", StringComparison.OrdinalIgnoreCase))
                 {
                     rampShapes++;
+                }
+                if (body.IsInGroup("residential_floor_slabs") && shape.Shape is BoxShape3D floorSlab)
+                {
+                    floorSlabShapes++;
+                    var center = body.Position + shape.Position;
+                    var slabMinX = center.X - floorSlab.Size.X * 0.5f;
+                    var slabMaxX = center.X + floorSlab.Size.X * 0.5f;
+                    var slabMinZ = center.Z - floorSlab.Size.Z * 0.5f;
+                    var slabMaxZ = center.Z + floorSlab.Size.Z * 0.5f;
+                    const float clearanceTolerance = 0.01f;
+                    var overlapsOpeningX = slabMinX < openingHalfWidth - clearanceTolerance
+                        && slabMaxX > -openingHalfWidth + clearanceTolerance;
+                    var overlapsOpeningZ = slabMinZ < openingSouth - clearanceTolerance
+                        && slabMaxZ > openingNorth + clearanceTolerance;
+                    if (overlapsOpeningX && overlapsOpeningZ)
+                    {
+                        intrudingFloorSlabs++;
+                    }
                 }
             }
         }
@@ -4107,6 +4147,11 @@ public partial class FreightTerminalWorld : Node3D
         var rampSlabAbsent = rampBodies == 0 && rampShapes == 0;
         var compactLandings = landingShapes == firstSpec.Floors
             && compactLandingShapes == landingShapes;
+        var openCenter = centerSpineShapes == 0
+            && centerSpineVisuals == 0
+            && innerGuardShapes == firstSpec.Floors * 2;
+        var floorSlabClearance = floorSlabShapes == (firstSpec.Floors + 1) * 4
+            && intrudingFloorSlabs == 0;
         // Hangar must not keep the old rotated ramp name.
         var hangar = _levelRoot.GetNodeOrNull<Node3D>("MaintenanceDistrict");
         var hangarRampGone = hangar is null || hangar.GetNodeOrNull("HangarStair") is null;
@@ -4162,8 +4207,9 @@ public partial class FreightTerminalWorld : Node3D
         var walkGain = _player.GlobalPosition.Y - walkStartY;
         var walked = reachedIndex >= waypoints.Length - 1 && walkGain > ResidentialFloorHeight - 0.4f;
         var valid = steppedCollider && consolidated && rampSlabAbsent && compactLandings
+            && openCenter && floorSlabClearance
             && hangarRampGone && walked && _residentialStairFlightCount > 0;
-        GD.Print($"STAIRS_CHECK valid={valid} step_bodies={stepBodies} step_shapes={stepShapes} consolidated_bodies={consolidatedBodies} consolidated={consolidated} ramp_bodies={rampBodies} ramp_shapes={rampShapes} stepped={steppedCollider} no_ramp_slab={rampSlabAbsent} compact_landings={compactLandings} landing_shapes={compactLandingShapes}/{landingShapes} hangar_ok={hangarRampGone} walk_h={walkGain:0.00} reached={reachedIndex + 1}/{waypoints.Length} climbed={walked} flights={_residentialStairFlightCount}");
+        GD.Print($"STAIRS_CHECK valid={valid} step_bodies={stepBodies} step_shapes={stepShapes} consolidated_bodies={consolidatedBodies} consolidated={consolidated} ramp_bodies={rampBodies} ramp_shapes={rampShapes} stepped={steppedCollider} no_ramp_slab={rampSlabAbsent} compact_landings={compactLandings} landing_shapes={compactLandingShapes}/{landingShapes} open_center={openCenter} spine={centerSpineShapes}/{centerSpineVisuals} inner_guards={innerGuardShapes}/{firstSpec.Floors * 2} slab_clear={floorSlabClearance} slab_intrusions={intrudingFloorSlabs} slab_shapes={floorSlabShapes}/{(firstSpec.Floors + 1) * 4} hangar_ok={hangarRampGone} walk_h={walkGain:0.00} reached={reachedIndex + 1}/{waypoints.Length} climbed={walked} flights={_residentialStairFlightCount}");
         GD.Print($"STAIRS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

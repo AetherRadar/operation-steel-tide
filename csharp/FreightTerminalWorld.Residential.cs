@@ -424,7 +424,7 @@ public partial class FreightTerminalWorld
         for (var floor = 0; floor < spec.Floors; floor++)
         {
             var floorY = floor * ResidentialFloorHeight;
-            BuildTowerFloorSlab(tower, spec, floorY, stairCoreZ, interiorFloor, floor == 0);
+            BuildTowerFloorSlab(tower, spec, floor, floorY, stairCoreZ, interiorFloor, floor == 0);
             var westSlot = linkSlots is not null && linkSlots.TryGetValue(1, out var westLink) && westLink.Floors.Contains(floor) ? westLink : null;
             var eastSlot = linkSlots is not null && linkSlots.TryGetValue(0, out var eastLink) && eastLink.Floors.Contains(floor) ? eastLink : null;
             BuildTowerFloorShell(tower, spec, floor, floorY, facade, glassField, spec.Accent, westSlot, eastSlot);
@@ -448,6 +448,7 @@ public partial class FreightTerminalWorld
     private void BuildTowerFloorSlab(
         Node3D tower,
         ResidentialTowerSpec spec,
+        int floor,
         float floorY,
         float coreZ,
         Godot.Material material,
@@ -463,12 +464,19 @@ public partial class FreightTerminalWorld
         var openingSouth = coreZ + ResidentialStairOpeningSouthDepth;
         // The asymmetric four-panel opening preserves standing headroom over both flights
         // and the deeper north turn platform without opening the rest of the floor.
-        ExpansionBox(tower, "ResidentialFloorSlab_W", new Vector3(-(openingWidth + sideWidth) * 0.5f, floorY + 0.05f, 0), new Vector3(sideWidth, 0.12f, depth), material);
-        ExpansionBox(tower, "ResidentialFloorSlab_E", new Vector3((openingWidth + sideWidth) * 0.5f, floorY + 0.05f, 0), new Vector3(sideWidth, 0.12f, depth), material);
         var northDepth = Mathf.Max(0.5f, openingNorth - northEdge);
         var southDepth = Mathf.Max(0.5f, southEdge - openingSouth);
-        ExpansionBox(tower, "ResidentialFloorSlab_N", new Vector3(0, floorY + 0.05f, northEdge + northDepth * 0.5f), new Vector3(openingWidth, 0.12f, northDepth), material);
-        ExpansionBox(tower, "ResidentialFloorSlab_S", new Vector3(0, floorY + 0.05f, openingSouth + southDepth * 0.5f), new Vector3(openingWidth, 0.12f, southDepth), material);
+        foreach (var panel in new (string Side, Vector3 Position, Vector3 Size)[]
+        {
+            ("W", new Vector3(-(openingWidth + sideWidth) * 0.5f, floorY + 0.05f, 0), new Vector3(sideWidth, 0.12f, depth)),
+            ("E", new Vector3((openingWidth + sideWidth) * 0.5f, floorY + 0.05f, 0), new Vector3(sideWidth, 0.12f, depth)),
+            ("N", new Vector3(0, floorY + 0.05f, northEdge + northDepth * 0.5f), new Vector3(openingWidth, 0.12f, northDepth)),
+            ("S", new Vector3(0, floorY + 0.05f, openingSouth + southDepth * 0.5f), new Vector3(openingWidth, 0.12f, southDepth))
+        })
+        {
+            var slab = ExpansionBox(tower, $"ResidentialFloorSlab_F{floor:00}_{panel.Side}", panel.Position, panel.Size, material);
+            slab.AddToGroup("residential_floor_slabs");
+        }
         // Do not fill the stair channel: the opening follows the full switchback shaft.
         if (groundFloor)
         {
@@ -1194,19 +1202,37 @@ public partial class FreightTerminalWorld
                 new Transform3D(Basis.Identity, new Vector3(position.X, position.Y - floorY, position.Z)));
         }
 
-        // The center spine separates the flights but stops south of the open turn platform.
+        // Keep the switchback center open. Thin guard colliders follow the visible inner
+        // handrails, preventing falls without restoring the full-height plate between flights.
         var coreTop = floorY + ResidentialFloorHeight * 0.5f;
-        var spineNorthZ = lowerStartZ + 0.65f;
-        var spineSouthZ = upperStartZ + 0.2f;
+        const float innerGuardHeight = 0.84f;
+        var innerGuardEdge = ResidentialStairTreadWidth * 0.5f + 0.015f;
+        var innerGuardLength = Mathf.Sqrt(ResidentialStairRun * ResidentialStairRun + halfRise * halfRise) + 0.08f;
+        var innerGuardAngle = Mathf.Atan2(halfRise, ResidentialStairRun);
+        foreach (var guard in new (string Side, float X, float BaseY, float Angle)[]
+        {
+            ("L", -1.45f + innerGuardEdge, floorY, innerGuardAngle),
+            ("U", 1.45f - innerGuardEdge, floorY + halfRise, -innerGuardAngle)
+        })
+        {
+            var surfaceMidY = guard.BaseY + halfRise * 0.5f + stepRise * 0.5f;
+            AddResidentialStairCollision(
+                stairCollision,
+                $"ResidentialStairInnerGuard_{guard.Side}{floor}",
+                new Vector3(guard.X, surfaceMidY + innerGuardHeight * 0.5f + 0.08f, coreZ),
+                new Vector3(0.1f, innerGuardHeight, innerGuardLength),
+                new Vector3(guard.Angle, 0, 0));
+        }
         var shaftNorthZ = landingNorthZ - 0.06f;
         var shaftSouthZ = upperStartZ + 0.45f;
         var shaftCenterZ = (shaftNorthZ + shaftSouthZ) * 0.5f;
         var shaftSideDepth = shaftSouthZ - shaftNorthZ - 0.12f;
-        AddResidentialStairPart(stairCollision, tower, $"ResidentialStairSpine_F{floor}", new Vector3(0, coreTop, (spineNorthZ + spineSouthZ) * 0.5f), new Vector3(0.24f, ResidentialFloorHeight, spineSouthZ - spineNorthZ), stair);
         AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftN_F{floor}", new Vector3(0, coreTop, shaftNorthZ), new Vector3(5.44f, ResidentialFloorHeight, 0.12f), stair);
         AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftW_F{floor}", new Vector3(-2.66f, coreTop, shaftCenterZ), new Vector3(0.12f, ResidentialFloorHeight, shaftSideDepth), stair);
         AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftE_F{floor}", new Vector3(2.66f, coreTop, shaftCenterZ), new Vector3(0.12f, ResidentialFloorHeight, shaftSideDepth), stair);
-        const float shaftDoorHalf = 1.1f;
+        // The corridor opening serves both switchback flights. A centered 2.2 m door hid
+        // half of each 1.95 m tread run, so leave only structural jambs at the shaft edges.
+        const float shaftDoorHalf = 2.6f;
         var shaftSideWidth = 2.72f - shaftDoorHalf;
         AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftSW_F{floor}", new Vector3(-(shaftDoorHalf + shaftSideWidth * 0.5f), floorY + 0.1f + 1.275f, upperStartZ + 0.45f), new Vector3(shaftSideWidth, 2.55f, 0.12f), stair);
         AddResidentialStairPart(stairCollision, tower, $"ResidentialStairShaftSE_F{floor}", new Vector3(shaftDoorHalf + shaftSideWidth * 0.5f, floorY + 0.1f + 1.275f, upperStartZ + 0.45f), new Vector3(shaftSideWidth, 2.55f, 0.12f), stair);
@@ -1221,12 +1247,14 @@ public partial class FreightTerminalWorld
         StaticBody3D body,
         string name,
         Vector3 position,
-        Vector3 size)
+        Vector3 size,
+        Vector3 rotation = default)
     {
         body.AddChild(new CollisionShape3D
         {
             Name = name,
             Position = position,
+            Rotation = rotation,
             Shape = new BoxShape3D { Size = size }
         });
     }
@@ -1255,7 +1283,7 @@ public partial class FreightTerminalWorld
         Godot.Material light)
     {
         var roofY = spec.Floors * ResidentialFloorHeight;
-        BuildTowerFloorSlab(tower, spec, roofY, coreZ, facade, false);
+        BuildTowerFloorSlab(tower, spec, spec.Floors, roofY, coreZ, facade, false);
         var width = spec.Footprint.X;
         var depth = spec.Footprint.Y;
         foreach (var rail in new (Vector3 Position, Vector3 Size)[]
@@ -1429,6 +1457,58 @@ public partial class FreightTerminalWorld
         doorProbe.CollideWithAreas = false;
         var standingDoorClear = GetWorld3D().DirectSpaceState.IntersectRay(doorProbe).Count == 0;
 
+        var stairDoorClearSamples = 0;
+        var stairDoorSupportSamples = 0;
+        var expectedStairDoorClearSamples = expectedFloors * 4;
+        var expectedStairDoorSupportSamples = expectedFloors * 2;
+        foreach (var (tower, spec) in _residentialTowers.Zip(ResidentialTowerSpecs))
+        {
+            var coreZ = -Mathf.Min(spec.Footprint.Y * 0.18f, 3.6f);
+            for (var floor = 0; floor < spec.Floors; floor++)
+            {
+                var floorY = floor * ResidentialFloorHeight;
+                foreach (var sampleX in new[] { -2.345f, -0.555f, 0.555f, 2.345f })
+                {
+                    var stairDoorProbe = PhysicsRayQueryParameters3D.Create(
+                        tower.ToGlobal(new Vector3(
+                            sampleX,
+                            floorY + 1.35f,
+                            coreZ + ResidentialStairRun * 0.5f + 1.2f)),
+                        tower.ToGlobal(new Vector3(
+                            sampleX,
+                            floorY + 1.35f,
+                            coreZ + ResidentialStairRun * 0.5f + 0.1f)));
+                    stairDoorProbe.CollisionMask = 1;
+                    stairDoorProbe.CollideWithAreas = false;
+                    if (GetWorld3D().DirectSpaceState.IntersectRay(stairDoorProbe).Count == 0)
+                    {
+                        stairDoorClearSamples++;
+                    }
+                }
+
+                foreach (var flightX in new[] { -1.45f, 1.45f })
+                {
+                    var supportProbe = PhysicsRayQueryParameters3D.Create(
+                        tower.ToGlobal(new Vector3(
+                            flightX,
+                            floorY + 0.55f,
+                            coreZ + ResidentialStairRun * 0.5f - 0.05f)),
+                        tower.ToGlobal(new Vector3(
+                            flightX,
+                            floorY - 0.45f,
+                            coreZ + ResidentialStairRun * 0.5f - 0.05f)));
+                    supportProbe.CollisionMask = 1;
+                    supportProbe.CollideWithAreas = false;
+                    if (GetWorld3D().DirectSpaceState.IntersectRay(supportProbe).Count > 0)
+                    {
+                        stairDoorSupportSamples++;
+                    }
+                }
+            }
+        }
+        var stairDoorClear = stairDoorClearSamples == expectedStairDoorClearSamples;
+        var stairDoorSupported = stairDoorSupportSamples == expectedStairDoorSupportSamples;
+
         // Face into the lower flight and walk forward along body yaw (no mid-flight teleports).
         _player.GlobalPosition = firstTower.ToGlobal(new Vector3(
             -1.45f,
@@ -1497,6 +1577,8 @@ public partial class FreightTerminalWorld
             && _residentialRooftops.Count == ResidentialTowerSpecs.Length
             && entryOpen
             && standingDoorClear
+            && stairDoorClear
+            && stairDoorSupported
             && stepCollision
             && playerClimbedRamp
             && hedgesSolid
@@ -1504,7 +1586,7 @@ public partial class FreightTerminalWorld
             && ResidentialSpecialCivilianCount >= ResidentialTowerSpecs.Length * 2
             && roles.Count == Enum.GetValues<CivilianRole>().Length
             && upperFloorPopulation;
-        GD.Print($"RESIDENTIAL_CHECK valid={valid} towers={ResidentialTowerCount}/{ResidentialTowerSpecs.Length} floors={_residentialFloorCount}/{expectedFloors} stair_flights={_residentialStairFlightCount} stair_details={_residentialStairDetailCount}/{expectedFloors} infill={_residentialInfillModuleCount}/{ResidentialTowerSpecs.Length * 4} entry_open={entryOpen} standing_door={standingDoorClear} step_collision={stepCollision} step_hit={stepName} player_climbed={playerClimbedRamp} climb_height={climbHeight:0.00} hedges_solid={hedgesSolid} hedge_hits={hedgeCollisionCount}/{hedgeColliders.Count} rooftops={_residentialRoofAccessCount} civilians={ResidentialCivilianCount} special={ResidentialSpecialCivilianCount} roles={roles.Count} upper_floors={upperFloorPopulation}");
+        GD.Print($"RESIDENTIAL_CHECK valid={valid} towers={ResidentialTowerCount}/{ResidentialTowerSpecs.Length} floors={_residentialFloorCount}/{expectedFloors} stair_flights={_residentialStairFlightCount} stair_details={_residentialStairDetailCount}/{expectedFloors} infill={_residentialInfillModuleCount}/{ResidentialTowerSpecs.Length * 4} entry_open={entryOpen} standing_door={standingDoorClear} stair_door_clear={stairDoorClear} stair_door_samples={stairDoorClearSamples}/{expectedStairDoorClearSamples} stair_door_supported={stairDoorSupported} stair_support_samples={stairDoorSupportSamples}/{expectedStairDoorSupportSamples} step_collision={stepCollision} step_hit={stepName} player_climbed={playerClimbedRamp} climb_height={climbHeight:0.00} hedges_solid={hedgesSolid} hedge_hits={hedgeCollisionCount}/{hedgeColliders.Count} rooftops={_residentialRoofAccessCount} civilians={ResidentialCivilianCount} special={ResidentialSpecialCivilianCount} roles={roles.Count} upper_floors={upperFloorPopulation}");
         if (!valid)
         {
             GD.PushError("Residential community validation failed.");
