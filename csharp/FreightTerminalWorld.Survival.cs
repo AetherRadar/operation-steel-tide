@@ -568,7 +568,18 @@ public partial class FreightTerminalWorld
         camera.MakeCurrent();
         await WaitFrames(28);
         SaveViewportImage("res://residential_stair_density_validation.png");
-        GD.Print($"RESIDENTIAL_STAIR_CAPTURE details={_residentialStairDetailCount} infill={_residentialInfillModuleCount} path=residential_stair_density_validation.png");
+
+        camera.GlobalPosition = tower.ToGlobal(new Vector3(
+            0.0f,
+            1.42f,
+            coreZ + ResidentialStairRun * 0.5f + 4.4f));
+        camera.LookAt(tower.ToGlobal(new Vector3(
+            0.0f,
+            1.42f,
+            coreZ + ResidentialStairRun * 0.5f - 0.45f)), Vector3.Up);
+        await WaitFrames(20);
+        SaveViewportImage("res://residential_stair_entry_validation.png");
+        GD.Print($"RESIDENTIAL_STAIR_CAPTURE details={_residentialStairDetailCount} infill={_residentialInfillModuleCount} paths=residential_stair_density_validation.png,residential_stair_entry_validation.png");
         GetTree().Quit();
     }
 
