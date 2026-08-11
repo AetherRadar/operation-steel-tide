@@ -130,6 +130,7 @@ public partial class FreightTerminalWorld
         _localPlayerDowned = false;
         _localPlayerEliminated = false;
         _squadOrder = SquadOrder.Follow;
+        ResetSquadLeaderTrail(_player.GlobalPosition);
 
         Error networkError = Error.Ok;
         switch (mode)
@@ -313,6 +314,7 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        UpdateSquadLeaderTrail();
         if (!_player.UiLocked && !_player.IsDead)
         {
             if (Input.IsActionJustPressed("squad_follow"))
@@ -381,7 +383,8 @@ public partial class FreightTerminalWorld
     private float _leaderReviveChannel;
     private float _reviverStuckTime;
     private float _reviverSnapshotTimer;
-    private Vector3 _reviverLastPosition;
+    private float _reviverBestPathCost = float.PositiveInfinity;
+    private int _reviverWaypointSnapshot;
 
     /// <summary>
     /// Downed leader rescue: the nearest living AI mate sprints over, kneels and
@@ -400,6 +403,7 @@ public partial class FreightTerminalWorld
         {
             if (_leaderReviver is not null && IsInstanceValid(_leaderReviver))
             {
+                ClearSquadNavigation(_leaderReviver);
                 _leaderReviver.EndLeaderRevive();
             }
             _leaderReviver = null;
@@ -413,7 +417,7 @@ public partial class FreightTerminalWorld
                 {
                     continue;
                 }
-                var distance = mate.GlobalPosition.DistanceTo(_player.GlobalPosition);
+                var distance = EstimateSquadNavigationCost(mate, _player.GlobalPosition);
                 if (distance < bestDistance)
                 {
                     bestDistance = distance;
@@ -426,7 +430,9 @@ public partial class FreightTerminalWorld
             }
             _leaderReviver = nearest;
             _leaderReviver.BeginLeaderRevive();
-            _reviverLastPosition = nearest.GlobalPosition;
+            BeginLeaderRescueNavigation(nearest);
+            _reviverBestPathCost = float.PositiveInfinity;
+            _reviverWaypointSnapshot = LeaderRescueWaypointAdvancesForDiagnostics;
             _reviverSnapshotTimer = 0.0f;
             _hud.ShowLocalizedMessage(
                 "mate_reviving_you",
@@ -439,39 +445,40 @@ public partial class FreightTerminalWorld
         if (distanceToLeader > 2.3f)
         {
             _leaderReviveChannel = Mathf.Max(0.0f, _leaderReviveChannel - delta * 1.5f);
-            // Anti-stuck: measure progress over one-second windows, not per frame.
+            // Route progress matters more than raw movement: circling a wall is not progress.
             _reviverSnapshotTimer += delta;
             if (_reviverSnapshotTimer >= 1.0f)
             {
-                if (reviver.GlobalPosition.DistanceTo(_reviverLastPosition) < 1.4f)
-                {
-                    _reviverStuckTime += _reviverSnapshotTimer;
-                }
-                else
+                var remainingPathCost = GetSquadNavigationRemainingCost(reviver, _player.GlobalPosition);
+                var routeAdvanced = LeaderRescueWaypointAdvancesForDiagnostics > _reviverWaypointSnapshot;
+                var reducedPathCost = remainingPathCost < _reviverBestPathCost - 0.55f;
+                if (routeAdvanced || reducedPathCost)
                 {
                     _reviverStuckTime = 0.0f;
                 }
-                _reviverLastPosition = reviver.GlobalPosition;
+                else
+                {
+                    _reviverStuckTime += _reviverSnapshotTimer;
+                }
+                _reviverBestPathCost = Mathf.Min(_reviverBestPathCost, remainingPathCost);
+                _reviverWaypointSnapshot = LeaderRescueWaypointAdvancesForDiagnostics;
                 _reviverSnapshotTimer = 0.0f;
             }
-            if (_reviverStuckTime >= 3.5f)
+            if (_reviverStuckTime >= 2.5f)
             {
-                var side = (reviver.GlobalPosition - _player.GlobalPosition).Normalized();
-                if (side.LengthSquared() < 0.01f)
-                {
-                    side = Vector3.Forward;
-                }
-                reviver.GlobalPosition = _player.GlobalPosition + side * 1.6f + Vector3.Up * 0.35f;
+                ReplanLeaderRescueNavigation(reviver);
                 _reviverStuckTime = 0.0f;
                 _reviverSnapshotTimer = 0.0f;
-                _reviverLastPosition = reviver.GlobalPosition;
+                _reviverBestPathCost = float.PositiveInfinity;
+                _reviverWaypointSnapshot = LeaderRescueWaypointAdvancesForDiagnostics;
             }
             return;
         }
 
         _reviverStuckTime = 0.0f;
         _reviverSnapshotTimer = 0.0f;
-        _reviverLastPosition = reviver.GlobalPosition;
+        _reviverBestPathCost = 0.0f;
+        _reviverWaypointSnapshot = LeaderRescueWaypointAdvancesForDiagnostics;
         _leaderReviveChannel += delta / 2.8f;
         if (_leaderReviveChannel < 1.0f)
         {
@@ -492,12 +499,15 @@ public partial class FreightTerminalWorld
     {
         if (_leaderReviver is not null && IsInstanceValid(_leaderReviver))
         {
+            ClearSquadNavigation(_leaderReviver);
             _leaderReviver.EndLeaderRevive();
         }
         _leaderReviver = null;
         _leaderReviveChannel = 0.0f;
         _reviverStuckTime = 0.0f;
         _reviverSnapshotTimer = 0.0f;
+        _reviverBestPathCost = float.PositiveInfinity;
+        _reviverWaypointSnapshot = 0;
     }
 
     private void BeginSquadMateView()
@@ -1650,15 +1660,40 @@ public partial class FreightTerminalWorld
         }
         var reviverMate = _squadMates.FirstOrDefault(m => IsInstanceValid(m) && !m.IsHumanProxy && !m.IsDowned);
         var aiReviveOk = false;
+        var rescueDirectBlocked = false;
+        var followDetourReady = false;
+        var rescueTrailUsed = false;
+        var rescueWaypointAdvances = 0;
+        var rescueReplans = 0;
         var playerViewOnDown = false;
         var downedBannerVisible = false;
         var playerViewAfterRevive = false;
         if (reviverMate is not null)
         {
-            // Deterministic arena: spawns are dispersed per run, so stage both actors on open ground.
-            _player.GlobalPosition = new Vector3(0.0f, 0.3f, 60.0f);
-            await WaitFrames(4);
-            reviverMate.GlobalPosition = _player.GlobalPosition + new Vector3(20.0f, 0.1f, 0.0f);
+            // Deterministic maze: the direct route is walled off, so rescue must use the side door.
+            var rescueMaze = BuildSquadRescueMazeForDiagnostics(
+                out var rescuePlayerPosition,
+                out var rescueReviverPosition,
+                out var rescueLeaderTrail);
+            await WaitFrames(3);
+            _player.GlobalPosition = rescuePlayerPosition;
+            _player.Velocity = Vector3.Zero;
+            reviverMate.GlobalPosition = rescueReviverPosition;
+            reviverMate.Velocity = Vector3.Zero;
+            reviverMate.ProcessMode = ProcessModeEnum.Inherit;
+            reviverMate.SetOrder(SquadOrder.Follow, rescueReviverPosition);
+            SetSquadLeaderTrailForDiagnostics(rescueLeaderTrail);
+            rescueDirectBlocked = !IsSquadMovementCorridorClear(
+                rescueReviverPosition,
+                rescuePlayerPosition,
+                reviverMate);
+            var followDetour = ResolveSquadNavigationDestination(
+                reviverMate,
+                rescuePlayerPosition,
+                emergency: false);
+            followDetourReady = followDetour.DistanceTo(rescuePlayerPosition) > 3.0f
+                && followDetour.X > rescueReviverPosition.X + 2.0f
+                && IsSquadMovementCorridorClear(rescueReviverPosition, followDetour, reviverMate);
             _player.SetHealthForDiagnostics(10.0f);
             _player.SetReviveUsedForDiagnostics(false);
             _player.TakeDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
@@ -1673,13 +1708,23 @@ public partial class FreightTerminalWorld
             for (var second = 0; second < 16 && _player.IsDead; second++)
             {
                 await ToSignal(GetTree().CreateTimer(1.0f), SceneTreeTimer.SignalName.Timeout);
-                GD.Print($"AI_REVIVE_DBG s={second} dead={_player.IsDead} reviving={reviverMate.IsRevivingLeader} dist={reviverMate.GlobalPosition.DistanceTo(_player.GlobalPosition):0.0} matePos=({reviverMate.GlobalPosition.X:0.0},{reviverMate.GlobalPosition.Z:0.0}) assigned={_leaderReviver?.Callsign ?? "none"} channel={_leaderReviveChannel:0.00} stuck={_reviverStuckTime:0.0} downedFlag={_localPlayerDowned}");
+                GD.Print($"AI_REVIVE_DBG s={second} dead={_player.IsDead} reviving={reviverMate.IsRevivingLeader} dist={reviverMate.GlobalPosition.DistanceTo(_player.GlobalPosition):0.0} matePos=({reviverMate.GlobalPosition.X:0.0},{reviverMate.GlobalPosition.Z:0.0}) assigned={_leaderReviver?.Callsign ?? "none"} channel={_leaderReviveChannel:0.00} stuck={_reviverStuckTime:0.0} trail={LeaderRescueUsedTrailForDiagnostics} advances={LeaderRescueWaypointAdvancesForDiagnostics} replans={LeaderRescueReplansForDiagnostics} downedFlag={_localPlayerDowned}");
             }
+            rescueTrailUsed = LeaderRescueUsedTrailForDiagnostics;
+            rescueWaypointAdvances = LeaderRescueWaypointAdvancesForDiagnostics;
+            rescueReplans = LeaderRescueReplansForDiagnostics;
             playerViewAfterRevive = IsLocalPlayerViewCurrent;
             aiReviveOk = aiReviveDowned && !_player.IsDead && _player.ReviveUsed
                 && !_localPlayerDowned && !reviverMate.IsRevivingLeader
                 && playerViewOnDown && downedBannerVisible && playerViewAfterRevive;
+            rescueMaze.QueueFree();
+            ResetSquadLeaderTrail(_player.GlobalPosition);
         }
+        var rescuePathOk = rescueDirectBlocked
+            && followDetourReady
+            && rescueTrailUsed
+            && rescueWaypointAdvances >= 2
+            && aiReviveOk;
 
         _player.SetHealthForDiagnostics(10.0f);
         _player.SetReviveUsedForDiagnostics(false);
@@ -1710,9 +1755,9 @@ public partial class FreightTerminalWorld
         var reviveOk = mateDowned && firstRevive && mateUp && bodyBagOk && secondReviveBlocked
             && playerDowned && playerFirstRevive && playerUp && playerSecondBlocked && secondDeathSpectate;
 
-        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} combat_ai={combatAiOk} wall_blocked={combatWallBlocked} target_lock={combatTargetLocked} flanked={combatFlanked} sight_recovered={combatSightRecovered} fired={combatFired} damaged={combatDamaged} faced_move={combatFacedMovement} close_retreat={closeRangeRetreat} close_strafe={closeRangeStrafe} revive_once={reviveOk} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} player_view_on_down={playerViewOnDown} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} finished_spectate={finishedSpectateOk} immediate_view={finishedPlayerSpectate} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
+        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} combat_ai={combatAiOk} wall_blocked={combatWallBlocked} target_lock={combatTargetLocked} flanked={combatFlanked} sight_recovered={combatSightRecovered} fired={combatFired} damaged={combatDamaged} faced_move={combatFacedMovement} close_retreat={closeRangeRetreat} close_strafe={closeRangeStrafe} revive_once={reviveOk} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} rescue_path={rescuePathOk} rescue_wall={rescueDirectBlocked} follow_detour={followDetourReady} rescue_trail={rescueTrailUsed} rescue_advances={rescueWaypointAdvances} rescue_replans={rescueReplans} player_view_on_down={playerViewOnDown} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} finished_spectate={finishedSpectateOk} immediate_view={finishedPlayerSpectate} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
         var valid = ActiveSquadCount >= 2 && roleFillOk && combatAiOk
-            && reviveOk && aiFinishOk && aiReviveOk && finishedSpectateOk;
+            && reviveOk && aiFinishOk && rescuePathOk && finishedSpectateOk;
         GD.Print($"SQUAD_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

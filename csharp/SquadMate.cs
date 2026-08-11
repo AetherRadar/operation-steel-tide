@@ -157,6 +157,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
         Order = order;
         _orderPosition = order == SquadOrder.Follow ? GlobalPosition : position;
+        if (order != SquadOrder.Follow && IsInstanceValid(Main))
+        {
+            Main.ClearSquadNavigation(this);
+        }
         OnSquadOrderChanged();
         UpdateLabel();
     }
@@ -279,8 +283,12 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
         if (_revivingLeader)
         {
-            destination = Leader.GlobalPosition;
+            destination = Main.ResolveSquadNavigationDestination(this, Leader.GlobalPosition, emergency: true);
             objectivePriority = true;
+        }
+        else if (Order == SquadOrder.Follow && hostile is null && !objectivePriority)
+        {
+            destination = Main.ResolveSquadNavigationDestination(this, destination, emergency: false);
         }
         UpdateTacticalMovement(destination, hostile, objectivePriority, dt);
         ConsiderMedicSupport(patient);

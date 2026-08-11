@@ -333,7 +333,10 @@ public partial class SquadMate
 
         var spec = OperatorRoles.Spec(Role);
         var boost = Role == OperatorRole.Assault && _overdriveTime > 0.0f ? 1.22f : 1.0f;
-        var speed = (distance > 8.0f ? 5.4f : 3.8f) * spec.MovementMultiplier * boost;
+        var urgencyDistance = _revivingLeader
+            ? GlobalPosition.DistanceTo(Leader.GlobalPosition)
+            : distance;
+        var speed = (urgencyDistance > 8.0f ? 5.4f : 3.8f) * spec.MovementMultiplier * boost;
         if (_skillActionTime > 0.0f)
         {
             speed *= 0.45f;
