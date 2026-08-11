@@ -301,6 +301,15 @@ public static class GameLocalization
         Chinese["damage_source_explosion"] = "\u7206\u70b8\u51b2\u51fb";
         Chinese["damage_source_vehicle"] = "\u8f7d\u5177\u649e\u51fb";
         Chinese["damage_source_environment"] = "\u73af\u5883\u4f24\u5bb3";
+        Chinese["stat_damage"] = "\u4f24\u5bb3";
+        Chinese["stat_range"] = "\u5c04\u7a0b";
+        Chinese["stat_recoil"] = "\u540e\u5750";
+        Chinese["stat_handling"] = "\u64cd\u63a7";
+        Chinese["stat_protection"] = "\u9632\u62a4";
+        Chinese["stat_durability"] = "\u8010\u4e45";
+        Chinese["stat_capacity"] = "\u5bb9\u91cf";
+        Chinese["comparison_new_primary"] = "\u65b0\u4e3b\u6b66\u5668";
+        Chinese["comparison_no_primary"] = "\u672a\u88c5\u5907\u4e3b\u6b66\u5668";
         Chinese["you"] = "\u4f60";
         Chinese["minimap_title"] = "\u6218\u672f\u5c0f\u5730\u56fe";
         Chinese["minimap_deploy"] = "\u51fa\u751f\u70b9";

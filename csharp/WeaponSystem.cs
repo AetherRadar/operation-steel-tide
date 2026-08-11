@@ -69,25 +69,15 @@ public static class LootGrades
 
     public static string DisplayName(LootGrade grade, string language)
     {
-        if (GameLocalization.IsChinese(language))
+        var (key, english) = grade switch
         {
-            return grade switch
-            {
-                LootGrade.Uncommon => "优良",
-                LootGrade.Rare => "稀有",
-                LootGrade.Epic => "史诗",
-                LootGrade.Legendary => "传说",
-                _ => "普通"
-            };
-        }
-        return grade switch
-        {
-            LootGrade.Uncommon => "UNCOMMON",
-            LootGrade.Rare => "RARE",
-            LootGrade.Epic => "EPIC",
-            LootGrade.Legendary => "LEGENDARY",
-            _ => "COMMON"
+            LootGrade.Uncommon => ("grade_uncommon", "UNCOMMON"),
+            LootGrade.Rare => ("grade_rare", "RARE"),
+            LootGrade.Epic => ("grade_epic", "EPIC"),
+            LootGrade.Legendary => ("grade_legendary", "LEGENDARY"),
+            _ => ("grade_common", "COMMON")
         };
+        return GameLocalization.Get(key, language, english);
     }
 
     public static int BaseValue(LootGrade grade) => grade switch

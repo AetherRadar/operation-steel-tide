@@ -2036,6 +2036,16 @@ public partial class FreightTerminalWorld : Node3D
         Input.MouseMode = Input.MouseModeEnum.Captured;
     }
 
+    internal bool InterruptLootForIncomingDamage()
+    {
+        if (!_hud.IsLootVisible)
+        {
+            return false;
+        }
+        CloseLoot();
+        return true;
+    }
+
     private void TakeLootItem(string itemId)
     {
         if (_openLootSource is null)
@@ -2848,6 +2858,21 @@ public partial class FreightTerminalWorld : Node3D
         await WaitFrames(4);
         var movementRestored = !_player.UiLocked && _player.HasMovementIntent;
         Input.ActionRelease("move_forward");
+        OpenPersonalBackpack();
+        await WaitFrames(3);
+        var damageViewOpened = _hud.IsLootVisible && _player.UiLocked;
+        var healthBeforeDamage = _player.Health;
+        _player.TakeDamage(8.0f, _player.GlobalPosition + Vector3.Up, this);
+        await WaitFrames(3);
+        var damageClosedLoot = damageViewOpened
+            && !_hud.IsLootVisible
+            && !_player.UiLocked
+            && Input.MouseMode == Input.MouseModeEnum.Captured
+            && _player.Health < healthBeforeDamage;
+        Input.ActionPress("move_forward");
+        await WaitFrames(4);
+        var damageMovementRestored = _player.HasMovementIntent;
+        Input.ActionRelease("move_forward");
         var valid = opened
             && targetMatched
             && immediateOpenMilliseconds <= 500
@@ -2862,8 +2887,10 @@ public partial class FreightTerminalWorld : Node3D
             && storageAtCapacity
             && reopenedEmpty
             && closedByInteract
-            && movementRestored;
-        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} storage_fits={searchStorageFits} storage_full={storageAtCapacity} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+            && movementRestored
+            && damageClosedLoot
+            && damageMovementRestored;
+        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} storage_fits={searchStorageFits} storage_full={storageAtCapacity} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         GD.Print($"LOOT_PASS valid={valid}");
         await WaitFrames(24);
         SaveViewportImage("res://modular_weapon_validation.png");
@@ -2934,7 +2961,7 @@ public partial class FreightTerminalWorld : Node3D
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Weapon, Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 2), Grade = LootGrade.Rare });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("armor_heavy"), Grade = LootGrade.Rare });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("pack_heavy"), Grade = LootGrade.Rare });
-        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Valuable, ValuableKind = ValuableItemKind.CannedCoffee, Quantity = 2, Grade = LootGrade.Common });
+        _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Equipment, Equipment = EquipmentCatalog.Create("armor_patrol"), Grade = LootGrade.Common });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Valuable, ValuableKind = ValuableItemKind.GraphicsCard, Grade = LootGrade.Rare });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Valuable, ValuableKind = ValuableItemKind.AntiqueClock, Grade = LootGrade.Legendary });
         OpenPersonalBackpack();
@@ -2965,13 +2992,57 @@ public partial class FreightTerminalWorld : Node3D
         Input.ActionRelease("weapon_cycle");
         await WaitFrames(2);
         var cycledToPrimary = !_player.KnifeEquipped;
+        var originalWeaponGrade = _player.EquippedWeaponGrade;
+        var swappedWeapon = _player.EquipFromLoot(new LootItem
+        {
+            Kind = LootItemKind.Weapon,
+            Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 2),
+            Grade = LootGrade.Legendary
+        });
+        var firstWeaponGradePreserved = _player.EquippedWeaponGrade == LootGrade.Legendary
+            && swappedWeapon?.Grade == originalWeaponGrade;
+        var returnedWeapon = swappedWeapon is null ? null : _player.EquipFromLoot(swappedWeapon);
+        var weaponGradeRoundTrip = firstWeaponGradePreserved
+            && _player.EquippedWeaponGrade == originalWeaponGrade
+            && returnedWeapon?.Grade == LootGrade.Legendary;
+        var originalOpticGrade = _player.EquippedAttachmentGrade(AttachmentSlot.Optic);
+        var swappedOptic = _player.EquipFromLoot(new LootItem
+        {
+            Kind = LootItemKind.Attachment,
+            AttachmentId = "optic_scope",
+            Grade = LootGrade.Epic
+        });
+        var firstOpticGradePreserved = _player.EquippedAttachmentGrade(AttachmentSlot.Optic) == LootGrade.Epic
+            && swappedOptic?.Grade == originalOpticGrade;
+        var returnedOptic = swappedOptic is null ? null : _player.EquipFromLoot(swappedOptic);
+        var attachmentGradeRoundTrip = firstOpticGradePreserved
+            && _player.EquippedAttachmentGrade(AttachmentSlot.Optic) == originalOpticGrade
+            && returnedOptic?.Grade == LootGrade.Epic;
+        _player.TryStoreInBackpack(new LootItem
+        {
+            Kind = LootItemKind.Weapon,
+            Weapon = WeaponCatalog.Build(WeaponPlatform.AXMC, 3),
+            Grade = LootGrade.Legendary
+        });
         OpenPersonalBackpack();
-        await WaitFrames(4);
+        await WaitFrames(6);
+        var comparisonCards = _hud.LootComparisonCardCount;
+        var comparisonDirections = _hud.LootComparisonHasUpgrade && _hud.LootComparisonHasDowngrade;
+        var gradeColorsStable = _hud.LootGradeColorsConsistent;
         _hud.ShowWeaponDetails(_player.EquippedWeapon);
         await WaitFrames(2);
         var detailsOpened = _hud.IsWeaponDetailVisible;
-        GD.Print($"WEAPON_UI_CHECK knife={cycledToKnife} primary={cycledToPrimary} details={detailsOpened} platform={_player.EquippedWeapon.Platform}");
-        GetTree().Quit();
+        var valid = cycledToKnife
+            && cycledToPrimary
+            && detailsOpened
+            && comparisonCards >= 1
+            && comparisonDirections
+            && gradeColorsStable
+            && weaponGradeRoundTrip
+            && attachmentGradeRoundTrip;
+        GD.Print($"WEAPON_UI_CHECK valid={valid} knife={cycledToKnife} primary={cycledToPrimary} details={detailsOpened} platform={_player.EquippedWeapon.Platform} comparisons={comparisonCards} directions={comparisonDirections} grade_colors={gradeColorsStable} weapon_grade={weaponGradeRoundTrip} attachment_grade={attachmentGradeRoundTrip}");
+        GD.Print($"WEAPON_UI_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private async void ValidateArsenalFlow()
@@ -4223,21 +4294,45 @@ public partial class FreightTerminalWorld : Node3D
             Equipment = EquipmentCatalog.Create("pack_heavy"),
             Grade = LootGrade.Rare
         });
+        var originalArmorGrade = _player.EquippedBodyArmorGrade;
+        var swappedArmor = _player.EquipFromLoot(new LootItem
+        {
+            Kind = LootItemKind.Equipment,
+            Equipment = EquipmentCatalog.Create("armor_heavy"),
+            Grade = LootGrade.Legendary
+        });
+        var firstArmorGradePreserved = _player.EquippedBodyArmorGrade == LootGrade.Legendary
+            && swappedArmor?.Grade == originalArmorGrade;
+        var returnedArmor = swappedArmor is null ? null : _player.EquipFromLoot(swappedArmor);
+        var armorGradeRoundTrip = firstArmorGradePreserved
+            && _player.EquippedBodyArmorGrade == originalArmorGrade
+            && returnedArmor?.Grade == LootGrade.Legendary;
         while (_player.Backpack.Count < _player.BackpackCapacity)
         {
+            var equipmentId = (_player.Backpack.Count % 3) switch
+            {
+                0 => "helmet_heavy",
+                1 => "armor_heavy",
+                _ => "armor_patrol"
+            };
             _player.TryStoreInBackpack(new LootItem
             {
                 Kind = LootItemKind.Equipment,
-                Equipment = EquipmentCatalog.Create(_player.Backpack.Count % 2 == 0 ? "helmet_heavy" : "armor_heavy"),
+                Equipment = EquipmentCatalog.Create(equipmentId),
                 Grade = LootGrade.Rare
             });
         }
         var weaponsInBackpack = 0;
+        var comparableItems = 0;
         foreach (var item in _player.Backpack)
         {
             if (item.Kind == LootItemKind.Weapon)
             {
                 weaponsInBackpack++;
+            }
+            if (item.Kind is LootItemKind.Weapon or LootItemKind.Equipment)
+            {
+                comparableItems++;
             }
         }
         var tabDown = new InputEventKey { Pressed = true, PhysicalKeycode = Key.Tab };
@@ -4251,10 +4346,17 @@ public partial class FreightTerminalWorld : Node3D
         var expanded = _hud.LootBackpackPanelExpanded;
         var contentFits = _hud.LootBackpackContentFits;
         var groundDropReady = _hud.LootGroundDropReady;
+        var comparisonCards = _hud.LootComparisonCardCount;
+        var comparisonDirections = _hud.LootComparisonHasUpgrade && _hud.LootComparisonHasDowngrade;
+        var gradeColorsStable = _hud.LootGradeColorsConsistent;
         var atCapacity = _player.Backpack.Count == _player.BackpackCapacity;
         var valid = opened && weaponsInBackpack == 0 && paperDollVisible && backpackSlotSeparated
-            && expanded && contentFits && groundDropReady && atCapacity;
-        GD.Print($"BACKPACK_TAB_CHECK opened={opened} backpack_items={_player.Backpack.Count} capacity={_player.BackpackCapacity} full={atCapacity} weapons={weaponsInBackpack} unarmed={!_player.HasFireablePrimary} paper_doll={paperDollVisible} backpack_isolated={backpackSlotSeparated} expanded={expanded} content_fits={contentFits} ground_drop={groundDropReady}");
+            && expanded && contentFits && groundDropReady && atCapacity
+            && comparisonCards == comparableItems
+            && comparisonDirections
+            && gradeColorsStable
+            && armorGradeRoundTrip;
+        GD.Print($"BACKPACK_TAB_CHECK valid={valid} opened={opened} backpack_items={_player.Backpack.Count} capacity={_player.BackpackCapacity} full={atCapacity} weapons={weaponsInBackpack} unarmed={!_player.HasFireablePrimary} paper_doll={paperDollVisible} backpack_isolated={backpackSlotSeparated} expanded={expanded} content_fits={contentFits} ground_drop={groundDropReady} comparisons={comparisonCards}/{comparableItems} directions={comparisonDirections} grade_colors={gradeColorsStable} armor_grade={armorGradeRoundTrip}");
         GD.Print($"BACKPACK_TAB_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace OperationSteelTide;
@@ -115,9 +116,26 @@ public partial class LootDragCard : PanelContainer
     public LootItemKind ItemKind { get; private set; }
     public EquipmentSlot? ItemSlot { get; private set; }
     public string DragTitle { get; private set; } = string.Empty;
+    public LootGrade ItemGrade { get; private set; }
+    public int ComparisonCount { get; private set; }
+    public bool HasUpgradeComparison { get; private set; }
+    public bool HasDowngradeComparison { get; private set; }
+    public bool QualityColorMatchesGrade
+    {
+        get
+        {
+            var expected = LootGrades.GlowColor(ItemGrade);
+            return Mathf.IsEqualApprox(_qualityAccent.R, expected.R)
+                && Mathf.IsEqualApprox(_qualityAccent.G, expected.G)
+                && Mathf.IsEqualApprox(_qualityAccent.B, expected.B)
+                && Mathf.IsEqualApprox(_qualityAccent.A, expected.A);
+        }
+    }
 
     public event Action<string, LootDragOrigin>? DoubleActivated;
     public event Action<WeaponBuild>? DetailsRequested;
+
+    private Color _qualityAccent;
 
     public void Configure(
         string itemId,
@@ -126,37 +144,59 @@ public partial class LootDragCard : PanelContainer
         EquipmentSlot? itemSlot,
         string title,
         string detail,
-        Color accent,
+        LootGrade grade,
         WeaponBuild? weapon = null,
         EquipmentItem? equipment = null,
         string detailAction = "DETAILS",
-        bool compact = false)
+        bool compact = false,
+        IReadOnlyList<LootStatComparison>? comparisons = null)
     {
         ItemId = itemId;
         Origin = origin;
         ItemKind = itemKind;
         ItemSlot = itemSlot;
         DragTitle = title;
+        TooltipText = detail;
+        ItemGrade = grade;
+        _qualityAccent = LootGrades.GlowColor(grade);
+        ComparisonCount = comparisons?.Count ?? 0;
+        HasUpgradeComparison = false;
+        HasDowngradeComparison = false;
+        if (comparisons is not null)
+        {
+            foreach (var comparison in comparisons)
+            {
+                HasUpgradeComparison |= comparison.Tone == LootComparisonTone.Upgrade;
+                HasDowngradeComparison |= comparison.Tone == LootComparisonTone.Downgrade;
+            }
+        }
+        var accent = _qualityAccent;
         CustomMinimumSize = compact
             ? new Vector2(180, 68)
-            : new Vector2(250, weapon is not null ? 126 : equipment is not null ? 108 : 88);
+            : new Vector2(250, weapon is not null && ComparisonCount > 0
+                ? 148
+                : equipment is not null && ComparisonCount > 0
+                    ? 122
+                    : weapon is not null
+                        ? 126
+                        : equipment is not null ? 108 : 88);
         MouseFilter = MouseFilterEnum.Pass;
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
         AddThemeStyleboxOverride("panel", Style(new Color(0.055f, 0.067f, 0.067f, 0.96f), accent));
 
         if (compact)
         {
-            BuildCompactCard(title, detail, accent, itemKind, itemSlot, weapon, detailAction);
+            BuildCompactCard(title, detail, accent, itemKind, itemSlot, weapon, detailAction, comparisons);
             return;
         }
         if (weapon is not null)
         {
-            BuildWeaponCard(title, detail, accent, weapon, detailAction);
+            BuildWeaponCard(title, detail, accent, weapon, detailAction, comparisons);
             return;
         }
         if (equipment is not null)
         {
-            BuildEquipmentCard(title, detail, accent, equipment);
+            BuildEquipmentCard(title, detail, accent, equipment, comparisons);
             return;
         }
 
@@ -190,6 +230,7 @@ public partial class LootDragCard : PanelContainer
         detailLabel.AddThemeFontSizeOverride("font_size", 12);
         detailLabel.AddThemeColorOverride("font_color", new Color(0.57f, 0.68f, 0.65f));
         text.AddChild(detailLabel);
+        AddComparisonGrid(text, comparisons, false);
     }
 
     private void BuildCompactCard(
@@ -199,7 +240,8 @@ public partial class LootDragCard : PanelContainer
         LootItemKind itemKind,
         EquipmentSlot? itemSlot,
         WeaponBuild? weapon,
-        string detailAction)
+        string detailAction,
+        IReadOnlyList<LootStatComparison>? comparisons)
     {
         var row = new HBoxContainer
         {
@@ -255,20 +297,33 @@ public partial class LootDragCard : PanelContainer
             header.AddChild(details);
         }
 
-        var detailLabel = new Label
+        if (comparisons is not null && comparisons.Count > 0)
         {
-            Text = detail,
-            ClipText = true,
-            TooltipText = detail,
-            MouseFilter = MouseFilterEnum.Ignore,
-            SizeFlagsHorizontal = SizeFlags.ExpandFill
-        };
-        detailLabel.AddThemeFontSizeOverride("font_size", 10);
-        detailLabel.AddThemeColorOverride("font_color", new Color(0.57f, 0.68f, 0.65f));
-        text.AddChild(detailLabel);
+            AddComparisonGrid(text, comparisons, true);
+        }
+        else
+        {
+            var detailLabel = new Label
+            {
+                Text = detail,
+                ClipText = true,
+                TooltipText = detail,
+                MouseFilter = MouseFilterEnum.Ignore,
+                SizeFlagsHorizontal = SizeFlags.ExpandFill
+            };
+            detailLabel.AddThemeFontSizeOverride("font_size", 10);
+            detailLabel.AddThemeColorOverride("font_color", new Color(0.57f, 0.68f, 0.65f));
+            text.AddChild(detailLabel);
+        }
     }
 
-    private void BuildWeaponCard(string title, string detail, Color accent, WeaponBuild weapon, string detailAction)
+    private void BuildWeaponCard(
+        string title,
+        string detail,
+        Color accent,
+        WeaponBuild weapon,
+        string detailAction,
+        IReadOnlyList<LootStatComparison>? comparisons)
     {
         var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         box.AddThemeConstantOverride("separation", 3);
@@ -309,9 +364,15 @@ public partial class LootDragCard : PanelContainer
         detailLabel.AddThemeFontSizeOverride("font_size", 11);
         detailLabel.AddThemeColorOverride("font_color", new Color(0.57f, 0.68f, 0.65f));
         box.AddChild(detailLabel);
+        AddComparisonGrid(box, comparisons, false);
     }
 
-    private void BuildEquipmentCard(string title, string detail, Color accent, EquipmentItem equipment)
+    private void BuildEquipmentCard(
+        string title,
+        string detail,
+        Color accent,
+        EquipmentItem equipment,
+        IReadOnlyList<LootStatComparison>? comparisons)
     {
         var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Pass, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         AddChild(row);
@@ -362,6 +423,50 @@ public partial class LootDragCard : PanelContainer
         detailLabel.AddThemeFontSizeOverride("font_size", 11);
         detailLabel.AddThemeColorOverride("font_color", new Color(0.61f, 0.7f, 0.66f));
         text.AddChild(detailLabel);
+        AddComparisonGrid(text, comparisons, false);
+    }
+
+    private static void AddComparisonGrid(
+        Control parent,
+        IReadOnlyList<LootStatComparison>? comparisons,
+        bool compact)
+    {
+        if (comparisons is null || comparisons.Count == 0)
+        {
+            return;
+        }
+        var grid = new GridContainer
+        {
+            Columns = 2,
+            MouseFilter = MouseFilterEnum.Ignore,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill
+        };
+        grid.AddThemeConstantOverride("h_separation", compact ? 3 : 7);
+        grid.AddThemeConstantOverride("v_separation", 1);
+        parent.AddChild(grid);
+        var visibleCount = compact ? Math.Min(2, comparisons.Count) : comparisons.Count;
+        for (var index = 0; index < visibleCount; index++)
+        {
+            var comparison = comparisons[index];
+            var color = comparison.Tone switch
+            {
+                LootComparisonTone.Upgrade => new Color(0.27f, 0.94f, 0.5f),
+                LootComparisonTone.Downgrade => new Color(1.0f, 0.36f, 0.28f),
+                _ => new Color(0.55f, 0.64f, 0.61f)
+            };
+            var label = new Label
+            {
+                Text = comparison.Text,
+                ClipText = true,
+                TooltipText = comparison.Text,
+                CustomMinimumSize = new Vector2(compact ? 65 : 104, compact ? 13 : 16),
+                MouseFilter = MouseFilterEnum.Ignore,
+                SizeFlagsHorizontal = SizeFlags.ExpandFill
+            };
+            label.AddThemeFontSizeOverride("font_size", compact ? 8 : 10);
+            label.AddThemeColorOverride("font_color", color);
+            grid.AddChild(label);
+        }
     }
 
     public override Variant _GetDragData(Vector2 _atPosition)

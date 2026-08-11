@@ -41,6 +41,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public EquipmentItem EquippedHelmet { get; private set; } = EquipmentCatalog.Create("helmet_light");
     public EquipmentItem EquippedBodyArmor { get; private set; } = EquipmentCatalog.Create("armor_carrier");
     public EquipmentItem EquippedBackpack { get; private set; } = EquipmentCatalog.Create("pack_assault");
+    public LootGrade EquippedHelmetGrade { get; private set; } = LootGrade.Uncommon;
+    public LootGrade EquippedBodyArmorGrade { get; private set; } = LootGrade.Rare;
+    public LootGrade EquippedBackpackGrade { get; private set; } = LootGrade.Uncommon;
     public float Armor => EquippedBodyArmor.Definition.MaxDurability <= 0.0f
         ? 0.0f
         : EquippedBodyArmor.Durability / EquippedBodyArmor.Definition.MaxDurability * 100.0f;
@@ -83,6 +86,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public bool FlashlightOn => _flashlightOn;
     public string FireMode => _automaticFire ? "AUTO" : "SEMI";
     public WeaponBuild EquippedWeapon { get; private set; } = WeaponCatalog.StarterWeapon();
+    public LootGrade EquippedWeaponGrade { get; private set; } = LootGrade.Rare;
     public List<LootItem> Backpack { get; } = new();
     public int BackpackCapacity => 6 + EquippedBackpack.Definition.CapacityBonus;
     public PlayerStance Stance => _stance;
@@ -92,6 +96,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public float ViewHeight => IsInstanceValid(_head) ? _head.Position.Y : 0.0f;
     public bool KnifeEquipped => _knifeEquipped;
     public string EquippedKnifeSkinId { get; private set; } = KnifeSkinCatalog.DefaultId;
+    public LootGrade EquippedKnifeGrade { get; private set; } = LootGrade.Uncommon;
     public AmmoCaliber CurrentAmmoCaliber => WeaponCatalog.Weapon(EquippedWeapon.Platform).Caliber;
     /// <summary>False at cold-start extraction until a looted primary is equipped.</summary>
     public bool HasFireablePrimary { get; private set; } = true;
@@ -163,6 +168,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private bool _knifeHitApplied;
     private bool _fireInputArmed;
     private bool _movementInputArmed;
+    private readonly Dictionary<AttachmentSlot, LootGrade> _equippedAttachmentGrades = new();
     private DriveableVehicle? _vehicle;
     private bool _vehicleCameraFollow;
     private float _fireReleaseTime;
@@ -1328,6 +1334,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             _slideTime = 0.0f;
             TrySetStance(PlayerStance.Standing);
         }
+        var vaulted = jumpPressed
+            && _stance == PlayerStance.Standing
+            && TryVaultLowObstacle(direction);
         var crouching = _stance == PlayerStance.Crouched;
         var prone = _stance == PlayerStance.Prone;
         var sprinting = Input.IsActionPressed("sprint") && input.Y < -0.15f && !crouching && !prone && !_isPlating
@@ -1366,7 +1375,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
 
         UpdateStaminaState(delta, sprinting);
-        if (!IsOnFloor())
+        if (vaulted)
+        {
+            velocity.Y = -0.1f;
+        }
+        else if (!IsOnFloor())
         {
             velocity.Y -= Gravity * delta;
         }
@@ -2283,8 +2296,15 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         if (item.Kind == LootItemKind.Weapon && item.Weapon is not null)
         {
-            var previous = new LootItem { Kind = LootItemKind.Weapon, Weapon = EquippedWeapon.Clone() };
-            EquipPrimary(item.Weapon);
+            var previous = HasFireablePrimary
+                ? new LootItem
+                {
+                    Kind = LootItemKind.Weapon,
+                    Weapon = EquippedWeapon.Clone(),
+                    Grade = EquippedWeaponGrade
+                }
+                : null;
+            EquipPrimary(item.Weapon, item.Grade);
             return previous;
         }
         if (item.Kind == LootItemKind.Attachment)
@@ -2293,9 +2313,15 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             LootItem? previous = null;
             if (EquippedWeapon.Attachments.TryGetValue(attachment.Slot, out var previousId))
             {
-                previous = new LootItem { Kind = LootItemKind.Attachment, AttachmentId = previousId };
+                previous = new LootItem
+                {
+                    Kind = LootItemKind.Attachment,
+                    AttachmentId = previousId,
+                    Grade = EquippedAttachmentGrade(attachment.Slot)
+                };
             }
             EquippedWeapon.Attachments[attachment.Slot] = attachment.Id;
+            _equippedAttachmentGrades[attachment.Slot] = item.Grade;
             ApplyWeaponBuildVisuals();
             Hud?.ShowLocalizedMessage("part_installed", "WEAPON PART INSTALLED", new Color(0.42f, 0.9f, 0.72f));
             return previous;
@@ -2311,10 +2337,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 return item;
             }
             var previousSkin = EquippedKnifeSkinId;
+            var previousGrade = EquippedKnifeGrade;
             EquippedKnifeSkinId = item.KnifeSkinId;
+            EquippedKnifeGrade = item.Grade;
             RebuildKnife();
             Hud?.ShowLocalizedMessage("knife_skin_equipped", "KNIFE FINISH EQUIPPED", new Color(0.88f, 0.42f, 0.34f));
-            return new LootItem { Kind = LootItemKind.KnifeSkin, KnifeSkinId = previousSkin, Grade = LootGrade.Uncommon };
+            return new LootItem { Kind = LootItemKind.KnifeSkin, KnifeSkinId = previousSkin, Grade = previousGrade };
         }
         if (item.Kind == LootItemKind.ArmorPlate && TryCollectArmorPlate(item.Grade, item.Quantity))
         {
@@ -2336,22 +2364,31 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 EquipmentSlot.Backpack => EquippedBackpack,
                 _ => null
             };
+            var previousGrade = EquippedEquipmentGrade(incoming.Definition.Slot);
             switch (incoming.Definition.Slot)
             {
                 case EquipmentSlot.Helmet:
                     EquippedHelmet = incoming.Clone();
+                    EquippedHelmetGrade = item.Grade;
                     break;
                 case EquipmentSlot.BodyArmor:
                     EquippedBodyArmor = incoming.Clone();
+                    EquippedBodyArmorGrade = item.Grade;
                     break;
                 case EquipmentSlot.Backpack:
                     EquippedBackpack = incoming.Clone();
+                    EquippedBackpackGrade = item.Grade;
                     break;
             }
             Hud?.ShowLocalizedMessage("equipment_replaced", "EQUIPMENT REPLACED", new Color(0.84f, 0.7f, 0.34f));
             return previous is null
                 ? null
-                : new LootItem { Kind = LootItemKind.Equipment, Equipment = previous.Clone() };
+                : new LootItem
+                {
+                    Kind = LootItemKind.Equipment,
+                    Equipment = previous.Clone(),
+                    Grade = previousGrade
+                };
         }
         return item;
     }
@@ -2415,9 +2452,15 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         return true;
     }
 
-    private void EquipPrimary(WeaponBuild build)
+    private void EquipPrimary(WeaponBuild build, LootGrade grade = LootGrade.Rare)
     {
         EquippedWeapon = build.Clone();
+        EquippedWeaponGrade = grade;
+        _equippedAttachmentGrades.Clear();
+        foreach (var slot in EquippedWeapon.Attachments.Keys)
+        {
+            _equippedAttachmentGrades[slot] = grade;
+        }
         HasFireablePrimary = true;
         _automaticFire = WeaponCatalog.Weapon(EquippedWeapon.Platform).SupportsAutomatic;
         _loadedAmmoGrade = BestAmmoGrade(CurrentAmmoCaliber);
@@ -2427,6 +2470,38 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         ApplyWeaponBuildVisuals();
         SwitchWeapon(false);
         Hud?.ShowLocalizedMessage("weapon_equipped", "PRIMARY WEAPON EQUIPPED", new Color(0.4f, 0.86f, 0.7f));
+    }
+
+    public LootGrade EquippedAttachmentGrade(AttachmentSlot slot)
+        => _equippedAttachmentGrades.TryGetValue(slot, out var grade) ? grade : EquippedWeaponGrade;
+
+    public LootGrade EquippedEquipmentGrade(EquipmentSlot slot) => slot switch
+    {
+        EquipmentSlot.Helmet => EquippedHelmetGrade,
+        EquipmentSlot.BodyArmor => EquippedBodyArmorGrade,
+        EquipmentSlot.Backpack => EquippedBackpackGrade,
+        _ => LootGrade.Common
+    };
+
+    private void ResetEquippedEquipmentGrades()
+    {
+        EquippedHelmetGrade = DefaultEquipmentGrade(EquippedHelmet);
+        EquippedBodyArmorGrade = DefaultEquipmentGrade(EquippedBodyArmor);
+        EquippedBackpackGrade = DefaultEquipmentGrade(EquippedBackpack);
+    }
+
+    private static LootGrade DefaultEquipmentGrade(EquipmentItem equipment)
+    {
+        if (equipment.Definition.Id.Contains("patrol", System.StringComparison.OrdinalIgnoreCase)
+            || equipment.Definition.Id.Contains("sling", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return LootGrade.Common;
+        }
+        if (equipment.Definition.Id.Contains("heavy", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return equipment.Definition.Slot == EquipmentSlot.BodyArmor ? LootGrade.Epic : LootGrade.Rare;
+        }
+        return equipment.Definition.Slot == EquipmentSlot.BodyArmor ? LootGrade.Rare : LootGrade.Uncommon;
     }
 
     private void RebuildKnife()
@@ -2482,6 +2557,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             return false;
         }
 
+        Main?.InterruptLootForIncomingDamage();
         CancelPlate();
         CancelMedicalUse();
 

@@ -7,6 +7,7 @@ public partial class TacticalPlayer
         EquippedHelmet = EquipmentCatalog.Create(loadout.HelmetId);
         EquippedBodyArmor = EquipmentCatalog.Create(loadout.BodyArmorId);
         EquippedBackpack = EquipmentCatalog.Create(loadout.BackpackId);
+        ResetEquippedEquipmentGrades();
         ResetAmmoReserves();
 
         if (loadout.Weapon is null)

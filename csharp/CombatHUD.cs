@@ -969,10 +969,6 @@ public partial class CombatHUD : CanvasLayer
             ? Text("equipped_loadout", "CURRENT LOADOUT")
             : $"{Text("equipped_loadout", "CURRENT LOADOUT")}  //  {Text("backpack_container", "BACKPACK CONTAINER")}";
         _lootCloseButton.Text = Text("close", "CLOSE");
-        _primarySlotCaption.Text = Text("primary_weapon", "PRIMARY WEAPON");
-        _helmetSlotCaption.Text = Text("helmet", "HELMET");
-        _armorSlotCaption.Text = Text("body_armor", "BODY ARMOR");
-        _packSlotCaption.Text = Text("backpack_container", "BACKPACK CONTAINER");
         _backpackItemsCaption.Text = $"{Text("backpack_storage", "BACKPACK STORAGE")}  {_shownPlayer.Backpack.Count}/{_shownPlayer.BackpackCapacity}";
         _groundDropCaption.Text = Text("drop_to_ground", "DROP TO GROUND");
         _primaryDetailButton.Text = Text("details", "DETAILS");
@@ -983,21 +979,34 @@ public partial class CombatHUD : CanvasLayer
         _backpackZone.Position = _shownSourceAvailable ? new Vector2(940, 510) : new Vector2(32, 122);
         _backpackZone.Size = _shownSourceAvailable ? new Vector2(830, 328) : new Vector2(1138, 716);
 
-        var stats = _shownPlayer.CurrentWeaponStats;
-        var weaponName = _shownPlayer.EquippedWeapon.DisplayName(_language);
-        _lootStats.Text = GameLocalization.IsChinese(_language)
-            ? $"当前主武器  {weaponName}     伤害 {stats.Damage:0}     射程 {stats.EffectiveRange:0}m     操控 {stats.Handling:0.00}"
-            : $"EQUIPPED  {weaponName}     DMG {stats.Damage:0}     RANGE {stats.EffectiveRange:0}m     HANDLING {stats.Handling:0.00}";
-        _primaryWeaponPreview.Configure(InventoryPreviewKind.Rifle, weapon: _shownPlayer.EquippedWeapon);
-        _primarySlotLabel.Text = GameLocalization.IsChinese(_language)
-            ? $"{weaponName}   //   后坐 {stats.Recoil:0.00}   弹匣 {stats.MagazineSize}"
-            : $"{weaponName}   //   RECOIL {stats.Recoil:0.00}   MAG {stats.MagazineSize}";
+        if (_shownPlayer.HasFireablePrimary)
+        {
+            var stats = _shownPlayer.CurrentWeaponStats;
+            var weaponName = _shownPlayer.EquippedWeapon.DisplayName(_language);
+            _lootStats.Text = GameLocalization.IsChinese(_language)
+                ? $"当前主武器  {weaponName}     伤害 {stats.Damage:0}     射程 {stats.EffectiveRange:0}m     操控 {stats.Handling:0.00}"
+                : $"EQUIPPED  {weaponName}     DMG {stats.Damage:0}     RANGE {stats.EffectiveRange:0}m     HANDLING {stats.Handling:0.00}";
+            _primaryWeaponPreview.Visible = true;
+            _primaryWeaponPreview.Configure(InventoryPreviewKind.Rifle, weapon: _shownPlayer.EquippedWeapon);
+            _primarySlotLabel.Text = GameLocalization.IsChinese(_language)
+                ? $"{weaponName}   //   后坐 {stats.Recoil:0.00}   弹匣 {stats.MagazineSize}"
+                : $"{weaponName}   //   RECOIL {stats.Recoil:0.00}   MAG {stats.MagazineSize}";
+            _primaryDetailButton.Visible = true;
+        }
+        else
+        {
+            _lootStats.Text = Text("comparison_no_primary", "NO PRIMARY WEAPON EQUIPPED");
+            _primaryWeaponPreview.Visible = false;
+            _primarySlotLabel.Text = Text("empty_slot", "EMPTY SLOT");
+            _primaryDetailButton.Visible = false;
+        }
         _helmetSlotLabel.Text = _shownPlayer.EquippedHelmet.DisplayName(_language) + "\n" + _shownPlayer.EquippedHelmet.Detail(_language);
         _armorSlotLabel.Text = _shownPlayer.EquippedBodyArmor.DisplayName(_language) + "\n" + _shownPlayer.EquippedBodyArmor.Detail(_language);
         _packSlotLabel.Text = _shownPlayer.EquippedBackpack.DisplayName(_language) + "\n" + _shownPlayer.EquippedBackpack.Detail(_language);
         _helmetPreview.Configure(InventoryPreviewKind.Helmet, _shownPlayer.EquippedHelmet);
         _armorPreview.Configure(InventoryPreviewKind.BodyArmor, _shownPlayer.EquippedBodyArmor);
         _packPreview.Configure(InventoryPreviewKind.Backpack, _shownPlayer.EquippedBackpack);
+        RefreshEquippedQualityStyles();
         _lootOperatorPreview.Configure(
             InventoryPreviewKind.Operator,
             weapon: _shownPlayer.HasFireablePrimary ? _shownPlayer.EquippedWeapon : null,
@@ -1079,26 +1088,26 @@ public partial class CombatHUD : CanvasLayer
             {
                 Kind = LootItemKind.Weapon,
                 Weapon = player.EquippedWeapon.Clone(),
-                Grade = LootGrade.Rare
+                Grade = player.EquippedWeaponGrade
             }.StackValue;
         }
         total += new LootItem
         {
             Kind = LootItemKind.Equipment,
             Equipment = player.EquippedHelmet,
-            Grade = LootGrade.Uncommon
+            Grade = player.EquippedHelmetGrade
         }.StackValue;
         total += new LootItem
         {
             Kind = LootItemKind.Equipment,
             Equipment = player.EquippedBodyArmor,
-            Grade = LootGrade.Rare
+            Grade = player.EquippedBodyArmorGrade
         }.StackValue;
         total += new LootItem
         {
             Kind = LootItemKind.Equipment,
             Equipment = player.EquippedBackpack,
-            Grade = LootGrade.Uncommon
+            Grade = player.EquippedBackpackGrade
         }.StackValue;
         total += player.TotalReserveAmmo * 2;
         return total;
@@ -1117,11 +1126,12 @@ public partial class CombatHUD : CanvasLayer
             slot,
             item.DisplayName(_language),
             item.Detail(_language),
-            LootGrades.GlowColor(item.Grade),
+            item.Grade,
             item.Weapon,
             item.Equipment,
             Text("details", "DETAILS"),
-            compact);
+            compact,
+            BuildLootComparisons(item));
         card.DetailsRequested += ShowWeaponDetails;
         card.DoubleActivated += (itemId, cardOrigin) =>
         {
