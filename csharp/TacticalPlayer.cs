@@ -313,6 +313,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             return;
         }
 
+        if (_isVaulting)
+        {
+            CancelLowObstacleVault("vehicle_mount");
+        }
+
         _vehicle = vehicle;
         CloseMedicalWheelWithoutUse();
         CancelMedicalUse(false);
@@ -976,6 +981,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             _pitch = Mathf.Clamp(_pitch - motion.Relative.Y * MouseSensitivity, -0.55f, 0.42f);
             return;
         }
+        if (_isVaulting)
+        {
+            // Keep the body aligned with the authored vault arc while preserving a
+            // small first-person look range during the movement lock.
+            _pitch = Mathf.Clamp(_pitch - motion.Relative.Y * MouseSensitivity, -0.7f, 0.58f);
+            return;
+        }
 
         var rotation = Rotation;
         rotation.Y -= motion.Relative.X * MouseSensitivity;
@@ -991,6 +1003,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             if (_isClimbingLadder)
             {
                 CancelLadderClimb(notify: false);
+            }
+            if (_isVaulting)
+            {
+                CancelLowObstacleVault("death");
             }
             CloseMedicalWheelWithoutUse();
             CancelMedicalUse(false);
@@ -1011,6 +1027,18 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 UpdateCameraAndWeapon(dt);
                 PushHudStats();
             }
+            return;
+        }
+        if (_isVaulting && UiLocked)
+        {
+            CancelLowObstacleVault("ui_locked");
+        }
+        if (_isVaulting)
+        {
+            UpdateVaultMovement(dt);
+            UpdateCameraAndWeapon(dt);
+            PushHudStats();
+            Hud?.SetAiming(false);
             return;
         }
         if (HandleMedicalWheelInput())
@@ -1334,9 +1362,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             _slideTime = 0.0f;
             TrySetStance(PlayerStance.Standing);
         }
-        var vaulted = jumpPressed
+        if (jumpPressed
             && _stance == PlayerStance.Standing
-            && TryVaultLowObstacle(direction);
+            && TryVaultLowObstacle(direction))
+        {
+            UpdateVaultMovement(delta);
+            return;
+        }
         var crouching = _stance == PlayerStance.Crouched;
         var prone = _stance == PlayerStance.Prone;
         var sprinting = Input.IsActionPressed("sprint") && input.Y < -0.15f && !crouching && !prone && !_isPlating
@@ -1375,11 +1407,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
 
         UpdateStaminaState(delta, sprinting);
-        if (vaulted)
-        {
-            velocity.Y = -0.1f;
-        }
-        else if (!IsOnFloor())
+        if (!IsOnFloor())
         {
             velocity.Y -= Gravity * delta;
         }
@@ -1547,6 +1575,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         if (_isClimbingLadder)
         {
             UpdateLadderViewAnimation(delta);
+            return;
+        }
+        if (_isVaulting)
+        {
+            UpdateVaultViewAnimation(delta);
             return;
         }
         UpdateDamageKick(delta);
