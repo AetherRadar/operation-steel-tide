@@ -673,6 +673,68 @@ public partial class FreightTerminalWorld
         }
         var walked = walkedRoutes == expected;
 
+        var vaultFloor = new StaticBody3D
+        {
+            Name = "YellowFurnitureVaultDiagnosticFloor",
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        AddChild(vaultFloor);
+        var vaultOrigin = new Vector3(0.0f, 80.0f, 0.0f);
+        vaultFloor.GlobalPosition = vaultOrigin;
+        vaultFloor.AddChild(new CollisionShape3D
+        {
+            Position = new Vector3(0.0f, -0.1f, 0.0f),
+            Shape = new BoxShape3D { Size = new Vector3(5.0f, 0.2f, 5.0f) }
+        });
+        var yellowDrawer = new ResidentialSearchableFurniture
+        {
+            Name = "YellowFurnitureVaultDiagnostic"
+        };
+        yellowDrawer.Configure(
+            ResidentialFurnitureKind.DeskDrawers,
+            ResidentialRoomEventKind.Alarm,
+            0,
+            0,
+            1,
+            new[]
+            {
+                new LootItem
+                {
+                    Kind = LootItemKind.Medical,
+                    MedicalKind = MedicalItemKind.Bandage,
+                    Quantity = 1,
+                    Grade = LootGrade.Common
+                }
+            });
+        AddChild(yellowDrawer);
+        yellowDrawer.GlobalPosition = vaultOrigin + new Vector3(0.0f, 0.03f, -0.78f);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        _player.GlobalPosition = vaultOrigin + Vector3.Up * 0.03f;
+        _player.Velocity = Vector3.Zero;
+        _player.UiLocked = false;
+        _player.RestoreMovementInput();
+        _player.FaceWorldPointForDiagnostics(yellowDrawer.GlobalPosition);
+        Input.ActionRelease("jump");
+        Input.ActionRelease("move_forward");
+        for (var frame = 0; frame < 3; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        var vaultsBefore = _player.SuccessfulVaultsForDiagnostics;
+        Input.ActionPress("move_forward");
+        Input.ActionPress("jump");
+        for (var frame = 0; frame < 2; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        Input.ActionRelease("jump");
+        Input.ActionRelease("move_forward");
+        var yellowFurnitureVaulted = _player.SuccessfulVaultsForDiagnostics == vaultsBefore + 1
+            && _player.GlobalPosition.Y >= vaultOrigin.Y + 0.58f;
+        yellowDrawer.QueueFree();
+        vaultFloor.QueueFree();
+
         var valid = structureReady
             && distinctTowers == expected
             && stepShapes == expected * ResidentialSkybridgeAccessStepCount
@@ -681,8 +743,9 @@ public partial class FreightTerminalWorld
             && floorsReady
             && clearanceReady
             && bridgeEntriesReady
-            && walked;
-        GD.Print($"SKYBRIDGE_ACCESS_CHECK valid={valid} accesses={_residentialSkybridgeAccesses.Count}/{expected} towers={distinctTowers}/{expected} steps={stepShapes}/{expected * ResidentialSkybridgeAccessStepCount} platforms={platformShapes}/{expected * 2} structure={structureReady} visuals={visualsReady} floors={floorsReady} clearance={clearanceReady} bridge_entries={bridgeEntriesReady} walk={walked} walked_routes={walkedRoutes}/{expected} reached={reached}/{expected * waypointsPerRoute} min_walk_h={minimumWalkGain:0.00}");
+            && walked
+            && yellowFurnitureVaulted;
+        GD.Print($"SKYBRIDGE_ACCESS_CHECK valid={valid} accesses={_residentialSkybridgeAccesses.Count}/{expected} towers={distinctTowers}/{expected} steps={stepShapes}/{expected * ResidentialSkybridgeAccessStepCount} platforms={platformShapes}/{expected * 2} structure={structureReady} visuals={visualsReady} floors={floorsReady} clearance={clearanceReady} bridge_entries={bridgeEntriesReady} walk={walked} walked_routes={walkedRoutes}/{expected} reached={reached}/{expected * waypointsPerRoute} min_walk_h={minimumWalkGain:0.00} yellow_furniture_vault={yellowFurnitureVaulted} vault_result={_player.LastVaultResultForDiagnostics} vault_y={_player.GlobalPosition.Y - vaultOrigin.Y:0.00}");
         GD.Print($"SKYBRIDGE_ACCESS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
