@@ -593,7 +593,7 @@ public partial class FreightTerminalWorld
         var walkedRoutes = 0;
         var reached = 0;
         var minimumWalkGain = float.PositiveInfinity;
-        const int waypointsPerRoute = 5;
+        const int waypointsPerRoute = 6;
         foreach (var access in _residentialSkybridgeAccesses)
         {
             _player.GlobalPosition = access.BottomFeet;
@@ -608,6 +608,7 @@ public partial class FreightTerminalWorld
                 access.MidFeet,
                 access.StairTopFeet,
                 access.LandingFeet,
+                access.PlatformFeet + access.Outward * 1.05f,
                 access.PlatformFeet,
                 access.BridgeFeet
             };
