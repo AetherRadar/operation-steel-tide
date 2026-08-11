@@ -598,6 +598,7 @@ public partial class FreightTerminalWorld
         {
             _player.GlobalPosition = access.BottomFeet;
             _player.Velocity = Vector3.Zero;
+            _player.SetStaminaForDiagnostics(100.0f);
             _player.RestoreMovementInput();
             await WaitFrames(6);
             var startY = _player.GlobalPosition.Y;
@@ -675,7 +676,7 @@ public partial class FreightTerminalWorld
 
         var vaultFloor = new StaticBody3D
         {
-            Name = "YellowFurnitureVaultDiagnosticFloor",
+            Name = "LowFurnitureVaultDiagnosticFloor",
             CollisionLayer = 1,
             CollisionMask = 0
         };
@@ -689,7 +690,7 @@ public partial class FreightTerminalWorld
         });
         var yellowDrawer = new ResidentialSearchableFurniture
         {
-            Name = "YellowFurnitureVaultDiagnostic"
+            Name = "LowFurnitureVaultDiagnostic"
         };
         yellowDrawer.Configure(
             ResidentialFurnitureKind.DeskDrawers,
@@ -722,17 +723,108 @@ public partial class FreightTerminalWorld
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
         var vaultsBefore = _player.SuccessfulVaultsForDiagnostics;
+        var vaultStartPosition = _player.GlobalPosition;
         Input.ActionPress("move_forward");
         Input.ActionPress("jump");
         for (var frame = 0; frame < 2; frame++)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
+        var lowFurnitureVaultStarted = _player.IsVaulting;
+        var sawVaultRise = _player.VaultPhaseForDiagnostics == "rise";
+        var sawVaultCross = _player.VaultPhaseForDiagnostics == "cross";
+        var sawVaultSettle = _player.VaultPhaseForDiagnostics == "settle";
         Input.ActionRelease("jump");
         Input.ActionRelease("move_forward");
-        var yellowFurnitureVaulted = _player.SuccessfulVaultsForDiagnostics == vaultsBefore + 1
-            && _player.GlobalPosition.Y >= vaultOrigin.Y + 0.58f;
+        var vaultWaitFrames = 0;
+        while (_player.IsVaulting && vaultWaitFrames < 90)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            sawVaultRise |= _player.VaultPhaseForDiagnostics == "rise";
+            sawVaultCross |= _player.VaultPhaseForDiagnostics == "cross";
+            sawVaultSettle |= _player.VaultPhaseForDiagnostics == "settle";
+            vaultWaitFrames++;
+        }
+        var lowFurnitureVaultTimedOut = _player.IsVaulting;
+        if (lowFurnitureVaultTimedOut)
+        {
+            _player.CancelLowObstacleVaultForDiagnostics();
+        }
+        var lowFurnitureVaulted = lowFurnitureVaultStarted
+            && !lowFurnitureVaultTimedOut
+            && _player.SuccessfulVaultsForDiagnostics == vaultsBefore + 1
+            && _player.GlobalPosition.Y >= vaultOrigin.Y + 0.58f
+            && new Vector2(
+                _player.GlobalPosition.X - vaultStartPosition.X,
+                _player.GlobalPosition.Z - vaultStartPosition.Z).Length() >= 0.34f;
         yellowDrawer.QueueFree();
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+        StaticBody3D AddVaultDiagnosticBox(string name, Vector3 center, Vector3 size)
+        {
+            var body = new StaticBody3D
+            {
+                Name = name,
+                CollisionLayer = 1,
+                CollisionMask = 0
+            };
+            AddChild(body);
+            body.GlobalPosition = center;
+            body.AddChild(new CollisionShape3D
+            {
+                Shape = new BoxShape3D { Size = size }
+            });
+            return body;
+        }
+
+        var blockedOrigin = vaultOrigin + new Vector3(1.35f, 0.0f, 0.0f);
+        var blockedObstacle = AddVaultDiagnosticBox(
+            "VaultBlockedObstacleDiagnostic",
+            blockedOrigin + new Vector3(0.0f, 0.3f, -0.72f),
+            new Vector3(0.8f, 0.6f, 0.5f));
+        var blockedBeam = AddVaultDiagnosticBox(
+            "VaultOverheadBeamDiagnostic",
+            blockedOrigin + new Vector3(0.0f, 1.95f, 0.0f),
+            new Vector3(1.0f, 0.2f, 0.22f));
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        _player.GlobalPosition = blockedOrigin + Vector3.Up * 0.03f;
+        _player.Velocity = Vector3.Zero;
+        _player.FaceWorldPointForDiagnostics(blockedObstacle.GlobalPosition);
+        var blockedVaultCount = _player.SuccessfulVaultsForDiagnostics;
+        Input.ActionPress("move_forward");
+        Input.ActionPress("jump");
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        Input.ActionRelease("jump");
+        Input.ActionRelease("move_forward");
+        var blockedVaultResult = _player.LastVaultResultForDiagnostics;
+        var blockedVaultRejected = !_player.IsVaulting
+            && _player.SuccessfulVaultsForDiagnostics == blockedVaultCount
+            && blockedVaultResult.StartsWith("rejected:path_blocked", System.StringComparison.Ordinal);
+        blockedObstacle.QueueFree();
+        blockedBeam.QueueFree();
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+        var highOrigin = vaultOrigin + new Vector3(-1.35f, 0.0f, 0.0f);
+        var highObstacle = AddVaultDiagnosticBox(
+            "VaultHighObstacleDiagnostic",
+            highOrigin + new Vector3(0.0f, 0.65f, -0.72f),
+            new Vector3(0.8f, 1.3f, 0.5f));
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        _player.GlobalPosition = highOrigin + Vector3.Up * 0.03f;
+        _player.Velocity = Vector3.Zero;
+        _player.FaceWorldPointForDiagnostics(highObstacle.GlobalPosition);
+        var highVaultCount = _player.SuccessfulVaultsForDiagnostics;
+        Input.ActionPress("move_forward");
+        Input.ActionPress("jump");
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        Input.ActionRelease("jump");
+        Input.ActionRelease("move_forward");
+        var highVaultRejected = !_player.IsVaulting
+            && _player.SuccessfulVaultsForDiagnostics == highVaultCount
+            && _player.LastVaultResultForDiagnostics.StartsWith("rejected:height", System.StringComparison.Ordinal);
+        highObstacle.QueueFree();
         vaultFloor.QueueFree();
 
         var valid = structureReady
@@ -744,8 +836,13 @@ public partial class FreightTerminalWorld
             && clearanceReady
             && bridgeEntriesReady
             && walked
-            && yellowFurnitureVaulted;
-        GD.Print($"SKYBRIDGE_ACCESS_CHECK valid={valid} accesses={_residentialSkybridgeAccesses.Count}/{expected} towers={distinctTowers}/{expected} steps={stepShapes}/{expected * ResidentialSkybridgeAccessStepCount} platforms={platformShapes}/{expected * 2} structure={structureReady} visuals={visualsReady} floors={floorsReady} clearance={clearanceReady} bridge_entries={bridgeEntriesReady} walk={walked} walked_routes={walkedRoutes}/{expected} reached={reached}/{expected * waypointsPerRoute} min_walk_h={minimumWalkGain:0.00} yellow_furniture_vault={yellowFurnitureVaulted} vault_result={_player.LastVaultResultForDiagnostics} vault_y={_player.GlobalPosition.Y - vaultOrigin.Y:0.00}");
+            && lowFurnitureVaulted
+            && sawVaultRise
+            && sawVaultCross
+            && sawVaultSettle
+            && blockedVaultRejected
+            && highVaultRejected;
+        GD.Print($"SKYBRIDGE_ACCESS_CHECK valid={valid} accesses={_residentialSkybridgeAccesses.Count}/{expected} towers={distinctTowers}/{expected} steps={stepShapes}/{expected * ResidentialSkybridgeAccessStepCount} platforms={platformShapes}/{expected * 2} structure={structureReady} visuals={visualsReady} floors={floorsReady} clearance={clearanceReady} bridge_entries={bridgeEntriesReady} walk={walked} walked_routes={walkedRoutes}/{expected} reached={reached}/{expected * waypointsPerRoute} min_walk_h={minimumWalkGain:0.00} low_furniture_vault={lowFurnitureVaulted} vault_started={lowFurnitureVaultStarted} vault_phases={sawVaultRise}/{sawVaultCross}/{sawVaultSettle} vault_timeout={lowFurnitureVaultTimedOut} vault_wait_frames={vaultWaitFrames} blocked_vault_rejected={blockedVaultRejected} blocked_vault_result={blockedVaultResult} high_vault_rejected={highVaultRejected}");
         GD.Print($"SKYBRIDGE_ACCESS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
