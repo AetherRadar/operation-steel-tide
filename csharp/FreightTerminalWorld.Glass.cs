@@ -154,6 +154,7 @@ public partial class FreightTerminalWorld
             && fields.Length <= ResidentialTowerSpecs.Length + ResidentialSkyLinks.Sum(link => link.Floors.Length) + 2;
         var panesDense = paneCount >= 1200;
         var framesComplete = frameInstances == paneCount * 5;
+        var singleSurfaceVisuals = fields.Length > 0 && fields.All(field => field.UsesSingleSurfaceVisual);
         var residentialTracked = ResidentialGlassPaneCount == paneCount;
         var valid = rayReady
             && firstShotBlocked
@@ -167,8 +168,9 @@ public partial class FreightTerminalWorld
             && fieldsBatched
             && panesDense
             && framesComplete
+            && singleSurfaceVisuals
             && residentialTracked;
-        GD.Print($"GLASS_CHECK valid={valid} fields={fields.Length} panes={paneCount} frames={frameInstances} ray_ready={rayReady} first_shot_blocked={firstShotBlocked} collision_disabled={collisionDisabled} second_shot_clear={secondShotCleared} audio_triggered={audioTriggered} audio_playing={audioPlaying} close_audio={closeAudioPlaying} skybridge_ready={skybridgeReady} skybridge_crosshair={skybridgeCrosshair} skybridge_alignment={skybridgeAlignment:0.000} skybridge_fire={skybridgeFireAccepted} skybridge_shot={skybridgeShot} player_audio={playerAudioPlaying} batched={fieldsBatched} dense={panesDense} tracked={residentialTracked}");
+        GD.Print($"GLASS_CHECK valid={valid} fields={fields.Length} panes={paneCount} frames={frameInstances} single_surface={singleSurfaceVisuals} ray_ready={rayReady} first_shot_blocked={firstShotBlocked} collision_disabled={collisionDisabled} second_shot_clear={secondShotCleared} audio_triggered={audioTriggered} audio_playing={audioPlaying} close_audio={closeAudioPlaying} skybridge_ready={skybridgeReady} skybridge_crosshair={skybridgeCrosshair} skybridge_alignment={skybridgeAlignment:0.000} skybridge_fire={skybridgeFireAccepted} skybridge_shot={skybridgeShot} player_audio={playerAudioPlaying} batched={fieldsBatched} dense={panesDense} tracked={residentialTracked}");
         GD.Print($"GLASS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

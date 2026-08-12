@@ -16,6 +16,7 @@ public partial class BreakableGlassField : Area3D
 
     private const float MinimumShatterDamage = 4.0f;
     private static readonly BoxMesh UnitBox = new() { Size = Vector3.One };
+    private static readonly QuadMesh UnitPane = new() { Size = Vector2.One };
     private static AudioStreamWav? _glassBreakSound;
 
     private sealed class PaneState
@@ -41,6 +42,7 @@ public partial class BreakableGlassField : Area3D
     public int ShatteredCount { get; private set; }
     public int FrameInstanceCount { get; private set; }
     public Vector3 LastShatterPosition { get; private set; }
+    public bool UsesSingleSurfaceVisual => _glassMultiMesh?.Mesh is QuadMesh;
 
     public void Configure(
         Godot.Material glassMaterial,
@@ -98,12 +100,12 @@ public partial class BreakableGlassField : Area3D
             TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
             UseColors = true,
             InstanceCount = _panes.Count,
-            Mesh = UnitBox
+            Mesh = UnitPane
         };
         for (var index = 0; index < _panes.Count; index++)
         {
             var pane = _panes[index];
-            _glassMultiMesh.SetInstanceTransform(index, BoxTransform(pane, Vector3.Zero, pane.Size));
+            _glassMultiMesh.SetInstanceTransform(index, PaneSurfaceTransform(pane));
             _glassMultiMesh.SetInstanceColor(index, pane.Tint);
         }
         AddChild(new MultiMeshInstance3D
@@ -229,6 +231,27 @@ public partial class BreakableGlassField : Area3D
     {
         var rotation = Basis.FromEuler(pane.Rotation);
         return new Transform3D(rotation.Scaled(size), pane.Position + rotation * localOffset);
+    }
+
+    private static Transform3D PaneSurfaceTransform(PaneState pane)
+    {
+        var thinAxis = ThinAxis(pane.Size);
+        var surfaceBasis = thinAxis switch
+        {
+            0 => new Basis(
+                Vector3.Back * pane.Size.Z,
+                Vector3.Up * pane.Size.Y,
+                Vector3.Right),
+            1 => new Basis(
+                Vector3.Right * pane.Size.X,
+                Vector3.Back * pane.Size.Z,
+                Vector3.Up),
+            _ => new Basis(
+                Vector3.Right * pane.Size.X,
+                Vector3.Up * pane.Size.Y,
+                Vector3.Back)
+        };
+        return new Transform3D(Basis.FromEuler(pane.Rotation) * surfaceBasis, pane.Position);
     }
 
     private static int ThinAxis(Vector3 size)
