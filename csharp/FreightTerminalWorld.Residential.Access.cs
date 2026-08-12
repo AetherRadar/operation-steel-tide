@@ -175,7 +175,6 @@ public partial class FreightTerminalWorld
 
         var treadTransforms = new List<Transform3D>(ResidentialSkybridgeAccessStepCount);
         var nosingTransforms = new List<Transform3D>(ResidentialSkybridgeAccessStepCount);
-        var treadFaces = new List<Vector3>(ResidentialSkybridgeAccessStepCount * 36);
         var treadSize = new Vector3(
             ResidentialSkybridgeAccessTreadWidth,
             ResidentialSkybridgeAccessTreadThickness,
@@ -189,19 +188,51 @@ public partial class FreightTerminalWorld
                 stairCenterX,
                 topY - ResidentialSkybridgeAccessTreadThickness * 0.5f,
                 z);
-            AppendSkybridgeAccessTreadTopFaces(treadFaces, position, treadSize);
             treadTransforms.Add(new Transform3D(Basis.Identity.Scaled(treadSize), position));
             nosingTransforms.Add(new Transform3D(
                 Basis.Identity.Scaled(new Vector3(ResidentialSkybridgeAccessTreadWidth, 0.035f, 0.055f)),
                 new Vector3(stairCenterX, topY + 0.016f, z + stepRun * 0.47f)));
         }
-        var treadCollision = new ConcavePolygonShape3D { BackfaceCollision = true };
-        treadCollision.SetFaces(treadFaces.ToArray());
-        collision.AddChild(new CollisionShape3D
+
+        var rampEndZ = stairStartZ + stepRun * risingStepCount;
+        var rampRun = rampEndZ - stairStartZ;
+        var rampRise = ResidentialSkybridgeAccessSurfaceY - ResidentialSkybridgeAccessGroundY;
+        var rampAngle = -Mathf.Atan2(rampRise, rampRun);
+        const float rampThickness = 0.18f;
+        const float rampOverlap = 0.12f;
+        var rampBasis = new Basis(Vector3.Right, rampAngle);
+        var rampTopCenter = new Vector3(
+            stairCenterX,
+            (ResidentialSkybridgeAccessGroundY + ResidentialSkybridgeAccessSurfaceY) * 0.5f,
+            (stairStartZ + rampEndZ) * 0.5f);
+        var rampCollision = new CollisionShape3D
         {
-            Name = $"SkybridgeAccessTreadsCollision_T{towerIndex + 1:00}",
-            Shape = treadCollision
-        });
+            Name = $"SkybridgeAccessRampCollision_T{towerIndex + 1:00}",
+            Position = rampTopCenter - rampBasis.Y * (rampThickness * 0.5f),
+            Rotation = new Vector3(rampAngle, 0.0f, 0.0f),
+            Shape = new BoxShape3D
+            {
+                Size = new Vector3(
+                    ResidentialSkybridgeAccessTreadWidth,
+                    rampThickness,
+                    Mathf.Sqrt(rampRun * rampRun + rampRise * rampRise) + rampOverlap)
+            }
+        };
+        collision.AddChild(rampCollision);
+        const float transitionOverlap = 0.06f;
+        var transitionStartZ = rampEndZ - transitionOverlap;
+        var transitionEndZ = platformNorthZ + transitionOverlap;
+        AddSkybridgeAccessCollision(
+            collision,
+            $"SkybridgeAccessTransitionCollision_T{towerIndex + 1:00}",
+            new Vector3(
+                stairCenterX,
+                ResidentialSkybridgeAccessSurfaceY - ResidentialSkybridgeAccessTreadThickness * 0.5f,
+                (transitionStartZ + transitionEndZ) * 0.5f),
+            new Vector3(
+                ResidentialSkybridgeAccessTreadWidth,
+                ResidentialSkybridgeAccessTreadThickness,
+                transitionEndZ - transitionStartZ));
         AppendVisuals(treadTransforms, treadColor);
         AppendVisuals(nosingTransforms, nosingColor);
 
@@ -419,37 +450,6 @@ public partial class FreightTerminalWorld
         });
     }
 
-    private static void AppendSkybridgeAccessTreadTopFaces(
-        ICollection<Vector3> faces,
-        Vector3 center,
-        Vector3 size)
-    {
-        var half = size * 0.5f;
-        var ntl = center + new Vector3(-half.X, half.Y, -half.Z);
-        var ntr = center + new Vector3(half.X, half.Y, -half.Z);
-        var ftl = center + new Vector3(-half.X, half.Y, half.Z);
-        var ftr = center + new Vector3(half.X, half.Y, half.Z);
-
-        // Vertical triangles in one merged concave stair can catch a capsule at
-        // tread seams. Overlapping top faces preserve every physical step cleanly.
-        AppendSkybridgeAccessQuad(faces, ntl, ftl, ftr, ntr);
-    }
-
-    private static void AppendSkybridgeAccessQuad(
-        ICollection<Vector3> faces,
-        Vector3 a,
-        Vector3 b,
-        Vector3 c,
-        Vector3 d)
-    {
-        faces.Add(a);
-        faces.Add(b);
-        faces.Add(c);
-        faces.Add(a);
-        faces.Add(c);
-        faces.Add(d);
-    }
-
     private void AddResidentialSkybridgeAccessBatch(
         Node3D root,
         string name,
@@ -538,8 +538,93 @@ public partial class FreightTerminalWorld
             (from + to) * 0.5f));
     }
 
+    private async System.Threading.Tasks.Task<(
+        bool Reached,
+        float VerticalDelta,
+        float StartY,
+        float MinimumY,
+        int MaximumStallFrames)> WalkSkybridgeAccessLeg(
+        Vector3 start,
+        Vector3 target)
+    {
+        Input.ActionRelease("move_forward");
+        Input.ActionRelease("sprint");
+        _player.GlobalPosition = start;
+        _player.Velocity = Vector3.Zero;
+        _player.SetStaminaForDiagnostics(100.0f);
+        _player.RestoreMovementInput();
+        await WaitFrames(6);
+
+        var settledStart = _player.GlobalPosition;
+        var walkDirection = target - settledStart;
+        walkDirection.Y = 0.0f;
+        walkDirection = walkDirection.Normalized();
+        var previousProjection = 0.0f;
+        var minimumY = settledStart.Y;
+        var consecutiveStallFrames = 0;
+        var maximumStallFrames = 0;
+        var reached = false;
+        Input.ActionPress("move_forward");
+        for (var frame = 0; frame < 300; frame++)
+        {
+            Input.ActionPress("move_forward");
+            _player.FaceWorldPointForDiagnostics(target);
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+            minimumY = Mathf.Min(minimumY, _player.GlobalPosition.Y);
+            var delta = target - _player.GlobalPosition;
+            var horizontalDistance = new Vector2(delta.X, delta.Z).Length();
+            if (horizontalDistance < 0.65f && Mathf.Abs(delta.Y) < 0.8f)
+            {
+                reached = true;
+                break;
+            }
+            if (frame > 2 && !_player.HasMovementIntent)
+            {
+                _player.RestoreMovementInput();
+            }
+
+            var progress = _player.GlobalPosition - settledStart;
+            progress.Y = 0.0f;
+            var projection = progress.Dot(walkDirection);
+            if (frame >= 8 && horizontalDistance > 0.8f)
+            {
+                consecutiveStallFrames = projection - previousProjection < 0.005f
+                    ? consecutiveStallFrames + 1
+                    : 0;
+                maximumStallFrames = System.Math.Max(maximumStallFrames, consecutiveStallFrames);
+            }
+            previousProjection = projection;
+        }
+        Input.ActionRelease("move_forward");
+        Input.ActionRelease("sprint");
+
+        if (!reached)
+        {
+            var blockers = new List<string>();
+            for (var collisionIndex = 0; collisionIndex < _player.GetSlideCollisionCount(); collisionIndex++)
+            {
+                var collision = _player.GetSlideCollision(collisionIndex);
+                if (collision.GetCollider() is Node colliderNode)
+                {
+                    var normal = collision.GetNormal();
+                    blockers.Add($"{colliderNode.Name}@n({normal.X:0.00},{normal.Y:0.00},{normal.Z:0.00})");
+                }
+            }
+            GD.Print($"SKYBRIDGE_ACCESS_LEG_STALL start=({settledStart.X:0.00},{settledStart.Y:0.00},{settledStart.Z:0.00}) end=({_player.GlobalPosition.X:0.00},{_player.GlobalPosition.Y:0.00},{_player.GlobalPosition.Z:0.00}) target=({target.X:0.00},{target.Y:0.00},{target.Z:0.00}) ui_locked={_player.UiLocked} intent={_player.HasMovementIntent} floor={_player.IsOnFloor()} blockers={string.Join(',', blockers)}");
+        }
+
+        return (
+            reached,
+            _player.GlobalPosition.Y - settledStart.Y,
+            settledStart.Y,
+            minimumY,
+            maximumStallFrames);
+    }
+
     private async void ValidateSkybridgeAccess()
     {
+        Engine.TimeScale = 2.0;
         DisableActorsForSurvivalDiagnostics();
         await WaitFrames(5);
 
@@ -550,6 +635,9 @@ public partial class FreightTerminalWorld
             .Count();
         var stepShapes = 0;
         var platformShapes = 0;
+        var rampShapes = 0;
+        var transitionShapes = 0;
+        var concaveShapes = 0;
         var structureReady = _residentialSkybridgeAccesses.Count == expected;
         var visualsReady = true;
         var floorsReady = true;
@@ -561,16 +649,41 @@ public partial class FreightTerminalWorld
             var shapes = access.CollisionBody.GetChildren()
                 .OfType<CollisionShape3D>()
                 .ToArray();
-            var treadCollisionReady = shapes.Count(shape =>
-                shape.Name.ToString().Contains("TreadsCollision", System.StringComparison.Ordinal)
-                && shape.Shape is ConcavePolygonShape3D) == 1;
+            var rampName = $"SkybridgeAccessRampCollision_T{access.TowerIndex + 1:00}";
+            var transitionName = $"SkybridgeAccessTransitionCollision_T{access.TowerIndex + 1:00}";
+            var accessRamps = shapes.Where(shape =>
+                    shape.Name.ToString() == rampName
+                    && !shape.Disabled
+                    && shape.Shape is BoxShape3D)
+                .ToArray();
+            var accessTransitions = shapes.Where(shape =>
+                    shape.Name.ToString() == transitionName
+                    && !shape.Disabled
+                    && shape.Shape is BoxShape3D)
+                .ToArray();
+            var accessConcaveShapes = shapes.Count(shape => shape.Shape is ConcavePolygonShape3D);
+            var expectedRampAngle = -Mathf.Atan2(
+                ResidentialSkybridgeAccessSurfaceY - ResidentialSkybridgeAccessGroundY,
+                ResidentialSkybridgeAccessRun
+                    * (ResidentialSkybridgeAccessStepCount - ResidentialSkybridgeAccessTransitionStepCount)
+                    / ResidentialSkybridgeAccessStepCount);
+            var solidRampReady = accessRamps.Length == 1
+                && accessRamps[0].Shape is BoxShape3D ramp
+                && ramp.Size.X >= ResidentialSkybridgeAccessTreadWidth - 0.01f
+                && ramp.Size.Y >= 0.17f
+                && Mathf.Abs(accessRamps[0].Rotation.X - expectedRampAngle) < 0.01f
+                && accessTransitions.Length == 1
+                && accessConcaveShapes == 0;
             var accessSteps = access.StepCount;
             var accessPlatforms = shapes.Count(shape => shape.Name.ToString().Contains("Platform", System.StringComparison.Ordinal));
             stepShapes += accessSteps;
             platformShapes += accessPlatforms;
+            rampShapes += accessRamps.Length;
+            transitionShapes += accessTransitions.Length;
+            concaveShapes += accessConcaveShapes;
             structureReady &= access.StepCount == ResidentialSkybridgeAccessStepCount
                 && accessSteps == ResidentialSkybridgeAccessStepCount
-                && treadCollisionReady
+                && solidRampReady
                 && accessPlatforms == 2;
 
             var visualBatch = access.Root.GetNodeOrNull<MultiMeshInstance3D>(
@@ -589,6 +702,61 @@ public partial class FreightTerminalWorld
                 access.PlatformFeet,
                 access.BridgeFeet);
         }
+
+        var laneTraversalsReady = true;
+        var laneTraversals = 0;
+        var laneMaximumStallFrames = 0;
+        var laneMinimumAscent = float.PositiveInfinity;
+        var laneMinimumDescent = float.PositiveInfinity;
+        var laneMinimumFloorMargin = float.PositiveInfinity;
+        var requiredVerticalTravel = ResidentialSkybridgeAccessSurfaceY
+            - ResidentialSkybridgeAccessGroundY
+            - 0.7f;
+        foreach (var access in _residentialSkybridgeAccesses.OrderByDescending(access => access.TowerIndex))
+        {
+            foreach (var lateralOffset in new[] { -0.52f, 0.0f, 0.52f })
+            {
+                var laneOffset = access.Outward * lateralOffset;
+                var bottom = access.BottomFeet + laneOffset;
+                var middle = access.MidFeet + laneOffset;
+                var top = access.StairTopFeet + laneOffset;
+                var laneFloorsReady = HasSkybridgeAccessFloor(middle)
+                    && HasSkybridgeAccessFloor(top);
+
+                var ascent = await WalkSkybridgeAccessLeg(bottom, top);
+                var ascentDropMargin = ascent.MinimumY - Mathf.Min(ascent.StartY, top.Y);
+                var ascentReady = ascent.Reached
+                    && ascent.VerticalDelta > requiredVerticalTravel
+                    && ascentDropMargin > -0.35f
+                    && ascent.MaximumStallFrames <= 18;
+
+                var descent = await WalkSkybridgeAccessLeg(top, bottom);
+                var descentDropMargin = descent.MinimumY - Mathf.Min(descent.StartY, bottom.Y);
+                var descentReady = descent.Reached
+                    && -descent.VerticalDelta > requiredVerticalTravel
+                    && descentDropMargin > -0.35f
+                    && descent.MaximumStallFrames <= 18;
+
+                laneTraversals++;
+                laneMaximumStallFrames = System.Math.Max(
+                    laneMaximumStallFrames,
+                    System.Math.Max(ascent.MaximumStallFrames, descent.MaximumStallFrames));
+                laneMinimumAscent = Mathf.Min(laneMinimumAscent, ascent.VerticalDelta);
+                laneMinimumDescent = Mathf.Min(laneMinimumDescent, -descent.VerticalDelta);
+                laneMinimumFloorMargin = Mathf.Min(
+                    laneMinimumFloorMargin,
+                    Mathf.Min(ascentDropMargin, descentDropMargin));
+                laneTraversalsReady &= laneFloorsReady && ascentReady && descentReady;
+                GD.Print($"SKYBRIDGE_ACCESS_LANE tower={access.TowerIndex + 1:00} offset={lateralOffset:0.00} valid={laneFloorsReady && ascentReady && descentReady} floors={laneFloorsReady} ascent={ascent.Reached}/{ascent.VerticalDelta:0.00} descent={descent.Reached}/{-descent.VerticalDelta:0.00} stall={ascent.MaximumStallFrames}/{descent.MaximumStallFrames} floor_margin={Mathf.Min(ascentDropMargin, descentDropMargin):0.00}");
+            }
+        }
+        if (_residentialSkybridgeAccesses.Count == 0)
+        {
+            laneMinimumAscent = 0.0f;
+            laneMinimumDescent = 0.0f;
+            laneMinimumFloorMargin = 0.0f;
+        }
+        Engine.TimeScale = 1.0;
 
         var walkedRoutes = 0;
         var reached = 0;
@@ -623,6 +791,7 @@ public partial class FreightTerminalWorld
                 var reachedWaypoint = false;
                 for (var frame = 0; frame < 240; frame++)
                 {
+                    Input.ActionPress("move_forward");
                     _player.FaceWorldPointForDiagnostics(waypoint);
                     var delta = waypoint - _player.GlobalPosition;
                     var horizontalDistance = new Vector2(delta.X, delta.Z).Length();
@@ -850,11 +1019,16 @@ public partial class FreightTerminalWorld
             && distinctTowers == expected
             && stepShapes == expected * ResidentialSkybridgeAccessStepCount
             && platformShapes == expected * 2
+            && rampShapes == expected
+            && transitionShapes == expected
+            && concaveShapes == 0
             && visualsReady
             && floorsReady
             && clearanceReady
             && bridgeEntriesReady
             && platformVisualsSeparated
+            && laneTraversals == expected * 3
+            && laneTraversalsReady
             && walked
             && lowFurnitureVaulted
             && sawVaultRise
@@ -862,8 +1036,9 @@ public partial class FreightTerminalWorld
             && sawVaultSettle
             && blockedVaultRejected
             && highVaultRejected;
-        GD.Print($"SKYBRIDGE_ACCESS_CHECK valid={valid} accesses={_residentialSkybridgeAccesses.Count}/{expected} towers={distinctTowers}/{expected} steps={stepShapes}/{expected * ResidentialSkybridgeAccessStepCount} platforms={platformShapes}/{expected * 2} structure={structureReady} visuals={visualsReady} platform_layers={platformVisualsSeparated} floors={floorsReady} clearance={clearanceReady} bridge_entries={bridgeEntriesReady} walk={walked} walked_routes={walkedRoutes}/{expected} reached={reached}/{expected * waypointsPerRoute} min_walk_h={minimumWalkGain:0.00} low_furniture_vault={lowFurnitureVaulted} vault_started={lowFurnitureVaultStarted} vault_phases={sawVaultRise}/{sawVaultCross}/{sawVaultSettle} vault_timeout={lowFurnitureVaultTimedOut} vault_wait_frames={vaultWaitFrames} blocked_vault_rejected={blockedVaultRejected} blocked_vault_result={blockedVaultResult} high_vault_rejected={highVaultRejected}");
+        GD.Print($"SKYBRIDGE_ACCESS_CHECK valid={valid} accesses={_residentialSkybridgeAccesses.Count}/{expected} towers={distinctTowers}/{expected} steps={stepShapes}/{expected * ResidentialSkybridgeAccessStepCount} ramps={rampShapes}/{expected} transitions={transitionShapes}/{expected} concave={concaveShapes} platforms={platformShapes}/{expected * 2} structure={structureReady} visuals={visualsReady} platform_layers={platformVisualsSeparated} floors={floorsReady} clearance={clearanceReady} bridge_entries={bridgeEntriesReady} lanes={laneTraversals}/{expected * 3} lanes_ready={laneTraversalsReady} lane_stall={laneMaximumStallFrames}/18 lane_ascent={laneMinimumAscent:0.00} lane_descent={laneMinimumDescent:0.00} lane_floor_margin={laneMinimumFloorMargin:0.00} walk={walked} walked_routes={walkedRoutes}/{expected} reached={reached}/{expected * waypointsPerRoute} min_walk_h={minimumWalkGain:0.00} low_furniture_vault={lowFurnitureVaulted} vault_started={lowFurnitureVaultStarted} vault_phases={sawVaultRise}/{sawVaultCross}/{sawVaultSettle} vault_timeout={lowFurnitureVaultTimedOut} vault_wait_frames={vaultWaitFrames} blocked_vault_rejected={blockedVaultRejected} blocked_vault_result={blockedVaultResult} high_vault_rejected={highVaultRejected}");
         GD.Print($"SKYBRIDGE_ACCESS_PASS valid={valid}");
+        Engine.TimeScale = 1.0;
         GetTree().Quit(valid ? 0 : 2);
     }
 

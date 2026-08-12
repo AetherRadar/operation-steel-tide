@@ -1313,6 +1313,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             {
                 continue;
             }
+            var normal = hit["normal"].AsVector3();
+            if (normal.Dot(Vector3.Up) < 0.96f)
+            {
+                continue;
+            }
             var land = hit["position"].AsVector3();
             var lift = land.Y - GlobalPosition.Y;
             if (lift > bestLift && lift <= maxStep)
