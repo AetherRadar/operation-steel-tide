@@ -7,17 +7,24 @@ public enum ExtractionAircraftPhase
     Hidden,
     Inbound,
     Boarding,
-    Departing
+    Departing,
+    Arrived
 }
 
 [GlobalClass]
 public partial class ExtractionAircraft : Node3D
 {
     public const float ArrivalDuration = 6.4f;
+    public const float TransferDuration = 9.2f;
 
     public Vector3 PadPosition { get; set; }
     public ExtractionAircraftPhase Phase { get; private set; } = ExtractionAircraftPhase.Hidden;
     public bool BoardingReady => Phase == ExtractionAircraftPhase.Boarding;
+    public bool DestinationReached => Phase == ExtractionAircraftPhase.Arrived;
+    public Camera3D CinematicCamera => _cinematicCamera;
+    public Marker3D PlayerSeat => _passengerSeats[0];
+    public int PassengerSeatCount => _passengerSeats.Length;
+    public bool PlayerPassengerVisible => IsInstanceValid(_playerPassengerAvatar) && _playerPassengerAvatar.Visible;
     public float ArrivalProgress => Phase == ExtractionAircraftPhase.Inbound
         ? Mathf.Clamp(_phaseElapsed / ArrivalDuration, 0.0f, 1.0f)
         : Phase == ExtractionAircraftPhase.Hidden ? 0.0f : 1.0f;
@@ -27,11 +34,17 @@ public partial class ExtractionAircraft : Node3D
     private Node3D _rightRotor = null!;
     private Node3D _ramp = null!;
     private Node3D _dust = null!;
+    private Node3D _cabinVisual = null!;
+    private Camera3D _cinematicCamera = null!;
+    private readonly Marker3D[] _passengerSeats = new Marker3D[3];
+    private Node3D _playerPassengerAvatar = null!;
+    private StandardMaterial3D _playerPassengerMaterial = null!;
     private AudioStreamPlayer3D _rotorAudio = null!;
     private Vector3 _startPosition;
     private Vector3 _departureStart;
     private Vector3 _departureTarget;
     private float _phaseElapsed;
+    private bool _landAtDepartureTarget;
 
     public override void _Ready()
     {
@@ -53,6 +66,8 @@ public partial class ExtractionAircraft : Node3D
         _phaseElapsed = 0.0f;
         Phase = ExtractionAircraftPhase.Inbound;
         Visible = true;
+        _visual.Visible = true;
+        _cabinVisual.Visible = false;
         _ramp.Rotation = Vector3.Zero;
         _dust.Visible = false;
         SetProcess(true);
@@ -68,17 +83,36 @@ public partial class ExtractionAircraft : Node3D
         {
             return;
         }
-        BeginDeparture(PadPosition + new Vector3(72.0f, 32.0f, 66.0f));
+        BeginDeparture(PadPosition + new Vector3(72.0f, 32.0f, 66.0f), false);
     }
 
     public void BeginDeparture()
     {
-        BeginDeparture(PadPosition + new Vector3(-96.0f, 42.0f, -78.0f));
+        BeginDeparture(PadPosition + new Vector3(-96.0f, 42.0f, -78.0f), false);
+    }
+
+    public void BeginTransferTo(Vector3 destination)
+    {
+        BeginDeparture(destination, true);
+    }
+
+    public Marker3D SquadSeat(int squadIndex)
+    {
+        return _passengerSeats[Mathf.Clamp(squadIndex + 1, 1, _passengerSeats.Length - 1)];
+    }
+
+    public void ShowPlayerPassenger(Color accent)
+    {
+        _playerPassengerMaterial.AlbedoColor = accent.Darkened(0.34f);
+        _playerPassengerMaterial.Emission = accent.Darkened(0.72f);
+        _playerPassengerAvatar.Visible = true;
     }
 
     public void ForceBoardingReadyForValidation()
     {
         Visible = true;
+        _visual.Visible = true;
+        _cabinVisual.Visible = false;
         Position = BoardingPosition();
         Rotation = Vector3.Zero;
         _phaseElapsed = ArrivalDuration;
@@ -97,12 +131,15 @@ public partial class ExtractionAircraft : Node3D
         AdvanceFlight(Mathf.Max(0.0f, delta));
     }
 
-    private void BeginDeparture(Vector3 target)
+    private void BeginDeparture(Vector3 target, bool landAtTarget)
     {
         _departureStart = Position;
         _departureTarget = target;
+        _landAtDepartureTarget = landAtTarget;
         _phaseElapsed = 0.0f;
         Phase = ExtractionAircraftPhase.Departing;
+        _visual.Visible = !landAtTarget;
+        _cabinVisual.Visible = landAtTarget;
         _ramp.Rotation = Vector3.Zero;
         _dust.Visible = true;
         SetProcess(true);
@@ -165,17 +202,41 @@ public partial class ExtractionAircraft : Node3D
 
     private void UpdateDeparture()
     {
-        const float duration = 3.8f;
+        var duration = _landAtDepartureTarget ? TransferDuration : 3.8f;
         var t = Mathf.Clamp(_phaseElapsed / duration, 0.0f, 1.0f);
         var eased = t * t * (3.0f - 2.0f * t);
-        Position = _departureStart.Lerp(_departureTarget, eased) + Vector3.Up * (Mathf.Sin(t * Mathf.Pi) * 8.0f);
+        var route = _departureTarget - _departureStart;
+        var cruiseLift = _landAtDepartureTarget
+            ? Mathf.Clamp(new Vector2(route.X, route.Z).Length() * 0.12f, 58.0f, 82.0f)
+            : 8.0f;
+        Position = _departureStart.Lerp(_departureTarget, eased)
+            + Vector3.Up * (Mathf.Sin(t * Mathf.Pi) * cruiseLift);
+        var routeYaw = route.LengthSquared() > 0.001f
+            ? Mathf.Atan2(-route.X, -route.Z)
+            : 0.0f;
+        var landingBlend = Mathf.SmoothStep(0.0f, 1.0f, Mathf.Clamp((t - 0.78f) / 0.22f, 0.0f, 1.0f));
+        var yaw = _landAtDepartureTarget
+            ? Mathf.LerpAngle(routeYaw, 0.0f, landingBlend)
+            : Mathf.LerpAngle(0.0f, 2.28f, eased);
         Rotation = new Vector3(
-            Mathf.Lerp(0.0f, -0.08f, eased),
-            Mathf.LerpAngle(0.0f, 2.28f, eased),
-            Mathf.Lerp(0.0f, 0.12f, eased));
-        _dust.Visible = t < 0.38f;
+            -Mathf.Sin(t * Mathf.Pi) * 0.08f,
+            yaw,
+            Mathf.Sin(t * Mathf.Pi) * 0.08f);
+        _dust.Visible = t < 0.22f || (_landAtDepartureTarget && t > 0.82f);
         if (t < 1.0f)
         {
+            return;
+        }
+
+        Position = _departureTarget;
+        Rotation = Vector3.Zero;
+        if (_landAtDepartureTarget)
+        {
+            Phase = ExtractionAircraftPhase.Arrived;
+            _ramp.Rotation = new Vector3(-0.58f, 0.0f, 0.0f);
+            _dust.Visible = true;
+            _rotorAudio.Stop();
+            SetProcess(false);
             return;
         }
 
@@ -223,7 +284,7 @@ public partial class ExtractionAircraft : Node3D
         MeshBox(_visual, new Vector3(0, 0.42f, -0.4f), new Vector3(8.7f, 0.18f, 2.45f), charcoal);
         MeshBox(_visual, new Vector3(0, 0.68f, 3.4f), new Vector3(3.8f, 0.14f, 1.35f), charcoal);
         MeshBox(_visual, new Vector3(0, 1.25f, 3.68f), new Vector3(0.18f, 1.75f, 1.25f), steel, new Vector3(-0.18f, 0, 0));
-        MeshBox(_visual, new Vector3(0, 0.62f, -0.2f), new Vector3(2.78f, 0.11f, 4.8f), rescue);
+        MeshBox(_visual, new Vector3(0, 1.12f, -0.2f), new Vector3(2.78f, 0.11f, 4.8f), rescue);
 
         _leftRotor = BuildRotor(_visual, new Vector3(-3.55f, 0.7f, -0.5f), charcoal, steel, warm);
         _rightRotor = BuildRotor(_visual, new Vector3(3.55f, 0.7f, -0.5f), charcoal, steel, warm);
@@ -264,6 +325,7 @@ public partial class ExtractionAircraft : Node3D
             SpotAngle = 42.0f,
             ShadowEnabled = false
         });
+        BuildPassengerCabin(charcoal, steel, rescue);
         _dust = new Node3D { Name = "RotorWash", Position = new Vector3(0, -2.25f, 0) };
         _visual.AddChild(_dust);
         var dustMaterial = Material(new Color(0.55f, 0.52f, 0.43f, 0.22f), 0.0f, 1.0f);
@@ -287,6 +349,84 @@ public partial class ExtractionAircraft : Node3D
             MaxDistance = 145.0f
         };
         AddChild(_rotorAudio);
+    }
+
+    private void BuildPassengerCabin(
+        StandardMaterial3D charcoal,
+        StandardMaterial3D steel,
+        StandardMaterial3D rescue)
+    {
+        _cabinVisual = new Node3D { Name = "PassengerCabinVisual", Visible = false };
+        AddChild(_cabinVisual);
+        var seatPositions = new[]
+        {
+            new Vector3(0.7f, -0.78f, -0.35f),
+            new Vector3(-0.7f, -0.78f, -0.35f),
+            new Vector3(0.0f, -0.78f, -0.35f)
+        };
+        for (var i = 0; i < seatPositions.Length; i++)
+        {
+            var seat = new Marker3D
+            {
+                Name = i == 0 ? "PlayerPassengerSeat" : $"SquadPassengerSeat_{i}",
+                Position = seatPositions[i],
+                Rotation = new Vector3(0.0f, Mathf.Pi, 0.0f)
+            };
+            _cabinVisual.AddChild(seat);
+            _passengerSeats[i] = seat;
+            MeshBox(_cabinVisual, seatPositions[i] + new Vector3(0, -0.12f, 0.08f), new Vector3(0.56f, 0.12f, 0.52f), charcoal);
+            MeshBox(_cabinVisual, seatPositions[i] + new Vector3(0, 0.35f, -0.3f), new Vector3(0.56f, 0.82f, 0.1f), charcoal);
+        }
+
+        var cabin = Material(new Color(0.035f, 0.052f, 0.05f), 0.5f, 0.48f);
+        cabin.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+        MeshBox(_cabinVisual, new Vector3(0, -1.02f, 0.35f), new Vector3(2.35f, 0.1f, 4.0f), cabin);
+        MeshBox(_cabinVisual, new Vector3(0, 1.0f, 0.25f), new Vector3(2.35f, 0.08f, 3.8f), cabin);
+        MeshBox(_cabinVisual, new Vector3(0, 0.0f, -1.62f), new Vector3(2.3f, 1.95f, 0.08f), cabin);
+        for (var z = -1.15f; z <= 1.55f; z += 0.9f)
+        {
+            MeshBox(_cabinVisual, new Vector3(-1.13f, 0.0f, z), new Vector3(0.08f, 1.85f, 0.45f), cabin);
+            MeshBox(_cabinVisual, new Vector3(1.13f, 0.0f, z), new Vector3(0.08f, 1.85f, 0.45f), cabin);
+        }
+        _cabinVisual.AddChild(new OmniLight3D
+        {
+            Name = "CabinLight",
+            Position = new Vector3(0.0f, 0.72f, 0.5f),
+            LightColor = new Color(0.35f, 1.0f, 0.68f),
+            LightEnergy = 0.9f,
+            OmniRange = 4.5f,
+            ShadowEnabled = false
+        });
+
+        _playerPassengerMaterial = Material(new Color(0.08f, 0.42f, 0.28f), 0.18f, 0.62f, new Color(0.01f, 0.08f, 0.05f));
+        _playerPassengerAvatar = new Node3D
+        {
+            Name = "PlayerPassengerAvatar",
+            Position = new Vector3(0.0f, 0.52f, 0.02f),
+            Visible = false
+        };
+        _passengerSeats[0].AddChild(_playerPassengerAvatar);
+        MeshBox(_playerPassengerAvatar, new Vector3(0, 0.22f, 0), new Vector3(0.5f, 0.75f, 0.32f), _playerPassengerMaterial);
+        Part(
+            _playerPassengerAvatar,
+            new SphereMesh { Radius = 0.22f, Height = 0.44f, RadialSegments = 12, Rings = 6 },
+            new Vector3(0, 0.78f, 0),
+            Vector3.Zero,
+            steel);
+        MeshBox(_playerPassengerAvatar, new Vector3(-0.34f, 0.18f, 0.04f), new Vector3(0.16f, 0.68f, 0.16f), rescue, new Vector3(0, 0, -0.42f));
+        MeshBox(_playerPassengerAvatar, new Vector3(0.34f, 0.18f, 0.04f), new Vector3(0.16f, 0.68f, 0.16f), rescue, new Vector3(0, 0, 0.42f));
+
+        _cinematicCamera = new Camera3D
+        {
+            Name = "ExtractionCinematicCamera",
+            Position = new Vector3(0.0f, 0.62f, 2.45f),
+            Fov = 64.0f,
+            Near = 0.05f,
+            Far = 1400.0f,
+            Current = false
+        };
+        AddChild(_cinematicCamera);
+        _cinematicCamera.LookAt(new Vector3(0.0f, 0.08f, -0.35f), Vector3.Up);
     }
 
     private static Node3D BuildRotor(

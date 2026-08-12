@@ -22,6 +22,13 @@ public partial class CombatHUD : CanvasLayer
     [Signal] public delegate void LootClosedEventHandler();
     [Signal] public delegate void WeaponSlotRequestedEventHandler(int slot);
     [Signal] public delegate void InventoryToggleRequestedEventHandler();
+    [Signal] public delegate void OperationsQuickStartRequestedEventHandler();
+    [Signal] public delegate void DemolitionModeRequestedEventHandler();
+    [Signal] public delegate void DemolitionDeploymentRequestedEventHandler(int role);
+    [Signal] public delegate void DemolitionBackRequestedEventHandler();
+    [Signal] public delegate void OperationsHomeRequestedEventHandler();
+
+    private Control _gameplayHudRoot = null!;
 
     private Label _healthLabel = null!;
     private Label _armorLabel = null!;
@@ -46,6 +53,7 @@ public partial class CombatHUD : CanvasLayer
     private ColorRect _stateOverlay = null!;
     private Label _stateTitle = null!;
     private Label _stateSubtitle = null!;
+    public bool IsMissionResultVisible => IsInstanceValid(_stateOverlay) && _stateOverlay.Visible;
     private ColorRect _downedBanner = null!;
     private Label _downedTitle = null!;
     private Label _downedSubtitle = null!;
@@ -140,7 +148,7 @@ public partial class CombatHUD : CanvasLayer
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (IsSquadLobbyVisible)
+        if (IsSquadLobbyVisible || IsOperationsOfficeVisible || IsDemolitionBriefingVisible)
         {
             return;
         }
@@ -199,12 +207,20 @@ public partial class CombatHUD : CanvasLayer
 
     private void BuildHud()
     {
-        var root = new Control
+        var canvasRoot = new Control
         {
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
-        root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        AddChild(root);
+        canvasRoot.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        AddChild(canvasRoot);
+
+        _gameplayHudRoot = new Control
+        {
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
+        _gameplayHudRoot.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        canvasRoot.AddChild(_gameplayHudRoot);
+        var root = _gameplayHudRoot;
 
         var damageOverlay = new ColorRect
         {
@@ -491,7 +507,8 @@ public partial class CombatHUD : CanvasLayer
         _stateOverlay.AddChild(_stateSubtitle);
         BuildPauseMenu(root);
         BuildLootOverlay(root);
-        BuildSquadHud(root);
+        BuildSquadHud(canvasRoot);
+        BuildOperationsOfficeHud(canvasRoot);
         root.MoveChild(_lootOverlay, root.GetChildCount() - 1);
     }
 
@@ -1327,6 +1344,7 @@ public partial class CombatHUD : CanvasLayer
         }
         UpdateWeaponSlotButtons();
         RefreshSquadLanguage();
+        RefreshOperationsOfficeLanguage();
         RefreshMedicalLanguage();
         RefreshTacticalLanguage();
         RefreshExtractionLanguage();
@@ -1606,6 +1624,8 @@ public partial class CombatHUD : CanvasLayer
         int wallet = 0,
         bool profileSaved = true)
     {
+        HideOperationsMenus();
+        _gameplayHudRoot.Visible = true;
         _downedBanner.Visible = false;
         _stateOverlay.Visible = true;
         if (victory)

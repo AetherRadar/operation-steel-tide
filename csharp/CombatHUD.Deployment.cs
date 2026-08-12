@@ -460,6 +460,7 @@ public partial class CombatHUD
             ? 0
             : DeploymentCatalog.NormalizeAmmoQuantity(profile.LastAmmoQuantity, weapon.ReserveAmmo);
         RefreshDeploymentStore();
+        RefreshOperationsOfficeProfile();
     }
 
     public void ShowDeploymentPurchaseError(string reason)

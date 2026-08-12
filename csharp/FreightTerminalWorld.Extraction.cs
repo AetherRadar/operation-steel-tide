@@ -11,12 +11,15 @@ public partial class FreightTerminalWorld
     private bool _extractionPlayerInside;
     private bool _extractionDeparturePlaying;
     private bool _skipExtractionCinematicForValidation;
+    private int _extractionBoardedSquadmates;
     private float _extractionRemaining = ExtractionCountdownDuration;
     private SquadOrder _preExtractionSquadOrder = SquadOrder.Follow;
     private Vector3 _preExtractionSquadMovePoint;
 
     public bool IsExtractionCountdownActive => _extractionCountdownActive;
     public bool IsExtractionDeparturePlaying => _extractionDeparturePlaying;
+    public int ExtractionBoardedSquadmateCount => _extractionBoardedSquadmates;
+    public bool IsExtractionAtOperationsOffice => _extractionAircraft?.DestinationReached == true;
 
     private void BuildExtractionAircraft()
     {
@@ -30,7 +33,7 @@ public partial class FreightTerminalWorld
 
     private void TryBeginExtractionSequence(Node3D body)
     {
-        if (body != _player || _missionEnded)
+        if (body != _player || _missionEnded || _demolitionMode)
         {
             return;
         }
@@ -54,6 +57,10 @@ public partial class FreightTerminalWorld
 
     private void UpdateExtractionSequence(float delta)
     {
+        if (_demolitionMode)
+        {
+            return;
+        }
         if (!IsInstanceValid(_player) || !_player.IsInsideTree()
             || !IsInstanceValid(_hud) || !_hud.IsInsideTree())
         {
@@ -221,16 +228,47 @@ public partial class FreightTerminalWorld
         _player.DisarmFireInput();
         _player.DisarmMovementInput();
         _hud.HideExtractionCountdown();
-        _extractionAircraft?.BeginDeparture();
-        BoardReadySquadmates();
+        var aircraft = _extractionAircraft;
+        if (aircraft is null || !IsInstanceValid(aircraft))
+        {
+            FinishExtractionMission();
+            return;
+        }
+
+        BoardExtractionSquad();
+        aircraft.BeginTransferTo(OperationsOfficeHelipad);
+        aircraft.CinematicCamera.MakeCurrent();
+        _hud.SetExtractionCinematicVisible(true);
         _hud.ShowLocalizedMessage(
             "extraction_departing",
-            "SQUAD ABOARD  //  CLEARING THE COMBAT ZONE",
+            "SQUAD ABOARD  //  TRANSFER TO OPERATIONS OFFICE",
             new Color(0.36f, 1.0f, 0.7f));
 
+        if (_skipExtractionCinematicForValidation)
+        {
+            aircraft.AdvanceForValidation(ExtractionAircraft.TransferDuration + 0.1f);
+        }
+        while (IsInsideTree() && IsInstanceValid(aircraft) && !aircraft.DestinationReached)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+        if (!IsInsideTree())
+        {
+            return;
+        }
+        if (!IsInstanceValid(aircraft))
+        {
+            FinishExtractionMission();
+            return;
+        }
+
+        _hud.ShowLocalizedMessage(
+            "extraction_arrived",
+            "OPERATIONS OFFICE REACHED  //  TOUCHDOWN CONFIRMED",
+            new Color(0.4f, 0.92f, 0.74f));
         if (!_skipExtractionCinematicForValidation)
         {
-            await ToSignal(GetTree().CreateTimer(2.4f), SceneTreeTimer.SignalName.Timeout);
+            await ToSignal(GetTree().CreateTimer(1.15f), SceneTreeTimer.SignalName.Timeout);
             if (!IsInsideTree())
             {
                 return;
@@ -239,24 +277,35 @@ public partial class FreightTerminalWorld
         FinishExtractionMission();
     }
 
-    private void BoardReadySquadmates()
+    private void BoardExtractionSquad()
     {
+        _extractionBoardedSquadmates = 0;
+        if (_extractionAircraft is null || !IsInstanceValid(_extractionAircraft))
+        {
+            return;
+        }
+
+        _extractionAircraft.ShowPlayerPassenger(OperatorRoles.Spec(_player.Role).Accent);
+        _player.BoardExtractionSeat(_extractionAircraft.PlayerSeat);
         foreach (var mate in _squadMates)
         {
             if (!IsInstanceValid(mate) || !mate.IsInsideTree() || mate.IsDowned || mate.IsBodyBag)
             {
                 continue;
             }
-            if (HorizontalDistance(mate.GlobalPosition, ExtractionPoint) <= 14.0f)
+            if (HorizontalDistance(mate.GlobalPosition, ExtractionPoint) <= 14.0f
+                && _extractionBoardedSquadmates < _extractionAircraft.PassengerSeatCount - 1)
             {
-                mate.Visible = false;
-                mate.SetPhysicsProcess(false);
+                ClearSquadNavigation(mate);
+                mate.BoardExtractionSeat(_extractionAircraft.SquadSeat(_extractionBoardedSquadmates));
+                _extractionBoardedSquadmates++;
             }
         }
     }
 
     private void FinishExtractionMission()
     {
+        _hud.SetExtractionCinematicVisible(false);
         _player.IsDead = true;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         _missionDirector.CompleteMission(true, _kills, _headshots, _shotsFired, _shotsHit);
@@ -316,18 +365,113 @@ public partial class FreightTerminalWorld
             && _missionPhase == earlyCallPhase;
 
         _player.GlobalPosition = ExtractionPoint + new Vector3(0, 0.12f, 1.0f);
+        for (var i = 0; i < _squadMates.Count; i++)
+        {
+            var mate = _squadMates[i];
+            if (IsInstanceValid(mate) && !mate.IsDowned && !mate.IsBodyBag)
+            {
+                mate.GlobalPosition = ExtractionPoint + new Vector3(-1.8f + i * 3.6f, 0.12f, 2.2f);
+                mate.Velocity = Vector3.Zero;
+            }
+        }
         TryBeginExtractionSequence(_player);
         _extractionAircraft?.AdvanceForValidation(ExtractionAircraft.ArrivalDuration + 0.1f);
         UpdateExtractionSequence(0.1f);
         var aircraftArrived = _extractionAircraft?.BoardingReady == true;
         var boardingShown = aircraftArrived && _hud.ExtractionAircraftReady;
-        _skipExtractionCinematicForValidation = true;
         UpdateExtractionSequence(ExtractionCountdownDuration + 0.2f);
-        var completed = _missionEnded && !_extractionCountdownActive && _extractionAircraft?.Phase == ExtractionAircraftPhase.Departing;
+        var departureStarted = _missionEnded
+            && _extractionDeparturePlaying
+            && _extractionAircraft?.Phase == ExtractionAircraftPhase.Departing;
+        var resultDelayed = !_hud.IsMissionResultVisible;
+        var playerSeated = _player.IsExtractionPassenger
+            && _player.GetParent() == _extractionAircraft?.PlayerSeat
+            && _extractionAircraft?.PlayerPassengerVisible == true
+            && _player.GlobalPosition.DistanceTo(_extractionAircraft.GlobalPosition) < 5.0f;
+        var expectedBoardedMates = Mathf.Min(_squadMates.Count, 2);
+        var squadSeated = _extractionBoardedSquadmates == expectedBoardedMates;
+        foreach (var mate in _squadMates)
+        {
+            if (IsInstanceValid(mate) && !mate.IsDowned && !mate.IsBodyBag)
+            {
+                squadSeated &= mate.IsExtractionPassenger
+                    && mate.Visible
+                    && mate.GlobalPosition.DistanceTo(_extractionAircraft!.GlobalPosition) < 5.0f;
+            }
+        }
+        var cameraFollowing = _extractionAircraft is not null
+            && GetViewport().GetCamera3D() == _extractionAircraft.CinematicCamera;
+        var cinematicHud = _hud.IsExtractionCinematicUiClear;
+        _skipExtractionCinematicForValidation = true;
+        _extractionAircraft?.AdvanceForValidation(ExtractionAircraft.TransferDuration + 0.1f);
+        await WaitFrames(2);
+        var destinationReached = _extractionAircraft?.DestinationReached == true
+            && _extractionAircraft.GlobalPosition.DistanceTo(OperationsOfficeHelipad) < 0.2f;
+        var completed = destinationReached
+            && _hud.IsMissionResultVisible
+            && !_extractionDeparturePlaying
+            && _missionPhase == "COMPLETE";
         var valid = entryStartedImmediately && countdownStarted && aircraftInbound
-            && combatPhasePreserved && leaveReset && aircraftArrived && boardingShown && completed;
-        GD.Print($"EXTRACTION_SEQUENCE_CHECK valid={valid} objective_free={entryStartedImmediately} combat_phase_preserved={combatPhasePreserved} countdown={countdownStarted} inbound={aircraftInbound} leave_reset={leaveReset} aircraft_arrived={aircraftArrived} boarding={boardingShown} completed={completed} duration={ExtractionCountdownDuration:0.0}");
+            && combatPhasePreserved && leaveReset && aircraftArrived && boardingShown
+            && departureStarted && resultDelayed && playerSeated && squadSeated
+            && cameraFollowing && cinematicHud && destinationReached && completed;
+        GD.Print($"EXTRACTION_SEQUENCE_CHECK valid={valid} objective_free={entryStartedImmediately} combat_phase_preserved={combatPhasePreserved} countdown={countdownStarted} inbound={aircraftInbound} leave_reset={leaveReset} aircraft_arrived={aircraftArrived} boarding={boardingShown} departure={departureStarted} result_delayed={resultDelayed} player_seated={playerSeated} squad_seated={squadSeated} boarded={_extractionBoardedSquadmates}/{expectedBoardedMates} camera={cameraFollowing} cinematic_hud={cinematicHud} destination={destinationReached} completed={completed} duration={ExtractionCountdownDuration:0.0} transfer={ExtractionAircraft.TransferDuration:0.0}");
         GD.Print($"EXTRACTION_SEQUENCE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private async void CaptureExtractionFlight()
+    {
+        await WaitFrames(6);
+        foreach (var enemy in _enemies)
+        {
+            if (IsInstanceValid(enemy))
+            {
+                enemy.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        foreach (var squad in _hostileSquads)
+        {
+            foreach (var member in squad.Members)
+            {
+                if (IsInstanceValid(member))
+                {
+                    member.ProcessMode = ProcessModeEnum.Disabled;
+                }
+            }
+        }
+        if (IsInstanceValid(_aircraft))
+        {
+            _aircraft.SetPhysicsProcess(false);
+        }
+        if (_extractionAircraft is null || !IsInstanceValid(_extractionAircraft))
+        {
+            GD.PushError("Extraction flight capture requires a valid friendly aircraft.");
+            GetTree().Quit(2);
+            return;
+        }
+
+        _player.GlobalPosition = ExtractionPoint + new Vector3(0.0f, 0.12f, 1.0f);
+        for (var i = 0; i < _squadMates.Count; i++)
+        {
+            var mate = _squadMates[i];
+            if (IsInstanceValid(mate) && !mate.IsDowned && !mate.IsBodyBag)
+            {
+                mate.GlobalPosition = ExtractionPoint + new Vector3(-1.8f + i * 3.6f, 0.12f, 2.2f);
+                mate.Velocity = Vector3.Zero;
+            }
+        }
+
+        TryBeginExtractionSequence(_player);
+        _extractionAircraft.ForceBoardingReadyForValidation();
+        _extractionRemaining = 0.0f;
+        UpdateExtractionSequence(0.1f);
+        await WaitFrames(2);
+        _extractionAircraft.AdvanceForValidation(ExtractionAircraft.TransferDuration * 0.48f);
+        await WaitFrames(12);
+
+        SaveViewportImage("res://extraction_flight_validation.png");
+        GD.Print($"EXTRACTION_FLIGHT_CAPTURE phase={_extractionAircraft.Phase} boarded={_extractionBoardedSquadmates} player_seated={_player.IsExtractionPassenger} camera={GetViewport().GetCamera3D() == _extractionAircraft.CinematicCamera} hud_hidden={_hud.IsExtractionCinematicUiClear} position={_extractionAircraft.GlobalPosition} path=extraction_flight_validation.png");
+        GetTree().Quit();
     }
 }

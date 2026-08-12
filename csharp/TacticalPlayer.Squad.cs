@@ -26,6 +26,7 @@ public partial class TacticalPlayer
     public float CombatHealth => Health;
     public float CombatMaxHealth => MaxHealth;
     public float CrawlSpeed => 1.15f;
+    public bool IsExtractionPassenger { get; private set; }
 
     private Node3D _roleDeviceRoot = null!;
     private Node3D _medicSprayer = null!;
@@ -56,6 +57,47 @@ public partial class TacticalPlayer
             SetRoleDeviceVisibility();
         }
         Hud?.SetClassSkill(Role, 0.0f, spec.SkillCooldown, false, false);
+    }
+
+    public void BoardExtractionSeat(Node3D seat)
+    {
+        if (!GodotObject.IsInstanceValid(seat) || IsExtractionPassenger)
+        {
+            return;
+        }
+
+        EjectFromVehicleIfAny();
+        CloseMedicalWheelWithoutUse();
+        CancelMedicalUse(false);
+        UiLocked = true;
+        DisarmFireInput();
+        DisarmMovementInput();
+        Velocity = Vector3.Zero;
+        CollisionLayer = 0;
+        CollisionMask = 0;
+        _collider.Disabled = true;
+        if (IsInstanceValid(_camera))
+        {
+            _camera.Current = false;
+        }
+        if (IsInstanceValid(_weaponRoot))
+        {
+            _weaponRoot.Visible = false;
+        }
+        if (IsInstanceValid(_knifeRoot))
+        {
+            _knifeRoot.Visible = false;
+        }
+        if (IsInstanceValid(_roleDeviceRoot))
+        {
+            _roleDeviceRoot.Visible = false;
+        }
+
+        Reparent(seat, keepGlobalTransform: false);
+        Position = Vector3.Zero;
+        Rotation = Vector3.Zero;
+        IsExtractionPassenger = true;
+        SetPhysicsProcess(false);
     }
 
     public bool ActivateRoleAbility(bool broadcast = true)

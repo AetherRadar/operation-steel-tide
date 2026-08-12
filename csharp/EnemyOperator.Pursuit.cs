@@ -23,6 +23,10 @@ public partial class EnemyOperator
     private float _avoidanceSide = 1.0f;
     private Vector3 _pursuitProgressOrigin;
     private float _pursuitProgressTimer;
+    private bool _scriptedObjectiveAvoiding;
+    private float _scriptedObjectiveSide = 1.0f;
+    private Vector3 _scriptedObjectiveProgressOrigin;
+    private float _scriptedObjectiveProgressTimer;
 
     private float CurrentPursuitDuration => IsWorldBoss ? 28.0f : IsRivalSquad ? RivalPursuitSeconds : GarrisonPursuitSeconds;
 
@@ -298,6 +302,96 @@ public partial class EnemyOperator
             side = -side;
         }
         return (direction * 0.28f + side).Normalized();
+    }
+
+    internal void ResetScriptedObjectiveNavigation()
+    {
+        _scriptedObjectiveAvoiding = false;
+        _scriptedObjectiveSide = _avoidanceSide;
+        _scriptedObjectiveProgressOrigin = GlobalPosition;
+        _scriptedObjectiveProgressTimer = 0.0f;
+    }
+
+    internal Vector3 ResolveScriptedObjectiveDirection(Vector3 objective, float delta)
+    {
+        var target = new Vector3(objective.X, GlobalPosition.Y, objective.Z);
+        var direction = GlobalPosition.DirectionTo(target);
+        direction.Y = 0.0f;
+        var distance = GlobalPosition.DistanceTo(target);
+        if (direction.LengthSquared() < 0.01f || distance < 0.15f)
+        {
+            return Vector3.Zero;
+        }
+        direction = direction.Normalized();
+
+        _scriptedObjectiveProgressTimer += delta;
+        if (_scriptedObjectiveProgressTimer >= 0.65f)
+        {
+            var progress = GlobalPosition.DistanceTo(_scriptedObjectiveProgressOrigin);
+            if (_scriptedObjectiveAvoiding && progress < 0.24f)
+            {
+                _scriptedObjectiveSide *= -1.0f;
+            }
+            _scriptedObjectiveProgressOrigin = GlobalPosition;
+            _scriptedObjectiveProgressTimer = 0.0f;
+        }
+
+        var directDistance = Mathf.Min(distance, 18.0f);
+        if (MeasureStaticCorridorClearance(direction, directDistance) >= directDistance - 0.08f)
+        {
+            _scriptedObjectiveAvoiding = false;
+            return direction;
+        }
+
+        var right = new Vector3(-direction.Z, 0.0f, direction.X);
+        if (!_scriptedObjectiveAvoiding)
+        {
+            var rightDirection = (right + direction * 0.18f).Normalized();
+            var leftDirection = (-right + direction * 0.18f).Normalized();
+            var rightScore = MeasureStaticCorridorClearance(rightDirection, 4.2f);
+            var leftScore = MeasureStaticCorridorClearance(leftDirection, 4.2f);
+            _scriptedObjectiveSide = rightScore >= leftScore ? 1.0f : -1.0f;
+            _scriptedObjectiveAvoiding = true;
+        }
+
+        var side = right * _scriptedObjectiveSide;
+        if (MeasureStaticCorridorClearance(side, 1.25f) < 0.72f)
+        {
+            _scriptedObjectiveSide *= -1.0f;
+            side = -side;
+        }
+        return (side + direction * 0.16f).Normalized();
+    }
+
+    internal bool IsScriptedObjectiveCorridorClear(Vector3 objective)
+    {
+        var target = new Vector3(objective.X, GlobalPosition.Y, objective.Z);
+        var offset = target - GlobalPosition;
+        offset.Y = 0.0f;
+        var distance = offset.Length();
+        return distance <= 0.15f
+            || MeasureStaticCorridorClearance(offset.Normalized(), distance) >= distance - 0.08f;
+    }
+
+    private float MeasureStaticCorridorClearance(Vector3 direction, float maxDistance)
+    {
+        direction = direction.Normalized();
+        var side = new Vector3(-direction.Z, 0.0f, direction.X) * 0.32f;
+        var minimum = maxDistance;
+        foreach (var offset in new[] { Vector3.Zero, side, -side })
+        {
+            var from = GlobalPosition + Vector3.Up * 0.78f + offset;
+            var query = PhysicsRayQueryParameters3D.Create(from, from + direction * maxDistance);
+            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+            query.CollideWithAreas = false;
+            query.CollisionMask = 1;
+            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+            if (hit.Count > 0)
+            {
+                minimum = Mathf.Min(minimum, from.DistanceTo(hit["position"].AsVector3()));
+            }
+        }
+        return minimum;
     }
 
     private float MeasureStaticClearance(Vector3 direction, float maxDistance)

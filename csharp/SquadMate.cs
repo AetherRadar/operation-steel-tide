@@ -16,8 +16,9 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     public long NetworkPeerId { get; private set; }
     public bool IsDowned { get; private set; }
     public bool ReviveUsed { get; private set; }
-    /// <summary>Second death after revive budget is spent — converted to a lootable body bag.</summary>
+    /// <summary>Second death after revive budget is spent becomes a lootable body bag.</summary>
     public bool IsBodyBag { get; private set; }
+    public bool IsExtractionPassenger { get; private set; }
     public float Health { get; private set; }
     public float MaxHealth { get; private set; }
     public float SkillCooldownRemaining => _skillCooldown;
@@ -163,6 +164,52 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
         OnSquadOrderChanged();
         UpdateLabel();
+    }
+
+    public void BoardExtractionSeat(Node3D seat)
+    {
+        if (!GodotObject.IsInstanceValid(seat) || IsExtractionPassenger || IsDowned || IsBodyBag)
+        {
+            return;
+        }
+
+        _revivingLeader = false;
+        Velocity = Vector3.Zero;
+        CollisionLayer = 0;
+        CollisionMask = 0;
+        foreach (var child in GetChildren())
+        {
+            if (child is CollisionShape3D collision)
+            {
+                collision.Disabled = true;
+            }
+        }
+        if (IsInstanceValid(_nameLabel))
+        {
+            _nameLabel.Visible = false;
+        }
+        if (IsInstanceValid(_healthFill))
+        {
+            _healthFill.Visible = false;
+        }
+        if (IsInstanceValid(_roleDevice))
+        {
+            _roleDevice.Visible = false;
+        }
+        if (IsInstanceValid(_rig))
+        {
+            _rig.Visible = true;
+            _rig.Position = new Vector3(0.0f, -0.12f, 0.0f);
+            _rig.Rotation = Vector3.Zero;
+            _rig.Scale = Vector3.One * 0.82f;
+        }
+
+        Reparent(seat, keepGlobalTransform: false);
+        Position = Vector3.Zero;
+        Rotation = Vector3.Zero;
+        Visible = true;
+        IsExtractionPassenger = true;
+        SetPhysicsProcess(false);
     }
 
     public bool IsRevivingLeader => _revivingLeader;

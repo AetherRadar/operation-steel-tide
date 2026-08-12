@@ -498,6 +498,12 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
         UpdatePursuitTimers(dt);
         AcquireCombatTarget();
+        if (Main?.TryHandleDemolitionDefenderMovement(this, dt, EngageTargetNode) == true)
+        {
+            MoveAndSlide();
+            AnimateBody(dt);
+            return;
+        }
         UpdateDownedFinishLock(dt);
         UpdateWorldBossState(dt);
         var velocity = Velocity;

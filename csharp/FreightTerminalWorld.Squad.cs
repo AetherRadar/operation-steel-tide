@@ -50,9 +50,16 @@ public partial class FreightTerminalWorld
         var lobbyCapture = Array.Exists(args, value => value == "--capture-squad-lobby");
         var networkHostCheck = Array.Exists(args, value => value == "--validate-network-host");
         var networkClientCheck = Array.Exists(args, value => value == "--validate-network-client");
+        var operationsOfficeCommand = Array.Exists(args, value =>
+            value == "--validate-operations-office"
+            || value == "--validate-demolition"
+            || value == "--capture-operations-office"
+            || value == "--capture-demolition-briefing");
         var diagnostic = Array.Exists(args, value =>
             value.StartsWith("--capture", StringComparison.Ordinal)
-            || value.StartsWith("--validate", StringComparison.Ordinal)) && !lobbyCapture;
+            || value.StartsWith("--validate", StringComparison.Ordinal))
+            && !lobbyCapture
+            && !operationsOfficeCommand;
         if (diagnostic)
         {
             var mode = networkHostCheck
@@ -70,9 +77,6 @@ public partial class FreightTerminalWorld
             _player.DisarmFireInput();
             _player.DisarmMovementInput();
             Input.MouseMode = Input.MouseModeEnum.Visible;
-            _hud.ShowSquadLobby(GameLocalization.IsChinese(_languageSetting)
-                ? "\u672c\u5730\u5c0f\u961f  //  3 \u4eba\u7f16\u5236  //  \u4f60\u9009\u804c\u4e1a\uff0cAI \u8865\u9f50\u5176\u4f59"
-                : "LOCAL SQUAD  //  3 OPERATORS  //  YOU PICK  //  AI FILLS THE REST");
         }
     }
 
@@ -121,6 +125,7 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        ActivateBattlefieldFromOperationsOffice();
         _player.ConfigureRole(role);
         _player.UiLocked = false;
         _player.DisarmFireInput();
@@ -1316,6 +1321,16 @@ public partial class FreightTerminalWorld
     {
         if (_missionEnded)
         {
+            return;
+        }
+        if (_demolitionMode)
+        {
+            FinishDemolitionRound(
+                false,
+                GameLocalization.Get(
+                    "demolition_attackers_eliminated",
+                    _languageSetting,
+                    "ATTACKING SQUAD ELIMINATED"));
             return;
         }
         _missionEnded = true;

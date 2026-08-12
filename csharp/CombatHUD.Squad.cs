@@ -19,6 +19,7 @@ public partial class CombatHUD
     private Button _localSquadButton = null!;
     private Button _hostSquadButton = null!;
     private Button _joinSquadButton = null!;
+    private Button _squadLobbyBackButton = null!;
     private Button _deploySquadButton = null!;
     private Label _roleCaption = null!;
     private readonly Button[] _roleButtons = new Button[3];
@@ -43,6 +44,8 @@ public partial class CombatHUD
     private float _displayedCooldownMax = 1.0f;
     private bool _displayedSkillActive;
     private bool _displayedSkillAction;
+
+    public bool SquadLobbyHomeUiReady => IsInstanceValid(_squadLobbyBackButton);
 
     private void BuildSquadHud(Control root)
     {
@@ -308,6 +311,15 @@ public partial class CombatHUD
         };
         _squadAddress.AddThemeFontSizeOverride("font_size", 12);
         sessionBand.AddChild(_squadAddress);
+
+        _squadLobbyBackButton = DeploymentSegment(
+            new Vector2(672, 36),
+            new Vector2(178, 38),
+            new Color(0.42f, 0.58f, 0.54f));
+        _squadLobbyBackButton.Text = "BACK TO OFFICE";
+        _squadLobbyBackButton.Pressed += () => EmitSignal(SignalName.OperationsHomeRequested);
+        sessionBand.AddChild(_squadLobbyBackButton);
+
         _deploySquadButton = Button("\u25b6  CONFIRM KIT & DEPLOY", new Vector2(866, 20), new Vector2(294, 56));
         _deploySquadButton.AddThemeFontSizeOverride("font_size", 15);
         _deploySquadButton.AddThemeColorOverride("font_color", new Color(0.03f, 0.08f, 0.065f));
@@ -386,6 +398,8 @@ public partial class CombatHUD
 
     public void ShowSquadLobby(string status = "LOCAL SQUAD")
     {
+        HideOperationsMenus();
+        _gameplayHudRoot.Visible = false;
         _squadLobby.Visible = true;
         _squadSessionStatus.Text = status;
         _classSkillRoot.Visible = false;
@@ -395,6 +409,7 @@ public partial class CombatHUD
     public void HideSquadLobby()
     {
         _squadLobby.Visible = false;
+        _gameplayHudRoot.Visible = true;
         _classSkillRoot.Visible = true;
         _squadRoster.Visible = true;
     }
@@ -511,6 +526,7 @@ public partial class CombatHUD
         _localSquadButton.Text = chinese ? "\u672c\u5730 + AI" : "LOCAL + AI";
         _hostSquadButton.Text = chinese ? "\u521b\u5efa\u5c40\u57df\u7f51" : "HOST LAN";
         _joinSquadButton.Text = chinese ? "\u52a0\u5165\u5c40\u57df\u7f51" : "JOIN LAN";
+        _squadLobbyBackButton.Text = Text("operations_back", "BACK TO OFFICE");
         _squadAddress.PlaceholderText = chinese ? "\u4e3b\u673a\u5730\u5740" : "HOST ADDRESS";
         var roles = new[] { OperatorRole.Assault, OperatorRole.Medic, OperatorRole.Recon };
         for (var i = 0; i < roles.Length; i++)
@@ -525,5 +541,13 @@ public partial class CombatHUD
         RefreshClassSkillText();
         RefreshDeploymentLanguage();
         RefreshSquadDeployAction();
+    }
+
+    public void PressSquadLobbyHomeForDiagnostics()
+    {
+        if (IsInstanceValid(_squadLobbyBackButton))
+        {
+            _squadLobbyBackButton.EmitSignal(Godot.Button.SignalName.Pressed);
+        }
     }
 }

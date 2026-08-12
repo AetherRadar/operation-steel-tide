@@ -110,6 +110,8 @@ public partial class FreightTerminalWorld : Node3D
         BuildEnvironment();
         BuildLevel();
         BuildHudAndPlayer();
+        BuildOperationsOffice();
+        BuildDemolitionSites();
         BuildSquadSystem();
         SpawnLootCases();
         SpawnBuildingGradedLoot();
@@ -123,7 +125,24 @@ public partial class FreightTerminalWorld : Node3D
         ApplyQuality(_qualitySetting);
 
         var args = OS.GetCmdlineUserArgs();
-        if (Array.Exists(args, value => value == "--capture-validation"))
+        InitializeOperationsOfficeState(args);
+        if (Array.Exists(args, value => value == "--validate-operations-office"))
+        {
+            ValidateOperationsOffice();
+        }
+        else if (Array.Exists(args, value => value == "--validate-demolition"))
+        {
+            ValidateDemolitionMode();
+        }
+        else if (Array.Exists(args, value => value == "--capture-operations-office"))
+        {
+            CaptureOperationsOffice();
+        }
+        else if (Array.Exists(args, value => value == "--capture-demolition-briefing"))
+        {
+            CaptureDemolitionBriefing();
+        }
+        else if (Array.Exists(args, value => value == "--capture-validation"))
         {
             CaptureValidationFrame();
         }
@@ -270,6 +289,10 @@ public partial class FreightTerminalWorld : Node3D
         else if (Array.Exists(args, value => value == "--validate-extraction-sequence"))
         {
             ValidateExtractionSequence();
+        }
+        else if (Array.Exists(args, value => value == "--capture-extraction-flight"))
+        {
+            CaptureExtractionFlight();
         }
         else if (Array.Exists(args, value => value == "--validate-tactical-hud"))
         {
@@ -454,6 +477,7 @@ public partial class FreightTerminalWorld : Node3D
     {
         UpdateSquad((float)delta);
         UpdateExtractionSequence((float)delta);
+        UpdateDemolitionRound((float)delta);
         UpdateWorldBossTracking();
         if (IsInstanceValid(_extractionMarker))
         {
@@ -536,6 +560,10 @@ public partial class FreightTerminalWorld : Node3D
         _missionDetectionRange = detectionRange;
         _reinforcementThreshold = reinforcementThreshold;
         _missionOnline = online;
+        if (_demolitionMode)
+        {
+            return;
+        }
         foreach (var enemy in _enemies)
         {
             if (IsInstanceValid(enemy))
@@ -550,6 +578,10 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OnPhaseChanged(string phase, float remaining, bool online)
     {
+        if (_demolitionMode)
+        {
+            return;
+        }
         var enteredCombat = _missionPhase != "COMBAT" && phase == "COMBAT";
         _missionPhase = phase;
         _missionRemaining = remaining;
@@ -564,6 +596,10 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OnObjectiveChanged(int index, string objective, bool extractionAvailable)
     {
+        if (_demolitionMode)
+        {
+            return;
+        }
         _objectiveStage = index;
         _currentObjective = objective;
         _interactionProgress = 0.0f;
@@ -901,6 +937,11 @@ public partial class FreightTerminalWorld : Node3D
         _hud.BackpackDropRequested += DropBackpackItemToGround;
         _hud.LootClosed += CloseLoot;
         _hud.InventoryToggleRequested += OnInventoryToggleRequested;
+        _hud.OperationsQuickStartRequested += OnOperationsQuickStartRequested;
+        _hud.DemolitionModeRequested += OnDemolitionModeRequested;
+        _hud.DemolitionBackRequested += OnDemolitionBackRequested;
+        _hud.DemolitionDeploymentRequested += OnDemolitionDeploymentRequested;
+        _hud.OperationsHomeRequested += OnOperationsHomeRequested;
 
         _player = new TacticalPlayer
         {
@@ -1821,6 +1862,11 @@ public partial class FreightTerminalWorld : Node3D
 
     private void UpdateInteraction(float delta)
     {
+        if (_demolitionMode)
+        {
+            UpdateDemolitionInteraction(delta);
+            return;
+        }
         if (_localPlayerEliminated)
         {
             _lootSearchTarget = null;
@@ -2123,6 +2169,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
+
         if (!_player.TryRemoveBackpackItem(itemId, out var returned))
         {
             return;
@@ -2247,7 +2294,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private void UpdateReinforcements(float delta)
     {
-        if (_missionEnded || _reinforcementsDeployed || _missionPhase != "COMBAT")
+        if (_demolitionMode || _missionEnded || _reinforcementsDeployed || _missionPhase != "COMBAT")
         {
             return;
         }
@@ -2822,6 +2869,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
         }
+        if (IsInstanceValid(_aircraft))
+        {
+            _aircraft!.SetPhysicsProcess(false);
+        }
         SetLanguage("zh");
         var source = _lootSources.OfType<WeaponCase>().First();
         _player.GlobalPosition = source.LootNode.GlobalPosition + new Vector3(0, 0.2f, 0.85f);
@@ -2970,17 +3021,22 @@ public partial class FreightTerminalWorld : Node3D
         await WaitFrames(4);
         var movementRestored = !_player.UiLocked && _player.HasMovementIntent;
         Input.ActionRelease("move_forward");
+        _player.SetHealthForDiagnostics(_player.MaxHealth);
         OpenPersonalBackpack();
         await WaitFrames(3);
         var damageViewOpened = _hud.IsLootVisible && _player.UiLocked;
         var healthBeforeDamage = _player.Health;
         _player.TakeDamage(8.0f, _player.GlobalPosition + Vector3.Up, this);
         await WaitFrames(3);
+        var damageOverlayClosed = !_hud.IsLootVisible;
+        var damageUiUnlocked = !_player.UiLocked;
+        var damageMouseCaptured = Input.MouseMode == Input.MouseModeEnum.Captured;
+        var damageApplied = _player.Health < healthBeforeDamage;
         var damageClosedLoot = damageViewOpened
-            && !_hud.IsLootVisible
-            && !_player.UiLocked
-            && Input.MouseMode == Input.MouseModeEnum.Captured
-            && _player.Health < healthBeforeDamage;
+            && damageOverlayClosed
+            && damageUiUnlocked
+            && damageMouseCaptured
+            && damageApplied;
         Input.ActionPress("move_forward");
         await WaitFrames(4);
         var damageMovementRestored = _player.HasMovementIntent;
@@ -3005,7 +3061,7 @@ public partial class FreightTerminalWorld : Node3D
             && movementRestored
             && damageClosedLoot
             && damageMovementRestored;
-        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         GD.Print($"LOOT_PASS valid={valid}");
         await WaitFrames(24);
         SaveViewportImage("res://modular_weapon_validation.png");

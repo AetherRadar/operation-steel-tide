@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace OperationSteelTide;
 
@@ -363,7 +364,8 @@ public static class GameLocalization
         Chinese["extraction_hold"] = "\u7559\u5728\u64a4\u79bb\u533a\u5185  //  \u79bb\u5f00\u5c06\u91cd\u7f6e\u5012\u8ba1\u65f6";
         Chinese["extraction_squad"] = "\u5c0f\u961f\u5c31\u4f4d";
         Chinese["extraction_aborted"] = "\u64a4\u79bb\u4e2d\u65ad  //  \u8fd4\u56de\u7eff\u8272\u533a\u57df\u91cd\u65b0\u547c\u53eb";
-        Chinese["extraction_departing"] = "\u5c0f\u961f\u767b\u673a\u5b8c\u6bd5  //  \u6b63\u5728\u8131\u79bb\u4ea4\u6218\u533a";
+        Chinese["extraction_departing"] = "\u5c0f\u961f\u767b\u673a\u5b8c\u6bd5  //  \u6b63\u5728\u8fd4\u822a\u7279\u52e4\u5904";
+        Chinese["extraction_arrived"] = "\u5df2\u62b5\u8fbe\u7279\u52e4\u5904  //  \u63a5\u9001\u673a\u5df2\u5b8c\u6210\u964d\u843d";
         Chinese["backpack_container"] = "\u80cc\u5305\u5bb9\u5668";
         Chinese["backpack_storage"] = "\u80cc\u5305\u50a8\u7269\u683c";
         Chinese["drop_to_ground"] = "\u4e22\u5230\u5730\u9762";
@@ -399,6 +401,45 @@ public static class GameLocalization
         Chinese["aircraft_supply_drop"] = "\u654c\u673a\u7a7a\u6295\u8865\u7ed9\u7bb1";
         Chinese["aircraft_supply_label"] = "\u7a7a\u6295  //  \u9ad8\u4ef7\u503c\u8865\u7ed9";
         Chinese["aircraft_supply_marked"] = "\u654c\u673a\u5df2\u51fb\u843d  //  \u7a7a\u6295\u8865\u7ed9\u5df2\u6807\u8bb0";
+        Chinese["operations_section"] = "\u7279\u79cd\u52e4\u52a1\u4e2d\u5fc3  //  \u4e1c\u7ffc";
+        Chinese["operations_office"] = "\u7279\u52e4\u5904";
+        Chinese["operations_subtitle"] = "\u94a2\u94c1\u6f6e\u6c50\u884c\u52a8";
+        Chinese["operations_available_funds"] = "\u53ef\u7528\u8d44\u91d1";
+        Chinese["operations_extractions"] = "\u6210\u529f\u64a4\u79bb";
+        Chinese["operations_lifetime_value"] = "\u7d2f\u8ba1\u5e26\u51fa";
+        Chinese["operations_quick_title"] = "\u5feb\u901f\u6478\u91d1";
+        Chinese["operations_quick_detail"] = "\u8fdb\u5165\u6574\u5907  //  \u7ec4\u961f  //  \u641c\u522e\u5e76\u64a4\u79bb";
+        Chinese["operations_demolition_title"] = "\u7206\u7834\u6a21\u5f0f";
+        Chinese["operations_demolition_detail"] = "\u56fa\u5b9a\u914d\u88c5  //  \u5b89\u88c5\u6216\u62c6\u9664  //  A / B \u70b9";
+        Chinese["operations_status_ready"] = "\u5916\u52e4\u5c0f\u961f\u5f85\u547d  //  \u505c\u673a\u576a\u5df2\u51c0\u7a7a";
+        Chinese["operations_quick_status"] = "\u672c\u5730\u5c0f\u961f  //  3 \u4eba\u7f16\u5236  //  \u4f60\u9009\u804c\u4e1a\uff0cAI \u8865\u9f50\u5176\u4f59";
+        Chinese["operations_back"] = "\u8fd4\u56de\u7279\u52e4\u5904";
+        Chinese["operations_exit"] = "\u9000\u51fa\u6e38\u620f";
+        Chinese["operations_return"] = "\u8fd4\u56de\u7279\u52e4\u5904";
+        Chinese["demolition_title"] = "\u7206\u7834\u4efb\u52a1\u7b80\u62a5";
+        Chinese["demolition"] = "\u7206\u7834";
+        Chinese["demolition_subtitle"] = "\u8d27\u8fd0\u7ec8\u7aef  //  \u8fdb\u653b\u65b9";
+        Chinese["demolition_rules_title"] = "\u4ea4\u6218\u89c4\u5219";
+        Chinese["demolition_rules"] = "\u5728 A \u6216 B \u70b9\u6309\u4f4f F \u5b89\u88c5\u88c5\u7f6e\n\u5b88\u4f4f\u88c5\u7f6e\u76f4\u5230\u7206\u70b8\n\u5168\u5458\u6d88\u706d\u4e5f\u4f1a\u7ed3\u675f\u672c\u5c40  //  \u4e0d\u7ed3\u7b97\u6478\u91d1\u7269\u8d44";
+        Chinese["demolition_select_role"] = "\u9009\u62e9\u5e72\u5458";
+        Chinese["demolition_loadout_title"] = "\u7edf\u4e00\u7ade\u6280\u914d\u88c5";
+        Chinese["demolition_loadout"] = "M4A1 \u6807\u51c6\u578b  //  \u666e\u901a 5.56  x120\n\u6807\u51c6\u9632\u5f39\u80cc\u5fc3  //  \u5de1\u903b\u5934\u76d4\n2 \u679a\u624b\u96f7  //  2 \u5757\u62a4\u7532  //  \u804c\u4e1a\u6280\u80fd\u53ef\u7528";
+        Chinese["demolition_back"] = "\u8fd4\u56de";
+        Chinese["demolition_deploy"] = "\u90e8\u7f72\u7206\u7834\u5c0f\u961f";
+        Chinese["demolition_role_ready"] = "{0}  //  \u56fa\u5b9a\u516c\u5e73\u914d\u88c5  //  \u4e0d\u6263\u9664\u6478\u91d1\u8d44\u91d1";
+        Chinese["demolition_success"] = "\u7206\u7834\u6210\u529f";
+        Chinese["demolition_failed"] = "\u7206\u7834\u5931\u8d25";
+        Chinese["demolition_result_economy"] = "\u7ade\u6280\u914d\u88c5\u5df2\u56de\u6536  //  \u6478\u91d1\u8d44\u91d1\u672a\u53d8\u52a8";
+        Chinese["demolition_objective_plant"] = "\u9009\u62e9 A \u6216 B \u70b9  //  \u6309\u4f4f F \u5b89\u88c5\u88c5\u7f6e";
+        Chinese["demolition_interaction_plant"] = "\u5b89\u88c5\u7206\u7834\u88c5\u7f6e  //  {0} \u70b9";
+        Chinese["demolition_deployed"] = "\u7206\u7834\u5c0f\u961f\u5df2\u90e8\u7f72  //  \u56fa\u5b9a\u914d\u88c5  //  \u524d\u5f80 A \u6216 B \u70b9\u5b89\u88c5";
+        Chinese["demolition_planted"] = "\u88c5\u7f6e\u5df2\u5b89\u88c5\u4e8e {0} \u70b9  //  \u9632\u5b88 {1:0} \u79d2";
+        Chinese["demolition_defend"] = "\u9632\u5b88 {0} \u70b9  //  {1:00.0}s{2}";
+        Chinese["demolition_defuse_suffix"] = "  //  \u62c6\u9664 {0:00}%";
+        Chinese["demolition_defenders_eliminated"] = "\u9632\u5b88\u65b9\u5df2\u5168\u90e8\u6d88\u706d";
+        Chinese["demolition_site_destroyed"] = "{0} \u70b9\u5df2\u6467\u6bc1";
+        Chinese["demolition_device_defused"] = "{0} \u70b9\u88c5\u7f6e\u5df2\u88ab\u62c6\u9664";
+        Chinese["demolition_attackers_eliminated"] = "\u8fdb\u653b\u5c0f\u961f\u5df2\u5168\u90e8\u6d88\u706d";
     }
 
     private static readonly Dictionary<string, string> ChineseObjectives = new()
@@ -417,6 +458,11 @@ public static class GameLocalization
     public static string Get(string key, string language, string english)
     {
         return IsChinese(language) && Chinese.TryGetValue(key, out var translated) ? translated : english;
+    }
+
+    public static string Format(string key, string language, string english, params object[] args)
+    {
+        return string.Format(CultureInfo.InvariantCulture, Get(key, language, english), args);
     }
 
     public static string Objective(string objective, string language)
