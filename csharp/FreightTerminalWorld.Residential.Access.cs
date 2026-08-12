@@ -188,7 +188,7 @@ public partial class FreightTerminalWorld
                 stairCenterX,
                 topY - ResidentialSkybridgeAccessTreadThickness * 0.5f,
                 z);
-            AppendSkybridgeAccessBoxFaces(treadFaces, position, treadSize);
+            AppendSkybridgeAccessTreadTopFaces(treadFaces, position, treadSize);
             treadTransforms.Add(new Transform3D(Basis.Identity.Scaled(treadSize), position));
             nosingTransforms.Add(new Transform3D(
                 Basis.Identity.Scaled(new Vector3(ResidentialSkybridgeAccessTreadWidth, 0.035f, 0.055f)),
@@ -418,27 +418,20 @@ public partial class FreightTerminalWorld
         });
     }
 
-    private static void AppendSkybridgeAccessBoxFaces(
+    private static void AppendSkybridgeAccessTreadTopFaces(
         ICollection<Vector3> faces,
         Vector3 center,
         Vector3 size)
     {
         var half = size * 0.5f;
-        var nbl = center + new Vector3(-half.X, -half.Y, -half.Z);
-        var nbr = center + new Vector3(half.X, -half.Y, -half.Z);
         var ntl = center + new Vector3(-half.X, half.Y, -half.Z);
         var ntr = center + new Vector3(half.X, half.Y, -half.Z);
-        var fbl = center + new Vector3(-half.X, -half.Y, half.Z);
-        var fbr = center + new Vector3(half.X, -half.Y, half.Z);
         var ftl = center + new Vector3(-half.X, half.Y, half.Z);
         var ftr = center + new Vector3(half.X, half.Y, half.Z);
 
-        AppendSkybridgeAccessQuad(faces, ntl, ntr, ftr, ftl);
-        AppendSkybridgeAccessQuad(faces, nbl, fbl, fbr, nbr);
-        AppendSkybridgeAccessQuad(faces, nbl, nbr, ntr, ntl);
-        AppendSkybridgeAccessQuad(faces, fbl, ftl, ftr, fbr);
-        AppendSkybridgeAccessQuad(faces, nbl, ntl, ftl, fbl);
-        AppendSkybridgeAccessQuad(faces, nbr, fbr, ftr, ntr);
+        // Vertical triangles in one merged concave stair can catch a capsule at
+        // tread seams. Overlapping top faces preserve every physical step cleanly.
+        AppendSkybridgeAccessQuad(faces, ntl, ftl, ftr, ntr);
     }
 
     private static void AppendSkybridgeAccessQuad(
