@@ -4581,6 +4581,12 @@ public partial class FreightTerminalWorld : Node3D
             for (var frame = 0; frame < 650; frame++)
             {
                 _player.FaceWorldPointForDiagnostics(waypoint);
+                if (frame > 2
+                    && Input.IsActionPressed("move_forward")
+                    && !_player.HasMovementIntent)
+                {
+                    _player.RestoreMovementInput();
+                }
                 if (_player.GlobalPosition.DistanceTo(waypoint) < 1.6f)
                 {
                     reachedWaypoint = true;
