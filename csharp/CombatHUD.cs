@@ -675,8 +675,8 @@ public partial class CombatHUD : CanvasLayer
         _groundDropZone = new LootDropZone
         {
             Target = LootDropTarget.Ground,
-            Position = new Vector2(32, 850),
-            Size = new Vector2(1738, 48)
+            Position = new Vector2(32, 826),
+            Size = new Vector2(1738, 72)
         };
         _groundDropZone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(new Color(0.96f, 0.48f, 0.28f)));
         _groundDropZone.Dropped += HandleLootDrop;
@@ -1109,7 +1109,6 @@ public partial class CombatHUD : CanvasLayer
             Equipment = player.EquippedBackpack,
             Grade = player.EquippedBackpackGrade
         }.StackValue;
-        total += player.TotalReserveAmmo * 2;
         return total;
     }
 
@@ -1133,6 +1132,11 @@ public partial class CombatHUD : CanvasLayer
             compact,
             BuildLootComparisons(item));
         card.DetailsRequested += ShowWeaponDetails;
+        if (origin == LootDragOrigin.Backpack)
+        {
+            card.TooltipText += $"\n{Text("drop_item_hint", "RIGHT-CLICK TO DROP")}";
+            card.DropRequested += itemId => EmitSignal(SignalName.BackpackDropRequested, itemId);
+        }
         card.DoubleActivated += (itemId, cardOrigin) =>
         {
             if (cardOrigin == LootDragOrigin.Backpack)

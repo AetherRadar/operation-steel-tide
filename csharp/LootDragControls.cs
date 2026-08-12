@@ -148,6 +148,7 @@ public partial class LootDragCard : PanelContainer
     }
 
     public event Action<string, LootDragOrigin>? DoubleActivated;
+    public event Action<string>? DropRequested;
     public event Action<WeaponBuild>? DetailsRequested;
 
     private readonly List<Label> _renderedComparisonLabels = new();
@@ -540,7 +541,17 @@ public partial class LootDragCard : PanelContainer
 
     public override void _GuiInput(InputEvent @event)
     {
-        if (@event is InputEventMouseButton mouse && mouse.Pressed && mouse.ButtonIndex == MouseButton.Left && mouse.DoubleClick)
+        if (@event is not InputEventMouseButton mouse || !mouse.Pressed)
+        {
+            return;
+        }
+        if (mouse.ButtonIndex == MouseButton.Right && Origin == LootDragOrigin.Backpack)
+        {
+            DropRequested?.Invoke(ItemId);
+            AcceptEvent();
+            return;
+        }
+        if (mouse.ButtonIndex == MouseButton.Left && mouse.DoubleClick)
         {
             DoubleActivated?.Invoke(ItemId, Origin);
             AcceptEvent();

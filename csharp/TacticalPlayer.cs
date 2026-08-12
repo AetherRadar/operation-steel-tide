@@ -2247,15 +2247,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     public bool TryCollectAmmo(AmmoCaliber caliber, int amount, LootGrade grade = LootGrade.Common)
     {
-        var maxReserveAmmo = caliber switch
-        {
-            AmmoCaliber.Magnum338 => 40,
-            AmmoCaliber.Sniper => 60,
-            AmmoCaliber.Smg => 270,
-            _ => 210
-        };
+        var maxReserveAmmo = MaximumAmmoReserve(caliber);
         var current = AmmoReserveFor(caliber);
-        if (current >= maxReserveAmmo)
+        if (current >= maxReserveAmmo || !CanAddAmmoStack(caliber, grade))
         {
             return false;
         }
@@ -2279,6 +2273,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     public bool TryStoreInBackpack(LootItem item)
     {
+        if (item.Kind == LootItemKind.Ammunition)
+        {
+            return TryStoreAmmoStack(item);
+        }
         if (item.Kind == LootItemKind.ArmorPlate)
         {
             return TryCollectArmorPlate(item.Grade, Mathf.Max(1, item.Quantity));
@@ -2434,6 +2432,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             return false;
         }
         var item = Backpack[index];
+        if (item.Kind == LootItemKind.Ammunition)
+        {
+            Hud?.ShowLocalizedMessage(
+                "ammo_linked",
+                "AMMUNITION IS LINKED TO THE RESERVE",
+                new Color(0.42f, 0.9f, 0.64f));
+            return false;
+        }
         if (item.Kind == LootItemKind.Medical)
         {
             return TryStartMedicalUse(item.MedicalKind);

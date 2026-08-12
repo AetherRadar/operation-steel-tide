@@ -155,6 +155,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ValidatePickupFlow();
         }
+        else if (Array.Exists(args, value => value == "--validate-ammo-inventory"))
+        {
+            ValidateAmmoInventoryFlow();
+        }
         else if (Array.Exists(args, value => value == "--capture-reload"))
         {
             CaptureReloadFrame();
@@ -2119,26 +2123,20 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
-        var index = _player.Backpack.FindIndex(item => item.Id == itemId);
-        if (index < 0)
+        if (!_player.TryRemoveBackpackItem(itemId, out var returned))
         {
             return;
         }
-        var returned = _player.Backpack[index];
-        _player.Backpack.RemoveAt(index);
         _openLootSource.Loot.Add(returned);
         RefreshLootView();
     }
 
     private void DropBackpackItemToGround(string itemId)
     {
-        var index = _player.Backpack.FindIndex(item => item.Id == itemId);
-        if (index < 0)
+        if (!_player.TryRemoveBackpackItem(itemId, out var item))
         {
             return;
         }
-
-        var item = _player.Backpack[index];
         var pickup = new GradedLootPickup
         {
             Name = $"DroppedLoot{_nextDroppedLootId++}"
@@ -2151,12 +2149,12 @@ public partial class FreightTerminalWorld : Node3D
         pickup.GlobalPosition = ResolveDroppedLootPosition();
         if (!pickup.IsInsideTree())
         {
+            _player.TryStoreInBackpack(item);
             pickup.QueueFree();
             return;
         }
 
         _lootSources.Add(pickup);
-        _player.Backpack.RemoveAt(index);
         RefreshLootView();
     }
 
@@ -2634,6 +2632,107 @@ public partial class FreightTerminalWorld : Node3D
         GetTree().Quit();
     }
 
+    private async void ValidateAmmoInventoryFlow()
+    {
+        await WaitFrames(6);
+        foreach (var enemy in _enemies)
+        {
+            if (IsInstanceValid(enemy))
+            {
+                enemy.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        foreach (var squad in _hostileSquads)
+        {
+            foreach (var member in squad.Members)
+            {
+                if (IsInstanceValid(member))
+                {
+                    member.ProcessMode = ProcessModeEnum.Disabled;
+                }
+            }
+        }
+
+        _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(WeaponPlatform.AK74, 1));
+        _player.ClearBackpackForDiagnostics();
+        var commonStored = _player.TryStoreInBackpack(new LootItem
+        {
+            Kind = LootItemKind.Ammunition,
+            AmmoCaliber = AmmoCaliber.Rifle,
+            Quantity = 12,
+            Grade = LootGrade.Common
+        });
+        var rareStored = _player.TryStoreInBackpack(new LootItem
+        {
+            Kind = LootItemKind.Ammunition,
+            AmmoCaliber = AmmoCaliber.Rifle,
+            Quantity = 36,
+            Grade = LootGrade.Rare
+        });
+        var sniperStored = _player.TryStoreInBackpack(new LootItem
+        {
+            Kind = LootItemKind.Ammunition,
+            AmmoCaliber = AmmoCaliber.Sniper,
+            Quantity = 8,
+            Grade = LootGrade.Epic
+        });
+        var pickupLinked = commonStored && rareStored && sniperStored
+            && _player.AmmoReserveFor(AmmoCaliber.Rifle, LootGrade.Common) == 12
+            && _player.AmmoReserveFor(AmmoCaliber.Rifle, LootGrade.Rare) == 36
+            && _player.AmmoReserveFor(AmmoCaliber.Sniper, LootGrade.Epic) == 8
+            && _player.Backpack.Exists(item => item.Kind == LootItemKind.Ammunition
+                && item.AmmoCaliber == AmmoCaliber.Rifle
+                && item.Grade == LootGrade.Rare
+                && item.Quantity == 36);
+
+        var reloaded = _player.ReloadImmediatelyForDiagnostics(0);
+        var reloadLinked = reloaded
+            && _player.Ammo == _player.CurrentWeaponStats.MagazineSize
+            && _player.CurrentAmmoGrade == LootGrade.Rare
+            && _player.AmmoReserveFor(AmmoCaliber.Rifle, LootGrade.Rare) == 6
+            && _player.AmmoReserveFor(AmmoCaliber.Rifle, LootGrade.Common) == 12
+            && _player.AmmoReserveFor(AmmoCaliber.Sniper, LootGrade.Epic) == 8
+            && _player.Backpack.Exists(item => item.Kind == LootItemKind.Ammunition
+                && item.AmmoCaliber == AmmoCaliber.Rifle
+                && item.Grade == LootGrade.Rare
+                && item.Quantity == 6);
+
+        var rareStack = _player.Backpack.Find(item => item.Kind == LootItemKind.Ammunition
+            && item.AmmoCaliber == AmmoCaliber.Rifle
+            && item.Grade == LootGrade.Rare);
+        GradedLootPickup? droppedPickup = null;
+        if (rareStack is not null)
+        {
+            DropBackpackItemToGround(rareStack.Id);
+            droppedPickup = _lootSources.OfType<GradedLootPickup>()
+                .FirstOrDefault(candidate => candidate.Loot.Exists(item => item.Id == rareStack.Id));
+        }
+        var dropLinked = rareStack is not null
+            && droppedPickup is not null
+            && droppedPickup.IsSearchable
+            && _player.AmmoReserveFor(AmmoCaliber.Rifle, LootGrade.Rare) == 0
+            && !_player.Backpack.Exists(item => item.Id == rareStack.Id);
+
+        var repicked = false;
+        if (droppedPickup is not null)
+        {
+            _openLootSource = droppedPickup;
+            TakeLootItem(droppedPickup.Loot[0].Id);
+            repicked = droppedPickup.Loot.Count == 0;
+            _openLootSource = null;
+        }
+        var repickLinked = repicked
+            && _player.AmmoReserveFor(AmmoCaliber.Rifle, LootGrade.Rare) == 6
+            && _player.Backpack.Exists(item => item.Kind == LootItemKind.Ammunition
+                && item.AmmoCaliber == AmmoCaliber.Rifle
+                && item.Grade == LootGrade.Rare
+                && item.Quantity == 6);
+        var valid = pickupLinked && reloadLinked && dropLinked && repickLinked;
+        GD.Print($"AMMO_INVENTORY_CHECK valid={valid} pickup_linked={pickupLinked} reload_linked={reloadLinked} drop_linked={dropLinked} repick_linked={repickLinked} rifle_common={_player.AmmoReserveFor(AmmoCaliber.Rifle, LootGrade.Common)} rifle_rare={_player.AmmoReserveFor(AmmoCaliber.Rifle, LootGrade.Rare)} sniper_epic={_player.AmmoReserveFor(AmmoCaliber.Sniper, LootGrade.Epic)} backpack_stacks={_player.Backpack.Count(item => item.Kind == LootItemKind.Ammunition)}");
+        GD.Print($"AMMO_INVENTORY_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
     private async void CaptureReloadFrame()
     {
         _player.GrantFireablePrimaryForDiagnostics();
@@ -2967,7 +3066,7 @@ public partial class FreightTerminalWorld : Node3D
             enemy.ProcessMode = ProcessModeEnum.Disabled;
         }
         SetLanguage("zh");
-        _player.Backpack.Clear();
+        _player.ClearBackpackForDiagnostics();
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.Bandage, Quantity = 2, Grade = LootGrade.Common });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.FieldMedkit, Quantity = 1, Grade = LootGrade.Rare });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Medical, MedicalKind = MedicalItemKind.Adrenaline, Quantity = 1, Grade = LootGrade.Epic });
