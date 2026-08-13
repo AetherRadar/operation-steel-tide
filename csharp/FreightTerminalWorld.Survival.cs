@@ -513,7 +513,7 @@ public partial class FreightTerminalWorld
         _player.GrantMedicalItemForDiagnostics(MedicalItemKind.FieldMedkit, 2);
         _player.GrantMedicalItemForDiagnostics(MedicalItemKind.Adrenaline, 2);
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.ArmorPlate, Quantity = 1, Grade = LootGrade.Epic });
-        _hud.SetLanguage("zh");
+        SetCaptureLanguage("en");
         _hud.OpenMedicalWheel(_player);
         _hud.SelectMedicalWheelForDiagnostics(FieldUseKind.ArmorPlate);
         await WaitFrames(8);
@@ -525,6 +525,8 @@ public partial class FreightTerminalWorld
     private async void CaptureHitFeedback()
     {
         DisableActorsForSurvivalDiagnostics();
+        SetCaptureLanguage("en");
+        _player.GrantFireablePrimaryForDiagnostics();
         var attacker = _enemies.Find(enemy => IsInstanceValid(enemy) && !enemy.IsDead);
         if (attacker is null)
         {
