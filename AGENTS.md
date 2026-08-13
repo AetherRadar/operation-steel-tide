@@ -19,6 +19,7 @@
 
 ## 代码约定 / Conventions
 
+- 所有新代码和重构必须遵守 `docs/ENGINEERING_STANDARDS.md`；其中的 `MUST` 是提交门槛，`SHOULD` 若偏离必须在提交或 PR 中说明。
 - Godot 4.6 Mono，C# partial class 拆分文件（如 `TacticalPlayer.cs` + `TacticalPlayer.Squad.cs`、`FreightTerminalWorld.cs` + `.Level/.Expansion/.Residential/.Squad.cs`）；新成员放进语义对应的 partial 文件。
 - 源文件 UTF-8 无 BOM、CRLF。中文文案写入 `csharp/GameLocalization.cs` 静态构造函数，用 `\uXXXX` 转义添加，避免编码损坏。
 - 诊断参数统一 `--validate-xxx`，输出 `XXX_CHECK ...` 与 `XXX_PASS valid=...`，以 `GetTree().Quit(valid ? 0 : 2)` 结束；诊断必须确定性（出生点是随机分散的，涉及位置断言时先把玩家/队友传送到固定空旷点）。

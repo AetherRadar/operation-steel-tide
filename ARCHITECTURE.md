@@ -2,6 +2,8 @@
 
 Operation Steel Tide is a playable Godot 4.6 Mono prototype. Its current architecture favors fast, deterministic iteration over editor-authored composition. This document describes the code as it exists today and the boundaries that future refactors should introduce without changing gameplay.
 
+The enforceable rules for new work and incremental refactors live in [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md). This document explains the current shape and migration direction; the standards document defines the required dependency, scene, file-size, compatibility, and verification constraints.
+
 ## Runtime composition
 
 The startup path is intentionally small:
@@ -57,6 +59,7 @@ This is not a mandate to convert all procedural content to scenes. Authored layo
 
 ## Change discipline
 
+- Follow [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md) for mandatory boundaries and review gates.
 - Preserve save data, controls, mission rules, spawn/loadout behavior, and diagnostic command names while extracting ownership.
 - Prefer one subsystem migration at a time over a wholesale rewrite.
 - Keep production behavior independent of diagnostics unless a validation flag is present.
