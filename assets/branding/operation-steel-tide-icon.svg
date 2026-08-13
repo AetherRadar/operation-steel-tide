@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Operation Steel Tide</title>
+  <desc id="desc">A steel shield crossed by three rising tide lines.</desc>
+  <rect width="512" height="512" rx="72" fill="#071315"/>
+  <path d="M256 54 414 116v122c0 104-59 179-158 220C157 417 98 342 98 238V116z"
+        fill="#10282a" stroke="#78e8d1" stroke-width="20" stroke-linejoin="round"/>
+  <path d="M134 214h244M120 268h272M135 322h242"
+        fill="none" stroke="#38d6b3" stroke-width="30" stroke-linecap="square"/>
+  <path d="m218 134 38-18 38 18v54l-38 18-38-18z" fill="#d2a84a"/>
+</svg>

@@ -29,7 +29,7 @@ Install Godot 4.6.3 Mono and the .NET 8 SDK. Go is optional for the offline fall
 
 Players who do not need the source can download the complete Windows build from [GitHub Releases](https://github.com/AetherRadar/operation-steel-tide/releases/latest), extract it, and run `PLAY.bat`. The package includes the game, .NET runtime files, and local Go mission service.
 
-For free internet co-op without router port forwarding, the host can run a [playit.gg](https://playit.gg/) UDP tunnel to `127.0.0.1:28960`. Its free plan currently provides four ports and two agents without requiring a credit card; only the host installs the agent. Other players enter the complete public endpoint, such as `example.gl.at.ply.gg:41237`, in `JOIN GAME`. See [ONLINE_PLAY.md](ONLINE_PLAY.md) for the exact setup, limitations, and private-network alternatives.
+For internet co-op without router port forwarding, the host can run a [playit.gg](https://playit.gg/) UDP tunnel to `127.0.0.1:28960`; only the host installs the agent. Other players enter the complete public endpoint, such as `example.gl.at.ply.gg:41237`, in `JOIN GAME`. See [ONLINE_PLAY.md](ONLINE_PLAY.md) for the exact setup, current service limits, and private-network alternatives.
 
 Double-click `START_GAME.bat`. The launcher locates Godot Mono through `GODOT_MONO`, PATH, or the default Downloads location. When Go is available, it builds and starts the service on `127.0.0.1:8787`, waits for the process, then launches Godot. Closing the game closes the service and removes `backend/backend.pid`.
 
@@ -82,7 +82,7 @@ godot --path .
 - Left mouse fires or strikes with the knife, right mouse aims through the installed optic, and `R` performs a full magazine reload
 - `G` throws a frag grenade; tap `F` to open or close nearby loot immediately, enter or exit a parked vehicle, or hold `F` to operate an objective terminal
 - `V` switch between AUTO and SEMI, `T` toggle the weapon light
-- `X` apply a spare armor plate while stationary; movement, sprinting, firing, or damage interrupts it
+- `X` starts applying a spare armor plate and pressing `X` again cancels it; movement is allowed, while incoming damage interrupts the action
 - Hold `B` to open the three-sector medical wheel, aim at bandages, a field medkit, or adrenaline, then release `B` or click to use it; taking damage interrupts treatment
 - `H` activates the selected class skill
 - `F1` orders AI squadmates to follow, `F2` orders them to hold their current positions, and `F3` sends them to the aimed world position
