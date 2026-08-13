@@ -3,6 +3,8 @@
 Operation Steel Tide is a four-operator tactical FPS prototype built with Godot 4.6 Forward+.
 The complete game client is C#, including LAN co-op, AI squadmates, three operator classes, the procedural world, player controller, weapons, enemy AI, HUD, effects, objectives, and backend integration. The local progression and mission service is Go.
 
+> **Development disclosure:** This is an AI-assisted solo prototype. AI tools were used for portions of implementation; the repository owner remains responsible for design decisions, integration, debugging, and validation. The project is not presented as a production-ready architecture reference. See [ARCHITECTURE.md](ARCHITECTURE.md) for the current boundaries and incremental refactor direction.
+
 ## Run
 
 Install Godot 4.6.3 Mono and the .NET 8 SDK. Go is optional for the offline fallback, but required for the local mission and progression service.
