@@ -68,21 +68,6 @@ public partial class CombatHUD : CanvasLayer
     private Control _equipmentRoot = null!;
     private Label _equipmentLabel = null!;
     private ProgressBar _equipmentBar = null!;
-    private ColorRect _pauseOverlay = null!;
-    private HSlider _sensitivitySlider = null!;
-    private Label _sensitivityValue = null!;
-    private OptionButton _qualitySelect = null!;
-    private CheckButton _fullscreenToggle = null!;
-    private OptionButton _languageSelect = null!;
-    private Label _pauseTitle = null!;
-    private Label _pauseOperation = null!;
-    private Label _sensitivityCaption = null!;
-    private Label _qualityCaption = null!;
-    private Label _languageCaption = null!;
-    private Button _resumeButton = null!;
-    private Button _restartButton = null!;
-    private Button _quitButton = null!;
-    private Label _buildLabel = null!;
     private ColorRect _lootOverlay = null!;
     private GridContainer _lootSourceList = null!;
     private GridContainer _backpackList = null!;
@@ -1207,137 +1192,13 @@ public partial class CombatHUD : CanvasLayer
         }
     }
 
-    private void BuildPauseMenu(Control root)
-    {
-        _pauseOverlay = new ColorRect
-        {
-            Color = new Color(0.004f, 0.008f, 0.01f, 0.93f),
-            MouseFilter = Control.MouseFilterEnum.Stop,
-            Visible = false
-        };
-        _pauseOverlay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        root.AddChild(_pauseOverlay);
-        var content = new Control
-        {
-            Position = new Vector2(-260, -270),
-            Size = new Vector2(520, 540)
-        };
-        content.SetAnchorsPreset(Control.LayoutPreset.Center);
-        _pauseOverlay.AddChild(content);
-        _pauseTitle = Label("TACTICAL PAUSE", 38, new Color(0.82f, 0.94f, 0.9f));
-        _pauseTitle.Position = Vector2.Zero;
-        _pauseTitle.Size = new Vector2(520, 54);
-        _pauseTitle.HorizontalAlignment = HorizontalAlignment.Center;
-        content.AddChild(_pauseTitle);
-        _pauseOperation = Label("OPERATION STEEL TIDE", 13, new Color(0.34f, 0.71f, 0.62f));
-        _pauseOperation.Position = new Vector2(0, 52);
-        _pauseOperation.Size = new Vector2(520, 24);
-        _pauseOperation.HorizontalAlignment = HorizontalAlignment.Center;
-        content.AddChild(_pauseOperation);
-        content.AddChild(new ColorRect
-        {
-            Position = new Vector2(40, 94),
-            Size = new Vector2(440, 1),
-            Color = new Color(0.2f, 0.38f, 0.34f, 0.7f)
-        });
-        _sensitivityCaption = PositionedLabel("LOOK SENSITIVITY", 13, new Color(0.56f, 0.66f, 0.63f), 40, 125);
-        content.AddChild(_sensitivityCaption);
-        _sensitivityValue = PositionedLabel("1.00", 13, new Color(0.37f, 0.86f, 0.7f), 424, 125);
-        content.AddChild(_sensitivityValue);
-        _sensitivitySlider = new HSlider
-        {
-            Position = new Vector2(40, 154),
-            Size = new Vector2(440, 28),
-            MinValue = 0.45,
-            MaxValue = 2.0,
-            Step = 0.05,
-            Value = 1.0
-        };
-        _sensitivitySlider.ValueChanged += value =>
-        {
-            _sensitivityValue.Text = $"{value:0.00}";
-            EmitSignal(SignalName.SensitivityChanged, (float)value);
-        };
-        content.AddChild(_sensitivitySlider);
-        _qualityCaption = PositionedLabel("RENDER QUALITY", 13, new Color(0.56f, 0.66f, 0.63f), 40, 205);
-        content.AddChild(_qualityCaption);
-        _qualitySelect = new OptionButton { Position = new Vector2(270, 194), Size = new Vector2(210, 38) };
-        _qualitySelect.AddItem("Performance");
-        _qualitySelect.AddItem("Balanced");
-        _qualitySelect.AddItem("Cinematic");
-        _qualitySelect.Selected = 2;
-        _qualitySelect.ItemSelected += index => EmitSignal(SignalName.QualityChanged, (int)index);
-        content.AddChild(_qualitySelect);
-
-        _languageCaption = PositionedLabel("LANGUAGE", 13, new Color(0.56f, 0.66f, 0.63f), 40, 255);
-        content.AddChild(_languageCaption);
-        _languageSelect = new OptionButton { Position = new Vector2(270, 244), Size = new Vector2(210, 38) };
-        _languageSelect.AddItem("English");
-        _languageSelect.AddItem("中文");
-        _languageSelect.ItemSelected += index =>
-        {
-            var language = index == 1 ? "zh" : "en";
-            SetLanguage(language);
-            EmitSignal(SignalName.LanguageChanged, language);
-        };
-        content.AddChild(_languageSelect);
-        _fullscreenToggle = new CheckButton
-        {
-            Text = "FULLSCREEN",
-            Position = new Vector2(35, 292),
-            Size = new Vector2(445, 38)
-        };
-        _fullscreenToggle.Toggled += active => EmitSignal(SignalName.FullscreenChanged, active);
-        content.AddChild(_fullscreenToggle);
-        _resumeButton = Button("RESUME OPERATION", new Vector2(40, 342), new Vector2(440, 46));
-        _resumeButton.Pressed += () => EmitSignal(SignalName.PauseRequested);
-        content.AddChild(_resumeButton);
-        _restartButton = Button("REDEPLOY", new Vector2(40, 401), new Vector2(210, 44));
-        _restartButton.Pressed += () => EmitSignal(SignalName.RestartRequested);
-        content.AddChild(_restartButton);
-        _quitButton = Button("EXIT TO DESKTOP", new Vector2(270, 401), new Vector2(210, 44));
-        _quitButton.Pressed += () => EmitSignal(SignalName.QuitRequested);
-        content.AddChild(_quitButton);
-        _buildLabel = PositionedLabel("FORWARD+  /  BUILD 1.1.0", 11, new Color(0.32f, 0.4f, 0.38f), 40, 477);
-        _buildLabel.Size = new Vector2(440, 22);
-        _buildLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        content.AddChild(_buildLabel);
-    }
-
-    public void SetPauseVisible(bool active) => _pauseOverlay.Visible = active;
-
-    public void SetSettings(float sensitivity, int quality, bool fullscreen, string language)
-    {
-        _sensitivitySlider.SetValueNoSignal(sensitivity);
-        _sensitivityValue.Text = $"{sensitivity:0.00}";
-        _qualitySelect.Select(Mathf.Clamp(quality, 0, 2));
-        _fullscreenToggle.SetPressedNoSignal(fullscreen);
-        SetLanguage(language);
-        _languageSelect.Select(GameLocalization.IsChinese(language) ? 1 : 0);
-    }
-
     public void SetLanguage(string language)
     {
         _language = GameLocalization.IsChinese(language) ? "zh" : "en";
-        if (_languageSelect != null)
-        {
-            _languageSelect.Select(_language == "zh" ? 1 : 0);
-        }
+        _pauseMenuView.SetLanguage(_language);
         _vitalCaption.Text = Text("vital", "VITAL");
         _armorCaption.Text = Text("armor", "PLATE");
         _operationBanner.Text = Text("operation", "OPERATION STEEL TIDE");
-        _pauseTitle.Text = Text("pause_title", "TACTICAL PAUSE");
-        _pauseOperation.Text = Text("operation", "OPERATION STEEL TIDE");
-        _sensitivityCaption.Text = Text("look_sensitivity", "LOOK SENSITIVITY");
-        _qualityCaption.Text = Text("render_quality", "RENDER QUALITY");
-        _languageCaption.Text = Text("language", "LANGUAGE");
-        _fullscreenToggle.Text = Text("fullscreen", "FULLSCREEN");
-        _resumeButton.Text = Text("resume", "RESUME OPERATION");
-        _restartButton.Text = Text("redeploy", "REDEPLOY");
-        _quitButton.Text = Text("exit", "EXIT TO DESKTOP");
-        _qualitySelect.SetItemText(0, Text("performance", "Performance"));
-        _qualitySelect.SetItemText(1, Text("balanced", "Balanced"));
-        _qualitySelect.SetItemText(2, Text("cinematic", "Cinematic"));
         if (IsInstanceValid(_backpackHotkeyButton))
         {
             _backpackHotkeyButton.Text = Text("backpack_button", "TAB  BACKPACK");

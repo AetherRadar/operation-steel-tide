@@ -1,0 +1,194 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://csharp/PauseMenuView.cs" id="1_pause_view"]
+
+[node name="PauseMenuView" type="ColorRect"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0.004, 0.008, 0.01, 0.93)
+script = ExtResource("1_pause_view")
+
+[node name="Content" type="Control" parent="."]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -260.0
+offset_top = -270.0
+offset_right = 260.0
+offset_bottom = 270.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PauseTitle" type="Label" parent="Content"]
+layout_mode = 0
+offset_right = 520.0
+offset_bottom = 54.0
+theme_override_colors/font_color = Color(0.82, 0.94, 0.9, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 38
+text = "TACTICAL PAUSE"
+horizontal_alignment = 1
+
+[node name="PauseOperation" type="Label" parent="Content"]
+layout_mode = 0
+offset_top = 52.0
+offset_right = 520.0
+offset_bottom = 76.0
+theme_override_colors/font_color = Color(0.34, 0.71, 0.62, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 13
+text = "OPERATION STEEL TIDE"
+horizontal_alignment = 1
+
+[node name="HeaderDivider" type="ColorRect" parent="Content"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 94.0
+offset_right = 480.0
+offset_bottom = 95.0
+mouse_filter = 2
+color = Color(0.2, 0.38, 0.34, 0.7)
+
+[node name="SensitivityCaption" type="Label" parent="Content"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 125.0
+offset_right = 270.0
+offset_bottom = 149.0
+theme_override_colors/font_color = Color(0.56, 0.66, 0.63, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 13
+text = "LOOK SENSITIVITY"
+
+[node name="SensitivityValue" type="Label" parent="Content"]
+layout_mode = 0
+offset_left = 424.0
+offset_top = 125.0
+offset_right = 480.0
+offset_bottom = 149.0
+theme_override_colors/font_color = Color(0.37, 0.86, 0.7, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 13
+text = "1.00"
+horizontal_alignment = 2
+
+[node name="SensitivitySlider" type="HSlider" parent="Content"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 154.0
+offset_right = 480.0
+offset_bottom = 182.0
+min_value = 0.45
+max_value = 2.0
+step = 0.05
+value = 1.0
+
+[node name="QualityCaption" type="Label" parent="Content"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 205.0
+offset_right = 260.0
+offset_bottom = 229.0
+theme_override_colors/font_color = Color(0.56, 0.66, 0.63, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 13
+text = "RENDER QUALITY"
+
+[node name="QualitySelect" type="OptionButton" parent="Content"]
+layout_mode = 0
+offset_left = 270.0
+offset_top = 194.0
+offset_right = 480.0
+offset_bottom = 232.0
+
+[node name="LanguageCaption" type="Label" parent="Content"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 255.0
+offset_right = 260.0
+offset_bottom = 279.0
+theme_override_colors/font_color = Color(0.56, 0.66, 0.63, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 13
+text = "LANGUAGE"
+
+[node name="LanguageSelect" type="OptionButton" parent="Content"]
+layout_mode = 0
+offset_left = 270.0
+offset_top = 244.0
+offset_right = 480.0
+offset_bottom = 282.0
+
+[node name="FullscreenToggle" type="CheckButton" parent="Content"]
+layout_mode = 0
+offset_left = 35.0
+offset_top = 292.0
+offset_right = 480.0
+offset_bottom = 330.0
+text = "FULLSCREEN"
+
+[node name="ResumeButton" type="Button" parent="Content"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 342.0
+offset_right = 480.0
+offset_bottom = 388.0
+theme_override_colors/font_color = Color(0.82, 0.9, 0.87, 1)
+theme_override_colors/font_hover_color = Color(0.19, 0.9, 0.69, 1)
+theme_override_font_sizes/font_size = 16
+text = "RESUME OPERATION"
+
+[node name="RestartButton" type="Button" parent="Content"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 401.0
+offset_right = 250.0
+offset_bottom = 445.0
+theme_override_colors/font_color = Color(0.82, 0.9, 0.87, 1)
+theme_override_colors/font_hover_color = Color(0.19, 0.9, 0.69, 1)
+theme_override_font_sizes/font_size = 16
+text = "REDEPLOY"
+
+[node name="QuitButton" type="Button" parent="Content"]
+layout_mode = 0
+offset_left = 270.0
+offset_top = 401.0
+offset_right = 480.0
+offset_bottom = 445.0
+theme_override_colors/font_color = Color(0.82, 0.9, 0.87, 1)
+theme_override_colors/font_hover_color = Color(0.19, 0.9, 0.69, 1)
+theme_override_font_sizes/font_size = 16
+text = "EXIT TO DESKTOP"
+
+[node name="BuildLabel" type="Label" parent="Content"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 477.0
+offset_right = 480.0
+offset_bottom = 499.0
+theme_override_colors/font_color = Color(0.32, 0.4, 0.38, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 11
+text = "FORWARD+  /  BUILD 1.1.0"
+horizontal_alignment = 1

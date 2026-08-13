@@ -166,6 +166,7 @@ Any accepted incoming hit immediately closes the active search or backpack view 
 
 ```text
 Godot_console.exe --path . -- --capture-deployment
+Godot_console.exe --path . -- --validate-pause-ui
 Godot_console.exe --path . -- --validate-objectives
 Godot_console.exe --path . -- --validate-reinforcements
 Godot_console.exe --path . -- --capture-ads
@@ -220,6 +221,8 @@ Godot_console.exe --headless --path . -- --validate-network-client
 ```
 
 `--validate-deployment-ui` verifies the full operator preview, six market entries, four quick-kit presets, four ammunition quantities, independent grade/quantity pricing, the three-slot map selector, locked-map rejection, kit cost, and projected post-deployment balance.
+
+`--validate-pause-ui` verifies the authored pause scene, required control bindings, signal-free settings synchronization, English and Chinese labels, pause visibility and mouse release, and the existing resume event path.
 
 `--validate-extraction-sequence` verifies the locked objective gate, 12-second hold, leave-zone reset, aircraft arrival, boarding state, and mission completion. `--capture-extraction` renders the live countdown and landed rescue tilt-rotor at the seawall pad.
 

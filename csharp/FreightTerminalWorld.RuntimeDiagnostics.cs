@@ -9,6 +9,7 @@ public partial class FreightTerminalWorld
         private static readonly (string Argument, Action<FreightTerminalWorld> Run)[] Commands =
         {
             ("--validate-operations-office", static world => world.ValidateOperationsOffice()),
+            ("--validate-pause-ui", static world => world.ValidatePauseUi()),
             ("--validate-demolition", static world => world.ValidateDemolitionMode()),
             ("--capture-operations-office", static world => world.CaptureOperationsOffice()),
             ("--capture-demolition-briefing", static world => world.CaptureDemolitionBriefing()),
