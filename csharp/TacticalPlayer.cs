@@ -1627,28 +1627,15 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _weaponRoot.Visible = !_knifeEquipped && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
         _knifeRoot.Visible = _knifeEquipped && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
         UpdateKnifeAnimation(delta);
-        var targetPosition = _isAiming
-            ? new Vector3(0.0f, -0.139f, -0.55f)
-            : new Vector3(0.34f, -0.33f, -0.58f);
-        if (_isReloading)
-        {
-            targetPosition = new Vector3(0.18f, -0.23f, -0.86f);
-        }
-        else if (_searchPose > 0.0f)
-        {
-            targetPosition = new Vector3(0.5f, -0.58f, -0.48f).Lerp(new Vector3(0.32f, -0.48f, -0.72f), _searchPose);
-        }
-        else if (_isPlating)
-        {
-            targetPosition += new Vector3(0.22f, -0.34f, 0.12f);
-        }
+        var targetPosition = WeaponViewPositionTarget();
         _weaponRoot.Position = _weaponRoot.Position.Lerp(targetPosition, SmoothFactor(_isAiming ? 7.5f + handling * 6.0f : 6.0f + handling * 3.0f, delta));
         var weaponRotation = _weaponRoot.Rotation;
-        var searchRoll = _searchPose > 0.0f ? -0.42f : 0.0f;
-        var searchPitch = _searchPose > 0.0f ? 0.34f : 0.0f;
-        weaponRotation.Z = Mathf.Lerp(weaponRotation.Z, _isReloading ? -0.32f : searchRoll + _recoilSide * 0.35f, SmoothFactor(9.0f, delta));
-        weaponRotation.X = Mathf.Lerp(weaponRotation.X, _isReloading ? -0.13f : searchPitch + _recoilPitch * 0.55f, SmoothFactor(9.0f, delta));
-        _weaponRoot.Rotation = weaponRotation;
+        if (_isAiming)
+        {
+            // Vault and ladder poses can carry a temporary yaw; ADS must begin on the optic axis.
+            weaponRotation.Y = 0.0f;
+        }
+        _weaponRoot.Rotation = weaponRotation.Lerp(WeaponViewRotationTarget(), SmoothFactor(9.0f, delta));
         _opticReticle.Visible = _isAiming && !_knifeEquipped;
         UpdateReloadAnimation();
     }

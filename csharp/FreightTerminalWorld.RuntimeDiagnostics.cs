@@ -30,6 +30,7 @@ public partial class FreightTerminalWorld
             ("--validate-corpse-loot", static world => world.ValidateCorpseLootFlow()),
             ("--capture-backpack", static world => world.CaptureBackpackFrame()),
             ("--capture-optics", static world => world.CaptureOpticsFrames()),
+            ("--validate-ads-alignment", static world => world.ValidateAdsAlignment()),
             ("--validate-stance-armor", static world => world.ValidateStanceAndArmorFlow()),
             ("--capture-expanded-map", static world => world.CaptureExpandedMapFrame()),
             ("--capture-extraction", static world => world.CaptureExtractionFrame()),
