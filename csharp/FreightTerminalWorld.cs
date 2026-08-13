@@ -2011,13 +2011,26 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SetLanguage(string language)
     {
+        ApplyLanguage(language, true);
+    }
+
+    private void SetCaptureLanguage(string language)
+    {
+        ApplyLanguage(language, false);
+    }
+
+    private void ApplyLanguage(string language, bool persist)
+    {
         _languageSetting = GameLocalization.IsChinese(language) ? "zh" : "en";
         _hud.SetLanguage(_languageSetting);
         _hud.SetEnemyCount(_enemiesRemaining);
         _hud.SetMissionPhase(_missionPhase, _missionRemaining, _missionOnline);
         RefreshLocalizedObjective();
         RefreshLootView();
-        SaveSettings();
+        if (persist)
+        {
+            SaveSettings();
+        }
     }
 
     private void RefreshLocalizedObjective()
@@ -2199,6 +2212,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private async void CaptureReloadFrame()
     {
+        SetCaptureLanguage("en");
         _player.GrantFireablePrimaryForDiagnostics();
         foreach (var enemy in _enemies)
         {
@@ -2251,6 +2265,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private async void CaptureKnifeFrame()
     {
+        SetCaptureLanguage("en");
         foreach (var enemy in _enemies)
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
@@ -2420,7 +2435,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
         }
-        SetLanguage("zh");
+        SetCaptureLanguage("en");
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = "optic_holo" });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Attachment, AttachmentId = "muzzle_suppressor" });
         _player.TryStoreInBackpack(new LootItem { Kind = LootItemKind.Ammunition, Quantity = 48 });
@@ -3691,6 +3706,8 @@ public partial class FreightTerminalWorld : Node3D
 
     private async void CaptureExtractionFrame()
     {
+        SetCaptureLanguage("en");
+        _player.GrantFireablePrimaryForDiagnostics();
         foreach (var enemy in _enemies)
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
@@ -3715,9 +3732,8 @@ public partial class FreightTerminalWorld : Node3D
             _missionDirector.AdvanceObjective();
         }
         await WaitFrames(4);
-        _hud.SetLanguage("zh");
         _player.GlobalPosition = ExtractionPoint + new Vector3(-4.5f, 0.12f, 5.0f);
-        _player.Rotation = new Vector3(0, -0.48f, 0);
+        _player.FaceWorldPointForDiagnostics(ExtractionPoint);
         TryBeginExtractionSequence(_player);
         _extractionAircraft?.ForceBoardingReadyForValidation();
         _extractionRemaining = 5.8f;

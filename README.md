@@ -1,9 +1,27 @@
 # Operation Steel Tide
 
-Operation Steel Tide is a four-operator tactical FPS prototype built with Godot 4.6 Forward+.
-The complete game client is C#, including LAN co-op, AI squadmates, three operator classes, the procedural world, player controller, weapons, enemy AI, HUD, effects, objectives, and backend integration. The local progression and mission service is Go.
+**A playable tactical extraction FPS prototype built with Godot 4.6, C#, and an optional Go mission service.** Pick a role, equip a three-operator strike team, infiltrate a 340 m x 320 m harbor district, complete physical objectives, loot what you can carry, and reach the rescue aircraft alive.
 
-## Run
+![Operation Steel Tide — loadout, extraction, and skybridge gameplay](docs/media/hero.webp)
+
+[![Godot 4.6](https://img.shields.io/badge/Godot-4.6-478CBF?logo=godot-engine&logoColor=white)](https://godotengine.org/)
+[![.NET 8](https://img.shields.io/badge/.NET-8-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-42e7c1.svg)](LICENSE)
+
+> **Prototype status:** the complete mission loop is playable, but this is still a code-first prototype with programmer art, rough animation, and no packaged release yet. The repository is for people who enjoy playable systems, Godot/C# experiments, and watching an ambitious FPS take shape in public.
+
+## Playable now
+
+- **Three-operator squads:** choose Assault, Medic, or Recon; AI fills empty roles, follows orders, fights, uses class skills, and revives downed teammates.
+- **A complete extraction loop:** infiltrate, disable the relay, steal the manifest, survive reinforcements, loot buildings and fallen operators, then hold the extraction zone.
+- **Meaningful loadouts:** buy five weapon platforms, armor, ammunition grades, and pack sizes; customize weapon parts and bank only the value extracted above your deployment baseline.
+- **Solo or LAN:** play locally with AI, host over ENet, or join another player; disconnected players are replaced by AI without restarting the mission.
+- **A dense playable district:** explore the freight terminal, rail yard, fuel farm, residential towers, drivable vehicles, and 22 glass skybridges with long sniper sightlines.
+
+If this is the kind of unusually deep prototype you want to see polished, **star the repository** and tell me which system should get attention next. Bug reports and focused playtest feedback are especially welcome in [Issues](https://github.com/AetherRadar/operation-steel-tide/issues).
+
+## Run the prototype
 
 Install Godot 4.6.3 Mono and the .NET 8 SDK. Go is optional for the offline fallback, but required for the local mission and progression service.
 
@@ -22,6 +40,33 @@ The backend can also be built manually from the repository root:
 cd backend
 go build -o ..\steel-tide-server.exe ./cmd/server
 ```
+
+On macOS or Linux, build and launch the client directly with the platform's Godot Mono executable:
+
+```bash
+dotnet build OperationSteelTide.csproj
+godot --path .
+```
+
+## Real in-engine screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/media/loadout.webp" alt="Operator class, weapon market, protection, ammunition, and LAN loadout screen"><br><sub>Choose a role, protection, weapon, ammunition grade, and LAN mode.</sub></td>
+    <td width="50%"><img src="docs/media/extraction.webp" alt="Rescue tilt-rotor waiting inside a green extraction beacon"><br><sub>Finish both objectives and hold the rescue zone while the squad boards.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/media/inventory.webp" alt="Field inventory showing weapons, ammunition, armor, attachments, and backpack value"><br><sub>Loot weapons, parts, armor, ammunition, medical items, and rare knife finishes.</sub></td>
+    <td width="50%"><img src="docs/media/medical-wheel.webp" alt="Medical selector with bandage, trauma kit, and adrenaline injector"><br><sub>Treatment consumes real inventory stacks and can be interrupted by incoming fire.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/media/skylink.webp" alt="Long glass skybridge connecting residential towers"><br><sub>Twenty-two walkable glass skybridges form elevated routes and sniper lanes.</sub></td>
+    <td width="50%"><img src="docs/media/reload.webp" alt="First-person staged magazine reload"><br><sub>Weapons have visible parts, caliber-specific ammunition, optics, fire modes, and staged reloads.</sub></td>
+  </tr>
+</table>
+
+<details>
+<summary><strong>Open the full controls and gameplay systems reference</strong></summary>
 
 ## Controls
 
@@ -80,6 +125,11 @@ Standing, crouched, and prone stances use different movement speed, camera and c
 Enemy operators use layered anatomical meshes with independent leg motion, helmet, goggles, headset, microphone, plate carrier, magazine pouches, radio, backpack, knee protection, gloves, boots, and a complete rifle silhouette. Their materials vary slightly per operator so a patrol does not read as a row of identical targets.
 
 The Go backend provides three mission definitions, objective text, detection rules, reinforcement thresholds, profiles, session persistence, XP, credits, and completion rewards. The C# `BackendClient` uses the service when available and falls back to a local mission when it is offline.
+
+</details>
+
+<details>
+<summary><strong>Open the technical layout and diagnostics reference</strong></summary>
 
 ## Technical layout
 
@@ -153,8 +203,14 @@ Godot_console.exe --headless --path . -- --validate-network-client
 
 `--validate-extraction-sequence` verifies the locked objective gate, 12-second hold, leave-zone reset, aircraft arrival, boarding state, and mission completion. `--capture-extraction` renders the live countdown and landed rescue tilt-rotor at the seawall pad.
 
-`--capture-deployment` waits 14 real seconds at spawn and prints health, armor, ammo, and phase. `--capture-ads` captures the centered reflex sight. `--capture-reload` freezes the seven-stage reload while the fresh magazine is moving into the magwell. `--capture-operator` isolates the detailed enemy model. `--capture-zh` checks the Chinese HUD and settings menu. `--capture-backpack` validates the Chinese personal item grid, 3D gear previews, caliber ammunition, knife finishes, and weapon detail modal, while `--capture-optics` captures all optic models. `--validate-weapon-ui` verifies both cycle directions and detail opening. `--validate-arsenal` verifies the M24 and MP5A5 catalogs, separated rifle/sniper/SMG reserves, forced-semi sniper behavior, knife-finish replacement, and world drops. `--validate-loot` also verifies `F` closing and immediate movement restoration, alongside held-key gating, empty-source reopening, transfer, and weapon replacement. `--validate-corpse-loot` checks repeated body searches. `--validate-stance-armor` checks crouched ADS leaning, prone height, hit regions, and equipment durability. `--capture-expanded-map` captures the complete 340 m x 320 m district and prints dimensions, enemy count, nine loot sources, extraction distance, sky state, cover-point count, residential towers, and civilians. `--capture-extraction` captures the unlocked seawall beacon and pad. `--validate-large-map` checks all six industrial districts, the remote extraction distance, marker unlock, and actual Area3D mission completion. `--validate-objectives` drives both terminals and verifies that C# enters `EXTRACTION` only after both operations complete. `--validate-reinforcements` forces confirmed combat and verifies the delayed QRF wave. `--validate-equipment` checks plating, fire mode, and weapon light state changes.
+`--capture-deployment` waits 14 real seconds at spawn and prints health, armor, ammo, and phase. `--capture-ads` captures the centered reflex sight. `--capture-reload` freezes the seven-stage reload while the fresh magazine is moving into the magwell. `--capture-operator` isolates the detailed enemy model. `--capture-zh` checks the Chinese HUD and settings menu. `--capture-backpack` captures the English personal item grid, 3D gear previews, caliber ammunition, knife finishes, and weapon detail modal, while `--capture-optics` captures all optic models. `--validate-weapon-ui` verifies both cycle directions and detail opening. `--validate-arsenal` verifies the M24 and MP5A5 catalogs, separated rifle/sniper/SMG reserves, forced-semi sniper behavior, knife-finish replacement, and world drops. `--validate-loot` also verifies `F` closing and immediate movement restoration, alongside held-key gating, empty-source reopening, transfer, and weapon replacement. `--validate-corpse-loot` checks repeated body searches. `--validate-stance-armor` checks crouched ADS leaning, prone height, hit regions, and equipment durability. `--capture-expanded-map` captures the complete 340 m x 320 m district and prints dimensions, enemy count, nine loot sources, extraction distance, sky state, cover-point count, residential towers, and civilians. `--capture-extraction` captures the unlocked seawall beacon and pad. `--validate-large-map` checks all six industrial districts, the remote extraction distance, marker unlock, and actual Area3D mission completion. `--validate-objectives` drives both terminals and verifies that C# enters `EXTRACTION` only after both operations complete. `--validate-reinforcements` forces confirmed combat and verifies the delayed QRF wave. `--validate-equipment` checks plating, fire mode, and weapon light state changes.
 
 `--validate-residential` checks all eleven towers, 96 floors, 192 stair flights, 96 detailed stair landings, 44 corner annexes, open entrances, actual player ascent, rooftop access, upper-floor occupants, and all five civilian roles. `--validate-residential-density` separately verifies unique collision-backed annexes, stair utility fixtures, and an unobstructed standing-height entrance. `--validate-residential-gameplay` verifies all seven room and cache archetypes, three stocked caches in every tower, medicine in every cache, loot UI registration, and one successful assist from every civilian role. `--validate-residential-cover` samples solid facades across all 96 residential floors, reproduces a close-range muzzle clipping through a thin wall, and verifies both the clamped shot origin and authoritative damage gate while preserving open fire. `--validate-medical` exercises wheel selection, timed healing, adrenaline, item consumption and stacking, cache distribution, and the `B` binding. `--validate-hit-feedback` verifies actual post-armor damage, attack direction, body region, source, camera impulse, and treatment interruption. `--validate-stairs` walks the player from the ground floor through the deep mid-level turn and into the second-floor corridor, requiring all four climb waypoints. `--capture-residential-stairs`, `--capture-medical-wheel`, `--capture-hit-feedback`, and `--capture-tactical-hud` provide focused visual checks. `--capture-residential` renders the exterior community, lobby and stairs, an occupied apartment doorway, and a rooftop; `--capture-residential-gameplay` separately captures the clinic, evacuation shelter, and security-post interiors; `--capture-skylinks` renders an interior sniper lane and an exterior stacked-span view. `--validate-skylinks` walks the player from one tower corridor, across a skyway, and into the neighboring tower while also verifying all eleven towers share the floor-2 ring, all 22 spans have glazing and ribs, every span keeps a clear sniper lane, and six M24 sentries remain armed. `--validate-squad` checks the three-operator role fill, physical default-follow movement, enforced AI cooldown, all three class effects, all three squad orders, HUD state, and the AI teammate running to revive the downed player. `--validate-vehicle-drive` boards the service truck, verifies W/S throttle over 60 m of open lane, climbs a synthetic curb through the step-up assist, and checks isolated reverse. The paired `--validate-network-host` and `--validate-network-client` diagnostics run a real host/client pair and verify remote slot replacement, shot relay, and class-ability relay. `--validate-extraction-loadout` verifies the player stays knife-only until a shop kit or world weapon is equipped, while friendly and rival AI operators deploy armed, then exercises the production loot-equip path for all three actor types. `--validate-tactical-hud` verifies minimap projection, ammunition tier scaling, and callsign knockdown feedback. `--validate-progression` verifies purchase deduction, atomic persistence, player loadout application, armed AI baselines, extraction credit, and insufficient-funds rejection.
 
 `--validate-performance` enforces the map optimization budgets: fewer than 40,000 runtime nodes, fewer than 7,500 static bodies, shared box-mesh resources, distance-culling for interior detail, quality-scaled 3D rendering and sky updates, batched stair visuals, preserved per-step collision shapes, and no more than two stair-related static bodies per floor.
+
+</details>
+
+## License
+
+The original source code and project-authored assets are available under the [MIT License](LICENSE). Third-party Poly Haven models and textures are CC0; their attribution and source links are recorded in [`assets/models/LICENSE.md`](assets/models/LICENSE.md) and [`assets/textures/LICENSE.md`](assets/textures/LICENSE.md).

@@ -1365,6 +1365,7 @@ public partial class FreightTerminalWorld
 
     private async void CaptureSquadFrame()
     {
+        SetCaptureLanguage("en");
         await ToSignal(GetTree().CreateTimer(0.65f), SceneTreeTimer.SignalName.Timeout);
         var stagedPositions = new[]
         {
@@ -1395,6 +1396,7 @@ public partial class FreightTerminalWorld
 
     private async void CaptureSquadLobbyFrame()
     {
+        SetCaptureLanguage("en");
         await ToSignal(GetTree().CreateTimer(0.6f), SceneTreeTimer.SignalName.Timeout);
         var image = GetViewport().GetTexture().GetImage();
         image.SavePng("user://squad_lobby_validation.png");
