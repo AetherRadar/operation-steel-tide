@@ -4,6 +4,8 @@ namespace OperationSteelTide;
 
 public partial class CombatHUD
 {
+    private const string OperationsOfficeViewScenePath = "res://ui/OperationsOfficeView.tscn";
+
     private ColorRect _operationsOfficeRoot = null!;
     private ColorRect _demolitionBriefingRoot = null!;
     private Label _operationsOfficeTitle = null!;
@@ -53,6 +55,11 @@ public partial class CombatHUD
         && IsInstanceValid(_demolitionModeButton)
         && IsInstanceValid(_operationsCredits)
         && IsInstanceValid(_resultOfficeButton);
+    public bool OperationsOfficeUsesPackedScene
+        => IsInstanceValid(_operationsOfficeRoot)
+        && _operationsOfficeRoot.SceneFilePath == OperationsOfficeViewScenePath
+        && _operationsOfficeRoot.GetNodeOrNull<Control>("Rail/QuickStartButton/QuickStartTitle") is not null
+        && _operationsOfficeRoot.GetNodeOrNull<Control>("Rail/DemolitionModeButton/DemolitionEntryTitle") is not null;
     public bool DemolitionBriefingUiReady
         => IsInstanceValid(_demolitionDeployButton)
         && _demolitionRoleButtons.Length == 3
@@ -77,102 +84,29 @@ public partial class CombatHUD
 
     private void BuildOperationsOfficeMenu(Control root)
     {
-        _operationsOfficeRoot = new ColorRect
-        {
-            Name = "OperationsOfficeMenu",
-            Color = new Color(0.002f, 0.006f, 0.007f, 0.16f),
-            MouseFilter = Control.MouseFilterEnum.Stop,
-            Visible = false
-        };
-        _operationsOfficeRoot.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        var scene = GD.Load<PackedScene>(OperationsOfficeViewScenePath)
+            ?? throw new System.InvalidOperationException($"Unable to load {OperationsOfficeViewScenePath}");
+        _operationsOfficeRoot = scene.Instantiate<ColorRect>();
         root.AddChild(_operationsOfficeRoot);
 
-        var rail = new ColorRect
-        {
-            Color = new Color(0.008f, 0.014f, 0.015f, 0.91f),
-            Size = new Vector2(520, 1080),
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        };
-        rail.AnchorBottom = 1.0f;
-        rail.OffsetBottom = 0.0f;
-        _operationsOfficeRoot.AddChild(rail);
-        rail.AddChild(new ColorRect
-        {
-            Position = new Vector2(519, 0),
-            Size = new Vector2(1, 1080),
-            Color = new Color(0.25f, 0.78f, 0.62f, 0.72f),
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        });
+        var rail = _operationsOfficeRoot.GetNode<Control>("Rail");
+        _operationsOfficeSection = rail.GetNode<Label>("OperationsOfficeSection");
+        _operationsOfficeTitle = rail.GetNode<Label>("OperationsOfficeTitle");
+        _operationsOfficeSubtitle = rail.GetNode<Label>("OperationsOfficeSubtitle");
+        _operationsCredits = rail.GetNode<Label>("OperationsCredits");
+        _operationsRecord = rail.GetNode<Label>("OperationsRecord");
+        _quickStartButton = rail.GetNode<Button>("QuickStartButton");
+        _quickStartTitle = _quickStartButton.GetNode<Label>("QuickStartTitle");
+        _quickStartDetail = _quickStartButton.GetNode<Label>("QuickStartDetail");
+        _demolitionModeButton = rail.GetNode<Button>("DemolitionModeButton");
+        _demolitionEntryTitle = _demolitionModeButton.GetNode<Label>("DemolitionEntryTitle");
+        _demolitionEntryDetail = _demolitionModeButton.GetNode<Label>("DemolitionEntryDetail");
+        _operationsStatus = rail.GetNode<Label>("OperationsStatus");
+        _operationsQuitButton = rail.GetNode<Button>("OperationsQuitButton");
 
-        _operationsOfficeSection = Label("SPECIAL OPERATIONS CENTER  //  EAST WING", 11, new Color(0.38f, 0.78f, 0.65f));
-        _operationsOfficeSection.Position = new Vector2(42, 46);
-        _operationsOfficeSection.Size = new Vector2(430, 22);
-        rail.AddChild(_operationsOfficeSection);
-        _operationsOfficeTitle = Label("OPERATIONS OFFICE", 35, new Color(0.9f, 0.97f, 0.94f));
-        _operationsOfficeTitle.Position = new Vector2(40, 76);
-        _operationsOfficeTitle.Size = new Vector2(440, 48);
-        rail.AddChild(_operationsOfficeTitle);
-        _operationsOfficeSubtitle = Label("OPERATION STEEL TIDE", 14, new Color(0.5f, 0.66f, 0.61f));
-        _operationsOfficeSubtitle.Position = new Vector2(42, 126);
-        _operationsOfficeSubtitle.Size = new Vector2(430, 26);
-        rail.AddChild(_operationsOfficeSubtitle);
-
-        rail.AddChild(new ColorRect
-        {
-            Position = new Vector2(40, 174),
-            Size = new Vector2(430, 1),
-            Color = new Color(0.18f, 0.32f, 0.28f, 0.82f),
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        });
-        _operationsCredits = Label("AVAILABLE FUNDS  18000", 16, new Color(0.96f, 0.8f, 0.31f));
-        _operationsCredits.Position = new Vector2(42, 196);
-        _operationsCredits.Size = new Vector2(430, 26);
-        rail.AddChild(_operationsCredits);
-        _operationsRecord = Label("EXTRACTIONS  0  //  LIFETIME VALUE  0", 12, new Color(0.58f, 0.72f, 0.67f));
-        _operationsRecord.Position = new Vector2(42, 228);
-        _operationsRecord.Size = new Vector2(430, 22);
-        rail.AddChild(_operationsRecord);
-
-        _quickStartButton = OperationsModeButton(rail, new Vector2(40, 294), new Color(0.28f, 0.9f, 0.67f));
         _quickStartButton.Pressed += () => EmitSignal(SignalName.OperationsQuickStartRequested);
-        _quickStartTitle = Label("QUICK EXTRACTION", 20, new Color(0.75f, 1.0f, 0.88f));
-        _quickStartTitle.Position = new Vector2(24, 17);
-        _quickStartTitle.Size = new Vector2(360, 28);
-        _quickStartTitle.MouseFilter = Control.MouseFilterEnum.Ignore;
-        _quickStartButton.AddChild(_quickStartTitle);
-        _quickStartDetail = Label("ENTER LOADOUT  //  SQUAD UP  //  LOOT AND EXTRACT", 11, new Color(0.48f, 0.68f, 0.61f));
-        _quickStartDetail.Position = new Vector2(25, 52);
-        _quickStartDetail.Size = new Vector2(350, 21);
-        _quickStartDetail.MouseFilter = Control.MouseFilterEnum.Ignore;
-        _quickStartButton.AddChild(_quickStartDetail);
-
-        _demolitionModeButton = OperationsModeButton(rail, new Vector2(40, 402), new Color(1.0f, 0.58f, 0.22f));
         _demolitionModeButton.Pressed += () => EmitSignal(SignalName.DemolitionModeRequested);
-        _demolitionEntryTitle = Label("DEMOLITION", 20, new Color(1.0f, 0.82f, 0.58f));
-        _demolitionEntryTitle.Position = new Vector2(24, 17);
-        _demolitionEntryTitle.Size = new Vector2(360, 28);
-        _demolitionEntryTitle.MouseFilter = Control.MouseFilterEnum.Ignore;
-        _demolitionModeButton.AddChild(_demolitionEntryTitle);
-        _demolitionEntryDetail = Label("FIXED KIT  //  PLANT OR DEFUSE  //  A / B SITES", 11, new Color(0.7f, 0.6f, 0.47f));
-        _demolitionEntryDetail.Position = new Vector2(25, 52);
-        _demolitionEntryDetail.Size = new Vector2(350, 21);
-        _demolitionEntryDetail.MouseFilter = Control.MouseFilterEnum.Ignore;
-        _demolitionModeButton.AddChild(_demolitionEntryDetail);
-
-        _operationsStatus = Label("FIELD TEAM STANDING BY  //  HELIPAD CLEAR", 12, new Color(0.42f, 0.82f, 0.67f));
-        _operationsStatus.Position = new Vector2(42, 534);
-        _operationsStatus.Size = new Vector2(430, 42);
-        _operationsStatus.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        rail.AddChild(_operationsStatus);
-
-        _operationsQuitButton = Button("EXIT TO DESKTOP", new Vector2(40, 970), new Vector2(204, 44));
         _operationsQuitButton.Pressed += () => EmitSignal(SignalName.QuitRequested);
-        rail.AddChild(_operationsQuitButton);
-        var version = Label("FORWARD+  //  OPERATIONS BUILD 1.2", 10, new Color(0.3f, 0.42f, 0.38f));
-        version.Position = new Vector2(264, 982);
-        version.Size = new Vector2(205, 20);
-        version.HorizontalAlignment = HorizontalAlignment.Right;
-        rail.AddChild(version);
     }
 
     private void BuildDemolitionBriefing(Control root)
@@ -294,15 +228,6 @@ public partial class CombatHUD
         _resultOfficeButton.AddThemeFontSizeOverride("font_size", 14);
         _resultOfficeButton.Pressed += () => EmitSignal(SignalName.OperationsHomeRequested);
         _stateOverlay.AddChild(_resultOfficeButton);
-    }
-
-    private static Button OperationsModeButton(Control parent, Vector2 position, Color accent)
-    {
-        var button = DeploymentSegment(position, new Vector2(430, 88), accent);
-        button.FocusMode = Control.FocusModeEnum.None;
-        button.AddThemeStyleboxOverride("hover", FlatStyle(new Color(0.045f, 0.075f, 0.068f, 0.98f), accent, 2));
-        parent.AddChild(button);
-        return button;
     }
 
     private void SelectDemolitionRole(OperatorRole role)

@@ -1,0 +1,312 @@
+[gd_scene load_steps=9 format=3]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_mode_normal"]
+bg_color = Color(0.035, 0.05, 0.049, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.11, 0.16, 0.15, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_quick_hover"]
+bg_color = Color(0.045, 0.075, 0.068, 0.98)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.28, 0.9, 0.67, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_quick_pressed"]
+bg_color = Color(0.055, 0.085, 0.076, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.28, 0.9, 0.67, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_quick_hover_pressed"]
+bg_color = Color(0.065, 0.1, 0.09, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.28, 0.9, 0.67, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_demolition_hover"]
+bg_color = Color(0.045, 0.075, 0.068, 0.98)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.58, 0.22, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_demolition_pressed"]
+bg_color = Color(0.055, 0.085, 0.076, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.58, 0.22, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_demolition_hover_pressed"]
+bg_color = Color(0.065, 0.1, 0.09, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.58, 0.22, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[node name="OperationsOfficeMenu" type="ColorRect"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0.002, 0.006, 0.007, 0.16)
+
+[node name="Rail" type="ColorRect" parent="."]
+layout_mode = 0
+anchor_bottom = 1.0
+offset_right = 520.0
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.008, 0.014, 0.015, 0.91)
+
+[node name="EdgeAccent" type="ColorRect" parent="Rail"]
+layout_mode = 0
+offset_left = 519.0
+offset_right = 520.0
+offset_bottom = 1080.0
+mouse_filter = 2
+color = Color(0.25, 0.78, 0.62, 0.72)
+
+[node name="OperationsOfficeSection" type="Label" parent="Rail"]
+layout_mode = 0
+offset_left = 42.0
+offset_top = 46.0
+offset_right = 472.0
+offset_bottom = 68.0
+theme_override_colors/font_color = Color(0.38, 0.78, 0.65, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 11
+text = "SPECIAL OPERATIONS CENTER  //  EAST WING"
+
+[node name="OperationsOfficeTitle" type="Label" parent="Rail"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 76.0
+offset_right = 480.0
+offset_bottom = 124.0
+theme_override_colors/font_color = Color(0.9, 0.97, 0.94, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 35
+text = "OPERATIONS OFFICE"
+
+[node name="OperationsOfficeSubtitle" type="Label" parent="Rail"]
+layout_mode = 0
+offset_left = 42.0
+offset_top = 126.0
+offset_right = 472.0
+offset_bottom = 152.0
+theme_override_colors/font_color = Color(0.5, 0.66, 0.61, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 14
+text = "OPERATION STEEL TIDE"
+
+[node name="ProfileDivider" type="ColorRect" parent="Rail"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 174.0
+offset_right = 470.0
+offset_bottom = 175.0
+mouse_filter = 2
+color = Color(0.18, 0.32, 0.28, 0.82)
+
+[node name="OperationsCredits" type="Label" parent="Rail"]
+layout_mode = 0
+offset_left = 42.0
+offset_top = 196.0
+offset_right = 472.0
+offset_bottom = 222.0
+theme_override_colors/font_color = Color(0.96, 0.8, 0.31, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 16
+text = "AVAILABLE FUNDS  18000"
+
+[node name="OperationsRecord" type="Label" parent="Rail"]
+layout_mode = 0
+offset_left = 42.0
+offset_top = 228.0
+offset_right = 472.0
+offset_bottom = 250.0
+theme_override_colors/font_color = Color(0.58, 0.72, 0.67, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 12
+text = "EXTRACTIONS  0  //  LIFETIME VALUE  0"
+
+[node name="QuickStartButton" type="Button" parent="Rail"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 294.0
+offset_right = 470.0
+offset_bottom = 382.0
+focus_mode = 0
+theme_override_colors/font_color = Color(0.72, 0.8, 0.77, 1)
+theme_override_colors/font_hover_color = Color(0.92, 0.98, 0.95, 1)
+theme_override_colors/font_pressed_color = Color(0.28, 0.9, 0.67, 1)
+theme_override_font_sizes/font_size = 10
+theme_override_styles/normal = SubResource("StyleBox_mode_normal")
+theme_override_styles/hover = SubResource("StyleBox_quick_hover")
+theme_override_styles/pressed = SubResource("StyleBox_quick_pressed")
+theme_override_styles/hover_pressed = SubResource("StyleBox_quick_hover_pressed")
+
+[node name="QuickStartTitle" type="Label" parent="Rail/QuickStartButton"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 17.0
+offset_right = 384.0
+offset_bottom = 45.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.75, 1, 0.88, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 20
+text = "QUICK EXTRACTION"
+
+[node name="QuickStartDetail" type="Label" parent="Rail/QuickStartButton"]
+layout_mode = 0
+offset_left = 25.0
+offset_top = 52.0
+offset_right = 375.0
+offset_bottom = 73.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.48, 0.68, 0.61, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 11
+text = "ENTER LOADOUT  //  SQUAD UP  //  LOOT AND EXTRACT"
+
+[node name="DemolitionModeButton" type="Button" parent="Rail"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 402.0
+offset_right = 470.0
+offset_bottom = 490.0
+focus_mode = 0
+theme_override_colors/font_color = Color(0.72, 0.8, 0.77, 1)
+theme_override_colors/font_hover_color = Color(0.92, 0.98, 0.95, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.58, 0.22, 1)
+theme_override_font_sizes/font_size = 10
+theme_override_styles/normal = SubResource("StyleBox_mode_normal")
+theme_override_styles/hover = SubResource("StyleBox_demolition_hover")
+theme_override_styles/pressed = SubResource("StyleBox_demolition_pressed")
+theme_override_styles/hover_pressed = SubResource("StyleBox_demolition_hover_pressed")
+
+[node name="DemolitionEntryTitle" type="Label" parent="Rail/DemolitionModeButton"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 17.0
+offset_right = 384.0
+offset_bottom = 45.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.58, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 20
+text = "DEMOLITION"
+
+[node name="DemolitionEntryDetail" type="Label" parent="Rail/DemolitionModeButton"]
+layout_mode = 0
+offset_left = 25.0
+offset_top = 52.0
+offset_right = 375.0
+offset_bottom = 73.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.7, 0.6, 0.47, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 11
+text = "FIXED KIT  //  PLANT OR DEFUSE  //  A / B SITES"
+
+[node name="OperationsStatus" type="Label" parent="Rail"]
+layout_mode = 0
+offset_left = 42.0
+offset_top = 534.0
+offset_right = 472.0
+offset_bottom = 576.0
+theme_override_colors/font_color = Color(0.42, 0.82, 0.67, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 12
+text = "FIELD TEAM STANDING BY  //  HELIPAD CLEAR"
+autowrap_mode = 3
+
+[node name="OperationsQuitButton" type="Button" parent="Rail"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 970.0
+offset_right = 244.0
+offset_bottom = 1014.0
+theme_override_colors/font_color = Color(0.82, 0.9, 0.87, 1)
+theme_override_colors/font_hover_color = Color(0.19, 0.9, 0.69, 1)
+theme_override_font_sizes/font_size = 16
+text = "EXIT TO DESKTOP"
+
+[node name="BuildVersion" type="Label" parent="Rail"]
+layout_mode = 0
+offset_left = 264.0
+offset_top = 982.0
+offset_right = 469.0
+offset_bottom = 1002.0
+theme_override_colors/font_color = Color(0.3, 0.42, 0.38, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 10
+text = "FORWARD+  //  OPERATIONS BUILD 1.2"
+horizontal_alignment = 2

@@ -385,6 +385,7 @@ public partial class FreightTerminalWorld
     {
         await WaitFrames(5);
         var uiReady = _hud.OperationsOfficeUiReady;
+        var packedUiReady = _hud.OperationsOfficeUsesPackedScene;
         var sceneReady = OperationsOfficeScenePartCount >= 50
             && _operationsOfficeScene.FindChild("TacticalMapTable", recursive: true, owned: false) is not null
             && _operationsOfficeScene.FindChild("HelipadRing", recursive: true, owned: false) is not null
@@ -424,9 +425,9 @@ public partial class FreightTerminalWorld
             && IsOperationsOfficeCameraCurrent
             && GetTree().Paused;
         var languageReady = chineseReady && englishReady;
-        var valid = uiReady && sceneReady && homeReady && demolitionReady && roleReady && backReady
+        var valid = uiReady && packedUiReady && sceneReady && homeReady && demolitionReady && roleReady && backReady
             && languageReady && loadoutReady && loadoutBackReady;
-        GD.Print($"OPERATIONS_OFFICE_CHECK valid={valid} ui={uiReady} scene={sceneReady} parts={OperationsOfficeScenePartCount} glass={OperationsOfficeGlassPaneCount} single_surface={OperationsOfficeUsesSingleSurfaceGlass} home={homeReady} demolition={demolitionReady} role={roleReady} back={backReady} language={languageReady} loadout={loadoutReady} loadout_back={loadoutBackReady} paused={GetTree().Paused} camera={IsOperationsOfficeCameraCurrent}");
+        GD.Print($"OPERATIONS_OFFICE_CHECK valid={valid} ui={uiReady} packed_ui={packedUiReady} scene={sceneReady} parts={OperationsOfficeScenePartCount} glass={OperationsOfficeGlassPaneCount} single_surface={OperationsOfficeUsesSingleSurfaceGlass} home={homeReady} demolition={demolitionReady} role={roleReady} back={backReady} language={languageReady} loadout={loadoutReady} loadout_back={loadoutBackReady} paused={GetTree().Paused} camera={IsOperationsOfficeCameraCurrent}");
         GD.Print($"OPERATIONS_OFFICE_PASS valid={valid}");
         GetTree().Paused = false;
         GetTree().Quit(valid ? 0 : 2);
