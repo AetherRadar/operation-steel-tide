@@ -11,7 +11,7 @@
 
 > **Prototype status:** the complete mission loop is playable and a packaged Windows build is available, but this remains a code-first prototype with programmer art and rough animation.
 
-> **Development disclosure:** This is an AI-assisted solo prototype. AI tools were used for portions of implementation; the repository owner remains responsible for design decisions, integration, debugging, and validation. The project is not presented as a production-ready architecture reference. See [ARCHITECTURE.md](ARCHITECTURE.md) for the current boundaries and incremental refactor direction.
+> **Development disclosure:** This is an AI-assisted solo prototype. AI tools were used for portions of implementation; the repository owner remains responsible for design decisions, integration, debugging, and validation. The project is not presented as a production-ready architecture reference. See [ARCHITECTURE.md](ARCHITECTURE.md) for the current boundaries and incremental refactor direction, and [Content Provenance](docs/CONTENT_PROVENANCE.md) for the known origin and licensing status of shipped and displayed content.
 
 ## Playable now
 
@@ -246,4 +246,4 @@ Godot_console.exe --headless --path . -- --validate-network-client
 
 ## License
 
-The original source code and project-authored assets are available under the [MIT License](LICENSE). Third-party Poly Haven models and textures are CC0; their attribution and source links are recorded in [`assets/models/LICENSE.md`](assets/models/LICENSE.md) and [`assets/textures/LICENSE.md`](assets/textures/LICENSE.md).
+The original source code and project-authored assets are available under the [MIT License](LICENSE). Third-party Poly Haven models and textures are CC0; their attribution and source links are recorded in [`assets/models/LICENSE.md`](assets/models/LICENSE.md) and [`assets/textures/LICENSE.md`](assets/textures/LICENSE.md). The project's AI-assistance disclosure and content-origin inventory are recorded in [`docs/CONTENT_PROVENANCE.md`](docs/CONTENT_PROVENANCE.md).
