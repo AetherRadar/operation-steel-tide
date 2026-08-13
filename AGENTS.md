@@ -2,10 +2,11 @@
 
 ## 交付纪律（强制 / Mandatory delivery discipline）
 
-- 每个任务的最后一步必须是提交代码：把本次任务的全部改动按功能分组做 `git commit`（可以多个 commit），确认工作区干净后才能结束任务。
-- Every task MUST end with git commits: group all task changes into logical commits (multiple allowed) and leave a clean working tree before finishing. Never hand off uncommitted work to the next task.
+- 每个任务的最终交付序列必须是：按功能分组完成全部 `git commit`（可以多个 commit），`git push` 当前分支到上游，再执行下述远端一致性核验；禁止把未提交或仅存在于本地的改动留给下一个任务。
+- Every task MUST finish with this delivery sequence: commit all changes in logical groups, `git push` the current branch to its upstream, then perform the remote-consistency checks below. Never hand off uncommitted or local-only work to the next task.
 - 提交前必须通过：`dotnet build OperationSteelTide.csproj` 0 警告 0 错误；与改动相关的 `--validate-*` 诊断全部通过（退出码 0）。
 - 提交信息用英文祈使句，一个功能一个 commit，例如 `Fix mirrored residential stairs`、`Add AI teammate revive for downed player`。
+- 推送后必须运行 `git fetch`，确认本地 `HEAD` 与上游分支提交一致，且 `git status --short --branch` 工作区干净、不显示 `ahead`。若认证、网络或分支保护导致推送失败，任务不得宣称已经交付完成。
 - 不要主动创建新分支；直接在当前分支提交。
 
 ## 构建与验证 / Build & validation

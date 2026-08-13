@@ -55,7 +55,9 @@ scene / composition root
 - New rules require focused tests or deterministic diagnostics at the same time as the behavior is introduced. A screenshot alone is not a behavioral test.
 - UI diagnostics MUST set their own deterministic state and report one machine-readable `*_CHECK` line, one `*_PASS valid=...` line, and exit with `0` on success or `2` on failure.
 - CI MUST retain the C# build gate. The next gates to add are Go tests, pinned Godot headless diagnostics, and a packaged-export smoke test, in that order as reproducibility permits.
-- Commits MUST be cohesive, use an English imperative subject, and leave the working tree clean at task completion, as required by `AGENTS.md`.
+- Commits MUST be cohesive, use an English imperative subject, and contain every task change before delivery, as required by `AGENTS.md`.
+- Every task MUST finish with this delivery sequence: commit all task changes, push the current branch to its configured upstream, then run `git fetch` and verify that local `HEAD` equals the upstream commit and `git status --short --branch` is clean without an `ahead` marker.
+- A task MUST NOT be reported as delivered when authentication, network failure, or branch protection prevents the required push.
 
 ## Review checklist
 
