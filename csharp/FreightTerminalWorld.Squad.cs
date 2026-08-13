@@ -54,8 +54,11 @@ public partial class FreightTerminalWorld
         var operationsOfficeCommand = Array.Exists(args, value =>
             value == "--validate-operations-office"
             || value == "--validate-demolition"
+            || value == "--validate-demolition-arena"
+            || value == "--validate-demolition-briefing"
             || value == "--capture-operations-office"
-            || value == "--capture-demolition-briefing");
+            || value == "--capture-demolition-briefing"
+            || value == "--capture-demolition-arena");
         var diagnostic = Array.Exists(args, value =>
             value.StartsWith("--capture", StringComparison.Ordinal)
             || value.StartsWith("--validate", StringComparison.Ordinal))

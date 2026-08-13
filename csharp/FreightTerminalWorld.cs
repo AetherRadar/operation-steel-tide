@@ -111,7 +111,6 @@ public partial class FreightTerminalWorld : Node3D
         BuildLevel();
         BuildHudAndPlayer();
         BuildOperationsOffice();
-        BuildDemolitionSites();
         BuildSquadSystem();
         SpawnLootCases();
         SpawnBuildingGradedLoot();

@@ -430,6 +430,7 @@ public partial class FreightTerminalWorld
         GD.Print($"OPERATIONS_OFFICE_CHECK valid={valid} ui={uiReady} packed_ui={packedUiReady} scene={sceneReady} parts={OperationsOfficeScenePartCount} glass={OperationsOfficeGlassPaneCount} single_surface={OperationsOfficeUsesSingleSurfaceGlass} home={homeReady} demolition={demolitionReady} role={roleReady} back={backReady} language={languageReady} loadout={loadoutReady} loadout_back={loadoutBackReady} paused={GetTree().Paused} camera={IsOperationsOfficeCameraCurrent}");
         GD.Print($"OPERATIONS_OFFICE_PASS valid={valid}");
         GetTree().Paused = false;
+        await WaitFrames(180);
         GetTree().Quit(valid ? 0 : 2);
     }
 

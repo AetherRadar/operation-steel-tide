@@ -60,6 +60,11 @@ public partial class FreightTerminalWorld
 
     private void UpdateWorldBossTracking()
     {
+        if (_demolitionMode)
+        {
+            _hud.SetMinimapWorldBoss(Vector3.Zero, false);
+            return;
+        }
         var active = IsInstanceValid(_worldBoss) && !_worldBoss!.IsDead;
         if (!active)
         {

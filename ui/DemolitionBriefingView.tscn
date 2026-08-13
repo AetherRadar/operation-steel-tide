@@ -1,0 +1,371 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://csharp/DemolitionBriefingView.cs" id="1_view"]
+
+[sub_resource type="StyleBoxFlat" id="Style_role_normal"]
+bg_color = Color(0.025, 0.036, 0.037, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.18, 0.3, 0.29, 0.82)
+
+[sub_resource type="StyleBoxFlat" id="Style_role_hover"]
+bg_color = Color(0.045, 0.072, 0.068, 0.98)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.38, 0.76, 0.65, 0.9)
+
+[sub_resource type="StyleBoxFlat" id="Style_role_pressed"]
+bg_color = Color(0.055, 0.105, 0.09, 1)
+border_width_left = 3
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.92, 0.52, 0.17, 1)
+
+[sub_resource type="StyleBoxFlat" id="Style_back"]
+bg_color = Color(0.035, 0.052, 0.05, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.43, 0.4, 0.9)
+
+[sub_resource type="StyleBoxFlat" id="Style_back_hover"]
+bg_color = Color(0.065, 0.1, 0.09, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.32, 0.84, 0.67, 1)
+
+[sub_resource type="StyleBoxFlat" id="Style_deploy"]
+bg_color = Color(0.98, 0.49, 0.14, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.77, 0.39, 1)
+
+[sub_resource type="StyleBoxFlat" id="Style_deploy_hover"]
+bg_color = Color(1, 0.63, 0.22, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 0.9, 0.65, 1)
+
+[sub_resource type="StyleBoxFlat" id="Style_intel"]
+bg_color = Color(0.016, 0.025, 0.027, 0.94)
+border_width_left = 3
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.9, 0.42, 0.12, 0.82)
+
+[node name="DemolitionBriefingView" type="ColorRect"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0.002, 0.005, 0.006, 0.58)
+script = ExtResource("1_view")
+
+[node name="Band" type="ColorRect" parent="."]
+layout_mode = 0
+offset_right = 760.0
+offset_bottom = 1080.0
+mouse_filter = 1
+color = Color(0.008, 0.012, 0.014, 0.97)
+
+[node name="Accent" type="ColorRect" parent="Band"]
+layout_mode = 0
+offset_left = 759.0
+offset_right = 760.0
+offset_bottom = 1080.0
+mouse_filter = 2
+color = Color(1, 0.52, 0.18, 0.82)
+
+[node name="Title" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 42.0
+offset_top = 48.0
+offset_right = 704.0
+offset_bottom = 92.0
+theme_override_colors/font_color = Color(1, 0.9, 0.78, 1)
+theme_override_font_sizes/font_size = 32
+text = "DEMOLITION BRIEFING"
+
+[node name="Subtitle" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 96.0
+offset_right = 704.0
+offset_bottom = 118.0
+theme_override_colors/font_color = Color(0.78, 0.55, 0.34, 1)
+theme_override_font_sizes/font_size = 12
+text = "TIDEFORGE ARENA  //  ATTACKING ELEMENT"
+
+[node name="HeaderRule" type="ColorRect" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 132.0
+offset_right = 704.0
+offset_bottom = 133.0
+mouse_filter = 2
+color = Color(0.31, 0.39, 0.36, 0.72)
+
+[node name="RulesTitle" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 154.0
+offset_right = 344.0
+offset_bottom = 176.0
+theme_override_colors/font_color = Color(0.48, 0.72, 0.64, 1)
+theme_override_font_sizes/font_size = 12
+text = "ENGAGEMENT RULES"
+
+[node name="Rules" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 184.0
+offset_right = 704.0
+offset_bottom = 276.0
+theme_override_colors/font_color = Color(0.76, 0.84, 0.81, 1)
+theme_override_constants/line_spacing = 6
+theme_override_font_sizes/font_size = 14
+text = "PLANT AT SITE A OR B  //  HOLD F\nDEFEND THE DEVICE UNTIL DETONATION\nELIMINATION ALSO ENDS THE ROUND  //  NO LOOT BANKING"
+autowrap_mode = 2
+
+[node name="RoleTitle" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 304.0
+offset_right = 344.0
+offset_bottom = 326.0
+theme_override_colors/font_color = Color(0.48, 0.72, 0.64, 1)
+theme_override_font_sizes/font_size = 12
+text = "SELECT OPERATOR"
+
+[node name="Roles" type="Control" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 340.0
+offset_right = 704.0
+offset_bottom = 458.0
+
+[node name="AssaultButton" type="Button" parent="Band/Roles"]
+layout_mode = 0
+offset_right = 210.0
+offset_bottom = 118.0
+focus_mode = 0
+toggle_mode = true
+button_pressed = true
+theme_override_styles/normal = SubResource("Style_role_normal")
+theme_override_styles/hover = SubResource("Style_role_hover")
+theme_override_styles/pressed = SubResource("Style_role_pressed")
+theme_override_styles/hover_pressed = SubResource("Style_role_pressed")
+
+[node name="RoleName" type="Label" parent="Band/Roles/AssaultButton"]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 12.0
+offset_right = 196.0
+offset_bottom = 36.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.66, 0.34, 1)
+theme_override_font_sizes/font_size = 15
+text = "ASSAULT"
+
+[node name="RoleDetail" type="Label" parent="Band/Roles/AssaultButton"]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 44.0
+offset_right = 196.0
+offset_bottom = 108.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.58, 0.7, 0.66, 1)
+theme_override_font_sizes/font_size = 10
+text = "COMBAT OVERDRIVE"
+autowrap_mode = 2
+
+[node name="MedicButton" type="Button" parent="Band/Roles"]
+layout_mode = 0
+offset_left = 226.0
+offset_right = 436.0
+offset_bottom = 118.0
+focus_mode = 0
+toggle_mode = true
+theme_override_styles/normal = SubResource("Style_role_normal")
+theme_override_styles/hover = SubResource("Style_role_hover")
+theme_override_styles/pressed = SubResource("Style_role_pressed")
+theme_override_styles/hover_pressed = SubResource("Style_role_pressed")
+
+[node name="RoleName" type="Label" parent="Band/Roles/MedicButton"]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 12.0
+offset_right = 196.0
+offset_bottom = 36.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 1, 0.68, 1)
+theme_override_font_sizes/font_size = 15
+text = "MEDIC"
+
+[node name="RoleDetail" type="Label" parent="Band/Roles/MedicButton"]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 44.0
+offset_right = 196.0
+offset_bottom = 108.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.58, 0.7, 0.66, 1)
+theme_override_font_sizes/font_size = 10
+text = "MEDICAL SPRAY"
+autowrap_mode = 2
+
+[node name="ReconButton" type="Button" parent="Band/Roles"]
+layout_mode = 0
+offset_left = 452.0
+offset_right = 660.0
+offset_bottom = 118.0
+focus_mode = 0
+toggle_mode = true
+theme_override_styles/normal = SubResource("Style_role_normal")
+theme_override_styles/hover = SubResource("Style_role_hover")
+theme_override_styles/pressed = SubResource("Style_role_pressed")
+theme_override_styles/hover_pressed = SubResource("Style_role_pressed")
+
+[node name="RoleName" type="Label" parent="Band/Roles/ReconButton"]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 12.0
+offset_right = 194.0
+offset_bottom = 36.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.82, 1, 1)
+theme_override_font_sizes/font_size = 15
+text = "RECON"
+
+[node name="RoleDetail" type="Label" parent="Band/Roles/ReconButton"]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 44.0
+offset_right = 194.0
+offset_bottom = 108.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.58, 0.7, 0.66, 1)
+theme_override_font_sizes/font_size = 10
+text = "PULSE SCANNER"
+autowrap_mode = 2
+
+[node name="LoadoutTitle" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 504.0
+offset_right = 344.0
+offset_bottom = 526.0
+theme_override_colors/font_color = Color(0.48, 0.72, 0.64, 1)
+theme_override_font_sizes/font_size = 12
+text = "REGULATION LOADOUT"
+
+[node name="Loadout" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 536.0
+offset_right = 704.0
+offset_bottom = 622.0
+theme_override_colors/font_color = Color(0.82, 0.88, 0.85, 1)
+theme_override_constants/line_spacing = 5
+theme_override_font_sizes/font_size = 14
+text = "M4A1 STANDARD  //  COMMON 5.56  x120\nSTANDARD CARRIER  //  PATROL HELMET\n2 FRAG  //  2 PLATES  //  CLASS SKILL ENABLED"
+
+[node name="ReadyStatus" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 650.0
+offset_right = 704.0
+offset_bottom = 678.0
+theme_override_colors/font_color = Color(1, 0.67, 0.31, 1)
+theme_override_font_sizes/font_size = 12
+text = "FAIR PLAY KIT  //  EXTRACTION WALLET UNAFFECTED"
+
+[node name="BackButton" type="Button" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 958.0
+offset_right = 234.0
+offset_bottom = 1008.0
+theme_override_colors/font_color = Color(0.82, 0.9, 0.87, 1)
+theme_override_colors/font_hover_color = Color(0.3, 0.96, 0.76, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("Style_back")
+theme_override_styles/hover = SubResource("Style_back_hover")
+text = "BACK"
+
+[node name="DeployButton" type="Button" parent="Band"]
+layout_mode = 0
+offset_left = 250.0
+offset_top = 958.0
+offset_right = 704.0
+offset_bottom = 1008.0
+theme_override_colors/font_color = Color(0.08, 0.035, 0.01, 1)
+theme_override_colors/font_hover_color = Color(0.08, 0.035, 0.01, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("Style_deploy")
+theme_override_styles/hover = SubResource("Style_deploy_hover")
+theme_override_styles/pressed = SubResource("Style_deploy")
+text = "DEPLOY DEMOLITION TEAM"
+
+[node name="ArenaIntel" type="Panel" parent="."]
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -488.0
+offset_top = -244.0
+offset_right = -48.0
+offset_bottom = -48.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("Style_intel")
+
+[node name="IntelCaption" type="Label" parent="ArenaIntel"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 18.0
+offset_right = 414.0
+offset_bottom = 40.0
+theme_override_colors/font_color = Color(0.5, 0.72, 0.65, 1)
+theme_override_font_sizes/font_size = 11
+text = "SELECTED BATTLESPACE"
+
+[node name="ArenaName" type="Label" parent="ArenaIntel"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 48.0
+offset_right = 414.0
+offset_bottom = 84.0
+theme_override_colors/font_color = Color(1, 0.66, 0.32, 1)
+theme_override_font_sizes/font_size = 24
+text = "TIDEFORGE ARENA"
+
+[node name="ArenaProfile" type="Label" parent="ArenaIntel"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 96.0
+offset_right = 414.0
+offset_bottom = 168.0
+theme_override_colors/font_color = Color(0.72, 0.82, 0.79, 1)
+theme_override_constants/line_spacing = 5
+theme_override_font_sizes/font_size = 12
+text = "THREE ATTACK ROUTES  //  MID ROTATION\nA  OPEN FOUNDRY YARD  //  B  ENCLOSED ASSEMBLY HALL"
+autowrap_mode = 2

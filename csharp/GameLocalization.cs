@@ -418,7 +418,7 @@ public static class GameLocalization
         Chinese["operations_return"] = "\u8fd4\u56de\u7279\u52e4\u5904";
         Chinese["demolition_title"] = "\u7206\u7834\u4efb\u52a1\u7b80\u62a5";
         Chinese["demolition"] = "\u7206\u7834";
-        Chinese["demolition_subtitle"] = "\u8d27\u8fd0\u7ec8\u7aef  //  \u8fdb\u653b\u65b9";
+        Chinese["demolition_subtitle"] = "\u6f6e\u6c50\u5de5\u574a  //  \u8fdb\u653b\u65b9";
         Chinese["demolition_rules_title"] = "\u4ea4\u6218\u89c4\u5219";
         Chinese["demolition_rules"] = "\u5728 A \u6216 B \u70b9\u6309\u4f4f F \u5b89\u88c5\u88c5\u7f6e\n\u5b88\u4f4f\u88c5\u7f6e\u76f4\u5230\u7206\u70b8\n\u5168\u5458\u6d88\u706d\u4e5f\u4f1a\u7ed3\u675f\u672c\u5c40  //  \u4e0d\u7ed3\u7b97\u6478\u91d1\u7269\u8d44";
         Chinese["demolition_select_role"] = "\u9009\u62e9\u5e72\u5458";
@@ -427,6 +427,14 @@ public static class GameLocalization
         Chinese["demolition_back"] = "\u8fd4\u56de";
         Chinese["demolition_deploy"] = "\u90e8\u7f72\u7206\u7834\u5c0f\u961f";
         Chinese["demolition_role_ready"] = "{0}  //  \u56fa\u5b9a\u516c\u5e73\u914d\u88c5  //  \u4e0d\u6263\u9664\u6478\u91d1\u8d44\u91d1";
+        Chinese["demolition_arena_selected"] = "\u9009\u5b9a\u6218\u533a";
+        Chinese["demolition_arena_name"] = "\u6f6e\u6c50\u5de5\u574a";
+        Chinese["demolition_arena_profile"] = "\u4e09\u8def\u8fdb\u653b  //  \u4e2d\u8def\u8f6c\u70b9\nA  \u5f00\u653e\u94f8\u9020\u573a  //  B  \u5ba4\u5185\u88c5\u914d\u5385";
+        Chinese["demolition_minimap_attack"] = "\u8fdb\u653b\u65b9";
+        Chinese["demolition_minimap_mid"] = "\u4e2d\u8def";
+        Chinese["demolition_minimap_a"] = "A \u70b9";
+        Chinese["demolition_minimap_b"] = "B \u70b9";
+        Chinese["demolition_minimap_defend"] = "\u9632\u5b88\u65b9";
         Chinese["demolition_success"] = "\u7206\u7834\u6210\u529f";
         Chinese["demolition_failed"] = "\u7206\u7834\u5931\u8d25";
         Chinese["demolition_result_economy"] = "\u7ade\u6280\u914d\u88c5\u5df2\u56de\u6536  //  \u6478\u91d1\u8d44\u91d1\u672a\u53d8\u52a8";

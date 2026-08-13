@@ -9,15 +9,10 @@ public partial class FreightTerminalWorld
     private const float DemolitionPlantDuration = 3.4f;
     private const float DemolitionFuseDuration = 32.0f;
     private const float DemolitionDefuseDuration = 6.5f;
-    private static readonly Vector3 DemolitionAttackSpawn = new(0.0f, 0.2f, 31.0f);
-    private static readonly Vector3[] DemolitionSitePositions =
-    {
-        new(21.0f, 0.18f, -12.0f),
-        new(-26.0f, 0.18f, -5.0f)
-    };
 
     private readonly List<Node3D> _demolitionSites = new();
     private readonly List<EnemyOperator> _demolitionDefenders = new();
+    private DemolitionArenaRuntime? _demolitionArena;
     private Node3D? _demolitionDevice;
     private EnemyOperator? _demolitionDefuser;
     private Vector3[] _demolitionDefuseRoute = System.Array.Empty<Vector3>();
@@ -38,70 +33,20 @@ public partial class FreightTerminalWorld
     public int DemolitionDefenderCount => _demolitionDefenders.Count(defender => IsInstanceValid(defender) && !defender.IsDead);
     public float DemolitionSecondsRemaining => _demolitionRemaining;
     public float DemolitionDefuseProgress => _demolitionDefuseProgress;
+    public bool IsDemolitionArenaActive => _demolitionArena?.Active == true;
+    public int DemolitionArenaCollisionBodyCount => _demolitionArena?.CollisionBodyCount ?? 0;
+    public int DemolitionArenaVisualPartCount => _demolitionArena?.VisualPartCount ?? 0;
 
-    private void BuildDemolitionSites()
+    private void EnsureDemolitionArenaBuilt()
     {
-        var baseMaterial = Mat("demolition_site_base", new Color(0.12f, 0.13f, 0.12f), 0.54f, 0.56f);
-        var orange = Mat(
-            "demolition_site_orange",
-            new Color(1.0f, 0.45f, 0.08f),
-            0.12f,
-            0.3f,
-            new Color(0.82f, 0.16f, 0.01f));
-        var dark = Mat("demolition_site_dark", new Color(0.025f, 0.035f, 0.032f), 0.72f, 0.34f);
-        for (var index = 0; index < DemolitionSitePositions.Length; index++)
+        if (_demolitionArena is not null)
         {
-            var site = new Node3D
-            {
-                Name = $"DemolitionSite_{(char)('A' + index)}",
-                Position = DemolitionSitePositions[index],
-                Visible = false
-            };
-            _levelRoot.AddChild(site);
-            site.AddChild(new MeshInstance3D
-            {
-                Name = "SiteRing",
-                Mesh = new TorusMesh { InnerRadius = 2.8f, OuterRadius = 3.05f, Rings = 36, RingSegments = 8 },
-                MaterialOverride = orange
-            });
-            OfficeBox(site, "SitePlate", new Vector3(0, 0.04f, 0), new Vector3(4.7f, 0.08f, 4.7f), baseMaterial);
-            OfficeBox(site, "SiteCaseLeft", new Vector3(-1.85f, 0.38f, -1.65f), new Vector3(1.2f, 0.7f, 0.75f), dark);
-            OfficeBox(site, "SiteCaseRight", new Vector3(1.85f, 0.38f, 1.65f), new Vector3(1.2f, 0.7f, 0.75f), dark);
-            var label = new Label3D
-            {
-                Name = "SiteLabel",
-                Text = ((char)('A' + index)).ToString(),
-                Position = new Vector3(0, 0.18f, 0),
-                RotationDegrees = new Vector3(-90, 0, 0),
-                FontSize = 170,
-                Modulate = new Color(1.0f, 0.58f, 0.16f),
-                OutlineSize = 8,
-                NoDepthTest = false
-            };
-            site.AddChild(label);
-            _demolitionSites.Add(site);
+            return;
         }
-    }
-
-    private bool IsDemolitionSitePlacementClear(Vector3 position)
-    {
-        var query = new PhysicsShapeQueryParameters3D
-        {
-            Shape = new BoxShape3D { Size = new Vector3(4.2f, 1.55f, 4.2f) },
-            Transform = new Transform3D(Basis.Identity, position + Vector3.Up * 1.05f),
-            CollisionMask = 1,
-            CollideWithAreas = false,
-            CollideWithBodies = true
-        };
-        var hits = GetWorld3D().DirectSpaceState.IntersectShape(query, 64);
-        foreach (var hit in hits)
-        {
-            if (hit["collider"].AsGodotObject() is StaticBody3D)
-            {
-                return false;
-            }
-        }
-        return true;
+        var builder = new DemolitionArenaBuilder(Mat, GroundMaterial);
+        _demolitionArena = builder.Build(this, new DemolitionArenaLayout());
+        _demolitionSites.Clear();
+        _demolitionSites.AddRange(_demolitionArena.Sites);
     }
 
     private void OnDemolitionDeploymentRequested(int role)
@@ -112,7 +57,9 @@ public partial class FreightTerminalWorld
         }
 
         PrepareDemolitionBattlefield();
-        _player.GlobalPosition = DemolitionAttackSpawn;
+        var layout = DemolitionLayout();
+        _player.GlobalPosition = layout.AttackSpawn;
+        _player.Rotation = Vector3.Zero;
         _player.ApplyDeploymentLoadout(BuildDemolitionLoadout());
         DeploySquad((OperatorRole)role, SquadSessionMode.Local, "127.0.0.1");
         _missionDirector.ExitDeploymentZone();
@@ -144,6 +91,11 @@ public partial class FreightTerminalWorld
 
     private void PrepareDemolitionBattlefield()
     {
+        EnsureDemolitionArenaBuilt();
+        if (_demolitionArena is null)
+        {
+            throw new System.InvalidOperationException("Demolition arena was not built before deployment.");
+        }
         _demolitionMode = true;
         _demolitionRoundActive = true;
         _demolitionDevicePlanted = false;
@@ -154,6 +106,10 @@ public partial class FreightTerminalWorld
         _demolitionDefuser = null;
         _reinforcementPending = false;
         _reinforcementCountdown = 0.0f;
+        _levelRoot.Visible = false;
+        _levelRoot.ProcessMode = ProcessModeEnum.Disabled;
+        _demolitionArena.SetActive(true);
+        ConfigureDemolitionMinimap();
         if (IsInstanceValid(_extractionMarker))
         {
             _extractionMarker.Visible = false;
@@ -164,11 +120,6 @@ public partial class FreightTerminalWorld
             _aircraft.SetPhysicsProcess(false);
             _aircraft.Visible = false;
         }
-        foreach (var site in _demolitionSites)
-        {
-            site.Visible = true;
-        }
-
         foreach (var enemy in _enemies.ToArray())
         {
             if (!IsInstanceValid(enemy))
@@ -195,29 +146,21 @@ public partial class FreightTerminalWorld
         }
 
         _demolitionDefenders.Clear();
-        var spawns = new[]
-        {
-            DemolitionSitePositions[0] + new Vector3(-5.0f, 0, 2.5f),
-            DemolitionSitePositions[0] + new Vector3(4.5f, 0, -2.0f),
-            DemolitionSitePositions[0] + new Vector3(0.5f, 0, -7.0f),
-            DemolitionSitePositions[1] + new Vector3(-4.5f, 0, -2.0f),
-            DemolitionSitePositions[1] + new Vector3(4.8f, 0, 2.8f),
-            DemolitionSitePositions[1] + new Vector3(0.0f, 0, -7.0f),
-            new Vector3(0.0f, 0.2f, -8.0f)
-        };
-        for (var index = 0; index < spawns.Length; index++)
+        var spawns = _demolitionArena.Layout.DefenderSpawns;
+        for (var index = 0; index < spawns.Count; index++)
         {
             var weapon = index % 3 == 0
                 ? WeaponCatalog.Build(WeaponPlatform.MP5A5, 1)
                 : WeaponCatalog.Build(WeaponPlatform.M4A1, 1);
             var defender = SpawnEnemy(
                 spawns[index],
-                alerted: true,
+                alerted: false,
                 teamId: 0,
                 initialWeapon: weapon,
-                sentryMode: false,
-                detectionRange: 62.0f);
+                sentryMode: true,
+                detectionRange: 52.0f);
             defender.Name = $"DemolitionDefender_{index + 1:00}";
+            defender.LookAt(_demolitionArena.Layout.Midpoint, Vector3.Up);
             _demolitionDefenders.Add(defender);
         }
         _enemiesRemaining = _demolitionDefenders.Count;
@@ -239,10 +182,12 @@ public partial class FreightTerminalWorld
 
         var nearestIndex = -1;
         var nearestDistance = 3.25f;
-        for (var index = 0; index < DemolitionSitePositions.Length; index++)
+        var layout = DemolitionLayout();
+        for (var index = 0; index < layout.SitePositions.Count; index++)
         {
-            var distance = HorizontalDistance(_player.GlobalPosition, DemolitionSitePositions[index]);
-            if (distance < nearestDistance && Mathf.Abs(_player.GlobalPosition.Y - DemolitionSitePositions[index].Y) < 2.8f)
+            var sitePosition = layout.SitePositions[index];
+            var distance = HorizontalDistance(_player.GlobalPosition, sitePosition);
+            if (distance < nearestDistance && Mathf.Abs(_player.GlobalPosition.Y - sitePosition.Y) < 2.8f)
             {
                 nearestDistance = distance;
                 nearestIndex = index;
@@ -274,7 +219,8 @@ public partial class FreightTerminalWorld
 
     private void PlantDemolitionDevice(int siteIndex)
     {
-        if (_demolitionDevicePlanted || siteIndex < 0 || siteIndex >= DemolitionSitePositions.Length)
+        var layout = DemolitionLayout();
+        if (_demolitionDevicePlanted || siteIndex < 0 || siteIndex >= layout.SitePositions.Count)
         {
             return;
         }
@@ -293,9 +239,9 @@ public partial class FreightTerminalWorld
         _demolitionDevice = new Node3D
         {
             Name = "PlantedDemolitionDevice",
-            Position = DemolitionSitePositions[siteIndex] + new Vector3(0, 0.34f, 0)
+            Position = layout.SitePositions[siteIndex] + new Vector3(0, 0.34f, 0)
         };
-        _levelRoot.AddChild(_demolitionDevice);
+        _demolitionArena!.Root.AddChild(_demolitionDevice);
         OfficeBox(_demolitionDevice, "DeviceCase", Vector3.Zero, new Vector3(0.9f, 0.48f, 0.62f), dark);
         OfficeBox(_demolitionDevice, "DeviceScreen", new Vector3(0, 0.1f, -0.33f), new Vector3(0.52f, 0.2f, 0.035f), orange);
         _demolitionDevice.AddChild(new OmniLight3D
@@ -311,6 +257,7 @@ public partial class FreightTerminalWorld
         {
             if (IsInstanceValid(defender) && !defender.IsDead)
             {
+                defender.SentryMode = false;
                 defender.SetAlerted(_player.GlobalPosition);
             }
         }
@@ -395,7 +342,7 @@ public partial class FreightTerminalWorld
         {
             return;
         }
-        var devicePosition = DemolitionSitePositions[_demolitionActiveSite];
+        var devicePosition = DemolitionLayout().SitePositions[_demolitionActiveSite];
         _demolitionDefuser = _demolitionDefenders
             .Where(defender => IsInstanceValid(defender) && !defender.IsDead)
             .OrderBy(defender => defender.GlobalPosition.DistanceSquaredTo(devicePosition))
@@ -414,7 +361,7 @@ public partial class FreightTerminalWorld
             return;
         }
 
-        var destination = DemolitionSitePositions[_demolitionActiveSite];
+        var destination = DemolitionLayout().SitePositions[_demolitionActiveSite];
         if (_demolitionDefuser!.IsScriptedObjectiveCorridorClear(destination))
         {
             _demolitionDefuseRoute = new[] { destination };
@@ -486,7 +433,7 @@ public partial class FreightTerminalWorld
             return false;
         }
 
-        var devicePosition = DemolitionSitePositions[_demolitionActiveSite];
+        var devicePosition = DemolitionLayout().SitePositions[_demolitionActiveSite];
         var flatDevice = new Vector3(devicePosition.X, defender.GlobalPosition.Y, devicePosition.Z);
         var distance = defender.GlobalPosition.DistanceTo(flatDevice);
         var velocity = defender.Velocity;
@@ -536,6 +483,32 @@ public partial class FreightTerminalWorld
         return true;
     }
 
+    private DemolitionArenaLayout DemolitionLayout()
+        => _demolitionArena?.Layout
+            ?? throw new System.InvalidOperationException("Demolition arena is unavailable.");
+
+    private bool IsDemolitionSitePlacementClear(Vector3 position)
+    {
+        var query = new PhysicsShapeQueryParameters3D
+        {
+            Shape = new BoxShape3D { Size = new Vector3(4.2f, 1.55f, 4.2f) },
+            Transform = new Transform3D(Basis.Identity, position + Vector3.Up * 1.05f),
+            CollisionMask = 1,
+            CollideWithAreas = false,
+            CollideWithBodies = true
+        };
+        var hits = GetWorld3D().DirectSpaceState.IntersectShape(query, 64);
+        foreach (var hit in hits)
+        {
+            if (hit["collider"].AsGodotObject() is StaticBody3D body
+                && _demolitionArena?.Owns(body) != true)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void FinishDemolitionRound(bool victory, string reason)
     {
         if (_missionEnded)
@@ -565,143 +538,5 @@ public partial class FreightTerminalWorld
         Input.MouseMode = Input.MouseModeEnum.Visible;
         _missionDirector.CompleteMission(victory, _kills, _headshots, _shotsFired, _shotsHit);
         _hud.ShowDemolitionResult(victory, reason);
-    }
-
-    private async void ValidateDemolitionMode()
-    {
-        await WaitFrames(5);
-        var creditsBefore = _operatorProfileStore.Profile.Credits;
-        var deploymentsBefore = _operatorProfileStore.Profile.DeploymentCount;
-
-        _hud.PressDemolitionModeForDiagnostics();
-        var entryButton = _hud.IsDemolitionBriefingVisible && !_hud.IsOperationsOfficeVisible;
-        _hud.PressDemolitionRoleForDiagnostics(OperatorRole.Medic);
-        var roleButton = _hud.SelectedDemolitionRole == OperatorRole.Medic;
-        _hud.PressDemolitionDeployForDiagnostics();
-        await WaitFrames(4);
-        var fixedKit = _player.Role == OperatorRole.Medic
-            && _player.HasFireablePrimary
-            && _player.EquippedWeapon.Platform == WeaponPlatform.M4A1
-            && _player.CurrentAmmoGrade == LootGrade.Common
-            && _player.ReserveAmmo == 120;
-        var isolatedEconomy = _operatorProfileStore.Profile.Credits == creditsBefore
-            && _operatorProfileStore.Profile.DeploymentCount == deploymentsBefore
-            && !_deploymentPurchaseCommitted;
-        var deployed = _demolitionMode
-            && _demolitionRoundActive
-            && _squadDeployed
-            && ActiveSquadCount == 3
-            && DemolitionDefenderCount == 7
-            && _demolitionSites.All(site => site.Visible)
-            && !_extractionMarker.Visible
-            && _hud.IsGameplayHudVisible
-            && !_hud.IsDemolitionBriefingVisible
-            && !GetTree().Paused;
-        var sitesClear = DemolitionSitePositions.All(IsDemolitionSitePlacementClear);
-
-        var hostileAircraftIsolated = !IsInstanceValid(_aircraft)
-            || (_aircraft!.ProcessMode == ProcessModeEnum.Disabled
-                && !_aircraft.Visible);
-        var demolitionPhase = _missionPhase;
-        var defenderCountBeforeReinforcementTick = DemolitionDefenderCount;
-        _reinforcementPending = true;
-        _reinforcementCountdown = 0.0f;
-        _missionPhase = "COMBAT";
-        UpdateReinforcements(8.0f);
-        var reinforcementsIsolated = _reinforcementPending
-            && !_reinforcementsDeployed
-            && DemolitionDefenderCount == defenderCountBeforeReinforcementTick
-            && _enemies.Count == defenderCountBeforeReinforcementTick;
-        _reinforcementPending = false;
-        _reinforcementCountdown = 0.0f;
-        _missionPhase = demolitionPhase;
-
-        OnPhaseChanged("COMBAT", 18.0f, true);
-        OnObjectiveChanged(2, "REACH THE EXTRACTION ZONE", true);
-        var directorIsolation = _missionPhase == "DEMOLITION"
-            && !_extractionMarker.Visible;
-
-        _player.GlobalPosition = DemolitionSitePositions[0] + new Vector3(0, 0.1f, 0);
-        _player.Velocity = Vector3.Zero;
-        _interactReleaseRequired = false;
-        Input.ActionRelease("interact");
-        Input.ActionPress("interact");
-        var plantSteps = 0;
-        var maximumPlantSteps = Mathf.CeilToInt(DemolitionPlantDuration / 0.1f) + 2;
-        while (!_demolitionDevicePlanted && plantSteps < maximumPlantSteps)
-        {
-            UpdateDemolitionInteraction(0.1f);
-            plantSteps++;
-        }
-        Input.ActionRelease("interact");
-        var planted = _demolitionDevicePlanted
-            && _demolitionActiveSite == 0
-            && IsInstanceValid(_demolitionDevice)
-            && !_extractionCountdownActive
-            && plantSteps > 1;
-        SelectDemolitionDefuser();
-        var defuser = _demolitionDefuser;
-        var defuseAi = false;
-        var initialDefuserDistance = 0.0f;
-        var finalDefuserDistance = float.PositiveInfinity;
-        var defuseFrames = 0;
-        if (defuser is not null)
-        {
-            _player.GlobalPosition = new Vector3(100.0f, 0.2f, 100.0f);
-            foreach (var mate in _squadMates)
-            {
-                if (IsInstanceValid(mate))
-                {
-                    mate.GlobalPosition = new Vector3(104.0f + mate.SquadSlot * 2.0f, 0.2f, 104.0f);
-                    mate.ProcessMode = ProcessModeEnum.Disabled;
-                }
-            }
-            foreach (var defender in _demolitionDefenders)
-            {
-                if (IsInstanceValid(defender))
-                {
-                    defender.ProcessMode = ProcessModeEnum.Disabled;
-                }
-            }
-            defuser.GlobalPosition = DemolitionSitePositions[0] + new Vector3(0, 0, 8.0f);
-            defuser.Velocity = Vector3.Zero;
-            defuser.ResetScriptedObjectiveNavigation();
-            PlanDemolitionDefuseRoute();
-            defuser.ProcessMode = ProcessModeEnum.Inherit;
-            initialDefuserDistance = HorizontalDistance(defuser.GlobalPosition, DemolitionSitePositions[0]);
-            const int maximumDefuseFrames = 600;
-            while (defuseFrames < maximumDefuseFrames
-                && _demolitionDefuseProgress < 0.12f
-                && !_missionEnded)
-            {
-                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-                defuseFrames++;
-            }
-            finalDefuserDistance = HorizontalDistance(defuser.GlobalPosition, DemolitionSitePositions[0]);
-            defuseAi = initialDefuserDistance >= 7.5f
-                && finalDefuserDistance <= 2.4f
-                && _demolitionDefuseProgress >= 0.08f
-                && !_missionEnded;
-        }
-        foreach (var defender in _demolitionDefenders)
-        {
-            if (IsInstanceValid(defender))
-            {
-                defender.ProcessMode = ProcessModeEnum.Disabled;
-            }
-        }
-        _demolitionRemaining = 0.05f;
-        UpdateDemolitionRound(0.1f);
-        var completed = _missionEnded
-            && !_demolitionRoundActive
-            && _hud.IsMissionResultVisible
-            && _operatorProfileStore.Profile.Credits == creditsBefore
-            && _operatorProfileStore.Profile.DeploymentCount == deploymentsBefore;
-        var valid = entryButton && roleButton && fixedKit && isolatedEconomy && deployed && sitesClear
-            && hostileAircraftIsolated && reinforcementsIsolated
-            && directorIsolation && planted && defuseAi && completed;
-        GD.Print($"DEMOLITION_CHECK valid={valid} entry_button={entryButton} role_button={roleButton} deployed={deployed} gameplay={_hud.IsGameplayHudVisible} squad={ActiveSquadCount} defenders={DemolitionDefenderCount} fixed_kit={fixedKit} economy={isolatedEconomy} aircraft_isolated={hostileAircraftIsolated} reinforcements_isolated={reinforcementsIsolated} director_isolation={directorIsolation} sites={DemolitionSiteCount} sites_clear={sitesClear} planted={planted} plant_steps={plantSteps} defuse_ai={defuseAi} defuse_distance={initialDefuserDistance:0.00}->{finalDefuserDistance:0.00} defuse_progress={_demolitionDefuseProgress:0.00} defuse_frames={defuseFrames}/600 completed={completed} result={_hud.IsMissionResultVisible}");
-        GD.Print($"DEMOLITION_PASS valid={valid}");
-        GetTree().Quit(valid ? 0 : 2);
     }
 }

@@ -26,6 +26,26 @@ public partial class FreightTerminalWorld
         _hud.SetMinimapPlayer(_player.GlobalPosition, 0.0f);
     }
 
+    private void ConfigureDemolitionMinimap()
+    {
+        if (_demolitionArena is null)
+        {
+            return;
+        }
+        var landmarks = new List<TacticalMapLandmark>();
+        foreach (var marker in _demolitionArena.Layout.Markers)
+        {
+            landmarks.Add(new TacticalMapLandmark(
+                marker.Position,
+                marker.LocalizationKey,
+                marker.EnglishName,
+                marker.Accent));
+        }
+        _hud.ConfigureMinimap(_demolitionArena.Layout.WorldBounds, landmarks);
+        _hud.SetMinimapWorldBoss(Vector3.Zero, false);
+        _hud.SetMinimapPlayer(_player.GlobalPosition, 0.0f);
+    }
+
     private async void ValidateTacticalHud()
     {
         foreach (var enemy in _enemies)
@@ -66,6 +86,7 @@ public partial class FreightTerminalWorld
         var valid = minimapReady && ammoTiersFunctional && knockdownVisible;
         GD.Print($"TACTICAL_HUD_CHECK valid={valid} minimap={minimapReady} landmarks={_hud.MinimapLandmarkCount} ammo_tiers={ammoTiersFunctional} loaded_grade={_player.CurrentAmmoGrade} knockdown={knockdownVisible}");
         GD.Print($"TACTICAL_HUD_PASS valid={valid}");
+        await WaitFrames(180);
         GetTree().Quit(valid ? 0 : 2);
     }
 

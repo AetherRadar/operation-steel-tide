@@ -17,6 +17,7 @@
 
 - **Three-operator squads:** choose Assault, Medic, or Recon; AI fills empty roles, follows orders, fights, uses class skills, and revives downed teammates.
 - **A complete extraction loop:** infiltrate, disable the relay, steal the manifest, survive reinforcements, loot buildings and fallen operators, then hold the extraction zone.
+- **A separate demolition arena:** deploy from the Operations Office into TIDEFORGE ARENA, a fixed-kit three-route map with balanced A/B timings, mid rotations, seven defenders, planting, and AI defusing.
 - **Meaningful loadouts:** buy firearms, armor, ammunition grades, and pack sizes; customize weapon parts and bank only the value extracted above your deployment baseline.
 - **Solo or online:** play locally with AI, host over ENet, or join a public `host:port`; disconnected players are replaced by AI without restarting the mission.
 - **A dense playable district:** explore the freight terminal, rail yard, fuel farm, residential towers, drivable vehicles, and 22 glass skybridges with long sniper sightlines.
@@ -112,6 +113,8 @@ The deployment lobby doubles as a persistent equipment market. Players spend an 
 
 The same lobby now includes a deployment-map selector. `MAP 01 // FREIGHT TERMINAL` is the current playable harbor operation. `MAP 02 // TIDAL PRISON` and `MAP 03 // ORBITAL COMPLEX` establish the next operation slots but remain visibly locked until their own world geometry and mission flows are implemented.
 
+The Operations Office also launches the separate TIDEFORGE ARENA demolition mode. Its original industrial layout uses three attack routes, a central rotation lane, an open foundry A site, and an enclosed assembly-hall B site with attack travel times kept within eight percent. Both teams use regulation equipment, extraction progression is isolated, and AI defenders rotate to and defuse a planted device.
+
 The playable district is approximately 340 m x 320 m. The original freight terminal remains the deployment complex, while the expanded grounds add a rail yard with parked freight cars, a maintenance hangar, an overflow container yard, a four-tank fuel farm, a quay crane, and a seawall approach to extraction. Multiple rival three-operator squads spawn on separated pads across the map and fight the player, each other, and garrison NPCs; NPCs prefer hunting those squads and fall back to looting buildings when quiet. Graded loot (common→legendary) glows by rarity inside buildings; the bottom-right backpack control shows total inventory value (guns, gear, ammo). Chinese UI mode localizes the new backpack/grade strings. The new ground and corrugated-metal PBR surfaces are CC0 assets from Poly Haven; their source links are recorded in `assets/textures/LICENSE.md`.
 
 The TIDE HUNTER is a unique 900-health rogue Boss hostile to the player, friendly squadmates, garrison troops, and rival operators. It patrols a 14-point, 230 m x 209 m route through every major district instead of waiting in an arena, hunts targets with a custom AXMC, and escalates through long-range hunt, tidal surge, and riptide-overdrive phases. The final two phases add a clearly telegraphed radial pulse that can damage every faction. A minimap marker tracks the roaming threat while phase-change broadcasts announce escalation without a persistent screen-wide health bar; defeating it leaves a searchable legendary cache containing its AXMC, 7x optic, .338 Magnum ammunition, heavy armor, unique Tide Hunter knife finish, and high-value transponder.
@@ -152,6 +155,8 @@ Any accepted incoming hit immediately closes the active search or backpack view 
 - `csharp/FreightTerminalWorld.Residential.cs`: eleven enterable apartment towers, physical stairwells, rooftops, courtyards, occupants, and residential diagnostics.
 - `csharp/FreightTerminalWorld.Residential.Access.cs`: exterior fire escapes to the floor-2 glass skyways, access collision, rails, and deterministic access diagnostics.
 - `csharp/FreightTerminalWorld.Boss.cs`, `EnemyOperator.Boss.cs`, and `CombatHUD.Boss.cs`: roaming TIDE HUNTER behavior, phases, pulse attack, rewards, minimap tracking, and Boss diagnostics.
+- `csharp/DemolitionArenaLayout.cs`, `DemolitionArenaBuilder.cs`, and `DemolitionArenaRuntime.cs`: TIDEFORGE geometry data, generated collision/visual assembly, activation isolation, route balance, and minimap markers.
+- `ui/DemolitionBriefingView.tscn` and `csharp/DemolitionBriefingView.cs`: scene-authored demolition briefing, localized arena intelligence, role selection, and intent signals.
 - `csharp/FreightTerminalWorld.Squad.cs`: squad slots, AI fill, orders, class effects, co-op combat relay, and squad diagnostics.
 - `csharp/FreightTerminalWorld.Tactical.cs`, `TacticalMinimap.cs`, and `AmmoTierSystem.cs`: minimap landmarks, knockdown feedback, graded ammunition, and tactical HUD diagnostics.
 - `csharp/FreightTerminalWorld.Economy.cs`, `OperatorProgression.cs`, `DeploymentMaps.cs`, and `CombatHUD.Deployment.cs`: atomic local profile persistence, deployment purchases, map selection, extraction banking, and market diagnostics.
@@ -167,6 +172,9 @@ Any accepted incoming hit immediately closes the active search or backpack view 
 ```text
 Godot_console.exe --path . -- --capture-deployment
 Godot_console.exe --path . -- --validate-pause-ui
+Godot_console.exe --path . -- --validate-demolition
+Godot_console.exe --path . -- --validate-demolition-arena
+Godot_console.exe --path . -- --validate-demolition-briefing
 Godot_console.exe --path . -- --validate-objectives
 Godot_console.exe --path . -- --validate-reinforcements
 Godot_console.exe --path . -- --capture-ads
@@ -223,6 +231,8 @@ Godot_console.exe --headless --path . -- --validate-network-client
 `--validate-deployment-ui` verifies the full operator preview, six market entries, four quick-kit presets, four ammunition quantities, independent grade/quantity pricing, the three-slot map selector, locked-map rejection, kit cost, and projected post-deployment balance.
 
 `--validate-pause-ui` verifies the authored pause scene, required control bindings, signal-free settings synchronization, English and Chinese labels, pause visibility and mouse release, and the existing resume event path.
+
+`--validate-demolition` verifies the Operations Office entry, role selection, fixed loadout, isolated economy and extraction systems, three-person squad, seven defenders, planting, AI rotation and defusing, and result flow. `--validate-demolition-arena` checks collision activation, three clear routes, balanced A/B travel, blocked spawn sightlines, mid rotation, site placement, localized minimap markers, and spatial isolation. `--validate-demolition-briefing` verifies scene loading, required bindings, English and Chinese synchronization, role selection without deployment, and back/deploy intent signals.
 
 `--validate-extraction-sequence` verifies the locked objective gate, 12-second hold, leave-zone reset, aircraft arrival, boarding state, and mission completion. `--capture-extraction` renders the live countdown and landed rescue tilt-rotor at the seawall pad.
 
