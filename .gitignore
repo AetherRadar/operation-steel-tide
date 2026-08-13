@@ -12,6 +12,8 @@
 
 /backend/data/
 /steel-tide-server.exe*
+/build/
+/dist/
 
 /*_validation.png
 /*_frame.png

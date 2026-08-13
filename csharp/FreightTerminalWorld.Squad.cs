@@ -50,6 +50,7 @@ public partial class FreightTerminalWorld
         var lobbyCapture = Array.Exists(args, value => value == "--capture-squad-lobby");
         var networkHostCheck = Array.Exists(args, value => value == "--validate-network-host");
         var networkClientCheck = Array.Exists(args, value => value == "--validate-network-client");
+        var networkEndpointCheck = Array.Exists(args, value => value == "--validate-network-endpoint");
         var operationsOfficeCommand = Array.Exists(args, value =>
             value == "--validate-operations-office"
             || value == "--validate-demolition"
@@ -59,6 +60,7 @@ public partial class FreightTerminalWorld
             value.StartsWith("--capture", StringComparison.Ordinal)
             || value.StartsWith("--validate", StringComparison.Ordinal))
             && !lobbyCapture
+            && !networkEndpointCheck
             && !operationsOfficeCommand;
         if (diagnostic)
         {
@@ -111,12 +113,19 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        var sessionMode = (SquadSessionMode)mode;
+        if (sessionMode == SquadSessionMode.Join
+            && !SquadNetwork.TryParseEndpoint(address, SquadNetwork.DefaultPort, out _, out _))
+        {
+            _hud.SetSquadStatus("JOIN FAILED  //  INVALID HOST OR PORT");
+            return;
+        }
         if (!TryCommitSelectedDeployment())
         {
             return;
         }
         _activeDeploymentMapId = _hud.SelectedDeploymentMapId;
-        DeploySquad((OperatorRole)role, (SquadSessionMode)mode, address);
+        DeploySquad((OperatorRole)role, sessionMode, address);
     }
 
     private void DeploySquad(OperatorRole role, SquadSessionMode mode, string address)
@@ -165,6 +174,52 @@ public partial class FreightTerminalWorld
             "squad_ready",
             "SQUAD READY  //  F1 FOLLOW  F2 HOLD  F3 MOVE  H SKILL",
             OperatorRoles.Spec(role).Accent);
+    }
+
+    private void ValidateNetworkEndpoint()
+    {
+        var defaultHost = SquadNetwork.TryParseEndpoint(string.Empty, SquadNetwork.DefaultPort,
+            out var loopback, out var loopbackPort)
+            && loopback == "127.0.0.1"
+            && loopbackPort == SquadNetwork.DefaultPort;
+        var hostname = SquadNetwork.TryParseEndpoint("steel-tide.example", SquadNetwork.DefaultPort,
+            out var hostnameValue, out var hostnamePort)
+            && hostnameValue == "steel-tide.example"
+            && hostnamePort == SquadNetwork.DefaultPort;
+        var tunnel = SquadNetwork.TryParseEndpoint("steel-tide.example:41237", SquadNetwork.DefaultPort,
+            out var tunnelHost, out var tunnelPort)
+            && tunnelHost == "steel-tide.example"
+            && tunnelPort == 41237;
+        var ipv6 = SquadNetwork.TryParseEndpoint("[2001:db8::7]:30001", SquadNetwork.DefaultPort,
+            out var ipv6Host, out var ipv6Port)
+            && ipv6Host == "2001:db8::7"
+            && ipv6Port == 30001;
+        var nakedIpv6 = SquadNetwork.TryParseEndpoint("2001:db8::8", SquadNetwork.DefaultPort,
+            out var nakedIpv6Host, out var nakedIpv6Port)
+            && nakedIpv6Host == "2001:db8::8"
+            && nakedIpv6Port == SquadNetwork.DefaultPort;
+        var invalidRejected = !SquadNetwork.TryParseEndpoint("host:0", SquadNetwork.DefaultPort, out _, out _)
+            && !SquadNetwork.TryParseEndpoint("host:65536", SquadNetwork.DefaultPort, out _, out _)
+            && !SquadNetwork.TryParseEndpoint(":28960", SquadNetwork.DefaultPort, out _, out _)
+            && !SquadNetwork.TryParseEndpoint("[2001:db8::7", SquadNetwork.DefaultPort, out _, out _)
+            && !SquadNetwork.TryParseEndpoint("host:28960:extra", SquadNetwork.DefaultPort, out _, out _)
+            && !SquadNetwork.TryParseEndpoint("udp://host:41237", SquadNetwork.DefaultPort, out _, out _)
+            && !SquadNetwork.TryParseEndpoint(":::", SquadNetwork.DefaultPort, out _, out _)
+            && !SquadNetwork.TryParseEndpoint("[not-ipv6]:41237", SquadNetwork.DefaultPort, out _, out _);
+        var creditsBefore = _operatorProfileStore.Profile.Credits;
+        var deploymentsBefore = _operatorProfileStore.Profile.DeploymentCount;
+        _hud.ShowSquadLobby("NETWORK ENDPOINT VALIDATION");
+        OnSquadDeploymentRequested((int)OperatorRole.Assault, (int)SquadSessionMode.Join, "host:0");
+        var invalidDeploymentPreserved = !_squadDeployed
+            && !_deploymentPurchaseCommitted
+            && _hud.IsSquadLobbyVisible
+            && _operatorProfileStore.Profile.Credits == creditsBefore
+            && _operatorProfileStore.Profile.DeploymentCount == deploymentsBefore;
+        var valid = defaultHost && hostname && tunnel && ipv6 && nakedIpv6
+            && invalidRejected && invalidDeploymentPreserved;
+        GD.Print($"NETWORK_ENDPOINT_CHECK valid={valid} default={defaultHost} hostname={hostname} tunnel={tunnel} ipv6={ipv6} naked_ipv6={nakedIpv6} invalid_rejected={invalidRejected} invalid_deployment_preserved={invalidDeploymentPreserved} endpoint={tunnelHost}:{tunnelPort}");
+        GD.Print($"NETWORK_ENDPOINT_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private void EnsureAiSquadFill()

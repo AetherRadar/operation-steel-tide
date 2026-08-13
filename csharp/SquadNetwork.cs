@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 using Godot;
 
 namespace OperationSteelTide;
@@ -67,9 +70,13 @@ public partial class SquadNetwork : Node
     public Error Join(string address, int port = DefaultPort)
     {
         Close();
-        address = string.IsNullOrWhiteSpace(address) ? "127.0.0.1" : address.Trim();
+        if (!TryParseEndpoint(address, port, out var host, out var endpointPort))
+        {
+            SetStatus("JOIN FAILED  //  INVALID HOST OR PORT");
+            return Error.InvalidParameter;
+        }
         _peer = new ENetMultiplayerPeer();
-        var error = _peer.CreateClient(address, port);
+        var error = _peer.CreateClient(host, endpointPort);
         if (error != Error.Ok)
         {
             SetStatus($"JOIN FAILED  //  {error}");
@@ -79,9 +86,83 @@ public partial class SquadNetwork : Node
         Multiplayer.MultiplayerPeer = _peer;
         IsOnline = false;
         IsHost = false;
-        SetStatus($"CONNECTING  //  {address}:{port}");
+        SetStatus($"CONNECTING  //  {FormatEndpoint(host, endpointPort)}");
         return Error.Ok;
     }
+
+    public static bool TryParseEndpoint(string? value, int defaultPort, out string host, out int port)
+    {
+        host = string.IsNullOrWhiteSpace(value) ? "127.0.0.1" : value.Trim();
+        port = defaultPort;
+        if (defaultPort is < 1 or > 65535)
+        {
+            return false;
+        }
+
+        if (host.StartsWith('['))
+        {
+            var closingBracket = host.IndexOf(']');
+            if (closingBracket < 2)
+            {
+                return false;
+            }
+
+            var suffix = host[(closingBracket + 1)..];
+            var bracketedHost = host[1..closingBracket];
+            if (!IPAddress.TryParse(bracketedHost, out var bracketedAddress)
+                || bracketedAddress.AddressFamily != AddressFamily.InterNetworkV6)
+            {
+                return false;
+            }
+            if (suffix.Length == 0)
+            {
+                host = bracketedHost;
+                return true;
+            }
+            if (!suffix.StartsWith(':') || !TryParsePort(suffix[1..], out port))
+            {
+                return false;
+            }
+
+            host = bracketedHost;
+            return true;
+        }
+
+        var colonCount = 0;
+        foreach (var character in host)
+        {
+            if (character == ':')
+            {
+                colonCount++;
+            }
+        }
+        if (colonCount == 0)
+        {
+            return host.Length > 0;
+        }
+        if (colonCount > 1)
+        {
+            return IPAddress.TryParse(host, out var address)
+                && address.AddressFamily == AddressFamily.InterNetworkV6;
+        }
+
+        var separator = host.LastIndexOf(':');
+        var suppliedHost = host[..separator].Trim();
+        if (suppliedHost.Length == 0 || !TryParsePort(host[(separator + 1)..], out port))
+        {
+            return false;
+        }
+
+        host = suppliedHost;
+        return true;
+    }
+
+    private static bool TryParsePort(string value, out int port)
+        => int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out port)
+        && port is >= 1 and <= 65535;
+
+    private static string FormatEndpoint(string host, int port)
+        => host.Contains(':') ? $"[{host}]:{port}" : $"{host}:{port}";
 
     public void Close()
     {

@@ -288,13 +288,13 @@ public partial class CombatHUD
         _localSquadButton.Pressed += () => SelectSessionMode(SquadSessionMode.Local);
         sessionBand.AddChild(_localSquadButton);
         _hostSquadButton = DeploymentSegment(new Vector2(150, 36), new Vector2(128, 38), new Color(0.3f, 0.74f, 1.0f));
-        _hostSquadButton.Text = "HOST LAN";
+        _hostSquadButton.Text = "HOST GAME";
         _hostSquadButton.ToggleMode = true;
         _hostSquadButton.ButtonGroup = sessionGroup;
         _hostSquadButton.Pressed += () => SelectSessionMode(SquadSessionMode.Host);
         sessionBand.AddChild(_hostSquadButton);
         _joinSquadButton = DeploymentSegment(new Vector2(284, 36), new Vector2(128, 38), new Color(0.3f, 0.74f, 1.0f));
-        _joinSquadButton.Text = "JOIN LAN";
+        _joinSquadButton.Text = "JOIN GAME";
         _joinSquadButton.ToggleMode = true;
         _joinSquadButton.ButtonGroup = sessionGroup;
         _joinSquadButton.Pressed += () => SelectSessionMode(SquadSessionMode.Join);
@@ -304,7 +304,7 @@ public partial class CombatHUD
         _squadAddress = new LineEdit
         {
             Text = "127.0.0.1",
-            PlaceholderText = "HOST ADDRESS",
+            PlaceholderText = "HOST OR HOST:PORT",
             Position = new Vector2(424, 36),
             Size = new Vector2(236, 38),
             ClearButtonEnabled = true
@@ -356,11 +356,11 @@ public partial class CombatHUD
         _squadSessionStatus.Text = mode switch
         {
             SquadSessionMode.Host => GameLocalization.IsChinese(_language)
-                ? "\u521b\u5efa\u5c40\u57df\u7f51\u5c0f\u961f  //  \u7a7a\u4f4d\u7531 AI \u8865\u9f50"
-                : "HOST LAN STRIKE TEAM  //  AI FILLS OPEN SLOTS",
+                ? "\u521b\u5efa\u8054\u673a\u5c0f\u961f  //  \u7a7a\u4f4d\u7531 AI \u8865\u9f50"
+                : "HOST STRIKE TEAM  //  AI FILLS OPEN SLOTS",
             SquadSessionMode.Join => GameLocalization.IsChinese(_language)
-                ? "\u52a0\u5165\u5c40\u57df\u7f51\u5c0f\u961f  //  \u8f93\u5165\u4e3b\u673a\u5730\u5740"
-                : "JOIN LAN STRIKE TEAM  //  ENTER HOST ADDRESS",
+                ? "\u52a0\u5165\u8054\u673a\u5c0f\u961f  //  \u8f93\u5165\u4e3b\u673a\u6216\u4e3b\u673a:\u7aef\u53e3"
+                : "JOIN STRIKE TEAM  //  ENTER HOST OR HOST:PORT",
             _ => GameLocalization.IsChinese(_language)
                 ? "\u672c\u5730\u7a81\u51fb\u5c0f\u961f  //  2 \u540d AI \u5e72\u5458\u5df2\u5c31\u7eea"
                 : "LOCAL STRIKE TEAM  //  2 AI OPERATORS READY"
@@ -419,10 +419,10 @@ public partial class CombatHUD
         _squadSessionStatus.Text = status;
         var source = status.Contains("HOST", StringComparison.OrdinalIgnoreCase)
             ? "HOST"
-            : status.Contains("CONNECT", StringComparison.OrdinalIgnoreCase) ? "LAN" : "LOCAL + AI";
+            : status.Contains("CONNECT", StringComparison.OrdinalIgnoreCase) ? "ONLINE" : "LOCAL + AI";
         if (GameLocalization.IsChinese(_language))
         {
-            source = source switch { "HOST" => "\u4e3b\u673a", "LAN" => "\u5c40\u57df\u7f51", _ => "\u672c\u5730 + AI" };
+            source = source switch { "HOST" => "\u4e3b\u673a", "ONLINE" => "\u8054\u673a", _ => "\u672c\u5730 + AI" };
             _squadRosterTitle.Text = $"\u5c0f\u961f  //  {source}";
         }
         else
@@ -524,10 +524,10 @@ public partial class CombatHUD
             : $"STRIKE TEAM PREPARATION  //  {Text(selectedMap.LocalizationKey, selectedMap.EnglishName)}";
         _roleCaption.Text = chinese ? "\u9009\u62e9\u5e72\u5458" : "SELECT OPERATOR";
         _localSquadButton.Text = chinese ? "\u672c\u5730 + AI" : "LOCAL + AI";
-        _hostSquadButton.Text = chinese ? "\u521b\u5efa\u5c40\u57df\u7f51" : "HOST LAN";
-        _joinSquadButton.Text = chinese ? "\u52a0\u5165\u5c40\u57df\u7f51" : "JOIN LAN";
+        _hostSquadButton.Text = chinese ? "\u521b\u5efa\u8054\u673a" : "HOST GAME";
+        _joinSquadButton.Text = chinese ? "\u52a0\u5165\u8054\u673a" : "JOIN GAME";
         _squadLobbyBackButton.Text = Text("operations_back", "BACK TO OFFICE");
-        _squadAddress.PlaceholderText = chinese ? "\u4e3b\u673a\u5730\u5740" : "HOST ADDRESS";
+        _squadAddress.PlaceholderText = chinese ? "\u4e3b\u673a\u5730\u5740\u6216\u5730\u5740:\u7aef\u53e3" : "HOST OR HOST:PORT";
         var roles = new[] { OperatorRole.Assault, OperatorRole.Medic, OperatorRole.Recon };
         for (var i = 0; i < roles.Length; i++)
         {

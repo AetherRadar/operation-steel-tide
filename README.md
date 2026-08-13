@@ -9,6 +9,8 @@ The complete game client is C#, including LAN co-op, AI squadmates, three operat
 
 Install Godot 4.6.3 Mono and the .NET 8 SDK. Go is optional for the offline fallback, but required for the local mission and progression service.
 
+Players who do not need the source can download the complete Windows build from [GitHub Releases](https://github.com/AetherRadar/operation-steel-tide/releases/latest), extract it, and run `PLAY.bat`. The package includes the game, .NET runtime files, and local Go mission service.
+
 Double-click `START_GAME.bat`. The launcher locates Godot Mono through `GODOT_MONO`, PATH, or the default Downloads location. When Go is available, it builds and starts the service on `127.0.0.1:8787`, waits for the process, then launches Godot. Closing the game closes the service and removes `backend/backend.pid`.
 
 To select a specific Godot executable before launching:
@@ -41,9 +43,9 @@ go build -o ..\steel-tide-server.exe ./cmd/server
 
 Fire and movement input are armed only after their controls have returned to neutral after launch or refocus. This prevents the click used to launch the game, or a held movement key, from becoming an accidental shot or deployment exit.
 
-## Squad and LAN co-op
+## Squad and online co-op
 
-Every deployment uses a three-operator squad. Choose Assault, Medic, or Recon on the deployment screen; the other two roles are filled by AI automatically. Start with `LOCAL + AI`, host a LAN session, or enter the host address and join. A connected player replaces one AI slot, and disconnecting hands that slot back to AI without restarting the mission. LAN sessions use ENet over UDP port `28960`, so the host may need to allow the game through the Windows firewall.
+Every deployment uses a three-operator squad. Choose Assault, Medic, or Recon on the deployment screen; the other two roles are filled by AI automatically. Start with `LOCAL + AI`, host a LAN session, or enter the host address and join. A connected player replaces one AI slot, and disconnecting hands that slot back to AI without restarting the mission. Sessions use ENet over UDP port `28960`, so the host may need to allow the game through the Windows firewall. Join accepts either `host` (default port `28960`) or `host:port`, including the public endpoint assigned by a UDP tunnel. See [ONLINE_PLAY.md](ONLINE_PLAY.md) for the free playit.gg setup and alternatives.
 
 - Assault has higher base health, movement speed, reload speed, and fire rate. `H` activates Combat Overdrive for a larger temporary movement, rate-of-fire, reload, and recoil-control boost.
 - Medic raises a visible trauma sprayer. Aim at an injured or downed squadmate and press `H` to heal or revive them; with no valid teammate in the spray cone, the medicine is applied to the Medic.
@@ -160,6 +162,7 @@ Godot_console.exe --path . -- --validate-skybridge-access
 Godot_console.exe --path . -- --validate-vehicle-drive
 Godot_console.exe --path . -- --capture-squad-lobby
 Godot_console.exe --path . -- --capture-squad
+Godot_console.exe --path . -- --validate-network-endpoint
 Godot_console.exe --headless --path . -- --validate-network-host
 Godot_console.exe --headless --path . -- --validate-network-client
 ```
