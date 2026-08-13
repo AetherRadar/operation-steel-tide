@@ -1195,7 +1195,10 @@ public partial class CombatHUD : CanvasLayer
     public void SetLanguage(string language)
     {
         _language = GameLocalization.IsChinese(language) ? "zh" : "en";
-        _pauseMenuView.SetLanguage(_language);
+        if (IsInstanceValid(_pauseMenuView))
+        {
+            _pauseMenuView.SetLanguage(_language);
+        }
         _vitalCaption.Text = Text("vital", "VITAL");
         _armorCaption.Text = Text("armor", "PLATE");
         _operationBanner.Text = Text("operation", "OPERATION STEEL TIDE");

@@ -614,7 +614,7 @@ public partial class FreightTerminalWorld : Node3D
         _hud.SetOperatorProfile(_operatorProfileStore.Profile);
         _hud.PauseRequested += TogglePause;
         _hud.RestartRequested += RestartMission;
-        _hud.QuitRequested += () => GetTree().Quit();
+        _hud.QuitRequested += QuitGame;
         _hud.SensitivityChanged += SetSensitivity;
         _hud.QualityChanged += ApplyQuality;
         _hud.FullscreenChanged += SetFullscreen;
@@ -2059,6 +2059,8 @@ public partial class FreightTerminalWorld : Node3D
         GetTree().Paused = false;
         GetTree().ReloadCurrentScene();
     }
+
+    private void QuitGame() => GetTree().Quit();
 
     private void SetSensitivity(float value)
     {

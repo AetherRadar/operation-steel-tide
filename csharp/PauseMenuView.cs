@@ -2,6 +2,11 @@ using Godot;
 
 namespace OperationSteelTide;
 
+/// <summary>
+/// Presents settings and language snapshots supplied through <see cref="SetSettings"/> and
+/// <see cref="SetLanguage"/>, then emits user intent signals after <see cref="_Ready"/> binds
+/// the required scene nodes. The view does not persist settings or mutate world state.
+/// </summary>
 [GlobalClass]
 public partial class PauseMenuView : ColorRect
 {
@@ -115,6 +120,43 @@ public partial class PauseMenuView : ColorRect
         if (IsInstanceValid(_resumeButton))
         {
             _resumeButton.EmitSignal(BaseButton.SignalName.Pressed);
+        }
+    }
+
+    internal void DriveSettingsForDiagnostics(
+        float sensitivity,
+        int quality,
+        bool fullscreen,
+        string language)
+    {
+        _sensitivitySlider.SetValueNoSignal(sensitivity);
+        _sensitivitySlider.EmitSignal(Range.SignalName.ValueChanged, (double)sensitivity);
+
+        var qualityIndex = Mathf.Clamp(quality, 0, 2);
+        _qualitySelect.Select(qualityIndex);
+        _qualitySelect.EmitSignal(OptionButton.SignalName.ItemSelected, (long)qualityIndex);
+
+        _fullscreenToggle.SetPressedNoSignal(fullscreen);
+        _fullscreenToggle.EmitSignal(BaseButton.SignalName.Toggled, fullscreen);
+
+        var languageIndex = GameLocalization.IsChinese(language) ? 1 : 0;
+        _languageSelect.Select(languageIndex);
+        _languageSelect.EmitSignal(OptionButton.SignalName.ItemSelected, (long)languageIndex);
+    }
+
+    internal void PressRestartForDiagnostics()
+    {
+        if (IsInstanceValid(_restartButton))
+        {
+            _restartButton.EmitSignal(BaseButton.SignalName.Pressed);
+        }
+    }
+
+    internal void PressQuitForDiagnostics()
+    {
+        if (IsInstanceValid(_quitButton))
+        {
+            _quitButton.EmitSignal(BaseButton.SignalName.Pressed);
         }
     }
 

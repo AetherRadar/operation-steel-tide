@@ -50,4 +50,15 @@ public partial class CombatHUD
         => IsInstanceValid(_pauseMenuView) && _pauseMenuView.LanguageMatches(language);
 
     public void PressPauseResumeForDiagnostics() => _pauseMenuView.PressResumeForDiagnostics();
+
+    internal void DrivePauseSettingsForDiagnostics(
+        float sensitivity,
+        int quality,
+        bool fullscreen,
+        string language)
+        => _pauseMenuView.DriveSettingsForDiagnostics(sensitivity, quality, fullscreen, language);
+
+    internal void PressPauseRestartForDiagnostics() => _pauseMenuView.PressRestartForDiagnostics();
+
+    internal void PressPauseQuitForDiagnostics() => _pauseMenuView.PressQuitForDiagnostics();
 }
