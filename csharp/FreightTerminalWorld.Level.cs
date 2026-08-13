@@ -7,6 +7,11 @@ public partial class FreightTerminalWorld
 {
     private static readonly Dictionary<Vector3, BoxMesh> SharedBoxMeshes = new();
 
+    private static void ReleaseSharedBoxMeshes()
+    {
+        SharedBoxMeshes.Clear();
+    }
+
     private static BoxMesh SharedBoxMesh(Vector3 size)
     {
         if (!SharedBoxMeshes.TryGetValue(size, out var mesh))

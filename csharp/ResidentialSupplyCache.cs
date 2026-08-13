@@ -19,6 +19,11 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource
 {
     private static readonly Dictionary<Vector3, BoxMesh> SharedBoxMeshes = new();
 
+    internal static void ReleaseSharedResources()
+    {
+        SharedBoxMeshes.Clear();
+    }
+
     public ResidentialCacheKind Kind { get; private set; }
     public int TowerIndex { get; private set; }
     public int FloorIndex { get; private set; }

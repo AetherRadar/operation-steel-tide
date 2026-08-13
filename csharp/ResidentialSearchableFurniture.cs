@@ -25,6 +25,11 @@ public partial class ResidentialSearchableFurniture : StaticBody3D, ILootSource
 {
     private static readonly Dictionary<Vector3, BoxMesh> SharedBoxMeshes = new();
 
+    internal static void ReleaseSharedResources()
+    {
+        SharedBoxMeshes.Clear();
+    }
+
     public event Action<ResidentialSearchableFurniture>? FirstSearched;
 
     public ResidentialFurnitureKind Kind { get; private set; }

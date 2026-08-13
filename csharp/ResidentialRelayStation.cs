@@ -21,6 +21,11 @@ public partial class ResidentialRelayStation : StaticBody3D
 {
     private static readonly Dictionary<Vector3, BoxMesh> SharedBoxes = new();
 
+    internal static void ReleaseSharedResources()
+    {
+        SharedBoxes.Clear();
+    }
+
     private Godot.Material _shell = null!;
     private Godot.Material _trim = null!;
     private Godot.Material _utility = null!;

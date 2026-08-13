@@ -15,9 +15,19 @@ public partial class BreakableGlassField : Area3D
     public const string AudioGroupName = "glass_break_audio";
 
     private const float MinimumShatterDamage = 4.0f;
-    private static readonly BoxMesh UnitBox = new() { Size = Vector3.One };
-    private static readonly QuadMesh UnitPane = new() { Size = Vector2.One };
+    private static BoxMesh? _unitBox;
+    private static QuadMesh? _unitPane;
     private static AudioStreamWav? _glassBreakSound;
+
+    private static BoxMesh UnitBox => _unitBox ??= new BoxMesh { Size = Vector3.One };
+    private static QuadMesh UnitPane => _unitPane ??= new QuadMesh { Size = Vector2.One };
+
+    internal static void ReleaseSharedResources()
+    {
+        _unitBox = null;
+        _unitPane = null;
+        _glassBreakSound = null;
+    }
 
     private sealed class PaneState
     {

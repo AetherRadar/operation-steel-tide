@@ -138,7 +138,7 @@ public partial class FreightTerminalWorld
         GD.Print($"PROGRESSION_PASS valid={valid}");
         TryDeleteProfile(profilePath);
         TryDeleteProfile(profilePath + ".tmp");
-        GetTree().Quit(valid ? 0 : 2);
+        QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }
 
     private async void ValidateDeploymentUi()
@@ -224,7 +224,7 @@ public partial class FreightTerminalWorld
 
         GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} weapon_count={DeploymentCatalog.Weapons.Count} armor_count={DeploymentCatalog.Armor.Count} ammo_pack_count={_hud.DeploymentAmmoPackCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} quantity={selection.AmmoQuantity} quantity_pricing={quantityPricing} grade_pricing={gradePricing} weapon_grades={starterWeaponGrade}/{selectedWeaponGrade} map_count={_hud.DeploymentMapCount} selected_map={_hud.SelectedDeploymentMapId} map_available={_hud.DeploymentMapAvailable} locked_map_rejected={lockedMapRejected} starter_preset={starterPresetSelected} starter_free={freeStarter} starter_weak={weakStarter} starter_upgrades_priced={starterUpgradesPriced} starter_equipped={starterEquipped} starter_damage={starterLoadout.Weapon?.Stats().Damage:0} starter_armor={starterArmor.Protection * 100.0f:0} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
         GD.Print($"DEPLOYMENT_UI_PASS valid={valid}");
-        GetTree().Quit(valid ? 0 : 2);
+        QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }
 
     private static void TryDeleteProfile(string path)

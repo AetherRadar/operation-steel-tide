@@ -131,8 +131,8 @@ public partial class FreightTerminalWorld : Node3D
     public override void _ExitTree()
     {
         CleanupOperatorProgression();
-        // Drop cached materials and stop long-lived nodes so Godot's Variant
-        // PagedAllocator does not report "pages in use" on process exit.
+        // Drop cached resources and stop long-lived nodes before Mono tears down
+        // its script bindings. The caches rebuild when the scene is reloaded.
         try
         {
             if (_aircraft is not null && IsInstanceValid(_aircraft))
@@ -153,7 +153,13 @@ public partial class FreightTerminalWorld : Node3D
                     mate.SetPhysicsProcess(false);
                 }
             }
+            _objectiveScreens.Clear();
             _materials.Clear();
+            ReleaseSharedBoxMeshes();
+            BreakableGlassField.ReleaseSharedResources();
+            ResidentialRelayStation.ReleaseSharedResources();
+            ResidentialSupplyCache.ReleaseSharedResources();
+            ResidentialSearchableFurniture.ReleaseSharedResources();
         }
         catch
         {

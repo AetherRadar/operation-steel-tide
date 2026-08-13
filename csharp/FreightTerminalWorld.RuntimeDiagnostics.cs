@@ -1,4 +1,6 @@
 using System;
+using System.Threading.Tasks;
+using Godot;
 
 namespace OperationSteelTide;
 
@@ -106,6 +108,30 @@ public partial class FreightTerminalWorld
                 command.Run(world);
                 return;
             }
+        }
+    }
+
+    private void QuitDiagnosticAfterSceneCleanup(int exitCode)
+    {
+        var tree = GetTree();
+        QueueFree();
+        CompleteDiagnosticShutdown(tree, exitCode);
+    }
+
+    private static async void CompleteDiagnosticShutdown(SceneTree tree, int exitCode)
+    {
+        await WaitTreeFrames(tree, 3);
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        await WaitTreeFrames(tree, 24);
+        tree.Quit(exitCode);
+    }
+
+    private static async Task WaitTreeFrames(SceneTree tree, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            await tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
         }
     }
 }
