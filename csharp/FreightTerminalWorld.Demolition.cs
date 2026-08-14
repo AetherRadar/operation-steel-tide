@@ -7,35 +7,49 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private const float DemolitionPlantDuration = 3.4f;
-    private const float DemolitionFuseDuration = 32.0f;
-    private const float DemolitionDefuseDuration = 6.5f;
-    private const float DemolitionRoundDuration = 105.0f;
-    private const float DemolitionIntermissionDuration = 4.5f;
+    private const float DemolitionFuseDuration = 40.0f;
+    private const float DemolitionDefuseDuration = 7.0f;
+    private const float DemolitionRoundDuration = 100.0f;
+    private const float DemolitionIntermissionDuration = 5.0f;
     private const float DemolitionStrategyRefreshDuration = 1.5f;
+    private const int DemolitionFullBuyCost = 4400;
+    private const int DemolitionEcoBuyCost = 2400;
+    private const int DemolitionSquadSize = 5;
 
     private readonly List<Node3D> _demolitionSites = new();
-    private readonly List<EnemyOperator> _demolitionDefenders = new();
-    private readonly Dictionary<EnemyOperator, DemolitionAssignment> _demolitionDefenderAssignments = new();
+    private readonly List<EnemyOperator> _demolitionOpponents = new();
+    private readonly Dictionary<EnemyOperator, DemolitionAssignment> _demolitionOpponentAssignments = new();
     private readonly Dictionary<SquadMate, string> _demolitionSquadAssignmentTargets = new();
     private readonly DemolitionMatchState _demolitionMatch = new();
     private readonly DemolitionStrategyPlanner _demolitionStrategyPlanner = new();
+    private readonly DemolitionEconomy _demolitionPlayerEconomy = new();
+    private readonly DemolitionEconomy _demolitionOpponentEconomy = new();
     private DemolitionArenaRuntime? _demolitionArena;
     private Node3D? _demolitionDevice;
     private EnemyOperator? _demolitionDefuser;
     private Vector3[] _demolitionDefuseRoute = System.Array.Empty<Vector3>();
     private int _demolitionDefuseRouteIndex;
+    private EnemyOperator? _demolitionCarrier;
+    private Vector3[] _demolitionCarrierRoute = System.Array.Empty<Vector3>();
+    private int _demolitionCarrierRouteIndex;
+    private int _demolitionEnemyTargetSite;
     private bool _demolitionMode;
     private bool _demolitionRoundActive;
     private bool _demolitionDevicePlanted;
     private int _demolitionActiveSite = -1;
     private float _demolitionPlantProgress;
-    private float _demolitionRemaining = DemolitionFuseDuration;
+    private float _demolitionRemaining = DemolitionRoundDuration;
+    private float _demolitionPlayerDefuseProgress;
+    private float _demolitionEnemyPlantProgress;
     private float _demolitionDefuseProgress;
     private float _demolitionPulse;
     private float _demolitionIntermissionRemaining;
     private float _demolitionStrategyRemaining;
     private OperatorRole _demolitionPlayerRole = OperatorRole.Assault;
+    private string _demolitionSelectedMapId = DemolitionMapCatalog.TideforgeId;
     private DeploymentLoadout _demolitionPlayerLoadout = BuildDemolitionLoadout();
+    private DeploymentLoadout _demolitionEcoLoadout = BuildDemolitionLoadout(
+        WeaponPlatform.MP5A5, 0, WeaponPlatform.P226);
     private DemolitionStrategyPlan? _demolitionAttackerPlan;
     private DemolitionStrategyPlan? _demolitionDefenderPlan;
 
@@ -43,20 +57,30 @@ public partial class FreightTerminalWorld
     public bool IsDemolitionRoundActive => _demolitionRoundActive;
     public bool IsDemolitionDevicePlanted => _demolitionDevicePlanted;
     public int DemolitionSiteCount => _demolitionSites.Count;
-    public int DemolitionDefenderCount => _demolitionDefenders.Count(defender => IsInstanceValid(defender) && !defender.IsDead);
+    public int DemolitionOpponentCount => _demolitionOpponents.Count(opponent => IsInstanceValid(opponent) && !opponent.IsDead);
+    public int DemolitionSquadSizeTotal => 1 + _squadMates.Count(mate => IsInstanceValid(mate));
     public float DemolitionSecondsRemaining => _demolitionRemaining;
-    public float DemolitionDefuseProgress => _demolitionDefuseProgress;
+    public float DemolitionPlayerDefuseProgress => _demolitionPlayerDefuseProgress;
+    public float DemolitionAiDefuseProgress => _demolitionDefuseProgress;
+    public float DemolitionEnemyPlantProgress => _demolitionEnemyPlantProgress;
     public int DemolitionRoundNumber => _demolitionMatch.CurrentRound;
-    public int DemolitionAttackerScore => _demolitionMatch.AttackerScore;
-    public int DemolitionDefenderScore => _demolitionMatch.DefenderScore;
+    public int DemolitionPlayerScore => _demolitionMatch.PlayerScore;
+    public int DemolitionOpponentScore => _demolitionMatch.OpponentScore;
     public bool IsDemolitionOvertime => _demolitionMatch.IsOvertime;
     public bool IsDemolitionMatchComplete => _demolitionMatch.IsComplete;
+    public DemolitionTeam DemolitionPlayerSide => _demolitionMatch.PlayerSide;
+    public int DemolitionPlayerFunds => _demolitionPlayerEconomy.Funds;
+    public int DemolitionOpponentFunds => _demolitionOpponentEconomy.Funds;
+    public string DemolitionSelectedMapId => _demolitionSelectedMapId;
     public int DemolitionStrategyAssignmentCount
         => (_demolitionAttackerPlan?.Assignments.Count ?? 0)
         + (_demolitionDefenderPlan?.Assignments.Count ?? 0);
     public bool IsDemolitionArenaActive => _demolitionArena?.Active == true;
     public int DemolitionArenaCollisionBodyCount => _demolitionArena?.CollisionBodyCount ?? 0;
     public int DemolitionArenaVisualPartCount => _demolitionArena?.VisualPartCount ?? 0;
+
+    private static DemolitionTeam DemolitionOtherSide(DemolitionTeam side)
+        => side == DemolitionTeam.Attackers ? DemolitionTeam.Defenders : DemolitionTeam.Attackers;
 
     private void EnsureDemolitionArenaBuilt()
     {
@@ -74,7 +98,8 @@ public partial class FreightTerminalWorld
         int role,
         int primaryPlatform,
         int buildTier,
-        int sidearmPlatform)
+        int sidearmPlatform,
+        string mapId)
     {
         if (_squadDeployed || _missionEnded)
         {
@@ -93,18 +118,18 @@ public partial class FreightTerminalWorld
             sidearm = WeaponPlatform.P226;
         }
         _demolitionPlayerLoadout = BuildDemolitionLoadout(primary, Mathf.Clamp(buildTier, 0, 2), sidearm);
+        _demolitionEcoLoadout = BuildDemolitionLoadout(WeaponPlatform.MP5A5, 0, sidearm);
+        _demolitionSelectedMapId = DemolitionMapCatalog.Resolve(mapId).Id;
         PrepareDemolitionBattlefield();
-        var layout = DemolitionLayout();
-        _player.GlobalPosition = layout.AttackSpawn;
-        _player.Rotation = Vector3.Zero;
         DeploySquad((OperatorRole)role, SquadSessionMode.Local, "127.0.0.1");
         StartDemolitionRound();
         _missionDirector.ExitDeploymentZone();
         _missionDirector.RaiseConfirmedAlarm();
         _missionPhase = "DEMOLITION";
+        _hud.SetSquadStatus("DEMOLITION  //  5 V 5  //  ATTACK THEN DEFEND");
         _hud.ShowLocalizedMessage(
             "demolition_deployed",
-            "DEMOLITION TEAM DEPLOYED  //  12 ROUND MATCH  //  PLANT AT A OR B",
+            "DEMOLITION 5V5  //  FIRST TO 13  //  SIDES SWAP AFTER ROUND 12",
             new Color(1.0f, 0.58f, 0.2f));
     }
 
@@ -145,17 +170,21 @@ public partial class FreightTerminalWorld
         _demolitionMode = true;
         _demolitionRoundActive = false;
         _demolitionMatch.Reset();
+        _demolitionPlayerEconomy.Reset();
+        _demolitionOpponentEconomy.Reset();
         _demolitionDevicePlanted = false;
         _demolitionActiveSite = -1;
         _demolitionPlantProgress = 0.0f;
-        _demolitionRemaining = DemolitionRoundDuration;
+        _demolitionPlayerDefuseProgress = 0.0f;
+        _demolitionEnemyPlantProgress = 0.0f;
         _demolitionDefuseProgress = 0.0f;
         _demolitionDefuser = null;
+        _demolitionCarrier = null;
         _demolitionIntermissionRemaining = 0.0f;
         _demolitionStrategyRemaining = 0.0f;
         _demolitionAttackerPlan = null;
         _demolitionDefenderPlan = null;
-        _demolitionDefenderAssignments.Clear();
+        _demolitionOpponentAssignments.Clear();
         _demolitionSquadAssignmentTargets.Clear();
         _reinforcementPending = false;
         _reinforcementCountdown = 0.0f;
@@ -197,50 +226,72 @@ public partial class FreightTerminalWorld
                 civilian.Visible = false;
             }
         }
-        ClearDemolitionDefenders();
+        ClearDemolitionOpponents();
     }
 
-    private void SpawnDemolitionDefenders()
+    private IReadOnlyList<Vector3> DemolitionSpawnsFor(DemolitionTeam side)
     {
-        ClearDemolitionDefenders();
-        var spawns = DemolitionLayout().DefenderSpawns;
-        for (var index = 0; index < spawns.Count; index++)
+        var layout = DemolitionLayout();
+        return side == DemolitionTeam.Attackers ? layout.AttackSpawns : layout.DefenderSpawns;
+    }
+
+    private void SpawnDemolitionOpponents()
+    {
+        ClearDemolitionOpponents();
+        var opponentSide = DemolitionOtherSide(_demolitionMatch.PlayerSide);
+        var spawns = DemolitionSpawnsFor(opponentSide);
+        var layout = DemolitionLayout();
+        var count = Mathf.Min(DemolitionSquadSize, spawns.Count);
+        for (var index = 0; index < count; index++)
         {
-            var weapon = index % 3 == 0
-                ? WeaponCatalog.Build(WeaponPlatform.MP5A5, 1)
-                : WeaponCatalog.Build(WeaponPlatform.M4A1, 1);
-            var defender = SpawnEnemy(
+            var weapon = BuildDemolitionOpponentWeapon(index);
+            var opponent = SpawnEnemy(
                 spawns[index],
                 alerted: false,
                 teamId: 0,
                 initialWeapon: weapon,
-                sentryMode: true,
+                sentryMode: opponentSide == DemolitionTeam.Defenders,
                 detectionRange: 52.0f);
-            defender.Name = $"DemolitionDefender_{index + 1:00}";
-            defender.LookAt(DemolitionLayout().Midpoint, Vector3.Up);
-            _demolitionDefenders.Add(defender);
+            opponent.Name = $"DemolitionOpponent_{index + 1:00}";
+            opponent.LookAt(layout.Midpoint, Vector3.Up);
+            _demolitionOpponents.Add(opponent);
         }
-        _enemiesRemaining = _demolitionDefenders.Count;
+        _enemiesRemaining = _demolitionOpponents.Count;
         _hud.SetEnemyCount(_enemiesRemaining);
     }
 
-    private void ClearDemolitionDefenders()
+    private WeaponBuild BuildDemolitionOpponentWeapon(int index)
     {
-        foreach (var defender in _demolitionDefenders)
+        return _demolitionOpponentEconomy.Funds >= DemolitionFullBuyCost
+            ? (index % 3) switch
+            {
+                0 => WeaponCatalog.Build(WeaponPlatform.M4A1, 1),
+                1 => WeaponCatalog.Build(WeaponPlatform.AK74, 1),
+                _ => WeaponCatalog.Build(WeaponPlatform.ScarL, 1)
+            }
+            : WeaponCatalog.Build(WeaponPlatform.MP5A5, _demolitionOpponentEconomy.Funds >= DemolitionEcoBuyCost ? 1 : 0);
+    }
+
+    private void ClearDemolitionOpponents()
+    {
+        foreach (var opponent in _demolitionOpponents)
         {
-            if (!IsInstanceValid(defender))
+            if (!IsInstanceValid(opponent))
             {
                 continue;
             }
-            defender.ProcessMode = ProcessModeEnum.Disabled;
-            _enemies.Remove(defender);
-            defender.QueueFree();
+            opponent.ProcessMode = ProcessModeEnum.Disabled;
+            _enemies.Remove(opponent);
+            opponent.QueueFree();
         }
-        _demolitionDefenders.Clear();
-        _demolitionDefenderAssignments.Clear();
+        _demolitionOpponents.Clear();
+        _demolitionOpponentAssignments.Clear();
         _demolitionDefuser = null;
         _demolitionDefuseRoute = System.Array.Empty<Vector3>();
         _demolitionDefuseRouteIndex = 0;
+        _demolitionCarrier = null;
+        _demolitionCarrierRoute = System.Array.Empty<Vector3>();
+        _demolitionCarrierRouteIndex = 0;
     }
 
     private void StartDemolitionRound()
@@ -252,16 +303,19 @@ public partial class FreightTerminalWorld
 
         ClearDemolitionDevice();
         ResetDemolitionSquad();
-        SpawnDemolitionDefenders();
+        SpawnDemolitionOpponents();
         _demolitionRoundActive = true;
         _demolitionDevicePlanted = false;
         _demolitionActiveSite = -1;
         _demolitionPlantProgress = 0.0f;
+        _demolitionPlayerDefuseProgress = 0.0f;
+        _demolitionEnemyPlantProgress = 0.0f;
         _demolitionDefuseProgress = 0.0f;
         _demolitionRemaining = DemolitionRoundDuration;
         _demolitionPulse = 0.0f;
         _demolitionIntermissionRemaining = 0.0f;
         _demolitionStrategyRemaining = 0.0f;
+        _demolitionEnemyTargetSite = _demolitionMatch.CompletedRounds % 2;
         _missionPhase = "DEMOLITION";
         RefreshDemolitionStrategies(true);
         UpdateDemolitionRoundHud();
@@ -287,24 +341,48 @@ public partial class FreightTerminalWorld
         }
 
         var layout = DemolitionLayout();
+        var playerSide = _demolitionMatch.PlayerSide;
+        var spawns = DemolitionSpawnsFor(playerSide);
         _localPlayerDowned = false;
         _localPlayerEliminated = false;
         _localPlayerDownedTimer = 0.0f;
         _allDownTimer = 0.0f;
         ClearLeaderReviveAi();
         RestoreLocalPlayerView();
-        _player.ResetForDemolitionRound(layout.AttackSpawn, _demolitionPlayerRole, _demolitionPlayerLoadout);
+        var loadout = ResolveDemolitionRoundLoadout(out var roundSpend);
+        _player.ResetForDemolitionRound(spawns[0], _demolitionPlayerRole, loadout);
+        _player.LookAt(layout.Midpoint, Vector3.Up);
         EnsureAiSquadFill();
         foreach (var mate in _squadMates.Where(IsInstanceValid))
         {
-            var offset = mate.SquadSlot == 1
-                ? new Vector3(-2.6f, 0.0f, 3.2f)
-                : new Vector3(2.6f, 0.0f, 3.2f);
-            mate.ResetForDemolitionRound(layout.AttackSpawn + offset);
+            var spawnIndex = 1 + ((mate.SquadSlot - 1) % (spawns.Count - 1));
+            mate.ResetForDemolitionRound(spawns[spawnIndex]);
+            mate.LookAt(layout.Midpoint, Vector3.Up);
         }
         ResetSquadLeaderTrail(_player.GlobalPosition);
         _hud.HideDownedState();
         RefreshSquadHud();
+        if (roundSpend > 0)
+        {
+            _hud.ShowRadioMessage(
+                GameLocalization.Format(
+                    "demolition_purchase",
+                    _languageSetting,
+                    "LOADOUT PURCHASED  //  -${0}",
+                    roundSpend),
+                new Color(0.55f, 0.86f, 0.72f));
+        }
+    }
+
+    private DeploymentLoadout ResolveDemolitionRoundLoadout(out int roundSpend)
+    {
+        if (_demolitionPlayerEconomy.Funds >= DemolitionFullBuyCost)
+        {
+            roundSpend = _demolitionPlayerEconomy.Spend(DemolitionFullBuyCost);
+            return _demolitionPlayerLoadout;
+        }
+        roundSpend = _demolitionPlayerEconomy.Spend(DemolitionEcoBuyCost);
+        return _demolitionEcoLoadout;
     }
 
     private void ClearDemolitionDevice()
@@ -320,20 +398,32 @@ public partial class FreightTerminalWorld
 
     private void UpdateDemolitionRoundHud()
     {
+        var sideLabel = GameLocalization.IsChinese(_languageSetting) ? "进攻" : "ATTACK";
+        if (_demolitionMatch.PlayerSide == DemolitionTeam.Defenders)
+        {
+            sideLabel = GameLocalization.IsChinese(_languageSetting) ? "防守" : "DEFEND";
+        }
         var overtime = _demolitionMatch.IsOvertime
             ? GameLocalization.IsChinese(_languageSetting) ? "  //  加时" : "  //  OVERTIME"
             : string.Empty;
         var score = GameLocalization.IsChinese(_languageSetting)
-            ? $"第 {_demolitionMatch.CurrentRound} 局  //  进攻 {_demolitionMatch.AttackerScore}:{_demolitionMatch.DefenderScore} 防守{overtime}"
-            : $"ROUND {_demolitionMatch.CurrentRound}  //  ATTACK {_demolitionMatch.AttackerScore}:{_demolitionMatch.DefenderScore} DEFEND{overtime}";
+            ? $"第 {_demolitionMatch.CurrentRound} 局  //  己方 {_demolitionMatch.PlayerScore}:{_demolitionMatch.OpponentScore} 敌方  //  {sideLabel}  //  ${_demolitionPlayerEconomy.Funds}{overtime}"
+            : $"ROUND {_demolitionMatch.CurrentRound}  //  YOU {_demolitionMatch.PlayerScore}:{_demolitionMatch.OpponentScore} ENEMY  //  {sideLabel}  //  ${_demolitionPlayerEconomy.Funds}{overtime}";
         _hud.SetMissionPhase(score, _demolitionRemaining, false);
         if (!_demolitionDevicePlanted)
         {
-            _hud.SetObjective(GameLocalization.Format(
-                "demolition_round_objective",
-                _languageSetting,
-                "{0}  //  CHOOSE SITE A OR B  //  HOLD F TO PLANT",
-                score));
+            var objective = _demolitionMatch.PlayerSide == DemolitionTeam.Attackers
+                ? GameLocalization.Format(
+                    "demolition_round_objective",
+                    _languageSetting,
+                    "{0}  //  CHOOSE SITE A OR B  //  HOLD F TO PLANT",
+                    score)
+                : GameLocalization.Format(
+                    "demolition_defend_hold",
+                    _languageSetting,
+                    "{0}  //  HOLD A AND B  //  DENY THE PLANT",
+                    score);
+            _hud.SetObjective(objective);
         }
     }
 
@@ -345,8 +435,8 @@ public partial class FreightTerminalWorld
         }
         _demolitionIntermissionRemaining = Mathf.Max(0.0f, _demolitionIntermissionRemaining - delta);
         var label = GameLocalization.IsChinese(_languageSetting)
-            ? $"下一局  //  {_demolitionIntermissionRemaining:0.0}s  //  进攻 {_demolitionMatch.AttackerScore}:{_demolitionMatch.DefenderScore} 防守"
-            : $"NEXT ROUND  //  {_demolitionIntermissionRemaining:0.0}s  //  ATTACK {_demolitionMatch.AttackerScore}:{_demolitionMatch.DefenderScore} DEFEND";
+            ? $"下一局  //  {_demolitionIntermissionRemaining:0.0}s  //  己方 {_demolitionMatch.PlayerScore}:{_demolitionMatch.OpponentScore} 敌方"
+            : $"NEXT ROUND  //  {_demolitionIntermissionRemaining:0.0}s  //  YOU {_demolitionMatch.PlayerScore}:{_demolitionMatch.OpponentScore} ENEMY";
         _hud.SetMissionPhase(label, _demolitionIntermissionRemaining, false);
         _hud.SetObjective(label);
         if (_demolitionIntermissionRemaining <= 0.0f)
@@ -362,8 +452,19 @@ public partial class FreightTerminalWorld
             _hud.SetInteraction(string.Empty, 0.0f, false);
             return;
         }
-        if (_demolitionDevicePlanted)
+        if (!_demolitionDevicePlanted)
         {
+            UpdateDemolitionPlantInteraction(delta);
+            return;
+        }
+        UpdateDemolitionDefuseInteraction(delta);
+    }
+
+    private void UpdateDemolitionPlantInteraction(float delta)
+    {
+        if (_demolitionMatch.PlayerSide != DemolitionTeam.Attackers)
+        {
+            _demolitionPlantProgress = 0.0f;
             _hud.SetInteraction(string.Empty, 0.0f, false);
             return;
         }
@@ -401,11 +502,51 @@ public partial class FreightTerminalWorld
         _hud.SetInteraction(action, _demolitionPlantProgress, true);
         if (_demolitionPlantProgress >= 1.0f)
         {
-            PlantDemolitionDevice(nearestIndex);
+            PlantDemolitionDevice(nearestIndex, byPlayerTeam: true);
         }
     }
 
-    private void PlantDemolitionDevice(int siteIndex)
+    private void UpdateDemolitionDefuseInteraction(float delta)
+    {
+        if (_demolitionMatch.PlayerSide != DemolitionTeam.Defenders || _demolitionActiveSite < 0)
+        {
+            _hud.SetInteraction(string.Empty, 0.0f, false);
+            return;
+        }
+        var layout = DemolitionLayout();
+        var devicePosition = layout.SitePositions[_demolitionActiveSite];
+        var distance = HorizontalDistance(_player.GlobalPosition, devicePosition);
+        if (distance > 3.25f || Mathf.Abs(_player.GlobalPosition.Y - devicePosition.Y) > 2.8f)
+        {
+            _demolitionPlayerDefuseProgress = Mathf.Max(0.0f, _demolitionPlayerDefuseProgress - delta * 1.4f);
+            _hud.SetInteraction(string.Empty, 0.0f, false);
+            return;
+        }
+
+        var defusing = Input.IsActionPressed("interact") && !_interactReleaseRequired;
+        _demolitionPlayerDefuseProgress = defusing
+            ? Mathf.Min(1.0f, _demolitionPlayerDefuseProgress + delta / DemolitionDefuseDuration)
+            : Mathf.Max(0.0f, _demolitionPlayerDefuseProgress - delta * 1.2f);
+        var siteName = ((char)('A' + _demolitionActiveSite)).ToString();
+        var action = GameLocalization.Format(
+            "demolition_interaction_defuse",
+            _languageSetting,
+            "DEFUSE DEMOLITION DEVICE  //  SITE {0}",
+            siteName);
+        _hud.SetInteraction(action, _demolitionPlayerDefuseProgress, true);
+        if (_demolitionPlayerDefuseProgress >= 1.0f)
+        {
+            FinishDemolitionRound(
+                true,
+                GameLocalization.Format(
+                    "demolition_device_defused",
+                    _languageSetting,
+                    "SITE {0} DEVICE DEFUSED",
+                    siteName));
+        }
+    }
+
+    private void PlantDemolitionDevice(int siteIndex, bool byPlayerTeam)
     {
         var layout = DemolitionLayout();
         if (_demolitionDevicePlanted || siteIndex < 0 || siteIndex >= layout.SitePositions.Count)
@@ -416,7 +557,9 @@ public partial class FreightTerminalWorld
         _demolitionActiveSite = siteIndex;
         _demolitionRemaining = DemolitionFuseDuration;
         _demolitionPlantProgress = 0.0f;
+        _demolitionEnemyPlantProgress = 0.0f;
         _demolitionDefuseProgress = 0.0f;
+        _demolitionPlayerDefuseProgress = 0.0f;
         var orange = Mat(
             "demolition_device_orange",
             new Color(1.0f, 0.24f, 0.04f),
@@ -441,24 +584,30 @@ public partial class FreightTerminalWorld
             OmniRange = 9.0f,
             ShadowEnabled = false
         });
-        foreach (var defender in _demolitionDefenders)
+        foreach (var opponent in _demolitionOpponents)
         {
-            if (IsInstanceValid(defender) && !defender.IsDead)
+            if (IsInstanceValid(opponent) && !opponent.IsDead)
             {
-                defender.SentryMode = false;
-                defender.SetAlerted(_player.GlobalPosition);
+                opponent.SentryMode = false;
+                opponent.SetAlerted(_player.GlobalPosition);
             }
         }
         RefreshDemolitionStrategies(true);
-        var siteName = ((char)('A' + siteIndex)).ToString();
+        var plantedSiteName = ((char)('A' + siteIndex)).ToString();
+        var messageKey = byPlayerTeam ? "demolition_planted" : "demolition_planted_by_enemy";
+        var messageEnglish = byPlayerTeam
+            ? "DEVICE PLANTED AT SITE {0}  //  DEFEND FOR {1:0} SECONDS"
+            : "ENEMY DEVICE PLANTED AT SITE {0}  //  DEFUSE OR LOSE THE ROUND";
         _hud.ShowRadioMessage(
             GameLocalization.Format(
-                "demolition_planted",
+                messageKey,
                 _languageSetting,
-                "DEVICE PLANTED AT SITE {0}  //  DEFEND FOR {1:0} SECONDS",
-                siteName,
+                messageEnglish,
+                plantedSiteName,
                 DemolitionFuseDuration),
-            new Color(1.0f, 0.5f, 0.16f));
+            byPlayerTeam
+                ? new Color(1.0f, 0.5f, 0.16f)
+                : new Color(1.0f, 0.3f, 0.2f));
     }
 
     private void UpdateDemolitionRound(float delta)
@@ -473,15 +622,16 @@ public partial class FreightTerminalWorld
             return;
         }
 
-        var defendersAlive = DemolitionDefenderCount;
-        if (defendersAlive == 0)
+        var playerSide = _demolitionMatch.PlayerSide;
+        var opponentsAlive = DemolitionOpponentCount;
+        if (opponentsAlive == 0 && (!_demolitionDevicePlanted || playerSide == DemolitionTeam.Attackers))
         {
             FinishDemolitionRound(
                 true,
                 GameLocalization.Get(
-                    "demolition_defenders_eliminated",
+                    "demolition_opponents_eliminated",
                     _languageSetting,
-                    "DEFENDING FORCE ELIMINATED"));
+                    "OPPOSING SQUAD ELIMINATED"));
             return;
         }
         _demolitionStrategyRemaining -= delta;
@@ -491,16 +641,22 @@ public partial class FreightTerminalWorld
         }
         if (!_demolitionDevicePlanted)
         {
+            if (playerSide == DemolitionTeam.Defenders
+                && (!IsInstanceValid(_demolitionCarrier) || _demolitionCarrier!.IsDead)
+                && _demolitionAttackerPlan is not null)
+            {
+                SelectDemolitionCarrier(_demolitionAttackerPlan);
+            }
             _demolitionRemaining = Mathf.Max(0.0f, _demolitionRemaining - delta);
             UpdateDemolitionRoundHud();
             if (_demolitionRemaining <= 0.0f)
             {
+                var defendersWin = true;
+                var timeoutKey = "demolition_round_timeout_defended";
+                var timeoutEnglish = "ATTACK WINDOW EXPIRED  //  SITES HELD";
                 FinishDemolitionRound(
-                    false,
-                    GameLocalization.Get(
-                        "demolition_round_timeout",
-                        _languageSetting,
-                        "ATTACK WINDOW EXPIRED"));
+                    defendersWin == (playerSide == DemolitionTeam.Defenders),
+                    GameLocalization.Get(timeoutKey, _languageSetting, timeoutEnglish));
             }
             return;
         }
@@ -512,30 +668,45 @@ public partial class FreightTerminalWorld
             var pulse = 1.0f + Mathf.Sin(_demolitionPulse * (5.0f + (1.0f - _demolitionRemaining / DemolitionFuseDuration) * 8.0f)) * 0.08f;
             _demolitionDevice!.Scale = Vector3.One * pulse;
         }
-        SelectDemolitionDefuser();
         var siteName = ((char)('A' + _demolitionActiveSite)).ToString();
-        var defuse = _demolitionDefuseProgress > 0.01f
+        if (playerSide == DemolitionTeam.Attackers)
+        {
+            SelectDemolitionDefuser();
+        }
+        var defusePercent = playerSide == DemolitionTeam.Defenders
+            ? _demolitionPlayerDefuseProgress
+            : _demolitionDefuseProgress;
+        var defuse = defusePercent > 0.01f
             ? GameLocalization.Format(
                 "demolition_defuse_suffix",
                 _languageSetting,
                 "  //  DEFUSE {0:00}%",
-                Mathf.RoundToInt(_demolitionDefuseProgress * 100.0f))
+                Mathf.RoundToInt(defusePercent * 100.0f))
             : string.Empty;
+        var objectiveKey = playerSide == DemolitionTeam.Attackers
+            ? "demolition_defend"
+            : "demolition_defuse_hold";
+        var objectiveEnglish = playerSide == DemolitionTeam.Attackers
+            ? "DEFEND SITE {0}  //  {1:00.0}s{2}"
+            : "DEFUSE SITE {0}  //  {1:00.0}s{2}";
         _hud.SetObjective(GameLocalization.Format(
-            "demolition_defend",
+            objectiveKey,
             _languageSetting,
-            "DEFEND SITE {0}  //  {1:00.0}s{2}",
+            objectiveEnglish,
             siteName,
             _demolitionRemaining,
             defuse));
+        var sideLabel = playerSide == DemolitionTeam.Attackers
+            ? (GameLocalization.IsChinese(_languageSetting) ? "进攻" : "ATTACK")
+            : (GameLocalization.IsChinese(_languageSetting) ? "防守" : "DEFEND");
         var phase = GameLocalization.IsChinese(_languageSetting)
-            ? $"第 {_demolitionMatch.CurrentRound} 局  //  进攻 {_demolitionMatch.AttackerScore}:{_demolitionMatch.DefenderScore} 防守"
-            : $"ROUND {_demolitionMatch.CurrentRound}  //  ATTACK {_demolitionMatch.AttackerScore}:{_demolitionMatch.DefenderScore} DEFEND";
+            ? $"第 {_demolitionMatch.CurrentRound} 局  //  己方 {_demolitionMatch.PlayerScore}:{_demolitionMatch.OpponentScore} 敌方  //  {sideLabel}"
+            : $"ROUND {_demolitionMatch.CurrentRound}  //  YOU {_demolitionMatch.PlayerScore}:{_demolitionMatch.OpponentScore} ENEMY  //  {sideLabel}";
         _hud.SetMissionPhase(phase, _demolitionRemaining, false);
         if (_demolitionRemaining <= 0.0f)
         {
             FinishDemolitionRound(
-                true,
+                playerSide == DemolitionTeam.Attackers,
                 GameLocalization.Format(
                     "demolition_site_destroyed",
                     _languageSetting,
@@ -570,7 +741,7 @@ public partial class FreightTerminalWorld
         return true;
     }
 
-    private void FinishDemolitionRound(bool victory, string reason)
+    private void FinishDemolitionRound(bool playerWon, string reason)
     {
         if (_missionEnded || !_demolitionRoundActive)
         {
@@ -581,11 +752,11 @@ public partial class FreightTerminalWorld
         _player.UiLocked = true;
         _player.DisarmFireInput();
         _player.DisarmMovementInput();
-        foreach (var defender in _demolitionDefenders)
+        foreach (var opponent in _demolitionOpponents)
         {
-            if (IsInstanceValid(defender))
+            if (IsInstanceValid(opponent))
             {
-                defender.ProcessMode = ProcessModeEnum.Disabled;
+                opponent.ProcessMode = ProcessModeEnum.Disabled;
             }
         }
         foreach (var mate in _squadMates)
@@ -595,22 +766,41 @@ public partial class FreightTerminalWorld
                 mate.ProcessMode = ProcessModeEnum.Disabled;
             }
         }
-        var result = _demolitionMatch.RecordRound(
-            victory ? DemolitionTeam.Attackers : DemolitionTeam.Defenders);
+
+        var defused = _demolitionPlayerDefuseProgress >= 1.0f;
+        var playerPlanted = _demolitionDevicePlanted
+            && _demolitionMatch.PlayerSide == DemolitionTeam.Attackers;
+        var opponentsPlanted = _demolitionDevicePlanted
+            && _demolitionMatch.PlayerSide == DemolitionTeam.Defenders;
+        _demolitionPlayerEconomy.RecordRound(playerWon, defused || playerPlanted && !playerWon);
+        _demolitionOpponentEconomy.RecordRound(!playerWon, opponentsPlanted && playerWon);
+
+        var result = _demolitionMatch.RecordRound(playerWon);
         if (result.MatchComplete)
         {
             CompleteDemolitionMatch(reason);
             return;
         }
 
+        if (result.SideSwap)
+        {
+            _demolitionPlayerEconomy.Reset();
+            _demolitionOpponentEconomy.Reset();
+        }
+
         _demolitionIntermissionRemaining = DemolitionIntermissionDuration;
+        var swap = result.SideSwap
+            ? GameLocalization.IsChinese(_languageSetting)
+                ? "  //  攻防互换，资金重置"
+                : "  //  SIDES SWAP  //  FUNDS RESET"
+            : string.Empty;
         var overtime = result.EnteredOvertime
             ? GameLocalization.IsChinese(_languageSetting) ? "  //  进入加时" : "  //  OVERTIME STARTS"
             : string.Empty;
         var roundMessage = GameLocalization.IsChinese(_languageSetting)
-            ? $"本局结束  //  {reason}  //  进攻 {result.AttackerScore}:{result.DefenderScore} 防守{overtime}"
-            : $"ROUND COMPLETE  //  {reason}  //  ATTACK {result.AttackerScore}:{result.DefenderScore} DEFEND{overtime}";
-        _hud.ShowRadioMessage(roundMessage, victory
+            ? $"本局结束  //  {reason}  //  己方 {result.PlayerScore}:{result.OpponentScore} 敌方{swap}{overtime}  //  ${_demolitionPlayerEconomy.Funds}"
+            : $"ROUND COMPLETE  //  {reason}  //  YOU {result.PlayerScore}:{result.OpponentScore} ENEMY{swap}{overtime}  //  ${_demolitionPlayerEconomy.Funds}";
+        _hud.ShowRadioMessage(roundMessage, playerWon
             ? new Color(1.0f, 0.62f, 0.22f)
             : new Color(0.35f, 0.85f, 0.7f));
     }
@@ -619,15 +809,15 @@ public partial class FreightTerminalWorld
     {
         _missionEnded = true;
         _demolitionIntermissionRemaining = 0.0f;
-        var playerVictory = _demolitionMatch.Winner == DemolitionTeam.Attackers;
+        var playerVictory = _demolitionMatch.PlayerScore > _demolitionMatch.OpponentScore;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         _missionDirector.CompleteMission(playerVictory, _kills, _headshots, _shotsFired, _shotsHit);
         var overtime = _demolitionMatch.IsOvertime
             ? GameLocalization.IsChinese(_languageSetting) ? "加时" : "OVERTIME"
             : GameLocalization.IsChinese(_languageSetting) ? "常规阶段" : "REGULATION";
         var result = GameLocalization.IsChinese(_languageSetting)
-            ? $"{finalRoundReason}\n最终比分  进攻 {_demolitionMatch.AttackerScore}:{_demolitionMatch.DefenderScore} 防守  //  {overtime}"
-            : $"{finalRoundReason}\nFINAL SCORE  ATTACK {_demolitionMatch.AttackerScore}:{_demolitionMatch.DefenderScore} DEFEND  //  {overtime}";
+            ? $"{finalRoundReason}\n最终比分  己方 {_demolitionMatch.PlayerScore}:{_demolitionMatch.OpponentScore} 敌方  //  {overtime}"
+            : $"{finalRoundReason}\nFINAL SCORE  YOU {_demolitionMatch.PlayerScore}:{_demolitionMatch.OpponentScore} ENEMY  //  {overtime}";
         _hud.ShowDemolitionResult(playerVictory, result);
     }
 }

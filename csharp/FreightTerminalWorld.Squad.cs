@@ -231,8 +231,9 @@ public partial class FreightTerminalWorld
         {
             return;
         }
-        // Exactly two AI slots (total squad size 3 including the player).
-        for (var slot = 1; slot <= 2; slot++)
+        // Demolition fields a 5v5 squad; extraction runs 1 human + 2 AI.
+        var slotCount = _demolitionMode ? 4 : 2;
+        for (var slot = 1; slot <= slotCount; slot++)
         {
             if (_squadMates.Any(mate => IsInstanceValid(mate) && mate.SquadSlot == slot))
             {
@@ -240,7 +241,7 @@ public partial class FreightTerminalWorld
             }
             SpawnSquadMate(slot, RoleForSlot(slot), false, 0);
         }
-        // Drop any legacy fourth/third AI if present.
+        // Drop any AI beyond the mode's roster.
         for (var i = _squadMates.Count - 1; i >= 0; i--)
         {
             var mate = _squadMates[i];
@@ -249,7 +250,7 @@ public partial class FreightTerminalWorld
                 _squadMates.RemoveAt(i);
                 continue;
             }
-            if (mate.SquadSlot > 2 && !mate.IsHumanProxy)
+            if (mate.SquadSlot > slotCount && !mate.IsHumanProxy)
             {
                 mate.QueueFree();
                 _squadMates.RemoveAt(i);
@@ -1386,9 +1387,9 @@ public partial class FreightTerminalWorld
             FinishDemolitionRound(
                 false,
                 GameLocalization.Get(
-                    "demolition_attackers_eliminated",
+                    "demolition_squad_eliminated",
                     _languageSetting,
-                    "ATTACKING SQUAD ELIMINATED"));
+                    "SQUAD ELIMINATED"));
             return;
         }
         _missionEnded = true;

@@ -1478,9 +1478,9 @@ public partial class FreightTerminalWorld : Node3D
             FinishDemolitionRound(
                 false,
                 GameLocalization.Get(
-                    "demolition_attackers_eliminated",
+                    "demolition_squad_eliminated",
                     _languageSetting,
-                    "ATTACKING SQUAD ELIMINATED"));
+                    "SQUAD ELIMINATED"));
             return;
         }
         _missionEnded = true;

@@ -231,8 +231,10 @@ public sealed class DemolitionStrategyPlanner
         List<DemolitionAgentSnapshot> members,
         int plantedSiteIndex)
     {
-        var siteX = plantedSiteIndex == 0 ? -25.0f : 25.0f;
-        var siteZ = -18.0f;
+        var site = DemolitionArenaLayout.LocalSiteCenters[
+            Math.Clamp(plantedSiteIndex, 0, DemolitionArenaLayout.LocalSiteCenters.Length - 1)];
+        var siteX = site.X;
+        var siteZ = site.Y;
         var defuser = members
             .OrderBy(member => DistanceSquared(member, siteX, siteZ) + (1.0f - member.HealthRatio) * 90.0f)
             .ThenBy(member => member.MemberId, StringComparer.Ordinal)
