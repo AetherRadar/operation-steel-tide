@@ -62,22 +62,22 @@ public sealed class DemolitionArenaLayout
     public DemolitionArenaLayout(Vector3? origin = null)
     {
         Origin = origin ?? WorldOrigin;
-        AttackSpawn = World(new Vector3(0.0f, 0.22f, 34.0f));
-        DefenderSpawn = World(new Vector3(0.0f, 0.22f, -36.0f));
+        AttackSpawn = World(new Vector3(0.0f, 0.22f, 56.0f));
+        DefenderSpawn = World(new Vector3(0.0f, 0.22f, -56.0f));
         Midpoint = World(new Vector3(0.0f, 0.12f, 1.0f));
-        WorldBounds = new Rect2(Origin.X - 41.0f, Origin.Z - 42.0f, 82.0f, 84.0f);
+        WorldBounds = new Rect2(Origin.X - 41.0f, Origin.Z - 62.0f, 82.0f, 124.0f);
 
         SitePositions = WorldPoints(
             new(-25.0f, 0.18f, -18.0f),
             new(25.0f, 0.18f, -18.0f));
         DefenderSpawns = WorldPoints(
-            new(-30.5f, 0.22f, -32.0f),
-            new(-22.0f, 0.22f, -33.0f),
-            new(-11.5f, 0.22f, -38.0f),
-            new(11.5f, 0.22f, -38.0f),
-            new(22.0f, 0.22f, -33.0f),
-            new(30.5f, 0.22f, -32.0f),
-            new(0.0f, 0.22f, -37.0f));
+            new(-25.0f, 0.22f, -51.0f),
+            new(-18.0f, 0.22f, -53.0f),
+            new(-9.0f, 0.22f, -57.0f),
+            new(9.0f, 0.22f, -57.0f),
+            new(18.0f, 0.22f, -53.0f),
+            new(25.0f, 0.22f, -51.0f),
+            new(0.0f, 0.22f, -54.0f));
         CoverPoints = WorldPoints(
             new(-31.2f, 0.2f, 11.0f), new(-25.8f, 0.2f, 5.0f),
             new(-31.0f, 0.2f, -15.0f), new(-19.5f, 0.2f, -19.0f),
@@ -93,20 +93,23 @@ public sealed class DemolitionArenaLayout
         Props = BuildProps();
         Markers = BuildMarkers();
         AttackToAPath = WorldPoints(
-            new(0, 0.2f, 34), new(0, 0.2f, 26), new(0, 0.2f, 13),
+            new(0, 0.2f, 56), new(0, 0.2f, 49), new(0, 0.2f, 40),
+            new(0, 0.2f, 31), new(0, 0.2f, 20), new(0, 0.2f, 13),
             new(-12, 0.2f, 10), new(-17, 0.2f, -2), new(-23, 0.2f, -3),
             new(-23, 0.2f, -9), new(-25, 0.2f, -18));
         AttackToBPath = WorldPoints(
-            new(0, 0.2f, 34), new(0, 0.2f, 26), new(0, 0.2f, 13),
+            new(0, 0.2f, 56), new(0, 0.2f, 49), new(0, 0.2f, 40),
+            new(0, 0.2f, 31), new(0, 0.2f, 20), new(0, 0.2f, 13),
             new(12, 0.2f, 10), new(17, 0.2f, -2), new(25, 0.2f, -3),
             new(25, 0.2f, -9), new(25, 0.2f, -18));
         AttackMidPath = WorldPoints(
-            new(0, 0.2f, 34), new(0, 0.2f, 26), new(0, 0.2f, 13),
+            new(0, 0.2f, 56), new(0, 0.2f, 49), new(0, 0.2f, 40),
+            new(0, 0.2f, 31), new(0, 0.2f, 20), new(0, 0.2f, 13),
             new(0, 0.2f, 1));
         SiteRotationPath = WorldPoints(
             new(-25, 0.2f, -18), new(-23, 0.2f, -9), new(-23, 0.2f, -3),
-            new(-14.5f, 0.2f, 1), new(-8, 0.2f, 1), new(0, 0.2f, 1),
-            new(8, 0.2f, 1), new(14.5f, 0.2f, 1),
+            new(-17, 0.2f, -2), new(-17, 0.2f, 6), new(-10, 0.2f, 9), new(0, 0.2f, 9),
+            new(10, 0.2f, 9), new(17, 0.2f, 6), new(17, 0.2f, -2),
             new(25, 0.2f, -3), new(25, 0.2f, -9), new(25, 0.2f, -18));
         CriticalPassageWidths = new[] { 3.8f, 4.2f, 4.5f, 5.2f, 6.0f };
         CriticalPassageHeights = new[] { 2.7f, 3.2f, 4.2f, 6.0f };
@@ -155,6 +158,35 @@ public sealed class DemolitionArenaLayout
 
     public Vector3 SitePosition(int index) => SitePositions[Mathf.Clamp(index, 0, SitePositions.Count - 1)];
 
+    public Vector3 StrategyTarget(string key) => key switch
+    {
+        "attack_entry_a" => World(new Vector3(-22.0f, 0.2f, -4.0f)),
+        "attack_entry_b" => World(new Vector3(22.0f, 0.2f, -4.0f)),
+        "attack_support_a" => World(new Vector3(-15.0f, 0.2f, 7.0f)),
+        "attack_support_b" => World(new Vector3(15.0f, 0.2f, 7.0f)),
+        "attack_mid_recon" => World(new Vector3(0.0f, 0.2f, 6.0f)),
+        "defense_anchor_a" => World(new Vector3(-24.0f, 0.2f, -22.0f)),
+        "defense_anchor_b" => World(new Vector3(23.0f, 0.2f, -23.0f)),
+        "defense_mid" => World(new Vector3(0.0f, 0.2f, -4.0f)),
+        "defense_rotate_a" => World(new Vector3(-9.0f, 0.2f, -27.0f)),
+        "defense_rotate_b" => World(new Vector3(9.0f, 0.2f, -27.0f)),
+        "retake_entry_a" => World(new Vector3(-17.0f, 0.2f, -3.0f)),
+        "retake_entry_b" => World(new Vector3(17.0f, 0.2f, -3.0f)),
+        "retake_cover_a" => World(new Vector3(-31.0f, 0.2f, -13.0f)),
+        "retake_cover_b" => World(new Vector3(31.0f, 0.2f, -13.0f)),
+        "retake_flank_a" => World(new Vector3(-19.0f, 0.2f, -26.0f)),
+        "retake_flank_b" => World(new Vector3(19.0f, 0.2f, -26.0f)),
+        "postplant_guard_a" => World(new Vector3(-22.0f, 0.2f, -16.0f)),
+        "postplant_guard_b" => World(new Vector3(22.0f, 0.2f, -16.0f)),
+        "postplant_crossfire_a" => World(new Vector3(-31.0f, 0.2f, -10.0f)),
+        "postplant_crossfire_b" => World(new Vector3(31.0f, 0.2f, -10.0f)),
+        "postplant_lurk_a" => World(new Vector3(-16.0f, 0.2f, -1.0f)),
+        "postplant_lurk_b" => World(new Vector3(16.0f, 0.2f, -1.0f)),
+        "site_a" => SitePositions[0],
+        "site_b" => SitePositions[1],
+        _ => Midpoint
+    };
+
     public bool IsInsideArena(Vector3 worldPosition, float margin = 0.0f)
     {
         return worldPosition.X >= WorldBounds.Position.X - margin
@@ -194,17 +226,17 @@ public sealed class DemolitionArenaLayout
     {
         var boxes = new List<DemolitionArenaBox>
         {
-            Box("ArenaFloor", new(0, -0.48f, 0), new(80, 1.0f, 82), "ground"),
-            Box("NorthPerimeter", new(0, 2.5f, -41), new(80, 5.0f, 1.0f), "concrete_dark"),
-            Box("SouthPerimeterLeft", new(-24, 2.5f, 41), new(32, 5.0f, 1.0f), "concrete_dark"),
-            Box("SouthPerimeterRight", new(24, 2.5f, 41), new(32, 5.0f, 1.0f), "concrete_dark"),
-            Box("WestPerimeter", new(-40, 2.5f, 0), new(1.0f, 5.0f, 82), "concrete_dark"),
-            Box("EastPerimeter", new(40, 2.5f, 0), new(1.0f, 5.0f, 82), "concrete_dark"),
+            Box("ArenaFloor", new(0, -0.48f, 0), new(80, 1.0f, 122), "ground"),
+            Box("NorthPerimeter", new(0, 2.5f, -61), new(80, 5.0f, 1.0f), "concrete_dark"),
+            Box("SouthPerimeterLeft", new(-24, 2.5f, 61), new(32, 5.0f, 1.0f), "concrete_dark"),
+            Box("SouthPerimeterRight", new(24, 2.5f, 61), new(32, 5.0f, 1.0f), "concrete_dark"),
+            Box("WestPerimeter", new(-40, 2.5f, 0), new(1.0f, 5.0f, 122), "concrete_dark"),
+            Box("EastPerimeter", new(40, 2.5f, 0), new(1.0f, 5.0f, 122), "concrete_dark"),
 
-            Box("SightBlockLeft", new(-8.8f, 1.65f, 22.5f), new(1.1f, 3.3f, 16.0f), "rust"),
-            Box("SightBlockRight", new(8.8f, 1.65f, 22.5f), new(1.1f, 3.3f, 16.0f), "rust"),
-            Box("SpawnGateLeft", new(-14.4f, 1.6f, 32.0f), new(13.0f, 3.2f, 1.0f), "concrete_dark"),
-            Box("SpawnGateRight", new(14.4f, 1.6f, 32.0f), new(13.0f, 3.2f, 1.0f), "concrete_dark"),
+            Box("SightBlockLeft", new(-6.0f, 1.65f, 38.0f), new(1.4f, 3.3f, 18.0f), "rust"),
+            Box("SightBlockRight", new(6.0f, 1.65f, 38.0f), new(1.4f, 3.3f, 18.0f), "rust"),
+            Box("SpawnGateLeft", new(-14.4f, 1.6f, 52.0f), new(13.0f, 3.2f, 1.0f), "concrete_dark"),
+            Box("SpawnGateRight", new(14.4f, 1.6f, 52.0f), new(13.0f, 3.2f, 1.0f), "concrete_dark"),
 
             Box("WestRouteWall", new(-19.0f, 1.7f, 12.0f), new(1.0f, 3.4f, 23.0f), "steel_dark"),
             Box("EastRouteWall", new(19.0f, 1.7f, 12.0f), new(1.0f, 3.4f, 23.0f), "steel_dark"),
@@ -227,8 +259,8 @@ public sealed class DemolitionArenaLayout
             Box("AssemblyRoof", new(25.0f, 7.0f, -18.0f), new(19.0f, 0.4f, 24.0f), "steel"),
             Box("AssemblyMachine", new(28.5f, 1.35f, -18.8f), new(4.5f, 2.7f, 6.5f), "steel"),
 
-            Box("DefenderGateLeft", new(-11.0f, 1.65f, -34.0f), new(14.0f, 3.3f, 1.0f), "concrete_dark"),
-            Box("DefenderGateRight", new(11.0f, 1.65f, -34.0f), new(14.0f, 3.3f, 1.0f), "concrete_dark")
+            Box("DefenderGateLeft", new(-11.0f, 1.65f, -47.0f), new(14.0f, 3.3f, 1.0f), "concrete_dark"),
+            Box("DefenderGateRight", new(11.0f, 1.65f, -47.0f), new(14.0f, 3.3f, 1.0f), "concrete_dark")
         };
         return boxes;
     }
@@ -237,11 +269,12 @@ public sealed class DemolitionArenaLayout
     {
         var boxes = new List<DemolitionArenaBox>
         {
-            Box("AttackApron", new(0, 0.035f, 34), new(18, 0.07f, 9), "spawn_floor"),
-            Box("AttackBorderNorth", new(0, 0.08f, 29.6f), new(18, 0.05f, 0.16f), "warning"),
-            Box("AttackBorderSouth", new(0, 0.08f, 38.4f), new(18, 0.05f, 0.16f), "warning"),
-            Box("AttackBorderLeft", new(-8.9f, 0.08f, 34), new(0.16f, 0.05f, 8.8f), "warning"),
-            Box("AttackBorderRight", new(8.9f, 0.08f, 34), new(0.16f, 0.05f, 8.8f), "warning"),
+            Box("AttackApron", new(0, 0.035f, 56), new(18, 0.07f, 9), "spawn_floor"),
+            Box("AttackBorderNorth", new(0, 0.08f, 51.6f), new(18, 0.05f, 0.16f), "warning"),
+            Box("AttackBorderSouth", new(0, 0.08f, 60.4f), new(18, 0.05f, 0.16f), "warning"),
+            Box("AttackBorderLeft", new(-8.9f, 0.08f, 56), new(0.16f, 0.05f, 8.8f), "warning"),
+            Box("AttackBorderRight", new(8.9f, 0.08f, 56), new(0.16f, 0.05f, 8.8f), "warning"),
+            Box("AttackApproachSurface", new(0, 0.035f, 37), new(10, 0.07f, 29), "mid_floor"),
             Box("MidLaneSurface", new(0, 0.04f, 4.0f), new(6.2f, 0.08f, 26), "mid_floor"),
             Box("MidGuideLeft", new(-3.0f, 0.09f, 4.0f), new(0.12f, 0.04f, 25), "marking"),
             Box("MidGuideRight", new(3.0f, 0.09f, 4.0f), new(0.12f, 0.04f, 25), "marking"),
@@ -251,17 +284,18 @@ public sealed class DemolitionArenaLayout
             Box("AssemblyFloor", new(25, 0.045f, -18), new(18, 0.09f, 23), "assembly_floor"),
             Box("AssemblyRoofStripe", new(25, 7.23f, -18), new(15, 0.07f, 2.0f), "warning"),
             Box("AssemblyWindowBand", new(34.54f, 4.4f, -18), new(0.05f, 1.4f, 15), "window"),
-            Box("DefenderApron", new(0, 0.04f, -36), new(18, 0.08f, 7.5f), "spawn_floor"),
-            Box("DefenderBorder", new(0, 0.09f, -32.3f), new(18, 0.04f, 0.16f), "cyan"),
+            Box("DefenderApron", new(0, 0.04f, -56), new(18, 0.08f, 7.5f), "spawn_floor"),
+            Box("DefenderBorder", new(0, 0.09f, -52.3f), new(18, 0.04f, 0.16f), "cyan"),
+            Box("DefenderApproachSurface", new(0, 0.035f, -42), new(10, 0.07f, 20), "mid_floor"),
             Box("MidPipeRackTop", new(0, 5.8f, -1), new(16, 0.35f, 1.2f), "steel"),
             Box("MidPipeRackLeft", new(-7.2f, 2.9f, -1), new(0.45f, 5.8f, 0.45f), "steel"),
             Box("MidPipeRackRight", new(7.2f, 2.9f, -1), new(0.45f, 5.8f, 0.45f), "steel"),
-            Box("DefenderSignBeam", new(0, 4.5f, -34), new(8.0f, 0.3f, 0.5f), "warning")
+            Box("DefenderSignBeam", new(0, 4.5f, -47), new(8.0f, 0.3f, 0.5f), "warning")
         };
-        for (var index = 0; index < 6; index++)
+        for (var index = 0; index < 9; index++)
         {
-            boxes.Add(Box($"WestLaneStripe_{index}", new(-28.5f, 0.04f, 25 - index * 6), new(0.18f, 0.08f, 3.2f), "warning"));
-            boxes.Add(Box($"EastLaneStripe_{index}", new(28.5f, 0.04f, 25 - index * 6), new(0.18f, 0.08f, 3.2f), "warning"));
+            boxes.Add(Box($"WestLaneStripe_{index}", new(-28.5f, 0.04f, 49 - index * 7), new(0.18f, 0.08f, 3.2f), "warning"));
+            boxes.Add(Box($"EastLaneStripe_{index}", new(28.5f, 0.04f, 49 - index * 7), new(0.18f, 0.08f, 3.2f), "warning"));
         }
         return boxes;
     }
@@ -275,7 +309,10 @@ public sealed class DemolitionArenaLayout
         {
             new Vector3(-30.5f, 0.02f, 11.0f), new(-24.5f, 0.02f, 4.5f),
             new(30.5f, 0.02f, 11.0f), new(24.5f, 0.02f, 4.5f),
-            new(-12.5f, 0.02f, -3.5f), new(12.5f, 0.02f, -3.5f)
+            new(-12.5f, 0.02f, -3.5f), new(12.5f, 0.02f, -3.5f),
+            new(-14.0f, 0.02f, 43.0f), new(14.0f, 0.02f, 43.0f),
+            new(-27.0f, 0.02f, 35.0f), new(27.0f, 0.02f, 35.0f),
+            new(-14.0f, 0.02f, -43.0f), new(14.0f, 0.02f, -43.0f)
         };
         for (var index = 0; index < barrierPositions.Length; index++)
         {
@@ -289,7 +326,10 @@ public sealed class DemolitionArenaLayout
             new Vector3(-29.0f, 0.02f, -14.5f), new(-20.5f, 0.02f, -21.0f),
             new(20.0f, 0.02f, -14.0f), new(30.0f, 0.02f, -23.0f),
             new(-10.5f, 0.02f, 20.5f), new(10.5f, 0.02f, 20.5f),
-            new(-5.8f, 0.02f, -20.5f), new(5.8f, 0.02f, -20.5f)
+            new(-5.8f, 0.02f, -20.5f), new(5.8f, 0.02f, -20.5f),
+            new(-10.5f, 0.02f, 46.0f), new(10.5f, 0.02f, 46.0f),
+            new(-24.0f, 0.02f, 34.0f), new(24.0f, 0.02f, 34.0f),
+            new(-8.5f, 0.02f, -44.5f), new(8.5f, 0.02f, -44.5f)
         };
         for (var index = 0; index < cratePositions.Length; index++)
         {

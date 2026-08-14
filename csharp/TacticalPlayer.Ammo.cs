@@ -79,6 +79,7 @@ public partial class TacticalPlayer
         AmmoCaliber.Magnum338 => 40,
         AmmoCaliber.Sniper => 60,
         AmmoCaliber.Smg => 270,
+        AmmoCaliber.Pistol => 180,
         _ => 210
     };
 

@@ -373,7 +373,7 @@ public partial class FreightTerminalWorld
 
     private void UpdateSquad(float delta)
     {
-        if (!_squadDeployed || _missionEnded)
+        if (!_squadDeployed || _missionEnded || _demolitionMode && !_demolitionRoundActive)
         {
             return;
         }

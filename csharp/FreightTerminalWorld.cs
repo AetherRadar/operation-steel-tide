@@ -1473,6 +1473,16 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
+        if (_demolitionMode)
+        {
+            FinishDemolitionRound(
+                false,
+                GameLocalization.Get(
+                    "demolition_attackers_eliminated",
+                    _languageSetting,
+                    "ATTACKING SQUAD ELIMINATED"));
+            return;
+        }
         _missionEnded = true;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         _hud.HideDownedState();

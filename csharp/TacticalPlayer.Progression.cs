@@ -18,11 +18,22 @@ public partial class TacticalPlayer
             return;
         }
 
-        var weaponTier = DeploymentCatalog.Weapon(loadout.Selection.WeaponId).BuildTier;
-        EquipPrimary(loadout.Weapon, LootGrades.FromTier(weaponTier));
+        var weaponTier = loadout.WeaponBuildTier >= 0
+            ? loadout.WeaponBuildTier
+            : DeploymentCatalog.Weapon(loadout.Selection.WeaponId).BuildTier;
+        InstallPrimaryWeapon(loadout.Weapon, LootGrades.FromTier(weaponTier));
         _loadedAmmoGrade = loadout.AmmoGrade;
         SetAmmoReserve(CurrentAmmoCaliber, loadout.AmmoGrade, loadout.ReserveAmmo);
         Ammo = EquippedWeapon.Stats().MagazineSize;
+        _primaryMagazineAmmo = Ammo;
+        _primaryLoadedAmmoGrade = _loadedAmmoGrade;
+        InstallSecondaryWeapon(loadout.Sidearm, LootGrade.Uncommon);
+        if (loadout.Sidearm is not null)
+        {
+            var sidearmCaliber = WeaponCatalog.Weapon(loadout.Sidearm.Platform).Caliber;
+            SetAmmoReserve(sidearmCaliber, LootGrade.Common, loadout.SidearmReserveAmmo);
+        }
+        ActivateWeaponSlot(PlayerWeaponSlot.Primary, false);
         Hud?.SetAmmoTier(CurrentAmmoGrade);
         Hud?.SetBackpackValuePlayer(this);
     }

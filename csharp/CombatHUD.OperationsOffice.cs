@@ -60,6 +60,18 @@ public partial class CombatHUD
         => IsInstanceValid(_demolitionBriefingView)
             ? _demolitionBriefingView.SelectedRole
             : OperatorRole.Assault;
+    public WeaponPlatform SelectedDemolitionPrimary
+        => IsInstanceValid(_demolitionBriefingView)
+            ? _demolitionBriefingView.SelectedPrimaryPlatform
+            : WeaponPlatform.M4A1;
+    public int SelectedDemolitionBuildTier
+        => IsInstanceValid(_demolitionBriefingView)
+            ? _demolitionBriefingView.SelectedBuildTier
+            : 1;
+    public WeaponPlatform SelectedDemolitionSidearm
+        => IsInstanceValid(_demolitionBriefingView)
+            ? _demolitionBriefingView.SelectedSidearmPlatform
+            : WeaponPlatform.P226;
     public bool OperationsOfficeLanguageReady
         => IsInstanceValid(_operationsOfficeTitle)
         && _operationsOfficeTitle.Text == Text("operations_office", "OPERATIONS OFFICE")
@@ -111,9 +123,12 @@ public partial class CombatHUD
         _demolitionBriefingView = scene.Instantiate<DemolitionBriefingView>();
         root.AddChild(_demolitionBriefingView);
         _demolitionBriefingView.BackRequested += () => EmitSignal(SignalName.DemolitionBackRequested);
-        _demolitionBriefingView.DeployRequested += role => EmitSignal(
+        _demolitionBriefingView.DeployRequested += (role, primary, build, sidearm) => EmitSignal(
             SignalName.DemolitionDeploymentRequested,
-            role);
+            role,
+            primary,
+            build,
+            sidearm);
     }
 
     private void BuildResultOfficeAction()
@@ -192,6 +207,12 @@ public partial class CombatHUD
     public void PressDemolitionDeployForDiagnostics()
         => _demolitionBriefingView.PressDeployForDiagnostics();
 
+    public void SelectDemolitionLoadoutForDiagnostics(
+        WeaponPlatform primary,
+        int buildTier,
+        WeaponPlatform sidearm)
+        => _demolitionBriefingView.SelectLoadoutForDiagnostics(primary, buildTier, sidearm);
+
     private static void PressButtonForDiagnostics(Button button)
     {
         if (IsInstanceValid(button))
@@ -240,7 +261,7 @@ public partial class CombatHUD
         _quickStartTitle.Text = Text("operations_quick_title", "QUICK EXTRACTION");
         _quickStartDetail.Text = Text("operations_quick_detail", "ENTER LOADOUT  //  SQUAD UP  //  LOOT AND EXTRACT");
         _demolitionEntryTitle.Text = Text("operations_demolition_title", "DEMOLITION");
-        _demolitionEntryDetail.Text = Text("operations_demolition_detail", "FIXED KIT  //  PLANT OR DEFUSE  //  A / B SITES");
+        _demolitionEntryDetail.Text = Text("operations_demolition_detail", "CUSTOM KIT  //  12 ROUNDS + OVERTIME  //  A / B SITES");
         _operationsQuitButton.Text = Text("operations_exit", "EXIT TO DESKTOP");
         _demolitionBriefingView.SetLanguage(_language);
         _resultOfficeButton.Text = Text("operations_return", "RETURN TO OPERATIONS OFFICE");

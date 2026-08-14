@@ -17,7 +17,7 @@
 
 - **The squad survives disconnects:** choose Assault, Medic, or Recon; AI fills empty roles, obeys follow/hold/move orders, uses class skills, revives downed teammates, and takes over a disconnected human slot without restarting the mission.
 - **A complete extraction loop:** infiltrate, disable the relay, steal the manifest, survive reinforcements, loot buildings and fallen operators, then hold the extraction zone.
-- **A separate demolition arena:** deploy from the Operations Office into TIDEFORGE ARENA, a fixed-kit three-route map with balanced A/B timings, mid rotations, seven defenders, planting, and AI defusing.
+- **A separate demolition match:** deploy into the extended TIDEFORGE ARENA for 12 regulation rounds and win-by-two overtime, choose a primary build and sidearm, and fight AI that assigns entry, support, recon, anchor, rotation, retake, cover, flank, and defuse duties from the live team state.
 - **Meaningful loadouts:** buy firearms, armor, ammunition grades, and pack sizes; customize weapon parts and bank only the value extracted above your deployment baseline.
 - **A hostile world, not a shooting gallery:** rival squads, garrison troops, civilians, a roaming three-phase Boss, a hostile aircraft, drivable vehicles, and 22 glass skybridges share the same district.
 
@@ -101,7 +101,7 @@ blender --background --factory-startup --python scripts/blender/build_extraction
 
 - `WASD` move, `Shift` sprint, `C` toggles crouch or starts a slide while sprinting, `Z` toggles prone, `Space` jumps while standing
 - `Q`/mouse side button 1 leans left; `E`/mouse side button 2 leans right
-- `1` draws the primary weapon, `3` draws the tactical knife, and `2` or the mouse wheel cycles between them; the lower-right weapon slots can also be clicked while the pointer is available
+- `1` draws the primary weapon, `2` draws the sidearm when one is equipped, `3` draws the tactical knife, and the mouse wheel cycles through available slots; the lower-right weapon slots can also be clicked while the pointer is available
 - Left mouse fires or strikes with the knife, right mouse aims through the installed optic, and `R` performs a full magazine reload
 - `G` throws a frag grenade; tap `F` to open or close nearby loot immediately, enter or exit a parked vehicle, or hold `F` to operate an objective terminal
 - `V` switch between AUTO and SEMI, `T` toggle the weapon light
@@ -177,8 +177,10 @@ Any accepted incoming hit immediately closes the active search or backpack view 
 - `csharp/FreightTerminalWorld.Residential.cs`: eleven enterable apartment towers, physical stairwells, rooftops, courtyards, occupants, and residential diagnostics.
 - `csharp/FreightTerminalWorld.Residential.Access.cs`: exterior fire escapes to the floor-2 glass skyways, access collision, rails, and deterministic access diagnostics.
 - `csharp/FreightTerminalWorld.Boss.cs`, `EnemyOperator.Boss.cs`, and `CombatHUD.Boss.cs`: roaming TIDE HUNTER behavior, phases, pulse attack, rewards, minimap tracking, and Boss diagnostics.
-- `csharp/DemolitionArenaLayout.cs`, `DemolitionArenaBuilder.cs`, and `DemolitionArenaRuntime.cs`: TIDEFORGE geometry data, generated collision/visual assembly, activation isolation, route balance, and minimap markers.
-- `ui/DemolitionBriefingView.tscn` and `csharp/DemolitionBriefingView.cs`: scene-authored demolition briefing, localized arena intelligence, role selection, and intent signals.
+- `csharp/DemolitionArenaLayout.cs`, `DemolitionArenaBuilder.cs`, and `DemolitionArenaRuntime.cs`: extended TIDEFORGE geometry data, generated collision/visual assembly, activation isolation, route balance, long rotations, and minimap markers.
+- `csharp/DemolitionMatchState.cs` and `DemolitionStrategyPlanner.cs`: pure 12-round/overtime scoring plus role-, health-, range-, survival-, and position-aware team assignments.
+- `csharp/FreightTerminalWorld.Demolition.Strategy.cs`: runtime snapshots, squad/defender plan application, retake routing, and physical defuse movement kept outside the round controller.
+- `ui/DemolitionBriefingView.tscn` and `csharp/DemolitionBriefingView.cs`: scene-authored demolition briefing, localized arena intelligence, role selection, primary/build/sidearm selection, and intent signals.
 - `csharp/FreightTerminalWorld.Squad.cs`: squad slots, AI fill, orders, class effects, co-op combat relay, and squad diagnostics.
 - `csharp/FreightTerminalWorld.Tactical.cs`, `TacticalMinimap.cs`, and `AmmoTierSystem.cs`: minimap landmarks, knockdown feedback, graded ammunition, and tactical HUD diagnostics.
 - `csharp/FreightTerminalWorld.Economy.cs`, `OperatorProgression.cs`, `DeploymentMaps.cs`, and `CombatHUD.Deployment.cs`: atomic local profile persistence, deployment purchases, map selection, extraction banking, and market diagnostics.
@@ -254,7 +256,7 @@ Godot_console.exe --headless --path . -- --validate-network-client
 
 `--validate-pause-ui` verifies the authored pause scene, required control bindings, signal-free settings synchronization, English and Chinese labels, pause visibility and mouse release, and the existing resume event path.
 
-`--validate-demolition` verifies the Operations Office entry, role selection, fixed loadout, isolated economy and extraction systems, three-person squad, seven defenders, planting, AI rotation and defusing, and result flow. `--validate-demolition-arena` checks collision activation, three clear routes, balanced A/B travel, blocked spawn sightlines, mid rotation, site placement, localized minimap markers, and spatial isolation. `--validate-demolition-briefing` verifies scene loading, required bindings, English and Chinese synchronization, role selection without deployment, and back/deploy intent signals.
+`--validate-demolition` verifies the Operations Office entry, role and custom loadout selection, primary/sidearm magazine persistence, isolated economy and extraction systems, three-person squad, seven defenders, opening and post-plant AI duties, planting, physical AI defusing, round scoring/reset, 6:6 overtime, and the two-point overtime win condition. `--validate-demolition-arena` checks activation, 112 m spawn separation, roughly 90 m A/B approaches, the roughly 96 m rotation, balanced travel, capsule-clear routes, blocked spawn sightlines, site placement, localized minimap markers, and spatial isolation. `--validate-demolition-briefing` verifies scene loading, required bindings, English and Chinese synchronization, role/loadout selection without deployment, and back/deploy intent signals.
 
 `--validate-extraction-sequence` verifies the authored GLB visual rig, locked objective gate, 12-second hold, leave-zone reset, aircraft arrival, boarding state, and mission completion. `--capture-extraction` renders the live countdown and landed rescue tilt-rotor at the seawall pad.
 

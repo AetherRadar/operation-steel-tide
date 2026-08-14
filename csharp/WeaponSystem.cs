@@ -13,7 +13,9 @@ public enum WeaponPlatform
     M24,
     MP5A5,
     M3A1,
-    AXMC
+    AXMC,
+    P226,
+    M1911
 }
 
 public enum AmmoCaliber
@@ -21,7 +23,8 @@ public enum AmmoCaliber
     Rifle,
     Sniper,
     Smg,
-    Magnum338
+    Magnum338,
+    Pistol
 }
 
 public enum AttachmentSlot
@@ -567,6 +570,20 @@ public static class WeaponCatalog
             LocalizationKey = "weapon_m3a1", Caliber = AmmoCaliber.Smg,
             Damage = 20, EffectiveRange = 68, Recoil = 1.25f, Handling = 0.82f,
             FireInterval = 0.135f, MagazineSize = 30, SoundRadius = 34, ReceiverLength = 0.34f, BarrelLength = 0.26f
+        },
+        [WeaponPlatform.P226] = new WeaponDefinition
+        {
+            Platform = WeaponPlatform.P226, Name = "P226 Service Pistol", ChineseName = "P226 \u5236\u5f0f\u624b\u67aa",
+            LocalizationKey = "weapon_p226", Caliber = AmmoCaliber.Pistol, SupportsAutomatic = false,
+            Damage = 29, EffectiveRange = 58, Recoil = 0.78f, Handling = 1.34f,
+            FireInterval = 0.16f, MagazineSize = 15, SoundRadius = 24, ReceiverLength = 0.25f, BarrelLength = 0.18f
+        },
+        [WeaponPlatform.M1911] = new WeaponDefinition
+        {
+            Platform = WeaponPlatform.M1911, Name = "M1911 Tactical", ChineseName = "M1911 \u6218\u672f\u624b\u67aa",
+            LocalizationKey = "weapon_m1911", Caliber = AmmoCaliber.Pistol, SupportsAutomatic = false,
+            Damage = 38, EffectiveRange = 52, Recoil = 1.05f, Handling = 1.18f,
+            FireInterval = 0.2f, MagazineSize = 8, SoundRadius = 27, ReceiverLength = 0.27f, BarrelLength = 0.2f
         }
     };
 
@@ -600,6 +617,7 @@ public static class WeaponCatalog
         AmmoCaliber.Magnum338 => GameLocalization.Get("ammo_338", language, ".338 Magnum ammunition"),
         AmmoCaliber.Sniper => GameLocalization.Get("ammo_sniper", language, "7.62 precision ammunition"),
         AmmoCaliber.Smg => GameLocalization.Get("ammo_smg", language, "9 mm submachine-gun ammunition"),
+        AmmoCaliber.Pistol => GameLocalization.Get("ammo_pistol", language, "Pistol ammunition"),
         _ => GameLocalization.Get("ammo_rifle", language, "Rifle ammunition")
     };
 
@@ -617,6 +635,16 @@ public static class WeaponCatalog
     public static WeaponBuild Build(WeaponPlatform platform, int tier)
     {
         var build = new WeaponBuild { Platform = platform };
+        if (platform is WeaponPlatform.P226 or WeaponPlatform.M1911)
+        {
+            build.Attachments[AttachmentSlot.Barrel] = "barrel_standard";
+            build.Attachments[AttachmentSlot.Magazine] = "mag_standard";
+            if (tier >= 2)
+            {
+                build.Attachments[AttachmentSlot.Muzzle] = "muzzle_suppressor";
+            }
+            return build;
+        }
         if (platform == WeaponPlatform.M3A1)
         {
             build.Attachments[AttachmentSlot.Barrel] = "barrel_cqb";

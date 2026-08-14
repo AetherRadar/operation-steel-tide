@@ -112,7 +112,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     /// <summary>Extraction cold-start: knife only, no magazine — must loot a primary.</summary>
     public void ApplyColdStartUnarmed()
     {
-        HasFireablePrimary = false;
+        ClearWeaponSlotsForColdStart();
         Ammo = 0;
         ResetAmmoReserves();
         EnsureEmergencyMedicalLoadout();
@@ -882,6 +882,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         var definition = WeaponCatalog.Weapon(EquippedWeapon.Platform);
         var stats = EquippedWeapon.Stats();
+        var isPistol = EquippedWeapon.Platform is WeaponPlatform.P226 or WeaponPlatform.M1911;
         _weaponRoot.Name = definition.Name;
         var barrelPart = EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Barrel, out var barrelId)
             ? WeaponCatalog.Attachment(barrelId)
@@ -896,6 +897,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.AXMC => new Color(0.035f, 0.14f, 0.15f),
             WeaponPlatform.MP5A5 => new Color(0.025f, 0.032f, 0.03f),
             WeaponPlatform.M3A1 => new Color(0.17f, 0.2f, 0.185f),
+            WeaponPlatform.P226 => new Color(0.055f, 0.06f, 0.065f),
+            WeaponPlatform.M1911 => new Color(0.16f, 0.15f, 0.13f),
             _ => new Color(0.045f, 0.052f, 0.05f)
         };
         var furnitureColor = EquippedWeapon.Platform switch
@@ -906,6 +909,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.AXMC => new Color(0.08f, 0.29f, 0.28f),
             WeaponPlatform.MP5A5 => new Color(0.055f, 0.065f, 0.06f),
             WeaponPlatform.M3A1 => new Color(0.105f, 0.12f, 0.11f),
+            WeaponPlatform.P226 => new Color(0.075f, 0.08f, 0.085f),
+            WeaponPlatform.M1911 => new Color(0.22f, 0.12f, 0.065f),
             _ => new Color(0.18f, 0.17f, 0.13f)
         };
         var receiverMaterial = TacticalSurfaceLibrary.WeaponFinish(receiverColor, 0.52f, 0.46f);
@@ -919,6 +924,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.AXMC => new Vector3(0.16f, 0.18f, 0.72f),
             WeaponPlatform.MP5A5 => new Vector3(0.14f, 0.17f, 0.36f),
             WeaponPlatform.M3A1 => new Vector3(0.135f, 0.155f, 0.34f),
+            WeaponPlatform.P226 => new Vector3(0.13f, 0.13f, 0.29f),
+            WeaponPlatform.M1911 => new Vector3(0.125f, 0.14f, 0.31f),
             _ => new Vector3(0.13f, 0.15f, 0.46f)
         };
         ((BoxMesh)_receiver.Mesh).Size = receiverSize;
@@ -945,19 +952,24 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _triggerGuardBase.Position = new Vector3(0.0f, -0.166f, triggerCenterZ);
         _trigger.Position = new Vector3(0.0f, -0.088f, triggerCenterZ + 0.003f);
         _selector.Position = new Vector3(receiverSideX + 0.011f, 0.008f, triggerCenterZ + 0.01f);
-        ((BoxMesh)_handguard.Mesh).Size = new Vector3(
-            EquippedWeapon.Platform is WeaponPlatform.ScarL or WeaponPlatform.M24 or WeaponPlatform.AXMC
-                ? 0.17f
-                : EquippedWeapon.Platform == WeaponPlatform.M3A1 ? 0.13f : 0.15f,
-            0.12f,
-            Mathf.Max(0.28f, barrelLength * 0.72f));
-        _handguard.Position = new Vector3(0, 0.01f, -0.29f - barrelLength * 0.25f);
+        ((BoxMesh)_handguard.Mesh).Size = isPistol
+            ? new Vector3(0.115f, 0.075f, 0.13f)
+            : new Vector3(
+                EquippedWeapon.Platform is WeaponPlatform.ScarL or WeaponPlatform.M24 or WeaponPlatform.AXMC
+                    ? 0.17f
+                    : EquippedWeapon.Platform == WeaponPlatform.M3A1 ? 0.13f : 0.15f,
+                0.12f,
+                Mathf.Max(0.28f, barrelLength * 0.72f));
+        _handguard.Position = isPistol
+            ? new Vector3(0, -0.005f, -0.21f)
+            : new Vector3(0, 0.01f, -0.29f - barrelLength * 0.25f);
         _handguard.MaterialOverride = furnitureMaterial;
         ((CylinderMesh)_barrelPart.Mesh).Height = barrelLength;
-        _barrelPart.Position = new Vector3(0, 0.015f, -0.56f - barrelLength * 0.5f);
+        var barrelBase = isPistol ? -0.25f : -0.56f;
+        _barrelPart.Position = new Vector3(0, 0.015f, barrelBase - barrelLength * 0.5f);
 
-        var muzzleLength = 0.14f;
-        var muzzleRadius = 0.047f;
+        var muzzleLength = isPistol ? 0.055f : 0.14f;
+        var muzzleRadius = isPistol ? 0.027f : 0.047f;
         if (EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Muzzle, out var muzzleId))
         {
             var muzzle = WeaponCatalog.Attachment(muzzleId);
@@ -967,13 +979,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         ((CylinderMesh)_muzzlePart.Mesh).Height = muzzleLength;
         ((CylinderMesh)_muzzlePart.Mesh).TopRadius = muzzleRadius;
         ((CylinderMesh)_muzzlePart.Mesh).BottomRadius = muzzleRadius;
-        var muzzleZ = -0.56f - barrelLength - muzzleLength * 0.5f;
+        var muzzleZ = barrelBase - barrelLength - muzzleLength * 0.5f;
         _muzzlePart.Position = new Vector3(0, 0.015f, muzzleZ);
         _muzzle.Position = new Vector3(0, 0.015f, muzzleZ - muzzleLength * 0.55f);
 
         var stockScale = EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Stock, out var stockId)
             ? WeaponCatalog.Attachment(stockId).VisualScale
             : 1.0f;
+        _stock.Visible = !isPistol;
         ((BoxMesh)_stock.Mesh).Size = EquippedWeapon.Platform == WeaponPlatform.M3A1
             ? new Vector3(0.055f, 0.055f, 0.34f)
             : new Vector3(0.14f * stockScale, 0.13f * stockScale, 0.38f * stockScale);
@@ -986,6 +999,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.AXMC => new Vector3(0.1f, 0.18f, 0.15f),
             WeaponPlatform.MP5A5 => new Vector3(0.075f, stats.MagazineSize > 30 ? 0.36f : 0.3f, 0.11f),
             WeaponPlatform.M3A1 => new Vector3(0.075f, 0.3f, 0.11f),
+            WeaponPlatform.P226 => new Vector3(0.065f, 0.2f, 0.085f),
+            WeaponPlatform.M1911 => new Vector3(0.06f, 0.18f, 0.08f),
             _ => new Vector3(0.09f, 0.26f * (stats.MagazineSize > 30 ? 1.24f : 1.0f), 0.14f)
         };
         ((BoxMesh)_magazine.Mesh).Size = magazineSize;
@@ -1022,7 +1037,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         };
 
         _weaponLight.SpotRange = stats.EffectiveRange * 0.28f;
-        _weaponLight.Position = new Vector3(0.09f, -0.015f, -0.5f - barrelLength * 0.45f);
+        _weaponLight.Position = isPistol
+            ? new Vector3(0.065f, -0.04f, -0.28f)
+            : new Vector3(0.09f, -0.015f, -0.5f - barrelLength * 0.45f);
         _gunAudio.MaxDistance = stats.SoundRadius * 1.9f;
         Ammo = Mathf.Min(Ammo, stats.MagazineSize);
     }
@@ -1171,15 +1188,19 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
         if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_primary"))
         {
-            SwitchWeapon(false);
+            ActivateWeaponSlot(PlayerWeaponSlot.Primary, true);
+        }
+        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_secondary"))
+        {
+            ActivateWeaponSlot(PlayerWeaponSlot.Secondary, true);
         }
         else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_melee"))
         {
-            SwitchWeapon(true);
+            ActivateWeaponSlot(PlayerWeaponSlot.Melee, true);
         }
         else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_cycle"))
         {
-            CycleWeapon();
+            CycleWeaponSlots();
         }
 
         if (Input.IsActionJustPressed("toggle_fire_mode")
@@ -1257,9 +1278,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             ArmorPlates,
             _knifeEquipped ? "KNIFE" : _automaticFire ? "AUTO" : "SEMI",
             EquippedWeapon.DisplayName(Hud?.CurrentLanguage ?? "en"),
-            EquippedWeapon,
+            PrimaryWeaponBuild,
             HasFireablePrimary,
-            EquippedKnifeSkinId);
+            EquippedKnifeSkinId,
+            SecondaryWeaponBuild,
+            (int)ActiveWeaponSlot);
         Hud?.SetAiming(_isAiming);
         var heading = Mathf.RadToDeg(Rotation.Y) * -1.0f;
         Hud?.SetHeading(heading);
@@ -1754,40 +1777,17 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     public void SelectWeapon(int slot)
     {
-        SwitchWeapon(slot == 1);
+        ActivateWeaponSlot((PlayerWeaponSlot)Mathf.Clamp(slot, 0, 2), true);
     }
 
     public void CycleWeapon()
     {
-        SwitchWeapon(!_knifeEquipped);
+        CycleWeaponSlots();
     }
 
     private void SwitchWeapon(bool useKnife)
     {
-        if (_knifeEquipped == useKnife || _isPlating)
-        {
-            return;
-        }
-        if (!useKnife && !HasFireablePrimary)
-        {
-            return;
-        }
-        if (_isReloading)
-        {
-            _isReloading = false;
-            _reloadTime = 0.0f;
-            ResetReloadRig();
-        }
-        _knifeEquipped = useKnife;
-        _isAiming = false;
-        _knifeTime = 0.0f;
-        _weaponRoot.Visible = !useKnife;
-        _knifeRoot.Visible = useKnife;
-        _weaponLight.Visible = !useKnife && _flashlightOn;
-        Hud?.ShowLocalizedMessage(
-            useKnife ? "knife_ready" : "primary_ready",
-            useKnife ? "TACTICAL KNIFE READY" : "PRIMARY WEAPON READY",
-            new Color(0.42f, 0.9f, 0.73f));
+        ActivateWeaponSlot(useKnife ? PlayerWeaponSlot.Melee : PlayerWeaponSlot.Primary, true);
     }
 
     private void StartKnifeAttack()
@@ -2579,21 +2579,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     private void EquipPrimary(WeaponBuild build, LootGrade grade = LootGrade.Rare)
     {
-        EquippedWeapon = build.Clone();
-        EquippedWeaponGrade = grade;
-        _equippedAttachmentGrades.Clear();
-        foreach (var slot in EquippedWeapon.Attachments.Keys)
-        {
-            _equippedAttachmentGrades[slot] = grade;
-        }
-        HasFireablePrimary = true;
-        _automaticFire = WeaponCatalog.Weapon(EquippedWeapon.Platform).SupportsAutomatic;
-        _loadedAmmoGrade = BestAmmoGrade(CurrentAmmoCaliber);
-        Ammo = EquippedWeapon.Stats().MagazineSize;
-        _isReloading = false;
-        ResetReloadRig();
-        ApplyWeaponBuildVisuals();
-        SwitchWeapon(false);
+        InstallPrimaryWeapon(build, grade);
         Hud?.ShowLocalizedMessage("weapon_equipped", "PRIMARY WEAPON EQUIPPED", new Color(0.4f, 0.86f, 0.7f));
     }
 

@@ -24,7 +24,11 @@ public partial class CombatHUD : CanvasLayer
     [Signal] public delegate void InventoryToggleRequestedEventHandler();
     [Signal] public delegate void OperationsQuickStartRequestedEventHandler();
     [Signal] public delegate void DemolitionModeRequestedEventHandler();
-    [Signal] public delegate void DemolitionDeploymentRequestedEventHandler(int role);
+    [Signal] public delegate void DemolitionDeploymentRequestedEventHandler(
+        int role,
+        int primaryPlatform,
+        int buildTier,
+        int sidearmPlatform);
     [Signal] public delegate void DemolitionBackRequestedEventHandler();
     [Signal] public delegate void OperationsHomeRequestedEventHandler();
 
@@ -37,9 +41,13 @@ public partial class CombatHUD : CanvasLayer
     private Label _grenadeLabel = null!;
     private Label _weaponModeLabel = null!;
     private Button _primaryWeaponButton = null!;
+    private Button _secondaryWeaponButton = null!;
     private Button _knifeWeaponButton = null!;
     private InventoryModelPreview _primaryWeaponSlotPreview = null!;
+    private InventoryModelPreview _secondaryWeaponSlotPreview = null!;
     private bool _hasPrimary = true;
+    private bool _hasSecondary;
+    private int _activeWeaponSlot;
     private InventoryModelPreview _knifeSlotPreview = null!;
     private Label _plateReserveLabel = null!;
     private Label _vitalCaption = null!;
@@ -306,13 +314,13 @@ public partial class CombatHUD : CanvasLayer
         };
         status.AddChild(_staminaBar);
 
-        var weapon = Panel(root, Vector2.Zero, new Vector2(420, 104));
+        var weapon = Panel(root, Vector2.Zero, new Vector2(520, 104));
         weapon.MouseFilter = Control.MouseFilterEnum.Pass;
         weapon.AnchorLeft = 1.0f;
         weapon.AnchorTop = 1.0f;
         weapon.AnchorRight = 1.0f;
         weapon.AnchorBottom = 1.0f;
-        weapon.OffsetLeft = -450;
+        weapon.OffsetLeft = -550;
         weapon.OffsetTop = -136;
         weapon.OffsetRight = -30;
         weapon.OffsetBottom = -32;
@@ -339,19 +347,35 @@ public partial class CombatHUD : CanvasLayer
         };
         _primaryWeaponSlotPreview.Configure(InventoryPreviewKind.Rifle, weapon: WeaponCatalog.StarterWeapon());
         _primaryWeaponButton.AddChild(_primaryWeaponSlotPreview);
-        _knifeWeaponButton = Button(string.Empty, new Vector2(298, 7), new Vector2(98, 50));
+        _secondaryWeaponButton = Button(string.Empty, new Vector2(298, 7), new Vector2(106, 50));
+        _secondaryWeaponButton.ToggleMode = true;
+        _secondaryWeaponButton.ButtonGroup = weaponSlots;
+        _secondaryWeaponButton.FocusMode = Control.FocusModeEnum.None;
+        _secondaryWeaponButton.Pressed += () => EmitSignal(SignalName.WeaponSlotRequested, 1);
+        weapon.AddChild(_secondaryWeaponButton);
+        var secondaryNumber = PositionedLabel("2", 12, new Color(0.66f, 0.78f, 0.74f), 7, 15);
+        secondaryNumber.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _secondaryWeaponButton.AddChild(secondaryNumber);
+        _secondaryWeaponSlotPreview = new InventoryModelPreview
+        {
+            Position = new Vector2(23, 3),
+            Size = new Vector2(78, 43)
+        };
+        _secondaryWeaponSlotPreview.Configure(InventoryPreviewKind.Rifle, weapon: WeaponCatalog.Build(WeaponPlatform.P226, 0));
+        _secondaryWeaponButton.AddChild(_secondaryWeaponSlotPreview);
+        _knifeWeaponButton = Button(string.Empty, new Vector2(410, 7), new Vector2(80, 50));
         _knifeWeaponButton.ToggleMode = true;
         _knifeWeaponButton.ButtonGroup = weaponSlots;
         _knifeWeaponButton.FocusMode = Control.FocusModeEnum.None;
-        _knifeWeaponButton.Pressed += () => EmitSignal(SignalName.WeaponSlotRequested, 1);
+        _knifeWeaponButton.Pressed += () => EmitSignal(SignalName.WeaponSlotRequested, 2);
         weapon.AddChild(_knifeWeaponButton);
         var knifeNumber = PositionedLabel("3", 12, new Color(0.66f, 0.78f, 0.74f), 7, 15);
         knifeNumber.MouseFilter = Control.MouseFilterEnum.Ignore;
         _knifeWeaponButton.AddChild(knifeNumber);
         _knifeSlotPreview = new InventoryModelPreview
         {
-            Position = new Vector2(22, 3),
-            Size = new Vector2(70, 43)
+            Position = new Vector2(20, 3),
+            Size = new Vector2(56, 43)
         };
         _knifeSlotPreview.Configure(InventoryPreviewKind.Knife);
         _knifeWeaponButton.AddChild(_knifeSlotPreview);
@@ -360,7 +384,7 @@ public partial class CombatHUD : CanvasLayer
         _weaponModeLabel.ClipText = true;
         weapon.AddChild(_weaponModeLabel);
         _grenadeLabel = Label("FRAG  x2", 13, new Color(0.78f, 0.83f, 0.8f));
-        _grenadeLabel.Position = new Vector2(332, 65);
+        _grenadeLabel.Position = new Vector2(432, 65);
         weapon.AddChild(_grenadeLabel);
         BuildAmmoTierHud(weapon);
 
@@ -1254,9 +1278,13 @@ public partial class CombatHUD : CanvasLayer
         string weaponName = "M4A1",
         WeaponBuild? weaponBuild = null,
         bool hasPrimary = true,
-        string knifeSkinId = KnifeSkinCatalog.DefaultId)
+        string knifeSkinId = KnifeSkinCatalog.DefaultId,
+        WeaponBuild? secondaryWeaponBuild = null,
+        int activeWeaponSlot = 0)
     {
         _hasPrimary = hasPrimary;
+        _hasSecondary = secondaryWeaponBuild is not null;
+        _activeWeaponSlot = Mathf.Clamp(activeWeaponSlot, 0, 2);
         if (IsInstanceValid(_primaryWeaponPreview))
         {
             _primaryWeaponPreview.Visible = hasPrimary;
@@ -1278,6 +1306,10 @@ public partial class CombatHUD : CanvasLayer
         if (weaponBuild is not null)
         {
             UpdateWeaponPreview(weaponBuild);
+        }
+        if (secondaryWeaponBuild is not null)
+        {
+            UpdateSecondaryWeaponPreview(secondaryWeaponBuild);
         }
         if (_knifePreviewSignature != knifeSkinId)
         {
@@ -1305,18 +1337,29 @@ public partial class CombatHUD : CanvasLayer
         _primaryWeaponSlotPreview.Configure(InventoryPreviewKind.Rifle, weapon: weapon);
     }
 
+    private void UpdateSecondaryWeaponPreview(WeaponBuild weapon)
+    {
+        _secondaryWeaponSlotPreview.Configure(InventoryPreviewKind.Rifle, weapon: weapon);
+    }
+
     private void UpdateWeaponSlotButtons()
     {
-        if (!IsInstanceValid(_primaryWeaponButton) || !IsInstanceValid(_knifeWeaponButton))
+        if (!IsInstanceValid(_primaryWeaponButton)
+            || !IsInstanceValid(_secondaryWeaponButton)
+            || !IsInstanceValid(_knifeWeaponButton))
         {
             return;
         }
         _primaryWeaponButton.Disabled = !_hasPrimary;
         _primaryWeaponSlotPreview.Visible = _hasPrimary;
+        _secondaryWeaponButton.Disabled = !_hasSecondary;
+        _secondaryWeaponSlotPreview.Visible = _hasSecondary;
         _primaryWeaponButton.TooltipText = Text("select_primary", "SELECT PRIMARY WEAPON");
+        _secondaryWeaponButton.TooltipText = Text("select_secondary", "SELECT SIDEARM");
         _knifeWeaponButton.TooltipText = Text("select_knife", "SELECT TACTICAL KNIFE");
-        _primaryWeaponButton.SetPressedNoSignal(_lastFireMode != "KNIFE");
-        _knifeWeaponButton.SetPressedNoSignal(_lastFireMode == "KNIFE");
+        _primaryWeaponButton.SetPressedNoSignal(_activeWeaponSlot == 0);
+        _secondaryWeaponButton.SetPressedNoSignal(_activeWeaponSlot == 1);
+        _knifeWeaponButton.SetPressedNoSignal(_activeWeaponSlot == 2);
     }
 
     public void SetEquipmentAction(string action, float progress, bool active)

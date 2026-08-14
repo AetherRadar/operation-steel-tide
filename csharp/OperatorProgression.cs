@@ -54,7 +54,10 @@ public sealed record DeploymentLoadout(
     string BackpackId,
     LootGrade AmmoGrade,
     int ReserveAmmo,
-    int TotalCost);
+    int TotalCost,
+    int WeaponBuildTier = -1,
+    WeaponBuild? Sidearm = null,
+    int SidearmReserveAmmo = 0);
 
 public sealed class OperatorProfileData
 {
@@ -230,6 +233,7 @@ public static class DeploymentCatalog
             AmmoCaliber.Magnum338 => 2.1f,
             AmmoCaliber.Sniper => 1.35f,
             AmmoCaliber.Smg => 0.8f,
+            AmmoCaliber.Pistol => 0.9f,
             _ => 1.0f
         };
         var rawPrice = AmmoPrice(grade) * quantity / 90.0f * caliberMultiplier;
@@ -264,7 +268,8 @@ public static class DeploymentCatalog
             armor.BackpackId,
             selection.AmmoGrade,
             quantity,
-            weapon.Price + armor.Price + ammoCost);
+            weapon.Price + armor.Price + ammoCost,
+            weapon.BuildTier);
     }
 }
 

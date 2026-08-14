@@ -63,6 +63,7 @@ public static class GameLocalization
         ["tactical_knife"] = "战术刀",
         ["knife_ready"] = "战术刀已就绪",
         ["primary_ready"] = "主武器已就绪",
+        ["secondary_ready"] = "\u624b\u67aa\u5df2\u5c31\u7eea",
         ["search"] = "搜索",
         ["open_loot"] = "打开",
         ["field_inventory"] = "战地装备管理",
@@ -88,6 +89,7 @@ public static class GameLocalization
         ["fitted_parts"] = "当前枪械配件",
         ["empty_slot"] = "空槽位",
         ["select_primary"] = "切换到主武器",
+        ["select_secondary"] = "\u5207\u6362\u5230\u526f\u6b66\u5668",
         ["select_knife"] = "切换到战术刀",
         ["helmet"] = "头盔",
         ["body_armor"] = "防弹衣",
@@ -140,6 +142,8 @@ public static class GameLocalization
         Chinese["mate_reviving_you"] = "\u961f\u53cb\u6b63\u5728\u8d76\u6765\u6551\u63f4  //  \u575a\u6301\u4f4f";
         Chinese["spectating_teammate"] = "\u6b63\u5728\u89c2\u6218\u961f\u53cb";
         Chinese["weapon_m24"] = "M24 \u7cbe\u786e\u5c04\u624b\u6b65\u67aa";
+        Chinese["weapon_p226"] = "P226 \u5236\u5f0f\u624b\u67aa";
+        Chinese["weapon_m1911"] = "M1911 \u6218\u672f\u624b\u67aa";
         Chinese["weapon_mp5a5"] = "MP5A5 \u51b2\u950b\u67aa";
         Chinese["weapon_m3a1"] = "M3A1 \u7b80\u6613\u51b2\u950b\u67aa";
         Chinese["weapon_axmc"] = "AXMC .338 \u8d85\u8fdc\u7a0b\u72d9\u51fb\u6b65\u67aa";
@@ -149,6 +153,7 @@ public static class GameLocalization
         Chinese["ammo_rifle"] = "\u6b65\u67aa\u5f39\u836f";
         Chinese["ammo_sniper"] = "7.62 \u6beb\u7c73\u7cbe\u786e\u5f39\u836f";
         Chinese["ammo_smg"] = "9 \u6beb\u7c73\u51b2\u950b\u67aa\u5f39\u836f";
+        Chinese["ammo_pistol"] = "\u624b\u67aa\u5f39\u836f";
         Chinese["ammo_338"] = ".338 \u9a6c\u683c\u5357\u72d9\u51fb\u5f39";
         Chinese["knife_skin"] = "\u6218\u672f\u5200\u6d82\u88c5";
         Chinese["knife_skin_carbon"] = "\u78b3\u7ea4\u9ed1";
@@ -410,7 +415,7 @@ public static class GameLocalization
         Chinese["operations_quick_title"] = "\u5feb\u901f\u6478\u91d1";
         Chinese["operations_quick_detail"] = "\u8fdb\u5165\u6574\u5907  //  \u7ec4\u961f  //  \u641c\u522e\u5e76\u64a4\u79bb";
         Chinese["operations_demolition_title"] = "\u7206\u7834\u6a21\u5f0f";
-        Chinese["operations_demolition_detail"] = "\u56fa\u5b9a\u914d\u88c5  //  \u5b89\u88c5\u6216\u62c6\u9664  //  A / B \u70b9";
+        Chinese["operations_demolition_detail"] = "\u81ea\u5b9a\u4e49\u914d\u88c5  //  12 \u5c40 + \u52a0\u65f6  //  A / B \u70b9";
         Chinese["operations_status_ready"] = "\u5916\u52e4\u5c0f\u961f\u5f85\u547d  //  \u505c\u673a\u576a\u5df2\u51c0\u7a7a";
         Chinese["operations_quick_status"] = "\u672c\u5730\u5c0f\u961f  //  3 \u4eba\u7f16\u5236  //  \u4f60\u9009\u804c\u4e1a\uff0cAI \u8865\u9f50\u5176\u4f59";
         Chinese["operations_back"] = "\u8fd4\u56de\u7279\u52e4\u5904";
@@ -420,13 +425,20 @@ public static class GameLocalization
         Chinese["demolition"] = "\u7206\u7834";
         Chinese["demolition_subtitle"] = "\u6f6e\u6c50\u5de5\u574a  //  \u8fdb\u653b\u65b9";
         Chinese["demolition_rules_title"] = "\u4ea4\u6218\u89c4\u5219";
-        Chinese["demolition_rules"] = "\u5728 A \u6216 B \u70b9\u6309\u4f4f F \u5b89\u88c5\u88c5\u7f6e\n\u5b88\u4f4f\u88c5\u7f6e\u76f4\u5230\u7206\u70b8\n\u5168\u5458\u6d88\u706d\u4e5f\u4f1a\u7ed3\u675f\u672c\u5c40  //  \u4e0d\u7ed3\u7b97\u6478\u91d1\u7269\u8d44";
+        Chinese["demolition_rules"] = "12 \u5c40\u5e38\u89c4\u8d5b  //  6:6 \u8fdb\u5165\u4e24\u5206\u4f18\u52bf\u52a0\u65f6\n\u5728 A \u6216 B \u70b9\u6309\u4f4f F \u5b89\u88c5\u88c5\u7f6e\n\u5168\u5458\u6d88\u706d\u6216\u76ee\u6807\u8d85\u65f6\u4e5f\u4f1a\u7ed3\u675f\u672c\u5c40";
         Chinese["demolition_select_role"] = "\u9009\u62e9\u5e72\u5458";
-        Chinese["demolition_loadout_title"] = "\u7edf\u4e00\u7ade\u6280\u914d\u88c5";
+        Chinese["demolition_loadout_title"] = "\u81ea\u5b9a\u4e49\u7ade\u6280\u914d\u88c5";
+        Chinese["demolition_primary"] = "\u4e3b\u6b66\u5668";
+        Chinese["demolition_build"] = "\u6784\u578b";
+        Chinese["demolition_sidearm"] = "\u624b\u67aa\u526f\u6b66\u5668";
+        Chinese["demolition_build_cqb"] = "\u8fd1\u6218";
+        Chinese["demolition_build_standard"] = "\u6807\u51c6";
+        Chinese["demolition_build_precision"] = "\u7cbe\u786e";
+        Chinese["demolition_custom_loadout"] = "{0}  //  {1} \u6784\u578b  //  \u4e3b\u6b66\u5668 x{3}\n{2}  //  \u624b\u67aa\u5f39\u836f x60  //  \u6570\u5b57\u952e 1 / 2 / 3\n\u6807\u51c6\u9632\u5f39\u80cc\u5fc3  //  2 \u679a\u624b\u96f7  //  \u804c\u4e1a\u6280\u80fd\u53ef\u7528";
         Chinese["demolition_loadout"] = "M4A1 \u6807\u51c6\u578b  //  \u666e\u901a 5.56  x120\n\u6807\u51c6\u9632\u5f39\u80cc\u5fc3  //  \u5de1\u903b\u5934\u76d4\n2 \u679a\u624b\u96f7  //  2 \u5757\u62a4\u7532  //  \u804c\u4e1a\u6280\u80fd\u53ef\u7528";
         Chinese["demolition_back"] = "\u8fd4\u56de";
         Chinese["demolition_deploy"] = "\u90e8\u7f72\u7206\u7834\u5c0f\u961f";
-        Chinese["demolition_role_ready"] = "{0}  //  \u56fa\u5b9a\u516c\u5e73\u914d\u88c5  //  \u4e0d\u6263\u9664\u6478\u91d1\u8d44\u91d1";
+        Chinese["demolition_role_ready"] = "{0}  //  \u81ea\u5b9a\u4e49\u7ade\u6280\u914d\u88c5  //  \u4e0d\u6263\u9664\u6478\u91d1\u8d44\u91d1";
         Chinese["demolition_arena_selected"] = "\u9009\u5b9a\u6218\u533a";
         Chinese["demolition_arena_name"] = "\u6f6e\u6c50\u5de5\u574a";
         Chinese["demolition_arena_profile"] = "\u4e09\u8def\u8fdb\u653b  //  \u4e2d\u8def\u8f6c\u70b9\nA  \u5f00\u653e\u94f8\u9020\u573a  //  B  \u5ba4\u5185\u88c5\u914d\u5385";
@@ -439,8 +451,10 @@ public static class GameLocalization
         Chinese["demolition_failed"] = "\u7206\u7834\u5931\u8d25";
         Chinese["demolition_result_economy"] = "\u7ade\u6280\u914d\u88c5\u5df2\u56de\u6536  //  \u6478\u91d1\u8d44\u91d1\u672a\u53d8\u52a8";
         Chinese["demolition_objective_plant"] = "\u9009\u62e9 A \u6216 B \u70b9  //  \u6309\u4f4f F \u5b89\u88c5\u88c5\u7f6e";
+        Chinese["demolition_round_objective"] = "{0}  //  \u9009\u62e9 A \u6216 B \u70b9  //  \u6309\u4f4f F \u5b89\u88c5\u88c5\u7f6e";
+        Chinese["demolition_round_timeout"] = "\u8fdb\u653b\u65f6\u95f4\u8017\u5c3d";
         Chinese["demolition_interaction_plant"] = "\u5b89\u88c5\u7206\u7834\u88c5\u7f6e  //  {0} \u70b9";
-        Chinese["demolition_deployed"] = "\u7206\u7834\u5c0f\u961f\u5df2\u90e8\u7f72  //  \u56fa\u5b9a\u914d\u88c5  //  \u524d\u5f80 A \u6216 B \u70b9\u5b89\u88c5";
+        Chinese["demolition_deployed"] = "\u7206\u7834\u5c0f\u961f\u5df2\u90e8\u7f72  //  12 \u5c40\u6bd4\u8d5b  //  \u524d\u5f80 A \u6216 B \u70b9\u5b89\u88c5";
         Chinese["demolition_planted"] = "\u88c5\u7f6e\u5df2\u5b89\u88c5\u4e8e {0} \u70b9  //  \u9632\u5b88 {1:0} \u79d2";
         Chinese["demolition_defend"] = "\u9632\u5b88 {0} \u70b9  //  {1:00.0}s{2}";
         Chinese["demolition_defuse_suffix"] = "  //  \u62c6\u9664 {0:00}%";

@@ -268,19 +268,79 @@ autowrap_mode = 2
 [node name="LoadoutTitle" type="Label" parent="Band"]
 layout_mode = 0
 offset_left = 44.0
-offset_top = 504.0
+offset_top = 486.0
 offset_right = 344.0
-offset_bottom = 526.0
+offset_bottom = 508.0
 theme_override_colors/font_color = Color(0.48, 0.72, 0.64, 1)
 theme_override_font_sizes/font_size = 12
 text = "REGULATION LOADOUT"
 
+[node name="PrimaryLabel" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 526.0
+offset_right = 166.0
+offset_bottom = 550.0
+theme_override_colors/font_color = Color(0.68, 0.8, 0.76, 1)
+theme_override_font_sizes/font_size = 11
+text = "PRIMARY"
+
+[node name="PrimaryOption" type="OptionButton" parent="Band"]
+layout_mode = 0
+offset_left = 164.0
+offset_top = 518.0
+offset_right = 394.0
+offset_bottom = 558.0
+focus_mode = 1
+theme_override_colors/font_color = Color(0.88, 0.94, 0.91, 1)
+theme_override_font_sizes/font_size = 13
+
+[node name="BuildLabel" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 416.0
+offset_top = 526.0
+offset_right = 508.0
+offset_bottom = 550.0
+theme_override_colors/font_color = Color(0.68, 0.8, 0.76, 1)
+theme_override_font_sizes/font_size = 11
+text = "BUILD"
+
+[node name="BuildOption" type="OptionButton" parent="Band"]
+layout_mode = 0
+offset_left = 500.0
+offset_top = 518.0
+offset_right = 704.0
+offset_bottom = 558.0
+focus_mode = 1
+theme_override_colors/font_color = Color(0.88, 0.94, 0.91, 1)
+theme_override_font_sizes/font_size = 13
+
+[node name="SidearmLabel" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 580.0
+offset_right = 166.0
+offset_bottom = 604.0
+theme_override_colors/font_color = Color(0.68, 0.8, 0.76, 1)
+theme_override_font_sizes/font_size = 11
+text = "SIDEARM"
+
+[node name="SidearmOption" type="OptionButton" parent="Band"]
+layout_mode = 0
+offset_left = 164.0
+offset_top = 572.0
+offset_right = 394.0
+offset_bottom = 612.0
+focus_mode = 1
+theme_override_colors/font_color = Color(0.88, 0.94, 0.91, 1)
+theme_override_font_sizes/font_size = 13
+
 [node name="Loadout" type="Label" parent="Band"]
 layout_mode = 0
 offset_left = 44.0
-offset_top = 536.0
+offset_top = 638.0
 offset_right = 704.0
-offset_bottom = 622.0
+offset_bottom = 716.0
 theme_override_colors/font_color = Color(0.82, 0.88, 0.85, 1)
 theme_override_constants/line_spacing = 5
 theme_override_font_sizes/font_size = 14
@@ -289,9 +349,9 @@ text = "M4A1 STANDARD  //  COMMON 5.56  x120\nSTANDARD CARRIER  //  PATROL HELME
 [node name="ReadyStatus" type="Label" parent="Band"]
 layout_mode = 0
 offset_left = 44.0
-offset_top = 650.0
+offset_top = 744.0
 offset_right = 704.0
-offset_bottom = 678.0
+offset_bottom = 772.0
 theme_override_colors/font_color = Color(1, 0.67, 0.31, 1)
 theme_override_font_sizes/font_size = 12
 text = "FAIR PLAY KIT  //  EXTRACTION WALLET UNAFFECTED"
