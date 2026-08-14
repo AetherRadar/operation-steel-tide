@@ -426,6 +426,8 @@ public partial class FreightTerminalWorld
             && _player.SecondaryWeaponPlatform == WeaponPlatform.M1911
             && _player.PrimaryMagazineAmmo == _player.EquippedWeapon.Stats().MagazineSize;
 
+        var tacticalAi = ValidateDemolitionTacticalAi(layout);
+
         // Rounds 2-12 are still the attacking half under MR12: run them out on the clock
         // so the halftime swap hands the player squad the defense in round 13.
         while (!_missionEnded && _demolitionRoundActive && DemolitionRoundNumber <= DemolitionMatchState.RoundsPerHalf)
@@ -445,10 +447,106 @@ public partial class FreightTerminalWorld
             && weaponSlots && isolatedEconomy && deployed && openingStrategy && sitesClear
             && minimapReady && hostileAircraftIsolated && reinforcementsIsolated
             && directorIsolation && playerBoughtEcoKit && planted && retakeStrategy && defuseAi
-            && roundRecorded && roundReset && defenseRound && matchRules && economyRules;
-        GD.Print($"DEMOLITION_CHECK valid={valid} entry_button={entryButton} briefing={briefingSelection} deployed={deployed} arena={IsDemolitionArenaActive} gameplay={_hud.IsGameplayHudVisible} squad={DemolitionSquadSizeTotal} opponents={DemolitionOpponentCount} eco_kit={ecoKit} eco_build={ecoBuild} slots={weaponSlots} bindings={slotBindings} economy={isolatedEconomy} opening_strategy={openingStrategy} retake_strategy={retakeStrategy} assignments={DemolitionStrategyAssignmentCount} minimap={minimapReady} aircraft_isolated={hostileAircraftIsolated} reinforcements_isolated={reinforcementsIsolated} director_isolation={directorIsolation} sites={DemolitionSiteCount} sites_clear={sitesClear} funds_after_buy={fundsAfterOpeningBuy} eco_buy={playerBoughtEcoKit} planted={planted} plant_steps={plantSteps} defuse_ai={defuseAi} defuse_distance={initialDefuserDistance:0.00}->{finalDefuserDistance:0.00} defuse_progress={_demolitionDefuseProgress:0.00} defuse_frames={defuseFrames}/600 round_recorded={roundRecorded} round_reset={roundReset} defense_round={defenseRound} match_rules={matchRules} economy_rules={economyRules} score={DemolitionPlayerScore}:{DemolitionOpponentScore} round={DemolitionRoundNumber} result={_hud.IsMissionResultVisible}");
+            && roundRecorded && roundReset && tacticalAi && defenseRound && matchRules && economyRules;
+        GD.Print($"DEMOLITION_CHECK valid={valid} entry_button={entryButton} briefing={briefingSelection} deployed={deployed} arena={IsDemolitionArenaActive} gameplay={_hud.IsGameplayHudVisible} squad={DemolitionSquadSizeTotal} opponents={DemolitionOpponentCount} eco_kit={ecoKit} eco_build={ecoBuild} slots={weaponSlots} bindings={slotBindings} economy={isolatedEconomy} opening_strategy={openingStrategy} retake_strategy={retakeStrategy} assignments={DemolitionStrategyAssignmentCount} minimap={minimapReady} aircraft_isolated={hostileAircraftIsolated} reinforcements_isolated={reinforcementsIsolated} director_isolation={directorIsolation} sites={DemolitionSiteCount} sites_clear={sitesClear} funds_after_buy={fundsAfterOpeningBuy} eco_buy={playerBoughtEcoKit} planted={planted} plant_steps={plantSteps} defuse_ai={defuseAi} defuse_distance={initialDefuserDistance:0.00}->{finalDefuserDistance:0.00} defuse_progress={_demolitionDefuseProgress:0.00} defuse_frames={defuseFrames}/600 round_recorded={roundRecorded} round_reset={roundReset} tactical_ai={tacticalAi} defense_round={defenseRound} match_rules={matchRules} economy_rules={economyRules} score={DemolitionPlayerScore}:{DemolitionOpponentScore} round={DemolitionRoundNumber} result={_hud.IsMissionResultVisible}");
         GD.Print($"DEMOLITION_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
+    }
+
+    /// <summary>
+    /// Exercises the tactical AI layer: combat-first arbitration with hysteresis, the
+    /// mid-channel guard rule, clock-pressure site switching, detour routing around
+    /// blocking walls, and squad post conversion from Move to Hold.
+    /// </summary>
+    private bool ValidateDemolitionTacticalAi(DemolitionArenaLayout layout)
+    {
+        if (_missionEnded || !_demolitionRoundActive)
+        {
+            return false;
+        }
+        var probe = _demolitionOpponents.FirstOrDefault(opponent => IsInstanceValid(opponent) && !opponent.IsDead);
+        if (probe is null || !_demolitionOpponentAssignments.ContainsKey(probe))
+        {
+            return false;
+        }
+
+        var savedPlayerPosition = _player.GlobalPosition;
+        var savedRemaining = _demolitionRemaining;
+        var savedTargetSite = _demolitionEnemyTargetSite;
+        var savedCarrier = _demolitionCarrier;
+        var savedPlantProgress = _demolitionEnemyPlantProgress;
+        try
+        {
+            // A hostile inside the engage bubble makes the objective mover yield to the
+            // full combat layer; past the resume ring it takes the objective back over.
+            _player.GlobalPosition = probe.GlobalPosition + new Vector3(18.0f, 0.2f, 0.0f);
+            var yieldedToCombat = !TryHandleDemolitionDefenderMovement(probe, 0.05f, _player)
+                && _demolitionCombatBreakoffs.Contains(probe);
+            _player.GlobalPosition = probe.GlobalPosition + new Vector3(34.0f, 0.2f, 0.0f);
+            var resumedObjective = TryHandleDemolitionDefenderMovement(probe, 0.05f, _player)
+                && !_demolitionCombatBreakoffs.Contains(probe);
+
+            // A carrier mid-plant keeps channeling while the shooter stays beyond the
+            // guard range: the plant progress is preserved rather than reset.
+            _demolitionCarrier = probe;
+            _demolitionEnemyPlantProgress = 0.3f;
+            _player.GlobalPosition = probe.GlobalPosition + new Vector3(18.0f, 0.2f, 0.0f);
+            var channelHoldsUnderFire = TryHandleDemolitionDefenderMovement(probe, 0.05f, _player)
+                && _demolitionEnemyPlantProgress >= 0.3f;
+
+            // Clock pressure: with the planned site unreachable in the remaining time,
+            // the carrier commits to the closest site that still fits the clock.
+            var carrierPosition = probe.GlobalPosition;
+            float TravelSeconds(Vector3 site)
+            {
+                var flat = new Vector3(site.X, carrierPosition.Y, site.Z);
+                return carrierPosition.DistanceTo(flat) / 5.1f + DemolitionPlantDuration;
+            }
+            var orderedSites = layout.SitePositions
+                .Select((site, index) => (Index: index, Travel: TravelSeconds(site)))
+                .OrderBy(entry => entry.Travel)
+                .ToList();
+            _demolitionEnemyTargetSite = orderedSites[^1].Index;
+            _demolitionEnemyPlantProgress = 0.0f;
+            _demolitionCarrierRoute = System.Array.Empty<Vector3>();
+            _demolitionRemaining = orderedSites[0].Travel + 2.5f;
+            ApplyDemolitionTimePressure();
+            var switchedUnderPressure = _demolitionEnemyTargetSite == orderedSites[0].Index;
+
+            // Detour planning: a straight corridor through the east route wall must
+            // produce a two-waypoint route around the blocking geometry.
+            probe.GlobalPosition = layout.Origin + new Vector3(15.0f, 0.2f, 6.0f);
+            var detour = PlanDemolitionDetourRoute(probe, layout.SitePositions[1]);
+            var detourRoutesAroundWall = detour.Length == 2;
+
+            // Squad posts: a mate standing on the assignment target converts its Move
+            // order into Hold so it anchors the position instead of milling around.
+            var postedMate = _squadMates.FirstOrDefault(IsInstanceValid);
+            var postsConverted = false;
+            if (postedMate is not null
+                && _demolitionSquadAssignmentTargets.TryGetValue(postedMate, out var targetKey))
+            {
+                postedMate.GlobalPosition = DemolitionLayout().StrategyTarget(targetKey);
+                UpdateDemolitionSquadPosts();
+                postsConverted = postedMate.Order == SquadOrder.Hold;
+            }
+
+            var valid = yieldedToCombat && resumedObjective && channelHoldsUnderFire
+                && switchedUnderPressure && detourRoutesAroundWall && postsConverted;
+            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} channel_guard={channelHoldsUnderFire} time_pressure={switchedUnderPressure} detour_points={detour.Length} posts={postsConverted}");
+            return valid;
+        }
+        finally
+        {
+            _player.GlobalPosition = savedPlayerPosition;
+            _demolitionRemaining = savedRemaining;
+            _demolitionEnemyTargetSite = savedTargetSite;
+            _demolitionCarrier = savedCarrier;
+            _demolitionEnemyPlantProgress = savedPlantProgress;
+            _demolitionCombatBreakoffs.Clear();
+            _demolitionCarrierRoute = System.Array.Empty<Vector3>();
+            _demolitionCarrierRouteIndex = 0;
+        }
     }
 
     /// <summary>
