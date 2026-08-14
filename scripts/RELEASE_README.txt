@@ -2,6 +2,13 @@ OPERATION STEEL TIDE 1.2.1 - WINDOWS X64
 
 Run PLAY.bat. Godot, .NET, and Go do not need to be installed.
 
+DOWNLOAD SAFETY
+- This is a portable ZIP, not an installer, and it does not request administrator access.
+- A SHA256 checksum file is published beside the ZIP on the GitHub release page.
+- Verify the ZIP before extraction if it was downloaded from any mirror.
+- The prototype is not code-signed, so Windows SmartScreen may show an
+  unknown-publisher warning. The complete source and packaging script are public.
+
 MULTIPLAYER
 - The host selects HOST GAME. The game listens on UDP 28960.
 - LAN players enter the host IP and select JOIN GAME.

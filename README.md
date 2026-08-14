@@ -1,36 +1,43 @@
 # Operation Steel Tide
 
-**A playable tactical extraction FPS prototype built with Godot 4.6, C#, and an optional Go mission service.** Pick a role, equip a three-operator strike team, infiltrate a 340 m x 320 m harbor district, complete physical objectives, loot what you can carry, and reach the rescue aircraft alive.
+**A Godot 4 extraction FPS where AI squadmates follow orders, fight, use class abilities, revive the player, and replace disconnected co-op teammates.** Infiltrate a 340 m x 320 m harbor district, complete physical objectives, keep the loot you extract, and get the whole strike team onto the rescue aircraft alive.
+
+[Download the Windows build](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [See real in-engine captures](#real-in-engine-screenshots) · [Inspect the squad AI](csharp/FreightTerminalWorld.Squad.cs) · [Read the architecture notes](ARCHITECTURE.md)
 
 ![Operation Steel Tide — loadout, extraction, and skybridge gameplay](docs/media/hero.webp)
+
+> **Play in under a minute:** download the latest Windows ZIP, extract the complete folder, and run `PLAY.bat`. It is a portable build with no installer and does not require Godot, .NET, or Go. A SHA256 file is published beside the ZIP so the download can be verified before launch.
 
 [![Godot 4.6](https://img.shields.io/badge/Godot-4.6-478CBF?logo=godot-engine&logoColor=white)](https://godotengine.org/)
 [![.NET 8](https://img.shields.io/badge/.NET-8-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-42e7c1.svg)](LICENSE)
 
-> **Prototype status:** the complete mission loop is playable and a packaged Windows build is available, but this remains a code-first prototype with programmer art and rough animation.
+## What makes it different
 
-> **Development disclosure:** This is an AI-assisted solo prototype. AI tools were used for portions of implementation; the repository owner remains responsible for design decisions, integration, debugging, and validation. The project is not presented as a production-ready architecture reference. See [ARCHITECTURE.md](ARCHITECTURE.md) for the current boundaries and incremental refactor direction, and [Content Provenance](docs/CONTENT_PROVENANCE.md) for the known origin and licensing status of shipped and displayed content.
-
-## Playable now
-
-- **Three-operator squads:** choose Assault, Medic, or Recon; AI fills empty roles, follows orders, fights, uses class skills, and revives downed teammates.
+- **The squad survives disconnects:** choose Assault, Medic, or Recon; AI fills empty roles, obeys follow/hold/move orders, uses class skills, revives downed teammates, and takes over a disconnected human slot without restarting the mission.
 - **A complete extraction loop:** infiltrate, disable the relay, steal the manifest, survive reinforcements, loot buildings and fallen operators, then hold the extraction zone.
 - **A separate demolition arena:** deploy from the Operations Office into TIDEFORGE ARENA, a fixed-kit three-route map with balanced A/B timings, mid rotations, seven defenders, planting, and AI defusing.
 - **Meaningful loadouts:** buy firearms, armor, ammunition grades, and pack sizes; customize weapon parts and bank only the value extracted above your deployment baseline.
-- **Solo or online:** play locally with AI, host over ENet, or join a public `host:port`; disconnected players are replaced by AI without restarting the mission.
-- **A dense playable district:** explore the freight terminal, rail yard, fuel farm, residential towers, drivable vehicles, and 22 glass skybridges with long sniper sightlines.
+- **A hostile world, not a shooting gallery:** rival squads, garrison troops, civilians, a roaming three-phase Boss, a hostile aircraft, drivable vehicles, and 22 glass skybridges share the same district.
 
-If this is the kind of unusually deep prototype you want to see polished, **star the repository** and tell me which system should get attention next. Bug reports and focused playtest feedback are especially welcome in [Issues](https://github.com/AetherRadar/operation-steel-tide/issues).
+This is still programmer art, not a finished commercial game. The useful question is whether the systems hold together: try a run, inspect the source, and [report the first thing that breaks](https://github.com/AetherRadar/operation-steel-tide/issues). If you want to follow the refactor and future operations, star the repository.
 
-## Run the prototype
+> **Development disclosure:** This is an AI-assisted solo prototype. AI tools were used for portions of implementation and documentation; the repository owner remains responsible for design decisions, integration, debugging, and validation. It is not presented as a production-ready architecture reference. See [ARCHITECTURE.md](ARCHITECTURE.md), [Engineering Standards](docs/ENGINEERING_STANDARDS.md), and [Content Provenance](docs/CONTENT_PROVENANCE.md) for the current boundaries, refactor rules, and known origin of shipped content.
 
-Install Godot 4.6.3 Mono and the .NET 8 SDK. Go is optional for the offline fallback, but required for the local mission and progression service.
+## Run the Windows build
 
-Players who do not need the source can download the complete Windows build from [GitHub Releases](https://github.com/AetherRadar/operation-steel-tide/releases/latest), extract it, and run `PLAY.bat`. The package includes the game, .NET runtime files, and local Go mission service.
+1. Open [the latest release](https://github.com/AetherRadar/operation-steel-tide/releases/latest).
+2. Download the Windows x64 ZIP and its optional `.sha256` file.
+3. Extract the complete ZIP to a writable folder and run `PLAY.bat`.
+
+The package contains the game, required .NET runtime files, and local mission/progression service. It has no installer and does not request administrator access. Because this prototype is not code-signed, Windows SmartScreen may show an unknown-publisher warning; the source, packaging script, release notes, and checksum are all available in this repository for inspection.
 
 For internet co-op without router port forwarding, the host can run a [playit.gg](https://playit.gg/) UDP tunnel to `127.0.0.1:28960`; only the host installs the agent. Other players enter the complete public endpoint, such as `example.gl.at.ply.gg:41237`, in `JOIN GAME`. See [ONLINE_PLAY.md](ONLINE_PLAY.md) for the exact setup, current service limits, and private-network alternatives.
+
+## Run from source
+
+Install Godot 4.6.3 Mono and the .NET 8 SDK. Go is optional for the offline fallback, but required for the local mission and progression service.
 
 Double-click `START_GAME.bat`. The launcher locates Godot Mono through `GODOT_MONO`, PATH, or the default Downloads location. When Go is available, it builds and starts the service on `127.0.0.1:8787`, waits for the process, then launches Godot. Closing the game closes the service and removes `backend/backend.pid`.
 
@@ -54,6 +61,15 @@ On macOS or Linux, build and launch the client directly with the platform's Godo
 dotnet build OperationSteelTide.csproj
 godot --path .
 ```
+
+## What developers can inspect
+
+| System | Start here | What is exercised |
+| --- | --- | --- |
+| Squad AI and human/AI slot handoff | [`FreightTerminalWorld.Squad.cs`](csharp/FreightTerminalWorld.Squad.cs), [`SquadMate.Combat.cs`](csharp/SquadMate.Combat.cs), [`SquadNetwork.cs`](csharp/SquadNetwork.cs) | Orders, combat movement, class abilities, revive routing, disconnect replacement, and host-authoritative relays |
+| Extraction state machine | [`FreightTerminalWorld.Extraction.cs`](csharp/FreightTerminalWorld.Extraction.cs), [`ExtractionAircraft.cs`](csharp/ExtractionAircraft.cs) | Objective gate, countdown reset, boarding, squad seating, cinematic transfer, and completion |
+| Persistent loadouts and loot | [`FreightTerminalWorld.Economy.cs`](csharp/FreightTerminalWorld.Economy.cs), [`OperatorProgression.cs`](csharp/OperatorProgression.cs), [`CombatHUD.LootComparison.cs`](csharp/CombatHUD.LootComparison.cs) | Atomic profile saves, deployment cost, grade-preserving transfer, equipment comparison, and extraction profit |
+| Deterministic diagnostics | [`FreightTerminalWorld.RuntimeDiagnostics.cs`](csharp/FreightTerminalWorld.RuntimeDiagnostics.cs) and the [diagnostics reference](#diagnostics) | Scriptable gameplay checks and real in-engine capture modes used during development |
 
 ## Real in-engine screenshots
 
