@@ -356,6 +356,7 @@ public partial class FreightTerminalWorld
             && _extractionRemaining < ExtractionCountdownDuration
             && _hud.IsExtractionCountdownVisible;
         var aircraftInbound = _extractionAircraft?.Phase == ExtractionAircraftPhase.Inbound;
+        var authoredVisual = _extractionAircraft?.UsesAuthoredVisual == true;
 
         _player.GlobalPosition = ExtractionPoint + new Vector3(ExtractionZoneRadius + 2.0f, 0.12f, 0);
         UpdateExtractionSequence(0.1f);
@@ -411,11 +412,11 @@ public partial class FreightTerminalWorld
             && _hud.IsMissionResultVisible
             && !_extractionDeparturePlaying
             && _missionPhase == "COMPLETE";
-        var valid = entryStartedImmediately && countdownStarted && aircraftInbound
+        var valid = entryStartedImmediately && countdownStarted && aircraftInbound && authoredVisual
             && combatPhasePreserved && leaveReset && aircraftArrived && boardingShown
             && departureStarted && resultDelayed && playerSeated && squadSeated
             && cameraFollowing && cinematicHud && destinationReached && completed;
-        GD.Print($"EXTRACTION_SEQUENCE_CHECK valid={valid} objective_free={entryStartedImmediately} combat_phase_preserved={combatPhasePreserved} countdown={countdownStarted} inbound={aircraftInbound} leave_reset={leaveReset} aircraft_arrived={aircraftArrived} boarding={boardingShown} departure={departureStarted} result_delayed={resultDelayed} player_seated={playerSeated} squad_seated={squadSeated} boarded={_extractionBoardedSquadmates}/{expectedBoardedMates} camera={cameraFollowing} cinematic_hud={cinematicHud} destination={destinationReached} completed={completed} duration={ExtractionCountdownDuration:0.0} transfer={ExtractionAircraft.TransferDuration:0.0}");
+        GD.Print($"EXTRACTION_SEQUENCE_CHECK valid={valid} objective_free={entryStartedImmediately} combat_phase_preserved={combatPhasePreserved} countdown={countdownStarted} inbound={aircraftInbound} authored_visual={authoredVisual} leave_reset={leaveReset} aircraft_arrived={aircraftArrived} boarding={boardingShown} departure={departureStarted} result_delayed={resultDelayed} player_seated={playerSeated} squad_seated={squadSeated} boarded={_extractionBoardedSquadmates}/{expectedBoardedMates} camera={cameraFollowing} cinematic_hud={cinematicHud} destination={destinationReached} completed={completed} duration={ExtractionCountdownDuration:0.0} transfer={ExtractionAircraft.TransferDuration:0.0}");
         GD.Print($"EXTRACTION_SEQUENCE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

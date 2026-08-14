@@ -25,6 +25,7 @@ public partial class ExtractionAircraft : Node3D
     public Marker3D PlayerSeat => _passengerSeats[0];
     public int PassengerSeatCount => _passengerSeats.Length;
     public bool PlayerPassengerVisible => IsInstanceValid(_playerPassengerAvatar) && _playerPassengerAvatar.Visible;
+    public bool UsesAuthoredVisual { get; private set; }
     public float ArrivalProgress => Phase == ExtractionAircraftPhase.Inbound
         ? Mathf.Clamp(_phaseElapsed / ArrivalDuration, 0.0f, 1.0f)
         : Phase == ExtractionAircraftPhase.Hidden ? 0.0f : 1.0f;
@@ -268,41 +269,51 @@ public partial class ExtractionAircraft : Node3D
 
     private void BuildVisuals()
     {
-        _visual = new Node3D { Name = "RescueTiltRotorVisual" };
-        AddChild(_visual);
-
         var charcoal = Material(new Color(0.055f, 0.07f, 0.068f), 0.68f, 0.38f);
         var steel = Material(new Color(0.31f, 0.35f, 0.32f), 0.74f, 0.34f);
         var glass = Material(new Color(0.035f, 0.14f, 0.16f), 0.82f, 0.12f);
         var rescue = Material(new Color(0.12f, 0.72f, 0.43f), 0.3f, 0.32f, new Color(0.04f, 0.42f, 0.19f));
         var warm = Material(new Color(1.0f, 0.58f, 0.16f), 0.12f, 0.28f, new Color(1.0f, 0.23f, 0.04f));
 
-        Part(_visual, new CapsuleMesh { Radius = 0.82f, Height = 7.8f, RadialSegments = 24, Rings = 10 },
-            new Vector3(0, 0, 0.15f), new Vector3(Mathf.Pi / 2.0f, 0, 0), steel);
-        MeshBox(_visual, new Vector3(0, -0.05f, 0.2f), new Vector3(2.65f, 1.35f, 5.8f), steel);
-        MeshBox(_visual, new Vector3(0, 0.16f, -3.25f), new Vector3(2.2f, 0.75f, 1.35f), glass, new Vector3(-0.18f, 0, 0));
-        MeshBox(_visual, new Vector3(0, 0.42f, -0.4f), new Vector3(8.7f, 0.18f, 2.45f), charcoal);
-        MeshBox(_visual, new Vector3(0, 0.68f, 3.4f), new Vector3(3.8f, 0.14f, 1.35f), charcoal);
-        MeshBox(_visual, new Vector3(0, 1.25f, 3.68f), new Vector3(0.18f, 1.75f, 1.25f), steel, new Vector3(-0.18f, 0, 0));
-        MeshBox(_visual, new Vector3(0, 1.12f, -0.2f), new Vector3(2.78f, 0.11f, 4.8f), rescue);
-
-        _leftRotor = BuildRotor(_visual, new Vector3(-3.55f, 0.7f, -0.5f), charcoal, steel, warm);
-        _rightRotor = BuildRotor(_visual, new Vector3(3.55f, 0.7f, -0.5f), charcoal, steel, warm);
-
-        foreach (var x in new[] { -0.82f, 0.82f })
+        var authoredRig = ExtractionAircraftVisualRig.TryInstantiate();
+        if (authoredRig is not null)
         {
-            MeshBox(_visual, new Vector3(x, -1.02f, -1.55f), new Vector3(0.13f, 0.92f, 0.13f), charcoal, new Vector3(0.18f, 0, 0));
-            MeshBox(_visual, new Vector3(x, -1.45f, -1.72f), new Vector3(0.24f, 0.12f, 0.58f), charcoal);
+            _visual = authoredRig.Root;
+            _leftRotor = authoredRig.LeftRotor;
+            _rightRotor = authoredRig.RightRotor;
+            _ramp = authoredRig.BoardingDoor;
+            UsesAuthoredVisual = true;
+            AddChild(_visual);
         }
-
-        var doorway = Material(new Color(0.012f, 0.018f, 0.017f), 0.05f, 0.96f);
-        MeshBox(_visual, new Vector3(0, -0.12f, 3.74f), new Vector3(1.62f, 1.18f, 0.08f), doorway);
-        _ramp = new Node3D { Name = "BoardingRamp", Position = new Vector3(0, -0.68f, 3.72f) };
-        _visual.AddChild(_ramp);
-        MeshBox(_ramp, new Vector3(0, 0, 1.05f), new Vector3(1.55f, 0.12f, 2.1f), charcoal);
-        for (var z = 0.25f; z <= 1.85f; z += 0.4f)
+        else
         {
-            MeshBox(_ramp, new Vector3(0, -0.07f, z), new Vector3(1.42f, 0.04f, 0.06f), rescue);
+            _visual = new Node3D { Name = "RescueTiltRotorVisual" };
+            AddChild(_visual);
+            Part(_visual, new CapsuleMesh { Radius = 0.82f, Height = 7.8f, RadialSegments = 24, Rings = 10 },
+                new Vector3(0, 0, 0.15f), new Vector3(Mathf.Pi / 2.0f, 0, 0), steel);
+            MeshBox(_visual, new Vector3(0, -0.05f, 0.2f), new Vector3(2.65f, 1.35f, 5.8f), steel);
+            MeshBox(_visual, new Vector3(0, 0.16f, -3.25f), new Vector3(2.2f, 0.75f, 1.35f), glass, new Vector3(-0.18f, 0, 0));
+            MeshBox(_visual, new Vector3(0, 0.42f, -0.4f), new Vector3(8.7f, 0.18f, 2.45f), charcoal);
+            MeshBox(_visual, new Vector3(0, 0.68f, 3.4f), new Vector3(3.8f, 0.14f, 1.35f), charcoal);
+            MeshBox(_visual, new Vector3(0, 1.25f, 3.68f), new Vector3(0.18f, 1.75f, 1.25f), steel, new Vector3(-0.18f, 0, 0));
+            MeshBox(_visual, new Vector3(0, 1.12f, -0.2f), new Vector3(2.78f, 0.11f, 4.8f), rescue);
+            _leftRotor = BuildRotor(_visual, new Vector3(-3.55f, 0.7f, -0.5f), charcoal, steel, warm);
+            _rightRotor = BuildRotor(_visual, new Vector3(3.55f, 0.7f, -0.5f), charcoal, steel, warm);
+            foreach (var x in new[] { -0.82f, 0.82f })
+            {
+                MeshBox(_visual, new Vector3(x, -1.02f, -1.55f), new Vector3(0.13f, 0.92f, 0.13f), charcoal, new Vector3(0.18f, 0, 0));
+                MeshBox(_visual, new Vector3(x, -1.45f, -1.72f), new Vector3(0.24f, 0.12f, 0.58f), charcoal);
+            }
+
+            var doorway = Material(new Color(0.012f, 0.018f, 0.017f), 0.05f, 0.96f);
+            MeshBox(_visual, new Vector3(0, -0.12f, 3.74f), new Vector3(1.62f, 1.18f, 0.08f), doorway);
+            _ramp = new Node3D { Name = "BoardingRamp", Position = new Vector3(0, -0.68f, 3.72f) };
+            _visual.AddChild(_ramp);
+            MeshBox(_ramp, new Vector3(0, 0, 1.05f), new Vector3(1.55f, 0.12f, 2.1f), charcoal);
+            for (var z = 0.25f; z <= 1.85f; z += 0.4f)
+            {
+                MeshBox(_ramp, new Vector3(0, -0.07f, z), new Vector3(1.42f, 0.04f, 0.06f), rescue);
+            }
         }
 
         _visual.AddChild(new OmniLight3D

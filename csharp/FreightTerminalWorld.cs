@@ -4698,6 +4698,10 @@ public partial class FreightTerminalWorld : Node3D
         _player.FaceWorldPointForDiagnostics(ExtractionPoint);
         TryBeginExtractionSequence(_player);
         _extractionAircraft?.ForceBoardingReadyForValidation();
+        if (_extractionAircraft is not null)
+        {
+            _player.AimCameraAtWorldPointForDiagnostics(_extractionAircraft.GlobalPosition + Vector3.Up * 0.25f);
+        }
         _extractionRemaining = 5.8f;
         UpdateExtractionHud();
         await WaitFrames(18);

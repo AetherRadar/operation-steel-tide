@@ -1,0 +1,2 @@
+*.cs text eol=crlf whitespace=cr-at-eol
+*.py text eol=crlf whitespace=cr-at-eol
