@@ -1,6 +1,6 @@
 param(
     [string]$Godot = $env:GODOT_MONO,
-    [string]$Version = "1.2.1",
+    [string]$Version = "1.3.0",
     [string]$OutputRoot = "dist"
 )
 
@@ -25,11 +25,15 @@ if ($Version -ne $projectVersion) {
 
 $releaseName = "OperationSteelTide-$Version-windows-x64"
 $outputRootPath = Join-Path $projectRoot $OutputRoot
+$buildRootPath = Join-Path $projectRoot "build"
 $stagePath = Join-Path $outputRootPath $releaseName
 $zipPath = Join-Path $outputRootPath "$releaseName.zip"
 $exportPath = Join-Path $stagePath "OperationSteelTide.exe"
 
-New-Item -ItemType Directory -Force -Path $outputRootPath | Out-Null
+foreach ($generatedRoot in @($outputRootPath, $buildRootPath)) {
+    New-Item -ItemType Directory -Force -Path $generatedRoot | Out-Null
+    Set-Content -LiteralPath (Join-Path $generatedRoot ".gdignore") -Value "" -Encoding ascii
+}
 if (Test-Path -LiteralPath $stagePath) {
     Remove-Item -LiteralPath $stagePath -Recurse -Force
 }
