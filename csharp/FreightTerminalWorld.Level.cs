@@ -315,6 +315,7 @@ void sky() {
         var white = Mat("marking", new Color(0.72f, 0.75f, 0.69f), 0.05f, 0.72f);
 
         StaticBox("Ground", new Vector3(0, -0.55f, MapCenterZ), new Vector3(MapWidthMeters, 1, MapDepthMeters), asphalt);
+        _levelRoot.AddChild(OceanBackdropFactory.Create(new Vector3(0.0f, -0.18f, MapCenterZ)));
         var northBoundary = MapCenterZ - MapDepthMeters * 0.5f;
         var southBoundary = MapCenterZ + MapDepthMeters * 0.5f;
         var sideBoundary = MapWidthMeters * 0.5f;

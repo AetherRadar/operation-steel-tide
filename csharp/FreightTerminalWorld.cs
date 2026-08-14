@@ -4751,6 +4751,7 @@ public partial class FreightTerminalWorld : Node3D
                 districtsPresent++;
             }
         }
+        var oceanBackdropPresent = _levelRoot.GetNodeOrNull<MeshInstance3D>("OceanBackdrop") is not null;
 
         var extractionDistance = DeploymentPoint.DistanceTo(ExtractionPoint);
         var markerInitiallyHidden = false; // beacon landmark always visible (findable extract)
@@ -4778,12 +4779,13 @@ public partial class FreightTerminalWorld : Node3D
         var completed = _missionEnded && _missionPhase == "COMPLETE";
         // Edge player pads → center extract is still a long run; beacon is always visible.
         var valid = districtsPresent == districtNames.Length
+            && oceanBackdropPresent
             && extractionDistance > 80.0f
             && _extractionMarker.Visible
             && extractionUnlocked
             && areaStarted
             && completed;
-        GD.Print($"LARGE_MAP_CHECK valid={valid} size={MapWidthMeters:0}x{MapDepthMeters:0} districts={districtsPresent}/{districtNames.Length} extraction_distance={extractionDistance:0.0} hidden={markerInitiallyHidden} unlocked={extractionUnlocked} area_started={areaStarted} completed={completed}");
+        GD.Print($"LARGE_MAP_CHECK valid={valid} size={MapWidthMeters:0}x{MapDepthMeters:0} districts={districtsPresent}/{districtNames.Length} ocean_backdrop={oceanBackdropPresent} extraction_distance={extractionDistance:0.0} hidden={markerInitiallyHidden} unlocked={extractionUnlocked} area_started={areaStarted} completed={completed}");
         if (!valid)
         {
             GD.PushError("Large map validation failed.");
