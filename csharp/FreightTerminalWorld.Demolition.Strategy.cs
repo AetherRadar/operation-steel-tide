@@ -51,7 +51,8 @@ public partial class FreightTerminalWorld
             playerTeamSide,
             phase,
             playerSnapshots,
-            _demolitionActiveSite);
+            _demolitionActiveSite,
+            CollectDemolitionSightings(opponentTeamSide, playerTeamSide, layout));
         _demolitionAttackerPlan = playerTeamSide == DemolitionTeam.Attackers ? playerPlan : _demolitionAttackerPlan;
         _demolitionDefenderPlan = playerTeamSide == DemolitionTeam.Defenders ? playerPlan : _demolitionDefenderPlan;
         ApplyDemolitionSquadPlan(playerPlan, layout);
@@ -78,7 +79,8 @@ public partial class FreightTerminalWorld
             opponentTeamSide,
             phase,
             opponentSnapshots,
-            _demolitionActiveSite);
+            _demolitionActiveSite,
+            CollectDemolitionSightings(playerTeamSide, opponentTeamSide, layout));
         _demolitionAttackerPlan = opponentTeamSide == DemolitionTeam.Attackers ? opponentPlan : _demolitionAttackerPlan;
         _demolitionDefenderPlan = opponentTeamSide == DemolitionTeam.Defenders ? opponentPlan : _demolitionDefenderPlan;
 
@@ -125,6 +127,58 @@ public partial class FreightTerminalWorld
         {
             _hud.ShowRadioMessage(playerPlan.Callout, new Color(0.35f, 0.82f, 1.0f));
         }
+    }
+
+    /// <summary>
+    /// Team blackboard built from live firefights: any opponent locked in combat is a
+    /// known position for the player team (mutual contact), and each alerted opponent's
+    /// engage target is a known position for the enemy team. Fed into the planner so both
+    /// sides react to contact instead of walking set pieces.
+    /// </summary>
+    private List<DemolitionAgentSnapshot> CollectDemolitionSightings(
+        DemolitionTeam sightedSide,
+        DemolitionTeam reportingSide,
+        DemolitionArenaLayout layout)
+    {
+        var sightings = new List<DemolitionAgentSnapshot>();
+        if (reportingSide == _demolitionMatch.PlayerSide)
+        {
+            // Player team reporting: positions of opponents currently fighting it.
+            foreach (var opponent in _demolitionOpponents.Where(opponent => IsInstanceValid(opponent)
+                     && !opponent.IsDead && opponent.Alerted))
+            {
+                sightings.Add(Snapshot(
+                    $"KNOWN:{opponent.Name}",
+                    sightedSide,
+                    OperatorRole.Recon,
+                    1.0f,
+                    100.0f,
+                    true,
+                    false,
+                    opponent.GlobalPosition,
+                    layout.Origin));
+            }
+            return sightings;
+        }
+        // Enemy team reporting: engage targets of its alerted members.
+        foreach (var opponent in _demolitionOpponents.Where(opponent => IsInstanceValid(opponent) && opponent.Alerted))
+        {
+            var target = opponent.EngageTargetNode;
+            if (target is not null && IsInstanceValid(target))
+            {
+                sightings.Add(Snapshot(
+                    $"KNOWN_P:{opponent.Name}",
+                    sightedSide,
+                    OperatorRole.Recon,
+                    1.0f,
+                    100.0f,
+                    true,
+                    false,
+                    target.GlobalPosition,
+                    layout.Origin));
+            }
+        }
+        return sightings;
     }
 
     private void SelectDemolitionCarrier(DemolitionStrategyPlan opponentPlan)
@@ -225,6 +279,121 @@ public partial class FreightTerminalWorld
     /// Converts arrived Move orders into Holds so demolition teammates anchor their
     /// assigned posts and use their combat layer from cover instead of milling around.
     /// </summary>
+    private static int NearestDemolitionSiteTo(Vector3 position, DemolitionArenaLayout layout)
+    {
+        var nearest = 0;
+        var nearestDistance = float.PositiveInfinity;
+        for (var index = 0; index < layout.SitePositions.Count; index++)
+        {
+            var site = layout.SitePositions[index];
+            var flat = new Vector3(site.X, position.Y, site.Z);
+            var distance = position.DistanceSquaredTo(flat);
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearest = index;
+            }
+        }
+        return nearest;
+    }
+
+    /// <summary>
+    /// Objective hand-off, borrowed from open-source bot relay logic: when the local
+    /// player who owns the bomb or the defuse role goes down mid-round, the closest able
+    /// mate inherits the objective — it is ordered onto the site and channels the plant
+    /// or defuse itself so the round is never lost to a dead carrier.
+    /// </summary>
+    private void UpdateDemolitionSquadObjectiveRelay(float delta)
+    {
+        if (!_demolitionRoundActive)
+        {
+            return;
+        }
+        // The relay only takes over when the objective owner cannot act: the downed or
+        // dead local player. A standing player keeps the bomb and the defuse role.
+        if (!_localPlayerDowned && !_player.IsDead)
+        {
+            if (IsInstanceValid(_demolitionSquadObjectiveMate))
+            {
+                _demolitionSquadObjectiveMate = null;
+                _demolitionSquadPlantProgress = 0.0f;
+                _demolitionSquadDefuseProgress = 0.0f;
+            }
+            return;
+        }
+        var layout = DemolitionLayout();
+        var side = _demolitionMatch.PlayerSide;
+        var objectiveActive = !_demolitionDevicePlanted
+            ? side == DemolitionTeam.Attackers
+            : side == DemolitionTeam.Defenders;
+        if (!objectiveActive)
+        {
+            return;
+        }
+
+        var siteIndex = !_demolitionDevicePlanted
+            ? NearestDemolitionSiteTo(_player.GlobalPosition, layout)
+            : Mathf.Clamp(_demolitionActiveSite, 0, layout.SitePositions.Count - 1);
+        if (siteIndex != _demolitionSquadObjectiveSite)
+        {
+            _demolitionSquadObjectiveSite = siteIndex;
+            _demolitionSquadObjectiveMate = null;
+            _demolitionSquadPlantProgress = 0.0f;
+            _demolitionSquadDefuseProgress = 0.0f;
+        }
+        if (!IsInstanceValid(_demolitionSquadObjectiveMate)
+            || _demolitionSquadObjectiveMate!.IsDowned
+            || _demolitionSquadObjectiveMate.IsBodyBag)
+        {
+            var site = layout.SitePositions[siteIndex];
+            _demolitionSquadObjectiveMate = _squadMates
+                .Where(mate => IsInstanceValid(mate) && !mate.IsDowned && !mate.IsBodyBag)
+                .OrderBy(mate => mate.GlobalPosition.DistanceSquaredTo(site))
+                .FirstOrDefault();
+            _demolitionSquadPlantProgress = 0.0f;
+            _demolitionSquadDefuseProgress = 0.0f;
+        }
+        var carrier = _demolitionSquadObjectiveMate;
+        if (carrier is null)
+        {
+            return;
+        }
+        var destination = layout.SitePositions[siteIndex];
+        var flatDestination = new Vector3(destination.X, carrier.GlobalPosition.Y, destination.Z);
+        if (carrier.GlobalPosition.DistanceTo(flatDestination) > 2.2f)
+        {
+            if (carrier.Order != SquadOrder.Move || carrier.GlobalPosition.DistanceTo(flatDestination) > 6.0f)
+            {
+                carrier.SetOrder(SquadOrder.Move, destination);
+            }
+            return;
+        }
+        if (carrier.Order == SquadOrder.Move)
+        {
+            carrier.SetOrder(SquadOrder.Hold, carrier.GlobalPosition);
+        }
+        var progress = !_demolitionDevicePlanted
+            ? _demolitionSquadPlantProgress += delta / DemolitionPlantDuration
+            : _demolitionSquadDefuseProgress += delta / DemolitionDefuseDuration;
+        if (progress >= 1.0f && !_demolitionDevicePlanted)
+        {
+            PlantDemolitionDevice(siteIndex, byPlayerTeam: true);
+            _demolitionSquadObjectiveMate = null;
+            _demolitionSquadPlantProgress = 0.0f;
+        }
+        else if (progress >= 1.0f)
+        {
+            var siteName = ((char)('A' + siteIndex)).ToString();
+            FinishDemolitionRound(
+                true,
+                GameLocalization.Format(
+                    "demolition_device_defused",
+                    _languageSetting,
+                    "SITE {0} DEVICE DEFUSED",
+                    siteName));
+        }
+    }
+
     private void UpdateDemolitionSquadPosts()
     {
         if (!_demolitionRoundActive)

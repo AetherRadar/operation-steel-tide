@@ -63,7 +63,8 @@ public sealed class DemolitionStrategyPlanner
         DemolitionTeam team,
         DemolitionStrategyPhase phase,
         IReadOnlyList<DemolitionAgentSnapshot> members,
-        int plantedSiteIndex = -1)
+        int plantedSiteIndex = -1,
+        IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents = null)
     {
         var available = members
             .Where(member => member.Team == team && member.Alive && !member.Downed)
@@ -79,20 +80,93 @@ public sealed class DemolitionStrategyPlanner
         {
             return phase == DemolitionStrategyPhase.PostPlant && plantedSiteIndex >= 0
                 ? PlanAttackerPostPlant(available, plantedSiteIndex)
-                : PlanAttackerOpening(available);
+                : PlanAttackerOpening(available, knownOpponents);
         }
         return phase == DemolitionStrategyPhase.PostPlant && plantedSiteIndex >= 0
             ? PlanDefenderRetake(available, plantedSiteIndex)
-            : PlanDefenderOpening(available);
+            : PlanDefenderOpening(available, knownOpponents);
     }
 
-    private static DemolitionStrategyPlan PlanAttackerOpening(List<DemolitionAgentSnapshot> members)
+    /// <summary>
+    /// Shared-intelligence site choice, the YaPB-style danger heuristic: with no contacts
+    /// keep the loadout-based default, but once defenders are sighted around one site,
+    /// attack the other.
+    /// </summary>
+    private static int ChooseAttackerSite(
+        List<DemolitionAgentSnapshot> members,
+        IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents)
     {
         var averageRange = members.Average(member => member.WeaponRange);
         var reconWeight = members.Count(member => member.Role == OperatorRole.Recon) * 0.18f;
         var weakenedLeft = members.Count(member => member.PositionX < 0.0f && member.HealthRatio < 0.58f);
         var weakenedRight = members.Count(member => member.PositionX >= 0.0f && member.HealthRatio < 0.58f);
-        var primarySite = averageRange >= 135.0f || reconWeight > 0.0f && weakenedLeft <= weakenedRight ? 0 : 1;
+        var fallback = averageRange >= 135.0f || reconWeight > 0.0f && weakenedLeft <= weakenedRight ? 0 : 1;
+        if (knownOpponents is null || knownOpponents.Count == 0)
+        {
+            return fallback;
+        }
+        var threats = new int[DemolitionArenaLayout.LocalSiteCenters.Length];
+        foreach (var opponent in knownOpponents)
+        {
+            for (var site = 0; site < threats.Length; site++)
+            {
+                if (IsNearSite(opponent, site, 30.0f))
+                {
+                    threats[site]++;
+                }
+            }
+        }
+        if (threats[0] == threats[1])
+        {
+            return fallback;
+        }
+        return threats[0] < threats[1] ? 0 : 1;
+    }
+
+    /// <summary>The site currently under contact, driving pre-plant defensive rotation.</summary>
+    private static int ThreatenedSite(IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents)
+    {
+        if (knownOpponents is null || knownOpponents.Count == 0)
+        {
+            return -1;
+        }
+        var best = -1;
+        var bestDistance = float.PositiveInfinity;
+        for (var site = 0; site < DemolitionArenaLayout.LocalSiteCenters.Length; site++)
+        {
+            foreach (var opponent in knownOpponents)
+            {
+                if (!IsNearSite(opponent, site, 34.0f))
+                {
+                    continue;
+                }
+                var center = DemolitionArenaLayout.LocalSiteCenters[site];
+                var dx = opponent.PositionX - center.X;
+                var dz = opponent.PositionZ - center.Y;
+                var distance = dx * dx + dz * dz;
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = site;
+                }
+            }
+        }
+        return best;
+    }
+
+    private static bool IsNearSite(DemolitionAgentSnapshot member, int site, float radius)
+    {
+        var center = DemolitionArenaLayout.LocalSiteCenters[site];
+        var dx = member.PositionX - center.X;
+        var dz = member.PositionZ - center.Y;
+        return dx * dx + dz * dz <= radius * radius;
+    }
+
+    private static DemolitionStrategyPlan PlanAttackerOpening(
+        List<DemolitionAgentSnapshot> members,
+        IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents = null)
+    {
+        var primarySite = ChooseAttackerSite(members, knownOpponents);
 
         var entry = members
             .OrderByDescending(member => EntryScore(member))
@@ -184,8 +258,11 @@ public sealed class DemolitionStrategyPlanner
             $"HOLD {siteName}  //  CROSSfire SET  //  WATCH ROTATE");
     }
 
-    private static DemolitionStrategyPlan PlanDefenderOpening(List<DemolitionAgentSnapshot> members)
+    private static DemolitionStrategyPlan PlanDefenderOpening(
+        List<DemolitionAgentSnapshot> members,
+        IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents = null)
     {
+        var threatened = ThreatenedSite(knownOpponents);
         var assignments = new List<DemolitionAssignment>(members.Count);
         var ordered = members
             .OrderByDescending(member => member.WeaponRange)
@@ -209,7 +286,9 @@ public sealed class DemolitionStrategyPlanner
                 DemolitionDuty.AnchorA => "defense_anchor_a",
                 DemolitionDuty.AnchorB => "defense_anchor_b",
                 DemolitionDuty.MidControl => "defense_mid",
-                _ => index % 2 == 0 ? "defense_rotate_a" : "defense_rotate_b"
+                _ => threatened >= 0
+                    ? (threatened == 0 ? "defense_rotate_a" : "defense_rotate_b")
+                    : index % 2 == 0 ? "defense_rotate_a" : "defense_rotate_b"
             };
             assignments.Add(new DemolitionAssignment(
                 member.MemberId,
