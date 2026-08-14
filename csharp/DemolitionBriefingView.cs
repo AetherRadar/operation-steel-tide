@@ -1,10 +1,11 @@
+using System;
 using Godot;
 
 namespace OperationSteelTide;
 
 /// <summary>
 /// Presents demolition briefing state supplied through <see cref="SetLanguage"/> and emits
-/// role, deployment, and back intent. The view never mutates world or progression state.
+/// role, loadout, map, and back intent. The view never mutates world or progression state.
 /// </summary>
 [GlobalClass]
 public partial class DemolitionBriefingView : ColorRect
@@ -14,7 +15,8 @@ public partial class DemolitionBriefingView : ColorRect
         int role,
         int primaryPlatform,
         int buildTier,
-        int sidearmPlatform);
+        int sidearmPlatform,
+        string mapId);
 
     private Label _title = null!;
     private Label _subtitle = null!;
@@ -22,6 +24,7 @@ public partial class DemolitionBriefingView : ColorRect
     private Label _rules = null!;
     private Label _roleTitle = null!;
     private Label _loadoutTitle = null!;
+    private Label _mapTitle = null!;
     private Label _primaryLabel = null!;
     private Label _buildLabel = null!;
     private Label _sidearmLabel = null!;
@@ -35,9 +38,13 @@ public partial class DemolitionBriefingView : ColorRect
     private OptionButton _primaryOption = null!;
     private OptionButton _buildOption = null!;
     private OptionButton _sidearmOption = null!;
+    private VBoxContainer _mapList = null!;
     private readonly Button[] _roleButtons = new Button[3];
     private readonly Label[] _roleNames = new Label[3];
     private readonly Label[] _roleDetails = new Label[3];
+    private readonly Button[] _mapButtons = new Button[DemolitionMapCatalog.PoolSize];
+    private readonly DemolitionMapOffer[] _mapOffers = new DemolitionMapOffer[DemolitionMapCatalog.PoolSize];
+    private string _selectedMapId = DemolitionMapCatalog.TideforgeId;
     private OperatorRole _selectedRole = OperatorRole.Assault;
     private string _language = "en";
 
@@ -45,6 +52,8 @@ public partial class DemolitionBriefingView : ColorRect
     public WeaponPlatform SelectedPrimaryPlatform => (WeaponPlatform)_primaryOption.GetSelectedId();
     public int SelectedBuildTier => (int)_buildOption.GetSelectedId();
     public WeaponPlatform SelectedSidearmPlatform => (WeaponPlatform)_sidearmOption.GetSelectedId();
+    public string SelectedMapId => _selectedMapId;
+    public int MapOptionCount => _mapButtons.Length;
     public bool UiReady
         => IsInstanceValid(_title)
         && IsInstanceValid(_arenaName)
@@ -53,6 +62,7 @@ public partial class DemolitionBriefingView : ColorRect
         && IsInstanceValid(_primaryOption)
         && IsInstanceValid(_buildOption)
         && IsInstanceValid(_sidearmOption)
+        && IsInstanceValid(_mapList)
         && IsInstanceValid(_roleButtons[0])
         && IsInstanceValid(_roleButtons[1])
         && IsInstanceValid(_roleButtons[2]);
@@ -72,6 +82,7 @@ public partial class DemolitionBriefingView : ColorRect
     {
         BindNodes();
         ConnectIntentSignals();
+        PopulateMapOptions();
         SetLanguage(_language);
         SelectRole(_selectedRole);
     }
@@ -80,23 +91,22 @@ public partial class DemolitionBriefingView : ColorRect
     {
         _language = GameLocalization.IsChinese(language) ? "zh" : "en";
         _title.Text = Text("demolition_title", "DEMOLITION BRIEFING");
-        _subtitle.Text = Text("demolition_subtitle", "TIDEFORGE ARENA  //  ATTACKING ELEMENT");
+        _subtitle.Text = Text("demolition_subtitle", "5 V 5  //  ATTACK THEN DEFEND");
         _rulesTitle.Text = Text("demolition_rules_title", "ENGAGEMENT RULES");
         _rules.Text = Text(
             "demolition_rules",
-            "12 REGULATION ROUNDS  //  6:6 ENTERS WIN-BY-TWO OVERTIME\nPLANT AT SITE A OR B  //  HOLD F\nELIMINATION OR OBJECTIVE TIMEOUT ALSO ENDS THE ROUND");
+            "MR12  //  FIRST TO 13 WINS  //  SIDES SWAP AFTER ROUND 12\n6:6 HALFTIME  //  12:12 ENTERS WIN-BY-TWO OVERTIME\nBOTH SQUADS START WITH $800 AND EARN ROUND REWARDS\nPLANT AT SITE A OR B  //  OR ELIMINATE THE ENEMY SQUAD");
         _roleTitle.Text = Text("demolition_select_role", "SELECT OPERATOR");
-        _loadoutTitle.Text = Text("demolition_loadout_title", "CUSTOM MATCH LOADOUT");
+        _loadoutTitle.Text = Text("demolition_loadout_title", "MATCH LOADOUT");
+        _mapTitle.Text = Text("demolition_map_title", "SELECT MAP  //  12 IN POOL");
         _primaryLabel.Text = Text("demolition_primary", "PRIMARY");
         _buildLabel.Text = Text("demolition_build", "BUILD");
         _sidearmLabel.Text = Text("demolition_sidearm", "SIDEARM");
         PopulateLoadoutOptions();
         RefreshLoadoutSummary();
+        RefreshMapLabels();
         _intelCaption.Text = Text("demolition_arena_selected", "SELECTED BATTLESPACE");
-        _arenaName.Text = Text("demolition_arena_name", "TIDEFORGE ARENA");
-        _arenaProfile.Text = Text(
-            "demolition_arena_profile",
-            "THREE ATTACK ROUTES  //  MID ROTATION\nA  OPEN FOUNDRY YARD  //  B  ENCLOSED ASSEMBLY HALL");
+        RefreshArenaIntel();
         _backButton.Text = Text("demolition_back", "BACK");
         _deployButton.Text = Text("demolition_deploy", "DEPLOY DEMOLITION TEAM");
         var roles = new[] { OperatorRole.Assault, OperatorRole.Medic, OperatorRole.Recon };
@@ -120,9 +130,22 @@ public partial class DemolitionBriefingView : ColorRect
         _readyStatus.Text = GameLocalization.Format(
             "demolition_role_ready",
             _language,
-            "{0} READY  //  CUSTOM KIT  //  EXTRACTION WALLET UNAFFECTED",
+            "{0} READY  //  MATCH ECONOMY ONLY  //  EXTRACTION WALLET UNAFFECTED",
             OperatorRoles.RoleName(role, _language));
         _readyStatus.AddThemeColorOverride("font_color", spec.Accent);
+    }
+
+    public bool SelectMap(string mapId)
+    {
+        var resolved = DemolitionMapCatalog.Resolve(mapId);
+        if (!resolved.Available || resolved.Id != mapId)
+        {
+            return false;
+        }
+        _selectedMapId = resolved.Id;
+        RefreshMapSelection();
+        RefreshArenaIntel();
+        return true;
     }
 
     public bool LanguageMatches(string language)
@@ -130,7 +153,7 @@ public partial class DemolitionBriefingView : ColorRect
         var normalized = GameLocalization.IsChinese(language) ? "zh" : "en";
         return _language == normalized
             && _title.Text == GameLocalization.Get("demolition_title", normalized, "DEMOLITION BRIEFING")
-            && _arenaName.Text == GameLocalization.Get("demolition_arena_name", normalized, "TIDEFORGE ARENA")
+            && _arenaName.Text == GameLocalization.Get("demolition_map_tideforge", normalized, "TIDEFORGE ARENA")
             && _deployButton.Text == GameLocalization.Get("demolition_deploy", normalized, "DEPLOY DEMOLITION TEAM")
             && _roleNames[(int)OperatorRole.Medic].Text == OperatorRoles.RoleName(OperatorRole.Medic, normalized)
             && _primaryLabel.Text == GameLocalization.Get("demolition_primary", normalized, "PRIMARY")
@@ -149,6 +172,8 @@ public partial class DemolitionBriefingView : ColorRect
     public void PressBackForDiagnostics() => _backButton.EmitSignal(BaseButton.SignalName.Pressed);
 
     public void PressDeployForDiagnostics() => _deployButton.EmitSignal(BaseButton.SignalName.Pressed);
+
+    public void PressMapForDiagnostics(string mapId) => SelectMap(mapId);
 
     public void SelectLoadoutForDiagnostics(
         WeaponPlatform primary,
@@ -170,6 +195,7 @@ public partial class DemolitionBriefingView : ColorRect
         _rules = band.GetNode<Label>("Rules");
         _roleTitle = band.GetNode<Label>("RoleTitle");
         _loadoutTitle = band.GetNode<Label>("LoadoutTitle");
+        _mapTitle = band.GetNode<Label>("MapTitle");
         _primaryLabel = band.GetNode<Label>("PrimaryLabel");
         _buildLabel = band.GetNode<Label>("BuildLabel");
         _sidearmLabel = band.GetNode<Label>("SidearmLabel");
@@ -184,6 +210,7 @@ public partial class DemolitionBriefingView : ColorRect
         BindRole(roles, 0, "AssaultButton");
         BindRole(roles, 1, "MedicButton");
         BindRole(roles, 2, "ReconButton");
+        _mapList = band.GetNode<VBoxContainer>("MapList");
         var arenaIntel = GetNode<Control>("ArenaIntel");
         _intelCaption = arenaIntel.GetNode<Label>("IntelCaption");
         _arenaName = arenaIntel.GetNode<Label>("ArenaName");
@@ -211,7 +238,68 @@ public partial class DemolitionBriefingView : ColorRect
             (int)_selectedRole,
             (int)SelectedPrimaryPlatform,
             SelectedBuildTier,
-            (int)SelectedSidearmPlatform);
+            (int)SelectedSidearmPlatform,
+            _selectedMapId);
+    }
+
+    private void PopulateMapOptions()
+    {
+        for (var index = 0; index < DemolitionMapCatalog.Maps.Count && index < _mapButtons.Length; index++)
+        {
+            var offer = DemolitionMapCatalog.Maps[index];
+            _mapOffers[index] = offer;
+            var button = new Button
+            {
+                Name = $"Map_{index + 1:00}",
+                ToggleMode = true,
+                FocusMode = FocusModeEnum.None,
+                CustomMinimumSize = new Vector2(0, 46)
+            };
+            var mapId = offer.Id;
+            button.Pressed += () => SelectMap(mapId);
+            _mapList.AddChild(button);
+            _mapButtons[index] = button;
+        }
+        RefreshMapLabels();
+        RefreshMapSelection();
+    }
+
+    private void RefreshMapLabels()
+    {
+        for (var index = 0; index < _mapButtons.Length; index++)
+        {
+            if (!IsInstanceValid(_mapButtons[index]))
+            {
+                continue;
+            }
+            var offer = _mapOffers[index];
+            var name = Text(offer.LocalizationKey, offer.EnglishName);
+            var state = offer.Available
+                ? string.Empty
+                : $"  //  {Text("demolition_map_locked", "LOCKED")}";
+            _mapButtons[index].Text = $"{offer.Code}  {name}{state}";
+            _mapButtons[index].Disabled = !offer.Available;
+        }
+    }
+
+    private void RefreshMapSelection()
+    {
+        for (var index = 0; index < _mapButtons.Length; index++)
+        {
+            if (IsInstanceValid(_mapButtons[index]))
+            {
+                _mapButtons[index].SetPressedNoSignal(_mapOffers[index].Id == _selectedMapId);
+            }
+        }
+    }
+
+    private void RefreshArenaIntel()
+    {
+        var offer = DemolitionMapCatalog.Resolve(_selectedMapId);
+        _arenaName.Text = Text(offer.LocalizationKey, offer.EnglishName);
+        _arenaProfile.Text = Text(
+            "demolition_arena_profile",
+            "DIAGONAL SITES  //  MID ROTATION  //  TWO FLOORS OF COVER\nA  SOUTHWEST FOUNDRY YARD  //  B  NORTHEAST ASSEMBLY HALL");
     }
 
     private void PopulateLoadoutOptions()
@@ -260,7 +348,7 @@ public partial class DemolitionBriefingView : ColorRect
         _loadout.Text = GameLocalization.Format(
             "demolition_custom_loadout",
             _language,
-            "{0}  //  {1} BUILD  //  PRIMARY x{3}\n{2}  //  60 PISTOL ROUNDS  //  KEYS 1 / 2 / 3\nSTANDARD CARRIER  //  2 FRAG  //  CLASS SKILL ENABLED",
+            "{0}  //  {1} BUILD  //  PRIMARY x{3}\n{2}  //  60 PISTOL ROUNDS  //  KEYS 1 / 2 / 3\n$800 START  //  WIN $3000  //  LOSS $1900+  //  AUTO BUY",
             primary,
             build,
             sidearm,

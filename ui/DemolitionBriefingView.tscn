@@ -110,7 +110,7 @@ offset_right = 704.0
 offset_bottom = 118.0
 theme_override_colors/font_color = Color(0.78, 0.55, 0.34, 1)
 theme_override_font_sizes/font_size = 12
-text = "TIDEFORGE ARENA  //  ATTACKING ELEMENT"
+text = "5 V 5  //  ATTACK THEN DEFEND"
 
 [node name="HeaderRule" type="ColorRect" parent="Band"]
 layout_mode = 0
@@ -136,11 +136,11 @@ layout_mode = 0
 offset_left = 44.0
 offset_top = 184.0
 offset_right = 704.0
-offset_bottom = 276.0
+offset_bottom = 292.0
 theme_override_colors/font_color = Color(0.76, 0.84, 0.81, 1)
 theme_override_constants/line_spacing = 6
 theme_override_font_sizes/font_size = 14
-text = "PLANT AT SITE A OR B  //  HOLD F\nDEFEND THE DEVICE UNTIL DETONATION\nELIMINATION ALSO ENDS THE ROUND  //  NO LOOT BANKING"
+text = "MR12  //  FIRST TO 13 WINS  //  SIDES SWAP AFTER ROUND 12\n6:6 HALFTIME  //  12:12 ENTERS WIN-BY-TWO OVERTIME\nBOTH SQUADS START WITH $800 AND EARN ROUND REWARDS\nPLANT AT SITE A OR B  //  OR ELIMINATE THE ENEMY SQUAD"
 autowrap_mode = 2
 
 [node name="RoleTitle" type="Label" parent="Band"]
@@ -346,12 +346,30 @@ theme_override_constants/line_spacing = 5
 theme_override_font_sizes/font_size = 14
 text = "M4A1 STANDARD  //  COMMON 5.56  x120\nSTANDARD CARRIER  //  PATROL HELMET\n2 FRAG  //  2 PLATES  //  CLASS SKILL ENABLED"
 
+[node name="MapTitle" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 640.0
+offset_right = 344.0
+offset_bottom = 662.0
+theme_override_colors/font_color = Color(0.48, 0.72, 0.64, 1)
+theme_override_font_sizes/font_size = 12
+text = "SELECT MAP  //  12 IN POOL"
+
+[node name="MapList" type="VBoxContainer" parent="Band"]
+layout_mode = 0
+offset_left = 44.0
+offset_top = 674.0
+offset_right = 704.0
+offset_bottom = 930.0
+theme_override_constants/separation = 6
+
 [node name="ReadyStatus" type="Label" parent="Band"]
 layout_mode = 0
 offset_left = 44.0
-offset_top = 744.0
+offset_top = 944.0
 offset_right = 704.0
-offset_bottom = 772.0
+offset_bottom = 972.0
 theme_override_colors/font_color = Color(1, 0.67, 0.31, 1)
 theme_override_font_sizes/font_size = 12
 text = "FAIR PLAY KIT  //  EXTRACTION WALLET UNAFFECTED"
@@ -427,5 +445,5 @@ offset_bottom = 168.0
 theme_override_colors/font_color = Color(0.72, 0.82, 0.79, 1)
 theme_override_constants/line_spacing = 5
 theme_override_font_sizes/font_size = 12
-text = "THREE ATTACK ROUTES  //  MID ROTATION\nA  OPEN FOUNDRY YARD  //  B  ENCLOSED ASSEMBLY HALL"
+text = "DIAGONAL SITES  //  MID ROTATION  //  TWO FLOORS OF COVER\nA  SOUTHWEST FOUNDRY YARD  //  B  NORTHEAST ASSEMBLY HALL"
 autowrap_mode = 2

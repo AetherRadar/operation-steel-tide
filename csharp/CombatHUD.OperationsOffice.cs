@@ -72,6 +72,12 @@ public partial class CombatHUD
         => IsInstanceValid(_demolitionBriefingView)
             ? _demolitionBriefingView.SelectedSidearmPlatform
             : WeaponPlatform.P226;
+    public string SelectedDemolitionMapId
+        => IsInstanceValid(_demolitionBriefingView)
+            ? _demolitionBriefingView.SelectedMapId
+            : DemolitionMapCatalog.TideforgeId;
+    public int DemolitionMapOptionCount
+        => IsInstanceValid(_demolitionBriefingView) ? _demolitionBriefingView.MapOptionCount : 0;
     public bool OperationsOfficeLanguageReady
         => IsInstanceValid(_operationsOfficeTitle)
         && _operationsOfficeTitle.Text == Text("operations_office", "OPERATIONS OFFICE")
@@ -123,12 +129,13 @@ public partial class CombatHUD
         _demolitionBriefingView = scene.Instantiate<DemolitionBriefingView>();
         root.AddChild(_demolitionBriefingView);
         _demolitionBriefingView.BackRequested += () => EmitSignal(SignalName.DemolitionBackRequested);
-        _demolitionBriefingView.DeployRequested += (role, primary, build, sidearm) => EmitSignal(
+        _demolitionBriefingView.DeployRequested += (role, primary, build, sidearm, mapId) => EmitSignal(
             SignalName.DemolitionDeploymentRequested,
             role,
             primary,
             build,
-            sidearm);
+            sidearm,
+            mapId);
     }
 
     private void BuildResultOfficeAction()
@@ -213,6 +220,9 @@ public partial class CombatHUD
         WeaponPlatform sidearm)
         => _demolitionBriefingView.SelectLoadoutForDiagnostics(primary, buildTier, sidearm);
 
+    public bool PressDemolitionMapForDiagnostics(string mapId)
+        => _demolitionBriefingView.SelectMap(mapId);
+
     private static void PressButtonForDiagnostics(Button button)
     {
         if (IsInstanceValid(button))
@@ -261,7 +271,7 @@ public partial class CombatHUD
         _quickStartTitle.Text = Text("operations_quick_title", "QUICK EXTRACTION");
         _quickStartDetail.Text = Text("operations_quick_detail", "ENTER LOADOUT  //  SQUAD UP  //  LOOT AND EXTRACT");
         _demolitionEntryTitle.Text = Text("operations_demolition_title", "DEMOLITION");
-        _demolitionEntryDetail.Text = Text("operations_demolition_detail", "CUSTOM KIT  //  12 ROUNDS + OVERTIME  //  A / B SITES");
+        _demolitionEntryDetail.Text = Text("operations_demolition_detail", "5 V 5  //  FIRST TO 13  //  12-MAP POOL");
         _operationsQuitButton.Text = Text("operations_exit", "EXIT TO DESKTOP");
         _demolitionBriefingView.SetLanguage(_language);
         _resultOfficeButton.Text = Text("operations_return", "RETURN TO OPERATIONS OFFICE");
