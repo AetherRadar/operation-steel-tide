@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://csharp/DemolitionBriefingView.cs" id="1_view"]
 
@@ -58,8 +58,24 @@ border_width_right = 3
 border_width_bottom = 3
 border_color = Color(1, 0.9, 0.65, 1)
 
+[sub_resource type="StyleBoxFlat" id="Style_nav"]
+bg_color = Color(0.025, 0.045, 0.043, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.32, 0.52, 0.47, 0.9)
+
+[sub_resource type="StyleBoxFlat" id="Style_nav_hover"]
+bg_color = Color(0.07, 0.12, 0.1, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.48, 0.9, 0.72, 1)
+
 [sub_resource type="StyleBoxFlat" id="Style_intel"]
-bg_color = Color(0.016, 0.025, 0.027, 0.94)
+bg_color = Color(0.016, 0.025, 0.027, 0.96)
 border_width_left = 3
 border_width_top = 1
 border_width_right = 1
@@ -74,96 +90,97 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 0
-color = Color(0.002, 0.005, 0.006, 0.58)
+color = Color(0.002, 0.005, 0.006, 0.78)
 script = ExtResource("1_view")
 
 [node name="Band" type="ColorRect" parent="."]
 layout_mode = 0
+offset_left = 32.0
+offset_top = 28.0
 offset_right = 760.0
-offset_bottom = 1080.0
+offset_bottom = 692.0
 mouse_filter = 1
-color = Color(0.008, 0.012, 0.014, 0.97)
+color = Color(0.008, 0.012, 0.014, 0.98)
 
 [node name="Accent" type="ColorRect" parent="Band"]
 layout_mode = 0
-offset_left = 759.0
-offset_right = 760.0
-offset_bottom = 1080.0
+offset_left = 727.0
+offset_right = 728.0
+offset_bottom = 664.0
 mouse_filter = 2
 color = Color(1, 0.52, 0.18, 0.82)
 
 [node name="Title" type="Label" parent="Band"]
 layout_mode = 0
-offset_left = 42.0
-offset_top = 48.0
-offset_right = 704.0
-offset_bottom = 92.0
+offset_left = 38.0
+offset_top = 24.0
+offset_right = 690.0
+offset_bottom = 66.0
 theme_override_colors/font_color = Color(1, 0.9, 0.78, 1)
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 30
 text = "DEMOLITION BRIEFING"
 
 [node name="Subtitle" type="Label" parent="Band"]
 layout_mode = 0
-offset_left = 44.0
-offset_top = 96.0
-offset_right = 704.0
-offset_bottom = 118.0
+offset_left = 40.0
+offset_top = 70.0
+offset_right = 690.0
+offset_bottom = 92.0
 theme_override_colors/font_color = Color(0.78, 0.55, 0.34, 1)
 theme_override_font_sizes/font_size = 12
 text = "5 V 5  //  ATTACK THEN DEFEND"
 
 [node name="HeaderRule" type="ColorRect" parent="Band"]
 layout_mode = 0
-offset_left = 44.0
-offset_top = 132.0
-offset_right = 704.0
-offset_bottom = 133.0
+offset_left = 40.0
+offset_top = 102.0
+offset_right = 690.0
+offset_bottom = 103.0
 mouse_filter = 2
 color = Color(0.31, 0.39, 0.36, 0.72)
 
 [node name="RulesTitle" type="Label" parent="Band"]
 layout_mode = 0
-offset_left = 44.0
-offset_top = 154.0
-offset_right = 344.0
-offset_bottom = 176.0
+offset_left = 40.0
+offset_top = 116.0
+offset_right = 300.0
+offset_bottom = 136.0
 theme_override_colors/font_color = Color(0.48, 0.72, 0.64, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 11
 text = "ENGAGEMENT RULES"
 
 [node name="Rules" type="Label" parent="Band"]
 layout_mode = 0
-offset_left = 44.0
-offset_top = 184.0
-offset_right = 704.0
-offset_bottom = 292.0
+offset_left = 40.0
+offset_top = 142.0
+offset_right = 690.0
+offset_bottom = 214.0
 theme_override_colors/font_color = Color(0.76, 0.84, 0.81, 1)
-theme_override_constants/line_spacing = 6
-theme_override_font_sizes/font_size = 14
-text = "MR12  //  FIRST TO 13 WINS  //  SIDES SWAP AFTER ROUND 12\n6:6 HALFTIME  //  12:12 ENTERS WIN-BY-TWO OVERTIME\nBOTH SQUADS START WITH $800 AND EARN ROUND REWARDS\nPLANT AT SITE A OR B  //  OR ELIMINATE THE ENEMY SQUAD"
-autowrap_mode = 2
+theme_override_constants/line_spacing = 3
+theme_override_font_sizes/font_size = 12
+text = "MR12  //  FIRST TO 13 WINS  //  SIDES SWAP AFTER ROUND 12\n6:6 HALFTIME  //  12:12 ENTERS WIN-BY-TWO OVERTIME\nEACH ROUND OPENS WITH A 15 SECOND BUY PHASE\nBOTH SQUADS START WITH $800  //  EXTRACTION WALLET UNAFFECTED"
 
 [node name="RoleTitle" type="Label" parent="Band"]
 layout_mode = 0
-offset_left = 44.0
-offset_top = 304.0
-offset_right = 344.0
-offset_bottom = 326.0
+offset_left = 40.0
+offset_top = 222.0
+offset_right = 300.0
+offset_bottom = 242.0
 theme_override_colors/font_color = Color(0.48, 0.72, 0.64, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 11
 text = "SELECT OPERATOR"
 
 [node name="Roles" type="Control" parent="Band"]
 layout_mode = 0
-offset_left = 44.0
-offset_top = 340.0
-offset_right = 704.0
-offset_bottom = 458.0
+offset_left = 40.0
+offset_top = 250.0
+offset_right = 690.0
+offset_bottom = 348.0
 
 [node name="AssaultButton" type="Button" parent="Band/Roles"]
 layout_mode = 0
-offset_right = 210.0
-offset_bottom = 118.0
+offset_right = 206.0
+offset_bottom = 98.0
 focus_mode = 0
 toggle_mode = true
 button_pressed = true
@@ -174,32 +191,32 @@ theme_override_styles/hover_pressed = SubResource("Style_role_pressed")
 
 [node name="RoleName" type="Label" parent="Band/Roles/AssaultButton"]
 layout_mode = 0
-offset_left = 14.0
-offset_top = 12.0
-offset_right = 196.0
-offset_bottom = 36.0
+offset_left = 12.0
+offset_top = 10.0
+offset_right = 194.0
+offset_bottom = 32.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 0.66, 0.34, 1)
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 14
 text = "ASSAULT"
 
 [node name="RoleDetail" type="Label" parent="Band/Roles/AssaultButton"]
 layout_mode = 0
-offset_left = 14.0
-offset_top = 44.0
-offset_right = 196.0
-offset_bottom = 108.0
+offset_left = 12.0
+offset_top = 38.0
+offset_right = 194.0
+offset_bottom = 90.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.58, 0.7, 0.66, 1)
-theme_override_font_sizes/font_size = 10
+theme_override_font_sizes/font_size = 9
 text = "COMBAT OVERDRIVE"
 autowrap_mode = 2
 
 [node name="MedicButton" type="Button" parent="Band/Roles"]
 layout_mode = 0
-offset_left = 226.0
-offset_right = 436.0
-offset_bottom = 118.0
+offset_left = 222.0
+offset_right = 428.0
+offset_bottom = 98.0
 focus_mode = 0
 toggle_mode = true
 theme_override_styles/normal = SubResource("Style_role_normal")
@@ -209,32 +226,32 @@ theme_override_styles/hover_pressed = SubResource("Style_role_pressed")
 
 [node name="RoleName" type="Label" parent="Band/Roles/MedicButton"]
 layout_mode = 0
-offset_left = 14.0
-offset_top = 12.0
-offset_right = 196.0
-offset_bottom = 36.0
+offset_left = 12.0
+offset_top = 10.0
+offset_right = 194.0
+offset_bottom = 32.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.42, 1, 0.68, 1)
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 14
 text = "MEDIC"
 
 [node name="RoleDetail" type="Label" parent="Band/Roles/MedicButton"]
 layout_mode = 0
-offset_left = 14.0
-offset_top = 44.0
-offset_right = 196.0
-offset_bottom = 108.0
+offset_left = 12.0
+offset_top = 38.0
+offset_right = 194.0
+offset_bottom = 90.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.58, 0.7, 0.66, 1)
-theme_override_font_sizes/font_size = 10
+theme_override_font_sizes/font_size = 9
 text = "MEDICAL SPRAY"
 autowrap_mode = 2
 
 [node name="ReconButton" type="Button" parent="Band/Roles"]
 layout_mode = 0
-offset_left = 452.0
-offset_right = 660.0
-offset_bottom = 118.0
+offset_left = 444.0
+offset_right = 650.0
+offset_bottom = 98.0
 focus_mode = 0
 toggle_mode = true
 theme_override_styles/normal = SubResource("Style_role_normal")
@@ -244,158 +261,155 @@ theme_override_styles/hover_pressed = SubResource("Style_role_pressed")
 
 [node name="RoleName" type="Label" parent="Band/Roles/ReconButton"]
 layout_mode = 0
-offset_left = 14.0
-offset_top = 12.0
+offset_left = 12.0
+offset_top = 10.0
 offset_right = 194.0
-offset_bottom = 36.0
+offset_bottom = 32.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.42, 0.82, 1, 1)
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 14
 text = "RECON"
 
 [node name="RoleDetail" type="Label" parent="Band/Roles/ReconButton"]
 layout_mode = 0
-offset_left = 14.0
-offset_top = 44.0
+offset_left = 12.0
+offset_top = 38.0
 offset_right = 194.0
-offset_bottom = 108.0
+offset_bottom = 90.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.58, 0.7, 0.66, 1)
-theme_override_font_sizes/font_size = 10
+theme_override_font_sizes/font_size = 9
 text = "PULSE SCANNER"
 autowrap_mode = 2
 
-[node name="LoadoutTitle" type="Label" parent="Band"]
-layout_mode = 0
-offset_left = 44.0
-offset_top = 486.0
-offset_right = 344.0
-offset_bottom = 508.0
-theme_override_colors/font_color = Color(0.48, 0.72, 0.64, 1)
-theme_override_font_sizes/font_size = 12
-text = "REGULATION LOADOUT"
-
-[node name="PrimaryLabel" type="Label" parent="Band"]
-layout_mode = 0
-offset_left = 44.0
-offset_top = 526.0
-offset_right = 166.0
-offset_bottom = 550.0
-theme_override_colors/font_color = Color(0.68, 0.8, 0.76, 1)
-theme_override_font_sizes/font_size = 11
-text = "PRIMARY"
-
-[node name="PrimaryOption" type="OptionButton" parent="Band"]
-layout_mode = 0
-offset_left = 164.0
-offset_top = 518.0
-offset_right = 394.0
-offset_bottom = 558.0
-focus_mode = 1
-theme_override_colors/font_color = Color(0.88, 0.94, 0.91, 1)
-theme_override_font_sizes/font_size = 13
-
-[node name="BuildLabel" type="Label" parent="Band"]
-layout_mode = 0
-offset_left = 416.0
-offset_top = 526.0
-offset_right = 508.0
-offset_bottom = 550.0
-theme_override_colors/font_color = Color(0.68, 0.8, 0.76, 1)
-theme_override_font_sizes/font_size = 11
-text = "BUILD"
-
-[node name="BuildOption" type="OptionButton" parent="Band"]
-layout_mode = 0
-offset_left = 500.0
-offset_top = 518.0
-offset_right = 704.0
-offset_bottom = 558.0
-focus_mode = 1
-theme_override_colors/font_color = Color(0.88, 0.94, 0.91, 1)
-theme_override_font_sizes/font_size = 13
-
-[node name="SidearmLabel" type="Label" parent="Band"]
-layout_mode = 0
-offset_left = 44.0
-offset_top = 580.0
-offset_right = 166.0
-offset_bottom = 604.0
-theme_override_colors/font_color = Color(0.68, 0.8, 0.76, 1)
-theme_override_font_sizes/font_size = 11
-text = "SIDEARM"
-
-[node name="SidearmOption" type="OptionButton" parent="Band"]
-layout_mode = 0
-offset_left = 164.0
-offset_top = 572.0
-offset_right = 394.0
-offset_bottom = 612.0
-focus_mode = 1
-theme_override_colors/font_color = Color(0.88, 0.94, 0.91, 1)
-theme_override_font_sizes/font_size = 13
-
-[node name="Loadout" type="Label" parent="Band"]
-layout_mode = 0
-offset_left = 44.0
-offset_top = 638.0
-offset_right = 704.0
-offset_bottom = 716.0
-theme_override_colors/font_color = Color(0.82, 0.88, 0.85, 1)
-theme_override_constants/line_spacing = 5
-theme_override_font_sizes/font_size = 14
-text = "M4A1 STANDARD  //  COMMON 5.56  x120\nSTANDARD CARRIER  //  PATROL HELMET\n2 FRAG  //  2 PLATES  //  CLASS SKILL ENABLED"
-
 [node name="MapTitle" type="Label" parent="Band"]
 layout_mode = 0
-offset_left = 44.0
-offset_top = 640.0
-offset_right = 344.0
-offset_bottom = 662.0
+offset_left = 40.0
+offset_top = 366.0
+offset_right = 400.0
+offset_bottom = 386.0
 theme_override_colors/font_color = Color(0.48, 0.72, 0.64, 1)
-theme_override_font_sizes/font_size = 12
-text = "SELECT MAP  //  12 IN POOL"
+theme_override_font_sizes/font_size = 11
+text = "BATTLESPACE  //  12-MAP POOL"
 
-[node name="MapList" type="VBoxContainer" parent="Band"]
+[node name="MapCarousel" type="ColorRect" parent="Band"]
 layout_mode = 0
-offset_left = 44.0
-offset_top = 674.0
-offset_right = 704.0
-offset_bottom = 930.0
-theme_override_constants/separation = 6
+offset_left = 40.0
+offset_top = 394.0
+offset_right = 690.0
+offset_bottom = 506.0
+color = Color(0.018, 0.029, 0.03, 1)
+
+[node name="PreviousMapButton" type="Button" parent="Band/MapCarousel"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 12.0
+offset_right = 60.0
+offset_bottom = 100.0
+focus_mode = 0
+tooltip_text = "Previous map"
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("Style_nav")
+theme_override_styles/hover = SubResource("Style_nav_hover")
+text = "<"
+
+[node name="NextMapButton" type="Button" parent="Band/MapCarousel"]
+layout_mode = 0
+offset_left = 590.0
+offset_top = 12.0
+offset_right = 640.0
+offset_bottom = 100.0
+focus_mode = 0
+tooltip_text = "Next map"
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("Style_nav")
+theme_override_styles/hover = SubResource("Style_nav_hover")
+text = ">"
+
+[node name="MapCode" type="Label" parent="Band/MapCarousel"]
+layout_mode = 0
+offset_left = 78.0
+offset_top = 12.0
+offset_right = 230.0
+offset_bottom = 32.0
+theme_override_colors/font_color = Color(0.98, 0.56, 0.22, 1)
+theme_override_font_sizes/font_size = 11
+text = "MAP 01"
+
+[node name="MapPosition" type="Label" parent="Band/MapCarousel"]
+layout_mode = 0
+offset_left = 440.0
+offset_top = 12.0
+offset_right = 572.0
+offset_bottom = 32.0
+theme_override_colors/font_color = Color(0.52, 0.68, 0.63, 1)
+theme_override_font_sizes/font_size = 11
+text = "01 / 12"
+horizontal_alignment = 2
+
+[node name="MapName" type="Label" parent="Band/MapCarousel"]
+layout_mode = 0
+offset_left = 78.0
+offset_top = 34.0
+offset_right = 572.0
+offset_bottom = 64.0
+theme_override_colors/font_color = Color(0.92, 0.96, 0.94, 1)
+theme_override_font_sizes/font_size = 20
+text = "TIDEFORGE ARENA"
+
+[node name="MapSubtitle" type="Label" parent="Band/MapCarousel"]
+layout_mode = 0
+offset_left = 78.0
+offset_top = 68.0
+offset_right = 430.0
+offset_bottom = 92.0
+theme_override_colors/font_color = Color(0.62, 0.74, 0.7, 1)
+theme_override_font_sizes/font_size = 10
+text = "DIAGONAL SITES  //  MID ROTATION"
+
+[node name="MapStatus" type="Label" parent="Band/MapCarousel"]
+layout_mode = 0
+offset_left = 438.0
+offset_top = 68.0
+offset_right = 572.0
+offset_bottom = 92.0
+theme_override_colors/font_color = Color(0.38, 0.92, 0.66, 1)
+theme_override_font_sizes/font_size = 10
+text = "AVAILABLE"
+horizontal_alignment = 2
 
 [node name="ReadyStatus" type="Label" parent="Band"]
 layout_mode = 0
-offset_left = 44.0
-offset_top = 944.0
-offset_right = 704.0
-offset_bottom = 972.0
+offset_left = 40.0
+offset_top = 524.0
+offset_right = 690.0
+offset_bottom = 550.0
 theme_override_colors/font_color = Color(1, 0.67, 0.31, 1)
-theme_override_font_sizes/font_size = 12
-text = "FAIR PLAY KIT  //  EXTRACTION WALLET UNAFFECTED"
+theme_override_font_sizes/font_size = 11
+text = "ASSAULT READY  //  BUY LOADOUT IN EACH ROUND  //  EXTRACTION WALLET UNAFFECTED"
 
 [node name="BackButton" type="Button" parent="Band"]
 layout_mode = 0
-offset_left = 44.0
-offset_top = 958.0
-offset_right = 234.0
-offset_bottom = 1008.0
+offset_left = 40.0
+offset_top = 574.0
+offset_right = 218.0
+offset_bottom = 626.0
 theme_override_colors/font_color = Color(0.82, 0.9, 0.87, 1)
 theme_override_colors/font_hover_color = Color(0.3, 0.96, 0.76, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 15
 theme_override_styles/normal = SubResource("Style_back")
 theme_override_styles/hover = SubResource("Style_back_hover")
 text = "BACK"
 
 [node name="DeployButton" type="Button" parent="Band"]
 layout_mode = 0
-offset_left = 250.0
-offset_top = 958.0
-offset_right = 704.0
-offset_bottom = 1008.0
+offset_left = 234.0
+offset_top = 574.0
+offset_right = 690.0
+offset_bottom = 626.0
 theme_override_colors/font_color = Color(0.08, 0.035, 0.01, 1)
 theme_override_colors/font_hover_color = Color(0.08, 0.035, 0.01, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 15
 theme_override_styles/normal = SubResource("Style_deploy")
 theme_override_styles/hover = SubResource("Style_deploy_hover")
 theme_override_styles/pressed = SubResource("Style_deploy")
@@ -404,46 +418,55 @@ text = "DEPLOY DEMOLITION TEAM"
 [node name="ArenaIntel" type="Panel" parent="."]
 layout_mode = 0
 anchor_left = 1.0
-anchor_top = 1.0
+anchor_top = 0.5
 anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -488.0
-offset_top = -244.0
-offset_right = -48.0
-offset_bottom = -48.0
+anchor_bottom = 0.5
+offset_left = -472.0
+offset_top = -154.0
+offset_right = -36.0
+offset_bottom = 154.0
 grow_horizontal = 0
-grow_vertical = 0
+grow_vertical = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("Style_intel")
 
 [node name="IntelCaption" type="Label" parent="ArenaIntel"]
 layout_mode = 0
-offset_left = 24.0
-offset_top = 18.0
-offset_right = 414.0
-offset_bottom = 40.0
+offset_left = 26.0
+offset_top = 24.0
+offset_right = 408.0
+offset_bottom = 46.0
 theme_override_colors/font_color = Color(0.5, 0.72, 0.65, 1)
 theme_override_font_sizes/font_size = 11
-text = "SELECTED BATTLESPACE"
+text = "BATTLESPACE INTELLIGENCE"
 
 [node name="ArenaName" type="Label" parent="ArenaIntel"]
 layout_mode = 0
-offset_left = 24.0
-offset_top = 48.0
-offset_right = 414.0
-offset_bottom = 84.0
+offset_left = 26.0
+offset_top = 60.0
+offset_right = 408.0
+offset_bottom = 98.0
 theme_override_colors/font_color = Color(1, 0.66, 0.32, 1)
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 23
 text = "TIDEFORGE ARENA"
+
+[node name="IntelRule" type="ColorRect" parent="ArenaIntel"]
+layout_mode = 0
+offset_left = 26.0
+offset_top = 114.0
+offset_right = 408.0
+offset_bottom = 115.0
+mouse_filter = 2
+color = Color(0.3, 0.42, 0.38, 0.8)
 
 [node name="ArenaProfile" type="Label" parent="ArenaIntel"]
 layout_mode = 0
-offset_left = 24.0
-offset_top = 96.0
-offset_right = 414.0
-offset_bottom = 168.0
+offset_left = 26.0
+offset_top = 136.0
+offset_right = 408.0
+offset_bottom = 270.0
 theme_override_colors/font_color = Color(0.72, 0.82, 0.79, 1)
-theme_override_constants/line_spacing = 5
+theme_override_constants/line_spacing = 6
 theme_override_font_sizes/font_size = 12
 text = "DIAGONAL SITES  //  MID ROTATION  //  TWO FLOORS OF COVER\nA  SOUTHWEST FOUNDRY YARD  //  B  NORTHEAST ASSEMBLY HALL"
 autowrap_mode = 2

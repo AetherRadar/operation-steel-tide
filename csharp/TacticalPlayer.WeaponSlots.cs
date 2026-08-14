@@ -184,7 +184,9 @@ public partial class TacticalPlayer
             PlayerWeaponSlot.Primary when HasSecondaryWeapon => PlayerWeaponSlot.Secondary,
             PlayerWeaponSlot.Primary => PlayerWeaponSlot.Melee,
             PlayerWeaponSlot.Secondary => PlayerWeaponSlot.Melee,
-            _ => HasFireablePrimary ? PlayerWeaponSlot.Primary : PlayerWeaponSlot.Melee
+            _ => HasFireablePrimary
+                ? PlayerWeaponSlot.Primary
+                : HasSecondaryWeapon ? PlayerWeaponSlot.Secondary : PlayerWeaponSlot.Melee
         };
         ActivateWeaponSlot(next, true);
     }

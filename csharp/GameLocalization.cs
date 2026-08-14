@@ -425,7 +425,7 @@ public static class GameLocalization
         Chinese["demolition"] = "\u7206\u7834";
         Chinese["demolition_subtitle"] = "5 v 5  //  \u5148\u653b\u540e\u5b88";
         Chinese["demolition_rules_title"] = "\u4ea4\u6218\u89c4\u5219";
-        Chinese["demolition_rules"] = "MR12  //  \u5148\u5f97 13 \u5206\u80dc  //  \u7b2c 12 \u5c40\u540e\u653b\u9632\u4e92\u6362\n6:6 \u4e2d\u573a\u6362\u8fb9  //  12:12 \u8fdb\u5165\u4e24\u5206\u4f18\u52bf\u52a0\u65f6\n\u53cc\u65b9\u5f00\u5c40 $800\uff0c\u6309\u56de\u5408\u7ed3\u679c\u53d1\u653e\u5956\u91d1\n\u5728 A \u6216 B \u70b9\u5b89\u88c5\u88c5\u7f6e\uff0c\u6216\u6d88\u706d\u6574\u4e2a\u654c\u65b9\u5c0f\u961f";
+        Chinese["demolition_rules"] = "MR12  //  \u5148\u5f97 13 \u5206\u80dc  //  \u7b2c 12 \u5c40\u540e\u653b\u9632\u4e92\u6362\n6:6 \u4e2d\u573a\u6362\u8fb9  //  12:12 \u8fdb\u5165\u4e24\u5206\u4f18\u52bf\u52a0\u65f6\n\u6bcf\u5c40\u5f00\u59cb\u524d\u6709 15 \u79d2\u8d2d\u4e70\u9636\u6bb5\n\u53cc\u65b9\u5f00\u5c40 $800  //  \u6478\u91d1\u8d44\u91d1\u4e0d\u53d7\u5f71\u54cd";
         Chinese["demolition_select_role"] = "\u9009\u62e9\u5e72\u5458";
         Chinese["demolition_loadout_title"] = "\u6bd4\u8d5b\u914d\u88c5";
         Chinese["demolition_primary"] = "\u4e3b\u6b66\u5668";
@@ -438,12 +438,14 @@ public static class GameLocalization
         Chinese["demolition_loadout"] = "M4A1 \u6807\u51c6\u578b  //  \u666e\u901a 5.56  x120\n\u6807\u51c6\u9632\u5f39\u80cc\u5fc3  //  \u5de1\u903b\u5934\u76d4\n2 \u679a\u624b\u96f7  //  2 \u5757\u62a4\u7532  //  \u804c\u4e1a\u6280\u80fd\u53ef\u7528";
         Chinese["demolition_back"] = "\u8fd4\u56de";
         Chinese["demolition_deploy"] = "\u90e8\u7f72\u7206\u7834\u5c0f\u961f";
-        Chinese["demolition_role_ready"] = "{0} \u5c31\u7eea  //  \u4ec5\u5f71\u54cd\u5c40\u5185\u7ecf\u6d4e  //  \u4e0d\u6263\u9664\u6478\u91d1\u8d44\u91d1";
+        Chinese["demolition_role_ready"] = "{0} \u5c31\u7eea  //  \u6bcf\u5c40\u8d2d\u4e70\u914d\u88c5  //  \u4e0d\u6263\u9664\u6478\u91d1\u8d44\u91d1";
         Chinese["demolition_arena_selected"] = "\u5df2\u9009\u6218\u533a";
         Chinese["demolition_arena_name"] = "\u6f6e\u6c50\u5de5\u574a";
         Chinese["demolition_arena_profile"] = "\u5bf9\u89d2\u5e03\u70b9  //  \u4e2d\u8def\u8f6c\u70b9  //  \u53cc\u5c42\u63a9\u4f53\nA  \u897f\u5357\u94f8\u9020\u573a  //  B  \u4e1c\u5317\u88c5\u914d\u5385";
-        Chinese["demolition_map_title"] = "\u9009\u62e9\u5730\u56fe  //  \u5171 12 \u5f20";
+        Chinese["demolition_map_title"] = "\u4f5c\u6218\u5730\u56fe  //  12 \u5f20\u5730\u56fe\u6c60";
         Chinese["demolition_map_locked"] = "\u672a\u5b8c\u5de5";
+        Chinese["demolition_map_available"] = "\u53ef\u90e8\u7f72";
+        Chinese["demolition_map_locked_detail"] = "\u6682\u672a\u5f00\u653e\u90e8\u7f72";
         Chinese["demolition_map_tideforge"] = "\u6f6e\u6c50\u5de5\u574a";
         Chinese["demolition_map_tideforge_subtitle"] = "\u5bf9\u89d2\u5e03\u70b9  //  \u4e2d\u8def\u8f6c\u70b9";
         Chinese["demolition_map_locked_subtitle"] = "\u65bd\u5de5\u4e2d";
@@ -486,6 +488,30 @@ public static class GameLocalization
         Chinese["demolition_interaction_defuse"] = "\u62c6\u9664\u7206\u7834\u88c5\u7f6e  //  {0} \u70b9";
         Chinese["demolition_round_timeout_defended"] = "\u8fdb\u653b\u65f6\u95f4\u8017\u5c3d  //  \u70b9\u4f4d\u5b88\u4f4f\u4e86";
         Chinese["demolition_purchase"] = "\u5df2\u8d2d\u4e70\u914d\u88c5  //  -${0}";
+        Chinese["demolition_buy_title"] = "\u56de\u5408\u8d2d\u4e70";
+        Chinese["demolition_buy_sidearms"] = "\u624b\u67aa";
+        Chinese["demolition_buy_primaries"] = "\u4e3b\u6b66\u5668";
+        Chinese["demolition_buy_protection"] = "\u9632\u62a4";
+        Chinese["demolition_buy_utility"] = "\u6295\u63b7\u7269";
+        Chinese["demolition_buy_summary"] = "\u8d2d\u4e70\u6e05\u5355";
+        Chinese["demolition_buy_armor"] = "\u62a4\u7532\u5957\u88c5";
+        Chinese["demolition_buy_clear"] = "\u6e05\u7a7a";
+        Chinese["demolition_buy_confirm"] = "\u786e\u8ba4\u8d2d\u4e70";
+        Chinese["demolition_buy_round_score"] = "\u7b2c {0} \u5c40  //  \u6211\u65b9 {1}:{2} \u654c\u65b9";
+        Chinese["demolition_buy_attack"] = "\u8fdb\u653b\u65b9";
+        Chinese["demolition_buy_defend"] = "\u9632\u5b88\u65b9";
+        Chinese["demolition_buy_funds"] = "\u8d44\u91d1";
+        Chinese["demolition_buy_countdown"] = "\u8d2d\u4e70  {0:0.0}s";
+        Chinese["demolition_buy_balance"] = "\u603b\u4ef7  ${0}  //  \u4f59\u989d  ${1}";
+        Chinese["demolition_buy_insufficient"] = "\u603b\u4ef7  ${0}  //  \u8d44\u91d1\u4e0d\u8db3";
+        Chinese["demolition_buy_insufficient_short"] = "\u8d44\u91d1\u4e0d\u8db3";
+        Chinese["demolition_buy_knife_only"] = "\u4ec5\u6218\u672f\u5200";
+        Chinese["demolition_buy_no_armor"] = "\u672a\u8d2d\u4e70\u62a4\u7532";
+        Chinese["demolition_buy_no_utility"] = "\u672a\u8d2d\u4e70\u6295\u63b7\u7269";
+        Chinese["demolition_buy_knife_live"] = "\u56de\u5408\u5f00\u59cb  //  \u4ec5\u6218\u672f\u5200  //  \u82b1\u8d39 ${0}";
+        Chinese["demolition_buy_ak74"] = "AK-74N";
+        Chinese["demolition_buy_m4a1"] = "M4A1";
+        Chinese["demolition_buy_scarl"] = "SCAR-L";
     }
 
     private static readonly Dictionary<string, string> ChineseObjectives = new()

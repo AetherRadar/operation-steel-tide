@@ -1,0 +1,439 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://csharp/DemolitionBuyView.cs" id="1_view"]
+
+[sub_resource type="StyleBoxFlat" id="Style_panel"]
+bg_color = Color(0.008, 0.014, 0.016, 0.985)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.23, 0.38, 0.35, 0.95)
+
+[sub_resource type="StyleBoxFlat" id="Style_offer"]
+bg_color = Color(0.026, 0.043, 0.042, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.24, 0.39, 0.36, 0.92)
+
+[sub_resource type="StyleBoxFlat" id="Style_offer_hover"]
+bg_color = Color(0.052, 0.086, 0.078, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.38, 0.82, 0.67, 1)
+
+[sub_resource type="StyleBoxFlat" id="Style_offer_pressed"]
+bg_color = Color(0.09, 0.105, 0.065, 1)
+border_width_left = 3
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.58, 0.2, 1)
+
+[sub_resource type="StyleBoxFlat" id="Style_offer_disabled"]
+bg_color = Color(0.018, 0.024, 0.025, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.15, 0.2, 0.19, 0.7)
+
+[sub_resource type="StyleBoxFlat" id="Style_summary"]
+bg_color = Color(0.018, 0.028, 0.029, 1)
+border_width_left = 3
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.85, 0.4, 0.12, 0.86)
+
+[sub_resource type="StyleBoxFlat" id="Style_confirm"]
+bg_color = Color(0.98, 0.49, 0.14, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.79, 0.42, 1)
+
+[sub_resource type="StyleBoxFlat" id="Style_confirm_hover"]
+bg_color = Color(1, 0.63, 0.22, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 0.92, 0.7, 1)
+
+[sub_resource type="StyleBoxFlat" id="Style_bar_fill"]
+bg_color = Color(0.96, 0.46, 0.13, 1)
+
+[node name="DemolitionBuyView" type="ColorRect"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0.001, 0.004, 0.005, 0.82)
+script = ExtResource("1_view")
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -540.0
+offset_top = -310.0
+offset_right = 540.0
+offset_bottom = 310.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+theme_override_styles/panel = SubResource("Style_panel")
+
+[node name="Title" type="Label" parent="Panel"]
+layout_mode = 0
+offset_left = 32.0
+offset_top = 20.0
+offset_right = 410.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(1, 0.9, 0.76, 1)
+theme_override_font_sizes/font_size = 26
+text = "ROUND BUY"
+
+[node name="RoundLabel" type="Label" parent="Panel"]
+layout_mode = 0
+offset_left = 34.0
+offset_top = 62.0
+offset_right = 560.0
+offset_bottom = 84.0
+theme_override_colors/font_color = Color(0.7, 0.82, 0.78, 1)
+theme_override_font_sizes/font_size = 12
+text = "ROUND 1  //  YOU 0:0 ENEMY"
+
+[node name="SideLabel" type="Label" parent="Panel"]
+layout_mode = 0
+offset_left = 590.0
+offset_top = 24.0
+offset_right = 770.0
+offset_bottom = 54.0
+theme_override_colors/font_color = Color(1, 0.58, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+text = "ATTACK"
+horizontal_alignment = 1
+
+[node name="FundsLabel" type="Label" parent="Panel"]
+layout_mode = 0
+offset_left = 794.0
+offset_top = 22.0
+offset_right = 1046.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(0.42, 0.94, 0.69, 1)
+theme_override_font_sizes/font_size = 20
+text = "FUNDS  $800"
+horizontal_alignment = 2
+
+[node name="CountdownLabel" type="Label" parent="Panel"]
+layout_mode = 0
+offset_left = 794.0
+offset_top = 64.0
+offset_right = 1046.0
+offset_bottom = 86.0
+theme_override_colors/font_color = Color(0.95, 0.68, 0.38, 1)
+theme_override_font_sizes/font_size = 12
+text = "BUY  15.0s"
+horizontal_alignment = 2
+
+[node name="CountdownBar" type="ProgressBar" parent="Panel"]
+layout_mode = 0
+offset_left = 32.0
+offset_top = 102.0
+offset_right = 1048.0
+offset_bottom = 112.0
+mouse_filter = 2
+theme_override_styles/fill = SubResource("Style_bar_fill")
+max_value = 15.0
+value = 15.0
+show_percentage = false
+
+[node name="HeaderRule" type="ColorRect" parent="Panel"]
+layout_mode = 0
+offset_left = 32.0
+offset_top = 126.0
+offset_right = 1048.0
+offset_bottom = 127.0
+mouse_filter = 2
+color = Color(0.28, 0.42, 0.38, 0.82)
+
+[node name="Offers" type="Control" parent="Panel"]
+layout_mode = 0
+offset_left = 32.0
+offset_top = 144.0
+offset_right = 692.0
+offset_bottom = 588.0
+
+[node name="SidearmsTitle" type="Label" parent="Panel/Offers"]
+layout_mode = 0
+offset_right = 300.0
+offset_bottom = 20.0
+theme_override_colors/font_color = Color(0.48, 0.75, 0.66, 1)
+theme_override_font_sizes/font_size = 11
+text = "SIDEARMS"
+
+[node name="P226Button" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_top = 28.0
+offset_right = 314.0
+offset_bottom = 88.0
+focus_mode = 0
+toggle_mode = true
+theme_override_colors/font_color = Color(0.86, 0.93, 0.9, 1)
+theme_override_colors/font_disabled_color = Color(0.34, 0.4, 0.38, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/pressed = SubResource("Style_offer_pressed")
+theme_override_styles/hover_pressed = SubResource("Style_offer_pressed")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "P226 SERVICE PISTOL\n$500"
+
+[node name="M1911Button" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_left = 330.0
+offset_top = 28.0
+offset_right = 644.0
+offset_bottom = 88.0
+focus_mode = 0
+toggle_mode = true
+theme_override_colors/font_color = Color(0.86, 0.93, 0.9, 1)
+theme_override_colors/font_disabled_color = Color(0.34, 0.4, 0.38, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/pressed = SubResource("Style_offer_pressed")
+theme_override_styles/hover_pressed = SubResource("Style_offer_pressed")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "M1911 TACTICAL\n$700"
+
+[node name="PrimariesTitle" type="Label" parent="Panel/Offers"]
+layout_mode = 0
+offset_top = 106.0
+offset_right = 300.0
+offset_bottom = 126.0
+theme_override_colors/font_color = Color(0.48, 0.75, 0.66, 1)
+theme_override_font_sizes/font_size = 11
+text = "PRIMARY WEAPONS"
+
+[node name="MP5Button" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_top = 134.0
+offset_right = 314.0
+offset_bottom = 194.0
+focus_mode = 0
+toggle_mode = true
+theme_override_colors/font_color = Color(0.86, 0.93, 0.9, 1)
+theme_override_colors/font_disabled_color = Color(0.34, 0.4, 0.38, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/pressed = SubResource("Style_offer_pressed")
+theme_override_styles/hover_pressed = SubResource("Style_offer_pressed")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "MP5A5\n$1700"
+
+[node name="AK74Button" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_left = 330.0
+offset_top = 134.0
+offset_right = 644.0
+offset_bottom = 194.0
+focus_mode = 0
+toggle_mode = true
+theme_override_colors/font_color = Color(0.86, 0.93, 0.9, 1)
+theme_override_colors/font_disabled_color = Color(0.34, 0.4, 0.38, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/pressed = SubResource("Style_offer_pressed")
+theme_override_styles/hover_pressed = SubResource("Style_offer_pressed")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "AK-74N\n$2900"
+
+[node name="M4A1Button" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_top = 204.0
+offset_right = 314.0
+offset_bottom = 264.0
+focus_mode = 0
+toggle_mode = true
+theme_override_colors/font_color = Color(0.86, 0.93, 0.9, 1)
+theme_override_colors/font_disabled_color = Color(0.34, 0.4, 0.38, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/pressed = SubResource("Style_offer_pressed")
+theme_override_styles/hover_pressed = SubResource("Style_offer_pressed")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "M4A1\n$3100"
+
+[node name="ScarLButton" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_left = 330.0
+offset_top = 204.0
+offset_right = 644.0
+offset_bottom = 264.0
+focus_mode = 0
+toggle_mode = true
+theme_override_colors/font_color = Color(0.86, 0.93, 0.9, 1)
+theme_override_colors/font_disabled_color = Color(0.34, 0.4, 0.38, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/pressed = SubResource("Style_offer_pressed")
+theme_override_styles/hover_pressed = SubResource("Style_offer_pressed")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "SCAR-L\n$3600"
+
+[node name="ProtectionTitle" type="Label" parent="Panel/Offers"]
+layout_mode = 0
+offset_top = 282.0
+offset_right = 300.0
+offset_bottom = 302.0
+theme_override_colors/font_color = Color(0.48, 0.75, 0.66, 1)
+theme_override_font_sizes/font_size = 11
+text = "PROTECTION"
+
+[node name="ArmorButton" type="CheckButton" parent="Panel/Offers"]
+layout_mode = 0
+offset_top = 310.0
+offset_right = 314.0
+offset_bottom = 354.0
+focus_mode = 0
+theme_override_colors/font_color = Color(0.82, 0.9, 0.87, 1)
+theme_override_colors/font_disabled_color = Color(0.34, 0.4, 0.38, 1)
+theme_override_font_sizes/font_size = 12
+text = "ARMOR KIT  $1000"
+
+[node name="UtilityTitle" type="Label" parent="Panel/Offers"]
+layout_mode = 0
+offset_top = 374.0
+offset_right = 300.0
+offset_bottom = 394.0
+theme_override_colors/font_color = Color(0.48, 0.75, 0.66, 1)
+theme_override_font_sizes/font_size = 11
+text = "UTILITY"
+
+[node name="GrenadeDecrease" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_top = 402.0
+offset_right = 48.0
+offset_bottom = 442.0
+focus_mode = 0
+tooltip_text = "Remove grenade"
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "-"
+
+[node name="GrenadeCount" type="Label" parent="Panel/Offers"]
+layout_mode = 0
+offset_left = 62.0
+offset_top = 408.0
+offset_right = 250.0
+offset_bottom = 438.0
+theme_override_colors/font_color = Color(0.84, 0.91, 0.88, 1)
+theme_override_font_sizes/font_size = 13
+text = "FRAG  x0  //  $450"
+vertical_alignment = 1
+
+[node name="GrenadeIncrease" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_left = 266.0
+offset_top = 402.0
+offset_right = 314.0
+offset_bottom = 442.0
+focus_mode = 0
+tooltip_text = "Add grenade"
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "+"
+
+[node name="SummaryPanel" type="Panel" parent="Panel"]
+layout_mode = 0
+offset_left = 720.0
+offset_top = 144.0
+offset_right = 1048.0
+offset_bottom = 588.0
+theme_override_styles/panel = SubResource("Style_summary")
+
+[node name="SummaryTitle" type="Label" parent="Panel/SummaryPanel"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 22.0
+offset_right = 304.0
+offset_bottom = 44.0
+theme_override_colors/font_color = Color(0.54, 0.76, 0.68, 1)
+theme_override_font_sizes/font_size = 11
+text = "PURCHASE SUMMARY"
+
+[node name="Summary" type="Label" parent="Panel/SummaryPanel"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 66.0
+offset_right = 304.0
+offset_bottom = 246.0
+theme_override_colors/font_color = Color(0.86, 0.92, 0.89, 1)
+theme_override_constants/line_spacing = 7
+theme_override_font_sizes/font_size = 14
+text = "KNIFE ONLY\n\nNO ARMOR\nNO UTILITY"
+autowrap_mode = 2
+
+[node name="ProjectedBalance" type="Label" parent="Panel/SummaryPanel"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 266.0
+offset_right = 304.0
+offset_bottom = 306.0
+theme_override_colors/font_color = Color(0.42, 0.92, 0.67, 1)
+theme_override_font_sizes/font_size = 12
+text = "TOTAL  $0  //  BALANCE  $800"
+autowrap_mode = 2
+
+[node name="ClearButton" type="Button" parent="Panel/SummaryPanel"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 326.0
+offset_right = 118.0
+offset_bottom = 404.0
+focus_mode = 0
+theme_override_colors/font_color = Color(0.78, 0.87, 0.83, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+text = "CLEAR"
+
+[node name="ConfirmButton" type="Button" parent="Panel/SummaryPanel"]
+layout_mode = 0
+offset_left = 132.0
+offset_top = 326.0
+offset_right = 304.0
+offset_bottom = 404.0
+focus_mode = 0
+theme_override_colors/font_color = Color(0.08, 0.035, 0.01, 1)
+theme_override_colors/font_hover_color = Color(0.08, 0.035, 0.01, 1)
+theme_override_colors/font_disabled_color = Color(0.28, 0.24, 0.2, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("Style_confirm")
+theme_override_styles/hover = SubResource("Style_confirm_hover")
+theme_override_styles/pressed = SubResource("Style_confirm")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "CONFIRM PURCHASE"
+autowrap_mode = 2

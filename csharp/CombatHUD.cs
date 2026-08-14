@@ -31,6 +31,11 @@ public partial class CombatHUD : CanvasLayer
         int sidearmPlatform,
         string mapId);
     [Signal] public delegate void DemolitionBackRequestedEventHandler();
+    [Signal] public delegate void DemolitionPurchaseRequestedEventHandler(
+        string sidearmId,
+        string primaryId,
+        bool armorSelected,
+        int grenadeCount);
     [Signal] public delegate void OperationsHomeRequestedEventHandler();
 
     private Control _gameplayHudRoot = null!;
@@ -142,7 +147,7 @@ public partial class CombatHUD : CanvasLayer
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (IsSquadLobbyVisible || IsOperationsOfficeVisible || IsDemolitionBriefingVisible)
+        if (IsSquadLobbyVisible || IsOperationsOfficeVisible || IsDemolitionBriefingVisible || IsDemolitionBuyVisible)
         {
             return;
         }
@@ -519,6 +524,7 @@ public partial class CombatHUD : CanvasLayer
         BuildLootOverlay(root);
         BuildSquadHud(canvasRoot);
         BuildOperationsOfficeHud(canvasRoot);
+        BuildDemolitionBuyHud(canvasRoot);
         root.MoveChild(_lootOverlay, root.GetChildCount() - 1);
     }
 
@@ -1234,6 +1240,7 @@ public partial class CombatHUD : CanvasLayer
         UpdateWeaponSlotButtons();
         RefreshSquadLanguage();
         RefreshOperationsOfficeLanguage();
+        RefreshDemolitionBuyLanguage();
         RefreshMedicalLanguage();
         RefreshTacticalLanguage();
         RefreshExtractionLanguage();

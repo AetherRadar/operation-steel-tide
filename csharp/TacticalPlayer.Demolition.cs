@@ -7,16 +7,16 @@ public partial class TacticalPlayer
     public void ResetForDemolitionRound(
         Vector3 spawn,
         OperatorRole role,
-        DeploymentLoadout loadout)
+        DeploymentLoadout loadout,
+        int grenadeCount)
     {
         EjectFromVehicleIfAny();
         ConfigureRole(role);
-        ApplyDeploymentLoadout(loadout);
+        ApplyDemolitionRoundLoadout(loadout, grenadeCount);
         GlobalPosition = spawn;
         Rotation = Vector3.Zero;
         Velocity = Vector3.Zero;
         Stamina = 100.0f;
-        Grenades = 2;
         IsDead = false;
         IsExtractionPassenger = false;
         UiLocked = false;
@@ -32,11 +32,10 @@ public partial class TacticalPlayer
         _plateTime = 0.0f;
         _isAiming = false;
         _knifeTime = 0.0f;
-        _knifeEquipped = false;
         ResetReloadRig();
-        _weaponRoot.Visible = HasFireablePrimary;
-        _knifeRoot.Visible = false;
-        _weaponLight.Visible = _flashlightOn && HasFireablePrimary;
+        _weaponRoot.Visible = HasActiveFirearm;
+        _knifeRoot.Visible = _knifeEquipped;
+        _weaponLight.Visible = _flashlightOn && HasActiveFirearm;
         if (IsInstanceValid(_camera))
         {
             _camera.Current = true;
@@ -44,6 +43,14 @@ public partial class TacticalPlayer
         DisarmFireInput();
         RestoreMovementInput();
         Hud?.HideDownedState();
+        PushHudStats();
+    }
+
+    public void ApplyDemolitionRoundLoadout(DeploymentLoadout loadout, int grenadeCount)
+    {
+        Backpack.Clear();
+        ApplyDeploymentLoadout(loadout, includeEmergencySupplies: false);
+        Grenades = Mathf.Clamp(grenadeCount, 0, DemolitionBuyCatalog.MaximumGrenades);
         PushHudStats();
     }
 }

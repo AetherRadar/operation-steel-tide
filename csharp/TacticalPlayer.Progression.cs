@@ -2,7 +2,7 @@ namespace OperationSteelTide;
 
 public partial class TacticalPlayer
 {
-    public void ApplyDeploymentLoadout(DeploymentLoadout loadout)
+    public void ApplyDeploymentLoadout(DeploymentLoadout loadout, bool includeEmergencySupplies = true)
     {
         EquippedHelmet = EquipmentCatalog.Create(loadout.HelmetId);
         EquippedBodyArmor = EquipmentCatalog.Create(loadout.BodyArmorId);
@@ -12,7 +12,14 @@ public partial class TacticalPlayer
 
         if (loadout.Weapon is null)
         {
-            ApplyColdStartUnarmed();
+            ApplyColdStartUnarmed(includeEmergencySupplies);
+            InstallSecondaryWeapon(loadout.Sidearm, LootGrade.Uncommon);
+            if (loadout.Sidearm is not null)
+            {
+                var sidearmCaliber = WeaponCatalog.Weapon(loadout.Sidearm.Platform).Caliber;
+                SetAmmoReserve(sidearmCaliber, LootGrade.Common, loadout.SidearmReserveAmmo);
+                ActivateWeaponSlot(PlayerWeaponSlot.Secondary, false, true, false);
+            }
             Hud?.SetAmmoTier(CurrentAmmoGrade);
             Hud?.SetBackpackValuePlayer(this);
             return;

@@ -450,7 +450,7 @@ public partial class TacticalPlayer
     {
         if (IsInstanceValid(_weaponRoot))
         {
-            _weaponRoot.Visible = !active && !_knifeEquipped && HasFireablePrimary;
+            _weaponRoot.Visible = !active && HasActiveFirearm;
         }
         if (IsInstanceValid(_knifeRoot))
         {

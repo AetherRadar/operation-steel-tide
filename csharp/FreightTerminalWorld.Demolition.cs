@@ -15,8 +15,6 @@ public partial class FreightTerminalWorld
     private const float DemolitionCombatEngageRange = 24.0f;
     private const float DemolitionCombatResumeRange = 30.0f;
     private const float DemolitionChannelGuardRange = 12.0f;
-    private const int DemolitionFullBuyCost = 4400;
-    private const int DemolitionEcoBuyCost = 2400;
     private const int DemolitionSquadSize = 5;
 
     private readonly List<Node3D> _demolitionSites = new();
@@ -37,6 +35,10 @@ public partial class FreightTerminalWorld
     private Vector3[] _demolitionCarrierRoute = System.Array.Empty<Vector3>();
     private int _demolitionCarrierRouteIndex;
     private int _demolitionEnemyTargetSite;
+    private SquadMate? _demolitionSquadObjectiveMate;
+    private int _demolitionSquadObjectiveSite = -1;
+    private float _demolitionSquadPlantProgress;
+    private float _demolitionSquadDefuseProgress;
     private bool _demolitionMode;
     private bool _demolitionRoundActive;
     private bool _demolitionDevicePlanted;
@@ -51,9 +53,6 @@ public partial class FreightTerminalWorld
     private float _demolitionStrategyRemaining;
     private OperatorRole _demolitionPlayerRole = OperatorRole.Assault;
     private string _demolitionSelectedMapId = DemolitionMapCatalog.TideforgeId;
-    private DeploymentLoadout _demolitionPlayerLoadout = BuildDemolitionLoadout();
-    private DeploymentLoadout _demolitionEcoLoadout = BuildDemolitionLoadout(
-        WeaponPlatform.MP5A5, 0, WeaponPlatform.P226);
     private DemolitionStrategyPlan? _demolitionAttackerPlan;
     private DemolitionStrategyPlan? _demolitionDefenderPlan;
 
@@ -111,18 +110,6 @@ public partial class FreightTerminalWorld
         }
 
         _demolitionPlayerRole = (OperatorRole)role;
-        var primary = (WeaponPlatform)primaryPlatform;
-        if (primary is not (WeaponPlatform.M4A1 or WeaponPlatform.AK74 or WeaponPlatform.MP5A5 or WeaponPlatform.ScarL))
-        {
-            primary = WeaponPlatform.M4A1;
-        }
-        var sidearm = (WeaponPlatform)sidearmPlatform;
-        if (sidearm is not (WeaponPlatform.P226 or WeaponPlatform.M1911))
-        {
-            sidearm = WeaponPlatform.P226;
-        }
-        _demolitionPlayerLoadout = BuildDemolitionLoadout(primary, Mathf.Clamp(buildTier, 0, 2), sidearm);
-        _demolitionEcoLoadout = BuildDemolitionLoadout(WeaponPlatform.MP5A5, 0, sidearm);
         _demolitionSelectedMapId = DemolitionMapCatalog.Resolve(mapId).Id;
         PrepareDemolitionBattlefield();
         DeploySquad((OperatorRole)role, SquadSessionMode.Local, "127.0.0.1");
@@ -135,33 +122,6 @@ public partial class FreightTerminalWorld
             "demolition_deployed",
             "DEMOLITION 5V5  //  FIRST TO 13  //  SIDES SWAP AFTER ROUND 12",
             new Color(1.0f, 0.58f, 0.2f));
-    }
-
-    private static DeploymentLoadout BuildDemolitionLoadout(
-        WeaponPlatform primary = WeaponPlatform.M4A1,
-        int buildTier = 1,
-        WeaponPlatform sidearm = WeaponPlatform.P226)
-    {
-        var weaponId = primary switch
-        {
-            WeaponPlatform.AK74 => "ak74",
-            WeaponPlatform.MP5A5 => "mp5a5",
-            WeaponPlatform.ScarL => "scarl",
-            _ => "m4a1"
-        };
-        var reserve = WeaponCatalog.Weapon(primary).Caliber == AmmoCaliber.Smg ? 150 : 120;
-        return new DeploymentLoadout(
-            new DeploymentLoadoutSelection(weaponId, "standard", LootGrade.Common, reserve),
-            WeaponCatalog.Build(primary, buildTier),
-            "helmet_patrol",
-            "armor_carrier",
-            "pack_assault",
-            LootGrade.Common,
-            reserve,
-            0,
-            buildTier,
-            WeaponCatalog.Build(sidearm, 0),
-            60);
     }
 
     private void PrepareDemolitionBattlefield()
@@ -185,6 +145,8 @@ public partial class FreightTerminalWorld
         _demolitionDefuser = null;
         _demolitionCarrier = null;
         _demolitionIntermissionRemaining = 0.0f;
+        _demolitionBuyPhaseActive = false;
+        _demolitionBuyRemaining = 0.0f;
         _demolitionStrategyRemaining = 0.0f;
         _demolitionAttackerPlan = null;
         _demolitionDefenderPlan = null;
@@ -248,12 +210,11 @@ public partial class FreightTerminalWorld
         var count = Mathf.Min(DemolitionSquadSize, spawns.Count);
         for (var index = 0; index < count; index++)
         {
-            var weapon = BuildDemolitionOpponentWeapon(index);
             var opponent = SpawnEnemy(
                 spawns[index],
                 alerted: false,
                 teamId: 0,
-                initialWeapon: weapon,
+                initialWeapon: _demolitionOpponentRoundWeapon,
                 sentryMode: opponentSide == DemolitionTeam.Defenders,
                 detectionRange: 52.0f);
             opponent.Name = $"DemolitionOpponent_{index + 1:00}";
@@ -262,18 +223,6 @@ public partial class FreightTerminalWorld
         }
         _enemiesRemaining = _demolitionOpponents.Count;
         _hud.SetEnemyCount(_enemiesRemaining);
-    }
-
-    private WeaponBuild BuildDemolitionOpponentWeapon(int index)
-    {
-        return _demolitionOpponentEconomy.Funds >= DemolitionFullBuyCost
-            ? (index % 3) switch
-            {
-                0 => WeaponCatalog.Build(WeaponPlatform.M4A1, 1),
-                1 => WeaponCatalog.Build(WeaponPlatform.AK74, 1),
-                _ => WeaponCatalog.Build(WeaponPlatform.ScarL, 1)
-            }
-            : WeaponCatalog.Build(WeaponPlatform.MP5A5, _demolitionOpponentEconomy.Funds >= DemolitionEcoBuyCost ? 1 : 0);
     }
 
     private void ClearDemolitionOpponents()
@@ -308,8 +257,9 @@ public partial class FreightTerminalWorld
 
         ClearDemolitionDevice();
         ResetDemolitionSquad();
+        ResolveDemolitionOpponentBuy();
         SpawnDemolitionOpponents();
-        _demolitionRoundActive = true;
+        _demolitionRoundActive = false;
         _demolitionDevicePlanted = false;
         _demolitionActiveSite = -1;
         _demolitionPlantProgress = 0.0f;
@@ -323,10 +273,13 @@ public partial class FreightTerminalWorld
         _demolitionEnemyTargetSite = _demolitionMatch.CompletedRounds % 2;
         _demolitionSquadAssignmentTargets.Clear();
         _demolitionCombatBreakoffs.Clear();
+        _demolitionSquadObjectiveMate = null;
+        _demolitionSquadObjectiveSite = -1;
+        _demolitionSquadPlantProgress = 0.0f;
+        _demolitionSquadDefuseProgress = 0.0f;
         _missionPhase = "DEMOLITION";
         RefreshDemolitionStrategies(true);
-        UpdateDemolitionRoundHud();
-        Input.MouseMode = Input.MouseModeEnum.Captured;
+        BeginDemolitionBuyPhase();
     }
 
     private void ResetDemolitionSquad()
@@ -356,8 +309,9 @@ public partial class FreightTerminalWorld
         _allDownTimer = 0.0f;
         ClearLeaderReviveAi();
         RestoreLocalPlayerView();
-        var loadout = ResolveDemolitionRoundLoadout(out var roundSpend);
-        _player.ResetForDemolitionRound(spawns[0], _demolitionPlayerRole, loadout);
+        var emptyQuote = DemolitionBuyCatalog.Quote(DemolitionPurchaseSelection.Empty, _demolitionPlayerEconomy.Funds);
+        var loadout = DemolitionBuyCatalog.BuildLoadout(emptyQuote);
+        _player.ResetForDemolitionRound(spawns[0], _demolitionPlayerRole, loadout, 0);
         _player.LookAt(layout.Midpoint, Vector3.Up);
         EnsureAiSquadFill();
         foreach (var mate in _squadMates.Where(IsInstanceValid))
@@ -369,27 +323,6 @@ public partial class FreightTerminalWorld
         ResetSquadLeaderTrail(_player.GlobalPosition);
         _hud.HideDownedState();
         RefreshSquadHud();
-        if (roundSpend > 0)
-        {
-            _hud.ShowRadioMessage(
-                GameLocalization.Format(
-                    "demolition_purchase",
-                    _languageSetting,
-                    "LOADOUT PURCHASED  //  -${0}",
-                    roundSpend),
-                new Color(0.55f, 0.86f, 0.72f));
-        }
-    }
-
-    private DeploymentLoadout ResolveDemolitionRoundLoadout(out int roundSpend)
-    {
-        if (_demolitionPlayerEconomy.Funds >= DemolitionFullBuyCost)
-        {
-            roundSpend = _demolitionPlayerEconomy.Spend(DemolitionFullBuyCost);
-            return _demolitionPlayerLoadout;
-        }
-        roundSpend = _demolitionPlayerEconomy.Spend(DemolitionEcoBuyCost);
-        return _demolitionEcoLoadout;
     }
 
     private void ClearDemolitionDevice()
@@ -623,6 +556,11 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        if (_demolitionBuyPhaseActive)
+        {
+            UpdateDemolitionBuyPhase(delta);
+            return;
+        }
         if (!_demolitionRoundActive)
         {
             UpdateDemolitionIntermission(delta);
@@ -647,6 +585,7 @@ public partial class FreightTerminalWorld
             RefreshDemolitionStrategies(false);
         }
         UpdateDemolitionSquadPosts();
+        UpdateDemolitionSquadObjectiveRelay(delta);
         if (!_demolitionDevicePlanted)
         {
             if (playerSide == DemolitionTeam.Defenders

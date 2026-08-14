@@ -56,8 +56,10 @@ public partial class FreightTerminalWorld
             || value == "--validate-demolition"
             || value == "--validate-demolition-arena"
             || value == "--validate-demolition-briefing"
+            || value == "--validate-demolition-buy"
             || value == "--capture-operations-office"
             || value == "--capture-demolition-briefing"
+            || value == "--capture-demolition-buy"
             || value == "--capture-demolition-arena");
         var diagnostic = Array.Exists(args, value =>
             value.StartsWith("--capture", StringComparison.Ordinal)

@@ -100,6 +100,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public AmmoCaliber CurrentAmmoCaliber => WeaponCatalog.Weapon(EquippedWeapon.Platform).Caliber;
     /// <summary>False at cold-start extraction until a looted primary is equipped.</summary>
     public bool HasFireablePrimary { get; private set; } = true;
+    public bool HasActiveFirearm
+        => !_knifeEquipped
+        && (_activeWeaponSlot == PlayerWeaponSlot.Primary
+            ? HasFireablePrimary && _primaryWeaponSlot is not null
+            : _activeWeaponSlot == PlayerWeaponSlot.Secondary && _secondaryWeaponSlot is not null);
     public bool UiLocked { get; set; }
     public bool SprintRecoveryRequired => _sprintRecoveryRequired || _sprintRecoveryDelay > 0.0f;
     public bool IsInVehicle => _vehicle is not null && GodotObject.IsInstanceValid(_vehicle);
@@ -110,13 +115,18 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public CombatHUD? Hud { get; set; }
 
     /// <summary>Extraction cold-start: knife only, no magazine — must loot a primary.</summary>
-    public void ApplyColdStartUnarmed()
+    public void ApplyColdStartUnarmed() => ApplyColdStartUnarmed(true);
+
+    private void ApplyColdStartUnarmed(bool includeEmergencySupplies)
     {
         ClearWeaponSlotsForColdStart();
         Ammo = 0;
         ResetAmmoReserves();
-        EnsureEmergencyMedicalLoadout();
-        EnsureEmergencyArmorLoadout();
+        if (includeEmergencySupplies)
+        {
+            EnsureEmergencyMedicalLoadout();
+            EnsureEmergencyArmorLoadout();
+        }
         SwitchWeapon(true);
         if (IsInstanceValid(_weaponRoot))
         {
@@ -1920,7 +1930,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             return;
         }
-        if (!HasFireablePrimary || _knifeEquipped)
+        if (!HasActiveFirearm)
         {
             return;
         }

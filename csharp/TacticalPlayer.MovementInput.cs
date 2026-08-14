@@ -397,7 +397,7 @@ public partial class TacticalPlayer
 
         _opticReticle.Visible = false;
         _weaponLight.Visible = false;
-        _weaponRoot.Visible = !_knifeEquipped && HasFireablePrimary;
+        _weaponRoot.Visible = HasActiveFirearm;
         _knifeRoot.Visible = _knifeEquipped;
         if (_weaponRoot.Visible)
         {

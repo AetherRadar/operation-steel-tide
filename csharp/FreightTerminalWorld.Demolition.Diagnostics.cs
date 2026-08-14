@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 
@@ -21,15 +22,28 @@ public partial class FreightTerminalWorld
         _hud.SetLanguage("en");
         var englishReady = _hud.DemolitionBriefingLanguageReady;
         _hud.PressDemolitionRoleForDiagnostics(OperatorRole.Medic);
-        _hud.SelectDemolitionLoadoutForDiagnostics(WeaponPlatform.ScarL, 2, WeaponPlatform.M1911);
         var mapPoolReady = _hud.DemolitionMapOptionCount == DemolitionMapCatalog.PoolSize
+            && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.TideforgeId
+            && _hud.BrowsedDemolitionMapIndex == 0
+            && _hud.BrowsedDemolitionMapAvailable
+            && _hud.DemolitionBriefingDeployEnabled;
+        _hud.PressNextDemolitionMapForDiagnostics();
+        var lockedCarousel = _hud.BrowsedDemolitionMapId == "harbor_locks"
+            && _hud.BrowsedDemolitionMapIndex == 1
+            && !_hud.BrowsedDemolitionMapAvailable
+            && !_hud.DemolitionBriefingDeployEnabled
             && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.TideforgeId;
+        _hud.PressPreviousDemolitionMapForDiagnostics();
+        var carouselReturned = _hud.BrowsedDemolitionMapId == DemolitionMapCatalog.TideforgeId
+            && _hud.BrowsedDemolitionMapAvailable
+            && _hud.DemolitionBriefingDeployEnabled;
         var lockedMapRejected = _hud.PressDemolitionMapForDiagnostics("harbor_locks") == false
             && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.TideforgeId;
+        _hud.PressDemolitionMapForDiagnostics(DemolitionMapCatalog.TideforgeId);
         var synchronizedWithoutDeployment = _hud.SelectedDemolitionRole == OperatorRole.Medic
-            && _hud.SelectedDemolitionPrimary == WeaponPlatform.ScarL
-            && _hud.SelectedDemolitionBuildTier == 2
-            && _hud.SelectedDemolitionSidearm == WeaponPlatform.M1911
+            && _hud.SelectedDemolitionPrimary == WeaponPlatform.M4A1
+            && _hud.SelectedDemolitionBuildTier == 1
+            && _hud.SelectedDemolitionSidearm == WeaponPlatform.P226
             && !_squadDeployed
             && !_demolitionMode;
 
@@ -59,8 +73,8 @@ public partial class FreightTerminalWorld
             };
             probe.SetLanguage("zh");
             probe.PressRoleForDiagnostics(OperatorRole.Recon);
-            probe.SelectLoadoutForDiagnostics(WeaponPlatform.AK74, 2, WeaponPlatform.M1911);
-            probe.PressMapForDiagnostics(DemolitionMapCatalog.TideforgeId);
+            probe.PressNextMapForDiagnostics();
+            probe.PressPreviousMapForDiagnostics();
             probe.PressBackForDiagnostics();
             probe.PressDeployForDiagnostics();
         }
@@ -74,9 +88,9 @@ public partial class FreightTerminalWorld
             && backRequests == 1
             && deployRequests == 1
             && requestedRole == (int)OperatorRole.Recon
-            && requestedPrimary == (int)WeaponPlatform.AK74
-            && requestedBuild == 2
-            && requestedSidearm == (int)WeaponPlatform.M1911
+            && requestedPrimary == (int)WeaponPlatform.M4A1
+            && requestedBuild == 1
+            && requestedSidearm == (int)WeaponPlatform.P226
             && requestedMap == DemolitionMapCatalog.TideforgeId;
         probe?.QueueFree();
         await WaitFrames(3);
@@ -87,9 +101,10 @@ public partial class FreightTerminalWorld
             && !_squadDeployed
             && !_demolitionMode;
         _hud.SetLanguage(originalLanguage);
-        var valid = sceneReady && chineseReady && englishReady && mapPoolReady && lockedMapRejected
+        var valid = sceneReady && chineseReady && englishReady && mapPoolReady && lockedCarousel
+            && carouselReturned && lockedMapRejected
             && synchronizedWithoutDeployment && probeReady && backReady;
-        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} map_pool={mapPoolReady} locked_rejected={lockedMapRejected} sync={synchronizedWithoutDeployment} probe={probeReady} back={backReady}");
+        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} map_pool={mapPoolReady} carousel_locked={lockedCarousel} carousel_return={carouselReturned} locked_rejected={lockedMapRejected} sync={synchronizedWithoutDeployment} probe={probeReady} back={backReady}");
         GD.Print($"DEMOLITION_BRIEFING_PASS valid={valid}");
         GetTree().Paused = false;
         await WaitFrames(180);
@@ -260,48 +275,62 @@ public partial class FreightTerminalWorld
         _hud.PressDemolitionModeForDiagnostics();
         var entryButton = _hud.IsDemolitionBriefingVisible && !_hud.IsOperationsOfficeVisible;
         _hud.PressDemolitionRoleForDiagnostics(OperatorRole.Medic);
-        _hud.SelectDemolitionLoadoutForDiagnostics(WeaponPlatform.AK74, 2, WeaponPlatform.M1911);
         _hud.PressDemolitionMapForDiagnostics(DemolitionMapCatalog.TideforgeId);
         var briefingSelection = _hud.SelectedDemolitionRole == OperatorRole.Medic
-            && _hud.SelectedDemolitionPrimary == WeaponPlatform.AK74
-            && _hud.SelectedDemolitionBuildTier == 2
-            && _hud.SelectedDemolitionSidearm == WeaponPlatform.M1911
             && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.TideforgeId;
         _hud.PressDemolitionDeployForDiagnostics();
         await WaitFrames(5);
         var layout = DemolitionLayout();
-        // The $800 opening wallet cannot cover the $4400 full buy, so round 1 deploys the
-        // eco kit: MP5A5 tier 0 with the sidearm chosen in the briefing.
-        var ecoKit = _player.Role == OperatorRole.Medic
-            && _player.HasFireablePrimary
-            && _player.EquippedWeapon.Platform == WeaponPlatform.MP5A5
+        var buyTimerPrecedesRound = _demolitionMode
+            && _demolitionBuyPhaseActive
+            && !_demolitionRoundActive
+            && _hud.IsDemolitionBuyVisible
+            && DemolitionPlayerFunds == DemolitionEconomy.StartingFunds
+            && Mathf.IsEqualApprox(_demolitionRemaining, DemolitionRoundDuration)
+            && _player.KnifeEquipped
+            && !_player.HasFireablePrimary
+            && !_player.HasSecondaryWeapon
+            && _player.Grenades == 0
+            && Mathf.IsZeroApprox(_player.Armor)
+            && _player.Backpack.Count == 0
+            && _player.ProcessMode == ProcessModeEnum.Disabled
+            && _demolitionOpponents.All(opponent => opponent.ProcessMode == ProcessModeEnum.Disabled)
+            && !_hud.IsDemolitionPrimaryOfferEnabled(DemolitionBuyCatalog.Mp5Id)
+            && !_hud.IsDemolitionPrimaryOfferEnabled(DemolitionBuyCatalog.M4A1Id)
+            && _hud.IsDemolitionSidearmOfferEnabled(DemolitionBuyCatalog.P226Id);
+        var opponentOpeningPistols = _demolitionOpponents.All(opponent =>
+            opponent.CarriedWeapon.Platform == WeaponPlatform.P226);
+        _hud.SelectDemolitionBuySidearmForDiagnostics(DemolitionBuyCatalog.P226Id);
+        var openingQuote = _hud.DemolitionBuyQuote;
+        _hud.PressDemolitionBuyConfirmForDiagnostics();
+        await WaitFrames(3);
+        var pistolKit = _player.Role == OperatorRole.Medic
+            && !_player.HasFireablePrimary
             && _player.HasSecondaryWeapon
-            && _player.SecondaryWeaponPlatform == WeaponPlatform.M1911
+            && _player.SecondaryWeaponPlatform == WeaponPlatform.P226
+            && _player.ActiveWeaponSlot == PlayerWeaponSlot.Secondary
+            && _player.HasActiveFirearm
             && _player.CurrentAmmoGrade == LootGrade.Common
-            && _player.ReserveAmmo == 150;
-        var ecoBuild = _player.EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Barrel, out var barrel)
-            && barrel == "barrel_cqb"
-            && _player.EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Optic, out var optic)
-            && optic == "optic_micro"
-            && !_player.EquippedWeapon.Attachments.ContainsKey(AttachmentSlot.Muzzle)
-            && _player.AmmoReserveFor(AmmoCaliber.Pistol) == 60;
+            && _player.AmmoReserveFor(AmmoCaliber.Pistol) == 45
+            && _player.Grenades == 0
+            && Mathf.IsZeroApprox(_player.Armor)
+            && _player.Backpack.Count == 1
+            && _player.Backpack.All(item => item.Kind == LootItemKind.Ammunition
+                && item.AmmoCaliber == AmmoCaliber.Pistol
+                && item.Quantity == 45);
+        GD.Print($"DEMOLITION_PISTOL_CHECK valid={pistolKit} role={_player.Role} primary={_player.HasFireablePrimary} secondary={_player.HasSecondaryWeapon} platform={_player.SecondaryWeaponPlatform} active={_player.ActiveWeaponSlot} firearm={_player.HasActiveFirearm} grade={_player.CurrentAmmoGrade} reserve={_player.AmmoReserveFor(AmmoCaliber.Pistol)} grenades={_player.Grenades} armor={_player.Armor:0.0} backpack={_player.Backpack.Count}");
         var slotBindings = InputMap.HasAction("weapon_primary")
             && InputMap.HasAction("weapon_secondary")
             && InputMap.HasAction("weapon_melee")
             && InputMap.ActionGetEvents("weapon_secondary").Count > 0;
         _player.SetMagazineAmmoForDiagnostics(11);
-        _player.SelectWeapon((int)PlayerWeaponSlot.Secondary);
-        var sidearmSelected = _player.ActiveWeaponSlot == PlayerWeaponSlot.Secondary
-            && _player.EquippedWeapon.Platform == WeaponPlatform.M1911;
-        _player.SetMagazineAmmoForDiagnostics(4);
-        _player.SelectWeapon((int)PlayerWeaponSlot.Primary);
-        var primaryMagazineSaved = _player.ActiveWeaponSlot == PlayerWeaponSlot.Primary
-            && _player.EquippedWeapon.Platform == WeaponPlatform.MP5A5
-            && _player.Ammo == 11;
-        _player.SelectWeapon((int)PlayerWeaponSlot.Secondary);
-        var secondaryMagazineSaved = _player.Ammo == 4;
-        _player.SelectWeapon((int)PlayerWeaponSlot.Primary);
-        var weaponSlots = sidearmSelected && primaryMagazineSaved && secondaryMagazineSaved;
+        var sidearmFires = _player.FireForDiagnostics() && _player.Ammo == 10;
+        _player.SelectWeapon((int)PlayerWeaponSlot.Melee);
+        _player.CycleWeapon();
+        var weaponSlots = sidearmFires
+            && _player.ActiveWeaponSlot == PlayerWeaponSlot.Secondary
+            && _player.EquippedWeapon.Platform == WeaponPlatform.P226
+            && _player.Ammo == 10;
         var isolatedEconomy = _operatorProfileStore.Profile.Credits == creditsBefore
             && _operatorProfileStore.Profile.DeploymentCount == deploymentsBefore
             && !_deploymentPurchaseCommitted;
@@ -320,6 +349,7 @@ public partial class FreightTerminalWorld
             && !_extractionMarker.Visible
             && _hud.IsGameplayHudVisible
             && !_hud.IsDemolitionBriefingVisible
+            && !_hud.IsDemolitionBuyVisible
             && !GetTree().Paused;
         var openingStrategy = _demolitionAttackerPlan is not null
             && _demolitionAttackerPlan.Assignments.Count == 5
@@ -356,8 +386,11 @@ public partial class FreightTerminalWorld
         var directorIsolation = _missionPhase == "DEMOLITION" && !_extractionMarker.Visible;
 
         var fundsAfterOpeningBuy = DemolitionPlayerFunds;
-        // The $2400 eco price clamps to the $800 opening wallet, leaving the player broke.
-        var playerBoughtEcoKit = ecoKit && ecoBuild && fundsAfterOpeningBuy == 0;
+        var playerBoughtPistol = pistolKit
+            && openingQuote.Affordable
+            && openingQuote.TotalCost == 500
+            && openingQuote.RemainingFunds == 300
+            && fundsAfterOpeningBuy == 300;
 
         _player.GlobalPosition = layout.SitePositions[0] + new Vector3(0, 0.1f, 0);
         _player.Velocity = Vector3.Zero;
@@ -408,10 +441,13 @@ public partial class FreightTerminalWorld
             && DemolitionRoundNumber == 2
             && playerFundsAfterWin == System.Math.Min(DemolitionEconomy.MaximumFunds,
                 fundsAfterOpeningBuy + DemolitionEconomy.WinReward)
-            && opponentFundsAfterLoss == DemolitionEconomy.StartingFunds + DemolitionEconomy.LossBaseReward;
+            && opponentFundsAfterLoss == DemolitionEconomy.StartingFunds - 500
+                + DemolitionEconomy.LossBaseReward;
         UpdateDemolitionIntermission(DemolitionIntermissionDuration + 0.1f);
         await WaitFrames(3);
-        var roundReset = _demolitionRoundActive
+        var roundReset = _demolitionBuyPhaseActive
+            && !_demolitionRoundActive
+            && _hud.IsDemolitionBuyVisible
             && !_demolitionDevicePlanted
             && DemolitionRoundNumber == 2
             && DemolitionOpponentCount == 5
@@ -421,11 +457,17 @@ public partial class FreightTerminalWorld
             && _squadMates.Where(IsInstanceValid).All(mate => !mate.IsDowned
                 && !mate.IsBodyBag
                 && Mathf.IsEqualApprox(mate.Health, mate.MaxHealth))
-            && _player.ActiveWeaponSlot == PlayerWeaponSlot.Primary
-            && _player.EquippedWeapon.Platform == WeaponPlatform.MP5A5
-            && _player.SecondaryWeaponPlatform == WeaponPlatform.M1911
-            && _player.PrimaryMagazineAmmo == _player.EquippedWeapon.Stats().MagazineSize;
+            && _player.KnifeEquipped
+            && !_player.HasFireablePrimary
+            && !_player.HasSecondaryWeapon
+            && DemolitionPlayerFunds == playerFundsAfterWin;
 
+        OnDemolitionPurchaseRequested(string.Empty, string.Empty, false, 0);
+        await WaitFrames(2);
+        var roundTwoLive = _demolitionRoundActive
+            && !_demolitionBuyPhaseActive
+            && !_hud.IsDemolitionBuyVisible
+            && _player.KnifeEquipped;
         var tacticalAi = ValidateDemolitionTacticalAi(layout);
 
         // Rounds 2-12 are still the attacking half under MR12: run them out on the clock
@@ -439,16 +481,20 @@ public partial class FreightTerminalWorld
                 break;
             }
             UpdateDemolitionIntermission(DemolitionIntermissionDuration + 0.1f);
+            if (_demolitionBuyPhaseActive)
+            {
+                OnDemolitionPurchaseRequested(string.Empty, string.Empty, false, 0);
+            }
         }
         var defenseRound = await ValidateDemolitionDefenseRound(layout);
         var matchRules = ValidateDemolitionMatchRules();
         var economyRules = ValidateDemolitionEconomyRules();
-        var valid = entryButton && briefingSelection && ecoKit && ecoBuild && slotBindings
-            && weaponSlots && isolatedEconomy && deployed && openingStrategy && sitesClear
+        var valid = entryButton && briefingSelection && buyTimerPrecedesRound && opponentOpeningPistols
+            && pistolKit && slotBindings && weaponSlots && isolatedEconomy && deployed && openingStrategy && sitesClear
             && minimapReady && hostileAircraftIsolated && reinforcementsIsolated
-            && directorIsolation && playerBoughtEcoKit && planted && retakeStrategy && defuseAi
-            && roundRecorded && roundReset && tacticalAi && defenseRound && matchRules && economyRules;
-        GD.Print($"DEMOLITION_CHECK valid={valid} entry_button={entryButton} briefing={briefingSelection} deployed={deployed} arena={IsDemolitionArenaActive} gameplay={_hud.IsGameplayHudVisible} squad={DemolitionSquadSizeTotal} opponents={DemolitionOpponentCount} eco_kit={ecoKit} eco_build={ecoBuild} slots={weaponSlots} bindings={slotBindings} economy={isolatedEconomy} opening_strategy={openingStrategy} retake_strategy={retakeStrategy} assignments={DemolitionStrategyAssignmentCount} minimap={minimapReady} aircraft_isolated={hostileAircraftIsolated} reinforcements_isolated={reinforcementsIsolated} director_isolation={directorIsolation} sites={DemolitionSiteCount} sites_clear={sitesClear} funds_after_buy={fundsAfterOpeningBuy} eco_buy={playerBoughtEcoKit} planted={planted} plant_steps={plantSteps} defuse_ai={defuseAi} defuse_distance={initialDefuserDistance:0.00}->{finalDefuserDistance:0.00} defuse_progress={_demolitionDefuseProgress:0.00} defuse_frames={defuseFrames}/600 round_recorded={roundRecorded} round_reset={roundReset} tactical_ai={tacticalAi} defense_round={defenseRound} match_rules={matchRules} economy_rules={economyRules} score={DemolitionPlayerScore}:{DemolitionOpponentScore} round={DemolitionRoundNumber} result={_hud.IsMissionResultVisible}");
+            && directorIsolation && playerBoughtPistol && planted && retakeStrategy && defuseAi
+            && roundRecorded && roundReset && roundTwoLive && tacticalAi && defenseRound && matchRules && economyRules;
+        GD.Print($"DEMOLITION_CHECK valid={valid} entry_button={entryButton} briefing={briefingSelection} buy_phase={buyTimerPrecedesRound} deployed={deployed} arena={IsDemolitionArenaActive} gameplay={_hud.IsGameplayHudVisible} squad={DemolitionSquadSizeTotal} opponents={DemolitionOpponentCount} opponent_pistols={opponentOpeningPistols} pistol_kit={pistolKit} slots={weaponSlots} bindings={slotBindings} economy={isolatedEconomy} opening_strategy={openingStrategy} retake_strategy={retakeStrategy} assignments={DemolitionStrategyAssignmentCount} minimap={minimapReady} aircraft_isolated={hostileAircraftIsolated} reinforcements_isolated={reinforcementsIsolated} director_isolation={directorIsolation} sites={DemolitionSiteCount} sites_clear={sitesClear} funds_after_buy={fundsAfterOpeningBuy} pistol_buy={playerBoughtPistol} planted={planted} plant_steps={plantSteps} defuse_ai={defuseAi} defuse_distance={initialDefuserDistance:0.00}->{finalDefuserDistance:0.00} defuse_progress={_demolitionDefuseProgress:0.00} defuse_frames={defuseFrames}/600 round_recorded={roundRecorded} round_reset={roundReset} round_two_live={roundTwoLive} tactical_ai={tacticalAi} defense_round={defenseRound} match_rules={matchRules} economy_rules={economyRules} score={DemolitionPlayerScore}:{DemolitionOpponentScore} round={DemolitionRoundNumber} result={_hud.IsMissionResultVisible}");
         GD.Print($"DEMOLITION_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -531,9 +577,74 @@ public partial class FreightTerminalWorld
                 postsConverted = postedMate.Order == SquadOrder.Hold;
             }
 
+            // Shared intelligence: the pure planner must avoid a site stacked with known
+            // defenders and the world blackboard must surface alerted opponents.
+            var siteCenters = DemolitionArenaLayout.LocalSiteCenters;
+            var stackedDefenders = new List<DemolitionAgentSnapshot>();
+            var farDefenders = new List<DemolitionAgentSnapshot>();
+            var stackedCenter = siteCenters[0];
+            for (var index = 0; index < 3; index++)
+            {
+                stackedDefenders.Add(new DemolitionAgentSnapshot(
+                    $"D{index}", DemolitionTeam.Defenders, OperatorRole.Assault,
+                    1.0f, 100.0f, true, false, stackedCenter.X + index * 2.0f, stackedCenter.Y));
+            }
+            var farCenter = siteCenters[1];
+            farDefenders.Add(new DemolitionAgentSnapshot(
+                "D9", DemolitionTeam.Defenders, OperatorRole.Assault, 1.0f, 100.0f, true, false,
+                farCenter.X, farCenter.Y));
+            var attackers = new List<DemolitionAgentSnapshot> { new(
+                "A0", DemolitionTeam.Attackers, OperatorRole.Assault, 1.0f, 100.0f, true, false, 0.0f, 40.0f) };
+            var plannerAvoidsStackedSite = _demolitionStrategyPlanner.Plan(
+                DemolitionTeam.Attackers,
+                DemolitionStrategyPhase.Opening,
+                attackers,
+                -1,
+                stackedDefenders).PrimarySiteIndex == 1
+                && _demolitionStrategyPlanner.Plan(
+                    DemolitionTeam.Attackers,
+                    DemolitionStrategyPhase.Opening,
+                    attackers,
+                    -1,
+                    farDefenders).PrimarySiteIndex == 0;
+            probe.SetAlerted(probe.GlobalPosition);
+            var blackboard = CollectDemolitionSightings(
+                DemolitionTeam.Defenders, _demolitionMatch.PlayerSide, layout);
+            var blackboardSeesAlertedOpponents = blackboard.Count >= 1;
+
+            // Objective relay: with the player downed while attacking, the closest able
+            // mate inherits the bomb and is ordered toward the nearest site.
+            var relay = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && !mate.IsDowned);
+            var relayTakesOver = false;
+            var savedPlayerDowned = _localPlayerDowned;
+            var savedRelayMate = _demolitionSquadObjectiveMate;
+            try
+            {
+                if (relay is not null)
+                {
+                    _localPlayerDowned = true;
+                    _demolitionSquadObjectiveMate = null;
+                    var nearestSite = layout.SitePositions[NearestDemolitionSiteTo(_player.GlobalPosition, layout)];
+                    relay.GlobalPosition = nearestSite + new Vector3(0.0f, 0.2f, 8.0f);
+                    UpdateDemolitionSquadObjectiveRelay(0.05f);
+                    relayTakesOver = ReferenceEquals(_demolitionSquadObjectiveMate, relay)
+                        && relay.Order == SquadOrder.Move;
+                }
+            }
+            finally
+            {
+                _localPlayerDowned = savedPlayerDowned;
+                _demolitionSquadObjectiveMate = savedRelayMate;
+                if (relay is not null)
+                {
+                    relay.SetOrder(SquadOrder.Follow, relay.GlobalPosition);
+                }
+            }
+
             var valid = yieldedToCombat && resumedObjective && channelHoldsUnderFire
-                && switchedUnderPressure && detourRoutesAroundWall && postsConverted;
-            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} channel_guard={channelHoldsUnderFire} time_pressure={switchedUnderPressure} detour_points={detour.Length} posts={postsConverted}");
+                && switchedUnderPressure && detourRoutesAroundWall && postsConverted
+                && plannerAvoidsStackedSite && blackboardSeesAlertedOpponents && relayTakesOver;
+            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} channel_guard={channelHoldsUnderFire} time_pressure={switchedUnderPressure} detour_points={detour.Length} posts={postsConverted} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
             return valid;
         }
         finally

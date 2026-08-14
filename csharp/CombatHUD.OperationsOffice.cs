@@ -78,6 +78,16 @@ public partial class CombatHUD
             : DemolitionMapCatalog.TideforgeId;
     public int DemolitionMapOptionCount
         => IsInstanceValid(_demolitionBriefingView) ? _demolitionBriefingView.MapOptionCount : 0;
+    public string BrowsedDemolitionMapId
+        => IsInstanceValid(_demolitionBriefingView)
+            ? _demolitionBriefingView.BrowsedMapId
+            : DemolitionMapCatalog.TideforgeId;
+    public int BrowsedDemolitionMapIndex
+        => IsInstanceValid(_demolitionBriefingView) ? _demolitionBriefingView.BrowsedMapIndex : 0;
+    public bool BrowsedDemolitionMapAvailable
+        => IsInstanceValid(_demolitionBriefingView) && _demolitionBriefingView.IsBrowsedMapAvailable;
+    public bool DemolitionBriefingDeployEnabled
+        => IsInstanceValid(_demolitionBriefingView) && _demolitionBriefingView.IsDeployEnabled;
     public bool OperationsOfficeLanguageReady
         => IsInstanceValid(_operationsOfficeTitle)
         && _operationsOfficeTitle.Text == Text("operations_office", "OPERATIONS OFFICE")
@@ -157,6 +167,7 @@ public partial class CombatHUD
 
     public void ShowOperationsOffice(string status = "FIELD TEAM STANDING BY  //  HELIPAD CLEAR")
     {
+        HideDemolitionBuy();
         _squadLobby.Visible = false;
         _demolitionBriefingView.Visible = false;
         _operationsOfficeRoot.Visible = true;
@@ -170,6 +181,7 @@ public partial class CombatHUD
 
     public void ShowDemolitionBriefing()
     {
+        HideDemolitionBuy();
         _squadLobby.Visible = false;
         _operationsOfficeRoot.Visible = false;
         _demolitionBriefingView.Visible = true;
@@ -190,6 +202,7 @@ public partial class CombatHUD
         {
             _demolitionBriefingView.Visible = false;
         }
+        HideDemolitionBuy();
     }
 
     public void SetExtractionCinematicVisible(bool active)
@@ -222,6 +235,12 @@ public partial class CombatHUD
 
     public bool PressDemolitionMapForDiagnostics(string mapId)
         => _demolitionBriefingView.SelectMap(mapId);
+
+    public void PressPreviousDemolitionMapForDiagnostics()
+        => _demolitionBriefingView.PressPreviousMapForDiagnostics();
+
+    public void PressNextDemolitionMapForDiagnostics()
+        => _demolitionBriefingView.PressNextMapForDiagnostics();
 
     private static void PressButtonForDiagnostics(Button button)
     {

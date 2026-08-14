@@ -460,6 +460,16 @@ public static class EquipmentCatalog
 {
     private static readonly Dictionary<string, EquipmentDefinition> Definitions = new(StringComparer.OrdinalIgnoreCase)
     {
+        ["helmet_none"] = new EquipmentDefinition
+        {
+            Id = "helmet_none", Name = "No helmet", ChineseName = "No helmet",
+            Slot = EquipmentSlot.Helmet, Protection = 0.0f, MaxDurability = 0.0f
+        },
+        ["armor_none"] = new EquipmentDefinition
+        {
+            Id = "armor_none", Name = "No body armor", ChineseName = "No body armor",
+            Slot = EquipmentSlot.BodyArmor, Protection = 0.0f, MaxDurability = 0.0f
+        },
         ["helmet_patrol"] = new EquipmentDefinition
         {
             Id = "helmet_patrol", Name = "Patrol protection cap", ChineseName = "Patrol protection cap",
