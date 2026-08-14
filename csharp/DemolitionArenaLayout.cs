@@ -29,14 +29,22 @@ public readonly record struct DemolitionArenaMarker(
 /// <summary>
 /// Authored Tideforge arena coordinates and pure balance checks. This data type owns no
 /// scene nodes, so route timing and clearance rules can be validated without a running tree.
+/// Sites sit on opposite diagonal corners of the arena so rotations always cross mid.
 /// </summary>
 public sealed class DemolitionArenaLayout
 {
     public const float MinimumPassageWidth = 2.6f;
     public const float MinimumPassageHeight = 2.45f;
-    public const float MaximumSiteTravelDifference = 0.08f;
+    public const float MaximumSiteTravelDifference = 0.12f;
 
     public static readonly Vector3 WorldOrigin = new(285.0f, 0.0f, -35.0f);
+
+    /// <summary>Site centers in arena-local coordinates, indexed by site number.</summary>
+    public static readonly Vector2[] LocalSiteCenters =
+    {
+        new(-33.0f, 21.0f),
+        new(33.0f, -19.0f)
+    };
 
     public string EnglishName => "TIDEFORGE ARENA";
     public string LocalizationKey => "demolition_arena_name";
@@ -47,6 +55,7 @@ public sealed class DemolitionArenaLayout
     public Rect2 WorldBounds { get; }
     public IReadOnlyList<Vector3> SitePositions { get; }
     public IReadOnlyList<Vector3> DefenderSpawns { get; }
+    public IReadOnlyList<Vector3> AttackSpawns { get; }
     public IReadOnlyList<Vector3> CoverPoints { get; }
     public IReadOnlyList<DemolitionArenaBox> CollisionBoxes { get; }
     public IReadOnlyList<DemolitionArenaBox> DetailBoxes { get; }
@@ -62,55 +71,63 @@ public sealed class DemolitionArenaLayout
     public DemolitionArenaLayout(Vector3? origin = null)
     {
         Origin = origin ?? WorldOrigin;
-        AttackSpawn = World(new Vector3(0.0f, 0.22f, 56.0f));
-        DefenderSpawn = World(new Vector3(0.0f, 0.22f, -56.0f));
-        Midpoint = World(new Vector3(0.0f, 0.12f, 1.0f));
-        WorldBounds = new Rect2(Origin.X - 41.0f, Origin.Z - 62.0f, 82.0f, 124.0f);
+        AttackSpawn = World(new Vector3(0.0f, 0.22f, 54.0f));
+        DefenderSpawn = World(new Vector3(0.0f, 0.22f, -54.0f));
+        Midpoint = World(new Vector3(0.0f, 0.12f, 2.0f));
+        WorldBounds = new Rect2(Origin.X - 40.0f, Origin.Z - 56.0f, 80.0f, 112.0f);
 
         SitePositions = WorldPoints(
-            new(-25.0f, 0.18f, -18.0f),
-            new(25.0f, 0.18f, -18.0f));
+            new(-33.0f, 0.18f, 21.0f),
+            new(33.0f, 0.18f, -19.0f));
+        AttackSpawns = WorldPoints(
+            new(-3.0f, 0.22f, 54.0f),
+            new(3.0f, 0.22f, 54.0f),
+            new(-6.0f, 0.22f, 51.0f),
+            new(6.0f, 0.22f, 51.0f),
+            new(0.0f, 0.22f, 52.0f));
         DefenderSpawns = WorldPoints(
-            new(-25.0f, 0.22f, -51.0f),
-            new(-18.0f, 0.22f, -53.0f),
-            new(-9.0f, 0.22f, -57.0f),
-            new(9.0f, 0.22f, -57.0f),
-            new(18.0f, 0.22f, -53.0f),
-            new(25.0f, 0.22f, -51.0f),
-            new(0.0f, 0.22f, -54.0f));
+            new(-3.0f, 0.22f, -52.0f),
+            new(3.0f, 0.22f, -52.0f),
+            new(-8.0f, 0.22f, -50.0f),
+            new(8.0f, 0.22f, -50.0f),
+            new(0.0f, 0.22f, -51.0f));
         CoverPoints = WorldPoints(
-            new(-31.2f, 0.2f, 11.0f), new(-25.8f, 0.2f, 5.0f),
-            new(-31.0f, 0.2f, -15.0f), new(-19.5f, 0.2f, -19.0f),
-            new(-13.8f, 0.2f, -4.0f), new(-7.0f, 0.2f, 3.5f),
-            new(7.0f, 0.2f, 3.5f), new(13.8f, 0.2f, -4.0f),
-            new(19.5f, 0.2f, -19.0f), new(31.0f, 0.2f, -15.0f),
-            new(25.8f, 0.2f, 5.0f), new(31.2f, 0.2f, 11.0f),
-            new(-11.2f, 0.2f, 21.0f), new(11.2f, 0.2f, 21.0f),
-            new(-6.0f, 0.2f, -20.0f), new(6.0f, 0.2f, -20.0f));
+            new(-29.0f, 0.2f, 27.0f), new(-27.0f, 0.2f, 14.0f),
+            new(-36.0f, 0.2f, 24.0f), new(-30.0f, 0.2f, 8.0f),
+            new(30.0f, 0.2f, -27.0f), new(36.0f, 0.2f, -22.0f),
+            new(26.0f, 0.2f, -16.0f), new(21.0f, 0.2f, -8.0f),
+            new(-8.0f, 0.2f, 4.0f), new(8.0f, 0.2f, 4.0f),
+            new(-8.0f, 0.2f, -7.0f), new(8.0f, 0.2f, -7.0f),
+            new(-15.0f, 0.2f, 31.0f), new(13.0f, 0.2f, 26.0f),
+            new(-22.0f, 0.2f, 6.0f), new(22.0f, 0.2f, 2.0f));
 
         CollisionBoxes = BuildCollisionBoxes();
         DetailBoxes = BuildDetailBoxes();
         Props = BuildProps();
         Markers = BuildMarkers();
         AttackToAPath = WorldPoints(
-            new(0, 0.2f, 56), new(0, 0.2f, 49), new(0, 0.2f, 40),
-            new(0, 0.2f, 31), new(0, 0.2f, 20), new(0, 0.2f, 13),
-            new(-12, 0.2f, 10), new(-17, 0.2f, -2), new(-23, 0.2f, -3),
-            new(-23, 0.2f, -9), new(-25, 0.2f, -18));
+            new(0, 0.2f, 54), new(0, 0.2f, 46),
+            new(-6, 0.2f, 36), new(-11, 0.2f, 26),
+            new(-12, 0.2f, 10), new(-18, 0.2f, 5),
+            new(-23, 0.2f, 10), new(-30, 0.2f, 15),
+            new(-28, 0.2f, 18), new(-33, 0.2f, 21));
         AttackToBPath = WorldPoints(
-            new(0, 0.2f, 56), new(0, 0.2f, 49), new(0, 0.2f, 40),
-            new(0, 0.2f, 31), new(0, 0.2f, 20), new(0, 0.2f, 13),
-            new(12, 0.2f, 10), new(17, 0.2f, -2), new(25, 0.2f, -3),
-            new(25, 0.2f, -9), new(25, 0.2f, -18));
+            new(0, 0.2f, 54), new(0, 0.2f, 46),
+            new(6, 0.2f, 33), new(8, 0.2f, 20),
+            new(15, 0.2f, 10), new(15, 0.2f, 5),
+            new(25, 0.2f, 5), new(25, 0.2f, -4),
+            new(29, 0.2f, -10), new(33, 0.2f, -19));
         AttackMidPath = WorldPoints(
-            new(0, 0.2f, 56), new(0, 0.2f, 49), new(0, 0.2f, 40),
-            new(0, 0.2f, 31), new(0, 0.2f, 20), new(0, 0.2f, 13),
-            new(0, 0.2f, 1));
+            new(0, 0.2f, 54), new(0, 0.2f, 46),
+            new(0, 0.2f, 38), new(0, 0.2f, 12),
+            new(0, 0.2f, 4));
         SiteRotationPath = WorldPoints(
-            new(-25, 0.2f, -18), new(-23, 0.2f, -9), new(-23, 0.2f, -3),
-            new(-17, 0.2f, -2), new(-17, 0.2f, 6), new(-10, 0.2f, 9), new(0, 0.2f, 9),
-            new(10, 0.2f, 9), new(17, 0.2f, 6), new(17, 0.2f, -2),
-            new(25, 0.2f, -3), new(25, 0.2f, -9), new(25, 0.2f, -18));
+            new(-33, 0.2f, 21), new(-28, 0.2f, 21), new(-24, 0.2f, 16),
+            new(-24, 0.2f, 4), new(-16, 0.2f, 3), new(-15, 0.2f, 0),
+            new(-8, 0.2f, -1), new(-8, 0.2f, -5), new(0, 0.2f, -5),
+            new(6, 0.2f, -1), new(14.6f, 0.2f, -1), new(15, 0.2f, 4),
+            new(15, 0.2f, 6), new(21, 0.2f, 6), new(24, 0.2f, -2), new(24, 0.2f, -9),
+            new(30, 0.2f, -11), new(33, 0.2f, -19));
         CriticalPassageWidths = new[] { 3.8f, 4.2f, 4.5f, 5.2f, 6.0f };
         CriticalPassageHeights = new[] { 2.7f, 3.2f, 4.2f, 6.0f };
     }
@@ -118,6 +135,7 @@ public sealed class DemolitionArenaLayout
     public float AttackToALength => PathLength(AttackToAPath);
     public float AttackToBLength => PathLength(AttackToBPath);
     public float RotationLength => PathLength(SiteRotationPath);
+    public float SiteSeparation => SitePositions[0].DistanceTo(SitePositions[1]);
     public float SiteTravelDifferenceRatio
         => Mathf.Abs(AttackToALength - AttackToBLength) / Mathf.Max(AttackToALength, AttackToBLength);
     public bool HasBalancedSiteTravel => SiteTravelDifferenceRatio <= MaximumSiteTravelDifference;
@@ -160,28 +178,28 @@ public sealed class DemolitionArenaLayout
 
     public Vector3 StrategyTarget(string key) => key switch
     {
-        "attack_entry_a" => World(new Vector3(-22.0f, 0.2f, -4.0f)),
-        "attack_entry_b" => World(new Vector3(22.0f, 0.2f, -4.0f)),
-        "attack_support_a" => World(new Vector3(-15.0f, 0.2f, 7.0f)),
-        "attack_support_b" => World(new Vector3(15.0f, 0.2f, 7.0f)),
-        "attack_mid_recon" => World(new Vector3(0.0f, 0.2f, 6.0f)),
-        "defense_anchor_a" => World(new Vector3(-24.0f, 0.2f, -22.0f)),
-        "defense_anchor_b" => World(new Vector3(23.0f, 0.2f, -23.0f)),
-        "defense_mid" => World(new Vector3(0.0f, 0.2f, -4.0f)),
-        "defense_rotate_a" => World(new Vector3(-9.0f, 0.2f, -27.0f)),
-        "defense_rotate_b" => World(new Vector3(9.0f, 0.2f, -27.0f)),
-        "retake_entry_a" => World(new Vector3(-17.0f, 0.2f, -3.0f)),
-        "retake_entry_b" => World(new Vector3(17.0f, 0.2f, -3.0f)),
-        "retake_cover_a" => World(new Vector3(-31.0f, 0.2f, -13.0f)),
-        "retake_cover_b" => World(new Vector3(31.0f, 0.2f, -13.0f)),
-        "retake_flank_a" => World(new Vector3(-19.0f, 0.2f, -26.0f)),
-        "retake_flank_b" => World(new Vector3(19.0f, 0.2f, -26.0f)),
-        "postplant_guard_a" => World(new Vector3(-22.0f, 0.2f, -16.0f)),
-        "postplant_guard_b" => World(new Vector3(22.0f, 0.2f, -16.0f)),
-        "postplant_crossfire_a" => World(new Vector3(-31.0f, 0.2f, -10.0f)),
-        "postplant_crossfire_b" => World(new Vector3(31.0f, 0.2f, -10.0f)),
-        "postplant_lurk_a" => World(new Vector3(-16.0f, 0.2f, -1.0f)),
-        "postplant_lurk_b" => World(new Vector3(16.0f, 0.2f, -1.0f)),
+        "attack_entry_a" => World(new Vector3(-24.0f, 0.2f, 14.0f)),
+        "attack_entry_b" => World(new Vector3(23.0f, 0.2f, -7.0f)),
+        "attack_support_a" => World(new Vector3(-23.0f, 0.2f, 17.0f)),
+        "attack_support_b" => World(new Vector3(24.0f, 0.2f, -8.0f)),
+        "attack_mid_recon" => World(new Vector3(0.0f, 0.2f, 3.0f)),
+        "defense_anchor_a" => World(new Vector3(-30.0f, 0.2f, 12.0f)),
+        "defense_anchor_b" => World(new Vector3(31.0f, 0.2f, -33.0f)),
+        "defense_mid" => World(new Vector3(0.0f, 0.2f, -10.0f)),
+        "defense_rotate_a" => World(new Vector3(-12.0f, 0.2f, -16.0f)),
+        "defense_rotate_b" => World(new Vector3(12.0f, 0.2f, -16.0f)),
+        "retake_entry_a" => World(new Vector3(-24.0f, 0.2f, 8.0f)),
+        "retake_entry_b" => World(new Vector3(24.0f, 0.2f, 0.0f)),
+        "retake_cover_a" => World(new Vector3(-30.0f, 0.2f, 28.0f)),
+        "retake_cover_b" => World(new Vector3(36.0f, 0.2f, -24.0f)),
+        "retake_flank_a" => World(new Vector3(-24.0f, 0.2f, 14.0f)),
+        "retake_flank_b" => World(new Vector3(26.0f, 0.2f, -16.0f)),
+        "postplant_guard_a" => World(new Vector3(-30.0f, 0.2f, 18.0f)),
+        "postplant_guard_b" => World(new Vector3(30.0f, 0.2f, -15.0f)),
+        "postplant_crossfire_a" => World(new Vector3(-36.0f, 0.2f, 27.0f)),
+        "postplant_crossfire_b" => World(new Vector3(35.0f, 0.2f, -26.0f)),
+        "postplant_lurk_a" => World(new Vector3(-20.0f, 0.2f, 4.0f)),
+        "postplant_lurk_b" => World(new Vector3(20.0f, 0.2f, 2.0f)),
         "site_a" => SitePositions[0],
         "site_b" => SitePositions[1],
         _ => Midpoint
@@ -226,38 +244,42 @@ public sealed class DemolitionArenaLayout
     {
         var boxes = new List<DemolitionArenaBox>
         {
-            Box("ArenaFloor", new(0, -0.48f, 0), new(80, 1.0f, 122), "ground"),
-            Box("NorthPerimeter", new(0, 2.5f, -61), new(80, 5.0f, 1.0f), "concrete_dark"),
-            Box("SouthPerimeterLeft", new(-24, 2.5f, 61), new(32, 5.0f, 1.0f), "concrete_dark"),
-            Box("SouthPerimeterRight", new(24, 2.5f, 61), new(32, 5.0f, 1.0f), "concrete_dark"),
-            Box("WestPerimeter", new(-40, 2.5f, 0), new(1.0f, 5.0f, 122), "concrete_dark"),
-            Box("EastPerimeter", new(40, 2.5f, 0), new(1.0f, 5.0f, 122), "concrete_dark"),
+            Box("ArenaFloor", new(0, -0.48f, 0), new(80, 1.0f, 112), "ground"),
+            Box("NorthPerimeter", new(0, 2.5f, -55.5f), new(80, 5.0f, 1.0f), "concrete_dark"),
+            Box("SouthPerimeterLeft", new(-24, 2.5f, 55.5f), new(32, 5.0f, 1.0f), "concrete_dark"),
+            Box("SouthPerimeterRight", new(24, 2.5f, 55.5f), new(32, 5.0f, 1.0f), "concrete_dark"),
+            Box("WestPerimeter", new(-39.5f, 2.5f, 0), new(1.0f, 5.0f, 112), "concrete_dark"),
+            Box("EastPerimeter", new(39.5f, 2.5f, 0), new(1.0f, 5.0f, 112), "concrete_dark"),
 
-            Box("SightBlockLeft", new(-6.0f, 1.65f, 38.0f), new(1.4f, 3.3f, 18.0f), "rust"),
-            Box("SightBlockRight", new(6.0f, 1.65f, 38.0f), new(1.4f, 3.3f, 18.0f), "rust"),
+            Box("SightBlockLeft", new(-12.0f, 1.65f, 36.0f), new(1.4f, 3.3f, 17.0f), "rust"),
+            Box("SightBlockRight", new(10.0f, 1.65f, 34.0f), new(1.4f, 3.3f, 17.0f), "rust"),
             Box("SpawnGateLeft", new(-14.4f, 1.6f, 52.0f), new(13.0f, 3.2f, 1.0f), "concrete_dark"),
             Box("SpawnGateRight", new(14.4f, 1.6f, 52.0f), new(13.0f, 3.2f, 1.0f), "concrete_dark"),
 
-            Box("WestRouteWall", new(-19.0f, 1.7f, 12.0f), new(1.0f, 3.4f, 23.0f), "steel_dark"),
-            Box("EastRouteWall", new(19.0f, 1.7f, 12.0f), new(1.0f, 3.4f, 23.0f), "steel_dark"),
-            Box("MidDividerLeft", new(-8.0f, 1.7f, -9.0f), new(12.0f, 3.4f, 1.0f), "steel_dark"),
-            Box("MidDividerRight", new(8.0f, 1.7f, -9.0f), new(12.0f, 3.4f, 1.0f), "steel_dark"),
+            Box("WestRouteWall", new(-17.0f, 1.7f, 24.0f), new(1.0f, 3.4f, 26.0f), "steel_dark"),
+            Box("EastRouteWall", new(17.0f, 1.7f, -10.0f), new(1.0f, 3.4f, 26.0f), "steel_dark"),
+            Box("MidDividerWest", new(-8.0f, 1.7f, 2.0f), new(12.0f, 3.4f, 1.0f), "steel_dark"),
+            Box("MidDividerEast", new(8.0f, 1.7f, 2.0f), new(12.0f, 3.4f, 1.0f), "steel_dark"),
+            Box("MidCrossNorth", new(0, 1.7f, -2.0f), new(4.0f, 3.4f, 1.0f), "steel_dark"),
+            Box("MidPipeRackColumn", new(0, 2.9f, -1.0f), new(1.2f, 5.8f, 1.2f), "steel"),
             Box("MidFoundryCore", new(0, 2.25f, -13.5f), new(8.0f, 4.5f, 8.0f), "rust"),
 
-            Box("FoundryWestWall", new(-34.0f, 3.0f, -18.0f), new(1.0f, 6.0f, 24.0f), "concrete_dark"),
-            Box("FoundryNorthWallLeft", new(-30.5f, 3.0f, -29.5f), new(7.0f, 6.0f, 1.0f), "concrete_dark"),
-            Box("FoundryNorthWallRight", new(-19.5f, 3.0f, -29.5f), new(7.0f, 6.0f, 1.0f), "concrete_dark"),
-            Box("FoundrySouthWall", new(-29.5f, 2.2f, -6.5f), new(9.0f, 4.4f, 1.0f), "concrete_dark"),
-            Box("FoundrySouthReturn", new(-18.5f, 2.2f, -6.5f), new(4.0f, 4.4f, 1.0f), "concrete_dark"),
-            Box("FoundryFurnace", new(-27.8f, 2.2f, -21.8f), new(4.6f, 4.4f, 5.0f), "rust"),
+            Box("FoundryNorthWall", new(-36.0f, 3.0f, -1.0f), new(7.0f, 6.0f, 1.0f), "concrete_dark"),
+            Box("FoundrySouthWall", new(-36.0f, 3.0f, 43.0f), new(7.0f, 6.0f, 1.0f), "concrete_dark"),
+            Box("FoundryWestWall", new(-38.5f, 3.0f, 21.0f), new(1.0f, 6.0f, 45.0f), "concrete_dark"),
+            Box("SightBlockA1", new(-33.0f, 1.65f, 10.0f), new(12.0f, 3.3f, 1.0f), "rust"),
+            Box("SightBlockA2", new(-33.0f, 1.65f, 33.0f), new(12.0f, 3.3f, 1.0f), "rust"),
+            Box("FoundryFurnace", new(-35.5f, 2.2f, 14.0f), new(4.6f, 4.4f, 5.0f), "rust"),
+            Box("FoundryMachine", new(-35.5f, 1.35f, 29.0f), new(4.5f, 2.7f, 6.5f), "steel"),
 
-            Box("AssemblyEastWall", new(34.0f, 3.5f, -18.0f), new(1.0f, 7.0f, 24.0f), "steel_dark"),
-            Box("AssemblyNorthWallLeft", new(19.5f, 3.5f, -29.5f), new(7.0f, 7.0f, 1.0f), "steel_dark"),
-            Box("AssemblyNorthWallRight", new(30.5f, 3.5f, -29.5f), new(7.0f, 7.0f, 1.0f), "steel_dark"),
-            Box("AssemblySouthLeft", new(20.0f, 3.5f, -6.5f), new(5.0f, 7.0f, 1.0f), "steel_dark"),
-            Box("AssemblySouthRight", new(31.0f, 3.5f, -6.5f), new(6.0f, 7.0f, 1.0f), "steel_dark"),
-            Box("AssemblyRoof", new(25.0f, 7.0f, -18.0f), new(19.0f, 0.4f, 24.0f), "steel"),
-            Box("AssemblyMachine", new(28.5f, 1.35f, -18.8f), new(4.5f, 2.7f, 6.5f), "steel"),
+            Box("AssemblyEastWall", new(39.5f, 3.5f, -20.0f), new(1.0f, 7.0f, 20.0f), "steel_dark"),
+            Box("AssemblyNorthWall", new(26.0f, 3.5f, -45.0f), new(26.0f, 7.0f, 1.0f), "steel_dark"),
+            Box("AssemblySouthLeft", new(20.0f, 3.5f, -3.0f), new(5.0f, 7.0f, 1.0f), "steel_dark"),
+            Box("AssemblySouthRight", new(31.0f, 3.5f, -3.0f), new(7.0f, 7.0f, 1.0f), "steel_dark"),
+            Box("AssemblyRoof", new(31.0f, 7.0f, -20.0f), new(18.0f, 0.4f, 26.0f), "steel"),
+            Box("AssemblyMachine", new(36.5f, 1.35f, -28.0f), new(4.5f, 2.7f, 6.5f), "steel"),
+            Box("AssemblyPillarNorth", new(20.0f, 3.5f, -37.0f), new(3.0f, 7.0f, 3.0f), "concrete_dark"),
+            Box("AssemblyPillarSouth", new(25.0f, 3.5f, -13.0f), new(3.0f, 7.0f, 3.0f), "concrete_dark"),
 
             Box("DefenderGateLeft", new(-11.0f, 1.65f, -47.0f), new(14.0f, 3.3f, 1.0f), "concrete_dark"),
             Box("DefenderGateRight", new(11.0f, 1.65f, -47.0f), new(14.0f, 3.3f, 1.0f), "concrete_dark")
@@ -274,28 +296,26 @@ public sealed class DemolitionArenaLayout
             Box("AttackBorderSouth", new(0, 0.08f, 60.4f), new(18, 0.05f, 0.16f), "warning"),
             Box("AttackBorderLeft", new(-8.9f, 0.08f, 56), new(0.16f, 0.05f, 8.8f), "warning"),
             Box("AttackBorderRight", new(8.9f, 0.08f, 56), new(0.16f, 0.05f, 8.8f), "warning"),
-            Box("AttackApproachSurface", new(0, 0.035f, 37), new(10, 0.07f, 29), "mid_floor"),
-            Box("MidLaneSurface", new(0, 0.04f, 4.0f), new(6.2f, 0.08f, 26), "mid_floor"),
-            Box("MidGuideLeft", new(-3.0f, 0.09f, 4.0f), new(0.12f, 0.04f, 25), "marking"),
-            Box("MidGuideRight", new(3.0f, 0.09f, 4.0f), new(0.12f, 0.04f, 25), "marking"),
-            Box("FoundryFloor", new(-25, 0.045f, -18), new(17, 0.09f, 22), "foundry_floor"),
-            Box("FoundryCanopyWest", new(-31.7f, 5.8f, -18), new(3.6f, 0.3f, 22), "rust"),
-            Box("FoundryCanopyNorth", new(-24.5f, 5.8f, -27.2f), new(10.8f, 0.3f, 3.6f), "rust"),
-            Box("AssemblyFloor", new(25, 0.045f, -18), new(18, 0.09f, 23), "assembly_floor"),
-            Box("AssemblyRoofStripe", new(25, 7.23f, -18), new(15, 0.07f, 2.0f), "warning"),
-            Box("AssemblyWindowBand", new(34.54f, 4.4f, -18), new(0.05f, 1.4f, 15), "window"),
+            Box("AttackApproachSurface", new(0, 0.035f, 40), new(10, 0.07f, 18), "mid_floor"),
+            Box("MidLaneSurface", new(0, 0.04f, 3.0f), new(6.2f, 0.08f, 20), "mid_floor"),
+            Box("MidGuideLeft", new(-3.0f, 0.09f, 3.0f), new(0.12f, 0.04f, 19), "marking"),
+            Box("MidGuideRight", new(3.0f, 0.09f, 3.0f), new(0.12f, 0.04f, 19), "marking"),
+            Box("FoundryFloor", new(-33, 0.045f, 21), new(13, 0.09f, 40), "foundry_floor"),
+            Box("FoundryCanopyNorth", new(-36.0f, 5.8f, -1.2f), new(7.2f, 0.3f, 3.6f), "rust"),
+            Box("FoundryCanopySouth", new(-36.0f, 5.8f, 43.2f), new(7.2f, 0.3f, 3.6f), "rust"),
+            Box("AssemblyFloor", new(30, 0.045f, -22), new(24, 0.09f, 40), "assembly_floor"),
+            Box("AssemblyRoofStripe", new(31, 7.23f, -22), new(15, 0.07f, 2.0f), "warning"),
+            Box("AssemblyWindowBand", new(39.54f, 4.4f, -20), new(0.05f, 1.4f, 15), "window"),
             Box("DefenderApron", new(0, 0.04f, -56), new(18, 0.08f, 7.5f), "spawn_floor"),
             Box("DefenderBorder", new(0, 0.09f, -52.3f), new(18, 0.04f, 0.16f), "cyan"),
-            Box("DefenderApproachSurface", new(0, 0.035f, -42), new(10, 0.07f, 20), "mid_floor"),
+            Box("DefenderApproachSurface", new(0, 0.035f, -40), new(10, 0.07f, 16), "mid_floor"),
             Box("MidPipeRackTop", new(0, 5.8f, -1), new(16, 0.35f, 1.2f), "steel"),
-            Box("MidPipeRackLeft", new(-7.2f, 2.9f, -1), new(0.45f, 5.8f, 0.45f), "steel"),
-            Box("MidPipeRackRight", new(7.2f, 2.9f, -1), new(0.45f, 5.8f, 0.45f), "steel"),
             Box("DefenderSignBeam", new(0, 4.5f, -47), new(8.0f, 0.3f, 0.5f), "warning")
         };
-        for (var index = 0; index < 9; index++)
+        for (var index = 0; index < 6; index++)
         {
-            boxes.Add(Box($"WestLaneStripe_{index}", new(-28.5f, 0.04f, 49 - index * 7), new(0.18f, 0.08f, 3.2f), "warning"));
-            boxes.Add(Box($"EastLaneStripe_{index}", new(28.5f, 0.04f, 49 - index * 7), new(0.18f, 0.08f, 3.2f), "warning"));
+            boxes.Add(Box($"WestLaneStripe_{index}", new(-24.0f, 0.04f, 4 - index * 7), new(0.18f, 0.08f, 3.2f), "warning"));
+            boxes.Add(Box($"EastLaneStripe_{index}", new(24.0f, 0.04f, -2 - index * 7), new(0.18f, 0.08f, 3.2f), "warning"));
         }
         return boxes;
     }
@@ -307,12 +327,12 @@ public sealed class DemolitionArenaLayout
         var props = new List<DemolitionArenaProp>();
         var barrierPositions = new[]
         {
-            new Vector3(-30.5f, 0.02f, 11.0f), new(-24.5f, 0.02f, 4.5f),
-            new(30.5f, 0.02f, 11.0f), new(24.5f, 0.02f, 4.5f),
-            new(-12.5f, 0.02f, -3.5f), new(12.5f, 0.02f, -3.5f),
-            new(-14.0f, 0.02f, 43.0f), new(14.0f, 0.02f, 43.0f),
-            new(-27.0f, 0.02f, 35.0f), new(27.0f, 0.02f, 35.0f),
-            new(-14.0f, 0.02f, -43.0f), new(14.0f, 0.02f, -43.0f)
+            new Vector3(-20.0f, 0.02f, 30.0f), new(-25.0f, 0.02f, 38.0f),
+            new(7.0f, 0.02f, 44.0f), new(-8.0f, 0.02f, 48.0f),
+            new(14.0f, 0.02f, -30.0f), new(35.0f, 0.02f, -8.0f),
+            new(-14.0f, 0.02f, -14.0f), new(10.0f, 0.02f, -16.0f),
+            new(-31.0f, 0.02f, 6.0f), new(28.0f, 0.02f, 14.0f),
+            new(0.0f, 0.02f, -24.0f), new(-32.0f, 0.02f, -6.0f)
         };
         for (var index = 0; index < barrierPositions.Length; index++)
         {
@@ -323,13 +343,11 @@ public sealed class DemolitionArenaLayout
         }
         var cratePositions = new[]
         {
-            new Vector3(-29.0f, 0.02f, -14.5f), new(-20.5f, 0.02f, -21.0f),
-            new(20.0f, 0.02f, -14.0f), new(30.0f, 0.02f, -23.0f),
-            new(-10.5f, 0.02f, 20.5f), new(10.5f, 0.02f, 20.5f),
-            new(-5.8f, 0.02f, -20.5f), new(5.8f, 0.02f, -20.5f),
-            new(-10.5f, 0.02f, 46.0f), new(10.5f, 0.02f, 46.0f),
-            new(-24.0f, 0.02f, 34.0f), new(24.0f, 0.02f, 34.0f),
-            new(-8.5f, 0.02f, -44.5f), new(8.5f, 0.02f, -44.5f)
+            new Vector3(-36.0f, 0.02f, 24.0f), new(-30.0f, 0.02f, 31.0f),
+            new(36.0f, 0.02f, -14.0f), new(24.0f, 0.02f, -40.0f),
+            new(-5.0f, 0.02f, 16.0f), new(5.0f, 0.02f, -12.0f),
+            new(17.0f, 0.02f, 26.0f), new(-17.0f, 0.02f, -24.0f),
+            new(32.0f, 0.02f, 4.0f), new(-34.0f, 0.02f, 36.0f)
         };
         for (var index = 0; index < cratePositions.Length; index++)
         {

@@ -194,9 +194,9 @@ public sealed class DemolitionArenaBuilder
         DemolitionArenaLayout layout,
         IReadOnlyDictionary<string, StandardMaterial3D> materials)
     {
-        AddSign(root, "ArenaTitle", layout.Origin + new Vector3(0, 5.3f, -34.55f), "TIDEFORGE  //  TF-07", 0, new Color(1.0f, 0.62f, 0.22f));
-        AddSign(root, "FoundrySign", layout.Origin + new Vector3(-25, 4.6f, -6.0f), "A  //  FOUNDRY YARD", Mathf.Pi, new Color(1.0f, 0.5f, 0.16f));
-        AddSign(root, "AssemblySign", layout.Origin + new Vector3(25, 4.8f, -6.0f), "B  //  ASSEMBLY HALL", Mathf.Pi, new Color(0.42f, 0.86f, 1.0f));
+        AddSign(root, "ArenaTitle", layout.Origin + new Vector3(0, 5.2f, -54.6f), "TIDEFORGE  //  TF-07", 0, new Color(1.0f, 0.62f, 0.22f));
+        AddSign(root, "FoundrySign", layout.Origin + new Vector3(-27.0f, 4.6f, 10.4f), "A  //  FOUNDRY YARD", Mathf.Pi, new Color(1.0f, 0.5f, 0.16f));
+        AddSign(root, "AssemblySign", layout.Origin + new Vector3(25.0f, 4.8f, -3.4f), "B  //  ASSEMBLY HALL", Mathf.Pi, new Color(0.42f, 0.86f, 1.0f));
 
         for (var index = 0; index < 5; index++)
         {
@@ -204,7 +204,7 @@ public sealed class DemolitionArenaBuilder
             var stack = new MeshInstance3D
             {
                 Name = $"FoundryStack_{index + 1:00}",
-                Position = layout.Origin + new Vector3(-31.0f + index * 3.0f, y, -25.5f),
+                Position = layout.Origin + new Vector3(-36.5f + index * 2.6f, y, -3.5f),
                 Mesh = new CylinderMesh { TopRadius = 0.48f, BottomRadius = 0.62f, Height = 4.0f + index * 0.7f, RadialSegments = 16 },
                 MaterialOverride = materials[index % 2 == 0 ? "rust" : "steel_dark"]
             };
@@ -217,7 +217,7 @@ public sealed class DemolitionArenaBuilder
                 root,
                 new DemolitionArenaBox(
                     $"AssemblyTruss_{index + 1:00}",
-                    layout.Origin + new Vector3(18.0f + index * 4.6f, 6.6f, -18.0f),
+                    layout.Origin + new Vector3(24.0f + index * 4.4f, 6.6f, -20.0f),
                     new Vector3(0.22f, 0.35f, 22.0f),
                     "warning"),
                 materials["warning"]);
@@ -242,11 +242,11 @@ public sealed class DemolitionArenaBuilder
 
     private void BuildRouteGuidance(Node3D root, DemolitionArenaLayout layout)
     {
-        AddFloorLabel(root, "AttackFloorLabel", layout.Origin + new Vector3(0, 0.09f, 35.0f), "ATTACK", new Color(0.56f, 0.92f, 0.86f), 78);
-        AddFloorLabel(root, "RouteALabel", layout.Origin + new Vector3(-5.8f, 0.09f, 12.0f), "<  A", new Color(1.0f, 0.58f, 0.18f), 68);
-        AddFloorLabel(root, "RouteMidLabel", layout.Origin + new Vector3(0, 0.09f, 11.0f), "MID", new Color(0.9f, 0.88f, 0.68f), 58);
-        AddFloorLabel(root, "RouteBLabel", layout.Origin + new Vector3(5.8f, 0.09f, 12.0f), "B  >", new Color(0.28f, 0.82f, 0.96f), 68);
-        AddFloorLabel(root, "DefendFloorLabel", layout.Origin + new Vector3(0, 0.09f, -37.0f), "DEFEND", new Color(0.46f, 0.94f, 0.68f), 72);
+        AddFloorLabel(root, "AttackFloorLabel", layout.Origin + new Vector3(0, 0.09f, 43.0f), "ATTACK", new Color(0.56f, 0.92f, 0.86f), 78);
+        AddFloorLabel(root, "RouteALabel", layout.Origin + new Vector3(-6.0f, 0.09f, 36.0f), "<  A", new Color(1.0f, 0.58f, 0.18f), 68);
+        AddFloorLabel(root, "RouteMidLabel", layout.Origin + new Vector3(0, 0.09f, 34.0f), "MID", new Color(0.9f, 0.88f, 0.68f), 58);
+        AddFloorLabel(root, "RouteBLabel", layout.Origin + new Vector3(6.0f, 0.09f, 36.0f), "B  >", new Color(0.28f, 0.82f, 0.96f), 68);
+        AddFloorLabel(root, "DefendFloorLabel", layout.Origin + new Vector3(0, 0.09f, -43.0f), "DEFEND", new Color(0.46f, 0.94f, 0.68f), 72);
     }
 
     private void AddFloorLabel(
@@ -278,8 +278,8 @@ public sealed class DemolitionArenaBuilder
     {
         var positions = new[]
         {
-            new Vector3(-31, 8.5f, 9), new Vector3(31, 8.5f, 9),
-            new Vector3(-15, 8.5f, -12), new Vector3(15, 8.5f, -12),
+            new Vector3(-31, 8.5f, 21), new Vector3(33, 8.5f, -19),
+            new Vector3(0, 8.5f, 8), new Vector3(0, 8.5f, -10),
             new Vector3(0, 8.5f, -31)
         };
         for (var index = 0; index < positions.Length; index++)
