@@ -12,6 +12,9 @@ public partial class FreightTerminalWorld
     private const float DemolitionRoundDuration = 100.0f;
     private const float DemolitionIntermissionDuration = 5.0f;
     private const float DemolitionStrategyRefreshDuration = 1.5f;
+    private const float DemolitionCombatEngageRange = 24.0f;
+    private const float DemolitionCombatResumeRange = 30.0f;
+    private const float DemolitionChannelGuardRange = 12.0f;
     private const int DemolitionFullBuyCost = 4400;
     private const int DemolitionEcoBuyCost = 2400;
     private const int DemolitionSquadSize = 5;
@@ -20,6 +23,7 @@ public partial class FreightTerminalWorld
     private readonly List<EnemyOperator> _demolitionOpponents = new();
     private readonly Dictionary<EnemyOperator, DemolitionAssignment> _demolitionOpponentAssignments = new();
     private readonly Dictionary<SquadMate, string> _demolitionSquadAssignmentTargets = new();
+    private readonly HashSet<EnemyOperator> _demolitionCombatBreakoffs = new();
     private readonly DemolitionMatchState _demolitionMatch = new();
     private readonly DemolitionStrategyPlanner _demolitionStrategyPlanner = new();
     private readonly DemolitionEconomy _demolitionPlayerEconomy = new();
@@ -286,6 +290,7 @@ public partial class FreightTerminalWorld
         }
         _demolitionOpponents.Clear();
         _demolitionOpponentAssignments.Clear();
+        _demolitionCombatBreakoffs.Clear();
         _demolitionDefuser = null;
         _demolitionDefuseRoute = System.Array.Empty<Vector3>();
         _demolitionDefuseRouteIndex = 0;
@@ -316,6 +321,8 @@ public partial class FreightTerminalWorld
         _demolitionIntermissionRemaining = 0.0f;
         _demolitionStrategyRemaining = 0.0f;
         _demolitionEnemyTargetSite = _demolitionMatch.CompletedRounds % 2;
+        _demolitionSquadAssignmentTargets.Clear();
+        _demolitionCombatBreakoffs.Clear();
         _missionPhase = "DEMOLITION";
         RefreshDemolitionStrategies(true);
         UpdateDemolitionRoundHud();
@@ -639,6 +646,7 @@ public partial class FreightTerminalWorld
         {
             RefreshDemolitionStrategies(false);
         }
+        UpdateDemolitionSquadPosts();
         if (!_demolitionDevicePlanted)
         {
             if (playerSide == DemolitionTeam.Defenders

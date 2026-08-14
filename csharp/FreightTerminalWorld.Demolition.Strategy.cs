@@ -105,6 +105,7 @@ public partial class FreightTerminalWorld
         if (opponentTeamSide == DemolitionTeam.Attackers && !_demolitionDevicePlanted)
         {
             SelectDemolitionCarrier(opponentPlan);
+            ApplyDemolitionTimePressure();
         }
         if (_demolitionDefuser != previousDefuser)
         {
@@ -143,6 +144,51 @@ public partial class FreightTerminalWorld
         }
     }
 
+    /// <summary>
+    /// Clock awareness for the attacking AI: once the remaining round time barely covers
+    /// the walk plus the plant, the carrier abandons the planned site and commits to the
+    /// closest reachable one so the attack does not expire mid-rotation.
+    /// </summary>
+    private void ApplyDemolitionTimePressure()
+    {
+        if (_demolitionDevicePlanted
+            || _demolitionEnemyPlantProgress > 0.02f
+            || !IsInstanceValid(_demolitionCarrier)
+            || _demolitionCarrier!.IsDead)
+        {
+            return;
+        }
+        var layout = DemolitionLayout();
+        var carrierPosition = _demolitionCarrier.GlobalPosition;
+        float TravelSeconds(Vector3 site)
+        {
+            var flat = new Vector3(site.X, carrierPosition.Y, site.Z);
+            return carrierPosition.DistanceTo(flat) / 5.1f + DemolitionPlantDuration;
+        }
+        var planned = layout.SitePositions[Mathf.Clamp(_demolitionEnemyTargetSite, 0, layout.SitePositions.Count - 1)];
+        if (TravelSeconds(planned) + 2.0f <= _demolitionRemaining)
+        {
+            return;
+        }
+        var nearest = -1;
+        var nearestTravel = float.PositiveInfinity;
+        for (var index = 0; index < layout.SitePositions.Count; index++)
+        {
+            var travel = TravelSeconds(layout.SitePositions[index]);
+            if (travel + 2.0f <= _demolitionRemaining && travel < nearestTravel)
+            {
+                nearestTravel = travel;
+                nearest = index;
+            }
+        }
+        if (nearest >= 0 && nearest != _demolitionEnemyTargetSite)
+        {
+            _demolitionEnemyTargetSite = nearest;
+            _demolitionCarrierRoute = System.Array.Empty<Vector3>();
+            _demolitionCarrierRouteIndex = 0;
+        }
+    }
+
     private void ApplyDemolitionSquadPlan(DemolitionStrategyPlan plan, DemolitionArenaLayout layout)
     {
         foreach (var assignment in plan.Assignments)
@@ -169,7 +215,34 @@ public partial class FreightTerminalWorld
                 continue;
             }
             _demolitionSquadAssignmentTargets[mate] = assignment.TargetKey;
+            // Move clears the old post; once the mate arrives it converts to Hold so the
+            // assignment behaves like an anchored position instead of a perpetual walk.
             mate.SetOrder(SquadOrder.Move, layout.StrategyTarget(assignment.TargetKey));
+        }
+    }
+
+    /// <summary>
+    /// Converts arrived Move orders into Holds so demolition teammates anchor their
+    /// assigned posts and use their combat layer from cover instead of milling around.
+    /// </summary>
+    private void UpdateDemolitionSquadPosts()
+    {
+        if (!_demolitionRoundActive)
+        {
+            return;
+        }
+        foreach (var mate in _squadMates.Where(IsInstanceValid))
+        {
+            if (mate.Order != SquadOrder.Move
+                || !_demolitionSquadAssignmentTargets.TryGetValue(mate, out var targetKey))
+            {
+                continue;
+            }
+            var target = DemolitionLayout().StrategyTarget(targetKey);
+            if (mate.GlobalPosition.DistanceTo(target) <= 3.0f)
+            {
+                mate.SetOrder(SquadOrder.Hold, mate.GlobalPosition);
+            }
         }
     }
 
@@ -231,26 +304,31 @@ public partial class FreightTerminalWorld
 
     private void PlanDemolitionDefuseRoute()
     {
-        _demolitionDefuseRoute = System.Array.Empty<Vector3>();
         _demolitionDefuseRouteIndex = 0;
-        if (!IsInstanceValid(_demolitionDefuser) || _demolitionActiveSite < 0)
+        _demolitionDefuseRoute = IsInstanceValid(_demolitionDefuser) && _demolitionActiveSite >= 0
+            ? PlanDemolitionDetourRoute(_demolitionDefuser!, DemolitionLayout().SitePositions[_demolitionActiveSite])
+            : System.Array.Empty<Vector3>();
+    }
+
+    /// <summary>
+    /// Builds a two-waypoint detour around blocking geometry by scanning lateral offsets,
+    /// shared by the defuser and the bomb carrier so both walk around walls instead of
+    /// grinding into them.
+    /// </summary>
+    private Vector3[] PlanDemolitionDetourRoute(EnemyOperator agent, Vector3 destination)
+    {
+        if (agent.IsScriptedObjectiveCorridorClear(destination))
         {
-            return;
+            return new[] { destination };
         }
 
-        var destination = DemolitionLayout().SitePositions[_demolitionActiveSite];
-        if (_demolitionDefuser!.IsScriptedObjectiveCorridorClear(destination))
-        {
-            _demolitionDefuseRoute = new[] { destination };
-            return;
-        }
-
-        var start = _demolitionDefuser.GlobalPosition;
+        var start = agent.GlobalPosition;
         var forward = destination - start;
         forward.Y = 0.0f;
         forward = forward.Normalized();
         var side = new Vector3(-forward.Z, 0.0f, forward.X);
         var bestLength = float.PositiveInfinity;
+        var bestRoute = new[] { destination };
         foreach (var sideSign in new[] { 1.0f, -1.0f })
         {
             foreach (var lateral in new[] { 2.5f, 3.5f, 4.5f, 5.5f })
@@ -259,15 +337,15 @@ public partial class FreightTerminalWorld
                 {
                     var waypoint = start + side * (sideSign * lateral) + forward * forwardOffset;
                     waypoint.Y = start.Y;
-                    if (!_demolitionDefuser.IsScriptedObjectiveCorridorClear(waypoint))
+                    if (!agent.IsScriptedObjectiveCorridorClear(waypoint))
                     {
                         continue;
                     }
 
-                    var oldPosition = _demolitionDefuser.GlobalPosition;
-                    _demolitionDefuser.GlobalPosition = waypoint;
-                    var destinationClear = _demolitionDefuser.IsScriptedObjectiveCorridorClear(destination);
-                    _demolitionDefuser.GlobalPosition = oldPosition;
+                    var oldPosition = agent.GlobalPosition;
+                    agent.GlobalPosition = waypoint;
+                    var destinationClear = agent.IsScriptedObjectiveCorridorClear(destination);
+                    agent.GlobalPosition = oldPosition;
                     if (!destinationClear)
                     {
                         continue;
@@ -277,19 +355,17 @@ public partial class FreightTerminalWorld
                     if (length < bestLength)
                     {
                         bestLength = length;
-                        _demolitionDefuseRoute = new[] { waypoint, destination };
+                        bestRoute = new[] { waypoint, destination };
                     }
                 }
             }
         }
-
-        if (_demolitionDefuseRoute.Length == 0)
-        {
-            _demolitionDefuseRoute = new[] { destination };
-        }
+        return bestRoute;
     }
 
-    /// <summary>Drives every demolition enemy: defenders defuse, attackers carry and plant.</summary>
+    /// <summary>
+    /// Drives every demolition enemy: defenders defuse, attackers carry and plant.
+    /// </summary>
     public bool TryHandleDemolitionDefenderMovement(EnemyOperator opponent, float delta, Node3D? combatTarget)
     {
         if (!_demolitionMode
@@ -303,6 +379,10 @@ public partial class FreightTerminalWorld
         var targetDistance = combatTarget is null || !IsInstanceValid(combatTarget)
             ? float.PositiveInfinity
             : opponent.GlobalPosition.DistanceTo(combatTarget.GlobalPosition);
+        if (!UpdateDemolitionCombatArbitration(opponent, targetDistance))
+        {
+            return false;
+        }
         if (_demolitionMatch.PlayerSide == DemolitionTeam.Attackers)
         {
             if (_demolitionDevicePlanted
@@ -317,10 +397,6 @@ public partial class FreightTerminalWorld
         {
             return true;
         }
-        if (targetDistance < 14.0f)
-        {
-            return false;
-        }
         return MoveDemolitionOpponentToward(
             opponent,
             DemolitionLayout().StrategyTarget(assignment.TargetKey),
@@ -328,6 +404,45 @@ public partial class FreightTerminalWorld
             2.0f,
             assignment.Duty is DemolitionDuty.Retake or DemolitionDuty.Flank ? 5.8f : 4.8f);
     }
+
+    /// <summary>
+    /// Combat-first arbitration, the core of any competent bot: objective movement yields
+    /// to the full combat layer while a hostile is inside the engage bubble, and resumes
+    /// with hysteresis once the threat leaves it. A carrier or defuser mid-channel holds
+    /// the channel under fire from beyond the guard range — trading damage for the
+    /// objective like a planted-round defuser in Counter-Strike.
+    /// </summary>
+    private bool UpdateDemolitionCombatArbitration(EnemyOperator opponent, float targetDistance)
+    {
+        var channeling = IsDemolitionOpponentChanneling(opponent);
+        if (channeling && targetDistance >= DemolitionChannelGuardRange)
+        {
+            return true;
+        }
+        var breaking = _demolitionCombatBreakoffs.Contains(opponent);
+        if (targetDistance < DemolitionCombatEngageRange
+            || breaking && targetDistance < DemolitionCombatResumeRange)
+        {
+            if (!breaking)
+            {
+                _demolitionCombatBreakoffs.Add(opponent);
+            }
+            return false;
+        }
+        if (breaking)
+        {
+            _demolitionCombatBreakoffs.Remove(opponent);
+        }
+        return true;
+    }
+
+    private bool IsDemolitionOpponentChanneling(EnemyOperator opponent)
+        => (!_demolitionDevicePlanted
+                && opponent == _demolitionCarrier
+                && _demolitionEnemyPlantProgress > 0.02f)
+            || (_demolitionDevicePlanted
+                && opponent == _demolitionDefuser
+                && _demolitionDefuseProgress > 0.02f);
 
     private bool TryHandleDemolitionAttackerMovement(
         EnemyOperator opponent,
@@ -343,10 +458,11 @@ public partial class FreightTerminalWorld
         {
             return false;
         }
-        if (targetDistance < 12.0f)
+        if (targetDistance < DemolitionChannelGuardRange)
         {
-            _demolitionEnemyPlantProgress = Mathf.Max(0.0f, _demolitionEnemyPlantProgress - delta * 0.35f);
-            return true;
+            // Threat inside the guard bubble: hand control to the combat layer. The
+            // channel keeps its progress and resumes once the fight is won or lost.
+            return false;
         }
         var layout = DemolitionLayout();
         var site = layout.SitePositions[Mathf.Clamp(_demolitionEnemyTargetSite, 0, layout.SitePositions.Count - 1)];
@@ -356,7 +472,7 @@ public partial class FreightTerminalWorld
         {
             if (_demolitionCarrierRoute.Length == 0)
             {
-                _demolitionCarrierRoute = new[] { site };
+                _demolitionCarrierRoute = PlanDemolitionDetourRoute(opponent, site);
             }
             while (_demolitionCarrierRouteIndex < _demolitionCarrierRoute.Length - 1
                 && HorizontalDistance(opponent.GlobalPosition, _demolitionCarrierRoute[_demolitionCarrierRouteIndex]) < 0.85f)
@@ -384,9 +500,9 @@ public partial class FreightTerminalWorld
 
     private bool TryHandleDemolitionDefuserMovement(EnemyOperator opponent, float delta, float targetDistance)
     {
-        if (targetDistance < 12.0f)
+        if (targetDistance < DemolitionChannelGuardRange)
         {
-            _demolitionDefuseProgress = Mathf.Max(0.0f, _demolitionDefuseProgress - delta * 0.35f);
+            // Same guard rule as the carrier: drop to the combat layer, keep the progress.
             return false;
         }
         var devicePosition = DemolitionLayout().SitePositions[_demolitionActiveSite];
