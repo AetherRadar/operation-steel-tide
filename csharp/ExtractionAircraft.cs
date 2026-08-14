@@ -139,8 +139,11 @@ public partial class ExtractionAircraft : Node3D
         _landAtDepartureTarget = landAtTarget;
         _phaseElapsed = 0.0f;
         Phase = ExtractionAircraftPhase.Departing;
-        _visual.Visible = !landAtTarget;
-        _cabinVisual.Visible = landAtTarget;
+        // Keep the authored aircraft visible during the entire transfer. The
+        // cinematic camera is mounted outside the fuselage, so hiding the
+        // aircraft here would turn the flight shot into an empty cabin view.
+        _visual.Visible = true;
+        _cabinVisual.Visible = false;
         _ramp.Rotation = Vector3.Zero;
         _dust.Visible = true;
         SetProcess(true);
@@ -235,6 +238,8 @@ public partial class ExtractionAircraft : Node3D
         {
             Phase = ExtractionAircraftPhase.Arrived;
             _ramp.Rotation = new Vector3(-0.58f, 0.0f, 0.0f);
+            _visual.Visible = true;
+            _cabinVisual.Visible = false;
             _dust.Visible = true;
             _rotorAudio.Stop();
             SetProcess(false);
@@ -430,14 +435,16 @@ public partial class ExtractionAircraft : Node3D
         _cinematicCamera = new Camera3D
         {
             Name = "ExtractionCinematicCamera",
-            Position = new Vector3(0.0f, 0.62f, 2.45f),
-            Fov = 64.0f,
+            // Exterior chase framing: the aircraft remains readable during
+            // the whole flight instead of showing the inside of the cabin.
+            Position = new Vector3(8.8f, 4.75f, 12.6f),
+            Fov = 58.0f,
             Near = 0.05f,
             Far = 1400.0f,
             Current = false
         };
         AddChild(_cinematicCamera);
-        _cinematicCamera.LookAt(new Vector3(0.0f, 0.08f, -0.35f), Vector3.Up);
+        _cinematicCamera.LookAt(new Vector3(0.0f, 0.28f, 0.15f), Vector3.Up);
     }
 
     private static Node3D BuildRotor(
