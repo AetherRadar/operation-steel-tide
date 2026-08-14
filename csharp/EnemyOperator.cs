@@ -357,10 +357,13 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         AddChild(_bodyRoot);
 
         var uniformShift = _rng.RandfRange(-0.018f, 0.025f);
-        _mainMaterial = Material(new Color(0.105f + uniformShift, 0.135f + uniformShift, 0.105f + uniformShift), 0.04f, 0.88f);
+        _mainMaterial = TacticalSurfaceLibrary.Fabric(
+            new Color(0.105f + uniformShift, 0.135f + uniformShift, 0.105f + uniformShift),
+            0.92f,
+            7.5f);
         var armor = Material(new Color(0.052f, 0.067f, 0.062f), 0.28f, 0.58f);
         var armorEdge = Material(new Color(0.025f, 0.034f, 0.032f), 0.58f, 0.4f);
-        var fabric = Material(new Color(0.17f, 0.155f, 0.105f), 0.0f, 0.94f);
+        var fabric = TacticalSurfaceLibrary.Fabric(new Color(0.17f, 0.155f, 0.105f), 0.96f, 9.0f);
         var skin = Material(new Color(0.34f, 0.235f, 0.17f), 0.0f, 0.92f);
         var mask = Material(new Color(0.045f, 0.052f, 0.047f), 0.02f, 0.9f);
         var carriedDefinition = WeaponCatalog.Weapon(CarriedWeapon.Platform);
@@ -378,7 +381,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             WeaponPlatform.M3A1 => new Color(0.18f, 0.21f, 0.19f),
             _ => new Color(0.018f, 0.023f, 0.022f)
         };
-        var gun = Material(gunColor, 0.88f, 0.25f);
+        var gun = TacticalSurfaceLibrary.WeaponFinish(gunColor, 0.88f, 0.25f);
         var lens = Material(new Color(0.025f, 0.16f, 0.15f), 0.62f, 0.08f);
 
         Part(Capsule(0.27f, 0.9f), new Vector3(0, 1.08f, 0.02f), _mainMaterial);

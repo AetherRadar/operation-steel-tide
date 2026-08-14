@@ -776,12 +776,12 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         _roleDevice = new Node3D { Name = "RoleDevice", Visible = false };
         _rig.AddChild(_roleDevice);
 
-        var uniform = Mat(new Color(0.11f, 0.13f, 0.125f), 0.02f, 0.9f);
+        var uniform = TacticalSurfaceLibrary.Fabric(new Color(0.11f, 0.13f, 0.125f), 0.93f, 7.5f);
         var armor = Mat(new Color(0.045f, 0.058f, 0.058f), 0.35f, 0.55f);
         var armorEdge = Mat(new Color(0.022f, 0.031f, 0.03f), 0.58f, 0.4f);
-        var fabric = Mat(new Color(0.16f, 0.145f, 0.1f), 0.0f, 0.94f);
+        var fabric = TacticalSurfaceLibrary.Fabric(new Color(0.16f, 0.145f, 0.1f), 0.96f, 9.0f);
         var skin = Mat(new Color(0.39f, 0.27f, 0.19f), 0.0f, 0.92f);
-        var gun = Mat(new Color(0.025f, 0.032f, 0.032f), 0.8f, 0.28f);
+        var gun = TacticalSurfaceLibrary.WeaponFinish(new Color(0.025f, 0.032f, 0.032f), 0.8f, 0.28f);
         var lens = Mat(new Color(0.025f, 0.2f, 0.21f), 0.62f, 0.08f);
         Part(_rig, Capsule(0.27f, 0.88f), new Vector3(0.0f, 1.08f, 0.0f), uniform);
         Part(_rig, Box(new Vector3(0.58f, 0.52f, 0.25f)), new Vector3(0.0f, 1.2f, 0.0f), armor);

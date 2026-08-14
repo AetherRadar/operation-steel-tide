@@ -215,6 +215,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private MeshInstance3D _muzzlePart = null!;
     private MeshInstance3D _foregrip = null!;
     private MeshInstance3D _stock = null!;
+    private MeshInstance3D _receiverSeam = null!;
+    private MeshInstance3D _ejectionPort = null!;
+    private MeshInstance3D _boltCarrier = null!;
+    private MeshInstance3D _triggerGuardFront = null!;
+    private MeshInstance3D _triggerGuardRear = null!;
+    private MeshInstance3D _triggerGuardBase = null!;
+    private MeshInstance3D _trigger = null!;
+    private MeshInstance3D _selector = null!;
     private Node3D _opticRoot = null!;
     private Node3D _reflexSightModel = null!;
     private Node3D _holoSightModel = null!;
@@ -522,10 +530,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         };
         _camera.AddChild(_weaponRoot);
 
-        var black = Material(new Color(0.075f, 0.083f, 0.079f), 0.64f, 0.38f);
-        var polymer = Material(new Color(0.055f, 0.065f, 0.061f), 0.25f, 0.58f);
-        var steel = Material(new Color(0.09f, 0.105f, 0.1f), 0.92f, 0.2f);
-        var tan = Material(new Color(0.27f, 0.245f, 0.19f), 0.05f, 0.72f);
+        var black = TacticalSurfaceLibrary.WeaponFinish(new Color(0.075f, 0.083f, 0.079f), 0.64f, 0.38f);
+        var polymer = TacticalSurfaceLibrary.WeaponFinish(new Color(0.055f, 0.065f, 0.061f), 0.18f, 0.62f, 5.5f);
+        var steel = TacticalSurfaceLibrary.WeaponFinish(new Color(0.09f, 0.105f, 0.1f), 0.92f, 0.2f, 3.5f);
+        var tan = TacticalSurfaceLibrary.WeaponFinish(new Color(0.27f, 0.245f, 0.19f), 0.05f, 0.72f, 5.5f);
         var glass = new StandardMaterial3D
         {
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
@@ -539,6 +547,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         };
 
         _receiver = MeshPart(_weaponRoot, Box(new Vector3(0.13f, 0.15f, 0.46f)), Vector3.Zero, Vector3.Zero, black);
+        BuildWeaponMechanismDetails(black, steel);
         _handguard = MeshPart(_weaponRoot, Box(new Vector3(0.15f, 0.12f, 0.4f)), new Vector3(0, 0.01f, -0.41f), Vector3.Zero, tan);
         _barrelPart = MeshPart(_weaponRoot, Cylinder(0.031f, 0.53f), new Vector3(0, 0.015f, -0.83f), new Vector3(Mathf.Pi / 2, 0, 0), steel);
         _muzzlePart = MeshPart(_weaponRoot, Cylinder(0.047f, 0.14f), new Vector3(0, 0.015f, -1.15f), new Vector3(Mathf.Pi / 2, 0, 0), black);
@@ -654,6 +663,68 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 Vector3.Zero,
                 material);
         }
+    }
+
+    private void BuildWeaponMechanismDetails(Godot.Material dark, Godot.Material steel)
+    {
+        _receiverSeam = MeshPart(
+            _weaponRoot,
+            Box(new Vector3(0.136f, 0.018f, 0.36f)),
+            new Vector3(0.0f, -0.076f, -0.015f),
+            Vector3.Zero,
+            dark);
+        _receiverSeam.Name = "LowerReceiverSeam";
+
+        _ejectionPort = MeshPart(
+            _weaponRoot,
+            Box(new Vector3(0.014f, 0.056f, 0.15f)),
+            new Vector3(0.078f, 0.018f, -0.045f),
+            Vector3.Zero,
+            dark);
+        _ejectionPort.Name = "EjectionPort";
+        _boltCarrier = MeshPart(
+            _weaponRoot,
+            Box(new Vector3(0.018f, 0.029f, 0.11f)),
+            new Vector3(0.086f, 0.055f, -0.05f),
+            Vector3.Zero,
+            steel);
+        _boltCarrier.Name = "BoltCarrierDetail";
+
+        _triggerGuardFront = MeshPart(
+            _weaponRoot,
+            Box(new Vector3(0.025f, 0.13f, 0.028f)),
+            new Vector3(0.0f, -0.105f, 0.145f),
+            new Vector3(0.0f, 0.0f, 0.12f),
+            dark);
+        _triggerGuardRear = MeshPart(
+            _weaponRoot,
+            Box(new Vector3(0.025f, 0.13f, 0.028f)),
+            new Vector3(0.0f, -0.105f, 0.005f),
+            new Vector3(0.0f, 0.0f, -0.12f),
+            dark);
+        _triggerGuardBase = MeshPart(
+            _weaponRoot,
+            Box(new Vector3(0.025f, 0.028f, 0.18f)),
+            new Vector3(0.0f, -0.166f, 0.075f),
+            Vector3.Zero,
+            dark);
+        _trigger = MeshPart(
+            _weaponRoot,
+            Box(new Vector3(0.022f, 0.064f, 0.018f)),
+            new Vector3(0.0f, -0.088f, 0.078f),
+            new Vector3(0.0f, 0.0f, 0.18f),
+            steel);
+        _selector = MeshPart(
+            _weaponRoot,
+            Box(new Vector3(0.018f, 0.068f, 0.026f)),
+            new Vector3(0.09f, 0.008f, 0.085f),
+            new Vector3(0.0f, 0.0f, -0.34f),
+            steel);
+        _triggerGuardFront.Name = "TriggerGuardFront";
+        _triggerGuardRear.Name = "TriggerGuardRear";
+        _triggerGuardBase.Name = "TriggerGuardBase";
+        _trigger.Name = "Trigger";
+        _selector.Name = "FireSelector";
     }
 
     private static Node3D BuildTacticalHand(
@@ -837,10 +908,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.M3A1 => new Color(0.105f, 0.12f, 0.11f),
             _ => new Color(0.18f, 0.17f, 0.13f)
         };
-        var receiverMaterial = Material(receiverColor, 0.52f, 0.46f);
-        var furnitureMaterial = Material(furnitureColor, 0.12f, 0.68f);
+        var receiverMaterial = TacticalSurfaceLibrary.WeaponFinish(receiverColor, 0.52f, 0.46f);
+        var furnitureMaterial = TacticalSurfaceLibrary.WeaponFinish(furnitureColor, 0.12f, 0.68f, 5.5f);
 
-        ((BoxMesh)_receiver.Mesh).Size = EquippedWeapon.Platform switch
+        var receiverSize = EquippedWeapon.Platform switch
         {
             WeaponPlatform.AK74 => new Vector3(0.14f, 0.16f, 0.52f),
             WeaponPlatform.ScarL => new Vector3(0.16f, 0.18f, 0.56f),
@@ -850,7 +921,30 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.M3A1 => new Vector3(0.135f, 0.155f, 0.34f),
             _ => new Vector3(0.13f, 0.15f, 0.46f)
         };
+        ((BoxMesh)_receiver.Mesh).Size = receiverSize;
         _receiver.MaterialOverride = receiverMaterial;
+        var receiverSideX = receiverSize.X * 0.5f + 0.007f;
+        var triggerCenterZ = receiverSize.Z * 0.16f;
+        ((BoxMesh)_receiverSeam.Mesh).Size = new Vector3(
+            receiverSize.X + 0.006f,
+            0.018f,
+            receiverSize.Z * 0.78f);
+        _receiverSeam.Position = new Vector3(0.0f, -receiverSize.Y * 0.5f - 0.008f, -receiverSize.Z * 0.025f);
+        ((BoxMesh)_ejectionPort.Mesh).Size = new Vector3(
+            0.014f,
+            receiverSize.Y * 0.36f,
+            Mathf.Clamp(receiverSize.Z * 0.33f, 0.11f, 0.18f));
+        _ejectionPort.Position = new Vector3(receiverSideX, receiverSize.Y * 0.12f, -receiverSize.Z * 0.1f);
+        ((BoxMesh)_boltCarrier.Mesh).Size = new Vector3(
+            0.018f,
+            receiverSize.Y * 0.19f,
+            Mathf.Clamp(receiverSize.Z * 0.24f, 0.085f, 0.14f));
+        _boltCarrier.Position = new Vector3(receiverSideX + 0.008f, receiverSize.Y * 0.36f, -receiverSize.Z * 0.11f);
+        _triggerGuardFront.Position = new Vector3(0.0f, -0.105f, triggerCenterZ + 0.07f);
+        _triggerGuardRear.Position = new Vector3(0.0f, -0.105f, triggerCenterZ - 0.07f);
+        _triggerGuardBase.Position = new Vector3(0.0f, -0.166f, triggerCenterZ);
+        _trigger.Position = new Vector3(0.0f, -0.088f, triggerCenterZ + 0.003f);
+        _selector.Position = new Vector3(receiverSideX + 0.011f, 0.008f, triggerCenterZ + 0.01f);
         ((BoxMesh)_handguard.Mesh).Size = new Vector3(
             EquippedWeapon.Platform is WeaponPlatform.ScarL or WeaponPlatform.M24 or WeaponPlatform.AXMC
                 ? 0.17f
