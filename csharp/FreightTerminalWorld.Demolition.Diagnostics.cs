@@ -22,6 +22,10 @@ public partial class FreightTerminalWorld
         var englishReady = _hud.DemolitionBriefingLanguageReady;
         _hud.PressDemolitionRoleForDiagnostics(OperatorRole.Medic);
         _hud.SelectDemolitionLoadoutForDiagnostics(WeaponPlatform.ScarL, 2, WeaponPlatform.M1911);
+        var mapPoolReady = _hud.DemolitionMapOptionCount == DemolitionMapCatalog.PoolSize
+            && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.TideforgeId;
+        var lockedMapRejected = _hud.PressDemolitionMapForDiagnostics("harbor_locks") == false
+            && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.TideforgeId;
         var synchronizedWithoutDeployment = _hud.SelectedDemolitionRole == OperatorRole.Medic
             && _hud.SelectedDemolitionPrimary == WeaponPlatform.ScarL
             && _hud.SelectedDemolitionBuildTier == 2
@@ -38,22 +42,25 @@ public partial class FreightTerminalWorld
         var requestedPrimary = -1;
         var requestedBuild = -1;
         var requestedSidearm = -1;
+        var requestedMap = string.Empty;
         if (probe is not null)
         {
             probe.Visible = false;
             _hud.AddChild(probe);
             probe.BackRequested += () => backRequests++;
-            probe.DeployRequested += (role, primary, build, sidearm) =>
+            probe.DeployRequested += (role, primary, build, sidearm, mapId) =>
             {
                 deployRequests++;
                 requestedRole = role;
                 requestedPrimary = primary;
                 requestedBuild = build;
                 requestedSidearm = sidearm;
+                requestedMap = mapId;
             };
             probe.SetLanguage("zh");
             probe.PressRoleForDiagnostics(OperatorRole.Recon);
             probe.SelectLoadoutForDiagnostics(WeaponPlatform.AK74, 2, WeaponPlatform.M1911);
+            probe.PressMapForDiagnostics(DemolitionMapCatalog.TideforgeId);
             probe.PressBackForDiagnostics();
             probe.PressDeployForDiagnostics();
         }
@@ -63,12 +70,14 @@ public partial class FreightTerminalWorld
             && probe.IntentSignalsConnected
             && probe.LanguageMatches("zh")
             && probe.SelectedRole == OperatorRole.Recon
+            && probe.MapOptionCount == DemolitionMapCatalog.PoolSize
             && backRequests == 1
             && deployRequests == 1
             && requestedRole == (int)OperatorRole.Recon
             && requestedPrimary == (int)WeaponPlatform.AK74
             && requestedBuild == 2
-            && requestedSidearm == (int)WeaponPlatform.M1911;
+            && requestedSidearm == (int)WeaponPlatform.M1911
+            && requestedMap == DemolitionMapCatalog.TideforgeId;
         probe?.QueueFree();
         await WaitFrames(3);
 
@@ -78,9 +87,9 @@ public partial class FreightTerminalWorld
             && !_squadDeployed
             && !_demolitionMode;
         _hud.SetLanguage(originalLanguage);
-        var valid = sceneReady && chineseReady && englishReady
+        var valid = sceneReady && chineseReady && englishReady && mapPoolReady && lockedMapRejected
             && synchronizedWithoutDeployment && probeReady && backReady;
-        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} sync={synchronizedWithoutDeployment} probe={probeReady} back={backReady}");
+        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} map_pool={mapPoolReady} locked_rejected={lockedMapRejected} sync={synchronizedWithoutDeployment} probe={probeReady} back={backReady}");
         GD.Print($"DEMOLITION_BRIEFING_PASS valid={valid}");
         GetTree().Paused = false;
         await WaitFrames(180);
@@ -120,18 +129,19 @@ public partial class FreightTerminalWorld
             && arena.AllStaticBodiesUseWorldLayer();
         var routesReady = layout.HasThreeAttackRoutes
             && layout.AttackToAPath.Count >= 6
-            && layout.AttackToBPath.Count >= 6
+            && layout.AttackToBPath.Count >= 7
             && layout.AttackMidPath.Count >= 4;
         var balanceReady = layout.HasBalancedSiteTravel
             && layout.SiteTravelDifferenceRatio <= DemolitionArenaLayout.MaximumSiteTravelDifference;
         var sightlinesBlocked = !layout.HasSpawnSightlineToSite(0)
             && !layout.HasSpawnSightlineToSite(1);
-        var extendedTravel = layout.WorldBounds.Size.Y >= 120.0f
-            && HorizontalDistance(layout.AttackSpawn, layout.DefenderSpawn) >= 108.0f
-            && layout.AttackToALength >= 85.0f
-            && layout.AttackToBLength >= 85.0f
-            && layout.SitePositions.All(site => HorizontalDistance(layout.DefenderSpawn, site) >= 43.0f);
-        var rotationReady = layout.RotationLength >= 82.0f && layout.RotationLength <= 105.0f;
+        var sitesSeparated = layout.SiteSeparation >= 74.0f
+            && HorizontalDistance(layout.AttackSpawn, layout.DefenderSpawn) >= 104.0f;
+        var extendedTravel = layout.WorldBounds.Size.Y >= 108.0f
+            && layout.AttackToALength >= 75.0f
+            && layout.AttackToBLength >= 75.0f
+            && layout.SitePositions.All(site => HorizontalDistance(layout.DefenderSpawn, site) >= 38.0f);
+        var rotationReady = layout.RotationLength >= 92.0f && layout.RotationLength <= 118.0f;
         var routeAClear = layout.HasCapsuleClearance(layout.AttackToAPath, out var routeABlocker);
         var routeBClear = layout.HasCapsuleClearance(layout.AttackToBPath, out var routeBBlocker);
         var routeMidClear = layout.HasCapsuleClearance(layout.AttackMidPath, out var routeMidBlocker);
@@ -161,9 +171,9 @@ public partial class FreightTerminalWorld
             && arena.ActiveCollisionBodyCount == 0
             && arena.AllStaticBodiesUseWorldLayer();
         var lifecycleReady = initiallyIsolated && collisionReady && deactivatedCleanly;
-        var valid = lifecycleReady && routesReady && balanceReady && sightlinesBlocked && extendedTravel
-            && rotationReady && clearanceReady && markersReady && spatialIsolation && sitesReady;
-        GD.Print($"DEMOLITION_ARENA_CHECK valid={valid} lifecycle={lifecycleReady} inactive={initiallyIsolated} active={collisionReady} deactivated={deactivatedCleanly} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} routes={routesReady} extended={extendedTravel} spawn_gap={HorizontalDistance(layout.AttackSpawn, layout.DefenderSpawn):0.00} path_a={layout.AttackToALength:0.00} path_b={layout.AttackToBLength:0.00} difference={layout.SiteTravelDifferenceRatio:P1} sightlines={sightlinesBlocked} rotation={layout.RotationLength:0.00} clearance={clearanceReady} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{rotationBlocker} markers={markersReady} isolation={spatialIsolation} sites={sitesReady}");
+        var valid = lifecycleReady && routesReady && balanceReady && sightlinesBlocked && sitesSeparated
+            && extendedTravel && rotationReady && clearanceReady && markersReady && spatialIsolation && sitesReady;
+        GD.Print($"DEMOLITION_ARENA_CHECK valid={valid} lifecycle={lifecycleReady} inactive={initiallyIsolated} active={collisionReady} deactivated={deactivatedCleanly} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} routes={routesReady} extended={extendedTravel} site_gap={layout.SiteSeparation:0.00} spawn_gap={HorizontalDistance(layout.AttackSpawn, layout.DefenderSpawn):0.00} path_a={layout.AttackToALength:0.00} path_b={layout.AttackToBLength:0.00} difference={layout.SiteTravelDifferenceRatio:P1} sightlines={sightlinesBlocked} rotation={layout.RotationLength:0.00} clearance={clearanceReady} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{rotationBlocker} markers={markersReady} isolation={spatialIsolation} sites={sitesReady}");
         GD.Print($"DEMOLITION_ARENA_PASS valid={valid}");
         var arenaRoot = arena.Root;
         _demolitionArena = null;
@@ -217,7 +227,7 @@ public partial class FreightTerminalWorld
             Far = 400.0f
         };
         AddChild(camera);
-        camera.GlobalPosition = layout.Origin + new Vector3(0.0f, 90.0f, 82.0f);
+        camera.GlobalPosition = layout.Origin + new Vector3(0.0f, 90.0f, 78.0f);
         camera.LookAt(layout.Origin, Vector3.Up);
         camera.MakeCurrent();
         await WaitFrames(48);
@@ -251,26 +261,29 @@ public partial class FreightTerminalWorld
         var entryButton = _hud.IsDemolitionBriefingVisible && !_hud.IsOperationsOfficeVisible;
         _hud.PressDemolitionRoleForDiagnostics(OperatorRole.Medic);
         _hud.SelectDemolitionLoadoutForDiagnostics(WeaponPlatform.AK74, 2, WeaponPlatform.M1911);
+        _hud.PressDemolitionMapForDiagnostics(DemolitionMapCatalog.TideforgeId);
         var briefingSelection = _hud.SelectedDemolitionRole == OperatorRole.Medic
             && _hud.SelectedDemolitionPrimary == WeaponPlatform.AK74
             && _hud.SelectedDemolitionBuildTier == 2
-            && _hud.SelectedDemolitionSidearm == WeaponPlatform.M1911;
+            && _hud.SelectedDemolitionSidearm == WeaponPlatform.M1911
+            && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.TideforgeId;
         _hud.PressDemolitionDeployForDiagnostics();
         await WaitFrames(5);
         var layout = DemolitionLayout();
-        var customKit = _player.Role == OperatorRole.Medic
+        // The $800 opening wallet cannot cover the $4400 full buy, so round 1 deploys the
+        // eco kit: MP5A5 tier 0 with the sidearm chosen in the briefing.
+        var ecoKit = _player.Role == OperatorRole.Medic
             && _player.HasFireablePrimary
-            && _player.EquippedWeapon.Platform == WeaponPlatform.AK74
+            && _player.EquippedWeapon.Platform == WeaponPlatform.MP5A5
             && _player.HasSecondaryWeapon
             && _player.SecondaryWeaponPlatform == WeaponPlatform.M1911
             && _player.CurrentAmmoGrade == LootGrade.Common
-            && _player.ReserveAmmo == 120;
-        var customBuild = _player.EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Barrel, out var barrel)
-            && barrel == "barrel_marksman"
+            && _player.ReserveAmmo == 150;
+        var ecoBuild = _player.EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Barrel, out var barrel)
+            && barrel == "barrel_cqb"
             && _player.EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Optic, out var optic)
-            && optic == "optic_scope"
-            && _player.EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Muzzle, out var muzzle)
-            && muzzle == "muzzle_suppressor"
+            && optic == "optic_micro"
+            && !_player.EquippedWeapon.Attachments.ContainsKey(AttachmentSlot.Muzzle)
             && _player.AmmoReserveFor(AmmoCaliber.Pistol) == 60;
         var slotBindings = InputMap.HasAction("weapon_primary")
             && InputMap.HasAction("weapon_secondary")
@@ -283,7 +296,7 @@ public partial class FreightTerminalWorld
         _player.SetMagazineAmmoForDiagnostics(4);
         _player.SelectWeapon((int)PlayerWeaponSlot.Primary);
         var primaryMagazineSaved = _player.ActiveWeaponSlot == PlayerWeaponSlot.Primary
-            && _player.EquippedWeapon.Platform == WeaponPlatform.AK74
+            && _player.EquippedWeapon.Platform == WeaponPlatform.MP5A5
             && _player.Ammo == 11;
         _player.SelectWeapon((int)PlayerWeaponSlot.Secondary);
         var secondaryMagazineSaved = _player.Ammo == 4;
@@ -295,11 +308,11 @@ public partial class FreightTerminalWorld
         var deployed = _demolitionMode
             && _demolitionRoundActive
             && _squadDeployed
-            && ActiveSquadCount == 3
-            && DemolitionDefenderCount == 7
-            && DemolitionRoundNumber == 1
-            && DemolitionAttackerScore == 0
-            && DemolitionDefenderScore == 0
+            && DemolitionSquadSizeTotal == 5
+            && DemolitionOpponentCount == 5
+            && DemolitionPlayerSide == DemolitionTeam.Attackers
+            && DemolitionPlayerScore == 0
+            && DemolitionOpponentScore == 0
             && _demolitionSites.All(site => site.Visible)
             && _demolitionArena?.Active == true
             && !_levelRoot.Visible
@@ -309,13 +322,14 @@ public partial class FreightTerminalWorld
             && !_hud.IsDemolitionBriefingVisible
             && !GetTree().Paused;
         var openingStrategy = _demolitionAttackerPlan is not null
-            && _demolitionAttackerPlan.Assignments.Count == 3
-            && _demolitionAttackerPlan.Assignments.Select(assignment => assignment.Duty).Distinct().Count() >= 3
+            && _demolitionAttackerPlan.Assignments.Count == 5
             && _demolitionDefenderPlan is not null
+            && _demolitionDefenderPlan.Assignments.Count == 5
             && _demolitionDefenderPlan.Assignments.Any(assignment => assignment.Duty == DemolitionDuty.AnchorA)
             && _demolitionDefenderPlan.Assignments.Any(assignment => assignment.Duty == DemolitionDuty.AnchorB)
             && _demolitionDefenderPlan.Assignments.Any(assignment => assignment.Duty == DemolitionDuty.MidControl)
-            && DemolitionStrategyAssignmentCount == 10;
+            && DemolitionStrategyAssignmentCount == 10
+            && !_demolitionDevicePlanted;
         var sitesClear = layout.SitePositions.All(IsDemolitionSitePlacementClear);
         var minimapReady = _hud.MinimapLandmarkCount == layout.Markers.Count
             && _hud.MinimapPlayerPosition.X > 0.0f
@@ -324,14 +338,14 @@ public partial class FreightTerminalWorld
         var hostileAircraftIsolated = !IsInstanceValid(_aircraft)
             || (_aircraft!.ProcessMode == ProcessModeEnum.Disabled && !_aircraft.Visible);
         var demolitionPhase = _missionPhase;
-        var defenderCountBeforeReinforcementTick = DemolitionDefenderCount;
+        var defenderCountBeforeReinforcementTick = DemolitionOpponentCount;
         _reinforcementPending = true;
         _reinforcementCountdown = 0.0f;
         _missionPhase = "COMBAT";
         UpdateReinforcements(8.0f);
         var reinforcementsIsolated = _reinforcementPending
             && !_reinforcementsDeployed
-            && DemolitionDefenderCount == defenderCountBeforeReinforcementTick
+            && DemolitionOpponentCount == defenderCountBeforeReinforcementTick
             && _enemies.Count == defenderCountBeforeReinforcementTick;
         _reinforcementPending = false;
         _reinforcementCountdown = 0.0f;
@@ -340,6 +354,10 @@ public partial class FreightTerminalWorld
         OnPhaseChanged("COMBAT", 18.0f, true);
         OnObjectiveChanged(2, "REACH THE EXTRACTION ZONE", true);
         var directorIsolation = _missionPhase == "DEMOLITION" && !_extractionMarker.Visible;
+
+        var fundsAfterOpeningBuy = DemolitionPlayerFunds;
+        // The $2400 eco price clamps to the $800 opening wallet, leaving the player broke.
+        var playerBoughtEcoKit = ecoKit && ecoBuild && fundsAfterOpeningBuy == 0;
 
         _player.GlobalPosition = layout.SitePositions[0] + new Vector3(0, 0.1f, 0);
         _player.Velocity = Vector3.Zero;
@@ -371,83 +389,258 @@ public partial class FreightTerminalWorld
             && _demolitionAttackerPlan.Assignments.Any(assignment => assignment.Duty == DemolitionDuty.Crossfire);
         var (defuseAi, initialDefuserDistance, finalDefuserDistance, defuseFrames) = await ValidateDemolitionDefuseAi(layout);
 
-        foreach (var defender in _demolitionDefenders)
+        foreach (var opponent in _demolitionOpponents)
         {
-            if (IsInstanceValid(defender))
+            if (IsInstanceValid(opponent))
             {
-                defender.ProcessMode = ProcessModeEnum.Disabled;
+                opponent.ProcessMode = ProcessModeEnum.Disabled;
             }
         }
         _demolitionRemaining = 0.05f;
         UpdateDemolitionRound(0.1f);
+        var playerFundsAfterWin = DemolitionPlayerFunds;
+        var opponentFundsAfterLoss = DemolitionOpponentFunds;
         var roundRecorded = !_missionEnded
             && !_demolitionRoundActive
             && !_hud.IsMissionResultVisible
-            && DemolitionAttackerScore == 1
-            && DemolitionDefenderScore == 0
+            && DemolitionPlayerScore == 1
+            && DemolitionOpponentScore == 0
             && DemolitionRoundNumber == 2
-            && _operatorProfileStore.Profile.Credits == creditsBefore
-            && _operatorProfileStore.Profile.DeploymentCount == deploymentsBefore;
+            && playerFundsAfterWin == System.Math.Min(DemolitionEconomy.MaximumFunds,
+                fundsAfterOpeningBuy + DemolitionEconomy.WinReward)
+            && opponentFundsAfterLoss == DemolitionEconomy.StartingFunds + DemolitionEconomy.LossBaseReward;
         UpdateDemolitionIntermission(DemolitionIntermissionDuration + 0.1f);
         await WaitFrames(3);
         var roundReset = _demolitionRoundActive
             && !_demolitionDevicePlanted
             && DemolitionRoundNumber == 2
-            && DemolitionDefenderCount == 7
-            && ActiveSquadCount == 3
+            && DemolitionOpponentCount == 5
+            && DemolitionSquadSizeTotal == 5
             && !_player.IsDead
             && Mathf.IsEqualApprox(_player.Health, _player.MaxHealth)
             && _squadMates.Where(IsInstanceValid).All(mate => !mate.IsDowned
                 && !mate.IsBodyBag
                 && Mathf.IsEqualApprox(mate.Health, mate.MaxHealth))
             && _player.ActiveWeaponSlot == PlayerWeaponSlot.Primary
-            && _player.EquippedWeapon.Platform == WeaponPlatform.AK74
+            && _player.EquippedWeapon.Platform == WeaponPlatform.MP5A5
             && _player.SecondaryWeaponPlatform == WeaponPlatform.M1911
             && _player.PrimaryMagazineAmmo == _player.EquippedWeapon.Stats().MagazineSize;
+
+        // Rounds 2-12 are still the attacking half under MR12: run them out on the clock
+        // so the halftime swap hands the player squad the defense in round 13.
+        while (!_missionEnded && _demolitionRoundActive && DemolitionRoundNumber <= DemolitionMatchState.RoundsPerHalf)
+        {
+            _demolitionRemaining = 0.05f;
+            UpdateDemolitionRound(0.1f);
+            if (_missionEnded || _demolitionRoundActive)
+            {
+                break;
+            }
+            UpdateDemolitionIntermission(DemolitionIntermissionDuration + 0.1f);
+        }
+        var defenseRound = await ValidateDemolitionDefenseRound(layout);
         var matchRules = ValidateDemolitionMatchRules();
-        var valid = entryButton && briefingSelection && customKit && customBuild && slotBindings
+        var economyRules = ValidateDemolitionEconomyRules();
+        var valid = entryButton && briefingSelection && ecoKit && ecoBuild && slotBindings
             && weaponSlots && isolatedEconomy && deployed && openingStrategy && sitesClear
             && minimapReady && hostileAircraftIsolated && reinforcementsIsolated
-            && directorIsolation && planted && retakeStrategy && defuseAi
-            && roundRecorded && roundReset && matchRules;
-        GD.Print($"DEMOLITION_CHECK valid={valid} entry_button={entryButton} briefing={briefingSelection} deployed={deployed} arena={IsDemolitionArenaActive} gameplay={_hud.IsGameplayHudVisible} squad={ActiveSquadCount} defenders={DemolitionDefenderCount} custom_kit={customKit} custom_build={customBuild} slots={weaponSlots} bindings={slotBindings} economy={isolatedEconomy} opening_strategy={openingStrategy} retake_strategy={retakeStrategy} assignments={DemolitionStrategyAssignmentCount} minimap={minimapReady} aircraft_isolated={hostileAircraftIsolated} reinforcements_isolated={reinforcementsIsolated} director_isolation={directorIsolation} sites={DemolitionSiteCount} sites_clear={sitesClear} planted={planted} plant_steps={plantSteps} defuse_ai={defuseAi} defuse_distance={initialDefuserDistance:0.00}->{finalDefuserDistance:0.00} defuse_progress={_demolitionDefuseProgress:0.00} defuse_frames={defuseFrames}/600 round_recorded={roundRecorded} round_reset={roundReset} match_rules={matchRules} score={DemolitionAttackerScore}:{DemolitionDefenderScore} round={DemolitionRoundNumber} result={_hud.IsMissionResultVisible}");
+            && directorIsolation && playerBoughtEcoKit && planted && retakeStrategy && defuseAi
+            && roundRecorded && roundReset && defenseRound && matchRules && economyRules;
+        GD.Print($"DEMOLITION_CHECK valid={valid} entry_button={entryButton} briefing={briefingSelection} deployed={deployed} arena={IsDemolitionArenaActive} gameplay={_hud.IsGameplayHudVisible} squad={DemolitionSquadSizeTotal} opponents={DemolitionOpponentCount} eco_kit={ecoKit} eco_build={ecoBuild} slots={weaponSlots} bindings={slotBindings} economy={isolatedEconomy} opening_strategy={openingStrategy} retake_strategy={retakeStrategy} assignments={DemolitionStrategyAssignmentCount} minimap={minimapReady} aircraft_isolated={hostileAircraftIsolated} reinforcements_isolated={reinforcementsIsolated} director_isolation={directorIsolation} sites={DemolitionSiteCount} sites_clear={sitesClear} funds_after_buy={fundsAfterOpeningBuy} eco_buy={playerBoughtEcoKit} planted={planted} plant_steps={plantSteps} defuse_ai={defuseAi} defuse_distance={initialDefuserDistance:0.00}->{finalDefuserDistance:0.00} defuse_progress={_demolitionDefuseProgress:0.00} defuse_frames={defuseFrames}/600 round_recorded={roundRecorded} round_reset={roundReset} defense_round={defenseRound} match_rules={matchRules} economy_rules={economyRules} score={DemolitionPlayerScore}:{DemolitionOpponentScore} round={DemolitionRoundNumber} result={_hud.IsMissionResultVisible}");
         GD.Print($"DEMOLITION_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
 
+    /// <summary>
+    /// Round 13 opens the second half with the player squad defending after the halftime
+    /// swap: verify the defender-side spawns, the enemy AI carrying and planting the bomb,
+    /// and the player defusing it to win the round.
+    /// </summary>
+    private async System.Threading.Tasks.Task<bool> ValidateDemolitionDefenseRound(DemolitionArenaLayout layout)
+    {
+        if (_missionEnded || !_demolitionRoundActive
+            || DemolitionRoundNumber != DemolitionMatchState.RoundsPerHalf + 1)
+        {
+            GD.Print($"DEMOLITION_DEFENSE_CHECK valid=False stage=preconditions round={DemolitionRoundNumber} active={_demolitionRoundActive}");
+            return false;
+        }
+
+        var playerSide = DemolitionPlayerSide;
+        var spawnsAtDefenderBarrier = playerSide == DemolitionTeam.Defenders
+            && _player.GlobalPosition.Z < layout.Origin.Z - 40.0f;
+        var enemiesAttacking = DemolitionOpponentCount == 5
+            && _demolitionOpponents.All(opponent => !IsInstanceValid(opponent)
+                || opponent.GlobalPosition.Z > layout.Origin.Z + 40.0f);
+
+        // Freeze every combatant except the enemy carrier so the plant run is
+        // deterministic; the carrier needs live physics to walk into plant range.
+        foreach (var opponent in _demolitionOpponents)
+        {
+            if (IsInstanceValid(opponent))
+            {
+                opponent.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        foreach (var mate in _squadMates)
+        {
+            if (IsInstanceValid(mate))
+            {
+                mate.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        _player.GlobalPosition = layout.Origin + new Vector3(6.0f, 0.2f, 30.0f);
+        _player.Velocity = Vector3.Zero;
+
+        var carrier = _demolitionCarrier;
+        if (carrier is null || !IsInstanceValid(carrier) || carrier.IsDead)
+        {
+            GD.Print($"DEMOLITION_DEFENSE_CHECK valid=False stage=carrier_missing round={DemolitionRoundNumber}");
+            return false;
+        }
+        var siteIndex = Mathf.Clamp(_demolitionEnemyTargetSite, 0, layout.SitePositions.Count - 1);
+        var site = layout.SitePositions[siteIndex];
+        carrier!.GlobalPosition = site + new Vector3(0.0f, 0.2f, 6.0f);
+        carrier.Velocity = Vector3.Zero;
+        carrier.ProcessMode = ProcessModeEnum.Inherit;
+
+        var plantFrames = 0;
+        while (!_demolitionDevicePlanted && plantFrames < 600)
+        {
+            _ = TryHandleDemolitionDefenderMovement(carrier, 0.05f, null);
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            plantFrames++;
+        }
+        var enemyPlanted = _demolitionDevicePlanted
+            && _demolitionActiveSite == siteIndex
+            && plantFrames > 1;
+        carrier.ProcessMode = ProcessModeEnum.Disabled;
+        if (!enemyPlanted)
+        {
+            GD.Print($"DEMOLITION_DEFENSE_CHECK valid=False stage=plant_failed frames={plantFrames} progress={_demolitionEnemyPlantProgress:0.00} carrier={carrier.GlobalPosition} site={site}");
+            return false;
+        }
+
+        // Walk the player to the planted device and hold the interact key to defuse.
+        _player.GlobalPosition = site + new Vector3(0.0f, 0.2f, 0.6f);
+        _interactReleaseRequired = false;
+        Input.ActionRelease("interact");
+        Input.ActionPress("interact");
+        var defuseSteps = 0;
+        var maximumDefuseSteps = Mathf.CeilToInt(DemolitionDefuseDuration / 0.1f) + 4;
+        while (_demolitionRoundActive && DemolitionPlayerDefuseProgress < 1.0f && defuseSteps < maximumDefuseSteps)
+        {
+            UpdateDemolitionInteraction(0.1f);
+            defuseSteps++;
+        }
+        Input.ActionRelease("interact");
+        var defusedAndWon = !_demolitionRoundActive
+            && DemolitionPlayerScore == 2
+            && DemolitionOpponentScore == DemolitionMatchState.RoundsPerHalf - 1
+            && defuseSteps > 1;
+
+        var valid = spawnsAtDefenderBarrier && enemiesAttacking && enemyPlanted && defusedAndWon;
+        GD.Print($"DEMOLITION_DEFENSE_CHECK valid={valid} side_swapped={playerSide == DemolitionTeam.Defenders} spawns_defend={spawnsAtDefenderBarrier} enemies_attacking={enemiesAttacking} ai_planted={enemyPlanted} plant_frames={plantFrames} defused={defusedAndWon} defuse_steps={defuseSteps}");
+        return valid;
+    }
+
     private static bool ValidateDemolitionMatchRules()
     {
-        var overtime = new DemolitionMatchState();
+        var match = new DemolitionMatchState();
+        var sidesHold = true;
+        for (var round = 1; round <= DemolitionMatchState.RegulationRounds; round++)
+        {
+            if (match.SideForRound(round) != (round <= DemolitionMatchState.RoundsPerHalf
+                ? DemolitionTeam.Attackers
+                : DemolitionTeam.Defenders))
+            {
+                sidesHold = false;
+            }
+        }
+        var overtimeSidesHold = match.SideForRound(25) == DemolitionTeam.Attackers
+            && match.SideForRound(29) == DemolitionTeam.Defenders
+            && match.SideForRound(33) == DemolitionTeam.Attackers;
+
+        // Trade rounds to 5-5, then tie it 6-6: the round completing the twelfth reports
+        // the halftime side swap.
+        for (var round = 0; round < 5; round++)
+        {
+            match.RecordRound(false);
+            match.RecordRound(true);
+        }
+        match.RecordRound(false);
+        var halftimeSwapReported = match.RecordRound(true).SideSwap;
+        var tiedAfterTwelve = match.CompletedRounds == 12
+            && match.PlayerScore == 6
+            && match.OpponentScore == 6
+            && !match.IsComplete;
+
+        // Trade to 12-12 through all 24 regulation rounds: overtime starts.
+        DemolitionRoundResult round24 = default;
         for (var round = 0; round < 6; round++)
         {
-            overtime.RecordRound(DemolitionTeam.Attackers);
-            overtime.RecordRound(DemolitionTeam.Defenders);
+            match.RecordRound(true);
+            round24 = match.RecordRound(false);
         }
-        var tiedAfterTwelve = overtime.CompletedRounds == 12
-            && overtime.AttackerScore == 6
-            && overtime.DefenderScore == 6
-            && overtime.IsOvertime
-            && !overtime.IsComplete;
-        overtime.RecordRound(DemolitionTeam.Attackers);
-        var onePointDoesNotFinish = overtime.AttackerScore == 7
-            && overtime.DefenderScore == 6
-            && !overtime.IsComplete;
-        overtime.RecordRound(DemolitionTeam.Attackers);
-        var twoPointLeadFinishes = overtime.IsComplete
-            && overtime.Winner == DemolitionTeam.Attackers
-            && overtime.AttackerScore == 8
-            && overtime.DefenderScore == 6;
+        var enteredOvertimeCleanly = round24.EnteredOvertime
+            && match.CompletedRounds == DemolitionMatchState.RegulationRounds
+            && match.PlayerScore == 12
+            && match.OpponentScore == 12
+            && match.IsOvertime
+            && !match.IsComplete;
+
+        // Overtime is win-by-two: 13-12 keeps playing, 14-12 finishes the match.
+        match.RecordRound(true);
+        var onePointLeadDoesNotFinish = !match.IsComplete
+            && match.PlayerScore == 13
+            && match.OpponentScore == 12;
+        var finished = match.RecordRound(true);
+        var twoPointLeadFinishes = finished.MatchComplete
+            && match.Winner is not null
+            && match.PlayerScore == 14
+            && match.OpponentScore == 12;
 
         var regulation = new DemolitionMatchState();
-        for (var round = 0; round < 7; round++)
+        for (var round = 0; round < 13; round++)
         {
-            regulation.RecordRound(DemolitionTeam.Defenders);
+            regulation.RecordRound(true);
         }
-        var regulationFirstToSeven = regulation.IsComplete
+        var regulationFirstToThirteen = regulation.IsComplete
             && !regulation.IsOvertime
-            && regulation.Winner == DemolitionTeam.Defenders
-            && regulation.DefenderScore == 7;
-        return tiedAfterTwelve && onePointDoesNotFinish && twoPointLeadFinishes && regulationFirstToSeven;
+            && regulation.PlayerScore == 13
+            && regulation.OpponentScore == 0;
+
+        return sidesHold && overtimeSidesHold && tiedAfterTwelve && halftimeSwapReported
+            && enteredOvertimeCleanly && onePointLeadDoesNotFinish && twoPointLeadFinishes
+            && regulationFirstToThirteen;
+    }
+
+    private static bool ValidateDemolitionEconomyRules()
+    {
+        var player = new DemolitionEconomy();
+        var opponent = new DemolitionEconomy();
+        var startsEqual = player.Funds == DemolitionEconomy.StartingFunds
+            && opponent.Funds == DemolitionEconomy.StartingFunds;
+        var winReward = player.RecordRound(won: true, objectiveCompleted: false);
+        var lossReward = opponent.RecordRound(won: false, objectiveCompleted: false);
+        var firstRewards = winReward == DemolitionEconomy.WinReward
+            && lossReward == DemolitionEconomy.LossBaseReward;
+        var secondLoss = opponent.RecordRound(won: false, objectiveCompleted: false);
+        var streaksEscalate = secondLoss == DemolitionEconomy.LossBaseReward + DemolitionEconomy.LossStreakBonus;
+        var plantBonus = new DemolitionEconomy()
+            .RecordRound(won: false, objectiveCompleted: true)
+            == DemolitionEconomy.LossBaseReward + DemolitionEconomy.PlantBonus;
+        var lossStreakResets = opponent.LossStreak == 2
+            && opponent.RecordRound(won: true, objectiveCompleted: false) == DemolitionEconomy.WinReward
+            && opponent.LossStreak == 0;
+        player.Reset();
+        var fundsCapped = new DemolitionEconomy();
+        for (var round = 0; round < 6; round++)
+        {
+            fundsCapped.RecordRound(won: true, objectiveCompleted: false);
+        }
+        var capHolds = fundsCapped.Funds == DemolitionEconomy.MaximumFunds;
+        return startsEqual && firstRewards && streaksEscalate && plantBonus
+            && lossStreakResets && player.Funds == DemolitionEconomy.StartingFunds && capHolds;
     }
 
     private async System.Threading.Tasks.Task<(bool Valid, float Initial, float Final, int Frames)> ValidateDemolitionDefuseAi(
@@ -469,11 +662,11 @@ public partial class FreightTerminalWorld
                 mate.ProcessMode = ProcessModeEnum.Disabled;
             }
         }
-        foreach (var defender in _demolitionDefenders)
+        foreach (var opponent in _demolitionOpponents)
         {
-            if (IsInstanceValid(defender))
+            if (IsInstanceValid(opponent))
             {
-                defender.ProcessMode = ProcessModeEnum.Disabled;
+                opponent.ProcessMode = ProcessModeEnum.Disabled;
             }
         }
         var site = layout.SitePositions[0];
