@@ -3,6 +3,12 @@ using Godot;
 
 namespace OperationSteelTide;
 
+/// <summary>
+/// Presents the current five-slot loadout supplied through <see cref="SetLoadout"/>.
+/// Emits <c>SlotRequested</c> for user intent and never mutates inventory state.
+/// Scene bindings and button callbacks are established in <see cref="_Ready"/>;
+/// loadout snapshots received before that point are retained and rendered once ready.
+/// </summary>
 [GlobalClass]
 public partial class QuickSlotBarView : Control
 {

@@ -1505,7 +1505,7 @@ public partial class FreightTerminalWorld : Node3D
             return;
         }
         _missionEnded = true;
-        Input.MouseMode = Input.MouseModeEnum.Visible;
+        LockLootForMissionTransition(Input.MouseModeEnum.Visible);
         _hud.HideDownedState();
         _missionDirector.CompleteMission(false, _kills, _headshots, _shotsFired, _shotsHit);
         _hud.ShowResult(false);
@@ -1586,7 +1586,7 @@ public partial class FreightTerminalWorld : Node3D
     }
 
     private bool LocalPlayerCannotInteract =>
-        _localPlayerDowned || _localPlayerEliminated || _player.IsDead;
+        _missionEnded || _localPlayerDowned || _localPlayerEliminated || _player.IsDead;
 
     private void UpdateInteraction(float delta)
     {
@@ -1768,16 +1768,17 @@ public partial class FreightTerminalWorld : Node3D
         _interactionProgress = 0.0f;
         if (LocalPlayerCannotInteract)
         {
-            _openLootSource = null;
-            _personalBackpackOpen = false;
-            _lootSearchTarget = null;
-            _player.SetSearchPose(false);
-            _hud.SetInteraction(string.Empty, 0.0f, false);
+            ClearPendingLootOpen();
             return;
         }
         _openLootSource = source;
         _personalBackpackOpen = false;
         source.OnSearched();
+        if (LocalPlayerCannotInteract || !ReferenceEquals(_openLootSource, source))
+        {
+            ClearPendingLootOpen();
+            return;
+        }
         _player.UiLocked = true;
         _player.SetSearchPose(true, 1.0f);
         _player.DisarmFireInput();
@@ -1785,6 +1786,30 @@ public partial class FreightTerminalWorld : Node3D
         Input.MouseMode = Input.MouseModeEnum.Visible;
         _hud.SetInteraction(string.Empty, 0.0f, false);
         _hud.ShowLoot(source.DisplayName(_languageSetting), source.Loot, _player, true);
+    }
+
+    private void ClearPendingLootOpen()
+    {
+        _openLootSource = null;
+        _personalBackpackOpen = false;
+        _lootSearchTarget = null;
+        _interactionProgress = 0.0f;
+        _player.SetSearchPose(false);
+        _hud.SetInteraction(string.Empty, 0.0f, false);
+    }
+
+    private void LockLootForMissionTransition(Input.MouseModeEnum mouseMode)
+    {
+        if (_hud.IsLootVisible)
+        {
+            _hud.HideLoot();
+        }
+        ClearPendingLootOpen();
+        _interactReleaseRequired = Input.IsActionPressed("interact");
+        _player.UiLocked = true;
+        _player.DisarmFireInput();
+        _player.DisarmMovementInput();
+        Input.MouseMode = mouseMode;
     }
 
     private void OpenPersonalBackpack()
@@ -1816,7 +1841,9 @@ public partial class FreightTerminalWorld : Node3D
         _interactReleaseRequired = Input.IsActionPressed("interact");
         _player.SetSearchPose(false);
         _player.DisarmFireInput();
-        Input.MouseMode = Input.MouseModeEnum.Captured;
+        Input.MouseMode = _missionEnded
+            ? Input.MouseModeEnum.Visible
+            : Input.MouseModeEnum.Captured;
         if (LocalPlayerCannotInteract)
         {
             _player.UiLocked = true;
@@ -1829,7 +1856,7 @@ public partial class FreightTerminalWorld : Node3D
 
     internal bool InterruptLootForIncomingDamage()
     {
-        if (!_hud.IsLootVisible)
+        if (!_hud.IsLootVisible && _openLootSource is null)
         {
             return false;
         }
@@ -1839,7 +1866,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private void TakeLootItem(string itemId)
     {
-        if (_openLootSource is null)
+        if (LocalPlayerCannotInteract || _openLootSource is null)
         {
             return;
         }
@@ -1859,7 +1886,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private void EquipLootItem(string itemId)
     {
-        if (_openLootSource is null)
+        if (LocalPlayerCannotInteract || _openLootSource is null)
         {
             return;
         }
@@ -1891,6 +1918,10 @@ public partial class FreightTerminalWorld : Node3D
 
     private void UseBackpackItem(string itemId)
     {
+        if (LocalPlayerCannotInteract)
+        {
+            return;
+        }
         var item = _player.Backpack.Find(candidate => candidate.Id == itemId);
         if (item?.Kind is LootItemKind.Medical or LootItemKind.ArmorPlate)
         {
@@ -1906,7 +1937,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private void ReturnBackpackItem(string itemId)
     {
-        if (_openLootSource is null)
+        if (LocalPlayerCannotInteract || _openLootSource is null)
         {
             return;
         }
@@ -1921,6 +1952,10 @@ public partial class FreightTerminalWorld : Node3D
 
     private void DropBackpackItemToGround(string itemId)
     {
+        if (LocalPlayerCannotInteract)
+        {
+            return;
+        }
         if (!_player.TryRemoveBackpackItem(itemId, out var item))
         {
             return;
@@ -2899,6 +2934,105 @@ public partial class FreightTerminalWorld : Node3D
         await WaitFrames(4);
         var damageMovementRestored = _player.HasMovementIntent;
         Input.ActionRelease("move_forward");
+        var damageSource = new ResidentialSupplyCache { Name = "LootDamageInterruptProbe" };
+        damageSource.Configure(
+            ResidentialCacheKind.FamilyStash,
+            0,
+            0,
+            new[]
+            {
+                new LootItem
+                {
+                    Kind = LootItemKind.Valuable,
+                    ValuableKind = ValuableItemKind.CannedCoffee,
+                    Grade = LootGrade.Common
+                }
+            });
+        AddChild(damageSource);
+        damageSource.FirstOpened += _ =>
+            _player.TakeDamage(8.0f, _player.GlobalPosition + Vector3.Up, this);
+        _player.SetHealthForDiagnostics(_player.MaxHealth);
+        var searchDamageHealthBefore = _player.Health;
+        OpenLoot(damageSource);
+        await WaitFrames(2);
+        var searchDamageMouseCaptured = Input.MouseMode == Input.MouseModeEnum.Captured;
+        var searchDamageMouseRestored = searchDamageMouseCaptured || !damageMouseObservable;
+        var searchDamageAborted = _player.Health < searchDamageHealthBefore
+            && !_hud.IsLootVisible
+            && !_player.UiLocked
+            && _openLootSource is null
+            && !_personalBackpackOpen
+            && searchDamageMouseRestored;
+        damageSource.QueueFree();
+        await WaitFrames(24);
+        SaveViewportImage("res://modular_weapon_validation.png");
+
+        var fatalStateSource = new ResidentialSupplyCache { Name = "LootFatalStateProbe" };
+        fatalStateSource.Configure(
+            ResidentialCacheKind.FamilyStash,
+            0,
+            0,
+            new[]
+            {
+                new LootItem
+                {
+                    Kind = LootItemKind.Valuable,
+                    ValuableKind = ValuableItemKind.CannedCoffee,
+                    Grade = LootGrade.Common
+                }
+            });
+        AddChild(fatalStateSource);
+        fatalStateSource.FirstOpened += _ =>
+        {
+            _missionEnded = true;
+            Input.MouseMode = Input.MouseModeEnum.Visible;
+        };
+        _missionEnded = false;
+        OpenLoot(fatalStateSource);
+        await WaitFrames(2);
+        var fatalMouseObservable = DisplayServer.GetName() != "headless";
+        var fatalMouseVisible = Input.MouseMode == Input.MouseModeEnum.Visible;
+        var fatalSearchStateHandled = _missionEnded
+            && !_hud.IsLootVisible
+            && _openLootSource is null
+            && !_personalBackpackOpen
+            && (fatalMouseVisible || !fatalMouseObservable);
+
+        _missionEnded = false;
+        _player.UiLocked = false;
+        _player.RestoreMovementInput();
+        Input.MouseMode = Input.MouseModeEnum.Captured;
+        OpenLoot(fatalStateSource);
+        await WaitFrames(2);
+        var activeLootOpenedBeforeEnd = _hud.IsLootVisible
+            && ReferenceEquals(_openLootSource, fatalStateSource);
+        static string InventoryFingerprint(IEnumerable<LootItem> items)
+            => string.Join('|', items.Select(item => $"{item.Id}:{item.Quantity}"));
+        var sourceBeforeEnd = InventoryFingerprint(fatalStateSource.Loot);
+        var backpackBeforeEnd = InventoryFingerprint(_player.Backpack);
+        var droppedLootIdBeforeEnd = _nextDroppedLootId;
+        var sourceItemId = fatalStateSource.Loot.FirstOrDefault()?.Id ?? string.Empty;
+        var backpackItemId = _player.Backpack.FirstOrDefault()?.Id ?? string.Empty;
+        _missionEnded = true;
+        LockLootForMissionTransition(Input.MouseModeEnum.Visible);
+        _hud.ShowResult(false);
+        TakeLootItem(sourceItemId);
+        EquipLootItem(sourceItemId);
+        ReturnBackpackItem(backpackItemId);
+        UseBackpackItem(backpackItemId);
+        DropBackpackItemToGround(backpackItemId);
+        CloseLoot();
+        var activeLootEndHandled = activeLootOpenedBeforeEnd
+            && _hud.IsMissionResultVisible
+            && !_hud.IsLootVisible
+            && _openLootSource is null
+            && !_personalBackpackOpen
+            && _player.UiLocked
+            && InventoryFingerprint(fatalStateSource.Loot) == sourceBeforeEnd
+            && InventoryFingerprint(_player.Backpack) == backpackBeforeEnd
+            && _nextDroppedLootId == droppedLootIdBeforeEnd
+            && (Input.MouseMode == Input.MouseModeEnum.Visible || !fatalMouseObservable);
+        fatalStateSource.QueueFree();
         var valid = opened
             && targetMatched
             && immediateOpenMilliseconds <= 500
@@ -2925,11 +3059,12 @@ public partial class FreightTerminalWorld : Node3D
             && closedByInteract
             && movementRestored
             && damageClosedLoot
-            && damageMovementRestored;
-        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} single_click={sourceClickActivated} auto_equip={emptyPrimaryAutoEquipped} policy={policyValid} weapon_menu={weaponMenuActivated}/{weaponMenuReady}/{weaponMenuEquipped} item_menu={itemMenuActivated}/{itemMenuDropOnly}/{itemMenuDropped} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_mouse_observable={damageMouseObservable} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+            && damageMovementRestored
+            && searchDamageAborted
+            && fatalSearchStateHandled
+            && activeLootEndHandled;
+        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} single_click={sourceClickActivated} auto_equip={emptyPrimaryAutoEquipped} policy={policyValid} weapon_menu={weaponMenuActivated}/{weaponMenuReady}/{weaponMenuEquipped} item_menu={itemMenuActivated}/{itemMenuDropOnly}/{itemMenuDropped} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_mouse_observable={damageMouseObservable} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} search_damage_aborted={searchDamageAborted} search_damage_mouse={searchDamageMouseCaptured} fatal_search_state={fatalSearchStateHandled} active_loot_end={activeLootEndHandled} fatal_result={_hud.IsMissionResultVisible} fatal_mouse={fatalMouseVisible} fatal_mouse_observable={fatalMouseObservable} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         GD.Print($"LOOT_PASS valid={valid}");
-        await WaitFrames(24);
-        SaveViewportImage("res://modular_weapon_validation.png");
         GetTree().Quit(valid ? 0 : 2);
     }
 

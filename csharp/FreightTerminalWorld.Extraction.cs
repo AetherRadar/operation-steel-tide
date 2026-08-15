@@ -223,6 +223,7 @@ public partial class FreightTerminalWorld
         _extractionCountdownActive = false;
         _extractionDeparturePlaying = true;
         _missionEnded = true;
+        LockLootForMissionTransition(Input.MouseModeEnum.Captured);
         _player.EjectFromVehicleIfAny();
         _player.UiLocked = true;
         _player.DisarmFireInput();
