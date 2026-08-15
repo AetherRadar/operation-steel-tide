@@ -39,6 +39,15 @@ public sealed class DemolitionArenaLayout
     public const float MaximumSiteTravelDifference = 0.12f;
     public const int MinimumCentralCoverBodyCount = 8;
 
+    internal static IReadOnlyList<string> StrategyTargetKeys { get; } = Array.AsReadOnly(new[]
+    {
+        "attack_entry_a", "attack_entry_b", "attack_support_a", "attack_support_b", "attack_mid_recon",
+        "defense_anchor_a", "defense_anchor_b", "defense_mid", "defense_rotate_a", "defense_rotate_b",
+        "retake_entry_a", "retake_entry_b", "retake_cover_a", "retake_cover_b", "retake_flank_a", "retake_flank_b",
+        "postplant_guard_a", "postplant_guard_b", "postplant_crossfire_a", "postplant_crossfire_b",
+        "postplant_lurk_a", "postplant_lurk_b", "site_a", "site_b"
+    });
+
     public static readonly Vector3 WorldOrigin = new(285.0f, 0.0f, -35.0f);
 
     /// <summary>Site centers in arena-local coordinates, indexed by site number.</summary>
@@ -213,7 +222,7 @@ public sealed class DemolitionArenaLayout
         "attack_mid_recon" => World(new Vector3(0.0f, 0.2f, 3.0f)),
         "defense_anchor_a" => World(new Vector3(-30.0f, 0.2f, 12.0f)),
         "defense_anchor_b" => World(new Vector3(31.0f, 0.2f, -33.0f)),
-        "defense_mid" => World(new Vector3(0.0f, 0.2f, -10.0f)),
+        "defense_mid" => World(new Vector3(0.0f, 0.2f, -8.0f)),
         "defense_rotate_a" => World(new Vector3(-12.0f, 0.2f, -16.0f)),
         "defense_rotate_b" => World(new Vector3(12.0f, 0.2f, -16.0f)),
         "retake_entry_a" => World(new Vector3(-24.0f, 0.2f, 8.0f)),
@@ -224,8 +233,8 @@ public sealed class DemolitionArenaLayout
         "retake_flank_b" => World(new Vector3(26.0f, 0.2f, -16.0f)),
         "postplant_guard_a" => World(new Vector3(-30.0f, 0.2f, 18.0f)),
         "postplant_guard_b" => World(new Vector3(30.0f, 0.2f, -15.0f)),
-        "postplant_crossfire_a" => World(new Vector3(-36.0f, 0.2f, 27.0f)),
-        "postplant_crossfire_b" => World(new Vector3(35.0f, 0.2f, -26.0f)),
+        "postplant_crossfire_a" => World(new Vector3(-29.0f, 0.2f, 27.0f)),
+        "postplant_crossfire_b" => World(new Vector3(30.0f, 0.2f, -27.0f)),
         "postplant_lurk_a" => World(new Vector3(-20.0f, 0.2f, 4.0f)),
         "postplant_lurk_b" => World(new Vector3(20.0f, 0.2f, 2.0f)),
         "site_a" => SitePositions[0],

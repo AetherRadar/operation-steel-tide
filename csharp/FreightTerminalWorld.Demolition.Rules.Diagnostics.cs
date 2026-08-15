@@ -55,6 +55,7 @@ public partial class FreightTerminalWorld
 
         var scoreBefore = _demolitionMatch.PlayerScore;
         _player.TakeDamage(9999.0f, _player.HitPoint(HitRegion.Torso), this);
+        var playerEliminationPosition = _player.GlobalPosition;
         var playerEliminated = _player.IsDead
             && _player.ReviveUsed
             && !_player.CanBeRevived
@@ -68,10 +69,12 @@ public partial class FreightTerminalWorld
             && _demolitionMatch.PlayerScore == scoreBefore;
 
         var mate = _squadMates.FirstOrDefault(candidate => IsInstanceValid(candidate) && !candidate.IsDowned);
+        var mateEliminationPosition = Vector3.Zero;
         var mateEliminated = false;
         if (mate is not null)
         {
             mate.TakeCombatDamage(9999.0f, mate.HitPoint(HitRegion.Torso), this);
+            mateEliminationPosition = mate.GlobalPosition;
             mateEliminated = mate.IsDowned
                 && mate.ReviveUsed
                 && !mate.CanBeRevived
@@ -80,6 +83,42 @@ public partial class FreightTerminalWorld
                 && !mate.TryReceiveRevive(50.0f)
                 && !mate.IsBodyBag;
         }
+        await WaitFrames(6);
+        var playerFrozenAfterElimination = !_player.IsPhysicsProcessing()
+            && _player.GlobalPosition.DistanceTo(playerEliminationPosition) <= 0.01f
+            && _player.Velocity.LengthSquared() <= 0.0001f;
+        var mateFrozenAfterElimination = mate is not null
+            && !mate.IsPhysicsProcessing()
+            && mate.GlobalPosition.DistanceTo(mateEliminationPosition) <= 0.01f
+            && mate.Velocity.LengthSquared() <= 0.0001f;
+        var playerEliminationCollision = $"{_player.CollisionLayer}/{_player.CollisionMask}";
+        var mateEliminationCollision = mate is null
+            ? "missing"
+            : $"{mate.CollisionLayer}/{mate.CollisionMask}";
+
+        var resetQuote = DemolitionBuyCatalog.Quote(DemolitionPurchaseSelection.Empty, 0);
+        var resetLoadout = DemolitionBuyCatalog.BuildLoadout(resetQuote);
+        _localPlayerDowned = false;
+        _localPlayerEliminated = false;
+        _player.ResetForDemolitionRound(
+            playerEliminationPosition,
+            _player.Role,
+            resetLoadout,
+            grenadeCount: 0,
+            smokeGrenadeCount: 0);
+        mate?.ResetForDemolitionRound(mateEliminationPosition);
+        var playerRestoredForNextRound = _player.IsPhysicsProcessing()
+            && !_player.IsDead
+            && _player.CollisionLayer == 1
+            && _player.CollisionMask == (1 | 2)
+            && _player.Velocity.LengthSquared() <= 0.0001f;
+        var mateRestoredForNextRound = mate is not null
+            && mate.IsPhysicsProcessing()
+            && !mate.IsDowned
+            && !mate.ReviveUsed
+            && mate.CollisionLayer == 4
+            && mate.CollisionMask == 1
+            && mate.Velocity.LengthSquared() <= 0.0001f;
 
         var smokePresentationAligned = Mathf.Abs(SmokeGrenade.CloudRadius - SmokeGrenade.VisualCoverageRadius) <= 0.1f;
         _hud.ShowOperationsOffice();
@@ -94,9 +133,13 @@ public partial class FreightTerminalWorld
             && reconBoundary
             && playerEliminated
             && mateEliminated
+            && playerFrozenAfterElimination
+            && mateFrozenAfterElimination
+            && playerRestoredForNextRound
+            && mateRestoredForNextRound
             && smokePresentationAligned
             && presentationRestored;
-        GD.Print($"DEMOLITION_RULES_CHECK valid={valid} roster_hidden={rosterHidden} skill_hud={skillHudVisible} orders_hidden={ordersHidden} utility={utilityHudVisible} recon_range={DemolitionReconScanRange:0.0} recon_boundary={reconBoundary} inputs={roleRules} elimination_rules={eliminationRules} spectator_localized={spectatorLocalized} player_eliminated={playerEliminated} player_collision={_player.CollisionLayer}/{_player.CollisionMask} mate_eliminated={mateEliminated} smoke_aligned={smokePresentationAligned} presentation_restored={presentationRestored} round_active={_demolitionRoundActive}");
+        GD.Print($"DEMOLITION_RULES_CHECK valid={valid} roster_hidden={rosterHidden} skill_hud={skillHudVisible} orders_hidden={ordersHidden} utility={utilityHudVisible} recon_range={DemolitionReconScanRange:0.0} recon_boundary={reconBoundary} inputs={roleRules} elimination_rules={eliminationRules} spectator_localized={spectatorLocalized} player_eliminated={playerEliminated} player_frozen={playerFrozenAfterElimination} player_collision={playerEliminationCollision} player_reset={playerRestoredForNextRound} mate_eliminated={mateEliminated} mate_frozen={mateFrozenAfterElimination} mate_collision={mateEliminationCollision} mate_reset={mateRestoredForNextRound} smoke_aligned={smokePresentationAligned} presentation_restored={presentationRestored} round_active={_demolitionRoundActive}");
         GD.Print($"DEMOLITION_RULES_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

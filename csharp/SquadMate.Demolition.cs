@@ -4,6 +4,8 @@ namespace OperationSteelTide;
 
 public partial class SquadMate
 {
+    internal Vector3 DemolitionOrderPositionForDiagnostics => _orderPosition;
+
     public void EliminateForDemolitionRound()
     {
         if (!IsDowned || IsBodyBag)
@@ -11,6 +13,8 @@ public partial class SquadMate
             return;
         }
         ReviveUsed = true;
+        Velocity = Vector3.Zero;
+        SetPhysicsProcess(false);
         CollisionLayer = 0;
         CollisionMask = 0;
         foreach (var child in GetChildren())
@@ -41,6 +45,7 @@ public partial class SquadMate
         _overdriveTime = 0.0f;
         _weaponCooldown = 0.0f;
         ProcessMode = ProcessModeEnum.Inherit;
+        SetPhysicsProcess(true);
         Visible = true;
         CollisionLayer = 4;
         CollisionMask = 1;

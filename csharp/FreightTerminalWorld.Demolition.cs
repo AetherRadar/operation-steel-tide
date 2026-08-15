@@ -26,6 +26,7 @@ public partial class FreightTerminalWorld
     private readonly HashSet<EnemyOperator> _demolitionCombatBreakoffs = new();
     private readonly DemolitionMatchState _demolitionMatch = new();
     private readonly DemolitionStrategyPlanner _demolitionStrategyPlanner = new();
+    private readonly DemolitionObjectiveChannelCoordinator _demolitionObjectiveChannelCoordinator = new();
     private readonly DemolitionEconomy _demolitionPlayerEconomy = new();
     private readonly DemolitionEconomy _demolitionOpponentEconomy = new();
     private DemolitionArenaRuntime? _demolitionArena;
@@ -809,6 +810,7 @@ public partial class FreightTerminalWorld
     private void CompleteDemolitionMatch(string finalRoundReason)
     {
         _missionEnded = true;
+        LockLootForMissionTransition(Input.MouseModeEnum.Visible);
         _demolitionIntermissionRemaining = 0.0f;
         var playerVictory = _demolitionMatch.PlayerScore > _demolitionMatch.OpponentScore;
         Input.MouseMode = Input.MouseModeEnum.Visible;

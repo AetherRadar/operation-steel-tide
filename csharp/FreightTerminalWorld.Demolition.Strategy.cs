@@ -89,42 +89,10 @@ public partial class FreightTerminalWorld
         _demolitionAttackerPlan = opponentTeamSide == DemolitionTeam.Attackers ? opponentPlan : _demolitionAttackerPlan;
         _demolitionDefenderPlan = opponentTeamSide == DemolitionTeam.Defenders ? opponentPlan : _demolitionDefenderPlan;
 
-        var previousDefuser = _demolitionDefuser;
-        var previousCarrier = _demolitionCarrier;
-        _demolitionOpponentAssignments.Clear();
-        _demolitionDefuser = null;
-        _demolitionCarrier = null;
-        foreach (var assignment in opponentPlan.Assignments)
-        {
-            var opponent = _demolitionOpponents.FirstOrDefault(candidate => IsInstanceValid(candidate)
-                && candidate.Name == assignment.MemberId);
-            if (opponent is null)
-            {
-                continue;
-            }
-            _demolitionOpponentAssignments[opponent] = assignment;
-            opponent.SentryMode = false;
-            if (assignment.Duty == DemolitionDuty.Defuse)
-            {
-                _demolitionDefuser = opponent;
-            }
-        }
+        ResolveAndApplyDemolitionObjectiveChannels(opponentPlan);
         if (opponentTeamSide == DemolitionTeam.Attackers && !_demolitionDevicePlanted)
         {
-            SelectDemolitionCarrier(opponentPlan);
             ApplyDemolitionTimePressure();
-        }
-        if (_demolitionDefuser != previousDefuser)
-        {
-            ResetDemolitionOpponentRoute(previousDefuser);
-            ResetDemolitionOpponentRoute(_demolitionDefuser);
-            _demolitionDefuseProgress = 0.0f;
-        }
-        if (_demolitionCarrier != previousCarrier)
-        {
-            ResetDemolitionOpponentRoute(previousCarrier);
-            ResetDemolitionOpponentRoute(_demolitionCarrier);
-            _demolitionEnemyPlantProgress = 0.0f;
         }
 
         if (announce && playerPlan.Assignments.Count > 0)
@@ -187,18 +155,73 @@ public partial class FreightTerminalWorld
 
     private void SelectDemolitionCarrier(DemolitionStrategyPlan opponentPlan)
     {
-        var entry = opponentPlan.Assignments.FirstOrDefault(assignment =>
-            assignment.Duty is DemolitionDuty.Entry or DemolitionDuty.Support or DemolitionDuty.Recon);
-        if (entry.MemberId is null)
+        ResolveAndApplyDemolitionObjectiveChannels(opponentPlan);
+    }
+
+    private void ResolveAndApplyDemolitionObjectiveChannels(DemolitionStrategyPlan opponentPlan)
+    {
+        var opponents = _demolitionOpponents
+            .Where(IsInstanceValid)
+            .ToList();
+        var aliveMemberIds = opponents
+            .Where(opponent => !opponent.IsDead)
+            .Select(opponent => opponent.Name.ToString())
+            .ToArray();
+        var previousCarrier = _demolitionCarrier;
+        var previousDefuser = _demolitionDefuser;
+        var resolution = _demolitionObjectiveChannelCoordinator.Resolve(
+            opponentPlan,
+            aliveMemberIds,
+            new DemolitionObjectiveChannelState(
+                IsInstanceValid(previousCarrier) ? previousCarrier!.Name.ToString() : null,
+                IsInstanceValid(previousDefuser) ? previousDefuser!.Name.ToString() : null,
+                _demolitionEnemyPlantProgress,
+                _demolitionDefuseProgress,
+                _demolitionEnemyTargetSite,
+                _demolitionActiveSite));
+
+        EnemyOperator? ResolveActor(string? memberId)
+            => memberId is null
+                ? null
+                : opponents.FirstOrDefault(opponent =>
+                    !opponent.IsDead
+                    && string.Equals(opponent.Name.ToString(), memberId, System.StringComparison.Ordinal));
+
+        _demolitionOpponentAssignments.Clear();
+        foreach (var assignment in resolution.Assignments)
         {
-            _demolitionCarrier = null;
-            return;
+            var opponent = ResolveActor(assignment.MemberId);
+            if (opponent is null)
+            {
+                continue;
+            }
+            _demolitionOpponentAssignments[opponent] = assignment;
+            opponent.SentryMode = false;
         }
-        _demolitionCarrier = _demolitionOpponents.FirstOrDefault(candidate =>
-            IsInstanceValid(candidate) && candidate.Name == entry.MemberId && !candidate.IsDead);
-        if (_demolitionCarrier is not null && opponentPlan.PrimarySiteIndex >= 0)
+
+        _demolitionCarrier = ResolveActor(resolution.CarrierMemberId);
+        _demolitionDefuser = ResolveActor(resolution.DefuserMemberId);
+        if (resolution.ResetPlantProgress)
         {
-            _demolitionEnemyTargetSite = opponentPlan.PrimarySiteIndex;
+            _demolitionEnemyPlantProgress = 0.0f;
+        }
+        if (resolution.ResetDefuseProgress)
+        {
+            _demolitionDefuseProgress = 0.0f;
+        }
+        if (_demolitionCarrier != previousCarrier)
+        {
+            ResetDemolitionOpponentRoute(previousCarrier);
+            ResetDemolitionOpponentRoute(_demolitionCarrier);
+        }
+        if (_demolitionDefuser != previousDefuser)
+        {
+            ResetDemolitionOpponentRoute(previousDefuser);
+            ResetDemolitionOpponentRoute(_demolitionDefuser);
+        }
+        if (_demolitionCarrier is not null && resolution.CarrierSiteIndex >= 0)
+        {
+            _demolitionEnemyTargetSite = resolution.CarrierSiteIndex;
         }
     }
 
@@ -210,7 +233,7 @@ public partial class FreightTerminalWorld
     private void ApplyDemolitionTimePressure()
     {
         if (_demolitionDevicePlanted
-            || _demolitionEnemyPlantProgress > 0.02f
+            || _demolitionEnemyPlantProgress > 0.0f
             || !IsInstanceValid(_demolitionCarrier)
             || _demolitionCarrier!.IsDead)
         {
@@ -450,27 +473,11 @@ public partial class FreightTerminalWorld
 
     private void SelectDemolitionDefuser()
     {
-        if (!_demolitionDevicePlanted || _demolitionActiveSite < 0)
-        {
-            _demolitionDefuser = null;
-            return;
-        }
         if (IsInstanceValid(_demolitionDefuser) && !_demolitionDefuser!.IsDead)
         {
             return;
         }
         RefreshDemolitionStrategies(false);
-        if (IsInstanceValid(_demolitionDefuser) && !_demolitionDefuser!.IsDead)
-        {
-            return;
-        }
-        var devicePosition = DemolitionLayout().SitePositions[_demolitionActiveSite];
-        _demolitionDefuser = _demolitionOpponents
-            .Where(opponent => IsInstanceValid(opponent) && !opponent.IsDead)
-            .OrderBy(opponent => opponent.GlobalPosition.DistanceSquaredTo(devicePosition))
-            .FirstOrDefault();
-        ResetDemolitionOpponentRoute(_demolitionDefuser);
-        _demolitionDefuseProgress = 0.0f;
     }
 
     private void ResetDemolitionOpponentRoute(EnemyOperator? opponent)
@@ -658,10 +665,10 @@ public partial class FreightTerminalWorld
     private bool IsDemolitionOpponentChanneling(EnemyOperator opponent)
         => (!_demolitionDevicePlanted
                 && opponent == _demolitionCarrier
-                && _demolitionEnemyPlantProgress > 0.02f)
+                && _demolitionEnemyPlantProgress > 0.0f)
             || (_demolitionDevicePlanted
                 && opponent == _demolitionDefuser
-                && _demolitionDefuseProgress > 0.02f);
+                && _demolitionDefuseProgress > 0.0f);
 
     private bool TryHandleDemolitionAttackerMovement(
         EnemyOperator opponent,

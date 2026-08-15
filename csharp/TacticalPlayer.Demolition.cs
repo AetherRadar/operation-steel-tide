@@ -14,6 +14,8 @@ public partial class TacticalPlayer
         int smokeGrenadeCount)
     {
         EjectFromVehicleIfAny();
+        CancelLadderClimb(notify: false);
+        CancelLowObstacleVault("demolition_round_reset");
         ConfigureRole(role);
         ApplyDemolitionRoundLoadout(loadout, grenadeCount, smokeGrenadeCount);
         GlobalPosition = spawn;
@@ -25,6 +27,7 @@ public partial class TacticalPlayer
         UiLocked = false;
         Visible = true;
         ProcessMode = ProcessModeEnum.Inherit;
+        SetPhysicsProcess(true);
         CollisionLayer = 1;
         CollisionMask = 1 | 2;
         _collider.Disabled = false;
@@ -34,6 +37,7 @@ public partial class TacticalPlayer
         _isPlating = false;
         _plateTime = 0.0f;
         _isAiming = false;
+        _slideTime = 0.0f;
         _knifeTime = 0.0f;
         ResetReloadRig();
         _weaponRoot.Visible = HasActiveFirearm;
@@ -89,6 +93,10 @@ public partial class TacticalPlayer
             return;
         }
         ReviveUsed = true;
+        CancelLadderClimb(notify: false);
+        CancelLowObstacleVault("demolition_eliminated");
+        Velocity = Vector3.Zero;
+        SetPhysicsProcess(false);
         CollisionLayer = 0;
         CollisionMask = 0;
         _collider.Disabled = true;

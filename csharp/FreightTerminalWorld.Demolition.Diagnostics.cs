@@ -193,6 +193,30 @@ public partial class FreightTerminalWorld
         var navigationReady = navigationChecks.All(check => check.Valid);
         var navigationDetails = string.Join(",", navigationChecks.Select(check =>
             $"{(char)('A' + check.Site)}:atk={check.Attack.ReachesDestination}/{check.AttackClear}/{check.Attack.Waypoints.Count}:def={check.Defense.ReachesDestination}/{check.DefenseClear}/{check.Defense.Waypoints.Count}"));
+        var strategyNavigationChecks = DemolitionArenaLayout.StrategyTargetKeys.Select(key =>
+        {
+            var target = layout.StrategyTarget(key);
+            var attackOwned = key.StartsWith("attack_", System.StringComparison.Ordinal)
+                || key.StartsWith("postplant_", System.StringComparison.Ordinal);
+            var defenseOwned = key.StartsWith("defense_", System.StringComparison.Ordinal)
+                || key.StartsWith("retake_", System.StringComparison.Ordinal)
+                || key.StartsWith("site_", System.StringComparison.Ordinal);
+            var start = attackOwned ? layout.AttackSpawn : layout.DefenderSpawn;
+            var route = routePlanner.Plan(start, target);
+            return new
+            {
+                Key = key,
+                Owner = attackOwned ? "atk" : defenseOwned ? "def" : "unknown",
+                OwnerKnown = attackOwned != defenseOwned,
+                Route = route,
+                Clear = routePlanner.IsRouteClear(start, route.Waypoints)
+            };
+        }).ToArray();
+        var strategyNavigationReady = strategyNavigationChecks.All(check =>
+            check.OwnerKnown && check.Route.ReachesDestination && check.Clear);
+        var blockedStrategyTargets = string.Join(",", strategyNavigationChecks
+            .Where(check => !check.OwnerKnown || !check.Route.ReachesDestination || !check.Clear)
+            .Select(check => $"{check.Owner}:{check.Key}"));
         var centralCollisionPartNames = new[]
         {
             "MidConverterWestDrum", "MidConverterWestExhaust",
@@ -232,9 +256,10 @@ public partial class FreightTerminalWorld
             && arena.AllStaticBodiesUseWorldLayer();
         var lifecycleReady = initiallyIsolated && collisionReady && deactivatedCleanly;
         var valid = lifecycleReady && routesReady && balanceReady && densityReady && sightlinesBlocked && sitesSeparated
-            && extendedTravel && rotationReady && clearanceReady && navigationReady && centralCollisionVisualsReady
+            && extendedTravel && rotationReady && clearanceReady && navigationReady && strategyNavigationReady
+            && centralCollisionVisualsReady
             && markersReady && spatialIsolation && sitesReady;
-        GD.Print($"DEMOLITION_ARENA_CHECK valid={valid} lifecycle={lifecycleReady} inactive={initiallyIsolated} active={collisionReady} deactivated={deactivatedCleanly} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} routes={routesReady} navigation={navigationReady} navigation_details={navigationDetails} density={densityReady} mid_cover={layout.CentralCoverBodyCount} cover_points={layout.CoverPoints.Count} prop_clear={layout.CentralPropsDoNotOverlap} shaped_cover={centralCollisionVisualsReady} extended={extendedTravel} site_gap={layout.SiteSeparation:0.00} spawn_gap={HorizontalDistance(layout.AttackSpawn, layout.DefenderSpawn):0.00} path_a={layout.AttackToALength:0.00} path_b={layout.AttackToBLength:0.00} difference={layout.SiteTravelDifferenceRatio:P1} sightlines={sightlinesBlocked} rotation={layout.RotationLength:0.00} clearance={clearanceReady} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{rotationBlocker} markers={markersReady} isolation={spatialIsolation} sites={sitesReady}");
+        GD.Print($"DEMOLITION_ARENA_CHECK valid={valid} lifecycle={lifecycleReady} inactive={initiallyIsolated} active={collisionReady} deactivated={deactivatedCleanly} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} routes={routesReady} navigation={navigationReady} navigation_details={navigationDetails} strategy_targets={strategyNavigationReady} strategy_blocked={blockedStrategyTargets} density={densityReady} mid_cover={layout.CentralCoverBodyCount} cover_points={layout.CoverPoints.Count} prop_clear={layout.CentralPropsDoNotOverlap} shaped_cover={centralCollisionVisualsReady} extended={extendedTravel} site_gap={layout.SiteSeparation:0.00} spawn_gap={HorizontalDistance(layout.AttackSpawn, layout.DefenderSpawn):0.00} path_a={layout.AttackToALength:0.00} path_b={layout.AttackToBLength:0.00} difference={layout.SiteTravelDifferenceRatio:P1} sightlines={sightlinesBlocked} rotation={layout.RotationLength:0.00} clearance={clearanceReady} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{rotationBlocker} markers={markersReady} isolation={spatialIsolation} sites={sitesReady}");
         GD.Print($"DEMOLITION_ARENA_PASS valid={valid}");
         var arenaRoot = arena.Root;
         _demolitionArena = null;
@@ -563,14 +588,47 @@ public partial class FreightTerminalWorld
         }
 
         var savedPlayerPosition = _player.GlobalPosition;
+        var savedPlayerVelocity = _player.Velocity;
         var savedRemaining = _demolitionRemaining;
         var savedTargetSite = _demolitionEnemyTargetSite;
         var savedCarrier = _demolitionCarrier;
         var savedPlantProgress = _demolitionEnemyPlantProgress;
+        var savedDevicePlanted = _demolitionDevicePlanted;
+        var savedActiveSite = _demolitionActiveSite;
+        var savedDefuser = _demolitionDefuser;
+        var savedDefuseProgress = _demolitionDefuseProgress;
+        var savedStrategyRemaining = _demolitionStrategyRemaining;
+        var savedAttackerPlan = _demolitionAttackerPlan;
+        var savedDefenderPlan = _demolitionDefenderPlan;
+        var savedRelayMate = _demolitionSquadObjectiveMate;
+        var savedRelaySite = _demolitionSquadObjectiveSite;
+        var savedSquadPlantProgress = _demolitionSquadPlantProgress;
+        var savedSquadDefuseProgress = _demolitionSquadDefuseProgress;
+        var savedPlayerDowned = _localPlayerDowned;
+        var savedOpponentAssignments = _demolitionOpponentAssignments.ToArray();
+        var savedOpponentRoutes = _demolitionOpponentRoutes.ToArray();
+        var savedSquadTargets = _demolitionSquadAssignmentTargets.ToArray();
+        var savedCombatBreakoffs = _demolitionCombatBreakoffs.ToArray();
+        var savedSentryModes = _demolitionOpponents
+            .Where(IsInstanceValid)
+            .ToDictionary(opponent => opponent, opponent => opponent.SentryMode);
+        var savedMateStates = _squadMates
+            .Where(IsInstanceValid)
+            .ToDictionary(
+                mate => mate,
+                mate => (
+                    mate.GlobalPosition,
+                    mate.Velocity,
+                    mate.Order,
+                    mate.DemolitionOrderPositionForDiagnostics));
         var savedProbePosition = probe.GlobalPosition;
         var savedProbeVelocity = probe.Velocity;
+        SmokeGrenade? diagnosticSmoke = null;
         try
         {
+            // Keep the live cursor object untouched so the diagnostic can restore the
+            // exact pre-check route instead of returning a newly planned approximation.
+            ResetDemolitionOpponentRoute(probe);
             // A hostile inside the engage bubble makes the objective mover yield to the
             // full combat layer; past the resume ring it takes the objective back over.
             _player.GlobalPosition = probe.GlobalPosition + new Vector3(18.0f, 0.2f, 0.0f);
@@ -585,19 +643,20 @@ public partial class FreightTerminalWorld
             _player.GlobalPosition = probe.GlobalPosition + new Vector3(18.0f, 0.0f, 0.0f);
             var smokeFrom = probe.GlobalPosition + Vector3.Up * 1.45f;
             var smokeTo = _player.GlobalPosition + Vector3.Up;
-            var smoke = new SmokeGrenade
+            diagnosticSmoke = new SmokeGrenade
             {
                 Position = smokeFrom.Lerp(smokeTo, 0.5f) - Vector3.Up * 1.45f
             };
-            AddChild(smoke);
-            smoke.Arm(Vector3.Forward);
-            smoke._PhysicsProcess(2.0);
+            AddChild(diagnosticSmoke);
+            diagnosticSmoke.Arm(Vector3.Forward);
+            diagnosticSmoke._PhysicsProcess(2.0);
             var smokeBlocksTarget = IsLineObscuredBySmoke(smokeFrom, smokeTo);
             var smokeResumesObjective = smokeBlocksTarget
                 && TryHandleDemolitionDefenderMovement(probe, 0.05f, _player)
                 && !_demolitionCombatBreakoffs.Contains(probe);
-            smoke.RemoveFromGroup(SmokeGrenade.ActiveGroupName);
-            smoke.QueueFree();
+            diagnosticSmoke.RemoveFromGroup(SmokeGrenade.ActiveGroupName);
+            diagnosticSmoke.QueueFree();
+            diagnosticSmoke = null;
 
             // A carrier mid-plant keeps channeling while the shooter stays beyond the
             // guard range: the plant progress is preserved rather than reset.
@@ -757,38 +816,131 @@ public partial class FreightTerminalWorld
                 && fullExecutePlan.Assignments.All(assignment => assignment.SiteIndex == fullExecutePlan.PrimarySiteIndex)
                 && splitPlan.OpeningPattern == DemolitionOpeningPattern.SplitPressure
                 && splitPlan.Assignments.Any(assignment => assignment.SiteIndex != splitPlan.PrimarySiteIndex);
-            probe.SetAlerted(probe.GlobalPosition);
-            var blackboard = CollectDemolitionSightings(
-                DemolitionTeam.Defenders, _demolitionMatch.PlayerSide, layout);
-            var blackboardSeesAlertedOpponents = blackboard.Count >= 1;
+            var objectiveChannels = ValidateDemolitionObjectiveChannelCoordinator();
+            var blackboardSeesAlertedOpponents = false;
+            EnemyOperator? blackboardProbe = null;
+            try
+            {
+                blackboardProbe = new EnemyOperator
+                {
+                    Name = "DemolitionBlackboardProbe",
+                    Position = layout.Midpoint,
+                    Player = _player,
+                    Main = this,
+                    MissionDirector = _missionDirector,
+                    ProcessMode = ProcessModeEnum.Disabled
+                };
+                AddChild(blackboardProbe);
+                blackboardProbe.SetPhysicsProcess(false);
+                blackboardProbe.CollisionLayer = 0;
+                blackboardProbe.CollisionMask = 0;
+                blackboardProbe.SetAlerted(blackboardProbe.GlobalPosition);
+                _demolitionOpponents.Add(blackboardProbe);
+                var blackboard = CollectDemolitionSightings(
+                    DemolitionTeam.Defenders, _demolitionMatch.PlayerSide, layout);
+                blackboardSeesAlertedOpponents = blackboard.Any(sighting =>
+                    sighting.MemberId == $"KNOWN:{blackboardProbe.Name}");
+            }
+            finally
+            {
+                if (blackboardProbe is not null)
+                {
+                    _demolitionOpponents.Remove(blackboardProbe);
+                    _demolitionOpponentAssignments.Remove(blackboardProbe);
+                    _demolitionOpponentRoutes.Remove(blackboardProbe);
+                    _demolitionCombatBreakoffs.Remove(blackboardProbe);
+                    if (IsInstanceValid(blackboardProbe))
+                    {
+                        blackboardProbe.QueueFree();
+                    }
+                }
+            }
 
             // Objective relay: with the player downed while attacking, the closest able
             // mate inherits the bomb and is ordered toward the nearest site.
             var relay = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && !mate.IsDowned);
             var relayTakesOver = false;
-            var savedPlayerDowned = _localPlayerDowned;
-            var savedRelayMate = _demolitionSquadObjectiveMate;
-            try
+            if (relay is not null)
             {
-                if (relay is not null)
-                {
-                    _localPlayerDowned = true;
-                    _demolitionSquadObjectiveMate = null;
-                    var nearestSite = layout.SitePositions[NearestDemolitionSiteTo(_player.GlobalPosition, layout)];
-                    relay.GlobalPosition = nearestSite + new Vector3(0.0f, 0.2f, 8.0f);
-                    UpdateDemolitionSquadObjectiveRelay(0.05f);
-                    relayTakesOver = ReferenceEquals(_demolitionSquadObjectiveMate, relay)
-                        && relay.Order == SquadOrder.Move;
-                }
+                _localPlayerDowned = true;
+                _demolitionSquadObjectiveMate = null;
+                var nearestSite = layout.SitePositions[NearestDemolitionSiteTo(_player.GlobalPosition, layout)];
+                relay.GlobalPosition = nearestSite + new Vector3(0.0f, 0.2f, 8.0f);
+                UpdateDemolitionSquadObjectiveRelay(0.05f);
+                relayTakesOver = ReferenceEquals(_demolitionSquadObjectiveMate, relay)
+                    && relay.Order == SquadOrder.Move;
             }
-            finally
+
+            // A stale plan can still name a carrier that died between refreshes. Once the
+            // channel owner is gone, selection transfers immediately and restarts progress.
+            var replacementCarrier = _demolitionOpponents.FirstOrDefault(opponent =>
+                IsInstanceValid(opponent) && !opponent.IsDead && opponent != probe);
+            var carrierTransferResetsChannel = false;
+            if (replacementCarrier is not null)
             {
-                _localPlayerDowned = savedPlayerDowned;
-                _demolitionSquadObjectiveMate = savedRelayMate;
-                if (relay is not null)
-                {
-                    relay.SetOrder(SquadOrder.Follow, relay.GlobalPosition);
-                }
+                var transferPlan = new DemolitionStrategyPlan(
+                    DemolitionTeam.Attackers,
+                    DemolitionStrategyPhase.Opening,
+                    0,
+                    DemolitionOpeningPattern.FullExecute,
+                    new[]
+                    {
+                        new DemolitionAssignment("missing_carrier", DemolitionDuty.Entry, 0,
+                            "attack_entry_a", "diagnostic missing carrier"),
+                        new DemolitionAssignment(replacementCarrier.Name, DemolitionDuty.Flank, 0,
+                            "attack_entry_a", "diagnostic live flank replacement")
+                    },
+                    "DIAGNOSTIC CARRIER TRANSFER");
+                _demolitionCarrier = null;
+                _demolitionEnemyPlantProgress = 0.35f;
+                SelectDemolitionCarrier(transferPlan);
+                carrierTransferResetsChannel = _demolitionCarrier == replacementCarrier
+                    && Mathf.IsZeroApprox(_demolitionEnemyPlantProgress);
+            }
+
+            // A live defuser that has started the channel owns it across the 1.5-second
+            // tactical refresh. Replanning may change everyone else, but cannot erase a
+            // seven-second objective channel because health or positioning scores moved.
+            var progressBeforeRefresh = 0.35f;
+            var strategyRefreshPreservesChannel = false;
+            var strategyRefreshReassignsLostChannel = false;
+            var strategyRefreshClearsChangedPhase = false;
+            _demolitionDevicePlanted = true;
+            _demolitionActiveSite = 0;
+            _demolitionDefuseProgress = 0.0f;
+            _demolitionDefuser = null;
+            RefreshDemolitionStrategies(false);
+            var plannedDefuser = _demolitionDefuser;
+            var stickyDefuser = _demolitionOpponents.FirstOrDefault(opponent =>
+                IsInstanceValid(opponent)
+                && !opponent.IsDead
+                && opponent != plannedDefuser);
+            if (stickyDefuser is not null)
+            {
+                _demolitionDefuser = stickyDefuser;
+                _demolitionDefuseProgress = progressBeforeRefresh;
+                RefreshDemolitionStrategies(false);
+                strategyRefreshPreservesChannel = _demolitionDefuser == stickyDefuser
+                    && Mathf.IsEqualApprox(_demolitionDefuseProgress, progressBeforeRefresh)
+                    && _demolitionOpponentAssignments.TryGetValue(stickyDefuser, out var stickyAssignment)
+                    && stickyAssignment.Duty == DemolitionDuty.Defuse;
+
+                _demolitionDefuser = null;
+                _demolitionDefuseProgress = progressBeforeRefresh;
+                RefreshDemolitionStrategies(false);
+                var replacementDefuser = _demolitionDefuser;
+                strategyRefreshReassignsLostChannel = IsInstanceValid(replacementDefuser)
+                    && replacementDefuser != stickyDefuser
+                    && Mathf.IsZeroApprox(_demolitionDefuseProgress)
+                    && _demolitionOpponentAssignments.TryGetValue(replacementDefuser!, out var replacementAssignment)
+                    && replacementAssignment.Duty == DemolitionDuty.Defuse;
+
+                _demolitionDefuseProgress = progressBeforeRefresh;
+                _demolitionDevicePlanted = false;
+                _demolitionActiveSite = -1;
+                RefreshDemolitionStrategies(false);
+                strategyRefreshClearsChangedPhase = _demolitionDefuser is null
+                    && Mathf.IsZeroApprox(_demolitionDefuseProgress);
             }
 
             var valid = yieldedToCombat && resumedObjective && channelHoldsUnderFire
@@ -796,22 +948,209 @@ public partial class FreightTerminalWorld
                 && switchedUnderPressure && detourRoutesAroundWall && unreachableSafe && unreachableRetries
                 && routeRecovery && runtimeRoute && postsConverted
                 && openingPatterns
-                && plannerAvoidsStackedSite && blackboardSeesAlertedOpponents && relayTakesOver;
-            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} opening_patterns={openingPatterns} posts={postsConverted} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
+                && objectiveChannels
+                && plannerAvoidsStackedSite && blackboardSeesAlertedOpponents && relayTakesOver
+                && carrierTransferResetsChannel
+                && strategyRefreshPreservesChannel
+                && strategyRefreshReassignsLostChannel
+                && strategyRefreshClearsChangedPhase;
+            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} opening_patterns={openingPatterns} posts={postsConverted} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
             return valid;
         }
         finally
         {
+            if (diagnosticSmoke is not null && IsInstanceValid(diagnosticSmoke))
+            {
+                diagnosticSmoke.RemoveFromGroup(SmokeGrenade.ActiveGroupName);
+                diagnosticSmoke.QueueFree();
+            }
             _player.GlobalPosition = savedPlayerPosition;
+            _player.Velocity = savedPlayerVelocity;
             _demolitionRemaining = savedRemaining;
             _demolitionEnemyTargetSite = savedTargetSite;
             _demolitionCarrier = savedCarrier;
             _demolitionEnemyPlantProgress = savedPlantProgress;
+            _demolitionDevicePlanted = savedDevicePlanted;
+            _demolitionActiveSite = savedActiveSite;
+            _demolitionDefuser = savedDefuser;
+            _demolitionDefuseProgress = savedDefuseProgress;
+            _demolitionStrategyRemaining = savedStrategyRemaining;
+            _demolitionAttackerPlan = savedAttackerPlan;
+            _demolitionDefenderPlan = savedDefenderPlan;
+            _demolitionSquadObjectiveMate = savedRelayMate;
+            _demolitionSquadObjectiveSite = savedRelaySite;
+            _demolitionSquadPlantProgress = savedSquadPlantProgress;
+            _demolitionSquadDefuseProgress = savedSquadDefuseProgress;
+            _localPlayerDowned = savedPlayerDowned;
+
+            _demolitionOpponentAssignments.Clear();
+            foreach (var (opponent, assignment) in savedOpponentAssignments)
+            {
+                _demolitionOpponentAssignments[opponent] = assignment;
+            }
+            probe.ResetScriptedObjectiveNavigation();
+            _demolitionOpponentRoutes.Clear();
+            foreach (var (opponent, route) in savedOpponentRoutes)
+            {
+                _demolitionOpponentRoutes[opponent] = route;
+            }
             _demolitionCombatBreakoffs.Clear();
+            foreach (var opponent in savedCombatBreakoffs)
+            {
+                _demolitionCombatBreakoffs.Add(opponent);
+            }
+            foreach (var (opponent, sentryMode) in savedSentryModes)
+            {
+                if (IsInstanceValid(opponent))
+                {
+                    opponent.SentryMode = sentryMode;
+                }
+            }
+            foreach (var (mate, state) in savedMateStates)
+            {
+                if (!IsInstanceValid(mate))
+                {
+                    continue;
+                }
+                mate.GlobalPosition = state.GlobalPosition;
+                mate.Velocity = state.Velocity;
+                mate.SetOrder(state.Order, state.DemolitionOrderPositionForDiagnostics);
+            }
+            _demolitionSquadAssignmentTargets.Clear();
+            foreach (var (mate, targetKey) in savedSquadTargets)
+            {
+                _demolitionSquadAssignmentTargets[mate] = targetKey;
+            }
             probe.GlobalPosition = savedProbePosition;
             probe.Velocity = savedProbeVelocity;
-            ResetDemolitionOpponentRoute(probe);
         }
+    }
+
+    private static bool ValidateDemolitionObjectiveChannelCoordinator()
+    {
+        var coordinator = new DemolitionObjectiveChannelCoordinator();
+        var attackPlan = new DemolitionStrategyPlan(
+            DemolitionTeam.Attackers,
+            DemolitionStrategyPhase.Opening,
+            1,
+            DemolitionOpeningPattern.FullExecute,
+            new[]
+            {
+                new DemolitionAssignment(
+                    "planned_carrier", DemolitionDuty.Entry, 1, "attack_entry_b", "planned carrier"),
+                new DemolitionAssignment(
+                    "active_carrier", DemolitionDuty.SiteGuard, 1, "postplant_guard_b", "stale duty")
+            },
+            "DIAGNOSTIC ATTACK");
+        var preservedPlant = coordinator.Resolve(
+            attackPlan,
+            new[] { "planned_carrier", "active_carrier" },
+            new DemolitionObjectiveChannelState(
+                "active_carrier", null, 0.35f, 0.0f, 0, -1));
+        var activeCarrierAssignment = preservedPlant.Assignments.FirstOrDefault(assignment =>
+            assignment.MemberId == "active_carrier");
+        var plantChannelPreserved = preservedPlant.CarrierMemberId == "active_carrier"
+            && preservedPlant.CarrierSiteIndex == 0
+            && !preservedPlant.ResetPlantProgress
+            && activeCarrierAssignment.MemberId == "active_carrier"
+            && DemolitionObjectiveChannelCoordinator.IsCarrierDuty(activeCarrierAssignment.Duty)
+            && activeCarrierAssignment.SiteIndex == 0;
+
+        var transferPlan = attackPlan with
+        {
+            PrimarySiteIndex = 0,
+            Assignments = new[]
+            {
+                new DemolitionAssignment(
+                    "lost_carrier", DemolitionDuty.Entry, 0, "attack_entry_a", "lost carrier"),
+                new DemolitionAssignment(
+                    "flank_carrier", DemolitionDuty.Flank, 0, "attack_entry_a", "live flank")
+            }
+        };
+        var transferredPlant = coordinator.Resolve(
+            transferPlan,
+            new[] { "flank_carrier" },
+            new DemolitionObjectiveChannelState(
+                "lost_carrier", null, 0.35f, 0.0f, 1, -1));
+        var flankTransferResets = transferredPlant.CarrierMemberId == "flank_carrier"
+            && transferredPlant.CarrierSiteIndex == 0
+            && transferredPlant.ResetPlantProgress;
+
+        var postPlantAttack = attackPlan with
+        {
+            Phase = DemolitionStrategyPhase.PostPlant,
+            Assignments = new[]
+            {
+                new DemolitionAssignment(
+                    "active_carrier", DemolitionDuty.SiteGuard, 1, "postplant_guard_b", "post-plant")
+            }
+        };
+        var clearedPlant = coordinator.Resolve(
+            postPlantAttack,
+            new[] { "active_carrier" },
+            new DemolitionObjectiveChannelState(
+                "active_carrier", null, 0.35f, 0.0f, 1, 1));
+        var plantPhaseReset = clearedPlant.CarrierMemberId is null
+            && clearedPlant.ResetPlantProgress;
+
+        var defensePlan = new DemolitionStrategyPlan(
+            DemolitionTeam.Defenders,
+            DemolitionStrategyPhase.PostPlant,
+            0,
+            DemolitionOpeningPattern.FullExecute,
+            new[]
+            {
+                new DemolitionAssignment(
+                    "planned_defuser", DemolitionDuty.Defuse, 0, "site_a", "planned defuser"),
+                new DemolitionAssignment(
+                    "active_defuser", DemolitionDuty.Retake, 0, "retake_entry_a", "active retaker")
+            },
+            "DIAGNOSTIC DEFENSE");
+        var preservedDefuse = coordinator.Resolve(
+            defensePlan,
+            new[] { "planned_defuser", "active_defuser" },
+            new DemolitionObjectiveChannelState(
+                null, "active_defuser", 0.0f, 0.35f, -1, 0));
+        var activeAssignment = preservedDefuse.Assignments.FirstOrDefault(assignment =>
+            assignment.MemberId == "active_defuser");
+        var replacementAssignment = preservedDefuse.Assignments.FirstOrDefault(assignment =>
+            assignment.MemberId == "planned_defuser");
+        var defuseChannelPreserved = preservedDefuse.DefuserMemberId == "active_defuser"
+            && !preservedDefuse.ResetDefuseProgress
+            && activeAssignment.Duty == DemolitionDuty.Defuse
+            && replacementAssignment.Duty == DemolitionDuty.CoverDefuser;
+
+        var replacedDefuse = coordinator.Resolve(
+            defensePlan,
+            new[] { "planned_defuser" },
+            new DemolitionObjectiveChannelState(
+                null, "lost_defuser", 0.0f, 0.35f, -1, 0));
+        var lostDefuserResets = replacedDefuse.DefuserMemberId == "planned_defuser"
+            && replacedDefuse.ResetDefuseProgress;
+
+        var openingDefense = defensePlan with
+        {
+            Phase = DemolitionStrategyPhase.Opening,
+            Assignments = new[]
+            {
+                new DemolitionAssignment(
+                    "active_defuser", DemolitionDuty.AnchorA, 0, "defense_anchor_a", "opening")
+            }
+        };
+        var clearedDefuse = coordinator.Resolve(
+            openingDefense,
+            new[] { "active_defuser" },
+            new DemolitionObjectiveChannelState(
+                null, "active_defuser", 0.0f, 0.35f, -1, -1));
+        var defusePhaseReset = clearedDefuse.DefuserMemberId is null
+            && clearedDefuse.ResetDefuseProgress;
+
+        return plantChannelPreserved
+            && flankTransferResets
+            && plantPhaseReset
+            && defuseChannelPreserved
+            && lostDefuserResets
+            && defusePhaseReset;
     }
 
     /// <summary>
@@ -860,6 +1199,30 @@ public partial class FreightTerminalWorld
             GD.Print($"DEMOLITION_DEFENSE_CHECK valid=False stage=carrier_missing round={DemolitionRoundNumber}");
             return false;
         }
+        var plannedCarrier = carrier!;
+        var stickyCarrier = _demolitionOpponents.FirstOrDefault(opponent =>
+            IsInstanceValid(opponent) && !opponent.IsDead && opponent != plannedCarrier);
+        var plantStrategyRefreshPreservesChannel = false;
+        if (stickyCarrier is not null)
+        {
+            var targetSiteBeforeRefresh = _demolitionEnemyTargetSite;
+            _demolitionCarrier = stickyCarrier;
+            _demolitionEnemyPlantProgress = 0.35f;
+            RefreshDemolitionStrategies(false);
+            plantStrategyRefreshPreservesChannel = _demolitionCarrier == stickyCarrier
+                && Mathf.IsEqualApprox(_demolitionEnemyPlantProgress, 0.35f)
+                && _demolitionEnemyTargetSite == targetSiteBeforeRefresh
+                && _demolitionOpponentAssignments.ContainsKey(stickyCarrier);
+            _demolitionEnemyPlantProgress = 0.0f;
+            _demolitionCarrier = plannedCarrier;
+            RefreshDemolitionStrategies(false);
+            carrier = _demolitionCarrier;
+        }
+        if (carrier is null || !IsInstanceValid(carrier) || carrier.IsDead)
+        {
+            GD.Print("DEMOLITION_DEFENSE_CHECK valid=False stage=carrier_restore_failed");
+            return false;
+        }
         var siteIndex = Mathf.Clamp(_demolitionEnemyTargetSite, 0, layout.SitePositions.Count - 1);
         var site = layout.SitePositions[siteIndex];
         carrier!.GlobalPosition = site + new Vector3(0.0f, 0.2f, 6.0f);
@@ -905,9 +1268,9 @@ public partial class FreightTerminalWorld
             && DemolitionOpponentScore == DemolitionMatchState.RoundsPerHalf - 1
             && defuseSteps > 1;
 
-        var valid = spawnsAtDefenderBarrier && enemiesAttacking && carrierRouteUsed
+        var valid = spawnsAtDefenderBarrier && enemiesAttacking && plantStrategyRefreshPreservesChannel && carrierRouteUsed
             && enemyPlanted && defusedAndWon;
-        GD.Print($"DEMOLITION_DEFENSE_CHECK valid={valid} side_swapped={playerSide == DemolitionTeam.Defenders} spawns_defend={spawnsAtDefenderBarrier} enemies_attacking={enemiesAttacking} carrier_route={carrierRouteUsed} ai_planted={enemyPlanted} plant_frames={plantFrames} defused={defusedAndWon} defuse_steps={defuseSteps}");
+        GD.Print($"DEMOLITION_DEFENSE_CHECK valid={valid} side_swapped={playerSide == DemolitionTeam.Defenders} spawns_defend={spawnsAtDefenderBarrier} enemies_attacking={enemiesAttacking} plant_strategy_channel={plantStrategyRefreshPreservesChannel} carrier_route={carrierRouteUsed} ai_planted={enemyPlanted} plant_frames={plantFrames} defused={defusedAndWon} defuse_steps={defuseSteps}");
         return valid;
     }
 
