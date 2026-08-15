@@ -43,6 +43,7 @@ public sealed class DemolitionArenaBuilder
         }
         var sites = BuildSites(root, layout, materials);
         BuildLandmarks(root, layout, materials);
+        BuildCentralCoverDetails(root, layout, materials);
         BuildRouteGuidance(root, layout);
         BuildLighting(root, layout, materials);
         return new DemolitionArenaRuntime(layout, root, sites, _staticBodies, _visualPartCount);
@@ -95,6 +96,50 @@ public sealed class DemolitionArenaBuilder
         {
             Name = "Collision",
             Shape = new BoxShape3D { Size = definition.Size }
+        });
+        root.AddChild(body);
+        _staticBodies.Add(body);
+        _visualPartCount++;
+    }
+
+    private void AddStaticCylinder(
+        Node3D root,
+        string name,
+        Vector3 position,
+        float topRadius,
+        float bottomRadius,
+        float height,
+        Godot.Material material,
+        Vector3 rotation = default)
+    {
+        var body = new StaticBody3D
+        {
+            Name = name,
+            Position = position,
+            Rotation = rotation,
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        body.AddChild(new MeshInstance3D
+        {
+            Name = "Visual",
+            Mesh = new CylinderMesh
+            {
+                TopRadius = topRadius,
+                BottomRadius = bottomRadius,
+                Height = height,
+                RadialSegments = 20
+            },
+            MaterialOverride = material
+        });
+        body.AddChild(new CollisionShape3D
+        {
+            Name = "Collision",
+            Shape = new CylinderShape3D
+            {
+                Radius = Mathf.Max(topRadius, bottomRadius),
+                Height = height
+            }
         });
         root.AddChild(body);
         _staticBodies.Add(body);
@@ -222,6 +267,53 @@ public sealed class DemolitionArenaBuilder
                     "warning"),
                 materials["warning"]);
         }
+    }
+
+    private void BuildCentralCoverDetails(
+        Node3D root,
+        DemolitionArenaLayout layout,
+        IReadOnlyDictionary<string, StandardMaterial3D> materials)
+    {
+        var converters = new[]
+        {
+            (Name: "West", Position: new Vector3(-6.8f, 3.72f, 17.5f), Material: "rust"),
+            (Name: "East", Position: new Vector3(6.8f, 3.72f, 12.0f), Material: "steel")
+        };
+        foreach (var converter in converters)
+        {
+            AddStaticCylinder(
+                root,
+                $"MidConverter{converter.Name}Drum",
+                layout.Origin + converter.Position,
+                1.38f,
+                1.55f,
+                1.72f,
+                materials[converter.Material]);
+            AddStaticCylinder(
+                root,
+                $"MidConverter{converter.Name}Exhaust",
+                layout.Origin + converter.Position + new Vector3(0.72f, 1.55f, 0.25f),
+                0.24f,
+                0.32f,
+                2.15f,
+                materials[converter.Name == "West" ? "warning" : "cyan"]);
+        }
+
+        for (var index = 0; index < 3; index++)
+        {
+            AddStaticCylinder(
+                root,
+                $"MidGantryPipe_{index + 1:00}",
+                layout.Origin + new Vector3(0, 4.65f + index * 0.27f, 21.64f + index * 0.19f),
+                0.12f,
+                0.12f,
+                26.5f,
+                materials[index == 1 ? "warning" : "steel"],
+                new Vector3(0, 0, Mathf.Pi * 0.5f));
+        }
+        AddSign(root, "MidGantrySign", layout.Origin + new Vector3(0, 4.4f, 21.54f), "MID  //  PROCESS LINE 04", 0, new Color(0.95f, 0.72f, 0.28f));
+        AddSign(root, "MidRelaySign", layout.Origin + new Vector3(23.0f, 4.2f, 19.18f), "R-12  //  RELAY", 0, new Color(0.3f, 0.88f, 1.0f));
+        AddSign(root, "MidMaintenanceSign", layout.Origin + new Vector3(-22.0f, 2.7f, -21.92f), "M-04  //  SERVICE", Mathf.Pi, new Color(1.0f, 0.62f, 0.22f));
     }
 
     private void AddSign(Node3D root, string name, Vector3 position, string text, float yaw, Color color)

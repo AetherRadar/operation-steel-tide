@@ -419,6 +419,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         Part(Cylinder(0.055f, 0.08f), new Vector3(0.18f, 1.72f, 0), armorEdge, new Vector3(0, 0, Mathf.Pi / 2));
         Part(Box(new Vector3(0.025f, 0.025f, 0.22f)), new Vector3(-0.2f, 1.65f, -0.09f), armorEdge, new Vector3(0.2f, 0.2f, 0));
 
+        AttachAuthoredOperatorVisual();
         _carriedWeaponRoot = new Node3D { Name = "CarriedWeapon" };
         _bodyRoot.AddChild(_carriedWeaponRoot);
         var receiverWidth = CarriedWeapon.Platform switch
@@ -1074,6 +1075,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         }
         var from = GlobalPosition + Vector3.Up * (IsProne ? 0.55f : 1.55f);
         var to = CurrentTargetPoint();
+        if (Main?.IsLineObscuredBySmoke(from, to) == true)
+        {
+            return false;
+        }
         var query = PhysicsRayQueryParameters3D.Create(from, to);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
         query.CollideWithAreas = false;
@@ -1097,8 +1102,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
     }
 
     internal bool HasClearBallisticPath(Node target, Vector3 aimPoint)
-        => GodotObject.IsInstanceValid(target)
-            && Ballistics.HasClearShot(GetWorld3D(), ResolveBallisticShotOrigin(), aimPoint, target, GetRid());
+    {
+        if (!GodotObject.IsInstanceValid(target))
+        {
+            return false;
+        }
+        var origin = ResolveBallisticShotOrigin();
+        return Main?.IsLineObscuredBySmoke(origin, aimPoint) != true
+            && Ballistics.HasClearShot(GetWorld3D(), origin, aimPoint, target, GetRid());
+    }
 
     internal Vector3 RawMuzzlePositionForDiagnostics => RawMuzzlePosition;
     internal Vector3 ResolvedShotOriginForDiagnostics => ResolveBallisticShotOrigin();

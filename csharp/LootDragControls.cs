@@ -147,11 +147,12 @@ public partial class LootDragCard : PanelContainer
         }
     }
 
-    public event Action<string, LootDragOrigin>? DoubleActivated;
-    public event Action<string>? DropRequested;
+    public event Action<string, LootDragOrigin>? Activated;
     public event Action<WeaponBuild>? DetailsRequested;
 
     private readonly List<Label> _renderedComparisonLabels = new();
+    private bool _leftPressed;
+    private bool _dragging;
 
     public void Configure(
         string itemId,
@@ -513,6 +514,8 @@ public partial class LootDragCard : PanelContainer
         {
             return default;
         }
+        _dragging = true;
+        _leftPressed = false;
         var data = new Godot.Collections.Dictionary
         {
             ["item_id"] = ItemId,
@@ -541,21 +544,43 @@ public partial class LootDragCard : PanelContainer
 
     public override void _GuiInput(InputEvent @event)
     {
-        if (@event is not InputEventMouseButton mouse || !mouse.Pressed)
+        if (@event is not InputEventMouseButton mouse || mouse.ButtonIndex != MouseButton.Left)
         {
             return;
         }
-        if (mouse.ButtonIndex == MouseButton.Right && Origin == LootDragOrigin.Backpack)
+        if (mouse.Pressed)
         {
-            DropRequested?.Invoke(ItemId);
-            AcceptEvent();
+            _leftPressed = true;
+            _dragging = false;
             return;
         }
-        if (mouse.ButtonIndex == MouseButton.Left && mouse.DoubleClick)
+        var activate = _leftPressed
+            && !_dragging
+            && new Rect2(Vector2.Zero, Size).HasPoint(mouse.Position);
+        _leftPressed = false;
+        _dragging = false;
+        if (activate)
         {
-            DoubleActivated?.Invoke(ItemId, Origin);
+            Activated?.Invoke(ItemId, Origin);
             AcceptEvent();
         }
+    }
+
+    internal void ActivateForDiagnostics()
+    {
+        var point = Size * 0.5f;
+        _GuiInput(new InputEventMouseButton
+        {
+            ButtonIndex = MouseButton.Left,
+            Pressed = true,
+            Position = point
+        });
+        _GuiInput(new InputEventMouseButton
+        {
+            ButtonIndex = MouseButton.Left,
+            Pressed = false,
+            Position = point
+        });
     }
 
     private static StyleBoxFlat Style(Color background, Color accent)

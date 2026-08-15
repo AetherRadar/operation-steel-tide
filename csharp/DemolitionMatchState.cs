@@ -16,6 +16,12 @@ public enum DemolitionRoundEndReason
     TimeExpired
 }
 
+public static class DemolitionRoundRules
+{
+    public static bool EliminationEndsRound(DemolitionTeam eliminatedTeam, bool devicePlanted)
+        => !devicePlanted || eliminatedTeam == DemolitionTeam.Defenders;
+}
+
 public readonly record struct DemolitionRoundResult(
     bool PlayerTeamWon,
     DemolitionTeam Winner,

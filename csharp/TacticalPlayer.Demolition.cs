@@ -4,15 +4,18 @@ namespace OperationSteelTide;
 
 public partial class TacticalPlayer
 {
+    public int SmokeGrenades { get; private set; }
+
     public void ResetForDemolitionRound(
         Vector3 spawn,
         OperatorRole role,
         DeploymentLoadout loadout,
-        int grenadeCount)
+        int grenadeCount,
+        int smokeGrenadeCount)
     {
         EjectFromVehicleIfAny();
         ConfigureRole(role);
-        ApplyDemolitionRoundLoadout(loadout, grenadeCount);
+        ApplyDemolitionRoundLoadout(loadout, grenadeCount, smokeGrenadeCount);
         GlobalPosition = spawn;
         Rotation = Vector3.Zero;
         Velocity = Vector3.Zero;
@@ -46,11 +49,49 @@ public partial class TacticalPlayer
         PushHudStats();
     }
 
-    public void ApplyDemolitionRoundLoadout(DeploymentLoadout loadout, int grenadeCount)
+    public void ApplyDemolitionRoundLoadout(
+        DeploymentLoadout loadout,
+        int grenadeCount,
+        int smokeGrenadeCount)
     {
         Backpack.Clear();
         ApplyDeploymentLoadout(loadout, includeEmergencySupplies: false);
         Grenades = Mathf.Clamp(grenadeCount, 0, DemolitionBuyCatalog.MaximumGrenades);
+        SmokeGrenades = Mathf.Clamp(
+            smokeGrenadeCount,
+            0,
+            DemolitionBuyCatalog.MaximumSmokeGrenades);
+        Hud?.SetDemolitionSmokeGrenades(SmokeGrenades);
         PushHudStats();
+    }
+
+    private bool ThrowSmokeGrenade()
+    {
+        if (SmokeGrenades <= 0 || _isReloading || MedicalActionBlocksWeapon || IsDead || Main is null)
+        {
+            return false;
+        }
+        SmokeGrenades--;
+        Main.ThrowSmokeGrenade(
+            _camera.GlobalPosition - _camera.GlobalBasis.Z * 0.7f,
+            -_camera.GlobalBasis.Z,
+            this);
+        Hud?.SetDemolitionSmokeGrenades(SmokeGrenades);
+        PushHudStats();
+        OnThrowableConsumed();
+        return true;
+    }
+
+    internal void MarkEliminatedForDemolitionRound()
+    {
+        if (!IsDead)
+        {
+            return;
+        }
+        ReviveUsed = true;
+        CollisionLayer = 0;
+        CollisionMask = 0;
+        _collider.Disabled = true;
+        Hud?.HideDownedState();
     }
 }

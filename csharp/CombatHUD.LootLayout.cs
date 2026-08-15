@@ -37,6 +37,11 @@ public partial class CombatHUD
         && _groundDropZone.Visible
         && _groundDropZone.Enabled;
 
+    public bool LootGroundDropInvisible
+        => LootGroundDropReady
+        && _groundDropZone.GetThemeStylebox("panel") is StyleBoxEmpty
+        && _groundDropZone.GetChildCount() == 0;
+
     public bool LootBackpackSlotSeparated
     {
         get

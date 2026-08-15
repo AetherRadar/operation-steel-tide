@@ -148,6 +148,10 @@ public partial class FreightTerminalWorld
             && layout.AttackMidPath.Count >= 4;
         var balanceReady = layout.HasBalancedSiteTravel
             && layout.SiteTravelDifferenceRatio <= DemolitionArenaLayout.MaximumSiteTravelDifference;
+        var densityReady = layout.HasDenseCentralCover
+            && layout.CentralCoverBodyCount >= DemolitionArenaLayout.MinimumCentralCoverBodyCount
+            && layout.CoverPoints.Count >= 28
+            && layout.CentralPropsDoNotOverlap;
         var sightlinesBlocked = !layout.HasSpawnSightlineToSite(0)
             && !layout.HasSpawnSightlineToSite(1);
         var sitesSeparated = layout.SiteSeparation >= 74.0f
@@ -166,6 +170,47 @@ public partial class FreightTerminalWorld
             && routeBClear
             && routeMidClear
             && rotationClear;
+        var routePlanner = new DemolitionRoutePlanner(layout);
+        var navigationChecks = layout.SitePositions.Select((site, index) =>
+        {
+            var attackRoute = routePlanner.Plan(layout.AttackSpawn, site);
+            var defenseRoute = routePlanner.Plan(layout.DefenderSpawn, site);
+            var attackClear = routePlanner.IsRouteClear(layout.AttackSpawn, attackRoute.Waypoints);
+            var defenseClear = routePlanner.IsRouteClear(layout.DefenderSpawn, defenseRoute.Waypoints);
+            return new
+            {
+                Site = index,
+                Attack = attackRoute,
+                Defense = defenseRoute,
+                AttackClear = attackClear,
+                DefenseClear = defenseClear,
+                Valid = attackRoute.ReachesDestination
+                    && defenseRoute.ReachesDestination
+                    && attackClear
+                    && defenseClear
+            };
+        }).ToArray();
+        var navigationReady = navigationChecks.All(check => check.Valid);
+        var navigationDetails = string.Join(",", navigationChecks.Select(check =>
+            $"{(char)('A' + check.Site)}:atk={check.Attack.ReachesDestination}/{check.AttackClear}/{check.Attack.Waypoints.Count}:def={check.Defense.ReachesDestination}/{check.DefenseClear}/{check.Defense.Waypoints.Count}"));
+        var centralCollisionPartNames = new[]
+        {
+            "MidConverterWestDrum", "MidConverterWestExhaust",
+            "MidConverterEastDrum", "MidConverterEastExhaust",
+            "MidGantryPipe_01", "MidGantryPipe_02", "MidGantryPipe_03"
+        };
+        var centralCollisionVisualsReady = centralCollisionPartNames.All(name =>
+        {
+            var body = arena.Root.GetNodeOrNull<StaticBody3D>(name);
+            var mesh = body?.GetNodeOrNull<MeshInstance3D>("Visual")?.Mesh as CylinderMesh;
+            var shape = body?.GetNodeOrNull<CollisionShape3D>("Collision")?.Shape as CylinderShape3D;
+            return IsInstanceValid(body)
+                && mesh is not null
+                && shape is not null
+                && shape.Radius + 0.001f >= Mathf.Max(mesh.TopRadius, mesh.BottomRadius)
+                && Mathf.IsEqualApprox(shape.Height, mesh.Height)
+                && body!.CollisionLayer == 1;
+        });
         var markersReady = layout.Markers.Count == 5
             && layout.Markers.Select(marker => marker.LocalizationKey).Distinct().Count() == layout.Markers.Count
             && layout.Markers.All(marker => layout.IsInsideArena(marker.Position, 0.1f))
@@ -186,9 +231,10 @@ public partial class FreightTerminalWorld
             && arena.ActiveCollisionBodyCount == 0
             && arena.AllStaticBodiesUseWorldLayer();
         var lifecycleReady = initiallyIsolated && collisionReady && deactivatedCleanly;
-        var valid = lifecycleReady && routesReady && balanceReady && sightlinesBlocked && sitesSeparated
-            && extendedTravel && rotationReady && clearanceReady && markersReady && spatialIsolation && sitesReady;
-        GD.Print($"DEMOLITION_ARENA_CHECK valid={valid} lifecycle={lifecycleReady} inactive={initiallyIsolated} active={collisionReady} deactivated={deactivatedCleanly} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} routes={routesReady} extended={extendedTravel} site_gap={layout.SiteSeparation:0.00} spawn_gap={HorizontalDistance(layout.AttackSpawn, layout.DefenderSpawn):0.00} path_a={layout.AttackToALength:0.00} path_b={layout.AttackToBLength:0.00} difference={layout.SiteTravelDifferenceRatio:P1} sightlines={sightlinesBlocked} rotation={layout.RotationLength:0.00} clearance={clearanceReady} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{rotationBlocker} markers={markersReady} isolation={spatialIsolation} sites={sitesReady}");
+        var valid = lifecycleReady && routesReady && balanceReady && densityReady && sightlinesBlocked && sitesSeparated
+            && extendedTravel && rotationReady && clearanceReady && navigationReady && centralCollisionVisualsReady
+            && markersReady && spatialIsolation && sitesReady;
+        GD.Print($"DEMOLITION_ARENA_CHECK valid={valid} lifecycle={lifecycleReady} inactive={initiallyIsolated} active={collisionReady} deactivated={deactivatedCleanly} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} routes={routesReady} navigation={navigationReady} navigation_details={navigationDetails} density={densityReady} mid_cover={layout.CentralCoverBodyCount} cover_points={layout.CoverPoints.Count} prop_clear={layout.CentralPropsDoNotOverlap} shaped_cover={centralCollisionVisualsReady} extended={extendedTravel} site_gap={layout.SiteSeparation:0.00} spawn_gap={HorizontalDistance(layout.AttackSpawn, layout.DefenderSpawn):0.00} path_a={layout.AttackToALength:0.00} path_b={layout.AttackToBLength:0.00} difference={layout.SiteTravelDifferenceRatio:P1} sightlines={sightlinesBlocked} rotation={layout.RotationLength:0.00} clearance={clearanceReady} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{rotationBlocker} markers={markersReady} isolation={spatialIsolation} sites={sitesReady}");
         GD.Print($"DEMOLITION_ARENA_PASS valid={valid}");
         var arenaRoot = arena.Root;
         _demolitionArena = null;
@@ -462,7 +508,7 @@ public partial class FreightTerminalWorld
             && !_player.HasSecondaryWeapon
             && DemolitionPlayerFunds == playerFundsAfterWin;
 
-        OnDemolitionPurchaseRequested(string.Empty, string.Empty, false, 0);
+        OnDemolitionPurchaseRequested(string.Empty, string.Empty, false, 0, 0);
         await WaitFrames(2);
         var roundTwoLive = _demolitionRoundActive
             && !_demolitionBuyPhaseActive
@@ -483,7 +529,7 @@ public partial class FreightTerminalWorld
             UpdateDemolitionIntermission(DemolitionIntermissionDuration + 0.1f);
             if (_demolitionBuyPhaseActive)
             {
-                OnDemolitionPurchaseRequested(string.Empty, string.Empty, false, 0);
+                OnDemolitionPurchaseRequested(string.Empty, string.Empty, false, 0, 0);
             }
         }
         var defenseRound = await ValidateDemolitionDefenseRound(layout);
@@ -521,6 +567,8 @@ public partial class FreightTerminalWorld
         var savedTargetSite = _demolitionEnemyTargetSite;
         var savedCarrier = _demolitionCarrier;
         var savedPlantProgress = _demolitionEnemyPlantProgress;
+        var savedProbePosition = probe.GlobalPosition;
+        var savedProbeVelocity = probe.Velocity;
         try
         {
             // A hostile inside the engage bubble makes the objective mover yield to the
@@ -531,6 +579,25 @@ public partial class FreightTerminalWorld
             _player.GlobalPosition = probe.GlobalPosition + new Vector3(34.0f, 0.2f, 0.0f);
             var resumedObjective = TryHandleDemolitionDefenderMovement(probe, 0.05f, _player)
                 && !_demolitionCombatBreakoffs.Contains(probe);
+
+            // Smoke breaks stale close-range target arbitration. The objective controller
+            // must resume while the combat layer has no visible target through the cloud.
+            _player.GlobalPosition = probe.GlobalPosition + new Vector3(18.0f, 0.0f, 0.0f);
+            var smokeFrom = probe.GlobalPosition + Vector3.Up * 1.45f;
+            var smokeTo = _player.GlobalPosition + Vector3.Up;
+            var smoke = new SmokeGrenade
+            {
+                Position = smokeFrom.Lerp(smokeTo, 0.5f) - Vector3.Up * 1.45f
+            };
+            AddChild(smoke);
+            smoke.Arm(Vector3.Forward);
+            smoke._PhysicsProcess(2.0);
+            var smokeBlocksTarget = IsLineObscuredBySmoke(smokeFrom, smokeTo);
+            var smokeResumesObjective = smokeBlocksTarget
+                && TryHandleDemolitionDefenderMovement(probe, 0.05f, _player)
+                && !_demolitionCombatBreakoffs.Contains(probe);
+            smoke.RemoveFromGroup(SmokeGrenade.ActiveGroupName);
+            smoke.QueueFree();
 
             // A carrier mid-plant keeps channeling while the shooter stays beyond the
             // guard range: the plant progress is preserved rather than reset.
@@ -554,17 +621,71 @@ public partial class FreightTerminalWorld
                 .ToList();
             _demolitionEnemyTargetSite = orderedSites[^1].Index;
             _demolitionEnemyPlantProgress = 0.0f;
-            _demolitionCarrierRoute = System.Array.Empty<Vector3>();
+            ResetDemolitionOpponentRoute(probe);
             _demolitionRemaining = orderedSites[0].Travel + 2.5f;
             ApplyDemolitionTimePressure();
             var switchedUnderPressure = _demolitionEnemyTargetSite == orderedSites[0].Index;
 
-            // Detour planning: a straight corridor through the east route wall must
-            // produce a two-waypoint route around the blocking geometry.
+            // Route planning: a straight corridor through the east route wall must
+            // produce a clear multi-waypoint route around the blocking geometry.
             probe.GlobalPosition = layout.Origin + new Vector3(15.0f, 0.2f, 6.0f);
-            var detour = PlanDemolitionDetourRoute(probe, layout.SitePositions[1]);
-            var detourRoutesAroundWall = detour.Length == 2;
+            var routePlanner = new DemolitionRoutePlanner(layout);
+            var detourResult = routePlanner.Plan(probe.GlobalPosition, layout.SitePositions[1]);
+            var detourRoutesAroundWall = detourResult.Waypoints.Count >= 2
+                && detourResult.ReachesDestination
+                && routePlanner.IsRouteClear(probe.GlobalPosition, detourResult.Waypoints);
+            ResetDemolitionOpponentRoute(probe);
+            MoveDemolitionOpponentAlongRoute(
+                probe,
+                layout.SitePositions[1],
+                "diagnostic_route",
+                0.05f,
+                2.0f,
+                4.8f);
+            var runtimeRoute = _demolitionOpponentRoutes.TryGetValue(probe, out var runtimeCursor)
+                && runtimeCursor.RouteKey == "diagnostic_route"
+                && runtimeCursor.ReachesDestination;
 
+            // A destination embedded inside the foundry core is intentionally unreachable.
+            // The planner may return a safe frontier, but never the blocked destination.
+            var blockedDestination = layout.Origin + new Vector3(0.0f, 0.2f, -13.5f);
+            var unreachableResult = routePlanner.Plan(layout.AttackSpawn, blockedDestination);
+            var unreachableSafe = !unreachableResult.ReachesDestination
+                && routePlanner.IsRouteClear(layout.AttackSpawn, unreachableResult.Waypoints)
+                && unreachableResult.Waypoints.All(point =>
+                    HorizontalDistance(point, blockedDestination) > 0.5f);
+            var unreachableCursor = new DemolitionRouteCursor();
+            unreachableCursor.Reset(
+                "blocked_diagnostic",
+                layout.AttackSpawn,
+                blockedDestination,
+                unreachableResult,
+                countAsReplan: false);
+            foreach (var waypoint in unreachableResult.Waypoints)
+            {
+                unreachableCursor.Advance(
+                    waypoint,
+                    DemolitionRouteCornerTolerance,
+                    DemolitionRouteCornerTolerance);
+            }
+            var unreachableRetries = unreachableCursor.Complete
+                && unreachableCursor.ShouldRetryUnreachable(0.76f);
+
+            var routeCursor = new DemolitionRouteCursor();
+            routeCursor.Reset(
+                "diagnostic",
+                probe.GlobalPosition,
+                layout.SitePositions[1],
+                detourResult,
+                countAsReplan: false);
+            var stalled = routeCursor.TrackMovement(probe.GlobalPosition, 0.81f, movementRequested: true);
+            routeCursor.Reset(
+                "diagnostic",
+                probe.GlobalPosition,
+                layout.SitePositions[1],
+                detourResult,
+                countAsReplan: stalled);
+            var routeRecovery = stalled && routeCursor.ReplanCount == 1;
             // Squad posts: a mate standing on the assignment target converts its Move
             // order into Hold so it anchors the position instead of milling around.
             var postedMate = _squadMates.FirstOrDefault(IsInstanceValid);
@@ -607,6 +728,35 @@ public partial class FreightTerminalWorld
                     attackers,
                     -1,
                     farDefenders).PrimarySiteIndex == 0;
+
+            var openingTeam = new List<DemolitionAgentSnapshot>();
+            for (var index = 0; index < 5; index++)
+            {
+                openingTeam.Add(new DemolitionAgentSnapshot(
+                    $"A{index}",
+                    DemolitionTeam.Attackers,
+                    index == 0 ? OperatorRole.Assault : index == 1 ? OperatorRole.Recon : OperatorRole.Medic,
+                    1.0f,
+                    90.0f + index * 12.0f,
+                    true,
+                    false,
+                    index * 1.5f,
+                    48.0f));
+            }
+            var fullExecutePlan = _demolitionStrategyPlanner.Plan(
+                DemolitionTeam.Attackers,
+                DemolitionStrategyPhase.Opening,
+                openingTeam,
+                strategySeed: 1);
+            var splitPlan = _demolitionStrategyPlanner.Plan(
+                DemolitionTeam.Attackers,
+                DemolitionStrategyPhase.Opening,
+                openingTeam,
+                strategySeed: 3);
+            var openingPatterns = fullExecutePlan.OpeningPattern == DemolitionOpeningPattern.FullExecute
+                && fullExecutePlan.Assignments.All(assignment => assignment.SiteIndex == fullExecutePlan.PrimarySiteIndex)
+                && splitPlan.OpeningPattern == DemolitionOpeningPattern.SplitPressure
+                && splitPlan.Assignments.Any(assignment => assignment.SiteIndex != splitPlan.PrimarySiteIndex);
             probe.SetAlerted(probe.GlobalPosition);
             var blackboard = CollectDemolitionSightings(
                 DemolitionTeam.Defenders, _demolitionMatch.PlayerSide, layout);
@@ -642,9 +792,12 @@ public partial class FreightTerminalWorld
             }
 
             var valid = yieldedToCombat && resumedObjective && channelHoldsUnderFire
-                && switchedUnderPressure && detourRoutesAroundWall && postsConverted
+                && smokeResumesObjective
+                && switchedUnderPressure && detourRoutesAroundWall && unreachableSafe && unreachableRetries
+                && routeRecovery && runtimeRoute && postsConverted
+                && openingPatterns
                 && plannerAvoidsStackedSite && blackboardSeesAlertedOpponents && relayTakesOver;
-            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} channel_guard={channelHoldsUnderFire} time_pressure={switchedUnderPressure} detour_points={detour.Length} posts={postsConverted} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
+            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} opening_patterns={openingPatterns} posts={postsConverted} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
             return valid;
         }
         finally
@@ -655,8 +808,9 @@ public partial class FreightTerminalWorld
             _demolitionCarrier = savedCarrier;
             _demolitionEnemyPlantProgress = savedPlantProgress;
             _demolitionCombatBreakoffs.Clear();
-            _demolitionCarrierRoute = System.Array.Empty<Vector3>();
-            _demolitionCarrierRouteIndex = 0;
+            probe.GlobalPosition = savedProbePosition;
+            probe.Velocity = savedProbeVelocity;
+            ResetDemolitionOpponentRoute(probe);
         }
     }
 
@@ -713,9 +867,13 @@ public partial class FreightTerminalWorld
         carrier.ProcessMode = ProcessModeEnum.Inherit;
 
         var plantFrames = 0;
+        var carrierRouteUsed = false;
         while (!_demolitionDevicePlanted && plantFrames < 600)
         {
             _ = TryHandleDemolitionDefenderMovement(carrier, 0.05f, null);
+            carrierRouteUsed |= _demolitionOpponentRoutes.TryGetValue(carrier, out var activeCarrierCursor)
+                && activeCarrierCursor.RouteKey.StartsWith("carrier_site_", System.StringComparison.Ordinal)
+                && activeCarrierCursor.ReachesDestination;
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             plantFrames++;
         }
@@ -747,8 +905,9 @@ public partial class FreightTerminalWorld
             && DemolitionOpponentScore == DemolitionMatchState.RoundsPerHalf - 1
             && defuseSteps > 1;
 
-        var valid = spawnsAtDefenderBarrier && enemiesAttacking && enemyPlanted && defusedAndWon;
-        GD.Print($"DEMOLITION_DEFENSE_CHECK valid={valid} side_swapped={playerSide == DemolitionTeam.Defenders} spawns_defend={spawnsAtDefenderBarrier} enemies_attacking={enemiesAttacking} ai_planted={enemyPlanted} plant_frames={plantFrames} defused={defusedAndWon} defuse_steps={defuseSteps}");
+        var valid = spawnsAtDefenderBarrier && enemiesAttacking && carrierRouteUsed
+            && enemyPlanted && defusedAndWon;
+        GD.Print($"DEMOLITION_DEFENSE_CHECK valid={valid} side_swapped={playerSide == DemolitionTeam.Defenders} spawns_defend={spawnsAtDefenderBarrier} enemies_attacking={enemiesAttacking} carrier_route={carrierRouteUsed} ai_planted={enemyPlanted} plant_frames={plantFrames} defused={defusedAndWon} defuse_steps={defuseSteps}");
         return valid;
     }
 
@@ -882,8 +1041,7 @@ public partial class FreightTerminalWorld
         defuser.GlobalPosition = site + new Vector3(0, 0, 8.0f);
         defuser.Velocity = Vector3.Zero;
         defuser.SentryMode = false;
-        defuser.ResetScriptedObjectiveNavigation();
-        PlanDemolitionDefuseRoute();
+        ResetDemolitionOpponentRoute(defuser);
         defuser.ProcessMode = ProcessModeEnum.Inherit;
         var initial = HorizontalDistance(defuser.GlobalPosition, site);
         const int maximumFrames = 600;
@@ -894,10 +1052,15 @@ public partial class FreightTerminalWorld
             frames++;
         }
         var final = HorizontalDistance(defuser.GlobalPosition, site);
+        var defuserRouteUsed = _demolitionOpponentRoutes.TryGetValue(defuser, out var defuserCursor)
+            && defuserCursor.RouteKey.StartsWith("defuser_site_", System.StringComparison.Ordinal)
+            && defuserCursor.ReachesDestination;
         var valid = initial >= 7.5f
             && final <= 2.4f
             && _demolitionDefuseProgress >= 0.08f
+            && defuserRouteUsed
             && !_missionEnded;
+        GD.Print($"DEMOLITION_DEFUSER_ROUTE_CHECK valid={defuserRouteUsed} route={defuserCursor?.RouteKey ?? "none"} reaches={defuserCursor?.ReachesDestination ?? false}");
         return (valid, initial, final, frames);
     }
 }

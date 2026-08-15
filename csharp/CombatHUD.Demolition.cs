@@ -6,6 +6,8 @@ public partial class CombatHUD
 {
     private const string DemolitionBuyViewScenePath = "res://ui/DemolitionBuyView.tscn";
     private DemolitionBuyView _demolitionBuyView = null!;
+    private bool _demolitionGameplayPresentation;
+    private int _demolitionSmokeGrenades;
 
     public bool IsDemolitionBuyVisible
         => IsInstanceValid(_demolitionBuyView) && _demolitionBuyView.Visible;
@@ -34,6 +36,34 @@ public partial class CombatHUD
         => IsInstanceValid(_demolitionBuyView) && _demolitionBuyView.IsSidearmOfferEnabled(id);
     public bool IsDemolitionPrimaryOfferEnabled(string id)
         => IsInstanceValid(_demolitionBuyView) && _demolitionBuyView.IsPrimaryOfferEnabled(id);
+    public bool IsDemolitionSquadRosterHidden
+        => _demolitionGameplayPresentation && IsInstanceValid(_squadRoster) && !_squadRoster.Visible;
+    public bool IsDemolitionSkillHudVisible
+        => _demolitionGameplayPresentation && IsInstanceValid(_classSkillRoot) && _classSkillRoot.Visible;
+    public bool AreDemolitionSquadOrdersHidden
+        => _demolitionGameplayPresentation
+        && IsInstanceValid(_squadOrderLabel)
+        && !_squadOrderLabel.Visible
+        && System.Array.TrueForAll(_orderButtons, button => IsInstanceValid(button) && !button.Visible);
+    public string DemolitionUtilityHudText
+        => IsInstanceValid(_quickSlotBar)
+            ? $"4 {_quickSlotBar.SlotText(3)}  //  5 {_quickSlotBar.SlotText(4)}"
+            : string.Empty;
+    public bool QuickSlotUiReady
+        => IsInstanceValid(_quickSlotBar) && _quickSlotBar.UiReady;
+    public bool QuickSlotUsesPackedScene
+        => IsInstanceValid(_quickSlotBar)
+        && _quickSlotBar.SceneFilePath == "res://ui/QuickSlotBarView.tscn";
+    public bool QuickSlotIntentSignalsReady
+        => IsInstanceValid(_quickSlotBar) && _quickSlotBar.IntentSignalsConnected;
+    public int VisibleQuickSlotCount
+        => IsInstanceValid(_quickSlotBar) ? _quickSlotBar.VisibleSlotCount : 0;
+    public int ActiveQuickSlot
+        => IsInstanceValid(_quickSlotBar) ? _quickSlotBar.ActiveSlot : -1;
+    public bool IsQuickSlotVisible(int slot)
+        => IsInstanceValid(_quickSlotBar) && _quickSlotBar.IsSlotVisible(slot);
+    public string QuickSlotText(int slot)
+        => IsInstanceValid(_quickSlotBar) ? _quickSlotBar.SlotText(slot) : string.Empty;
 
     private void BuildDemolitionBuyHud(Control root)
     {
@@ -41,14 +71,55 @@ public partial class CombatHUD
             ?? throw new System.InvalidOperationException($"Unable to load {DemolitionBuyViewScenePath}");
         _demolitionBuyView = scene.Instantiate<DemolitionBuyView>();
         root.AddChild(_demolitionBuyView);
-        _demolitionBuyView.PurchaseRequested += (sidearmId, primaryId, armorSelected, grenadeCount) =>
+        _demolitionBuyView.PurchaseRequested += (
+            sidearmId,
+            primaryId,
+            armorSelected,
+            grenadeCount,
+            smokeGrenadeCount) =>
             EmitSignal(
                 SignalName.DemolitionPurchaseRequested,
                 sidearmId,
                 primaryId,
                 armorSelected,
-                grenadeCount);
+                grenadeCount,
+                smokeGrenadeCount);
     }
+
+    public void SetDemolitionGameplayPresentation(bool active)
+    {
+        _demolitionGameplayPresentation = active;
+        RefreshQuickSlotBar();
+        if (IsInstanceValid(_squadRoster))
+        {
+            _squadRoster.Visible = !active;
+        }
+        if (IsInstanceValid(_classSkillRoot))
+        {
+            _classSkillRoot.Visible = true;
+            _classSkillRoot.Size = new Vector2(430, active ? 46 : 92);
+        }
+        if (IsInstanceValid(_squadOrderLabel))
+        {
+            _squadOrderLabel.Visible = !active;
+        }
+        foreach (var button in _orderButtons)
+        {
+            if (IsInstanceValid(button))
+            {
+                button.Visible = !active;
+            }
+        }
+    }
+
+    public void SetDemolitionSmokeGrenades(int count)
+    {
+        _demolitionSmokeGrenades = Mathf.Max(0, count);
+        RefreshQuickSlotBar();
+    }
+
+    public void PressQuickSlotForDiagnostics(int slot)
+        => _quickSlotBar.PressSlotForDiagnostics(slot);
 
     public void ShowDemolitionBuy(DemolitionBuySnapshot snapshot)
     {
@@ -94,6 +165,9 @@ public partial class CombatHUD
 
     public void SetDemolitionBuyGrenadesForDiagnostics(int count)
         => _demolitionBuyView.SetGrenadesForDiagnostics(count);
+
+    public void SetDemolitionBuySmokeGrenadesForDiagnostics(int count)
+        => _demolitionBuyView.SetSmokeGrenadesForDiagnostics(count);
 
     public void PressDemolitionBuyConfirmForDiagnostics()
         => _demolitionBuyView.PressConfirmForDiagnostics();

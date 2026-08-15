@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace OperationSteelTide;
@@ -36,6 +37,7 @@ public sealed class DemolitionArenaLayout
     public const float MinimumPassageWidth = 2.6f;
     public const float MinimumPassageHeight = 2.45f;
     public const float MaximumSiteTravelDifference = 0.12f;
+    public const int MinimumCentralCoverBodyCount = 8;
 
     public static readonly Vector3 WorldOrigin = new(285.0f, 0.0f, -35.0f);
 
@@ -64,9 +66,13 @@ public sealed class DemolitionArenaLayout
     public IReadOnlyList<Vector3> AttackToAPath { get; }
     public IReadOnlyList<Vector3> AttackToBPath { get; }
     public IReadOnlyList<Vector3> AttackMidPath { get; }
+    public IReadOnlyList<Vector3> DefenderToAPath { get; }
+    public IReadOnlyList<Vector3> DefenderToBPath { get; }
     public IReadOnlyList<Vector3> SiteRotationPath { get; }
     public IReadOnlyList<float> CriticalPassageWidths { get; }
     public IReadOnlyList<float> CriticalPassageHeights { get; }
+    public int CentralCoverBodyCount { get; }
+    public bool CentralPropsDoNotOverlap { get; }
 
     public DemolitionArenaLayout(Vector3? origin = null)
     {
@@ -99,11 +105,25 @@ public sealed class DemolitionArenaLayout
             new(-8.0f, 0.2f, 4.0f), new(8.0f, 0.2f, 4.0f),
             new(-8.0f, 0.2f, -7.0f), new(8.0f, 0.2f, -7.0f),
             new(-15.0f, 0.2f, 31.0f), new(13.0f, 0.2f, 26.0f),
-            new(-22.0f, 0.2f, 6.0f), new(22.0f, 0.2f, 2.0f));
+            new(-22.0f, 0.2f, 6.0f), new(22.0f, 0.2f, 2.0f),
+            new(-9.3f, 0.2f, 17.5f), new(-4.3f, 0.2f, 17.5f),
+            new(4.3f, 0.2f, 12.0f), new(9.3f, 0.2f, 12.0f),
+            new(-6.7f, 0.2f, 31.0f), new(-2.9f, 0.2f, 31.0f),
+            new(2.7f, 0.2f, 27.0f), new(6.5f, 0.2f, 27.0f),
+            new(-9.5f, 0.2f, -31.0f), new(-4.5f, 0.2f, -31.0f),
+            new(4.5f, 0.2f, -36.0f), new(9.5f, 0.2f, -36.0f),
+            new(18.5f, 0.2f, 22.0f), new(27.5f, 0.2f, 22.0f),
+            new(23.0f, 0.2f, 16.0f), new(23.0f, 0.2f, 28.0f),
+            new(-27.0f, 0.2f, -26.0f), new(-17.0f, 0.2f, -26.0f),
+            new(-22.0f, 0.2f, -20.5f), new(-22.0f, 0.2f, -31.5f));
 
         CollisionBoxes = BuildCollisionBoxes();
+        CentralCoverBodyCount = CollisionBoxes.Count(box => box.Name.StartsWith("MidCover", StringComparison.Ordinal));
         DetailBoxes = BuildDetailBoxes();
         Props = BuildProps();
+        CentralPropsDoNotOverlap = !Props.Any(prop => CollisionBoxes.Any(box =>
+            box.Name.StartsWith("MidCover", StringComparison.Ordinal)
+            && GroundFootprintsOverlap(box, prop)));
         Markers = BuildMarkers();
         AttackToAPath = WorldPoints(
             new(0, 0.2f, 54), new(0, 0.2f, 46),
@@ -121,6 +141,19 @@ public sealed class DemolitionArenaLayout
             new(0, 0.2f, 54), new(0, 0.2f, 46),
             new(0, 0.2f, 38), new(0, 0.2f, 12),
             new(0, 0.2f, 4));
+        DefenderToAPath = WorldPoints(
+            new(0, 0.2f, -54), new(0, 0.2f, -46),
+            new(0, 0.2f, -40), new(-4.0f, 0.2f, -35),
+            new(-4.0f, 0.2f, -27), new(-8.0f, 0.2f, -22),
+            new(-8.0f, 0.2f, -7), new(-8.0f, 0.2f, -5),
+            new(-16.0f, 0.2f, 3), new(-24.0f, 0.2f, 4),
+            new(-24.0f, 0.2f, 16), new(-28.0f, 0.2f, 21),
+            new(-33.0f, 0.2f, 21));
+        DefenderToBPath = WorldPoints(
+            new(0, 0.2f, -54), new(0, 0.2f, -46),
+            new(7.0f, 0.2f, -43), new(11.0f, 0.2f, -39),
+            new(11.0f, 0.2f, -28), new(20.0f, 0.2f, -24),
+            new(28.0f, 0.2f, -20), new(33.0f, 0.2f, -19));
         SiteRotationPath = WorldPoints(
             new(-33, 0.2f, 21), new(-28, 0.2f, 21), new(-24, 0.2f, 16),
             new(-24, 0.2f, 4), new(-16, 0.2f, 3), new(-15, 0.2f, 0),
@@ -142,6 +175,7 @@ public sealed class DemolitionArenaLayout
     public bool HasThreeAttackRoutes => AttackToAPath.Count >= 5
         && AttackToBPath.Count >= 5
         && AttackMidPath.Count >= 4;
+    public bool HasDenseCentralCover => CentralCoverBodyCount >= MinimumCentralCoverBodyCount;
     public bool HasPlayerClearance
         => AllAtLeast(CriticalPassageWidths, MinimumPassageWidth)
         && AllAtLeast(CriticalPassageHeights, MinimumPassageHeight);
@@ -159,15 +193,9 @@ public sealed class DemolitionArenaLayout
         {
             var start = route[segment - 1];
             var end = route[segment];
-            var samples = Mathf.Max(1, Mathf.CeilToInt(start.DistanceTo(end) / 0.2f));
-            for (var sample = 0; sample <= samples; sample++)
+            if (TryFindCapsuleSegmentBlocker(start, end, out blockerName))
             {
-                var position = start.Lerp(end, sample / (float)samples);
-                if (!TryFindCapsuleBlocker(position, out blockerName))
-                {
-                    continue;
-                }
-                blockerName = $"{blockerName}@{segment}:{sample}";
+                blockerName = $"{blockerName}@{segment}";
                 return false;
             }
         }
@@ -263,6 +291,18 @@ public sealed class DemolitionArenaLayout
             Box("MidCrossNorth", new(0, 1.7f, -2.0f), new(4.0f, 3.4f, 1.0f), "steel_dark"),
             Box("MidPipeRackColumn", new(0, 2.9f, -1.0f), new(1.2f, 5.8f, 1.2f), "steel"),
             Box("MidFoundryCore", new(0, 2.25f, -13.5f), new(8.0f, 4.5f, 8.0f), "rust"),
+            Box("MidCoverWestConverter", new(-6.8f, 1.35f, 17.5f), new(4.0f, 2.7f, 7.0f), "rust"),
+            Box("MidCoverEastConverter", new(6.8f, 1.35f, 12.0f), new(4.0f, 2.7f, 6.5f), "steel"),
+            Box("MidCoverAttackWest", new(-4.8f, 1.05f, 31.0f), new(2.6f, 2.1f, 4.2f), "steel"),
+            Box("MidCoverAttackEast", new(4.6f, 1.05f, 27.0f), new(2.6f, 2.1f, 4.2f), "concrete_dark"),
+            Box("MidCoverGantryWest", new(-14.0f, 2.6f, 22.0f), new(0.8f, 5.2f, 0.8f), "steel_dark"),
+            Box("MidCoverGantryEast", new(14.0f, 2.6f, 22.0f), new(0.8f, 5.2f, 0.8f), "steel_dark"),
+            Box("MidCoverDefenderWest", new(-7.0f, 1.15f, -31.0f), new(4.0f, 2.3f, 5.5f), "concrete_dark"),
+            Box("MidCoverDefenderEast", new(7.0f, 1.15f, -36.0f), new(4.0f, 2.3f, 5.5f), "steel_dark"),
+            Box("MidCoverRelayCore", new(23.0f, 2.7f, 22.0f), new(5.0f, 5.4f, 5.5f), "steel_dark"),
+            Box("MidCoverRelayWing", new(18.8f, 1.25f, 22.0f), new(3.2f, 2.5f, 7.0f), "steel"),
+            Box("MidCoverMaintenanceBay", new(-22.0f, 1.65f, -26.0f), new(7.0f, 3.3f, 8.0f), "concrete_dark"),
+            Box("MidCoverMaintenanceVent", new(-17.0f, 1.0f, -29.0f), new(2.5f, 2.0f, 3.5f), "rust"),
 
             Box("FoundryNorthWall", new(-36.0f, 3.0f, -1.0f), new(7.0f, 6.0f, 1.0f), "concrete_dark"),
             Box("FoundrySouthWall", new(-36.0f, 3.0f, 43.0f), new(7.0f, 6.0f, 1.0f), "concrete_dark"),
@@ -310,6 +350,30 @@ public sealed class DemolitionArenaLayout
             Box("DefenderBorder", new(0, 0.09f, -52.3f), new(18, 0.04f, 0.16f), "cyan"),
             Box("DefenderApproachSurface", new(0, 0.035f, -40), new(10, 0.07f, 16), "mid_floor"),
             Box("MidPipeRackTop", new(0, 5.8f, -1), new(16, 0.35f, 1.2f), "steel"),
+            Box("MidCoverGantryBeam", new(0, 5.25f, 22.0f), new(28.8f, 0.5f, 0.8f), "steel"),
+            Box("MidCoverGantryStripe", new(0, 5.54f, 22.0f), new(27.0f, 0.08f, 0.9f), "warning"),
+            Box("MidCoverAttackWestCap", new(-4.8f, 2.16f, 31.0f), new(2.9f, 0.12f, 4.5f), "steel_dark"),
+            Box("MidCoverAttackWestStripe", new(-4.8f, 2.24f, 31.0f), new(2.0f, 0.04f, 0.22f), "warning"),
+            Box("MidCoverAttackEastCap", new(4.6f, 2.16f, 27.0f), new(2.9f, 0.12f, 4.5f), "steel_dark"),
+            Box("MidCoverAttackEastStripe", new(4.6f, 2.24f, 27.0f), new(2.0f, 0.04f, 0.22f), "cyan"),
+            Box("MidCoverWestCap", new(-6.8f, 2.78f, 17.5f), new(4.4f, 0.16f, 7.4f), "steel_dark"),
+            Box("MidCoverWestTopStripe", new(-6.8f, 2.88f, 17.5f), new(3.2f, 0.04f, 0.28f), "warning"),
+            Box("MidCoverWestPanel", new(-6.8f, 1.45f, 21.03f), new(2.7f, 1.4f, 0.08f), "warning"),
+            Box("MidCoverEastCap", new(6.8f, 2.78f, 12.0f), new(4.4f, 0.16f, 6.9f), "steel_dark"),
+            Box("MidCoverEastTopStripe", new(6.8f, 2.88f, 12.0f), new(3.2f, 0.04f, 0.28f), "cyan"),
+            Box("MidCoverEastPanel", new(6.8f, 1.45f, 15.28f), new(2.7f, 1.4f, 0.08f), "cyan"),
+            Box("MidCoverDefenderWestCap", new(-7.0f, 2.36f, -31.0f), new(4.4f, 0.12f, 5.9f), "steel"),
+            Box("MidCoverDefenderWestStripe", new(-7.0f, 2.44f, -31.0f), new(3.0f, 0.04f, 0.24f), "marking"),
+            Box("MidCoverDefenderEastCap", new(7.0f, 2.36f, -36.0f), new(4.4f, 0.12f, 5.9f), "steel"),
+            Box("MidCoverDefenderEastStripe", new(7.0f, 2.44f, -36.0f), new(3.0f, 0.04f, 0.24f), "cyan"),
+            Box("MidCoverRelayCap", new(23.0f, 5.46f, 22.0f), new(5.4f, 0.12f, 5.9f), "steel"),
+            Box("MidCoverRelayBeacon", new(23.0f, 5.58f, 22.0f), new(1.2f, 0.12f, 1.2f), "cyan"),
+            Box("MidCoverRelayWingCap", new(18.8f, 2.56f, 22.0f), new(3.5f, 0.12f, 7.3f), "steel_dark"),
+            Box("MidCoverRelayPanel", new(20.44f, 1.45f, 22.0f), new(0.08f, 1.5f, 4.8f), "cyan"),
+            Box("MidCoverMaintenanceRoof", new(-22.0f, 3.36f, -26.0f), new(7.4f, 0.12f, 8.4f), "steel"),
+            Box("MidCoverMaintenanceStripe", new(-22.0f, 3.44f, -26.0f), new(5.4f, 0.04f, 0.28f), "warning"),
+            Box("MidCoverMaintenancePanel", new(-18.46f, 1.55f, -26.0f), new(0.08f, 1.6f, 4.8f), "warning"),
+            Box("MidCoverMaintenanceVentCap", new(-17.0f, 2.06f, -29.0f), new(2.8f, 0.12f, 3.8f), "steel_dark"),
             Box("DefenderSignBeam", new(0, 4.5f, -47), new(8.0f, 0.3f, 0.5f), "warning")
         };
         for (var index = 0; index < 6; index++)
@@ -345,8 +409,8 @@ public sealed class DemolitionArenaLayout
         {
             new Vector3(-36.0f, 0.02f, 24.0f), new(-30.0f, 0.02f, 31.0f),
             new(36.0f, 0.02f, -14.0f), new(24.0f, 0.02f, -40.0f),
-            new(-5.0f, 0.02f, 16.0f), new(5.0f, 0.02f, -12.0f),
-            new(17.0f, 0.02f, 26.0f), new(-17.0f, 0.02f, -24.0f),
+            new(-7.5f, 0.02f, 8.0f), new(5.0f, 0.02f, -12.0f),
+            new(13.5f, 0.02f, 31.0f), new(-17.0f, 0.02f, -24.0f),
             new(32.0f, 0.02f, 4.0f), new(-34.0f, 0.02f, 36.0f)
         };
         for (var index = 0; index < cratePositions.Length; index++)
@@ -396,13 +460,13 @@ public sealed class DemolitionArenaLayout
         return length;
     }
 
-    private bool TryFindCapsuleBlocker(Vector3 feetPosition, out string blockerName)
+    private bool TryFindCapsuleSegmentBlocker(Vector3 start, Vector3 end, out string blockerName)
     {
         const float radius = 0.38f;
         const float centerOffset = 0.9f;
         const float halfHeight = 0.875f;
-        var capsuleBottom = feetPosition.Y + centerOffset - halfHeight;
-        var capsuleTop = feetPosition.Y + centerOffset + halfHeight;
+        var capsuleBottom = Mathf.Min(start.Y, end.Y) + centerOffset - halfHeight;
+        var capsuleTop = Mathf.Max(start.Y, end.Y) + centerOffset + halfHeight;
         foreach (var box in CollisionBoxes)
         {
             var half = box.Size * 0.5f;
@@ -410,8 +474,16 @@ public sealed class DemolitionArenaLayout
             {
                 continue;
             }
-            var local = new Basis(Quaternion.FromEuler(box.Rotation)).Inverse() * (feetPosition - box.Center);
-            if (Mathf.Abs(local.X) <= half.X + radius && Mathf.Abs(local.Z) <= half.Z + radius)
+            var inverse = new Basis(Quaternion.FromEuler(box.Rotation)).Inverse();
+            var localStart = inverse * (start - box.Center);
+            var localEnd = inverse * (end - box.Center);
+            var bounds = new Rect2(
+                new Vector2(-half.X - radius, -half.Z - radius),
+                new Vector2((half.X + radius) * 2.0f, (half.Z + radius) * 2.0f));
+            if (SegmentIntersectsRect(
+                    new Vector2(localStart.X, localStart.Z),
+                    new Vector2(localEnd.X, localEnd.Z),
+                    bounds))
             {
                 blockerName = box.Name;
                 return true;
@@ -427,8 +499,16 @@ public sealed class DemolitionArenaLayout
             {
                 continue;
             }
-            var local = yaw.Inverse() * (feetPosition - center);
-            if (Mathf.Abs(local.X) <= half.X + radius && Mathf.Abs(local.Z) <= half.Z + radius)
+            var inverse = yaw.Inverse();
+            var localStart = inverse * (start - center);
+            var localEnd = inverse * (end - center);
+            var bounds = new Rect2(
+                new Vector2(-half.X - radius, -half.Z - radius),
+                new Vector2((half.X + radius) * 2.0f, (half.Z + radius) * 2.0f));
+            if (SegmentIntersectsRect(
+                    new Vector2(localStart.X, localStart.Z),
+                    new Vector2(localEnd.X, localEnd.Z),
+                    bounds))
             {
                 blockerName = prop.Name;
                 return true;
@@ -449,6 +529,23 @@ public sealed class DemolitionArenaLayout
             }
         }
         return true;
+    }
+
+    private static bool GroundFootprintsOverlap(DemolitionArenaBox box, DemolitionArenaProp prop)
+    {
+        const float separationMargin = 0.05f;
+        var boxBasis = new Basis(Quaternion.FromEuler(box.Rotation));
+        var boxHalf = box.Size * 0.5f;
+        var boxExtentX = Mathf.Abs(boxBasis.X.X) * boxHalf.X + Mathf.Abs(boxBasis.Z.X) * boxHalf.Z;
+        var boxExtentZ = Mathf.Abs(boxBasis.X.Z) * boxHalf.X + Mathf.Abs(boxBasis.Z.Z) * boxHalf.Z;
+
+        var propBasis = new Basis(Vector3.Up, prop.Yaw);
+        var propHalf = prop.CollisionSize * prop.Scale * 0.5f;
+        var propCenter = prop.Position + propBasis * (prop.CollisionOffset * prop.Scale);
+        var propExtentX = Mathf.Abs(propBasis.X.X) * propHalf.X + Mathf.Abs(propBasis.Z.X) * propHalf.Z;
+        var propExtentZ = Mathf.Abs(propBasis.X.Z) * propHalf.X + Mathf.Abs(propBasis.Z.Z) * propHalf.Z;
+        return Mathf.Abs(box.Center.X - propCenter.X) < boxExtentX + propExtentX + separationMargin
+            && Mathf.Abs(box.Center.Z - propCenter.Z) < boxExtentZ + propExtentZ + separationMargin;
     }
 
     private static bool SegmentIntersectsRect(Vector2 start, Vector2 end, Rect2 rect)

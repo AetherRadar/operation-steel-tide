@@ -6,6 +6,9 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    private const float DemolitionRouteCornerTolerance = 0.3f;
+    private const float DemolitionRouteWaypointStop = 0.22f;
+
     private void RefreshDemolitionStrategies(bool announce)
     {
         if (!_demolitionRoundActive && !announce)
@@ -52,7 +55,8 @@ public partial class FreightTerminalWorld
             phase,
             playerSnapshots,
             _demolitionActiveSite,
-            CollectDemolitionSightings(opponentTeamSide, playerTeamSide, layout));
+            CollectDemolitionSightings(opponentTeamSide, playerTeamSide, layout),
+            strategySeed: _demolitionMatch.CurrentRound);
         _demolitionAttackerPlan = playerTeamSide == DemolitionTeam.Attackers ? playerPlan : _demolitionAttackerPlan;
         _demolitionDefenderPlan = playerTeamSide == DemolitionTeam.Defenders ? playerPlan : _demolitionDefenderPlan;
         ApplyDemolitionSquadPlan(playerPlan, layout);
@@ -80,7 +84,8 @@ public partial class FreightTerminalWorld
             phase,
             opponentSnapshots,
             _demolitionActiveSite,
-            CollectDemolitionSightings(playerTeamSide, opponentTeamSide, layout));
+            CollectDemolitionSightings(playerTeamSide, opponentTeamSide, layout),
+            strategySeed: _demolitionMatch.CurrentRound);
         _demolitionAttackerPlan = opponentTeamSide == DemolitionTeam.Attackers ? opponentPlan : _demolitionAttackerPlan;
         _demolitionDefenderPlan = opponentTeamSide == DemolitionTeam.Defenders ? opponentPlan : _demolitionDefenderPlan;
 
@@ -111,15 +116,14 @@ public partial class FreightTerminalWorld
         }
         if (_demolitionDefuser != previousDefuser)
         {
-            _demolitionDefuser?.ResetScriptedObjectiveNavigation();
-            PlanDemolitionDefuseRoute();
+            ResetDemolitionOpponentRoute(previousDefuser);
+            ResetDemolitionOpponentRoute(_demolitionDefuser);
             _demolitionDefuseProgress = 0.0f;
         }
         if (_demolitionCarrier != previousCarrier)
         {
-            _demolitionCarrier?.ResetScriptedObjectiveNavigation();
-            _demolitionCarrierRoute = System.Array.Empty<Vector3>();
-            _demolitionCarrierRouteIndex = 0;
+            ResetDemolitionOpponentRoute(previousCarrier);
+            ResetDemolitionOpponentRoute(_demolitionCarrier);
             _demolitionEnemyPlantProgress = 0.0f;
         }
 
@@ -238,8 +242,7 @@ public partial class FreightTerminalWorld
         if (nearest >= 0 && nearest != _demolitionEnemyTargetSite)
         {
             _demolitionEnemyTargetSite = nearest;
-            _demolitionCarrierRoute = System.Array.Empty<Vector3>();
-            _demolitionCarrierRouteIndex = 0;
+            ResetDemolitionOpponentRoute(_demolitionCarrier);
         }
     }
 
@@ -466,70 +469,21 @@ public partial class FreightTerminalWorld
             .Where(opponent => IsInstanceValid(opponent) && !opponent.IsDead)
             .OrderBy(opponent => opponent.GlobalPosition.DistanceSquaredTo(devicePosition))
             .FirstOrDefault();
-        _demolitionDefuser?.ResetScriptedObjectiveNavigation();
-        PlanDemolitionDefuseRoute();
+        ResetDemolitionOpponentRoute(_demolitionDefuser);
         _demolitionDefuseProgress = 0.0f;
     }
 
-    private void PlanDemolitionDefuseRoute()
+    private void ResetDemolitionOpponentRoute(EnemyOperator? opponent)
     {
-        _demolitionDefuseRouteIndex = 0;
-        _demolitionDefuseRoute = IsInstanceValid(_demolitionDefuser) && _demolitionActiveSite >= 0
-            ? PlanDemolitionDetourRoute(_demolitionDefuser!, DemolitionLayout().SitePositions[_demolitionActiveSite])
-            : System.Array.Empty<Vector3>();
-    }
-
-    /// <summary>
-    /// Builds a two-waypoint detour around blocking geometry by scanning lateral offsets,
-    /// shared by the defuser and the bomb carrier so both walk around walls instead of
-    /// grinding into them.
-    /// </summary>
-    private Vector3[] PlanDemolitionDetourRoute(EnemyOperator agent, Vector3 destination)
-    {
-        if (agent.IsScriptedObjectiveCorridorClear(destination))
+        if (opponent is null)
         {
-            return new[] { destination };
+            return;
         }
-
-        var start = agent.GlobalPosition;
-        var forward = destination - start;
-        forward.Y = 0.0f;
-        forward = forward.Normalized();
-        var side = new Vector3(-forward.Z, 0.0f, forward.X);
-        var bestLength = float.PositiveInfinity;
-        var bestRoute = new[] { destination };
-        foreach (var sideSign in new[] { 1.0f, -1.0f })
+        _demolitionOpponentRoutes.Remove(opponent);
+        if (IsInstanceValid(opponent))
         {
-            foreach (var lateral in new[] { 2.5f, 3.5f, 4.5f, 5.5f })
-            {
-                foreach (var forwardOffset in new[] { 0.0f, 2.0f, 4.0f })
-                {
-                    var waypoint = start + side * (sideSign * lateral) + forward * forwardOffset;
-                    waypoint.Y = start.Y;
-                    if (!agent.IsScriptedObjectiveCorridorClear(waypoint))
-                    {
-                        continue;
-                    }
-
-                    var oldPosition = agent.GlobalPosition;
-                    agent.GlobalPosition = waypoint;
-                    var destinationClear = agent.IsScriptedObjectiveCorridorClear(destination);
-                    agent.GlobalPosition = oldPosition;
-                    if (!destinationClear)
-                    {
-                        continue;
-                    }
-
-                    var length = HorizontalDistance(start, waypoint) + HorizontalDistance(waypoint, destination);
-                    if (length < bestLength)
-                    {
-                        bestLength = length;
-                        bestRoute = new[] { waypoint, destination };
-                    }
-                }
-            }
+            opponent.ResetScriptedObjectiveNavigation();
         }
-        return bestRoute;
     }
 
     /// <summary>
@@ -545,9 +499,7 @@ public partial class FreightTerminalWorld
             return false;
         }
 
-        var targetDistance = combatTarget is null || !IsInstanceValid(combatTarget)
-            ? float.PositiveInfinity
-            : opponent.GlobalPosition.DistanceTo(combatTarget.GlobalPosition);
+        var targetDistance = ResolveDemolitionCombatTargetDistance(opponent, combatTarget);
         if (!UpdateDemolitionCombatArbitration(opponent, targetDistance))
         {
             return false;
@@ -566,19 +518,117 @@ public partial class FreightTerminalWorld
         {
             return true;
         }
-        return MoveDemolitionOpponentToward(
+        return MoveDemolitionOpponentAlongRoute(
             opponent,
             DemolitionLayout().StrategyTarget(assignment.TargetKey),
+            assignment.TargetKey,
             delta,
             2.0f,
             assignment.Duty is DemolitionDuty.Retake or DemolitionDuty.Flank ? 5.8f : 4.8f);
+    }
+
+    private bool MoveDemolitionOpponentAlongRoute(
+        EnemyOperator opponent,
+        Vector3 destination,
+        string routeKey,
+        float delta,
+        float stoppingDistance,
+        float speed)
+    {
+        var planner = _demolitionRoutePlanner ??= new DemolitionRoutePlanner(DemolitionLayout());
+        if (!_demolitionOpponentRoutes.TryGetValue(opponent, out var cursor))
+        {
+            cursor = new DemolitionRouteCursor();
+            _demolitionOpponentRoutes[opponent] = cursor;
+        }
+
+        if (!cursor.Matches(routeKey, destination))
+        {
+            ResetDemolitionRouteCursor(
+                opponent,
+                cursor,
+                planner,
+                routeKey,
+                destination,
+                countAsReplan: false);
+        }
+
+        cursor.Advance(
+            opponent.GlobalPosition,
+            DemolitionRouteCornerTolerance,
+            cursor.ReachesDestination ? stoppingDistance : DemolitionRouteCornerTolerance);
+        var distance = HorizontalDistance(opponent.GlobalPosition, destination);
+        if (cursor.ReachesDestination && (cursor.Complete || distance <= stoppingDistance))
+        {
+            return MoveDemolitionOpponentToward(opponent, destination, delta, stoppingDistance, speed);
+        }
+        if (cursor.Complete)
+        {
+            StopDemolitionOpponent(opponent);
+            if (cursor.ShouldRetryUnreachable(delta))
+            {
+                ResetDemolitionRouteCursor(
+                    opponent,
+                    cursor,
+                    planner,
+                    routeKey,
+                    destination,
+                    countAsReplan: true);
+            }
+            return true;
+        }
+
+        MoveDemolitionOpponentToward(
+            opponent,
+            cursor.CurrentWaypoint,
+            delta,
+            DemolitionRouteWaypointStop,
+            speed);
+        var stalled = cursor.TrackMovement(opponent.GlobalPosition, delta, movementRequested: true);
+        if (stalled)
+        {
+            ResetDemolitionRouteCursor(
+                opponent,
+                cursor,
+                planner,
+                routeKey,
+                destination,
+                countAsReplan: true);
+        }
+        return true;
+    }
+
+    private static void ResetDemolitionRouteCursor(
+        EnemyOperator opponent,
+        DemolitionRouteCursor cursor,
+        DemolitionRoutePlanner planner,
+        string routeKey,
+        Vector3 destination,
+        bool countAsReplan)
+    {
+        var route = planner.Plan(opponent.GlobalPosition, destination);
+        cursor.Reset(routeKey, opponent.GlobalPosition, destination, route, countAsReplan);
+        opponent.ResetScriptedObjectiveNavigation();
+    }
+
+    private float ResolveDemolitionCombatTargetDistance(EnemyOperator opponent, Node3D? target)
+    {
+        if (target is null || !IsInstanceValid(target))
+        {
+            return float.PositiveInfinity;
+        }
+        var from = opponent.GlobalPosition + Vector3.Up * 1.45f;
+        var to = target.GlobalPosition + Vector3.Up;
+        return IsLineObscuredBySmoke(from, to)
+            ? float.PositiveInfinity
+            : opponent.GlobalPosition.DistanceTo(target.GlobalPosition);
     }
 
     /// <summary>
     /// Combat-first arbitration, the core of any competent bot: objective movement yields
     /// to the full combat layer while a hostile is inside the engage bubble, and resumes
     /// with hysteresis once the threat leaves it. A carrier or defuser mid-channel holds
-    /// the channel under fire from beyond the guard range — trading damage for the
+    /// the channel under fire from beyond the guard range, trading damage for the
     /// objective like a planted-round defuser in Counter-Strike.
     /// </summary>
     private bool UpdateDemolitionCombatArbitration(EnemyOperator opponent, float targetDistance)
@@ -639,20 +689,13 @@ public partial class FreightTerminalWorld
         var distance = opponent.GlobalPosition.DistanceTo(flatSite);
         if (distance > 2.15f)
         {
-            if (_demolitionCarrierRoute.Length == 0)
-            {
-                _demolitionCarrierRoute = PlanDemolitionDetourRoute(opponent, site);
-            }
-            while (_demolitionCarrierRouteIndex < _demolitionCarrierRoute.Length - 1
-                && HorizontalDistance(opponent.GlobalPosition, _demolitionCarrierRoute[_demolitionCarrierRouteIndex]) < 0.85f)
-            {
-                _demolitionCarrierRouteIndex++;
-                opponent.ResetScriptedObjectiveNavigation();
-            }
-            var movementTarget = _demolitionCarrierRoute[
-                Mathf.Clamp(_demolitionCarrierRouteIndex, 0, _demolitionCarrierRoute.Length - 1)];
-            MoveDemolitionOpponentToward(opponent, movementTarget, delta, 0.72f, 5.1f);
-            return true;
+            return MoveDemolitionOpponentAlongRoute(
+                opponent,
+                site,
+                $"carrier_site_{_demolitionEnemyTargetSite}",
+                delta,
+                2.15f,
+                5.1f);
         }
 
         var velocity = opponent.Velocity;
@@ -679,19 +722,13 @@ public partial class FreightTerminalWorld
         var distance = opponent.GlobalPosition.DistanceTo(flatDevice);
         if (distance > 2.15f)
         {
-            if (_demolitionDefuseRoute.Length == 0)
-            {
-                PlanDemolitionDefuseRoute();
-            }
-            while (_demolitionDefuseRouteIndex < _demolitionDefuseRoute.Length - 1
-                && HorizontalDistance(opponent.GlobalPosition, _demolitionDefuseRoute[_demolitionDefuseRouteIndex]) < 0.85f)
-            {
-                _demolitionDefuseRouteIndex++;
-                opponent.ResetScriptedObjectiveNavigation();
-            }
-            var movementTarget = _demolitionDefuseRoute[
-                Mathf.Clamp(_demolitionDefuseRouteIndex, 0, _demolitionDefuseRoute.Length - 1)];
-            return MoveDemolitionOpponentToward(opponent, movementTarget, delta, 0.72f, 5.3f);
+            return MoveDemolitionOpponentAlongRoute(
+                opponent,
+                devicePosition,
+                $"defuser_site_{_demolitionActiveSite}",
+                delta,
+                2.15f,
+                5.3f);
         }
 
         var velocity = opponent.Velocity;
@@ -743,5 +780,13 @@ public partial class FreightTerminalWorld
         velocity.Z = Mathf.MoveToward(velocity.Z, direction.Z * speed, delta * 12.0f);
         opponent.Velocity = velocity;
         return true;
+    }
+
+    private static void StopDemolitionOpponent(EnemyOperator opponent)
+    {
+        var velocity = opponent.Velocity;
+        velocity.X = 0.0f;
+        velocity.Z = 0.0f;
+        opponent.Velocity = velocity;
     }
 }

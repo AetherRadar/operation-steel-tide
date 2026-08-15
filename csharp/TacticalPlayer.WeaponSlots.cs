@@ -123,7 +123,10 @@ public partial class TacticalPlayer
         {
             return false;
         }
-        if (!force && _activeWeaponSlot == slot && (slot == PlayerWeaponSlot.Melee) == _knifeEquipped)
+        if (!force
+            && _activeWeaponSlot == slot
+            && _activeQuickSlot == (PlayerQuickSlot)(int)slot
+            && (slot == PlayerWeaponSlot.Melee) == _knifeEquipped)
         {
             return true;
         }
@@ -139,6 +142,8 @@ public partial class TacticalPlayer
             StoreActiveFirearmState();
         }
         _activeWeaponSlot = slot;
+        _activeQuickSlot = (PlayerQuickSlot)(int)slot;
+        _returnQuickSlot = _activeQuickSlot;
         _knifeEquipped = slot == PlayerWeaponSlot.Melee;
         _isAiming = false;
         _knifeTime = 0.0f;
@@ -179,6 +184,11 @@ public partial class TacticalPlayer
 
     private void CycleWeaponSlots()
     {
+        if (IsThrowableQuickSlotSelected)
+        {
+            ReturnFromThrowableSlot();
+            return;
+        }
         var next = _activeWeaponSlot switch
         {
             PlayerWeaponSlot.Primary when HasSecondaryWeapon => PlayerWeaponSlot.Secondary,

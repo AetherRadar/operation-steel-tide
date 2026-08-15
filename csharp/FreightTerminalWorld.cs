@@ -1273,7 +1273,11 @@ public partial class FreightTerminalWorld : Node3D
             {
                 continue;
             }
-            if (!source.Loot.Exists(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null))
+            var hasWeapon = source.Loot.Exists(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null);
+            var sealedWeaponCandidate = source is IDeferredLootSource deferred
+                && !deferred.ContentsResolved
+                && deferred.MayContainWeapon;
+            if (!hasWeapon && !sealedWeaponCandidate)
             {
                 continue;
             }
@@ -1301,6 +1305,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             return false;
         }
+        if (source is IDeferredLootSource { ContentsResolved: false })
+        {
+            source.OnSearched();
+        }
         var index = source.Loot.FindIndex(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null);
         if (index < 0)
         {
@@ -1326,6 +1334,14 @@ public partial class FreightTerminalWorld : Node3D
         if (source is null || !source.IsSearchable || !IsInstanceValid(_player))
         {
             return false;
+        }
+        if (source is IDeferredLootSource { ContentsResolved: false })
+        {
+            source.OnSearched();
+            if (_player.IsDead)
+            {
+                return false;
+            }
         }
         var index = source.Loot.FindIndex(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null);
         if (index < 0)
@@ -1364,6 +1380,10 @@ public partial class FreightTerminalWorld : Node3D
         if (mate is null || source is null || !IsInstanceValid(mate) || !source.IsSearchable)
         {
             return false;
+        }
+        if (source is IDeferredLootSource { ContentsResolved: false })
+        {
+            source.OnSearched();
         }
         var index = source.Loot.FindIndex(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null);
         if (index < 0)
@@ -1565,18 +1585,22 @@ public partial class FreightTerminalWorld : Node3D
         return Math.Max(0, playerBackpackValue) + Math.Max(0, livingMateBonus);
     }
 
+    private bool LocalPlayerCannotInteract =>
+        _localPlayerDowned || _localPlayerEliminated || _player.IsDead;
+
     private void UpdateInteraction(float delta)
     {
+        if (LocalPlayerCannotInteract)
+        {
+            _lootSearchTarget = null;
+            _interactionProgress = 0.0f;
+            _player.SetSearchPose(false);
+            _hud.SetInteraction(string.Empty, 0.0f, false);
+            return;
+        }
         if (_demolitionMode)
         {
             UpdateDemolitionInteraction(delta);
-            return;
-        }
-        if (_localPlayerEliminated)
-        {
-            _lootSearchTarget = null;
-            _player.SetSearchPose(false);
-            _hud.SetInteraction(string.Empty, 0.0f, false);
             return;
         }
         if (!Input.IsActionPressed("interact"))
@@ -1742,16 +1766,18 @@ public partial class FreightTerminalWorld : Node3D
     private void OpenLoot(ILootSource source)
     {
         _interactionProgress = 0.0f;
-        _openLootSource = source;
-        _personalBackpackOpen = false;
-        source.OnSearched();
-        if (_player.IsDead)
+        if (LocalPlayerCannotInteract)
         {
             _openLootSource = null;
+            _personalBackpackOpen = false;
+            _lootSearchTarget = null;
             _player.SetSearchPose(false);
             _hud.SetInteraction(string.Empty, 0.0f, false);
             return;
         }
+        _openLootSource = source;
+        _personalBackpackOpen = false;
+        source.OnSearched();
         _player.UiLocked = true;
         _player.SetSearchPose(true, 1.0f);
         _player.DisarmFireInput();
@@ -1763,6 +1789,10 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OpenPersonalBackpack()
     {
+        if (LocalPlayerCannotInteract)
+        {
+            return;
+        }
         _openLootSource = null;
         _personalBackpackOpen = true;
         _player.UiLocked = true;
@@ -1784,11 +1814,17 @@ public partial class FreightTerminalWorld : Node3D
         _lootSearchTarget = null;
         _interactionProgress = 0.0f;
         _interactReleaseRequired = Input.IsActionPressed("interact");
-        _player.UiLocked = false;
         _player.SetSearchPose(false);
         _player.DisarmFireInput();
-        _player.RestoreMovementInput();
         Input.MouseMode = Input.MouseModeEnum.Captured;
+        if (LocalPlayerCannotInteract)
+        {
+            _player.UiLocked = true;
+            _player.DisarmMovementInput();
+            return;
+        }
+        _player.UiLocked = false;
+        _player.RestoreMovementInput();
     }
 
     internal bool InterruptLootForIncomingDamage()
@@ -2346,6 +2382,7 @@ public partial class FreightTerminalWorld : Node3D
         Input.ActionPress("use_plate");
         await WaitFrames(2);
         Input.ActionRelease("use_plate");
+        await WaitFrames(2);
         var restarted = _player.IsPlateUseActiveForDiagnostics;
         var deadline = Time.GetTicksMsec() + 4000;
         while (_player.ArmorPlates == platesBefore && Time.GetTicksMsec() < deadline)
@@ -2395,8 +2432,10 @@ public partial class FreightTerminalWorld : Node3D
         var reserveBefore = _player.ReserveAmmo;
         SpawnPickup(_player.GlobalPosition + Vector3.Up * 0.1f, TacticalPickupKind.Ammunition);
         await WaitFrames(8);
-        GD.Print($"PICKUP_CHECK ammo_before={reserveBefore} ammo_after={_player.ReserveAmmo}");
-        GetTree().Quit();
+        var valid = _player.ReserveAmmo > reserveBefore;
+        GD.Print($"PICKUP_CHECK valid={valid} ammo_before={reserveBefore} ammo_after={_player.ReserveAmmo}");
+        GD.Print($"PICKUP_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private async void ValidateAmmoInventoryFlow()
@@ -2525,6 +2564,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private async void CaptureOperatorFrame()
     {
+        SetCaptureLanguage("en");
         for (var i = 0; i < _enemies.Count; i++)
         {
             _enemies[i].ProcessMode = ProcessModeEnum.Disabled;
@@ -2532,10 +2572,27 @@ public partial class FreightTerminalWorld : Node3D
         }
         var target = _enemies[0];
         target.GlobalPosition = new Vector3(0, 0.15f, 29.5f);
-        target.Rotation = new Vector3(0, Mathf.Pi, 0);
-        await WaitFrames(145);
+
+        var captureCamera = new Camera3D
+        {
+            Name = "OperatorCaptureCamera",
+            Fov = 34.0f,
+            Near = 0.04f
+        };
+        AddChild(captureCamera);
+        captureCamera.GlobalPosition = new Vector3(0, 1.55f, 24.65f);
+        target.LookAt(
+            new Vector3(captureCamera.GlobalPosition.X, target.GlobalPosition.Y, captureCamera.GlobalPosition.Z),
+            Vector3.Up);
+        captureCamera.LookAt(target.GlobalPosition + Vector3.Up * 1.12f, Vector3.Up);
+        captureCamera.MakeCurrent();
+
+        await WaitFrames(24);
         SaveViewportImage("res://operator_validation.png");
-        GD.Print("OPERATOR_CHECK detailed_model=true visible=1");
+        var projected = captureCamera.UnprojectPosition(target.GlobalPosition + Vector3.Up * 1.12f);
+        var viewportCenter = GetViewport().GetVisibleRect().Size * 0.5f;
+        var framed = projected.DistanceTo(viewportCenter) < 3.0f;
+        GD.Print($"OPERATOR_CHECK detailed_model=true visible=1 camera_current={captureCamera.Current} framed={framed} center_offset={projected.DistanceTo(viewportCenter):0.00}");
         GetTree().Quit();
     }
 
@@ -2614,11 +2671,88 @@ public partial class FreightTerminalWorld : Node3D
         }
         var opened = _hud.IsLootVisible;
         var immediateOpenMilliseconds = Time.GetTicksMsec() - openedAt;
+        await WaitFrames(2);
         var item = source.Loot.Find(candidate => candidate.Kind == LootItemKind.Weapon);
+        var sourceClickActivated = false;
+        var emptyPrimaryAutoEquipped = false;
         if (item is not null)
         {
-            EquipLootItem(item.Id);
+            var expectedPlatform = item.Weapon?.Platform;
+            var startedUnarmed = !_player.HasFireablePrimary;
+            sourceClickActivated = _hud.ActivateLootCardForDiagnostics(item.Id, LootDragOrigin.Source);
+            await WaitFrames(2);
+            emptyPrimaryAutoEquipped = startedUnarmed
+                && _player.HasFireablePrimary
+                && expectedPlatform.HasValue
+                && _player.EquippedWeapon.Platform == expectedPlatform.Value
+                && source.Loot.TrueForAll(candidate => candidate.Id != item.Id);
         }
+        var policyValid = LootInteractionPolicy.ResolveSourceActivation(LootItemKind.Weapon, false)
+                == LootSourceActivationAction.EquipPrimaryWeapon
+            && LootInteractionPolicy.ResolveSourceActivation(LootItemKind.Weapon, true)
+                == LootSourceActivationAction.MoveToBackpack
+            && LootInteractionPolicy.ResolveSourceActivation(LootItemKind.Valuable, false)
+                == LootSourceActivationAction.MoveToBackpack
+            && LootInteractionPolicy.GetBackpackMenuCapabilities(LootItemKind.Weapon)
+                == new LootBackpackMenuCapabilities(true, true)
+            && LootInteractionPolicy.GetBackpackMenuCapabilities(LootItemKind.Valuable)
+                == new LootBackpackMenuCapabilities(false, true);
+
+        var menuWeapon = new LootItem
+        {
+            Kind = LootItemKind.Weapon,
+            Weapon = WeaponCatalog.Build(WeaponPlatform.MP5A5, 1),
+            Grade = LootGrade.Uncommon
+        };
+        var menuWeaponStored = _player.TryStoreInBackpack(menuWeapon);
+        RefreshLootView();
+        await WaitFrames(2);
+        var weaponBeforeMenuOpen = _player.EquippedWeapon.Platform;
+        var weaponMenuActivated = menuWeaponStored
+            && _hud.ActivateLootCardForDiagnostics(menuWeapon.Id, LootDragOrigin.Backpack);
+        await WaitFrames(2);
+        var weaponMenuReady = _hud.LootActionMenuReady
+            && _hud.LootActionMenuVisible
+            && _hud.LootActionMenuCanEquip
+            && _hud.LootActionMenuItemId == menuWeapon.Id
+            && _hud.LootActionMenuEquipText == GameLocalization.Get("equip", "zh", "EQUIP")
+            && _hud.LootActionMenuDropText == GameLocalization.Get("drop_to_ground", "zh", "DROP TO GROUND")
+            && _player.EquippedWeapon.Platform == weaponBeforeMenuOpen
+            && _player.Backpack.Exists(candidate => candidate.Id == menuWeapon.Id);
+        if (weaponMenuReady)
+        {
+            _hud.PressLootMenuEquipForDiagnostics();
+            await WaitFrames(2);
+        }
+        var weaponMenuEquipped = weaponMenuReady
+            && _player.EquippedWeapon.Platform == WeaponPlatform.MP5A5
+            && _player.Backpack.TrueForAll(candidate => candidate.Id != menuWeapon.Id);
+
+        var menuValuable = new LootItem
+        {
+            Kind = LootItemKind.Valuable,
+            ValuableKind = ValuableItemKind.CannedCoffee,
+            Grade = LootGrade.Rare
+        };
+        var menuValuableStored = _player.TryStoreInBackpack(menuValuable);
+        RefreshLootView();
+        await WaitFrames(2);
+        var itemMenuActivated = menuValuableStored
+            && _hud.ActivateLootCardForDiagnostics(menuValuable.Id, LootDragOrigin.Backpack);
+        await WaitFrames(2);
+        var itemMenuDropOnly = _hud.LootActionMenuVisible
+            && !_hud.LootActionMenuCanEquip
+            && _hud.LootActionMenuItemId == menuValuable.Id
+            && _player.Backpack.Exists(candidate => candidate.Id == menuValuable.Id);
+        if (itemMenuDropOnly)
+        {
+            _hud.PressLootMenuDropForDiagnostics();
+            await WaitFrames(2);
+        }
+        var itemMenuDropped = itemMenuDropOnly
+            && !_player.Backpack.Exists(candidate => candidate.Id == menuValuable.Id)
+            && _lootSources.OfType<GradedLootPickup>()
+                .Any(candidate => candidate.Loot.Exists(drop => drop.Id == menuValuable.Id));
         var dragCandidate = source.Loot.Find(candidate => candidate.Kind != LootItemKind.Weapon);
         var returnedToSource = false;
         var dragDropRouted = false;
@@ -2753,11 +2887,13 @@ public partial class FreightTerminalWorld : Node3D
         var damageOverlayClosed = !_hud.IsLootVisible;
         var damageUiUnlocked = !_player.UiLocked;
         var damageMouseCaptured = Input.MouseMode == Input.MouseModeEnum.Captured;
+        var damageMouseObservable = DisplayServer.GetName() != "headless";
+        var damageMouseRestored = damageMouseCaptured || !damageMouseObservable;
         var damageApplied = _player.Health < healthBeforeDamage;
         var damageClosedLoot = damageViewOpened
             && damageOverlayClosed
             && damageUiUnlocked
-            && damageMouseCaptured
+            && damageMouseRestored
             && damageApplied;
         Input.ActionPress("move_forward");
         await WaitFrames(4);
@@ -2766,6 +2902,13 @@ public partial class FreightTerminalWorld : Node3D
         var valid = opened
             && targetMatched
             && immediateOpenMilliseconds <= 500
+            && sourceClickActivated
+            && emptyPrimaryAutoEquipped
+            && policyValid
+            && weaponMenuActivated
+            && weaponMenuEquipped
+            && itemMenuActivated
+            && itemMenuDropped
             && heldInputBlocked
             && dragDropRouted
             && returnedToSource
@@ -2783,7 +2926,7 @@ public partial class FreightTerminalWorld : Node3D
             && movementRestored
             && damageClosedLoot
             && damageMovementRestored;
-        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} single_click={sourceClickActivated} auto_equip={emptyPrimaryAutoEquipped} policy={policyValid} weapon_menu={weaponMenuActivated}/{weaponMenuReady}/{weaponMenuEquipped} item_menu={itemMenuActivated}/{itemMenuDropOnly}/{itemMenuDropped} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_mouse_observable={damageMouseObservable} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         GD.Print($"LOOT_PASS valid={valid}");
         await WaitFrames(24);
         SaveViewportImage("res://modular_weapon_validation.png");
@@ -4311,6 +4454,7 @@ public partial class FreightTerminalWorld : Node3D
         var expanded = _hud.LootBackpackPanelExpanded;
         var contentFits = _hud.LootBackpackContentFits;
         var groundDropReady = _hud.LootGroundDropReady;
+        var groundDropInvisible = _hud.LootGroundDropInvisible;
         var comparisonCards = _hud.LootComparisonCardCount;
         var comparisonDirections = _hud.LootComparisonHasUpgrade && _hud.LootComparisonHasDowngrade;
         var gradeColorsStable = _hud.LootGradeColorsConsistent;
@@ -4318,8 +4462,18 @@ public partial class FreightTerminalWorld : Node3D
         var equippedGradeStylesStable = _hud.LootEquippedGradeStylesConsistent;
         var emptyPrimaryGradeHidden = _hud.LootEmptyPrimaryGradeHidden;
         var atCapacity = _player.Backpack.Count == _player.BackpackCapacity;
+        var menuCandidate = _player.Backpack.FirstOrDefault();
+        var itemMenuActivated = menuCandidate is not null
+            && _hud.ActivateLootCardForDiagnostics(menuCandidate.Id, LootDragOrigin.Backpack);
+        await WaitFrames(2);
+        var dropOnlyMenu = itemMenuActivated
+            && _hud.LootActionMenuReady
+            && _hud.LootActionMenuVisible
+            && !_hud.LootActionMenuCanEquip
+            && _hud.LootActionMenuItemId == menuCandidate!.Id;
         var valid = opened && weaponsInBackpack == 0 && paperDollVisible && backpackSlotSeparated
-            && expanded && contentFits && groundDropReady && atCapacity
+            && expanded && contentFits && groundDropReady && groundDropInvisible && atCapacity
+            && dropOnlyMenu
             && comparisonCards == comparableItems
             && comparisonDirections
             && gradeColorsStable
@@ -4329,7 +4483,7 @@ public partial class FreightTerminalWorld : Node3D
             && helmetGradeRoundTrip
             && armorGradeRoundTrip
             && packGradeRoundTrip;
-        GD.Print($"BACKPACK_TAB_CHECK valid={valid} opened={opened} backpack_items={_player.Backpack.Count} capacity={_player.BackpackCapacity} full={atCapacity} weapons={weaponsInBackpack} unarmed={!_player.HasFireablePrimary} paper_doll={paperDollVisible} backpack_isolated={backpackSlotSeparated} expanded={expanded} content_fits={contentFits} ground_drop={groundDropReady} comparisons={comparisonCards}/{comparableItems} directions={comparisonDirections} rendered_all={renderedComparisonsComplete} grade_colors={gradeColorsStable} equipped_grade_styles={equippedGradeStylesStable} empty_primary_grade_hidden={emptyPrimaryGradeHidden} helmet_grade={helmetGradeRoundTrip} armor_grade={armorGradeRoundTrip} pack_grade={packGradeRoundTrip}");
+        GD.Print($"BACKPACK_TAB_CHECK valid={valid} opened={opened} backpack_items={_player.Backpack.Count} capacity={_player.BackpackCapacity} full={atCapacity} weapons={weaponsInBackpack} unarmed={!_player.HasFireablePrimary} paper_doll={paperDollVisible} backpack_isolated={backpackSlotSeparated} expanded={expanded} content_fits={contentFits} ground_drop={groundDropReady} drop_invisible={groundDropInvisible} action_menu={itemMenuActivated}/{dropOnlyMenu} comparisons={comparisonCards}/{comparableItems} directions={comparisonDirections} rendered_all={renderedComparisonsComplete} grade_colors={gradeColorsStable} equipped_grade_styles={equippedGradeStylesStable} empty_primary_grade_hidden={emptyPrimaryGradeHidden} helmet_grade={helmetGradeRoundTrip} armor_grade={armorGradeRoundTrip} pack_grade={packGradeRoundTrip}");
         GD.Print($"BACKPACK_TAB_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -4450,13 +4604,16 @@ public partial class FreightTerminalWorld : Node3D
             target
         };
         Input.ActionPress("move_forward");
-        Input.ActionPress("sprint");
+        Input.ActionRelease("sprint");
         var reachedWaypoints = 0;
         foreach (var waypoint in waypoints)
         {
             var reachedWaypoint = false;
             for (var frame = 0; frame < 650; frame++)
             {
+                // Synthetic actions can be released by another diagnostic cleanup path.
+                // Reassert walking so this check measures bridge collision, not input lifetime.
+                Input.ActionPress("move_forward");
                 _player.FaceWorldPointForDiagnostics(waypoint);
                 if (frame > 2
                     && Input.IsActionPressed("move_forward")
@@ -4495,17 +4652,41 @@ public partial class FreightTerminalWorld : Node3D
                 var traceCollider = traceHit.Count > 0 && traceHit["collider"].AsGodotObject() is Node traceNode
                     ? traceNode.Name.ToString()
                     : "none";
+                static string TraceObstacle(
+                    PhysicsDirectSpaceState3D space,
+                    TacticalPlayer player,
+                    Vector3 waypoint,
+                    float height)
+                {
+                    var from = player.GlobalPosition + Vector3.Up * height;
+                    var to = new Vector3(waypoint.X, player.GlobalPosition.Y + height, waypoint.Z);
+                    var query = PhysicsRayQueryParameters3D.Create(from, to);
+                    query.Exclude = new Godot.Collections.Array<Rid> { player.GetRid() };
+                    query.CollisionMask = 1;
+                    query.CollideWithAreas = false;
+                    var hit = space.IntersectRay(query);
+                    if (hit.Count == 0)
+                    {
+                        return "none";
+                    }
+                    var collider = hit["collider"].AsGodotObject() as Node;
+                    var position = hit["position"].AsVector3();
+                    return $"{collider?.Name ?? "unknown"}@({position.X:0.0},{position.Y:0.0},{position.Z:0.0})";
+                }
+                var lowTrace = TraceObstacle(GetWorld3D().DirectSpaceState, _player, waypoint, 0.32f);
+                var waistTrace = TraceObstacle(GetWorld3D().DirectSpaceState, _player, waypoint, 0.68f);
                 var contactBody = _player.GetSlideCollisionCount() > 0
                     ? _player.GetSlideCollision(0).GetCollider() as StaticBody3D
                     : null;
                 var contactShape = contactBody?.GetChildren().OfType<CollisionShape3D>().FirstOrDefault();
                 var contactLocal = contactBody is not null ? contactBody.ToLocal(_player.GlobalPosition) : Vector3.Zero;
                 var contactSize = contactShape?.Shape is BoxShape3D box ? box.Size : Vector3.Zero;
-                GD.Print($"SKYLINK_STALL waypoint={reachedWaypoints} dist={_player.GlobalPosition.DistanceTo(waypoint):0.0} progress={progress:0.0} player=({_player.GlobalPosition.X:0.0},{_player.GlobalPosition.Y:0.0},{_player.GlobalPosition.Z:0.0}) target=({waypoint.X:0.0},{waypoint.Y:0.0},{waypoint.Z:0.0}) trace={traceCollider} contact_local=({contactLocal.X:0.0},{contactLocal.Y:0.0},{contactLocal.Z:0.0}) contact_size=({contactSize.X:0.0},{contactSize.Y:0.0},{contactSize.Z:0.0}) health={_player.Health:0.0} dead={_player.IsDead} intent={_player.HasMovementIntent} stamina={_player.Stamina:0.0} velocity=({_player.Velocity.X:0.0},{_player.Velocity.Y:0.0},{_player.Velocity.Z:0.0}) colliders={string.Join(',', colliders)}");
+                GD.Print($"SKYLINK_STALL waypoint={reachedWaypoints} dist={_player.GlobalPosition.DistanceTo(waypoint):0.0} progress={progress:0.0} player=({_player.GlobalPosition.X:0.0},{_player.GlobalPosition.Y:0.0},{_player.GlobalPosition.Z:0.0}) target=({waypoint.X:0.0},{waypoint.Y:0.0},{waypoint.Z:0.0}) trace={traceCollider} low_trace={lowTrace} waist_trace={waistTrace} contact_local=({contactLocal.X:0.0},{contactLocal.Y:0.0},{contactLocal.Z:0.0}) contact_size=({contactSize.X:0.0},{contactSize.Y:0.0},{contactSize.Z:0.0}) health={_player.Health:0.0} dead={_player.IsDead} intent={_player.HasMovementIntent} stamina={_player.Stamina:0.0} velocity=({_player.Velocity.X:0.0},{_player.Velocity.Y:0.0},{_player.Velocity.Z:0.0}) colliders={string.Join(',', colliders)}");
                 SaveViewportImage("res://skylink_stall_validation.png");
                 break;
             }
             reachedWaypoints++;
+            _player.Velocity = Vector3.Zero;
         }
         Input.ActionRelease("sprint");
         Input.ActionRelease("move_forward");

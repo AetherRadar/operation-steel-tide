@@ -1,0 +1,118 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://csharp/LootItemActionMenuView.cs" id="1_action_menu"]
+
+[sub_resource type="StyleBoxFlat" id="Style_panel"]
+bg_color = Color(0.025, 0.035, 0.034, 0.985)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.25, 0.48, 0.4, 0.98)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="Style_action"]
+bg_color = Color(0.052, 0.072, 0.068, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.18, 0.31, 0.27, 0.95)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="Style_action_hover"]
+bg_color = Color(0.075, 0.145, 0.12, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.34, 0.84, 0.62, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[node name="LootItemActionMenuView" type="PopupPanel"]
+size = Vector2i(226, 128)
+unresizable = true
+borderless = true
+transparent_bg = true
+theme_override_styles/panel = SubResource("Style_panel")
+script = ExtResource("1_action_menu")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 7
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 7
+
+[node name="Actions" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="Header" type="HBoxContainer" parent="Margin/Actions"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ItemName" type="Label" parent="Margin/Actions/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(170, 24)
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.86, 0.93, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "ITEM"
+clip_text = true
+vertical_alignment = 1
+
+[node name="CloseButton" type="Button" parent="Margin/Actions/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 2
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_colors/font_color = Color(0.55, 0.65, 0.62, 1)
+theme_override_colors/font_hover_color = Color(0.95, 0.42, 0.34, 1)
+theme_override_font_sizes/font_size = 13
+text = "X"
+
+[node name="Divider" type="ColorRect" parent="Margin/Actions"]
+custom_minimum_size = Vector2(1, 1)
+layout_mode = 2
+mouse_filter = 2
+color = Color(0.2, 0.38, 0.33, 0.72)
+
+[node name="EquipButton" type="Button" parent="Margin/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(210, 31)
+layout_mode = 2
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_colors/font_color = Color(0.72, 0.94, 0.84, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("Style_action")
+theme_override_styles/hover = SubResource("Style_action_hover")
+theme_override_styles/pressed = SubResource("Style_action_hover")
+text = "EQUIP"
+
+[node name="DropButton" type="Button" parent="Margin/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(210, 31)
+layout_mode = 2
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_colors/font_color = Color(0.91, 0.72, 0.64, 1)
+theme_override_colors/font_hover_color = Color(1, 0.47, 0.35, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("Style_action")
+theme_override_styles/hover = SubResource("Style_action_hover")
+theme_override_styles/pressed = SubResource("Style_action_hover")
+text = "DROP TO GROUND"

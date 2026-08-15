@@ -51,7 +51,8 @@ public partial class FreightTerminalWorld
         string sidearmId,
         string primaryId,
         bool armorSelected,
-        int grenadeCount)
+        int grenadeCount,
+        int smokeGrenadeCount)
     {
         if (!_demolitionMode || !_demolitionBuyPhaseActive || _missionEnded)
         {
@@ -62,7 +63,8 @@ public partial class FreightTerminalWorld
             sidearmId,
             primaryId,
             armorSelected,
-            grenadeCount);
+            grenadeCount,
+            smokeGrenadeCount);
         var quote = DemolitionBuyCatalog.Quote(selection, _demolitionPlayerEconomy.Funds);
         if (!quote.Affordable)
         {
@@ -79,7 +81,10 @@ public partial class FreightTerminalWorld
             return;
         }
         var loadout = DemolitionBuyCatalog.BuildLoadout(quote);
-        _player.ApplyDemolitionRoundLoadout(loadout, quote.Selection.GrenadeCount);
+        _player.ApplyDemolitionRoundLoadout(
+            loadout,
+            quote.Selection.GrenadeCount,
+            quote.Selection.SmokeGrenadeCount);
         CompleteDemolitionBuyPhase(spent, quote.HasFirearm);
     }
 
@@ -150,5 +155,30 @@ public partial class FreightTerminalWorld
         }
         _demolitionOpponentEconomy.Spend(offer?.Price ?? 0);
         _demolitionOpponentRoundWeapon = WeaponCatalog.Build(platform, 0);
+    }
+
+    public void ThrowSmokeGrenade(Vector3 origin, Vector3 direction, Node source)
+    {
+        var grenade = new SmokeGrenade
+        {
+            Position = origin,
+            OwnerBody = source
+        };
+        AddChild(grenade);
+        grenade.Arm(direction);
+    }
+
+    public bool IsLineObscuredBySmoke(Vector3 from, Vector3 to)
+    {
+        foreach (var node in GetTree().GetNodesInGroup(SmokeGrenade.ActiveGroupName))
+        {
+            if (node is SmokeGrenade smoke
+                && IsInstanceValid(smoke)
+                && smoke.ObscuresSegment(from, to))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 }

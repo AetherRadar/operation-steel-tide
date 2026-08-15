@@ -187,6 +187,7 @@ public static class GameLocalization
         Chinese["residential_room_trap"] = "\u8be1\u96f7\u89e6\u53d1  //  \u623f\u95f4\u5df2\u66b4\u9732";
         Chinese["residential_room_alarm"] = "\u623f\u95f4\u8b66\u62a5  //  \u654c\u4eba\u6b63\u5728\u8d76\u6765";
         Chinese["residential_room_intel"] = "\u623f\u95f4\u60c5\u62a5  //  \u9644\u8fd1\u654c\u4eba\u5df2\u6807\u8bb0";
+        Chinese["residential_room_guard_ambush"] = "\u5b88\u519b\u4f0f\u51fb  //  \u8fd1\u8ddd\u79bb\u63a5\u654c";
         Chinese["residential_room_clinic"] = "\u793e\u533a\u8bca\u6240";
         Chinese["residential_room_evac_shelter"] = "\u758f\u6563\u907f\u96be\u6240";
         Chinese["residential_room_maintenance"] = "\u7ef4\u4fee\u5de5\u574a";
@@ -373,6 +374,7 @@ public static class GameLocalization
         Chinese["extraction_arrived"] = "\u5df2\u62b5\u8fbe\u7279\u52e4\u5904  //  \u63a5\u9001\u673a\u5df2\u5b8c\u6210\u964d\u843d";
         Chinese["backpack_container"] = "\u80cc\u5305\u5bb9\u5668";
         Chinese["backpack_storage"] = "\u80cc\u5305\u50a8\u7269\u683c";
+        Chinese["equip"] = "\u88c5\u5907";
         Chinese["drop_to_ground"] = "\u4e22\u5230\u5730\u9762";
         Chinese["active_loadout"] = "\u5f53\u524d\u6574\u5907";
         Chinese["loot_complex_room"] = "\u5efa\u7b51\u5185\u8865\u7ed9";
@@ -508,6 +510,16 @@ public static class GameLocalization
         Chinese["demolition_buy_knife_only"] = "\u4ec5\u6218\u672f\u5200";
         Chinese["demolition_buy_no_armor"] = "\u672a\u8d2d\u4e70\u62a4\u7532";
         Chinese["demolition_buy_no_utility"] = "\u672a\u8d2d\u4e70\u6295\u63b7\u7269";
+        Chinese["smoke_grenade"] = "\u70df\u96fe\u5f39";
+        Chinese["select_frag_grenade"] = "\u5207\u6362\u5230\u7834\u7247\u624b\u96f7";
+        Chinese["select_utility"] = "\u5207\u6362\u5230\u5176\u4ed6\u9053\u5177";
+        Chinese["frag_grenade_ready"] = "\u7834\u7247\u624b\u96f7\u5df2\u5c31\u7eea";
+        Chinese["utility_ready"] = "\u9053\u5177\u5df2\u5c31\u7eea";
+        Chinese["quick_slot_empty"] = "\u69fd\u4f4d\u4e3a\u7a7a";
+        Chinese["quick_throw"] = "\u6295\u63b7";
+        Chinese["quick_deploy"] = "\u4f7f\u7528";
+        Chinese["demolition_teammate_eliminated"] = "\u961f\u53cb\u672c\u56de\u5408\u9635\u4ea1  //  \u65e0\u6cd5\u6551\u63f4";
+        Chinese["demolition_spectating_device"] = "\u6b63\u5728\u89c2\u6218  //  \u5df2\u5b89\u653e\u7684\u70b8\u5f39";
         Chinese["demolition_buy_knife_live"] = "\u56de\u5408\u5f00\u59cb  //  \u4ec5\u6218\u672f\u5200  //  \u82b1\u8d39 ${0}";
         Chinese["demolition_buy_ak74"] = "AK-74N";
         Chinese["demolition_buy_m4a1"] = "M4A1";

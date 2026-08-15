@@ -24,9 +24,10 @@ public readonly record struct DemolitionPurchaseSelection(
     string SidearmId,
     string PrimaryId,
     bool ArmorSelected,
-    int GrenadeCount)
+    int GrenadeCount,
+    int SmokeGrenadeCount)
 {
-    public static DemolitionPurchaseSelection Empty => new(string.Empty, string.Empty, false, 0);
+    public static DemolitionPurchaseSelection Empty => new(string.Empty, string.Empty, false, 0, 0);
 }
 
 public readonly record struct DemolitionPurchaseQuote(
@@ -64,7 +65,9 @@ public static class DemolitionBuyCatalog
     public const string ScarLId = "scarl";
     public const int ArmorPrice = 1000;
     public const int GrenadePrice = 450;
+    public const int SmokeGrenadePrice = 300;
     public const int MaximumGrenades = 2;
+    public const int MaximumSmokeGrenades = 2;
 
     public static readonly IReadOnlyList<DemolitionBuyOffer> Sidearms = new[]
     {
@@ -94,7 +97,8 @@ public static class DemolitionBuyCatalog
             sidearm,
             primary,
             selection.ArmorSelected,
-            Math.Clamp(selection.GrenadeCount, 0, MaximumGrenades));
+            Math.Clamp(selection.GrenadeCount, 0, MaximumGrenades),
+            Math.Clamp(selection.SmokeGrenadeCount, 0, MaximumSmokeGrenades));
     }
 
     public static DemolitionPurchaseQuote Quote(DemolitionPurchaseSelection selection, int funds)
@@ -103,7 +107,8 @@ public static class DemolitionBuyCatalog
         var total = (Find(Sidearms, normalized.SidearmId)?.Price ?? 0)
             + (Find(Primaries, normalized.PrimaryId)?.Price ?? 0)
             + (normalized.ArmorSelected ? ArmorPrice : 0)
-            + normalized.GrenadeCount * GrenadePrice;
+            + normalized.GrenadeCount * GrenadePrice
+            + normalized.SmokeGrenadeCount * SmokeGrenadePrice;
         var available = Math.Max(0, funds);
         return new DemolitionPurchaseQuote(
             normalized,

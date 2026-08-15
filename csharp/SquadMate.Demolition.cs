@@ -4,6 +4,25 @@ namespace OperationSteelTide;
 
 public partial class SquadMate
 {
+    public void EliminateForDemolitionRound()
+    {
+        if (!IsDowned || IsBodyBag)
+        {
+            return;
+        }
+        ReviveUsed = true;
+        CollisionLayer = 0;
+        CollisionMask = 0;
+        foreach (var child in GetChildren())
+        {
+            if (child is CollisionShape3D collision)
+            {
+                collision.Disabled = true;
+            }
+        }
+        UpdateLabel();
+    }
+
     public void ResetForDemolitionRound(Vector3 spawn)
     {
         GlobalPosition = spawn;
@@ -16,7 +35,7 @@ public partial class SquadMate
         ReviveUsed = false;
         IsExtractionPassenger = false;
         _remoteDown = false;
-        _revivingLeader = false;
+        _reviveTarget = null;
         _revivePoseBlend = 0.0f;
         _skillActionTime = 0.0f;
         _overdriveTime = 0.0f;

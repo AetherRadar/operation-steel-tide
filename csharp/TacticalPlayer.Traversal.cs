@@ -462,7 +462,7 @@ public partial class TacticalPlayer
         }
         if (IsInstanceValid(_weaponLight))
         {
-            _weaponLight.Visible = !active && !_knifeEquipped && _flashlightOn;
+            _weaponLight.Visible = !active && IsFirearmQuickSlotSelected && _flashlightOn;
         }
     }
 

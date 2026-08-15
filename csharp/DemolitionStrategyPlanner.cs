@@ -10,6 +10,12 @@ public enum DemolitionStrategyPhase
     PostPlant
 }
 
+public enum DemolitionOpeningPattern
+{
+    FullExecute,
+    SplitPressure
+}
+
 public enum DemolitionDuty
 {
     Entry,
@@ -50,6 +56,7 @@ public sealed record DemolitionStrategyPlan(
     DemolitionTeam Team,
     DemolitionStrategyPhase Phase,
     int PrimarySiteIndex,
+    DemolitionOpeningPattern OpeningPattern,
     IReadOnlyList<DemolitionAssignment> Assignments,
     string Callout);
 
@@ -64,7 +71,8 @@ public sealed class DemolitionStrategyPlanner
         DemolitionStrategyPhase phase,
         IReadOnlyList<DemolitionAgentSnapshot> members,
         int plantedSiteIndex = -1,
-        IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents = null)
+        IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents = null,
+        int strategySeed = 0)
     {
         var available = members
             .Where(member => member.Team == team && member.Alive && !member.Downed)
@@ -73,6 +81,7 @@ public sealed class DemolitionStrategyPlanner
         if (available.Count == 0)
         {
             return new DemolitionStrategyPlan(team, phase, Math.Max(0, plantedSiteIndex),
+                DemolitionOpeningPattern.FullExecute,
                 Array.Empty<DemolitionAssignment>(), "NO OPERATORS AVAILABLE");
         }
 
@@ -80,7 +89,7 @@ public sealed class DemolitionStrategyPlanner
         {
             return phase == DemolitionStrategyPhase.PostPlant && plantedSiteIndex >= 0
                 ? PlanAttackerPostPlant(available, plantedSiteIndex)
-                : PlanAttackerOpening(available, knownOpponents);
+                : PlanAttackerOpening(available, knownOpponents, strategySeed);
         }
         return phase == DemolitionStrategyPhase.PostPlant && plantedSiteIndex >= 0
             ? PlanDefenderRetake(available, plantedSiteIndex)
@@ -162,39 +171,73 @@ public sealed class DemolitionStrategyPlanner
         return dx * dx + dz * dz <= radius * radius;
     }
 
+    private static DemolitionOpeningPattern ChooseOpeningPattern(
+        IReadOnlyCollection<DemolitionAgentSnapshot> members,
+        int strategySeed)
+    {
+        if (members.Count < 4)
+        {
+            return DemolitionOpeningPattern.FullExecute;
+        }
+
+        // A round-stable seed prevents the live 1.5 second strategy refresh from making
+        // operators reverse course. Two rounds commit as a group, then one applies 3-2
+        // pressure, giving the opponent readable but non-repetitive team behavior.
+        var cycle = Math.Abs((long)strategySeed) % 3L;
+        return cycle == 0L
+            ? DemolitionOpeningPattern.SplitPressure
+            : DemolitionOpeningPattern.FullExecute;
+    }
+
     private static DemolitionStrategyPlan PlanAttackerOpening(
         List<DemolitionAgentSnapshot> members,
-        IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents = null)
+        IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents,
+        int strategySeed)
     {
         var primarySite = ChooseAttackerSite(members, knownOpponents);
+        var openingPattern = ChooseOpeningPattern(members, strategySeed);
 
         var entry = members
             .OrderByDescending(member => EntryScore(member))
             .ThenBy(member => member.MemberId, StringComparer.Ordinal)
             .First();
         var remaining = members.Where(member => member.MemberId != entry.MemberId).ToList();
-        var recon = remaining
-            .OrderByDescending(member => ReconScore(member))
-            .ThenBy(member => member.MemberId, StringComparer.Ordinal)
-            .FirstOrDefault();
-
         var assignments = new List<DemolitionAssignment>
         {
             new(entry.MemberId, DemolitionDuty.Entry, primarySite,
                 primarySite == 0 ? "attack_entry_a" : "attack_entry_b",
                 $"entry score {EntryScore(entry):0.00}: health {entry.HealthRatio:0.00}, range {entry.WeaponRange:0}")
         };
-        if (!string.IsNullOrEmpty(recon.MemberId))
+
+        if (openingPattern == DemolitionOpeningPattern.SplitPressure && remaining.Count >= 3)
         {
+            var recon = remaining
+                .OrderByDescending(member => ReconScore(member))
+                .ThenBy(member => member.MemberId, StringComparer.Ordinal)
+                .First();
+            remaining.RemoveAll(member => member.MemberId == recon.MemberId);
             assignments.Add(new DemolitionAssignment(
                 recon.MemberId,
                 DemolitionDuty.Recon,
                 primarySite,
                 "attack_mid_recon",
                 $"recon score {ReconScore(recon):0.00}: role {recon.Role}, range {recon.WeaponRange:0}"));
+
+            var secondarySite = 1 - primarySite;
+            var flanker = remaining
+                .OrderByDescending(member => member.HealthRatio * 0.55f + member.WeaponRange / 300.0f)
+                .ThenBy(member => member.MemberId, StringComparer.Ordinal)
+                .First();
+            remaining.RemoveAll(member => member.MemberId == flanker.MemberId);
+            assignments.Add(new DemolitionAssignment(
+                flanker.MemberId,
+                DemolitionDuty.Flank,
+                secondarySite,
+                secondarySite == 0 ? "attack_entry_a" : "attack_entry_b",
+                $"secondary pressure at health {flanker.HealthRatio:0.00}, range {flanker.WeaponRange:0}"));
         }
 
-        foreach (var member in remaining.Where(member => member.MemberId != recon.MemberId))
+        foreach (var member in remaining)
         {
             assignments.Add(new DemolitionAssignment(
                 member.MemberId,
@@ -208,8 +251,11 @@ public sealed class DemolitionStrategyPlanner
             DemolitionTeam.Attackers,
             DemolitionStrategyPhase.Opening,
             primarySite,
+            openingPattern,
             assignments,
-            primarySite == 0 ? "EXECUTE A  //  RECON MID" : "EXECUTE B  //  RECON MID");
+            openingPattern == DemolitionOpeningPattern.FullExecute
+                ? primarySite == 0 ? "GROUP EXECUTE A  //  FIVE COMMIT" : "GROUP EXECUTE B  //  FIVE COMMIT"
+                : primarySite == 0 ? "3-2 SPLIT  //  HIT A  //  PRESSURE B" : "3-2 SPLIT  //  HIT B  //  PRESSURE A");
     }
 
     private static DemolitionStrategyPlan PlanAttackerPostPlant(
@@ -254,6 +300,7 @@ public sealed class DemolitionStrategyPlanner
             DemolitionTeam.Attackers,
             DemolitionStrategyPhase.PostPlant,
             plantedSiteIndex,
+            DemolitionOpeningPattern.FullExecute,
             assignments,
             $"HOLD {siteName}  //  CROSSfire SET  //  WATCH ROTATE");
     }
@@ -273,23 +320,7 @@ public sealed class DemolitionStrategyPlanner
         for (var index = 0; index < ordered.Count; index++)
         {
             var member = ordered[index];
-            var duty = index switch
-            {
-                0 => DemolitionDuty.MidControl,
-                1 or 3 => DemolitionDuty.AnchorA,
-                2 or 4 => DemolitionDuty.AnchorB,
-                _ => DemolitionDuty.Rotate
-            };
-            var site = duty == DemolitionDuty.AnchorA ? 0 : duty == DemolitionDuty.AnchorB ? 1 : index % 2;
-            var target = duty switch
-            {
-                DemolitionDuty.AnchorA => "defense_anchor_a",
-                DemolitionDuty.AnchorB => "defense_anchor_b",
-                DemolitionDuty.MidControl => "defense_mid",
-                _ => threatened >= 0
-                    ? (threatened == 0 ? "defense_rotate_a" : "defense_rotate_b")
-                    : index % 2 == 0 ? "defense_rotate_a" : "defense_rotate_b"
-            };
+            var (duty, site, target) = DefenderOpeningPost(index, threatened);
             assignments.Add(new DemolitionAssignment(
                 member.MemberId,
                 duty,
@@ -301,9 +332,52 @@ public sealed class DemolitionStrategyPlanner
         return new DemolitionStrategyPlan(
             DemolitionTeam.Defenders,
             DemolitionStrategyPhase.Opening,
-            0,
+            threatened >= 0 ? threatened : 0,
+            DemolitionOpeningPattern.FullExecute,
             assignments,
-            "HOLD BOTH SITES  //  ONE MID  //  FLEX ROTATE");
+            threatened switch
+            {
+                0 => "CONTACT A  //  THREE STRONG  //  B ANCHOR",
+                1 => "CONTACT B  //  THREE STRONG  //  A ANCHOR",
+                _ => "HOLD BOTH SITES  //  ONE MID  //  FLEX ROTATE"
+            });
+    }
+
+    private static (DemolitionDuty Duty, int Site, string Target) DefenderOpeningPost(int index, int threatened)
+    {
+        if (threatened >= 0)
+        {
+            var weakSite = 1 - threatened;
+            return index switch
+            {
+                0 => (DemolitionDuty.MidControl, threatened, "defense_mid"),
+                1 or 2 => threatened == 0
+                    ? (DemolitionDuty.AnchorA, 0, "defense_anchor_a")
+                    : (DemolitionDuty.AnchorB, 1, "defense_anchor_b"),
+                3 => weakSite == 0
+                    ? (DemolitionDuty.AnchorA, 0, "defense_anchor_a")
+                    : (DemolitionDuty.AnchorB, 1, "defense_anchor_b"),
+                _ => (DemolitionDuty.Rotate, threatened,
+                    threatened == 0 ? "defense_rotate_a" : "defense_rotate_b")
+            };
+        }
+
+        var duty = index switch
+        {
+            0 => DemolitionDuty.MidControl,
+            1 or 3 => DemolitionDuty.AnchorA,
+            2 or 4 => DemolitionDuty.AnchorB,
+            _ => DemolitionDuty.Rotate
+        };
+        var site = duty == DemolitionDuty.AnchorA ? 0 : duty == DemolitionDuty.AnchorB ? 1 : index % 2;
+        var target = duty switch
+        {
+            DemolitionDuty.AnchorA => "defense_anchor_a",
+            DemolitionDuty.AnchorB => "defense_anchor_b",
+            DemolitionDuty.MidControl => "defense_mid",
+            _ => index % 2 == 0 ? "defense_rotate_a" : "defense_rotate_b"
+        };
+        return (duty, site, target);
     }
 
     private static DemolitionStrategyPlan PlanDefenderRetake(
@@ -362,6 +436,7 @@ public sealed class DemolitionStrategyPlanner
             DemolitionTeam.Defenders,
             DemolitionStrategyPhase.PostPlant,
             plantedSiteIndex,
+            DemolitionOpeningPattern.FullExecute,
             assignments,
             $"RETAKE {siteName}  //  COVER DEFUSER  //  FLANK LATE");
     }

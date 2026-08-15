@@ -15,11 +15,13 @@ public partial class FreightTerminalWorld
     private const float DemolitionCombatEngageRange = 24.0f;
     private const float DemolitionCombatResumeRange = 30.0f;
     private const float DemolitionChannelGuardRange = 12.0f;
+    internal const float DemolitionReconScanRange = 34.0f;
     private const int DemolitionSquadSize = 5;
 
     private readonly List<Node3D> _demolitionSites = new();
     private readonly List<EnemyOperator> _demolitionOpponents = new();
     private readonly Dictionary<EnemyOperator, DemolitionAssignment> _demolitionOpponentAssignments = new();
+    private readonly Dictionary<EnemyOperator, DemolitionRouteCursor> _demolitionOpponentRoutes = new();
     private readonly Dictionary<SquadMate, string> _demolitionSquadAssignmentTargets = new();
     private readonly HashSet<EnemyOperator> _demolitionCombatBreakoffs = new();
     private readonly DemolitionMatchState _demolitionMatch = new();
@@ -27,13 +29,10 @@ public partial class FreightTerminalWorld
     private readonly DemolitionEconomy _demolitionPlayerEconomy = new();
     private readonly DemolitionEconomy _demolitionOpponentEconomy = new();
     private DemolitionArenaRuntime? _demolitionArena;
+    private DemolitionRoutePlanner? _demolitionRoutePlanner;
     private Node3D? _demolitionDevice;
     private EnemyOperator? _demolitionDefuser;
-    private Vector3[] _demolitionDefuseRoute = System.Array.Empty<Vector3>();
-    private int _demolitionDefuseRouteIndex;
     private EnemyOperator? _demolitionCarrier;
-    private Vector3[] _demolitionCarrierRoute = System.Array.Empty<Vector3>();
-    private int _demolitionCarrierRouteIndex;
     private int _demolitionEnemyTargetSite;
     private SquadMate? _demolitionSquadObjectiveMate;
     private int _demolitionSquadObjectiveSite = -1;
@@ -42,6 +41,7 @@ public partial class FreightTerminalWorld
     private bool _demolitionMode;
     private bool _demolitionRoundActive;
     private bool _demolitionDevicePlanted;
+    private bool _demolitionObjectiveSpectatorActive;
     private int _demolitionActiveSite = -1;
     private float _demolitionPlantProgress;
     private float _demolitionRemaining = DemolitionRoundDuration;
@@ -89,10 +89,13 @@ public partial class FreightTerminalWorld
     {
         if (_demolitionArena is not null)
         {
+            _demolitionRoutePlanner ??= new DemolitionRoutePlanner(_demolitionArena.Layout);
             return;
         }
+        var layout = new DemolitionArenaLayout();
         var builder = new DemolitionArenaBuilder(Mat, GroundMaterial);
-        _demolitionArena = builder.Build(this, new DemolitionArenaLayout());
+        _demolitionArena = builder.Build(this, layout);
+        _demolitionRoutePlanner = new DemolitionRoutePlanner(layout);
         _demolitionSites.Clear();
         _demolitionSites.AddRange(_demolitionArena.Sites);
     }
@@ -113,6 +116,7 @@ public partial class FreightTerminalWorld
         _demolitionSelectedMapId = DemolitionMapCatalog.Resolve(mapId).Id;
         PrepareDemolitionBattlefield();
         DeploySquad((OperatorRole)role, SquadSessionMode.Local, "127.0.0.1");
+        _hud.SetDemolitionGameplayPresentation(true);
         StartDemolitionRound();
         _missionDirector.ExitDeploymentZone();
         _missionDirector.RaiseConfirmedAlarm();
@@ -151,6 +155,7 @@ public partial class FreightTerminalWorld
         _demolitionAttackerPlan = null;
         _demolitionDefenderPlan = null;
         _demolitionOpponentAssignments.Clear();
+        _demolitionOpponentRoutes.Clear();
         _demolitionSquadAssignmentTargets.Clear();
         _reinforcementPending = false;
         _reinforcementCountdown = 0.0f;
@@ -239,13 +244,10 @@ public partial class FreightTerminalWorld
         }
         _demolitionOpponents.Clear();
         _demolitionOpponentAssignments.Clear();
+        _demolitionOpponentRoutes.Clear();
         _demolitionCombatBreakoffs.Clear();
         _demolitionDefuser = null;
-        _demolitionDefuseRoute = System.Array.Empty<Vector3>();
-        _demolitionDefuseRouteIndex = 0;
         _demolitionCarrier = null;
-        _demolitionCarrierRoute = System.Array.Empty<Vector3>();
-        _demolitionCarrierRouteIndex = 0;
     }
 
     private void StartDemolitionRound()
@@ -273,8 +275,10 @@ public partial class FreightTerminalWorld
         _demolitionEnemyTargetSite = _demolitionMatch.CompletedRounds % 2;
         _demolitionSquadAssignmentTargets.Clear();
         _demolitionCombatBreakoffs.Clear();
+        _demolitionOpponentRoutes.Clear();
         _demolitionSquadObjectiveMate = null;
         _demolitionSquadObjectiveSite = -1;
+        _demolitionObjectiveSpectatorActive = false;
         _demolitionSquadPlantProgress = 0.0f;
         _demolitionSquadDefuseProgress = 0.0f;
         _missionPhase = "DEMOLITION";
@@ -311,7 +315,7 @@ public partial class FreightTerminalWorld
         RestoreLocalPlayerView();
         var emptyQuote = DemolitionBuyCatalog.Quote(DemolitionPurchaseSelection.Empty, _demolitionPlayerEconomy.Funds);
         var loadout = DemolitionBuyCatalog.BuildLoadout(emptyQuote);
-        _player.ResetForDemolitionRound(spawns[0], _demolitionPlayerRole, loadout, 0);
+        _player.ResetForDemolitionRound(spawns[0], _demolitionPlayerRole, loadout, 0, 0);
         _player.LookAt(layout.Midpoint, Vector3.Up);
         EnsureAiSquadFill();
         foreach (var mate in _squadMates.Where(IsInstanceValid))
@@ -323,6 +327,38 @@ public partial class FreightTerminalWorld
         ResetSquadLeaderTrail(_player.GlobalPosition);
         _hud.HideDownedState();
         RefreshSquadHud();
+    }
+
+    private bool ShouldObservePlantedDemolitionDevice()
+        => _demolitionDevicePlanted
+        && _demolitionMatch.PlayerSide == DemolitionTeam.Attackers;
+
+    private void BeginDemolitionObjectiveView()
+    {
+        if (!ShouldObservePlantedDemolitionDevice() || _demolitionActiveSite < 0)
+        {
+            return;
+        }
+
+        var camera = EnsureSquadSpectatorCamera();
+        var layout = DemolitionLayout();
+        var focus = IsInstanceValid(_demolitionDevice)
+            ? _demolitionDevice!.GlobalPosition
+            : layout.SitePositions[_demolitionActiveSite];
+        var outward = focus - layout.Midpoint;
+        outward.Y = 0.0f;
+        if (outward.LengthSquared() < 0.01f)
+        {
+            outward = Vector3.Right;
+        }
+        camera.GlobalPosition = focus + outward.Normalized() * 7.5f + Vector3.Up * 6.0f;
+        camera.LookAt(focus + Vector3.Up * 0.55f, Vector3.Up);
+        camera.MakeCurrent();
+        _demolitionObjectiveSpectatorActive = true;
+        _hud.ShowLocalizedMessage(
+            "demolition_spectating_device",
+            "SPECTATING  //  PLANTED DEVICE",
+            new Color(1.0f, 0.62f, 0.24f));
     }
 
     private void ClearDemolitionDevice()
@@ -569,7 +605,25 @@ public partial class FreightTerminalWorld
 
         var playerSide = _demolitionMatch.PlayerSide;
         var opponentsAlive = DemolitionOpponentCount;
-        if (opponentsAlive == 0 && (!_demolitionDevicePlanted || playerSide == DemolitionTeam.Attackers))
+        var playerSquadEliminated = _player.IsDead && _squadMates
+            .Where(IsInstanceValid)
+            .All(mate => mate.IsDowned || mate.IsBodyBag);
+        if (playerSquadEliminated
+            && DemolitionRoundRules.EliminationEndsRound(playerSide, _demolitionDevicePlanted))
+        {
+            FinishDemolitionRound(
+                false,
+                GameLocalization.Get(
+                    "demolition_squad_eliminated",
+                    _languageSetting,
+                    "SQUAD ELIMINATED"));
+            return;
+        }
+        var opponentSide = playerSide == DemolitionTeam.Attackers
+            ? DemolitionTeam.Defenders
+            : DemolitionTeam.Attackers;
+        if (opponentsAlive == 0
+            && DemolitionRoundRules.EliminationEndsRound(opponentSide, _demolitionDevicePlanted))
         {
             FinishDemolitionRound(
                 true,

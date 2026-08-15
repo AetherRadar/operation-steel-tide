@@ -198,7 +198,9 @@ public partial class FreightTerminalWorld
 
     private void BeginRelayClimb(ResidentialRelayStation station, bool descend)
     {
-        if (_relayClimbStation is not null || !IsInstanceValid(station))
+        if (LocalPlayerCannotInteract
+            || _relayClimbStation is not null
+            || !IsInstanceValid(station))
         {
             return;
         }
@@ -220,7 +222,7 @@ public partial class FreightTerminalWorld
         {
             return false;
         }
-        if (!IsInstanceValid(_relayClimbStation) || _player.IsDead)
+        if (!IsInstanceValid(_relayClimbStation) || LocalPlayerCannotInteract)
         {
             FinishRelayClimb();
             return false;
@@ -248,12 +250,19 @@ public partial class FreightTerminalWorld
     {
         _relayClimbStation = null;
         _relayClimbProgress = 0.0f;
-        _player.UiLocked = false;
         _player.Velocity = Vector3.Zero;
         _player.SetSearchPose(false);
         _player.DisarmFireInput();
-        _player.RestoreMovementInput();
         _hud.SetInteraction(string.Empty, 0.0f, false);
+        if (LocalPlayerCannotInteract)
+        {
+            _player.UiLocked = true;
+            _player.DisarmMovementInput();
+            Input.MouseMode = Input.MouseModeEnum.Captured;
+            return;
+        }
+        _player.UiLocked = false;
+        _player.RestoreMovementInput();
     }
 
     private bool CompleteRelayStationActivation(ResidentialRelayStation station)

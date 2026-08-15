@@ -436,7 +436,7 @@ public partial class TacticalPlayer
         DisarmFireInput();
         if (IsInstanceValid(_weaponLight))
         {
-            _weaponLight.Visible = !_knifeEquipped && _flashlightOn;
+            _weaponLight.Visible = IsFirearmQuickSlotSelected && _flashlightOn;
         }
     }
 
@@ -456,7 +456,7 @@ public partial class TacticalPlayer
         DisarmFireInput();
         if (IsInstanceValid(_weaponLight))
         {
-            _weaponLight.Visible = !_knifeEquipped && _flashlightOn;
+            _weaponLight.Visible = IsFirearmQuickSlotSelected && _flashlightOn;
         }
     }
 

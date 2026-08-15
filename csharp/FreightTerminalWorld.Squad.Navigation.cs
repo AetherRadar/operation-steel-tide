@@ -12,8 +12,11 @@ public partial class FreightTerminalWorld
     private sealed class SquadTrailPathState
     {
         public int Cursor;
+        public int EndCursor;
+        public int Direction = 1;
         public int Revision;
         public bool Emergency;
+        public Vector3 Destination;
         public ulong NextDirectCheckMilliseconds;
     }
 
@@ -137,15 +140,16 @@ public partial class FreightTerminalWorld
         if (state is null
             || state.Revision != _squadLeaderTrailRevision
             || state.Emergency != emergency
+            || emergency && state.Destination.DistanceSquaredTo(destination) > 1.0f
             || state.Cursor < 0
             || state.Cursor >= _squadLeaderTrail.Count)
         {
-            state = PlanSquadTrailPath(mate, emergency);
+            state = PlanSquadTrailPath(mate, destination, emergency);
             _squadTrailPaths[id] = state;
         }
 
         AdvanceSquadTrailCursor(mate, state, emergency);
-        if (state.Cursor >= _squadLeaderTrail.Count)
+        if (!SquadTrailCursorActive(state))
         {
             _squadTrailPaths.Remove(id);
             return destination;
@@ -153,24 +157,57 @@ public partial class FreightTerminalWorld
         return _squadLeaderTrail[state.Cursor];
     }
 
-    private SquadTrailPathState PlanSquadTrailPath(SquadMate mate, bool emergency)
+    private SquadTrailPathState PlanSquadTrailPath(
+        SquadMate mate,
+        Vector3 destination,
+        bool emergency)
     {
         var cursor = FindLatestVisibleTrailIndex(mate);
         if (cursor < 0)
         {
             cursor = FindNearestTrailIndex(mate.GlobalPosition);
         }
-        if (emergency && cursor < _squadLeaderTrail.Count - 1)
+        var endCursor = emergency
+            ? FindClosestDestinationTrailIndex(destination, mate)
+            : _squadLeaderTrail.Count - 1;
+        if (endCursor < 0)
+        {
+            endCursor = _squadLeaderTrail.Count - 1;
+        }
+        if (emergency)
         {
             _leaderRescueUsedTrail = true;
         }
         return new SquadTrailPathState
         {
             Cursor = Mathf.Max(0, cursor),
+            EndCursor = endCursor,
+            Direction = endCursor >= cursor ? 1 : -1,
             Revision = _squadLeaderTrailRevision,
             Emergency = emergency,
+            Destination = destination,
             NextDirectCheckMilliseconds = Time.GetTicksMsec() + 180
         };
+    }
+
+    private int FindClosestDestinationTrailIndex(Vector3 destination, SquadMate mate)
+    {
+        var closest = -1;
+        var bestDistance = float.PositiveInfinity;
+        for (var index = 0; index < _squadLeaderTrail.Count; index++)
+        {
+            var point = _squadLeaderTrail[index];
+            var distance = point.DistanceSquaredTo(destination);
+            if (distance >= bestDistance
+                || Mathf.Abs(point.Y - destination.Y) > 1.8f
+                || !IsSquadMovementCorridorClear(point, destination, mate))
+            {
+                continue;
+            }
+            bestDistance = distance;
+            closest = index;
+        }
+        return closest;
     }
 
     private int FindLatestVisibleTrailIndex(SquadMate mate)
@@ -213,17 +250,21 @@ public partial class FreightTerminalWorld
         bool emergency)
     {
         var advanced = 0;
-        while (state.Cursor < _squadLeaderTrail.Count
+        while (SquadTrailCursorActive(state)
             && SquadTrailWaypointReached(mate.GlobalPosition, _squadLeaderTrail[state.Cursor]))
         {
-            state.Cursor++;
+            state.Cursor += state.Direction;
             advanced++;
         }
 
-        if (state.Cursor < _squadLeaderTrail.Count - 1)
+        if (SquadTrailCursorActive(state))
         {
-            var furthest = Mathf.Min(_squadLeaderTrail.Count - 1, state.Cursor + 18);
-            for (var index = furthest; index > state.Cursor; index--)
+            var furthest = state.Direction > 0
+                ? Mathf.Min(state.EndCursor, state.Cursor + 18)
+                : Mathf.Max(state.EndCursor, state.Cursor - 18);
+            for (var index = furthest;
+                 state.Direction > 0 ? index > state.Cursor : index < state.Cursor;
+                 index -= state.Direction)
             {
                 var point = _squadLeaderTrail[index];
                 if (mate.GlobalPosition.DistanceTo(point) > 16.0f
@@ -232,7 +273,7 @@ public partial class FreightTerminalWorld
                 {
                     continue;
                 }
-                advanced += index - state.Cursor;
+                advanced += Mathf.Abs(index - state.Cursor);
                 state.Cursor = index;
                 break;
             }
@@ -242,6 +283,17 @@ public partial class FreightTerminalWorld
         {
             _leaderRescueWaypointAdvances += advanced;
         }
+    }
+
+    private bool SquadTrailCursorActive(SquadTrailPathState state)
+    {
+        if (state.Cursor < 0 || state.Cursor >= _squadLeaderTrail.Count)
+        {
+            return false;
+        }
+        return state.Direction > 0
+            ? state.Cursor <= state.EndCursor
+            : state.Cursor >= state.EndCursor;
     }
 
     private static bool SquadTrailWaypointReached(Vector3 position, Vector3 waypoint)
@@ -303,12 +355,18 @@ public partial class FreightTerminalWorld
         {
             return mate.GlobalPosition.DistanceTo(destination) + 1000.0f;
         }
-        var cost = mate.GlobalPosition.DistanceTo(_squadLeaderTrail[cursor]);
-        for (var index = cursor + 1; index < _squadLeaderTrail.Count; index++)
+        var endCursor = FindClosestDestinationTrailIndex(destination, mate);
+        if (endCursor < 0)
         {
-            cost += _squadLeaderTrail[index - 1].DistanceTo(_squadLeaderTrail[index]);
+            return mate.GlobalPosition.DistanceTo(destination) + 1000.0f;
         }
-        cost += _squadLeaderTrail[^1].DistanceTo(destination);
+        var cost = mate.GlobalPosition.DistanceTo(_squadLeaderTrail[cursor]);
+        var direction = endCursor >= cursor ? 1 : -1;
+        for (var index = cursor + direction; direction > 0 ? index <= endCursor : index >= endCursor; index += direction)
+        {
+            cost += _squadLeaderTrail[index - direction].DistanceTo(_squadLeaderTrail[index]);
+        }
+        cost += _squadLeaderTrail[endCursor].DistanceTo(destination);
         return cost;
     }
 
@@ -322,11 +380,13 @@ public partial class FreightTerminalWorld
         }
 
         var cost = mate.GlobalPosition.DistanceTo(_squadLeaderTrail[state.Cursor]);
-        for (var index = state.Cursor + 1; index < _squadLeaderTrail.Count; index++)
+        for (var index = state.Cursor + state.Direction;
+             state.Direction > 0 ? index <= state.EndCursor : index >= state.EndCursor;
+             index += state.Direction)
         {
-            cost += _squadLeaderTrail[index - 1].DistanceTo(_squadLeaderTrail[index]);
+            cost += _squadLeaderTrail[index - state.Direction].DistanceTo(_squadLeaderTrail[index]);
         }
-        cost += _squadLeaderTrail[^1].DistanceTo(destination);
+        cost += _squadLeaderTrail[state.EndCursor].DistanceTo(destination);
         return cost;
     }
 

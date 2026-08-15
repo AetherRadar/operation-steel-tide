@@ -99,7 +99,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     private Vector3 _networkAbilityForward;
     private ILootSource? _lootHuntSource;
     private float _lootHuntCooldown;
-    private bool _revivingLeader;
+    private ISquadCombatant? _reviveTarget;
     private float _revivePoseBlend;
 
     public void Configure(
@@ -173,7 +173,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             return;
         }
 
-        _revivingLeader = false;
+        _reviveTarget = null;
         Velocity = Vector3.Zero;
         CollisionLayer = 0;
         CollisionMask = 0;
@@ -212,21 +212,42 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         SetPhysicsProcess(false);
     }
 
-    public bool IsRevivingLeader => _revivingLeader;
+    public bool IsRevivingLeader => ReferenceEquals(_reviveTarget, Leader) && HasActiveReviveTarget;
+    internal bool IsRevivingFriendly => HasActiveReviveTarget;
+    internal bool IsRevivingTarget(ISquadCombatant target)
+        => ReferenceEquals(_reviveTarget, target) && HasActiveReviveTarget;
 
-    /// <summary>Task this mate with running to the downed leader and reviving them.</summary>
-    public void BeginLeaderRevive()
+    private bool HasActiveReviveTarget
     {
-        if (IsDowned || IsBodyBag || IsHumanProxy)
+        get
+        {
+            if (_reviveTarget is null || !_reviveTarget.CanBeRevived)
+            {
+                return false;
+            }
+            var node = _reviveTarget.CombatNode;
+            return IsInstanceValid(node);
+        }
+    }
+
+    private Node3D? ActiveReviveTargetNode => HasActiveReviveTarget
+        ? _reviveTarget!.CombatNode
+        : null;
+
+    /// <summary>Commit this AI mate to reaching and reviving a downed friendly.</summary>
+    public void BeginSquadRevive(ISquadCombatant target)
+    {
+        if (IsDowned || IsBodyBag || IsHumanProxy || !target.CanBeRevived
+            || ReferenceEquals(target, this) || !IsInstanceValid(target.CombatNode))
         {
             return;
         }
-        _revivingLeader = true;
+        _reviveTarget = target;
     }
 
-    public void EndLeaderRevive()
+    public void EndSquadRevive()
     {
-        _revivingLeader = false;
+        _reviveTarget = null;
         _revivePoseBlend = 0.0f;
         if (IsInstanceValid(_rig))
         {
@@ -328,9 +349,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             objectivePriority = hostile is null
                 || GlobalPosition.DistanceTo(hostile.GlobalPosition) > 14.0f;
         }
-        if (_revivingLeader)
+        var reviveTargetNode = ActiveReviveTargetNode;
+        if (reviveTargetNode is not null)
         {
-            destination = Main.ResolveSquadNavigationDestination(this, Leader.GlobalPosition, emergency: true);
+            destination = Main.ResolveSquadNavigationDestination(this, reviveTargetNode.GlobalPosition, emergency: true);
             objectivePriority = true;
         }
         else if (Order == SquadOrder.Follow && hostile is null && !objectivePriority)
@@ -403,9 +425,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             return;
         }
-        if (_revivingLeader && _revivePoseBlend > 0.5f)
+        var reviveTargetNode = ActiveReviveTargetNode;
+        if (reviveTargetNode is not null && GlobalPosition.DistanceTo(reviveTargetNode.GlobalPosition) < 2.4f)
         {
-            // Kneeling revive channel: hold fire until back on the move.
+            // A committed close-range revive is uninterrupted by ordinary contact.
             return;
         }
         var distance = GlobalPosition.DistanceTo(enemy.GlobalPosition);
@@ -482,6 +505,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     {
         var from = GlobalPosition + Vector3.Up * 1.55f;
         var to = enemy.GlobalPosition + Vector3.Up * 1.05f;
+        if (Main?.IsLineObscuredBySmoke(from, to) == true)
+        {
+            return false;
+        }
         var query = PhysicsRayQueryParameters3D.Create(from, to);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
         query.CollideWithAreas = false;
@@ -810,6 +837,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         Part(_rig, Capsule(0.1f, 0.58f), new Vector3(0.33f, 1.22f, -0.12f), uniform, new Vector3(0.7f, 0.0f, 0.15f));
         Part(_rig, Box(new Vector3(0.19f, 0.16f, 0.19f)), new Vector3(-0.34f, 1.35f, -0.02f), armor);
         Part(_rig, Box(new Vector3(0.19f, 0.16f, 0.19f)), new Vector3(0.34f, 1.35f, -0.02f), armor);
+        AttachAuthoredOperatorVisual();
         Part(_weapon, Box(new Vector3(0.13f, 0.14f, 0.56f)), new Vector3(0.0f, 1.24f, -0.36f), gun);
         Part(_weapon, Box(new Vector3(0.1f, 0.24f, 0.13f)), new Vector3(0.0f, 1.07f, -0.35f), gun, new Vector3(-0.18f, 0.0f, 0.0f));
         Part(_weapon, Cylinder(0.025f, 0.48f), new Vector3(0.0f, 1.24f, -0.85f), gun, new Vector3(Mathf.Pi / 2.0f, 0.0f, 0.0f));
@@ -847,8 +875,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             return;
         }
         var accent = OperatorRoles.Spec(Role).Accent;
-        Part(_rig, Box(new Vector3(0.5f, 0.075f, 0.03f)), new Vector3(0.0f, 1.38f, -0.14f),
-            Mat(accent, 0.0f, 0.35f, true));
+        SetAuthoredRoleColor(accent);
         if (Role == OperatorRole.Medic)
         {
             Part(_roleDevice, Cylinder(0.045f, 0.25f), new Vector3(0.0f, 0.0f, -0.17f),
@@ -878,12 +905,13 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
     private void UpdateRevivePose(float delta)
     {
-        if (!_revivingLeader && _revivePoseBlend <= 0.0f)
+        var reviveTargetNode = ActiveReviveTargetNode;
+        if (reviveTargetNode is null && _revivePoseBlend <= 0.0f)
         {
             return;
         }
-        var kneeling = _revivingLeader && !IsDowned
-            && GlobalPosition.DistanceTo(Leader.GlobalPosition) < 2.4f;
+        var kneeling = reviveTargetNode is not null && !IsDowned
+            && GlobalPosition.DistanceTo(reviveTargetNode.GlobalPosition) < 2.4f;
         _revivePoseBlend = Mathf.MoveToward(_revivePoseBlend, kneeling ? 1.0f : 0.0f, delta * 5.0f);
         if (!IsInstanceValid(_rig))
         {

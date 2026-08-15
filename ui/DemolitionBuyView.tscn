@@ -175,7 +175,7 @@ layout_mode = 0
 offset_left = 32.0
 offset_top = 144.0
 offset_right = 692.0
-offset_bottom = 588.0
+offset_bottom = 598.0
 
 [node name="SidearmsTitle" type="Label" parent="Panel/Offers"]
 layout_mode = 0
@@ -301,18 +301,18 @@ text = "SCAR-L\n$3600"
 
 [node name="ProtectionTitle" type="Label" parent="Panel/Offers"]
 layout_mode = 0
-offset_top = 282.0
+offset_top = 274.0
 offset_right = 300.0
-offset_bottom = 302.0
+offset_bottom = 294.0
 theme_override_colors/font_color = Color(0.48, 0.75, 0.66, 1)
 theme_override_font_sizes/font_size = 11
 text = "PROTECTION"
 
 [node name="ArmorButton" type="CheckButton" parent="Panel/Offers"]
 layout_mode = 0
-offset_top = 310.0
+offset_top = 298.0
 offset_right = 314.0
-offset_bottom = 354.0
+offset_bottom = 338.0
 focus_mode = 0
 theme_override_colors/font_color = Color(0.82, 0.9, 0.87, 1)
 theme_override_colors/font_disabled_color = Color(0.34, 0.4, 0.38, 1)
@@ -321,18 +321,18 @@ text = "ARMOR KIT  $1000"
 
 [node name="UtilityTitle" type="Label" parent="Panel/Offers"]
 layout_mode = 0
-offset_top = 374.0
+offset_top = 346.0
 offset_right = 300.0
-offset_bottom = 394.0
+offset_bottom = 366.0
 theme_override_colors/font_color = Color(0.48, 0.75, 0.66, 1)
 theme_override_font_sizes/font_size = 11
 text = "UTILITY"
 
 [node name="GrenadeDecrease" type="Button" parent="Panel/Offers"]
 layout_mode = 0
-offset_top = 402.0
+offset_top = 374.0
 offset_right = 48.0
-offset_bottom = 442.0
+offset_bottom = 408.0
 focus_mode = 0
 tooltip_text = "Remove grenade"
 theme_override_font_sizes/font_size = 18
@@ -344,9 +344,9 @@ text = "-"
 [node name="GrenadeCount" type="Label" parent="Panel/Offers"]
 layout_mode = 0
 offset_left = 62.0
-offset_top = 408.0
+offset_top = 376.0
 offset_right = 250.0
-offset_bottom = 438.0
+offset_bottom = 406.0
 theme_override_colors/font_color = Color(0.84, 0.91, 0.88, 1)
 theme_override_font_sizes/font_size = 13
 text = "FRAG  x0  //  $450"
@@ -355,11 +355,49 @@ vertical_alignment = 1
 [node name="GrenadeIncrease" type="Button" parent="Panel/Offers"]
 layout_mode = 0
 offset_left = 266.0
-offset_top = 402.0
+offset_top = 374.0
 offset_right = 314.0
-offset_bottom = 442.0
+offset_bottom = 408.0
 focus_mode = 0
 tooltip_text = "Add grenade"
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "+"
+
+[node name="SmokeGrenadeDecrease" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_top = 414.0
+offset_right = 48.0
+offset_bottom = 448.0
+focus_mode = 0
+tooltip_text = "Remove smoke grenade"
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "-"
+
+[node name="SmokeGrenadeCount" type="Label" parent="Panel/Offers"]
+layout_mode = 0
+offset_left = 62.0
+offset_top = 416.0
+offset_right = 250.0
+offset_bottom = 446.0
+theme_override_colors/font_color = Color(0.84, 0.91, 0.88, 1)
+theme_override_font_sizes/font_size = 13
+text = "SMOKE  x0  //  $300"
+vertical_alignment = 1
+
+[node name="SmokeGrenadeIncrease" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_left = 266.0
+offset_top = 414.0
+offset_right = 314.0
+offset_bottom = 448.0
+focus_mode = 0
+tooltip_text = "Add smoke grenade"
 theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("Style_offer")
 theme_override_styles/hover = SubResource("Style_offer_hover")

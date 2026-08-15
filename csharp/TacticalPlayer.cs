@@ -101,7 +101,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     /// <summary>False at cold-start extraction until a looted primary is equipped.</summary>
     public bool HasFireablePrimary { get; private set; } = true;
     public bool HasActiveFirearm
-        => !_knifeEquipped
+        => IsFirearmQuickSlotSelected
+        && !_knifeEquipped
         && (_activeWeaponSlot == PlayerWeaponSlot.Primary
             ? HasFireablePrimary && _primaryWeaponSlot is not null
             : _activeWeaponSlot == PlayerWeaponSlot.Secondary && _secondaryWeaponSlot is not null);
@@ -393,11 +394,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _head.Position = new Vector3(0.0f, 1.57f, 0.0f);
         if (IsInstanceValid(_weaponRoot))
         {
-            _weaponRoot.Visible = !_knifeEquipped;
+            _weaponRoot.Visible = IsFirearmQuickSlotSelected;
         }
         if (IsInstanceValid(_knifeRoot))
         {
-            _knifeRoot.Visible = _knifeEquipped;
+            _knifeRoot.Visible = _activeQuickSlot == PlayerQuickSlot.Melee;
         }
         if (!IsDead)
         {
@@ -539,6 +540,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             Scale = Vector3.One * 0.68f
         };
         _camera.AddChild(_weaponRoot);
+        _proceduralWeaponVisual = new Node3D { Name = "ProceduralWeaponVisual" };
+        _weaponRoot.AddChild(_proceduralWeaponVisual);
 
         var black = TacticalSurfaceLibrary.WeaponFinish(new Color(0.075f, 0.083f, 0.079f), 0.64f, 0.38f);
         var polymer = TacticalSurfaceLibrary.WeaponFinish(new Color(0.055f, 0.065f, 0.061f), 0.18f, 0.62f, 5.5f);
@@ -556,19 +559,19 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             EmissionEnergyMultiplier = 0.38f
         };
 
-        _receiver = MeshPart(_weaponRoot, Box(new Vector3(0.13f, 0.15f, 0.46f)), Vector3.Zero, Vector3.Zero, black);
+        _receiver = MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.13f, 0.15f, 0.46f)), Vector3.Zero, Vector3.Zero, black);
         BuildWeaponMechanismDetails(black, steel);
-        _handguard = MeshPart(_weaponRoot, Box(new Vector3(0.15f, 0.12f, 0.4f)), new Vector3(0, 0.01f, -0.41f), Vector3.Zero, tan);
-        _barrelPart = MeshPart(_weaponRoot, Cylinder(0.031f, 0.53f), new Vector3(0, 0.015f, -0.83f), new Vector3(Mathf.Pi / 2, 0, 0), steel);
-        _muzzlePart = MeshPart(_weaponRoot, Cylinder(0.047f, 0.14f), new Vector3(0, 0.015f, -1.15f), new Vector3(Mathf.Pi / 2, 0, 0), black);
-        _stock = MeshPart(_weaponRoot, Box(new Vector3(0.14f, 0.13f, 0.38f)), new Vector3(0, -0.01f, 0.38f), Vector3.Zero, polymer);
-        MeshPart(_weaponRoot, Box(new Vector3(0.12f, 0.3f, 0.13f)), new Vector3(0, -0.2f, -0.04f), new Vector3(0.2f, 0, 0), polymer);
-        _magazine = MeshPart(_weaponRoot, Box(new Vector3(0.09f, 0.26f, 0.14f)), new Vector3(0, -0.2f, -0.31f), new Vector3(-0.19f, 0, 0), black);
+        _handguard = MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.15f, 0.12f, 0.4f)), new Vector3(0, 0.01f, -0.41f), Vector3.Zero, tan);
+        _barrelPart = MeshPart(_proceduralWeaponVisual, Cylinder(0.031f, 0.53f), new Vector3(0, 0.015f, -0.83f), new Vector3(Mathf.Pi / 2, 0, 0), steel);
+        _muzzlePart = MeshPart(_proceduralWeaponVisual, Cylinder(0.047f, 0.14f), new Vector3(0, 0.015f, -1.15f), new Vector3(Mathf.Pi / 2, 0, 0), black);
+        _stock = MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.14f, 0.13f, 0.38f)), new Vector3(0, -0.01f, 0.38f), Vector3.Zero, polymer);
+        MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.12f, 0.3f, 0.13f)), new Vector3(0, -0.2f, -0.04f), new Vector3(0.2f, 0, 0), polymer);
+        _magazine = MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.09f, 0.26f, 0.14f)), new Vector3(0, -0.2f, -0.31f), new Vector3(-0.19f, 0, 0), black);
         MeshPart(_magazine, Box(new Vector3(0.095f, 0.028f, 0.15f)), new Vector3(0, -0.11f, 0), Vector3.Zero, steel);
         AddMagazineDetail(_magazine, steel);
-        MeshPart(_weaponRoot, Box(new Vector3(0.14f, 0.045f, 0.64f)), new Vector3(0, 0.11f, -0.34f), Vector3.Zero, steel);
+        MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.14f, 0.045f, 0.64f)), new Vector3(0, 0.11f, -0.34f), Vector3.Zero, steel);
         BuildReflexSight(black, glass);
-        _foregrip = MeshPart(_weaponRoot, Box(new Vector3(0.08f, 0.18f, 0.16f)), new Vector3(0, -0.17f, -0.58f), Vector3.Zero, polymer);
+        _foregrip = MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.08f, 0.18f, 0.16f)), new Vector3(0, -0.17f, -0.58f), Vector3.Zero, polymer);
 
         var glove = GloveFabric(new Color(0.12f, 0.135f, 0.112f));
         var gloveArmor = Material(new Color(0.022f, 0.03f, 0.028f), 0.12f, 0.76f);
@@ -576,11 +579,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _supportForearm = BuildSleevedForearm(_weaponRoot, new Vector3(-0.12f, -0.42f, -0.47f), new Vector3(0.25f, 0, -0.26f), glove, gloveArmor);
         BuildTacticalHand(_weaponRoot, false, new Vector3(0.115f, -0.2f, -0.075f), new Vector3(-0.12f, 0.05f, -0.18f), glove, gloveArmor);
         BuildSleevedForearm(_weaponRoot, new Vector3(0.19f, -0.42f, 0.015f), new Vector3(-0.18f, 0.05f, -0.3f), glove, gloveArmor);
-        _spareMagazine = MeshPart(_weaponRoot, Box(new Vector3(0.09f, 0.26f, 0.14f)), new Vector3(-0.3f, -0.62f, -0.18f), new Vector3(0.35f, 0, 0.35f), black);
+        _spareMagazine = MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.09f, 0.26f, 0.14f)), new Vector3(-0.3f, -0.62f, -0.18f), new Vector3(0.35f, 0, 0.35f), black);
         MeshPart(_spareMagazine, Box(new Vector3(0.095f, 0.028f, 0.15f)), new Vector3(0, -0.11f, 0), Vector3.Zero, steel);
         AddMagazineDetail(_spareMagazine, steel);
         _spareMagazine.Visible = false;
-        _chargingHandle = MeshPart(_weaponRoot, Box(new Vector3(0.055f, 0.04f, 0.12f)), new Vector3(0.075f, 0.085f, -0.05f), Vector3.Zero, steel);
+        _chargingHandle = MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.055f, 0.04f, 0.12f)), new Vector3(0.075f, 0.085f, -0.05f), Vector3.Zero, steel);
 
         _muzzle = new Marker3D { Position = new Vector3(0, 0.015f, -1.24f) };
         _weaponRoot.AddChild(_muzzle);
@@ -624,7 +627,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             Visible = false
         };
         _weaponRoot.AddChild(_weaponLight);
-        MeshPart(_weaponRoot, Cylinder(0.036f, 0.18f), new Vector3(0.09f, -0.015f, -0.73f), new Vector3(Mathf.Pi / 2, 0, 0), black);
+        MeshPart(_proceduralWeaponVisual, Cylinder(0.036f, 0.18f), new Vector3(0.09f, -0.015f, -0.73f), new Vector3(Mathf.Pi / 2, 0, 0), black);
 
         _ejectMarker = new Marker3D { Position = new Vector3(0.13f, 0.08f, -0.12f) };
         _weaponRoot.AddChild(_ejectMarker);
@@ -660,6 +663,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             MaxDistance = 16.0f
         };
         AddChild(_footstepAudio);
+        BuildAuthoredPrimaryWeapon();
     }
 
     private static void AddMagazineDetail(Node3D magazine, Godot.Material material)
@@ -678,7 +682,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private void BuildWeaponMechanismDetails(Godot.Material dark, Godot.Material steel)
     {
         _receiverSeam = MeshPart(
-            _weaponRoot,
+            _proceduralWeaponVisual,
             Box(new Vector3(0.136f, 0.018f, 0.36f)),
             new Vector3(0.0f, -0.076f, -0.015f),
             Vector3.Zero,
@@ -686,14 +690,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _receiverSeam.Name = "LowerReceiverSeam";
 
         _ejectionPort = MeshPart(
-            _weaponRoot,
+            _proceduralWeaponVisual,
             Box(new Vector3(0.014f, 0.056f, 0.15f)),
             new Vector3(0.078f, 0.018f, -0.045f),
             Vector3.Zero,
             dark);
         _ejectionPort.Name = "EjectionPort";
         _boltCarrier = MeshPart(
-            _weaponRoot,
+            _proceduralWeaponVisual,
             Box(new Vector3(0.018f, 0.029f, 0.11f)),
             new Vector3(0.086f, 0.055f, -0.05f),
             Vector3.Zero,
@@ -701,31 +705,31 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _boltCarrier.Name = "BoltCarrierDetail";
 
         _triggerGuardFront = MeshPart(
-            _weaponRoot,
+            _proceduralWeaponVisual,
             Box(new Vector3(0.025f, 0.13f, 0.028f)),
             new Vector3(0.0f, -0.105f, 0.145f),
             new Vector3(0.0f, 0.0f, 0.12f),
             dark);
         _triggerGuardRear = MeshPart(
-            _weaponRoot,
+            _proceduralWeaponVisual,
             Box(new Vector3(0.025f, 0.13f, 0.028f)),
             new Vector3(0.0f, -0.105f, 0.005f),
             new Vector3(0.0f, 0.0f, -0.12f),
             dark);
         _triggerGuardBase = MeshPart(
-            _weaponRoot,
+            _proceduralWeaponVisual,
             Box(new Vector3(0.025f, 0.028f, 0.18f)),
             new Vector3(0.0f, -0.166f, 0.075f),
             Vector3.Zero,
             dark);
         _trigger = MeshPart(
-            _weaponRoot,
+            _proceduralWeaponVisual,
             Box(new Vector3(0.022f, 0.064f, 0.018f)),
             new Vector3(0.0f, -0.088f, 0.078f),
             new Vector3(0.0f, 0.0f, 0.18f),
             steel);
         _selector = MeshPart(
-            _weaponRoot,
+            _proceduralWeaponVisual,
             Box(new Vector3(0.018f, 0.068f, 0.026f)),
             new Vector3(0.09f, 0.008f, 0.085f),
             new Vector3(0.0f, 0.0f, -0.34f),
@@ -1052,6 +1056,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             : new Vector3(0.09f, -0.015f, -0.5f - barrelLength * 0.45f);
         _gunAudio.MaxDistance = stats.SoundRadius * 1.9f;
         Ammo = Mathf.Min(Ammo, stats.MagazineSize);
+        RefreshAuthoredPrimaryWeapon();
     }
 
     private void BuildKnife()
@@ -1208,13 +1213,21 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             ActivateWeaponSlot(PlayerWeaponSlot.Melee, true);
         }
+        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_grenade"))
+        {
+            SelectQuickSlot(PlayerQuickSlot.FragmentationGrenade);
+        }
+        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_utility"))
+        {
+            SelectQuickSlot(PlayerQuickSlot.Utility);
+        }
         else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_cycle"))
         {
             CycleWeaponSlots();
         }
 
         if (Input.IsActionJustPressed("toggle_fire_mode")
-            && !_knifeEquipped
+            && IsFirearmQuickSlotSelected
             && !_isReloading
             && !_isPlating
             && !MedicalActionBlocksWeapon
@@ -1226,7 +1239,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 _automaticFire ? "FIRE MODE  //  AUTO" : "FIRE MODE  //  SEMI",
                 new Color(0.42f, 0.9f, 0.73f));
         }
-        if (Input.IsActionJustPressed("toggle_flashlight") && !_knifeEquipped && !MedicalActionBlocksWeapon)
+        if (Input.IsActionJustPressed("toggle_flashlight") && IsFirearmQuickSlotSelected && !MedicalActionBlocksWeapon)
         {
             _flashlightOn = !_flashlightOn;
             _weaponLight.Visible = _flashlightOn;
@@ -1256,7 +1269,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 FinishReload();
             }
         }
-        if (!_knifeEquipped && !_isPlating && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionJustPressed("reload"))
+        if (IsFirearmQuickSlotSelected && !_isPlating && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionJustPressed("reload"))
         {
             StartReload();
         }
@@ -1264,16 +1277,19 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             ThrowGrenade();
         }
-
-        _isAiming = !_knifeEquipped && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionPressed("aim") && !_isReloading && !_isPlating && _slideTime <= 0.0f;
-        var fireRequested = _knifeEquipped
-            ? Input.IsActionJustPressed("fire")
-            : _automaticFire ? Input.IsActionPressed("fire") : Input.IsActionJustPressed("fire");
+        _isAiming = IsFirearmQuickSlotSelected && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionPressed("aim") && !_isReloading && !_isPlating && _slideTime <= 0.0f;
+        var fireRequested = IsFirearmQuickSlotSelected && _automaticFire
+            ? Input.IsActionPressed("fire")
+            : Input.IsActionJustPressed("fire");
         if (!_isPlating && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && _fireInputArmed && fireRequested && Input.MouseMode == Input.MouseModeEnum.Captured)
         {
-            if (_knifeEquipped)
+            if (_activeQuickSlot == PlayerQuickSlot.Melee)
             {
                 StartKnifeAttack();
+            }
+            else if (IsThrowableQuickSlotSelected)
+            {
+                ThrowSelectedQuickSlot();
             }
             else
             {
@@ -1286,13 +1302,24 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         PushHudStats();
         Hud?.SetEquipment(
             ArmorPlates,
-            _knifeEquipped ? "KNIFE" : _automaticFire ? "AUTO" : "SEMI",
-            EquippedWeapon.DisplayName(Hud?.CurrentLanguage ?? "en"),
+            _activeQuickSlot switch
+            {
+                PlayerQuickSlot.Melee => "KNIFE",
+                PlayerQuickSlot.FragmentationGrenade => "GRENADE",
+                PlayerQuickSlot.Utility => "UTILITY",
+                _ => _automaticFire ? "AUTO" : "SEMI"
+            },
+            _activeQuickSlot switch
+            {
+                PlayerQuickSlot.FragmentationGrenade => GameLocalization.Get("grenade", Hud?.CurrentLanguage ?? "en", "FRAG GRENADE"),
+                PlayerQuickSlot.Utility => GameLocalization.Get("smoke_grenade", Hud?.CurrentLanguage ?? "en", "SMOKE GRENADE"),
+                _ => EquippedWeapon.DisplayName(Hud?.CurrentLanguage ?? "en")
+            },
             PrimaryWeaponBuild,
             HasFireablePrimary,
             EquippedKnifeSkinId,
             SecondaryWeaponBuild,
-            (int)ActiveWeaponSlot);
+            (int)ActiveQuickSlot);
         Hud?.SetAiming(_isAiming);
         var heading = Mathf.RadToDeg(Rotation.Y) * -1.0f;
         Hud?.SetHeading(heading);
@@ -1751,8 +1778,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var targetFov = _isAiming ? AimFieldOfView() : _slideTime > 0.0f ? 84.0f : horizontalSpeed > 7.0f ? 82.0f : 76.0f;
         var handling = EquippedWeapon.Stats().Handling;
         _camera.Fov = Mathf.Lerp(_camera.Fov, targetFov, SmoothFactor(6.5f + handling * 5.0f, delta));
-        _weaponRoot.Visible = !_knifeEquipped && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
-        _knifeRoot.Visible = _knifeEquipped && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
+        _weaponRoot.Visible = IsFirearmQuickSlotSelected && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
+        _knifeRoot.Visible = _activeQuickSlot == PlayerQuickSlot.Melee && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
         UpdateKnifeAnimation(delta);
         var targetPosition = WeaponViewPositionTarget();
         _weaponRoot.Position = _weaponRoot.Position.Lerp(targetPosition, SmoothFactor(_isAiming ? 7.5f + handling * 6.0f : 6.0f + handling * 3.0f, delta));
@@ -1763,8 +1790,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             weaponRotation.Y = 0.0f;
         }
         _weaponRoot.Rotation = weaponRotation.Lerp(WeaponViewRotationTarget(), SmoothFactor(9.0f, delta));
-        _opticReticle.Visible = _isAiming && !_knifeEquipped;
+        _opticReticle.Visible = _isAiming && IsFirearmQuickSlotSelected;
         UpdateReloadAnimation();
+        SyncAuthoredPrimaryWeapon();
     }
 
     private float AimFieldOfView()
@@ -1787,7 +1815,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     public void SelectWeapon(int slot)
     {
-        ActivateWeaponSlot((PlayerWeaponSlot)Mathf.Clamp(slot, 0, 2), true);
+        SelectQuickSlot((PlayerQuickSlot)Mathf.Clamp(slot, 0, 4));
     }
 
     public void CycleWeapon()
@@ -2219,6 +2247,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _supportForearm.Position = new Vector3(-0.12f, -0.42f, -0.47f);
         _supportForearm.Rotation = new Vector3(0.25f, 0, -0.26f);
         _chargingHandle.Position = new Vector3(0.075f, 0.085f, -0.05f);
+        SyncAuthoredPrimaryWeapon();
     }
 
     private static float SmoothStep(float value)
@@ -2636,14 +2665,17 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _knifeRoot.Visible = visible;
     }
 
-    private void ThrowGrenade()
+    private bool ThrowGrenade()
     {
         if (Grenades <= 0 || _isReloading || MedicalActionBlocksWeapon || IsDead || Main is null)
         {
-            return;
+            return false;
         }
         Grenades--;
         Main.ThrowGrenade(_camera.GlobalPosition - _camera.GlobalBasis.Z * 0.7f, -_camera.GlobalBasis.Z, this);
+        Hud?.SetStats(Health, Armor, Stamina, Ammo, ReserveAmmo, Grenades);
+        OnThrowableConsumed();
+        return true;
     }
 
     public Vector3 HitPoint(HitRegion region)

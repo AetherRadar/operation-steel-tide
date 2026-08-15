@@ -168,6 +168,7 @@ public partial class CombatHUD
     public void ShowOperationsOffice(string status = "FIELD TEAM STANDING BY  //  HELIPAD CLEAR")
     {
         HideDemolitionBuy();
+        SetDemolitionGameplayPresentation(false);
         _squadLobby.Visible = false;
         _demolitionBriefingView.Visible = false;
         _operationsOfficeRoot.Visible = true;

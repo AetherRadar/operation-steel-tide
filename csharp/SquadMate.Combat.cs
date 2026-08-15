@@ -319,7 +319,9 @@ public partial class SquadMate
             ? GlobalPosition.DirectionTo(flatDestination)
             : Vector3.Zero;
         desired.Y = 0.0f;
-        if (_combatRecoveryTimer > 0.0f && _combatRecoveryDirection.LengthSquared() > 0.01f)
+        if (!objectivePriority
+            && _combatRecoveryTimer > 0.0f
+            && _combatRecoveryDirection.LengthSquared() > 0.01f)
         {
             desired = _combatRecoveryDirection;
         }
@@ -333,8 +335,9 @@ public partial class SquadMate
 
         var spec = OperatorRoles.Spec(Role);
         var boost = Role == OperatorRole.Assault && _overdriveTime > 0.0f ? 1.22f : 1.0f;
-        var urgencyDistance = _revivingLeader
-            ? GlobalPosition.DistanceTo(Leader.GlobalPosition)
+        var reviveTargetNode = ActiveReviveTargetNode;
+        var urgencyDistance = reviveTargetNode is not null
+            ? GlobalPosition.DistanceTo(reviveTargetNode.GlobalPosition)
             : distance;
         var speed = (urgencyDistance > 8.0f ? 5.4f : 3.8f) * spec.MovementMultiplier * boost;
         if (_skillActionTime > 0.0f)
@@ -519,6 +522,10 @@ public partial class SquadMate
     {
         var from = position + Vector3.Up * 1.35f;
         var to = hostile.GlobalPosition + Vector3.Up * 1.05f;
+        if (Main?.IsLineObscuredBySmoke(from, to) == true)
+        {
+            return false;
+        }
         var query = PhysicsRayQueryParameters3D.Create(from, to);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
         query.CollideWithAreas = false;

@@ -331,6 +331,9 @@ public partial class EnemyOperator
         {
             _mainMaterial.AlbedoColor = color;
         }
+        SetAuthoredThreatColor(phase >= 3
+            ? new Color(1.0f, 0.24f, 0.12f)
+            : new Color(0.12f, 0.94f, 0.76f));
         if (IsInstanceValid(_worldBossLabel))
         {
             _worldBossLabel!.Text = phase switch
