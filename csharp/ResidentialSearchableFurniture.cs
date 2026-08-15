@@ -12,14 +12,6 @@ public enum ResidentialFurnitureKind
     DeskDrawers
 }
 
-public enum ResidentialRoomEventKind
-{
-    None,
-    Alarm,
-    BoobyTrap,
-    Intel
-}
-
 [GlobalClass]
 public partial class ResidentialSearchableFurniture : StaticBody3D, ILootSource
 {
@@ -42,6 +34,7 @@ public partial class ResidentialSearchableFurniture : StaticBody3D, ILootSource
     public Node3D LootNode => this;
     public bool IsSearchable => Loot.Count > 0;
     public float SearchDuration => Kind == ResidentialFurnitureKind.Wardrobe ? 0.9f : 0.65f;
+    public bool VisualReady => IsInstanceValid(_movingPart) && _partCounter > 0;
 
     private Node3D _movingPart = null!;
     private Vector3 _openRotation;

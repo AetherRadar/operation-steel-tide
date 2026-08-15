@@ -1,10 +1,80 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    private ResidentialRoomEncounterController CreateResidentialRoomEncounterController()
+        => new(new ResidentialEncounterEffects(
+            DamagePlayerNearResidentialEvent,
+            ReportGunshot,
+            AlertEnemiesNear,
+            ScanEnemiesNear,
+            SpawnResidentialRoomGuards,
+            ShowResidentialEncounterMessage));
+
+    private void OnResidentialCacheFirstOpened(ResidentialSupplyCache cache)
+    {
+        if (cache.EventKind != ResidentialRoomEventKind.None)
+        {
+            _residentialChestEventCount++;
+        }
+        _residentialEncounterController?.Handle(cache);
+    }
+
+    private void DamagePlayerNearResidentialEvent(Vector3 origin, float damage)
+    {
+        if (IsInstanceValid(_player) && !_player.IsDead && _player.GlobalPosition.DistanceTo(origin) <= 3.2f)
+        {
+            _player.TakeDamage(damage, _player.HitPoint(HitRegion.Torso), this);
+        }
+    }
+
+    private int ScanEnemiesNear(Vector3 origin, float radius)
+    {
+        var marked = 0;
+        foreach (var enemy in _enemies)
+        {
+            if (!IsInstanceValid(enemy) || enemy.IsDead || enemy.GlobalPosition.DistanceTo(origin) > radius)
+            {
+                continue;
+            }
+            enemy.SetScanned(12.0f);
+            marked++;
+        }
+        return marked;
+    }
+
+    private void SpawnResidentialRoomGuards(ResidentialSupplyCache cache, int count)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            var localOffset = new Vector3(index == 0 ? -0.75f : 0.75f, 0.05f, -1.85f - index * 0.28f);
+            var guard = SpawnEnemy(cache.ToGlobal(localOffset), alerted: true, teamId: 0);
+            guard.Name = $"RESIDENTIAL_GUARD_T{cache.TowerIndex + 1:00}_F{cache.FloorIndex + 1:00}_{_residentialGuardAmbushSpawnCount + 1:00}";
+            _residentialGuardAmbushSpawnCount++;
+        }
+        _enemiesRemaining = _enemies.Count(enemy => IsInstanceValid(enemy) && !enemy.IsDead);
+        if (IsInstanceValid(_hud))
+        {
+            _hud.SetEnemyCount(_enemiesRemaining);
+        }
+    }
+
+    private void ShowResidentialEncounterMessage(
+        Vector3 origin,
+        string localizationKey,
+        string english,
+        Color color)
+    {
+        if (IsInstanceValid(_player) && _player.GlobalPosition.DistanceTo(origin) <= 12.0f)
+        {
+            _hud.ShowLocalizedMessage(localizationKey, english, color);
+        }
+    }
+
     private static List<LootItem> CreateResidentialFurnitureLoot(
         ResidentialFurnitureKind kind,
         ResidentialRoomArchetype archetype,

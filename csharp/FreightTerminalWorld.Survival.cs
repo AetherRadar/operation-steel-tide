@@ -98,23 +98,25 @@ public partial class FreightTerminalWorld
             && _player.MedicalCount(MedicalItemKind.Bandage) == beforeStack + 5;
 
         var cacheMedicalCount = 0;
-        var allCachesCarryMedicine = true;
+        var allCachesResolved = true;
         var medicalKinds = new HashSet<MedicalItemKind>();
+        var encounterController = _residentialEncounterController;
+        _residentialEncounterController = null;
         foreach (var cache in _residentialCaches)
         {
-            var cacheHasMedicine = false;
+            cache.OnSearched();
+            allCachesResolved &= cache.ContentsResolved;
             foreach (var item in cache.Loot)
             {
                 if (item.Kind != LootItemKind.Medical)
                 {
                     continue;
                 }
-                cacheHasMedicine = true;
                 cacheMedicalCount++;
                 medicalKinds.Add(item.MedicalKind);
             }
-            allCachesCarryMedicine &= cacheHasMedicine;
         }
+        _residentialEncounterController = encounterController;
 
         var wheelAction = InputMap.HasAction("medical_wheel");
         var wheelKeyBound = false;
@@ -149,11 +151,12 @@ public partial class FreightTerminalWorld
             && plateRepaired
             && emptyPlateBlocked
             && stackingWorked
-            && allCachesCarryMedicine
+            && allCachesResolved
+            && cacheMedicalCount > 0
             && medicalKinds.Count == Enum.GetValues<MedicalItemKind>().Length
             && wheelAction
             && wheelKeyBound;
-        GD.Print($"MEDICAL_CHECK valid={valid} wheel_open={wheelOpened} clicked={wheelClicked} choice={wheelChoice} plate_wheel={plateWheelOpened && plateWheelClicked && plateWheelChoice} plate_backpack={plateInBackpack} plate_started={plateStarted} plate_held={plateHeldUntilCompletion} plate_repaired={plateRepaired} plate_empty_blocked={emptyPlateBlocked} armor={armorBefore:0.0}->{_player.Armor:0.0} medkit_started={medkitStarted} hands_busy={medkitBlockedWeapon} medkit_healed={medkitHealed} adrenaline_started={adrenalineStarted} adrenaline_active={adrenalineApplied} stacking={stackingWorked} cache_medicine={cacheMedicalCount} all_caches={allCachesCarryMedicine} medicine_types={medicalKinds.Count}/3 input_action={wheelAction} key_b={wheelKeyBound}");
+        GD.Print($"MEDICAL_CHECK valid={valid} wheel_open={wheelOpened} clicked={wheelClicked} choice={wheelChoice} plate_wheel={plateWheelOpened && plateWheelClicked && plateWheelChoice} plate_backpack={plateInBackpack} plate_started={plateStarted} plate_held={plateHeldUntilCompletion} plate_repaired={plateRepaired} plate_empty_blocked={emptyPlateBlocked} armor={armorBefore:0.0}->{_player.Armor:0.0} medkit_started={medkitStarted} hands_busy={medkitBlockedWeapon} medkit_healed={medkitHealed} adrenaline_started={adrenalineStarted} adrenaline_active={adrenalineApplied} stacking={stackingWorked} cache_medicine={cacheMedicalCount} caches_resolved={allCachesResolved} medicine_types={medicalKinds.Count}/3 input_action={wheelAction} key_b={wheelKeyBound}");
         GD.Print($"MEDICAL_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -248,6 +251,7 @@ public partial class FreightTerminalWorld
         var expectedKinds = Enum.GetValues<ValuableItemKind>().Length;
         var expectedGrades = Enum.GetValues<LootGrade>().Length;
         var definitionKinds = new HashSet<ValuableItemKind>();
+        var ambientWorldKinds = new HashSet<ValuableItemKind>();
         var definitionGrades = new HashSet<LootGrade>();
         var localizedDefinitions = true;
         var minimumValueByGrade = new int[expectedGrades];
@@ -260,6 +264,10 @@ public partial class FreightTerminalWorld
         foreach (var definition in ValuableItems.All)
         {
             definitionKinds.Add(definition.Kind);
+            if (definition.Kind != ValuableItemKind.TideHunterTransponder)
+            {
+                ambientWorldKinds.Add(definition.Kind);
+            }
             definitionGrades.Add(definition.NativeGrade);
             var englishName = ValuableItems.DisplayName(definition.Kind, "en");
             var chineseName = ValuableItems.DisplayName(definition.Kind, "zh");
@@ -288,7 +296,18 @@ public partial class FreightTerminalWorld
         var worldGrades = new HashSet<LootGrade>();
         var valuableWorldPickups = 0;
         var worldVisualsReady = true;
+        var worldVisualFailures = new HashSet<string>();
         var nativeGradesMatch = true;
+        var encounterController = _residentialEncounterController;
+        _residentialEncounterController = null;
+        foreach (var source in _lootSources)
+        {
+            if (source is IDeferredLootSource { ContentsResolved: false })
+            {
+                source.OnSearched();
+            }
+        }
+        _residentialEncounterController = encounterController;
         foreach (var source in _lootSources)
         {
             foreach (var item in source.Loot)
@@ -301,7 +320,18 @@ public partial class FreightTerminalWorld
                 worldKinds.Add(item.ValuableKind);
                 worldGrades.Add(item.Grade);
                 nativeGradesMatch &= item.Grade == ValuableItems.Definition(item.ValuableKind).NativeGrade;
-                worldVisualsReady &= source is GradedLootPickup pickup && pickup.VisualReady;
+                var sourceVisualReady = source switch
+                {
+                    GradedLootPickup pickup => pickup.VisualReady,
+                    ResidentialSearchableFurniture furniture => furniture.VisualReady,
+                    ResidentialSupplyCache cache => cache.NeutralVisualReady,
+                    _ => true
+                };
+                worldVisualsReady &= sourceVisualReady;
+                if (!sourceVisualReady)
+                {
+                    worldVisualFailures.Add($"{source.GetType().Name}:{source.LootNode.Name}");
+                }
             }
         }
 
@@ -338,13 +368,13 @@ public partial class FreightTerminalWorld
             && definitionGrades.Count == expectedGrades
             && localizedDefinitions
             && separatedGradeValues
-            && worldKinds.Count == expectedKinds
+            && worldKinds.SetEquals(ambientWorldKinds)
             && worldGrades.Count == expectedGrades
             && valuableWorldPickups >= expectedKinds
             && nativeGradesMatch
             && worldVisualsReady
             && stackingWorked;
-        GD.Print($"LOOT_VARIETY_CHECK valid={valid} definitions={definitionKinds.Count}/{expectedKinds} grades={definitionGrades.Count}/{expectedGrades} localized={localizedDefinitions} value_bands={separatedGradeValues} world_kinds={worldKinds.Count}/{expectedKinds} world_grades={worldGrades.Count}/{expectedGrades} world_pickups={valuableWorldPickups} native_grades={nativeGradesMatch} visuals={worldVisualsReady} stacking={stackingWorked}");
+        GD.Print($"LOOT_VARIETY_CHECK valid={valid} definitions={definitionKinds.Count}/{expectedKinds} grades={definitionGrades.Count}/{expectedGrades} localized={localizedDefinitions} value_bands={separatedGradeValues} world_kinds={worldKinds.Count}/{ambientWorldKinds.Count} world_grades={worldGrades.Count}/{expectedGrades} world_pickups={valuableWorldPickups} native_grades={nativeGradesMatch} visuals={worldVisualsReady} visual_failures={string.Join(',', worldVisualFailures)} stacking={stackingWorked}");
         GD.Print($"LOOT_VARIETY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

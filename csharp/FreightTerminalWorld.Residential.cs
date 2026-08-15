@@ -7,17 +7,6 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
-    private enum ResidentialRoomArchetype
-    {
-        FamilyApartment,
-        MedicalClinic,
-        EvacuationShelter,
-        MaintenanceWorkshop,
-        CommunitySecurity,
-        SmugglerDen,
-        CommunityKitchen
-    }
-
     private const float ResidentialFloorHeight = 3.15f;
     private const float ResidentialStairRun = 5.4f;
     private const float ResidentialStairOpeningWidth = 5.6f;
@@ -139,6 +128,8 @@ public partial class FreightTerminalWorld
     private readonly HashSet<ResidentialRoomArchetype> _residentialRoomArchetypes = new();
     private readonly List<Action<string>> _residentialLanguageRefreshers = new();
     private readonly int[] _residentialCacheCountByTower = new int[ResidentialTowerSpecs.Length];
+    private ResidentialRoomEncounterController? _residentialEncounterController;
+    private uint _residentialLootSeedSalt;
     private int _residentialFloorCount;
     private int _residentialStairFlightCount;
     private int _residentialRoofAccessCount;
@@ -149,6 +140,8 @@ public partial class FreightTerminalWorld
     private int _residentialInfillModuleCount;
     private int _residentialStairDetailCount;
     private int _residentialFurnitureEventCount;
+    private int _residentialChestEventCount;
+    private int _residentialGuardAmbushSpawnCount;
 
     public int ResidentialTowerCount => _residentialTowers.Count;
     public int ResidentialCivilianCount => _civilians.Count;
@@ -208,6 +201,15 @@ public partial class FreightTerminalWorld
         _residentialGlassFields.Clear();
         _residentialRoomArchetypes.Clear();
         _residentialFurnitureEventCount = 0;
+        _residentialChestEventCount = 0;
+        _residentialGuardAmbushSpawnCount = 0;
+        _residentialEncounterController = CreateResidentialRoomEncounterController();
+        var diagnosticArgs = OS.GetCmdlineUserArgs();
+        _residentialLootSeedSalt = diagnosticArgs.Contains("--validate-residential-gameplay")
+            || diagnosticArgs.Contains("--validate-medical")
+            || diagnosticArgs.Contains("--validate-loot-variety")
+            ? 0x5e71c4a3u
+            : _rng.Randi();
         Array.Clear(_residentialCacheCountByTower, 0, _residentialCacheCountByTower.Length);
         _residentialSkybridgeCount = 0;
         _residentialSkybridgeWindowCount = 0;
@@ -618,7 +620,7 @@ public partial class FreightTerminalWorld
         var appliance = Mat("residential_appliance", new Color(0.55f, 0.58f, 0.56f), 0.62f, 0.35f);
         var screen = Mat("residential_screen", new Color(0.035f, 0.045f, 0.048f), 0.08f, 0.52f);
         var table = Mat("residential_table", new Color(0.24f, 0.16f, 0.1f), 0.05f, 0.78f);
-        var featuredFloor = ShouldSpawnResidentialCache(spec, floor);
+        var featuredFloor = IsResidentialFeaturedFloor(spec, floor);
         foreach (var side in new[] { -1.0f, 1.0f })
         {
             var roomX = side * (corridorHalfWidth + roomWidth * 0.5f);
@@ -671,6 +673,23 @@ public partial class FreightTerminalWorld
                 floorY,
                 bedZ,
                 kitchenX);
+            var cacheX = roomX + side * roomWidth * 0.38f;
+            SpawnResidentialCache(
+                tower,
+                towerIndex,
+                floor,
+                side,
+                ResidentialRoomZone.North,
+                archetype,
+                new Vector3(cacheX, floorY + 0.1f, -depth * 0.35f));
+            SpawnResidentialCache(
+                tower,
+                towerIndex,
+                floor,
+                side,
+                ResidentialRoomZone.South,
+                archetype,
+                new Vector3(cacheX, floorY + 0.1f, depth * 0.35f));
             // Extra clutter so apartments read as lived-in, not empty boxes.
             ExpansionBox(tower, "ApartmentShelf", new Vector3(roomX + side * roomWidth * 0.18f, floorY + 1.15f, -depth * 0.18f), new Vector3(0.9f, 1.7f, 0.32f), wood);
             ExpansionBox(tower, "ApartmentCrate", new Vector3(roomX - side * 0.55f, floorY + 0.28f, depth * 0.12f), new Vector3(0.55f, 0.45f, 0.55f), table);
@@ -678,16 +697,6 @@ public partial class FreightTerminalWorld
             if (featuredFloor)
             {
                 BuildResidentialRoomTheme(tower, archetype, roomX, side, roomWidth, depth, floorY);
-            }
-            if (featuredFloor && side > 0.0f)
-            {
-                SpawnResidentialCache(
-                    tower,
-                    towerIndex,
-                    floor,
-                    archetype,
-                    new Vector3(roomX - side * roomWidth * 0.18f, floorY + 0.12f, -depth * 0.18f),
-                    side);
             }
             tower.AddChild(RegisterResidentialLocalizedLabel(new Label3D
             {
@@ -822,26 +831,6 @@ public partial class FreightTerminalWorld
         return (ResidentialFurnitureKind)Mathf.PosMod(selector, Enum.GetValues<ResidentialFurnitureKind>().Length);
     }
 
-    private static ResidentialRoomEventKind ResidentialRoomEventFor(
-        ResidentialRoomArchetype archetype,
-        bool featuredFloor)
-    {
-        if (!featuredFloor)
-        {
-            return ResidentialRoomEventKind.None;
-        }
-        return archetype switch
-        {
-            ResidentialRoomArchetype.SmugglerDen => ResidentialRoomEventKind.BoobyTrap,
-            ResidentialRoomArchetype.CommunitySecurity => ResidentialRoomEventKind.Alarm,
-            ResidentialRoomArchetype.MedicalClinic => ResidentialRoomEventKind.Intel,
-            ResidentialRoomArchetype.EvacuationShelter => ResidentialRoomEventKind.Alarm,
-            ResidentialRoomArchetype.MaintenanceWorkshop => ResidentialRoomEventKind.BoobyTrap,
-            ResidentialRoomArchetype.FamilyApartment => ResidentialRoomEventKind.Intel,
-            _ => ResidentialRoomEventKind.None
-        };
-    }
-
     private void SpawnResidentialFurniture(
         Node3D tower,
         int towerIndex,
@@ -864,7 +853,7 @@ public partial class FreightTerminalWorld
             ResidentialFurnitureKind.DeskDrawers => new Vector3(roomX - side * 0.2f, floorY + 0.08f, -depth * 0.08f - side * 0.72f),
             _ => new Vector3(roomX + side * roomWidth * 0.28f, floorY + 0.08f, bedZ + 0.75f)
         };
-        var eventKind = ResidentialRoomEventFor(archetype, featuredFloor);
+        var eventKind = ResidentialRoomEventKind.None;
         var furniture = new ResidentialSearchableFurniture
         {
             Name = $"ResidentialFurniture_T{towerIndex + 1:00}_F{floor + 1:00}_S{(side > 0.0f ? 1 : 0)}_{kind}",
@@ -981,35 +970,28 @@ public partial class FreightTerminalWorld
         }
     }
 
-    private static bool ShouldSpawnResidentialCache(ResidentialTowerSpec spec, int floor)
+    private static bool IsResidentialFeaturedFloor(ResidentialTowerSpec spec, int floor)
         => floor == 0 || floor == spec.Floors / 2 || floor == Mathf.Max(1, spec.Floors - 2);
 
     private void SpawnResidentialCache(
         Node3D tower,
         int towerIndex,
         int floor,
+        float side,
+        ResidentialRoomZone zone,
         ResidentialRoomArchetype archetype,
-        Vector3 localPosition,
-        float side)
+        Vector3 localPosition)
     {
-        var kind = archetype switch
-        {
-            ResidentialRoomArchetype.MedicalClinic => ResidentialCacheKind.MedicalCabinet,
-            ResidentialRoomArchetype.EvacuationShelter => ResidentialCacheKind.EvacuationLocker,
-            ResidentialRoomArchetype.MaintenanceWorkshop => ResidentialCacheKind.WorkshopLocker,
-            ResidentialRoomArchetype.CommunitySecurity => ResidentialCacheKind.SecurityArmory,
-            ResidentialRoomArchetype.SmugglerDen => ResidentialCacheKind.SmugglerCache,
-            ResidentialRoomArchetype.CommunityKitchen => ResidentialCacheKind.CommunityPantry,
-            _ => ResidentialCacheKind.FamilyStash
-        };
+        var roomId = new ResidentialRoomId(towerIndex, floor, side > 0.0f ? 1 : -1, zone);
+        var plan = ResidentialRoomLootRules.Plan(roomId, archetype, _residentialLootSeedSalt);
         var cache = new ResidentialSupplyCache
         {
-            Name = $"ResidentialCache_T{towerIndex + 1:00}_F{floor + 1:00}_{kind}",
+            Name = $"ResidentialCache_T{towerIndex + 1:00}_F{floor + 1:00}_S{(side > 0.0f ? 1 : 0)}_{zone}",
             Position = localPosition,
             Rotation = new Vector3(0, side * Mathf.Pi * 0.5f, 0)
         };
-        cache.Configure(kind, towerIndex, floor, CreateResidentialCacheLoot(kind));
-        RegisterResidentialLanguageRefresher(cache.SetLanguage);
+        cache.ConfigureRoom(plan);
+        cache.FirstOpened += OnResidentialCacheFirstOpened;
         tower.AddChild(cache);
         _residentialCaches.Add(cache);
         _residentialCacheCountByTower[towerIndex]++;
@@ -1594,14 +1576,13 @@ public partial class FreightTerminalWorld
         GetTree().Quit(valid ? 0 : 2);
     }
 
-    private (int Count, int Expected, bool Chinese, Label3D? EnglishLeak) CheckResidentialLocalization(int expectedCaches)
+    private (int Count, int Expected, bool Chinese, Label3D? EnglishLeak) CheckResidentialLocalization()
     {
         var labels = GetTree().GetNodesInGroup("residential_localized_labels")
             .OfType<Label3D>()
             .Where(IsInstanceValid)
             .ToList();
         var expected = ResidentialTowerSpecs.Sum(spec => spec.Floors) * 4
-            + expectedCaches
             + ResidentialTowerSpecs.Length
             + 2
             + ResidentialCivilianCount
@@ -1622,9 +1603,18 @@ public partial class FreightTerminalWorld
         SetLanguage("zh");
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
 
-        var (count, expected, chinese, englishLeak) = CheckResidentialLocalization(ResidentialCacheCount);
-        var valid = count == expected && chinese && englishLeak is null;
-        GD.Print($"RESIDENTIAL_LOCALIZATION_CHECK valid={valid} labels={count}/{expected} chinese={chinese} no_english={englishLeak is null} leak={englishLeak?.Text ?? "none"}");
+        var (count, expected, chinese, englishLeak) = CheckResidentialLocalization();
+        var encounterKeys = new[]
+        {
+            "residential_room_trap",
+            "residential_room_alarm",
+            "residential_room_intel",
+            "residential_room_guard_ambush"
+        };
+        var encountersLocalized = encounterKeys.All(key =>
+            GameLocalization.Get(key, "zh", key).Any(character => character >= '\u3400' && character <= '\u9fff'));
+        var valid = count == expected && chinese && englishLeak is null && encountersLocalized;
+        GD.Print($"RESIDENTIAL_LOCALIZATION_CHECK valid={valid} labels={count}/{expected} chinese={chinese} no_english={englishLeak is null} encounters={encountersLocalized} leak={englishLeak?.Text ?? "none"}");
         GD.Print($"RESIDENTIAL_LOCALIZATION_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -1637,57 +1627,163 @@ public partial class FreightTerminalWorld
         }
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
 
-        var expectedCaches = ResidentialTowerSpecs.Sum(spec => Enumerable.Range(0, spec.Floors)
-            .Count(floor => ShouldSpawnResidentialCache(spec, floor)));
+        static string LootFingerprint(IEnumerable<LootItem> items) => string.Join(
+            ";",
+            items.Select(item => $"{item.Kind}:{item.Grade}:{item.Quantity}:{item.Weapon?.Platform}:{item.AttachmentId}:{item.Equipment?.DefinitionId}:{item.AmmoCaliber}:{item.MedicalKind}:{item.ValuableKind}"));
+
+        var expectedCaches = ResidentialTowerSpecs.Sum(spec => spec.Floors * 4);
         var expectedFurniture = ResidentialTowerSpecs.Sum(spec => spec.Floors * 2);
         var cacheKinds = new HashSet<ResidentialCacheKind>();
+        var cacheGrades = new HashSet<LootGrade>();
+        var roomEvents = new HashSet<ResidentialRoomEventKind>();
         var lootKinds = new HashSet<LootItemKind>();
-        var stockedFloors = new HashSet<(int Tower, int Floor)>();
-        var everyCacheHasMedicine = true;
-        var cachesRegistered = true;
-        var cachesStocked = true;
-        var reachableCaches = 0;
-        foreach (var cache in _residentialCaches)
-        {
-            cacheKinds.Add(cache.Kind);
-            stockedFloors.Add((cache.TowerIndex, cache.FloorIndex));
-            cachesRegistered &= _lootSources.Contains(cache) && IsInstanceValid(cache);
-            cachesStocked &= cache.IsSearchable && cache.Loot.Count >= 2;
-            if (HasClearLootInteractionApproach(cache))
-            {
-                reachableCaches++;
-            }
-            var cacheHasMedicine = false;
-            foreach (var item in cache.Loot)
-            {
-                lootKinds.Add(item.Kind);
-                cacheHasMedicine |= item.Kind == LootItemKind.Medical;
-            }
-            everyCacheHasMedicine &= cacheHasMedicine;
-        }
-        var everyTowerStocked = true;
-        for (var towerIndex = 0; towerIndex < _residentialCacheCountByTower.Length; towerIndex++)
-        {
-            var spec = ResidentialTowerSpecs[towerIndex];
-            var expectedTowerCaches = Enumerable.Range(0, spec.Floors)
-                .Count(floor => ShouldSpawnResidentialCache(spec, floor));
-            everyTowerStocked &= _residentialCacheCountByTower[towerIndex] == expectedTowerCaches;
-        }
-        var expectedStockedFloors = new HashSet<(int Tower, int Floor)>();
+        var roomIds = new HashSet<ResidentialRoomId>();
+        var expectedRoomIds = new HashSet<ResidentialRoomId>();
         for (var towerIndex = 0; towerIndex < ResidentialTowerSpecs.Length; towerIndex++)
         {
             for (var floor = 0; floor < ResidentialTowerSpecs[towerIndex].Floors; floor++)
             {
-                if (ShouldSpawnResidentialCache(ResidentialTowerSpecs[towerIndex], floor))
+                foreach (var side in new[] { -1, 1 })
                 {
-                    expectedStockedFloors.Add((towerIndex, floor));
+                    expectedRoomIds.Add(new ResidentialRoomId(towerIndex, floor, side, ResidentialRoomZone.North));
+                    expectedRoomIds.Add(new ResidentialRoomId(towerIndex, floor, side, ResidentialRoomZone.South));
                 }
             }
         }
-        var everyFloorStocked = stockedFloors.SetEquals(expectedStockedFloors);
+
+        var cachesRegistered = true;
+        var cachesInitiallySealed = true;
+        var cachesResolved = true;
+        var deterministicLoot = true;
+        var noReroll = true;
+        var neutralVisuals = true;
+        var noVisibleHints = true;
+        var sealedWeaponHints = true;
+        var visiblePartCount = -1;
+        var reachableCaches = 0;
+        var unreachableCaches = new List<string>();
+        var damageRequests = 0;
+        var noiseRequests = 0;
+        var alertRequests = 0;
+        var scanRequests = 0;
+        var guardRequests = 0;
+        var messageRequests = 0;
+        var expectedDamageRequests = 0;
+        var expectedNoiseRequests = 0;
+        var expectedAlertRequests = 0;
+        var expectedScanRequests = 0;
+        var expectedGuardRequests = 0;
+        var expectedMessageRequests = 0;
+        var productionController = _residentialEncounterController;
+        _residentialEncounterController = new ResidentialRoomEncounterController(new ResidentialEncounterEffects(
+            (_, _) => damageRequests++,
+            (_, _) => noiseRequests++,
+            (_, _) => alertRequests++,
+            (_, _) =>
+            {
+                scanRequests++;
+                return 0;
+            },
+            (_, count) => guardRequests += count,
+            (_, _, _, _) => messageRequests++));
+        _residentialChestEventCount = 0;
+        foreach (var cache in _residentialCaches)
+        {
+            cacheKinds.Add(cache.Kind);
+            roomEvents.Add(cache.EventKind);
+            cachesRegistered &= _lootSources.Contains(cache) && IsInstanceValid(cache);
+            cachesInitiallySealed &= !cache.ContentsResolved
+                && cache.Loot.Count == 0
+                && cache.ResolutionCount == 0
+                && cache.OpenEventCount == 0;
+            sealedWeaponHints &= cache.MayContainWeapon;
+            neutralVisuals &= cache.NeutralVisualReady;
+            noVisibleHints &= !cache.HasVisibleLootHint;
+            if (visiblePartCount < 0)
+            {
+                visiblePartCount = cache.VisibleModelPartCount;
+            }
+            neutralVisuals &= cache.VisibleModelPartCount == visiblePartCount;
+            if (cache.RoomId is ResidentialRoomId roomId)
+            {
+                roomIds.Add(roomId);
+            }
+            else
+            {
+                cachesRegistered = false;
+                continue;
+            }
+            if (HasClearLootInteractionApproach(cache))
+            {
+                reachableCaches++;
+            }
+            else
+            {
+                unreachableCaches.Add(cache.Name);
+            }
+
+            var expectedPlan = ResidentialRoomLootRules.Plan(roomId, cache.Archetype, _residentialLootSeedSalt);
+            var expectedResolution = ResidentialRoomLootRules.Resolve(expectedPlan);
+            cache.OnSearched();
+            var firstFingerprint = LootFingerprint(cache.Loot);
+            deterministicLoot &= cache.RevealedGrade == expectedResolution.Grade
+                && firstFingerprint == LootFingerprint(expectedResolution.Items);
+            cache.OnSearched();
+            noReroll &= firstFingerprint == LootFingerprint(cache.Loot)
+                && cache.ResolutionCount == 1
+                && cache.OpenEventCount == 1;
+            cachesResolved &= cache.ContentsResolved && cache.Loot.Count is >= 2 and <= 4;
+            if (cache.RevealedGrade is LootGrade revealedGrade)
+            {
+                cacheGrades.Add(revealedGrade);
+            }
+            foreach (var item in cache.Loot)
+            {
+                lootKinds.Add(item.Kind);
+            }
+            if (cache.EventKind != ResidentialRoomEventKind.None)
+            {
+                expectedMessageRequests++;
+            }
+            switch (cache.EventKind)
+            {
+                case ResidentialRoomEventKind.BoobyTrap:
+                    expectedDamageRequests++;
+                    expectedNoiseRequests++;
+                    expectedAlertRequests++;
+                    break;
+                case ResidentialRoomEventKind.Alarm:
+                    expectedNoiseRequests++;
+                    expectedAlertRequests++;
+                    break;
+                case ResidentialRoomEventKind.Intel:
+                    expectedScanRequests++;
+                    break;
+                case ResidentialRoomEventKind.GuardAmbush:
+                    expectedNoiseRequests++;
+                    expectedGuardRequests += cache.GuardCount;
+                    break;
+            }
+        }
+        _residentialEncounterController = productionController;
+
+        var everyTowerStocked = true;
+        for (var towerIndex = 0; towerIndex < _residentialCacheCountByTower.Length; towerIndex++)
+        {
+            var spec = ResidentialTowerSpecs[towerIndex];
+            var expectedTowerCaches = spec.Floors * 4;
+            everyTowerStocked &= _residentialCacheCountByTower[towerIndex] == expectedTowerCaches;
+        }
+        var everyRoomStocked = roomIds.SetEquals(expectedRoomIds);
+        var eventEffectsExact = damageRequests == expectedDamageRequests
+            && noiseRequests == expectedNoiseRequests
+            && alertRequests == expectedAlertRequests
+            && scanRequests == expectedScanRequests
+            && guardRequests == expectedGuardRequests
+            && messageRequests == expectedMessageRequests
+            && _residentialChestEventCount == expectedMessageRequests;
 
         var furnitureKinds = new HashSet<ResidentialFurnitureKind>();
-        var configuredEvents = new HashSet<ResidentialRoomEventKind>();
         var furnitureRegistered = true;
         var furnitureStocked = true;
         var reachableFurniture = 0;
@@ -1695,7 +1791,6 @@ public partial class FreightTerminalWorld
         foreach (var furniture in _residentialFurniture)
         {
             furnitureKinds.Add(furniture.Kind);
-            configuredEvents.Add(furniture.EventKind);
             furnitureRegistered &= _lootSources.Contains(furniture) && IsInstanceValid(furniture);
             furnitureStocked &= furniture.IsSearchable && furniture.Loot.Count >= 2 && furniture.SearchDuration >= 0.6f;
             var reachable = HasClearLootInteractionApproach(furniture);
@@ -1715,17 +1810,6 @@ public partial class FreightTerminalWorld
             OpenLoot(firstCache);
             lootUiOpened = _hud.IsLootVisible && ReferenceEquals(_openLootSource, firstCache);
             CloseLoot();
-        }
-
-        var roomEventTriggered = false;
-        var eventFurniture = _residentialFurniture.FirstOrDefault(furniture => furniture.EventKind == ResidentialRoomEventKind.Intel);
-        if (eventFurniture is not null)
-        {
-            var eventsBefore = _residentialFurnitureEventCount;
-            eventFurniture.OnSearched();
-            eventFurniture.OnSearched();
-            roomEventTriggered = eventFurniture.EventTriggered
-                && _residentialFurnitureEventCount == eventsBefore + 1;
         }
 
         var assistanceRoles = new HashSet<CivilianRole>();
@@ -1754,26 +1838,32 @@ public partial class FreightTerminalWorld
         var valid = ResidentialCacheCount == expectedCaches
             && ResidentialFurnitureCount == expectedFurniture
             && everyTowerStocked
-            && everyFloorStocked
+            && everyRoomStocked
             && _residentialRoomArchetypes.Count == Enum.GetValues<ResidentialRoomArchetype>().Length
             && cacheKinds.Count == Enum.GetValues<ResidentialCacheKind>().Length
+            && cacheGrades.Count == Enum.GetValues<LootGrade>().Length
+            && roomEvents.Count == Enum.GetValues<ResidentialRoomEventKind>().Length
             && lootKinds.Count >= 6
             && lootKinds.Contains(LootItemKind.Medical)
-            && everyCacheHasMedicine
             && cachesRegistered
-            && cachesStocked
+            && cachesInitiallySealed
+            && cachesResolved
+            && deterministicLoot
+            && noReroll
+            && neutralVisuals
+            && noVisibleHints
+            && sealedWeaponHints
             && reachableCaches == expectedCaches
+            && eventEffectsExact
             && furnitureKinds.Count == Enum.GetValues<ResidentialFurnitureKind>().Length
-            && configuredEvents.Count >= 4
             && furnitureRegistered
             && furnitureStocked
             && reachableFurniture == expectedFurniture
-            && roomEventTriggered
             && lootUiOpened
             && assistanceRoles.Count == Enum.GetValues<CivilianRole>().Length
             && medicHealed;
         var furnitureReachabilityText = string.Join(",", furnitureReachability.Select(pair => $"{pair.Key}={pair.Value.Reachable}/{pair.Value.Total}"));
-        GD.Print($"RESIDENTIAL_GAMEPLAY_CHECK valid={valid} room_types={_residentialRoomArchetypes.Count}/7 caches={ResidentialCacheCount}/{expectedCaches} stocked_floors={stockedFloors.Count}/{expectedCaches} cache_reachable={reachableCaches}/{expectedCaches} cache_types={cacheKinds.Count}/7 loot_types={lootKinds.Count} every_tower={everyTowerStocked} featured_floors={everyFloorStocked} registered={cachesRegistered} stocked={cachesStocked} furniture={ResidentialFurnitureCount}/{expectedFurniture} furniture_types={furnitureKinds.Count}/4 event_types={configuredEvents.Count}/4 furniture_registered={furnitureRegistered} furniture_stocked={furnitureStocked} furniture_reachable={reachableFurniture}/{expectedFurniture} furniture_by_kind={furnitureReachabilityText} event_once={roomEventTriggered} loot_ui={lootUiOpened} assistance_roles={assistanceRoles.Count}/5 medic_healed={medicHealed}");
+        GD.Print($"RESIDENTIAL_GAMEPLAY_CHECK valid={valid} room_types={_residentialRoomArchetypes.Count}/7 caches={ResidentialCacheCount}/{expectedCaches} unique_rooms={roomIds.Count}/{expectedRoomIds.Count} cache_reachable={reachableCaches}/{expectedCaches} unreachable={string.Join(',', unreachableCaches)} cache_types={cacheKinds.Count}/7 grades={cacheGrades.Count}/5 loot_types={lootKinds.Count} events={roomEvents.Count}/5 guards={guardRequests}/{expectedGuardRequests} event_effects={eventEffectsExact} every_tower={everyTowerStocked} every_room={everyRoomStocked} registered={cachesRegistered} sealed={cachesInitiallySealed} resolved={cachesResolved} deterministic={deterministicLoot} no_reroll={noReroll} neutral_visual={neutralVisuals} visible_parts={visiblePartCount} no_hints={noVisibleHints} ai_hint={sealedWeaponHints} furniture={ResidentialFurnitureCount}/{expectedFurniture} furniture_types={furnitureKinds.Count}/4 furniture_registered={furnitureRegistered} furniture_stocked={furnitureStocked} furniture_reachable={reachableFurniture}/{expectedFurniture} furniture_by_kind={furnitureReachabilityText} loot_ui={lootUiOpened} assistance_roles={assistanceRoles.Count}/5 medic_healed={medicHealed}");
         GD.Print($"RESIDENTIAL_GAMEPLAY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -15,45 +16,109 @@ public enum ResidentialCacheKind
 }
 
 [GlobalClass]
-public partial class ResidentialSupplyCache : StaticBody3D, ILootSource
+public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferredLootSource
 {
-    private static readonly Dictionary<Vector3, BoxMesh> SharedBoxMeshes = new();
+    public const string NeutralModelPath = "res://assets/models/old_military_crate/old_military_crate.gltf";
 
-    internal static void ReleaseSharedResources()
-    {
-        SharedBoxMeshes.Clear();
-    }
+    private static readonly Dictionary<Vector3, BoxMesh> SharedFallbackMeshes = new();
+    private static PackedScene? _sharedChestScene;
+    private static ArrayMesh? _sharedClosedMesh;
+    private static ArrayMesh? _sharedBodyMesh;
+    private static Mesh? _sharedLidMesh;
+    private static Transform3D _sharedLidTransform = Transform3D.Identity;
+    private static int _sharedVisiblePartCount;
+
+    public event Action<ResidentialSupplyCache>? FirstOpened;
 
     public ResidentialCacheKind Kind { get; private set; }
     public int TowerIndex { get; private set; }
     public int FloorIndex { get; private set; }
+    public ResidentialRoomId? RoomId { get; private set; }
+    public ResidentialRoomArchetype Archetype { get; private set; }
+    public ResidentialRoomEventKind EventKind { get; private set; }
+    public int GuardCount { get; private set; }
+    public LootGrade? RevealedGrade { get; private set; }
+    public int ResolutionCount { get; private set; }
+    public int OpenEventCount { get; private set; }
     public List<LootItem> Loot { get; } = new();
     public Node3D LootNode => this;
-    public bool IsSearchable => true;
+    public bool ContentsResolved { get; private set; }
+    public bool MayContainWeapon => !ContentsResolved
+        || Loot.Exists(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null);
+    public bool IsSearchable => !ContentsResolved || Loot.Count > 0;
     public float SearchDuration => 0.65f;
+    public bool NeutralVisualReady => IsInstanceValid(_visualRoot) && VisibleModelPartCount > 0;
+    public int VisibleModelPartCount { get; private set; }
+    public bool HasVisibleLootHint => GetNodeOrNull<Label3D>("CacheLabel") is not null
+        || GetNodeOrNull<Light3D>("CacheGlow") is not null;
 
-    private Node3D _door = null!;
-    private Label3D _label = null!;
-    private string _language = "en";
+    private ResidentialChestPlan? _plan;
+    private Node3D _visualRoot = null!;
+    private Node3D _lid = null!;
+    private MeshInstance3D? _closedVisual;
+    private float _closedLidRotationX;
     private bool _opened;
-    private int _partCounter;
 
-    public void Configure(ResidentialCacheKind kind, int towerIndex, int floorIndex, IEnumerable<LootItem> loot)
+    private readonly record struct ImportedCratePart(
+        Mesh Mesh,
+        Transform3D Transform,
+        bool IsLid);
+
+    internal static void ReleaseSharedResources()
+    {
+        SharedFallbackMeshes.Clear();
+        _sharedChestScene = null;
+        _sharedClosedMesh = null;
+        _sharedBodyMesh = null;
+        _sharedLidMesh = null;
+        _sharedLidTransform = Transform3D.Identity;
+        _sharedVisiblePartCount = 0;
+    }
+
+    public void Configure(
+        ResidentialCacheKind kind,
+        int towerIndex,
+        int floorIndex,
+        IEnumerable<LootItem> loot)
     {
         Kind = kind;
         TowerIndex = towerIndex;
         FloorIndex = floorIndex;
+        RoomId = null;
+        Archetype = ResidentialRoomArchetype.FamilyApartment;
+        EventKind = ResidentialRoomEventKind.None;
+        GuardCount = 0;
+        RevealedGrade = null;
+        ResolutionCount = 0;
+        OpenEventCount = 0;
+        _plan = null;
+        _opened = false;
         Loot.Clear();
         Loot.AddRange(loot);
+        ContentsResolved = true;
+    }
+
+    public void ConfigureRoom(ResidentialChestPlan plan)
+    {
+        _plan = plan;
+        Kind = plan.CacheKind;
+        TowerIndex = plan.RoomId.TowerIndex;
+        FloorIndex = plan.RoomId.FloorIndex;
+        RoomId = plan.RoomId;
+        Archetype = plan.Archetype;
+        EventKind = plan.EventKind;
+        GuardCount = plan.GuardCount;
+        RevealedGrade = null;
+        ResolutionCount = 0;
+        OpenEventCount = 0;
+        _opened = false;
+        Loot.Clear();
+        ContentsResolved = false;
     }
 
     public void SetLanguage(string language)
     {
-        _language = GameLocalization.IsChinese(language) ? "zh" : "en";
-        if (IsInstanceValid(_label))
-        {
-            _label.Text = CacheLabelText();
-        }
+        _ = language;
     }
 
     public override void _Ready()
@@ -65,175 +130,259 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource
     }
 
     public string DisplayName(string language)
-    {
-        var key = Kind switch
-        {
-            ResidentialCacheKind.MedicalCabinet => "residential_cache_medical",
-            ResidentialCacheKind.EvacuationLocker => "residential_cache_evac",
-            ResidentialCacheKind.WorkshopLocker => "residential_cache_workshop",
-            ResidentialCacheKind.SecurityArmory => "residential_cache_security",
-            ResidentialCacheKind.SmugglerCache => "residential_cache_smuggler",
-            ResidentialCacheKind.CommunityPantry => "residential_cache_pantry",
-            _ => "residential_cache_family"
-        };
-        var english = Kind switch
-        {
-            ResidentialCacheKind.MedicalCabinet => "Community medical cabinet",
-            ResidentialCacheKind.EvacuationLocker => "Evacuation supply locker",
-            ResidentialCacheKind.WorkshopLocker => "Maintenance tool locker",
-            ResidentialCacheKind.SecurityArmory => "Community security armory",
-            ResidentialCacheKind.SmugglerCache => "Concealed contraband cache",
-            ResidentialCacheKind.CommunityPantry => "Community pantry reserve",
-            _ => "Resident emergency stash"
-        };
-        return GameLocalization.Get(key, language, english);
-    }
+        => GameLocalization.Get("residential_cache_family", language, "Residential supply chest");
 
     public void OnSearched()
     {
+        ResolveContents();
         if (_opened)
         {
             return;
         }
+
         _opened = true;
-        CreateTween()
-            .TweenProperty(_door, "rotation:y", -1.35f, 0.32f)
-            .SetTrans(Tween.TransitionType.Quad)
-            .SetEase(Tween.EaseType.Out);
+        PrepareImportedOpenVisual();
+        if (IsInstanceValid(_lid))
+        {
+            CreateTween()
+                .TweenProperty(_lid, "rotation:x", _closedLidRotationX - 1.18f, 0.38f)
+                .SetTrans(Tween.TransitionType.Quad)
+                .SetEase(Tween.EaseType.Out);
+        }
+        OpenEventCount++;
+        FirstOpened?.Invoke(this);
+    }
+
+    private void ResolveContents()
+    {
+        if (ContentsResolved)
+        {
+            return;
+        }
+        if (_plan is not ResidentialChestPlan plan)
+        {
+            ContentsResolved = true;
+            return;
+        }
+
+        var resolution = ResidentialRoomLootRules.Resolve(plan);
+        Loot.Clear();
+        Loot.AddRange(resolution.Items);
+        RevealedGrade = resolution.Grade;
+        ContentsResolved = true;
+        ResolutionCount++;
     }
 
     private void BuildCache()
     {
-        var accent = Kind switch
-        {
-            ResidentialCacheKind.MedicalCabinet => new Color(0.28f, 0.88f, 0.58f),
-            ResidentialCacheKind.EvacuationLocker => new Color(0.95f, 0.58f, 0.18f),
-            ResidentialCacheKind.WorkshopLocker => new Color(0.95f, 0.72f, 0.16f),
-            ResidentialCacheKind.SecurityArmory => new Color(0.28f, 0.58f, 0.82f),
-            ResidentialCacheKind.SmugglerCache => new Color(0.72f, 0.3f, 0.22f),
-            ResidentialCacheKind.CommunityPantry => new Color(0.45f, 0.68f, 0.36f),
-            _ => new Color(0.62f, 0.52f, 0.4f)
-        };
-        var tall = Kind is ResidentialCacheKind.MedicalCabinet
-            or ResidentialCacheKind.EvacuationLocker
-            or ResidentialCacheKind.WorkshopLocker
-            or ResidentialCacheKind.SecurityArmory
-            or ResidentialCacheKind.CommunityPantry;
-        var size = tall ? new Vector3(1.05f, 1.45f, 0.52f) : new Vector3(1.18f, 0.62f, 0.72f);
-        var center = new Vector3(0, size.Y * 0.5f, 0);
         AddChild(new CollisionShape3D
         {
             Name = "CacheCollision",
-            Position = center,
-            Shape = new BoxShape3D { Size = size }
+            Position = new Vector3(0.0f, 0.29f, 0.0f),
+            Shape = new BoxShape3D { Size = new Vector3(1.18f, 0.58f, 0.78f) }
         });
 
-        var shell = Material(accent * 0.62f, 0.42f, 0.58f);
-        var trim = Material(new Color(0.055f, 0.065f, 0.062f), 0.75f, 0.34f);
-        var glow = Material(accent, 0.08f, 0.32f, true);
-        Part(this, SharedBox(size), center, shell);
-        Part(this, SharedBox(new Vector3(size.X + 0.05f, 0.07f, size.Z + 0.04f)), new Vector3(0, size.Y + 0.02f, 0), trim);
-
-        _door = new Node3D
+        if (EnsureSharedImportedMeshes())
         {
-            Name = "CacheDoor",
-            Position = new Vector3(-size.X * 0.5f, size.Y * 0.5f, -size.Z * 0.51f)
-        };
-        AddChild(_door);
-        Part(
-            _door,
-            SharedBox(new Vector3(size.X - 0.08f, size.Y - 0.1f, 0.055f)),
-            new Vector3(size.X * 0.5f, 0, 0),
-            shell);
-        Part(
-            _door,
-            SharedBox(new Vector3(0.12f, 0.18f, 0.07f)),
-            new Vector3(size.X - 0.17f, 0, -0.03f),
-            trim);
-
-        if (Kind == ResidentialCacheKind.MedicalCabinet)
-        {
-            Part(_door, SharedBox(new Vector3(0.38f, 0.08f, 0.065f)), new Vector3(size.X * 0.5f, 0, -0.04f), glow);
-            Part(_door, SharedBox(new Vector3(0.08f, 0.38f, 0.065f)), new Vector3(size.X * 0.5f, 0, -0.045f), glow);
-        }
-        else
-        {
-            Part(_door, SharedBox(new Vector3(size.X * 0.58f, 0.08f, 0.065f)), new Vector3(size.X * 0.5f, size.Y * 0.2f, -0.04f), glow);
+            _closedVisual = new MeshInstance3D
+            {
+                Name = "NeutralMilitaryChest",
+                Mesh = _sharedClosedMesh,
+                Position = new Vector3(0.53f, 0.02f, 0.0f),
+                Scale = Vector3.One * 1.06f,
+                VisibilityRangeEnd = 52.0f,
+                VisibilityRangeEndMargin = 6.0f
+            };
+            _visualRoot = _closedVisual;
+            VisibleModelPartCount = _sharedVisiblePartCount;
+            AddChild(_closedVisual);
+            return;
         }
 
-        _label = new Label3D
-        {
-            Name = "CacheLabel",
-            Position = new Vector3(0, size.Y + 0.28f, 0),
-            Text = CacheLabelText(),
-            FontSize = 15,
-            OutlineSize = 5,
-            Modulate = accent,
-            Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-            VisibilityRangeEnd = 16.0f
-        };
-        _label.AddToGroup("residential_localized_labels");
-        AddChild(_label);
+        BuildFallbackChest();
     }
 
-    private string CacheLabelText()
+    private static bool EnsureSharedImportedMeshes()
     {
-        var key = Kind switch
+        if (_sharedClosedMesh is not null
+            && _sharedBodyMesh is not null
+            && _sharedLidMesh is not null
+            && _sharedVisiblePartCount > 0)
         {
-            ResidentialCacheKind.MedicalCabinet => "residential_cache_label_medical",
-            ResidentialCacheKind.EvacuationLocker => "residential_cache_label_evac",
-            ResidentialCacheKind.WorkshopLocker => "residential_cache_label_tools",
-            ResidentialCacheKind.SecurityArmory => "residential_cache_label_security",
-            ResidentialCacheKind.SmugglerCache => "residential_cache_label_concealed",
-            ResidentialCacheKind.CommunityPantry => "residential_cache_label_reserve",
-            _ => "residential_cache_label_stash"
-        };
-        var english = Kind switch
+            return true;
+        }
+
+        _sharedChestScene ??= GD.Load<PackedScene>(NeutralModelPath);
+        if (_sharedChestScene?.Instantiate() is not Node3D model)
         {
-            ResidentialCacheKind.MedicalCabinet => "MEDICAL",
-            ResidentialCacheKind.EvacuationLocker => "EVAC SUPPLY",
-            ResidentialCacheKind.WorkshopLocker => "TOOLS",
-            ResidentialCacheKind.SecurityArmory => "SECURITY",
-            ResidentialCacheKind.SmugglerCache => "CONCEALED",
-            ResidentialCacheKind.CommunityPantry => "RESERVE",
-            _ => "STASH"
-        };
-        return GameLocalization.Get(key, _language, english);
+            return false;
+        }
+
+        try
+        {
+            var parts = new List<ImportedCratePart>(5);
+            CollectImportedParts(model, Transform3D.Identity, parts);
+            _sharedVisiblePartCount = parts.Count;
+            _sharedClosedMesh = CombineImportedParts(parts, includeLid: true);
+            _sharedBodyMesh = CombineImportedParts(parts, includeLid: false);
+            foreach (var part in parts)
+            {
+                if (!part.IsLid)
+                {
+                    continue;
+                }
+                _sharedLidMesh = part.Mesh;
+                _sharedLidTransform = part.Transform;
+                break;
+            }
+            return _sharedClosedMesh is not null
+                && _sharedBodyMesh is not null
+                && _sharedLidMesh is not null
+                && _sharedVisiblePartCount > 0;
+        }
+        finally
+        {
+            model.Free();
+        }
     }
 
-    private static StandardMaterial3D Material(Color color, float metallic, float roughness, bool emission = false)
+    private static void CollectImportedParts(
+        Node parent,
+        Transform3D parentTransform,
+        List<ImportedCratePart> parts)
     {
-        return new StandardMaterial3D
+        foreach (var child in parent.GetChildren())
         {
-            AlbedoColor = color,
-            Metallic = metallic,
-            Roughness = roughness,
-            EmissionEnabled = emission,
-            Emission = emission ? color : Colors.Black,
-            EmissionEnergyMultiplier = emission ? 1.35f : 1.0f
-        };
+            if (child is not Node3D child3D)
+            {
+                CollectImportedParts(child, parentTransform, parts);
+                continue;
+            }
+            var transform = parentTransform * child3D.Transform;
+            var name = child3D.Name.ToString();
+            if (child3D is MeshInstance3D { Mesh: not null } mesh
+                && name.EndsWith("_a", StringComparison.OrdinalIgnoreCase))
+            {
+                parts.Add(new ImportedCratePart(
+                    mesh.Mesh,
+                    transform,
+                    name.Equals("old_military_crate_lid_a", StringComparison.OrdinalIgnoreCase)));
+            }
+            CollectImportedParts(child3D, transform, parts);
+        }
     }
 
-    private static BoxMesh SharedBox(Vector3 size)
+    private static ArrayMesh? CombineImportedParts(
+        IReadOnlyList<ImportedCratePart> parts,
+        bool includeLid)
     {
-        if (!SharedBoxMeshes.TryGetValue(size, out var mesh))
+        var surface = new SurfaceTool();
+        Godot.Material? material = null;
+        var appended = 0;
+        foreach (var part in parts)
+        {
+            if (!includeLid && part.IsLid)
+            {
+                continue;
+            }
+            for (var surfaceIndex = 0; surfaceIndex < part.Mesh.GetSurfaceCount(); surfaceIndex++)
+            {
+                surface.AppendFrom(part.Mesh, surfaceIndex, part.Transform);
+                material ??= part.Mesh.SurfaceGetMaterial(surfaceIndex);
+                appended++;
+            }
+        }
+        if (appended == 0)
+        {
+            surface.Dispose();
+            return null;
+        }
+        surface.SetMaterial(material);
+        var combined = surface.Commit();
+        surface.Dispose();
+        return combined;
+    }
+
+    private void PrepareImportedOpenVisual()
+    {
+        if (_closedVisual is null
+            || !IsInstanceValid(_closedVisual)
+            || _sharedBodyMesh is null
+            || _sharedLidMesh is null)
+        {
+            return;
+        }
+
+        var openRoot = new Node3D
+        {
+            Name = "NeutralMilitaryChestOpen",
+            Transform = _closedVisual.Transform
+        };
+        AddChild(openRoot);
+        openRoot.AddChild(new MeshInstance3D
+        {
+            Name = "NeutralMilitaryChestBody",
+            Mesh = _sharedBodyMesh,
+            VisibilityRangeEnd = 52.0f,
+            VisibilityRangeEndMargin = 6.0f
+        });
+        _lid = new MeshInstance3D
+        {
+            Name = "NeutralMilitaryChestLid",
+            Mesh = _sharedLidMesh,
+            Transform = _sharedLidTransform,
+            VisibilityRangeEnd = 52.0f,
+            VisibilityRangeEndMargin = 6.0f
+        };
+        openRoot.AddChild(_lid);
+        _closedLidRotationX = _lid.Rotation.X;
+        _closedVisual.QueueFree();
+        _closedVisual = null;
+        _visualRoot = openRoot;
+    }
+
+    private void BuildFallbackChest()
+    {
+        _visualRoot = new Node3D { Name = "NeutralMilitaryChestFallback" };
+        AddChild(_visualRoot);
+        var shell = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.19f, 0.22f, 0.16f),
+            Metallic = 0.28f,
+            Roughness = 0.76f
+        };
+        var trim = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.055f, 0.062f, 0.052f),
+            Metallic = 0.72f,
+            Roughness = 0.38f
+        };
+        AddFallbackPart(_visualRoot, new Vector3(1.12f, 0.46f, 0.72f), new Vector3(0, 0.24f, 0), shell);
+        _lid = new Node3D
+        {
+            Name = "NeutralChestLid",
+            Position = new Vector3(0, 0.49f, 0.34f)
+        };
+        _visualRoot.AddChild(_lid);
+        AddFallbackPart(_lid, new Vector3(1.16f, 0.12f, 0.76f), new Vector3(0, 0, -0.34f), shell);
+        AddFallbackPart(_visualRoot, new Vector3(0.22f, 0.12f, 0.05f), new Vector3(0, 0.31f, -0.39f), trim);
+        _closedLidRotationX = 0.0f;
+    }
+
+    private void AddFallbackPart(Node parent, Vector3 size, Vector3 position, Godot.Material material)
+    {
+        if (!SharedFallbackMeshes.TryGetValue(size, out var mesh))
         {
             mesh = new BoxMesh { Size = size };
-            SharedBoxMeshes[size] = mesh;
+            SharedFallbackMeshes[size] = mesh;
         }
-        return mesh;
-    }
-
-    private MeshInstance3D Part(Node parent, PrimitiveMesh mesh, Vector3 position, Godot.Material material)
-    {
-        var part = new MeshInstance3D
+        parent.AddChild(new MeshInstance3D
         {
-            Name = $"CachePart_{_partCounter++:00}",
+            Name = $"NeutralChestPart_{VisibleModelPartCount:00}",
             Mesh = mesh,
             Position = position,
             MaterialOverride = material
-        };
-        parent.AddChild(part);
-        return part;
+        });
+        VisibleModelPartCount++;
     }
 }
