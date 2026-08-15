@@ -1573,6 +1573,7 @@ public partial class FreightTerminalWorld
         {
             GD.PushError("Residential community validation failed.");
         }
+        GD.Print($"RESIDENTIAL_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
 
@@ -1625,11 +1626,37 @@ public partial class FreightTerminalWorld
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
         }
-        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await WaitFrames(4);
 
         static string LootFingerprint(IEnumerable<LootItem> items) => string.Join(
             ";",
             items.Select(item => $"{item.Kind}:{item.Grade}:{item.Quantity}:{item.Weapon?.Platform}:{item.AttachmentId}:{item.Equipment?.DefinitionId}:{item.AmmoCaliber}:{item.MedicalKind}:{item.ValuableKind}"));
+
+        static int RuntimeNodeCount(Node root)
+        {
+            var count = 1;
+            foreach (var child in root.GetChildren())
+            {
+                if (child is Node childNode)
+                {
+                    count += RuntimeNodeCount(childNode);
+                }
+            }
+            return count;
+        }
+
+        static HashSet<Node> RuntimeNodes(Node root)
+        {
+            var nodes = new HashSet<Node> { root };
+            foreach (var child in root.GetChildren())
+            {
+                if (child is Node childNode)
+                {
+                    nodes.UnionWith(RuntimeNodes(childNode));
+                }
+            }
+            return nodes;
+        }
 
         var expectedCaches = ResidentialTowerSpecs.Sum(spec => spec.Floors * 4);
         var expectedFurniture = ResidentialTowerSpecs.Sum(spec => spec.Floors * 2);
@@ -1674,6 +1701,8 @@ public partial class FreightTerminalWorld
         var expectedScanRequests = 0;
         var expectedGuardRequests = 0;
         var expectedMessageRequests = 0;
+        var cacheNodesBeforeOpen = _residentialCaches.Sum(cache => RuntimeNodeCount(cache));
+        var sceneNodesBeforeOpen = RuntimeNodeCount(this);
         var productionController = _residentialEncounterController;
         _residentialEncounterController = new ResidentialRoomEncounterController(new ResidentialEncounterEffects(
             (_, _) => damageRequests++,
@@ -1765,7 +1794,459 @@ public partial class FreightTerminalWorld
                     break;
             }
         }
+        var openVisualDeadline = Time.GetTicksMsec() + 2500UL;
+        while (_residentialCaches.Any(cache => !cache.OpenVisualReady)
+            && Time.GetTicksMsec() < openVisualDeadline)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+        var cacheNodesAfterOpen = _residentialCaches.Sum(cache => RuntimeNodeCount(cache));
+        var sceneNodesAfterOpen = RuntimeNodeCount(this);
+        var cacheNodesStable = cacheNodesAfterOpen == cacheNodesBeforeOpen;
+        var sceneNodesStable = sceneNodesAfterOpen == sceneNodesBeforeOpen;
+        var openedVisualsReady = _residentialCaches.All(cache => cache.OpenVisualReady);
+        var openedFeedbackReady = _residentialCaches.All(cache => cache.OpenFeedbackReady);
+        var openedNodeBudgetMet = sceneNodesAfterOpen < 40000;
         _residentialEncounterController = productionController;
+
+        var guardProbeExclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+        ResidentialSupplyCache? realGuardCache = null;
+        var realGuardTarget = Vector3.Zero;
+        var realGuardExpectedPositions = new List<Vector3>();
+        var guardGeometryFailures = new List<string>();
+        var guardCacheRouteLeaks = new List<string>();
+        var guardSpawnPointsSafe = 0;
+        var guardRoutesReady = 0;
+        var guardCachesReady = 0;
+        var guardCacheClearancesBlocked = 0;
+        var guardCacheRouteProbes = 0;
+        var guardAmbushCaches = _residentialCaches
+            .Where(cache => cache.EventKind == ResidentialRoomEventKind.GuardAmbush && cache.GuardCount > 0)
+            .OrderByDescending(cache => cache.GuardCount)
+            .ThenBy(cache => cache.Archetype == ResidentialRoomArchetype.FamilyApartment ? 0 : 1)
+            .ThenBy(cache => cache.TowerIndex)
+            .ThenBy(cache => cache.FloorIndex)
+            .ThenBy(cache => cache.Name.ToString(), StringComparer.Ordinal)
+            .ToList();
+        var guardSpawnPointsChecked = guardAmbushCaches.Sum(cache => cache.GuardCount);
+        foreach (var candidate in guardAmbushCaches)
+        {
+            var guardPlanner = CreateResidentialGuardSpawnPlanner(candidate, guardProbeExclude);
+            if (!guardPlanner.TryGroundPosition(candidate.GlobalPosition, out _))
+            {
+                guardCacheClearancesBlocked++;
+            }
+            var crossCacheStart = candidate.ToGlobal(new Vector3(-1.45f, 0.05f, 0.0f));
+            var crossCacheEnd = candidate.ToGlobal(new Vector3(1.45f, 0.05f, 0.0f));
+            if (guardPlanner.TryGroundPosition(crossCacheStart, out var groundedCrossStart)
+                && guardPlanner.TryGroundPosition(crossCacheEnd, out var groundedCrossEnd))
+            {
+                guardCacheRouteProbes++;
+                if (guardPlanner.HasRoute(groundedCrossStart, groundedCrossEnd))
+                {
+                    guardCacheRouteLeaks.Add(candidate.Name.ToString());
+                }
+            }
+            var layoutReady = guardPlanner.TryFindLayout(candidate.GuardCount, out var layout);
+            var selectedTarget = layoutReady ? layout.Target : Vector3.Zero;
+            var expectedPositions = layoutReady
+                ? layout.SpawnPositions.ToList()
+                : new List<Vector3>();
+            var safePositions = expectedPositions.Count(position =>
+                guardPlanner.TryGroundPosition(position, out var grounded)
+                && grounded.DistanceTo(position) <= 0.03f);
+            guardSpawnPointsSafe += safePositions;
+            var readyRoutes = expectedPositions.Count(start =>
+                guardPlanner.HasRoute(start, selectedTarget));
+            guardRoutesReady += readyRoutes;
+            var cacheGeometryReady = layoutReady
+                && expectedPositions.Count == candidate.GuardCount
+                && safePositions == candidate.GuardCount
+                && readyRoutes == candidate.GuardCount;
+            if (!cacheGeometryReady)
+            {
+                guardGeometryFailures.Add(
+                    $"{candidate.Name}:layout={layoutReady}:safe={safePositions}/{candidate.GuardCount}:route={readyRoutes}/{candidate.GuardCount}");
+                continue;
+            }
+
+            guardCachesReady++;
+            if (realGuardCache is null)
+            {
+                realGuardCache = candidate;
+                realGuardTarget = selectedTarget;
+                realGuardExpectedPositions = expectedPositions;
+            }
+        }
+        var farPreferredTargetBounded = false;
+        if (guardAmbushCaches.Count > 0)
+        {
+            var farTargetCache = guardAmbushCaches[0];
+            var farTargetPlanner = CreateResidentialGuardSpawnPlanner(farTargetCache, guardProbeExclude);
+            var farTargetLayout = farTargetPlanner.Plan(
+                farTargetCache.GuardCount,
+                farTargetCache.GlobalPosition + Vector3.Right * 1000.0f);
+            farPreferredTargetBounded = farTargetLayout.UsesResolvedGeometry
+                && farTargetLayout.SpawnPositions.Length == farTargetCache.GuardCount
+                && farTargetLayout.Target.DistanceTo(farTargetCache.GlobalPosition) <= 6.0f;
+        }
+        var guardAmbushGeometryReady = guardAmbushCaches.Count > 0
+            && guardCachesReady == guardAmbushCaches.Count
+            && guardSpawnPointsSafe == guardSpawnPointsChecked
+            && guardRoutesReady == guardSpawnPointsChecked
+            && guardCacheClearancesBlocked == guardAmbushCaches.Count
+            && guardCacheRouteProbes > 0
+            && guardCacheRouteLeaks.Count == 0
+            && farPreferredTargetBounded;
+
+        var realGuardExpected = realGuardCache?.GuardCount ?? 0;
+        var realGuardSpawned = 0;
+        var realGuardPositionsExact = false;
+        var realGuardSpawnSafe = false;
+        var realGuardRoutesReady = false;
+        var realGuardGrounded = false;
+        var realGuardsAlerted = false;
+        var realGuardsArmed = false;
+        var realGuardsFixedWeapon = false;
+        var realGuardsTargetPlayer = false;
+        var realGuardsBallisticClear = false;
+        var realGuardBallisticBlockers = "not_checked";
+        var realGuardsMoved = false;
+        var realGuardMinimumMovement = 0.0f;
+        var realGuardsFired = false;
+        var realGuardShotsFired = 0;
+        var realGuardPlayerCollisionReady = false;
+        var realGuardMissionStatePreserved = false;
+        var realGuardMissionStateDetails = "not_checked";
+        var realGuardsAttackReady = false;
+        var realGuardsCleaned = false;
+        var realGuardRemainingInstances = -1;
+        var realGuardEnemyLeaks = -1;
+        var realGuardLootLeaks = -1;
+        var realGuardSceneNodesAfterCleanup = -1;
+        var realGuardExtraNodes = "not_checked";
+        if (realGuardCache is not null)
+        {
+            var enemiesBeforeGuardProbe = new HashSet<EnemyOperator>(_enemies);
+            var sceneNodesBeforeGuardProbe = RuntimeNodeCount(this);
+            var sceneNodeSetBeforeGuardProbe = RuntimeNodes(this);
+            var networkIdBeforeGuardProbe = _nextEnemyNetworkId;
+            var ambushCountBeforeGuardProbe = _residentialGuardAmbushSpawnCount;
+            var enemyCountBeforeGuardProbe = _enemiesRemaining;
+            var killsBeforeGuardProbe = _kills;
+            var playerPositionBeforeGuardProbe = _player.GlobalPosition;
+            var playerVelocityBeforeGuardProbe = _player.Velocity;
+            var playerProcessModeBeforeGuardProbe = _player.ProcessMode;
+            var playerHealthBeforeGuardProbe = _player.Health;
+            var playerArmorBeforeGuardProbe = _player.Armor;
+            var playerHelmetDurabilityBeforeGuardProbe = _player.EquippedHelmet.Durability;
+            var playerWasDeadBeforeGuardProbe = _player.IsDead;
+            var playerUiLockedBeforeGuardProbe = _player.UiLocked;
+            var playerReviveUsedBeforeGuardProbe = _player.ReviveUsed;
+            var playerStanceBeforeGuardProbe = _player.Stance;
+            var playerCollisionLayerBeforeGuardProbe = _player.CollisionLayer;
+            var playerCollisionMaskBeforeGuardProbe = _player.CollisionMask;
+            var playerWasProcessing = _player.IsProcessing();
+            var playerWasPhysicsProcessing = _player.IsPhysicsProcessing();
+            var squadStatesBeforeGuardProbe = _squadMates
+                .Where(mate => IsInstanceValid(mate))
+                .Select(mate => (
+                    Mate: mate,
+                    Position: mate.GlobalPosition,
+                    Velocity: mate.Velocity,
+                    ProcessMode: mate.ProcessMode,
+                    Processing: mate.IsProcessing(),
+                    PhysicsProcessing: mate.IsPhysicsProcessing()))
+                .ToList();
+            var externalActors = new HashSet<Node>();
+            if (IsInstanceValid(_aircraft))
+            {
+                externalActors.Add(_aircraft!);
+            }
+            if (IsInstanceValid(_extractionAircraft))
+            {
+                externalActors.Add(_extractionAircraft!);
+            }
+            externalActors.UnionWith(_barrels.Where(barrel => IsInstanceValid(barrel)));
+            externalActors.UnionWith(_vehicles.Where(vehicle => IsInstanceValid(vehicle)));
+            externalActors.UnionWith(enemiesBeforeGuardProbe.Where(enemy => IsInstanceValid(enemy)));
+            externalActors.UnionWith(_civilians.Where(civilian => IsInstanceValid(civilian)));
+            externalActors.UnionWith(sceneNodeSetBeforeGuardProbe.Where(node => node is FragGrenade));
+            foreach (var node in GetTree().GetNodesInGroup("aircraft_shells"))
+            {
+                if (node is Node shell && IsInstanceValid(shell))
+                {
+                    externalActors.Add(shell);
+                }
+            }
+            var externalActorStatesBeforeGuardProbe = externalActors
+                .Select(actor => (
+                    Actor: actor,
+                    ProcessMode: actor.ProcessMode,
+                    Processing: actor.IsProcessing(),
+                    PhysicsProcessing: actor.IsPhysicsProcessing()))
+                .ToList();
+            var worldWasProcessing = IsProcessing();
+            var directorProcessModeBeforeGuardProbe = _missionDirector.ProcessMode;
+            var directorPhaseBeforeGuardProbe = _missionDirector.CurrentPhase();
+            var directorProtectionBeforeGuardProbe = _missionDirector.IsDeploymentProtected();
+            var worldMissionPhaseBeforeGuardProbe = _missionPhase;
+            var spawnedGuards = new List<EnemyOperator>();
+            try
+            {
+                SetProcess(false);
+                _missionDirector.ProcessMode = ProcessModeEnum.Disabled;
+                foreach (var squadState in squadStatesBeforeGuardProbe)
+                {
+                    squadState.Mate.ProcessMode = ProcessModeEnum.Disabled;
+                }
+                foreach (var actorState in externalActorStatesBeforeGuardProbe)
+                {
+                    actorState.Actor.ProcessMode = ProcessModeEnum.Disabled;
+                    actorState.Actor.SetProcess(false);
+                    actorState.Actor.SetPhysicsProcess(false);
+                }
+                _player.ProcessMode = ProcessModeEnum.Inherit;
+                _player.SetProcess(false);
+                _player.SetPhysicsProcess(false);
+                _player.CollisionLayer = 1;
+                _player.CollisionMask = 1 | 2;
+                _player.GlobalPosition = realGuardTarget;
+                _player.Velocity = Vector3.Zero;
+                _player.SetHealthForDiagnostics(_player.MaxHealth);
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                realGuardPlayerCollisionReady = _player.HasActiveLadderCollisionForDiagnostics;
+
+                SpawnResidentialGuardAmbush(
+                    realGuardCache,
+                    realGuardExpected,
+                    WeaponCatalog.Build(WeaponPlatform.M4A1, 0));
+                spawnedGuards = _enemies
+                    .Where(enemy => !enemiesBeforeGuardProbe.Contains(enemy))
+                    .ToList();
+                realGuardSpawned = spawnedGuards.Count;
+                realGuardPositionsExact = realGuardSpawned == realGuardExpected
+                    && spawnedGuards.Select((guard, index) =>
+                            guard.GlobalPosition.DistanceTo(realGuardExpectedPositions[index]) <= 0.02f)
+                        .All(exact => exact);
+                var realGuardPlanner = CreateResidentialGuardSpawnPlanner(
+                    realGuardCache,
+                    guardProbeExclude);
+                realGuardSpawnSafe = realGuardExpectedPositions.All(position =>
+                    realGuardPlanner.TryGroundPosition(position, out var grounded)
+                    && grounded.DistanceTo(position) <= 0.03f);
+                realGuardRoutesReady = realGuardExpectedPositions.All(position =>
+                    realGuardPlanner.HasRoute(position, realGuardTarget));
+                var guardInitialPositions = spawnedGuards
+                    .Select(guard => guard.GlobalPosition)
+                    .ToList();
+                var guardMaximumMovements = new float[spawnedGuards.Count];
+                var guardInitialShots = spawnedGuards
+                    .Select(guard => guard.AttackShotsFired)
+                    .ToList();
+                var guardObservedShots = guardInitialShots.ToArray();
+                var guardShotBallisticClear = new bool[spawnedGuards.Count];
+                var guardBallisticDetails = spawnedGuards
+                    .Select(guard => $"{guard.Name}:no_shot")
+                    .ToArray();
+
+                (bool Clear, string Detail) GuardBallisticAtCurrentPosition(EnemyOperator guard)
+                {
+                    if (!IsInstanceValid(guard))
+                    {
+                        return (false, "invalid");
+                    }
+                    var playerAimPoint = _player.HitPoint(HitRegion.Torso);
+                    var origin = guard.ResolvedShotOriginForDiagnostics;
+                    var direction = origin.DirectionTo(playerAimPoint);
+                    var rayEnd = playerAimPoint + direction * 0.9f;
+                    if (IsLineObscuredBySmoke(origin, playerAimPoint))
+                    {
+                        return (false, "smoke");
+                    }
+
+                    var clear = Ballistics.HasClearShot(
+                        GetWorld3D(),
+                        origin,
+                        rayEnd,
+                        _player,
+                        guard.GetRid());
+                    if (clear)
+                    {
+                        return (true, "none");
+                    }
+
+                    var query = PhysicsRayQueryParameters3D.Create(origin, rayEnd);
+                    query.Exclude = new Godot.Collections.Array<Rid> { guard.GetRid() };
+                    query.CollideWithAreas = false;
+                    query.CollisionMask = 0xFFFFFFFF;
+                    var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+                    if (hit.Count == 0)
+                    {
+                        return (false, "no_target");
+                    }
+                    var collider = hit["collider"].AsGodotObject();
+                    var blocker = collider is Node node
+                        ? node.Name.ToString()
+                        : collider?.GetType().Name ?? "unknown";
+                    return (false, blocker);
+                }
+
+                for (var index = 0; index < spawnedGuards.Count; index++)
+                {
+                    // Preserve mission protection while exercising EnemyOperator's real
+                    // close-range player fallback on diagnostics-only guard instances.
+                    var guard = spawnedGuards[index];
+                    guard.Main = null;
+                    guard.MissionDirector = null;
+                    guard.ConfigureCombatProbeForDiagnostics(
+                        0x5EED_4100UL + (ulong)index,
+                        realGuardTarget);
+                }
+
+                for (var frame = 0; frame < 90; frame++)
+                {
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                    _player.SetHealthForDiagnostics(_player.MaxHealth);
+                    for (var index = 0; index < spawnedGuards.Count; index++)
+                    {
+                        var guard = spawnedGuards[index];
+                        if (!IsInstanceValid(guard))
+                        {
+                            continue;
+                        }
+                        var start = guardInitialPositions[index];
+                        var movement = new Vector2(
+                            guard.GlobalPosition.X - start.X,
+                            guard.GlobalPosition.Z - start.Z).Length();
+                        guardMaximumMovements[index] = Mathf.Max(
+                            guardMaximumMovements[index],
+                            movement);
+                        if (guard.AttackShotsFired <= guardObservedShots[index])
+                        {
+                            continue;
+                        }
+                        guardObservedShots[index] = guard.AttackShotsFired;
+                        var ballistic = GuardBallisticAtCurrentPosition(guard);
+                        guardShotBallisticClear[index] |= ballistic.Clear;
+                        if (ballistic.Clear || !guardShotBallisticClear[index])
+                        {
+                            guardBallisticDetails[index] = $"{guard.Name}:{ballistic.Detail}";
+                        }
+                    }
+                }
+                realGuardMinimumMovement = guardMaximumMovements.Length > 0
+                    ? guardMaximumMovements.Min()
+                    : 0.0f;
+                realGuardsMoved = guardMaximumMovements.Length == realGuardExpected
+                    && guardMaximumMovements.All(distance => distance >= 0.12f);
+                var guardShotDeltas = spawnedGuards.Select((guard, index) =>
+                    guard.AttackShotsFired - guardInitialShots[index]).ToList();
+                realGuardShotsFired = guardShotDeltas.Sum();
+                realGuardsFired = guardShotDeltas.Count == realGuardExpected
+                    && guardShotDeltas.All(shots => shots > 0);
+                realGuardsBallisticClear = guardShotBallisticClear.Length == realGuardExpected
+                    && guardShotBallisticClear.All(clear => clear);
+                realGuardBallisticBlockers = string.Join(",", guardBallisticDetails);
+                realGuardGrounded = spawnedGuards.All(guard =>
+                    IsInstanceValid(guard) && guard.IsOnFloor());
+                realGuardsAlerted = spawnedGuards.All(guard =>
+                    IsInstanceValid(guard) && guard.Alerted && guard.Suspicion >= 99.0f);
+                realGuardsArmed = spawnedGuards.All(guard =>
+                    IsInstanceValid(guard) && guard.HasFireablePrimary);
+                realGuardsFixedWeapon = spawnedGuards.All(guard =>
+                    IsInstanceValid(guard) && guard.CarriedWeapon.Platform == WeaponPlatform.M4A1);
+                realGuardsTargetPlayer = spawnedGuards.All(guard =>
+                    IsInstanceValid(guard) && ReferenceEquals(guard.EngageTargetNode, _player));
+                realGuardMissionStatePreserved = _missionDirector.CurrentPhase() == directorPhaseBeforeGuardProbe
+                    && _missionDirector.IsDeploymentProtected() == directorProtectionBeforeGuardProbe
+                    && _missionPhase == worldMissionPhaseBeforeGuardProbe;
+                realGuardMissionStateDetails =
+                    $"{directorPhaseBeforeGuardProbe}>{_missionDirector.CurrentPhase()}:"
+                    + $"{directorProtectionBeforeGuardProbe}>{_missionDirector.IsDeploymentProtected()}:"
+                    + $"{worldMissionPhaseBeforeGuardProbe}>{_missionPhase}";
+                realGuardsAttackReady = realGuardsArmed
+                    && realGuardsFixedWeapon
+                    && realGuardsTargetPlayer
+                    && realGuardsBallisticClear
+                    && realGuardsMoved
+                    && realGuardsFired;
+            }
+            finally
+            {
+                foreach (var guard in spawnedGuards)
+                {
+                    _enemies.Remove(guard);
+                    _lootSources.Remove(guard);
+                    if (!IsInstanceValid(guard))
+                    {
+                        continue;
+                    }
+                    guard.ProcessMode = ProcessModeEnum.Disabled;
+                    guard.Eliminated -= OnEnemyEliminated;
+                    guard.Free();
+                }
+                _nextEnemyNetworkId = networkIdBeforeGuardProbe;
+                _residentialGuardAmbushSpawnCount = ambushCountBeforeGuardProbe;
+                _enemiesRemaining = enemyCountBeforeGuardProbe;
+                _kills = killsBeforeGuardProbe;
+                _player.GlobalPosition = playerPositionBeforeGuardProbe;
+                _player.Velocity = playerVelocityBeforeGuardProbe;
+                _player.CollisionLayer = playerCollisionLayerBeforeGuardProbe;
+                _player.CollisionMask = playerCollisionMaskBeforeGuardProbe;
+                _player.ProcessMode = playerProcessModeBeforeGuardProbe;
+                _player.SetProcess(playerWasProcessing);
+                _player.SetPhysicsProcess(playerWasPhysicsProcessing);
+                _player.SetHealthForDiagnostics(playerHealthBeforeGuardProbe);
+                _player.SetArmorForDiagnostics(playerArmorBeforeGuardProbe);
+                _player.EquippedHelmet.Durability = playerHelmetDurabilityBeforeGuardProbe;
+                _player.IsDead = playerWasDeadBeforeGuardProbe;
+                _player.UiLocked = playerUiLockedBeforeGuardProbe;
+                _player.SetReviveUsedForDiagnostics(playerReviveUsedBeforeGuardProbe);
+                _player.TrySetStance(playerStanceBeforeGuardProbe);
+                foreach (var squadState in squadStatesBeforeGuardProbe)
+                {
+                    if (!IsInstanceValid(squadState.Mate))
+                    {
+                        continue;
+                    }
+                    squadState.Mate.GlobalPosition = squadState.Position;
+                    squadState.Mate.Velocity = squadState.Velocity;
+                    squadState.Mate.ProcessMode = squadState.ProcessMode;
+                    squadState.Mate.SetProcess(squadState.Processing);
+                    squadState.Mate.SetPhysicsProcess(squadState.PhysicsProcessing);
+                }
+                realGuardRemainingInstances = spawnedGuards.Count(guard => IsInstanceValid(guard));
+                realGuardEnemyLeaks = spawnedGuards.Count(guard => _enemies.Contains(guard));
+                realGuardLootLeaks = spawnedGuards.Count(guard => _lootSources.Contains(guard));
+                realGuardSceneNodesAfterCleanup = RuntimeNodeCount(this);
+                realGuardExtraNodes = string.Join(',', RuntimeNodes(this)
+                    .Where(node => !sceneNodeSetBeforeGuardProbe.Contains(node))
+                    .Take(24)
+                    .Select(node => node.Name.ToString()));
+                realGuardsCleaned = realGuardRemainingInstances == 0
+                    && realGuardLootLeaks == 0
+                    && enemiesBeforeGuardProbe.SetEquals(_enemies)
+                    && realGuardSceneNodesAfterCleanup == sceneNodesBeforeGuardProbe;
+                foreach (var actorState in externalActorStatesBeforeGuardProbe)
+                {
+                    if (!IsInstanceValid(actorState.Actor))
+                    {
+                        continue;
+                    }
+                    actorState.Actor.ProcessMode = actorState.ProcessMode;
+                    actorState.Actor.SetProcess(actorState.Processing);
+                    actorState.Actor.SetPhysicsProcess(actorState.PhysicsProcessing);
+                }
+                _missionDirector.ProcessMode = directorProcessModeBeforeGuardProbe;
+                SetProcess(worldWasProcessing);
+                if (IsInstanceValid(_hud))
+                {
+                    _hud.SetEnemyCount(_enemiesRemaining);
+                }
+            }
+        }
 
         var everyTowerStocked = true;
         for (var towerIndex = 0; towerIndex < _residentialCacheCountByTower.Length; towerIndex++)
@@ -1834,6 +2315,20 @@ public partial class FreightTerminalWorld
             }
         }
         var medicHealed = _player.Health > healthBefore;
+        var realGuardValidation = guardAmbushGeometryReady
+            && realGuardExpected > 0
+            && realGuardSpawned == realGuardExpected
+            && realGuardPositionsExact
+            && realGuardSpawnSafe
+            && realGuardRoutesReady
+            && realGuardGrounded
+            && realGuardsAlerted
+            && realGuardsMoved
+            && realGuardsFired
+            && realGuardPlayerCollisionReady
+            && realGuardMissionStatePreserved
+            && realGuardsAttackReady
+            && realGuardsCleaned;
 
         var valid = ResidentialCacheCount == expectedCaches
             && ResidentialFurnitureCount == expectedFurniture
@@ -1851,10 +2346,16 @@ public partial class FreightTerminalWorld
             && deterministicLoot
             && noReroll
             && neutralVisuals
+            && openedVisualsReady
+            && openedFeedbackReady
+            && cacheNodesStable
+            && sceneNodesStable
+            && openedNodeBudgetMet
             && noVisibleHints
             && sealedWeaponHints
             && reachableCaches == expectedCaches
             && eventEffectsExact
+            && realGuardValidation
             && furnitureKinds.Count == Enum.GetValues<ResidentialFurnitureKind>().Length
             && furnitureRegistered
             && furnitureStocked
@@ -1863,7 +2364,13 @@ public partial class FreightTerminalWorld
             && assistanceRoles.Count == Enum.GetValues<CivilianRole>().Length
             && medicHealed;
         var furnitureReachabilityText = string.Join(",", furnitureReachability.Select(pair => $"{pair.Key}={pair.Value.Reachable}/{pair.Value.Total}"));
-        GD.Print($"RESIDENTIAL_GAMEPLAY_CHECK valid={valid} room_types={_residentialRoomArchetypes.Count}/7 caches={ResidentialCacheCount}/{expectedCaches} unique_rooms={roomIds.Count}/{expectedRoomIds.Count} cache_reachable={reachableCaches}/{expectedCaches} unreachable={string.Join(',', unreachableCaches)} cache_types={cacheKinds.Count}/7 grades={cacheGrades.Count}/5 loot_types={lootKinds.Count} events={roomEvents.Count}/5 guards={guardRequests}/{expectedGuardRequests} event_effects={eventEffectsExact} every_tower={everyTowerStocked} every_room={everyRoomStocked} registered={cachesRegistered} sealed={cachesInitiallySealed} resolved={cachesResolved} deterministic={deterministicLoot} no_reroll={noReroll} neutral_visual={neutralVisuals} visible_parts={visiblePartCount} no_hints={noVisibleHints} ai_hint={sealedWeaponHints} furniture={ResidentialFurnitureCount}/{expectedFurniture} furniture_types={furnitureKinds.Count}/4 furniture_registered={furnitureRegistered} furniture_stocked={furnitureStocked} furniture_reachable={reachableFurniture}/{expectedFurniture} furniture_by_kind={furnitureReachabilityText} loot_ui={lootUiOpened} assistance_roles={assistanceRoles.Count}/5 medic_healed={medicHealed}");
+        var guardGeometryFailureText = guardGeometryFailures.Count == 0
+            ? "none"
+            : string.Join('|', guardGeometryFailures);
+        var guardCacheRouteLeakText = guardCacheRouteLeaks.Count == 0
+            ? "none"
+            : string.Join('|', guardCacheRouteLeaks);
+        GD.Print($"RESIDENTIAL_GAMEPLAY_CHECK valid={valid} room_types={_residentialRoomArchetypes.Count}/7 caches={ResidentialCacheCount}/{expectedCaches} unique_rooms={roomIds.Count}/{expectedRoomIds.Count} cache_reachable={reachableCaches}/{expectedCaches} unreachable={string.Join(',', unreachableCaches)} cache_types={cacheKinds.Count}/7 grades={cacheGrades.Count}/5 loot_types={lootKinds.Count} events={roomEvents.Count}/5 guards={guardRequests}/{expectedGuardRequests} event_effects={eventEffectsExact} guard_cache_geometry={guardCachesReady}/{guardAmbushCaches.Count} guard_spawn_geometry={guardSpawnPointsSafe}/{guardSpawnPointsChecked} guard_route_geometry={guardRoutesReady}/{guardSpawnPointsChecked} guard_cache_clearance={guardCacheClearancesBlocked}/{guardAmbushCaches.Count} guard_cross_cache={guardCacheRouteProbes}:{guardCacheRouteLeakText} guard_far_target={farPreferredTargetBounded} guard_geometry_failures={guardGeometryFailureText} real_guards={realGuardSpawned}/{realGuardExpected} guard_positions={realGuardPositionsExact} guard_safe={realGuardSpawnSafe} guard_routes={realGuardRoutesReady} guard_grounded={realGuardGrounded} guard_alerted={realGuardsAlerted} guard_armed={realGuardsArmed} guard_fixed_weapon={realGuardsFixedWeapon} guard_target={realGuardsTargetPlayer} guard_ballistic={realGuardsBallisticClear} guard_blockers={realGuardBallisticBlockers} guard_moved={realGuardsMoved} guard_move_min={realGuardMinimumMovement:0.00} guard_fired={realGuardsFired} guard_shots={realGuardShotsFired} guard_player_collision={realGuardPlayerCollisionReady} guard_mission_preserved={realGuardMissionStatePreserved} guard_mission_state={realGuardMissionStateDetails} guard_attack_ready={realGuardsAttackReady} guard_cleanup={realGuardsCleaned} guard_cleanup_instances={realGuardRemainingInstances} guard_cleanup_enemies={realGuardEnemyLeaks} guard_cleanup_loot={realGuardLootLeaks} guard_cleanup_nodes={sceneNodesBeforeOpen}->{realGuardSceneNodesAfterCleanup} guard_cleanup_extra={realGuardExtraNodes} every_tower={everyTowerStocked} every_room={everyRoomStocked} registered={cachesRegistered} sealed={cachesInitiallySealed} resolved={cachesResolved} deterministic={deterministicLoot} no_reroll={noReroll} neutral_visual={neutralVisuals} opened_visual={openedVisualsReady} open_feedback={openedFeedbackReady} visible_parts={visiblePartCount} cache_nodes={cacheNodesBeforeOpen}->{cacheNodesAfterOpen} cache_nodes_stable={cacheNodesStable} scene_nodes={sceneNodesBeforeOpen}->{sceneNodesAfterOpen} scene_nodes_stable={sceneNodesStable} opened_node_budget={openedNodeBudgetMet} no_hints={noVisibleHints} ai_hint={sealedWeaponHints} furniture={ResidentialFurnitureCount}/{expectedFurniture} furniture_types={furnitureKinds.Count}/4 furniture_registered={furnitureRegistered} furniture_stocked={furnitureStocked} furniture_reachable={reachableFurniture}/{expectedFurniture} furniture_by_kind={furnitureReachabilityText} loot_ui={lootUiOpened} assistance_roles={assistanceRoles.Count}/5 medic_healed={medicHealed}");
         GD.Print($"RESIDENTIAL_GAMEPLAY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -2071,13 +2578,24 @@ public partial class FreightTerminalWorld
         camera.MakeCurrent();
 
         var clinicTower = _residentialTowers[0];
-        camera.GlobalPosition = clinicTower.ToGlobal(new Vector3(3.7f, 1.55f, -5.0f));
-        camera.LookAt(clinicTower.ToGlobal(new Vector3(7.2f, 0.95f, -10.5f)), Vector3.Up);
-        await WaitFrames(24);
+        var openedCaptureCache = _residentialCaches.FirstOrDefault(cache =>
+                cache.EventKind == ResidentialRoomEventKind.None
+                && cache.Archetype == ResidentialRoomArchetype.MedicalClinic)
+            ?? _residentialCaches.First(cache => cache.EventKind == ResidentialRoomEventKind.None);
+        openedCaptureCache.OnSearched();
+        camera.Fov = 58.0f;
+        camera.GlobalPosition = openedCaptureCache.ToGlobal(new Vector3(-2.4f, 1.45f, -3.1f));
+        camera.LookAt(openedCaptureCache.GlobalPosition + Vector3.Up * 0.55f, Vector3.Up);
+        var openCaptureDeadline = Time.GetTicksMsec() + 2500UL;
+        while (!openedCaptureCache.OpenVisualReady && Time.GetTicksMsec() < openCaptureDeadline)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
         SaveViewportImage("res://residential_clinic_validation.png");
 
         const int shelterFloor = 4;
         var shelterY = shelterFloor * ResidentialFloorHeight;
+        camera.Fov = 72.0f;
         camera.GlobalPosition = clinicTower.ToGlobal(new Vector3(3.7f, shelterY + 1.55f, -5.0f));
         camera.LookAt(clinicTower.ToGlobal(new Vector3(7.2f, shelterY + 0.95f, -10.5f)), Vector3.Up);
         await WaitFrames(20);
@@ -2088,7 +2606,7 @@ public partial class FreightTerminalWorld
         camera.LookAt(securityTower.ToGlobal(new Vector3(10.5f, 1.05f, -5.5f)), Vector3.Up);
         await WaitFrames(20);
         SaveViewportImage("res://residential_security_validation.png");
-        GD.Print($"RESIDENTIAL_GAMEPLAY_CAPTURE caches={ResidentialCacheCount} room_types={_residentialRoomArchetypes.Count} paths=residential_clinic_validation.png,residential_shelter_validation.png,residential_security_validation.png");
+        GD.Print($"RESIDENTIAL_GAMEPLAY_CAPTURE caches={ResidentialCacheCount} room_types={_residentialRoomArchetypes.Count} opened_cache={openedCaptureCache.Name} opened_visual={openedCaptureCache.OpenVisualReady} paths=residential_clinic_validation.png,residential_shelter_validation.png,residential_security_validation.png");
         GetTree().Quit();
     }
 

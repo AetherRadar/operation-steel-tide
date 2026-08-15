@@ -12,7 +12,7 @@ public partial class FreightTerminalWorld
             ReportGunshot,
             AlertEnemiesNear,
             ScanEnemiesNear,
-            SpawnResidentialRoomGuards,
+            SpawnResidentialGuardAmbush,
             ShowResidentialEncounterMessage));
 
     private void OnResidentialCacheFirstOpened(ResidentialSupplyCache cache)
@@ -47,12 +47,33 @@ public partial class FreightTerminalWorld
         return marked;
     }
 
-    private void SpawnResidentialRoomGuards(ResidentialSupplyCache cache, int count)
+    private void SpawnResidentialGuardAmbush(ResidentialSupplyCache cache, int count)
+        => SpawnResidentialGuardAmbush(cache, count, initialWeapon: null);
+
+    private void SpawnResidentialGuardAmbush(
+        ResidentialSupplyCache cache,
+        int count,
+        WeaponBuild? initialWeapon)
     {
+        var guardExclude = new Godot.Collections.Array<Rid>();
+        if (IsInstanceValid(_player))
+        {
+            guardExclude.Add(_player.GetRid());
+        }
+        var planner = CreateResidentialGuardSpawnPlanner(cache, guardExclude);
+        var preferredTarget = IsInstanceValid(_player)
+            ? _player.GlobalPosition
+            : cache.GlobalPosition;
+        var layout = planner.Plan(count, preferredTarget);
+
         for (var index = 0; index < count; index++)
         {
-            var localOffset = new Vector3(index == 0 ? -0.75f : 0.75f, 0.05f, -1.85f - index * 0.28f);
-            var guard = SpawnEnemy(cache.ToGlobal(localOffset), alerted: true, teamId: 0);
+            var spawnPosition = layout.SpawnPositions[index];
+            var guard = SpawnEnemy(
+                spawnPosition,
+                alerted: true,
+                teamId: 0,
+                initialWeapon: initialWeapon);
             guard.Name = $"RESIDENTIAL_GUARD_T{cache.TowerIndex + 1:00}_F{cache.FloorIndex + 1:00}_{_residentialGuardAmbushSpawnCount + 1:00}";
             _residentialGuardAmbushSpawnCount++;
         }
@@ -62,6 +83,15 @@ public partial class FreightTerminalWorld
             _hud.SetEnemyCount(_enemiesRemaining);
         }
     }
+
+    private ResidentialGuardSpawnPlanner CreateResidentialGuardSpawnPlanner(
+        ResidentialSupplyCache cache,
+        IEnumerable<Rid> additionalExclude)
+        => new(
+            GetWorld3D().DirectSpaceState,
+            cache.GlobalTransform,
+            cache.GetRid(),
+            additionalExclude);
 
     private void ShowResidentialEncounterMessage(
         Vector3 origin,

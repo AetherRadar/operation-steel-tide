@@ -19,13 +19,13 @@ public enum ResidentialCacheKind
 public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferredLootSource
 {
     public const string NeutralModelPath = "res://assets/models/old_military_crate/old_military_crate.gltf";
+    private const int ImportedOpenAnimationFrameCount = 7;
 
     private static readonly Dictionary<Vector3, BoxMesh> SharedFallbackMeshes = new();
     private static PackedScene? _sharedChestScene;
     private static ArrayMesh? _sharedClosedMesh;
-    private static ArrayMesh? _sharedBodyMesh;
-    private static Mesh? _sharedLidMesh;
-    private static Transform3D _sharedLidTransform = Transform3D.Identity;
+    private static ArrayMesh? _sharedOpenedMesh;
+    private static ArrayMesh[] _sharedOpenAnimationMeshes = Array.Empty<ArrayMesh>();
     private static int _sharedVisiblePartCount;
 
     public event Action<ResidentialSupplyCache>? FirstOpened;
@@ -48,6 +48,14 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
     public bool IsSearchable => !ContentsResolved || Loot.Count > 0;
     public float SearchDuration => 0.65f;
     public bool NeutralVisualReady => IsInstanceValid(_visualRoot) && VisibleModelPartCount > 0;
+    internal bool OpenVisualReady => _opened
+        && ((_closedVisual is not null
+                && IsInstanceValid(_closedVisual)
+                && ReferenceEquals(_closedVisual.Mesh, _sharedOpenedMesh))
+            || (_closedVisual is null
+                && IsInstanceValid(_lid)
+                && Mathf.Abs(_lid.Rotation.X - (_closedLidRotationX - 1.18f)) <= 0.02f));
+    internal bool OpenFeedbackReady => _openFeedbackStarted;
     public int VisibleModelPartCount { get; private set; }
     public bool HasVisibleLootHint => GetNodeOrNull<Label3D>("CacheLabel") is not null
         || GetNodeOrNull<Light3D>("CacheGlow") is not null;
@@ -58,20 +66,20 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
     private MeshInstance3D? _closedVisual;
     private float _closedLidRotationX;
     private bool _opened;
+    private bool _openFeedbackStarted;
 
     private readonly record struct ImportedCratePart(
+        string Name,
         Mesh Mesh,
-        Transform3D Transform,
-        bool IsLid);
+        Transform3D Transform);
 
     internal static void ReleaseSharedResources()
     {
         SharedFallbackMeshes.Clear();
         _sharedChestScene = null;
         _sharedClosedMesh = null;
-        _sharedBodyMesh = null;
-        _sharedLidMesh = null;
-        _sharedLidTransform = Transform3D.Identity;
+        _sharedOpenedMesh = null;
+        _sharedOpenAnimationMeshes = Array.Empty<ArrayMesh>();
         _sharedVisiblePartCount = 0;
     }
 
@@ -93,6 +101,7 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
         OpenEventCount = 0;
         _plan = null;
         _opened = false;
+        _openFeedbackStarted = false;
         Loot.Clear();
         Loot.AddRange(loot);
         ContentsResolved = true;
@@ -112,6 +121,7 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
         ResolutionCount = 0;
         OpenEventCount = 0;
         _opened = false;
+        _openFeedbackStarted = false;
         Loot.Clear();
         ContentsResolved = false;
     }
@@ -142,13 +152,7 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
 
         _opened = true;
         PrepareImportedOpenVisual();
-        if (IsInstanceValid(_lid))
-        {
-            CreateTween()
-                .TweenProperty(_lid, "rotation:x", _closedLidRotationX - 1.18f, 0.38f)
-                .SetTrans(Tween.TransitionType.Quad)
-                .SetEase(Tween.EaseType.Out);
-        }
+        PlayOpenFeedback();
         OpenEventCount++;
         FirstOpened?.Invoke(this);
     }
@@ -205,8 +209,8 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
     private static bool EnsureSharedImportedMeshes()
     {
         if (_sharedClosedMesh is not null
-            && _sharedBodyMesh is not null
-            && _sharedLidMesh is not null
+            && _sharedOpenedMesh is not null
+            && _sharedOpenAnimationMeshes.Length == ImportedOpenAnimationFrameCount
             && _sharedVisiblePartCount > 0)
         {
             return true;
@@ -220,25 +224,32 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
 
         try
         {
-            var parts = new List<ImportedCratePart>(5);
-            CollectImportedParts(model, Transform3D.Identity, parts);
-            _sharedVisiblePartCount = parts.Count;
-            _sharedClosedMesh = CombineImportedParts(parts, includeLid: true);
-            _sharedBodyMesh = CombineImportedParts(parts, includeLid: false);
-            foreach (var part in parts)
+            var closedParts = new List<ImportedCratePart>(5);
+            var openedParts = new List<ImportedCratePart>(5);
+            CollectImportedParts(model, Transform3D.Identity, "_a", closedParts);
+            CollectImportedParts(model, Transform3D.Identity, "_b", openedParts);
+            if (closedParts.Count == 0
+                || openedParts.Count != closedParts.Count
+                || !TryFindVariantAnchor(closedParts, "old_military_crate_a", out var closedAnchor)
+                || !TryFindVariantAnchor(openedParts, "old_military_crate_b", out var openedAnchor))
             {
-                if (!part.IsLid)
-                {
-                    continue;
-                }
-                _sharedLidMesh = part.Mesh;
-                _sharedLidTransform = part.Transform;
-                break;
+                return false;
             }
-            return _sharedClosedMesh is not null
-                && _sharedBodyMesh is not null
-                && _sharedLidMesh is not null
-                && _sharedVisiblePartCount > 0;
+
+            var animationMeshes = BuildImportedOpenAnimationMeshes(
+                closedParts,
+                openedParts,
+                closedAnchor - openedAnchor);
+            if (animationMeshes is null)
+            {
+                return false;
+            }
+
+            _sharedVisiblePartCount = closedParts.Count;
+            _sharedOpenAnimationMeshes = animationMeshes;
+            _sharedClosedMesh = animationMeshes[0];
+            _sharedOpenedMesh = animationMeshes[^1];
+            return true;
         }
         finally
         {
@@ -249,46 +260,106 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
     private static void CollectImportedParts(
         Node parent,
         Transform3D parentTransform,
+        string variantSuffix,
         List<ImportedCratePart> parts)
     {
         foreach (var child in parent.GetChildren())
         {
             if (child is not Node3D child3D)
             {
-                CollectImportedParts(child, parentTransform, parts);
+                CollectImportedParts(child, parentTransform, variantSuffix, parts);
                 continue;
             }
             var transform = parentTransform * child3D.Transform;
             var name = child3D.Name.ToString();
             if (child3D is MeshInstance3D { Mesh: not null } mesh
-                && name.EndsWith("_a", StringComparison.OrdinalIgnoreCase))
+                && name.EndsWith(variantSuffix, StringComparison.OrdinalIgnoreCase))
             {
                 parts.Add(new ImportedCratePart(
+                    name,
                     mesh.Mesh,
-                    transform,
-                    name.Equals("old_military_crate_lid_a", StringComparison.OrdinalIgnoreCase)));
+                    transform));
             }
-            CollectImportedParts(child3D, transform, parts);
+            CollectImportedParts(child3D, transform, variantSuffix, parts);
         }
     }
 
-    private static ArrayMesh? CombineImportedParts(
+    private static bool TryFindVariantAnchor(
         IReadOnlyList<ImportedCratePart> parts,
-        bool includeLid)
+        string anchorName,
+        out Vector3 origin)
+    {
+        foreach (var part in parts)
+        {
+            if (part.Name.Equals(anchorName, StringComparison.OrdinalIgnoreCase))
+            {
+                origin = part.Transform.Origin;
+                return true;
+            }
+        }
+        origin = Vector3.Zero;
+        return false;
+    }
+
+    private static ArrayMesh[]? BuildImportedOpenAnimationMeshes(
+        IReadOnlyList<ImportedCratePart> closedParts,
+        IReadOnlyList<ImportedCratePart> openedParts,
+        Vector3 alignmentOffset)
+    {
+        var openedByName = new Dictionary<string, ImportedCratePart>(StringComparer.OrdinalIgnoreCase);
+        foreach (var openedPart in openedParts)
+        {
+            if (!openedByName.TryAdd(VariantBaseName(openedPart.Name), openedPart))
+            {
+                return null;
+            }
+        }
+
+        var partPairs = new List<(ImportedCratePart Closed, ImportedCratePart Opened)>(closedParts.Count);
+        foreach (var closedPart in closedParts)
+        {
+            if (!openedByName.TryGetValue(VariantBaseName(closedPart.Name), out var openedPart))
+            {
+                return null;
+            }
+            partPairs.Add((closedPart, openedPart));
+        }
+
+        var meshes = new ArrayMesh[ImportedOpenAnimationFrameCount];
+        for (var frame = 0; frame < meshes.Length; frame++)
+        {
+            var progress = frame / (float)(meshes.Length - 1);
+            var mesh = CombineImportedAnimationFrame(partPairs, alignmentOffset, progress);
+            if (mesh is null)
+            {
+                return null;
+            }
+            meshes[frame] = mesh;
+        }
+        return meshes;
+    }
+
+    private static string VariantBaseName(string name)
+        => name.Length > 2 ? name[..^2] : name;
+
+    private static ArrayMesh? CombineImportedAnimationFrame(
+        IReadOnlyList<(ImportedCratePart Closed, ImportedCratePart Opened)> partPairs,
+        Vector3 alignmentOffset,
+        float progress)
     {
         var surface = new SurfaceTool();
         Godot.Material? material = null;
         var appended = 0;
-        foreach (var part in parts)
+        var alignment = new Transform3D(Basis.Identity, alignmentOffset);
+        foreach (var (closedPart, openedPart) in partPairs)
         {
-            if (!includeLid && part.IsLid)
+            var openedTransform = alignment * openedPart.Transform;
+            var transform = closedPart.Transform.InterpolateWith(openedTransform, progress);
+            var mesh = progress >= 0.999f ? openedPart.Mesh : closedPart.Mesh;
+            for (var surfaceIndex = 0; surfaceIndex < mesh.GetSurfaceCount(); surfaceIndex++)
             {
-                continue;
-            }
-            for (var surfaceIndex = 0; surfaceIndex < part.Mesh.GetSurfaceCount(); surfaceIndex++)
-            {
-                surface.AppendFrom(part.Mesh, surfaceIndex, part.Transform);
-                material ??= part.Mesh.SurfaceGetMaterial(surfaceIndex);
+                surface.AppendFrom(mesh, surfaceIndex, transform);
+                material ??= mesh.SurfaceGetMaterial(surfaceIndex);
                 appended++;
             }
         }
@@ -307,38 +378,69 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
     {
         if (_closedVisual is null
             || !IsInstanceValid(_closedVisual)
-            || _sharedBodyMesh is null
-            || _sharedLidMesh is null)
+            || _sharedOpenAnimationMeshes.Length != ImportedOpenAnimationFrameCount)
         {
             return;
         }
 
-        var openRoot = new Node3D
+        _closedVisual.Name = "NeutralMilitaryChestOpen";
+        _visualRoot = _closedVisual;
+    }
+
+    private void PlayOpenFeedback()
+    {
+        if (_closedVisual is not null
+            && IsInstanceValid(_closedVisual)
+            && _sharedOpenAnimationMeshes.Length == ImportedOpenAnimationFrameCount)
         {
-            Name = "NeutralMilitaryChestOpen",
-            Transform = _closedVisual.Transform
-        };
-        AddChild(openRoot);
-        openRoot.AddChild(new MeshInstance3D
+            var opening = CreateTween();
+            for (var frame = 1; frame < _sharedOpenAnimationMeshes.Length; frame++)
+            {
+                var frameMesh = _sharedOpenAnimationMeshes[frame];
+                opening.TweenInterval(0.055f);
+                opening.TweenCallback(Callable.From(() =>
+                {
+                    if (IsInstanceValid(_closedVisual))
+                    {
+                        _closedVisual.Mesh = frameMesh;
+                    }
+                }));
+            }
+
+            var restPosition = _closedVisual.Position;
+            var restRotation = _closedVisual.Rotation;
+            var restScale = _closedVisual.Scale;
+            _closedVisual.Position = restPosition + Vector3.Up * 0.08f;
+            _closedVisual.Rotation = restRotation + new Vector3(-0.045f, 0.0f, 0.0f);
+            _closedVisual.Scale = new Vector3(
+                restScale.X * 0.97f,
+                restScale.Y * 1.08f,
+                restScale.Z * 1.04f);
+
+            var rebound = CreateTween().SetParallel();
+            rebound.TweenProperty(_closedVisual, "position", restPosition, 0.22f)
+                .SetTrans(Tween.TransitionType.Back)
+                .SetEase(Tween.EaseType.Out);
+            rebound.TweenProperty(_closedVisual, "rotation", restRotation, 0.24f)
+                .SetTrans(Tween.TransitionType.Back)
+                .SetEase(Tween.EaseType.Out);
+            rebound.TweenProperty(_closedVisual, "scale", restScale, 0.26f)
+                .SetTrans(Tween.TransitionType.Back)
+                .SetEase(Tween.EaseType.Out);
+            _openFeedbackStarted = true;
+            return;
+        }
+
+        if (!IsInstanceValid(_lid))
         {
-            Name = "NeutralMilitaryChestBody",
-            Mesh = _sharedBodyMesh,
-            VisibilityRangeEnd = 52.0f,
-            VisibilityRangeEndMargin = 6.0f
-        });
-        _lid = new MeshInstance3D
-        {
-            Name = "NeutralMilitaryChestLid",
-            Mesh = _sharedLidMesh,
-            Transform = _sharedLidTransform,
-            VisibilityRangeEnd = 52.0f,
-            VisibilityRangeEndMargin = 6.0f
-        };
-        openRoot.AddChild(_lid);
-        _closedLidRotationX = _lid.Rotation.X;
-        _closedVisual.QueueFree();
-        _closedVisual = null;
-        _visualRoot = openRoot;
+            return;
+        }
+
+        CreateTween()
+            .TweenProperty(_lid, "rotation:x", _closedLidRotationX - 1.18f, 0.38f)
+            .SetTrans(Tween.TransitionType.Quad)
+            .SetEase(Tween.EaseType.Out);
+        _openFeedbackStarted = true;
     }
 
     private void BuildFallbackChest()
