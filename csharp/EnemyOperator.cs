@@ -595,7 +595,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
 
         var distance = GlobalPosition.DistanceTo(CurrentTargetPosition());
-        var hasSight = distance < DetectionRange && WithinViewCone() && HasLineOfSight();
+        var occupiedVehicleAwareness = HasOccupiedVehicleAwareness(distance);
+        var hasSight = distance < CurrentTargetDetectionRange()
+            && WithinViewCone()
+            && HasLineOfSight();
         // Mid-loot contact: any acquired hostile inside a hard contact bubble ends looting immediately.
         var midLootContact = _searchingLoot && distance < 22.0f;
         if (!Alerted)
@@ -609,6 +612,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
                 var proximity = Mathf.Clamp(1.0f - distance / DetectionRange, 0.0f, 1.0f);
                 Suspicion = Mathf.Min(100.0f, Suspicion + dt * (18.0f + proximity * 58.0f));
             }
+            else if (occupiedVehicleAwareness)
+            {
+                Suspicion = 100.0f;
+            }
             else if (distance < CurrentContactAcquireRange * 0.65f)
             {
                 // Close contact without perfect LOS still builds pressure.
@@ -621,7 +628,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
             // Rivals press any in-range hostile; NPCs need sight/suspicion/close contact.
             // Looting NPCs always flip to combat on mid-loot contact.
-            if (Suspicion >= 100.0f || hasSight || midLootContact
+            if (Suspicion >= 100.0f || hasSight || midLootContact || occupiedVehicleAwareness
                 || (IsRivalSquad && hasEngageTarget && distance < 24.0f)
                 || (!IsRivalSquad && distance < 16.0f))
             {
@@ -715,7 +722,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
                 return;
             }
             var distanceSq = GlobalPosition.DistanceSquaredTo(candidate.GlobalPosition);
-            if (distanceSq > acquireRangeSq)
+            if (distanceSq > CandidateAcquireRangeSquared(candidate, acquireRangeSq))
             {
                 return;
             }
@@ -739,6 +746,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             {
                 bias += DownedFinishScorePenalty;
             }
+            bias += OccupiedVehicleTargetBias(candidate);
             var score = distanceSq + bias;
             if (score < bestScore)
             {
@@ -1040,6 +1048,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private Vector3 CurrentTargetPoint()
     {
+        if (TryResolveOccupiedVehicleTarget(out var vehicle))
+        {
+            return vehicle!.HostileAimPoint(GlobalPosition);
+        }
         if (_combatTarget is not null && IsAttackableCombatant(_combatTarget))
         {
             return _combatTarget.HitPoint(IsProne ? HitRegion.Limbs : HitRegion.Torso);
@@ -1053,6 +1065,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private Vector3 CurrentTargetPosition()
     {
+        if (TryResolveOccupiedVehicleTarget(out var vehicle))
+        {
+            return vehicle!.GlobalPosition;
+        }
         if (_combatTarget is not null)
         {
             return _combatTarget.CombatNode.GlobalPosition;
@@ -1066,7 +1082,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private bool HasLineOfSight()
     {
-        var targetNode = _combatTarget?.CombatNode ?? _rawTarget;
+        var targetNode = CurrentBallisticTargetNode();
         if (targetNode is null || !GodotObject.IsInstanceValid(targetNode))
         {
             return false;
@@ -1378,6 +1394,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
         if (_combatTarget.CombatDowned && _downedFinishLockTimer > 0.0f)
         {
+            return;
+        }
+        if (TryResolveOccupiedVehicleTarget(out var vehicle))
+        {
+            FireAtOccupiedVehicle(vehicle!, distance);
             return;
         }
         BeginMuzzleFlash();
