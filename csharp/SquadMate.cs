@@ -365,6 +365,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             destination = Main.ResolveSquadNavigationDestination(this, destination, emergency: false);
         }
         UpdateTacticalMovement(destination, hostile, objectivePriority, dt);
+        MaintainStairNavigation(destination, dt);
         ConsiderMedicSupport(patient);
         if (hostile is not null && !hostile.IsDead)
         {
@@ -372,6 +373,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             ConsiderRoleAbility(hostile, _combatHasSight);
         }
         MoveAndSlide();
+        TryNavigationStepUp(_combatDesiredDirection);
         TrackTacticalMovement(dt);
         AnimateRig(dt);
     }
