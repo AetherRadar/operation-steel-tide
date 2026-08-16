@@ -1788,12 +1788,14 @@ public partial class FreightTerminalWorld : Node3D
 
     private void ClearPendingLootOpen()
     {
+        var pendingSource = _openLootSource;
         _openLootSource = null;
         _personalBackpackOpen = false;
         _lootSearchTarget = null;
         _interactionProgress = 0.0f;
         _player.SetSearchPose(false);
         _hud.SetInteraction(string.Empty, 0.0f, false);
+        RetireEmptyGradedLootPickup(pendingSource);
     }
 
     private void LockLootForMissionTransition(Input.MouseModeEnum mouseMode)
@@ -2038,6 +2040,14 @@ public partial class FreightTerminalWorld : Node3D
             || !IsInstanceValid(graded)
             || graded.IsQueuedForDeletion())
         {
+            return;
+        }
+        if (ReferenceEquals(_openLootSource, graded))
+        {
+            if (_hud.IsLootVisible)
+            {
+                RefreshLootView();
+            }
             return;
         }
 
@@ -2721,7 +2731,11 @@ public partial class FreightTerminalWorld : Node3D
             ValuableKind = ValuableItemKind.AntiqueClock,
             Grade = LootGrade.Legendary
         };
-        var sealedPickupProbe = new GradedLootPickup { Name = "SealedLootVisualProbe" };
+        var sealedPickupProbe = new GradedLootPickup
+        {
+            Name = "SealedLootVisualProbe",
+            Position = new Vector3(0.0f, 0.2f, 420.0f)
+        };
         sealedPickupProbe.Configure(
             sealedProbeItem,
             "Sealed visual probe",
@@ -2743,7 +2757,43 @@ public partial class FreightTerminalWorld : Node3D
             && sealedPickupProbe.VisualReady
             && sealedPickupProbe.OpenVisualReady
             && sealedPickupProbe.CollisionLayer == 1;
-        sealedPickupProbe.QueueFree();
+        var looseProbeItem = new LootItem
+        {
+            Kind = LootItemKind.Medical,
+            MedicalKind = MedicalItemKind.Bandage,
+            Grade = LootGrade.Rare
+        };
+        sealedPickupProbe.ConfigureDropped(
+            looseProbeItem,
+            "Loose visual probe",
+            "\u6563\u843d\u5916\u89c2\u6d4b\u8bd5");
+        await WaitFrames(2);
+        var treeReconfiguredLoose = sealedPickupProbe.IsOpened
+            && sealedPickupProbe.VisualReady
+            && !sealedPickupProbe.GradeConcealedBeforeOpen;
+        sealedPickupProbe.Configure(
+            sealedProbeItem,
+            "Sealed visual probe",
+            "\u5bc6\u5c01\u5916\u89c2\u6d4b\u8bd5");
+        await WaitFrames(2);
+        var treeReconfiguredSealed = !sealedPickupProbe.IsOpened
+            && sealedPickupProbe.VisualReady
+            && sealedPickupProbe.GradeConcealedBeforeOpen;
+        _lootSources.Add(sealedPickupProbe);
+        _lootWorldPoints.Add(sealedPickupProbe.GlobalPosition);
+        var sealedPickupProbePosition = sealedPickupProbe.GlobalPosition;
+        _openLootSource = sealedPickupProbe;
+        sealedPickupProbe.MarkEmpty();
+        RetireEmptyGradedLootPickup(sealedPickupProbe);
+        var openEmptyPickupRetained = _lootSources.Contains(sealedPickupProbe)
+            && IsInstanceValid(sealedPickupProbe)
+            && !sealedPickupProbe.IsQueuedForDeletion();
+        _openLootSource = null;
+        RetireEmptyGradedLootPickup(sealedPickupProbe);
+        await WaitFrames(2);
+        var emptyPickupRetired = !_lootSources.Contains(sealedPickupProbe)
+            && !_lootWorldPoints.Contains(sealedPickupProbePosition)
+            && !IsInstanceValid(sealedPickupProbe);
         _player.GlobalPosition = source.LootNode.GlobalPosition + new Vector3(0, 0.2f, 0.85f);
         _missionDirector.ExitDeploymentZone();
         var targetDeadline = Time.GetTicksMsec() + 1000;
@@ -3118,6 +3168,10 @@ public partial class FreightTerminalWorld : Node3D
             && sealedPickupOpens
             && sealedPickupEmptyHidden
             && sealedPickupReturnRestored
+            && treeReconfiguredLoose
+            && treeReconfiguredSealed
+            && openEmptyPickupRetained
+            && emptyPickupRetired
             && sourceSealedBeforeOpen
             && contentsConcealedDuringSearch
             && firstOpenMilliseconds >= 650
@@ -3150,7 +3204,7 @@ public partial class FreightTerminalWorld : Node3D
             && searchDamageAborted
             && fatalSearchStateHandled
             && activeLootEndHandled;
-        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} sealed_grade={sealedPickupConcealsGrade} sealed_open={sealedPickupOpens} sealed_empty_hidden={sealedPickupEmptyHidden} sealed_return_restored={sealedPickupReturnRestored} source_sealed={sourceSealedBeforeOpen} search_concealed={contentsConcealedDuringSearch} first_open_ms={firstOpenMilliseconds} source_open_visual={sourceOpenVisualReady} single_click={sourceClickActivated} auto_equip={emptyPrimaryAutoEquipped} policy={policyValid} weapon_menu={weaponMenuActivated}/{weaponMenuReady}/{weaponMenuEquipped} item_menu={itemMenuActivated}/{itemMenuDropOnly}/{itemMenuDropped} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_mouse_observable={damageMouseObservable} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} search_damage_aborted={searchDamageAborted} search_damage_mouse={searchDamageMouseCaptured} fatal_search_state={fatalSearchStateHandled} fatal_input_primed={fatalInputPrimed} fatal_controls_locked={fatalControlLocked} active_loot_end={activeLootEndHandled} fatal_result={_hud.IsMissionResultVisible} fatal_mouse={fatalMouseVisible} fatal_mouse_observable={fatalMouseObservable} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} sealed_grade={sealedPickupConcealsGrade} sealed_open={sealedPickupOpens} sealed_empty_hidden={sealedPickupEmptyHidden} sealed_return_restored={sealedPickupReturnRestored} tree_loose={treeReconfiguredLoose} tree_sealed={treeReconfiguredSealed} open_empty_retained={openEmptyPickupRetained} empty_retired={emptyPickupRetired} source_sealed={sourceSealedBeforeOpen} search_concealed={contentsConcealedDuringSearch} first_open_ms={firstOpenMilliseconds} source_open_visual={sourceOpenVisualReady} single_click={sourceClickActivated} auto_equip={emptyPrimaryAutoEquipped} policy={policyValid} weapon_menu={weaponMenuActivated}/{weaponMenuReady}/{weaponMenuEquipped} item_menu={itemMenuActivated}/{itemMenuDropOnly}/{itemMenuDropped} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_mouse_observable={damageMouseObservable} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} search_damage_aborted={searchDamageAborted} search_damage_mouse={searchDamageMouseCaptured} fatal_search_state={fatalSearchStateHandled} fatal_input_primed={fatalInputPrimed} fatal_controls_locked={fatalControlLocked} active_loot_end={activeLootEndHandled} fatal_result={_hud.IsMissionResultVisible} fatal_mouse={fatalMouseVisible} fatal_mouse_observable={fatalMouseObservable} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         GD.Print($"LOOT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -4288,8 +4342,8 @@ public partial class FreightTerminalWorld : Node3D
             Grade = LootGrade.Rare
         };
         var playerCache = new GradedLootPickup { Position = _player.GlobalPosition + new Vector3(1.2f, 0.0f, 0.4f) };
-        AddChild(playerCache);
         playerCache.Configure(weaponLoot, "Loadout Test Rifle", "测试步枪");
+        AddChild(playerCache);
         await WaitFrames(2);
         var playerArmedAfterLoot = TryPlayerEquipWeaponFromLootSource(playerCache)
             && _player.HasFireablePrimary
@@ -4311,8 +4365,8 @@ public partial class FreightTerminalWorld : Node3D
                 Grade = LootGrade.Uncommon
             };
             var rivalCache = new GradedLootPickup { Position = sampleRival.GlobalPosition + new Vector3(0.8f, 0.0f, 0.5f) };
-            AddChild(rivalCache);
             rivalCache.Configure(rivalWeapon, "Rival Cache", "敌对物资");
+            AddChild(rivalCache);
             await WaitFrames(2);
             rivalArmedAfterLoot = TryEquipWeaponFromLootSource(sampleRival, rivalCache) && sampleRival.HasFireablePrimary;
         }
@@ -4331,8 +4385,8 @@ public partial class FreightTerminalWorld : Node3D
                 Grade = LootGrade.Common
             };
             var mateCache = new GradedLootPickup { Position = testMate.GlobalPosition + new Vector3(-0.9f, 0.0f, 0.4f) };
-            AddChild(mateCache);
             mateCache.Configure(mateWeapon, "Mate Cache", "队友物资");
+            AddChild(mateCache);
             await WaitFrames(2);
             mateArmedAfterLoot = TryMateEquipWeaponFromLootSource(testMate, mateCache) && testMate.HasFireablePrimary;
         }

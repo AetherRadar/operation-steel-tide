@@ -42,37 +42,24 @@ public partial class GradedLootPickup : StaticBody3D, ILootSource, IOpenableLoot
     private OmniLight3D _glow = null!;
     private MeshInstance3D _core = null!;
     private Label3D _label = null!;
+    private Node3D _presentationRoot = null!;
     private Node3D _containerRoot = null!;
     private Node3D _lid = null!;
     private MeshInstance3D _importedContainerVisual = null!;
     private ArrayMesh[] _openAnimationMeshes = System.Array.Empty<ArrayMesh>();
+    private Tween? _openingTween;
     private bool _loosePresentation;
     private bool _opened;
     private int _containerPartCount;
 
     public void Configure(LootItem item, string englishName, string chineseName)
     {
-        Loot.Clear();
-        Loot.Add(item);
-        Grade = item.Grade;
-        EnglishName = englishName;
-        ChineseName = chineseName;
-        _loosePresentation = false;
-        _opened = false;
-        if (IsInsideTree())
-        {
-            ApplyVisuals();
-        }
+        ConfigurePresentation(item, englishName, chineseName, loosePresentation: false);
     }
 
     public void ConfigureDropped(LootItem item, string englishName, string chineseName)
     {
-        Configure(item, englishName, chineseName);
-        _loosePresentation = true;
-        if (IsInsideTree())
-        {
-            ApplyVisuals();
-        }
+        ConfigurePresentation(item, englishName, chineseName, loosePresentation: true);
     }
 
     public override void _Ready()
@@ -85,8 +72,13 @@ public partial class GradedLootPickup : StaticBody3D, ILootSource, IOpenableLoot
             Position = new Vector3(0.0f, 0.25f, 0.0f),
             Shape = new BoxShape3D { Size = new Vector3(0.82f, 0.5f, 0.58f) }
         });
-        BuildMesh();
-        ApplyVisuals();
+        RebuildPresentation();
+    }
+
+    public override void _ExitTree()
+    {
+        _openingTween?.Kill();
+        _openingTween = null;
     }
 
     public string DisplayName(string language) => GameLocalization.IsChinese(language) ? ChineseName : EnglishName;
@@ -100,14 +92,15 @@ public partial class GradedLootPickup : StaticBody3D, ILootSource, IOpenableLoot
         _opened = true;
         if (IsInstanceValid(_importedContainerVisual) && _openAnimationMeshes.Length > 1)
         {
-            var opening = CreateTween()
+            _openingTween?.Kill();
+            _openingTween = CreateTween()
                 .SetProcessMode(Tween.TweenProcessMode.Idle)
                 .SetPauseMode(Tween.TweenPauseMode.Process);
             for (var frame = 1; frame < _openAnimationMeshes.Length; frame++)
             {
                 var frameMesh = _openAnimationMeshes[frame];
-                opening.TweenInterval(0.055f);
-                opening.TweenCallback(Callable.From(() =>
+                _openingTween.TweenInterval(0.055f);
+                _openingTween.TweenCallback(Callable.From(() =>
                 {
                     if (IsInstanceValid(_importedContainerVisual))
                     {
@@ -119,10 +112,11 @@ public partial class GradedLootPickup : StaticBody3D, ILootSource, IOpenableLoot
         }
         if (!_loosePresentation && IsInstanceValid(_lid))
         {
-            CreateTween()
+            _openingTween?.Kill();
+            _openingTween = CreateTween()
                 .SetProcessMode(Tween.TweenProcessMode.Idle)
-                .SetPauseMode(Tween.TweenPauseMode.Process)
-                .TweenProperty(_lid, "rotation:x", -1.32f, 0.38f)
+                .SetPauseMode(Tween.TweenPauseMode.Process);
+            _openingTween.TweenProperty(_lid, "rotation:x", -1.32f, 0.38f)
                 .SetTrans(Tween.TransitionType.Back)
                 .SetEase(Tween.EaseType.Out);
         }
@@ -143,6 +137,74 @@ public partial class GradedLootPickup : StaticBody3D, ILootSource, IOpenableLoot
         ApplyVisuals();
     }
 
+    private void ConfigurePresentation(
+        LootItem item,
+        string englishName,
+        string chineseName,
+        bool loosePresentation)
+    {
+        var presentationChanged = _loosePresentation != loosePresentation;
+        Loot.Clear();
+        Loot.Add(item);
+        Grade = item.Grade;
+        EnglishName = englishName;
+        ChineseName = chineseName;
+        _loosePresentation = loosePresentation;
+        _opened = false;
+        if (!IsInsideTree())
+        {
+            return;
+        }
+
+        if (presentationChanged || !IsInstanceValid(_presentationRoot))
+        {
+            RebuildPresentation();
+            return;
+        }
+
+        ResetOpenPresentation();
+        ApplyVisuals();
+    }
+
+    private void RebuildPresentation()
+    {
+        _openingTween?.Kill();
+        _openingTween = null;
+        if (IsInstanceValid(_presentationRoot))
+        {
+            _presentationRoot.Free();
+        }
+
+        _core = null!;
+        _glow = null!;
+        _label = null!;
+        _containerRoot = null!;
+        _lid = null!;
+        _importedContainerVisual = null!;
+        _openAnimationMeshes = System.Array.Empty<ArrayMesh>();
+        _containerPartCount = 0;
+        _presentationRoot = new Node3D { Name = "LootPresentation" };
+        AddChild(_presentationRoot);
+        BuildMesh();
+        ApplyVisuals();
+    }
+
+    private void ResetOpenPresentation()
+    {
+        _openingTween?.Kill();
+        _openingTween = null;
+        if (IsInstanceValid(_importedContainerVisual) && _openAnimationMeshes.Length > 0)
+        {
+            _importedContainerVisual.Mesh = _openAnimationMeshes[0];
+        }
+        if (IsInstanceValid(_lid))
+        {
+            var rotation = _lid.Rotation;
+            rotation.X = 0.0f;
+            _lid.Rotation = rotation;
+        }
+    }
+
     private void BuildMesh()
     {
         if (!_loosePresentation)
@@ -156,7 +218,7 @@ public partial class GradedLootPickup : StaticBody3D, ILootSource, IOpenableLoot
             Position = new Vector3(0.0f, 0.18f, 0.0f),
             Mesh = new BoxMesh { Size = new Vector3(0.48f, 0.28f, 0.34f) }
         };
-        AddChild(_core);
+        _presentationRoot.AddChild(_core);
         _glow = new OmniLight3D
         {
             Position = new Vector3(0.0f, 0.42f, 0.0f),
@@ -164,7 +226,7 @@ public partial class GradedLootPickup : StaticBody3D, ILootSource, IOpenableLoot
             LightEnergy = 1.4f,
             ShadowEnabled = false
         };
-        AddChild(_glow);
+        _presentationRoot.AddChild(_glow);
         _label = new Label3D
         {
             Position = new Vector3(0.0f, 0.62f, 0.0f),
@@ -173,12 +235,12 @@ public partial class GradedLootPickup : StaticBody3D, ILootSource, IOpenableLoot
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             VisibilityRangeEnd = 22.0f
         };
-        AddChild(_label);
+        _presentationRoot.AddChild(_label);
     }
 
     private void BuildContainerMesh()
     {
-        _containerRoot = this;
+        _containerRoot = _presentationRoot;
         if (ResidentialSupplyCache.TryGetSharedChestAnimation(out var animationMeshes, out _))
         {
             _openAnimationMeshes = animationMeshes;
@@ -191,7 +253,7 @@ public partial class GradedLootPickup : StaticBody3D, ILootSource, IOpenableLoot
                 VisibilityRangeEnd = 46.0f,
                 VisibilityRangeEndMargin = 5.0f
             };
-            AddChild(_importedContainerVisual);
+            _containerRoot.AddChild(_importedContainerVisual);
             return;
         }
 
@@ -214,7 +276,7 @@ public partial class GradedLootPickup : StaticBody3D, ILootSource, IOpenableLoot
             Name = "SealedFieldCacheLid",
             Position = new Vector3(0.0f, 0.46f, 0.27f)
         };
-        AddChild(_lid);
+        _containerRoot.AddChild(_lid);
         ContainerPart(_lid, new Vector3(0.82f, 0.12f, 0.58f), new Vector3(0.0f, 0.0f, -0.27f), shell);
         ContainerPart(_lid, new Vector3(0.26f, 0.08f, 0.06f), new Vector3(0.0f, -0.025f, -0.58f), trim);
     }

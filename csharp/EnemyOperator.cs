@@ -859,10 +859,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     /// <summary>Reset cover/prone/loot so headless scenarios start from a known AI state.</summary>
     public void ResetTacticalStateForDiagnostics()
     {
+        ResetCorpseLootBackpackForDiagnostics();
         if (IsDead)
         {
             // Revive dead diagnostics subjects so multi-phase validators can reuse them.
-            ResetCorpseLootBackpackForDiagnostics();
             IsDead = false;
             CollisionLayer = 2;
             CollisionMask = 1 | 2;
