@@ -8,6 +8,7 @@ public partial class CombatHUD
     private DemolitionBuyView _demolitionBuyView = null!;
     private bool _demolitionGameplayPresentation;
     private int _demolitionSmokeGrenades;
+    private int _radioMessageDiagnosticSuppressionDepth;
 
     public bool IsDemolitionBuyVisible
         => IsInstanceValid(_demolitionBuyView) && _demolitionBuyView.Visible;
@@ -120,6 +121,17 @@ public partial class CombatHUD
 
     public void PressQuickSlotForDiagnostics(int slot)
         => _quickSlotBar.PressSlotForDiagnostics(slot);
+
+    internal void BeginRadioMessageSuppressionForDiagnostics()
+        => _radioMessageDiagnosticSuppressionDepth++;
+
+    internal void EndRadioMessageSuppressionForDiagnostics()
+    {
+        if (_radioMessageDiagnosticSuppressionDepth > 0)
+        {
+            _radioMessageDiagnosticSuppressionDepth--;
+        }
+    }
 
     public void ShowDemolitionBuy(DemolitionBuySnapshot snapshot)
     {

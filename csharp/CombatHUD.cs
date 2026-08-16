@@ -1408,6 +1408,10 @@ public partial class CombatHUD : CanvasLayer
 
     public void ShowRadioMessage(string message, Color color)
     {
+        if (_radioMessageDiagnosticSuppressionDepth > 0)
+        {
+            return;
+        }
         if (_radioTween?.IsRunning() == true)
         {
             _radioTween.Kill();

@@ -666,6 +666,8 @@ public partial class FreightTerminalWorld
         var savedTargetSite = _demolitionEnemyTargetSite;
         var savedCarrier = _demolitionCarrier;
         var savedPlantProgress = _demolitionEnemyPlantProgress;
+        var savedPlayerPlantProgress = _demolitionPlantProgress;
+        var savedPlayerDefuseProgress = _demolitionPlayerDefuseProgress;
         var savedDevicePlanted = _demolitionDevicePlanted;
         var savedDeviceRuntime = CaptureDemolitionDeviceRuntimeForDiagnostics();
         var savedActiveSite = _demolitionActiveSite;
@@ -704,7 +706,8 @@ public partial class FreightTerminalWorld
                 opponent => (
                     Transform: opponent.GlobalTransform,
                     opponent.Velocity,
-                    Navigation: opponent.CaptureScriptedObjectiveNavigationForDiagnostics()));
+                    Navigation: opponent.CaptureScriptedObjectiveNavigationForDiagnostics(),
+                    PlantRuntime: opponent.CaptureDemolitionPlantRuntimeForDiagnostics()));
         var savedSentryModes = _demolitionOpponents
             .Where(IsInstanceValid)
             .ToDictionary(opponent => opponent, opponent => opponent.SentryMode);
@@ -719,6 +722,7 @@ public partial class FreightTerminalWorld
                     mate.DemolitionOrderPositionForDiagnostics,
                     TacticalState: mate.CaptureDemolitionTacticalStateForDiagnostics()));
         SmokeGrenade? diagnosticSmoke = null;
+        _hud.BeginRadioMessageSuppressionForDiagnostics();
         try
         {
             // Keep the live cursor object untouched so the diagnostic can restore the
@@ -1054,7 +1058,19 @@ public partial class FreightTerminalWorld
                 _demolitionActiveSite = -1;
                 _demolitionSquadObjectiveSite = -1;
                 _demolitionSquadPlantProgress = 0.0f;
-                relay.ResetCombatTacticsForDiagnostics();
+                // Preserve the relay's combat target and timers. Moving every referenced
+                // defender outside the plant guard radius makes the real AI channel deterministic.
+                for (var index = 0; index < _demolitionOpponents.Count; index++)
+                {
+                    var opponent = _demolitionOpponents[index];
+                    if (!IsInstanceValid(opponent))
+                    {
+                        continue;
+                    }
+                    opponent.GlobalPosition = layout.AttackSpawn
+                        + new Vector3((index - 2) * 1.5f, 0.2f, 0.0f);
+                    opponent.Velocity = Vector3.Zero;
+                }
                 ForceDemolitionDeviceCarrierForDiagnostics(relay);
                 var friendlySiteIndex = Mathf.Clamp(
                     _demolitionAttackerPlan.PrimarySiteIndex,
@@ -1062,6 +1078,7 @@ public partial class FreightTerminalWorld
                     layout.SitePositions.Count - 1);
                 relay.GlobalPosition = layout.SitePositions[friendlySiteIndex]
                     + new Vector3(0.0f, 0.2f, 0.4f);
+                relay.Velocity = Vector3.Zero;
                 TryUpdateDemolitionSquadDeviceObjective(DemolitionPlantDuration + 0.1f);
                 friendlyAiPlantsDevice = _demolitionDevicePlanted
                     && _demolitionDeviceLifecycle.IsPlanted
@@ -1085,6 +1102,7 @@ public partial class FreightTerminalWorld
         }
         finally
         {
+            _hud.EndRadioMessageSuppressionForDiagnostics();
             if (diagnosticSmoke is not null && IsInstanceValid(diagnosticSmoke))
             {
                 diagnosticSmoke.RemoveFromGroup(SmokeGrenade.ActiveGroupName);
@@ -1096,6 +1114,8 @@ public partial class FreightTerminalWorld
             _demolitionEnemyTargetSite = savedTargetSite;
             _demolitionCarrier = savedCarrier;
             _demolitionEnemyPlantProgress = savedPlantProgress;
+            _demolitionPlantProgress = savedPlayerPlantProgress;
+            _demolitionPlayerDefuseProgress = savedPlayerDefuseProgress;
             _demolitionDevicePlanted = savedDevicePlanted;
             RestoreDemolitionDeviceRuntimeForDiagnostics(savedDeviceRuntime);
             _demolitionActiveSite = savedActiveSite;
@@ -1141,6 +1161,7 @@ public partial class FreightTerminalWorld
                 opponent.GlobalTransform = state.Transform;
                 opponent.Velocity = state.Velocity;
                 opponent.RestoreScriptedObjectiveNavigationForDiagnostics(state.Navigation);
+                opponent.RestoreDemolitionPlantRuntimeForDiagnostics(state.PlantRuntime);
             }
             foreach (var (mate, state) in savedMateStates)
             {
