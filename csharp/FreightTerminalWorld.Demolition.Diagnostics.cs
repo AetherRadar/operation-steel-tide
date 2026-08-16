@@ -1046,6 +1046,28 @@ public partial class FreightTerminalWorld
                     && Mathf.IsZeroApprox(_demolitionDefuseProgress);
             }
 
+            var friendlyAiPlantsDevice = false;
+            if (relay is not null && _demolitionAttackerPlan is not null)
+            {
+                _localPlayerDowned = false;
+                _demolitionDevicePlanted = false;
+                _demolitionActiveSite = -1;
+                _demolitionSquadObjectiveSite = -1;
+                _demolitionSquadPlantProgress = 0.0f;
+                relay.ResetCombatTacticsForDiagnostics();
+                ForceDemolitionDeviceCarrierForDiagnostics(relay);
+                var friendlySiteIndex = Mathf.Clamp(
+                    _demolitionAttackerPlan.PrimarySiteIndex,
+                    0,
+                    layout.SitePositions.Count - 1);
+                relay.GlobalPosition = layout.SitePositions[friendlySiteIndex]
+                    + new Vector3(0.0f, 0.2f, 0.4f);
+                TryUpdateDemolitionSquadDeviceObjective(DemolitionPlantDuration + 0.1f);
+                friendlyAiPlantsDevice = _demolitionDevicePlanted
+                    && _demolitionDeviceLifecycle.IsPlanted
+                    && _demolitionActiveSite == friendlySiteIndex;
+            }
+
             var valid = yieldedToCombat && resumedObjective && channelHoldsUnderFire
                 && smokeResumesObjective
                 && switchedUnderPressure && detourRoutesAroundWall && unreachableSafe && unreachableRetries
@@ -1056,8 +1078,9 @@ public partial class FreightTerminalWorld
                 && carrierTransferResetsChannel
                 && strategyRefreshPreservesChannel
                 && strategyRefreshReassignsLostChannel
-                && strategyRefreshClearsChangedPhase;
-            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} opening_patterns={openingPatterns} posts={postsConverted} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
+                && strategyRefreshClearsChangedPhase
+                && friendlyAiPlantsDevice;
+            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} friendly_ai_plant={friendlyAiPlantsDevice} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} opening_patterns={openingPatterns} posts={postsConverted} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
             return valid;
         }
         finally

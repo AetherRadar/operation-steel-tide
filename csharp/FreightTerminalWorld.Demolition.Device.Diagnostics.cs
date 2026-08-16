@@ -8,11 +8,13 @@ public partial class FreightTerminalWorld
         DemolitionDeviceLifecycleSnapshot Lifecycle,
         Vector3 GroundPosition,
         Vector3 LastCarrierPosition,
+        string Name,
         Transform3D Transform,
         Vector3 Scale,
         bool Visible,
         bool BeaconVisible,
         float BeaconEnergy,
+        float BeaconRange,
         int DetonationCount);
 
     private DemolitionDeviceRuntimeDiagnosticState CaptureDemolitionDeviceRuntimeForDiagnostics()
@@ -20,11 +22,13 @@ public partial class FreightTerminalWorld
             _demolitionDeviceLifecycle.Capture(),
             _demolitionDeviceGroundPosition,
             _demolitionDeviceLastCarrierPosition,
+            IsInstanceValid(_demolitionDevice) ? _demolitionDevice!.Name.ToString() : string.Empty,
             IsInstanceValid(_demolitionDevice) ? _demolitionDevice!.GlobalTransform : Transform3D.Identity,
             IsInstanceValid(_demolitionDevice) ? _demolitionDevice!.Scale : Vector3.One,
             IsInstanceValid(_demolitionDevice) && _demolitionDevice!.Visible,
             IsInstanceValid(_demolitionDeviceBeacon) && _demolitionDeviceBeacon!.Visible,
             IsInstanceValid(_demolitionDeviceBeacon) ? _demolitionDeviceBeacon!.LightEnergy : 0.0f,
+            IsInstanceValid(_demolitionDeviceBeacon) ? _demolitionDeviceBeacon!.OmniRange : 0.0f,
             _demolitionDetonationCount);
 
     private void RestoreDemolitionDeviceRuntimeForDiagnostics(
@@ -36,6 +40,10 @@ public partial class FreightTerminalWorld
         _demolitionDetonationCount = state.DetonationCount;
         if (IsInstanceValid(_demolitionDevice))
         {
+            if (!string.IsNullOrWhiteSpace(state.Name))
+            {
+                _demolitionDevice!.Name = state.Name;
+            }
             _demolitionDevice!.GlobalTransform = state.Transform;
             _demolitionDevice.Scale = state.Scale;
             _demolitionDevice.Visible = state.Visible;
@@ -44,6 +52,7 @@ public partial class FreightTerminalWorld
         {
             _demolitionDeviceBeacon!.Visible = state.BeaconVisible;
             _demolitionDeviceBeacon.LightEnergy = state.BeaconEnergy;
+            _demolitionDeviceBeacon.OmniRange = state.BeaconRange;
         }
     }
 
