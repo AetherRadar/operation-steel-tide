@@ -6,9 +6,10 @@ public enum PlayerQuickSlot
 {
     Primary = 0,
     Secondary = 1,
-    Melee = 2,
-    FragmentationGrenade = 3,
-    Utility = 4
+    Sidearm = 2,
+    Melee = 3,
+    FragmentationGrenade = 4,
+    Utility = 5
 }
 
 public partial class TacticalPlayer
@@ -18,7 +19,7 @@ public partial class TacticalPlayer
 
     public PlayerQuickSlot ActiveQuickSlot => _activeQuickSlot;
     public bool IsFirearmQuickSlotSelected
-        => _activeQuickSlot is PlayerQuickSlot.Primary or PlayerQuickSlot.Secondary;
+        => _activeQuickSlot is PlayerQuickSlot.Primary or PlayerQuickSlot.Secondary or PlayerQuickSlot.Sidearm;
     public bool IsThrowableQuickSlotSelected
         => _activeQuickSlot is PlayerQuickSlot.FragmentationGrenade or PlayerQuickSlot.Utility;
 
@@ -34,6 +35,8 @@ public partial class TacticalPlayer
                 return ActivateWeaponSlot(PlayerWeaponSlot.Primary, notify);
             case PlayerQuickSlot.Secondary:
                 return ActivateWeaponSlot(PlayerWeaponSlot.Secondary, notify);
+            case PlayerQuickSlot.Sidearm:
+                return ActivateWeaponSlot(PlayerWeaponSlot.Sidearm, notify);
             case PlayerQuickSlot.Melee:
                 return ActivateWeaponSlot(PlayerWeaponSlot.Melee, notify);
             case PlayerQuickSlot.FragmentationGrenade when Grenades > 0:
@@ -53,7 +56,7 @@ public partial class TacticalPlayer
 
     private void SelectThrowableSlot(PlayerQuickSlot slot, bool notify)
     {
-        if (_activeQuickSlot is PlayerQuickSlot.Primary or PlayerQuickSlot.Secondary or PlayerQuickSlot.Melee)
+        if (_activeQuickSlot is PlayerQuickSlot.Primary or PlayerQuickSlot.Secondary or PlayerQuickSlot.Sidearm or PlayerQuickSlot.Melee)
         {
             _returnQuickSlot = _activeQuickSlot;
             StoreActiveFirearmState();
@@ -87,16 +90,11 @@ public partial class TacticalPlayer
 
     private void ReturnFromThrowableSlot()
     {
-        var target = _returnQuickSlot;
-        if (target == PlayerQuickSlot.Primary && (!HasFireablePrimary || PrimaryWeaponBuild is null))
+        var target = (PlayerWeaponSlot)Mathf.Clamp((int)_returnQuickSlot, 0, (int)PlayerWeaponSlot.Melee);
+        if (!ActivateWeaponSlot(target, true))
         {
-            target = HasSecondaryWeapon ? PlayerQuickSlot.Secondary : PlayerQuickSlot.Melee;
+            ActivateWeaponSlot(PreferredFirearmOrMelee(), true);
         }
-        else if (target == PlayerQuickSlot.Secondary && !HasSecondaryWeapon)
-        {
-            target = HasFireablePrimary ? PlayerQuickSlot.Primary : PlayerQuickSlot.Melee;
-        }
-        ActivateWeaponSlot((PlayerWeaponSlot)Mathf.Clamp((int)target, 0, 2), true);
     }
 
     private void UpdateHeldItemVisibility()
@@ -115,6 +113,7 @@ public partial class TacticalPlayer
         {
             _weaponLight.Visible = firearmVisible && _flashlightOn;
         }
+        UpdateHeldThrowableVisual();
     }
 
     private bool ThrowSelectedQuickSlot()
@@ -132,10 +131,6 @@ public partial class TacticalPlayer
 
     private void OnThrowableConsumed()
     {
-        if (_activeQuickSlot is PlayerQuickSlot.FragmentationGrenade && Grenades <= 0
-            || _activeQuickSlot is PlayerQuickSlot.Utility && SmokeGrenades <= 0)
-        {
-            ReturnFromThrowableSlot();
-        }
+        ActivateWeaponSlot(PreferredFirearmOrMelee(), true);
     }
 }

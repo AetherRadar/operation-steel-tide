@@ -63,7 +63,8 @@ public static class GameLocalization
         ["tactical_knife"] = "战术刀",
         ["knife_ready"] = "战术刀已就绪",
         ["primary_ready"] = "主武器已就绪",
-        ["secondary_ready"] = "\u624b\u67aa\u5df2\u5c31\u7eea",
+        ["secondary_ready"] = "\u526f\u6b66\u5668\u5df2\u5c31\u7eea",
+        ["sidearm_ready"] = "\u624b\u67aa\u5df2\u5c31\u7eea",
         ["search"] = "搜索",
         ["open_loot"] = "打开",
         ["field_inventory"] = "战地装备管理",
@@ -90,6 +91,7 @@ public static class GameLocalization
         ["empty_slot"] = "空槽位",
         ["select_primary"] = "切换到主武器",
         ["select_secondary"] = "\u5207\u6362\u5230\u526f\u6b66\u5668",
+        ["select_sidearm"] = "\u5207\u6362\u5230\u624b\u67aa",
         ["select_knife"] = "切换到战术刀",
         ["helmet"] = "头盔",
         ["body_armor"] = "防弹衣",
@@ -124,6 +126,8 @@ public static class GameLocalization
 
     static GameLocalization()
     {
+        Chinese["secondary_weapon"] = "\u526f\u6b66\u5668";
+        Chinese["sidearm_weapon"] = "\u624b\u67aa";
         Chinese["squad_ready"] = "\u5c0f\u961f\u5df2\u5c31\u7eea  //  F1 \u8ddf\u968f  F2 \u6212\u5907  F3 \u79fb\u52a8  H \u6280\u80fd";
         Chinese["medic_spray"] = "\u533b\u7597\u55b7\u96fe  //  \u4f24\u52bf\u5df2\u7a33\u5b9a";
         Chinese["squad_revive"] = "\u533b\u7597\u55b7\u96fe  //  \u961f\u53cb\u5df2\u6551\u8d77";
@@ -144,6 +148,9 @@ public static class GameLocalization
         Chinese["weapon_m24"] = "M24 \u7cbe\u786e\u5c04\u624b\u6b65\u67aa";
         Chinese["weapon_p226"] = "P226 \u5236\u5f0f\u624b\u67aa";
         Chinese["weapon_m1911"] = "M1911 \u6218\u672f\u624b\u67aa";
+        Chinese["weapon_awm"] = "AWM .338 \u9a6c\u683c\u5357\u72d9\u51fb\u6b65\u67aa";
+        Chinese["weapon_vss"] = "VSS \u5fae\u58f0\u72d9\u51fb\u6b65\u67aa";
+        Chinese["weapon_desert_eagle"] = "\u6c99\u6f20\u4e4b\u9e70 .50 AE";
         Chinese["weapon_mp5a5"] = "MP5A5 \u51b2\u950b\u67aa";
         Chinese["weapon_m3a1"] = "M3A1 \u7b80\u6613\u51b2\u950b\u67aa";
         Chinese["weapon_axmc"] = "AXMC .338 \u8d85\u8fdc\u7a0b\u72d9\u51fb\u6b65\u67aa";

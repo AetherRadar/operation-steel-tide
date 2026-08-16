@@ -263,6 +263,11 @@ public partial class InventoryModelPreview : SubViewportContainer
     private void BuildRifle(Node3D root)
     {
         var platform = _weapon?.Platform ?? WeaponPlatform.M4A1;
+        if (WeaponCatalog.IsSidearm(platform))
+        {
+            BuildSidearm(root, platform);
+            return;
+        }
         var metal = platform switch
         {
             WeaponPlatform.AK74 => new Color(0.19f, 0.2f, 0.18f),
@@ -271,6 +276,8 @@ public partial class InventoryModelPreview : SubViewportContainer
             WeaponPlatform.AXMC => new Color(0.04f, 0.23f, 0.23f),
             WeaponPlatform.MP5A5 => new Color(0.055f, 0.065f, 0.06f),
             WeaponPlatform.M3A1 => new Color(0.24f, 0.28f, 0.26f),
+            WeaponPlatform.AWM => new Color(0.22f, 0.24f, 0.23f),
+            WeaponPlatform.VSS => new Color(0.08f, 0.12f, 0.075f),
             _ => new Color(0.12f, 0.15f, 0.145f)
         };
         var furniture = platform switch
@@ -279,6 +286,8 @@ public partial class InventoryModelPreview : SubViewportContainer
             WeaponPlatform.M24 => new Color(0.2f, 0.31f, 0.18f),
             WeaponPlatform.AXMC => new Color(0.08f, 0.4f, 0.35f),
             WeaponPlatform.M3A1 => new Color(0.13f, 0.15f, 0.14f),
+            WeaponPlatform.AWM => new Color(0.16f, 0.19f, 0.17f),
+            WeaponPlatform.VSS => new Color(0.17f, 0.25f, 0.14f),
             _ => metal.Lightened(0.12f)
         };
         var steel = new Color(0.44f, 0.5f, 0.48f);
@@ -302,6 +311,42 @@ public partial class InventoryModelPreview : SubViewportContainer
         if (_weapon?.Attachments.ContainsKey(AttachmentSlot.Muzzle) == true)
         {
             Cylinder(root, 0.075f, 0.3f, new Vector3(1.57f, 0.01f, 0), new Vector3(0, 0, Mathf.Pi / 2), steel.Darkened(0.2f), 0.82f, 0.7f);
+        }
+        if (platform == WeaponPlatform.AWM)
+        {
+            Cylinder(root, 0.035f, 0.78f, new Vector3(0.05f, 0.27f, 0), new Vector3(0, 0, Mathf.Pi / 2), steel.Darkened(0.1f), 0.9f, 0.24f);
+            Cylinder(root, 0.024f, 0.52f, new Vector3(0.62f, -0.24f, 0.12f), new Vector3(0, 0, 0.35f), steel.Darkened(0.22f), 0.82f, 0.4f);
+            Cylinder(root, 0.024f, 0.52f, new Vector3(0.62f, -0.24f, -0.12f), new Vector3(0, 0, -0.35f), steel.Darkened(0.22f), 0.82f, 0.4f);
+        }
+        else if (platform == WeaponPlatform.VSS)
+        {
+            Cylinder(root, 0.095f, 0.74f, new Vector3(0.78f, 0, 0), new Vector3(0, 0, Mathf.Pi / 2), metal.Darkened(0.22f), 0.75f, 0.48f);
+            Box(root, new Vector3(0.58f, 0.055f, 0.14f), new Vector3(-0.72f, 0.12f, 0), furniture, 0.15f, rotation: new Vector3(0, 0, 0.38f));
+            Box(root, new Vector3(0.58f, 0.055f, 0.14f), new Vector3(-0.72f, -0.12f, 0), furniture, 0.15f, rotation: new Vector3(0, 0, -0.38f));
+        }
+    }
+
+    private static void BuildSidearm(Node3D root, WeaponPlatform platform)
+    {
+        var desertEagle = platform == WeaponPlatform.DesertEagle;
+        var metal = desertEagle ? new Color(0.5f, 0.52f, 0.48f) : new Color(0.12f, 0.14f, 0.135f);
+        var grip = platform == WeaponPlatform.M1911
+            ? new Color(0.28f, 0.13f, 0.06f)
+            : new Color(0.055f, 0.065f, 0.06f);
+        var slideLength = desertEagle ? 0.92f : platform == WeaponPlatform.M1911 ? 0.76f : 0.7f;
+        Box(root, new Vector3(slideLength, desertEagle ? 0.23f : 0.18f, 0.2f),
+            new Vector3(0.08f, 0.1f, 0), metal, desertEagle ? 0.92f : 0.65f, desertEagle ? 0.16f : 0.38f);
+        Box(root, new Vector3(0.44f, 0.16f, 0.19f), new Vector3(-0.08f, -0.06f, 0), metal.Darkened(0.14f), 0.62f);
+        Box(root, new Vector3(0.22f, 0.62f, 0.2f), new Vector3(-0.25f, -0.38f, 0), grip, 0.12f, 0.72f,
+            rotation: new Vector3(0, 0, -0.22f));
+        Cylinder(root, desertEagle ? 0.052f : 0.038f, desertEagle ? 0.42f : 0.3f,
+            new Vector3(0.55f, 0.1f, 0), new Vector3(0, 0, Mathf.Pi / 2), metal.Darkened(0.2f), 0.86f, 0.22f);
+        Box(root, new Vector3(0.28f, 0.035f, 0.22f), new Vector3(0.05f, -0.22f, 0),
+            grip.Darkened(0.18f), 0.42f, rotation: new Vector3(0, 0, 0.12f));
+        if (desertEagle)
+        {
+            Box(root, new Vector3(0.34f, 0.045f, 0.215f), new Vector3(0.24f, 0.23f, 0),
+                metal.Lightened(0.12f), 0.96f, 0.12f);
         }
     }
 

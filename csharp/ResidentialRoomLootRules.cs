@@ -152,9 +152,10 @@ public static class ResidentialRoomLootRules
         {
             var platform = grade switch
             {
-                LootGrade.Legendary => WeaponPlatform.M24,
-                LootGrade.Epic => WeaponPlatform.ScarL,
-                LootGrade.Rare when random.Next(100) < 42 => WeaponPlatform.MP5A5,
+                LootGrade.Legendary => random.Next(100) < 55 ? WeaponPlatform.AWM : WeaponPlatform.M24,
+                LootGrade.Epic => random.Next(100) < 48 ? WeaponPlatform.VSS : WeaponPlatform.ScarL,
+                LootGrade.Rare when random.Next(100) < 22 => WeaponPlatform.DesertEagle,
+                LootGrade.Rare when random.Next(100) < 54 => WeaponPlatform.MP5A5,
                 _ => WeaponPlatform.M4A1
             };
             var tier = grade >= LootGrade.Legendary ? 2 : grade >= LootGrade.Rare ? 1 : 0;
@@ -162,14 +163,17 @@ public static class ResidentialRoomLootRules
         }
         if (roll < 30)
         {
+            var caliberRoll = random.Next(100);
             var caliber = grade >= LootGrade.Epic
-                ? AmmoCaliber.Sniper
-                : random.Next(100) < 32 ? AmmoCaliber.Smg : AmmoCaliber.Rifle;
+                ? caliberRoll < 24 ? AmmoCaliber.Magnum338 : AmmoCaliber.Sniper
+                : caliberRoll < 18 ? AmmoCaliber.Pistol : caliberRoll < 46 ? AmmoCaliber.Smg : AmmoCaliber.Rifle;
             return new LootItem
             {
                 Kind = LootItemKind.Ammunition,
                 AmmoCaliber = caliber,
-                Quantity = caliber == AmmoCaliber.Sniper ? 10 + (int)grade * 3 : 24 + (int)grade * 12,
+                Quantity = caliber is AmmoCaliber.Sniper or AmmoCaliber.Magnum338
+                    ? 10 + (int)grade * 3
+                    : 24 + (int)grade * 12,
                 Grade = grade
             };
         }

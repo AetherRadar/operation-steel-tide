@@ -103,9 +103,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public bool HasActiveFirearm
         => IsFirearmQuickSlotSelected
         && !_knifeEquipped
-        && (_activeWeaponSlot == PlayerWeaponSlot.Primary
-            ? HasFireablePrimary && _primaryWeaponSlot is not null
-            : _activeWeaponSlot == PlayerWeaponSlot.Secondary && _secondaryWeaponSlot is not null);
+        && _activeWeaponSlot switch
+        {
+            PlayerWeaponSlot.Primary => HasFireablePrimary && _primaryWeaponSlot is not null,
+            PlayerWeaponSlot.Secondary => _secondaryWeaponSlot is not null,
+            PlayerWeaponSlot.Sidearm => _sidearmWeaponSlot is not null,
+            _ => false
+        };
     public bool UiLocked { get; set; }
     public bool SprintRecoveryRequired => _sprintRecoveryRequired || _sprintRecoveryDelay > 0.0f;
     public bool IsInVehicle => _vehicle is not null && GodotObject.IsInstanceValid(_vehicle);
@@ -260,6 +264,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         BuildBody();
         BuildWeapon();
         BuildKnife();
+        BuildHeldThrowables();
         BuildLadderViewModel();
         BuildRoleDevices();
         BuildMedicalDevices();
@@ -542,6 +547,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _camera.AddChild(_weaponRoot);
         _proceduralWeaponVisual = new Node3D { Name = "ProceduralWeaponVisual" };
         _weaponRoot.AddChild(_proceduralWeaponVisual);
+        _platformSignatureRoot = new Node3D { Name = "PlatformSignatureVisual" };
+        _proceduralWeaponVisual.AddChild(_platformSignatureRoot);
 
         var black = TacticalSurfaceLibrary.WeaponFinish(new Color(0.075f, 0.083f, 0.079f), 0.64f, 0.38f);
         var polymer = TacticalSurfaceLibrary.WeaponFinish(new Color(0.055f, 0.065f, 0.061f), 0.18f, 0.62f, 5.5f);
@@ -896,7 +903,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         var definition = WeaponCatalog.Weapon(EquippedWeapon.Platform);
         var stats = EquippedWeapon.Stats();
-        var isPistol = EquippedWeapon.Platform is WeaponPlatform.P226 or WeaponPlatform.M1911;
+        var isPistol = WeaponCatalog.IsSidearm(EquippedWeapon.Platform);
         _weaponRoot.Name = definition.Name;
         var barrelPart = EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Barrel, out var barrelId)
             ? WeaponCatalog.Attachment(barrelId)
@@ -913,6 +920,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.M3A1 => new Color(0.17f, 0.2f, 0.185f),
             WeaponPlatform.P226 => new Color(0.055f, 0.06f, 0.065f),
             WeaponPlatform.M1911 => new Color(0.16f, 0.15f, 0.13f),
+            WeaponPlatform.AWM => new Color(0.2f, 0.22f, 0.21f),
+            WeaponPlatform.VSS => new Color(0.075f, 0.1f, 0.075f),
+            WeaponPlatform.DesertEagle => new Color(0.42f, 0.44f, 0.41f),
             _ => new Color(0.045f, 0.052f, 0.05f)
         };
         var furnitureColor = EquippedWeapon.Platform switch
@@ -925,6 +935,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.M3A1 => new Color(0.105f, 0.12f, 0.11f),
             WeaponPlatform.P226 => new Color(0.075f, 0.08f, 0.085f),
             WeaponPlatform.M1911 => new Color(0.22f, 0.12f, 0.065f),
+            WeaponPlatform.AWM => new Color(0.15f, 0.18f, 0.16f),
+            WeaponPlatform.VSS => new Color(0.16f, 0.24f, 0.14f),
+            WeaponPlatform.DesertEagle => new Color(0.07f, 0.075f, 0.07f),
             _ => new Color(0.18f, 0.17f, 0.13f)
         };
         var receiverMaterial = TacticalSurfaceLibrary.WeaponFinish(receiverColor, 0.52f, 0.46f);
@@ -940,6 +953,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.M3A1 => new Vector3(0.135f, 0.155f, 0.34f),
             WeaponPlatform.P226 => new Vector3(0.13f, 0.13f, 0.29f),
             WeaponPlatform.M1911 => new Vector3(0.125f, 0.14f, 0.31f),
+            WeaponPlatform.AWM => new Vector3(0.165f, 0.18f, 0.76f),
+            WeaponPlatform.VSS => new Vector3(0.15f, 0.165f, 0.5f),
+            WeaponPlatform.DesertEagle => new Vector3(0.145f, 0.15f, 0.36f),
             _ => new Vector3(0.13f, 0.15f, 0.46f)
         };
         ((BoxMesh)_receiver.Mesh).Size = receiverSize;
@@ -969,7 +985,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         ((BoxMesh)_handguard.Mesh).Size = isPistol
             ? new Vector3(0.115f, 0.075f, 0.13f)
             : new Vector3(
-                EquippedWeapon.Platform is WeaponPlatform.ScarL or WeaponPlatform.M24 or WeaponPlatform.AXMC
+                EquippedWeapon.Platform is WeaponPlatform.ScarL or WeaponPlatform.M24 or WeaponPlatform.AXMC or WeaponPlatform.AWM
                     ? 0.17f
                     : EquippedWeapon.Platform == WeaponPlatform.M3A1 ? 0.13f : 0.15f,
                 0.12f,
@@ -1015,6 +1031,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.M3A1 => new Vector3(0.075f, 0.3f, 0.11f),
             WeaponPlatform.P226 => new Vector3(0.065f, 0.2f, 0.085f),
             WeaponPlatform.M1911 => new Vector3(0.06f, 0.18f, 0.08f),
+            WeaponPlatform.AWM => new Vector3(0.1f, 0.18f, 0.15f),
+            WeaponPlatform.VSS => new Vector3(0.09f, 0.24f, 0.13f),
+            WeaponPlatform.DesertEagle => new Vector3(0.075f, 0.2f, 0.1f),
             _ => new Vector3(0.09f, 0.26f * (stats.MagazineSize > 30 ? 1.24f : 1.0f), 0.14f)
         };
         ((BoxMesh)_magazine.Mesh).Size = magazineSize;
@@ -1055,7 +1074,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             ? new Vector3(0.065f, -0.04f, -0.28f)
             : new Vector3(0.09f, -0.015f, -0.5f - barrelLength * 0.45f);
         _gunAudio.MaxDistance = stats.SoundRadius * 1.9f;
+        _gunAudio.Stream = EquippedWeapon.Platform == WeaponPlatform.DesertEagle
+            ? SoundLab.DesertEagleShot()
+            : SoundLab.Gunshot();
         Ammo = Mathf.Min(Ammo, stats.MagazineSize);
+        RefreshPlatformSignatureVisual();
         RefreshAuthoredPrimaryWeapon();
     }
 
@@ -1209,6 +1232,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             ActivateWeaponSlot(PlayerWeaponSlot.Secondary, true);
         }
+        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_sidearm"))
+        {
+            ActivateWeaponSlot(PlayerWeaponSlot.Sidearm, true);
+        }
         else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_melee"))
         {
             ActivateWeaponSlot(PlayerWeaponSlot.Melee, true);
@@ -1319,6 +1346,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             HasFireablePrimary,
             EquippedKnifeSkinId,
             SecondaryWeaponBuild,
+            SidearmWeaponBuild,
             (int)ActiveQuickSlot);
         Hud?.SetAiming(_isAiming);
         var heading = Mathf.RadToDeg(Rotation.Y) * -1.0f;
@@ -1780,6 +1808,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _camera.Fov = Mathf.Lerp(_camera.Fov, targetFov, SmoothFactor(6.5f + handling * 5.0f, delta));
         _weaponRoot.Visible = IsFirearmQuickSlotSelected && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
         _knifeRoot.Visible = _activeQuickSlot == PlayerQuickSlot.Melee && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
+        UpdateHeldThrowableVisual();
         UpdateKnifeAnimation(delta);
         var targetPosition = WeaponViewPositionTarget();
         _weaponRoot.Position = _weaponRoot.Position.Lerp(targetPosition, SmoothFactor(_isAiming ? 7.5f + handling * 6.0f : 6.0f + handling * 3.0f, delta));
@@ -1815,7 +1844,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     public void SelectWeapon(int slot)
     {
-        SelectQuickSlot((PlayerQuickSlot)Mathf.Clamp(slot, 0, 4));
+        SelectQuickSlot((PlayerQuickSlot)Mathf.Clamp(slot, 0, 5));
     }
 
     public void CycleWeapon()
@@ -2452,16 +2481,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         if (item.Kind == LootItemKind.Weapon && item.Weapon is not null)
         {
-            var previous = HasFireablePrimary
-                ? new LootItem
-                {
-                    Kind = LootItemKind.Weapon,
-                    Weapon = EquippedWeapon.Clone(),
-                    Grade = EquippedWeaponGrade
-                }
-                : null;
-            EquipPrimary(item.Weapon, item.Grade);
-            return previous;
+            return EquipLootWeapon(item.Weapon, item.Grade);
         }
         if (item.Kind == LootItemKind.Attachment)
         {

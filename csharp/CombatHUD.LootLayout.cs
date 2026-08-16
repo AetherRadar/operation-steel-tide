@@ -10,6 +10,32 @@ public partial class CombatHUD
     public bool LootPaperDollReady
         => IsInstanceValid(_lootOperatorPreview) && _lootOperatorPreview.Visible;
 
+    public bool LootWeaponRackReady
+        => IsInstanceValid(_lootWeaponRack)
+        && _lootWeaponRack.UiReady
+        && _lootWeaponRack.IntentSignalsReady;
+
+    public bool LootWeaponRackUsesPackedScene
+        => IsInstanceValid(_lootWeaponRack)
+        && _lootWeaponRack.SceneFilePath == LootWeaponRackView.ScenePath;
+
+    public int LootVisibleWeaponSlotCount
+        => IsInstanceValid(_lootWeaponRack) ? _lootWeaponRack.VisibleWeaponCount : 0;
+
+    public WeaponPlatform? LootWeaponPlatformForSlot(PlayerWeaponSlot slot)
+        => IsInstanceValid(_lootWeaponRack) ? _lootWeaponRack.PlatformForSlot(slot) : null;
+
+    public string LootWeaponCaptionForSlot(PlayerWeaponSlot slot)
+        => IsInstanceValid(_lootWeaponRack) ? _lootWeaponRack.CaptionForSlot(slot) : string.Empty;
+
+    public void PressLootWeaponDetailsForDiagnostics(PlayerWeaponSlot slot)
+    {
+        if (IsInstanceValid(_lootWeaponRack))
+        {
+            _lootWeaponRack.PressDetailsForDiagnostics(slot);
+        }
+    }
+
     public bool LootBackpackPanelExpanded
         => !_shownSourceAvailable
         && IsInstanceValid(_backpackZone)
@@ -109,10 +135,12 @@ public partial class CombatHUD
         _lootOperatorCaption.MouseFilter = Control.MouseFilterEnum.Ignore;
         frame.AddChild(_lootOperatorCaption);
 
-        AddLootConnector(parent, new Vector2(1384, 246), new Vector2(6, 1), new Color(0.34f, 0.86f, 0.7f));
-        AddLootConnector(parent, new Vector2(1384, 394), new Vector2(6, 1), new Color(0.35f, 0.68f, 0.94f));
-        AddLootConnector(parent, new Vector2(1600, 220), new Vector2(10, 1), new Color(0.84f, 0.66f, 0.3f));
-        AddLootConnector(parent, new Vector2(1600, 379), new Vector2(10, 1), new Color(0.62f, 0.55f, 0.86f));
+        AddLootConnector(parent, new Vector2(1384, 220), new Vector2(6, 1), new Color(0.34f, 0.86f, 0.7f));
+        AddLootConnector(parent, new Vector2(1384, 320), new Vector2(6, 1), new Color(0.34f, 0.86f, 0.7f));
+        AddLootConnector(parent, new Vector2(1384, 420), new Vector2(6, 1), new Color(0.84f, 0.66f, 0.3f));
+        AddLootConnector(parent, new Vector2(1600, 218), new Vector2(10, 1), new Color(0.84f, 0.66f, 0.3f));
+        AddLootConnector(parent, new Vector2(1600, 316), new Vector2(10, 1), new Color(0.35f, 0.68f, 0.94f));
+        AddLootConnector(parent, new Vector2(1600, 420), new Vector2(10, 1), new Color(0.62f, 0.55f, 0.86f));
     }
 
     private static void AddLootConnector(Control parent, Vector2 position, Vector2 size, Color color)

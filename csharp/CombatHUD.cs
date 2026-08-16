@@ -51,6 +51,7 @@ public partial class CombatHUD : CanvasLayer
     private int _activeWeaponSlot;
     private WeaponBuild? _quickPrimaryBuild;
     private WeaponBuild? _quickSecondaryBuild;
+    private WeaponBuild? _quickSidearmBuild;
     private string _quickKnifeSkinId = KnifeSkinCatalog.DefaultId;
     private int _grenadeCount;
     private Label _plateReserveLabel = null!;
@@ -87,15 +88,13 @@ public partial class CombatHUD : CanvasLayer
     private LootDropZone _backpackZone = null!;
     private LootDropZone _groundDropZone = null!;
     private ScrollContainer _backpackScroll = null!;
-    private LootDropZone _primarySlot = null!;
+    private LootWeaponRackView _lootWeaponRack = null!;
     private LootDropZone _helmetSlot = null!;
     private LootDropZone _armorSlot = null!;
     private LootDropZone _packSlot = null!;
-    private Label _primarySlotLabel = null!;
     private Label _helmetSlotLabel = null!;
     private Label _armorSlotLabel = null!;
     private Label _packSlotLabel = null!;
-    private Label _primarySlotCaption = null!;
     private Label _helmetSlotCaption = null!;
     private Label _armorSlotCaption = null!;
     private Label _packSlotCaption = null!;
@@ -108,8 +107,6 @@ public partial class CombatHUD : CanvasLayer
     private Button _lootCloseButton = null!;
     private Button _backpackHotkeyButton = null!;
     private Label _backpackHotkeyValue = null!;
-    private Button _primaryDetailButton = null!;
-    private InventoryModelPreview _primaryWeaponPreview = null!;
     private InventoryModelPreview _helmetPreview = null!;
     private InventoryModelPreview _armorPreview = null!;
     private InventoryModelPreview _packPreview = null!;
@@ -624,10 +621,17 @@ public partial class CombatHUD : CanvasLayer
         panel.AddChild(_lootStats);
 
         BuildLootOperatorDisplay(panel);
-        _primarySlot = BuildPrimaryWeaponSlot(panel, new Vector2(1200, 174), new Vector2(184, 154));
-        _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(1200, 338), new Vector2(184, 124), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel, out _armorPreview);
-        _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(1610, 174), new Vector2(160, 104), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel, out _helmetPreview);
-        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK CONTAINER", new Vector2(1610, 326), new Vector2(160, 108), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel, out _packPreview);
+        var weaponRackScene = GD.Load<PackedScene>(LootWeaponRackView.ScenePath)
+            ?? throw new InvalidOperationException($"Missing scene: {LootWeaponRackView.ScenePath}");
+        _lootWeaponRack = weaponRackScene.Instantiate<LootWeaponRackView>();
+        _lootWeaponRack.Position = new Vector2(1200, 174);
+        _lootWeaponRack.Size = new Vector2(184, 296);
+        _lootWeaponRack.Dropped += HandleLootDrop;
+        _lootWeaponRack.WeaponDetailsRequested += ShowLootWeaponDetails;
+        panel.AddChild(_lootWeaponRack);
+        _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(1610, 174), new Vector2(160, 88), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel, out _helmetPreview);
+        _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(1610, 268), new Vector2(160, 96), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel, out _armorPreview);
+        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK CONTAINER", new Vector2(1610, 370), new Vector2(160, 100), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel, out _packPreview);
 
         _backpackItemsCaption = PositionedLabel("BACKPACK STORAGE", 12, new Color(0.43f, 0.72f, 0.96f), 940, 484);
         _backpackItemsCaption.Size = new Vector2(340, 22);
@@ -674,58 +678,6 @@ public partial class CombatHUD : CanvasLayer
 
         BuildWeaponDetailOverlay();
         BuildLootItemActionMenu();
-    }
-
-    private LootDropZone BuildPrimaryWeaponSlot(Control parent, Vector2 position, Vector2 size)
-    {
-        var accent = new Color(0.34f, 0.86f, 0.7f);
-        var zone = new LootDropZone
-        {
-            Target = LootDropTarget.PrimaryWeapon,
-            Position = position,
-            Size = size
-        };
-        zone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(accent));
-        zone.Dropped += HandleLootDrop;
-        parent.AddChild(zone);
-        var box = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
-        box.AddThemeConstantOverride("separation", 1);
-        zone.AddChild(box);
-        var header = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-        box.AddChild(header);
-        _primarySlotCaption = Label("PRIMARY WEAPON", 11, accent);
-        _primarySlotCaption.MouseFilter = Control.MouseFilterEnum.Ignore;
-        _primarySlotCaption.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        header.AddChild(_primarySlotCaption);
-        _primaryDetailButton = new Button
-        {
-            Text = "DETAILS",
-            CustomMinimumSize = new Vector2(92, 25),
-            FocusMode = Control.FocusModeEnum.None
-        };
-        _primaryDetailButton.AddThemeFontSizeOverride("font_size", 11);
-        _primaryDetailButton.AddThemeColorOverride("font_color", accent);
-        _primaryDetailButton.Pressed += () =>
-        {
-            if (_shownPlayer is not null)
-            {
-                ShowWeaponDetails(_shownPlayer.EquippedWeapon);
-            }
-        };
-        header.AddChild(_primaryDetailButton);
-        _primaryWeaponPreview = new InventoryModelPreview
-        {
-            CustomMinimumSize = new Vector2(Mathf.Max(120.0f, size.X - 20.0f), 54),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
-        };
-        _primaryWeaponPreview.Configure(InventoryPreviewKind.Rifle, weapon: WeaponCatalog.StarterWeapon());
-        box.AddChild(_primaryWeaponPreview);
-        _primarySlotLabel = Label("", 11, new Color(0.68f, 0.78f, 0.75f));
-        _primarySlotLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
-        _primarySlotLabel.ClipText = true;
-        _primarySlotLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        box.AddChild(_primarySlotLabel);
-        return zone;
     }
 
     private LootDropZone BuildEquipmentSlot(
@@ -856,6 +808,7 @@ public partial class CombatHUD : CanvasLayer
     }
 
     public bool IsWeaponDetailVisible => IsInstanceValid(_weaponDetailOverlay) && _weaponDetailOverlay.Visible;
+    public WeaponPlatform? DetailedWeaponPlatformForDiagnostics => _detailedWeapon?.Platform;
 
     public void ShowWeaponDetails(WeaponBuild weapon)
     {
@@ -957,34 +910,32 @@ public partial class CombatHUD : CanvasLayer
             : $"{Text("equipped_loadout", "CURRENT LOADOUT")}  //  {Text("backpack_container", "BACKPACK CONTAINER")}";
         _lootCloseButton.Text = Text("close", "CLOSE");
         _backpackItemsCaption.Text = $"{Text("backpack_storage", "BACKPACK STORAGE")}  {_shownPlayer.Backpack.Count}/{_shownPlayer.BackpackCapacity}";
-        _primaryDetailButton.Text = Text("details", "DETAILS");
-        _primaryDetailButton.TooltipText = Text("weapon_details", "WEAPON DETAILS");
         _lootSourceZone.Enabled = _shownSourceAvailable;
         _lootSourceZone.Visible = _shownSourceAvailable;
         _backpackItemsCaption.Visible = _shownSourceAvailable;
         _backpackZone.Position = _shownSourceAvailable ? new Vector2(940, 510) : new Vector2(32, 122);
         _backpackZone.Size = _shownSourceAvailable ? new Vector2(830, 328) : new Vector2(1138, 716);
 
-        if (_shownPlayer.HasFireablePrimary)
+        var primaryWeapon = _shownPlayer.PrimaryWeaponBuild;
+        _lootWeaponRack.SetLoadout(
+            _language,
+            primaryWeapon,
+            _shownPlayer.PrimaryWeaponGrade,
+            _shownPlayer.SecondaryWeaponBuild,
+            _shownPlayer.SecondaryWeaponGrade,
+            _shownPlayer.SidearmWeaponBuild,
+            _shownPlayer.SidearmWeaponGrade);
+        if (primaryWeapon is not null)
         {
-            var stats = _shownPlayer.CurrentWeaponStats;
-            var weaponName = _shownPlayer.EquippedWeapon.DisplayName(_language);
+            var stats = primaryWeapon.Stats();
+            var weaponName = primaryWeapon.DisplayName(_language);
             _lootStats.Text = GameLocalization.IsChinese(_language)
                 ? $"当前主武器  {weaponName}     伤害 {stats.Damage:0}     射程 {stats.EffectiveRange:0}m     操控 {stats.Handling:0.00}"
-                : $"EQUIPPED  {weaponName}     DMG {stats.Damage:0}     RANGE {stats.EffectiveRange:0}m     HANDLING {stats.Handling:0.00}";
-            _primaryWeaponPreview.Visible = true;
-            _primaryWeaponPreview.Configure(InventoryPreviewKind.Rifle, weapon: _shownPlayer.EquippedWeapon);
-            _primarySlotLabel.Text = GameLocalization.IsChinese(_language)
-                ? $"{weaponName}   //   后坐 {stats.Recoil:0.00}   弹匣 {stats.MagazineSize}"
-                : $"{weaponName}   //   RECOIL {stats.Recoil:0.00}   MAG {stats.MagazineSize}";
-            _primaryDetailButton.Visible = true;
+                : $"PRIMARY  {weaponName}     DMG {stats.Damage:0}     RANGE {stats.EffectiveRange:0}m     HANDLING {stats.Handling:0.00}";
         }
         else
         {
             _lootStats.Text = Text("comparison_no_primary", "NO PRIMARY WEAPON EQUIPPED");
-            _primaryWeaponPreview.Visible = false;
-            _primarySlotLabel.Text = Text("empty_slot", "EMPTY SLOT");
-            _primaryDetailButton.Visible = false;
         }
         _helmetSlotLabel.Text = _shownPlayer.EquippedHelmet.DisplayName(_language) + "\n" + _shownPlayer.EquippedHelmet.Detail(_language);
         _armorSlotLabel.Text = _shownPlayer.EquippedBodyArmor.DisplayName(_language) + "\n" + _shownPlayer.EquippedBodyArmor.Detail(_language);
@@ -1064,19 +1015,13 @@ public partial class CombatHUD : CanvasLayer
         }
     }
 
-    /// <summary>Shipped value path: equipped loadout + backpack stacks. Unarmed cold-start primaries add 0.</summary>
+    /// <summary>Shipped value path: all three weapon slots, equipped gear, and backpack stacks.</summary>
     public static int ComputeBackpackTotalValue(TacticalPlayer player)
     {
         var total = LootItem.TotalValue(player.Backpack);
-        if (player.HasFireablePrimary)
-        {
-            total += new LootItem
-            {
-                Kind = LootItemKind.Weapon,
-                Weapon = player.EquippedWeapon.Clone(),
-                Grade = player.EquippedWeaponGrade
-            }.StackValue;
-        }
+        total += WeaponSlotValue(player.PrimaryWeaponBuild, player.PrimaryWeaponGrade);
+        total += WeaponSlotValue(player.SecondaryWeaponBuild, player.SecondaryWeaponGrade);
+        total += WeaponSlotValue(player.SidearmWeaponBuild, player.SidearmWeaponGrade);
         total += new LootItem
         {
             Kind = LootItemKind.Equipment,
@@ -1096,6 +1041,35 @@ public partial class CombatHUD : CanvasLayer
             Grade = player.EquippedBackpackGrade
         }.StackValue;
         return total;
+    }
+
+    private static int WeaponSlotValue(WeaponBuild? weapon, LootGrade grade)
+        => weapon is null
+            ? 0
+            : new LootItem
+            {
+                Kind = LootItemKind.Weapon,
+                Weapon = weapon,
+                Grade = grade
+            }.StackValue;
+
+    private void ShowLootWeaponDetails(int slot)
+    {
+        if (_shownPlayer is null)
+        {
+            return;
+        }
+        var weapon = (PlayerWeaponSlot)slot switch
+        {
+            PlayerWeaponSlot.Primary => _shownPlayer.PrimaryWeaponBuild,
+            PlayerWeaponSlot.Secondary => _shownPlayer.SecondaryWeaponBuild,
+            PlayerWeaponSlot.Sidearm => _shownPlayer.SidearmWeaponBuild,
+            _ => null
+        };
+        if (weapon is not null)
+        {
+            ShowWeaponDetails(weapon);
+        }
     }
 
     private Control BuildLootCard(LootItem item, LootDragOrigin origin, bool compact = false)
@@ -1223,21 +1197,15 @@ public partial class CombatHUD : CanvasLayer
         bool hasPrimary = true,
         string knifeSkinId = KnifeSkinCatalog.DefaultId,
         WeaponBuild? secondaryWeaponBuild = null,
+        WeaponBuild? sidearmWeaponBuild = null,
         int activeWeaponSlot = 0)
     {
         _hasPrimary = hasPrimary;
-        _activeWeaponSlot = Mathf.Clamp(activeWeaponSlot, 0, 4);
+        _activeWeaponSlot = Mathf.Clamp(activeWeaponSlot, 0, 5);
         _quickPrimaryBuild = hasPrimary ? weaponBuild : null;
         _quickSecondaryBuild = secondaryWeaponBuild;
+        _quickSidearmBuild = sidearmWeaponBuild;
         _quickKnifeSkinId = knifeSkinId;
-        if (IsInstanceValid(_primaryWeaponPreview))
-        {
-            _primaryWeaponPreview.Visible = hasPrimary;
-        }
-        if (IsInstanceValid(_primaryDetailButton))
-        {
-            _primaryDetailButton.Disabled = !hasPrimary;
-        }
         _plateReserveLabel.Text = $"x{armorPlates}";
         _lastFireMode = fireMode;
         var mode = fireMode switch
@@ -1264,6 +1232,7 @@ public partial class CombatHUD : CanvasLayer
             _quickPrimaryBuild,
             _hasPrimary,
             _quickSecondaryBuild,
+            _quickSidearmBuild,
             _quickKnifeSkinId,
             _grenadeCount,
             _demolitionGameplayPresentation ? _demolitionSmokeGrenades : 0,

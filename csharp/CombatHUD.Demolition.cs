@@ -48,7 +48,7 @@ public partial class CombatHUD
         && System.Array.TrueForAll(_orderButtons, button => IsInstanceValid(button) && !button.Visible);
     public string DemolitionUtilityHudText
         => IsInstanceValid(_quickSlotBar)
-            ? $"4 {_quickSlotBar.SlotText(3)}  //  5 {_quickSlotBar.SlotText(4)}"
+            ? $"5 {_quickSlotBar.SlotText(4)}  //  6 {_quickSlotBar.SlotText(5)}"
             : string.Empty;
     public bool QuickSlotUiReady
         => IsInstanceValid(_quickSlotBar) && _quickSlotBar.UiReady;

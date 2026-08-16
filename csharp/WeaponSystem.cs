@@ -15,7 +15,16 @@ public enum WeaponPlatform
     M3A1,
     AXMC,
     P226,
-    M1911
+    M1911,
+    AWM,
+    VSS,
+    DesertEagle
+}
+
+public enum WeaponCarryClass
+{
+    LongGun,
+    Sidearm
 }
 
 public enum AmmoCaliber
@@ -163,6 +172,7 @@ public sealed class WeaponDefinition
     public required string Name { get; init; }
     public required string ChineseName { get; init; }
     public string LocalizationKey { get; init; } = string.Empty;
+    public WeaponCarryClass CarryClass { get; init; } = WeaponCarryClass.LongGun;
     public AmmoCaliber Caliber { get; init; } = AmmoCaliber.Rifle;
     public bool SupportsAutomatic { get; init; } = true;
     public float Damage { get; init; }
@@ -584,16 +594,40 @@ public static class WeaponCatalog
         [WeaponPlatform.P226] = new WeaponDefinition
         {
             Platform = WeaponPlatform.P226, Name = "P226 Service Pistol", ChineseName = "P226 \u5236\u5f0f\u624b\u67aa",
-            LocalizationKey = "weapon_p226", Caliber = AmmoCaliber.Pistol, SupportsAutomatic = false,
+            LocalizationKey = "weapon_p226", CarryClass = WeaponCarryClass.Sidearm,
+            Caliber = AmmoCaliber.Pistol, SupportsAutomatic = false,
             Damage = 29, EffectiveRange = 58, Recoil = 0.78f, Handling = 1.34f,
             FireInterval = 0.16f, MagazineSize = 15, SoundRadius = 24, ReceiverLength = 0.25f, BarrelLength = 0.18f
         },
         [WeaponPlatform.M1911] = new WeaponDefinition
         {
             Platform = WeaponPlatform.M1911, Name = "M1911 Tactical", ChineseName = "M1911 \u6218\u672f\u624b\u67aa",
-            LocalizationKey = "weapon_m1911", Caliber = AmmoCaliber.Pistol, SupportsAutomatic = false,
+            LocalizationKey = "weapon_m1911", CarryClass = WeaponCarryClass.Sidearm,
+            Caliber = AmmoCaliber.Pistol, SupportsAutomatic = false,
             Damage = 38, EffectiveRange = 52, Recoil = 1.05f, Handling = 1.18f,
             FireInterval = 0.2f, MagazineSize = 8, SoundRadius = 27, ReceiverLength = 0.27f, BarrelLength = 0.2f
+        },
+        [WeaponPlatform.AWM] = new WeaponDefinition
+        {
+            Platform = WeaponPlatform.AWM, Name = "AWM .338 Magnum", ChineseName = "AWM .338 \u9a6c\u683c\u5357\u72d9\u51fb\u6b65\u67aa",
+            LocalizationKey = "weapon_awm", Caliber = AmmoCaliber.Magnum338, SupportsAutomatic = false,
+            Damage = 162, EffectiveRange = 610, Recoil = 3.35f, Handling = 0.32f,
+            FireInterval = 1.44f, MagazineSize = 5, SoundRadius = 102, ReceiverLength = 0.76f, BarrelLength = 1.1f
+        },
+        [WeaponPlatform.VSS] = new WeaponDefinition
+        {
+            Platform = WeaponPlatform.VSS, Name = "VSS Vintorez", ChineseName = "VSS \u5fae\u58f0\u72d9\u51fb\u6b65\u67aa",
+            LocalizationKey = "weapon_vss", Caliber = AmmoCaliber.Rifle, SupportsAutomatic = true,
+            Damage = 51, EffectiveRange = 215, Recoil = 0.72f, Handling = 0.86f,
+            FireInterval = 0.092f, MagazineSize = 20, SoundRadius = 17, ReceiverLength = 0.5f, BarrelLength = 0.58f
+        },
+        [WeaponPlatform.DesertEagle] = new WeaponDefinition
+        {
+            Platform = WeaponPlatform.DesertEagle, Name = "Desert Eagle .50 AE", ChineseName = "\u6c99\u6f20\u4e4b\u9e70 .50 AE",
+            LocalizationKey = "weapon_desert_eagle", CarryClass = WeaponCarryClass.Sidearm,
+            Caliber = AmmoCaliber.Pistol, SupportsAutomatic = false,
+            Damage = 74, EffectiveRange = 92, Recoil = 1.72f, Handling = 0.88f,
+            FireInterval = 0.29f, MagazineSize = 7, SoundRadius = 46, ReceiverLength = 0.33f, BarrelLength = 0.27f
         }
     };
 
@@ -618,6 +652,8 @@ public static class WeaponCatalog
     };
 
     public static WeaponDefinition Weapon(WeaponPlatform platform) => Weapons[platform];
+    public static bool IsSidearm(WeaponPlatform platform)
+        => Weapon(platform).CarryClass == WeaponCarryClass.Sidearm;
     public static AttachmentDefinition Attachment(string id) => Attachments[id];
     public static IReadOnlyCollection<WeaponDefinition> AllWeapons => Weapons.Values;
     public static IReadOnlyCollection<AttachmentDefinition> AllAttachments => Attachments.Values;
@@ -645,13 +681,15 @@ public static class WeaponCatalog
     public static WeaponBuild Build(WeaponPlatform platform, int tier)
     {
         var build = new WeaponBuild { Platform = platform };
-        if (platform is WeaponPlatform.P226 or WeaponPlatform.M1911)
+        if (IsSidearm(platform))
         {
             build.Attachments[AttachmentSlot.Barrel] = "barrel_standard";
             build.Attachments[AttachmentSlot.Magazine] = "mag_standard";
             if (tier >= 2)
             {
-                build.Attachments[AttachmentSlot.Muzzle] = "muzzle_suppressor";
+                build.Attachments[AttachmentSlot.Muzzle] = platform == WeaponPlatform.DesertEagle
+                    ? "muzzle_brake"
+                    : "muzzle_suppressor";
             }
             return build;
         }
@@ -673,7 +711,7 @@ public static class WeaponCatalog
             }
             return build;
         }
-        if (platform == WeaponPlatform.AXMC)
+        if (platform is WeaponPlatform.AXMC or WeaponPlatform.AWM)
         {
             build.Attachments[AttachmentSlot.Barrel] = "barrel_marksman";
             build.Attachments[AttachmentSlot.Optic] = "optic_7x";
@@ -683,6 +721,15 @@ public static class WeaponCatalog
             {
                 build.Attachments[AttachmentSlot.Muzzle] = "muzzle_brake";
             }
+            return build;
+        }
+        if (platform == WeaponPlatform.VSS)
+        {
+            build.Attachments[AttachmentSlot.Barrel] = "barrel_standard";
+            build.Attachments[AttachmentSlot.Optic] = tier >= 2 ? "optic_7x" : "optic_scope";
+            build.Attachments[AttachmentSlot.Stock] = "stock_precision";
+            build.Attachments[AttachmentSlot.Magazine] = "mag_standard";
+            build.Attachments[AttachmentSlot.Muzzle] = "muzzle_suppressor";
             return build;
         }
         if (platform == WeaponPlatform.MP5A5)

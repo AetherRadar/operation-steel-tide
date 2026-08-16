@@ -3453,12 +3453,21 @@ public partial class FreightTerminalWorld : Node3D
             Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 2),
             Grade = LootGrade.Legendary
         });
-        var firstWeaponGradePreserved = _player.EquippedWeaponGrade == LootGrade.Legendary
-            && swappedWeapon?.Grade == originalWeaponGrade;
-        var returnedWeapon = swappedWeapon is null ? null : _player.EquipFromLoot(swappedWeapon);
+        var firstWeaponGradePreserved = swappedWeapon is null
+            && _player.ActiveWeaponSlot == PlayerWeaponSlot.Secondary
+            && _player.EquippedWeaponGrade == LootGrade.Legendary
+            && _player.PrimaryWeaponBuild?.Platform == WeaponPlatform.M4A1;
+        var returnedWeapon = _player.EquipFromLoot(new LootItem
+        {
+            Kind = LootItemKind.Weapon,
+            Weapon = WeaponCatalog.Build(WeaponPlatform.VSS, 1),
+            Grade = originalWeaponGrade
+        });
         var weaponGradeRoundTrip = firstWeaponGradePreserved
             && _player.EquippedWeaponGrade == originalWeaponGrade
-            && returnedWeapon?.Grade == LootGrade.Legendary;
+            && returnedWeapon?.Weapon?.Platform == WeaponPlatform.AK74
+            && returnedWeapon.Grade == LootGrade.Legendary
+            && _player.PrimaryWeaponBuild?.Platform == WeaponPlatform.M4A1;
         var originalOpticGrade = _player.EquippedAttachmentGrade(AttachmentSlot.Optic);
         var swappedOptic = _player.EquipFromLoot(new LootItem
         {

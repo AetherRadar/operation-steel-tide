@@ -41,6 +41,38 @@ public static class SoundLab
         return MakeStream(samples, rate);
     }
 
+    public static AudioStreamWav DesertEagleShot()
+    {
+        const int rate = 22050;
+        var samples = new float[(int)(rate * 0.46f)];
+        var rng = new RandomNumberGenerator { Seed = 501917 };
+        var pressure = 0.0f;
+        var peak = 0.0f;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var t = (float)i / rate;
+            var blast = Mathf.Exp(-t * 18.0f);
+            var muzzleCrack = rng.RandfRange(-1.0f, 1.0f) * Mathf.Exp(-t * 92.0f);
+            pressure = Mathf.Lerp(pressure, rng.RandfRange(-1.0f, 1.0f), 0.035f);
+            var chestThump = Mathf.Sin(Mathf.Tau * (64.0f - t * 24.0f) * t) * Mathf.Exp(-t * 7.0f);
+            var metallicSnap = Mathf.Sin(Mathf.Tau * 1850.0f * t) * Mathf.Exp(-t * 48.0f);
+            samples[i] = muzzleCrack * 1.05f
+                + pressure * blast * 0.72f
+                + chestThump * 0.9f
+                + metallicSnap * 0.18f;
+            peak = Mathf.Max(peak, Mathf.Abs(samples[i]));
+        }
+        if (peak > 0.001f)
+        {
+            var normalization = 0.96f / peak;
+            for (var i = 0; i < samples.Length; i++)
+            {
+                samples[i] *= normalization;
+            }
+        }
+        return MakeStream(samples, rate);
+    }
+
     public static AudioStreamWav ReloadClick()
     {
         const int rate = 22050;

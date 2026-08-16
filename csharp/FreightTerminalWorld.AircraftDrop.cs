@@ -57,14 +57,40 @@ public partial class FreightTerminalWorld
             new()
             {
                 Kind = LootItemKind.Weapon,
-                Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 2),
+                Weapon = WeaponCatalog.Build(WeaponPlatform.AWM, 3),
+                Grade = LootGrade.Legendary
+            },
+            new()
+            {
+                Kind = LootItemKind.Weapon,
+                Weapon = WeaponCatalog.Build(WeaponPlatform.VSS, 2),
                 Grade = LootGrade.Epic
+            },
+            new()
+            {
+                Kind = LootItemKind.Weapon,
+                Weapon = WeaponCatalog.Build(WeaponPlatform.DesertEagle, 1),
+                Grade = LootGrade.Rare
+            },
+            new()
+            {
+                Kind = LootItemKind.Ammunition,
+                AmmoCaliber = AmmoCaliber.Magnum338,
+                Quantity = 24,
+                Grade = LootGrade.Rare
             },
             new()
             {
                 Kind = LootItemKind.Ammunition,
                 AmmoCaliber = AmmoCaliber.Rifle,
-                Quantity = 90,
+                Quantity = 72,
+                Grade = LootGrade.Rare
+            },
+            new()
+            {
+                Kind = LootItemKind.Ammunition,
+                AmmoCaliber = AmmoCaliber.Pistol,
+                Quantity = 35,
                 Grade = LootGrade.Rare
             },
             new()

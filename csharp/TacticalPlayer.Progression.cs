@@ -13,12 +13,12 @@ public partial class TacticalPlayer
         if (loadout.Weapon is null)
         {
             ApplyColdStartUnarmed(includeEmergencySupplies);
-            InstallSecondaryWeapon(loadout.Sidearm, LootGrade.Uncommon);
+            InstallSidearmWeapon(loadout.Sidearm, LootGrade.Uncommon);
             if (loadout.Sidearm is not null)
             {
                 var sidearmCaliber = WeaponCatalog.Weapon(loadout.Sidearm.Platform).Caliber;
                 SetAmmoReserve(sidearmCaliber, LootGrade.Common, loadout.SidearmReserveAmmo);
-                ActivateWeaponSlot(PlayerWeaponSlot.Secondary, false, true, false);
+                ActivateWeaponSlot(PlayerWeaponSlot.Sidearm, false, true, false);
             }
             Hud?.SetAmmoTier(CurrentAmmoGrade);
             Hud?.SetBackpackValuePlayer(this);
@@ -28,13 +28,14 @@ public partial class TacticalPlayer
         var weaponTier = loadout.WeaponBuildTier >= 0
             ? loadout.WeaponBuildTier
             : DeploymentCatalog.Weapon(loadout.Selection.WeaponId).BuildTier;
+        InstallSecondaryWeapon(null, LootGrade.Uncommon);
         InstallPrimaryWeapon(loadout.Weapon, LootGrades.FromTier(weaponTier));
         _loadedAmmoGrade = loadout.AmmoGrade;
         SetAmmoReserve(CurrentAmmoCaliber, loadout.AmmoGrade, loadout.ReserveAmmo);
         Ammo = EquippedWeapon.Stats().MagazineSize;
         _primaryMagazineAmmo = Ammo;
         _primaryLoadedAmmoGrade = _loadedAmmoGrade;
-        InstallSecondaryWeapon(loadout.Sidearm, LootGrade.Uncommon);
+        InstallSidearmWeapon(loadout.Sidearm, LootGrade.Uncommon);
         if (loadout.Sidearm is not null)
         {
             var sidearmCaliber = WeaponCatalog.Weapon(loadout.Sidearm.Platform).Caliber;

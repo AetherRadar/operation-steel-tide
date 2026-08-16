@@ -4,7 +4,7 @@ using Godot;
 namespace OperationSteelTide;
 
 /// <summary>
-/// Presents the current five-slot loadout supplied through <see cref="SetLoadout"/>.
+/// Presents the current six-slot loadout supplied through <see cref="SetLoadout"/>.
 /// Emits <c>SlotRequested</c> for user intent and never mutates inventory state.
 /// Scene bindings and button callbacks are established in <see cref="_Ready"/>;
 /// loadout snapshots received before that point are retained and rendered once ready.
@@ -15,15 +15,17 @@ public partial class QuickSlotBarView : Control
     [Signal]
     public delegate void SlotRequestedEventHandler(int slot);
 
-    private readonly Button[] _buttons = new Button[5];
+    private readonly Button[] _buttons = new Button[6];
     private InventoryModelPreview _primaryPreview = null!;
     private InventoryModelPreview _secondaryPreview = null!;
+    private InventoryModelPreview _sidearmPreview = null!;
     private InventoryModelPreview _knifePreview = null!;
     private Label _fragLabel = null!;
     private Label _utilityLabel = null!;
     private string _language = "en";
     private WeaponBuild? _primary;
     private WeaponBuild? _secondary;
+    private WeaponBuild? _sidearm;
     private string _knifeSkinId = KnifeSkinCatalog.DefaultId;
     private int _fragGrenades;
     private int _utilityItems;
@@ -32,12 +34,14 @@ public partial class QuickSlotBarView : Control
     private bool _configured;
     private string _primarySignature = string.Empty;
     private string _secondarySignature = string.Empty;
+    private string _sidearmSignature = string.Empty;
     private string _knifeSignature = string.Empty;
 
     public bool UiReady
         => Array.TrueForAll(_buttons, IsInstanceValid)
         && IsInstanceValid(_primaryPreview)
         && IsInstanceValid(_secondaryPreview)
+        && IsInstanceValid(_sidearmPreview)
         && IsInstanceValid(_knifePreview)
         && IsInstanceValid(_fragLabel)
         && IsInstanceValid(_utilityLabel);
@@ -68,11 +72,13 @@ public partial class QuickSlotBarView : Control
     {
         _buttons[0] = GetNode<Button>("%Primary");
         _buttons[1] = GetNode<Button>("%Secondary");
-        _buttons[2] = GetNode<Button>("%Melee");
-        _buttons[3] = GetNode<Button>("%Fragmentation");
-        _buttons[4] = GetNode<Button>("%Utility");
+        _buttons[2] = GetNode<Button>("%Sidearm");
+        _buttons[3] = GetNode<Button>("%Melee");
+        _buttons[4] = GetNode<Button>("%Fragmentation");
+        _buttons[5] = GetNode<Button>("%Utility");
         _primaryPreview = GetNode<InventoryModelPreview>("%PrimaryPreview");
         _secondaryPreview = GetNode<InventoryModelPreview>("%SecondaryPreview");
+        _sidearmPreview = GetNode<InventoryModelPreview>("%SidearmPreview");
         _knifePreview = GetNode<InventoryModelPreview>("%KnifePreview");
         _fragLabel = GetNode<Label>("%FragmentationContent");
         _utilityLabel = GetNode<Label>("%UtilityContent");
@@ -99,6 +105,7 @@ public partial class QuickSlotBarView : Control
         WeaponBuild? primary,
         bool hasPrimary,
         WeaponBuild? secondary,
+        WeaponBuild? sidearm,
         string knifeSkinId,
         int fragGrenades,
         int utilityItems,
@@ -108,6 +115,7 @@ public partial class QuickSlotBarView : Control
         _primary = primary;
         _hasPrimary = hasPrimary && primary is not null;
         _secondary = secondary;
+        _sidearm = sidearm;
         _knifeSkinId = knifeSkinId;
         _fragGrenades = Math.Max(0, fragGrenades);
         _utilityItems = Math.Max(0, utilityItems);
@@ -127,11 +135,11 @@ public partial class QuickSlotBarView : Control
 
     public string SlotText(int slot)
     {
-        if (slot == 3 && IsInstanceValid(_fragLabel))
+        if (slot == 4 && IsInstanceValid(_fragLabel))
         {
             return _fragLabel.Text;
         }
-        if (slot == 4 && IsInstanceValid(_utilityLabel))
+        if (slot == 5 && IsInstanceValid(_utilityLabel))
         {
             return _utilityLabel.Text;
         }
@@ -155,17 +163,19 @@ public partial class QuickSlotBarView : Control
 
         _buttons[0].Visible = _hasPrimary;
         _buttons[1].Visible = _secondary is not null;
-        _buttons[2].Visible = true;
-        _buttons[3].Visible = _fragGrenades > 0;
-        _buttons[4].Visible = _utilityItems > 0;
+        _buttons[2].Visible = _sidearm is not null;
+        _buttons[3].Visible = true;
+        _buttons[4].Visible = _fragGrenades > 0;
+        _buttons[5].Visible = _utilityItems > 0;
 
         _fragLabel.Text = $"{Text("grenade", "FRAG")}  x{_fragGrenades}";
         _utilityLabel.Text = $"{Text("smoke_grenade", "SMOKE")}  x{_utilityItems}";
         _buttons[0].TooltipText = Text("select_primary", "SELECT PRIMARY WEAPON");
-        _buttons[1].TooltipText = Text("select_secondary", "SELECT SIDEARM");
-        _buttons[2].TooltipText = Text("select_knife", "SELECT TACTICAL KNIFE");
-        _buttons[3].TooltipText = Text("select_frag_grenade", "SELECT FRAGMENTATION GRENADE");
-        _buttons[4].TooltipText = Text("select_utility", "SELECT UTILITY ITEM");
+        _buttons[1].TooltipText = Text("select_secondary", "SELECT SECONDARY WEAPON");
+        _buttons[2].TooltipText = Text("select_sidearm", "SELECT SIDEARM");
+        _buttons[3].TooltipText = Text("select_knife", "SELECT TACTICAL KNIFE");
+        _buttons[4].TooltipText = Text("select_frag_grenade", "SELECT FRAGMENTATION GRENADE");
+        _buttons[5].TooltipText = Text("select_utility", "SELECT UTILITY ITEM");
 
         for (var slot = 0; slot < _buttons.Length; slot++)
         {
@@ -174,6 +184,7 @@ public partial class QuickSlotBarView : Control
 
         ConfigurePreview(_primaryPreview, _primary, ref _primarySignature);
         ConfigurePreview(_secondaryPreview, _secondary, ref _secondarySignature);
+        ConfigurePreview(_sidearmPreview, _sidearm, ref _sidearmSignature);
         if (!string.Equals(_knifeSignature, _knifeSkinId, StringComparison.Ordinal))
         {
             _knifeSignature = _knifeSkinId;

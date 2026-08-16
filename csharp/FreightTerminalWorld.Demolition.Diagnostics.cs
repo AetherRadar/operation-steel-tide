@@ -370,6 +370,7 @@ public partial class FreightTerminalWorld
             && _player.KnifeEquipped
             && !_player.HasFireablePrimary
             && !_player.HasSecondaryWeapon
+            && !_player.HasSidearmWeapon
             && _player.Grenades == 0
             && Mathf.IsZeroApprox(_player.Armor)
             && _player.Backpack.Count == 0
@@ -386,9 +387,10 @@ public partial class FreightTerminalWorld
         await WaitFrames(3);
         var pistolKit = _player.Role == OperatorRole.Medic
             && !_player.HasFireablePrimary
-            && _player.HasSecondaryWeapon
-            && _player.SecondaryWeaponPlatform == WeaponPlatform.P226
-            && _player.ActiveWeaponSlot == PlayerWeaponSlot.Secondary
+            && !_player.HasSecondaryWeapon
+            && _player.HasSidearmWeapon
+            && _player.SidearmWeaponPlatform == WeaponPlatform.P226
+            && _player.ActiveWeaponSlot == PlayerWeaponSlot.Sidearm
             && _player.HasActiveFirearm
             && _player.CurrentAmmoGrade == LootGrade.Common
             && _player.AmmoReserveFor(AmmoCaliber.Pistol) == 45
@@ -398,17 +400,18 @@ public partial class FreightTerminalWorld
             && _player.Backpack.All(item => item.Kind == LootItemKind.Ammunition
                 && item.AmmoCaliber == AmmoCaliber.Pistol
                 && item.Quantity == 45);
-        GD.Print($"DEMOLITION_PISTOL_CHECK valid={pistolKit} role={_player.Role} primary={_player.HasFireablePrimary} secondary={_player.HasSecondaryWeapon} platform={_player.SecondaryWeaponPlatform} active={_player.ActiveWeaponSlot} firearm={_player.HasActiveFirearm} grade={_player.CurrentAmmoGrade} reserve={_player.AmmoReserveFor(AmmoCaliber.Pistol)} grenades={_player.Grenades} armor={_player.Armor:0.0} backpack={_player.Backpack.Count}");
+        GD.Print($"DEMOLITION_PISTOL_CHECK valid={pistolKit} role={_player.Role} primary={_player.HasFireablePrimary} secondary={_player.HasSecondaryWeapon} sidearm={_player.HasSidearmWeapon} platform={_player.SidearmWeaponPlatform} active={_player.ActiveWeaponSlot} firearm={_player.HasActiveFirearm} grade={_player.CurrentAmmoGrade} reserve={_player.AmmoReserveFor(AmmoCaliber.Pistol)} grenades={_player.Grenades} armor={_player.Armor:0.0} backpack={_player.Backpack.Count}");
         var slotBindings = InputMap.HasAction("weapon_primary")
             && InputMap.HasAction("weapon_secondary")
+            && InputMap.HasAction("weapon_sidearm")
             && InputMap.HasAction("weapon_melee")
-            && InputMap.ActionGetEvents("weapon_secondary").Count > 0;
+            && InputMap.ActionGetEvents("weapon_sidearm").Count > 0;
         _player.SetMagazineAmmoForDiagnostics(11);
         var sidearmFires = _player.FireForDiagnostics() && _player.Ammo == 10;
         _player.SelectWeapon((int)PlayerWeaponSlot.Melee);
         _player.CycleWeapon();
         var weaponSlots = sidearmFires
-            && _player.ActiveWeaponSlot == PlayerWeaponSlot.Secondary
+            && _player.ActiveWeaponSlot == PlayerWeaponSlot.Sidearm
             && _player.EquippedWeapon.Platform == WeaponPlatform.P226
             && _player.Ammo == 10;
         var isolatedEconomy = _operatorProfileStore.Profile.Credits == creditsBefore
@@ -590,6 +593,7 @@ public partial class FreightTerminalWorld
             && _player.KnifeEquipped
             && !_player.HasFireablePrimary
             && !_player.HasSecondaryWeapon
+            && !_player.HasSidearmWeapon
             && DemolitionPlayerFunds == playerFundsAfterWin;
 
         OnDemolitionPurchaseRequested(string.Empty, string.Empty, false, 0, 0);
@@ -748,7 +752,8 @@ public partial class FreightTerminalWorld
             };
             AddChild(diagnosticSmoke);
             diagnosticSmoke.Arm(Vector3.Forward);
-            diagnosticSmoke._PhysicsProcess(2.0);
+            diagnosticSmoke.BeginGroundFuseForDiagnostics();
+            diagnosticSmoke._PhysicsProcess(0.4);
             var smokeBlocksTarget = IsLineObscuredBySmoke(smokeFrom, smokeTo);
             var smokeResumesObjective = smokeBlocksTarget
                 && TryHandleDemolitionDefenderMovement(probe, 0.05f, _player)

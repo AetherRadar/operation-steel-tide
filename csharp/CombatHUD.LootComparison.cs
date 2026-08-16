@@ -161,9 +161,8 @@ public partial class CombatHUD
             {
                 return false;
             }
-            var primaryValid = !_shownPlayer.HasFireablePrimary
-                || ZoneColorMatchesGrade(_primarySlot, _shownPlayer.EquippedWeaponGrade);
-            return primaryValid
+            return IsInstanceValid(_lootWeaponRack)
+                && _lootWeaponRack.GradeStylesConsistent
                 && ZoneColorMatchesGrade(_helmetSlot, _shownPlayer.EquippedHelmetGrade)
                 && ZoneColorMatchesGrade(_armorSlot, _shownPlayer.EquippedBodyArmorGrade)
                 && ZoneColorMatchesGrade(_packSlot, _shownPlayer.EquippedBackpackGrade);
@@ -171,7 +170,8 @@ public partial class CombatHUD
     }
 
     public bool LootEmptyPrimaryGradeHidden => _shownPlayer is { HasFireablePrimary: false }
-        && _primarySlotCaption.Text == Text("primary_weapon", "PRIMARY WEAPON");
+        && IsInstanceValid(_lootWeaponRack)
+        && _lootWeaponRack.EmptyCaptionsHaveNoGrade;
 
     public Vector2 LootSourceZoneSizeForDiagnostics => _lootSourceZone.Size;
     public Vector2 LootBackpackZoneSizeForDiagnostics => _backpackZone.Size;
@@ -285,18 +285,6 @@ public partial class CombatHUD
         {
             return;
         }
-        if (_shownPlayer.HasFireablePrimary)
-        {
-            StyleEquippedSlot(
-                _primarySlot,
-                _primarySlotCaption,
-                Text("primary_weapon", "PRIMARY WEAPON"),
-                _shownPlayer.EquippedWeaponGrade);
-        }
-        else
-        {
-            StyleEmptyPrimarySlot();
-        }
         StyleEquippedSlot(
             _helmetSlot,
             _helmetSlotCaption,
@@ -320,14 +308,6 @@ public partial class CombatHUD
         zone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(color));
         caption.Text = $"{slotName}  //  {LootGrades.DisplayName(grade, _language)}";
         caption.AddThemeColorOverride("font_color", color);
-    }
-
-    private void StyleEmptyPrimarySlot()
-    {
-        var color = new Color(0.48f, 0.54f, 0.52f);
-        _primarySlot.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(color));
-        _primarySlotCaption.Text = Text("primary_weapon", "PRIMARY WEAPON");
-        _primarySlotCaption.AddThemeColorOverride("font_color", color);
     }
 
     private static bool ZoneColorMatchesGrade(LootDropZone zone, LootGrade grade)

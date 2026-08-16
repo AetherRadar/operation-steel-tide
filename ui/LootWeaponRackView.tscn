@@ -1,0 +1,230 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://csharp/LootWeaponRackView.cs" id="1_rack"]
+[ext_resource type="Script" path="res://csharp/LootWeaponSlotView.cs" id="2_slot"]
+[ext_resource type="Script" path="res://csharp/InventoryModelPreview.cs" id="3_preview"]
+
+[sub_resource type="StyleBoxFlat" id="Style_slot"]
+bg_color = Color(0.035, 0.047, 0.047, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.36, 0.405, 0.39, 0.75)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="Style_detail"]
+bg_color = Color(0.045, 0.065, 0.062, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.22, 0.42, 0.36, 0.92)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="Style_detail_hover"]
+bg_color = Color(0.075, 0.145, 0.12, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.34, 0.84, 0.62, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[node name="LootWeaponRackView" type="Control"]
+custom_minimum_size = Vector2(184, 296)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 184.0
+offset_bottom = 296.0
+mouse_filter = 1
+script = ExtResource("1_rack")
+
+[node name="Slots" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 7
+
+[node name="PrimarySlot" type="PanelContainer" parent="Slots"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(184, 94)
+layout_mode = 2
+mouse_filter = 1
+theme_override_styles/panel = SubResource("Style_slot")
+script = ExtResource("2_slot")
+
+[node name="Margin" type="MarginContainer" parent="Slots/PrimarySlot"]
+layout_mode = 2
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 4
+
+[node name="Content" type="VBoxContainer" parent="Slots/PrimarySlot/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 1
+
+[node name="Header" type="HBoxContainer" parent="Slots/PrimarySlot/Margin/Content"]
+layout_mode = 2
+
+[node name="Caption" type="Label" parent="Slots/PrimarySlot/Margin/Content/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.48, 0.54, 0.52, 1)
+theme_override_font_sizes/font_size = 10
+text = "PRIMARY WEAPON"
+clip_text = true
+
+[node name="DetailsButton" type="Button" parent="Slots/PrimarySlot/Margin/Content/Header"]
+custom_minimum_size = Vector2(24, 20)
+layout_mode = 2
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_colors/font_color = Color(0.7, 0.84, 0.79, 1)
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("Style_detail")
+theme_override_styles/hover = SubResource("Style_detail_hover")
+theme_override_styles/pressed = SubResource("Style_detail_hover")
+text = "i"
+
+[node name="Preview" type="SubViewportContainer" parent="Slots/PrimarySlot/Margin/Content"]
+custom_minimum_size = Vector2(172, 42)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("3_preview")
+
+[node name="WeaponLabel" type="Label" parent="Slots/PrimarySlot/Margin/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.68, 0.78, 0.75, 1)
+theme_override_font_sizes/font_size = 10
+text = "EMPTY SLOT"
+clip_text = true
+
+[node name="SecondarySlot" type="PanelContainer" parent="Slots"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(184, 94)
+layout_mode = 2
+mouse_filter = 1
+theme_override_styles/panel = SubResource("Style_slot")
+script = ExtResource("2_slot")
+
+[node name="Margin" type="MarginContainer" parent="Slots/SecondarySlot"]
+layout_mode = 2
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 4
+
+[node name="Content" type="VBoxContainer" parent="Slots/SecondarySlot/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 1
+
+[node name="Header" type="HBoxContainer" parent="Slots/SecondarySlot/Margin/Content"]
+layout_mode = 2
+
+[node name="Caption" type="Label" parent="Slots/SecondarySlot/Margin/Content/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.48, 0.54, 0.52, 1)
+theme_override_font_sizes/font_size = 10
+text = "SECONDARY WEAPON"
+clip_text = true
+
+[node name="DetailsButton" type="Button" parent="Slots/SecondarySlot/Margin/Content/Header"]
+custom_minimum_size = Vector2(24, 20)
+layout_mode = 2
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_colors/font_color = Color(0.7, 0.84, 0.79, 1)
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("Style_detail")
+theme_override_styles/hover = SubResource("Style_detail_hover")
+theme_override_styles/pressed = SubResource("Style_detail_hover")
+text = "i"
+
+[node name="Preview" type="SubViewportContainer" parent="Slots/SecondarySlot/Margin/Content"]
+custom_minimum_size = Vector2(172, 42)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("3_preview")
+
+[node name="WeaponLabel" type="Label" parent="Slots/SecondarySlot/Margin/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.68, 0.78, 0.75, 1)
+theme_override_font_sizes/font_size = 10
+text = "EMPTY SLOT"
+clip_text = true
+
+[node name="SidearmSlot" type="PanelContainer" parent="Slots"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(184, 94)
+layout_mode = 2
+mouse_filter = 1
+theme_override_styles/panel = SubResource("Style_slot")
+script = ExtResource("2_slot")
+
+[node name="Margin" type="MarginContainer" parent="Slots/SidearmSlot"]
+layout_mode = 2
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 4
+
+[node name="Content" type="VBoxContainer" parent="Slots/SidearmSlot/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 1
+
+[node name="Header" type="HBoxContainer" parent="Slots/SidearmSlot/Margin/Content"]
+layout_mode = 2
+
+[node name="Caption" type="Label" parent="Slots/SidearmSlot/Margin/Content/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.48, 0.54, 0.52, 1)
+theme_override_font_sizes/font_size = 10
+text = "SIDEARM"
+clip_text = true
+
+[node name="DetailsButton" type="Button" parent="Slots/SidearmSlot/Margin/Content/Header"]
+custom_minimum_size = Vector2(24, 20)
+layout_mode = 2
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_colors/font_color = Color(0.7, 0.84, 0.79, 1)
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("Style_detail")
+theme_override_styles/hover = SubResource("Style_detail_hover")
+theme_override_styles/pressed = SubResource("Style_detail_hover")
+text = "i"
+
+[node name="Preview" type="SubViewportContainer" parent="Slots/SidearmSlot/Margin/Content"]
+custom_minimum_size = Vector2(172, 42)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("3_preview")
+
+[node name="WeaponLabel" type="Label" parent="Slots/SidearmSlot/Margin/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.68, 0.78, 0.75, 1)
+theme_override_font_sizes/font_size = 10
+text = "EMPTY SLOT"
+clip_text = true

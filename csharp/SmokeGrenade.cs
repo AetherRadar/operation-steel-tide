@@ -5,6 +5,9 @@ namespace OperationSteelTide;
 [GlobalClass]
 public partial class SmokeGrenade : RigidBody3D
 {
+    private const float GroundFuseDuration = 0.35f;
+    private const float MaximumAirborneLifetime = 18.0f;
+
     public const string ActiveGroupName = "active_smoke_grenades";
     public const float CloudRadius = 5.6f;
     public const float CloudDuration = 13.0f;
@@ -14,13 +17,16 @@ public partial class SmokeGrenade : RigidBody3D
     public bool IsDeployed { get; private set; }
     public float RemainingDuration { get; private set; }
     public bool OwnerCollisionExcluded { get; private set; }
+    public bool HasTouchedGround { get; private set; }
+    public bool FuseStarted => HasTouchedGround && _armed;
     public int CloudVisualCount => IsInstanceValid(_cloudRoot) ? _cloudRoot.GetChildCount() : 0;
 
     private MeshInstance3D _casing = null!;
     private Node3D _cloudRoot = null!;
     private bool _armed;
     private bool _fading;
-    private float _fuse = 1.45f;
+    private float _fuse;
+    private float _airborneLifetime;
 
     public override void _Ready()
     {
@@ -29,6 +35,8 @@ public partial class SmokeGrenade : RigidBody3D
         Mass = 0.46f;
         GravityScale = 1.0f;
         ContinuousCd = true;
+        ContactMonitor = true;
+        MaxContactsReported = 6;
         AddToGroup(ActiveGroupName);
         if (OwnerBody is PhysicsBody3D owner && IsInstanceValid(owner))
         {
@@ -40,17 +48,9 @@ public partial class SmokeGrenade : RigidBody3D
         {
             Shape = new CapsuleShape3D { Radius = 0.075f, Height = 0.19f }
         });
-        _casing = new MeshInstance3D
-        {
-            Mesh = new CapsuleMesh { Radius = 0.075f, Height = 0.19f, RadialSegments = 12, Rings = 4 },
-            MaterialOverride = new StandardMaterial3D
-            {
-                AlbedoColor = new Color(0.68f, 0.72f, 0.67f),
-                Metallic = 0.42f,
-                Roughness = 0.48f
-            }
-        };
+        _casing = new MeshInstance3D { Name = "SmokeCasingVisibility" };
         AddChild(_casing);
+        _casing.AddChild(GrenadeVisualFactory.CreateSmokeGrenade(firstPerson: false));
     }
 
     public void Arm(Vector3 direction)
@@ -67,6 +67,15 @@ public partial class SmokeGrenade : RigidBody3D
         {
             if (!_armed)
             {
+                return;
+            }
+            if (!HasTouchedGround)
+            {
+                _airborneLifetime += step;
+                if (_airborneLifetime >= MaximumAirborneLifetime)
+                {
+                    QueueFree();
+                }
                 return;
             }
             _fuse -= step;
@@ -88,6 +97,25 @@ public partial class SmokeGrenade : RigidBody3D
             QueueFree();
         }
     }
+
+    public override void _IntegrateForces(PhysicsDirectBodyState3D state)
+    {
+        if (!_armed || HasTouchedGround || IsDeployed)
+        {
+            return;
+        }
+        for (var contact = 0; contact < state.GetContactCount(); contact++)
+        {
+            var normal = (GlobalBasis * state.GetContactLocalNormal(contact)).Normalized();
+            if (normal.Dot(Vector3.Up) >= 0.35f && state.LinearVelocity.Y <= 3.0f)
+            {
+                BeginGroundFuse();
+                return;
+            }
+        }
+    }
+
+    internal void BeginGroundFuseForDiagnostics() => BeginGroundFuse();
 
     public bool ObscuresSegment(Vector3 from, Vector3 to)
     {
@@ -131,6 +159,16 @@ public partial class SmokeGrenade : RigidBody3D
         {
             AddSmokeLobe(index);
         }
+    }
+
+    private void BeginGroundFuse()
+    {
+        if (!_armed || HasTouchedGround || IsDeployed)
+        {
+            return;
+        }
+        HasTouchedGround = true;
+        _fuse = GroundFuseDuration;
     }
 
     private void AddSmokeLobe(int index)
