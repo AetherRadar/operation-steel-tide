@@ -296,16 +296,13 @@ public partial class FreightTerminalWorld
             baluster,
             landingGuardPostTransforms);
 
-        // Compact wall plates and integrated light strips keep the landing readable without
-        // introducing detached floor-height pipes or hanging posts.
-        var panelTransforms = new List<Transform3D>(2);
+        // Wall-mounted light strips keep the landing readable without adding broad panels
+        // that block sightlines between stair flights.
         var lightTransforms = new List<Transform3D>(2);
         foreach (var x in new[] { -2.72f, 2.72f })
         {
-            panelTransforms.Add(new Transform3D(Basis.Identity, new Vector3(x, floorY + halfRise + 0.48f, landingCenter)));
             lightTransforms.Add(new Transform3D(Basis.Identity, new Vector3(x + (x < 0 ? 0.05f : -0.05f), floorY + halfRise + 1.02f, landingCenter)));
         }
-        AddResidentialStairDetailBatch(tower, $"ResidentialStairWallPanels_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.08f, 0.78f, 2.15f), panel, panelTransforms);
         AddResidentialStairDetailBatch(tower, $"ResidentialStairWallLights_T{towerIndex + 1:00}_F{floor + 1:00}", new Vector3(0.05f, 0.08f, 1.65f), light, lightTransforms);
         var locker = ExpansionBox(
             tower,

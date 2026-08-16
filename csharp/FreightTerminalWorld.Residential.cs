@@ -1490,6 +1490,11 @@ public partial class FreightTerminalWorld
         }
         var stairDoorClear = stairDoorClearSamples == expectedStairDoorClearSamples;
         var stairDoorSupported = stairDoorSupportSamples == expectedStairDoorSupportSamples;
+        var stairWallPanelsAbsent = _levelRoot.FindChildren(
+            "ResidentialStairWallPanels_*",
+            "MultiMeshInstance3D",
+            recursive: true,
+            owned: false).Count == 0;
 
         // Face into the lower flight and walk forward along body yaw (no mid-flight teleports).
         _player.GlobalPosition = firstTower.ToGlobal(new Vector3(
@@ -1561,6 +1566,7 @@ public partial class FreightTerminalWorld
             && standingDoorClear
             && stairDoorClear
             && stairDoorSupported
+            && stairWallPanelsAbsent
             && stepCollision
             && playerClimbedRamp
             && hedgesSolid
@@ -1568,7 +1574,7 @@ public partial class FreightTerminalWorld
             && ResidentialSpecialCivilianCount >= ResidentialTowerSpecs.Length * 2
             && roles.Count == Enum.GetValues<CivilianRole>().Length
             && upperFloorPopulation;
-        GD.Print($"RESIDENTIAL_CHECK valid={valid} towers={ResidentialTowerCount}/{ResidentialTowerSpecs.Length} floors={_residentialFloorCount}/{expectedFloors} stair_flights={_residentialStairFlightCount} stair_details={_residentialStairDetailCount}/{expectedFloors} infill={_residentialInfillModuleCount}/{ResidentialTowerSpecs.Length * 4} entry_open={entryOpen} standing_door={standingDoorClear} stair_door_clear={stairDoorClear} stair_door_samples={stairDoorClearSamples}/{expectedStairDoorClearSamples} stair_door_supported={stairDoorSupported} stair_support_samples={stairDoorSupportSamples}/{expectedStairDoorSupportSamples} step_collision={stepCollision} step_hit={stepName} player_climbed={playerClimbedRamp} climb_height={climbHeight:0.00} hedges_solid={hedgesSolid} hedge_hits={hedgeCollisionCount}/{hedgeColliders.Count} rooftops={_residentialRoofAccessCount} civilians={ResidentialCivilianCount} special={ResidentialSpecialCivilianCount} roles={roles.Count} upper_floors={upperFloorPopulation}");
+        GD.Print($"RESIDENTIAL_CHECK valid={valid} towers={ResidentialTowerCount}/{ResidentialTowerSpecs.Length} floors={_residentialFloorCount}/{expectedFloors} stair_flights={_residentialStairFlightCount} stair_details={_residentialStairDetailCount}/{expectedFloors} stair_panels_absent={stairWallPanelsAbsent} infill={_residentialInfillModuleCount}/{ResidentialTowerSpecs.Length * 4} entry_open={entryOpen} standing_door={standingDoorClear} stair_door_clear={stairDoorClear} stair_door_samples={stairDoorClearSamples}/{expectedStairDoorClearSamples} stair_door_supported={stairDoorSupported} stair_support_samples={stairDoorSupportSamples}/{expectedStairDoorSupportSamples} step_collision={stepCollision} step_hit={stepName} player_climbed={playerClimbedRamp} climb_height={climbHeight:0.00} hedges_solid={hedgesSolid} hedge_hits={hedgeCollisionCount}/{hedgeColliders.Count} rooftops={_residentialRoofAccessCount} civilians={ResidentialCivilianCount} special={ResidentialSpecialCivilianCount} roles={roles.Count} upper_floors={upperFloorPopulation}");
         if (!valid)
         {
             GD.PushError("Residential community validation failed.");
