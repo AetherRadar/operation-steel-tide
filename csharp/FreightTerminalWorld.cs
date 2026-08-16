@@ -1238,6 +1238,36 @@ public partial class FreightTerminalWorld : Node3D
         return false;
     }
 
+    private bool HasClearPlayerLootInteractionLineOfSight(ILootSource source)
+    {
+        if (!source.IsSearchable || !IsInstanceValid(source.LootNode) || !IsInstanceValid(_player))
+        {
+            return false;
+        }
+
+        var exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+        if (source.LootNode is CollisionObject3D collisionSource)
+        {
+            exclude.Add(collisionSource.GetRid());
+        }
+
+        var from = _player.GlobalPosition + Vector3.Up * 1.25f;
+        foreach (var targetHeight in new[] { 0.28f, 0.72f, 1.16f })
+        {
+            var query = PhysicsRayQueryParameters3D.Create(
+                from,
+                source.LootNode.GlobalPosition + Vector3.Up * targetHeight);
+            query.CollisionMask = 1;
+            query.CollideWithAreas = false;
+            query.Exclude = exclude;
+            if (GetWorld3D().DirectSpaceState.IntersectRay(query).Count == 0)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// <summary>
     /// Nearest searchable loot source that still contains a weapon stack (for cold-start re-arm).
     /// Prefers graded world pickups, then corpse/case sources.
@@ -1711,7 +1741,7 @@ public partial class FreightTerminalWorld : Node3D
                 continue;
             }
             var distance = _player.GlobalPosition.DistanceTo(source.LootNode.GlobalPosition);
-            if (distance < nearestDistance)
+            if (distance < nearestDistance && HasClearPlayerLootInteractionLineOfSight(source))
             {
                 nearest = source;
                 nearestDistance = distance;
@@ -1755,6 +1785,10 @@ public partial class FreightTerminalWorld : Node3D
                 }
             }
             return;
+        }
+        if (_lootSearchTarget is not null)
+        {
+            _interactionProgress = 0.0f;
         }
         _lootSearchTarget = null;
         _player.SetSearchPose(false);
@@ -2794,6 +2828,54 @@ public partial class FreightTerminalWorld : Node3D
         var emptyPickupRetired = !_lootSources.Contains(sealedPickupProbe)
             && !_lootWorldPoints.Contains(sealedPickupProbePosition)
             && !IsInstanceValid(sealedPickupProbe);
+        var lineOfSightProbe = new GradedLootPickup
+        {
+            Name = "LootLineOfSightProbe",
+            Position = new Vector3(0.0f, 0.2f, 430.0f)
+        };
+        lineOfSightProbe.Configure(
+            new LootItem { Kind = LootItemKind.ArmorPlate, Grade = LootGrade.Uncommon },
+            "Line-of-sight probe",
+            "\u89c6\u7ebf\u6d4b\u8bd5\u7269\u8d44");
+        AddChild(lineOfSightProbe);
+        _lootSources.Add(lineOfSightProbe);
+        var lineOfSightWall = new StaticBody3D
+        {
+            Name = "LootInteractionWallProbe",
+            Position = new Vector3(0.0f, 1.6f, 428.9f),
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        lineOfSightWall.AddChild(new CollisionShape3D
+        {
+            Shape = new BoxShape3D { Size = new Vector3(3.0f, 3.2f, 0.25f) }
+        });
+        AddChild(lineOfSightWall);
+        var playerProcessMode = _player.ProcessMode;
+        _player.ProcessMode = ProcessModeEnum.Disabled;
+        _player.GlobalPosition = new Vector3(0.0f, 0.2f, 427.8f);
+        _lootSearchTarget = lineOfSightProbe;
+        _interactionProgress = 0.65f;
+        _player.SetSearchPose(true, _interactionProgress);
+        await WaitFrames(3);
+        var lootWallBlocked = _lootSearchTarget is null
+            && _interactionProgress <= 0.001f
+            && !HasClearPlayerLootInteractionLineOfSight(lineOfSightProbe);
+        lineOfSightWall.QueueFree();
+        await WaitFrames(3);
+        var lineOfSightDeadline = Time.GetTicksMsec() + 1000;
+        while (!ReferenceEquals(_lootSearchTarget, lineOfSightProbe)
+            && Time.GetTicksMsec() < lineOfSightDeadline)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+        var lootWallCleared = ReferenceEquals(_lootSearchTarget, lineOfSightProbe)
+            && HasClearPlayerLootInteractionLineOfSight(lineOfSightProbe);
+        _lootSources.Remove(lineOfSightProbe);
+        _lootSearchTarget = null;
+        lineOfSightProbe.QueueFree();
+        _player.ProcessMode = playerProcessMode;
+        await WaitFrames(2);
         _player.GlobalPosition = source.LootNode.GlobalPosition + new Vector3(0, 0.2f, 0.85f);
         _missionDirector.ExitDeploymentZone();
         var targetDeadline = Time.GetTicksMsec() + 1000;
@@ -3172,6 +3254,8 @@ public partial class FreightTerminalWorld : Node3D
             && treeReconfiguredSealed
             && openEmptyPickupRetained
             && emptyPickupRetired
+            && lootWallBlocked
+            && lootWallCleared
             && sourceSealedBeforeOpen
             && contentsConcealedDuringSearch
             && firstOpenMilliseconds >= 650
@@ -3204,7 +3288,7 @@ public partial class FreightTerminalWorld : Node3D
             && searchDamageAborted
             && fatalSearchStateHandled
             && activeLootEndHandled;
-        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} sealed_grade={sealedPickupConcealsGrade} sealed_open={sealedPickupOpens} sealed_empty_hidden={sealedPickupEmptyHidden} sealed_return_restored={sealedPickupReturnRestored} tree_loose={treeReconfiguredLoose} tree_sealed={treeReconfiguredSealed} open_empty_retained={openEmptyPickupRetained} empty_retired={emptyPickupRetired} source_sealed={sourceSealedBeforeOpen} search_concealed={contentsConcealedDuringSearch} first_open_ms={firstOpenMilliseconds} source_open_visual={sourceOpenVisualReady} single_click={sourceClickActivated} auto_equip={emptyPrimaryAutoEquipped} policy={policyValid} weapon_menu={weaponMenuActivated}/{weaponMenuReady}/{weaponMenuEquipped} item_menu={itemMenuActivated}/{itemMenuDropOnly}/{itemMenuDropped} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_mouse_observable={damageMouseObservable} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} search_damage_aborted={searchDamageAborted} search_damage_mouse={searchDamageMouseCaptured} fatal_search_state={fatalSearchStateHandled} fatal_input_primed={fatalInputPrimed} fatal_controls_locked={fatalControlLocked} active_loot_end={activeLootEndHandled} fatal_result={_hud.IsMissionResultVisible} fatal_mouse={fatalMouseVisible} fatal_mouse_observable={fatalMouseObservable} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} wall_blocked={lootWallBlocked} wall_cleared={lootWallCleared} sealed_grade={sealedPickupConcealsGrade} sealed_open={sealedPickupOpens} sealed_empty_hidden={sealedPickupEmptyHidden} sealed_return_restored={sealedPickupReturnRestored} tree_loose={treeReconfiguredLoose} tree_sealed={treeReconfiguredSealed} open_empty_retained={openEmptyPickupRetained} empty_retired={emptyPickupRetired} source_sealed={sourceSealedBeforeOpen} search_concealed={contentsConcealedDuringSearch} first_open_ms={firstOpenMilliseconds} source_open_visual={sourceOpenVisualReady} single_click={sourceClickActivated} auto_equip={emptyPrimaryAutoEquipped} policy={policyValid} weapon_menu={weaponMenuActivated}/{weaponMenuReady}/{weaponMenuEquipped} item_menu={itemMenuActivated}/{itemMenuDropOnly}/{itemMenuDropped} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_mouse_observable={damageMouseObservable} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} search_damage_aborted={searchDamageAborted} search_damage_mouse={searchDamageMouseCaptured} fatal_search_state={fatalSearchStateHandled} fatal_input_primed={fatalInputPrimed} fatal_controls_locked={fatalControlLocked} active_loot_end={activeLootEndHandled} fatal_result={_hud.IsMissionResultVisible} fatal_mouse={fatalMouseVisible} fatal_mouse_observable={fatalMouseObservable} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         GD.Print($"LOOT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
