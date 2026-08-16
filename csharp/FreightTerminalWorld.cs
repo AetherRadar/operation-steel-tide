@@ -2986,14 +2986,32 @@ public partial class FreightTerminalWorld : Node3D
         fatalStateSource.FirstOpened += _ =>
         {
             _missionEnded = true;
-            Input.MouseMode = Input.MouseModeEnum.Visible;
+            LockLootForMissionTransition(Input.MouseModeEnum.Visible);
         };
         _missionEnded = false;
+        _player.UiLocked = false;
+        _player.RestoreMovementInput();
+        Input.ActionRelease("fire");
+        Input.MouseMode = Input.MouseModeEnum.Captured;
+        var fatalInputPrimeDeadline = Time.GetTicksMsec() + 1000UL;
+        while (!_player.FireInputArmedForDiagnostics
+            && Time.GetTicksMsec() < fatalInputPrimeDeadline)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        var fatalInputPrimed = _player.FireInputArmedForDiagnostics
+            && _player.MovementInputArmedForDiagnostics;
         OpenLoot(fatalStateSource);
         await WaitFrames(2);
         var fatalMouseObservable = DisplayServer.GetName() != "headless";
         var fatalMouseVisible = Input.MouseMode == Input.MouseModeEnum.Visible;
+        var fatalControlLocked = _player.UiLocked
+            && !_player.FireInputArmedForDiagnostics
+            && !_player.MovementInputArmedForDiagnostics
+            && !_player.HasMovementIntent;
         var fatalSearchStateHandled = _missionEnded
+            && fatalInputPrimed
+            && fatalControlLocked
             && !_hud.IsLootVisible
             && _openLootSource is null
             && !_personalBackpackOpen
@@ -3029,6 +3047,8 @@ public partial class FreightTerminalWorld : Node3D
             && _openLootSource is null
             && !_personalBackpackOpen
             && _player.UiLocked
+            && !_player.FireInputArmedForDiagnostics
+            && !_player.MovementInputArmedForDiagnostics
             && InventoryFingerprint(fatalStateSource.Loot) == sourceBeforeEnd
             && InventoryFingerprint(_player.Backpack) == backpackBeforeEnd
             && _nextDroppedLootId == droppedLootIdBeforeEnd
@@ -3064,7 +3084,7 @@ public partial class FreightTerminalWorld : Node3D
             && searchDamageAborted
             && fatalSearchStateHandled
             && activeLootEndHandled;
-        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} single_click={sourceClickActivated} auto_equip={emptyPrimaryAutoEquipped} policy={policyValid} weapon_menu={weaponMenuActivated}/{weaponMenuReady}/{weaponMenuEquipped} item_menu={itemMenuActivated}/{itemMenuDropOnly}/{itemMenuDropped} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_mouse_observable={damageMouseObservable} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} search_damage_aborted={searchDamageAborted} search_damage_mouse={searchDamageMouseCaptured} fatal_search_state={fatalSearchStateHandled} active_loot_end={activeLootEndHandled} fatal_result={_hud.IsMissionResultVisible} fatal_mouse={fatalMouseVisible} fatal_mouse_observable={fatalMouseObservable} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} immediate_ms={immediateOpenMilliseconds} single_click={sourceClickActivated} auto_equip={emptyPrimaryAutoEquipped} policy={policyValid} weapon_menu={weaponMenuActivated}/{weaponMenuReady}/{weaponMenuEquipped} item_menu={itemMenuActivated}/{itemMenuDropOnly}/{itemMenuDropped} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_mouse_observable={damageMouseObservable} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} search_damage_aborted={searchDamageAborted} search_damage_mouse={searchDamageMouseCaptured} fatal_search_state={fatalSearchStateHandled} fatal_input_primed={fatalInputPrimed} fatal_controls_locked={fatalControlLocked} active_loot_end={activeLootEndHandled} fatal_result={_hud.IsMissionResultVisible} fatal_mouse={fatalMouseVisible} fatal_mouse_observable={fatalMouseObservable} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         GD.Print($"LOOT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

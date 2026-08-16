@@ -29,6 +29,8 @@ public partial class TacticalPlayer
     public int SuccessfulVaultsForDiagnostics { get; private set; }
     public float MaximumVaultHeightForDiagnostics => LowObstacleVaultMaxHeight;
     public string LastVaultResultForDiagnostics { get; private set; } = "not_attempted";
+    internal bool FireInputArmedForDiagnostics => _fireInputArmed;
+    internal bool MovementInputArmedForDiagnostics => _movementInputArmed;
     public bool IsVaulting => _isVaulting;
     public float VaultProgress => !_isVaulting && _vaultPhase == "idle"
         ? 0.0f
