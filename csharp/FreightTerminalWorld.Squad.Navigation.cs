@@ -116,7 +116,7 @@ public partial class FreightTerminalWorld
         Vector3 destination,
         bool emergency)
     {
-        if (!IsInstanceValid(mate) || _squadLeaderTrail.Count == 0)
+        if (!IsInstanceValid(mate))
         {
             return destination;
         }
@@ -129,6 +129,7 @@ public partial class FreightTerminalWorld
             if (IsSquadMovementCorridorClear(mate.GlobalPosition, destination, mate))
             {
                 _squadTrailPaths.Remove(id);
+                _squadGridPaths.Remove(id);
                 return destination;
             }
             if (state is not null)
@@ -137,27 +138,48 @@ public partial class FreightTerminalWorld
             }
         }
 
-        if (state is null
-            || state.Revision != _squadLeaderTrailRevision
-            || state.Emergency != emergency
-            || emergency && state.Destination.DistanceSquaredTo(destination) > 1.0f
-            || state.Cursor < 0
-            || state.Cursor >= _squadLeaderTrail.Count)
+        if (_squadLeaderTrail.Count > 0)
         {
-            state = PlanSquadTrailPath(mate, destination, emergency);
-            _squadTrailPaths[id] = state;
+            if (state is null
+                || state.Revision != _squadLeaderTrailRevision
+                || state.Emergency != emergency
+                || emergency && state.Destination.DistanceSquaredTo(destination) > 1.0f
+                || state.Cursor < 0
+                || state.Cursor >= _squadLeaderTrail.Count)
+            {
+                state = PlanSquadTrailPath(mate, destination, emergency);
+                if (state is null)
+                {
+                    _squadTrailPaths.Remove(id);
+                }
+                else
+                {
+                    _squadTrailPaths[id] = state;
+                }
+            }
+            if (state is not null)
+            {
+                AdvanceSquadTrailCursor(mate, state, emergency);
+                if (SquadTrailCursorActive(state))
+                {
+                    _squadGridPaths.Remove(id);
+                    return _squadLeaderTrail[state.Cursor];
+                }
+                // Trail route exhausted without corridor access to the destination.
+                _squadTrailPaths.Remove(id);
+            }
         }
 
-        AdvanceSquadTrailCursor(mate, state, emergency);
-        if (!SquadTrailCursorActive(state))
+        // Trail unusable (off-trail, stale, or exhausted): fall back to the
+        // geometric ground-grid planner before the legacy direct push.
+        if (TryResolveSquadGridNavigation(mate, destination, emergency, out var gridWaypoint))
         {
-            _squadTrailPaths.Remove(id);
-            return destination;
+            return gridWaypoint;
         }
-        return _squadLeaderTrail[state.Cursor];
+        return destination;
     }
 
-    private SquadTrailPathState PlanSquadTrailPath(
+    private SquadTrailPathState? PlanSquadTrailPath(
         SquadMate mate,
         Vector3 destination,
         bool emergency)
@@ -165,13 +187,23 @@ public partial class FreightTerminalWorld
         var cursor = FindLatestVisibleTrailIndex(mate);
         if (cursor < 0)
         {
-            cursor = FindNearestTrailIndex(mate.GlobalPosition);
+            // Off-trail: the grid planner owns the approach (or hands back to the
+            // trail at a reachable entry point). Blind nearest-point beelines
+            // walk squad mates straight into walls.
+            return null;
         }
         var endCursor = emergency
             ? FindClosestDestinationTrailIndex(destination, mate)
             : _squadLeaderTrail.Count - 1;
         if (endCursor < 0)
         {
+            if (emergency)
+            {
+                // No trail point connects to the destination: falling back to the
+                // trail tail would hug walls or spin in place. Hand off to the
+                // geometric grid planner instead.
+                return null;
+            }
             endCursor = _squadLeaderTrail.Count - 1;
         }
         if (emergency)
@@ -225,23 +257,6 @@ public partial class FreightTerminalWorld
             }
         }
         return -1;
-    }
-
-    private int FindNearestTrailIndex(Vector3 position)
-    {
-        var nearest = 0;
-        var bestDistance = float.PositiveInfinity;
-        for (var index = 0; index < _squadLeaderTrail.Count; index++)
-        {
-            var distance = position.DistanceSquaredTo(_squadLeaderTrail[index]);
-            if (distance >= bestDistance)
-            {
-                continue;
-            }
-            bestDistance = distance;
-            nearest = index;
-        }
-        return nearest;
     }
 
     private void AdvanceSquadTrailCursor(
@@ -304,6 +319,19 @@ public partial class FreightTerminalWorld
 
     private bool IsSquadMovementCorridorClear(Vector3 from, Vector3 to, SquadMate mate)
     {
+        var exclude = new Godot.Collections.Array<Rid> { mate.GetRid() };
+        if (IsInstanceValid(_player))
+        {
+            exclude.Add(_player.GetRid());
+        }
+        return IsSquadMovementCorridorClearExcluding(from, to, exclude);
+    }
+
+    private bool IsSquadMovementCorridorClearExcluding(
+        Vector3 from,
+        Vector3 to,
+        Godot.Collections.Array<Rid> exclude)
+    {
         var horizontal = new Vector2(to.X - from.X, to.Z - from.Z);
         if (horizontal.LengthSquared() <= 0.16f)
         {
@@ -316,11 +344,6 @@ public partial class FreightTerminalWorld
 
         var direction = horizontal.Normalized();
         var side = new Vector3(-direction.Y, 0.0f, direction.X) * 0.3f;
-        var exclude = new Godot.Collections.Array<Rid> { mate.GetRid() };
-        if (IsInstanceValid(_player))
-        {
-            exclude.Add(_player.GetRid());
-        }
         for (var ray = 0; ray < 3; ray++)
         {
             var offset = ray switch
@@ -351,13 +374,15 @@ public partial class FreightTerminalWorld
         }
 
         var cursor = FindLatestVisibleTrailIndex(mate);
-        if (cursor < 0)
+        var endCursor = cursor < 0 ? -1 : FindClosestDestinationTrailIndex(destination, mate);
+        if (cursor < 0 || endCursor < 0)
         {
-            return mate.GlobalPosition.DistanceTo(destination) + 1000.0f;
-        }
-        var endCursor = FindClosestDestinationTrailIndex(destination, mate);
-        if (endCursor < 0)
-        {
+            // No usable trail route: the geometric grid supplies a real estimate
+            // so reviver selection prefers a mate that can actually path there.
+            if (TryEstimateSquadGridCost(mate, destination, out var gridCost))
+            {
+                return gridCost;
+            }
             return mate.GlobalPosition.DistanceTo(destination) + 1000.0f;
         }
         var cost = mate.GlobalPosition.DistanceTo(_squadLeaderTrail[cursor]);
@@ -376,6 +401,11 @@ public partial class FreightTerminalWorld
             || state.Cursor < 0
             || state.Cursor >= _squadLeaderTrail.Count)
         {
+            var gridCost = GetSquadGridRemainingCost(mate);
+            if (!float.IsNaN(gridCost))
+            {
+                return gridCost;
+            }
             return mate.GlobalPosition.DistanceTo(destination);
         }
 
@@ -395,7 +425,10 @@ public partial class FreightTerminalWorld
         _leaderRescueWaypointAdvances = 0;
         _leaderRescueReplans = 0;
         _leaderRescueUsedTrail = false;
+        _leaderRescueGridPlans = 0;
+        _leaderRescueUsedGrid = false;
         _squadTrailPaths.Remove(mate.GetInstanceId());
+        _squadGridPaths.Remove(mate.GetInstanceId());
         mate.RequestNavigationRecovery();
     }
 
@@ -403,6 +436,7 @@ public partial class FreightTerminalWorld
     {
         _leaderRescueReplans++;
         _squadTrailPaths.Remove(mate.GetInstanceId());
+        _squadGridPaths.Remove(mate.GetInstanceId());
         mate.RequestNavigationRecovery();
     }
 
@@ -411,6 +445,7 @@ public partial class FreightTerminalWorld
         if (IsInstanceValid(mate))
         {
             _squadTrailPaths.Remove(mate.GetInstanceId());
+            _squadGridPaths.Remove(mate.GetInstanceId());
         }
     }
 
