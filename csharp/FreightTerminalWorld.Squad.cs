@@ -2332,6 +2332,99 @@ public partial class FreightTerminalWorld
             await WaitFrames(2);
         }
 
+        // A capsule-width pinch can look clear to sparse corridor rays while the
+        // character body is physically blocked. Rescue recovery must sidestep it.
+        var recoveryMate = _squadMates.FirstOrDefault(m => IsInstanceValid(m) && !m.IsHumanProxy && !m.IsDowned);
+        var recoveryPinchOk = false;
+        var recoveryRayClear = false;
+        var recoveryAssigned = false;
+        var recoveryCompleted = false;
+        var recoveryCount = 0;
+        var recoveryLateral = 0.0f;
+        if (recoveryMate is not null)
+        {
+            ClearLeaderReviveAi();
+            var recoveryPinch = BuildSquadRecoveryPinchForDiagnostics(
+                out var recoveryPlayerPosition,
+                out var recoveryReviverPosition);
+            await WaitFrames(3);
+            foreach (var squadMate in _squadMates)
+            {
+                if (!IsInstanceValid(squadMate) || squadMate == recoveryMate)
+                {
+                    continue;
+                }
+                squadMate.ProcessMode = ProcessModeEnum.Disabled;
+            }
+            _player.ProcessMode = ProcessModeEnum.Disabled;
+            _player.GlobalPosition = recoveryPlayerPosition;
+            _player.Velocity = Vector3.Zero;
+            recoveryMate.ProcessMode = ProcessModeEnum.Disabled;
+            recoveryMate.GlobalPosition = recoveryReviverPosition;
+            recoveryMate.Velocity = Vector3.Zero;
+            recoveryMate.ResetCombatTacticsForDiagnostics();
+            recoveryMate.SetOrder(SquadOrder.Hold, recoveryReviverPosition);
+            SetSquadLeaderTrailForDiagnostics(new[] { recoveryReviverPosition, recoveryPlayerPosition });
+            recoveryRayClear = IsSquadMovementCorridorClear(
+                recoveryReviverPosition,
+                recoveryPlayerPosition,
+                recoveryMate);
+            var recoveriesBefore = recoveryMate.CombatStuckRecoveries;
+
+            _player.SetHealthForDiagnostics(10.0f);
+            _player.SetReviveUsedForDiagnostics(false);
+            _player.TakeDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
+            if (!_player.IsDead)
+            {
+                _player.TakeCombatDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
+            }
+            var recoveryDowned = _player.IsDead && _localPlayerDowned;
+            recoveryMate.ProcessMode = ProcessModeEnum.Inherit;
+            for (var frame = 0; frame < 960 && _player.IsDead; frame++)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                recoveryAssigned |= ReferenceEquals(_leaderReviver, recoveryMate)
+                    && ReferenceEquals(_aiReviveTarget, _player);
+                recoveryLateral = Mathf.Max(
+                    recoveryLateral,
+                    Mathf.Abs(recoveryMate.GlobalPosition.X - recoveryReviverPosition.X));
+            }
+            recoveryCount = recoveryMate.CombatStuckRecoveries - recoveriesBefore;
+            recoveryCompleted = recoveryDowned
+                && !_player.IsDead
+                && _player.ReviveUsed
+                && !_localPlayerDowned;
+            recoveryPinchOk = recoveryRayClear
+                && recoveryAssigned
+                && recoveryCount >= 1
+                && recoveryLateral > 0.85f
+                && recoveryCompleted;
+
+            if (_player.IsDead)
+            {
+                _player.TryReceiveRevive(50.0f);
+            }
+            ClearLeaderReviveAi();
+            _player.GlobalPosition = DeploymentPoint + Vector3.Up * 0.3f;
+            _player.Velocity = Vector3.Zero;
+            recoveryMate.GlobalPosition = _player.GlobalPosition + new Vector3(2.0f, 0.0f, 1.0f);
+            recoveryMate.Velocity = Vector3.Zero;
+            recoveryMate.SetOrder(SquadOrder.Follow, _player.GlobalPosition);
+            recoveryPinch.QueueFree();
+            ResetSquadLeaderTrail(_player.GlobalPosition);
+            foreach (var squadMate in _squadMates)
+            {
+                if (IsInstanceValid(squadMate))
+                {
+                    squadMate.ProcessMode = ProcessModeEnum.Inherit;
+                }
+            }
+            _player.ProcessMode = ProcessModeEnum.Inherit;
+            await WaitFrames(2);
+        }
+        GD.Print($"SQUAD_RECOVERY pinch={recoveryPinchOk} ray_clear={recoveryRayClear} assigned={recoveryAssigned} completed={recoveryCompleted} recoveries={recoveryCount} lateral={recoveryLateral:0.00}");
+        gridDetourOk &= recoveryPinchOk;
+
         _player.SetHealthForDiagnostics(10.0f);
         _player.SetReviveUsedForDiagnostics(false);
         _player.TakeDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);

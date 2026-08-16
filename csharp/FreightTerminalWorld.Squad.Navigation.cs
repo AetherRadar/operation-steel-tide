@@ -440,7 +440,7 @@ public partial class FreightTerminalWorld
         _leaderRescueReplans++;
         _squadTrailPaths.Remove(mate.GetInstanceId());
         _squadGridPaths.Remove(mate.GetInstanceId());
-        mate.RequestNavigationRecovery();
+        mate.RequestNavigationRecovery(forceEscape: true);
     }
 
     internal void ClearSquadNavigation(SquadMate mate)
@@ -507,6 +507,49 @@ public partial class FreightTerminalWorld
             origin + new Vector3(2.2f, 0.25f, 5.5f),
             playerPosition
         };
+        return root;
+    }
+
+    private Node3D BuildSquadRecoveryPinchForDiagnostics(
+        out Vector3 playerPosition,
+        out Vector3 reviverPosition)
+    {
+        var origin = new Vector3(45.0f, 80.0f, 0.0f);
+        var root = new Node3D { Name = "SquadRecoveryPinchDiagnostic", Position = origin };
+        AddChild(root);
+
+        var floor = new StaticBody3D
+        {
+            Name = "SquadRecoveryPinchFloor",
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        root.AddChild(floor);
+        floor.AddChild(new CollisionShape3D
+        {
+            Position = new Vector3(0.0f, -0.15f, 0.0f),
+            Shape = new BoxShape3D { Size = new Vector3(18.0f, 0.3f, 16.0f) }
+        });
+
+        var pinch = new StaticBody3D
+        {
+            Name = "SquadRecoveryPinchPosts",
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        root.AddChild(pinch);
+        for (var index = 0; index < 2; index++)
+        {
+            pinch.AddChild(new CollisionShape3D
+            {
+                Name = $"PinchPost_{index + 1}",
+                Position = new Vector3(index == 0 ? -0.48f : 0.48f, 1.6f, 0.0f),
+                Shape = new BoxShape3D { Size = new Vector3(0.26f, 3.2f, 0.55f) }
+            });
+        }
+
+        playerPosition = origin + new Vector3(0.0f, 0.25f, 5.5f);
+        reviverPosition = origin + new Vector3(0.0f, 0.25f, -5.5f);
         return root;
     }
 }

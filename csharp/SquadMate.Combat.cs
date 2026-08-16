@@ -319,7 +319,8 @@ public partial class SquadMate
             ? GlobalPosition.DirectionTo(flatDestination)
             : Vector3.Zero;
         desired.Y = 0.0f;
-        if (!objectivePriority
+        var reviveTargetNode = ActiveReviveTargetNode;
+        if ((!objectivePriority || reviveTargetNode is not null)
             && _combatRecoveryTimer > 0.0f
             && _combatRecoveryDirection.LengthSquared() > 0.01f)
         {
@@ -335,7 +336,6 @@ public partial class SquadMate
 
         var spec = OperatorRoles.Spec(Role);
         var boost = Role == OperatorRole.Assault && _overdriveTime > 0.0f ? 1.22f : 1.0f;
-        var reviveTargetNode = ActiveReviveTargetNode;
         var urgencyDistance = reviveTargetNode is not null
             ? GlobalPosition.DistanceTo(reviveTargetNode.GlobalPosition)
             : distance;
