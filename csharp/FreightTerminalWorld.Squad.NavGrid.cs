@@ -13,10 +13,14 @@ public partial class FreightTerminalWorld
     private const float SquadNavSameBandHeight = 1.6f;
     private const float SquadNavGoalHeight = 1.25f;
     private const ulong SquadNavEdgeTtlMilliseconds = 3000;
+    private const int SquadNavFollowExpansionCap = 900;
     private const int SquadNavEstimateExpansionCap = 2500;
     private const int SquadNavCellCacheResetCapacity = 60000;
     private const int SquadNavTrailHandoffCandidates = 3;
     private const float SquadNavTrailHandoffRange = 26.0f;
+    private const float SquadNavRetryDestinationDistance = 3.0f;
+    private const ulong SquadNavRetryBaseMilliseconds = 900;
+    private const ulong SquadNavRetryMaximumMilliseconds = 8000;
 
     // Covers the full playable ground plane (map 340x320 centered near z=-60).
     private static readonly Vector2 SquadNavGridOrigin = new(-175.0f, -225.0f);
@@ -39,6 +43,7 @@ public partial class FreightTerminalWorld
         public bool Emergency;
         public Vector3 Destination;
         public ulong NextPlanMilliseconds;
+        public int FailedPlanAttempts;
         public bool TrailHandoff;
         public Vector3 HandoffPoint;
     }
@@ -63,24 +68,31 @@ public partial class FreightTerminalWorld
         var now = Time.GetTicksMsec();
         var id = mate.GetInstanceId();
         _squadGridPaths.TryGetValue(id, out var state);
+        var failedPlanAttempts = 0;
 
         if (state is not null && state.Waypoints.Length == 0)
         {
-            // Blocked marker: keeps replan cost cadenced while no route exists.
-            if (now < state.NextPlanMilliseconds)
+            // A failed full search is stable for static interior geometry. Back off
+            // repeated probes unless the requested destination meaningfully changes.
+            var retryDistance = emergency ? 1.0f : SquadNavRetryDestinationDistance;
+            var requestChanged = state.Emergency != emergency
+                || state.Destination.DistanceSquaredTo(destination) > retryDistance * retryDistance;
+            if (!requestChanged && now < state.NextPlanMilliseconds)
             {
                 return false;
             }
+            failedPlanAttempts = requestChanged ? 0 : state.FailedPlanAttempts;
             _squadGridPaths.Remove(id);
             state = null;
         }
 
         if (state is not null)
         {
+            // Every adjacent path edge was physics-validated during A*. Rechecking
+            // here invalidates valid corner routes and can cause full replan storms.
             var stale = state.Emergency != emergency
                 || emergency && state.Destination.DistanceSquaredTo(destination) > 1.0f
-                || state.Cursor >= state.Waypoints.Length
-                || !IsSquadMovementCorridorClear(mate.GlobalPosition, state.Waypoints[state.Cursor], mate);
+                || state.Cursor >= state.Waypoints.Length;
             if (stale)
             {
                 _squadGridPaths.Remove(id);
@@ -107,7 +119,14 @@ public partial class FreightTerminalWorld
 
         if (!TryPlanSquadGridRoute(mate, destination, emergency, out var route))
         {
-            _squadGridPaths[id] = new SquadGridPathState { NextPlanMilliseconds = now + 180 };
+            var failures = failedPlanAttempts + 1;
+            _squadGridPaths[id] = new SquadGridPathState
+            {
+                Emergency = emergency,
+                Destination = destination,
+                FailedPlanAttempts = failures,
+                NextPlanMilliseconds = now + SquadNavRetryDelayMilliseconds(failures, id)
+            };
             return false;
         }
         if (emergency)
@@ -127,6 +146,15 @@ public partial class FreightTerminalWorld
         return true;
     }
 
+    private static ulong SquadNavRetryDelayMilliseconds(int failures, ulong instanceId)
+    {
+        var shift = Mathf.Clamp(failures - 1, 0, 3);
+        var delay = Math.Min(
+            SquadNavRetryBaseMilliseconds << shift,
+            SquadNavRetryMaximumMilliseconds);
+        return delay + instanceId % 251;
+    }
+
     private bool TryPlanSquadGridRoute(
         SquadMate mate,
         Vector3 destination,
@@ -134,8 +162,13 @@ public partial class FreightTerminalWorld
         out SquadGridPathState state)
     {
         state = new SquadGridPathState { Emergency = emergency, Destination = destination };
+        // Normal formation following can cheaply fall back to the leader trail;
+        // emergency rescue retains the full search budget for correctness.
+        var expansionCap = emergency
+            ? SquadNavGrid.DefaultExpansionCap
+            : SquadNavFollowExpansionCap;
         if (Mathf.Abs(mate.GlobalPosition.Y - destination.Y) <= SquadNavSameBandHeight
-            && TryBuildSquadGridWaypoints(mate, destination, SquadNavGrid.DefaultExpansionCap, out var direct))
+            && TryBuildSquadGridWaypoints(mate, destination, expansionCap, out var direct))
         {
             state.Waypoints = direct;
             return true;
@@ -146,7 +179,7 @@ public partial class FreightTerminalWorld
         }
         foreach (var entryPoint in FindSquadGridTrailEntryCandidates(mate))
         {
-            if (!TryBuildSquadGridWaypoints(mate, entryPoint, SquadNavGrid.DefaultExpansionCap, out var handoff))
+            if (!TryBuildSquadGridWaypoints(mate, entryPoint, expansionCap, out var handoff))
             {
                 continue;
             }
