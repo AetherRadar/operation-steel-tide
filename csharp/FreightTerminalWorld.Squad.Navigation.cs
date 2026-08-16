@@ -86,6 +86,7 @@ public partial class FreightTerminalWorld
         _squadLeaderTrail.RemoveRange(0, 128);
         _squadLeaderTrailRevision++;
         _squadTrailPaths.Clear();
+        _squadGridPaths.Clear();
     }
 
     private void ResetSquadLeaderTrail(Vector3 position)
@@ -96,6 +97,7 @@ public partial class FreightTerminalWorld
         _squadLeaderTrailInitialized = true;
         _squadLeaderTrailRevision++;
         _squadTrailPaths.Clear();
+        _squadGridPaths.Clear();
     }
 
     private void SetSquadLeaderTrailForDiagnostics(IReadOnlyList<Vector3> points)
@@ -109,6 +111,7 @@ public partial class FreightTerminalWorld
         _squadLeaderTrailInitialized = true;
         _squadLeaderTrailRevision++;
         _squadTrailPaths.Clear();
+        _squadGridPaths.Clear();
     }
 
     internal Vector3 ResolveSquadNavigationDestination(

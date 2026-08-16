@@ -2240,6 +2240,7 @@ public partial class FreightTerminalWorld
         var gridDetourReady = false;
         var gridRescueUsedGrid = false;
         var gridRescueCompleted = false;
+        var gridPathLifecycleOk = false;
         if (gridMate is not null)
         {
             var gridMaze = BuildSquadRescueMazeForDiagnostics(
@@ -2276,12 +2277,23 @@ public partial class FreightTerminalWorld
                 gridReviverPosition,
                 gridPlayerPosition,
                 gridMate);
+            _ = ResolveSquadNavigationDestination(
+                gridMate,
+                gridPlayerPosition,
+                emergency: true);
+            var gridPathCreated = _squadGridPaths.ContainsKey(gridMate.GetInstanceId());
+            ResetSquadLeaderTrail(_player.GlobalPosition);
+            var gridPathCleared = !_squadGridPaths.ContainsKey(gridMate.GetInstanceId());
             var gridFirstWaypoint = ResolveSquadNavigationDestination(
                 gridMate,
                 gridPlayerPosition,
                 emergency: true);
+            gridPathLifecycleOk = gridPathCreated
+                && gridPathCleared
+                && _squadGridPaths.ContainsKey(gridMate.GetInstanceId());
             gridDetourReady = gridDirectBlocked
-                && gridFirstWaypoint.DistanceTo(gridPlayerPosition) > 3.0f                && gridFirstWaypoint.X > gridReviverPosition.X + 2.0f
+                && gridFirstWaypoint.DistanceTo(gridPlayerPosition) > 3.0f
+                && gridFirstWaypoint.X > gridReviverPosition.X + 2.0f
                 && IsSquadMovementCorridorClear(gridReviverPosition, gridFirstWaypoint, gridMate);
 
             _player.SetHealthForDiagnostics(10.0f);
@@ -2303,7 +2315,10 @@ public partial class FreightTerminalWorld
                 && !_player.IsDead
                 && _player.ReviveUsed
                 && !_localPlayerDowned;
-            gridDetourOk = gridDetourReady && gridRescueUsedGrid && gridRescueCompleted;
+            gridDetourOk = gridDetourReady
+                && gridPathLifecycleOk
+                && gridRescueUsedGrid
+                && gridRescueCompleted;
             gridMaze.QueueFree();
             ResetSquadLeaderTrail(_player.GlobalPosition);
             foreach (var squadMate in _squadMates)
@@ -2369,7 +2384,7 @@ public partial class FreightTerminalWorld
         var downedInteractionOk = downedLootBlocked && downedBackpackBlocked && interruptedClimbLocked;
         var eliminatedInteractionOk = eliminatedLootBlocked && eliminatedBackpackBlocked;
         interactionProbe.QueueFree();
-        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} combat_ai={combatAiOk} wall_blocked={combatWallBlocked} target_lock={combatTargetLocked} flanked={combatFlanked} sight_recovered={combatSightRecovered} fired={combatFired} damaged={combatDamaged} faced_move={combatFacedMovement} close_retreat={closeRangeRetreat} close_strafe={closeRangeStrafe} revive_once={reviveOk} ai_mate_revive={aiMateRescueOk} far_rescue_blocked={farRescueBlocked} far_cost={farNavigationCost:0.0} critical_rescue_blocked={criticalRescueBlocked} critical_health={criticalReviverHealth:0.00} mate_enemy_contact={mateRescueEnemyDetected} mate_rescue_assigned={mateRescueAssigned} mate_rescue_motion={mateRescueMinDistance < mateRescueStartDistance - 2.0f} mate_reviver_health={mateReviver.Health / mateReviver.MaxHealth:0.00} eliminated_mate_rescue={mateRescueAfterElimination} reverse_trail_rescue={reverseTrailRescue} reverse_wall={reverseTrailDirectBlocked} reverse_cost={reverseTrailCost:0.0} wall_channel_blocked={wallChannelBlocked} unreachable_abandoned={unreachableAbandoned} abandon_seconds={unreachableElapsed:0.0} abandon_grid_used={unreachableGridUsed} abandon_grid_plans={unreachableGridPlans} bleed_resumed={bleedResumedAfterAbandon} abandon_clear_revive={abandonmentClearedOnRevive} abandon_clear_down={abandonmentClearedOnDown} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} rescue_path={rescuePathOk} grid_rescue={gridDetourOk} grid_detour={gridDetourReady} grid_used={gridRescueUsedGrid} grid_completed={gridRescueCompleted} rescue_wall={rescueDirectBlocked} follow_detour={followDetourReady} rescue_trail={rescueTrailUsed} rescue_advances={rescueWaypointAdvances} rescue_replans={rescueReplans} first_down_spectate={squadMateViewOnDown} downed_input_locked={downedInputLocked} downed_loot_blocked={downedLootBlocked} downed_backpack_blocked={downedBackpackBlocked} climb_interrupt_locked={interruptedClimbLocked} eliminated_loot_blocked={eliminatedLootBlocked} eliminated_backpack_blocked={eliminatedBackpackBlocked} spectator_tracks={spectatorTracksMate} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} finished_spectate={finishedSpectateOk} immediate_view={finishedPlayerSpectate} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
+        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} combat_ai={combatAiOk} wall_blocked={combatWallBlocked} target_lock={combatTargetLocked} flanked={combatFlanked} sight_recovered={combatSightRecovered} fired={combatFired} damaged={combatDamaged} faced_move={combatFacedMovement} close_retreat={closeRangeRetreat} close_strafe={closeRangeStrafe} revive_once={reviveOk} ai_mate_revive={aiMateRescueOk} far_rescue_blocked={farRescueBlocked} far_cost={farNavigationCost:0.0} critical_rescue_blocked={criticalRescueBlocked} critical_health={criticalReviverHealth:0.00} mate_enemy_contact={mateRescueEnemyDetected} mate_rescue_assigned={mateRescueAssigned} mate_rescue_motion={mateRescueMinDistance < mateRescueStartDistance - 2.0f} mate_reviver_health={mateReviver.Health / mateReviver.MaxHealth:0.00} eliminated_mate_rescue={mateRescueAfterElimination} reverse_trail_rescue={reverseTrailRescue} reverse_wall={reverseTrailDirectBlocked} reverse_cost={reverseTrailCost:0.0} wall_channel_blocked={wallChannelBlocked} unreachable_abandoned={unreachableAbandoned} abandon_seconds={unreachableElapsed:0.0} abandon_grid_used={unreachableGridUsed} abandon_grid_plans={unreachableGridPlans} bleed_resumed={bleedResumedAfterAbandon} abandon_clear_revive={abandonmentClearedOnRevive} abandon_clear_down={abandonmentClearedOnDown} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} rescue_path={rescuePathOk} grid_rescue={gridDetourOk} grid_detour={gridDetourReady} grid_lifecycle={gridPathLifecycleOk} grid_used={gridRescueUsedGrid} grid_completed={gridRescueCompleted} rescue_wall={rescueDirectBlocked} follow_detour={followDetourReady} rescue_trail={rescueTrailUsed} rescue_advances={rescueWaypointAdvances} rescue_replans={rescueReplans} first_down_spectate={squadMateViewOnDown} downed_input_locked={downedInputLocked} downed_loot_blocked={downedLootBlocked} downed_backpack_blocked={downedBackpackBlocked} climb_interrupt_locked={interruptedClimbLocked} eliminated_loot_blocked={eliminatedLootBlocked} eliminated_backpack_blocked={eliminatedBackpackBlocked} spectator_tracks={spectatorTracksMate} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} finished_spectate={finishedSpectateOk} immediate_view={finishedPlayerSpectate} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
         var valid = ActiveSquadCount >= 2 && roleFillOk && combatAiOk
             && reviveOk && aiMateRescueOk && unreachableTimeoutOk && abandonmentLifecycleOk
             && aiFinishOk && rescuePathOk && gridDetourOk && downedInteractionOk && eliminatedInteractionOk
