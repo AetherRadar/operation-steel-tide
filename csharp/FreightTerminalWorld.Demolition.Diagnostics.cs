@@ -587,7 +587,7 @@ public partial class FreightTerminalWorld
             return false;
         }
 
-        var savedPlayerPosition = _player.GlobalPosition;
+        var savedPlayerTransform = _player.GlobalTransform;
         var savedPlayerVelocity = _player.Velocity;
         var savedRemaining = _demolitionRemaining;
         var savedTargetSite = _demolitionEnemyTargetSite;
@@ -606,9 +606,31 @@ public partial class FreightTerminalWorld
         var savedSquadDefuseProgress = _demolitionSquadDefuseProgress;
         var savedPlayerDowned = _localPlayerDowned;
         var savedOpponentAssignments = _demolitionOpponentAssignments.ToArray();
-        var savedOpponentRoutes = _demolitionOpponentRoutes.ToArray();
+        var savedOpponentRoutes = _demolitionOpponentRoutes.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value.CloneForDiagnostics());
         var savedSquadTargets = _demolitionSquadAssignmentTargets.ToArray();
         var savedCombatBreakoffs = _demolitionCombatBreakoffs.ToArray();
+        var savedSquadTrailPaths = _squadTrailPaths.ToDictionary(
+            pair => pair.Key,
+            pair => new SquadTrailPathState
+            {
+                Cursor = pair.Value.Cursor,
+                EndCursor = pair.Value.EndCursor,
+                Direction = pair.Value.Direction,
+                Revision = pair.Value.Revision,
+                Emergency = pair.Value.Emergency,
+                Destination = pair.Value.Destination,
+                NextDirectCheckMilliseconds = pair.Value.NextDirectCheckMilliseconds
+            });
+        var savedOpponentNavigation = _demolitionOpponents
+            .Where(IsInstanceValid)
+            .ToDictionary(
+                opponent => opponent,
+                opponent => (
+                    Transform: opponent.GlobalTransform,
+                    opponent.Velocity,
+                    Navigation: opponent.CaptureScriptedObjectiveNavigationForDiagnostics()));
         var savedSentryModes = _demolitionOpponents
             .Where(IsInstanceValid)
             .ToDictionary(opponent => opponent, opponent => opponent.SentryMode);
@@ -617,12 +639,11 @@ public partial class FreightTerminalWorld
             .ToDictionary(
                 mate => mate,
                 mate => (
-                    mate.GlobalPosition,
+                    Transform: mate.GlobalTransform,
                     mate.Velocity,
                     mate.Order,
-                    mate.DemolitionOrderPositionForDiagnostics));
-        var savedProbePosition = probe.GlobalPosition;
-        var savedProbeVelocity = probe.Velocity;
+                    mate.DemolitionOrderPositionForDiagnostics,
+                    TacticalState: mate.CaptureDemolitionTacticalStateForDiagnostics()));
         SmokeGrenade? diagnosticSmoke = null;
         try
         {
@@ -964,7 +985,7 @@ public partial class FreightTerminalWorld
                 diagnosticSmoke.RemoveFromGroup(SmokeGrenade.ActiveGroupName);
                 diagnosticSmoke.QueueFree();
             }
-            _player.GlobalPosition = savedPlayerPosition;
+            _player.GlobalTransform = savedPlayerTransform;
             _player.Velocity = savedPlayerVelocity;
             _demolitionRemaining = savedRemaining;
             _demolitionEnemyTargetSite = savedTargetSite;
@@ -988,7 +1009,6 @@ public partial class FreightTerminalWorld
             {
                 _demolitionOpponentAssignments[opponent] = assignment;
             }
-            probe.ResetScriptedObjectiveNavigation();
             _demolitionOpponentRoutes.Clear();
             foreach (var (opponent, route) in savedOpponentRoutes)
             {
@@ -1006,23 +1026,39 @@ public partial class FreightTerminalWorld
                     opponent.SentryMode = sentryMode;
                 }
             }
+            foreach (var (opponent, state) in savedOpponentNavigation)
+            {
+                if (!IsInstanceValid(opponent))
+                {
+                    continue;
+                }
+                opponent.GlobalTransform = state.Transform;
+                opponent.Velocity = state.Velocity;
+                opponent.RestoreScriptedObjectiveNavigationForDiagnostics(state.Navigation);
+            }
             foreach (var (mate, state) in savedMateStates)
             {
                 if (!IsInstanceValid(mate))
                 {
                     continue;
                 }
-                mate.GlobalPosition = state.GlobalPosition;
+                mate.GlobalTransform = state.Transform;
                 mate.Velocity = state.Velocity;
-                mate.SetOrder(state.Order, state.DemolitionOrderPositionForDiagnostics);
+                mate.RestoreDemolitionOrderForDiagnostics(
+                    state.Order,
+                    state.DemolitionOrderPositionForDiagnostics);
+                mate.RestoreDemolitionTacticalStateForDiagnostics(state.TacticalState);
+            }
+            _squadTrailPaths.Clear();
+            foreach (var (mateId, trailState) in savedSquadTrailPaths)
+            {
+                _squadTrailPaths[mateId] = trailState;
             }
             _demolitionSquadAssignmentTargets.Clear();
             foreach (var (mate, targetKey) in savedSquadTargets)
             {
                 _demolitionSquadAssignmentTargets[mate] = targetKey;
             }
-            probe.GlobalPosition = savedProbePosition;
-            probe.Velocity = savedProbeVelocity;
         }
     }
 

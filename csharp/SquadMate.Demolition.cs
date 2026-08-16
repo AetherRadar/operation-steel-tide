@@ -6,6 +6,37 @@ public partial class SquadMate
 {
     internal Vector3 DemolitionOrderPositionForDiagnostics => _orderPosition;
 
+    internal void RestoreDemolitionOrderForDiagnostics(SquadOrder order, Vector3 orderPosition)
+    {
+        Order = order;
+        _orderPosition = orderPosition;
+        UpdateLabel();
+    }
+
+    internal bool AreDemolitionCollisionShapesDisabledForDiagnostics
+        => CollisionShapesMatchForDiagnostics(disabled: true);
+
+    internal bool AreDemolitionCollisionShapesEnabledForDiagnostics
+        => CollisionShapesMatchForDiagnostics(disabled: false);
+
+    private bool CollisionShapesMatchForDiagnostics(bool disabled)
+    {
+        var foundShape = false;
+        foreach (var child in GetChildren())
+        {
+            if (child is not CollisionShape3D collision)
+            {
+                continue;
+            }
+            foundShape = true;
+            if (collision.Disabled != disabled)
+            {
+                return false;
+            }
+        }
+        return foundShape;
+    }
+
     public void EliminateForDemolitionRound()
     {
         if (!IsDowned || IsBodyBag)

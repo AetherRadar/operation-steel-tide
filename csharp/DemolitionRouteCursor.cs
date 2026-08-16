@@ -26,6 +26,22 @@ public sealed class DemolitionRouteCursor
     public bool Complete => WaypointIndex >= _waypoints.Length;
     public Vector3 CurrentWaypoint => Complete ? Destination : _waypoints[WaypointIndex];
 
+    internal DemolitionRouteCursor CloneForDiagnostics()
+    {
+        return new DemolitionRouteCursor
+        {
+            RouteKey = RouteKey,
+            Destination = Destination,
+            WaypointIndex = WaypointIndex,
+            ReplanCount = ReplanCount,
+            ReachesDestination = ReachesDestination,
+            _waypoints = CopyWaypoints(_waypoints),
+            _progressOrigin = _progressOrigin,
+            _progressTimer = _progressTimer,
+            _unreachableRetryTimer = _unreachableRetryTimer
+        };
+    }
+
     public bool Matches(string routeKey, Vector3 destination)
         => string.Equals(RouteKey, routeKey, StringComparison.Ordinal)
             && HorizontalDistanceSquared(Destination, destination) <= DestinationMatchDistanceSquared;

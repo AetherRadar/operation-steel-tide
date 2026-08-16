@@ -1496,6 +1496,7 @@ public partial class FreightTerminalWorld : Node3D
         }
         if (_demolitionMode)
         {
+            _player.MarkEliminatedForDemolitionRound();
             FinishDemolitionRound(
                 false,
                 GameLocalization.Get(

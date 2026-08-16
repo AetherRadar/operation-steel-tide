@@ -5,6 +5,7 @@ namespace OperationSteelTide;
 public partial class TacticalPlayer
 {
     public int SmokeGrenades { get; private set; }
+    internal bool DemolitionColliderDisabledForDiagnostics => _collider.Disabled;
 
     public void ResetForDemolitionRound(
         Vector3 spawn,
