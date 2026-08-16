@@ -349,6 +349,11 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             objectivePriority = hostile is null
                 || GlobalPosition.DistanceTo(hostile.GlobalPosition) > 14.0f;
         }
+        if (Main.ShouldPrioritizeDemolitionObjective(this, hostile))
+        {
+            destination = ResolveFormationDestination();
+            objectivePriority = true;
+        }
         var reviveTargetNode = ActiveReviveTargetNode;
         if (reviveTargetNode is not null)
         {

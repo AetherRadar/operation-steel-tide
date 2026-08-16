@@ -6,6 +6,25 @@ public partial class SquadMate
 {
     internal Vector3 DemolitionOrderPositionForDiagnostics => _orderPosition;
 
+    internal bool HasDemolitionThreatWithin(float range)
+    {
+        if (_combatTarget is not null
+            && IsInstanceValid(_combatTarget)
+            && !_combatTarget.IsDead
+            && GlobalPosition.DistanceTo(_combatTarget.GlobalPosition) < range)
+        {
+            return true;
+        }
+        return _combatThreat is not null
+            && IsInstanceValid(_combatThreat)
+            && !_combatThreat.IsDead
+            && GlobalPosition.DistanceTo(_combatThreat.GlobalPosition) < range;
+    }
+
+    internal bool DemolitionMoveTargets(Vector3 position, float tolerance = 0.25f)
+        => Order == SquadOrder.Move
+            && _orderPosition.DistanceTo(position) <= tolerance;
+
     internal void RestoreDemolitionOrderForDiagnostics(SquadOrder order, Vector3 orderPosition)
     {
         Order = order;

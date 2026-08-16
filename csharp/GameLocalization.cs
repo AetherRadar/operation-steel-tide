@@ -472,6 +472,11 @@ public static class GameLocalization
         Chinese["demolition_result_economy"] = "\u7ade\u6280\u914d\u88c5\u5df2\u56de\u6536  //  \u6478\u91d1\u8d44\u91d1\u672a\u53d8\u52a8";
         Chinese["demolition_objective_plant"] = "\u9009\u62e9 A \u6216 B \u70b9  //  \u6309\u4f4f F \u5b89\u88c5\u88c5\u7f6e";
         Chinese["demolition_round_objective"] = "{0}  //  \u9009\u62e9 A \u6216 B \u70b9  //  \u6309\u4f4f F \u5b89\u88c5\u88c5\u7f6e";
+        Chinese["demolition_device_pickup_objective"] = "{0}  //  \u88c5\u7f6e\u5728\u8fdb\u653b\u65b9\u51fa\u751f\u70b9  //  {1} \u524d\u5f80\u62fe\u53d6";
+        Chinese["demolition_device_escort_objective"] = "{0}  //  \u62a4\u9001 {1} \u524d\u5f80\u7206\u7834\u70b9  //  \u4f18\u5148\u90e8\u7f72\u88c5\u7f6e";
+        Chinese["demolition_device_picked_up"] = "{0} \u5df2\u62fe\u53d6\u7206\u7834\u88c5\u7f6e  //  \u524d\u5f80 A \u6216 B \u70b9";
+        Chinese["demolition_device_dropped"] = "\u7206\u7834\u88c5\u7f6e\u5df2\u6389\u843d  //  {0} \u63a5\u66ff\u643a\u5e26";
+        Chinese["demolition_no_carrier"] = "\u6682\u65e0\u53ef\u7528\u643a\u5e26\u8005";
         Chinese["demolition_round_timeout"] = "\u8fdb\u653b\u65f6\u95f4\u8017\u5c3d";
         Chinese["demolition_interaction_plant"] = "\u5b89\u88c5\u7206\u7834\u88c5\u7f6e  //  {0} \u70b9";
         Chinese["demolition_deployed"] = "\u7206\u7834 5v5  //  \u5148\u5f97 13 \u5206  //  \u7b2c 12 \u5c40\u540e\u653b\u9632\u4e92\u6362";

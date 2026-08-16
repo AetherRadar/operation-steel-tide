@@ -199,7 +199,17 @@ public partial class FreightTerminalWorld
             opponent.SentryMode = false;
         }
 
-        _demolitionCarrier = ResolveActor(resolution.CarrierMemberId);
+        var resolvedCarrier = ResolveActor(resolution.CarrierMemberId);
+        var deviceObjectiveId = _demolitionDeviceLifecycle.IsGrounded
+            ? _demolitionDeviceLifecycle.PickupRunnerMemberId
+            : _demolitionDeviceLifecycle.IsCarried
+                ? _demolitionDeviceLifecycle.CarrierMemberId
+                : null;
+        var deviceObjectiveEnemy = opponentPlan.Team == DemolitionTeam.Attackers
+            && !_demolitionDevicePlanted
+            ? ResolveDemolitionAttacker(deviceObjectiveId) as EnemyOperator
+            : null;
+        _demolitionCarrier = deviceObjectiveEnemy ?? resolvedCarrier;
         _demolitionDefuser = ResolveActor(resolution.DefuserMemberId);
         if (resolution.ResetPlantProgress)
         {
@@ -219,7 +229,28 @@ public partial class FreightTerminalWorld
             ResetDemolitionOpponentRoute(previousDefuser);
             ResetDemolitionOpponentRoute(_demolitionDefuser);
         }
-        if (_demolitionCarrier is not null && resolution.CarrierSiteIndex >= 0)
+        if (deviceObjectiveEnemy is not null)
+        {
+            if (!_demolitionOpponentAssignments.TryGetValue(deviceObjectiveEnemy, out var assignment)
+                || !DemolitionObjectiveChannelCoordinator.IsCarrierDuty(assignment.Duty))
+            {
+                var siteIndex = Mathf.Clamp(
+                    opponentPlan.PrimarySiteIndex,
+                    0,
+                    DemolitionLayout().SitePositions.Count - 1);
+                _demolitionOpponentAssignments[deviceObjectiveEnemy] = new DemolitionAssignment(
+                    deviceObjectiveEnemy.Name,
+                    DemolitionDuty.Entry,
+                    siteIndex,
+                    siteIndex == 0 ? "attack_entry_a" : "attack_entry_b",
+                    "round-assigned demolition device carrier");
+            }
+            if (_demolitionEnemyPlantProgress <= 0.0f)
+            {
+                _demolitionEnemyTargetSite = opponentPlan.PrimarySiteIndex;
+            }
+        }
+        else if (_demolitionCarrier is not null && resolution.CarrierSiteIndex >= 0)
         {
             _demolitionEnemyTargetSite = resolution.CarrierSiteIndex;
         }
@@ -289,6 +320,10 @@ public partial class FreightTerminalWorld
             {
                 continue;
             }
+            if (IsDemolitionSquadDeviceObjectiveMate(mate))
+            {
+                continue;
+            }
             if (_demolitionSquadAssignmentTargets.TryGetValue(mate, out var current)
                 && current == assignment.TargetKey)
             {
@@ -332,6 +367,10 @@ public partial class FreightTerminalWorld
     private void UpdateDemolitionSquadObjectiveRelay(float delta)
     {
         if (!_demolitionRoundActive)
+        {
+            return;
+        }
+        if (TryUpdateDemolitionSquadDeviceObjective(delta))
         {
             return;
         }
@@ -403,7 +442,7 @@ public partial class FreightTerminalWorld
             : _demolitionSquadDefuseProgress += delta / DemolitionDefuseDuration;
         if (progress >= 1.0f && !_demolitionDevicePlanted)
         {
-            PlantDemolitionDevice(siteIndex, byPlayerTeam: true);
+            PlantDemolitionDevice(siteIndex, byPlayerTeam: true, carrier);
             _demolitionSquadObjectiveMate = null;
             _demolitionSquadPlantProgress = 0.0f;
         }
@@ -498,12 +537,35 @@ public partial class FreightTerminalWorld
     /// </summary>
     public bool TryHandleDemolitionDefenderMovement(EnemyOperator opponent, float delta, Node3D? combatTarget)
     {
+        var deviceObjectiveId = _demolitionDeviceLifecycle.IsGrounded
+            ? _demolitionDeviceLifecycle.PickupRunnerMemberId
+            : _demolitionDeviceLifecycle.IsCarried
+                ? _demolitionDeviceLifecycle.CarrierMemberId
+                : null;
+        var isDeviceObjectiveEnemy = _demolitionMatch.PlayerSide == DemolitionTeam.Defenders
+            && !_demolitionDevicePlanted
+            && DemolitionMemberId(opponent) == deviceObjectiveId;
         if (!_demolitionMode
             || !_demolitionRoundActive
             || opponent.IsDead
-            || !_demolitionOpponentAssignments.TryGetValue(opponent, out var assignment))
+            || !_demolitionOpponentAssignments.TryGetValue(opponent, out var assignment)
+                && !isDeviceObjectiveEnemy)
         {
             return false;
+        }
+        if (isDeviceObjectiveEnemy
+            && string.IsNullOrWhiteSpace(assignment.MemberId))
+        {
+            var siteIndex = Mathf.Clamp(
+                _demolitionEnemyTargetSite,
+                0,
+                DemolitionLayout().SitePositions.Count - 1);
+            assignment = new DemolitionAssignment(
+                opponent.Name,
+                DemolitionDuty.Entry,
+                siteIndex,
+                siteIndex == 0 ? "attack_entry_a" : "attack_entry_b",
+                "live demolition device objective");
         }
 
         var targetDistance = ResolveDemolitionCombatTargetDistance(opponent, combatTarget);
@@ -680,7 +742,43 @@ public partial class FreightTerminalWorld
         {
             return false;
         }
-        if (opponent != _demolitionCarrier)
+        if (_demolitionMatch.PlayerSide == DemolitionTeam.Defenders
+            && _demolitionDeviceLifecycle.IsGrounded)
+        {
+            var pickupRunner = ResolveDemolitionAttacker(
+                _demolitionDeviceLifecycle.PickupRunnerMemberId) as EnemyOperator;
+            if (opponent != pickupRunner)
+            {
+                return false;
+            }
+            if (targetDistance < DemolitionChannelGuardRange)
+            {
+                return false;
+            }
+            var pickupDistance = HorizontalDistance(
+                opponent.GlobalPosition,
+                _demolitionDeviceGroundPosition);
+            if (pickupDistance > DemolitionDevicePickupRadius)
+            {
+                return MoveDemolitionOpponentAlongRoute(
+                    opponent,
+                    _demolitionDeviceGroundPosition,
+                    "device_pickup",
+                    delta,
+                    DemolitionDevicePickupRadius,
+                    5.1f);
+            }
+            if (!TryPickupDemolitionDevice(opponent))
+            {
+                StopDemolitionOpponent(opponent);
+                return true;
+            }
+        }
+        var lifecycleCarrier = _demolitionMatch.PlayerSide == DemolitionTeam.Defenders
+            && _demolitionDeviceLifecycle.IsCarried
+            ? ResolveDemolitionAttacker(_demolitionDeviceLifecycle.CarrierMemberId) as EnemyOperator
+            : null;
+        if (opponent != (lifecycleCarrier ?? _demolitionCarrier))
         {
             return false;
         }
@@ -712,7 +810,7 @@ public partial class FreightTerminalWorld
         _demolitionEnemyPlantProgress = Mathf.Min(1.0f, _demolitionEnemyPlantProgress + delta / DemolitionPlantDuration);
         if (_demolitionEnemyPlantProgress >= 1.0f)
         {
-            PlantDemolitionDevice(_demolitionEnemyTargetSite, byPlayerTeam: false);
+            PlantDemolitionDevice(_demolitionEnemyTargetSite, byPlayerTeam: false, opponent);
         }
         return true;
     }
