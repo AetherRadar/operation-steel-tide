@@ -21,7 +21,12 @@ public partial class FreightTerminalWorld
         var ordersHidden = _hud.AreDemolitionSquadOrdersHidden;
         var utilityHudVisible = _hud.DemolitionUtilityHudText.Contains("4 FRAG", System.StringComparison.Ordinal)
             && _hud.DemolitionUtilityHudText.Contains("5 SMOKE", System.StringComparison.Ordinal);
-        var hudIsolated = rosterHidden && skillHudVisible && ordersHidden && utilityHudVisible;
+        var demolitionFooterSeparated = _hud.FooterHudRuntimeSeparatedForDiagnostics;
+        var hudIsolated = rosterHidden
+            && skillHudVisible
+            && ordersHidden
+            && utilityHudVisible
+            && demolitionFooterSeparated;
         var roleRules = DemolitionReconScanRange < 72.0f
             && InputMap.HasAction("use_class_skill")
             && InputMap.HasAction("throw_grenade")
@@ -33,6 +38,31 @@ public partial class FreightTerminalWorld
             && DemolitionRoundRules.EliminationEndsRound(DemolitionTeam.Defenders, false)
             && !DemolitionRoundRules.EliminationEndsRound(DemolitionTeam.Attackers, true)
             && DemolitionRoundRules.EliminationEndsRound(DemolitionTeam.Defenders, true);
+        var deviceLifecycle = new DemolitionDeviceLifecycle();
+        deviceLifecycle.BeginGrounded();
+        var assignedRunner = deviceLifecycle.AssignRandomPickupRunner(
+            new[] { "player", "mate-a", "mate-b" },
+            selectionToken: 4);
+        var wrongPickupRejected = !deviceLifecycle.TryPickup("player");
+        var assignedPickupAccepted = deviceLifecycle.TryPickup("mate-a");
+        var carriedSnapshot = deviceLifecycle.Capture();
+        var dropTransferred = deviceLifecycle.TryDrop("mate-a", "mate-b")
+            && deviceLifecycle.TryPickup("mate-b");
+        var plantAccepted = deviceLifecycle.TryPlant("mate-b");
+        var detonationAccepted = deviceLifecycle.TryDetonate();
+        deviceLifecycle.Restore(carriedSnapshot);
+        var snapshotRestored = deviceLifecycle.IsCarried
+            && deviceLifecycle.CarrierMemberId == "mate-a"
+            && deviceLifecycle.PickupRunnerMemberId is null;
+        deviceLifecycle.Clear();
+        var deviceLifecycleValid = assignedRunner == "mate-a"
+            && wrongPickupRejected
+            && assignedPickupAccepted
+            && dropTransferred
+            && plantAccepted
+            && detonationAccepted
+            && snapshotRestored
+            && deviceLifecycle.Phase == DemolitionDevicePhase.Inactive;
         var spectatorLocalized = GameLocalization.Get(
                 "demolition_spectating_device",
                 "zh",
@@ -176,11 +206,13 @@ public partial class FreightTerminalWorld
         _hud.ShowOperationsOffice();
         var presentationRestored = !_hud.IsDemolitionSquadRosterHidden
             && !_hud.IsDemolitionSkillHudVisible
-            && !_hud.AreDemolitionSquadOrdersHidden;
+            && !_hud.AreDemolitionSquadOrdersHidden
+            && _hud.FooterHudRuntimeSeparatedForDiagnostics;
 
         var valid = hudIsolated
             && roleRules
             && eliminationRules
+            && deviceLifecycleValid
             && spectatorLocalized
             && reconBoundary
             && playerEliminated
@@ -192,7 +224,7 @@ public partial class FreightTerminalWorld
             && noAllyPlayerEliminated
             && smokePresentationAligned
             && presentationRestored;
-        GD.Print($"DEMOLITION_RULES_CHECK valid={valid} roster_hidden={rosterHidden} skill_hud={skillHudVisible} orders_hidden={ordersHidden} utility={utilityHudVisible} recon_range={DemolitionReconScanRange:0.0} recon_boundary={reconBoundary} inputs={roleRules} elimination_rules={eliminationRules} spectator_localized={spectatorLocalized} player_eliminated={playerEliminated} player_frozen={playerFrozenAfterElimination} player_collision={playerEliminationCollision} player_collider_disabled={playerColliderDisabled} player_reset={playerRestoredForNextRound} mate_eliminated={mateEliminated} mate_frozen={mateFrozenAfterElimination} mate_collision={mateEliminationCollision} mate_shapes_disabled={mateCollisionShapesDisabled} mate_reset={mateRestoredForNextRound} no_ally_eliminated={noAllyPlayerEliminated} no_ally_mates={noAllyMatesEliminated} smoke_aligned={smokePresentationAligned} presentation_restored={presentationRestored} round_active={_demolitionRoundActive}");
+        GD.Print($"DEMOLITION_RULES_CHECK valid={valid} roster_hidden={rosterHidden} skill_hud={skillHudVisible} orders_hidden={ordersHidden} utility={utilityHudVisible} footer_separated={demolitionFooterSeparated} recon_range={DemolitionReconScanRange:0.0} recon_boundary={reconBoundary} inputs={roleRules} elimination_rules={eliminationRules} device_lifecycle={deviceLifecycleValid} spectator_localized={spectatorLocalized} player_eliminated={playerEliminated} player_frozen={playerFrozenAfterElimination} player_collision={playerEliminationCollision} player_collider_disabled={playerColliderDisabled} player_reset={playerRestoredForNextRound} mate_eliminated={mateEliminated} mate_frozen={mateFrozenAfterElimination} mate_collision={mateEliminationCollision} mate_shapes_disabled={mateCollisionShapesDisabled} mate_reset={mateRestoredForNextRound} no_ally_eliminated={noAllyPlayerEliminated} no_ally_mates={noAllyMatesEliminated} smoke_aligned={smokePresentationAligned} presentation_restored={presentationRestored} round_active={_demolitionRoundActive}");
         GD.Print($"DEMOLITION_RULES_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
