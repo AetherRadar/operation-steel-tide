@@ -58,22 +58,22 @@ public partial class CombatHUD
     {
         _squadRoster = new Control
         {
-            Position = new Vector2(28, 286),
-            Size = new Vector2(250, 158),
+            Position = new Vector2(SquadRosterLeft, SquadRosterTop),
+            Size = new Vector2(SquadRosterWidth, SquadRosterHeight),
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         root.AddChild(_squadRoster);
         var background = new ColorRect
         {
             Color = new Color(0.01f, 0.018f, 0.02f, 0.78f),
-            Size = new Vector2(250, 158),
+            Size = new Vector2(SquadRosterWidth, SquadRosterHeight),
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         _squadRoster.AddChild(background);
         background.AddChild(new ColorRect
         {
             Color = new Color(0.22f, 0.82f, 0.68f, 0.9f),
-            Size = new Vector2(3, 158),
+            Size = new Vector2(3, SquadRosterHeight),
             MouseFilter = Control.MouseFilterEnum.Ignore
         });
         _squadRosterTitle = Label("SQUAD  //  3 OPERATORS", 12, new Color(0.45f, 0.88f, 0.74f));
@@ -115,7 +115,6 @@ public partial class CombatHUD
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         _classSkillRoot.SetAnchorsPreset(Control.LayoutPreset.CenterBottom);
-        _classSkillRoot.Position = new Vector2(-215, -122);
         root.AddChild(_classSkillRoot);
         _classSkillRoot.AddChild(new ColorRect
         {
@@ -159,6 +158,7 @@ public partial class CombatHUD
             _orderButtons[i] = button;
         }
         _orderButtons[0].ButtonPressed = true;
+        BindFooterLayout(root);
     }
 
     private void BuildSquadLobby(Control root)

@@ -3253,6 +3253,17 @@ public partial class FreightTerminalWorld : Node3D
         _hud.ShowWeaponDetails(_player.EquippedWeapon);
         await WaitFrames(2);
         var detailsOpened = _hud.IsWeaponDetailVisible;
+        var footerRuntimeSeparated = _hud.FooterHudRuntimeSeparatedForDiagnostics;
+        var footerResponsive = _hud.FooterHudResponsiveScenariosValidForDiagnostics;
+        var footerInitiallyVisible = _hud.WeaponHudVisibleForDiagnostics
+            && _hud.ClassSkillHudVisibleForDiagnostics;
+        _hud.ShowDownedState(10.0f);
+        var downedFooterSuppressed = _hud.IsDownedBannerVisible
+            && _hud.DownedFooterSuppressedForDiagnostics;
+        _hud.HideDownedState();
+        var downedFooterRestored = !_hud.IsDownedBannerVisible
+            && _hud.WeaponHudVisibleForDiagnostics
+            && _hud.ClassSkillHudVisibleForDiagnostics;
         var valid = cycledToKnife
             && cycledToPrimary
             && detailsOpened
@@ -3264,8 +3275,13 @@ public partial class FreightTerminalWorld : Node3D
             && equippedGradeStylesStable
             && weaponGradeRoundTrip
             && attachmentGradeRoundTrip
-            && knifeGradeRoundTrip;
-        GD.Print($"WEAPON_UI_CHECK valid={valid} knife={cycledToKnife} primary={cycledToPrimary} details={detailsOpened} platform={_player.EquippedWeapon.Platform} comparisons={comparisonCards} directions={comparisonDirections} rendered_all={renderedComparisonsComplete} attachment_comparison={attachmentComparisonRendered} grade_colors={gradeColorsStable} equipped_grade_styles={equippedGradeStylesStable} weapon_grade={weaponGradeRoundTrip} attachment_grade={attachmentGradeRoundTrip} knife_grade={knifeGradeRoundTrip}");
+            && knifeGradeRoundTrip
+            && footerRuntimeSeparated
+            && footerResponsive
+            && footerInitiallyVisible
+            && downedFooterSuppressed
+            && downedFooterRestored;
+        GD.Print($"WEAPON_UI_CHECK valid={valid} knife={cycledToKnife} primary={cycledToPrimary} details={detailsOpened} platform={_player.EquippedWeapon.Platform} comparisons={comparisonCards} directions={comparisonDirections} rendered_all={renderedComparisonsComplete} attachment_comparison={attachmentComparisonRendered} grade_colors={gradeColorsStable} equipped_grade_styles={equippedGradeStylesStable} weapon_grade={weaponGradeRoundTrip} attachment_grade={attachmentGradeRoundTrip} knife_grade={knifeGradeRoundTrip} footer_runtime={footerRuntimeSeparated} footer_responsive={footerResponsive} footer_visible={footerInitiallyVisible} downed_suppressed={downedFooterSuppressed} downed_restored={downedFooterRestored} {_hud.FooterHudLayoutForDiagnostics}");
         GD.Print($"WEAPON_UI_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

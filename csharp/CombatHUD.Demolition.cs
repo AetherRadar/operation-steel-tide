@@ -97,7 +97,7 @@ public partial class CombatHUD
         if (IsInstanceValid(_classSkillRoot))
         {
             _classSkillRoot.Visible = true;
-            _classSkillRoot.Size = new Vector2(430, active ? 46 : 92);
+            RefreshFooterLayout();
         }
         if (IsInstanceValid(_squadOrderLabel))
         {

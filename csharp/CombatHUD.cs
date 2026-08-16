@@ -284,15 +284,16 @@ public partial class CombatHUD : CanvasLayer
         _radioLabel.Visible = false;
         root.AddChild(_radioLabel);
 
-        var status = Panel(root, Vector2.Zero, new Vector2(245, 92));
+        _statusHudRoot = Panel(root, Vector2.Zero, new Vector2(StatusHudWidth, StatusHudHeight));
+        var status = _statusHudRoot;
         status.AnchorLeft = 0.0f;
         status.AnchorTop = 1.0f;
         status.AnchorRight = 0.0f;
         status.AnchorBottom = 1.0f;
-        status.OffsetLeft = 30;
-        status.OffsetTop = -124;
-        status.OffsetRight = 275;
-        status.OffsetBottom = -32;
+        status.OffsetLeft = StatusHudLeftMargin;
+        status.OffsetTop = -(StatusHudBottomMargin + StatusHudHeight);
+        status.OffsetRight = StatusHudRightEdge;
+        status.OffsetBottom = -StatusHudBottomMargin;
         _healthLabel = Label("100", 31, new Color(0.88f, 0.96f, 0.92f));
         _healthLabel.Position = new Vector2(22, 10);
         status.AddChild(_healthLabel);
@@ -315,16 +316,17 @@ public partial class CombatHUD : CanvasLayer
         };
         status.AddChild(_staminaBar);
 
-        var weapon = Panel(root, Vector2.Zero, new Vector2(750, 104));
+        _weaponHudRoot = Panel(root, Vector2.Zero, new Vector2(WeaponHudWidth, WeaponHudHeight));
+        var weapon = _weaponHudRoot;
         weapon.MouseFilter = Control.MouseFilterEnum.Pass;
         weapon.AnchorLeft = 1.0f;
         weapon.AnchorTop = 1.0f;
         weapon.AnchorRight = 1.0f;
         weapon.AnchorBottom = 1.0f;
-        weapon.OffsetLeft = -780;
-        weapon.OffsetTop = -136;
-        weapon.OffsetRight = -30;
-        weapon.OffsetBottom = -32;
+        weapon.OffsetLeft = -(WeaponHudRightMargin + WeaponHudWidth);
+        weapon.OffsetTop = -(WeaponHudBottomMargin + WeaponHudHeight);
+        weapon.OffsetRight = -WeaponHudRightMargin;
+        weapon.OffsetBottom = -WeaponHudBottomMargin;
         _ammoLabel = Label("30", 42, new Color(0.95f, 0.98f, 0.95f));
         _ammoLabel.Position = new Vector2(22, 4);
         weapon.AddChild(_ammoLabel);
@@ -344,9 +346,14 @@ public partial class CombatHUD : CanvasLayer
         BuildAmmoTierHud(weapon);
 
         // Bottom-right backpack control: open inventory + live total value.
-        _backpackHotkeyButton = Button("TAB  BACKPACK", new Vector2(0, 0), new Vector2(210, 52));
+        _backpackHotkeyButton = Button(
+            "TAB  BACKPACK",
+            Vector2.Zero,
+            new Vector2(BackpackHudWidth, BackpackHudHeight));
         _backpackHotkeyButton.SetAnchorsPreset(Control.LayoutPreset.BottomRight);
-        _backpackHotkeyButton.Position = new Vector2(-240, -198);
+        _backpackHotkeyButton.Position = new Vector2(
+            -(BackpackHudRightMargin + BackpackHudWidth),
+            -BackpackHudBottomOffset);
         _backpackHotkeyButton.FocusMode = Control.FocusModeEnum.None;
         _backpackHotkeyButton.AddThemeFontSizeOverride("font_size", 13);
         _backpackHotkeyButton.Pressed += () => EmitSignal(SignalName.InventoryToggleRequested);
@@ -1477,6 +1484,7 @@ public partial class CombatHUD : CanvasLayer
 
     public void ShowDownedState(float reviveWindowSeconds = 15.0f)
     {
+        SetDownedFooterSuppressed(true);
         _downedBanner.Visible = true;
         UpdateDownedState(reviveWindowSeconds);
     }
@@ -1495,6 +1503,7 @@ public partial class CombatHUD : CanvasLayer
     public void HideDownedState()
     {
         _downedBanner.Visible = false;
+        SetDownedFooterSuppressed(false);
     }
 
     public bool IsDownedBannerVisible => IsInstanceValid(_downedBanner) && _downedBanner.Visible;
