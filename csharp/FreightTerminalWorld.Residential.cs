@@ -1909,6 +1909,10 @@ public partial class FreightTerminalWorld
         var realGuardsArmed = false;
         var realGuardsFixedWeapon = false;
         var realGuardsTargetPlayer = false;
+        var realGuardsUseProductionTargetEnumeration = false;
+        var realGuardEnumerationReturnedPlayer = false;
+        var realGuardsContactSharingSuppressed = false;
+        var realGuardExistingEnemyTacticsPreserved = false;
         var realGuardsBallisticClear = false;
         var realGuardBallisticBlockers = "not_checked";
         var realGuardsMoved = false;
@@ -1919,6 +1923,7 @@ public partial class FreightTerminalWorld
         var realGuardMissionStatePreserved = false;
         var realGuardMissionStateDetails = "not_checked";
         var realGuardsAttackReady = false;
+        var realGuardGlassStateRestored = false;
         var realGuardsCleaned = false;
         var realGuardRemainingInstances = -1;
         var realGuardEnemyLeaks = -1;
@@ -1928,8 +1933,19 @@ public partial class FreightTerminalWorld
         if (realGuardCache is not null)
         {
             var enemiesBeforeGuardProbe = new HashSet<EnemyOperator>(_enemies);
+            var enemyPursuitStatesBeforeGuardProbe = enemiesBeforeGuardProbe
+                .Where(IsInstanceValid)
+                .ToDictionary(
+                    enemy => enemy,
+                    enemy => enemy.CapturePursuitContactStateForDiagnostics());
             var sceneNodesBeforeGuardProbe = RuntimeNodeCount(this);
             var sceneNodeSetBeforeGuardProbe = RuntimeNodes(this);
+            var glassStatesBeforeGuardProbe = _residentialGlassFields
+                .Where(field => IsInstanceValid(field))
+                .Select(field => (
+                    Field: field,
+                    Snapshot: field.CaptureStateForDiagnostics()))
+                .ToList();
             var networkIdBeforeGuardProbe = _nextEnemyNetworkId;
             var ambushCountBeforeGuardProbe = _residentialGuardAmbushSpawnCount;
             var enemyCountBeforeGuardProbe = _enemiesRemaining;
@@ -2095,15 +2111,21 @@ public partial class FreightTerminalWorld
 
                 for (var index = 0; index < spawnedGuards.Count; index++)
                 {
-                    // Preserve mission protection while exercising EnemyOperator's real
-                    // close-range player fallback on diagnostics-only guard instances.
                     var guard = spawnedGuards[index];
-                    guard.Main = null;
                     guard.MissionDirector = null;
                     guard.ConfigureCombatProbeForDiagnostics(
                         0x5EED_4100UL + (ulong)index,
-                        realGuardTarget);
+                        realGuardTarget,
+                        bypassPlayerProtection: true,
+                        suppressContactSharing: true);
                 }
+                realGuardsUseProductionTargetEnumeration = spawnedGuards.Count == realGuardExpected
+                    && spawnedGuards.All(guard => ReferenceEquals(guard.Main, this));
+                realGuardEnumerationReturnedPlayer = realGuardsUseProductionTargetEnumeration
+                    && spawnedGuards.All(guard => EnumerateHostileTargetsFor(guard)
+                        .Any(candidate => ReferenceEquals(candidate, _player)));
+                realGuardsContactSharingSuppressed = spawnedGuards.Count == realGuardExpected
+                    && spawnedGuards.All(guard => guard.SuppressesContactSharingForDiagnostics);
 
                 for (var frame = 0; frame < 90; frame++)
                 {
@@ -2217,6 +2239,20 @@ public partial class FreightTerminalWorld
                     squadState.Mate.SetProcess(squadState.Processing);
                     squadState.Mate.SetPhysicsProcess(squadState.PhysicsProcessing);
                 }
+                foreach (var glassState in glassStatesBeforeGuardProbe)
+                {
+                    if (IsInstanceValid(glassState.Field))
+                    {
+                        glassState.Field.RestoreStateForDiagnostics(glassState.Snapshot);
+                    }
+                }
+                realGuardGlassStateRestored = glassStatesBeforeGuardProbe.Count == _residentialGlassFields.Count
+                    && glassStatesBeforeGuardProbe.All(glassState =>
+                        IsInstanceValid(glassState.Field)
+                        && glassState.Field.MatchesStateForDiagnostics(glassState.Snapshot));
+                realGuardExistingEnemyTacticsPreserved = enemyPursuitStatesBeforeGuardProbe.All(pair =>
+                    IsInstanceValid(pair.Key)
+                    && pair.Key.MatchesPursuitContactStateForDiagnostics(pair.Value));
                 realGuardRemainingInstances = spawnedGuards.Count(guard => IsInstanceValid(guard));
                 realGuardEnemyLeaks = spawnedGuards.Count(guard => _enemies.Contains(guard));
                 realGuardLootLeaks = spawnedGuards.Count(guard => _lootSources.Contains(guard));
@@ -2327,7 +2363,12 @@ public partial class FreightTerminalWorld
             && realGuardsFired
             && realGuardPlayerCollisionReady
             && realGuardMissionStatePreserved
+            && realGuardsUseProductionTargetEnumeration
+            && realGuardEnumerationReturnedPlayer
+            && realGuardsContactSharingSuppressed
+            && realGuardExistingEnemyTacticsPreserved
             && realGuardsAttackReady
+            && realGuardGlassStateRestored
             && realGuardsCleaned;
 
         var valid = ResidentialCacheCount == expectedCaches
@@ -2370,7 +2411,7 @@ public partial class FreightTerminalWorld
         var guardCacheRouteLeakText = guardCacheRouteLeaks.Count == 0
             ? "none"
             : string.Join('|', guardCacheRouteLeaks);
-        GD.Print($"RESIDENTIAL_GAMEPLAY_CHECK valid={valid} room_types={_residentialRoomArchetypes.Count}/7 caches={ResidentialCacheCount}/{expectedCaches} unique_rooms={roomIds.Count}/{expectedRoomIds.Count} cache_reachable={reachableCaches}/{expectedCaches} unreachable={string.Join(',', unreachableCaches)} cache_types={cacheKinds.Count}/7 grades={cacheGrades.Count}/5 loot_types={lootKinds.Count} events={roomEvents.Count}/5 guards={guardRequests}/{expectedGuardRequests} event_effects={eventEffectsExact} guard_cache_geometry={guardCachesReady}/{guardAmbushCaches.Count} guard_spawn_geometry={guardSpawnPointsSafe}/{guardSpawnPointsChecked} guard_route_geometry={guardRoutesReady}/{guardSpawnPointsChecked} guard_cache_clearance={guardCacheClearancesBlocked}/{guardAmbushCaches.Count} guard_cross_cache={guardCacheRouteProbes}:{guardCacheRouteLeakText} guard_far_target={farPreferredTargetBounded} guard_geometry_failures={guardGeometryFailureText} real_guards={realGuardSpawned}/{realGuardExpected} guard_positions={realGuardPositionsExact} guard_safe={realGuardSpawnSafe} guard_routes={realGuardRoutesReady} guard_grounded={realGuardGrounded} guard_alerted={realGuardsAlerted} guard_armed={realGuardsArmed} guard_fixed_weapon={realGuardsFixedWeapon} guard_target={realGuardsTargetPlayer} guard_ballistic={realGuardsBallisticClear} guard_blockers={realGuardBallisticBlockers} guard_moved={realGuardsMoved} guard_move_min={realGuardMinimumMovement:0.00} guard_fired={realGuardsFired} guard_shots={realGuardShotsFired} guard_player_collision={realGuardPlayerCollisionReady} guard_mission_preserved={realGuardMissionStatePreserved} guard_mission_state={realGuardMissionStateDetails} guard_attack_ready={realGuardsAttackReady} guard_cleanup={realGuardsCleaned} guard_cleanup_instances={realGuardRemainingInstances} guard_cleanup_enemies={realGuardEnemyLeaks} guard_cleanup_loot={realGuardLootLeaks} guard_cleanup_nodes={sceneNodesBeforeOpen}->{realGuardSceneNodesAfterCleanup} guard_cleanup_extra={realGuardExtraNodes} every_tower={everyTowerStocked} every_room={everyRoomStocked} registered={cachesRegistered} sealed={cachesInitiallySealed} resolved={cachesResolved} deterministic={deterministicLoot} no_reroll={noReroll} neutral_visual={neutralVisuals} opened_visual={openedVisualsReady} open_feedback={openedFeedbackReady} visible_parts={visiblePartCount} cache_nodes={cacheNodesBeforeOpen}->{cacheNodesAfterOpen} cache_nodes_stable={cacheNodesStable} scene_nodes={sceneNodesBeforeOpen}->{sceneNodesAfterOpen} scene_nodes_stable={sceneNodesStable} opened_node_budget={openedNodeBudgetMet} no_hints={noVisibleHints} ai_hint={sealedWeaponHints} furniture={ResidentialFurnitureCount}/{expectedFurniture} furniture_types={furnitureKinds.Count}/4 furniture_registered={furnitureRegistered} furniture_stocked={furnitureStocked} furniture_reachable={reachableFurniture}/{expectedFurniture} furniture_by_kind={furnitureReachabilityText} loot_ui={lootUiOpened} assistance_roles={assistanceRoles.Count}/5 medic_healed={medicHealed}");
+        GD.Print($"RESIDENTIAL_GAMEPLAY_CHECK valid={valid} room_types={_residentialRoomArchetypes.Count}/7 caches={ResidentialCacheCount}/{expectedCaches} unique_rooms={roomIds.Count}/{expectedRoomIds.Count} cache_reachable={reachableCaches}/{expectedCaches} unreachable={string.Join(',', unreachableCaches)} cache_types={cacheKinds.Count}/7 grades={cacheGrades.Count}/5 loot_types={lootKinds.Count} events={roomEvents.Count}/5 guards={guardRequests}/{expectedGuardRequests} event_effects={eventEffectsExact} guard_cache_geometry={guardCachesReady}/{guardAmbushCaches.Count} guard_spawn_geometry={guardSpawnPointsSafe}/{guardSpawnPointsChecked} guard_route_geometry={guardRoutesReady}/{guardSpawnPointsChecked} guard_cache_clearance={guardCacheClearancesBlocked}/{guardAmbushCaches.Count} guard_cross_cache={guardCacheRouteProbes}:{guardCacheRouteLeakText} guard_far_target={farPreferredTargetBounded} guard_geometry_failures={guardGeometryFailureText} real_guards={realGuardSpawned}/{realGuardExpected} guard_positions={realGuardPositionsExact} guard_safe={realGuardSpawnSafe} guard_routes={realGuardRoutesReady} guard_grounded={realGuardGrounded} guard_alerted={realGuardsAlerted} guard_armed={realGuardsArmed} guard_fixed_weapon={realGuardsFixedWeapon} guard_target={realGuardsTargetPlayer} guard_target_main={realGuardsUseProductionTargetEnumeration} guard_target_enumerated_player={realGuardEnumerationReturnedPlayer} guard_contact_share_suppressed={realGuardsContactSharingSuppressed} guard_enemy_tactics_preserved={realGuardExistingEnemyTacticsPreserved} guard_ballistic={realGuardsBallisticClear} guard_blockers={realGuardBallisticBlockers} guard_moved={realGuardsMoved} guard_move_min={realGuardMinimumMovement:0.00} guard_fired={realGuardsFired} guard_shots={realGuardShotsFired} guard_player_collision={realGuardPlayerCollisionReady} guard_mission_preserved={realGuardMissionStatePreserved} guard_mission_state={realGuardMissionStateDetails} guard_attack_ready={realGuardsAttackReady} guard_glass_restored={realGuardGlassStateRestored} guard_cleanup={realGuardsCleaned} guard_cleanup_instances={realGuardRemainingInstances} guard_cleanup_enemies={realGuardEnemyLeaks} guard_cleanup_loot={realGuardLootLeaks} guard_cleanup_nodes={sceneNodesBeforeOpen}->{realGuardSceneNodesAfterCleanup} guard_cleanup_extra={realGuardExtraNodes} every_tower={everyTowerStocked} every_room={everyRoomStocked} registered={cachesRegistered} sealed={cachesInitiallySealed} resolved={cachesResolved} deterministic={deterministicLoot} no_reroll={noReroll} neutral_visual={neutralVisuals} opened_visual={openedVisualsReady} open_feedback={openedFeedbackReady} visible_parts={visiblePartCount} cache_nodes={cacheNodesBeforeOpen}->{cacheNodesAfterOpen} cache_nodes_stable={cacheNodesStable} scene_nodes={sceneNodesBeforeOpen}->{sceneNodesAfterOpen} scene_nodes_stable={sceneNodesStable} opened_node_budget={openedNodeBudgetMet} no_hints={noVisibleHints} ai_hint={sealedWeaponHints} furniture={ResidentialFurnitureCount}/{expectedFurniture} furniture_types={furnitureKinds.Count}/4 furniture_registered={furnitureRegistered} furniture_stocked={furnitureStocked} furniture_reachable={reachableFurniture}/{expectedFurniture} furniture_by_kind={furnitureReachabilityText} loot_ui={lootUiOpened} assistance_roles={assistanceRoles.Count}/5 medic_healed={medicHealed}");
         GD.Print($"RESIDENTIAL_GAMEPLAY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

@@ -1101,7 +1101,7 @@ public partial class FreightTerminalWorld : Node3D
     /// <summary>All living combatants that are hostile to the given operator (player squad, other teams, NPCs).</summary>
     public IEnumerable<Node3D> EnumerateHostileTargetsFor(EnemyOperator self)
     {
-        if (IsPlayerProtected())
+        if (IsPlayerProtected() && !self.BypassesPlayerProtectionForDiagnostics)
         {
             yield break;
         }

@@ -148,7 +148,7 @@ public partial class EnemyOperator
 
     private void SharePursuitContact(Node3D target, Vector3 position)
     {
-        if (!IsInsideTree())
+        if (SuppressesContactSharingForDiagnostics || !IsInsideTree())
         {
             return;
         }
