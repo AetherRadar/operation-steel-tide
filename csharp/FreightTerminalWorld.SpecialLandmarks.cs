@@ -240,22 +240,70 @@ public partial class FreightTerminalWorld
         }
     }
 
+    private void AddSpecialOpenCanopyFrame(
+        Node3D parent,
+        string prefix,
+        Vector3 center,
+        Vector2 size,
+        float ridgeRise,
+        Godot.Material frame,
+        Godot.Material accent)
+    {
+        var halfWidth = size.X * 0.5f;
+        var halfDepth = size.Y * 0.5f;
+        foreach (var x in new[] { -halfWidth, halfWidth })
+        {
+            foreach (var z in new[] { -halfDepth, halfDepth })
+            {
+                ExpansionBox(
+                    parent,
+                    $"{prefix}_Post_{x:0.0}_{z:0.0}",
+                    new Vector3(center.X + x, center.Y * 0.5f, center.Z + z),
+                    new Vector3(0.2f, center.Y, 0.2f),
+                    frame);
+            }
+        }
+
+        ExpansionBox(parent, $"{prefix}_EaveLeft", center + new Vector3(-halfWidth, 0.0f, 0.0f), new Vector3(0.18f, 0.2f, size.Y), frame);
+        ExpansionBox(parent, $"{prefix}_EaveRight", center + new Vector3(halfWidth, 0.0f, 0.0f), new Vector3(0.18f, 0.2f, size.Y), frame);
+        ExpansionBox(parent, $"{prefix}_EndFront", center + new Vector3(0.0f, 0.0f, -halfDepth), new Vector3(size.X, 0.2f, 0.18f), frame);
+        ExpansionBox(parent, $"{prefix}_EndBack", center + new Vector3(0.0f, 0.0f, halfDepth), new Vector3(size.X, 0.2f, 0.18f), frame);
+        ExpansionBox(parent, $"{prefix}_RidgeBeam", center + new Vector3(0.0f, ridgeRise, 0.0f), new Vector3(0.2f, 0.22f, size.Y), accent);
+
+        for (var rib = 0; rib < 7; rib++)
+        {
+            var z = center.Z + Mathf.Lerp(-halfDepth, halfDepth, rib / 6.0f);
+            AddSpecialSlopedRail(
+                parent,
+                $"{prefix}_RibLeft_{rib:00}",
+                new Vector3(center.X - halfWidth, center.Y, z),
+                new Vector3(center.X, center.Y + ridgeRise, z),
+                0.11f,
+                accent);
+            AddSpecialSlopedRail(
+                parent,
+                $"{prefix}_RibRight_{rib:00}",
+                new Vector3(center.X, center.Y + ridgeRise, z),
+                new Vector3(center.X + halfWidth, center.Y, z),
+                0.11f,
+                accent);
+        }
+    }
+
     private void BuildSalvageBazaar(
         Vector3 position,
         Godot.Material paving,
         Godot.Material yellow,
         Godot.Material orange)
     {
-        var canopyRoof = PaintedMetal("special_landmark_bazaar_canopy", new Color(0.68f, 0.42f, 0.18f));
-        var canopyUnderside = PaintedMetal("special_landmark_bazaar_canopy_underside", new Color(0.58f, 0.64f, 0.6f));
-        var canopyRib = PaintedMetal("special_landmark_bazaar_canopy_rib", new Color(0.7f, 0.55f, 0.28f));
+        var canopyFrame = PaintedMetal("special_landmark_bazaar_canopy_frame", new Color(0.44f, 0.52f, 0.5f));
+        var canopyAccent = PaintedMetal("special_landmark_bazaar_canopy_accent", new Color(0.7f, 0.55f, 0.28f));
         var stallTimber = PaintedMetal("special_landmark_bazaar_stall_timber", new Color(0.55f, 0.32f, 0.14f));
         var stallSteel = PaintedMetal("special_landmark_bazaar_stall_steel", new Color(0.44f, 0.52f, 0.5f));
         var deckSteel = PaintedMetal("special_landmark_bazaar_deck", new Color(0.48f, 0.54f, 0.52f));
         var supportSteel = PaintedMetal("special_landmark_bazaar_support", new Color(0.34f, 0.4f, 0.4f));
-        ConfigureBazaarShadowFill(canopyRoof, new Color(0.07f, 0.035f, 0.012f), 0.34f);
-        ConfigureBazaarShadowFill(canopyUnderside, new Color(0.09f, 0.095f, 0.075f), 0.48f);
-        ConfigureBazaarShadowFill(canopyRib, new Color(0.08f, 0.055f, 0.02f), 0.4f);
+        ConfigureBazaarShadowFill(canopyFrame, new Color(0.055f, 0.065f, 0.06f), 0.38f);
+        ConfigureBazaarShadowFill(canopyAccent, new Color(0.08f, 0.055f, 0.02f), 0.4f);
         ConfigureBazaarShadowFill(stallTimber, new Color(0.055f, 0.028f, 0.01f), 0.32f);
         ConfigureBazaarShadowFill(stallSteel, new Color(0.055f, 0.065f, 0.06f), 0.38f);
         ConfigureBazaarShadowFill(deckSteel, new Color(0.06f, 0.068f, 0.062f), 0.42f);
@@ -279,17 +327,14 @@ public partial class FreightTerminalWorld
             MeshBox(body, new Vector3(0, 1.36f, -1.08f), new Vector3(2.4f, 0.52f, 0.06f), orange).Name = $"BazaarKioskSign_{index:00}";
         }
 
-        AddSpecialCanopy(
+        AddSpecialOpenCanopyFrame(
             root,
             "BazaarCanopy",
-            new Vector3(0, 3.82f, 0),
+            new Vector3(0, 5.35f, 0),
             new Vector2(17.0f, 12.2f),
-            2.15f,
-            canopyRoof,
-            supportSteel,
-            0.82f,
-            canopyUnderside,
-            canopyRib);
+            1.2f,
+            canopyFrame,
+            canopyAccent);
         ExpansionCylinder(root, "BazaarSignalMast", new Vector3(0, 4.8f, 0), 0.16f, 9.6f, supportSteel);
         MeshBox(root, new Vector3(0, 9.75f, 0), new Vector3(2.2f, 0.18f, 0.18f), orange).Name = "BazaarSignalArm";
 
@@ -690,14 +735,16 @@ public partial class FreightTerminalWorld
         var bazaarRoofRight = bazaar?.GetNodeOrNull<MeshInstance3D>("BazaarCanopy_Roof_1");
         var bazaarLiningLeft = bazaar?.GetNodeOrNull<MeshInstance3D>("BazaarCanopy_Underside_-1");
         var bazaarLiningRight = bazaar?.GetNodeOrNull<MeshInstance3D>("BazaarCanopy_Underside_1");
-        var bazaarCanopyClearance = Mathf.Min(
-            BazaarCanopyMinimumY(bazaarRoofLeft),
-            BazaarCanopyMinimumY(bazaarLiningLeft));
-        var bazaarCanopyGap = BazaarCanopyRidgeGap(bazaarRoofLeft, bazaarRoofRight);
-        var bazaarHeadClearance = bazaarCanopyClearance >= 3.64f
-            && BazaarCanopyMinimumY(bazaarLiningRight) >= 3.64f;
-        var bazaarLightGap = bazaarCanopyGap >= 0.68f;
-        var bazaarMaterialsReadable = HasReadableBazaarShadowMaterial(bazaarLiningLeft, 0.5f, 0.03f)
+        var bazaarSolidPanelsAbsent = bazaarRoofLeft is null
+            && bazaarRoofRight is null
+            && bazaarLiningLeft is null
+            && bazaarLiningRight is null;
+        var bazaarFrameReady = bazaar?.GetNodeOrNull("BazaarCanopy_RidgeBeam") is not null
+            && bazaar.GetNodeOrNull("BazaarCanopy_EaveLeft") is not null
+            && bazaar.GetNodeOrNull("BazaarCanopy_EaveRight") is not null
+            && bazaar.GetNodeOrNull("BazaarCanopy_RibLeft_03") is not null
+            && bazaar.GetNodeOrNull("BazaarCanopy_RibRight_03") is not null;
+        var bazaarMaterialsReadable = HasReadableBazaarShadowMaterial(bazaar?.GetNodeOrNull("BazaarCanopy_RidgeBeam"), 0.5f, 0.02f)
             && HasReadableBazaarShadowMaterial(bazaar?.GetNodeOrNull("BazaarKiosk_01"), 0.42f, 0.018f)
             && HasReadableBazaarShadowMaterial(bazaar?.GetNodeOrNull("BazaarAuctionDeck"), 0.46f, 0.02f);
         var valid = SpecialLandmarkCount == expected.Length
@@ -711,10 +758,10 @@ public partial class FreightTerminalWorld
             && lootGrades.Count == Enum.GetValues<LootGrade>().Length
             && SpecialLandmarkVerticalRouteCount >= 5
             && routeNodes.Count == SpecialLandmarkVerticalRouteCount
-            && bazaarHeadClearance
-            && bazaarLightGap
+            && bazaarSolidPanelsAbsent
+            && bazaarFrameReady
             && bazaarMaterialsReadable;
-        GD.Print($"SPECIAL_LANDMARK_CHECK valid={valid} landmarks={SpecialLandmarkCount}/{expected.Length} present={present} collision={collisionReady} key_structures={keyStructuresReady} loot={SpecialLandmarkLootCount}/{lootNodes.Count} registered={lootRegistered} grades={lootGrades.Count} routes={SpecialLandmarkVerticalRouteCount}/{routeNodes.Count} spawn_clear={spawnClear} nearest_spawn={nearestSpawnDistance:0.0} bazaar_head_clear={bazaarHeadClearance} bazaar_clearance={bazaarCanopyClearance:0.00} bazaar_light_gap={bazaarLightGap} bazaar_gap={bazaarCanopyGap:0.00} bazaar_materials={bazaarMaterialsReadable}");
+        GD.Print($"SPECIAL_LANDMARK_CHECK valid={valid} landmarks={SpecialLandmarkCount}/{expected.Length} present={present} collision={collisionReady} key_structures={keyStructuresReady} loot={SpecialLandmarkLootCount}/{lootNodes.Count} registered={lootRegistered} grades={lootGrades.Count} routes={SpecialLandmarkVerticalRouteCount}/{routeNodes.Count} spawn_clear={spawnClear} nearest_spawn={nearestSpawnDistance:0.0} bazaar_solid_panels_absent={bazaarSolidPanelsAbsent} bazaar_frame={bazaarFrameReady} bazaar_materials={bazaarMaterialsReadable}");
         GD.Print($"SPECIAL_LANDMARK_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
