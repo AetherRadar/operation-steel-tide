@@ -10,6 +10,7 @@ public partial class FreightTerminalWorld
     private const float DistrictRouteDeckHeight = 5.2f;
     private const float DistrictRouteDeckWidth = 3.2f;
     private const float DistrictRouteDeckThickness = 0.22f;
+    private const float DistrictRouteHubSize = 5.2f;
     private const float DistrictRouteStairRun = 14.4f;
     private const float DistrictRouteStairRise = 5.05f;
     private const int DistrictRouteStairSteps = 32;
@@ -107,7 +108,7 @@ public partial class FreightTerminalWorld
         if (hubs.ContainsKey("WestResidentialGateway") && hubs.ContainsKey("EastResidentialGateway"))
         {
             AddDistrictRouteLink(hubs, "WestResidentialGateway", "BazaarGate", deck, guard, support, safety,
-                DistrictRoutePoint(-80.0f, -8.0f));
+                DistrictRoutePoint(-80.0f, -8.0f), DistrictRoutePoint(-66.0f, -8.0f));
             AddDistrictRouteLink(hubs, "WestResidentialGateway", "RailGate", deck, guard, support, safety);
             AddDistrictRouteLink(hubs, "WestResidentialGateway", "CustomsGate", deck, guard, support, safety,
                 DistrictRoutePoint(-78.0f, -14.0f));
@@ -176,7 +177,7 @@ public partial class FreightTerminalWorld
             _districtRouteRoot,
             $"DistrictHub_{hub.Id}",
             hub.DeckCenter,
-            new Vector3(5.2f, DistrictRouteDeckThickness, 5.2f),
+            new Vector3(DistrictRouteHubSize, DistrictRouteDeckThickness, DistrictRouteHubSize),
             deck);
         platform.AddToGroup("district_route_collision");
         platform.AddToGroup("district_route_deck");
@@ -239,6 +240,17 @@ public partial class FreightTerminalWorld
         points.Add(toHub.DeckCenter);
         var link = new DistrictRouteLink(from, to, points.ToArray());
         _districtRouteLinks.Add(link);
+        var navigationPoints = new Vector3[link.Points.Length];
+        for (var index = 0; index < link.Points.Length; index++)
+        {
+            navigationPoints[index] = link.Points[index]
+                + Vector3.Up * (DistrictRouteDeckThickness * 0.5f + 0.12f);
+        }
+        RegisterSquadTraversalLink(
+            $"district_deck:{from}:{to}",
+            SquadTraversalKind.Walk,
+            bidirectional: true,
+            navigationPoints);
         for (var segment = 0; segment < link.Points.Length - 1; segment++)
         {
             BuildDistrictRouteSegment(
@@ -406,7 +418,10 @@ public partial class FreightTerminalWorld
 
         var direction = hub.StairDirection.Normalized();
         var yaw = Mathf.Atan2(direction.X, direction.Z);
-        var stepRun = DistrictRouteStairRun / DistrictRouteStairSteps;
+        var axisExtent = Mathf.Max(Mathf.Abs(direction.X), Mathf.Abs(direction.Z));
+        var platformEdgeDistance = DistrictRouteHubSize * 0.5f / Mathf.Max(0.001f, axisExtent);
+        var stairRun = DistrictRouteStairRun - platformEdgeDistance;
+        var stepRun = stairRun / DistrictRouteStairSteps;
         var stepRise = DistrictRouteStairRise / DistrictRouteStairSteps;
         var stairBody = new StaticBody3D
         {
@@ -419,6 +434,10 @@ public partial class FreightTerminalWorld
         _districtRouteRoot.AddChild(stairBody);
 
         var stepTransforms = new List<Transform3D>(DistrictRouteStairSteps);
+        var navigationPoints = new List<Vector3>(DistrictRouteStairSteps + 2)
+        {
+            hub.StairStart - direction * 0.65f + Vector3.Up * 0.12f
+        };
         var rotation = Basis.FromEuler(new Vector3(0, yaw, 0));
         const float treadThickness = 0.14f;
         for (var step = 0; step < DistrictRouteStairSteps; step++)
@@ -435,7 +454,17 @@ public partial class FreightTerminalWorld
                 Shape = new BoxShape3D { Size = size }
             });
             stepTransforms.Add(new Transform3D(rotation.Scaled(size), center));
+            navigationPoints.Add(new Vector3(center.X, top + 0.12f, center.Z));
         }
+
+        navigationPoints.Add(
+            hub.DeckCenter + Vector3.Up * (DistrictRouteDeckThickness * 0.5f + 0.12f));
+        RegisterSquadTraversalLink(
+            $"district_stair:{hub.Id}",
+            SquadTraversalKind.Step,
+            bidirectional: true,
+            navigationPoints,
+            costMultiplier: 1.08f);
 
         AddDistrictRouteBatch(
             $"DistrictStairVisual_{hub.Id}",
@@ -445,7 +474,7 @@ public partial class FreightTerminalWorld
 
         var lateral = new Vector3(direction.Z, 0.0f, -direction.X).Normalized();
         var railStartCenter = hub.StairStart + direction * stepRun * 0.5f + Vector3.Up * (stepRise + 0.94f);
-        var railEndCenter = hub.StairStart + direction * (DistrictRouteStairRun - stepRun * 0.5f)
+        var railEndCenter = hub.StairStart + direction * (stairRun - stepRun * 0.5f)
             + Vector3.Up * (DistrictRouteStairRise + 0.94f);
         var balusters = new List<Transform3D>(18);
         foreach (var side in new[] { -1.0f, 1.0f })
@@ -459,7 +488,7 @@ public partial class FreightTerminalWorld
             for (var post = 0; post < 9; post++)
             {
                 var t = post / 8.0f;
-                var position = hub.StairStart + direction * Mathf.Lerp(stepRun * 0.5f, DistrictRouteStairRun - stepRun * 0.5f, t) + offset;
+                var position = hub.StairStart + direction * Mathf.Lerp(stepRun * 0.5f, stairRun - stepRun * 0.5f, t) + offset;
                 var surfaceY = hub.StairStart.Y + Mathf.Lerp(stepRise, DistrictRouteStairRise, t);
                 position.Y = surfaceY + 0.46f;
                 balusters.Add(new Transform3D(Basis.Identity, position));

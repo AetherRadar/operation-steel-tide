@@ -174,6 +174,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
 
         _reviveTarget = null;
+        CancelNavigationTraversal();
         Velocity = Vector3.Zero;
         CollisionLayer = 0;
         CollisionMask = 0;
@@ -248,6 +249,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     public void EndSquadRevive()
     {
         _reviveTarget = null;
+        CancelNavigationTraversal();
         _revivePoseBlend = 0.0f;
         if (IsInstanceValid(_rig))
         {
@@ -326,6 +328,12 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             return;
         }
 
+        if (UpdateActiveNavigationTraversal(dt))
+        {
+            AnimateRig(dt);
+            return;
+        }
+
         UpdateSkillAction(dt);
         _lootHuntCooldown = Mathf.Max(0.0f, _lootHuntCooldown - dt);
         var hostile = UpdateCombatTarget(dt);
@@ -336,6 +344,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             UpdateWeaponLootHunt(dt, hostile);
         }
         var destination = ResolveFormationDestination();
+        var navigationDirective = SquadNavigationDirective.Walk(destination);
         var objectivePriority = false;
         if (!HasFireablePrimary && _lootHuntSource is not null && IsInstanceValid(_lootHuntSource.LootNode))
         {
@@ -357,14 +366,29 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         var reviveTargetNode = ActiveReviveTargetNode;
         if (reviveTargetNode is not null)
         {
-            destination = Main.ResolveSquadNavigationDestination(this, reviveTargetNode.GlobalPosition, emergency: true);
+            navigationDirective = Main.ResolveSquadNavigationDestination(
+                this,
+                reviveTargetNode.GlobalPosition,
+                emergency: true);
+            destination = navigationDirective.Target;
             objectivePriority = true;
         }
         else if (Order == SquadOrder.Follow && hostile is null && !objectivePriority)
         {
-            destination = Main.ResolveSquadNavigationDestination(this, destination, emergency: false);
+            destination = Main.ResolveSquadFollowDestination(this, destination);
+            navigationDirective = Main.ResolveSquadNavigationDestination(this, destination, emergency: false);
+            destination = navigationDirective.Target;
         }
-        UpdateTacticalMovement(destination, hostile, objectivePriority, dt);
+        UpdateTacticalMovement(destination, hostile, objectivePriority, navigationDirective.Kind, dt);
+        if (TryBeginNavigationTraversal(navigationDirective)
+            || navigationDirective.Kind == SquadTraversalKind.Walk
+                && (TryBeginVaultTowardDestination(destination)
+                    || TryBeginDropTowardDestination(destination)))
+        {
+            UpdateActiveNavigationTraversal(dt);
+            AnimateRig(dt);
+            return;
+        }
         MaintainStairNavigation(destination, dt);
         ConsiderMedicSupport(patient);
         if (hostile is not null && !hostile.IsDead)
@@ -373,7 +397,9 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             ConsiderRoleAbility(hostile, _combatHasSight);
         }
         MoveAndSlide();
-        TryNavigationStepUp(_combatDesiredDirection);
+        TryNavigationStepUp(navigationDirective.Kind == SquadTraversalKind.Step
+            ? _combatPathDirection
+            : _combatDesiredDirection);
         TrackTacticalMovement(dt);
         AnimateRig(dt);
     }

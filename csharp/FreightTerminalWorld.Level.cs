@@ -303,6 +303,7 @@ void sky() {
 
     private void BuildLevel()
     {
+        ResetSquadTraversalLinks();
         _levelRoot = new Node3D { Name = "FreightTerminal" };
         AddChild(_levelRoot);
         var asphalt = GroundMaterial("asphalt", new Color(0.45f, 0.49f, 0.5f), 0.88f);
@@ -905,6 +906,10 @@ void sky() {
                 MeshBox(body, new Vector3(0, y, -0.47f), new Vector3(1.36f, 0.018f, 0.018f), cage);
                 MeshBox(body, new Vector3(0, y, 0.47f), new Vector3(1.36f, 0.018f, 0.018f), cage);
             }
+            RegisterSquadHescoTraversalLinks(
+                position,
+                yaw,
+                $"hesco:{center.X:0.0}:{center.Z:0.0}:{index}");
         }
     }
 

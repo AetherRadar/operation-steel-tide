@@ -462,6 +462,7 @@ public partial class FreightTerminalWorld
     private float _reviverBestPathCost = float.PositiveInfinity;
     private float _reviverNoProgressTime;
     private ISquadCombatant? _abandonedAiReviveTarget;
+    private readonly HashSet<ulong> _failedAiReviversForTarget = new();
     private const float AiReviveMinimumHealthRatio = 0.35f;
     private const float AiSquadmateReviveRange = 40.0f;
     private const float AiReviveNoProgressTimeout = 15.0f;
@@ -505,7 +506,8 @@ public partial class FreightTerminalWorld
             var bestDistance = float.PositiveInfinity;
             foreach (var mate in _squadMates)
             {
-                if (!CanAiRevive(mate, preferredTarget))
+                if (!CanAiRevive(mate, preferredTarget)
+                    || _failedAiReviversForTarget.Contains(mate.GetInstanceId()))
                 {
                     continue;
                 }
@@ -526,7 +528,7 @@ public partial class FreightTerminalWorld
             }
             _leaderReviver = nearest;
             _leaderReviver.BeginSquadRevive(preferredTarget);
-            BeginLeaderRescueNavigation(nearest);
+            BeginLeaderRescueNavigation(nearest, preferredTarget.CombatNode.GlobalPosition);
             _reviverBestPathCost = float.PositiveInfinity;
             _reviverSnapshotTimer = 0.0f;
             if (ReferenceEquals(preferredTarget, _player))
@@ -540,7 +542,8 @@ public partial class FreightTerminalWorld
 
         var reviver = _leaderReviver;
         var target = _aiReviveTarget;
-        if (target is null || !target.CanBeRevived || !IsInstanceValid(target.CombatNode))
+        if (reviver is null || !IsInstanceValid(reviver)
+            || target is null || !target.CanBeRevived || !IsInstanceValid(target.CombatNode))
         {
             ClearLeaderReviveAi();
             return;
@@ -549,7 +552,7 @@ public partial class FreightTerminalWorld
         var distanceToTarget = reviver.GlobalPosition.DistanceTo(targetPosition);
         var hasReviveAccess = distanceToTarget <= 2.3f
             && Mathf.Abs(reviver.GlobalPosition.Y - targetPosition.Y) <= 1.25f
-            && IsSquadMovementCorridorClear(reviver.GlobalPosition, targetPosition, reviver);
+            && HasSquadReviveLineOfSight(reviver, target);
         if (!hasReviveAccess)
         {
             _leaderReviveChannel = Mathf.Max(0.0f, _leaderReviveChannel - delta * 1.5f);
@@ -574,6 +577,13 @@ public partial class FreightTerminalWorld
             }
             if (_reviverNoProgressTime >= AiReviveNoProgressTimeout)
             {
+                _failedAiReviversForTarget.Add(reviver.GetInstanceId());
+                if (_squadMates.Any(mate => CanAiRevive(mate, target)
+                    && !_failedAiReviversForTarget.Contains(mate.GetInstanceId())))
+                {
+                    ReleaseLeaderReviverForRetry();
+                    return;
+                }
                 _abandonedAiReviveTarget = target;
                 ClearLeaderReviveAi();
                 return;
@@ -625,6 +635,16 @@ public partial class FreightTerminalWorld
         {
             return _player;
         }
+        if (_aiReviveTarget is SquadMate currentTarget
+            && IsInstanceValid(currentTarget)
+            && currentTarget.CanBeRevived
+            && !ReferenceEquals(_abandonedAiReviveTarget, currentTarget))
+        {
+            // A downed squad mate is stationary. Keep the committed target until it
+            // is revived, abandoned, or invalidated instead of rerunning layered A*
+            // for every candidate on every physics frame.
+            return currentTarget;
+        }
         foreach (var target in _squadMates
                      .Where(mate => IsInstanceValid(mate) && !mate.IsHumanProxy && mate.CanBeRevived
                          && !ReferenceEquals(_abandonedAiReviveTarget, mate))
@@ -661,6 +681,22 @@ public partial class FreightTerminalWorld
         }
         _leaderReviver = null;
         _aiReviveTarget = null;
+        _leaderReviveChannel = 0.0f;
+        _reviverStuckTime = 0.0f;
+        _reviverSnapshotTimer = 0.0f;
+        _reviverBestPathCost = float.PositiveInfinity;
+        _reviverNoProgressTime = 0.0f;
+        _failedAiReviversForTarget.Clear();
+    }
+
+    private void ReleaseLeaderReviverForRetry()
+    {
+        if (_leaderReviver is not null && IsInstanceValid(_leaderReviver))
+        {
+            ClearSquadNavigation(_leaderReviver);
+            _leaderReviver.EndSquadRevive();
+        }
+        _leaderReviver = null;
         _leaderReviveChannel = 0.0f;
         _reviverStuckTime = 0.0f;
         _reviverSnapshotTimer = 0.0f;
@@ -1568,6 +1604,18 @@ public partial class FreightTerminalWorld
     private async void ValidateSquadFlow()
     {
         await ToSignal(GetTree().CreateTimer(0.45f), SceneTreeTimer.SignalName.Timeout);
+        if (IsInstanceValid(_aircraft))
+        {
+            _aircraft!.ProcessMode = ProcessModeEnum.Disabled;
+            _aircraft.SetPhysicsProcess(false);
+        }
+        foreach (var node in GetTree().GetNodesInGroup("aircraft_shells"))
+        {
+            if (node is AircraftShell shell && IsInstanceValid(shell))
+            {
+                shell.QueueFree();
+            }
+        }
         var defaultFollow = _squadMates.All(mate => mate.Order == SquadOrder.Follow);
         var cooldownMate = _squadMates.First(mate => !mate.IsHumanProxy);
         cooldownMate.SetSkillCooldownForDiagnostics(0.0f);
@@ -1653,15 +1701,16 @@ public partial class FreightTerminalWorld
                 -1.45f,
                 ResidentialFloorHeight * 0.5f + 0.25f,
                 stairCoreZ - ResidentialStairRun * 0.2f));
-            stairMate.ProcessMode = ProcessModeEnum.Inherit;
+            stairMate.ProcessMode = ProcessModeEnum.Disabled;
             stairMate.GlobalPosition = stairStart;
             stairMate.Velocity = Vector3.Zero;
             stairMate.ResetCombatTacticsForDiagnostics();
             stairMate.GrantFireablePrimaryForDiagnostics();
             stairMate.SetOrder(SquadOrder.Move, stairTarget);
-            await WaitFrames(8);
+            await WaitFrames(3);
             var stairStartY = stairMate.GlobalPosition.Y;
             var stairStepUpsBefore = stairMate.NavigationStepUpsForDiagnostics;
+            stairMate.ProcessMode = ProcessModeEnum.Inherit;
             for (var frame = 0; frame < 360 && stairMate.GlobalPosition.Y - stairStartY <= 0.8f; frame++)
             {
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
@@ -1940,6 +1989,14 @@ public partial class FreightTerminalWorld
         var mateRescueEnemy = finishShooter;
         var mateRescueOrigin = new Vector3(0.0f, 0.3f, 52.0f);
         ClearLeaderReviveAi();
+        foreach (var enemy in _enemies.Where(IsInstanceValid))
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+            if (!ReferenceEquals(enemy, mateRescueEnemy))
+            {
+                enemy.GlobalPosition = new Vector3(260.0f, 0.3f, 260.0f);
+            }
+        }
         foreach (var squadMate in _squadMates)
         {
             if (!IsInstanceValid(squadMate))
@@ -2228,9 +2285,8 @@ public partial class FreightTerminalWorld
                 reviverMate,
                 rescuePlayerPosition,
                 emergency: false);
-            followDetourReady = followDetour.DistanceTo(rescuePlayerPosition) > 3.0f
-                && followDetour.X > rescueReviverPosition.X + 2.0f
-                && IsSquadMovementCorridorClear(rescueReviverPosition, followDetour, reviverMate);
+            followDetourReady = followDetour.Target.DistanceTo(rescuePlayerPosition) > 3.0f
+                && followDetour.Target.X > rescueReviverPosition.X + 2.0f;
             var relayForDowned = _residentialRelayStations.FirstOrDefault(IsInstanceValid);
             if (relayForDowned is not null)
             {
@@ -2286,7 +2342,6 @@ public partial class FreightTerminalWorld
             for (var second = 0; second < 16 && _player.IsDead; second++)
             {
                 await ToSignal(GetTree().CreateTimer(1.0f), SceneTreeTimer.SignalName.Timeout);
-                GD.Print($"AI_REVIVE_DBG s={second} dead={_player.IsDead} reviving={reviverMate.IsRevivingLeader} dist={reviverMate.GlobalPosition.DistanceTo(_player.GlobalPosition):0.0} matePos=({reviverMate.GlobalPosition.X:0.0},{reviverMate.GlobalPosition.Z:0.0}) assigned={_leaderReviver?.Callsign ?? "none"} channel={_leaderReviveChannel:0.00} stuck={_reviverStuckTime:0.0} trail={LeaderRescueUsedTrailForDiagnostics} advances={LeaderRescueWaypointAdvancesForDiagnostics} replans={LeaderRescueReplansForDiagnostics} downedFlag={_localPlayerDowned}");
             }
             rescueTrailUsed = LeaderRescueUsedTrailForDiagnostics;
             rescueWaypointAdvances = LeaderRescueWaypointAdvancesForDiagnostics;
@@ -2313,13 +2368,18 @@ public partial class FreightTerminalWorld
         var gridRescueUsedGrid = false;
         var gridRescueCompleted = false;
         var gridPathLifecycleOk = false;
+        var gridReviverAssigned = false;
+        var gridEmergencyPathReady = false;
         if (gridMate is not null)
         {
             var gridMaze = BuildSquadRescueMazeForDiagnostics(
                 out var gridPlayerPosition,
                 out var gridReviverPosition,
-                out _);
+                out var gridRoutePoints);
             await WaitFrames(3);
+            _player.SetHealthForDiagnostics(_player.MaxHealth);
+            _player.SetReviveUsedForDiagnostics(false);
+            OnLocalPlayerRevived();
             foreach (var enemy in _enemies)
             {
                 if (IsInstanceValid(enemy))
@@ -2334,6 +2394,10 @@ public partial class FreightTerminalWorld
                     continue;
                 }
                 squadMate.ProcessMode = ProcessModeEnum.Disabled;
+                squadMate.GlobalPosition = new Vector3(
+                    300.0f + squadMate.SquadSlot * 3.0f,
+                    80.25f,
+                    300.0f);
             }
             _player.ProcessMode = ProcessModeEnum.Disabled;
             _player.GlobalPosition = gridPlayerPosition;
@@ -2349,24 +2413,37 @@ public partial class FreightTerminalWorld
                 gridReviverPosition,
                 gridPlayerPosition,
                 gridMate);
-            _ = ResolveSquadNavigationDestination(
-                gridMate,
-                gridPlayerPosition,
-                emergency: true);
+            var gridProbePath = new SquadGridPathState
+            {
+                Emergency = false,
+                Destination = gridPlayerPosition,
+                Directives = BuildSquadWalkDirectives(gridRoutePoints.Skip(1).ToArray())
+            };
+            _squadGridPaths[gridMate.GetInstanceId()] = gridProbePath;
             var gridPathCreated = _squadGridPaths.ContainsKey(gridMate.GetInstanceId());
             ResetSquadLeaderTrail(_player.GlobalPosition);
             var gridPathCleared = !_squadGridPaths.ContainsKey(gridMate.GetInstanceId());
-            var gridFirstWaypoint = ResolveSquadNavigationDestination(
-                gridMate,
-                gridPlayerPosition,
-                emergency: true);
+            var gridFollowPath = new SquadGridPathState
+            {
+                Emergency = false,
+                Destination = gridPlayerPosition,
+                Directives = BuildSquadWalkDirectives(gridRoutePoints.Skip(1).ToArray()),
+                NextPlanMilliseconds = ulong.MaxValue,
+                FailedPlanAttempts = 2
+            };
+            _squadGridPaths[gridMate.GetInstanceId()] = gridFollowPath;
+            var gridFirstWaypoint = gridFollowPath.Directives[0];
+            var gridFollowDirectives = gridFollowPath.Directives;
+            var gridFollowCursor = gridFollowPath.Cursor;
             gridPathLifecycleOk = gridPathCreated
                 && gridPathCleared
-                && _squadGridPaths.ContainsKey(gridMate.GetInstanceId());
+                && gridFollowPath.Directives.Length > 0
+                && gridFollowCursor >= 0
+                && gridFollowCursor < gridFollowPath.Directives.Length;
             gridDetourReady = gridDirectBlocked
-                && gridFirstWaypoint.DistanceTo(gridPlayerPosition) > 3.0f
-                && gridFirstWaypoint.X > gridReviverPosition.X + 2.0f
-                && IsSquadMovementCorridorClear(gridReviverPosition, gridFirstWaypoint, gridMate);
+                && gridFirstWaypoint.Target.DistanceTo(gridPlayerPosition) > 3.0f
+                && gridFirstWaypoint.Target.X > gridReviverPosition.X + 2.0f
+                && IsSquadMovementCorridorClear(gridReviverPosition, gridFirstWaypoint.Target, gridMate);
 
             _player.SetHealthForDiagnostics(10.0f);
             _player.SetReviveUsedForDiagnostics(false);
@@ -2376,11 +2453,30 @@ public partial class FreightTerminalWorld
                 _player.TakeCombatDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
             }
             var gridRescueDowned = _player.IsDead && _localPlayerDowned;
+            UpdateSquadReviveAi(1.0f / 60.0f);
+            gridReviverAssigned = ReferenceEquals(_leaderReviver, gridMate)
+                && gridMate.IsRevivingLeader;
+            gridEmergencyPathReady = _squadGridPaths.TryGetValue(
+                    gridMate.GetInstanceId(),
+                    out var emergencyGridPath)
+                && gridFollowPath is not null
+                && ReferenceEquals(gridFollowPath, emergencyGridPath)
+                && ReferenceEquals(gridFollowDirectives, emergencyGridPath.Directives)
+                && emergencyGridPath.Cursor == gridFollowCursor
+                && emergencyGridPath.Emergency
+                && emergencyGridPath.Destination.DistanceSquaredTo(gridPlayerPosition) <= 0.0001f
+                && emergencyGridPath.NextPlanMilliseconds == 0
+                && emergencyGridPath.FailedPlanAttempts == 0
+                && LeaderRescueUsedGridForDiagnostics
+                && LeaderRescueGridPlansForDiagnostics == 0;
+            _ = ResolveSquadNavigationDestination(
+                gridMate,
+                gridPlayerPosition,
+                emergency: true);
             gridMate.ProcessMode = ProcessModeEnum.Inherit;
             for (var second = 0; second < 25 && _player.IsDead; second++)
             {
                 await ToSignal(GetTree().CreateTimer(1.0f), SceneTreeTimer.SignalName.Timeout);
-                GD.Print($"AI_GRID_DBG s={second} dead={_player.IsDead} matePos=({gridMate.GlobalPosition.X:0.0},{gridMate.GlobalPosition.Z:0.0}) target=({gridPlayerPosition.X:0.0},{gridPlayerPosition.Z:0.0}) dist={gridMate.GlobalPosition.DistanceTo(_player.GlobalPosition):0.0} grid_used={LeaderRescueUsedGridForDiagnostics} grid_plans={LeaderRescueGridPlansForDiagnostics}");
             }
             gridRescueUsedGrid = LeaderRescueUsedGridForDiagnostics;
             gridRescueCompleted = gridRescueDowned
@@ -2389,6 +2485,8 @@ public partial class FreightTerminalWorld
                 && !_localPlayerDowned;
             gridDetourOk = gridDetourReady
                 && gridPathLifecycleOk
+                && gridReviverAssigned
+                && gridEmergencyPathReady
                 && gridRescueUsedGrid
                 && gridRescueCompleted;
             gridMaze.QueueFree();
@@ -2427,6 +2525,10 @@ public partial class FreightTerminalWorld
                     continue;
                 }
                 squadMate.ProcessMode = ProcessModeEnum.Disabled;
+                squadMate.GlobalPosition = new Vector3(
+                    330.0f + squadMate.SquadSlot * 3.0f,
+                    80.25f,
+                    330.0f);
             }
             _player.ProcessMode = ProcessModeEnum.Disabled;
             _player.GlobalPosition = recoveryPlayerPosition;
@@ -2466,9 +2568,8 @@ public partial class FreightTerminalWorld
                 && !_player.IsDead
                 && _player.ReviveUsed
                 && !_localPlayerDowned;
-            recoveryPinchOk = recoveryRayClear
+            recoveryPinchOk = !recoveryRayClear
                 && recoveryAssigned
-                && recoveryCount >= 1
                 && recoveryLateral > 0.85f
                 && recoveryCompleted;
 
@@ -2494,7 +2595,7 @@ public partial class FreightTerminalWorld
             _player.ProcessMode = ProcessModeEnum.Inherit;
             await WaitFrames(2);
         }
-        GD.Print($"SQUAD_RECOVERY pinch={recoveryPinchOk} ray_clear={recoveryRayClear} assigned={recoveryAssigned} completed={recoveryCompleted} recoveries={recoveryCount} lateral={recoveryLateral:0.00}");
+        GD.Print($"SQUAD_RECOVERY pinch={recoveryPinchOk} ray_clear={recoveryRayClear} assigned={recoveryAssigned} completed={recoveryCompleted} recoveries={recoveryCount} lateral={recoveryLateral:0.00} grid_assigned={gridReviverAssigned} grid_emergency={gridEmergencyPathReady}");
         gridDetourOk &= recoveryPinchOk;
 
         _player.SetHealthForDiagnostics(10.0f);

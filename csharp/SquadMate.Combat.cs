@@ -8,6 +8,9 @@ public partial class SquadMate
     private const float CombatRetainRange = 78.0f;
     private const float VisibleContactMemory = 8.0f;
     private const float DamageContactMemory = 12.0f;
+    private const float NavigationRecoveryMaximumSpeed = 3.0f;
+    private const float RequiredStepRecoveryDuration = 0.48f;
+    private const float RequiredStepRecoveryMaximumSpeed = 2.4f;
 
     private EnemyOperator? _combatTarget;
     private EnemyOperator? _combatThreat;
@@ -27,9 +30,11 @@ public partial class SquadMate
     private Vector3 _combatRecoveryDirection;
     private Vector3 _combatEngagementAnchor;
     private Vector3 _combatDesiredDirection;
+    private Vector3 _combatPathDirection;
     private Vector3 _combatProgressOrigin;
     private float _combatProgressTimer;
     private bool _combatMoveRequested;
+    private bool _requiredStepRecoveryActive;
     private bool _combatHasSight;
     private bool _combatHasCoverPosition;
     private bool _combatHasEngagementAnchor;
@@ -40,6 +45,12 @@ public partial class SquadMate
     public int CombatCoverSelections { get; private set; }
     public int CombatFlankSelections { get; private set; }
     public int CombatStuckRecoveries { get; private set; }
+    internal int RequiredStepRecoveriesForDiagnostics { get; private set; }
+    internal bool RequiredStepRecoveryActiveForDiagnostics => _requiredStepRecoveryActive
+        && _combatRecoveryTimer > 0.0f;
+    internal Vector3 RequiredStepRecoveryDirectionForDiagnostics => _requiredStepRecoveryActive
+        ? _combatRecoveryDirection
+        : Vector3.Zero;
     internal bool CombatHasSightForDiagnostics => _combatHasSight;
     internal EnemyOperator? CombatTargetForDiagnostics => _combatTarget;
     internal Vector3 CombatFlankPositionForDiagnostics => _combatFlankPosition;
@@ -295,6 +306,7 @@ public partial class SquadMate
         Vector3 anchorDestination,
         EnemyOperator? hostile,
         bool objectivePriority,
+        SquadTraversalKind navigationKind,
         float delta)
     {
         var destination = anchorDestination;
@@ -315,22 +327,50 @@ public partial class SquadMate
 
         var flatDestination = FlattenToCurrentHeight(destination);
         var distance = GlobalPosition.DistanceTo(flatDestination);
-        var desired = distance > 0.75f
+        var stopDistance = navigationKind == SquadTraversalKind.Step ? 0.2f : 0.75f;
+        var desired = distance > stopDistance
             ? GlobalPosition.DirectionTo(flatDestination)
             : Vector3.Zero;
         desired.Y = 0.0f;
+        _combatPathDirection = desired;
         var reviveTargetNode = ActiveReviveTargetNode;
-        if ((!objectivePriority || reviveTargetNode is not null)
+        if (navigationKind == SquadTraversalKind.Step
+            && _requiredStepRecoveryActive
             && _combatRecoveryTimer > 0.0f
             && _combatRecoveryDirection.LengthSquared() > 0.01f)
         {
             desired = _combatRecoveryDirection;
         }
+        else if (navigationKind == SquadTraversalKind.Step)
+        {
+            _requiredStepRecoveryActive = false;
+            _combatRecoveryTimer = 0.0f;
+            _combatRecoveryDirection = Vector3.Zero;
+        }
+        else
+        {
+            if (_requiredStepRecoveryActive)
+            {
+                _requiredStepRecoveryActive = false;
+                _combatRecoveryTimer = 0.0f;
+                _combatRecoveryDirection = Vector3.Zero;
+            }
+            else if ((!objectivePriority || reviveTargetNode is not null)
+                && _combatRecoveryTimer > 0.0f
+                && _combatRecoveryDirection.LengthSquared() > 0.01f)
+            {
+                desired = _combatRecoveryDirection;
+            }
+        }
         _combatMoveRequested = desired.LengthSquared() > 0.01f;
         if (_combatMoveRequested)
         {
-            desired = AvoidObstacle(desired.Normalized());
-            desired = ApplySquadSeparation(desired);
+            desired = desired.Normalized();
+            if (navigationKind != SquadTraversalKind.Step)
+            {
+                desired = AvoidObstacle(desired);
+                desired = ApplySquadSeparation(desired);
+            }
         }
         _combatDesiredDirection = desired;
 
@@ -340,6 +380,14 @@ public partial class SquadMate
             ? GlobalPosition.DistanceTo(reviveTargetNode.GlobalPosition)
             : distance;
         var speed = (urgencyDistance > 8.0f ? 5.4f : 3.8f) * spec.MovementMultiplier * boost;
+        if (_requiredStepRecoveryActive)
+        {
+            speed = Mathf.Min(speed, RequiredStepRecoveryMaximumSpeed);
+        }
+        else if (_combatRecoveryTimer > 0.0f)
+        {
+            speed = Mathf.Min(speed, NavigationRecoveryMaximumSpeed);
+        }
         if (_skillActionTime > 0.0f)
         {
             speed *= 0.45f;
@@ -654,22 +702,29 @@ public partial class SquadMate
         var progress = GlobalPosition.DistanceTo(_combatProgressOrigin);
         if (_combatMoveRequested && progress < 0.24f)
         {
-            _combatStrafeSign *= -1.0f;
-            _combatFlankSide *= -1.0f;
-            _combatAvoidanceTimer = 1.25f;
-            var forward = _combatDesiredDirection.LengthSquared() > 0.01f
-                ? _combatDesiredDirection.Normalized()
+            var forward = _combatPathDirection.LengthSquared() > 0.01f
+                ? _combatPathDirection.Normalized()
+                : _combatDesiredDirection.LengthSquared() > 0.01f
+                    ? _combatDesiredDirection.Normalized()
                 : -GlobalBasis.Z;
-            var side = new Vector3(-forward.Z, 0.0f, forward.X) * _combatStrafeSign;
-            var sideClearance = MeasureMovementClearance(side, 2.2f);
-            var reverseClearance = MeasureMovementClearance(-forward, 1.8f);
-            _combatRecoveryDirection = sideClearance >= reverseClearance
-                ? (side - forward * 0.25f).Normalized()
-                : (-forward + side * 0.35f).Normalized();
-            _combatRecoveryTimer = 1.05f;
-            _combatManeuverTimer = 0.0f;
-            _combatHasCoverPosition = false;
-            CombatStuckRecoveries++;
+            if (TryBeginTraversalRecovery(forward))
+            {
+                _combatProgressOrigin = GlobalPosition;
+                _combatProgressTimer = 0.0f;
+                return;
+            }
+            if (TrySelectGroundedNavigationRecoveryDirection(forward, 3.0f, out var recovery))
+            {
+                var left = new Vector3(-forward.Z, 0.0f, forward.X);
+                _combatStrafeSign = recovery.Dot(left) >= 0.0f ? 1.0f : -1.0f;
+                _combatFlankSide = _combatStrafeSign;
+                _combatAvoidanceTimer = 1.25f;
+                _combatRecoveryDirection = recovery;
+                _combatRecoveryTimer = 1.05f;
+                _combatManeuverTimer = 0.0f;
+                _combatHasCoverPosition = false;
+                CombatStuckRecoveries++;
+            }
         }
         _combatProgressOrigin = GlobalPosition;
         _combatProgressTimer = 0.0f;
@@ -689,7 +744,9 @@ public partial class SquadMate
         _lootHuntSource = null;
         _combatMoveRequested = false;
         _combatDesiredDirection = Vector3.Zero;
+        _combatPathDirection = Vector3.Zero;
         Velocity = Vector3.Zero;
+        CancelNavigationTraversal();
         ResetMovementProgress();
     }
 
@@ -700,8 +757,10 @@ public partial class SquadMate
         _combatAvoidanceTimer = 0.0f;
         _combatRecoveryTimer = 0.0f;
         _combatRecoveryDirection = Vector3.Zero;
+        _requiredStepRecoveryActive = false;
         _combatMoveRequested = false;
         _combatDesiredDirection = Vector3.Zero;
+        _combatPathDirection = Vector3.Zero;
     }
 
     internal bool HasCombatLineOfSightForDiagnostics(EnemyOperator hostile)
@@ -727,6 +786,7 @@ public partial class SquadMate
         CombatCoverSelections = 0;
         CombatFlankSelections = 0;
         CombatStuckRecoveries = 0;
+        RequiredStepRecoveriesForDiagnostics = 0;
         ResetMovementProgress();
         UpdateHealthVisual();
     }

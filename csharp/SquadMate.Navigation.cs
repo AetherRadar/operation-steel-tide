@@ -20,12 +20,109 @@ public partial class SquadMate
             return;
         }
 
+        if (!TrySelectGroundedNavigationRecoveryDirection(forward, 3.2f, out var recovery))
+        {
+            return;
+        }
         var left = new Vector3(-forward.Z, 0.0f, forward.X);
-        var leftClearance = MeasureMovementClearance(left, 2.2f);
-        var rightClearance = MeasureMovementClearance(-left, 2.2f);
-        _combatStrafeSign = leftClearance >= rightClearance ? 1.0f : -1.0f;
-        var side = left * _combatStrafeSign;
-        _combatRecoveryDirection = (side - forward * 0.2f).Normalized();
+        _combatStrafeSign = recovery.Dot(left) >= 0.0f ? 1.0f : -1.0f;
+        _combatRecoveryDirection = recovery;
         _combatRecoveryTimer = 1.15f;
+    }
+
+    private bool TrySelectGroundedNavigationRecoveryDirection(
+        Vector3 forward,
+        float travelDistance,
+        out Vector3 recovery)
+    {
+        recovery = Vector3.Zero;
+        forward.Y = 0.0f;
+        if (forward.LengthSquared() <= 0.01f)
+        {
+            return false;
+        }
+        forward = forward.Normalized();
+        var left = new Vector3(-forward.Z, 0.0f, forward.X);
+        var candidates = new[]
+        {
+            (left * 0.82f - forward * 0.36f).Normalized(),
+            (-left * 0.82f - forward * 0.36f).Normalized(),
+            -forward
+        };
+        var bestScore = float.NegativeInfinity;
+        foreach (var candidate in candidates)
+        {
+            var clearance = MeasureMovementClearance(candidate, travelDistance + 0.25f);
+            var supportedDistance = Mathf.Min(travelDistance, Mathf.Max(0.0f, clearance - 0.12f));
+            if (supportedDistance < Mathf.Min(0.7f, travelDistance * 0.65f)
+                || !HasNavigationRecoveryGroundPath(candidate, supportedDistance))
+            {
+                continue;
+            }
+            if (clearance > bestScore)
+            {
+                bestScore = clearance;
+                recovery = candidate;
+            }
+        }
+        return recovery.LengthSquared() > 0.01f;
+    }
+
+    private bool HasNavigationRecoveryGroundPath(Vector3 direction, float distance)
+    {
+        var exclude = BuildNavigationStepExclusions();
+        var samples = Mathf.Max(2, Mathf.CeilToInt(distance / 0.55f));
+        var space = GetWorld3D().DirectSpaceState;
+        for (var sample = 1; sample <= samples; sample++)
+        {
+            var point = GlobalPosition + direction * (distance * sample / samples);
+            var query = PhysicsRayQueryParameters3D.Create(
+                point + Vector3.Up * 0.65f,
+                point + Vector3.Down * 0.9f);
+            query.CollisionMask = 1;
+            query.CollideWithAreas = false;
+            query.Exclude = exclude;
+            var hit = space.IntersectRay(query);
+            if (hit.Count == 0
+                || hit["normal"].AsVector3().Dot(Vector3.Up) < 0.72f
+                || Mathf.Abs(hit["position"].AsVector3().Y - GlobalPosition.Y) > 0.68f)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    internal void RequestRequiredStepRecovery()
+    {
+        var forward = _combatPathDirection.LengthSquared() > 0.01f
+            ? _combatPathDirection
+            : _lastStairNavigationDirection.LengthSquared() > 0.01f
+                ? _lastStairNavigationDirection
+                : _combatDesiredDirection.LengthSquared() > 0.01f
+                    ? _combatDesiredDirection
+                    : -GlobalBasis.Z;
+        forward.Y = 0.0f;
+        if (forward.LengthSquared() <= 0.01f)
+        {
+            forward = Vector3.Forward;
+        }
+        forward = forward.Normalized();
+
+        ResetMovementProgress();
+        if (!TrySelectGroundedNavigationRecoveryDirection(forward, 1.15f, out var escape))
+        {
+            return;
+        }
+        var left = new Vector3(-forward.Z, 0.0f, forward.X);
+        _combatStrafeSign = escape.Dot(left) >= 0.0f ? 1.0f : -1.0f;
+        _combatRecoveryDirection = escape;
+        _combatRecoveryTimer = RequiredStepRecoveryDuration;
+        _requiredStepRecoveryActive = true;
+        var velocity = Velocity;
+        velocity.X *= 0.15f;
+        velocity.Z *= 0.15f;
+        Velocity = velocity;
+        RequiredStepRecoveriesForDiagnostics++;
     }
 }
