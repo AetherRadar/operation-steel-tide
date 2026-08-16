@@ -26,6 +26,24 @@ public partial class ExtractionAircraft : Node3D
     public int PassengerSeatCount => _passengerSeats.Length;
     public bool PlayerPassengerVisible => IsInstanceValid(_playerPassengerAvatar) && _playerPassengerAvatar.Visible;
     public bool UsesAuthoredVisual { get; private set; }
+    internal float DepartureVisualAlignmentForDiagnostics
+    {
+        get
+        {
+            var route = _departureTarget - _departureStart;
+            route.Y = 0.0f;
+            if (route.LengthSquared() <= 0.001f || !IsInstanceValid(_visual))
+            {
+                return 0.0f;
+            }
+
+            var visualForward = UsesAuthoredVisual ? _visual.GlobalBasis.Z : -_visual.GlobalBasis.Z;
+            visualForward.Y = 0.0f;
+            return visualForward.LengthSquared() > 0.001f
+                ? visualForward.Normalized().Dot(route.Normalized())
+                : 0.0f;
+        }
+    }
     public float ArrivalProgress => Phase == ExtractionAircraftPhase.Inbound
         ? Mathf.Clamp(_phaseElapsed / ArrivalDuration, 0.0f, 1.0f)
         : Phase == ExtractionAircraftPhase.Hidden ? 0.0f : 1.0f;
@@ -284,6 +302,10 @@ public partial class ExtractionAircraft : Node3D
         if (authoredRig is not null)
         {
             _visual = authoredRig.Root;
+            // The Blender-authored model points along local +Z, while Godot
+            // flight nodes use -Z as forward. Normalize the asset at this
+            // boundary so route yaw drives both visual implementations alike.
+            _visual.Rotation = new Vector3(0.0f, Mathf.Pi, 0.0f);
             _leftRotor = authoredRig.LeftRotor;
             _rightRotor = authoredRig.RightRotor;
             _ramp = authoredRig.BoardingDoor;
