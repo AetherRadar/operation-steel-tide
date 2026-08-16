@@ -6,24 +6,31 @@ namespace OperationSteelTide;
 public partial class DestructibleAircraft : StaticBody3D
 {
     public FreightTerminalWorld? Main { get; set; }
-    public float Health { get; private set; } = 240.0f;
-    public float MaxHealth { get; private set; } = 240.0f;
+    public float Health { get; private set; } = 1200.0f;
+    public float MaxHealth { get; private set; } = 1200.0f;
     public bool IsDestroyed { get; private set; }
     public bool IsHostile { get; private set; } = true;
     public bool SupplyDropReleased { get; private set; }
     public int AttackSalvosFired { get; private set; }
     public float LastAttackDamage { get; private set; }
+    public float LastPatrolStepDistance { get; private set; }
+    public float PatrolDistanceTravelled { get; private set; }
 
+    public const float CruiseSpeed = 17.5f;
     private const float EngageRange = 118.0f;
     private const float FireCooldown = 3.1f;
     private const float ShellDamage = 48.0f;
     private const float ShellBlastRadius = 12.5f;
+    private const float PatrolRadiusX = 62.0f;
+    private const float PatrolRadiusZ = 30.0f;
+    private const float PatrolAltitude = 40.5f;
+    private const float PatrolAltitudeSwing = 1.5f;
+    private static readonly Vector3 PatrolCenter = new(10.0f, PatrolAltitude, -78.0f);
 
     private Node3D _visual = null!;
     private CollisionShape3D _collider = null!;
-    private Tween? _flightTween;
-    private Vector3 _start = new(-52, 39, -78);
-    private Vector3 _end = new(72, 42, -92);
+    private float _patrolPhase;
+    private Vector3 _flightDirection = Vector3.Right;
     private float _fallVelocity;
     private bool _falling;
     private float _fireCooldown;
@@ -46,9 +53,6 @@ public partial class DestructibleAircraft : StaticBody3D
 
     public override void _ExitTree()
     {
-        // Infinite patrol tweens retain Variant pool pages if left running at process exit.
-        _flightTween?.Kill();
-        _flightTween = null;
         SetPhysicsProcess(false);
     }
 
@@ -66,6 +70,7 @@ public partial class DestructibleAircraft : StaticBody3D
             return;
         }
 
+        UpdatePatrol(dt);
         UpdateCombat(dt);
     }
 
@@ -111,6 +116,13 @@ public partial class DestructibleAircraft : StaticBody3D
         return true;
     }
 
+    internal void SetPatrolPhaseForDiagnostics(float phase)
+    {
+        _patrolPhase = Mathf.PosMod(phase, Mathf.Tau);
+        Position = PatrolPosition(_patrolPhase);
+        LastPatrolStepDistance = 0.0f;
+    }
+
     private void UpdateCombat(float dt)
     {
         _fireCooldown = Mathf.Max(0.0f, _fireCooldown - dt);
@@ -124,15 +136,6 @@ public partial class DestructibleAircraft : StaticBody3D
         if (_currentTarget is null || !GodotObject.IsInstanceValid(_currentTarget))
         {
             return;
-        }
-
-        // Face roughly toward the intrusion target while patrolling.
-        var toTarget = _currentTarget.GlobalPosition - GlobalPosition;
-        toTarget.Y = 0.0f;
-        if (toTarget.LengthSquared() > 0.01f)
-        {
-            var yaw = Mathf.Atan2(-toTarget.X, -toTarget.Z);
-            Rotation = new Vector3(0.0f, Mathf.LerpAngle(Rotation.Y, yaw, dt * 1.8f), 0.0f);
         }
 
         if (_fireCooldown <= 0.0f && GlobalPosition.DistanceTo(_currentTarget.GlobalPosition) <= EngageRange)
@@ -173,7 +176,7 @@ public partial class DestructibleAircraft : StaticBody3D
             return false;
         }
 
-        var muzzle = GlobalPosition + Vector3.Down * 1.4f - GlobalBasis.Z * 2.2f;
+        var muzzle = GlobalPosition + Vector3.Down * 1.9f + _flightDirection * 2.2f;
         var aim = target.GlobalPosition + Vector3.Up * 0.4f;
         // Lead slightly for moving targets.
         if (target is CharacterBody3D body)
@@ -220,7 +223,6 @@ public partial class DestructibleAircraft : StaticBody3D
         }
 
         _falling = true;
-        _flightTween?.Kill();
         Main?.SpawnImpact(GlobalPosition, Vector3.Up);
     }
 
@@ -248,19 +250,49 @@ public partial class DestructibleAircraft : StaticBody3D
 
     private void StartPatrol()
     {
-        Position = _start;
-        _flightTween?.Kill();
-        _flightTween = CreateTween().SetLoops();
-        _flightTween.TweenProperty(this, "position", _end, 62.0)
-            .From(_start)
-            .SetTrans(Tween.TransitionType.Linear);
-        _flightTween.TweenCallback(Callable.From(() =>
+        _patrolPhase = Mathf.Pi;
+        Position = PatrolPosition(_patrolPhase);
+        LastPatrolStepDistance = 0.0f;
+        PatrolDistanceTravelled = 0.0f;
+    }
+
+    private void UpdatePatrol(float dt)
+    {
+        var sin = Mathf.Sin(_patrolPhase);
+        var cos = Mathf.Cos(_patrolPhase);
+        var tangent = new Vector3(
+            -PatrolRadiusX * sin,
+            -PatrolAltitudeSwing * sin,
+            PatrolRadiusZ * cos);
+        _patrolPhase += CruiseSpeed * dt / Mathf.Max(0.01f, tangent.Length());
+        if (_patrolPhase >= Mathf.Tau)
         {
-            if (!IsDestroyed && !_falling)
-            {
-                Position = _start;
-            }
-        }));
+            _patrolPhase -= Mathf.Tau;
+        }
+
+        var nextPosition = PatrolPosition(_patrolPhase);
+        var step = nextPosition - Position;
+        LastPatrolStepDistance = step.Length();
+        PatrolDistanceTravelled += LastPatrolStepDistance;
+        Position = nextPosition;
+
+        var horizontalDirection = new Vector3(step.X, 0.0f, step.Z);
+        if (horizontalDirection.LengthSquared() <= 0.0001f)
+        {
+            return;
+        }
+
+        _flightDirection = horizontalDirection.Normalized();
+        var yaw = Mathf.Atan2(-_flightDirection.Z, _flightDirection.X);
+        Rotation = new Vector3(0.0f, Mathf.LerpAngle(Rotation.Y, yaw, dt * 5.0f), 0.0f);
+    }
+
+    private static Vector3 PatrolPosition(float phase)
+    {
+        return PatrolCenter + new Vector3(
+            PatrolRadiusX * Mathf.Cos(phase),
+            PatrolAltitudeSwing * Mathf.Cos(phase),
+            PatrolRadiusZ * Mathf.Sin(phase));
     }
 
     private void BuildVisuals()

@@ -8,6 +8,9 @@ namespace OperationSteelTide;
 [GlobalClass]
 public partial class AircraftShell : CharacterBody3D
 {
+    [Signal]
+    public delegate void DetonatedEventHandler(bool onGround);
+
     public FreightTerminalWorld? Main { get; set; }
     public Node? OwnerAircraft { get; set; }
     public float Damage { get; private set; } = 42.0f;
@@ -16,6 +19,7 @@ public partial class AircraftShell : CharacterBody3D
     public bool IsDestroyed { get; private set; }
     public bool DetonatedOnGround { get; private set; }
     public bool InterceptedInAir { get; private set; }
+    public bool OwnerCollisionExcluded { get; private set; }
 
     public const float TravelSpeed = 20.0f;
     private const float MaxLifetime = 10.0f;
@@ -46,6 +50,11 @@ public partial class AircraftShell : CharacterBody3D
     {
         CollisionLayer = 1;
         CollisionMask = 1;
+        if (OwnerAircraft is PhysicsBody3D owner && IsInstanceValid(owner))
+        {
+            AddCollisionExceptionWith(owner);
+            OwnerCollisionExcluded = true;
+        }
         AddToGroup("aircraft_shells");
         BuildVisual();
     }
@@ -133,6 +142,7 @@ public partial class AircraftShell : CharacterBody3D
             Main?.SpawnImpact(GlobalPosition, Vector3.Up);
         }
 
+        EmitSignal(SignalName.Detonated, !airBurst);
         QueueFree();
     }
 

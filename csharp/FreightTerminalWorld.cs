@@ -3813,6 +3813,26 @@ public partial class FreightTerminalWorld : Node3D
             return;
         }
 
+        var patrolStart = aircraft.GlobalPosition;
+        var patrolDistanceStart = aircraft.PatrolDistanceTravelled;
+        var maximumPatrolStep = 0.0f;
+        for (var frame = 0; frame < 30; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            maximumPatrolStep = Mathf.Max(maximumPatrolStep, aircraft.LastPatrolStepDistance);
+        }
+        var patrolDistance = aircraft.PatrolDistanceTravelled - patrolDistanceStart;
+        var patrolDisplacement = aircraft.GlobalPosition.DistanceTo(patrolStart);
+        aircraft.SetPatrolPhaseForDiagnostics(Mathf.Tau - 0.001f);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        var patrolWrapStep = aircraft.LastPatrolStepDistance;
+        var smoothPatrol = maximumPatrolStep < 0.75f
+            && patrolWrapStep < 0.75f
+            && patrolDistance > 6.0f
+            && patrolDisplacement > 5.0f;
+        var durable = aircraft.MaxHealth >= 1200.0f
+            && Mathf.IsEqualApprox(aircraft.Health, aircraft.MaxHealth);
+
         _missionDirector.ExitDeploymentZone();
         var salvosBefore = aircraft.AttackSalvosFired;
         var fired = aircraft.TryAttackTarget(_player, ignoreCooldown: true);
@@ -3849,11 +3869,46 @@ public partial class FreightTerminalWorld : Node3D
         }
 
         var uninterruptible = false;
+        var ownerCollisionExcluded = false;
         if (shell is not null)
         {
+            ownerCollisionExcluded = shell.OwnerCollisionExcluded;
             var interrupted = shell.TakeDamage(999.0f, shell.GlobalPosition, _player);
             await WaitFrames(3);
             uninterruptible = !interrupted && !shell.InterceptedInAir && !shell.IsDestroyed;
+        }
+
+        var landingPoint = new Vector3(150.0f, 0.0f, 82.0f);
+        var landingQuery = PhysicsRayQueryParameters3D.Create(
+            landingPoint + Vector3.Up * 90.0f,
+            landingPoint + Vector3.Down * 6.0f);
+        landingQuery.CollisionMask = 1;
+        landingQuery.CollideWithAreas = false;
+        landingQuery.Exclude = new Godot.Collections.Array<Rid> { aircraft.GetRid() };
+        var landingHit = GetWorld3D().DirectSpaceState.IntersectRay(landingQuery);
+        var missileLanded = false;
+        var missileLandingLow = false;
+        if (landingHit.Count > 0)
+        {
+            var surface = landingHit["position"].AsVector3();
+            var landingShell = new AircraftShell
+            {
+                Name = "AircraftLandingDiagnosticShell",
+                Main = this,
+                OwnerAircraft = aircraft,
+                Position = surface + Vector3.Up * 12.0f
+            };
+            landingShell.Detonated += onGround =>
+            {
+                missileLanded = onGround;
+                missileLandingLow = landingShell.GlobalPosition.Y <= surface.Y + 1.0f;
+            };
+            AddChild(landingShell);
+            landingShell.Launch(surface + Vector3.Up * 12.0f, surface, 1.0f, 1.0f);
+            for (var frame = 0; frame < 90 && !missileLanded; frame++)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            }
         }
 
         // Ground blast path still hurts operators when a shell is allowed to land.
@@ -3866,8 +3921,9 @@ public partial class FreightTerminalWorld : Node3D
         var lastAttackDamage = aircraft.LastAttackDamage;
         var dropsBefore = _aircraftSupplyDrops.Count(drop => IsInstanceValid(drop));
         aircraft.GlobalPosition = new Vector3(22.0f, 1.3f, 42.0f);
-        var destroyed = aircraft.TakeDamage(999.0f, aircraft.GlobalPosition, _player);
-        var repeatDamageIgnored = !aircraft.TakeDamage(999.0f, aircraft.GlobalPosition, _player);
+        var lethalDamage = aircraft.MaxHealth + 1.0f;
+        var destroyed = aircraft.TakeDamage(lethalDamage, aircraft.GlobalPosition, _player);
+        var repeatDamageIgnored = !aircraft.TakeDamage(lethalDamage, aircraft.GlobalPosition, _player);
         for (var frame = 0; frame < 45 && _aircraftSupplyDrops.Count(drop => IsInstanceValid(drop)) == dropsBefore; frame++)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
@@ -3904,6 +3960,11 @@ public partial class FreightTerminalWorld : Node3D
         var valid = fired
             && shellSpawned
             && uninterruptible
+            && ownerCollisionExcluded
+            && missileLanded
+            && missileLandingLow
+            && smoothPatrol
+            && durable
             && slowEnoughToDodge
             && playerHurt
             && stillAlive
@@ -3915,7 +3976,7 @@ public partial class FreightTerminalWorld : Node3D
             && dropVisible
             && dropGrounded
             && dropSearchable;
-        GD.Print($"AIRCRAFT_COMBAT_CHECK valid={valid} fired={fired} shell={shellSpawned} uninterruptible={uninterruptible} speed={AircraftShell.TravelSpeed:0.0} salvos={salvosFired} last_damage={lastAttackDamage:0.0} player_hurt={playerHurt} destroyed={destroyed} repeat_ignored={repeatDamageIgnored} drop_once={dropSpawnedOnce} drop_registered={dropRegistered} drop_stocked={dropStocked} drop_visible={dropVisible} drop_grounded={dropGrounded} drop_searchable={dropSearchable}");
+        GD.Print($"AIRCRAFT_COMBAT_CHECK valid={valid} fired={fired} shell={shellSpawned} uninterruptible={uninterruptible} owner_excluded={ownerCollisionExcluded} missile_landed={missileLanded} missile_low={missileLandingLow} shell_speed={AircraftShell.TravelSpeed:0.0} cruise_speed={DestructibleAircraft.CruiseSpeed:0.0} patrol_distance={patrolDistance:0.0} max_step={maximumPatrolStep:0.00} wrap_step={patrolWrapStep:0.00} smooth_patrol={smoothPatrol} health={aircraft.MaxHealth:0} durable={durable} salvos={salvosFired} last_damage={lastAttackDamage:0.0} player_hurt={playerHurt} destroyed={destroyed} repeat_ignored={repeatDamageIgnored} drop_once={dropSpawnedOnce} drop_registered={dropRegistered} drop_stocked={dropStocked} drop_visible={dropVisible} drop_grounded={dropGrounded} drop_searchable={dropSearchable}");
         GD.Print($"AIRCRAFT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
