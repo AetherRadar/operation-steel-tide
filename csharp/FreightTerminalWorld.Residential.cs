@@ -711,8 +711,28 @@ public partial class FreightTerminalWorld
             }, language => ResidentialRoomName(archetype, language)));
             // The single floor light below serves both rooms; per-room lights multiply too quickly across 96 floors.
         }
-        // Corridor carpet runner and ceiling strip lights (mesh only).
-        MeshBox(tower, new Vector3(0, floorY + 0.08f, depth * 0.05f), new Vector3(2.2f, 0.03f, depth * 0.62f), carpet);
+        // Keep the corridor runner on the occupied floor bands. One long strip crossed the
+        // switchback opening and appeared as a red plate above every stair flight.
+        foreach (var segment in new (string Side, float Start, float End)[]
+        {
+            ("N", northStart, northEnd),
+            ("S", southStart, southEnd)
+        })
+        {
+            var segmentDepth = segment.End - segment.Start;
+            if (segmentDepth <= 0.1f)
+            {
+                continue;
+            }
+            var runner = MeshBox(
+                tower,
+                new Vector3(0, floorY + 0.08f, segment.Start + segmentDepth * 0.5f),
+                new Vector3(2.2f, 0.03f, segmentDepth),
+                carpet);
+            runner.Name = $"ResidentialCorridorRunner_F{floor:00}_{segment.Side}";
+            runner.AddToGroup("residential_corridor_runners");
+        }
+        // Corridor ceiling strip lights (mesh only).
         // Lived-in corridor dressing so each floor reads as a home, not a shell.
         var vending = Mat("residential_vending", new Color(0.72f, 0.18f, 0.16f), 0.3f, 0.4f, new Color(0.9f, 0.3f, 0.2f));
         var plantPot = Mat("residential_corridor_pot", new Color(0.24f, 0.27f, 0.23f), 0.05f, 0.86f);

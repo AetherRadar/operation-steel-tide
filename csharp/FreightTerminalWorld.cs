@@ -4702,6 +4702,8 @@ public partial class FreightTerminalWorld : Node3D
         var innerGuardShapes = 0;
         var floorSlabShapes = 0;
         var intrudingFloorSlabs = 0;
+        var corridorRunnerMeshes = 0;
+        var intrudingCorridorRunners = 0;
         var openingWidth = Mathf.Min(ResidentialStairOpeningWidth, firstSpec.Footprint.X - 5.0f);
         var openingHalfWidth = openingWidth * 0.5f;
         var openingNorth = firstCoreZ - ResidentialStairOpeningNorthDepth;
@@ -4712,6 +4714,25 @@ public partial class FreightTerminalWorld : Node3D
             if (childName.Contains("ResidentialStairSpine", StringComparison.OrdinalIgnoreCase))
             {
                 centerSpineVisuals++;
+            }
+            if (child is MeshInstance3D runner
+                && runner.IsInGroup("residential_corridor_runners")
+                && runner.Mesh is BoxMesh runnerBox)
+            {
+                corridorRunnerMeshes++;
+                var runnerMinX = runner.Position.X - runnerBox.Size.X * 0.5f;
+                var runnerMaxX = runner.Position.X + runnerBox.Size.X * 0.5f;
+                var runnerMinZ = runner.Position.Z - runnerBox.Size.Z * 0.5f;
+                var runnerMaxZ = runner.Position.Z + runnerBox.Size.Z * 0.5f;
+                const float runnerClearanceTolerance = 0.01f;
+                var overlapsOpeningX = runnerMinX < openingHalfWidth - runnerClearanceTolerance
+                    && runnerMaxX > -openingHalfWidth + runnerClearanceTolerance;
+                var overlapsOpeningZ = runnerMinZ < openingSouth - runnerClearanceTolerance
+                    && runnerMaxZ > openingNorth + runnerClearanceTolerance;
+                if (overlapsOpeningX && overlapsOpeningZ)
+                {
+                    intrudingCorridorRunners++;
+                }
             }
             if (child is not StaticBody3D body)
             {
@@ -4796,6 +4817,8 @@ public partial class FreightTerminalWorld : Node3D
             && innerGuardShapes == firstSpec.Floors * 2;
         var floorSlabClearance = floorSlabShapes == (firstSpec.Floors + 1) * 4
             && intrudingFloorSlabs == 0;
+        var corridorRunnerClearance = corridorRunnerMeshes == firstSpec.Floors * 2
+            && intrudingCorridorRunners == 0;
         // Hangar must not keep the old rotated ramp name.
         var hangar = _levelRoot.GetNodeOrNull<Node3D>("MaintenanceDistrict");
         var hangarRampGone = hangar is null || hangar.GetNodeOrNull("HangarStair") is null;
@@ -4852,9 +4875,9 @@ public partial class FreightTerminalWorld : Node3D
         var walkGain = _player.GlobalPosition.Y - walkStartY;
         var walked = reachedIndex >= waypoints.Length - 1 && walkGain > ResidentialFloorHeight - 0.4f;
         var valid = steppedCollider && consolidated && rampSlabAbsent && compactLandings
-            && openCenter && floorSlabClearance
+            && openCenter && floorSlabClearance && corridorRunnerClearance
             && hangarRampGone && walked && _residentialStairFlightCount > 0;
-        GD.Print($"STAIRS_CHECK valid={valid} step_bodies={stepBodies} step_shapes={stepShapes} consolidated_bodies={consolidatedBodies} consolidated={consolidated} ramp_bodies={rampBodies} ramp_shapes={rampShapes} stepped={steppedCollider} no_ramp_slab={rampSlabAbsent} compact_landings={compactLandings} landing_shapes={compactLandingShapes}/{landingShapes} open_center={openCenter} spine={centerSpineShapes}/{centerSpineVisuals} inner_guards={innerGuardShapes}/{firstSpec.Floors * 2} slab_clear={floorSlabClearance} slab_intrusions={intrudingFloorSlabs} slab_shapes={floorSlabShapes}/{(firstSpec.Floors + 1) * 4} hangar_ok={hangarRampGone} walk_h={walkGain:0.00} reached={reachedIndex + 1}/{waypoints.Length} climbed={walked} flights={_residentialStairFlightCount}");
+        GD.Print($"STAIRS_CHECK valid={valid} step_bodies={stepBodies} step_shapes={stepShapes} consolidated_bodies={consolidatedBodies} consolidated={consolidated} ramp_bodies={rampBodies} ramp_shapes={rampShapes} stepped={steppedCollider} no_ramp_slab={rampSlabAbsent} compact_landings={compactLandings} landing_shapes={compactLandingShapes}/{landingShapes} open_center={openCenter} spine={centerSpineShapes}/{centerSpineVisuals} inner_guards={innerGuardShapes}/{firstSpec.Floors * 2} slab_clear={floorSlabClearance} slab_intrusions={intrudingFloorSlabs} slab_shapes={floorSlabShapes}/{(firstSpec.Floors + 1) * 4} runner_clear={corridorRunnerClearance} runner_intrusions={intrudingCorridorRunners} runner_meshes={corridorRunnerMeshes}/{firstSpec.Floors * 2} hangar_ok={hangarRampGone} walk_h={walkGain:0.00} reached={reachedIndex + 1}/{waypoints.Length} climbed={walked} flights={_residentialStairFlightCount}");
         GD.Print($"STAIRS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
