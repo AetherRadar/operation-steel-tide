@@ -13,9 +13,15 @@ public interface ILootSource
     void OnSearched();
 }
 
+/// <summary>A loot source that conceals its contents until its opening interaction completes.</summary>
+public interface IOpenableLootSource
+{
+    bool IsOpened { get; }
+}
+
 /// <summary>Permanent KIA remains for a squadmate after their revive budget is spent.</summary>
 [GlobalClass]
-public partial class SquadBodyBag : StaticBody3D, ILootSource
+public partial class SquadBodyBag : StaticBody3D, ILootSource, IOpenableLootSource
 {
     public string EnglishName { get; set; } = "Operator body bag";
     public string ChineseName { get; set; } = "干员遗体袋";
@@ -23,8 +29,21 @@ public partial class SquadBodyBag : StaticBody3D, ILootSource
     public Node3D LootNode => this;
     public bool IsSearchable => true;
     public float SearchDuration => 0.85f;
+    public bool IsOpened => _tagged;
+    internal bool ClosedVisualReady => !_tagged
+        && IsInstanceValid(_flap)
+        && Mathf.Abs(_flap.Rotation.X) <= 0.01f
+        && FlapPartCountForDiagnostics >= 2;
+    internal bool OpenVisualReady => _tagged
+        && IsInstanceValid(_flap)
+        && Mathf.Abs(_flap.Rotation.X + 1.08f) <= 0.03f
+        && FlapPartCountForDiagnostics >= 2;
+    internal int FlapPartCountForDiagnostics => IsInstanceValid(_flap)
+        ? _flap.GetChildCount()
+        : 0;
 
     private bool _tagged;
+    private Node3D _flap = null!;
 
     public override void _Ready()
     {
@@ -58,6 +77,12 @@ public partial class SquadBodyBag : StaticBody3D, ILootSource
             return;
         }
         _tagged = true;
+        CreateTween()
+            .SetProcessMode(Tween.TweenProcessMode.Idle)
+            .SetPauseMode(Tween.TweenPauseMode.Process)
+            .TweenProperty(_flap, "rotation:x", -1.08f, 0.36f)
+            .SetTrans(Tween.TransitionType.Quad)
+            .SetEase(Tween.EaseType.Out);
     }
 
     private void BuildBag()
@@ -89,9 +114,16 @@ public partial class SquadBodyBag : StaticBody3D, ILootSource
             Mesh = new BoxMesh { Size = new Vector3(1.3f, 0.32f, 0.58f) },
             MaterialOverride = fabric
         });
-        AddChild(new MeshInstance3D
+        _flap = new Node3D
         {
-            Position = new Vector3(0.0f, 0.38f, 0.0f),
+            Name = "BodyBagFlap",
+            Position = new Vector3(0.0f, 0.38f, 0.24f)
+        };
+        AddChild(_flap);
+        _flap.AddChild(new MeshInstance3D
+        {
+            Name = "BodyBagFlapPanel",
+            Position = new Vector3(0.0f, 0.0f, -0.24f),
             Mesh = new BoxMesh { Size = new Vector3(1.22f, 0.06f, 0.5f) },
             MaterialOverride = fabric
         });
@@ -102,9 +134,10 @@ public partial class SquadBodyBag : StaticBody3D, ILootSource
             Mesh = new BoxMesh { Size = new Vector3(1.28f, 0.08f, 0.04f) },
             MaterialOverride = stripe
         });
-        AddChild(new MeshInstance3D
+        _flap.AddChild(new MeshInstance3D
         {
-            Position = new Vector3(0.0f, 0.36f, 0.0f),
+            Name = "BodyBagFlapZipper",
+            Position = new Vector3(0.0f, -0.02f, -0.24f),
             Mesh = new BoxMesh { Size = new Vector3(1.1f, 0.03f, 0.04f) },
             MaterialOverride = zipper
         });
@@ -118,7 +151,7 @@ public partial class SquadBodyBag : StaticBody3D, ILootSource
 }
 
 [GlobalClass]
-public partial class WeaponCase : StaticBody3D, ILootSource
+public partial class WeaponCase : StaticBody3D, ILootSource, IOpenableLootSource
 {
     public string EnglishName { get; set; } = "Weapon case";
     public string ChineseName { get; set; } = "武器箱";
@@ -126,6 +159,10 @@ public partial class WeaponCase : StaticBody3D, ILootSource
     public Node3D LootNode => this;
     public bool IsSearchable => true;
     public float SearchDuration => 0.9f;
+    public bool IsOpened => _opened;
+    public bool OpenVisualReady => _opened
+        && IsInstanceValid(_lid)
+        && Mathf.Abs(_lid.Rotation.X + 1.45f) <= 0.03f;
 
     private Node3D _lid = null!;
     private bool _opened;
@@ -152,6 +189,8 @@ public partial class WeaponCase : StaticBody3D, ILootSource
         }
         _opened = true;
         CreateTween()
+            .SetProcessMode(Tween.TweenProcessMode.Idle)
+            .SetPauseMode(Tween.TweenPauseMode.Process)
             .TweenProperty(_lid, "rotation:x", -1.45f, 0.38f)
             .SetTrans(Tween.TransitionType.Quad)
             .SetEase(Tween.EaseType.Out);

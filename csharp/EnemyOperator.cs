@@ -4,7 +4,7 @@ using Godot;
 namespace OperationSteelTide;
 
 [GlobalClass]
-public partial class EnemyOperator : CharacterBody3D, ILootSource
+public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLootSource
 {
     [Signal]
     public delegate void EliminatedEventHandler(EnemyOperator enemy);
@@ -212,6 +212,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
 
     public void OnSearched()
     {
+        OpenCorpseLootBackpack();
     }
 
     public void MarkCarriedWeaponRemoved()
@@ -861,6 +862,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
         if (IsDead)
         {
             // Revive dead diagnostics subjects so multi-phase validators can reuse them.
+            ResetCorpseLootBackpackForDiagnostics();
             IsDead = false;
             CollisionLayer = 2;
             CollisionMask = 1 | 2;
@@ -1609,6 +1611,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource
             return;
         }
         IsDead = true;
+        ShowCorpseLootBackpack();
         ClearPursuitMemory(clearTarget: true);
         CollisionLayer = 0;
         CollisionMask = 0;

@@ -16,7 +16,7 @@ public enum ResidentialCacheKind
 }
 
 [GlobalClass]
-public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferredLootSource
+public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferredLootSource, IOpenableLootSource
 {
     public const string NeutralModelPath = "res://assets/models/old_military_crate/old_military_crate.gltf";
     private const int ImportedOpenAnimationFrameCount = 7;
@@ -47,6 +47,7 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
         || Loot.Exists(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null);
     public bool IsSearchable => !ContentsResolved || Loot.Count > 0;
     public float SearchDuration => 0.65f;
+    public bool IsOpened => _opened;
     public bool NeutralVisualReady => IsInstanceValid(_visualRoot) && VisibleModelPartCount > 0;
     internal bool OpenVisualReady => _opened
         && ((_closedVisual is not null
@@ -81,6 +82,22 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
         _sharedOpenedMesh = null;
         _sharedOpenAnimationMeshes = Array.Empty<ArrayMesh>();
         _sharedVisiblePartCount = 0;
+    }
+
+    internal static bool TryGetSharedChestAnimation(
+        out ArrayMesh[] animationMeshes,
+        out int visiblePartCount)
+    {
+        if (!EnsureSharedImportedMeshes())
+        {
+            animationMeshes = Array.Empty<ArrayMesh>();
+            visiblePartCount = 0;
+            return false;
+        }
+
+        animationMeshes = _sharedOpenAnimationMeshes;
+        visiblePartCount = _sharedVisiblePartCount;
+        return true;
     }
 
     public void Configure(
@@ -393,7 +410,9 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
             && IsInstanceValid(_closedVisual)
             && _sharedOpenAnimationMeshes.Length == ImportedOpenAnimationFrameCount)
         {
-            var opening = CreateTween();
+            var opening = CreateTween()
+                .SetProcessMode(Tween.TweenProcessMode.Idle)
+                .SetPauseMode(Tween.TweenPauseMode.Process);
             for (var frame = 1; frame < _sharedOpenAnimationMeshes.Length; frame++)
             {
                 var frameMesh = _sharedOpenAnimationMeshes[frame];
@@ -417,7 +436,10 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
                 restScale.Y * 1.08f,
                 restScale.Z * 1.04f);
 
-            var rebound = CreateTween().SetParallel();
+            var rebound = CreateTween()
+                .SetProcessMode(Tween.TweenProcessMode.Idle)
+                .SetPauseMode(Tween.TweenPauseMode.Process)
+                .SetParallel();
             rebound.TweenProperty(_closedVisual, "position", restPosition, 0.22f)
                 .SetTrans(Tween.TransitionType.Back)
                 .SetEase(Tween.EaseType.Out);
@@ -437,6 +459,8 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
         }
 
         CreateTween()
+            .SetProcessMode(Tween.TweenProcessMode.Idle)
+            .SetPauseMode(Tween.TweenPauseMode.Process)
             .TweenProperty(_lid, "rotation:x", _closedLidRotationX - 1.18f, 0.38f)
             .SetTrans(Tween.TransitionType.Quad)
             .SetEase(Tween.EaseType.Out);

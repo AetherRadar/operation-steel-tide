@@ -4,7 +4,7 @@ using Godot;
 namespace OperationSteelTide;
 
 [GlobalClass]
-public partial class AircraftSupplyDrop : StaticBody3D, ILootSource
+public partial class AircraftSupplyDrop : StaticBody3D, ILootSource, IOpenableLootSource
 {
     public List<LootItem> Loot { get; } = new();
     public Node3D LootNode => this;
@@ -74,6 +74,8 @@ public partial class AircraftSupplyDrop : StaticBody3D, ILootSource
         }
         IsOpened = true;
         CreateTween()
+            .SetProcessMode(Tween.TweenProcessMode.Idle)
+            .SetPauseMode(Tween.TweenPauseMode.Process)
             .TweenProperty(_lid, "rotation:x", -1.25f, 0.42f)
             .SetTrans(Tween.TransitionType.Quad)
             .SetEase(Tween.EaseType.Out);
