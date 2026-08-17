@@ -20,6 +20,7 @@ public partial class FreightTerminalWorld
         public bool Emergency;
         public Vector3 Destination;
         public ulong NextDirectCheckMilliseconds;
+        public ulong NextShortcutCheckMilliseconds;
     }
 
     private sealed class SquadCorridorQueryState
@@ -344,7 +345,8 @@ public partial class FreightTerminalWorld
             Revision = _squadLeaderTrailRevision,
             Emergency = emergency,
             Destination = destination,
-            NextDirectCheckMilliseconds = Time.GetTicksMsec() + 180
+            NextDirectCheckMilliseconds = Time.GetTicksMsec() + 180,
+            NextShortcutCheckMilliseconds = Time.GetTicksMsec() + SquadNavShortcutCheckIntervalMilliseconds
         };
     }
 
@@ -398,26 +400,39 @@ public partial class FreightTerminalWorld
             advanced++;
         }
 
-        if (SquadTrailCursorActive(state))
+        var now = Time.GetTicksMsec();
+        if (SquadTrailCursorActive(state)
+            && now >= state.NextShortcutCheckMilliseconds)
         {
+            // Trail points are already sequentially traversable. Keep one optional
+            // far shortcut probe off the hot path instead of testing every point.
             var furthest = state.Direction > 0
                 ? Mathf.Min(state.EndCursor, state.Cursor + 18)
                 : Mathf.Max(state.EndCursor, state.Cursor - 18);
+            var shortcut = state.Cursor;
             for (var index = furthest;
                  state.Direction > 0 ? index > state.Cursor : index < state.Cursor;
                  index -= state.Direction)
             {
                 var point = _squadLeaderTrail[index];
                 if (mate.GlobalPosition.DistanceTo(point) > 16.0f
-                    || Mathf.Abs(point.Y - mate.GlobalPosition.Y) > 1.8f
-                    || !IsSquadMovementCorridorClear(mate.GlobalPosition, point, mate))
+                    || Mathf.Abs(point.Y - mate.GlobalPosition.Y) > 1.8f)
                 {
                     continue;
                 }
-                advanced += Mathf.Abs(index - state.Cursor);
-                state.Cursor = index;
+                shortcut = index;
                 break;
             }
+            if (shortcut != state.Cursor
+                && IsSquadMovementCorridorClear(
+                    mate.GlobalPosition,
+                    _squadLeaderTrail[shortcut],
+                    mate))
+            {
+                advanced += Mathf.Abs(shortcut - state.Cursor);
+                state.Cursor = shortcut;
+            }
+            state.NextShortcutCheckMilliseconds = now + SquadNavShortcutCheckIntervalMilliseconds;
         }
 
         if (emergency && advanced > 0)

@@ -19,6 +19,7 @@ public partial class FreightTerminalWorld
     private const int SquadNavFollowExpansionCap = 192;
     private const float SquadNavCorridorSampleSpacing = 1.8f;
     private const ulong SquadNavNormalPlanIntervalMilliseconds = 90;
+    private const ulong SquadNavShortcutCheckIntervalMilliseconds = 180;
     private const int SquadNavEstimateExpansionCap = 2500;
     private const int SquadNavCellCacheResetCapacity = 60000;
     private const int SquadNavTrailHandoffCandidates = 3;
@@ -70,6 +71,7 @@ public partial class FreightTerminalWorld
         public int FailedPlanAttempts;
         public bool TrailHandoff;
         public Vector3 HandoffPoint;
+        public ulong NextShortcutCheckMilliseconds;
     }
 
     /// <summary>
@@ -148,7 +150,8 @@ public partial class FreightTerminalWorld
                 Emergency = false,
                 Destination = destination,
                 FailedPlanAttempts = failedPlanAttempts,
-                NextPlanMilliseconds = _squadNavNextNormalPlanMilliseconds
+                NextPlanMilliseconds = _squadNavNextNormalPlanMilliseconds,
+                NextShortcutCheckMilliseconds = now + SquadNavShortcutCheckIntervalMilliseconds
             };
             return false;
         }
@@ -165,7 +168,8 @@ public partial class FreightTerminalWorld
                 Emergency = emergency,
                 Destination = destination,
                 FailedPlanAttempts = failures,
-                NextPlanMilliseconds = now + SquadNavRetryDelayMilliseconds(failures, id)
+                NextPlanMilliseconds = now + SquadNavRetryDelayMilliseconds(failures, id),
+                NextShortcutCheckMilliseconds = now + SquadNavShortcutCheckIntervalMilliseconds
             };
             return false;
         }
@@ -176,6 +180,7 @@ public partial class FreightTerminalWorld
         }
         _squadTrailPaths.Remove(id);
         _squadGridPaths[id] = route;
+        route.NextShortcutCheckMilliseconds = now + SquadNavShortcutCheckIntervalMilliseconds;
         AdvanceSquadGridCursor(mate, route);
         if (route.Cursor >= route.Directives.Length)
         {
@@ -438,6 +443,13 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        var now = Time.GetTicksMsec();
+        if (now < state.NextShortcutCheckMilliseconds)
+        {
+            return;
+        }
+        // A* already validated each edge. Probe only the farthest shortcut so
+        // steady-state following cannot fan out into many capsule sweeps per frame.
         var furthest = Mathf.Min(state.Directives.Length - 1, state.Cursor + 20);
         for (var index = state.Cursor + 1; index <= furthest; index++)
         {
@@ -448,18 +460,27 @@ public partial class FreightTerminalWorld
             furthest = index - 1;
             break;
         }
+        var shortcut = state.Cursor;
         for (var index = furthest; index > state.Cursor; index--)
         {
             var point = state.Directives[index].Target;
             if (mate.GlobalPosition.DistanceTo(point) > 16.0f
-                || Mathf.Abs(point.Y - mate.GlobalPosition.Y) > 1.8f
-                || !IsSquadMovementCorridorClear(mate.GlobalPosition, point, mate))
+                || Mathf.Abs(point.Y - mate.GlobalPosition.Y) > 1.8f)
             {
                 continue;
             }
-            state.Cursor = index;
+            shortcut = index;
             break;
         }
+        if (shortcut > state.Cursor
+            && IsSquadMovementCorridorClear(
+                mate.GlobalPosition,
+                state.Directives[shortcut].Target,
+                mate))
+        {
+            state.Cursor = shortcut;
+        }
+        state.NextShortcutCheckMilliseconds = now + SquadNavShortcutCheckIntervalMilliseconds;
     }
 
     private static bool SquadNavigationDirectiveReached(
