@@ -10,7 +10,9 @@ public sealed record DemolitionMapOffer(
     string EnglishName,
     string SubtitleLocalizationKey,
     string EnglishSubtitle,
-    bool Available);
+    bool Available,
+    string ProfileLocalizationKey = "demolition_arena_profile",
+    string EnglishProfile = "DIAGONAL SITES  //  MID ROTATION  //  TWO FLOORS OF COVER\nA  SOUTHWEST FOUNDRY YARD  //  B  NORTHEAST ASSEMBLY HALL");
 
 /// <summary>
 /// Open demolition map pool. Every entry is selectable from the briefing; only maps with
@@ -19,6 +21,7 @@ public sealed record DemolitionMapOffer(
 public static class DemolitionMapCatalog
 {
     public const string TideforgeId = "tideforge";
+    public const string HarborLocksId = "harbor_locks";
     public const int PoolSize = 12;
 
     public static readonly IReadOnlyList<DemolitionMapOffer> Maps = new[]
@@ -32,13 +35,15 @@ public static class DemolitionMapCatalog
             "DIAGONAL SITES  //  MID ROTATION",
             true),
         new DemolitionMapOffer(
-            "harbor_locks",
+            HarborLocksId,
             "MAP 02",
             "demolition_map_harbor_locks",
             "HARBOR LOCKS",
-            "demolition_map_locked_subtitle",
-            "CANAL DOCKS  //  IN CONSTRUCTION",
-            false),
+            "demolition_map_harbor_locks_subtitle",
+            "LOCK GATES  //  PUMP STATIONS",
+            true,
+            "demolition_map_harbor_locks_profile",
+            "THREE LOCK LANES  //  HARD COVER ROTATIONS  //  LONG QUAYSIDE ANGLES\nA  WEST CONTROL YARD  //  B  EAST PUMP ANNEX"),
         new DemolitionMapOffer(
             "tideglass_reactor",
             "MAP 03",

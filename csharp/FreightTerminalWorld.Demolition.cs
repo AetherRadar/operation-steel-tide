@@ -90,10 +90,19 @@ public partial class FreightTerminalWorld
     {
         if (_demolitionArena is not null)
         {
-            _demolitionRoutePlanner ??= new DemolitionRoutePlanner(_demolitionArena.Layout);
-            return;
+            if (_demolitionArena.Layout.MapId == _demolitionSelectedMapId)
+            {
+                _demolitionRoutePlanner ??= new DemolitionRoutePlanner(_demolitionArena.Layout);
+                return;
+            }
+
+            _demolitionArena.SetActive(false);
+            _demolitionArena.Root.QueueFree();
+            _demolitionArena = null;
+            _demolitionRoutePlanner = null;
+            _demolitionSites.Clear();
         }
-        var layout = new DemolitionArenaLayout();
+        var layout = new DemolitionArenaLayout(_demolitionSelectedMapId);
         var builder = new DemolitionArenaBuilder(Mat, GroundMaterial);
         _demolitionArena = builder.Build(this, layout);
         _demolitionRoutePlanner = new DemolitionRoutePlanner(layout);

@@ -10,7 +10,8 @@ public readonly record struct DemolitionArenaBox(
     Vector3 Center,
     Vector3 Size,
     string Material,
-    Vector3 Rotation = default);
+    Vector3 Rotation = default,
+    bool Visible = true);
 
 public readonly record struct DemolitionArenaProp(
     string Name,
@@ -28,11 +29,11 @@ public readonly record struct DemolitionArenaMarker(
     Color Accent);
 
 /// <summary>
-/// Authored Tideforge arena coordinates and pure balance checks. This data type owns no
+/// Authored demolition arena coordinates and pure balance checks. This data type owns no
 /// scene nodes, so route timing and clearance rules can be validated without a running tree.
-/// Sites sit on opposite diagonal corners of the arena so rotations always cross mid.
+/// Sites sit on opposite diagonal corners of each arena so rotations always cross mid.
 /// </summary>
-public sealed class DemolitionArenaLayout
+public sealed partial class DemolitionArenaLayout
 {
     public const float MinimumPassageWidth = 2.6f;
     public const float MinimumPassageHeight = 2.45f;
@@ -57,8 +58,13 @@ public sealed class DemolitionArenaLayout
         new(33.0f, -19.0f)
     };
 
-    public string EnglishName => "TIDEFORGE ARENA";
-    public string LocalizationKey => "demolition_arena_name";
+    public string MapId { get; }
+    public string EnglishName => MapId == DemolitionMapCatalog.HarborLocksId
+        ? "HARBOR LOCKS"
+        : "TIDEFORGE ARENA";
+    public string LocalizationKey => MapId == DemolitionMapCatalog.HarborLocksId
+        ? "demolition_map_harbor_locks"
+        : "demolition_arena_name";
     public Vector3 Origin { get; }
     public Vector3 AttackSpawn { get; }
     public Vector3 DefenderSpawn { get; }
@@ -84,7 +90,15 @@ public sealed class DemolitionArenaLayout
     public bool CentralPropsDoNotOverlap { get; }
 
     public DemolitionArenaLayout(Vector3? origin = null)
+        : this(DemolitionMapCatalog.TideforgeId, origin)
     {
+    }
+
+    public DemolitionArenaLayout(string mapId, Vector3? origin = null)
+    {
+        MapId = string.Equals(mapId, DemolitionMapCatalog.HarborLocksId, StringComparison.OrdinalIgnoreCase)
+            ? DemolitionMapCatalog.HarborLocksId
+            : DemolitionMapCatalog.TideforgeId;
         Origin = origin ?? WorldOrigin;
         AttackSpawn = World(new Vector3(0.0f, 0.22f, 54.0f));
         DefenderSpawn = World(new Vector3(0.0f, 0.22f, -54.0f));
@@ -126,10 +140,16 @@ public sealed class DemolitionArenaLayout
             new(-27.0f, 0.2f, -26.0f), new(-17.0f, 0.2f, -26.0f),
             new(-22.0f, 0.2f, -20.5f), new(-22.0f, 0.2f, -31.5f));
 
-        CollisionBoxes = BuildCollisionBoxes();
+        CollisionBoxes = MapId == DemolitionMapCatalog.HarborLocksId
+            ? BuildHarborLocksCollisionBoxes()
+            : BuildCollisionBoxes();
         CentralCoverBodyCount = CollisionBoxes.Count(box => box.Name.StartsWith("MidCover", StringComparison.Ordinal));
-        DetailBoxes = BuildDetailBoxes();
-        Props = BuildProps();
+        DetailBoxes = MapId == DemolitionMapCatalog.HarborLocksId
+            ? BuildHarborLocksDetailBoxes()
+            : BuildDetailBoxes();
+        Props = MapId == DemolitionMapCatalog.HarborLocksId
+            ? BuildHarborLocksProps()
+            : BuildProps();
         CentralPropsDoNotOverlap = !Props.Any(prop => CollisionBoxes.Any(box =>
             box.Name.StartsWith("MidCover", StringComparison.Ordinal)
             && GroundFootprintsOverlap(box, prop)));
@@ -213,8 +233,14 @@ public sealed class DemolitionArenaLayout
 
     public Vector3 SitePosition(int index) => SitePositions[Mathf.Clamp(index, 0, SitePositions.Count - 1)];
 
-    public Vector3 StrategyTarget(string key) => key switch
+    public Vector3 StrategyTarget(string key)
     {
+        if (MapId == DemolitionMapCatalog.HarborLocksId)
+        {
+            return HarborLocksStrategyTarget(key);
+        }
+        return key switch
+        {
         "attack_entry_a" => World(new Vector3(-24.0f, 0.2f, 14.0f)),
         "attack_entry_b" => World(new Vector3(23.0f, 0.2f, -7.0f)),
         "attack_support_a" => World(new Vector3(-23.0f, 0.2f, 17.0f)),
@@ -239,8 +265,9 @@ public sealed class DemolitionArenaLayout
         "postplant_lurk_b" => World(new Vector3(20.0f, 0.2f, 2.0f)),
         "site_a" => SitePositions[0],
         "site_b" => SitePositions[1],
-        _ => Midpoint
-    };
+            _ => Midpoint
+        };
+    }
 
     public bool IsInsideArena(Vector3 worldPosition, float margin = 0.0f)
     {
@@ -444,8 +471,14 @@ public sealed class DemolitionArenaLayout
         };
     }
 
-    private DemolitionArenaBox Box(string name, Vector3 center, Vector3 size, string material, Vector3 rotation = default)
-        => new(name, World(center), size, material, rotation);
+    private DemolitionArenaBox Box(
+        string name,
+        Vector3 center,
+        Vector3 size,
+        string material,
+        Vector3 rotation = default,
+        bool visible = true)
+        => new(name, World(center), size, material, rotation, visible);
 
     private Vector3 World(Vector3 local) => Origin + local;
 

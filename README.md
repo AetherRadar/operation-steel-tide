@@ -17,7 +17,7 @@
 
 - **The squad survives disconnects:** choose Assault, Medic, or Recon; AI fills empty roles, obeys follow/hold/move orders, uses class skills, revives downed teammates, and takes over a disconnected human slot without restarting the mission.
 - **A complete extraction loop:** infiltrate, disable the relay, steal the manifest, survive reinforcements, loot buildings and fallen operators, then hold the extraction zone.
-- **A separate demolition match:** browse a twelve-map pool one arena at a time (TIDEFORGE ARENA playable today), then deploy into an MR12 5v5 match: first to 13 rounds, halftime side swap, and win-by-two overtime. Every round opens with a 15-second manual buy phase; the $800 opening wallet can afford a pistol but no primary weapon, while round rewards and loss-streak bonuses fund later equipment. AI assigns entry, support, recon, anchor, rotation, retake, cover, flank, plant, and defuse duties from the live team state.
+- **A separate demolition match:** browse a twelve-map pool one arena at a time (TIDEFORGE ARENA and HARBOR LOCKS playable today), then deploy into an MR12 5v5 match: first to 13 rounds, halftime side swap, and win-by-two overtime. Every round opens with a 15-second manual buy phase; the $800 opening wallet can afford a pistol but no primary weapon, while round rewards and loss-streak bonuses fund later equipment. AI assigns entry, support, recon, anchor, rotation, retake, cover, flank, plant, and defuse duties from the live team state.
 - **Meaningful loadouts:** buy firearms, armor, ammunition grades, and pack sizes; customize weapon parts and bank only the value extracted above your deployment baseline.
 - **A hostile world, not a shooting gallery:** rival squads, garrison troops, civilians, a roaming three-phase Boss, a hostile aircraft, drivable vehicles, and 22 glass skybridges share the same district.
 
@@ -178,9 +178,9 @@ Any accepted incoming hit immediately closes the active search or backpack view 
 - `csharp/FreightTerminalWorld.Residential.cs`: eleven enterable apartment towers, physical stairwells, rooftops, courtyards, occupants, and residential diagnostics.
 - `csharp/FreightTerminalWorld.Residential.Access.cs`: exterior fire escapes to the floor-2 glass skyways, access collision, rails, and deterministic access diagnostics.
 - `csharp/FreightTerminalWorld.Boss.cs`, `EnemyOperator.Boss.cs`, and `CombatHUD.Boss.cs`: roaming TIDE HUNTER behavior, phases, pulse attack, rewards, minimap tracking, and Boss diagnostics.
-- `csharp/DemolitionArenaLayout.cs`, `DemolitionArenaBuilder.cs`, and `DemolitionArenaRuntime.cs`: extended TIDEFORGE geometry data, generated collision/visual assembly, activation isolation, route balance, long rotations, and minimap markers.
+- `csharp/DemolitionArenaLayout*.cs`, `DemolitionArenaBuilder*.cs`, and `DemolitionArenaRuntime.cs`: Tideforge and Harbor Locks geometry data, imported industrial-model composition, generated collision/visual assembly, activation isolation, route balance, long rotations, and minimap markers.
 - `csharp/DemolitionMatchState.cs`, `DemolitionEconomy.cs`, `DemolitionBuyCatalog.cs`, and `DemolitionStrategyPlanner.cs`: pure MR12 scoring with halftime swaps and win-by-two overtime, the $800 round economy, purchase eligibility and pricing, and role-, health-, range-, survival-, and position-aware team assignments.
-- `csharp/DemolitionMapCatalog.cs`: the twelve-map demolition pool with per-map availability for the single-map briefing carousel.
+- `csharp/DemolitionMapCatalog.cs`: the twelve-map demolition pool with per-map availability for the briefing carousel.
 - `csharp/FreightTerminalWorld.Demolition.Strategy.cs`: runtime snapshots, squad/defender plan application, retake routing, and physical plant/defuse movement kept outside the round controller.
 - `ui/DemolitionBriefingView.tscn` and `csharp/DemolitionBriefingView.cs`: scene-authored demolition briefing, localized arena intelligence, role selection, a previous/next map carousel, and intent signals.
 - `ui/DemolitionBuyView.tscn` and `csharp/DemolitionBuyView.cs`: scene-authored round purchase panel with localized offers, affordability state, countdown, running total, remaining funds, and purchase intent signals.
@@ -202,6 +202,8 @@ Godot_console.exe --path . -- --validate-pause-ui
 Godot_console.exe --path . -- --validate-demolition
 Godot_console.exe --path . -- --validate-demolition-rules
 Godot_console.exe --path . -- --validate-demolition-arena
+Godot_console.exe --path . -- --validate-harbor-locks
+Godot_console.exe --path . -- --capture-harbor-locks
 Godot_console.exe --path . -- --validate-demolition-briefing
 Godot_console.exe --path . -- --validate-demolition-buy
 Godot_console.exe --path . -- --validate-objectives

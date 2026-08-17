@@ -28,17 +28,24 @@ public partial class FreightTerminalWorld
             && _hud.BrowsedDemolitionMapAvailable
             && _hud.DemolitionBriefingDeployEnabled;
         _hud.PressNextDemolitionMapForDiagnostics();
-        var lockedCarousel = _hud.BrowsedDemolitionMapId == "harbor_locks"
+        var harborCarousel = _hud.BrowsedDemolitionMapId == DemolitionMapCatalog.HarborLocksId
             && _hud.BrowsedDemolitionMapIndex == 1
+            && _hud.BrowsedDemolitionMapAvailable
+            && _hud.DemolitionBriefingDeployEnabled
+            && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.HarborLocksId;
+        _hud.PressNextDemolitionMapForDiagnostics();
+        var lockedCarousel = _hud.BrowsedDemolitionMapId == "tideglass_reactor"
+            && _hud.BrowsedDemolitionMapIndex == 2
             && !_hud.BrowsedDemolitionMapAvailable
             && !_hud.DemolitionBriefingDeployEnabled
-            && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.TideforgeId;
+            && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.HarborLocksId;
         _hud.PressPreviousDemolitionMapForDiagnostics();
-        var carouselReturned = _hud.BrowsedDemolitionMapId == DemolitionMapCatalog.TideforgeId
+        var carouselReturned = _hud.BrowsedDemolitionMapId == DemolitionMapCatalog.HarborLocksId
             && _hud.BrowsedDemolitionMapAvailable
-            && _hud.DemolitionBriefingDeployEnabled;
-        var lockedMapRejected = _hud.PressDemolitionMapForDiagnostics("harbor_locks") == false
-            && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.TideforgeId;
+            && _hud.DemolitionBriefingDeployEnabled
+            && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.HarborLocksId;
+        var lockedMapRejected = _hud.PressDemolitionMapForDiagnostics("tideglass_reactor") == false
+            && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.HarborLocksId;
         _hud.PressDemolitionMapForDiagnostics(DemolitionMapCatalog.TideforgeId);
         var synchronizedWithoutDeployment = _hud.SelectedDemolitionRole == OperatorRole.Medic
             && _hud.SelectedDemolitionPrimary == WeaponPlatform.M4A1
@@ -101,10 +108,10 @@ public partial class FreightTerminalWorld
             && !_squadDeployed
             && !_demolitionMode;
         _hud.SetLanguage(originalLanguage);
-        var valid = sceneReady && chineseReady && englishReady && mapPoolReady && lockedCarousel
+        var valid = sceneReady && chineseReady && englishReady && mapPoolReady && harborCarousel && lockedCarousel
             && carouselReturned && lockedMapRejected
             && synchronizedWithoutDeployment && probeReady && backReady;
-        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} map_pool={mapPoolReady} carousel_locked={lockedCarousel} carousel_return={carouselReturned} locked_rejected={lockedMapRejected} sync={synchronizedWithoutDeployment} probe={probeReady} back={backReady}");
+        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} map_pool={mapPoolReady} harbor={harborCarousel} carousel_locked={lockedCarousel} carousel_return={carouselReturned} locked_rejected={lockedMapRejected} sync={synchronizedWithoutDeployment} probe={probeReady} back={backReady}");
         GD.Print($"DEMOLITION_BRIEFING_PASS valid={valid}");
         GetTree().Paused = false;
         await WaitFrames(180);

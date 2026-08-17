@@ -12,3 +12,14 @@ The following models are from [Poly Haven](https://polyhaven.com/) and are dedic
 - Concrete Road Barrier: https://polyhaven.com/a/concrete_road_barrier
 
 License: https://polyhaven.com/license
+
+## Kenney CC0 models
+
+The City Kit (Industrial) 1.0 model set is distributed by Kenney under CC0 1.0:
+
+- Source: https://kenney.nl/assets/city-kit-industrial
+- Download: https://kenney.nl/media/pages/assets/city-kit-industrial/5fcb837741-1750838303/kenney_city-kit-industrial_1.0.zip
+- Local assets: `kenney_city_kit_industrial/*.glb`
+- License copy: `kenney_city_kit_industrial/KENNEY_LICENSE.txt`
+
+The complete GLB set is retained so authored demolition layouts can combine the pack's buildings, chimneys, and tank detail without modifying third-party geometry.

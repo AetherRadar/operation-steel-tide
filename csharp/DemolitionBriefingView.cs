@@ -280,10 +280,7 @@ public partial class DemolitionBriefingView : ColorRect
         _deployButton.Disabled = !offer.Available;
         _arenaName.Text = _mapName.Text;
         _arenaProfile.Text = offer.Available
-            ? Text(
-                "demolition_arena_profile",
-                "DIAGONAL SITES  //  MID ROTATION  //  TWO FLOORS OF COVER\n"
-                + "A  SOUTHWEST FOUNDRY YARD  //  B  NORTHEAST ASSEMBLY HALL")
+            ? Text(offer.ProfileLocalizationKey, offer.EnglishProfile)
             : _mapSubtitle.Text + "\n" + Text("demolition_map_locked_detail", "NOT YET AVAILABLE FOR DEPLOYMENT");
     }
 

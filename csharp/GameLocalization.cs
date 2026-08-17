@@ -459,6 +459,8 @@ public static class GameLocalization
         Chinese["demolition_map_tideforge_subtitle"] = "\u5bf9\u89d2\u5e03\u70b9  //  \u4e2d\u8def\u8f6c\u70b9";
         Chinese["demolition_map_locked_subtitle"] = "\u65bd\u5de5\u4e2d";
         Chinese["demolition_map_harbor_locks"] = "\u6e2f\u53e3\u95f8\u95e8";
+        Chinese["demolition_map_harbor_locks_subtitle"] = "\u95f8\u95e8\u822a\u9053  //  \u6cf5\u7ad9\u533a";
+        Chinese["demolition_map_harbor_locks_profile"] = "\u4e09\u6761\u6c34\u95f8\u901a\u8def  //  \u786c\u63a9\u4f53\u8f6c\u70b9  //  \u6e2f\u5cb8\u957f\u67aa\u7ebf\nA  \u897f\u4fa7\u63a7\u5236\u573a  //  B  \u4e1c\u4fa7\u6cf5\u7ad9\u9644\u697c";
         Chinese["demolition_map_tideglass_reactor"] = "\u6f6e\u73bb\u53cd\u5e94\u5806";
         Chinese["demolition_map_drydock_yard"] = "\u5e72\u8239\u5742\u573a";
         Chinese["demolition_map_observatory_ridge"] = "\u89c2\u6d6a\u5c71\u810a";

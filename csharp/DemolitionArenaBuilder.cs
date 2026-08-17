@@ -4,8 +4,8 @@ using Godot;
 
 namespace OperationSteelTide;
 
-/// <summary>Builds the generated Tideforge world from immutable layout data.</summary>
-public sealed class DemolitionArenaBuilder
+/// <summary>Builds generated demolition worlds from immutable layout data.</summary>
+public sealed partial class DemolitionArenaBuilder
 {
     private readonly Func<string, Color, float, float, Color, StandardMaterial3D> _material;
     private readonly Func<string, Color, float, StandardMaterial3D> _groundMaterial;
@@ -25,7 +25,12 @@ public sealed class DemolitionArenaBuilder
     {
         _staticBodies.Clear();
         _visualPartCount = 0;
-        var root = new Node3D { Name = "TideforgeArena" };
+        var root = new Node3D
+        {
+            Name = layout.MapId == DemolitionMapCatalog.HarborLocksId
+                ? "HarborLocksArena"
+                : "TideforgeArena"
+        };
         parent.AddChild(root);
         var materials = BuildMaterials();
 
@@ -66,6 +71,8 @@ public sealed class DemolitionArenaBuilder
             ["mid_floor"] = _groundMaterial("demolition_arena_mid_floor", new Color(0.28f, 0.29f, 0.27f), 0.88f),
             ["foundry_floor"] = _groundMaterial("demolition_arena_foundry_floor", new Color(0.34f, 0.21f, 0.16f), 0.9f),
             ["assembly_floor"] = _groundMaterial("demolition_arena_assembly_floor", new Color(0.12f, 0.21f, 0.23f), 0.82f),
+            ["harbor_floor"] = _groundMaterial("demolition_arena_harbor_floor", new Color(0.23f, 0.29f, 0.31f), 0.9f),
+            ["water"] = _material("demolition_arena_water", new Color(0.035f, 0.22f, 0.28f), 0.18f, 0.2f, new Color(0.0f, 0.045f, 0.055f)),
             ["site"] = _material("demolition_arena_site", new Color(0.09f, 0.11f, 0.105f), 0.55f, 0.45f, default),
             ["window"] = _material("demolition_arena_window", new Color(0.025f, 0.12f, 0.15f), 0.68f, 0.18f, new Color(0.01f, 0.055f, 0.07f))
         };
@@ -86,12 +93,16 @@ public sealed class DemolitionArenaBuilder
             CollisionLayer = 1,
             CollisionMask = 0
         };
-        body.AddChild(new MeshInstance3D
+        if (definition.Visible)
         {
-            Name = "Visual",
-            Mesh = SharedBox(definition.Size),
-            MaterialOverride = material
-        });
+            body.AddChild(new MeshInstance3D
+            {
+                Name = "Visual",
+                Mesh = SharedBox(definition.Size),
+                MaterialOverride = material
+            });
+            _visualPartCount++;
+        }
         body.AddChild(new CollisionShape3D
         {
             Name = "Collision",
@@ -99,7 +110,6 @@ public sealed class DemolitionArenaBuilder
         });
         root.AddChild(body);
         _staticBodies.Add(body);
-        _visualPartCount++;
     }
 
     private void AddStaticCylinder(
@@ -239,6 +249,11 @@ public sealed class DemolitionArenaBuilder
         DemolitionArenaLayout layout,
         IReadOnlyDictionary<string, StandardMaterial3D> materials)
     {
+        if (layout.MapId == DemolitionMapCatalog.HarborLocksId)
+        {
+            BuildHarborLocksLandmarks(root, layout, materials);
+            return;
+        }
         AddSign(root, "ArenaTitle", layout.Origin + new Vector3(0, 5.2f, -54.6f), "TIDEFORGE  //  TF-07", 0, new Color(1.0f, 0.62f, 0.22f));
         AddSign(root, "FoundrySign", layout.Origin + new Vector3(-27.0f, 4.6f, 10.4f), "A  //  FOUNDRY YARD", Mathf.Pi, new Color(1.0f, 0.5f, 0.16f));
         AddSign(root, "AssemblySign", layout.Origin + new Vector3(25.0f, 4.8f, -3.4f), "B  //  ASSEMBLY HALL", Mathf.Pi, new Color(0.42f, 0.86f, 1.0f));
@@ -274,6 +289,11 @@ public sealed class DemolitionArenaBuilder
         DemolitionArenaLayout layout,
         IReadOnlyDictionary<string, StandardMaterial3D> materials)
     {
+        if (layout.MapId == DemolitionMapCatalog.HarborLocksId)
+        {
+            BuildHarborLocksCoverDetails(root, layout, materials);
+            return;
+        }
         var converters = new[]
         {
             (Name: "West", Position: new Vector3(-6.8f, 3.72f, 17.5f), Material: "rust"),
@@ -334,6 +354,11 @@ public sealed class DemolitionArenaBuilder
 
     private void BuildRouteGuidance(Node3D root, DemolitionArenaLayout layout)
     {
+        if (layout.MapId == DemolitionMapCatalog.HarborLocksId)
+        {
+            BuildHarborLocksRouteGuidance(root, layout);
+            return;
+        }
         AddFloorLabel(root, "AttackFloorLabel", layout.Origin + new Vector3(0, 0.09f, 43.0f), "ATTACK", new Color(0.56f, 0.92f, 0.86f), 78);
         AddFloorLabel(root, "RouteALabel", layout.Origin + new Vector3(-6.0f, 0.09f, 36.0f), "<  A", new Color(1.0f, 0.58f, 0.18f), 68);
         AddFloorLabel(root, "RouteMidLabel", layout.Origin + new Vector3(0, 0.09f, 34.0f), "MID", new Color(0.9f, 0.88f, 0.68f), 58);

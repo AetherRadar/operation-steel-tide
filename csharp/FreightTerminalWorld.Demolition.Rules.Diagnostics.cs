@@ -19,8 +19,8 @@ public partial class FreightTerminalWorld
         var rosterHidden = _hud.IsDemolitionSquadRosterHidden;
         var skillHudVisible = _hud.IsDemolitionSkillHudVisible;
         var ordersHidden = _hud.AreDemolitionSquadOrdersHidden;
-        var utilityHudVisible = _hud.DemolitionUtilityHudText.Contains("4 FRAG", System.StringComparison.Ordinal)
-            && _hud.DemolitionUtilityHudText.Contains("5 SMOKE", System.StringComparison.Ordinal);
+        var utilityHudVisible = _hud.DemolitionUtilityHudText.Contains("5 FRAG", System.StringComparison.Ordinal)
+            && _hud.DemolitionUtilityHudText.Contains("6 SMOKE", System.StringComparison.Ordinal);
         var demolitionFooterSeparated = _hud.FooterHudRuntimeSeparatedForDiagnostics;
         var hudIsolated = rosterHidden
             && skillHudVisible
