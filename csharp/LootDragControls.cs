@@ -18,7 +18,9 @@ public enum LootDropTarget
     PrimaryWeapon,
     Helmet,
     BodyArmor,
-    BackpackGear
+    BackpackGear,
+    SecondaryWeapon,
+    SidearmWeapon
 }
 
 [GlobalClass]
@@ -631,7 +633,10 @@ public partial class LootDropZone : PanelContainer
             LootDropTarget.Source => origin == LootDragOrigin.Backpack,
             LootDropTarget.Backpack => origin == LootDragOrigin.Source,
             LootDropTarget.Ground => origin == LootDragOrigin.Backpack,
-            LootDropTarget.PrimaryWeapon => kind is LootItemKind.Weapon or LootItemKind.Attachment,
+            LootDropTarget.PrimaryWeapon
+                or LootDropTarget.SecondaryWeapon
+                or LootDropTarget.SidearmWeapon
+                => kind is LootItemKind.Weapon or LootItemKind.Attachment,
             LootDropTarget.Helmet => kind == LootItemKind.Equipment && slot == EquipmentSlot.Helmet,
             LootDropTarget.BodyArmor => kind == LootItemKind.Equipment && slot == EquipmentSlot.BodyArmor,
             LootDropTarget.BackpackGear => kind == LootItemKind.Equipment && slot == EquipmentSlot.Backpack,

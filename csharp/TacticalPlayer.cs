@@ -2570,6 +2570,23 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         return item;
     }
 
+    public LootItem? EquipFromLootToWeaponSlot(LootItem item, PlayerWeaponSlot slot)
+    {
+        if (slot is not (PlayerWeaponSlot.Primary or PlayerWeaponSlot.Secondary or PlayerWeaponSlot.Sidearm))
+        {
+            return item;
+        }
+        if (item.Kind == LootItemKind.Weapon && item.Weapon is not null)
+        {
+            return WeaponFitsSlot(item.Weapon.Platform, slot)
+                ? EquipLootWeapon(item.Weapon, item.Grade, slot)
+                : item;
+        }
+        return item.Kind == LootItemKind.Attachment
+            ? EquipAttachmentToWeaponSlot(item, slot)
+            : item;
+    }
+
     public bool UseBackpackItem(string itemId)
     {
         var index = Backpack.FindIndex(item => item.Id == itemId);
@@ -2595,6 +2612,30 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             return StartPlate(item.Id);
         }
         var replacement = EquipFromLoot(item);
+        if (ReferenceEquals(replacement, item))
+        {
+            return false;
+        }
+        if (replacement is null)
+        {
+            Backpack.RemoveAt(index);
+        }
+        else
+        {
+            Backpack[index] = replacement;
+        }
+        return true;
+    }
+
+    public bool UseBackpackItemInWeaponSlot(string itemId, PlayerWeaponSlot slot)
+    {
+        var index = Backpack.FindIndex(item => item.Id == itemId);
+        if (index < 0)
+        {
+            return false;
+        }
+        var item = Backpack[index];
+        var replacement = EquipFromLootToWeaponSlot(item, slot);
         if (ReferenceEquals(replacement, item))
         {
             return false;

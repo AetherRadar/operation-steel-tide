@@ -19,6 +19,7 @@ public partial class CombatHUD : CanvasLayer
     [Signal] public delegate void LootReturnRequestedEventHandler(string itemId);
     [Signal] public delegate void BackpackUseRequestedEventHandler(string itemId);
     [Signal] public delegate void BackpackDropRequestedEventHandler(string itemId);
+    [Signal] public delegate void LootWeaponSlotRequestedEventHandler(string itemId, int origin, int slot);
     [Signal] public delegate void LootClosedEventHandler();
     [Signal] public delegate void WeaponSlotRequestedEventHandler(int slot);
     [Signal] public delegate void InventoryToggleRequestedEventHandler();
@@ -1103,6 +1104,17 @@ public partial class CombatHUD : CanvasLayer
     {
         switch (target)
         {
+            case LootDropTarget.PrimaryWeapon:
+            case LootDropTarget.SecondaryWeapon:
+            case LootDropTarget.SidearmWeapon:
+                var slot = target switch
+                {
+                    LootDropTarget.SecondaryWeapon => PlayerWeaponSlot.Secondary,
+                    LootDropTarget.SidearmWeapon => PlayerWeaponSlot.Sidearm,
+                    _ => PlayerWeaponSlot.Primary
+                };
+                EmitSignal(SignalName.LootWeaponSlotRequested, itemId, (int)origin, (int)slot);
+                break;
             case LootDropTarget.Backpack when origin == LootDragOrigin.Source:
                 EmitSignal(SignalName.LootTakeRequested, itemId);
                 break;
@@ -1124,6 +1136,13 @@ public partial class CombatHUD : CanvasLayer
                 break;
         }
     }
+
+    internal bool DropLootOnWeaponSlotForDiagnostics(
+        LootItem item,
+        PlayerWeaponSlot slot,
+        LootDragOrigin origin = LootDragOrigin.Backpack)
+        => IsInstanceValid(_lootWeaponRack)
+            && _lootWeaponRack.DropForDiagnostics(item, origin, slot);
 
     private static void ClearRows(Node parent)
     {

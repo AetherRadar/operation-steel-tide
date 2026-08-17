@@ -130,8 +130,47 @@ public partial class LootWeaponRackView : Control
 
     private void BindSlot(LootWeaponSlotView slotView, PlayerWeaponSlot slot)
     {
+        slotView.Target = slot switch
+        {
+            PlayerWeaponSlot.Secondary => LootDropTarget.SecondaryWeapon,
+            PlayerWeaponSlot.Sidearm => LootDropTarget.SidearmWeapon,
+            _ => LootDropTarget.PrimaryWeapon
+        };
         slotView.Dropped += (itemId, origin, target) => Dropped?.Invoke(itemId, origin, target);
         slotView.DetailsRequested += () => EmitSignal(SignalName.WeaponDetailsRequested, (int)slot);
+    }
+
+    public bool DropForDiagnostics(
+        LootItem item,
+        LootDragOrigin origin,
+        PlayerWeaponSlot slot)
+    {
+        var slotView = slot switch
+        {
+            PlayerWeaponSlot.Primary => _primarySlot,
+            PlayerWeaponSlot.Secondary => _secondarySlot,
+            PlayerWeaponSlot.Sidearm => _sidearmSlot,
+            _ => null
+        };
+        if (!IsInstanceValid(slotView))
+        {
+            return false;
+        }
+        var data = new Godot.Collections.Dictionary
+        {
+            ["item_id"] = item.Id,
+            ["origin"] = (int)origin,
+            ["kind"] = (int)item.Kind,
+            ["slot"] = item.Kind == LootItemKind.Equipment && item.Equipment is not null
+                ? (int)item.Equipment.Definition.Slot
+                : -1
+        };
+        if (!slotView!._CanDropData(Vector2.Zero, data))
+        {
+            return false;
+        }
+        slotView._DropData(Vector2.Zero, data);
+        return true;
     }
 
     private void ApplyPresentation()

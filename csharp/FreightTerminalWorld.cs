@@ -637,6 +637,7 @@ public partial class FreightTerminalWorld : Node3D
         _hud.LootReturnRequested += ReturnBackpackItem;
         _hud.BackpackUseRequested += UseBackpackItem;
         _hud.BackpackDropRequested += DropBackpackItemToGround;
+        _hud.LootWeaponSlotRequested += EquipLootItemToWeaponSlot;
         _hud.LootClosed += CloseLoot;
         _hud.InventoryToggleRequested += OnInventoryToggleRequested;
         _hud.OperationsQuickStartRequested += OnOperationsQuickStartRequested;
@@ -1994,6 +1995,59 @@ public partial class FreightTerminalWorld : Node3D
         {
             RefreshLootView();
         }
+    }
+
+    private void EquipLootItemToWeaponSlot(string itemId, int originValue, int slotValue)
+    {
+        if (LocalPlayerCannotInteract
+            || !System.Enum.IsDefined(typeof(LootDragOrigin), originValue)
+            || !System.Enum.IsDefined(typeof(PlayerWeaponSlot), slotValue))
+        {
+            return;
+        }
+        var origin = (LootDragOrigin)originValue;
+        var slot = (PlayerWeaponSlot)slotValue;
+        if (slot == PlayerWeaponSlot.Melee)
+        {
+            return;
+        }
+        if (origin == LootDragOrigin.Backpack)
+        {
+            if (_player.UseBackpackItemInWeaponSlot(itemId, slot))
+            {
+                RefreshLootView();
+            }
+            return;
+        }
+        if (_openLootSource is null)
+        {
+            return;
+        }
+        var index = _openLootSource.Loot.FindIndex(item => item.Id == itemId);
+        if (index < 0)
+        {
+            return;
+        }
+        var original = _openLootSource.Loot[index];
+        var replacement = _player.EquipFromLootToWeaponSlot(original, slot);
+        if (ReferenceEquals(replacement, original))
+        {
+            return;
+        }
+        if (replacement is null)
+        {
+            _openLootSource.Loot.RemoveAt(index);
+        }
+        else
+        {
+            _openLootSource.Loot[index] = replacement;
+        }
+        RefreshGradedLootPickupPresentation(_openLootSource);
+        if (_openLootSource is EnemyOperator enemy && original.Kind == LootItemKind.Weapon)
+        {
+            enemy.MarkCarriedWeaponRemoved();
+        }
+        RefreshLootView();
     }
 
     private void ReturnBackpackItem(string itemId)
@@ -3524,20 +3578,50 @@ public partial class FreightTerminalWorld : Node3D
             && returnedKnife is not null
             && returnedKnife.KnifeSkinId == "knife_arctic"
             && returnedKnife.Grade == LootGrade.Legendary;
-        _player.TryStoreInBackpack(new LootItem
+        var targetedPrimary = new LootItem
         {
             Kind = LootItemKind.Weapon,
             Weapon = WeaponCatalog.Build(WeaponPlatform.AXMC, 3),
             Grade = LootGrade.Legendary
-        });
-        _player.TryStoreInBackpack(new LootItem
+        };
+        var targetedOptic = new LootItem
         {
             Kind = LootItemKind.Attachment,
-            AttachmentId = "muzzle_suppressor",
+            AttachmentId = "optic_7x",
             Grade = LootGrade.Epic
-        });
+        };
+        _player.ClearBackpackForDiagnostics();
+        var targetedPrimaryStored = _player.TryStoreInBackpack(targetedPrimary);
+        var targetedOpticStored = _player.TryStoreInBackpack(targetedOptic);
         OpenPersonalBackpack();
         await WaitFrames(6);
+        var secondaryBeforeTargetedDrop = _player.SecondaryWeaponBuild?.Platform;
+        var primaryDropRouted = _hud.DropLootOnWeaponSlotForDiagnostics(
+            targetedPrimary,
+            PlayerWeaponSlot.Primary);
+        await WaitFrames(2);
+        var primarySlotReplaced = targetedPrimaryStored
+            && primaryDropRouted
+            && _player.PrimaryWeaponBuild?.Platform == WeaponPlatform.AXMC
+            && _player.PrimaryWeaponGrade == LootGrade.Legendary
+            && _player.SecondaryWeaponBuild?.Platform == secondaryBeforeTargetedDrop
+            && _player.Backpack.Any(item => item.Kind == LootItemKind.Weapon
+                && item.Weapon?.Platform == WeaponPlatform.M4A1
+                && item.Grade == originalWeaponGrade);
+        var primaryOpticBeforeAttachmentDrop = _player.PrimaryWeaponBuild?.Attachments
+            .GetValueOrDefault(AttachmentSlot.Optic);
+        var secondaryOpticDropRouted = _hud.DropLootOnWeaponSlotForDiagnostics(
+            targetedOptic,
+            PlayerWeaponSlot.Secondary);
+        await WaitFrames(2);
+        var secondaryOpticAfterTargetedDrop = _player.SecondaryWeaponBuild?.Attachments
+            .GetValueOrDefault(AttachmentSlot.Optic);
+        var primaryOpticAfterTargetedDrop = _player.PrimaryWeaponBuild?.Attachments
+            .GetValueOrDefault(AttachmentSlot.Optic);
+        var secondaryAttachmentTargeted = targetedOpticStored
+            && secondaryOpticDropRouted
+            && secondaryOpticAfterTargetedDrop == "optic_7x"
+            && primaryOpticAfterTargetedDrop == primaryOpticBeforeAttachmentDrop;
         var comparisonCards = _hud.LootComparisonCardCount;
         var comparisonDirections = _hud.LootComparisonHasUpgrade && _hud.LootComparisonHasDowngrade;
         var gradeColorsStable = _hud.LootGradeColorsConsistent;
@@ -3569,13 +3653,15 @@ public partial class FreightTerminalWorld : Node3D
             && equippedGradeStylesStable
             && weaponGradeRoundTrip
             && attachmentGradeRoundTrip
+            && primarySlotReplaced
+            && secondaryAttachmentTargeted
             && knifeGradeRoundTrip
             && footerRuntimeSeparated
             && footerResponsive
             && footerInitiallyVisible
             && downedFooterSuppressed
             && downedFooterRestored;
-        GD.Print($"WEAPON_UI_CHECK valid={valid} knife={cycledToKnife} primary={cycledToPrimary} details={detailsOpened} platform={_player.EquippedWeapon.Platform} comparisons={comparisonCards} directions={comparisonDirections} rendered_all={renderedComparisonsComplete} attachment_comparison={attachmentComparisonRendered} grade_colors={gradeColorsStable} equipped_grade_styles={equippedGradeStylesStable} weapon_grade={weaponGradeRoundTrip} attachment_grade={attachmentGradeRoundTrip} knife_grade={knifeGradeRoundTrip} footer_runtime={footerRuntimeSeparated} footer_responsive={footerResponsive} footer_visible={footerInitiallyVisible} downed_suppressed={downedFooterSuppressed} downed_restored={downedFooterRestored} {_hud.FooterHudLayoutForDiagnostics}");
+        GD.Print($"WEAPON_UI_CHECK valid={valid} knife={cycledToKnife} primary={cycledToPrimary} details={detailsOpened} platform={_player.EquippedWeapon.Platform} comparisons={comparisonCards} directions={comparisonDirections} rendered_all={renderedComparisonsComplete} attachment_comparison={attachmentComparisonRendered} grade_colors={gradeColorsStable} equipped_grade_styles={equippedGradeStylesStable} weapon_grade={weaponGradeRoundTrip} attachment_grade={attachmentGradeRoundTrip} targeted_primary={primarySlotReplaced} targeted_primary_stored={targetedPrimaryStored} targeted_primary_routed={primaryDropRouted} targeted_attachment={secondaryAttachmentTargeted} targeted_attachment_stored={targetedOpticStored} targeted_attachment_routed={secondaryOpticDropRouted} targeted_secondary_optic={secondaryOpticAfterTargetedDrop ?? "none"} targeted_primary_optic={primaryOpticAfterTargetedDrop ?? "none"} targeted_primary_optic_before={primaryOpticBeforeAttachmentDrop ?? "none"} knife_grade={knifeGradeRoundTrip} footer_runtime={footerRuntimeSeparated} footer_responsive={footerResponsive} footer_visible={footerInitiallyVisible} downed_suppressed={downedFooterSuppressed} downed_restored={downedFooterRestored} {_hud.FooterHudLayoutForDiagnostics}");
         GD.Print($"WEAPON_UI_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

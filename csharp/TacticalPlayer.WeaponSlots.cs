@@ -81,11 +81,14 @@ public partial class TacticalPlayer
         RefreshOrLeaveRemovedSlot(PlayerWeaponSlot.Sidearm);
     }
 
-    private LootItem? EquipLootWeapon(WeaponBuild build, LootGrade grade)
+    private LootItem? EquipLootWeapon(
+        WeaponBuild build,
+        LootGrade grade,
+        PlayerWeaponSlot? requestedSlot = null)
     {
-        var target = WeaponCatalog.IsSidearm(build.Platform)
+        var target = requestedSlot ?? (WeaponCatalog.IsSidearm(build.Platform)
             ? PlayerWeaponSlot.Sidearm
-            : EmptyLongGunSlot();
+            : EmptyLongGunSlot());
         var previousBuild = WeaponBuildForSlot(target)?.Clone();
         var previousGrade = WeaponGradeForSlot(target);
         switch (target)
@@ -110,6 +113,49 @@ public partial class TacticalPlayer
                 Weapon = previousBuild,
                 Grade = previousGrade
             };
+    }
+
+    private static bool WeaponFitsSlot(WeaponPlatform platform, PlayerWeaponSlot slot)
+        => WeaponCatalog.IsSidearm(platform)
+            ? slot == PlayerWeaponSlot.Sidearm
+            : slot is PlayerWeaponSlot.Primary or PlayerWeaponSlot.Secondary;
+
+    private LootItem? EquipAttachmentToWeaponSlot(LootItem item, PlayerWeaponSlot slot)
+    {
+        var build = WeaponBuildForSlot(slot);
+        if (build is null || slot == PlayerWeaponSlot.Primary && !HasFireablePrimary)
+        {
+            return item;
+        }
+        var attachment = WeaponCatalog.Attachment(item.AttachmentId);
+        var grades = AttachmentGradesForSlot(slot);
+        LootItem? previous = null;
+        if (build.Attachments.TryGetValue(attachment.Slot, out var previousId))
+        {
+            previous = new LootItem
+            {
+                Kind = LootItemKind.Attachment,
+                AttachmentId = previousId,
+                Grade = grades.GetValueOrDefault(attachment.Slot, WeaponGradeForSlot(slot))
+            };
+        }
+        if (!_knifeEquipped && _activeWeaponSlot == slot)
+        {
+            EquippedWeapon.Attachments[attachment.Slot] = attachment.Id;
+            _equippedAttachmentGrades[attachment.Slot] = item.Grade;
+            StoreActiveFirearmState();
+            ApplyWeaponBuildVisuals();
+        }
+        else
+        {
+            build.Attachments[attachment.Slot] = attachment.Id;
+            grades[attachment.Slot] = item.Grade;
+        }
+        Hud?.ShowLocalizedMessage(
+            "part_installed",
+            "WEAPON PART INSTALLED",
+            new Color(0.42f, 0.9f, 0.72f));
+        return previous;
     }
 
     private PlayerWeaponSlot EmptyLongGunSlot()
