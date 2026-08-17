@@ -205,11 +205,22 @@ public partial class FreightTerminalWorld
             var stringerCenterY = flightBaseY + halfRise * 0.5f + stepRise * 0.5f
                 - ResidentialStairTreadThickness - 0.08f;
             var railBasis = Basis.FromEuler(new Vector3(localAngle, 0, 0));
+            var outerDirection = flight == 0 ? -1.0f : 1.0f;
+            foreach (var edgeInset in new[] { 0.0f, 0.18f })
+            {
+                var outerStringerX = centerX + outerDirection * (edge - edgeInset);
+                stringerTransforms.Add(new Transform3D(
+                    railBasis,
+                    new Vector3(outerStringerX, stringerCenterY, lowerCenterZ)));
+            }
+            // Keep the dark handrail on the outside edge. The inner side retains its orange
+            // safety rail but no longer puts a thick dark bar across the stairwell view.
+            handrailTransforms.Add(new Transform3D(
+                railBasis,
+                new Vector3(centerX + outerDirection * edge, railCenterY, lowerCenterZ)));
             foreach (var x in new[] { centerX - edge, centerX + edge })
             {
-                handrailTransforms.Add(new Transform3D(railBasis, new Vector3(x, railCenterY, lowerCenterZ)));
                 safetyRailTransforms.Add(new Transform3D(railBasis, new Vector3(x, railCenterY - 0.43f, lowerCenterZ)));
-                stringerTransforms.Add(new Transform3D(railBasis, new Vector3(x, stringerCenterY, lowerCenterZ)));
                 for (var post = 0; post <= 6; post++)
                 {
                     var t = post / 6.0f;
