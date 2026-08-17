@@ -54,6 +54,33 @@ public partial class TacticalPlayer
         PushHudStats();
     }
 
+    public void ApplyDemolitionNetworkHealth(float health, bool dead)
+    {
+        Health = Mathf.Clamp(health, 0.0f, MaxHealth);
+        if (dead)
+        {
+            if (!IsDead)
+            {
+                IsDead = true;
+                Velocity = Vector3.Zero;
+                MarkEliminatedForDemolitionRound();
+                EmitSignal(SignalName.Died);
+            }
+            return;
+        }
+        if (IsDead)
+        {
+            IsDead = false;
+            ProcessMode = ProcessModeEnum.Inherit;
+            SetPhysicsProcess(true);
+            CollisionLayer = 1;
+            CollisionMask = 1 | 2;
+            _collider.SetDeferred(CollisionShape3D.PropertyName.Disabled, false);
+            UiLocked = false;
+        }
+        Hud?.SetStats(Health, Armor, Stamina, Ammo, ReserveAmmo, Grenades);
+    }
+
     public void ApplyDemolitionRoundLoadout(
         DeploymentLoadout loadout,
         int grenadeCount,

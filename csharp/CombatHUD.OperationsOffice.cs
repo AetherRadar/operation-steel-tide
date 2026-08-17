@@ -76,6 +76,14 @@ public partial class CombatHUD
         => IsInstanceValid(_demolitionBriefingView)
             ? _demolitionBriefingView.SelectedMapId
             : DemolitionMapCatalog.TideforgeId;
+    public SquadSessionMode SelectedDemolitionSessionMode
+        => IsInstanceValid(_demolitionBriefingView)
+            ? _demolitionBriefingView.SelectedSessionMode
+            : SquadSessionMode.Local;
+    public DemolitionNetworkTeam SelectedDemolitionNetworkTeam
+        => IsInstanceValid(_demolitionBriefingView)
+            ? _demolitionBriefingView.SelectedNetworkTeam
+            : DemolitionNetworkTeam.Alpha;
     public int DemolitionMapOptionCount
         => IsInstanceValid(_demolitionBriefingView) ? _demolitionBriefingView.MapOptionCount : 0;
     public string BrowsedDemolitionMapId
@@ -139,13 +147,17 @@ public partial class CombatHUD
         _demolitionBriefingView = scene.Instantiate<DemolitionBriefingView>();
         root.AddChild(_demolitionBriefingView);
         _demolitionBriefingView.BackRequested += () => EmitSignal(SignalName.DemolitionBackRequested);
-        _demolitionBriefingView.DeployRequested += (role, primary, build, sidearm, mapId) => EmitSignal(
+        _demolitionBriefingView.DeployRequested += (
+            role, primary, build, sidearm, mapId, sessionMode, address, networkTeam) => EmitSignal(
             SignalName.DemolitionDeploymentRequested,
             role,
             primary,
             build,
             sidearm,
-            mapId);
+            mapId,
+            sessionMode,
+            address,
+            networkTeam);
     }
 
     private void BuildResultOfficeAction()
@@ -236,6 +248,12 @@ public partial class CombatHUD
 
     public bool PressDemolitionMapForDiagnostics(string mapId)
         => _demolitionBriefingView.SelectMap(mapId);
+
+    public void SelectDemolitionNetworkForDiagnostics(
+        SquadSessionMode sessionMode,
+        DemolitionNetworkTeam team,
+        string address = "127.0.0.1")
+        => _demolitionBriefingView.SelectNetworkForDiagnostics(sessionMode, team, address);
 
     public void PressPreviousDemolitionMapForDiagnostics()
         => _demolitionBriefingView.PressPreviousMapForDiagnostics();

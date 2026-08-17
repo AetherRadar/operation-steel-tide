@@ -15,9 +15,9 @@ public partial class FreightTerminalWorld
     private DemolitionBuySnapshot DemolitionBuyState()
         => new(
             _demolitionMatch.CurrentRound,
-            _demolitionMatch.PlayerScore,
-            _demolitionMatch.OpponentScore,
-            _demolitionMatch.PlayerSide,
+            LocalDemolitionScore,
+            OpposingDemolitionScore,
+            LocalDemolitionSide,
             _demolitionPlayerEconomy.Funds,
             _demolitionBuyRemaining,
             DemolitionBuyDuration,

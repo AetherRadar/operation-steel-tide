@@ -16,7 +16,10 @@ public partial class DemolitionBriefingView : ColorRect
         int primaryPlatform,
         int buildTier,
         int sidearmPlatform,
-        string mapId);
+        string mapId,
+        int sessionMode,
+        string address,
+        int networkTeam);
 
     private Label _title = null!;
     private Label _subtitle = null!;
@@ -37,6 +40,14 @@ public partial class DemolitionBriefingView : ColorRect
     private Button _nextMapButton = null!;
     private Button _backButton = null!;
     private Button _deployButton = null!;
+    private Button _localButton = null!;
+    private Button _hostButton = null!;
+    private Button _joinButton = null!;
+    private Button _alphaButton = null!;
+    private Button _bravoButton = null!;
+    private LineEdit _address = null!;
+    private Label _sessionTitle = null!;
+    private Label _teamTitle = null!;
     private readonly Button[] _roleButtons = new Button[3];
     private readonly Label[] _roleNames = new Label[3];
     private readonly Label[] _roleDetails = new Label[3];
@@ -44,6 +55,8 @@ public partial class DemolitionBriefingView : ColorRect
     private string _selectedMapId = DemolitionMapCatalog.TideforgeId;
     private int _browsedMapIndex;
     private string _language = "en";
+    private SquadSessionMode _sessionMode = SquadSessionMode.Local;
+    private DemolitionNetworkTeam _networkTeam = DemolitionNetworkTeam.Alpha;
 
     public OperatorRole SelectedRole => _selectedRole;
     public WeaponPlatform SelectedPrimaryPlatform => WeaponPlatform.M4A1;
@@ -54,6 +67,9 @@ public partial class DemolitionBriefingView : ColorRect
     public int BrowsedMapIndex => _browsedMapIndex;
     public bool IsBrowsedMapAvailable => BrowsedMap.Available;
     public int MapOptionCount => DemolitionMapCatalog.Maps.Count;
+    public SquadSessionMode SelectedSessionMode => _sessionMode;
+    public DemolitionNetworkTeam SelectedNetworkTeam => _networkTeam;
+    public string NetworkAddress => _address.Text.Trim();
     public bool IsDeployEnabled => IsInstanceValid(_deployButton) && !_deployButton.Disabled;
     public bool UiReady
         => IsInstanceValid(_title)
@@ -86,6 +102,7 @@ public partial class DemolitionBriefingView : ColorRect
         SetLanguage(_language);
         SelectRole(_selectedRole);
         SelectMap(_selectedMapId);
+        SelectSessionMode(_sessionMode);
     }
 
     public void SetLanguage(string language)
@@ -105,6 +122,16 @@ public partial class DemolitionBriefingView : ColorRect
         _intelCaption.Text = Text("demolition_arena_selected", "BATTLESPACE INTELLIGENCE");
         _backButton.Text = Text("demolition_back", "BACK");
         _deployButton.Text = Text("demolition_deploy", "DEPLOY DEMOLITION TEAM");
+        _sessionTitle.Text = GameLocalization.IsChinese(_language) ? "\u8054\u673a\u4f1a\u8bdd" : "LAN SESSION";
+        _teamTitle.Text = GameLocalization.IsChinese(_language) ? "\u52a0\u5165\u9635\u8425" : "JOIN TEAM";
+        _localButton.Text = GameLocalization.IsChinese(_language) ? "\u672c\u5730 + AI" : "LOCAL + AI";
+        _hostButton.Text = GameLocalization.IsChinese(_language) ? "\u521b\u5efa\u623f\u95f4" : "HOST";
+        _joinButton.Text = GameLocalization.IsChinese(_language) ? "\u52a0\u5165\u623f\u95f4" : "JOIN";
+        _alphaButton.Text = GameLocalization.IsChinese(_language) ? "ALPHA  //  \u5148\u653b" : "ALPHA  //  ATTACK FIRST";
+        _bravoButton.Text = GameLocalization.IsChinese(_language) ? "BRAVO  //  \u5148\u5b88" : "BRAVO  //  DEFEND FIRST";
+        _address.PlaceholderText = GameLocalization.IsChinese(_language)
+            ? "\u4e3b\u673a\u5730\u5740\u6216\u5730\u5740:\u7aef\u53e3"
+            : "HOST OR HOST:PORT";
         var roles = new[] { OperatorRole.Assault, OperatorRole.Medic, OperatorRole.Recon };
         for (var index = 0; index < roles.Length; index++)
         {
@@ -114,6 +141,7 @@ public partial class DemolitionBriefingView : ColorRect
         }
         SelectRole(_selectedRole);
         RefreshMap();
+        SelectSessionMode(_sessionMode);
     }
 
     public void SelectRole(OperatorRole role)
@@ -191,6 +219,16 @@ public partial class DemolitionBriefingView : ColorRect
 
     public void PressMapForDiagnostics(string mapId) => SelectMap(mapId);
 
+    public void SelectNetworkForDiagnostics(
+        SquadSessionMode sessionMode,
+        DemolitionNetworkTeam team,
+        string address = "127.0.0.1")
+    {
+        _address.Text = address;
+        SelectSessionMode(sessionMode);
+        SelectNetworkTeam(team);
+    }
+
     public void SelectLoadoutForDiagnostics(WeaponPlatform primary, int buildTier, WeaponPlatform sidearm)
     {
         // Kept as a compatibility hook; demolition weapons are now purchased in-round.
@@ -216,6 +254,14 @@ public partial class DemolitionBriefingView : ColorRect
         _readyStatus = band.GetNode<Label>("ReadyStatus");
         _backButton = band.GetNode<Button>("BackButton");
         _deployButton = band.GetNode<Button>("DeployButton");
+        _sessionTitle = band.GetNode<Label>("SessionTitle");
+        _teamTitle = band.GetNode<Label>("TeamTitle");
+        _localButton = band.GetNode<Button>("LocalButton");
+        _hostButton = band.GetNode<Button>("HostButton");
+        _joinButton = band.GetNode<Button>("JoinButton");
+        _address = band.GetNode<LineEdit>("Address");
+        _alphaButton = band.GetNode<Button>("AlphaButton");
+        _bravoButton = band.GetNode<Button>("BravoButton");
         var roles = band.GetNode<Control>("Roles");
         BindRole(roles, 0, "AssaultButton");
         BindRole(roles, 1, "MedicButton");
@@ -242,6 +288,11 @@ public partial class DemolitionBriefingView : ColorRect
         _nextMapButton.Pressed += () => BrowseMap(1);
         _backButton.Pressed += () => EmitSignal(SignalName.BackRequested);
         _deployButton.Pressed += EmitDeploymentIntent;
+        _localButton.Pressed += () => SelectSessionMode(SquadSessionMode.Local);
+        _hostButton.Pressed += () => SelectSessionMode(SquadSessionMode.Host);
+        _joinButton.Pressed += () => SelectSessionMode(SquadSessionMode.Join);
+        _alphaButton.Pressed += () => SelectNetworkTeam(DemolitionNetworkTeam.Alpha);
+        _bravoButton.Pressed += () => SelectNetworkTeam(DemolitionNetworkTeam.Bravo);
     }
 
     private void EmitDeploymentIntent()
@@ -256,7 +307,33 @@ public partial class DemolitionBriefingView : ColorRect
             (int)SelectedPrimaryPlatform,
             SelectedBuildTier,
             (int)SelectedSidearmPlatform,
-            _selectedMapId);
+            _selectedMapId,
+            (int)_sessionMode,
+            _address.Text.Trim(),
+            (int)_networkTeam);
+    }
+
+    private void SelectSessionMode(SquadSessionMode mode)
+    {
+        _sessionMode = mode;
+        _localButton.SetPressedNoSignal(mode == SquadSessionMode.Local);
+        _hostButton.SetPressedNoSignal(mode == SquadSessionMode.Host);
+        _joinButton.SetPressedNoSignal(mode == SquadSessionMode.Join);
+        _address.Editable = mode == SquadSessionMode.Join;
+        _address.Modulate = mode == SquadSessionMode.Join ? Colors.White : new Color(0.42f, 0.48f, 0.46f);
+        _alphaButton.Disabled = mode != SquadSessionMode.Join;
+        _bravoButton.Disabled = mode != SquadSessionMode.Join;
+        if (mode != SquadSessionMode.Join)
+        {
+            SelectNetworkTeam(DemolitionNetworkTeam.Alpha);
+        }
+    }
+
+    private void SelectNetworkTeam(DemolitionNetworkTeam team)
+    {
+        _networkTeam = _sessionMode == SquadSessionMode.Join ? team : DemolitionNetworkTeam.Alpha;
+        _alphaButton.SetPressedNoSignal(_networkTeam == DemolitionNetworkTeam.Alpha);
+        _bravoButton.SetPressedNoSignal(_networkTeam == DemolitionNetworkTeam.Bravo);
     }
 
     private void RefreshMap()

@@ -42,6 +42,11 @@ public partial class FreightTerminalWorld
         _squadNetwork.RemotePeerLeft += OnRemoteSquadPeerLeft;
         _squadNetwork.RemoteAbilityReceived += OnRemoteSquadAbility;
         _squadNetwork.RemoteShotReceived += OnRemoteSquadShot;
+        _squadNetwork.DemolitionPlayerStateReceived += OnDemolitionPlayerState;
+        _squadNetwork.DemolitionActorStateReceived += OnDemolitionActorState;
+        _squadNetwork.DemolitionMatchStateReceived += OnDemolitionMatchState;
+        _squadNetwork.DemolitionAssignmentReceived += OnDemolitionNetworkAssignment;
+        _squadNetwork.DemolitionActionReceived += OnDemolitionNetworkAction;
         _squadNetwork.StatusChanged += status => _hud.SetSquadStatus(status);
         _hud.SquadDeploymentRequested += OnSquadDeploymentRequested;
         _hud.SquadOrderRequested += value => IssueSquadOrder((SquadOrder)value);
@@ -51,6 +56,11 @@ public partial class FreightTerminalWorld
         var networkHostCheck = Array.Exists(args, value => value == "--validate-network-host");
         var networkClientCheck = Array.Exists(args, value => value == "--validate-network-client");
         var networkEndpointCheck = Array.Exists(args, value => value == "--validate-network-endpoint");
+        var demolitionNetworkCheck = Array.Exists(args, value =>
+            value is "--validate-demolition-network-host"
+                or "--validate-demolition-network-client"
+                or "--validate-demolition-network-alpha-host"
+                or "--validate-demolition-network-alpha-client");
         var operationsOfficeCommand = Array.Exists(args, value =>
             value == "--validate-operations-office"
             || value == "--validate-demolition"
@@ -58,6 +68,10 @@ public partial class FreightTerminalWorld
             || value == "--validate-demolition-arena"
             || value == "--validate-demolition-briefing"
             || value == "--validate-demolition-buy"
+            || value == "--validate-demolition-network-host"
+            || value == "--validate-demolition-network-client"
+            || value == "--validate-demolition-network-alpha-host"
+            || value == "--validate-demolition-network-alpha-client"
             || value == "--capture-operations-office"
             || value == "--capture-demolition-briefing"
             || value == "--capture-demolition-buy"
@@ -67,6 +81,7 @@ public partial class FreightTerminalWorld
             || value.StartsWith("--validate", StringComparison.Ordinal))
             && !lobbyCapture
             && !networkEndpointCheck
+            && !demolitionNetworkCheck
             && !operationsOfficeCommand;
         if (diagnostic)
         {
@@ -167,6 +182,14 @@ public partial class FreightTerminalWorld
         _squadOrder = SquadOrder.Follow;
         ResetSquadLeaderTrail(_player.GlobalPosition);
 
+        if (_demolitionMode)
+        {
+            _squadNetwork.ConfigureDemolitionSession(_demolitionSelectedMapId, _demolitionLocalNetworkTeam);
+        }
+        else
+        {
+            _squadNetwork.ConfigureExtractionSession();
+        }
         Error networkError = Error.Ok;
         switch (mode)
         {
@@ -250,14 +273,24 @@ public partial class FreightTerminalWorld
             return;
         }
         // Demolition fields a 5v5 squad; extraction runs 1 human + 2 AI.
-        var slotCount = _demolitionMode ? 4 : 2;
-        for (var slot = 1; slot <= slotCount; slot++)
+        var firstSlot = _demolitionMode ? 0 : 1;
+        var lastSlot = _demolitionMode ? DemolitionSquadSize - 1 : 2;
+        for (var slot = firstSlot; slot <= lastSlot; slot++)
         {
+            if (_demolitionMode && slot == _demolitionLocalNetworkSlot)
+            {
+                continue;
+            }
             if (_squadMates.Any(mate => IsInstanceValid(mate) && mate.SquadSlot == slot))
             {
                 continue;
             }
-            SpawnSquadMate(slot, RoleForSlot(slot), false, 0);
+            var networkProxy = _demolitionMode && IsDemolitionNetworkClient;
+            SpawnSquadMate(
+                slot,
+                RoleForSlot(slot),
+                networkProxy,
+                networkProxy ? -DemolitionActorId(_demolitionLocalNetworkTeam, slot) : 0);
         }
         // Drop any AI beyond the mode's roster.
         for (var i = _squadMates.Count - 1; i >= 0; i--)
@@ -268,7 +301,7 @@ public partial class FreightTerminalWorld
                 _squadMates.RemoveAt(i);
                 continue;
             }
-            if (mate.SquadSlot > slotCount && !mate.IsHumanProxy)
+            if ((mate.SquadSlot < firstSlot || mate.SquadSlot > lastSlot) && !mate.IsHumanProxy)
             {
                 mate.QueueFree();
                 _squadMates.RemoveAt(i);
@@ -351,6 +384,7 @@ public partial class FreightTerminalWorld
             proxy.QueueFree();
         }
         EnsureAiSquadFill();
+        OnDemolitionNetworkPeerLeft(peerId);
         _hud.ShowLocalizedMessage("player_left", "SQUADMATE DISCONNECTED  //  AI TOOK CONTROL", new Color(0.95f, 0.68f, 0.26f));
     }
 
@@ -383,8 +417,26 @@ public partial class FreightTerminalWorld
         {
             NotifyAircraftOperatorAttack(proxy, origin, 52.0f);
         }
+        if (_remoteDemolitionOpponents.TryGetValue(peerId, out var opponentProxy)
+            && IsInstanceValid(opponentProxy))
+        {
+            opponentProxy.PlayRemoteNetworkShot(end);
+        }
         if (enemyId < 0 || damage <= 0.0f)
         {
+            return;
+        }
+        if (_demolitionMode)
+        {
+            if (IsDemolitionNetworkHostileShot(peerId, enemyId))
+            {
+                Node? attacker = proxy;
+                if (attacker is null && IsInstanceValid(opponentProxy))
+                {
+                    attacker = opponentProxy;
+                }
+                ApplyDemolitionNetworkDamage(enemyId, damage, end, attacker);
+            }
             return;
         }
         var enemy = _enemies.FirstOrDefault(candidate => IsInstanceValid(candidate) && candidate.NetworkId == enemyId);

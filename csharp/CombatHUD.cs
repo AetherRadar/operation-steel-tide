@@ -29,7 +29,10 @@ public partial class CombatHUD : CanvasLayer
         int primaryPlatform,
         int buildTier,
         int sidearmPlatform,
-        string mapId);
+        string mapId,
+        int sessionMode,
+        string address,
+        int networkTeam);
     [Signal] public delegate void DemolitionBackRequestedEventHandler();
     [Signal] public delegate void DemolitionPurchaseRequestedEventHandler(
         string sidearmId,

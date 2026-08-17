@@ -189,7 +189,7 @@ public partial class FreightTerminalWorld
             _demolitionSquadPlantProgress = 0.0f;
         }
         SyncDemolitionDeviceVisual();
-        if (_demolitionMatch.PlayerSide == DemolitionTeam.Attackers)
+        if (LocalDemolitionSide == DemolitionTeam.Attackers)
         {
             _hud.ShowRadioMessage(
                 GameLocalization.Format(
@@ -231,7 +231,7 @@ public partial class FreightTerminalWorld
         ApplyDemolitionDevicePickupAssignment(replacement);
         SyncDemolitionDeviceVisual();
 
-        if (_demolitionMatch.PlayerSide == DemolitionTeam.Attackers)
+        if (LocalDemolitionSide == DemolitionTeam.Attackers)
         {
             var replacementName = replacement is null
                 ? GameLocalization.Get("demolition_no_carrier", _languageSetting, "NO CARRIER AVAILABLE")
@@ -287,7 +287,7 @@ public partial class FreightTerminalWorld
 
     private IEnumerable<Node3D> LivingDemolitionAttackers()
     {
-        if (_demolitionMatch.PlayerSide == DemolitionTeam.Attackers)
+        if (LocalDemolitionSide == DemolitionTeam.Attackers)
         {
             if (!_player.IsDead)
             {
@@ -318,13 +318,13 @@ public partial class FreightTerminalWorld
     private bool IsLivingDemolitionAttacker(Node3D? actor)
         => actor switch
         {
-            TacticalPlayer player => _demolitionMatch.PlayerSide == DemolitionTeam.Attackers
+            TacticalPlayer player => LocalDemolitionSide == DemolitionTeam.Attackers
                 && !player.IsDead,
-            SquadMate mate => _demolitionMatch.PlayerSide == DemolitionTeam.Attackers
+            SquadMate mate => LocalDemolitionSide == DemolitionTeam.Attackers
                 && IsInstanceValid(mate)
                 && !mate.IsDowned
                 && !mate.IsBodyBag,
-            EnemyOperator opponent => _demolitionMatch.PlayerSide == DemolitionTeam.Defenders
+            EnemyOperator opponent => LocalDemolitionSide == DemolitionTeam.Defenders
                 && IsInstanceValid(opponent)
                 && !opponent.IsDead,
             _ => false
@@ -347,16 +347,16 @@ public partial class FreightTerminalWorld
         }
         if (memberId == "PLAYER")
         {
-            return _demolitionMatch.PlayerSide == DemolitionTeam.Attackers ? _player : null;
+            return LocalDemolitionSide == DemolitionTeam.Attackers ? _player : null;
         }
         if (memberId.StartsWith("MATE:", System.StringComparison.Ordinal)
             && int.TryParse(memberId.Substring(5), out var slot))
         {
-            return _demolitionMatch.PlayerSide == DemolitionTeam.Attackers
+            return LocalDemolitionSide == DemolitionTeam.Attackers
                 ? _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && mate.SquadSlot == slot)
                 : null;
         }
-        return _demolitionMatch.PlayerSide == DemolitionTeam.Defenders
+        return LocalDemolitionSide == DemolitionTeam.Defenders
             ? _demolitionOpponents.FirstOrDefault(opponent => IsInstanceValid(opponent)
                 && string.Equals(opponent.Name.ToString(), memberId, System.StringComparison.Ordinal))
             : null;
@@ -372,14 +372,16 @@ public partial class FreightTerminalWorld
         };
 
     private bool PlayerCarriesDemolitionDevice()
-        => _demolitionDeviceLifecycle.IsCarried
-            && _demolitionDeviceLifecycle.CarrierMemberId == "PLAYER";
+        => IsDemolitionNetworkClient
+            ? _networkDeviceCarrierActorId == LocalDemolitionActorId
+            : _demolitionDeviceLifecycle.IsCarried
+                && _demolitionDeviceLifecycle.CarrierMemberId == "PLAYER";
 
     private bool IsDemolitionSquadDeviceObjectiveMate(SquadMate mate)
     {
         var memberId = DemolitionMemberId(mate);
         return !_demolitionDevicePlanted
-            && _demolitionMatch.PlayerSide == DemolitionTeam.Attackers
+            && LocalDemolitionSide == DemolitionTeam.Attackers
             && (memberId == _demolitionDeviceLifecycle.CarrierMemberId
                 || memberId == _demolitionDeviceLifecycle.PickupRunnerMemberId);
     }
@@ -392,7 +394,7 @@ public partial class FreightTerminalWorld
         }
         var ownsAttackObjective = IsDemolitionSquadDeviceObjectiveMate(mate);
         var ownsDefuseObjective = _demolitionDevicePlanted
-            && _demolitionMatch.PlayerSide == DemolitionTeam.Defenders
+            && LocalDemolitionSide == DemolitionTeam.Defenders
             && mate == _demolitionSquadObjectiveMate;
         if (!ownsAttackObjective && !ownsDefuseObjective)
         {
@@ -408,7 +410,7 @@ public partial class FreightTerminalWorld
     {
         if (!_demolitionRoundActive
             || _demolitionDevicePlanted
-            || _demolitionMatch.PlayerSide != DemolitionTeam.Attackers)
+            || LocalDemolitionSide != DemolitionTeam.Attackers)
         {
             return false;
         }

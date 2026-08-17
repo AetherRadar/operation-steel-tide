@@ -179,6 +179,7 @@ public partial class SquadNetwork : Node
         IsHost = false;
         _snapshotTimer = 0.0f;
         _nextAbilityTimeByPeer.Clear();
+        ResetDemolitionNetworkState();
     }
 
     public override void _Process(double delta)
@@ -193,6 +194,11 @@ public partial class SquadNetwork : Node
             return;
         }
         _snapshotTimer = 0.075f;
+        if (IsDemolitionSession)
+        {
+            BroadcastDemolitionPlayerState();
+            return;
+        }
         var peerId = Multiplayer.GetUniqueId();
         if (IsHost)
         {
@@ -325,6 +331,7 @@ public partial class SquadNetwork : Node
     private void OnPeerDisconnected(long peerId)
     {
         _nextAbilityTimeByPeer.Remove(peerId);
+        ForgetDemolitionPeer(peerId);
         RemotePeerLeft?.Invoke(peerId);
         var connected = Mathf.Max(1, Multiplayer.GetPeers().Length + 1);
         SetStatus(IsHost

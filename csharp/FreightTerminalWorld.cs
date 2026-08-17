@@ -177,6 +177,7 @@ public partial class FreightTerminalWorld : Node3D
         UpdateSquad((float)delta);
         UpdateExtractionSequence((float)delta);
         UpdateDemolitionRound((float)delta);
+        UpdateDemolitionNetwork((float)delta);
         UpdateWorldBossTracking();
         if (IsInstanceValid(_extractionMarker))
         {

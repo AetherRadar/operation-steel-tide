@@ -381,19 +381,122 @@ horizontal_alignment = 2
 [node name="ReadyStatus" type="Label" parent="Band"]
 layout_mode = 0
 offset_left = 40.0
-offset_top = 524.0
+offset_top = 508.0
 offset_right = 690.0
-offset_bottom = 550.0
+offset_bottom = 528.0
 theme_override_colors/font_color = Color(1, 0.67, 0.31, 1)
 theme_override_font_sizes/font_size = 11
 text = "ASSAULT READY  //  BUY LOADOUT IN EACH ROUND  //  EXTRACTION WALLET UNAFFECTED"
 
+[node name="SessionTitle" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 532.0
+offset_right = 136.0
+offset_bottom = 548.0
+theme_override_colors/font_color = Color(0.48, 0.72, 0.64, 1)
+theme_override_font_sizes/font_size = 9
+text = "LAN SESSION"
+
+[node name="LocalButton" type="Button" parent="Band"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 550.0
+offset_right = 142.0
+offset_bottom = 580.0
+focus_mode = 0
+toggle_mode = true
+button_pressed = true
+theme_override_font_sizes/font_size = 10
+theme_override_styles/normal = SubResource("Style_back")
+theme_override_styles/hover = SubResource("Style_back_hover")
+theme_override_styles/pressed = SubResource("Style_role_pressed")
+text = "LOCAL + AI"
+
+[node name="HostButton" type="Button" parent="Band"]
+layout_mode = 0
+offset_left = 148.0
+offset_top = 550.0
+offset_right = 238.0
+offset_bottom = 580.0
+focus_mode = 0
+toggle_mode = true
+theme_override_font_sizes/font_size = 10
+theme_override_styles/normal = SubResource("Style_back")
+theme_override_styles/hover = SubResource("Style_back_hover")
+theme_override_styles/pressed = SubResource("Style_role_pressed")
+text = "HOST"
+
+[node name="JoinButton" type="Button" parent="Band"]
+layout_mode = 0
+offset_left = 244.0
+offset_top = 550.0
+offset_right = 334.0
+offset_bottom = 580.0
+focus_mode = 0
+toggle_mode = true
+theme_override_font_sizes/font_size = 10
+theme_override_styles/normal = SubResource("Style_back")
+theme_override_styles/hover = SubResource("Style_back_hover")
+theme_override_styles/pressed = SubResource("Style_role_pressed")
+text = "JOIN"
+
+[node name="Address" type="LineEdit" parent="Band"]
+layout_mode = 0
+offset_left = 342.0
+offset_top = 550.0
+offset_right = 690.0
+offset_bottom = 580.0
+theme_override_font_sizes/font_size = 10
+text = "127.0.0.1"
+placeholder_text = "HOST OR HOST:PORT"
+clear_button_enabled = true
+
+[node name="TeamTitle" type="Label" parent="Band"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 584.0
+offset_right = 136.0
+offset_bottom = 600.0
+theme_override_colors/font_color = Color(0.48, 0.72, 0.64, 1)
+theme_override_font_sizes/font_size = 9
+text = "JOIN TEAM"
+
+[node name="AlphaButton" type="Button" parent="Band"]
+layout_mode = 0
+offset_left = 142.0
+offset_top = 582.0
+offset_right = 406.0
+offset_bottom = 608.0
+focus_mode = 0
+toggle_mode = true
+button_pressed = true
+theme_override_font_sizes/font_size = 9
+theme_override_styles/normal = SubResource("Style_back")
+theme_override_styles/hover = SubResource("Style_back_hover")
+theme_override_styles/pressed = SubResource("Style_role_pressed")
+text = "ALPHA  //  ATTACK FIRST"
+
+[node name="BravoButton" type="Button" parent="Band"]
+layout_mode = 0
+offset_left = 414.0
+offset_top = 582.0
+offset_right = 690.0
+offset_bottom = 608.0
+focus_mode = 0
+toggle_mode = true
+theme_override_font_sizes/font_size = 9
+theme_override_styles/normal = SubResource("Style_back")
+theme_override_styles/hover = SubResource("Style_back_hover")
+theme_override_styles/pressed = SubResource("Style_role_pressed")
+text = "BRAVO  //  DEFEND FIRST"
+
 [node name="BackButton" type="Button" parent="Band"]
 layout_mode = 0
 offset_left = 40.0
-offset_top = 574.0
+offset_top = 614.0
 offset_right = 218.0
-offset_bottom = 626.0
+offset_bottom = 650.0
 theme_override_colors/font_color = Color(0.82, 0.9, 0.87, 1)
 theme_override_colors/font_hover_color = Color(0.3, 0.96, 0.76, 1)
 theme_override_font_sizes/font_size = 15
@@ -404,9 +507,9 @@ text = "BACK"
 [node name="DeployButton" type="Button" parent="Band"]
 layout_mode = 0
 offset_left = 234.0
-offset_top = 574.0
+offset_top = 614.0
 offset_right = 690.0
-offset_bottom = 626.0
+offset_bottom = 650.0
 theme_override_colors/font_color = Color(0.08, 0.035, 0.01, 1)
 theme_override_colors/font_hover_color = Color(0.08, 0.035, 0.01, 1)
 theme_override_font_sizes/font_size = 15

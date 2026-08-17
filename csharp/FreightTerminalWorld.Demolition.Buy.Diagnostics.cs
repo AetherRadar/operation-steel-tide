@@ -126,6 +126,7 @@ public partial class FreightTerminalWorld
         };
         AddChild(smoke);
         smoke.Arm(Vector3.Forward);
+        smoke.BeginGroundFuseForDiagnostics();
         smoke._PhysicsProcess(2.0);
         var smokeCenter = smoke.GlobalPosition + Vector3.Up * 1.45f;
         var smokeReady = smoke.IsDeployed

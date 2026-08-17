@@ -64,6 +64,23 @@ public sealed class DemolitionMatchState
         Winner = null;
     }
 
+    public void ApplyNetworkState(
+        int currentRound,
+        int playerScore,
+        int opponentScore,
+        bool overtime,
+        bool complete)
+    {
+        PlayerScore = Math.Max(0, playerScore);
+        OpponentScore = Math.Max(0, opponentScore);
+        CompletedRounds = Math.Max(0, currentRound - 1);
+        IsOvertime = overtime;
+        IsComplete = complete;
+        Winner = complete
+            ? PlayerScore >= OpponentScore ? DemolitionTeam.Attackers : DemolitionTeam.Defenders
+            : null;
+    }
+
     /// <summary>The side the player squad plays on for the given 1-based round number.</summary>
     public DemolitionTeam SideForRound(int roundNumber)
     {

@@ -64,12 +64,15 @@ public partial class FreightTerminalWorld
         var requestedBuild = -1;
         var requestedSidearm = -1;
         var requestedMap = string.Empty;
+        var requestedSessionMode = -1;
+        var requestedAddress = string.Empty;
+        var requestedNetworkTeam = -1;
         if (probe is not null)
         {
             probe.Visible = false;
             _hud.AddChild(probe);
             probe.BackRequested += () => backRequests++;
-            probe.DeployRequested += (role, primary, build, sidearm, mapId) =>
+            probe.DeployRequested += (role, primary, build, sidearm, mapId, sessionMode, address, networkTeam) =>
             {
                 deployRequests++;
                 requestedRole = role;
@@ -77,11 +80,18 @@ public partial class FreightTerminalWorld
                 requestedBuild = build;
                 requestedSidearm = sidearm;
                 requestedMap = mapId;
+                requestedSessionMode = sessionMode;
+                requestedAddress = address;
+                requestedNetworkTeam = networkTeam;
             };
             probe.SetLanguage("zh");
             probe.PressRoleForDiagnostics(OperatorRole.Recon);
             probe.PressNextMapForDiagnostics();
             probe.PressPreviousMapForDiagnostics();
+            probe.SelectNetworkForDiagnostics(
+                SquadSessionMode.Join,
+                DemolitionNetworkTeam.Bravo,
+                "192.168.10.25");
             probe.PressBackForDiagnostics();
             probe.PressDeployForDiagnostics();
         }
@@ -98,7 +108,10 @@ public partial class FreightTerminalWorld
             && requestedPrimary == (int)WeaponPlatform.M4A1
             && requestedBuild == 1
             && requestedSidearm == (int)WeaponPlatform.P226
-            && requestedMap == DemolitionMapCatalog.TideforgeId;
+            && requestedMap == DemolitionMapCatalog.TideforgeId
+            && requestedSessionMode == (int)SquadSessionMode.Join
+            && requestedAddress == "192.168.10.25"
+            && requestedNetworkTeam == (int)DemolitionNetworkTeam.Bravo;
         probe?.QueueFree();
         await WaitFrames(3);
 
