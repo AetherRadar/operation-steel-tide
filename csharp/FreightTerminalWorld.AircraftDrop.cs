@@ -74,6 +74,12 @@ public partial class FreightTerminalWorld
             },
             new()
             {
+                Kind = LootItemKind.Weapon,
+                Weapon = WeaponCatalog.Build(WeaponPlatform.GSh18, 1),
+                Grade = LootGrade.Rare
+            },
+            new()
+            {
                 Kind = LootItemKind.Ammunition,
                 AmmoCaliber = AmmoCaliber.Magnum338,
                 Quantity = 24,

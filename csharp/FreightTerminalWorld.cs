@@ -5500,8 +5500,28 @@ public partial class FreightTerminalWorld : Node3D
         var zhOk = zhGrade == "史诗" && zhBackpack.Contains("背包", StringComparison.Ordinal);
         var gradedPickups = GetTree().GetNodesInGroup("graded_loot").Count;
         var buildingLootOk = gradedPickups >= 8;
-        var valid = gradeOrderOk && valueRises && glowOk && zhOk && buildingLootOk && after > 0;
-        GD.Print($"EXTRACTION_LOOT_CHECK valid={valid} grade_order={gradeOrderOk} value_before={before} mid={mid} after={after} rises={valueRises} glow={glowOk} zh={zhOk} graded_pickups={gradedPickups}");
+        var supplyDropGsh18 = CreateAircraftSupplyDropLoot().Any(item =>
+            item.Kind == LootItemKind.Weapon && item.Weapon?.Platform == WeaponPlatform.GSh18);
+        var residentialGsh18 = false;
+        var gsh18Room = new ResidentialRoomId(0, 0, 1, ResidentialRoomZone.North);
+        for (uint salt = 0; salt < 4096 && !residentialGsh18; salt++)
+        {
+            var plan = ResidentialRoomLootRules.Plan(
+                gsh18Room,
+                ResidentialRoomArchetype.CommunitySecurity,
+                salt);
+            residentialGsh18 = ResidentialRoomLootRules.Resolve(plan).Items.Any(item =>
+                item.Kind == LootItemKind.Weapon && item.Weapon?.Platform == WeaponPlatform.GSh18);
+        }
+        var valid = gradeOrderOk
+            && valueRises
+            && glowOk
+            && zhOk
+            && buildingLootOk
+            && supplyDropGsh18
+            && residentialGsh18
+            && after > 0;
+        GD.Print($"EXTRACTION_LOOT_CHECK valid={valid} grade_order={gradeOrderOk} value_before={before} mid={mid} after={after} rises={valueRises} glow={glowOk} zh={zhOk} graded_pickups={gradedPickups} gsh18_drop={supplyDropGsh18} gsh18_residential={residentialGsh18}");
         GD.Print($"EXTRACTION_LOOT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

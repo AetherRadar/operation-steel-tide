@@ -923,6 +923,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.AWM => new Color(0.2f, 0.22f, 0.21f),
             WeaponPlatform.VSS => new Color(0.075f, 0.1f, 0.075f),
             WeaponPlatform.DesertEagle => new Color(0.42f, 0.44f, 0.41f),
+            WeaponPlatform.GSh18 => new Color(0.045f, 0.052f, 0.05f),
             _ => new Color(0.045f, 0.052f, 0.05f)
         };
         var furnitureColor = EquippedWeapon.Platform switch
@@ -938,6 +939,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.AWM => new Color(0.15f, 0.18f, 0.16f),
             WeaponPlatform.VSS => new Color(0.16f, 0.24f, 0.14f),
             WeaponPlatform.DesertEagle => new Color(0.07f, 0.075f, 0.07f),
+            WeaponPlatform.GSh18 => new Color(0.07f, 0.075f, 0.072f),
             _ => new Color(0.18f, 0.17f, 0.13f)
         };
         var receiverMaterial = TacticalSurfaceLibrary.WeaponFinish(receiverColor, 0.52f, 0.46f);
@@ -956,6 +958,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.AWM => new Vector3(0.165f, 0.18f, 0.76f),
             WeaponPlatform.VSS => new Vector3(0.15f, 0.165f, 0.5f),
             WeaponPlatform.DesertEagle => new Vector3(0.145f, 0.15f, 0.36f),
+            WeaponPlatform.GSh18 => new Vector3(0.125f, 0.13f, 0.28f),
             _ => new Vector3(0.13f, 0.15f, 0.46f)
         };
         ((BoxMesh)_receiver.Mesh).Size = receiverSize;
@@ -1034,6 +1037,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             WeaponPlatform.AWM => new Vector3(0.1f, 0.18f, 0.15f),
             WeaponPlatform.VSS => new Vector3(0.09f, 0.24f, 0.13f),
             WeaponPlatform.DesertEagle => new Vector3(0.075f, 0.2f, 0.1f),
+            WeaponPlatform.GSh18 => new Vector3(0.065f, 0.21f, 0.085f),
             _ => new Vector3(0.09f, 0.26f * (stats.MagazineSize > 30 ? 1.24f : 1.0f), 0.14f)
         };
         ((BoxMesh)_magazine.Mesh).Size = magazineSize;
@@ -1074,9 +1078,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             ? new Vector3(0.065f, -0.04f, -0.28f)
             : new Vector3(0.09f, -0.015f, -0.5f - barrelLength * 0.45f);
         _gunAudio.MaxDistance = stats.SoundRadius * 1.9f;
-        _gunAudio.Stream = EquippedWeapon.Platform == WeaponPlatform.DesertEagle
-            ? SoundLab.DesertEagleShot()
-            : SoundLab.Gunshot();
+        _gunAudio.Stream = EquippedWeapon.Platform switch
+        {
+            WeaponPlatform.DesertEagle => SoundLab.DesertEagleShot(),
+            WeaponPlatform.GSh18 => SoundLab.Gsh18Shot(),
+            _ => SoundLab.Gunshot()
+        };
         Ammo = Mathf.Min(Ammo, stats.MagazineSize);
         RefreshPlatformSignatureVisual();
         RefreshAuthoredPrimaryWeapon();

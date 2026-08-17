@@ -188,7 +188,7 @@ text = "SIDEARMS"
 [node name="P226Button" type="Button" parent="Panel/Offers"]
 layout_mode = 0
 offset_top = 28.0
-offset_right = 314.0
+offset_right = 204.0
 offset_bottom = 88.0
 focus_mode = 0
 toggle_mode = true
@@ -202,9 +202,27 @@ theme_override_styles/hover_pressed = SubResource("Style_offer_pressed")
 theme_override_styles/disabled = SubResource("Style_offer_disabled")
 text = "P226 SERVICE PISTOL\n$500"
 
+[node name="GSh18Button" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_left = 220.0
+offset_top = 28.0
+offset_right = 424.0
+offset_bottom = 88.0
+focus_mode = 0
+toggle_mode = true
+theme_override_colors/font_color = Color(0.86, 0.93, 0.9, 1)
+theme_override_colors/font_disabled_color = Color(0.34, 0.4, 0.38, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/pressed = SubResource("Style_offer_pressed")
+theme_override_styles/hover_pressed = SubResource("Style_offer_pressed")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "GSh-18 SERVICE PISTOL\n$650"
+
 [node name="M1911Button" type="Button" parent="Panel/Offers"]
 layout_mode = 0
-offset_left = 330.0
+offset_left = 440.0
 offset_top = 28.0
 offset_right = 644.0
 offset_bottom = 88.0

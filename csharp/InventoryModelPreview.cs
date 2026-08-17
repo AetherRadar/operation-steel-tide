@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace OperationSteelTide;
@@ -263,6 +264,10 @@ public partial class InventoryModelPreview : SubViewportContainer
     private void BuildRifle(Node3D root)
     {
         var platform = _weapon?.Platform ?? WeaponPlatform.M4A1;
+        if (platform == WeaponPlatform.GSh18 && TryBuildAuthoredGsh18(root))
+        {
+            return;
+        }
         if (WeaponCatalog.IsSidearm(platform))
         {
             BuildSidearm(root, platform);
@@ -329,11 +334,14 @@ public partial class InventoryModelPreview : SubViewportContainer
     private static void BuildSidearm(Node3D root, WeaponPlatform platform)
     {
         var desertEagle = platform == WeaponPlatform.DesertEagle;
-        var metal = desertEagle ? new Color(0.5f, 0.52f, 0.48f) : new Color(0.12f, 0.14f, 0.135f);
+        var gsh18 = platform == WeaponPlatform.GSh18;
+        var metal = desertEagle
+            ? new Color(0.5f, 0.52f, 0.48f)
+            : gsh18 ? new Color(0.055f, 0.065f, 0.062f) : new Color(0.12f, 0.14f, 0.135f);
         var grip = platform == WeaponPlatform.M1911
             ? new Color(0.28f, 0.13f, 0.06f)
             : new Color(0.055f, 0.065f, 0.06f);
-        var slideLength = desertEagle ? 0.92f : platform == WeaponPlatform.M1911 ? 0.76f : 0.7f;
+        var slideLength = desertEagle ? 0.92f : platform == WeaponPlatform.M1911 ? 0.76f : gsh18 ? 0.72f : 0.7f;
         Box(root, new Vector3(slideLength, desertEagle ? 0.23f : 0.18f, 0.2f),
             new Vector3(0.08f, 0.1f, 0), metal, desertEagle ? 0.92f : 0.65f, desertEagle ? 0.16f : 0.38f);
         Box(root, new Vector3(0.44f, 0.16f, 0.19f), new Vector3(-0.08f, -0.06f, 0), metal.Darkened(0.14f), 0.62f);
@@ -347,6 +355,27 @@ public partial class InventoryModelPreview : SubViewportContainer
         {
             Box(root, new Vector3(0.34f, 0.045f, 0.215f), new Vector3(0.24f, 0.23f, 0),
                 metal.Lightened(0.12f), 0.96f, 0.12f);
+        }
+    }
+
+    private static bool TryBuildAuthoredGsh18(Node3D root)
+    {
+        try
+        {
+            var orientation = new Node3D
+            {
+                Name = "GSh18PreviewOrientation",
+                Position = new Vector3(0.02f, -0.04f, 0.0f),
+                RotationDegrees = new Vector3(0.0f, -90.0f, 0.0f)
+            };
+            root.AddChild(orientation);
+            orientation.AddChild(CombatModelLibrary.InstantiateGsh18(firstPerson: false).Root);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            GD.PushWarning($"GSh-18 inventory model unavailable; using procedural preview: {exception.Message}");
+            return false;
         }
     }
 

@@ -59,6 +59,7 @@ public static class DemolitionBuyCatalog
 {
     public const string P226Id = "p226";
     public const string M1911Id = "m1911";
+    public const string Gsh18Id = "gsh18";
     public const string Mp5Id = "mp5a5";
     public const string Ak74Id = "ak74";
     public const string M4A1Id = "m4a1";
@@ -73,6 +74,8 @@ public static class DemolitionBuyCatalog
     {
         new DemolitionBuyOffer(P226Id, DemolitionBuyCategory.Sidearm, WeaponPlatform.P226,
             500, 45, "weapon_p226", "P226 SERVICE PISTOL"),
+        new DemolitionBuyOffer(Gsh18Id, DemolitionBuyCategory.Sidearm, WeaponPlatform.GSh18,
+            650, 54, "weapon_gsh18", "GSh-18 SERVICE PISTOL"),
         new DemolitionBuyOffer(M1911Id, DemolitionBuyCategory.Sidearm, WeaponPlatform.M1911,
             700, 32, "weapon_m1911", "M1911 TACTICAL")
     };

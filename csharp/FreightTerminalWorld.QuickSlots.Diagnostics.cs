@@ -14,7 +14,7 @@ public partial class FreightTerminalWorld
 
         var quote = DemolitionBuyCatalog.Quote(
             new DemolitionPurchaseSelection(
-                DemolitionBuyCatalog.P226Id,
+                DemolitionBuyCatalog.Gsh18Id,
                 string.Empty,
                 false,
                 1,
@@ -53,13 +53,22 @@ public partial class FreightTerminalWorld
             && _player.HasSidearmWeapon
             && _player.PrimaryWeaponBuild?.Platform == WeaponPlatform.AWM
             && _player.SecondaryWeaponPlatform == WeaponPlatform.VSS
-            && _player.SidearmWeaponPlatform == WeaponPlatform.P226;
+            && _player.SidearmWeaponPlatform == WeaponPlatform.GSh18;
         var uniqueLongGunModels = awmSignatureParts == 4
             && vssSignatureParts == 3
             && WeaponCatalog.Weapon(WeaponPlatform.AWM).BarrelLength
                 != WeaponCatalog.Weapon(WeaponPlatform.VSS).BarrelLength;
         var initialVisibility = Enumerable.Range(0, 6).All(_hud.IsQuickSlotVisible)
             && _hud.VisibleQuickSlotCount == 6;
+
+        var gsh18Selected = _player.SelectQuickSlot(PlayerQuickSlot.Sidearm, false);
+        await WaitFrames(2);
+        var gsh18Ready = gsh18Selected
+            && _player.ActiveWeaponSlot == PlayerWeaponSlot.Sidearm
+            && _player.SidearmWeaponPlatform == WeaponPlatform.GSh18
+            && _player.UsesAuthoredGsh18ForDiagnostics
+            && _player.UsesGsh18ReportForDiagnostics;
+        _player.SelectQuickSlot(PlayerQuickSlot.Primary, false);
 
         _hud.PressQuickSlotForDiagnostics((int)PlayerQuickSlot.FragmentationGrenade);
         await WaitFrames(2);
@@ -187,6 +196,7 @@ public partial class FreightTerminalWorld
             && weaponSlotsReady
             && uniqueLongGunModels
             && initialVisibility
+            && gsh18Ready
             && fragSelected
             && fragConsumed
             && localized
@@ -204,7 +214,7 @@ public partial class FreightTerminalWorld
             && rackDetailIntent
             && rackValueReady
             && redeployClearsSecondary;
-        GD.Print($"QUICK_SLOTS_CHECK valid={valid} scene={sceneReady} inputs={inputReady} weapon_slots={weaponSlotsReady} unique_models={uniqueLongGunModels} initial={initialVisibility} frag_selected={fragSelected} frag_consumed={fragConsumed} localized={localized} utility_selected={utilitySelected} utility_consumed={utilityConsumed} frag_air_safe={fragAirborneSafe} frag_ground={fragGroundDetonated} smoke_air_safe={smokeAirborneSafe} smoke_ground={smokeGroundDeployed} deagle={desertEagleReady} empty_blocked={emptyBlocked} rack={rackReady} rack_zh={rackChinese} rack_en={rackEnglish} rack_detail={rackDetailIntent} rack_value={rackValueReady}/{rackValue} redeploy_clear={redeployClearsSecondary} visible={_hud.VisibleQuickSlotCount} active={_player.ActiveQuickSlot}");
+        GD.Print($"QUICK_SLOTS_CHECK valid={valid} scene={sceneReady} inputs={inputReady} weapon_slots={weaponSlotsReady} unique_models={uniqueLongGunModels} initial={initialVisibility} gsh18={gsh18Ready} frag_selected={fragSelected} frag_consumed={fragConsumed} localized={localized} utility_selected={utilitySelected} utility_consumed={utilityConsumed} frag_air_safe={fragAirborneSafe} frag_ground={fragGroundDetonated} smoke_air_safe={smokeAirborneSafe} smoke_ground={smokeGroundDeployed} deagle={desertEagleReady} empty_blocked={emptyBlocked} rack={rackReady} rack_zh={rackChinese} rack_en={rackEnglish} rack_detail={rackDetailIntent} rack_value={rackValueReady}/{rackValue} redeploy_clear={redeployClearsSecondary} visible={_hud.VisibleQuickSlotCount} active={_player.ActiveQuickSlot}");
         GD.Print($"QUICK_SLOTS_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }

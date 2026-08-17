@@ -20,7 +20,11 @@ public partial class FreightTerminalWorld
         var smokeQuote = DemolitionBuyCatalog.Quote(
             new DemolitionPurchaseSelection(DemolitionBuyCatalog.P226Id, string.Empty, false, 0, 1),
             DemolitionEconomy.StartingFunds);
+        var gsh18Quote = DemolitionBuyCatalog.Quote(
+            new DemolitionPurchaseSelection(DemolitionBuyCatalog.Gsh18Id, string.Empty, false, 0, 0),
+            DemolitionEconomy.StartingFunds);
         var pistolLoadout = DemolitionBuyCatalog.BuildLoadout(pistolQuote);
+        var gsh18Loadout = DemolitionBuyCatalog.BuildLoadout(gsh18Quote);
         var domainReady = !openingPrimary.Affordable
             && pistolQuote.Affordable
             && pistolQuote.TotalCost == 500
@@ -31,7 +35,12 @@ public partial class FreightTerminalWorld
             && smokeQuote.Selection.SmokeGrenadeCount == 1
             && pistolLoadout.Weapon is null
             && pistolLoadout.Sidearm?.Platform == WeaponPlatform.P226
-            && pistolLoadout.BodyArmorId == "armor_none";
+            && pistolLoadout.BodyArmorId == "armor_none"
+            && gsh18Quote.Affordable
+            && gsh18Quote.TotalCost == 650
+            && gsh18Quote.RemainingFunds == 150
+            && gsh18Loadout.Sidearm?.Platform == WeaponPlatform.GSh18
+            && gsh18Loadout.SidearmReserveAmmo == 54;
 
         const string scenePath = "res://ui/DemolitionBuyView.tscn";
         var packedScene = GD.Load<PackedScene>(scenePath);
@@ -80,6 +89,7 @@ public partial class FreightTerminalWorld
             && probe.IntentSignalsConnected
             && probe.LanguageMatches("zh")
             && probe.IsSidearmOfferEnabled(DemolitionBuyCatalog.P226Id)
+            && probe.IsSidearmOfferEnabled(DemolitionBuyCatalog.Gsh18Id)
             && !probe.IsPrimaryOfferEnabled(DemolitionBuyCatalog.Mp5Id)
             && !probe.IsPrimaryOfferEnabled(DemolitionBuyCatalog.M4A1Id)
             && probe.CurrentQuote.TotalCost == 800
@@ -141,7 +151,7 @@ public partial class FreightTerminalWorld
         await WaitFrames(3);
 
         var valid = domainReady && sceneReady && unaffordableBlocked && hudReady && smokeReady;
-        GD.Print($"DEMOLITION_BUY_CHECK valid={valid} domain={domainReady} scene={sceneReady} signals={purchaseRequests} primary_locked={!openingPrimary.Affordable} pistol_cost={pistolQuote.TotalCost} pistol_balance={pistolQuote.RemainingFunds} smoke_cost={DemolitionBuyCatalog.SmokeGrenadePrice} smoke={smokeReady} combo_blocked={unaffordableBlocked} hud={hudReady}");
+        GD.Print($"DEMOLITION_BUY_CHECK valid={valid} domain={domainReady} scene={sceneReady} signals={purchaseRequests} primary_locked={!openingPrimary.Affordable} pistol_cost={pistolQuote.TotalCost} pistol_balance={pistolQuote.RemainingFunds} gsh18_cost={gsh18Quote.TotalCost} gsh18_platform={gsh18Loadout.Sidearm?.Platform} smoke_cost={DemolitionBuyCatalog.SmokeGrenadePrice} smoke={smokeReady} combo_blocked={unaffordableBlocked} hud={hudReady}");
         GD.Print($"DEMOLITION_BUY_PASS valid={valid}");
         GetTree().Paused = false;
         await WaitFrames(30);
@@ -160,7 +170,7 @@ public partial class FreightTerminalWorld
             11.8f,
             DemolitionBuyDuration,
             false));
-        _hud.SelectDemolitionBuySidearmForDiagnostics(DemolitionBuyCatalog.P226Id);
+        _hud.SelectDemolitionBuySidearmForDiagnostics(DemolitionBuyCatalog.Gsh18Id);
         _hud.SelectDemolitionBuyPrimaryForDiagnostics(DemolitionBuyCatalog.M4A1Id);
         _hud.SetDemolitionBuyGrenadesForDiagnostics(1);
         _hud.SetDemolitionBuySmokeGrenadesForDiagnostics(1);

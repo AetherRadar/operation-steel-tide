@@ -32,6 +32,7 @@ public partial class DemolitionBuyView : ColorRect
     private Label _grenadeCount = null!;
     private Label _smokeGrenadeCount = null!;
     private Button _p226Button = null!;
+    private Button _gsh18Button = null!;
     private Button _m1911Button = null!;
     private Button _mp5Button = null!;
     private Button _ak74Button = null!;
@@ -57,6 +58,7 @@ public partial class DemolitionBuyView : ColorRect
     public bool IsSidearmOfferEnabled(string id) => id switch
     {
         DemolitionBuyCatalog.P226Id => !_p226Button.Disabled,
+        DemolitionBuyCatalog.Gsh18Id => !_gsh18Button.Disabled,
         DemolitionBuyCatalog.M1911Id => !_m1911Button.Disabled,
         _ => false
     };
@@ -72,6 +74,7 @@ public partial class DemolitionBuyView : ColorRect
         => IsInstanceValid(_title)
         && IsInstanceValid(_countdownBar)
         && IsInstanceValid(_p226Button)
+        && IsInstanceValid(_gsh18Button)
         && IsInstanceValid(_scarLButton)
         && IsInstanceValid(_armorButton)
         && IsInstanceValid(_smokeGrenadeCount)
@@ -79,6 +82,7 @@ public partial class DemolitionBuyView : ColorRect
     public bool IntentSignalsConnected
         => HasConnections(SignalName.PurchaseRequested)
         && _p226Button.HasConnections(BaseButton.SignalName.Pressed)
+        && _gsh18Button.HasConnections(BaseButton.SignalName.Pressed)
         && _m1911Button.HasConnections(BaseButton.SignalName.Pressed)
         && _mp5Button.HasConnections(BaseButton.SignalName.Pressed)
         && _ak74Button.HasConnections(BaseButton.SignalName.Pressed)
@@ -130,7 +134,8 @@ public partial class DemolitionBuyView : ColorRect
         _clearButton.Text = Text("demolition_buy_clear", "CLEAR");
         _confirmButton.Text = Text("demolition_buy_confirm", "CONFIRM PURCHASE");
         SetOfferText(_p226Button, DemolitionBuyCatalog.Sidearms[0]);
-        SetOfferText(_m1911Button, DemolitionBuyCatalog.Sidearms[1]);
+        SetOfferText(_gsh18Button, DemolitionBuyCatalog.Sidearms[1]);
+        SetOfferText(_m1911Button, DemolitionBuyCatalog.Sidearms[2]);
         SetOfferText(_mp5Button, DemolitionBuyCatalog.Primaries[0]);
         SetOfferText(_ak74Button, DemolitionBuyCatalog.Primaries[1]);
         SetOfferText(_m4a1Button, DemolitionBuyCatalog.Primaries[2]);
@@ -198,6 +203,7 @@ public partial class DemolitionBuyView : ColorRect
         _protectionTitle = offers.GetNode<Label>("ProtectionTitle");
         _utilityTitle = offers.GetNode<Label>("UtilityTitle");
         _p226Button = offers.GetNode<Button>("P226Button");
+        _gsh18Button = offers.GetNode<Button>("GSh18Button");
         _m1911Button = offers.GetNode<Button>("M1911Button");
         _mp5Button = offers.GetNode<Button>("MP5Button");
         _ak74Button = offers.GetNode<Button>("AK74Button");
@@ -221,6 +227,7 @@ public partial class DemolitionBuyView : ColorRect
     private void ConnectIntentSignals()
     {
         _p226Button.Pressed += () => SelectSidearm(DemolitionBuyCatalog.P226Id);
+        _gsh18Button.Pressed += () => SelectSidearm(DemolitionBuyCatalog.Gsh18Id);
         _m1911Button.Pressed += () => SelectSidearm(DemolitionBuyCatalog.M1911Id);
         _mp5Button.Pressed += () => SelectPrimary(DemolitionBuyCatalog.Mp5Id);
         _ak74Button.Pressed += () => SelectPrimary(DemolitionBuyCatalog.Ak74Id);
@@ -324,13 +331,15 @@ public partial class DemolitionBuyView : ColorRect
         _grenadeCount.Text = $"{Text("grenade", "FRAG")}  x{_selection.GrenadeCount}  //  ${DemolitionBuyCatalog.GrenadePrice}";
         _smokeGrenadeCount.Text = $"{Text("smoke_grenade", "SMOKE")}  x{_selection.SmokeGrenadeCount}  //  ${DemolitionBuyCatalog.SmokeGrenadePrice}";
         SetSelected(_p226Button, _selection.SidearmId == DemolitionBuyCatalog.P226Id);
+        SetSelected(_gsh18Button, _selection.SidearmId == DemolitionBuyCatalog.Gsh18Id);
         SetSelected(_m1911Button, _selection.SidearmId == DemolitionBuyCatalog.M1911Id);
         SetSelected(_mp5Button, _selection.PrimaryId == DemolitionBuyCatalog.Mp5Id);
         SetSelected(_ak74Button, _selection.PrimaryId == DemolitionBuyCatalog.Ak74Id);
         SetSelected(_m4a1Button, _selection.PrimaryId == DemolitionBuyCatalog.M4A1Id);
         SetSelected(_scarLButton, _selection.PrimaryId == DemolitionBuyCatalog.ScarLId);
         _p226Button.Disabled = DemolitionBuyCatalog.Sidearms[0].Price > _snapshot.Funds;
-        _m1911Button.Disabled = DemolitionBuyCatalog.Sidearms[1].Price > _snapshot.Funds;
+        _gsh18Button.Disabled = DemolitionBuyCatalog.Sidearms[1].Price > _snapshot.Funds;
+        _m1911Button.Disabled = DemolitionBuyCatalog.Sidearms[2].Price > _snapshot.Funds;
         _mp5Button.Disabled = DemolitionBuyCatalog.Primaries[0].Price > _snapshot.Funds;
         _ak74Button.Disabled = DemolitionBuyCatalog.Primaries[1].Price > _snapshot.Funds;
         _m4a1Button.Disabled = DemolitionBuyCatalog.Primaries[2].Price > _snapshot.Funds;

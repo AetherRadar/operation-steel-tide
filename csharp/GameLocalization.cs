@@ -151,6 +151,7 @@ public static class GameLocalization
         Chinese["weapon_awm"] = "AWM .338 \u9a6c\u683c\u5357\u72d9\u51fb\u6b65\u67aa";
         Chinese["weapon_vss"] = "VSS \u5fae\u58f0\u72d9\u51fb\u6b65\u67aa";
         Chinese["weapon_desert_eagle"] = "\u6c99\u6f20\u4e4b\u9e70 .50 AE";
+        Chinese["weapon_gsh18"] = "GSh-18 \u6218\u6597\u624b\u67aa";
         Chinese["weapon_mp5a5"] = "MP5A5 \u51b2\u950b\u67aa";
         Chinese["weapon_m3a1"] = "M3A1 \u7b80\u6613\u51b2\u950b\u67aa";
         Chinese["weapon_axmc"] = "AXMC .338 \u8d85\u8fdc\u7a0b\u72d9\u51fb\u6b65\u67aa";

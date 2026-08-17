@@ -23,3 +23,13 @@ The City Kit (Industrial) 1.0 model set is distributed by Kenney under CC0 1.0:
 - License copy: `kenney_city_kit_industrial/KENNEY_LICENSE.txt`
 
 The complete GLB set is retained so authored demolition layouts can combine the pack's buildings, chimneys, and tank detail without modifying third-party geometry.
+
+## TastyTony CC BY 4.0 model
+
+The GSh-18 sidearm model is **Low-Poly GSh-18** by TastyTony and is used under Creative Commons Attribution 4.0 International:
+
+- Source: https://sketchfab.com/3d-models/low-poly-gsh-18-7ce65f794f0e42f98f61a96026e4d75e
+- License: https://creativecommons.org/licenses/by/4.0/
+- Local asset and attribution: `tastytony_gsh18/low-poly_gsh-18.glb` and `tastytony_gsh18/LICENSE.md`
+
+The model remains credited to TastyTony and is not covered by the repository's MIT license.

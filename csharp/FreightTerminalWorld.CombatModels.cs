@@ -10,6 +10,7 @@ public partial class FreightTerminalWorld
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         var weapon = CombatModelLibrary.InspectWeapon();
         var operatorModel = CombatModelLibrary.InspectOperator();
+        var gsh18 = CombatModelLibrary.InspectGsh18();
         var weaponGeometry = weapon.Loaded
             && weapon.RequiredNodes
             && weapon.MeshCount >= 8
@@ -22,6 +23,12 @@ public partial class FreightTerminalWorld
             && operatorModel.Size.X is >= 0.55f and <= 1.15f
             && operatorModel.Size.Y is >= 1.75f and <= 2.3f
             && operatorModel.Size.Z is >= 0.4f and <= 1.1f;
+        var gsh18Geometry = gsh18.Loaded
+            && gsh18.RequiredNodes
+            && gsh18.MeshCount >= 10
+            && gsh18.Size.X is >= 0.08f and <= 0.3f
+            && gsh18.Size.Y is >= 0.3f and <= 0.75f
+            && gsh18.Size.Z is >= 0.65f and <= 0.9f;
         var playerAuthored = _player.UsesAuthoredPrimaryWeaponForDiagnostics;
         var squadAuthored = _squadMates.Count > 0
             && _squadMates.Where(IsInstanceValid).All(mate => mate.UsesAuthoredOperatorForDiagnostics);
@@ -30,6 +37,7 @@ public partial class FreightTerminalWorld
             && livingEnemies.All(enemy => enemy.UsesAuthoredOperatorForDiagnostics);
         var valid = weaponGeometry
             && operatorGeometry
+            && gsh18Geometry
             && playerAuthored
             && squadAuthored
             && enemiesAuthored;
@@ -39,6 +47,8 @@ public partial class FreightTerminalWorld
             + $"weapon_meshes={weapon.MeshCount} weapon_size={weapon.Size} "
             + $"operator_loaded={operatorModel.Loaded} operator_nodes={operatorModel.RequiredNodes} "
             + $"operator_meshes={operatorModel.MeshCount} operator_size={operatorModel.Size} "
+            + $"gsh18_loaded={gsh18.Loaded} gsh18_nodes={gsh18.RequiredNodes} "
+            + $"gsh18_meshes={gsh18.MeshCount} gsh18_size={gsh18.Size} "
             + $"player_authored={playerAuthored} squad_authored={squadAuthored} "
             + $"enemies_authored={enemiesAuthored} enemies={livingEnemies.Length}");
         GD.Print($"COMBAT_MODELS_PASS valid={valid}");

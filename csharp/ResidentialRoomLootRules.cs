@@ -154,8 +154,13 @@ public static class ResidentialRoomLootRules
             {
                 LootGrade.Legendary => random.Next(100) < 55 ? WeaponPlatform.AWM : WeaponPlatform.M24,
                 LootGrade.Epic => random.Next(100) < 48 ? WeaponPlatform.VSS : WeaponPlatform.ScarL,
-                LootGrade.Rare when random.Next(100) < 22 => WeaponPlatform.DesertEagle,
-                LootGrade.Rare when random.Next(100) < 54 => WeaponPlatform.MP5A5,
+                LootGrade.Rare => random.Next(100) switch
+                {
+                    < 18 => WeaponPlatform.DesertEagle,
+                    < 50 => WeaponPlatform.GSh18,
+                    < 78 => WeaponPlatform.MP5A5,
+                    _ => WeaponPlatform.M4A1
+                },
                 _ => WeaponPlatform.M4A1
             };
             var tier = grade >= LootGrade.Legendary ? 2 : grade >= LootGrade.Rare ? 1 : 0;

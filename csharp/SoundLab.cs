@@ -73,6 +73,35 @@ public static class SoundLab
         return MakeStream(samples, rate);
     }
 
+    public static AudioStreamWav Gsh18Shot()
+    {
+        const int rate = 22050;
+        var samples = new float[(int)(rate * 0.36f)];
+        var rng = new RandomNumberGenerator { Seed = 918018 };
+        var pressure = 0.0f;
+        var peak = 0.0f;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var t = (float)i / rate;
+            var crack = rng.RandfRange(-1.0f, 1.0f) * Mathf.Exp(-t * 105.0f);
+            pressure = Mathf.Lerp(pressure, rng.RandfRange(-1.0f, 1.0f), 0.075f);
+            var compactBlast = Mathf.Sin(Mathf.Tau * (118.0f - t * 52.0f) * t) * Mathf.Exp(-t * 13.0f);
+            var slideSnap = Mathf.Sin(Mathf.Tau * 2380.0f * t) * Mathf.Exp(-Mathf.Abs(t - 0.026f) * 76.0f);
+            var tail = pressure * Mathf.Exp(-t * 18.0f);
+            samples[i] = crack * 0.92f + compactBlast * 0.64f + slideSnap * 0.17f + tail * 0.32f;
+            peak = Mathf.Max(peak, Mathf.Abs(samples[i]));
+        }
+        if (peak > 0.001f)
+        {
+            var normalization = 0.94f / peak;
+            for (var i = 0; i < samples.Length; i++)
+            {
+                samples[i] *= normalization;
+            }
+        }
+        return MakeStream(samples, rate);
+    }
+
     public static AudioStreamWav ReloadClick()
     {
         const int rate = 22050;

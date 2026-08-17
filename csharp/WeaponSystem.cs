@@ -18,7 +18,8 @@ public enum WeaponPlatform
     M1911,
     AWM,
     VSS,
-    DesertEagle
+    DesertEagle,
+    GSh18
 }
 
 public enum WeaponCarryClass
@@ -628,6 +629,14 @@ public static class WeaponCatalog
             Caliber = AmmoCaliber.Pistol, SupportsAutomatic = false,
             Damage = 74, EffectiveRange = 92, Recoil = 1.72f, Handling = 0.88f,
             FireInterval = 0.29f, MagazineSize = 7, SoundRadius = 46, ReceiverLength = 0.33f, BarrelLength = 0.27f
+        },
+        [WeaponPlatform.GSh18] = new WeaponDefinition
+        {
+            Platform = WeaponPlatform.GSh18, Name = "GSh-18 Service Pistol", ChineseName = "GSh-18 \u6218\u6597\u624b\u67aa",
+            LocalizationKey = "weapon_gsh18", CarryClass = WeaponCarryClass.Sidearm,
+            Caliber = AmmoCaliber.Pistol, SupportsAutomatic = false,
+            Damage = 33, EffectiveRange = 63, Recoil = 0.72f, Handling = 1.42f,
+            FireInterval = 0.145f, MagazineSize = 18, SoundRadius = 26, ReceiverLength = 0.25f, BarrelLength = 0.17f
         }
     };
 

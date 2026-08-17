@@ -12,6 +12,10 @@ public partial class TacticalPlayer
         => EquippedWeapon.Platform == WeaponPlatform.DesertEagle
         && IsInstanceValid(_gunAudio)
         && _gunAudio.Stream is AudioStreamWav { Data.Length: > 16000 };
+    internal bool UsesGsh18ReportForDiagnostics
+        => EquippedWeapon.Platform == WeaponPlatform.GSh18
+        && IsInstanceValid(_gunAudio)
+        && _gunAudio.Stream is AudioStreamWav { Data.Length: > 14000 };
 
     private void RefreshPlatformSignatureVisual()
     {
@@ -55,6 +59,12 @@ public partial class TacticalPlayer
                     new Vector3(0, -0.08f, -0.22f), new Vector3(0.2f, 0, 0), black);
                 MeshPart(_platformSignatureRoot, Cylinder(0.018f, 0.095f),
                     new Vector3(0.085f, 0.095f, 0.03f), new Vector3(0, 0, Mathf.Pi / 2), chrome);
+                break;
+            case WeaponPlatform.GSh18:
+                MeshPart(_platformSignatureRoot, Box(new Vector3(0.132f, 0.026f, 0.19f)),
+                    new Vector3(0, 0.145f, -0.035f), Vector3.Zero, steel);
+                MeshPart(_platformSignatureRoot, Box(new Vector3(0.014f, 0.032f, 0.052f)),
+                    new Vector3(0.074f, 0.12f, -0.03f), Vector3.Zero, black);
                 break;
         }
     }

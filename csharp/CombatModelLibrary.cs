@@ -50,6 +50,16 @@ internal sealed class AuthoredWeaponVisual
     }
 }
 
+internal sealed class AuthoredGsh18Visual
+{
+    public AuthoredGsh18Visual(Node3D root)
+    {
+        Root = root;
+    }
+
+    public Node3D Root { get; }
+}
+
 internal sealed class AuthoredOperatorVisual
 {
     public AuthoredOperatorVisual(Node3D root)
@@ -99,6 +109,10 @@ internal static class CombatModelLibrary
 {
     internal const string WeaponScenePath = "res://assets/models/steel_tide_m4a1/steel_tide_m4a1.glb";
     internal const string OperatorScenePath = "res://assets/models/steel_tide_operator/steel_tide_operator.glb";
+    internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/low-poly_gsh-18.glb";
+
+    private const float Gsh18FirstPersonLength = 0.64f;
+    private const float Gsh18PreviewLength = 0.78f;
 
     private static readonly string[] WeaponNodes =
     {
@@ -110,6 +124,11 @@ internal static class CombatModelLibrary
     {
         "SteelTideOperator", "LeftLegRig", "RightLegRig", "Helmet",
         "Vest", "Backpack", "TeamPatch"
+    };
+
+    private static readonly string[] Gsh18Nodes =
+    {
+        "Armature", "Skeleton3D"
     };
 
     public static AuthoredWeaponVisual InstantiateWeapon(bool firstPerson)
@@ -133,11 +152,61 @@ internal static class CombatModelLibrary
         return new AuthoredOperatorVisual(root);
     }
 
+    public static AuthoredGsh18Visual InstantiateGsh18(bool firstPerson)
+    {
+        var source = InstantiateRequired(Gsh18ScenePath, Gsh18Nodes);
+        RemoveStagingNode(source, "Lamp");
+        RemoveStagingNode(source, "Camera");
+        var sourceBounds = ComputeBounds(source);
+        if (sourceBounds.MeshCount == 0 || sourceBounds.Size.Y <= 0.001f)
+        {
+            source.Free();
+            throw new InvalidOperationException("GSh-18 model has no usable geometry bounds.");
+        }
+
+        source.Position = -sourceBounds.Center;
+        var targetLength = firstPerson ? Gsh18FirstPersonLength : Gsh18PreviewLength;
+        var wrapper = new Node3D
+        {
+            Name = "AuthoredGsh18Visual",
+            RotationDegrees = new Vector3(-90.0f, 0.0f, 0.0f),
+            Scale = Vector3.One * (targetLength / sourceBounds.Size.Y)
+        };
+        wrapper.AddChild(source);
+        if (firstPerson)
+        {
+            foreach (var geometry in GeometryBelow(wrapper))
+            {
+                geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+            }
+        }
+        return new AuthoredGsh18Visual(wrapper);
+    }
+
     public static CombatModelInspection InspectWeapon()
         => Inspect(WeaponScenePath, WeaponNodes);
 
     public static CombatModelInspection InspectOperator()
         => Inspect(OperatorScenePath, OperatorNodes);
+
+    public static CombatModelInspection InspectGsh18()
+    {
+        Node3D? root = null;
+        try
+        {
+            root = InstantiateGsh18(firstPerson: false).Root;
+            var bounds = ComputeBounds(root);
+            return new CombatModelInspection(true, true, bounds.MeshCount, bounds.Size);
+        }
+        catch
+        {
+            return new CombatModelInspection(false, false, 0, Vector3.Zero);
+        }
+        finally
+        {
+            root?.Free();
+        }
+    }
 
     internal static Node3D RequireNode(Node3D root, string name)
     {
@@ -198,15 +267,15 @@ internal static class CombatModelLibrary
         }
     }
 
-    private static (int MeshCount, Vector3 Size) ComputeBounds(Node3D root)
+    private static (int MeshCount, Vector3 Size, Vector3 Center) ComputeBounds(Node3D root)
     {
         var minimum = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
         var maximum = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
         var meshCount = 0;
         AccumulateBounds(root, Transform3D.Identity, ref minimum, ref maximum, ref meshCount);
         return meshCount == 0
-            ? (0, Vector3.Zero)
-            : (meshCount, maximum - minimum);
+            ? (0, Vector3.Zero, Vector3.Zero)
+            : (meshCount, maximum - minimum, (minimum + maximum) * 0.5f);
     }
 
     private static void AccumulateBounds(
@@ -254,6 +323,12 @@ internal static class CombatModelLibrary
             return root;
         }
         return root.FindChild(name, recursive: true, owned: false) as Node3D;
+    }
+
+    private static void RemoveStagingNode(Node3D root, string name)
+    {
+        var node = FindNode(root, name);
+        node?.Free();
     }
 
     private static IEnumerable<GeometryInstance3D> GeometryBelow(Node root)
