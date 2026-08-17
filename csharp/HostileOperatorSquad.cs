@@ -145,17 +145,18 @@ public static class Ballistics
         {
             return bodyOrigin;
         }
-        var query = PhysicsRayQueryParameters3D.Create(bodyOrigin, muzzleOrigin);
-        query.Exclude = new Godot.Collections.Array<Rid> { excludeRid };
-        query.CollideWithAreas = false;
-        query.CollisionMask = 0xFFFFFFFF;
-        var hit = world.DirectSpaceState.IntersectRay(query);
-        if (hit.Count == 0)
+        if (!PhysicsRaycast.TryHit(
+                world,
+                bodyOrigin,
+                muzzleOrigin,
+                excludeRid,
+                uint.MaxValue,
+                out var hit))
         {
             return muzzleOrigin;
         }
         var direction = bodyOrigin.DirectionTo(muzzleOrigin);
-        return hit["position"].AsVector3() - direction * 0.04f;
+        return hit.Position - direction * 0.04f;
     }
 
     /// <summary>
@@ -168,16 +169,17 @@ public static class Ballistics
         {
             return false;
         }
-        var query = PhysicsRayQueryParameters3D.Create(from, to);
-        query.Exclude = new Godot.Collections.Array<Rid> { excludeRid };
-        query.CollideWithAreas = false;
-        query.CollisionMask = 0xFFFFFFFF; // all solid layers
-        var hit = world.DirectSpaceState.IntersectRay(query);
-        if (hit.Count == 0)
+        if (!PhysicsRaycast.TryHit(
+                world,
+                from,
+                to,
+                excludeRid,
+                uint.MaxValue,
+                out var hit))
         {
             return false;
         }
-        var collider = hit["collider"].AsGodotObject();
+        var collider = hit.Collider;
         if (collider == target)
         {
             return true;

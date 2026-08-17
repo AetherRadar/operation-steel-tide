@@ -608,6 +608,7 @@ public partial class FreightTerminalWorld
         var gatewaysReady = _districtRouteGatewayCount == 2 && gatewayLinks >= 4;
 
         var collisionNodes = GetTree().GetNodesInGroup("district_route_collision");
+        using var collisionNodesBacking = collisionNodes.AsDisposable();
         var collisionReady = collisionNodes.Count > 0;
         foreach (var node in collisionNodes)
         {
@@ -616,16 +617,21 @@ public partial class FreightTerminalWorld
                 collisionReady = false;
                 break;
             }
-            collisionReady &= body.GetChildren().OfType<CollisionShape3D>().Any(shape => shape.Shape is not null);
+            var bodyChildren = body.GetChildren();
+            using var bodyChildrenBacking = bodyChildren.AsDisposable();
+            collisionReady &= bodyChildren.OfType<CollisionShape3D>().Any(shape => shape.Shape is not null);
         }
 
         var stairNodes = GetTree().GetNodesInGroup("district_route_stair");
+        using var stairNodesBacking = stairNodes.AsDisposable();
         var stairShapeCount = 0;
         foreach (var node in stairNodes)
         {
             if (node is StaticBody3D stair)
             {
-                stairShapeCount += stair.GetChildren().OfType<CollisionShape3D>().Count(shape => shape.Shape is BoxShape3D);
+                var stairChildren = stair.GetChildren();
+                using var stairChildrenBacking = stairChildren.AsDisposable();
+                stairShapeCount += stairChildren.OfType<CollisionShape3D>().Count(shape => shape.Shape is BoxShape3D);
             }
         }
         var verticalRoutesReady = stairNodes.Count == expectedHubCount
@@ -637,23 +643,23 @@ public partial class FreightTerminalWorld
         var deckHits = 0;
         foreach (var sample in _districtRouteDeckSamples)
         {
-            var down = PhysicsRayQueryParameters3D.Create(sample + Vector3.Up * 1.25f, sample - Vector3.Up * 0.7f);
-            down.CollisionMask = 1;
-            down.CollideWithAreas = false;
-            var hit = GetWorld3D().DirectSpaceState.IntersectRay(down);
-            if (hit.Count > 0
-                && hit["collider"].AsGodotObject() is Node collider
+            if (PhysicsRaycast.TryHit(
+                    GetWorld3D().DirectSpaceState,
+                    sample + Vector3.Up * 1.25f,
+                    sample - Vector3.Up * 0.7f,
+                    1,
+                    out var hit)
+                && hit.Collider is Node collider
                 && collider.IsInGroup("district_route_deck"))
             {
                 deckHits++;
             }
 
-            var up = PhysicsRayQueryParameters3D.Create(
+            headClearanceReady &= !PhysicsRaycast.HasHit(
+                GetWorld3D().DirectSpaceState,
                 sample + Vector3.Up * (DistrictRouteDeckThickness * 0.5f + 0.12f),
-                sample + Vector3.Up * 2.15f);
-            up.CollisionMask = 1;
-            up.CollideWithAreas = false;
-            headClearanceReady &= GetWorld3D().DirectSpaceState.IntersectRay(up).Count == 0;
+                sample + Vector3.Up * 2.15f,
+                1);
         }
         deckSamplesReady &= deckHits == _districtRouteDeckSamples.Count;
 
@@ -685,15 +691,17 @@ public partial class FreightTerminalWorld
 
         var routeBlockers = new HashSet<string>(StringComparer.Ordinal);
         var clearanceHeight = 1.62f;
-        var routeClearanceShape = new CapsuleShape3D { Radius = 0.32f, Height = clearanceHeight };
-        var routeClearanceQuery = new PhysicsShapeQueryParameters3D
+        using var routeClearanceShape = new CapsuleShape3D { Radius = 0.32f, Height = clearanceHeight };
+        var routeClearanceExclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+        using var routeClearanceExcludeBacking = routeClearanceExclude.AsDisposable();
+        using var routeClearanceQuery = new PhysicsShapeQueryParameters3D
         {
             Shape = routeClearanceShape,
             CollisionMask = 1,
             CollideWithAreas = false,
             CollideWithBodies = true,
             Margin = 0.005f,
-            Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() }
+            Exclude = routeClearanceExclude
         };
         foreach (var link in _districtRouteLinks)
         {
@@ -710,11 +718,12 @@ public partial class FreightTerminalWorld
                         Basis.Identity,
                         feet + Vector3.Up * (clearanceHeight * 0.5f + 0.04f));
                     var hits = GetWorld3D().DirectSpaceState.IntersectShape(routeClearanceQuery, 12);
-                    foreach (var hit in hits)
+                    using var hitsBacking = hits.AsDisposable();
+                    for (var hitIndex = 0; hitIndex < hits.Count; hitIndex++)
                     {
-                        var collider = hit.TryGetValue("collider", out var value)
-                            ? value.AsGodotObject() as Node
-                            : null;
+                        using var hit = hits[hitIndex];
+                        using var colliderValue = hit[GodotPhysicsResultKeys.Collider];
+                        var collider = colliderValue.AsGodotObject() as Node;
                         if (collider?.IsInGroup("district_route_collision") == true)
                         {
                             continue;
@@ -723,7 +732,9 @@ public partial class FreightTerminalWorld
                         if (collider is Node3D blocker3D)
                         {
                             blockerDescription += $"[{blocker3D.GlobalPosition.X:0.0},{blocker3D.GlobalPosition.Y:0.0},{blocker3D.GlobalPosition.Z:0.0}]";
-                            var shape = blocker3D.GetChildren().OfType<CollisionShape3D>().FirstOrDefault()?.Shape;
+                            var blockerChildren = blocker3D.GetChildren();
+                            using var blockerChildrenBacking = blockerChildren.AsDisposable();
+                            var shape = blockerChildren.OfType<CollisionShape3D>().FirstOrDefault()?.Shape;
                             if (shape is BoxShape3D box)
                             {
                                 blockerDescription += $"box({box.Size.X:0.0},{box.Size.Y:0.0},{box.Size.Z:0.0})";

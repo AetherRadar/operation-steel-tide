@@ -23,7 +23,9 @@ public partial class EnemyOperator
             GD.PushWarning($"Authored enemy operator unavailable; retaining procedural visual: {exception.Message}");
             return;
         }
-        foreach (var child in _bodyRoot.GetChildren())
+        var children = _bodyRoot.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is Node3D visual && visual != _authoredOperatorVisual.Root)
             {

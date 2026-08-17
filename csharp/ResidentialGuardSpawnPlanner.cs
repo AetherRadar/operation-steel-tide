@@ -12,7 +12,7 @@ internal readonly record struct ResidentialGuardSpawnLayout(
 /// Resolves one residential cache ambush against an explicitly supplied physics snapshot.
 /// Instances are scoped to a single cache plan and retain no scene nodes or subscriptions.
 /// </summary>
-internal sealed class ResidentialGuardSpawnPlanner
+internal sealed class ResidentialGuardSpawnPlanner : System.IDisposable
 {
     private const int CandidateDirectionCount = 16;
     private const int MaximumBacktrackingSteps = 4096;
@@ -150,27 +150,26 @@ internal sealed class ResidentialGuardSpawnPlanner
 
     public bool TryGroundPosition(Vector3 position, out Vector3 feet)
     {
-        var floorQuery = PhysicsRayQueryParameters3D.Create(
-            position + Vector3.Up * 0.75f,
-            position + Vector3.Down * 0.9f);
-        floorQuery.CollisionMask = 1;
-        floorQuery.CollideWithAreas = false;
-        floorQuery.Exclude = _groundRayExclude;
-        var floorHit = _space.IntersectRay(floorQuery);
-        if (floorHit.Count == 0
-            || floorHit["normal"].AsVector3().Dot(Vector3.Up) < 0.72f)
+        if (!PhysicsRaycast.TryHit(
+                _space,
+                position + Vector3.Up * 0.75f,
+                position + Vector3.Down * 0.9f,
+                _groundRayExclude,
+                1,
+                out var floorHit)
+            || floorHit.Normal.Dot(Vector3.Up) < 0.72f)
         {
             feet = Vector3.Zero;
             return false;
         }
 
-        feet = floorHit["position"].AsVector3() + Vector3.Up * 0.03f;
+        feet = floorHit.Position + Vector3.Up * 0.03f;
         if (Mathf.Abs(feet.Y - position.Y) > 0.42f)
         {
             return false;
         }
 
-        var clearanceQuery = new PhysicsShapeQueryParameters3D
+        using var clearanceQuery = new PhysicsShapeQueryParameters3D
         {
             Shape = _clearanceShape,
             Transform = new Transform3D(Basis.Identity, feet + Vector3.Up * 0.89f),
@@ -179,7 +178,14 @@ internal sealed class ResidentialGuardSpawnPlanner
             CollideWithAreas = false,
             Exclude = _clearanceExclude
         };
-        return _space.IntersectShape(clearanceQuery, 1).Count == 0;
+        return !PhysicsShapeProbe.HasCollision(_space, clearanceQuery, 1);
+    }
+
+    public void Dispose()
+    {
+        _clearanceShape.Dispose();
+        _groundRayExclude.AsDisposable().Dispose();
+        _clearanceExclude.AsDisposable().Dispose();
     }
 
     public bool HasRoute(Vector3 start, Vector3 destination)

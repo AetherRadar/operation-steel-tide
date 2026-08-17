@@ -43,9 +43,13 @@ public partial class FreightTerminalWorld
         {
             var body = arena.Root.GetNodeOrNull<StaticBody3D>(prop.Name);
             var model = body?.GetNodeOrNull<Node3D>("Model");
-            return IsInstanceValid(body)
-                && IsInstanceValid(model)
-                && model!.FindChildren("*", "MeshInstance3D", true, false).Count > 0;
+            if (!IsInstanceValid(body) || !IsInstanceValid(model))
+            {
+                return false;
+            }
+            var meshes = model!.FindChildren("*", "MeshInstance3D", true, false);
+            using var meshesBacking = meshes.AsDisposable();
+            return meshes.Count > 0;
         });
         var assetsReady = layout.Props.Count >= 16
             && importedModels == layout.Props.Count;

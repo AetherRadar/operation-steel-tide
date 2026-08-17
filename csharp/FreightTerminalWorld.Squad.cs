@@ -28,6 +28,7 @@ public partial class FreightTerminalWorld
     public int ActiveSquadCount => 1 + _squadMates.Count(mate => IsInstanceValid(mate));
     public int AiSquadCount => _squadMates.Count(mate => IsInstanceValid(mate) && !mate.IsHumanProxy);
     public string ActiveDeploymentMapId => _activeDeploymentMapId;
+    internal IReadOnlyList<SquadMate> SquadMatesForRuntime => _squadMates;
 
     private void BuildSquadSystem()
     {
@@ -106,23 +107,26 @@ public partial class FreightTerminalWorld
 
     private static void EnsureSquadInputActions()
     {
-        EnsureKeyAction("use_class_skill", Key.H);
-        EnsureKeyAction("squad_follow", Key.F1);
-        EnsureKeyAction("squad_hold", Key.F2);
-        EnsureKeyAction("squad_move", Key.F3);
+        EnsureKeyAction(GameInputActions.UseClassSkill, Key.H);
+        EnsureKeyAction(GameInputActions.SquadFollow, Key.F1);
+        EnsureKeyAction(GameInputActions.SquadHold, Key.F2);
+        EnsureKeyAction(GameInputActions.SquadMove, Key.F3);
     }
 
-    private static void EnsureKeyAction(string action, Key key)
+    private static void EnsureKeyAction(StringName action, Key key)
     {
         if (!InputMap.HasAction(action))
         {
             InputMap.AddAction(action);
         }
-        if (InputMap.ActionGetEvents(action).Count > 0)
+        var events = InputMap.ActionGetEvents(action);
+        using var eventsBacking = events.AsDisposable();
+        if (events.Count > 0)
         {
             return;
         }
-        InputMap.ActionAddEvent(action, new InputEventKey { PhysicalKeycode = key });
+        using var inputEvent = new InputEventKey { PhysicalKeycode = key };
+        InputMap.ActionAddEvent(action, inputEvent);
     }
 
     private void OnSquadDeploymentRequested(int role, int mode, string address)
@@ -455,15 +459,15 @@ public partial class FreightTerminalWorld
         UpdateSquadLeaderTrail();
         if (!_demolitionMode && !_player.UiLocked && !_player.IsDead)
         {
-            if (Input.IsActionJustPressed("squad_follow"))
+            if (Input.IsActionJustPressed(GameInputActions.SquadFollow))
             {
                 IssueSquadOrder(SquadOrder.Follow);
             }
-            else if (Input.IsActionJustPressed("squad_hold"))
+            else if (Input.IsActionJustPressed(GameInputActions.SquadHold))
             {
                 IssueSquadOrder(SquadOrder.Hold);
             }
-            else if (Input.IsActionJustPressed("squad_move"))
+            else if (Input.IsActionJustPressed(GameInputActions.SquadMove))
             {
                 IssueSquadOrder(SquadOrder.Move);
             }
@@ -536,6 +540,7 @@ public partial class FreightTerminalWorld
     private const float AiReviveMinimumHealthRatio = 0.35f;
     private const float AiSquadmateReviveRange = 40.0f;
     private const float AiReviveNoProgressTimeout = 15.0f;
+    private const ulong AiReviveSelectionMaximumMicroseconds = 50_000;
 
     /// <summary>
     /// The nearest available AI commits to the highest-priority downed friendly,
@@ -573,7 +578,8 @@ public partial class FreightTerminalWorld
             _leaderReviveChannel = 0.0f;
             _reviverStuckTime = 0.0f;
             SquadMate? nearest = null;
-            var bestDistance = float.PositiveInfinity;
+            var bestDistanceSquared = float.PositiveInfinity;
+            var selectionTargetPosition = preferredTarget.CombatNode.GlobalPosition;
             foreach (var mate in _squadMates)
             {
                 if (!CanAiRevive(mate, preferredTarget)
@@ -581,14 +587,17 @@ public partial class FreightTerminalWorld
                 {
                     continue;
                 }
-                var distance = EstimateSquadNavigationCost(mate, preferredTarget.CombatNode.GlobalPosition);
-                if (preferredTarget is SquadMate && distance > AiSquadmateReviveRange)
+                // Selection runs every frame while a target is pending. Keep it
+                // geometric; the bounded planner validates the committed route.
+                var distanceSquared = mate.GlobalPosition.DistanceSquaredTo(selectionTargetPosition);
+                if (preferredTarget is SquadMate
+                    && distanceSquared > AiSquadmateReviveRange * AiSquadmateReviveRange)
                 {
                     continue;
                 }
-                if (distance < bestDistance)
+                if (distanceSquared < bestDistanceSquared)
                 {
-                    bestDistance = distance;
+                    bestDistanceSquared = distanceSquared;
                     nearest = mate;
                 }
             }
@@ -720,9 +729,12 @@ public partial class FreightTerminalWorld
                          && !ReferenceEquals(_abandonedAiReviveTarget, mate))
                      .OrderBy(mate => mate.SquadSlot))
         {
-            var reachable = _squadMates.Any(mate => CanAiRevive(mate, target)
-                && EstimateSquadNavigationCost(mate, target.GlobalPosition) <= AiSquadmateReviveRange);
-            if (reachable)
+            // Reachability is resolved only after assignment. Running layered A*
+            // here made one unavailable mate trigger a full physics search per frame.
+            var reviverInRange = _squadMates.Any(mate => CanAiRevive(mate, target)
+                && mate.GlobalPosition.DistanceSquaredTo(target.GlobalPosition)
+                    <= AiSquadmateReviveRange * AiSquadmateReviveRange);
+            if (reviverInRange)
             {
                 return target;
             }
@@ -953,7 +965,7 @@ public partial class FreightTerminalWorld
         var label = GameLocalization.IsChinese(_languageSetting)
             ? "按住 F 救援队友"
             : "HOLD F  //  REVIVE TEAMMATE";
-        if (!Input.IsActionPressed("interact") || _interactReleaseRequired)
+        if (!Input.IsActionPressed(GameInputActions.Interact) || _interactReleaseRequired)
         {
             _manualReviveProgress = Mathf.Max(0.0f, _manualReviveProgress - delta * 1.4f);
             _manualReviveTarget = target;
@@ -1664,7 +1676,9 @@ public partial class FreightTerminalWorld
             _aircraft!.ProcessMode = ProcessModeEnum.Disabled;
             _aircraft.SetPhysicsProcess(false);
         }
-        foreach (var node in GetTree().GetNodesInGroup("aircraft_shells"))
+        var aircraftShellNodes = GetTree().GetNodesInGroup("aircraft_shells");
+        using var aircraftShellNodesBacking = aircraftShellNodes.AsDisposable();
+        foreach (var node in aircraftShellNodes)
         {
             if (node is AircraftShell shell && IsInstanceValid(shell))
             {
@@ -1892,14 +1906,17 @@ public partial class FreightTerminalWorld
             }
             var traceFrom = combatMate.GlobalPosition + Vector3.Up * 1.55f;
             var traceTo = combatEnemy.GlobalPosition + Vector3.Up * 1.05f;
-            var traceQuery = PhysicsRayQueryParameters3D.Create(traceFrom, traceTo);
-            traceQuery.Exclude = new Godot.Collections.Array<Rid> { combatMate.GetRid() };
-            traceQuery.CollideWithAreas = false;
-            var traceHit = GetWorld3D().DirectSpaceState.IntersectRay(traceQuery);
-            var traceCollider = traceHit.Count > 0 && traceHit["collider"].AsGodotObject() is Node traceNode
+            var hasTraceHit = PhysicsRaycast.TryHit(
+                GetWorld3D().DirectSpaceState,
+                traceFrom,
+                traceTo,
+                combatMate.GetRid(),
+                uint.MaxValue,
+                out var traceHit);
+            var traceCollider = hasTraceHit && traceHit.Collider is Node traceNode
                 ? traceNode.Name.ToString()
                 : "none";
-            var tracePosition = traceHit.Count > 0 ? traceHit["position"].AsVector3() : Vector3.Zero;
+            var tracePosition = hasTraceHit ? traceHit.Position : Vector3.Zero;
             GD.Print($"SQUAD_COMBAT_WALL_TRACE pos=({combatMate.GlobalPosition.X:0.00},{combatMate.GlobalPosition.Z:0.00}) flank=({combatMate.CombatFlankPositionForDiagnostics.X:0.00},{combatMate.CombatFlankPositionForDiagnostics.Z:0.00}) lateral={maxWallLateral:0.00} sight={combatMate.CombatHasSightForDiagnostics} ray={traceCollider}@({tracePosition.X:0.00},{tracePosition.Z:0.00}) shots={combatMate.CombatShotsFired - shotsBeforeWall} switches={combatMate.CombatTargetSwitches} flank_n={combatMate.CombatFlankSelections} stuck={combatMate.CombatStuckRecoveries}");
             combatFlanked = combatMate.CombatFlankSelections > 0 && maxWallLateral > 2.7f;
             combatFired = combatMate.CombatShotsFired > shotsBeforeWall;
@@ -2013,15 +2030,20 @@ public partial class FreightTerminalWorld
                 finishTargetAcquired |= finishShooter.EngageTargetNode == finishTarget;
             }
             finishLockHeld = finishShooter.AttackShotsFired == shotsBeforeFinish;
-            var bagsBeforeFinish = GetTree().GetNodesInGroup("squad_body_bags").Count;
+            var bagsBeforeFinishNodes = GetTree().GetNodesInGroup("squad_body_bags");
+            var bagsBeforeFinish = bagsBeforeFinishNodes.Count;
+            bagsBeforeFinishNodes.AsDisposable().Dispose();
             for (var frame = 0; frame < 120 && _squadMates.Contains(finishTarget); frame++)
             {
                 finishShooter.ArmWeaponForDiagnostics();
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             }
             finishShotFired = finishShooter.AttackShotsFired > shotsBeforeFinish;
+            var bagsAfterFinishNodes = GetTree().GetNodesInGroup("squad_body_bags");
+            var bagsAfterFinish = bagsAfterFinishNodes.Count;
+            bagsAfterFinishNodes.AsDisposable().Dispose();
             finishConverted = !_squadMates.Contains(finishTarget)
-                && GetTree().GetNodesInGroup("squad_body_bags").Count > bagsBeforeFinish;
+                && bagsAfterFinish > bagsBeforeFinish;
             finishShooter.ProcessMode = ProcessModeEnum.Disabled;
         }
         var aiFinishOk = finishTargetDowned
@@ -2079,9 +2101,13 @@ public partial class FreightTerminalWorld
             this);
         mate.TakeCombatDamage(999.0f, mate.HitPoint(HitRegion.Torso), this);
         var mateDowned = mate.IsDowned && mate.CanBeRevived;
-        var farNavigationCost = EstimateSquadNavigationCost(mateReviver, mate.GlobalPosition);
+        var farSelectionStarted = Time.GetTicksUsec();
         UpdateSquadReviveAi(1.0f / 60.0f);
-        var farRescueBlocked = farNavigationCost > AiSquadmateReviveRange
+        var farSelectionMicroseconds = Time.GetTicksUsec() - farSelectionStarted;
+        var farSelectionResponsive = farSelectionMicroseconds <= AiReviveSelectionMaximumMicroseconds;
+        var farNavigationCost = EstimateSquadNavigationCost(mateReviver, mate.GlobalPosition);
+        var farRescueBlocked = farSelectionResponsive
+            && farNavigationCost > AiSquadmateReviveRange
             && _leaderReviver is null
             && _aiReviveTarget is null
             && !mateReviver.IsRevivingFriendly;
@@ -2191,11 +2217,15 @@ public partial class FreightTerminalWorld
         ResetSquadLeaderTrail(_player.GlobalPosition);
         await WaitFrames(2);
         // Second down after revive → permanent body bag (not a sliding human).
-        var bagsBefore = GetTree().GetNodesInGroup("squad_body_bags").Count;
+        var bagsBeforeNodes = GetTree().GetNodesInGroup("squad_body_bags");
+        var bagsBefore = bagsBeforeNodes.Count;
+        bagsBeforeNodes.AsDisposable().Dispose();
         var lootBefore = _lootSources.Count;
         mate.TakeCombatDamage(999.0f, mate.HitPoint(HitRegion.Torso), this);
         await WaitFrames(4);
-        var bagsAfter = GetTree().GetNodesInGroup("squad_body_bags").Count;
+        var bagsAfterNodes = GetTree().GetNodesInGroup("squad_body_bags");
+        var bagsAfter = bagsAfterNodes.Count;
+        bagsAfterNodes.AsDisposable().Dispose();
         var bodyBagOk = bagsAfter > bagsBefore
             || _lootSources.Count > lootBefore
             || _lootSources.Exists(source => source is SquadBodyBag);
@@ -2705,7 +2735,7 @@ public partial class FreightTerminalWorld
         var downedInteractionOk = downedLootBlocked && downedBackpackBlocked && interruptedClimbLocked;
         var eliminatedInteractionOk = eliminatedLootBlocked && eliminatedBackpackBlocked;
         interactionProbe.QueueFree();
-        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} stair_climbed={squadStairClimbed} stair_gain={squadStairGain:0.00} stair_steps={squadStairStepUps} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} combat_ai={combatAiOk} wall_blocked={combatWallBlocked} target_lock={combatTargetLocked} flanked={combatFlanked} sight_recovered={combatSightRecovered} fired={combatFired} damaged={combatDamaged} faced_move={combatFacedMovement} close_retreat={closeRangeRetreat} close_strafe={closeRangeStrafe} revive_once={reviveOk} ai_mate_revive={aiMateRescueOk} far_rescue_blocked={farRescueBlocked} far_cost={farNavigationCost:0.0} critical_rescue_blocked={criticalRescueBlocked} critical_health={criticalReviverHealth:0.00} mate_enemy_contact={mateRescueEnemyDetected} mate_rescue_assigned={mateRescueAssigned} mate_rescue_motion={mateRescueMinDistance < mateRescueStartDistance - 2.0f} mate_reviver_health={mateReviver.Health / mateReviver.MaxHealth:0.00} eliminated_mate_rescue={mateRescueAfterElimination} reverse_trail_rescue={reverseTrailRescue} reverse_wall={reverseTrailDirectBlocked} reverse_cost={reverseTrailCost:0.0} wall_channel_blocked={wallChannelBlocked} unreachable_abandoned={unreachableAbandoned} abandon_seconds={unreachableElapsed:0.0} abandon_grid_used={unreachableGridUsed} abandon_grid_plans={unreachableGridPlans} bleed_resumed={bleedResumedAfterAbandon} abandon_clear_revive={abandonmentClearedOnRevive} abandon_clear_down={abandonmentClearedOnDown} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} rescue_path={rescuePathOk} grid_rescue={gridDetourOk} grid_detour={gridDetourReady} grid_lifecycle={gridPathLifecycleOk} grid_used={gridRescueUsedGrid} grid_completed={gridRescueCompleted} rescue_wall={rescueDirectBlocked} follow_detour={followDetourReady} rescue_trail={rescueTrailUsed} rescue_advances={rescueWaypointAdvances} rescue_replans={rescueReplans} first_down_spectate={squadMateViewOnDown} downed_input_locked={downedInputLocked} downed_loot_blocked={downedLootBlocked} downed_backpack_blocked={downedBackpackBlocked} climb_interrupt_locked={interruptedClimbLocked} eliminated_loot_blocked={eliminatedLootBlocked} eliminated_backpack_blocked={eliminatedBackpackBlocked} spectator_tracks={spectatorTracksMate} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} finished_spectate={finishedSpectateOk} immediate_view={finishedPlayerSpectate} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
+        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} stair_climbed={squadStairClimbed} stair_gain={squadStairGain:0.00} stair_steps={squadStairStepUps} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} combat_ai={combatAiOk} wall_blocked={combatWallBlocked} target_lock={combatTargetLocked} flanked={combatFlanked} sight_recovered={combatSightRecovered} fired={combatFired} damaged={combatDamaged} faced_move={combatFacedMovement} close_retreat={closeRangeRetreat} close_strafe={closeRangeStrafe} revive_once={reviveOk} ai_mate_revive={aiMateRescueOk} far_rescue_blocked={farRescueBlocked} far_cost={farNavigationCost:0.0} revive_select_usec={farSelectionMicroseconds} revive_select_budget={AiReviveSelectionMaximumMicroseconds} critical_rescue_blocked={criticalRescueBlocked} critical_health={criticalReviverHealth:0.00} mate_enemy_contact={mateRescueEnemyDetected} mate_rescue_assigned={mateRescueAssigned} mate_rescue_motion={mateRescueMinDistance < mateRescueStartDistance - 2.0f} mate_reviver_health={mateReviver.Health / mateReviver.MaxHealth:0.00} eliminated_mate_rescue={mateRescueAfterElimination} reverse_trail_rescue={reverseTrailRescue} reverse_wall={reverseTrailDirectBlocked} reverse_cost={reverseTrailCost:0.0} wall_channel_blocked={wallChannelBlocked} unreachable_abandoned={unreachableAbandoned} abandon_seconds={unreachableElapsed:0.0} abandon_grid_used={unreachableGridUsed} abandon_grid_plans={unreachableGridPlans} bleed_resumed={bleedResumedAfterAbandon} abandon_clear_revive={abandonmentClearedOnRevive} abandon_clear_down={abandonmentClearedOnDown} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} rescue_path={rescuePathOk} grid_rescue={gridDetourOk} grid_detour={gridDetourReady} grid_lifecycle={gridPathLifecycleOk} grid_used={gridRescueUsedGrid} grid_completed={gridRescueCompleted} rescue_wall={rescueDirectBlocked} follow_detour={followDetourReady} rescue_trail={rescueTrailUsed} rescue_advances={rescueWaypointAdvances} rescue_replans={rescueReplans} first_down_spectate={squadMateViewOnDown} downed_input_locked={downedInputLocked} downed_loot_blocked={downedLootBlocked} downed_backpack_blocked={downedBackpackBlocked} climb_interrupt_locked={interruptedClimbLocked} eliminated_loot_blocked={eliminatedLootBlocked} eliminated_backpack_blocked={eliminatedBackpackBlocked} spectator_tracks={spectatorTracksMate} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} finished_spectate={finishedSpectateOk} immediate_view={finishedPlayerSpectate} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
         var valid = ActiveSquadCount >= 2 && roleFillOk && combatAiOk
             && squadStairClimbed
             && reviveOk && aiMateRescueOk && unreachableTimeoutOk && abandonmentLifecycleOk

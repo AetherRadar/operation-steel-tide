@@ -266,20 +266,21 @@ public partial class FreightTerminalWorld
 
     private bool IsRefineryLaneClear(float x)
     {
-        var query = PhysicsRayQueryParameters3D.Create(
+        var exclusions = BuildRefineryLaneExclusions();
+        using var exclusionsBacking = exclusions.AsDisposable();
+        if (!PhysicsRaycast.TryHit(
+                GetWorld3D().DirectSpaceState,
             new Vector3(x, 1.1f, 82),
-            new Vector3(x, 1.1f, -190));
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        query.Exclude = BuildRefineryLaneExclusions();
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        if (hit.Count == 0)
+                new Vector3(x, 1.1f, -190),
+                exclusions,
+                1,
+                out var hit))
         {
             return true;
         }
 
-        var collider = hit["collider"].As<Node>();
-        GD.Print($"REFINERY_LANE_BLOCKED x={x:0.0} collider={collider?.Name ?? "unknown"} position={hit["position"].AsVector3()}");
+        var collider = hit.Collider as Node;
+        GD.Print($"REFINERY_LANE_BLOCKED x={x:0.0} collider={collider?.Name ?? "unknown"} position={hit.Position}");
         return false;
     }
 
@@ -345,7 +346,9 @@ public partial class FreightTerminalWorld
                 counts.NonBoxModelCollisionShapes++;
             }
         }
-        foreach (var child in node.GetChildren())
+        var children = node.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is Node childNode)
             {

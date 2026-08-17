@@ -23,7 +23,9 @@ public partial class TacticalPlayer
         {
             return;
         }
-        foreach (var child in _platformSignatureRoot.GetChildren())
+        var children = _platformSignatureRoot.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             child.QueueFree();
         }

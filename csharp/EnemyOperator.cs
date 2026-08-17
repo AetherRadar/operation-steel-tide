@@ -1097,15 +1097,17 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         {
             return false;
         }
-        var query = PhysicsRayQueryParameters3D.Create(from, to);
-        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        query.CollideWithAreas = false;
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        if (hit.Count == 0)
+        if (!PhysicsRaycast.TryHit(
+                GetWorld3D(),
+                from,
+                to,
+                GetRid(),
+                uint.MaxValue,
+                out var hit))
         {
             return false;
         }
-        var collider = hit["collider"].AsGodotObject();
+        var collider = hit.Collider;
         return collider == targetNode || collider is Node node && targetNode.IsAncestorOf(node);
     }
 
@@ -1441,13 +1443,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         else if (!clear)
         {
             // Tracer stops at the wall hit instead of ghosting through.
-            var query = PhysicsRayQueryParameters3D.Create(shotOrigin, aimPoint);
-            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            query.CollideWithAreas = false;
-            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-            if (hit.Count > 0)
+            if (PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    shotOrigin,
+                    aimPoint,
+                    GetRid(),
+                    uint.MaxValue,
+                    out var hit))
             {
-                aimPoint = hit["position"].AsVector3();
+                aimPoint = hit.Position;
             }
         }
         else
@@ -1489,13 +1493,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
         else if (!clear)
         {
-            var query = PhysicsRayQueryParameters3D.Create(shotOrigin, aimPoint);
-            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            query.CollideWithAreas = false;
-            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-            if (hit.Count > 0)
+            if (PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    shotOrigin,
+                    aimPoint,
+                    GetRid(),
+                    uint.MaxValue,
+                    out var hit))
             {
-                aimPoint = hit["position"].AsVector3();
+                aimPoint = hit.Position;
             }
         }
         else

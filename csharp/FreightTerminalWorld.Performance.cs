@@ -5,7 +5,7 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
-    private const string MapDetailVisualGroup = "map_detail_visuals";
+    private static readonly StringName MapDetailVisualGroup = "map_detail_visuals";
     private static readonly float[] MapDetailVisibilityRanges = { 34.0f, 58.0f, 84.0f };
 
     private struct MapRuntimeCounts
@@ -79,7 +79,9 @@ public partial class FreightTerminalWorld
         {
             return;
         }
-        foreach (var node in GetTree().GetNodesInGroup(MapDetailVisualGroup))
+        var detailNodes = GetTree().GetNodesInGroup(MapDetailVisualGroup);
+        using var detailNodesBacking = detailNodes.AsDisposable();
+        foreach (var node in detailNodes)
         {
             if (node is GeometryInstance3D visual && IsInstanceValid(visual))
             {
@@ -155,7 +157,9 @@ public partial class FreightTerminalWorld
                 counts.ResidentialStairVisuals++;
             }
         }
-        foreach (var child in node.GetChildren())
+        var children = node.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is Node childNode)
             {
@@ -185,7 +189,9 @@ public partial class FreightTerminalWorld
         var stairVisualsBatched = counts.MultiMeshInstances >= expectedFloors;
         var expectedDetailRange = MapDetailVisibilityRanges[Mathf.Clamp(_qualitySetting, 0, 2)];
         var detailQualityReady = true;
-        foreach (var node in GetTree().GetNodesInGroup(MapDetailVisualGroup))
+        var detailNodes = GetTree().GetNodesInGroup(MapDetailVisualGroup);
+        using var detailNodesBacking = detailNodes.AsDisposable();
+        foreach (var node in detailNodes)
         {
             if (node is not GeometryInstance3D visual)
             {

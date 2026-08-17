@@ -80,7 +80,9 @@ public partial class TacticalPlayer
             return 0;
         }
         var count = root is MeshInstance3D ? 1 : 0;
-        foreach (var child in root!.GetChildren())
+        var children = root!.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             count += CountMeshes(child);
         }

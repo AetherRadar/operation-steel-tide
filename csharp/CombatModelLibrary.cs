@@ -307,7 +307,9 @@ internal static class CombatModelLibrary
                 }
             }
         }
-        foreach (var child in node.GetChildren())
+        var children = node.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is Node3D child3D)
             {
@@ -333,7 +335,9 @@ internal static class CombatModelLibrary
 
     private static IEnumerable<GeometryInstance3D> GeometryBelow(Node root)
     {
-        foreach (var child in root.GetChildren())
+        var children = root.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is GeometryInstance3D geometry)
             {

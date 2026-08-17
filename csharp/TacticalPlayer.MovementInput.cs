@@ -126,24 +126,23 @@ public partial class TacticalPlayer
 
         var feet = GlobalPosition;
         var exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        var space = GetWorld3D().DirectSpaceState;
-        var obstacleQuery = PhysicsRayQueryParameters3D.Create(
-            feet + Vector3.Up * 0.38f,
-            feet + Vector3.Up * 0.38f + movementDirection * LowObstacleVaultReach);
-        obstacleQuery.CollisionMask = 1;
-        obstacleQuery.CollideWithAreas = false;
-        obstacleQuery.Exclude = exclude;
-        var obstacleHit = space.IntersectRay(obstacleQuery);
-        if (obstacleHit.Count == 0)
+        using var excludeBacking = exclude.AsDisposable();
+        if (!PhysicsRaycast.TryHit(
+                GetWorld3D(),
+                feet + Vector3.Up * 0.38f,
+                feet + Vector3.Up * 0.38f + movementDirection * LowObstacleVaultReach,
+                exclude,
+                1,
+                out var obstacleHit))
         {
             LastVaultResultForDiagnostics = "rejected:no_obstacle";
             return false;
         }
 
-        var obstacle = obstacleHit["collider"].AsGodotObject();
-        var obstacleShape = obstacleHit.ContainsKey("shape") ? obstacleHit["shape"].AsInt32() : -1;
+        var obstacle = obstacleHit.Collider;
+        var obstacleShape = obstacleHit.Shape;
         LastVaultResultForDiagnostics = $"candidate:{(obstacle as Node)?.Name ?? obstacle?.GetType().Name ?? "unknown"}";
-        var obstaclePosition = obstacleHit["position"].AsVector3();
+        var obstaclePosition = obstacleHit.Position;
         var obstacleDistance = new Vector2(
             obstaclePosition.X - feet.X,
             obstaclePosition.Z - feet.Z).Length();
@@ -154,33 +153,32 @@ public partial class TacticalPlayer
                 0.34f,
                 LowObstacleVaultReach);
             var sample = feet + movementDirection * sampleDistance;
-            var topQuery = PhysicsRayQueryParameters3D.Create(
-                sample + Vector3.Up * (LowObstacleVaultMaxHeight + 0.32f),
-                sample + Vector3.Up * 0.08f);
-            topQuery.CollisionMask = 1;
-            topQuery.CollideWithAreas = false;
-            topQuery.Exclude = exclude;
-            var topHit = space.IntersectRay(topQuery);
-            if (topHit.Count == 0)
+            if (!PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    sample + Vector3.Up * (LowObstacleVaultMaxHeight + 0.32f),
+                    sample + Vector3.Up * 0.08f,
+                    exclude,
+                    1,
+                    out var topHit))
             {
                 LastVaultResultForDiagnostics = $"rejected:no_top:{inset:0.00}";
                 continue;
             }
-            var topCollider = topHit["collider"].AsGodotObject();
-            var topShape = topHit.ContainsKey("shape") ? topHit["shape"].AsInt32() : -1;
+            var topCollider = topHit.Collider;
+            var topShape = topHit.Shape;
             if (topCollider != obstacle || (obstacleShape >= 0 && topShape >= 0 && topShape != obstacleShape))
             {
                 LastVaultResultForDiagnostics = $"rejected:wrong_surface:{(topCollider as Node)?.Name ?? topCollider?.GetType().Name ?? "unknown"}";
                 continue;
             }
-            var topNormal = topHit["normal"].AsVector3();
+            var topNormal = topHit.Normal;
             if (topNormal.Dot(Vector3.Up) < 0.78f)
             {
                 LastVaultResultForDiagnostics = $"rejected:steep_top:{topNormal.Dot(Vector3.Up):0.00}";
                 continue;
             }
 
-            var top = topHit["position"].AsVector3();
+            var top = topHit.Position;
             var lift = top.Y - feet.Y;
             if (lift < LowObstacleVaultMinHeight || lift > LowObstacleVaultMaxHeight)
             {
@@ -189,9 +187,10 @@ public partial class TacticalPlayer
             }
 
             var targetFeet = top + Vector3.Up * LowObstacleVaultLandingClearance;
-            var clearance = new PhysicsShapeQueryParameters3D
+            using var clearanceShape = new CapsuleShape3D { Radius = 0.38f, Height = 1.75f };
+            using var clearance = new PhysicsShapeQueryParameters3D
             {
-                Shape = new CapsuleShape3D { Radius = 0.38f, Height = 1.75f },
+                Shape = clearanceShape,
                 Transform = new Transform3D(Basis.Identity, targetFeet + Vector3.Up * 0.9f),
                 CollisionMask = 1,
                 CollideWithAreas = false,
@@ -199,10 +198,13 @@ public partial class TacticalPlayer
                 Margin = 0.005f,
                 Exclude = exclude
             };
-            var overlaps = space.IntersectShape(clearance, 8);
+            var overlaps = GetWorld3D().DirectSpaceState.IntersectShape(clearance, 8);
+            using var overlapsBacking = overlaps.AsDisposable();
             if (overlaps.Count > 0)
             {
-                var blocker = overlaps[0]["collider"].AsGodotObject();
+                using var firstOverlap = overlaps[0];
+                using var blockerValue = firstOverlap[GodotPhysicsResultKeys.Collider];
+                var blocker = blockerValue.AsGodotObject();
                 LastVaultResultForDiagnostics = $"rejected:landing_blocked:{(blocker as Node)?.Name ?? blocker?.GetType().Name ?? "unknown"}";
                 continue;
             }

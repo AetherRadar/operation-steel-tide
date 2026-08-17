@@ -201,7 +201,7 @@ public partial class FreightTerminalWorld : Node3D
             GetTree().ReloadCurrentScene();
             return;
         }
-        if (!_missionEnded && !_player.IsDead && Input.IsActionJustPressed("inventory"))
+        if (!_missionEnded && !_player.IsDead && Input.IsActionJustPressed(GameInputActions.Inventory))
         {
             if (_hud.IsLootVisible)
             {
@@ -215,11 +215,11 @@ public partial class FreightTerminalWorld : Node3D
         }
         if (_hud.IsLootVisible)
         {
-            if (!Input.IsActionPressed("interact"))
+            if (!Input.IsActionPressed(GameInputActions.Interact))
             {
                 _interactReleaseRequired = false;
             }
-            else if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
+            else if (!_interactReleaseRequired && Input.IsActionJustPressed(GameInputActions.Interact))
             {
                 _interactReleaseRequired = true;
                 CloseLoot();
@@ -433,11 +433,13 @@ public partial class FreightTerminalWorld : Node3D
             {
                 continue;
             }
-            var query = PhysicsRayQueryParameters3D.Create(point + Vector3.Up, threat + Vector3.Up * 1.3f);
-            query.CollideWithAreas = false;
-            query.CollisionMask = 1;
-            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-            if (hit.Count == 0 || (hit.TryGetValue("collider", out var collider) && collider.AsGodotObject() == _player))
+            if (!PhysicsRaycast.TryHit(
+                    GetWorld3D().DirectSpaceState,
+                    point + Vector3.Up,
+                    threat + Vector3.Up * 1.3f,
+                    1,
+                    out var hit)
+                || hit.Collider == _player)
             {
                 continue;
             }
@@ -523,7 +525,9 @@ public partial class FreightTerminalWorld : Node3D
     {
         ReportGunshot(position, 70.0f);
         var glassEffectBudget = 12;
-        foreach (var node in GetTree().GetNodesInGroup(BreakableGlassField.GroupName))
+        var glassFields = GetTree().GetNodesInGroup(BreakableGlassField.GroupName);
+        using var glassFieldsBacking = glassFields.AsDisposable();
+        foreach (var node in glassFields)
         {
             if (node is not BreakableGlassField glass || !IsInstanceValid(glass))
             {
@@ -1199,8 +1203,9 @@ public partial class FreightTerminalWorld : Node3D
 
         var space = GetWorld3D().DirectSpaceState;
         var target = source.LootNode.GlobalPosition + Vector3.Up * 0.28f;
-        var playerShape = new CapsuleShape3D { Radius = 0.38f, Height = 1.75f };
+        using var playerShape = new CapsuleShape3D { Radius = 0.38f, Height = 1.75f };
         var clearanceExclude = new Godot.Collections.Array<Rid>();
+        using var clearanceExcludeBacking = clearanceExclude.AsDisposable();
         if (source.LootNode is CollisionObject3D collisionSource)
         {
             clearanceExclude.Add(collisionSource.GetRid());
@@ -1221,19 +1226,19 @@ public partial class FreightTerminalWorld : Node3D
             foreach (var direction in approachDirections)
             {
                 var approach = source.LootNode.GlobalPosition + direction * approachDistance;
-                var floorQuery = PhysicsRayQueryParameters3D.Create(
-                    approach + Vector3.Up * 2.2f,
-                    approach + Vector3.Down * 2.2f);
-                floorQuery.CollisionMask = 1;
-                floorQuery.CollideWithAreas = false;
-                var floorHit = space.IntersectRay(floorQuery);
-                if (floorHit.Count == 0 || floorHit["normal"].AsVector3().Dot(Vector3.Up) < 0.65f)
+                if (!PhysicsRaycast.TryHit(
+                        space,
+                        approach + Vector3.Up * 2.2f,
+                        approach + Vector3.Down * 2.2f,
+                        1,
+                        out var floorHit)
+                    || floorHit.Normal.Dot(Vector3.Up) < 0.65f)
                 {
                     continue;
                 }
 
-                var feet = floorHit["position"].AsVector3() + Vector3.Up * 0.03f;
-                var clearanceQuery = new PhysicsShapeQueryParameters3D
+                var feet = floorHit.Position + Vector3.Up * 0.03f;
+                using var clearanceQuery = new PhysicsShapeQueryParameters3D
                 {
                     Shape = playerShape,
                     Transform = new Transform3D(Basis.Identity, feet + Vector3.Up * 0.88f),
@@ -1242,18 +1247,18 @@ public partial class FreightTerminalWorld : Node3D
                     CollideWithAreas = false,
                     Exclude = clearanceExclude
                 };
-                if (space.IntersectShape(clearanceQuery, 1).Count > 0)
+                if (PhysicsShapeProbe.HasCollision(space, clearanceQuery, 1))
                 {
                     continue;
                 }
 
-                var sightQuery = PhysicsRayQueryParameters3D.Create(
-                    target + direction * approachDistance,
-                    target);
-                sightQuery.CollisionMask = 1;
-                sightQuery.CollideWithAreas = false;
-                var sightHit = space.IntersectRay(sightQuery);
-                if (sightHit.Count > 0 && sightHit["collider"].AsGodotObject() == source.LootNode)
+                if (PhysicsRaycast.TryHit(
+                        space,
+                        target + direction * approachDistance,
+                        target,
+                        1,
+                        out var sightHit)
+                    && sightHit.Collider == source.LootNode)
                 {
                     return true;
                 }
@@ -1270,6 +1275,7 @@ public partial class FreightTerminalWorld : Node3D
         }
 
         var exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+        using var excludeBacking = exclude.AsDisposable();
         if (source.LootNode is CollisionObject3D collisionSource)
         {
             exclude.Add(collisionSource.GetRid());
@@ -1278,13 +1284,12 @@ public partial class FreightTerminalWorld : Node3D
         var from = _player.GlobalPosition + Vector3.Up * 1.25f;
         foreach (var targetHeight in new[] { 0.28f, 0.72f, 1.16f })
         {
-            var query = PhysicsRayQueryParameters3D.Create(
-                from,
-                source.LootNode.GlobalPosition + Vector3.Up * targetHeight);
-            query.CollisionMask = 1;
-            query.CollideWithAreas = false;
-            query.Exclude = exclude;
-            if (GetWorld3D().DirectSpaceState.IntersectRay(query).Count == 0)
+            if (!PhysicsRaycast.HasHit(
+                    GetWorld3D(),
+                    from,
+                    source.LootNode.GlobalPosition + Vector3.Up * targetHeight,
+                    exclude,
+                    1))
             {
                 return true;
             }
@@ -1300,7 +1305,9 @@ public partial class FreightTerminalWorld : Node3D
     {
         ILootSource? best = null;
         var bestDist = range * range;
-        foreach (var node in GetTree().GetNodesInGroup("graded_loot"))
+        var gradedLoot = GetTree().GetNodesInGroup("graded_loot");
+        using var gradedLootBacking = gradedLoot.AsDisposable();
+        foreach (var node in gradedLoot)
         {
             if (node is not GradedLootPickup pickup || !IsInstanceValid(pickup) || !pickup.IsSearchable)
             {
@@ -1652,7 +1659,7 @@ public partial class FreightTerminalWorld : Node3D
             UpdateDemolitionInteraction(delta);
             return;
         }
-        if (!Input.IsActionPressed("interact"))
+        if (!Input.IsActionPressed(GameInputActions.Interact))
         {
             _interactReleaseRequired = false;
         }
@@ -1670,7 +1677,7 @@ public partial class FreightTerminalWorld : Node3D
             if (vehicle is not null)
             {
                 _hud.SetInteraction(vehicle.InteractionLabel(_languageSetting), -1.0f, true);
-                if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
+                if (!_interactReleaseRequired && Input.IsActionJustPressed(GameInputActions.Interact))
                 {
                     _interactReleaseRequired = true;
                     vehicle.ExitDriver();
@@ -1714,7 +1721,7 @@ public partial class FreightTerminalWorld : Node3D
             _lootSearchTarget = null;
             _player.SetSearchPose(false);
             _hud.SetInteraction(nearestVehicle.InteractionLabel(_languageSetting), -1.0f, true);
-            if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
+            if (!_interactReleaseRequired && Input.IsActionJustPressed(GameInputActions.Interact))
             {
                 _interactReleaseRequired = true;
                 nearestVehicle.TryEnter(_player);
@@ -1743,7 +1750,7 @@ public partial class FreightTerminalWorld : Node3D
             _lootSearchTarget = null;
             _player.SetSearchPose(false);
             _hud.SetInteraction($"{nearestCivilian.AssistanceLabel(_languageSetting)}  //  F", -1.0f, true);
-            if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
+            if (!_interactReleaseRequired && Input.IsActionJustPressed(GameInputActions.Interact))
             {
                 _interactReleaseRequired = true;
                 nearestCivilian.TryProvideAssistance(_player);
@@ -1781,7 +1788,7 @@ public partial class FreightTerminalWorld : Node3D
             var unopenedContainer = nearest is IOpenableLootSource { IsOpened: false };
             if (nearest is ResidentialSearchableFurniture || unopenedContainer)
             {
-                var searching = Input.IsActionPressed("interact") && !_interactReleaseRequired;
+                var searching = Input.IsActionPressed(GameInputActions.Interact) && !_interactReleaseRequired;
                 _interactionProgress = searching
                     ? Mathf.Min(1.0f, _interactionProgress + delta / nearest.SearchDuration)
                     : Mathf.Max(0.0f, _interactionProgress - delta * 2.2f);
@@ -1802,7 +1809,7 @@ public partial class FreightTerminalWorld : Node3D
                 _player.SetSearchPose(false);
                 var open = GameLocalization.Get("open_loot", _languageSetting, "OPEN");
                 _hud.SetInteraction($"{open}  //  {nearest.DisplayName(_languageSetting)}", -1.0f, true);
-                if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
+                if (!_interactReleaseRequired && Input.IsActionJustPressed(GameInputActions.Interact))
                 {
                     _interactReleaseRequired = true;
                     OpenLoot(nearest);
@@ -1863,7 +1870,7 @@ public partial class FreightTerminalWorld : Node3D
             _hud.HideLoot();
         }
         ClearPendingLootOpen();
-        _interactReleaseRequired = Input.IsActionPressed("interact");
+        _interactReleaseRequired = Input.IsActionPressed(GameInputActions.Interact);
         _player.UiLocked = true;
         _player.DisarmFireInput();
         _player.DisarmMovementInput();
@@ -1897,7 +1904,7 @@ public partial class FreightTerminalWorld : Node3D
         _personalBackpackOpen = false;
         _lootSearchTarget = null;
         _interactionProgress = 0.0f;
-        _interactReleaseRequired = Input.IsActionPressed("interact");
+        _interactReleaseRequired = Input.IsActionPressed(GameInputActions.Interact);
         _player.SetSearchPose(false);
         _player.DisarmFireInput();
         RetireEmptyGradedLootPickup(closedSource);
@@ -2108,16 +2115,15 @@ public partial class FreightTerminalWorld : Node3D
         forward = forward.Normalized();
 
         var candidate = _player.GlobalPosition + forward * 1.35f;
-        var query = PhysicsRayQueryParameters3D.Create(
-            candidate + Vector3.Up * 1.6f,
-            candidate + Vector3.Down * 3.2f);
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        query.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        if (hit.TryGetValue("position", out var floorPosition))
+        if (PhysicsRaycast.TryHit(
+                GetWorld3D(),
+                candidate + Vector3.Up * 1.6f,
+                candidate + Vector3.Down * 3.2f,
+                _player.GetRid(),
+                1,
+                out var hit))
         {
-            return floorPosition.AsVector3() + Vector3.Up * 0.03f;
+            return hit.Position + Vector3.Up * 0.03f;
         }
         candidate.Y = _player.GlobalPosition.Y + 0.03f;
         return candidate;
@@ -2185,7 +2191,7 @@ public partial class FreightTerminalWorld : Node3D
         var action = _objectiveStage == 0
             ? GameLocalization.Get("disable_relay", _languageSetting, "DISABLE RELAY")
             : GameLocalization.Get("download_manifest", _languageSetting, "DOWNLOAD MANIFEST");
-        _interactionProgress = Input.IsActionPressed("interact") && !_interactReleaseRequired
+        _interactionProgress = Input.IsActionPressed(GameInputActions.Interact) && !_interactReleaseRequired
             ? Mathf.Min(1.0f, _interactionProgress + delta / 1.8f)
             : Mathf.Max(0.0f, _interactionProgress - delta * 1.6f);
         _hud.SetInteraction(action, _interactionProgress, true);
@@ -2575,11 +2581,13 @@ public partial class FreightTerminalWorld : Node3D
             && _player.ArmorPlates == platesBefore - 1
             && _player.Armor > armorBefore;
 
-        var plateAction = InputMap.HasAction("use_plate");
+        var plateAction = InputMap.HasAction(GameInputActions.UsePlate);
         var plateKeyBound = false;
         if (plateAction)
         {
-            foreach (var inputEvent in InputMap.ActionGetEvents("use_plate"))
+            var plateEvents = InputMap.ActionGetEvents(GameInputActions.UsePlate);
+            using var plateEventsBacking = plateEvents.AsDisposable();
+            foreach (var inputEvent in plateEvents)
             {
                 if (inputEvent is InputEventKey key && key.PhysicalKeycode == Key.X)
                 {
@@ -3813,6 +3821,9 @@ public partial class FreightTerminalWorld : Node3D
             enemy.ProcessMode = ProcessModeEnum.Disabled;
         }
         _missionDirector.ExitDeploymentZone();
+        _player.GlobalPosition = new Vector3(8.0f, 0.2f, -8.0f);
+        _player.Velocity = Vector3.Zero;
+        await WaitFrames(3);
         var attacker = _enemies[0];
         var crouched = _player.TrySetStance(PlayerStance.Crouched);
         await WaitFrames(18);
@@ -3950,16 +3961,15 @@ public partial class FreightTerminalWorld : Node3D
         var attackOrbitReady = false;
         var maximumAttackStep = 0.0f;
         var attackGroundPoint = new Vector3(150.0f, 0.0f, 82.0f);
-        var attackGroundQuery = PhysicsRayQueryParameters3D.Create(
-            attackGroundPoint + Vector3.Up * 90.0f,
-            attackGroundPoint + Vector3.Down * 6.0f);
-        attackGroundQuery.CollisionMask = 1;
-        attackGroundQuery.CollideWithAreas = false;
-        attackGroundQuery.Exclude = new Godot.Collections.Array<Rid> { aircraft.GetRid() };
-        var attackGroundHit = GetWorld3D().DirectSpaceState.IntersectRay(attackGroundQuery);
-        if (attackGroundHit.Count > 0)
+        if (PhysicsRaycast.TryHit(
+                GetWorld3D().DirectSpaceState,
+                attackGroundPoint + Vector3.Up * 90.0f,
+                attackGroundPoint + Vector3.Down * 6.0f,
+                aircraft.GetRid(),
+                1,
+                out var attackGroundHit))
         {
-            var attackSurface = attackGroundHit["position"].AsVector3();
+            var attackSurface = attackGroundHit.Position;
             _player.ProcessMode = ProcessModeEnum.Disabled;
             _player.GlobalPosition = attackSurface + Vector3.Up * 0.3f;
             _player.Velocity = Vector3.Zero;
@@ -4006,6 +4016,7 @@ public partial class FreightTerminalWorld : Node3D
         }
         await WaitFrames(6);
         var shellNodes = GetTree().GetNodesInGroup("aircraft_shells");
+        using var shellNodesBacking = shellNodes.AsDisposable();
         var shellSpawned = shellNodes.Count > 0 || aircraft.AttackSalvosFired > salvosBefore;
         AircraftShell? shell = null;
         foreach (var node in shellNodes)
@@ -4026,7 +4037,9 @@ public partial class FreightTerminalWorld : Node3D
                 12.0f,
                 aircraft);
             await WaitFrames(2);
-            foreach (var node in GetTree().GetNodesInGroup("aircraft_shells"))
+            var diagnosticShellNodes = GetTree().GetNodesInGroup("aircraft_shells");
+            using var diagnosticShellNodesBacking = diagnosticShellNodes.AsDisposable();
+            foreach (var node in diagnosticShellNodes)
             {
                 if (node is AircraftShell candidate && IsInstanceValid(candidate) && !candidate.IsDestroyed)
                 {
@@ -4047,18 +4060,17 @@ public partial class FreightTerminalWorld : Node3D
         }
 
         var landingPoint = new Vector3(150.0f, 0.0f, 82.0f);
-        var landingQuery = PhysicsRayQueryParameters3D.Create(
-            landingPoint + Vector3.Up * 90.0f,
-            landingPoint + Vector3.Down * 6.0f);
-        landingQuery.CollisionMask = 1;
-        landingQuery.CollideWithAreas = false;
-        landingQuery.Exclude = new Godot.Collections.Array<Rid> { aircraft.GetRid() };
-        var landingHit = GetWorld3D().DirectSpaceState.IntersectRay(landingQuery);
         var missileLanded = false;
         var missileLandingLow = false;
-        if (landingHit.Count > 0)
+        if (PhysicsRaycast.TryHit(
+                GetWorld3D().DirectSpaceState,
+                landingPoint + Vector3.Up * 90.0f,
+                landingPoint + Vector3.Down * 6.0f,
+                aircraft.GetRid(),
+                1,
+                out var landingHit))
         {
-            var surface = landingHit["position"].AsVector3();
+            var surface = landingHit.Position;
             var landingShell = new AircraftShell
             {
                 Name = "AircraftLandingDiagnosticShell",
@@ -4113,14 +4125,13 @@ public partial class FreightTerminalWorld : Node3D
         var dropSearchable = false;
         if (supplyDrop is not null)
         {
-            var supportQuery = PhysicsRayQueryParameters3D.Create(
-                supplyDrop.GlobalPosition + Vector3.Up * 0.12f,
-                supplyDrop.GlobalPosition + Vector3.Down * 0.45f);
-            supportQuery.CollisionMask = 1;
-            supportQuery.CollideWithAreas = false;
-            supportQuery.Exclude = new Godot.Collections.Array<Rid> { supplyDrop.GetRid() };
             dropGrounded = supplyDrop.GroundResolved
-                && GetWorld3D().DirectSpaceState.IntersectRay(supportQuery).Count > 0;
+                && PhysicsRaycast.HasHit(
+                    GetWorld3D().DirectSpaceState,
+                    supplyDrop.GlobalPosition + Vector3.Up * 0.12f,
+                    supplyDrop.GlobalPosition + Vector3.Down * 0.45f,
+                    supplyDrop.GetRid(),
+                    1);
             supplyDrop.OnSearched();
             dropSearchable = supplyDrop.IsSearchable && supplyDrop.IsOpened;
         }
@@ -4879,7 +4890,9 @@ public partial class FreightTerminalWorld : Node3D
         var openingHalfWidth = openingWidth * 0.5f;
         var openingNorth = firstCoreZ - ResidentialStairOpeningNorthDepth;
         var openingSouth = firstCoreZ + ResidentialStairOpeningSouthDepth;
-        foreach (var child in firstTower.GetChildren())
+        var firstTowerChildren = firstTower.GetChildren();
+        using var firstTowerChildrenBacking = firstTowerChildren.AsDisposable();
+        foreach (var child in firstTowerChildren)
         {
             var childName = child.Name.ToString();
             if (childName.Contains("ResidentialStairSpine", StringComparison.OrdinalIgnoreCase))
@@ -4924,7 +4937,9 @@ public partial class FreightTerminalWorld : Node3D
             {
                 rampBodies++;
             }
-            foreach (var bodyChild in body.GetChildren())
+            var bodyChildren = body.GetChildren();
+            using var bodyChildrenBacking = bodyChildren.AsDisposable();
+            foreach (var bodyChild in bodyChildren)
             {
                 if (bodyChild is not CollisionShape3D shape)
                 {
@@ -5242,18 +5257,19 @@ public partial class FreightTerminalWorld : Node3D
         for (var sightlineIndex = 0; sightlineIndex < _residentialSkybridgeSightlines.Count; sightlineIndex++)
         {
             var sightline = _residentialSkybridgeSightlines[sightlineIndex];
-            var query = PhysicsRayQueryParameters3D.Create(sightline.From, sightline.To);
-            query.CollisionMask = 1;
-            query.CollideWithAreas = false;
-            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-            if (hit.Count == 0)
+            if (!PhysicsRaycast.TryHit(
+                    GetWorld3D().DirectSpaceState,
+                    sightline.From,
+                    sightline.To,
+                    1,
+                    out var hit))
             {
                 bridgeSightlineClear[sightline.BridgeIndex] = true;
             }
             else if (blockedSightline < 0)
             {
                 blockedSightline = sightlineIndex;
-                blockedCollider = hit["collider"].AsGodotObject() is Node colliderNode ? colliderNode.Name : "unknown";
+                blockedCollider = hit.Collider is Node colliderNode ? colliderNode.Name : "unknown";
             }
         }
         clearSightlines &= bridgeSightlineClear.All(value => value);
@@ -5314,7 +5330,7 @@ public partial class FreightTerminalWorld : Node3D
                 Input.ActionPress("move_forward");
                 _player.FaceWorldPointForDiagnostics(waypoint);
                 if (frame > 2
-                    && Input.IsActionPressed("move_forward")
+                    && Input.IsActionPressed(GameInputActions.MoveForward)
                     && !_player.HasMovementIntent)
                 {
                     _player.RestoreMovementInput();
@@ -5340,14 +5356,14 @@ public partial class FreightTerminalWorld : Node3D
                     }
                 }
                 var progress = (_player.GlobalPosition - worldA).Dot(direction);
-                var trace = PhysicsRayQueryParameters3D.Create(
+                var hasTraceHit = PhysicsRaycast.TryHit(
+                    GetWorld3D().DirectSpaceState,
                     _player.GlobalPosition + Vector3.Up * 0.75f,
-                    waypoint + Vector3.Up * 0.75f);
-                trace.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
-                trace.CollisionMask = 1;
-                trace.CollideWithAreas = false;
-                var traceHit = GetWorld3D().DirectSpaceState.IntersectRay(trace);
-                var traceCollider = traceHit.Count > 0 && traceHit["collider"].AsGodotObject() is Node traceNode
+                    waypoint + Vector3.Up * 0.75f,
+                    _player.GetRid(),
+                    1,
+                    out var traceHit);
+                var traceCollider = hasTraceHit && traceHit.Collider is Node traceNode
                     ? traceNode.Name.ToString()
                     : "none";
                 static string TraceObstacle(
@@ -5358,17 +5374,18 @@ public partial class FreightTerminalWorld : Node3D
                 {
                     var from = player.GlobalPosition + Vector3.Up * height;
                     var to = new Vector3(waypoint.X, player.GlobalPosition.Y + height, waypoint.Z);
-                    var query = PhysicsRayQueryParameters3D.Create(from, to);
-                    query.Exclude = new Godot.Collections.Array<Rid> { player.GetRid() };
-                    query.CollisionMask = 1;
-                    query.CollideWithAreas = false;
-                    var hit = space.IntersectRay(query);
-                    if (hit.Count == 0)
+                    if (!PhysicsRaycast.TryHit(
+                            space,
+                            from,
+                            to,
+                            player.GetRid(),
+                            1,
+                            out var hit))
                     {
                         return "none";
                     }
-                    var collider = hit["collider"].AsGodotObject() as Node;
-                    var position = hit["position"].AsVector3();
+                    var collider = hit.Collider as Node;
+                    var position = hit.Position;
                     return $"{collider?.Name ?? "unknown"}@({position.X:0.0},{position.Y:0.0},{position.Z:0.0})";
                 }
                 var lowTrace = TraceObstacle(GetWorld3D().DirectSpaceState, _player, waypoint, 0.32f);
@@ -5376,7 +5393,13 @@ public partial class FreightTerminalWorld : Node3D
                 var contactBody = _player.GetSlideCollisionCount() > 0
                     ? _player.GetSlideCollision(0).GetCollider() as StaticBody3D
                     : null;
-                var contactShape = contactBody?.GetChildren().OfType<CollisionShape3D>().FirstOrDefault();
+                CollisionShape3D? contactShape = null;
+                if (contactBody is not null)
+                {
+                    var contactChildren = contactBody.GetChildren();
+                    using var contactChildrenBacking = contactChildren.AsDisposable();
+                    contactShape = contactChildren.OfType<CollisionShape3D>().FirstOrDefault();
+                }
                 var contactLocal = contactBody is not null ? contactBody.ToLocal(_player.GlobalPosition) : Vector3.Zero;
                 var contactSize = contactShape?.Shape is BoxShape3D box ? box.Size : Vector3.Zero;
                 GD.Print($"SKYLINK_STALL waypoint={reachedWaypoints} dist={_player.GlobalPosition.DistanceTo(waypoint):0.0} progress={progress:0.0} player=({_player.GlobalPosition.X:0.0},{_player.GlobalPosition.Y:0.0},{_player.GlobalPosition.Z:0.0}) target=({waypoint.X:0.0},{waypoint.Y:0.0},{waypoint.Z:0.0}) trace={traceCollider} low_trace={lowTrace} waist_trace={waistTrace} contact_local=({contactLocal.X:0.0},{contactLocal.Y:0.0},{contactLocal.Z:0.0}) contact_size=({contactSize.X:0.0},{contactSize.Y:0.0},{contactSize.Z:0.0}) health={_player.Health:0.0} dead={_player.IsDead} intent={_player.HasMovementIntent} stamina={_player.Stamina:0.0} velocity=({_player.Velocity.X:0.0},{_player.Velocity.Y:0.0},{_player.Velocity.Z:0.0}) colliders={string.Join(',', colliders)}");
@@ -5498,7 +5521,9 @@ public partial class FreightTerminalWorld : Node3D
         var zhGrade = LootGrades.DisplayName(LootGrade.Epic, "zh");
         var zhBackpack = GameLocalization.Get("backpack_button", "zh", "TAB  BACKPACK");
         var zhOk = zhGrade == "史诗" && zhBackpack.Contains("背包", StringComparison.Ordinal);
-        var gradedPickups = GetTree().GetNodesInGroup("graded_loot").Count;
+        var gradedPickupNodes = GetTree().GetNodesInGroup("graded_loot");
+        using var gradedPickupNodesBacking = gradedPickupNodes.AsDisposable();
+        var gradedPickups = gradedPickupNodes.Count;
         var buildingLootOk = gradedPickups >= 8;
         var supplyDropGsh18 = CreateAircraftSupplyDropLoot().Any(item =>
             item.Kind == LootItemKind.Weapon && item.Weapon?.Platform == WeaponPlatform.GSh18);
@@ -5540,7 +5565,9 @@ public partial class FreightTerminalWorld : Node3D
             // Prove the real projectile ignores weapon damage and continues flying.
             SpawnAircraftShell(aircraft.GlobalPosition, aircraft.GlobalPosition + Vector3.Down * 6.0f, 30.0f, 11.0f, aircraft);
             await WaitFrames(2);
-            foreach (var node in GetTree().GetNodesInGroup("aircraft_shells"))
+            var aircraftShellNodes = GetTree().GetNodesInGroup("aircraft_shells");
+            using var aircraftShellNodesBacking = aircraftShellNodes.AsDisposable();
+            foreach (var node in aircraftShellNodes)
             {
                 if (node is AircraftShell shell && IsInstanceValid(shell) && !shell.IsDestroyed)
                 {

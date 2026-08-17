@@ -193,22 +193,21 @@ public partial class SquadMate
 
         var feet = GlobalPosition;
         var exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        var space = GetWorld3D().DirectSpaceState;
-        var obstacleQuery = PhysicsRayQueryParameters3D.Create(
-            feet + Vector3.Up * 0.38f,
-            feet + Vector3.Up * 0.38f + direction * NavigationVaultReach);
-        obstacleQuery.CollisionMask = 1;
-        obstacleQuery.CollideWithAreas = false;
-        obstacleQuery.Exclude = exclude;
-        var obstacleHit = space.IntersectRay(obstacleQuery);
-        if (obstacleHit.Count == 0)
+        using var excludeBacking = exclude.AsDisposable();
+        if (!PhysicsRaycast.TryHit(
+                GetWorld3D(),
+                feet + Vector3.Up * 0.38f,
+                feet + Vector3.Up * 0.38f + direction * NavigationVaultReach,
+                exclude,
+                1,
+                out var obstacleHit))
         {
             return false;
         }
 
-        var obstacle = obstacleHit["collider"].AsGodotObject();
-        var obstacleShape = obstacleHit.ContainsKey("shape") ? obstacleHit["shape"].AsInt32() : -1;
-        var obstaclePosition = obstacleHit["position"].AsVector3();
+        var obstacle = obstacleHit.Collider;
+        var obstacleShape = obstacleHit.Shape;
+        var obstaclePosition = obstacleHit.Position;
         var obstacleDistance = new Vector2(
             obstaclePosition.X - feet.X,
             obstaclePosition.Z - feet.Z).Length();
@@ -219,27 +218,26 @@ public partial class SquadMate
                 0.34f,
                 NavigationVaultReach);
             var sample = feet + direction * sampleDistance;
-            var topQuery = PhysicsRayQueryParameters3D.Create(
-                sample + Vector3.Up * (NavigationVaultMaxHeight + 0.32f),
-                sample + Vector3.Up * 0.08f);
-            topQuery.CollisionMask = 1;
-            topQuery.CollideWithAreas = false;
-            topQuery.Exclude = exclude;
-            var topHit = space.IntersectRay(topQuery);
-            if (topHit.Count == 0)
+            if (!PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    sample + Vector3.Up * (NavigationVaultMaxHeight + 0.32f),
+                    sample + Vector3.Up * 0.08f,
+                    exclude,
+                    1,
+                    out var topHit))
             {
                 continue;
             }
-            var topCollider = topHit["collider"].AsGodotObject();
-            var topShape = topHit.ContainsKey("shape") ? topHit["shape"].AsInt32() : -1;
-            var topNormal = topHit["normal"].AsVector3();
+            var topCollider = topHit.Collider;
+            var topShape = topHit.Shape;
+            var topNormal = topHit.Normal;
             if (topCollider != obstacle
                 || obstacleShape >= 0 && topShape >= 0 && topShape != obstacleShape
                 || topNormal.Dot(Vector3.Up) < 0.78f)
             {
                 continue;
             }
-            var top = topHit["position"].AsVector3();
+            var top = topHit.Position;
             var lift = top.Y - feet.Y;
             if (lift < NavigationVaultMinHeight || lift > NavigationVaultMaxHeight)
             {
@@ -275,14 +273,13 @@ public partial class SquadMate
         }
         var feet = GlobalPosition;
         var exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        var space = GetWorld3D().DirectSpaceState;
-        var guardQuery = PhysicsRayQueryParameters3D.Create(
-            feet + Vector3.Up * 0.62f,
-            feet + Vector3.Up * 0.62f + direction * 0.82f);
-        guardQuery.CollisionMask = 1;
-        guardQuery.CollideWithAreas = false;
-        guardQuery.Exclude = exclude;
-        if (space.IntersectRay(guardQuery).Count > 0)
+        using var excludeBacking = exclude.AsDisposable();
+        if (PhysicsRaycast.HasHit(
+                GetWorld3D(),
+                feet + Vector3.Up * 0.62f,
+                feet + Vector3.Up * 0.62f + direction * 0.82f,
+                exclude,
+                1))
         {
             return false;
         }
@@ -290,18 +287,18 @@ public partial class SquadMate
         foreach (var distance in new[] { 0.78f, 1.02f, 1.26f })
         {
             var sample = feet + direction * distance;
-            var landingQuery = PhysicsRayQueryParameters3D.Create(
-                sample + Vector3.Up * 0.55f,
-                sample + Vector3.Down * (NavigationDropMaxHeight + 0.35f));
-            landingQuery.CollisionMask = 1;
-            landingQuery.CollideWithAreas = false;
-            landingQuery.Exclude = exclude;
-            var landingHit = space.IntersectRay(landingQuery);
-            if (landingHit.Count == 0 || landingHit["normal"].AsVector3().Dot(Vector3.Up) < 0.78f)
+            if (!PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    sample + Vector3.Up * 0.55f,
+                    sample + Vector3.Down * (NavigationDropMaxHeight + 0.35f),
+                    exclude,
+                    1,
+                    out var landingHit)
+                || landingHit.Normal.Dot(Vector3.Up) < 0.78f)
             {
                 continue;
             }
-            var landingSurface = landingHit["position"].AsVector3();
+            var landingSurface = landingHit.Position;
             var drop = feet.Y - landingSurface.Y;
             if (drop < NavigationDropMinHeight || drop > NavigationDropMaxHeight)
             {
@@ -341,9 +338,11 @@ public partial class SquadMate
 
     private bool HasNavigationLandingClearance(Vector3 landing)
     {
-        var query = new PhysicsShapeQueryParameters3D
+        var exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        using var excludeBacking = exclude.AsDisposable();
+        using var query = new PhysicsShapeQueryParameters3D
         {
-            Shape = new CapsuleShape3D { Radius = NavigationBodyRadius, Height = NavigationBodyHeight },
+            Shape = _navigationStepClearanceShape,
             Transform = new Transform3D(
                 Basis.Identity,
                 landing + Vector3.Up * NavigationBodyCenterHeight),
@@ -351,9 +350,11 @@ public partial class SquadMate
             CollideWithAreas = false,
             CollideWithBodies = true,
             Margin = 0.005f,
-            Exclude = new Godot.Collections.Array<Rid> { GetRid() }
+            Exclude = exclude
         };
-        return GetWorld3D().DirectSpaceState.IntersectShape(query, 8).Count == 0;
+        var hits = GetWorld3D().DirectSpaceState.IntersectShape(query, 8);
+        using var hitsBacking = hits.AsDisposable();
+        return hits.Count == 0;
     }
 
     private bool ValidateNavigationTraversalPath(NavigationTraversalPath path, out string blocker)

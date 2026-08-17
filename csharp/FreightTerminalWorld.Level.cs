@@ -1230,7 +1230,9 @@ void sky() {
                 visual.VisibilityRangeEndMargin = Mathf.Min(18.0f, visibilityRange * 0.12f);
             }
         }
-        foreach (var child in node.GetChildren())
+        var children = node.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is Node childNode)
             {

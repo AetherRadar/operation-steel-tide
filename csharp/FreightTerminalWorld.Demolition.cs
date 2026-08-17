@@ -334,7 +334,9 @@ public partial class FreightTerminalWorld
                 source.QueueFree();
             }
         }
-        foreach (var orphan in GetTree().GetNodesInGroup("player_squad_ai").OfType<SquadMate>().ToArray())
+        var squadNodes = GetTree().GetNodesInGroup("player_squad_ai");
+        using var squadNodesBacking = squadNodes.AsDisposable();
+        foreach (var orphan in squadNodes.OfType<SquadMate>().ToArray())
         {
             if (!_squadMates.Contains(orphan) && IsInstanceValid(orphan))
             {
@@ -515,7 +517,7 @@ public partial class FreightTerminalWorld
             return;
         }
 
-        var planting = Input.IsActionPressed("interact") && !_interactReleaseRequired;
+        var planting = Input.IsActionPressed(GameInputActions.Interact) && !_interactReleaseRequired;
         _demolitionPlantProgress = planting
             ? Mathf.Min(1.0f, _demolitionPlantProgress + delta / DemolitionPlantDuration)
             : Mathf.Max(0.0f, _demolitionPlantProgress - delta * 1.2f);
@@ -557,7 +559,7 @@ public partial class FreightTerminalWorld
             return;
         }
 
-        var defusing = Input.IsActionPressed("interact") && !_interactReleaseRequired;
+        var defusing = Input.IsActionPressed(GameInputActions.Interact) && !_interactReleaseRequired;
         _demolitionPlayerDefuseProgress = defusing
             ? Mathf.Min(1.0f, _demolitionPlayerDefuseProgress + delta / DemolitionDefuseDuration)
             : Mathf.Max(0.0f, _demolitionPlayerDefuseProgress - delta * 1.2f);
@@ -786,18 +788,22 @@ public partial class FreightTerminalWorld
 
     private bool IsDemolitionSitePlacementClear(Vector3 position)
     {
-        var query = new PhysicsShapeQueryParameters3D
+        using var shape = new BoxShape3D { Size = new Vector3(4.2f, 1.55f, 4.2f) };
+        using var query = new PhysicsShapeQueryParameters3D
         {
-            Shape = new BoxShape3D { Size = new Vector3(4.2f, 1.55f, 4.2f) },
+            Shape = shape,
             Transform = new Transform3D(Basis.Identity, position + Vector3.Up * 1.05f),
             CollisionMask = 1,
             CollideWithAreas = false,
             CollideWithBodies = true
         };
         var hits = GetWorld3D().DirectSpaceState.IntersectShape(query, 64);
-        foreach (var hit in hits)
+        using var hitsBacking = hits.AsDisposable();
+        for (var index = 0; index < hits.Count; index++)
         {
-            if (hit["collider"].AsGodotObject() is StaticBody3D body
+            using var hit = hits[index];
+            using var colliderValue = hit[GodotPhysicsResultKeys.Collider];
+            if (colliderValue.AsGodotObject() is StaticBody3D body
                 && _demolitionArena?.Owns(body) != true)
             {
                 return false;

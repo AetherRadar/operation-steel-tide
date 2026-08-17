@@ -58,7 +58,7 @@ public partial class FreightTerminalWorld
             var key = mode == RelayInteractionMode.Descend ? "relay_descend" : "relay_climb";
             var english = mode == RelayInteractionMode.Descend ? "DESCEND RELAY LADDER" : "CLIMB RELAY LADDER";
             _hud.SetInteraction(GameLocalization.Get(key, _languageSetting, english), -1.0f, true);
-            if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
+            if (!_interactReleaseRequired && Input.IsActionJustPressed(GameInputActions.Interact))
             {
                 _interactReleaseRequired = true;
                 BeginRelayClimb(station, mode == RelayInteractionMode.Descend);
@@ -75,7 +75,7 @@ public partial class FreightTerminalWorld
             return true;
         }
 
-        var held = Input.IsActionPressed("interact") && !_interactReleaseRequired;
+        var held = Input.IsActionPressed(GameInputActions.Interact) && !_interactReleaseRequired;
         var completed = AdvanceRelayStationActivation(station, delta, held, notifyDamage: true);
         _hud.SetInteraction(
             GameLocalization.Get("relay_activate", _languageSetting, "ACTIVATE RELAY // SCAN + ROOF CACHE"),
@@ -398,6 +398,7 @@ public partial class FreightTerminalWorld
         await WaitFrames(4);
         var expected = ResidentialTowerSpecs.Length * 4;
         var grouped = GetTree().GetNodesInGroup("residential_relay_stations");
+        using var groupedBacking = grouped.AsDisposable();
         var kinds = _residentialRelayStations.Select(station => station.Kind).Distinct().Count();
         var structureReady = _residentialRelayStations.All(station => IsInstanceValid(station)
             && station.CollisionLayer == 1

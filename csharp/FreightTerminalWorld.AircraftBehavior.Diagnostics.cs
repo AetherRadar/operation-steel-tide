@@ -52,13 +52,13 @@ public partial class FreightTerminalWorld
         }
 
         var probe = new Vector3(150.0f, 0.0f, 82.0f);
-        var groundQuery = PhysicsRayQueryParameters3D.Create(
+        var hasGroundHit = PhysicsRaycast.TryHit(
+            GetWorld3D().DirectSpaceState,
             probe + Vector3.Up * 90.0f,
-            probe + Vector3.Down * 6.0f);
-        groundQuery.CollisionMask = 1;
-        groundQuery.CollideWithAreas = false;
-        groundQuery.Exclude = new Godot.Collections.Array<Rid> { aircraft.GetRid() };
-        var groundHit = GetWorld3D().DirectSpaceState.IntersectRay(groundQuery);
+            probe + Vector3.Down * 6.0f,
+            aircraft.GetRid(),
+            1,
+            out var groundHit);
         var deploymentProtected = false;
         var visualEligible = false;
         var visualConfirmed = false;
@@ -77,9 +77,9 @@ public partial class FreightTerminalWorld
         var missionEndDisengaged = false;
         var cooldownWaitedForRejoin = false;
         var rejoinedPatrol = false;
-        if (groundHit.Count > 0)
+        if (hasGroundHit)
         {
-            var surface = groundHit["position"].AsVector3();
+            var surface = groundHit.Position;
             _player.ProcessMode = ProcessModeEnum.Disabled;
             _player.GlobalPosition = surface + Vector3.Up * 0.3f;
             _player.Velocity = Vector3.Zero;

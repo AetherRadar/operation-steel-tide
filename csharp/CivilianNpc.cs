@@ -314,11 +314,12 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         if (direction.LengthSquared() > 0.01f)
         {
             var from = GlobalPosition + Vector3.Up * 0.8f;
-            var query = PhysicsRayQueryParameters3D.Create(from, from + direction * 0.9f);
-            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            query.CollisionMask = 1;
-            query.CollideWithAreas = false;
-            if (GetWorld3D().DirectSpaceState.IntersectRay(query).Count > 0)
+            if (PhysicsRaycast.HasHit(
+                    GetWorld3D(),
+                    from,
+                    from + direction * 0.9f,
+                    GetRid(),
+                    1))
             {
                 PickWanderTarget();
                 direction = new Vector3(-direction.Z, 0.0f, direction.X);

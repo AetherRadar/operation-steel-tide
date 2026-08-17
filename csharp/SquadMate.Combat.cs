@@ -574,15 +574,17 @@ public partial class SquadMate
         {
             return false;
         }
-        var query = PhysicsRayQueryParameters3D.Create(from, to);
-        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        query.CollideWithAreas = false;
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        if (hit.Count == 0)
+        if (!PhysicsRaycast.TryHit(
+                GetWorld3D(),
+                from,
+                to,
+                GetRid(),
+                uint.MaxValue,
+                out var hit))
         {
             return false;
         }
-        var collider = hit["collider"].AsGodotObject();
+        var collider = hit.Collider;
         return collider == hostile
             || collider is Node node && (hostile.IsAncestorOf(node) || node.IsAncestorOf(hostile));
     }
@@ -590,11 +592,12 @@ public partial class SquadMate
     private bool HasGroundSupport(Vector3 position)
     {
         var from = position + Vector3.Up * 0.8f;
-        var query = PhysicsRayQueryParameters3D.Create(from, position + Vector3.Down * 1.8f);
-        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        return GetWorld3D().DirectSpaceState.IntersectRay(query).Count > 0;
+        return PhysicsRaycast.HasHit(
+            GetWorld3D(),
+            from,
+            position + Vector3.Down * 1.8f,
+            GetRid(),
+            1);
     }
 
     private float PreferredCombatDistance() => Role switch
@@ -653,10 +656,11 @@ public partial class SquadMate
     private Vector3 ApplySquadSeparation(Vector3 desired)
     {
         var separation = Vector3.Zero;
-        foreach (var node in GetTree().GetNodesInGroup("player_squad_ai"))
+        var mates = Main.SquadMatesForRuntime;
+        for (var index = 0; index < mates.Count; index++)
         {
-            if (node is not SquadMate mate
-                || mate == this
+            var mate = mates[index];
+            if (mate == this
                 || mate.IsDowned
                 || mate.IsBodyBag
                 || !IsInstanceValid(mate))
@@ -682,14 +686,15 @@ public partial class SquadMate
     private float MeasureMovementClearance(Vector3 direction, float maxDistance)
     {
         var from = GlobalPosition + Vector3.Up * 0.8f;
-        var query = PhysicsRayQueryParameters3D.Create(from, from + direction * maxDistance);
-        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        return hit.Count == 0
-            ? maxDistance
-            : from.DistanceTo(hit["position"].AsVector3());
+        return PhysicsRaycast.TryHit(
+            GetWorld3D(),
+            from,
+            from + direction * maxDistance,
+            GetRid(),
+            1,
+            out var hit)
+                ? from.DistanceTo(hit.Position)
+                : maxDistance;
     }
 
     private void TrackTacticalMovement(float delta)

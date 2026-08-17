@@ -21,6 +21,10 @@ public partial class FreightTerminalWorld
     private const ulong SquadNavNormalPlanIntervalMilliseconds = 90;
     private const ulong SquadNavShortcutCheckIntervalMilliseconds = 180;
     private const int SquadNavEstimateExpansionCap = 2500;
+    private const double SquadNavFollowPlanBudgetMilliseconds = 68.0;
+    private const double SquadNavEmergencyPlanBudgetMilliseconds = 68.0;
+    private const double SquadNavEstimatePlanBudgetMilliseconds = 8.0;
+    private const double SquadNavDiagnosticPlanBudgetMilliseconds = 500.0;
     private const int SquadNavCellCacheResetCapacity = 60000;
     private const int SquadNavTrailHandoffCandidates = 3;
     private const float SquadNavTrailHandoffRange = 26.0f;
@@ -207,21 +211,27 @@ public partial class FreightTerminalWorld
         out SquadGridPathState state)
     {
         state = new SquadGridPathState { Emergency = emergency, Destination = destination };
-        // Normal formation searches are globally staggered and use a small budget;
-        // emergency rescue retains the full search budget for correctness.
+        // One budget spans the direct route, layered connectors, and trail handoffs.
+        // This prevents a single no-route request from multiplying the cap per segment.
         var expansionCap = emergency
             ? SquadNavGrid.DefaultExpansionCap
             : SquadNavFollowExpansionCap;
+        var budget = new SquadNavSearchBudget(
+            expansionCap,
+            emergency
+                ? SquadNavEmergencyPlanBudgetMilliseconds
+                : SquadNavFollowPlanBudgetMilliseconds);
         if (Mathf.Abs(mate.GlobalPosition.Y - destination.Y) <= SquadNavSameBandHeight
-            && TryBuildSquadGridWaypoints(mate, destination, expansionCap, out var direct))
+            && TryBuildSquadGridWaypoints(mate, destination, budget, out var direct))
         {
             state.Directives = BuildSquadWalkDirectives(direct);
             return true;
         }
-        if (TryPlanSquadLayeredRoute(
+        if (!budget.IsExhausted
+            && TryPlanSquadLayeredRoute(
                 mate,
                 destination,
-                expansionCap,
+                budget,
                 out var layered,
                 out _))
         {
@@ -234,7 +244,11 @@ public partial class FreightTerminalWorld
         }
         foreach (var entryPoint in FindSquadGridTrailEntryCandidates(mate))
         {
-            if (!TryBuildSquadGridWaypoints(mate, entryPoint, expansionCap, out var handoff))
+            if (budget.IsExhausted)
+            {
+                break;
+            }
+            if (!TryBuildSquadGridWaypoints(mate, entryPoint, budget, out var handoff))
             {
                 continue;
             }
@@ -299,16 +313,17 @@ public partial class FreightTerminalWorld
     private bool TryBuildSquadGridWaypoints(
         SquadMate mate,
         Vector3 goal,
-        int expansionCap,
+        SquadNavSearchBudget budget,
         out Vector3[] waypoints)
     {
         var bucket = SquadTraversalBucket(mate.GlobalPosition);
         var exclude = BuildSquadNavExclusions();
+        using var excludeBacking = exclude.AsDisposable();
         return TryBuildSquadGridSegment(
             mate.GlobalPosition,
             goal,
             bucket,
-            expansionCap,
+            budget,
             exclude,
             out waypoints,
             out _);
@@ -318,22 +333,30 @@ public partial class FreightTerminalWorld
         Vector3 start,
         Vector3 goal,
         int bucket,
-        int expansionCap,
+        SquadNavSearchBudget budget,
         Godot.Collections.Array<Rid> exclude,
         out Vector3[] waypoints,
         out float cost)
     {
         waypoints = Array.Empty<Vector3>();
         cost = float.PositiveInfinity;
+        if (!budget.CanProbe)
+        {
+            return false;
+        }
         var anchorY = bucket * SquadNavCellSize;
         if (Mathf.Abs(start.Y - goal.Y) <= SquadNavStepHeight
-            && IsSquadMovementCorridorClearExcluding(start, goal, exclude))
+            && IsSquadMovementCorridorClearExcluding(start, goal, exclude, budget))
         {
             waypoints = new[] { goal };
             cost = start.DistanceTo(goal);
             return true;
         }
-        var probe = new SquadNavProbe(this, bucket, anchorY, exclude);
+        if (budget.IsExhausted)
+        {
+            return false;
+        }
+        var probe = new SquadNavProbe(this, bucket, anchorY, exclude, budget);
         SquadNavWorldToCell(start.X, start.Z, out var startX, out var startZ);
         SquadNavWorldToCell(goal.X, goal.Z, out var goalX, out var goalZ);
         if (!SquadNavPlanner.Contains(startX, startZ) || !SquadNavPlanner.Contains(goalX, goalZ))
@@ -345,15 +368,19 @@ public partial class FreightTerminalWorld
         {
             return false;
         }
-        foreach (var goalCell in FindSquadGridGoalCells(probe, goal, goalX, goalZ, exclude))
+        foreach (var goalCell in FindSquadGridGoalCells(probe, goal, goalX, goalZ, exclude, budget))
         {
+            if (budget.IsExhausted)
+            {
+                return false;
+            }
             var path = SquadNavPlanner.FindPath(
                 probe,
                 startCell.Value.X,
                 startCell.Value.Z,
                 goalCell.X,
                 goalCell.Z,
-                expansionCap);
+                budget);
             if (path is not { Count: > 1 })
             {
                 continue;
@@ -361,7 +388,8 @@ public partial class FreightTerminalWorld
             var points = new List<Vector3>(path.Count + 1);
             foreach (var cell in path)
             {
-                if (!TrySampleSquadNavSupport(cell.X, cell.Z, bucket, anchorY, exclude, out var supportY))
+                if (!budget.CanProbe
+                    || !TrySampleSquadNavSupport(cell.X, cell.Z, bucket, anchorY, exclude, out var supportY))
                 {
                     points.Clear();
                     break;
@@ -389,13 +417,18 @@ public partial class FreightTerminalWorld
         Vector3 goal,
         int goalX,
         int goalZ,
-        Godot.Collections.Array<Rid> exclude)
+        Godot.Collections.Array<Rid> exclude,
+        SquadNavSearchBudget budget)
     {
         var candidates = new List<(int X, int Z, float Distance)>();
         for (var dx = -2; dx <= 2; dx++)
         {
             for (var dz = -2; dz <= 2; dz++)
             {
+                if (!budget.CanProbe)
+                {
+                    return new List<(int X, int Z)>();
+                }
                 var cellX = goalX + dx;
                 var cellZ = goalZ + dz;
                 if (!SquadNavPlanner.Contains(cellX, cellZ) || !probe.IsCellWalkable(cellX, cellZ))
@@ -408,7 +441,7 @@ public partial class FreightTerminalWorld
                     continue;
                 }
                 var cellWorld = SquadNavCellToWorld(cellX, cellZ, supportY);
-                if (!IsSquadMovementCorridorClearExcluding(cellWorld, goal, exclude))
+                if (!IsSquadMovementCorridorClearExcluding(cellWorld, goal, exclude, budget))
                 {
                     continue;
                 }
@@ -560,11 +593,14 @@ public partial class FreightTerminalWorld
     private bool TryEstimateSquadGridCost(SquadMate mate, Vector3 destination, out float cost)
     {
         cost = 0.0f;
+        var budget = new SquadNavSearchBudget(
+            SquadNavEstimateExpansionCap,
+            SquadNavEstimatePlanBudgetMilliseconds);
         if (Mathf.Abs(mate.GlobalPosition.Y - destination.Y) <= SquadNavSameBandHeight
             && TryBuildSquadGridWaypoints(
                 mate,
                 destination,
-                SquadNavEstimateExpansionCap,
+                budget,
                 out var waypoints)
             && waypoints.Length > 0)
         {
@@ -575,10 +611,11 @@ public partial class FreightTerminalWorld
             }
             return true;
         }
-        if (!TryPlanSquadLayeredRoute(
+        if (budget.IsExhausted
+            || !TryPlanSquadLayeredRoute(
                 mate,
                 destination,
-                SquadNavEstimateExpansionCap,
+                budget,
                 out _,
                 out cost))
         {
@@ -790,23 +827,22 @@ public partial class FreightTerminalWorld
         supportY = float.NaN;
         var minimumY = float.PositiveInfinity;
         var maximumY = float.NegativeInfinity;
-        var space = GetWorld3D().DirectSpaceState;
         for (var index = 0; index < SquadNavSupportFootprintOffsets.Length; index++)
         {
             var offset = SquadNavSupportFootprintOffsets[index];
             var sample = new Vector3(expected.X + offset.X, expected.Y, expected.Z + offset.Y);
-            var query = PhysicsRayQueryParameters3D.Create(
-                sample + Vector3.Up * rayAbove,
-                sample + Vector3.Down * rayBelow);
-            query.CollisionMask = 1;
-            query.CollideWithAreas = false;
-            query.Exclude = exclude;
-            var hit = space.IntersectRay(query);
-            if (hit.Count == 0 || hit["normal"].AsVector3().Dot(Vector3.Up) < 0.72f)
+            if (!PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    sample + Vector3.Up * rayAbove,
+                    sample + Vector3.Down * rayBelow,
+                    exclude,
+                    1,
+                    out var hit)
+                || hit.Normal.Dot(Vector3.Up) < 0.72f)
             {
                 return false;
             }
-            var hitY = hit["position"].AsVector3().Y;
+            var hitY = hit.Position.Y;
             var delta = hitY - expected.Y;
             if (delta > maximumAbove || delta < -maximumBelow)
             {
@@ -838,7 +874,7 @@ public partial class FreightTerminalWorld
         Vector3 feet,
         Godot.Collections.Array<Rid> exclude)
     {
-        var query = new PhysicsShapeQueryParameters3D
+        using var query = new PhysicsShapeQueryParameters3D
         {
             Shape = _squadNavClearanceShape,
             Transform = new Transform3D(
@@ -850,7 +886,9 @@ public partial class FreightTerminalWorld
             Margin = 0.0f,
             Exclude = exclude
         };
-        return GetWorld3D().DirectSpaceState.IntersectShape(query, 4).Count == 0;
+        var hits = GetWorld3D().DirectSpaceState.IntersectShape(query, 4);
+        using var hitsBacking = hits.AsDisposable();
+        return hits.Count == 0;
     }
 
     private bool TryProbeSquadCorridorSupport(
@@ -864,19 +902,19 @@ public partial class FreightTerminalWorld
     {
         supportY = float.NaN;
         var sample = expected;
-        var query = PhysicsRayQueryParameters3D.Create(
-            sample + Vector3.Up * rayAbove,
-            sample + Vector3.Down * rayBelow);
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        query.Exclude = exclude;
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        if (hit.Count == 0 || hit["normal"].AsVector3().Dot(Vector3.Up) < 0.72f)
+        if (!PhysicsRaycast.TryHit(
+                GetWorld3D(),
+                sample + Vector3.Up * rayAbove,
+                sample + Vector3.Down * rayBelow,
+                exclude,
+                1,
+                out var hit)
+            || hit.Normal.Dot(Vector3.Up) < 0.72f)
         {
             return false;
         }
 
-        var hitY = hit["position"].AsVector3().Y;
+        var hitY = hit.Position.Y;
         var delta = hitY - expected.Y;
         if (delta > maximumAbove || delta < -maximumBelow)
         {
@@ -891,15 +929,18 @@ public partial class FreightTerminalWorld
     {
         private readonly FreightTerminalWorld _world;
         private readonly Godot.Collections.Array<Rid> _exclude;
+        private readonly SquadNavSearchBudget _budget;
 
         public SquadNavProbe(
             FreightTerminalWorld world,
             int bucket,
             float anchorY,
-            Godot.Collections.Array<Rid> exclude)
+            Godot.Collections.Array<Rid> exclude,
+            SquadNavSearchBudget budget)
         {
             _world = world;
             _exclude = exclude;
+            _budget = budget;
             Bucket = bucket;
             AnchorY = anchorY;
         }
@@ -908,11 +949,13 @@ public partial class FreightTerminalWorld
         public float AnchorY { get; }
 
         public bool IsCellWalkable(int x, int z)
-            => _world.TrySampleSquadNavSupport(x, z, Bucket, AnchorY, _exclude, out _);
+            => _budget.CanProbe
+                && _world.TrySampleSquadNavSupport(x, z, Bucket, AnchorY, _exclude, out _);
 
         public bool IsEdgeClear(int x, int z, int neighborX, int neighborZ)
         {
-            if (!_world.TrySampleSquadNavSupport(x, z, Bucket, AnchorY, _exclude, out var fromY)
+            if (!_budget.CanProbe
+                || !_world.TrySampleSquadNavSupport(x, z, Bucket, AnchorY, _exclude, out var fromY)
                 || !_world.TrySampleSquadNavSupport(neighborX, neighborZ, Bucket, AnchorY, _exclude, out var toY)
                 || Mathf.Abs(toY - fromY) > SquadNavStepHeight)
             {
@@ -928,7 +971,8 @@ public partial class FreightTerminalWorld
             var clear = _world.IsSquadMovementCorridorClearExcluding(
                 SquadNavCellToWorld(x, z, fromY),
                 SquadNavCellToWorld(neighborX, neighborZ, toY),
-                _exclude);
+                _exclude,
+                _budget);
             _world._squadNavEdgeCache[(edge, Bucket)] = (clear, now + SquadNavEdgeTtlMilliseconds);
             return clear;
         }

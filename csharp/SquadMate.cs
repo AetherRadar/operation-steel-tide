@@ -178,7 +178,9 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         Velocity = Vector3.Zero;
         CollisionLayer = 0;
         CollisionMask = 0;
-        foreach (var child in GetChildren())
+        var children = GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is CollisionShape3D collision)
             {
@@ -511,13 +513,15 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         // Wallbang gate on the real damage path.
         if (!Ballistics.HasClearShot(GetWorld3D(), shotOrigin, hitPoint, enemy, GetRid()))
         {
-            var query = PhysicsRayQueryParameters3D.Create(shotOrigin, hitPoint);
-            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            query.CollideWithAreas = false;
-            var blocked = GetWorld3D().DirectSpaceState.IntersectRay(query);
-            if (blocked.Count > 0)
+            if (PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    shotOrigin,
+                    hitPoint,
+                    GetRid(),
+                    uint.MaxValue,
+                    out var blocked))
             {
-                hitPoint = blocked["position"].AsVector3();
+                hitPoint = blocked.Position;
             }
             Main.SpawnTracer(shotOrigin, hitPoint, new Color(0.34f, 0.78f, 1.0f));
             return;
@@ -543,15 +547,17 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             return false;
         }
-        var query = PhysicsRayQueryParameters3D.Create(from, to);
-        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        query.CollideWithAreas = false;
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        if (hit.Count == 0)
+        if (!PhysicsRaycast.TryHit(
+                GetWorld3D(),
+                from,
+                to,
+                GetRid(),
+                uint.MaxValue,
+                out var hit))
         {
             return false;
         }
-        var collider = hit["collider"].AsGodotObject();
+        var collider = hit.Collider;
         return collider == enemy
             || collider is Node node && (enemy.IsAncestorOf(node) || node.IsAncestorOf(enemy));
     }

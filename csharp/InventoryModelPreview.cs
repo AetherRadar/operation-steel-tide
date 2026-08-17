@@ -111,7 +111,9 @@ public partial class InventoryModelPreview : SubViewportContainer
         {
             return;
         }
-        foreach (var child in _modelRoot.GetChildren())
+        var children = _modelRoot.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             _modelRoot.RemoveChild(child);
             child.QueueFree();

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace OperationSteelTide;
@@ -8,6 +9,7 @@ public partial class FreightTerminalWorld
     private bool _demolitionBuyPhaseActive;
     private float _demolitionBuyRemaining;
     private WeaponBuild _demolitionOpponentRoundWeapon = WeaponCatalog.Build(WeaponPlatform.P226, 0);
+    private readonly List<SmokeGrenade> _activeSmokeGrenades = new();
 
     public bool IsDemolitionBuyPhaseActive => _demolitionBuyPhaseActive;
     public float DemolitionBuySecondsRemaining => _demolitionBuyRemaining;
@@ -170,15 +172,30 @@ public partial class FreightTerminalWorld
 
     public bool IsLineObscuredBySmoke(Vector3 from, Vector3 to)
     {
-        foreach (var node in GetTree().GetNodesInGroup(SmokeGrenade.ActiveGroupName))
+        for (var index = _activeSmokeGrenades.Count - 1; index >= 0; index--)
         {
-            if (node is SmokeGrenade smoke
-                && IsInstanceValid(smoke)
-                && smoke.ObscuresSegment(from, to))
+            var smoke = _activeSmokeGrenades[index];
+            if (!IsInstanceValid(smoke))
+            {
+                _activeSmokeGrenades.RemoveAt(index);
+                continue;
+            }
+            if (smoke.ObscuresSegment(from, to))
             {
                 return true;
             }
         }
         return false;
     }
+
+    internal void RegisterActiveSmokeGrenade(SmokeGrenade smoke)
+    {
+        if (!_activeSmokeGrenades.Contains(smoke))
+        {
+            _activeSmokeGrenades.Add(smoke);
+        }
+    }
+
+    internal void UnregisterActiveSmokeGrenade(SmokeGrenade smoke)
+        => _activeSmokeGrenades.Remove(smoke);
 }

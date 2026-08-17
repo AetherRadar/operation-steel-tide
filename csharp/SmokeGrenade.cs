@@ -27,6 +27,7 @@ public partial class SmokeGrenade : RigidBody3D
     private bool _fading;
     private float _fuse;
     private float _airborneLifetime;
+    private FreightTerminalWorld? _registeredWorld;
 
     public override void _Ready()
     {
@@ -38,6 +39,8 @@ public partial class SmokeGrenade : RigidBody3D
         ContactMonitor = true;
         MaxContactsReported = 6;
         AddToGroup(ActiveGroupName);
+        _registeredWorld = GetParent() as FreightTerminalWorld;
+        _registeredWorld?.RegisterActiveSmokeGrenade(this);
         if (OwnerBody is PhysicsBody3D owner && IsInstanceValid(owner))
         {
             AddCollisionExceptionWith(owner);
@@ -51,6 +54,15 @@ public partial class SmokeGrenade : RigidBody3D
         _casing = new MeshInstance3D { Name = "SmokeCasingVisibility" };
         AddChild(_casing);
         _casing.AddChild(GrenadeVisualFactory.CreateSmokeGrenade(firstPerson: false));
+    }
+
+    public override void _ExitTree()
+    {
+        if (_registeredWorld is not null && IsInstanceValid(_registeredWorld))
+        {
+            _registeredWorld.UnregisterActiveSmokeGrenade(this);
+        }
+        _registeredWorld = null;
     }
 
     public void Arm(Vector3 direction)
@@ -223,7 +235,9 @@ public partial class SmokeGrenade : RigidBody3D
         {
             return;
         }
-        foreach (var child in _cloudRoot.GetChildren())
+        var children = _cloudRoot.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is not MeshInstance3D lobe)
             {

@@ -154,7 +154,9 @@ public partial class EnemyOperator
         }
         var group = IsRivalSquad ? "rival_operators" : "map_npc_operators";
         var shareRangeSq = SquadContactShareRange * SquadContactShareRange;
-        foreach (var node in GetTree().GetNodesInGroup(group))
+        var nodes = GetTree().GetNodesInGroup(group);
+        using var nodesBacking = nodes.AsDisposable();
+        foreach (var node in nodes)
         {
             if (node is not EnemyOperator ally
                 || ally == this
@@ -381,14 +383,15 @@ public partial class EnemyOperator
         foreach (var offset in new[] { Vector3.Zero, side, -side })
         {
             var from = GlobalPosition + Vector3.Up * 0.78f + offset;
-            var query = PhysicsRayQueryParameters3D.Create(from, from + direction * maxDistance);
-            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            query.CollideWithAreas = false;
-            query.CollisionMask = 1;
-            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-            if (hit.Count > 0)
+            if (PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    from,
+                    from + direction * maxDistance,
+                    GetRid(),
+                    1,
+                    out var hit))
             {
-                minimum = Mathf.Min(minimum, from.DistanceTo(hit["position"].AsVector3()));
+                minimum = Mathf.Min(minimum, from.DistanceTo(hit.Position));
             }
         }
         return minimum;
@@ -397,14 +400,15 @@ public partial class EnemyOperator
     private float MeasureStaticClearance(Vector3 direction, float maxDistance)
     {
         var from = GlobalPosition + Vector3.Up * 0.78f;
-        var query = PhysicsRayQueryParameters3D.Create(from, from + direction * maxDistance);
-        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        query.CollideWithAreas = false;
-        query.CollisionMask = 1;
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        return hit.Count == 0
-            ? maxDistance
-            : from.DistanceTo(hit["position"].AsVector3());
+        return PhysicsRaycast.TryHit(
+            GetWorld3D(),
+            from,
+            from + direction * maxDistance,
+            GetRid(),
+            1,
+            out var hit)
+                ? from.DistanceTo(hit.Position)
+                : maxDistance;
     }
 
     private void TrackPursuitProgress(float delta, bool wantsMove)

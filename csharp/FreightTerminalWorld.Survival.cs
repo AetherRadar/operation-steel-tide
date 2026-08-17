@@ -118,11 +118,13 @@ public partial class FreightTerminalWorld
         }
         _residentialEncounterController = encounterController;
 
-        var wheelAction = InputMap.HasAction("medical_wheel");
+        var wheelAction = InputMap.HasAction(GameInputActions.MedicalWheel);
         var wheelKeyBound = false;
         if (wheelAction)
         {
-            foreach (var inputEvent in InputMap.ActionGetEvents("medical_wheel"))
+            var wheelEvents = InputMap.ActionGetEvents(GameInputActions.MedicalWheel);
+            using var wheelEventsBacking = wheelEvents.AsDisposable();
+            foreach (var inputEvent in wheelEvents)
             {
                 if (inputEvent is InputEventKey key && key.PhysicalKeycode == Key.B)
                 {
@@ -427,7 +429,9 @@ public partial class FreightTerminalWorld
             expectedFloors += spec.Floors;
         }
         var infillNodes = GetTree().GetNodesInGroup("residential_infill");
+        using var infillNodesBacking = infillNodes.AsDisposable();
         var stairDetailNodes = GetTree().GetNodesInGroup("residential_stair_details");
+        using var stairDetailNodesBacking = stairDetailNodes.AsDisposable();
         var uniqueNames = new HashSet<string>();
         var infillCollisionCorrect = true;
         foreach (var node in infillNodes)
@@ -454,7 +458,9 @@ public partial class FreightTerminalWorld
         var solidLandingGuardPanelsAbsent = true;
         var solidLandingSlabsAbsent = true;
         var openTreadNosings = true;
-        foreach (var child in firstTower.GetChildren())
+        var towerChildren = firstTower.GetChildren();
+        using var towerChildrenBacking = towerChildren.AsDisposable();
+        foreach (var child in towerChildren)
         {
             var name = child.Name.ToString();
             obsoleteColumnDetailsAbsent &= !name.StartsWith("ResidentialStairRisers_", StringComparison.Ordinal)
@@ -514,12 +520,11 @@ public partial class FreightTerminalWorld
             && solidLandingGuardPanelsAbsent
             && solidLandingSlabsAbsent
             && openTreadNosings;
-        var entryRay = PhysicsRayQueryParameters3D.Create(
+        var entryClear = !PhysicsRaycast.HasHit(
+            GetWorld3D().DirectSpaceState,
             firstTower.ToGlobal(new Vector3(0, 1.65f, firstSpec.Footprint.Y * 0.5f + 2.8f)),
-            firstTower.ToGlobal(new Vector3(0, 1.65f, firstSpec.Footprint.Y * 0.5f - 2.0f)));
-        entryRay.CollisionMask = 1;
-        entryRay.CollideWithAreas = false;
-        var entryClear = GetWorld3D().DirectSpaceState.IntersectRay(entryRay).Count == 0;
+            firstTower.ToGlobal(new Vector3(0, 1.65f, firstSpec.Footprint.Y * 0.5f - 2.0f)),
+            1);
         var expectedModules = ResidentialTowerSpecs.Length * 4;
         var valid = _residentialInfillModuleCount == expectedModules
             && infillNodes.Count == expectedModules

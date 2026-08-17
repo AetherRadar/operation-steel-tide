@@ -221,10 +221,15 @@ public partial class FreightTerminalWorld
 
     private static bool HasQuickSlotKey(string action, Key physicalKey)
     {
-        return InputMap.HasAction(action)
-            && InputMap.ActionGetEvents(action)
-                .OfType<InputEventKey>()
-                .Any(input => input.PhysicalKeycode == physicalKey);
+        using var actionName = new StringName(action);
+        if (!InputMap.HasAction(actionName))
+        {
+            return false;
+        }
+        var events = InputMap.ActionGetEvents(actionName);
+        using var eventsBacking = events.AsDisposable();
+        return events.OfType<InputEventKey>()
+            .Any(input => input.PhysicalKeycode == physicalKey);
     }
 
     private static int WeaponValue(WeaponBuild? weapon, LootGrade grade)

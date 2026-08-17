@@ -8,7 +8,9 @@ public partial class FreightTerminalWorld
     private async void CaptureGlassBreak()
     {
         await WaitFrames(6);
-        var field = GetTree().GetNodesInGroup(BreakableGlassField.GroupName)
+        var fieldNodes = GetTree().GetNodesInGroup(BreakableGlassField.GroupName);
+        using var fieldNodesBacking = fieldNodes.AsDisposable();
+        var field = fieldNodes
             .OfType<BreakableGlassField>()
             .FirstOrDefault(candidate => candidate.Name.ToString().StartsWith(
                 "SkybridgeBreakableGlass",
@@ -48,7 +50,9 @@ public partial class FreightTerminalWorld
     private async void ValidateBreakableGlass()
     {
         await WaitFrames(6);
-        var fields = GetTree().GetNodesInGroup(BreakableGlassField.GroupName)
+        var fieldNodes = GetTree().GetNodesInGroup(BreakableGlassField.GroupName);
+        using var fieldNodesBacking = fieldNodes.AsDisposable();
+        var fields = fieldNodes
             .OfType<BreakableGlassField>()
             .Where(IsInstanceValid)
             .ToArray();
@@ -109,14 +113,18 @@ public partial class FreightTerminalWorld
                     out _,
                     true);
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-                audioPlaying = GetTree().GetNodesInGroup(BreakableGlassField.AudioGroupName)
+                var audioNodes = GetTree().GetNodesInGroup(BreakableGlassField.AudioGroupName);
+                using var audioNodesBacking = audioNodes.AsDisposable();
+                audioPlaying = audioNodes
                     .Any(node => node switch
                     {
                         AudioStreamPlayer3D spatial => spatial.Playing && spatial.Stream?.GetLength() >= 0.6,
                         AudioStreamPlayer close => close.Playing && close.Stream?.GetLength() >= 0.6,
                         _ => false
                     });
-                closeAudioPlaying = GetTree().GetNodesInGroup(BreakableGlassField.AudioGroupName)
+                var closeAudioNodes = GetTree().GetNodesInGroup(BreakableGlassField.AudioGroupName);
+                using var closeAudioNodesBacking = closeAudioNodes.AsDisposable();
+                closeAudioPlaying = closeAudioNodes
                     .OfType<AudioStreamPlayer>()
                     .Any(audio => audio.Playing && audio.Stream?.GetLength() >= 0.6);
             }

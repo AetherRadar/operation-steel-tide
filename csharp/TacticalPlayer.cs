@@ -167,11 +167,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public bool HasGlassInCrosshairForDiagnostics(float range = 12.0f)
     {
         var from = DiagnosticCameraPosition;
-        var query = PhysicsRayQueryParameters3D.Create(from, from + DiagnosticCameraForward * range);
-        query.CollisionMask = BreakableGlassField.GlassCollisionLayer;
-        query.CollideWithAreas = true;
-        query.CollideWithBodies = false;
-        return GetWorld3D().DirectSpaceState.IntersectRay(query).Count > 0;
+        return PhysicsRaycast.HasHit(
+            GetWorld3D(),
+            from,
+            from + DiagnosticCameraForward * range,
+            BreakableGlassField.GlassCollisionLayer,
+            collideWithAreas: true,
+            collideWithBodies: false);
     }
 
     private bool _isReloading;
@@ -1211,7 +1213,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
 
         UpdateRoleAbility(dt);
-        if (Input.IsActionJustPressed("use_class_skill"))
+        if (Input.IsActionJustPressed(GameInputActions.UseClassSkill))
         {
             ActivateRoleAbility();
         }
@@ -1220,7 +1222,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _knifeTime = Mathf.Max(0.0f, _knifeTime - dt);
         if (!_fireInputArmed)
         {
-            if (Input.IsActionPressed("fire"))
+            if (Input.IsActionPressed(GameInputActions.Fire))
             {
                 _fireReleaseTime = 0.0f;
             }
@@ -1231,36 +1233,36 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             }
         }
 
-        if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_primary"))
+        if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed(GameInputActions.WeaponPrimary))
         {
             ActivateWeaponSlot(PlayerWeaponSlot.Primary, true);
         }
-        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_secondary"))
+        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed(GameInputActions.WeaponSecondary))
         {
             ActivateWeaponSlot(PlayerWeaponSlot.Secondary, true);
         }
-        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_sidearm"))
+        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed(GameInputActions.WeaponSidearm))
         {
             ActivateWeaponSlot(PlayerWeaponSlot.Sidearm, true);
         }
-        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_melee"))
+        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed(GameInputActions.WeaponMelee))
         {
             ActivateWeaponSlot(PlayerWeaponSlot.Melee, true);
         }
-        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_grenade"))
+        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed(GameInputActions.WeaponGrenade))
         {
             SelectQuickSlot(PlayerQuickSlot.FragmentationGrenade);
         }
-        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_utility"))
+        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed(GameInputActions.WeaponUtility))
         {
             SelectQuickSlot(PlayerQuickSlot.Utility);
         }
-        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed("weapon_cycle"))
+        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed(GameInputActions.WeaponCycle))
         {
             CycleWeaponSlots();
         }
 
-        if (Input.IsActionJustPressed("toggle_fire_mode")
+        if (Input.IsActionJustPressed(GameInputActions.ToggleFireMode)
             && IsFirearmQuickSlotSelected
             && !_isReloading
             && !_isPlating
@@ -1273,7 +1275,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 _automaticFire ? "FIRE MODE  //  AUTO" : "FIRE MODE  //  SEMI",
                 new Color(0.42f, 0.9f, 0.73f));
         }
-        if (Input.IsActionJustPressed("toggle_flashlight") && IsFirearmQuickSlotSelected && !MedicalActionBlocksWeapon)
+        if (Input.IsActionJustPressed(GameInputActions.ToggleFlashlight) && IsFirearmQuickSlotSelected && !MedicalActionBlocksWeapon)
         {
             _flashlightOn = !_flashlightOn;
             _weaponLight.Visible = _flashlightOn;
@@ -1282,7 +1284,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 _flashlightOn ? "WEAPON LIGHT  //  ON" : "WEAPON LIGHT  //  OFF",
                 _flashlightOn ? new Color(0.72f, 0.9f, 1.0f) : new Color(0.55f, 0.65f, 0.63f));
         }
-        if (Input.IsActionJustPressed("use_plate") && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon)
+        if (Input.IsActionJustPressed(GameInputActions.UsePlate) && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon)
         {
             if (_isPlating)
             {
@@ -1303,18 +1305,18 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 FinishReload();
             }
         }
-        if (IsFirearmQuickSlotSelected && !_isPlating && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionJustPressed("reload"))
+        if (IsFirearmQuickSlotSelected && !_isPlating && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionJustPressed(GameInputActions.Reload))
         {
             StartReload();
         }
-        if (!_isPlating && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionJustPressed("throw_grenade"))
+        if (!_isPlating && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionJustPressed(GameInputActions.ThrowGrenade))
         {
             ThrowGrenade();
         }
-        _isAiming = IsFirearmQuickSlotSelected && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionPressed("aim") && !_isReloading && !_isPlating && _slideTime <= 0.0f;
+        _isAiming = IsFirearmQuickSlotSelected && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionPressed(GameInputActions.Aim) && !_isReloading && !_isPlating && _slideTime <= 0.0f;
         var fireRequested = IsFirearmQuickSlotSelected && _automaticFire
-            ? Input.IsActionPressed("fire")
-            : Input.IsActionJustPressed("fire");
+            ? Input.IsActionPressed(GameInputActions.Fire)
+            : Input.IsActionJustPressed(GameInputActions.Fire);
         if (!_isPlating && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && _fireInputArmed && fireRequested && Input.MouseMode == Input.MouseModeEnum.Captured)
         {
             if (_activeQuickSlot == PlayerQuickSlot.Melee)
@@ -1448,7 +1450,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
         var input = UiLocked
             ? Vector2.Zero
-            : Input.GetVector("move_left", "move_right", "move_forward", "move_backward");
+            : Input.GetVector(
+                GameInputActions.MoveLeft,
+                GameInputActions.MoveRight,
+                GameInputActions.MoveForward,
+                GameInputActions.MoveBackward);
         var direction = (Transform.Basis * new Vector3(input.X, 0, input.Y)).Normalized();
         var velocity = Velocity;
         velocity.X = Mathf.MoveToward(velocity.X, direction.X * CrawlSpeed, delta * 10.0f);
@@ -1493,21 +1499,16 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             var from = GlobalPosition + Vector3.Up * (maxStep + 0.12f) + forward * dist;
             var to = from + Vector3.Down * (maxStep + 0.45f);
-            var query = PhysicsRayQueryParameters3D.Create(from, to);
-            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            query.CollisionMask = 1;
-            query.CollideWithAreas = false;
-            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-            if (hit.Count == 0)
+            if (!PhysicsRaycast.TryHit(GetWorld3D(), from, to, GetRid(), 1, out var hit))
             {
                 continue;
             }
-            var normal = hit["normal"].AsVector3();
+            var normal = hit.Normal;
             if (normal.Dot(Vector3.Up) < 0.96f)
             {
                 continue;
             }
-            var land = hit["position"].AsVector3();
+            var land = hit.Position;
             var lift = land.Y - GlobalPosition.Y;
             if (lift > bestLift && lift <= maxStep)
             {
@@ -1532,7 +1533,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     private void MovePlayer(float delta)
     {
-        var input = Input.GetVector("move_left", "move_right", "move_forward", "move_backward");
+        var input = Input.GetVector(
+            GameInputActions.MoveLeft,
+            GameInputActions.MoveRight,
+            GameInputActions.MoveForward,
+            GameInputActions.MoveBackward);
         if (!_movementInputArmed)
         {
             if (input.LengthSquared() > 0.001f)
@@ -1550,7 +1555,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var direction = (Transform.Basis * new Vector3(input.X, 0, input.Y)).Normalized();
         var horizontalSpeedBeforeMove = new Vector2(Velocity.X, Velocity.Z).Length();
         UpdateStanceInput(horizontalSpeedBeforeMove);
-        var jumpPressed = Input.IsActionJustPressed("jump") && IsOnFloor() && !_isPlating;
+        var jumpPressed = Input.IsActionJustPressed(GameInputActions.Jump) && IsOnFloor() && !_isPlating;
         if (jumpPressed && _stance != PlayerStance.Standing)
         {
             _slideTime = 0.0f;
@@ -1565,7 +1570,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
         var crouching = _stance == PlayerStance.Crouched;
         var prone = _stance == PlayerStance.Prone;
-        var sprinting = Input.IsActionPressed("sprint") && input.Y < -0.15f && !crouching && !prone && !_isPlating
+        var sprinting = Input.IsActionPressed(GameInputActions.Sprint) && input.Y < -0.15f && !crouching && !prone && !_isPlating
             && Stamina > 1.0f && !SprintRecoveryRequired && !_isAiming;
         var speed = (prone ? ProneSpeed : crouching ? CrouchSpeed : sprinting ? SprintSpeed : WalkSpeed)
             * RoleMovementMultiplier
@@ -1648,13 +1653,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             return;
         }
-        if (Input.IsActionJustPressed("prone"))
+        if (Input.IsActionJustPressed(GameInputActions.Prone))
         {
             TrySetStance(_stance == PlayerStance.Prone ? PlayerStance.Crouched : PlayerStance.Prone);
             _slideTime = 0.0f;
             return;
         }
-        if (!Input.IsActionJustPressed("crouch"))
+        if (!Input.IsActionJustPressed(GameInputActions.Crouch))
         {
             return;
         }
@@ -1706,12 +1711,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         };
         foreach (var offset in offsets)
         {
-            var query = PhysicsRayQueryParameters3D.Create(
-                GlobalPosition + offset + Vector3.Up * (currentHeight - 0.08f),
-                GlobalPosition + offset + Vector3.Up * (targetHeight + 0.08f));
-            query.CollisionMask = 1;
-            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            if (GetWorld3D().DirectSpaceState.IntersectRay(query).Count > 0)
+            if (PhysicsRaycast.HasHit(
+                    GetWorld3D(),
+                    GlobalPosition + offset + Vector3.Up * (currentHeight - 0.08f),
+                    GlobalPosition + offset + Vector3.Up * (targetHeight + 0.08f),
+                    GetRid(),
+                    1))
             {
                 return false;
             }
@@ -1779,7 +1784,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         UpdateDamageKick(delta);
         _recoilPitch = Mathf.Lerp(_recoilPitch, 0.0f, SmoothFactor(11.0f, delta));
         _recoilSide = Mathf.Lerp(_recoilSide, 0.0f, SmoothFactor(13.0f, delta));
-        var leanInput = Input.GetActionStrength("lean_right") - Input.GetActionStrength("lean_left");
+        var leanInput = Input.GetActionStrength(GameInputActions.LeanRight)
+            - Input.GetActionStrength(GameInputActions.LeanLeft);
         _leanValue = Mathf.Lerp(_leanValue, _slideTime <= 0.0f ? leanInput : 0.0f, SmoothFactor(9.0f, delta));
         _head.Rotation = new Vector3(
             _pitch + _recoilPitch + _damageKickPitch,
@@ -1938,23 +1944,25 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             PlayLocalGlassBreak();
             return;
         }
-        var query = PhysicsRayQueryParameters3D.Create(from, to);
-        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        query.CollideWithAreas = false;
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        if (hit.Count == 0)
+        if (!PhysicsRaycast.TryHit(
+                GetWorld3D(),
+                from,
+                to,
+                GetRid(),
+                uint.MaxValue,
+                out var hit)
+            && !PhysicsRaycast.TryHit(
+                GetWorld3D(),
+                _camera.GlobalPosition,
+                _camera.GlobalPosition - _camera.GlobalBasis.Z * 2.4f,
+                GetRid(),
+                uint.MaxValue,
+                out hit))
         {
-            query = PhysicsRayQueryParameters3D.Create(_camera.GlobalPosition, _camera.GlobalPosition - _camera.GlobalBasis.Z * 2.4f);
-            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            query.CollideWithAreas = false;
-            hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-            if (hit.Count == 0)
-            {
-                return;
-            }
+            return;
         }
-        var point = hit["position"].AsVector3();
-        var target = hit["collider"].AsGodotObject();
+        var point = hit.Position;
+        var target = hit.Collider;
         if (target is EnemyOperator enemy)
         {
             var killed = enemy.TakeDamage(_rng.RandfRange(56.0f, 68.0f), point, this);
@@ -1985,7 +1993,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             var destroyed = shell.TakeDamage(48.0f, point, this);
             EmitSignal(SignalName.HitConfirmed, destroyed, false, false);
         }
-        Main?.SpawnImpact(point, hit["normal"].AsVector3());
+        Main?.SpawnImpact(point, hit.Normal);
     }
 
     public void Fire()
@@ -2057,23 +2065,23 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             PlayLocalGlassBreak();
         }
-        var hit = new Godot.Collections.Dictionary();
-        if (!glassBlocked)
-        {
-            var query = PhysicsRayQueryParameters3D.Create(from, to);
-            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            query.CollideWithAreas = false;
-            hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        }
+        var hit = default(PhysicsRaycastHit);
+        var hasHit = !glassBlocked && PhysicsRaycast.TryHit(
+            GetWorld3D(),
+            from,
+            to,
+            GetRid(),
+            uint.MaxValue,
+            out hit);
         var end = glassBlocked ? glassHitPosition : to;
         var damagedTarget = false;
         var headshot = false;
         var networkEnemyId = -1;
         var networkDamage = 0.0f;
-        if (hit.Count > 0)
+        if (hasHit)
         {
-            end = hit["position"].AsVector3();
-            var target = hit["collider"].AsGodotObject();
+            end = hit.Position;
+            var target = hit.Collider;
             var killed = false;
             if (target is EnemyOperator enemy)
             {
@@ -2126,7 +2134,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 var destroyed = shell.TakeDamage(stats.Damage * _rng.RandfRange(1.15f, 1.35f), end, this);
                 EmitSignal(SignalName.HitConfirmed, destroyed, false, false);
             }
-            Main?.SpawnImpact(end, hit["normal"].AsVector3());
+            Main?.SpawnImpact(end, hit.Normal);
         }
 
         Main?.SpawnTracer(_muzzle.GlobalPosition, end, new Color(1.0f, 0.67f, 0.24f));

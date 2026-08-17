@@ -234,7 +234,7 @@ public partial class TacticalPlayer
                 TryStartFieldUse(confirmed);
                 return true;
             }
-            if (!Input.IsActionPressed("medical_wheel"))
+            if (!Input.IsActionPressed(GameInputActions.MedicalWheel))
             {
                 var accepted = Hud.CloseMedicalWheel(true, out var highlighted);
                 FinishMedicalWheel();
@@ -250,7 +250,7 @@ public partial class TacticalPlayer
             }
             return true;
         }
-        if (!Input.IsActionJustPressed("medical_wheel")
+        if (!Input.IsActionJustPressed(GameInputActions.MedicalWheel)
             || IsDead
             || IsInVehicle
             || UiLocked

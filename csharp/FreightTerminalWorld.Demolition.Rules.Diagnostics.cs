@@ -27,13 +27,17 @@ public partial class FreightTerminalWorld
             && ordersHidden
             && utilityHudVisible
             && demolitionFooterSeparated;
+        var grenadeEvents = InputMap.ActionGetEvents(GameInputActions.WeaponGrenade);
+        using var grenadeEventsBacking = grenadeEvents.AsDisposable();
+        var utilityEvents = InputMap.ActionGetEvents(GameInputActions.WeaponUtility);
+        using var utilityEventsBacking = utilityEvents.AsDisposable();
         var roleRules = DemolitionReconScanRange < 72.0f
-            && InputMap.HasAction("use_class_skill")
-            && InputMap.HasAction("throw_grenade")
-            && InputMap.HasAction("weapon_grenade")
-            && InputMap.HasAction("weapon_utility")
-            && InputMap.ActionGetEvents("weapon_grenade").Count > 0
-            && InputMap.ActionGetEvents("weapon_utility").Count > 0;
+            && InputMap.HasAction(GameInputActions.UseClassSkill)
+            && InputMap.HasAction(GameInputActions.ThrowGrenade)
+            && InputMap.HasAction(GameInputActions.WeaponGrenade)
+            && InputMap.HasAction(GameInputActions.WeaponUtility)
+            && grenadeEvents.Count > 0
+            && utilityEvents.Count > 0;
         var eliminationRules = DemolitionRoundRules.EliminationEndsRound(DemolitionTeam.Attackers, false)
             && DemolitionRoundRules.EliminationEndsRound(DemolitionTeam.Defenders, false)
             && !DemolitionRoundRules.EliminationEndsRound(DemolitionTeam.Attackers, true)

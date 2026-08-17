@@ -255,6 +255,7 @@ public partial class FreightTerminalWorld
         }
 
         var exclude = new Godot.Collections.Array<Rid> { mate.GetRid() };
+        using var excludeBacking = exclude.AsDisposable();
         if (IsInstanceValid(_player))
         {
             exclude.Add(_player.GetRid());
@@ -485,6 +486,7 @@ public partial class FreightTerminalWorld
     private bool IsSquadMovementCorridorClear(Vector3 from, Vector3 to, SquadMate mate)
     {
         var exclude = new Godot.Collections.Array<Rid> { mate.GetRid() };
+        using var excludeBacking = exclude.AsDisposable();
         if (IsInstanceValid(_player))
         {
             exclude.Add(_player.GetRid());
@@ -495,8 +497,13 @@ public partial class FreightTerminalWorld
     private bool IsSquadMovementCorridorClearExcluding(
         Vector3 from,
         Vector3 to,
-        Godot.Collections.Array<Rid> exclude)
+        Godot.Collections.Array<Rid> exclude,
+        SquadNavSearchBudget? budget = null)
     {
+        if (budget is not null && !budget.CanProbe)
+        {
+            return false;
+        }
         var horizontal = new Vector2(to.X - from.X, to.Z - from.Z);
         if (horizontal.LengthSquared() <= 0.16f)
         {
@@ -506,7 +513,7 @@ public partial class FreightTerminalWorld
         {
             return false;
         }
-        if (!HasSquadCorridorSupport(from, to, horizontal.Length(), exclude))
+        if (!HasSquadCorridorSupport(from, to, horizontal.Length(), exclude, budget))
         {
             return false;
         }
@@ -515,6 +522,10 @@ public partial class FreightTerminalWorld
         var side = new Vector3(-direction.Y, 0.0f, direction.X) * 0.3f;
         for (var ray = 0; ray < 3; ray++)
         {
+            if (budget is not null && !budget.CanProbe)
+            {
+                return false;
+            }
             var offset = ray switch
             {
                 1 => side,
@@ -523,11 +534,7 @@ public partial class FreightTerminalWorld
             };
             var rayFrom = from + Vector3.Up * 0.82f + offset;
             var rayTo = to + Vector3.Up * 0.82f + offset;
-            var query = PhysicsRayQueryParameters3D.Create(rayFrom, rayTo);
-            query.CollisionMask = 1;
-            query.CollideWithAreas = false;
-            query.Exclude = exclude;
-            if (GetWorld3D().DirectSpaceState.IntersectRay(query).Count > 0)
+            if (PhysicsRaycast.HasHit(GetWorld3D(), rayFrom, rayTo, exclude, 1))
             {
                 return false;
             }
@@ -538,22 +545,24 @@ public partial class FreightTerminalWorld
     private bool IsSquadPortalCenterRayClear(
         Vector3 from,
         Vector3 to,
-        Godot.Collections.Array<Rid> exclude)
+        Godot.Collections.Array<Rid> exclude,
+        SquadNavSearchBudget? budget = null)
     {
-        var query = PhysicsRayQueryParameters3D.Create(
+        return (budget is null || budget.CanProbe)
+            && !PhysicsRaycast.HasHit(
+            GetWorld3D(),
             from + Vector3.Up * 0.82f,
-            to + Vector3.Up * 0.82f);
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        query.Exclude = exclude;
-        return GetWorld3D().DirectSpaceState.IntersectRay(query).Count == 0;
+            to + Vector3.Up * 0.82f,
+            exclude,
+            1);
     }
 
     private bool HasSquadCorridorSupport(
         Vector3 from,
         Vector3 to,
         float horizontalLength,
-        Godot.Collections.Array<Rid> exclude)
+        Godot.Collections.Array<Rid> exclude,
+        SquadNavSearchBudget? budget = null)
     {
         var samples = Mathf.Max(1, Mathf.CeilToInt(horizontalLength / SquadNavCorridorSampleSpacing));
         var previousSupport = float.NaN;
@@ -561,6 +570,10 @@ public partial class FreightTerminalWorld
         var lastSupport = float.NaN;
         for (var sample = 0; sample <= samples; sample++)
         {
+            if (budget is not null && !budget.CanProbe)
+            {
+                return false;
+            }
             var expected = from.Lerp(to, sample / (float)samples);
             var endpoint = sample == 0 || sample == samples;
             var supported = endpoint
@@ -599,15 +612,21 @@ public partial class FreightTerminalWorld
         return IsSquadCorridorCapsuleSweepClear(
             new Vector3(from.X, firstSupport, from.Z),
             new Vector3(to.X, lastSupport, to.Z),
-            exclude);
+            exclude,
+            budget);
     }
 
     private bool IsSquadCorridorCapsuleSweepClear(
         Vector3 fromFeet,
         Vector3 toFeet,
-        Godot.Collections.Array<Rid> exclude)
+        Godot.Collections.Array<Rid> exclude,
+        SquadNavSearchBudget? budget = null)
     {
-        var query = new PhysicsShapeQueryParameters3D
+        if (budget is not null && !budget.CanProbe)
+        {
+            return false;
+        }
+        using var query = new PhysicsShapeQueryParameters3D
         {
             Shape = _squadNavClearanceShape,
             Transform = new Transform3D(

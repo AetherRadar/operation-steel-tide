@@ -38,15 +38,15 @@ public partial class FreightTerminalWorld
         var z = Mathf.Clamp(crashPosition.Z, minimumZ, maximumZ);
         var from = new Vector3(x, 90.0f, z);
         var to = new Vector3(x, -6.0f, z);
-        var query = PhysicsRayQueryParameters3D.Create(from, to);
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        query.CollideWithBodies = true;
-        query.Exclude = new Godot.Collections.Array<Rid> { aircraftRid };
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        groundResolved = hit.Count > 0;
+        groundResolved = PhysicsRaycast.TryHit(
+            GetWorld3D().DirectSpaceState,
+            from,
+            to,
+            aircraftRid,
+            1,
+            out var hit);
         return groundResolved
-            ? hit["position"].AsVector3() + Vector3.Up * 0.03f
+            ? hit.Position + Vector3.Up * 0.03f
             : new Vector3(x, 0.05f, z);
     }
 

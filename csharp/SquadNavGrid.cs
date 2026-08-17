@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace OperationSteelTide;
 
@@ -13,6 +14,42 @@ public interface ISquadNavProbe
 
     /// <summary>True when an operator-sized corridor connects two adjacent cells.</summary>
     bool IsEdgeClear(int x, int z, int neighborX, int neighborZ);
+}
+
+/// <summary>
+/// Shared guard for every grid segment attempted by one synchronous squad plan.
+/// Physics-backed probes use the time limit while A* also consumes the expansion limit.
+/// </summary>
+internal sealed class SquadNavSearchBudget
+{
+    private readonly long _deadlineTimestamp;
+    private int _remainingExpansions;
+
+    public SquadNavSearchBudget(int expansionCap, double maximumMilliseconds)
+    {
+        _remainingExpansions = Math.Max(0, expansionCap);
+        var durationTicks = Math.Max(
+            1L,
+            (long)Math.Ceiling(Math.Max(0.1, maximumMilliseconds) * Stopwatch.Frequency / 1000.0));
+        var started = Stopwatch.GetTimestamp();
+        _deadlineTimestamp = durationTicks >= long.MaxValue - started
+            ? long.MaxValue
+            : started + durationTicks;
+    }
+
+    public bool CanProbe => Stopwatch.GetTimestamp() < _deadlineTimestamp;
+
+    public bool IsExhausted => _remainingExpansions <= 0 || !CanProbe;
+
+    public bool TryConsumeExpansion()
+    {
+        if (_remainingExpansions <= 0 || !CanProbe)
+        {
+            return false;
+        }
+        _remainingExpansions--;
+        return true;
+    }
 }
 
 /// <summary>
@@ -100,8 +137,42 @@ public sealed class SquadNavGrid
         int goalX,
         int goalZ,
         int expansionCap = DefaultExpansionCap)
+        => FindPath(
+            probe,
+            startX,
+            startZ,
+            goalX,
+            goalZ,
+            expansionCap,
+            budget: null);
+
+    internal List<(int X, int Z)>? FindPath(
+        ISquadNavProbe probe,
+        int startX,
+        int startZ,
+        int goalX,
+        int goalZ,
+        SquadNavSearchBudget budget)
+        => FindPath(
+            probe,
+            startX,
+            startZ,
+            goalX,
+            goalZ,
+            expansionCap: 0,
+            budget);
+
+    private List<(int X, int Z)>? FindPath(
+        ISquadNavProbe probe,
+        int startX,
+        int startZ,
+        int goalX,
+        int goalZ,
+        int expansionCap,
+        SquadNavSearchBudget? budget)
     {
-        if (expansionCap <= 0
+        if (budget is null && expansionCap <= 0
+            || budget is not null && budget.IsExhausted
             || !Contains(startX, startZ)
             || !Contains(goalX, goalZ)
             || (startX == goalX && startZ == goalZ))
@@ -131,7 +202,9 @@ public sealed class SquadNavGrid
             {
                 return ReconstructPath(cameFrom, goalKey, startKey);
             }
-            if (++expansions > expansionCap)
+            if (budget is not null
+                    ? !budget.TryConsumeExpansion()
+                    : ++expansions > expansionCap)
             {
                 return null;
             }

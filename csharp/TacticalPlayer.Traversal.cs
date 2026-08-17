@@ -197,20 +197,21 @@ public partial class TacticalPlayer
         Velocity = Vector3.Zero;
         if (!_ladderCancelArmed)
         {
-            _ladderCancelArmed = !Input.IsActionPressed("interact");
+            _ladderCancelArmed = !Input.IsActionPressed(GameInputActions.Interact);
         }
-        else if (Input.IsActionJustPressed("interact"))
+        else if (Input.IsActionJustPressed(GameInputActions.Interact))
         {
             CancelLadderClimb();
             return;
         }
-        if (Input.IsActionJustPressed("jump"))
+        if (Input.IsActionJustPressed(GameInputActions.Jump))
         {
             CancelLadderClimb();
             return;
         }
 
-        var move = Input.GetActionStrength("move_forward") - Input.GetActionStrength("move_backward");
+        var move = Input.GetActionStrength(GameInputActions.MoveForward)
+            - Input.GetActionStrength(GameInputActions.MoveBackward);
         _ladderMotionAmount = Mathf.Lerp(
             _ladderMotionAmount,
             Mathf.Abs(move),
@@ -365,19 +366,21 @@ public partial class TacticalPlayer
         }
 
         var clearanceHeight = Mathf.Max(1.4f, playerCapsule.Height - 0.1f);
-        var clearance = new CapsuleShape3D
+        using var clearance = new CapsuleShape3D
         {
             Radius = Mathf.Max(0.26f, playerCapsule.Radius - 0.06f),
             Height = clearanceHeight
         };
-        var query = new PhysicsShapeQueryParameters3D
+        var exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        using var excludeBacking = exclude.AsDisposable();
+        using var query = new PhysicsShapeQueryParameters3D
         {
             Shape = clearance,
             CollisionMask = 1,
             CollideWithAreas = false,
             CollideWithBodies = true,
             Margin = 0.005f,
-            Exclude = new Godot.Collections.Array<Rid> { GetRid() }
+            Exclude = exclude
         };
         var sampleCount = Mathf.Max(4, Mathf.CeilToInt(pathLength / 0.38f));
         for (var sample = 0; sample <= sampleCount; sample++)
@@ -397,11 +400,12 @@ public partial class TacticalPlayer
                 Basis.Identity,
                 feet + Vector3.Up * (clearanceHeight * 0.5f + 0.045f));
             var hits = GetWorld3D().DirectSpaceState.IntersectShape(query, 16);
-            foreach (var hit in hits)
+            using var hitsBacking = hits.AsDisposable();
+            for (var index = 0; index < hits.Count; index++)
             {
-                var collider = hit.TryGetValue("collider", out var value)
-                    ? value.AsGodotObject() as Node
-                    : null;
+                using var hit = hits[index];
+                using var colliderValue = hit[GodotPhysicsResultKeys.Collider];
+                var collider = colliderValue.AsGodotObject() as Node;
                 if (collider?.IsInGroup("roof_access_ladder_geometry") == true)
                 {
                     continue;

@@ -80,7 +80,9 @@ public partial class CombatHUD
         {
             return false;
         }
-        foreach (var child in list.GetChildren())
+        var children = list.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is LootDragCard card && card.ItemId == itemId)
             {

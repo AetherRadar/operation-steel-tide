@@ -98,13 +98,15 @@ public partial class EnemyOperator
         }
         else if (!clear)
         {
-            var query = PhysicsRayQueryParameters3D.Create(shotOrigin, aimPoint);
-            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            query.CollideWithAreas = false;
-            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-            if (hit.Count > 0)
+            if (PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    shotOrigin,
+                    aimPoint,
+                    GetRid(),
+                    uint.MaxValue,
+                    out var hit))
             {
-                aimPoint = hit["position"].AsVector3();
+                aimPoint = hit.Position;
             }
         }
         else

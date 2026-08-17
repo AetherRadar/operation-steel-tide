@@ -395,20 +395,23 @@ public partial class BreakableGlassField : Area3D
         {
             return false;
         }
-        var query = PhysicsRayQueryParameters3D.Create(from, to);
-        query.CollisionMask = GlassCollisionLayer;
-        query.CollideWithAreas = true;
-        query.CollideWithBodies = false;
-        var hit = world.DirectSpaceState.IntersectRay(query);
-        if (hit.Count == 0 || hit["collider"].AsGodotObject() is not BreakableGlassField glass)
+        if (!PhysicsRaycast.TryHit(
+                world,
+                from,
+                to,
+                GlassCollisionLayer,
+                out var hit,
+                collideWithAreas: true,
+                collideWithBodies: false)
+            || hit.Collider is not BreakableGlassField glass)
         {
             return false;
         }
-        hitPosition = hit["position"].AsVector3();
+        hitPosition = hit.Position;
         return glass.TryShatterShape(
-            hit["shape"].AsInt32(),
+            hit.Shape,
             hitPosition,
-            hit["normal"].AsVector3(),
+            hit.Normal,
             shotDirection,
             damage,
             spawnEffects);

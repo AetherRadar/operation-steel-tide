@@ -1146,7 +1146,9 @@ public partial class CombatHUD : CanvasLayer
 
     private static void ClearRows(Node parent)
     {
-        foreach (var child in parent.GetChildren())
+        var children = parent.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             parent.RemoveChild(child);
             child.QueueFree();

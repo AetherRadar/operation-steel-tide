@@ -379,11 +379,9 @@ public partial class DestructibleAircraft
 
     private bool HasSensorLineOfSight(Vector3 from, Vector3 to, Node3D target)
     {
-        var query = PhysicsRayQueryParameters3D.Create(from, to);
-        query.CollisionMask = 1 | 2 | 4;
-        query.CollideWithAreas = false;
-        query.Exclude = AttackQueryExclusions(target);
-        return GetWorld3D().DirectSpaceState.IntersectRay(query).Count == 0;
+        var exclude = AttackQueryExclusions(target);
+        using var excludeBacking = exclude.AsDisposable();
+        return !PhysicsRaycast.HasHit(GetWorld3D(), from, to, exclude, 1 | 2 | 4);
     }
 
     private bool IsValidCombatTarget(Node3D? target)
@@ -454,27 +452,23 @@ public partial class DestructibleAircraft
             return false;
         }
 
-        var query = PhysicsRayQueryParameters3D.Create(
+        var exclude = AttackQueryExclusions(target);
+        using var excludeBacking = exclude.AsDisposable();
+        return !PhysicsRaycast.HasHit(
+            GetWorld3D(),
             point + Vector3.Up * 0.8f,
-            point + Vector3.Up * OpenSkyProbeHeight);
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        query.Exclude = AttackQueryExclusions(target);
-        return GetWorld3D().DirectSpaceState.IntersectRay(query).Count == 0;
+            point + Vector3.Up * OpenSkyProbeHeight,
+            exclude,
+            1);
     }
 
     private bool HasClearAttackPath(Vector3 from, Vector3 to, Node3D target)
     {
-        var query = PhysicsRayQueryParameters3D.Create(from, to);
-        query.CollisionMask = 1 | 4;
-        query.CollideWithAreas = false;
-        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        if (hit.Count == 0)
+        if (!PhysicsRaycast.TryHit(GetWorld3D(), from, to, GetRid(), 1 | 4, out var hit))
         {
             return true;
         }
-        return hit["collider"].AsGodotObject() == target;
+        return hit.Collider == target;
     }
 
     private Godot.Collections.Array<Rid> AttackQueryExclusions(Node3D target)

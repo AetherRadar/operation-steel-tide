@@ -311,12 +311,9 @@ public partial class TacticalPlayer
     {
         var from = _camera.GlobalPosition;
         var to = from - _camera.GlobalBasis.Z * maximumDistance;
-        var query = PhysicsRayQueryParameters3D.Create(from, to);
-        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        query.CollisionMask = 1 | 2;
-        query.CollideWithAreas = false;
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        return hit.Count > 0 ? hit["position"].AsVector3() : to;
+        return PhysicsRaycast.TryHit(GetWorld3D(), from, to, GetRid(), 1 | 2, out var hit)
+            ? hit.Position
+            : to;
     }
 
     public bool TakeCombatDamage(float amount, Vector3 hitPosition, Node? attacker = null)

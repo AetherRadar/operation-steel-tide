@@ -421,11 +421,13 @@ public partial class FreightTerminalWorld
                 && item.AmmoCaliber == AmmoCaliber.Pistol
                 && item.Quantity == 45);
         GD.Print($"DEMOLITION_PISTOL_CHECK valid={pistolKit} role={_player.Role} primary={_player.HasFireablePrimary} secondary={_player.HasSecondaryWeapon} sidearm={_player.HasSidearmWeapon} platform={_player.SidearmWeaponPlatform} active={_player.ActiveWeaponSlot} firearm={_player.HasActiveFirearm} grade={_player.CurrentAmmoGrade} reserve={_player.AmmoReserveFor(AmmoCaliber.Pistol)} grenades={_player.Grenades} armor={_player.Armor:0.0} backpack={_player.Backpack.Count}");
-        var slotBindings = InputMap.HasAction("weapon_primary")
-            && InputMap.HasAction("weapon_secondary")
-            && InputMap.HasAction("weapon_sidearm")
-            && InputMap.HasAction("weapon_melee")
-            && InputMap.ActionGetEvents("weapon_sidearm").Count > 0;
+        var sidearmEvents = InputMap.ActionGetEvents(GameInputActions.WeaponSidearm);
+        using var sidearmEventsBacking = sidearmEvents.AsDisposable();
+        var slotBindings = InputMap.HasAction(GameInputActions.WeaponPrimary)
+            && InputMap.HasAction(GameInputActions.WeaponSecondary)
+            && InputMap.HasAction(GameInputActions.WeaponSidearm)
+            && InputMap.HasAction(GameInputActions.WeaponMelee)
+            && sidearmEvents.Count > 0;
         _player.SetMagazineAmmoForDiagnostics(11);
         var sidearmFires = _player.FireForDiagnostics() && _player.Ammo == 10;
         _player.SelectWeapon((int)PlayerWeaponSlot.Melee);

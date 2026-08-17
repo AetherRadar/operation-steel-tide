@@ -99,10 +99,23 @@ public partial class FreightTerminalWorld
         int expansionCap,
         out SquadNavigationDirective[] directives,
         out float cost)
+        => TryPlanSquadLayeredRoute(
+            mate,
+            destination,
+            new SquadNavSearchBudget(expansionCap, SquadNavDiagnosticPlanBudgetMilliseconds),
+            out directives,
+            out cost);
+
+    private bool TryPlanSquadLayeredRoute(
+        SquadMate mate,
+        Vector3 destination,
+        SquadNavSearchBudget budget,
+        out SquadNavigationDirective[] directives,
+        out float cost)
     {
         directives = Array.Empty<SquadNavigationDirective>();
         cost = float.PositiveInfinity;
-        if (_squadTraversalLinks.Count == 0 || !IsInstanceValid(mate))
+        if (_squadTraversalLinks.Count == 0 || !IsInstanceValid(mate) || budget.IsExhausted)
         {
             return false;
         }
@@ -143,12 +156,16 @@ public partial class FreightTerminalWorld
         var goalNode = nodes.Count;
         nodes.Add(new SquadPortalNode(destination, SquadTraversalBucket(destination)));
         var exclude = BuildSquadNavExclusions();
+        using var excludeBacking = exclude.AsDisposable();
 
         AddSquadPortalWalkConnectors(
             portalNodeCount,
             nodes,
-            graphEdges,
-            exclude);
+            graphEdges);
+        if (budget.IsExhausted)
+        {
+            return false;
+        }
 
         var portalComponents = BuildSquadPortalComponentMap(portalNodeCount, graphEdges);
         var startComponents = FindSquadPortalEndpointComponents(
@@ -189,9 +206,13 @@ public partial class FreightTerminalWorld
                 portalComponents,
                 attemptedStartComponents,
                 graphEdges,
-                expansionCap,
+                budget,
                 exclude,
                 componentsThatReachGoal);
+            if (budget.IsExhausted)
+            {
+                return false;
+            }
             AddSquadPortalConnectors(
                 destination,
                 goalNode,
@@ -201,9 +222,13 @@ public partial class FreightTerminalWorld
                 portalComponents,
                 attemptedGoalComponents,
                 graphEdges,
-                expansionCap,
+                budget,
                 exclude,
                 componentsReachableFromStart);
+            if (budget.IsExhausted)
+            {
+                return false;
+            }
 
             var route = SquadNavigationGraph.FindShortestPath(
                 nodes.Count,
@@ -254,27 +279,38 @@ public partial class FreightTerminalWorld
         IReadOnlyList<int> portalComponents,
         ISet<int> attemptedComponents,
         List<SquadNavigationGraphEdge> graphEdges,
-        int expansionCap,
+        SquadNavSearchBudget budget,
         Godot.Collections.Array<Rid> exclude,
         ISet<int>? eligibleComponents)
     {
         var bucket = SquadTraversalBucket(endpoint);
-        var ranked = new List<(int Node, float DistanceSquared)>();
+        var ranked = new PriorityQueue<
+            (int Node, float DistanceSquared),
+            (float DistanceSquared, int Node)>();
         for (var node = 0; node < portalNodeCount; node++)
         {
+            if (budget.IsExhausted)
+            {
+                return;
+            }
             if (nodes[node].Bucket != bucket)
             {
                 continue;
             }
             var offset = nodes[node].Position - endpoint;
             offset.Y = 0.0f;
-            InsertSquadPortalCandidate(ranked, node, offset.LengthSquared());
+            var distanceSquared = offset.LengthSquared();
+            ranked.Enqueue((node, distanceSquared), (distanceSquared, node));
         }
 
         var candidatesByComponent = new Dictionary<int, List<(int Node, float DistanceSquared)>>();
         var componentOrder = new List<int>();
-        foreach (var candidate in ranked)
+        while (ranked.TryDequeue(out var candidate, out _))
         {
+            if (budget.IsExhausted)
+            {
+                return;
+            }
             var component = portalComponents[candidate.Node];
             if (attemptedComponents.Contains(component)
                 || eligibleComponents is not null && !eligibleComponents.Contains(component))
@@ -293,17 +329,25 @@ public partial class FreightTerminalWorld
         var componentsAttemptedThisPass = 0;
         foreach (var component in componentOrder)
         {
+            if (budget.IsExhausted)
+            {
+                return;
+            }
             attemptedComponents.Add(component);
             componentsAttemptedThisPass++;
             foreach (var candidate in candidatesByComponent[component])
             {
+                if (budget.IsExhausted)
+                {
+                    return;
+                }
                 var from = connectFromVirtual ? endpoint : nodes[candidate.Node].Position;
                 var to = connectFromVirtual ? nodes[candidate.Node].Position : endpoint;
                 if (!TryBuildSquadGridSegment(
                         from,
                         to,
                         bucket,
-                        expansionCap,
+                        budget,
                         exclude,
                         out var waypoints,
                         out var segmentCost))
@@ -403,23 +447,6 @@ public partial class FreightTerminalWorld
             }
         }
         return reachable;
-    }
-
-    private static void InsertSquadPortalCandidate(
-        List<(int Node, float DistanceSquared)> ranked,
-        int node,
-        float distanceSquared)
-    {
-        var insertAt = ranked.Count;
-        for (var index = 0; index < ranked.Count; index++)
-        {
-            if (distanceSquared < ranked[index].DistanceSquared)
-            {
-                insertAt = index;
-                break;
-            }
-        }
-        ranked.Insert(insertAt, (node, distanceSquared));
     }
 
     private static SquadNavigationDirective[] BuildSquadWalkDirectives(IReadOnlyList<Vector3> points)

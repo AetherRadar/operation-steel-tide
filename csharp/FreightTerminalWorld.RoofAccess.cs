@@ -314,7 +314,7 @@ public partial class FreightTerminalWorld
             _languageSetting,
             startAtTop ? "CLIMB DOWN" : "CLIMB TO ROOF");
         _hud.SetInteraction($"{verb}  //  {nearest.Building}", -1.0f, true);
-        if (!_interactReleaseRequired && Input.IsActionJustPressed("interact"))
+        if (!_interactReleaseRequired && Input.IsActionJustPressed(GameInputActions.Interact))
         {
             _interactReleaseRequired = true;
             if (!_player.BeginLadderClimb(
@@ -350,14 +350,14 @@ public partial class FreightTerminalWorld
         {
             return true;
         }
-        var query = PhysicsRayQueryParameters3D.Create(from, to);
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        query.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-        return hit.Count == 0
-            || !hit.TryGetValue("position", out var position)
-            || from.DistanceTo(position.AsVector3()) >= distance - 0.22f;
+        return !PhysicsRaycast.TryHit(
+                GetWorld3D().DirectSpaceState,
+                from,
+                to,
+                _player.GetRid(),
+                1,
+                out var hit)
+            || from.DistanceTo(hit.Position) >= distance - 0.22f;
     }
 
     private async void ValidateRoofAccess()
@@ -415,7 +415,9 @@ public partial class FreightTerminalWorld
             {
                 continue;
             }
-            var visual = route.VisualRoot.GetChildren().OfType<MultiMeshInstance3D>().FirstOrDefault();
+            var visualChildren = route.VisualRoot.GetChildren();
+            using var visualChildrenBacking = visualChildren.AsDisposable();
+            var visual = visualChildren.OfType<MultiMeshInstance3D>().FirstOrDefault();
             var instanceCount = visual?.Multimesh?.InstanceCount ?? 0;
             visualReady &= visual is not null && instanceCount >= 5;
             ladderGeometryCount += instanceCount;
@@ -551,24 +553,22 @@ public partial class FreightTerminalWorld
 
     private bool HasRoofAccessFloor(Vector3 feet, float downDistance)
     {
-        var query = PhysicsRayQueryParameters3D.Create(
+        return PhysicsRaycast.HasHit(
+            GetWorld3D().DirectSpaceState,
             feet + Vector3.Up * 0.65f,
-            feet + Vector3.Down * downDistance);
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        query.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
-        return GetWorld3D().DirectSpaceState.IntersectRay(query).Count > 0;
+            feet + Vector3.Down * downDistance,
+            _player.GetRid(),
+            1);
     }
 
     private bool HasRoofAccessLandingClearance(Vector3 feet)
     {
-        var query = PhysicsRayQueryParameters3D.Create(
+        return !PhysicsRaycast.HasHit(
+            GetWorld3D().DirectSpaceState,
             feet + Vector3.Up * 0.18f,
-            feet + Vector3.Up * 1.82f);
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        query.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
-        return GetWorld3D().DirectSpaceState.IntersectRay(query).Count == 0;
+            feet + Vector3.Up * 1.82f,
+            _player.GetRid(),
+            1);
     }
 
     private async void CaptureRoofAccess()

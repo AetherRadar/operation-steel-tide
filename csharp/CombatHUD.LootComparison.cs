@@ -185,7 +185,9 @@ public partial class CombatHUD
             {
                 return result;
             }
-            foreach (var child in _lootSourceList.GetChildren())
+            var children = _lootSourceList.GetChildren();
+            using var childrenBacking = children.AsDisposable();
+            foreach (var child in children)
             {
                 if (child is LootDragCard card)
                 {
@@ -329,7 +331,9 @@ public partial class CombatHUD
     {
         if (IsInstanceValid(_lootSourceList))
         {
-            foreach (var child in _lootSourceList.GetChildren())
+            var children = _lootSourceList.GetChildren();
+            using var childrenBacking = children.AsDisposable();
+            foreach (var child in children)
             {
                 if (child is LootDragCard card)
                 {
@@ -339,7 +343,9 @@ public partial class CombatHUD
         }
         if (IsInstanceValid(_backpackList))
         {
-            foreach (var child in _backpackList.GetChildren())
+            var children = _backpackList.GetChildren();
+            using var childrenBacking = children.AsDisposable();
+            foreach (var child in children)
             {
                 if (child is LootDragCard card)
                 {

@@ -41,7 +41,9 @@ public partial class SquadMate
     private bool CollisionShapesMatchForDiagnostics(bool disabled)
     {
         var foundShape = false;
-        foreach (var child in GetChildren())
+        var children = GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is not CollisionShape3D collision)
             {
@@ -67,7 +69,9 @@ public partial class SquadMate
         SetPhysicsProcess(false);
         CollisionLayer = 0;
         CollisionMask = 0;
-        foreach (var child in GetChildren())
+        var children = GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is CollisionShape3D collision)
             {
@@ -99,7 +103,9 @@ public partial class SquadMate
         Visible = true;
         CollisionLayer = 4;
         CollisionMask = 1;
-        foreach (var child in GetChildren())
+        var children = GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is CollisionShape3D collision)
             {

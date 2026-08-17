@@ -617,7 +617,9 @@ public partial class FreightTerminalWorld
         {
             return null;
         }
-        foreach (var child in node.GetChildren())
+        var children = node.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is MeshInstance3D childVisual)
             {
@@ -696,7 +698,9 @@ public partial class FreightTerminalWorld
             }
             present++;
             var staticBodies = 0;
-            foreach (var child in root.GetChildren())
+            var children = root.GetChildren();
+            using var childrenBacking = children.AsDisposable();
+            foreach (var child in children)
             {
                 if (child is StaticBody3D)
                 {
@@ -714,6 +718,7 @@ public partial class FreightTerminalWorld
         }
 
         var lootNodes = GetTree().GetNodesInGroup("special_landmark_loot");
+        using var lootNodesBacking = lootNodes.AsDisposable();
         var lootRegistered = true;
         var lootGrades = new HashSet<LootGrade>();
         foreach (var node in lootNodes)
@@ -730,6 +735,7 @@ public partial class FreightTerminalWorld
             }
         }
         var routeNodes = GetTree().GetNodesInGroup("special_landmark_vertical_route");
+        using var routeNodesBacking = routeNodes.AsDisposable();
         var bazaar = _levelRoot.GetNodeOrNull<Node3D>("SalvageBazaar");
         var bazaarRoofLeft = bazaar?.GetNodeOrNull<MeshInstance3D>("BazaarCanopy_Roof_-1");
         var bazaarRoofRight = bazaar?.GetNodeOrNull<MeshInstance3D>("BazaarCanopy_Roof_1");

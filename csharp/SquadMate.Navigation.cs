@@ -71,21 +71,20 @@ public partial class SquadMate
     private bool HasNavigationRecoveryGroundPath(Vector3 direction, float distance)
     {
         var exclude = BuildNavigationStepExclusions();
+        using var excludeBacking = exclude.AsDisposable();
         var samples = Mathf.Max(2, Mathf.CeilToInt(distance / 0.55f));
-        var space = GetWorld3D().DirectSpaceState;
         for (var sample = 1; sample <= samples; sample++)
         {
             var point = GlobalPosition + direction * (distance * sample / samples);
-            var query = PhysicsRayQueryParameters3D.Create(
-                point + Vector3.Up * 0.65f,
-                point + Vector3.Down * 0.9f);
-            query.CollisionMask = 1;
-            query.CollideWithAreas = false;
-            query.Exclude = exclude;
-            var hit = space.IntersectRay(query);
-            if (hit.Count == 0
-                || hit["normal"].AsVector3().Dot(Vector3.Up) < 0.72f
-                || Mathf.Abs(hit["position"].AsVector3().Y - GlobalPosition.Y) > 0.68f)
+            if (!PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    point + Vector3.Up * 0.65f,
+                    point + Vector3.Down * 0.9f,
+                    exclude,
+                    1,
+                    out var hit)
+                || hit.Normal.Dot(Vector3.Up) < 0.72f
+                || Mathf.Abs(hit.Position.Y - GlobalPosition.Y) > 0.68f)
             {
                 return false;
             }

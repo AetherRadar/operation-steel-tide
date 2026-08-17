@@ -280,7 +280,9 @@ public partial class ResidentialSupplyCache : StaticBody3D, ILootSource, IDeferr
         string variantSuffix,
         List<ImportedCratePart> parts)
     {
-        foreach (var child in parent.GetChildren())
+        var children = parent.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is not Node3D child3D)
             {

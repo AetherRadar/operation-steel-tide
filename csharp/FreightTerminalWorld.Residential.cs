@@ -1430,34 +1430,38 @@ public partial class FreightTerminalWorld
         var firstCoreZ = -Mathf.Min(firstSpec.Footprint.Y * 0.18f, 3.6f);
         var entryFrom = firstTower.ToGlobal(new Vector3(0, 1.2f, firstSpec.Footprint.Y * 0.5f + 1.2f));
         var entryTo = firstTower.ToGlobal(new Vector3(0, 1.2f, firstSpec.Footprint.Y * 0.5f - 2.2f));
-        var entryQuery = PhysicsRayQueryParameters3D.Create(entryFrom, entryTo);
-        entryQuery.CollisionMask = 1;
-        entryQuery.CollideWithAreas = false;
-        var entryOpen = GetWorld3D().DirectSpaceState.IntersectRay(entryQuery).Count == 0;
+        var entryOpen = !PhysicsRaycast.HasHit(
+            GetWorld3D().DirectSpaceState,
+            entryFrom,
+            entryTo,
+            1);
 
         var rampSample = firstTower.ToGlobal(new Vector3(
             -1.45f,
             0.1f + ResidentialFloorHeight * 0.25f,
             firstCoreZ + ResidentialStairRun * 0.2f));
-        var rampQuery = PhysicsRayQueryParameters3D.Create(rampSample + Vector3.Up * 1.8f, rampSample - Vector3.Up * 1.8f);
-        rampQuery.CollisionMask = 1;
-        rampQuery.CollideWithAreas = false;
-        var rampHit = GetWorld3D().DirectSpaceState.IntersectRay(rampQuery);
-        var rampCollider = rampHit.Count > 0 ? rampHit["collider"].AsGodotObject() as Node : null;
+        var hasRampHit = PhysicsRaycast.TryHit(
+            GetWorld3D().DirectSpaceState,
+            rampSample + Vector3.Up * 1.8f,
+            rampSample - Vector3.Up * 1.8f,
+            1,
+            out var rampHit);
+        var rampCollider = hasRampHit ? rampHit.Collider as Node : null;
         var stepName = rampCollider?.Name.ToString() ?? "";
         // Prefer discrete StairStep colliders; never require a solid ramp slab.
         var stepCollision = stepName.Contains("StairStep", StringComparison.Ordinal)
             || stepName.Contains("StairLanding", StringComparison.Ordinal)
             || stepName.Contains("Stair", StringComparison.Ordinal)
-            || (rampHit.Count > 0 && rampHit["position"].AsVector3().Y > 0.35f);
+            || (hasRampHit && rampHit.Position.Y > 0.35f);
 
         // Standing doorway clearance probe (no crouch required).
         var doorProbeFrom = firstTower.ToGlobal(new Vector3(0, 1.7f, firstSpec.Footprint.Y * 0.5f + 0.8f));
         var doorProbeTo = firstTower.ToGlobal(new Vector3(0, 1.7f, firstSpec.Footprint.Y * 0.5f - 1.5f));
-        var doorProbe = PhysicsRayQueryParameters3D.Create(doorProbeFrom, doorProbeTo);
-        doorProbe.CollisionMask = 1;
-        doorProbe.CollideWithAreas = false;
-        var standingDoorClear = GetWorld3D().DirectSpaceState.IntersectRay(doorProbe).Count == 0;
+        var standingDoorClear = !PhysicsRaycast.HasHit(
+            GetWorld3D().DirectSpaceState,
+            doorProbeFrom,
+            doorProbeTo,
+            1);
 
         var stairDoorClearSamples = 0;
         var stairDoorSupportSamples = 0;
@@ -1471,18 +1475,18 @@ public partial class FreightTerminalWorld
                 var floorY = floor * ResidentialFloorHeight;
                 foreach (var sampleX in new[] { -2.345f, -0.555f, 0.555f, 2.345f })
                 {
-                    var stairDoorProbe = PhysicsRayQueryParameters3D.Create(
-                        tower.ToGlobal(new Vector3(
-                            sampleX,
-                            floorY + 1.35f,
-                            coreZ + ResidentialStairRun * 0.5f + 1.2f)),
-                        tower.ToGlobal(new Vector3(
-                            sampleX,
-                            floorY + 1.35f,
-                            coreZ + ResidentialStairRun * 0.5f + 0.1f)));
-                    stairDoorProbe.CollisionMask = 1;
-                    stairDoorProbe.CollideWithAreas = false;
-                    if (GetWorld3D().DirectSpaceState.IntersectRay(stairDoorProbe).Count == 0)
+                    if (!PhysicsRaycast.TryHit(
+                            GetWorld3D().DirectSpaceState,
+                            tower.ToGlobal(new Vector3(
+                                sampleX,
+                                floorY + 1.35f,
+                                coreZ + ResidentialStairRun * 0.5f + 1.2f)),
+                            tower.ToGlobal(new Vector3(
+                                sampleX,
+                                floorY + 1.35f,
+                                coreZ + ResidentialStairRun * 0.5f + 0.1f)),
+                            1,
+                            out _))
                     {
                         stairDoorClearSamples++;
                     }
@@ -1490,18 +1494,18 @@ public partial class FreightTerminalWorld
 
                 foreach (var flightX in new[] { -1.45f, 1.45f })
                 {
-                    var supportProbe = PhysicsRayQueryParameters3D.Create(
-                        tower.ToGlobal(new Vector3(
-                            flightX,
-                            floorY + 0.55f,
-                            coreZ + ResidentialStairRun * 0.5f - 0.05f)),
-                        tower.ToGlobal(new Vector3(
-                            flightX,
-                            floorY - 0.45f,
-                            coreZ + ResidentialStairRun * 0.5f - 0.05f)));
-                    supportProbe.CollisionMask = 1;
-                    supportProbe.CollideWithAreas = false;
-                    if (GetWorld3D().DirectSpaceState.IntersectRay(supportProbe).Count > 0)
+                    if (PhysicsRaycast.TryHit(
+                            GetWorld3D().DirectSpaceState,
+                            tower.ToGlobal(new Vector3(
+                                flightX,
+                                floorY + 0.55f,
+                                coreZ + ResidentialStairRun * 0.5f - 0.05f)),
+                            tower.ToGlobal(new Vector3(
+                                flightX,
+                                floorY - 0.45f,
+                                coreZ + ResidentialStairRun * 0.5f - 0.05f)),
+                            1,
+                            out _))
                     {
                         stairDoorSupportSamples++;
                     }
@@ -1510,11 +1514,13 @@ public partial class FreightTerminalWorld
         }
         var stairDoorClear = stairDoorClearSamples == expectedStairDoorClearSamples;
         var stairDoorSupported = stairDoorSupportSamples == expectedStairDoorSupportSamples;
-        var stairWallPanelsAbsent = _levelRoot.FindChildren(
+        var stairWallPanels = _levelRoot.FindChildren(
             "ResidentialStairWallPanels_*",
             "MultiMeshInstance3D",
             recursive: true,
-            owned: false).Count == 0;
+            owned: false);
+        using var stairWallPanelsBacking = stairWallPanels.AsDisposable();
+        var stairWallPanelsAbsent = stairWallPanels.Count == 0;
 
         // Face into the lower flight and walk forward along body yaw (no mid-flight teleports).
         _player.GlobalPosition = firstTower.ToGlobal(new Vector3(
@@ -1545,6 +1551,7 @@ public partial class FreightTerminalWorld
         var playerClimbedRamp = climbHeight > 0.70f;
 
         var hedgeColliders = GetTree().GetNodesInGroup("courtyard_hedge_colliders");
+        using var hedgeCollidersBacking = hedgeColliders.AsDisposable();
         var hedgeCollisionCount = 0;
         foreach (var node in hedgeColliders)
         {
@@ -1553,13 +1560,13 @@ public partial class FreightTerminalWorld
                 continue;
             }
             var axis = hedge.GlobalTransform.Basis.X.Normalized();
-            var hedgeQuery = PhysicsRayQueryParameters3D.Create(
-                hedge.GlobalPosition - axis * 1.5f,
-                hedge.GlobalPosition + axis * 1.5f);
-            hedgeQuery.CollisionMask = 1;
-            hedgeQuery.CollideWithAreas = false;
-            var hedgeHit = GetWorld3D().DirectSpaceState.IntersectRay(hedgeQuery);
-            if (hedgeHit.Count > 0 && hedgeHit["collider"].AsGodotObject() == hedge)
+            if (PhysicsRaycast.TryHit(
+                    GetWorld3D().DirectSpaceState,
+                    hedge.GlobalPosition - axis * 1.5f,
+                    hedge.GlobalPosition + axis * 1.5f,
+                    1,
+                    out var hedgeHit)
+                && hedgeHit.Collider == hedge)
             {
                 hedgeCollisionCount++;
             }
@@ -1605,7 +1612,9 @@ public partial class FreightTerminalWorld
 
     private (int Count, int Expected, bool Chinese, Label3D? EnglishLeak) CheckResidentialLocalization()
     {
-        var labels = GetTree().GetNodesInGroup("residential_localized_labels")
+        var labelNodes = GetTree().GetNodesInGroup("residential_localized_labels");
+        using var labelNodesBacking = labelNodes.AsDisposable();
+        var labels = labelNodes
             .OfType<Label3D>()
             .Where(IsInstanceValid)
             .ToList();
@@ -1661,7 +1670,9 @@ public partial class FreightTerminalWorld
         static int RuntimeNodeCount(Node root)
         {
             var count = 1;
-            foreach (var child in root.GetChildren())
+            var children = root.GetChildren();
+            using var childrenBacking = children.AsDisposable();
+            foreach (var child in children)
             {
                 if (child is Node childNode)
                 {
@@ -1674,7 +1685,9 @@ public partial class FreightTerminalWorld
         static HashSet<Node> RuntimeNodes(Node root)
         {
             var nodes = new HashSet<Node> { root };
-            foreach (var child in root.GetChildren())
+            var children = root.GetChildren();
+            using var childrenBacking = children.AsDisposable();
+            foreach (var child in children)
             {
                 if (child is Node childNode)
                 {
@@ -1836,6 +1849,7 @@ public partial class FreightTerminalWorld
         _residentialEncounterController = productionController;
 
         var guardProbeExclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+        using var guardProbeExcludeBacking = guardProbeExclude.AsDisposable();
         ResidentialSupplyCache? realGuardCache = null;
         var realGuardTarget = Vector3.Zero;
         var realGuardExpectedPositions = new List<Vector3>();
@@ -1857,7 +1871,7 @@ public partial class FreightTerminalWorld
         var guardSpawnPointsChecked = guardAmbushCaches.Sum(cache => cache.GuardCount);
         foreach (var candidate in guardAmbushCaches)
         {
-            var guardPlanner = CreateResidentialGuardSpawnPlanner(candidate, guardProbeExclude);
+            using var guardPlanner = CreateResidentialGuardSpawnPlanner(candidate, guardProbeExclude);
             if (!guardPlanner.TryGroundPosition(candidate.GlobalPosition, out _))
             {
                 guardCacheClearancesBlocked++;
@@ -1908,7 +1922,7 @@ public partial class FreightTerminalWorld
         if (guardAmbushCaches.Count > 0)
         {
             var farTargetCache = guardAmbushCaches[0];
-            var farTargetPlanner = CreateResidentialGuardSpawnPlanner(farTargetCache, guardProbeExclude);
+            using var farTargetPlanner = CreateResidentialGuardSpawnPlanner(farTargetCache, guardProbeExclude);
             var farTargetLayout = farTargetPlanner.Plan(
                 farTargetCache.GuardCount,
                 farTargetCache.GlobalPosition + Vector3.Right * 1000.0f);
@@ -2014,7 +2028,9 @@ public partial class FreightTerminalWorld
             externalActors.UnionWith(enemiesBeforeGuardProbe.Where(enemy => IsInstanceValid(enemy)));
             externalActors.UnionWith(_civilians.Where(civilian => IsInstanceValid(civilian)));
             externalActors.UnionWith(sceneNodeSetBeforeGuardProbe.Where(node => node is FragGrenade));
-            foreach (var node in GetTree().GetNodesInGroup("aircraft_shells"))
+            var aircraftShellNodes = GetTree().GetNodesInGroup("aircraft_shells");
+            using var aircraftShellNodesBacking = aircraftShellNodes.AsDisposable();
+            foreach (var node in aircraftShellNodes)
             {
                 if (node is Node shell && IsInstanceValid(shell))
                 {
@@ -2072,7 +2088,7 @@ public partial class FreightTerminalWorld
                     && spawnedGuards.Select((guard, index) =>
                             guard.GlobalPosition.DistanceTo(realGuardExpectedPositions[index]) <= 0.02f)
                         .All(exact => exact);
-                var realGuardPlanner = CreateResidentialGuardSpawnPlanner(
+                using var realGuardPlanner = CreateResidentialGuardSpawnPlanner(
                     realGuardCache,
                     guardProbeExclude);
                 realGuardSpawnSafe = realGuardExpectedPositions.All(position =>
@@ -2119,16 +2135,17 @@ public partial class FreightTerminalWorld
                         return (true, "none");
                     }
 
-                    var query = PhysicsRayQueryParameters3D.Create(origin, rayEnd);
-                    query.Exclude = new Godot.Collections.Array<Rid> { guard.GetRid() };
-                    query.CollideWithAreas = false;
-                    query.CollisionMask = 0xFFFFFFFF;
-                    var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-                    if (hit.Count == 0)
+                    if (!PhysicsRaycast.TryHit(
+                            GetWorld3D().DirectSpaceState,
+                            origin,
+                            rayEnd,
+                            guard.GetRid(),
+                            0xFFFFFFFF,
+                            out var hit))
                     {
                         return (false, "no_target");
                     }
-                    var collider = hit["collider"].AsGodotObject();
+                    var collider = hit.Collider;
                     var blocker = collider is Node node
                         ? node.Name.ToString()
                         : collider?.GetType().Name ?? "unknown";
@@ -2477,22 +2494,25 @@ public partial class FreightTerminalWorld
 
         string FirstShotHit(Vector3 from, Vector3 to)
         {
-            var query = PhysicsRayQueryParameters3D.Create(from, to);
-            query.Exclude = new Godot.Collections.Array<Rid> { shooter.GetRid() };
-            query.CollideWithAreas = false;
-            query.CollisionMask = 0xFFFFFFFF;
-            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-            if (hit.Count == 0)
+            if (!PhysicsRaycast.TryHit(
+                    GetWorld3D().DirectSpaceState,
+                    from,
+                    to,
+                    shooter.GetRid(),
+                    0xFFFFFFFF,
+                    out var hit))
             {
                 return "none";
             }
-            var node = hit["collider"].AsGodotObject() as Node;
+            var node = hit.Collider as Node;
             return node?.Name.ToString() ?? "unknown";
         }
 
         var sampleCount = 0;
         var blockedSamples = 0;
         string? firstLeak = null;
+        var sampleExclude = new Godot.Collections.Array<Rid> { shooter.GetRid(), _player.GetRid() };
+        using var sampleExcludeBacking = sampleExclude.AsDisposable();
         for (var towerIndex = 0; towerIndex < ResidentialTowerSpecs.Length; towerIndex++)
         {
             var tower = _residentialTowers[towerIndex];
@@ -2512,11 +2532,12 @@ public partial class FreightTerminalWorld
             void Sample(Vector3 localFrom, Vector3 localTo, string label)
             {
                 sampleCount++;
-                var query = PhysicsRayQueryParameters3D.Create(tower.ToGlobal(localFrom), tower.ToGlobal(localTo));
-                query.Exclude = new Godot.Collections.Array<Rid> { shooter.GetRid(), _player.GetRid() };
-                query.CollideWithAreas = false;
-                query.CollisionMask = 1;
-                if (GetWorld3D().DirectSpaceState.IntersectRay(query).Count > 0)
+                if (PhysicsRaycast.HasHit(
+                        GetWorld3D().DirectSpaceState,
+                        tower.ToGlobal(localFrom),
+                        tower.ToGlobal(localTo),
+                        sampleExclude,
+                        1))
                 {
                     blockedSamples++;
                 }

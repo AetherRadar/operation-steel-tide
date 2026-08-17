@@ -646,7 +646,9 @@ public partial class FreightTerminalWorld
         var platformVisualsSeparated = true;
         foreach (var access in _residentialSkybridgeAccesses)
         {
-            var shapes = access.CollisionBody.GetChildren()
+            var collisionChildren = access.CollisionBody.GetChildren();
+            using var collisionChildrenBacking = collisionChildren.AsDisposable();
+            var shapes = collisionChildren
                 .OfType<CollisionShape3D>()
                 .ToArray();
             var rampName = $"SkybridgeAccessRampCollision_T{access.TowerIndex + 1:00}";
@@ -1044,36 +1046,33 @@ public partial class FreightTerminalWorld
 
     private bool HasSkybridgeAccessFloor(Vector3 feet)
     {
-        var query = PhysicsRayQueryParameters3D.Create(
+        return PhysicsRaycast.HasHit(
+            GetWorld3D().DirectSpaceState,
             feet + Vector3.Up * 0.55f,
-            feet + Vector3.Down * 1.2f);
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        query.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
-        return GetWorld3D().DirectSpaceState.IntersectRay(query).Count > 0;
+            feet + Vector3.Down * 1.2f,
+            _player.GetRid(),
+            1);
     }
 
     private bool HasSkybridgeAccessClearance(Vector3 feet)
     {
-        var query = PhysicsRayQueryParameters3D.Create(
+        return !PhysicsRaycast.HasHit(
+            GetWorld3D().DirectSpaceState,
             feet + Vector3.Up * 0.12f,
-            feet + Vector3.Up * 1.7f);
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        query.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
-        return GetWorld3D().DirectSpaceState.IntersectRay(query).Count == 0;
+            feet + Vector3.Up * 1.7f,
+            _player.GetRid(),
+            1);
     }
 
     private bool HasSkybridgeAccessEntryClearance(Vector3 platformFeet, Vector3 bridgeFeet)
     {
         var chestOffset = Vector3.Up * 0.68f;
-        var query = PhysicsRayQueryParameters3D.Create(
+        return !PhysicsRaycast.HasHit(
+            GetWorld3D().DirectSpaceState,
             platformFeet + chestOffset,
-            bridgeFeet + chestOffset);
-        query.CollisionMask = 1;
-        query.CollideWithAreas = false;
-        query.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
-        return GetWorld3D().DirectSpaceState.IntersectRay(query).Count == 0;
+            bridgeFeet + chestOffset,
+            _player.GetRid(),
+            1);
     }
 
     private async void CaptureSkybridgeAccess()
@@ -1114,12 +1113,14 @@ public partial class FreightTerminalWorld
         {
             var rayFrom = camera.ProjectRayOrigin(sample);
             var rayTo = rayFrom + camera.ProjectRayNormal(sample) * 80.0f;
-            var query = PhysicsRayQueryParameters3D.Create(rayFrom, rayTo);
-            query.CollisionMask = 1;
-            query.CollideWithAreas = false;
-            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-            var collider = hit.Count > 0 ? hit["collider"].AsGodotObject() as Node : null;
-            var hitPosition = hit.Count > 0 ? hit["position"].AsVector3() : Vector3.Zero;
+            var hasHit = PhysicsRaycast.TryHit(
+                GetWorld3D().DirectSpaceState,
+                rayFrom,
+                rayTo,
+                1,
+                out var hit);
+            var collider = hasHit ? hit.Collider as Node : null;
+            var hitPosition = hasHit ? hit.Position : Vector3.Zero;
             var hitLocal = _residentialTowers[access.TowerIndex].ToLocal(hitPosition);
             GD.Print($"SKYBRIDGE_ACCESS_SCREEN_RAY screen=({sample.X:0},{sample.Y:0}) collider={collider?.Name ?? "none"} parent={collider?.GetParent()?.Name ?? "none"} access={ReferenceEquals(collider, access.Root)} hit=({hitPosition.X:0.00},{hitPosition.Y:0.00},{hitPosition.Z:0.00}) local=({hitLocal.X:0.00},{hitLocal.Y:0.00},{hitLocal.Z:0.00})");
         }

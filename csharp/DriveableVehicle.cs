@@ -166,21 +166,21 @@ public partial class DriveableVehicle : CharacterBody3D
     private void Drive(float dt)
     {
         var throttle = 0.0f;
-        if (Input.IsActionPressed("move_forward"))
+        if (Input.IsActionPressed(GameInputActions.MoveForward))
         {
             throttle += 1.0f;
         }
-        if (Input.IsActionPressed("move_backward"))
+        if (Input.IsActionPressed(GameInputActions.MoveBackward))
         {
             throttle -= 1.0f;
         }
 
         var steerInput = 0.0f;
-        if (Input.IsActionPressed("move_left"))
+        if (Input.IsActionPressed(GameInputActions.MoveLeft))
         {
             steerInput += 1.0f;
         }
-        if (Input.IsActionPressed("move_right"))
+        if (Input.IsActionPressed(GameInputActions.MoveRight))
         {
             steerInput -= 1.0f;
         }
@@ -258,29 +258,32 @@ public partial class DriveableVehicle : CharacterBody3D
             return false;
         }
         forward = forward.Normalized();
-        var space = GetWorld3D().DirectSpaceState;
         // Probe just past the bumper at a few depths so thin props are not missed.
         foreach (var probeDistance in new[] { 2.8f, 3.4f, 4.0f })
         {
             var origin = GlobalPosition + Vector3.Up * 0.82f + forward * probeDistance;
-            var downQuery = PhysicsRayQueryParameters3D.Create(origin, origin + Vector3.Down * 1.35f);
-            downQuery.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            downQuery.CollisionMask = CollisionMask;
-            var hit = space.IntersectRay(downQuery);
-            if (hit.Count == 0)
+            if (!PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    origin,
+                    origin + Vector3.Down * 1.35f,
+                    GetRid(),
+                    CollisionMask,
+                    out var hit))
             {
                 continue;
             }
-            var top = hit["position"].AsVector3();
+            var top = hit.Position;
             var lift = top.Y - GlobalPosition.Y;
             if (lift < 0.08f || lift > 0.62f)
             {
                 continue;
             }
-            var clearQuery = PhysicsRayQueryParameters3D.Create(top + Vector3.Up * 0.25f, top + Vector3.Up * 2.3f);
-            clearQuery.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            clearQuery.CollisionMask = CollisionMask;
-            if (space.IntersectRay(clearQuery).Count > 0)
+            if (PhysicsRaycast.HasHit(
+                    GetWorld3D(),
+                    top + Vector3.Up * 0.25f,
+                    top + Vector3.Up * 2.3f,
+                    GetRid(),
+                    CollisionMask))
             {
                 continue;
             }

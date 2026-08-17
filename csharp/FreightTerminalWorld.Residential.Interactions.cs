@@ -56,11 +56,12 @@ public partial class FreightTerminalWorld
         WeaponBuild? initialWeapon)
     {
         var guardExclude = new Godot.Collections.Array<Rid>();
+        using var guardExcludeBacking = guardExclude.AsDisposable();
         if (IsInstanceValid(_player))
         {
             guardExclude.Add(_player.GetRid());
         }
-        var planner = CreateResidentialGuardSpawnPlanner(cache, guardExclude);
+        using var planner = CreateResidentialGuardSpawnPlanner(cache, guardExclude);
         var preferredTarget = IsInstanceValid(_player)
             ? _player.GlobalPosition
             : cache.GlobalPosition;

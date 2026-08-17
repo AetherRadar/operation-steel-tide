@@ -56,24 +56,25 @@ public partial class SquadMate
         const float maxStep = 0.28f;
         var forward = moveDirection.Normalized();
         var exclude = BuildNavigationStepExclusions();
+        using var excludeBacking = exclude.AsDisposable();
         var bestLift = 0.0f;
         var bestLanding = GlobalPosition;
         foreach (var distance in new[] { 0.28f, 0.42f, 0.55f })
         {
             var from = GlobalPosition + Vector3.Up * (maxStep + 0.12f) + forward * distance;
-            var query = PhysicsRayQueryParameters3D.Create(
-                from,
-                from + Vector3.Down * (maxStep + 0.45f));
-            query.Exclude = exclude;
-            query.CollisionMask = 1;
-            query.CollideWithAreas = false;
-            var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
-            if (hit.Count == 0 || hit["normal"].AsVector3().Dot(Vector3.Up) < 0.96f)
+            if (!PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    from,
+                    from + Vector3.Down * (maxStep + 0.45f),
+                    exclude,
+                    1,
+                    out var hit)
+                || hit.Normal.Dot(Vector3.Up) < 0.96f)
             {
                 continue;
             }
 
-            var landingY = hit["position"].AsVector3().Y;
+            var landingY = hit.Position.Y;
             var lift = landingY - GlobalPosition.Y;
             var landingDistance = Mathf.Max(0.12f, distance - 0.08f);
             var landing = new Vector3(
@@ -121,7 +122,7 @@ public partial class SquadMate
         Vector3 landing,
         Godot.Collections.Array<Rid> exclude)
     {
-        var query = new PhysicsShapeQueryParameters3D
+        using var query = new PhysicsShapeQueryParameters3D
         {
             Shape = _navigationStepClearanceShape,
             Transform = new Transform3D(
@@ -133,6 +134,8 @@ public partial class SquadMate
             Margin = 0.01f,
             Exclude = exclude
         };
-        return GetWorld3D().DirectSpaceState.IntersectShape(query, 4).Count == 0;
+        var hits = GetWorld3D().DirectSpaceState.IntersectShape(query, 4);
+        using var hitsBacking = hits.AsDisposable();
+        return hits.Count == 0;
     }
 }

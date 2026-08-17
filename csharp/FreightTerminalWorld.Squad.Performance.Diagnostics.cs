@@ -10,7 +10,15 @@ public partial class FreightTerminalWorld
     private const ulong SquadPerformanceMaximumTotalMicroseconds = 110_000;
     private const ulong SquadPerformanceMaximumReuseMicroseconds = 12_000;
     private const ulong SquadPerformanceMaximumReuseTotalMicroseconds = 60_000;
+    private const ulong SquadPerformanceMaximumQueryProbeMicroseconds = 750_000;
+    private const ulong SquadPerformanceMaximumFinalizerMicroseconds = 350_000;
+    private const ulong SquadPerformanceMaximumConnectorWarmPassMicroseconds = 25_000;
+    private const ulong SquadPerformanceMaximumProximityFrameMicroseconds = 350_000;
+    private const ulong SquadPerformanceMaximumProximityAverageMicroseconds = 50_000;
+    private const ulong SquadPerformanceMaximumProximityFinalizerMicroseconds = 350_000;
     private const int SquadPerformanceReuseSamples = 12;
+    private const int SquadPerformanceQueryProbeSamples = 1536;
+    private const int SquadPerformanceProximityFrames = 720;
 
     private async void ValidateSquadPerformance()
     {
@@ -32,6 +40,24 @@ public partial class FreightTerminalWorld
             GetTree().Quit(2);
             return;
         }
+
+        DrainPendingFinalizersForDiagnostics();
+        var queryProbeFrom = mates[0].GlobalPosition + Vector3.Up * 1.1f;
+        var queryProbeStarted = Time.GetTicksUsec();
+        for (var sample = 0; sample < SquadPerformanceQueryProbeSamples; sample++)
+        {
+            var direction = sample % 2 == 0 ? Vector3.Down * 3.0f : Vector3.Forward * 0.75f;
+            _ = PhysicsRaycast.HasHit(
+                GetWorld3D(),
+                queryProbeFrom,
+                queryProbeFrom + direction,
+                mates[0].GetRid(),
+                1);
+        }
+        var queryProbeMicroseconds = Time.GetTicksUsec() - queryProbeStarted;
+        var finalizerStarted = Time.GetTicksUsec();
+        DrainPendingFinalizersForDiagnostics();
+        var finalizerMicroseconds = Time.GetTicksUsec() - finalizerStarted;
 
         var fixture = BuildSquadRescueMazeForDiagnostics(
             out var destination,
@@ -96,6 +122,53 @@ public partial class FreightTerminalWorld
             }
         }
 
+        var proximityAnchor = start + new Vector3(0.0f, 0.0f, 2.4f);
+        _player.GlobalPosition = proximityAnchor;
+        _player.Velocity = Vector3.Zero;
+        _player.Rotation = Vector3.Zero;
+        SetSquadLeaderTrailForDiagnostics(new[] { proximityAnchor });
+        IssueSquadOrder(SquadOrder.Follow);
+        for (var index = 0; index < mates.Length; index++)
+        {
+            var mate = mates[index];
+            mate.GlobalPosition = proximityAnchor + new Vector3(index * 0.32f - 0.16f, 0.0f, -0.55f);
+            mate.Velocity = Vector3.Zero;
+            mate.GrantFireablePrimaryForDiagnostics();
+            mate.ResetCombatTacticsForDiagnostics();
+            ClearSquadNavigation(mate);
+            mate.ProcessMode = ProcessModeEnum.Inherit;
+        }
+
+        DrainPendingFinalizersForDiagnostics();
+        ulong proximityTotalMicroseconds = 0;
+        ulong proximityMaximumMicroseconds = 0;
+        var proximityFramesOverBudget = 0;
+        for (var frame = 0; frame < SquadPerformanceProximityFrames; frame++)
+        {
+            _player.GlobalPosition = proximityAnchor + new Vector3(
+                Mathf.Sin(frame * 0.11f) * 1.6f,
+                0.0f,
+                Mathf.Cos(frame * 0.07f) * 0.35f);
+            var frameStarted = Time.GetTicksUsec();
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            var frameMicroseconds = Time.GetTicksUsec() - frameStarted;
+            proximityTotalMicroseconds += frameMicroseconds;
+            proximityMaximumMicroseconds = Math.Max(proximityMaximumMicroseconds, frameMicroseconds);
+            if (frameMicroseconds > SquadPerformanceMaximumProximityFrameMicroseconds)
+            {
+                proximityFramesOverBudget++;
+            }
+        }
+        foreach (var mate in mates)
+        {
+            mate.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        var proximityFinalizerStarted = Time.GetTicksUsec();
+        DrainPendingFinalizersForDiagnostics();
+        var proximityFinalizerMicroseconds = Time.GetTicksUsec() - proximityFinalizerStarted;
+        var proximityAverageMicroseconds = proximityTotalMicroseconds
+            / (ulong)SquadPerformanceProximityFrames;
+
         var valid = plannedRoutes >= 1
             && deferredPlans >= 1
             && reuseSamples == SquadPerformanceReuseSamples
@@ -103,7 +176,15 @@ public partial class FreightTerminalWorld
             && maximumMicroseconds <= SquadPerformanceMaximumPlanMicroseconds
             && totalMicroseconds <= SquadPerformanceMaximumTotalMicroseconds
             && reuseMaximumMicroseconds <= SquadPerformanceMaximumReuseMicroseconds
-            && reuseTotalMicroseconds <= SquadPerformanceMaximumReuseTotalMicroseconds;
+            && reuseTotalMicroseconds <= SquadPerformanceMaximumReuseTotalMicroseconds
+            && queryProbeMicroseconds <= SquadPerformanceMaximumQueryProbeMicroseconds
+            && finalizerMicroseconds <= SquadPerformanceMaximumFinalizerMicroseconds
+            && SquadPortalWalkWarmPassesForDiagnostics >= 1
+            && SquadPortalWalkWarmMaximumMicrosecondsForDiagnostics
+                <= SquadPerformanceMaximumConnectorWarmPassMicroseconds
+            && proximityFramesOverBudget == 0
+            && proximityAverageMicroseconds <= SquadPerformanceMaximumProximityAverageMicroseconds
+            && proximityFinalizerMicroseconds <= SquadPerformanceMaximumProximityFinalizerMicroseconds;
         GD.Print(
             $"SQUAD_PERFORMANCE_CHECK valid={valid} mates={mates.Length} planned={plannedRoutes} deferred={deferredPlans} "
             + $"connector_cache={_squadPortalWalkCorridorCacheReady} "
@@ -112,9 +193,32 @@ public partial class FreightTerminalWorld
             + $"reuse_samples={reuseSamples} reuse_max_usec={reuseMaximumMicroseconds} "
             + $"reuse_max_budget={SquadPerformanceMaximumReuseMicroseconds} "
             + $"reuse_total_usec={reuseTotalMicroseconds} "
-            + $"reuse_total_budget={SquadPerformanceMaximumReuseTotalMicroseconds}");
+            + $"reuse_total_budget={SquadPerformanceMaximumReuseTotalMicroseconds} "
+            + $"query_samples={SquadPerformanceQueryProbeSamples} "
+            + $"query_usec={queryProbeMicroseconds} "
+            + $"query_budget={SquadPerformanceMaximumQueryProbeMicroseconds} "
+            + $"finalizer_usec={finalizerMicroseconds} "
+            + $"finalizer_budget={SquadPerformanceMaximumFinalizerMicroseconds} "
+            + $"connector_warm_passes={SquadPortalWalkWarmPassesForDiagnostics} "
+            + $"connector_warm_max_usec={SquadPortalWalkWarmMaximumMicrosecondsForDiagnostics} "
+            + $"connector_warm_budget={SquadPerformanceMaximumConnectorWarmPassMicroseconds} "
+            + $"proximity_frames={SquadPerformanceProximityFrames} "
+            + $"proximity_max_usec={proximityMaximumMicroseconds} "
+            + $"proximity_max_budget={SquadPerformanceMaximumProximityFrameMicroseconds} "
+            + $"proximity_avg_usec={proximityAverageMicroseconds} "
+            + $"proximity_avg_budget={SquadPerformanceMaximumProximityAverageMicroseconds} "
+            + $"proximity_over_budget={proximityFramesOverBudget} "
+            + $"proximity_finalizer_usec={proximityFinalizerMicroseconds} "
+            + $"proximity_finalizer_budget={SquadPerformanceMaximumProximityFinalizerMicroseconds}");
         GD.Print($"SQUAD_PERFORMANCE_PASS valid={valid}");
         fixture.QueueFree();
         GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private static void DrainPendingFinalizersForDiagnostics()
+    {
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
     }
 }

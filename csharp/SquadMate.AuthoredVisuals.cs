@@ -23,7 +23,9 @@ public partial class SquadMate
             GD.PushWarning($"Authored squad operator unavailable; retaining procedural visual: {exception.Message}");
             return;
         }
-        foreach (var child in _rig.GetChildren())
+        var children = _rig.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
         {
             if (child is MeshInstance3D mesh && mesh != _authoredOperatorVisual.Root)
             {
