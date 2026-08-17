@@ -86,6 +86,7 @@ public partial class FreightTerminalWorld
             _player.DisarmMovementInput();
             Input.MouseMode = Input.MouseModeEnum.Visible;
         }
+        WarmSquadPortalWalkConnectorCache();
     }
 
     private static void EnsureSquadInputActions()

@@ -17,6 +17,7 @@ public partial class FreightTerminalWorld
     // Keep the geometric fallback deliberately small so a first follow frame cannot
     // monopolize the physics thread with a second full navigation search.
     private const int SquadNavFollowExpansionCap = 192;
+    private const float SquadNavCorridorSampleSpacing = 1.8f;
     private const ulong SquadNavNormalPlanIntervalMilliseconds = 90;
     private const int SquadNavEstimateExpansionCap = 2500;
     private const int SquadNavCellCacheResetCapacity = 60000;
@@ -829,6 +830,39 @@ public partial class FreightTerminalWorld
             Exclude = exclude
         };
         return GetWorld3D().DirectSpaceState.IntersectShape(query, 4).Count == 0;
+    }
+
+    private bool TryProbeSquadCorridorSupport(
+        Vector3 expected,
+        float rayAbove,
+        float rayBelow,
+        float maximumAbove,
+        float maximumBelow,
+        Godot.Collections.Array<Rid> exclude,
+        out float supportY)
+    {
+        supportY = float.NaN;
+        var sample = expected;
+        var query = PhysicsRayQueryParameters3D.Create(
+            sample + Vector3.Up * rayAbove,
+            sample + Vector3.Down * rayBelow);
+        query.CollisionMask = 1;
+        query.CollideWithAreas = false;
+        query.Exclude = exclude;
+        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+        if (hit.Count == 0 || hit["normal"].AsVector3().Dot(Vector3.Up) < 0.72f)
+        {
+            return false;
+        }
+
+        var hitY = hit["position"].AsVector3().Y;
+        var delta = hitY - expected.Y;
+        if (delta > maximumAbove || delta < -maximumBelow)
+        {
+            return false;
+        }
+        supportY = hitY;
+        return true;
     }
 
     /// <summary>Deterministic physics-backed probe for one anchor height band.</summary>

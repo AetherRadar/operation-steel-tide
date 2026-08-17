@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -5,10 +6,96 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    private readonly HashSet<long> _squadBlockedPortalWalkCorridors = new();
+    private bool _squadPortalWalkCorridorCacheReady;
+    private bool _squadPortalWalkCorridorCacheWarming;
+
     private readonly record struct SquadPortalComponentBridge(
         int FirstComponent,
         int SecondComponent,
         float DistanceSquared);
+
+    private void ResetSquadPortalWalkConnectorCache()
+    {
+        _squadBlockedPortalWalkCorridors.Clear();
+        _squadPortalWalkCorridorCacheReady = false;
+        _squadPortalWalkCorridorCacheWarming = false;
+    }
+
+    private async void WarmSquadPortalWalkConnectorCache()
+    {
+        if (_squadPortalWalkCorridorCacheReady
+            || _squadPortalWalkCorridorCacheWarming
+            || _squadTraversalLinks.Count == 0)
+        {
+            return;
+        }
+
+        _squadPortalWalkCorridorCacheWarming = true;
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        if (!IsInsideTree() || _squadTraversalLinks.Count == 0)
+        {
+            _squadPortalWalkCorridorCacheWarming = false;
+            return;
+        }
+
+        var nodes = new List<SquadPortalNode>();
+        var nodeLookup = new Dictionary<(int X, int Z, int Bucket), int>();
+        var graphEdges = new List<SquadNavigationGraphEdge>();
+        foreach (var link in _squadTraversalLinks)
+        {
+            var from = GetOrAddSquadPortalNode(link.ForwardPoints[0], nodes, nodeLookup);
+            var to = GetOrAddSquadPortalNode(link.ForwardPoints[^1], nodes, nodeLookup);
+            graphEdges.Add(new SquadNavigationGraphEdge(
+                from,
+                to,
+                link.Cost,
+                Array.Empty<SquadNavigationDirective>()));
+            if (link.Bidirectional)
+            {
+                graphEdges.Add(new SquadNavigationGraphEdge(
+                    to,
+                    from,
+                    link.Cost,
+                    Array.Empty<SquadNavigationDirective>()));
+            }
+        }
+
+        AddSquadPortalWalkConnectors(
+            nodes.Count,
+            nodes,
+            graphEdges,
+            BuildSquadPortalWalkConnectorExclusions());
+        _squadPortalWalkCorridorCacheReady = true;
+        _squadPortalWalkCorridorCacheWarming = false;
+    }
+
+    private Godot.Collections.Array<Rid> BuildSquadPortalWalkConnectorExclusions()
+    {
+        var exclude = BuildSquadNavExclusions();
+        foreach (var vehicle in _vehicles)
+        {
+            if (IsInstanceValid(vehicle))
+            {
+                exclude.Add(vehicle.GetRid());
+            }
+        }
+        foreach (var mate in _squadMates)
+        {
+            if (IsInstanceValid(mate))
+            {
+                exclude.Add(mate.GetRid());
+            }
+        }
+        foreach (var enemy in _enemies)
+        {
+            if (IsInstanceValid(enemy))
+            {
+                exclude.Add(enemy.GetRid());
+            }
+        }
+        return exclude;
+    }
 
     private void AddSquadPortalWalkConnectors(
         int portalNodeCount,
@@ -152,8 +239,16 @@ public partial class FreightTerminalWorld
     {
         var from = nodes[first].Position;
         var to = nodes[second].Position;
-        if (!IsSquadMovementCorridorClearExcluding(from, to, exclude))
+        var key = SquadPortalNodePairKey(first, second);
+        if (_squadBlockedPortalWalkCorridors.Contains(key))
         {
+            return false;
+        }
+        var clear = IsSquadPortalCenterRayClear(from, to, exclude)
+            && IsSquadMovementCorridorClearExcluding(from, to, exclude);
+        if (!clear)
+        {
+            _squadBlockedPortalWalkCorridors.Add(key);
             return false;
         }
 
@@ -168,6 +263,13 @@ public partial class FreightTerminalWorld
             from.DistanceTo(to),
             new[] { SquadNavigationDirective.Walk(from) }));
         return true;
+    }
+
+    private static long SquadPortalNodePairKey(int first, int second)
+    {
+        var minimum = Math.Min(first, second);
+        var maximum = Math.Max(first, second);
+        return (long)minimum << 32 | (uint)maximum;
     }
 
     private static int[] BuildSquadPortalComponentMap(

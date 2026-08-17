@@ -22,6 +22,7 @@ public partial class FreightTerminalWorld
         _squadTraversalLinks.Clear();
         _squadTraversalFailures.Clear();
         _squadTraversalRecoveryAttempts.Clear();
+        ResetSquadPortalWalkConnectorCache();
     }
 
     private int RegisterSquadTraversalLink(
@@ -150,6 +151,28 @@ public partial class FreightTerminalWorld
             exclude);
 
         var portalComponents = BuildSquadPortalComponentMap(portalNodeCount, graphEdges);
+        var startComponents = FindSquadPortalEndpointComponents(
+            mate.GlobalPosition,
+            portalNodeCount,
+            nodes,
+            portalComponents);
+        var goalComponents = FindSquadPortalEndpointComponents(
+            destination,
+            portalNodeCount,
+            nodes,
+            portalComponents);
+        var componentsReachableFromStart = BuildSquadPortalComponentReachability(
+            portalNodeCount,
+            graphEdges,
+            portalComponents,
+            startComponents,
+            reverse: false);
+        var componentsThatReachGoal = BuildSquadPortalComponentReachability(
+            portalNodeCount,
+            graphEdges,
+            portalComponents,
+            goalComponents,
+            reverse: true);
         var attemptedStartComponents = new HashSet<int>();
         var attemptedGoalComponents = new HashSet<int>();
         // Keep the common case bounded, but continue through distinct strongly
@@ -167,7 +190,8 @@ public partial class FreightTerminalWorld
                 attemptedStartComponents,
                 graphEdges,
                 expansionCap,
-                exclude);
+                exclude,
+                componentsThatReachGoal);
             AddSquadPortalConnectors(
                 destination,
                 goalNode,
@@ -178,7 +202,8 @@ public partial class FreightTerminalWorld
                 attemptedGoalComponents,
                 graphEdges,
                 expansionCap,
-                exclude);
+                exclude,
+                componentsReachableFromStart);
 
             var route = SquadNavigationGraph.FindShortestPath(
                 nodes.Count,
@@ -230,7 +255,8 @@ public partial class FreightTerminalWorld
         ISet<int> attemptedComponents,
         List<SquadNavigationGraphEdge> graphEdges,
         int expansionCap,
-        Godot.Collections.Array<Rid> exclude)
+        Godot.Collections.Array<Rid> exclude,
+        ISet<int>? eligibleComponents)
     {
         var bucket = SquadTraversalBucket(endpoint);
         var ranked = new List<(int Node, float DistanceSquared)>();
@@ -250,7 +276,8 @@ public partial class FreightTerminalWorld
         foreach (var candidate in ranked)
         {
             var component = portalComponents[candidate.Node];
-            if (attemptedComponents.Contains(component))
+            if (attemptedComponents.Contains(component)
+                || eligibleComponents is not null && !eligibleComponents.Contains(component))
             {
                 continue;
             }
@@ -295,6 +322,87 @@ public partial class FreightTerminalWorld
                 break;
             }
         }
+    }
+
+    private static HashSet<int> FindSquadPortalEndpointComponents(
+        Vector3 endpoint,
+        int portalNodeCount,
+        IReadOnlyList<SquadPortalNode> nodes,
+        IReadOnlyList<int> portalComponents)
+    {
+        var components = new HashSet<int>();
+        var bucket = SquadTraversalBucket(endpoint);
+        for (var node = 0; node < portalNodeCount; node++)
+        {
+            if (nodes[node].Bucket == bucket)
+            {
+                components.Add(portalComponents[node]);
+            }
+        }
+        return components;
+    }
+
+    private static HashSet<int> BuildSquadPortalComponentReachability(
+        int portalNodeCount,
+        IReadOnlyList<SquadNavigationGraphEdge> graphEdges,
+        IReadOnlyList<int> portalComponents,
+        IReadOnlySet<int> seedComponents,
+        bool reverse)
+    {
+        var componentCount = 0;
+        for (var node = 0; node < portalNodeCount; node++)
+        {
+            componentCount = Math.Max(componentCount, portalComponents[node] + 1);
+        }
+        var adjacency = new List<int>[componentCount];
+        for (var component = 0; component < componentCount; component++)
+        {
+            adjacency[component] = new List<int>();
+        }
+        foreach (var edge in graphEdges)
+        {
+            if (edge.From < 0 || edge.From >= portalNodeCount
+                || edge.To < 0 || edge.To >= portalNodeCount)
+            {
+                continue;
+            }
+            var from = portalComponents[edge.From];
+            var to = portalComponents[edge.To];
+            if (from == to)
+            {
+                continue;
+            }
+            if (reverse)
+            {
+                (from, to) = (to, from);
+            }
+            if (!adjacency[from].Contains(to))
+            {
+                adjacency[from].Add(to);
+            }
+        }
+
+        var reachable = new HashSet<int>();
+        var pending = new Stack<int>();
+        foreach (var seed in seedComponents)
+        {
+            if (seed >= 0 && seed < componentCount && reachable.Add(seed))
+            {
+                pending.Push(seed);
+            }
+        }
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            foreach (var next in adjacency[current])
+            {
+                if (reachable.Add(next))
+                {
+                    pending.Push(next);
+                }
+            }
+        }
+        return reachable;
     }
 
     private static void InsertSquadPortalCandidate(

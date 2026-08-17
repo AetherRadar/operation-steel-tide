@@ -520,27 +520,58 @@ public partial class FreightTerminalWorld
         return true;
     }
 
+    private bool IsSquadPortalCenterRayClear(
+        Vector3 from,
+        Vector3 to,
+        Godot.Collections.Array<Rid> exclude)
+    {
+        var query = PhysicsRayQueryParameters3D.Create(
+            from + Vector3.Up * 0.82f,
+            to + Vector3.Up * 0.82f);
+        query.CollisionMask = 1;
+        query.CollideWithAreas = false;
+        query.Exclude = exclude;
+        return GetWorld3D().DirectSpaceState.IntersectRay(query).Count == 0;
+    }
+
     private bool HasSquadCorridorSupport(
         Vector3 from,
         Vector3 to,
         float horizontalLength,
         Godot.Collections.Array<Rid> exclude)
     {
-        var samples = Mathf.Max(1, Mathf.CeilToInt(horizontalLength / 0.72f));
+        var samples = Mathf.Max(1, Mathf.CeilToInt(horizontalLength / SquadNavCorridorSampleSpacing));
         var previousSupport = float.NaN;
+        var firstSupport = float.NaN;
+        var lastSupport = float.NaN;
         for (var sample = 0; sample <= samples; sample++)
         {
             var expected = from.Lerp(to, sample / (float)samples);
-            if (!TryProbeSquadNavigationSupport(
+            var endpoint = sample == 0 || sample == samples;
+            var supported = endpoint
+                ? TryProbeSquadNavigationSupport(
                     expected,
                     SquadNavStepHeight + 0.12f,
                     SquadNavBandDrop + 0.12f,
                     maximumAbove: 0.22f,
                     maximumBelow: SquadNavBandDrop,
                     exclude,
-                    out var supportY))
+                    out var supportY)
+                : TryProbeSquadCorridorSupport(
+                    expected,
+                    SquadNavStepHeight + 0.12f,
+                    SquadNavBandDrop + 0.12f,
+                    maximumAbove: 0.22f,
+                    maximumBelow: SquadNavBandDrop,
+                    exclude,
+                    out supportY);
+            if (!supported)
             {
                 return false;
+            }
+            if (sample == 0)
+            {
+                firstSupport = supportY;
             }
             if (!float.IsNaN(previousSupport)
                     && Mathf.Abs(supportY - previousSupport) > SquadNavStepHeight + 0.12f)
@@ -548,8 +579,34 @@ public partial class FreightTerminalWorld
                 return false;
             }
             previousSupport = supportY;
+            lastSupport = supportY;
         }
-        return true;
+        return IsSquadCorridorCapsuleSweepClear(
+            new Vector3(from.X, firstSupport, from.Z),
+            new Vector3(to.X, lastSupport, to.Z),
+            exclude);
+    }
+
+    private bool IsSquadCorridorCapsuleSweepClear(
+        Vector3 fromFeet,
+        Vector3 toFeet,
+        Godot.Collections.Array<Rid> exclude)
+    {
+        var query = new PhysicsShapeQueryParameters3D
+        {
+            Shape = _squadNavClearanceShape,
+            Transform = new Transform3D(
+                Basis.Identity,
+                fromFeet + Vector3.Up * (SquadNavClearanceCenterHeight + SquadNavClearanceFloorLift)),
+            Motion = toFeet - fromFeet,
+            CollisionMask = 1,
+            CollideWithAreas = false,
+            CollideWithBodies = true,
+            Margin = 0.0f,
+            Exclude = exclude
+        };
+        var fractions = GetWorld3D().DirectSpaceState.CastMotion(query);
+        return fractions.Length >= 2 && fractions[0] >= 0.999f;
     }
 
     private float EstimateSquadNavigationCost(SquadMate mate, Vector3 destination)
