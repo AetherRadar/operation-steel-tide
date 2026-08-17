@@ -214,15 +214,18 @@ public partial class FreightTerminalWorld
         var mapCatalog = _hud.DeploymentMapCount == 3
             && _hud.SelectedDeploymentMapId == DeploymentMapCatalog.FreightTerminalId
             && _hud.DeploymentMapAvailable;
-        _hud.ApplyDeploymentMapForDiagnostics("tidal_prison");
-        var lockedMapRejected = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.FreightTerminalId;
+        _hud.ApplyDeploymentMapForDiagnostics(DeploymentMapCatalog.BlackwaterRefineryId);
+        var refineryMapAccepted = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.BlackwaterRefineryId
+            && _hud.DeploymentMapAvailable;
+        _hud.ApplyDeploymentMapForDiagnostics("orbital_complex");
+        var lockedMapRejected = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.BlackwaterRefineryId;
         var valid = uiReady && presetCount && weaponCount && armorCount && ammoPackCount && presetSelected
             && loadoutSelected && cost && projectedBalance && quantityPricing && gradePricing
-            && mapCatalog && lockedMapRejected && starterPresetSelected && freeStarter
+            && mapCatalog && refineryMapAccepted && lockedMapRejected && starterPresetSelected && freeStarter
             && weakStarter && starterUpgradesPriced && starterEquipped
             && starterWeaponGrade && selectedWeaponGrade;
 
-        GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} weapon_count={DeploymentCatalog.Weapons.Count} armor_count={DeploymentCatalog.Armor.Count} ammo_pack_count={_hud.DeploymentAmmoPackCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} quantity={selection.AmmoQuantity} quantity_pricing={quantityPricing} grade_pricing={gradePricing} weapon_grades={starterWeaponGrade}/{selectedWeaponGrade} map_count={_hud.DeploymentMapCount} selected_map={_hud.SelectedDeploymentMapId} map_available={_hud.DeploymentMapAvailable} locked_map_rejected={lockedMapRejected} starter_preset={starterPresetSelected} starter_free={freeStarter} starter_weak={weakStarter} starter_upgrades_priced={starterUpgradesPriced} starter_equipped={starterEquipped} starter_damage={starterLoadout.Weapon?.Stats().Damage:0} starter_armor={starterArmor.Protection * 100.0f:0} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
+        GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} weapon_count={DeploymentCatalog.Weapons.Count} armor_count={DeploymentCatalog.Armor.Count} ammo_pack_count={_hud.DeploymentAmmoPackCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} quantity={selection.AmmoQuantity} quantity_pricing={quantityPricing} grade_pricing={gradePricing} weapon_grades={starterWeaponGrade}/{selectedWeaponGrade} map_count={_hud.DeploymentMapCount} selected_map={_hud.SelectedDeploymentMapId} map_available={_hud.DeploymentMapAvailable} refinery_map={refineryMapAccepted} locked_map_rejected={lockedMapRejected} starter_preset={starterPresetSelected} starter_free={freeStarter} starter_weak={weakStarter} starter_upgrades_priced={starterUpgradesPriced} starter_equipped={starterEquipped} starter_damage={starterLoadout.Weapon?.Stats().Damage:0} starter_armor={starterArmor.Protection * 100.0f:0} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
         GD.Print($"DEPLOYMENT_UI_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }

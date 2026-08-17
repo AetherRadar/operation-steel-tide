@@ -15,6 +15,7 @@ public sealed record DeploymentMapOffer(
 public static class DeploymentMapCatalog
 {
     public const string FreightTerminalId = "freight_terminal";
+    public const string BlackwaterRefineryId = "blackwater_refinery";
 
     public static readonly IReadOnlyList<DeploymentMapOffer> Maps = new[]
     {
@@ -27,13 +28,13 @@ public static class DeploymentMapCatalog
             "HARBOR EXCLUSION ZONE",
             true),
         new DeploymentMapOffer(
-            "tidal_prison",
+            BlackwaterRefineryId,
             "MAP 02",
-            "map_tidal_prison",
-            "TIDAL PRISON",
-            "map_tidal_prison_subtitle",
-            "VERTICAL DETENTION COMPLEX  //  LOCKED",
-            false),
+            "map_blackwater_refinery",
+            "BLACKWATER REFINERY",
+            "map_blackwater_refinery_subtitle",
+            "CRACKING YARDS  //  PUMP DISTRICT",
+            true),
         new DeploymentMapOffer(
             "orbital_complex",
             "MAP 03",

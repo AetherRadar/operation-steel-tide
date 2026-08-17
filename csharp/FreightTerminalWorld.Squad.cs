@@ -126,11 +126,24 @@ public partial class FreightTerminalWorld
             _hud.SetSquadStatus("JOIN FAILED  //  INVALID HOST OR PORT");
             return;
         }
+        var selectedMapId = _hud.SelectedDeploymentMapId;
+        if (!string.Equals(selectedMapId, _activeRuntimeMapId, StringComparison.OrdinalIgnoreCase))
+        {
+            DeploymentMapRuntime.StageDeployment(new PendingExtractionDeployment(
+                selectedMapId,
+                (OperatorRole)role,
+                sessionMode,
+                address,
+                _hud.SelectedDeploymentLoadout));
+            GetTree().Paused = false;
+            GetTree().ReloadCurrentScene();
+            return;
+        }
         if (!TryCommitSelectedDeployment())
         {
             return;
         }
-        _activeDeploymentMapId = _hud.SelectedDeploymentMapId;
+        _activeDeploymentMapId = selectedMapId;
         DeploySquad((OperatorRole)role, sessionMode, address);
     }
 

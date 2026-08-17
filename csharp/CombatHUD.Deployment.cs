@@ -488,7 +488,9 @@ public partial class CombatHUD
         RefreshDeploymentStore();
     }
 
-    public void ApplyDeploymentMapForDiagnostics(string id) => SelectDeploymentMap(id);
+    public void SetDeploymentMapSelection(string id) => SelectDeploymentMap(id);
+
+    public void ApplyDeploymentMapForDiagnostics(string id) => SetDeploymentMapSelection(id);
 
     private void SelectDeploymentMap(string id)
     {

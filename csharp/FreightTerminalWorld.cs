@@ -13,6 +13,7 @@ public partial class FreightTerminalWorld : Node3D
     private const float MapDepthMeters = 320.0f;
     private const float MapCenterZ = -60.0f;
     private const float DeploymentZoneRadiusMeters = 9.0f;
+    private string _activeRuntimeMapId = DeploymentMapCatalog.FreightTerminalId;
     /// <summary>Player deploy pad chosen from edge set each match (not a fixed center apron).</summary>
     private Vector3 DeploymentPoint = new(0, 0.2f, 42.0f);
     private static readonly Vector3 ExtractionPoint = new(0.0f, 0.08f, -60.0f);
@@ -32,6 +33,7 @@ public partial class FreightTerminalWorld : Node3D
     public int HostileSquadCount => _hostileSquads.Count;
     public IReadOnlyList<HostileOperatorSquad> HostileSquads => _hostileSquads;
     private readonly Dictionary<string, StandardMaterial3D> _materials = new();
+    private readonly Dictionary<string, PackedScene> _modelScenes = new();
     private readonly List<Node3D> _objectiveTerminals = new();
     private readonly List<StandardMaterial3D> _objectiveScreens = new();
     private readonly List<OmniLight3D> _objectiveLights = new();
@@ -103,6 +105,8 @@ public partial class FreightTerminalWorld : Node3D
 
     public override void _Ready()
     {
+        var args = OS.GetCmdlineUserArgs();
+        _activeRuntimeMapId = DeploymentMapRuntime.ResolveStartupMap(args);
         _rng.Randomize();
         LoadSettings();
         InitializeOperatorProgression();
@@ -123,9 +127,9 @@ public partial class FreightTerminalWorld : Node3D
         _hud.SetMissionPhase(_missionPhase, _missionDirector.SpawnProtectionSeconds, _missionOnline);
         ApplyQuality(_qualitySetting);
 
-        var args = OS.GetCmdlineUserArgs();
         InitializeOperationsOfficeState(args);
         RuntimeDiagnosticRunner.RunFirst(this, args);
+        ResumePendingExtractionDeployment();
     }
 
     public override void _ExitTree()
@@ -155,6 +159,7 @@ public partial class FreightTerminalWorld : Node3D
             }
             _objectiveScreens.Clear();
             _materials.Clear();
+            _modelScenes.Clear();
             ReleaseSharedBoxMeshes();
             BreakableGlassField.ReleaseSharedResources();
             ResidentialRelayStation.ReleaseSharedResources();
@@ -419,7 +424,8 @@ public partial class FreightTerminalWorld : Node3D
     {
         var best = new Vector3(0, -1000, 0);
         var bestScore = float.PositiveInfinity;
-        foreach (var point in _coverPoints)
+        var coverPoints = IsBlackwaterRefineryMap ? RefineryLayout.CoverPoints : _coverPoints;
+        foreach (var point in coverPoints)
         {
             var travel = origin.DistanceTo(point);
             if (travel > 18.0f || point.DistanceTo(threat) < 4.0f)
@@ -616,6 +622,7 @@ public partial class FreightTerminalWorld : Node3D
 
         _hud = new CombatHUD { Name = "CombatHUD" };
         AddChild(_hud);
+        _hud.SetDeploymentMapSelection(_activeRuntimeMapId);
         _hud.SetOperatorProfile(_operatorProfileStore.Profile);
         _hud.PauseRequested += TogglePause;
         _hud.RestartRequested += RestartMission;
@@ -675,6 +682,11 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SpawnLootCases()
     {
+        if (IsBlackwaterRefineryMap)
+        {
+            SpawnRefineryWeaponCases();
+            return;
+        }
         var cases = new[]
         {
             new
@@ -841,6 +853,11 @@ public partial class FreightTerminalWorld : Node3D
     private void SpawnBuildingGradedLoot()
     {
         _buildingLootPickupCount = 0;
+        if (IsBlackwaterRefineryMap)
+        {
+            SpawnRefineryGradedLoot();
+            return;
+        }
         // Interior caches inside complex buildings + residential lobbies (glowing graded pickups).
         var spots = new (Vector3 Pos, LootGrade Grade, string En, string Zh)[]
         {
@@ -985,7 +1002,9 @@ public partial class FreightTerminalWorld : Node3D
     private void SpawnEnemies()
     {
         // Map garrison NPCs (TeamId 0) — prefer hunting rival squads, loot when idle.
-        var positions = new[]
+        IReadOnlyList<Vector3> positions = IsBlackwaterRefineryMap
+            ? RefineryLayout.GarrisonSpawns
+            : new[]
         {
             new Vector3(-12, 0.15f, 11), new Vector3(-22, 0.15f, 7), new Vector3(3, 0.15f, 2),
             new Vector3(20, 0.15f, 8), new Vector3(29, 0.15f, -10), new Vector3(-10, 0.15f, -17),
@@ -1001,7 +1020,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             SpawnEnemy(position, false, teamId: 0);
         }
-        SpawnSkybridgeMarksmen();
+        if (!IsBlackwaterRefineryMap)
+        {
+            SpawnSkybridgeMarksmen();
+        }
         _enemiesRemaining = _enemies.Count;
     }
 

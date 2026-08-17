@@ -6,6 +6,11 @@ public partial class FreightTerminalWorld
 {
     private void SpawnCivilianValuableLoot()
     {
+        if (IsBlackwaterRefineryMap)
+        {
+            SpawnRefineryValuableLoot();
+            return;
+        }
         var placements = new (Vector3 Position, ValuableItemKind Kind, LootGrade Grade)[]
         {
             (new Vector3(-121, 0.2f, -34), ValuableItemKind.CannedCoffee, LootGrade.Common),

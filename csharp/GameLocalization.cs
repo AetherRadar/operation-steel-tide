@@ -330,6 +330,11 @@ public static class GameLocalization
         Chinese["minimap_extract"] = "\u64a4\u79bb\u70b9";
         Chinese["minimap_relay"] = "\u901a\u4fe1\u4e2d\u7ee7";
         Chinese["minimap_manifest"] = "\u6e05\u5355\u70b9";
+        Chinese["minimap_refinery_intake"] = "\u8fdb\u6599\u533a";
+        Chinese["minimap_refinery_west_pump"] = "\u897f\u6cf5\u7ad9";
+        Chinese["minimap_refinery_east_pump"] = "\u4e1c\u6cf5\u7ad9";
+        Chinese["minimap_refinery_cracking"] = "\u88c2\u89e3\u573a";
+        Chinese["minimap_refinery_turbine"] = "\u6da1\u8f6e\u533a";
         Chinese["minimap_warehouse"] = "\u4ed3\u5e93";
         Chinese["minimap_radar"] = "\u96f7\u8fbe\u5854";
         Chinese["minimap_residential"] = "\u6f6e\u6c50\u4f4f\u533a";
@@ -349,6 +354,8 @@ public static class GameLocalization
         Chinese["ammo_requires_weapon"] = "\u8bf7\u5148\u9009\u62e9\u4e3b\u6b66\u5668";
         Chinese["map_freight_terminal"] = "\u6e2f\u533a\u8d27\u8fd0\u7ec8\u7aef";
         Chinese["map_freight_terminal_subtitle"] = "\u6e2f\u533a\u5c01\u9501\u533a";
+        Chinese["map_blackwater_refinery"] = "\u9ed1\u6c34\u70bc\u5316\u5382";
+        Chinese["map_blackwater_refinery_subtitle"] = "\u88c2\u89e3\u573a  //  \u6cf5\u7ad9\u533a";
         Chinese["map_tidal_prison"] = "\u6f6e\u6c50\u76d1\u72f1";
         Chinese["map_tidal_prison_subtitle"] = "\u7acb\u4f53\u62d8\u7981\u590d\u5408\u533a  //  \u672a\u89e3\u9501";
         Chinese["map_orbital_complex"] = "\u8f68\u9053\u590d\u5408\u533a";

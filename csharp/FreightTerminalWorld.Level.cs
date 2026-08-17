@@ -304,6 +304,11 @@ void sky() {
     private void BuildLevel()
     {
         ResetSquadTraversalLinks();
+        if (IsBlackwaterRefineryMap)
+        {
+            BuildBlackwaterRefineryLevel();
+            return;
+        }
         _levelRoot = new Node3D { Name = "FreightTerminal" };
         AddChild(_levelRoot);
         var asphalt = GroundMaterial("asphalt", new Color(0.45f, 0.49f, 0.5f), 0.88f);
@@ -1167,7 +1172,15 @@ void sky() {
 
     private int _modelPropCounter;
 
-    private StaticBody3D ModelProp(string path, Vector3 position, float yaw, float scale, Vector3 collisionSize, Vector3 collisionOffset)
+    private StaticBody3D ModelProp(
+        string path,
+        Vector3 position,
+        float yaw,
+        float scale,
+        Vector3 collisionSize,
+        Vector3 collisionOffset,
+        float visibilityRange = 0.0f,
+        bool castShadow = true)
     {
         // Duplicate sibling names get mangled to @Class@Id by Godot, so keep them unique.
         var body = new StaticBody3D
@@ -1178,10 +1191,18 @@ void sky() {
             CollisionLayer = 1,
             CollisionMask = 0
         };
-        var scene = GD.Load<PackedScene>(path);
+        if (!_modelScenes.TryGetValue(path, out var scene))
+        {
+            scene = GD.Load<PackedScene>(path);
+            if (scene is not null)
+            {
+                _modelScenes[path] = scene;
+            }
+        }
         if (scene?.Instantiate() is Node3D model)
         {
             model.Scale = Vector3.One * scale;
+            ConfigureAuthoredMapModel(model, visibilityRange, castShadow);
             body.AddChild(model);
         }
         body.AddChild(new CollisionShape3D
@@ -1191,5 +1212,30 @@ void sky() {
         });
         _levelRoot.AddChild(body);
         return body;
+    }
+
+    private static void ConfigureAuthoredMapModel(
+        Node node,
+        float visibilityRange,
+        bool castShadow)
+    {
+        if (node is GeometryInstance3D visual)
+        {
+            visual.CastShadow = castShadow
+                ? GeometryInstance3D.ShadowCastingSetting.On
+                : GeometryInstance3D.ShadowCastingSetting.Off;
+            if (visibilityRange > 0.0f)
+            {
+                visual.VisibilityRangeEnd = visibilityRange;
+                visual.VisibilityRangeEndMargin = Mathf.Min(18.0f, visibilityRange * 0.12f);
+            }
+        }
+        foreach (var child in node.GetChildren())
+        {
+            if (child is Node childNode)
+            {
+                ConfigureAuthoredMapModel(childNode, visibilityRange, castShadow);
+            }
+        }
     }
 }

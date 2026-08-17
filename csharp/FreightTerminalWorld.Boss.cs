@@ -31,10 +31,11 @@ public partial class FreightTerminalWorld
 
     private void SpawnWorldBoss()
     {
+        var patrolRoute = ActiveWorldBossPatrolRoute;
         var boss = new EnemyOperator
         {
             Name = "TIDE_HUNTER",
-            Position = WorldBossPatrolRoute[0],
+            Position = patrolRoute[0],
             NetworkId = _nextEnemyNetworkId++,
             Player = _player,
             Main = this,
@@ -42,7 +43,7 @@ public partial class FreightTerminalWorld
             TeamId = EnemyOperator.WorldBossTeamId,
             DetectionRange = 240.0f
         };
-        boss.ConfigureWorldBoss(WorldBossPatrolRoute);
+        boss.ConfigureWorldBoss(patrolRoute);
         AddChild(boss);
         boss.Eliminated += OnEnemyEliminated;
         boss.Eliminated += OnWorldBossEliminated;
