@@ -3835,7 +3835,66 @@ public partial class FreightTerminalWorld : Node3D
 
         _missionDirector.ExitDeploymentZone();
         var salvosBefore = aircraft.AttackSalvosFired;
-        var fired = aircraft.TryAttackTarget(_player, ignoreCooldown: true);
+        var fired = false;
+        var roofBlocked = false;
+        var narrowAttack = false;
+        var attackOrbitReady = false;
+        var maximumAttackStep = 0.0f;
+        var attackGroundPoint = new Vector3(150.0f, 0.0f, 82.0f);
+        var attackGroundQuery = PhysicsRayQueryParameters3D.Create(
+            attackGroundPoint + Vector3.Up * 90.0f,
+            attackGroundPoint + Vector3.Down * 6.0f);
+        attackGroundQuery.CollisionMask = 1;
+        attackGroundQuery.CollideWithAreas = false;
+        attackGroundQuery.Exclude = new Godot.Collections.Array<Rid> { aircraft.GetRid() };
+        var attackGroundHit = GetWorld3D().DirectSpaceState.IntersectRay(attackGroundQuery);
+        if (attackGroundHit.Count > 0)
+        {
+            var attackSurface = attackGroundHit["position"].AsVector3();
+            _player.ProcessMode = ProcessModeEnum.Disabled;
+            _player.GlobalPosition = attackSurface + Vector3.Up * 0.3f;
+            _player.Velocity = Vector3.Zero;
+            aircraft.SetAttackTargetForDiagnostics(_player, Vector3.Right * 36.0f);
+            for (var frame = 0; frame < 180 && !attackOrbitReady; frame++)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                maximumAttackStep = Mathf.Max(maximumAttackStep, aircraft.LastPatrolStepDistance);
+                attackOrbitReady = aircraft.IsAttackOrbitActive
+                    && aircraft.AttackHorizontalDistance <= DestructibleAircraft.AttackOrbitRadius + 1.5f;
+            }
+            attackOrbitReady &= maximumAttackStep < 0.5f;
+
+            var roof = new StaticBody3D
+            {
+                Name = "AircraftAttackRoofDiagnostic",
+                Position = _player.GlobalPosition + Vector3.Up * 3.0f,
+                CollisionLayer = 1,
+                CollisionMask = 0
+            };
+            roof.AddChild(new CollisionShape3D
+            {
+                Shape = new BoxShape3D { Size = new Vector3(10.0f, 0.4f, 10.0f) }
+            });
+            AddChild(roof);
+            await WaitFrames(2);
+            aircraft.SetAttackTargetForDiagnostics(
+                _player,
+                Vector3.Right * DestructibleAircraft.AttackOrbitRadius);
+            var blockedSalvos = aircraft.AttackSalvosFired;
+            roofBlocked = !aircraft.TryAttackTarget(_player, ignoreCooldown: true)
+                && aircraft.AttackSalvosFired == blockedSalvos
+                && !aircraft.LastAttackPathClear;
+            roof.QueueFree();
+            await WaitFrames(2);
+
+            aircraft.SetAttackTargetForDiagnostics(
+                _player,
+                Vector3.Right * DestructibleAircraft.AttackOrbitRadius);
+            fired = aircraft.TryAttackTarget(_player, ignoreCooldown: true);
+            narrowAttack = fired
+                && aircraft.LastAttackPathClear
+                && aircraft.LastAttackAngleDegrees <= DestructibleAircraft.MaximumAttackAngleDegrees;
+        }
         await WaitFrames(6);
         var shellNodes = GetTree().GetNodesInGroup("aircraft_shells");
         var shellSpawned = shellNodes.Count > 0 || aircraft.AttackSalvosFired > salvosBefore;
@@ -3958,6 +4017,9 @@ public partial class FreightTerminalWorld : Node3D
         }
         var slowEnoughToDodge = AircraftShell.TravelSpeed <= 22.0f;
         var valid = fired
+            && roofBlocked
+            && narrowAttack
+            && attackOrbitReady
             && shellSpawned
             && uninterruptible
             && ownerCollisionExcluded
@@ -3976,7 +4038,7 @@ public partial class FreightTerminalWorld : Node3D
             && dropVisible
             && dropGrounded
             && dropSearchable;
-        GD.Print($"AIRCRAFT_COMBAT_CHECK valid={valid} fired={fired} shell={shellSpawned} uninterruptible={uninterruptible} owner_excluded={ownerCollisionExcluded} missile_landed={missileLanded} missile_low={missileLandingLow} shell_speed={AircraftShell.TravelSpeed:0.0} cruise_speed={DestructibleAircraft.CruiseSpeed:0.0} patrol_distance={patrolDistance:0.0} max_step={maximumPatrolStep:0.00} wrap_step={patrolWrapStep:0.00} smooth_patrol={smoothPatrol} health={aircraft.MaxHealth:0} durable={durable} salvos={salvosFired} last_damage={lastAttackDamage:0.0} player_hurt={playerHurt} destroyed={destroyed} repeat_ignored={repeatDamageIgnored} drop_once={dropSpawnedOnce} drop_registered={dropRegistered} drop_stocked={dropStocked} drop_visible={dropVisible} drop_grounded={dropGrounded} drop_searchable={dropSearchable}");
+        GD.Print($"AIRCRAFT_COMBAT_CHECK valid={valid} fired={fired} roof_blocked={roofBlocked} narrow_attack={narrowAttack} attack_orbit={attackOrbitReady} attack_distance={aircraft.AttackHorizontalDistance:0.0} attack_angle={aircraft.LastAttackAngleDegrees:0.0}/{DestructibleAircraft.MaximumAttackAngleDegrees:0.0} attack_step={maximumAttackStep:0.00} path_clear={aircraft.LastAttackPathClear} shell={shellSpawned} uninterruptible={uninterruptible} owner_excluded={ownerCollisionExcluded} missile_landed={missileLanded} missile_low={missileLandingLow} shell_speed={AircraftShell.TravelSpeed:0.0} cruise_speed={DestructibleAircraft.CruiseSpeed:0.0} patrol_distance={patrolDistance:0.0} max_step={maximumPatrolStep:0.00} wrap_step={patrolWrapStep:0.00} smooth_patrol={smoothPatrol} health={aircraft.MaxHealth:0} durable={durable} salvos={salvosFired} last_damage={lastAttackDamage:0.0} player_hurt={playerHurt} destroyed={destroyed} repeat_ignored={repeatDamageIgnored} drop_once={dropSpawnedOnce} drop_registered={dropRegistered} drop_stocked={dropStocked} drop_visible={dropVisible} drop_grounded={dropGrounded} drop_searchable={dropSearchable}");
         GD.Print($"AIRCRAFT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

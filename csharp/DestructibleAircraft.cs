@@ -17,10 +17,6 @@ public partial class DestructibleAircraft : StaticBody3D
     public float PatrolDistanceTravelled { get; private set; }
 
     public const float CruiseSpeed = 17.5f;
-    private const float EngageRange = 118.0f;
-    private const float FireCooldown = 3.1f;
-    private const float ShellDamage = 48.0f;
-    private const float ShellBlastRadius = 12.5f;
     private const float PatrolRadiusX = 62.0f;
     private const float PatrolRadiusZ = 30.0f;
     private const float PatrolAltitude = 40.5f;
@@ -31,11 +27,9 @@ public partial class DestructibleAircraft : StaticBody3D
     private CollisionShape3D _collider = null!;
     private float _patrolPhase;
     private Vector3 _flightDirection = Vector3.Right;
+    private bool _rejoiningPatrol;
     private float _fallVelocity;
     private bool _falling;
-    private float _fireCooldown;
-    private float _acquireTimer;
-    private Node3D? _currentTarget;
     private readonly RandomNumberGenerator _rng = new();
 
     public override void _Ready()
@@ -70,8 +64,16 @@ public partial class DestructibleAircraft : StaticBody3D
             return;
         }
 
-        UpdatePatrol(dt);
-        UpdateCombat(dt);
+        UpdateTargeting(dt);
+        if (_currentTarget is not null && GodotObject.IsInstanceValid(_currentTarget))
+        {
+            UpdateAttackFlight(_currentTarget, dt);
+        }
+        else
+        {
+            UpdatePatrol(dt);
+        }
+        UpdateCombat();
     }
 
     /// <summary>Headless/diagnostic: force one attack tick against an explicit target.</summary>
@@ -118,85 +120,13 @@ public partial class DestructibleAircraft : StaticBody3D
 
     internal void SetPatrolPhaseForDiagnostics(float phase)
     {
+        _currentTarget = null;
+        _acquireTimer = 1.0f;
+        IsAttackOrbitActive = false;
+        _rejoiningPatrol = false;
         _patrolPhase = Mathf.PosMod(phase, Mathf.Tau);
         Position = PatrolPosition(_patrolPhase);
         LastPatrolStepDistance = 0.0f;
-    }
-
-    private void UpdateCombat(float dt)
-    {
-        _fireCooldown = Mathf.Max(0.0f, _fireCooldown - dt);
-        _acquireTimer -= dt;
-        if (_acquireTimer <= 0.0f)
-        {
-            _acquireTimer = 0.45f;
-            _currentTarget = AcquireTarget();
-        }
-
-        if (_currentTarget is null || !GodotObject.IsInstanceValid(_currentTarget))
-        {
-            return;
-        }
-
-        if (_fireCooldown <= 0.0f && GlobalPosition.DistanceTo(_currentTarget.GlobalPosition) <= EngageRange)
-        {
-            FireAt(_currentTarget);
-        }
-    }
-
-    private Node3D? AcquireTarget()
-    {
-        if (Main is null || !IsHostile)
-        {
-            return null;
-        }
-
-        Node3D? best = null;
-        var bestDistance = EngageRange;
-        foreach (var combatant in Main.GetHostileAircraftTargets())
-        {
-            if (combatant is null || !GodotObject.IsInstanceValid(combatant))
-            {
-                continue;
-            }
-            var distance = GlobalPosition.DistanceTo(combatant.GlobalPosition);
-            if (distance < bestDistance)
-            {
-                bestDistance = distance;
-                best = combatant;
-            }
-        }
-        return best;
-    }
-
-    private bool FireAt(Node3D target)
-    {
-        if (Main is null)
-        {
-            return false;
-        }
-
-        var muzzle = GlobalPosition + Vector3.Down * 1.9f + _flightDirection * 2.2f;
-        var aim = target.GlobalPosition + Vector3.Up * 0.4f;
-        // Lead slightly for moving targets.
-        if (target is CharacterBody3D body)
-        {
-            aim += body.Velocity * 0.35f;
-        }
-        aim += new Vector3(
-            _rng.RandfRange(-2.4f, 2.4f),
-            _rng.RandfRange(-0.2f, 0.8f),
-            _rng.RandfRange(-2.4f, 2.4f));
-
-        var damage = ShellDamage * _rng.RandfRange(0.92f, 1.08f);
-        LastAttackDamage = damage;
-        AttackSalvosFired++;
-        _fireCooldown = FireCooldown;
-
-        // Physical bomb: deliberately slow enough to dodge, but impossible to shoot down.
-        Main.SpawnAircraftShell(muzzle, aim, damage, ShellBlastRadius, this);
-        Main.SpawnTracer(muzzle, aim, new Color(1.0f, 0.4f, 0.12f));
-        return true;
     }
 
     private void UpdateFall(float dt)
@@ -258,6 +188,25 @@ public partial class DestructibleAircraft : StaticBody3D
 
     private void UpdatePatrol(float dt)
     {
+        if (IsAttackOrbitActive)
+        {
+            IsAttackOrbitActive = false;
+            AttackHorizontalDistance = float.PositiveInfinity;
+            _patrolPhase = ClosestPatrolPhase(Position);
+            _rejoiningPatrol = true;
+        }
+
+        if (_rejoiningPatrol)
+        {
+            var patrolDestination = PatrolPosition(_patrolPhase);
+            ApplyFlightStep(Position.MoveToward(patrolDestination, CruiseSpeed * dt), countPatrolDistance: true, dt);
+            if (Position.DistanceTo(patrolDestination) <= 0.05f)
+            {
+                _rejoiningPatrol = false;
+            }
+            return;
+        }
+
         var sin = Mathf.Sin(_patrolPhase);
         var cos = Mathf.Cos(_patrolPhase);
         var tangent = new Vector3(
@@ -271,9 +220,17 @@ public partial class DestructibleAircraft : StaticBody3D
         }
 
         var nextPosition = PatrolPosition(_patrolPhase);
+        ApplyFlightStep(nextPosition, countPatrolDistance: true, dt);
+    }
+
+    private void ApplyFlightStep(Vector3 nextPosition, bool countPatrolDistance, float dt)
+    {
         var step = nextPosition - Position;
         LastPatrolStepDistance = step.Length();
-        PatrolDistanceTravelled += LastPatrolStepDistance;
+        if (countPatrolDistance)
+        {
+            PatrolDistanceTravelled += LastPatrolStepDistance;
+        }
         Position = nextPosition;
 
         var horizontalDirection = new Vector3(step.X, 0.0f, step.Z);
@@ -285,6 +242,15 @@ public partial class DestructibleAircraft : StaticBody3D
         _flightDirection = horizontalDirection.Normalized();
         var yaw = Mathf.Atan2(-_flightDirection.Z, _flightDirection.X);
         Rotation = new Vector3(0.0f, Mathf.LerpAngle(Rotation.Y, yaw, dt * 5.0f), 0.0f);
+    }
+
+    private static float ClosestPatrolPhase(Vector3 position)
+    {
+        return Mathf.PosMod(
+            Mathf.Atan2(
+                (position.Z - PatrolCenter.Z) / PatrolRadiusZ,
+                (position.X - PatrolCenter.X) / PatrolRadiusX),
+            Mathf.Tau);
     }
 
     private static Vector3 PatrolPosition(float phase)
