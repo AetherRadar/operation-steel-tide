@@ -379,6 +379,10 @@ public partial class FreightTerminalWorld
         _remoteNetworkShotCount++;
         var proxy = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && mate.IsHumanProxy && mate.NetworkPeerId == peerId);
         proxy?.PlayRemoteShot(end);
+        if (proxy is not null)
+        {
+            NotifyAircraftOperatorAttack(proxy, origin, 52.0f);
+        }
         if (enemyId < 0 || damage <= 0.0f)
         {
             return;
@@ -1248,21 +1252,6 @@ public partial class FreightTerminalWorld
                 wasDown ? "squad_revive" : "medic_spray",
                 wasDown ? "MEDIC SPRAY  //  SQUADMATE REVIVED" : "MEDIC SPRAY  //  TRAUMA STABILIZED",
                 OperatorRoles.Spec(OperatorRole.Medic).Accent);
-        }
-    }
-
-    public IEnumerable<Node3D> GetHostileAircraftTargets()
-    {
-        if (IsInstanceValid(_player) && !_player.IsDead)
-        {
-            yield return _player;
-        }
-        foreach (var mate in _squadMates)
-        {
-            if (IsInstanceValid(mate) && !mate.IsDowned)
-            {
-                yield return mate;
-            }
         }
     }
 

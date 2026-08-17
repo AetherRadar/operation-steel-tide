@@ -1508,6 +1508,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private void BeginMuzzleFlash()
     {
         AttackShotsFired++;
+        Main?.NotifyAircraftOperatorAttack(this, GlobalPosition, CarriedWeapon.Stats().SoundRadius);
         _shotAudio.PitchScale = _rng.RandfRange(0.88f, 1.08f);
         _shotAudio.Play();
         _muzzleLight.LightEnergy = 5.5f;

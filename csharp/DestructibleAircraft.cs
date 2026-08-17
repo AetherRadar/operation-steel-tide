@@ -15,17 +15,30 @@ public partial class DestructibleAircraft : StaticBody3D
     public float LastAttackDamage { get; private set; }
     public float LastPatrolStepDistance { get; private set; }
     public float PatrolDistanceTravelled { get; private set; }
+    public int PatrolVariantIndex { get; private set; }
+    public float PatrolPhaseForDiagnostics => _patrolPhase;
+    public int PatrolDirectionForDiagnostics => _patrolDirection;
 
     public const float CruiseSpeed = 17.5f;
     private const float PatrolRadiusX = 62.0f;
     private const float PatrolRadiusZ = 30.0f;
     private const float PatrolAltitude = 40.5f;
     private const float PatrolAltitudeSwing = 1.5f;
-    private static readonly Vector3 PatrolCenter = new(10.0f, PatrolAltitude, -78.0f);
+    private static readonly Vector3[] PatrolCenters =
+    {
+        new(-82.0f, PatrolAltitude, -152.0f),
+        new(82.0f, PatrolAltitude, -150.0f),
+        new(-76.0f, PatrolAltitude, 2.0f),
+        new(78.0f, PatrolAltitude, 4.0f),
+        new(8.0f, PatrolAltitude, -82.0f)
+    };
+    public static int PatrolVariantCount => PatrolCenters.Length;
 
     private Node3D _visual = null!;
     private CollisionShape3D _collider = null!;
     private float _patrolPhase;
+    private int _patrolDirection = 1;
+    private Vector3 _patrolCenter = PatrolCenters[0];
     private Vector3 _flightDirection = Vector3.Right;
     private bool _rejoiningPatrol;
     private float _fallVelocity;
@@ -97,6 +110,7 @@ public partial class DestructibleAircraft : StaticBody3D
             return false;
         }
 
+        NotifyDamagedByOperator(attacker);
         Health = Mathf.Max(0.0f, Health - amount);
         Main?.SpawnImpact(hitPosition, Vector3.Up);
         if (Health > MaxHealth * 0.45f)
@@ -120,12 +134,12 @@ public partial class DestructibleAircraft : StaticBody3D
 
     internal void SetPatrolPhaseForDiagnostics(float phase)
     {
-        _currentTarget = null;
-        _acquireTimer = 1.0f;
-        IsAttackOrbitActive = false;
+        ResetCombatForPatrol(initialScanDelay: 1.0f);
         _rejoiningPatrol = false;
+        _patrolDirection = 1;
         _patrolPhase = Mathf.PosMod(phase, Mathf.Tau);
         Position = PatrolPosition(_patrolPhase);
+        SetFlightDirectionFromPatrolPhase();
         LastPatrolStepDistance = 0.0f;
     }
 
@@ -180,10 +194,15 @@ public partial class DestructibleAircraft : StaticBody3D
 
     private void StartPatrol()
     {
-        _patrolPhase = Mathf.Pi;
+        PatrolVariantIndex = _rng.RandiRange(0, PatrolCenters.Length - 1);
+        _patrolCenter = PatrolCenters[PatrolVariantIndex];
+        _patrolPhase = _rng.RandfRange(0.0f, Mathf.Tau);
+        _patrolDirection = _rng.Randf() < 0.5f ? -1 : 1;
         Position = PatrolPosition(_patrolPhase);
+        SetFlightDirectionFromPatrolPhase();
         LastPatrolStepDistance = 0.0f;
         PatrolDistanceTravelled = 0.0f;
+        ResetCombatForPatrol(_rng.RandfRange(0.2f, 0.65f));
     }
 
     private void UpdatePatrol(float dt)
@@ -207,17 +226,10 @@ public partial class DestructibleAircraft : StaticBody3D
             return;
         }
 
-        var sin = Mathf.Sin(_patrolPhase);
-        var cos = Mathf.Cos(_patrolPhase);
-        var tangent = new Vector3(
-            -PatrolRadiusX * sin,
-            -PatrolAltitudeSwing * sin,
-            PatrolRadiusZ * cos);
-        _patrolPhase += CruiseSpeed * dt / Mathf.Max(0.01f, tangent.Length());
-        if (_patrolPhase >= Mathf.Tau)
-        {
-            _patrolPhase -= Mathf.Tau;
-        }
+        var tangent = PatrolTangent(_patrolPhase) * _patrolDirection;
+        _patrolPhase = Mathf.PosMod(
+            _patrolPhase + _patrolDirection * CruiseSpeed * dt / Mathf.Max(0.01f, tangent.Length()),
+            Mathf.Tau);
 
         var nextPosition = PatrolPosition(_patrolPhase);
         ApplyFlightStep(nextPosition, countPatrolDistance: true, dt);
@@ -244,21 +256,39 @@ public partial class DestructibleAircraft : StaticBody3D
         Rotation = new Vector3(0.0f, Mathf.LerpAngle(Rotation.Y, yaw, dt * 5.0f), 0.0f);
     }
 
-    private static float ClosestPatrolPhase(Vector3 position)
+    private float ClosestPatrolPhase(Vector3 position)
     {
         return Mathf.PosMod(
             Mathf.Atan2(
-                (position.Z - PatrolCenter.Z) / PatrolRadiusZ,
-                (position.X - PatrolCenter.X) / PatrolRadiusX),
+                (position.Z - _patrolCenter.Z) / PatrolRadiusZ,
+                (position.X - _patrolCenter.X) / PatrolRadiusX),
             Mathf.Tau);
     }
 
-    private static Vector3 PatrolPosition(float phase)
+    private Vector3 PatrolPosition(float phase)
     {
-        return PatrolCenter + new Vector3(
+        return _patrolCenter + new Vector3(
             PatrolRadiusX * Mathf.Cos(phase),
             PatrolAltitudeSwing * Mathf.Cos(phase),
             PatrolRadiusZ * Mathf.Sin(phase));
+    }
+
+    private static Vector3 PatrolTangent(float phase)
+    {
+        return new Vector3(
+            -PatrolRadiusX * Mathf.Sin(phase),
+            -PatrolAltitudeSwing * Mathf.Sin(phase),
+            PatrolRadiusZ * Mathf.Cos(phase));
+    }
+
+    private void SetFlightDirectionFromPatrolPhase()
+    {
+        var tangent = PatrolTangent(_patrolPhase) * _patrolDirection;
+        var horizontal = new Vector3(tangent.X, 0.0f, tangent.Z);
+        if (horizontal.LengthSquared() > 0.0001f)
+        {
+            _flightDirection = horizontal.Normalized();
+        }
     }
 
     private void BuildVisuals()

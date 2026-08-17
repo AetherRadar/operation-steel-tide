@@ -2005,6 +2005,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var stats = EquippedWeapon.Stats();
         _fireCooldown = stats.FireInterval * RoleFireIntervalMultiplier;
         Main?.ReportGunshot(GlobalPosition, stats.SoundRadius);
+        Main?.NotifyAircraftOperatorAttack(this, GlobalPosition, stats.SoundRadius);
         _gunAudio.PitchScale = _rng.RandfRange(0.94f, 1.06f);
         _gunAudio.Play();
         _muzzleFlash.LightEnergy = 7.0f;

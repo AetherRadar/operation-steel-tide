@@ -495,6 +495,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         var muzzlePos = IsInstanceValid(_muzzle) ? _muzzle.GlobalPosition : bodyOrigin;
         var shotOrigin = Ballistics.ResolveShotOrigin(GetWorld3D(), bodyOrigin, muzzlePos, GetRid());
         CombatShotsFired++;
+        Main.NotifyAircraftOperatorAttack(this, GlobalPosition, 52.0f);
         if (BreakableGlassField.TryShatterAlongRay(
             GetWorld3D(),
             shotOrigin,
