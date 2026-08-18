@@ -1321,7 +1321,7 @@ public partial class FreightTerminalWorld
 
     public void ApplyAircraftStrike(Vector3 impact, float radius, float damage, Node source)
     {
-        foreach (var friendly in FriendlyCombatants())
+        foreach (var friendly in FriendlyCombatants().ToArray())
         {
             if (!IsInstanceValid(friendly.CombatNode))
             {
@@ -1467,7 +1467,7 @@ public partial class FreightTerminalWorld
 
     private void DamageSquadFromExplosion(Vector3 position, float radius, float maxDamage, Node? source)
     {
-        foreach (var mate in _squadMates)
+        foreach (var mate in _squadMates.ToArray())
         {
             if (!IsInstanceValid(mate) || mate.IsDowned)
             {
