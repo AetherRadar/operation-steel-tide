@@ -1,4 +1,4 @@
-OPERATION STEEL TIDE 1.3.0 - WINDOWS X64
+OPERATION STEEL TIDE 1.3.3 - WINDOWS X64
 
 Run PLAY.bat. Godot, .NET, and Go do not need to be installed.
 
@@ -10,7 +10,8 @@ DOWNLOAD SAFETY
   unknown-publisher warning. The complete source and packaging script are public.
 
 MULTIPLAYER
-- The host selects HOST GAME. The game listens on UDP 28960.
+- The host selects HOST GAME. Leave the address blank to listen on all network interfaces at UDP 28960.
+- The host may enter a local bind IP or IP:PORT when a specific interface or port is required.
 - LAN players enter the host IP and select JOIN GAME.
 - Internet players can enter host:port when the host uses port forwarding or a UDP tunnel.
 - Windows Firewall may ask to allow OperationSteelTide.exe on first host launch.
