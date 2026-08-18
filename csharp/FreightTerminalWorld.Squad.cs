@@ -150,6 +150,12 @@ public partial class FreightTerminalWorld
             _hud.SetSquadStatus("JOIN FAILED  //  INVALID HOST OR PORT");
             return;
         }
+        if (sessionMode == SquadSessionMode.Host
+            && !SquadNetwork.TryParseHostEndpoint(address, SquadNetwork.DefaultPort, out _, out _))
+        {
+            _hud.SetSquadStatus("HOST FAILED  //  INVALID BIND IP OR PORT");
+            return;
+        }
         var selectedMapId = _hud.SelectedDeploymentMapId;
         if (!string.Equals(selectedMapId, _activeRuntimeMapId, StringComparison.OrdinalIgnoreCase))
         {
@@ -212,7 +218,7 @@ public partial class FreightTerminalWorld
         switch (mode)
         {
             case SquadSessionMode.Host:
-                networkError = _squadNetwork.Host();
+                networkError = _squadNetwork.Host(address);
                 break;
             case SquadSessionMode.Join:
                 if (!_squadNetwork.IsOnline)
@@ -303,6 +309,23 @@ public partial class FreightTerminalWorld
             out var nakedIpv6Host, out var nakedIpv6Port)
             && nakedIpv6Host == "2001:db8::8"
             && nakedIpv6Port == SquadNetwork.DefaultPort;
+        var defaultHostBind = SquadNetwork.TryParseHostEndpoint(string.Empty, SquadNetwork.DefaultPort,
+            out var defaultBindIp, out var defaultBindPort)
+            && defaultBindIp == "*"
+            && defaultBindPort == SquadNetwork.DefaultPort;
+        var ipv4HostBind = SquadNetwork.TryParseHostEndpoint("192.168.10.5:31000", SquadNetwork.DefaultPort,
+            out var ipv4BindIp, out var ipv4BindPort)
+            && ipv4BindIp == "192.168.10.5"
+            && ipv4BindPort == 31000;
+        var ipv6HostBind = SquadNetwork.TryParseHostEndpoint("[2001:db8::9]:31001", SquadNetwork.DefaultPort,
+            out var ipv6BindIp, out var ipv6BindPort)
+            && ipv6BindIp == "2001:db8::9"
+            && ipv6BindPort == 31001;
+        var hostnameHostBindRejected = !SquadNetwork.TryParseHostEndpoint(
+            "steel-tide.example:31000",
+            SquadNetwork.DefaultPort,
+            out _,
+            out _);
         var invalidRejected = !SquadNetwork.TryParseEndpoint("host:0", SquadNetwork.DefaultPort, out _, out _)
             && !SquadNetwork.TryParseEndpoint("host:65536", SquadNetwork.DefaultPort, out _, out _)
             && !SquadNetwork.TryParseEndpoint(":28960", SquadNetwork.DefaultPort, out _, out _)
@@ -314,6 +337,37 @@ public partial class FreightTerminalWorld
         var creditsBefore = _operatorProfileStore.Profile.Credits;
         var deploymentsBefore = _operatorProfileStore.Profile.DeploymentCount;
         _hud.ShowSquadLobby("NETWORK ENDPOINT VALIDATION");
+        _hud.SelectSquadSessionForDiagnostics(SquadSessionMode.Local);
+        var localAddressLocked = !_hud.IsSquadNetworkAddressEditable;
+        _hud.SelectSquadSessionForDiagnostics(SquadSessionMode.Host);
+        var hostAddressEditable = _hud.IsSquadNetworkAddressEditable;
+        _hud.SetSquadConnectionPending(true, "NETWORK ENDPOINT VALIDATION");
+        var pendingAddressLocked = !_hud.IsSquadNetworkAddressEditable;
+        _hud.SetSquadConnectionPending(false, "NETWORK ENDPOINT VALIDATION");
+        var hostAddressRestored = _hud.IsSquadNetworkAddressEditable;
+        _hud.SelectSquadSessionForDiagnostics(SquadSessionMode.Join);
+        var joinAddressEditable = _hud.IsSquadNetworkAddressEditable;
+        var addressModes = localAddressLocked && hostAddressEditable && pendingAddressLocked
+            && hostAddressRestored && joinAddressEditable;
+        OnSquadDeploymentRequested(
+            (int)OperatorRole.Assault,
+            (int)SquadSessionMode.Host,
+            "steel-tide.example:31000");
+        var invalidHostDeploymentPreserved = !_squadDeployed
+            && !_deploymentPurchaseCommitted
+            && _hud.IsSquadLobbyVisible
+            && _operatorProfileStore.Profile.Credits == creditsBefore
+            && _operatorProfileStore.Profile.DeploymentCount == deploymentsBefore;
+        OnDemolitionDeploymentRequested(
+            (int)OperatorRole.Assault,
+            (int)WeaponPlatform.M4A1,
+            1,
+            (int)WeaponPlatform.P226,
+            DemolitionMapCatalog.TideforgeId,
+            (int)SquadSessionMode.Host,
+            "steel-tide.example:31000",
+            (int)DemolitionNetworkTeam.Alpha);
+        var invalidDemolitionHostPreserved = !_squadDeployed && !_demolitionMode;
         OnSquadDeploymentRequested((int)OperatorRole.Assault, (int)SquadSessionMode.Join, "host:0");
         var invalidDeploymentPreserved = !_squadDeployed
             && !_deploymentPurchaseCommitted
@@ -341,9 +395,12 @@ public partial class FreightTerminalWorld
         var demolitionJoinDeferred = !_squadDeployed && _demolitionJoinPending;
         _squadNetwork.Close();
         CancelPendingNetworkDeployment();
-        var valid = defaultHost && hostname && tunnel && ipv6 && nakedIpv6
-            && invalidRejected && invalidDeploymentPreserved && validJoinDeferred && demolitionJoinDeferred;
-        GD.Print($"NETWORK_ENDPOINT_CHECK valid={valid} default={defaultHost} hostname={hostname} tunnel={tunnel} ipv6={ipv6} naked_ipv6={nakedIpv6} invalid_rejected={invalidRejected} invalid_deployment_preserved={invalidDeploymentPreserved} join_deferred={validJoinDeferred} demolition_join_deferred={demolitionJoinDeferred} endpoint={tunnelHost}:{tunnelPort}");
+        var valid = defaultHost && hostname && tunnel && ipv6 && nakedIpv6 && defaultHostBind
+            && ipv4HostBind && ipv6HostBind && hostnameHostBindRejected && addressModes
+            && invalidRejected && invalidHostDeploymentPreserved && invalidDemolitionHostPreserved
+            && invalidDeploymentPreserved
+            && validJoinDeferred && demolitionJoinDeferred;
+        GD.Print($"NETWORK_ENDPOINT_CHECK valid={valid} default={defaultHost} hostname={hostname} tunnel={tunnel} ipv6={ipv6} naked_ipv6={nakedIpv6} host_default={defaultHostBind} host_ipv4={ipv4HostBind} host_ipv6={ipv6HostBind} host_hostname_rejected={hostnameHostBindRejected} address_modes={addressModes} invalid_rejected={invalidRejected} invalid_host_deployment_preserved={invalidHostDeploymentPreserved} invalid_demolition_host_preserved={invalidDemolitionHostPreserved} invalid_deployment_preserved={invalidDeploymentPreserved} join_deferred={validJoinDeferred} demolition_join_deferred={demolitionJoinDeferred} endpoint={tunnelHost}:{tunnelPort}");
         GD.Print($"NETWORK_ENDPOINT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

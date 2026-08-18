@@ -52,10 +52,22 @@ public partial class SquadNetwork : Node
     }
 
     public Error Host(int port = DefaultPort)
+        => Host(null, port);
+
+    public Error Host(string? address, int port = DefaultPort)
     {
         Close();
+        if (!TryParseHostEndpoint(address, port, out var bindIp, out var endpointPort))
+        {
+            SetStatus("HOST FAILED  //  INVALID BIND IP OR PORT");
+            return Error.InvalidParameter;
+        }
         _peer = new ENetMultiplayerPeer();
-        var error = _peer.CreateServer(port, MaximumPlayers - 1);
+        if (bindIp != "*")
+        {
+            _peer.SetBindIP(bindIp);
+        }
+        var error = _peer.CreateServer(endpointPort, MaximumPlayers - 1);
         if (error != Error.Ok)
         {
             SetStatus($"HOST FAILED  //  {error}");
@@ -65,7 +77,9 @@ public partial class SquadNetwork : Node
         Multiplayer.MultiplayerPeer = _peer;
         IsOnline = true;
         IsHost = true;
-        SetStatus($"HOSTING UDP {port}  //  1/{MaximumPlayers}");
+        SetStatus(bindIp == "*"
+            ? $"HOSTING UDP {endpointPort}  //  1/{MaximumPlayers}"
+            : $"HOSTING {FormatEndpoint(bindIp, endpointPort)}  //  1/{MaximumPlayers}");
         return Error.Ok;
     }
 
@@ -157,6 +171,29 @@ public partial class SquadNetwork : Node
 
         host = suppliedHost;
         return true;
+    }
+
+    public static bool TryParseHostEndpoint(
+        string? value,
+        int defaultPort,
+        out string bindIp,
+        out int port)
+    {
+        bindIp = "*";
+        port = defaultPort;
+        if (defaultPort is < 1 or > 65535)
+        {
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+        if (!TryParseEndpoint(value, defaultPort, out bindIp, out port))
+        {
+            return false;
+        }
+        return IPAddress.TryParse(bindIp, out _);
     }
 
     private static bool TryParsePort(string value, out int port)

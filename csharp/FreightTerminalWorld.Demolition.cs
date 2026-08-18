@@ -138,6 +138,12 @@ public partial class FreightTerminalWorld
             _hud.SetSquadStatus("JOIN FAILED  //  INVALID HOST OR PORT");
             return;
         }
+        if (mode == SquadSessionMode.Host
+            && !SquadNetwork.TryParseHostEndpoint(address, SquadNetwork.DefaultPort, out _, out _))
+        {
+            _hud.SetDemolitionNetworkConnectionPending(false, "HOST FAILED  //  INVALID BIND IP OR PORT");
+            return;
+        }
         if (mode == SquadSessionMode.Join && !_squadNetwork.IsOnline)
         {
             BeginPendingDemolitionJoin((OperatorRole)role, mapId, address, team);

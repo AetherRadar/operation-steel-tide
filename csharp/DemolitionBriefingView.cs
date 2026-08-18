@@ -70,6 +70,7 @@ public partial class DemolitionBriefingView : ColorRect
     public SquadSessionMode SelectedSessionMode => _sessionMode;
     public DemolitionNetworkTeam SelectedNetworkTeam => _networkTeam;
     public string NetworkAddress => _address.Text.Trim();
+    public bool IsNetworkAddressEditable => IsInstanceValid(_address) && _address.Editable;
     public bool IsDeployEnabled => IsInstanceValid(_deployButton) && !_deployButton.Disabled;
     public bool UiReady
         => IsInstanceValid(_title)
@@ -129,9 +130,6 @@ public partial class DemolitionBriefingView : ColorRect
         _joinButton.Text = GameLocalization.IsChinese(_language) ? "\u52a0\u5165\u623f\u95f4" : "JOIN";
         _alphaButton.Text = GameLocalization.IsChinese(_language) ? "ALPHA  //  \u5148\u653b" : "ALPHA  //  ATTACK FIRST";
         _bravoButton.Text = GameLocalization.IsChinese(_language) ? "BRAVO  //  \u5148\u5b88" : "BRAVO  //  DEFEND FIRST";
-        _address.PlaceholderText = GameLocalization.IsChinese(_language)
-            ? "\u4e3b\u673a\u5c40\u57df\u7f51 IP\uff0c\u5982 192.168.x.x"
-            : "HOST LAN IP, E.G. 192.168.x.x";
         var roles = new[] { OperatorRole.Assault, OperatorRole.Medic, OperatorRole.Recon };
         for (var index = 0; index < roles.Length; index++)
         {
@@ -245,7 +243,7 @@ public partial class DemolitionBriefingView : ColorRect
         _joinButton.Disabled = pending;
         _alphaButton.Disabled = pending || _sessionMode != SquadSessionMode.Join;
         _bravoButton.Disabled = pending || _sessionMode != SquadSessionMode.Join;
-        _address.Editable = !pending && _sessionMode == SquadSessionMode.Join;
+        _address.Editable = !pending && _sessionMode != SquadSessionMode.Local;
         _deployButton.Disabled = pending || !BrowsedMap.Available;
         _deployButton.Text = pending
             ? GameLocalization.IsChinese(_language) ? "\u6b63\u5728\u8fde\u63a5\u4e3b\u673a..." : "CONNECTING TO HOST..."
@@ -337,8 +335,20 @@ public partial class DemolitionBriefingView : ColorRect
         _localButton.SetPressedNoSignal(mode == SquadSessionMode.Local);
         _hostButton.SetPressedNoSignal(mode == SquadSessionMode.Host);
         _joinButton.SetPressedNoSignal(mode == SquadSessionMode.Join);
-        _address.Editable = mode == SquadSessionMode.Join;
-        _address.Modulate = mode == SquadSessionMode.Join ? Colors.White : new Color(0.42f, 0.48f, 0.46f);
+        _address.Editable = mode != SquadSessionMode.Local;
+        _address.Modulate = mode != SquadSessionMode.Local ? Colors.White : new Color(0.42f, 0.48f, 0.46f);
+        _address.PlaceholderText = mode switch
+        {
+            SquadSessionMode.Host => GameLocalization.IsChinese(_language)
+                ? "\u9009\u586b\u7ed1\u5b9a IP:\u7aef\u53e3\uff1b\u7559\u7a7a\u76d1\u542c\u5168\u90e8\u7f51\u5361"
+                : "OPTIONAL BIND IP:PORT; BLANK = ALL",
+            SquadSessionMode.Join => GameLocalization.IsChinese(_language)
+                ? "\u4e3b\u673a\u5c40\u57df\u7f51 IP\uff0c\u5982 192.168.x.x"
+                : "HOST LAN IP, E.G. 192.168.x.x",
+            _ => GameLocalization.IsChinese(_language)
+                ? "\u521b\u5efa\u6216\u52a0\u5165\u8054\u673a\u65f6\u4f7f\u7528"
+                : "USED FOR HOST OR JOIN"
+        };
         _alphaButton.Disabled = mode != SquadSessionMode.Join;
         _bravoButton.Disabled = mode != SquadSessionMode.Join;
         if (mode != SquadSessionMode.Join)

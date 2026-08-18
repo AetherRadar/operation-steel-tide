@@ -67,6 +67,7 @@ public partial class FreightTerminalWorld
         var requestedSessionMode = -1;
         var requestedAddress = string.Empty;
         var requestedNetworkTeam = -1;
+        var addressModes = false;
         if (probe is not null)
         {
             probe.Visible = false;
@@ -88,10 +89,21 @@ public partial class FreightTerminalWorld
             probe.PressRoleForDiagnostics(OperatorRole.Recon);
             probe.PressNextMapForDiagnostics();
             probe.PressPreviousMapForDiagnostics();
+            probe.SelectNetworkForDiagnostics(SquadSessionMode.Local, DemolitionNetworkTeam.Alpha);
+            var localAddressLocked = !probe.IsNetworkAddressEditable;
+            probe.SelectNetworkForDiagnostics(SquadSessionMode.Host, DemolitionNetworkTeam.Alpha);
+            var hostAddressEditable = probe.IsNetworkAddressEditable;
+            probe.SetNetworkConnectionPending(true, "NETWORK ADDRESS VALIDATION");
+            var pendingAddressLocked = !probe.IsNetworkAddressEditable;
+            probe.SetNetworkConnectionPending(false, "NETWORK ADDRESS VALIDATION");
+            var hostAddressRestored = probe.IsNetworkAddressEditable;
             probe.SelectNetworkForDiagnostics(
                 SquadSessionMode.Join,
                 DemolitionNetworkTeam.Bravo,
                 "192.168.10.25");
+            var joinAddressEditable = probe.IsNetworkAddressEditable;
+            addressModes = localAddressLocked && hostAddressEditable && pendingAddressLocked
+                && hostAddressRestored && joinAddressEditable;
             probe.PressBackForDiagnostics();
             probe.PressDeployForDiagnostics();
         }
@@ -111,7 +123,8 @@ public partial class FreightTerminalWorld
             && requestedMap == DemolitionMapCatalog.TideforgeId
             && requestedSessionMode == (int)SquadSessionMode.Join
             && requestedAddress == "192.168.10.25"
-            && requestedNetworkTeam == (int)DemolitionNetworkTeam.Bravo;
+            && requestedNetworkTeam == (int)DemolitionNetworkTeam.Bravo
+            && addressModes;
         probe?.QueueFree();
         await WaitFrames(3);
 
@@ -124,7 +137,7 @@ public partial class FreightTerminalWorld
         var valid = sceneReady && chineseReady && englishReady && mapPoolReady && harborCarousel && lockedCarousel
             && carouselReturned && lockedMapRejected
             && synchronizedWithoutDeployment && probeReady && backReady;
-        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} map_pool={mapPoolReady} harbor={harborCarousel} carousel_locked={lockedCarousel} carousel_return={carouselReturned} locked_rejected={lockedMapRejected} sync={synchronizedWithoutDeployment} probe={probeReady} back={backReady}");
+        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} map_pool={mapPoolReady} harbor={harborCarousel} carousel_locked={lockedCarousel} carousel_return={carouselReturned} locked_rejected={lockedMapRejected} sync={synchronizedWithoutDeployment} address_modes={addressModes} probe={probeReady} back={backReady}");
         GD.Print($"DEMOLITION_BRIEFING_PASS valid={valid}");
         GetTree().Paused = false;
         await WaitFrames(180);
