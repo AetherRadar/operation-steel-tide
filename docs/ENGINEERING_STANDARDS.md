@@ -40,7 +40,6 @@ scene / composition root
 - Every reusable UI scene SHOULD have a focused controller/view class that binds its own required nodes, owns presentation updates, and emits user-intent signals. The composition root is responsible only for instantiation, connection, and supplying state.
 - Required scene nodes MUST use stable unique names and typed `GetNode<T>` bindings. Optional nodes MAY use `GetNodeOrNull<T>` with an explicit fallback.
 - A view MUST document its inputs, output signals, and lifecycle in its public API. Showing or hiding a view MUST NOT implicitly save settings or change gameplay state.
-- Programmatic world geometry MAY remain in C# when it is generated, repeated, or validated from data. Authored layouts and one-off static interface structure SHOULD be editor-visible scenes or resources.
 - Every newly extracted UI scene MUST have a deterministic `--validate-*` diagnostic that verifies scene loading, required bindings, data synchronization without feedback signals, localization where applicable, and user-intent signals.
 
 ## Services and state
