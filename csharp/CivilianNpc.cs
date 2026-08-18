@@ -37,6 +37,9 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
     private float _decisionTimer;
     private float _threatCheckTimer;
     private float _animationTime;
+    private float _simulationAccumulator;
+    private float _lodCheckTimer;
+    private bool _reducedSimulation;
     private bool _cowering;
     private Node3D _rig = null!;
     private Node3D _leftArm = null!;
@@ -63,6 +66,7 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         _homeLocal = homeLocal;
         _targetLocal = homeLocal;
         _roamHalfExtents = roamHalfExtents;
+        _lodCheckTimer = ((towerIndex * 7 + floorIndex * 3) % 10) * 0.04f;
         Position = _towerTransform * homeLocal;
         Rotation = new Vector3(0, towerTransform.Basis.GetEuler().Y, 0);
     }
@@ -267,13 +271,32 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         {
             return;
         }
-        var dt = (float)delta;
-        _decisionTimer -= dt;
-        _threatCheckTimer -= dt;
+        var frameDelta = (float)delta;
+        _decisionTimer -= frameDelta;
+        _threatCheckTimer -= frameDelta;
+        _simulationAccumulator += frameDelta;
+        _lodCheckTimer -= frameDelta;
+        if (_lodCheckTimer <= 0.0f)
+        {
+            _lodCheckTimer = 0.45f;
+            _reducedSimulation = IsOnFloor()
+                && _main.ShouldUseReducedCivilianSimulation(GlobalPosition);
+        }
+        if (_reducedSimulation && _simulationAccumulator < 0.1f)
+        {
+            return;
+        }
+        var dt = Mathf.Min(_simulationAccumulator, 0.12f);
+        _simulationAccumulator = 0.0f;
         if (_threatCheckTimer <= 0.0f)
         {
             _threatCheckTimer = 0.45f + _rng.RandfRange(0.0f, 0.25f);
-            _cowering = _main.FindNearestEnemy(GlobalPosition, 24.0f) is not null;
+            var cowering = _main.FindNearestEnemy(GlobalPosition, 24.0f) is not null;
+            if (_cowering != cowering)
+            {
+                _cowering = cowering;
+                RefreshRoleLabel();
+            }
         }
 
         if (_cowering)
@@ -348,7 +371,6 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         _leftArm.Rotation = new Vector3(_cowering ? -1.1f : -stride * 0.7f, 0, 0.08f);
         _rightArm.Rotation = new Vector3(_cowering ? -1.1f : stride * 0.7f, 0, -0.08f);
         _rig.Position = new Vector3(0, Mathf.Lerp(_rig.Position.Y, _cowering ? -0.42f : 0.0f, delta * 6.0f), 0);
-        RefreshRoleLabel();
     }
 
     private void BuildCivilian()

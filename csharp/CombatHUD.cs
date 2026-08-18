@@ -1337,19 +1337,30 @@ public partial class CombatHUD : CanvasLayer
 
     public void SetAlert(float value, string phase)
     {
-        if (phase is "CONTACT" or "COMBAT")
+        var state = phase is "CONTACT" or "COMBAT"
+            ? 3
+            : value >= 65.0f ? 2
+            : value >= 18.0f ? 1
+            : 0;
+        var displayedValue = state == 1 ? (int)value : -1;
+        if (!BeginAlertPresentationUpdate(state, displayedValue))
+        {
+            return;
+        }
+
+        if (state == 3)
         {
             _alertLabel.Text = Text("alerted", "ALERTED");
             _alertLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.28f, 0.17f));
         }
-        else if (value >= 65.0f)
+        else if (state == 2)
         {
             _alertLabel.Text = Text("suspicion_high", "SUSPICION  HIGH");
             _alertLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.58f, 0.19f));
         }
-        else if (value >= 18.0f)
+        else if (state == 1)
         {
-            _alertLabel.Text = $"{Text("suspicion", "SUSPICION")}  {(int)value:00}";
+            _alertLabel.Text = $"{Text("suspicion", "SUSPICION")}  {displayedValue:00}";
             _alertLabel.AddThemeColorOverride("font_color", new Color(0.9f, 0.78f, 0.28f));
         }
         else
