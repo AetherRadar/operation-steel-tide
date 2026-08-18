@@ -1,0 +1,40 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://csharp/LanRoomBrowserView.cs" id="1_browser"]
+
+[sub_resource type="StyleBoxFlat" id="Style_normal"]
+bg_color = Color(0.025, 0.043, 0.041, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.18, 0.34, 0.31, 0.9)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="Style_hover"]
+bg_color = Color(0.055, 0.12, 0.105, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.32, 0.86, 0.69, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[node name="LanRoomBrowserView" type="MenuButton"]
+custom_minimum_size = Vector2(64, 30)
+layout_mode = 0
+focus_mode = 0
+theme_override_colors/font_color = Color(0.68, 0.94, 0.83, 1)
+theme_override_colors/font_hover_color = Color(0.86, 1, 0.94, 1)
+theme_override_font_sizes/font_size = 10
+theme_override_styles/normal = SubResource("Style_normal")
+theme_override_styles/hover = SubResource("Style_hover")
+theme_override_styles/pressed = SubResource("Style_hover")
+text = "LAN  SCANNING"
+script = ExtResource("1_browser")

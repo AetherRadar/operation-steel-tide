@@ -1,6 +1,7 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://csharp/DemolitionBriefingView.cs" id="1_view"]
+[ext_resource type="PackedScene" path="res://ui/LanRoomBrowserView.tscn" id="2_rooms"]
 
 [sub_resource type="StyleBoxFlat" id="Style_role_normal"]
 bg_color = Color(0.025, 0.036, 0.037, 0.98)
@@ -445,12 +446,19 @@ text = "JOIN"
 layout_mode = 0
 offset_left = 342.0
 offset_top = 550.0
-offset_right = 690.0
+offset_right = 612.0
 offset_bottom = 580.0
 theme_override_font_sizes/font_size = 10
 text = ""
 placeholder_text = "HOST LAN IP, E.G. 192.168.x.x"
 clear_button_enabled = true
+
+[node name="LanRoomBrowser" parent="Band" instance=ExtResource("2_rooms")]
+layout_mode = 0
+offset_left = 618.0
+offset_top = 550.0
+offset_right = 690.0
+offset_bottom = 580.0
 
 [node name="TeamTitle" type="Label" parent="Band"]
 layout_mode = 0

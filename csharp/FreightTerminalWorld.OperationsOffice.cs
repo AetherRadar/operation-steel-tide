@@ -335,6 +335,7 @@ public partial class FreightTerminalWorld
 
     private void EnterOperationsOffice()
     {
+        _squadNetwork?.StopLanRoomBrowsing();
         _operationsOfficeActive = true;
         _player.UiLocked = true;
         _player.DisarmFireInput();
@@ -351,6 +352,7 @@ public partial class FreightTerminalWorld
 
     private void ActivateBattlefieldFromOperationsOffice()
     {
+        _squadNetwork.StopLanRoomBrowsing();
         GetTree().Paused = false;
         _operationsOfficeActive = false;
         _missionDirector.ProcessMode = ProcessModeEnum.Always;
@@ -361,13 +363,18 @@ public partial class FreightTerminalWorld
 
     private void OnOperationsQuickStartRequested()
     {
+        _squadNetwork.StartLanRoomBrowsing();
         _hud.ShowSquadLobby(GameLocalization.Get(
             "operations_quick_status",
             _languageSetting,
             "LOCAL SQUAD  //  3 OPERATORS  //  YOU PICK  //  AI FILLS THE REST"));
     }
 
-    private void OnDemolitionModeRequested() => _hud.ShowDemolitionBriefing();
+    private void OnDemolitionModeRequested()
+    {
+        _squadNetwork.StartLanRoomBrowsing();
+        _hud.ShowDemolitionBriefing();
+    }
 
     private void OnDemolitionBackRequested() => EnterOperationsOffice();
 
@@ -401,13 +408,15 @@ public partial class FreightTerminalWorld
         _hud.PressDemolitionModeForDiagnostics();
         var demolitionReady = _hud.IsDemolitionBriefingVisible
             && _hud.DemolitionBriefingUiReady
-            && !_hud.IsOperationsOfficeVisible;
+            && !_hud.IsOperationsOfficeVisible
+            && _squadNetwork.IsLanRoomBrowsingRequested;
         _hud.PressDemolitionRoleForDiagnostics(OperatorRole.Recon);
         var roleReady = _hud.SelectedDemolitionRole == OperatorRole.Recon;
         _hud.PressDemolitionBackForDiagnostics();
         var backReady = _hud.IsOperationsOfficeVisible
             && !_hud.IsDemolitionBriefingVisible
-            && IsOperationsOfficeCameraCurrent;
+            && IsOperationsOfficeCameraCurrent
+            && !_squadNetwork.IsLanRoomBrowsingRequested;
 
         _hud.SetLanguage("zh");
         var chineseReady = _hud.OperationsOfficeLanguageReady;
@@ -418,11 +427,13 @@ public partial class FreightTerminalWorld
         var loadoutReady = _hud.IsSquadLobbyVisible
             && !_hud.IsOperationsOfficeVisible
             && _hud.SquadLobbyHomeUiReady
+            && _squadNetwork.IsLanRoomBrowsingRequested
             && GetTree().Paused;
         _hud.PressSquadLobbyHomeForDiagnostics();
         var loadoutBackReady = _hud.IsOperationsOfficeVisible
             && !_hud.IsSquadLobbyVisible
             && IsOperationsOfficeCameraCurrent
+            && !_squadNetwork.IsLanRoomBrowsingRequested
             && GetTree().Paused;
         var languageReady = chineseReady && englishReady;
         var valid = uiReady && packedUiReady && sceneReady && homeReady && demolitionReady && roleReady && backReady
@@ -445,6 +456,23 @@ public partial class FreightTerminalWorld
 
     private async void CaptureDemolitionBriefing()
     {
+        _hud.SetLanRoomBrowseAvailable(true);
+        _hud.SetLanRooms(new[]
+        {
+            new LanRoomInfo(
+                "capture-demolition-room",
+                "STEEL-TIDE-HOST",
+                "192.168.10.42",
+                SquadNetwork.DefaultPort,
+                LanRoomKind.Demolition,
+                DemolitionMapCatalog.TideforgeId,
+                2,
+                SquadNetwork.MaximumPlayers)
+        });
+        _hud.SelectDemolitionNetworkForDiagnostics(
+            SquadSessionMode.Join,
+            DemolitionNetworkTeam.Alpha,
+            string.Empty);
         await WaitFrames(18);
         SaveViewportImage("res://demolition_briefing_validation.png");
         GD.Print("DEMOLITION_BRIEFING_CAPTURE path=demolition_briefing_validation.png");

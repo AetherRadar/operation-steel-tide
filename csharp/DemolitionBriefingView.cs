@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace OperationSteelTide;
@@ -46,6 +47,7 @@ public partial class DemolitionBriefingView : ColorRect
     private Button _alphaButton = null!;
     private Button _bravoButton = null!;
     private LineEdit _address = null!;
+    private LanRoomBrowserView _roomBrowser = null!;
     private Label _sessionTitle = null!;
     private Label _teamTitle = null!;
     private readonly Button[] _roleButtons = new Button[3];
@@ -71,6 +73,8 @@ public partial class DemolitionBriefingView : ColorRect
     public DemolitionNetworkTeam SelectedNetworkTeam => _networkTeam;
     public string NetworkAddress => _address.Text.Trim();
     public bool IsNetworkAddressEditable => IsInstanceValid(_address) && _address.Editable;
+    public bool LanRoomBrowserUiReady => IsInstanceValid(_roomBrowser) && _roomBrowser.UiReady;
+    public int VisibleLanRoomCount => IsInstanceValid(_roomBrowser) ? _roomBrowser.VisibleRoomCount : 0;
     public bool IsDeployEnabled => IsInstanceValid(_deployButton) && !_deployButton.Disabled;
     public bool UiReady
         => IsInstanceValid(_title)
@@ -80,6 +84,7 @@ public partial class DemolitionBriefingView : ColorRect
         && IsInstanceValid(_nextMapButton)
         && IsInstanceValid(_backButton)
         && IsInstanceValid(_deployButton)
+        && IsInstanceValid(_roomBrowser)
         && IsInstanceValid(_roleButtons[0])
         && IsInstanceValid(_roleButtons[1])
         && IsInstanceValid(_roleButtons[2]);
@@ -130,6 +135,7 @@ public partial class DemolitionBriefingView : ColorRect
         _joinButton.Text = GameLocalization.IsChinese(_language) ? "\u52a0\u5165\u623f\u95f4" : "JOIN";
         _alphaButton.Text = GameLocalization.IsChinese(_language) ? "ALPHA  //  \u5148\u653b" : "ALPHA  //  ATTACK FIRST";
         _bravoButton.Text = GameLocalization.IsChinese(_language) ? "BRAVO  //  \u5148\u5b88" : "BRAVO  //  DEFEND FIRST";
+        _roomBrowser.ApplyLanguage(_language);
         var roles = new[] { OperatorRole.Assault, OperatorRole.Medic, OperatorRole.Recon };
         for (var index = 0; index < roles.Length; index++)
         {
@@ -250,6 +256,12 @@ public partial class DemolitionBriefingView : ColorRect
             : Text("demolition_deploy", "DEPLOY DEMOLITION TEAM");
     }
 
+    public void SetLanRooms(IReadOnlyList<LanRoomInfo> rooms)
+        => _roomBrowser.SetRooms(rooms);
+
+    public void SetLanRoomBrowseAvailable(bool available)
+        => _roomBrowser.SetDiscoveryAvailable(available);
+
     private void BindNodes()
     {
         var band = GetNode<Control>("Band");
@@ -276,6 +288,8 @@ public partial class DemolitionBriefingView : ColorRect
         _hostButton = band.GetNode<Button>("HostButton");
         _joinButton = band.GetNode<Button>("JoinButton");
         _address = band.GetNode<LineEdit>("Address");
+        _roomBrowser = band.GetNode<LanRoomBrowserView>("LanRoomBrowser");
+        _roomBrowser.SetContext(LanRoomKind.Demolition);
         _alphaButton = band.GetNode<Button>("AlphaButton");
         _bravoButton = band.GetNode<Button>("BravoButton");
         var roles = band.GetNode<Control>("Roles");
@@ -307,6 +321,7 @@ public partial class DemolitionBriefingView : ColorRect
         _localButton.Pressed += () => SelectSessionMode(SquadSessionMode.Local);
         _hostButton.Pressed += () => SelectSessionMode(SquadSessionMode.Host);
         _joinButton.Pressed += () => SelectSessionMode(SquadSessionMode.Join);
+        _roomBrowser.RoomSelected += SelectLanRoom;
         _alphaButton.Pressed += () => SelectNetworkTeam(DemolitionNetworkTeam.Alpha);
         _bravoButton.Pressed += () => SelectNetworkTeam(DemolitionNetworkTeam.Bravo);
     }
@@ -336,6 +351,8 @@ public partial class DemolitionBriefingView : ColorRect
         _hostButton.SetPressedNoSignal(mode == SquadSessionMode.Host);
         _joinButton.SetPressedNoSignal(mode == SquadSessionMode.Join);
         _address.Editable = mode != SquadSessionMode.Local;
+        _address.Size = new Vector2(mode == SquadSessionMode.Join ? 270 : 348, 30);
+        _roomBrowser.Visible = mode == SquadSessionMode.Join;
         _address.Modulate = mode != SquadSessionMode.Local ? Colors.White : new Color(0.42f, 0.48f, 0.46f);
         _address.PlaceholderText = mode switch
         {
@@ -356,6 +373,25 @@ public partial class DemolitionBriefingView : ColorRect
             SelectNetworkTeam(DemolitionNetworkTeam.Alpha);
         }
     }
+
+    private void SelectLanRoom(LanRoomInfo room)
+    {
+        if (room.Kind != LanRoomKind.Demolition || !SelectMap(room.MapId))
+        {
+            return;
+        }
+        _address.Text = room.Endpoint;
+        SelectSessionMode(SquadSessionMode.Join);
+        _readyStatus.Text = GameLocalization.Format(
+            "lan_room_selected",
+            _language,
+            "ROOM SELECTED  //  {0}  //  {1}",
+            room.HostName,
+            Text(BrowsedMap.LocalizationKey, BrowsedMap.EnglishName));
+    }
+
+    public void SelectLanRoomForDiagnostics(int index)
+        => _roomBrowser.SelectRoomForDiagnostics(index);
 
     private void SelectNetworkTeam(DemolitionNetworkTeam team)
     {

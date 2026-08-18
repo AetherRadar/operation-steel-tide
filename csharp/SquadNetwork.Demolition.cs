@@ -21,6 +21,7 @@ public partial class SquadNetwork
 
     public void ConfigureDemolitionSession(string mapId, DemolitionNetworkTeam requestedTeam)
     {
+        ConfigureLanRoom(LanRoomKind.Demolition, mapId);
         IsDemolitionSession = true;
         DemolitionMapId = mapId;
         RequestedDemolitionTeam = requestedTeam;
@@ -28,8 +29,9 @@ public partial class SquadNetwork
         _demolitionAssignments.Clear();
     }
 
-    public void ConfigureExtractionSession()
+    public void ConfigureExtractionSession(string mapId = DeploymentMapCatalog.FreightTerminalId)
     {
+        ConfigureLanRoom(LanRoomKind.Extraction, mapId);
         IsDemolitionSession = false;
         DemolitionMapId = string.Empty;
         RequestedDemolitionTeam = DemolitionNetworkTeam.Alpha;

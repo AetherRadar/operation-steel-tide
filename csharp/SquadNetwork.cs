@@ -34,6 +34,7 @@ public partial class SquadNetwork : Node
     public override void _Ready()
     {
         Name = "SquadNetwork";
+        InitializeLanRoomDiscovery();
         Multiplayer.PeerConnected += OnPeerConnected;
         Multiplayer.PeerDisconnected += OnPeerDisconnected;
         Multiplayer.ConnectedToServer += OnConnectedToServer;
@@ -56,12 +57,13 @@ public partial class SquadNetwork : Node
 
     public Error Host(string? address, int port = DefaultPort)
     {
-        Close();
         if (!TryParseHostEndpoint(address, port, out var bindIp, out var endpointPort))
         {
             SetStatus("HOST FAILED  //  INVALID BIND IP OR PORT");
             return Error.InvalidParameter;
         }
+        PauseLanRoomBrowsing();
+        Close();
         _peer = new ENetMultiplayerPeer();
         if (bindIp != "*")
         {
@@ -72,31 +74,35 @@ public partial class SquadNetwork : Node
         {
             SetStatus($"HOST FAILED  //  {error}");
             _peer = null;
+            ResumeLanRoomBrowsingIfRequested();
             return error;
         }
         Multiplayer.MultiplayerPeer = _peer;
         IsOnline = true;
         IsHost = true;
+        StartLanRoomAdvertisement(endpointPort);
         SetStatus(bindIp == "*"
-            ? $"HOSTING UDP {endpointPort}  //  1/{MaximumPlayers}"
+            ? HostStatus(1)
             : $"HOSTING {FormatEndpoint(bindIp, endpointPort)}  //  1/{MaximumPlayers}");
         return Error.Ok;
     }
 
     public Error Join(string address, int port = DefaultPort)
     {
-        Close();
         if (!TryParseEndpoint(address, port, out var host, out var endpointPort))
         {
             SetStatus("JOIN FAILED  //  INVALID HOST OR PORT");
             return Error.InvalidParameter;
         }
+        PauseLanRoomBrowsing();
+        Close();
         _peer = new ENetMultiplayerPeer();
         var error = _peer.CreateClient(host, endpointPort);
         if (error != Error.Ok)
         {
             SetStatus($"JOIN FAILED  //  {error}");
             _peer = null;
+            ResumeLanRoomBrowsingIfRequested();
             return error;
         }
         Multiplayer.MultiplayerPeer = _peer;
@@ -205,6 +211,7 @@ public partial class SquadNetwork : Node
 
     public void Close()
     {
+        StopLanRoomAdvertisement();
         if (_peer is not null)
         {
             _peer.Close();
@@ -216,6 +223,7 @@ public partial class SquadNetwork : Node
         }
         IsOnline = false;
         IsHost = false;
+        _hostPort = DefaultPort;
         _snapshotTimer = 0.0f;
         _nextAbilityTimeByPeer.Clear();
         ResetDemolitionNetworkState();
@@ -362,8 +370,9 @@ public partial class SquadNetwork : Node
     private void OnPeerConnected(long peerId)
     {
         var connected = Multiplayer.GetPeers().Length + 1;
+        UpdateLanRoomAdvertisement();
         SetStatus(IsHost
-            ? $"HOSTING UDP {DefaultPort}  //  {connected}/{MaximumPlayers}"
+            ? HostStatus(connected)
             : $"CONNECTED  //  SQUAD {connected}/{MaximumPlayers}");
     }
 
@@ -373,8 +382,9 @@ public partial class SquadNetwork : Node
         ForgetDemolitionPeer(peerId);
         RemotePeerLeft?.Invoke(peerId);
         var connected = Mathf.Max(1, Multiplayer.GetPeers().Length + 1);
+        UpdateLanRoomAdvertisement();
         SetStatus(IsHost
-            ? $"HOSTING UDP {DefaultPort}  //  {connected}/{MaximumPlayers}"
+            ? HostStatus(connected)
             : $"CONNECTED  //  SQUAD {connected}/{MaximumPlayers}");
     }
 
@@ -388,6 +398,7 @@ public partial class SquadNetwork : Node
     private void OnConnectionFailed()
     {
         Close();
+        ResumeLanRoomBrowsingIfRequested();
         SetStatus("CONNECTION FAILED  //  AI SQUAD ACTIVE");
         ConnectionAttemptFailed?.Invoke();
     }

@@ -438,6 +438,13 @@ public static class GameLocalization
         Chinese["operations_back"] = "\u8fd4\u56de\u7279\u52e4\u5904";
         Chinese["operations_exit"] = "\u9000\u51fa\u6e38\u620f";
         Chinese["operations_return"] = "\u8fd4\u56de\u7279\u52e4\u5904";
+        Chinese["lan_scanning"] = "\u5c40\u57df\u7f51  \u626b\u63cf\u4e2d";
+        Chinese["lan_unavailable"] = "\u5c40\u57df\u7f51  \u624b\u52a8";
+        Chinese["lan_no_rooms"] = "\u672a\u53d1\u73b0\u5c40\u57df\u7f51\u623f\u95f4  //  \u53ef\u624b\u52a8\u8f93\u5165 IP";
+        Chinese["lan_scan_unavailable"] = "\u5c40\u57df\u7f51\u626b\u63cf\u4e0d\u53ef\u7528  //  \u8bf7\u624b\u52a8\u8f93\u5165 IP";
+        Chinese["lan_rooms_tooltip"] = "\u5c40\u57df\u7f51\u623f\u95f4  //  \u9009\u62e9\u540e\u81ea\u52a8\u586b\u5165\u4e3b\u673a\u5730\u5740";
+        Chinese["lan_room_full"] = "\u5df2\u6ee1";
+        Chinese["lan_room_selected"] = "\u5df2\u9009\u623f\u95f4  //  {0}  //  {1}";
         Chinese["demolition_title"] = "\u7206\u7834\u4efb\u52a1\u7b80\u62a5";
         Chinese["demolition"] = "\u7206\u7834";
         Chinese["demolition_subtitle"] = "5 v 5  //  \u5148\u653b\u540e\u5b88";

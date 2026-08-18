@@ -50,6 +50,9 @@ public partial class FreightTerminalWorld
         _squadNetwork.DemolitionAssignmentReceived += OnDemolitionNetworkAssignment;
         _squadNetwork.DemolitionActionReceived += OnDemolitionNetworkAction;
         _squadNetwork.StatusChanged += status => _hud.SetSquadStatus(status);
+        _squadNetwork.LanRoomsChanged += rooms => _hud.SetLanRooms(rooms);
+        _squadNetwork.LanRoomBrowseAvailabilityChanged += available =>
+            _hud.SetLanRoomBrowseAvailable(available);
         _squadNetwork.ConnectionEstablished += CompletePendingNetworkDeployment;
         _squadNetwork.ConnectionAttemptFailed += CancelPendingNetworkDeployment;
         _hud.SquadDeploymentRequested += OnSquadDeploymentRequested;
@@ -60,6 +63,7 @@ public partial class FreightTerminalWorld
         var networkHostCheck = Array.Exists(args, value => value == "--validate-network-host");
         var networkClientCheck = Array.Exists(args, value => value == "--validate-network-client");
         var networkEndpointCheck = Array.Exists(args, value => value == "--validate-network-endpoint");
+        var lanDiscoveryCheck = Array.Exists(args, value => value == "--validate-lan-discovery");
         var demolitionNetworkCheck = Array.Exists(args, value =>
             value is "--validate-demolition-network-host"
                 or "--validate-demolition-network-client"
@@ -85,6 +89,7 @@ public partial class FreightTerminalWorld
             || value.StartsWith("--validate", StringComparison.Ordinal))
             && !lobbyCapture
             && !networkEndpointCheck
+            && !lanDiscoveryCheck
             && !demolitionNetworkCheck
             && !operationsOfficeCommand;
         if (diagnostic)
@@ -212,7 +217,7 @@ public partial class FreightTerminalWorld
         }
         else
         {
-            _squadNetwork.ConfigureExtractionSession();
+            _squadNetwork.ConfigureExtractionSession(_activeDeploymentMapId);
         }
         Error networkError = Error.Ok;
         switch (mode)
@@ -349,6 +354,25 @@ public partial class FreightTerminalWorld
         var joinAddressEditable = _hud.IsSquadNetworkAddressEditable;
         var addressModes = localAddressLocked && hostAddressEditable && pendingAddressLocked
             && hostAddressRestored && joinAddressEditable;
+        _hud.SetLanRoomBrowseAvailable(true);
+        _hud.SetLanRooms(new[]
+        {
+            new LanRoomInfo(
+                "endpoint-room",
+                "ENDPOINT HOST",
+                "192.168.10.42",
+                30123,
+                LanRoomKind.Extraction,
+                DeploymentMapCatalog.FreightTerminalId,
+                2,
+                SquadNetwork.MaximumPlayers)
+        });
+        _hud.SelectSquadLanRoomForDiagnostics(0);
+        var lanRoomSelection = _hud.SquadLanRoomBrowserUiReady
+            && _hud.VisibleExtractionLanRoomCount == 1
+            && _hud.SelectedSquadSessionMode == SquadSessionMode.Join
+            && _hud.SquadNetworkAddress == "192.168.10.42:30123"
+            && _hud.SelectedDeploymentMapId == DeploymentMapCatalog.FreightTerminalId;
         OnSquadDeploymentRequested(
             (int)OperatorRole.Assault,
             (int)SquadSessionMode.Host,
@@ -396,11 +420,11 @@ public partial class FreightTerminalWorld
         _squadNetwork.Close();
         CancelPendingNetworkDeployment();
         var valid = defaultHost && hostname && tunnel && ipv6 && nakedIpv6 && defaultHostBind
-            && ipv4HostBind && ipv6HostBind && hostnameHostBindRejected && addressModes
+            && ipv4HostBind && ipv6HostBind && hostnameHostBindRejected && addressModes && lanRoomSelection
             && invalidRejected && invalidHostDeploymentPreserved && invalidDemolitionHostPreserved
             && invalidDeploymentPreserved
             && validJoinDeferred && demolitionJoinDeferred;
-        GD.Print($"NETWORK_ENDPOINT_CHECK valid={valid} default={defaultHost} hostname={hostname} tunnel={tunnel} ipv6={ipv6} naked_ipv6={nakedIpv6} host_default={defaultHostBind} host_ipv4={ipv4HostBind} host_ipv6={ipv6HostBind} host_hostname_rejected={hostnameHostBindRejected} address_modes={addressModes} invalid_rejected={invalidRejected} invalid_host_deployment_preserved={invalidHostDeploymentPreserved} invalid_demolition_host_preserved={invalidDemolitionHostPreserved} invalid_deployment_preserved={invalidDeploymentPreserved} join_deferred={validJoinDeferred} demolition_join_deferred={demolitionJoinDeferred} endpoint={tunnelHost}:{tunnelPort}");
+        GD.Print($"NETWORK_ENDPOINT_CHECK valid={valid} default={defaultHost} hostname={hostname} tunnel={tunnel} ipv6={ipv6} naked_ipv6={nakedIpv6} host_default={defaultHostBind} host_ipv4={ipv4HostBind} host_ipv6={ipv6HostBind} host_hostname_rejected={hostnameHostBindRejected} address_modes={addressModes} lan_room={lanRoomSelection} invalid_rejected={invalidRejected} invalid_host_deployment_preserved={invalidHostDeploymentPreserved} invalid_demolition_host_preserved={invalidDemolitionHostPreserved} invalid_deployment_preserved={invalidDeploymentPreserved} join_deferred={validJoinDeferred} demolition_join_deferred={demolitionJoinDeferred} endpoint={tunnelHost}:{tunnelPort}");
         GD.Print($"NETWORK_ENDPOINT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -2935,6 +2959,20 @@ public partial class FreightTerminalWorld
     private async void CaptureSquadLobbyFrame()
     {
         SetCaptureLanguage("en");
+        _hud.SetLanRoomBrowseAvailable(true);
+        _hud.SetLanRooms(new[]
+        {
+            new LanRoomInfo(
+                "capture-room",
+                "STEEL-TIDE-HOST",
+                "192.168.10.42",
+                SquadNetwork.DefaultPort,
+                LanRoomKind.Extraction,
+                DeploymentMapCatalog.FreightTerminalId,
+                2,
+                SquadNetwork.MaximumPlayers)
+        });
+        _hud.SelectSquadSessionForDiagnostics(SquadSessionMode.Join);
         await ToSignal(GetTree().CreateTimer(0.6f), SceneTreeTimer.SignalName.Timeout);
         var image = GetViewport().GetTexture().GetImage();
         image.SavePng("user://squad_lobby_validation.png");

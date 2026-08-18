@@ -1,6 +1,8 @@
 # Online Play
 
-Operation Steel Tide currently uses a listen server: the player who selects `HOST GAME` runs the authoritative ENet session. Leave the host address field blank to listen on every network interface at UDP port `28960`; enter a local bind IP or `IP:PORT` only when a specific interface or port is required. The included Go service stores local mission progress; it is not a gameplay server.
+Operation Steel Tide uses a listen server: the player who selects `HOST GAME` runs the authoritative ENet session. On the same Wi-Fi or wired LAN, the joining player can select `JOIN GAME` and choose the host from the automatic `LAN` room list. The host advertises while the match is running, stale rooms disappear automatically, and both computers must run the exact same game version.
+
+Gameplay uses UDP port `28960`; LAN room discovery uses UDP port `28961`. Allow the game through the Windows and macOS firewalls on private/local networks. Leave the host address field blank to listen on every network interface, or enter a local bind IP or `IP:PORT` only when a specific interface or port is required. Manual `host:port` entry remains available when broadcast discovery is blocked by a firewall, guest Wi-Fi isolation, a VPN, or a routed network. `127.0.0.1` always means the current computer and cannot connect two different machines. The included Go service stores local mission progress; it is not a gameplay server.
 
 ## Recommended free option: playit.gg
 

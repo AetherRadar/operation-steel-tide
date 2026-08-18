@@ -12,12 +12,20 @@ public partial class CombatHUD
     public bool IsSquadLobbyVisible => IsInstanceValid(_squadLobby) && _squadLobby.Visible;
     public bool IsSquadNetworkAddressEditable
         => IsInstanceValid(_squadAddress) && _squadAddress.Editable;
+    public bool SquadLanRoomBrowserUiReady
+        => IsInstanceValid(_squadRoomBrowser) && _squadRoomBrowser.UiReady;
+    public int VisibleExtractionLanRoomCount
+        => IsInstanceValid(_squadRoomBrowser) ? _squadRoomBrowser.VisibleRoomCount : 0;
+    public SquadSessionMode SelectedSquadSessionMode => _selectedSessionMode;
+    public string SquadNetworkAddress
+        => IsInstanceValid(_squadAddress) ? _squadAddress.Text.Trim() : string.Empty;
 
     private ColorRect _squadLobby = null!;
     private Label _squadLobbyTitle = null!;
     private Label _squadLobbySubtitle = null!;
     private Label _squadSessionStatus = null!;
     private LineEdit _squadAddress = null!;
+    private LanRoomBrowserView _squadRoomBrowser = null!;
     private Button _localSquadButton = null!;
     private Button _hostSquadButton = null!;
     private Button _joinSquadButton = null!;
@@ -308,11 +316,20 @@ public partial class CombatHUD
             Text = string.Empty,
             PlaceholderText = "192.168.x.x OR HOST:PORT",
             Position = new Vector2(424, 36),
-            Size = new Vector2(236, 38),
+            Size = new Vector2(166, 38),
             ClearButtonEnabled = true
         };
         _squadAddress.AddThemeFontSizeOverride("font_size", 12);
         sessionBand.AddChild(_squadAddress);
+
+        var roomBrowserScene = GD.Load<PackedScene>(LanRoomBrowserView.ScenePath)
+            ?? throw new InvalidOperationException($"Unable to load {LanRoomBrowserView.ScenePath}");
+        _squadRoomBrowser = roomBrowserScene.Instantiate<LanRoomBrowserView>();
+        _squadRoomBrowser.Position = new Vector2(596, 36);
+        _squadRoomBrowser.Size = new Vector2(64, 38);
+        _squadRoomBrowser.SetContext(LanRoomKind.Extraction);
+        _squadRoomBrowser.RoomSelected += SelectExtractionLanRoom;
+        sessionBand.AddChild(_squadRoomBrowser);
 
         _squadLobbyBackButton = DeploymentSegment(
             new Vector2(672, 36),
@@ -352,6 +369,8 @@ public partial class CombatHUD
         _hostSquadButton.SetPressedNoSignal(mode == SquadSessionMode.Host);
         _joinSquadButton.SetPressedNoSignal(mode == SquadSessionMode.Join);
         _squadAddress.Editable = mode != SquadSessionMode.Local;
+        _squadAddress.Size = new Vector2(mode == SquadSessionMode.Join ? 166 : 236, 38);
+        _squadRoomBrowser.Visible = mode == SquadSessionMode.Join;
         _squadAddress.Modulate = mode != SquadSessionMode.Local
             ? Colors.White
             : new Color(0.42f, 0.48f, 0.46f);
@@ -385,6 +404,24 @@ public partial class CombatHUD
     private void RequestSquadDeployment()
     {
         SquadDeploymentRequested?.Invoke((int)_selectedRole, (int)_selectedSessionMode, _squadAddress.Text.Trim());
+    }
+
+    private void SelectExtractionLanRoom(LanRoomInfo room)
+    {
+        if (room.Kind != LanRoomKind.Extraction || !DeploymentMapCatalog.IsAvailable(room.MapId))
+        {
+            return;
+        }
+        SetDeploymentMapSelection(room.MapId);
+        _squadAddress.Text = room.Endpoint;
+        SelectSessionMode(SquadSessionMode.Join);
+        var map = DeploymentMapCatalog.Resolve(room.MapId);
+        _squadSessionStatus.Text = GameLocalization.Format(
+            "lan_room_selected",
+            _language,
+            "ROOM SELECTED  //  {0}  //  {1}",
+            room.HostName,
+            Text(map.LocalizationKey, map.EnglishName));
     }
 
     private void RefreshSquadDeployAction()
@@ -561,6 +598,7 @@ public partial class CombatHUD
         _hostSquadButton.Text = chinese ? "\u521b\u5efa\u8054\u673a" : "HOST GAME";
         _joinSquadButton.Text = chinese ? "\u52a0\u5165\u8054\u673a" : "JOIN GAME";
         _squadLobbyBackButton.Text = Text("operations_back", "BACK TO OFFICE");
+        _squadRoomBrowser.ApplyLanguage(_language);
         var roles = new[] { OperatorRole.Assault, OperatorRole.Medic, OperatorRole.Recon };
         for (var i = 0; i < roles.Length; i++)
         {
@@ -586,4 +624,31 @@ public partial class CombatHUD
 
     public void SelectSquadSessionForDiagnostics(SquadSessionMode mode)
         => SelectSessionMode(mode);
+
+    public void SetLanRooms(IReadOnlyList<LanRoomInfo> rooms)
+    {
+        if (IsInstanceValid(_squadRoomBrowser))
+        {
+            _squadRoomBrowser.SetRooms(rooms);
+        }
+        if (IsInstanceValid(_demolitionBriefingView))
+        {
+            _demolitionBriefingView.SetLanRooms(rooms);
+        }
+    }
+
+    public void SetLanRoomBrowseAvailable(bool available)
+    {
+        if (IsInstanceValid(_squadRoomBrowser))
+        {
+            _squadRoomBrowser.SetDiscoveryAvailable(available);
+        }
+        if (IsInstanceValid(_demolitionBriefingView))
+        {
+            _demolitionBriefingView.SetLanRoomBrowseAvailable(available);
+        }
+    }
+
+    public void SelectSquadLanRoomForDiagnostics(int index)
+        => _squadRoomBrowser.SelectRoomForDiagnostics(index);
 }

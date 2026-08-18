@@ -97,13 +97,32 @@ public partial class FreightTerminalWorld
             var pendingAddressLocked = !probe.IsNetworkAddressEditable;
             probe.SetNetworkConnectionPending(false, "NETWORK ADDRESS VALIDATION");
             var hostAddressRestored = probe.IsNetworkAddressEditable;
+            probe.SetLanRoomBrowseAvailable(true);
+            probe.SetLanRooms(new[]
+            {
+                new LanRoomInfo(
+                    "demolition-room",
+                    "DEMOLITION HOST",
+                    "192.168.10.33",
+                    30222,
+                    LanRoomKind.Demolition,
+                    DemolitionMapCatalog.TideforgeId,
+                    2,
+                    SquadNetwork.MaximumPlayers)
+            });
+            probe.SelectLanRoomForDiagnostics(0);
+            var lanRoomSelection = probe.LanRoomBrowserUiReady
+                && probe.VisibleLanRoomCount == 1
+                && probe.SelectedSessionMode == SquadSessionMode.Join
+                && probe.NetworkAddress == "192.168.10.33:30222"
+                && probe.SelectedMapId == DemolitionMapCatalog.TideforgeId;
             probe.SelectNetworkForDiagnostics(
                 SquadSessionMode.Join,
                 DemolitionNetworkTeam.Bravo,
                 "192.168.10.25");
             var joinAddressEditable = probe.IsNetworkAddressEditable;
             addressModes = localAddressLocked && hostAddressEditable && pendingAddressLocked
-                && hostAddressRestored && joinAddressEditable;
+                && hostAddressRestored && joinAddressEditable && lanRoomSelection;
             probe.PressBackForDiagnostics();
             probe.PressDeployForDiagnostics();
         }
