@@ -1,5 +1,7 @@
 # Operation Steel Tide
 
+English | [简体中文](README.zh-CN.md)
+
 **A Godot 4 extraction FPS where AI squadmates follow orders, fight, use class abilities, revive the player, and replace disconnected co-op teammates.** Infiltrate a 340 m x 320 m harbor district, complete physical objectives, keep the loot you extract, and get the whole strike team onto the rescue aircraft alive.
 
 [Download the Windows build](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [See real in-engine captures](#real-in-engine-screenshots) · [Inspect the squad AI](csharp/FreightTerminalWorld.Squad.cs) · [Read the architecture notes](ARCHITECTURE.md)
