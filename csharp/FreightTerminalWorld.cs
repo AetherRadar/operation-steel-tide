@@ -1077,15 +1077,12 @@ public partial class FreightTerminalWorld : Node3D
                 SpawnPad = chosen[i],
                 CallsignPrefix = prefixes[i % prefixes.Length]
             };
-            var offsets = new[]
-            {
-                new Vector3(-1.8f, 0.0f, 0.6f),
-                new Vector3(1.8f, 0.0f, 0.6f),
-                new Vector3(0.0f, 0.0f, -1.8f)
-            };
             for (var m = 0; m < ExtractionSpawnPads.SquadSize; m++)
             {
-                var member = SpawnEnemy(chosen[i] + offsets[m], alerted: false, teamId: teamId);
+                var member = SpawnEnemy(
+                    ExtractionSpawnPads.HostileMemberPosition(chosen[i], m),
+                    alerted: false,
+                    teamId: teamId);
                 member.Name = $"{squad.CallsignPrefix}_{m + 1}";
                 squad.Members.Add(member);
             }
@@ -4267,6 +4264,7 @@ public partial class FreightTerminalWorld : Node3D
                 candidate.DistanceTo(playerPad) > 1.0f
                 && candidate.DistanceTo(playerPad) >= ExtractionSpawnPads.MinPlayerHostileSeparationMeters)
             >= ExtractionSpawnPads.HostileSquadTargetCount);
+        var spawnGeometry = InspectExtractionSpawnGeometry();
         var localDeploymentBoundary = !IsOutsideDeploymentZone(
                 DeploymentPoint + Vector3.Right * (DeploymentZoneRadiusMeters - 0.1f))
             && IsOutsideDeploymentZone(
@@ -4288,10 +4286,11 @@ public partial class FreightTerminalWorld : Node3D
         var valid = playerSquadOk && hostileOk && teamTotalOk && sizesOk
             && separated && playerClear && hostileMembersClear && playerOnEdge
             && everyPadHasFourSafeRivals
+            && spawnGeometry.Clear
             && protectedBeforeAlarm && openingTruce
             && protectionSurvivesEnemyAlarm && physicalExitClearsProtection
             && localDeploymentBoundary && extractVisible;
-        GD.Print($"EXTRACTION_SPAWNS_CHECK valid={valid} player_squad={ActiveSquadCount} hostile_squads={HostileSquadCount} teams={HostileSquadCount + 1} sizes_ok={sizesOk} min_pad_m={minDist:0.0} nearest_hostile_m={nearestHostileMember:0.0} separated={separated} player_clear={playerClear} member_clear={hostileMembersClear} all_pad_choices={everyPadHasFourSafeRivals} player_edge={playerOnEdge} protected={protectedBeforeAlarm} opening_truce={openingTruce} alarm_protected={protectionSurvivesEnemyAlarm} physical_exit={physicalExitClearsProtection} local_boundary={localDeploymentBoundary} extract_beacon={extractVisible}");
+        GD.Print($"EXTRACTION_SPAWNS_CHECK valid={valid} player_squad={ActiveSquadCount} hostile_squads={HostileSquadCount} teams={HostileSquadCount + 1} sizes_ok={sizesOk} min_pad_m={minDist:0.0} nearest_hostile_m={nearestHostileMember:0.0} separated={separated} player_clear={playerClear} member_clear={hostileMembersClear} all_pad_choices={everyPadHasFourSafeRivals} spawn_geometry={spawnGeometry.Clear} spawn_positions={spawnGeometry.CheckedPositions} spawn_blockers={spawnGeometry.Blockers} player_edge={playerOnEdge} protected={protectedBeforeAlarm} opening_truce={openingTruce} alarm_protected={protectionSurvivesEnemyAlarm} physical_exit={physicalExitClearsProtection} local_boundary={localDeploymentBoundary} extract_beacon={extractVisible}");
         GD.Print($"EXTRACTION_SPAWNS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

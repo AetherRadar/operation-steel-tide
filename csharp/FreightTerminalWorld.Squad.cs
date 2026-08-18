@@ -465,12 +465,10 @@ public partial class FreightTerminalWorld
     private SquadMate SpawnSquadMate(int slot, OperatorRole role, bool human, long peerId)
     {
         var callsigns = new[] { "RAVEN", "ECHO", "VIPER" };
-        var formation = slot switch
-        {
-            1 => new Vector3(-2.25f, 0.05f, 3.2f),
-            _ => new Vector3(2.25f, 0.05f, 3.2f)
-        };
-        var position = _player.GlobalPosition + _player.GlobalBasis.X * formation.X + _player.GlobalBasis.Z * formation.Z;
+        var position = ExtractionSpawnPads.FriendlyMemberPosition(
+            _player.GlobalPosition,
+            _player.GlobalBasis,
+            slot);
         var mate = new SquadMate
         {
             Name = human ? $"NetworkSquadmate_{peerId}" : $"AiSquadmate_{slot}",

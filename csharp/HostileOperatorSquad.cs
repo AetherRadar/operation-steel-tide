@@ -52,7 +52,7 @@ public static class ExtractionSpawnPads
         new(148.0f, 0.18f, MapCenterZ - 138.0f),  // NE corner
         new(-148.0f, 0.18f, MapCenterZ + 132.0f), // SW corner
         new(148.0f, 0.18f, MapCenterZ + 132.0f),  // SE corner
-        new(0.0f, 0.18f, MapCenterZ - 145.0f),    // North mid
+        new(0.0f, 0.18f, MapCenterZ - 155.0f),    // North apron, clear of North Quay 2
         new(0.0f, 0.18f, MapCenterZ + 140.0f),    // South mid
         new(-155.0f, 0.18f, MapCenterZ),          // West mid
         new(155.0f, 0.18f, MapCenterZ)           // East mid
@@ -68,6 +68,22 @@ public static class ExtractionSpawnPads
     public const int OperatorTeamCount = 5;
     public const int HostileSquadTargetCount = 4;
     public const int SquadSize = 3;
+
+    private static readonly Vector3[] HostileMemberOffsets =
+    {
+        new(-1.8f, 0.0f, 0.6f),
+        new(1.8f, 0.0f, 0.6f),
+        new(0.0f, 0.0f, -1.8f)
+    };
+
+    public static Vector3 FriendlyMemberPosition(Vector3 leaderPosition, Basis leaderBasis, int slot)
+    {
+        var lateral = slot == 1 ? -2.25f : 2.25f;
+        return leaderPosition + leaderBasis.X * lateral + leaderBasis.Z * 3.2f;
+    }
+
+    public static Vector3 HostileMemberPosition(Vector3 spawnPad, int memberIndex)
+        => spawnPad + HostileMemberOffsets[Mathf.Clamp(memberIndex, 0, HostileMemberOffsets.Length - 1)];
 
     public static float MinPairwiseDistance(IReadOnlyList<Vector3> pads)
     {
