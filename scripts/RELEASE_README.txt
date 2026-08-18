@@ -1,4 +1,4 @@
-OPERATION STEEL TIDE 1.3.3 - WINDOWS X64
+OPERATION STEEL TIDE 1.3.4 - WINDOWS X64
 
 Run PLAY.bat. Godot, .NET, and Go do not need to be installed.
 
@@ -12,7 +12,8 @@ DOWNLOAD SAFETY
 MULTIPLAYER
 - The host selects HOST GAME. Leave the address blank to listen on all network interfaces at UDP 28960.
 - The host may enter a local bind IP or IP:PORT when a specific interface or port is required.
-- LAN players enter the host IP and select JOIN GAME.
+- LAN players select JOIN GAME and choose the host from the automatic LAN room list.
+- LAN discovery uses UDP 28961. Manual host:port entry remains available when broadcast is blocked.
 - Internet players can enter host:port when the host uses port forwarding or a UDP tunnel.
 - Windows Firewall may ask to allow OperationSteelTide.exe on first host launch.
 - ONLINE_PLAY.md contains the free playit.gg setup and other connection options.
