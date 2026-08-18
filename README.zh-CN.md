@@ -1,8 +1,8 @@
-# Operation Steel Tide
+# Operation Steel Tide - 开源 Godot 战术撤离射击游戏
 
 [English](README.md) | 简体中文
 
-**一款使用 Godot 4 开发的撤离射击 FPS：AI 队友能够服从命令、参与战斗、使用职业技能、救援玩家，并在联机队友掉线后接管其位置。** 潜入一片 340 米 x 320 米的港区，完成需要实际操作的任务目标，带走成功撤离的战利品，并让整支突击小队活着登上救援飞机。
+**Operation Steel Tide 是一款使用 Godot 4.6 和 C# 开发的开源战术撤离射击游戏（FPS），包含 AI 队友、在线合作多人游戏、持久化战利品与配装，以及独立的 5v5 爆破模式。** AI 队友能够服从命令、参与战斗、使用职业技能、救援玩家，并在联机队友掉线后接管其位置。潜入一片 340 米 x 320 米的港区，完成需要实际操作的任务目标，带走成功撤离的战利品，并让整支突击小队活着登上救援飞机。
 
 [下载 Windows 版本](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [查看真实引擎截图](#真实引擎截图) · [查看小队 AI 源码](csharp/FreightTerminalWorld.Squad.cs) · [阅读架构说明](ARCHITECTURE.md)
 
@@ -15,7 +15,7 @@
 [![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-42e7c1.svg)](LICENSE)
 
-## 项目特色
+## Godot 4 撤离射击游戏特色
 
 - **掉线后仍能继续行动的小队：** 选择突击兵、医疗兵或侦察兵；AI 会补齐空位，执行跟随、原地防守和移动命令，使用职业技能，救援倒地队友，并在真人玩家掉线后接管其位置，无需重启任务。
 - **完整的撤离循环：** 潜入区域、关闭通信中继、窃取货运清单、抵御增援、搜刮建筑和阵亡干员，最后守住撤离区。

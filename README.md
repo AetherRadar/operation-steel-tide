@@ -1,8 +1,8 @@
-# Operation Steel Tide
+# Operation Steel Tide - Open-Source Godot Extraction Shooter
 
 English | [简体中文](README.zh-CN.md)
 
-**A Godot 4 extraction FPS where AI squadmates follow orders, fight, use class abilities, revive the player, and replace disconnected co-op teammates.** Infiltrate a 340 m x 320 m harbor district, complete physical objectives, keep the loot you extract, and get the whole strike team onto the rescue aircraft alive.
+**Operation Steel Tide is an open-source Godot 4.6 C# tactical extraction shooter and FPS with AI squadmates, online co-op multiplayer, persistent loot and loadouts, and a separate 5v5 demolition mode.** AI squadmates follow orders, fight, use class abilities, revive the player, and replace disconnected co-op teammates. Infiltrate a 340 m x 320 m harbor district, complete physical objectives, keep the loot you extract, and get the whole strike team onto the rescue aircraft alive.
 
 [Download the Windows build](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [See real in-engine captures](#real-in-engine-screenshots) · [Inspect the squad AI](csharp/FreightTerminalWorld.Squad.cs) · [Read the architecture notes](ARCHITECTURE.md)
 
@@ -15,7 +15,7 @@ English | [简体中文](README.zh-CN.md)
 [![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-42e7c1.svg)](LICENSE)
 
-## What makes it different
+## Godot 4 extraction shooter features
 
 - **The squad survives disconnects:** choose Assault, Medic, or Recon; AI fills empty roles, obeys follow/hold/move orders, uses class skills, revives downed teammates, and takes over a disconnected human slot without restarting the mission.
 - **A complete extraction loop:** infiltrate, disable the relay, steal the manifest, survive reinforcements, loot buildings and fallen operators, then hold the extraction zone.
