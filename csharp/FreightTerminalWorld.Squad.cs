@@ -97,7 +97,8 @@ public partial class FreightTerminalWorld
             var mode = networkHostCheck
                 ? SquadSessionMode.Host
                 : networkClientCheck ? SquadSessionMode.Join : SquadSessionMode.Local;
-            DeploySquad(OperatorRole.Assault, mode, "127.0.0.1");
+            var diagnosticEndpoint = ResolveNetworkDiagnosticEndpoint(args);
+            DeploySquad(OperatorRole.Assault, mode, diagnosticEndpoint);
             if (networkHostCheck || networkClientCheck)
             {
                 ValidateNetworkSession(networkHostCheck ? "host" : "client");
@@ -111,6 +112,19 @@ public partial class FreightTerminalWorld
             Input.MouseMode = Input.MouseModeEnum.Visible;
         }
         WarmSquadPortalWalkConnectorCache();
+    }
+
+    private static string ResolveNetworkDiagnosticEndpoint(string[] args)
+    {
+        const string prefix = "--network-diagnostic-endpoint=";
+        foreach (var argument in args)
+        {
+            if (argument.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return argument[prefix.Length..].Trim();
+            }
+        }
+        return "127.0.0.1";
     }
 
     private static void EnsureSquadInputActions()
@@ -288,7 +302,7 @@ public partial class FreightTerminalWorld
     private void CancelPendingNetworkDeployment()
     {
         _pendingNetworkExtractionDeployment = null;
-        _hud.SetSquadConnectionPending(false, "CONNECTION FAILED  //  CHECK HOST IP AND UDP 28960");
+        _hud.SetSquadConnectionPending(false, "CONNECTION FAILED  //  ALLOW LOCAL NETWORK / UDP 28960");
         CancelPendingDemolitionJoin();
     }
 
@@ -2982,7 +2996,20 @@ public partial class FreightTerminalWorld
 
     private async void ValidateNetworkSession(string mode)
     {
-        await ToSignal(GetTree().CreateTimer(2.2f), SceneTreeTimer.SignalName.Timeout);
+        var connectionDeadline = Time.GetTicksMsec() + 20000;
+        var connected = false;
+        while (Time.GetTicksMsec() < connectionDeadline)
+        {
+            connected = mode == "host"
+                ? _squadNetwork.ConnectedPeerCount > 0
+                : _squadNetwork.IsOnline;
+            if (connected)
+            {
+                break;
+            }
+            await ToSignal(GetTree().CreateTimer(0.1f), SceneTreeTimer.SignalName.Timeout);
+        }
+        await ToSignal(GetTree().CreateTimer(0.35f), SceneTreeTimer.SignalName.Timeout);
         _squadNetwork.BroadcastShot(_player.GlobalPosition + Vector3.Up, _player.GlobalPosition - Vector3.Forward * 4.0f, -1, 0.0f);
         _squadNetwork.BroadcastAbility(OperatorRole.Assault, _player.GlobalPosition + Vector3.Up, -Vector3.Forward);
         if (mode == "client")
@@ -2992,11 +3019,12 @@ public partial class FreightTerminalWorld
         await ToSignal(GetTree().CreateTimer(mode == "host" ? 1.5f : 1.7f), SceneTreeTimer.SignalName.Timeout);
         var remoteHumans = _squadMates.Count(mate => IsInstanceValid(mate) && mate.IsHumanProxy);
         var cooldownGate = _remoteNetworkAbilityCount == 1;
-        GD.Print($"NETWORK_CHECK mode={mode} online={_squadNetwork.IsOnline} peers={_squadNetwork.ConnectedPeerCount} remote_humans={remoteHumans} remote_shots={_remoteNetworkShotCount} remote_abilities={_remoteNetworkAbilityCount} cooldown_gate={cooldownGate} members={ActiveSquadCount} ai={AiSquadCount}");
+        var valid = connected && cooldownGate && remoteHumans == 1;
+        GD.Print($"NETWORK_CHECK mode={mode} valid={valid} connected={connected} online={_squadNetwork.IsOnline} peers={_squadNetwork.ConnectedPeerCount} remote_humans={remoteHumans} remote_shots={_remoteNetworkShotCount} remote_abilities={_remoteNetworkAbilityCount} cooldown_gate={cooldownGate} members={ActiveSquadCount} ai={AiSquadCount}");
         if (mode == "host")
         {
             await ToSignal(GetTree().CreateTimer(2.5f), SceneTreeTimer.SignalName.Timeout);
         }
-        GetTree().Quit(cooldownGate ? 0 : 2);
+        GetTree().Quit(valid ? 0 : 2);
     }
 }

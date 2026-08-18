@@ -9,6 +9,18 @@ public partial class FreightTerminalWorld
     {
         await WaitFrames(3);
         var version = ProjectSettings.GetSetting("application/config/version", "dev").AsString();
+        var permissionReceiver = new PacketPeerUdp();
+        var permissionBindError = permissionReceiver.Bind(0, "127.0.0.1");
+        var permissionProbeSent = permissionBindError == Error.Ok
+            && LanRoomDiscovery.SendLocalNetworkPermissionProbeForDiagnostics(
+                new[] { "127.0.0.1" },
+                permissionReceiver.GetLocalPort()) == 1;
+        await ToSignal(GetTree().CreateTimer(0.08, true), SceneTreeTimer.SignalName.Timeout);
+        var permissionProbeReceived = permissionProbeSent
+            && permissionReceiver.GetAvailablePacketCount() == 1
+            && permissionReceiver.GetPacket().Length > 0;
+        permissionReceiver.Close();
+
         var browser = new LanRoomDiscovery { Name = "LanRoomDiagnosticBrowser" };
         var advertiser = new LanRoomDiscovery { Name = "LanRoomDiagnosticAdvertiser" };
         AddChild(browser);
@@ -114,11 +126,13 @@ public partial class FreightTerminalWorld
         advertiser.StopAdvertising();
         await ToSignal(GetTree().CreateTimer(0.9, true), SceneTreeTimer.SignalName.Timeout);
         var expired = browser.Rooms.Count == 0;
-        var valid = listenerReady && discovered && updated && decoded && wrongVersionRejected
+        var valid = permissionProbeSent && permissionProbeReceived
+            && listenerReady && discovered && updated && decoded && wrongVersionRejected
             && malformedRejected && extractionSelection && demolitionSelection && expired
             && snapshotCount >= 4;
         GD.Print(
-            $"LAN_DISCOVERY_CHECK valid={valid} listener={listenerReady} discovered={discovered} "
+            $"LAN_DISCOVERY_CHECK valid={valid} permission_sent={permissionProbeSent} "
+            + $"permission_received={permissionProbeReceived} listener={listenerReady} discovered={discovered} "
             + $"updated={updated} decoded={decoded} version_rejected={wrongVersionRejected} "
             + $"malformed_rejected={malformedRejected} extraction_ui={extractionSelection} "
             + $"demolition_ui={demolitionSelection} expired={expired} snapshots={snapshotCount}");

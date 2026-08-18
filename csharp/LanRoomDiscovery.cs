@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 using Godot;
 
@@ -51,6 +52,8 @@ public partial class LanRoomDiscovery : Node
     private const ulong DefaultRoomLifetimeMilliseconds = 3200;
     private const int MaximumPacketsPerFrame = 32;
     private const string GameId = "operation-steel-tide";
+    private static readonly byte[] LocalNetworkPermissionProbe =
+        Encoding.ASCII.GetBytes("operation-steel-tide:local-network-permission");
 
     public event Action<IReadOnlyList<LanRoomInfo>>? RoomsChanged;
     public event Action<bool>? BrowseAvailabilityChanged;
@@ -117,6 +120,7 @@ public partial class LanRoomDiscovery : Node
             return error;
         }
         SetBrowseAvailable(true);
+        RequestLocalNetworkPermission();
         return Error.Ok;
     }
 
@@ -182,6 +186,11 @@ public partial class LanRoomDiscovery : Node
         string expectedVersion,
         out LanRoomInfo room)
         => TryDecode(packet, sourceAddress, expectedVersion, out room);
+
+    internal static int SendLocalNetworkPermissionProbeForDiagnostics(
+        IReadOnlyList<string> targets,
+        int port)
+        => SendLocalNetworkPermissionProbe(targets, port);
 
     private void StartAdvertising(
         LanRoomAdvertisement advertisement,
@@ -384,6 +393,35 @@ public partial class LanRoomDiscovery : Node
 
     private static string CurrentVersion()
         => ProjectSettings.GetSetting("application/config/version", "dev").AsString();
+
+    private static void RequestLocalNetworkPermission()
+    {
+        if (OS.HasFeature("macos"))
+        {
+            SendLocalNetworkPermissionProbe(BroadcastTargets(), DefaultDiscoveryPort);
+        }
+    }
+
+    private static int SendLocalNetworkPermissionProbe(IReadOnlyList<string> targets, int port)
+    {
+        if (port is < 1 or > 65535)
+        {
+            return 0;
+        }
+        var probe = new PacketPeerUdp();
+        probe.SetBroadcastEnabled(true);
+        var sent = 0;
+        foreach (var target in targets)
+        {
+            if (probe.SetDestAddress(target, port) == Error.Ok
+                && probe.PutPacket(LocalNetworkPermissionProbe) == Error.Ok)
+            {
+                sent++;
+            }
+        }
+        probe.Close();
+        return sent;
+    }
 
     private static IReadOnlyList<string> BroadcastTargets()
     {

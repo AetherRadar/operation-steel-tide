@@ -144,7 +144,7 @@ public partial class FreightTerminalWorld
         _demolitionJoinPending = false;
         _hud.SetDemolitionNetworkConnectionPending(
             false,
-            "CONNECTION FAILED  //  CHECK HOST IP AND UDP 28960");
+            "CONNECTION FAILED  //  ALLOW LOCAL NETWORK / UDP 28960");
     }
 
     private void OnDemolitionNetworkAssignment(DemolitionNetworkTeam team, int slot)

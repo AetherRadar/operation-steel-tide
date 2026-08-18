@@ -4,6 +4,8 @@ Operation Steel Tide uses a listen server: the player who selects `HOST GAME` ru
 
 Gameplay uses UDP port `28960`; LAN room discovery uses UDP port `28961`. Allow the game through the Windows and macOS firewalls on private/local networks. Leave the host address field blank to listen on every network interface, or enter a local bind IP or `IP:PORT` only when a specific interface or port is required. Manual `host:port` entry remains available when broadcast discovery is blocked by a firewall, guest Wi-Fi isolation, a VPN, or a routed network. `127.0.0.1` always means the current computer and cannot connect two different machines. The included Go service stores local mission progress; it is not a gameplay server.
 
+On macOS, accept the Local Network permission prompt when the deployment lobby opens. If a Mac can see a Windows LAN room but joining times out, open **System Settings > Privacy & Security > Local Network**, enable Operation Steel Tide, quit the game completely, and reopen it. On Windows, allow `OperationSteelTide.exe` for the active network profile; setting a trusted home Wi-Fi connection to Private also avoids public-network firewall defaults.
+
 ## Recommended free option: playit.gg
 
 [playit.gg](https://playit.gg/) can expose the host's UDP port without router configuration. Only the host runs the playit agent; joining players use the public endpoint it assigns. Account limits and endpoint availability are controlled by playit and may change, so check its [current pricing and limits](https://playit.gg/pricing) before setting up a session.

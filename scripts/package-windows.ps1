@@ -1,10 +1,11 @@
 param(
     [string]$Godot = $env:GODOT_MONO,
-    [string]$Version = "1.3.0",
+    [string]$Version = "1.3.5",
     [string]$OutputRoot = "dist"
 )
 
 $ErrorActionPreference = "Stop"
+$env:NuGetAudit = "false"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($Godot)) {
     $Godot = Join-Path $env:USERPROFILE "Downloads\Godot_v4.6.3-stable_mono_win64\Godot_v4.6.3-stable_mono_win64\Godot_v4.6.3-stable_mono_win64_console.exe"
