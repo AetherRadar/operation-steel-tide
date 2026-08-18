@@ -96,6 +96,7 @@ public partial class FreightTerminalWorld
             ("--validate-hit-feedback", static world => world.ValidateHitFeedback()),
             ("--validate-glass", static world => world.ValidateBreakableGlass()),
             ("--validate-performance", static world => world.ValidateMapPerformance()),
+            ("--validate-crowd-performance", static world => world.ValidateCrowdPerformance()),
             ("--capture-residential", static world => world.CaptureResidentialCommunity()),
             ("--capture-special-landmarks", static world => world.CaptureSpecialLandmarks()),
             ("--capture-residential-gameplay", static world => world.CaptureResidentialGameplay()),

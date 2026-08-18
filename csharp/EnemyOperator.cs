@@ -130,6 +130,13 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private bool _searchingLoot;
     private Vector3 _lootTarget;
     private WeaponBuild? _configuredLoadout;
+    private readonly List<Node3D> _combatTargetCandidates = new(24);
+    private float _combatTargetAcquireTimer;
+    private float _lineOfSightProbeTimer;
+    private bool _cachedLineOfSight;
+    private ulong _cachedLineOfSightTargetId;
+    private float _crowdSchedulePhase;
+    private float _stationaryMoveTimer;
     /// <summary>How long without in-range contact before map NPCs start looting.</summary>
     private const float NpcLootIdleSeconds = 6.5f;
     /// <summary>Beyond this distance a living hostile is ignored for engagement (still exists on map).</summary>
@@ -138,6 +145,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private const float DownedFinishAcquireRange = 22.0f;
     private const float DownedFinishScorePenalty = 32.0f * 32.0f;
     private const float DownedFinishLockSeconds = 1.5f;
+    private const float ActiveTargetAcquireInterval = 0.24f;
+    private const float IdleTargetAcquireInterval = 0.48f;
+    private const float ActiveLineOfSightInterval = 0.09f;
+    private const float IdleLineOfSightInterval = 0.16f;
     private bool UsesLongRangeRifle => CarriedWeapon.Platform is WeaponPlatform.M24 or WeaponPlatform.AXMC;
     private float CurrentContactAcquireRange => IsWorldBoss
         ? 240.0f
@@ -172,8 +183,17 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     {
         _rng.Randomize();
         _strafeSign = _rng.Randf() < 0.5f ? -1.0f : 1.0f;
+        var scheduleSeed = NetworkId >= 0
+            ? NetworkId + 1
+            : (int)(GetInstanceId() % 1021UL) + 1;
+        _crowdSchedulePhase = scheduleSeed * 0.61803398875f % 1.0f;
+        _combatTargetAcquireTimer = _crowdSchedulePhase * IdleTargetAcquireInterval;
+        _lineOfSightProbeTimer = _crowdSchedulePhase * IdleLineOfSightInterval;
+        _squadShareCooldown = _crowdSchedulePhase * 0.55f;
         CollisionLayer = 2;
-        CollisionMask = 1 | 2;
+        // Player/world collision remains bidirectional, while operators no longer solve
+        // CharacterBody collisions against every other operator in a dense firefight.
+        CollisionMask = 1;
         FloorSnapLength = 0.35f;
         BuildLootInventory();
         BuildOperator();
@@ -502,10 +522,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
 
         UpdatePursuitTimers(dt);
-        AcquireCombatTarget();
+        UpdateCombatTarget(dt);
         if (Main?.TryHandleDemolitionDefenderMovement(this, dt, EngageTargetNode) == true)
         {
-            MoveAndSlide();
+            MoveOperator(dt);
             AnimateBody(dt);
             return;
         }
@@ -589,16 +609,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
                     Patrol(dt);
                 }
             }
-            MoveAndSlide();
+            MoveOperator(dt);
             AnimateBody(dt);
             return;
         }
 
         var distance = GlobalPosition.DistanceTo(CurrentTargetPosition());
         var occupiedVehicleAwareness = HasOccupiedVehicleAwareness(distance);
-        var hasSight = distance < CurrentTargetDetectionRange()
-            && WithinViewCone()
-            && HasLineOfSight();
+        var sightEligible = distance < CurrentTargetDetectionRange() && WithinViewCone();
+        var hasSight = UpdateCachedLineOfSight(dt, sightEligible);
         // Mid-loot contact: any acquired hostile inside a hard contact bubble ends looting immediately.
         var midLootContact = _searchingLoot && distance < 22.0f;
         if (!Alerted)
@@ -670,8 +689,26 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         {
             Patrol(dt);
         }
-        MoveAndSlide();
+        MoveOperator(dt);
         AnimateBody(dt);
+    }
+
+    private void MoveOperator(float delta)
+    {
+        _stationaryMoveTimer -= delta;
+        var stationary = IsOnFloor()
+            && Mathf.Abs(Velocity.X) < 0.02f
+            && Mathf.Abs(Velocity.Y) < 0.2f
+            && Mathf.Abs(Velocity.Z) < 0.02f;
+        if (stationary && _stationaryMoveTimer > 0.0f)
+        {
+            return;
+        }
+
+        MoveAndSlide();
+        _stationaryMoveTimer = stationary
+            ? 0.25f * (0.85f + _crowdSchedulePhase * 0.3f)
+            : 0.0f;
     }
 
     private void HoldSentryPosition(float delta)
@@ -680,6 +717,68 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         stopped.X = Mathf.MoveToward(stopped.X, 0.0f, delta * 14.0f);
         stopped.Z = Mathf.MoveToward(stopped.Z, 0.0f, delta * 14.0f);
         Velocity = stopped;
+    }
+
+    private void UpdateCombatTarget(float delta)
+    {
+        _combatTargetAcquireTimer -= delta;
+        var previousTarget = AssignedCombatTargetNode();
+        if (!IsValidHostileTarget(previousTarget))
+        {
+            _combatTargetAcquireTimer = 0.0f;
+        }
+        if (_combatTargetAcquireTimer > 0.0f)
+        {
+            return;
+        }
+
+        AcquireCombatTarget();
+        TargetAcquisitionCountForDiagnostics++;
+        var active = AssignedCombatTargetNode() is not null || Alerted || IsPursuing;
+        var interval = active ? ActiveTargetAcquireInterval : IdleTargetAcquireInterval;
+        _combatTargetAcquireTimer = interval * (0.85f + _crowdSchedulePhase * 0.3f);
+        if (AssignedCombatTargetNode() != previousTarget)
+        {
+            InvalidateLineOfSightCache();
+        }
+    }
+
+    private bool UpdateCachedLineOfSight(float delta, bool eligible)
+    {
+        _lineOfSightProbeTimer -= delta;
+        var target = CurrentBallisticTargetNode();
+        var targetId = target is not null && GodotObject.IsInstanceValid(target)
+            ? target.GetInstanceId()
+            : 0UL;
+        if (targetId != _cachedLineOfSightTargetId)
+        {
+            _cachedLineOfSightTargetId = targetId;
+            _lineOfSightProbeTimer = 0.0f;
+            _cachedLineOfSight = false;
+        }
+        if (!eligible || targetId == 0UL)
+        {
+            _cachedLineOfSight = false;
+            return false;
+        }
+        if (_lineOfSightProbeTimer > 0.0f)
+        {
+            return _cachedLineOfSight;
+        }
+
+        _cachedLineOfSight = HasLineOfSight();
+        var interval = Alerted || IsPursuing
+            ? ActiveLineOfSightInterval
+            : IdleLineOfSightInterval;
+        _lineOfSightProbeTimer = interval * (0.85f + _crowdSchedulePhase * 0.3f);
+        return _cachedLineOfSight;
+    }
+
+    private void InvalidateLineOfSightCache()
+    {
+        _cachedLineOfSight = false;
+        _cachedLineOfSightTargetId = 0UL;
+        _lineOfSightProbeTimer = 0.0f;
     }
 
     private void AcquireCombatTarget()
@@ -715,54 +814,22 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             ? contactAcquireRangeSq * 1.35f * 1.35f
             : contactAcquireRangeSq;
 
-        void ConsiderCandidate(Node3D candidate)
+        Main.CollectHostileTargetsFor(this, Mathf.Sqrt(acquireRangeSq), _combatTargetCandidates);
+        foreach (var candidate in _combatTargetCandidates)
         {
-            if (candidate is null || !GodotObject.IsInstanceValid(candidate))
+            TargetCandidateEvaluationCountForDiagnostics++;
+            if (!TryScoreCombatCandidate(
+                    candidate,
+                    acquireRangeSq,
+                    out var score,
+                    out var candidateCombatant)
+                || score >= bestScore)
             {
-                return;
+                continue;
             }
-            var distanceSq = GlobalPosition.DistanceSquaredTo(candidate.GlobalPosition);
-            if (distanceSq > CandidateAcquireRangeSquared(candidate, acquireRangeSq))
-            {
-                return;
-            }
-            var candidateCombatant = candidate as ISquadCombatant;
-            if (candidateCombatant?.CombatDowned == true
-                && distanceSq > DownedFinishAcquireRange * DownedFinishAcquireRange)
-            {
-                return;
-            }
-            // Rival squads heavily prefer player/other operators over distant noise.
-            var bias = 0.0f;
-            if (candidate is TacticalPlayer || candidate is SquadMate)
-            {
-                bias = IsRivalSquad ? -40.0f : -15.0f;
-            }
-            else if (candidate is EnemyOperator other && other.IsRivalSquad)
-            {
-                bias = -35.0f; // map NPCs prefer rival operator squads inside range
-            }
-            if (candidateCombatant?.CombatDowned == true)
-            {
-                bias += DownedFinishScorePenalty;
-            }
-            bias += OccupiedVehicleTargetBias(candidate);
-            var score = distanceSq + bias;
-            if (score < bestScore)
-            {
-                bestScore = score;
-                bestNode = candidate;
-                bestCombatant = candidateCombatant;
-            }
-        }
-
-        foreach (var candidate in Main.EnumerateHostileTargetsFor(this))
-        {
-            ConsiderCandidate(candidate);
-        }
-        foreach (var candidate in Main.EnumerateDownedSquadTargets())
-        {
-            ConsiderCandidate(candidate);
+            bestScore = score;
+            bestNode = candidate;
+            bestCombatant = candidateCombatant;
         }
 
         if (bestCombatant is not null)
@@ -791,6 +858,49 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             ClearPursuitMemory(clearTarget: false);
         }
         // No fallback to infinitely-distant player — leave EngageTargetNode null so loot idle can run.
+    }
+
+    private bool TryScoreCombatCandidate(
+        Node3D candidate,
+        float acquireRangeSquared,
+        out float score,
+        out ISquadCombatant? candidateCombatant)
+    {
+        score = float.PositiveInfinity;
+        candidateCombatant = null;
+        if (!GodotObject.IsInstanceValid(candidate))
+        {
+            return false;
+        }
+
+        var distanceSquared = GlobalPosition.DistanceSquaredTo(candidate.GlobalPosition);
+        if (distanceSquared > CandidateAcquireRangeSquared(candidate, acquireRangeSquared))
+        {
+            return false;
+        }
+        candidateCombatant = candidate as ISquadCombatant;
+        if (candidateCombatant?.CombatDowned == true
+            && distanceSquared > DownedFinishAcquireRange * DownedFinishAcquireRange)
+        {
+            return false;
+        }
+
+        var bias = 0.0f;
+        if (candidate is TacticalPlayer || candidate is SquadMate)
+        {
+            bias = IsRivalSquad ? -40.0f : -15.0f;
+        }
+        else if (candidate is EnemyOperator other && other.IsRivalSquad)
+        {
+            bias = -35.0f;
+        }
+        if (candidateCombatant?.CombatDowned == true)
+        {
+            bias += DownedFinishScorePenalty;
+        }
+        bias += OccupiedVehicleTargetBias(candidate);
+        score = distanceSquared + bias;
+        return true;
     }
 
     private void UpdateDownedFinishLock(float delta)
@@ -873,7 +983,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             // Revive dead diagnostics subjects so multi-phase validators can reuse them.
             IsDead = false;
             CollisionLayer = 2;
-            CollisionMask = 1 | 2;
+            CollisionMask = 1;
             SetPhysicsProcess(true);
             ProcessMode = ProcessModeEnum.Inherit;
             if (IsInstanceValid(_bodyRoot))
@@ -900,7 +1010,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         _rawTarget = null;
         _downedFinishTarget = null;
         _downedFinishLockTimer = 0.0f;
+        _combatTargetAcquireTimer = 0.0f;
+        InvalidateLineOfSightCache();
         ResetPursuitStateForDiagnostics();
+        Main?.InvalidateCombatContactRelayForDiagnostics(TeamId);
         // Phase-1 duel may have removed this unit from the world roster on death.
         // Re-list so later validator phases (and AcquireCombatTarget) can see us again.
         Main?.EnsureEnemyRegisteredForDiagnostics(this);
@@ -1082,6 +1195,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private bool HasLineOfSight()
     {
+        LineOfSightProbeCountForDiagnostics++;
         var targetNode = CurrentBallisticTargetNode();
         if (targetNode is null || !GodotObject.IsInstanceValid(targetNode))
         {
@@ -1179,6 +1293,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         Suspicion = 100.0f;
         Alerted = true;
         _patrolTarget = investigatePosition;
+        _combatTargetAcquireTimer = 0.0f;
         RememberInvestigationPoint(investigatePosition, CurrentPursuitDuration * 0.7f);
         _fireTimer = _rng.RandfRange(0.45f, 0.9f);
     }

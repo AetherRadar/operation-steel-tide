@@ -53,7 +53,7 @@ public partial class EnemyOperator
         {
             IsDead = false;
             CollisionLayer = 2;
-            CollisionMask = 1 | 2;
+            CollisionMask = 1;
             if (IsInstanceValid(_bodyRoot))
             {
                 _bodyRoot.Position = Vector3.Zero;

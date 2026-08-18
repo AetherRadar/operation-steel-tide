@@ -148,29 +148,15 @@ public partial class EnemyOperator
 
     private void SharePursuitContact(Node3D target, Vector3 position)
     {
-        if (SuppressesContactSharingForDiagnostics || !IsInsideTree())
+        ContactShareRequestCountForDiagnostics++;
+        if (SuppressesContactSharingForDiagnostics || !IsInsideTree() || Main is null)
         {
             return;
         }
-        var group = IsRivalSquad ? "rival_operators" : "map_npc_operators";
-        var shareRangeSq = SquadContactShareRange * SquadContactShareRange;
-        var nodes = GetTree().GetNodesInGroup(group);
-        using var nodesBacking = nodes.AsDisposable();
-        foreach (var node in nodes)
-        {
-            if (node is not EnemyOperator ally
-                || ally == this
-                || ally.IsDead
-                || ally.TeamId != TeamId
-                || GlobalPosition.DistanceSquaredTo(ally.GlobalPosition) > shareRangeSq)
-            {
-                continue;
-            }
-            ally.ReceiveSharedPursuitContact(target, position);
-        }
+        Main.RelayOperatorContact(this, target, position, SquadContactShareRange);
     }
 
-    private void ReceiveSharedPursuitContact(Node3D target, Vector3 position)
+    internal void ReceiveSharedPursuitContact(Node3D target, Vector3 position)
     {
         if (!IsValidHostileTarget(target))
         {

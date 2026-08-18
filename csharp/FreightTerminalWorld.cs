@@ -1120,6 +1120,7 @@ public partial class FreightTerminalWorld : Node3D
         AddChild(enemy);
         enemy.Eliminated += OnEnemyEliminated;
         _enemies.Add(enemy);
+        InvalidateCombatTargetIndex();
         if (alerted)
         {
             enemy.SetAlerted(_player.GlobalPosition);
@@ -1493,6 +1494,7 @@ public partial class FreightTerminalWorld : Node3D
         _kills++;
         _hud.SetEnemyCount(_enemiesRemaining);
         _enemies.Remove(enemy);
+        InvalidateCombatTargetIndex();
     }
 
     /// <summary>
@@ -1510,6 +1512,7 @@ public partial class FreightTerminalWorld : Node3D
         if (!_enemies.Contains(enemy))
         {
             _enemies.Add(enemy);
+            InvalidateCombatTargetIndex();
         }
         _enemiesRemaining = _enemies.Count(e => IsInstanceValid(e) && !e.IsDead);
         _hud.SetEnemyCount(_enemiesRemaining);

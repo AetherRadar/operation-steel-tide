@@ -20,6 +20,18 @@ public partial class EnemyOperator
 {
     internal bool BypassesPlayerProtectionForDiagnostics { get; private set; }
     internal bool SuppressesContactSharingForDiagnostics { get; private set; }
+    internal int TargetAcquisitionCountForDiagnostics { get; private set; }
+    internal int TargetCandidateEvaluationCountForDiagnostics { get; private set; }
+    internal int LineOfSightProbeCountForDiagnostics { get; private set; }
+    internal int ContactShareRequestCountForDiagnostics { get; private set; }
+
+    internal void ResetCrowdPerformanceCountersForDiagnostics()
+    {
+        TargetAcquisitionCountForDiagnostics = 0;
+        TargetCandidateEvaluationCountForDiagnostics = 0;
+        LineOfSightProbeCountForDiagnostics = 0;
+        ContactShareRequestCountForDiagnostics = 0;
+    }
 
     /// <summary>
     /// Seeds one isolated combat probe and resets only tactical transients. Subsequent target
