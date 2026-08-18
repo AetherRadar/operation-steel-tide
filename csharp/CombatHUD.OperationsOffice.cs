@@ -56,6 +56,14 @@ public partial class CombatHUD
         => IsInstanceValid(_demolitionBriefingView) && _demolitionBriefingView.IntentSignalsConnected;
     public bool DemolitionBriefingLanguageReady
         => IsInstanceValid(_demolitionBriefingView) && _demolitionBriefingView.LanguageMatches(_language);
+
+    public void SetDemolitionNetworkConnectionPending(bool pending, string status)
+    {
+        if (IsInstanceValid(_demolitionBriefingView))
+        {
+            _demolitionBriefingView.SetNetworkConnectionPending(pending, status);
+        }
+    }
     public OperatorRole SelectedDemolitionRole
         => IsInstanceValid(_demolitionBriefingView)
             ? _demolitionBriefingView.SelectedRole

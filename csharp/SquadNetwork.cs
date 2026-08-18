@@ -18,6 +18,8 @@ public partial class SquadNetwork : Node
     public event Action<long, OperatorRole, Vector3, Vector3>? RemoteAbilityReceived;
     public event Action<long, Vector3, Vector3, int, float>? RemoteShotReceived;
     public event Action<string>? StatusChanged;
+    public event Action? ConnectionEstablished;
+    public event Action? ConnectionAttemptFailed;
 
     public bool IsOnline { get; private set; }
     public bool IsHost { get; private set; }
@@ -343,12 +345,14 @@ public partial class SquadNetwork : Node
     {
         IsOnline = true;
         SetStatus($"CONNECTED  //  PEER {Multiplayer.GetUniqueId()}");
+        ConnectionEstablished?.Invoke();
     }
 
     private void OnConnectionFailed()
     {
         Close();
         SetStatus("CONNECTION FAILED  //  AI SQUAD ACTIVE");
+        ConnectionAttemptFailed?.Invoke();
     }
 
     private void OnServerDisconnected()

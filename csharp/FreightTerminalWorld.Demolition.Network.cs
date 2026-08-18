@@ -17,6 +17,11 @@ public partial class FreightTerminalWorld
     private bool _demolitionNetworkClient;
     private float _demolitionNetworkSnapshotTimer;
     private int _demolitionNetworkRound;
+    private bool _demolitionJoinPending;
+    private OperatorRole _pendingDemolitionRole;
+    private string _pendingDemolitionMapId = string.Empty;
+    private string _pendingDemolitionAddress = string.Empty;
+    private DemolitionNetworkTeam _pendingDemolitionTeam;
     private int _networkDeviceCarrierActorId = -1;
 
     public DemolitionNetworkTeam DemolitionLocalNetworkTeam => _demolitionLocalNetworkTeam;
@@ -82,6 +87,64 @@ public partial class FreightTerminalWorld
         _demolitionNetworkActionAppliedForDiagnostics = false;
         _demolitionNetworkActionDistanceForDiagnostics = -1.0f;
         _squadNetwork.ConfigureDemolitionSession(_demolitionSelectedMapId, _demolitionLocalNetworkTeam);
+    }
+
+    private void BeginPendingDemolitionJoin(
+        OperatorRole role,
+        string mapId,
+        string address,
+        DemolitionNetworkTeam team)
+    {
+        if (_demolitionJoinPending)
+        {
+            return;
+        }
+        _demolitionJoinPending = true;
+        _pendingDemolitionRole = role;
+        _pendingDemolitionMapId = mapId;
+        _pendingDemolitionAddress = address;
+        _pendingDemolitionTeam = team;
+        _hud.SetDemolitionNetworkConnectionPending(true, $"CONNECTING  //  {address}");
+        var error = _squadNetwork.Join(address);
+        if (error != Error.Ok)
+        {
+            CancelPendingNetworkDeployment();
+        }
+    }
+
+    private void CompletePendingDemolitionJoin()
+    {
+        if (!_demolitionJoinPending)
+        {
+            return;
+        }
+        var role = _pendingDemolitionRole;
+        var mapId = _pendingDemolitionMapId;
+        var address = _pendingDemolitionAddress;
+        var team = _pendingDemolitionTeam;
+        _demolitionJoinPending = false;
+        _hud.SetDemolitionNetworkConnectionPending(false, _squadNetwork.Status);
+        OnDemolitionDeploymentRequested(
+            (int)role,
+            (int)WeaponPlatform.M4A1,
+            1,
+            (int)WeaponPlatform.P226,
+            mapId,
+            (int)SquadSessionMode.Join,
+            address,
+            (int)team);
+    }
+
+    private void CancelPendingDemolitionJoin()
+    {
+        if (!_demolitionJoinPending)
+        {
+            return;
+        }
+        _demolitionJoinPending = false;
+        _hud.SetDemolitionNetworkConnectionPending(
+            false,
+            "CONNECTION FAILED  //  CHECK HOST IP AND UDP 28960");
     }
 
     private void OnDemolitionNetworkAssignment(DemolitionNetworkTeam team, int slot)

@@ -303,8 +303,8 @@ public partial class CombatHUD
 
         _squadAddress = new LineEdit
         {
-            Text = "127.0.0.1",
-            PlaceholderText = "HOST OR HOST:PORT",
+            Text = string.Empty,
+            PlaceholderText = "192.168.x.x OR HOST:PORT",
             Position = new Vector2(424, 36),
             Size = new Vector2(236, 38),
             ClearButtonEnabled = true
@@ -349,10 +349,10 @@ public partial class CombatHUD
         _localSquadButton.SetPressedNoSignal(mode == SquadSessionMode.Local);
         _hostSquadButton.SetPressedNoSignal(mode == SquadSessionMode.Host);
         _joinSquadButton.SetPressedNoSignal(mode == SquadSessionMode.Join);
-        _squadAddress.Editable = mode != SquadSessionMode.Local;
-        _squadAddress.Modulate = mode == SquadSessionMode.Local
-            ? new Color(0.42f, 0.48f, 0.46f)
-            : Colors.White;
+        _squadAddress.Editable = mode == SquadSessionMode.Join;
+        _squadAddress.Modulate = mode == SquadSessionMode.Join
+            ? Colors.White
+            : new Color(0.42f, 0.48f, 0.46f);
         _squadSessionStatus.Text = mode switch
         {
             SquadSessionMode.Host => GameLocalization.IsChinese(_language)
@@ -428,6 +428,26 @@ public partial class CombatHUD
         else
         {
             _squadRosterTitle.Text = $"SQUAD  //  {source}";
+        }
+    }
+
+    public void SetSquadConnectionPending(bool pending, string status)
+    {
+        _squadSessionStatus.Text = status;
+        _localSquadButton.Disabled = pending;
+        _hostSquadButton.Disabled = pending;
+        _joinSquadButton.Disabled = pending;
+        _squadAddress.Editable = !pending && _selectedSessionMode == SquadSessionMode.Join;
+        if (pending)
+        {
+            _deploySquadButton.Disabled = true;
+            _deploySquadButton.Text = GameLocalization.IsChinese(_language)
+                ? "\u6b63\u5728\u8fde\u63a5\u4e3b\u673a..."
+                : "CONNECTING TO HOST...";
+        }
+        else
+        {
+            RefreshSquadDeployAction();
         }
     }
 
@@ -527,7 +547,9 @@ public partial class CombatHUD
         _hostSquadButton.Text = chinese ? "\u521b\u5efa\u8054\u673a" : "HOST GAME";
         _joinSquadButton.Text = chinese ? "\u52a0\u5165\u8054\u673a" : "JOIN GAME";
         _squadLobbyBackButton.Text = Text("operations_back", "BACK TO OFFICE");
-        _squadAddress.PlaceholderText = chinese ? "\u4e3b\u673a\u5730\u5740\u6216\u5730\u5740:\u7aef\u53e3" : "HOST OR HOST:PORT";
+        _squadAddress.PlaceholderText = chinese
+            ? "\u4e3b\u673a\u5c40\u57df\u7f51 IP\uff0c\u5982 192.168.x.x"
+            : "HOST LAN IP, E.G. 192.168.x.x";
         var roles = new[] { OperatorRole.Assault, OperatorRole.Medic, OperatorRole.Recon };
         for (var i = 0; i < roles.Length; i++)
         {

@@ -24,6 +24,7 @@ public partial class FreightTerminalWorld
     private int _remoteNetworkShotCount;
     private int _remoteNetworkAbilityCount;
     private string _activeDeploymentMapId = DeploymentMapCatalog.FreightTerminalId;
+    private PendingExtractionDeployment? _pendingNetworkExtractionDeployment;
 
     public int ActiveSquadCount => 1 + _squadMates.Count(mate => IsInstanceValid(mate));
     public int AiSquadCount => _squadMates.Count(mate => IsInstanceValid(mate) && !mate.IsHumanProxy);
@@ -49,6 +50,8 @@ public partial class FreightTerminalWorld
         _squadNetwork.DemolitionAssignmentReceived += OnDemolitionNetworkAssignment;
         _squadNetwork.DemolitionActionReceived += OnDemolitionNetworkAction;
         _squadNetwork.StatusChanged += status => _hud.SetSquadStatus(status);
+        _squadNetwork.ConnectionEstablished += CompletePendingNetworkDeployment;
+        _squadNetwork.ConnectionAttemptFailed += CancelPendingNetworkDeployment;
         _hud.SquadDeploymentRequested += OnSquadDeploymentRequested;
         _hud.SquadOrderRequested += value => IssueSquadOrder((SquadOrder)value);
 
@@ -141,7 +144,8 @@ public partial class FreightTerminalWorld
         }
         var sessionMode = (SquadSessionMode)mode;
         if (sessionMode == SquadSessionMode.Join
-            && !SquadNetwork.TryParseEndpoint(address, SquadNetwork.DefaultPort, out _, out _))
+            && (string.IsNullOrWhiteSpace(address)
+                || !SquadNetwork.TryParseEndpoint(address, SquadNetwork.DefaultPort, out _, out _)))
         {
             _hud.SetSquadStatus("JOIN FAILED  //  INVALID HOST OR PORT");
             return;
@@ -157,6 +161,16 @@ public partial class FreightTerminalWorld
                 _hud.SelectedDeploymentLoadout));
             GetTree().Paused = false;
             GetTree().ReloadCurrentScene();
+            return;
+        }
+        if (sessionMode == SquadSessionMode.Join && !_squadNetwork.IsOnline)
+        {
+            BeginPendingExtractionJoin(new PendingExtractionDeployment(
+                selectedMapId,
+                (OperatorRole)role,
+                sessionMode,
+                address,
+                _hud.SelectedDeploymentLoadout));
             return;
         }
         if (!TryCommitSelectedDeployment())
@@ -201,7 +215,10 @@ public partial class FreightTerminalWorld
                 networkError = _squadNetwork.Host();
                 break;
             case SquadSessionMode.Join:
-                networkError = _squadNetwork.Join(address);
+                if (!_squadNetwork.IsOnline)
+                {
+                    networkError = _squadNetwork.Join(address);
+                }
                 break;
             default:
                 _squadNetwork.Close();
@@ -222,6 +239,46 @@ public partial class FreightTerminalWorld
             "squad_ready",
             "SQUAD READY  //  F1 FOLLOW  F2 HOLD  F3 MOVE  H SKILL",
             OperatorRoles.Spec(role).Accent);
+    }
+
+    private void BeginPendingExtractionJoin(PendingExtractionDeployment deployment)
+    {
+        if (_pendingNetworkExtractionDeployment is not null)
+        {
+            return;
+        }
+        _pendingNetworkExtractionDeployment = deployment;
+        _hud.SetSquadConnectionPending(true, $"CONNECTING  //  {deployment.Address}");
+        var error = _squadNetwork.Join(deployment.Address);
+        if (error != Error.Ok)
+        {
+            CancelPendingNetworkDeployment();
+        }
+    }
+
+    private void CompletePendingNetworkDeployment()
+    {
+        if (_pendingNetworkExtractionDeployment is { } extraction)
+        {
+            _pendingNetworkExtractionDeployment = null;
+            _hud.SetSquadConnectionPending(false, _squadNetwork.Status);
+            if (!TryCommitPendingDeployment(extraction.Loadout))
+            {
+                _squadNetwork.Close();
+                return;
+            }
+            _activeDeploymentMapId = extraction.MapId;
+            DeploySquad(extraction.Role, extraction.SessionMode, extraction.Address);
+            return;
+        }
+        CompletePendingDemolitionJoin();
+    }
+
+    private void CancelPendingNetworkDeployment()
+    {
+        _pendingNetworkExtractionDeployment = null;
+        _hud.SetSquadConnectionPending(false, "CONNECTION FAILED  //  CHECK HOST IP AND UDP 28960");
+        CancelPendingDemolitionJoin();
     }
 
     private void ValidateNetworkEndpoint()
@@ -263,9 +320,30 @@ public partial class FreightTerminalWorld
             && _hud.IsSquadLobbyVisible
             && _operatorProfileStore.Profile.Credits == creditsBefore
             && _operatorProfileStore.Profile.DeploymentCount == deploymentsBefore;
+        OnSquadDeploymentRequested((int)OperatorRole.Assault, (int)SquadSessionMode.Join, "127.0.0.1:28961");
+        var validJoinDeferred = !_squadDeployed
+            && !_deploymentPurchaseCommitted
+            && _pendingNetworkExtractionDeployment is not null
+            && _hud.IsSquadLobbyVisible
+            && _operatorProfileStore.Profile.Credits == creditsBefore
+            && _operatorProfileStore.Profile.DeploymentCount == deploymentsBefore;
+        _squadNetwork.Close();
+        CancelPendingNetworkDeployment();
+        OnDemolitionDeploymentRequested(
+            (int)OperatorRole.Assault,
+            (int)WeaponPlatform.M4A1,
+            1,
+            (int)WeaponPlatform.P226,
+            DemolitionMapCatalog.TideforgeId,
+            (int)SquadSessionMode.Join,
+            "127.0.0.1:28961",
+            (int)DemolitionNetworkTeam.Alpha);
+        var demolitionJoinDeferred = !_squadDeployed && _demolitionJoinPending;
+        _squadNetwork.Close();
+        CancelPendingNetworkDeployment();
         var valid = defaultHost && hostname && tunnel && ipv6 && nakedIpv6
-            && invalidRejected && invalidDeploymentPreserved;
-        GD.Print($"NETWORK_ENDPOINT_CHECK valid={valid} default={defaultHost} hostname={hostname} tunnel={tunnel} ipv6={ipv6} naked_ipv6={nakedIpv6} invalid_rejected={invalidRejected} invalid_deployment_preserved={invalidDeploymentPreserved} endpoint={tunnelHost}:{tunnelPort}");
+            && invalidRejected && invalidDeploymentPreserved && validJoinDeferred && demolitionJoinDeferred;
+        GD.Print($"NETWORK_ENDPOINT_CHECK valid={valid} default={defaultHost} hostname={hostname} tunnel={tunnel} ipv6={ipv6} naked_ipv6={nakedIpv6} invalid_rejected={invalidRejected} invalid_deployment_preserved={invalidDeploymentPreserved} join_deferred={validJoinDeferred} demolition_join_deferred={demolitionJoinDeferred} endpoint={tunnelHost}:{tunnelPort}");
         GD.Print($"NETWORK_ENDPOINT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

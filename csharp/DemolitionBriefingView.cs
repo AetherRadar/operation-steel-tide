@@ -130,8 +130,8 @@ public partial class DemolitionBriefingView : ColorRect
         _alphaButton.Text = GameLocalization.IsChinese(_language) ? "ALPHA  //  \u5148\u653b" : "ALPHA  //  ATTACK FIRST";
         _bravoButton.Text = GameLocalization.IsChinese(_language) ? "BRAVO  //  \u5148\u5b88" : "BRAVO  //  DEFEND FIRST";
         _address.PlaceholderText = GameLocalization.IsChinese(_language)
-            ? "\u4e3b\u673a\u5730\u5740\u6216\u5730\u5740:\u7aef\u53e3"
-            : "HOST OR HOST:PORT";
+            ? "\u4e3b\u673a\u5c40\u57df\u7f51 IP\uff0c\u5982 192.168.x.x"
+            : "HOST LAN IP, E.G. 192.168.x.x";
         var roles = new[] { OperatorRole.Assault, OperatorRole.Medic, OperatorRole.Recon };
         for (var index = 0; index < roles.Length; index++)
         {
@@ -232,6 +232,24 @@ public partial class DemolitionBriefingView : ColorRect
     public void SelectLoadoutForDiagnostics(WeaponPlatform primary, int buildTier, WeaponPlatform sidearm)
     {
         // Kept as a compatibility hook; demolition weapons are now purchased in-round.
+    }
+
+    public void SetNetworkConnectionPending(bool pending, string status)
+    {
+        _readyStatus.Text = status;
+        _readyStatus.AddThemeColorOverride(
+            "font_color",
+            pending ? new Color(1.0f, 0.72f, 0.28f) : OperatorRoles.Spec(_selectedRole).Accent);
+        _localButton.Disabled = pending;
+        _hostButton.Disabled = pending;
+        _joinButton.Disabled = pending;
+        _alphaButton.Disabled = pending || _sessionMode != SquadSessionMode.Join;
+        _bravoButton.Disabled = pending || _sessionMode != SquadSessionMode.Join;
+        _address.Editable = !pending && _sessionMode == SquadSessionMode.Join;
+        _deployButton.Disabled = pending || !BrowsedMap.Available;
+        _deployButton.Text = pending
+            ? GameLocalization.IsChinese(_language) ? "\u6b63\u5728\u8fde\u63a5\u4e3b\u673a..." : "CONNECTING TO HOST..."
+            : Text("demolition_deploy", "DEPLOY DEMOLITION TEAM");
     }
 
     private void BindNodes()

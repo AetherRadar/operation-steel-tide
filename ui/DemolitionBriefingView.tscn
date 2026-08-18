@@ -448,8 +448,8 @@ offset_top = 550.0
 offset_right = 690.0
 offset_bottom = 580.0
 theme_override_font_sizes/font_size = 10
-text = "127.0.0.1"
-placeholder_text = "HOST OR HOST:PORT"
+text = ""
+placeholder_text = "HOST LAN IP, E.G. 192.168.x.x"
 clear_button_enabled = true
 
 [node name="TeamTitle" type="Label" parent="Band"]

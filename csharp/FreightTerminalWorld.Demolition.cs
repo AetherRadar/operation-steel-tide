@@ -132,9 +132,15 @@ public partial class FreightTerminalWorld
             ? (DemolitionNetworkTeam)networkTeam
             : DemolitionNetworkTeam.Alpha;
         if (mode == SquadSessionMode.Join
-            && !SquadNetwork.TryParseEndpoint(address, SquadNetwork.DefaultPort, out _, out _))
+            && (string.IsNullOrWhiteSpace(address)
+                || !SquadNetwork.TryParseEndpoint(address, SquadNetwork.DefaultPort, out _, out _)))
         {
             _hud.SetSquadStatus("JOIN FAILED  //  INVALID HOST OR PORT");
+            return;
+        }
+        if (mode == SquadSessionMode.Join && !_squadNetwork.IsOnline)
+        {
+            BeginPendingDemolitionJoin((OperatorRole)role, mapId, address, team);
             return;
         }
         _demolitionPlayerRole = (OperatorRole)role;
@@ -152,7 +158,9 @@ public partial class FreightTerminalWorld
         _missionDirector.ExitDeploymentZone();
         _missionDirector.RaiseConfirmedAlarm();
         _missionPhase = "DEMOLITION";
-        _hud.SetSquadStatus("DEMOLITION  //  5 V 5  //  ATTACK THEN DEFEND");
+        _hud.SetSquadStatus(mode == SquadSessionMode.Local
+            ? "DEMOLITION  //  LOCAL + AI"
+            : _squadNetwork.Status);
         _hud.ShowLocalizedMessage(
             "demolition_deployed",
             "DEMOLITION 5V5  //  FIRST TO 13  //  SIDES SWAP AFTER ROUND 12",
