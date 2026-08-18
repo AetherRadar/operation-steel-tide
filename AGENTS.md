@@ -32,3 +32,16 @@
 - 冷启动：玩家与 AI 队友出生空手，需要搜刮武器；背包 UI 不得在未持枪时显示主武器。
 - 玩家倒地后由最近的存活 AI 队友跑过来跪地读条救援（`UpdateLeaderReviveAi`），每个角色每条命只能被救一次。
 - 车辆：WASD 驾驶，低矮路缘/道具自动越障（`TryCurbStep`），完全受阻时提示倒车；卡车出生点正前方车道（x -2..1，自 -0.5,-11.5 向 -Z）必须保持畅通。
+
+## 3D art quality gate (mandatory)
+
+- Characters, buildings, vehicles, and major visible props MUST use production-quality authored 3D assets. Use a suitable finished asset from a reputable model marketplace, or create/edit the asset in a real DCC workflow such as Blender. Code-generated primitive meshes, CSG, and assembled boxes MUST NOT be presented as final visible art.
+- Procedural geometry is allowed only for grayboxing, diagnostics, collision, navigation, occlusion, or invisible gameplay scaffolding. It may ship as visible art only when the user explicitly approves a procedural or primitive visual style.
+- Before adding or replacing a character, building, vehicle, or major prop, inspect suitable assets on sources such as Fab, Sketchfab, Poly Haven, CGTrader, or KitBash3D. Prefer `GLB`/`glTF` or `FBX`, usable PBR materials, an appropriate polygon budget, and a visual style consistent with the realistic tactical-industrial direction of this project.
+- Do not mix visibly stylized, toy-like, or generic low-poly packs into the realistic art direction unless the user explicitly approves the mismatch. Existing programmer art is a placeholder and must not be used as the visual quality reference for new work.
+- This is a public MIT repository. Raw third-party assets may be committed only when their license explicitly permits redistribution, normally CC0 or CC BY 4.0. A zero price does not imply redistribution permission. Fab Standard, marketplace, editorial, personal-use, or unclear-license assets MUST remain outside the public repository.
+- Record the creator, source URL, exact license, acquisition date, required attribution, and local file mapping in `assets/models/LICENSE.md` and `docs/CONTENT_PROVENANCE.md`. Preserve a copy or screenshot of the license evidence when practical.
+- Paid or non-redistributable assets must live in a private asset store. Commit only import scripts, adapters, placeholders, and acquisition/setup instructions; never commit or reconstruct the protected raw asset.
+- Imported visual models should wrap the existing gameplay contract instead of replacing it. Preserve procedural collision, navigation, stairs, interiors, loot positions, skybridges, and required character attachment nodes unless a deliberate gameplay change is requested.
+- Validate every final asset in Godot from representative player-camera distances. Check scale, silhouette, PBR materials, animation deformation, equipment attachment, lighting, collision alignment, clipping, draw calls, and texture memory; capture screenshots for visual review before declaring the work complete.
+- If no suitable licensable asset can be found and a proper DCC asset cannot be produced with the available tools, stop and report the constraint. Do not silently substitute programmer art, primitive geometry, or a code-only procedural model as the final result.
