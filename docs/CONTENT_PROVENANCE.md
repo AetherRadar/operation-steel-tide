@@ -18,6 +18,7 @@ Consequently, this repository must not be described as satisfying policies that 
 | Rescue tilt-rotor `.blend` and `.glb` model | Project-authored in Blender from the checked-in procedural modeling script, with disclosed AI assistance | Included under the root MIT license, subject to the limitation above | `scripts/blender/build_extraction_aircraft.py`, `source_art/extraction_aircraft/extraction_aircraft.blend`, and Git history |
 | Steel Tide M4A1 and operator `.blend` and `.glb` models | Project-authored in Blender from the checked-in procedural modeling script, with disclosed AI assistance; no third-party geometry or textures copied | Included under the root MIT license, subject to the limitation above | `scripts/blender/generate_combat_models.py`, `source_art/combat_models/`, and Git history |
 | Low-Poly GSh-18 sidearm model | TastyTony on Sketchfab | CC BY 4.0; attribution required | `assets/models/tastytony_gsh18/LICENSE.md` and the creator/source metadata embedded in the GLB |
+| Desert Eagle sidearm model | ELIZION on Sketchfab | CC BY 4.0; attribution required | `assets/models/elizion_desert_eagle/LICENSE.md` and the creator/source metadata embedded in the GLB |
 | Old Military Crate and Concrete Road Barrier | Poly Haven | CC0 | `assets/models/LICENSE.md` |
 | City Kit (Industrial) 1.0 GLB model set | Kenney | CC0 1.0 | `assets/models/LICENSE.md` and `assets/models/kenney_city_kit_industrial/KENNEY_LICENSE.txt` |
 | Asphalt 03, Concrete Floor, Rusty Painted Metal, Corrugated Iron, and Gravel Embedded Concrete | Poly Haven | CC0 | `assets/textures/LICENSE.md` |
@@ -28,6 +29,7 @@ No separate third-party music, font, character pack, animation pack, or stock-im
 ## Posting guidance
 
 - Credit TastyTony for the Low-Poly GSh-18 model and retain its source and CC BY 4.0 license record in distributions.
+- Credit ELIZION for the Desert Eagle model and retain its source and CC BY 4.0 license record in distributions.
 - Credit Poly Haven and link the two asset license records whenever a platform requires attribution or source disclosure.
 - Describe screenshots as direct in-engine captures, not as independently generated promotional images.
 - Disclose AI assistance plainly. Do not claim that human review, ownership of output, or the MIT license proves anything about model training data.

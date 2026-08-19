@@ -60,6 +60,16 @@ internal sealed class AuthoredGsh18Visual
     public Node3D Root { get; }
 }
 
+internal sealed class AuthoredDesertEagleVisual
+{
+    public AuthoredDesertEagleVisual(Node3D root)
+    {
+        Root = root;
+    }
+
+    public Node3D Root { get; }
+}
+
 internal sealed class AuthoredOperatorVisual
 {
     public AuthoredOperatorVisual(Node3D root)
@@ -103,6 +113,7 @@ internal readonly record struct CombatModelInspection(
     bool Loaded,
     bool RequiredNodes,
     int MeshCount,
+    int MaterialCount,
     Vector3 Size);
 
 internal static class CombatModelLibrary
@@ -110,9 +121,12 @@ internal static class CombatModelLibrary
     internal const string WeaponScenePath = "res://assets/models/steel_tide_m4a1/steel_tide_m4a1.glb";
     internal const string OperatorScenePath = "res://assets/models/steel_tide_operator/steel_tide_operator.glb";
     internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/low-poly_gsh-18.glb";
+    internal const string DesertEagleScenePath = "res://assets/models/elizion_desert_eagle/desert_eagle.glb";
 
     private const float Gsh18FirstPersonLength = 0.64f;
     private const float Gsh18PreviewLength = 0.78f;
+    private const float DesertEagleFirstPersonLength = 0.82f;
+    private const float DesertEaglePreviewLength = 1.05f;
 
     private static readonly string[] WeaponNodes =
     {
@@ -129,6 +143,11 @@ internal static class CombatModelLibrary
     private static readonly string[] Gsh18Nodes =
     {
         "Armature", "Skeleton3D"
+    };
+
+    private static readonly string[] DesertEagleNodes =
+    {
+        "RootNode", "Frame_low", "Slide_low", "Magazine_low"
     };
 
     public static AuthoredWeaponVisual InstantiateWeapon(bool firstPerson)
@@ -183,6 +202,34 @@ internal static class CombatModelLibrary
         return new AuthoredGsh18Visual(wrapper);
     }
 
+    public static AuthoredDesertEagleVisual InstantiateDesertEagle(bool firstPerson)
+    {
+        var source = InstantiateRequired(DesertEagleScenePath, DesertEagleNodes);
+        var sourceBounds = ComputeBounds(source);
+        if (sourceBounds.MeshCount == 0 || sourceBounds.Size.Z <= 0.001f)
+        {
+            source.Free();
+            throw new InvalidOperationException("Desert Eagle model has no usable geometry bounds.");
+        }
+
+        source.Position = -sourceBounds.Center;
+        var targetLength = firstPerson ? DesertEagleFirstPersonLength : DesertEaglePreviewLength;
+        var wrapper = new Node3D
+        {
+            Name = "AuthoredDesertEagleVisual",
+            Scale = Vector3.One * (targetLength / sourceBounds.Size.Z)
+        };
+        wrapper.AddChild(source);
+        if (firstPerson)
+        {
+            foreach (var geometry in GeometryBelow(wrapper))
+            {
+                geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+            }
+        }
+        return new AuthoredDesertEagleVisual(wrapper);
+    }
+
     public static CombatModelInspection InspectWeapon()
         => Inspect(WeaponScenePath, WeaponNodes);
 
@@ -196,11 +243,40 @@ internal static class CombatModelLibrary
         {
             root = InstantiateGsh18(firstPerson: false).Root;
             var bounds = ComputeBounds(root);
-            return new CombatModelInspection(true, true, bounds.MeshCount, bounds.Size);
+            return new CombatModelInspection(
+                true,
+                true,
+                bounds.MeshCount,
+                CountMaterials(root),
+                bounds.Size);
         }
         catch
         {
-            return new CombatModelInspection(false, false, 0, Vector3.Zero);
+            return new CombatModelInspection(false, false, 0, 0, Vector3.Zero);
+        }
+        finally
+        {
+            root?.Free();
+        }
+    }
+
+    public static CombatModelInspection InspectDesertEagle()
+    {
+        Node3D? root = null;
+        try
+        {
+            root = InstantiateDesertEagle(firstPerson: false).Root;
+            var bounds = ComputeBounds(root);
+            return new CombatModelInspection(
+                true,
+                true,
+                bounds.MeshCount,
+                CountMaterials(root),
+                bounds.Size);
+        }
+        catch
+        {
+            return new CombatModelInspection(false, false, 0, 0, Vector3.Zero);
         }
         finally
         {
@@ -248,7 +324,7 @@ internal static class CombatModelLibrary
         var scene = GD.Load<PackedScene>(path);
         if (scene is null)
         {
-            return new CombatModelInspection(false, false, 0, Vector3.Zero);
+            return new CombatModelInspection(false, false, 0, 0, Vector3.Zero);
         }
         var root = scene.Instantiate<Node3D>();
         try
@@ -259,12 +335,42 @@ internal static class CombatModelLibrary
                 required &= FindNode(root, nodeName) is not null;
             }
             var bounds = ComputeBounds(root);
-            return new CombatModelInspection(true, required, bounds.MeshCount, bounds.Size);
+            return new CombatModelInspection(
+                true,
+                required,
+                bounds.MeshCount,
+                CountMaterials(root),
+                bounds.Size);
         }
         finally
         {
             root.Free();
         }
+    }
+
+    private static int CountMaterials(Node root)
+    {
+        var materialCount = 0;
+        foreach (var meshInstance in MeshesBelow(root))
+        {
+            if (meshInstance.MaterialOverride is not null)
+            {
+                materialCount += Mathf.Max(1, meshInstance.Mesh?.GetSurfaceCount() ?? 0);
+                continue;
+            }
+            if (meshInstance.Mesh is not { } mesh)
+            {
+                continue;
+            }
+            for (var surface = 0; surface < mesh.GetSurfaceCount(); surface++)
+            {
+                if (mesh.SurfaceGetMaterial(surface) is not null)
+                {
+                    materialCount++;
+                }
+            }
+        }
+        return materialCount;
     }
 
     private static (int MeshCount, Vector3 Size, Vector3 Center) ComputeBounds(Node3D root)

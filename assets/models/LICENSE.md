@@ -33,3 +33,13 @@ The GSh-18 sidearm model is **Low-Poly GSh-18** by TastyTony and is used under C
 - Local asset and attribution: `tastytony_gsh18/low-poly_gsh-18.glb` and `tastytony_gsh18/LICENSE.md`
 
 The model remains credited to TastyTony and is not covered by the repository's MIT license.
+
+## ELIZION CC BY 4.0 model
+
+The Desert Eagle sidearm model is **Desert Eagle** by ELIZION and is used under Creative Commons Attribution 4.0 International:
+
+- Source: https://sketchfab.com/3d-models/desert-eagle-cabde59f5cf24effaf80536e35d04e95
+- License: https://creativecommons.org/licenses/by/4.0/
+- Local asset and attribution: `elizion_desert_eagle/desert_eagle.glb`, its extracted `desert_eagle_*.png` PBR maps, and `elizion_desert_eagle/LICENSE.md`
+
+The model remains credited to ELIZION and is not covered by the repository's MIT license.

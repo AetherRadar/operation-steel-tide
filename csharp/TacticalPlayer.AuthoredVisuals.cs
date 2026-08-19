@@ -8,7 +8,9 @@ public partial class TacticalPlayer
     private Node3D _proceduralWeaponVisual = null!;
     private AuthoredWeaponVisual _authoredPrimaryWeapon = null!;
     private AuthoredGsh18Visual _authoredGsh18Weapon = null!;
+    private AuthoredDesertEagleVisual _authoredDesertEagleWeapon = null!;
     private bool _gsh18LoadAttempted;
+    private bool _desertEagleLoadAttempted;
 
     internal bool UsesAuthoredPrimaryWeaponForDiagnostics
         => IsInstanceValid(_authoredPrimaryWeapon?.Root)
@@ -17,6 +19,10 @@ public partial class TacticalPlayer
         => IsInstanceValid(_authoredGsh18Weapon?.Root)
         && EquippedWeapon.Platform == WeaponPlatform.GSh18
         && _authoredGsh18Weapon.Root.Visible;
+    internal bool UsesAuthoredDesertEagleForDiagnostics
+        => IsInstanceValid(_authoredDesertEagleWeapon?.Root)
+        && EquippedWeapon.Platform == WeaponPlatform.DesertEagle
+        && _authoredDesertEagleWeapon.Root.Visible;
 
     private void BuildAuthoredPrimaryWeapon()
     {
@@ -37,9 +43,15 @@ public partial class TacticalPlayer
     {
         var useAuthoredM4 = EquippedWeapon.Platform == WeaponPlatform.M4A1;
         var useAuthoredGsh18 = EquippedWeapon.Platform == WeaponPlatform.GSh18;
+        var wantsAuthoredDesertEagle = EquippedWeapon.Platform == WeaponPlatform.DesertEagle;
+        var useAuthoredDesertEagle = wantsAuthoredDesertEagle;
         if (useAuthoredGsh18)
         {
             EnsureAuthoredGsh18Weapon();
+        }
+        if (useAuthoredDesertEagle)
+        {
+            EnsureAuthoredDesertEagleWeapon();
         }
         if (IsInstanceValid(_authoredPrimaryWeapon?.Root))
         {
@@ -62,7 +74,37 @@ public partial class TacticalPlayer
         {
             useAuthoredGsh18 = false;
         }
-        _proceduralWeaponVisual.Visible = !useAuthoredM4 && !useAuthoredGsh18;
+        if (IsInstanceValid(_authoredDesertEagleWeapon?.Root))
+        {
+            _authoredDesertEagleWeapon.Root.Visible = useAuthoredDesertEagle;
+        }
+        else
+        {
+            useAuthoredDesertEagle = false;
+        }
+        _proceduralWeaponVisual.Visible = !useAuthoredM4
+            && !useAuthoredGsh18
+            && !wantsAuthoredDesertEagle;
+    }
+
+    private void EnsureAuthoredDesertEagleWeapon()
+    {
+        if (_desertEagleLoadAttempted || IsInstanceValid(_authoredDesertEagleWeapon?.Root))
+        {
+            return;
+        }
+        _desertEagleLoadAttempted = true;
+        try
+        {
+            var authoredWeapon = CombatModelLibrary.InstantiateDesertEagle(firstPerson: true);
+            authoredWeapon.Root.Position = new Vector3(0.0f, -0.04f, -0.02f);
+            _weaponRoot.AddChild(authoredWeapon.Root);
+            _authoredDesertEagleWeapon = authoredWeapon;
+        }
+        catch (Exception exception)
+        {
+            GD.PushError($"Required authored Desert Eagle unavailable: {exception.Message}");
+        }
     }
 
     private void EnsureAuthoredGsh18Weapon()

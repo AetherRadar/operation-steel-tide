@@ -68,10 +68,16 @@ public partial class FreightTerminalWorld
             && _player.SidearmWeaponPlatform == WeaponPlatform.GSh18
             && _player.UsesAuthoredGsh18ForDiagnostics
             && _player.UsesGsh18ReportForDiagnostics;
+        SaveViewportImage("res://gsh18_first_person_validation.png");
+        OpenPersonalBackpack();
+        await WaitFrames(5);
+        SaveViewportImage("res://gsh18_preview_validation.png");
+        CloseLoot();
+        await WaitFrames(3);
         _player.SelectQuickSlot(PlayerQuickSlot.Primary, false);
 
         _hud.PressQuickSlotForDiagnostics((int)PlayerQuickSlot.FragmentationGrenade);
-        await WaitFrames(2);
+        await WaitFrames(4);
         var fragSelected = _player.ActiveQuickSlot == PlayerQuickSlot.FragmentationGrenade
             && _hud.ActiveQuickSlot == (int)PlayerQuickSlot.FragmentationGrenade
             && _player.HeldFragmentationGrenadeVisibleForDiagnostics
@@ -90,7 +96,7 @@ public partial class FreightTerminalWorld
         var localized = _hud.QuickSlotText((int)PlayerQuickSlot.Utility)
             .Contains(expectedUtilityName, System.StringComparison.Ordinal);
         _hud.PressQuickSlotForDiagnostics((int)PlayerQuickSlot.Utility);
-        await WaitFrames(2);
+        await WaitFrames(4);
         var utilitySelected = _player.ActiveQuickSlot == PlayerQuickSlot.Utility
             && _hud.ActiveQuickSlot == (int)PlayerQuickSlot.Utility
             && _player.HeldSmokeGrenadeVisibleForDiagnostics
@@ -135,8 +141,10 @@ public partial class FreightTerminalWorld
         var desertEagleReady = _player.ActiveWeaponSlot == PlayerWeaponSlot.Sidearm
             && _player.SidearmWeaponPlatform == WeaponPlatform.DesertEagle
             && _player.SecondaryWeaponPlatform == WeaponPlatform.VSS
-            && _player.WeaponSignaturePartCountForDiagnostics == 3
+            && _player.WeaponSignaturePartCountForDiagnostics == 0
+            && _player.UsesAuthoredDesertEagleForDiagnostics
             && _player.UsesDesertEagleReportForDiagnostics;
+        SaveViewportImage("res://desert_eagle_first_person_validation.png");
         var activeBeforeEmptySelection = _player.ActiveQuickSlot;
         var emptyBlocked = !_player.SelectQuickSlot(PlayerQuickSlot.Utility, false)
             && _player.ActiveQuickSlot == activeBeforeEmptySelection;
@@ -151,6 +159,7 @@ public partial class FreightTerminalWorld
             && _hud.LootWeaponPlatformForSlot(PlayerWeaponSlot.Secondary) == WeaponPlatform.VSS
             && _hud.LootWeaponPlatformForSlot(PlayerWeaponSlot.Sidearm) == WeaponPlatform.DesertEagle
             && _hud.LootEquippedGradeStylesConsistent;
+        SaveViewportImage("res://desert_eagle_preview_validation.png");
         var rackChinese = _hud.LootWeaponCaptionForSlot(PlayerWeaponSlot.Secondary)
                 .Contains(GameLocalization.Get("secondary_weapon", "zh", "SECONDARY WEAPON"), System.StringComparison.Ordinal)
             && _hud.LootWeaponCaptionForSlot(PlayerWeaponSlot.Sidearm)

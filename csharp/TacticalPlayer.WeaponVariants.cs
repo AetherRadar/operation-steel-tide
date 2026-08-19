@@ -53,15 +53,6 @@ public partial class TacticalPlayer
                 MeshPart(_platformSignatureRoot, Box(new Vector3(0.035f, 0.22f, 0.48f)),
                     new Vector3(0.05f, 0, 0.37f), new Vector3(0, -0.12f, 0.32f), green);
                 break;
-            case WeaponPlatform.DesertEagle:
-                var chrome = TacticalSurfaceLibrary.WeaponFinish(new Color(0.48f, 0.5f, 0.46f), 0.96f, 0.12f);
-                MeshPart(_platformSignatureRoot, Box(new Vector3(0.145f, 0.075f, 0.36f)),
-                    new Vector3(0, 0.075f, -0.03f), Vector3.Zero, chrome);
-                MeshPart(_platformSignatureRoot, Box(new Vector3(0.15f, 0.032f, 0.15f)),
-                    new Vector3(0, -0.08f, -0.22f), new Vector3(0.2f, 0, 0), black);
-                MeshPart(_platformSignatureRoot, Cylinder(0.018f, 0.095f),
-                    new Vector3(0.085f, 0.095f, 0.03f), new Vector3(0, 0, Mathf.Pi / 2), chrome);
-                break;
             case WeaponPlatform.GSh18:
                 MeshPart(_platformSignatureRoot, Box(new Vector3(0.132f, 0.026f, 0.19f)),
                     new Vector3(0, 0.145f, -0.035f), Vector3.Zero, steel);
