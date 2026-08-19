@@ -173,7 +173,10 @@ public partial class FreightTerminalWorld
             new(new Vector3(-91, 0, -72), "minimap_refinery_west_pump", "WEST PUMPS", new Color(0.38f, 0.78f, 1.0f)),
             new(new Vector3(92, 0, -75), "minimap_refinery_east_pump", "EAST PUMPS", new Color(0.38f, 0.78f, 1.0f)),
             new(new Vector3(0, 0, -132), "minimap_refinery_cracking", "CRACKING", new Color(1.0f, 0.48f, 0.18f)),
-            new(new Vector3(39, 0, -165), "minimap_refinery_turbine", "TURBINE", new Color(0.44f, 0.94f, 0.68f))
+            new(new Vector3(39, 0, -165), "minimap_refinery_turbine", "TURBINE", new Color(0.44f, 0.94f, 0.68f)),
+            new(new Vector3(-78, 0, -39), "minimap_refinery_cyclone", "CYCLONE", new Color(0.44f, 0.82f, 1.0f)),
+            new(new Vector3(78, 0, -41), "minimap_refinery_reactor", "REACTOR", new Color(1.0f, 0.48f, 0.22f)),
+            new(new Vector3(0, 0, -67), "minimap_refinery_skybridge", "SKYBRIDGE", new Color(0.88f, 0.72f, 1.0f))
         };
         _hud.ConfigureMinimap(new Rect2(-170, -220, MapWidthMeters, MapDepthMeters), landmarks);
         _hud.SetMinimapPlayer(_player.GlobalPosition, 0.0f);
@@ -221,13 +224,27 @@ public partial class FreightTerminalWorld
             && HasFactorySource("crane.glb")
             && HasFactorySource("machine-fortified.glb");
         var hallEntriesReady = ValidateRefineryFactoryEntries();
+        var wondersReady = _refineryWonderLandmarks is
+        {
+            LandmarkCount: 3,
+            AuthoredModelCount: >= 55,
+            CollisionShapeCount: >= 20,
+            ElevatedBridgeModuleCount: >= 15,
+            EnterableLandmarkCount: 2
+        };
+        var wonderSourcesReady = _refineryWonderLandmarks?.ScenePaths.Count >= 8
+            && HasWonderSource("structure-doorway-wide.glb")
+            && HasWonderSource("hopper-high-round.glb")
+            && HasWonderSource("catwalk-straight.glb")
+            && HasWonderSource("crane.glb");
+        var wonderTraversalReady = ValidateRefineryWonderLandmarks();
         var gameplayReady = _objectiveTerminals.Count == 2
             && IsInstanceValid(_extractionArea)
             && IsInstanceValid(_extractionAircraft)
             && _buildingLootPickupCount == RefineryLayout.LootPlacements.Count
             && _lootSources.Count >= 30
             && _enemies.Count >= RefineryLayout.GarrisonSpawns.Count
-            && _hud.MinimapLandmarkCount >= 9;
+            && _hud.MinimapLandmarkCount >= 12;
         var lanesReady = IsRefineryLaneClear(-8.2f) && IsRefineryLaneClear(8.2f);
         var deploymentReady = DeploymentPoint.DistanceTo(ExtractionPoint) > 80.0f;
         var performanceReady = counts.Nodes < 2500
@@ -237,8 +254,9 @@ public partial class FreightTerminalWorld
         var valid = rootsReady && authoredReady && sourcesReady && proxiesReady
             && doorwayReady && skylineReady && doorwayBallisticsReady
             && factoryReady && factorySourcesReady && hallEntriesReady
+            && wondersReady && wonderSourcesReady && wonderTraversalReady
             && gameplayReady && lanesReady && deploymentReady && performanceReady;
-        GD.Print($"REFINERY_MAP_CHECK valid={valid} root={rootsReady} authored={authoredReady} models={_refineryAuthoredModelCount}/{RefineryLayout.Models.Count} unique_scenes={_refineryModelScenes.Count} sources={sourcesReady} imported_meshes={counts.ImportedMeshes} culled={counts.CulledImportedMeshes} proxies={counts.ModelCollisionShapes}/{_refineryCollisionProxyCount} proxy_boxes={proxiesReady} doorways={_refineryAccessibleBuildingCount} doorway_shapes={counts.DoorwayCollisionShapes} entry_beacons={counts.EntryBeacons}/{_refineryEntryBeaconCount} doorway_ready={doorwayReady} doorway_ballistics={doorwayBallisticsReady} tall_scenes={_refineryTallSceneCount} skyline={skylineReady} factory={factoryReady} factory_sources={factorySourcesReady} hall_entries={hallEntriesReady} factory_models={_refineryFactoryDistrict?.AuthoredModelCount ?? 0} factory_collision={_refineryFactoryDistrict?.CollisionShapeCount ?? 0} roof={_refineryFactoryDistrict?.RoofModuleCount ?? 0} catwalk={_refineryFactoryDistrict?.CatwalkModuleCount ?? 0} interior_props={_refineryFactoryDistrict?.InteriorPropCount ?? 0} alley_props={_refineryFactoryDistrict?.AlleyPropCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} lanes={lanesReady} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
+        GD.Print($"REFINERY_MAP_CHECK valid={valid} root={rootsReady} authored={authoredReady} models={_refineryAuthoredModelCount}/{RefineryLayout.Models.Count} unique_scenes={_refineryModelScenes.Count} sources={sourcesReady} imported_meshes={counts.ImportedMeshes} culled={counts.CulledImportedMeshes} proxies={counts.ModelCollisionShapes}/{_refineryCollisionProxyCount} proxy_boxes={proxiesReady} doorways={_refineryAccessibleBuildingCount} doorway_shapes={counts.DoorwayCollisionShapes} entry_beacons={counts.EntryBeacons}/{_refineryEntryBeaconCount} doorway_ready={doorwayReady} doorway_ballistics={doorwayBallisticsReady} tall_scenes={_refineryTallSceneCount} skyline={skylineReady} factory={factoryReady} factory_sources={factorySourcesReady} hall_entries={hallEntriesReady} factory_models={_refineryFactoryDistrict?.AuthoredModelCount ?? 0} factory_collision={_refineryFactoryDistrict?.CollisionShapeCount ?? 0} roof={_refineryFactoryDistrict?.RoofModuleCount ?? 0} catwalk={_refineryFactoryDistrict?.CatwalkModuleCount ?? 0} interior_props={_refineryFactoryDistrict?.InteriorPropCount ?? 0} alley_props={_refineryFactoryDistrict?.AlleyPropCount ?? 0} wonders={wondersReady} wonder_sources={wonderSourcesReady} wonder_traversal={wonderTraversalReady} wonder_models={_refineryWonderLandmarks?.AuthoredModelCount ?? 0} wonder_collision={_refineryWonderLandmarks?.CollisionShapeCount ?? 0} bridge_modules={_refineryWonderLandmarks?.ElevatedBridgeModuleCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} lanes={lanesReady} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
         GD.Print($"REFINERY_MAP_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -279,7 +297,12 @@ public partial class FreightTerminalWorld
         camera.Fov = 70.0f;
         await WaitFrames(10);
         SaveViewportImage("res://refinery_hall_validation.png");
-        GD.Print($"REFINERY_MAP_CAPTURE models={_refineryAuthoredModelCount} scenes={_refineryModelScenes.Count} factory_models={_refineryFactoryDistrict?.AuthoredModelCount ?? 0} paths=refinery_map_validation.png,refinery_ground_validation.png,refinery_hall_validation.png");
+        camera.GlobalPosition = new Vector3(0, 28.0f, 48.0f);
+        camera.LookAt(new Vector3(0, 7.0f, -48.0f), Vector3.Up);
+        camera.Fov = 72.0f;
+        await WaitFrames(10);
+        SaveViewportImage("res://refinery_wonders_validation.png");
+        GD.Print($"REFINERY_MAP_CAPTURE models={_refineryAuthoredModelCount} scenes={_refineryModelScenes.Count} factory_models={_refineryFactoryDistrict?.AuthoredModelCount ?? 0} wonder_models={_refineryWonderLandmarks?.AuthoredModelCount ?? 0} paths=refinery_map_validation.png,refinery_ground_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png");
         GetTree().Quit();
     }
 
@@ -371,6 +394,43 @@ public partial class FreightTerminalWorld
     private bool HasFactorySource(string fileName)
         => _refineryFactoryDistrict?.ScenePaths.Any(path =>
             path.EndsWith('/' + fileName, System.StringComparison.OrdinalIgnoreCase)) == true;
+
+    private bool HasWonderSource(string fileName)
+        => _refineryWonderLandmarks?.ScenePaths.Any(path =>
+            path.EndsWith('/' + fileName, System.StringComparison.OrdinalIgnoreCase)) == true;
+
+    private bool ValidateRefineryWonderLandmarks()
+    {
+        if (_refineryWonderLandmarks is not { } wonders)
+        {
+            return false;
+        }
+        var westEntryClear = !PhysicsRaycast.HasHit(GetWorld3D(), wonders.WestEntry, wonders.WestInterior, 1);
+        var eastEntryClear = !PhysicsRaycast.HasHit(GetWorld3D(), wonders.EastEntry, wonders.EastInterior, 1);
+        var gateGroundClear = !PhysicsRaycast.HasHit(
+            GetWorld3D(),
+            new Vector3(0, 2.2f, wonders.GateCenter.Z + 8.0f),
+            new Vector3(0, 2.2f, wonders.GateCenter.Z - 8.0f),
+            1);
+        var bridgeBlocks = PhysicsRaycast.HasHit(
+            GetWorld3D(),
+            wonders.GateCenter + Vector3.Down * 2.0f,
+            wonders.GateCenter + Vector3.Up * 2.0f,
+            1);
+        var westWallBlocks = PhysicsRaycast.HasHit(
+            GetWorld3D(),
+            wonders.WestInterior + new Vector3(-10.0f, 13.0f, -4.0f),
+            wonders.WestInterior + new Vector3(0, 13.0f, -4.0f),
+            1);
+        var eastWallBlocks = PhysicsRaycast.HasHit(
+            GetWorld3D(),
+            wonders.EastInterior + new Vector3(10.0f, 13.0f, -4.0f),
+            wonders.EastInterior + new Vector3(0, 13.0f, -4.0f),
+            1);
+        GD.Print($"REFINERY_WONDER_CHECK west_entry={westEntryClear} east_entry={eastEntryClear} gate_clear={gateGroundClear} bridge={bridgeBlocks} west_wall={westWallBlocks} east_wall={eastWallBlocks}");
+        return westEntryClear && eastEntryClear && gateGroundClear && bridgeBlocks
+            && westWallBlocks && eastWallBlocks;
+    }
 
     private bool ValidateRefineryFactoryEntries()
     {

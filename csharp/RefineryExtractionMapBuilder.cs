@@ -281,7 +281,8 @@ public sealed class RefineryExtractionMapBuilder
         new Vector3(-23, 0, 54), new Vector3(26, 0, 56), new Vector3(-74, 0, -58), new Vector3(75, 0, -59),
         new Vector3(-88, 0, -140), new Vector3(91, 0, -142), new Vector3(-13, 0, -48), new Vector3(14, 0, -73),
         new Vector3(-18, 0, -101), new Vector3(18, 0, -103), new Vector3(-18, 0, -124),
-        new Vector3(18, 0, -126), new Vector3(-18, 0, -145), new Vector3(18, 0, -147)
+        new Vector3(18, 0, -126), new Vector3(-18, 0, -145), new Vector3(18, 0, -147),
+        new Vector3(-84, 0, -40), new Vector3(84, 0, -42)
     };
 
     private static IReadOnlyList<RefineryLootPlacement> LootPlacements() => new[]
@@ -303,7 +304,9 @@ public sealed class RefineryExtractionMapBuilder
         Loot(new(-12, 0.2f, -48), LootGrade.Common, "Extraction approach bag", "\u64a4\u79bb\u8fdb\u573a\u7269\u8d44"),
         Loot(new(14, 0.2f, -73), LootGrade.Uncommon, "Pad service kit", "\u505c\u673a\u576a\u7ef4\u4fee\u5305"),
         Loot(new(-18, 0.2f, -112), LootGrade.Rare, "Cracking hall line cache", "\u88c2\u89e3\u5382\u7ebf\u7269\u8d44"),
-        Loot(new(18, 0.2f, -132), LootGrade.Epic, "Cracking hall supervisor case", "\u88c2\u89e3\u5382\u76d1\u7ba1\u7bb1")
+        Loot(new(18, 0.2f, -132), LootGrade.Epic, "Cracking hall supervisor case", "\u88c2\u89e3\u5382\u76d1\u7ba1\u7bb1"),
+        Loot(new(-78, 0.2f, -34), LootGrade.Epic, "Cyclone sanctum cache", "\u65cb\u6d41\u5723\u6240\u7269\u8d44\u7bb1"),
+        Loot(new(78, 0.2f, -36), LootGrade.Epic, "Reactor crown case", "\u53cd\u5e94\u5806\u51a0\u5854\u7269\u8d44\u7bb1")
     };
 
     private static RefineryLootPlacement Loot(
@@ -324,6 +327,8 @@ public sealed class RefineryExtractionMapBuilder
         (new Vector3(-128, 0.2f, -58), ValuableItemKind.VintageCamera, LootGrade.Rare),
         (new Vector3(130, 0.2f, -64), ValuableItemKind.DesignerPerfume, LootGrade.Rare),
         (new Vector3(-27, 0.2f, -143), ValuableItemKind.EncryptedDrive, LootGrade.Epic),
-        (new Vector3(27, 0.2f, -103), ValuableItemKind.GraphicsCard, LootGrade.Rare)
+        (new Vector3(27, 0.2f, -103), ValuableItemKind.GraphicsCard, LootGrade.Rare),
+        (new Vector3(-73, 0.2f, -40), ValuableItemKind.CollectorCoin, LootGrade.Legendary),
+        (new Vector3(73, 0.2f, -42), ValuableItemKind.EncryptedDrive, LootGrade.Legendary)
     };
 }
