@@ -105,9 +105,20 @@ public sealed class RefineryExtractionMapBuilder
         string file,
         Vector3 position,
         float yaw,
-        float scale,
-        Vector3 collisionSize)
-        => new(
+        float scale)
+    {
+        var collisionSize = file switch
+        {
+            "building-p.glb" => new Vector3(1.82f, 1.3f, 1.48f),
+            "building-q.glb" => new Vector3(2.14f, 0.88f, 1.77f),
+            "building-r.glb" => new Vector3(2.48f, 1.39f, 1.27f),
+            "building-t.glb" => new Vector3(1.72f, 1.01f, 1.39f),
+            _ => throw new System.ArgumentOutOfRangeException(
+                nameof(file),
+                file,
+                "Tall refinery building has no measured collision profile.")
+        };
+        return new RefineryModelPlacement(
             name,
             $"{KenneyRoot}/{file}",
             position,
@@ -119,6 +130,7 @@ public sealed class RefineryExtractionMapBuilder
             true,
             true,
             true);
+    }
 
     private static void AddProcessClusters(List<RefineryModelPlacement> models)
     {
@@ -159,12 +171,12 @@ public sealed class RefineryExtractionMapBuilder
         // openings so these are playable structures rather than flat backdrops.
         models.AddRange(new[]
         {
-            TallKenney("SkylineTowerWestSouth", "building-r.glb", new(-148, 0.02f, 52), 0.0f, 8.6f, new(2.8f, 3.2f, 2.3f)),
-            TallKenney("SkylineTowerEastSouth", "building-t.glb", new(148, 0.02f, 50), Mathf.Pi, 8.4f, new(2.6f, 3.0f, 2.4f)),
-            TallKenney("SkylineTowerWestMid", "building-q.glb", new(-151, 0.02f, -42), Mathf.Pi * 0.5f, 8.8f, new(2.8f, 2.6f, 2.5f)),
-            TallKenney("SkylineTowerEastMid", "building-p.glb", new(151, 0.02f, -45), -Mathf.Pi * 0.5f, 8.8f, new(2.7f, 2.8f, 2.5f)),
-            TallKenney("SkylineTowerWestNorth", "building-r.glb", new(-148, 0.02f, -171), Mathf.Pi, 9.2f, new(2.9f, 3.3f, 2.4f)),
-            TallKenney("SkylineTowerEastNorth", "building-t.glb", new(148, 0.02f, -173), 0.0f, 9.0f, new(2.8f, 3.1f, 2.5f))
+            TallKenney("SkylineTowerWestSouth", "building-r.glb", new(-148, 0.02f, 52), 0.0f, 8.6f),
+            TallKenney("SkylineTowerEastSouth", "building-t.glb", new(148, 0.02f, 50), Mathf.Pi, 8.4f),
+            TallKenney("SkylineTowerWestMid", "building-q.glb", new(-151, 0.02f, -42), Mathf.Pi * 0.5f, 8.8f),
+            TallKenney("SkylineTowerEastMid", "building-p.glb", new(151, 0.02f, -45), -Mathf.Pi * 0.5f, 8.8f),
+            TallKenney("SkylineTowerWestNorth", "building-r.glb", new(-148, 0.02f, -171), Mathf.Pi, 9.2f),
+            TallKenney("SkylineTowerEastNorth", "building-t.glb", new(148, 0.02f, -173), 0.0f, 9.0f)
         });
 
         var tankPositions = new[]

@@ -207,6 +207,9 @@ public partial class FreightTerminalWorld
             && counts.EntryBeacons == _refineryEntryBeaconCount;
         var skylineReady = _refineryTallSceneCount >= 6
             && counts.TallSceneModels == _refineryTallSceneCount;
+        var skylineClearanceReady = ValidateRefinerySkylineClearance(
+            out var skylineClearanceProbes,
+            out var skylineClearanceBlocker);
         var doorwayBallisticsReady = ValidateRefineryDoorwayBallistics();
         var factoryReady = _refineryFactoryDistrict is
         {
@@ -252,11 +255,11 @@ public partial class FreightTerminalWorld
             && counts.MeshInstances < 900
             && counts.Lights <= 28;
         var valid = rootsReady && authoredReady && sourcesReady && proxiesReady
-            && doorwayReady && skylineReady && doorwayBallisticsReady
+            && doorwayReady && skylineReady && skylineClearanceReady && doorwayBallisticsReady
             && factoryReady && factorySourcesReady && hallEntriesReady
             && wondersReady && wonderSourcesReady && wonderTraversalReady
             && gameplayReady && lanesReady && deploymentReady && performanceReady;
-        GD.Print($"REFINERY_MAP_CHECK valid={valid} root={rootsReady} authored={authoredReady} models={_refineryAuthoredModelCount}/{RefineryLayout.Models.Count} unique_scenes={_refineryModelScenes.Count} sources={sourcesReady} imported_meshes={counts.ImportedMeshes} culled={counts.CulledImportedMeshes} proxies={counts.ModelCollisionShapes}/{_refineryCollisionProxyCount} proxy_boxes={proxiesReady} doorways={_refineryAccessibleBuildingCount} doorway_shapes={counts.DoorwayCollisionShapes} entry_beacons={counts.EntryBeacons}/{_refineryEntryBeaconCount} doorway_ready={doorwayReady} doorway_ballistics={doorwayBallisticsReady} tall_scenes={_refineryTallSceneCount} skyline={skylineReady} factory={factoryReady} factory_sources={factorySourcesReady} hall_entries={hallEntriesReady} factory_models={_refineryFactoryDistrict?.AuthoredModelCount ?? 0} factory_collision={_refineryFactoryDistrict?.CollisionShapeCount ?? 0} roof={_refineryFactoryDistrict?.RoofModuleCount ?? 0} catwalk={_refineryFactoryDistrict?.CatwalkModuleCount ?? 0} interior_props={_refineryFactoryDistrict?.InteriorPropCount ?? 0} alley_props={_refineryFactoryDistrict?.AlleyPropCount ?? 0} wonders={wondersReady} wonder_sources={wonderSourcesReady} wonder_traversal={wonderTraversalReady} wonder_models={_refineryWonderLandmarks?.AuthoredModelCount ?? 0} wonder_collision={_refineryWonderLandmarks?.CollisionShapeCount ?? 0} bridge_modules={_refineryWonderLandmarks?.ElevatedBridgeModuleCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} lanes={lanesReady} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
+        GD.Print($"REFINERY_MAP_CHECK valid={valid} root={rootsReady} authored={authoredReady} models={_refineryAuthoredModelCount}/{RefineryLayout.Models.Count} unique_scenes={_refineryModelScenes.Count} sources={sourcesReady} imported_meshes={counts.ImportedMeshes} culled={counts.CulledImportedMeshes} proxies={counts.ModelCollisionShapes}/{_refineryCollisionProxyCount} proxy_boxes={proxiesReady} doorways={_refineryAccessibleBuildingCount} doorway_shapes={counts.DoorwayCollisionShapes} entry_beacons={counts.EntryBeacons}/{_refineryEntryBeaconCount} doorway_ready={doorwayReady} doorway_ballistics={doorwayBallisticsReady} tall_scenes={_refineryTallSceneCount} skyline={skylineReady} skyline_clearance={skylineClearanceReady} skyline_probes={skylineClearanceProbes} skyline_blocker={skylineClearanceBlocker} factory={factoryReady} factory_sources={factorySourcesReady} hall_entries={hallEntriesReady} factory_models={_refineryFactoryDistrict?.AuthoredModelCount ?? 0} factory_collision={_refineryFactoryDistrict?.CollisionShapeCount ?? 0} roof={_refineryFactoryDistrict?.RoofModuleCount ?? 0} catwalk={_refineryFactoryDistrict?.CatwalkModuleCount ?? 0} interior_props={_refineryFactoryDistrict?.InteriorPropCount ?? 0} alley_props={_refineryFactoryDistrict?.AlleyPropCount ?? 0} wonders={wondersReady} wonder_sources={wonderSourcesReady} wonder_traversal={wonderTraversalReady} wonder_models={_refineryWonderLandmarks?.AuthoredModelCount ?? 0} wonder_collision={_refineryWonderLandmarks?.CollisionShapeCount ?? 0} bridge_modules={_refineryWonderLandmarks?.ElevatedBridgeModuleCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} lanes={lanesReady} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
         GD.Print($"REFINERY_MAP_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -389,6 +392,64 @@ public partial class FreightTerminalWorld
             building.ToGlobal(new Vector3(wallX, probeY, 0)),
             1);
         return doorwayOpen && wallBlocks;
+    }
+
+    private bool ValidateRefinerySkylineClearance(
+        out int checkedProbes,
+        out string firstBlocker)
+    {
+        checkedProbes = 0;
+        firstBlocker = "none";
+        using var clearanceShape = new CapsuleShape3D
+        {
+            Radius = 0.34f,
+            Height = 1.72f
+        };
+        foreach (var placement in RefineryLayout.Models.Where(model => model.IsTallScene))
+        {
+            var building = _levelRoot.GetNodeOrNull<StaticBody3D>(placement.Name);
+            if (building is null)
+            {
+                firstBlocker = $"{placement.Name}:missing";
+                return false;
+            }
+
+            var size = placement.CollisionSize * placement.Scale;
+            var offsets = new[]
+            {
+                new Vector3(-size.X * 0.5f - 0.82f, 0.92f, 0),
+                new Vector3(size.X * 0.5f + 0.82f, 0.92f, 0),
+                new Vector3(0, 0.92f, -size.Z * 0.5f - 0.82f),
+                new Vector3(0, 0.92f, size.Z * 0.5f + 0.82f)
+            };
+            foreach (var offset in offsets)
+            {
+                checkedProbes++;
+                using var query = new PhysicsShapeQueryParameters3D
+                {
+                    Shape = clearanceShape,
+                    Transform = new Transform3D(Basis.Identity, building.ToGlobal(offset)),
+                    CollisionMask = 1,
+                    CollideWithAreas = false,
+                    CollideWithBodies = true,
+                    Margin = 0.005f
+                };
+                var hits = GetWorld3D().DirectSpaceState.IntersectShape(query, 16);
+                using var hitsBacking = hits.AsDisposable();
+                for (var index = 0; index < hits.Count; index++)
+                {
+                    using var hit = hits[index];
+                    using var colliderValue = hit[GodotPhysicsResultKeys.Collider];
+                    if (colliderValue.AsGodotObject() is not StaticBody3D blocker)
+                    {
+                        continue;
+                    }
+                    firstBlocker = $"{placement.Name}:{blocker.Name}";
+                    return false;
+                }
+            }
+        }
+        return checkedProbes == _refineryTallSceneCount * 4;
     }
 
     private bool HasFactorySource(string fileName)
