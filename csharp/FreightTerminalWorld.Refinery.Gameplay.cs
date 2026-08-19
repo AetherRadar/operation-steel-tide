@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace OperationSteelTide;
@@ -182,7 +183,7 @@ public partial class FreightTerminalWorld
     {
         await WaitFrames(6);
         var counts = new RefineryRuntimeCounts();
-        CountRefineryNodes(_levelRoot, false, ref counts);
+        CountRefineryNodes(_levelRoot, false, false, ref counts);
         var rootsReady = IsBlackwaterRefineryMap
             && _levelRoot.Name == "BlackwaterRefinery"
             && _levelRoot.GetNodeOrNull<Node3D>("ExtractionSite") is not null;
@@ -195,8 +196,15 @@ public partial class FreightTerminalWorld
             && HasRefinerySource("old_military_crate")
             && HasRefinerySource("concrete_road_barrier");
         var proxiesReady = _refineryCollisionProxyCount == _refineryAuthoredModelCount
-            && counts.ModelCollisionShapes == _refineryCollisionProxyCount
+            && counts.ModelCollisionShapes >= _refineryCollisionProxyCount
             && counts.NonBoxModelCollisionShapes == 0;
+        var doorwayReady = _refineryAccessibleBuildingCount >= 40
+            && counts.DoorwayCollisionShapes >= _refineryAccessibleBuildingCount * 4
+            && _refineryEntryBeaconCount == _refineryAccessibleBuildingCount
+            && counts.EntryBeacons == _refineryEntryBeaconCount;
+        var skylineReady = _refineryTallSceneCount >= 6
+            && counts.TallSceneModels == _refineryTallSceneCount;
+        var doorwayBallisticsReady = ValidateRefineryDoorwayBallistics();
         var gameplayReady = _objectiveTerminals.Count == 2
             && IsInstanceValid(_extractionArea)
             && IsInstanceValid(_extractionAircraft)
@@ -211,8 +219,9 @@ public partial class FreightTerminalWorld
             && counts.MeshInstances < 900
             && counts.Lights <= 20;
         var valid = rootsReady && authoredReady && sourcesReady && proxiesReady
+            && doorwayReady && skylineReady && doorwayBallisticsReady
             && gameplayReady && lanesReady && deploymentReady && performanceReady;
-        GD.Print($"REFINERY_MAP_CHECK valid={valid} root={rootsReady} authored={authoredReady} models={_refineryAuthoredModelCount}/{RefineryLayout.Models.Count} unique_scenes={_refineryModelScenes.Count} sources={sourcesReady} imported_meshes={counts.ImportedMeshes} culled={counts.CulledImportedMeshes} proxies={counts.ModelCollisionShapes}/{_refineryCollisionProxyCount} proxy_boxes={proxiesReady} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} lanes={lanesReady} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
+        GD.Print($"REFINERY_MAP_CHECK valid={valid} root={rootsReady} authored={authoredReady} models={_refineryAuthoredModelCount}/{RefineryLayout.Models.Count} unique_scenes={_refineryModelScenes.Count} sources={sourcesReady} imported_meshes={counts.ImportedMeshes} culled={counts.CulledImportedMeshes} proxies={counts.ModelCollisionShapes}/{_refineryCollisionProxyCount} proxy_boxes={proxiesReady} doorways={_refineryAccessibleBuildingCount} doorway_shapes={counts.DoorwayCollisionShapes} entry_beacons={counts.EntryBeacons}/{_refineryEntryBeaconCount} doorway_ready={doorwayReady} doorway_ballistics={doorwayBallisticsReady} tall_scenes={_refineryTallSceneCount} skyline={skylineReady} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} lanes={lanesReady} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
         GD.Print($"REFINERY_MAP_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -311,13 +320,41 @@ public partial class FreightTerminalWorld
         return exclusions;
     }
 
+    private bool ValidateRefineryDoorwayBallistics()
+    {
+        var placement = RefineryLayout.Models.FirstOrDefault(model => model.HasDoorway);
+        var building = _levelRoot.GetNodeOrNull<StaticBody3D>(placement.Name);
+        if (building is null)
+        {
+            return false;
+        }
+        var size = placement.CollisionSize * placement.Scale;
+        var probeY = Mathf.Min(1.45f, size.Y * 0.25f);
+        var outsideZ = size.Z * 0.5f + 0.8f;
+        var doorwayOpen = !PhysicsRaycast.HasHit(
+            GetWorld3D(),
+            building.ToGlobal(new Vector3(0, probeY, outsideZ)),
+            building.ToGlobal(new Vector3(0, probeY, 0)),
+            building.GetRid(),
+            1);
+        var wallX = size.X * 0.36f;
+        var wallBlocks = PhysicsRaycast.HasHit(
+            GetWorld3D(),
+            building.ToGlobal(new Vector3(wallX, probeY, outsideZ)),
+            building.ToGlobal(new Vector3(wallX, probeY, 0)),
+            1);
+        return doorwayOpen && wallBlocks;
+    }
+
     private static void CountRefineryNodes(
         Node node,
         bool insideAuthoredModel,
+        bool insideAccessibleBuilding,
         ref RefineryRuntimeCounts counts)
     {
         counts.Nodes++;
         var authored = insideAuthoredModel || node.IsInGroup("refinery_authored_model");
+        var accessible = insideAccessibleBuilding || node.IsInGroup("refinery_accessible_building");
         if (node is StaticBody3D)
         {
             counts.StaticBodies++;
@@ -345,6 +382,18 @@ public partial class FreightTerminalWorld
             {
                 counts.NonBoxModelCollisionShapes++;
             }
+            if (accessible && collision.Name.ToString().StartsWith("Doorway", System.StringComparison.Ordinal))
+            {
+                counts.DoorwayCollisionShapes++;
+            }
+        }
+        if (node.IsInGroup("refinery_tall_scene"))
+        {
+            counts.TallSceneModels++;
+        }
+        if (node.IsInGroup("refinery_entry_beacon"))
+        {
+            counts.EntryBeacons++;
         }
         var children = node.GetChildren();
         using var childrenBacking = children.AsDisposable();
@@ -352,7 +401,7 @@ public partial class FreightTerminalWorld
         {
             if (child is Node childNode)
             {
-                CountRefineryNodes(childNode, authored, ref counts);
+                CountRefineryNodes(childNode, authored, accessible, ref counts);
             }
         }
     }
@@ -377,5 +426,8 @@ public partial class FreightTerminalWorld
         public int CulledImportedMeshes;
         public int ModelCollisionShapes;
         public int NonBoxModelCollisionShapes;
+        public int DoorwayCollisionShapes;
+        public int TallSceneModels;
+        public int EntryBeacons;
     }
 }

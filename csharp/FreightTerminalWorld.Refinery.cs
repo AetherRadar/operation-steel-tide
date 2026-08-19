@@ -8,6 +8,9 @@ public partial class FreightTerminalWorld
     private RefineryExtractionMapLayout? _refineryLayout;
     private int _refineryAuthoredModelCount;
     private int _refineryCollisionProxyCount;
+    private int _refineryAccessibleBuildingCount;
+    private int _refineryTallSceneCount;
+    private int _refineryEntryBeaconCount;
     private readonly HashSet<string> _refineryModelScenes = new();
 
     private bool IsBlackwaterRefineryMap
@@ -106,7 +109,16 @@ public partial class FreightTerminalWorld
     {
         _refineryAuthoredModelCount = 0;
         _refineryCollisionProxyCount = 0;
+        _refineryAccessibleBuildingCount = 0;
+        _refineryTallSceneCount = 0;
+        _refineryEntryBeaconCount = 0;
         _refineryModelScenes.Clear();
+        var entryMaterial = Mat(
+            "refinery_entry_beacon",
+            new Color(0.08f, 0.44f, 0.31f),
+            0.25f,
+            0.42f,
+            new Color(0.12f, 0.95f, 0.56f));
         foreach (var placement in RefineryLayout.Models)
         {
             var body = ModelProp(
@@ -117,13 +129,61 @@ public partial class FreightTerminalWorld
                 placement.CollisionSize,
                 placement.CollisionOffset,
                 placement.VisibilityRange,
-                placement.CastShadow);
+                placement.CastShadow,
+                placement.HasDoorway);
             body.Name = placement.Name;
             body.AddToGroup("refinery_authored_model");
+            if (placement.HasDoorway)
+            {
+                body.AddToGroup("refinery_accessible_building");
+                AddRefineryEntryBeacon(body, placement, entryMaterial);
+                _refineryAccessibleBuildingCount++;
+            }
+            if (placement.IsTallScene)
+            {
+                body.AddToGroup("refinery_tall_scene");
+                _refineryTallSceneCount++;
+            }
             _refineryAuthoredModelCount++;
             _refineryCollisionProxyCount++;
             _refineryModelScenes.Add(placement.ScenePath);
         }
+    }
+
+    private void AddRefineryEntryBeacon(
+        StaticBody3D building,
+        RefineryModelPlacement placement,
+        Godot.Material material)
+    {
+        var scaledSize = placement.CollisionSize * placement.Scale;
+        var doorway = _authoredBuildingCollisionPlanner.DoorwayMetrics(scaledSize);
+        var frontZ = scaledSize.Z * 0.5f + 0.06f;
+        var root = new Node3D { Name = "EntryBeacon" };
+        root.AddToGroup("refinery_entry_beacon");
+        building.AddChild(root);
+        ConfigureRefineryEntryBeaconMesh(MeshBox(
+            root,
+            new Vector3(-doorway.Width * 0.5f, doorway.Height * 0.5f, frontZ),
+            new Vector3(0.07f, doorway.Height, 0.06f),
+            material));
+        ConfigureRefineryEntryBeaconMesh(MeshBox(
+            root,
+            new Vector3(doorway.Width * 0.5f, doorway.Height * 0.5f, frontZ),
+            new Vector3(0.07f, doorway.Height, 0.06f),
+            material));
+        ConfigureRefineryEntryBeaconMesh(MeshBox(
+            root,
+            new Vector3(0, doorway.Height, frontZ),
+            new Vector3(doorway.Width, 0.07f, 0.06f),
+            material));
+        _refineryEntryBeaconCount++;
+    }
+
+    private static void ConfigureRefineryEntryBeaconMesh(MeshInstance3D mesh)
+    {
+        mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        mesh.VisibilityRangeEnd = 180.0f;
+        mesh.VisibilityRangeEndMargin = 14.0f;
     }
 
     private void BuildRefineryLighting(Godot.Material steel, Godot.Material lamp)

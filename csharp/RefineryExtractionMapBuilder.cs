@@ -12,7 +12,9 @@ public readonly record struct RefineryModelPlacement(
     Vector3 CollisionSize,
     Vector3 CollisionOffset,
     float VisibilityRange,
-    bool CastShadow);
+    bool CastShadow,
+    bool HasDoorway = false,
+    bool IsTallScene = false);
 
 public readonly record struct RefineryLootPlacement(
     Vector3 Position,
@@ -94,6 +96,28 @@ public sealed class RefineryExtractionMapBuilder
             collisionSize,
             new Vector3(0, collisionSize.Y * 0.5f, 0),
             visibilityRange,
+            true,
+            file.StartsWith("building-", System.StringComparison.OrdinalIgnoreCase),
+            false);
+
+    private static RefineryModelPlacement TallKenney(
+        string name,
+        string file,
+        Vector3 position,
+        float yaw,
+        float scale,
+        Vector3 collisionSize)
+        => new(
+            name,
+            $"{KenneyRoot}/{file}",
+            position,
+            yaw,
+            scale * 1.65f,
+            collisionSize,
+            new Vector3(0, collisionSize.Y * 0.5f, 0),
+            360.0f,
+            true,
+            true,
             true);
 
     private static void AddProcessClusters(List<RefineryModelPlacement> models)
@@ -128,6 +152,19 @@ public sealed class RefineryExtractionMapBuilder
             Kenney("SeparatorCorridorEast", "building-s.glb", new(24, 0.02f, -93), -Mathf.Pi * 0.5f, 4.7f, new(1.64f, 1.08f, 1.44f)),
             Kenney("TurbineCorridorWest", "building-j.glb", new(-24, 0.02f, -146), 0.0f, 4.8f, new(1.58f, 1.35f, 1.45f)),
             Kenney("TurbineCorridorEast", "building-o.glb", new(24, 0.02f, -148), Mathf.Pi, 4.8f, new(1.48f, 1.38f, 1.42f))
+        });
+
+        // Perimeter skyline landmarks add readable vertical scale without blocking the
+        // central vehicle lanes. They reuse the CC0 industrial kit and keep real entry
+        // openings so these are playable structures rather than flat backdrops.
+        models.AddRange(new[]
+        {
+            TallKenney("SkylineTowerWestSouth", "building-r.glb", new(-148, 0.02f, 52), 0.0f, 8.6f, new(2.8f, 3.2f, 2.3f)),
+            TallKenney("SkylineTowerEastSouth", "building-t.glb", new(148, 0.02f, 50), Mathf.Pi, 8.4f, new(2.6f, 3.0f, 2.4f)),
+            TallKenney("SkylineTowerWestMid", "building-q.glb", new(-151, 0.02f, -42), Mathf.Pi * 0.5f, 8.8f, new(2.8f, 2.6f, 2.5f)),
+            TallKenney("SkylineTowerEastMid", "building-p.glb", new(151, 0.02f, -45), -Mathf.Pi * 0.5f, 8.8f, new(2.7f, 2.8f, 2.5f)),
+            TallKenney("SkylineTowerWestNorth", "building-r.glb", new(-148, 0.02f, -171), Mathf.Pi, 9.2f, new(2.9f, 3.3f, 2.4f)),
+            TallKenney("SkylineTowerEastNorth", "building-t.glb", new(148, 0.02f, -173), 0.0f, 9.0f, new(2.8f, 3.1f, 2.5f))
         });
 
         var tankPositions = new[]

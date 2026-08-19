@@ -6,6 +6,7 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private static readonly Dictionary<Vector3, BoxMesh> SharedBoxMeshes = new();
+    private readonly AuthoredBuildingCollisionPlanner _authoredBuildingCollisionPlanner = new();
 
     private static void ReleaseSharedBoxMeshes()
     {
@@ -1180,7 +1181,8 @@ void sky() {
         Vector3 collisionSize,
         Vector3 collisionOffset,
         float visibilityRange = 0.0f,
-        bool castShadow = true)
+        bool castShadow = true,
+        bool hasDoorway = false)
     {
         // Duplicate sibling names get mangled to @Class@Id by Godot, so keep them unique.
         var body = new StaticBody3D
@@ -1205,11 +1207,26 @@ void sky() {
             ConfigureAuthoredMapModel(model, visibilityRange, castShadow);
             body.AddChild(model);
         }
-        body.AddChild(new CollisionShape3D
+        var scaledSize = collisionSize * scale;
+        var scaledOffset = collisionOffset * scale;
+        foreach (var collision in _authoredBuildingCollisionPlanner.Plan(
+                     scaledSize,
+                     scaledOffset,
+                     hasDoorway))
         {
-            Shape = new BoxShape3D { Size = collisionSize * scale },
-            Position = collisionOffset * scale
-        });
+            if (collision.Size.X <= 0.01f
+                || collision.Size.Y <= 0.01f
+                || collision.Size.Z <= 0.01f)
+            {
+                continue;
+            }
+            body.AddChild(new CollisionShape3D
+            {
+                Name = collision.Name,
+                Shape = new BoxShape3D { Size = collision.Size },
+                Position = collision.Position
+            });
+        }
         _levelRoot.AddChild(body);
         return body;
     }
