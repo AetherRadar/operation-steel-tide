@@ -81,6 +81,25 @@ public partial class TacticalPlayer
         Hud?.SetStats(Health, Armor, Stamina, Ammo, ReserveAmmo, Grenades);
     }
 
+    public void ApplyExtractionNetworkHealth(float health, bool down, bool reviveUsed)
+    {
+        Health = Mathf.Clamp(health, 0.0f, MaxHealth);
+        ReviveUsed = reviveUsed;
+        if (down)
+        {
+            IsDead = true;
+            Velocity = Vector3.Zero;
+            _stance = PlayerStance.Prone;
+        }
+        else if (IsDead)
+        {
+            IsDead = false;
+            UiLocked = false;
+            _stance = PlayerStance.Crouched;
+        }
+        Hud?.SetStats(Health, Armor, Stamina, Ammo, ReserveAmmo, Grenades);
+    }
+
     public void ApplyDemolitionRoundLoadout(
         DeploymentLoadout loadout,
         int grenadeCount,

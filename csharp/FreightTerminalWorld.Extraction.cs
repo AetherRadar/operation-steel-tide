@@ -1,3 +1,4 @@
+using System.Linq;
 using Godot;
 
 namespace OperationSteelTide;
@@ -10,6 +11,7 @@ public partial class FreightTerminalWorld
     private bool _extractionCountdownActive;
     private bool _extractionPlayerInside;
     private bool _extractionDeparturePlaying;
+    private bool _extractionMissionSucceeded;
     private bool _skipExtractionCinematicForValidation;
     private int _extractionBoardedSquadmates;
     private float _extractionRemaining = ExtractionCountdownDuration;
@@ -33,7 +35,7 @@ public partial class FreightTerminalWorld
 
     private void TryBeginExtractionSequence(Node3D body)
     {
-        if (body != _player || _missionEnded || _demolitionMode)
+        if (body != _player || _missionEnded || _demolitionMode || IsExtractionNetworkClient)
         {
             return;
         }
@@ -48,6 +50,10 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        if (IsExtractionNetworkClient)
+        {
+            return;
+        }
         _extractionPlayerInside = false;
         if (_extractionCountdownActive)
         {
@@ -57,7 +63,7 @@ public partial class FreightTerminalWorld
 
     private void UpdateExtractionSequence(float delta)
     {
-        if (_demolitionMode)
+        if (_demolitionMode || IsExtractionNetworkClient)
         {
             return;
         }
@@ -98,7 +104,21 @@ public partial class FreightTerminalWorld
 
     private bool IsPlayerInsideExtractionZone()
     {
-        var offset = _player.GlobalPosition - ExtractionPoint;
+        if (IsInsideExtractionZone(_player.GlobalPosition))
+        {
+            return true;
+        }
+        return IsExtractionNetworkMatch && _squadNetwork.IsHost
+            && _squadMates.Any(mate => IsInstanceValid(mate)
+                && mate.IsHumanProxy
+                && !mate.IsDowned
+                && !mate.IsBodyBag
+                && IsInsideExtractionZone(mate.GlobalPosition));
+    }
+
+    private static bool IsInsideExtractionZone(Vector3 position)
+    {
+        var offset = position - ExtractionPoint;
         var horizontalSquared = offset.X * offset.X + offset.Z * offset.Z;
         return horizontalSquared <= ExtractionZoneRadius * ExtractionZoneRadius
             && offset.Y >= -1.5f
@@ -222,6 +242,7 @@ public partial class FreightTerminalWorld
 
         _extractionCountdownActive = false;
         _extractionDeparturePlaying = true;
+        _extractionMissionSucceeded = true;
         _missionEnded = true;
         LockLootForMissionTransition(Input.MouseModeEnum.Captured);
         _player.EjectFromVehicleIfAny();

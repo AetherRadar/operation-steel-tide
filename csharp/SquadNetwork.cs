@@ -20,6 +20,7 @@ public partial class SquadNetwork : Node
     public event Action<string>? StatusChanged;
     public event Action? ConnectionEstablished;
     public event Action? ConnectionAttemptFailed;
+    public event Action<bool>? ConnectionLost;
 
     public bool IsOnline { get; private set; }
     public bool IsHost { get; private set; }
@@ -27,13 +28,16 @@ public partial class SquadNetwork : Node
     public int ConnectedPeerCount => IsOnline ? Multiplayer.GetPeers().Length : 0;
     public TacticalPlayer? LocalPlayer { get; set; }
 
+    private int ActivePlayerCapacity => IsExtractionSession
+        ? ExtractionSquadCapacity
+        : MaximumPlayers;
+
     private ENetMultiplayerPeer? _peer;
     private readonly Dictionary<long, ulong> _nextAbilityTimeByPeer = new();
     private float _snapshotTimer;
 
     public override void _Ready()
     {
-        Name = "SquadNetwork";
         InitializeLanRoomDiscovery();
         Multiplayer.PeerConnected += OnPeerConnected;
         Multiplayer.PeerDisconnected += OnPeerDisconnected;
@@ -63,13 +67,13 @@ public partial class SquadNetwork : Node
             return Error.InvalidParameter;
         }
         PauseLanRoomBrowsing();
-        Close();
+        CloseTransport();
         _peer = new ENetMultiplayerPeer();
         if (bindIp != "*")
         {
             _peer.SetBindIP(bindIp);
         }
-        var error = _peer.CreateServer(endpointPort, MaximumPlayers - 1);
+        var error = _peer.CreateServer(endpointPort, ActivePlayerCapacity - 1);
         if (error != Error.Ok)
         {
             SetStatus($"HOST FAILED  //  {error}");
@@ -83,7 +87,7 @@ public partial class SquadNetwork : Node
         StartLanRoomAdvertisement(endpointPort);
         SetStatus(bindIp == "*"
             ? HostStatus(1)
-            : $"HOSTING {FormatEndpoint(bindIp, endpointPort)}  //  1/{MaximumPlayers}");
+            : $"HOSTING {FormatEndpoint(bindIp, endpointPort)}  //  1/{ActivePlayerCapacity}");
         return Error.Ok;
     }
 
@@ -95,7 +99,7 @@ public partial class SquadNetwork : Node
             return Error.InvalidParameter;
         }
         PauseLanRoomBrowsing();
-        Close();
+        CloseTransport();
         _peer = new ENetMultiplayerPeer();
         var error = _peer.CreateClient(host, endpointPort);
         if (error != Error.Ok)
@@ -211,6 +215,13 @@ public partial class SquadNetwork : Node
 
     public void Close()
     {
+        CloseTransport();
+        ResetDemolitionNetworkState();
+        ResetExtractionNetworkState();
+    }
+
+    private void CloseTransport()
+    {
         StopLanRoomAdvertisement();
         if (_peer is not null)
         {
@@ -226,7 +237,6 @@ public partial class SquadNetwork : Node
         _hostPort = DefaultPort;
         _snapshotTimer = 0.0f;
         _nextAbilityTimeByPeer.Clear();
-        ResetDemolitionNetworkState();
     }
 
     public override void _Process(double delta)
@@ -246,6 +256,20 @@ public partial class SquadNetwork : Node
             BroadcastDemolitionPlayerState();
             return;
         }
+        if (IsExtractionSession && ExtractionMatchStarted)
+        {
+            if (!ExtractionWorldLaunchStarted)
+            {
+                return;
+            }
+            if (!IsHost)
+            {
+                RpcId(1, MethodName.SubmitClientState, (int)LocalPlayer.Role,
+                    LocalPlayer.GlobalPosition, LocalPlayer.Rotation,
+                    LocalPlayer.Health, LocalPlayer.IsDead);
+            }
+            return;
+        }
         var peerId = Multiplayer.GetUniqueId();
         if (IsHost)
         {
@@ -261,7 +285,8 @@ public partial class SquadNetwork : Node
 
     public void BroadcastAbility(OperatorRole role, Vector3 origin, Vector3 forward)
     {
-        if (!IsOnline)
+        if (!IsOnline || IsExtractionSession && ExtractionMatchStarted
+            && !ExtractionWorldLaunchStarted)
         {
             return;
         }
@@ -277,7 +302,8 @@ public partial class SquadNetwork : Node
 
     public void BroadcastShot(Vector3 origin, Vector3 end, int enemyId, float damage)
     {
-        if (!IsOnline)
+        if (!IsOnline || IsExtractionSession && ExtractionMatchStarted
+            && !ExtractionWorldLaunchStarted)
         {
             return;
         }
@@ -294,11 +320,28 @@ public partial class SquadNetwork : Node
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered)]
     private void SubmitClientState(int role, Vector3 position, Vector3 rotation, float health, bool dead)
     {
-        if (!IsHost)
+        if (!IsHost || !Enum.IsDefined(typeof(OperatorRole), role)
+            || !IsFinite(position) || !IsFinite(rotation))
         {
             return;
         }
         var sender = Multiplayer.GetRemoteSenderId();
+        if (IsExtractionSession && ExtractionMatchStarted)
+        {
+            if (!ExtractionWorldLaunchStarted)
+            {
+                return;
+            }
+            var slot = ExtractionSlotForPeer(sender);
+            if (slot <= 0)
+            {
+                return;
+            }
+            var assignedRole = ExtractionRoleForSlot(slot);
+            RemoteStateReceived?.Invoke(
+                sender, assignedRole, position, rotation, health, dead);
+            return;
+        }
         RemoteStateReceived?.Invoke(sender, (OperatorRole)role, position, rotation, health, dead);
         Rpc(MethodName.ReceiveState, sender, role, position, rotation, health, dead);
     }
@@ -324,6 +367,18 @@ public partial class SquadNetwork : Node
         if (!Enum.IsDefined(typeof(OperatorRole), role))
         {
             return;
+        }
+        if (IsExtractionSession && ExtractionMatchStarted)
+        {
+            if (!ExtractionWorldLaunchStarted)
+            {
+                return;
+            }
+            var slot = ExtractionSlotForPeer(sender);
+            if (slot <= 0 || ExtractionRoleForSlot(slot) != (OperatorRole)role)
+            {
+                return;
+            }
         }
         var now = Time.GetTicksMsec();
         if (_nextAbilityTimeByPeer.TryGetValue(sender, out var readyAt) && now < readyAt)
@@ -353,6 +408,10 @@ public partial class SquadNetwork : Node
             return;
         }
         var sender = Multiplayer.GetRemoteSenderId();
+        if (IsExtractionSession && ExtractionMatchStarted && !ExtractionWorldLaunchStarted)
+        {
+            return;
+        }
         RemoteShotReceived?.Invoke(sender, origin, end, enemyId, damage);
         Rpc(MethodName.ReceiveShot, sender, origin, end, enemyId, damage);
     }
@@ -369,23 +428,29 @@ public partial class SquadNetwork : Node
 
     private void OnPeerConnected(long peerId)
     {
+        if (IsHost && IsExtractionSession && ExtractionMatchStarted)
+        {
+            _peer?.DisconnectPeer((int)peerId, true);
+            return;
+        }
         var connected = Multiplayer.GetPeers().Length + 1;
         UpdateLanRoomAdvertisement();
         SetStatus(IsHost
             ? HostStatus(connected)
-            : $"CONNECTED  //  SQUAD {connected}/{MaximumPlayers}");
+            : $"CONNECTED  //  SQUAD {connected}/{ActivePlayerCapacity}");
     }
 
     private void OnPeerDisconnected(long peerId)
     {
         _nextAbilityTimeByPeer.Remove(peerId);
         ForgetDemolitionPeer(peerId);
+        ForgetExtractionPeer(peerId);
         RemotePeerLeft?.Invoke(peerId);
         var connected = Mathf.Max(1, Multiplayer.GetPeers().Length + 1);
         UpdateLanRoomAdvertisement();
         SetStatus(IsHost
             ? HostStatus(connected)
-            : $"CONNECTED  //  SQUAD {connected}/{MaximumPlayers}");
+            : $"CONNECTED  //  SQUAD {connected}/{ActivePlayerCapacity}");
     }
 
     private void OnConnectedToServer()
@@ -405,8 +470,10 @@ public partial class SquadNetwork : Node
 
     private void OnServerDisconnected()
     {
+        var extractionSession = IsExtractionSession;
         Close();
         SetStatus("HOST LOST  //  AI SQUAD ACTIVE");
+        ConnectionLost?.Invoke(extractionSession);
     }
 
     private void SetStatus(string value)
@@ -414,4 +481,7 @@ public partial class SquadNetwork : Node
         Status = value;
         StatusChanged?.Invoke(value);
     }
+
+    private static bool IsFinite(Vector3 value)
+        => float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
 }

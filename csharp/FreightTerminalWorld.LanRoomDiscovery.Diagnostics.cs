@@ -40,7 +40,7 @@ public partial class FreightTerminalWorld
             LanRoomKind.Extraction,
             DeploymentMapCatalog.FreightTerminalId,
             1,
-            SquadNetwork.MaximumPlayers);
+            SquadNetwork.ExtractionSquadCapacity);
         if (listenerReady)
         {
             advertiser.StartAdvertisingForDiagnostics(
@@ -55,11 +55,19 @@ public partial class FreightTerminalWorld
             && rooms[0].RoomId == advertisement.RoomId
             && rooms[0].Address == "127.0.0.1"
             && rooms[0].Endpoint == "127.0.0.1:30117"
-            && rooms[0].PlayerCount == 1;
+            && rooms[0].PlayerCount == 1
+            && rooms[0].MaximumPlayers == SquadNetwork.ExtractionSquadCapacity;
 
         advertiser.UpdateAdvertisingPlayers(3);
         await ToSignal(GetTree().CreateTimer(0.12, true), SceneTreeTimer.SignalName.Timeout);
-        var updated = browser.Rooms.Count == 1 && browser.Rooms[0].PlayerCount == 3;
+        var updated = browser.Rooms.Count == 1
+            && browser.Rooms[0].PlayerCount == SquadNetwork.ExtractionSquadCapacity
+            && browser.Rooms[0].IsFull;
+        advertiser.UpdateAdvertisingPlayers(SquadNetwork.ExtractionSquadCapacity - 1);
+        await ToSignal(GetTree().CreateTimer(0.12, true), SceneTreeTimer.SignalName.Timeout);
+        var joinable = browser.Rooms.Count == 1
+            && browser.Rooms[0].PlayerCount == SquadNetwork.ExtractionSquadCapacity - 1
+            && !browser.Rooms[0].IsFull;
 
         var packet = LanRoomDiscovery.EncodeForDiagnostics(advertisement);
         var decoded = LanRoomDiscovery.TryDecodeForDiagnostics(
@@ -127,13 +135,13 @@ public partial class FreightTerminalWorld
         await ToSignal(GetTree().CreateTimer(0.9, true), SceneTreeTimer.SignalName.Timeout);
         var expired = browser.Rooms.Count == 0;
         var valid = permissionProbeSent && permissionProbeReceived
-            && listenerReady && discovered && updated && decoded && wrongVersionRejected
+            && listenerReady && discovered && updated && joinable && decoded && wrongVersionRejected
             && malformedRejected && extractionSelection && demolitionSelection && expired
-            && snapshotCount >= 4;
+            && snapshotCount >= 5;
         GD.Print(
             $"LAN_DISCOVERY_CHECK valid={valid} permission_sent={permissionProbeSent} "
             + $"permission_received={permissionProbeReceived} listener={listenerReady} discovered={discovered} "
-            + $"updated={updated} decoded={decoded} version_rejected={wrongVersionRejected} "
+            + $"updated={updated} joinable={joinable} decoded={decoded} version_rejected={wrongVersionRejected} "
             + $"malformed_rejected={malformedRejected} extraction_ui={extractionSelection} "
             + $"demolition_ui={demolitionSelection} expired={expired} snapshots={snapshotCount}");
         GD.Print($"LAN_DISCOVERY_PASS valid={valid}");

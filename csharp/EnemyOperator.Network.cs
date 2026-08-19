@@ -25,6 +25,51 @@ public partial class EnemyOperator
         Name = human ? $"NetworkOpponent_{peerId}" : $"NetworkOpponentAi_{NetworkId}";
     }
 
+    public void ConfigureExtractionNetworkProxy()
+    {
+        IsNetworkProxy = true;
+        IsHumanProxy = false;
+        NetworkPeerId = 0;
+        SentryMode = false;
+        _combatTarget = null;
+        _rawTarget = null;
+        _searchingLoot = false;
+        SetPhysicsProcess(false);
+        Name = $"ExtractionEnemyProxy_{NetworkId}";
+    }
+
+    public void ApplyExtractionNetworkState(ExtractionEnemyNetworkState state)
+    {
+        if (!IsNetworkProxy || state.NetworkId != NetworkId)
+        {
+            return;
+        }
+        TeamId = state.TeamId;
+        GlobalPosition = state.Position;
+        Rotation = state.Rotation;
+        Velocity = Vector3.Zero;
+        var flags = (ExtractionEnemyNetworkFlags)state.Flags;
+        Alerted = flags.HasFlag(ExtractionEnemyNetworkFlags.Alerted);
+        SentryMode = flags.HasFlag(ExtractionEnemyNetworkFlags.Sentry);
+        SetProne(flags.HasFlag(ExtractionEnemyNetworkFlags.Prone));
+        if (System.Enum.IsDefined(typeof(WeaponPlatform), state.WeaponPlatform))
+        {
+            CarriedWeapon = WeaponCatalog.Build((WeaponPlatform)state.WeaponPlatform, 0);
+        }
+        HasFireablePrimary = flags.HasFlag(ExtractionEnemyNetworkFlags.HasWeapon);
+        if (IsInstanceValid(_carriedWeaponRoot))
+        {
+            _carriedWeaponRoot.Visible = HasFireablePrimary
+                && flags.HasFlag(ExtractionEnemyNetworkFlags.CarriedWeaponVisible);
+        }
+        _health = Mathf.Clamp(state.Health, 0.0f, MaxHealth);
+        if (flags.HasFlag(ExtractionEnemyNetworkFlags.Dead))
+        {
+            Die();
+        }
+        SetPhysicsProcess(false);
+    }
+
     public void SetRemoteNetworkState(
         OperatorRole role,
         Vector3 position,

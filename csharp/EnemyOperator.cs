@@ -15,6 +15,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     public float DetectionRange { get; set; } = 34.0f;
     public bool SentryMode { get; set; }
     public int NetworkId { get; set; } = -1;
+    public ulong SimulationSeed { get; set; }
     /// <summary>0 = legacy map NPC garrison. ≥1 = rival extraction squad team.</summary>
     public int TeamId { get; set; }
     public bool IsRivalSquad => TeamId > 0;
@@ -181,7 +182,14 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     public override void _Ready()
     {
-        _rng.Randomize();
+        if (SimulationSeed != 0)
+        {
+            _rng.Seed = SimulationSeed;
+        }
+        else
+        {
+            _rng.Randomize();
+        }
         _strafeSign = _rng.Randf() < 0.5f ? -1.0f : 1.0f;
         var scheduleSeed = NetworkId >= 0
             ? NetworkId + 1
@@ -1677,6 +1685,13 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         if (IsDead)
         {
             return true;
+        }
+        if (IsNetworkProxy && Main?.IsExtractionNetworkClient == true)
+        {
+            var proxyHitHeight = hitPosition.Y - GlobalPosition.Y;
+            LastHitWasHeadshot = proxyHitHeight > 1.48f;
+            LastHitWasArmored = proxyHitHeight > 0.66f;
+            return false;
         }
         Alerted = true;
         LastDamageAttacker = attacker;

@@ -61,7 +61,7 @@ public partial class SquadNetwork
             _lanRoomKind,
             _lanRoomMapId,
             Multiplayer.GetPeers().Length + 1,
-            MaximumPlayers));
+            ActivePlayerCapacity));
     }
 
     private void UpdateLanRoomAdvertisement()
@@ -82,7 +82,7 @@ public partial class SquadNetwork
     }
 
     private string HostStatus(int connected)
-        => $"HOSTING UDP {_hostPort}  //  {connected}/{MaximumPlayers}";
+        => $"HOSTING UDP {_hostPort}  //  {connected}/{ActivePlayerCapacity}";
 
     private static string FriendlyHostName()
     {

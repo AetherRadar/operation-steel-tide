@@ -2778,6 +2778,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             return true;
         }
+        if (Main?.IsExtractionNetworkClient == true)
+        {
+            return false;
+        }
         // Deployment protection only blocks enemy AI during the protected spawn window.
         // Headless combat checks and live fire still apply once the director leaves deployment.
         if (Main?.IsPlayerProtected() == true && attacker is EnemyOperator)

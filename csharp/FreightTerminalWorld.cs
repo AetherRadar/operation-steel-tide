@@ -107,7 +107,15 @@ public partial class FreightTerminalWorld : Node3D
     {
         var args = OS.GetCmdlineUserArgs();
         _activeRuntimeMapId = DeploymentMapRuntime.ResolveStartupMap(args);
-        _rng.Randomize();
+        var worldSeed = DeploymentMapRuntime.CurrentWorldSeed;
+        if (worldSeed != 0)
+        {
+            _rng.Seed = unchecked((ulong)worldSeed);
+        }
+        else
+        {
+            _rng.Randomize();
+        }
         LoadSettings();
         InitializeOperatorProgression();
         InitMissionDirector();
@@ -134,6 +142,7 @@ public partial class FreightTerminalWorld : Node3D
 
     public override void _ExitTree()
     {
+        DetachSquadNetworkEvents();
         CleanupOperatorProgression();
         // Drop cached resources and stop long-lived nodes before Mono tears down
         // its script bindings. The caches rebuild when the scene is reloaded.
@@ -174,10 +183,15 @@ public partial class FreightTerminalWorld : Node3D
 
     public override void _Process(double delta)
     {
+        if (_extractionWorldLaunchPending)
+        {
+            return;
+        }
         UpdateSquad((float)delta);
         UpdateExtractionSequence((float)delta);
         UpdateDemolitionRound((float)delta);
         UpdateDemolitionNetwork((float)delta);
+        UpdateExtractionNetwork((float)delta);
         UpdateWorldBossTracking();
         if (IsInstanceValid(_extractionMarker))
         {
@@ -198,7 +212,7 @@ public partial class FreightTerminalWorld : Node3D
 
         if (_missionEnded && !IsExtractionDeparturePlaying && Input.IsKeyPressed(Key.Enter))
         {
-            GetTree().ReloadCurrentScene();
+            RestartMission();
             return;
         }
         if (!_missionEnded && !_player.IsDead && Input.IsActionJustPressed(GameInputActions.Inventory))
@@ -257,6 +271,10 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OnMissionLoaded(int _spawnProtection, float detectionRange, int reinforcementThreshold, bool online)
     {
+        if (IsExtractionNetworkClient)
+        {
+            return;
+        }
         _missionDetectionRange = detectionRange;
         _reinforcementThreshold = reinforcementThreshold;
         _missionOnline = online;
@@ -278,7 +296,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OnPhaseChanged(string phase, float remaining, bool online)
     {
-        if (_demolitionMode)
+        if (_demolitionMode || IsExtractionNetworkClient)
         {
             return;
         }
@@ -296,7 +314,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OnObjectiveChanged(int index, string objective, bool extractionAvailable)
     {
-        if (_demolitionMode)
+        if (_demolitionMode || IsExtractionNetworkClient)
         {
             return;
         }
@@ -364,6 +382,10 @@ public partial class FreightTerminalWorld : Node3D
 
     public void ReportGunshot(Vector3 origin, float radius)
     {
+        if (IsExtractionNetworkClient)
+        {
+            return;
+        }
         _missionDirector.ReportGunshot(origin, radius);
         if (_missionPhase is "CONTACT" or "COMBAT" && !_reinforcementsDeployed)
         {
@@ -375,6 +397,10 @@ public partial class FreightTerminalWorld : Node3D
 
     private void UpdateDeploymentProtection()
     {
+        if (IsExtractionNetworkClient)
+        {
+            return;
+        }
         if (IsInstanceValid(_player) && IsPlayerProtected()
             && IsOutsideDeploymentZone(_player.GlobalPosition))
         {
@@ -1099,10 +1125,12 @@ public partial class FreightTerminalWorld : Node3D
         bool sentryMode = false,
         float? detectionRange = null)
     {
+        var networkId = _nextEnemyNetworkId++;
         var enemy = new EnemyOperator
         {
             Position = position,
-            NetworkId = _nextEnemyNetworkId++,
+            NetworkId = networkId,
+            SimulationSeed = ExtractionEntitySeed(networkId),
             Player = _player,
             Main = this,
             MissionDirector = _missionDirector,
@@ -1117,6 +1145,7 @@ public partial class FreightTerminalWorld : Node3D
         AddChild(enemy);
         enemy.Eliminated += OnEnemyEliminated;
         _enemies.Add(enemy);
+        RegisterExtractionNetworkEnemy(enemy);
         InvalidateCombatTargetIndex();
         if (alerted)
         {
@@ -1381,6 +1410,7 @@ public partial class FreightTerminalWorld : Node3D
             corpse.MarkCarriedWeaponRemoved();
         }
         source.OnSearched();
+        PublishExtractionLootMutation(source);
         RetireEmptyGradedLootPickup(source);
         return operatorNode.EquipWeaponFromLoot(weaponItem.Weapon!);
     }
@@ -1425,6 +1455,7 @@ public partial class FreightTerminalWorld : Node3D
         }
         RefreshGradedLootPickupPresentation(source);
         source.OnSearched();
+        PublishExtractionLootMutation(source);
         RetireEmptyGradedLootPickup(source);
         return _player.HasFireablePrimary;
     }
@@ -1453,6 +1484,7 @@ public partial class FreightTerminalWorld : Node3D
             corpse.MarkCarriedWeaponRemoved();
         }
         source.OnSearched();
+        PublishExtractionLootMutation(source);
         RetireEmptyGradedLootPickup(source);
         return mate.EquipWeaponFromLoot(weaponItem.Weapon!);
     }
@@ -1476,6 +1508,19 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OnEnemyEliminated(EnemyOperator enemy)
     {
+        if (_applyingExtractionNetworkState)
+        {
+            if (!_lootSources.Contains(enemy))
+            {
+                _lootSources.Add(enemy);
+            }
+            _enemies.Remove(enemy);
+            _enemiesRemaining = _enemies.Count(candidate => IsInstanceValid(candidate) && !candidate.IsDead);
+            _hud.SetEnemyCount(_enemiesRemaining);
+            RegisterExtractionLootSource(enemy, EnemyLootSourceBase + enemy.NetworkId);
+            InvalidateCombatTargetIndex();
+            return;
+        }
         if (enemy.LastDamageAttacker == _player)
         {
             _hud.ShowKnockdown(
@@ -1487,6 +1532,16 @@ public partial class FreightTerminalWorld : Node3D
             _hud.ShowKnockdown(enemy.OperatorCallsign(_languageSetting), mate.Callsign);
         }
         _lootSources.Add(enemy);
+        if (IsExtractionNetworkMatch)
+        {
+            var sourceId = EnemyLootSourceBase + enemy.NetworkId;
+            RegisterExtractionLootSource(enemy, sourceId);
+            if (_squadNetwork.IsHost)
+            {
+                _squadNetwork.BroadcastExtractionLootState(
+                    CaptureExtractionLootSourceState(sourceId, enemy, granted: false));
+            }
+        }
         _enemiesRemaining = Mathf.Max(0, _enemiesRemaining - 1);
         _kills++;
         _hud.SetEnemyCount(_enemiesRemaining);
@@ -1828,6 +1883,39 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OpenLoot(ILootSource source)
     {
+        if (IsExtractionNetworkMatch)
+        {
+            var sourceId = EnsureExtractionLootSourceId(source);
+            if (IsExtractionNetworkClient)
+            {
+                if (_pendingExtractionLootOpen is not null)
+                {
+                    return;
+                }
+                _pendingExtractionLootOpen = source;
+                _hud.SetInteraction("SYNCING LOOT  //  HOST AUTHORITY", -1.0f, true);
+                _squadNetwork.RequestExtractionLootOpen(sourceId);
+                return;
+            }
+            if (_extractionLootLeaseOwners.TryGetValue(sourceId, out var owner) && owner != 1)
+            {
+                _hud.ShowLocalizedMessage(
+                    "loot_busy",
+                    "LOOT SOURCE IN USE  //  WAIT FOR SQUADMATE",
+                    new Color(1.0f, 0.62f, 0.24f));
+                return;
+            }
+            _extractionLootLeaseOwners[sourceId] = 1;
+            OpenLootLocal(source);
+            _squadNetwork.BroadcastExtractionLootState(
+                CaptureExtractionLootSourceState(sourceId, source, granted: false));
+            return;
+        }
+        OpenLootLocal(source);
+    }
+
+    private void OpenLootLocal(ILootSource source)
+    {
         _interactionProgress = 0.0f;
         if (LocalPlayerCannotInteract)
         {
@@ -1896,6 +1984,19 @@ public partial class FreightTerminalWorld : Node3D
     private void CloseLoot()
     {
         var closedSource = _openLootSource;
+        if (IsExtractionNetworkMatch && closedSource is not null
+            && _extractionLootIds.TryGetValue(closedSource.LootNode.GetInstanceId(), out var sourceId))
+        {
+            if (_squadNetwork.IsHost)
+            {
+                _extractionLootLeaseOwners.Remove(sourceId);
+            }
+            else
+            {
+                _squadNetwork.CloseExtractionLoot(sourceId);
+            }
+        }
+        _pendingExtractionLootOpen = null;
         if (_hud.IsLootVisible)
         {
             _hud.HideLoot();
@@ -1949,6 +2050,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             enemy.MarkCarriedWeaponRemoved();
         }
+        PublishExtractionLootMutation(_openLootSource);
         RefreshLootView();
     }
 
@@ -1982,6 +2084,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             enemy.MarkCarriedWeaponRemoved();
         }
+        PublishExtractionLootMutation(_openLootSource);
         RefreshLootView();
     }
 
@@ -2054,6 +2157,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             enemy.MarkCarriedWeaponRemoved();
         }
+        PublishExtractionLootMutation(_openLootSource);
         RefreshLootView();
     }
 
@@ -2070,6 +2174,7 @@ public partial class FreightTerminalWorld : Node3D
         }
         _openLootSource.Loot.Add(returned);
         RefreshGradedLootPickupPresentation(_openLootSource);
+        PublishExtractionLootMutation(_openLootSource);
         RefreshLootView();
     }
 
@@ -2081,6 +2186,15 @@ public partial class FreightTerminalWorld : Node3D
         }
         if (!_player.TryRemoveBackpackItem(itemId, out var item))
         {
+            return;
+        }
+        if (IsExtractionNetworkClient)
+        {
+            var position = ResolveDroppedLootPosition();
+            _squadNetwork.RequestExtractionLootDrop(
+                position,
+                ExtractionLootNetworkCodec.SerializeItems(new[] { item }));
+            RefreshLootView();
             return;
         }
         var pickup = new GradedLootPickup
@@ -2101,6 +2215,13 @@ public partial class FreightTerminalWorld : Node3D
         }
 
         _lootSources.Add(pickup);
+        if (IsExtractionNetworkMatch && _squadNetwork.IsHost)
+        {
+            var sourceId = _nextExtractionDynamicLootId++;
+            RegisterExtractionLootSource(pickup, sourceId);
+            _squadNetwork.BroadcastExtractionLootState(
+                CaptureExtractionLootSourceState(sourceId, pickup, granted: false));
+        }
         RefreshLootView();
     }
 
@@ -2203,6 +2324,12 @@ public partial class FreightTerminalWorld : Node3D
 
     private void CompleteCurrentObjective()
     {
+        if (IsExtractionNetworkClient)
+        {
+            _interactionProgress = 0.0f;
+            _squadNetwork.RequestExtractionObjective(_objectiveStage);
+            return;
+        }
         if (_objectiveStage >= _objectiveTerminals.Count)
         {
             return;
@@ -2223,6 +2350,10 @@ public partial class FreightTerminalWorld : Node3D
 
     private void UpdateReinforcements(float delta)
     {
+        if (IsExtractionNetworkClient)
+        {
+            return;
+        }
         if (_demolitionMode || _missionEnded || _reinforcementsDeployed || _missionPhase != "COMBAT")
         {
             return;
@@ -2296,6 +2427,8 @@ public partial class FreightTerminalWorld : Node3D
 
     private void RestartMission()
     {
+        _squadNetwork?.Close();
+        DeploymentMapRuntime.ClearTransientDeployment();
         GetTree().Paused = false;
         GetTree().ReloadCurrentScene();
     }
@@ -2981,7 +3114,11 @@ public partial class FreightTerminalWorld : Node3D
         }
         var opened = _hud.IsLootVisible;
         var firstOpenMilliseconds = Time.GetTicksMsec() - openedAt;
-        await WaitFrames(28);
+        var sourceOpenDeadline = Time.GetTicksMsec() + 2500UL;
+        while (!source.OpenVisualReady && Time.GetTicksMsec() < sourceOpenDeadline)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
         var sourceOpenVisualReady = source.OpenVisualReady;
         var item = source.Loot.Find(candidate => candidate.Kind == LootItemKind.Weapon);
         var sourceClickActivated = false;

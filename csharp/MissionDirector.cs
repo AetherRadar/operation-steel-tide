@@ -83,6 +83,20 @@ public partial class MissionDirector : Node
 
     public string CurrentPhase() => _phase;
 
+    public void ApplyExtractionNetworkState(
+        string phase,
+        float remaining,
+        int objectiveIndex,
+        bool deploymentProtected,
+        bool missionEnded)
+    {
+        _phase = phase;
+        _deploymentRemaining = Mathf.Max(0.0f, remaining);
+        _objectiveIndex = Mathf.Max(0, objectiveIndex);
+        _deploymentProtectionActive = deploymentProtected;
+        _resultSubmitted = missionEnded;
+    }
+
 	public void ExitDeploymentZone()
 	{
 		_deploymentProtectionActive = false;

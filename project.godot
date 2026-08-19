@@ -7,6 +7,9 @@ config/features=PackedStringArray("4.3", "C#", "Forward Plus")
 boot_splash/bg_color=Color(0.018, 0.024, 0.028, 1)
 boot_splash/show_image=false
 
+[autoload]
+SquadNetworkRuntime="*res://csharp/SquadNetwork.cs"
+
 [display]
 window/size/viewport_width=1920
 window/size/viewport_height=1080

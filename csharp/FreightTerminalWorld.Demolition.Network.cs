@@ -104,6 +104,7 @@ public partial class FreightTerminalWorld
         _pendingDemolitionMapId = mapId;
         _pendingDemolitionAddress = address;
         _pendingDemolitionTeam = team;
+        _squadNetwork.ConfigureDemolitionSession(mapId, team);
         _hud.SetDemolitionNetworkConnectionPending(true, $"CONNECTING  //  {address}");
         var error = _squadNetwork.Join(address);
         if (error != Error.Ok)

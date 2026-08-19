@@ -7,7 +7,9 @@ public sealed record PendingExtractionDeployment(
     OperatorRole Role,
     SquadSessionMode SessionMode,
     string Address,
-    DeploymentLoadoutSelection Loadout);
+    DeploymentLoadoutSelection Loadout,
+    long WorldSeed = 0,
+    int SquadSlot = 0);
 
 /// <summary>
 /// Carries the selected extraction map across a scene reload without persisting it to disk.
@@ -17,6 +19,9 @@ public static class DeploymentMapRuntime
 {
     private static string _selectedMapId = DeploymentMapCatalog.FreightTerminalId;
     private static PendingExtractionDeployment? _pendingDeployment;
+    private static long _selectedWorldSeed;
+
+    public static long CurrentWorldSeed => _selectedWorldSeed;
 
     public static string ResolveStartupMap(string[] args)
     {
@@ -42,6 +47,7 @@ public static class DeploymentMapRuntime
     public static void StageDeployment(PendingExtractionDeployment deployment)
     {
         SelectMap(deployment.MapId);
+        _selectedWorldSeed = deployment.WorldSeed;
         _pendingDeployment = deployment with { MapId = _selectedMapId };
     }
 
@@ -59,6 +65,12 @@ public static class DeploymentMapRuntime
 
         deployment = null!;
         return false;
+    }
+
+    public static void ClearTransientDeployment()
+    {
+        _pendingDeployment = null;
+        _selectedWorldSeed = 0;
     }
 
     private static void SelectMap(string mapId)

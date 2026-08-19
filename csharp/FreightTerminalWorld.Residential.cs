@@ -1652,7 +1652,7 @@ public partial class FreightTerminalWorld
         var valid = count == expected && chinese && englishLeak is null && encountersLocalized;
         GD.Print($"RESIDENTIAL_LOCALIZATION_CHECK valid={valid} labels={count}/{expected} chinese={chinese} no_english={englishLeak is null} encounters={encountersLocalized} leak={englishLeak?.Text ?? "none"}");
         GD.Print($"RESIDENTIAL_LOCALIZATION_PASS valid={valid}");
-        GetTree().Quit(valid ? 0 : 2);
+        QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }
 
     private async void ValidateResidentialGameplay()

@@ -1,6 +1,8 @@
 # Online Play
 
-Operation Steel Tide uses a listen server: the player who selects `HOST GAME` runs the authoritative ENet session. On the same Wi-Fi or wired LAN, the joining player can select `JOIN GAME` and choose the host from the automatic `LAN` room list. The host advertises while the match is running, stale rooms disappear automatically, and both computers must run the exact same game version.
+Operation Steel Tide uses a listen server: the player who selects `HOST GAME` runs the authoritative ENet session. Creating a room keeps the host in the lobby. On the same Wi-Fi or wired LAN, the joining player selects `JOIN GAME` and chooses the host from the automatic `LAN` room list; after at least one player joins, the host selects `START OPERATION`. The room stops advertising when the match starts, late joins are rejected, stale lobby entries disappear automatically, and every computer must run the exact same game version.
+
+All peers load the host-selected map from the same world seed while gameplay remains paused. The host sends a reliable initial world snapshot and loot state before releasing the match, then remains authoritative for enemies, AI squadmates, mission objectives, reinforcements, extraction, down/revive state, loot sources, and the final outcome. Clients send their player movement and requested actions to the host instead of simulating a separate mission world.
 
 Gameplay uses UDP port `28960`; LAN room discovery uses UDP port `28961`. Allow the game through the Windows and macOS firewalls on private/local networks. Leave the host address field blank to listen on every network interface, or enter a local bind IP or `IP:PORT` only when a specific interface or port is required. Manual `host:port` entry remains available when broadcast discovery is blocked by a firewall, guest Wi-Fi isolation, a VPN, or a routed network. `127.0.0.1` always means the current computer and cannot connect two different machines. The included Go service stores local mission progress; it is not a gameplay server.
 
@@ -11,10 +13,11 @@ On macOS, accept the Local Network permission prompt when the deployment lobby o
 [playit.gg](https://playit.gg/) can expose the host's UDP port without router configuration. Only the host runs the playit agent; joining players use the public endpoint it assigns. Account limits and endpoint availability are controlled by playit and may change, so check its [current pricing and limits](https://playit.gg/pricing) before setting up a session.
 
 1. Every player downloads the same game release and extracts it.
-2. The host runs `PLAY.bat`, starts a deployment, and selects `HOST GAME`.
+2. The host runs `PLAY.bat`, opens extraction deployment, selects `HOST GAME`, and creates the room without entering the world.
 3. The host installs and runs the [playit agent](https://playit.gg/download), then creates a custom UDP tunnel to local address `127.0.0.1` and local port `28960`.
 4. The host shares the assigned public address and port, for example `example.gl.at.ply.gg:41237`.
-5. The other player runs `PLAY.bat`, chooses `JOIN GAME`, enters the complete `host:port`, and joins.
+5. The other player runs `PLAY.bat`, chooses `JOIN GAME`, enters the complete `host:port`, and joins the lobby.
+6. After all players appear in the lobby, the host selects `START OPERATION`; everyone loads and enters together.
 
 Keep both the host game and playit agent running for the whole session. This provides a public route to a player-hosted match; it is not a 24-hour dedicated server. The host may also need to allow `OperationSteelTide.exe` and the playit agent through Windows Firewall. Routing and latency depend on the service configuration and player locations.
 

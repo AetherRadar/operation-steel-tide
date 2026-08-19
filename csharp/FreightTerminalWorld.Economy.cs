@@ -21,7 +21,9 @@ public partial class FreightTerminalWorld
             || value.StartsWith("--capture", StringComparison.Ordinal));
         if (isolatedRun)
         {
-            _diagnosticProfilePath = Path.Combine(OS.GetUserDataDir(), "operator_profile_runtime_validation.json");
+            _diagnosticProfilePath = Path.Combine(
+                OS.GetUserDataDir(),
+                $"operator_profile_runtime_validation_{System.Environment.ProcessId}.json");
             TryDeleteProfile(_diagnosticProfilePath);
         }
         _operatorProfileStore = new OperatorProfileStore(_diagnosticProfilePath);

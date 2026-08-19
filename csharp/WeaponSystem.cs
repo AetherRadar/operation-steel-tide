@@ -348,7 +348,7 @@ public static class KnifeSkinCatalog
 
 public sealed class LootItem
 {
-    public string Id { get; } = Guid.NewGuid().ToString("N");
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
     public LootItemKind Kind { get; init; }
     public WeaponBuild? Weapon { get; init; }
     public string AttachmentId { get; init; } = string.Empty;

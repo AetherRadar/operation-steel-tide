@@ -109,7 +109,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         OperatorRole role,
         string callsign,
         bool humanProxy = false,
-        long peerId = 0)
+        long peerId = 0,
+        bool networkProxy = false)
     {
         Main = main;
         Leader = leader;
@@ -117,6 +118,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         Role = role;
         Callsign = callsign;
         IsHumanProxy = humanProxy;
+        IsNetworkProxy = humanProxy || networkProxy;
         NetworkPeerId = peerId;
         var spec = OperatorRoles.Spec(role);
         MaxHealth = spec.MaxHealth;
@@ -142,7 +144,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         BuildOperator();
         ApplyRoleVisuals();
         InitializeCombatTactics();
-        if (!IsHumanProxy)
+        if (!IsNetworkProxy)
         {
             _skillCooldown = SkillCooldownDuration * Mathf.Clamp(0.24f + SquadSlot * 0.11f, 0.35f, 0.62f);
         }
@@ -152,7 +154,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
     public void SetOrder(SquadOrder order, Vector3 position)
     {
-        if (IsHumanProxy)
+        if (IsNetworkProxy)
         {
             return;
         }
@@ -264,7 +266,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
     public void SetRemoteState(OperatorRole role, Vector3 position, Vector3 rotation, float health, bool down)
     {
-        if (!IsHumanProxy)
+        if (!IsNetworkProxy)
         {
             return;
         }
@@ -299,7 +301,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         _decisionTimer = Mathf.Max(0.0f, _decisionTimer - dt);
         UpdateCombatTacticalTimers(dt);
 
-        if (IsHumanProxy)
+        if (IsNetworkProxy)
         {
             UpdateRemoteProxy(dt);
             AnimateRig(dt);

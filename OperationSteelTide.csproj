@@ -4,5 +4,6 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <RootNamespace>OperationSteelTide</RootNamespace>
     <Nullable>enable</Nullable>
+    <NuGetAudit>false</NuGetAudit>
   </PropertyGroup>
 </Project>

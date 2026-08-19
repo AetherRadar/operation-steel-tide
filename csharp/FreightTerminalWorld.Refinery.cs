@@ -199,7 +199,12 @@ public partial class FreightTerminalWorld
         }
 
         _activeDeploymentMapId = deployment.MapId;
+        _extractionLocalSquadSlot = deployment.SquadSlot;
         DeploySquad(deployment.Role, deployment.SessionMode, deployment.Address);
+        if (_squadNetwork.ExtractionMatchStarted)
+        {
+            _squadNetwork.NotifyExtractionWorldReady();
+        }
     }
 
     private bool TryCommitPendingDeployment(DeploymentLoadoutSelection selection)

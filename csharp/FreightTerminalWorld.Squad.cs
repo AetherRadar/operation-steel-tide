@@ -25,6 +25,9 @@ public partial class FreightTerminalWorld
     private int _remoteNetworkAbilityCount;
     private string _activeDeploymentMapId = DeploymentMapCatalog.FreightTerminalId;
     private PendingExtractionDeployment? _pendingNetworkExtractionDeployment;
+    private PendingExtractionDeployment? _networkLobbyDeployment;
+    private int _extractionLocalSquadSlot;
+    private bool _networkMatchReloadQueued;
 
     public int ActiveSquadCount => 1 + _squadMates.Count(mate => IsInstanceValid(mate));
     public int AiSquadCount => _squadMates.Count(mate => IsInstanceValid(mate) && !mate.IsHumanProxy);
@@ -34,12 +37,7 @@ public partial class FreightTerminalWorld
     private void BuildSquadSystem()
     {
         EnsureSquadInputActions();
-        _squadNetwork = new SquadNetwork
-        {
-            Name = "SquadNetwork",
-            LocalPlayer = _player
-        };
-        AddChild(_squadNetwork);
+        _squadNetwork = SquadNetworkRuntime.GetOrCreate(GetTree());
         _squadNetwork.RemoteStateReceived += OnRemoteSquadState;
         _squadNetwork.RemotePeerLeft += OnRemoteSquadPeerLeft;
         _squadNetwork.RemoteAbilityReceived += OnRemoteSquadAbility;
@@ -49,12 +47,27 @@ public partial class FreightTerminalWorld
         _squadNetwork.DemolitionMatchStateReceived += OnDemolitionMatchState;
         _squadNetwork.DemolitionAssignmentReceived += OnDemolitionNetworkAssignment;
         _squadNetwork.DemolitionActionReceived += OnDemolitionNetworkAction;
-        _squadNetwork.StatusChanged += status => _hud.SetSquadStatus(status);
-        _squadNetwork.LanRoomsChanged += rooms => _hud.SetLanRooms(rooms);
-        _squadNetwork.LanRoomBrowseAvailabilityChanged += available =>
-            _hud.SetLanRoomBrowseAvailable(available);
-        _squadNetwork.ConnectionEstablished += CompletePendingNetworkDeployment;
+        _squadNetwork.ExtractionLobbyMemberReceived += OnExtractionLobbyMember;
+        _squadNetwork.ExtractionLobbyStateReceived += OnExtractionLobbyState;
+        _squadNetwork.ExtractionAssignmentReceived += OnExtractionAssignment;
+        _squadNetwork.ExtractionMatchStartReceived += OnExtractionMatchStart;
+        _squadNetwork.ExtractionWorldLaunchReceived += OnExtractionWorldLaunch;
+        _squadNetwork.ExtractionWorldReadyReceived += OnExtractionWorldReady;
+        _squadNetwork.ExtractionWorldStateReceived += OnExtractionWorldState;
+        _squadNetwork.ExtractionMissionStateReceived += OnExtractionMissionState;
+        _squadNetwork.ExtractionObjectiveRequested += OnExtractionObjectiveRequested;
+        _squadNetwork.ExtractionReviveRequested += OnExtractionReviveRequested;
+        _squadNetwork.ExtractionLootOpenRequested += OnExtractionLootOpenRequested;
+        _squadNetwork.ExtractionLootMutationReceived += OnExtractionLootMutationReceived;
+        _squadNetwork.ExtractionLootCloseRequested += OnExtractionLootCloseRequested;
+        _squadNetwork.ExtractionLootDropRequested += OnExtractionLootDropRequested;
+        _squadNetwork.ExtractionLootStateReceived += OnExtractionLootState;
+        _squadNetwork.StatusChanged += OnSquadNetworkStatusChanged;
+        _squadNetwork.LanRoomsChanged += OnLanRoomsChanged;
+        _squadNetwork.LanRoomBrowseAvailabilityChanged += OnLanRoomBrowseAvailabilityChanged;
+        _squadNetwork.ConnectionEstablished += OnSquadConnectionEstablished;
         _squadNetwork.ConnectionAttemptFailed += CancelPendingNetworkDeployment;
+        _squadNetwork.ConnectionLost += OnSquadConnectionLost;
         _hud.SquadDeploymentRequested += OnSquadDeploymentRequested;
         _hud.SquadOrderRequested += value => IssueSquadOrder((SquadOrder)value);
 
@@ -64,6 +77,9 @@ public partial class FreightTerminalWorld
         var networkClientCheck = Array.Exists(args, value => value == "--validate-network-client");
         var networkEndpointCheck = Array.Exists(args, value => value == "--validate-network-endpoint");
         var lanDiscoveryCheck = Array.Exists(args, value => value == "--validate-lan-discovery");
+        var extractionNetworkCheck = Array.Exists(args, value =>
+            value is "--validate-extraction-network-host"
+                or "--validate-extraction-network-client");
         var demolitionNetworkCheck = Array.Exists(args, value =>
             value is "--validate-demolition-network-host"
                 or "--validate-demolition-network-client"
@@ -90,6 +106,7 @@ public partial class FreightTerminalWorld
             && !lobbyCapture
             && !networkEndpointCheck
             && !lanDiscoveryCheck
+            && !extractionNetworkCheck
             && !demolitionNetworkCheck
             && !operationsOfficeCommand;
         if (diagnostic)
@@ -176,26 +193,35 @@ public partial class FreightTerminalWorld
             return;
         }
         var selectedMapId = _hud.SelectedDeploymentMapId;
-        if (!string.Equals(selectedMapId, _activeRuntimeMapId, StringComparison.OrdinalIgnoreCase))
+        var deployment = new PendingExtractionDeployment(
+            selectedMapId,
+            (OperatorRole)role,
+            sessionMode,
+            address,
+            _hud.SelectedDeploymentLoadout);
+        if (sessionMode == SquadSessionMode.Host)
         {
-            DeploymentMapRuntime.StageDeployment(new PendingExtractionDeployment(
-                selectedMapId,
-                (OperatorRole)role,
-                sessionMode,
-                address,
-                _hud.SelectedDeploymentLoadout));
-            GetTree().Paused = false;
-            GetTree().ReloadCurrentScene();
+            if (_networkLobbyDeployment is not null)
+            {
+                StartHostedExtractionMatch();
+                return;
+            }
+            BeginHostedExtractionLobby(deployment);
             return;
         }
-        if (sessionMode == SquadSessionMode.Join && !_squadNetwork.IsOnline)
+        if (sessionMode == SquadSessionMode.Join)
         {
-            BeginPendingExtractionJoin(new PendingExtractionDeployment(
-                selectedMapId,
-                (OperatorRole)role,
-                sessionMode,
-                address,
-                _hud.SelectedDeploymentLoadout));
+            if (!_squadNetwork.IsOnline)
+            {
+                BeginPendingExtractionJoin(deployment);
+            }
+            return;
+        }
+        if (!string.Equals(selectedMapId, _activeRuntimeMapId, StringComparison.OrdinalIgnoreCase))
+        {
+            DeploymentMapRuntime.StageDeployment(deployment);
+            GetTree().Paused = false;
+            GetTree().ReloadCurrentScene();
             return;
         }
         if (!TryCommitSelectedDeployment())
@@ -213,7 +239,21 @@ public partial class FreightTerminalWorld
             return;
         }
         ActivateBattlefieldFromOperationsOffice();
+        _squadNetwork.LocalPlayer = _player;
         _player.ConfigureRole(role);
+        if (!_demolitionMode
+            && _squadNetwork.IsOnline
+            && _squadNetwork.IsExtractionSession
+            && _squadNetwork.ExtractionMatchStarted)
+        {
+            _player.GlobalPosition = _extractionLocalSquadSlot == 0
+                ? DeploymentPoint
+                : ExtractionSpawnPads.FriendlyMemberPosition(
+                    DeploymentPoint,
+                    _player.GlobalBasis,
+                    _extractionLocalSquadSlot);
+            _player.Velocity = Vector3.Zero;
+        }
         _player.UiLocked = false;
         _player.DisarmFireInput();
         _player.RestoreMovementInput();
@@ -229,26 +269,31 @@ public partial class FreightTerminalWorld
         {
             _squadNetwork.ConfigureDemolitionSession(_demolitionSelectedMapId, _demolitionLocalNetworkTeam);
         }
-        else
+        else if (!_squadNetwork.IsExtractionSession
+            || !string.Equals(_squadNetwork.ExtractionMapId, _activeDeploymentMapId,
+                StringComparison.OrdinalIgnoreCase))
         {
             _squadNetwork.ConfigureExtractionSession(_activeDeploymentMapId);
         }
         Error networkError = Error.Ok;
-        switch (mode)
+        var reuseExtractionSession = !_demolitionMode
+            && _squadNetwork.IsOnline
+            && _squadNetwork.IsExtractionSession;
+        if (!reuseExtractionSession)
         {
-            case SquadSessionMode.Host:
-                networkError = _squadNetwork.Host(address);
-                break;
-            case SquadSessionMode.Join:
-                if (!_squadNetwork.IsOnline)
-                {
+            switch (mode)
+            {
+                case SquadSessionMode.Host:
+                    networkError = _squadNetwork.Host(address);
+                    break;
+                case SquadSessionMode.Join:
                     networkError = _squadNetwork.Join(address);
-                }
-                break;
-            default:
-                _squadNetwork.Close();
-                _hud.SetSquadStatus("LOCAL SQUAD  //  1 HUMAN + 2 AI");
-                break;
+                    break;
+                default:
+                    _squadNetwork.Close();
+                    _hud.SetSquadStatus("LOCAL SQUAD  //  1 HUMAN + 2 AI");
+                    break;
+            }
         }
         if (networkError != Error.Ok)
         {
@@ -256,14 +301,9 @@ public partial class FreightTerminalWorld
         }
 
         EnsureAiSquadFill();
-        _hud.HideSquadLobby();
-        _hud.SetSquadOrder(_squadOrder);
-        RefreshSquadHud();
-        Input.MouseMode = Input.MouseModeEnum.Captured;
-        _hud.ShowLocalizedMessage(
-            "squad_ready",
-            "SQUAD READY  //  F1 FOLLOW  F2 HOLD  F3 MOVE  H SKILL",
-            OperatorRoles.Spec(role).Accent);
+        InitializeExtractionNetworkWorld();
+        InitializeExtractionLootNetwork();
+        CompleteSquadDeploymentPresentation(role);
     }
 
     private void BeginPendingExtractionJoin(PendingExtractionDeployment deployment)
@@ -273,11 +313,51 @@ public partial class FreightTerminalWorld
             return;
         }
         _pendingNetworkExtractionDeployment = deployment;
+        _squadNetwork.ConfigureExtractionSession(deployment.MapId);
         _hud.SetSquadConnectionPending(true, $"CONNECTING  //  {deployment.Address}");
         var error = _squadNetwork.Join(deployment.Address);
         if (error != Error.Ok)
         {
             CancelPendingNetworkDeployment();
+        }
+    }
+
+    private void BeginHostedExtractionLobby(PendingExtractionDeployment deployment)
+    {
+        _squadNetwork.ConfigureExtractionSession(deployment.MapId);
+        var error = _squadNetwork.Host(deployment.Address);
+        if (error != Error.Ok)
+        {
+            _hud.SetSquadStatus($"HOST FAILED  //  {error}");
+            return;
+        }
+        _networkLobbyDeployment = deployment;
+        _extractionLocalSquadSlot = 0;
+        _squadNetwork.SetLocalExtractionLobbyMember(deployment.Role);
+        _hud.SetSquadLobbyWaiting(
+            host: true,
+            players: 1,
+            capacity: SquadNetwork.ExtractionSquadCapacity,
+            canStart: false,
+            status: GameLocalization.Get(
+                "squad_lobby_room_open",
+                _languageSetting,
+                "ROOM OPEN  //  WAITING FOR ANOTHER PLAYER"));
+    }
+
+    private void StartHostedExtractionMatch()
+    {
+        if (_networkLobbyDeployment is null)
+        {
+            return;
+        }
+        var seed = Random.Shared.NextInt64(1, long.MaxValue);
+        if (!_squadNetwork.TryStartExtractionMatch(seed))
+        {
+            _hud.SetSquadStatus(GameLocalization.Get(
+                "squad_wait_connected_player",
+                _languageSetting,
+                "WAITING FOR A CONNECTED PLAYER"));
         }
     }
 
@@ -287,23 +367,206 @@ public partial class FreightTerminalWorld
         {
             _pendingNetworkExtractionDeployment = null;
             _hud.SetSquadConnectionPending(false, _squadNetwork.Status);
-            if (!TryCommitPendingDeployment(extraction.Loadout))
-            {
-                _squadNetwork.Close();
-                return;
-            }
-            _activeDeploymentMapId = extraction.MapId;
-            DeploySquad(extraction.Role, extraction.SessionMode, extraction.Address);
+            _networkLobbyDeployment = extraction;
+            _squadNetwork.SetLocalExtractionLobbyMember(extraction.Role);
+            _hud.SetSquadLobbyWaiting(
+                host: false,
+                players: 1,
+                capacity: SquadNetwork.ExtractionSquadCapacity,
+                canStart: false,
+                status: GameLocalization.Get(
+                    "squad_lobby_connected",
+                    _languageSetting,
+                    "CONNECTED  //  WAITING FOR HOST TO START"));
             return;
         }
         CompletePendingDemolitionJoin();
     }
 
+    private void OnSquadConnectionEstablished() => CompletePendingNetworkDeployment();
+
     private void CancelPendingNetworkDeployment()
     {
         _pendingNetworkExtractionDeployment = null;
+        _networkLobbyDeployment = null;
+        _hud.ClearSquadLobbyWaiting();
         _hud.SetSquadConnectionPending(false, "CONNECTION FAILED  //  ALLOW LOCAL NETWORK / UDP 28960");
         CancelPendingDemolitionJoin();
+    }
+
+    private void OnExtractionLobbyMember(ExtractionLobbyMember member)
+    {
+        if (_networkLobbyDeployment is null || member.Slot < 0)
+        {
+            return;
+        }
+        OnExtractionLobbyState(new ExtractionLobbyState(
+            _squadNetwork.ExtractionMapId,
+            _squadNetwork.RegisteredExtractionPlayerCount,
+            SquadNetwork.ExtractionSquadCapacity,
+            _squadNetwork.ExtractionMatchStarted));
+    }
+
+    private void OnExtractionLobbyState(ExtractionLobbyState state)
+    {
+        if (_networkLobbyDeployment is null || state.MatchStarted)
+        {
+            return;
+        }
+        _hud.SetDeploymentMapSelection(state.MapId);
+        var host = _squadNetwork.IsHost;
+        var canStart = host && state.PlayerCount >= 2;
+        var status = host
+            ? canStart
+                ? GameLocalization.Format(
+                    "squad_lobby_ready",
+                    _languageSetting,
+                    "PLAYER CONNECTED  //  {0}/{1}  //  READY TO START",
+                    state.PlayerCount,
+                    state.Capacity)
+                : GameLocalization.Format(
+                    "squad_lobby_waiting",
+                    _languageSetting,
+                    "ROOM OPEN  //  {0}/{1}  //  WAITING",
+                    state.PlayerCount,
+                    state.Capacity)
+            : GameLocalization.Format(
+                "squad_lobby_client_waiting",
+                _languageSetting,
+                "CONNECTED  //  {0}/{1}  //  WAITING FOR HOST",
+                state.PlayerCount,
+                state.Capacity);
+        _hud.SetSquadLobbyWaiting(host, state.PlayerCount, state.Capacity, canStart, status);
+    }
+
+    private void OnExtractionAssignment(int slot)
+    {
+        if (slot == -2)
+        {
+            _squadNetwork.Close();
+            CancelPendingNetworkDeployment();
+            _hud.SetSquadStatus("JOIN FAILED  //  HOST IS USING A DIFFERENT MAP");
+            return;
+        }
+        if (slot < 0)
+        {
+            _squadNetwork.Close();
+            CancelPendingNetworkDeployment();
+            _hud.SetSquadStatus("ROOM FULL  //  EXTRACTION SQUAD SUPPORTS 3 PLAYERS");
+            return;
+        }
+        _extractionLocalSquadSlot = slot;
+    }
+
+    private void OnExtractionMatchStart(string mapId, long worldSeed)
+    {
+        if (_networkMatchReloadQueued || _networkLobbyDeployment is null || worldSeed == 0)
+        {
+            return;
+        }
+        _networkMatchReloadQueued = true;
+        var deployment = _networkLobbyDeployment with
+        {
+            MapId = mapId,
+            WorldSeed = worldSeed,
+            SquadSlot = _squadNetwork.LocalExtractionSlot
+        };
+        DeploymentMapRuntime.StageDeployment(deployment);
+        _hud.SetSquadLobbyWaiting(
+            _squadNetwork.IsHost,
+            _squadNetwork.RegisteredExtractionPlayerCount,
+            SquadNetwork.ExtractionSquadCapacity,
+            canStart: false,
+            status: GameLocalization.Get(
+                "squad_lobby_loading",
+                _languageSetting,
+                "SYNCHRONIZING OPERATION  //  LOADING SHARED WORLD"));
+        GetTree().Paused = false;
+        CallDeferred(MethodName.ReloadNetworkMatchScene);
+    }
+
+    private void ReloadNetworkMatchScene()
+    {
+        if (_networkMatchReloadQueued)
+        {
+            GetTree().ReloadCurrentScene();
+        }
+    }
+
+    private void OnSquadNetworkStatusChanged(string status) => _hud.SetSquadStatus(status);
+
+    private void OnSquadConnectionLost(bool extractionSession)
+    {
+        if (!extractionSession)
+        {
+            return;
+        }
+        var sharedWorldActive = _networkMatchReloadQueued
+            || _squadDeployed
+            || _extractionWorldLaunchPending
+            || DeploymentMapRuntime.CurrentWorldSeed != 0;
+        _pendingNetworkExtractionDeployment = null;
+        _networkLobbyDeployment = null;
+        _networkMatchReloadQueued = false;
+        _hud.ClearSquadLobbyWaiting();
+        _hud.SetSquadConnectionPending(false, "HOST LOST  //  RETURNING TO OPERATIONS");
+        if (!sharedWorldActive)
+        {
+            return;
+        }
+        _extractionWorldLaunchPending = false;
+        GetTree().Paused = false;
+        DeploymentMapRuntime.ClearTransientDeployment();
+        CallDeferred(MethodName.ReloadAfterExtractionConnectionLost);
+    }
+
+    private void ReloadAfterExtractionConnectionLost() => GetTree().ReloadCurrentScene();
+
+    private void OnLanRoomsChanged(IReadOnlyList<LanRoomInfo> rooms) => _hud.SetLanRooms(rooms);
+
+    private void OnLanRoomBrowseAvailabilityChanged(bool available)
+        => _hud.SetLanRoomBrowseAvailable(available);
+
+    private void DetachSquadNetworkEvents()
+    {
+        if (!IsInstanceValid(_squadNetwork))
+        {
+            return;
+        }
+        _squadNetwork.RemoteStateReceived -= OnRemoteSquadState;
+        _squadNetwork.RemotePeerLeft -= OnRemoteSquadPeerLeft;
+        _squadNetwork.RemoteAbilityReceived -= OnRemoteSquadAbility;
+        _squadNetwork.RemoteShotReceived -= OnRemoteSquadShot;
+        _squadNetwork.DemolitionPlayerStateReceived -= OnDemolitionPlayerState;
+        _squadNetwork.DemolitionActorStateReceived -= OnDemolitionActorState;
+        _squadNetwork.DemolitionMatchStateReceived -= OnDemolitionMatchState;
+        _squadNetwork.DemolitionAssignmentReceived -= OnDemolitionNetworkAssignment;
+        _squadNetwork.DemolitionActionReceived -= OnDemolitionNetworkAction;
+        _squadNetwork.ExtractionLobbyMemberReceived -= OnExtractionLobbyMember;
+        _squadNetwork.ExtractionLobbyStateReceived -= OnExtractionLobbyState;
+        _squadNetwork.ExtractionAssignmentReceived -= OnExtractionAssignment;
+        _squadNetwork.ExtractionMatchStartReceived -= OnExtractionMatchStart;
+        _squadNetwork.ExtractionWorldLaunchReceived -= OnExtractionWorldLaunch;
+        _squadNetwork.ExtractionWorldReadyReceived -= OnExtractionWorldReady;
+        _squadNetwork.ExtractionWorldStateReceived -= OnExtractionWorldState;
+        _squadNetwork.ExtractionMissionStateReceived -= OnExtractionMissionState;
+        _squadNetwork.ExtractionObjectiveRequested -= OnExtractionObjectiveRequested;
+        _squadNetwork.ExtractionReviveRequested -= OnExtractionReviveRequested;
+        _squadNetwork.ExtractionLootOpenRequested -= OnExtractionLootOpenRequested;
+        _squadNetwork.ExtractionLootMutationReceived -= OnExtractionLootMutationReceived;
+        _squadNetwork.ExtractionLootCloseRequested -= OnExtractionLootCloseRequested;
+        _squadNetwork.ExtractionLootDropRequested -= OnExtractionLootDropRequested;
+        _squadNetwork.ExtractionLootStateReceived -= OnExtractionLootState;
+        _squadNetwork.StatusChanged -= OnSquadNetworkStatusChanged;
+        _squadNetwork.LanRoomsChanged -= OnLanRoomsChanged;
+        _squadNetwork.LanRoomBrowseAvailabilityChanged -= OnLanRoomBrowseAvailabilityChanged;
+        _squadNetwork.ConnectionEstablished -= OnSquadConnectionEstablished;
+        _squadNetwork.ConnectionAttemptFailed -= CancelPendingNetworkDeployment;
+        _squadNetwork.ConnectionLost -= OnSquadConnectionLost;
+        if (ReferenceEquals(_squadNetwork.LocalPlayer, _player))
+        {
+            _squadNetwork.LocalPlayer = null;
+        }
     }
 
     private void ValidateNetworkEndpoint()
@@ -379,7 +642,7 @@ public partial class FreightTerminalWorld
                 LanRoomKind.Extraction,
                 DeploymentMapCatalog.FreightTerminalId,
                 2,
-                SquadNetwork.MaximumPlayers)
+                SquadNetwork.ExtractionSquadCapacity)
         });
         _hud.SelectSquadLanRoomForDiagnostics(0);
         var lanRoomSelection = _hud.SquadLanRoomBrowserUiReady
@@ -449,8 +712,12 @@ public partial class FreightTerminalWorld
         {
             return;
         }
-        // Demolition fields a 5v5 squad; extraction runs 1 human + 2 AI.
-        var firstSlot = _demolitionMode ? 0 : 1;
+        // Demolition fields a 5v5 squad; network extraction uses three host-assigned slots.
+        var networkExtraction = !_demolitionMode
+            && _squadNetwork.IsOnline
+            && _squadNetwork.IsExtractionSession
+            && _squadNetwork.ExtractionMatchStarted;
+        var firstSlot = _demolitionMode || networkExtraction ? 0 : 1;
         var lastSlot = _demolitionMode ? DemolitionSquadSize - 1 : 2;
         for (var slot = firstSlot; slot <= lastSlot; slot++)
         {
@@ -458,16 +725,30 @@ public partial class FreightTerminalWorld
             {
                 continue;
             }
+            if (networkExtraction && slot == _extractionLocalSquadSlot)
+            {
+                continue;
+            }
             if (_squadMates.Any(mate => IsInstanceValid(mate) && mate.SquadSlot == slot))
             {
                 continue;
             }
-            var networkProxy = _demolitionMode && IsDemolitionNetworkClient;
+            var extractionHuman = networkExtraction && _squadNetwork.IsExtractionHumanSlot(slot);
+            var extractionPeer = extractionHuman ? _squadNetwork.ExtractionPeerForSlot(slot) : 0;
+            var networkProxy = _demolitionMode && IsDemolitionNetworkClient
+                || networkExtraction && !_squadNetwork.IsHost && !extractionHuman;
+            var humanProxy = networkExtraction ? extractionHuman : networkProxy;
+            var resolvedRole = networkExtraction && extractionHuman
+                ? _squadNetwork.ExtractionRoleForSlot(slot)
+                : RoleForSlot(slot);
             SpawnSquadMate(
                 slot,
-                RoleForSlot(slot),
-                networkProxy,
-                networkProxy ? -DemolitionActorId(_demolitionLocalNetworkTeam, slot) : 0);
+                resolvedRole,
+                humanProxy,
+                networkExtraction
+                    ? extractionPeer
+                    : networkProxy ? -DemolitionActorId(_demolitionLocalNetworkTeam, slot) : 0,
+                networkProxy);
         }
         // Drop any AI beyond the mode's roster.
         for (var i = _squadMates.Count - 1; i >= 0; i--)
@@ -500,7 +781,12 @@ public partial class FreightTerminalWorld
         return remaining[Mathf.Clamp(slot - 1, 0, remaining.Count - 1)];
     }
 
-    private SquadMate SpawnSquadMate(int slot, OperatorRole role, bool human, long peerId)
+    private SquadMate SpawnSquadMate(
+        int slot,
+        OperatorRole role,
+        bool human,
+        long peerId,
+        bool networkProxy = false)
     {
         var callsigns = new[] { "RAVEN", "ECHO", "VIPER" };
         var position = ExtractionSpawnPads.FriendlyMemberPosition(
@@ -513,7 +799,7 @@ public partial class FreightTerminalWorld
             Position = position
         };
         var sign = callsigns[Mathf.Clamp(slot, 0, callsigns.Length - 1)];
-        mate.Configure(this, _player, slot, role, sign, human, peerId);
+        mate.Configure(this, _player, slot, role, sign, human, peerId, networkProxy);
         AddChild(mate);
         mate.SetOrder(_squadOrder, _squadMovePoint);
         _squadMates.Add(mate);
@@ -529,11 +815,17 @@ public partial class FreightTerminalWorld
         var proxy = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && mate.IsHumanProxy && mate.NetworkPeerId == peerId);
         if (proxy is null)
         {
+            var assignedSlot = _squadNetwork.IsExtractionSession
+                && _squadNetwork.ExtractionMatchStarted
+                ? _squadNetwork.ExtractionSlotForPeer(peerId)
+                : -1;
             var occupiedSlots = _squadMates
                 .Where(mate => IsInstanceValid(mate) && mate.IsHumanProxy)
                 .Select(mate => mate.SquadSlot)
                 .ToHashSet();
-            var slot = Enumerable.Range(1, 2).FirstOrDefault(value => !occupiedSlots.Contains(value));
+            var slot = assignedSlot >= 0
+                ? assignedSlot
+                : Enumerable.Range(1, 2).FirstOrDefault(value => !occupiedSlots.Contains(value));
             if (slot == 0)
             {
                 return;
@@ -547,7 +839,13 @@ public partial class FreightTerminalWorld
             proxy = SpawnSquadMate(slot, role, true, peerId);
             _hud.ShowLocalizedMessage("player_joined", $"SQUADMATE CONNECTED  //  PEER {peerId}", OperatorRoles.Spec(role).Accent);
         }
-        proxy.SetRemoteState(role, position, rotation, health, down);
+        var authoritative = IsExtractionNetworkMatch && _squadNetwork.IsHost;
+        proxy.SetRemoteState(
+            role,
+            position,
+            rotation,
+            authoritative ? proxy.Health : health,
+            authoritative ? proxy.IsDowned || proxy.IsBodyBag : down);
     }
 
     private void OnRemoteSquadPeerLeft(long peerId)
@@ -555,10 +853,12 @@ public partial class FreightTerminalWorld
         var proxy = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && mate.IsHumanProxy && mate.NetworkPeerId == peerId);
         if (proxy is not null)
         {
+            _extractionSquadTombstones.Remove(proxy.SquadSlot);
             _squadMates.Remove(proxy);
             proxy.QueueFree();
         }
         EnsureAiSquadFill();
+        TryLaunchExtractionWorldIfReady();
         OnDemolitionNetworkPeerLeft(peerId);
         _hud.ShowLocalizedMessage("player_left", "SQUADMATE DISCONNECTED  //  AI TOOK CONTROL", new Color(0.95f, 0.68f, 0.26f));
     }
@@ -614,9 +914,32 @@ public partial class FreightTerminalWorld
             }
             return;
         }
+        if (IsExtractionNetworkMatch && !_squadNetwork.IsHost)
+        {
+            return;
+        }
+        if (IsExtractionNetworkMatch && _squadNetwork.IsHost)
+        {
+            if (proxy is null || proxy.GlobalPosition.DistanceTo(origin) > 4.5f)
+            {
+                return;
+            }
+            var shotDistance = origin.DistanceTo(end);
+            if (shotDistance <= 0.05f || shotDistance > 260.0f)
+            {
+                return;
+            }
+            ReportGunshot(origin, 52.0f);
+            damage = Mathf.Clamp(damage, 0.0f, 180.0f);
+        }
         var enemy = _enemies.FirstOrDefault(candidate => IsInstanceValid(candidate) && candidate.NetworkId == enemyId);
         if (enemy is not null && !enemy.IsDead)
         {
+            if (IsExtractionNetworkMatch && _squadNetwork.IsHost
+                && !IsExtractionRemoteShotClear(proxy!, enemy, origin, end))
+            {
+                return;
+            }
             enemy.TakeDamage(damage, end, proxy);
         }
     }
@@ -719,7 +1042,7 @@ public partial class FreightTerminalWorld
     /// </summary>
     private void UpdateSquadReviveAi(float delta)
     {
-        if (_demolitionMode || _missionEnded)
+        if (_demolitionMode || _missionEnded || IsExtractionNetworkClient)
         {
             ClearLeaderReviveAi();
             return;
@@ -1158,12 +1481,29 @@ public partial class FreightTerminalWorld
             return;
         }
 
-        var revived = target.TryReceiveRevive(62.0f);
+        var networkTarget = IsExtractionNetworkClient ? target as SquadMate : null;
+        var networkRequest = networkTarget is not null;
+        var revived = false;
+        if (networkRequest)
+        {
+            _squadNetwork.RequestExtractionRevive(networkTarget!.SquadSlot);
+        }
+        else
+        {
+            revived = target.TryReceiveRevive(62.0f);
+        }
         _manualReviveProgress = 0.0f;
         _manualReviveTarget = null;
         _interactReleaseRequired = true;
         _player.SetSearchPose(false);
-        if (revived)
+        if (networkRequest)
+        {
+            _hud.ShowLocalizedMessage(
+                "squad_revive_sync",
+                "REVIVE SENT  //  WAITING FOR HOST CONFIRMATION",
+                OperatorRoles.Spec(OperatorRole.Medic).Accent);
+        }
+        else if (revived)
         {
             ResetAiReviveAbandonment();
             if (ReferenceEquals(target, _player) || target is TacticalPlayer)
@@ -1689,6 +2029,24 @@ public partial class FreightTerminalWorld
             EnglishName = $"{mate.Callsign} body bag",
             ChineseName = $"{mate.Callsign} 遗体袋"
         };
+        if (IsExtractionNetworkMatch && _squadNetwork.IsHost)
+        {
+            var flags = ExtractionSquadNetworkFlags.Down
+                | ExtractionSquadNetworkFlags.BodyBag
+                | ExtractionSquadNetworkFlags.ReviveUsed;
+            if (mate.IsHumanProxy)
+            {
+                flags |= ExtractionSquadNetworkFlags.Human;
+            }
+            _extractionSquadTombstones[mate.SquadSlot] = new ExtractionSquadNetworkState(
+                mate.SquadSlot,
+                mate.IsHumanProxy ? mate.NetworkPeerId : 0,
+                mate.Role,
+                mate.GlobalPosition,
+                mate.Rotation,
+                0.0f,
+                (int)flags);
+        }
         // Light field kit left on the fallen operator.
         bag.Loot.Add(new LootItem { Kind = LootItemKind.Ammunition, Quantity = 30 });
         bag.Loot.Add(new LootItem { Kind = LootItemKind.ArmorPlate });
@@ -1698,6 +2056,16 @@ public partial class FreightTerminalWorld
         }
         AddChild(bag);
         _lootSources.Add(bag);
+        if (IsExtractionNetworkMatch)
+        {
+            var sourceId = SquadBodyBagSourceBase + mate.SquadSlot;
+            RegisterExtractionLootSource(bag, sourceId);
+            if (_squadNetwork.IsHost)
+            {
+                _squadNetwork.BroadcastExtractionLootState(
+                    CaptureExtractionLootSourceState(sourceId, bag, granted: false));
+            }
+        }
         _squadMates.Remove(mate);
     }
 
@@ -2984,7 +3352,7 @@ public partial class FreightTerminalWorld
                 LanRoomKind.Extraction,
                 DeploymentMapCatalog.FreightTerminalId,
                 2,
-                SquadNetwork.MaximumPlayers)
+                SquadNetwork.ExtractionSquadCapacity)
         });
         _hud.SelectSquadSessionForDiagnostics(SquadSessionMode.Join);
         await ToSignal(GetTree().CreateTimer(0.6f), SceneTreeTimer.SignalName.Timeout);

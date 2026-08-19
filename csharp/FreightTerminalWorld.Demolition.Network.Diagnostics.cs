@@ -41,6 +41,7 @@ public partial class FreightTerminalWorld
                 ? DemolitionNetworkTeam.Bravo
                 : DemolitionNetworkTeam.Alpha,
             0);
+        var endpoint = ResolveNetworkDiagnosticEndpoint(OS.GetCmdlineUserArgs());
         OnDemolitionDeploymentRequested(
             (int)(host ? OperatorRole.Assault : OperatorRole.Recon),
             (int)WeaponPlatform.M4A1,
@@ -48,7 +49,7 @@ public partial class FreightTerminalWorld
             (int)WeaponPlatform.P226,
             DemolitionMapCatalog.TideforgeId,
             (int)mode,
-            "127.0.0.1",
+            endpoint,
             (int)team);
         await ToSignal(GetTree().CreateTimer(3.0f), SceneTreeTimer.SignalName.Timeout);
 

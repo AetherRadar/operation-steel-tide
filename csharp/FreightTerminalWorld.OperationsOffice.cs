@@ -385,6 +385,13 @@ public partial class FreightTerminalWorld
             RestartMission();
             return;
         }
+        if (_networkLobbyDeployment is not null || _pendingNetworkExtractionDeployment is not null)
+        {
+            _networkLobbyDeployment = null;
+            _pendingNetworkExtractionDeployment = null;
+            _squadNetwork.Close();
+            _hud.ClearSquadLobbyWaiting();
+        }
         EnterOperationsOffice();
     }
 

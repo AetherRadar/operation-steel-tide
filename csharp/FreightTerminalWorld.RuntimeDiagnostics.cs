@@ -22,6 +22,8 @@ public partial class FreightTerminalWorld
             ("--validate-demolition-network-client", static world => world.ValidateDemolitionNetworkSession(host: false)),
             ("--validate-demolition-network-alpha-host", static world => world.ValidateDemolitionNetworkSession(host: true, DemolitionNetworkTeam.Alpha)),
             ("--validate-demolition-network-alpha-client", static world => world.ValidateDemolitionNetworkSession(host: false, DemolitionNetworkTeam.Alpha)),
+            ("--validate-extraction-network-host", static world => world.ValidateExtractionNetworkSession(host: true)),
+            ("--validate-extraction-network-client", static world => world.ValidateExtractionNetworkSession(host: false)),
             ("--capture-operations-office", static world => world.CaptureOperationsOffice()),
             ("--capture-demolition-briefing", static world => world.CaptureDemolitionBriefing()),
             ("--capture-demolition-buy", static world => world.CaptureDemolitionBuy()),

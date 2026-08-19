@@ -54,6 +54,11 @@ public partial class CombatHUD
     private float _displayedCooldownMax = 1.0f;
     private bool _displayedSkillActive;
     private bool _displayedSkillAction;
+    private bool _squadLobbyWaiting;
+    private bool _squadLobbyHost;
+    private bool _squadLobbyCanStart;
+    private int _squadLobbyPlayers = 1;
+    private int _squadLobbyCapacity = SquadNetwork.ExtractionSquadCapacity;
 
     public bool SquadLobbyHomeUiReady => IsInstanceValid(_squadLobbyBackButton);
 
@@ -353,6 +358,10 @@ public partial class CombatHUD
 
     private void SelectSquadRole(OperatorRole role)
     {
+        if (_squadLobbyWaiting)
+        {
+            return;
+        }
         _selectedRole = role;
         var spec = OperatorRoles.Spec(role);
         _squadSessionStatus.Text = GameLocalization.IsChinese(_language)
@@ -364,6 +373,10 @@ public partial class CombatHUD
 
     private void SelectSessionMode(SquadSessionMode mode)
     {
+        if (_squadLobbyWaiting)
+        {
+            return;
+        }
         _selectedSessionMode = mode;
         _localSquadButton.SetPressedNoSignal(mode == SquadSessionMode.Local);
         _hostSquadButton.SetPressedNoSignal(mode == SquadSessionMode.Host);
@@ -432,19 +445,112 @@ public partial class CombatHUD
         }
         var affordable = DeploymentProjectedBalance >= 0;
         var mapAvailable = DeploymentMapAvailable;
+        if (_squadLobbyWaiting)
+        {
+            _deploySquadButton.Disabled = !_squadLobbyHost || !_squadLobbyCanStart;
+            _deploySquadButton.Text = _squadLobbyHost
+                ? GameLocalization.Format(
+                    "squad_lobby_start",
+                    _language,
+                    "\u25b6  START OPERATION  //  {0}/{1}",
+                    _squadLobbyPlayers,
+                    _squadLobbyCapacity)
+                : GameLocalization.Format(
+                    "squad_lobby_wait_host",
+                    _language,
+                    "WAITING FOR HOST  //  {0}/{1}",
+                    _squadLobbyPlayers,
+                    _squadLobbyCapacity);
+            return;
+        }
         var deployable = affordable && mapAvailable;
         _deploySquadButton.Disabled = !deployable;
         _deploySquadButton.Text = GameLocalization.IsChinese(_language)
             ? !mapAvailable
                 ? "\u5730\u56fe\u672a\u89e3\u9501  //  \u8bf7\u9009\u62e9\u53ef\u7528\u5730\u56fe"
                 : affordable
-                ? $"\u25b6  \u786e\u8ba4\u6574\u5907\u5e76\u90e8\u7f72  //  {DeploymentSelectedCost}"
+                ? _selectedSessionMode switch
+                {
+                    SquadSessionMode.Host => GameLocalization.Format(
+                        "squad_create_room", _language, "CREATE ROOM  //  {0}", DeploymentSelectedCost),
+                    SquadSessionMode.Join => GameLocalization.Format(
+                        "squad_join_room", _language, "JOIN ROOM  //  {0}", DeploymentSelectedCost),
+                    _ => $"\u25b6  \u786e\u8ba4\u6574\u5907\u5e76\u90e8\u7f72  //  {DeploymentSelectedCost}"
+                }
                 : "\u4f59\u989d\u4e0d\u8db3  //  \u8c03\u6574\u6574\u5907"
             : !mapAvailable
                 ? "MAP LOCKED  //  SELECT AN AVAILABLE OPERATION"
                 : affordable
-                ? $"\u25b6  CONFIRM KIT & DEPLOY  //  {DeploymentSelectedCost}"
+                ? _selectedSessionMode switch
+                {
+                    SquadSessionMode.Host => $"CREATE ROOM  //  {DeploymentSelectedCost}",
+                    SquadSessionMode.Join => $"JOIN ROOM  //  {DeploymentSelectedCost}",
+                    _ => $"\u25b6  CONFIRM KIT & DEPLOY  //  {DeploymentSelectedCost}"
+                }
                 : "INSUFFICIENT BALANCE  //  ADJUST KIT";
+    }
+
+    public void SetSquadLobbyWaiting(
+        bool host,
+        int players,
+        int capacity,
+        bool canStart,
+        string status)
+    {
+        _squadLobbyWaiting = true;
+        _squadLobbyHost = host;
+        _squadLobbyPlayers = Mathf.Max(1, players);
+        _squadLobbyCapacity = Mathf.Max(1, capacity);
+        _squadLobbyCanStart = canStart;
+        _squadSessionStatus.Text = status;
+        SetSquadLobbySelectionLocked(true);
+        RefreshSquadDeployAction();
+    }
+
+    public void ClearSquadLobbyWaiting()
+    {
+        _squadLobbyWaiting = false;
+        _squadLobbyHost = false;
+        _squadLobbyCanStart = false;
+        _squadLobbyPlayers = 1;
+        SetSquadLobbySelectionLocked(false);
+        SelectSessionMode(_selectedSessionMode);
+    }
+
+    private void SetSquadLobbySelectionLocked(bool locked)
+    {
+        _localSquadButton.Disabled = locked;
+        _hostSquadButton.Disabled = locked;
+        _joinSquadButton.Disabled = locked;
+        _squadAddress.Editable = !locked && _selectedSessionMode != SquadSessionMode.Local;
+        foreach (var button in _roleButtons)
+        {
+            button.Disabled = locked;
+        }
+        foreach (var button in _deploymentWeaponButtons.Values)
+        {
+            button.Disabled = locked;
+        }
+        foreach (var button in _deploymentArmorButtons.Values)
+        {
+            button.Disabled = locked;
+        }
+        foreach (var button in _deploymentAmmoButtons.Values)
+        {
+            button.Disabled = locked;
+        }
+        foreach (var button in _deploymentAmmoQuantityButtons.Values)
+        {
+            button.Disabled = locked;
+        }
+        foreach (var button in _deploymentMapButtons.Values)
+        {
+            button.Disabled = locked;
+        }
+        foreach (var button in _deploymentPresetButtons.Values)
+        {
+            button.Disabled = locked;
+        }
     }
 
     public void ShowSquadLobby(string status = "LOCAL SQUAD")

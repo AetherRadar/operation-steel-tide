@@ -32,11 +32,13 @@ public partial class FreightTerminalWorld
     private void SpawnWorldBoss()
     {
         var patrolRoute = ActiveWorldBossPatrolRoute;
+        var networkId = _nextEnemyNetworkId++;
         var boss = new EnemyOperator
         {
             Name = "TIDE_HUNTER",
             Position = patrolRoute[0],
-            NetworkId = _nextEnemyNetworkId++,
+            NetworkId = networkId,
+            SimulationSeed = ExtractionEntitySeed(networkId),
             Player = _player,
             Main = this,
             MissionDirector = _missionDirector,
@@ -48,6 +50,7 @@ public partial class FreightTerminalWorld
         boss.Eliminated += OnEnemyEliminated;
         boss.Eliminated += OnWorldBossEliminated;
         _enemies.Add(boss);
+        RegisterExtractionNetworkEnemy(boss);
         _worldBoss = boss;
         _worldBossDefeated = false;
         _enemiesRemaining = _enemies.Count(enemy => IsInstanceValid(enemy) && !enemy.IsDead);
