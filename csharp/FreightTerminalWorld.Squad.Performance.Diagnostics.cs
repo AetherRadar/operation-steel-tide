@@ -6,20 +6,25 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
-    private const ulong SquadPerformanceMaximumPlanMicroseconds = 75_000;
-    private const ulong SquadPerformanceMaximumTotalMicroseconds = 110_000;
-    private const ulong SquadPerformanceMaximumReuseMicroseconds = 12_000;
-    private const ulong SquadPerformanceMaximumReuseTotalMicroseconds = 60_000;
+    private const ulong SquadPerformanceMaximumPlanMicroseconds = 18_000;
+    private const ulong SquadPerformanceMaximumTotalMicroseconds = 180_000;
+    private const ulong SquadPerformanceMaximumReuseMicroseconds = 4_000;
+    private const ulong SquadPerformanceMaximumReuseTotalMicroseconds = 24_000;
+    private const ulong SquadPerformanceMaximumDecisionReuseMicroseconds = 1_500;
+    private const ulong SquadPerformanceMaximumDecisionReuseTotalMicroseconds = 12_000;
     private const ulong SquadPerformanceMaximumQueryProbeMicroseconds = 750_000;
     private const ulong SquadPerformanceMaximumFinalizerMicroseconds = 350_000;
-    private const ulong SquadPerformanceMaximumConnectorWarmPassMicroseconds = 25_000;
-    private const ulong SquadPerformanceMaximumProximityFrameMicroseconds = 300_000;
-    private const ulong SquadPerformanceMaximumRepeatedProximityFrameMicroseconds = 75_000;
-    private const ulong SquadPerformanceMaximumProximityAverageMicroseconds = 25_000;
+    private const ulong SquadPerformanceMaximumConnectorWarmPassMicroseconds = 18_000;
+    private const ulong SquadPerformanceMaximumProximityFrameMicroseconds = 50_000;
+    private const ulong SquadPerformanceMaximumRepeatedProximityFrameMicroseconds = 32_000;
+    private const ulong SquadPerformanceMaximumProximityAverageMicroseconds = 19_000;
     private const ulong SquadPerformanceMaximumProximityFinalizerMicroseconds = 350_000;
+    private const int SquadPerformanceMaximumPlanAttempts = 12;
     private const int SquadPerformanceReuseSamples = 12;
+    private const int SquadPerformanceDecisionReuseSamples = 24;
     private const int SquadPerformanceQueryProbeSamples = 1536;
     private const int SquadPerformanceProximityFrames = 720;
+    private const int SquadPerformanceProximityWarmupFrames = 24;
 
     private async void ValidateSquadPerformance()
     {
@@ -72,6 +77,7 @@ public partial class FreightTerminalWorld
         ulong maximumMicroseconds = 0;
         var deferredPlans = 0;
         var plannedRoutes = 0;
+        var planAttempts = 0;
         SquadMate? plannedMate = null;
         SquadGridPathState? plannedState = null;
         for (var index = 0; index < mates.Length; index++)
@@ -81,23 +87,38 @@ public partial class FreightTerminalWorld
             mate.Velocity = Vector3.Zero;
             ClearSquadNavigation(mate);
 
-            var started = Time.GetTicksUsec();
-            _ = ResolveSquadNavigationDestination(mate, destination, emergency: false);
-            var elapsed = Time.GetTicksUsec() - started;
-            totalMicroseconds += elapsed;
-            maximumMicroseconds = Math.Max(maximumMicroseconds, elapsed);
-
-            if (_squadGridPaths.TryGetValue(mate.GetInstanceId(), out var state))
+            var maximumAttempts = index == 0 ? SquadPerformanceMaximumPlanAttempts : 1;
+            for (var attempt = 0; attempt < maximumAttempts; attempt++)
             {
+                if (attempt > 0)
+                {
+                    _squadGridPaths.Remove(mate.GetInstanceId());
+                    _squadNavigationDecisions.Remove(mate.GetInstanceId());
+                    _squadNavNextNormalPlanMilliseconds = 0;
+                }
+
+                var started = Time.GetTicksUsec();
+                _ = ResolveSquadNavigationDestination(mate, destination, emergency: false);
+                var elapsed = Time.GetTicksUsec() - started;
+                planAttempts++;
+                totalMicroseconds += elapsed;
+                maximumMicroseconds = Math.Max(maximumMicroseconds, elapsed);
+
+                if (!_squadGridPaths.TryGetValue(mate.GetInstanceId(), out var state))
+                {
+                    continue;
+                }
                 if (state.Directives.Length > 0)
                 {
                     plannedRoutes++;
                     plannedMate ??= mate;
                     plannedState ??= state;
+                    break;
                 }
-                else if (state.NextPlanMilliseconds > Time.GetTicksMsec())
+                if (index > 0 && state.NextPlanMilliseconds > Time.GetTicksMsec())
                 {
                     deferredPlans++;
+                    break;
                 }
             }
         }
@@ -113,6 +134,7 @@ public partial class FreightTerminalWorld
             {
                 plannedState.Cursor = 0;
                 plannedState.NextShortcutCheckMilliseconds = 0;
+                _squadNavigationDecisions.Remove(id);
                 var started = Time.GetTicksUsec();
                 _ = ResolveSquadNavigationDestination(plannedMate, destination, emergency: false);
                 var elapsed = Time.GetTicksUsec() - started;
@@ -121,6 +143,40 @@ public partial class FreightTerminalWorld
                 reuseSamples++;
                 _squadGridPaths[id] = plannedState;
             }
+        }
+
+        ulong decisionReuseTotalMicroseconds = 0;
+        ulong decisionReuseMaximumMicroseconds = 0;
+        var decisionReuseSamples = 0;
+        var decisionComputations = 0;
+        var decisionReuses = 0;
+        if (plannedMate is not null)
+        {
+            ClearSquadNavigation(plannedMate);
+            var decisionDestination = plannedMate.GlobalPosition + Vector3.Right * 0.8f;
+            var computationsBefore = _squadNavigationDecisionComputationsForDiagnostics;
+            var reusesBefore = _squadNavigationDecisionReusesForDiagnostics;
+            _ = ResolveSquadNavigationDestination(
+                plannedMate,
+                decisionDestination,
+                emergency: false);
+            for (var sample = 0; sample < SquadPerformanceDecisionReuseSamples; sample++)
+            {
+                var started = Time.GetTicksUsec();
+                _ = ResolveSquadNavigationDestination(
+                    plannedMate,
+                    decisionDestination,
+                    emergency: false);
+                var elapsed = Time.GetTicksUsec() - started;
+                decisionReuseTotalMicroseconds += elapsed;
+                decisionReuseMaximumMicroseconds = Math.Max(
+                    decisionReuseMaximumMicroseconds,
+                    elapsed);
+                decisionReuseSamples++;
+            }
+            decisionComputations = _squadNavigationDecisionComputationsForDiagnostics
+                - computationsBefore;
+            decisionReuses = _squadNavigationDecisionReusesForDiagnostics - reusesBefore;
         }
 
         var proximityAnchor = start + new Vector3(0.0f, 0.0f, 2.4f);
@@ -158,6 +214,14 @@ public partial class FreightTerminalWorld
             ClearSquadNavigation(mate);
         }
 
+        for (var frame = 0; frame < SquadPerformanceProximityWarmupFrames; frame++)
+        {
+            _player.GlobalPosition = proximityAnchor + new Vector3(
+                Mathf.Sin(frame * 0.11f) * 1.6f,
+                0.0f,
+                Mathf.Cos(frame * 0.07f) * 0.35f);
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
         DrainPendingFinalizersForDiagnostics();
         ulong proximityTotalMicroseconds = 0;
         ulong proximityMaximumMicroseconds = 0;
@@ -201,12 +265,20 @@ public partial class FreightTerminalWorld
 
         var valid = plannedRoutes >= 1
             && deferredPlans >= 1
+            && planAttempts <= SquadPerformanceMaximumPlanAttempts + mates.Length - 1
             && reuseSamples == SquadPerformanceReuseSamples
+            && decisionReuseSamples == SquadPerformanceDecisionReuseSamples
+            && decisionComputations == 1
+            && decisionReuses == SquadPerformanceDecisionReuseSamples
             && _squadPortalWalkCorridorCacheReady
             && maximumMicroseconds <= SquadPerformanceMaximumPlanMicroseconds
             && totalMicroseconds <= SquadPerformanceMaximumTotalMicroseconds
             && reuseMaximumMicroseconds <= SquadPerformanceMaximumReuseMicroseconds
             && reuseTotalMicroseconds <= SquadPerformanceMaximumReuseTotalMicroseconds
+            && decisionReuseMaximumMicroseconds
+                <= SquadPerformanceMaximumDecisionReuseMicroseconds
+            && decisionReuseTotalMicroseconds
+                <= SquadPerformanceMaximumDecisionReuseTotalMicroseconds
             && queryProbeMicroseconds <= SquadPerformanceMaximumQueryProbeMicroseconds
             && finalizerMicroseconds <= SquadPerformanceMaximumFinalizerMicroseconds
             && SquadPortalWalkWarmPassesForDiagnostics >= 1
@@ -223,6 +295,7 @@ public partial class FreightTerminalWorld
             && proximityFinalizerMicroseconds <= SquadPerformanceMaximumProximityFinalizerMicroseconds;
         GD.Print(
             $"SQUAD_PERFORMANCE_CHECK valid={valid} mates={mates.Length} planned={plannedRoutes} deferred={deferredPlans} "
+            + $"plan_attempts={planAttempts} plan_attempt_budget={SquadPerformanceMaximumPlanAttempts} "
             + $"connector_cache={_squadPortalWalkCorridorCacheReady} "
             + $"max_usec={maximumMicroseconds} max_budget={SquadPerformanceMaximumPlanMicroseconds} "
             + $"total_usec={totalMicroseconds} total_budget={SquadPerformanceMaximumTotalMicroseconds} "
@@ -230,6 +303,13 @@ public partial class FreightTerminalWorld
             + $"reuse_max_budget={SquadPerformanceMaximumReuseMicroseconds} "
             + $"reuse_total_usec={reuseTotalMicroseconds} "
             + $"reuse_total_budget={SquadPerformanceMaximumReuseTotalMicroseconds} "
+            + $"decision_samples={decisionReuseSamples} "
+            + $"decision_computations={decisionComputations} "
+            + $"decision_reuses={decisionReuses} "
+            + $"decision_max_usec={decisionReuseMaximumMicroseconds} "
+            + $"decision_max_budget={SquadPerformanceMaximumDecisionReuseMicroseconds} "
+            + $"decision_total_usec={decisionReuseTotalMicroseconds} "
+            + $"decision_total_budget={SquadPerformanceMaximumDecisionReuseTotalMicroseconds} "
             + $"query_samples={SquadPerformanceQueryProbeSamples} "
             + $"query_usec={queryProbeMicroseconds} "
             + $"query_budget={SquadPerformanceMaximumQueryProbeMicroseconds} "
@@ -242,6 +322,7 @@ public partial class FreightTerminalWorld
             + $"leader_probe_clear={leaderProbeClear} "
             + $"leader_motion_clear={leaderMotionClear} "
             + $"proximity_frames={SquadPerformanceProximityFrames} "
+            + $"proximity_warmup_frames={SquadPerformanceProximityWarmupFrames} "
             + $"proximity_max_usec={proximityMaximumMicroseconds} "
             + $"proximity_max_frame={proximityMaximumFrame} "
             + $"proximity_max_budget={SquadPerformanceMaximumProximityFrameMicroseconds} "

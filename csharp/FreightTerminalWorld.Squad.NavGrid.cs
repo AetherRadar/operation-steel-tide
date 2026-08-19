@@ -6,6 +6,8 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    // Legacy partial retained because cached physics probes and traversal connectors share ownership.
+    // Follow-up: move the grid planner orchestration into the squad navigation runtime service.
     private const float SquadNavCellSize = 0.9f;
     private const float SquadNavBandDrop = 0.62f;
     private const float SquadNavBandRise = 0.62f;
@@ -21,16 +23,18 @@ public partial class FreightTerminalWorld
     private const ulong SquadNavNormalPlanIntervalMilliseconds = 90;
     private const ulong SquadNavShortcutCheckIntervalMilliseconds = 180;
     private const int SquadNavEstimateExpansionCap = 2500;
-    private const double SquadNavFollowPlanBudgetMilliseconds = 68.0;
-    private const double SquadNavEmergencyPlanBudgetMilliseconds = 68.0;
+    private const double SquadNavFollowPlanBudgetMilliseconds = 6.0;
+    private const double SquadNavEmergencyPlanBudgetMilliseconds = 8.0;
     private const double SquadNavEstimatePlanBudgetMilliseconds = 8.0;
     private const double SquadNavDiagnosticPlanBudgetMilliseconds = 500.0;
     private const int SquadNavCellCacheResetCapacity = 60000;
     private const int SquadNavTrailHandoffCandidates = 3;
     private const float SquadNavTrailHandoffRange = 26.0f;
     private const float SquadNavRetryDestinationDistance = 3.0f;
-    private const ulong SquadNavRetryBaseMilliseconds = 900;
-    private const ulong SquadNavRetryMaximumMilliseconds = 8000;
+    private const ulong SquadNavRetryBaseMilliseconds = 180;
+    private const ulong SquadNavRetryMaximumMilliseconds = 1200;
+    private const ulong SquadNavEmergencyRetryBaseMilliseconds = 90;
+    private const ulong SquadNavEmergencyRetryMaximumMilliseconds = 480;
     private const float SquadNavSupportFootprintRadius = 0.26f;
     private const float SquadNavClearanceRadius = 0.37f;
     private const float SquadNavClearanceHeight = 1.76f;
@@ -178,7 +182,7 @@ public partial class FreightTerminalWorld
                 Emergency = emergency,
                 Destination = destination,
                 FailedPlanAttempts = failures,
-                NextPlanMilliseconds = now + SquadNavRetryDelayMilliseconds(failures, id),
+                NextPlanMilliseconds = now + SquadNavRetryDelayMilliseconds(failures, id, emergency),
                 NextShortcutCheckMilliseconds = now + SquadNavShortcutCheckIntervalMilliseconds
             };
             return false;
@@ -201,13 +205,22 @@ public partial class FreightTerminalWorld
         return true;
     }
 
-    private static ulong SquadNavRetryDelayMilliseconds(int failures, ulong instanceId)
+    private static ulong SquadNavRetryDelayMilliseconds(
+        int failures,
+        ulong instanceId,
+        bool emergency)
     {
         var shift = Mathf.Clamp(failures - 1, 0, 3);
+        var retryBase = emergency
+            ? SquadNavEmergencyRetryBaseMilliseconds
+            : SquadNavRetryBaseMilliseconds;
+        var retryMaximum = emergency
+            ? SquadNavEmergencyRetryMaximumMilliseconds
+            : SquadNavRetryMaximumMilliseconds;
         var delay = Math.Min(
-            SquadNavRetryBaseMilliseconds << shift,
-            SquadNavRetryMaximumMilliseconds);
-        return delay + instanceId % 251;
+            retryBase << shift,
+            retryMaximum);
+        return delay + instanceId % (emergency ? 61UL : 151UL);
     }
 
     private bool TryPlanSquadGridRoute(
