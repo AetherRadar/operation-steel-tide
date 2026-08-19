@@ -8,11 +8,11 @@ public partial class FreightTerminalWorld
 {
     private static readonly Vector3[] RefineryWorldBossPatrolRoute =
     {
-        new(-126, 0.2f, 54), new(-72, 0.2f, 31), new(-18, 0.2f, 24),
-        new(37, 0.2f, 18), new(118, 0.2f, 31), new(132, 0.2f, -57),
-        new(105, 0.2f, -132), new(54, 0.2f, -181), new(-8, 0.2f, -187),
-        new(-73, 0.2f, -171), new(-124, 0.2f, -128), new(-136, 0.2f, -48),
-        new(-78, 0.2f, -52), new(0, 0.2f, -60), new(81, 0.2f, -68)
+        new(-132, 0.2f, 40), new(-86, 0.2f, 31), new(-24, 0.2f, 28),
+        new(24, 0.2f, 28), new(92, 0.2f, 22), new(132, 0.2f, -28),
+        new(118, 0.2f, -92), new(84, 0.2f, -112), new(28, 0.2f, -146),
+        new(-28, 0.2f, -146), new(-86, 0.2f, -112), new(-118, 0.2f, -92),
+        new(-96, 0.2f, -28), new(-24, 0.2f, -60), new(24, 0.2f, -60)
     };
 
     private IReadOnlyList<Vector3> ActiveWorldBossPatrolRoute
@@ -23,35 +23,35 @@ public partial class FreightTerminalWorld
         var definitions = new[]
         {
             new RefineryWeaponCaseDefinition(
-                new Vector3(-40.5f, 0.02f, -2.0f), 0.0f,
-                "Manifest intake armory", "\u6e05\u5355\u5165\u5e93\u519b\u68b0\u7bb1",
-                WeaponCatalog.Build(WeaponPlatform.M4A1, 1),
-                new[] { "optic_holo", "mag_extended" }, new[] { "pack_assault" }, string.Empty),
+                new Vector3(-91, 0.02f, -122), 0.0f,
+                "Grand Hotel security armory", "\u5927\u9152\u5e97\u5b89\u4fdd\u519b\u68b0\u5e93",
+                WeaponCatalog.Build(WeaponPlatform.M4A1, 2),
+                new[] { "optic_holo", "mag_extended" }, new[] { "armor_heavy" }, "knife_crimson"),
             new RefineryWeaponCaseDefinition(
-                new Vector3(41.5f, 0.02f, -18.0f), Mathf.Pi,
-                "Relay maintenance locker", "\u4e2d\u7ee7\u7ef4\u4fee\u67dc",
-                WeaponCatalog.Build(WeaponPlatform.MP5A5, 1),
-                new[] { "optic_micro", "muzzle_suppressor" }, new[] { "helmet_light" }, "knife_hazard"),
+                new Vector3(-77, 0.02f, -116), Mathf.Pi,
+                "Hotel concierge response case", "\u9152\u5e97\u793c\u5bbe\u5e94\u6025\u7bb1",
+                WeaponCatalog.Build(WeaponPlatform.MP5A5, 2),
+                new[] { "optic_micro", "muzzle_suppressor" }, new[] { "helmet_light" }, string.Empty),
             new RefineryWeaponCaseDefinition(
-                new Vector3(-78.0f, 0.02f, -79.0f), Mathf.Pi * 0.5f,
-                "West pump response case", "\u897f\u6cf5\u7ad9\u5e94\u6025\u7bb1",
+                new Vector3(91, 0.02f, 4), Mathf.Pi,
+                "Treasury tactical vault", "\u5e02\u653f\u91d1\u5e93\u6218\u672f\u67dc",
+                WeaponCatalog.Build(WeaponPlatform.ScarL, 2),
+                new[] { "optic_scope", "stock_precision" }, new[] { "armor_heavy", "pack_heavy" }, "knife_arctic"),
+            new RefineryWeaponCaseDefinition(
+                new Vector3(77, 0.02f, -4), 0.0f,
+                "Treasury guard locker", "\u91d1\u5e93\u536b\u961f\u67dc",
                 WeaponCatalog.Build(WeaponPlatform.AK74, 2),
-                new[] { "muzzle_brake", "grip_vertical" }, new[] { "armor_carrier" }, string.Empty),
+                new[] { "muzzle_brake", "grip_vertical" }, new[] { "helmet_heavy" }, string.Empty),
             new RefineryWeaponCaseDefinition(
-                new Vector3(79.0f, 0.02f, -87.0f), -Mathf.Pi * 0.5f,
-                "East pump security case", "\u4e1c\u6cf5\u7ad9\u5b89\u4fdd\u7bb1",
-                WeaponCatalog.Build(WeaponPlatform.ScarL, 2),
-                new[] { "optic_scope", "stock_precision" }, new[] { "helmet_heavy" }, string.Empty),
-            new RefineryWeaponCaseDefinition(
-                new Vector3(-48.0f, 0.02f, -151.0f), 0.0f,
-                "Cracking yard marksman case", "\u88c2\u89e3\u573a\u5c04\u624b\u7bb1",
+                new Vector3(-14, 4.45f, -126), Mathf.Pi * 0.5f,
+                "Market rooftop marksman case", "\u5e02\u96c6\u5c4b\u9876\u5c04\u624b\u7bb1",
                 WeaponCatalog.Build(WeaponPlatform.M24, 2),
-                new[] { "optic_scope", "muzzle_suppressor" }, new[] { "armor_heavy" }, "knife_arctic"),
+                new[] { "optic_scope", "muzzle_suppressor" }, new[] { "pack_assault" }, string.Empty),
             new RefineryWeaponCaseDefinition(
-                new Vector3(49.0f, 0.02f, -175.0f), Mathf.Pi,
-                "Turbine master locker", "\u6da1\u8f6e\u4e3b\u50a8\u7269\u67dc",
-                WeaponCatalog.Build(WeaponPlatform.ScarL, 2),
-                new[] { "optic_holo", "mag_extended" }, new[] { "armor_heavy", "pack_heavy" }, "knife_crimson")
+                new Vector3(18, 0.02f, -47), -Mathf.Pi * 0.5f,
+                "Founders Plaza response case", "\u5f00\u57ce\u5e7f\u573a\u5e94\u6025\u7bb1",
+                WeaponCatalog.Build(WeaponPlatform.GSh18, 1),
+                new[] { "optic_micro" }, new[] { "armor_carrier" }, string.Empty)
         };
         foreach (var definition in definitions)
         {
@@ -121,7 +121,7 @@ public partial class FreightTerminalWorld
         {
             var pickup = new GradedLootPickup
             {
-                Name = $"RefineryLoot_{++index:000}",
+                Name = $"OldTownLoot_{++index:000}",
                 Position = placement.Position
             };
             pickup.Configure(
@@ -148,7 +148,7 @@ public partial class FreightTerminalWorld
             };
             var pickup = new GradedLootPickup
             {
-                Name = $"RefineryValuable_{++index:00}_{placement.Kind}",
+                Name = $"OldTownValuable_{++index:00}_{placement.Kind}",
                 Position = placement.Position
             };
             pickup.Configure(
@@ -167,16 +167,14 @@ public partial class FreightTerminalWorld
         {
             new(DeploymentPoint, "minimap_deploy", "DEPLOY", new Color(0.36f, 0.82f, 1.0f)),
             new(ExtractionPoint, "minimap_extract", "EXTRACT", new Color(0.32f, 0.95f, 0.66f)),
-            new(new Vector3(-31, 0, -7), "minimap_manifest", "MANIFEST", new Color(0.98f, 0.72f, 0.24f)),
-            new(new Vector3(35.5f, 0, -10), "minimap_relay", "RELAY", new Color(1.0f, 0.5f, 0.2f)),
-            new(new Vector3(0, 0, 48), "minimap_refinery_intake", "INTAKE", new Color(0.94f, 0.66f, 0.22f)),
-            new(new Vector3(-91, 0, -72), "minimap_refinery_west_pump", "WEST PUMPS", new Color(0.38f, 0.78f, 1.0f)),
-            new(new Vector3(92, 0, -75), "minimap_refinery_east_pump", "EAST PUMPS", new Color(0.38f, 0.78f, 1.0f)),
-            new(new Vector3(0, 0, -132), "minimap_refinery_cracking", "CRACKING", new Color(1.0f, 0.48f, 0.18f)),
-            new(new Vector3(39, 0, -165), "minimap_refinery_turbine", "TURBINE", new Color(0.44f, 0.94f, 0.68f)),
-            new(new Vector3(-78, 0, -39), "minimap_refinery_cyclone", "CYCLONE", new Color(0.44f, 0.82f, 1.0f)),
-            new(new Vector3(78, 0, -41), "minimap_refinery_reactor", "REACTOR", new Color(1.0f, 0.48f, 0.22f)),
-            new(new Vector3(0, 0, -67), "minimap_refinery_skybridge", "SKYBRIDGE", new Color(0.88f, 0.72f, 1.0f))
+            new(RefineryExtractionMapBuilder.HotelCenter, "minimap_old_town_hotel", "GRAND HOTEL", new Color(1.0f, 0.45f, 0.2f)),
+            new(RefineryExtractionMapBuilder.TreasuryCenter, "minimap_old_town_treasury", "TREASURY", new Color(1.0f, 0.45f, 0.2f)),
+            new(new Vector3(0, 0, -60), "minimap_old_town_plaza", "FOUNDERS PLAZA", new Color(0.95f, 0.73f, 0.3f)),
+            new(new Vector3(0, 0, -126), "minimap_old_town_rooftop", "MARKET ROOFTOP", new Color(0.45f, 0.85f, 1.0f)),
+            new(new Vector3(-43, 0, -92), "minimap_old_town_canal", "CANAL ROW", new Color(0.4f, 0.74f, 1.0f)),
+            new(new Vector3(43, 0, -28), "minimap_old_town_garden", "GARDEN QUARTER", new Color(0.48f, 0.9f, 0.55f)),
+            new(new Vector3(0, 0, -184), "minimap_old_town_north_gate", "NORTH GATE", new Color(0.82f, 0.78f, 0.7f)),
+            new(new Vector3(0, 0, 48), "minimap_old_town_south_gate", "SOUTH GATE", new Color(0.82f, 0.78f, 0.7f))
         };
         _hud.ConfigureMinimap(new Rect2(-170, -220, MapWidthMeters, MapDepthMeters), landmarks);
         _hud.SetMinimapPlayer(_player.GlobalPosition, 0.0f);
@@ -184,82 +182,64 @@ public partial class FreightTerminalWorld
 
     private async void ValidateRefineryMap()
     {
-        await WaitFrames(6);
+        await WaitFrames(8);
         var counts = new RefineryRuntimeCounts();
-        CountRefineryNodes(_levelRoot, false, false, ref counts);
+        CountRefineryNodes(_levelRoot, false, ref counts);
+
         var rootsReady = IsBlackwaterRefineryMap
-            && _levelRoot.Name == "BlackwaterRefinery"
-            && _levelRoot.GetNodeOrNull<Node3D>("ExtractionSite") is not null;
+            && _levelRoot.Name == "SaintMaraisOldTown"
+            && _levelRoot.GetNodeOrNull<Node3D>("ExtractionSite") is not null
+            && _levelRoot.GetNodeOrNull<Node3D>("OldTownLandmarks") is not null;
+        var mapOffer = DeploymentMapCatalog.Resolve(DeploymentMapCatalog.BlackwaterRefineryId);
+        var localizationReady = mapOffer.EnglishName == "SAINT MARAIS OLD TOWN"
+            && mapOffer.EnglishSubtitle == "GRAND HOTEL  //  MUNICIPAL TREASURY"
+            && GameLocalization.Get(mapOffer.LocalizationKey, "zh", mapOffer.EnglishName)
+                == "\u5723\u9a6c\u96f7\u65e7\u57ce"
+            && new[]
+            {
+                "minimap_old_town_hotel", "minimap_old_town_treasury",
+                "minimap_old_town_plaza", "minimap_old_town_rooftop",
+                "minimap_old_town_canal", "minimap_old_town_garden",
+                "minimap_old_town_north_gate", "minimap_old_town_south_gate"
+            }.All(key => GameLocalization.Get(key, "zh", key) != key);
         var authoredReady = _refineryAuthoredModelCount == RefineryLayout.Models.Count
-            && _refineryAuthoredModelCount >= 90
+            && _refineryAuthoredModelCount >= 120
             && counts.ImportedMeshes >= _refineryAuthoredModelCount
             && counts.CulledImportedMeshes == counts.ImportedMeshes;
-        var sourcesReady = _refineryModelScenes.Count >= 18
-            && HasRefinerySource("kenney_city_kit_industrial")
-            && HasRefinerySource("old_military_crate")
-            && HasRefinerySource("concrete_road_barrier");
-        var proxiesReady = _refineryCollisionProxyCount == _refineryAuthoredModelCount
+        var sourcesReady = _refineryModelScenes.Count >= 10
+            && HasRefinerySource("quaternius_downtown_city")
+            && HasRefinerySource("Building_Large_2.gltf")
+            && HasRefinerySource("Street_4WayIntersection.gltf")
+            && _oldTownLandmarks?.ScenePaths.Count >= 10;
+        var proxiesReady = _refineryCollisionProxyCount >= 45
             && counts.ModelCollisionShapes >= _refineryCollisionProxyCount
             && counts.NonBoxModelCollisionShapes == 0;
-        var doorwayReady = _refineryAccessibleBuildingCount >= 40
-            && counts.DoorwayCollisionShapes >= _refineryAccessibleBuildingCount * 4
-            && _refineryEntryBeaconCount == _refineryAccessibleBuildingCount
-            && counts.EntryBeacons == _refineryEntryBeaconCount;
-        var skylineReady = _refineryTallSceneCount >= 6
+        var skylineReady = _refineryTallSceneCount >= 30
             && counts.TallSceneModels == _refineryTallSceneCount;
-        var skylineClearanceReady = ValidateRefinerySkylineClearance(
-            out var skylineClearanceProbes,
-            out var skylineClearanceBlocker);
-        var doorwayBallisticsReady = ValidateRefineryDoorwayBallistics();
-        var factoryReady = _refineryFactoryDistrict is
-        {
-            AuthoredModelCount: >= 180,
-            CollisionShapeCount: >= 34,
-            EntryCount: 2,
-            RoofModuleCount: >= 20,
-            CatwalkModuleCount: >= 20,
-            InteriorPropCount: >= 20,
-            AlleyPropCount: >= 10
-        };
-        var factorySourcesReady = _refineryFactoryDistrict?.ScenePaths.Count >= 15
-            && HasFactorySource("structure-doorway-wide.glb")
-            && HasFactorySource("catwalk-straight.glb")
-            && HasFactorySource("crane.glb")
-            && HasFactorySource("machine-fortified.glb");
-        var hallEntriesReady = ValidateRefineryFactoryEntries();
-        var wondersReady = _refineryWonderLandmarks is
-        {
-            LandmarkCount: 3,
-            AuthoredModelCount: >= 55,
-            CollisionShapeCount: >= 20,
-            ElevatedBridgeModuleCount: >= 15,
-            EnterableLandmarkCount: 2
-        };
-        var wonderSourcesReady = _refineryWonderLandmarks?.ScenePaths.Count >= 8
-            && HasWonderSource("structure-doorway-wide.glb")
-            && HasWonderSource("hopper-high-round.glb")
-            && HasWonderSource("catwalk-straight.glb")
-            && HasWonderSource("crane.glb");
-        var wonderTraversalReady = ValidateRefineryWonderLandmarks();
+        var districtsReady = _oldTownDistricts.Count >= 10
+            && _oldTownDistricts.Contains("grand_hotel")
+            && _oldTownDistricts.Contains("municipal_treasury")
+            && _oldTownDistricts.Contains("founders_plaza");
+        var highValueReady = ValidateOldTownHighValueZones(out var zoneSeparation, out var zoneSummary);
+        var routeReady = ValidateOldTownRouteProbes(out var routeProbeCount, out var routeBlocker);
+        var landmarkReady = ValidateOldTownLandmarks();
         var gameplayReady = _objectiveTerminals.Count == 2
             && IsInstanceValid(_extractionArea)
             && IsInstanceValid(_extractionAircraft)
             && _buildingLootPickupCount == RefineryLayout.LootPlacements.Count
-            && _lootSources.Count >= 30
+            && _lootSources.Count >= 32
             && _enemies.Count >= RefineryLayout.GarrisonSpawns.Count
-            && _hud.MinimapLandmarkCount >= 12;
-        var lanesReady = IsRefineryLaneClear(-8.2f) && IsRefineryLaneClear(8.2f);
+            && _hud.MinimapLandmarkCount >= 10;
         var deploymentReady = DeploymentPoint.DistanceTo(ExtractionPoint) > 80.0f;
-        var performanceReady = counts.Nodes < 2500
-            && counts.StaticBodies < 140
-            && counts.MeshInstances < 900
-            && counts.Lights <= 28;
-        var valid = rootsReady && authoredReady && sourcesReady && proxiesReady
-            && doorwayReady && skylineReady && skylineClearanceReady && doorwayBallisticsReady
-            && factoryReady && factorySourcesReady && hallEntriesReady
-            && wondersReady && wonderSourcesReady && wonderTraversalReady
-            && gameplayReady && lanesReady && deploymentReady && performanceReady;
-        GD.Print($"REFINERY_MAP_CHECK valid={valid} root={rootsReady} authored={authoredReady} models={_refineryAuthoredModelCount}/{RefineryLayout.Models.Count} unique_scenes={_refineryModelScenes.Count} sources={sourcesReady} imported_meshes={counts.ImportedMeshes} culled={counts.CulledImportedMeshes} proxies={counts.ModelCollisionShapes}/{_refineryCollisionProxyCount} proxy_boxes={proxiesReady} doorways={_refineryAccessibleBuildingCount} doorway_shapes={counts.DoorwayCollisionShapes} entry_beacons={counts.EntryBeacons}/{_refineryEntryBeaconCount} doorway_ready={doorwayReady} doorway_ballistics={doorwayBallisticsReady} tall_scenes={_refineryTallSceneCount} skyline={skylineReady} skyline_clearance={skylineClearanceReady} skyline_probes={skylineClearanceProbes} skyline_blocker={skylineClearanceBlocker} factory={factoryReady} factory_sources={factorySourcesReady} hall_entries={hallEntriesReady} factory_models={_refineryFactoryDistrict?.AuthoredModelCount ?? 0} factory_collision={_refineryFactoryDistrict?.CollisionShapeCount ?? 0} roof={_refineryFactoryDistrict?.RoofModuleCount ?? 0} catwalk={_refineryFactoryDistrict?.CatwalkModuleCount ?? 0} interior_props={_refineryFactoryDistrict?.InteriorPropCount ?? 0} alley_props={_refineryFactoryDistrict?.AlleyPropCount ?? 0} wonders={wondersReady} wonder_sources={wonderSourcesReady} wonder_traversal={wonderTraversalReady} wonder_models={_refineryWonderLandmarks?.AuthoredModelCount ?? 0} wonder_collision={_refineryWonderLandmarks?.CollisionShapeCount ?? 0} bridge_modules={_refineryWonderLandmarks?.ElevatedBridgeModuleCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} lanes={lanesReady} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
+        var performanceReady = counts.Nodes < 1900
+            && counts.StaticBodies < 125
+            && counts.MeshInstances < 760
+            && counts.Lights <= 32;
+        var valid = rootsReady && localizationReady && authoredReady && sourcesReady && proxiesReady
+            && skylineReady && districtsReady && highValueReady && routeReady
+            && landmarkReady && gameplayReady && deploymentReady && performanceReady;
+
+        GD.Print($"REFINERY_MAP_CHECK valid={valid} identity=saint_marais_old_town root={rootsReady} localization={localizationReady} authored={authoredReady} models={_refineryAuthoredModelCount}/{RefineryLayout.Models.Count} unique_scenes={_refineryModelScenes.Count} sources={sourcesReady} districts={_oldTownDistricts.Count} district_ready={districtsReady} imported_meshes={counts.ImportedMeshes} culled={counts.CulledImportedMeshes} proxies={counts.ModelCollisionShapes}/{_refineryCollisionProxyCount} proxy_boxes={proxiesReady} tall_scenes={_refineryTallSceneCount} skyline={skylineReady} high_value={highValueReady} zone_separation={zoneSeparation:0.0} zone_summary={zoneSummary} routes={routeReady} route_probes={routeProbeCount} route_blocker={routeBlocker} landmarks={landmarkReady} landmark_models={_oldTownLandmarks?.AuthoredModelCount ?? 0} landmark_collision={_oldTownLandmarks?.CollisionShapeCount ?? 0} rooftop_routes={_oldTownLandmarks?.RooftopRouteCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
         GD.Print($"REFINERY_MAP_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -277,69 +257,130 @@ public partial class FreightTerminalWorld
         _hud.Visible = false;
         var captureLight = new DirectionalLight3D
         {
-            Name = "RefineryCaptureLight",
-            RotationDegrees = new Vector3(-58, -32, 0),
-            LightEnergy = 0.85f,
+            Name = "OldTownCaptureLight",
+            RotationDegrees = new Vector3(-55, -35, 0),
+            LightEnergy = 0.9f,
             ShadowEnabled = false
         };
         AddChild(captureLight);
-        var camera = new Camera3D { Name = "RefineryCaptureCamera", Fov = 52.0f, Far = 520.0f };
+        var camera = new Camera3D { Name = "OldTownCaptureCamera", Fov = 52.0f, Far = 560.0f };
         AddChild(camera);
-        camera.GlobalPosition = new Vector3(126, 96, 58);
-        camera.LookAt(new Vector3(0, 3, -78), Vector3.Up);
+        camera.GlobalPosition = new Vector3(148, 126, 88);
+        camera.LookAt(new Vector3(0, 4, -68), Vector3.Up);
         camera.MakeCurrent();
-        await WaitFrames(14);
+        await WaitFrames(16);
         SaveViewportImage("res://refinery_map_validation.png");
-        camera.GlobalPosition = new Vector3(0, 5.8f, 69);
-        camera.LookAt(new Vector3(0, 4.2f, -48), Vector3.Up);
-        camera.Fov = 62.0f;
-        await WaitFrames(8);
+        camera.GlobalPosition = new Vector3(0, 5.8f, 70);
+        camera.LookAt(new Vector3(0, 5.0f, -82), Vector3.Up);
+        camera.Fov = 64.0f;
+        await WaitFrames(10);
         SaveViewportImage("res://refinery_ground_validation.png");
-        camera.GlobalPosition = new Vector3(0, 3.8f, -68.0f);
-        camera.LookAt(new Vector3(0, 5.0f, -124.0f), Vector3.Up);
+        camera.GlobalPosition = new Vector3(-86, 7.0f, -92);
+        camera.LookAt(RefineryExtractionMapBuilder.HotelCenter + Vector3.Up * 2.8f, Vector3.Up);
         camera.Fov = 70.0f;
         await WaitFrames(10);
         SaveViewportImage("res://refinery_hall_validation.png");
-        camera.GlobalPosition = new Vector3(0, 28.0f, 48.0f);
-        camera.LookAt(new Vector3(0, 7.0f, -48.0f), Vector3.Up);
-        camera.Fov = 72.0f;
+        camera.GlobalPosition = new Vector3(86, 7.0f, -28);
+        camera.LookAt(RefineryExtractionMapBuilder.TreasuryCenter + Vector3.Up * 2.8f, Vector3.Up);
         await WaitFrames(10);
         SaveViewportImage("res://refinery_wonders_validation.png");
-        GD.Print($"REFINERY_MAP_CAPTURE models={_refineryAuthoredModelCount} scenes={_refineryModelScenes.Count} factory_models={_refineryFactoryDistrict?.AuthoredModelCount ?? 0} wonder_models={_refineryWonderLandmarks?.AuthoredModelCount ?? 0} paths=refinery_map_validation.png,refinery_ground_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png");
+        camera.GlobalPosition = new Vector3(0, 11.5f, -96);
+        camera.LookAt(new Vector3(0, 4.5f, -126), Vector3.Up);
+        camera.Fov = 68.0f;
+        await WaitFrames(10);
+        SaveViewportImage("res://old_town_rooftop_validation.png");
+        GD.Print($"REFINERY_MAP_CAPTURE identity=saint_marais_old_town models={_refineryAuthoredModelCount} scenes={_refineryModelScenes.Count} landmark_models={_oldTownLandmarks?.AuthoredModelCount ?? 0} paths=refinery_map_validation.png,refinery_ground_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png");
         GetTree().Quit();
     }
 
-    private bool HasRefinerySource(string fragment)
+    private bool ValidateOldTownHighValueZones(out float separation, out string summary)
     {
-        foreach (var path in _refineryModelScenes)
+        separation = RefineryLayout.HighValueZones.Count == 2
+            ? RefineryLayout.HighValueZones[0].Center.DistanceTo(RefineryLayout.HighValueZones[1].Center)
+            : 0.0f;
+        var valid = RefineryLayout.HighValueZones.Count == 2 && separation >= 190.0f;
+        var parts = new List<string>();
+        foreach (var zone in RefineryLayout.HighValueZones)
         {
-            if (path.Contains(fragment, System.StringComparison.Ordinal))
-            {
-                return true;
-            }
+            var graded = RefineryLayout.LootPlacements.Count(loot =>
+                HorizontalDistance(loot.Position, zone.Center) <= zone.Radius
+                && loot.Grade >= LootGrade.Epic);
+            var valuables = RefineryLayout.ValuablePlacements.Count(loot =>
+                HorizontalDistance(loot.Position, zone.Center) <= zone.Radius
+                && loot.Grade >= LootGrade.Epic);
+            var guards = RefineryLayout.GarrisonSpawns.Count(position =>
+                HorizontalDistance(position, zone.Center) <= zone.Radius + 12.0f);
+            valid &= graded >= 3 && valuables >= 3 && guards >= 4;
+            parts.Add($"{zone.Id}:{graded}/{valuables}/{guards}");
         }
-        return false;
+        summary = string.Join(',', parts);
+        return valid;
     }
 
-    private bool IsRefineryLaneClear(float x)
+    private bool ValidateOldTownRouteProbes(out int checkedProbes, out string firstBlocker)
     {
+        checkedProbes = 0;
+        firstBlocker = "none";
         var exclusions = BuildRefineryLaneExclusions();
         using var exclusionsBacking = exclusions.AsDisposable();
-        if (!PhysicsRaycast.TryHit(
-                GetWorld3D().DirectSpaceState,
-            new Vector3(x, 1.1f, 82),
-                new Vector3(x, 1.1f, -190),
-                exclusions,
-                1,
-                out var hit))
+        foreach (var probe in RefineryLayout.RouteProbes)
         {
-            return true;
+            checkedProbes++;
+            if (!PhysicsRaycast.TryHit(
+                    GetWorld3D().DirectSpaceState,
+                    probe.From,
+                    probe.To,
+                    exclusions,
+                    1,
+                    out var hit))
+            {
+                continue;
+            }
+            var blocker = hit.Collider as Node3D;
+            firstBlocker = blocker is null
+                ? $"{probe.Name}:unknown@{hit.Position}"
+                : $"{probe.Name}:{blocker.GetPath()}@{blocker.GlobalPosition}:hit={hit.Position}:shape={hit.Shape}";
+            return false;
         }
-
-        var collider = hit.Collider as Node;
-        GD.Print($"REFINERY_LANE_BLOCKED x={x:0.0} collider={collider?.Name ?? "unknown"} position={hit.Position}");
-        return false;
+        return checkedProbes == RefineryLayout.RouteProbes.Count;
     }
+
+    private bool ValidateOldTownLandmarks()
+    {
+        if (_oldTownLandmarks is not { } landmarks)
+        {
+            return false;
+        }
+        var hotelEntryClear = !PhysicsRaycast.HasHit(
+            GetWorld3D(), landmarks.HotelEntry, landmarks.HotelInterior, 1);
+        var treasuryEntryClear = !PhysicsRaycast.HasHit(
+            GetWorld3D(), landmarks.TreasuryEntry, landmarks.TreasuryInterior, 1);
+        var hotelWallBlocks = PhysicsRaycast.HasHit(
+            GetWorld3D(), landmarks.HotelCenter + new Vector3(-14, 1.2f, 0), landmarks.HotelCenter, 1);
+        var treasuryWallBlocks = PhysicsRaycast.HasHit(
+            GetWorld3D(), landmarks.TreasuryCenter + new Vector3(14, 1.2f, 0), landmarks.TreasuryCenter, 1);
+        var rooftopDeckBlocks = PhysicsRaycast.HasHit(
+            GetWorld3D(), new Vector3(0, 7.0f, -126), new Vector3(0, 2.0f, -126), 1);
+        var rooftopWalkClear = !PhysicsRaycast.HasHit(
+            GetWorld3D(), new Vector3(-20, 5.7f, -126), new Vector3(20, 5.7f, -126), 1);
+        var traversalRegistered = _squadTraversalLinks.Any(link =>
+            link.Source == "old_town_market_rooftop"
+            && link.Bidirectional
+            && link.ForwardPoints.Length >= 8);
+        var countsReady = landmarks.LandmarkCount == 3
+            && landmarks.HighValueZoneCount == 2
+            && landmarks.AuthoredModelCount >= 110
+            && landmarks.CollisionShapeCount >= 17
+            && landmarks.EntryCount == 2
+            && landmarks.RooftopRouteCount == 1;
+        GD.Print($"OLD_TOWN_LANDMARK_CHECK hotel_entry={hotelEntryClear} treasury_entry={treasuryEntryClear} hotel_wall={hotelWallBlocks} treasury_wall={treasuryWallBlocks} rooftop_deck={rooftopDeckBlocks} rooftop_clear={rooftopWalkClear} traversal={traversalRegistered} counts={countsReady}");
+        return hotelEntryClear && treasuryEntryClear && hotelWallBlocks && treasuryWallBlocks
+            && rooftopDeckBlocks && rooftopWalkClear && traversalRegistered && countsReady;
+    }
+
+    private bool HasRefinerySource(string fragment)
+        => _refineryModelScenes.Any(path =>
+            path.Contains(fragment, System.StringComparison.OrdinalIgnoreCase));
 
     private Godot.Collections.Array<Rid> BuildRefineryLaneExclusions()
     {
@@ -368,166 +409,13 @@ public partial class FreightTerminalWorld
         return exclusions;
     }
 
-    private bool ValidateRefineryDoorwayBallistics()
-    {
-        var placement = RefineryLayout.Models.FirstOrDefault(model => model.HasDoorway);
-        var building = _levelRoot.GetNodeOrNull<StaticBody3D>(placement.Name);
-        if (building is null)
-        {
-            return false;
-        }
-        var size = placement.CollisionSize * placement.Scale;
-        var probeY = Mathf.Min(1.45f, size.Y * 0.25f);
-        var outsideZ = size.Z * 0.5f + 0.8f;
-        var doorwayOpen = !PhysicsRaycast.HasHit(
-            GetWorld3D(),
-            building.ToGlobal(new Vector3(0, probeY, outsideZ)),
-            building.ToGlobal(new Vector3(0, probeY, 0)),
-            building.GetRid(),
-            1);
-        var wallX = size.X * 0.36f;
-        var wallBlocks = PhysicsRaycast.HasHit(
-            GetWorld3D(),
-            building.ToGlobal(new Vector3(wallX, probeY, outsideZ)),
-            building.ToGlobal(new Vector3(wallX, probeY, 0)),
-            1);
-        return doorwayOpen && wallBlocks;
-    }
-
-    private bool ValidateRefinerySkylineClearance(
-        out int checkedProbes,
-        out string firstBlocker)
-    {
-        checkedProbes = 0;
-        firstBlocker = "none";
-        using var clearanceShape = new CapsuleShape3D
-        {
-            Radius = 0.34f,
-            Height = 1.72f
-        };
-        foreach (var placement in RefineryLayout.Models.Where(model => model.IsTallScene))
-        {
-            var building = _levelRoot.GetNodeOrNull<StaticBody3D>(placement.Name);
-            if (building is null)
-            {
-                firstBlocker = $"{placement.Name}:missing";
-                return false;
-            }
-
-            var size = placement.CollisionSize * placement.Scale;
-            var offsets = new[]
-            {
-                new Vector3(-size.X * 0.5f - 0.82f, 0.92f, 0),
-                new Vector3(size.X * 0.5f + 0.82f, 0.92f, 0),
-                new Vector3(0, 0.92f, -size.Z * 0.5f - 0.82f),
-                new Vector3(0, 0.92f, size.Z * 0.5f + 0.82f)
-            };
-            foreach (var offset in offsets)
-            {
-                checkedProbes++;
-                using var query = new PhysicsShapeQueryParameters3D
-                {
-                    Shape = clearanceShape,
-                    Transform = new Transform3D(Basis.Identity, building.ToGlobal(offset)),
-                    CollisionMask = 1,
-                    CollideWithAreas = false,
-                    CollideWithBodies = true,
-                    Margin = 0.005f
-                };
-                var hits = GetWorld3D().DirectSpaceState.IntersectShape(query, 16);
-                using var hitsBacking = hits.AsDisposable();
-                for (var index = 0; index < hits.Count; index++)
-                {
-                    using var hit = hits[index];
-                    using var colliderValue = hit[GodotPhysicsResultKeys.Collider];
-                    if (colliderValue.AsGodotObject() is not StaticBody3D blocker)
-                    {
-                        continue;
-                    }
-                    firstBlocker = $"{placement.Name}:{blocker.Name}";
-                    return false;
-                }
-            }
-        }
-        return checkedProbes == _refineryTallSceneCount * 4;
-    }
-
-    private bool HasFactorySource(string fileName)
-        => _refineryFactoryDistrict?.ScenePaths.Any(path =>
-            path.EndsWith('/' + fileName, System.StringComparison.OrdinalIgnoreCase)) == true;
-
-    private bool HasWonderSource(string fileName)
-        => _refineryWonderLandmarks?.ScenePaths.Any(path =>
-            path.EndsWith('/' + fileName, System.StringComparison.OrdinalIgnoreCase)) == true;
-
-    private bool ValidateRefineryWonderLandmarks()
-    {
-        if (_refineryWonderLandmarks is not { } wonders)
-        {
-            return false;
-        }
-        var westEntryClear = !PhysicsRaycast.HasHit(GetWorld3D(), wonders.WestEntry, wonders.WestInterior, 1);
-        var eastEntryClear = !PhysicsRaycast.HasHit(GetWorld3D(), wonders.EastEntry, wonders.EastInterior, 1);
-        var gateGroundClear = !PhysicsRaycast.HasHit(
-            GetWorld3D(),
-            new Vector3(0, 2.2f, wonders.GateCenter.Z + 8.0f),
-            new Vector3(0, 2.2f, wonders.GateCenter.Z - 8.0f),
-            1);
-        var bridgeBlocks = PhysicsRaycast.HasHit(
-            GetWorld3D(),
-            wonders.GateCenter + Vector3.Down * 2.0f,
-            wonders.GateCenter + Vector3.Up * 2.0f,
-            1);
-        var westWallBlocks = PhysicsRaycast.HasHit(
-            GetWorld3D(),
-            wonders.WestInterior + new Vector3(-10.0f, 13.0f, -4.0f),
-            wonders.WestInterior + new Vector3(0, 13.0f, -4.0f),
-            1);
-        var eastWallBlocks = PhysicsRaycast.HasHit(
-            GetWorld3D(),
-            wonders.EastInterior + new Vector3(10.0f, 13.0f, -4.0f),
-            wonders.EastInterior + new Vector3(0, 13.0f, -4.0f),
-            1);
-        GD.Print($"REFINERY_WONDER_CHECK west_entry={westEntryClear} east_entry={eastEntryClear} gate_clear={gateGroundClear} bridge={bridgeBlocks} west_wall={westWallBlocks} east_wall={eastWallBlocks}");
-        return westEntryClear && eastEntryClear && gateGroundClear && bridgeBlocks
-            && westWallBlocks && eastWallBlocks;
-    }
-
-    private bool ValidateRefineryFactoryEntries()
-    {
-        if (_refineryFactoryDistrict is not { } hall)
-        {
-            return false;
-        }
-        const float traversalLaneX = 8.2f;
-        var southClear = !PhysicsRaycast.HasHit(
-            GetWorld3D(),
-            hall.SouthEntry + new Vector3(-traversalLaneX, 1.0f, 0),
-            hall.NorthEntry + new Vector3(-traversalLaneX, 1.0f, 10.0f),
-            1);
-        var northClear = !PhysicsRaycast.HasHit(
-            GetWorld3D(),
-            hall.NorthEntry + new Vector3(traversalLaneX, 1.0f, 0),
-            hall.SouthEntry + new Vector3(traversalLaneX, 1.0f, -10.0f),
-            1);
-        var sideBlocked = PhysicsRaycast.HasHit(
-            GetWorld3D(),
-            hall.InteriorCenter + new Vector3(-10, 1.2f, 0),
-            hall.InteriorCenter + new Vector3(-39, 1.2f, 0),
-            1);
-        GD.Print($"REFINERY_HALL_ENTRY_CHECK south={southClear} north={northClear} wall={sideBlocked}");
-        return southClear && northClear && sideBlocked;
-    }
-
     private static void CountRefineryNodes(
         Node node,
         bool insideAuthoredModel,
-        bool insideAccessibleBuilding,
         ref RefineryRuntimeCounts counts)
     {
         counts.Nodes++;
         var authored = insideAuthoredModel || node.IsInGroup("refinery_authored_model");
-        var accessible = insideAccessibleBuilding || node.IsInGroup("refinery_accessible_building");
         if (node is StaticBody3D)
         {
             counts.StaticBodies++;
@@ -555,18 +443,10 @@ public partial class FreightTerminalWorld
             {
                 counts.NonBoxModelCollisionShapes++;
             }
-            if (accessible && collision.Name.ToString().StartsWith("Doorway", System.StringComparison.Ordinal))
-            {
-                counts.DoorwayCollisionShapes++;
-            }
         }
         if (node.IsInGroup("refinery_tall_scene"))
         {
             counts.TallSceneModels++;
-        }
-        if (node.IsInGroup("refinery_entry_beacon"))
-        {
-            counts.EntryBeacons++;
         }
         var children = node.GetChildren();
         using var childrenBacking = children.AsDisposable();
@@ -574,7 +454,7 @@ public partial class FreightTerminalWorld
         {
             if (child is Node childNode)
             {
-                CountRefineryNodes(childNode, authored, accessible, ref counts);
+                CountRefineryNodes(childNode, authored, ref counts);
             }
         }
     }
@@ -599,8 +479,6 @@ public partial class FreightTerminalWorld
         public int CulledImportedMeshes;
         public int ModelCollisionShapes;
         public int NonBoxModelCollisionShapes;
-        public int DoorwayCollisionShapes;
         public int TallSceneModels;
-        public int EntryBeacons;
     }
 }

@@ -4586,8 +4586,8 @@ public partial class FreightTerminalWorld : Node3D
         }
         rivalA.ProcessMode = ProcessModeEnum.Inherit;
         _player.ProcessMode = ProcessModeEnum.Inherit;
-        // Fresh open arena far from cover geometry so Engage does not dig into cover first.
-        var fireArena = new Vector3(5.0f, 0.25f, 25.0f);
+        // Reuse the elevated apron proven clear by the extraction LOS diagnostic.
+        var fireArena = new Vector3(0.0f, 0.35f, 55.0f);
         rivalA.GlobalPosition = fireArena;
         rivalB.GlobalPosition = new Vector3(180.0f, 0.2f, 180.0f);
         _player.GlobalPosition = fireArena + new Vector3(0.0f, 0.0f, -8.5f);
@@ -4598,6 +4598,9 @@ public partial class FreightTerminalWorld : Node3D
         {
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
+        var playerShotPathClear = rivalA.HasClearBallisticPath(
+            _player,
+            _player.HitPoint(HitRegion.Torso));
         var playerHp = _player.Health;
         var shotsBeforePlayer = rivalA.AttackShotsFired;
         for (var i = 0; i < 130; i++)
@@ -4621,7 +4624,11 @@ public partial class FreightTerminalWorld : Node3D
         rivalA.ResetTacticalStateForDiagnostics();
         rivalA.GrantFireablePrimaryForDiagnostics();
         _player.SetHealthForDiagnostics(_player.MaxHealth);
-        var coverSpot = _coverPoints.OrderBy(p => p.DistanceTo(fireArena)).First();
+        _player.IsDead = false;
+        _player.ProcessMode = ProcessModeEnum.Inherit;
+        _player.RestoreMovementInput();
+        var coverReference = new Vector3(5.0f, 0.25f, 25.0f);
+        var coverSpot = _coverPoints.OrderBy(p => p.DistanceTo(coverReference)).First();
         rivalA.GlobalPosition = coverSpot + new Vector3(0.8f, 0.15f, 0.8f);
         _player.GlobalPosition = rivalA.GlobalPosition + new Vector3(0.0f, 0.15f, 18.0f);
         rivalA.SetAlerted(_player.GlobalPosition);
@@ -4823,12 +4830,12 @@ public partial class FreightTerminalWorld : Node3D
         }
 
         var valid = vsEnemyTarget && vsEnemyShots && vsEnemyDamage
-            && firedAtPlayer && playerHurtByFire && engagedPlayer
+            && playerShotPathClear && firedAtPlayer && playerHurtByFire && engagedPlayer
             && sawProneOrCover
             && lootStarted && leftLootForCombat && npcTargetedOp
             && pursuitPairReady && pursuitRetained && pursuitAdvanced
             && memoryStayedFrozen && squadContactShared && damageThreatLocked && wallFlanked;
-        GD.Print($"EXTRACTION_AI_CHECK valid={valid} vs_enemy_target={vsEnemyTarget} vs_enemy_shots={vsEnemyShots} vs_enemy_dmg={vsEnemyDamage} fire_player={firedAtPlayer} player_hurt={playerHurtByFire} engaged_player={engagedPlayer} prone_or_cover={sawProneOrCover} loot_start={lootStarted} loot_via_physics=True loot_to_combat={leftLootForCombat} npc_target_op={npcTargetedOp} pursuit_pair={pursuitPairReady} pursuit_retained={pursuitRetained} pursuit_advanced={pursuitAdvanced} memory_frozen={memoryStayedFrozen} squad_shared={squadContactShared} damage_threat={damageThreatLocked} wall_flanked={wallFlanked}");
+        GD.Print($"EXTRACTION_AI_CHECK valid={valid} vs_enemy_target={vsEnemyTarget} vs_enemy_shots={vsEnemyShots} vs_enemy_dmg={vsEnemyDamage} player_path_clear={playerShotPathClear} fire_player={firedAtPlayer} player_hurt={playerHurtByFire} engaged_player={engagedPlayer} prone_or_cover={sawProneOrCover} loot_start={lootStarted} loot_via_physics=True loot_to_combat={leftLootForCombat} npc_target_op={npcTargetedOp} pursuit_pair={pursuitPairReady} pursuit_retained={pursuitRetained} pursuit_advanced={pursuitAdvanced} memory_frozen={memoryStayedFrozen} squad_shared={squadContactShared} damage_threat={damageThreatLocked} wall_flanked={wallFlanked}");
         GD.Print($"EXTRACTION_AI_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

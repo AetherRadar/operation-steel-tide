@@ -31,9 +31,9 @@ public static class DeploymentMapCatalog
             BlackwaterRefineryId,
             "MAP 02",
             "map_blackwater_refinery",
-            "BLACKWATER REFINERY",
+            "SAINT MARAIS OLD TOWN",
             "map_blackwater_refinery_subtitle",
-            "CRACKING YARDS  //  PUMP DISTRICT",
+            "GRAND HOTEL  //  MUNICIPAL TREASURY",
             true),
         new DeploymentMapOffer(
             "orbital_complex",

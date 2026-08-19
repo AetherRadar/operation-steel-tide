@@ -24,16 +24,18 @@ The City Kit (Industrial) 1.0 model set is distributed by Kenney under CC0 1.0:
 
 The complete GLB set is retained so authored demolition layouts can combine the pack's buildings, chimneys, and tank detail without modifying third-party geometry.
 
-The Kenney Factory Kit 3.0 is distributed under CC0 1.0:
+## Quaternius CC0 models
 
-- Creator: Kenney
-- Source: https://kenney.nl/assets/factory-kit
-- Download: https://kenney.nl/media/pages/assets/factory-kit/edaac9d4f6-1777639602/kenney_factory-kit_3.0.zip
-- License: `assets/models/kenney_factory_kit/KENNEY_LICENSE.txt`
+The standard free version of the Downtown City MegaKit is distributed by Quaternius under CC0 1.0 Universal:
+
+- Creator: Quaternius (`@Quaternius`)
+- Source: https://quaternius.com/packs/downtowncitymegakit.html
+- License: CC0 1.0 Universal, https://creativecommons.org/publicdomain/zero/1.0/
 - Acquisition date: 2026-08-19
-- Local assets: `assets/models/kenney_factory_kit/*.glb`
+- Local assets: `quaternius_downtown_city/*.gltf`, matching `.bin` buffers, and shared 1K texture maps
+- License copy and processing record: `quaternius_downtown_city/QUATERNIUS_LICENSE.txt` and `quaternius_downtown_city/README.md`
 
-The repository keeps only the modular factory pieces used by the Blackwater Refinery cracking hall and its approach alleys.
+The repository contains 21 selected modular scenes and 26 shared textures for composing Saint Marais Old Town. The user-provided CS:GO Town Sketchfab page was treated as layout reference only; no geometry, textures, or other files from that page are included.
 
 ## TastyTony CC BY 4.0 model
 
