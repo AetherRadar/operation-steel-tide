@@ -206,8 +206,7 @@ public partial class SquadMate
         }
 
         var feet = GlobalPosition;
-        var exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        using var excludeBacking = exclude.AsDisposable();
+        var exclude = NavigationProbeExclusions();
         if (!PhysicsRaycast.TryHit(
                 GetWorld3D(),
                 feet + Vector3.Up * 0.38f,
@@ -286,8 +285,7 @@ public partial class SquadMate
             return false;
         }
         var feet = GlobalPosition;
-        var exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        using var excludeBacking = exclude.AsDisposable();
+        var exclude = NavigationProbeExclusions();
         if (PhysicsRaycast.HasHit(
                 GetWorld3D(),
                 feet + Vector3.Up * 0.62f,
@@ -352,8 +350,7 @@ public partial class SquadMate
 
     private bool HasNavigationLandingClearance(Vector3 landing)
     {
-        var exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        using var excludeBacking = exclude.AsDisposable();
+        var exclude = NavigationProbeExclusions();
         using var query = new PhysicsShapeQueryParameters3D
         {
             Shape = _navigationStepClearanceShape,

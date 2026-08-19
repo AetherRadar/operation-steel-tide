@@ -57,8 +57,7 @@ public partial class SquadMate
 
         const float maxStep = 0.28f;
         var forward = moveDirection.Normalized();
-        var exclude = BuildNavigationStepExclusions();
-        using var excludeBacking = exclude.AsDisposable();
+        var exclude = NavigationProbeExclusions();
         var selectedLift = 0.0f;
         var selectedLanding = GlobalPosition;
         foreach (var distance in new[] { 0.28f, 0.42f, 0.55f })
@@ -105,9 +104,11 @@ public partial class SquadMate
         NavigationStepUpsForDiagnostics++;
     }
 
-    private Godot.Collections.Array<Rid> BuildNavigationStepExclusions()
+    private Godot.Collections.Array<Rid> NavigationProbeExclusions()
     {
-        var exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        var exclude = _navigationProbeExclusions ??= new Godot.Collections.Array<Rid>();
+        exclude.Clear();
+        exclude.Add(GetRid());
         if (IsInstanceValid(Leader))
         {
             exclude.Add(Leader.GetRid());

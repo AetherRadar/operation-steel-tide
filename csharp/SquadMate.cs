@@ -101,6 +101,9 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     private float _lootHuntCooldown;
     private ISquadCombatant? _reviveTarget;
     private float _revivePoseBlend;
+    private Godot.Collections.Array<Rid>? _navigationProbeExclusions;
+
+    internal bool LeaderCollisionExcludedForDiagnostics { get; private set; }
 
     public void Configure(
         FreightTerminalWorld main,
@@ -140,6 +143,11 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         CollisionLayer = 4;
         CollisionMask = 1;
         FloorSnapLength = 0.35f;
+        if (IsInstanceValid(Leader))
+        {
+            AddCollisionExceptionWith(Leader);
+            LeaderCollisionExcludedForDiagnostics = true;
+        }
         AddToGroup("player_squad_ai");
         BuildOperator();
         ApplyRoleVisuals();
@@ -150,6 +158,12 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
         _remotePosition = GlobalPosition;
         _remoteRotation = Rotation;
+    }
+
+    public override void _ExitTree()
+    {
+        _navigationProbeExclusions?.AsDisposable().Dispose();
+        _navigationProbeExclusions = null;
     }
 
     public void SetOrder(SquadOrder order, Vector3 position)

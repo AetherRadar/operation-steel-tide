@@ -70,8 +70,7 @@ public partial class SquadMate
 
     private bool HasNavigationRecoveryGroundPath(Vector3 direction, float distance)
     {
-        var exclude = BuildNavigationStepExclusions();
-        using var excludeBacking = exclude.AsDisposable();
+        var exclude = NavigationProbeExclusions();
         var samples = Mathf.Max(2, Mathf.CeilToInt(distance / 0.55f));
         for (var sample = 1; sample <= samples; sample++)
         {

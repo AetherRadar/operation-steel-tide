@@ -13,8 +13,9 @@ public partial class FreightTerminalWorld
     private const ulong SquadPerformanceMaximumQueryProbeMicroseconds = 750_000;
     private const ulong SquadPerformanceMaximumFinalizerMicroseconds = 350_000;
     private const ulong SquadPerformanceMaximumConnectorWarmPassMicroseconds = 25_000;
-    private const ulong SquadPerformanceMaximumProximityFrameMicroseconds = 350_000;
-    private const ulong SquadPerformanceMaximumProximityAverageMicroseconds = 50_000;
+    private const ulong SquadPerformanceMaximumProximityFrameMicroseconds = 300_000;
+    private const ulong SquadPerformanceMaximumRepeatedProximityFrameMicroseconds = 75_000;
+    private const ulong SquadPerformanceMaximumProximityAverageMicroseconds = 25_000;
     private const ulong SquadPerformanceMaximumProximityFinalizerMicroseconds = 350_000;
     private const int SquadPerformanceReuseSamples = 12;
     private const int SquadPerformanceQueryProbeSamples = 1536;
@@ -139,9 +140,29 @@ public partial class FreightTerminalWorld
             mate.ProcessMode = ProcessModeEnum.Inherit;
         }
 
+        mates[1].GlobalPosition = proximityAnchor + Vector3.Right * 4.0f;
+        mates[0].GlobalPosition = proximityAnchor + Vector3.Back * 1.2f;
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        var leaderCollisionExcluded = mates.All(mate => mate.LeaderCollisionExcludedForDiagnostics);
+        var leaderProbeClear = mates[0].MeasureMovementClearanceForDiagnostics(
+            Vector3.Forward,
+            2.0f) >= 1.95f;
+        var leaderMotionClear = !mates[0].WouldNavigationMotionCollideForDiagnostics(
+            Vector3.Forward * 2.0f);
+        for (var index = 0; index < mates.Length; index++)
+        {
+            var mate = mates[index];
+            mate.GlobalPosition = proximityAnchor + new Vector3(index * 0.32f - 0.16f, 0.0f, -0.55f);
+            mate.Velocity = Vector3.Zero;
+            mate.ResetCombatTacticsForDiagnostics();
+            ClearSquadNavigation(mate);
+        }
+
         DrainPendingFinalizersForDiagnostics();
         ulong proximityTotalMicroseconds = 0;
         ulong proximityMaximumMicroseconds = 0;
+        ulong proximitySecondMaximumMicroseconds = 0;
+        var proximityMaximumFrame = -1;
         var proximityFramesOverBudget = 0;
         for (var frame = 0; frame < SquadPerformanceProximityFrames; frame++)
         {
@@ -153,8 +174,17 @@ public partial class FreightTerminalWorld
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             var frameMicroseconds = Time.GetTicksUsec() - frameStarted;
             proximityTotalMicroseconds += frameMicroseconds;
-            proximityMaximumMicroseconds = Math.Max(proximityMaximumMicroseconds, frameMicroseconds);
-            if (frameMicroseconds > SquadPerformanceMaximumProximityFrameMicroseconds)
+            if (frameMicroseconds > proximityMaximumMicroseconds)
+            {
+                proximitySecondMaximumMicroseconds = proximityMaximumMicroseconds;
+                proximityMaximumMicroseconds = frameMicroseconds;
+                proximityMaximumFrame = frame;
+            }
+            else if (frameMicroseconds > proximitySecondMaximumMicroseconds)
+            {
+                proximitySecondMaximumMicroseconds = frameMicroseconds;
+            }
+            if (frameMicroseconds > SquadPerformanceMaximumRepeatedProximityFrameMicroseconds)
             {
                 proximityFramesOverBudget++;
             }
@@ -182,7 +212,13 @@ public partial class FreightTerminalWorld
             && SquadPortalWalkWarmPassesForDiagnostics >= 1
             && SquadPortalWalkWarmMaximumMicrosecondsForDiagnostics
                 <= SquadPerformanceMaximumConnectorWarmPassMicroseconds
-            && proximityFramesOverBudget == 0
+            && leaderCollisionExcluded
+            && leaderProbeClear
+            && leaderMotionClear
+            && proximityMaximumMicroseconds <= SquadPerformanceMaximumProximityFrameMicroseconds
+            && proximitySecondMaximumMicroseconds
+                <= SquadPerformanceMaximumRepeatedProximityFrameMicroseconds
+            && proximityFramesOverBudget <= 1
             && proximityAverageMicroseconds <= SquadPerformanceMaximumProximityAverageMicroseconds
             && proximityFinalizerMicroseconds <= SquadPerformanceMaximumProximityFinalizerMicroseconds;
         GD.Print(
@@ -202,9 +238,15 @@ public partial class FreightTerminalWorld
             + $"connector_warm_passes={SquadPortalWalkWarmPassesForDiagnostics} "
             + $"connector_warm_max_usec={SquadPortalWalkWarmMaximumMicrosecondsForDiagnostics} "
             + $"connector_warm_budget={SquadPerformanceMaximumConnectorWarmPassMicroseconds} "
+            + $"leader_collision_excluded={leaderCollisionExcluded} "
+            + $"leader_probe_clear={leaderProbeClear} "
+            + $"leader_motion_clear={leaderMotionClear} "
             + $"proximity_frames={SquadPerformanceProximityFrames} "
             + $"proximity_max_usec={proximityMaximumMicroseconds} "
+            + $"proximity_max_frame={proximityMaximumFrame} "
             + $"proximity_max_budget={SquadPerformanceMaximumProximityFrameMicroseconds} "
+            + $"proximity_second_max_usec={proximitySecondMaximumMicroseconds} "
+            + $"proximity_repeat_budget={SquadPerformanceMaximumRepeatedProximityFrameMicroseconds} "
             + $"proximity_avg_usec={proximityAverageMicroseconds} "
             + $"proximity_avg_budget={SquadPerformanceMaximumProximityAverageMicroseconds} "
             + $"proximity_over_budget={proximityFramesOverBudget} "

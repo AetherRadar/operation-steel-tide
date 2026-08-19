@@ -607,7 +607,7 @@ public partial class SquadMate
             GetWorld3D(),
             from,
             position + Vector3.Down * 1.8f,
-            GetRid(),
+            NavigationProbeExclusions(),
             1);
     }
 
@@ -701,12 +701,24 @@ public partial class SquadMate
             GetWorld3D(),
             from,
             from + direction * maxDistance,
-            GetRid(),
+            NavigationProbeExclusions(),
             1,
             out var hit)
                 ? from.DistanceTo(hit.Position)
                 : maxDistance;
     }
+
+    internal float MeasureMovementClearanceForDiagnostics(Vector3 direction, float maxDistance)
+        => MeasureMovementClearance(direction, maxDistance);
+
+    internal bool WouldNavigationMotionCollideForDiagnostics(Vector3 motion)
+        => TestMove(
+            GlobalTransform,
+            motion,
+            null,
+            NavigationTraversalSafeMargin,
+            recoveryAsCollision: false,
+            maxCollisions: 4);
 
     private void TrackTacticalMovement(float delta)
     {
