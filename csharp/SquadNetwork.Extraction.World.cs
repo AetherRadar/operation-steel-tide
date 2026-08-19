@@ -12,6 +12,7 @@ public partial class SquadNetwork
     public event Action<long>? ExtractionWorldReadyReceived;
     public event Action<byte[]>? ExtractionWorldStateReceived;
     public event Action<ExtractionMissionNetworkState>? ExtractionMissionStateReceived;
+    public event Action<ExtractionPlayerDamageNetworkEvent>? ExtractionPlayerDamageReceived;
     public event Action<long, int>? ExtractionObjectiveRequested;
     public event Action<long, int>? ExtractionReviveRequested;
 
@@ -122,6 +123,28 @@ public partial class SquadNetwork
             state.ReinforcementCountdown, state.EnemiesRemaining, state.ExtractionActive,
             state.ExtractionRemaining, state.MissionEnded, state.ExtractionDeparturePlaying,
             state.MissionSucceeded, state.WorldBossDefeated);
+    }
+
+    public void SendExtractionPlayerDamage(
+        long peerId,
+        ExtractionPlayerDamageNetworkEvent damageEvent)
+    {
+        if (!IsOnline || !IsHost || !IsExtractionSession || !ExtractionMatchStarted
+            || !ExtractionWorldLaunchStarted || peerId <= 1
+            || ExtractionSlotForPeer(peerId) <= 0)
+        {
+            return;
+        }
+        RpcId(peerId, MethodName.ReceiveExtractionPlayerDamage,
+            damageEvent.StateSequence,
+            damageEvent.AppliedDamage,
+            damageEvent.Health,
+            (int)damageEvent.Region,
+            damageEvent.SourcePosition,
+            (int)damageEvent.Source,
+            damageEvent.Down,
+            damageEvent.BodyBag,
+            damageEvent.ReviveUsed);
     }
 
     public void RequestExtractionObjective(int objectiveStage)
@@ -353,6 +376,40 @@ public partial class SquadNetwork
             reinforcementPending, reinforcementsDeployed, reinforcementCountdown,
             enemiesRemaining, extractionActive, extractionRemaining, missionEnded,
             extractionDeparturePlaying, missionSucceeded, worldBossDefeated));
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void ReceiveExtractionPlayerDamage(
+        int stateSequence,
+        float appliedDamage,
+        float health,
+        int region,
+        Vector3 sourcePosition,
+        int source,
+        bool down,
+        bool bodyBag,
+        bool reviveUsed)
+    {
+        if (IsHost || !IsExtractionSession || !ExtractionMatchStarted
+            || !ExtractionWorldLaunchStarted || stateSequence < 0
+            || !float.IsFinite(appliedDamage) || appliedDamage < 0.0f
+            || !float.IsFinite(health) || health < 0.0f
+            || !IsFinite(sourcePosition)
+            || !Enum.IsDefined(typeof(HitRegion), region)
+            || !Enum.IsDefined(typeof(ExtractionDamageSourceKind), source))
+        {
+            return;
+        }
+        ExtractionPlayerDamageReceived?.Invoke(new ExtractionPlayerDamageNetworkEvent(
+            stateSequence,
+            appliedDamage,
+            health,
+            (HitRegion)region,
+            sourcePosition,
+            (ExtractionDamageSourceKind)source,
+            down,
+            bodyBag,
+            reviveUsed));
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]

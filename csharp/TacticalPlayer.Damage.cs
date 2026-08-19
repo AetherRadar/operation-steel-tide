@@ -18,6 +18,21 @@ public partial class TacticalPlayer
         bool armorHit,
         Node? attacker,
         Vector3 hitPosition)
+        => ApplyIncomingDamageFeedback(
+            appliedDamage,
+            region,
+            armorHit,
+            attacker,
+            hitPosition,
+            DamageSource(attacker));
+
+    private void ApplyIncomingDamageFeedback(
+        float appliedDamage,
+        HitRegion region,
+        bool armorHit,
+        Node? attacker,
+        Vector3 hitPosition,
+        (string Key, string English) source)
     {
         var angle = IncomingDamageAngle(attacker, hitPosition);
         var intensity = Mathf.Clamp(appliedDamage / 38.0f, 0.32f, 1.0f);
@@ -32,8 +47,35 @@ public partial class TacticalPlayer
             -side * Mathf.Lerp(0.018f, 0.055f, intensity),
             -Mathf.Lerp(0.012f, 0.042f, intensity),
             Mathf.Cos(angle) * Mathf.Lerp(0.008f, 0.028f, intensity));
-        var (sourceKey, sourceEnglish) = DamageSource(attacker);
-        Hud?.ShowIncomingDamage(appliedDamage, angle, region, armorHit, sourceKey, sourceEnglish);
+        Hud?.ShowIncomingDamage(
+            appliedDamage,
+            angle,
+            region,
+            armorHit,
+            source.Key,
+            source.English);
+    }
+
+    public void ApplyExtractionNetworkDamageFeedback(
+        float appliedDamage,
+        HitRegion region,
+        Vector3 sourcePosition,
+        ExtractionDamageSourceKind source)
+    {
+        if (!float.IsFinite(appliedDamage) || appliedDamage <= 0.0f)
+        {
+            return;
+        }
+        Main?.InterruptLootForIncomingDamage();
+        CancelPlate();
+        CancelMedicalUse();
+        ApplyIncomingDamageFeedback(
+            appliedDamage,
+            region,
+            armorHit: false,
+            attacker: null,
+            hitPosition: sourcePosition,
+            source: DamageSource(source));
     }
 
     private float IncomingDamageAngle(Node? attacker, Vector3 hitPosition)
@@ -69,6 +111,16 @@ public partial class TacticalPlayer
         DriveableVehicle => ("damage_source_vehicle", "VEHICLE IMPACT"),
         _ => ("damage_source_environment", "ENVIRONMENTAL IMPACT")
     };
+
+    private static (string Key, string English) DamageSource(ExtractionDamageSourceKind source)
+        => source switch
+        {
+            ExtractionDamageSourceKind.EnemyOperator => ("damage_source_enemy", "ENEMY OPERATOR"),
+            ExtractionDamageSourceKind.AircraftStrike => ("damage_source_aircraft", "AIRCRAFT STRIKE"),
+            ExtractionDamageSourceKind.Explosion => ("damage_source_explosion", "EXPLOSIVE BLAST"),
+            ExtractionDamageSourceKind.Vehicle => ("damage_source_vehicle", "VEHICLE IMPACT"),
+            _ => ("damage_source_environment", "ENVIRONMENTAL IMPACT")
+        };
 
     private void UpdateDamageKick(float delta)
     {

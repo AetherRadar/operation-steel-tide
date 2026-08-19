@@ -12,9 +12,13 @@ public partial class FreightTerminalWorld
         bool bodyBag,
         bool reviveUsed)
     {
+        var authoritativeDown = down || bodyBag || health <= 0.0f;
         var wasDown = _localPlayerDowned;
         var wasEliminated = _localPlayerEliminated;
-        _player.ApplyExtractionNetworkHealth(health, down || bodyBag, reviveUsed || bodyBag);
+        _player.ApplyExtractionNetworkHealth(
+            health,
+            authoritativeDown,
+            reviveUsed || bodyBag);
         if (bodyBag)
         {
             _localPlayerDowned = false;
@@ -29,7 +33,7 @@ public partial class FreightTerminalWorld
             }
             return;
         }
-        if (down)
+        if (authoritativeDown)
         {
             _localPlayerDowned = true;
             _localPlayerEliminated = false;
@@ -46,6 +50,68 @@ public partial class FreightTerminalWorld
         if (wasDown || wasEliminated)
         {
             OnLocalPlayerRevived();
+        }
+    }
+
+    internal void OnSquadMateDamageApplied(
+        SquadMate mate,
+        float appliedDamage,
+        HitRegion region,
+        Vector3 hitPosition,
+        Node? attacker)
+    {
+        if (!IsExtractionNetworkMatch || !_squadNetwork.IsHost
+            || !mate.IsHumanProxy || mate.NetworkPeerId <= 1
+            || appliedDamage <= 0.0f && !mate.IsDowned && !mate.IsBodyBag)
+        {
+            return;
+        }
+        var sourcePosition = attacker is Node3D sourceNode && IsInstanceValid(sourceNode)
+            ? sourceNode.GlobalPosition
+            : hitPosition;
+        var source = attacker switch
+        {
+            EnemyOperator => ExtractionDamageSourceKind.EnemyOperator,
+            DestructibleAircraft or AircraftShell => ExtractionDamageSourceKind.AircraftStrike,
+            ExplosiveBarrel or FragGrenade => ExtractionDamageSourceKind.Explosion,
+            DriveableVehicle => ExtractionDamageSourceKind.Vehicle,
+            _ => ExtractionDamageSourceKind.Environment
+        };
+        _squadNetwork.SendExtractionPlayerDamage(
+            mate.NetworkPeerId,
+            new ExtractionPlayerDamageNetworkEvent(
+                unchecked(_extractionWorldSequence + 1),
+                appliedDamage,
+                mate.Health,
+                region,
+                sourcePosition,
+                source,
+                mate.IsDowned,
+                mate.IsBodyBag,
+                mate.ReviveUsed));
+    }
+
+    private void OnExtractionPlayerDamage(ExtractionPlayerDamageNetworkEvent damageEvent)
+    {
+        if (!IsExtractionNetworkClient)
+        {
+            return;
+        }
+        _player.ApplyExtractionNetworkDamageFeedback(
+            damageEvent.AppliedDamage,
+            damageEvent.Region,
+            damageEvent.SourcePosition,
+            damageEvent.Source);
+        if (_lastExtractionWorldSequence < damageEvent.StateSequence)
+        {
+            _minimumExtractionWorldSequence = System.Math.Max(
+                _minimumExtractionWorldSequence,
+                damageEvent.StateSequence);
+            ApplyExtractionLocalPlayerState(
+                damageEvent.Health,
+                damageEvent.Down,
+                damageEvent.BodyBag,
+                damageEvent.ReviveUsed);
         }
     }
 

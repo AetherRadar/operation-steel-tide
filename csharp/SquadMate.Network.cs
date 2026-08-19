@@ -6,6 +6,16 @@ public partial class SquadMate
 {
     public bool IsNetworkProxy { get; private set; }
 
+    private void CommitAuthoritativeRemoteCombatState()
+    {
+        if (!IsNetworkProxy)
+        {
+            return;
+        }
+        _remoteHealth = Health;
+        _remoteDown = IsDowned || IsBodyBag;
+    }
+
     public void SetExtractionRemoteState(
         OperatorRole role,
         Vector3 position,

@@ -16,6 +16,7 @@ public partial class FreightTerminalWorld
     private float _extractionMissionSnapshotTimer;
     private int _extractionWorldSequence;
     private int _lastExtractionWorldSequence = -1;
+    private int _minimumExtractionWorldSequence;
     private bool _applyingExtractionNetworkState;
 
     internal bool IsExtractionNetworkClient => !_demolitionMode
@@ -213,6 +214,7 @@ public partial class FreightTerminalWorld
     {
         if (!IsExtractionNetworkClient
             || !ExtractionWorldStateCodec.TryDecode(payload, out var state)
+            || state.Sequence < _minimumExtractionWorldSequence
             || state.Sequence <= _lastExtractionWorldSequence)
         {
             return;

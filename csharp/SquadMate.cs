@@ -726,11 +726,23 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             return true;
         }
         var localHeight = hitPosition.Y - GlobalPosition.Y;
-        var multiplier = localHeight > 1.5f ? 1.65f : localHeight < 0.58f ? 0.74f : 1.0f;
+        var region = localHeight > 1.5f
+            ? HitRegion.Head
+            : localHeight < 0.58f ? HitRegion.Limbs : HitRegion.Torso;
+        var multiplier = region switch
+        {
+            HitRegion.Head => 1.65f,
+            HitRegion.Limbs => 0.74f,
+            _ => 1.0f
+        };
+        var healthBefore = Health;
         Health = Mathf.Max(0.0f, Health - amount * multiplier);
+        var appliedDamage = Mathf.Max(0.0f, healthBefore - Health);
         UpdateHealthVisual();
         if (Health > 0.0f)
         {
+            CommitAuthoritativeRemoteCombatState();
+            Main.OnSquadMateDamageApplied(this, appliedDamage, region, hitPosition, attacker);
             return false;
         }
 
@@ -738,6 +750,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         if (ReviveUsed)
         {
             ConvertToBodyBag();
+            Main.OnSquadMateDamageApplied(this, appliedDamage, region, hitPosition, attacker);
             return true;
         }
 
@@ -746,7 +759,9 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         OnCombatIncapacitated();
         _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
         UpdateLabel();
+        CommitAuthoritativeRemoteCombatState();
         Main.OnSquadMateDowned(this);
+        Main.OnSquadMateDamageApplied(this, appliedDamage, region, hitPosition, attacker);
         return true;
     }
 
@@ -758,6 +773,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             return;
         }
         Health = Mathf.Clamp(Health + amount, 0.0f, MaxHealth);
+        CommitAuthoritativeRemoteCombatState();
         UpdateHealthVisual();
         UpdateLabel();
     }
@@ -771,6 +787,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         ReviveUsed = true;
         IsDowned = false;
         Health = Mathf.Clamp(healAmount, 1.0f, MaxHealth);
+        CommitAuthoritativeRemoteCombatState();
         ResetMovementProgress();
         _rig.Rotation = Vector3.Zero;
         UpdateHealthVisual();
@@ -784,7 +801,14 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             return false;
         }
+        var hitPosition = HitPoint(HitRegion.Torso);
         ConvertToBodyBag();
+        Main.OnSquadMateDamageApplied(
+            mate: this,
+            appliedDamage: 0.0f,
+            region: HitRegion.Torso,
+            hitPosition: hitPosition,
+            attacker: attacker);
         return true;
     }
 
@@ -799,6 +823,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         IsDowned = true;
         ReviveUsed = true;
         Health = 0.0f;
+        CommitAuthoritativeRemoteCombatState();
         Velocity = Vector3.Zero;
         CollisionLayer = 0;
         CollisionMask = 0;

@@ -83,10 +83,19 @@ public partial class TacticalPlayer
 
     public void ApplyExtractionNetworkHealth(float health, bool down, bool reviveUsed)
     {
+        var authoritativeDown = down || health <= 0.0f;
+        var becameDown = authoritativeDown && !IsDead;
         Health = Mathf.Clamp(health, 0.0f, MaxHealth);
         ReviveUsed = reviveUsed;
-        if (down)
+        if (authoritativeDown)
         {
+            if (becameDown)
+            {
+                Main?.InterruptLootForIncomingDamage();
+                CancelPlate();
+                CancelMedicalUse();
+                EjectFromVehicleIfAny();
+            }
             IsDead = true;
             Velocity = Vector3.Zero;
             _stance = PlayerStance.Prone;

@@ -26,6 +26,15 @@ public enum ExtractionSquadNetworkFlags
     HasWeapon = 1 << 4
 }
 
+public enum ExtractionDamageSourceKind
+{
+    Environment,
+    EnemyOperator,
+    AircraftStrike,
+    Explosion,
+    Vehicle
+}
+
 public enum ExtractionLootSourceKind
 {
     Static,
@@ -69,6 +78,17 @@ public readonly record struct ExtractionWorldNetworkState(
     int Sequence,
     ExtractionEnemyNetworkState[] Enemies,
     ExtractionSquadNetworkState[] Squad);
+
+public readonly record struct ExtractionPlayerDamageNetworkEvent(
+    int StateSequence,
+    float AppliedDamage,
+    float Health,
+    HitRegion Region,
+    Vector3 SourcePosition,
+    ExtractionDamageSourceKind Source,
+    bool Down,
+    bool BodyBag,
+    bool ReviveUsed);
 
 public readonly record struct ExtractionMissionNetworkState(
     string Phase,

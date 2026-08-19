@@ -55,6 +55,7 @@ public partial class FreightTerminalWorld
         _squadNetwork.ExtractionWorldReadyReceived += OnExtractionWorldReady;
         _squadNetwork.ExtractionWorldStateReceived += OnExtractionWorldState;
         _squadNetwork.ExtractionMissionStateReceived += OnExtractionMissionState;
+        _squadNetwork.ExtractionPlayerDamageReceived += OnExtractionPlayerDamage;
         _squadNetwork.ExtractionObjectiveRequested += OnExtractionObjectiveRequested;
         _squadNetwork.ExtractionReviveRequested += OnExtractionReviveRequested;
         _squadNetwork.ExtractionLootOpenRequested += OnExtractionLootOpenRequested;
@@ -550,6 +551,7 @@ public partial class FreightTerminalWorld
         _squadNetwork.ExtractionWorldReadyReceived -= OnExtractionWorldReady;
         _squadNetwork.ExtractionWorldStateReceived -= OnExtractionWorldState;
         _squadNetwork.ExtractionMissionStateReceived -= OnExtractionMissionState;
+        _squadNetwork.ExtractionPlayerDamageReceived -= OnExtractionPlayerDamage;
         _squadNetwork.ExtractionObjectiveRequested -= OnExtractionObjectiveRequested;
         _squadNetwork.ExtractionReviveRequested -= OnExtractionReviveRequested;
         _squadNetwork.ExtractionLootOpenRequested -= OnExtractionLootOpenRequested;
@@ -812,10 +814,19 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        var authoritative = IsExtractionNetworkMatch && _squadNetwork.IsHost;
+        var assignedSlot = authoritative
+            ? _squadNetwork.ExtractionSlotForPeer(peerId)
+            : -1;
+        if (authoritative && assignedSlot > 0
+            && _extractionSquadTombstones.ContainsKey(assignedSlot))
+        {
+            return;
+        }
         var proxy = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && mate.IsHumanProxy && mate.NetworkPeerId == peerId);
         if (proxy is null)
         {
-            var assignedSlot = _squadNetwork.IsExtractionSession
+            assignedSlot = _squadNetwork.IsExtractionSession
                 && _squadNetwork.ExtractionMatchStarted
                 ? _squadNetwork.ExtractionSlotForPeer(peerId)
                 : -1;
@@ -839,7 +850,6 @@ public partial class FreightTerminalWorld
             proxy = SpawnSquadMate(slot, role, true, peerId);
             _hud.ShowLocalizedMessage("player_joined", $"SQUADMATE CONNECTED  //  PEER {peerId}", OperatorRoles.Spec(role).Accent);
         }
-        var authoritative = IsExtractionNetworkMatch && _squadNetwork.IsHost;
         proxy.SetRemoteState(
             role,
             position,
