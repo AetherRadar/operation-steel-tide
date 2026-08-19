@@ -90,9 +90,13 @@ internal sealed class AuthoredOperatorVisual
     public Node3D Vest { get; }
     public Node3D Backpack { get; }
     public Node3D TeamPatch { get; }
+    public Color TeamColorForDiagnostics { get; private set; }
+    public Color GearTintForDiagnostics { get; private set; }
+    public int GearOverlayCountForDiagnostics { get; private set; }
 
     public void SetTeamColor(Color color)
     {
+        TeamColorForDiagnostics = color;
         var patchMaterial = new StandardMaterial3D
         {
             AlbedoColor = color,
@@ -105,6 +109,28 @@ internal sealed class AuthoredOperatorVisual
         foreach (var mesh in CombatModelLibrary.MeshesBelow(TeamPatch))
         {
             mesh.MaterialOverride = patchMaterial;
+        }
+    }
+
+    public void SetFactionAppearance(Color patchColor, Color gearTint)
+    {
+        SetTeamColor(patchColor);
+        GearTintForDiagnostics = gearTint;
+        GearOverlayCountForDiagnostics = 0;
+        var gearOverlay = new StandardMaterial3D
+        {
+            AlbedoColor = gearTint,
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            Metallic = 0.08f,
+            Roughness = 0.72f
+        };
+        foreach (var part in new[] { Helmet, Vest, Backpack })
+        {
+            foreach (var mesh in CombatModelLibrary.MeshesBelow(part))
+            {
+                mesh.MaterialOverlay = gearOverlay;
+                GearOverlayCountForDiagnostics++;
+            }
         }
     }
 }

@@ -44,13 +44,26 @@ public partial class FreightTerminalWorld
         var livingEnemies = _enemies.Where(IsInstanceValid).ToArray();
         var enemiesAuthored = livingEnemies.Length > 0
             && livingEnemies.All(enemy => enemy.UsesAuthoredOperatorForDiagnostics);
+        var garrison = livingEnemies.FirstOrDefault(enemy => !enemy.IsRivalSquad && !enemy.IsWorldBoss);
+        var rivals = livingEnemies.Where(enemy => enemy.IsRivalSquad).ToArray();
+        var garrisonColor = garrison?.AuthoredTeamColorForDiagnostics ?? Colors.Transparent;
+        var factionAppearance = garrison is not null
+            && rivals.Length >= 2
+            && garrison.AuthoredGearOverlayCountForDiagnostics >= 3
+            && garrisonColor.G > garrisonColor.R + 0.3f
+            && garrisonColor.B > garrisonColor.R + 0.2f
+            && rivals.All(enemy => enemy.AuthoredGearOverlayCountForDiagnostics >= 3)
+            && rivals.Any(enemy =>
+                ColorDistance(enemy.AuthoredTeamColorForDiagnostics, garrisonColor) > 0.55f)
+            && rivals.Select(enemy => enemy.AuthoredTeamColorForDiagnostics).Distinct().Count() >= 2;
         var valid = weaponGeometry
             && operatorGeometry
             && gsh18Geometry
             && desertEagleGeometry
             && playerAuthored
             && squadAuthored
-            && enemiesAuthored;
+            && enemiesAuthored
+            && factionAppearance;
 
         GD.Print(
             $"COMBAT_MODELS_CHECK weapon_loaded={weapon.Loaded} weapon_nodes={weapon.RequiredNodes} "
@@ -63,8 +76,18 @@ public partial class FreightTerminalWorld
             + $"deagle_meshes={desertEagle.MeshCount} deagle_materials={desertEagle.MaterialCount} "
             + $"deagle_size={desertEagle.Size} "
             + $"player_authored={playerAuthored} squad_authored={squadAuthored} "
-            + $"enemies_authored={enemiesAuthored} enemies={livingEnemies.Length}");
+            + $"enemies_authored={enemiesAuthored} enemies={livingEnemies.Length} "
+            + $"faction_appearance={factionAppearance} garrison_color={garrisonColor} "
+            + $"rival_colors={rivals.Select(enemy => enemy.AuthoredTeamColorForDiagnostics).Distinct().Count()}");
         GD.Print($"COMBAT_MODELS_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
+    }
+
+    private static float ColorDistance(Color left, Color right)
+    {
+        var red = left.R - right.R;
+        var green = left.G - right.G;
+        var blue = left.B - right.B;
+        return Mathf.Sqrt(red * red + green * green + blue * blue);
     }
 }
