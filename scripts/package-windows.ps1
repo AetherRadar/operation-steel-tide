@@ -1,6 +1,6 @@
 param(
     [string]$Godot = $env:GODOT_MONO,
-    [string]$Version = "1.3.5",
+    [string]$Version = "1.3.6",
     [string]$OutputRoot = "dist"
 )
 
