@@ -40,11 +40,20 @@ public partial class CombatHUD
     {
         if (origin == LootDragOrigin.Source)
         {
-            var action = LootInteractionPolicy.ResolveSourceActivation(
-                item.Kind,
-                _shownPlayer?.HasFireablePrimary ?? true);
+            var action = LootSourceActivationAction.MoveToBackpack;
+            if (item.Kind == LootItemKind.Weapon
+                && item.Weapon is not null
+                && _shownPlayer is { } player)
+            {
+                action = LootInteractionPolicy.ResolveSourceActivation(
+                    item.Kind,
+                    WeaponCatalog.IsSidearm(item.Weapon.Platform),
+                    player.HasFireablePrimary,
+                    player.HasSecondaryWeapon,
+                    player.HasSidearmWeapon);
+            }
             EmitSignal(
-                action == LootSourceActivationAction.EquipPrimaryWeapon
+                action == LootSourceActivationAction.EquipWeapon
                     ? SignalName.LootEquipRequested
                     : SignalName.LootTakeRequested,
                 item.Id);

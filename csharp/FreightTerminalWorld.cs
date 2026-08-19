@@ -3123,6 +3123,8 @@ public partial class FreightTerminalWorld : Node3D
         var item = source.Loot.Find(candidate => candidate.Kind == LootItemKind.Weapon);
         var sourceClickActivated = false;
         var emptyPrimaryAutoEquipped = false;
+        var emptySecondaryAutoEquipped = false;
+        var emptySidearmAutoEquipped = false;
         if (item is not null)
         {
             var expectedPlatform = item.Weapon?.Platform;
@@ -3135,8 +3137,74 @@ public partial class FreightTerminalWorld : Node3D
                 && _player.EquippedWeapon.Platform == expectedPlatform.Value
                 && source.Loot.TrueForAll(candidate => candidate.Id != item.Id);
         }
-        var policyValid = LootInteractionPolicy.ResolveSourceActivation(LootItemKind.Weapon, false)
-                == LootSourceActivationAction.EquipPrimaryWeapon
+        var secondaryProbe = new LootItem
+        {
+            Kind = LootItemKind.Weapon,
+            Weapon = WeaponCatalog.Build(WeaponPlatform.VSS, 1),
+            Grade = LootGrade.Rare
+        };
+        source.Loot.Add(secondaryProbe);
+        RefreshLootView();
+        await WaitFrames(2);
+        var secondaryClickActivated = _hud.ActivateLootCardForDiagnostics(
+            secondaryProbe.Id,
+            LootDragOrigin.Source);
+        await WaitFrames(2);
+        emptySecondaryAutoEquipped = secondaryClickActivated
+            && _player.HasSecondaryWeapon
+            && _player.SecondaryWeaponPlatform == WeaponPlatform.VSS
+            && _player.ActiveWeaponSlot == PlayerWeaponSlot.Secondary
+            && source.Loot.TrueForAll(candidate => candidate.Id != secondaryProbe.Id);
+
+        var sidearmProbe = new LootItem
+        {
+            Kind = LootItemKind.Weapon,
+            Weapon = WeaponCatalog.Build(WeaponPlatform.P226, 1),
+            Grade = LootGrade.Uncommon
+        };
+        source.Loot.Add(sidearmProbe);
+        RefreshLootView();
+        await WaitFrames(2);
+        var sidearmClickActivated = _hud.ActivateLootCardForDiagnostics(
+            sidearmProbe.Id,
+            LootDragOrigin.Source);
+        await WaitFrames(2);
+        emptySidearmAutoEquipped = sidearmClickActivated
+            && _player.HasSidearmWeapon
+            && _player.SidearmWeaponPlatform == WeaponPlatform.P226
+            && _player.ActiveWeaponSlot == PlayerWeaponSlot.Sidearm
+            && source.Loot.TrueForAll(candidate => candidate.Id != sidearmProbe.Id);
+
+        var policyValid = LootInteractionPolicy.ResolveSourceActivation(
+                LootItemKind.Weapon,
+                isSidearm: false,
+                hasPrimaryWeapon: false,
+                hasSecondaryWeapon: false,
+                hasSidearmWeapon: false) == LootSourceActivationAction.EquipWeapon
+            && LootInteractionPolicy.ResolveSourceActivation(
+                LootItemKind.Weapon,
+                isSidearm: false,
+                hasPrimaryWeapon: true,
+                hasSecondaryWeapon: false,
+                hasSidearmWeapon: true) == LootSourceActivationAction.EquipWeapon
+            && LootInteractionPolicy.ResolveSourceActivation(
+                LootItemKind.Weapon,
+                isSidearm: false,
+                hasPrimaryWeapon: true,
+                hasSecondaryWeapon: true,
+                hasSidearmWeapon: false) == LootSourceActivationAction.MoveToBackpack
+            && LootInteractionPolicy.ResolveSourceActivation(
+                LootItemKind.Weapon,
+                isSidearm: true,
+                hasPrimaryWeapon: true,
+                hasSecondaryWeapon: true,
+                hasSidearmWeapon: false) == LootSourceActivationAction.EquipWeapon
+            && LootInteractionPolicy.ResolveSourceActivation(
+                LootItemKind.Weapon,
+                isSidearm: true,
+                hasPrimaryWeapon: false,
+                hasSecondaryWeapon: false,
+                hasSidearmWeapon: true) == LootSourceActivationAction.MoveToBackpack
             && LootInteractionPolicy.ResolveSourceActivation(LootItemKind.Weapon, true)
                 == LootSourceActivationAction.MoveToBackpack
             && LootInteractionPolicy.ResolveSourceActivation(LootItemKind.Valuable, false)
@@ -3485,6 +3553,8 @@ public partial class FreightTerminalWorld : Node3D
             && sourceOpenVisualReady
             && sourceClickActivated
             && emptyPrimaryAutoEquipped
+            && emptySecondaryAutoEquipped
+            && emptySidearmAutoEquipped
             && policyValid
             && weaponMenuActivated
             && weaponMenuEquipped
@@ -3510,7 +3580,7 @@ public partial class FreightTerminalWorld : Node3D
             && searchDamageAborted
             && fatalSearchStateHandled
             && activeLootEndHandled;
-        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} wall_blocked={lootWallBlocked} wall_cleared={lootWallCleared} sealed_grade={sealedPickupConcealsGrade} sealed_open={sealedPickupOpens} sealed_empty_hidden={sealedPickupEmptyHidden} sealed_return_restored={sealedPickupReturnRestored} tree_loose={treeReconfiguredLoose} tree_sealed={treeReconfiguredSealed} open_empty_retained={openEmptyPickupRetained} empty_retired={emptyPickupRetired} source_sealed={sourceSealedBeforeOpen} search_concealed={contentsConcealedDuringSearch} first_open_ms={firstOpenMilliseconds} source_open_visual={sourceOpenVisualReady} single_click={sourceClickActivated} auto_equip={emptyPrimaryAutoEquipped} policy={policyValid} weapon_menu={weaponMenuActivated}/{weaponMenuReady}/{weaponMenuEquipped} item_menu={itemMenuActivated}/{itemMenuDropOnly}/{itemMenuDropped} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_mouse_observable={damageMouseObservable} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} search_damage_aborted={searchDamageAborted} search_damage_mouse={searchDamageMouseCaptured} fatal_search_state={fatalSearchStateHandled} fatal_input_primed={fatalInputPrimed} fatal_controls_locked={fatalControlLocked} active_loot_end={activeLootEndHandled} fatal_result={_hud.IsMissionResultVisible} fatal_mouse={fatalMouseVisible} fatal_mouse_observable={fatalMouseObservable} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} wall_blocked={lootWallBlocked} wall_cleared={lootWallCleared} sealed_grade={sealedPickupConcealsGrade} sealed_open={sealedPickupOpens} sealed_empty_hidden={sealedPickupEmptyHidden} sealed_return_restored={sealedPickupReturnRestored} tree_loose={treeReconfiguredLoose} tree_sealed={treeReconfiguredSealed} open_empty_retained={openEmptyPickupRetained} empty_retired={emptyPickupRetired} source_sealed={sourceSealedBeforeOpen} search_concealed={contentsConcealedDuringSearch} first_open_ms={firstOpenMilliseconds} source_open_visual={sourceOpenVisualReady} single_click={sourceClickActivated} auto_primary={emptyPrimaryAutoEquipped} auto_secondary={emptySecondaryAutoEquipped} auto_sidearm={emptySidearmAutoEquipped} policy={policyValid} weapon_menu={weaponMenuActivated}/{weaponMenuReady}/{weaponMenuEquipped} item_menu={itemMenuActivated}/{itemMenuDropOnly}/{itemMenuDropped} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_mouse_observable={damageMouseObservable} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} search_damage_aborted={searchDamageAborted} search_damage_mouse={searchDamageMouseCaptured} fatal_search_state={fatalSearchStateHandled} fatal_input_primed={fatalInputPrimed} fatal_controls_locked={fatalControlLocked} active_loot_end={activeLootEndHandled} fatal_result={_hud.IsMissionResultVisible} fatal_mouse={fatalMouseVisible} fatal_mouse_observable={fatalMouseObservable} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         GD.Print($"LOOT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
