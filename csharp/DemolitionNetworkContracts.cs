@@ -12,6 +12,41 @@ public enum DemolitionNetworkAction
     Defuse
 }
 
+public enum DemolitionNetworkPhase
+{
+    Lobby,
+    Buy,
+    Live,
+    Intermission,
+    Complete
+}
+
+public readonly record struct DemolitionLobbyMember(
+    long PeerId,
+    DemolitionNetworkTeam Team,
+    int Slot,
+    OperatorRole Role,
+    bool Host);
+
+public readonly record struct DemolitionLobbyState(
+    string MapId,
+    int PlayerCount,
+    int AlphaPlayers,
+    int BravoPlayers,
+    int Capacity,
+    bool MatchStarted);
+
+public readonly record struct DemolitionPurchaseNetworkResult(
+    int Round,
+    bool Approved,
+    DemolitionPurchaseSelection Selection,
+    int TotalCost,
+    int RemainingFunds);
+
+public readonly record struct DemolitionFundsNetworkState(
+    int Round,
+    int Funds);
+
 public readonly record struct DemolitionPlayerNetworkState(
     long PeerId,
     DemolitionNetworkTeam Team,
@@ -37,9 +72,10 @@ public readonly record struct DemolitionMatchNetworkState(
     int BravoScore,
     bool Overtime,
     bool Complete,
-    bool RoundActive,
-    bool BuyActive,
-    float Remaining,
+    DemolitionNetworkPhase Phase,
+    float PhaseRemaining,
+    int AlphaFunds,
+    int BravoFunds,
     int DevicePhase,
     int ActiveSite,
     int CarrierActorId,

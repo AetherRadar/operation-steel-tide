@@ -318,6 +318,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         if (IsNetworkProxy)
         {
             UpdateRemoteProxy(dt);
+            UpdateSkillAction(dt);
             AnimateRig(dt);
             return;
         }
@@ -663,12 +664,13 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         return true;
     }
 
-    public bool TriggerRemoteRoleAbility(Vector3 origin, Vector3 forward)
+    public bool TriggerRemoteRoleAbility(Vector3 origin, Vector3 forward, bool applyEffect)
     {
         var started = TriggerRoleAbility(origin + forward * 5.0f);
         if (started)
         {
             _networkAbilityPending = Role != OperatorRole.Assault;
+            _networkAbilityApplyEffect = applyEffect;
             _networkAbilityOrigin = origin;
             _networkAbilityForward = forward.Normalized();
         }
@@ -694,7 +696,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             {
                 if (_networkAbilityPending)
                 {
-                    Main.ApplyMedicSpray(this, _networkAbilityOrigin, _networkAbilityForward);
+                    if (_networkAbilityApplyEffect)
+                    {
+                        Main.ApplyMedicSpray(this, _networkAbilityOrigin, _networkAbilityForward);
+                    }
                 }
                 else
                 {
@@ -707,13 +712,17 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             }
             else
             {
-                Main.PerformReconScan(this, _networkAbilityPending ? _networkAbilityOrigin : GlobalPosition);
+                if (!_networkAbilityPending || _networkAbilityApplyEffect)
+                {
+                    Main.PerformReconScan(this, _networkAbilityPending ? _networkAbilityOrigin : GlobalPosition);
+                }
             }
         }
         if (_skillActionTime <= 0.0f)
         {
             _roleDevice.Visible = false;
             _networkAbilityPending = false;
+            _networkAbilityApplyEffect = false;
         }
     }
 

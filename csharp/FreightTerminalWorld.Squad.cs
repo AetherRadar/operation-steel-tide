@@ -42,11 +42,17 @@ public partial class FreightTerminalWorld
         _squadNetwork.RemotePeerLeft += OnRemoteSquadPeerLeft;
         _squadNetwork.RemoteAbilityReceived += OnRemoteSquadAbility;
         _squadNetwork.RemoteShotReceived += OnRemoteSquadShot;
+        _squadNetwork.DemolitionLobbyMemberReceived += OnDemolitionLobbyMember;
+        _squadNetwork.DemolitionLobbyStateReceived += OnDemolitionLobbyState;
+        _squadNetwork.DemolitionMatchStartReceived += OnDemolitionMatchStart;
         _squadNetwork.DemolitionPlayerStateReceived += OnDemolitionPlayerState;
         _squadNetwork.DemolitionActorStateReceived += OnDemolitionActorState;
         _squadNetwork.DemolitionMatchStateReceived += OnDemolitionMatchState;
         _squadNetwork.DemolitionAssignmentReceived += OnDemolitionNetworkAssignment;
         _squadNetwork.DemolitionActionReceived += OnDemolitionNetworkAction;
+        _squadNetwork.DemolitionPurchaseRequested += OnDemolitionNetworkPurchaseRequested;
+        _squadNetwork.DemolitionPurchaseResultReceived += OnDemolitionPurchaseResult;
+        _squadNetwork.DemolitionFundsStateReceived += OnDemolitionFundsState;
         _squadNetwork.ExtractionLobbyMemberReceived += OnExtractionLobbyMember;
         _squadNetwork.ExtractionLobbyStateReceived += OnExtractionLobbyState;
         _squadNetwork.ExtractionAssignmentReceived += OnExtractionAssignment;
@@ -85,7 +91,12 @@ public partial class FreightTerminalWorld
             value is "--validate-demolition-network-host"
                 or "--validate-demolition-network-client"
                 or "--validate-demolition-network-alpha-host"
-                or "--validate-demolition-network-alpha-client");
+                or "--validate-demolition-network-alpha-client"
+                or "--validate-demolition-network-late-client"
+                or "--validate-demolition-network-mismatch-client"
+                or "--validate-demolition-network-roster-host"
+                or "--validate-demolition-network-roster-alpha-client"
+                or "--validate-demolition-network-roster-bravo-client");
         var operationsOfficeCommand = Array.Exists(args, value =>
             value == "--validate-operations-office"
             || value == "--validate-demolition"
@@ -97,6 +108,11 @@ public partial class FreightTerminalWorld
             || value == "--validate-demolition-network-client"
             || value == "--validate-demolition-network-alpha-host"
             || value == "--validate-demolition-network-alpha-client"
+            || value == "--validate-demolition-network-late-client"
+            || value == "--validate-demolition-network-mismatch-client"
+            || value == "--validate-demolition-network-roster-host"
+            || value == "--validate-demolition-network-roster-alpha-client"
+            || value == "--validate-demolition-network-roster-bravo-client"
             || value == "--capture-operations-office"
             || value == "--capture-demolition-briefing"
             || value == "--capture-demolition-buy"
@@ -266,13 +282,19 @@ public partial class FreightTerminalWorld
         _squadOrder = SquadOrder.Follow;
         ResetSquadLeaderTrail(_player.GlobalPosition);
 
-        if (_demolitionMode)
+        var reuseDemolitionSession = _demolitionMode
+            && _squadNetwork.IsOnline
+            && _squadNetwork.IsDemolitionSession
+            && _squadNetwork.DemolitionMatchStarted
+            && string.Equals(_squadNetwork.DemolitionMapId, _demolitionSelectedMapId,
+                StringComparison.OrdinalIgnoreCase);
+        if (_demolitionMode && !reuseDemolitionSession)
         {
             _squadNetwork.ConfigureDemolitionSession(_demolitionSelectedMapId, _demolitionLocalNetworkTeam);
         }
-        else if (!_squadNetwork.IsExtractionSession
+        else if (!_demolitionMode && (!_squadNetwork.IsExtractionSession
             || !string.Equals(_squadNetwork.ExtractionMapId, _activeDeploymentMapId,
-                StringComparison.OrdinalIgnoreCase))
+                StringComparison.OrdinalIgnoreCase)))
         {
             _squadNetwork.ConfigureExtractionSession(_activeDeploymentMapId);
         }
@@ -280,7 +302,7 @@ public partial class FreightTerminalWorld
         var reuseExtractionSession = !_demolitionMode
             && _squadNetwork.IsOnline
             && _squadNetwork.IsExtractionSession;
-        if (!reuseExtractionSession)
+        if (!reuseExtractionSession && !reuseDemolitionSession)
         {
             switch (mode)
             {
@@ -500,6 +522,24 @@ public partial class FreightTerminalWorld
     {
         if (!extractionSession)
         {
+            var demolitionSession = _demolitionJoinPending
+                || _demolitionLobbyDeployment is not null
+                || _demolitionNetworkClient
+                || _demolitionMode && _squadDeployed;
+            if (!demolitionSession)
+            {
+                return;
+            }
+            var battlefieldActive = _demolitionMode && _squadDeployed;
+            CancelDemolitionNetworkLobby(closeNetwork: false);
+            _hud.SetDemolitionNetworkConnectionPending(
+                false,
+                "HOST LOST  //  RETURNING TO OPERATIONS");
+            if (battlefieldActive)
+            {
+                GetTree().Paused = false;
+                CallDeferred(MethodName.ReloadAfterExtractionConnectionLost);
+            }
             return;
         }
         var sharedWorldActive = _networkMatchReloadQueued
@@ -538,11 +578,17 @@ public partial class FreightTerminalWorld
         _squadNetwork.RemotePeerLeft -= OnRemoteSquadPeerLeft;
         _squadNetwork.RemoteAbilityReceived -= OnRemoteSquadAbility;
         _squadNetwork.RemoteShotReceived -= OnRemoteSquadShot;
+        _squadNetwork.DemolitionLobbyMemberReceived -= OnDemolitionLobbyMember;
+        _squadNetwork.DemolitionLobbyStateReceived -= OnDemolitionLobbyState;
+        _squadNetwork.DemolitionMatchStartReceived -= OnDemolitionMatchStart;
         _squadNetwork.DemolitionPlayerStateReceived -= OnDemolitionPlayerState;
         _squadNetwork.DemolitionActorStateReceived -= OnDemolitionActorState;
         _squadNetwork.DemolitionMatchStateReceived -= OnDemolitionMatchState;
         _squadNetwork.DemolitionAssignmentReceived -= OnDemolitionNetworkAssignment;
         _squadNetwork.DemolitionActionReceived -= OnDemolitionNetworkAction;
+        _squadNetwork.DemolitionPurchaseRequested -= OnDemolitionNetworkPurchaseRequested;
+        _squadNetwork.DemolitionPurchaseResultReceived -= OnDemolitionPurchaseResult;
+        _squadNetwork.DemolitionFundsStateReceived -= OnDemolitionFundsState;
         _squadNetwork.ExtractionLobbyMemberReceived -= OnExtractionLobbyMember;
         _squadNetwork.ExtractionLobbyStateReceived -= OnExtractionLobbyState;
         _squadNetwork.ExtractionAssignmentReceived -= OnExtractionAssignment;
@@ -868,6 +914,8 @@ public partial class FreightTerminalWorld
 
     private void OnRemoteSquadPeerLeft(long peerId)
     {
+        var demolitionLobby = !_demolitionMode && _demolitionLobbyDeployment is not null;
+        var demolitionPlayer = _demolitionNetworkPlayers.GetValueOrDefault(peerId);
         var proxy = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && mate.IsHumanProxy && mate.NetworkPeerId == peerId);
         if (proxy is not null)
         {
@@ -878,16 +926,26 @@ public partial class FreightTerminalWorld
         EnsureAiSquadFill();
         TryLaunchExtractionWorldIfReady();
         OnDemolitionNetworkPeerLeft(peerId);
-        _hud.ShowLocalizedMessage("player_left", "SQUADMATE DISCONNECTED  //  AI TOOK CONTROL", new Color(0.95f, 0.68f, 0.26f));
+        var message = demolitionLobby
+            ? "PLAYER DISCONNECTED  //  LOBBY UPDATED"
+            : _demolitionMode && demolitionPlayer.PeerId != 0
+                && demolitionPlayer.Team != _demolitionLocalNetworkTeam
+                ? "OPPONENT DISCONNECTED  //  AI TOOK CONTROL"
+                : "SQUADMATE DISCONNECTED  //  AI TOOK CONTROL";
+        _hud.ShowLocalizedMessage("player_left", message, new Color(0.95f, 0.68f, 0.26f));
     }
 
     private void OnRemoteSquadAbility(long peerId, OperatorRole role, Vector3 origin, Vector3 forward)
     {
         _remoteNetworkAbilityCount++;
+        if (HandleDemolitionRemoteAbility(peerId, role, origin, forward))
+        {
+            return;
+        }
         var proxy = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && mate.IsHumanProxy && mate.NetworkPeerId == peerId);
         if (proxy is not null)
         {
-            proxy.TriggerRemoteRoleAbility(origin, forward);
+            proxy.TriggerRemoteRoleAbility(origin, forward, _squadNetwork.IsHost);
         }
     }
 
@@ -921,14 +979,18 @@ public partial class FreightTerminalWorld
         }
         if (_demolitionMode)
         {
-            if (IsDemolitionNetworkHostileShot(peerId, enemyId))
+            if (!_squadNetwork.IsHost || !_demolitionRoundActive)
             {
-                Node? attacker = proxy;
-                if (attacker is null && IsInstanceValid(opponentProxy))
-                {
-                    attacker = opponentProxy;
-                }
-                ApplyDemolitionNetworkDamage(enemyId, damage, end, attacker);
+                return;
+            }
+            if (IsDemolitionNetworkHostileShot(peerId, enemyId)
+                && IsDemolitionRemoteShotValid(peerId, enemyId, origin, end, out var attacker))
+            {
+                ApplyDemolitionNetworkDamage(
+                    enemyId,
+                    Mathf.Clamp(damage, 0.0f, 180.0f),
+                    end,
+                    attacker);
             }
             return;
         }

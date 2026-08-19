@@ -1731,7 +1731,9 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         {
             return true;
         }
-        if (IsNetworkProxy && Main?.IsExtractionNetworkClient == true)
+        if (IsNetworkProxy
+            && (Main?.IsExtractionNetworkClient == true
+                || Main?.IsDemolitionNetworkClient == true))
         {
             var proxyHitHeight = hitPosition.Y - GlobalPosition.Y;
             LastHitWasHeadshot = proxyHitHeight > 1.48f;

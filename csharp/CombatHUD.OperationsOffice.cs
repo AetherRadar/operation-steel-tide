@@ -56,12 +56,40 @@ public partial class CombatHUD
         => IsInstanceValid(_demolitionBriefingView) && _demolitionBriefingView.IntentSignalsConnected;
     public bool DemolitionBriefingLanguageReady
         => IsInstanceValid(_demolitionBriefingView) && _demolitionBriefingView.LanguageMatches(_language);
+    public bool IsDemolitionNetworkLobbyWaiting
+        => IsInstanceValid(_demolitionBriefingView) && _demolitionBriefingView.IsNetworkLobbyWaiting;
+    public int DemolitionNetworkLobbyPlayerCount
+        => IsInstanceValid(_demolitionBriefingView) ? _demolitionBriefingView.NetworkLobbyPlayerCount : 0;
+    public bool DemolitionNetworkLobbyCanStart
+        => IsInstanceValid(_demolitionBriefingView) && _demolitionBriefingView.NetworkLobbyCanStart;
 
     public void SetDemolitionNetworkConnectionPending(bool pending, string status)
     {
         if (IsInstanceValid(_demolitionBriefingView))
         {
             _demolitionBriefingView.SetNetworkConnectionPending(pending, status);
+        }
+    }
+
+    public void SetDemolitionNetworkLobbyWaiting(
+        bool host,
+        int players,
+        int capacity,
+        bool canStart,
+        string status)
+    {
+        if (IsInstanceValid(_demolitionBriefingView))
+        {
+            _demolitionBriefingView.SetNetworkLobbyWaiting(
+                host, players, capacity, canStart, status);
+        }
+    }
+
+    public void ClearDemolitionNetworkLobbyWaiting()
+    {
+        if (IsInstanceValid(_demolitionBriefingView))
+        {
+            _demolitionBriefingView.ClearNetworkLobbyWaiting();
         }
     }
     public OperatorRole SelectedDemolitionRole

@@ -10,7 +10,9 @@ public partial class EnemyOperator
     public const float WorldBossMaxHealth = 900.0f;
 
     public bool IsWorldBoss { get; private set; }
-    public float MaxHealth => IsWorldBoss ? WorldBossMaxHealth : 100.0f;
+    public float MaxHealth => IsWorldBoss
+        ? WorldBossMaxHealth
+        : IsHumanProxy ? OperatorRoles.Spec(NetworkRole).MaxHealth : 100.0f;
     public float HealthRatio => Mathf.Clamp(_health / MaxHealth, 0.0f, 1.0f);
     public int WorldBossPhase => HealthRatio > 0.66f ? 1 : HealthRatio > 0.3f ? 2 : 3;
     public int WorldBossPatrolRouteCount => _worldBossPatrolRoute.Length;

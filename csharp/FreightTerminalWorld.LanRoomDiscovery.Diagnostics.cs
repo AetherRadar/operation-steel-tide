@@ -121,7 +121,7 @@ public partial class FreightTerminalWorld
                     LanRoomKind.Demolition,
                     DemolitionMapCatalog.HarborLocksId,
                     2,
-                    SquadNetwork.MaximumPlayers)
+                    SquadNetwork.DemolitionCapacity)
             });
             briefing.SelectLanRoomForDiagnostics(0);
             demolitionSelection = briefing.LanRoomBrowserUiReady

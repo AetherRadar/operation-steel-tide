@@ -17,11 +17,8 @@ public partial class FreightTerminalWorld
     private bool _demolitionNetworkClient;
     private float _demolitionNetworkSnapshotTimer;
     private int _demolitionNetworkRound;
-    private bool _demolitionJoinPending;
-    private OperatorRole _pendingDemolitionRole;
-    private string _pendingDemolitionMapId = string.Empty;
-    private string _pendingDemolitionAddress = string.Empty;
-    private DemolitionNetworkTeam _pendingDemolitionTeam;
+    private DemolitionNetworkPhase _demolitionNetworkPhase = DemolitionNetworkPhase.Lobby;
+    private DemolitionDevicePhase _networkDevicePhase = DemolitionDevicePhase.Inactive;
     private int _networkDeviceCarrierActorId = -1;
 
     public DemolitionNetworkTeam DemolitionLocalNetworkTeam => _demolitionLocalNetworkTeam;
@@ -31,8 +28,9 @@ public partial class FreightTerminalWorld
         state => state.Team == _demolitionLocalNetworkTeam);
     public int DemolitionNetworkOpponentHumanCount => _demolitionNetworkPlayers.Values.Count(
         state => state.Team != _demolitionLocalNetworkTeam);
+    public DemolitionNetworkPhase DemolitionNetworkCurrentPhase => _demolitionNetworkPhase;
 
-    private bool IsDemolitionNetworkClient
+    internal bool IsDemolitionNetworkClient
         => _demolitionMode && _demolitionNetworkClient;
 
     private DemolitionTeam LocalDemolitionSide
@@ -69,93 +67,74 @@ public partial class FreightTerminalWorld
 
     private static int DemolitionActorSlot(int actorId) => actorId % 100;
 
-    private void ConfigureDemolitionNetwork(
-        SquadSessionMode mode,
-        string address,
-        DemolitionNetworkTeam team)
+    private Node3D? DemolitionActorForId(int actorId)
+    {
+        if (actorId == LocalDemolitionActorId)
+        {
+            return _player;
+        }
+        if (actorId < DemolitionAlphaActorBase)
+        {
+            return null;
+        }
+        var team = DemolitionActorTeam(actorId);
+        var slot = DemolitionActorSlot(actorId);
+        if (team == _demolitionLocalNetworkTeam)
+        {
+            return _squadMates.FirstOrDefault(mate => IsInstanceValid(mate)
+                && mate.SquadSlot == slot);
+        }
+        return _demolitionOpponents.FirstOrDefault(opponent => IsInstanceValid(opponent)
+            && opponent.NetworkId == actorId);
+    }
+
+    private void InitializeDemolitionNetworkRuntime(SquadSessionMode mode)
     {
         _demolitionLocalNetworkTeam = mode == SquadSessionMode.Join
-            ? team
+            ? _squadNetwork.RequestedDemolitionTeam
             : DemolitionNetworkTeam.Alpha;
-        _demolitionLocalNetworkSlot = 0;
+        _demolitionLocalNetworkSlot = mode == SquadSessionMode.Join
+            ? Mathf.Clamp(_squadNetwork.LocalDemolitionSlot, 0, DemolitionSquadSize - 1)
+            : 0;
         _demolitionNetworkClient = mode == SquadSessionMode.Join;
         _demolitionNetworkPlayers.Clear();
         _remoteDemolitionOpponents.Clear();
         _demolitionNetworkRound = 0;
+        _demolitionNetworkPhase = DemolitionNetworkPhase.Lobby;
+        _networkDevicePhase = DemolitionDevicePhase.Inactive;
         _networkDeviceCarrierActorId = -1;
         _demolitionNetworkActionReceivedForDiagnostics = false;
         _demolitionNetworkActionAppliedForDiagnostics = false;
         _demolitionNetworkActionDistanceForDiagnostics = -1.0f;
-        _squadNetwork.ConfigureDemolitionSession(_demolitionSelectedMapId, _demolitionLocalNetworkTeam);
-    }
-
-    private void BeginPendingDemolitionJoin(
-        OperatorRole role,
-        string mapId,
-        string address,
-        DemolitionNetworkTeam team)
-    {
-        if (_demolitionJoinPending)
-        {
-            return;
-        }
-        _demolitionJoinPending = true;
-        _pendingDemolitionRole = role;
-        _pendingDemolitionMapId = mapId;
-        _pendingDemolitionAddress = address;
-        _pendingDemolitionTeam = team;
-        _squadNetwork.ConfigureDemolitionSession(mapId, team);
-        _hud.SetDemolitionNetworkConnectionPending(true, $"CONNECTING  //  {address}");
-        var error = _squadNetwork.Join(address);
-        if (error != Error.Ok)
-        {
-            CancelPendingNetworkDeployment();
-        }
-    }
-
-    private void CompletePendingDemolitionJoin()
-    {
-        if (!_demolitionJoinPending)
-        {
-            return;
-        }
-        var role = _pendingDemolitionRole;
-        var mapId = _pendingDemolitionMapId;
-        var address = _pendingDemolitionAddress;
-        var team = _pendingDemolitionTeam;
-        _demolitionJoinPending = false;
-        _hud.SetDemolitionNetworkConnectionPending(false, _squadNetwork.Status);
-        OnDemolitionDeploymentRequested(
-            (int)role,
-            (int)WeaponPlatform.M4A1,
-            1,
-            (int)WeaponPlatform.P226,
-            mapId,
-            (int)SquadSessionMode.Join,
-            address,
-            (int)team);
-    }
-
-    private void CancelPendingDemolitionJoin()
-    {
-        if (!_demolitionJoinPending)
-        {
-            return;
-        }
-        _demolitionJoinPending = false;
-        _hud.SetDemolitionNetworkConnectionPending(
-            false,
-            "CONNECTION FAILED  //  ALLOW LOCAL NETWORK / UDP 28960");
+        InitializeRemoteDemolitionEconomies();
     }
 
     private void OnDemolitionNetworkAssignment(DemolitionNetworkTeam team, int slot)
     {
-        if (!_demolitionMode || !_demolitionNetworkClient)
+        if (!_demolitionNetworkClient && _demolitionLobbyDeployment?.Mode != SquadSessionMode.Join)
         {
+            return;
+        }
+        if (slot < 0)
+        {
+            _demolitionJoinRejectionCode = slot;
+            var status = slot switch
+            {
+                -2 => "JOIN FAILED  //  HOST IS USING A DIFFERENT MAP",
+                -3 => "JOIN FAILED  //  MATCH ALREADY STARTED",
+                _ => "ROOM FULL  //  SELECT ANOTHER TEAM OR ROOM"
+            };
+            _squadNetwork.Close();
+            CancelDemolitionNetworkLobby(closeNetwork: false);
+            _hud.SetDemolitionNetworkConnectionPending(false, status);
             return;
         }
         _demolitionLocalNetworkTeam = team;
         _demolitionLocalNetworkSlot = Mathf.Clamp(slot, 0, DemolitionSquadSize - 1);
+        if (!_demolitionMode)
+        {
+            return;
+        }
         var conflictingAi = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate)
             && !mate.IsHumanProxy && mate.SquadSlot == _demolitionLocalNetworkSlot);
         if (conflictingAi is not null)
@@ -174,7 +153,6 @@ public partial class FreightTerminalWorld
         {
             return;
         }
-        _demolitionNetworkPlayers[state.PeerId] = state;
         if (state.Team == _demolitionLocalNetworkTeam)
         {
             RemoveRemoteDemolitionOpponent(state.PeerId);
@@ -195,16 +173,44 @@ public partial class FreightTerminalWorld
             var authoritativeDead = _squadNetwork.IsHost
                 ? mate.IsDowned || mate.IsBodyBag
                 : state.Dead;
-            mate.SetRemoteState(state.Role, state.Position, state.Rotation,
-                authoritativeHealth, authoritativeDead);
+            var acceptedState = state with
+            {
+                Health = authoritativeHealth,
+                Dead = authoritativeDead
+            };
+            _demolitionNetworkPlayers[state.PeerId] = acceptedState;
+            mate.SetRemoteState(
+                acceptedState.Role,
+                acceptedState.Position,
+                acceptedState.Rotation,
+                acceptedState.Health,
+                acceptedState.Dead);
+            if (_squadNetwork.IsHost)
+            {
+                _squadNetwork.RelayDemolitionPlayerState(acceptedState);
+            }
             return;
         }
 
         var opponent = EnsureRemoteDemolitionOpponent(state);
         var opponentHealth = _squadNetwork.IsHost ? opponent.CurrentHealth : state.Health;
         var opponentDead = _squadNetwork.IsHost ? opponent.IsDead : state.Dead;
-        opponent.SetRemoteNetworkState(state.Role, state.Position, state.Rotation,
-            opponentHealth, opponentDead);
+        var acceptedOpponentState = state with
+        {
+            Health = opponentHealth,
+            Dead = opponentDead
+        };
+        _demolitionNetworkPlayers[state.PeerId] = acceptedOpponentState;
+        opponent.SetRemoteNetworkState(
+            acceptedOpponentState.Role,
+            acceptedOpponentState.Position,
+            acceptedOpponentState.Rotation,
+            acceptedOpponentState.Health,
+            acceptedOpponentState.Dead);
+        if (_squadNetwork.IsHost)
+        {
+            _squadNetwork.RelayDemolitionPlayerState(acceptedOpponentState);
+        }
     }
 
     private EnemyOperator EnsureRemoteDemolitionOpponent(DemolitionPlayerNetworkState state)
@@ -212,6 +218,7 @@ public partial class FreightTerminalWorld
         if (_remoteDemolitionOpponents.TryGetValue(state.PeerId, out var existing)
             && IsInstanceValid(existing))
         {
+            existing.ConfigureNetworkProxy(state.PeerId, state.Role, human: true);
             return existing;
         }
         var actorId = DemolitionActorId(state.Team, state.Slot);
@@ -269,7 +276,17 @@ public partial class FreightTerminalWorld
     private void OnDemolitionNetworkPeerLeft(long peerId)
     {
         _demolitionNetworkPlayers.Remove(peerId);
+        _demolitionBuyReadyPeers.Remove(peerId);
+        _demolitionRemoteEconomies.Remove(peerId);
         RemoveRemoteDemolitionOpponent(peerId);
+        if (_demolitionMode)
+        {
+            EnsureAiSquadFill();
+        }
+        if (_squadNetwork.IsHost && _demolitionBuyPhaseActive)
+        {
+            TryBeginNetworkDemolitionLivePhase();
+        }
     }
 
     private void UpdateDemolitionNetwork(float delta)
@@ -333,15 +350,33 @@ public partial class FreightTerminalWorld
         var position = IsInstanceValid(_demolitionDevice)
             ? _demolitionDevice!.GlobalPosition
             : _demolitionDeviceGroundPosition;
+        var phase = _demolitionMatch.IsComplete || _missionEnded
+            ? DemolitionNetworkPhase.Complete
+            : _demolitionBuyPhaseActive
+                ? DemolitionNetworkPhase.Buy
+                : _demolitionRoundActive
+                    ? DemolitionNetworkPhase.Live
+                    : _demolitionIntermissionRemaining > 0.0f
+                        ? DemolitionNetworkPhase.Intermission
+                        : DemolitionNetworkPhase.Lobby;
+        var phaseRemaining = phase switch
+        {
+            DemolitionNetworkPhase.Buy => _demolitionBuyRemaining,
+            DemolitionNetworkPhase.Live => _demolitionRemaining,
+            DemolitionNetworkPhase.Intermission => _demolitionIntermissionRemaining,
+            _ => 0.0f
+        };
+        _demolitionNetworkPhase = phase;
         return new DemolitionMatchNetworkState(
             _demolitionMatch.CurrentRound,
             _demolitionMatch.PlayerScore,
             _demolitionMatch.OpponentScore,
             _demolitionMatch.IsOvertime,
             _demolitionMatch.IsComplete,
-            _demolitionRoundActive,
-            _demolitionBuyPhaseActive,
-            _demolitionRemaining,
+            phase,
+            phaseRemaining,
+            _demolitionPlayerEconomy.Funds,
+            _demolitionOpponentEconomy.Funds,
             (int)_demolitionDeviceLifecycle.Phase,
             _demolitionActiveSite,
             carrierActorId,
@@ -392,7 +427,10 @@ public partial class FreightTerminalWorld
         var opponent = _demolitionOpponents.FirstOrDefault(candidate => IsInstanceValid(candidate)
             && candidate.NetworkId == state.ActorId)
             ?? SpawnDemolitionOpponentAtSlot(slot, team);
-        opponent.ConfigureNetworkProxy(-state.ActorId, state.Role, state.Human);
+        var proxyPeerId = state.Human && opponent.IsHumanProxy && opponent.NetworkPeerId > 0
+            ? opponent.NetworkPeerId
+            : -state.ActorId;
+        opponent.ConfigureNetworkProxy(proxyPeerId, state.Role, state.Human);
         opponent.SetRemoteNetworkState(state.Role, state.Position, state.Rotation, state.Health, state.Dead);
     }
 
@@ -402,28 +440,31 @@ public partial class FreightTerminalWorld
         {
             return;
         }
-        var roundChanged = _demolitionNetworkRound != 0 && _demolitionNetworkRound != state.CurrentRound;
+        var previousRound = _demolitionNetworkRound;
+        var previousPhase = _demolitionNetworkPhase;
         _demolitionNetworkRound = state.CurrentRound;
+        _demolitionNetworkPhase = state.Phase;
         _demolitionMatch.ApplyNetworkState(
             state.CurrentRound, state.AlphaScore, state.BravoScore, state.Overtime, state.Complete);
-        _demolitionRoundActive = state.RoundActive;
-        _demolitionBuyPhaseActive = state.BuyActive;
-        _demolitionRemaining = state.Remaining;
+        var opponentFunds = _demolitionLocalNetworkTeam == DemolitionNetworkTeam.Alpha
+            ? state.BravoFunds
+            : state.AlphaFunds;
+        _demolitionOpponentEconomy.ApplyNetworkFunds(opponentFunds);
+        _networkDevicePhase = (DemolitionDevicePhase)state.DevicePhase;
         _demolitionDevicePlanted = state.DevicePhase == (int)DemolitionDevicePhase.Planted;
         _demolitionActiveSite = state.ActiveSite;
         _networkDeviceCarrierActorId = state.CarrierActorId;
-        if (roundChanged)
-        {
-            ResetDemolitionSquad();
-            SpawnDemolitionOpponents();
-        }
         if (IsInstanceValid(_demolitionDevice))
         {
             _demolitionDevice!.GlobalPosition = state.DevicePosition;
             _demolitionDevice.Visible = state.DevicePhase is not (int)DemolitionDevicePhase.Inactive
                 and not (int)DemolitionDevicePhase.Detonated;
         }
-        if (state.Complete && !_missionEnded)
+        ApplyDemolitionNetworkClientPhase(
+            state,
+            previousRound != state.CurrentRound,
+            previousPhase != state.Phase);
+        if ((state.Complete || state.Phase == DemolitionNetworkPhase.Complete) && !_missionEnded)
         {
             CompleteDemolitionMatch(GameLocalization.Get(
                 "mission_complete",
@@ -431,23 +472,138 @@ public partial class FreightTerminalWorld
                 "MATCH COMPLETE"));
             return;
         }
-        UpdateDemolitionRoundHud();
+    }
+
+    private void ApplyDemolitionNetworkClientPhase(
+        DemolitionMatchNetworkState state,
+        bool roundChanged,
+        bool phaseChanged)
+    {
+        switch (state.Phase)
+        {
+            case DemolitionNetworkPhase.Buy:
+                if (roundChanged || phaseChanged || !_demolitionBuyPhaseActive)
+                {
+                    PrepareDemolitionRoundRuntime(resolveOpponentBuy: false);
+                    BeginDemolitionBuyPhase(state.PhaseRemaining);
+                }
+                else
+                {
+                    _demolitionBuyRemaining = state.PhaseRemaining;
+                    if (!_demolitionLocalBuyReady)
+                    {
+                        _hud.UpdateDemolitionBuy(DemolitionBuyState());
+                    }
+                }
+                break;
+            case DemolitionNetworkPhase.Live:
+                if (!_demolitionRoundActive || phaseChanged)
+                {
+                    ApplyDemolitionNetworkBuyFallback();
+                    _demolitionBuyPhaseActive = false;
+                    _demolitionBuyRemaining = 0.0f;
+                    _demolitionRoundActive = true;
+                    _hud.HideDemolitionBuy();
+                    SetDemolitionActorsFrozen(false);
+                    RefreshDemolitionStrategies(true);
+                    Input.MouseMode = Input.MouseModeEnum.Captured;
+                }
+                _demolitionRemaining = state.PhaseRemaining;
+                UpdateDemolitionRoundHud();
+                break;
+            case DemolitionNetworkPhase.Intermission:
+                _demolitionBuyPhaseActive = false;
+                _demolitionRoundActive = false;
+                _demolitionIntermissionRemaining = state.PhaseRemaining;
+                _hud.HideDemolitionBuy();
+                SetDemolitionActorsFrozen(true);
+                UpdateDemolitionNetworkIntermissionHud();
+                break;
+            case DemolitionNetworkPhase.Complete:
+                _demolitionBuyPhaseActive = false;
+                _demolitionRoundActive = false;
+                _demolitionIntermissionRemaining = 0.0f;
+                _hud.HideDemolitionBuy();
+                SetDemolitionActorsFrozen(true);
+                break;
+            default:
+                _demolitionBuyPhaseActive = false;
+                _demolitionRoundActive = false;
+                SetDemolitionActorsFrozen(true);
+                break;
+        }
+    }
+
+    private void UpdateDemolitionNetworkIntermissionHud()
+    {
+        var label = GameLocalization.IsChinese(_languageSetting)
+            ? $"\u4e0b\u4e00\u5c40  //  {_demolitionIntermissionRemaining:0.0}s  //  \u5df1\u65b9 {LocalDemolitionScore}:{OpposingDemolitionScore} \u654c\u65b9"
+            : $"NEXT ROUND  //  {_demolitionIntermissionRemaining:0.0}s  //  YOU {LocalDemolitionScore}:{OpposingDemolitionScore} ENEMY";
+        _hud.SetMissionPhase(label, _demolitionIntermissionRemaining, false);
+        _hud.SetObjective(label);
     }
 
     private void UpdateDemolitionNetworkClientRound(float delta)
     {
-        if (_demolitionBuyPhaseActive)
+        if (_demolitionNetworkPhase == DemolitionNetworkPhase.Buy)
         {
-            UpdateDemolitionBuyPhase(delta);
+            if (!_demolitionLocalBuyReady)
+            {
+                _hud.UpdateDemolitionBuy(DemolitionBuyState());
+            }
             return;
         }
-        if (!_demolitionRoundActive)
+        if (_demolitionNetworkPhase == DemolitionNetworkPhase.Intermission)
+        {
+            UpdateDemolitionNetworkIntermissionHud();
+            return;
+        }
+        if (_demolitionNetworkPhase != DemolitionNetworkPhase.Live || !_demolitionRoundActive)
+        {
+            return;
+        }
+        UpdateDemolitionInteraction(delta);
+        UpdateDemolitionNetworkClientLiveHud();
+    }
+
+    private void UpdateDemolitionNetworkClientLiveHud()
+    {
+        if (!_demolitionDevicePlanted || _demolitionActiveSite < 0)
         {
             UpdateDemolitionRoundHud();
             return;
         }
-        UpdateDemolitionInteraction(delta);
-        UpdateDemolitionRoundHud();
+
+        var siteName = ((char)('A' + _demolitionActiveSite)).ToString();
+        var defending = LocalDemolitionSide == DemolitionTeam.Defenders;
+        var defuse = defending && _demolitionPlayerDefuseProgress > 0.01f
+            ? GameLocalization.Format(
+                "demolition_defuse_suffix",
+                _languageSetting,
+                "  //  DEFUSE {0:00}%",
+                Mathf.RoundToInt(_demolitionPlayerDefuseProgress * 100.0f))
+            : string.Empty;
+        var objectiveKey = defending
+            ? "demolition_defuse_hold"
+            : "demolition_defend";
+        var objectiveEnglish = defending
+            ? "DEFUSE SITE {0}  //  {1:00.0}s{2}"
+            : "DEFEND SITE {0}  //  {1:00.0}s{2}";
+        _hud.SetObjective(GameLocalization.Format(
+            objectiveKey,
+            _languageSetting,
+            objectiveEnglish,
+            siteName,
+            _demolitionRemaining,
+            defuse));
+
+        var sideLabel = defending
+            ? GameLocalization.IsChinese(_languageSetting) ? "\u9632\u5b88" : "DEFEND"
+            : GameLocalization.IsChinese(_languageSetting) ? "\u8fdb\u653b" : "ATTACK";
+        var phase = GameLocalization.IsChinese(_languageSetting)
+            ? $"\u7b2c {_demolitionMatch.CurrentRound} \u5c40  //  \u5df1\u65b9 {LocalDemolitionScore}:{OpposingDemolitionScore} \u654c\u65b9  //  {sideLabel}"
+            : $"ROUND {_demolitionMatch.CurrentRound}  //  YOU {LocalDemolitionScore}:{OpposingDemolitionScore} ENEMY  //  {sideLabel}";
+        _hud.SetMissionPhase(phase, _demolitionRemaining, false);
     }
 
     private void OnDemolitionNetworkAction(long peerId, DemolitionNetworkAction action, int siteIndex)
@@ -531,6 +687,51 @@ public partial class FreightTerminalWorld
                 ? playerState.Team
                 : (DemolitionNetworkTeam?)null;
         return shooterTeam.HasValue && shooterTeam.Value != DemolitionActorTeam(actorId);
+    }
+
+    private bool IsDemolitionRemoteShotValid(
+        long peerId,
+        int actorId,
+        Vector3 origin,
+        Vector3 end,
+        out Node3D? shooter)
+    {
+        shooter = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate)
+            && mate.IsHumanProxy && mate.NetworkPeerId == peerId);
+        if (!IsInstanceValid(shooter)
+            && _remoteDemolitionOpponents.TryGetValue(peerId, out var opponent)
+            && IsInstanceValid(opponent))
+        {
+            shooter = opponent;
+        }
+        if (!IsInstanceValid(shooter)
+            || shooter!.GlobalPosition.DistanceTo(origin) > 4.5f)
+        {
+            return false;
+        }
+        var shotDistance = origin.DistanceTo(end);
+        if (shotDistance is <= 0.05f or > 260.0f)
+        {
+            return false;
+        }
+
+        Node3D? target = null;
+        var team = DemolitionActorTeam(actorId);
+        var slot = DemolitionActorSlot(actorId);
+        if (team == DemolitionNetworkTeam.Alpha)
+        {
+            target = slot == 0
+                ? _player
+                : _squadMates.FirstOrDefault(mate => IsInstanceValid(mate)
+                    && mate.SquadSlot == slot);
+        }
+        else
+        {
+            target = _demolitionOpponents.FirstOrDefault(candidate => IsInstanceValid(candidate)
+                && candidate.NetworkId == actorId);
+        }
+        return IsInstanceValid(target)
+            && end.DistanceTo(target!.GlobalPosition + Vector3.Up * 0.9f) <= 2.4f;
     }
 
 }

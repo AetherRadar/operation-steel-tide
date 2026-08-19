@@ -68,6 +68,7 @@ public partial class FreightTerminalWorld
         var requestedAddress = string.Empty;
         var requestedNetworkTeam = -1;
         var addressModes = false;
+        var networkLobbyState = false;
         if (probe is not null)
         {
             probe.Visible = false;
@@ -97,6 +98,27 @@ public partial class FreightTerminalWorld
             var pendingAddressLocked = !probe.IsNetworkAddressEditable;
             probe.SetNetworkConnectionPending(false, "NETWORK ADDRESS VALIDATION");
             var hostAddressRestored = probe.IsNetworkAddressEditable;
+            var lobbyRole = probe.SelectedRole;
+            var lobbyMap = probe.SelectedMapId;
+            probe.SetNetworkLobbyWaiting(
+                host: true,
+                players: 2,
+                capacity: SquadNetwork.DemolitionCapacity,
+                canStart: true,
+                status: "NETWORK LOBBY VALIDATION");
+            probe.PressRoleForDiagnostics(OperatorRole.Assault);
+            probe.PressNextMapForDiagnostics();
+            var hostLobbyReady = probe.IsNetworkLobbyWaiting
+                && probe.NetworkLobbyPlayerCount == 2
+                && probe.NetworkLobbyCanStart
+                && probe.IsDeployEnabled
+                && !probe.IsNetworkAddressEditable
+                && probe.SelectedRole == lobbyRole
+                && probe.SelectedMapId == lobbyMap;
+            probe.ClearNetworkLobbyWaiting();
+            networkLobbyState = hostLobbyReady
+                && !probe.IsNetworkLobbyWaiting
+                && probe.IsNetworkAddressEditable;
             probe.SetLanRoomBrowseAvailable(true);
             probe.SetLanRooms(new[]
             {
@@ -108,7 +130,7 @@ public partial class FreightTerminalWorld
                     LanRoomKind.Demolition,
                     DemolitionMapCatalog.TideforgeId,
                     2,
-                    SquadNetwork.MaximumPlayers)
+                    SquadNetwork.DemolitionCapacity)
             });
             probe.SelectLanRoomForDiagnostics(0);
             var lanRoomSelection = probe.LanRoomBrowserUiReady
@@ -122,7 +144,8 @@ public partial class FreightTerminalWorld
                 "192.168.10.25");
             var joinAddressEditable = probe.IsNetworkAddressEditable;
             addressModes = localAddressLocked && hostAddressEditable && pendingAddressLocked
-                && hostAddressRestored && joinAddressEditable && lanRoomSelection;
+                && hostAddressRestored && joinAddressEditable && lanRoomSelection
+                && networkLobbyState;
             probe.PressBackForDiagnostics();
             probe.PressDeployForDiagnostics();
         }
@@ -155,8 +178,9 @@ public partial class FreightTerminalWorld
         _hud.SetLanguage(originalLanguage);
         var valid = sceneReady && chineseReady && englishReady && mapPoolReady && harborCarousel && lockedCarousel
             && carouselReturned && lockedMapRejected
-            && synchronizedWithoutDeployment && probeReady && backReady;
-        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} map_pool={mapPoolReady} harbor={harborCarousel} carousel_locked={lockedCarousel} carousel_return={carouselReturned} locked_rejected={lockedMapRejected} sync={synchronizedWithoutDeployment} address_modes={addressModes} probe={probeReady} back={backReady}");
+            && synchronizedWithoutDeployment && addressModes && networkLobbyState
+            && probeReady && backReady;
+        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} map_pool={mapPoolReady} harbor={harborCarousel} carousel_locked={lockedCarousel} carousel_return={carouselReturned} locked_rejected={lockedMapRejected} sync={synchronizedWithoutDeployment} address_modes={addressModes} network_lobby={networkLobbyState} probe={probeReady} back={backReady}");
         GD.Print($"DEMOLITION_BRIEFING_PASS valid={valid}");
         GetTree().Paused = false;
         await WaitFrames(180);

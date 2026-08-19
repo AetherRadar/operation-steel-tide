@@ -131,6 +131,14 @@ public partial class FreightTerminalWorld
         var team = System.Enum.IsDefined(typeof(DemolitionNetworkTeam), networkTeam)
             ? (DemolitionNetworkTeam)networkTeam
             : DemolitionNetworkTeam.Alpha;
+        if (_demolitionLobbyDeployment is not null)
+        {
+            if (_squadNetwork.IsHost && mode == SquadSessionMode.Host)
+            {
+                StartHostedDemolitionMatch();
+            }
+            return;
+        }
         if (mode == SquadSessionMode.Join
             && (string.IsNullOrWhiteSpace(address)
                 || !SquadNetwork.TryParseEndpoint(address, SquadNetwork.DefaultPort, out _, out _)))
@@ -144,20 +152,40 @@ public partial class FreightTerminalWorld
             _hud.SetDemolitionNetworkConnectionPending(false, "HOST FAILED  //  INVALID BIND IP OR PORT");
             return;
         }
-        if (mode == SquadSessionMode.Join && !_squadNetwork.IsOnline)
+        if (mode == SquadSessionMode.Join
+            && (!_squadNetwork.IsOnline
+                || !_squadNetwork.IsDemolitionSession
+                || !string.Equals(
+                    _squadNetwork.DemolitionMapId,
+                    DemolitionMapCatalog.Resolve(mapId).Id,
+                    System.StringComparison.OrdinalIgnoreCase)))
         {
             BeginPendingDemolitionJoin((OperatorRole)role, mapId, address, team);
             return;
         }
         _demolitionPlayerRole = (OperatorRole)role;
         _demolitionSelectedMapId = DemolitionMapCatalog.Resolve(mapId).Id;
+        if (mode == SquadSessionMode.Host)
+        {
+            BeginHostedDemolitionLobby(new PendingDemolitionDeployment(
+                _demolitionPlayerRole,
+                _demolitionSelectedMapId,
+                mode,
+                address,
+                DemolitionNetworkTeam.Alpha));
+            return;
+        }
+        if (mode == SquadSessionMode.Join)
+        {
+            return;
+        }
         _demolitionLocalNetworkTeam = mode == SquadSessionMode.Join
             ? team
             : DemolitionNetworkTeam.Alpha;
         _demolitionLocalNetworkSlot = 0;
         _demolitionNetworkClient = mode == SquadSessionMode.Join;
         PrepareDemolitionBattlefield();
-        ConfigureDemolitionNetwork(mode, address, team);
+        InitializeDemolitionNetworkRuntime(mode);
         DeploySquad((OperatorRole)role, mode, address);
         _hud.SetDemolitionGameplayPresentation(true);
         StartDemolitionRound();
@@ -196,6 +224,9 @@ public partial class FreightTerminalWorld
         _demolitionIntermissionRemaining = 0.0f;
         _demolitionBuyPhaseActive = false;
         _demolitionBuyRemaining = 0.0f;
+        _demolitionLocalBuyReady = false;
+        _demolitionPurchasePending = false;
+        _demolitionBuyReadyPeers.Clear();
         _demolitionStrategyRemaining = 0.0f;
         _demolitionAttackerPlan = null;
         _demolitionDefenderPlan = null;
@@ -308,9 +339,19 @@ public partial class FreightTerminalWorld
             return;
         }
 
+        PrepareDemolitionRoundRuntime(resolveOpponentBuy: true);
+        BeginDemolitionBuyPhase();
+    }
+
+    private void PrepareDemolitionRoundRuntime(bool resolveOpponentBuy)
+    {
         ClearDemolitionDevice();
         ResetDemolitionSquad();
-        ResolveDemolitionOpponentBuy();
+        if (resolveOpponentBuy)
+        {
+            ResolveDemolitionOpponentBuy();
+        }
+        _remoteDemolitionOpponents.Clear();
         SpawnDemolitionOpponents();
         _demolitionRoundActive = false;
         _demolitionDevicePlanted = false;
@@ -335,7 +376,6 @@ public partial class FreightTerminalWorld
         BeginDemolitionDeviceRound();
         _missionPhase = "DEMOLITION";
         RefreshDemolitionStrategies(true);
-        BeginDemolitionBuyPhase();
     }
 
     private void ResetDemolitionSquad()
@@ -606,6 +646,10 @@ public partial class FreightTerminalWorld
 
     private void PlantDemolitionDevice(int siteIndex, bool byPlayerTeam, Node3D planter)
     {
+        if (IsDemolitionNetworkClient)
+        {
+            return;
+        }
         var layout = DemolitionLayout();
         var planterId = DemolitionMemberId(planter);
         if (_demolitionDevicePlanted
@@ -828,7 +872,7 @@ public partial class FreightTerminalWorld
 
     private void FinishDemolitionRound(bool playerWon, string reason)
     {
-        if (_missionEnded || !_demolitionRoundActive)
+        if (IsDemolitionNetworkClient || _missionEnded || !_demolitionRoundActive)
         {
             return;
         }
@@ -857,12 +901,19 @@ public partial class FreightTerminalWorld
             && _demolitionMatch.PlayerSide == DemolitionTeam.Attackers;
         var opponentsPlanted = _demolitionDevicePlanted
             && _demolitionMatch.PlayerSide == DemolitionTeam.Defenders;
-        _demolitionPlayerEconomy.RecordRound(playerWon, defused || playerPlanted && !playerWon);
-        _demolitionOpponentEconomy.RecordRound(!playerWon, opponentsPlanted && playerWon);
+        var alphaObjectiveCompleted = defused || playerPlanted && !playerWon;
+        var bravoObjectiveCompleted = opponentsPlanted && playerWon;
+        _demolitionPlayerEconomy.RecordRound(playerWon, alphaObjectiveCompleted);
+        _demolitionOpponentEconomy.RecordRound(!playerWon, bravoObjectiveCompleted);
+        RecordRemoteDemolitionRoundEconomies(
+            playerWon,
+            alphaObjectiveCompleted,
+            bravoObjectiveCompleted);
 
         var result = _demolitionMatch.RecordRound(playerWon);
         if (result.MatchComplete)
         {
+            BroadcastRemoteDemolitionFunds();
             CompleteDemolitionMatch(reason);
             return;
         }
@@ -871,7 +922,9 @@ public partial class FreightTerminalWorld
         {
             _demolitionPlayerEconomy.Reset();
             _demolitionOpponentEconomy.Reset();
+            ResetRemoteDemolitionEconomies();
         }
+        BroadcastRemoteDemolitionFunds();
 
         _demolitionIntermissionRemaining = DemolitionIntermissionDuration;
         var swap = result.SideSwap

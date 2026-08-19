@@ -58,6 +58,9 @@ public sealed class DemolitionEconomy
         return spent;
     }
 
+    public void ApplyNetworkFunds(int funds)
+        => Funds = Cap(funds);
+
     public bool CanFullBuy => Funds >= BuyCap;
     public bool ShouldEco => Funds < EcoThreshold;
 

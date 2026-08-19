@@ -59,6 +59,11 @@ public partial class DemolitionBriefingView : ColorRect
     private string _language = "en";
     private SquadSessionMode _sessionMode = SquadSessionMode.Local;
     private DemolitionNetworkTeam _networkTeam = DemolitionNetworkTeam.Alpha;
+    private bool _networkLobbyWaiting;
+    private bool _networkLobbyHost;
+    private bool _networkLobbyCanStart;
+    private int _networkLobbyPlayers = 1;
+    private int _networkLobbyCapacity = SquadNetwork.DemolitionCapacity;
 
     public OperatorRole SelectedRole => _selectedRole;
     public WeaponPlatform SelectedPrimaryPlatform => WeaponPlatform.M4A1;
@@ -76,6 +81,9 @@ public partial class DemolitionBriefingView : ColorRect
     public bool LanRoomBrowserUiReady => IsInstanceValid(_roomBrowser) && _roomBrowser.UiReady;
     public int VisibleLanRoomCount => IsInstanceValid(_roomBrowser) ? _roomBrowser.VisibleRoomCount : 0;
     public bool IsDeployEnabled => IsInstanceValid(_deployButton) && !_deployButton.Disabled;
+    public bool IsNetworkLobbyWaiting => _networkLobbyWaiting;
+    public int NetworkLobbyPlayerCount => _networkLobbyPlayers;
+    public bool NetworkLobbyCanStart => _networkLobbyCanStart;
     public bool UiReady
         => IsInstanceValid(_title)
         && IsInstanceValid(_mapCode)
@@ -108,7 +116,15 @@ public partial class DemolitionBriefingView : ColorRect
         SetLanguage(_language);
         SelectRole(_selectedRole);
         SelectMap(_selectedMapId);
-        SelectSessionMode(_sessionMode);
+        if (_networkLobbyWaiting)
+        {
+            SetNetworkSelectionLocked(true);
+            RefreshNetworkLobbyAction();
+        }
+        else
+        {
+            SelectSessionMode(_sessionMode);
+        }
     }
 
     public void SetLanguage(string language)
@@ -145,11 +161,23 @@ public partial class DemolitionBriefingView : ColorRect
         }
         SelectRole(_selectedRole);
         RefreshMap();
-        SelectSessionMode(_sessionMode);
+        if (_networkLobbyWaiting)
+        {
+            SetNetworkSelectionLocked(true);
+            RefreshNetworkLobbyAction();
+        }
+        else
+        {
+            SelectSessionMode(_sessionMode);
+        }
     }
 
     public void SelectRole(OperatorRole role)
     {
+        if (_networkLobbyWaiting)
+        {
+            return;
+        }
         _selectedRole = role;
         for (var index = 0; index < _roleButtons.Length; index++)
         {
@@ -165,6 +193,10 @@ public partial class DemolitionBriefingView : ColorRect
 
     public bool SelectMap(string mapId)
     {
+        if (_networkLobbyWaiting)
+        {
+            return false;
+        }
         for (var index = 0; index < DemolitionMapCatalog.Maps.Count; index++)
         {
             var offer = DemolitionMapCatalog.Maps[index];
@@ -185,6 +217,10 @@ public partial class DemolitionBriefingView : ColorRect
 
     public void BrowseMap(int direction)
     {
+        if (_networkLobbyWaiting)
+        {
+            return;
+        }
         var count = DemolitionMapCatalog.Maps.Count;
         _browsedMapIndex = (_browsedMapIndex + Math.Sign(direction) + count) % count;
         if (BrowsedMap.Available)
@@ -254,6 +290,36 @@ public partial class DemolitionBriefingView : ColorRect
         _deployButton.Text = pending
             ? GameLocalization.IsChinese(_language) ? "\u6b63\u5728\u8fde\u63a5\u4e3b\u673a..." : "CONNECTING TO HOST..."
             : Text("demolition_deploy", "DEPLOY DEMOLITION TEAM");
+    }
+
+    public void SetNetworkLobbyWaiting(
+        bool host,
+        int players,
+        int capacity,
+        bool canStart,
+        string status)
+    {
+        _networkLobbyWaiting = true;
+        _networkLobbyHost = host;
+        _networkLobbyCapacity = Mathf.Max(1, capacity);
+        _networkLobbyPlayers = Mathf.Clamp(players, 1, _networkLobbyCapacity);
+        _networkLobbyCanStart = canStart;
+        _readyStatus.Text = status;
+        _readyStatus.AddThemeColorOverride("font_color", new Color(0.42f, 0.88f, 0.72f));
+        SetNetworkSelectionLocked(true);
+        RefreshNetworkLobbyAction();
+    }
+
+    public void ClearNetworkLobbyWaiting()
+    {
+        _networkLobbyWaiting = false;
+        _networkLobbyHost = false;
+        _networkLobbyCanStart = false;
+        _networkLobbyPlayers = 1;
+        _networkLobbyCapacity = SquadNetwork.DemolitionCapacity;
+        SetNetworkSelectionLocked(false);
+        SelectSessionMode(_sessionMode);
+        _deployButton.Text = Text("demolition_deploy", "DEPLOY DEMOLITION TEAM");
     }
 
     public void SetLanRooms(IReadOnlyList<LanRoomInfo> rooms)
@@ -346,6 +412,10 @@ public partial class DemolitionBriefingView : ColorRect
 
     private void SelectSessionMode(SquadSessionMode mode)
     {
+        if (_networkLobbyWaiting)
+        {
+            return;
+        }
         _sessionMode = mode;
         _localButton.SetPressedNoSignal(mode == SquadSessionMode.Local);
         _hostButton.SetPressedNoSignal(mode == SquadSessionMode.Host);
@@ -400,6 +470,42 @@ public partial class DemolitionBriefingView : ColorRect
         _bravoButton.SetPressedNoSignal(_networkTeam == DemolitionNetworkTeam.Bravo);
     }
 
+    private void SetNetworkSelectionLocked(bool locked)
+    {
+        _localButton.Disabled = locked;
+        _hostButton.Disabled = locked;
+        _joinButton.Disabled = locked;
+        _previousMapButton.Disabled = locked;
+        _nextMapButton.Disabled = locked;
+        _alphaButton.Disabled = locked || _sessionMode != SquadSessionMode.Join;
+        _bravoButton.Disabled = locked || _sessionMode != SquadSessionMode.Join;
+        _address.Editable = !locked && _sessionMode != SquadSessionMode.Local;
+        foreach (var button in _roleButtons)
+        {
+            button.Disabled = locked;
+        }
+    }
+
+    private void RefreshNetworkLobbyAction()
+    {
+        if (!_networkLobbyWaiting)
+        {
+            return;
+        }
+        _deployButton.Disabled = !_networkLobbyHost || !_networkLobbyCanStart;
+        _deployButton.Text = _networkLobbyHost
+            ? _networkLobbyCanStart
+                ? GameLocalization.IsChinese(_language)
+                    ? $"\u25b6  \u5f00\u59cb\u6bd4\u8d5b  //  {_networkLobbyPlayers}/{_networkLobbyCapacity}"
+                    : $"\u25b6  START MATCH  //  {_networkLobbyPlayers}/{_networkLobbyCapacity}"
+                : GameLocalization.IsChinese(_language)
+                    ? $"\u7b49\u5f85\u73a9\u5bb6  //  {_networkLobbyPlayers}/{_networkLobbyCapacity}"
+                    : $"WAITING FOR PLAYERS  //  {_networkLobbyPlayers}/{_networkLobbyCapacity}"
+            : GameLocalization.IsChinese(_language)
+                ? $"\u7b49\u5f85\u623f\u4e3b\u5f00\u59cb  //  {_networkLobbyPlayers}/{_networkLobbyCapacity}"
+                : $"WAITING FOR HOST  //  {_networkLobbyPlayers}/{_networkLobbyCapacity}";
+    }
+
     private void RefreshMap()
     {
         if (!IsInstanceValid(_mapName))
@@ -418,7 +524,9 @@ public partial class DemolitionBriefingView : ColorRect
         _mapStatus.AddThemeColorOverride(
             "font_color",
             offer.Available ? new Color(0.38f, 0.92f, 0.66f) : new Color(0.92f, 0.46f, 0.25f));
-        _deployButton.Disabled = !offer.Available;
+        _deployButton.Disabled = _networkLobbyWaiting
+            ? !_networkLobbyHost || !_networkLobbyCanStart
+            : !offer.Available;
         _arenaName.Text = _mapName.Text;
         _arenaProfile.Text = offer.Available
             ? Text(offer.ProfileLocalizationKey, offer.EnglishProfile)

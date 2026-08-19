@@ -2767,7 +2767,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             return true;
         }
-        if (Main?.IsExtractionNetworkClient == true)
+        if (Main?.IsExtractionNetworkClient == true
+            || Main?.IsDemolitionNetworkClient == true)
         {
             return false;
         }

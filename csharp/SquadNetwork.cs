@@ -28,9 +28,9 @@ public partial class SquadNetwork : Node
     public int ConnectedPeerCount => IsOnline ? Multiplayer.GetPeers().Length : 0;
     public TacticalPlayer? LocalPlayer { get; set; }
 
-    private int ActivePlayerCapacity => IsExtractionSession
-        ? ExtractionSquadCapacity
-        : MaximumPlayers;
+    private int ActivePlayerCapacity => IsDemolitionSession
+        ? DemolitionCapacity
+        : IsExtractionSession ? ExtractionSquadCapacity : MaximumPlayers;
 
     private ENetMultiplayerPeer? _peer;
     private readonly Dictionary<long, ulong> _nextAbilityTimeByPeer = new();
@@ -286,13 +286,24 @@ public partial class SquadNetwork : Node
     public void BroadcastAbility(OperatorRole role, Vector3 origin, Vector3 forward)
     {
         if (!IsOnline || IsExtractionSession && ExtractionMatchStarted
-            && !ExtractionWorldLaunchStarted)
+            && !ExtractionWorldLaunchStarted
+            || IsDemolitionSession && !DemolitionMatchStarted
+            || !IsFinite(origin) || !IsFinite(forward)
+            || forward.LengthSquared() < 0.01f)
         {
             return;
         }
         if (IsHost)
         {
-            Rpc(MethodName.ReceiveAbility, Multiplayer.GetUniqueId(), (int)role, origin, forward);
+            if (IsDemolitionSession)
+            {
+                BroadcastDemolitionAbilityToRegisteredPeers(
+                    Multiplayer.GetUniqueId(), role, origin, forward);
+            }
+            else
+            {
+                Rpc(MethodName.ReceiveAbility, Multiplayer.GetUniqueId(), (int)role, origin, forward);
+            }
         }
         else
         {
@@ -303,13 +314,23 @@ public partial class SquadNetwork : Node
     public void BroadcastShot(Vector3 origin, Vector3 end, int enemyId, float damage)
     {
         if (!IsOnline || IsExtractionSession && ExtractionMatchStarted
-            && !ExtractionWorldLaunchStarted)
+            && !ExtractionWorldLaunchStarted
+            || IsDemolitionSession && !DemolitionMatchStarted
+            || !IsFinite(origin) || !IsFinite(end) || !float.IsFinite(damage))
         {
             return;
         }
         if (IsHost)
         {
-            Rpc(MethodName.ReceiveShot, Multiplayer.GetUniqueId(), origin, end, enemyId, damage);
+            if (IsDemolitionSession)
+            {
+                BroadcastDemolitionShotToRegisteredPeers(
+                    Multiplayer.GetUniqueId(), origin, end, enemyId, damage);
+            }
+            else
+            {
+                Rpc(MethodName.ReceiveShot, Multiplayer.GetUniqueId(), origin, end, enemyId, damage);
+            }
         }
         else
         {
@@ -359,7 +380,8 @@ public partial class SquadNetwork : Node
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void SubmitClientAbility(int role, Vector3 origin, Vector3 forward)
     {
-        if (!IsHost)
+        if (!IsHost || !IsFinite(origin) || !IsFinite(forward)
+            || forward.LengthSquared() < 0.01f)
         {
             return;
         }
@@ -380,6 +402,14 @@ public partial class SquadNetwork : Node
                 return;
             }
         }
+        if (IsDemolitionSession && DemolitionMatchStarted)
+        {
+            if (!TryGetDemolitionAssignment(sender, out _, out _, out var assignedRole)
+                || assignedRole != (OperatorRole)role)
+            {
+                return;
+            }
+        }
         var now = Time.GetTicksMsec();
         if (_nextAbilityTimeByPeer.TryGetValue(sender, out var readyAt) && now < readyAt)
         {
@@ -387,7 +417,15 @@ public partial class SquadNetwork : Node
         }
         _nextAbilityTimeByPeer[sender] = now + (ulong)(OperatorRoles.Spec((OperatorRole)role).SkillCooldown * 1000.0f);
         RemoteAbilityReceived?.Invoke(sender, (OperatorRole)role, origin, forward);
-        Rpc(MethodName.ReceiveAbility, sender, role, origin, forward);
+        if (IsDemolitionSession)
+        {
+            BroadcastDemolitionAbilityToRegisteredPeers(
+                sender, (OperatorRole)role, origin, forward);
+        }
+        else
+        {
+            Rpc(MethodName.ReceiveAbility, sender, role, origin, forward);
+        }
     }
 
     [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -397,13 +435,19 @@ public partial class SquadNetwork : Node
         {
             return;
         }
+        if (IsDemolitionSession
+            && (!DemolitionMatchStarted
+                || peerId != 1 && !_demolitionAssignments.ContainsKey(peerId)))
+        {
+            return;
+        }
         RemoteAbilityReceived?.Invoke(peerId, (OperatorRole)role, origin, forward);
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void SubmitClientShot(Vector3 origin, Vector3 end, int enemyId, float damage)
     {
-        if (!IsHost)
+        if (!IsHost || !IsFinite(origin) || !IsFinite(end) || !float.IsFinite(damage))
         {
             return;
         }
@@ -412,14 +456,33 @@ public partial class SquadNetwork : Node
         {
             return;
         }
+        if (IsDemolitionSession
+            && (!DemolitionMatchStarted
+                || !TryGetDemolitionAssignment(sender, out _, out _, out _)))
+        {
+            return;
+        }
         RemoteShotReceived?.Invoke(sender, origin, end, enemyId, damage);
-        Rpc(MethodName.ReceiveShot, sender, origin, end, enemyId, damage);
+        if (IsDemolitionSession)
+        {
+            BroadcastDemolitionShotToRegisteredPeers(sender, origin, end, enemyId, damage);
+        }
+        else
+        {
+            Rpc(MethodName.ReceiveShot, sender, origin, end, enemyId, damage);
+        }
     }
 
     [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void ReceiveShot(long peerId, Vector3 origin, Vector3 end, int enemyId, float damage)
     {
         if (peerId == Multiplayer.GetUniqueId())
+        {
+            return;
+        }
+        if (IsDemolitionSession
+            && (!DemolitionMatchStarted
+                || peerId != 1 && !_demolitionAssignments.ContainsKey(peerId)))
         {
             return;
         }
@@ -430,7 +493,7 @@ public partial class SquadNetwork : Node
     {
         if (IsHost && IsExtractionSession && ExtractionMatchStarted)
         {
-            _peer?.DisconnectPeer((int)peerId, true);
+            _peer?.DisconnectPeer((int)peerId, false);
             return;
         }
         var connected = Multiplayer.GetPeers().Length + 1;
@@ -442,10 +505,15 @@ public partial class SquadNetwork : Node
 
     private void OnPeerDisconnected(long peerId)
     {
+        var registeredDemolitionPeer = !IsDemolitionSession
+            || _demolitionAssignments.ContainsKey(peerId);
         _nextAbilityTimeByPeer.Remove(peerId);
         ForgetDemolitionPeer(peerId);
         ForgetExtractionPeer(peerId);
-        RemotePeerLeft?.Invoke(peerId);
+        if (registeredDemolitionPeer)
+        {
+            RemotePeerLeft?.Invoke(peerId);
+        }
         var connected = Mathf.Max(1, Multiplayer.GetPeers().Length + 1);
         UpdateLanRoomAdvertisement();
         SetStatus(IsHost

@@ -11,10 +11,16 @@ public partial class EnemyOperator
 
     public void ConfigureNetworkProxy(long peerId, OperatorRole role, bool human)
     {
+        var initializeHumanHealth = human
+            && (!IsNetworkProxy || !IsHumanProxy || NetworkPeerId != peerId);
         IsNetworkProxy = true;
         IsHumanProxy = human;
         NetworkPeerId = peerId;
         NetworkRole = role;
+        if (initializeHumanHealth)
+        {
+            _health = MaxHealth;
+        }
         SentryMode = false;
         Alerted = false;
         Suspicion = 0.0f;
@@ -106,6 +112,15 @@ public partial class EnemyOperator
             }
         }
         SetPhysicsProcess(false);
+    }
+
+    internal void RestoreDemolitionNetworkHealth(float amount)
+    {
+        if (IsDead || amount <= 0.0f)
+        {
+            return;
+        }
+        _health = Mathf.Min(MaxHealth, _health + amount);
     }
 
     public void PlayRemoteNetworkShot(Vector3 end)

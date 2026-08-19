@@ -376,7 +376,14 @@ public partial class FreightTerminalWorld
         _hud.ShowDemolitionBriefing();
     }
 
-    private void OnDemolitionBackRequested() => EnterOperationsOffice();
+    private void OnDemolitionBackRequested()
+    {
+        if (_demolitionLobbyDeployment is not null || _demolitionJoinPending)
+        {
+            CancelDemolitionNetworkLobby();
+        }
+        EnterOperationsOffice();
+    }
 
     private void OnOperationsHomeRequested()
     {
@@ -391,6 +398,10 @@ public partial class FreightTerminalWorld
             _pendingNetworkExtractionDeployment = null;
             _squadNetwork.Close();
             _hud.ClearSquadLobbyWaiting();
+        }
+        if (_demolitionLobbyDeployment is not null || _demolitionJoinPending)
+        {
+            CancelDemolitionNetworkLobby();
         }
         EnterOperationsOffice();
     }
@@ -474,7 +485,7 @@ public partial class FreightTerminalWorld
                 LanRoomKind.Demolition,
                 DemolitionMapCatalog.TideforgeId,
                 2,
-                SquadNetwork.MaximumPlayers)
+                SquadNetwork.DemolitionCapacity)
         });
         _hud.SelectDemolitionNetworkForDiagnostics(
             SquadSessionMode.Join,

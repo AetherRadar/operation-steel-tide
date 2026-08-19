@@ -5,6 +5,7 @@ namespace OperationSteelTide;
 public partial class SquadMate
 {
     public bool IsNetworkProxy { get; private set; }
+    private bool _networkAbilityApplyEffect;
 
     private void CommitAuthoritativeRemoteCombatState()
     {
