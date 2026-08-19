@@ -145,6 +145,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private const float SniperContactAcquireRange = 185.0f;
     private const float DownedFinishAcquireRange = 22.0f;
     private const float DownedFinishScorePenalty = 32.0f * 32.0f;
+    private const float RivalPlayerSquadPreference = 9.0f * 9.0f;
+    private const float GarrisonPlayerSquadPreference = 5.0f * 5.0f;
+    private const float ForeignRivalPreference = 30.0f * 30.0f;
+    private const float ForeignOperatorPreference = 24.0f * 24.0f;
     private const float DownedFinishLockSeconds = 1.5f;
     private const float ActiveTargetAcquireInterval = 0.24f;
     private const float IdleTargetAcquireInterval = 0.48f;
@@ -896,11 +900,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         var bias = 0.0f;
         if (candidate is TacticalPlayer || candidate is SquadMate)
         {
-            bias = IsRivalSquad ? -40.0f : -15.0f;
+            bias = IsRivalSquad
+                ? -RivalPlayerSquadPreference
+                : -GarrisonPlayerSquadPreference;
         }
-        else if (candidate is EnemyOperator other && other.IsRivalSquad)
+        else if (candidate is EnemyOperator other && IsHostileTo(other))
         {
-            bias = -35.0f;
+            bias = IsRivalSquad && other.IsRivalSquad
+                ? -ForeignRivalPreference
+                : -ForeignOperatorPreference;
         }
         if (candidateCombatant?.CombatDowned == true)
         {

@@ -104,7 +104,9 @@ public partial class FreightTerminalWorld
         {
             // A failed full search is stable for static interior geometry. Back off
             // repeated probes unless the requested destination meaningfully changes.
-            var retryDistance = emergency ? 1.0f : SquadNavRetryDestinationDistance;
+            var retryDistance = emergency
+                ? 1.0f
+                : SquadNavigationActiveDestinationDistance;
             var requestChanged = state.Emergency != emergency
                 || state.Destination.DistanceSquaredTo(destination) > retryDistance * retryDistance;
             if (!requestChanged && now < state.NextPlanMilliseconds)
@@ -120,8 +122,12 @@ public partial class FreightTerminalWorld
         {
             // Every adjacent path edge was physics-validated during A*. Rechecking
             // here invalidates valid corner routes and can cause full replan storms.
+            var destinationDistance = emergency
+                ? 1.0f
+                : SquadNavigationActiveDestinationDistance;
             var stale = state.Emergency != emergency
-                || emergency && state.Destination.DistanceSquaredTo(destination) > 1.0f
+                || state.Destination.DistanceSquaredTo(destination)
+                    > destinationDistance * destinationDistance
                 || state.Cursor >= state.Directives.Length;
             if (stale)
             {

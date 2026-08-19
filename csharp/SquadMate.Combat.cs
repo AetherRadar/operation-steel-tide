@@ -39,6 +39,7 @@ public partial class SquadMate
     private bool _combatHasCoverPosition;
     private bool _combatHasEngagementAnchor;
     private int _burstShotsRemaining;
+    private int _combatNavigationStallCount;
 
     public int CombatShotsFired { get; private set; }
     public int CombatTargetSwitches { get; private set; }
@@ -68,6 +69,7 @@ public partial class SquadMate
         _combatHasSight = false;
         _combatHasEngagementAnchor = false;
         _burstShotsRemaining = 0;
+        _combatNavigationStallCount = 0;
         CombatShotsFired = 0;
         CombatTargetSwitches = 0;
         CombatCoverSelections = 0;
@@ -84,6 +86,7 @@ public partial class SquadMate
         _combatFlankSide = _combatStrafeSign;
         _combatRecoveryTimer = 0.0f;
         _burstShotsRemaining = 0;
+        _combatNavigationStallCount = 0;
         ResetMovementProgress();
     }
 
@@ -302,27 +305,35 @@ public partial class SquadMate
             + Leader.GlobalBasis.Z * formation.Z;
     }
 
+    private Vector3 ResolveTacticalDestination(
+        Vector3 anchorDestination,
+        EnemyOperator? hostile,
+        bool objectivePriority)
+    {
+        return hostile is not null
+            && IsInstanceValid(hostile)
+            && !hostile.IsDead
+            && !objectivePriority
+                ? ResolveCombatDestination(anchorDestination, hostile)
+                : anchorDestination;
+    }
+
     private void UpdateTacticalMovement(
         Vector3 anchorDestination,
         EnemyOperator? hostile,
         bool objectivePriority,
         SquadTraversalKind navigationKind,
+        bool navigationSteppedDirect,
         float delta)
     {
         var destination = anchorDestination;
-        var anchorFlat = FlattenToCurrentHeight(anchorDestination);
         if (Order == SquadOrder.Follow
             && hostile is null
             && !Leader.IsDead
             && GlobalPosition.DistanceTo(Leader.GlobalPosition) > 42.0f)
         {
-            GlobalPosition = anchorFlat + Vector3.Up * 0.35f;
+            GlobalPosition = Leader.GlobalPosition + Vector3.Up * 0.35f;
             ResetMovementProgress();
-        }
-
-        if (hostile is not null && IsInstanceValid(hostile) && !hostile.IsDead && !objectivePriority)
-        {
-            destination = ResolveCombatDestination(anchorDestination, hostile);
         }
 
         var flatDestination = FlattenToCurrentHeight(destination);
@@ -366,7 +377,7 @@ public partial class SquadMate
         if (_combatMoveRequested)
         {
             desired = desired.Normalized();
-            if (navigationKind != SquadTraversalKind.Step)
+            if (navigationKind != SquadTraversalKind.Step && !navigationSteppedDirect)
             {
                 desired = AvoidObstacle(desired);
                 desired = ApplySquadSeparation(desired);
@@ -704,9 +715,14 @@ public partial class SquadMate
         {
             return;
         }
-        var progress = GlobalPosition.DistanceTo(_combatProgressOrigin);
+        var movement = GlobalPosition - _combatProgressOrigin;
+        var progress = movement.Length();
+        var pathAdvance = _combatPathDirection.LengthSquared() > 0.01f
+            ? movement.Dot(_combatPathDirection.Normalized())
+            : 0.0f;
         if (_combatMoveRequested && progress < 0.24f)
         {
+            _combatNavigationStallCount++;
             var forward = _combatPathDirection.LengthSquared() > 0.01f
                 ? _combatPathDirection.Normalized()
                 : _combatDesiredDirection.LengthSquared() > 0.01f
@@ -730,6 +746,15 @@ public partial class SquadMate
                 _combatHasCoverPosition = false;
                 CombatStuckRecoveries++;
             }
+            if (_combatNavigationStallCount >= 3)
+            {
+                Main.ReplanSquadNavigationAfterStall(this);
+                _combatNavigationStallCount = 0;
+            }
+        }
+        else if (!_combatMoveRequested || pathAdvance > 0.35f)
+        {
+            _combatNavigationStallCount = 0;
         }
         _combatProgressOrigin = GlobalPosition;
         _combatProgressTimer = 0.0f;
@@ -746,6 +771,7 @@ public partial class SquadMate
     {
         ClearCombatTarget();
         _combatThreat = null;
+        _combatNavigationStallCount = 0;
         _lootHuntSource = null;
         _combatMoveRequested = false;
         _combatDesiredDirection = Vector3.Zero;
@@ -791,6 +817,7 @@ public partial class SquadMate
         CombatCoverSelections = 0;
         CombatFlankSelections = 0;
         CombatStuckRecoveries = 0;
+        _combatNavigationStallCount = 0;
         RequiredStepRecoveriesForDiagnostics = 0;
         ResetMovementProgress();
         UpdateHealthVisual();

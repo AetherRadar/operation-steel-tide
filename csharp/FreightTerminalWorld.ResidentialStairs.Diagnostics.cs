@@ -46,6 +46,23 @@ public partial class FreightTerminalWorld
             var tower = _residentialTowers[0];
             var spec = ResidentialTowerSpecs[0];
             var coreZ = -Mathf.Min(spec.Footprint.Y * 0.18f, 3.6f);
+            var longStart = tower.ToGlobal(new Vector3(
+                -1.45f,
+                0.25f,
+                coreZ + ResidentialStairRun * 0.5f - 0.25f));
+            var longTarget = tower.ToGlobal(new Vector3(
+                -1.45f,
+                ResidentialFloorHeight * 0.5f + 0.25f,
+                coreZ - ResidentialStairRun * 0.2f));
+            mate.GlobalPosition = longStart;
+            mate.Velocity = Vector3.Zero;
+            var longDirect = TryValidateSquadSteppedDirectRoute(
+                mate,
+                longTarget,
+                out var longDirectReason);
+            GD.Print(
+                $"RESIDENTIAL_SQUAD_STAIRS_LONG_PROBE valid={longDirect} reason={longDirectReason} "
+                + $"distance={longStart.DistanceTo(longTarget):0.00} rise={longTarget.Y - longStart.Y:0.00}");
             foreach (var laneOffset in new[] { -0.48f, 0.0f, 0.48f })
             {
                 foreach (var descending in new[] { false, true })
@@ -69,6 +86,10 @@ public partial class FreightTerminalWorld
                         var target = route[targetIndex];
                         mate.SetOrder(SquadOrder.Move, target);
                         var segmentStart = mate.GlobalPosition;
+                        var steppedDirect = TryValidateSquadSteppedDirectRoute(
+                            mate,
+                            target,
+                            out var steppedDirectReason);
                         var segmentLength = Mathf.Max(0.01f, segmentStart.DistanceTo(target));
                         var segmentBestProgress = 0.0f;
                         var reached = false;
@@ -91,6 +112,7 @@ public partial class FreightTerminalWorld
                             GD.Print(
                                 $"RESIDENTIAL_SQUAD_STAIRS_STALL lane={laneOffset:0.00} descending={descending} "
                                 + $"target={targetIndex}/{route.Count - 1} progress={segmentBestProgress:0.00} "
+                                + $"stepped_direct={steppedDirect}:{steppedDirectReason} "
                                 + $"pos=({mate.GlobalPosition.X:0.00},{mate.GlobalPosition.Y:0.00},{mate.GlobalPosition.Z:0.00}) "
                                 + $"target_pos=({target.X:0.00},{target.Y:0.00},{target.Z:0.00})");
                             break;

@@ -18,10 +18,11 @@ internal readonly record struct SquadNavigationDirective(
     Vector3 Target,
     SquadTraversalKind Kind,
     int DirectedEdgeId,
-    bool Required)
+    bool Required,
+    bool SteppedDirect = false)
 {
-    public static SquadNavigationDirective Walk(Vector3 target)
-        => new(target, SquadTraversalKind.Walk, -1, false);
+    public static SquadNavigationDirective Walk(Vector3 target, bool steppedDirect = false)
+        => new(target, SquadTraversalKind.Walk, -1, false, steppedDirect);
 }
 
 /// <summary>

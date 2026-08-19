@@ -183,6 +183,20 @@ public partial class SquadMate
             && BeginNavigationTraversal(vault, -1);
     }
 
+    internal bool CanUseLocalNavigationTraversal(Vector3 destination)
+    {
+        if (_navigationTraversalActive || !IsOnFloor())
+        {
+            return false;
+        }
+        var direction = destination - GlobalPosition;
+        var descending = direction.Y <= -NavigationDropMinHeight;
+        direction.Y = 0.0f;
+        return descending
+            ? TryBuildNavigationDropPath(direction, out _)
+            : TryBuildNavigationVaultPath(direction, out _);
+    }
+
     private bool TryBuildNavigationVaultPath(Vector3 direction, out NavigationTraversalPath path)
     {
         path = default;

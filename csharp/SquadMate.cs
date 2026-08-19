@@ -348,7 +348,6 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             UpdateWeaponLootHunt(dt, hostile);
         }
         var destination = ResolveFormationDestination();
-        var navigationDirective = SquadNavigationDirective.Walk(destination);
         var objectivePriority = false;
         if (!HasFireablePrimary && _lootHuntSource is not null && IsInstanceValid(_lootHuntSource.LootNode))
         {
@@ -370,20 +369,29 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         var reviveTargetNode = ActiveReviveTargetNode;
         if (reviveTargetNode is not null)
         {
-            navigationDirective = Main.ResolveSquadNavigationDestination(
-                this,
-                reviveTargetNode.GlobalPosition,
-                emergency: true);
-            destination = navigationDirective.Target;
+            destination = reviveTargetNode.GlobalPosition;
             objectivePriority = true;
         }
-        else if (Order == SquadOrder.Follow && hostile is null && !objectivePriority)
+        else
         {
-            destination = Main.ResolveSquadFollowDestination(this, destination);
-            navigationDirective = Main.ResolveSquadNavigationDestination(this, destination, emergency: false);
-            destination = navigationDirective.Target;
+            if (Order == SquadOrder.Follow && !objectivePriority)
+            {
+                destination = Main.ResolveSquadFollowDestination(this, destination);
+            }
+            destination = ResolveTacticalDestination(destination, hostile, objectivePriority);
         }
-        UpdateTacticalMovement(destination, hostile, objectivePriority, navigationDirective.Kind, dt);
+        var navigationDirective = Main.ResolveSquadNavigationDestination(
+            this,
+            destination,
+            emergency: reviveTargetNode is not null);
+        destination = navigationDirective.Target;
+        UpdateTacticalMovement(
+            destination,
+            hostile,
+            objectivePriority,
+            navigationDirective.Kind,
+            navigationDirective.SteppedDirect,
+            dt);
         if (TryBeginNavigationTraversal(navigationDirective)
             || navigationDirective.Kind == SquadTraversalKind.Walk
                 && (TryBeginVaultTowardDestination(destination)
@@ -530,10 +538,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             Main.SpawnTracer(shotOrigin, hitPoint, new Color(0.34f, 0.78f, 1.0f));
             return;
         }
-        var accuracy = Mathf.Clamp(0.91f - distance * 0.009f, 0.48f, 0.9f);
+        var accuracy = Mathf.Clamp(0.94f - distance * 0.006f, 0.58f, 0.93f);
         if (_rng.Randf() < accuracy)
         {
-            enemy.TakeDamage(_rng.RandfRange(11.0f, 16.5f), hitPoint, this);
+            enemy.TakeDamage(_rng.RandfRange(14.0f, 20.0f), hitPoint, this);
         }
         else
         {

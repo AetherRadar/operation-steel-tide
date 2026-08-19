@@ -5,6 +5,8 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    private const float SquadNavigationActiveDestinationDistance = 1.5f;
+
     private const float SquadTrailSampleSpacing = 0.85f;
     private const float SquadTrailTeleportResetDistance = 18.0f;
     private const int SquadTrailCapacity = 1024;
@@ -171,8 +173,10 @@ public partial class FreightTerminalWorld
                     destination,
                     now))
             {
-                _squadTrailPaths.Remove(id);
-                _squadGridPaths.Remove(id);
+                // Keep an already validated route as a fallback while taking the
+                // shortcut. Door-edge capsule probes can fluctuate for a frame as
+                // the character clears a portal; discarding the route here leaves
+                // the mate with no safe directive if the next probe is blocked.
                 return SquadNavigationDirective.Walk(destination);
             }
             if (state is not null)
@@ -180,13 +184,18 @@ public partial class FreightTerminalWorld
                 state.NextDirectCheckMilliseconds = now + 180;
             }
         }
+        if (CanUseSquadSteppedDirectRoute(mate, destination))
+        {
+            return SquadNavigationDirective.Walk(destination, steppedDirect: true);
+        }
 
         if (_squadLeaderTrail.Count > 0)
         {
             if (state is null
                 || state.Revision != _squadLeaderTrailRevision
                 || state.Emergency != emergency
-                || emergency && state.Destination.DistanceSquaredTo(destination) > 1.0f
+                || state.Destination.DistanceSquaredTo(destination)
+                    > SquadNavigationActiveDestinationDistance * SquadNavigationActiveDestinationDistance
                 || state.Cursor < 0
                 || state.Cursor >= _squadLeaderTrail.Count)
             {
@@ -214,12 +223,117 @@ public partial class FreightTerminalWorld
         }
 
         // Trail unusable (off-trail, stale, or exhausted): fall back to the
-        // geometric ground-grid planner before the legacy direct push.
+        // geometric ground-grid planner. If it cannot plan this frame, hold position
+        // instead of deliberately pushing into the blocking wall.
         if (TryResolveSquadGridNavigation(mate, destination, emergency, out var gridDirective))
         {
             return gridDirective;
         }
-        return SquadNavigationDirective.Walk(destination);
+        if (mate.CanUseLocalNavigationTraversal(destination))
+        {
+            return SquadNavigationDirective.Walk(destination);
+        }
+        return SquadNavigationDirective.Walk(mate.GlobalPosition);
+    }
+
+    private bool CanUseSquadSteppedDirectRoute(SquadMate mate, Vector3 destination)
+        => TryValidateSquadSteppedDirectRoute(mate, destination, out _);
+
+    private bool TryValidateSquadSteppedDirectRoute(
+        SquadMate mate,
+        Vector3 destination,
+        out string reason)
+    {
+        reason = "geometry";
+        var origin = mate.GlobalPosition;
+        var horizontal = new Vector2(destination.X - origin.X, destination.Z - origin.Z);
+        var horizontalDistance = horizontal.Length();
+        var verticalDistance = destination.Y - origin.Y;
+        if (horizontalDistance is < 0.45f or > 7.5f
+            || Mathf.Abs(verticalDistance) > 2.2f
+            || Mathf.Abs(verticalDistance) > horizontalDistance * 0.72f + 0.5f)
+        {
+            return false;
+        }
+
+        var exclude = new Godot.Collections.Array<Rid> { mate.GetRid() };
+        using var excludeBacking = exclude.AsDisposable();
+        if (IsInstanceValid(_player))
+        {
+            exclude.Add(_player.GetRid());
+        }
+        var samples = Mathf.Max(3, Mathf.CeilToInt(horizontalDistance / 0.3f));
+        var previousSupport = float.NaN;
+        var finalSupport = float.NaN;
+        for (var sample = 0; sample <= samples; sample++)
+        {
+            var expected = origin.Lerp(destination, sample / (float)samples);
+            var supportY = float.NaN;
+            var closestDelta = float.PositiveInfinity;
+            foreach (var offset in SquadNavSupportFootprintOffsets)
+            {
+                var probe = new Vector3(expected.X + offset.X, expected.Y, expected.Z + offset.Y);
+                if (!PhysicsRaycast.TryHit(
+                        GetWorld3D(),
+                        probe + Vector3.Up * 0.7f,
+                        probe + Vector3.Down * 0.85f,
+                        exclude,
+                        1,
+                        out var support)
+                    || support.Normal.Dot(Vector3.Up) < 0.72f)
+                {
+                    continue;
+                }
+                var candidateDelta = Mathf.Abs(support.Position.Y - expected.Y);
+                if (candidateDelta < closestDelta)
+                {
+                    closestDelta = candidateDelta;
+                    supportY = support.Position.Y;
+                }
+            }
+            if (float.IsNaN(supportY))
+            {
+                reason = $"support:{sample}";
+                return false;
+            }
+            var supportDelta = supportY - expected.Y;
+            if (supportDelta is > 0.52f or < -0.68f)
+            {
+                reason = $"support_delta:{sample}:{supportDelta:0.00}";
+                return false;
+            }
+            if (!float.IsNaN(previousSupport))
+            {
+                var step = supportY - previousSupport;
+                if (Mathf.Abs(step) > 0.32f
+                    || verticalDistance > 0.0f && step < -0.16f
+                    || verticalDistance < 0.0f && step > 0.16f)
+                {
+                    reason = $"step:{sample}:{step:0.00}";
+                    return false;
+                }
+            }
+            previousSupport = supportY;
+            finalSupport = supportY;
+        }
+        if (Mathf.Abs(finalSupport - destination.Y) > 0.75f)
+        {
+            reason = $"final:{finalSupport - destination.Y:0.00}";
+            return false;
+        }
+
+        if (PhysicsRaycast.HasHit(
+            GetWorld3D(),
+            origin + Vector3.Up * 1.35f,
+            destination + Vector3.Up * 1.35f,
+            exclude,
+            1))
+        {
+            reason = "body_ray";
+            return false;
+        }
+        reason = "clear";
+        return true;
     }
 
     internal Vector3 ResolveSquadFollowDestination(SquadMate mate, Vector3 formationDestination)
@@ -732,6 +846,28 @@ public partial class FreightTerminalWorld
         }
         _squadTrailPaths.Remove(mate.GetInstanceId());
         _squadGridPaths.Remove(mate.GetInstanceId());
+        mate.RequestNavigationRecovery(forceEscape: true);
+    }
+
+    internal void ReplanSquadNavigationAfterStall(SquadMate mate)
+    {
+        if (!IsInstanceValid(mate))
+        {
+            return;
+        }
+        if (TryGetActiveRequiredSquadTraversalEdge(mate, out var directedEdgeId))
+        {
+            if (PreserveSquadTraversalAfterStall(mate, directedEdgeId))
+            {
+                mate.RequestRequiredStepRecovery();
+                return;
+            }
+            ReportSquadTraversalFailure(mate, directedEdgeId);
+        }
+        else
+        {
+            ClearSquadNavigation(mate);
+        }
         mate.RequestNavigationRecovery(forceEscape: true);
     }
 
