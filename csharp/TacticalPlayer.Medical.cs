@@ -2,6 +2,12 @@ using Godot;
 
 namespace OperationSteelTide;
 
+internal readonly record struct FieldSupplySnapshot(
+    int Bandages,
+    int FieldMedkits,
+    int Adrenaline,
+    int ArmorPlates);
+
 public partial class TacticalPlayer
 {
     public bool MedicalActionBlocksWeapon => _medicalActionRemaining > 0.0f;
@@ -25,15 +31,47 @@ public partial class TacticalPlayer
 
     public int MedicalCount(MedicalItemKind kind)
     {
-        var total = 0;
+        var supplies = CaptureFieldSupplySnapshot();
+        return kind switch
+        {
+            MedicalItemKind.FieldMedkit => supplies.FieldMedkits,
+            MedicalItemKind.Adrenaline => supplies.Adrenaline,
+            _ => supplies.Bandages
+        };
+    }
+
+    internal FieldSupplySnapshot CaptureFieldSupplySnapshot()
+    {
+        var bandages = 0;
+        var fieldMedkits = 0;
+        var adrenaline = 0;
+        var armorPlates = 0;
         foreach (var item in Backpack)
         {
-            if (item.Kind == LootItemKind.Medical && item.MedicalKind == kind)
+            var quantity = Mathf.Max(0, item.Quantity);
+            if (item.Kind == LootItemKind.ArmorPlate)
             {
-                total += Mathf.Max(0, item.Quantity);
+                armorPlates += quantity;
+                continue;
+            }
+            if (item.Kind != LootItemKind.Medical)
+            {
+                continue;
+            }
+            switch (item.MedicalKind)
+            {
+                case MedicalItemKind.FieldMedkit:
+                    fieldMedkits += quantity;
+                    break;
+                case MedicalItemKind.Adrenaline:
+                    adrenaline += quantity;
+                    break;
+                default:
+                    bandages += quantity;
+                    break;
             }
         }
-        return total;
+        return new FieldSupplySnapshot(bandages, fieldMedkits, adrenaline, armorPlates);
     }
 
     public int FieldUseCount(FieldUseKind kind)

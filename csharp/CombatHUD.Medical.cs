@@ -125,23 +125,17 @@ public partial class CombatHUD
 
     public void SetMedicalInventory(TacticalPlayer player)
     {
-        if (!IsInstanceValid(_medicalStatusLabel))
-        {
-            return;
-        }
-        var bandages = player.MedicalCount(MedicalItemKind.Bandage);
-        var medkits = player.MedicalCount(MedicalItemKind.FieldMedkit);
-        var adrenaline = player.MedicalCount(MedicalItemKind.Adrenaline);
-        var plates = player.ArmorPlates;
-        var caption = Text("medical_hotkey", "B  FIELD SUPPLIES");
-        _medicalStatusLabel.Text = $"{caption}  //  B{bandages}  +{medkits}  A{adrenaline}  P{plates}";
-        _medicalBoostLabel.Text = player.AdrenalineActive
-            ? $"{Text("medical_boost", "ADRENALINE BOOST")}  {player.AdrenalineRemaining:0.0}s"
-            : Text("medical_hold_hint", "HOLD B FOR RADIAL SELECT");
-        _medicalBoostLabel.AddThemeColorOverride(
-            "font_color",
-            player.AdrenalineActive ? new Color(1.0f, 0.66f, 0.2f) : new Color(0.42f, 0.56f, 0.53f));
+        SetMedicalInventory(
+            player.CaptureFieldSupplySnapshot(),
+            player.AdrenalineActive,
+            player.AdrenalineRemaining);
     }
+
+    internal void SetMedicalInventory(
+        FieldSupplySnapshot supplies,
+        bool adrenalineActive,
+        float adrenalineRemaining)
+        => ApplyMedicalPresentation(supplies, adrenalineActive, adrenalineRemaining);
 
     private void RefreshMedicalLanguage()
     {

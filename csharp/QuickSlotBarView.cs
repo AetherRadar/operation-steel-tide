@@ -36,6 +36,7 @@ public partial class QuickSlotBarView : Control
     private string _secondarySignature = string.Empty;
     private string _sidearmSignature = string.Empty;
     private string _knifeSignature = string.Empty;
+    private int _presentationUpdateCount;
 
     public bool UiReady
         => Array.TrueForAll(_buttons, IsInstanceValid)
@@ -51,6 +52,9 @@ public partial class QuickSlotBarView : Control
         && Array.TrueForAll(_buttons, button => button.HasConnections(BaseButton.SignalName.Pressed));
 
     public int ActiveSlot => _activeSlot;
+    internal int PresentationUpdateCountForDiagnostics => _presentationUpdateCount;
+
+    internal void ResetPresentationUpdateCountForDiagnostics() => _presentationUpdateCount = 0;
 
     public int VisibleSlotCount
     {
@@ -160,6 +164,8 @@ public partial class QuickSlotBarView : Control
         {
             return;
         }
+
+        _presentationUpdateCount++;
 
         _buttons[0].Visible = _hasPrimary;
         _buttons[1].Visible = _secondary is not null;

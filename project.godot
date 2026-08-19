@@ -10,6 +10,9 @@ boot_splash/show_image=false
 [autoload]
 SquadNetworkRuntime="*res://csharp/SquadNetwork.cs"
 
+[debug]
+settings/profiler/max_timestamp_query_elements=1024
+
 [display]
 window/size/viewport_width=1920
 window/size/viewport_height=1080

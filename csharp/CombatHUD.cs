@@ -1022,40 +1022,27 @@ public partial class CombatHUD : CanvasLayer
     /// <summary>Shipped value path: all three weapon slots, equipped gear, and backpack stacks.</summary>
     public static int ComputeBackpackTotalValue(TacticalPlayer player)
     {
-        var total = LootItem.TotalValue(player.Backpack);
-        total += WeaponSlotValue(player.PrimaryWeaponBuild, player.PrimaryWeaponGrade);
-        total += WeaponSlotValue(player.SecondaryWeaponBuild, player.SecondaryWeaponGrade);
-        total += WeaponSlotValue(player.SidearmWeaponBuild, player.SidearmWeaponGrade);
-        total += new LootItem
+        var total = 0;
+        foreach (var item in player.Backpack)
         {
-            Kind = LootItemKind.Equipment,
-            Equipment = player.EquippedHelmet,
-            Grade = player.EquippedHelmetGrade
-        }.StackValue;
-        total += new LootItem
-        {
-            Kind = LootItemKind.Equipment,
-            Equipment = player.EquippedBodyArmor,
-            Grade = player.EquippedBodyArmorGrade
-        }.StackValue;
-        total += new LootItem
-        {
-            Kind = LootItemKind.Equipment,
-            Equipment = player.EquippedBackpack,
-            Grade = player.EquippedBackpackGrade
-        }.StackValue;
+            total += item.StackValue;
+        }
+        total += WeaponSlotValue(player.PrimaryWeaponForHud, player.PrimaryWeaponGrade);
+        total += WeaponSlotValue(player.SecondaryWeaponForHud, player.SecondaryWeaponGrade);
+        total += WeaponSlotValue(player.SidearmWeaponForHud, player.SidearmWeaponGrade);
+        total += EquipmentSlotValue(player.EquippedHelmetGrade);
+        total += EquipmentSlotValue(player.EquippedBodyArmorGrade);
+        total += EquipmentSlotValue(player.EquippedBackpackGrade);
         return total;
     }
 
     private static int WeaponSlotValue(WeaponBuild? weapon, LootGrade grade)
         => weapon is null
             ? 0
-            : new LootItem
-            {
-                Kind = LootItemKind.Weapon,
-                Weapon = weapon,
-                Grade = grade
-            }.StackValue;
+            : LootGrades.BaseValue(grade) + (int)grade * 180 + 200;
+
+    private static int EquipmentSlotValue(LootGrade grade)
+        => LootGrades.BaseValue(grade) + 90;
 
     private void ShowLootWeaponDetails(int slot)
     {
@@ -1187,27 +1174,14 @@ public partial class CombatHUD : CanvasLayer
 
     public void SetStats(float health, float armor, float stamina, int ammo, int reserve, int grenades)
     {
-        _healthLabel.Text = $"{Mathf.Max(0, (int)health):000}";
-        _armorLabel.Text = $"{Mathf.Max(0, (int)armor):00}";
-        _staminaBar.Value = stamina;
-        _ammoLabel.Text = $"{ammo:00}";
-        _reserveLabel.Text = $"/ {reserve:000}";
-        _grenadeCount = Mathf.Max(0, grenades);
-        RefreshQuickSlotBar();
-        _healthLabel.AddThemeColorOverride("font_color", health < 30 ? new Color(1.0f, 0.36f, 0.25f) : new Color(0.88f, 0.96f, 0.92f));
-        if (_shownPlayer is not null)
-        {
-            UpdateBackpackHotkey(_shownPlayer);
-        }
+        ApplyStatsPresentation(health, armor, stamina, ammo, reserve, grenades);
     }
 
     public void SetStaminaRecoveryState(bool recovering)
     {
         if (IsInstanceValid(_staminaBar))
         {
-            _staminaBar.Modulate = recovering
-                ? new Color(1.0f, 0.55f, 0.22f)
-                : new Color(0.46f, 0.92f, 0.68f);
+            ApplyStaminaRecoveryPresentation(recovering);
         }
     }
 
@@ -1224,25 +1198,16 @@ public partial class CombatHUD : CanvasLayer
         WeaponBuild? sidearmWeaponBuild = null,
         int activeWeaponSlot = 0)
     {
-        _hasPrimary = hasPrimary;
-        _activeWeaponSlot = Mathf.Clamp(activeWeaponSlot, 0, 5);
-        _quickPrimaryBuild = hasPrimary ? weaponBuild : null;
-        _quickSecondaryBuild = secondaryWeaponBuild;
-        _quickSidearmBuild = sidearmWeaponBuild;
-        _quickKnifeSkinId = knifeSkinId;
-        _plateReserveLabel.Text = $"x{armorPlates}";
-        _lastFireMode = fireMode;
-        var mode = fireMode switch
-        {
-            "AUTO" => Text("auto", "AUTO"),
-            "SEMI" => Text("semi", "SEMI"),
-            "GRENADE" => Text("quick_throw", "THROW"),
-            "UTILITY" => Text("quick_deploy", "DEPLOY"),
-            _ => Text("knife", "KNIFE")
-        };
-        var displayWeapon = fireMode == "KNIFE" ? Text("tactical_knife", "TACTICAL KNIFE") : weaponName;
-        _weaponModeLabel.Text = $"{displayWeapon}   {mode}";
-        RefreshQuickSlotBar();
+        ApplyEquipmentPresentation(
+            armorPlates,
+            fireMode,
+            weaponName,
+            weaponBuild,
+            hasPrimary,
+            knifeSkinId,
+            secondaryWeaponBuild,
+            sidearmWeaponBuild,
+            activeWeaponSlot);
     }
 
     private void RefreshQuickSlotBar()
@@ -1307,10 +1272,7 @@ public partial class CombatHUD : CanvasLayer
 
     public void SetHeading(float degrees)
     {
-        var directions = new[] { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
-        var normalized = Mathf.PosMod(degrees, 360.0f);
-        var index = (int)Mathf.Round(normalized / 45.0f) % 8;
-        _compassLabel.Text = $"{directions[(index + 7) % 8]}      {normalized:000}      {directions[index]}";
+        ApplyHeadingPresentation(degrees);
     }
 
     public void SetMissionPhase(string phase, float remaining, bool online)

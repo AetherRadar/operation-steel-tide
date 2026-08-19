@@ -64,20 +64,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     }
     public int Grenades { get; private set; } = 2;
     public int ArmorPlates
-    {
-        get
-        {
-            var total = 0;
-            foreach (var item in Backpack)
-            {
-                if (item.Kind == LootItemKind.ArmorPlate)
-                {
-                    total += Mathf.Max(0, item.Quantity);
-                }
-            }
-            return total;
-        }
-    }
+        => CaptureFieldSupplySnapshot().ArmorPlates;
     public bool IsDead { get; set; }
     public bool HasMovementIntent { get; private set; }
     public bool IsAiming => _isAiming;
@@ -1335,9 +1322,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
         MovePlayer(dt);
         UpdateCameraAndWeapon(dt);
-        PushHudStats();
+        var fieldSupplies = PushHudStats();
         Hud?.SetEquipment(
-            ArmorPlates,
+            fieldSupplies.ArmorPlates,
             _activeQuickSlot switch
             {
                 PlayerQuickSlot.Melee => "KNIFE",
@@ -1351,11 +1338,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 PlayerQuickSlot.Utility => GameLocalization.Get("smoke_grenade", Hud?.CurrentLanguage ?? "en", "SMOKE GRENADE"),
                 _ => EquippedWeapon.DisplayName(Hud?.CurrentLanguage ?? "en")
             },
-            PrimaryWeaponBuild,
+            PrimaryWeaponForHud,
             HasFireablePrimary,
             EquippedKnifeSkinId,
-            SecondaryWeaponBuild,
-            SidearmWeaponBuild,
+            SecondaryWeaponForHud,
+            SidearmWeaponForHud,
             (int)ActiveQuickSlot);
         Hud?.SetAiming(_isAiming);
         var heading = Mathf.RadToDeg(Rotation.Y) * -1.0f;
@@ -1418,12 +1405,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
     }
 
-    private void PushHudStats()
+    private FieldSupplySnapshot PushHudStats()
     {
+        var fieldSupplies = CaptureFieldSupplySnapshot();
         Hud?.SetStats(Health, Armor, Stamina, Ammo, ReserveAmmo, Grenades);
         Hud?.SetStaminaRecoveryState(SprintRecoveryRequired);
         Hud?.SetAmmoTier(CurrentAmmoGrade);
-        Hud?.SetMedicalInventory(this);
+        Hud?.SetMedicalInventory(fieldSupplies, AdrenalineActive, AdrenalineRemaining);
+        return fieldSupplies;
     }
 
     private void UpdateDownedCrawl(float delta)
@@ -2397,18 +2386,18 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public int AmmoReserveFor(AmmoCaliber caliber)
     {
         var total = 0;
-        foreach (var grade in System.Enum.GetValues<LootGrade>())
+        for (var tier = (int)LootGrade.Common; tier <= (int)LootGrade.Legendary; tier++)
         {
-            total += AmmoReserveFor(caliber, grade);
+            total += AmmoReserveFor(caliber, (LootGrade)tier);
         }
         return total;
     }
 
     private void SetAmmoReserve(AmmoCaliber caliber, int amount)
     {
-        foreach (var grade in System.Enum.GetValues<LootGrade>())
+        for (var tier = (int)LootGrade.Common; tier <= (int)LootGrade.Legendary; tier++)
         {
-            SetAmmoReserve(caliber, grade, 0);
+            SetAmmoReserve(caliber, (LootGrade)tier, 0);
         }
         SetAmmoReserve(caliber, LootGrade.Common, amount);
     }

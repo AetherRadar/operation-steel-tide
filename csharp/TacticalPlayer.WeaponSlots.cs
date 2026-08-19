@@ -38,6 +38,9 @@ public partial class TacticalPlayer
     public WeaponBuild? PrimaryWeaponBuild => WeaponSnapshotForSlot(PlayerWeaponSlot.Primary);
     public WeaponBuild? SecondaryWeaponBuild => WeaponSnapshotForSlot(PlayerWeaponSlot.Secondary);
     public WeaponBuild? SidearmWeaponBuild => WeaponSnapshotForSlot(PlayerWeaponSlot.Sidearm);
+    internal WeaponBuild? PrimaryWeaponForHud => WeaponViewForSlot(PlayerWeaponSlot.Primary);
+    internal WeaponBuild? SecondaryWeaponForHud => WeaponViewForSlot(PlayerWeaponSlot.Secondary);
+    internal WeaponBuild? SidearmWeaponForHud => WeaponViewForSlot(PlayerWeaponSlot.Sidearm);
     public LootGrade PrimaryWeaponGrade => _primaryWeaponSlotGrade;
     public LootGrade SecondaryWeaponGrade => _secondaryWeaponSlotGrade;
     public LootGrade SidearmWeaponGrade => _sidearmWeaponSlotGrade;
@@ -362,14 +365,15 @@ public partial class TacticalPlayer
 
     private WeaponBuild? WeaponSnapshotForSlot(PlayerWeaponSlot slot)
     {
+        return WeaponViewForSlot(slot)?.Clone();
+    }
+
+    private WeaponBuild? WeaponViewForSlot(PlayerWeaponSlot slot)
+    {
         var stored = WeaponBuildForSlot(slot);
-        if (stored is null)
-        {
-            return null;
-        }
-        return !_knifeEquipped && _activeWeaponSlot == slot
-            ? EquippedWeapon.Clone()
-            : stored.Clone();
+        return stored is null
+            ? null
+            : !_knifeEquipped && _activeWeaponSlot == slot ? EquippedWeapon : stored;
     }
 
     private LootGrade WeaponGradeForSlot(PlayerWeaponSlot slot) => slot switch
