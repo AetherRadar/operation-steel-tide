@@ -14,6 +14,10 @@ public partial class FreightTerminalWorld
     private static bool _extractionNetworkDiagnosticLobbyWaited;
     private static bool _extractionNetworkDiagnosticMutationApplied;
     private static bool _extractionNetworkDiagnosticTombstoneGuarded;
+    private static bool _extractionNetworkDiagnosticDownMotionGuarded;
+    private static long _extractionNetworkDiagnosticDownPeerId;
+    private static Vector3 _extractionNetworkDiagnosticDownPosition;
+    private static Vector3 _extractionNetworkDiagnosticDownRotation;
 
     private async void ValidateExtractionNetworkSession(bool host)
     {
@@ -32,6 +36,10 @@ public partial class FreightTerminalWorld
         _extractionNetworkDiagnosticLobbyWaited = false;
         _extractionNetworkDiagnosticMutationApplied = false;
         _extractionNetworkDiagnosticTombstoneGuarded = false;
+        _extractionNetworkDiagnosticDownMotionGuarded = false;
+        _extractionNetworkDiagnosticDownPeerId = 0;
+        _extractionNetworkDiagnosticDownPosition = Vector3.Zero;
+        _extractionNetworkDiagnosticDownRotation = Vector3.Zero;
 
         var endpoint = ResolveNetworkDiagnosticEndpoint(OS.GetCmdlineUserArgs());
         _hud.ShowSquadLobby(host
@@ -129,6 +137,7 @@ public partial class FreightTerminalWorld
         if (!host)
         {
             _player.GlobalPosition = clientPosition;
+            _player.Rotation = Vector3.Zero;
             _player.Velocity = Vector3.Zero;
             _player.SetPhysicsProcess(false);
         }
@@ -146,6 +155,13 @@ public partial class FreightTerminalWorld
                 FailExtractionNetworkDiagnostic(host, "host_authority_mutation_failed");
                 return;
             }
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            if (!GodotObject.IsInstanceValid(this))
+            {
+                return;
+            }
+            CompleteExtractionNetworkDownMotionGuard();
         }
 
         while (Time.GetTicksMsec() < deadline && !ExtractionNetworkDiagnosticStateReady(host))
@@ -171,7 +187,7 @@ public partial class FreightTerminalWorld
             && _squadNetwork.ConnectedPeerCount == 1
             && (!host || _squadNetwork.LastExtractionWorldChunkCount > 1);
 
-        GD.Print($"EXTRACTION_NETWORK_CHECK mode={(host ? "host" : "client")} valid={valid} lobby_waited={_extractionNetworkDiagnosticLobbyWaited} launch_waited={_extractionWorldLaunchWaitObserved} launch_paused={_extractionWorldLaunchPauseObserved} bootstrap={_squadNetwork.ExtractionWorldBootstrapReceived} launch_started={_squadNetwork.ExtractionWorldLaunchStarted} launch_pending={_extractionWorldLaunchPending} persistent={persistentRuntime} online={_squadNetwork.IsOnline} peers={_squadNetwork.ConnectedPeerCount} slot={_extractionLocalSquadSlot} seed={DeploymentMapRuntime.CurrentWorldSeed} sequence={_lastExtractionWorldSequence} chunks={_squadNetwork.LastExtractionWorldChunkCount} ready_peers={_squadNetwork.ExtractionWorldReadyPlayerCount} enemies={_extractionNetworkEnemies.Count} squad={ActiveSquadCount} ai={AiSquadCount} objective={_objectiveStage} loot_marker={HasExtractionDiagnosticLootItem()} mutation={_extractionNetworkDiagnosticMutationApplied} tombstone_guard={_extractionNetworkDiagnosticTombstoneGuarded} damage_feedback={ExtractionNetworkDamageFeedbackReady()} incoming={_hud.LastIncomingDamage:0.0} source={_hud.LastIncomingSource.Replace(' ', '_')} kick={_player.DamageKickMagnitude:0.0000} down_presentation={ExtractionNetworkDownPresentationReady()} health={_player.Health:0.0} dead={_player.IsDead} local_down={_localPlayerDowned} down_banner={_hud.IsDownedBannerVisible} squad_view={IsSquadMateViewCurrent}");
+        GD.Print($"EXTRACTION_NETWORK_CHECK mode={(host ? "host" : "client")} valid={valid} lobby_waited={_extractionNetworkDiagnosticLobbyWaited} launch_waited={_extractionWorldLaunchWaitObserved} launch_paused={_extractionWorldLaunchPauseObserved} bootstrap={_squadNetwork.ExtractionWorldBootstrapReceived} launch_started={_squadNetwork.ExtractionWorldLaunchStarted} launch_pending={_extractionWorldLaunchPending} persistent={persistentRuntime} online={_squadNetwork.IsOnline} peers={_squadNetwork.ConnectedPeerCount} slot={_extractionLocalSquadSlot} seed={DeploymentMapRuntime.CurrentWorldSeed} sequence={_lastExtractionWorldSequence} chunks={_squadNetwork.LastExtractionWorldChunkCount} ready_peers={_squadNetwork.ExtractionWorldReadyPlayerCount} enemies={_extractionNetworkEnemies.Count} squad={ActiveSquadCount} ai={AiSquadCount} objective={_objectiveStage} loot_marker={HasExtractionDiagnosticLootItem()} mutation={_extractionNetworkDiagnosticMutationApplied} tombstone_guard={_extractionNetworkDiagnosticTombstoneGuarded} down_motion_guard={_extractionNetworkDiagnosticDownMotionGuarded} damage_feedback={ExtractionNetworkDamageFeedbackReady()} incoming={_hud.LastIncomingDamage:0.0} source={_hud.LastIncomingSource.Replace(' ', '_')} kick={_player.DamageKickMagnitude:0.0000} down_presentation={ExtractionNetworkDownPresentationReady()} health={_player.Health:0.0} dead={_player.IsDead} local_down={_localPlayerDowned} down_banner={_hud.IsDownedBannerVisible} squad_view={IsSquadMateViewCurrent}");
         GD.Print($"EXTRACTION_NETWORK_PASS valid={valid}");
         if (host)
         {
@@ -223,9 +239,30 @@ public partial class FreightTerminalWorld
         enemy.GlobalPosition = clientPosition + new Vector3(0.0f, 0.1f, -5.0f);
         enemy.Velocity = Vector3.Zero;
         enemy.SetPhysicsProcess(false);
+        var queuedMovementAccepted = TryApplyRemoteSquadState(
+            remote.NetworkPeerId,
+            remote.Role,
+            remote.GlobalPosition + Vector3.Right * 18.0f,
+            remote.Rotation + Vector3.Up * 1.1f,
+            remote.MaxHealth,
+            down: false);
         enemy.TakeDamage(18.0f, enemy.GlobalPosition + Vector3.Up, _player);
         remote.TakeCombatDamage(18.0f, remote.HitPoint(HitRegion.Torso), enemy);
         remote.TakeCombatDamage(999.0f, remote.HitPoint(HitRegion.Torso), enemy);
+        _extractionNetworkDiagnosticDownPeerId = remote.NetworkPeerId;
+        _extractionNetworkDiagnosticDownPosition = remote.GlobalPosition;
+        _extractionNetworkDiagnosticDownRotation = remote.Rotation;
+        var staleDownMovementAccepted = TryApplyRemoteSquadState(
+            remote.NetworkPeerId,
+            remote.Role,
+            remote.GlobalPosition + Vector3.Back * 18.0f,
+            remote.Rotation + Vector3.Up * 0.7f,
+            remote.MaxHealth,
+            down: false);
+        _extractionNetworkDiagnosticDownMotionGuarded = queuedMovementAccepted
+            && !staleDownMovementAccepted
+            && remote.IsDowned
+            && remote.Health <= 0.0f;
         _extractionSquadTombstones[remote.SquadSlot] = new ExtractionSquadNetworkState(
             remote.SquadSlot,
             remote.NetworkPeerId,
@@ -294,6 +331,7 @@ public partial class FreightTerminalWorld
         {
             return _extractionNetworkDiagnosticMutationApplied
                 && _extractionNetworkDiagnosticTombstoneGuarded
+                && _extractionNetworkDiagnosticDownMotionGuarded
                 && enemyAuthority
                 && aiAuthority
                 && missionAuthority
@@ -335,6 +373,18 @@ public partial class FreightTerminalWorld
             && _localPlayerDowned
             && _hud.IsDownedBannerVisible
             && IsSquadMateViewCurrent;
+
+    private void CompleteExtractionNetworkDownMotionGuard()
+    {
+        var remote = _squadMates.FirstOrDefault(candidate => IsInstanceValid(candidate)
+            && candidate.IsHumanProxy
+            && candidate.NetworkPeerId == _extractionNetworkDiagnosticDownPeerId);
+        _extractionNetworkDiagnosticDownMotionGuarded &= remote is not null
+            && remote.IsDowned
+            && remote.Health <= 0.0f
+            && remote.GlobalPosition.DistanceSquaredTo(_extractionNetworkDiagnosticDownPosition) <= 0.0001f
+            && remote.Rotation.DistanceSquaredTo(_extractionNetworkDiagnosticDownRotation) <= 0.0001f;
+    }
 
     private bool TryFindExtractionDiagnosticRemote(Vector3 expectedPosition, out SquadMate remote)
     {

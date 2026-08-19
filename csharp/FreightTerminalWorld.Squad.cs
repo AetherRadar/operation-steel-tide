@@ -809,10 +809,13 @@ public partial class FreightTerminalWorld
     }
 
     private void OnRemoteSquadState(long peerId, OperatorRole role, Vector3 position, Vector3 rotation, float health, bool down)
+        => TryApplyRemoteSquadState(peerId, role, position, rotation, health, down);
+
+    private bool TryApplyRemoteSquadState(long peerId, OperatorRole role, Vector3 position, Vector3 rotation, float health, bool down)
     {
         if (!_squadDeployed)
         {
-            return;
+            return false;
         }
         var authoritative = IsExtractionNetworkMatch && _squadNetwork.IsHost;
         var assignedSlot = authoritative
@@ -821,7 +824,7 @@ public partial class FreightTerminalWorld
         if (authoritative && assignedSlot > 0
             && _extractionSquadTombstones.ContainsKey(assignedSlot))
         {
-            return;
+            return false;
         }
         var proxy = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && mate.IsHumanProxy && mate.NetworkPeerId == peerId);
         if (proxy is null)
@@ -839,7 +842,7 @@ public partial class FreightTerminalWorld
                 : Enumerable.Range(1, 2).FirstOrDefault(value => !occupiedSlots.Contains(value));
             if (slot == 0)
             {
-                return;
+                return false;
             }
             var ai = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && !mate.IsHumanProxy && mate.SquadSlot == slot);
             if (ai is not null)
@@ -850,12 +853,17 @@ public partial class FreightTerminalWorld
             proxy = SpawnSquadMate(slot, role, true, peerId);
             _hud.ShowLocalizedMessage("player_joined", $"SQUADMATE CONNECTED  //  PEER {peerId}", OperatorRoles.Spec(role).Accent);
         }
+        if (authoritative && (proxy.IsDowned || proxy.IsBodyBag))
+        {
+            return false;
+        }
         proxy.SetRemoteState(
             role,
             position,
             rotation,
             authoritative ? proxy.Health : health,
             authoritative ? proxy.IsDowned || proxy.IsBodyBag : down);
+        return true;
     }
 
     private void OnRemoteSquadPeerLeft(long peerId)

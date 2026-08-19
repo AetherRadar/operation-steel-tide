@@ -12,8 +12,14 @@ public partial class SquadMate
         {
             return;
         }
+        var down = IsDowned || IsBodyBag;
         _remoteHealth = Health;
-        _remoteDown = IsDowned || IsBodyBag;
+        _remoteDown = down;
+        if (down)
+        {
+            _remotePosition = GlobalPosition;
+            _remoteRotation = Rotation;
+        }
     }
 
     public void SetExtractionRemoteState(
