@@ -148,10 +148,10 @@ public sealed class RefineryExtractionMapBuilder
             Kenney("IntakeCorridorEast", "building-t.glb", new(24, 0.02f, 44), -Mathf.Pi * 0.5f, 4.6f, new(1.72f, 1.01f, 1.39f)),
             Kenney("MeterCorridorWest", "building-i.glb", new(-23, 0.02f, -5), 0.0f, 4.5f, new(1.62f, 1.08f, 1.38f)),
             Kenney("MeterCorridorEast", "building-k.glb", new(23, 0.02f, -7), Mathf.Pi, 4.5f, new(1.68f, 1.14f, 1.42f)),
-            Kenney("SeparatorCorridorWest", "building-d.glb", new(-24, 0.02f, -91), Mathf.Pi * 0.5f, 4.7f, new(1.78f, 1.2f, 1.46f)),
-            Kenney("SeparatorCorridorEast", "building-s.glb", new(24, 0.02f, -93), -Mathf.Pi * 0.5f, 4.7f, new(1.64f, 1.08f, 1.44f)),
-            Kenney("TurbineCorridorWest", "building-j.glb", new(-24, 0.02f, -146), 0.0f, 4.8f, new(1.58f, 1.35f, 1.45f)),
-            Kenney("TurbineCorridorEast", "building-o.glb", new(24, 0.02f, -148), Mathf.Pi, 4.8f, new(1.48f, 1.38f, 1.42f))
+            Kenney("SeparatorCorridorWest", "building-d.glb", new(-51, 0.02f, -91), Mathf.Pi * 0.5f, 4.7f, new(1.78f, 1.2f, 1.46f)),
+            Kenney("SeparatorCorridorEast", "building-s.glb", new(51, 0.02f, -93), -Mathf.Pi * 0.5f, 4.7f, new(1.64f, 1.08f, 1.44f)),
+            Kenney("TurbineCorridorWest", "building-j.glb", new(-51, 0.02f, -146), 0.0f, 4.8f, new(1.58f, 1.35f, 1.45f)),
+            Kenney("TurbineCorridorEast", "building-o.glb", new(51, 0.02f, -148), Mathf.Pi, 4.8f, new(1.48f, 1.38f, 1.42f))
         });
 
         // Perimeter skyline landmarks add readable vertical scale without blocking the
@@ -173,7 +173,7 @@ public sealed class RefineryExtractionMapBuilder
             new Vector3(87, 0.02f, 30), new Vector3(108, 0.02f, 31), new Vector3(128, 0.02f, 29),
             new Vector3(-132, 0.02f, -105), new Vector3(-101, 0.02f, -108),
             new Vector3(102, 0.02f, -110), new Vector3(132, 0.02f, -106),
-            new Vector3(-17, 0.02f, -116), new Vector3(18, 0.02f, -118)
+            new Vector3(-52, 0.02f, -116), new Vector3(53, 0.02f, -118)
         };
         for (var index = 0; index < tankPositions.Length; index++)
         {
@@ -265,6 +265,8 @@ public sealed class RefineryExtractionMapBuilder
         new Vector3(-107, 0.15f, -82), new Vector3(109, 0.15f, -87),
         new Vector3(-52, 0.15f, -116), new Vector3(51, 0.15f, -119),
         new Vector3(-12, 0.15f, -142), new Vector3(14, 0.15f, -151),
+        new Vector3(-17, 0.15f, -101), new Vector3(18, 0.15f, -103),
+        new Vector3(-17, 0.15f, -136), new Vector3(18, 0.15f, -138),
         new Vector3(-104, 0.15f, -151), new Vector3(107, 0.15f, -154),
         new Vector3(-85, 0.15f, 23), new Vector3(87, 0.15f, 20)
     };
@@ -277,7 +279,9 @@ public sealed class RefineryExtractionMapBuilder
         new Vector3(-55, 0, -139), new Vector3(56, 0, -146), new Vector3(-20, 0, -133), new Vector3(-15, 0, -133),
         new Vector3(18, 0, -181), new Vector3(23, 0, -181), new Vector3(-101, 0, 12), new Vector3(103, 0, 9),
         new Vector3(-23, 0, 54), new Vector3(26, 0, 56), new Vector3(-74, 0, -58), new Vector3(75, 0, -59),
-        new Vector3(-88, 0, -140), new Vector3(91, 0, -142), new Vector3(-13, 0, -48), new Vector3(14, 0, -73)
+        new Vector3(-88, 0, -140), new Vector3(91, 0, -142), new Vector3(-13, 0, -48), new Vector3(14, 0, -73),
+        new Vector3(-18, 0, -101), new Vector3(18, 0, -103), new Vector3(-18, 0, -124),
+        new Vector3(18, 0, -126), new Vector3(-18, 0, -145), new Vector3(18, 0, -147)
     };
 
     private static IReadOnlyList<RefineryLootPlacement> LootPlacements() => new[]
@@ -297,7 +301,9 @@ public sealed class RefineryExtractionMapBuilder
         Loot(new(-30, 0.2f, -176), LootGrade.Epic, "Bonded storage case", "\u4fdd\u7a0e\u5e93\u7269\u8d44\u7bb1"),
         Loot(new(40, 0.2f, -177), LootGrade.Legendary, "Turbine master safe", "\u6da1\u8f6e\u4e3b\u4fdd\u9669\u7bb1"),
         Loot(new(-12, 0.2f, -48), LootGrade.Common, "Extraction approach bag", "\u64a4\u79bb\u8fdb\u573a\u7269\u8d44"),
-        Loot(new(14, 0.2f, -73), LootGrade.Uncommon, "Pad service kit", "\u505c\u673a\u576a\u7ef4\u4fee\u5305")
+        Loot(new(14, 0.2f, -73), LootGrade.Uncommon, "Pad service kit", "\u505c\u673a\u576a\u7ef4\u4fee\u5305"),
+        Loot(new(-18, 0.2f, -112), LootGrade.Rare, "Cracking hall line cache", "\u88c2\u89e3\u5382\u7ebf\u7269\u8d44"),
+        Loot(new(18, 0.2f, -132), LootGrade.Epic, "Cracking hall supervisor case", "\u88c2\u89e3\u5382\u76d1\u7ba1\u7bb1")
     };
 
     private static RefineryLootPlacement Loot(
@@ -316,6 +322,8 @@ public sealed class RefineryExtractionMapBuilder
         (new Vector3(-21, 0.2f, -158), ValuableItemKind.CollectorCoin, LootGrade.Epic),
         (new Vector3(29, 0.2f, -168), ValuableItemKind.GoldJewelry, LootGrade.Legendary),
         (new Vector3(-128, 0.2f, -58), ValuableItemKind.VintageCamera, LootGrade.Rare),
-        (new Vector3(130, 0.2f, -64), ValuableItemKind.DesignerPerfume, LootGrade.Rare)
+        (new Vector3(130, 0.2f, -64), ValuableItemKind.DesignerPerfume, LootGrade.Rare),
+        (new Vector3(-27, 0.2f, -143), ValuableItemKind.EncryptedDrive, LootGrade.Epic),
+        (new Vector3(27, 0.2f, -103), ValuableItemKind.GraphicsCard, LootGrade.Rare)
     };
 }

@@ -11,6 +11,8 @@ public partial class FreightTerminalWorld
     private int _refineryAccessibleBuildingCount;
     private int _refineryTallSceneCount;
     private int _refineryEntryBeaconCount;
+    private RefineryFactoryDistrictResult? _refineryFactoryDistrict;
+    private readonly RefineryFactoryDistrictBuilder _refineryFactoryDistrictBuilder = new();
     private readonly HashSet<string> _refineryModelScenes = new();
 
     private bool IsBlackwaterRefineryMap
@@ -36,6 +38,7 @@ public partial class FreightTerminalWorld
         BuildRefineryPerimeter(concreteDark);
         BuildRefineryRoadMarkings(yellow, white);
         BuildRefineryModelAssembly();
+        _refineryFactoryDistrict = _refineryFactoryDistrictBuilder.Build(_levelRoot);
         BuildRefineryLighting(steel, yellow);
         BuildRefinerySigns();
         BuildMissionTerminals();

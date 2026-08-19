@@ -205,6 +205,22 @@ public partial class FreightTerminalWorld
         var skylineReady = _refineryTallSceneCount >= 6
             && counts.TallSceneModels == _refineryTallSceneCount;
         var doorwayBallisticsReady = ValidateRefineryDoorwayBallistics();
+        var factoryReady = _refineryFactoryDistrict is
+        {
+            AuthoredModelCount: >= 180,
+            CollisionShapeCount: >= 34,
+            EntryCount: 2,
+            RoofModuleCount: >= 20,
+            CatwalkModuleCount: >= 20,
+            InteriorPropCount: >= 20,
+            AlleyPropCount: >= 10
+        };
+        var factorySourcesReady = _refineryFactoryDistrict?.ScenePaths.Count >= 15
+            && HasFactorySource("structure-doorway-wide.glb")
+            && HasFactorySource("catwalk-straight.glb")
+            && HasFactorySource("crane.glb")
+            && HasFactorySource("machine-fortified.glb");
+        var hallEntriesReady = ValidateRefineryFactoryEntries();
         var gameplayReady = _objectiveTerminals.Count == 2
             && IsInstanceValid(_extractionArea)
             && IsInstanceValid(_extractionAircraft)
@@ -217,11 +233,12 @@ public partial class FreightTerminalWorld
         var performanceReady = counts.Nodes < 2500
             && counts.StaticBodies < 140
             && counts.MeshInstances < 900
-            && counts.Lights <= 20;
+            && counts.Lights <= 28;
         var valid = rootsReady && authoredReady && sourcesReady && proxiesReady
             && doorwayReady && skylineReady && doorwayBallisticsReady
+            && factoryReady && factorySourcesReady && hallEntriesReady
             && gameplayReady && lanesReady && deploymentReady && performanceReady;
-        GD.Print($"REFINERY_MAP_CHECK valid={valid} root={rootsReady} authored={authoredReady} models={_refineryAuthoredModelCount}/{RefineryLayout.Models.Count} unique_scenes={_refineryModelScenes.Count} sources={sourcesReady} imported_meshes={counts.ImportedMeshes} culled={counts.CulledImportedMeshes} proxies={counts.ModelCollisionShapes}/{_refineryCollisionProxyCount} proxy_boxes={proxiesReady} doorways={_refineryAccessibleBuildingCount} doorway_shapes={counts.DoorwayCollisionShapes} entry_beacons={counts.EntryBeacons}/{_refineryEntryBeaconCount} doorway_ready={doorwayReady} doorway_ballistics={doorwayBallisticsReady} tall_scenes={_refineryTallSceneCount} skyline={skylineReady} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} lanes={lanesReady} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
+        GD.Print($"REFINERY_MAP_CHECK valid={valid} root={rootsReady} authored={authoredReady} models={_refineryAuthoredModelCount}/{RefineryLayout.Models.Count} unique_scenes={_refineryModelScenes.Count} sources={sourcesReady} imported_meshes={counts.ImportedMeshes} culled={counts.CulledImportedMeshes} proxies={counts.ModelCollisionShapes}/{_refineryCollisionProxyCount} proxy_boxes={proxiesReady} doorways={_refineryAccessibleBuildingCount} doorway_shapes={counts.DoorwayCollisionShapes} entry_beacons={counts.EntryBeacons}/{_refineryEntryBeaconCount} doorway_ready={doorwayReady} doorway_ballistics={doorwayBallisticsReady} tall_scenes={_refineryTallSceneCount} skyline={skylineReady} factory={factoryReady} factory_sources={factorySourcesReady} hall_entries={hallEntriesReady} factory_models={_refineryFactoryDistrict?.AuthoredModelCount ?? 0} factory_collision={_refineryFactoryDistrict?.CollisionShapeCount ?? 0} roof={_refineryFactoryDistrict?.RoofModuleCount ?? 0} catwalk={_refineryFactoryDistrict?.CatwalkModuleCount ?? 0} interior_props={_refineryFactoryDistrict?.InteriorPropCount ?? 0} alley_props={_refineryFactoryDistrict?.AlleyPropCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} lanes={lanesReady} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
         GD.Print($"REFINERY_MAP_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -257,7 +274,12 @@ public partial class FreightTerminalWorld
         camera.Fov = 62.0f;
         await WaitFrames(8);
         SaveViewportImage("res://refinery_ground_validation.png");
-        GD.Print($"REFINERY_MAP_CAPTURE models={_refineryAuthoredModelCount} scenes={_refineryModelScenes.Count} paths=refinery_map_validation.png,refinery_ground_validation.png");
+        camera.GlobalPosition = new Vector3(0, 3.8f, -68.0f);
+        camera.LookAt(new Vector3(0, 5.0f, -124.0f), Vector3.Up);
+        camera.Fov = 70.0f;
+        await WaitFrames(10);
+        SaveViewportImage("res://refinery_hall_validation.png");
+        GD.Print($"REFINERY_MAP_CAPTURE models={_refineryAuthoredModelCount} scenes={_refineryModelScenes.Count} factory_models={_refineryFactoryDistrict?.AuthoredModelCount ?? 0} paths=refinery_map_validation.png,refinery_ground_validation.png,refinery_hall_validation.png");
         GetTree().Quit();
     }
 
@@ -344,6 +366,36 @@ public partial class FreightTerminalWorld
             building.ToGlobal(new Vector3(wallX, probeY, 0)),
             1);
         return doorwayOpen && wallBlocks;
+    }
+
+    private bool HasFactorySource(string fileName)
+        => _refineryFactoryDistrict?.ScenePaths.Any(path =>
+            path.EndsWith('/' + fileName, System.StringComparison.OrdinalIgnoreCase)) == true;
+
+    private bool ValidateRefineryFactoryEntries()
+    {
+        if (_refineryFactoryDistrict is not { } hall)
+        {
+            return false;
+        }
+        const float traversalLaneX = 8.2f;
+        var southClear = !PhysicsRaycast.HasHit(
+            GetWorld3D(),
+            hall.SouthEntry + new Vector3(-traversalLaneX, 1.0f, 0),
+            hall.NorthEntry + new Vector3(-traversalLaneX, 1.0f, 10.0f),
+            1);
+        var northClear = !PhysicsRaycast.HasHit(
+            GetWorld3D(),
+            hall.NorthEntry + new Vector3(traversalLaneX, 1.0f, 0),
+            hall.SouthEntry + new Vector3(traversalLaneX, 1.0f, -10.0f),
+            1);
+        var sideBlocked = PhysicsRaycast.HasHit(
+            GetWorld3D(),
+            hall.InteriorCenter + new Vector3(-10, 1.2f, 0),
+            hall.InteriorCenter + new Vector3(-39, 1.2f, 0),
+            1);
+        GD.Print($"REFINERY_HALL_ENTRY_CHECK south={southClear} north={northClear} wall={sideBlocked}");
+        return southClear && northClear && sideBlocked;
     }
 
     private static void CountRefineryNodes(

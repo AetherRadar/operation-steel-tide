@@ -24,6 +24,17 @@ The City Kit (Industrial) 1.0 model set is distributed by Kenney under CC0 1.0:
 
 The complete GLB set is retained so authored demolition layouts can combine the pack's buildings, chimneys, and tank detail without modifying third-party geometry.
 
+The Kenney Factory Kit 3.0 is distributed under CC0 1.0:
+
+- Creator: Kenney
+- Source: https://kenney.nl/assets/factory-kit
+- Download: https://kenney.nl/media/pages/assets/factory-kit/edaac9d4f6-1777639602/kenney_factory-kit_3.0.zip
+- License: `assets/models/kenney_factory_kit/KENNEY_LICENSE.txt`
+- Acquisition date: 2026-08-19
+- Local assets: `assets/models/kenney_factory_kit/*.glb`
+
+The repository keeps only the modular factory pieces used by the Blackwater Refinery cracking hall and its approach alleys.
+
 ## TastyTony CC BY 4.0 model
 
 The GSh-18 sidearm model is **Low-Poly GSh-18** by TastyTony and is used under Creative Commons Attribution 4.0 International:
