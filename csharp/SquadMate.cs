@@ -401,9 +401,11 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             ConsiderRoleAbility(hostile, _combatHasSight);
         }
         MoveAndSlide();
-        TryNavigationStepUp(navigationDirective.Kind == SquadTraversalKind.Step
-            ? _combatPathDirection
-            : _combatDesiredDirection);
+        TryNavigationStepUp(
+            navigationDirective.Kind == SquadTraversalKind.Step
+                ? _combatPathDirection
+                : _combatDesiredDirection,
+            destination);
         TrackTacticalMovement(dt);
         AnimateRig(dt);
     }

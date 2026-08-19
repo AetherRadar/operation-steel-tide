@@ -44,11 +44,13 @@ public partial class SquadMate
         Velocity = velocity;
     }
 
-    private void TryNavigationStepUp(Vector3 moveDirection)
+    private void TryNavigationStepUp(Vector3 moveDirection, Vector3 destination)
     {
+        // Do not snap onto the adjacent upper flight while descending through a switchback.
         if (_requiredStepRecoveryActive
             || !IsOnFloor()
-            || moveDirection.LengthSquared() < 0.01f)
+            || moveDirection.LengthSquared() < 0.01f
+            || destination.Y < GlobalPosition.Y - 0.08f)
         {
             return;
         }
@@ -57,8 +59,8 @@ public partial class SquadMate
         var forward = moveDirection.Normalized();
         var exclude = BuildNavigationStepExclusions();
         using var excludeBacking = exclude.AsDisposable();
-        var bestLift = 0.0f;
-        var bestLanding = GlobalPosition;
+        var selectedLift = 0.0f;
+        var selectedLanding = GlobalPosition;
         foreach (var distance in new[] { 0.28f, 0.42f, 0.55f })
         {
             var from = GlobalPosition + Vector3.Up * (maxStep + 0.12f) + forward * distance;
@@ -81,21 +83,22 @@ public partial class SquadMate
                 GlobalPosition.X + forward.X * landingDistance,
                 landingY + NavigationTraversalClearance,
                 GlobalPosition.Z + forward.Z * landingDistance);
-            if (lift > bestLift
+            if (lift > 0.025f
                 && lift <= maxStep
                 && HasNavigationStepClearance(landing, exclude))
             {
-                bestLift = lift;
-                bestLanding = landing;
+                selectedLift = lift;
+                selectedLanding = landing;
+                break;
             }
         }
 
-        if (bestLift <= 0.025f)
+        if (selectedLift <= 0.025f)
         {
             return;
         }
 
-        GlobalPosition = bestLanding;
+        GlobalPosition = selectedLanding;
         var velocity = Velocity;
         velocity.Y = 0.0f;
         Velocity = velocity;
