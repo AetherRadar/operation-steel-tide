@@ -6,11 +6,13 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private static readonly Dictionary<Vector3, BoxMesh> SharedBoxMeshes = new();
+    private static readonly Dictionary<Vector3, BoxShape3D> SharedBoxShapes = new();
     private readonly AuthoredBuildingCollisionPlanner _authoredBuildingCollisionPlanner = new();
 
     private static void ReleaseSharedBoxMeshes()
     {
         SharedBoxMeshes.Clear();
+        SharedBoxShapes.Clear();
     }
 
     private static BoxMesh SharedBoxMesh(Vector3 size)
@@ -21,6 +23,16 @@ public partial class FreightTerminalWorld
             SharedBoxMeshes[size] = mesh;
         }
         return mesh;
+    }
+
+    private static BoxShape3D SharedBoxShape(Vector3 size)
+    {
+        if (!SharedBoxShapes.TryGetValue(size, out var shape))
+        {
+            shape = new BoxShape3D { Size = size };
+            SharedBoxShapes[size] = shape;
+        }
+        return shape;
     }
 
     private StandardMaterial3D Mat(

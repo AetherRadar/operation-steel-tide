@@ -101,9 +101,13 @@ public partial class FreightTerminalWorld
         {
             counts.StaticBodies++;
         }
-        if (node is CollisionShape3D)
+        if (node is CollisionObject3D collisionObject)
         {
-            counts.CollisionShapes++;
+            var owners = collisionObject.GetShapeOwners();
+            foreach (var owner in owners)
+            {
+                counts.CollisionShapes += collisionObject.ShapeOwnerGetShapeCount((uint)owner);
+            }
         }
         if (node is MeshInstance3D)
         {
@@ -148,9 +152,13 @@ public partial class FreightTerminalWorld
             {
                 counts.ResidentialStairBodies++;
             }
-            if (node is CollisionShape3D)
+            if (node is CollisionObject3D stairCollision)
             {
-                counts.ResidentialStairShapes++;
+                var owners = stairCollision.GetShapeOwners();
+                foreach (var owner in owners)
+                {
+                    counts.ResidentialStairShapes += stairCollision.ShapeOwnerGetShapeCount((uint)owner);
+                }
             }
             if (node is MeshInstance3D or MultiMeshInstance3D)
             {

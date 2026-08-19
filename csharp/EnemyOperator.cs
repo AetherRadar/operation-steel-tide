@@ -6,6 +6,10 @@ namespace OperationSteelTide;
 [GlobalClass]
 public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLootSource
 {
+    private static readonly Dictionary<Vector3, BoxMesh> SharedBoxMeshes = new();
+    private static readonly Dictionary<Vector2, CapsuleMesh> SharedCapsuleMeshes = new();
+    private static readonly Dictionary<Vector2, CylinderMesh> SharedCylinderMeshes = new();
+
     [Signal]
     public delegate void EliminatedEventHandler(EnemyOperator enemy);
 
@@ -326,23 +330,56 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         };
     }
 
-    private static BoxMesh Box(Vector3 size) => new() { Size = size };
-
-    private static CapsuleMesh Capsule(float radius, float height) => new()
+    internal static void ReleaseSharedPrimitiveMeshes()
     {
-        Radius = radius,
-        Height = height,
-        RadialSegments = 16,
-        Rings = 8
-    };
+        SharedBoxMeshes.Clear();
+        SharedCapsuleMeshes.Clear();
+        SharedCylinderMeshes.Clear();
+    }
 
-    private static CylinderMesh Cylinder(float radius, float height) => new()
+    private static BoxMesh Box(Vector3 size)
     {
-        TopRadius = radius,
-        BottomRadius = radius,
-        Height = height,
-        RadialSegments = 16
-    };
+        if (!SharedBoxMeshes.TryGetValue(size, out var mesh))
+        {
+            mesh = new BoxMesh { Size = size };
+            SharedBoxMeshes[size] = mesh;
+        }
+        return mesh;
+    }
+
+    private static CapsuleMesh Capsule(float radius, float height)
+    {
+        var key = new Vector2(radius, height);
+        if (!SharedCapsuleMeshes.TryGetValue(key, out var mesh))
+        {
+            mesh = new CapsuleMesh
+            {
+                Radius = radius,
+                Height = height,
+                RadialSegments = 16,
+                Rings = 8
+            };
+            SharedCapsuleMeshes[key] = mesh;
+        }
+        return mesh;
+    }
+
+    private static CylinderMesh Cylinder(float radius, float height)
+    {
+        var key = new Vector2(radius, height);
+        if (!SharedCylinderMeshes.TryGetValue(key, out var mesh))
+        {
+            mesh = new CylinderMesh
+            {
+                TopRadius = radius,
+                BottomRadius = radius,
+                Height = height,
+                RadialSegments = 16
+            };
+            SharedCylinderMeshes[key] = mesh;
+        }
+        return mesh;
+    }
 
     private MeshInstance3D Part(
         PrimitiveMesh mesh,

@@ -1247,18 +1247,16 @@ public partial class FreightTerminalWorld
 
     private static void AddResidentialStairCollision(
         StaticBody3D body,
-        string name,
+        string _,
         Vector3 position,
         Vector3 size,
         Vector3 rotation = default)
     {
-        body.AddChild(new CollisionShape3D
-        {
-            Name = name,
-            Position = position,
-            Rotation = rotation,
-            Shape = new BoxShape3D { Size = size }
-        });
+        var owner = body.CreateShapeOwner(body);
+        body.ShapeOwnerSetTransform(
+            owner,
+            new Transform3D(Basis.FromEuler(rotation), position));
+        body.ShapeOwnerAddShape(owner, SharedBoxShape(size));
     }
 
     private void AddResidentialStairPart(

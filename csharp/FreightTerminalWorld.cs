@@ -170,6 +170,7 @@ public partial class FreightTerminalWorld : Node3D
             _materials.Clear();
             _modelScenes.Clear();
             ReleaseSharedBoxMeshes();
+            EnemyOperator.ReleaseSharedPrimitiveMeshes();
             BreakableGlassField.ReleaseSharedResources();
             ResidentialRelayStation.ReleaseSharedResources();
             ResidentialSupplyCache.ReleaseSharedResources();
@@ -5145,6 +5146,41 @@ public partial class FreightTerminalWorld : Node3D
                 && !n.Contains("StairStep", StringComparison.OrdinalIgnoreCase))
             {
                 rampBodies++;
+            }
+            if (n.Contains("ResidentialStairCollision", StringComparison.OrdinalIgnoreCase))
+            {
+                var owners = body.GetShapeOwners();
+                foreach (var owner in owners)
+                {
+                    var ownerId = (uint)owner;
+                    var shapeCount = body.ShapeOwnerGetShapeCount(ownerId);
+                    for (var shapeIndex = 0; shapeIndex < shapeCount; shapeIndex++)
+                    {
+                        if (body.ShapeOwnerGetShape(ownerId, shapeIndex) is not BoxShape3D box)
+                        {
+                            continue;
+                        }
+                        var step = Mathf.IsEqualApprox(box.Size.X, ResidentialStairTreadWidth)
+                            && Mathf.IsEqualApprox(box.Size.Y, ResidentialStairTreadThickness);
+                        var landing = Mathf.IsEqualApprox(box.Size.X, ResidentialStairLandingWidth)
+                            && Mathf.IsEqualApprox(box.Size.Y, ResidentialStairTreadThickness)
+                            && Mathf.IsEqualApprox(box.Size.Z, ResidentialStairLandingDepth);
+                        if (step || landing)
+                        {
+                            stepShapes++;
+                        }
+                        if (landing)
+                        {
+                            landingShapes++;
+                            compactLandingShapes++;
+                        }
+                        if (Mathf.IsEqualApprox(box.Size.X, 0.1f)
+                            && Mathf.IsEqualApprox(box.Size.Y, 0.84f))
+                        {
+                            innerGuardShapes++;
+                        }
+                    }
+                }
             }
             var bodyChildren = body.GetChildren();
             using var bodyChildrenBacking = bodyChildren.AsDisposable();
