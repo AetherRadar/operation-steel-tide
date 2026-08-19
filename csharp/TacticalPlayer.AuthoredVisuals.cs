@@ -117,8 +117,15 @@ public partial class TacticalPlayer
         try
         {
             var authoredWeapon = CombatModelLibrary.InstantiateGsh18(firstPerson: true);
-            authoredWeapon.Root.Position = new Vector3(0.0f, -0.02f, -0.1f);
-            _weaponRoot.AddChild(authoredWeapon.Root);
+            authoredWeapon.Root.Scale *= CombatModelLibrary.Gsh18FirstPersonPresentationScale;
+            var displayMount = new Node3D
+            {
+                Name = "GSh18ViewMount",
+                Position = new Vector3(0.2f, 0.0f, -0.08f),
+                RotationDegrees = new Vector3(0.0f, -16.0f, 0.0f)
+            };
+            _weaponRoot.AddChild(displayMount);
+            displayMount.AddChild(authoredWeapon.Root);
             _authoredGsh18Weapon = authoredWeapon;
         }
         catch (Exception exception)

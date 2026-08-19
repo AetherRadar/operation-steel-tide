@@ -390,7 +390,8 @@ public partial class InventoryModelPreview : SubViewportContainer
             {
                 Name = "GSh18PreviewOrientation",
                 Position = new Vector3(0.02f, -0.04f, 0.0f),
-                Scale = Vector3.One * 8.0f
+                RotationDegrees = new Vector3(0.0f, -90.0f, 0.0f),
+                Scale = Vector3.One * CombatModelLibrary.Gsh18PreviewPresentationScale
             };
             root.AddChild(orientation);
             orientation.AddChild(CombatModelLibrary.InstantiateGsh18(firstPerson: false).Root);

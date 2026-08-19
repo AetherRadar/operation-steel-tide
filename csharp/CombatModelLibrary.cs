@@ -151,6 +151,8 @@ internal static class CombatModelLibrary
 
     private const float Gsh18FirstPersonLength = 0.64f;
     private const float Gsh18PreviewLength = 0.78f;
+    internal const float Gsh18FirstPersonPresentationScale = 2.8f;
+    internal const float Gsh18PreviewPresentationScale = 8.0f;
     private const float DesertEagleFirstPersonLength = 0.82f;
     private const float DesertEaglePreviewLength = 1.05f;
 
@@ -243,6 +245,7 @@ internal static class CombatModelLibrary
         var wrapper = new Node3D
         {
             Name = "AuthoredDesertEagleVisual",
+            RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f),
             Scale = Vector3.One * (targetLength / sourceBounds.Size.Z)
         };
         wrapper.AddChild(source);
