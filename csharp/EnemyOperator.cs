@@ -1718,6 +1718,12 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private void AnimateBody(float delta)
     {
         var speed = new Vector2(Velocity.X, Velocity.Z).Length();
+        if (UsesTideHunterMonsterForDiagnostics)
+        {
+            UpdateTideHunterVisual(speed);
+            UpdateAuthoredStanceCollider();
+            return;
+        }
         if (UsesAuthoredOperatorForDiagnostics)
         {
             _authoredOperatorVisual.SetWeaponReadied(Alerted && HasFireablePrimary && !IsDead);
@@ -1801,7 +1807,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             adjustedDamage = ApplyProtection(protectiveGear, adjustedDamage, armorPenetration);
         }
         _health -= adjustedDamage;
-        if (_health > 0.0f && UsesAuthoredOperatorForDiagnostics)
+        if (_health > 0.0f && UsesAuthoredOperatorForDiagnostics && !UsesTideHunterMonsterForDiagnostics)
         {
             _authoredOperatorAnimator.PlayHit();
         }
@@ -1857,6 +1863,20 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         CollisionMask = 0;
         Velocity = Vector3.Zero;
         EmitSignal(SignalName.Eliminated, this);
+        if (UsesTideHunterMonsterForDiagnostics)
+        {
+            if (IsInstanceValid(_worldBossChargeRing))
+            {
+                _worldBossChargeRing!.Visible = false;
+            }
+            if (IsInstanceValid(_worldBossLabel))
+            {
+                _worldBossLabel!.Visible = false;
+            }
+            var monsterDeath = _tideHunterMonsterVisual!.BeginDeath(_rng.Randf() < 0.5f);
+            monsterDeath.Finished += () => SetPhysicsProcess(false);
+            return;
+        }
         if (UsesAuthoredOperatorForDiagnostics)
         {
             _authoredOperatorAnimator.Update(

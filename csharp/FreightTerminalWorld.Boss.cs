@@ -198,9 +198,13 @@ public partial class FreightTerminalWorld
             return;
         }
 
+        var monsterReady = boss.UsesTideHunterMonsterForDiagnostics
+            && boss.TideHunterMonsterMeshCountForDiagnostics == 1
+            && boss.TideHunterMonsterAnimationCountForDiagnostics == 3;
+
         foreach (var enemy in _enemies)
         {
-            if (IsInstanceValid(enemy))
+            if (IsInstanceValid(enemy) && enemy != _worldBoss)
             {
                 enemy.ProcessMode = ProcessModeEnum.Disabled;
             }
@@ -279,6 +283,7 @@ public partial class FreightTerminalWorld
             && _worldBossDefeated
             && _lootSources.Contains(boss)
             && minimapCleared;
+        var monsterDeathReady = boss.TideHunterMonsterDeathStartedForDiagnostics;
         var valid = factionReady
             && allFactionTargets
             && arsenalReady
@@ -289,8 +294,10 @@ public partial class FreightTerminalWorld
             && trackingReady
             && pulseDamagedFaction
             && rewardsReady
-            && deathReady;
-        GD.Print($"BOSS_CHECK valid={valid} faction={factionReady} all_targets={allFactionTargets} team={boss.TeamId} health={boss.MaxHealth:0} weapon={weapon.Platform} optic_7x={hasSevenPowerOptic} caliber={WeaponCatalog.Weapon(weapon.Platform).Caliber} route={boss.WorldBossPatrolRouteCount} span=({boss.WorldBossPatrolSpan.X:0},{boss.WorldBossPatrolSpan.Y:0}) patrol={patrolAdvances} surge={surgePhase} riptide={riptidePhase} top_hud_absent={topHudAbsent} minimap_alive={minimapTracked} minimap_cleared={minimapCleared} tracking={trackingReady} pulse={pulseDamagedFaction} rewards={rewardsReady} reward_value={LootItem.TotalValue(boss.Loot)} corpse={deathReady}");
+            && deathReady
+            && monsterReady
+            && monsterDeathReady;
+        GD.Print($"BOSS_CHECK valid={valid} faction={factionReady} all_targets={allFactionTargets} team={boss.TeamId} health={boss.MaxHealth:0} weapon={weapon.Platform} optic_7x={hasSevenPowerOptic} caliber={WeaponCatalog.Weapon(weapon.Platform).Caliber} route={boss.WorldBossPatrolRouteCount} span=({boss.WorldBossPatrolSpan.X:0},{boss.WorldBossPatrolSpan.Y:0}) patrol={patrolAdvances} surge={surgePhase} riptide={riptidePhase} top_hud_absent={topHudAbsent} minimap_alive={minimapTracked} minimap_cleared={minimapCleared} tracking={trackingReady} pulse={pulseDamagedFaction} rewards={rewardsReady} reward_value={LootItem.TotalValue(boss.Loot)} corpse={deathReady} monster={monsterReady} monster_meshes={boss.TideHunterMonsterMeshCountForDiagnostics} monster_anims={boss.TideHunterMonsterAnimationCountForDiagnostics} monster_death={monsterDeathReady}");
         GD.Print($"BOSS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -305,7 +312,7 @@ public partial class FreightTerminalWorld
         }
         foreach (var enemy in _enemies)
         {
-            if (IsInstanceValid(enemy))
+            if (IsInstanceValid(enemy) && enemy != _worldBoss)
             {
                 enemy.ProcessMode = ProcessModeEnum.Disabled;
             }

@@ -131,28 +131,12 @@ public partial class EnemyOperator
 
     private void BuildWorldBossVisuals()
     {
-        _bodyRoot.Scale = new Vector3(1.16f, 1.13f, 1.16f);
-        _mainMaterial.AlbedoColor = new Color(0.035f, 0.2f, 0.19f);
-        var armor = Material(new Color(0.025f, 0.065f, 0.065f), 0.72f, 0.32f);
+        _bodyRoot.Scale = Vector3.One;
+        AttachTideHunterMonsterVisual();
         var tide = Material(new Color(0.08f, 0.72f, 0.62f), 0.28f, 0.2f);
         tide.EmissionEnabled = true;
         tide.Emission = new Color(0.03f, 0.82f, 0.68f);
         tide.EmissionEnergyMultiplier = 3.4f;
-
-        Part(Box(new Vector3(0.76f, 0.17f, 0.34f)), new Vector3(0.0f, 1.46f, 0.02f), armor);
-        Part(Box(new Vector3(0.18f, 0.2f, 0.24f)), new Vector3(-0.43f, 1.43f, 0.0f), armor);
-        Part(Box(new Vector3(0.18f, 0.2f, 0.24f)), new Vector3(0.43f, 1.43f, 0.0f), armor);
-        Part(Box(new Vector3(0.12f, 0.08f, 0.2f)), new Vector3(-0.43f, 1.56f, -0.02f), tide);
-        Part(Box(new Vector3(0.12f, 0.08f, 0.2f)), new Vector3(0.43f, 1.56f, -0.02f), tide);
-        Part(Box(new Vector3(0.3f, 0.24f, 0.045f)), new Vector3(0.0f, 1.22f, -0.205f), tide);
-        Part(Cylinder(0.105f, 0.56f), new Vector3(-0.2f, 1.25f, 0.32f), armor);
-        Part(Cylinder(0.105f, 0.56f), new Vector3(0.2f, 1.25f, 0.32f), armor);
-        Part(Cylinder(0.115f, 0.045f), new Vector3(-0.2f, 1.28f, 0.32f), tide);
-        Part(Cylinder(0.115f, 0.045f), new Vector3(0.2f, 1.28f, 0.32f), tide);
-        Part(Box(new Vector3(0.42f, 0.06f, 0.055f)), new Vector3(0.0f, 1.76f, -0.2f), tide);
-        Part(Box(new Vector3(0.09f, 0.22f, 0.18f)), new Vector3(0.0f, 2.03f, 0.02f), armor, new Vector3(0.0f, 0.0f, 0.16f));
-        Part(Cylinder(0.025f, 0.52f), new Vector3(0.14f, 1.85f, 0.23f), armor, new Vector3(0.12f, 0.0f, -0.08f));
-        Part(Cylinder(0.045f, 0.09f), new Vector3(0.11f, 2.1f, 0.21f), tide);
 
         _worldBossChargeRing = new MeshInstance3D
         {
@@ -333,9 +317,10 @@ public partial class EnemyOperator
         {
             _mainMaterial.AlbedoColor = color;
         }
-        SetAuthoredThreatColor(phase >= 3
-            ? new Color(1.0f, 0.24f, 0.12f)
-            : new Color(0.12f, 0.94f, 0.76f));
+        if (UsesTideHunterMonsterForDiagnostics)
+        {
+            _tideHunterMonsterVisual!.SetPhase(phase);
+        }
         if (IsInstanceValid(_worldBossLabel))
         {
             _worldBossLabel!.Text = phase switch

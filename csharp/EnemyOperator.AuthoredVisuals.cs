@@ -7,6 +7,7 @@ public partial class EnemyOperator
 {
     private AuthoredOperatorVisual _authoredOperatorVisual = null!;
     private AuthoredOperatorAnimator _authoredOperatorAnimator = null!;
+    private TideHunterMonsterVisual? _tideHunterMonsterVisual;
 
     internal bool UsesAuthoredOperatorForDiagnostics
         => IsInstanceValid(_authoredOperatorVisual?.Root);
@@ -30,6 +31,16 @@ public partial class EnemyOperator
         => UsesAuthoredOperatorForDiagnostics
             ? _authoredOperatorAnimator.AnimationCount
             : 0;
+    internal bool UsesTideHunterMonsterForDiagnostics
+        => IsInstanceValid(_tideHunterMonsterVisual?.Root);
+    internal int TideHunterMonsterMeshCountForDiagnostics
+        => UsesTideHunterMonsterForDiagnostics ? _tideHunterMonsterVisual!.MeshCount : 0;
+    internal int TideHunterMonsterAnimationCountForDiagnostics
+        => UsesTideHunterMonsterForDiagnostics ? _tideHunterMonsterVisual!.AnimationCount : 0;
+    internal string TideHunterMonsterAnimationForDiagnostics
+        => UsesTideHunterMonsterForDiagnostics ? _tideHunterMonsterVisual!.CurrentAnimation : string.Empty;
+    internal bool TideHunterMonsterDeathStartedForDiagnostics
+        => UsesTideHunterMonsterForDiagnostics && _tideHunterMonsterVisual!.DeathStarted;
 
     internal void SetAuthoredCombatPoseForDiagnostics()
     {
@@ -52,6 +63,10 @@ public partial class EnemyOperator
 
     private void AttachAuthoredOperatorVisual()
     {
+        if (IsWorldBoss)
+        {
+            return;
+        }
         try
         {
             var authoredOperator = CombatModelLibrary.InstantiateOperator(CarriedWeapon);
@@ -74,6 +89,28 @@ public partial class EnemyOperator
             }
         }
         SetAuthoredThreatColor(ResolveAuthoredFactionAppearance().Patch);
+    }
+
+    private void AttachTideHunterMonsterVisual()
+    {
+        var monster = TideHunterMonsterLibrary.Instantiate();
+        _bodyRoot.AddChild(monster.Root);
+        _tideHunterMonsterVisual = monster;
+        _tideHunterMonsterVisual.SetPhase(WorldBossPhase);
+        foreach (var child in _bodyRoot.GetChildren())
+        {
+            if (child is Node3D visual
+                && visual != _tideHunterMonsterVisual.Root
+                && visual != _carriedWeaponRoot)
+            {
+                visual.QueueFree();
+            }
+        }
+        _carriedWeaponRoot.Visible = false;
+        foreach (var mesh in CombatModelLibrary.MeshesBelow(_carriedWeaponRoot))
+        {
+            mesh.Visible = false;
+        }
     }
 
     private void UpdateAuthoredStanceCollider()
@@ -103,6 +140,14 @@ public partial class EnemyOperator
         if (IsInstanceValid(_authoredOperatorVisual?.Root))
         {
             _authoredOperatorVisual.SetWeaponVisible(visible);
+        }
+    }
+
+    private void UpdateTideHunterVisual(float speed)
+    {
+        if (UsesTideHunterMonsterForDiagnostics)
+        {
+            _tideHunterMonsterVisual!.Update(speed);
         }
     }
 

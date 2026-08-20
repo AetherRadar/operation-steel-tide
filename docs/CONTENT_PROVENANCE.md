@@ -20,6 +20,7 @@ Consequently, this repository must not be described as satisfying policies that 
 | Low-Poly GSh-18 sidearm model | TastyTony on Sketchfab | CC BY 4.0; attribution required | `assets/models/tastytony_gsh18/LICENSE.md` and the creator/source metadata embedded in the GLB |
 | Desert Eagle sidearm model | ELIZION on Sketchfab | CC BY 4.0; attribution required | `assets/models/elizion_desert_eagle/LICENSE.md` and the creator/source metadata embedded in the GLB |
 | Deployment-preview military soldier | BAMEN (`bamenwo05`) on Sketchfab | CC BY 4.0; attribution required | `assets/models/bamen_military_soldier/LICENSE.md`, retained original FBX, cleaned Blender source, and reproducible import script |
+| Tide Hunter roaming Boss monster | HorrorGameMaker.com on OpenGameArt | CC0 / Public Domain as marked on the source page | `assets/models/tide_hunter_monster/LICENSE.md`, `source_art/third_party/tide_hunter_monster/tide_hunter_monster.blend`, and `scripts/blender/build_tide_hunter_monster.py` |
 | Field operator animation clips | Quaternius Universal Animation Library and Universal Animation Library 2 | CC0 1.0 Universal; no attribution required, creator credit retained as courtesy | Acquired 2026-08-20 from the two official itch.io pages; standard GLB exports, license copies, and source mapping are in `source_art/third_party/quaternius_universal_animation_library/`; retargeted output is `assets/models/bamen_military_soldier/bamen_military_soldier_animated.glb` |
 | Old Military Crate and Concrete Road Barrier | Poly Haven | CC0 | `assets/models/LICENSE.md` |
 | City Kit (Industrial) 1.0 GLB model set | Kenney | CC0 1.0 | `assets/models/LICENSE.md` and `assets/models/kenney_city_kit_industrial/KENNEY_LICENSE.txt` |
@@ -34,6 +35,7 @@ No separate third-party music, font, or stock-image collection is currently trac
 - Credit TastyTony for the Low-Poly GSh-18 model and retain its source and CC BY 4.0 license record in distributions.
 - Credit ELIZION for the Desert Eagle model and retain its source and CC BY 4.0 license record in distributions.
 - Credit BAMEN for the deployment-preview military soldier and retain its source and CC BY 4.0 license record in distributions.
+- Credit HorrorGameMaker.com for the Tide Hunter monster as a courtesy and retain the CC0 source record above.
 - Quaternius animations are CC0; retaining the creator and source links above is recommended for provenance even though attribution is not required.
 - Credit Poly Haven and link the two asset license records whenever a platform requires attribution or source disclosure.
 - Describe screenshots as direct in-engine captures, not as independently generated promotional images.

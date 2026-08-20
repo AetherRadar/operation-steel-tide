@@ -68,6 +68,18 @@ The deployment-preview character is **FREE [Military Soldier] RIGGED** by BAMEN 
 
 The model remains credited to BAMEN and is not covered by the repository's MIT license.
 
+## Tide Hunter CC0 monster
+
+The roaming Boss uses **3D Horror Game Monster** by HorrorGameMaker.com:
+
+- Source: https://opengameart.org/content/3d-horror-game-monster
+- License: CC0 / Public Domain, as marked on the source page
+- Acquisition date: 2026-08-20
+- Local asset: `tide_hunter_monster/tide_hunter_monster.glb`
+- Editable packed source and reproducible cleanup script: `source_art/third_party/tide_hunter_monster/tide_hunter_monster.blend` and `scripts/blender/build_tide_hunter_monster.py`
+
+The Boss is a single skinned mesh with embedded PBR maps and `idle`, `walk`, and `run` actions. Credit is retained as courtesy.
+
 ## Quaternius CC0 animation libraries
 
 The field-operator animation set combines the standard free exports from
