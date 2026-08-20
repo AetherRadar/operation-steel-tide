@@ -1698,6 +1698,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private void BeginMuzzleFlash()
     {
         AttackShotsFired++;
+        HoldAuthoredAimAfterShot();
         Main?.NotifyAircraftOperatorAttack(this, GlobalPosition, CarriedWeapon.Stats().SoundRadius);
         _shotAudio.PitchScale = _rng.RandfRange(0.88f, 1.08f);
         _shotAudio.Play();
@@ -1726,16 +1727,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
         if (UsesAuthoredOperatorForDiagnostics)
         {
-            _authoredOperatorVisual.SetWeaponReadied(Alerted && HasFireablePrimary && !IsDead);
-            _authoredOperatorAnimator.Update(
-                delta,
-                speed,
-                IsProne,
-                _inCover && !IsProne,
-                Alerted && HasFireablePrimary,
-                downed: false,
-                reviving: false,
-                IsDead);
+            AnimateAuthoredOperator(delta, speed);
             UpdateAuthoredStanceCollider();
             return;
         }
@@ -1882,6 +1874,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             _authoredOperatorAnimator.Update(
                 0.0f,
                 0.0f,
+                weaponReadied: false,
                 prone: false,
                 crouched: false,
                 aiming: false,

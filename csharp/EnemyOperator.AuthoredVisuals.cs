@@ -8,6 +8,7 @@ public partial class EnemyOperator
     private AuthoredOperatorVisual _authoredOperatorVisual = null!;
     private AuthoredOperatorAnimator _authoredOperatorAnimator = null!;
     private TideHunterMonsterVisual? _tideHunterMonsterVisual;
+    private float _authoredAimHoldRemaining;
 
     internal bool UsesAuthoredOperatorForDiagnostics
         => IsInstanceValid(_authoredOperatorVisual?.Root);
@@ -53,12 +54,39 @@ public partial class EnemyOperator
         _authoredOperatorAnimator.Update(
             0.0f,
             0.0f,
+            weaponReadied: true,
             prone: false,
             crouched: false,
             aiming: true,
             downed: false,
             reviving: false,
             dead: false);
+    }
+
+    private void HoldAuthoredAimAfterShot()
+        => _authoredAimHoldRemaining = Mathf.Max(_authoredAimHoldRemaining, 0.36f);
+
+    private void AnimateAuthoredOperator(float delta, float speed)
+    {
+        _authoredAimHoldRemaining = Mathf.Max(0.0f, _authoredAimHoldRemaining - delta);
+        var weaponReadied = HasFireablePrimary && !IsDead;
+        var target = EngageTargetNode;
+        var visibleTargetInRange = Alerted
+            && target is not null
+            && IsInstanceValid(target)
+            && _cachedLineOfSight
+            && GlobalPosition.DistanceTo(target.GlobalPosition) <= CurrentFireRange * 1.05f;
+        _authoredOperatorVisual.SetWeaponReadied(weaponReadied);
+        _authoredOperatorAnimator.Update(
+            delta,
+            speed,
+            weaponReadied,
+            IsProne,
+            _inCover && !IsProne,
+            visibleTargetInRange || _authoredAimHoldRemaining > 0.0f,
+            downed: false,
+            reviving: false,
+            IsDead);
     }
 
     private void AttachAuthoredOperatorVisual()

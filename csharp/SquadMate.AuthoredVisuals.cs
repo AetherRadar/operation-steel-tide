@@ -7,6 +7,7 @@ public partial class SquadMate
 {
     private AuthoredOperatorVisual _authoredOperatorVisual = null!;
     private AuthoredOperatorAnimator _authoredOperatorAnimator = null!;
+    private float _authoredAimHoldRemaining;
 
     internal bool UsesAuthoredOperatorForDiagnostics
         => IsInstanceValid(_authoredOperatorVisual?.Root);
@@ -19,7 +20,7 @@ public partial class SquadMate
             ? _authoredOperatorAnimator.AnimationCount
             : 0;
 
-    internal void SetAuthoredMovementPoseForDiagnostics(float speed)
+    internal void SetAuthoredMovementPoseForDiagnostics(float speed, bool aiming = false)
     {
         if (!UsesAuthoredOperatorForDiagnostics)
         {
@@ -30,11 +31,37 @@ public partial class SquadMate
         _authoredOperatorAnimator.Update(
             1.0f,
             speed,
+            weaponReadied: true,
             prone: false,
             crouched: false,
-            aiming: true,
+            aiming,
             downed: false,
             reviving: false,
+            dead: false);
+    }
+
+    private void HoldAuthoredAimAfterShot()
+        => _authoredAimHoldRemaining = Mathf.Max(_authoredAimHoldRemaining, 0.36f);
+
+    private void AnimateAuthoredOperator(float delta, float speed)
+    {
+        _authoredAimHoldRemaining = Mathf.Max(0.0f, _authoredAimHoldRemaining - delta);
+        var weaponReadied = HasFireablePrimary && !IsDowned && _revivePoseBlend <= 0.5f;
+        var visibleTargetInRange = _combatTarget is not null
+            && IsInstanceValid(_combatTarget)
+            && !_combatTarget.IsDead
+            && _combatHasSight
+            && GlobalPosition.DistanceTo(_combatTarget.GlobalPosition) <= 55.0f;
+        _authoredOperatorVisual.SetWeaponReadied(weaponReadied);
+        _authoredOperatorAnimator.Update(
+            delta,
+            speed,
+            weaponReadied,
+            prone: false,
+            crouched: false,
+            aiming: weaponReadied && (visibleTargetInRange || _authoredAimHoldRemaining > 0.0f),
+            downed: IsDowned,
+            reviving: _revivePoseBlend > 0.5f,
             dead: false);
     }
 

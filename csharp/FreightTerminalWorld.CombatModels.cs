@@ -14,6 +14,7 @@ public partial class FreightTerminalWorld
         var weaponSocketPosition = Vector3.Zero;
         var backWeaponSocketPosition = Vector3.Zero;
         var rifleFit = default(OperatorRifleFitInspection);
+        var readyIdleFit = default(OperatorRifleFitInspection);
         var movementRifleFits = new System.Collections.Generic.List<string>();
         var movementRifleFitValid = true;
         var count = 0;
@@ -23,32 +24,47 @@ public partial class FreightTerminalWorld
             AddChild(visual.Root);
             var animator = new AuthoredOperatorAnimator(visual);
             count = animator.AnimationCount;
-            void Sample(float speed, bool prone, bool crouched, bool aiming, bool downed, bool reviving, bool dead)
+            void Sample(
+                float speed,
+                bool weaponReadied,
+                bool prone,
+                bool crouched,
+                bool aiming,
+                bool downed,
+                bool reviving,
+                bool dead)
             {
-                animator.Update(0.25f, speed, prone, crouched, aiming, downed, reviving, dead);
+                animator.Update(0.25f, speed, weaponReadied, prone, crouched, aiming, downed, reviving, dead);
                 transitions.Add(animator.CurrentAnimation);
             }
-            Sample(0.0f, false, false, false, false, false, false);
-            Sample(0.0f, false, false, true, false, false, false);
-            Sample(1.8f, false, false, false, false, false, false);
-            Sample(3.4f, false, false, false, false, false, false);
-            Sample(5.2f, false, false, false, false, false, false);
-            Sample(1.8f, false, false, true, false, false, false);
-            Sample(3.4f, false, false, true, false, false, false);
-            Sample(5.2f, false, false, true, false, false, false);
-            Sample(0.0f, false, true, false, false, false, false);
-            Sample(1.5f, false, true, false, false, false, false);
-            Sample(1.5f, false, true, true, false, false, false);
-            Sample(0.0f, true, false, true, false, false, false);
-            Sample(1.1f, true, false, true, false, false, false);
-            Sample(0.0f, false, false, false, false, true, false);
-            Sample(0.0f, false, false, false, true, false, false);
+            Sample(0.0f, false, false, false, false, false, false, false);
+            Sample(0.0f, true, false, false, false, false, false, false);
+            Sample(0.0f, true, false, false, true, false, false, false);
+            Sample(1.8f, false, false, false, false, false, false, false);
+            Sample(3.4f, false, false, false, false, false, false, false);
+            Sample(5.2f, false, false, false, false, false, false, false);
+            Sample(1.8f, true, false, false, false, false, false, false);
+            Sample(3.4f, true, false, false, false, false, false, false);
+            Sample(5.2f, true, false, false, false, false, false, false);
+            Sample(1.8f, true, false, false, true, false, false, false);
+            Sample(3.4f, true, false, false, true, false, false, false);
+            Sample(5.2f, true, false, false, true, false, false, false);
+            Sample(0.0f, false, false, true, false, false, false, false);
+            Sample(1.5f, false, false, true, false, false, false, false);
+            Sample(0.0f, true, false, true, false, false, false, false);
+            Sample(1.5f, true, false, true, false, false, false, false);
+            Sample(0.0f, true, false, true, true, false, false, false);
+            Sample(1.5f, true, false, true, true, false, false, false);
+            Sample(0.0f, true, true, false, true, false, false, false);
+            Sample(1.1f, true, true, false, true, false, false, false);
+            Sample(0.0f, false, false, false, false, false, true, false);
+            Sample(0.0f, false, false, false, false, true, false, false);
             animator.PlayHit();
             transitions.Add(animator.CurrentAnimation);
             animator.PlayRevived();
             transitions.Add(animator.CurrentAnimation);
-            animator.Update(0.7f, 0.0f, false, false, false, false, false, false);
-            Sample(0.0f, false, false, false, false, false, true);
+            animator.Update(0.7f, 0.0f, false, false, false, false, false, false, false);
+            Sample(0.0f, false, false, false, false, false, false, true);
             sockets = IsInstanceValid(visual.WeaponSocket)
                 && IsInstanceValid(visual.BackWeaponSocket)
                 && IsInstanceValid(visual.HeadSocket)
@@ -58,15 +74,26 @@ public partial class FreightTerminalWorld
             weaponSocketPosition = visual.WeaponSocket.GlobalPosition;
             backWeaponSocketPosition = visual.BackWeaponSocket.GlobalPosition;
             visual.SetWeaponReadied(true);
+            visual.AnimationPlayer.Play("ready_idle", 0.0);
+            visual.AnimationPlayer.Seek(0.0, update: true);
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            readyIdleFit = visual.InspectRifleFit();
             visual.AnimationPlayer.Play("aim_idle", 0.0);
             visual.AnimationPlayer.Seek(0.0, update: true);
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             rifleFit = visual.InspectRifleFit();
             foreach (var (animation, time) in new[]
             {
+                ("ready_idle", 0.0),
+                ("ready_walk", 0.33),
+                ("ready_run", 0.2),
+                ("ready_sprint", 0.17),
+                ("ready_crouch_idle", 0.0),
+                ("ready_crouch_walk", 0.5),
                 ("aim_walk", 0.33),
                 ("aim_run", 0.2),
                 ("aim_sprint", 0.17),
+                ("aim_crouch_idle", 0.0),
                 ("aim_crouch_walk", 0.5)
             })
             {
@@ -89,22 +116,28 @@ public partial class FreightTerminalWorld
 
         var expected = new[]
         {
-            "idle", "aim_idle", "walk", "run", "sprint", "aim_walk", "aim_run", "aim_sprint",
-            "crouch_idle", "crouch_walk", "aim_crouch_walk",
+            "idle", "ready_idle", "aim_idle", "walk", "run", "sprint",
+            "ready_walk", "ready_run", "ready_sprint", "aim_walk", "aim_run", "aim_sprint",
+            "crouch_idle", "crouch_walk", "ready_crouch_idle", "ready_crouch_walk",
+            "aim_crouch_idle", "aim_crouch_walk",
             "prone_idle", "prone_crawl", "revive_kneel", "downed", "hit",
             "revived", "death"
         };
         var transitionsValid = transitions.SequenceEqual(expected);
-        var valid = count == 18
+        var readyDistinct = readyIdleFit.WeaponOrigin.Y <= rifleFit.WeaponOrigin.Y - 0.18f;
+        var valid = count == 25
             && sockets
             && transitionsValid
             && rifleFit.Valid
-            && movementRifleFitValid;
+            && movementRifleFitValid
+            && readyDistinct;
         GD.Print(
             $"OPERATOR_ANIMATIONS_CHECK count={count} sockets={sockets} "
             + $"weapon_socket={weaponSocketPosition} back_socket={backWeaponSocketPosition} "
             + $"rifle_fit={rifleFit.Valid} primary_hand={rifleFit.PrimaryHandDistance:F3} "
             + $"support_hand={rifleFit.SupportHandDistance:F3} "
+            + $"ready_distinct={readyDistinct} ready_weapon={readyIdleFit.WeaponOrigin} "
+            + $"aim_weapon={rifleFit.WeaponOrigin} ready_muzzle={readyIdleFit.MuzzleOffset} "
             + $"movement_rifle_fit={string.Join(',', movementRifleFits)} "
             + $"muzzle_offset={rifleFit.MuzzleOffset} stock_offset={rifleFit.StockOffset} "
             + $"transitions={string.Join('>', transitions)} expected={string.Join('>', expected)}");

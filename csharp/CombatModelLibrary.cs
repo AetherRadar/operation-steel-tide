@@ -144,6 +144,7 @@ internal sealed class AuthoredOperatorVisual
             valid,
             primaryHandDistance,
             supportHandDistance,
+            weaponOrigin,
             muzzleOffset,
             stockOffset);
     }
@@ -314,6 +315,7 @@ internal readonly record struct OperatorRifleFitInspection(
     bool Valid,
     float PrimaryHandDistance,
     float SupportHandDistance,
+    Vector3 WeaponOrigin,
     Vector3 MuzzleOffset,
     Vector3 StockOffset);
 

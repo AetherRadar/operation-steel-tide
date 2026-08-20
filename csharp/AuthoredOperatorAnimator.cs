@@ -9,7 +9,9 @@ internal sealed class AuthoredOperatorAnimator
     private static readonly string[] RequiredAnimations =
     {
         "idle", "walk", "run", "sprint", "crouch_idle", "crouch_walk",
-        "aim_walk", "aim_run", "aim_sprint", "aim_crouch_walk",
+        "ready_idle", "ready_walk", "ready_run", "ready_sprint",
+        "ready_crouch_idle", "ready_crouch_walk",
+        "aim_walk", "aim_run", "aim_sprint", "aim_crouch_idle", "aim_crouch_walk",
         "prone_idle", "prone_crawl", "aim_idle", "hit", "death", "downed",
         "revive_kneel", "revived"
     };
@@ -17,7 +19,9 @@ internal sealed class AuthoredOperatorAnimator
     private static readonly HashSet<string> LoopingAnimations = new(StringComparer.Ordinal)
     {
         "idle", "walk", "run", "sprint", "crouch_idle", "crouch_walk",
-        "aim_walk", "aim_run", "aim_sprint", "aim_crouch_walk",
+        "ready_idle", "ready_walk", "ready_run", "ready_sprint",
+        "ready_crouch_idle", "ready_crouch_walk",
+        "aim_walk", "aim_run", "aim_sprint", "aim_crouch_idle", "aim_crouch_walk",
         "prone_idle", "prone_crawl", "aim_idle", "downed", "revive_kneel"
     };
 
@@ -53,6 +57,7 @@ internal sealed class AuthoredOperatorAnimator
     public void Update(
         float delta,
         float speed,
+        bool weaponReadied,
         bool prone,
         bool crouched,
         bool aiming,
@@ -93,31 +98,39 @@ internal sealed class AuthoredOperatorAnimator
         else if (crouched)
         {
             next = moving
-                ? aiming ? "aim_crouch_walk" : "crouch_walk"
-                : aiming ? "aim_idle" : "crouch_idle";
+                ? SelectWeaponPose(aiming, weaponReadied, "aim_crouch_walk", "ready_crouch_walk", "crouch_walk")
+                : SelectWeaponPose(aiming, weaponReadied, "aim_crouch_idle", "ready_crouch_idle", "crouch_idle");
             playbackSpeed = moving ? Mathf.Clamp(speed / 2.4f, 0.72f, 1.4f) : 1.0f;
         }
         else if (!moving)
         {
-            next = aiming ? "aim_idle" : "idle";
+            next = SelectWeaponPose(aiming, weaponReadied, "aim_idle", "ready_idle", "idle");
         }
         else if (speed >= 4.5f)
         {
-            next = aiming ? "aim_sprint" : "sprint";
+            next = SelectWeaponPose(aiming, weaponReadied, "aim_sprint", "ready_sprint", "sprint");
             playbackSpeed = Mathf.Clamp(speed / 5.2f, 0.78f, 1.35f);
         }
         else if (speed >= 2.75f)
         {
-            next = aiming ? "aim_run" : "run";
+            next = SelectWeaponPose(aiming, weaponReadied, "aim_run", "ready_run", "run");
             playbackSpeed = Mathf.Clamp(speed / 3.6f, 0.78f, 1.35f);
         }
         else
         {
-            next = aiming ? "aim_walk" : "walk";
+            next = SelectWeaponPose(aiming, weaponReadied, "aim_walk", "ready_walk", "walk");
             playbackSpeed = Mathf.Clamp(speed / 2.1f, 0.72f, 1.35f);
         }
         Play(next, playbackSpeed);
     }
+
+    private static string SelectWeaponPose(
+        bool aiming,
+        bool weaponReadied,
+        string aimPose,
+        string readyPose,
+        string unarmedPose)
+        => aiming ? aimPose : weaponReadied ? readyPose : unarmedPose;
 
     public bool PlayHit()
     {

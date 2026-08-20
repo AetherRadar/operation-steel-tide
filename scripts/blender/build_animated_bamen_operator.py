@@ -26,9 +26,12 @@ M4_GLB = REPO_ROOT / "assets" / "models" / "steel_tide_m4a1" / "steel_tide_m4a1.
 OUTPUT_BLEND = REPO_ROOT / "source_art" / "third_party" / "bamen_military_soldier" / "bamen_military_soldier_animated.blend"
 OUTPUT_GLB = REPO_ROOT / "assets" / "models" / "bamen_military_soldier" / "bamen_military_soldier_animated.glb"
 PREVIEW_DIR = REPO_ROOT / "build" / "art-previews" / "animated-operator"
-RIFLE_ORIGIN = Vector((-0.16, -0.18, 1.61))
-RIFLE_FORWARD = Vector((0.12, -0.993, 0.0)).normalized()
-RIFLE_UP = Vector((0.0, 0.0, 1.0))
+RIFLE_AIM_ORIGIN = Vector((-0.16, -0.18, 1.61))
+RIFLE_AIM_FORWARD = Vector((0.12, -0.993, 0.0)).normalized()
+RIFLE_AIM_UP = Vector((0.0, 0.0, 1.0))
+RIFLE_READY_ORIGIN = Vector((-0.13, -0.12, 1.31))
+RIFLE_READY_FORWARD = Vector((0.10, -0.94, -0.32)).normalized()
+RIFLE_READY_UP = Vector((0.03, -0.32, 0.95)).normalized()
 RIFLE_SCALE = 0.476
 
 
@@ -79,13 +82,25 @@ AIM_LOCOMOTION_SOURCES = {
     "aim_walk": "walk",
     "aim_run": "run",
     "aim_sprint": "sprint",
+    "aim_crouch_idle": "crouch_idle",
     "aim_crouch_walk": "crouch_walk",
+}
+
+
+READY_LOCOMOTION_SOURCES = {
+    "ready_walk": "walk",
+    "ready_run": "run",
+    "ready_sprint": "sprint",
+    "ready_crouch_idle": "crouch_idle",
+    "ready_crouch_walk": "crouch_walk",
 }
 
 
 LOOP_ACTIONS = {
     name for name, (_, _, loop) in ACTION_SOURCES.items() if loop
-} | set(AIM_LOCOMOTION_SOURCES) | {"prone_idle", "prone_crawl", "downed"}
+} | set(AIM_LOCOMOTION_SOURCES) | set(READY_LOCOMOTION_SOURCES) | {
+    "ready_idle", "prone_idle", "prone_crawl", "downed"
+}
 
 
 def require_file(path: Path) -> None:
@@ -330,9 +345,16 @@ def author_pose_hold(
     return action
 
 
-def author_rifle_aim_hold(
+def author_rifle_hold(
     armature: bpy.types.Object,
     source: bpy.types.Action,
+    output_name: str,
+    rifle_origin: Vector,
+    rifle_forward: Vector,
+    rifle_up: Vector,
+    neck_direction: Vector,
+    head_direction: Vector,
+    remove_source: bool = False,
 ) -> bpy.types.Action:
     armature.animation_data.action = source
     bpy.context.scene.frame_set(int(math.floor(source.frame_range[0])))
@@ -341,10 +363,10 @@ def author_rifle_aim_hold(
     bpy.ops.import_scene.gltf(filepath=str(M4_GLB))
     imported_objects = [obj for obj in bpy.data.objects if obj not in before_objects]
     rifle = next(obj for obj in imported_objects if obj.name == "SteelTideM4A1")
-    rifle_right = RIFLE_FORWARD.cross(RIFLE_UP).normalized()
-    rifle_up = rifle_right.cross(RIFLE_FORWARD).normalized()
-    rifle_matrix = Matrix((rifle_right, RIFLE_FORWARD, rifle_up)).transposed().to_4x4()
-    rifle_matrix.translation = RIFLE_ORIGIN
+    rifle_right = rifle_forward.cross(rifle_up).normalized()
+    corrected_rifle_up = rifle_right.cross(rifle_forward).normalized()
+    rifle_matrix = Matrix((rifle_right, rifle_forward, corrected_rifle_up)).transposed().to_4x4()
+    rifle_matrix.translation = rifle_origin
     rifle.matrix_world = rifle_matrix @ Matrix.Diagonal((RIFLE_SCALE, RIFLE_SCALE, RIFLE_SCALE, 1.0))
     bpy.context.view_layer.update()
     foregrip = next(obj for obj in imported_objects if obj.name == "Foregrip")
@@ -354,7 +376,7 @@ def author_rifle_aim_hold(
     constraints: list[tuple[bpy.types.PoseBone, bpy.types.Constraint]] = []
     targets: list[bpy.types.Object] = []
     hand_targets = {
-        "mixamorig:RightForeArm": RIFLE_ORIGIN,
+        "mixamorig:RightForeArm": rifle_origin,
         "mixamorig:LeftForeArm": left_wrist,
     }
     for bone_name, location in hand_targets.items():
@@ -380,8 +402,8 @@ def author_rifle_aim_hold(
     left_hand.matrix = left_hand.matrix @ Matrix.Rotation(math.radians(-90.0), 4, "Y")
     bpy.context.view_layer.update()
     for bone_name, desired_direction in {
-        "mixamorig:Neck": Vector((0.0, -0.50, 0.866)),
-        "mixamorig:Head": Vector((0.0, -0.62, 0.785)),
+        "mixamorig:Neck": neck_direction,
+        "mixamorig:Head": head_direction,
     }.items():
         align_pose_bone_world_direction(armature, bone_name, desired_direction)
         bpy.context.view_layer.update()
@@ -414,8 +436,9 @@ def author_rifle_aim_hold(
     for obj in reversed(imported_objects):
         if obj.name in bpy.data.objects:
             bpy.data.objects.remove(obj, do_unlink=True)
-    source.name = "aim_idle_source"
-    action = bpy.data.actions.new("aim_idle")
+    if source.name == output_name:
+        source.name = f"{output_name}_source"
+    action = bpy.data.actions.new(output_name)
     armature.animation_data.action = action
     reset_pose(armature)
     for frame in (0, 30):
@@ -425,18 +448,19 @@ def author_rifle_aim_hold(
             bone.keyframe_insert(data_path="rotation_quaternion", frame=frame, group=bone.name)
     action["loop"] = True
     armature.animation_data.action = None
-    bpy.data.actions.remove(source)
+    if remove_source:
+        bpy.data.actions.remove(source)
     return action
 
 
-def author_aim_locomotion(
+def author_upper_body_locomotion(
     armature: bpy.types.Object,
     locomotion: bpy.types.Action,
-    aim_hold: bpy.types.Action,
+    upper_body_hold: bpy.types.Action,
     output_name: str,
 ) -> bpy.types.Action:
-    armature.animation_data.action = aim_hold
-    bpy.context.scene.frame_set(int(math.floor(aim_hold.frame_range[0])))
+    armature.animation_data.action = upper_body_hold
+    bpy.context.scene.frame_set(int(math.floor(upper_body_hold.frame_range[0])))
     bpy.context.view_layer.update()
     upper_root = armature.pose.bones["mixamorig:Spine"]
     upper_bones = [
@@ -448,7 +472,7 @@ def author_aim_locomotion(
         key=lambda bone: len(bone.parent_recursive),
     )
     upper_bone_names = {bone.name for bone in upper_bones}
-    aim_local_matrices = {
+    upper_body_local_matrices = {
         bone.name: local_pose_matrix(bone)
         for bone in upper_bones
     }
@@ -470,7 +494,7 @@ def author_aim_locomotion(
         bpy.context.view_layer.update()
         for bone in hierarchy:
             local_matrix = (
-                aim_local_matrices[bone.name]
+                upper_body_local_matrices[bone.name]
                 if bone.name in upper_bone_names
                 else locomotion_local_matrices[bone.name]
             )
@@ -580,6 +604,7 @@ def main() -> None:
         require_file(path)
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
     scene = bpy.context.scene
+    scene.render.engine = "BLENDER_EEVEE_NEXT"
     scene.render.fps = 30
     scene.render.fps_base = 1.0
     target = next(obj for obj in scene.objects if obj.type == "ARMATURE")
@@ -602,9 +627,36 @@ def main() -> None:
             find_source_action(library, source_name),
             output_name,
         )
-    generated["aim_idle"] = author_rifle_aim_hold(target, generated["aim_idle"])
+    generated["ready_idle"] = author_rifle_hold(
+        target,
+        generated["idle"],
+        "ready_idle",
+        RIFLE_READY_ORIGIN,
+        RIFLE_READY_FORWARD,
+        RIFLE_READY_UP,
+        Vector((0.0, -0.12, 0.993)).normalized(),
+        Vector((0.0, -0.18, 0.984)).normalized(),
+    )
+    generated["aim_idle"] = author_rifle_hold(
+        target,
+        generated["aim_idle"],
+        "aim_idle",
+        RIFLE_AIM_ORIGIN,
+        RIFLE_AIM_FORWARD,
+        RIFLE_AIM_UP,
+        Vector((0.0, -0.50, 0.866)),
+        Vector((0.0, -0.62, 0.785)),
+        remove_source=True,
+    )
+    for output_name, source_name in READY_LOCOMOTION_SOURCES.items():
+        generated[output_name] = author_upper_body_locomotion(
+            target,
+            generated[source_name],
+            generated["ready_idle"],
+            output_name,
+        )
     for output_name, source_name in AIM_LOCOMOTION_SOURCES.items():
-        generated[output_name] = author_aim_locomotion(
+        generated[output_name] = author_upper_body_locomotion(
             target,
             generated[source_name],
             generated["aim_idle"],

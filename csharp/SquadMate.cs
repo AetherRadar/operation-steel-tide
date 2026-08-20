@@ -307,6 +307,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             return;
         }
+        HoldAuthoredAimAfterShot();
         Main.SpawnTracer(_muzzle.GlobalPosition, end, new Color(0.32f, 0.78f, 1.0f));
     }
 
@@ -506,6 +507,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             return;
         }
+        HoldAuthoredAimAfterShot();
 
         var spec = OperatorRoles.Spec(Role);
         var fireBoost = Role == OperatorRole.Assault && _overdriveTime > 0.0f ? 0.68f : 1.0f;
@@ -1031,17 +1033,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         UpdateRevivePose(delta);
         if (UsesAuthoredOperatorForDiagnostics)
         {
-            _authoredOperatorVisual.SetWeaponReadied(
-                HasFireablePrimary && !IsDowned && _revivePoseBlend <= 0.5f);
-            _authoredOperatorAnimator.Update(
-                delta,
-                speed,
-                prone: false,
-                crouched: false,
-                aiming: HasFireablePrimary,
-                downed: IsDowned,
-                reviving: _revivePoseBlend > 0.5f,
-                dead: false);
+            AnimateAuthoredOperator(delta, speed);
             UpdateAuthoredStanceCollider();
             UpdateHealthVisual();
             return;
