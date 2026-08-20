@@ -38,7 +38,9 @@ MATERIALS = {
     "iron": ((0.08, 0.095, 0.09, 1.0), 0.86, 0.27),
     "metal": ((0.22, 0.245, 0.235, 1.0), 0.8, 0.24),
     "shoes": ((0.035, 0.04, 0.037, 1.0), 0.0, 0.76),
-    "skin": ((0.48, 0.28, 0.18, 1.0), 0.0, 0.68),
+    # The model's face is fully covered by the helmet; reuse its skin slot for
+    # low-reflectance tactical gloves so no bare hands break the uniform design.
+    "skin": ((0.018, 0.024, 0.023, 1.0), 0.0, 0.64),
 }
 
 

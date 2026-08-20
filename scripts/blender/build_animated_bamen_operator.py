@@ -340,7 +340,9 @@ def author_rifle_aim_hold(
     rifle.matrix_world = rifle_matrix @ Matrix.Diagonal((RIFLE_SCALE, RIFLE_SCALE, RIFLE_SCALE, 1.0))
     bpy.context.view_layer.update()
     foregrip = next(obj for obj in imported_objects if obj.name == "Foregrip")
-    left_wrist = foregrip.matrix_world @ Vector((-0.19, -0.04, -0.11))
+    # Center the support wrist over the angled foregrip. The previous target sat
+    # on the receiver-facing side, so the palm could never visibly wrap the grip.
+    left_wrist = foregrip.matrix_world @ Vector((0.0, -0.02, -0.11))
     constraints: list[tuple[bpy.types.PoseBone, bpy.types.Constraint]] = []
     targets: list[bpy.types.Object] = []
     hand_targets = {
@@ -366,6 +368,9 @@ def author_rifle_aim_hold(
     for bone_name, desired_direction in hand_directions.items():
         align_pose_bone_world_direction(armature, bone_name, desired_direction)
     bpy.context.view_layer.update()
+    left_hand = armature.pose.bones["mixamorig:LeftHand"]
+    left_hand.matrix = left_hand.matrix @ Matrix.Rotation(math.radians(-90.0), 4, "Y")
+    bpy.context.view_layer.update()
     for bone_name, desired_direction in {
         "mixamorig:Neck": Vector((0.0, -0.50, 0.866)),
         "mixamorig:Head": Vector((0.0, -0.62, 0.785)),
@@ -385,7 +390,10 @@ def author_rifle_aim_hold(
             for segment, angle in enumerate(angles, start=1):
                 bone = armature.pose.bones[f"mixamorig:{side}Hand{finger}{segment}"]
                 bone.rotation_mode = "XYZ"
-                bone.rotation_euler.x = math.radians(-angle)
+                if side == "Left":
+                    bone.rotation_euler.z = math.radians(-angle)
+                else:
+                    bone.rotation_euler.x = math.radians(-angle)
     bpy.context.view_layer.update()
     pose_matrices = {
         bone.name: bone.matrix.copy()
