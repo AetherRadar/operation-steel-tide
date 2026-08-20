@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace OperationSteelTide;
@@ -63,6 +64,16 @@ internal sealed class AuthoredGsh18Visual
 internal sealed class AuthoredDesertEagleVisual
 {
     public AuthoredDesertEagleVisual(Node3D root)
+    {
+        Root = root;
+    }
+
+    public Node3D Root { get; }
+}
+
+internal sealed class AuthoredPreviewOperatorVisual
+{
+    public AuthoredPreviewOperatorVisual(Node3D root)
     {
         Root = root;
     }
@@ -146,6 +157,7 @@ internal static class CombatModelLibrary
 {
     internal const string WeaponScenePath = "res://assets/models/steel_tide_m4a1/steel_tide_m4a1.glb";
     internal const string OperatorScenePath = "res://assets/models/steel_tide_operator/steel_tide_operator.glb";
+    internal const string PreviewOperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier.glb";
     internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/low-poly_gsh-18.glb";
     internal const string DesertEagleScenePath = "res://assets/models/elizion_desert_eagle/desert_eagle.glb";
 
@@ -155,6 +167,9 @@ internal static class CombatModelLibrary
     internal const float Gsh18PreviewPresentationScale = 8.0f;
     private const float DesertEagleFirstPersonLength = 0.82f;
     private const float DesertEaglePreviewLength = 1.05f;
+    private const float OperatorPreviewHeight = 2.55f;
+    private static readonly Vector3 PreviewOperatorSourceSize = new(1.3053f, 2.1079f, 0.4252f);
+    private static readonly Vector3 PreviewOperatorSourceCenter = new(0.0f, 1.04885f, 0.0258f);
 
     private static readonly string[] WeaponNodes =
     {
@@ -166,6 +181,11 @@ internal static class CombatModelLibrary
     {
         "SteelTideOperator", "LeftLegRig", "RightLegRig", "Helmet",
         "Vest", "Backpack", "TeamPatch"
+    };
+
+    private static readonly string[] PreviewOperatorNodes =
+    {
+        "BamenMilitarySoldier", "BamenMilitarySoldierRig", "BamenMilitarySoldierMesh"
     };
 
     private static readonly string[] Gsh18Nodes =
@@ -197,6 +217,19 @@ internal static class CombatModelLibrary
         var root = InstantiateRequired(OperatorScenePath, OperatorNodes);
         root.Name = "AuthoredOperatorVisual";
         return new AuthoredOperatorVisual(root);
+    }
+
+    public static AuthoredPreviewOperatorVisual InstantiatePreviewOperator()
+    {
+        var source = InstantiateRequired(PreviewOperatorScenePath, PreviewOperatorNodes);
+        source.Position = -PreviewOperatorSourceCenter;
+        var wrapper = new Node3D
+        {
+            Name = "AuthoredPreviewOperatorVisual",
+            Scale = Vector3.One * (OperatorPreviewHeight / PreviewOperatorSourceSize.Y)
+        };
+        wrapper.AddChild(source);
+        return new AuthoredPreviewOperatorVisual(wrapper);
     }
 
     public static AuthoredGsh18Visual InstantiateGsh18(bool firstPerson)
@@ -264,6 +297,30 @@ internal static class CombatModelLibrary
 
     public static CombatModelInspection InspectOperator()
         => Inspect(OperatorScenePath, OperatorNodes);
+
+    public static CombatModelInspection InspectPreviewOperator()
+    {
+        Node3D? root = null;
+        try
+        {
+            root = InstantiatePreviewOperator().Root;
+            var scale = OperatorPreviewHeight / PreviewOperatorSourceSize.Y;
+            return new CombatModelInspection(
+                true,
+                true,
+                MeshesBelow(root).Count(),
+                CountMaterials(root),
+                PreviewOperatorSourceSize * scale);
+        }
+        catch
+        {
+            return new CombatModelInspection(false, false, 0, 0, Vector3.Zero);
+        }
+        finally
+        {
+            root?.Free();
+        }
+    }
 
     public static CombatModelInspection InspectGsh18()
     {

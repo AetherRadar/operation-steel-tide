@@ -19,10 +19,6 @@ public partial class InventoryModelPreview : SubViewportContainer
     private InventoryPreviewKind _kind;
     private EquipmentItem? _equipment;
     private WeaponBuild? _weapon;
-    private EquipmentItem? _helmet;
-    private EquipmentItem? _bodyArmor;
-    private EquipmentItem? _backpack;
-    private OperatorRole _role = OperatorRole.Assault;
     private string _knifeSkinId = KnifeSkinCatalog.DefaultId;
     private SubViewport? _viewport;
     private Node3D? _modelRoot;
@@ -43,10 +39,6 @@ public partial class InventoryModelPreview : SubViewportContainer
         _equipment = equipment?.Clone();
         _weapon = weapon?.Clone();
         _knifeSkinId = knifeSkinId;
-        _role = role;
-        _helmet = helmet?.Clone();
-        _bodyArmor = bodyArmor?.Clone();
-        _backpack = backpack?.Clone();
         if (IsInsideTree())
         {
             RebuildModel();
@@ -156,7 +148,7 @@ public partial class InventoryModelPreview : SubViewportContainer
             case InventoryPreviewKind.Operator:
                 BuildOperator(_modelRoot);
                 _camera.Size = 3.4f;
-                _modelRoot.Position = new Vector3(0, -1.34f, 0);
+                _modelRoot.Position = Vector3.Zero;
                 _modelRoot.RotationDegrees = new Vector3(0, -9, 0);
                 break;
         }
@@ -184,85 +176,7 @@ public partial class InventoryModelPreview : SubViewportContainer
 
     private void BuildOperator(Node3D root)
     {
-        var spec = OperatorRoles.Spec(_role);
-        var heavyArmor = _bodyArmor?.DefinitionId == "armor_heavy";
-        var patrolArmor = _bodyArmor?.DefinitionId == "armor_patrol";
-        var heavyHelmet = _helmet?.DefinitionId == "helmet_heavy";
-        var patrolHelmet = _helmet?.DefinitionId == "helmet_patrol";
-        var heavyPack = _backpack?.DefinitionId == "pack_heavy";
-        var patrolPack = _backpack?.DefinitionId == "pack_sling";
-        var uniform = new Color(0.11f, 0.145f, 0.135f).Lerp(spec.Accent, 0.08f);
-        var fabric = heavyArmor
-            ? new Color(0.19f, 0.2f, 0.15f)
-            : patrolArmor ? new Color(0.22f, 0.24f, 0.21f) : new Color(0.13f, 0.18f, 0.16f);
-        var armor = heavyArmor
-            ? new Color(0.22f, 0.24f, 0.18f)
-            : patrolArmor ? new Color(0.12f, 0.14f, 0.13f) : new Color(0.08f, 0.115f, 0.105f);
-        var skin = new Color(0.42f, 0.29f, 0.21f);
-        var dark = new Color(0.035f, 0.045f, 0.042f);
-
-        Capsule(root, 0.25f, 0.94f, new Vector3(0, 1.46f, 0), uniform, 0.0f, 0.94f);
-        Box(root, new Vector3(patrolArmor ? 0.53f : 0.66f, heavyArmor ? 0.76f : patrolArmor ? 0.48f : 0.65f, heavyArmor ? 0.34f : patrolArmor ? 0.18f : 0.27f),
-            new Vector3(0, patrolArmor ? 1.43f : 1.48f, 0.02f), armor, patrolArmor ? 0.02f : 0.16f, patrolArmor ? 0.92f : 0.74f);
-        Box(root, new Vector3(patrolArmor ? 0.38f : 0.5f, 0.08f, patrolArmor ? 0.22f : 0.36f), new Vector3(0, patrolArmor ? 1.61f : 1.72f, 0.02f), fabric.Lightened(0.1f), 0.04f, 0.9f);
-        var firstPouch = patrolArmor ? 0 : -1;
-        var lastPouch = patrolArmor ? 0 : 1;
-        for (var pouch = firstPouch; pouch <= lastPouch; pouch++)
-        {
-            Box(root, new Vector3(0.18f, 0.22f, 0.12f), new Vector3(pouch * 0.2f, 1.2f, 0.2f),
-                fabric.Lightened(0.06f), 0.02f, 0.94f);
-        }
-
-        Capsule(root, 0.13f, 0.9f, new Vector3(-0.18f, 0.57f, 0), uniform.Darkened(0.04f), 0.0f, 0.95f,
-            new Vector3(0, 0, -0.03f));
-        Capsule(root, 0.13f, 0.9f, new Vector3(0.18f, 0.57f, 0), uniform.Darkened(0.04f), 0.0f, 0.95f,
-            new Vector3(0, 0, 0.03f));
-        Box(root, new Vector3(0.25f, 0.18f, 0.36f), new Vector3(-0.18f, 0.08f, 0.04f), dark, 0.1f, 0.7f);
-        Box(root, new Vector3(0.25f, 0.18f, 0.36f), new Vector3(0.18f, 0.08f, 0.04f), dark, 0.1f, 0.7f);
-
-        Capsule(root, 0.11f, 0.78f, new Vector3(-0.42f, 1.52f, 0.02f), uniform, 0.0f, 0.94f,
-            new Vector3(0, 0, -0.46f));
-        Capsule(root, 0.11f, 0.78f, new Vector3(0.42f, 1.52f, 0.02f), uniform, 0.0f, 0.94f,
-            new Vector3(0, 0, 0.46f));
-        Capsule(root, 0.095f, 0.57f, new Vector3(-0.47f, 1.22f, 0.21f), uniform.Darkened(0.04f), 0.0f, 0.94f,
-            new Vector3(0.28f, 0, 0.2f));
-        Capsule(root, 0.095f, 0.57f, new Vector3(0.47f, 1.22f, 0.21f), uniform.Darkened(0.04f), 0.0f, 0.94f,
-            new Vector3(0.28f, 0, -0.2f));
-        Sphere(root, 0.12f, 0.24f, new Vector3(-0.42f, 1.03f, 0.38f), dark, 0.05f, 0.76f);
-        Sphere(root, 0.12f, 0.24f, new Vector3(0.42f, 1.03f, 0.38f), dark, 0.05f, 0.76f);
-
-        Sphere(root, 0.23f, 0.46f, new Vector3(0, 2.23f, 0.01f), skin, 0.0f, 0.93f);
-        Sphere(root, heavyHelmet ? 0.31f : patrolHelmet ? 0.265f : 0.285f, heavyHelmet ? 0.42f : patrolHelmet ? 0.29f : 0.34f,
-            new Vector3(0, patrolHelmet ? 2.37f : 2.39f, -0.005f), heavyHelmet ? new Color(0.27f, 0.25f, 0.17f) : patrolHelmet ? new Color(0.25f, 0.27f, 0.24f) : fabric, patrolHelmet ? 0.02f : 0.12f, patrolHelmet ? 0.9f : 0.78f);
-        Box(root, new Vector3(patrolHelmet ? 0.38f : 0.48f, patrolHelmet ? 0.07f : 0.12f, 0.12f), new Vector3(0, 2.27f, 0.22f), dark, 0.35f, 0.42f);
-        Box(root, new Vector3(0.12f, 0.13f, 0.05f), new Vector3(0, 2.48f, 0.27f), spec.Accent, 0.18f, 0.5f);
-
-        Box(root, new Vector3(heavyPack ? 0.72f : patrolPack ? 0.43f : 0.58f, heavyPack ? 0.92f : patrolPack ? 0.55f : 0.72f, patrolPack ? 0.2f : 0.3f),
-            new Vector3(patrolPack ? 0.12f : 0, patrolPack ? 1.37f : 1.43f, -0.27f), fabric.Darkened(0.04f), 0.02f, 0.95f);
-        Box(root, new Vector3(0.13f, 0.42f, 0.08f), new Vector3(-0.27f, 1.53f, 0.19f), spec.Accent.Darkened(0.2f), 0.02f, 0.82f);
-
-        if (_weapon is not null)
-        {
-            var weaponRoot = new Node3D
-            {
-                Position = new Vector3(0, 1.3f, 0.43f),
-                RotationDegrees = new Vector3(0, -4, -7),
-                Scale = Vector3.One * 0.66f
-            };
-            root.AddChild(weaponRoot);
-            BuildRifle(weaponRoot);
-        }
-        else
-        {
-            var knifeRoot = new Node3D
-            {
-                Position = new Vector3(0.24f, 1.18f, 0.4f),
-                RotationDegrees = new Vector3(0, 0, 72),
-                Scale = Vector3.One * 0.55f
-            };
-            root.AddChild(knifeRoot);
-            BuildKnife(knifeRoot);
-        }
+        root.AddChild(CombatModelLibrary.InstantiatePreviewOperator().Root);
     }
 
     private void BuildRifle(Node3D root)

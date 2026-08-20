@@ -56,3 +56,14 @@ The Desert Eagle sidearm model is **Desert Eagle** by ELIZION and is used under 
 - Local asset and attribution: `elizion_desert_eagle/desert_eagle.glb`, its extracted `desert_eagle_*.png` PBR maps, and `elizion_desert_eagle/LICENSE.md`
 
 The model remains credited to ELIZION and is not covered by the repository's MIT license.
+
+## BAMEN CC BY 4.0 character
+
+The deployment-preview character is **FREE [Military Soldier] RIGGED** by BAMEN and is used under Creative Commons Attribution 4.0 International:
+
+- Source: https://sketchfab.com/3d-models/free-military-soldier-rigged-e9c56308a67d4a3db62e914fafa4d198
+- License: https://creativecommons.org/licenses/by/4.0/
+- Local asset and attribution: `bamen_military_soldier/bamen_military_soldier.glb` and `bamen_military_soldier/LICENSE.md`
+- Editable and original source: `source_art/third_party/bamen_military_soldier/`
+
+The model remains credited to BAMEN and is not covered by the repository's MIT license.
