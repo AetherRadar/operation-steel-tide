@@ -84,6 +84,12 @@ internal sealed class AuthoredPreviewOperatorVisual
 internal sealed class AuthoredOperatorVisual
 {
     private const float FieldWeaponScale = 0.42f;
+    private static readonly Quaternion ReadiedWeaponRotation = new(
+        -0.9934235f,
+        0.0130106f,
+        0.0974600f,
+        0.0586704f);
+    private readonly Skeleton3D _skeleton;
     private AuthoredWeaponVisual? _weapon;
     private bool _weaponReadied;
 
@@ -91,9 +97,9 @@ internal sealed class AuthoredOperatorVisual
     {
         Root = root;
         AnimationPlayer = CombatModelLibrary.RequireAnimationPlayer(root);
-        var skeleton = CombatModelLibrary.RequireSkeleton(root);
-        WeaponSocket = CreateBoneAttachment(skeleton, "RuntimeWeaponSocket", "mixamorig:RightHand");
-        BackWeaponSocket = CreateBoneAttachment(skeleton, "RuntimeBackWeaponSocket", "mixamorig:Spine2");
+        _skeleton = CombatModelLibrary.RequireSkeleton(root);
+        WeaponSocket = CreateBoneAttachment(_skeleton, "RuntimeWeaponSocket", "mixamorig:RightHand");
+        BackWeaponSocket = CreateBoneAttachment(_skeleton, "RuntimeBackWeaponSocket", "mixamorig:Spine2");
         HeadSocket = CombatModelLibrary.RequireNode(root, "HeadSocket");
         VestSocket = CombatModelLibrary.RequireNode(root, "VestSocket");
         BackpackSocket = CombatModelLibrary.RequireNode(root, "BackpackSocket");
@@ -111,6 +117,36 @@ internal sealed class AuthoredOperatorVisual
     public Color TeamColorForDiagnostics { get; private set; }
     public Color GearTintForDiagnostics { get; private set; }
     public int GearOverlayCountForDiagnostics { get; private set; }
+
+    public OperatorRifleFitInspection InspectRifleFit()
+    {
+        var weapon = _weapon;
+        if (weapon is null)
+        {
+            return default;
+        }
+        var rightHandIndex = ResolveBoneIndex(_skeleton, "mixamorig:RightHand");
+        var leftHandIndex = ResolveBoneIndex(_skeleton, "mixamorig:LeftHand");
+        var rightHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(rightHandIndex);
+        var leftHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(leftHandIndex);
+        var weaponOrigin = weapon.Root.GlobalPosition;
+        var primaryHandDistance = rightHand.Origin.DistanceTo(weaponOrigin);
+        var supportHandDistance = leftHand.Origin.DistanceTo(weapon.Foregrip.GlobalPosition);
+        var muzzleOffset = weapon.MuzzleDevice.GlobalPosition - weaponOrigin;
+        var stockOffset = weapon.Stock.GlobalPosition - weaponOrigin;
+        var valid = primaryHandDistance <= 0.025f
+            && supportHandDistance <= 0.16f
+            && muzzleOffset.Z <= -0.44f
+            && Mathf.Abs(muzzleOffset.X) <= 0.16f
+            && Mathf.Abs(muzzleOffset.Y) <= 0.12f
+            && stockOffset.Z >= 0.14f;
+        return new OperatorRifleFitInspection(
+            valid,
+            primaryHandDistance,
+            supportHandDistance,
+            muzzleOffset,
+            stockOffset);
+    }
 
     public void AttachWeapon(AuthoredWeaponVisual weapon, WeaponBuild build)
     {
@@ -152,9 +188,9 @@ internal sealed class AuthoredOperatorVisual
             _weapon.Root.Reparent(socket, keepGlobalTransform: false);
         }
         _weapon.Root.Position = Vector3.Zero;
-        _weapon.Root.RotationDegrees = readied
-            ? new Vector3(0.0f, 90.0f, 0.0f)
-            : Vector3.Zero;
+        _weapon.Root.Quaternion = readied
+            ? ReadiedWeaponRotation
+            : Quaternion.Identity;
         var socketRelativeToRoot = TransformRelativeToAncestor(socket, Root);
         var inheritedScale = Mathf.Max(0.0001f, socketRelativeToRoot.Basis.Scale.X);
         _weapon.Root.Scale = Vector3.One * (FieldWeaponScale / inheritedScale);
@@ -214,6 +250,16 @@ internal sealed class AuthoredOperatorVisual
         return null;
     }
 
+    private static int ResolveBoneIndex(Skeleton3D skeleton, string requestedName)
+    {
+        var resolved = ResolveBoneName(skeleton, requestedName);
+        if (resolved is null)
+        {
+            throw new InvalidOperationException($"Animated operator skeleton is missing bone {requestedName}.");
+        }
+        return skeleton.FindBone(resolved);
+    }
+
     public void SetTeamColor(Color color)
     {
         TeamColorForDiagnostics = color;
@@ -263,6 +309,13 @@ internal sealed class AuthoredOperatorVisual
         }
     }
 }
+
+internal readonly record struct OperatorRifleFitInspection(
+    bool Valid,
+    float PrimaryHandDistance,
+    float SupportHandDistance,
+    Vector3 MuzzleOffset,
+    Vector3 StockOffset);
 
 internal readonly record struct CombatModelInspection(
     bool Loaded,
@@ -329,7 +382,12 @@ internal static class CombatModelLibrary
                 geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
             }
         }
-        return new AuthoredWeaponVisual(root);
+        var visual = new AuthoredWeaponVisual(root);
+        if (!firstPerson)
+        {
+            visual.SpareMagazine.Visible = false;
+        }
+        return visual;
     }
 
     public static AuthoredOperatorVisual InstantiateOperator(WeaponBuild? weaponBuild = null)

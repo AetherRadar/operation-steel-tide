@@ -13,6 +13,7 @@ public partial class FreightTerminalWorld
         var sockets = false;
         var weaponSocketPosition = Vector3.Zero;
         var backWeaponSocketPosition = Vector3.Zero;
+        var rifleFit = default(OperatorRifleFitInspection);
         var count = 0;
         try
         {
@@ -49,6 +50,11 @@ public partial class FreightTerminalWorld
                 && IsInstanceValid(visual.TeamPatchSocket);
             weaponSocketPosition = visual.WeaponSocket.GlobalPosition;
             backWeaponSocketPosition = visual.BackWeaponSocket.GlobalPosition;
+            visual.SetWeaponReadied(true);
+            visual.AnimationPlayer.Play("aim_idle", 0.0);
+            visual.AnimationPlayer.Seek(0.0, update: true);
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            rifleFit = visual.InspectRifleFit();
         }
         catch (System.Exception exception)
         {
@@ -62,10 +68,13 @@ public partial class FreightTerminalWorld
             "revived", "death"
         };
         var transitionsValid = transitions.SequenceEqual(expected);
-        var valid = count == 14 && sockets && transitionsValid;
+        var valid = count == 14 && sockets && transitionsValid && rifleFit.Valid;
         GD.Print(
             $"OPERATOR_ANIMATIONS_CHECK count={count} sockets={sockets} "
             + $"weapon_socket={weaponSocketPosition} back_socket={backWeaponSocketPosition} "
+            + $"rifle_fit={rifleFit.Valid} primary_hand={rifleFit.PrimaryHandDistance:F3} "
+            + $"support_hand={rifleFit.SupportHandDistance:F3} "
+            + $"muzzle_offset={rifleFit.MuzzleOffset} stock_offset={rifleFit.StockOffset} "
             + $"transitions={string.Join('>', transitions)} expected={string.Join('>', expected)}");
         GD.Print($"OPERATOR_ANIMATIONS_PASS valid={valid}");
         visual?.Root.QueueFree();

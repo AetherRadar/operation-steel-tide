@@ -22,9 +22,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_BLEND = REPO_ROOT / "source_art" / "third_party" / "bamen_military_soldier" / "bamen_military_soldier_clean.blend"
 UAL1_GLB = REPO_ROOT / "source_art" / "third_party" / "quaternius_universal_animation_library" / "UAL1_Standard.glb"
 UAL2_GLB = REPO_ROOT / "source_art" / "third_party" / "quaternius_universal_animation_library" / "UAL2_Standard.glb"
+M4_GLB = REPO_ROOT / "assets" / "models" / "steel_tide_m4a1" / "steel_tide_m4a1.glb"
 OUTPUT_BLEND = REPO_ROOT / "source_art" / "third_party" / "bamen_military_soldier" / "bamen_military_soldier_animated.blend"
 OUTPUT_GLB = REPO_ROOT / "assets" / "models" / "bamen_military_soldier" / "bamen_military_soldier_animated.glb"
 PREVIEW_DIR = REPO_ROOT / "build" / "art-previews" / "animated-operator"
+RIFLE_ORIGIN = Vector((-0.16, -0.18, 1.61))
+RIFLE_FORWARD = Vector((0.12, -0.993, 0.0)).normalized()
+RIFLE_UP = Vector((0.0, 0.0, 1.0))
+RIFLE_SCALE = 0.476
 
 
 BONE_MAP = {
@@ -88,6 +93,26 @@ def matrix_from_rotation_translation(rotation: Quaternion, translation: Vector) 
     matrix = rotation.to_matrix().to_4x4()
     matrix.translation = translation
     return matrix
+
+
+def align_pose_bone_world_direction(
+    armature: bpy.types.Object,
+    bone_name: str,
+    desired_direction: Vector,
+) -> None:
+    bone = armature.pose.bones[bone_name]
+    current_direction = (
+        armature.matrix_world @ bone.tail - armature.matrix_world @ bone.head
+    ).normalized()
+    current_world_rotation = rotation_only(armature.matrix_world @ bone.matrix)
+    desired_world_rotation = (
+        current_direction.rotation_difference(desired_direction.normalized())
+        @ current_world_rotation
+    ).normalized()
+    desired_local_rotation = (
+        rotation_only(armature.matrix_world).inverted() @ desired_world_rotation
+    ).normalized()
+    bone.matrix = matrix_from_rotation_translation(desired_local_rotation, bone.matrix.translation)
 
 
 def reset_pose(armature: bpy.types.Object) -> None:
@@ -304,11 +329,23 @@ def author_rifle_aim_hold(
     armature.animation_data.action = source
     bpy.context.scene.frame_set(int(math.floor(source.frame_range[0])))
     bpy.context.view_layer.update()
+    before_objects = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=str(M4_GLB))
+    imported_objects = [obj for obj in bpy.data.objects if obj not in before_objects]
+    rifle = next(obj for obj in imported_objects if obj.name == "SteelTideM4A1")
+    rifle_right = RIFLE_FORWARD.cross(RIFLE_UP).normalized()
+    rifle_up = rifle_right.cross(RIFLE_FORWARD).normalized()
+    rifle_matrix = Matrix((rifle_right, RIFLE_FORWARD, rifle_up)).transposed().to_4x4()
+    rifle_matrix.translation = RIFLE_ORIGIN
+    rifle.matrix_world = rifle_matrix @ Matrix.Diagonal((RIFLE_SCALE, RIFLE_SCALE, RIFLE_SCALE, 1.0))
+    bpy.context.view_layer.update()
+    foregrip = next(obj for obj in imported_objects if obj.name == "Foregrip")
+    left_wrist = foregrip.matrix_world @ Vector((-0.19, -0.04, -0.11))
     constraints: list[tuple[bpy.types.PoseBone, bpy.types.Constraint]] = []
     targets: list[bpy.types.Object] = []
     hand_targets = {
-        "mixamorig:RightForeArm": (-0.10, -0.22, 1.42),
-        "mixamorig:LeftForeArm": (0.10, -0.47, 1.45),
+        "mixamorig:RightForeArm": RIFLE_ORIGIN,
+        "mixamorig:LeftForeArm": left_wrist,
     }
     for bone_name, location in hand_targets.items():
         target = bpy.data.objects.new(f"{bone_name}_RifleAimTarget", None)
@@ -321,6 +358,35 @@ def author_rifle_aim_hold(
         constraints.append((armature.pose.bones[bone_name], constraint))
         targets.append(target)
     bpy.context.view_layer.update()
+
+    hand_directions = {
+        "mixamorig:RightHand": Vector((0.0, 0.12, -0.993)).normalized(),
+        "mixamorig:LeftHand": Vector((0.02, 0.05, 0.998)).normalized(),
+    }
+    for bone_name, desired_direction in hand_directions.items():
+        align_pose_bone_world_direction(armature, bone_name, desired_direction)
+    bpy.context.view_layer.update()
+    for bone_name, desired_direction in {
+        "mixamorig:Neck": Vector((0.0, -0.50, 0.866)),
+        "mixamorig:Head": Vector((0.0, -0.62, 0.785)),
+    }.items():
+        align_pose_bone_world_direction(armature, bone_name, desired_direction)
+        bpy.context.view_layer.update()
+
+    finger_curls = {
+        "Thumb": (28.0, 36.0, 38.0, 34.0),
+        "Index": (32.0, 46.0, 52.0, 42.0),
+        "Middle": (54.0, 64.0, 68.0, 48.0),
+        "Ring": (58.0, 68.0, 72.0, 52.0),
+        "Pinky": (62.0, 72.0, 74.0, 54.0),
+    }
+    for side in ("Left", "Right"):
+        for finger, angles in finger_curls.items():
+            for segment, angle in enumerate(angles, start=1):
+                bone = armature.pose.bones[f"mixamorig:{side}Hand{finger}{segment}"]
+                bone.rotation_mode = "XYZ"
+                bone.rotation_euler.x = math.radians(-angle)
+    bpy.context.view_layer.update()
     pose_matrices = {
         bone.name: bone.matrix.copy()
         for bone in armature.pose.bones
@@ -329,6 +395,9 @@ def author_rifle_aim_hold(
         bone.constraints.remove(constraint)
     for target in targets:
         bpy.data.objects.remove(target, do_unlink=True)
+    for obj in reversed(imported_objects):
+        if obj.name in bpy.data.objects:
+            bpy.data.objects.remove(obj, do_unlink=True)
     source.name = "aim_idle_source"
     action = bpy.data.actions.new("aim_idle")
     armature.animation_data.action = action
@@ -423,7 +492,7 @@ def save_source() -> None:
 
 
 def main() -> None:
-    for path in (SOURCE_BLEND, UAL1_GLB, UAL2_GLB):
+    for path in (SOURCE_BLEND, UAL1_GLB, UAL2_GLB, M4_GLB):
         require_file(path)
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
     scene = bpy.context.scene
