@@ -67,15 +67,18 @@ public partial class EnemyOperator
         {
             return;
         }
+        AuthoredOperatorVisual? authoredOperator = null;
         try
         {
-            var authoredOperator = CombatModelLibrary.InstantiateOperator(CarriedWeapon);
+            authoredOperator = CombatModelLibrary.InstantiateOperator(CarriedWeapon);
             _bodyRoot.AddChild(authoredOperator.Root);
+            var authoredAnimator = new AuthoredOperatorAnimator(authoredOperator);
             _authoredOperatorVisual = authoredOperator;
-            _authoredOperatorAnimator = new AuthoredOperatorAnimator(authoredOperator);
+            _authoredOperatorAnimator = authoredAnimator;
         }
         catch (Exception exception)
         {
+            authoredOperator?.Root.QueueFree();
             GD.PushWarning($"Authored enemy operator unavailable; retaining procedural visual: {exception.Message}");
             return;
         }

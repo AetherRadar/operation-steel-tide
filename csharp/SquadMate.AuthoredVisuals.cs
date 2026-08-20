@@ -21,16 +21,19 @@ public partial class SquadMate
 
     private void AttachAuthoredOperatorVisual()
     {
+        AuthoredOperatorVisual? authoredOperator = null;
         try
         {
-            var authoredOperator = CombatModelLibrary.InstantiateOperator(
+            authoredOperator = CombatModelLibrary.InstantiateOperator(
                 WeaponCatalog.Build(WeaponPlatform.M4A1, 0));
             _rig.AddChild(authoredOperator.Root);
+            var authoredAnimator = new AuthoredOperatorAnimator(authoredOperator);
             _authoredOperatorVisual = authoredOperator;
-            _authoredOperatorAnimator = new AuthoredOperatorAnimator(authoredOperator);
+            _authoredOperatorAnimator = authoredAnimator;
         }
         catch (Exception exception)
         {
+            authoredOperator?.Root.QueueFree();
             GD.PushWarning($"Authored squad operator unavailable; retaining procedural visual: {exception.Message}");
             return;
         }
