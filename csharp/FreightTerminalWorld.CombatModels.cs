@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Godot;
 
@@ -91,6 +92,11 @@ public partial class FreightTerminalWorld
     {
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         var weapon = CombatModelLibrary.InspectWeapon();
+        var platformInspections = Enum.GetValues<WeaponPlatform>()
+            .ToDictionary(platform => platform, CombatModelLibrary.InspectWeapon);
+        var platformGeometry = platformInspections.ToDictionary(
+            pair => pair.Key,
+            pair => IsValidPlatformWeapon(pair.Key, pair.Value));
         var operatorModel = CombatModelLibrary.InspectOperator();
         var previewOperator = CombatModelLibrary.InspectPreviewOperator();
         var gsh18 = CombatModelLibrary.InspectGsh18();
@@ -149,6 +155,7 @@ public partial class FreightTerminalWorld
                 ColorDistance(enemy.AuthoredTeamColorForDiagnostics, garrisonColor) > 0.55f)
             && rivals.Select(enemy => enemy.AuthoredTeamColorForDiagnostics).Distinct().Count() >= 2;
         var valid = weaponGeometry
+            && platformGeometry.Values.All(value => value)
             && operatorGeometry
             && previewOperatorGeometry
             && gsh18Geometry
@@ -172,6 +179,7 @@ public partial class FreightTerminalWorld
             + $"deagle_loaded={desertEagle.Loaded} deagle_nodes={desertEagle.RequiredNodes} "
             + $"deagle_meshes={desertEagle.MeshCount} deagle_materials={desertEagle.MaterialCount} "
             + $"deagle_size={desertEagle.Size} "
+            + $"platforms={string.Join(',', platformInspections.Select(pair => $"{pair.Key}:{FormatWeaponInspection(pair.Value, platformGeometry[pair.Key])}"))} "
             + $"player_authored={playerAuthored} squad_authored={squadAuthored} "
             + $"enemies_authored={enemiesAuthored} enemies={livingEnemies.Length} "
             + $"faction_appearance={factionAppearance} garrison_color={garrisonColor} "
@@ -179,6 +187,26 @@ public partial class FreightTerminalWorld
         GD.Print($"COMBAT_MODELS_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }
+
+    private static bool IsValidPlatformWeapon(WeaponPlatform platform, CombatModelInspection inspection)
+    {
+        if (platform is WeaponPlatform.GSh18 or WeaponPlatform.DesertEagle)
+        {
+            return inspection.Loaded && inspection.RequiredNodes && inspection.MeshCount > 0
+                && inspection.Size.X > 0.001f && inspection.Size.Y > 0.001f && inspection.Size.Z > 0.001f;
+        }
+        return inspection.Loaded
+            && inspection.RequiredNodes
+            && inspection.MeshCount > 0
+            && inspection.Size.X > 0.001f
+            && inspection.Size.Y > 0.001f
+            && inspection.Size.Z > 0.001f;
+    }
+
+    private static string FormatWeaponInspection(
+        CombatModelInspection inspection,
+        bool valid)
+        => $"valid={valid};loaded={inspection.Loaded};nodes={inspection.RequiredNodes};meshes={inspection.MeshCount};bounds={inspection.Size}";
 
     private static float ColorDistance(Color left, Color right)
     {

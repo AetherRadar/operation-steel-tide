@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -966,9 +967,12 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         Part(_rig, Box(new Vector3(0.19f, 0.16f, 0.19f)), new Vector3(-0.34f, 1.35f, -0.02f), armor);
         Part(_rig, Box(new Vector3(0.19f, 0.16f, 0.19f)), new Vector3(0.34f, 1.35f, -0.02f), armor);
         AttachAuthoredOperatorVisual();
-        Part(_weapon, Box(new Vector3(0.13f, 0.14f, 0.56f)), new Vector3(0.0f, 1.24f, -0.36f), gun);
-        Part(_weapon, Box(new Vector3(0.1f, 0.24f, 0.13f)), new Vector3(0.0f, 1.07f, -0.35f), gun, new Vector3(-0.18f, 0.0f, 0.0f));
-        Part(_weapon, Cylinder(0.025f, 0.48f), new Vector3(0.0f, 1.24f, -0.85f), gun, new Vector3(Mathf.Pi / 2.0f, 0.0f, 0.0f));
+        if (!UsesAuthoredOperatorForDiagnostics)
+        {
+            Part(_weapon, Box(new Vector3(0.13f, 0.14f, 0.56f)), new Vector3(0.0f, 1.24f, -0.36f), gun);
+            Part(_weapon, Box(new Vector3(0.1f, 0.24f, 0.13f)), new Vector3(0.0f, 1.07f, -0.35f), gun, new Vector3(-0.18f, 0.0f, 0.0f));
+            Part(_weapon, Cylinder(0.025f, 0.48f), new Vector3(0.0f, 1.24f, -0.85f), gun, new Vector3(Mathf.Pi / 2.0f, 0.0f, 0.0f));
+        }
         _muzzle = new Marker3D { Position = new Vector3(0.0f, 1.24f, -1.1f) };
         _weapon.AddChild(_muzzle);
         HasFireablePrimary = true;

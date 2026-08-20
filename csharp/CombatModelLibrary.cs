@@ -7,6 +7,8 @@ namespace OperationSteelTide;
 
 internal sealed class AuthoredWeaponVisual
 {
+    private readonly Vector3 _chargingHandleRestPosition;
+
     public AuthoredWeaponVisual(Node3D root)
     {
         Root = root;
@@ -18,6 +20,7 @@ internal sealed class AuthoredWeaponVisual
         MuzzleDevice = CombatModelLibrary.RequireNode(root, "MuzzleDevice");
         Suppressor = CombatModelLibrary.RequireNode(root, "Suppressor");
         OpticMount = CombatModelLibrary.RequireNode(root, "OpticMount");
+        _chargingHandleRestPosition = ChargingHandle.Position;
     }
 
     public Node3D Root { get; }
@@ -48,6 +51,14 @@ internal sealed class AuthoredWeaponVisual
         SpareMagazine.Transform = spareMagazine.Transform;
         SpareMagazine.Visible = spareMagazine.Visible;
         ChargingHandle.Transform = chargingHandle.Transform;
+    }
+
+    public void SyncMechanismState(Node3D magazine, Node3D spareMagazine, Node3D chargingHandle)
+    {
+        Magazine.Visible = magazine.Visible;
+        SpareMagazine.Visible = spareMagazine.Visible;
+        var reloadOffset = chargingHandle.Position.Z + 0.05f;
+        ChargingHandle.Position = _chargingHandleRestPosition + new Vector3(0.0f, 0.0f, reloadOffset);
     }
 }
 
@@ -327,6 +338,7 @@ internal readonly record struct CombatModelInspection(
 internal static class CombatModelLibrary
 {
     internal const string WeaponScenePath = "res://assets/models/steel_tide_m4a1/steel_tide_m4a1.glb";
+    private const string WeaponPlatformRoot = "res://assets/models/weapon_platforms";
     internal const string OperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier_animated.glb";
     internal const string PreviewOperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier.glb";
     internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/low-poly_gsh-18.glb";
@@ -347,6 +359,12 @@ internal static class CombatModelLibrary
     {
         "SteelTideM4A1", "Magazine", "SpareMagazine", "ChargingHandle",
         "Stock", "Foregrip", "MuzzleDevice", "Suppressor", "OpticMount"
+    };
+
+    private static readonly string[] PlatformWeaponNodes =
+    {
+        "Magazine", "SpareMagazine", "ChargingHandle", "Stock",
+        "Foregrip", "MuzzleDevice", "Suppressor", "OpticMount"
     };
 
     private static readonly string[] OperatorNodes =
@@ -372,9 +390,15 @@ internal static class CombatModelLibrary
     };
 
     public static AuthoredWeaponVisual InstantiateWeapon(bool firstPerson)
+        => InstantiateWeapon(WeaponPlatform.M4A1, firstPerson);
+
+    public static AuthoredWeaponVisual InstantiateWeapon(WeaponPlatform platform, bool firstPerson)
     {
-        var root = InstantiateRequired(WeaponScenePath, WeaponNodes);
-        root.Name = "AuthoredM4A1Visual";
+        var path = WeaponScenePathFor(platform);
+        var root = InstantiateRequired(
+            path,
+            platform == WeaponPlatform.M4A1 ? WeaponNodes : PlatformWeaponNodes);
+        root.Name = $"Authored{platform}Visual";
         if (firstPerson)
         {
             foreach (var geometry in GeometryBelow(root))
@@ -403,9 +427,34 @@ internal static class CombatModelLibrary
         sourcePresentation.AddChild(source);
         wrapper.AddChild(sourcePresentation);
         var visual = new AuthoredOperatorVisual(wrapper);
+        var carriedBuild = weaponBuild ?? WeaponCatalog.Build(WeaponPlatform.M4A1, 0);
         visual.AttachWeapon(
-            InstantiateWeapon(firstPerson: false),
-            weaponBuild ?? WeaponCatalog.Build(WeaponPlatform.M4A1, 0));
+            InstantiateWeapon(carriedBuild.Platform, firstPerson: false),
+            carriedBuild);
+        return visual;
+    }
+
+    public static Node3D InstantiateWorldWeapon(WeaponPlatform platform)
+    {
+        var visual = platform switch
+        {
+            WeaponPlatform.GSh18 => InstantiateGsh18(firstPerson: false).Root,
+            WeaponPlatform.DesertEagle => InstantiateDesertEagle(firstPerson: false).Root,
+            _ => InstantiateWeapon(platform, firstPerson: false).Root
+        };
+        visual.Name = $"AuthoredWorld{platform}Weapon";
+        visual.RotationDegrees = platform switch
+        {
+            WeaponPlatform.GSh18 or WeaponPlatform.DesertEagle => Vector3.Zero,
+            _ => new Vector3(-90.0f, 0.0f, 0.0f)
+        };
+        visual.Scale = Vector3.One * 0.92f;
+        var muzzle = new Marker3D
+        {
+            Name = "WeaponMuzzle",
+            Position = new Vector3(0.0f, WorldWeaponLength(platform), 0.0f)
+        };
+        visual.AddChild(muzzle);
         return visual;
     }
 
@@ -484,6 +533,45 @@ internal static class CombatModelLibrary
 
     public static CombatModelInspection InspectWeapon()
         => Inspect(WeaponScenePath, WeaponNodes);
+
+    public static CombatModelInspection InspectWeapon(WeaponPlatform platform)
+        => platform switch
+        {
+            WeaponPlatform.GSh18 => InspectGsh18(),
+            WeaponPlatform.DesertEagle => InspectDesertEagle(),
+            _ => Inspect(
+                WeaponScenePathFor(platform),
+                platform == WeaponPlatform.M4A1 ? WeaponNodes : PlatformWeaponNodes)
+        };
+
+    internal static string WeaponScenePathFor(WeaponPlatform platform)
+        => platform switch
+        {
+            WeaponPlatform.M4A1 => WeaponScenePath,
+            WeaponPlatform.GSh18 => Gsh18ScenePath,
+            WeaponPlatform.DesertEagle => DesertEagleScenePath,
+            WeaponPlatform.AK74 => $"{WeaponPlatformRoot}/ak74.glb",
+            WeaponPlatform.ScarL => $"{WeaponPlatformRoot}/scarl.glb",
+            WeaponPlatform.M24 => $"{WeaponPlatformRoot}/m24.glb",
+            WeaponPlatform.MP5A5 => $"{WeaponPlatformRoot}/mp5a5.glb",
+            WeaponPlatform.M3A1 => $"{WeaponPlatformRoot}/m3a1.glb",
+            WeaponPlatform.AXMC => $"{WeaponPlatformRoot}/axmc.glb",
+            WeaponPlatform.AWM => $"{WeaponPlatformRoot}/awm.glb",
+            WeaponPlatform.VSS => $"{WeaponPlatformRoot}/vss.glb",
+            WeaponPlatform.P226 => $"{WeaponPlatformRoot}/p226.glb",
+            WeaponPlatform.M1911 => $"{WeaponPlatformRoot}/m1911.glb",
+            _ => WeaponScenePath
+        };
+
+    private static float WorldWeaponLength(WeaponPlatform platform)
+        => platform switch
+        {
+            WeaponPlatform.M24 or WeaponPlatform.AXMC or WeaponPlatform.AWM => 1.8f,
+            WeaponPlatform.AK74 or WeaponPlatform.ScarL or WeaponPlatform.VSS => 1.45f,
+            WeaponPlatform.MP5A5 or WeaponPlatform.M3A1 => 1.1f,
+            WeaponPlatform.P226 or WeaponPlatform.M1911 or WeaponPlatform.GSh18 or WeaponPlatform.DesertEagle => 0.75f,
+            _ => 1.35f
+        };
 
     public static CombatModelInspection InspectOperator()
     {

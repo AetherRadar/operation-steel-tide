@@ -4,6 +4,13 @@
 
 The Steel Tide M4A1 and operator models are generated from `scripts/blender/generate_combat_models.py`. Their editable `.blend` sources are tracked under `source_art/combat_models/`. They contain no copied third-party geometry or textures and are covered by the repository's root MIT license, subject to the disclosure in `docs/CONTENT_PROVENANCE.md`.
 
+The firearm platform set under `weapon_platforms/` (AK-74N, SCAR-L, M24, MP5A5,
+M3A1, AXMC, AWM, VSS, P226, and M1911) is also authored in Blender by this
+project. The checked-in `.glb` exports and editable `.blend` sources are generated
+by `scripts/blender/generate_weapon_platform_models.py`; they contain no copied
+third-party geometry or textures and are covered by the repository's root MIT
+license.
+
 ## Poly Haven CC0 models
 
 The following models are from [Poly Haven](https://polyhaven.com/) and are dedicated to the public domain under CC0:
