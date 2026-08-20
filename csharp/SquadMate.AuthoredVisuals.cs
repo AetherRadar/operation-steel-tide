@@ -19,6 +19,25 @@ public partial class SquadMate
             ? _authoredOperatorAnimator.AnimationCount
             : 0;
 
+    internal void SetAuthoredMovementPoseForDiagnostics(float speed)
+    {
+        if (!UsesAuthoredOperatorForDiagnostics)
+        {
+            return;
+        }
+        _authoredOperatorVisual.SetWeaponVisible(true);
+        _authoredOperatorVisual.SetWeaponReadied(true);
+        _authoredOperatorAnimator.Update(
+            1.0f,
+            speed,
+            prone: false,
+            crouched: false,
+            aiming: true,
+            downed: false,
+            reviving: false,
+            dead: false);
+    }
+
     private void AttachAuthoredOperatorVisual()
     {
         AuthoredOperatorVisual? authoredOperator = null;

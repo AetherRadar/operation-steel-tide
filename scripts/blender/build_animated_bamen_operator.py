@@ -443,9 +443,13 @@ def author_aim_locomotion(
         bone for bone in armature.pose.bones
         if bone == upper_root or upper_root in bone.parent_recursive
     ]
-    upper_bones.sort(key=lambda bone: len(bone.parent_recursive))
+    hierarchy = sorted(
+        armature.pose.bones,
+        key=lambda bone: len(bone.parent_recursive),
+    )
+    upper_bone_names = {bone.name for bone in upper_bones}
     aim_local_matrices = {
-        bone.name: bone.parent.matrix.inverted() @ bone.matrix
+        bone.name: local_pose_matrix(bone)
         for bone in upper_bones
     }
 
@@ -456,17 +460,25 @@ def author_aim_locomotion(
         armature.animation_data.action = locomotion
         bpy.context.scene.frame_set(frame)
         bpy.context.view_layer.update()
-        locomotion_matrices = {
-            bone.name: bone.matrix.copy()
+        locomotion_local_matrices = {
+            bone.name: local_pose_matrix(bone)
             for bone in armature.pose.bones
         }
 
         armature.animation_data.action = action
         reset_pose(armature)
-        for bone in armature.pose.bones:
-            bone.matrix = locomotion_matrices[bone.name]
-        for bone in upper_bones:
-            bone.matrix = bone.parent.matrix @ aim_local_matrices[bone.name]
+        bpy.context.view_layer.update()
+        for bone in hierarchy:
+            local_matrix = (
+                aim_local_matrices[bone.name]
+                if bone.name in upper_bone_names
+                else locomotion_local_matrices[bone.name]
+            )
+            bone.matrix = (
+                bone.parent.matrix @ local_matrix
+                if bone.parent is not None
+                else local_matrix
+            )
         bpy.context.view_layer.update()
         for bone in armature.pose.bones:
             bone.keyframe_insert(data_path="location", frame=frame, group=bone.name)
@@ -475,6 +487,14 @@ def author_aim_locomotion(
     action["loop"] = True
     reset_pose(armature)
     return action
+
+
+def local_pose_matrix(bone: bpy.types.PoseBone) -> Matrix:
+    return (
+        bone.parent.matrix.inverted() @ bone.matrix
+        if bone.parent is not None
+        else bone.matrix.copy()
+    )
 
 
 def add_socket(

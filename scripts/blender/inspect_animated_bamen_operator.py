@@ -18,8 +18,12 @@ POSES = (
     ("walk", 10),
     ("run", 6),
     ("sprint", 5),
+    ("aim_walk", 10),
+    ("aim_run", 6),
+    ("aim_sprint", 5),
     ("crouch_idle", 18),
     ("crouch_walk", 15),
+    ("aim_crouch_walk", 15),
     ("prone_idle", 20),
     ("prone_crawl", 12),
     ("hit", 5),
@@ -54,7 +58,7 @@ def setup_scene() -> tuple[bpy.types.Object, bpy.types.Object]:
     armature = next(obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE")
     mesh = next(obj for obj in bpy.context.scene.objects if obj.type == "MESH")
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE"
+    scene.render.engine = "BLENDER_EEVEE_NEXT"
     scene.render.resolution_x = 480
     scene.render.resolution_y = 480
     scene.render.resolution_percentage = 100

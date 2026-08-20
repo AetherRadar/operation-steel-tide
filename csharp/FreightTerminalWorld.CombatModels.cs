@@ -14,6 +14,8 @@ public partial class FreightTerminalWorld
         var weaponSocketPosition = Vector3.Zero;
         var backWeaponSocketPosition = Vector3.Zero;
         var rifleFit = default(OperatorRifleFitInspection);
+        var movementRifleFits = new System.Collections.Generic.List<string>();
+        var movementRifleFitValid = true;
         var count = 0;
         try
         {
@@ -60,6 +62,25 @@ public partial class FreightTerminalWorld
             visual.AnimationPlayer.Seek(0.0, update: true);
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             rifleFit = visual.InspectRifleFit();
+            foreach (var (animation, time) in new[]
+            {
+                ("aim_walk", 0.33),
+                ("aim_run", 0.2),
+                ("aim_sprint", 0.17),
+                ("aim_crouch_walk", 0.5)
+            })
+            {
+                visual.AnimationPlayer.Play(animation, 0.0);
+                visual.AnimationPlayer.Seek(time, update: true);
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                var movementFit = visual.InspectRifleFit();
+                var handsFit = movementFit.PrimaryHandDistance <= 0.025f
+                    && movementFit.SupportHandDistance <= 0.16f;
+                movementRifleFitValid &= handsFit;
+                movementRifleFits.Add(
+                    $"{animation}:{handsFit}:primary={movementFit.PrimaryHandDistance:F3}:"
+                    + $"support={movementFit.SupportHandDistance:F3}:muzzle={movementFit.MuzzleOffset}");
+            }
         }
         catch (System.Exception exception)
         {
@@ -74,12 +95,17 @@ public partial class FreightTerminalWorld
             "revived", "death"
         };
         var transitionsValid = transitions.SequenceEqual(expected);
-        var valid = count == 18 && sockets && transitionsValid && rifleFit.Valid;
+        var valid = count == 18
+            && sockets
+            && transitionsValid
+            && rifleFit.Valid
+            && movementRifleFitValid;
         GD.Print(
             $"OPERATOR_ANIMATIONS_CHECK count={count} sockets={sockets} "
             + $"weapon_socket={weaponSocketPosition} back_socket={backWeaponSocketPosition} "
             + $"rifle_fit={rifleFit.Valid} primary_hand={rifleFit.PrimaryHandDistance:F3} "
             + $"support_hand={rifleFit.SupportHandDistance:F3} "
+            + $"movement_rifle_fit={string.Join(',', movementRifleFits)} "
             + $"muzzle_offset={rifleFit.MuzzleOffset} stock_offset={rifleFit.StockOffset} "
             + $"transitions={string.Join('>', transitions)} expected={string.Join('>', expected)}");
         GD.Print($"OPERATOR_ANIMATIONS_PASS valid={valid}");

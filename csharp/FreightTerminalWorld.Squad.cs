@@ -3395,6 +3395,7 @@ public partial class FreightTerminalWorld
             captureCenter + new Vector3(0.0f, 0.0f, 1.25f)
         };
         var staged = _squadMates.OrderBy(mate => mate.SquadSlot).ToArray();
+        var stagedSpeeds = new[] { 1.8f, 3.4f, 5.2f };
         for (var i = 0; i < staged.Length && i < stagedPositions.Length; i++)
         {
             staged[i].GlobalPosition = stagedPositions[i];
@@ -3403,6 +3404,7 @@ public partial class FreightTerminalWorld
                 new Vector3(captureCamera.GlobalPosition.X, stagedPositions[i].Y, captureCamera.GlobalPosition.Z),
                 Vector3.Up);
             staged[i].ProcessMode = ProcessModeEnum.Disabled;
+            staged[i].SetAuthoredMovementPoseForDiagnostics(stagedSpeeds[i]);
         }
         _player.ConfigureRole(OperatorRole.Medic);
         if (staged.Length > 1)
