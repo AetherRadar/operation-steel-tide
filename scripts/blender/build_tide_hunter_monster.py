@@ -11,6 +11,7 @@ import bpy
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_GLB = REPO_ROOT / "assets/models/tide_hunter_monster/tide_hunter_monster.glb"
 OUTPUT_BLEND = REPO_ROOT / "source_art/third_party/tide_hunter_monster/tide_hunter_monster.blend"
+OUTPUT_TEXTURE_DIR = OUTPUT_GLB.parent
 TEXTURE_NAMES = {
     "albedo": "test_StingrayPBS1SG_AlbedoTransparency.png",
     "metallic": "test_StingrayPBS1SG_MetallicSmoothness.png",
@@ -124,11 +125,26 @@ def load_texture(path: Path, colorspace: str) -> bpy.types.Image:
     return image
 
 
+def export_texture(image: bpy.types.Image, source_name: str) -> None:
+    OUTPUT_TEXTURE_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = OUTPUT_TEXTURE_DIR / f"tide_hunter_monster_{source_name}"
+    source_path = image.filepath_raw
+    source_format = image.file_format
+    image.filepath_raw = str(output_path)
+    image.file_format = "PNG"
+    image.save()
+    image.filepath_raw = source_path
+    image.file_format = source_format
+
+
 def build_material(source_dir: Path) -> bpy.types.Material:
     texture_dir = source_dir / "UnityTexture"
     albedo = load_texture(texture_dir / TEXTURE_NAMES["albedo"], "sRGB")
     metallic_smoothness = load_texture(texture_dir / TEXTURE_NAMES["metallic"], "Non-Color")
     normal = load_texture(texture_dir / TEXTURE_NAMES["normal"], "Non-Color")
+    export_texture(albedo, TEXTURE_NAMES["albedo"])
+    export_texture(metallic_smoothness, TEXTURE_NAMES["metallic"])
+    export_texture(normal, TEXTURE_NAMES["normal"])
 
     material = bpy.data.materials.new("TideHunterPBR")
     material.use_nodes = True

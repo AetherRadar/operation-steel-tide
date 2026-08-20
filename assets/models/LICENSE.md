@@ -75,7 +75,7 @@ The roaming Boss uses **3D Horror Game Monster** by HorrorGameMaker.com:
 - Source: https://opengameart.org/content/3d-horror-game-monster
 - License: CC0 / Public Domain, as marked on the source page
 - Acquisition date: 2026-08-20
-- Local asset: `tide_hunter_monster/tide_hunter_monster.glb`
+- Local asset: `tide_hunter_monster/tide_hunter_monster.glb` with its three tracked `tide_hunter_monster_test_StingrayPBS1SG_*.png` PBR maps
 - Editable packed source and reproducible cleanup script: `source_art/third_party/tide_hunter_monster/tide_hunter_monster.blend` and `scripts/blender/build_tide_hunter_monster.py`
 
 The Boss is a single skinned mesh with embedded PBR maps and `idle`, `walk`, and `run` actions. Credit is retained as courtesy.
