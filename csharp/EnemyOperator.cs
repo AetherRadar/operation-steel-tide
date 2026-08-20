@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -507,21 +506,18 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             WeaponPlatform.M3A1 => 0.135f,
             _ => 0.13f
         };
-        if (!UsesAuthoredOperatorForDiagnostics)
-        {
-            RigPart(
-                _carriedWeaponRoot,
-                Box(new Vector3(receiverWidth, 0.14f, carriedDefinition.ReceiverLength)),
-                new Vector3(0, 1.23f, -0.22f - carriedDefinition.ReceiverLength * 0.5f),
-                gun);
-            RigPart(_carriedWeaponRoot, Box(new Vector3(0.16f, 0.13f, 0.22f)), new Vector3(0, 1.22f, -0.21f), gun);
-            RigPart(_carriedWeaponRoot, Box(new Vector3(0.09f, 0.27f, 0.13f)), new Vector3(0, 1.07f, -0.39f), gun, new Vector3(-0.2f, 0, 0));
-            RigPart(_carriedWeaponRoot, Cylinder(0.028f, carriedBarrelLength), new Vector3(0, 1.23f, -0.55f - carriedBarrelLength * 0.5f), gun, new Vector3(Mathf.Pi / 2, 0, 0));
-            RigPart(_carriedWeaponRoot, Cylinder(0.045f, 0.13f), new Vector3(0, 1.23f, -0.62f - carriedBarrelLength), gun, new Vector3(Mathf.Pi / 2, 0, 0));
-            RigPart(_carriedWeaponRoot, Box(new Vector3(0.11f, 0.1f, 0.13f)), new Vector3(0, 1.36f, -0.43f), gun);
-            RigPart(_carriedWeaponRoot, Cylinder(0.036f, 0.03f), new Vector3(0, 1.36f, -0.51f), lens, new Vector3(Mathf.Pi / 2, 0, 0));
-            RigPart(_carriedWeaponRoot, Box(new Vector3(0.14f, 0.16f, 0.28f)), new Vector3(0, 1.23f, -0.02f), armorEdge);
-        }
+        RigPart(
+            _carriedWeaponRoot,
+            Box(new Vector3(receiverWidth, 0.14f, carriedDefinition.ReceiverLength)),
+            new Vector3(0, 1.23f, -0.22f - carriedDefinition.ReceiverLength * 0.5f),
+            gun);
+        RigPart(_carriedWeaponRoot, Box(new Vector3(0.16f, 0.13f, 0.22f)), new Vector3(0, 1.22f, -0.21f), gun);
+        RigPart(_carriedWeaponRoot, Box(new Vector3(0.09f, 0.27f, 0.13f)), new Vector3(0, 1.07f, -0.39f), gun, new Vector3(-0.2f, 0, 0));
+        RigPart(_carriedWeaponRoot, Cylinder(0.028f, carriedBarrelLength), new Vector3(0, 1.23f, -0.55f - carriedBarrelLength * 0.5f), gun, new Vector3(Mathf.Pi / 2, 0, 0));
+        RigPart(_carriedWeaponRoot, Cylinder(0.045f, 0.13f), new Vector3(0, 1.23f, -0.62f - carriedBarrelLength), gun, new Vector3(Mathf.Pi / 2, 0, 0));
+        RigPart(_carriedWeaponRoot, Box(new Vector3(0.11f, 0.1f, 0.13f)), new Vector3(0, 1.36f, -0.43f), gun);
+        RigPart(_carriedWeaponRoot, Cylinder(0.036f, 0.03f), new Vector3(0, 1.36f, -0.51f), lens, new Vector3(Mathf.Pi / 2, 0, 0));
+        RigPart(_carriedWeaponRoot, Box(new Vector3(0.14f, 0.16f, 0.28f)), new Vector3(0, 1.23f, -0.02f), armorEdge);
 
         _muzzle = new Marker3D { Position = new Vector3(0, 1.23f, -0.72f - carriedBarrelLength) };
         _carriedWeaponRoot.AddChild(_muzzle);
