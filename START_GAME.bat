@@ -18,6 +18,20 @@ if not exist "%GODOT%" (
   pause
   exit /b 1
 )
+where dotnet.exe >nul 2>&1
+if errorlevel 1 (
+  echo .NET SDK was not found. Install .NET 8 SDK or add dotnet.exe to PATH.
+  pause
+  exit /b 1
+)
+echo Updating the C# game assembly...
+dotnet build "%PROJECT%\OperationSteelTide.csproj" --nologo --verbosity minimal
+if errorlevel 1 (
+  echo.
+  echo The C# game assembly could not be updated.
+  pause
+  exit /b 1
+)
 if not exist "%STEEL_TIDE_SERVER%" (
   where go.exe >nul 2>&1
   if not errorlevel 1 (
