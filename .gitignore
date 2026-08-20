@@ -15,6 +15,7 @@
 /steel-tide-server.exe*
 /build/
 /dist/
+__pycache__/
 
 /*_validation.png
 /*_frame.png
