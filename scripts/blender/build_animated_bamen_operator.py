@@ -75,9 +75,17 @@ ACTION_SOURCES = {
 }
 
 
+AIM_LOCOMOTION_SOURCES = {
+    "aim_walk": "walk",
+    "aim_run": "run",
+    "aim_sprint": "sprint",
+    "aim_crouch_walk": "crouch_walk",
+}
+
+
 LOOP_ACTIONS = {
     name for name, (_, _, loop) in ACTION_SOURCES.items() if loop
-} | {"prone_idle", "prone_crawl", "downed"}
+} | set(AIM_LOCOMOTION_SOURCES) | {"prone_idle", "prone_crawl", "downed"}
 
 
 def require_file(path: Path) -> None:
@@ -421,6 +429,54 @@ def author_rifle_aim_hold(
     return action
 
 
+def author_aim_locomotion(
+    armature: bpy.types.Object,
+    locomotion: bpy.types.Action,
+    aim_hold: bpy.types.Action,
+    output_name: str,
+) -> bpy.types.Action:
+    armature.animation_data.action = aim_hold
+    bpy.context.scene.frame_set(int(math.floor(aim_hold.frame_range[0])))
+    bpy.context.view_layer.update()
+    upper_root = armature.pose.bones["mixamorig:Spine"]
+    upper_bones = [
+        bone for bone in armature.pose.bones
+        if bone == upper_root or upper_root in bone.parent_recursive
+    ]
+    upper_bones.sort(key=lambda bone: len(bone.parent_recursive))
+    aim_local_matrices = {
+        bone.name: bone.parent.matrix.inverted() @ bone.matrix
+        for bone in upper_bones
+    }
+
+    action = bpy.data.actions.new(output_name)
+    start = int(math.floor(locomotion.frame_range[0]))
+    end = int(math.ceil(locomotion.frame_range[1]))
+    for frame in range(start, end + 1):
+        armature.animation_data.action = locomotion
+        bpy.context.scene.frame_set(frame)
+        bpy.context.view_layer.update()
+        locomotion_matrices = {
+            bone.name: bone.matrix.copy()
+            for bone in armature.pose.bones
+        }
+
+        armature.animation_data.action = action
+        reset_pose(armature)
+        for bone in armature.pose.bones:
+            bone.matrix = locomotion_matrices[bone.name]
+        for bone in upper_bones:
+            bone.matrix = bone.parent.matrix @ aim_local_matrices[bone.name]
+        bpy.context.view_layer.update()
+        for bone in armature.pose.bones:
+            bone.keyframe_insert(data_path="location", frame=frame, group=bone.name)
+            bone.keyframe_insert(data_path="rotation_quaternion", frame=frame, group=bone.name)
+
+    action["loop"] = True
+    reset_pose(armature)
+    return action
+
+
 def add_socket(
     armature: bpy.types.Object,
     name: str,
@@ -527,6 +583,13 @@ def main() -> None:
             output_name,
         )
     generated["aim_idle"] = author_rifle_aim_hold(target, generated["aim_idle"])
+    for output_name, source_name in AIM_LOCOMOTION_SOURCES.items():
+        generated[output_name] = author_aim_locomotion(
+            target,
+            generated[source_name],
+            generated["aim_idle"],
+            output_name,
+        )
     ground_action(target, target_mesh, generated["prone_idle"])
     ground_action(target, target_mesh, generated["prone_crawl"])
     stale_prone_idle = generated["prone_idle"]

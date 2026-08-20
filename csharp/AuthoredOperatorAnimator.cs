@@ -9,6 +9,7 @@ internal sealed class AuthoredOperatorAnimator
     private static readonly string[] RequiredAnimations =
     {
         "idle", "walk", "run", "sprint", "crouch_idle", "crouch_walk",
+        "aim_walk", "aim_run", "aim_sprint", "aim_crouch_walk",
         "prone_idle", "prone_crawl", "aim_idle", "hit", "death", "downed",
         "revive_kneel", "revived"
     };
@@ -16,12 +17,14 @@ internal sealed class AuthoredOperatorAnimator
     private static readonly HashSet<string> LoopingAnimations = new(StringComparer.Ordinal)
     {
         "idle", "walk", "run", "sprint", "crouch_idle", "crouch_walk",
+        "aim_walk", "aim_run", "aim_sprint", "aim_crouch_walk",
         "prone_idle", "prone_crawl", "aim_idle", "downed", "revive_kneel"
     };
 
     private readonly AnimationPlayer _player;
     private string _current = string.Empty;
     private float _overrideRemaining;
+    private float _hitCooldownRemaining;
 
     public AuthoredOperatorAnimator(AuthoredOperatorVisual visual)
     {
@@ -57,6 +60,7 @@ internal sealed class AuthoredOperatorAnimator
         bool reviving,
         bool dead)
     {
+        _hitCooldownRemaining = Mathf.Max(0.0f, _hitCooldownRemaining - delta);
         if (_overrideRemaining > 0.0f && !dead && !downed)
         {
             _overrideRemaining = Mathf.Max(0.0f, _overrideRemaining - delta);
@@ -88,7 +92,9 @@ internal sealed class AuthoredOperatorAnimator
         }
         else if (crouched)
         {
-            next = moving ? "crouch_walk" : "crouch_idle";
+            next = moving
+                ? aiming ? "aim_crouch_walk" : "crouch_walk"
+                : aiming ? "aim_idle" : "crouch_idle";
             playbackSpeed = moving ? Mathf.Clamp(speed / 2.4f, 0.72f, 1.4f) : 1.0f;
         }
         else if (!moving)
@@ -97,24 +103,32 @@ internal sealed class AuthoredOperatorAnimator
         }
         else if (speed >= 4.5f)
         {
-            next = "sprint";
+            next = aiming ? "aim_sprint" : "sprint";
             playbackSpeed = Mathf.Clamp(speed / 5.2f, 0.78f, 1.35f);
         }
         else if (speed >= 2.75f)
         {
-            next = "run";
+            next = aiming ? "aim_run" : "run";
             playbackSpeed = Mathf.Clamp(speed / 3.6f, 0.78f, 1.35f);
         }
         else
         {
-            next = "walk";
+            next = aiming ? "aim_walk" : "walk";
             playbackSpeed = Mathf.Clamp(speed / 2.1f, 0.72f, 1.35f);
         }
         Play(next, playbackSpeed);
     }
 
-    public void PlayHit()
-        => PlayOverride("hit", 0.28f);
+    public bool PlayHit()
+    {
+        if (_hitCooldownRemaining > 0.0f)
+        {
+            return false;
+        }
+        _hitCooldownRemaining = 0.62f;
+        PlayOverride("hit", 0.22f);
+        return true;
+    }
 
     public void PlayRevived()
         => PlayOverride("revived", 1.15f);

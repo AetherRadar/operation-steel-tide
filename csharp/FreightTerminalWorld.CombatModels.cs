@@ -31,8 +31,12 @@ public partial class FreightTerminalWorld
             Sample(1.8f, false, false, false, false, false, false);
             Sample(3.4f, false, false, false, false, false, false);
             Sample(5.2f, false, false, false, false, false, false);
+            Sample(1.8f, false, false, true, false, false, false);
+            Sample(3.4f, false, false, true, false, false, false);
+            Sample(5.2f, false, false, true, false, false, false);
             Sample(0.0f, false, true, false, false, false, false);
             Sample(1.5f, false, true, false, false, false, false);
+            Sample(1.5f, false, true, true, false, false, false);
             Sample(0.0f, true, false, true, false, false, false);
             Sample(1.1f, true, false, true, false, false, false);
             Sample(0.0f, false, false, false, false, true, false);
@@ -41,6 +45,7 @@ public partial class FreightTerminalWorld
             transitions.Add(animator.CurrentAnimation);
             animator.PlayRevived();
             transitions.Add(animator.CurrentAnimation);
+            animator.Update(0.7f, 0.0f, false, false, false, false, false, false);
             Sample(0.0f, false, false, false, false, false, true);
             sockets = IsInstanceValid(visual.WeaponSocket)
                 && IsInstanceValid(visual.BackWeaponSocket)
@@ -63,12 +68,13 @@ public partial class FreightTerminalWorld
 
         var expected = new[]
         {
-            "idle", "aim_idle", "walk", "run", "sprint", "crouch_idle", "crouch_walk",
+            "idle", "aim_idle", "walk", "run", "sprint", "aim_walk", "aim_run", "aim_sprint",
+            "crouch_idle", "crouch_walk", "aim_crouch_walk",
             "prone_idle", "prone_crawl", "revive_kneel", "downed", "hit",
             "revived", "death"
         };
         var transitionsValid = transitions.SequenceEqual(expected);
-        var valid = count == 14 && sockets && transitionsValid && rifleFit.Valid;
+        var valid = count == 18 && sockets && transitionsValid && rifleFit.Valid;
         GD.Print(
             $"OPERATOR_ANIMATIONS_CHECK count={count} sockets={sockets} "
             + $"weapon_socket={weaponSocketPosition} back_socket={backWeaponSocketPosition} "
@@ -127,8 +133,9 @@ public partial class FreightTerminalWorld
         var squadAuthored = _squadMates.Count > 0
             && _squadMates.Where(IsInstanceValid).All(mate => mate.UsesAuthoredOperatorForDiagnostics);
         var livingEnemies = _enemies.Where(IsInstanceValid).ToArray();
-        var enemiesAuthored = livingEnemies.Length > 0
-            && livingEnemies.All(enemy => enemy.UsesAuthoredOperatorForDiagnostics);
+        var humanEnemies = livingEnemies.Where(enemy => !enemy.IsWorldBoss).ToArray();
+        var enemiesAuthored = humanEnemies.Length > 0
+            && humanEnemies.All(enemy => enemy.UsesAuthoredOperatorForDiagnostics);
         var garrison = livingEnemies.FirstOrDefault(enemy => !enemy.IsRivalSquad && !enemy.IsWorldBoss);
         var rivals = livingEnemies.Where(enemy => enemy.IsRivalSquad).ToArray();
         var garrisonColor = garrison?.AuthoredTeamColorForDiagnostics ?? Colors.Transparent;
