@@ -45,6 +45,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             _muzzle.Visible = false;
         }
+        SetAuthoredWeaponVisible(false);
     }
 
     public void GrantFireablePrimaryForDiagnostics()
@@ -54,6 +55,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             _weapon.Visible = true;
         }
+        SetAuthoredWeaponVisible(true);
     }
 
     /// <summary>Production path: equip a weapon taken from a world loot source.</summary>
@@ -72,11 +74,13 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             _muzzle.Visible = true;
         }
+        SetAuthoredWeaponVisible(true);
         return HasFireablePrimary;
     }
 
     private readonly RandomNumberGenerator _rng = new();
     private Node3D _rig = null!;
+    private CollisionShape3D _collider = null!;
     private Node3D _weapon = null!;
     private Node3D _roleDevice = null!;
     private Marker3D _muzzle = null!;
@@ -342,7 +346,11 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
                 Velocity = new Vector3(0.0f, -12.0f, 0.0f);
                 MoveAndSlide();
             }
-            _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
+            if (!UsesAuthoredOperatorForDiagnostics)
+            {
+                _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
+            }
+            AnimateRig(dt);
             UpdateLabel();
             return;
         }
@@ -728,6 +736,16 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
     public Vector3 HitPoint(HitRegion region)
     {
+        if (IsDowned)
+        {
+            var downedHeight = region switch
+            {
+                HitRegion.Head => 0.58f,
+                HitRegion.Torso => 0.42f,
+                _ => 0.22f
+            };
+            return GlobalPosition + Vector3.Up * downedHeight;
+        }
         var height = region switch
         {
             HitRegion.Head => 1.7f,
@@ -788,7 +806,11 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         IsDowned = true;
         Velocity = Vector3.Zero;
         OnCombatIncapacitated();
-        _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
+        if (!UsesAuthoredOperatorForDiagnostics)
+        {
+            _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
+        }
+        UpdateAuthoredStanceCollider();
         UpdateLabel();
         CommitAuthoritativeRemoteCombatState();
         Main.OnSquadMateDowned(this);
@@ -821,6 +843,11 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         CommitAuthoritativeRemoteCombatState();
         ResetMovementProgress();
         _rig.Rotation = Vector3.Zero;
+        if (UsesAuthoredOperatorForDiagnostics)
+        {
+            _authoredOperatorAnimator.PlayRevived();
+        }
+        UpdateAuthoredStanceCollider();
         UpdateHealthVisual();
         UpdateLabel();
         return true;
@@ -891,11 +918,12 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
     private void BuildOperator()
     {
-        AddChild(new CollisionShape3D
+        _collider = new CollisionShape3D
         {
             Position = new Vector3(0.0f, 0.88f, 0.0f),
             Shape = new CapsuleShape3D { Radius = 0.37f, Height = 1.76f }
-        });
+        };
+        AddChild(_collider);
         _rig = new Node3D { Name = "FriendlyOperatorRig" };
         AddChild(_rig);
         _weapon = new Node3D { Name = "SquadRifle" };
@@ -945,6 +973,14 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         _weapon.AddChild(_muzzle);
         HasFireablePrimary = true;
         _weapon.Visible = true;
+        if (UsesAuthoredOperatorForDiagnostics)
+        {
+            foreach (var mesh in CombatModelLibrary.MeshesBelow(_weapon))
+            {
+                mesh.Visible = false;
+            }
+            SetAuthoredWeaponVisible(true);
+        }
 
         _nameLabel = new Label3D
         {
@@ -992,6 +1028,24 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     private void AnimateRig(float delta)
     {
         var speed = new Vector2(Velocity.X, Velocity.Z).Length();
+        UpdateRevivePose(delta);
+        if (UsesAuthoredOperatorForDiagnostics)
+        {
+            _authoredOperatorVisual.SetWeaponReadied(
+                HasFireablePrimary && !IsDowned && _revivePoseBlend <= 0.5f);
+            _authoredOperatorAnimator.Update(
+                delta,
+                speed,
+                prone: false,
+                crouched: false,
+                aiming: HasFireablePrimary,
+                downed: IsDowned,
+                reviving: _revivePoseBlend > 0.5f,
+                dead: false);
+            UpdateAuthoredStanceCollider();
+            UpdateHealthVisual();
+            return;
+        }
         _animationPhase += delta * (4.0f + speed * 1.5f);
         if (!IsDowned)
         {
@@ -999,7 +1053,6 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             position.Y = Mathf.Lerp(position.Y, Mathf.Sin(_animationPhase * 2.0f) * 0.012f * Mathf.Clamp(speed, 0.0f, 1.0f), delta * 9.0f);
             _rig.Position = position;
         }
-        UpdateRevivePose(delta);
         UpdateHealthVisual();
     }
 
@@ -1014,6 +1067,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             && GlobalPosition.DistanceTo(reviveTargetNode.GlobalPosition) < 2.4f;
         _revivePoseBlend = Mathf.MoveToward(_revivePoseBlend, kneeling ? 1.0f : 0.0f, delta * 5.0f);
         if (!IsInstanceValid(_rig))
+        {
+            return;
+        }
+        if (UsesAuthoredOperatorForDiagnostics)
         {
             return;
         }

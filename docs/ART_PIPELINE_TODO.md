@@ -6,13 +6,14 @@ This list tracks the remaining replacement of programmer art with redistributabl
 
 - [x] Add a CC BY 4.0 tactical soldier as the deployment and backpack operator preview.
 - [x] Retain the original FBX, a cleaned Blender source, and a reproducible GLB import script.
-- [ ] Download a CC0 animation library and archive its license evidence.
-- [ ] Retarget idle, walk, run, crouch, aim, hit, revive, and death clips to the Mixamo-compatible rig in Blender.
-- [ ] Replace the neutral preview stance with a relaxed weapon-ready idle after retargeting is stable.
-- [ ] Add named right-hand weapon, back weapon, head, vest, backpack, and team-patch sockets to the Blender rig.
+- [x] Download the Quaternius CC0 animation libraries and archive their license evidence.
+- [x] Retarget idle, walk, run, crouch, aim, hit, revive, and death clips to the Mixamo-compatible rig in Blender.
+- [x] Add authored prone crawl, downed hold, revive recovery, and per-frame map grounding in Blender.
+- [x] Replace the neutral preview stance with a relaxed authored idle after retargeting is stable.
+- [x] Add named right-hand weapon, back weapon, head, vest, backpack, and team-patch sockets to the Blender rig.
 - [ ] Split or mask authored equipment so helmet, armor, and backpack selections remain visually distinct.
-- [ ] Build a Godot adapter scene that exposes the existing operator node contract without vendor-specific names in gameplay code.
-- [ ] Replace friendly and hostile field operators only after animation, sockets, hit regions, and collision alignment pass `--validate-squad`, `--validate-stance-armor`, and `--validate-combat-models`.
+- [x] Build a vendor-neutral Godot animation adapter and retain procedural fallback behavior for asset-load failures.
+- [x] Replace friendly and hostile field operators; validate animation, sockets, hit regions, collision alignment, squad behavior, and map traversal.
 - [ ] Produce at least two additional redistributable operator silhouettes to reduce clone repetition.
 
 ## First-person and vehicles
@@ -32,5 +33,6 @@ This list tracks the remaining replacement of programmer art with redistributabl
 ## Review gates
 
 - [ ] Capture deployment, backpack, squad, enemy, and extraction frames at representative camera distances after each asset batch.
-- [ ] Inspect deformation, clipping, sockets, collision alignment, material response, shadows, draw calls, and texture memory in Godot.
+- [x] Inspect Blender deformation, clipping, socket presence, collision dimensions, material response, and animation action coverage.
+- [x] Verify Godot crowd, squad, stairs, residential, skybridge, skylink, vehicle, and general performance diagnostics with the animated operator.
 - [ ] Confirm all imported files remain redistributable in this public repository before every push.

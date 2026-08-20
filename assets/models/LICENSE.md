@@ -67,3 +67,20 @@ The deployment-preview character is **FREE [Military Soldier] RIGGED** by BAMEN 
 - Editable and original source: `source_art/third_party/bamen_military_soldier/`
 
 The model remains credited to BAMEN and is not covered by the repository's MIT license.
+
+## Quaternius CC0 animation libraries
+
+The field-operator animation set combines the standard free exports from
+Quaternius Universal Animation Library and Universal Animation Library 2:
+
+- Creator: Quaternius (`@Quaternius`)
+- Sources: https://quaternius.itch.io/universal-animation-library and https://quaternius.itch.io/universal-animation-library-2
+- Exact license: CC0 1.0 Universal, https://creativecommons.org/publicdomain/zero/1.0/
+- Acquisition date: 2026-08-20
+- Local source exports: `source_art/third_party/quaternius_universal_animation_library/UAL1_Standard.glb` and `UAL2_Standard.glb`
+- License evidence: `source_art/third_party/quaternius_universal_animation_library/LICENSE.txt` and `UAL2_LICENSE.txt`
+- Blender output: `source_art/third_party/bamen_military_soldier/bamen_military_soldier_animated.blend` and `assets/models/bamen_military_soldier/bamen_military_soldier_animated.glb`
+
+The checked-in standard exports are the root-motion-disabled versions. The
+retargeting script keeps navigation in Godot authoritative and uses Blender
+to add prone/downed integration, recovery poses, and attachment sockets.

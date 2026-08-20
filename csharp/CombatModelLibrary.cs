@@ -83,44 +83,152 @@ internal sealed class AuthoredPreviewOperatorVisual
 
 internal sealed class AuthoredOperatorVisual
 {
+    private const float FieldWeaponScale = 0.42f;
+    private AuthoredWeaponVisual? _weapon;
+    private bool _weaponReadied;
+
     public AuthoredOperatorVisual(Node3D root)
     {
         Root = root;
-        LeftLegRig = CombatModelLibrary.RequireNode(root, "LeftLegRig");
-        RightLegRig = CombatModelLibrary.RequireNode(root, "RightLegRig");
-        Helmet = CombatModelLibrary.RequireNode(root, "Helmet");
-        Vest = CombatModelLibrary.RequireNode(root, "Vest");
-        Backpack = CombatModelLibrary.RequireNode(root, "Backpack");
-        TeamPatch = CombatModelLibrary.RequireNode(root, "TeamPatch");
+        AnimationPlayer = CombatModelLibrary.RequireAnimationPlayer(root);
+        var skeleton = CombatModelLibrary.RequireSkeleton(root);
+        WeaponSocket = CreateBoneAttachment(skeleton, "RuntimeWeaponSocket", "mixamorig:RightHand");
+        BackWeaponSocket = CreateBoneAttachment(skeleton, "RuntimeBackWeaponSocket", "mixamorig:Spine2");
+        HeadSocket = CombatModelLibrary.RequireNode(root, "HeadSocket");
+        VestSocket = CombatModelLibrary.RequireNode(root, "VestSocket");
+        BackpackSocket = CombatModelLibrary.RequireNode(root, "BackpackSocket");
+        TeamPatchSocket = CombatModelLibrary.RequireNode(root, "TeamPatchSocket");
     }
 
     public Node3D Root { get; }
-    public Node3D LeftLegRig { get; }
-    public Node3D RightLegRig { get; }
-    public Node3D Helmet { get; }
-    public Node3D Vest { get; }
-    public Node3D Backpack { get; }
-    public Node3D TeamPatch { get; }
+    public AnimationPlayer AnimationPlayer { get; }
+    public Node3D WeaponSocket { get; }
+    public Node3D BackWeaponSocket { get; }
+    public Node3D HeadSocket { get; }
+    public Node3D VestSocket { get; }
+    public Node3D BackpackSocket { get; }
+    public Node3D TeamPatchSocket { get; }
     public Color TeamColorForDiagnostics { get; private set; }
     public Color GearTintForDiagnostics { get; private set; }
     public int GearOverlayCountForDiagnostics { get; private set; }
 
+    public void AttachWeapon(AuthoredWeaponVisual weapon, WeaponBuild build)
+    {
+        _weapon = weapon;
+        weapon.Configure(build);
+        BackWeaponSocket.AddChild(weapon.Root);
+        ApplyWeaponSocketTransform(readied: false);
+    }
+
+    public void SetWeaponVisible(bool visible)
+    {
+        var weapon = _weapon;
+        if (weapon is not null && GodotObject.IsInstanceValid(weapon.Root))
+        {
+            weapon.Root.Visible = visible;
+        }
+    }
+
+    public void SetWeaponReadied(bool readied)
+    {
+        var weapon = _weapon;
+        if (weapon is null || !GodotObject.IsInstanceValid(weapon.Root) || _weaponReadied == readied)
+        {
+            return;
+        }
+        _weaponReadied = readied;
+        ApplyWeaponSocketTransform(readied);
+    }
+
+    private void ApplyWeaponSocketTransform(bool readied)
+    {
+        if (_weapon is null)
+        {
+            return;
+        }
+        var socket = readied ? WeaponSocket : BackWeaponSocket;
+        if (_weapon.Root.GetParent() != socket)
+        {
+            _weapon.Root.Reparent(socket, keepGlobalTransform: false);
+        }
+        _weapon.Root.Position = Vector3.Zero;
+        _weapon.Root.RotationDegrees = readied
+            ? new Vector3(0.0f, 90.0f, 0.0f)
+            : Vector3.Zero;
+        var socketRelativeToRoot = TransformRelativeToAncestor(socket, Root);
+        var inheritedScale = Mathf.Max(0.0001f, socketRelativeToRoot.Basis.Scale.X);
+        _weapon.Root.Scale = Vector3.One * (FieldWeaponScale / inheritedScale);
+    }
+
+    private static Transform3D TransformRelativeToAncestor(Node3D node, Node3D ancestor)
+    {
+        var result = node.Transform;
+        var parent = node.GetParent();
+        while (parent != ancestor)
+        {
+            if (parent is null)
+            {
+                throw new InvalidOperationException($"{node.Name} is not a descendant of {ancestor.Name}.");
+            }
+            if (parent is Node3D parent3D)
+            {
+                result = parent3D.Transform * result;
+            }
+            parent = parent.GetParent();
+        }
+        return result;
+    }
+
+    private static BoneAttachment3D CreateBoneAttachment(
+        Skeleton3D skeleton,
+        string name,
+        string boneName)
+    {
+        var resolvedBoneName = ResolveBoneName(skeleton, boneName);
+        if (resolvedBoneName is null)
+        {
+            throw new InvalidOperationException($"Animated operator skeleton is missing bone {boneName}.");
+        }
+        var attachment = new BoneAttachment3D
+        {
+            Name = name,
+            BoneName = resolvedBoneName
+        };
+        skeleton.AddChild(attachment);
+        return attachment;
+    }
+
+    private static StringName? ResolveBoneName(Skeleton3D skeleton, string requestedName)
+    {
+        var suffix = requestedName[(requestedName.LastIndexOf(':') + 1)..];
+        for (var index = 0; index < skeleton.GetBoneCount(); index++)
+        {
+            var candidate = skeleton.GetBoneName(index);
+            var value = candidate.ToString();
+            if (string.Equals(value, requestedName, StringComparison.OrdinalIgnoreCase)
+                || value.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
     public void SetTeamColor(Color color)
     {
         TeamColorForDiagnostics = color;
-        var patchMaterial = new StandardMaterial3D
+        var roleOverlay = new StandardMaterial3D
         {
-            AlbedoColor = color,
-            Metallic = 0.16f,
-            Roughness = 0.3f,
-            EmissionEnabled = true,
-            Emission = color.Darkened(0.35f),
-            EmissionEnergyMultiplier = 1.7f
+            AlbedoColor = new Color(color.R, color.G, color.B, 0.08f),
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            Metallic = 0.08f,
+            Roughness = 0.72f
         };
-        foreach (var mesh in CombatModelLibrary.MeshesBelow(TeamPatch))
+        foreach (var mesh in CombatModelLibrary.MeshesBelow(Root))
         {
-            mesh.MaterialOverride = patchMaterial;
+            mesh.MaterialOverlay = roleOverlay;
         }
+        ClearWeaponOverlay();
     }
 
     public void SetFactionAppearance(Color patchColor, Color gearTint)
@@ -135,13 +243,23 @@ internal sealed class AuthoredOperatorVisual
             Metallic = 0.08f,
             Roughness = 0.72f
         };
-        foreach (var part in new[] { Helmet, Vest, Backpack })
+        foreach (var mesh in CombatModelLibrary.MeshesBelow(Root))
         {
-            foreach (var mesh in CombatModelLibrary.MeshesBelow(part))
-            {
-                mesh.MaterialOverlay = gearOverlay;
-                GearOverlayCountForDiagnostics++;
-            }
+            mesh.MaterialOverlay = gearOverlay;
+            GearOverlayCountForDiagnostics += Mathf.Max(1, mesh.Mesh?.GetSurfaceCount() ?? 0);
+        }
+        ClearWeaponOverlay();
+    }
+
+    private void ClearWeaponOverlay()
+    {
+        if (_weapon is null)
+        {
+            return;
+        }
+        foreach (var mesh in CombatModelLibrary.MeshesBelow(_weapon.Root))
+        {
+            mesh.MaterialOverlay = null;
         }
     }
 }
@@ -156,7 +274,7 @@ internal readonly record struct CombatModelInspection(
 internal static class CombatModelLibrary
 {
     internal const string WeaponScenePath = "res://assets/models/steel_tide_m4a1/steel_tide_m4a1.glb";
-    internal const string OperatorScenePath = "res://assets/models/steel_tide_operator/steel_tide_operator.glb";
+    internal const string OperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier_animated.glb";
     internal const string PreviewOperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier.glb";
     internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/low-poly_gsh-18.glb";
     internal const string DesertEagleScenePath = "res://assets/models/elizion_desert_eagle/desert_eagle.glb";
@@ -168,6 +286,7 @@ internal static class CombatModelLibrary
     private const float DesertEagleFirstPersonLength = 0.82f;
     private const float DesertEaglePreviewLength = 1.05f;
     private const float OperatorPreviewHeight = 2.55f;
+    private const float AnimatedOperatorHeight = 1.86f;
     private static readonly Vector3 PreviewOperatorSourceSize = new(1.3053f, 2.1079f, 0.4252f);
     private static readonly Vector3 PreviewOperatorSourceCenter = new(0.0f, 1.04885f, 0.0258f);
 
@@ -179,8 +298,9 @@ internal static class CombatModelLibrary
 
     private static readonly string[] OperatorNodes =
     {
-        "SteelTideOperator", "LeftLegRig", "RightLegRig", "Helmet",
-        "Vest", "Backpack", "TeamPatch"
+        "BamenMilitarySoldier", "BamenMilitarySoldierRig", "BamenMilitarySoldierMesh",
+        "WeaponSocket", "BackWeaponSocket", "HeadSocket", "VestSocket",
+        "BackpackSocket", "TeamPatchSocket"
     };
 
     private static readonly string[] PreviewOperatorNodes =
@@ -212,11 +332,23 @@ internal static class CombatModelLibrary
         return new AuthoredWeaponVisual(root);
     }
 
-    public static AuthoredOperatorVisual InstantiateOperator()
+    public static AuthoredOperatorVisual InstantiateOperator(WeaponBuild? weaponBuild = null)
     {
-        var root = InstantiateRequired(OperatorScenePath, OperatorNodes);
-        root.Name = "AuthoredOperatorVisual";
-        return new AuthoredOperatorVisual(root);
+        var source = InstantiateRequired(OperatorScenePath, OperatorNodes);
+        var wrapper = new Node3D { Name = "AuthoredOperatorVisual" };
+        var sourcePresentation = new Node3D
+        {
+            Name = "AnimatedOperatorPresentation",
+            RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f),
+            Scale = Vector3.One * (AnimatedOperatorHeight / PreviewOperatorSourceSize.Y)
+        };
+        sourcePresentation.AddChild(source);
+        wrapper.AddChild(sourcePresentation);
+        var visual = new AuthoredOperatorVisual(wrapper);
+        visual.AttachWeapon(
+            InstantiateWeapon(firstPerson: false),
+            weaponBuild ?? WeaponCatalog.Build(WeaponPlatform.M4A1, 0));
+        return visual;
     }
 
     public static AuthoredPreviewOperatorVisual InstantiatePreviewOperator()
@@ -296,7 +428,28 @@ internal static class CombatModelLibrary
         => Inspect(WeaponScenePath, WeaponNodes);
 
     public static CombatModelInspection InspectOperator()
-        => Inspect(OperatorScenePath, OperatorNodes);
+    {
+        Node3D? root = null;
+        try
+        {
+            root = InstantiateOperator().Root;
+            var scale = AnimatedOperatorHeight / PreviewOperatorSourceSize.Y;
+            return new CombatModelInspection(
+                true,
+                true,
+                MeshesBelow(root).Count(),
+                CountMaterials(root),
+                PreviewOperatorSourceSize * scale);
+        }
+        catch
+        {
+            return new CombatModelInspection(false, false, 0, 0, Vector3.Zero);
+        }
+        finally
+        {
+            root?.Free();
+        }
+    }
 
     public static CombatModelInspection InspectPreviewOperator()
     {
@@ -375,6 +528,50 @@ internal static class CombatModelLibrary
         var node = FindNode(root, name);
         return node ?? throw new InvalidOperationException(
             $"Combat model {root.Name} is missing required node {name}.");
+    }
+
+    internal static AnimationPlayer RequireAnimationPlayer(Node root)
+    {
+        if (root is AnimationPlayer player)
+        {
+            return player;
+        }
+        var children = root.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
+        {
+            try
+            {
+                return RequireAnimationPlayer(child);
+            }
+            catch (InvalidOperationException)
+            {
+                // Continue until the imported glTF AnimationPlayer is found.
+            }
+        }
+        throw new InvalidOperationException($"Combat model {root.Name} is missing AnimationPlayer.");
+    }
+
+    internal static Skeleton3D RequireSkeleton(Node root)
+    {
+        if (root is Skeleton3D skeleton)
+        {
+            return skeleton;
+        }
+        var children = root.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
+        {
+            try
+            {
+                return RequireSkeleton(child);
+            }
+            catch (InvalidOperationException)
+            {
+                // Continue until the imported glTF skeleton is found.
+            }
+        }
+        throw new InvalidOperationException($"Combat model {root.Name} is missing Skeleton3D.");
     }
 
     internal static IEnumerable<MeshInstance3D> MeshesBelow(Node root)

@@ -6,6 +6,7 @@ namespace OperationSteelTide;
 public partial class EnemyOperator
 {
     private AuthoredOperatorVisual _authoredOperatorVisual = null!;
+    private AuthoredOperatorAnimator _authoredOperatorAnimator = null!;
 
     internal bool UsesAuthoredOperatorForDiagnostics
         => IsInstanceValid(_authoredOperatorVisual?.Root);
@@ -21,14 +22,42 @@ public partial class EnemyOperator
         => UsesAuthoredOperatorForDiagnostics
             ? _authoredOperatorVisual.GearOverlayCountForDiagnostics
             : 0;
+    internal string AuthoredAnimationForDiagnostics
+        => UsesAuthoredOperatorForDiagnostics
+            ? _authoredOperatorAnimator.CurrentAnimation
+            : string.Empty;
+    internal int AuthoredAnimationCountForDiagnostics
+        => UsesAuthoredOperatorForDiagnostics
+            ? _authoredOperatorAnimator.AnimationCount
+            : 0;
+
+    internal void SetAuthoredCombatPoseForDiagnostics()
+    {
+        if (!UsesAuthoredOperatorForDiagnostics)
+        {
+            return;
+        }
+        _authoredOperatorVisual.SetWeaponVisible(true);
+        _authoredOperatorVisual.SetWeaponReadied(true);
+        _authoredOperatorAnimator.Update(
+            0.0f,
+            0.0f,
+            prone: false,
+            crouched: false,
+            aiming: true,
+            downed: false,
+            reviving: false,
+            dead: false);
+    }
 
     private void AttachAuthoredOperatorVisual()
     {
         try
         {
-            var authoredOperator = CombatModelLibrary.InstantiateOperator();
+            var authoredOperator = CombatModelLibrary.InstantiateOperator(CarriedWeapon);
             _bodyRoot.AddChild(authoredOperator.Root);
             _authoredOperatorVisual = authoredOperator;
+            _authoredOperatorAnimator = new AuthoredOperatorAnimator(authoredOperator);
         }
         catch (Exception exception)
         {
@@ -44,9 +73,19 @@ public partial class EnemyOperator
                 visual.QueueFree();
             }
         }
-        _leftLegRig = _authoredOperatorVisual.LeftLegRig;
-        _rightLegRig = _authoredOperatorVisual.RightLegRig;
         SetAuthoredThreatColor(ResolveAuthoredFactionAppearance().Patch);
+    }
+
+    private void UpdateAuthoredStanceCollider()
+    {
+        if (!IsInstanceValid(_collider) || _collider.Shape is not CapsuleShape3D capsule)
+        {
+            return;
+        }
+        var crouched = _inCover && !IsProne && !IsDead;
+        var height = IsProne || IsDead ? 0.78f : crouched ? 1.22f : 1.78f;
+        capsule.Height = height;
+        _collider.Position = new Vector3(0.0f, height * 0.5f, 0.0f);
     }
 
     private void SetAuthoredThreatColor(Color color)
@@ -56,6 +95,14 @@ public partial class EnemyOperator
             _authoredOperatorVisual.SetFactionAppearance(
                 color,
                 ResolveAuthoredFactionAppearance().GearTint);
+        }
+    }
+
+    private void SetAuthoredWeaponVisible(bool visible)
+    {
+        if (IsInstanceValid(_authoredOperatorVisual?.Root))
+        {
+            _authoredOperatorVisual.SetWeaponVisible(visible);
         }
     }
 

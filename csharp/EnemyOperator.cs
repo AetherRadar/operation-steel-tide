@@ -89,6 +89,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         {
             _carriedWeaponRoot.Visible = true;
         }
+        SetAuthoredWeaponVisible(true);
     }
 
     public void ConfigureInitialLoadout(WeaponBuild build)
@@ -109,6 +110,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         {
             _carriedWeaponRoot.Visible = true;
         }
+        SetAuthoredWeaponVisible(true);
         // Keep a clone on the corpse loot table only when already dead searchable.
         return HasFireablePrimary;
     }
@@ -179,6 +181,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private readonly RandomNumberGenerator _rng = new();
     private Node3D _bodyRoot = null!;
+    private CollisionShape3D _collider = null!;
     private Marker3D _muzzle = null!;
     private AudioStreamPlayer3D _shotAudio = null!;
     private StandardMaterial3D _mainMaterial = null!;
@@ -257,6 +260,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         {
             _carriedWeaponRoot.Visible = false;
         }
+        SetAuthoredWeaponVisible(false);
     }
 
     private void BuildLootInventory()
@@ -418,11 +422,12 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private void BuildOperator()
     {
-        AddChild(new CollisionShape3D
+        _collider = new CollisionShape3D
         {
             Position = new Vector3(0, 0.89f, 0),
             Shape = new CapsuleShape3D { Radius = 0.38f, Height = 1.78f }
-        });
+        };
+        AddChild(_collider);
         _bodyRoot = new Node3D { Name = "EnemyRig" };
         AddChild(_bodyRoot);
 
@@ -549,6 +554,14 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             Visible = false
         };
         _muzzle.AddChild(_muzzleBloom);
+        if (UsesAuthoredOperatorForDiagnostics)
+        {
+            foreach (var mesh in CombatModelLibrary.MeshesBelow(_carriedWeaponRoot))
+            {
+                mesh.Visible = false;
+            }
+            SetAuthoredWeaponVisible(HasFireablePrimary);
+        }
     }
 
     private Node3D BuildLeg(float x, Godot.Material uniform, Godot.Material armor, Godot.Material boot)
@@ -1196,10 +1209,13 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     public void SetProne(bool prone)
     {
         IsProne = prone;
+        UpdateAuthoredStanceCollider();
         if (IsInstanceValid(_bodyRoot))
         {
-            _bodyRoot.Position = new Vector3(0.0f, prone ? 0.22f : 0.0f, 0.0f);
-            _bodyRoot.Rotation = new Vector3(prone ? Mathf.Pi * 0.48f : 0.0f, 0.0f, 0.0f);
+            _bodyRoot.Position = Vector3.Zero;
+            _bodyRoot.Rotation = UsesAuthoredOperatorForDiagnostics
+                ? Vector3.Zero
+                : new Vector3(prone ? Mathf.Pi * 0.48f : 0.0f, 0.0f, 0.0f);
         }
     }
 
@@ -1702,6 +1718,21 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private void AnimateBody(float delta)
     {
         var speed = new Vector2(Velocity.X, Velocity.Z).Length();
+        if (UsesAuthoredOperatorForDiagnostics)
+        {
+            _authoredOperatorVisual.SetWeaponReadied(Alerted && HasFireablePrimary && !IsDead);
+            _authoredOperatorAnimator.Update(
+                delta,
+                speed,
+                IsProne,
+                _inCover && !IsProne,
+                Alerted && HasFireablePrimary,
+                downed: false,
+                reviving: false,
+                IsDead);
+            UpdateAuthoredStanceCollider();
+            return;
+        }
         _animationPhase += delta * (4.0f + speed * 1.7f);
         var coverOffset = _inCover ? -0.38f : 0.0f;
         var position = _bodyRoot.Position;
@@ -1770,6 +1801,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             adjustedDamage = ApplyProtection(protectiveGear, adjustedDamage, armorPenetration);
         }
         _health -= adjustedDamage;
+        if (_health > 0.0f && UsesAuthoredOperatorForDiagnostics)
+        {
+            _authoredOperatorAnimator.PlayHit();
+        }
         OnWorldBossDamaged();
         _hitStun = 0.14f;
         var original = _mainMaterial.AlbedoColor;
@@ -1822,6 +1857,22 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         CollisionMask = 0;
         Velocity = Vector3.Zero;
         EmitSignal(SignalName.Eliminated, this);
+        if (UsesAuthoredOperatorForDiagnostics)
+        {
+            _authoredOperatorAnimator.Update(
+                0.0f,
+                0.0f,
+                prone: false,
+                crouched: false,
+                aiming: false,
+                downed: false,
+                reviving: false,
+                dead: true);
+            var authoredDeath = CreateTween();
+            authoredDeath.TweenInterval(1.9f);
+            authoredDeath.Finished += () => SetPhysicsProcess(false);
+            return;
+        }
         var tween = CreateTween().SetParallel(true);
         tween.TweenProperty(_bodyRoot, "rotation:z", _rng.Randf() < 0.5f ? -1.38f : 1.38f, 0.52f)
             .SetTrans(Tween.TransitionType.Quad);

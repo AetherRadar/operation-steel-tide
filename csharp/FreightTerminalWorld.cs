@@ -2896,6 +2896,7 @@ public partial class FreightTerminalWorld : Node3D
         }
         var target = _enemies[0];
         target.GlobalPosition = new Vector3(0, 0.15f, 29.5f);
+        target.SetAuthoredCombatPoseForDiagnostics();
 
         var captureCamera = new Camera3D
         {
@@ -4046,10 +4047,15 @@ public partial class FreightTerminalWorld : Node3D
         await WaitFrames(2);
         Input.ActionRelease("jump");
         var crouchJumpedStanding = _player.Stance == PlayerStance.Standing && _player.Velocity.Y > 0.1f;
-        for (var frame = 0; frame < 100 && !_player.IsOnFloor(); frame++)
+        for (var frame = 0; frame < 12 && _player.IsOnFloor(); frame++)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
+        for (var frame = 0; frame < 120 && !_player.IsOnFloor(); frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        await WaitFrames(3);
         var prone = _player.TrySetStance(PlayerStance.Prone);
         await WaitFrames(18);
         var proneHeight = _player.ViewHeight;

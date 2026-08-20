@@ -5,6 +5,73 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    private async void ValidateOperatorAnimations()
+    {
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        AuthoredOperatorVisual? visual = null;
+        var transitions = new System.Collections.Generic.List<string>();
+        var sockets = false;
+        var weaponSocketPosition = Vector3.Zero;
+        var backWeaponSocketPosition = Vector3.Zero;
+        var count = 0;
+        try
+        {
+            visual = CombatModelLibrary.InstantiateOperator();
+            AddChild(visual.Root);
+            var animator = new AuthoredOperatorAnimator(visual);
+            count = animator.AnimationCount;
+            void Sample(float speed, bool prone, bool crouched, bool aiming, bool downed, bool reviving, bool dead)
+            {
+                animator.Update(0.25f, speed, prone, crouched, aiming, downed, reviving, dead);
+                transitions.Add(animator.CurrentAnimation);
+            }
+            Sample(0.0f, false, false, false, false, false, false);
+            Sample(0.0f, false, false, true, false, false, false);
+            Sample(1.8f, false, false, false, false, false, false);
+            Sample(3.4f, false, false, false, false, false, false);
+            Sample(5.2f, false, false, false, false, false, false);
+            Sample(0.0f, false, true, false, false, false, false);
+            Sample(1.5f, false, true, false, false, false, false);
+            Sample(0.0f, true, false, true, false, false, false);
+            Sample(1.1f, true, false, true, false, false, false);
+            Sample(0.0f, false, false, false, false, true, false);
+            Sample(0.0f, false, false, false, true, false, false);
+            animator.PlayHit();
+            transitions.Add(animator.CurrentAnimation);
+            animator.PlayRevived();
+            transitions.Add(animator.CurrentAnimation);
+            Sample(0.0f, false, false, false, false, false, true);
+            sockets = IsInstanceValid(visual.WeaponSocket)
+                && IsInstanceValid(visual.BackWeaponSocket)
+                && IsInstanceValid(visual.HeadSocket)
+                && IsInstanceValid(visual.VestSocket)
+                && IsInstanceValid(visual.BackpackSocket)
+                && IsInstanceValid(visual.TeamPatchSocket);
+            weaponSocketPosition = visual.WeaponSocket.GlobalPosition;
+            backWeaponSocketPosition = visual.BackWeaponSocket.GlobalPosition;
+        }
+        catch (System.Exception exception)
+        {
+            GD.PushError($"Operator animation validation failed to instantiate: {exception}");
+        }
+
+        var expected = new[]
+        {
+            "idle", "aim_idle", "walk", "run", "sprint", "crouch_idle", "crouch_walk",
+            "prone_idle", "prone_crawl", "revive_kneel", "downed", "hit",
+            "revived", "death"
+        };
+        var transitionsValid = transitions.SequenceEqual(expected);
+        var valid = count == 14 && sockets && transitionsValid;
+        GD.Print(
+            $"OPERATOR_ANIMATIONS_CHECK count={count} sockets={sockets} "
+            + $"weapon_socket={weaponSocketPosition} back_socket={backWeaponSocketPosition} "
+            + $"transitions={string.Join('>', transitions)} expected={string.Join('>', expected)}");
+        GD.Print($"OPERATOR_ANIMATIONS_PASS valid={valid}");
+        visual?.Root.QueueFree();
+        QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
+    }
+
     private async void ValidateCombatModels()
     {
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -21,10 +88,11 @@ public partial class FreightTerminalWorld
             && weapon.Size.Z is >= 1.4f and <= 2.5f;
         var operatorGeometry = operatorModel.Loaded
             && operatorModel.RequiredNodes
-            && operatorModel.MeshCount >= 7
-            && operatorModel.Size.X is >= 0.55f and <= 1.15f
+            && operatorModel.MeshCount >= 1
+            && operatorModel.MaterialCount >= 8
+            && operatorModel.Size.X is >= 0.55f and <= 1.25f
             && operatorModel.Size.Y is >= 1.75f and <= 2.3f
-            && operatorModel.Size.Z is >= 0.4f and <= 1.1f;
+            && operatorModel.Size.Z is >= 0.3f and <= 0.8f;
         var previewOperatorGeometry = previewOperator.Loaded
             && previewOperator.RequiredNodes
             && previewOperator.MeshCount >= 1
@@ -78,7 +146,8 @@ public partial class FreightTerminalWorld
             $"COMBAT_MODELS_CHECK weapon_loaded={weapon.Loaded} weapon_nodes={weapon.RequiredNodes} "
             + $"weapon_meshes={weapon.MeshCount} weapon_size={weapon.Size} "
             + $"operator_loaded={operatorModel.Loaded} operator_nodes={operatorModel.RequiredNodes} "
-            + $"operator_meshes={operatorModel.MeshCount} operator_size={operatorModel.Size} "
+            + $"operator_meshes={operatorModel.MeshCount} operator_materials={operatorModel.MaterialCount} "
+            + $"operator_size={operatorModel.Size} "
             + $"preview_operator_loaded={previewOperator.Loaded} preview_operator_nodes={previewOperator.RequiredNodes} "
             + $"preview_operator_meshes={previewOperator.MeshCount} preview_operator_materials={previewOperator.MaterialCount} "
             + $"preview_operator_size={previewOperator.Size} "

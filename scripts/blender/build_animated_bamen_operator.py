@@ -1,0 +1,496 @@
+"""Build the animated BAMEN operator used by combat AI.
+
+The script retargets selected CC0 Quaternius actions onto the authored BAMEN
+Mixamo skeleton, keeps locomotion in-place, adds attachment sockets, and
+authors the missing prone/downed support poses needed by Steel Tide.
+
+Run from the repository root with Blender 5.2 LTS or newer:
+    blender --background --factory-startup \
+        --python scripts/blender/build_animated_bamen_operator.py
+"""
+
+from __future__ import annotations
+
+import math
+from pathlib import Path
+
+import bpy
+from mathutils import Euler, Matrix, Quaternion, Vector
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SOURCE_BLEND = REPO_ROOT / "source_art" / "third_party" / "bamen_military_soldier" / "bamen_military_soldier_clean.blend"
+UAL1_GLB = REPO_ROOT / "source_art" / "third_party" / "quaternius_universal_animation_library" / "UAL1_Standard.glb"
+UAL2_GLB = REPO_ROOT / "source_art" / "third_party" / "quaternius_universal_animation_library" / "UAL2_Standard.glb"
+OUTPUT_BLEND = REPO_ROOT / "source_art" / "third_party" / "bamen_military_soldier" / "bamen_military_soldier_animated.blend"
+OUTPUT_GLB = REPO_ROOT / "assets" / "models" / "bamen_military_soldier" / "bamen_military_soldier_animated.glb"
+PREVIEW_DIR = REPO_ROOT / "build" / "art-previews" / "animated-operator"
+
+
+BONE_MAP = {
+    "pelvis": "mixamorig:Hips",
+    "spine_01": "mixamorig:Spine",
+    "spine_02": "mixamorig:Spine1",
+    "spine_03": "mixamorig:Spine2",
+    "neck_01": "mixamorig:Neck",
+    "Head": "mixamorig:Head",
+    "clavicle_l": "mixamorig:LeftShoulder",
+    "upperarm_l": "mixamorig:LeftArm",
+    "lowerarm_l": "mixamorig:LeftForeArm",
+    "hand_l": "mixamorig:LeftHand",
+    "clavicle_r": "mixamorig:RightShoulder",
+    "upperarm_r": "mixamorig:RightArm",
+    "lowerarm_r": "mixamorig:RightForeArm",
+    "hand_r": "mixamorig:RightHand",
+    "thigh_l": "mixamorig:LeftUpLeg",
+    "calf_l": "mixamorig:LeftLeg",
+    "foot_l": "mixamorig:LeftFoot",
+    "ball_l": "mixamorig:LeftToeBase",
+    "thigh_r": "mixamorig:RightUpLeg",
+    "calf_r": "mixamorig:RightLeg",
+    "foot_r": "mixamorig:RightFoot",
+    "ball_r": "mixamorig:RightToeBase",
+}
+
+
+ACTION_SOURCES = {
+    "idle": ("ual1", "Idle_Loop", True),
+    "walk": ("ual1", "Walk_Loop", True),
+    "run": ("ual1", "Jog_Fwd_Loop", True),
+    "sprint": ("ual1", "Sprint_Loop", True),
+    "crouch_idle": ("ual1", "Crouch_Idle_Loop", True),
+    "crouch_walk": ("ual1", "Crouch_Fwd_Loop", True),
+    "prone_idle": ("ual1", "Swim_Idle_Loop", True),
+    "prone_crawl": ("ual1", "Swim_Fwd_Loop", True),
+    "aim_idle": ("ual1", "Pistol_Aim_Neutral", True),
+    "hit": ("ual1", "Hit_Chest", False),
+    "death": ("ual1", "Death01", False),
+    "revive_kneel": ("ual1", "Fixing_Kneeling", True),
+    "revived": ("ual2", "LayToIdle", False),
+}
+
+
+LOOP_ACTIONS = {
+    name for name, (_, _, loop) in ACTION_SOURCES.items() if loop
+} | {"prone_idle", "prone_crawl", "downed"}
+
+
+def require_file(path: Path) -> None:
+    if not path.is_file():
+        raise FileNotFoundError(path)
+
+
+def rotation_only(matrix: Matrix) -> Quaternion:
+    return matrix.to_quaternion().normalized()
+
+
+def matrix_from_rotation_translation(rotation: Quaternion, translation: Vector) -> Matrix:
+    matrix = rotation.to_matrix().to_4x4()
+    matrix.translation = translation
+    return matrix
+
+
+def reset_pose(armature: bpy.types.Object) -> None:
+    for bone in armature.pose.bones:
+        bone.rotation_mode = "QUATERNION"
+        bone.location = Vector((0.0, 0.0, 0.0))
+        bone.rotation_quaternion = Quaternion((1.0, 0.0, 0.0, 0.0))
+        bone.scale = Vector((1.0, 1.0, 1.0))
+
+
+def mesh_world_bounds(mesh: bpy.types.Object) -> tuple[Vector, Vector]:
+    evaluated = mesh.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    minimum = Vector((math.inf, math.inf, math.inf))
+    maximum = Vector((-math.inf, -math.inf, -math.inf))
+    for corner in evaluated.bound_box:
+        point = evaluated.matrix_world @ Vector(corner)
+        minimum.x = min(minimum.x, point.x)
+        minimum.y = min(minimum.y, point.y)
+        minimum.z = min(minimum.z, point.z)
+        maximum.x = max(maximum.x, point.x)
+        maximum.y = max(maximum.y, point.y)
+        maximum.z = max(maximum.z, point.z)
+    return minimum, maximum
+
+
+def import_animation_library(path: Path, label: str) -> bpy.types.Object:
+    before_objects = set(bpy.data.objects)
+    before_actions = set(bpy.data.actions)
+    bpy.ops.import_scene.gltf(filepath=str(path))
+    imported_objects = [obj for obj in bpy.data.objects if obj not in before_objects]
+    armatures = [obj for obj in imported_objects if obj.type == "ARMATURE"]
+    if len(armatures) != 1:
+        raise RuntimeError(f"Expected one {label} armature, found {len(armatures)}")
+    source = armatures[0]
+    source.name = f"{label}_RetargetSource"
+    source["retarget_library"] = label
+    for action in bpy.data.actions:
+        if action not in before_actions:
+            action["retarget_library"] = label
+    for obj in imported_objects:
+        obj.hide_render = True
+        obj.hide_viewport = True
+    source.hide_viewport = False
+    return source
+
+
+def find_source_action(label: str, name: str) -> bpy.types.Action:
+    matches = [
+        action for action in bpy.data.actions
+        if action.name == name and action.get("retarget_library") == label
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"Expected one {label}:{name} action, found {len(matches)}")
+    return matches[0]
+
+
+def target_height(armature: bpy.types.Object) -> float:
+    foot = armature.data.bones["mixamorig:LeftFoot"]
+    head = armature.data.bones["mixamorig:Head"]
+    return (armature.matrix_world @ head.tail_local).z - (armature.matrix_world @ foot.head_local).z
+
+
+def source_height(armature: bpy.types.Object) -> float:
+    foot = armature.data.bones["foot_l"]
+    head = armature.data.bones["Head"]
+    return (armature.matrix_world @ head.tail_local).z - (armature.matrix_world @ foot.head_local).z
+
+
+def retarget_action(
+    target: bpy.types.Object,
+    source: bpy.types.Object,
+    source_action: bpy.types.Action,
+    output_name: str,
+) -> bpy.types.Action:
+    scene = bpy.context.scene
+    source.animation_data_create()
+    source.animation_data.action = source_action
+    target.animation_data_create()
+    action = bpy.data.actions.new(output_name)
+    target.animation_data.action = action
+    scale = target_height(target) / source_height(source)
+    start = int(math.floor(source_action.frame_range[0]))
+    end = int(math.ceil(source_action.frame_range[1]))
+    target_rest_world = {
+        name: target.matrix_world @ target.data.bones[name].matrix_local
+        for name in BONE_MAP.values()
+    }
+    target_rest_directions = {
+        name: (
+            target.matrix_world @ target.data.bones[name].tail_local
+            - target.matrix_world @ target.data.bones[name].head_local
+        ).normalized()
+        for name in BONE_MAP.values()
+    }
+    target_world_inverse = target.matrix_world.inverted()
+
+    for frame in range(start, end + 1):
+        scene.frame_set(frame)
+        bpy.context.view_layer.update()
+        desired_rotations: dict[str, Quaternion] = {}
+        for source_name, target_name in BONE_MAP.items():
+            source_pose_bone = source.pose.bones[source_name]
+            source_pose_direction = (
+                source.matrix_world @ source_pose_bone.tail
+                - source.matrix_world @ source_pose_bone.head
+            ).normalized()
+            direction_alignment = target_rest_directions[target_name].rotation_difference(
+                source_pose_direction
+            )
+            desired_rotations[target_name] = (
+                direction_alignment @ rotation_only(target_rest_world[target_name])
+            ).normalized()
+
+        for source_name, target_name in BONE_MAP.items():
+            pose_bone = target.pose.bones[target_name]
+            target_bone = target.data.bones[target_name]
+            if target_bone.parent is None or target_bone.parent.name not in desired_rotations:
+                source_pose_head_world = source.matrix_world @ source.pose.bones[source_name].head
+                source_rest_head_world = source.matrix_world @ source.data.bones[source_name].head_local
+                translation_world = source_pose_head_world - source_rest_head_world
+                desired_head_world = target.matrix_world @ target_bone.head_local + translation_world * scale
+                desired_head_local = target_world_inverse @ desired_head_world
+            else:
+                parent_pose = target.pose.bones[target_bone.parent.name].matrix
+                relative_rest = target_bone.parent.matrix_local.inverted() @ target_bone.matrix_local
+                desired_head_local = (parent_pose @ relative_rest).translation
+
+            desired_rotation_local = (
+                rotation_only(target.matrix_world).inverted() @ desired_rotations[target_name]
+            ).normalized()
+            pose_bone.matrix = matrix_from_rotation_translation(desired_rotation_local, desired_head_local)
+            pose_bone.keyframe_insert(data_path="location", frame=frame, group=target_name)
+            pose_bone.keyframe_insert(data_path="rotation_quaternion", frame=frame, group=target_name)
+
+    action.name = output_name
+    action["loop"] = output_name in LOOP_ACTIONS
+    reset_pose(target)
+    return action
+
+
+def ground_action(
+    armature: bpy.types.Object,
+    mesh: bpy.types.Object,
+    action: bpy.types.Action,
+    clearance: float = 0.025,
+) -> None:
+    armature.animation_data.action = action
+    start = int(math.floor(action.frame_range[0]))
+    end = int(math.ceil(action.frame_range[1]))
+    for frame in range(start, end + 1):
+        bpy.context.scene.frame_set(frame)
+        bpy.context.view_layer.update()
+        minimum, _ = mesh_world_bounds(mesh)
+        world_shift = Vector((0.0, 0.0, clearance - minimum.z))
+        armature_shift = armature.matrix_world.inverted().to_3x3() @ world_shift
+        hips = armature.pose.bones["mixamorig:Hips"]
+        hips_matrix = hips.matrix.copy()
+        hips_matrix.translation += armature_shift
+        hips.matrix = hips_matrix
+        hips.keyframe_insert(data_path="location", frame=frame, group=hips.name)
+
+def author_downed_hold(armature: bpy.types.Object, death: bpy.types.Action) -> None:
+    armature.animation_data.action = death
+    bpy.context.scene.frame_set(int(math.ceil(death.frame_range[1])))
+    bpy.context.view_layer.update()
+    pose = {
+        bone.name: (bone.location.copy(), bone.rotation_quaternion.copy())
+        for bone in armature.pose.bones
+    }
+    action = bpy.data.actions.new("downed")
+    armature.animation_data.action = action
+    for frame in (0, 30):
+        for name, (location, rotation) in pose.items():
+            bone = armature.pose.bones[name]
+            bone.location = location
+            bone.rotation_mode = "QUATERNION"
+            bone.rotation_quaternion = rotation
+            bone.keyframe_insert(data_path="location", frame=frame, group=name)
+            bone.keyframe_insert(data_path="rotation_quaternion", frame=frame, group=name)
+    action["loop"] = True
+
+
+def author_pose_hold(
+    armature: bpy.types.Object,
+    source: bpy.types.Action,
+    source_frame: int,
+    output_name: str,
+) -> bpy.types.Action:
+    armature.animation_data.action = source
+    bpy.context.scene.frame_set(source_frame)
+    bpy.context.view_layer.update()
+    pose = {
+        bone.name: (bone.location.copy(), bone.rotation_quaternion.copy())
+        for bone in armature.pose.bones
+    }
+    action = bpy.data.actions.new(output_name)
+    armature.animation_data.action = action
+    for frame in (0, 30):
+        for name, (location, rotation) in pose.items():
+            bone = armature.pose.bones[name]
+            bone.location = location
+            bone.rotation_mode = "QUATERNION"
+            bone.rotation_quaternion = rotation
+            bone.keyframe_insert(data_path="location", frame=frame, group=name)
+            bone.keyframe_insert(data_path="rotation_quaternion", frame=frame, group=name)
+    action["loop"] = True
+    return action
+
+
+def author_rifle_aim_hold(
+    armature: bpy.types.Object,
+    source: bpy.types.Action,
+) -> bpy.types.Action:
+    armature.animation_data.action = source
+    bpy.context.scene.frame_set(int(math.floor(source.frame_range[0])))
+    bpy.context.view_layer.update()
+    constraints: list[tuple[bpy.types.PoseBone, bpy.types.Constraint]] = []
+    targets: list[bpy.types.Object] = []
+    hand_targets = {
+        "mixamorig:RightForeArm": (-0.10, -0.22, 1.42),
+        "mixamorig:LeftForeArm": (0.10, -0.47, 1.45),
+    }
+    for bone_name, location in hand_targets.items():
+        target = bpy.data.objects.new(f"{bone_name}_RifleAimTarget", None)
+        bpy.context.collection.objects.link(target)
+        target.location = location
+        constraint = armature.pose.bones[bone_name].constraints.new("IK")
+        constraint.target = target
+        constraint.chain_count = 2
+        constraint.use_tail = True
+        constraints.append((armature.pose.bones[bone_name], constraint))
+        targets.append(target)
+    bpy.context.view_layer.update()
+    pose_matrices = {
+        bone.name: bone.matrix.copy()
+        for bone in armature.pose.bones
+    }
+    for bone, constraint in constraints:
+        bone.constraints.remove(constraint)
+    for target in targets:
+        bpy.data.objects.remove(target, do_unlink=True)
+    source.name = "aim_idle_source"
+    action = bpy.data.actions.new("aim_idle")
+    armature.animation_data.action = action
+    reset_pose(armature)
+    for frame in (0, 30):
+        for bone in armature.pose.bones:
+            bone.matrix = pose_matrices[bone.name]
+            bone.keyframe_insert(data_path="location", frame=frame, group=bone.name)
+            bone.keyframe_insert(data_path="rotation_quaternion", frame=frame, group=bone.name)
+    action["loop"] = True
+    armature.animation_data.action = None
+    bpy.data.actions.remove(source)
+    return action
+
+
+def add_socket(
+    armature: bpy.types.Object,
+    name: str,
+    bone_name: str,
+    world_location: tuple[float, float, float] | None = None,
+    world_rotation_degrees: tuple[float, float, float] = (0.0, 0.0, 0.0),
+) -> None:
+    socket = bpy.data.objects.new(name, None)
+    bpy.context.collection.objects.link(socket)
+    socket.parent = armature
+    socket.parent_type = "BONE"
+    socket.parent_bone = bone_name
+    socket.matrix_parent_inverse = Matrix.Identity(4)
+    if world_location is None:
+        world_location = tuple(armature.matrix_world @ armature.data.bones[bone_name].head_local)
+    rotation = Euler(tuple(math.radians(value) for value in world_rotation_degrees)).to_matrix().to_4x4()
+    rotation.translation = Vector(world_location)
+    socket.matrix_world = rotation
+    socket.empty_display_type = "PLAIN_AXES"
+    socket.empty_display_size = 8.0
+
+
+def cleanup_sources(sources: list[bpy.types.Object]) -> None:
+    source_roots = set()
+    for source in sources:
+        root = source
+        while root.parent is not None:
+            root = root.parent
+        source_roots.add(root)
+    for root in source_roots:
+        descendants = [root] + list(root.children_recursive)
+        for obj in reversed(descendants):
+            if obj.name in bpy.data.objects:
+                bpy.data.objects.remove(obj, do_unlink=True)
+    for action in list(bpy.data.actions):
+        if action.get("retarget_library"):
+            bpy.data.actions.remove(action)
+
+
+def set_action_export_metadata() -> None:
+    for action in bpy.data.actions:
+        action.asset_mark()
+        if action.name in LOOP_ACTIONS:
+            action["loop"] = True
+
+
+def export_asset(armature: bpy.types.Object) -> None:
+    OUTPUT_GLB.parent.mkdir(parents=True, exist_ok=True)
+    bpy.ops.object.select_all(action="DESELECT")
+    root = armature.parent
+    root.select_set(True)
+    armature.select_set(True)
+    for child in armature.children_recursive:
+        child.select_set(True)
+    bpy.context.view_layer.objects.active = armature
+    bpy.ops.export_scene.gltf(
+        filepath=str(OUTPUT_GLB),
+        export_format="GLB",
+        use_selection=True,
+        export_apply=True,
+        export_animations=True,
+        export_animation_mode="ACTIONS",
+        export_nla_strips=False,
+        export_optimize_animation_size=True,
+        export_force_sampling=True,
+        export_frame_range=False,
+        export_cameras=False,
+        export_lights=False,
+        export_extras=True,
+    )
+
+
+def save_source() -> None:
+    OUTPUT_BLEND.parent.mkdir(parents=True, exist_ok=True)
+    bpy.context.preferences.filepaths.save_version = 0
+    bpy.ops.wm.save_as_mainfile(filepath=str(OUTPUT_BLEND))
+
+
+def main() -> None:
+    for path in (SOURCE_BLEND, UAL1_GLB, UAL2_GLB):
+        require_file(path)
+    bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
+    scene = bpy.context.scene
+    scene.render.fps = 30
+    scene.render.fps_base = 1.0
+    target = next(obj for obj in scene.objects if obj.type == "ARMATURE")
+    target_mesh = next(obj for obj in scene.objects if obj.type == "MESH")
+    target.data.pose_position = "POSE"
+    target.animation_data_create()
+    target.animation_data.action = None
+    for action in list(bpy.data.actions):
+        bpy.data.actions.remove(action)
+    reset_pose(target)
+
+    ual1 = import_animation_library(UAL1_GLB, "ual1")
+    ual2 = import_animation_library(UAL2_GLB, "ual2")
+    sources = {"ual1": ual1, "ual2": ual2}
+    generated: dict[str, bpy.types.Action] = {}
+    for output_name, (library, source_name, _) in ACTION_SOURCES.items():
+        generated[output_name] = retarget_action(
+            target,
+            sources[library],
+            find_source_action(library, source_name),
+            output_name,
+        )
+    generated["aim_idle"] = author_rifle_aim_hold(target, generated["aim_idle"])
+    ground_action(target, target_mesh, generated["prone_idle"])
+    ground_action(target, target_mesh, generated["prone_crawl"])
+    stale_prone_idle = generated["prone_idle"]
+    target.animation_data.action = None
+    bpy.data.actions.remove(stale_prone_idle)
+    generated["prone_idle"] = author_pose_hold(
+        target,
+        generated["prone_crawl"],
+        12,
+        "prone_idle",
+    )
+    author_downed_hold(target, generated["death"])
+    reset_pose(target)
+    cleanup_sources([ual1, ual2])
+    right_hand = tuple(target.matrix_world @ target.data.bones["mixamorig:RightHand"].head_local)
+    add_socket(
+        target,
+        "WeaponSocket",
+        "mixamorig:RightHand",
+        world_location=right_hand,
+        world_rotation_degrees=(0.0, 0.0, 180.0),
+    )
+    add_socket(
+        target,
+        "BackWeaponSocket",
+        "mixamorig:Spine2",
+        world_location=(0.22, 0.14, 1.28),
+        world_rotation_degrees=(90.0, 0.0, -8.0),
+    )
+    add_socket(target, "HeadSocket", "mixamorig:Head")
+    add_socket(target, "VestSocket", "mixamorig:Spine2")
+    add_socket(target, "BackpackSocket", "mixamorig:Spine2")
+    add_socket(target, "TeamPatchSocket", "mixamorig:LeftShoulder")
+    set_action_export_metadata()
+    save_source()
+    export_asset(target)
+    print(
+        "BAMEN_ANIMATED_EXPORT "
+        f"glb={OUTPUT_GLB} actions={sorted(action.name for action in bpy.data.actions)}"
+    )
+
+
+if __name__ == "__main__":
+    main()
