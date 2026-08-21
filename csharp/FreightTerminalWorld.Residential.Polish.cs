@@ -11,6 +11,7 @@ public partial class FreightTerminalWorld
         int towerIndex,
         Color accent)
     {
+        var profile = ResidentialTowerDiversityPlan.ForTower(towerIndex);
         var width = spec.Footprint.X;
         var depth = spec.Footprint.Y;
         var buildingHeight = spec.Floors * ResidentialFloorHeight;
@@ -37,17 +38,62 @@ public partial class FreightTerminalWorld
         var bands = new List<Transform3D>(spec.Floors * 4 + 10);
         for (var floor = 1; floor <= spec.Floors; floor++)
         {
+            var includeBand = profile.Facade switch
+            {
+                ResidentialFacadeStyle.RibbonGlass => floor % 3 == 0,
+                ResidentialFacadeStyle.VerticalBays => floor % 2 == 0,
+                ResidentialFacadeStyle.ServiceBands => floor % 3 == 1 || floor == spec.Floors,
+                ResidentialFacadeStyle.TerracedWindows => floor % 2 == 1 || floor == spec.Floors,
+                _ => true
+            };
+            if (!includeBand)
+            {
+                continue;
+            }
             var y = floor * ResidentialFloorHeight - 0.06f;
-            AddFacadeBox(bands, new Vector3(0, y, -depth * 0.5f - 0.13f), new Vector3(width + 0.34f, 0.105f, 0.13f));
-            AddFacadeBox(bands, new Vector3(0, y, depth * 0.5f + 0.13f), new Vector3(width + 0.34f, 0.105f, 0.13f));
-            AddFacadeBox(bands, new Vector3(-width * 0.5f - 0.13f, y, 0), new Vector3(0.13f, 0.105f, depth));
-            AddFacadeBox(bands, new Vector3(width * 0.5f + 0.13f, y, 0), new Vector3(0.13f, 0.105f, depth));
+            var bandHeight = profile.Facade is ResidentialFacadeStyle.RibbonGlass or ResidentialFacadeStyle.ServiceBands
+                ? 0.18f
+                : 0.105f;
+            AddFacadeBox(bands, new Vector3(0, y, -depth * 0.5f - 0.13f), new Vector3(width + 0.34f, bandHeight, 0.13f));
+            AddFacadeBox(bands, new Vector3(0, y, depth * 0.5f + 0.13f), new Vector3(width + 0.34f, bandHeight, 0.13f));
+            AddFacadeBox(bands, new Vector3(-width * 0.5f - 0.13f, y, 0), new Vector3(0.13f, bandHeight, depth));
+            AddFacadeBox(bands, new Vector3(width * 0.5f + 0.13f, y, 0), new Vector3(0.13f, bandHeight, depth));
         }
         foreach (var x in new[] { -width * 0.5f - 0.14f, width * 0.5f + 0.14f })
         {
             foreach (var z in new[] { -depth * 0.5f - 0.14f, depth * 0.5f + 0.14f })
             {
                 AddFacadeBox(bands, new Vector3(x, buildingHeight * 0.5f, z), new Vector3(0.16f, buildingHeight, 0.16f));
+            }
+        }
+        switch (profile.Facade)
+        {
+            case ResidentialFacadeStyle.VerticalBays:
+                foreach (var x in new[] { -width * 0.27f, width * 0.27f })
+                {
+                    AddFacadeBox(bands, new Vector3(x, buildingHeight * 0.5f, -depth * 0.5f - 0.16f), new Vector3(0.2f, buildingHeight, 0.18f));
+                    AddFacadeBox(bands, new Vector3(x, buildingHeight * 0.5f, depth * 0.5f + 0.16f), new Vector3(0.2f, buildingHeight, 0.18f));
+                }
+                break;
+            case ResidentialFacadeStyle.RibbonGlass:
+                foreach (var z in new[] { -depth * 0.28f, depth * 0.28f })
+                {
+                    AddFacadeBox(bands, new Vector3(-width * 0.5f - 0.16f, buildingHeight * 0.5f, z), new Vector3(0.18f, buildingHeight, 0.2f));
+                    AddFacadeBox(bands, new Vector3(width * 0.5f + 0.16f, buildingHeight * 0.5f, z), new Vector3(0.18f, buildingHeight, 0.2f));
+                }
+                break;
+            case ResidentialFacadeStyle.ServiceBands:
+                AddFacadeBox(bands, new Vector3(0, buildingHeight * 0.5f, -depth * 0.5f - 0.16f), new Vector3(Mathf.Min(1.35f, width * 0.08f), buildingHeight, 0.18f));
+                break;
+            case ResidentialFacadeStyle.StaggeredGrid:
+                AddFacadeBox(bands, new Vector3(-width * 0.34f, buildingHeight * 0.62f, depth * 0.5f + 0.16f), new Vector3(0.18f, buildingHeight * 0.74f, 0.18f));
+                AddFacadeBox(bands, new Vector3(width * 0.34f, buildingHeight * 0.38f, depth * 0.5f + 0.16f), new Vector3(0.18f, buildingHeight * 0.74f, 0.18f));
+                break;
+            case ResidentialFacadeStyle.TerracedWindows:
+            {
+                var side = towerIndex % 2 == 0 ? -1.0f : 1.0f;
+                AddFacadeBox(bands, new Vector3(side * (width * 0.5f + 0.16f), buildingHeight * 0.55f, depth * 0.18f), new Vector3(0.18f, buildingHeight * 0.82f, Mathf.Min(4.6f, depth * 0.24f)));
+                break;
             }
         }
         AddFacadeBoxBatch(tower, "FacadeBands", bandMaterial, bands, 190.0f, false);
@@ -57,10 +103,19 @@ public partial class FreightTerminalWorld
         AddFacadeBox(accents, new Vector3(-2.02f, 1.52f, frontZ), new Vector3(0.2f, 3.02f, 0.22f));
         AddFacadeBox(accents, new Vector3(2.02f, 1.52f, frontZ), new Vector3(0.2f, 3.02f, 0.22f));
         AddFacadeBox(accents, new Vector3(0, 2.94f, frontZ), new Vector3(4.25f, 0.18f, 0.22f));
+        var accentSide = towerIndex % 2 == 0 ? -1.0f : 1.0f;
         AddFacadeBox(
             accents,
-            new Vector3(-width * 0.5f - 0.18f, buildingHeight * 0.58f, -depth * 0.18f),
+            new Vector3(accentSide * (width * 0.5f + 0.18f), buildingHeight * 0.58f, -depth * 0.18f),
             new Vector3(0.2f, buildingHeight * 0.54f, Mathf.Min(4.8f, depth * 0.24f)));
+        if (profile.Facade == ResidentialFacadeStyle.RibbonGlass)
+        {
+            AddFacadeBox(accents, new Vector3(0, buildingHeight * 0.52f, depth * 0.5f + 0.2f), new Vector3(width * 0.72f, 0.26f, 0.22f));
+        }
+        else if (profile.Facade == ResidentialFacadeStyle.ServiceBands)
+        {
+            AddFacadeBox(accents, new Vector3(0, buildingHeight - 0.65f, depth * 0.5f + 0.2f), new Vector3(width * 0.46f, 0.72f, 0.22f));
+        }
         AddFacadeBoxBatch(tower, "FacadeAccents", accentMaterial, accents, 150.0f, false);
 
         var utilityBoxes = new List<Transform3D>();

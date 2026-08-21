@@ -200,6 +200,8 @@ public partial class FreightTerminalWorld
         _relayLootMarkers.Clear();
         _residentialGlassFields.Clear();
         _residentialRoomArchetypes.Clear();
+        _residentialTowerArtResults.Clear();
+        _residentialTowerArtBuilder = new ResidentialTowerArtBuilder();
         _residentialFurnitureEventCount = 0;
         _residentialChestEventCount = 0;
         _residentialGuardAmbushSpawnCount = 0;
@@ -390,6 +392,11 @@ public partial class FreightTerminalWorld
             Position = spec.Position,
             Rotation = new Vector3(0, yaw, 0)
         };
+        var diversityProfile = ResidentialTowerDiversityPlan.ForTower(index);
+        tower.SetMeta("residential_profile_signature", diversityProfile.Signature);
+        tower.SetMeta("residential_facade_style", diversityProfile.Facade.ToString());
+        tower.SetMeta("residential_roof_style", diversityProfile.Roof.ToString());
+        tower.SetMeta("residential_tower_use", diversityProfile.Use.ToString());
         community.AddChild(tower);
         _residentialTowers.Add(tower);
 
@@ -429,7 +436,7 @@ public partial class FreightTerminalWorld
             BuildTowerFloorSlab(tower, spec, floor, floorY, stairCoreZ, interiorFloor, floor == 0);
             var westSlot = linkSlots is not null && linkSlots.TryGetValue(1, out var westLink) && westLink.Floors.Contains(floor) ? westLink : null;
             var eastSlot = linkSlots is not null && linkSlots.TryGetValue(0, out var eastLink) && eastLink.Floors.Contains(floor) ? eastLink : null;
-            BuildTowerFloorShell(tower, spec, floor, floorY, facade, glassField, spec.Accent, westSlot, eastSlot);
+            BuildTowerFloorShell(tower, spec, index, floor, floorY, facade, glassField, spec.Accent, westSlot, eastSlot);
             BuildTowerInterior(tower, spec, index, floor, floorY, stairCoreZ, interiorWall, wood, bedding, warmLight, westSlot, eastSlot);
             BuildTowerStairs(tower, floor, floorY, stairCoreZ, stair, warmLight);
             BuildTowerStairDetails(tower, spec, index, floor, floorY, stairCoreZ, trim, warmLight);
@@ -437,7 +444,8 @@ public partial class FreightTerminalWorld
         }
         glassField.Commit();
         BuildTowerFacadeDetails(tower, spec, index, spec.Accent);
-        BuildTowerRoof(tower, spec, stairCoreZ, facade, steel, trim, warmLight);
+        BuildTowerRoof(tower, spec, stairCoreZ, facade, trim, warmLight);
+        BuildResidentialAuthoredDressing(tower, spec, index);
         _residentialRoofAccessCount++;
 
         var basis = Basis.FromEuler(new Vector3(0, yaw, 0));
@@ -496,6 +504,7 @@ public partial class FreightTerminalWorld
     private void BuildTowerFloorShell(
         Node3D tower,
         ResidentialTowerSpec spec,
+        int towerIndex,
         int floor,
         float floorY,
         Godot.Material facade,
@@ -530,31 +539,7 @@ public partial class FreightTerminalWorld
             ExpansionBox(tower, "ResidentialSouthWall", new Vector3(0, wallCenterY, depth * 0.5f), new Vector3(width, wallHeight, wallThickness), facade);
         }
 
-        var windowTint = floor % 3 == 0
-            ? new Color(0.78f, 0.92f, 0.94f, 0.92f)
-            : new Color(0.58f, 0.76f, 0.8f, 0.84f);
-        if (floor % 4 == 0)
-        {
-            windowTint = windowTint.Lerp(new Color(accent.R, accent.G, accent.B, windowTint.A), 0.16f);
-        }
-        var windowY = floorY + 1.66f;
-        for (var x = -width * 0.5f + 2.1f; x <= width * 0.5f - 2.0f; x += 3.6f)
-        {
-            glassField.AddPane(new Vector3(x, windowY, -depth * 0.5f - 0.105f), new Vector3(2.05f, 1.28f, 0.035f), windowTint);
-            if (floor > 0 || Mathf.Abs(x) > 2.1f)
-            {
-                glassField.AddPane(new Vector3(x, windowY, depth * 0.5f + 0.105f), new Vector3(2.05f, 1.28f, 0.035f), windowTint);
-            }
-        }
-        for (var z = -depth * 0.5f + 2.1f; z <= depth * 0.5f - 2.0f; z += 3.6f)
-        {
-            glassField.AddPane(new Vector3(-width * 0.5f - 0.105f, windowY, z), new Vector3(0.035f, 1.28f, 2.05f), windowTint);
-            glassField.AddPane(new Vector3(width * 0.5f + 0.105f, windowY, z), new Vector3(0.035f, 1.28f, 2.05f), windowTint);
-        }
-        if (floor > 0 && floor % 3 == 0)
-        {
-            ExpansionBox(tower, "ResidentialBalcony", new Vector3(0, floorY + 0.18f, depth * 0.5f + 0.85f), new Vector3(Mathf.Min(8.0f, width * 0.48f), 0.14f, 1.7f), facade);
-        }
+        BuildResidentialFacadePattern(tower, spec, towerIndex, floor, floorY, glassField, accent);
     }
 
     private void BuildSideWall(
@@ -602,8 +587,6 @@ public partial class FreightTerminalWorld
         var width = spec.Footprint.X;
         var depth = spec.Footprint.Y;
         const float corridorHalfWidth = 2.9f;
-        const float partitionHeight = 2.85f;
-        var wallY = floorY + 0.1f + partitionHeight * 0.5f;
         var northStart = -depth * 0.5f + 0.35f;
         var northEnd = coreZ - ResidentialStairOpeningNorthDepth - 0.55f;
         var southStart = coreZ + ResidentialStairOpeningSouthDepth + 0.55f;
@@ -621,6 +604,7 @@ public partial class FreightTerminalWorld
         var screen = Mat("residential_screen", new Color(0.035f, 0.045f, 0.048f), 0.08f, 0.52f);
         var table = Mat("residential_table", new Color(0.24f, 0.16f, 0.1f), 0.05f, 0.78f);
         var featuredFloor = IsResidentialFeaturedFloor(spec, floor);
+        var (layoutRoot, floorLayout) = CreateResidentialFloorLayoutRoot(tower, towerIndex, floor, spec.Floors);
         foreach (var side in new[] { -1.0f, 1.0f })
         {
             var roomX = side * (corridorHalfWidth + roomWidth * 0.5f);
@@ -628,37 +612,35 @@ public partial class FreightTerminalWorld
                 ? ResidentialRoomArchetypeFor(towerIndex, floor, side)
                 : ResidentialRoomArchetype.FamilyApartment;
             _residentialRoomArchetypes.Add(archetype);
-            ExpansionBox(tower, "ApartmentDivider", new Vector3(roomX, wallY, depth * 0.08f), new Vector3(roomWidth * 0.92f, partitionHeight, 0.1f), wall);
-            // Living / bedroom set
-            var livingZ = depth * 0.28f;
-            var bedZ = -depth * 0.28f;
             var furnitureKind = ResidentialFurnitureKindFor(towerIndex, floor, side, archetype, featuredFloor);
-            MeshBox(tower, new Vector3(roomX, floorY + 0.07f, livingZ), new Vector3(roomWidth * 0.82f, 0.04f, Mathf.Min(3.2f, depth * 0.28f)), carpet);
-            ExpansionBox(tower, "ApartmentSofa", new Vector3(roomX - side * 0.35f, floorY + 0.34f, livingZ + 0.35f), new Vector3(Mathf.Min(2.0f, roomWidth * 0.58f), 0.48f, 0.78f), bedding);
-            ExpansionBox(tower, "ApartmentCoffeeTable", new Vector3(roomX + side * 0.45f, floorY + 0.28f, livingZ - 0.35f), new Vector3(0.95f, 0.32f, 0.55f), table);
-            ExpansionBox(tower, "ApartmentTVStand", new Vector3(roomX + side * roomWidth * 0.28f, floorY + 0.35f, livingZ + 0.95f), new Vector3(1.15f, 0.5f, 0.38f), wood);
-            MeshBox(tower, new Vector3(roomX + side * roomWidth * 0.28f, floorY + 0.92f, livingZ + 1.05f), new Vector3(0.95f, 0.55f, 0.08f), screen);
-            ExpansionBox(tower, "ApartmentBed", new Vector3(roomX, floorY + 0.3f, bedZ), new Vector3(Mathf.Min(2.15f, roomWidth * 0.66f), 0.42f, 1.25f), wood);
-            MeshBox(tower, new Vector3(roomX, floorY + 0.54f, bedZ), new Vector3(Mathf.Min(1.95f, roomWidth * 0.6f), 0.1f, 1.05f), bedding);
-            if (furnitureKind != ResidentialFurnitureKind.Nightstand)
-            {
-                ExpansionBox(tower, "ApartmentNightstand", new Vector3(roomX + side * roomWidth * 0.28f, floorY + 0.32f, bedZ + 0.75f), new Vector3(0.45f, 0.48f, 0.4f), wood);
-            }
-            if (furnitureKind != ResidentialFurnitureKind.Wardrobe)
-            {
-                ExpansionBox(tower, "ApartmentWardrobe", new Vector3(roomX - side * roomWidth * 0.28f, floorY + 1.05f, bedZ - 0.15f), new Vector3(0.72f, 1.95f, 0.55f), wood);
-            }
-            // Kitchenette strip against the outer wall
-            var kitchenX = roomX + side * roomWidth * 0.32f;
-            ExpansionBox(tower, "ApartmentCounter", new Vector3(kitchenX, floorY + 0.48f, depth * 0.05f), new Vector3(0.62f, 0.78f, 1.8f), appliance);
-            if (furnitureKind != ResidentialFurnitureKind.Refrigerator)
-            {
-                ExpansionBox(tower, "ApartmentFridge", new Vector3(kitchenX, floorY + 0.95f, depth * 0.05f - 1.15f), new Vector3(0.7f, 1.75f, 0.68f), appliance);
-            }
-            MeshBox(tower, new Vector3(kitchenX, floorY + 0.92f, depth * 0.05f + 0.35f), new Vector3(0.5f, 0.08f, 0.5f), table);
-            // Desk / work corner
-            ExpansionBox(tower, "ApartmentDesk", new Vector3(roomX - side * 0.2f, floorY + 0.4f, -depth * 0.08f), new Vector3(1.35f, 0.12f, 0.62f), table);
-            ExpansionBox(tower, "ApartmentChair", new Vector3(roomX - side * 0.2f, floorY + 0.28f, -depth * 0.08f + side * 0.55f), new Vector3(0.45f, 0.45f, 0.45f), wood);
+            BuildResidentialLayoutPartitions(
+                layoutRoot,
+                towerIndex,
+                floor,
+                side,
+                roomX,
+                roomWidth,
+                depth,
+                floorY,
+                floorLayout,
+                wall);
+            var anchors = BuildResidentialLayoutFurnishings(
+                layoutRoot,
+                towerIndex,
+                floor,
+                side,
+                roomX,
+                roomWidth,
+                depth,
+                floorY,
+                floorLayout,
+                furnitureKind,
+                wood,
+                bedding,
+                carpet,
+                appliance,
+                screen,
+                table);
             SpawnResidentialFurniture(
                 tower,
                 towerIndex,
@@ -671,8 +653,8 @@ public partial class FreightTerminalWorld
                 roomWidth,
                 depth,
                 floorY,
-                bedZ,
-                kitchenX);
+                anchors.BedZ,
+                anchors.KitchenX);
             var cacheX = roomX + side * roomWidth * 0.38f;
             SpawnResidentialCache(
                 tower,
@@ -690,18 +672,14 @@ public partial class FreightTerminalWorld
                 ResidentialRoomZone.South,
                 archetype,
                 new Vector3(cacheX, floorY + 0.1f, depth * 0.35f));
-            // Extra clutter so apartments read as lived-in, not empty boxes.
-            ExpansionBox(tower, "ApartmentShelf", new Vector3(roomX + side * roomWidth * 0.18f, floorY + 1.15f, -depth * 0.18f), new Vector3(0.9f, 1.7f, 0.32f), wood);
-            ExpansionBox(tower, "ApartmentCrate", new Vector3(roomX - side * 0.55f, floorY + 0.28f, depth * 0.12f), new Vector3(0.55f, 0.45f, 0.55f), table);
-            MeshBox(tower, new Vector3(roomX + side * 0.4f, floorY + 0.08f, -depth * 0.2f), new Vector3(0.7f, 0.05f, 0.9f), carpet);
             if (featuredFloor)
             {
-                BuildResidentialRoomTheme(tower, archetype, roomX, side, roomWidth, depth, floorY);
+                BuildResidentialRoomTheme(layoutRoot, archetype, roomX, side, roomWidth, depth, floorY);
             }
             tower.AddChild(RegisterResidentialLocalizedLabel(new Label3D
             {
-                Name = "ApartmentPurposeSign",
-                Position = new Vector3(side * (corridorHalfWidth + 0.08f), floorY + 1.55f, livingZ),
+                Name = $"ApartmentPurposeSign_T{towerIndex + 1:00}_F{floor + 1:00}_{(side < 0 ? "W" : "E")}",
+                Position = new Vector3(side * (corridorHalfWidth + 0.08f), floorY + 1.55f, depth * 0.28f),
                 FontSize = 16,
                 OutlineSize = 5,
                 Modulate = ResidentialRoomColor(archetype),
@@ -1278,7 +1256,6 @@ public partial class FreightTerminalWorld
         ResidentialTowerSpec spec,
         float coreZ,
         Godot.Material facade,
-        Godot.Material steel,
         Godot.Material trim,
         Godot.Material light)
     {
@@ -1296,12 +1273,7 @@ public partial class FreightTerminalWorld
         {
             MeshBox(tower, rail.Position, rail.Size, trim);
         }
-        ExpansionBox(tower, "RooftopUtilityRoom", new Vector3(width * 0.22f, roofY + 1.5f, -depth * 0.2f), new Vector3(Mathf.Min(5.0f, width * 0.3f), 3.0f, Mathf.Min(5.2f, depth * 0.3f)), steel);
         MeshBox(tower, new Vector3(0, roofY + 0.3f, coreZ + ResidentialStairOpeningSouthDepth + 0.5f), new Vector3(2.4f, 0.05f, 0.24f), light);
-        if (spec.Floors >= 9)
-        {
-            ExpansionCylinder(tower, "ResidentialRoofAntenna", new Vector3(0, roofY + 4.2f, 0), 0.08f, 7.5f, trim);
-        }
     }
 
     private void BuildTowerCourtyard(
