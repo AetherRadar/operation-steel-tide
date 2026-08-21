@@ -4007,6 +4007,7 @@ public partial class FreightTerminalWorld : Node3D
             (Id: "optic_holo", File: "optic_holo_validation.png", Platform: WeaponPlatform.M4A1),
             (Id: "optic_scope", File: "optic_scope_validation.png", Platform: WeaponPlatform.ScarL),
             (Id: "optic_7x", File: "optic_7x_validation.png", Platform: WeaponPlatform.AXMC),
+            (Id: "optic_7x", File: "awm_optic_7x_validation.png", Platform: WeaponPlatform.AWM),
             (Id: "optic_sniper", File: "optic_sniper_validation.png", Platform: WeaponPlatform.M24)
         };
         foreach (var optic in optics)

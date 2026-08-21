@@ -240,7 +240,7 @@ public partial class TacticalPlayer
         try
         {
             var authoredWeapon = CombatModelLibrary.InstantiateGsh18(firstPerson: true);
-            authoredWeapon.Root.Position = new Vector3(0.0f, -0.04f, -0.02f);
+            authoredWeapon.Root.Position = new Vector3(0.0f, -0.04f, -0.16f);
             _weaponRoot.AddChild(authoredWeapon.Root);
             _authoredGsh18Weapon = authoredWeapon;
         }

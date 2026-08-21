@@ -1051,7 +1051,15 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             : 0.0f;
         _opticRoot.Visible = opticScale > 0.0f;
         _opticRoot.Scale = Vector3.One;
-        _opticRoot.Position = new Vector3(0, opticId is "optic_scope" or "optic_7x" or "optic_sniper" ? 0.225f : 0.205f, -0.25f);
+        var precisionOpticHeight = EquippedWeapon.Platform == WeaponPlatform.AWM
+            ? 0.38f
+            : 0.225f;
+        _opticRoot.Position = new Vector3(
+            0,
+            opticId is "optic_scope" or "optic_7x" or "optic_sniper"
+                ? precisionOpticHeight
+                : 0.205f,
+            -0.25f);
         _reflexSightModel.Visible = opticId == "optic_micro";
         _holoSightModel.Visible = opticId == "optic_holo";
         _scopeSightModel.Visible = opticId is "optic_scope" or "optic_7x" or "optic_sniper";

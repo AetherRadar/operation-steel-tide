@@ -144,6 +144,7 @@ internal sealed class AuthoredOperatorVisual
         var primaryHandDistance = rightHand.Origin.DistanceTo(weaponOrigin);
         var supportHandOffset = weapon.Foregrip.GlobalPosition - leftHand.Origin;
         var supportHandDistance = supportHandOffset.Length();
+        var handSeparation = rightHand.Origin.DistanceTo(leftHand.Origin);
         var muzzleOffset = weapon.MuzzleDevice.GlobalPosition - weaponOrigin;
         var stockOffset = weapon.Stock.GlobalPosition - weaponOrigin;
         var valid = primaryHandDistance <= 0.025f
@@ -157,6 +158,7 @@ internal sealed class AuthoredOperatorVisual
             primaryHandDistance,
             supportHandDistance,
             supportHandOffset,
+            handSeparation,
             weaponOrigin,
             muzzleOffset,
             stockOffset);
@@ -329,6 +331,7 @@ internal readonly record struct OperatorRifleFitInspection(
     float PrimaryHandDistance,
     float SupportHandDistance,
     Vector3 SupportHandOffset,
+    float HandSeparation,
     Vector3 WeaponOrigin,
     Vector3 MuzzleOffset,
     Vector3 StockOffset);
@@ -631,7 +634,8 @@ internal static partial class CombatModelLibrary
     {
         var length = platform switch
         {
-            WeaponPlatform.M24 or WeaponPlatform.AXMC or WeaponPlatform.AWM => 1.62f,
+            WeaponPlatform.AWM => 1.9f,
+            WeaponPlatform.M24 or WeaponPlatform.AXMC => 1.62f,
             WeaponPlatform.AK74 or WeaponPlatform.ScarL or WeaponPlatform.VSS => 1.42f,
             WeaponPlatform.MP5A5 or WeaponPlatform.M3A1 => 1.08f,
             WeaponPlatform.P226 or WeaponPlatform.M1911 => 0.68f,

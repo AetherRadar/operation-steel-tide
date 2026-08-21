@@ -69,6 +69,12 @@ public partial class FreightTerminalWorld
             && _player.UsesAuthoredGsh18ForDiagnostics
             && _player.UsesGsh18ReportForDiagnostics;
         SaveViewportImage("res://gsh18_first_person_validation.png");
+        Input.ActionPress("aim");
+        await WaitFrames(38);
+        var gsh18Aiming = _player.IsAiming;
+        SaveViewportImage("res://gsh18_ads_validation.png");
+        Input.ActionRelease("aim");
+        await WaitFrames(12);
         OpenPersonalBackpack();
         await WaitFrames(5);
         SaveViewportImage("res://gsh18_preview_validation.png");
@@ -206,6 +212,7 @@ public partial class FreightTerminalWorld
             && uniqueLongGunModels
             && initialVisibility
             && gsh18Ready
+            && gsh18Aiming
             && fragSelected
             && fragConsumed
             && localized

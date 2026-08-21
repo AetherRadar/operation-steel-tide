@@ -118,6 +118,24 @@ def matrix_from_rotation_translation(rotation: Quaternion, translation: Vector) 
     return matrix
 
 
+def rifle_world_rotation(rifle_forward: Vector, rifle_up: Vector) -> Quaternion:
+    rifle_right = rifle_forward.cross(rifle_up).normalized()
+    corrected_rifle_up = rifle_right.cross(rifle_forward).normalized()
+    return Matrix((rifle_right, rifle_forward, corrected_rifle_up)).transposed().to_quaternion()
+
+
+def set_pose_bone_world_rotation(
+    armature: bpy.types.Object,
+    bone_name: str,
+    desired_world_rotation: Quaternion,
+) -> None:
+    bone = armature.pose.bones[bone_name]
+    desired_local_rotation = (
+        rotation_only(armature.matrix_world).inverted() @ desired_world_rotation
+    ).normalized()
+    bone.matrix = matrix_from_rotation_translation(desired_local_rotation, bone.matrix.translation)
+
+
 def align_pose_bone_world_direction(
     armature: bpy.types.Object,
     bone_name: str,
@@ -355,6 +373,7 @@ def author_rifle_hold(
     neck_direction: Vector,
     head_direction: Vector,
     support_hand_offset: Vector | None = None,
+    right_hand_world_rotation: Quaternion | None = None,
     remove_source: bool = False,
 ) -> bpy.types.Action:
     armature.animation_data.action = source
@@ -364,9 +383,7 @@ def author_rifle_hold(
     bpy.ops.import_scene.gltf(filepath=str(M4_GLB))
     imported_objects = [obj for obj in bpy.data.objects if obj not in before_objects]
     rifle = next(obj for obj in imported_objects if obj.name == "SteelTideM4A1")
-    rifle_right = rifle_forward.cross(rifle_up).normalized()
-    corrected_rifle_up = rifle_right.cross(rifle_forward).normalized()
-    rifle_matrix = Matrix((rifle_right, rifle_forward, corrected_rifle_up)).transposed().to_4x4()
+    rifle_matrix = rifle_world_rotation(rifle_forward, rifle_up).to_matrix().to_4x4()
     rifle_matrix.translation = rifle_origin
     rifle.matrix_world = rifle_matrix @ Matrix.Diagonal((RIFLE_SCALE, RIFLE_SCALE, RIFLE_SCALE, 1.0))
     bpy.context.view_layer.update()
@@ -402,6 +419,9 @@ def author_rifle_hold(
         @ Vector((0.02, 0.05, 0.998)).normalized(),
     }
     for bone_name, desired_direction in hand_directions.items():
+        if bone_name == "mixamorig:RightHand" and right_hand_world_rotation is not None:
+            set_pose_bone_world_rotation(armature, bone_name, right_hand_world_rotation)
+            continue
         align_pose_bone_world_direction(armature, bone_name, desired_direction)
     bpy.context.view_layer.update()
     left_hand = armature.pose.bones["mixamorig:LeftHand"]
@@ -633,17 +653,6 @@ def main() -> None:
             find_source_action(library, source_name),
             output_name,
         )
-    generated["ready_idle"] = author_rifle_hold(
-        target,
-        generated["idle"],
-        "ready_idle",
-        RIFLE_READY_ORIGIN,
-        RIFLE_READY_FORWARD,
-        RIFLE_READY_UP,
-        Vector((0.0, -0.12, 0.993)).normalized(),
-        Vector((0.0, -0.18, 0.984)).normalized(),
-        support_hand_offset=Vector((-0.27, -0.02, 0.06)),
-    )
     generated["aim_idle"] = author_rifle_hold(
         target,
         generated["aim_idle"],
@@ -654,6 +663,28 @@ def main() -> None:
         Vector((0.0, -0.50, 0.866)),
         Vector((0.0, -0.62, 0.785)),
         remove_source=True,
+    )
+    target.animation_data.action = generated["aim_idle"]
+    bpy.context.scene.frame_set(0)
+    bpy.context.view_layer.update()
+    aim_hand_world_rotation = rotation_only(
+        target.matrix_world @ target.pose.bones["mixamorig:RightHand"].matrix
+    )
+    ready_hand_world_rotation = (
+        rifle_world_rotation(RIFLE_READY_FORWARD, RIFLE_READY_UP)
+        @ rifle_world_rotation(RIFLE_AIM_FORWARD, RIFLE_AIM_UP).inverted()
+        @ aim_hand_world_rotation
+    ).normalized()
+    generated["ready_idle"] = author_rifle_hold(
+        target,
+        generated["idle"],
+        "ready_idle",
+        RIFLE_READY_ORIGIN,
+        RIFLE_READY_FORWARD,
+        RIFLE_READY_UP,
+        Vector((0.0, -0.12, 0.993)).normalized(),
+        Vector((0.0, -0.18, 0.984)).normalized(),
+        right_hand_world_rotation=ready_hand_world_rotation,
     )
     for output_name, source_name in READY_LOCOMOTION_SOURCES.items():
         generated[output_name] = author_upper_body_locomotion(

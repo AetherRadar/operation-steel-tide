@@ -103,12 +103,15 @@ public partial class FreightTerminalWorld
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
                 var movementFit = visual.InspectRifleFit();
                 var handsFit = movementFit.PrimaryHandDistance <= 0.025f
-                    && movementFit.SupportHandDistance <= 0.16f;
+                    && movementFit.SupportHandDistance <= 0.16f
+                    && (!animation.StartsWith("ready_", StringComparison.Ordinal)
+                        || movementFit.HandSeparation >= 0.22f);
                 movementRifleFitValid &= handsFit;
                 movementRifleFits.Add(
                     $"{animation}:{handsFit}:primary={movementFit.PrimaryHandDistance:F3}:"
                     + $"support={movementFit.SupportHandDistance:F3}:"
-                    + $"support_offset={movementFit.SupportHandOffset}:muzzle={movementFit.MuzzleOffset}");
+                    + $"support_offset={movementFit.SupportHandOffset}:"
+                    + $"hand_separation={movementFit.HandSeparation:F3}:muzzle={movementFit.MuzzleOffset}");
             }
         }
         catch (System.Exception exception)
@@ -142,6 +145,7 @@ public partial class FreightTerminalWorld
             + $"rifle_fit={rifleFit.Valid} primary_hand={rifleFit.PrimaryHandDistance:F3} "
             + $"support_hand={rifleFit.SupportHandDistance:F3} "
             + $"support_offset={rifleFit.SupportHandOffset} "
+            + $"hand_separation={rifleFit.HandSeparation:F3} "
             + $"ready_distinct={readyDistinct} ready_weapon={readyIdleFit.WeaponOrigin} "
             + $"ready_cross_body={readyCrossBody} aim_weapon={rifleFit.WeaponOrigin} "
             + $"ready_muzzle={readyIdleFit.MuzzleOffset} "
