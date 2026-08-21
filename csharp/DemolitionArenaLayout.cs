@@ -71,6 +71,7 @@ public sealed partial class DemolitionArenaLayout
     public Vector3 Midpoint { get; }
     public Rect2 WorldBounds { get; }
     public IReadOnlyList<Vector3> SitePositions { get; }
+    public IReadOnlyList<Vector2> LocalSiteCoordinates { get; }
     public IReadOnlyList<Vector3> DefenderSpawns { get; }
     public IReadOnlyList<Vector3> AttackSpawns { get; }
     public IReadOnlyList<Vector3> CoverPoints { get; }
@@ -100,77 +101,122 @@ public sealed partial class DemolitionArenaLayout
             ? DemolitionMapCatalog.HarborLocksId
             : DemolitionMapCatalog.TideforgeId;
         Origin = origin ?? WorldOrigin;
-        AttackSpawn = World(new Vector3(0.0f, 0.22f, 54.0f));
-        DefenderSpawn = World(new Vector3(0.0f, 0.22f, -54.0f));
-        Midpoint = World(new Vector3(0.0f, 0.12f, 2.0f));
-        WorldBounds = new Rect2(Origin.X - 40.0f, Origin.Z - 56.0f, 80.0f, 112.0f);
-
-        SitePositions = WorldPoints(
-            new(-33.0f, 0.18f, 21.0f),
-            new(33.0f, 0.18f, -19.0f));
-        AttackSpawns = WorldPoints(
-            new(-3.0f, 0.22f, 54.0f),
-            new(3.0f, 0.22f, 54.0f),
-            new(-6.0f, 0.22f, 51.0f),
-            new(6.0f, 0.22f, 51.0f),
-            new(0.0f, 0.22f, 52.0f));
-        DefenderSpawns = WorldPoints(
-            new(-3.0f, 0.22f, -52.0f),
-            new(3.0f, 0.22f, -52.0f),
-            new(-8.0f, 0.22f, -50.0f),
-            new(8.0f, 0.22f, -50.0f),
-            new(0.0f, 0.22f, -51.0f));
-        CoverPoints = WorldPoints(
-            new(-29.0f, 0.2f, 27.0f), new(-27.0f, 0.2f, 14.0f),
-            new(-36.0f, 0.2f, 24.0f), new(-30.0f, 0.2f, 8.0f),
-            new(30.0f, 0.2f, -27.0f), new(36.0f, 0.2f, -22.0f),
-            new(26.0f, 0.2f, -16.0f), new(21.0f, 0.2f, -8.0f),
-            new(-8.0f, 0.2f, 4.0f), new(8.0f, 0.2f, 4.0f),
-            new(-8.0f, 0.2f, -7.0f), new(8.0f, 0.2f, -7.0f),
-            new(-15.0f, 0.2f, 31.0f), new(13.0f, 0.2f, 26.0f),
-            new(-22.0f, 0.2f, 6.0f), new(22.0f, 0.2f, 2.0f),
-            new(-9.3f, 0.2f, 17.5f), new(-4.3f, 0.2f, 17.5f),
-            new(4.3f, 0.2f, 12.0f), new(9.3f, 0.2f, 12.0f),
-            new(-6.7f, 0.2f, 31.0f), new(-2.9f, 0.2f, 31.0f),
-            new(2.7f, 0.2f, 27.0f), new(6.5f, 0.2f, 27.0f),
-            new(-9.5f, 0.2f, -31.0f), new(-4.5f, 0.2f, -31.0f),
-            new(4.5f, 0.2f, -36.0f), new(9.5f, 0.2f, -36.0f),
-            new(18.5f, 0.2f, 22.0f), new(27.5f, 0.2f, 22.0f),
-            new(23.0f, 0.2f, 16.0f), new(23.0f, 0.2f, 28.0f),
-            new(-27.0f, 0.2f, -26.0f), new(-17.0f, 0.2f, -26.0f),
-            new(-22.0f, 0.2f, -20.5f), new(-22.0f, 0.2f, -31.5f));
+        var harborLocks = MapId == DemolitionMapCatalog.HarborLocksId;
+        if (harborLocks)
+        {
+            AttackSpawn = World(new Vector3(-32.0f, 0.22f, 35.0f));
+            DefenderSpawn = World(new Vector3(32.0f, 0.22f, -35.0f));
+            Midpoint = World(new Vector3(0.0f, 0.12f, 0.0f));
+            WorldBounds = new Rect2(Origin.X - 58.0f, Origin.Z - 42.0f, 116.0f, 84.0f);
+            LocalSiteCoordinates = Array.AsReadOnly(new[]
+            {
+                new Vector2(-41.0f, -20.0f),
+                new Vector2(41.0f, 20.0f)
+            });
+            SitePositions = WorldPoints(
+                new(-41.0f, 0.18f, -20.0f),
+                new(41.0f, 0.18f, 20.0f));
+            AttackSpawns = WorldPoints(
+                new(-35.0f, 0.22f, 36.0f),
+                new(-31.0f, 0.22f, 36.0f),
+                new(-37.0f, 0.22f, 33.0f),
+                new(-29.0f, 0.22f, 33.0f),
+                new(-33.0f, 0.22f, 34.0f));
+            DefenderSpawns = WorldPoints(
+                new(29.0f, 0.22f, -36.0f),
+                new(33.0f, 0.22f, -36.0f),
+                new(27.0f, 0.22f, -33.0f),
+                new(35.0f, 0.22f, -33.0f),
+                new(31.0f, 0.22f, -34.0f));
+            CoverPoints = WorldPoints(
+                new(-50.0f, 0.2f, -24.0f), new(-45.0f, 0.2f, -14.0f),
+                new(-34.0f, 0.2f, -20.0f), new(-34.0f, 0.2f, -25.0f),
+                new(50.0f, 0.2f, 24.0f), new(46.0f, 0.2f, 14.0f),
+                new(34.0f, 0.2f, 20.0f), new(34.0f, 0.2f, 25.0f),
+                new(-30.0f, 0.2f, 5.0f), new(-20.0f, 0.2f, 3.0f),
+                new(-9.0f, 0.2f, 1.0f), new(0.0f, 0.2f, 4.0f),
+                new(9.0f, 0.2f, -1.0f), new(20.0f, 0.2f, -3.0f),
+                new(30.0f, 0.2f, -5.0f), new(-24.0f, 0.2f, 24.0f),
+                new(-12.0f, 0.2f, 21.0f), new(12.0f, 0.2f, -22.0f),
+                new(24.0f, 0.2f, -24.0f), new(-52.0f, 0.2f, 8.0f),
+                new(52.0f, 0.2f, -8.0f), new(-4.0f, 0.2f, -25.0f),
+                new(4.0f, 0.2f, 25.0f), new(28.0f, 0.2f, 12.0f));
+        }
+        else
+        {
+            AttackSpawn = World(new Vector3(0.0f, 0.22f, 54.0f));
+            DefenderSpawn = World(new Vector3(0.0f, 0.22f, -54.0f));
+            Midpoint = World(new Vector3(0.0f, 0.12f, 2.0f));
+            WorldBounds = new Rect2(Origin.X - 40.0f, Origin.Z - 56.0f, 80.0f, 112.0f);
+            LocalSiteCoordinates = Array.AsReadOnly(LocalSiteCenters);
+            SitePositions = WorldPoints(
+                new(-33.0f, 0.18f, 21.0f),
+                new(33.0f, 0.18f, -19.0f));
+            AttackSpawns = WorldPoints(
+                new(-3.0f, 0.22f, 54.0f),
+                new(3.0f, 0.22f, 54.0f),
+                new(-6.0f, 0.22f, 51.0f),
+                new(6.0f, 0.22f, 51.0f),
+                new(0.0f, 0.22f, 52.0f));
+            DefenderSpawns = WorldPoints(
+                new(-3.0f, 0.22f, -52.0f),
+                new(3.0f, 0.22f, -52.0f),
+                new(-8.0f, 0.22f, -50.0f),
+                new(8.0f, 0.22f, -50.0f),
+                new(0.0f, 0.22f, -51.0f));
+            CoverPoints = WorldPoints(
+                new(-29.0f, 0.2f, 27.0f), new(-27.0f, 0.2f, 14.0f),
+                new(-36.0f, 0.2f, 24.0f), new(-30.0f, 0.2f, 8.0f),
+                new(30.0f, 0.2f, -27.0f), new(36.0f, 0.2f, -22.0f),
+                new(26.0f, 0.2f, -16.0f), new(21.0f, 0.2f, -8.0f),
+                new(-8.0f, 0.2f, 4.0f), new(8.0f, 0.2f, 4.0f),
+                new(-8.0f, 0.2f, -7.0f), new(8.0f, 0.2f, -7.0f),
+                new(-15.0f, 0.2f, 31.0f), new(13.0f, 0.2f, 26.0f),
+                new(-22.0f, 0.2f, 6.0f), new(22.0f, 0.2f, 2.0f),
+                new(-9.3f, 0.2f, 17.5f), new(-4.3f, 0.2f, 17.5f),
+                new(4.3f, 0.2f, 12.0f), new(9.3f, 0.2f, 12.0f),
+                new(-6.7f, 0.2f, 31.0f), new(-2.9f, 0.2f, 31.0f),
+                new(2.7f, 0.2f, 27.0f), new(6.5f, 0.2f, 27.0f),
+                new(-9.5f, 0.2f, -31.0f), new(-4.5f, 0.2f, -31.0f),
+                new(4.5f, 0.2f, -36.0f), new(9.5f, 0.2f, -36.0f),
+                new(18.5f, 0.2f, 22.0f), new(27.5f, 0.2f, 22.0f),
+                new(23.0f, 0.2f, 16.0f), new(23.0f, 0.2f, 28.0f),
+                new(-27.0f, 0.2f, -26.0f), new(-17.0f, 0.2f, -26.0f),
+                new(-22.0f, 0.2f, -20.5f), new(-22.0f, 0.2f, -31.5f));
+        }
 
         CollisionBoxes = MapId == DemolitionMapCatalog.HarborLocksId
             ? BuildHarborLocksCollisionBoxes()
             : BuildCollisionBoxes();
-        CentralCoverBodyCount = CollisionBoxes.Count(box => box.Name.StartsWith("MidCover", StringComparison.Ordinal));
         DetailBoxes = MapId == DemolitionMapCatalog.HarborLocksId
             ? BuildHarborLocksDetailBoxes()
             : BuildDetailBoxes();
         Props = MapId == DemolitionMapCatalog.HarborLocksId
             ? BuildHarborLocksProps()
             : BuildProps();
+        CentralCoverBodyCount = CollisionBoxes.Count(box => box.Name.StartsWith("MidCover", StringComparison.Ordinal))
+            + Props.Count(prop => prop.Name.StartsWith("MidCover", StringComparison.Ordinal));
         CentralPropsDoNotOverlap = !Props.Any(prop => CollisionBoxes.Any(box =>
             box.Name.StartsWith("MidCover", StringComparison.Ordinal)
             && GroundFootprintsOverlap(box, prop)));
         Markers = BuildMarkers();
-        AttackToAPath = WorldPoints(
+        AttackToAPath = harborLocks ? BuildHarborLocksAttackToAPath() : WorldPoints(
             new(0, 0.2f, 54), new(0, 0.2f, 46),
             new(-6, 0.2f, 36), new(-11, 0.2f, 26),
             new(-12, 0.2f, 10), new(-18, 0.2f, 5),
             new(-23, 0.2f, 10), new(-30, 0.2f, 15),
             new(-28, 0.2f, 18), new(-33, 0.2f, 21));
-        AttackToBPath = WorldPoints(
+        AttackToBPath = harborLocks ? BuildHarborLocksAttackToBPath() : WorldPoints(
             new(0, 0.2f, 54), new(0, 0.2f, 46),
             new(6, 0.2f, 33), new(8, 0.2f, 20),
             new(15, 0.2f, 10), new(15, 0.2f, 5),
             new(25, 0.2f, 5), new(25, 0.2f, -4),
             new(29, 0.2f, -10), new(33, 0.2f, -19));
-        AttackMidPath = WorldPoints(
+        AttackMidPath = harborLocks ? BuildHarborLocksAttackMidPath() : WorldPoints(
             new(0, 0.2f, 54), new(0, 0.2f, 46),
             new(0, 0.2f, 38), new(0, 0.2f, 12),
             new(0, 0.2f, 4));
-        DefenderToAPath = WorldPoints(
+        DefenderToAPath = harborLocks ? BuildHarborLocksDefenderToAPath() : WorldPoints(
             new(0, 0.2f, -54), new(0, 0.2f, -46),
             new(0, 0.2f, -40), new(-4.0f, 0.2f, -35),
             new(-4.0f, 0.2f, -27), new(-8.0f, 0.2f, -22),
@@ -178,20 +224,24 @@ public sealed partial class DemolitionArenaLayout
             new(-16.0f, 0.2f, 3), new(-24.0f, 0.2f, 4),
             new(-24.0f, 0.2f, 16), new(-28.0f, 0.2f, 21),
             new(-33.0f, 0.2f, 21));
-        DefenderToBPath = WorldPoints(
+        DefenderToBPath = harborLocks ? BuildHarborLocksDefenderToBPath() : WorldPoints(
             new(0, 0.2f, -54), new(0, 0.2f, -46),
             new(7.0f, 0.2f, -43), new(11.0f, 0.2f, -39),
             new(11.0f, 0.2f, -28), new(20.0f, 0.2f, -24),
             new(28.0f, 0.2f, -20), new(33.0f, 0.2f, -19));
-        SiteRotationPath = WorldPoints(
+        SiteRotationPath = harborLocks ? BuildHarborLocksSiteRotationPath() : WorldPoints(
             new(-33, 0.2f, 21), new(-28, 0.2f, 21), new(-24, 0.2f, 16),
             new(-24, 0.2f, 4), new(-16, 0.2f, 3), new(-15, 0.2f, 0),
             new(-8, 0.2f, -1), new(-8, 0.2f, -5), new(0, 0.2f, -5),
             new(6, 0.2f, -1), new(14.6f, 0.2f, -1), new(15, 0.2f, 4),
             new(15, 0.2f, 6), new(21, 0.2f, 6), new(24, 0.2f, -2), new(24, 0.2f, -9),
             new(30, 0.2f, -11), new(33, 0.2f, -19));
-        CriticalPassageWidths = new[] { 3.8f, 4.2f, 4.5f, 5.2f, 6.0f };
-        CriticalPassageHeights = new[] { 2.7f, 3.2f, 4.2f, 6.0f };
+        CriticalPassageWidths = harborLocks
+            ? new[] { 3.2f, 3.8f, 4.4f, 5.0f, 7.2f }
+            : new[] { 3.8f, 4.2f, 4.5f, 5.2f, 6.0f };
+        CriticalPassageHeights = harborLocks
+            ? new[] { 3.0f, 3.8f, 5.0f, 7.5f }
+            : new[] { 2.7f, 3.2f, 4.2f, 6.0f };
     }
 
     public float AttackToALength => PathLength(AttackToAPath);

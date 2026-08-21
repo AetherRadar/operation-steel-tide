@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Godot;
 
 namespace OperationSteelTide;
 
@@ -72,8 +73,10 @@ public sealed class DemolitionStrategyPlanner
         IReadOnlyList<DemolitionAgentSnapshot> members,
         int plantedSiteIndex = -1,
         IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents = null,
-        int strategySeed = 0)
+        int strategySeed = 0,
+        IReadOnlyList<Vector2>? siteCenters = null)
     {
+        siteCenters ??= DemolitionArenaLayout.LocalSiteCenters;
         var available = members
             .Where(member => member.Team == team && member.Alive && !member.Downed)
             .OrderBy(member => member.MemberId, StringComparer.Ordinal)
@@ -89,11 +92,11 @@ public sealed class DemolitionStrategyPlanner
         {
             return phase == DemolitionStrategyPhase.PostPlant && plantedSiteIndex >= 0
                 ? PlanAttackerPostPlant(available, plantedSiteIndex)
-                : PlanAttackerOpening(available, knownOpponents, strategySeed);
+                : PlanAttackerOpening(available, knownOpponents, strategySeed, siteCenters);
         }
         return phase == DemolitionStrategyPhase.PostPlant && plantedSiteIndex >= 0
-            ? PlanDefenderRetake(available, plantedSiteIndex)
-            : PlanDefenderOpening(available, knownOpponents);
+            ? PlanDefenderRetake(available, plantedSiteIndex, siteCenters)
+            : PlanDefenderOpening(available, knownOpponents, siteCenters);
     }
 
     /// <summary>
@@ -103,7 +106,8 @@ public sealed class DemolitionStrategyPlanner
     /// </summary>
     private static int ChooseAttackerSite(
         List<DemolitionAgentSnapshot> members,
-        IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents)
+        IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents,
+        IReadOnlyList<Vector2> siteCenters)
     {
         var averageRange = members.Average(member => member.WeaponRange);
         var reconWeight = members.Count(member => member.Role == OperatorRole.Recon) * 0.18f;
@@ -114,12 +118,12 @@ public sealed class DemolitionStrategyPlanner
         {
             return fallback;
         }
-        var threats = new int[DemolitionArenaLayout.LocalSiteCenters.Length];
+        var threats = new int[siteCenters.Count];
         foreach (var opponent in knownOpponents)
         {
             for (var site = 0; site < threats.Length; site++)
             {
-                if (IsNearSite(opponent, site, 30.0f))
+                if (IsNearSite(opponent, site, 30.0f, siteCenters))
                 {
                     threats[site]++;
                 }
@@ -133,7 +137,9 @@ public sealed class DemolitionStrategyPlanner
     }
 
     /// <summary>The site currently under contact, driving pre-plant defensive rotation.</summary>
-    private static int ThreatenedSite(IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents)
+    private static int ThreatenedSite(
+        IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents,
+        IReadOnlyList<Vector2> siteCenters)
     {
         if (knownOpponents is null || knownOpponents.Count == 0)
         {
@@ -141,15 +147,15 @@ public sealed class DemolitionStrategyPlanner
         }
         var best = -1;
         var bestDistance = float.PositiveInfinity;
-        for (var site = 0; site < DemolitionArenaLayout.LocalSiteCenters.Length; site++)
+        for (var site = 0; site < siteCenters.Count; site++)
         {
             foreach (var opponent in knownOpponents)
             {
-                if (!IsNearSite(opponent, site, 34.0f))
+                if (!IsNearSite(opponent, site, 34.0f, siteCenters))
                 {
                     continue;
                 }
-                var center = DemolitionArenaLayout.LocalSiteCenters[site];
+                var center = siteCenters[site];
                 var dx = opponent.PositionX - center.X;
                 var dz = opponent.PositionZ - center.Y;
                 var distance = dx * dx + dz * dz;
@@ -163,9 +169,13 @@ public sealed class DemolitionStrategyPlanner
         return best;
     }
 
-    private static bool IsNearSite(DemolitionAgentSnapshot member, int site, float radius)
+    private static bool IsNearSite(
+        DemolitionAgentSnapshot member,
+        int site,
+        float radius,
+        IReadOnlyList<Vector2> siteCenters)
     {
-        var center = DemolitionArenaLayout.LocalSiteCenters[site];
+        var center = siteCenters[site];
         var dx = member.PositionX - center.X;
         var dz = member.PositionZ - center.Y;
         return dx * dx + dz * dz <= radius * radius;
@@ -192,9 +202,10 @@ public sealed class DemolitionStrategyPlanner
     private static DemolitionStrategyPlan PlanAttackerOpening(
         List<DemolitionAgentSnapshot> members,
         IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents,
-        int strategySeed)
+        int strategySeed,
+        IReadOnlyList<Vector2> siteCenters)
     {
-        var primarySite = ChooseAttackerSite(members, knownOpponents);
+        var primarySite = ChooseAttackerSite(members, knownOpponents, siteCenters);
         var openingPattern = ChooseOpeningPattern(members, strategySeed);
 
         var entry = members
@@ -307,9 +318,10 @@ public sealed class DemolitionStrategyPlanner
 
     private static DemolitionStrategyPlan PlanDefenderOpening(
         List<DemolitionAgentSnapshot> members,
-        IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents = null)
+        IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents,
+        IReadOnlyList<Vector2> siteCenters)
     {
-        var threatened = ThreatenedSite(knownOpponents);
+        var threatened = ThreatenedSite(knownOpponents, siteCenters);
         var assignments = new List<DemolitionAssignment>(members.Count);
         var ordered = members
             .OrderByDescending(member => member.WeaponRange)
@@ -382,10 +394,10 @@ public sealed class DemolitionStrategyPlanner
 
     private static DemolitionStrategyPlan PlanDefenderRetake(
         List<DemolitionAgentSnapshot> members,
-        int plantedSiteIndex)
+        int plantedSiteIndex,
+        IReadOnlyList<Vector2> siteCenters)
     {
-        var site = DemolitionArenaLayout.LocalSiteCenters[
-            Math.Clamp(plantedSiteIndex, 0, DemolitionArenaLayout.LocalSiteCenters.Length - 1)];
+        var site = siteCenters[Math.Clamp(plantedSiteIndex, 0, siteCenters.Count - 1)];
         var siteX = site.X;
         var siteZ = site.Y;
         var defuser = members

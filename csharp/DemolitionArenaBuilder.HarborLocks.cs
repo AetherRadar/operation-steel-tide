@@ -10,19 +10,19 @@ public sealed partial class DemolitionArenaBuilder
         DemolitionArenaLayout layout,
         IReadOnlyDictionary<string, StandardMaterial3D> materials)
     {
-        AddSign(root, "ArenaTitle", layout.Origin + new Vector3(0, 5.2f, -54.6f), "HARBOR LOCKS  //  HL-02", 0, new Color(0.34f, 0.88f, 1.0f));
-        AddSign(root, "WestControlSign", layout.Origin + new Vector3(-27.0f, 4.6f, 10.4f), "A  //  WEST CONTROL", Mathf.Pi, new Color(1.0f, 0.58f, 0.16f));
-        AddSign(root, "EastPumpSign", layout.Origin + new Vector3(25.0f, 4.8f, -3.4f), "B  //  EAST PUMP", Mathf.Pi, new Color(0.36f, 0.86f, 1.0f));
-        AddSign(root, "LockGateSign", layout.Origin + new Vector3(0.0f, 4.5f, 21.54f), "LOCK 02  //  GATE CONTROL", 0, new Color(0.72f, 0.92f, 0.94f));
+        AddSign(root, "ArenaTitle", layout.Origin + new Vector3(0, 5.2f, -41.0f), "HARBOR LOCKS  //  HL-02", 0, new Color(0.34f, 0.88f, 1.0f));
+        AddSign(root, "WestControlSign", layout.Origin + new Vector3(-41.0f, 4.6f, -26.4f), "A  //  WEST CONTROL", 0, new Color(1.0f, 0.58f, 0.16f));
+        AddSign(root, "EastPumpSign", layout.Origin + new Vector3(41.0f, 4.8f, 26.4f), "B  //  EAST PUMP", Mathf.Pi, new Color(0.36f, 0.86f, 1.0f));
+        AddSign(root, "LockGateSign", layout.Origin + new Vector3(0.0f, 4.5f, 4.42f), "LOCK 02  //  CONTROL BRIDGE", Mathf.Pi, new Color(0.72f, 0.92f, 0.94f));
 
         for (var index = 0; index < 5; index++)
         {
-            var x = -12.0f + index * 6.0f;
+            var x = -9.0f + index * 4.5f;
             AddVisualBox(
                 root,
                 new DemolitionArenaBox(
                     $"HarborGantryRib_{index + 1:00}",
-                    layout.Origin + new Vector3(x, 6.4f, 22.0f),
+                    layout.Origin + new Vector3(x, 6.4f, 0.0f),
                     new Vector3(0.24f, 2.2f, 0.24f),
                     "steel"),
                 materials["steel"]);
@@ -34,35 +34,35 @@ public sealed partial class DemolitionArenaBuilder
         DemolitionArenaLayout layout,
         IReadOnlyDictionary<string, StandardMaterial3D> materials)
     {
-        for (var index = 0; index < 4; index++)
+        for (var index = 0; index < 5; index++)
         {
             AddStaticCylinder(
                 root,
-                $"HarborBollardWest_{index + 1:00}",
-                layout.Origin + new Vector3(-15.4f, 0.65f, 31.0f - index * 17.0f),
+                $"HarborBollardNorth_{index + 1:00}",
+                layout.Origin + new Vector3(-44.0f + index * 22.0f, 0.65f, -9.2f),
                 0.28f,
                 0.38f,
                 1.3f,
                 materials["steel_dark"]);
             AddStaticCylinder(
                 root,
-                $"HarborBollardEast_{index + 1:00}",
-                layout.Origin + new Vector3(15.4f, 0.65f, 26.0f - index * 17.0f),
+                $"HarborBollardSouth_{index + 1:00}",
+                layout.Origin + new Vector3(-44.0f + index * 22.0f, 0.65f, 9.2f),
                 0.28f,
                 0.38f,
                 1.3f,
                 materials["steel_dark"]);
         }
-        AddSign(root, "WestQuaySign", layout.Origin + new Vector3(-22.0f, 2.7f, -21.92f), "WEST QUAY  //  SERVICE", Mathf.Pi, new Color(1.0f, 0.68f, 0.22f));
-        AddSign(root, "EastQuaySign", layout.Origin + new Vector3(23.0f, 4.2f, 19.18f), "EAST QUAY  //  PUMPS", 0, new Color(0.32f, 0.88f, 1.0f));
+        AddSign(root, "WestQuaySign", layout.Origin + new Vector3(-50.8f, 2.7f, 0.0f), "WEST SERVICE BRIDGE", Mathf.Pi * 0.5f, new Color(1.0f, 0.68f, 0.22f));
+        AddSign(root, "EastQuaySign", layout.Origin + new Vector3(50.8f, 2.7f, 0.0f), "EAST SERVICE BRIDGE", -Mathf.Pi * 0.5f, new Color(0.32f, 0.88f, 1.0f));
     }
 
     private void BuildHarborLocksRouteGuidance(Node3D root, DemolitionArenaLayout layout)
     {
-        AddFloorLabel(root, "AttackFloorLabel", layout.Origin + new Vector3(0, 0.09f, 43.0f), "ATTACK QUAY", new Color(0.56f, 0.92f, 0.86f), 68);
-        AddFloorLabel(root, "RouteALabel", layout.Origin + new Vector3(-6.0f, 0.09f, 36.0f), "<  A CONTROL", new Color(1.0f, 0.58f, 0.18f), 58);
-        AddFloorLabel(root, "RouteMidLabel", layout.Origin + new Vector3(0, 0.09f, 34.0f), "LOCK", new Color(0.9f, 0.88f, 0.68f), 54);
-        AddFloorLabel(root, "RouteBLabel", layout.Origin + new Vector3(6.0f, 0.09f, 36.0f), "B PUMPS  >", new Color(0.28f, 0.82f, 0.96f), 58);
-        AddFloorLabel(root, "DefendFloorLabel", layout.Origin + new Vector3(0, 0.09f, -43.0f), "DEFEND QUAY", new Color(0.46f, 0.94f, 0.68f), 64);
+        AddFloorLabel(root, "AttackFloorLabel", layout.Origin + new Vector3(-33.0f, 0.09f, 35.0f), "HARBOR ENTRY", new Color(0.56f, 0.92f, 0.86f), 68);
+        AddFloorLabel(root, "RouteALabel", layout.Origin + new Vector3(-43.0f, 0.09f, 24.0f), "A CONTROL  ^", new Color(1.0f, 0.58f, 0.18f), 58);
+        AddFloorLabel(root, "RouteMidLabel", layout.Origin + new Vector3(-18.0f, 0.09f, 18.0f), "LOCK BRIDGE", new Color(0.9f, 0.88f, 0.68f), 54);
+        AddFloorLabel(root, "RouteBLabel", layout.Origin + new Vector3(17.0f, 0.09f, 24.0f), "B PUMPS  >", new Color(0.28f, 0.82f, 0.96f), 58);
+        AddFloorLabel(root, "DefendFloorLabel", layout.Origin + new Vector3(32.0f, 0.09f, -35.0f), "MAINTENANCE YARD", new Color(0.46f, 0.94f, 0.68f), 64);
     }
 }
