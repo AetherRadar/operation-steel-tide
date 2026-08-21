@@ -166,7 +166,7 @@ public static class GameLocalization
         Chinese["weapon_desert_eagle"] = "\u6c99\u6f20\u4e4b\u9e70 .50 AE";
         Chinese["weapon_gsh18"] = "GSh-18 \u6218\u6597\u624b\u67aa";
         Chinese["weapon_mp5a5"] = "MP5A5 \u51b2\u950b\u67aa";
-        Chinese["weapon_m3a1"] = "M3A1 \u7b80\u6613\u51b2\u950b\u67aa";
+        Chinese["weapon_m3a1"] = "SMG-45 \u6218\u672f\u51b2\u950b\u67aa";
         Chinese["weapon_axmc"] = "AXMC .338 \u8d85\u8fdc\u7a0b\u72d9\u51fb\u6b65\u67aa";
         Chinese["equipment_patrol_helmet"] = "\u5de1\u903b\u9632\u62a4\u76d4";
         Chinese["equipment_patrol_armor"] = "\u8f6f\u8d28\u5de1\u903b\u62a4\u7532";
@@ -363,7 +363,7 @@ public static class GameLocalization
         Chinese["minimap_command"] = "\u6307\u6325\u8231";
         Chinese["ammo_tier_tooltip"] = "\u5f39\u5323\u5185\u5f39\u836f\u7b49\u7ea7";
         Chinese["loadout_scavenger"] = "\u641c\u7d22\u8005 / \u4ec5\u5200\u5177";
-        Chinese["loadout_m3a1"] = "M3A1 \u65b0\u624b\u51b2\u950b\u67aa";
+        Chinese["loadout_m3a1"] = "SMG-45 \u65b0\u624b\u51b2\u950b\u67aa";
         Chinese["loadout_m4a1"] = "M4A1 \u7a81\u51fb";
         Chinese["loadout_ak74"] = "AK-74N \u7a81\u51fb";
         Chinese["loadout_scarl"] = "SCAR-L \u7279\u79cd\u6b65\u67aa";

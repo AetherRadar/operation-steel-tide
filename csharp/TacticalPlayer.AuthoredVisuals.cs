@@ -6,11 +6,17 @@ namespace OperationSteelTide;
 
 public partial class TacticalPlayer
 {
+    private const float AuthoredSmgPresentationScale = 0.72f;
+    private static readonly Vector3 AuthoredSmgCameraPosition = new(0.34f, -0.45f, -0.72f);
+
     private Node3D _proceduralWeaponVisual = null!;
+    private Node3D _proceduralFirstPersonArms = null!;
     private AuthoredWeaponVisual _authoredPrimaryWeapon = null!;
     private readonly Dictionary<WeaponPlatform, AuthoredWeaponVisual> _authoredPlatformWeapons = new();
+    private AuthoredFirstPersonSmgVisual _authoredFirstPersonSmg = null!;
     private AuthoredGsh18Visual _authoredGsh18Weapon = null!;
     private AuthoredDesertEagleVisual _authoredDesertEagleWeapon = null!;
+    private bool _smg45LoadAttempted;
     private bool _gsh18LoadAttempted;
     private bool _desertEagleLoadAttempted;
 
@@ -30,6 +36,9 @@ public partial class TacticalPlayer
         {
             WeaponPlatform.M4A1 => UsesAuthoredPrimaryWeaponForDiagnostics
                 && _authoredPrimaryWeapon.Root.Visible,
+            WeaponPlatform.M3A1 => IsInstanceValid(_authoredFirstPersonSmg?.Root)
+                && EquippedWeapon.Platform == WeaponPlatform.M3A1
+                && _authoredFirstPersonSmg.Root.Visible,
             WeaponPlatform.GSh18 => UsesAuthoredGsh18ForDiagnostics,
             WeaponPlatform.DesertEagle => UsesAuthoredDesertEagleForDiagnostics,
             _ => _authoredPlatformWeapons.TryGetValue(platform, out var visual)
@@ -38,10 +47,13 @@ public partial class TacticalPlayer
                 && visual.Root.Visible
         };
     internal ulong AuthoredWeaponInstanceIdForDiagnostics(WeaponPlatform platform)
-        => _authoredPlatformWeapons.TryGetValue(platform, out var visual)
-            && IsInstanceValid(visual.Root)
-            ? visual.Root.GetInstanceId()
-            : 0;
+        => platform == WeaponPlatform.M3A1
+            && IsInstanceValid(_authoredFirstPersonSmg?.Root)
+                ? _authoredFirstPersonSmg.Root.GetInstanceId()
+                : _authoredPlatformWeapons.TryGetValue(platform, out var visual)
+                    && IsInstanceValid(visual.Root)
+                    ? visual.Root.GetInstanceId()
+                    : 0;
 
     private void BuildAuthoredPrimaryWeapon()
     {
@@ -61,7 +73,10 @@ public partial class TacticalPlayer
     private void RefreshAuthoredPrimaryWeapon()
     {
         var useAuthoredM4 = EquippedWeapon.Platform == WeaponPlatform.M4A1;
+        var wantsAuthoredSmg = EquippedWeapon.Platform == WeaponPlatform.M3A1;
+        var useAuthoredSmg = wantsAuthoredSmg;
         var useAuthoredPlatform = EquippedWeapon.Platform is not WeaponPlatform.M4A1
+            and not WeaponPlatform.M3A1
             and not WeaponPlatform.GSh18
             and not WeaponPlatform.DesertEagle;
         var useAuthoredGsh18 = EquippedWeapon.Platform == WeaponPlatform.GSh18;
@@ -70,6 +85,10 @@ public partial class TacticalPlayer
         if (useAuthoredGsh18)
         {
             EnsureAuthoredGsh18Weapon();
+        }
+        if (useAuthoredSmg)
+        {
+            EnsureAuthoredFirstPersonSmg();
         }
         if (useAuthoredDesertEagle)
         {
@@ -91,6 +110,18 @@ public partial class TacticalPlayer
         else
         {
             useAuthoredM4 = false;
+        }
+        if (IsInstanceValid(_authoredFirstPersonSmg?.Root))
+        {
+            _authoredFirstPersonSmg.Root.Visible = useAuthoredSmg;
+            if (useAuthoredSmg)
+            {
+                _authoredFirstPersonSmg.SyncMechanisms(_magazine, _chargingHandle);
+            }
+        }
+        else
+        {
+            useAuthoredSmg = false;
         }
         if (IsInstanceValid(_authoredGsh18Weapon?.Root))
         {
@@ -122,10 +153,39 @@ public partial class TacticalPlayer
             EquippedWeapon.Platform,
             out var activePlatformWeapon)
             && IsInstanceValid(activePlatformWeapon.Root);
+        if (IsInstanceValid(_proceduralFirstPersonArms))
+        {
+            _proceduralFirstPersonArms.Visible = !useAuthoredSmg;
+        }
         _proceduralWeaponVisual.Visible = !useAuthoredM4
+            && !useAuthoredSmg
             && !useAuthoredGsh18
             && !wantsAuthoredDesertEagle
             && !useAuthoredPlatform;
+    }
+
+    private void EnsureAuthoredFirstPersonSmg()
+    {
+        if (_smg45LoadAttempted || IsInstanceValid(_authoredFirstPersonSmg?.Root))
+        {
+            return;
+        }
+        _smg45LoadAttempted = true;
+        try
+        {
+            var authoredSmg = CombatModelLibrary.InstantiateFirstPersonSmg45();
+            var inheritedScale = Mathf.Max(0.0001f, _weaponRoot.Scale.X);
+            authoredSmg.Root.Scale = Vector3.One * (AuthoredSmgPresentationScale / inheritedScale);
+            authoredSmg.Root.Position =
+                (AuthoredSmgCameraPosition - _weaponRoot.Position) / inheritedScale;
+            authoredSmg.Root.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
+            _weaponRoot.AddChild(authoredSmg.Root);
+            _authoredFirstPersonSmg = authoredSmg;
+        }
+        catch (Exception exception)
+        {
+            GD.PushError($"Required authored SMG-45 first-person model unavailable: {exception.Message}");
+        }
     }
 
     private void EnsureAuthoredPlatformWeapon(WeaponPlatform platform)
@@ -194,6 +254,12 @@ public partial class TacticalPlayer
             && IsInstanceValid(_authoredPrimaryWeapon?.Root))
         {
             _authoredPrimaryWeapon.SyncMechanisms(_magazine, _spareMagazine, _chargingHandle);
+        }
+        if (EquippedWeapon.Platform == WeaponPlatform.M3A1
+            && IsInstanceValid(_authoredFirstPersonSmg?.Root))
+        {
+            _authoredFirstPersonSmg.SyncMechanisms(_magazine, _chargingHandle);
+            _muzzle.GlobalTransform = _authoredFirstPersonSmg.Muzzle.GlobalTransform;
         }
         SyncAuthoredPlatformWeapon();
     }

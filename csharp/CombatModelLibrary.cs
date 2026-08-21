@@ -340,7 +340,7 @@ internal readonly record struct CombatModelInspection(
     int MaterialCount,
     Vector3 Size);
 
-internal static class CombatModelLibrary
+internal static partial class CombatModelLibrary
 {
     internal const string WeaponScenePath = "res://assets/models/steel_tide_m4a1/steel_tide_m4a1.glb";
     private const string QuaterniusWeaponRoot = "res://assets/models/quaternius_ultimate_guns";
@@ -618,7 +618,7 @@ internal static class CombatModelLibrary
             WeaponPlatform.ScarL => $"{QuaterniusWeaponRoot}/scarl.glb",
             WeaponPlatform.M24 => $"{QuaterniusWeaponRoot}/m24.glb",
             WeaponPlatform.MP5A5 => $"{QuaterniusWeaponRoot}/mp5a5.glb",
-            WeaponPlatform.M3A1 => $"{QuaterniusWeaponRoot}/m3a1.glb",
+            WeaponPlatform.M3A1 => Smg45WeaponScenePath,
             WeaponPlatform.AXMC => $"{QuaterniusWeaponRoot}/axmc.glb",
             WeaponPlatform.AWM => $"{QuaterniusWeaponRoot}/awm.glb",
             WeaponPlatform.VSS => $"{QuaterniusWeaponRoot}/vss.glb",

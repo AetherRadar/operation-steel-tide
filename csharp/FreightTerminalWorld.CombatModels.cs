@@ -168,6 +168,7 @@ public partial class FreightTerminalWorld
         var previewOperator = CombatModelLibrary.InspectPreviewOperator();
         var gsh18 = CombatModelLibrary.InspectGsh18();
         var desertEagle = CombatModelLibrary.InspectDesertEagle();
+        var firstPersonSmg = CombatModelLibrary.InspectFirstPersonSmg45();
         var weaponGeometry = weapon.Loaded
             && weapon.RequiredNodes
             && weapon.MeshCount >= 8
@@ -202,6 +203,13 @@ public partial class FreightTerminalWorld
             && desertEagle.Size.X is >= 0.1f and <= 0.3f
             && desertEagle.Size.Y is >= 0.45f and <= 0.75f
             && desertEagle.Size.Z is >= 0.9f and <= 1.2f;
+        var firstPersonSmgGeometry = firstPersonSmg.Loaded
+            && firstPersonSmg.RequiredNodes
+            && firstPersonSmg.MeshCount >= 7
+            && firstPersonSmg.MaterialCount >= 2
+            && firstPersonSmg.Size.X is >= 0.45f and <= 1.1f
+            && firstPersonSmg.Size.Y is >= 0.3f and <= 0.9f
+            && firstPersonSmg.Size.Z is >= 1.2f and <= 1.8f;
         var playerAuthored = _player.UsesAuthoredPrimaryWeaponForDiagnostics;
         var squadAuthored = _squadMates.Count > 0
             && _squadMates.Where(IsInstanceValid).All(mate => mate.UsesAuthoredOperatorForDiagnostics);
@@ -229,6 +237,7 @@ public partial class FreightTerminalWorld
             && previewOperatorGeometry
             && gsh18Geometry
             && desertEagleGeometry
+            && firstPersonSmgGeometry
             && playerAuthored
             && squadAuthored
             && enemiesAuthored
@@ -248,6 +257,9 @@ public partial class FreightTerminalWorld
             + $"deagle_loaded={desertEagle.Loaded} deagle_nodes={desertEagle.RequiredNodes} "
             + $"deagle_meshes={desertEagle.MeshCount} deagle_materials={desertEagle.MaterialCount} "
             + $"deagle_size={desertEagle.Size} "
+            + $"smg45_fp_loaded={firstPersonSmg.Loaded} smg45_fp_nodes={firstPersonSmg.RequiredNodes} "
+            + $"smg45_fp_meshes={firstPersonSmg.MeshCount} smg45_fp_materials={firstPersonSmg.MaterialCount} "
+            + $"smg45_fp_size={firstPersonSmg.Size} "
             + $"platforms={string.Join(',', platformInspections.Select(pair => $"{pair.Key}:{FormatWeaponInspection(pair.Value, platformGeometry[pair.Key])}"))} "
             + $"lineup={lineupCaptured} "
             + $"first_person={string.Join(',', firstPersonCaptures.Select(pair => $"{pair.Key}:{pair.Value}"))} "

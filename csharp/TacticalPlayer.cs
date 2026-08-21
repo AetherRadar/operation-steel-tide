@@ -571,10 +571,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
         var glove = GloveFabric(new Color(0.12f, 0.135f, 0.112f));
         var gloveArmor = Material(new Color(0.022f, 0.03f, 0.028f), 0.12f, 0.76f);
-        _supportHand = BuildTacticalHand(_weaponRoot, true, new Vector3(-0.03f, -0.2f, -0.58f), new Vector3(0.2f, 0, 0.05f), glove, gloveArmor);
-        _supportForearm = BuildSleevedForearm(_weaponRoot, new Vector3(-0.12f, -0.42f, -0.47f), new Vector3(0.25f, 0, -0.26f), glove, gloveArmor);
-        BuildTacticalHand(_weaponRoot, false, new Vector3(0.115f, -0.2f, -0.075f), new Vector3(-0.12f, 0.05f, -0.18f), glove, gloveArmor);
-        BuildSleevedForearm(_weaponRoot, new Vector3(0.19f, -0.42f, 0.015f), new Vector3(-0.18f, 0.05f, -0.3f), glove, gloveArmor);
+        _proceduralFirstPersonArms = new Node3D { Name = "ProceduralFirstPersonArms" };
+        _weaponRoot.AddChild(_proceduralFirstPersonArms);
+        _supportHand = BuildTacticalHand(_proceduralFirstPersonArms, true, new Vector3(-0.03f, -0.2f, -0.58f), new Vector3(0.2f, 0, 0.05f), glove, gloveArmor);
+        _supportForearm = BuildSleevedForearm(_proceduralFirstPersonArms, new Vector3(-0.12f, -0.42f, -0.47f), new Vector3(0.25f, 0, -0.26f), glove, gloveArmor);
+        BuildTacticalHand(_proceduralFirstPersonArms, false, new Vector3(0.115f, -0.2f, -0.075f), new Vector3(-0.12f, 0.05f, -0.18f), glove, gloveArmor);
+        BuildSleevedForearm(_proceduralFirstPersonArms, new Vector3(0.19f, -0.42f, 0.015f), new Vector3(-0.18f, 0.05f, -0.3f), glove, gloveArmor);
         _spareMagazine = MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.09f, 0.26f, 0.14f)), new Vector3(-0.3f, -0.62f, -0.18f), new Vector3(0.35f, 0, 0.35f), black);
         MeshPart(_spareMagazine, Box(new Vector3(0.095f, 0.028f, 0.15f)), new Vector3(0, -0.11f, 0), Vector3.Zero, steel);
         AddMagazineDetail(_spareMagazine, steel);

@@ -37,6 +37,13 @@ The Ultimate Guns Pack is distributed by Quaternius under CC0 1.0 Universal:
 Ten selected authored models replace the runtime primitive visuals for AK-74N,
 SCAR-L, M24, AXMC, AWM, VSS, MP5A5, M3A1, P226, and M1911.
 
+## DJMaesen CC BY 4.0 first-person arms and SMG
+
+The realistic first-person arms and SMG-45 visuals are adapted from **fps
+animated smg** by **DJMaesen**, licensed under **CC BY 4.0**. Full attribution,
+the original source mapping, and the reproducible Blender build are recorded in
+`djmaesen_smg45/LICENSE.md`.
+
 The standard free version of the Downtown City MegaKit is distributed by Quaternius under CC0 1.0 Universal:
 
 - Creator: Quaternius (`@Quaternius`)

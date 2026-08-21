@@ -23,6 +23,7 @@ Consequently, this repository must not be described as satisfying policies that 
 | Tide Hunter roaming Boss monster | HorrorGameMaker.com on OpenGameArt | CC0 / Public Domain as marked on the source page | `assets/models/tide_hunter_monster/LICENSE.md`, `source_art/third_party/tide_hunter_monster/tide_hunter_monster.blend`, and `scripts/blender/build_tide_hunter_monster.py` |
 | Field operator animation clips | Quaternius Universal Animation Library and Universal Animation Library 2 | CC0 1.0 Universal; no attribution required, creator credit retained as courtesy | Acquired 2026-08-20 from the two official itch.io pages; standard GLB exports, license copies, and source mapping are in `source_art/third_party/quaternius_universal_animation_library/`; retargeted output is `assets/models/bamen_military_soldier/bamen_military_soldier_animated.glb` |
 | AK-74N, SCAR-L, M24, AXMC, AWM, VSS, MP5A5, M3A1, P226, and M1911 weapon visuals | Selected authored GLB models from Quaternius Ultimate Guns Pack | CC0 1.0 Universal; no attribution required, creator credit retained as courtesy | Acquired 2026-08-20 from `https://poly.pizza/bundle/Ultimate-Guns-Pack-cpgUfI4t2F`; exact source-file mapping and license record are in `assets/models/quaternius_ultimate_guns/LICENSE.md` |
+| First-person tactical arms and SMG-45 weapon visual | DJMaesen on Sketchfab | CC BY 4.0; attribution required | Acquired 2026-08-21; original GLB metadata, runtime adaptations, and reproducible Blender source are recorded in `assets/models/djmaesen_smg45/LICENSE.md` and `source_art/third_party/djmaesen_fps_smg45/` |
 | Old Military Crate and Concrete Road Barrier | Poly Haven | CC0 | `assets/models/LICENSE.md` |
 | City Kit (Industrial) 1.0 GLB model set | Kenney | CC0 1.0 | `assets/models/LICENSE.md` and `assets/models/kenney_city_kit_industrial/KENNEY_LICENSE.txt` |
 | Downtown City MegaKit standard modular scene set | Quaternius | CC0 1.0 Universal | Acquired 2026-08-19 from `https://quaternius.com/packs/downtowncitymegakit.html`; selected-file mapping and license copy in `assets/models/quaternius_downtown_city/` |
@@ -39,6 +40,7 @@ No separate third-party music, font, or stock-image collection is currently trac
 - Credit HorrorGameMaker.com for the Tide Hunter monster as a courtesy and retain the CC0 source record above.
 - Quaternius animations are CC0; retaining the creator and source links above is recommended for provenance even though attribution is not required.
 - Quaternius weapon models are CC0; retain the pack link and platform mapping so generic silhouettes are not mistaken for manufacturer-authenticated replicas.
+- Credit DJMaesen for the FPS animated SMG source and retain the CC BY 4.0 license record in distributions.
 - Credit Poly Haven and link the two asset license records whenever a platform requires attribution or source disclosure.
 - Describe screenshots as direct in-engine captures, not as independently generated promotional images.
 - Disclose AI assistance plainly. Do not claim that human review, ownership of output, or the MIT license proves anything about model training data.

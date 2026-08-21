@@ -587,7 +587,7 @@ public static class WeaponCatalog
         },
         [WeaponPlatform.M3A1] = new WeaponDefinition
         {
-            Platform = WeaponPlatform.M3A1, Name = "M3A1 Grease Gun", ChineseName = "M3A1 Grease Gun",
+            Platform = WeaponPlatform.M3A1, Name = "SMG-45 Tactical", ChineseName = "SMG-45 \u6218\u672f\u51b2\u950b\u67aa",
             LocalizationKey = "weapon_m3a1", Caliber = AmmoCaliber.Smg,
             Damage = 20, EffectiveRange = 68, Recoil = 1.25f, Handling = 0.82f,
             FireInterval = 0.135f, MagazineSize = 30, SoundRadius = 34, ReceiverLength = 0.34f, BarrelLength = 0.26f
