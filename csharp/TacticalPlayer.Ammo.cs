@@ -167,4 +167,25 @@ public partial class TacticalPlayer
         FinishReload();
         return true;
     }
+
+    internal bool SetReloadPoseForDiagnostics(float progress)
+    {
+        if (EquippedWeapon.Platform != WeaponPlatform.M3A1)
+        {
+            return false;
+        }
+        _isReloading = true;
+        _activeReloadDuration = ReloadDuration * RoleReloadMultiplier;
+        _reloadTime = _activeReloadDuration * (1.0f - Mathf.Clamp(progress, 0.0f, 1.0f));
+        UpdateReloadAnimation();
+        SyncAuthoredPrimaryWeapon();
+        return true;
+    }
+
+    internal void ClearReloadPoseForDiagnostics()
+    {
+        _isReloading = false;
+        _reloadTime = 0.0f;
+        ResetReloadRig();
+    }
 }

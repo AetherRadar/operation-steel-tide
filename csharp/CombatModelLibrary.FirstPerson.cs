@@ -5,6 +5,7 @@ namespace OperationSteelTide;
 
 internal sealed class AuthoredFirstPersonSmgVisual
 {
+    private const string ReloadAnimationName = "reload";
     public AuthoredFirstPersonSmgVisual(Node3D root)
     {
         Root = root;
@@ -13,6 +14,14 @@ internal sealed class AuthoredFirstPersonSmgVisual
         Magazine = CombatModelLibrary.RequireNode(root, "MagazineGeometry");
         ChargingHandle = CombatModelLibrary.RequireNode(root, "ChargingHandleGeometry");
         Muzzle = CombatModelLibrary.RequireNode(root, "Muzzle");
+        AnimationPlayer = CombatModelLibrary.RequireAnimationPlayer(root);
+        Skeleton = CombatModelLibrary.RequireSkeleton(root);
+        if (!AnimationPlayer.HasAnimation(ReloadAnimationName)
+            || Skeleton.FindBone("L_wrist_03") < 0)
+        {
+            throw new InvalidOperationException("Authored SMG-45 is missing its reload animation rig.");
+        }
+        SetReloadProgress(0.0f);
     }
 
     public Node3D Root { get; }
@@ -21,14 +30,66 @@ internal sealed class AuthoredFirstPersonSmgVisual
     public Node3D Magazine { get; }
     public Node3D ChargingHandle { get; }
     public Node3D Muzzle { get; }
+    public AnimationPlayer AnimationPlayer { get; }
+    public Skeleton3D Skeleton { get; }
+    public float ReloadAnimationDuration
+        => (float)AnimationPlayer.GetAnimation(ReloadAnimationName).Length;
 
-    public void SyncMechanisms(Node3D magazine, Node3D chargingHandle)
+    public void SyncMechanisms()
     {
-        Magazine.Visible = magazine.Visible;
-        var reloadOffset = Mathf.Clamp(chargingHandle.Position.Z + 0.05f, -0.08f, 0.08f);
-        ChargingHandle.Position = new Vector3(0.0f, 0.0f, reloadOffset);
+        Magazine.Visible = true;
+        ChargingHandle.Visible = true;
+    }
+
+    public void SetReloadProgress(float progress)
+    {
+        AnimationPlayer.Play(ReloadAnimationName, 0.0);
+        AnimationPlayer.Seek(
+            ReloadAnimationDuration * Mathf.Clamp(progress, 0.0f, 1.0f),
+            update: true);
+        AnimationPlayer.Pause();
+    }
+
+    public FirstPersonSmgReloadInspection InspectReloadAnimation()
+    {
+        var animation = AnimationPlayer.GetAnimation(ReloadAnimationName);
+        var sampleTime = ReloadAnimationDuration * 0.46f;
+        var supportArmRotation = 0.0f;
+        var magazineTravel = 0.0f;
+        for (var track = 0; track < animation.GetTrackCount(); track++)
+        {
+            var path = animation.TrackGetPath(track).ToString();
+            if (animation.TrackGetType(track) == Animation.TrackType.Rotation3D
+                && (path.Contains("L_arm_01", StringComparison.Ordinal)
+                    || path.Contains("L_elbow_02", StringComparison.Ordinal)
+                    || path.Contains("L_wrist_03", StringComparison.Ordinal)))
+            {
+                var idle = animation.RotationTrackInterpolate(track, 0.0, backward: false);
+                var reload = animation.RotationTrackInterpolate(track, sampleTime, backward: false);
+                supportArmRotation = Mathf.Max(supportArmRotation, idle.AngleTo(reload));
+            }
+            if (animation.TrackGetType(track) == Animation.TrackType.Position3D
+                && path.Contains("clip", StringComparison.OrdinalIgnoreCase))
+            {
+                var idle = animation.PositionTrackInterpolate(track, 0.0, backward: false);
+                var reload = animation.PositionTrackInterpolate(track, sampleTime, backward: false);
+                magazineTravel = Mathf.Max(magazineTravel, idle.DistanceTo(reload));
+            }
+        }
+        SetReloadProgress(0.0f);
+        return new FirstPersonSmgReloadInspection(
+            true,
+            ReloadAnimationDuration,
+            supportArmRotation,
+            magazineTravel);
     }
 }
+
+internal readonly record struct FirstPersonSmgReloadInspection(
+    bool Loaded,
+    float Duration,
+    float SupportArmRotation,
+    float MagazineTravel);
 
 internal static partial class CombatModelLibrary
 {
@@ -75,6 +136,24 @@ internal static partial class CombatModelLibrary
         finally
         {
             root?.Free();
+        }
+    }
+
+    public static FirstPersonSmgReloadInspection InspectFirstPersonSmg45Reload()
+    {
+        AuthoredFirstPersonSmgVisual? visual = null;
+        try
+        {
+            visual = InstantiateFirstPersonSmg45();
+            return visual.InspectReloadAnimation();
+        }
+        catch (Exception)
+        {
+            return new FirstPersonSmgReloadInspection(false, 0.0f, 0.0f, 0.0f);
+        }
+        finally
+        {
+            visual?.Root.Free();
         }
     }
 }

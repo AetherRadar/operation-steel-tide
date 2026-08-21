@@ -169,6 +169,7 @@ public partial class FreightTerminalWorld
         var gsh18 = CombatModelLibrary.InspectGsh18();
         var desertEagle = CombatModelLibrary.InspectDesertEagle();
         var firstPersonSmg = CombatModelLibrary.InspectFirstPersonSmg45();
+        var firstPersonSmgReload = CombatModelLibrary.InspectFirstPersonSmg45Reload();
         var weaponGeometry = weapon.Loaded
             && weapon.RequiredNodes
             && weapon.MeshCount >= 8
@@ -207,9 +208,13 @@ public partial class FreightTerminalWorld
             && firstPersonSmg.RequiredNodes
             && firstPersonSmg.MeshCount >= 7
             && firstPersonSmg.MaterialCount >= 2
-            && firstPersonSmg.Size.X is >= 0.45f and <= 1.1f
-            && firstPersonSmg.Size.Y is >= 0.3f and <= 0.9f
-            && firstPersonSmg.Size.Z is >= 1.2f and <= 1.8f;
+            && firstPersonSmg.Size.X is >= 0.1f and <= 0.3f
+            && firstPersonSmg.Size.Y is >= 0.45f and <= 0.8f
+            && firstPersonSmg.Size.Z is >= 1.0f and <= 1.4f;
+        var firstPersonSmgReloadGeometry = firstPersonSmgReload.Loaded
+            && firstPersonSmgReload.Duration is >= 2.4f and <= 2.9f
+            && firstPersonSmgReload.SupportArmRotation >= 0.2f
+            && firstPersonSmgReload.MagazineTravel >= 0.12f;
         var playerAuthored = _player.UsesAuthoredPrimaryWeaponForDiagnostics;
         var squadAuthored = _squadMates.Count > 0
             && _squadMates.Where(IsInstanceValid).All(mate => mate.UsesAuthoredOperatorForDiagnostics);
@@ -238,6 +243,7 @@ public partial class FreightTerminalWorld
             && gsh18Geometry
             && desertEagleGeometry
             && firstPersonSmgGeometry
+            && firstPersonSmgReloadGeometry
             && playerAuthored
             && squadAuthored
             && enemiesAuthored
@@ -260,6 +266,10 @@ public partial class FreightTerminalWorld
             + $"smg45_fp_loaded={firstPersonSmg.Loaded} smg45_fp_nodes={firstPersonSmg.RequiredNodes} "
             + $"smg45_fp_meshes={firstPersonSmg.MeshCount} smg45_fp_materials={firstPersonSmg.MaterialCount} "
             + $"smg45_fp_size={firstPersonSmg.Size} "
+            + $"smg45_reload_loaded={firstPersonSmgReload.Loaded} "
+            + $"smg45_reload_duration={firstPersonSmgReload.Duration:F3} "
+            + $"smg45_support_rotation={firstPersonSmgReload.SupportArmRotation:F3} "
+            + $"smg45_magazine_travel={firstPersonSmgReload.MagazineTravel:F3} "
             + $"platforms={string.Join(',', platformInspections.Select(pair => $"{pair.Key}:{FormatWeaponInspection(pair.Value, platformGeometry[pair.Key])}"))} "
             + $"lineup={lineupCaptured} "
             + $"first_person={string.Join(',', firstPersonCaptures.Select(pair => $"{pair.Key}:{pair.Value}"))} "
@@ -387,6 +397,22 @@ public partial class FreightTerminalWorld
             captures[platform] = _player.UsesAuthoredWeaponPlatformForDiagnostics(platform)
                 && System.IO.File.Exists(absolutePath)
                 && new System.IO.FileInfo(absolutePath).Length > 0;
+            if (platform == WeaponPlatform.M3A1)
+            {
+                var reloadPath = "res://first_person_m3a1_reload_validation.png";
+                var reloadAbsolutePath = ProjectSettings.GlobalizePath(reloadPath);
+                if (System.IO.File.Exists(reloadAbsolutePath))
+                {
+                    System.IO.File.Delete(reloadAbsolutePath);
+                }
+                var reloadPose = _player.SetReloadPoseForDiagnostics(0.46f);
+                await WaitFrames(2);
+                SaveViewportImage(reloadPath);
+                captures[platform] &= reloadPose
+                    && System.IO.File.Exists(reloadAbsolutePath)
+                    && new System.IO.FileInfo(reloadAbsolutePath).Length > 0;
+                _player.ClearReloadPoseForDiagnostics();
+            }
             var instanceId = _player.AuthoredWeaponInstanceIdForDiagnostics(platform);
             if (instanceId != 0)
             {

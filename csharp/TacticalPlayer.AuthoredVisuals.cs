@@ -116,7 +116,8 @@ public partial class TacticalPlayer
             _authoredFirstPersonSmg.Root.Visible = useAuthoredSmg;
             if (useAuthoredSmg)
             {
-                _authoredFirstPersonSmg.SyncMechanisms(_magazine, _chargingHandle);
+                _authoredFirstPersonSmg.SyncMechanisms();
+                _authoredFirstPersonSmg.SetReloadProgress(_isReloading ? ReloadProgress : 0.0f);
             }
         }
         else
@@ -181,6 +182,7 @@ public partial class TacticalPlayer
             authoredSmg.Root.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
             _weaponRoot.AddChild(authoredSmg.Root);
             _authoredFirstPersonSmg = authoredSmg;
+            _authoredFirstPersonSmg.SetReloadProgress(0.0f);
         }
         catch (Exception exception)
         {
@@ -258,7 +260,8 @@ public partial class TacticalPlayer
         if (EquippedWeapon.Platform == WeaponPlatform.M3A1
             && IsInstanceValid(_authoredFirstPersonSmg?.Root))
         {
-            _authoredFirstPersonSmg.SyncMechanisms(_magazine, _chargingHandle);
+            _authoredFirstPersonSmg.SyncMechanisms();
+            _authoredFirstPersonSmg.SetReloadProgress(_isReloading ? ReloadProgress : 0.0f);
             _muzzle.GlobalTransform = _authoredFirstPersonSmg.Muzzle.GlobalTransform;
         }
         SyncAuthoredPlatformWeapon();

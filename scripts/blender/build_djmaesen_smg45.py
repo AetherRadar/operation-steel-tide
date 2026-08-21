@@ -22,7 +22,11 @@ FIRST_PERSON_GLB = RUNTIME_DIR / "smg45_first_person.glb"
 FIELD_GLB = RUNTIME_DIR / "smg45_weapon.glb"
 
 SOURCE_IDLE_FRAME = 155
+SOURCE_RELOAD_START_FRAME = 0
+SOURCE_RELOAD_END_FRAME = 64
 SOURCE_TO_METERS = 0.015
+SLEEVE_BLEND_LENGTH = 12.0
+SLEEVE_EXTENSION = 36.0
 FIELD_ROTATION = Matrix.Rotation(math.radians(90.0), 4, "Z")
 WEAPON_MESH_NAMES = (
     "base_smg45_0",
@@ -58,12 +62,50 @@ def clear_scene() -> None:
                 datablocks.remove(datablock)
 
 
-def import_source() -> None:
+def import_source(frame: int = SOURCE_IDLE_FRAME) -> None:
     clear_scene()
     bpy.ops.import_scene.gltf(filepath=str(SOURCE_GLB))
     bpy.context.scene.render.fps = 24
-    bpy.context.scene.frame_set(SOURCE_IDLE_FRAME)
+    bpy.context.scene.frame_set(frame)
     bpy.context.view_layer.update()
+
+
+def extend_authored_sleeves() -> None:
+    """Move the two upper-sleeve cuffs behind the first-person camera."""
+    arms = bpy.data.objects["Object_7"]
+    mesh = arms.data
+    adjacency: dict[int, set[int]] = {index: set() for index in range(len(mesh.vertices))}
+    for edge in mesh.edges:
+        left, right = edge.vertices
+        adjacency[left].add(right)
+        adjacency[right].add(left)
+
+    unseen = set(adjacency)
+    components: list[set[int]] = []
+    while unseen:
+        seed = unseen.pop()
+        component = {seed}
+        stack = [seed]
+        while stack:
+            vertex = stack.pop()
+            for neighbor in adjacency[vertex]:
+                if neighbor in unseen:
+                    unseen.remove(neighbor)
+                    component.add(neighbor)
+                    stack.append(neighbor)
+        components.append(component)
+
+    for component in sorted(components, key=len, reverse=True)[:2]:
+        maximum_y = max(mesh.vertices[index].co.y for index in component)
+        blend_start = maximum_y - SLEEVE_BLEND_LENGTH
+        for index in component:
+            vertex = mesh.vertices[index]
+            if vertex.co.y <= blend_start:
+                continue
+            normalized = min(1.0, max(0.0, (vertex.co.y - blend_start) / SLEEVE_BLEND_LENGTH))
+            falloff = normalized * normalized * (3.0 - 2.0 * normalized)
+            vertex.co.y += SLEEVE_EXTENSION * falloff
+    mesh.update()
 
 
 def evaluated_mesh_copy(source: bpy.types.Object, name: str) -> bpy.types.Object:
@@ -95,7 +137,7 @@ def new_root(name: str) -> bpy.types.Object:
     return root
 
 
-def export_root(root: bpy.types.Object, output: Path) -> None:
+def export_root(root: bpy.types.Object, output: Path, animated: bool = False) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
     root.select_set(True)
@@ -106,7 +148,11 @@ def export_root(root: bpy.types.Object, output: Path) -> None:
         filepath=str(output),
         export_format="GLB",
         use_selection=True,
-        export_animations=False,
+        export_animations=animated,
+        export_frame_range=animated,
+        export_force_sampling=animated,
+        export_animation_mode="NLA_TRACKS" if animated else "ACTIONS",
+        export_nla_strips_merged_animation_name="reload",
         export_cameras=False,
         export_lights=False,
         export_apply=False,
@@ -124,24 +170,37 @@ def add_marker(root: bpy.types.Object, name: str, location: tuple[float, float, 
     marker.parent = root
 
 
+def prepare_first_person_hierarchy() -> bpy.types.Object:
+    root = bpy.data.objects["Sketchfab_model"]
+    root.name = "DJMaesenSMG45FirstPerson"
+    root.scale = Vector((SOURCE_TO_METERS, SOURCE_TO_METERS, SOURCE_TO_METERS))
+    bpy.data.objects["Object_7"].name = "AuthoredArms"
+    for source_name, runtime_name in RUNTIME_WEAPON_NAMES.items():
+        bpy.data.objects[source_name].name = runtime_name
+    for child in root.children_recursive:
+        if child.animation_data is None:
+            continue
+        for track in child.animation_data.nla_tracks:
+            track.name = "reload"
+    scene = bpy.context.scene
+    scene.frame_start = SOURCE_RELOAD_START_FRAME
+    scene.frame_end = SOURCE_RELOAD_END_FRAME
+    scene.frame_set(SOURCE_RELOAD_START_FRAME)
+    return root
+
+
 def build_first_person() -> None:
-    import_source()
-    root = new_root("DJMaesenSMG45FirstPerson")
-    source_scale = Matrix.Scale(SOURCE_TO_METERS, 4)
-
-    arms = evaluated_mesh_copy(bpy.data.objects["Object_7"], "AuthoredArms")
-    arms.matrix_world = source_scale @ arms.matrix_world
-    parent_keep_world(arms, root)
-    for source_name in WEAPON_MESH_NAMES:
-        runtime_name = RUNTIME_WEAPON_NAMES[source_name]
-        mesh = evaluated_mesh_copy(bpy.data.objects[source_name], runtime_name)
-        mesh.matrix_world = source_scale @ mesh.matrix_world
-        parent_keep_world(mesh, root)
-
-    add_marker(root, "Magazine", (0.0, -0.272, -0.08))
-    add_marker(root, "ChargingHandle", (0.0, -0.098, 0.125))
-    add_marker(root, "Muzzle", (0.0, -0.744, 0.074))
-    export_root(root, FIRST_PERSON_GLB)
+    import_source(SOURCE_RELOAD_START_FRAME)
+    extend_authored_sleeves()
+    root = prepare_first_person_hierarchy()
+    base = bpy.data.objects["base"]
+    muzzle = bpy.data.objects.new("Muzzle", None)
+    muzzle.empty_display_type = "PLAIN_AXES"
+    muzzle.empty_display_size = 0.035
+    bpy.context.collection.objects.link(muzzle)
+    muzzle.parent = base
+    muzzle.location = base.matrix_world.inverted() @ Vector((0.0, -49.60, 4.93))
+    export_root(root, FIRST_PERSON_GLB, animated=True)
 
 
 def transformed_bounds(
@@ -184,7 +243,8 @@ def build_field_weapon() -> None:
 
 
 def save_editable_source() -> None:
-    import_source()
+    import_source(SOURCE_IDLE_FRAME)
+    extend_authored_sleeves()
     SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
 
@@ -192,6 +252,7 @@ def save_editable_source() -> None:
 def main() -> None:
     if not SOURCE_GLB.exists():
         raise FileNotFoundError(f"Missing tracked source asset: {SOURCE_GLB}")
+    bpy.context.preferences.filepaths.save_version = 0
     RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     save_editable_source()
     build_first_person()

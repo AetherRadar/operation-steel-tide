@@ -19,6 +19,7 @@ Attribution: **"fps animated smg" by DJMaesen, licensed under CC BY 4.0.**
 
 The original GLB embeds the creator, source URL, title, and `CC-BY-4.0`
 license in `asset.extras`. The runtime GLBs are Blender-generated adaptations
-that bake the authored idle grip and separate the first-person arms from the
-field weapon. The original model remains copyright DJMaesen and is not covered
-by the repository's MIT license.
+that retain the authored two-handed reload action, extend the first-person
+sleeves beyond the camera to hide their source cut surfaces, and separate the
+first-person rig from the field weapon. The original model remains copyright
+DJMaesen and is not covered by the repository's MIT license.
