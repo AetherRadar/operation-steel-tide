@@ -29,9 +29,9 @@ PREVIEW_DIR = REPO_ROOT / "build" / "art-previews" / "animated-operator"
 RIFLE_AIM_ORIGIN = Vector((-0.16, -0.18, 1.61))
 RIFLE_AIM_FORWARD = Vector((0.12, -0.993, 0.0)).normalized()
 RIFLE_AIM_UP = Vector((0.0, 0.0, 1.0))
-RIFLE_READY_ORIGIN = Vector((-0.13, -0.12, 1.31))
-RIFLE_READY_FORWARD = Vector((0.10, -0.94, -0.32)).normalized()
-RIFLE_READY_UP = Vector((0.03, -0.32, 0.95)).normalized()
+RIFLE_READY_ORIGIN = Vector((-0.10, -0.15, 1.40))
+RIFLE_READY_FORWARD = Vector((0.48, -0.87, -0.10)).normalized()
+RIFLE_READY_UP = Vector((0.05, -0.09, 0.995)).normalized()
 RIFLE_SCALE = 0.476
 
 
@@ -354,6 +354,7 @@ def author_rifle_hold(
     rifle_up: Vector,
     neck_direction: Vector,
     head_direction: Vector,
+    support_hand_offset: Vector | None = None,
     remove_source: bool = False,
 ) -> bpy.types.Action:
     armature.animation_data.action = source
@@ -373,6 +374,8 @@ def author_rifle_hold(
     # Center the support wrist over the angled foregrip. The previous target sat
     # on the receiver-facing side, so the palm could never visibly wrap the grip.
     left_wrist = foregrip.matrix_world @ Vector((0.0, -0.02, -0.11))
+    if support_hand_offset is not None:
+        left_wrist += support_hand_offset
     constraints: list[tuple[bpy.types.PoseBone, bpy.types.Constraint]] = []
     targets: list[bpy.types.Object] = []
     hand_targets = {
@@ -391,9 +394,12 @@ def author_rifle_hold(
         targets.append(target)
     bpy.context.view_layer.update()
 
+    hand_pose_rotation = RIFLE_AIM_FORWARD.rotation_difference(rifle_forward)
     hand_directions = {
-        "mixamorig:RightHand": Vector((0.0, 0.12, -0.993)).normalized(),
-        "mixamorig:LeftHand": Vector((0.02, 0.05, 0.998)).normalized(),
+        "mixamorig:RightHand": hand_pose_rotation
+        @ Vector((0.0, 0.12, -0.993)).normalized(),
+        "mixamorig:LeftHand": hand_pose_rotation
+        @ Vector((0.02, 0.05, 0.998)).normalized(),
     }
     for bone_name, desired_direction in hand_directions.items():
         align_pose_bone_world_direction(armature, bone_name, desired_direction)
@@ -636,6 +642,7 @@ def main() -> None:
         RIFLE_READY_UP,
         Vector((0.0, -0.12, 0.993)).normalized(),
         Vector((0.0, -0.18, 0.984)).normalized(),
+        support_hand_offset=Vector((-0.27, -0.02, 0.06)),
     )
     generated["aim_idle"] = author_rifle_hold(
         target,

@@ -142,7 +142,8 @@ internal sealed class AuthoredOperatorVisual
         var leftHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(leftHandIndex);
         var weaponOrigin = weapon.Root.GlobalPosition;
         var primaryHandDistance = rightHand.Origin.DistanceTo(weaponOrigin);
-        var supportHandDistance = leftHand.Origin.DistanceTo(weapon.Foregrip.GlobalPosition);
+        var supportHandOffset = weapon.Foregrip.GlobalPosition - leftHand.Origin;
+        var supportHandDistance = supportHandOffset.Length();
         var muzzleOffset = weapon.MuzzleDevice.GlobalPosition - weaponOrigin;
         var stockOffset = weapon.Stock.GlobalPosition - weaponOrigin;
         var valid = primaryHandDistance <= 0.025f
@@ -155,6 +156,7 @@ internal sealed class AuthoredOperatorVisual
             valid,
             primaryHandDistance,
             supportHandDistance,
+            supportHandOffset,
             weaponOrigin,
             muzzleOffset,
             stockOffset);
@@ -326,6 +328,7 @@ internal readonly record struct OperatorRifleFitInspection(
     bool Valid,
     float PrimaryHandDistance,
     float SupportHandDistance,
+    Vector3 SupportHandOffset,
     Vector3 WeaponOrigin,
     Vector3 MuzzleOffset,
     Vector3 StockOffset);

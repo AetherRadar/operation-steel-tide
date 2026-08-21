@@ -107,7 +107,8 @@ public partial class FreightTerminalWorld
                 movementRifleFitValid &= handsFit;
                 movementRifleFits.Add(
                     $"{animation}:{handsFit}:primary={movementFit.PrimaryHandDistance:F3}:"
-                    + $"support={movementFit.SupportHandDistance:F3}:muzzle={movementFit.MuzzleOffset}");
+                    + $"support={movementFit.SupportHandDistance:F3}:"
+                    + $"support_offset={movementFit.SupportHandOffset}:muzzle={movementFit.MuzzleOffset}");
             }
         }
         catch (System.Exception exception)
@@ -126,19 +127,24 @@ public partial class FreightTerminalWorld
         };
         var transitionsValid = transitions.SequenceEqual(expected);
         var readyDistinct = readyIdleFit.WeaponOrigin.Y <= rifleFit.WeaponOrigin.Y - 0.18f;
+        var readyCrossBody = Mathf.Abs(readyIdleFit.MuzzleOffset.X) >= 0.16f
+            && readyIdleFit.MuzzleOffset.Z <= -0.38f;
         var valid = count == 25
             && sockets
             && transitionsValid
             && rifleFit.Valid
             && movementRifleFitValid
-            && readyDistinct;
+            && readyDistinct
+            && readyCrossBody;
         GD.Print(
             $"OPERATOR_ANIMATIONS_CHECK count={count} sockets={sockets} "
             + $"weapon_socket={weaponSocketPosition} back_socket={backWeaponSocketPosition} "
             + $"rifle_fit={rifleFit.Valid} primary_hand={rifleFit.PrimaryHandDistance:F3} "
             + $"support_hand={rifleFit.SupportHandDistance:F3} "
+            + $"support_offset={rifleFit.SupportHandOffset} "
             + $"ready_distinct={readyDistinct} ready_weapon={readyIdleFit.WeaponOrigin} "
-            + $"aim_weapon={rifleFit.WeaponOrigin} ready_muzzle={readyIdleFit.MuzzleOffset} "
+            + $"ready_cross_body={readyCrossBody} aim_weapon={rifleFit.WeaponOrigin} "
+            + $"ready_muzzle={readyIdleFit.MuzzleOffset} "
             + $"movement_rifle_fit={string.Join(',', movementRifleFits)} "
             + $"muzzle_offset={rifleFit.MuzzleOffset} stock_offset={rifleFit.StockOffset} "
             + $"transitions={string.Join('>', transitions)} expected={string.Join('>', expected)}");
