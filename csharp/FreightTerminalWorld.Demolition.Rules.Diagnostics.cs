@@ -44,6 +44,10 @@ public partial class FreightTerminalWorld
             && DemolitionRoundRules.EliminationEndsRound(DemolitionTeam.Defenders, true);
         var deviceLifecycle = new DemolitionDeviceLifecycle();
         deviceLifecycle.BeginGrounded();
+        var playerCanBeSelected = deviceLifecycle.AssignRandomPickupRunner(
+            new[] { "player", "mate-a", "mate-b" },
+            selectionToken: 0) == "player";
+        deviceLifecycle.BeginGrounded();
         var assignedRunner = deviceLifecycle.AssignRandomPickupRunner(
             new[] { "player", "mate-a", "mate-b" },
             selectionToken: 4);
@@ -59,7 +63,8 @@ public partial class FreightTerminalWorld
             && deviceLifecycle.CarrierMemberId == "mate-a"
             && deviceLifecycle.PickupRunnerMemberId is null;
         deviceLifecycle.Clear();
-        var deviceLifecycleValid = assignedRunner == "mate-a"
+        var deviceLifecycleValid = playerCanBeSelected
+            && assignedRunner == "mate-a"
             && wrongPickupRejected
             && assignedPickupAccepted
             && dropTransferred

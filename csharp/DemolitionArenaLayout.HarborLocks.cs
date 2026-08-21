@@ -80,7 +80,15 @@ public sealed partial class DemolitionArenaLayout
             HarborBuilding("MidCoverTankSouthEast", "detail-tank.glb", new(14.0f, 0.02f, 7.0f), 0.0f, 4.5f, new(0.85f, 0.42f, 0.52f)),
 
             HarborBuilding("WestControlStack", "chimney-large.glb", new(-53.0f, 0.02f, 33.0f), 0.0f, 5.8f, new(1.0f, 1.70f, 1.0f)),
-            HarborBuilding("EastPumpStack", "chimney-large.glb", new(53.0f, 0.02f, -33.0f), 0.0f, 5.8f, new(1.0f, 1.70f, 1.0f))
+            HarborBuilding("EastPumpStack", "chimney-large.glb", new(53.0f, 0.02f, -33.0f), 0.0f, 5.8f, new(1.0f, 1.70f, 1.0f)),
+
+            HarborBuilding("NorthDispatchOffice", "building-j.glb", new(-29.0f, 0.02f, -33.0f), 0.0f, 4.5f, new(1.04f, 0.86f, 1.32f), new(-0.435f, 0.431f, 0.274f)),
+            HarborBuilding("NorthSecurityOffice", "building-j.glb", new(-3.0f, 0.02f, -34.0f), Mathf.Pi, 4.5f, new(1.04f, 0.86f, 1.32f), new(-0.435f, 0.431f, 0.274f)),
+            HarborBuilding("SouthSecurityOffice", "building-j.glb", new(28.0f, 0.02f, 34.0f), 0.0f, 4.5f, new(1.04f, 0.86f, 1.32f), new(-0.435f, 0.431f, 0.274f)),
+            HarborBuilding("WestCustomsWorkshop", "building-g.glb", new(-32.0f, 0.02f, 13.0f), Mathf.Pi, 5.0f, new(1.68f, 1.28f, 1.28f)),
+            HarborBuilding("WestServiceOffice", "building-j.glb", new(-18.0f, 0.02f, 9.0f), Mathf.Pi * 0.5f, 4.5f, new(1.04f, 0.86f, 1.32f), new(-0.435f, 0.431f, 0.274f)),
+            HarborBuilding("EastQuayWorkshop", "building-g.glb", new(51.0f, 0.02f, 5.0f), 0.0f, 5.0f, new(1.68f, 1.28f, 1.28f)),
+            HarborBuilding("EastServiceOffice", "building-j.glb", new(51.0f, 0.02f, 15.0f), Mathf.Pi, 4.5f, new(1.04f, 0.86f, 1.32f), new(-0.435f, 0.431f, 0.274f))
         };
     }
 

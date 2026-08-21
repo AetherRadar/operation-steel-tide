@@ -7,6 +7,9 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private const float DemolitionDevicePickupRadius = 1.8f;
+    private const float DemolitionDeviceGroundHeight = 0.16f;
+    private const float DemolitionDeviceCarryHeight = 0.82f;
+    private const float DemolitionDeviceCarryOffset = 0.22f;
     private readonly DemolitionDeviceLifecycle _demolitionDeviceLifecycle = new();
     private Vector3 _demolitionDeviceGroundPosition;
     private Vector3 _demolitionDeviceLastCarrierPosition;
@@ -16,11 +19,11 @@ public partial class FreightTerminalWorld
     private void BeginDemolitionDeviceRound()
     {
         var layout = DemolitionLayout();
-        _demolitionDeviceGroundPosition = layout.AttackSpawn + Vector3.Up * 0.26f;
+        _demolitionDeviceGroundPosition = layout.AttackSpawn + Vector3.Up * DemolitionDeviceGroundHeight;
         _demolitionDeviceLastCarrierPosition = _demolitionDeviceGroundPosition;
         _demolitionDeviceLifecycle.BeginGrounded();
         BuildDemolitionDeviceVisual();
-        AssignInitialDemolitionDevicePickupRunner();
+        AssignInitialDemolitionDeviceCarrier();
         SyncDemolitionDeviceVisual();
     }
 
@@ -51,18 +54,18 @@ public partial class FreightTerminalWorld
             _demolitionDevice,
             "DeviceCase",
             Vector3.Zero,
-            new Vector3(0.9f, 0.48f, 0.62f),
+            new Vector3(0.56f, 0.28f, 0.38f),
             dark);
         OfficeBox(
             _demolitionDevice,
             "DeviceScreen",
-            new Vector3(0.0f, 0.1f, -0.33f),
-            new Vector3(0.52f, 0.2f, 0.035f),
+            new Vector3(0.0f, 0.06f, -0.205f),
+            new Vector3(0.31f, 0.115f, 0.025f),
             orange);
         _demolitionDeviceBeacon = new OmniLight3D
         {
             Name = "DeviceBeacon",
-            Position = new Vector3(0.0f, 0.45f, 0.0f),
+            Position = new Vector3(0.0f, 0.28f, 0.0f),
             LightColor = new Color(1.0f, 0.12f, 0.02f),
             LightEnergy = 1.2f,
             OmniRange = 5.0f,
@@ -71,7 +74,7 @@ public partial class FreightTerminalWorld
         _demolitionDevice.AddChild(_demolitionDeviceBeacon);
     }
 
-    private void AssignInitialDemolitionDevicePickupRunner()
+    private void AssignInitialDemolitionDeviceCarrier()
     {
         var attackers = LivingDemolitionAttackers().ToList();
         var memberIds = attackers
@@ -82,7 +85,12 @@ public partial class FreightTerminalWorld
         var selectedId = _demolitionDeviceLifecycle.AssignRandomPickupRunner(
             memberIds,
             _rng.Randi());
-        ApplyDemolitionDevicePickupAssignment(ResolveDemolitionAttacker(selectedId));
+        var selectedCarrier = ResolveDemolitionAttacker(selectedId);
+        if (selectedCarrier is not null && TryPickupDemolitionDevice(selectedCarrier))
+        {
+            return;
+        }
+        ApplyDemolitionDevicePickupAssignment(selectedCarrier);
     }
 
     private void EnsureDemolitionDevicePickupRunner()
@@ -212,7 +220,7 @@ public partial class FreightTerminalWorld
         var dropOrigin = IsInstanceValid(carrier)
             ? carrier!.GlobalPosition
             : _demolitionDeviceLastCarrierPosition;
-        _demolitionDeviceGroundPosition = dropOrigin + Vector3.Up * 0.26f;
+        _demolitionDeviceGroundPosition = dropOrigin + Vector3.Up * DemolitionDeviceGroundHeight;
         var replacement = NearestLivingDemolitionAttacker(dropOrigin, carrier);
         var replacementId = DemolitionMemberId(replacement);
         if (!_demolitionDeviceLifecycle.TryDrop(carrierId, replacementId))
@@ -267,8 +275,8 @@ public partial class FreightTerminalWorld
             if (IsInstanceValid(carrier))
             {
                 _demolitionDevice.GlobalPosition = carrier!.GlobalPosition
-                    + Vector3.Up * 1.0f
-                    + carrier.GlobalBasis.X * 0.36f;
+                    + Vector3.Up * DemolitionDeviceCarryHeight
+                    + carrier.GlobalBasis.X * DemolitionDeviceCarryOffset;
             }
             SetDemolitionDeviceBeacon(active: false, energy: 0.0f, range: 5.0f);
         }

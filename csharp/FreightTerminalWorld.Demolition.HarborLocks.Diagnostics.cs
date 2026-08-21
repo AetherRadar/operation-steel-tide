@@ -51,7 +51,7 @@ public partial class FreightTerminalWorld
             using var meshesBacking = meshes.AsDisposable();
             return meshes.Count > 0;
         });
-        var assetsReady = layout.Props.Count >= 16
+        var assetsReady = layout.Props.Count >= 25
             && importedModels == layout.Props.Count;
         var tideforge = new DemolitionArenaLayout(DemolitionMapCatalog.TideforgeId, layout.Origin);
         var independentTopology = layout.WorldBounds.Size.X > layout.WorldBounds.Size.Y
@@ -74,7 +74,7 @@ public partial class FreightTerminalWorld
             .ToArray();
         var collisionCoverage = collisionCoverageFailures.Length == 0;
         var geometryReady = independentTopology
-            && largeBuildings >= 7
+            && largeBuildings >= 8
             && propsInsideBounds
             && propsSeparated
             && sitesClear
