@@ -390,6 +390,7 @@ public partial class SquadMate
         bool objectivePriority,
         SquadTraversalKind navigationKind,
         bool navigationSteppedDirect,
+        bool navigationPreciseTrail,
         float delta)
     {
         var destination = anchorDestination;
@@ -448,7 +449,9 @@ public partial class SquadMate
         if (_combatMoveRequested)
         {
             desired = desired.Normalized();
-            if (navigationKind != SquadTraversalKind.Step && !navigationSteppedDirect)
+            if (navigationKind != SquadTraversalKind.Step
+                && !navigationSteppedDirect
+                && !navigationPreciseTrail)
             {
                 desired = AvoidObstacle(desired);
                 desired = ApplySquadSeparation(desired);

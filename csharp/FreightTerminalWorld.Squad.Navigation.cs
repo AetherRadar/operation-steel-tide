@@ -268,7 +268,9 @@ public partial class FreightTerminalWorld
                         destination,
                         emergency,
                         now,
-                        SquadNavigationDirective.Walk(_squadLeaderTrail[state.Cursor]));
+                        SquadNavigationDirective.Walk(
+                            _squadLeaderTrail[state.Cursor],
+                            preciseTrail: true));
                 }
                 // Trail route exhausted without corridor access to the destination.
                 _squadTrailPaths.Remove(id);
@@ -651,7 +653,9 @@ public partial class FreightTerminalWorld
     {
         var advanced = 0;
         while (SquadTrailCursorActive(state)
-            && SquadTrailWaypointReached(mate.GlobalPosition, _squadLeaderTrail[state.Cursor]))
+            && SquadPreciseTrailWaypointReached(
+                mate.GlobalPosition,
+                _squadLeaderTrail[state.Cursor]))
         {
             state.Cursor += state.Direction;
             advanced++;
@@ -713,6 +717,12 @@ public partial class FreightTerminalWorld
     {
         var horizontal = new Vector2(position.X - waypoint.X, position.Z - waypoint.Z).Length();
         return horizontal <= 1.05f && Mathf.Abs(position.Y - waypoint.Y) <= 1.25f;
+    }
+
+    private static bool SquadPreciseTrailWaypointReached(Vector3 position, Vector3 waypoint)
+    {
+        var horizontal = new Vector2(position.X - waypoint.X, position.Z - waypoint.Z).Length();
+        return horizontal <= 0.62f && Mathf.Abs(position.Y - waypoint.Y) <= 0.78f;
     }
 
     private bool IsSquadTrailSpanTraversable(int cursor, int endCursor)

@@ -1246,7 +1246,79 @@ public partial class FreightTerminalWorld
         var landingLight = MeshBox(tower, new Vector3(0, floorY + halfRise + 1.35f, landingNorthZ + 0.08f), new Vector3(1.8f, 0.04f, 0.16f), light);
         landingLight.Name = $"ResidentialStairLandingLight_F{floor}";
         RegisterMapDetailVisual(landingLight);
+        var navigationRoute = BuildResidentialStairNavigationRoute(
+            tower,
+            floorY,
+            coreZ,
+            laneOffset: 0.0f,
+            descending: false);
+        RegisterSquadTraversalLink(
+            $"residential_stair:{tower.Name}:{floor}",
+            SquadTraversalKind.Step,
+            bidirectional: true,
+            navigationRoute,
+            costMultiplier: 1.06f);
         _residentialStairFlightCount += 2;
+    }
+
+    private static List<Vector3> BuildResidentialStairNavigationRoute(
+        Node3D tower,
+        float floorY,
+        float coreZ,
+        float laneOffset,
+        bool descending)
+    {
+        var halfRise = ResidentialFloorHeight * 0.5f;
+        var stepRise = halfRise / ResidentialStepsPerFlight;
+        var stepRun = ResidentialStairRun / ResidentialStepsPerFlight;
+        var lowerStart = coreZ - ResidentialStairRun * 0.5f;
+        var upperStart = coreZ + ResidentialStairRun * 0.5f;
+        var points = new List<Vector3>
+        {
+            tower.ToGlobal(new Vector3(
+                -1.45f + laneOffset,
+                floorY + 0.12f,
+                upperStart + 0.35f))
+        };
+
+        for (var step = 2; step < ResidentialStepsPerFlight; step += 3)
+        {
+            points.Add(tower.ToGlobal(new Vector3(
+                -1.45f + laneOffset,
+                floorY + stepRise * (step + 1) + 0.075f,
+                upperStart - stepRun * (step + 0.5f))));
+        }
+        points.Add(tower.ToGlobal(new Vector3(
+            -1.45f + laneOffset,
+            floorY + halfRise + 0.075f,
+            lowerStart - 0.55f)));
+        points.Add(tower.ToGlobal(new Vector3(-0.65f, floorY + halfRise + 0.075f, lowerStart - 0.55f)));
+        points.Add(tower.ToGlobal(new Vector3(0.25f, floorY + halfRise + 0.075f, lowerStart - 0.55f)));
+        points.Add(tower.ToGlobal(new Vector3(1.15f, floorY + halfRise + 0.075f, lowerStart - 0.55f)));
+        points.Add(tower.ToGlobal(new Vector3(
+            1.45f - laneOffset,
+            floorY + halfRise + 0.075f,
+            lowerStart - 0.55f)));
+        for (var step = 2; step < ResidentialStepsPerFlight; step += 3)
+        {
+            points.Add(tower.ToGlobal(new Vector3(
+                1.45f - laneOffset,
+                floorY + halfRise + stepRise * (step + 1) + 0.075f,
+                lowerStart + stepRun * (step + 0.5f))));
+        }
+        points.Add(tower.ToGlobal(new Vector3(
+            1.45f - laneOffset,
+            floorY + ResidentialFloorHeight + 0.075f,
+            // Land well inside the floor corridor. The shaft header ends near
+            // upperStart + 0.45; stopping at +0.75 leaves an operator capsule
+            // intersecting the jamb and makes the portal connector reject it.
+            upperStart + 1.25f)));
+
+        if (descending)
+        {
+            points.Reverse();
+        }
+        return points;
     }
 
     private static void AddResidentialStairCollision(

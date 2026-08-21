@@ -135,6 +135,7 @@ public partial class EnemyOperator
         bool shareContact)
     {
         AssignCombatTarget(target);
+        ConfirmPursuitNavigationContact(target);
         RememberInvestigationPoint(position, seconds);
         Alerted = true;
         Suspicion = 100.0f;
@@ -169,6 +170,7 @@ public partial class EnemyOperator
         }
         SquadContactsReceived++;
         AssignCombatTarget(target);
+        ConfirmPursuitNavigationContact(target);
         RememberInvestigationPoint(position, SharedPursuitSeconds);
         Alerted = true;
         Suspicion = 100.0f;
@@ -234,28 +236,19 @@ public partial class EnemyOperator
         _inCover = false;
         _searchingLoot = false;
 
-        var destination = CurrentPursuitDestination();
-        var targetFlat = new Vector3(destination.X, GlobalPosition.Y, destination.Z);
-        var direction = GlobalPosition.DirectionTo(targetFlat);
-        direction.Y = 0.0f;
-        var wantsMove = direction.LengthSquared() > 0.02f;
-        TrackPursuitProgress(delta, wantsMove);
-        if (wantsMove)
-        {
-            direction = ApplyPursuitObstacleAvoidance(direction.Normalized());
-            LookAt(GlobalPosition + direction, Vector3.Up);
-        }
-
+        var target = AssignedCombatTargetNode();
+        RefreshAudiblePursuitTrail(target);
         var speed = HasFireablePrimary ? 5.7f : 6.1f;
         if (IsRivalSquad)
         {
             speed *= 1.08f;
         }
-        var movement = wantsMove ? direction * speed : Vector3.Zero;
-        var velocity = Velocity;
-        velocity.X = Mathf.MoveToward(velocity.X, movement.X, delta * 15.0f);
-        velocity.Z = Mathf.MoveToward(velocity.Z, movement.Z, delta * 15.0f);
-        Velocity = velocity;
+        UpdatePursuitNavigationMovement(
+            delta,
+            target,
+            CurrentPursuitDestination(),
+            speed,
+            requireRoute: false);
     }
 
     private Vector3 ApplyPursuitObstacleAvoidance(Vector3 direction)
@@ -397,7 +390,7 @@ public partial class EnemyOperator
                 : maxDistance;
     }
 
-    private void TrackPursuitProgress(float delta, bool wantsMove)
+    private void TrackPursuitProgress(float delta, bool wantsMove, bool followingRoute)
     {
         _pursuitProgressTimer += delta;
         if (_pursuitProgressTimer < 0.65f)
@@ -407,8 +400,19 @@ public partial class EnemyOperator
         var progress = GlobalPosition.DistanceTo(_pursuitProgressOrigin);
         if (wantsMove && progress < 0.28f)
         {
-            _avoidanceSide *= -1.0f;
-            _avoidanceHoldTimer = 1.35f;
+            if (followingRoute)
+            {
+                RecoverPursuitNavigationRoute();
+            }
+            else
+            {
+                _avoidanceSide *= -1.0f;
+                _avoidanceHoldTimer = 1.35f;
+            }
+        }
+        else if (!wantsMove || progress >= 0.42f)
+        {
+            _pursuitRouteStallCount = 0;
         }
         _pursuitProgressOrigin = GlobalPosition;
         _pursuitProgressTimer = 0.0f;
@@ -422,6 +426,7 @@ public partial class EnemyOperator
         _avoidanceHoldTimer = 0.0f;
         _pursuitProgressOrigin = GlobalPosition;
         _pursuitProgressTimer = 0.0f;
+        ClearPursuitNavigationRoutes();
         if (clearTarget)
         {
             _combatTarget = null;
@@ -435,5 +440,6 @@ public partial class EnemyOperator
         SquadContactsReceived = 0;
         _squadShareCooldown = 0.0f;
         _avoidanceSide = _strafeSign;
+        ResetPursuitNavigationForDiagnostics();
     }
 }

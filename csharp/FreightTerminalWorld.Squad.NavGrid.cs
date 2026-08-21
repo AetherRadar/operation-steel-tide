@@ -18,7 +18,7 @@ public partial class FreightTerminalWorld
     // Formation following already has the leader trail as its cross-floor route.
     // Keep the geometric fallback deliberately small so a first follow frame cannot
     // monopolize the physics thread with a second full navigation search.
-    private const int SquadNavFollowExpansionCap = 192;
+    private const int SquadNavFollowExpansionCap = 384;
     private const float SquadNavCorridorSampleSpacing = 1.8f;
     private const ulong SquadNavNormalPlanIntervalMilliseconds = 90;
     private const ulong SquadNavShortcutCheckIntervalMilliseconds = 180;

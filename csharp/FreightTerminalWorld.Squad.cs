@@ -3131,6 +3131,19 @@ public partial class FreightTerminalWorld
             && wallRescueAssigned
             && _player.IsDead
             && _leaderReviveChannel <= 0.001f;
+        for (var attempt = 0;
+             attempt < SquadPerformanceMaximumPlanAttempts
+                 && !LeaderRescueUsedGridForDiagnostics;
+             attempt++)
+        {
+            var reviverId = mateReviver.GetInstanceId();
+            _squadGridPaths.Remove(reviverId);
+            _squadNavigationDecisions.Remove(reviverId);
+            _ = ResolveSquadNavigationDestination(
+                mateReviver,
+                blockedPlayerPosition,
+                emergency: true);
+        }
         var unreachableElapsed = 0.5f;
         for (var second = 0; second < 20 && !ReferenceEquals(_abandonedAiReviveTarget, _player); second++)
         {

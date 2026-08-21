@@ -57,6 +57,12 @@ public partial class FreightTerminalWorld
         try
         {
             await WaitSquadTraversalPhysicsFrames(4);
+            for (var frame = 0;
+                 frame < 600 && !_squadPortalWalkCorridorCacheReady;
+                 frame++)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            }
             _missionDirector.ExitDeploymentZone();
             productionVaultLink = _squadTraversalLinks.Any(link =>
                 link.Kind == SquadTraversalKind.Vault

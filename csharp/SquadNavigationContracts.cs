@@ -10,6 +10,16 @@ internal enum SquadTraversalKind : byte
     Drop
 }
 
+[System.Flags]
+internal enum SquadTraversalCapabilities : byte
+{
+    Walk = 1 << (int)SquadTraversalKind.Walk,
+    Step = 1 << (int)SquadTraversalKind.Step,
+    Vault = 1 << (int)SquadTraversalKind.Vault,
+    Drop = 1 << (int)SquadTraversalKind.Drop,
+    All = Walk | Step | Vault | Drop
+}
+
 /// <summary>
 /// One directed navigation instruction. Required instructions are portal/action
 /// boundaries and must not be removed by ordinary line-of-sight shortcuts.
@@ -19,10 +29,14 @@ internal readonly record struct SquadNavigationDirective(
     SquadTraversalKind Kind,
     int DirectedEdgeId,
     bool Required,
-    bool SteppedDirect = false)
+    bool SteppedDirect = false,
+    bool PreciseTrail = false)
 {
-    public static SquadNavigationDirective Walk(Vector3 target, bool steppedDirect = false)
-        => new(target, SquadTraversalKind.Walk, -1, false, steppedDirect);
+    public static SquadNavigationDirective Walk(
+        Vector3 target,
+        bool steppedDirect = false,
+        bool preciseTrail = false)
+        => new(target, SquadTraversalKind.Walk, -1, false, steppedDirect, preciseTrail);
 }
 
 /// <summary>
@@ -35,4 +49,6 @@ internal readonly record struct SquadTraversalLink(
     SquadTraversalKind Kind,
     bool Bidirectional,
     Vector3[] ForwardPoints,
-    float Cost);
+    float Cost,
+    SquadNavigationDirective[] ForwardDirectives,
+    SquadNavigationDirective[] ReverseDirectives);

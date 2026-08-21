@@ -68,7 +68,12 @@ public partial class FreightTerminalWorld
                 foreach (var descending in new[] { false, true })
                 {
                     cases++;
-                    var route = BuildResidentialSquadStairRoute(tower, coreZ, laneOffset, descending);
+                    var route = BuildResidentialStairNavigationRoute(
+                        tower,
+                        floorY: 0.0f,
+                        coreZ,
+                        laneOffset,
+                        descending);
                     mate.ProcessMode = ProcessModeEnum.Disabled;
                     mate.GlobalPosition = route[0];
                     mate.Velocity = Vector3.Zero;
@@ -148,53 +153,4 @@ public partial class FreightTerminalWorld
         GetTree().Quit(valid ? 0 : 2);
     }
 
-    private static List<Vector3> BuildResidentialSquadStairRoute(
-        Node3D tower,
-        float coreZ,
-        float laneOffset,
-        bool descending)
-    {
-        var halfRise = ResidentialFloorHeight * 0.5f;
-        var stepRise = halfRise / ResidentialStepsPerFlight;
-        var stepRun = ResidentialStairRun / ResidentialStepsPerFlight;
-        var lowerStart = coreZ - ResidentialStairRun * 0.5f;
-        var upperStart = coreZ + ResidentialStairRun * 0.5f;
-        var points = new List<Vector3>
-        {
-            tower.ToGlobal(new Vector3(-1.45f + laneOffset, 0.12f, upperStart + 0.35f))
-        };
-
-        for (var step = 2; step < ResidentialStepsPerFlight; step += 3)
-        {
-            points.Add(tower.ToGlobal(new Vector3(
-                -1.45f + laneOffset,
-                stepRise * (step + 1) + 0.075f,
-                upperStart - stepRun * (step + 0.5f))));
-        }
-        points.Add(tower.ToGlobal(new Vector3(
-            -1.45f + laneOffset,
-            halfRise + 0.075f,
-            lowerStart - 0.55f)));
-        foreach (var x in new[] { -0.65f, 0.25f, 1.15f, 1.45f - laneOffset })
-        {
-            points.Add(tower.ToGlobal(new Vector3(x, halfRise + 0.075f, lowerStart - 0.55f)));
-        }
-        for (var step = 2; step < ResidentialStepsPerFlight; step += 3)
-        {
-            points.Add(tower.ToGlobal(new Vector3(
-                1.45f - laneOffset,
-                halfRise + stepRise * (step + 1) + 0.075f,
-                lowerStart + stepRun * (step + 0.5f))));
-        }
-        points.Add(tower.ToGlobal(new Vector3(
-            1.45f - laneOffset,
-            ResidentialFloorHeight + 0.075f,
-            upperStart + 0.75f)));
-
-        if (descending)
-        {
-            points.Reverse();
-        }
-        return points;
-    }
 }

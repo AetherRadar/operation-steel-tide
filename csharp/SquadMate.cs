@@ -391,6 +391,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
     public override void _PhysicsProcess(double delta)
     {
+        RecordCombatMovementTrail();
         var dt = (float)delta;
         _weaponCooldown = Mathf.Max(0.0f, _weaponCooldown - dt);
         _reloadTimer = Mathf.Max(0.0f, _reloadTimer - dt);
@@ -501,6 +502,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             objectivePriority,
             navigationDirective.Kind,
             navigationDirective.SteppedDirect,
+            navigationDirective.PreciseTrail,
             dt);
         if (TryBeginNavigationTraversal(navigationDirective)
             || navigationDirective.Kind == SquadTraversalKind.Walk
@@ -521,6 +523,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         MoveAndSlide();
         TryNavigationStepUp(
             navigationDirective.Kind == SquadTraversalKind.Step
+                || navigationDirective.SteppedDirect
+                || navigationDirective.PreciseTrail
                 ? _combatPathDirection
                 : _combatDesiredDirection,
             destination);

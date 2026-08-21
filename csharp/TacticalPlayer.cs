@@ -1153,6 +1153,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     public override void _PhysicsProcess(double delta)
     {
+        RecordCombatMovementTrail();
         var dt = (float)delta;
         if (IsDead)
         {

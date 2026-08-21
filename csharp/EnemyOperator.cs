@@ -151,6 +151,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private ulong _cachedLineOfSightTargetId;
     private float _crowdSchedulePhase;
     private float _stationaryMoveTimer;
+    private Tween? _deathTween;
     /// <summary>How long without in-range contact before map NPCs start looting.</summary>
     private const float NpcLootIdleSeconds = 6.5f;
     /// <summary>Beyond this distance a living hostile is ignored for engagement (still exists on map).</summary>
@@ -584,7 +585,9 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     public override void _PhysicsProcess(double delta)
     {
+        RecordCombatMovementTrail();
         var dt = (float)delta;
+        ResetPursuitNavigationMotorFrame();
         if (IsDead || !GodotObject.IsInstanceValid(Player))
         {
             return;
@@ -592,7 +595,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
         UpdatePursuitTimers(dt);
         UpdateCombatTarget(dt);
-        if (Main?.TryHandleDemolitionDefenderMovement(this, dt, EngageTargetNode) == true)
+        // A confirmed pursuit takes precedence over the scripted demolition
+        // objective route; otherwise an alerted defender can stand on its
+        // assignment while the hostile moves through a doorway or around a wall.
+        if (!IsPursuing
+            && Main?.TryHandleDemolitionDefenderMovement(this, dt, EngageTargetNode) == true)
         {
             MoveOperator(dt);
             AnimateBody(dt);
@@ -775,6 +782,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
 
         MoveAndSlide();
+        TryPursuitNavigationStepUp();
         _stationaryMoveTimer = stationary
             ? 0.25f * (0.85f + _crowdSchedulePhase * 0.3f)
             : 0.0f;
@@ -1050,6 +1058,9 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     /// <summary>Reset cover/prone/loot so headless scenarios start from a known AI state.</summary>
     public void ResetTacticalStateForDiagnostics()
     {
+        _deathTween?.Kill();
+        _deathTween = null;
+        SetPhysicsProcess(true);
         ResetCorpseLootBackpackForDiagnostics();
         if (IsDead)
         {
@@ -1401,6 +1412,34 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         {
             UpdateLostContactMovement(delta);
             return;
+        }
+
+        var visibleTarget = AssignedCombatTargetNode();
+        if (ShouldUseVisiblePursuitNavigation(visibleTarget))
+        {
+            var routeSpeed = (distance > 8.0f ? 5.5f : 3.8f)
+                * (IsRivalSquad ? 1.08f : 1.0f)
+                * (IsWorldBoss ? WorldBossMoveMultiplier : 1.0f);
+            if (UpdatePursuitNavigationMovement(
+                    delta,
+                    visibleTarget,
+                    CurrentTargetPosition(),
+                    routeSpeed,
+                    requireRoute: true))
+            {
+                if (_fireTimer <= 0.0f && distance < CurrentFireRange)
+                {
+                    if (_combatTarget is not null)
+                    {
+                        FireAtSquad(distance);
+                    }
+                    else if (_rawTarget is EnemyOperator routedRival && !routedRival.IsDead)
+                    {
+                        FireAtNode(routedRival, distance);
+                    }
+                }
+                return;
+            }
         }
 
         var combatPosition = CurrentTargetPosition();
@@ -1912,8 +1951,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             {
                 _worldBossLabel!.Visible = false;
             }
-            var monsterDeath = _tideHunterMonsterVisual!.BeginDeath(_rng.Randf() < 0.5f);
-            monsterDeath.Finished += () => SetPhysicsProcess(false);
+            _deathTween = _tideHunterMonsterVisual!.BeginDeath(_rng.Randf() < 0.5f);
+            _deathTween.Finished += () =>
+            {
+                if (IsDead)
+                {
+                    SetPhysicsProcess(false);
+                }
+                _deathTween = null;
+            };
             return;
         }
         if (UsesAuthoredOperatorForDiagnostics)
@@ -1928,15 +1974,29 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
                 downed: false,
                 reviving: false,
                 dead: true);
-            var authoredDeath = CreateTween();
-            authoredDeath.TweenInterval(1.9f);
-            authoredDeath.Finished += () => SetPhysicsProcess(false);
+            _deathTween = CreateTween();
+            _deathTween.TweenInterval(1.9f);
+            _deathTween.Finished += () =>
+            {
+                if (IsDead)
+                {
+                    SetPhysicsProcess(false);
+                }
+                _deathTween = null;
+            };
             return;
         }
-        var tween = CreateTween().SetParallel(true);
-        tween.TweenProperty(_bodyRoot, "rotation:z", _rng.Randf() < 0.5f ? -1.38f : 1.38f, 0.52f)
+        _deathTween = CreateTween().SetParallel(true);
+        _deathTween.TweenProperty(_bodyRoot, "rotation:z", _rng.Randf() < 0.5f ? -1.38f : 1.38f, 0.52f)
             .SetTrans(Tween.TransitionType.Quad);
-        tween.TweenProperty(_bodyRoot, "position:y", 0.18f, 0.52f);
-        tween.Finished += () => SetPhysicsProcess(false);
+        _deathTween.TweenProperty(_bodyRoot, "position:y", 0.18f, 0.52f);
+        _deathTween.Finished += () =>
+        {
+            if (IsDead)
+            {
+                SetPhysicsProcess(false);
+            }
+            _deathTween = null;
+        };
     }
 }

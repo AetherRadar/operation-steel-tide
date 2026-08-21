@@ -58,50 +58,52 @@ public partial class SquadMate
         const float maxStep = 0.28f;
         var forward = moveDirection.Normalized();
         var exclude = NavigationProbeExclusions();
-        var selectedLift = 0.0f;
-        var selectedLanding = GlobalPosition;
-        foreach (var distance in new[] { 0.28f, 0.42f, 0.55f })
-        {
-            var from = GlobalPosition + Vector3.Up * (maxStep + 0.12f) + forward * distance;
-            if (!PhysicsRaycast.TryHit(
-                    GetWorld3D(),
-                    from,
-                    from + Vector3.Down * (maxStep + 0.45f),
-                    exclude,
-                    1,
-                    out var hit)
-                || hit.Normal.Dot(Vector3.Up) < 0.96f)
-            {
-                continue;
-            }
-
-            var landingY = hit.Position.Y;
-            var lift = landingY - GlobalPosition.Y;
-            var landingDistance = Mathf.Max(0.12f, distance - 0.08f);
-            var landing = new Vector3(
-                GlobalPosition.X + forward.X * landingDistance,
-                landingY + NavigationTraversalClearance,
-                GlobalPosition.Z + forward.Z * landingDistance);
-            if (lift > 0.025f
-                && lift <= maxStep
-                && HasNavigationStepClearance(landing, exclude))
-            {
-                selectedLift = lift;
-                selectedLanding = landing;
-                break;
-            }
-        }
-
-        if (selectedLift <= 0.025f)
+        if (!TryFindNavigationStepLanding(forward, 0.28f, maxStep, exclude, out var landing)
+            && !TryFindNavigationStepLanding(forward, 0.42f, maxStep, exclude, out landing)
+            && !TryFindNavigationStepLanding(forward, 0.55f, maxStep, exclude, out landing))
         {
             return;
         }
 
-        GlobalPosition = selectedLanding;
+        GlobalPosition = landing;
         var velocity = Velocity;
         velocity.Y = 0.0f;
         Velocity = velocity;
         NavigationStepUpsForDiagnostics++;
+    }
+
+    private bool TryFindNavigationStepLanding(
+        Vector3 forward,
+        float distance,
+        float maximumStep,
+        Godot.Collections.Array<Rid> exclude,
+        out Vector3 landing)
+    {
+        landing = default;
+        var from = GlobalPosition + Vector3.Up * (maximumStep + 0.12f) + forward * distance;
+        if (!PhysicsRaycast.TryHit(
+                GetWorld3D(),
+                from,
+                from + Vector3.Down * (maximumStep + 0.45f),
+                exclude,
+                1,
+                out var hit)
+            || hit.Normal.Dot(Vector3.Up) < 0.96f)
+        {
+            return false;
+        }
+
+        var lift = hit.Position.Y - GlobalPosition.Y;
+        if (lift <= 0.025f || lift > maximumStep)
+        {
+            return false;
+        }
+        var landingDistance = Mathf.Max(0.12f, distance - 0.08f);
+        landing = new Vector3(
+            GlobalPosition.X + forward.X * landingDistance,
+            hit.Position.Y + NavigationTraversalClearance,
+            GlobalPosition.Z + forward.Z * landingDistance);
+        return HasNavigationStepClearance(landing, exclude);
     }
 
     private Godot.Collections.Array<Rid> NavigationProbeExclusions()
