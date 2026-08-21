@@ -19,8 +19,6 @@ public partial class FreightTerminalWorld
     private float _squadHudTimer;
     private float _allDownTimer;
     private float _localPlayerDownedTimer;
-    private Camera3D? _squadSpectatorCamera;
-    private SquadMate? _spectatedMate;
     private int _remoteNetworkShotCount;
     private int _remoteNetworkAbilityCount;
     private string _activeDeploymentMapId = DeploymentMapCatalog.FreightTerminalId;
@@ -1368,126 +1366,6 @@ public partial class FreightTerminalWorld
     {
         _abandonedAiReviveTarget = null;
         _reviverNoProgressTime = 0.0f;
-    }
-
-    private void BeginSquadMateView()
-    {
-        _spectatedMate = FindLivingSpectatorTarget();
-        if (_spectatedMate is null)
-        {
-            return;
-        }
-
-        var spectatorCamera = EnsureSquadSpectatorCamera();
-
-        SnapSquadSpectatorCamera();
-        spectatorCamera.MakeCurrent();
-        _hud.ShowLocalizedMessage(
-            "spectating_teammate",
-            $"SPECTATING  //  {_spectatedMate.Callsign}",
-            OperatorRoles.Spec(_spectatedMate.Role).Accent);
-    }
-
-    private void UpdateSquadSpectatorCamera()
-    {
-        if (_squadSpectatorCamera is null || !IsInstanceValid(_squadSpectatorCamera))
-        {
-            BeginSquadMateView();
-            return;
-        }
-
-        if (_spectatedMate is null || !IsInstanceValid(_spectatedMate)
-            || _spectatedMate.IsDowned || _spectatedMate.IsBodyBag)
-        {
-            _spectatedMate = FindLivingSpectatorTarget();
-            if (_spectatedMate is not null)
-            {
-                _hud.ShowLocalizedMessage(
-                    "spectating_teammate",
-                    $"SPECTATING  //  {_spectatedMate.Callsign}",
-                    OperatorRoles.Spec(_spectatedMate.Role).Accent);
-            }
-        }
-        if (_spectatedMate is null)
-        {
-            if (!_demolitionObjectiveSpectatorActive && ShouldObservePlantedDemolitionDevice())
-            {
-                BeginDemolitionObjectiveView();
-            }
-            return;
-        }
-
-        SnapSquadSpectatorCamera();
-        if (!_squadSpectatorCamera.Current)
-        {
-            _squadSpectatorCamera.MakeCurrent();
-        }
-    }
-
-    private SquadMate? FindLivingSpectatorTarget()
-    {
-        return _squadMates
-            .Where(mate => IsInstanceValid(mate) && !mate.IsDowned && !mate.IsBodyBag)
-            .OrderBy(mate => mate.GlobalPosition.DistanceSquaredTo(_player.GlobalPosition))
-            .FirstOrDefault();
-    }
-
-    private Camera3D EnsureSquadSpectatorCamera()
-    {
-        if (_squadSpectatorCamera is not null && IsInstanceValid(_squadSpectatorCamera))
-        {
-            return _squadSpectatorCamera;
-        }
-        _squadSpectatorCamera = new Camera3D
-        {
-            Name = "SquadSpectatorCamera",
-            Fov = 76.0f,
-            Near = 0.04f,
-            PhysicsInterpolationMode = PhysicsInterpolationModeEnum.Off
-        };
-        AddChild(_squadSpectatorCamera);
-        return _squadSpectatorCamera;
-    }
-
-    private void SnapSquadSpectatorCamera()
-    {
-        if (_squadSpectatorCamera is null || _spectatedMate is null
-            || !IsInstanceValid(_squadSpectatorCamera) || !IsInstanceValid(_spectatedMate))
-        {
-            return;
-        }
-
-        var basis = _spectatedMate.GlobalBasis.Orthonormalized();
-        var eyePosition = _spectatedMate.GlobalPosition
-            + Vector3.Up * 1.64f
-            - basis.Z * 0.28f;
-        _squadSpectatorCamera.GlobalTransform = new Transform3D(basis, eyePosition);
-    }
-
-    private void RestoreLocalPlayerView()
-    {
-        _spectatedMate = null;
-        _demolitionObjectiveSpectatorActive = false;
-        var playerCamera = _player.GetNodeOrNull<Camera3D>("Head/CombatCamera");
-        playerCamera?.MakeCurrent();
-    }
-
-    private bool IsSquadMateViewCurrent =>
-        _squadSpectatorCamera is not null
-        && IsInstanceValid(_squadSpectatorCamera)
-        && GetViewport().GetCamera3D() == _squadSpectatorCamera
-        && _spectatedMate is not null
-        && IsInstanceValid(_spectatedMate)
-        && !_spectatedMate.IsDowned
-        && !_spectatedMate.IsBodyBag;
-
-    private bool IsLocalPlayerViewCurrent
-    {
-        get
-        {
-            var playerCamera = _player.GetNodeOrNull<Camera3D>("Head/CombatCamera");
-            return playerCamera is not null && GetViewport().GetCamera3D() == playerCamera;
-        }
     }
 
     private float _manualReviveProgress;
@@ -2953,6 +2831,9 @@ public partial class FreightTerminalWorld
         var eliminatedLootBlocked = false;
         var eliminatedBackpackBlocked = false;
         var spectatorTracksMate = false;
+        var spectatorOutsideMate = false;
+        var spectatorThirdPerson = false;
+        var spectatorWallAvoided = false;
         var downedBannerVisible = false;
         var playerViewAfterRevive = false;
         var interactionProbe = new ResidentialSupplyCache { Name = "SquadInteractionProbe" };
@@ -3040,12 +2921,36 @@ public partial class FreightTerminalWorld
             UpdateSquadSpectatorCamera();
             if (_squadSpectatorCamera is not null && IsInstanceValid(_squadSpectatorCamera))
             {
-                var spectatedBasis = reviverMate.GlobalBasis.Orthonormalized();
-                var expectedCameraPosition = reviverMate.GlobalPosition
-                    + Vector3.Up * 1.64f
-                    - spectatedBasis.Z * 0.28f;
+                var cameraDistance = _squadSpectatorCamera.GlobalPosition
+                    .DistanceTo(reviverMate.GlobalPosition);
+                spectatorOutsideMate = IsSquadSpectatorCameraOutsideMate(
+                    reviverMate,
+                    _squadSpectatorCamera.GlobalPosition);
+                spectatorThirdPerson = cameraDistance >= 1.5f;
                 spectatorTracksMate = IsSquadMateViewCurrent
-                    && _squadSpectatorCamera.GlobalPosition.DistanceTo(expectedCameraPosition) < 0.20f;
+                    && spectatorOutsideMate
+                    && spectatorThirdPerson;
+
+                var previousMateProcessMode = reviverMate.ProcessMode;
+                reviverMate.ProcessMode = ProcessModeEnum.Disabled;
+                var spectatorWall = BuildSquadSpectatorWallForDiagnostics(reviverMate);
+                await WaitFrames(2);
+                UpdateSquadSpectatorCamera();
+                var wallCameraPosition = _squadSpectatorCamera.GlobalPosition;
+                var wallPivot = reviverMate.GlobalPosition
+                    + Vector3.Up * SquadSpectatorPivotHeight;
+                spectatorWallAvoided = _squadSpectatorCameraCollisionAdjustedForDiagnostics
+                    && IsSquadSpectatorCameraOutsideMate(reviverMate, wallCameraPosition)
+                    && !PhysicsRaycast.HasHit(
+                        GetWorld3D(),
+                        wallPivot,
+                        wallCameraPosition,
+                        reviverMate.GetRid(),
+                        1);
+                spectatorWall.QueueFree();
+                reviverMate.ProcessMode = previousMateProcessMode;
+                await WaitFrames(2);
+                UpdateSquadSpectatorCamera();
             }
             for (var second = 0; second < 16 && _player.IsDead; second++)
             {
@@ -3358,11 +3263,12 @@ public partial class FreightTerminalWorld
         var downedInteractionOk = downedLootBlocked && downedBackpackBlocked && interruptedClimbLocked;
         var eliminatedInteractionOk = eliminatedLootBlocked && eliminatedBackpackBlocked;
         interactionProbe.QueueFree();
-        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} stair_climbed={squadStairClimbed} stair_gain={squadStairGain:0.00} stair_steps={squadStairStepUps} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} combat_ai={combatAiOk} wall_blocked={combatWallBlocked} target_lock={combatTargetLocked} flanked={combatFlanked} sight_recovered={combatSightRecovered} fired={combatFired} damaged={combatDamaged} faced_move={combatFacedMovement} close_retreat={closeRangeRetreat} close_strafe={closeRangeStrafe} revive_once={reviveOk} ai_mate_revive={aiMateRescueOk} far_rescue_blocked={farRescueBlocked} far_cost={farNavigationCost:0.0} revive_select_usec={farSelectionMicroseconds} revive_select_budget={AiReviveSelectionMaximumMicroseconds} critical_rescue_blocked={criticalRescueBlocked} critical_health={criticalReviverHealth:0.00} mate_enemy_contact={mateRescueEnemyDetected} mate_rescue_assigned={mateRescueAssigned} mate_rescue_motion={mateRescueMinDistance < mateRescueStartDistance - 2.0f} mate_reviver_health={mateReviver.Health / mateReviver.MaxHealth:0.00} eliminated_mate_rescue={mateRescueAfterElimination} reverse_trail_rescue={reverseTrailRescue} reverse_wall={reverseTrailDirectBlocked} reverse_cost={reverseTrailCost:0.0} wall_channel_blocked={wallChannelBlocked} unreachable_abandoned={unreachableAbandoned} abandon_seconds={unreachableElapsed:0.0} abandon_grid_used={unreachableGridUsed} abandon_grid_plans={unreachableGridPlans} bleed_resumed={bleedResumedAfterAbandon} abandon_clear_revive={abandonmentClearedOnRevive} abandon_clear_down={abandonmentClearedOnDown} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} rescue_path={rescuePathOk} grid_rescue={gridDetourOk} grid_detour={gridDetourReady} grid_lifecycle={gridPathLifecycleOk} grid_used={gridRescueUsedGrid} grid_completed={gridRescueCompleted} rescue_wall={rescueDirectBlocked} follow_detour={followDetourReady} rescue_trail={rescueTrailUsed} rescue_advances={rescueWaypointAdvances} rescue_replans={rescueReplans} first_down_spectate={squadMateViewOnDown} downed_input_locked={downedInputLocked} downed_loot_blocked={downedLootBlocked} downed_backpack_blocked={downedBackpackBlocked} climb_interrupt_locked={interruptedClimbLocked} eliminated_loot_blocked={eliminatedLootBlocked} eliminated_backpack_blocked={eliminatedBackpackBlocked} spectator_tracks={spectatorTracksMate} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} finished_spectate={finishedSpectateOk} immediate_view={finishedPlayerSpectate} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
+        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} stair_climbed={squadStairClimbed} stair_gain={squadStairGain:0.00} stair_steps={squadStairStepUps} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} combat_ai={combatAiOk} wall_blocked={combatWallBlocked} target_lock={combatTargetLocked} flanked={combatFlanked} sight_recovered={combatSightRecovered} fired={combatFired} damaged={combatDamaged} faced_move={combatFacedMovement} close_retreat={closeRangeRetreat} close_strafe={closeRangeStrafe} revive_once={reviveOk} ai_mate_revive={aiMateRescueOk} far_rescue_blocked={farRescueBlocked} far_cost={farNavigationCost:0.0} revive_select_usec={farSelectionMicroseconds} revive_select_budget={AiReviveSelectionMaximumMicroseconds} critical_rescue_blocked={criticalRescueBlocked} critical_health={criticalReviverHealth:0.00} mate_enemy_contact={mateRescueEnemyDetected} mate_rescue_assigned={mateRescueAssigned} mate_rescue_motion={mateRescueMinDistance < mateRescueStartDistance - 2.0f} mate_reviver_health={mateReviver.Health / mateReviver.MaxHealth:0.00} eliminated_mate_rescue={mateRescueAfterElimination} reverse_trail_rescue={reverseTrailRescue} reverse_wall={reverseTrailDirectBlocked} reverse_cost={reverseTrailCost:0.0} wall_channel_blocked={wallChannelBlocked} unreachable_abandoned={unreachableAbandoned} abandon_seconds={unreachableElapsed:0.0} abandon_grid_used={unreachableGridUsed} abandon_grid_plans={unreachableGridPlans} bleed_resumed={bleedResumedAfterAbandon} abandon_clear_revive={abandonmentClearedOnRevive} abandon_clear_down={abandonmentClearedOnDown} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} rescue_path={rescuePathOk} grid_rescue={gridDetourOk} grid_detour={gridDetourReady} grid_lifecycle={gridPathLifecycleOk} grid_used={gridRescueUsedGrid} grid_completed={gridRescueCompleted} rescue_wall={rescueDirectBlocked} follow_detour={followDetourReady} rescue_trail={rescueTrailUsed} rescue_advances={rescueWaypointAdvances} rescue_replans={rescueReplans} first_down_spectate={squadMateViewOnDown} downed_input_locked={downedInputLocked} downed_loot_blocked={downedLootBlocked} downed_backpack_blocked={downedBackpackBlocked} climb_interrupt_locked={interruptedClimbLocked} eliminated_loot_blocked={eliminatedLootBlocked} eliminated_backpack_blocked={eliminatedBackpackBlocked} spectator_tracks={spectatorTracksMate} spectator_outside={spectatorOutsideMate} spectator_third_person={spectatorThirdPerson} spectator_wall_avoided={spectatorWallAvoided} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} finished_spectate={finishedSpectateOk} immediate_view={finishedPlayerSpectate} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}");
         var valid = ActiveSquadCount >= 2 && roleFillOk && combatAiOk
             && squadStairClimbed
             && reviveOk && aiMateRescueOk && unreachableTimeoutOk && abandonmentLifecycleOk
             && aiFinishOk && rescuePathOk && gridDetourOk && downedInteractionOk && eliminatedInteractionOk
+            && spectatorOutsideMate && spectatorThirdPerson && spectatorWallAvoided
             && finishedSpectateOk;
         GD.Print($"SQUAD_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
