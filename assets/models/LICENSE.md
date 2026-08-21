@@ -24,6 +24,16 @@ The City Kit (Industrial) 1.0 model set is distributed by Kenney under CC0 1.0:
 
 The complete GLB set is retained so authored demolition layouts can combine the pack's buildings, chimneys, and tank detail without modifying third-party geometry.
 
+The Factory Kit 3.0 model set is distributed by Kenney under CC0 1.0:
+
+- Source: https://kenney.nl/assets/factory-kit
+- Download: https://kenney.nl/media/pages/assets/factory-kit/edaac9d4f6-1777639602/kenney_factory-kit_3.0.zip
+- Acquisition date: 2026-08-19
+- Local assets: `kenney_factory_kit/door-wide-closed.glb` and its original `kenney_factory_kit/Textures/colormap.png` material atlas
+- License copy: `kenney_factory_kit/KENNEY_LICENSE.txt`
+
+The authored overhead door is used for the interactive entrances to the Grand Hotel and Municipal Treasury in Saint Marais Old Town.
+
 ## Quaternius CC0 models
 
 The Ultimate Guns Pack is distributed by Quaternius under CC0 1.0 Universal:

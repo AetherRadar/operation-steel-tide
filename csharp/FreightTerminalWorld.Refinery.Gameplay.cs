@@ -214,6 +214,11 @@ public partial class FreightTerminalWorld
         var proxiesReady = _refineryCollisionProxyCount >= 45
             && counts.ModelCollisionShapes >= _refineryCollisionProxyCount
             && counts.NonBoxModelCollisionShapes == 0;
+        var interactiveDoorsReady = _oldTownLandmarks is { } landmarks
+            && _refineryDoors.Count == landmarks.EntryCount
+            && _refineryDoors.All(door => IsInstanceValid(door)
+                && door.UsesAuthoredVisual
+                && door.HasBoxCollision);
         var skylineReady = _refineryTallSceneCount >= 30
             && counts.TallSceneModels == _refineryTallSceneCount;
         var districtsReady = _oldTownDistricts.Count >= 10
@@ -233,13 +238,13 @@ public partial class FreightTerminalWorld
         var deploymentReady = DeploymentPoint.DistanceTo(ExtractionPoint) > 80.0f;
         var performanceReady = counts.Nodes < 1900
             && counts.StaticBodies < 125
-            && counts.MeshInstances < 760
+            && counts.MeshInstances < 770
             && counts.Lights <= 32;
         var valid = rootsReady && localizationReady && authoredReady && sourcesReady && proxiesReady
-            && skylineReady && districtsReady && highValueReady && routeReady
+            && interactiveDoorsReady && skylineReady && districtsReady && highValueReady && routeReady
             && landmarkReady && gameplayReady && deploymentReady && performanceReady;
 
-        GD.Print($"REFINERY_MAP_CHECK valid={valid} identity=saint_marais_old_town root={rootsReady} localization={localizationReady} authored={authoredReady} models={_refineryAuthoredModelCount}/{RefineryLayout.Models.Count} unique_scenes={_refineryModelScenes.Count} sources={sourcesReady} districts={_oldTownDistricts.Count} district_ready={districtsReady} imported_meshes={counts.ImportedMeshes} culled={counts.CulledImportedMeshes} proxies={counts.ModelCollisionShapes}/{_refineryCollisionProxyCount} proxy_boxes={proxiesReady} tall_scenes={_refineryTallSceneCount} skyline={skylineReady} high_value={highValueReady} zone_separation={zoneSeparation:0.0} zone_summary={zoneSummary} routes={routeReady} route_probes={routeProbeCount} route_blocker={routeBlocker} landmarks={landmarkReady} landmark_models={_oldTownLandmarks?.AuthoredModelCount ?? 0} landmark_collision={_oldTownLandmarks?.CollisionShapeCount ?? 0} rooftop_routes={_oldTownLandmarks?.RooftopRouteCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
+        GD.Print($"REFINERY_MAP_CHECK valid={valid} identity=saint_marais_old_town root={rootsReady} localization={localizationReady} authored={authoredReady} models={_refineryAuthoredModelCount}/{RefineryLayout.Models.Count} unique_scenes={_refineryModelScenes.Count} sources={sourcesReady} districts={_oldTownDistricts.Count} district_ready={districtsReady} imported_meshes={counts.ImportedMeshes} culled={counts.CulledImportedMeshes} proxies={counts.ModelCollisionShapes}/{_refineryCollisionProxyCount} proxy_boxes={proxiesReady} doors={_refineryDoors.Count}/{_oldTownLandmarks?.EntryCount ?? 0} doors_ready={interactiveDoorsReady} tall_scenes={_refineryTallSceneCount} skyline={skylineReady} high_value={highValueReady} zone_separation={zoneSeparation:0.0} zone_summary={zoneSummary} routes={routeReady} route_probes={routeProbeCount} route_blocker={routeBlocker} landmarks={landmarkReady} landmark_models={_oldTownLandmarks?.AuthoredModelCount ?? 0} landmark_collision={_oldTownLandmarks?.CollisionShapeCount ?? 0} rooftop_routes={_oldTownLandmarks?.RooftopRouteCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
         GD.Print($"REFINERY_MAP_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -289,7 +294,25 @@ public partial class FreightTerminalWorld
         camera.Fov = 68.0f;
         await WaitFrames(10);
         SaveViewportImage("res://old_town_rooftop_validation.png");
-        GD.Print($"REFINERY_MAP_CAPTURE identity=saint_marais_old_town models={_refineryAuthoredModelCount} scenes={_refineryModelScenes.Count} landmark_models={_oldTownLandmarks?.AuthoredModelCount ?? 0} paths=refinery_map_validation.png,refinery_ground_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png");
+        var captureDoor = _refineryDoors.FirstOrDefault();
+        if (captureDoor is not null)
+        {
+            var outward = (captureDoor.OutsideProbe - captureDoor.InsideProbe).Normalized();
+            camera.GlobalPosition = captureDoor.InteractionPoint + outward * 7.0f + Vector3.Up * 1.7f;
+            camera.LookAt(captureDoor.InteractionPoint + Vector3.Up * 0.6f, Vector3.Up);
+            camera.Fov = 56.0f;
+            await WaitFrames(8);
+            SaveViewportImage("res://refinery_door_closed_validation.png");
+            captureDoor.TrySetOpen(true, bypassClearance: true);
+            for (var frame = 0; frame < 120 && captureDoor.IsAnimating; frame++)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            }
+            await WaitFrames(4);
+            SaveViewportImage("res://refinery_door_open_validation.png");
+            captureDoor.SetOpenImmediate(false);
+        }
+        GD.Print($"REFINERY_MAP_CAPTURE identity=saint_marais_old_town models={_refineryAuthoredModelCount} scenes={_refineryModelScenes.Count} landmark_models={_oldTownLandmarks?.AuthoredModelCount ?? 0} doors={_refineryDoors.Count} paths=refinery_map_validation.png,refinery_ground_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,refinery_door_closed_validation.png,refinery_door_open_validation.png");
         GetTree().Quit();
     }
 
@@ -351,10 +374,12 @@ public partial class FreightTerminalWorld
         {
             return false;
         }
+        var exclusions = BuildRefineryLaneExclusions();
+        using var exclusionsBacking = exclusions.AsDisposable();
         var hotelEntryClear = !PhysicsRaycast.HasHit(
-            GetWorld3D(), landmarks.HotelEntry, landmarks.HotelInterior, 1);
+            GetWorld3D(), landmarks.HotelEntry, landmarks.HotelInterior, exclusions, 1);
         var treasuryEntryClear = !PhysicsRaycast.HasHit(
-            GetWorld3D(), landmarks.TreasuryEntry, landmarks.TreasuryInterior, 1);
+            GetWorld3D(), landmarks.TreasuryEntry, landmarks.TreasuryInterior, exclusions, 1);
         var hotelWallBlocks = PhysicsRaycast.HasHit(
             GetWorld3D(), landmarks.HotelCenter + new Vector3(-14, 1.2f, 0), landmarks.HotelCenter, 1);
         var treasuryWallBlocks = PhysicsRaycast.HasHit(
@@ -404,6 +429,13 @@ public partial class FreightTerminalWorld
             if (IsInstanceValid(vehicle))
             {
                 exclusions.Add(vehicle.GetRid());
+            }
+        }
+        foreach (var door in _refineryDoors)
+        {
+            if (IsInstanceValid(door))
+            {
+                exclusions.Add(door.GetRid());
             }
         }
         return exclusions;

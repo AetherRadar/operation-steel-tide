@@ -69,6 +69,8 @@ public partial class FreightTerminalWorld
         _squadNetwork.ExtractionLootCloseRequested += OnExtractionLootCloseRequested;
         _squadNetwork.ExtractionLootDropRequested += OnExtractionLootDropRequested;
         _squadNetwork.ExtractionLootStateReceived += OnExtractionLootState;
+        _squadNetwork.ExtractionDoorToggleRequested += OnExtractionDoorToggleRequested;
+        _squadNetwork.ExtractionDoorStateReceived += OnExtractionDoorState;
         _squadNetwork.StatusChanged += OnSquadNetworkStatusChanged;
         _squadNetwork.LanRoomsChanged += OnLanRoomsChanged;
         _squadNetwork.LanRoomBrowseAvailabilityChanged += OnLanRoomBrowseAvailabilityChanged;
@@ -605,6 +607,8 @@ public partial class FreightTerminalWorld
         _squadNetwork.ExtractionLootCloseRequested -= OnExtractionLootCloseRequested;
         _squadNetwork.ExtractionLootDropRequested -= OnExtractionLootDropRequested;
         _squadNetwork.ExtractionLootStateReceived -= OnExtractionLootState;
+        _squadNetwork.ExtractionDoorToggleRequested -= OnExtractionDoorToggleRequested;
+        _squadNetwork.ExtractionDoorStateReceived -= OnExtractionDoorState;
         _squadNetwork.StatusChanged -= OnSquadNetworkStatusChanged;
         _squadNetwork.LanRoomsChanged -= OnLanRoomsChanged;
         _squadNetwork.LanRoomBrowseAvailabilityChanged -= OnLanRoomBrowseAvailabilityChanged;

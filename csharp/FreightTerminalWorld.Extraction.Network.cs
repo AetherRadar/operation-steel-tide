@@ -444,6 +444,7 @@ public partial class FreightTerminalWorld
         if (peerId > 1)
         {
             SendAllExtractionLootStates(peerId);
+            SendAllExtractionDoorStates(peerId);
         }
         TryLaunchExtractionWorldIfReady();
     }
@@ -468,6 +469,7 @@ public partial class FreightTerminalWorld
                 }
                 _squadNetwork.SendExtractionWorldBootstrapState(peerId, bootstrap);
                 SendAllExtractionLootStates(peerId);
+                SendAllExtractionDoorStates(peerId);
             }
             _squadNetwork.BroadcastExtractionMissionState(CaptureExtractionMissionState());
             _squadNetwork.BroadcastExtractionWorldLaunch();

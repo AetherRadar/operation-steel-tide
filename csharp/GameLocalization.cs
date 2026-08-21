@@ -126,6 +126,10 @@ public static class GameLocalization
 
     static GameLocalization()
     {
+        Chinese["open_door"] = "\u5f00\u95e8";
+        Chinese["close_door"] = "\u5173\u95e8";
+        Chinese["door_moving"] = "\u95e8\u6b63\u5728\u79fb\u52a8";
+        Chinese["door_blocked"] = "\u95e8\u88ab\u963b\u6321  //  \u8bf7\u79bb\u5f00\u5165\u53e3";
         Chinese["secondary_weapon"] = "\u526f\u6b66\u5668";
         Chinese["sidearm_weapon"] = "\u624b\u67aa";
         Chinese["squad_ready"] = "\u5c0f\u961f\u5df2\u5c31\u7eea  //  F1 \u8ddf\u968f  F2 \u6212\u5907  F3 \u79fb\u52a8  H \u6280\u80fd";

@@ -1785,6 +1785,11 @@ public partial class FreightTerminalWorld : Node3D
             return;
         }
 
+        if (TryHandleRefineryDoorInteraction())
+        {
+            return;
+        }
+
         CivilianNpc? nearestCivilian = null;
         var nearestCivilianDistance = 2.85f;
         foreach (var civilian in _civilians)

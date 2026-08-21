@@ -36,7 +36,9 @@ public static class DeploymentMapRuntime
         }
 
         if (Array.Exists(args, value =>
-                value is "--validate-refinery-map" or "--capture-refinery-map"))
+                value is "--validate-refinery-map"
+                    or "--validate-refinery-doors"
+                    or "--capture-refinery-map"))
         {
             SelectMap(DeploymentMapCatalog.BlackwaterRefineryId);
         }

@@ -43,6 +43,7 @@ public partial class FreightTerminalWorld
         BuildOldTownPerimeter(oldStone);
         BuildRefineryModelAssembly();
         _oldTownLandmarks = _oldTownLandmarksBuilder.Build(_levelRoot);
+        BuildOldTownLandmarkDoors(_levelRoot, _oldTownLandmarks);
         if (_oldTownLandmarks.RooftopRoute.Count >= 2)
         {
             RegisterSquadTraversalLink(
@@ -82,6 +83,7 @@ public partial class FreightTerminalWorld
         _refineryAuthoredModelCount = 0;
         _refineryCollisionProxyCount = 0;
         _refineryTallSceneCount = 0;
+        _refineryDoors.Clear();
         _refineryModelScenes.Clear();
         _oldTownDistricts.Clear();
 
