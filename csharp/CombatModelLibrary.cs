@@ -7,6 +7,8 @@ namespace OperationSteelTide;
 
 internal sealed class AuthoredWeaponVisual
 {
+    private readonly Vector3 _chargingHandleRestPosition;
+
     public AuthoredWeaponVisual(Node3D root)
     {
         Root = root;
@@ -18,6 +20,7 @@ internal sealed class AuthoredWeaponVisual
         MuzzleDevice = CombatModelLibrary.RequireNode(root, "MuzzleDevice");
         Suppressor = CombatModelLibrary.RequireNode(root, "Suppressor");
         OpticMount = CombatModelLibrary.RequireNode(root, "OpticMount");
+        _chargingHandleRestPosition = ChargingHandle.Position;
     }
 
     public Node3D Root { get; }
@@ -48,6 +51,14 @@ internal sealed class AuthoredWeaponVisual
         SpareMagazine.Transform = spareMagazine.Transform;
         SpareMagazine.Visible = spareMagazine.Visible;
         ChargingHandle.Transform = chargingHandle.Transform;
+    }
+
+    public void SyncMechanismState(Node3D magazine, Node3D spareMagazine, Node3D chargingHandle)
+    {
+        Magazine.Visible = magazine.Visible;
+        SpareMagazine.Visible = spareMagazine.Visible;
+        var reloadOffset = chargingHandle.Position.Z + 0.05f;
+        ChargingHandle.Position = _chargingHandleRestPosition + new Vector3(0.0f, 0.0f, reloadOffset);
     }
 }
 
@@ -329,6 +340,7 @@ internal readonly record struct CombatModelInspection(
 internal static class CombatModelLibrary
 {
     internal const string WeaponScenePath = "res://assets/models/steel_tide_m4a1/steel_tide_m4a1.glb";
+    private const string QuaterniusWeaponRoot = "res://assets/models/quaternius_ultimate_guns";
     internal const string OperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier_animated.glb";
     internal const string PreviewOperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier.glb";
     internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/low-poly_gsh-18.glb";
@@ -336,8 +348,6 @@ internal static class CombatModelLibrary
 
     private const float Gsh18FirstPersonLength = 0.64f;
     private const float Gsh18PreviewLength = 0.78f;
-    internal const float Gsh18FirstPersonPresentationScale = 2.8f;
-    internal const float Gsh18PreviewPresentationScale = 8.0f;
     private const float DesertEagleFirstPersonLength = 0.82f;
     private const float DesertEaglePreviewLength = 1.05f;
     private const float OperatorPreviewHeight = 2.55f;
@@ -374,7 +384,14 @@ internal static class CombatModelLibrary
     };
 
     public static AuthoredWeaponVisual InstantiateWeapon(bool firstPerson)
+        => InstantiateWeapon(WeaponPlatform.M4A1, firstPerson);
+
+    public static AuthoredWeaponVisual InstantiateWeapon(WeaponPlatform platform, bool firstPerson)
     {
+        if (platform != WeaponPlatform.M4A1)
+        {
+            return InstantiateAdaptedWeapon(platform, firstPerson);
+        }
         var root = InstantiateRequired(WeaponScenePath, WeaponNodes);
         root.Name = "AuthoredM4A1Visual";
         if (firstPerson)
@@ -405,10 +422,81 @@ internal static class CombatModelLibrary
         sourcePresentation.AddChild(source);
         wrapper.AddChild(sourcePresentation);
         var visual = new AuthoredOperatorVisual(wrapper);
+        var carriedBuild = weaponBuild ?? WeaponCatalog.Build(WeaponPlatform.M4A1, 0);
         visual.AttachWeapon(
-            InstantiateWeapon(firstPerson: false),
-            weaponBuild ?? WeaponCatalog.Build(WeaponPlatform.M4A1, 0));
+            InstantiateWeapon(carriedBuild.Platform, firstPerson: false),
+            carriedBuild);
         return visual;
+    }
+
+    private static AuthoredWeaponVisual InstantiateAdaptedWeapon(WeaponPlatform platform, bool firstPerson)
+    {
+        Node3D source;
+        if (platform == WeaponPlatform.GSh18)
+        {
+            source = InstantiateGsh18(firstPerson).Root;
+        }
+        else if (platform == WeaponPlatform.DesertEagle)
+        {
+            source = InstantiateDesertEagle(firstPerson).Root;
+        }
+        else
+        {
+            source = InstantiateRequired(WeaponScenePathFor(platform), Array.Empty<string>());
+        }
+
+        var sourceBounds = ComputeBounds(source);
+        if (sourceBounds.MeshCount == 0 || sourceBounds.Size.X <= 0.001f)
+        {
+            source.Free();
+            throw new InvalidOperationException($"Authored {platform} model has no usable geometry bounds.");
+        }
+
+        var targetLength = WeaponPresentationLength(platform, firstPerson);
+        var root = new Node3D { Name = $"Authored{platform}Visual" };
+        var presentation = new Node3D
+        {
+            Name = $"{platform}Presentation",
+            Position = new Vector3(0.0f, 0.0f, 0.32f - targetLength * 0.5f),
+            RotationDegrees = platform is WeaponPlatform.GSh18 or WeaponPlatform.DesertEagle
+                ? Vector3.Zero
+                : new Vector3(0.0f, 90.0f, 0.0f),
+            Scale = platform is WeaponPlatform.GSh18 or WeaponPlatform.DesertEagle
+                ? Vector3.One
+                : Vector3.One * (targetLength / sourceBounds.Size.X)
+        };
+        if (platform is not WeaponPlatform.GSh18 and not WeaponPlatform.DesertEagle)
+        {
+            source.Position = -sourceBounds.Center;
+        }
+        presentation.AddChild(source);
+        root.AddChild(presentation);
+        AddWeaponMarkers(root, targetLength);
+        if (firstPerson)
+        {
+            foreach (var geometry in GeometryBelow(root))
+            {
+                geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+            }
+        }
+        return new AuthoredWeaponVisual(root);
+    }
+
+    private static void AddWeaponMarkers(Node3D root, float length)
+    {
+        AddMarker(root, "Magazine", new Vector3(0.0f, -0.2f, -0.18f));
+        AddMarker(root, "SpareMagazine", new Vector3(-0.3f, -0.62f, -0.18f));
+        AddMarker(root, "ChargingHandle", new Vector3(0.075f, 0.085f, -0.05f));
+        AddMarker(root, "Stock", new Vector3(0.0f, 0.0f, 0.28f));
+        AddMarker(root, "Foregrip", new Vector3(0.0f, -0.16f, 0.18f - length * 0.55f));
+        AddMarker(root, "MuzzleDevice", new Vector3(0.0f, 0.0f, 0.28f - length));
+        AddMarker(root, "Suppressor", new Vector3(0.0f, 0.0f, 0.28f - length));
+        AddMarker(root, "OpticMount", new Vector3(0.0f, 0.16f, -0.16f));
+    }
+
+    private static void AddMarker(Node3D root, string name, Vector3 position)
+    {
+        root.AddChild(new Marker3D { Name = name, Position = position });
     }
 
     public static AuthoredPreviewOperatorVisual InstantiatePreviewOperator()
@@ -430,7 +518,7 @@ internal static class CombatModelLibrary
         RemoveStagingNode(source, "Lamp");
         RemoveStagingNode(source, "Camera");
         var sourceBounds = ComputeBounds(source);
-        if (sourceBounds.MeshCount == 0 || sourceBounds.Size.Y <= 0.001f)
+        if (sourceBounds.MeshCount == 0 || sourceBounds.Size.X <= 0.001f)
         {
             source.Free();
             throw new InvalidOperationException("GSh-18 model has no usable geometry bounds.");
@@ -441,8 +529,8 @@ internal static class CombatModelLibrary
         var wrapper = new Node3D
         {
             Name = "AuthoredGsh18Visual",
-            RotationDegrees = new Vector3(-90.0f, 0.0f, 0.0f),
-            Scale = Vector3.One * (targetLength / sourceBounds.Size.Y)
+            RotationDegrees = new Vector3(0.0f, 90.0f, 0.0f),
+            Scale = Vector3.One * (targetLength / sourceBounds.Size.X)
         };
         wrapper.AddChild(source);
         if (firstPerson)
@@ -486,6 +574,70 @@ internal static class CombatModelLibrary
 
     public static CombatModelInspection InspectWeapon()
         => Inspect(WeaponScenePath, WeaponNodes);
+
+    public static CombatModelInspection InspectWeapon(WeaponPlatform platform)
+    {
+        Node3D? root = null;
+        try
+        {
+            root = platform switch
+            {
+                WeaponPlatform.M4A1 => InstantiateWeapon(firstPerson: false).Root,
+                WeaponPlatform.GSh18 => InstantiateGsh18(firstPerson: false).Root,
+                WeaponPlatform.DesertEagle => InstantiateDesertEagle(firstPerson: false).Root,
+                _ => InstantiateWeapon(platform, firstPerson: false).Root
+            };
+            var bounds = ComputeBounds(root);
+            return new CombatModelInspection(
+                true,
+                true,
+                bounds.MeshCount,
+                CountMaterials(root),
+                bounds.Size);
+        }
+        catch
+        {
+            return new CombatModelInspection(false, false, 0, 0, Vector3.Zero);
+        }
+        finally
+        {
+            root?.Free();
+        }
+    }
+
+    internal static string WeaponScenePathFor(WeaponPlatform platform)
+        => platform switch
+        {
+            WeaponPlatform.M4A1 => WeaponScenePath,
+            WeaponPlatform.GSh18 => Gsh18ScenePath,
+            WeaponPlatform.DesertEagle => DesertEagleScenePath,
+            WeaponPlatform.AK74 => $"{QuaterniusWeaponRoot}/ak74.glb",
+            WeaponPlatform.ScarL => $"{QuaterniusWeaponRoot}/scarl.glb",
+            WeaponPlatform.M24 => $"{QuaterniusWeaponRoot}/m24.glb",
+            WeaponPlatform.MP5A5 => $"{QuaterniusWeaponRoot}/mp5a5.glb",
+            WeaponPlatform.M3A1 => $"{QuaterniusWeaponRoot}/m3a1.glb",
+            WeaponPlatform.AXMC => $"{QuaterniusWeaponRoot}/axmc.glb",
+            WeaponPlatform.AWM => $"{QuaterniusWeaponRoot}/awm.glb",
+            WeaponPlatform.VSS => $"{QuaterniusWeaponRoot}/vss.glb",
+            WeaponPlatform.P226 => $"{QuaterniusWeaponRoot}/p226.glb",
+            WeaponPlatform.M1911 => $"{QuaterniusWeaponRoot}/m1911.glb",
+            _ => WeaponScenePath
+        };
+
+    private static float WeaponPresentationLength(WeaponPlatform platform, bool firstPerson)
+    {
+        var length = platform switch
+        {
+            WeaponPlatform.M24 or WeaponPlatform.AXMC or WeaponPlatform.AWM => 1.62f,
+            WeaponPlatform.AK74 or WeaponPlatform.ScarL or WeaponPlatform.VSS => 1.42f,
+            WeaponPlatform.MP5A5 or WeaponPlatform.M3A1 => 1.08f,
+            WeaponPlatform.P226 or WeaponPlatform.M1911 => 0.68f,
+            WeaponPlatform.GSh18 => Gsh18FirstPersonLength,
+            WeaponPlatform.DesertEagle => DesertEagleFirstPersonLength,
+            _ => 1.36f
+        };
+        return firstPerson ? length : length * 1.12f;
+    }
 
     public static CombatModelInspection InspectOperator()
     {

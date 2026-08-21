@@ -191,6 +191,10 @@ public partial class InventoryModelPreview : SubViewportContainer
         {
             return;
         }
+        if (TryBuildAuthoredPlatform(root, platform))
+        {
+            return;
+        }
         if (WeaponCatalog.IsSidearm(platform))
         {
             BuildSidearm(root, platform);
@@ -304,8 +308,7 @@ public partial class InventoryModelPreview : SubViewportContainer
             {
                 Name = "GSh18PreviewOrientation",
                 Position = new Vector3(0.02f, -0.04f, 0.0f),
-                RotationDegrees = new Vector3(0.0f, -90.0f, 0.0f),
-                Scale = Vector3.One * CombatModelLibrary.Gsh18PreviewPresentationScale
+                RotationDegrees = new Vector3(0.0f, -90.0f, 0.0f)
             };
             root.AddChild(orientation);
             orientation.AddChild(CombatModelLibrary.InstantiateGsh18(firstPerson: false).Root);
@@ -314,6 +317,30 @@ public partial class InventoryModelPreview : SubViewportContainer
         catch (Exception exception)
         {
             GD.PushWarning($"GSh-18 inventory model unavailable; using procedural preview: {exception.Message}");
+            return false;
+        }
+    }
+
+    private bool TryBuildAuthoredPlatform(Node3D root, WeaponPlatform platform)
+    {
+        try
+        {
+            var authored = CombatModelLibrary.InstantiateWeapon(platform, firstPerson: false);
+            authored.Configure(_weapon ?? WeaponCatalog.Build(platform, 0));
+            var orientation = new Node3D
+            {
+                Name = $"{platform}PreviewOrientation",
+                Position = new Vector3(0.02f, -0.04f, 0.0f),
+                RotationDegrees = new Vector3(0.0f, -90.0f, 0.0f),
+                Scale = Vector3.One * 1.16f
+            };
+            orientation.AddChild(authored.Root);
+            root.AddChild(orientation);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            GD.PushError($"Required authored {platform} preview unavailable: {exception.Message}");
             return false;
         }
     }

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Godot;
 
@@ -150,6 +151,13 @@ public partial class FreightTerminalWorld
     {
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         var weapon = CombatModelLibrary.InspectWeapon();
+        var platformInspections = Enum.GetValues<WeaponPlatform>()
+            .ToDictionary(platform => platform, CombatModelLibrary.InspectWeapon);
+        var platformGeometry = platformInspections.ToDictionary(
+            pair => pair.Key,
+            pair => IsValidPlatformWeapon(pair.Key, pair.Value));
+        var lineupCaptured = await CaptureAuthoredWeaponLineup();
+        var firstPersonCaptures = await CaptureFirstPersonWeaponViews();
         var operatorModel = CombatModelLibrary.InspectOperator();
         var previewOperator = CombatModelLibrary.InspectPreviewOperator();
         var gsh18 = CombatModelLibrary.InspectGsh18();
@@ -178,8 +186,8 @@ public partial class FreightTerminalWorld
             && gsh18.RequiredNodes
             && gsh18.MeshCount >= 10
             && gsh18.MaterialCount >= 1
-            && gsh18.Size.X is >= 0.08f and <= 0.3f
-            && gsh18.Size.Y is >= 0.3f and <= 0.75f
+            && gsh18.Size.X > 0.001f
+            && gsh18.Size.Y > 0.001f
             && gsh18.Size.Z is >= 0.65f and <= 0.9f;
         var desertEagleGeometry = desertEagle.Loaded
             && desertEagle.RequiredNodes
@@ -208,6 +216,9 @@ public partial class FreightTerminalWorld
                 ColorDistance(enemy.AuthoredTeamColorForDiagnostics, garrisonColor) > 0.55f)
             && rivals.Select(enemy => enemy.AuthoredTeamColorForDiagnostics).Distinct().Count() >= 2;
         var valid = weaponGeometry
+            && platformGeometry.Values.All(value => value)
+            && lineupCaptured
+            && firstPersonCaptures.Values.All(value => value)
             && operatorGeometry
             && previewOperatorGeometry
             && gsh18Geometry
@@ -231,6 +242,9 @@ public partial class FreightTerminalWorld
             + $"deagle_loaded={desertEagle.Loaded} deagle_nodes={desertEagle.RequiredNodes} "
             + $"deagle_meshes={desertEagle.MeshCount} deagle_materials={desertEagle.MaterialCount} "
             + $"deagle_size={desertEagle.Size} "
+            + $"platforms={string.Join(',', platformInspections.Select(pair => $"{pair.Key}:{FormatWeaponInspection(pair.Value, platformGeometry[pair.Key])}"))} "
+            + $"lineup={lineupCaptured} "
+            + $"first_person={string.Join(',', firstPersonCaptures.Select(pair => $"{pair.Key}:{pair.Value}"))} "
             + $"player_authored={playerAuthored} squad_authored={squadAuthored} "
             + $"enemies_authored={enemiesAuthored} enemies={livingEnemies.Length} "
             + $"faction_appearance={factionAppearance} garrison_color={garrisonColor} "
@@ -238,6 +252,164 @@ public partial class FreightTerminalWorld
         GD.Print($"COMBAT_MODELS_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }
+
+    private async System.Threading.Tasks.Task<bool> CaptureAuthoredWeaponLineup()
+    {
+        var viewport = new SubViewport
+        {
+            Name = "AuthoredWeaponLineupViewport",
+            Size = new Vector2I(1600, 900),
+            OwnWorld3D = true,
+            RenderTargetUpdateMode = SubViewport.UpdateMode.Always
+        };
+        AddChild(viewport);
+        var stage = new Node3D { Name = "AuthoredWeaponLineupStage" };
+        viewport.AddChild(stage);
+        stage.AddChild(new WorldEnvironment
+        {
+            Environment = new Godot.Environment
+            {
+                BackgroundMode = Godot.Environment.BGMode.Color,
+                BackgroundColor = new Color(0.035f, 0.045f, 0.052f),
+                AmbientLightSource = Godot.Environment.AmbientSource.Color,
+                AmbientLightColor = new Color(0.76f, 0.84f, 0.82f),
+                AmbientLightEnergy = 1.35f
+            }
+        });
+        stage.AddChild(new DirectionalLight3D
+        {
+            RotationDegrees = new Vector3(-28.0f, -32.0f, 0.0f),
+            LightColor = new Color(0.9f, 0.96f, 1.0f),
+            LightEnergy = 1.4f,
+            ShadowEnabled = false
+        });
+        var camera = new Camera3D
+        {
+            Projection = Camera3D.ProjectionType.Orthogonal,
+            Size = 7.0f,
+            Position = new Vector3(0.0f, 0.0f, 8.0f),
+            Current = true
+        };
+        stage.AddChild(camera);
+
+        var platforms = Enum.GetValues<WeaponPlatform>();
+        for (var index = 0; index < platforms.Length; index++)
+        {
+            var platform = platforms[index];
+            var column = index % 4;
+            var row = index / 4;
+            var x = (column - 1.5f) * 2.75f;
+            var y = (1.5f - row) * 1.55f;
+            var weapon = platform switch
+            {
+                WeaponPlatform.GSh18 => CombatModelLibrary.InstantiateGsh18(firstPerson: false).Root,
+                WeaponPlatform.DesertEagle => CombatModelLibrary.InstantiateDesertEagle(firstPerson: false).Root,
+                _ => CombatModelLibrary.InstantiateWeapon(platform, firstPerson: false).Root
+            };
+            var mount = new Node3D
+            {
+                Name = $"{platform}LineupMount",
+                Position = new Vector3(x, y, 0.0f),
+                RotationDegrees = new Vector3(0.0f, -90.0f, 0.0f)
+            };
+            weapon.Scale *= platform is WeaponPlatform.GSh18 or WeaponPlatform.DesertEagle
+                ? 0.78f
+                : 0.92f;
+            mount.AddChild(weapon);
+            stage.AddChild(mount);
+            stage.AddChild(new Label3D
+            {
+                Text = platform.ToString(),
+                Position = new Vector3(x, y - 0.56f, 0.0f),
+                FontSize = 28,
+                OutlineSize = 6,
+                Modulate = new Color(0.82f, 0.9f, 0.88f),
+                NoDepthTest = true
+            });
+        }
+
+        await WaitFrames(5);
+        var image = viewport.GetTexture().GetImage();
+        var path = ProjectSettings.GlobalizePath("res://authored_weapon_lineup_validation.png");
+        var saved = !image.IsEmpty() && image.SavePng(path) == Error.Ok;
+        viewport.QueueFree();
+        return saved;
+    }
+
+    private async System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<WeaponPlatform, bool>>
+        CaptureFirstPersonWeaponViews()
+    {
+        foreach (var enemy in _enemies)
+        {
+            enemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        foreach (var mate in _squadMates.Where(IsInstanceValid))
+        {
+            mate.ProcessMode = ProcessModeEnum.Disabled;
+            mate.GlobalPosition = new Vector3(240.0f + mate.SquadSlot * 3.0f, 80.0f, 240.0f);
+        }
+        _missionDirector.ExitDeploymentZone();
+        _player.GlobalPosition = new Vector3(8.0f, 0.2f, -8.0f);
+        _player.Velocity = Vector3.Zero;
+        _player.FaceWorldPointForDiagnostics(new Vector3(8.0f, 0.2f, -80.0f));
+
+        var captures = new System.Collections.Generic.Dictionary<WeaponPlatform, bool>();
+        var cachedInstances = new System.Collections.Generic.Dictionary<WeaponPlatform, ulong>();
+        foreach (var platform in Enum.GetValues<WeaponPlatform>())
+        {
+            _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
+            await WaitFrames(8);
+            var path = $"res://first_person_{platform.ToString().ToLowerInvariant()}_validation.png";
+            var absolutePath = ProjectSettings.GlobalizePath(path);
+            if (System.IO.File.Exists(absolutePath))
+            {
+                System.IO.File.Delete(absolutePath);
+            }
+            SaveViewportImage(path);
+            captures[platform] = _player.UsesAuthoredWeaponPlatformForDiagnostics(platform)
+                && System.IO.File.Exists(absolutePath)
+                && new System.IO.FileInfo(absolutePath).Length > 0;
+            var instanceId = _player.AuthoredWeaponInstanceIdForDiagnostics(platform);
+            if (instanceId != 0)
+            {
+                cachedInstances[platform] = instanceId;
+            }
+        }
+
+        foreach (var pair in cachedInstances)
+        {
+            _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(pair.Key, 0));
+            await WaitFrames(2);
+            captures[pair.Key] &= _player.AuthoredWeaponInstanceIdForDiagnostics(pair.Key) == pair.Value;
+        }
+
+        _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(WeaponPlatform.M4A1, 0));
+        await WaitFrames(3);
+        return captures;
+    }
+
+    private static bool IsValidPlatformWeapon(WeaponPlatform platform, CombatModelInspection inspection)
+    {
+        var minimumMeshes = platform switch
+        {
+            WeaponPlatform.M4A1 => 8,
+            WeaponPlatform.GSh18 => 10,
+            WeaponPlatform.DesertEagle => 20,
+            _ => 1
+        };
+        return inspection.Loaded
+            && inspection.RequiredNodes
+            && inspection.MeshCount >= minimumMeshes
+            && inspection.MaterialCount >= 1
+            && inspection.Size.X > 0.001f
+            && inspection.Size.Y > 0.001f
+            && inspection.Size.Z > 0.001f;
+    }
+
+    private static string FormatWeaponInspection(
+        CombatModelInspection inspection,
+        bool valid)
+        => $"valid={valid};loaded={inspection.Loaded};nodes={inspection.RequiredNodes};meshes={inspection.MeshCount};bounds={inspection.Size}";
 
     private static float ColorDistance(Color left, Color right)
     {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace OperationSteelTide;
@@ -7,6 +8,7 @@ public partial class TacticalPlayer
 {
     private Node3D _proceduralWeaponVisual = null!;
     private AuthoredWeaponVisual _authoredPrimaryWeapon = null!;
+    private readonly Dictionary<WeaponPlatform, AuthoredWeaponVisual> _authoredPlatformWeapons = new();
     private AuthoredGsh18Visual _authoredGsh18Weapon = null!;
     private AuthoredDesertEagleVisual _authoredDesertEagleWeapon = null!;
     private bool _gsh18LoadAttempted;
@@ -23,6 +25,23 @@ public partial class TacticalPlayer
         => IsInstanceValid(_authoredDesertEagleWeapon?.Root)
         && EquippedWeapon.Platform == WeaponPlatform.DesertEagle
         && _authoredDesertEagleWeapon.Root.Visible;
+    internal bool UsesAuthoredWeaponPlatformForDiagnostics(WeaponPlatform platform)
+        => platform switch
+        {
+            WeaponPlatform.M4A1 => UsesAuthoredPrimaryWeaponForDiagnostics
+                && _authoredPrimaryWeapon.Root.Visible,
+            WeaponPlatform.GSh18 => UsesAuthoredGsh18ForDiagnostics,
+            WeaponPlatform.DesertEagle => UsesAuthoredDesertEagleForDiagnostics,
+            _ => _authoredPlatformWeapons.TryGetValue(platform, out var visual)
+                && IsInstanceValid(visual.Root)
+                && EquippedWeapon.Platform == platform
+                && visual.Root.Visible
+        };
+    internal ulong AuthoredWeaponInstanceIdForDiagnostics(WeaponPlatform platform)
+        => _authoredPlatformWeapons.TryGetValue(platform, out var visual)
+            && IsInstanceValid(visual.Root)
+            ? visual.Root.GetInstanceId()
+            : 0;
 
     private void BuildAuthoredPrimaryWeapon()
     {
@@ -42,6 +61,9 @@ public partial class TacticalPlayer
     private void RefreshAuthoredPrimaryWeapon()
     {
         var useAuthoredM4 = EquippedWeapon.Platform == WeaponPlatform.M4A1;
+        var useAuthoredPlatform = EquippedWeapon.Platform is not WeaponPlatform.M4A1
+            and not WeaponPlatform.GSh18
+            and not WeaponPlatform.DesertEagle;
         var useAuthoredGsh18 = EquippedWeapon.Platform == WeaponPlatform.GSh18;
         var wantsAuthoredDesertEagle = EquippedWeapon.Platform == WeaponPlatform.DesertEagle;
         var useAuthoredDesertEagle = wantsAuthoredDesertEagle;
@@ -52,6 +74,10 @@ public partial class TacticalPlayer
         if (useAuthoredDesertEagle)
         {
             EnsureAuthoredDesertEagleWeapon();
+        }
+        if (useAuthoredPlatform)
+        {
+            EnsureAuthoredPlatformWeapon(EquippedWeapon.Platform);
         }
         if (IsInstanceValid(_authoredPrimaryWeapon?.Root))
         {
@@ -82,9 +108,44 @@ public partial class TacticalPlayer
         {
             useAuthoredDesertEagle = false;
         }
+        foreach (var pair in _authoredPlatformWeapons)
+        {
+            var active = useAuthoredPlatform && pair.Key == EquippedWeapon.Platform;
+            pair.Value.Root.Visible = active;
+            if (active)
+            {
+                pair.Value.Configure(EquippedWeapon);
+                SyncAuthoredPlatformWeapon();
+            }
+        }
+        useAuthoredPlatform &= _authoredPlatformWeapons.TryGetValue(
+            EquippedWeapon.Platform,
+            out var activePlatformWeapon)
+            && IsInstanceValid(activePlatformWeapon.Root);
         _proceduralWeaponVisual.Visible = !useAuthoredM4
             && !useAuthoredGsh18
-            && !wantsAuthoredDesertEagle;
+            && !wantsAuthoredDesertEagle
+            && !useAuthoredPlatform;
+    }
+
+    private void EnsureAuthoredPlatformWeapon(WeaponPlatform platform)
+    {
+        if (_authoredPlatformWeapons.TryGetValue(platform, out var existing)
+            && IsInstanceValid(existing.Root))
+        {
+            return;
+        }
+        try
+        {
+            var authoredWeapon = CombatModelLibrary.InstantiateWeapon(platform, firstPerson: true);
+            authoredWeapon.Configure(EquippedWeapon);
+            _weaponRoot.AddChild(authoredWeapon.Root);
+            _authoredPlatformWeapons[platform] = authoredWeapon;
+        }
+        catch (Exception exception)
+        {
+            GD.PushError($"Required authored {platform} weapon unavailable: {exception.Message}");
+        }
     }
 
     private void EnsureAuthoredDesertEagleWeapon()
@@ -117,15 +178,8 @@ public partial class TacticalPlayer
         try
         {
             var authoredWeapon = CombatModelLibrary.InstantiateGsh18(firstPerson: true);
-            authoredWeapon.Root.Scale *= CombatModelLibrary.Gsh18FirstPersonPresentationScale;
-            var displayMount = new Node3D
-            {
-                Name = "GSh18ViewMount",
-                Position = new Vector3(0.2f, 0.0f, -0.08f),
-                RotationDegrees = new Vector3(0.0f, -16.0f, 0.0f)
-            };
-            _weaponRoot.AddChild(displayMount);
-            displayMount.AddChild(authoredWeapon.Root);
+            authoredWeapon.Root.Position = new Vector3(0.0f, -0.04f, -0.02f);
+            _weaponRoot.AddChild(authoredWeapon.Root);
             _authoredGsh18Weapon = authoredWeapon;
         }
         catch (Exception exception)
@@ -136,11 +190,21 @@ public partial class TacticalPlayer
 
     private void SyncAuthoredPrimaryWeapon()
     {
-        if (!IsInstanceValid(_authoredPrimaryWeapon?.Root)
-            || EquippedWeapon.Platform != WeaponPlatform.M4A1)
+        if (EquippedWeapon.Platform == WeaponPlatform.M4A1
+            && IsInstanceValid(_authoredPrimaryWeapon?.Root))
+        {
+            _authoredPrimaryWeapon.SyncMechanisms(_magazine, _spareMagazine, _chargingHandle);
+        }
+        SyncAuthoredPlatformWeapon();
+    }
+
+    private void SyncAuthoredPlatformWeapon()
+    {
+        if (!_authoredPlatformWeapons.TryGetValue(EquippedWeapon.Platform, out var authoredWeapon)
+            || !IsInstanceValid(authoredWeapon.Root))
         {
             return;
         }
-        _authoredPrimaryWeapon.SyncMechanisms(_magazine, _spareMagazine, _chargingHandle);
+        authoredWeapon.SyncMechanismState(_magazine, _spareMagazine, _chargingHandle);
     }
 }

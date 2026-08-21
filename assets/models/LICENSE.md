@@ -26,6 +26,17 @@ The complete GLB set is retained so authored demolition layouts can combine the 
 
 ## Quaternius CC0 models
 
+The Ultimate Guns Pack is distributed by Quaternius under CC0 1.0 Universal:
+
+- Source: https://poly.pizza/bundle/Ultimate-Guns-Pack-cpgUfI4t2F
+- License: CC0 1.0 Universal, https://creativecommons.org/publicdomain/zero/1.0/
+- Acquisition date: 2026-08-20
+- Local assets: `quaternius_ultimate_guns/*.glb`
+- License and source-file mapping: `quaternius_ultimate_guns/LICENSE.md`
+
+Ten selected authored models replace the runtime primitive visuals for AK-74N,
+SCAR-L, M24, AXMC, AWM, VSS, MP5A5, M3A1, P226, and M1911.
+
 The standard free version of the Downtown City MegaKit is distributed by Quaternius under CC0 1.0 Universal:
 
 - Creator: Quaternius (`@Quaternius`)
