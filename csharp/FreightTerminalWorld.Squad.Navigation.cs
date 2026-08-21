@@ -71,6 +71,10 @@ public partial class FreightTerminalWorld
     private bool _leaderRescueUsedTrail;
     private int _squadNavigationDecisionComputationsForDiagnostics;
     private int _squadNavigationDecisionReusesForDiagnostics;
+    private int _squadSupportQueryComputationsForDiagnostics;
+    private int _squadSupportQueryReusesForDiagnostics;
+    private int _squadCorridorQueryComputationsForDiagnostics;
+    private int _squadCorridorQueryReusesForDiagnostics;
 
     private int LeaderRescueWaypointAdvancesForDiagnostics => _leaderRescueWaypointAdvances;
     private int LeaderRescueReplansForDiagnostics => _leaderRescueReplans;
@@ -481,9 +485,11 @@ public partial class FreightTerminalWorld
             && now < cached.ExpiresMilliseconds
             && cached.Destination.DistanceSquaredTo(destination) <= SquadSpatialQueryReuseDistanceSquared)
         {
+            _squadSupportQueryReusesForDiagnostics++;
             return cached.Supported;
         }
 
+        _squadSupportQueryComputationsForDiagnostics++;
         var exclude = new Godot.Collections.Array<Rid> { mate.GetRid() };
         using var excludeBacking = exclude.AsDisposable();
         if (IsInstanceValid(_player))
@@ -519,9 +525,11 @@ public partial class FreightTerminalWorld
             && cached.From.DistanceSquaredTo(from) <= SquadSpatialQueryReuseDistanceSquared
             && cached.To.DistanceSquaredTo(to) <= SquadSpatialQueryReuseDistanceSquared)
         {
+            _squadCorridorQueryReusesForDiagnostics++;
             return cached.Clear;
         }
 
+        _squadCorridorQueryComputationsForDiagnostics++;
         var clear = IsSquadMovementCorridorClear(from, to, mate);
         _squadCorridorQueries[id] = new SquadCorridorQueryState
         {

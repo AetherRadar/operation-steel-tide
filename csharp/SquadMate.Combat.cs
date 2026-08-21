@@ -11,6 +11,11 @@ public partial class SquadMate
     private const float NavigationRecoveryMaximumSpeed = 3.0f;
     private const float RequiredStepRecoveryDuration = 0.48f;
     private const float RequiredStepRecoveryMaximumSpeed = 2.4f;
+    private const float FollowFormationArrivalDistance = 1.0f;
+    private const float FollowFormationResumeDistance = 1.65f;
+    private const float FollowFormationMaximumHeightDifference = 0.45f;
+    private const float ClearAvoidanceReuseSeconds = 0.1f;
+    private const float ClearAvoidanceDirectionDot = 0.97f;
 
     private EnemyOperator? _combatTarget;
     private EnemyOperator? _combatThreat;
@@ -21,6 +26,7 @@ public partial class SquadMate
     private float _combatManeuverTimer;
     private float _combatCoverCommitment;
     private float _combatAvoidanceTimer;
+    private float _combatClearanceReuseTimer;
     private float _combatRecoveryTimer;
     private float _combatStrafeSign;
     private float _combatFlankSide;
@@ -28,6 +34,7 @@ public partial class SquadMate
     private Vector3 _combatCoverPosition;
     private Vector3 _combatFlankPosition;
     private Vector3 _combatRecoveryDirection;
+    private Vector3 _combatClearanceDirection;
     private Vector3 _combatEngagementAnchor;
     private Vector3 _combatDesiredDirection;
     private Vector3 _combatPathDirection;
@@ -38,6 +45,7 @@ public partial class SquadMate
     private bool _combatHasSight;
     private bool _combatHasCoverPosition;
     private bool _combatHasEngagementAnchor;
+    private bool _followFormationSettled;
     private int _burstShotsRemaining;
     private int _combatNavigationStallCount;
 
@@ -55,6 +63,10 @@ public partial class SquadMate
     internal bool CombatHasSightForDiagnostics => _combatHasSight;
     internal EnemyOperator? CombatTargetForDiagnostics => _combatTarget;
     internal Vector3 CombatFlankPositionForDiagnostics => _combatFlankPosition;
+    internal int MovementClearanceProbesForDiagnostics { get; private set; }
+    internal int ClearAvoidanceReusesForDiagnostics { get; private set; }
+    internal int FollowFormationHoldFramesForDiagnostics { get; private set; }
+    internal int MovementRequestTransitionsForDiagnostics { get; private set; }
 
     private void InitializeCombatTactics()
     {
@@ -66,8 +78,11 @@ public partial class SquadMate
         _combatTargetScanTimer = 0.0f;
         _combatManeuverTimer = 0.0f;
         _combatRecoveryTimer = 0.0f;
+        _combatClearanceReuseTimer = 0.0f;
+        _combatClearanceDirection = Vector3.Zero;
         _combatHasSight = false;
         _combatHasEngagementAnchor = false;
+        _followFormationSettled = false;
         _burstShotsRemaining = 0;
         _combatNavigationStallCount = 0;
         CombatShotsFired = 0;
@@ -85,6 +100,9 @@ public partial class SquadMate
         _combatStrafeSign = SquadSlot % 2 == 0 ? 1.0f : -1.0f;
         _combatFlankSide = _combatStrafeSign;
         _combatRecoveryTimer = 0.0f;
+        _combatClearanceReuseTimer = 0.0f;
+        _combatClearanceDirection = Vector3.Zero;
+        _followFormationSettled = false;
         _burstShotsRemaining = 0;
         _combatNavigationStallCount = 0;
         ResetMovementProgress();
@@ -99,6 +117,7 @@ public partial class SquadMate
         _combatManeuverTimer = Mathf.Max(0.0f, _combatManeuverTimer - delta);
         _combatCoverCommitment = Mathf.Max(0.0f, _combatCoverCommitment - delta);
         _combatAvoidanceTimer = Mathf.Max(0.0f, _combatAvoidanceTimer - delta);
+        _combatClearanceReuseTimer = Mathf.Max(0.0f, _combatClearanceReuseTimer - delta);
         _combatRecoveryTimer = Mathf.Max(0.0f, _combatRecoveryTimer - delta);
 
         if (_combatThreatAge > 5.0f)
@@ -318,6 +337,36 @@ public partial class SquadMate
                 : anchorDestination;
     }
 
+    private bool ShouldHoldFollowFormation(
+        Vector3 destination,
+        EnemyOperator? hostile,
+        bool objectivePriority)
+    {
+        if (Order != SquadOrder.Follow
+            || hostile is not null
+            || objectivePriority
+            || Leader.IsDead
+            || Mathf.Abs(GlobalPosition.Y - destination.Y)
+                > FollowFormationMaximumHeightDifference)
+        {
+            _followFormationSettled = false;
+            return false;
+        }
+
+        var threshold = _followFormationSettled
+            ? FollowFormationResumeDistance
+            : FollowFormationArrivalDistance;
+        if (GlobalPosition.DistanceSquaredTo(destination) > threshold * threshold)
+        {
+            _followFormationSettled = false;
+            return false;
+        }
+
+        _followFormationSettled = true;
+        FollowFormationHoldFramesForDiagnostics++;
+        return true;
+    }
+
     private void UpdateTacticalMovement(
         Vector3 anchorDestination,
         EnemyOperator? hostile,
@@ -373,7 +422,12 @@ public partial class SquadMate
                 desired = _combatRecoveryDirection;
             }
         }
-        _combatMoveRequested = desired.LengthSquared() > 0.01f;
+        var moveRequested = desired.LengthSquared() > 0.01f;
+        if (moveRequested != _combatMoveRequested)
+        {
+            MovementRequestTransitionsForDiagnostics++;
+        }
+        _combatMoveRequested = moveRequested;
         if (_combatMoveRequested)
         {
             desired = desired.Normalized();
@@ -649,12 +703,22 @@ public partial class SquadMate
         {
             return (desired * 0.22f + left * _combatStrafeSign).Normalized();
         }
+        if (_combatClearanceReuseTimer > 0.0f
+            && desired.Dot(_combatClearanceDirection) >= ClearAvoidanceDirectionDot)
+        {
+            ClearAvoidanceReusesForDiagnostics++;
+            return desired;
+        }
 
         var forwardClearance = MeasureMovementClearance(desired, 1.6f);
         if (forwardClearance >= 1.35f)
         {
+            _combatClearanceDirection = desired;
+            _combatClearanceReuseTimer = ClearAvoidanceReuseSeconds;
             return desired;
         }
+        _combatClearanceReuseTimer = 0.0f;
+        _combatClearanceDirection = Vector3.Zero;
         var leftScore = MeasureMovementClearance(left, 2.1f)
             + MeasureMovementClearance((desired * 0.35f + left).Normalized(), 2.4f);
         var rightScore = MeasureMovementClearance(-left, 2.1f)
@@ -696,6 +760,7 @@ public partial class SquadMate
 
     private float MeasureMovementClearance(Vector3 direction, float maxDistance)
     {
+        MovementClearanceProbesForDiagnostics++;
         var from = GlobalPosition + Vector3.Up * 0.8f;
         return PhysicsRaycast.TryHit(
             GetWorld3D(),
@@ -798,12 +863,15 @@ public partial class SquadMate
         _combatProgressOrigin = GlobalPosition;
         _combatProgressTimer = 0.0f;
         _combatAvoidanceTimer = 0.0f;
+        _combatClearanceReuseTimer = 0.0f;
+        _combatClearanceDirection = Vector3.Zero;
         _combatRecoveryTimer = 0.0f;
         _combatRecoveryDirection = Vector3.Zero;
         _requiredStepRecoveryActive = false;
         _combatMoveRequested = false;
         _combatDesiredDirection = Vector3.Zero;
         _combatPathDirection = Vector3.Zero;
+        _followFormationSettled = false;
     }
 
     internal bool HasCombatLineOfSightForDiagnostics(EnemyOperator hostile)
@@ -833,5 +901,13 @@ public partial class SquadMate
         RequiredStepRecoveriesForDiagnostics = 0;
         ResetMovementProgress();
         UpdateHealthVisual();
+    }
+
+    internal void ResetMovementPerformanceCountersForDiagnostics()
+    {
+        MovementClearanceProbesForDiagnostics = 0;
+        ClearAvoidanceReusesForDiagnostics = 0;
+        FollowFormationHoldFramesForDiagnostics = 0;
+        MovementRequestTransitionsForDiagnostics = 0;
     }
 }

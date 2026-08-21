@@ -15,6 +15,7 @@ The files below exceed 800 lines after the current gameplay work. They were alre
 | `csharp/FreightTerminalWorld.Squad.cs` | Legacy squad lifecycle, rescue coordination, spectator state, and diagnostics share one partial. | Move the squad validator into `FreightTerminalWorld.Squad.Diagnostics.cs`, then extract AI rescue assignment into a pure coordinator. |
 | `csharp/FreightTerminalWorld.cs` | Main compatibility facade still owns legacy interaction and diagnostic entry points. | Extract loot interaction orchestration and the remaining validators into focused partials/controllers, leaving composition and lifecycle delegation. |
 | `csharp/SquadMate.cs` | Legacy squad actor aggregate still owns navigation, orders, revive state, and animation. | Extract revive locomotion/state transitions into a focused controller and keep the node as the lifecycle adapter. |
+| `csharp/SquadMate.Combat.cs` | Combat movement, formation settling, obstacle avoidance, and stall recovery still share one tactical state machine. | Extract formation-follow and local-avoidance state into a focused locomotion controller while preserving the existing combat target lifecycle. |
 | `csharp/TacticalPlayer.cs` | Legacy player aggregate still owns health, inventory, input locks, and weapon state. | Extract downed/interaction-lock state and inventory ownership into focused controllers while preserving existing public signals and save keys. |
 
 Each extraction must land as its own behavior-preserving change and pass the diagnostics named for that subsystem in `AGENTS.md`.

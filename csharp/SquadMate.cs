@@ -404,10 +404,13 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             }
             destination = ResolveTacticalDestination(destination, hostile, objectivePriority);
         }
-        var navigationDirective = Main.ResolveSquadNavigationDestination(
-            this,
-            destination,
-            emergency: reviveTargetNode is not null);
+        var holdFormation = ShouldHoldFollowFormation(destination, hostile, objectivePriority);
+        var navigationDirective = holdFormation
+            ? SquadNavigationDirective.Walk(GlobalPosition)
+            : Main.ResolveSquadNavigationDestination(
+                this,
+                destination,
+                emergency: reviveTargetNode is not null);
         destination = navigationDirective.Target;
         UpdateTacticalMovement(
             destination,

@@ -25,6 +25,12 @@ public partial class FreightTerminalWorld
     private const int SquadPerformanceQueryProbeSamples = 1536;
     private const int SquadPerformanceProximityFrames = 720;
     private const int SquadPerformanceProximityWarmupFrames = 24;
+    private const int SquadPerformanceMaximumMovementClearanceProbes = 600;
+    private const int SquadPerformanceMinimumClearanceReuses = 40;
+    private const int SquadPerformanceMinimumFormationHoldFrames = 240;
+    private const int SquadPerformanceMaximumMovementRequestTransitions = 120;
+    private const int SquadPerformanceMaximumSupportQueryComputations = 360;
+    private const int SquadPerformanceMaximumCorridorQueryComputations = 90;
 
     private async void ValidateSquadPerformance()
     {
@@ -222,6 +228,14 @@ public partial class FreightTerminalWorld
                 Mathf.Cos(frame * 0.07f) * 0.35f);
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
+        foreach (var mate in mates)
+        {
+            mate.ResetMovementPerformanceCountersForDiagnostics();
+        }
+        var supportQueryComputationsBefore = _squadSupportQueryComputationsForDiagnostics;
+        var supportQueryReusesBefore = _squadSupportQueryReusesForDiagnostics;
+        var corridorQueryComputationsBefore = _squadCorridorQueryComputationsForDiagnostics;
+        var corridorQueryReusesBefore = _squadCorridorQueryReusesForDiagnostics;
         DrainPendingFinalizersForDiagnostics();
         ulong proximityTotalMicroseconds = 0;
         ulong proximityMaximumMicroseconds = 0;
@@ -262,6 +276,22 @@ public partial class FreightTerminalWorld
         var proximityFinalizerMicroseconds = Time.GetTicksUsec() - proximityFinalizerStarted;
         var proximityAverageMicroseconds = proximityTotalMicroseconds
             / (ulong)SquadPerformanceProximityFrames;
+        var movementClearanceProbes = mates.Sum(
+            mate => mate.MovementClearanceProbesForDiagnostics);
+        var clearAvoidanceReuses = mates.Sum(
+            mate => mate.ClearAvoidanceReusesForDiagnostics);
+        var formationHoldFrames = mates.Sum(
+            mate => mate.FollowFormationHoldFramesForDiagnostics);
+        var movementRequestTransitions = mates.Sum(
+            mate => mate.MovementRequestTransitionsForDiagnostics);
+        var supportQueryComputations = _squadSupportQueryComputationsForDiagnostics
+            - supportQueryComputationsBefore;
+        var supportQueryReuses = _squadSupportQueryReusesForDiagnostics
+            - supportQueryReusesBefore;
+        var corridorQueryComputations = _squadCorridorQueryComputationsForDiagnostics
+            - corridorQueryComputationsBefore;
+        var corridorQueryReuses = _squadCorridorQueryReusesForDiagnostics
+            - corridorQueryReusesBefore;
 
         var valid = plannedRoutes >= 1
             && deferredPlans >= 1
@@ -292,6 +322,12 @@ public partial class FreightTerminalWorld
                 <= SquadPerformanceMaximumRepeatedProximityFrameMicroseconds
             && proximityFramesOverBudget <= 1
             && proximityAverageMicroseconds <= SquadPerformanceMaximumProximityAverageMicroseconds
+            && movementClearanceProbes <= SquadPerformanceMaximumMovementClearanceProbes
+            && clearAvoidanceReuses >= SquadPerformanceMinimumClearanceReuses
+            && formationHoldFrames >= SquadPerformanceMinimumFormationHoldFrames
+            && movementRequestTransitions <= SquadPerformanceMaximumMovementRequestTransitions
+            && supportQueryComputations <= SquadPerformanceMaximumSupportQueryComputations
+            && corridorQueryComputations <= SquadPerformanceMaximumCorridorQueryComputations
             && proximityFinalizerMicroseconds <= SquadPerformanceMaximumProximityFinalizerMicroseconds;
         GD.Print(
             $"SQUAD_PERFORMANCE_CHECK valid={valid} mates={mates.Length} planned={plannedRoutes} deferred={deferredPlans} "
@@ -331,6 +367,20 @@ public partial class FreightTerminalWorld
             + $"proximity_avg_usec={proximityAverageMicroseconds} "
             + $"proximity_avg_budget={SquadPerformanceMaximumProximityAverageMicroseconds} "
             + $"proximity_over_budget={proximityFramesOverBudget} "
+            + $"movement_clearance_probes={movementClearanceProbes} "
+            + $"movement_clearance_probe_budget={SquadPerformanceMaximumMovementClearanceProbes} "
+            + $"clear_avoidance_reuses={clearAvoidanceReuses} "
+            + $"clear_avoidance_reuse_min={SquadPerformanceMinimumClearanceReuses} "
+            + $"formation_hold_frames={formationHoldFrames} "
+            + $"formation_hold_min={SquadPerformanceMinimumFormationHoldFrames} "
+            + $"movement_request_transitions={movementRequestTransitions} "
+            + $"movement_request_transition_budget={SquadPerformanceMaximumMovementRequestTransitions} "
+            + $"support_query_computations={supportQueryComputations} "
+            + $"support_query_computation_budget={SquadPerformanceMaximumSupportQueryComputations} "
+            + $"support_query_reuses={supportQueryReuses} "
+            + $"corridor_query_computations={corridorQueryComputations} "
+            + $"corridor_query_computation_budget={SquadPerformanceMaximumCorridorQueryComputations} "
+            + $"corridor_query_reuses={corridorQueryReuses} "
             + $"proximity_finalizer_usec={proximityFinalizerMicroseconds} "
             + $"proximity_finalizer_budget={SquadPerformanceMaximumProximityFinalizerMicroseconds}");
         GD.Print($"SQUAD_PERFORMANCE_PASS valid={valid}");
