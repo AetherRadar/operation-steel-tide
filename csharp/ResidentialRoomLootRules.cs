@@ -172,6 +172,9 @@ public static class ResidentialRoomLootRules
             var caliber = grade >= LootGrade.Epic
                 ? caliberRoll < 24 ? AmmoCaliber.Magnum338 : AmmoCaliber.Sniper
                 : caliberRoll < 18 ? AmmoCaliber.Pistol : caliberRoll < 46 ? AmmoCaliber.Smg : AmmoCaliber.Rifle;
+            // Residential stashes top out at T3 ammo; epic/legendary rounds only come from
+            // secured rooms and supply drops.
+            var ammoGrade = (LootGrade)Math.Min((int)grade, (int)LootGrade.Rare);
             return new LootItem
             {
                 Kind = LootItemKind.Ammunition,
@@ -179,7 +182,7 @@ public static class ResidentialRoomLootRules
                 Quantity = caliber is AmmoCaliber.Sniper or AmmoCaliber.Magnum338
                     ? 10 + (int)grade * 3
                     : 24 + (int)grade * 12,
-                Grade = grade
+                Grade = ammoGrade
             };
         }
         if (roll < 47)

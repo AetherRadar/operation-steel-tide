@@ -8,17 +8,17 @@ public static class AmmoTiers
     {
         LootGrade.Uncommon => 1.0f,
         LootGrade.Rare => 1.06f,
-        LootGrade.Epic => 1.12f,
-        LootGrade.Legendary => 1.18f,
+        LootGrade.Epic => 1.13f,
+        LootGrade.Legendary => 1.20f,
         _ => 0.94f
     };
 
     public static float ArmorPenetration(LootGrade grade) => grade switch
     {
-        LootGrade.Uncommon => 0.08f,
-        LootGrade.Rare => 0.17f,
-        LootGrade.Epic => 0.27f,
-        LootGrade.Legendary => 0.38f,
+        LootGrade.Uncommon => 0.12f,
+        LootGrade.Rare => 0.28f,
+        LootGrade.Epic => 0.46f,
+        LootGrade.Legendary => 0.62f,
         _ => 0.0f
     };
 

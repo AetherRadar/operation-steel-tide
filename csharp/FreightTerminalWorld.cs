@@ -774,7 +774,8 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.M24, 2),
                 Parts = new[] { "muzzle_suppressor", "optic_scope" },
                 Equipment = new[] { "armor_heavy" },
-                KnifeSkin = "knife_crimson"
+                KnifeSkin = "knife_crimson",
+                SecureRoom = true
             },
             new
             {
@@ -785,7 +786,8 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.M4A1, 1),
                 Parts = new[] { "optic_holo", "mag_extended" },
                 Equipment = new[] { "pack_heavy" },
-                KnifeSkin = string.Empty
+                KnifeSkin = string.Empty,
+                SecureRoom = true
             },
             new
             {
@@ -796,7 +798,8 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 1),
                 Parts = new[] { "muzzle_brake", "grip_vertical" },
                 Equipment = new[] { "helmet_light" },
-                KnifeSkin = "knife_hazard"
+                KnifeSkin = "knife_hazard",
+                SecureRoom = true
             },
             new
             {
@@ -807,7 +810,8 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.MP5A5, 1),
                 Parts = new[] { "optic_micro", "mag_extended" },
                 Equipment = new[] { "helmet_heavy" },
-                KnifeSkin = string.Empty
+                KnifeSkin = string.Empty,
+                SecureRoom = false
             },
             new
             {
@@ -818,7 +822,8 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 1),
                 Parts = new[] { "barrel_cqb", "muzzle_brake" },
                 Equipment = new[] { "armor_carrier", "pack_assault" },
-                KnifeSkin = string.Empty
+                KnifeSkin = string.Empty,
+                SecureRoom = false
             },
             new
             {
@@ -829,7 +834,8 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 1),
                 Parts = new[] { "stock_precision", "optic_holo" },
                 Equipment = new[] { "helmet_heavy", "armor_heavy" },
-                KnifeSkin = string.Empty
+                KnifeSkin = string.Empty,
+                SecureRoom = false
             },
             new
             {
@@ -840,7 +846,8 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 2),
                 Parts = new[] { "optic_scope", "stock_precision" },
                 Equipment = new[] { "pack_heavy" },
-                KnifeSkin = "knife_arctic"
+                KnifeSkin = "knife_arctic",
+                SecureRoom = false
             },
             new
             {
@@ -851,7 +858,8 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.M4A1, 2),
                 Parts = new[] { "grip_vertical", "muzzle_suppressor" },
                 Equipment = new[] { "armor_carrier", "helmet_light" },
-                KnifeSkin = string.Empty
+                KnifeSkin = string.Empty,
+                SecureRoom = false
             },
             new
             {
@@ -862,7 +870,8 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 2),
                 Parts = new[] { "optic_holo", "mag_extended" },
                 Equipment = new[] { "armor_heavy", "pack_assault" },
-                KnifeSkin = string.Empty
+                KnifeSkin = string.Empty,
+                SecureRoom = false
             }
         };
         foreach (var definition in cases)
@@ -898,6 +907,8 @@ public partial class FreightTerminalWorld : Node3D
                     Grade = equipmentId.Contains("heavy") ? LootGrade.Epic : LootGrade.Rare
                 });
             }
+            // Secure rooms are the only world source of high-tier ammo (T3–T4); everywhere
+            // else cases carry ball ammunition so grades stay a risk-reward pickup.
             weaponCase.Loot.Add(new LootItem
             {
                 Kind = LootItemKind.Ammunition,
@@ -907,8 +918,10 @@ public partial class FreightTerminalWorld : Node3D
                     WeaponPlatform.M24 => _rng.RandiRange(14, 24),
                     WeaponPlatform.MP5A5 => _rng.RandiRange(55, 85),
                     _ => _rng.RandiRange(35, 65)
-                },
-                Grade = LootGrade.Common
+                } + (definition.SecureRoom ? 20 : 0),
+                Grade = definition.SecureRoom
+                    ? (LootGrade)_rng.RandiRange((int)LootGrade.Rare, (int)LootGrade.Epic)
+                    : LootGrade.Common
             });
             if (!string.IsNullOrEmpty(definition.KnifeSkin))
             {
@@ -1001,7 +1014,7 @@ public partial class FreightTerminalWorld : Node3D
         }
     }
 
-    private LootItem CreateGradedLootItem(LootGrade grade)
+    private LootItem CreateGradedLootItem(LootGrade grade, bool allowHighTierAmmo = false)
     {
         var roll = _rng.Randf();
         if (roll < 0.22f)
@@ -1063,6 +1076,9 @@ public partial class FreightTerminalWorld : Node3D
                 Grade = grade
             };
         }
+        var ammoGrade = allowHighTierAmmo
+            ? grade
+            : (LootGrade)Mathf.Min((int)grade, (int)LootGrade.Rare);
         var caliber = grade >= LootGrade.Epic
             ? AmmoCaliber.Sniper
             : grade >= LootGrade.Rare && _rng.Randf() < 0.4f ? AmmoCaliber.Smg : AmmoCaliber.Rifle;
@@ -1072,7 +1088,7 @@ public partial class FreightTerminalWorld : Node3D
             AmmoCaliber.Smg => 35 + (int)grade * 18,
             _ => 20 + (int)grade * 15
         };
-        return new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = caliber, Quantity = quantity, Grade = grade };
+        return new LootItem { Kind = LootItemKind.Ammunition, AmmoCaliber = caliber, Quantity = quantity, Grade = ammoGrade };
     }
 
     private void SpawnEnemies()
