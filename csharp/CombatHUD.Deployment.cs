@@ -21,6 +21,8 @@ public partial class CombatHUD
     private Label _deploymentCreditsLabel = null!;
     private Label _deploymentExtractedLabel = null!;
     private Label _deploymentRankLabel = null!;
+    private Button _deploymentThreatButton = null!;
+    private DeploymentThreatLevel _selectedThreatLevel = DeploymentThreatLevel.Standard;
     private Label _deploymentCostLabel = null!;
     private Label _deploymentStatusLabel = null!;
     private Label _deploymentMapCaption = null!;
@@ -61,6 +63,18 @@ public partial class CombatHUD
     public string SelectedDeploymentMapId => _selectedDeploymentMapId;
     public int DeploymentMapCount => _deploymentMapButtons.Count;
     public int DeploymentRankLevel => OperatorReputation.LevelForPoints(_displayedProfile.ReputationPoints);
+    public DeploymentThreatLevel SelectedDeploymentThreatLevel => _selectedThreatLevel;
+    public bool IsDeploymentThreatLocked(DeploymentThreatLevel level)
+        => DeploymentRankLevel < ThreatLevels.RequiredReputationLevel(level);
+    public void SetDeploymentThreatForDiagnostics(DeploymentThreatLevel level)
+    {
+        if (IsDeploymentThreatLocked(level))
+        {
+            return;
+        }
+        _selectedThreatLevel = level;
+        RefreshDeploymentStore();
+    }
     public bool IsDeploymentWeaponLocked(string weaponId)
         => DeploymentRankLevel < OperatorReputation.RequiredLevelForWeapon(weaponId);
     public bool IsDeploymentAmmoGradeLocked(LootGrade grade)
@@ -123,6 +137,14 @@ public partial class CombatHUD
         _deploymentRankLabel.ClipText = true;
         _deploymentRankLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
         panel.AddChild(_deploymentRankLabel);
+
+        _deploymentThreatButton = Button(string.Empty, new Vector2(825, 58), new Vector2(175, 16));
+        _deploymentThreatButton.FocusMode = Control.FocusModeEnum.None;
+        _deploymentThreatButton.AddThemeFontSizeOverride("font_size", 9);
+        _deploymentThreatButton.AddThemeColorOverride("font_color", new Color(0.95f, 0.78f, 0.5f));
+        _deploymentThreatButton.AddThemeColorOverride("font_hover_color", new Color(1.0f, 0.9f, 0.7f));
+        _deploymentThreatButton.Pressed += CycleDeploymentThreat;
+        panel.AddChild(_deploymentThreatButton);
 
         _deploymentCostLabel = Label("KIT VALUE  5100", 15, new Color(0.72f, 0.94f, 0.84f));
         _deploymentCostLabel.Position = new Vector2(998, 18);
@@ -522,6 +544,43 @@ public partial class CombatHUD
         RefreshDeploymentStore();
     }
 
+    private void CycleDeploymentThreat()
+    {
+        for (var step = 1; step <= 2; step++)
+        {
+            var candidate = (DeploymentThreatLevel)(((int)_selectedThreatLevel + step) % 3);
+            if (!IsDeploymentThreatLocked(candidate))
+            {
+                _selectedThreatLevel = candidate;
+                ClearDeploymentError();
+                RefreshDeploymentStore();
+                return;
+            }
+        }
+    }
+
+    private void RefreshDeploymentThreat()
+    {
+        if (!IsInstanceValid(_deploymentThreatButton))
+        {
+            return;
+        }
+        if (IsDeploymentThreatLocked(_selectedThreatLevel))
+        {
+            _selectedThreatLevel = DeploymentThreatLevel.Standard;
+        }
+        var payoutPercent = Mathf.RoundToInt((ThreatLevels.PayoutMultiplier(_selectedThreatLevel) - 1.0f) * 100.0f);
+        var chinese = GameLocalization.IsChinese(_language);
+        _deploymentThreatButton.Text = chinese
+            ? $"\u5a01\u80c1  {ThreatLevels.DisplayName(_selectedThreatLevel, _language)}  //  \u7ed3\u7b97 +{payoutPercent}%"
+            : $"THREAT  {ThreatLevels.DisplayName(_selectedThreatLevel, _language)}  //  PAYOUT +{payoutPercent}%";
+        var detectionPercent = Mathf.RoundToInt((ThreatLevels.DetectionMultiplier(_selectedThreatLevel) - 1.0f) * 100.0f);
+        var accuracyPercent = Mathf.RoundToInt(ThreatLevels.AccuracyBonus(_selectedThreatLevel) * 100.0f);
+        _deploymentThreatButton.TooltipText = chinese
+            ? $"\u4fa6\u6d4b +{detectionPercent}%  \u7cbe\u5ea6 +{accuracyPercent}%  \u5feb\u901f\u53cd\u5e94\u90e8\u961f\u66f4\u9891  //  \u5347\u7ea7\u5a01\u80c1\u9700\u58f0\u671b L{ThreatLevels.RequiredReputationLevel(DeploymentThreatLevel.Elevated)}  \u6700\u9ad8\u5a01\u80c1\u9700 L{ThreatLevels.RequiredReputationLevel(DeploymentThreatLevel.Maximum)}"
+            : $"DETECTION +{detectionPercent}%  AIM +{accuracyPercent}%  FASTER QRF  //  ELEVATED NEEDS REP L{ThreatLevels.RequiredReputationLevel(DeploymentThreatLevel.Elevated)}  MAXIMUM NEEDS L{ThreatLevels.RequiredReputationLevel(DeploymentThreatLevel.Maximum)}";
+    }
+
     private void ClearDeploymentError() => _deploymentError = string.Empty;
 
     private string MatchingPresetId()
@@ -556,6 +615,7 @@ public partial class CombatHUD
             ? $"\u5386\u53f2\u64a4\u79bb  {_displayedProfile.LifetimeExtractedValue}"
             : $"EXTRACTED  {_displayedProfile.LifetimeExtractedValue}";
         _deploymentRankLabel.Text = DeploymentRankText(chinese);
+        RefreshDeploymentThreat();
         _deploymentCostLabel.Text = chinese
             ? $"\u6574\u5907\u4ef7\u503c  {selected.TotalCost}"
             : $"KIT VALUE  {selected.TotalCost}";

@@ -76,7 +76,7 @@ public partial class FreightTerminalWorld
             return 1.0f;
         }
         var completed = Mathf.Clamp(_objectiveStage, 0, _objectiveTerminals.Count);
-        return 1.0f + 0.15f * completed;
+        return (1.0f + 0.15f * completed) * ThreatLevels.PayoutMultiplier(_deploymentThreatLevel);
     }
 
     private (int ExtractedValue, int Wallet, bool Saved) CommitExtractionValue()
@@ -288,6 +288,11 @@ public partial class FreightTerminalWorld
             && _hud.IsDeploymentAmmoGradeLocked(LootGrade.Legendary)
             && !_hud.IsDeploymentAmmoGradeLocked(LootGrade.Common)
             && _hud.DeploymentRankLevel == 1;
+        var threatDefault = _hud.SelectedDeploymentThreatLevel == DeploymentThreatLevel.Standard
+            && _hud.IsDeploymentThreatLocked(DeploymentThreatLevel.Elevated)
+            && _hud.IsDeploymentThreatLocked(DeploymentThreatLevel.Maximum);
+        _hud.SetDeploymentThreatForDiagnostics(DeploymentThreatLevel.Maximum);
+        var threatLockedRejected = _hud.SelectedDeploymentThreatLevel == DeploymentThreatLevel.Standard;
         _hud.ApplyDeploymentMapForDiagnostics(DeploymentMapCatalog.BlackwaterRefineryId);
         var refineryLockedRejected = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.FreightTerminalId;
         var promotedProfile = new OperatorProfileData { ReputationPoints = OperatorReputation.PointsForLevel(2) };
@@ -296,16 +301,22 @@ public partial class FreightTerminalWorld
         var refineryMapAccepted = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.BlackwaterRefineryId
             && _hud.DeploymentMapAvailable
             && _hud.DeploymentRankLevel == 2;
+        _hud.SetDeploymentThreatForDiagnostics(DeploymentThreatLevel.Elevated);
+        var threatElevatedAccepted = _hud.SelectedDeploymentThreatLevel == DeploymentThreatLevel.Elevated;
+        _hud.SetDeploymentThreatForDiagnostics(DeploymentThreatLevel.Maximum);
+        var threatMaximumStillLocked = _hud.SelectedDeploymentThreatLevel == DeploymentThreatLevel.Elevated;
         _hud.ApplyDeploymentMapForDiagnostics("orbital_complex");
         var lockedMapRejected = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.BlackwaterRefineryId;
         var valid = uiReady && presetCount && weaponCount && armorCount && ammoPackCount && presetSelected
             && loadoutSelected && cost && projectedBalance && quantityPricing && gradePricing
             && mapCatalog && refineryMapAccepted && lockedMapRejected && refineryLockedRejected
-            && weaponLocksFresh && starterPresetSelected && freeStarter
+            && weaponLocksFresh && threatDefault && threatLockedRejected
+            && threatElevatedAccepted && threatMaximumStillLocked
+            && starterPresetSelected && freeStarter
             && weakStarter && starterUpgradesPriced && starterEquipped
             && starterWeaponGrade && selectedWeaponGrade;
 
-        GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} weapon_count={DeploymentCatalog.Weapons.Count} armor_count={DeploymentCatalog.Armor.Count} ammo_pack_count={_hud.DeploymentAmmoPackCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} quantity={selection.AmmoQuantity} quantity_pricing={quantityPricing} grade_pricing={gradePricing} weapon_grades={starterWeaponGrade}/{selectedWeaponGrade} map_count={_hud.DeploymentMapCount} selected_map={_hud.SelectedDeploymentMapId} map_available={_hud.DeploymentMapAvailable} refinery_locked={refineryLockedRejected} refinery_map={refineryMapAccepted} locked_map_rejected={lockedMapRejected} weapon_locks={weaponLocksFresh} rank_level={_hud.DeploymentRankLevel} starter_preset={starterPresetSelected} starter_free={freeStarter} starter_weak={weakStarter} starter_upgrades_priced={starterUpgradesPriced} starter_equipped={starterEquipped} starter_damage={starterLoadout.Weapon?.Stats().Damage:0} starter_armor={starterArmor.Protection * 100.0f:0} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
+        GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} weapon_count={DeploymentCatalog.Weapons.Count} armor_count={DeploymentCatalog.Armor.Count} ammo_pack_count={_hud.DeploymentAmmoPackCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} quantity={selection.AmmoQuantity} quantity_pricing={quantityPricing} grade_pricing={gradePricing} weapon_grades={starterWeaponGrade}/{selectedWeaponGrade} map_count={_hud.DeploymentMapCount} selected_map={_hud.SelectedDeploymentMapId} map_available={_hud.DeploymentMapAvailable} refinery_locked={refineryLockedRejected} refinery_map={refineryMapAccepted} locked_map_rejected={lockedMapRejected} weapon_locks={weaponLocksFresh} rank_level={_hud.DeploymentRankLevel} threat_default={threatDefault} threat_locked={threatLockedRejected} threat_elevated={threatElevatedAccepted} threat_max_locked={threatMaximumStillLocked} starter_preset={starterPresetSelected} starter_free={freeStarter} starter_weak={weakStarter} starter_upgrades_priced={starterUpgradesPriced} starter_equipped={starterEquipped} starter_damage={starterLoadout.Weapon?.Stats().Damage:0} starter_armor={starterArmor.Protection * 100.0f:0} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
         GD.Print($"DEPLOYMENT_UI_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }

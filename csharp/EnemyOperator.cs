@@ -18,6 +18,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     public FreightTerminalWorld? Main { get; set; }
     public MissionDirector? MissionDirector { get; set; }
     public float DetectionRange { get; set; } = 34.0f;
+    /// <summary>Flat aim bonus from the deploy-time threat level.</summary>
+    public float AccuracyBonus { get; set; }
     public bool SentryMode { get; set; }
     public int NetworkId { get; set; } = -1;
     public ulong SimulationSeed { get; set; }
@@ -1639,7 +1641,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         var rangeFactor = Mathf.Clamp(stats.EffectiveRange / 150.0f, 0.7f, 1.25f);
         // Rivals are more accurate at medium range so multi-squad fights resolve.
         var baseAcc = IsWorldBoss ? 0.95f : IsRivalSquad ? 0.97f : 0.9f;
-        var accuracy = Mathf.Clamp((IsProne ? baseAcc + 0.02f : baseAcc) - distance * 0.005f / rangeFactor, 0.55f, 0.98f);
+        var accuracy = Mathf.Clamp((IsProne ? baseAcc + 0.02f : baseAcc) - distance * 0.005f / rangeFactor + AccuracyBonus, 0.55f, 0.98f);
         var regionRoll = _rng.Randf();
         var hitRegion = IsProne
             ? HitRegion.Torso
@@ -1701,7 +1703,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         var stats = CarriedWeapon.Stats();
         _fireTimer = _rng.RandfRange(stats.FireInterval * 3.2f, stats.FireInterval * 6.8f)
             * (IsWorldBoss ? WorldBossFireCadenceMultiplier : 1.0f);
-        var accuracy = Mathf.Clamp(0.9f - distance * 0.008f, 0.4f, 0.94f);
+        var accuracy = Mathf.Clamp(0.9f - distance * 0.008f + AccuracyBonus, 0.4f, 0.94f);
         var aimPoint = rival.GlobalPosition + Vector3.Up * (rival.IsProne ? 0.45f : 1.2f);
         var shotOrigin = ResolveBallisticShotOrigin();
         if (BreakableGlassField.TryShatterAlongRay(

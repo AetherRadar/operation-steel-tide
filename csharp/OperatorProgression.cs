@@ -331,6 +331,49 @@ public static class DeploymentCatalog
     }
 }
 
+/// <summary>Deploy-time threat level: harder garrisons for richer extraction payouts.</summary>
+public enum DeploymentThreatLevel
+{
+    Standard = 0,
+    Elevated = 1,
+    Maximum = 2
+}
+
+public static class ThreatLevels
+{
+    public static float DetectionMultiplier(DeploymentThreatLevel level)
+        => 1.0f + 0.16f * (int)level;
+
+    public static float AccuracyBonus(DeploymentThreatLevel level)
+        => 0.05f * (int)level;
+
+    /// <summary>Reinforcement threat accrues sooner; applied as a threshold reduction.</summary>
+    public static int ReinforcementThresholdShift(DeploymentThreatLevel level)
+        => -8 * (int)level;
+
+    public static float PayoutMultiplier(DeploymentThreatLevel level)
+        => 1.0f + 0.2f * (int)level;
+
+    public static int RequiredReputationLevel(DeploymentThreatLevel level)
+        => level switch
+        {
+            DeploymentThreatLevel.Elevated => 2,
+            DeploymentThreatLevel.Maximum => 4,
+            _ => 1
+        };
+
+    public static string DisplayName(DeploymentThreatLevel level, string language)
+    {
+        var chinese = GameLocalization.IsChinese(language);
+        return level switch
+        {
+            DeploymentThreatLevel.Elevated => chinese ? "\u5347\u7ea7\u5a01\u80c1" : "ELEVATED",
+            DeploymentThreatLevel.Maximum => chinese ? "\u6700\u9ad8\u5a01\u80c1" : "MAXIMUM",
+            _ => chinese ? "\u6807\u51c6\u5a01\u80c1" : "STANDARD"
+        };
+    }
+}
+
 public sealed class OperatorProfileStore
 {
     public const int StartingCredits = 18000;

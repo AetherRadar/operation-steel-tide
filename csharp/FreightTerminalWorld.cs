@@ -117,6 +117,7 @@ public partial class FreightTerminalWorld : Node3D
     private string _missionPhase = "DEPLOYMENT";
     private string _currentObjective = "DISABLE THE COMMUNICATIONS RELAY";
     private float _missionDetectionRange = 34.0f;
+    private DeploymentThreatLevel _deploymentThreatLevel = DeploymentThreatLevel.Standard;
     private float _missionRemaining = 12.0f;
     private bool _missionOnline;
     private bool _missionEnded;
@@ -320,20 +321,29 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
-        _missionDetectionRange = detectionRange;
-        _reinforcementThreshold = reinforcementThreshold;
+        // Deploy-time threat level scales detection, accuracy, and reinforcement pacing.
+        if (IsInstanceValid(_hud))
+        {
+            _deploymentThreatLevel = _hud.SelectedDeploymentThreatLevel;
+        }
+        _missionDetectionRange = detectionRange * ThreatLevels.DetectionMultiplier(_deploymentThreatLevel);
+        _reinforcementThreshold = Mathf.Max(
+            40,
+            reinforcementThreshold + ThreatLevels.ReinforcementThresholdShift(_deploymentThreatLevel));
         _missionOnline = online;
         if (_demolitionMode)
         {
             return;
         }
+        var accuracyBonus = ThreatLevels.AccuracyBonus(_deploymentThreatLevel);
         foreach (var enemy in _enemies)
         {
             if (IsInstanceValid(enemy))
             {
+                enemy.AccuracyBonus = accuracyBonus;
                 enemy.DetectionRange = enemy.IsWorldBoss
                     ? Mathf.Max(240.0f, enemy.DetectionRange)
-                    : detectionRange;
+                    : _missionDetectionRange;
             }
         }
         _hud.SetMissionPhase(_missionPhase, _missionRemaining, _missionOnline);
@@ -1200,6 +1210,7 @@ public partial class FreightTerminalWorld : Node3D
             Main = this,
             MissionDirector = _missionDirector,
             DetectionRange = detectionRange ?? _missionDetectionRange,
+            AccuracyBonus = ThreatLevels.AccuracyBonus(_deploymentThreatLevel),
             TeamId = teamId,
             SentryMode = sentryMode
         };
