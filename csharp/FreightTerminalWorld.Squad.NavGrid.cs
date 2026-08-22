@@ -174,6 +174,13 @@ public partial class FreightTerminalWorld
             _squadNavNextNormalPlanMilliseconds = now + SquadNavNormalPlanIntervalMilliseconds;
         }
 
+        if (emergency)
+        {
+            // Count engagement, not success: a sealed or wall-hugging start can legitimately
+            // fail every plan, and the rescue diagnostics must still show the grid fallback ran.
+            _leaderRescueGridPlans++;
+            _leaderRescueUsedGrid = true;
+        }
         if (!TryPlanSquadGridRoute(mate, destination, emergency, out var route))
         {
             var failures = failedPlanAttempts + 1;
@@ -186,11 +193,6 @@ public partial class FreightTerminalWorld
                 NextShortcutCheckMilliseconds = now + SquadNavShortcutCheckIntervalMilliseconds
             };
             return false;
-        }
-        if (emergency)
-        {
-            _leaderRescueGridPlans++;
-            _leaderRescueUsedGrid = true;
         }
         _squadTrailPaths.Remove(id);
         _squadGridPaths[id] = route;
