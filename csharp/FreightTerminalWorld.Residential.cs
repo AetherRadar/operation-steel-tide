@@ -259,6 +259,32 @@ public partial class FreightTerminalWorld
         BuildResidentialGapInfill(community, concrete, steel, glass, trim);
         BuildResidentialSkyLinks(community, concrete, steel, glass);
         BuildResidentialSkybridgeAccessStairs();
+        RegisterResidentialCoverPoints();
+    }
+
+    /// <summary>
+    /// Auto-registers cover from the authored tower layout so residential firefights
+    /// can use the same cover-seeking AI as the core terminal yard.
+    /// </summary>
+    private void RegisterResidentialCoverPoints()
+    {
+        foreach (var spec in ResidentialTowerSpecs)
+        {
+            var half = spec.Footprint * 0.5f + new Vector2(1.3f, 1.3f);
+            RegisterCoverPoint(spec.Position + new Vector3(-half.X, 0.0f, -half.Y));
+            RegisterCoverPoint(spec.Position + new Vector3(half.X, 0.0f, -half.Y));
+            RegisterCoverPoint(spec.Position + new Vector3(-half.X, 0.0f, half.Y));
+            RegisterCoverPoint(spec.Position + new Vector3(half.X, 0.0f, half.Y));
+            RegisterCoverPoint(spec.Position + new Vector3(-half.X, 0.0f, 0.0f));
+            RegisterCoverPoint(spec.Position + new Vector3(half.X, 0.0f, 0.0f));
+        }
+        foreach (var link in ResidentialSkyLinks)
+        {
+            var from = ResidentialTowerSpecs[link.From].Position;
+            var to = ResidentialTowerSpecs[link.To].Position;
+            RegisterCoverPoint(from.Lerp(to, 0.18f));
+            RegisterCoverPoint(from.Lerp(to, 0.82f));
+        }
     }
 
     private void BuildResidentialRoads(Node3D community)

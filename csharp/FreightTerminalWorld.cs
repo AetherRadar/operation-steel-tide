@@ -22,6 +22,7 @@ public partial class FreightTerminalWorld : Node3D
     internal TacticalPlayer LocalPlayerRef => _player;
     private CombatHUD _hud = null!;
     private MissionDirector _missionDirector = null!;
+    private readonly List<Vector3> _registeredCoverPoints = new();
     private readonly List<EnemyOperator> _enemies = new();
     private readonly List<HostileOperatorSquad> _hostileSquads = new();
     private List<Vector3> _assignedHostilePads = new();
@@ -511,8 +512,24 @@ public partial class FreightTerminalWorld : Node3D
     {
         var best = new Vector3(0, -1000, 0);
         var bestScore = float.PositiveInfinity;
-        var coverPoints = IsBlackwaterRefineryMap ? RefineryLayout.CoverPoints : _coverPoints;
-        foreach (var point in coverPoints)
+        if (!IsBlackwaterRefineryMap)
+        {
+            ConsiderCoverPoint(_coverPoints, origin, threat, ref best, ref bestScore);
+            ConsiderCoverPoint(_registeredCoverPoints, origin, threat, ref best, ref bestScore);
+            return best;
+        }
+        ConsiderCoverPoint(RefineryLayout.CoverPoints, origin, threat, ref best, ref bestScore);
+        return best;
+    }
+
+    private void ConsiderCoverPoint(
+        IEnumerable<Vector3> candidates,
+        Vector3 origin,
+        Vector3 threat,
+        ref Vector3 best,
+        ref float bestScore)
+    {
+        foreach (var point in candidates)
         {
             var travel = origin.DistanceTo(point);
             if (travel > 18.0f || point.DistanceTo(threat) < 4.0f)
@@ -536,7 +553,26 @@ public partial class FreightTerminalWorld : Node3D
                 best = point;
             }
         }
-        return best;
+    }
+
+    /// <summary>Runtime cover registration for districts built after the core array (residential ring, skylinks).</summary>
+    public void RegisterCoverPoint(Vector3 point)
+    {
+        point.Y = 0.0f;
+        if (Mathf.Abs(point.X) > MapWidthMeters * 0.5f - 2.0f
+            || point.Z < MapCenterZ - MapDepthMeters * 0.5f + 2.0f
+            || point.Z > MapCenterZ + MapDepthMeters * 0.5f - 2.0f)
+        {
+            return;
+        }
+        foreach (var existing in _registeredCoverPoints)
+        {
+            if (existing.DistanceSquaredTo(point) < 1.0f)
+            {
+                return;
+            }
+        }
+        _registeredCoverPoints.Add(point);
     }
 
     public void SpawnTracer(Vector3 from, Vector3 to, Color color)
@@ -4341,7 +4377,7 @@ public partial class FreightTerminalWorld : Node3D
             && _levelRoot.GetNodeOrNull<Node3D>("RadarFoundation") is not null;
         var aircraftMoving = aircraft is not null && aircraft.Position.DistanceTo(aircraftStart) > 0.1f;
         var dynamicSky = _environmentRef.Sky?.SkyMaterial is ShaderMaterial;
-        GD.Print($"MAP_CHECK width={MapWidthMeters:0} depth={MapDepthMeters:0} loot_sources={_lootSources.Count} hostiles={_enemiesRemaining} extraction_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} landmarks={landmarksPresent} cover_points={_coverPoints.Length} dynamic_sky={dynamicSky} aircraft_moving={aircraftMoving} residential_towers={ResidentialTowerCount} civilians={ResidentialCivilianCount} complex_buildings={ComplexBuildingCount} complex_rooms={ComplexRoomCount} complex_props={ComplexInteriorPropCount}");
+        GD.Print($"MAP_CHECK width={MapWidthMeters:0} depth={MapDepthMeters:0} loot_sources={_lootSources.Count} hostiles={_enemiesRemaining} extraction_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} landmarks={landmarksPresent} cover_points={_coverPoints.Length} cover_registered={_registeredCoverPoints.Count} dynamic_sky={dynamicSky} aircraft_moving={aircraftMoving} residential_towers={ResidentialTowerCount} civilians={ResidentialCivilianCount} complex_buildings={ComplexBuildingCount} complex_rooms={ComplexRoomCount} complex_props={ComplexInteriorPropCount}");
         GetTree().Quit();
     }
 
