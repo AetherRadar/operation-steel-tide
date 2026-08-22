@@ -1141,6 +1141,7 @@ public partial class FreightTerminalWorld
     private const float AiSquadmateReviveRange = 40.0f;
     private const float AiReviveNoProgressTimeout = 15.0f;
     private const ulong AiReviveSelectionMaximumMicroseconds = 50_000;
+    internal const float ReconScanRange = 72.0f;
 
     /// <summary>
     /// The nearest available AI commits to the highest-priority downed friendly,
@@ -2039,7 +2040,7 @@ public partial class FreightTerminalWorld
 
     public void PerformReconScan(ISquadCombatant source, Vector3 origin)
     {
-        var scanRange = _demolitionMode ? DemolitionReconScanRange : 72.0f;
+        var scanRange = _demolitionMode ? DemolitionReconScanRange : ReconScanRange;
         var revealed = 0;
         foreach (var enemy in _enemies)
         {
@@ -2428,10 +2429,39 @@ public partial class FreightTerminalWorld
         await ToSignal(GetTree().CreateTimer(0.8f), SceneTreeTimer.SignalName.Timeout);
         var medicSelf = _player.Health > healthBefore;
 
+        // Recon and follow assertions run on a dedicated sky platform so spawn RNG
+        // cannot change the verdict: the platform geometry is identical every run,
+        // the scan range boundary is probed with one target inside and one outside,
+        // and the follower walks a fixed 12 m gap back to the leader.
+        var followPlatform = BuildSquadFollowPlatformForDiagnostics(out var pinnedOrigin);
+        _player.GlobalPosition = pinnedOrigin;
+        _player.Velocity = Vector3.Zero;
+        var reconTargetStates = _enemies
+            .Where(enemy => IsInstanceValid(enemy) && !enemy.IsDead && !enemy.IsScanned)
+            .Take(2)
+            .Select(enemy => (Enemy: enemy, Position: enemy.GlobalPosition, Mode: enemy.ProcessMode))
+            .ToList();
+        var reconBoundary = reconTargetStates.Count == 2;
+        if (reconBoundary)
+        {
+            reconTargetStates[0].Enemy.GlobalPosition = pinnedOrigin + Vector3.Right * (ReconScanRange - 1.0f);
+            reconTargetStates[1].Enemy.GlobalPosition = pinnedOrigin + Vector3.Left * (ReconScanRange + 1.0f);
+            foreach (var state in reconTargetStates)
+            {
+                state.Enemy.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
         _player.ConfigureRole(OperatorRole.Recon);
         _player.ActivateRoleAbility(false);
         await ToSignal(GetTree().CreateTimer(0.9f), SceneTreeTimer.SignalName.Timeout);
-        var scanned = _enemies.Count(enemy => enemy.IsScanned);
+        var scanned = reconBoundary
+            ? (reconTargetStates[0].Enemy.IsScanned && !reconTargetStates[1].Enemy.IsScanned)
+            : _enemies.Count(enemy => enemy.IsScanned) > 0;
+        foreach (var state in reconTargetStates)
+        {
+            state.Enemy.GlobalPosition = state.Position;
+            state.Enemy.ProcessMode = state.Mode;
+        }
 
         _player.ConfigureRole(OperatorRole.Assault);
         _player.ActivateRoleAbility(false);
@@ -2444,10 +2474,25 @@ public partial class FreightTerminalWorld
         IssueSquadOrder(SquadOrder.Follow);
         var follow = _squadMates.Where(mate => !mate.IsHumanProxy).All(mate => mate.Order == SquadOrder.Follow);
         var follower = _squadMates.First(mate => !mate.IsHumanProxy);
-        follower.GlobalPosition = _player.GlobalPosition + new Vector3(12.0f, 0.1f, 0.0f);
+        // The follower must be armed, otherwise the cold-start weapon loot hunt
+        // diverts it to a random nearby cache instead of the formation slot.
+        follower.GrantFireablePrimaryForDiagnostics();
+        follower.ProcessMode = ProcessModeEnum.Disabled;
+        follower.GlobalPosition = pinnedOrigin + new Vector3(12.0f, 0.1f, 0.0f);
+        follower.Velocity = Vector3.Zero;
+        follower.ResetCombatTacticsForDiagnostics();
+        // Teleporting without clearing the leader trail and cached navigation leaves
+        // the mate walking pre-teleport breadcrumbs away from the pinned leader.
+        SetSquadLeaderTrailForDiagnostics(Array.Empty<Vector3>());
+        ClearSquadNavigation(follower);
+        await WaitFrames(2);
+        follower.ProcessMode = ProcessModeEnum.Inherit;
         var followDistanceBefore = follower.GlobalPosition.DistanceTo(_player.GlobalPosition);
         await ToSignal(GetTree().CreateTimer(0.65f), SceneTreeTimer.SignalName.Timeout);
         var followMotion = follower.GlobalPosition.DistanceTo(_player.GlobalPosition) < followDistanceBefore - 0.5f;
+        followPlatform.QueueFree();
+        _player.GlobalPosition = new Vector3(210.0f, 0.3f, 210.0f);
+        _player.Velocity = Vector3.Zero;
 
         // 3-operator fill: player Assault → AI must be Medic + Recon (no third AI).
         _player.ConfigureRole(OperatorRole.Assault, refillHealth: true);

@@ -1028,6 +1028,34 @@ public partial class FreightTerminalWorld
         }
     }
 
+    /// <summary>
+    /// Clear sky platform used by the squad validator for deterministic recon and
+    /// follow assertions; ground spawn points sit in dense districts whose cover
+    /// changes with spawn RNG and reroutes the follower.
+    /// </summary>
+    private Node3D BuildSquadFollowPlatformForDiagnostics(out Vector3 pinnedOrigin)
+    {
+        var origin = new Vector3(-60.0f, 80.0f, 0.0f);
+        var root = new Node3D { Name = "SquadFollowPlatformDiagnostic", Position = origin };
+        AddChild(root);
+
+        var floor = new StaticBody3D
+        {
+            Name = "SquadFollowPlatformFloor",
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        root.AddChild(floor);
+        floor.AddChild(new CollisionShape3D
+        {
+            Position = new Vector3(0.0f, -0.15f, 0.0f),
+            Shape = new BoxShape3D { Size = new Vector3(30.0f, 0.3f, 24.0f) }
+        });
+
+        pinnedOrigin = origin + new Vector3(0.0f, 0.25f, 0.0f);
+        return root;
+    }
+
     private Node3D BuildSquadRescueMazeForDiagnostics(
         out Vector3 playerPosition,
         out Vector3 reviverPosition,
