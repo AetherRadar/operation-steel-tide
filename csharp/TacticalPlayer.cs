@@ -352,7 +352,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _head.Rotation = new Vector3(_pitch, 0.0f, 0.0f);
         if (IsInstanceValid(_weaponRoot))
         {
-            _weaponRoot.Visible = false;
+            // Firearm stays in hand across the mount so the cab gunner can shoot.
+            _weaponRoot.Visible = IsFirearmQuickSlotSelected;
         }
         if (IsInstanceValid(_knifeRoot))
         {
@@ -1377,7 +1378,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             return;
         }
 
-        // Keep the rider seated; look pitch only. Weapons stay holstered in the cab.
+        // Keep the rider seated; look pitch only. The cab gunner keeps the firearm up.
         Position = Vector3.Zero;
         Rotation = Vector3.Zero;
         var headPosition = _head.Position;
@@ -1387,11 +1388,36 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _head.Rotation = new Vector3(_pitch, 0.0f, 0.0f);
         if (IsInstanceValid(_weaponRoot))
         {
-            _weaponRoot.Visible = false;
+            _weaponRoot.Visible = IsFirearmQuickSlotSelected;
         }
         if (IsInstanceValid(_knifeRoot))
         {
             _knifeRoot.Visible = false;
+        }
+
+        if (!_fireInputArmed)
+        {
+            if (Input.IsActionPressed(GameInputActions.Fire))
+            {
+                _fireReleaseTime = 0.0f;
+            }
+            else
+            {
+                _fireReleaseTime += delta;
+                _fireInputArmed = _fireReleaseTime >= 0.2f;
+            }
+        }
+        var fireRequested = IsFirearmQuickSlotSelected && _automaticFire
+            ? Input.IsActionPressed(GameInputActions.Fire)
+            : Input.IsActionJustPressed(GameInputActions.Fire);
+        if (IsFirearmQuickSlotSelected
+            && _fireInputArmed
+            && fireRequested
+            && Input.MouseMode == Input.MouseModeEnum.Captured
+            && !RoleActionBlocksWeapon
+            && !MedicalActionBlocksWeapon)
+        {
+            Fire();
         }
 
         // Light cabin camera sway from vehicle speed (no full weapon bob).
@@ -1406,13 +1432,25 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         if (IsInstanceValid(_vehicle))
         {
             var ratio = _vehicle.Health / Mathf.Max(1.0f, _vehicle.MaxHealth);
+            var fireHint = IsFirearmQuickSlotSelected ? "  LMB FIRE" : string.Empty;
             Hud?.SetInteraction(
                 GameLocalization.IsChinese(Hud?.CurrentLanguage ?? "en")
-                    ? $"载具耐久  {(int)_vehicle.Health}  //  WASD驾驶  F下车"
-                    : $"VEHICLE HP  {(int)_vehicle.Health}  //  WASD DRIVE  F EXIT",
+                    ? $"载具耐久  {(int)_vehicle.Health}  //  WASD驾驶  F下车{fireHint}"
+                    : $"VEHICLE HP  {(int)_vehicle.Health}  //  WASD DRIVE  F EXIT{fireHint}",
                 ratio,
                 true);
         }
+    }
+
+    /// <summary>Ground speed of the ridden vehicle; adds cab-gun spread, zero on foot.</summary>
+    private float PlatformMotionSpeed()
+    {
+        if (!IsInVehicle || _vehicle is null || !GodotObject.IsInstanceValid(_vehicle))
+        {
+            return 0.0f;
+        }
+        var vehicleVelocity = _vehicle.Velocity;
+        return new Vector2(vehicleVelocity.X, vehicleVelocity.Z).Length();
     }
 
     private FieldSupplySnapshot PushHudStats()
@@ -2010,10 +2048,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             StartReload();
             return;
         }
-        if (new Vector2(Velocity.X, Velocity.Z).Length() > 7.4f)
-        {
-            return;
-        }
 
         Ammo--;
         var stats = EquippedWeapon.Stats();
@@ -2037,7 +2071,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         Main?.SpawnShell(_ejectMarker.GlobalPosition, shellVelocity);
         Hud?.PulseCrosshair();
 
-        var movingPenalty = Mathf.Clamp(new Vector2(Velocity.X, Velocity.Z).Length() / SprintSpeed, 0.0f, 1.0f);
+        // Sprint or vehicle motion degrades accuracy instead of blocking the trigger.
+        var movingPenalty = Mathf.Clamp(
+            (new Vector2(Velocity.X, Velocity.Z).Length() + PlatformMotionSpeed()) / SprintSpeed,
+            0.0f,
+            1.6f);
         var stanceAccuracy = _stance switch
         {
             PlayerStance.Prone => 0.52f,

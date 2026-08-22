@@ -5954,8 +5954,15 @@ public partial class FreightTerminalWorld : Node3D
         Input.ActionRelease("move_backward");
         var reverseDistance = vehicle.GlobalPosition.DistanceTo(reverseStart);
 
-        var valid = entered && forwardDistance > 18.0f && curbCleared && reverseDistance > 3.0f;
-        GD.Print($"VEHICLE_DRIVE_CHECK entered={entered} forward={forwardDistance:0.00} curb_cleared={curbCleared} reverse={reverseDistance:0.00} blocker={(firstBlocker is null ? "none" : firstBlocker.Name)}");
+        // Cab gunner: the mounted player can still put rounds downrange with the vehicle
+        // stopped (stationary cab fire, no sprint gate).
+        Input.ActionRelease("move_forward");
+        await WaitFrames(4);
+        _player.GrantFireablePrimaryForDiagnostics();
+        var cabFire = _player.FireForDiagnostics();
+
+        var valid = entered && forwardDistance > 18.0f && curbCleared && reverseDistance > 3.0f && cabFire;
+        GD.Print($"VEHICLE_DRIVE_CHECK entered={entered} forward={forwardDistance:0.00} curb_cleared={curbCleared} reverse={reverseDistance:0.00} cab_fire={cabFire} blocker={(firstBlocker is null ? "none" : firstBlocker.Name)}");
         GD.Print($"VEHICLE_DRIVE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
