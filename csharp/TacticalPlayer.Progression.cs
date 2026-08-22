@@ -1,3 +1,5 @@
+using Godot;
+
 namespace OperationSteelTide;
 
 public partial class TacticalPlayer
@@ -19,6 +21,10 @@ public partial class TacticalPlayer
                 var sidearmCaliber = WeaponCatalog.Weapon(loadout.Sidearm.Platform).Caliber;
                 SetAmmoReserve(sidearmCaliber, LootGrade.Common, loadout.SidearmReserveAmmo);
                 ActivateWeaponSlot(PlayerWeaponSlot.Sidearm, false, true, false);
+            }
+            if (includeEmergencySupplies)
+            {
+                ApplyReputationPerks(loadout);
             }
             Hud?.SetAmmoTier(CurrentAmmoGrade);
             Hud?.SetBackpackValuePlayer(this);
@@ -42,7 +48,39 @@ public partial class TacticalPlayer
             SetAmmoReserve(sidearmCaliber, LootGrade.Common, loadout.SidearmReserveAmmo);
         }
         ActivateWeaponSlot(PlayerWeaponSlot.Primary, false);
+        if (includeEmergencySupplies)
+        {
+            ApplyReputationPerks(loadout);
+        }
         Hud?.SetAmmoTier(CurrentAmmoGrade);
         Hud?.SetBackpackValuePlayer(this);
+    }
+
+    /// <summary>Reputation perks grant non-weapon starting gear; raid deployments only.</summary>
+    private void ApplyReputationPerks(DeploymentLoadout loadout)
+    {
+        var reputationLevel = loadout.ReputationLevel;
+        if (reputationLevel < OperatorReputation.SmokeGrenadePerkLevel)
+        {
+            return;
+        }
+        SmokeGrenades = Mathf.Clamp(
+            SmokeGrenades + 1,
+            0,
+            DemolitionBuyCatalog.MaximumSmokeGrenades);
+        Hud?.SetDemolitionSmokeGrenades(SmokeGrenades);
+        if (reputationLevel >= OperatorReputation.ReserveAmmoPerkLevel && loadout.Weapon is not null)
+        {
+            var caliber = WeaponCatalog.Weapon(loadout.Weapon.Platform).Caliber;
+            SetAmmoReserve(
+                caliber,
+                loadout.AmmoGrade,
+                AmmoReserveFor(caliber, loadout.AmmoGrade) + OperatorReputation.ReserveAmmoBonus);
+        }
+        if (reputationLevel >= OperatorReputation.ArmorPlatePerkLevel)
+        {
+            TryStoreArmorPlate(LootGrade.Uncommon, 1);
+            Hud?.SetMedicalInventory(this);
+        }
     }
 }

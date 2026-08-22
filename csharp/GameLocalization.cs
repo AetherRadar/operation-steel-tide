@@ -400,6 +400,7 @@ public static class GameLocalization
         Chinese["deployment_strike_team"] = "\u7a81\u51fb\u5c0f\u961f";
         Chinese["loadout_knife_only"] = "\u6218\u672f\u5200";
         Chinese["loadout_insufficient"] = "\u4f59\u989d\u4e0d\u8db3  //  \u8bf7\u9009\u62e9\u66f4\u4fbf\u5b9c\u7684\u6574\u5907";
+        Chinese["loadout_reputation_locked"] = "\u58f0\u671b\u7b49\u7ea7\u4e0d\u8db3  //  \u8bf7\u5148\u63d0\u5347\u5e72\u5458\u7b49\u7ea7";
         Chinese["loadout_save_failed"] = "\u6863\u6848\u4fdd\u5b58\u5931\u8d25  //  \u5df2\u53d6\u6d88\u90e8\u7f72";
         Chinese["extraction_bank"] = "\u5df2\u5b58\u5165\u64a4\u79bb\u4ef7\u503c";
         Chinese["extraction_unbanked"] = "\u64a4\u79bb\u4ef7\u503c\u672a\u5165\u8d26";

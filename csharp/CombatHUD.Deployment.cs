@@ -20,6 +20,7 @@ public partial class CombatHUD
     private readonly Label[] _deploymentMetricLabels = new Label[3];
     private Label _deploymentCreditsLabel = null!;
     private Label _deploymentExtractedLabel = null!;
+    private Label _deploymentRankLabel = null!;
     private Label _deploymentCostLabel = null!;
     private Label _deploymentStatusLabel = null!;
     private Label _deploymentMapCaption = null!;
@@ -59,7 +60,16 @@ public partial class CombatHUD
     public string ActiveDeploymentPresetId => MatchingPresetId();
     public string SelectedDeploymentMapId => _selectedDeploymentMapId;
     public int DeploymentMapCount => _deploymentMapButtons.Count;
-    public bool DeploymentMapAvailable => DeploymentMapCatalog.IsAvailable(_selectedDeploymentMapId);
+    public int DeploymentRankLevel => OperatorReputation.LevelForPoints(_displayedProfile.ReputationPoints);
+    public bool IsDeploymentWeaponLocked(string weaponId)
+        => DeploymentRankLevel < OperatorReputation.RequiredLevelForWeapon(weaponId);
+    public bool IsDeploymentAmmoGradeLocked(LootGrade grade)
+        => DeploymentRankLevel < OperatorReputation.RequiredLevelForAmmoGrade(grade);
+    public bool DeploymentMapAvailable => IsMapSelectable(_selectedDeploymentMapId);
+
+    private bool IsMapSelectable(string mapId)
+        => DeploymentMapCatalog.IsAvailable(mapId)
+            && DeploymentRankLevel >= OperatorReputation.RequiredLevelForMap(mapId);
 
     private void BuildDeploymentStore(Control panel)
     {
@@ -106,6 +116,13 @@ public partial class CombatHUD
         _deploymentExtractedLabel.Position = new Vector2(825, 20);
         _deploymentExtractedLabel.Size = new Vector2(175, 22);
         panel.AddChild(_deploymentExtractedLabel);
+
+        _deploymentRankLabel = Label(string.Empty, 9, new Color(0.66f, 0.82f, 0.72f));
+        _deploymentRankLabel.Position = new Vector2(825, 42);
+        _deploymentRankLabel.Size = new Vector2(175, 16);
+        _deploymentRankLabel.ClipText = true;
+        _deploymentRankLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
+        panel.AddChild(_deploymentRankLabel);
 
         _deploymentCostLabel = Label("KIT VALUE  5100", 15, new Color(0.72f, 0.94f, 0.84f));
         _deploymentCostLabel.Position = new Vector2(998, 18);
@@ -468,6 +485,7 @@ public partial class CombatHUD
         _deploymentError = reason switch
         {
             "insufficient_credits" => Text("loadout_insufficient", "INSUFFICIENT BALANCE  //  SELECT A CHEAPER KIT"),
+            "reputation_locked" => Text("loadout_reputation_locked", "REPUTATION LOCKED  //  RAISE OPERATOR LEVEL FIRST"),
             _ => Text("loadout_save_failed", "PROFILE SAVE FAILED  //  DEPLOYMENT CANCELLED")
         };
         RefreshDeploymentStore();
@@ -495,7 +513,7 @@ public partial class CombatHUD
     private void SelectDeploymentMap(string id)
     {
         var map = DeploymentMapCatalog.Resolve(id);
-        if (!map.Available)
+        if (!IsMapSelectable(map.Id))
         {
             return;
         }
@@ -537,6 +555,7 @@ public partial class CombatHUD
         _deploymentExtractedLabel.Text = chinese
             ? $"\u5386\u53f2\u64a4\u79bb  {_displayedProfile.LifetimeExtractedValue}"
             : $"EXTRACTED  {_displayedProfile.LifetimeExtractedValue}";
+        _deploymentRankLabel.Text = DeploymentRankText(chinese);
         _deploymentCostLabel.Text = chinese
             ? $"\u6574\u5907\u4ef7\u503c  {selected.TotalCost}"
             : $"KIT VALUE  {selected.TotalCost}";
@@ -556,16 +575,25 @@ public partial class CombatHUD
         foreach (var preset in DeploymentCatalog.Presets)
         {
             var button = _deploymentPresetButtons[preset.Id];
+            var presetLocked = DeploymentRankLevel < OperatorReputation.RequiredLevelForPreset(preset);
             button.SetPressedNoSignal(preset.Id == matchingPreset);
-            button.Text = Text(preset.LocalizationKey, preset.EnglishName);
+            button.Disabled = presetLocked;
+            button.Text = presetLocked
+                ? $"{Text(preset.LocalizationKey, preset.EnglishName)}  //  L{OperatorReputation.RequiredLevelForPreset(preset)}"
+                : Text(preset.LocalizationKey, preset.EnglishName);
         }
         var selectedMap = DeploymentMapCatalog.Resolve(_selectedDeploymentMapId);
         foreach (var map in DeploymentMapCatalog.Maps)
         {
             var button = _deploymentMapButtons[map.Id];
+            var mapLocked = !IsMapSelectable(map.Id);
             button.SetPressedNoSignal(map.Id == selectedMap.Id);
+            button.Disabled = mapLocked;
             button.Text = DeploymentMapButtonText(map);
-            button.TooltipText = $"{map.Code}  //  {Text(map.LocalizationKey, map.EnglishName)}\n{Text(map.SubtitleLocalizationKey, map.EnglishSubtitle)}";
+            var lockHint = !map.Available
+                ? string.Empty
+                : $"REQUIRES REP L{OperatorReputation.RequiredLevelForMap(map.Id)}\n";
+            button.TooltipText = $"{map.Code}  //  {Text(map.LocalizationKey, map.EnglishName)}\n{lockHint}{Text(map.SubtitleLocalizationKey, map.EnglishSubtitle)}";
         }
         _deploymentMapStatusLabel.Text = $"{selectedMap.Code}  //  {Text(selectedMap.LocalizationKey, selectedMap.EnglishName)}  //  {Text(selectedMap.SubtitleLocalizationKey, selectedMap.EnglishSubtitle)}";
         if (IsInstanceValid(_squadLobbySubtitle))
@@ -577,36 +605,44 @@ public partial class CombatHUD
         foreach (var offer in DeploymentCatalog.Weapons)
         {
             var selectedOffer = string.Equals(offer.Id, _selectedWeaponId, StringComparison.OrdinalIgnoreCase);
+            var weaponLocked = IsDeploymentWeaponLocked(offer.Id);
+            _deploymentWeaponButtons[offer.Id].Disabled = weaponLocked;
             _deploymentWeaponButtons[offer.Id].SetPressedNoSignal(selectedOffer);
             _deploymentWeaponNames[offer.Id].Text = Text(offer.LocalizationKey, offer.EnglishName);
             _deploymentWeaponNames[offer.Id].AddThemeColorOverride(
                 "font_color",
                 selectedOffer ? new Color(0.9f, 1.0f, 0.95f) : new Color(0.62f, 0.75f, 0.7f));
-            _deploymentWeaponDetails[offer.Id].Text = WeaponOfferDetail(offer, chinese);
+            _deploymentWeaponDetails[offer.Id].Text = WeaponOfferDetail(offer, chinese, weaponLocked);
             _deploymentWeaponButtons[offer.Id].TooltipText = $"{Text(offer.LocalizationKey, offer.EnglishName)}\n{_deploymentWeaponDetails[offer.Id].Text}";
         }
         foreach (var offer in DeploymentCatalog.Armor)
         {
             var selectedOffer = string.Equals(offer.Id, _selectedArmorId, StringComparison.OrdinalIgnoreCase);
+            var armorLocked = DeploymentRankLevel < OperatorReputation.RequiredLevelForArmor(offer.Id);
+            _deploymentArmorButtons[offer.Id].Disabled = armorLocked;
             _deploymentArmorButtons[offer.Id].SetPressedNoSignal(selectedOffer);
             _deploymentArmorNames[offer.Id].Text = Text(offer.LocalizationKey, offer.EnglishName);
             _deploymentArmorNames[offer.Id].AddThemeColorOverride(
                 "font_color",
                 selectedOffer ? new Color(0.9f, 1.0f, 0.95f) : new Color(0.62f, 0.75f, 0.7f));
-            _deploymentArmorDetails[offer.Id].Text = ArmorOfferDetail(offer, chinese);
+            _deploymentArmorDetails[offer.Id].Text = ArmorOfferDetail(offer, chinese, armorLocked);
             _deploymentArmorButtons[offer.Id].TooltipText = $"{Text(offer.LocalizationKey, offer.EnglishName)}\n{_deploymentArmorDetails[offer.Id].Text}";
         }
         var selectedWeaponOffer = DeploymentCatalog.Weapon(_selectedWeaponId);
         foreach (var grade in Enum.GetValues<LootGrade>())
         {
             var button = _deploymentAmmoButtons[grade];
+            var gradeLocked = IsDeploymentAmmoGradeLocked(grade);
             button.SetPressedNoSignal(grade == _selectedAmmoGrade);
+            button.Disabled = gradeLocked;
             var price = selected.Weapon is null
                 ? 0
                 : DeploymentCatalog.AmmoCost(selectedWeaponOffer, grade, selected.ReserveAmmo);
-            button.Text = selected.Weapon is null
-                ? $"T{(int)grade + 1}\n--"
-                : $"T{(int)grade + 1}\n{price}";
+            button.Text = gradeLocked
+                ? $"T{(int)grade + 1}\nL{OperatorReputation.RequiredLevelForAmmoGrade(grade)}"
+                : selected.Weapon is null
+                    ? $"T{(int)grade + 1}\n--"
+                    : $"T{(int)grade + 1}\n{price}";
             button.TooltipText = AmmoTiers.DisplayName(grade, _language);
         }
         foreach (var pack in DeploymentCatalog.AmmoPacks)
@@ -700,7 +736,7 @@ public partial class CombatHUD
         _deploymentMetricBars[index].Value = value;
     }
 
-    private string WeaponOfferDetail(DeploymentWeaponOffer offer, bool chinese)
+    private string WeaponOfferDetail(DeploymentWeaponOffer offer, bool chinese, bool locked)
     {
         if (offer.Platform is null)
         {
@@ -708,26 +744,59 @@ public partial class CombatHUD
         }
         var build = WeaponCatalog.Build(offer.Platform.Value, offer.BuildTier);
         var stats = build.Stats();
+        if (locked)
+        {
+            var required = OperatorReputation.RequiredLevelForWeapon(offer.Id);
+            return chinese
+                ? $"{stats.Damage:0}\u4f24\u5bb3  {stats.MagazineSize}\u53d1\n\u58f0\u671b\u9501\u5b9a  //  \u9700 L{required}"
+                : $"{stats.Damage:0} DMG  {stats.MagazineSize} RD\nREP LOCKED  //  NEEDS L{required}";
+        }
         var ammoPrice = DeploymentCatalog.AmmoCost(offer, _selectedAmmoGrade, _selectedAmmoQuantity);
         return chinese
             ? $"{stats.Damage:0}\u4f24\u5bb3  {stats.MagazineSize}\u53d1\n\u67aa {offer.Price}  \u5f39\u836f {ammoPrice}"
             : $"{stats.Damage:0} DMG  {stats.MagazineSize} RD\nGUN {offer.Price}  AMMO {ammoPrice}";
     }
 
+    private string DeploymentRankText(bool chinese)
+    {
+        var points = _displayedProfile.ReputationPoints;
+        var level = OperatorReputation.LevelForPoints(points);
+        if (level >= OperatorReputation.MaxLevel)
+        {
+            return chinese ? $"\u58f0\u671b L{level}  //  \u5df2\u6ee1\u7ea7" : $"REP L{level}  //  MAX";
+        }
+        var start = OperatorReputation.PointsForLevel(level);
+        var end = OperatorReputation.PointsForLevel(level + 1);
+        return chinese
+            ? $"\u58f0\u671b L{level}  //  {points - start}/{end - start} \u5347\u7ea7"
+            : $"REP L{level}  //  {points - start}/{end - start} TO L{level + 1}";
+    }
+
     private string DeploymentMapButtonText(DeploymentMapOffer map)
     {
         var code = map.Code.Replace("MAP ", string.Empty, StringComparison.Ordinal);
-        if (map.Available)
+        if (map.Available && IsMapSelectable(map.Id))
         {
             return $"{code}\n{Text(map.LocalizationKey, map.EnglishName)}";
+        }
+        if (map.Available)
+        {
+            return $"{code}\nL{OperatorReputation.RequiredLevelForMap(map.Id)}";
         }
         return $"{code}\n{Text("map_locked_short", "LOCKED")}";
     }
 
-    private string ArmorOfferDetail(DeploymentArmorOffer offer, bool chinese)
+    private string ArmorOfferDetail(DeploymentArmorOffer offer, bool chinese, bool locked)
     {
         var armor = EquipmentCatalog.Create(offer.BodyArmorId).Definition;
         var pack = EquipmentCatalog.Create(offer.BackpackId).Definition;
+        if (locked)
+        {
+            var required = OperatorReputation.RequiredLevelForArmor(offer.Id);
+            return chinese
+                ? $"{armor.Protection * 100:0}% \u9632\u62a4\n\u58f0\u671b\u9501\u5b9a  //  \u9700 L{required}"
+                : $"{armor.Protection * 100:0}% ARMOR\nREP LOCKED  //  NEEDS L{required}";
+        }
         return chinese
             ? $"{armor.Protection * 100:0}% \u9632\u62a4  +{pack.CapacityBonus} \u5bb9\u91cf  //  {offer.Price}"
             : $"{armor.Protection * 100:0}% ARMOR  +{pack.CapacityBonus} CAP  //  {offer.Price}";

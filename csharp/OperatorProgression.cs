@@ -57,7 +57,8 @@ public sealed record DeploymentLoadout(
     int TotalCost,
     int WeaponBuildTier = -1,
     WeaponBuild? Sidearm = null,
-    int SidearmReserveAmmo = 0);
+    int SidearmReserveAmmo = 0,
+    int ReputationLevel = 1);
 
 public sealed class OperatorProfileData
 {
@@ -66,6 +67,7 @@ public sealed class OperatorProfileData
     public int LifetimeExtractedValue { get; set; }
     public int SuccessfulExtractions { get; set; }
     public int DeploymentCount { get; set; }
+    public int ReputationPoints { get; set; }
     public string LastWeaponId { get; set; } = "m3a1";
     public string LastArmorId { get; set; } = "patrol";
     public LootGrade LastAmmoGrade { get; set; } = LootGrade.Common;
@@ -78,11 +80,67 @@ public sealed class OperatorProfileData
         LifetimeExtractedValue = LifetimeExtractedValue,
         SuccessfulExtractions = SuccessfulExtractions,
         DeploymentCount = DeploymentCount,
+        ReputationPoints = ReputationPoints,
         LastWeaponId = LastWeaponId,
         LastArmorId = LastArmorId,
         LastAmmoGrade = LastAmmoGrade,
         LastAmmoQuantity = LastAmmoQuantity
     };
+}
+
+/// <summary>
+/// Reputation levels convert extracted loot value into a long-term progression curve.
+/// Higher levels unlock market stock, the second deployment map, and starting perks.
+/// </summary>
+public static class OperatorReputation
+{
+    public const int MaxLevel = 12;
+    public const int SmokeGrenadePerkLevel = 3;
+    public const int ReserveAmmoPerkLevel = 5;
+    public const int ArmorPlatePerkLevel = 7;
+    public const int ReserveAmmoBonus = 30;
+
+    public static int PointsForLevel(int level)
+        => 4000 * Math.Max(0, level - 1) * Math.Max(0, level - 1);
+
+    public static int LevelForPoints(int points)
+    {
+        var level = 1;
+        while (level < MaxLevel && points >= PointsForLevel(level + 1))
+        {
+            level++;
+        }
+        return level;
+    }
+
+    public static int RequiredLevelForWeapon(string weaponId) => weaponId switch
+    {
+        "scarl" => 2,
+        "m24" => 3,
+        _ => 1
+    };
+
+    public static int RequiredLevelForArmor(string armorId)
+        => armorId == "heavy" ? 3 : 1;
+
+    public static int RequiredLevelForAmmoGrade(LootGrade grade) => grade switch
+    {
+        LootGrade.Rare => 2,
+        LootGrade.Epic => 4,
+        LootGrade.Legendary => 6,
+        _ => 1
+    };
+
+    public static int RequiredLevelForMap(string mapId)
+        => mapId == DeploymentMapCatalog.BlackwaterRefineryId ? 2 : 1;
+
+    public static int RequiredLevelForPreset(DeploymentPresetOffer preset)
+    {
+        var level = Math.Max(
+            RequiredLevelForWeapon(preset.WeaponId),
+            RequiredLevelForArmor(preset.ArmorId));
+        return Math.Max(level, RequiredLevelForAmmoGrade(preset.AmmoGrade));
+    }
 }
 
 public static class DeploymentCatalog
@@ -301,6 +359,18 @@ public sealed class OperatorProfileStore
                 failure = "insufficient_credits";
                 return false;
             }
+            var reputationLevel = OperatorReputation.LevelForPoints(Profile.ReputationPoints);
+            var requiredLevel = Math.Max(
+                OperatorReputation.RequiredLevelForWeapon(loadout.Selection.WeaponId),
+                Math.Max(
+                    OperatorReputation.RequiredLevelForArmor(loadout.Selection.ArmorId),
+                    OperatorReputation.RequiredLevelForAmmoGrade(loadout.Selection.AmmoGrade)));
+            if (reputationLevel < requiredLevel)
+            {
+                failure = "reputation_locked";
+                return false;
+            }
+            loadout = loadout with { ReputationLevel = reputationLevel };
 
             var previous = Profile.Clone();
             Profile.Credits -= loadout.TotalCost;
@@ -328,6 +398,7 @@ public sealed class OperatorProfileStore
             var previous = Profile.Clone();
             Profile.Credits += value;
             Profile.LifetimeExtractedValue += value;
+            Profile.ReputationPoints += value;
             Profile.SuccessfulExtractions++;
             if (TrySave())
             {
@@ -352,6 +423,7 @@ public sealed class OperatorProfileStore
             profile.LifetimeExtractedValue = Math.Max(0, profile.LifetimeExtractedValue);
             profile.SuccessfulExtractions = Math.Max(0, profile.SuccessfulExtractions);
             profile.DeploymentCount = Math.Max(0, profile.DeploymentCount);
+            profile.ReputationPoints = Math.Max(0, profile.ReputationPoints);
             profile.LastAmmoGrade = (LootGrade)Math.Clamp((int)profile.LastAmmoGrade, 0, 4);
             profile.LastAmmoQuantity = Math.Max(0, profile.LastAmmoQuantity);
             return profile;
