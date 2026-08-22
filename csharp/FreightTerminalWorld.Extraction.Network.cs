@@ -402,7 +402,9 @@ public partial class FreightTerminalWorld
         else if (_extractionCountdownActive)
         {
             _extractionCountdownActive = false;
-            _extractionRemaining = ExtractionCountdownDuration;
+            _extractionRemaining = ExtractionCountdownForRemainingObjectives(
+                _objectiveTerminals.Count,
+                state.ObjectiveStage);
             _hud.HideExtractionCountdown();
             _extractionAircraft?.AbortPickup();
         }

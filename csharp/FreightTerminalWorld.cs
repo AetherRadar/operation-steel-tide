@@ -67,6 +67,47 @@ public partial class FreightTerminalWorld : Node3D
         new(-5.4f, 0, -136), new(-3.6f, 0, -136), new(3.8f, 0, -151), new(5.4f, 0, -151)
     };
 
+    /// <summary>
+    /// Cross-district garrison patrol loops. Waypoints reuse garrison spawn posts and the
+    /// lanes between registered cover points, so patrols stay on walkable ground.
+    /// </summary>
+    private static readonly Vector3[][] GarrisonPatrolRoutes =
+    {
+        // Core container-yard perimeter.
+        new[]
+        {
+            new Vector3(-12, 0.15f, 11), new Vector3(20, 0.15f, 8), new Vector3(29, 0.15f, -10),
+            new Vector3(20, 0.15f, -20), new Vector3(4, 0.15f, -32), new Vector3(-10, 0.15f, -17)
+        },
+        // West harbor lane past the tank farm.
+        new[]
+        {
+            new Vector3(-91, 0.15f, -58), new Vector3(-76, 0.15f, -92),
+            new Vector3(-58, 0.15f, -126), new Vector3(-88, 0.15f, -146)
+        },
+        // East harbor lane along the overflow yard.
+        new[]
+        {
+            new Vector3(51, 0.15f, -68), new Vector3(82, 0.15f, -101),
+            new Vector3(66, 0.15f, -132), new Vector3(34, 0.15f, -136)
+        }
+    };
+
+    private static Vector3[]? PatrolRouteForGarrison(Vector3 position)
+    {
+        foreach (var route in GarrisonPatrolRoutes)
+        {
+            for (var i = 0; i < route.Length; i++)
+            {
+                if (route[i].DistanceSquaredTo(position) < 4.0f)
+                {
+                    return route;
+                }
+            }
+        }
+        return null;
+    }
+
     private Node3D _levelRoot = null!;
     private Area3D _extractionArea = null!;
     private Node3D _extractionMarker = null!;
@@ -98,6 +139,8 @@ public partial class FreightTerminalWorld : Node3D
     private float _reinforcementCountdown;
     private bool _reinforcementPending;
     private bool _reinforcementsDeployed;
+    private int _reinforcementWavesDeployed;
+    private const int ReinforcementWaveLimit = 3;
     private float _sensitivitySetting = 1.0f;
     private int _qualitySetting = 2;
     private bool _fullscreenSetting;
@@ -336,7 +379,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             _hud.ShowLocalizedMessage(
                 "extraction_unlocked",
-                "EXTRACTION OPEN  //  ENTER THE GREEN ZONE AND HOLD FOR 12 SECONDS",
+                "PRIORITY EXTRACTION  //  ALL OBJECTIVES COMPLETE  //  FAST LANE AUTHORIZED",
                 new Color(0.3f, 1.0f, 0.68f));
         }
     }
@@ -1051,7 +1094,11 @@ public partial class FreightTerminalWorld : Node3D
         };
         foreach (var position in positions)
         {
-            SpawnEnemy(position, false, teamId: 0);
+            var garrison = SpawnEnemy(position, false, teamId: 0);
+            if (PatrolRouteForGarrison(position) is { } route)
+            {
+                garrison.AssignPatrolRoute(route);
+            }
         }
         if (!IsBlackwaterRefineryMap)
         {
@@ -2360,13 +2407,23 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
+        // Threat cools while the squad stays quiet, so stealth keeps the QRF asleep.
+        if (!_reinforcementPending
+            && !_reinforcementsDeployed
+            && _missionPhase is "INFILTRATION" or "CONTACT"
+            && _threatLevel > 0.0f)
+        {
+            _threatLevel = Mathf.Max(0.0f, _threatLevel - delta * 1.15f);
+        }
         if (_demolitionMode || _missionEnded || _reinforcementsDeployed || _missionPhase != "COMBAT")
         {
             return;
         }
         if (!_reinforcementPending)
         {
-            _threatLevel = Mathf.Min(_reinforcementThreshold, _threatLevel + delta * 2.6f);
+            // The garrison reacts faster after each lost wave.
+            var accrual = 2.6f + _reinforcementWavesDeployed * 0.5f;
+            _threatLevel = Mathf.Min(_reinforcementThreshold, _threatLevel + delta * accrual);
             if (_threatLevel < _reinforcementThreshold)
             {
                 return;
@@ -2386,7 +2443,13 @@ public partial class FreightTerminalWorld : Node3D
     private void SpawnReinforcementWave()
     {
         _reinforcementPending = false;
-        _reinforcementsDeployed = true;
+        var waveIndex = _reinforcementWavesDeployed + 1;
+        var waveSize = waveIndex switch
+        {
+            1 => 3,
+            2 => 4,
+            _ => 5
+        };
         var spawnPoints = new[]
         {
             new Vector3(-101, 0.15f, 38), new Vector3(101, 0.15f, 38),
@@ -2402,16 +2465,35 @@ public partial class FreightTerminalWorld : Node3D
             {
                 continue;
             }
-            SpawnEnemy(spawnPoint, true);
+            // Escalating waves arrive with better hardware; the final wave fields a marksman.
+            WeaponBuild? loadout = waveIndex >= 3 && deployed == 1
+                ? WeaponCatalog.Build(WeaponPlatform.M24, 1)
+                : waveIndex >= 2
+                    ? WeaponCatalog.Build(WeaponPlatform.ScarL, 1)
+                    : null;
+            SpawnEnemy(spawnPoint, true, teamId: 0, initialWeapon: loadout);
             deployed++;
-            if (deployed == 3)
+            if (deployed == waveSize)
             {
                 break;
             }
         }
         _enemiesRemaining += deployed;
         _hud.SetEnemyCount(_enemiesRemaining);
-        _hud.ShowLocalizedMessage("qrf_deployed", "QRF DEPLOYED  //  THREE CONTACTS", new Color(1.0f, 0.42f, 0.22f));
+        _reinforcementWavesDeployed++;
+        if (_reinforcementWavesDeployed >= ReinforcementWaveLimit)
+        {
+            _reinforcementsDeployed = true;
+        }
+        else
+        {
+            // A wave bought the garrison time, but the network stays hot and rebuilds.
+            _threatLevel = Mathf.Max(0.0f, _threatLevel - _reinforcementThreshold * 0.55f);
+        }
+        _hud.ShowLocalizedMessage(
+            $"qrf_deployed_{Mathf.Clamp(deployed, 3, 5)}",
+            $"QRF WAVE {waveIndex} DEPLOYED  //  {deployed} CONTACTS",
+            new Color(1.0f, 0.42f, 0.22f));
     }
 
     private void TogglePause()
@@ -5975,7 +6057,7 @@ public partial class FreightTerminalWorld : Node3D
         var areaStarted = _extractionCountdownActive;
         _skipExtractionCinematicForValidation = true;
         _extractionAircraft?.ForceBoardingReadyForValidation();
-        UpdateExtractionSequence(ExtractionCountdownDuration + 0.2f);
+        UpdateExtractionSequence(CurrentExtractionCountdownDuration() + 0.2f);
         await WaitFrames(1);
         var completed = _missionEnded && _missionPhase == "COMPLETE";
         // Edge player pads → center extract is still a long run; beacon is always visible.

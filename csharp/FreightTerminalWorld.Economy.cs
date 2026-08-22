@@ -68,6 +68,17 @@ public partial class FreightTerminalWorld
         }
     }
 
+    /// <summary>Each completed objective adds 15% to the extraction payout; no objectives, no bonus.</summary>
+    private float ObjectiveExtractionMultiplier()
+    {
+        if (_objectiveTerminals.Count == 0)
+        {
+            return 1.0f;
+        }
+        var completed = Mathf.Clamp(_objectiveStage, 0, _objectiveTerminals.Count);
+        return 1.0f + 0.15f * completed;
+    }
+
     private (int ExtractedValue, int Wallet, bool Saved) CommitExtractionValue()
     {
         if (_extractionValueCommitted)
@@ -77,7 +88,9 @@ public partial class FreightTerminalWorld
 
         EnsureDeploymentBaseline();
         var currentValue = CombatHUD.ComputeBackpackTotalValue(_player);
-        var extractedValue = Math.Max(0, currentValue - _deploymentBaselineValue);
+        var extractedValue = Math.Max(
+            0,
+            Mathf.RoundToInt((currentValue - _deploymentBaselineValue) * ObjectiveExtractionMultiplier()));
         var saved = _operatorProfileStore.CreditExtraction(extractedValue);
         if (saved)
         {

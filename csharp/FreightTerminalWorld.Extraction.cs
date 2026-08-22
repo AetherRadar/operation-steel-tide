@@ -6,6 +6,9 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private const float ExtractionCountdownDuration = 12.0f;
+    private const float PriorityExtractionSeconds = 9.0f;
+    private const float PartialExtractionSeconds = 15.0f;
+    private const float ColdExtractionSeconds = 18.0f;
     private const float ExtractionZoneRadius = 7.0f;
     private ExtractionAircraft? _extractionAircraft;
     private bool _extractionCountdownActive;
@@ -125,6 +128,32 @@ public partial class FreightTerminalWorld
             && offset.Y <= 4.2f;
     }
 
+    /// <summary>
+    /// Objective-coupled hold time: skipping objectives forces a longer cold hold while a
+    /// full clear earns a fast pickup. Maps without objective terminals keep the base time.
+    /// </summary>
+    private static float ExtractionCountdownForRemainingObjectives(int totalObjectives, int completedObjectives)
+    {
+        if (totalObjectives <= 0)
+        {
+            return ExtractionCountdownDuration;
+        }
+        var remaining = totalObjectives - Mathf.Clamp(completedObjectives, 0, totalObjectives);
+        return remaining switch
+        {
+            0 => PriorityExtractionSeconds,
+            1 => PartialExtractionSeconds,
+            _ => ColdExtractionSeconds
+        };
+    }
+
+    private float CurrentExtractionCountdownDuration()
+        => ExtractionCountdownForRemainingObjectives(_objectiveTerminals.Count, _objectiveStage);
+
+    private bool ObjectivesIncompleteForExtraction()
+        => _objectiveTerminals.Count > 0
+            && Mathf.Clamp(_objectiveStage, 0, _objectiveTerminals.Count) < _objectiveTerminals.Count;
+
     private void BeginExtractionCountdown()
     {
         if (_extractionCountdownActive || _missionEnded)
@@ -133,23 +162,33 @@ public partial class FreightTerminalWorld
         }
 
         _extractionCountdownActive = true;
-        _extractionRemaining = ExtractionCountdownDuration;
+        _extractionRemaining = CurrentExtractionCountdownDuration();
         _missionDirector.ExitDeploymentZone();
         _preExtractionSquadOrder = _squadOrder;
         _preExtractionSquadMovePoint = _squadMovePoint;
         _extractionAircraft?.BeginInbound();
         RallySquadToExtraction();
         UpdateExtractionHud();
-        _hud.ShowLocalizedMessage(
-            "extraction_inbound",
-            "FRIENDLY TILT-ROTOR INBOUND  //  HOLD THE ZONE",
-            new Color(0.3f, 1.0f, 0.66f));
+        if (ObjectivesIncompleteForExtraction())
+        {
+            _hud.ShowLocalizedMessage(
+                "extraction_cold",
+                "COLD EXTRACTION  //  OBJECTIVES INCOMPLETE  //  EXTENDED HOLD",
+                new Color(1.0f, 0.62f, 0.26f));
+        }
+        else
+        {
+            _hud.ShowLocalizedMessage(
+                "extraction_inbound",
+                "FRIENDLY TILT-ROTOR INBOUND  //  HOLD THE ZONE",
+                new Color(0.3f, 1.0f, 0.66f));
+        }
     }
 
     private void CancelExtractionCountdown()
     {
         _extractionCountdownActive = false;
-        _extractionRemaining = ExtractionCountdownDuration;
+        _extractionRemaining = CurrentExtractionCountdownDuration();
         _hud.HideExtractionCountdown();
         _extractionAircraft?.AbortPickup();
         RestoreSquadOrderAfterExtractionAbort();
@@ -201,7 +240,7 @@ public partial class FreightTerminalWorld
         var (ready, total) = CountExtractionSquad();
         _hud.SetExtractionCountdown(
             _extractionRemaining,
-            ExtractionCountdownDuration,
+            CurrentExtractionCountdownDuration(),
             _extractionAircraft?.BoardingReady == true,
             ready,
             total);
@@ -333,6 +372,14 @@ public partial class FreightTerminalWorld
         _missionDirector.CompleteMission(true, _kills, _headshots, _shotsFired, _shotsHit);
         var ranks = BuildExtractionLootRanking();
         var progression = CommitExtractionValue();
+        var objectiveMultiplier = ObjectiveExtractionMultiplier();
+        if (objectiveMultiplier > 1.0f)
+        {
+            _hud.ShowLocalizedMessage(
+                "extraction_objective_bonus",
+                $"OBJECTIVE BONUS  //  PAYOUT x{objectiveMultiplier:0.00}",
+                new Color(0.35f, 0.95f, 0.6f));
+        }
         _hud.ShowResult(true, ranks, progression.ExtractedValue, progression.Wallet, progression.Saved);
         _extractionDeparturePlaying = false;
     }
@@ -363,19 +410,26 @@ public partial class FreightTerminalWorld
         }
 
         _objectiveStage = 0;
+        var coldDuration = CurrentExtractionCountdownDuration();
+        var priorityDuration = ExtractionCountdownForRemainingObjectives(
+            _objectiveTerminals.Count,
+            _objectiveTerminals.Count);
+        var objectiveScaled = coldDuration > ExtractionCountdownDuration
+            && priorityDuration < ExtractionCountdownDuration
+            && priorityDuration < coldDuration;
         _missionDirector.ExitDeploymentZone();
         _missionDirector.RaiseConfirmedAlarm();
         _player.GlobalPosition = ExtractionPoint + new Vector3(0, 0.12f, 1.0f);
         TryBeginExtractionSequence(_player);
         var earlyCallPhase = _missionPhase;
         var entryStartedImmediately = _extractionCountdownActive
-            && Mathf.IsEqualApprox(_extractionRemaining, ExtractionCountdownDuration)
+            && Mathf.IsEqualApprox(_extractionRemaining, coldDuration)
             && _hud.IsExtractionCountdownVisible
             && !IsPlayerProtected();
         var combatPhasePreserved = earlyCallPhase == "COMBAT";
         UpdateExtractionSequence(3.0f);
         var countdownStarted = _extractionCountdownActive
-            && _extractionRemaining < ExtractionCountdownDuration
+            && _extractionRemaining < coldDuration
             && _hud.IsExtractionCountdownVisible;
         var aircraftInbound = _extractionAircraft?.Phase == ExtractionAircraftPhase.Inbound;
         var authoredVisual = _extractionAircraft?.UsesAuthoredVisual == true;
@@ -383,7 +437,7 @@ public partial class FreightTerminalWorld
         _player.GlobalPosition = ExtractionPoint + new Vector3(ExtractionZoneRadius + 2.0f, 0.12f, 0);
         UpdateExtractionSequence(0.1f);
         var leaveReset = !_extractionCountdownActive
-            && Mathf.IsEqualApprox(_extractionRemaining, ExtractionCountdownDuration)
+            && Mathf.IsEqualApprox(_extractionRemaining, coldDuration)
             && !_hud.IsExtractionCountdownVisible
             && _missionPhase == earlyCallPhase;
 
@@ -402,7 +456,7 @@ public partial class FreightTerminalWorld
         UpdateExtractionSequence(0.1f);
         var aircraftArrived = _extractionAircraft?.BoardingReady == true;
         var boardingShown = aircraftArrived && _hud.ExtractionAircraftReady;
-        UpdateExtractionSequence(ExtractionCountdownDuration + 0.2f);
+        UpdateExtractionSequence(coldDuration + 0.2f);
         var departureStarted = _missionEnded
             && _extractionDeparturePlaying
             && _extractionAircraft?.Phase == ExtractionAircraftPhase.Departing;
@@ -439,8 +493,9 @@ public partial class FreightTerminalWorld
         var valid = entryStartedImmediately && countdownStarted && aircraftInbound && authoredVisual
             && combatPhasePreserved && leaveReset && aircraftArrived && boardingShown
             && departureStarted && resultDelayed && playerSeated && squadSeated
-            && cameraFollowing && cinematicHud && aircraftFacesTravel && destinationReached && completed;
-        GD.Print($"EXTRACTION_SEQUENCE_CHECK valid={valid} objective_free={entryStartedImmediately} combat_phase_preserved={combatPhasePreserved} countdown={countdownStarted} inbound={aircraftInbound} authored_visual={authoredVisual} leave_reset={leaveReset} aircraft_arrived={aircraftArrived} boarding={boardingShown} departure={departureStarted} result_delayed={resultDelayed} player_seated={playerSeated} squad_seated={squadSeated} boarded={_extractionBoardedSquadmates}/{expectedBoardedMates} camera={cameraFollowing} cinematic_hud={cinematicHud} faces_travel={aircraftFacesTravel} destination={destinationReached} completed={completed} duration={ExtractionCountdownDuration:0.0} transfer={ExtractionAircraft.TransferDuration:0.0}");
+            && cameraFollowing && cinematicHud && aircraftFacesTravel && destinationReached && completed
+            && objectiveScaled;
+        GD.Print($"EXTRACTION_SEQUENCE_CHECK valid={valid} objective_free={entryStartedImmediately} objective_scaled={objectiveScaled} cold_duration={coldDuration:0.0} priority_duration={priorityDuration:0.0} combat_phase_preserved={combatPhasePreserved} countdown={countdownStarted} inbound={aircraftInbound} authored_visual={authoredVisual} leave_reset={leaveReset} aircraft_arrived={aircraftArrived} boarding={boardingShown} departure={departureStarted} result_delayed={resultDelayed} player_seated={playerSeated} squad_seated={squadSeated} boarded={_extractionBoardedSquadmates}/{expectedBoardedMates} camera={cameraFollowing} cinematic_hud={cinematicHud} faces_travel={aircraftFacesTravel} destination={destinationReached} completed={completed} duration={coldDuration:0.0} transfer={ExtractionAircraft.TransferDuration:0.0}");
         GD.Print($"EXTRACTION_SEQUENCE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
