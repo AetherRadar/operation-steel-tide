@@ -2002,7 +2002,18 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var target = hit.Collider;
         if (target is EnemyOperator enemy)
         {
-            var killed = enemy.TakeDamage(_rng.RandfRange(56.0f, 68.0f), point, this);
+            // Strikes from behind the target's facing hit an unguarded side.
+            var toAttacker = GlobalPosition - enemy.GlobalPosition;
+            var facing = -enemy.GlobalBasis.Z;
+            toAttacker.Y = 0.0f;
+            facing.Y = 0.0f;
+            var backstab = facing.LengthSquared() > 0.01f
+                && toAttacker.LengthSquared() > 0.01f
+                && facing.Normalized().Dot(toAttacker.Normalized()) < -0.35f;
+            var killed = enemy.TakeDamage(
+                _rng.RandfRange(56.0f, 68.0f) * (backstab ? 1.6f : 1.0f),
+                point,
+                this);
             EmitSignal(SignalName.HitConfirmed, killed, enemy.LastHitWasHeadshot, enemy.LastHitWasArmored);
         }
         else if (target is CivilianNpc civilian)
@@ -2839,6 +2850,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             HitRegion.Head => amount * 1.85f,
             HitRegion.Limbs => amount * 0.72f,
             _ => amount
+        };
+        // Crouched and prone profiles present a smaller target to incoming fire.
+        adjustedDamage *= _stance switch
+        {
+            PlayerStance.Prone => 0.82f,
+            PlayerStance.Crouched => 0.9f,
+            _ => 1.0f
         };
         var protectiveGear = region switch
         {

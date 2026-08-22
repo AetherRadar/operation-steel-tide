@@ -107,11 +107,42 @@ public partial class DriveableVehicle : CharacterBody3D
 
         var player = _driver;
         _driver = null;
-        // Exit to the left of the cab (driver side), slightly forward of center.
-        var exitPoint = GlobalPosition
-            + GlobalBasis.X * -2.4f
-            + Vector3.Up * 0.25f
-            - GlobalBasis.Z * 0.6f;
+        // Prefer the driver-side step-out, but swing right, rear-left, or straight back
+        // when geometry hugs the cab so the exit never drops the rider into a wall.
+        var exitOffsets = new[]
+        {
+            GlobalBasis.X * -2.4f - GlobalBasis.Z * 0.6f,
+            GlobalBasis.X * 2.4f - GlobalBasis.Z * 0.6f,
+            GlobalBasis.X * -2.2f + GlobalBasis.Z * 1.8f,
+            -GlobalBasis.Z * 2.9f
+        };
+        var exitPoint = GlobalPosition + exitOffsets[0] + Vector3.Up * 0.25f;
+        var space = GetWorld3D().DirectSpaceState;
+        foreach (var offset in exitOffsets)
+        {
+            var candidate = GlobalPosition + offset + Vector3.Up * 0.25f;
+            if (PhysicsRaycast.TryHit(
+                    space,
+                    GlobalPosition + Vector3.Up * 1.3f,
+                    candidate + Vector3.Up * 1.0f,
+                    GetRid(),
+                    1,
+                    out _))
+            {
+                continue;
+            }
+            if (!PhysicsRaycast.HasHit(
+                    space,
+                    candidate + Vector3.Up * 1.4f,
+                    candidate + Vector3.Down * 1.4f,
+                    GetRid(),
+                    1))
+            {
+                continue;
+            }
+            exitPoint = candidate;
+            break;
+        }
         player.ExitVehicle(exitPoint, forced);
         _prompt.Visible = !IsDestroyed;
         SetCabinInteriorVisible(false);
