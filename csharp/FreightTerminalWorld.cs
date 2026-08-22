@@ -6069,6 +6069,9 @@ public partial class FreightTerminalWorld : Node3D
         var aircraftOk = false;
         if (aircraft is not null)
         {
+            // Deterministic staging: the dive-angle solution needs the tilt-rotor nearly
+            // overhead, which the random deploy pad and patrol phase cannot guarantee.
+            aircraft.GlobalPosition = _player.GlobalPosition + new Vector3(0.0f, 40.5f, 0.0f);
             var before = aircraft.AttackSalvosFired;
             aircraftOk = aircraft.TryAttackTarget(_player, ignoreCooldown: true) && aircraft.AttackSalvosFired > before;
             await WaitFrames(3);
