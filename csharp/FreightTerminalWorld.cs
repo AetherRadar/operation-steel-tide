@@ -118,6 +118,7 @@ public partial class FreightTerminalWorld : Node3D
     private string _currentObjective = "DISABLE THE COMMUNICATIONS RELAY";
     private float _missionDetectionRange = 34.0f;
     private DeploymentThreatLevel _deploymentThreatLevel = DeploymentThreatLevel.Standard;
+    private DeploymentTimeOfDay _deploymentTimeOfDay = DeploymentTimeOfDay.Day;
     private float _missionRemaining = 12.0f;
     private bool _missionOnline;
     private bool _missionEnded;
@@ -325,8 +326,12 @@ public partial class FreightTerminalWorld : Node3D
         if (IsInstanceValid(_hud))
         {
             _deploymentThreatLevel = _hud.SelectedDeploymentThreatLevel;
+            _deploymentTimeOfDay = _hud.SelectedDeploymentTimeOfDay;
         }
-        _missionDetectionRange = detectionRange * ThreatLevels.DetectionMultiplier(_deploymentThreatLevel);
+        ApplyTimeOfDay(_deploymentTimeOfDay);
+        _missionDetectionRange = detectionRange
+            * ThreatLevels.DetectionMultiplier(_deploymentThreatLevel)
+            * TimeOfDayStyles.Style(_deploymentTimeOfDay).DetectionMultiplier;
         _reinforcementThreshold = Mathf.Max(
             40,
             reinforcementThreshold + ThreatLevels.ReinforcementThresholdShift(_deploymentThreatLevel));

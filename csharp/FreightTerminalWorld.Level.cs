@@ -178,6 +178,26 @@ public partial class FreightTerminalWorld
         AddDust();
     }
 
+    /// <summary>Re-lights the map for the deploy-time selection; called once at mission load.</summary>
+    private void ApplyTimeOfDay(DeploymentTimeOfDay timeOfDay)
+    {
+        var style = TimeOfDayStyles.Style(timeOfDay);
+        if (IsInstanceValid(_sunLight))
+        {
+            _sunLight.RotationDegrees = style.SunRotationDegrees;
+            _sunLight.LightColor = style.SunColor;
+            _sunLight.LightEnergy = style.SunEnergy;
+        }
+        if (IsInstanceValid(_environmentRef))
+        {
+            _environmentRef.AmbientLightEnergy = style.AmbientEnergy;
+            _environmentRef.FogLightColor = style.FogColor;
+            _environmentRef.FogLightEnergy = style.FogEnergy;
+            _environmentRef.FogDensity = style.FogDensity;
+            _environmentRef.TonemapExposure = style.Exposure;
+        }
+    }
+
     private static ShaderMaterial BuildDynamicSkyMaterial()
     {
         var shader = new Shader

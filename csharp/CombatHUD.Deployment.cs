@@ -22,7 +22,9 @@ public partial class CombatHUD
     private Label _deploymentExtractedLabel = null!;
     private Label _deploymentRankLabel = null!;
     private Button _deploymentThreatButton = null!;
+    private Button _deploymentTimeButton = null!;
     private DeploymentThreatLevel _selectedThreatLevel = DeploymentThreatLevel.Standard;
+    private DeploymentTimeOfDay _selectedTimeOfDay = DeploymentTimeOfDay.Day;
     private Label _deploymentCostLabel = null!;
     private Label _deploymentStatusLabel = null!;
     private Label _deploymentMapCaption = null!;
@@ -64,6 +66,12 @@ public partial class CombatHUD
     public int DeploymentMapCount => _deploymentMapButtons.Count;
     public int DeploymentRankLevel => OperatorReputation.LevelForPoints(_displayedProfile.ReputationPoints);
     public DeploymentThreatLevel SelectedDeploymentThreatLevel => _selectedThreatLevel;
+    public DeploymentTimeOfDay SelectedDeploymentTimeOfDay => _selectedTimeOfDay;
+    public void SetDeploymentTimeForDiagnostics(DeploymentTimeOfDay timeOfDay)
+    {
+        _selectedTimeOfDay = timeOfDay;
+        RefreshDeploymentStore();
+    }
     public bool IsDeploymentThreatLocked(DeploymentThreatLevel level)
         => DeploymentRankLevel < ThreatLevels.RequiredReputationLevel(level);
     public void SetDeploymentThreatForDiagnostics(DeploymentThreatLevel level)
@@ -138,7 +146,7 @@ public partial class CombatHUD
         _deploymentRankLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
         panel.AddChild(_deploymentRankLabel);
 
-        _deploymentThreatButton = Button(string.Empty, new Vector2(825, 58), new Vector2(175, 16));
+        _deploymentThreatButton = Button(string.Empty, new Vector2(825, 66), new Vector2(175, 16));
         _deploymentThreatButton.FocusMode = Control.FocusModeEnum.None;
         _deploymentThreatButton.AddThemeFontSizeOverride("font_size", 9);
         _deploymentThreatButton.AddThemeColorOverride("font_color", new Color(0.95f, 0.78f, 0.5f));
@@ -153,10 +161,23 @@ public partial class CombatHUD
         panel.AddChild(_deploymentCostLabel);
 
         _deploymentStatusLabel = Label(string.Empty, 11, new Color(0.5f, 0.68f, 0.63f));
-        _deploymentStatusLabel.Position = new Vector2(648, 50);
-        _deploymentStatusLabel.Size = new Vector2(512, 22);
+        _deploymentStatusLabel.Position = new Vector2(648, 44);
+        _deploymentStatusLabel.Size = new Vector2(512, 20);
         _deploymentStatusLabel.HorizontalAlignment = HorizontalAlignment.Right;
         panel.AddChild(_deploymentStatusLabel);
+
+        _deploymentTimeButton = Button(string.Empty, new Vector2(648, 66), new Vector2(170, 16));
+        _deploymentTimeButton.FocusMode = Control.FocusModeEnum.None;
+        _deploymentTimeButton.AddThemeFontSizeOverride("font_size", 9);
+        _deploymentTimeButton.AddThemeColorOverride("font_color", new Color(0.62f, 0.74f, 0.94f));
+        _deploymentTimeButton.AddThemeColorOverride("font_hover_color", new Color(0.8f, 0.88f, 1.0f));
+        _deploymentTimeButton.Pressed += () =>
+        {
+            _selectedTimeOfDay = (DeploymentTimeOfDay)(((int)_selectedTimeOfDay + 1) % 4);
+            ClearDeploymentError();
+            RefreshDeploymentStore();
+        };
+        panel.AddChild(_deploymentTimeButton);
     }
 
     private void BuildOperatorPreview(Control panel)
@@ -616,6 +637,17 @@ public partial class CombatHUD
             : $"EXTRACTED  {_displayedProfile.LifetimeExtractedValue}";
         _deploymentRankLabel.Text = DeploymentRankText(chinese);
         RefreshDeploymentThreat();
+        if (IsInstanceValid(_deploymentTimeButton))
+        {
+            var style = TimeOfDayStyles.Style(_selectedTimeOfDay);
+            var detectionPercent = Mathf.RoundToInt((style.DetectionMultiplier - 1.0f) * 100.0f);
+            _deploymentTimeButton.Text = chinese
+                ? $"TIME  {TimeOfDayStyles.DisplayName(_selectedTimeOfDay, _language)}  //  \u4fa6\u6d4b {detectionPercent:+#;-#;0}%"
+                : $"TIME  {TimeOfDayStyles.DisplayName(_selectedTimeOfDay, _language)}  //  DETECTION {detectionPercent:+#;-#;0}%";
+            _deploymentTimeButton.TooltipText = chinese
+                ? "\u540c\u4e00\u5f20\u5730\u56fe\u7684\u56db\u79cd\u5149\u7167\u4e0e\u4fa6\u6d4b\u73af\u5883  //  \u591c\u6218\u9700\u8981\u624b\u7535\u7b52"
+                : "FOUR LIGHTING AND DETECTION MOODS FOR THE SAME MAP  //  NIGHT FAVORS THE FLASHLIGHT";
+        }
         _deploymentCostLabel.Text = chinese
             ? $"\u6574\u5907\u4ef7\u503c  {selected.TotalCost}"
             : $"KIT VALUE  {selected.TotalCost}";
