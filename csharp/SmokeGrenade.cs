@@ -65,9 +65,9 @@ public partial class SmokeGrenade : RigidBody3D
         _registeredWorld = null;
     }
 
-    public void Arm(Vector3 direction)
+    public void Arm(Vector3 direction, float speed = 14.0f, float loft = 5.0f)
     {
-        LinearVelocity = direction.Normalized() * 14.0f + Vector3.Up * 5.0f;
+        LinearVelocity = direction.Normalized() * speed + Vector3.Up * loft;
         AngularVelocity = new Vector3(7.0f, 10.0f, 6.0f);
         _armed = true;
     }

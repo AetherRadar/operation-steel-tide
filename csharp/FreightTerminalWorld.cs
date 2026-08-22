@@ -1526,6 +1526,18 @@ public partial class FreightTerminalWorld : Node3D
         }
         var weaponItem = source.Loot[index];
         source.Loot.RemoveAt(index);
+        // Adopt (and consume) a matching-caliber ammo stack so mate fire respects ammo grades.
+        var ammoGrade = weaponItem.Grade;
+        var caliber = WeaponCatalog.Weapon(weaponItem.Weapon!.Platform).Caliber;
+        var ammoIndex = source.Loot.FindIndex(item =>
+            item.Kind == LootItemKind.Ammunition
+            && item.Quantity > 0
+            && item.AmmoCaliber == caliber);
+        if (ammoIndex >= 0)
+        {
+            ammoGrade = source.Loot[ammoIndex].Grade;
+            source.Loot.RemoveAt(ammoIndex);
+        }
         RefreshGradedLootPickupPresentation(source);
         if (source is EnemyOperator corpse)
         {
@@ -1534,7 +1546,7 @@ public partial class FreightTerminalWorld : Node3D
         source.OnSearched();
         PublishExtractionLootMutation(source);
         RetireEmptyGradedLootPickup(source);
-        return mate.EquipWeaponFromLoot(weaponItem.Weapon!);
+        return mate.EquipWeaponFromLoot(weaponItem.Weapon!, ammoGrade);
     }
 
     private void SpawnExplosives()

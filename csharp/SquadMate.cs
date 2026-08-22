@@ -32,6 +32,19 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     public float CombatMaxHealth => MaxHealth;
     /// <summary>AI operators deploy with a primary; diagnostics may temporarily strip it.</summary>
     public bool HasFireablePrimary { get; private set; } = true;
+    /// <summary>Squad hold-fire stance blocks mate trigger pulls without dropping awareness.</summary>
+    public bool HoldFireActive { get; private set; }
+    /// <summary>Weapon the mate actually shoots with; loot pickups swap it for real stat changes.</summary>
+    public WeaponBuild CarriedWeapon { get; private set; } = WeaponCatalog.Build(WeaponPlatform.M4A1, 0);
+    /// <summary>Midpoint of the AI damage band (stats.Damage × 0.32–0.48) for deterministic checks.</summary>
+    public float MeanShotDamageForDiagnostics => CarriedWeapon.Stats().Damage * 0.4f;
+    /// <summary>Ammo grade adopted from the looted weapon kit; drives damage and armor penetration.</summary>
+    public LootGrade AmmoGrade => _ammoGrade;
+    /// <summary>Smoke canisters left for leader-called screens.</summary>
+    public int SmokeChargesRemaining => _smokeCharges;
+
+    private const int SquadSmokeCanisters = 2;
+    private const float SquadSmokeThrowSpeed = 14.0f;
 
     public void ApplyColdStartUnarmed()
     {
@@ -51,6 +64,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     public void GrantFireablePrimaryForDiagnostics()
     {
         HasFireablePrimary = true;
+        _ammoGrade = LootGrade.Uncommon;
+        RefillMagazine();
         if (IsInstanceValid(_weapon))
         {
             _weapon.Visible = true;
@@ -59,12 +74,15 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     }
 
     /// <summary>Production path: equip a weapon taken from a world loot source.</summary>
-    public bool EquipWeaponFromLoot(WeaponBuild build)
+    public bool EquipWeaponFromLoot(WeaponBuild build, LootGrade ammoGrade = LootGrade.Uncommon)
     {
         if (build is null)
         {
             return false;
         }
+        CarriedWeapon = build.Clone();
+        _ammoGrade = ammoGrade;
+        RefillMagazine();
         HasFireablePrimary = true;
         if (IsInstanceValid(_weapon))
         {
@@ -76,6 +94,55 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
         SetAuthoredWeaponVisible(true);
         return HasFireablePrimary;
+    }
+
+    public void SetHoldFire(bool holdFire)
+    {
+        HoldFireActive = holdFire;
+        if (holdFire)
+        {
+            _burstShotsRemaining = 0;
+        }
+    }
+
+    /// <summary>Leader-called smoke screen: lob a canister that lands near the marked point.</summary>
+    public bool DeploySmokeScreen(Vector3 targetPoint)
+    {
+        if (IsDowned || IsBodyBag || IsNetworkProxy || Main is null || !IsInstanceValid(Main) || _smokeCharges <= 0)
+        {
+            return false;
+        }
+        var flatTarget = FlattenToCurrentHeight(targetPoint);
+        var toTarget = flatTarget - GlobalPosition;
+        toTarget.Y = 0.0f;
+        if (toTarget.LengthSquared() < 0.25f)
+        {
+            toTarget = -GlobalBasis.Z;
+            toTarget.Y = 0.0f;
+        }
+        var distance = toTarget.Length();
+        // Fixed 14 m/s throw: the loft sets flight time, so range ≈ 2.86 × loft.
+        var loft = Mathf.Clamp(distance / 2.86f, 2.2f, 7.2f);
+        var origin = IsInstanceValid(_muzzle) ? _muzzle.GlobalPosition : GlobalPosition + Vector3.Up * 1.35f;
+        FaceTacticalPoint(flatTarget, 1.0f);
+        Main.ThrowSmokeGrenade(origin, toTarget.Normalized(), this, SquadSmokeThrowSpeed, loft);
+        _smokeCharges--;
+        _burstShotsRemaining = 0;
+        _weaponCooldown = Mathf.Max(_weaponCooldown, 0.7f);
+        return true;
+    }
+
+    private void RefillMagazine()
+    {
+        _magazineRemaining = CarriedWeapon.Stats().MagazineSize;
+        _reloadTimer = 0.0f;
+    }
+
+    internal void SetCarriedWeaponForDiagnostics(WeaponBuild build)
+    {
+        CarriedWeapon = build.Clone();
+        _ammoGrade = LootGrade.Uncommon;
+        RefillMagazine();
     }
 
     private readonly RandomNumberGenerator _rng = new();
@@ -90,6 +157,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     private Vector3 _remotePosition;
     private Vector3 _remoteRotation;
     private float _weaponCooldown;
+    private float _reloadTimer;
+    private int _magazineRemaining;
+    private int _smokeCharges = SquadSmokeCanisters;
+    private LootGrade _ammoGrade = LootGrade.Uncommon;
     private float _skillCooldown;
     private float _skillActionTime;
     private float _overdriveTime;
@@ -127,6 +198,13 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         IsHumanProxy = humanProxy;
         IsNetworkProxy = humanProxy || networkProxy;
         NetworkPeerId = peerId;
+        // Role-flavoured default primaries; everything downstream reads the real stats.
+        CarriedWeapon = WeaponCatalog.Build(role switch
+        {
+            OperatorRole.Medic => WeaponPlatform.ScarL,
+            OperatorRole.Recon => WeaponPlatform.VSS,
+            _ => WeaponPlatform.M4A1
+        }, 0);
         var spec = OperatorRoles.Spec(role);
         MaxHealth = spec.MaxHealth;
         Health = MaxHealth;
@@ -315,6 +393,11 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     {
         var dt = (float)delta;
         _weaponCooldown = Mathf.Max(0.0f, _weaponCooldown - dt);
+        _reloadTimer = Mathf.Max(0.0f, _reloadTimer - dt);
+        if (_reloadTimer <= 0.0f && _magazineRemaining <= 0)
+        {
+            RefillMagazine();
+        }
         _skillCooldown = Mathf.Max(0.0f, _skillCooldown - dt);
         _overdriveTime = Mathf.Max(0.0f, _overdriveTime - dt);
         _decisionTimer = Mathf.Max(0.0f, _decisionTimer - dt);
@@ -495,7 +578,11 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
     private void TryFire(EnemyOperator enemy)
     {
-        if (!HasFireablePrimary || _weaponCooldown > 0.0f || _skillActionTime > 0.0f)
+        if (!HasFireablePrimary
+            || HoldFireActive
+            || _weaponCooldown > 0.0f
+            || _reloadTimer > 0.0f
+            || _skillActionTime > 0.0f)
         {
             return;
         }
@@ -505,8 +592,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             // A committed close-range revive is uninterrupted by ordinary contact.
             return;
         }
+        var stats = CarriedWeapon.Stats();
+        var engageRange = Mathf.Clamp(stats.EffectiveRange * 0.62f, 30.0f, 95.0f);
         var distance = GlobalPosition.DistanceTo(enemy.GlobalPosition);
-        if (distance > 55.0f || !HasLineOfSight(enemy))
+        if (distance > engageRange || !HasLineOfSight(enemy))
         {
             return;
         }
@@ -524,9 +613,11 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             };
         }
         _burstShotsRemaining--;
+        // Slow primaries (DMRs, snipers) stretch the burst rhythm without stalling it.
+        var cadenceScale = Mathf.Clamp(stats.FireInterval / 0.092f, 1.0f, 1.9f);
         _weaponCooldown = (_burstShotsRemaining > 0
             ? _rng.RandfRange(0.12f, 0.19f)
-            : _rng.RandfRange(0.42f, 0.72f)) * spec.FireIntervalMultiplier * fireBoost;
+            : _rng.RandfRange(0.42f, 0.72f)) * spec.FireIntervalMultiplier * fireBoost * cadenceScale;
         var targetVelocity = enemy.Velocity;
         targetVelocity.Y = 0.0f;
         var leadSeconds = Mathf.Clamp(distance / 180.0f, 0.04f, 0.22f);
@@ -537,17 +628,17 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         var muzzlePos = IsInstanceValid(_muzzle) ? _muzzle.GlobalPosition : bodyOrigin;
         var shotOrigin = Ballistics.ResolveShotOrigin(GetWorld3D(), bodyOrigin, muzzlePos, GetRid());
         CombatShotsFired++;
-        Main.NotifyAircraftOperatorAttack(this, GlobalPosition, 52.0f);
+        Main.NotifyAircraftOperatorAttack(this, GlobalPosition, stats.SoundRadius);
         if (BreakableGlassField.TryShatterAlongRay(
             GetWorld3D(),
             shotOrigin,
             hitPoint,
-            12.0f,
+            stats.Damage * 0.4f,
             shotOrigin.DirectionTo(hitPoint),
             out var glassHitPosition))
         {
             Main.SpawnTracer(shotOrigin, glassHitPosition, new Color(0.34f, 0.78f, 1.0f));
-            Main.ReportGunshot(GlobalPosition, 52.0f);
+            Main.ReportGunshot(GlobalPosition, stats.SoundRadius);
             return;
         }
         // Wallbang gate on the real damage path.
@@ -569,14 +660,25 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         var accuracy = Mathf.Clamp(0.94f - distance * 0.006f, 0.58f, 0.93f);
         if (_rng.Randf() < accuracy)
         {
-            enemy.TakeDamage(_rng.RandfRange(14.0f, 20.0f), hitPoint, this);
+            enemy.TakeDamage(
+                stats.Damage * AmmoTiers.DamageMultiplier(_ammoGrade) * _rng.RandfRange(0.32f, 0.48f),
+                hitPoint,
+                this,
+                AmmoTiers.ArmorPenetration(_ammoGrade));
         }
         else
         {
             hitPoint += new Vector3(_rng.RandfRange(-1.4f, 1.4f), _rng.RandfRange(-0.7f, 1.2f), _rng.RandfRange(-1.4f, 1.4f));
         }
+        _magazineRemaining--;
+        if (_magazineRemaining <= 0)
+        {
+            var reloadBoost = Role == OperatorRole.Assault && _overdriveTime > 0.0f ? 0.78f : 1.0f;
+            _reloadTimer = Mathf.Clamp(2.6f * spec.ReloadMultiplier * reloadBoost, 1.2f, 3.6f);
+            _burstShotsRemaining = 0;
+        }
         Main.SpawnTracer(shotOrigin, hitPoint, new Color(0.34f, 0.78f, 1.0f));
-        Main.ReportGunshot(GlobalPosition, 52.0f);
+        Main.ReportGunshot(GlobalPosition, stats.SoundRadius);
     }
 
     private bool HasLineOfSight(EnemyOperator enemy)

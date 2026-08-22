@@ -151,10 +151,23 @@ public partial class SquadMate
         {
             candidate = _combatThreat;
         }
-        else if (_combatTargetScanTimer <= 0.0f)
+        else
         {
-            candidate = SelectBestCombatCandidate();
-            _combatTargetScanTimer = 0.42f + SquadSlot * 0.04f;
+            // Leader's focus mark outranks ordinary scanning, never self-defence.
+            var focus = Main.SquadFocusTarget;
+            if (focus is not null
+                && IsInstanceValid(focus)
+                && !focus.IsDead
+                && Main.CanSquadEngage(focus)
+                && GlobalPosition.DistanceTo(focus.GlobalPosition) < CombatRetainRange)
+            {
+                candidate = focus;
+            }
+            else if (_combatTargetScanTimer <= 0.0f)
+            {
+                candidate = SelectBestCombatCandidate();
+                _combatTargetScanTimer = 0.42f + SquadSlot * 0.04f;
+            }
         }
 
         if (candidate is not null && ShouldAdoptCombatTarget(candidate))
@@ -237,6 +250,10 @@ public partial class SquadMate
         if (candidate == _combatThreat)
         {
             score -= 24.0f;
+        }
+        if (candidate == Main.SquadFocusTarget)
+        {
+            score -= 30.0f;
         }
         if (candidate.EngageTargetNode == this)
         {
@@ -890,6 +907,7 @@ public partial class SquadMate
         _combatFlankSide = _combatStrafeSign;
         _burstShotsRemaining = 0;
         _weaponCooldown = 0.0f;
+        RefillMagazine();
         _skillActionTime = 0.0f;
         Health = MaxHealth;
         CombatShotsFired = 0;

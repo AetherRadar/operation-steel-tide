@@ -413,6 +413,9 @@ public partial class FreightTerminalWorld
     }
 
     public void ThrowSmokeGrenade(Vector3 origin, Vector3 direction, Node source)
+        => ThrowSmokeGrenade(origin, direction, source, 14.0f, 5.0f);
+
+    public void ThrowSmokeGrenade(Vector3 origin, Vector3 direction, Node source, float speed, float loft)
     {
         var grenade = new SmokeGrenade
         {
@@ -420,7 +423,7 @@ public partial class FreightTerminalWorld
             OwnerBody = source
         };
         AddChild(grenade);
-        grenade.Arm(direction);
+        grenade.Arm(direction, speed, loft);
     }
 
     public bool IsLineObscuredBySmoke(Vector3 from, Vector3 to)

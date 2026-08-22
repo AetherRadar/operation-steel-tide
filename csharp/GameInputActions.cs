@@ -21,8 +21,11 @@ internal static class GameInputActions
     public static readonly StringName Reload = "reload";
     public static readonly StringName Sprint = "sprint";
     public static readonly StringName SquadFollow = "squad_follow";
+    public static readonly StringName SquadFocus = "squad_focus";
     public static readonly StringName SquadHold = "squad_hold";
+    public static readonly StringName SquadHoldFire = "squad_hold_fire";
     public static readonly StringName SquadMove = "squad_move";
+    public static readonly StringName SquadSmoke = "squad_smoke";
     public static readonly StringName ThrowGrenade = "throw_grenade";
     public static readonly StringName ToggleFireMode = "toggle_fire_mode";
     public static readonly StringName ToggleFlashlight = "toggle_flashlight";

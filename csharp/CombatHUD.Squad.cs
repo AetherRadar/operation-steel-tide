@@ -8,6 +8,7 @@ public partial class CombatHUD
 {
     public event Action<int, int, string>? SquadDeploymentRequested;
     public event Action<int>? SquadOrderRequested;
+    public event Action? SquadFireStanceRequested;
 
     public bool IsSquadLobbyVisible => IsInstanceValid(_squadLobby) && _squadLobby.Visible;
     public bool IsSquadNetworkAddressEditable
@@ -46,10 +47,12 @@ public partial class CombatHUD
     private ProgressBar _classSkillBar = null!;
     private Label _squadOrderLabel = null!;
     private readonly Button[] _orderButtons = new Button[3];
+    private Button _fireStanceButton = null!;
     private OperatorRole _selectedRole = OperatorRole.Assault;
     private SquadSessionMode _selectedSessionMode = SquadSessionMode.Local;
     private OperatorRole _displayedRole = OperatorRole.Assault;
     private SquadOrder _displayedOrder = SquadOrder.Follow;
+    private bool _displayedHoldFire;
     private float _displayedCooldown;
     private float _displayedCooldownMax = 1.0f;
     private bool _displayedSkillActive;
@@ -154,7 +157,7 @@ public partial class CombatHUD
         };
         _classSkillRoot.AddChild(_classSkillBar);
 
-        _squadOrderLabel = Label("F1 FOLLOW    F2 HOLD    F3 MOVE", 12, new Color(0.73f, 0.81f, 0.78f));
+        _squadOrderLabel = Label("F1 FOLLOW    F2 HOLD    F3 MOVE    F4 FIRE    F5 FOCUS", 12, new Color(0.73f, 0.81f, 0.78f));
         _squadOrderLabel.Position = new Vector2(0, 53);
         _squadOrderLabel.Size = new Vector2(430, 20);
         _squadOrderLabel.HorizontalAlignment = HorizontalAlignment.Center;
@@ -163,7 +166,7 @@ public partial class CombatHUD
         for (var i = 0; i < 3; i++)
         {
             var order = (SquadOrder)i;
-            var button = Button($"F{i + 1}", new Vector2(82 + i * 92, 73), new Vector2(82, 26));
+            var button = Button($"F{i + 1}", new Vector2(82 + i * 88, 73), new Vector2(82, 26));
             button.ToggleMode = true;
             button.ButtonGroup = buttonGroup;
             button.FocusMode = Control.FocusModeEnum.None;
@@ -173,6 +176,13 @@ public partial class CombatHUD
             _orderButtons[i] = button;
         }
         _orderButtons[0].ButtonPressed = true;
+        // Fire-stance toggle sits beside the orders but is not part of their button group.
+        _fireStanceButton = Button("F4", new Vector2(82 + 3 * 88, 73), new Vector2(82, 26));
+        _fireStanceButton.ToggleMode = true;
+        _fireStanceButton.FocusMode = Control.FocusModeEnum.None;
+        _fireStanceButton.AddThemeFontSizeOverride("font_size", 11);
+        _fireStanceButton.Pressed += () => SquadFireStanceRequested?.Invoke();
+        _classSkillRoot.AddChild(_fireStanceButton);
         BindFooterLayout(root);
     }
 
@@ -660,10 +670,32 @@ public partial class CombatHUD
         {
             _orderButtons[i].SetPressedNoSignal(i == (int)order);
         }
-        var orderName = OperatorRoles.OrderName(order, _language);
+        RefreshSquadOrderLabel();
+    }
+
+    public void SetSquadFireStance(bool holdFire)
+    {
+        _displayedHoldFire = holdFire;
+        if (IsInstanceValid(_fireStanceButton))
+        {
+            _fireStanceButton.SetPressedNoSignal(holdFire);
+        }
+        RefreshSquadOrderLabel();
+    }
+
+    private void RefreshSquadOrderLabel()
+    {
+        if (!IsInstanceValid(_squadOrderLabel))
+        {
+            return;
+        }
+        var orderName = OperatorRoles.OrderName(_displayedOrder, _language);
+        var stance = _displayedHoldFire
+            ? GameLocalization.Get("squad_stance_hold_fire", _language, "HOLD FIRE")
+            : GameLocalization.Get("squad_stance_free_fire", _language, "WEAPONS FREE");
         _squadOrderLabel.Text = GameLocalization.IsChinese(_language)
-            ? $"当前命令  //  {orderName}    F1 跟随  F2 戒备  F3 移动"
-            : $"ORDER  //  {orderName}    F1 FOLLOW  F2 HOLD  F3 MOVE";
+            ? $"当前命令  //  {orderName}  //  {stance}    F1 跟随  F2 戒备  F3 移动  F4 停火  F5 集火"
+            : $"ORDER  //  {orderName}  //  {stance}    F1 FOLLOW  F2 HOLD  F3 MOVE  F4 FIRE  F5 FOCUS";
     }
 
     private void RefreshClassSkillText()
