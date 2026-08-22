@@ -30,6 +30,7 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
 
     private FreightTerminalWorld _main = null!;
     private readonly RandomNumberGenerator _rng = new();
+    private bool _searchEventRolled;
     private Transform3D _towerTransform;
     private Vector3 _homeLocal;
     private Vector3 _targetLocal;
@@ -105,8 +106,46 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         }
         : $"{Role} belongings";
 
+    /// <summary>
+    /// First corpse search rolls a one-off event: pocket intel, a noise trap, or spare
+    /// rounds. Later searches are silent.
+    /// </summary>
     public void OnSearched()
     {
+        if (_searchEventRolled || !IsDead || _main is null)
+        {
+            return;
+        }
+        _searchEventRolled = true;
+        var player = _main.LocalPlayerRef;
+        if (player is null || !IsInstanceValid(player))
+        {
+            return;
+        }
+        var roll = _rng.Randf();
+        if (roll < 0.28f)
+        {
+            _main.PerformReconScan(player, GlobalPosition);
+            player.Hud?.ShowLocalizedMessage(
+                "civilian_search_intel",
+                "POCKET LEDGER  //  NEARBY HOSTILES MARKED",
+                new Color(0.4f, 0.86f, 0.7f));
+        }
+        else if (roll < 0.44f)
+        {
+            _main.ReportGunshot(GlobalPosition, 46.0f);
+            player.Hud?.ShowLocalizedMessage(
+                "civilian_search_trap",
+                "TRAPPED RADIO  //  NOISE DREW HOSTILES",
+                new Color(1.0f, 0.5f, 0.3f));
+        }
+        else if (player.TryCollectAmmo(12))
+        {
+            player.Hud?.ShowLocalizedMessage(
+                "civilian_search_ammo",
+                "SPARE ROUNDS  //  AMMUNITION RECOVERED",
+                new Color(0.42f, 0.9f, 0.64f));
+        }
     }
 
     public string AssistanceLabel(string language)

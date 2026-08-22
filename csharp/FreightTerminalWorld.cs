@@ -19,6 +19,7 @@ public partial class FreightTerminalWorld : Node3D
     private static readonly Vector3 ExtractionPoint = new(0.0f, 0.08f, -60.0f);
 
     private TacticalPlayer _player = null!;
+    internal TacticalPlayer LocalPlayerRef => _player;
     private CombatHUD _hud = null!;
     private MissionDirector _missionDirector = null!;
     private readonly List<EnemyOperator> _enemies = new();

@@ -194,6 +194,9 @@ public static class GameLocalization
         Chinese["civilian_local_intel"] = "\u793e\u533a\u60c5\u62a5  //  \u654c\u4eba\u5df2\u6807\u8bb0";
         Chinese["civilian_field_repair"] = "\u73b0\u573a\u62a2\u4fee  //  \u8f7d\u5177\u6216\u88c5\u5907\u5df2\u7ef4\u62a4";
         Chinese["civilian_evac_supply"] = "\u64a4\u79bb\u7269\u8d44  //  \u5df2\u83b7\u5f97\u5f39\u836f";
+        Chinese["civilian_search_intel"] = "\u968f\u8eab\u8bb0\u4e8b  //  \u9644\u8fd1\u654c\u4eba\u5df2\u6807\u8bb0";
+        Chinese["civilian_search_trap"] = "\u8be6\u9677\u96f7\u7684\u7535\u53f0  //  \u566a\u58f0\u5f15\u6765\u4e86\u654c\u4eba";
+        Chinese["civilian_search_ammo"] = "\u5907\u7528\u5b50\u5f39  //  \u5df2\u83b7\u5f97\u5f39\u836f";
         Chinese["resident_supplies"] = "\u5c45\u6c11\u8865\u7ed9\u5df2\u83b7\u5f97";
         Chinese["civilian_medic_request"] = "\u8bf7\u6c42\u533b\u7597\u6551\u52a9";
         Chinese["civilian_guard_request"] = "\u8bf7\u6c42\u793e\u533a\u60c5\u62a5";
