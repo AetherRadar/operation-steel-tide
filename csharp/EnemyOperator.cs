@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -28,6 +29,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     public bool IsSearchingLoot => _searchingLoot;
     public float CurrentHealth => _health;
     public int AttackShotsFired { get; private set; }
+    internal int PatrolRouteWaypointCountForDiagnostics => _patrolRoute.Length;
+    internal int PatrolRouteIndexForDiagnostics => _patrolRouteIndex;
     /// <summary>Engage target node, including a revivable hostile waiting to be finished.</summary>
     public Node3D? EngageTargetNode =>
         _combatTarget is not null
@@ -118,6 +121,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private float _health = 100.0f;
     private Vector3 _patrolOrigin;
     private Vector3 _patrolTarget;
+    private Vector3[] _patrolRoute = Array.Empty<Vector3>();
+    private int _patrolRouteIndex;
     private float _fireTimer = 0.5f;
     private float _repathTimer;
     private float _patrolTimer;
@@ -1550,11 +1555,51 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         Velocity = velocity;
     }
 
+    /// <summary>
+    /// Assign a fixed multi-district patrol loop. The enemy enters the route at the waypoint
+    /// nearest its spawn so it never deadheads across the map to reach the start.
+    /// </summary>
+    public void AssignPatrolRoute(Vector3[] waypoints)
+    {
+        if (waypoints is null || waypoints.Length == 0)
+        {
+            return;
+        }
+        _patrolRoute = waypoints;
+        var bestIndex = 0;
+        var bestDistance = float.PositiveInfinity;
+        for (var i = 0; i < waypoints.Length; i++)
+        {
+            var distance = GlobalPosition.DistanceSquaredTo(waypoints[i]);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                bestIndex = i;
+            }
+        }
+        _patrolRouteIndex = bestIndex;
+        _patrolTarget = waypoints[bestIndex];
+        _patrolTimer = RoutedPatrolLegSeconds(_patrolTarget);
+    }
+
+    private float RoutedPatrolLegSeconds(Vector3 waypoint)
+    {
+        // Timeout headroom per leg keeps routed patrols advancing even when geometry blocks a leg.
+        return Mathf.Clamp(GlobalPosition.DistanceTo(waypoint) / 1.3f + 2.0f, 4.0f, 26.0f);
+    }
+
     private void PickPatrolTarget()
     {
         if (IsWorldBoss)
         {
             SelectNextWorldBossPatrolPoint();
+            return;
+        }
+        if (_patrolRoute.Length > 0)
+        {
+            _patrolRouteIndex = (_patrolRouteIndex + 1) % _patrolRoute.Length;
+            _patrolTarget = _patrolRoute[_patrolRouteIndex];
+            _patrolTimer = RoutedPatrolLegSeconds(_patrolTarget);
             return;
         }
         _patrolTarget = _patrolOrigin + new Vector3(

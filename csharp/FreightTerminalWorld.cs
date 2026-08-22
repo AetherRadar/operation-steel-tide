@@ -2727,16 +2727,92 @@ public partial class FreightTerminalWorld : Node3D
         }
         _missionDirector.ExitDeploymentZone();
         _missionDirector.RaiseConfirmedAlarm();
+        // Fixed open point keeps wave spawn selection deterministic regardless of the pad RNG.
+        _player.GlobalPosition = DeploymentPoint;
+        _player.Velocity = Vector3.Zero;
+
+        var routedEnemies = _enemies
+            .Where(enemy => IsInstanceValid(enemy) && enemy.PatrolRouteWaypointCountForDiagnostics > 0)
+            .ToList();
+
+        var waveDeadline = Time.GetTicksMsec() + 12000;
         _threatLevel = _reinforcementThreshold;
-        var deadline = Time.GetTicksMsec() + 10000;
-        while (!_reinforcementsDeployed && Time.GetTicksMsec() < deadline)
+        while (_reinforcementWavesDeployed < 1 && Time.GetTicksMsec() < waveDeadline)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         }
+        var waveOneSpawned = _reinforcementWavesDeployed == 1 && !_reinforcementsDeployed && !_reinforcementPending;
+        var enemiesAfterWaveOne = _enemiesRemaining;
+        DisableLiveEnemiesForReinforcementDiagnostics();
+
+        waveDeadline = Time.GetTicksMsec() + 12000;
+        _threatLevel = _reinforcementThreshold;
+        while (_reinforcementWavesDeployed < 2 && Time.GetTicksMsec() < waveDeadline)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+        var waveTwoEscalated = _reinforcementWavesDeployed == 2
+            && !_reinforcementsDeployed
+            && _enemiesRemaining > enemiesAfterWaveOne;
+        var enemiesAfterWaveTwo = _enemiesRemaining;
+        DisableLiveEnemiesForReinforcementDiagnostics();
+
+        waveDeadline = Time.GetTicksMsec() + 12000;
+        _threatLevel = _reinforcementThreshold;
+        while (!_reinforcementsDeployed && Time.GetTicksMsec() < waveDeadline)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+        var finalWaveLocked = _reinforcementsDeployed
+            && _reinforcementWavesDeployed == ReinforcementWaveLimit
+            && _enemiesRemaining > enemiesAfterWaveTwo
+            && !_reinforcementPending;
+        DisableLiveEnemiesForReinforcementDiagnostics();
+
+        // Patrol check: one west-harbor routed garrison, far from the fixed player point.
+        var patrolEnemy = routedEnemies.FirstOrDefault(enemy =>
+            IsInstanceValid(enemy)
+            && enemy.GlobalPosition.DistanceTo(new Vector3(-76, 0.15f, -92)) < 45.0f);
+        var patrolAdvanced = false;
+        var patrolMoved = false;
+        if (patrolEnemy is not null)
+        {
+            var startWaypointIndex = patrolEnemy.PatrolRouteIndexForDiagnostics;
+            var startPosition = patrolEnemy.GlobalPosition;
+            patrolEnemy.ProcessMode = ProcessModeEnum.Inherit;
+            var patrolDeadline = Time.GetTicksMsec() + 8000;
+            var maxPatrolDistanceSquared = 0.0f;
+            while (Time.GetTicksMsec() < patrolDeadline)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                maxPatrolDistanceSquared = Mathf.Max(
+                    maxPatrolDistanceSquared,
+                    patrolEnemy.GlobalPosition.DistanceSquaredTo(startPosition));
+            }
+            patrolAdvanced = patrolEnemy.PatrolRouteIndexForDiagnostics != startWaypointIndex;
+            patrolMoved = maxPatrolDistanceSquared >= 4.0f;
+            patrolEnemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
         await WaitFrames(2);
         SaveViewportImage("res://reinforcement_validation.png");
-        GD.Print($"REINFORCEMENT_CHECK deployed={_reinforcementsDeployed} hostiles={_enemiesRemaining} phase={_missionPhase}");
-        GetTree().Quit();
+        var routedCount = routedEnemies.Count(enemy => IsInstanceValid(enemy));
+        GD.Print($"REINFORCEMENT_CHECK deployed={_reinforcementsDeployed} waves={_reinforcementWavesDeployed} wave1={waveOneSpawned} wave2_escalated={waveTwoEscalated} final_locked={finalWaveLocked} hostiles={_enemiesRemaining} routed_garrison={routedCount} patrol_advanced={patrolAdvanced} patrol_moved={patrolMoved} phase={_missionPhase}");
+        var valid = waveOneSpawned && waveTwoEscalated && finalWaveLocked
+            && routedCount >= 10 && patrolAdvanced && patrolMoved;
+        GD.Print($"REINFORCEMENT_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private void DisableLiveEnemiesForReinforcementDiagnostics()
+    {
+        foreach (var enemy in _enemies)
+        {
+            if (IsInstanceValid(enemy) && enemy.ProcessMode != ProcessModeEnum.Disabled)
+            {
+                enemy.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
     }
 
     private async void CaptureAdsFrame()

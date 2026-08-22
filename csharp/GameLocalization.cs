@@ -43,7 +43,9 @@ public static class GameLocalization
         ["enemy_network"] = "敌方通信网络已激活",
         ["relay_offline"] = "中继已关闭  //  响应延迟",
         ["qrf_inbound"] = "敌方快速反应部队  //  7秒后到达",
-        ["qrf_deployed"] = "快速反应部队抵达  //  三个目标",
+        ["qrf_deployed_3"] = "\u5feb\u901f\u53cd\u5e94\u90e8\u961f\u62b5\u8fbe  //  \u4e09\u4e2a\u76ee\u6807",
+        ["qrf_deployed_4"] = "\u5feb\u901f\u53cd\u5e94\u90e8\u961f\u589e\u63f4\u62b5\u8fbe  //  \u56db\u4e2a\u76ee\u6807",
+        ["qrf_deployed_5"] = "\u5feb\u901f\u53cd\u5e94\u90e8\u961f\u4e3b\u529b\u62b5\u8fbe  //  \u4e94\u4e2a\u76ee\u6807",
         ["pause_title"] = "战术暂停",
         ["look_sensitivity"] = "视角灵敏度",
         ["render_quality"] = "画面质量",
@@ -406,6 +408,13 @@ public static class GameLocalization
         Chinese["extraction_unlocked"] = "\u4f18\u5148\u64a4\u79bb  //  \u4efb\u52a1\u76ee\u6807\u5168\u90e8\u5b8c\u6210  //  \u5df2\u6388\u6743\u5feb\u901f\u901a\u9053";
         Chinese["extraction_cold"] = "\u7d27\u6025\u64a4\u79bb  //  \u4efb\u52a1\u76ee\u6807\u672a\u5b8c\u6210  //  \u575a\u5b88\u65f6\u95f4\u5ef6\u957f";
         Chinese["extraction_objective_bonus"] = "\u4efb\u52a1\u76ee\u6807\u5956\u52b1  //  \u7ed3\u7b97\u52a0\u6210";
+        Chinese["squad_hold_fire_on"] = "\u5c0f\u961f\u547d\u4ee4  //  \u505c\u706b  //  \u6536\u67aa\u5f85\u547d";
+        Chinese["squad_hold_fire_off"] = "\u5c0f\u961f\u547d\u4ee4  //  \u81ea\u7531\u5c04\u51fb";
+        Chinese["squad_focus_set"] = "\u96c6\u706b\u76ee\u6807\u5df2\u6807\u8bb0  //  \u5c0f\u961f\u4f18\u5148\u653b\u51fb";
+        Chinese["squad_focus_clear"] = "\u96c6\u706b\u53d6\u6d88  //  \u51c6\u661f\u4e0b\u6ca1\u6709\u76ee\u6807";
+        Chinese["squad_focus_lost"] = "\u96c6\u706b\u76ee\u6807\u4e22\u5931  //  \u5c0f\u961f\u6062\u590d\u7d22\u654c";
+        Chinese["squad_stance_hold_fire"] = "\u505c\u706b";
+        Chinese["squad_stance_free_fire"] = "\u81ea\u7531\u5c04\u51fb";
         Chinese["extraction_locked"] = "\u64a4\u79bb\u70b9\u672a\u542f\u7528  //  \u5148\u5b8c\u6210\u4efb\u52a1\u76ee\u6807";
         Chinese["extraction_inbound"] = "\u53cb\u519b\u503e\u8f6c\u65cb\u7ffc\u673a\u6b63\u5728\u8fdb\u573a";
         Chinese["extraction_boarding"] = "\u63a5\u5e94\u673a\u5df2\u5c31\u4f4d  //  \u51c6\u5907\u767b\u673a";
