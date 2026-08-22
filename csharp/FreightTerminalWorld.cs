@@ -5407,10 +5407,16 @@ public partial class FreightTerminalWorld : Node3D
             }
             if (n.Contains("ResidentialStairCollision", StringComparison.OrdinalIgnoreCase))
             {
+                // Child CollisionShape3D nodes register as shape owners too, so this loop
+                // only counts owners added directly via CreateShapeOwner (no children here).
                 var owners = body.GetShapeOwners();
                 foreach (var owner in owners)
                 {
                     var ownerId = (uint)owner;
+                    if (body.ShapeOwnerGetOwner(ownerId) is CollisionShape3D)
+                    {
+                        continue;
+                    }
                     var shapeCount = body.ShapeOwnerGetShapeCount(ownerId);
                     for (var shapeIndex = 0; shapeIndex < shapeCount; shapeIndex++)
                     {

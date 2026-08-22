@@ -1251,16 +1251,20 @@ public partial class FreightTerminalWorld
 
     private static void AddResidentialStairCollision(
         StaticBody3D body,
-        string _,
+        string name,
         Vector3 position,
         Vector3 size,
         Vector3 rotation = default)
     {
-        var owner = body.CreateShapeOwner(body);
-        body.ShapeOwnerSetTransform(
-            owner,
-            new Transform3D(Basis.FromEuler(rotation), position));
-        body.ShapeOwnerAddShape(owner, SharedBoxShape(size));
+        // Per-tread child shapes keep the swept capsule stepping that mates rely on;
+        // shape-owner sharing broke the second-flight climb even with clear rays.
+        body.AddChild(new CollisionShape3D
+        {
+            Name = name,
+            Position = position,
+            Rotation = rotation,
+            Shape = new BoxShape3D { Size = size }
+        });
     }
 
     private void AddResidentialStairPart(
@@ -2452,7 +2456,9 @@ public partial class FreightTerminalWorld
             : string.Join('|', guardCacheRouteLeaks);
         GD.Print($"RESIDENTIAL_GAMEPLAY_CHECK valid={valid} room_types={_residentialRoomArchetypes.Count}/7 caches={ResidentialCacheCount}/{expectedCaches} unique_rooms={roomIds.Count}/{expectedRoomIds.Count} cache_reachable={reachableCaches}/{expectedCaches} unreachable={string.Join(',', unreachableCaches)} cache_types={cacheKinds.Count}/7 grades={cacheGrades.Count}/5 loot_types={lootKinds.Count} events={roomEvents.Count}/5 guards={guardRequests}/{expectedGuardRequests} event_effects={eventEffectsExact} guard_cache_geometry={guardCachesReady}/{guardAmbushCaches.Count} guard_spawn_geometry={guardSpawnPointsSafe}/{guardSpawnPointsChecked} guard_route_geometry={guardRoutesReady}/{guardSpawnPointsChecked} guard_cache_clearance={guardCacheClearancesBlocked}/{guardAmbushCaches.Count} guard_cross_cache={guardCacheRouteProbes}:{guardCacheRouteLeakText} guard_far_target={farPreferredTargetBounded} guard_geometry_failures={guardGeometryFailureText} real_guards={realGuardSpawned}/{realGuardExpected} guard_positions={realGuardPositionsExact} guard_safe={realGuardSpawnSafe} guard_routes={realGuardRoutesReady} guard_grounded={realGuardGrounded} guard_alerted={realGuardsAlerted} guard_armed={realGuardsArmed} guard_fixed_weapon={realGuardsFixedWeapon} guard_target={realGuardsTargetPlayer} guard_target_main={realGuardsUseProductionTargetEnumeration} guard_target_enumerated_player={realGuardEnumerationReturnedPlayer} guard_contact_share_suppressed={realGuardsContactSharingSuppressed} guard_enemy_tactics_preserved={realGuardExistingEnemyTacticsPreserved} guard_ballistic={realGuardsBallisticClear} guard_blockers={realGuardBallisticBlockers} guard_moved={realGuardsMoved} guard_move_min={realGuardMinimumMovement:0.00} guard_fired={realGuardsFired} guard_shots={realGuardShotsFired} guard_player_collision={realGuardPlayerCollisionReady} guard_mission_preserved={realGuardMissionStatePreserved} guard_mission_state={realGuardMissionStateDetails} guard_attack_ready={realGuardsAttackReady} guard_glass_restored={realGuardGlassStateRestored} guard_cleanup={realGuardsCleaned} guard_cleanup_instances={realGuardRemainingInstances} guard_cleanup_enemies={realGuardEnemyLeaks} guard_cleanup_loot={realGuardLootLeaks} guard_cleanup_nodes={sceneNodesBeforeOpen}->{realGuardSceneNodesAfterCleanup} guard_cleanup_extra={realGuardExtraNodes} every_tower={everyTowerStocked} every_room={everyRoomStocked} registered={cachesRegistered} sealed={cachesInitiallySealed} resolved={cachesResolved} deterministic={deterministicLoot} no_reroll={noReroll} neutral_visual={neutralVisuals} opened_visual={openedVisualsReady} open_feedback={openedFeedbackReady} visible_parts={visiblePartCount} cache_nodes={cacheNodesBeforeOpen}->{cacheNodesAfterOpen} cache_nodes_stable={cacheNodesStable} scene_nodes={sceneNodesBeforeOpen}->{sceneNodesAfterOpen} scene_nodes_stable={sceneNodesStable} opened_node_budget={openedNodeBudgetMet} no_hints={noVisibleHints} ai_hint={sealedWeaponHints} furniture={ResidentialFurnitureCount}/{expectedFurniture} furniture_types={furnitureKinds.Count}/4 furniture_registered={furnitureRegistered} furniture_stocked={furnitureStocked} furniture_reachable={reachableFurniture}/{expectedFurniture} furniture_by_kind={furnitureReachabilityText} loot_ui={lootUiOpened} assistance_roles={assistanceRoles.Count}/5 medic_healed={medicHealed}");
         GD.Print($"RESIDENTIAL_GAMEPLAY_PASS valid={valid}");
-        GetTree().Quit(valid ? 0 : 2);
+        // Per-tread child collision nodes add thousands of C# bindings; a raw Quit
+        // races Mono teardown and aborts with a nonzero exit after the verdict.
+        QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }
 
     private async void ValidateResidentialCover()
