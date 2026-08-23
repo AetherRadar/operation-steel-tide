@@ -30,8 +30,10 @@ SLEEVE_BLEND_LENGTH = 12.0
 # Negative extension pulls the cuffs back toward/behind the first-person camera
 # so the tubes never end inside the visible frame, and the drop pushes them
 # below the bottom edge of the camera frustum across the reload animation.
-SLEEVE_EXTENSION = -60.0
-SLEEVE_DROP = 240.0
+# Increased from -60/240 to -120/400 to fully hide cuffs during SMG-45 reload
+# where support arm is extended and viewed at an oblique angle.
+SLEEVE_EXTENSION = -120.0
+SLEEVE_DROP = 400.0
 FIELD_ROTATION = Matrix.Rotation(math.radians(90.0), 4, "Z")
 WEAPON_MESH_NAMES = (
     "base_smg45_0",

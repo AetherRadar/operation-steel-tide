@@ -475,7 +475,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             AlbedoTexture = ImageTexture.CreateFromImage(image),
             Roughness = 0.96f,
             Uv1Scale = new Vector3(5.0f, 5.0f, 5.0f),
-            TextureFilter = BaseMaterial3D.TextureFilterEnum.Linear
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.Linear,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled
         };
     }
 

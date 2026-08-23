@@ -16,7 +16,8 @@ internal static class TacticalSurfaceLibrary
             Metallic = 0.0f,
             Roughness = roughness,
             Uv1Scale = Vector3.One * textureScale,
-            TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled
         };
     }
 
