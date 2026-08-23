@@ -722,9 +722,13 @@ public partial class FreightTerminalWorld
         {
             return true;
         }
+        // 更智能：载体/拆包者只在贴脸且有视线时才弃包/弃拆去刚枪，避免白房面墙罚站；普通队员保持24/30m
+        var isCarrierOrDefuser = opponent == _demolitionCarrier || opponent == _demolitionDefuser;
+        var engageRange = isCarrierOrDefuser ? 14.0f : DemolitionCombatEngageRange;
+        var resumeRange = isCarrierOrDefuser ? 18.0f : DemolitionCombatResumeRange;
         var breaking = _demolitionCombatBreakoffs.Contains(opponent);
-        if (targetDistance < DemolitionCombatEngageRange
-            || breaking && targetDistance < DemolitionCombatResumeRange)
+        if (targetDistance < engageRange
+            || breaking && targetDistance < resumeRange)
         {
             if (!breaking)
             {
