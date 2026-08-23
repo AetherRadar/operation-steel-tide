@@ -25,6 +25,7 @@ public partial class EnemyOperator
     private long _pursuitTrailCompletedEnd = -1;
     private ulong _pursuitNextTrailAttachMilliseconds;
     private ulong _pursuitNextTrailShortcutMilliseconds;
+    private float _pursuitDoorWaitTimer;
     private SquadNavigationDirective[] _pursuitStaticRoute = Array.Empty<SquadNavigationDirective>();
     private int _pursuitStaticRouteCursor;
     private ulong _pursuitStaticRouteTargetId;
@@ -73,14 +74,22 @@ public partial class EnemyOperator
             && Main.TryPrepareAiDoorTraversal(GlobalPosition, destination, out var doorWaiting)
             && doorWaiting)
         {
-            var doorVelocity = Velocity;
-            doorVelocity.X = Mathf.MoveToward(doorVelocity.X, 0.0f, delta * 18.0f);
-            doorVelocity.Z = Mathf.MoveToward(doorVelocity.Z, 0.0f, delta * 18.0f);
-            Velocity = doorVelocity;
-            _pursuitProgressOrigin = GlobalPosition;
-            _pursuitProgressTimer = 0.0f;
-            ResetPursuitNavigationMotorFrame();
-            return true;
+            _pursuitDoorWaitTimer += delta;
+            if (_pursuitDoorWaitTimer < 0.9f)
+            {
+                var doorVelocity = Velocity;
+                doorVelocity.X = Mathf.MoveToward(doorVelocity.X, 0.0f, delta * 18.0f);
+                doorVelocity.Z = Mathf.MoveToward(doorVelocity.Z, 0.0f, delta * 18.0f);
+                Velocity = doorVelocity;
+                _pursuitProgressOrigin = GlobalPosition;
+                _pursuitProgressTimer = 0.0f;
+                ResetPursuitNavigationMotorFrame();
+                return true;
+            }
+        }
+        else
+        {
+            _pursuitDoorWaitTimer = 0.0f;
         }
 
         var targetFlat = new Vector3(destination.X, GlobalPosition.Y, destination.Z);
@@ -452,6 +461,7 @@ public partial class EnemyOperator
         _pursuitTrailRevision = -1;
         _pursuitTrailConfirmedEnd = -1;
         _pursuitTrailCompletedEnd = -1;
+        _pursuitDoorWaitTimer = 0.0f;
         InvalidatePursuitTrailRoute();
         InvalidateStaticPursuitRoute();
         _pursuitRouteStallCount = 0;

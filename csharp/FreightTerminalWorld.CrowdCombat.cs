@@ -18,7 +18,7 @@ public partial class FreightTerminalWorld
         List<Node3D> results)
     {
         results.Clear();
-        if (IsPlayerProtected() && !self.BypassesPlayerProtectionForDiagnostics)
+        if (IsPlayerProtected() && !self.IsRivalSquad && !self.BypassesPlayerProtectionForDiagnostics)
         {
             return;
         }

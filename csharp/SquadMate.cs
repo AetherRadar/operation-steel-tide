@@ -176,6 +176,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     private Vector3 _networkAbilityForward;
     private ILootSource? _lootHuntSource;
     private float _lootHuntCooldown;
+    private float _doorWaitTimer;
     private ISquadCombatant? _reviveTarget;
     private float _revivePoseBlend;
     private Godot.Collections.Array<Rid>? _navigationProbeExclusions;
@@ -502,14 +503,22 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         if (Main.TryPrepareAiDoorTraversal(GlobalPosition, destination, out var doorWaiting)
             && doorWaiting)
         {
-            var doorVelocity = Velocity;
-            doorVelocity.X = Mathf.MoveToward(doorVelocity.X, 0.0f, dt * 18.0f);
-            doorVelocity.Z = Mathf.MoveToward(doorVelocity.Z, 0.0f, dt * 18.0f);
-            Velocity = doorVelocity;
-            ResetMovementProgress();
-            MoveAndSlide();
-            AnimateRig(dt);
-            return;
+            _doorWaitTimer += dt;
+            if (_doorWaitTimer < 0.9f)
+            {
+                var doorVelocity = Velocity;
+                doorVelocity.X = Mathf.MoveToward(doorVelocity.X, 0.0f, dt * 18.0f);
+                doorVelocity.Z = Mathf.MoveToward(doorVelocity.Z, 0.0f, dt * 18.0f);
+                Velocity = doorVelocity;
+                ResetMovementProgress();
+                MoveAndSlide();
+                AnimateRig(dt);
+                return;
+            }
+        }
+        else
+        {
+            _doorWaitTimer = 0.0f;
         }
         UpdateTacticalMovement(
             destination,

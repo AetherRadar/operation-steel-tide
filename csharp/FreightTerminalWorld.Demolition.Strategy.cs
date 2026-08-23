@@ -101,6 +101,17 @@ public partial class FreightTerminalWorld
         {
             _hud.ShowRadioMessage(playerPlan.Callout, new Color(0.35f, 0.82f, 1.0f));
         }
+        // Performance-safe anti-idle: once round is live, clear sentry hold for all assigned demolition opponents so they walk to site instead of freezing at spawn.
+        if (_demolitionRoundActive)
+        {
+            foreach (var opponent in _demolitionOpponents.Where(IsInstanceValid).Where(opponent => !opponent.IsDead && opponent.SentryMode))
+            {
+                if (_demolitionOpponentAssignments.ContainsKey(opponent))
+                {
+                    opponent.SentryMode = false;
+                }
+            }
+        }
     }
 
     /// <summary>

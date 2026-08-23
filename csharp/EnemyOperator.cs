@@ -153,9 +153,9 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private float _stationaryMoveTimer;
     private Tween? _deathTween;
     /// <summary>How long without in-range contact before map NPCs start looting.</summary>
-    private const float NpcLootIdleSeconds = 6.5f;
+    private const float NpcLootIdleSeconds = 3.5f;
     /// <summary>Beyond this distance a living hostile is ignored for engagement (still exists on map).</summary>
-    private const float DefaultContactAcquireRange = 48.0f;
+    private const float DefaultContactAcquireRange = 65.0f;
     private const float SniperContactAcquireRange = 185.0f;
     private const float DownedFinishAcquireRange = 22.0f;
     private const float DownedFinishScorePenalty = 32.0f * 32.0f;

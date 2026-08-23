@@ -7,7 +7,7 @@ public partial class EnemyOperator
     private const float RivalPursuitSeconds = 18.0f;
     private const float GarrisonPursuitSeconds = 13.0f;
     private const float SharedPursuitSeconds = 10.0f;
-    private const float SquadContactShareRange = 38.0f;
+    private const float SquadContactShareRange = 52.0f;
 
     public bool IsPursuing => !IsDead && _hasLastKnownTarget && _pursuitTimer > 0.0f;
     public Vector3 LastKnownTargetPosition => _lastKnownTargetPosition;

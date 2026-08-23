@@ -88,7 +88,11 @@ public partial class TacticalPlayer
         var useAuthoredGsh18 = EquippedWeapon.Platform == WeaponPlatform.GSh18;
         var wantsAuthoredDesertEagle = EquippedWeapon.Platform == WeaponPlatform.DesertEagle;
         var useAuthoredDesertEagle = wantsAuthoredDesertEagle;
-        if (useAuthoredM4)
+        var isRifleNeedingAuthoredArms = EquippedWeapon.Platform is WeaponPlatform.M4A1
+            or WeaponPlatform.AK74 or WeaponPlatform.ScarL or WeaponPlatform.M24
+            or WeaponPlatform.AXMC or WeaponPlatform.AWM or WeaponPlatform.VSS
+            or WeaponPlatform.MP5A5;
+        if (useAuthoredM4 || isRifleNeedingAuthoredArms)
         {
             EnsureAuthoredRifleArms();
         }
@@ -164,11 +168,15 @@ public partial class TacticalPlayer
             EquippedWeapon.Platform,
             out var activePlatformWeapon)
             && IsInstanceValid(activePlatformWeapon.Root);
-        var useAuthoredRifleArms = useAuthoredM4
+        var useAuthoredRifleArms = isRifleNeedingAuthoredArms
             && IsInstanceValid(_authoredRifleArms?.Root);
         if (IsInstanceValid(_authoredRifleArms?.Root))
         {
-            _authoredRifleArms.Root.Visible = useAuthoredM4;
+            _authoredRifleArms.Root.Visible = isRifleNeedingAuthoredArms;
+            if (isRifleNeedingAuthoredArms)
+            {
+                AlignRifleArmsToWeapon();
+            }
         }
         if (IsInstanceValid(_proceduralFirstPersonArms))
         {
@@ -236,6 +244,9 @@ public partial class TacticalPlayer
         try
         {
             var arms = CombatModelLibrary.InstantiateFirstPersonArms();
+            // DJMaesen SMG-45 is authored facing +Z; the full SMG is flipped 180 for first-person.
+            // Rifle arms must match the same flip, otherwise the palms face backwards (正面顺序反).
+            arms.Root.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
             _weaponRoot.AddChild(arms.Root);
             _authoredRifleArms = arms;
             AlignRifleArmsToWeapon();
@@ -256,21 +267,63 @@ public partial class TacticalPlayer
         var right = toLocal * _authoredRifleArms.PalmPosition("R_palm_039");
         var left = toLocal * _authoredRifleArms.PalmPosition("L_palm_015");
         var current = left - right;
-        var target = RifleForegripAnchor - RifleGripAnchor;
-        var currentFlat = new Vector2(current.X, current.Z);
-        var targetFlat = new Vector2(target.X, target.Z);
-        if (currentFlat.Length() < 0.0001f || targetFlat.Length() < 0.0001f)
+        // Use weapon-specific fore-grip anchor so MP5A5/M24 etc. don't stretch to M4A1's -0.58
+        var target = GetRifleForegripAnchorForCurrentWeapon() - RifleGripAnchor;
+        if (current.LengthSquared() < 0.0001f || target.LengthSquared() < 0.0001f)
         {
             return;
         }
-        var scale = targetFlat.Length() / currentFlat.Length();
-        var yaw = currentFlat.AngleTo(targetFlat);
-        var basis = new Basis(Vector3.Up, yaw).Scaled(Vector3.One * scale);
+        var scale = target.Length() / current.Length();
+        var fromNorm = current.Normalized();
+        var toNorm = target.Normalized();
+        var axis = fromNorm.Cross(toNorm);
+        var angle = fromNorm.AngleTo(toNorm);
+        Basis basis;
+        if (axis.LengthSquared() < 0.0001f)
+        {
+            if (fromNorm.Dot(toNorm) > 0.0f)
+            {
+                basis = Basis.Identity.Scaled(Vector3.One * scale);
+                angle = 0.0f;
+            }
+            else
+            {
+                axis = Vector3.Up;
+                angle = Mathf.Pi;
+                var quat = new Quaternion(axis, angle);
+                basis = new Basis(quat).Scaled(Vector3.One * scale);
+            }
+        }
+        else
+        {
+            var quat = new Quaternion(axis.Normalized(), angle);
+            basis = new Basis(quat).Scaled(Vector3.One * scale);
+        }
         _authoredRifleArms.Root.Basis = basis;
         _authoredRifleArms.Root.Position = RifleGripAnchor - basis * right;
         var toLocalAfter = _weaponRoot.GlobalTransform.AffineInverse();
         var residual = (toLocalAfter * _authoredRifleArms.PalmPosition("R_palm_039") - RifleGripAnchor).Length();
-        GD.Print($"RIFLE_ARMS_ALIGN grip_residual={residual:F4} scale={scale:F3} yaw_deg={Mathf.RadToDeg(yaw):F1}");
+        var yaw = Mathf.Atan2(toNorm.X, -toNorm.Z) - Mathf.Atan2(fromNorm.X, -fromNorm.Z);
+        GD.Print($"RIFLE_ARMS_ALIGN grip_residual={residual:F4} scale={scale:F3} angle_deg={Mathf.RadToDeg(angle):F1} yaw_deg={Mathf.RadToDeg(yaw):F1}");
+    }
+
+    private Vector3 GetRifleForegripAnchorForCurrentWeapon()
+    {
+        // Keep M4A1's authored anchor, adjust others by barrel length so the support hand doesn't over-stretch
+        var platform = EquippedWeapon.Platform;
+        var baseAnchor = RifleForegripAnchor;
+        var extraForward = platform switch
+        {
+            WeaponPlatform.AK74 => -0.04f,
+            WeaponPlatform.ScarL => -0.05f,
+            WeaponPlatform.M24 => -0.12f,
+            WeaponPlatform.AXMC => -0.18f,
+            WeaponPlatform.AWM => -0.20f,
+            WeaponPlatform.VSS => -0.06f,
+            WeaponPlatform.MP5A5 => 0.08f,
+            _ => 0.0f
+        };
+        return baseAnchor + new Vector3(0, 0, extraForward);
     }
 
     private void EnsureAuthoredDesertEagleWeapon()
