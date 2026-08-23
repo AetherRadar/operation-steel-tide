@@ -115,6 +115,7 @@ public partial class FreightTerminalWorld : Node3D
     private Node3D _extractionMarker = null!;
     private Godot.Environment _environmentRef = null!;
     private DirectionalLight3D _sunLight = null!;
+    private DirectionalLight3D _fillLight = null!;
     private string _missionPhase = "DEPLOYMENT";
     private string _currentObjective = "DISABLE THE COMMUNICATIONS RELAY";
     private float _missionDetectionRange = 34.0f;

@@ -38,34 +38,34 @@ public static class TimeOfDayStyles
     public static readonly TimeOfDayStyle Dusk = new(
         new Vector3(-11.0f, -64.0f, 0.0f),
         new Color(1.0f, 0.55f, 0.28f),
-        0.88f,
-        0.6f,
-        new Color(0.52f, 0.38f, 0.34f),
-        0.56f,
-        0.00165f,
-        1.04f,
+        0.55f,
+        0.32f,
+        new Color(0.42f, 0.30f, 0.26f),
+        0.32f,
+        0.00175f,
+        0.92f,
         0.92f);
 
     public static readonly TimeOfDayStyle Night = new(
         new Vector3(-38.0f, 152.0f, 0.0f),
-        new Color(0.52f, 0.62f, 0.85f),
-        0.34f,
-        0.3f,
-        new Color(0.13f, 0.17f, 0.24f),
-        0.3f,
-        0.0019f,
-        0.94f,
+        new Color(0.42f, 0.52f, 0.78f),
+        0.08f,
+        0.07f,
+        new Color(0.07f, 0.09f, 0.16f),
+        0.10f,
+        0.00220f,
+        0.72f,
         0.74f);
 
     public static readonly TimeOfDayStyle Dawn = new(
         new Vector3(-8.0f, 62.0f, 0.0f),
         new Color(0.95f, 0.82f, 0.66f),
-        0.8f,
-        0.54f,
-        new Color(0.48f, 0.53f, 0.6f),
-        0.44f,
-        0.00145f,
-        1.06f,
+        0.45f,
+        0.24f,
+        new Color(0.38f, 0.42f, 0.48f),
+        0.26f,
+        0.00160f,
+        0.88f,
         0.88f);
 
     public static TimeOfDayStyle Style(DeploymentTimeOfDay timeOfDay) => timeOfDay switch

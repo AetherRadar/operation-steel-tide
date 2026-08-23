@@ -166,13 +166,14 @@ public partial class FreightTerminalWorld
             DirectionalShadowSplit3 = 0.48f
         };
         AddChild(_sunLight);
-        AddChild(new DirectionalLight3D
+        _fillLight = new DirectionalLight3D
         {
             RotationDegrees = new Vector3(-25, 145, 0),
             LightColor = new Color(0.3f, 0.48f, 0.72f),
             LightEnergy = 0.34f,
             ShadowEnabled = false
-        });
+        };
+        AddChild(_fillLight);
         AddDust();
     }
 
@@ -195,6 +196,25 @@ public partial class FreightTerminalWorld
             _sunLight.DirectionalShadowPancakeSize = grazing ? 18.0f : 20.0f;
             _sunLight.DirectionalShadowBlendSplits = true;
         }
+        if (IsInstanceValid(_fillLight))
+        {
+            var fillEnergy = timeOfDay switch
+            {
+                DeploymentTimeOfDay.Night => 0.05f,
+                DeploymentTimeOfDay.Dusk => 0.12f,
+                DeploymentTimeOfDay.Dawn => 0.10f,
+                _ => 0.34f
+            };
+            var fillColor = timeOfDay switch
+            {
+                DeploymentTimeOfDay.Night => new Color(0.14f, 0.18f, 0.32f),
+                DeploymentTimeOfDay.Dusk => new Color(0.26f, 0.30f, 0.40f),
+                DeploymentTimeOfDay.Dawn => new Color(0.22f, 0.28f, 0.34f),
+                _ => new Color(0.3f, 0.48f, 0.72f)
+            };
+            _fillLight.LightColor = fillColor;
+            _fillLight.LightEnergy = fillEnergy;
+        }
         if (IsInstanceValid(_environmentRef))
         {
             _environmentRef.AmbientLightEnergy = style.AmbientEnergy;
@@ -206,11 +226,37 @@ public partial class FreightTerminalWorld
             {
                 _environmentRef.Sky.SkyMaterial = BuildDynamicSkyMaterial(timeOfDay);
             }
-            // Night needs true darkness: dim sky contribution beyond the already-low AmbientEnergy.
+            // True night must be much darker than even the dimmed style values — the previous
+            // Night palette (Sun 0.34/Ambient 0.3) was only 30% of day and still looked like day.
+            // Clamp post-processing and volumetric fog per time-of-day so the darkest level is unmistakably night.
             if (timeOfDay == DeploymentTimeOfDay.Night)
             {
-                _environmentRef.AmbientLightEnergy = Mathf.Min(_environmentRef.AmbientLightEnergy, 0.22f);
-                _environmentRef.FogDensity = Mathf.Max(_environmentRef.FogDensity, 0.0019f);
+                SetIfSupported(_environmentRef, "adjustment_enabled", true);
+                SetIfSupported(_environmentRef, "adjustment_brightness", 0.88f);
+                SetIfSupported(_environmentRef, "adjustment_contrast", 1.08f);
+                SetIfSupported(_environmentRef, "adjustment_saturation", 0.88f);
+                SetIfSupported(_environmentRef, "volumetric_fog_density", 0.0055f);
+            }
+            else if (timeOfDay == DeploymentTimeOfDay.Dusk)
+            {
+                SetIfSupported(_environmentRef, "adjustment_brightness", 0.96f);
+                SetIfSupported(_environmentRef, "adjustment_contrast", 1.06f);
+                SetIfSupported(_environmentRef, "adjustment_saturation", 1.00f);
+                SetIfSupported(_environmentRef, "volumetric_fog_density", 0.0038f);
+            }
+            else if (timeOfDay == DeploymentTimeOfDay.Dawn)
+            {
+                SetIfSupported(_environmentRef, "adjustment_brightness", 0.96f);
+                SetIfSupported(_environmentRef, "adjustment_contrast", 1.04f);
+                SetIfSupported(_environmentRef, "adjustment_saturation", 0.98f);
+                SetIfSupported(_environmentRef, "volumetric_fog_density", 0.0035f);
+            }
+            else // Day
+            {
+                SetIfSupported(_environmentRef, "adjustment_brightness", 1.03f);
+                SetIfSupported(_environmentRef, "adjustment_contrast", 1.05f);
+                SetIfSupported(_environmentRef, "adjustment_saturation", 1.12f);
+                SetIfSupported(_environmentRef, "volumetric_fog_density", 0.0032f);
             }
         }
     }
