@@ -692,7 +692,7 @@ public partial class FreightTerminalWorld : Node3D
     {
         var effect = new Node3D { Position = position };
         AddChild(effect);
-        var light = new OmniLight3D { LightColor = new Color(1.0f, 0.29f, 0.07f), LightEnergy = 18.0f, OmniRange = 15.0f, ShadowEnabled = true };
+        var light = new OmniLight3D { LightColor = new Color(1.0f, 0.29f, 0.07f), LightEnergy = 18.0f, OmniRange = 15.0f, ShadowEnabled = false };
         effect.AddChild(light);
         var coreMaterial = new StandardMaterial3D
         {
@@ -2637,7 +2637,20 @@ public partial class FreightTerminalWorld : Node3D
         if (IsInstanceValid(_sunLight))
         {
             _sunLight.ShadowEnabled = _qualitySetting >= 1;
-            _sunLight.DirectionalShadowMaxDistance = new[] { 80.0f, 150.0f, 260.0f }[_qualitySetting];
+            // Reduced 260→180: large max distances drop texel density and cause swimming/shimmer,
+            // especially far from origin or with animated FOV (sprint/ADS). 80/140/180 still
+            // covers the 340×320 map while keeping PSSM splits stable.
+            _sunLight.DirectionalShadowMaxDistance = new[] { 80.0f, 140.0f, 180.0f }[_qualitySetting];
+            _sunLight.DirectionalShadowBlendSplits = _qualitySetting >= 1;
+            _sunLight.DirectionalShadowSplit1 = 0.08f;
+            _sunLight.DirectionalShadowSplit2 = 0.22f;
+            _sunLight.DirectionalShadowSplit3 = 0.48f;
+            _sunLight.ShadowBias = _qualitySetting >= 2 ? 0.05f : 0.055f;
+            _sunLight.ShadowNormalBias = _qualitySetting >= 2 ? 1.8f : 2.0f;
+            _sunLight.ShadowTransmittanceBias = 0.05f;
+            _sunLight.ShadowBlur = 0.6f;
+            _sunLight.DirectionalShadowFadeStart = 0.85f;
+            _sunLight.DirectionalShadowPancakeSize = 20.0f;
         }
         ApplyMapDetailQuality();
         SaveSettings();

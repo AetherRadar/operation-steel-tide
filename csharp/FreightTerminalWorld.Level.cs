@@ -152,8 +152,18 @@ public partial class FreightTerminalWorld
             LightColor = new Color(1.0f, 0.9f, 0.72f),
             LightEnergy = 1.25f,
             ShadowEnabled = true,
-            DirectionalShadowMaxDistance = 360.0f,
-            DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel4Splits
+            ShadowBias = 0.05f,
+            ShadowNormalBias = 1.8f,
+            ShadowTransmittanceBias = 0.05f,
+            ShadowBlur = 0.6f,
+            DirectionalShadowMaxDistance = 180.0f,
+            DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel4Splits,
+            DirectionalShadowBlendSplits = true,
+            DirectionalShadowFadeStart = 0.85f,
+            DirectionalShadowPancakeSize = 20.0f,
+            DirectionalShadowSplit1 = 0.1f,
+            DirectionalShadowSplit2 = 0.22f,
+            DirectionalShadowSplit3 = 0.48f
         };
         AddChild(_sunLight);
         AddChild(new DirectionalLight3D
@@ -175,6 +185,15 @@ public partial class FreightTerminalWorld
             _sunLight.RotationDegrees = style.SunRotationDegrees;
             _sunLight.LightColor = style.SunColor;
             _sunLight.LightEnergy = style.SunEnergy;
+            // Dusk/Dawn use a grazing sun (−11°/−8°) that stretches shadows and amplifies acne.
+            // Bump bias/normal-bias there to suppress the per-frame shadow-acne shimmer that reads as flicker.
+            var grazing = style.SunRotationDegrees.X > -20.0f;
+            _sunLight.ShadowBias = grazing ? 0.08f : 0.05f;
+            _sunLight.ShadowNormalBias = grazing ? 2.2f : 1.8f;
+            _sunLight.ShadowTransmittanceBias = 0.05f;
+            _sunLight.ShadowBlur = grazing ? 0.8f : 0.6f;
+            _sunLight.DirectionalShadowPancakeSize = grazing ? 18.0f : 20.0f;
+            _sunLight.DirectionalShadowBlendSplits = true;
         }
         if (IsInstanceValid(_environmentRef))
         {
@@ -1165,6 +1184,13 @@ void sky() {
             CollisionMask = 0
         };
         var visual = new MeshInstance3D { Mesh = SharedBoxMesh(size), MaterialOverride = material };
+        // Large ground plane must not cast shadows onto itself — self-shadowing on a flat
+        // 340x320 ground produces classic shadow-acne shimmer that flickers per pixel
+        // as the PSSM texel snaps with camera movement.
+        if (name == "Ground" || (size.Y <= 1.1f && size.X * size.Z >= 8000.0f))
+        {
+            visual.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        }
         body.AddChild(visual);
         body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } });
         _levelRoot.AddChild(body);

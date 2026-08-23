@@ -62,6 +62,16 @@ renderer/rendering_method.mobile="mobile"
 textures/default_filters/use_nearest_mipmap_filter=false
 textures/vram_compression/import_etc2_astc=true
 environment/defaults/default_clear_color=Color(0.012, 0.017, 0.022, 1)
+lights_and_shadows/directional_shadow/size=4096
+lights_and_shadows/directional_shadow/size.mobile=2048
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=2
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality.mobile=1
+lights_and_shadows/positional_shadow/atlas_size=4096
+lights_and_shadows/positional_shadow/atlas_size.mobile=2048
+lights_and_shadows/positional_shadow/soft_shadow_filter_quality=2
+lights_and_shadows/positional_shadow/soft_shadow_filter_quality.mobile=1
+anti_aliasing/quality/msaa_3d=1
+anti_aliasing/quality/msaa_3d.mobile=0
 
 [audio]
 driver/enable_input=false
