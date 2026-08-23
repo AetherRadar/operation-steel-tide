@@ -1897,6 +1897,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     private float AimFieldOfView()
     {
+        if (WeaponCatalog.IsSidearm(EquippedWeapon.Platform))
+        {
+            return 62.0f;
+        }
         if (!EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Optic, out var opticId))
         {
             return 55.0f;
