@@ -29,6 +29,7 @@ internal static class GameInputActions
     public static readonly StringName ThrowGrenade = "throw_grenade";
     public static readonly StringName ToggleFireMode = "toggle_fire_mode";
     public static readonly StringName ToggleFlashlight = "toggle_flashlight";
+    public static readonly StringName ToggleNvg = "toggle_nvg";
     public static readonly StringName UseClassSkill = "use_class_skill";
     public static readonly StringName UsePlate = "use_plate";
     public static readonly StringName WeaponCycle = "weapon_cycle";

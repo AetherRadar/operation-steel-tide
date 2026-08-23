@@ -258,6 +258,44 @@ public partial class FreightTerminalWorld
                 SetIfSupported(_environmentRef, "adjustment_saturation", 1.12f);
                 SetIfSupported(_environmentRef, "volumetric_fog_density", 0.0032f);
             }
+            if (_nvgActive)
+            {
+                ApplyNightVisionOverride();
+            }
+        }
+    }
+
+    public void SetNightVisionActive(bool active)
+    {
+        _nvgActive = active;
+        if (!IsInstanceValid(_environmentRef))
+        {
+            return;
+        }
+        if (active)
+        {
+            ApplyNightVisionOverride();
+        }
+        else
+        {
+            ApplyTimeOfDay(_deploymentTimeOfDay);
+        }
+    }
+
+    private void ApplyNightVisionOverride()
+    {
+        // NVG intensifier: lift exposure and brightness, crush saturation toward green, keep contrast
+        SetIfSupported(_environmentRef, "adjustment_enabled", true);
+        SetIfSupported(_environmentRef, "adjustment_brightness", 1.62f);
+        SetIfSupported(_environmentRef, "adjustment_contrast", 1.18f);
+        SetIfSupported(_environmentRef, "adjustment_saturation", 0.38f);
+        // Slightly lift fog so dark corners remain readable under NVG
+        SetIfSupported(_environmentRef, "volumetric_fog_density", 0.0022f);
+        // Ambient lift for NVG — not modifying sun itself, just the eye adaptation
+        if (_deploymentTimeOfDay == DeploymentTimeOfDay.Night)
+        {
+            _environmentRef.AmbientLightEnergy = Mathf.Max(_environmentRef.AmbientLightEnergy, 0.45f);
+            _environmentRef.FogLightEnergy = Mathf.Max(_environmentRef.FogLightEnergy, 0.28f);
         }
     }
 

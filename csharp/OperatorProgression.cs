@@ -120,8 +120,12 @@ public static class OperatorReputation
         _ => 1
     };
 
-    public static int RequiredLevelForArmor(string armorId)
-        => armorId == "heavy" ? 3 : 1;
+    public static int RequiredLevelForArmor(string armorId) => armorId switch
+    {
+        "heavy" => 3,
+        "nvg" => 2,
+        _ => 1
+    };
 
     public static int RequiredLevelForAmmoGrade(LootGrade grade) => grade switch
     {
@@ -189,7 +193,15 @@ public static class DeploymentCatalog
             "pack_heavy",
             3800,
             "loadout_heavy_armor",
-            "HEAVY ASSAULT KIT")
+            "HEAVY ASSAULT KIT"),
+        new DeploymentArmorOffer(
+            "nvg",
+            "helmet_nvg",
+            "armor_carrier",
+            "pack_assault",
+            2600,
+            "loadout_nvg_armor",
+            "NIGHT OPS KIT")
     };
 
     public static readonly IReadOnlyList<DeploymentPresetOffer> Presets = new[]

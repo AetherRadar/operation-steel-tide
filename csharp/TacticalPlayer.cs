@@ -71,6 +71,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public bool IsReloading => _isReloading;
     public float ReloadProgress => _isReloading ? 1.0f - _reloadTime / _activeReloadDuration : 0.0f;
     public bool FlashlightOn => _flashlightOn;
+    public bool HasNightVisionHelmet => EquippedHelmet.DefinitionId == "helmet_nvg";
+    public bool NightVisionOn => _nvgOn && HasNightVisionHelmet;
     public string FireMode => _automaticFire ? "AUTO" : "SEMI";
     public WeaponBuild EquippedWeapon { get; private set; } = WeaponCatalog.StarterWeapon();
     public LootGrade EquippedWeaponGrade { get; private set; } = LootGrade.Rare;
@@ -168,6 +170,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private bool _isPlating;
     private bool _automaticFire = true;
     private bool _flashlightOn;
+    private bool _nvgOn;
     private bool _knifeEquipped;
     private bool _knifeHitApplied;
     private bool _fireInputArmed;
@@ -1279,6 +1282,26 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 _flashlightOn ? "light_on" : "light_off",
                 _flashlightOn ? "WEAPON LIGHT  //  ON" : "WEAPON LIGHT  //  OFF",
                 _flashlightOn ? new Color(0.72f, 0.9f, 1.0f) : new Color(0.55f, 0.65f, 0.63f));
+        }
+        if (Input.IsActionJustPressed(GameInputActions.ToggleNvg) && !MedicalActionBlocksWeapon)
+        {
+            if (!HasNightVisionHelmet)
+            {
+                Hud?.ShowLocalizedMessage(
+                    "nvg_no_helmet",
+                    "NVG HELMET REQUIRED  //  EQUIP NIGHT OPS",
+                    new Color(1.0f, 0.55f, 0.28f));
+            }
+            else
+            {
+                _nvgOn = !_nvgOn;
+                Main?.SetNightVisionActive(_nvgOn);
+                Hud?.SetNightVisionActive(_nvgOn);
+                Hud?.ShowLocalizedMessage(
+                    _nvgOn ? "nvg_on" : "nvg_off",
+                    _nvgOn ? "NVG  //  ON  //  N" : "NVG  //  OFF  //  N",
+                    _nvgOn ? new Color(0.42f, 0.95f, 0.42f) : new Color(0.55f, 0.65f, 0.55f));
+            }
         }
         if (Input.IsActionJustPressed(GameInputActions.UsePlate) && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon)
         {
@@ -2608,6 +2631,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 case EquipmentSlot.Helmet:
                     EquippedHelmet = incoming.Clone();
                     EquippedHelmetGrade = item.Grade;
+                    if (!HasNightVisionHelmet && _nvgOn)
+                    {
+                        _nvgOn = false;
+                        Main?.SetNightVisionActive(false);
+                        Hud?.SetNightVisionActive(false);
+                        Hud?.ShowLocalizedMessage("nvg_off", "NVG  //  OFF  //  N", new Color(0.55f, 0.65f, 0.55f));
+                    }
                     break;
                 case EquipmentSlot.BodyArmor:
                     EquippedBodyArmor = incoming.Clone();

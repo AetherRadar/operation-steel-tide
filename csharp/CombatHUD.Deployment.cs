@@ -302,10 +302,11 @@ public partial class CombatHUD
         _deploymentArmorCaption = DeploymentCaption("PROTECTION", new Vector2(16, 258), new Vector2(220, 18));
         market.AddChild(_deploymentArmorCaption);
         var armorGroup = new ButtonGroup();
+        var armorSpacing = DeploymentCatalog.Armor.Count == 4 ? 128 : 168;
         for (var index = 0; index < DeploymentCatalog.Armor.Count; index++)
         {
             var offer = DeploymentCatalog.Armor[index];
-            BuildArmorOfferCard(market, offer, new Vector2(16 + index * 168, 278), armorGroup);
+            BuildArmorOfferCard(market, offer, new Vector2(16 + index * armorSpacing, 278), armorGroup);
         }
 
         _deploymentAmmoCaption = DeploymentCaption("AMMUNITION GRADE  //  PRICE", new Vector2(16, 338), new Vector2(260, 18));
@@ -408,9 +409,11 @@ public partial class CombatHUD
         {
             "heavy" => new Color(1.0f, 0.62f, 0.22f),
             "patrol" => new Color(0.55f, 0.77f, 0.7f),
+            "nvg" => new Color(0.42f, 0.95f, 0.42f),
             _ => new Color(0.36f, 0.76f, 1.0f)
         };
-        var button = DeploymentSegment(position, new Vector2(163, 54), accent);
+        var width = DeploymentCatalog.Armor.Count == 4 ? 122 : 163;
+        var button = DeploymentSegment(position, new Vector2(width, 54), accent);
         button.ToggleMode = true;
         button.ButtonGroup = group;
         button.Pressed += () =>
@@ -422,23 +425,26 @@ public partial class CombatHUD
         parent.AddChild(button);
         _deploymentArmorButtons[offer.Id] = button;
 
+        var isCompactArmor = DeploymentCatalog.Armor.Count == 4;
         var preview = new InventoryModelPreview
         {
             Position = new Vector2(5, 4),
-            Size = new Vector2(48, 46)
+            Size = isCompactArmor ? new Vector2(36, 34) : new Vector2(48, 46)
         };
         preview.Configure(InventoryPreviewKind.BodyArmor, equipment: EquipmentCatalog.Create(offer.BodyArmorId));
         button.AddChild(preview);
+        var namePosX = isCompactArmor ? 44 : 57;
+        var innerWidth = width - namePosX - 5;
         var name = Label(string.Empty, 9, accent);
-        name.Position = new Vector2(57, 5);
-        name.Size = new Vector2(100, 18);
+        name.Position = new Vector2(namePosX, 5);
+        name.Size = new Vector2(innerWidth, 18);
         name.ClipText = true;
         name.MouseFilter = Control.MouseFilterEnum.Ignore;
         button.AddChild(name);
         _deploymentArmorNames[offer.Id] = name;
         var detail = Label(string.Empty, 8, new Color(0.61f, 0.7f, 0.67f));
-        detail.Position = new Vector2(57, 24);
-        detail.Size = new Vector2(100, 26);
+        detail.Position = new Vector2(namePosX, 24);
+        detail.Size = new Vector2(innerWidth, 26);
         detail.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         detail.MouseFilter = Control.MouseFilterEnum.Ignore;
         button.AddChild(detail);

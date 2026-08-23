@@ -46,6 +46,7 @@ weapon_utility={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keyco
 interact={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":70)]}
 toggle_fire_mode={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":86)]}
 toggle_flashlight={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":84)]}
+toggle_nvg={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":78)]}
 use_plate={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":88)]}
 medical_wheel={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":66)]}
 use_class_skill={"deadzone": 0.2, "events": [Object(InputEventKey,"physical_keycode":72)]}

@@ -509,6 +509,12 @@ public static class EquipmentCatalog
             Id = "helmet_heavy", Name = "Heavy composite helmet", ChineseName = "重型复合头盔",
             Slot = EquipmentSlot.Helmet, Protection = 0.58f, MaxDurability = 85.0f
         },
+        ["helmet_nvg"] = new EquipmentDefinition
+        {
+            Id = "helmet_nvg", Name = "NVG tactical helmet", ChineseName = "夜视战术头盔",
+            LocalizationKey = "equipment_nvg_helmet",
+            Slot = EquipmentSlot.Helmet, Protection = 0.45f, MaxDurability = 72.0f
+        },
         ["armor_carrier"] = new EquipmentDefinition
         {
             Id = "armor_carrier", Name = "Plate carrier", ChineseName = "插板式防弹衣",

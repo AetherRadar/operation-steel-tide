@@ -177,6 +177,10 @@ public static class GameLocalization
         Chinese["equipment_patrol_helmet"] = "\u5de1\u903b\u9632\u62a4\u76d4";
         Chinese["equipment_patrol_armor"] = "\u8f6f\u8d28\u5de1\u903b\u62a4\u7532";
         Chinese["equipment_patrol_pack"] = "\u5355\u80a9\u5de1\u903b\u5305";
+        Chinese["equipment_nvg_helmet"] = "\u591c\u89c6\u6218\u672f\u5934\u76d4";
+        Chinese["nvg_on"] = "\u591c\u89c6\u4eea  //  \u5f00\u542f";
+        Chinese["nvg_off"] = "\u591c\u89c6\u4eea  //  \u5173\u95ed";
+        Chinese["nvg_no_helmet"] = "\u9700\u8981\u591c\u89c6\u5934\u76d4  //  \u88c5\u5907\u591c\u6218\u5957\u88c5";
         Chinese["ammo_rifle"] = "\u6b65\u67aa\u5f39\u836f";
         Chinese["ammo_sniper"] = "7.62 \u6beb\u7c73\u7cbe\u786e\u5f39\u836f";
         Chinese["ammo_smg"] = "9 \u6beb\u7c73\u51b2\u950b\u67aa\u5f39\u836f";
@@ -395,6 +399,7 @@ public static class GameLocalization
         Chinese["loadout_standard_armor"] = "\u6807\u51c6\u91ce\u6218\u88c5\u5907";
         Chinese["loadout_heavy_armor"] = "\u91cd\u578b\u7a81\u51fb\u88c5\u5907";
         Chinese["loadout_patrol_armor"] = "\u5de1\u903b\u7ea7\u8f7b\u578b\u62a4\u5177";
+        Chinese["loadout_nvg_armor"] = "\u591c\u6218\u5957\u88c5";
         Chinese["preset_scavenger"] = "\u8f7b\u88c5\u641c\u7d22";
         Chinese["preset_recruit"] = "\u65b0\u624b\u4fdd\u969c";
         Chinese["preset_assault"] = "\u7a81\u51fb\u5957\u88c5";

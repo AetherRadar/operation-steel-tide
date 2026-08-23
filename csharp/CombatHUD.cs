@@ -134,12 +134,84 @@ public partial class CombatHUD : CanvasLayer
     private Tween? _radioTween;
     private string _language = "en";
     public string CurrentLanguage => _language;
+    private ColorRect _nvgOverlay = null!;
+    private ColorRect _nvgVignette = null!;
+    private Label _nvgLabel = null!;
+    private bool _nvgActive;
 
     public override void _Ready()
     {
         ProcessMode = Node.ProcessModeEnum.Always;
         Layer = 20;
         BuildHud();
+        BuildNightVisionOverlay();
+    }
+
+    private void BuildNightVisionOverlay()
+    {
+        _nvgOverlay = new ColorRect
+        {
+            Color = new Color(0.06f, 0.28f, 0.06f, 0.16f),
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Visible = false
+        };
+        _nvgOverlay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        AddChild(_nvgOverlay);
+        // Vignette via shader
+        _nvgVignette = new ColorRect
+        {
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Visible = false
+        };
+        _nvgVignette.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        var vignetteShader = new Shader
+        {
+            Code = """
+                shader_type canvas_item;
+                void fragment() {
+                    float dist = distance(UV, vec2(0.5));
+                    float vignette = smoothstep(0.35, 0.95, dist);
+                    float scanline = sin(UV.y * 1080.0 * 0.85) * 0.06 + 0.94;
+                    vec3 tint = vec3(0.08, 0.42, 0.08) * 0.18 * vignette * scanline;
+                    // subtle chromatic noise
+                    float noise = fract(sin(dot(UV, vec2(12.9898, 78.233))) * 43758.5453) * 0.03;
+                    COLOR = vec4(tint + vec3(noise * 0.02), vignette * 0.55 * scanline);
+                }
+                """
+        };
+        _nvgVignette.Material = new ShaderMaterial { Shader = vignetteShader };
+        AddChild(_nvgVignette);
+        _nvgLabel = new Label
+        {
+            Text = "NVG  //  ON  //  N",
+            Visible = false,
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
+        _nvgLabel.AddThemeFontSizeOverride("font_size", 11);
+        _nvgLabel.AddThemeColorOverride("font_color", new Color(0.42f, 0.95f, 0.42f));
+        _nvgLabel.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.85f));
+        _nvgLabel.AddThemeConstantOverride("shadow_offset_x", 2);
+        _nvgLabel.AddThemeConstantOverride("shadow_offset_y", 2);
+        _nvgLabel.Position = new Vector2(24, 96);
+        _nvgLabel.Size = new Vector2(200, 18);
+        AddChild(_nvgLabel);
+    }
+
+    public void SetNightVisionActive(bool active)
+    {
+        _nvgActive = active;
+        if (IsInstanceValid(_nvgOverlay))
+        {
+            _nvgOverlay.Visible = active;
+        }
+        if (IsInstanceValid(_nvgVignette))
+        {
+            _nvgVignette.Visible = active;
+        }
+        if (IsInstanceValid(_nvgLabel))
+        {
+            _nvgLabel.Visible = active;
+        }
     }
 
     public override void _UnhandledInput(InputEvent @event)

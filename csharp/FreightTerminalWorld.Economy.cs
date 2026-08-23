@@ -252,7 +252,7 @@ public partial class FreightTerminalWorld
         var uiReady = _hud.DeploymentUiReady;
         var presetCount = _hud.DeploymentPresetCount == 5;
         var weaponCount = DeploymentCatalog.Weapons.Count >= 7;
-        var armorCount = DeploymentCatalog.Armor.Count == 3;
+        var armorCount = DeploymentCatalog.Armor.Count == 4;
         var ammoPackCount = _hud.DeploymentAmmoPackCount == 4;
         var presetSelected = _hud.ActiveDeploymentPresetId == "overwatch";
         var loadoutSelected = selection.WeaponId == "m24"

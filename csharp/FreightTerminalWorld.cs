@@ -116,6 +116,7 @@ public partial class FreightTerminalWorld : Node3D
     private Godot.Environment _environmentRef = null!;
     private DirectionalLight3D _sunLight = null!;
     private DirectionalLight3D _fillLight = null!;
+    private bool _nvgActive;
     private string _missionPhase = "DEPLOYMENT";
     private string _currentObjective = "DISABLE THE COMMUNICATIONS RELAY";
     private float _missionDetectionRange = 34.0f;
@@ -937,7 +938,7 @@ public partial class FreightTerminalWorld : Node3D
                 Chinese = "\u6d77\u5824\u5e94\u6025\u88c5\u5907\u67dc",
                 Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 2),
                 Parts = new[] { "optic_holo", "mag_extended" },
-                Equipment = new[] { "armor_heavy", "pack_assault" },
+                Equipment = new[] { "armor_heavy", "pack_assault", "helmet_nvg" },
                 KnifeSkin = string.Empty,
                 SecureRoom = false
             }
@@ -1080,6 +1081,25 @@ public partial class FreightTerminalWorld : Node3D
             _lootWorldPoints.Add(placement.Position);
             _buildingLootPickupCount++;
         }
+        // Guaranteed NVG helmet near the vault house for night ops — always findable without RNG
+        var nvgPickup = new GradedLootPickup
+        {
+            Name = $"BuildingLoot_{++lootIndex:000}",
+            Position = new Vector3(-38.0f, 0.2f, 45.0f)
+        };
+        nvgPickup.Configure(
+            new LootItem
+            {
+                Kind = LootItemKind.Equipment,
+                Equipment = EquipmentCatalog.Create("helmet_nvg"),
+                Grade = LootGrade.Epic
+            },
+            "Vault house NVG cache",
+            "\u91d1\u5e93\u591c\u89c6\u88c5\u5907");
+        AddChild(nvgPickup);
+        _lootSources.Add(nvgPickup);
+        _lootWorldPoints.Add(nvgPickup.Position);
+        _buildingLootPickupCount++;
     }
 
     private LootItem CreateGradedLootItem(LootGrade grade, bool allowHighTierAmmo = false)
@@ -1103,6 +1123,25 @@ public partial class FreightTerminalWorld : Node3D
         }
         if (roll < 0.42f)
         {
+            // High-grade helmets have a chance to be NVG for night ops
+            if (grade >= LootGrade.Epic && _rng.Randf() < 0.32f)
+            {
+                return new LootItem
+                {
+                    Kind = LootItemKind.Equipment,
+                    Equipment = EquipmentCatalog.Create("helmet_nvg"),
+                    Grade = grade
+                };
+            }
+            if (grade >= LootGrade.Rare && _rng.Randf() < 0.18f)
+            {
+                return new LootItem
+                {
+                    Kind = LootItemKind.Equipment,
+                    Equipment = EquipmentCatalog.Create("helmet_nvg"),
+                    Grade = grade
+                };
+            }
             return new LootItem
             {
                 Kind = LootItemKind.Equipment,
