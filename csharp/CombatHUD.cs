@@ -42,6 +42,7 @@ public partial class CombatHUD : CanvasLayer
         int grenadeCount,
         int smokeGrenadeCount);
     [Signal] public delegate void OperationsHomeRequestedEventHandler();
+    [Signal] public delegate void DeploymentTimeOfDayChangedEventHandler(int timeOfDay);
 
     private Control _gameplayHudRoot = null!;
 

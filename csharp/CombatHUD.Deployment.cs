@@ -71,6 +71,7 @@ public partial class CombatHUD
     {
         _selectedTimeOfDay = timeOfDay;
         RefreshDeploymentStore();
+        EmitSignal(SignalName.DeploymentTimeOfDayChanged, (int)_selectedTimeOfDay);
     }
     public bool IsDeploymentThreatLocked(DeploymentThreatLevel level)
         => DeploymentRankLevel < ThreatLevels.RequiredReputationLevel(level);
@@ -176,6 +177,7 @@ public partial class CombatHUD
             _selectedTimeOfDay = (DeploymentTimeOfDay)(((int)_selectedTimeOfDay + 1) % 4);
             ClearDeploymentError();
             RefreshDeploymentStore();
+            EmitSignal(SignalName.DeploymentTimeOfDayChanged, (int)_selectedTimeOfDay);
         };
         panel.AddChild(_deploymentTimeButton);
     }

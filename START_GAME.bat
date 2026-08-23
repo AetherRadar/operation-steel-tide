@@ -50,7 +50,8 @@ if exist "%STEEL_TIDE_SERVER%" (
   echo Go mission service not found; starting with the built-in offline mission fallback.
 )
 echo Starting Operation Steel Tide...
-start "" /wait "%GODOT%" --path "%PROJECT%" --log-file "%PROJECT%\runtime.log"
+echo   Tip: In the Operations Office lobby use TIME to cycle Day/Dusk/Night/Dawn - the sky updates live. For direct launch use: START_GAME.bat -- --time=Night  (also --time=Day/Dusk/Dawn, --night/--dusk/--dawn, --tod=Night)
+start "" /wait "%GODOT%" --path "%PROJECT%" --log-file "%PROJECT%\runtime.log" -- %*
 set "EXIT_CODE=%ERRORLEVEL%"
 if defined BACKEND_PID taskkill /PID %BACKEND_PID% /T /F >nul 2>&1
 if exist "%STEEL_TIDE_BACKEND_PID_FILE%" del /q "%STEEL_TIDE_BACKEND_PID_FILE%"

@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace OperationSteelTide;
@@ -67,6 +68,61 @@ public static class TimeOfDayStyles
         0.00160f,
         0.88f,
         0.88f);
+
+    public static bool TryParseTimeOfDay(string value, out DeploymentTimeOfDay result)
+    {
+        // Accept english enum names (day/night/dusk/dawn) and numeric 0-3
+        if (Enum.TryParse<DeploymentTimeOfDay>(value, true, out result))
+        {
+            return true;
+        }
+        if (int.TryParse(value, out var numeric) && Enum.IsDefined(typeof(DeploymentTimeOfDay), numeric))
+        {
+            result = (DeploymentTimeOfDay)numeric;
+            return true;
+        }
+        result = DeploymentTimeOfDay.Day;
+        return false;
+    }
+
+    public static DeploymentTimeOfDay ResolveStartupTimeOfDay(string[] args)
+    {
+        foreach (var argument in args)
+        {
+            if (argument.StartsWith("--time=", StringComparison.OrdinalIgnoreCase)
+                && TryParseTimeOfDay(argument[7..], out var parsed))
+            {
+                return parsed;
+            }
+            if (argument.StartsWith("--tod=", StringComparison.OrdinalIgnoreCase)
+                && TryParseTimeOfDay(argument[6..], out var parsed2))
+            {
+                return parsed2;
+            }
+            if (argument.StartsWith("--timeofday=", StringComparison.OrdinalIgnoreCase)
+                && TryParseTimeOfDay(argument[12..], out var parsed3))
+            {
+                return parsed3;
+            }
+            if (argument.Equals("--night", StringComparison.OrdinalIgnoreCase))
+            {
+                return DeploymentTimeOfDay.Night;
+            }
+            if (argument.Equals("--dusk", StringComparison.OrdinalIgnoreCase))
+            {
+                return DeploymentTimeOfDay.Dusk;
+            }
+            if (argument.Equals("--dawn", StringComparison.OrdinalIgnoreCase))
+            {
+                return DeploymentTimeOfDay.Dawn;
+            }
+            if (argument.Equals("--day", StringComparison.OrdinalIgnoreCase))
+            {
+                return DeploymentTimeOfDay.Day;
+            }
+        }
+        return DeploymentTimeOfDay.Day;
+    }
 
     public static TimeOfDayStyle Style(DeploymentTimeOfDay timeOfDay) => timeOfDay switch
     {

@@ -170,6 +170,15 @@ public partial class FreightTerminalWorld : Node3D
         BuildEnvironment();
         BuildLevel();
         BuildHudAndPlayer();
+        // Startup time-of-day from command line (e.g. --time=Night) must be visible immediately in the lobby,
+        // not only after OnMissionLoaded. Otherwise START_GAME.bat always looks like Day until deployment.
+        var startupTimeOfDay = TimeOfDayStyles.ResolveStartupTimeOfDay(args);
+        if (startupTimeOfDay != DeploymentTimeOfDay.Day)
+        {
+            _deploymentTimeOfDay = startupTimeOfDay;
+            _hud.SetDeploymentTimeForDiagnostics(startupTimeOfDay);
+            ApplyTimeOfDay(startupTimeOfDay);
+        }
         BuildOperationsOffice();
         BuildSquadSystem();
         SpawnLootCases();
@@ -182,6 +191,11 @@ public partial class FreightTerminalWorld : Node3D
         _hud.SetEnemyCount(_enemiesRemaining);
         _hud.SetMissionPhase(_missionPhase, _missionDirector.SpawnProtectionSeconds, _missionOnline);
         ApplyQuality(_qualitySetting);
+        // Re-apply time after quality (quality rebuilds some sky state) so Night stays dark even on low quality.
+        if (startupTimeOfDay != DeploymentTimeOfDay.Day)
+        {
+            ApplyTimeOfDay(startupTimeOfDay);
+        }
 
         InitializeOperationsOfficeState(args);
         RuntimeDiagnosticRunner.RunFirst(this, args);
@@ -759,6 +773,7 @@ public partial class FreightTerminalWorld : Node3D
         _hud.QualityChanged += ApplyQuality;
         _hud.FullscreenChanged += SetFullscreen;
         _hud.LanguageChanged += SetLanguage;
+        _hud.DeploymentTimeOfDayChanged += index => ApplyTimeOfDay((DeploymentTimeOfDay)index);
         _hud.LootTakeRequested += TakeLootItem;
         _hud.LootEquipRequested += EquipLootItem;
         _hud.LootReturnRequested += ReturnBackpackItem;
