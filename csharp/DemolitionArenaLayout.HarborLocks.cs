@@ -84,7 +84,7 @@ public sealed partial class DemolitionArenaLayout
             HarborBuilding("MidCoverTankNorthWest", "detail-tank.glb", new(-14.0f, 0.02f, -5.0f), 0.0f, 6.2f, new(0.85f, 0.42f, 0.52f)),
             HarborBuilding("MidCoverTankNorthEast", "detail-tank.glb", new(13.0f, 0.02f, -6.0f), Mathf.Pi * 0.5f, 6.2f, new(0.85f, 0.42f, 0.52f)),
             HarborBuilding("MidCoverTankSouthWest", "detail-tank.glb", new(-12.0f, 0.02f, 7.0f), Mathf.Pi * 0.5f, 6.2f, new(0.85f, 0.42f, 0.52f)),
-            HarborBuilding("MidCoverTankSouthEast", "detail-tank.glb", new(12.0f, 0.02f, 5.0f), 0.0f, 6.2f, new(0.85f, 0.42f, 0.52f)),
+            HarborBuilding("MidCoverTankSouthEast", "detail-tank.glb", new(12.0f, 0.02f, 3.0f), 0.0f, 6.2f, new(0.85f, 0.42f, 0.52f)),
 
             HarborBuilding("WestControlStack", "chimney-large.glb", new(-53.0f, 0.02f, 33.0f), 0.0f, 7.8f, new(1.0f, 1.70f, 1.0f)),
             HarborBuilding("EastPumpStack", "chimney-large.glb", new(53.0f, 0.02f, -33.0f), 0.0f, 7.8f, new(1.0f, 1.70f, 1.0f)),
