@@ -151,13 +151,13 @@ public partial class CombatHUD : CanvasLayer
     {
         _nvgOverlay = new ColorRect
         {
-            Color = new Color(0.06f, 0.28f, 0.06f, 0.16f),
+            Color = new Color(0.07f, 0.32f, 0.07f, 0.22f),
             MouseFilter = Control.MouseFilterEnum.Ignore,
             Visible = false
         };
         _nvgOverlay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         AddChild(_nvgOverlay);
-        // Vignette via shader
+        // Vignette + scanline phosphor — full-screen green wash is in _nvgOverlay, this adds tube vignette
         _nvgVignette = new ColorRect
         {
             MouseFilter = Control.MouseFilterEnum.Ignore,
@@ -170,12 +170,14 @@ public partial class CombatHUD : CanvasLayer
                 shader_type canvas_item;
                 void fragment() {
                     float dist = distance(UV, vec2(0.5));
-                    float vignette = smoothstep(0.35, 0.95, dist);
-                    float scanline = sin(UV.y * 1080.0 * 0.85) * 0.06 + 0.94;
-                    vec3 tint = vec3(0.08, 0.42, 0.08) * 0.18 * vignette * scanline;
-                    // subtle chromatic noise
-                    float noise = fract(sin(dot(UV, vec2(12.9898, 78.233))) * 43758.5453) * 0.03;
-                    COLOR = vec4(tint + vec3(noise * 0.02), vignette * 0.55 * scanline);
+                    float vignette = smoothstep(0.32, 1.05, dist);
+                    float scanline = sin(UV.y * 1080.0 * 1.15) * 0.045 + 0.955;
+                    // Edge darkening + central phosphor glow
+                    vec3 edge = vec3(0.02, 0.08, 0.02) * vignette * 0.85;
+                    float grain = fract(sin(dot(UV * 1.7, vec2(12.9898, 78.233))) * 43758.5453) * 0.025;
+                    // Subtle radial brightness falloff to sell tube
+                    float radial = 1.0 - vignette * 0.42;
+                    COLOR = vec4((edge + vec3(grain * 0.015)) * scanline * radial, vignette * 0.62 * scanline);
                 }
                 """
         };

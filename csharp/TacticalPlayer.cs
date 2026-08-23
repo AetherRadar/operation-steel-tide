@@ -2631,6 +2631,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 case EquipmentSlot.Helmet:
                     EquippedHelmet = incoming.Clone();
                     EquippedHelmetGrade = item.Grade;
+                    if (incoming.DefinitionId == "helmet_nvg")
+                    {
+                        Hud?.ShowLocalizedMessage("nvg_equipped", "NVG HELMET EQUIPPED // PRESS N TO TOGGLE", new Color(0.42f, 0.95f, 0.42f));
+                    }
                     if (!HasNightVisionHelmet && _nvgOn)
                     {
                         _nvgOn = false;

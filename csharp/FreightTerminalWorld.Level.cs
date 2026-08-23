@@ -284,18 +284,23 @@ public partial class FreightTerminalWorld
 
     private void ApplyNightVisionOverride()
     {
-        // NVG intensifier: lift exposure and brightness, crush saturation toward green, keep contrast
+        // NVG intensifier: must overcome Night's 0.07 ambient / 0.08 sun — previous 1.62 was invisible
         SetIfSupported(_environmentRef, "adjustment_enabled", true);
-        SetIfSupported(_environmentRef, "adjustment_brightness", 1.62f);
-        SetIfSupported(_environmentRef, "adjustment_contrast", 1.18f);
-        SetIfSupported(_environmentRef, "adjustment_saturation", 0.38f);
-        // Slightly lift fog so dark corners remain readable under NVG
-        SetIfSupported(_environmentRef, "volumetric_fog_density", 0.0022f);
-        // Ambient lift for NVG — not modifying sun itself, just the eye adaptation
-        if (_deploymentTimeOfDay == DeploymentTimeOfDay.Night)
+        SetIfSupported(_environmentRef, "adjustment_brightness", 2.85f);
+        SetIfSupported(_environmentRef, "adjustment_contrast", 1.06f);
+        SetIfSupported(_environmentRef, "adjustment_saturation", 0.22f);
+        SetIfSupported(_environmentRef, "volumetric_fog_density", 0.0016f);
+        // Strong ambient/exposure lift — green phosphor needs actual scene brightening, not just tint
+        _environmentRef.AmbientLightEnergy = Mathf.Max(_environmentRef.AmbientLightEnergy, 1.45f);
+        _environmentRef.FogLightEnergy = Mathf.Max(_environmentRef.FogLightEnergy, 0.62f);
+        _environmentRef.TonemapExposure = Mathf.Max(_environmentRef.TonemapExposure, 1.35f);
+        if (IsInstanceValid(_sunLight))
         {
-            _environmentRef.AmbientLightEnergy = Mathf.Max(_environmentRef.AmbientLightEnergy, 0.45f);
-            _environmentRef.FogLightEnergy = Mathf.Max(_environmentRef.FogLightEnergy, 0.28f);
+            _sunLight.LightEnergy = Mathf.Max(_sunLight.LightEnergy, 0.52f);
+        }
+        if (IsInstanceValid(_fillLight))
+        {
+            _fillLight.LightEnergy = Mathf.Max(_fillLight.LightEnergy, 0.48f);
         }
     }
 

@@ -181,6 +181,7 @@ public static class GameLocalization
         Chinese["nvg_on"] = "\u591c\u89c6\u4eea  //  \u5f00\u542f";
         Chinese["nvg_off"] = "\u591c\u89c6\u4eea  //  \u5173\u95ed";
         Chinese["nvg_no_helmet"] = "\u9700\u8981\u591c\u89c6\u5934\u76d4  //  \u88c5\u5907\u591c\u6218\u5957\u88c5";
+        Chinese["nvg_equipped"] = "\u591c\u89c6\u5934\u76d4\u5df2\u88c5\u5907  //  \u6309 N \u5207\u6362";
         Chinese["ammo_rifle"] = "\u6b65\u67aa\u5f39\u836f";
         Chinese["ammo_sniper"] = "7.62 \u6beb\u7c73\u7cbe\u786e\u5f39\u836f";
         Chinese["ammo_smg"] = "9 \u6beb\u7c73\u51b2\u950b\u67aa\u5f39\u836f";
