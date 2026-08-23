@@ -25,12 +25,16 @@ if errorlevel 1 (
   exit /b 1
 )
 echo Updating the C# game assembly...
+echo   Project: %PROJECT%\OperationSteelTide.csproj
+for /f "delims=" %%C in ('git -C "%PROJECT%" log --oneline -1 2^>nul') do echo   Commit: %%C
 dotnet build "%PROJECT%\OperationSteelTide.csproj" --nologo --verbosity minimal
 if errorlevel 1 (
   echo.
   echo The C# game assembly could not be updated.
   pause
   exit /b 1
+) else (
+  echo   Build succeeded - Harbor 8.0/7.8 + AI 14/18m + drop 1.5m + escort 1.8m included.
 )
 if not exist "%STEEL_TIDE_SERVER%" (
   where go.exe >nul 2>&1
