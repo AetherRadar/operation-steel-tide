@@ -496,6 +496,18 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
                 destination,
                 emergency: reviveTargetNode is not null);
         destination = navigationDirective.Target;
+        if (Main.TryPrepareAiDoorTraversal(GlobalPosition, destination, out var doorWaiting)
+            && doorWaiting)
+        {
+            var doorVelocity = Velocity;
+            doorVelocity.X = Mathf.MoveToward(doorVelocity.X, 0.0f, dt * 18.0f);
+            doorVelocity.Z = Mathf.MoveToward(doorVelocity.Z, 0.0f, dt * 18.0f);
+            Velocity = doorVelocity;
+            ResetMovementProgress();
+            MoveAndSlide();
+            AnimateRig(dt);
+            return;
+        }
         UpdateTacticalMovement(
             destination,
             hostile,

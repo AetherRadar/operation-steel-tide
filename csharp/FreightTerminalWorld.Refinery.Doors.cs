@@ -56,6 +56,26 @@ public partial class FreightTerminalWorld
             visibilityRange: 220.0f);
         mount.AddChild(door);
         _refineryDoors.Add(door);
+
+        var groundInward = inward;
+        groundInward.Y = 0.0f;
+        groundInward = groundInward.LengthSquared() > 0.01f
+            ? groundInward.Normalized()
+            : Vector3.Back;
+        var outsidePoint = doorPlane - groundInward * 1.05f + Vector3.Up * 0.12f;
+        var insidePoint = doorPlane + groundInward * 1.05f + Vector3.Up * 0.12f;
+        RegisterSquadTraversalLink(
+            $"refinery_door:{door.DoorId}",
+            SquadTraversalKind.Walk,
+            bidirectional: true,
+            new[]
+            {
+                new Vector3(entry.X, 0.12f, entry.Z),
+                outsidePoint,
+                insidePoint,
+                new Vector3(interior.X, 0.12f, interior.Z)
+            },
+            costMultiplier: 1.04f);
     }
 
     private bool TryHandleRefineryDoorInteraction()
@@ -191,6 +211,20 @@ public partial class FreightTerminalWorld
     private async void ValidateRefineryDoors()
     {
         await WaitFrames(6);
+        foreach (var mate in _squadMates)
+        {
+            if (IsInstanceValid(mate))
+            {
+                mate.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        foreach (var enemy in _enemies)
+        {
+            if (IsInstanceValid(enemy))
+            {
+                enemy.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
         var expectedDoorCount = _oldTownLandmarks?.EntryCount ?? 0;
         var countReady = _refineryDoors.Count == expectedDoorCount
             && expectedDoorCount == 2;
@@ -252,6 +286,7 @@ public partial class FreightTerminalWorld
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         }
+        await WaitFrames(3);
         var closedAgain = _refineryDoors.All(door =>
             !door.IsOpen
             && !door.IsAnimating
@@ -262,13 +297,37 @@ public partial class FreightTerminalWorld
             door.OutsideProbe,
             door.InsideProbe,
             1));
+
+        var aiLinkReady = _squadTraversalLinks.Any(link =>
+            link.Source == $"refinery_door:{first.DoorId}"
+            && link.Kind == SquadTraversalKind.Walk
+            && link.Bidirectional);
+        var aiActorPosition = first.OutsideProbe;
+        var aiWaypoint = first.InsideProbe;
+        var aiOpened = TryPrepareAiDoorTraversal(
+            aiActorPosition,
+            aiWaypoint,
+            out var aiWaitingDuringMotion)
+            && aiWaitingDuringMotion;
+        for (var frame = 0; frame < 120 && first.IsAnimating; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+        var aiContinued = TryPrepareAiDoorTraversal(
+            aiActorPosition,
+            aiWaypoint,
+            out var aiWaitingAfterMotion)
+            && first.IsOpen
+            && !aiWaitingAfterMotion;
+        first.SetOpenImmediate(false);
         _player.GlobalPosition = playerPosition;
 
         var valid = countReady && idsReady && authoredReady && initiallyClosed
             && englishPromptReady && chinesePromptReady && nearestReady
             && closedBlocks && openingStarted && opened && openClears && closePromptReady
-            && occupiedCloseRejected && closingStarted && closedAgain && closedAgainBlocks;
-        GD.Print($"REFINERY_DOORS_CHECK valid={valid} doors={_refineryDoors.Count}/{expectedDoorCount} ids={idsReady} authored={authoredReady} closed_initial={initiallyClosed} prompt_en={englishPromptReady} prompt_zh={chinesePromptReady} nearest={nearestReady} closed_block={closedBlocks} opening={openingStarted} opened={opened} angle={first.MotionAngleDegrees:0.0} open_clear={openClears} close_prompt={closePromptReady} occupied_rejected={occupiedCloseRejected} closing={closingStarted} closed_again={closedAgain} closed_block_again={closedAgainBlocks} motions={string.Join(',', _refineryDoors.Select(door => door.CompletedMotionCount))}");
+            && occupiedCloseRejected && closingStarted && closedAgain && closedAgainBlocks
+            && aiLinkReady && aiOpened && aiContinued;
+        GD.Print($"REFINERY_DOORS_CHECK valid={valid} doors={_refineryDoors.Count}/{expectedDoorCount} ids={idsReady} authored={authoredReady} closed_initial={initiallyClosed} prompt_en={englishPromptReady} prompt_zh={chinesePromptReady} nearest={nearestReady} closed_block={closedBlocks} opening={openingStarted} opened={opened} angle={first.MotionAngleDegrees:0.0} open_clear={openClears} close_prompt={closePromptReady} occupied_rejected={occupiedCloseRejected} closing={closingStarted} closed_again={closedAgain} closed_block_again={closedAgainBlocks} ai_link={aiLinkReady} ai_opened={aiOpened} ai_continued={aiContinued} motions={string.Join(',', _refineryDoors.Select(door => door.CompletedMotionCount))}");
         GD.Print($"REFINERY_DOORS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

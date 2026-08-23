@@ -69,6 +69,20 @@ public partial class EnemyOperator
             return false;
         }
 
+        if (Main is not null
+            && Main.TryPrepareAiDoorTraversal(GlobalPosition, destination, out var doorWaiting)
+            && doorWaiting)
+        {
+            var doorVelocity = Velocity;
+            doorVelocity.X = Mathf.MoveToward(doorVelocity.X, 0.0f, delta * 18.0f);
+            doorVelocity.Z = Mathf.MoveToward(doorVelocity.Z, 0.0f, delta * 18.0f);
+            Velocity = doorVelocity;
+            _pursuitProgressOrigin = GlobalPosition;
+            _pursuitProgressTimer = 0.0f;
+            ResetPursuitNavigationMotorFrame();
+            return true;
+        }
+
         var targetFlat = new Vector3(destination.X, GlobalPosition.Y, destination.Z);
         var direction = GlobalPosition.DirectionTo(targetFlat);
         direction.Y = 0.0f;

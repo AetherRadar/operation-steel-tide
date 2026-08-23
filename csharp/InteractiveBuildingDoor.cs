@@ -30,6 +30,7 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
     public bool HasBoxCollision => IsInstanceValid(_doorCollision)
         && _doorCollision.Shape is BoxShape3D;
     public float MotionAngleDegrees => RotationDegrees.X;
+    internal float WidthForNavigation => _width;
 
     public Vector3 InteractionPoint
         => GetParent() is Node3D parent ? parent.ToGlobal(_interactionLocal) : GlobalPosition;
