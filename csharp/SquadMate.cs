@@ -259,7 +259,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
         Order = order;
         _orderPosition = order == SquadOrder.Follow ? GlobalPosition : position;
-        if (order != SquadOrder.Follow && IsInstanceValid(Main))
+        if (IsInstanceValid(Main)
+            && (order != SquadOrder.Follow || Main.IsDemolitionMode))
         {
             Main.ClearSquadNavigation(this);
         }

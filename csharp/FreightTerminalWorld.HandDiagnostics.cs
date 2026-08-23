@@ -51,7 +51,7 @@ public partial class FreightTerminalWorld
                 if (supHand != null) { supportHandPos = supHand.GlobalPosition; leftHandVisible = supHand.Visible; if (cam != null) { var pos = cam.UnprojectPosition(supportHandPos); supHandScreen = pos; supHandBehind = cam.IsPositionBehind(supportHandPos); } }
                 if (supFore != null) supportForearmPos = supFore.GlobalPosition;
                 // right hand is sibling of support hand, find by name
-                Node3D rightNode = null;
+                Node3D? rightNode = null;
                 if (fArmsNode != null)
                 {
                     rightNode = fArmsNode.GetNodeOrNull<Node3D>("RightTacticalHand");
