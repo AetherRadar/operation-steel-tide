@@ -60,6 +60,24 @@ public partial class TacticalPlayer
                     && IsInstanceValid(visual.Root)
                     ? visual.Root.GetInstanceId()
                     : 0;
+    internal bool WeaponHandPoseValidForDiagnostics
+    {
+        get
+        {
+            if (!IsInstanceValid(_primaryHand)
+                || !IsInstanceValid(_supportHand)
+                || !IsInstanceValid(_primaryForearm)
+                || !IsInstanceValid(_supportForearm))
+            {
+                return false;
+            }
+            var separation = _primaryHand.Position.DistanceTo(_supportHand.Position);
+            var expectedRange = WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
+                ? new Vector2(0.08f, 0.28f)
+                : new Vector2(0.22f, 1.02f);
+            return separation >= expectedRange.X && separation <= expectedRange.Y;
+        }
+    }
 
     private void BuildAuthoredPrimaryWeapon()
     {
@@ -179,6 +197,53 @@ public partial class TacticalPlayer
             && !useAuthoredGsh18
             && !wantsAuthoredDesertEagle
             && !useAuthoredPlatform;
+        ApplyProceduralHandPose();
+    }
+
+    private void ApplyProceduralHandPose()
+    {
+        if (!IsInstanceValid(_primaryHand)
+            || !IsInstanceValid(_primaryForearm)
+            || !IsInstanceValid(_supportHand)
+            || !IsInstanceValid(_supportForearm))
+        {
+            return;
+        }
+
+        // Every platform gets its own grip and support point. The old fixed M4 pose
+        // left the support hand floating on pistols and short/long guns.
+        var aimingDrop = _isAiming && WeaponCatalog.IsSidearm(EquippedWeapon.Platform) ? -0.045f : 0.0f;
+        var primary = EquippedWeapon.Platform switch
+        {
+            WeaponPlatform.P226 or WeaponPlatform.M1911 or WeaponPlatform.GSh18
+                or WeaponPlatform.DesertEagle => new Vector3(0.10f, -0.135f + aimingDrop, 0.02f),
+            WeaponPlatform.MP5A5 or WeaponPlatform.M3A1 => new Vector3(0.11f, -0.18f, -0.08f),
+            WeaponPlatform.M24 or WeaponPlatform.AXMC or WeaponPlatform.AWM => new Vector3(0.0f, -0.17f, 0.02f),
+            _ => RifleGripAnchor
+        };
+        var support = EquippedWeapon.Platform switch
+        {
+            WeaponPlatform.P226 or WeaponPlatform.M1911 or WeaponPlatform.GSh18
+                or WeaponPlatform.DesertEagle => new Vector3(-0.035f, -0.14f + aimingDrop, -0.13f),
+            WeaponPlatform.MP5A5 or WeaponPlatform.M3A1 => new Vector3(-0.035f, -0.19f, -0.42f),
+            WeaponPlatform.M24 or WeaponPlatform.AXMC => new Vector3(-0.02f, -0.19f, -0.72f),
+            WeaponPlatform.AWM => new Vector3(-0.02f, -0.19f, -0.86f),
+            WeaponPlatform.VSS => new Vector3(-0.02f, -0.18f, -0.62f),
+            _ => RifleForegripAnchor
+        };
+
+        _primaryHand.Position = primary;
+        _primaryHand.Rotation = WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
+            ? new Vector3(-0.16f, 0.08f, -0.14f)
+            : new Vector3(-0.12f, 0.05f, -0.18f);
+        _supportHand.Position = support;
+        _supportHand.Rotation = WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
+            ? new Vector3(0.16f, -0.04f, 0.18f)
+            : new Vector3(0.2f, 0.0f, 0.05f);
+        _primaryForearm.Position = primary + new Vector3(0.08f, -0.25f, 0.09f);
+        _primaryForearm.Rotation = new Vector3(-0.18f, 0.05f, -0.3f);
+        _supportForearm.Position = support + new Vector3(-0.09f, -0.24f, 0.1f);
+        _supportForearm.Rotation = new Vector3(0.22f, 0.05f, -0.28f);
     }
 
     private void EnsureAuthoredFirstPersonSmg()

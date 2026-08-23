@@ -216,6 +216,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private MeshInstance3D _spareMagazine = null!;
     private Node3D _supportHand = null!;
     private Node3D _supportForearm = null!;
+    private Node3D _primaryHand = null!;
+    private Node3D _primaryForearm = null!;
     private MeshInstance3D _receiver = null!;
     private MeshInstance3D _handguard = null!;
     private MeshInstance3D _barrelPart = null!;
@@ -580,8 +582,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _weaponRoot.AddChild(_proceduralFirstPersonArms);
         _supportHand = BuildTacticalHand(_proceduralFirstPersonArms, true, new Vector3(-0.03f, -0.2f, -0.58f), new Vector3(0.2f, 0, 0.05f), glove, gloveArmor);
         _supportForearm = BuildSleevedForearm(_proceduralFirstPersonArms, new Vector3(-0.12f, -0.42f, -0.47f), new Vector3(0.25f, 0, -0.26f), glove, gloveArmor);
-        BuildTacticalHand(_proceduralFirstPersonArms, false, new Vector3(0.115f, -0.2f, -0.075f), new Vector3(-0.12f, 0.05f, -0.18f), glove, gloveArmor);
-        BuildSleevedForearm(_proceduralFirstPersonArms, new Vector3(0.19f, -0.42f, 0.015f), new Vector3(-0.18f, 0.05f, -0.3f), glove, gloveArmor);
+        _primaryHand = BuildTacticalHand(_proceduralFirstPersonArms, false, new Vector3(0.115f, -0.2f, -0.075f), new Vector3(-0.12f, 0.05f, -0.18f), glove, gloveArmor);
+        _primaryForearm = BuildSleevedForearm(_proceduralFirstPersonArms, new Vector3(0.19f, -0.42f, 0.015f), new Vector3(-0.18f, 0.05f, -0.3f), glove, gloveArmor);
         _spareMagazine = MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.09f, 0.26f, 0.14f)), new Vector3(-0.3f, -0.62f, -0.18f), new Vector3(0.35f, 0, 0.35f), black);
         MeshPart(_spareMagazine, Box(new Vector3(0.095f, 0.028f, 0.15f)), new Vector3(0, -0.11f, 0), Vector3.Zero, steel);
         AddMagazineDetail(_spareMagazine, steel);
@@ -1890,6 +1892,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             weaponRotation.Y = 0.0f;
         }
         _weaponRoot.Rotation = weaponRotation.Lerp(WeaponViewRotationTarget(), SmoothFactor(9.0f, delta));
+        ApplyProceduralHandPose();
         _opticReticle.Visible = _isAiming && IsFirearmQuickSlotSelected;
         UpdateReloadAnimation();
         SyncAuthoredPrimaryWeapon();
@@ -1899,7 +1902,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         if (WeaponCatalog.IsSidearm(EquippedWeapon.Platform))
         {
-            return 68.0f;
+            return 72.0f;
         }
         if (!EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Optic, out var opticId))
         {
@@ -2270,6 +2273,15 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         if (!_isReloading)
         {
+            return;
+        }
+        if (EquippedWeapon.Platform != WeaponPlatform.M4A1)
+        {
+            // The M4 hand-off animation is authored for its magazine geometry only.
+            // Keep every other platform in its correct two-hand hold until its own
+            // authored reload clip is available instead of moving the support hand
+            // through the rifle's magwell.
+            ApplyProceduralHandPose();
             return;
         }
 
