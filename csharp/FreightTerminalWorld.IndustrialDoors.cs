@@ -111,7 +111,7 @@ public partial class FreightTerminalWorld
     private async void ValidateFreightTerminalDoors()
     {
         await WaitFrames(6);
-        var expectedDoorCount = 10;
+        var expectedDoorCount = 11;
         var countReady = _refineryDoors.Count == expectedDoorCount;
         var idsReady = _refineryDoors.Select(door => door.DoorId).Distinct().Count() == expectedDoorCount
             && _refineryDoors.Select(door => door.DoorId).OrderBy(id => id)

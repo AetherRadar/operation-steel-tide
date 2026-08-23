@@ -202,14 +202,104 @@ public partial class FreightTerminalWorld
             _environmentRef.FogLightEnergy = style.FogEnergy;
             _environmentRef.FogDensity = style.FogDensity;
             _environmentRef.TonemapExposure = style.Exposure;
+            if (_environmentRef.Sky != null)
+            {
+                _environmentRef.Sky.SkyMaterial = BuildDynamicSkyMaterial(timeOfDay);
+            }
+            // Night needs true darkness: dim sky contribution beyond the already-low AmbientEnergy.
+            if (timeOfDay == DeploymentTimeOfDay.Night)
+            {
+                _environmentRef.AmbientLightEnergy = Mathf.Min(_environmentRef.AmbientLightEnergy, 0.22f);
+                _environmentRef.FogDensity = Mathf.Max(_environmentRef.FogDensity, 0.0019f);
+            }
         }
     }
 
-    private static ShaderMaterial BuildDynamicSkyMaterial()
+    private static Vector3 CalculateSunDirection(Vector3 rotationDegrees)
     {
-        var shader = new Shader
+        var rad = rotationDegrees * (Mathf.Pi / 180.0f);
+        var basis = Basis.FromEuler(rad);
+        var lightDir = basis * Vector3.Forward;
+        var sunDir = (-lightDir).Normalized();
+        // Fallback if basis math yields zero (should not happen)
+        if (sunDir.LengthSquared() < 0.001f)
         {
-            Code = @"shader_type sky;
+            return new Vector3(-0.38f, 0.62f, -0.69f).Normalized();
+        }
+        return sunDir;
+    }
+
+    private static ShaderMaterial BuildDynamicSkyMaterial(DeploymentTimeOfDay timeOfDay = DeploymentTimeOfDay.Day)
+    {
+        var style = TimeOfDayStyles.Style(timeOfDay);
+        var sunDir = CalculateSunDirection(style.SunRotationDegrees);
+
+        // Palette per time-of-day — night must be truly dark, otherwise the Sky's radiance
+        // keeps the scene bright even though AmbientLightEnergy/SunEnergy are low.
+        Vector3 horizon, zenith, horizonGlow, sunHalo, sunCore, cloudShadow, cloudLight, lowerDark, lowerLight, cirrusCol, groundA, groundB;
+        switch (timeOfDay)
+        {
+            case DeploymentTimeOfDay.Night:
+                horizon = new Vector3(0.008f, 0.012f, 0.024f);
+                zenith = new Vector3(0.0015f, 0.003f, 0.008f);
+                horizonGlow = new Vector3(0.008f, 0.009f, 0.014f);
+                sunHalo = Vector3.Zero;
+                sunCore = Vector3.Zero;
+                cloudShadow = new Vector3(0.015f, 0.018f, 0.022f);
+                cloudLight = new Vector3(0.035f, 0.042f, 0.055f);
+                lowerDark = new Vector3(0.012f, 0.015f, 0.018f);
+                lowerLight = new Vector3(0.025f, 0.030f, 0.038f);
+                cirrusCol = new Vector3(0.020f, 0.025f, 0.032f);
+                groundA = new Vector3(0.006f, 0.008f, 0.010f);
+                groundB = new Vector3(0.015f, 0.018f, 0.022f);
+                break;
+            case DeploymentTimeOfDay.Dusk:
+                horizon = new Vector3(0.42f, 0.24f, 0.14f);
+                zenith = new Vector3(0.08f, 0.03f, 0.08f);
+                horizonGlow = new Vector3(0.28f, 0.14f, 0.06f);
+                sunHalo = new Vector3(1.0f, 0.45f, 0.15f);
+                sunCore = new Vector3(1.0f, 0.68f, 0.30f);
+                cloudShadow = new Vector3(0.28f, 0.18f, 0.16f);
+                cloudLight = new Vector3(0.68f, 0.50f, 0.42f);
+                lowerDark = new Vector3(0.24f, 0.18f, 0.16f);
+                lowerLight = new Vector3(0.62f, 0.48f, 0.38f);
+                cirrusCol = new Vector3(0.55f, 0.42f, 0.36f);
+                groundA = new Vector3(0.030f, 0.020f, 0.018f);
+                groundB = new Vector3(0.14f, 0.10f, 0.08f);
+                break;
+            case DeploymentTimeOfDay.Dawn:
+                horizon = new Vector3(0.35f, 0.32f, 0.36f);
+                zenith = new Vector3(0.020f, 0.030f, 0.060f);
+                horizonGlow = new Vector3(0.16f, 0.13f, 0.12f);
+                sunHalo = new Vector3(0.95f, 0.60f, 0.35f);
+                sunCore = new Vector3(0.98f, 0.78f, 0.50f);
+                cloudShadow = new Vector3(0.22f, 0.22f, 0.26f);
+                cloudLight = new Vector3(0.60f, 0.62f, 0.66f);
+                lowerDark = new Vector3(0.20f, 0.22f, 0.24f);
+                lowerLight = new Vector3(0.55f, 0.58f, 0.62f);
+                cirrusCol = new Vector3(0.52f, 0.55f, 0.58f);
+                groundA = new Vector3(0.022f, 0.025f, 0.030f);
+                groundB = new Vector3(0.12f, 0.14f, 0.16f);
+                break;
+            default: // Day
+                horizon = new Vector3(0.22f, 0.46f, 0.64f);
+                zenith = new Vector3(0.025f, 0.105f, 0.29f);
+                horizonGlow = new Vector3(0.22f, 0.17f, 0.10f);
+                sunHalo = new Vector3(1.0f, 0.62f, 0.30f);
+                sunCore = new Vector3(1.0f, 0.86f, 0.58f);
+                cloudShadow = new Vector3(0.27f, 0.36f, 0.41f);
+                cloudLight = new Vector3(0.78f, 0.84f, 0.86f);
+                lowerDark = new Vector3(0.31f, 0.40f, 0.43f);
+                lowerLight = new Vector3(0.83f, 0.86f, 0.84f);
+                cirrusCol = new Vector3(0.78f, 0.84f, 0.86f);
+                groundA = new Vector3(0.035f, 0.05f, 0.052f);
+                groundB = new Vector3(0.23f, 0.30f, 0.30f);
+                break;
+        }
+
+        string Vec(Vector3 v) => $"{v.X:F3}, {v.Y:F3}, {v.Z:F3}";
+
+        var template = @"shader_type sky;
 render_mode use_debanding;
 
 vec2 cloud_hash(vec2 point) {
@@ -242,15 +332,15 @@ float cloud_fbm(vec2 point) {
 
 void sky() {
     float elevation = clamp(EYEDIR.y, 0.0, 1.0);
-    vec3 horizon = vec3(0.22, 0.46, 0.64);
-    vec3 zenith = vec3(0.025, 0.105, 0.29);
+    vec3 horizon = vec3(__HORIZON__);
+    vec3 zenith = vec3(__ZENITH__);
     vec3 color = mix(horizon, zenith, pow(elevation, 0.62));
-    color += vec3(0.22, 0.17, 0.1) * pow(1.0 - elevation, 4.0);
+    color += vec3(__HORIZON_GLOW__) * pow(1.0 - elevation, 4.0);
 
-    vec3 sun_direction = normalize(vec3(-0.38, 0.62, -0.69));
+    vec3 sun_direction = normalize(vec3(__SUNDIR__));
     float sun = max(dot(EYEDIR, sun_direction), 0.0);
-    color += vec3(1.0, 0.62, 0.3) * pow(sun, 18.0) * 0.42;
-    color += vec3(1.0, 0.86, 0.58) * pow(sun, 520.0) * 6.5;
+    color += vec3(__SUN_HALO__) * pow(sun, 18.0) * 0.42;
+    color += vec3(__SUN_CORE__) * pow(sun, 520.0) * 6.5;
 
     if (EYEDIR.y > 0.0) {
         vec2 cloud_plane = EYEDIR.xz / max(EYEDIR.y + 0.17, 0.22);
@@ -267,8 +357,8 @@ void sky() {
         float cloud = smoothstep(0.505, 0.665, field);
         float cloud_band = smoothstep(0.025, 0.13, EYEDIR.y) * (1.0 - smoothstep(0.72, 0.96, EYEDIR.y));
         float lit_side = clamp(0.55 + EYEDIR.x * -0.24 + EYEDIR.z * -0.14, 0.0, 1.0);
-        vec3 cloud_shadow = vec3(0.27, 0.36, 0.41);
-        vec3 cloud_light = vec3(0.78, 0.84, 0.86);
+        vec3 cloud_shadow = vec3(__CLOUD_SHADOW__);
+        vec3 cloud_light = vec3(__CLOUD_LIGHT__);
         vec3 cloud_color = mix(cloud_shadow, cloud_light, lit_side + elevation * 0.22);
         color = mix(color, cloud_shadow, cloud_shadow_mask * cloud_band * 0.2);
         color = mix(color, cloud_color, cloud * cloud_band * 0.64);
@@ -279,19 +369,33 @@ void sky() {
         float lower_field = lower_broad * 0.72 + lower_detail * 0.28;
         float lower_cloud = smoothstep(0.525, 0.665, lower_field);
         float lower_band = smoothstep(0.012, 0.055, elevation) * (1.0 - smoothstep(0.2, 0.39, elevation));
-        vec3 lower_color = mix(vec3(0.31, 0.4, 0.43), vec3(0.83, 0.86, 0.84), clamp(lit_side + 0.28, 0.0, 1.0));
+        vec3 lower_color = mix(vec3(__LOWER_DARK__), vec3(__LOWER_LIGHT__), clamp(lit_side + 0.28, 0.0, 1.0));
         color = mix(color, lower_color, lower_cloud * lower_band * 0.7);
 
         float cirrus = smoothstep(0.58, 0.77, cloud_fbm(EYEDIR.xz * 4.2 + wind * 0.36 + vec2(14.0, 5.0)));
         cirrus *= smoothstep(0.28, 0.74, elevation) * 0.28;
-        color = mix(color, vec3(0.78, 0.84, 0.86), cirrus);
+        color = mix(color, vec3(__CIRRUS__), cirrus);
     } else {
-        color = mix(vec3(0.035, 0.05, 0.052), vec3(0.23, 0.3, 0.3), clamp(EYEDIR.y + 1.0, 0.0, 1.0));
+        color = mix(vec3(__GROUND_A__), vec3(__GROUND_B__), clamp(EYEDIR.y + 1.0, 0.0, 1.0));
     }
 
     COLOR = color;
-}"
-        };
+}";
+        template = template.Replace("__HORIZON__", Vec(horizon))
+            .Replace("__ZENITH__", Vec(zenith))
+            .Replace("__HORIZON_GLOW__", Vec(horizonGlow))
+            .Replace("__SUNDIR__", Vec(sunDir))
+            .Replace("__SUN_HALO__", Vec(sunHalo))
+            .Replace("__SUN_CORE__", Vec(sunCore))
+            .Replace("__CLOUD_SHADOW__", Vec(cloudShadow))
+            .Replace("__CLOUD_LIGHT__", Vec(cloudLight))
+            .Replace("__LOWER_DARK__", Vec(lowerDark))
+            .Replace("__LOWER_LIGHT__", Vec(lowerLight))
+            .Replace("__CIRRUS__", Vec(cirrusCol))
+            .Replace("__GROUND_A__", Vec(groundA))
+            .Replace("__GROUND_B__", Vec(groundB));
+
+        var shader = new Shader { Code = template };
         return new ShaderMaterial { Shader = shader };
     }
 
@@ -399,6 +503,7 @@ void sky() {
         BuildRadarSpire(concrete, steel, steelDark, yellow);
         BuildCover(concreteDark);
         BuildHarborExpansion(asphalt, concrete, concreteDark, steel, steelDark, rust, yellow, white);
+        BuildHarborVaultHouse(concrete, steel, steelDark, yellow);
         BuildFreightAuthoredLandmarks();
         BuildFreightTerminalDoors();
         BuildBackground(concreteDark, steel);
