@@ -81,6 +81,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             return false;
         }
         CarriedWeapon = build.Clone();
+        _audioWeapon = build.Clone();
+        RefreshShotAudio();
         _ammoGrade = ammoGrade;
         RefillMagazine();
         HasFireablePrimary = true;
@@ -386,6 +388,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             return;
         }
         HoldAuthoredAimAfterShot();
+        PlayShotAudio();
         Main.SpawnTracer(_muzzle.GlobalPosition, end, new Color(0.32f, 0.78f, 1.0f));
     }
 
@@ -644,6 +647,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         var muzzlePos = IsInstanceValid(_muzzle) ? _muzzle.GlobalPosition : bodyOrigin;
         var shotOrigin = Ballistics.ResolveShotOrigin(GetWorld3D(), bodyOrigin, muzzlePos, GetRid());
         CombatShotsFired++;
+        PlayShotAudio();
         Main.NotifyAircraftOperatorAttack(this, GlobalPosition, stats.SoundRadius);
         if (BreakableGlassField.TryShatterAlongRay(
             GetWorld3D(),
@@ -1094,6 +1098,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         Part(_weapon, Cylinder(0.025f, 0.48f), new Vector3(0.0f, 1.24f, -0.85f), gun, new Vector3(Mathf.Pi / 2.0f, 0.0f, 0.0f));
         _muzzle = new Marker3D { Position = new Vector3(0.0f, 1.24f, -1.1f) };
         _weapon.AddChild(_muzzle);
+        BuildShotAudio();
         HasFireablePrimary = true;
         _weapon.Visible = true;
         if (UsesAuthoredOperatorForDiagnostics)

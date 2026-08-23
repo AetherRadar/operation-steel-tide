@@ -641,8 +641,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
         _gunAudio = new AudioStreamPlayer3D
         {
-            Stream = SoundLab.Gunshot(),
-            VolumeDb = -5.0f,
+            Stream = SoundLab.WeaponShot(EquippedWeapon),
+            VolumeDb = SoundLab.WeaponShotVolumeDb(EquippedWeapon),
             MaxDistance = 80.0f
         };
         _muzzle.AddChild(_gunAudio);
@@ -1078,12 +1078,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             ? new Vector3(0.065f, -0.04f, -0.28f)
             : new Vector3(0.09f, -0.015f, -0.5f - barrelLength * 0.45f);
         _gunAudio.MaxDistance = stats.SoundRadius * 1.9f;
-        _gunAudio.Stream = EquippedWeapon.Platform switch
-        {
-            WeaponPlatform.DesertEagle => SoundLab.DesertEagleShot(),
-            WeaponPlatform.GSh18 => SoundLab.Gsh18Shot(),
-            _ => SoundLab.Gunshot()
-        };
+        _gunAudio.Stream = SoundLab.WeaponShot(EquippedWeapon);
+        _gunAudio.VolumeDb = SoundLab.WeaponShotVolumeDb(EquippedWeapon);
         Ammo = Mathf.Min(Ammo, stats.MagazineSize);
         RefreshPlatformSignatureVisual();
         RefreshAuthoredPrimaryWeapon();
