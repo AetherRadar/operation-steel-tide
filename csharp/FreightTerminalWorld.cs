@@ -4625,6 +4625,12 @@ public partial class FreightTerminalWorld : Node3D
     private async void ValidateMapDensity()
     {
         await WaitFrames(4);
+        // Interior loot reachability is evaluated with the new building doors open;
+        // the dedicated door diagnostic covers the closed-state blocking contract.
+        foreach (var door in _refineryDoors)
+        {
+            door.SetOpenImmediate(true);
+        }
         var customs = _levelRoot.GetNodeOrNull<Node3D>("CustomsWarehouseComplex") is not null;
         var ops = _levelRoot.GetNodeOrNull<Node3D>("OpsAnnexComplex") is not null;
         var fuel = _levelRoot.GetNodeOrNull<Node3D>("FuelLogisticsHall") is not null;

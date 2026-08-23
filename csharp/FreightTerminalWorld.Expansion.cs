@@ -105,7 +105,7 @@ public partial class FreightTerminalWorld
             "CustomsWarehouseComplex",
             new Vector3(-55, 0, -28),
             new Vector2(28, 22),
-            5.4f,
+            6.4f,
             corrugated,
             concrete,
             steelDark,
@@ -120,7 +120,7 @@ public partial class FreightTerminalWorld
             "OpsAnnexComplex",
             new Vector3(48, 0, -48),
             new Vector2(22, 18),
-            4.8f,
+            5.8f,
             steel,
             concrete,
             steelDark,
@@ -136,7 +136,7 @@ public partial class FreightTerminalWorld
             "FuelLogisticsHall",
             new Vector3(58, 0, -118),
             new Vector2(26, 16),
-            5.0f,
+            6.0f,
             corrugated,
             concrete,
             rust,
@@ -151,7 +151,7 @@ public partial class FreightTerminalWorld
             "QuayBondedStorage",
             new Vector3(18, 0, -148),
             new Vector2(24, 14),
-            4.6f,
+            5.6f,
             steelDark,
             concrete,
             steel,
@@ -254,11 +254,11 @@ public partial class FreightTerminalWorld
                     // Partitions with door gaps
                     if (ix > 0)
                     {
-                        ExpansionBox(root, "ComplexPartitionX", new Vector3(cx - cellW * 0.5f, y0 + wallHeight * 0.42f, cz), new Vector3(0.1f, wallHeight * 0.84f, cellD * 0.72f), interior);
+                        ExpansionBox(root, "ComplexPartitionX", new Vector3(cx - cellW * 0.5f, y0 + wallHeight * 0.42f, cz), new Vector3(0.1f, wallHeight * 0.84f, cellD * 0.55f), interior);
                     }
                     if (iz > 0)
                     {
-                        ExpansionBox(root, "ComplexPartitionZ", new Vector3(cx, y0 + wallHeight * 0.42f, cz - cellD * 0.5f), new Vector3(cellW * 0.72f, wallHeight * 0.84f, 0.1f), interior);
+                        ExpansionBox(root, "ComplexPartitionZ", new Vector3(cx, y0 + wallHeight * 0.42f, cz - cellD * 0.5f), new Vector3(cellW * 0.55f, wallHeight * 0.84f, 0.1f), interior);
                     }
 
                     // Room props
@@ -330,6 +330,13 @@ public partial class FreightTerminalWorld
         var roofY = floors * (wallHeight + 0.2f);
         ExpansionBox(root, "ComplexRoof", new Vector3(0, roofY, 0), new Vector3(width + 0.6f, 0.28f, depth + 0.6f), exterior);
         ExpansionBox(root, "ComplexCanopy", new Vector3(0, 2.9f, depth * 0.5f + 1.1f), new Vector3(doorW + 1.4f, 0.14f, 2.2f), trim);
+        AddIndustrialDoor(
+            root,
+            $"{name}Door",
+            new Vector3(0, 0, depth * 0.5f + 0.14f),
+            doorW,
+            doorH,
+            visibilityRange: 250.0f);
         root.AddChild(new Label3D
         {
             Position = new Vector3(0, 3.4f, depth * 0.5f + 0.3f),
@@ -589,6 +596,13 @@ public partial class FreightTerminalWorld
         ExpansionBox(parent, "DispatchSouthL", center + new Vector3(-5.4f, 1.75f, 7), new Vector3(5.2f, 3.5f, 0.22f), corrugated);
         ExpansionBox(parent, "DispatchSouthR", center + new Vector3(5.4f, 1.75f, 7), new Vector3(5.2f, 3.5f, 0.22f), corrugated);
         ExpansionBox(parent, "DispatchDoorHeader", center + new Vector3(0, 3.05f, 7), new Vector3(5.6f, 0.9f, 0.22f), corrugated);
+        AddIndustrialDoor(
+            parent,
+            "RailDispatchDoor",
+            center + new Vector3(0, 0, 7.14f),
+            5.6f,
+            2.7f,
+            visibilityRange: 220.0f);
         MeshBox(parent, center + new Vector3(0, 2.65f, 7.14f), new Vector3(3.5f, 0.18f, 0.05f), yellow);
         ExpansionBox(parent, "DispatchDesk", center + new Vector3(2.7f, 0.72f, -2.2f), new Vector3(3.8f, 0.14f, 1.05f), steel);
         parent.AddChild(new OmniLight3D
@@ -777,7 +791,22 @@ public partial class FreightTerminalWorld
         {
             ExpansionCylinder(district, "TransferPipe", new Vector3(75.5f, 4.15f, z), 0.19f, 54, rust, new Vector3(0, 0, Mathf.Pi / 2));
         }
-        ExpansionBox(district, "TankControlShelter", new Vector3(99, 1.75f, -118), new Vector3(10, 3.5f, 8), steelDark);
+        var controlCenter = new Vector3(99, 0, -118);
+        ExpansionBox(district, "TankControlFloor", controlCenter + new Vector3(0, 0.1f, 0), new Vector3(10, 0.2f, 8), concrete);
+        ExpansionBox(district, "TankControlRoof", controlCenter + new Vector3(0, 3.5f, 0), new Vector3(10.2f, 0.24f, 8.2f), steelDark);
+        ExpansionBox(district, "TankControlNorth", controlCenter + new Vector3(0, 1.75f, -4), new Vector3(10, 3.5f, 0.22f), steelDark);
+        ExpansionBox(district, "TankControlWest", controlCenter + new Vector3(-5, 1.75f, 0), new Vector3(0.22f, 3.5f, 8), steelDark);
+        ExpansionBox(district, "TankControlEast", controlCenter + new Vector3(5, 1.75f, 0), new Vector3(0.22f, 3.5f, 8), steelDark);
+        ExpansionBox(district, "TankControlSouthL", controlCenter + new Vector3(-3.1f, 1.75f, 4), new Vector3(3.8f, 3.5f, 0.22f), steelDark);
+        ExpansionBox(district, "TankControlSouthR", controlCenter + new Vector3(3.1f, 1.75f, 4), new Vector3(3.8f, 3.5f, 0.22f), steelDark);
+        ExpansionBox(district, "TankControlDoorHeader", controlCenter + new Vector3(0, 3.05f, 4), new Vector3(2.4f, 0.9f, 0.22f), steelDark);
+        AddIndustrialDoor(
+            district,
+            "TankControlDoor",
+            controlCenter + new Vector3(0, 0, 4.14f),
+            2.4f,
+            2.7f,
+            visibilityRange: 220.0f);
         MeshBox(district, new Vector3(94, 1.9f, -118), new Vector3(0.06f, 1.1f, 3.6f), yellow);
         district.AddChild(new OmniLight3D
         {
@@ -833,6 +862,16 @@ public partial class FreightTerminalWorld
         ExpansionBox(district, "SeawallShelterNorth", shelterCenter + new Vector3(0, 1.55f, -4), new Vector3(9, 3.1f, 0.22f), corrugated);
         ExpansionBox(district, "SeawallShelterWest", shelterCenter + new Vector3(-4.5f, 1.55f, 0), new Vector3(0.22f, 3.1f, 8), corrugated);
         ExpansionBox(district, "SeawallShelterEast", shelterCenter + new Vector3(4.5f, 1.55f, 0), new Vector3(0.22f, 3.1f, 8), corrugated);
+        ExpansionBox(district, "SeawallShelterSouthL", shelterCenter + new Vector3(-3.2f, 1.55f, 4), new Vector3(2.6f, 3.1f, 0.22f), corrugated);
+        ExpansionBox(district, "SeawallShelterSouthR", shelterCenter + new Vector3(3.2f, 1.55f, 4), new Vector3(2.6f, 3.1f, 0.22f), corrugated);
+        ExpansionBox(district, "SeawallShelterDoorHeader", shelterCenter + new Vector3(0, 2.55f, 4), new Vector3(3.8f, 1.1f, 0.22f), corrugated);
+        AddIndustrialDoor(
+            district,
+            "SeawallShelterDoor",
+            shelterCenter + new Vector3(0, 0, 4.14f),
+            3.8f,
+            2.4f,
+            visibilityRange: 220.0f);
         MeshBox(district, shelterCenter + new Vector3(0, 2.78f, 4.12f), new Vector3(4.2f, 0.18f, 0.06f), yellow);
 
         for (var x = -20; x <= 104; x += 8)

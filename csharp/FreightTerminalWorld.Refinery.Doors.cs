@@ -80,7 +80,7 @@ public partial class FreightTerminalWorld
 
     private bool TryHandleRefineryDoorInteraction()
     {
-        if (!IsBlackwaterRefineryMap)
+        if (_refineryDoors.Count == 0)
         {
             return false;
         }

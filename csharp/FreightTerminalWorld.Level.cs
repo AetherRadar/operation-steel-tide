@@ -325,6 +325,7 @@ void sky() {
     private void BuildLevel()
     {
         ResetSquadTraversalLinks();
+        _refineryDoors.Clear();
         if (IsBlackwaterRefineryMap)
         {
             BuildBlackwaterRefineryLevel();
@@ -379,6 +380,8 @@ void sky() {
         BuildRadarSpire(concrete, steel, steelDark, yellow);
         BuildCover(concreteDark);
         BuildHarborExpansion(asphalt, concrete, concreteDark, steel, steelDark, rust, yellow, white);
+        BuildFreightAuthoredLandmarks();
+        BuildFreightTerminalDoors();
         BuildBackground(concreteDark, steel);
         BuildInterdistrictRouteNetwork(concrete, steel, steelDark, yellow);
         BuildRoofAccessNetwork(steel, yellow);
@@ -575,6 +578,13 @@ void sky() {
         StaticBox("WarehouseSouthA", new Vector3(33.5f, 4.5f, 16), new Vector3(11, 9, 0.6f), dark);
         StaticBox("WarehouseSouthB", new Vector3(16, 4.5f, 16), new Vector3(10, 9, 0.6f), dark);
         StaticBox("WarehouseRoof", new Vector3(23.5f, 9, -5), new Vector3(31, 0.35f, 42), steel);
+        AddIndustrialDoor(
+            _levelRoot,
+            "WarehouseLoadingDoor",
+            new Vector3(25.0f, 0, 16.38f),
+            7.2f,
+            6.6f,
+            visibilityRange: 250.0f);
         for (var z = -23; z < 15; z += 6)
         {
             StaticBox("WarehouseColumn", new Vector3(8.2f, 3.2f, z), new Vector3(0.55f, 6.4f, 0.55f), steel);
@@ -732,6 +742,13 @@ void sky() {
         StaticBox("BarracksSouthL", center + new Vector3(-5.15f, height * 0.5f, depth * 0.5f), new Vector3(6.7f, height, 0.18f), wall);
         StaticBox("BarracksSouthR", center + new Vector3(5.15f, height * 0.5f, depth * 0.5f), new Vector3(6.7f, height, 0.18f), wall);
         StaticBox("BarracksDoorHeader", center + new Vector3(0, 2.68f, depth * 0.5f), new Vector3(3.6f, 0.64f, 0.18f), wall);
+        AddIndustrialDoor(
+            _levelRoot,
+            "BarracksEntryDoor",
+            center + new Vector3(0, 0, depth * 0.5f + 0.14f),
+            3.6f,
+            2.7f,
+            visibilityRange: 220.0f);
         foreach (var x in new[] { -2.8f, 2.8f })
         {
             StaticBox("BarracksPartitionA", center + new Vector3(x, 1.5f, -2.6f), new Vector3(0.14f, 3.0f, 2.2f), wall);
