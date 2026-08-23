@@ -28,7 +28,6 @@ SOURCE_RELOAD_END_FRAME = 64
 SOURCE_TO_METERS = 0.015
 SLEEVE_BLEND_LENGTH = 12.0
 SLEEVE_EXTENSION = 36.0
-SLEEVE_CAP_BAND = 1.0
 FIELD_ROTATION = Matrix.Rotation(math.radians(90.0), 4, "Z")
 WEAPON_MESH_NAMES = (
     "base_smg45_0",
@@ -123,66 +122,69 @@ def _boundary_edges(mesh: bpy.types.Mesh, component: set[int]) -> list[tuple[int
     ]
 
 
-def _ordered_boundary_segment(
-    mesh: bpy.types.Mesh,
-    edges: list[tuple[int, int]],
-    low_end: bool,
-) -> list[int]:
-    boundary_vertices = {index for edge in edges for index in edge}
-    extremum = (
-        min(mesh.vertices[index].co.y for index in boundary_vertices)
-        if low_end
-        else max(mesh.vertices[index].co.y for index in boundary_vertices)
-    )
-    candidates = {
-        index
-        for index in boundary_vertices
-        if (
-            mesh.vertices[index].co.y <= extremum + SLEEVE_CAP_BAND
-            if low_end
-            else mesh.vertices[index].co.y >= extremum - SLEEVE_CAP_BAND
-        )
-    }
-    adjacency: dict[int, list[int]] = {index: [] for index in candidates}
+def _boundary_loops(edges: list[tuple[int, int]]) -> list[list[int]]:
+    """Group boundary edges into ordered loops (open chains are returned too)."""
+    adjacency: dict[int, list[int]] = {}
     for left, right in edges:
-        if left in candidates and right in candidates:
-            adjacency[left].append(right)
-            adjacency[right].append(left)
-    endpoints = [index for index, neighbors in adjacency.items() if len(neighbors) == 1]
-    if len(endpoints) >= 2:
-        start = min(endpoints, key=lambda index: mesh.vertices[index].co.x)
-    else:
-        start = min(candidates, key=lambda index: mesh.vertices[index].co.z)
-    ordered = [start]
-    previous = -1
-    current = start
-    while True:
-        next_vertices = [index for index in adjacency[current] if index != previous]
-        if not next_vertices:
-            break
-        next_vertex = next_vertices[0]
-        if next_vertex in ordered:
-            break
-        ordered.append(next_vertex)
-        previous, current = current, next_vertex
-    return ordered
+        adjacency.setdefault(left, []).append(right)
+        adjacency.setdefault(right, []).append(left)
+
+    loops: list[list[int]] = []
+    visited_edges: set[tuple[int, int]] = set()
+    for start in sorted(adjacency):
+        for neighbor in adjacency[start]:
+            edge_key = (min(start, neighbor), max(start, neighbor))
+            if edge_key in visited_edges:
+                continue
+            ordered = [start, neighbor]
+            visited_edges.add(edge_key)
+            previous, current = start, neighbor
+            while True:
+                next_vertices = [
+                    index
+                    for index in adjacency[current]
+                    if index != previous
+                    and (min(current, index), max(current, index)) not in visited_edges
+                ]
+                if not next_vertices:
+                    break
+                next_vertex = next_vertices[0]
+                visited_edges.add((min(current, next_vertex), max(current, next_vertex)))
+                ordered.append(next_vertex)
+                if next_vertex == start:
+                    ordered.pop()
+                    break
+                previous, current = current, next_vertex
+            if len(ordered) >= 3:
+                loops.append(ordered)
+    return loops
 
 
-def _cap_boundary_segment(mesh: bpy.types.Mesh, indices: list[int], low_end: bool) -> None:
-    if len(indices) < 3:
+def _cap_boundary_loops(mesh: bpy.types.Mesh, component: set[int]) -> None:
+    edges = _boundary_edges(mesh, component)
+    loops = _boundary_loops(edges)
+    if not loops:
         return
     bm = bmesh.new()
     try:
         bm.from_mesh(mesh)
         bm.verts.ensure_lookup_table()
-        vertices = [bm.verts[index] for index in indices]
-        face = bm.faces.new(vertices)
-        face.material_index = 0
-        face.normal_update()
-        expected = Vector((0.0, -1.0 if low_end else 1.0, 0.0))
-        if face.normal.dot(expected) < 0.0:
-            face.normal_flip()
-        face.smooth = True
+        new_faces = []
+        for order in loops:
+            vertices = [bm.verts[index] for index in order]
+            try:
+                face = bm.faces.new(vertices)
+            except ValueError:
+                continue
+            face.material_index = 0
+            new_faces.append(face)
+        if new_faces:
+            component_faces = [
+                face for face in bm.faces if any(vertex.index in component for vertex in face.verts)
+            ]
+            bmesh.ops.recalc_face_normals(bm, faces=component_faces)
+            for face in new_faces:
+                face.smooth = True
         bm.to_mesh(mesh)
         mesh.update()
     finally:
@@ -190,7 +192,7 @@ def _cap_boundary_segment(mesh: bpy.types.Mesh, indices: list[int], low_end: boo
 
 
 def cap_authored_sleeves() -> None:
-    """Close the authored sleeve cuffs so the first-person arms stay watertight."""
+    """Seal every boundary loop on the authored arms so the first-person model stays watertight."""
     arms = bpy.data.objects["Object_7"]
     mesh = arms.data
     adjacency: dict[int, set[int]] = {index: set() for index in range(len(mesh.vertices))}
@@ -214,10 +216,8 @@ def cap_authored_sleeves() -> None:
                     stack.append(neighbor)
         components.append(component)
 
-    for component in sorted(components, key=len, reverse=True)[:2]:
-        edges = _boundary_edges(mesh, component)
-        _cap_boundary_segment(mesh, _ordered_boundary_segment(mesh, edges, low_end=True), low_end=True)
-        _cap_boundary_segment(mesh, _ordered_boundary_segment(mesh, edges, low_end=False), low_end=False)
+    for component in sorted(components, key=len, reverse=True):
+        _cap_boundary_loops(mesh, component)
 
 
 def evaluated_mesh_copy(source: bpy.types.Object, name: str) -> bpy.types.Object:
