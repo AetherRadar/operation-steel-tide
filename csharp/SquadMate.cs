@@ -478,6 +478,12 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             destination = ResolveFormationDestination();
             objectivePriority = true;
         }
+        else if (Main.TryGetDemolitionEscortTarget(this, out var escortPos))
+        {
+            var offset = new Vector3((SquadSlot % 2 == 0 ? 1.8f : -1.8f), 0, -2.2f);
+            destination = escortPos + offset;
+            objectivePriority = true;
+        }
         var reviveTargetNode = ActiveReviveTargetNode;
         if (reviveTargetNode is not null)
         {

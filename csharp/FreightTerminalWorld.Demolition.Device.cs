@@ -220,6 +220,8 @@ public partial class FreightTerminalWorld
         var dropOrigin = IsInstanceValid(carrier)
             ? carrier!.GlobalPosition
             : _demolitionDeviceLastCarrierPosition;
+        // 掉在墙内则向最近空旷侧探1.5m，避免全员对墙罚站
+        dropOrigin = FindFreeDemolitionDropPosition(dropOrigin);
         _demolitionDeviceGroundPosition = dropOrigin + Vector3.Up * DemolitionDeviceGroundHeight;
         var replacement = NearestLivingDemolitionAttacker(dropOrigin, carrier);
         var replacementId = DemolitionMemberId(replacement);
@@ -252,6 +254,54 @@ public partial class FreightTerminalWorld
                     replacementName),
                 new Color(1.0f, 0.3f, 0.18f));
         }
+        // 立即重算策略，不等1.5s，避免新Runner拿包后全员原地
+        _demolitionStrategyRemaining = 0.0f;
+    }
+
+    private Vector3 FindFreeDemolitionDropPosition(Vector3 origin)
+    {
+        var layout = DemolitionLayout();
+        // 若掉落点在墙体内，向四方向侧探1.5m找空旷点
+        if (!IsPointInsideDemolitionGeometry(origin, layout))
+        {
+            return origin;
+        }
+        var offsets = new Vector3[] { new(1.5f, 0, 0), new(-1.5f, 0, 0), new(0, 0, 1.5f), new(0, 0, -1.5f) };
+        foreach (var offset in offsets)
+        {
+            var candidate = origin + offset;
+            if (!IsPointInsideDemolitionGeometry(candidate, layout))
+            {
+                return candidate;
+            }
+        }
+        return origin;
+    }
+
+    private bool IsPointInsideDemolitionGeometry(Vector3 point, DemolitionArenaLayout layout)
+    {
+        // 检查碰撞盒与道具包围盒
+        foreach (var box in layout.CollisionBoxes)
+        {
+            var half = box.Size * 0.5f;
+            var delta = point - box.Center;
+            // 粗略AABB，忽略旋转（旋转盒已在布局中少见，且1.5m侧探足够）
+            if (Mathf.Abs(delta.X) < half.X + 0.6f && Mathf.Abs(delta.Z) < half.Z + 0.6f && Mathf.Abs(delta.Y - box.Center.Y) < half.Y + 1.0f)
+            {
+                return true;
+            }
+        }
+        foreach (var prop in layout.Props)
+        {
+            var half = prop.CollisionSize * prop.Scale * 0.5f;
+            var center = prop.Position + new Basis(Vector3.Up, prop.Yaw) * (prop.CollisionOffset * prop.Scale);
+            var delta = point - center;
+            if (Mathf.Abs(delta.X) < half.X + 0.6f && Mathf.Abs(delta.Z) < half.Z + 0.6f && Mathf.Abs(delta.Y - center.Y) < half.Y + 1.0f)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void SyncDemolitionDeviceVisual()
@@ -412,6 +462,34 @@ public partial class FreightTerminalWorld
             || !IsInstanceValid(hostile)
             || hostile.IsDead
             || mate.GlobalPosition.DistanceTo(hostile.GlobalPosition) >= DemolitionCombatEngageRange;
+    }
+
+    internal bool TryGetDemolitionEscortTarget(SquadMate mate, out Vector3 escortPos)
+    {
+        escortPos = default;
+        if (!_demolitionMode || !_demolitionRoundActive || mate.IsDowned || mate.IsBodyBag || _demolitionDevicePlanted)
+        {
+            return false;
+        }
+        if (IsDemolitionSquadDeviceObjectiveMate(mate) || LocalDemolitionSide != DemolitionTeam.Attackers)
+        {
+            return false;
+        }
+        var carrier = ResolveDemolitionAttacker(_demolitionDeviceLifecycle.CarrierMemberId) as SquadMate;
+        if (carrier is null || !IsInstanceValid(carrier) || carrier.IsDowned || carrier.IsBodyBag)
+        {
+            carrier = ResolveDemolitionAttacker(_demolitionDeviceLifecycle.PickupRunnerMemberId) as SquadMate;
+            if (carrier is null || !IsInstanceValid(carrier) || carrier.IsDowned || carrier.IsBodyBag)
+            {
+                return false;
+            }
+        }
+        if (carrier == mate)
+        {
+            return false;
+        }
+        escortPos = carrier.GlobalPosition;
+        return true;
     }
 
     private bool TryUpdateDemolitionSquadDeviceObjective(float delta)

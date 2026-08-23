@@ -110,7 +110,8 @@ public sealed class DemolitionStrategyPlanner
         List<DemolitionAgentSnapshot> members,
         IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents,
         IReadOnlyList<Vector2> siteCenters,
-        float remainingSeconds = 100.0f)
+        float remainingSeconds = 100.0f,
+        int strategySeed = 0)
     {
         // Time pressure overrides loadout: if clock barely covers walk+plant, pick the geometrically nearest site.
         if (remainingSeconds < 35.0f && members.Count > 0)
@@ -131,10 +132,14 @@ public sealed class DemolitionStrategyPlanner
             return dx0 * dx0 + dz0 * dz0 < dx1 * dx1 + dz1 * dz1 ? 0 : 1;
         }
         var averageRange = members.Average(member => member.WeaponRange);
+        // 加入回合哈希扰动，避免前2局全A的固定fallback
+        var hash = Math.Abs((long)strategySeed * 0x9e3779b1L) % 100L;
+        var hashBias = hash < 12L ? 1 : 0;
         var reconWeight = members.Count(member => member.Role == OperatorRole.Recon) * 0.18f;
         var weakenedLeft = members.Count(member => member.PositionX < 0.0f && member.HealthRatio < 0.58f);
         var weakenedRight = members.Count(member => member.PositionX >= 0.0f && member.HealthRatio < 0.58f);
-        var fallback = averageRange >= 135.0f || reconWeight > 0.0f && weakenedLeft <= weakenedRight ? 0 : 1;
+        var baseFallback = averageRange >= 135.0f || reconWeight > 0.0f && weakenedLeft <= weakenedRight ? 0 : 1;
+        var fallback = (baseFallback + hashBias) % 2;
         if (knownOpponents is null || knownOpponents.Count == 0)
         {
             return fallback;
@@ -227,7 +232,7 @@ public sealed class DemolitionStrategyPlanner
         IReadOnlyList<Vector2> siteCenters,
         float remainingSeconds = 100.0f)
     {
-        var primarySite = ChooseAttackerSite(members, knownOpponents, siteCenters, remainingSeconds);
+        var primarySite = ChooseAttackerSite(members, knownOpponents, siteCenters, remainingSeconds, strategySeed);
         var openingPattern = remainingSeconds < 25.0f ? DemolitionOpeningPattern.FullExecute : ChooseOpeningPattern(members, strategySeed);
 
         var entry = members
