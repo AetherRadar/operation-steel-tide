@@ -42,7 +42,7 @@ public partial class TacticalPlayer
                 WeaponPlatform.M1911 => 0.124f,
                 _ => 0.120f
             };
-            return new Vector3(0.0f, -pistolSightHeight * _weaponRoot.Scale.Y, -0.74f);
+            return new Vector3(0.08f, -pistolSightHeight * _weaponRoot.Scale.Y - 0.045f, -0.84f);
         }
         var sightHeight = IsInstanceValid(_opticRoot) && _opticRoot.Visible
             ? _opticRoot.Position.Y
