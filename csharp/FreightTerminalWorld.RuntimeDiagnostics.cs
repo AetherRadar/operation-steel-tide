@@ -96,6 +96,8 @@ public partial class FreightTerminalWorld
             ("--validate-skylinks", static world => world.ValidateSkyLinks()),
             ("--validate-skybridge-access", static world => world.ValidateSkybridgeAccess()),
             ("--validate-vehicle-drive", static world => world.ValidateVehicleDrive()),
+            ("--validate-hand-diagnostics", static world => world.ValidateHandDiagnostics()),
+            ("--capture-open-hand", static world => world.CaptureOpenHandValidation()),
             ("--validate-vehicle-combat", static world => world.ValidateVehicleCombat()),
             ("--validate-stairs", static world => world.ValidateStairsClimb()),
             ("--validate-roof-access", static world => world.ValidateRoofAccess()),

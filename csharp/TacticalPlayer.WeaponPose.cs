@@ -31,18 +31,18 @@ public partial class TacticalPlayer
 
     private Vector3 AimWeaponPosition()
     {
-        // Pistols sit lower and closer to the eye; generic 0.205 is for rifle optics and makes pistols fill the screen
+        // Pistols were filling the screen and sitting too high — lower and push back
         if (WeaponCatalog.IsSidearm(EquippedWeapon.Platform))
         {
             var pistolSightHeight = EquippedWeapon.Platform switch
             {
-                WeaponPlatform.DesertEagle => 0.095f,
-                WeaponPlatform.GSh18 => 0.088f,
-                WeaponPlatform.P226 => 0.086f,
-                WeaponPlatform.M1911 => 0.090f,
-                _ => 0.088f
+                WeaponPlatform.DesertEagle => 0.118f,
+                WeaponPlatform.GSh18 => 0.122f,
+                WeaponPlatform.P226 => 0.120f,
+                WeaponPlatform.M1911 => 0.124f,
+                _ => 0.120f
             };
-            return new Vector3(0.0f, -pistolSightHeight * _weaponRoot.Scale.Y, -0.66f);
+            return new Vector3(0.0f, -pistolSightHeight * _weaponRoot.Scale.Y, -0.74f);
         }
         var sightHeight = IsInstanceValid(_opticRoot) && _opticRoot.Visible
             ? _opticRoot.Position.Y
