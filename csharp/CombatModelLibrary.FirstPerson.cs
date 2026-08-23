@@ -85,6 +85,35 @@ internal sealed class AuthoredFirstPersonSmgVisual
     }
 }
 
+internal sealed class AuthoredFirstPersonArmsVisual
+{
+    private static readonly string[] WeaponOnlyNodes =
+    {
+        "WeaponBody", "MagazineGeometry", "ChargingHandleGeometry",
+        "BoltGeometry", "TriggerGeometry", "ChamberedRoundGeometry",
+        "Muzzle", "Icosphere"
+    };
+
+    public AuthoredFirstPersonArmsVisual(Node3D root, Skeleton3D skeleton)
+    {
+        Root = root;
+        Skeleton = skeleton;
+    }
+
+    public Node3D Root { get; }
+    public Skeleton3D Skeleton { get; }
+
+    public Vector3 PalmPosition(string boneName)
+    {
+        var bone = Skeleton.FindBone(boneName);
+        if (bone < 0)
+        {
+            return Vector3.Zero;
+        }
+        return Skeleton.GlobalTransform * Skeleton.GetBoneGlobalPose(bone).Origin;
+    }
+}
+
 internal readonly record struct FirstPersonSmgReloadInspection(
     bool Loaded,
     float Duration,
@@ -113,6 +142,30 @@ internal static partial class CombatModelLibrary
             geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         }
         return new AuthoredFirstPersonSmgVisual(root);
+    }
+
+    public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonArms()
+    {
+        var root = InstantiateRequired(Smg45FirstPersonScenePath, Smg45FirstPersonNodes);
+        root.Name = "AuthoredFirstPersonArmsVisual";
+        foreach (var name in new[]
+        {
+            "WeaponBody", "MagazineGeometry", "ChargingHandleGeometry",
+            "BoltGeometry", "TriggerGeometry", "ChamberedRoundGeometry",
+            "Muzzle", "Icosphere"
+        })
+        {
+            var node = root.FindChild(name, recursive: true, owned: false);
+            if (node is Node3D node3D)
+            {
+                node3D.Visible = false;
+            }
+        }
+        foreach (var geometry in GeometryBelow(root))
+        {
+            geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        }
+        return new AuthoredFirstPersonArmsVisual(root, RequireSkeleton(root));
     }
 
     public static CombatModelInspection InspectFirstPersonSmg45()

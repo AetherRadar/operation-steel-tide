@@ -27,7 +27,11 @@ SOURCE_RELOAD_START_FRAME = 0
 SOURCE_RELOAD_END_FRAME = 64
 SOURCE_TO_METERS = 0.015
 SLEEVE_BLEND_LENGTH = 12.0
-SLEEVE_EXTENSION = 36.0
+# Negative extension pulls the cuffs back toward/behind the first-person camera
+# so the tubes never end inside the visible frame, and the drop pushes them
+# below the bottom edge of the camera frustum across the reload animation.
+SLEEVE_EXTENSION = -60.0
+SLEEVE_DROP = 240.0
 FIELD_ROTATION = Matrix.Rotation(math.radians(90.0), 4, "Z")
 WEAPON_MESH_NAMES = (
     "base_smg45_0",
@@ -106,6 +110,7 @@ def extend_authored_sleeves() -> None:
             normalized = min(1.0, max(0.0, (blend_end - vertex.co.y) / SLEEVE_BLEND_LENGTH))
             falloff = normalized * normalized * (3.0 - 2.0 * normalized)
             vertex.co.y -= SLEEVE_EXTENSION * falloff
+            vertex.co.z -= SLEEVE_DROP * falloff
     mesh.update()
 
 
