@@ -283,6 +283,11 @@ public partial class FreightTerminalWorld
         {
             Solid("Refrigerator", new Vector3(kitchenX, floorY + 0.95f, depth * 0.05f - 1.15f), new Vector3(0.7f, 1.75f, 0.68f), appliance);
         }
+        if (furnitureKind != ResidentialFurnitureKind.Refrigerator
+            && layout is ResidentialFloorLayout.FamilySplit or ResidentialFloorLayout.OffsetApartment or ResidentialFloorLayout.OpenLoft)
+        {
+            Solid("Refrigerator", new Vector3(kitchenX, floorY + 0.95f, depth * 0.05f - 1.15f), new Vector3(0.7f, 1.75f, 0.68f), appliance);
+        }
         return new ResidentialRoomAnchors(bedZ, kitchenX);
     }
 
