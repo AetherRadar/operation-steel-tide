@@ -74,7 +74,8 @@ public sealed class DemolitionStrategyPlanner
         int plantedSiteIndex = -1,
         IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents = null,
         int strategySeed = 0,
-        IReadOnlyList<Vector2>? siteCenters = null)
+        IReadOnlyList<Vector2>? siteCenters = null,
+        float remainingSeconds = 100.0f)
     {
         siteCenters ??= DemolitionArenaLayout.LocalSiteCenters;
         var available = members
@@ -92,7 +93,7 @@ public sealed class DemolitionStrategyPlanner
         {
             return phase == DemolitionStrategyPhase.PostPlant && plantedSiteIndex >= 0
                 ? PlanAttackerPostPlant(available, plantedSiteIndex)
-                : PlanAttackerOpening(available, knownOpponents, strategySeed, siteCenters);
+                : PlanAttackerOpening(available, knownOpponents, strategySeed, siteCenters, remainingSeconds);
         }
         return phase == DemolitionStrategyPhase.PostPlant && plantedSiteIndex >= 0
             ? PlanDefenderRetake(available, plantedSiteIndex, siteCenters)
@@ -102,13 +103,33 @@ public sealed class DemolitionStrategyPlanner
     /// <summary>
     /// Shared-intelligence site choice, the YaPB-style danger heuristic: with no contacts
     /// keep the loadout-based default, but once defenders are sighted around one site,
-    /// attack the other.
+    /// attack the other. Under time pressure (&lt;35s) the nearest site wins regardless
+    /// of loadout, so the team still reaches a plant before the clock expires.
     /// </summary>
     private static int ChooseAttackerSite(
         List<DemolitionAgentSnapshot> members,
         IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents,
-        IReadOnlyList<Vector2> siteCenters)
+        IReadOnlyList<Vector2> siteCenters,
+        float remainingSeconds = 100.0f)
     {
+        // Time pressure overrides loadout: if clock barely covers walk+plant, pick the geometrically nearest site.
+        if (remainingSeconds < 35.0f && members.Count > 0)
+        {
+            var avgX = 0.0f;
+            var avgZ = 0.0f;
+            foreach (var m in members)
+            {
+                avgX += m.PositionX;
+                avgZ += m.PositionZ;
+            }
+            avgX /= members.Count;
+            avgZ /= members.Count;
+            var dx0 = avgX - siteCenters[0].X;
+            var dz0 = avgZ - siteCenters[0].Y;
+            var dx1 = avgX - siteCenters[1].X;
+            var dz1 = avgZ - siteCenters[1].Y;
+            return dx0 * dx0 + dz0 * dz0 < dx1 * dx1 + dz1 * dz1 ? 0 : 1;
+        }
         var averageRange = members.Average(member => member.WeaponRange);
         var reconWeight = members.Count(member => member.Role == OperatorRole.Recon) * 0.18f;
         var weakenedLeft = members.Count(member => member.PositionX < 0.0f && member.HealthRatio < 0.58f);
@@ -203,10 +224,11 @@ public sealed class DemolitionStrategyPlanner
         List<DemolitionAgentSnapshot> members,
         IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents,
         int strategySeed,
-        IReadOnlyList<Vector2> siteCenters)
+        IReadOnlyList<Vector2> siteCenters,
+        float remainingSeconds = 100.0f)
     {
-        var primarySite = ChooseAttackerSite(members, knownOpponents, siteCenters);
-        var openingPattern = ChooseOpeningPattern(members, strategySeed);
+        var primarySite = ChooseAttackerSite(members, knownOpponents, siteCenters, remainingSeconds);
+        var openingPattern = remainingSeconds < 25.0f ? DemolitionOpeningPattern.FullExecute : ChooseOpeningPattern(members, strategySeed);
 
         var entry = members
             .OrderByDescending(member => EntryScore(member))

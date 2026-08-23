@@ -57,7 +57,8 @@ public partial class FreightTerminalWorld
             _demolitionActiveSite,
             CollectDemolitionSightings(opponentTeamSide, playerTeamSide, layout),
             strategySeed: _demolitionMatch.CurrentRound,
-            siteCenters: layout.LocalSiteCoordinates);
+            siteCenters: layout.LocalSiteCoordinates,
+            remainingSeconds: _demolitionRemaining);
         _demolitionAttackerPlan = playerTeamSide == DemolitionTeam.Attackers ? playerPlan : _demolitionAttackerPlan;
         _demolitionDefenderPlan = playerTeamSide == DemolitionTeam.Defenders ? playerPlan : _demolitionDefenderPlan;
         ApplyDemolitionSquadPlan(playerPlan, layout);
@@ -87,7 +88,8 @@ public partial class FreightTerminalWorld
             _demolitionActiveSite,
             CollectDemolitionSightings(playerTeamSide, opponentTeamSide, layout),
             strategySeed: _demolitionMatch.CurrentRound,
-            siteCenters: layout.LocalSiteCoordinates);
+            siteCenters: layout.LocalSiteCoordinates,
+            remainingSeconds: _demolitionRemaining);
         _demolitionAttackerPlan = opponentTeamSide == DemolitionTeam.Attackers ? opponentPlan : _demolitionAttackerPlan;
         _demolitionDefenderPlan = opponentTeamSide == DemolitionTeam.Defenders ? opponentPlan : _demolitionDefenderPlan;
 
