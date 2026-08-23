@@ -9,6 +9,20 @@ public partial class TacticalPlayer
         EquippedHelmet = EquipmentCatalog.Create(loadout.HelmetId);
         EquippedBodyArmor = EquipmentCatalog.Create(loadout.BodyArmorId);
         EquippedBackpack = EquipmentCatalog.Create(loadout.BackpackId);
+        // Auto-enable NVG when spawning with NVG helmet — default should be on
+        if (loadout.HelmetId == "helmet_nvg")
+        {
+            _nvgOn = true;
+            Main?.SetNightVisionActive(true);
+            Hud?.SetNightVisionActive(true);
+            Hud?.ShowLocalizedMessage("nvg_auto_on", "NVG AUTO ON // PRESS N TO TOGGLE", new Color(0.42f, 0.95f, 0.42f));
+        }
+        else if (_nvgOn)
+        {
+            _nvgOn = false;
+            Main?.SetNightVisionActive(false);
+            Hud?.SetNightVisionActive(false);
+        }
         ResetEquippedEquipmentGrades();
         ResetAmmoReserves();
 

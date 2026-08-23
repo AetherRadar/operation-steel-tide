@@ -774,7 +774,11 @@ public partial class FreightTerminalWorld : Node3D
         _hud.QualityChanged += ApplyQuality;
         _hud.FullscreenChanged += SetFullscreen;
         _hud.LanguageChanged += SetLanguage;
-        _hud.DeploymentTimeOfDayChanged += index => ApplyTimeOfDay((DeploymentTimeOfDay)index);
+        _hud.DeploymentTimeOfDayChanged += index =>
+        {
+            _deploymentTimeOfDay = (DeploymentTimeOfDay)index;
+            ApplyTimeOfDay(_deploymentTimeOfDay);
+        };
         _hud.LootTakeRequested += TakeLootItem;
         _hud.LootEquipRequested += EquipLootItem;
         _hud.LootReturnRequested += ReturnBackpackItem;
