@@ -35,14 +35,6 @@ internal sealed class AuthoredFirstPersonSmgVisual
     public float ReloadAnimationDuration
         => (float)AnimationPlayer.GetAnimation(ReloadAnimationName).Length;
 
-    public Vector3 PalmPosition(string boneName)
-    {
-        var bone = Skeleton.FindBone(boneName);
-        return bone < 0
-            ? Vector3.Zero
-            : Skeleton.GlobalTransform * Skeleton.GetBoneGlobalPose(bone).Origin;
-    }
-
     public void SyncMechanisms()
     {
         Magazine.Visible = true;
@@ -98,32 +90,33 @@ internal sealed class AuthoredFirstPersonArmsVisual
     public AuthoredFirstPersonArmsVisual(Node3D root)
     {
         Root = root;
-        PrimaryArm = CombatModelLibrary.RequireNode(root, "RightArm");
-        SupportArm = CombatModelLibrary.RequireNode(root, "LeftArm");
+        Arms = CombatModelLibrary.RequireNode(root, "AuthoredArms");
+        RightPalmFrame = CombatModelLibrary.RequireNode(root, "RightPalmFrame");
+        LeftPalmFrame = CombatModelLibrary.RequireNode(root, "LeftPalmFrame");
+        RightWristFrame = CombatModelLibrary.RequireNode(root, "RightWristFrame");
+        LeftWristFrame = CombatModelLibrary.RequireNode(root, "LeftWristFrame");
     }
 
     public Node3D Root { get; }
-    public Node3D PrimaryArm { get; }
-    public Node3D SupportArm { get; }
+    public Node3D Arms { get; }
+    public Node3D RightPalmFrame { get; }
+    public Node3D LeftPalmFrame { get; }
+    public Node3D RightWristFrame { get; }
+    public Node3D LeftWristFrame { get; }
 
-    public Vector3 PrimaryPalmPosition => PrimaryArm.GlobalPosition;
-    public Vector3 SupportPalmPosition => SupportArm.GlobalPosition;
+    public Transform3D MarkerTransformInRoot(Node3D marker)
+        => Root.GlobalTransform.AffineInverse() * marker.GlobalTransform;
 
-    public void ApplyPose(FirstPersonArmPoseDefinition pose)
-    {
-        var armMountParent = PrimaryArm.GetParent() as Node3D
-            ?? throw new InvalidOperationException("Authored first-person arm is missing its mount parent.");
-        // The GLB keeps the authored 0.015 import scale on its named rig child,
-        // while the packed-scene wrapper carries the presentation rotation.
-        // Convert through both transforms so the palm anchors land in metres
-        // instead of being compressed back toward the weapon-root origin.
-        var weaponToRig = armMountParent.Transform.AffineInverse()
-            * Root.Transform.AffineInverse();
-        PrimaryArm.Position = weaponToRig * pose.PrimaryGrip;
-        SupportArm.Position = weaponToRig * pose.SupportGrip;
-        PrimaryArm.Rotation = Vector3.Zero;
-        SupportArm.Rotation = Vector3.Zero;
-    }
+    public Transform3D RightPalmTransformInRoot
+        => MarkerTransformInRoot(RightPalmFrame);
+
+    public Transform3D LeftPalmTransformInRoot
+        => MarkerTransformInRoot(LeftPalmFrame);
+
+    public Vector3 PalmPosition(string boneName)
+        => boneName.StartsWith("L_", StringComparison.Ordinal)
+            ? LeftPalmFrame.GlobalPosition
+            : RightPalmFrame.GlobalPosition;
 }
 
 internal readonly record struct FirstPersonSmgReloadInspection(
@@ -136,10 +129,14 @@ internal static partial class CombatModelLibrary
 {
     internal const string Smg45FirstPersonScenePath =
         "res://assets/models/djmaesen_smg45/smg45_first_person.glb";
-    internal const string FirstPersonArmsScenePath =
-        "res://assets/models/djmaesen_smg45/first_person_arms.glb";
     internal const string Smg45WeaponScenePath =
         "res://assets/models/djmaesen_smg45/smg45_weapon.glb";
+    internal const string Smg45RifleArmsScenePath =
+        "res://assets/models/djmaesen_smg45/smg45_rifle_arms.glb";
+    internal const string Smg45PistolServiceArmsScenePath =
+        "res://assets/models/djmaesen_smg45/smg45_pistol_service_arms.glb";
+    internal const string Smg45PistolLargeArmsScenePath =
+        "res://assets/models/djmaesen_smg45/smg45_pistol_large_arms.glb";
 
     private static readonly string[] Smg45FirstPersonNodes =
     {
@@ -147,10 +144,9 @@ internal static partial class CombatModelLibrary
         "MagazineGeometry", "ChargingHandleGeometry", "Muzzle"
     };
 
-    private static readonly string[] FirstPersonArmsNodes =
+    private static readonly string[] StaticFirstPersonArmsNodes =
     {
-        "DJMaesenFirstPersonArms", "RightArm", "RightArmMesh",
-        "RightPalm", "LeftArm", "LeftArmMesh", "LeftPalm"
+        "AuthoredArms"
     };
 
     public static AuthoredFirstPersonSmgVisual InstantiateFirstPersonSmg45()
@@ -164,10 +160,27 @@ internal static partial class CombatModelLibrary
         return new AuthoredFirstPersonSmgVisual(root);
     }
 
-    public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonArms()
+    public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonRifleArms()
+        => InstantiateStaticFirstPersonArms(
+            Smg45RifleArmsScenePath,
+            "AuthoredFirstPersonRifleArmsVisual");
+
+    public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonPistolServiceArms()
+        => InstantiateStaticFirstPersonArms(
+            Smg45PistolServiceArmsScenePath,
+            "AuthoredFirstPersonPistolServiceArmsVisual");
+
+    public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonPistolLargeArms()
+        => InstantiateStaticFirstPersonArms(
+            Smg45PistolLargeArmsScenePath,
+            "AuthoredFirstPersonPistolLargeArmsVisual");
+
+    private static AuthoredFirstPersonArmsVisual InstantiateStaticFirstPersonArms(
+        string scenePath,
+        string runtimeName)
     {
-        var root = InstantiateRequired(FirstPersonArmsScenePath, FirstPersonArmsNodes);
-        root.Name = "AuthoredFirstPersonArmsVisual";
+        var root = InstantiateRequired(scenePath, StaticFirstPersonArmsNodes);
+        root.Name = runtimeName;
         foreach (var geometry in GeometryBelow(root))
         {
             geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;

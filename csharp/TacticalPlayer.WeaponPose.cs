@@ -42,7 +42,14 @@ public partial class TacticalPlayer
                 WeaponPlatform.M1911 => 0.22f,
                 _ => 0.20f
             };
-            return new Vector3(0.16f, -pistolSightHeight * _weaponRoot.Scale.Y, -0.94f);
+            // Keep the sight picture close enough to the camera that a nearby
+            // wall cannot swallow the entire pistol when ADS starts.  The old
+            // -0.94 depth pushed short sidearms through cover and made them
+            // appear to vanish while aiming.
+            return new Vector3(
+                0.12f,
+                -pistolSightHeight * _weaponRoot.Scale.Y - 0.02f,
+                -0.82f);
         }
         var sightHeight = IsInstanceValid(_opticRoot) && _opticRoot.Visible
             ? _opticRoot.Position.Y
