@@ -349,7 +349,7 @@ internal static partial class CombatModelLibrary
     private const string QuaterniusWeaponRoot = "res://assets/models/quaternius_ultimate_guns";
     internal const string OperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier_animated.glb";
     internal const string PreviewOperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier.glb";
-    internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/low-poly_gsh-18.glb";
+    internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/gsh18_runtime.glb";
     internal const string DesertEagleScenePath = "res://assets/models/elizion_desert_eagle/desert_eagle.glb";
 
     private const float Gsh18FirstPersonLength = 0.64f;
@@ -381,7 +381,7 @@ internal static partial class CombatModelLibrary
 
     private static readonly string[] Gsh18Nodes =
     {
-        "Armature", "Skeleton3D"
+        "TastyTonyGsh18Runtime"
     };
 
     private static readonly string[] DesertEagleNodes =
@@ -524,7 +524,10 @@ internal static partial class CombatModelLibrary
         RemoveStagingNode(source, "Lamp");
         RemoveStagingNode(source, "Camera");
         var sourceBounds = ComputeBounds(source);
-        if (sourceBounds.MeshCount == 0 || sourceBounds.Size.X <= 0.001f)
+        if (sourceBounds.MeshCount == 0
+            || sourceBounds.Size.X <= 0.001f
+            || sourceBounds.Size.Y <= 0.001f
+            || sourceBounds.Size.Z <= 0.001f)
         {
             source.Free();
             throw new InvalidOperationException("GSh-18 model has no usable geometry bounds.");
@@ -532,11 +535,17 @@ internal static partial class CombatModelLibrary
 
         source.Position = -sourceBounds.Center;
         var targetLength = firstPerson ? Gsh18FirstPersonLength : Gsh18PreviewLength;
+        // Godot's glTF import contract is source X = barrel length, source Y =
+        // height, source Z = thickness. The presentation yaw maps those to
+        // world Z, Y, and X respectively. Length is the authoritative scale;
+        // preserving the authored aspect ratio keeps the slide and grip from
+        // becoming a distorted pillar.
+        var scale = targetLength / sourceBounds.Size.X;
         var wrapper = new Node3D
         {
             Name = "AuthoredGsh18Visual",
             RotationDegrees = new Vector3(0.0f, 90.0f, 0.0f),
-            Scale = Vector3.One * (targetLength / sourceBounds.Size.X)
+            Scale = Vector3.One * scale
         };
         wrapper.AddChild(source);
         if (firstPerson)

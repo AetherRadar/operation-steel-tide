@@ -17,9 +17,6 @@ public partial class TacticalPlayer
     private AuthoredFirstPersonArmsVisual _authoredRifleArms = null!;
     private bool _rifleArmsLoadAttempted;
 
-    // Anchors in authored M4A1 (weapon-root local) coordinates.
-    private static readonly Vector3 RifleGripAnchor = new(0.0f, -0.15f, -0.05f);
-    private static readonly Vector3 RifleForegripAnchor = new(0.0f, -0.17f, -0.58f);
     private AuthoredGsh18Visual _authoredGsh18Weapon = null!;
     private AuthoredDesertEagleVisual _authoredDesertEagleWeapon = null!;
     private bool _smg45LoadAttempted;
@@ -60,28 +57,117 @@ public partial class TacticalPlayer
                     && IsInstanceValid(visual.Root)
                     ? visual.Root.GetInstanceId()
                     : 0;
-    internal bool WeaponHandPoseValidForDiagnostics
+    internal bool UsesAuthoredHandRigForDiagnostics
     {
         get
         {
-            if (!IsInstanceValid(_primaryHand)
-                || !IsInstanceValid(_supportHand)
-                || !IsInstanceValid(_primaryForearm)
-                || !IsInstanceValid(_supportForearm))
-            {
-                return false;
-            }
-            var separation = _primaryHand.Position.DistanceTo(_supportHand.Position);
-            var expectedRange = WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
-                ? new Vector2(0.08f, 0.28f)
-                : new Vector2(0.22f, 1.02f);
-            return separation >= expectedRange.X && separation <= expectedRange.Y;
+            var arms = _authoredRifleArms;
+            return EquippedWeapon.Platform != WeaponPlatform.M3A1
+                && arms is not null
+                && IsInstanceValid(arms.Root)
+                && arms.Root.Visible;
         }
     }
-    internal bool UsesAuthoredHandRigForDiagnostics
-        => EquippedWeapon.Platform != WeaponPlatform.M3A1
-            && IsInstanceValid(_authoredRifleArms?.Root)
-            && _authoredRifleArms.Root.Visible;
+
+    internal FirstPersonArmRigSnapshot InspectFirstPersonArmRigForDiagnostics()
+    {
+        var platform = EquippedWeapon.Platform;
+        var pose = FirstPersonArmPoseCatalog.For(platform);
+        var proceduralVisible = IsInstanceValid(_proceduralFirstPersonArms)
+            && _proceduralFirstPersonArms.Visible;
+        if (platform == WeaponPlatform.M3A1)
+        {
+            var smg = _authoredFirstPersonSmg;
+            var active = smg is not null
+                && IsInstanceValid(smg.Root)
+                && smg.Root.Visible;
+            var primaryGlobal = active
+                ? smg!.PalmPosition("R_palm_039")
+                : Vector3.Zero;
+            var supportGlobal = active
+                ? smg!.PalmPosition("L_palm_015")
+                : Vector3.Zero;
+            return BuildArmRigSnapshot(
+                platform,
+                pose,
+                active,
+                nativeSmgRig: true,
+                proceduralVisible,
+                active ? smg!.Root.GetInstanceId() : 0,
+                active ? smg!.Root.Scale : Vector3.Zero,
+                primaryGlobal,
+                supportGlobal,
+                0.0f,
+                0.0f);
+        }
+
+        var arms = _authoredRifleArms;
+        var authoredActive = arms is not null
+            && IsInstanceValid(arms.Root)
+            && arms.Root.Visible;
+        var primaryPalm = authoredActive
+            ? arms!.PrimaryPalmPosition
+            : Vector3.Zero;
+        var supportPalm = authoredActive
+            ? arms!.SupportPalmPosition
+            : Vector3.Zero;
+        var toWeaponLocal = _weaponRoot.GlobalTransform.AffineInverse();
+        var primaryLocal = toWeaponLocal * primaryPalm;
+        var supportLocal = toWeaponLocal * supportPalm;
+        return BuildArmRigSnapshot(
+            platform,
+            pose,
+            authoredActive,
+            nativeSmgRig: false,
+            proceduralVisible,
+            authoredActive ? arms!.Root.GetInstanceId() : 0,
+            authoredActive ? arms!.Root.Scale : Vector3.Zero,
+            primaryPalm,
+            supportPalm,
+            primaryLocal.DistanceTo(pose.PrimaryGrip),
+            supportLocal.DistanceTo(pose.SupportGrip));
+    }
+
+    private FirstPersonArmRigSnapshot BuildArmRigSnapshot(
+        WeaponPlatform platform,
+        FirstPersonArmPoseDefinition pose,
+        bool active,
+        bool nativeSmgRig,
+        bool proceduralVisible,
+        ulong instanceId,
+        Vector3 rootScale,
+        Vector3 primaryGlobal,
+        Vector3 supportGlobal,
+        float primaryGripError,
+        float supportGripError)
+    {
+        var viewportSize = _camera.GetViewport().GetVisibleRect().Size;
+        var primaryScreen = active && viewportSize.X > 0.0f && viewportSize.Y > 0.0f
+            ? _camera.UnprojectPosition(primaryGlobal) / viewportSize
+            : Vector2.Zero;
+        var supportScreen = active && viewportSize.X > 0.0f && viewportSize.Y > 0.0f
+            ? _camera.UnprojectPosition(supportGlobal) / viewportSize
+            : Vector2.Zero;
+        var toWeaponLocal = _weaponRoot.GlobalTransform.AffineInverse();
+        return new FirstPersonArmRigSnapshot(
+            platform,
+            pose.Kind,
+            active,
+            nativeSmgRig,
+            proceduralVisible,
+            instanceId,
+            rootScale,
+            toWeaponLocal * primaryGlobal,
+            toWeaponLocal * supportGlobal,
+            primaryGlobal,
+            supportGlobal,
+            primaryGripError,
+            supportGripError,
+            primaryScreen,
+            supportScreen,
+            active && _camera.IsPositionBehind(primaryGlobal),
+            active && _camera.IsPositionBehind(supportGlobal));
+    }
 
     private void BuildAuthoredPrimaryWeapon()
     {
@@ -193,12 +279,12 @@ public partial class TacticalPlayer
             _authoredRifleArms.Root.Visible = useAuthoredRifleArms;
             if (useAuthoredRifleArms)
             {
-                AlignRifleArmsToWeapon();
+                ApplyAuthoredArmPose();
             }
         }
         if (IsInstanceValid(_proceduralFirstPersonArms))
         {
-            _proceduralFirstPersonArms.Visible = !useAuthoredSmg && !useAuthoredRifleArms;
+            _proceduralFirstPersonArms.Visible = false;
         }
         _proceduralWeaponVisual.Visible = !useAuthoredM4
             && !useAuthoredSmg
@@ -227,7 +313,7 @@ public partial class TacticalPlayer
                 or WeaponPlatform.DesertEagle => new Vector3(0.10f, -0.135f + aimingDrop, 0.02f),
             WeaponPlatform.MP5A5 or WeaponPlatform.M3A1 => new Vector3(0.11f, -0.18f, -0.08f),
             WeaponPlatform.M24 or WeaponPlatform.AXMC or WeaponPlatform.AWM => new Vector3(0.0f, -0.17f, 0.02f),
-            _ => RifleGripAnchor
+            _ => FirstPersonArmPoseCatalog.For(EquippedWeapon.Platform).PrimaryGrip
         };
         var support = EquippedWeapon.Platform switch
         {
@@ -237,7 +323,7 @@ public partial class TacticalPlayer
             WeaponPlatform.M24 or WeaponPlatform.AXMC => new Vector3(-0.02f, -0.19f, -0.72f),
             WeaponPlatform.AWM => new Vector3(-0.02f, -0.19f, -0.86f),
             WeaponPlatform.VSS => new Vector3(-0.02f, -0.18f, -0.62f),
-            _ => RifleForegripAnchor
+            _ => FirstPersonArmPoseCatalog.For(EquippedWeapon.Platform).SupportGrip
         };
 
         _primaryHand.Position = primary;
@@ -265,7 +351,7 @@ public partial class TacticalPlayer
         {
             var authoredSmg = CombatModelLibrary.InstantiateFirstPersonSmg45();
             var inheritedScale = Mathf.Max(0.0001f, _weaponRoot.Scale.X);
-            authoredSmg.Root.Scale = Vector3.One * (AuthoredSmgPresentationScale / inheritedScale);
+            authoredSmg.Root.Scale *= AuthoredSmgPresentationScale / inheritedScale;
             authoredSmg.Root.Position =
                 (AuthoredSmgCameraPosition - _weaponRoot.Position) / inheritedScale;
             authoredSmg.Root.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
@@ -314,58 +400,22 @@ public partial class TacticalPlayer
             arms.Root.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
             _weaponRoot.AddChild(arms.Root);
             _authoredRifleArms = arms;
-            AlignRifleArmsToWeapon();
+            ApplyAuthoredArmPose();
         }
         catch (Exception exception)
         {
-            GD.PushWarning($"Authored rifle arms unavailable; retaining procedural hands: {exception.Message}");
+            GD.PushError($"Required authored first-person arms unavailable: {exception.Message}");
         }
     }
 
-    private void AlignRifleArmsToWeapon()
+    private void ApplyAuthoredArmPose()
     {
         if (!IsInstanceValid(_authoredRifleArms?.Root))
         {
             return;
         }
-        var toLocal = _weaponRoot.GlobalTransform.AffineInverse();
-        var right = toLocal * _authoredRifleArms.PalmPosition("R_palm_039");
-        var left = toLocal * _authoredRifleArms.PalmPosition("L_palm_015");
-        var (gripAnchor, supportAnchor) = FirstPersonHandAnchors(EquippedWeapon.Platform);
-        var current = left - right;
-        var target = supportAnchor - gripAnchor;
-        var currentFlat = new Vector2(current.X, current.Z);
-        var targetFlat = new Vector2(target.X, target.Z);
-        if (currentFlat.Length() < 0.0001f || targetFlat.Length() < 0.0001f)
-        {
-            return;
-        }
-        var scale = targetFlat.Length() / currentFlat.Length();
-        var yaw = currentFlat.AngleTo(targetFlat);
-        var basis = new Basis(Vector3.Up, yaw).Scaled(Vector3.One * scale);
-        _authoredRifleArms.Root.Basis = basis;
-        _authoredRifleArms.Root.Position = gripAnchor - basis * right;
-        var toLocalAfter = _weaponRoot.GlobalTransform.AffineInverse();
-        var residual = (toLocalAfter * _authoredRifleArms.PalmPosition("R_palm_039") - gripAnchor).Length();
-        GD.Print($"RIFLE_ARMS_ALIGN grip_residual={residual:F4} scale={scale:F3} yaw_deg={Mathf.RadToDeg(yaw):F1}");
+        _authoredRifleArms.ApplyPose(FirstPersonArmPoseCatalog.For(EquippedWeapon.Platform));
     }
-
-    private static (Vector3 Grip, Vector3 Support) FirstPersonHandAnchors(WeaponPlatform platform)
-        => platform switch
-        {
-            WeaponPlatform.P226 or WeaponPlatform.M1911 or WeaponPlatform.GSh18
-                or WeaponPlatform.DesertEagle
-                => (new Vector3(0.105f, -0.17f, 0.035f), new Vector3(-0.075f, -0.19f, -0.19f)),
-            WeaponPlatform.MP5A5 or WeaponPlatform.M3A1
-                => (new Vector3(0.105f, -0.18f, -0.08f), new Vector3(-0.035f, -0.19f, -0.42f)),
-            WeaponPlatform.M24 or WeaponPlatform.AXMC
-                => (new Vector3(0.0f, -0.17f, 0.02f), new Vector3(-0.02f, -0.19f, -0.72f)),
-            WeaponPlatform.AWM
-                => (new Vector3(0.0f, -0.17f, 0.02f), new Vector3(-0.02f, -0.19f, -0.86f)),
-            WeaponPlatform.VSS
-                => (new Vector3(0.0f, -0.16f, -0.02f), new Vector3(-0.02f, -0.18f, -0.62f)),
-            _ => (RifleGripAnchor, RifleForegripAnchor)
-        };
 
     private void EnsureAuthoredDesertEagleWeapon()
     {
@@ -403,7 +453,7 @@ public partial class TacticalPlayer
         }
         catch (Exception exception)
         {
-            GD.PushWarning($"Authored GSh-18 unavailable; retaining procedural visual: {exception.Message}");
+            GD.PushError($"Required authored GSh-18 weapon unavailable: {exception.Message}");
         }
     }
 

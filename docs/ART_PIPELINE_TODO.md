@@ -18,7 +18,7 @@ This list tracks the remaining replacement of programmer art with redistributabl
 
 ## First-person and vehicles
 
-- [ ] Replace the procedural first-person arms with a rigged authored arm set that matches weapon sockets and reload clips.
+- [x] Replace the procedural first-person arms with a licensed authored arm set, fixed-scale pose classes, and named runtime palm mounts.
 - [ ] Replace remaining procedural primary-weapon previews with licensed authored models, starting with AK-74N, SCAR-L, MP5A5, M24, and AXMC.
 - [ ] Rework the extraction tilt-rotor silhouette, landing gear, fuselage materials, rotor blur, and boarding interior in Blender.
 - [ ] Audit drivable vehicles and major visible props for remaining primitive presentation meshes.

@@ -198,8 +198,8 @@ public partial class FreightTerminalWorld
             && gsh18.RequiredNodes
             && gsh18.MeshCount >= 10
             && gsh18.MaterialCount >= 1
-            && gsh18.Size.X > 0.001f
-            && gsh18.Size.Y > 0.001f
+            && gsh18.Size.X is >= 0.08f and <= 0.3f
+            && gsh18.Size.Y is >= 0.35f and <= 0.75f
             && gsh18.Size.Z is >= 0.65f and <= 0.9f;
         var desertEagleGeometry = desertEagle.Loaded
             && desertEagle.RequiredNodes

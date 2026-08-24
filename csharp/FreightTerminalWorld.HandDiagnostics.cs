@@ -18,73 +18,68 @@ public partial class FreightTerminalWorld
         await WaitFrames(6);
 
         var results = new List<string>();
-        var posesValid = true;
-        var authoredRigValid = true;
+        var firstPass = new Dictionary<WeaponPlatform, FirstPersonArmRigSnapshot>();
+        var selectionValid = true;
+        var gripValid = true;
+        var scaleValid = true;
+        var screenValid = true;
         foreach (var platform in Enum.GetValues<WeaponPlatform>())
         {
             _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
             await WaitFrames(8);
-            posesValid &= _player.WeaponHandPoseValidForDiagnostics;
-            authoredRigValid &= platform == WeaponPlatform.M3A1 || _player.UsesAuthoredHandRigForDiagnostics;
-            // Ensure arms are refreshed
-            var useAuthoredM4 = platform == WeaponPlatform.M4A1;
-            var useAuthoredSmg = platform == WeaponPlatform.M3A1;
-            var useAuthoredPlatform = platform is not WeaponPlatform.M4A1 and not WeaponPlatform.M3A1 and not WeaponPlatform.GSh18 and not WeaponPlatform.DesertEagle;
-            var procArmsVisible = IsInstanceValid(_player.GetNodeOrNull<Node3D>("Camera3D/WeaponRoot/ProceduralFirstPersonArms")) ? _player.GetNodeOrNull<Node3D>("Camera3D/WeaponRoot/ProceduralFirstPersonArms")?.Visible : false;
-            // Try to get support hand global pos via reflection (private fields)
-            var supportHandPos = Vector3.Zero;
-            var supportForearmPos = Vector3.Zero;
-            var rightHandVisible = false;
-            var leftHandVisible = false;
-            try
-            {
-                var type = typeof(TacticalPlayer);
-                var fArms = type.GetField("_proceduralFirstPersonArms", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var fSupportHand = type.GetField("_supportHand", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var fSupportForearm = type.GetField("_supportForearm", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var fCamera = type.GetField("_camera", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var fArmsNode = fArms?.GetValue(_player) as Node3D;
-                var supHand = fSupportHand?.GetValue(_player) as Node3D;
-                var supFore = fSupportForearm?.GetValue(_player) as Node3D;
-                var cam = fCamera?.GetValue(_player) as Camera3D;
-                if (fArmsNode != null) procArmsVisible = fArmsNode.Visible;
-                Vector2 supHandScreen = Vector2.Zero;
-                Vector2 rightHandScreen = Vector2.Zero;
-                bool supHandBehind = false;
-                bool rightHandBehind = false;
-                if (supHand != null) { supportHandPos = supHand.GlobalPosition; leftHandVisible = supHand.Visible; if (cam != null) { var pos = cam.UnprojectPosition(supportHandPos); supHandScreen = pos; supHandBehind = cam.IsPositionBehind(supportHandPos); } }
-                if (supFore != null) supportForearmPos = supFore.GlobalPosition;
-                // right hand is sibling of support hand, find by name
-                Node3D? rightNode = null;
-                if (fArmsNode != null)
-                {
-                    rightNode = fArmsNode.GetNodeOrNull<Node3D>("RightTacticalHand");
-                    if (rightNode != null) { rightHandVisible = rightNode.Visible; if (cam != null) { var rp = rightNode.GlobalPosition; rightHandScreen = cam.UnprojectPosition(rp); rightHandBehind = cam.IsPositionBehind(rp); } }
-                }
-                // authored rifle arms
-                var fAuthArms = type.GetField("_authoredRifleArms", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var authArms = fAuthArms?.GetValue(_player) as AuthoredFirstPersonArmsVisual;
-                if (authArms != null && IsInstanceValid(authArms.Root))
-                {
-                    var authVisible = authArms.Root.Visible;
-                    var rPalm = authArms.PalmPosition("R_palm_039");
-                    var lPalm = authArms.PalmPosition("L_palm_015");
-                    var rPalmScreen = cam != null ? cam.UnprojectPosition(rPalm) : Vector2.Zero;
-                    var lPalmScreen = cam != null ? cam.UnprojectPosition(lPalm) : Vector2.Zero;
-                    var rBehind = cam != null ? cam.IsPositionBehind(rPalm) : false;
-                    var lBehind = cam != null ? cam.IsPositionBehind(lPalm) : false;
-                    results.Add($"{platform}: procArmsVis={procArmsVisible} authArmsVis={authVisible} rightVis={rightHandVisible} leftVis={leftHandVisible} supHandPos={supportHandPos} supHandScreen={supHandScreen} behind={supHandBehind} rightScreen={rightHandScreen} rightBehind={rightHandBehind} rPalm={rPalm} rScreen={rPalmScreen} rBehind={rBehind} lPalm={lPalm} lScreen={lPalmScreen} lBehind={lBehind} weaponVis={_player.UsesAuthoredWeaponPlatformForDiagnostics(platform)}");
-                    continue;
-                }
-            }
-            catch (Exception e) { results.Add($"{platform}: exception {e.Message}"); continue; }
-            results.Add($"{platform}: procArmsVis={procArmsVisible} rightVis={rightHandVisible} leftVis={leftHandVisible} supHandPos={supportHandPos} weaponVis={_player.UsesAuthoredWeaponPlatformForDiagnostics(platform)}");
+            var snapshot = _player.InspectFirstPersonArmRigForDiagnostics();
+            firstPass[platform] = snapshot;
+            selectionValid &= snapshot.Active
+                && !snapshot.ProceduralVisible
+                && _player.UsesAuthoredWeaponPlatformForDiagnostics(platform);
+            gripValid &= snapshot.NativeSmgRig
+                || snapshot.PrimaryGripError <= 0.002f && snapshot.SupportGripError <= 0.002f;
+            scaleValid &= IsFinite(snapshot.RootScale)
+                && snapshot.RootScale.X > 0.0f
+                && Mathf.Abs(snapshot.RootScale.X - snapshot.RootScale.Y) <= 0.0001f
+                && Mathf.Abs(snapshot.RootScale.X - snapshot.RootScale.Z) <= 0.0001f;
+            screenValid &= IsFinite(snapshot.PrimaryPalmLocal)
+                && IsFinite(snapshot.SupportPalmLocal)
+                && IsOnScreen(snapshot.PrimaryScreen)
+                && IsOnScreen(snapshot.SupportScreen)
+                && !snapshot.PrimaryBehindCamera
+                && !snapshot.SupportBehindCamera;
+            results.Add(FormatArmSnapshot(snapshot));
+        }
+
+        var idempotent = true;
+        foreach (var platform in Enum.GetValues<WeaponPlatform>())
+        {
+            _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
+            await WaitFrames(3);
+            var repeated = _player.InspectFirstPersonArmRigForDiagnostics();
+            var original = firstPass[platform];
+            idempotent &= repeated.InstanceId == original.InstanceId
+                && repeated.RootScale.DistanceTo(original.RootScale) <= 0.0001f
+                && repeated.PrimaryPalmLocal.DistanceTo(original.PrimaryPalmLocal) <= 0.002f
+                && repeated.SupportPalmLocal.DistanceTo(original.SupportPalmLocal) <= 0.002f;
         }
         foreach (var line in results) GD.Print(line);
-        var valid = posesValid && authoredRigValid;
-        GD.Print($"HAND_POSE_CHECK valid={valid} procedural_pose={posesValid} authored_rig={authoredRigValid} samples={results.Count}");
+        var valid = selectionValid && gripValid && scaleValid && screenValid && idempotent;
+        GD.Print($"HAND_POSE_CHECK valid={valid} samples={results.Count} selection={selectionValid} grips={gripValid} scale={scaleValid} screen={screenValid} idempotent={idempotent}");
         GD.Print($"HAND_POSE_PASS valid={valid}");
         GD.Print($"HAND_DIAGNOSTICS_DONE count={results.Count}");
         GetTree().Quit(valid ? 0 : 2);
     }
+
+    private static bool IsFinite(Vector3 value)
+        => float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
+
+    private static bool IsOnScreen(Vector2 value)
+        => float.IsFinite(value.X)
+        && float.IsFinite(value.Y)
+        && value.X is >= -0.1f and <= 1.1f
+        && value.Y is >= -0.1f and <= 1.1f;
+
+    private static string FormatArmSnapshot(FirstPersonArmRigSnapshot snapshot)
+        => $"{snapshot.Platform}: pose={snapshot.PoseKind} active={snapshot.Active} "
+        + $"native={snapshot.NativeSmgRig} procedural={snapshot.ProceduralVisible} "
+        + $"scale={snapshot.RootScale} primary_error={snapshot.PrimaryGripError:F4} "
+        + $"support_error={snapshot.SupportGripError:F4} primary_screen={snapshot.PrimaryScreen} "
+        + $"support_screen={snapshot.SupportScreen} behind={snapshot.PrimaryBehindCamera}/{snapshot.SupportBehindCamera}";
 }

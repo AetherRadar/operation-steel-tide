@@ -12,7 +12,10 @@ The runtime models in this directory are adapted from **fps animated smg** by
   `source_art/third_party/djmaesen_fps_smg45/fps_animated_smg.glb`
 - Original SHA-256:
   `61F30D8980CE292869F97D98587A2736BAF719A19C0A32756838BD9EF2ADA83A`
-- Runtime adaptations: `smg45_first_person.glb` and `smg45_weapon.glb`
+- Runtime adaptations: `smg45_first_person.glb`, `first_person_arms.glb`, and `smg45_weapon.glb`
+- The static arm export carries the companion texture files
+  `first_person_arms_Image_0.png`, `first_person_arms_Image_1.png`, and
+  `first_person_arms_Image_2.png`.
 - Build script: `scripts/blender/build_djmaesen_smg45.py`
 
 Attribution: **"fps animated smg" by DJMaesen, licensed under CC BY 4.0.**

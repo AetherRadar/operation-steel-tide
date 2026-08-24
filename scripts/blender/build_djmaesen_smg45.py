@@ -20,6 +20,7 @@ SOURCE_GLB = SOURCE_DIR / "fps_animated_smg.glb"
 SOURCE_BLEND = SOURCE_DIR / "djmaesen_fps_smg45.blend"
 RUNTIME_DIR = REPO_ROOT / "assets" / "models" / "djmaesen_smg45"
 FIRST_PERSON_GLB = RUNTIME_DIR / "smg45_first_person.glb"
+FIRST_PERSON_ARMS_GLB = RUNTIME_DIR / "first_person_arms.glb"
 FIELD_GLB = RUNTIME_DIR / "smg45_weapon.glb"
 
 SOURCE_IDLE_FRAME = 155
@@ -242,6 +243,46 @@ def evaluated_mesh_copy(source: bpy.types.Object, name: str) -> bpy.types.Object
     return result
 
 
+def arm_side_copy(
+    source: bpy.types.Object,
+    name: str,
+    keep_positive_x: bool,
+) -> bpy.types.Object:
+    """Keep one disconnected authored arm while preserving materials and UVs."""
+    mesh = source.data.copy()
+    mesh.name = f"{name}Mesh"
+    result = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(result)
+    result.matrix_world = source.matrix_world.copy()
+
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(mesh)
+        unseen = set(bm.verts)
+        remove = []
+        while unseen:
+            seed = unseen.pop()
+            component = {seed}
+            stack = [seed]
+            while stack:
+                vertex = stack.pop()
+                for edge in vertex.link_edges:
+                    neighbor = edge.other_vert(vertex)
+                    if neighbor in unseen:
+                        unseen.remove(neighbor)
+                        component.add(neighbor)
+                        stack.append(neighbor)
+            center_x = sum(vertex.co.x for vertex in component) / len(component)
+            if (center_x >= 0.0) != keep_positive_x:
+                remove.extend(component)
+        bmesh.ops.delete(bm, geom=remove, context="VERTS")
+        bm.to_mesh(mesh)
+        mesh.update()
+    finally:
+        bm.free()
+    return result
+
+
 def parent_keep_world(child: bpy.types.Object, parent: bpy.types.Object) -> None:
     world = child.matrix_world.copy()
     child.parent = parent
@@ -323,6 +364,38 @@ def build_first_person() -> None:
     export_root(root, FIRST_PERSON_GLB, animated=True)
 
 
+def build_first_person_arms() -> None:
+    """Bake the authored idle pose into independently mounted, fixed-scale arms."""
+    import_source(SOURCE_IDLE_FRAME)
+    cap_authored_sleeves()
+    source = bpy.data.objects["Object_7"]
+    baked = evaluated_mesh_copy(source, "AuthoredArmsBaked")
+    right_mesh = arm_side_copy(baked, "RightArmMesh", keep_positive_x=False)
+    left_mesh = arm_side_copy(baked, "LeftArmMesh", keep_positive_x=True)
+
+    armature = next(obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE")
+    right_palm = (
+        armature.matrix_world @ armature.pose.bones["R_palm_039"].matrix
+    ).translation
+    left_palm = (
+        armature.matrix_world @ armature.pose.bones["L_palm_015"].matrix
+    ).translation
+
+    root = new_root("DJMaesenFirstPersonArms")
+    right_arm = new_root("RightArm")
+    left_arm = new_root("LeftArm")
+    right_arm.location = right_palm
+    left_arm.location = left_palm
+    right_arm.parent = root
+    left_arm.parent = root
+    parent_keep_world(right_mesh, right_arm)
+    parent_keep_world(left_mesh, left_arm)
+    add_marker(right_arm, "RightPalm", (0.0, 0.0, 0.0))
+    add_marker(left_arm, "LeftPalm", (0.0, 0.0, 0.0))
+    root.scale = Vector((SOURCE_TO_METERS, SOURCE_TO_METERS, SOURCE_TO_METERS))
+    export_root(root, FIRST_PERSON_ARMS_GLB)
+
+
 def transformed_bounds(
     objects: list[bpy.types.Object],
     transform: Matrix,
@@ -377,8 +450,10 @@ def main() -> None:
     RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     save_editable_source()
     build_first_person()
+    build_first_person_arms()
     build_field_weapon()
     print(f"Wrote {FIRST_PERSON_GLB}")
+    print(f"Wrote {FIRST_PERSON_ARMS_GLB}")
     print(f"Wrote {FIELD_GLB}")
     print(f"Wrote {SOURCE_BLEND}")
 
