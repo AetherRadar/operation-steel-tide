@@ -55,8 +55,9 @@ scene / composition root
 - UI diagnostics MUST set their own deterministic state and report one machine-readable `*_CHECK` line, one `*_PASS valid=...` line, and exit with `0` on success or `2` on failure.
 - CI MUST retain the C# build gate. The next gates to add are Go tests, pinned Godot headless diagnostics, and a packaged-export smoke test, in that order as reproducibility permits.
 - Commits MUST be cohesive, use an English imperative subject, and contain every task change before delivery, as required by `AGENTS.md`.
-- Every task MUST finish with this delivery sequence: commit all task changes, push the current branch to its configured upstream, then run `git fetch` and verify that local `HEAD` equals the upstream commit and `git status --short --branch` is clean without an `ahead` marker.
-- A task MUST NOT be reported as delivered when authentication, network failure, or branch protection prevents the required push.
+- Worktree tasks MAY run on a detached HEAD and MUST NOT require a shared Local checkout or assume that a current branch/upstream exists. Parallel development remains isolated in task worktrees; only final `main` integration and synchronization are serialized.
+- Every task MUST finish the delivery sequence defined in `AGENTS.md`: commit all task changes, update onto the latest `origin/main`, rerun required gates after any rebase, deliver with a non-force fast-forward push or an actually merged pull request, and fast-forward the clean local `main` checkout to `origin/main`.
+- Final verification MUST prove that the landed commit is an ancestor of `origin/main` (the task commit for a direct push, or the platform-created commit for a squash/rebase pull request), the local `main` checkout equals `origin/main`, and both the task worktree and local `main` checkout are clean. A task MUST NOT be reported as delivered when authentication, network failure, branch protection, concurrent integration, or a dirty/diverged local checkout prevents any required step.
 
 ## Review checklist
 
