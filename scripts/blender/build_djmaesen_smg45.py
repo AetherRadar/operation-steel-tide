@@ -27,6 +27,9 @@ SOURCE_IDLE_FRAME = 155
 SOURCE_RELOAD_START_FRAME = 0
 SOURCE_RELOAD_END_FRAME = 64
 SOURCE_TO_METERS = 0.015
+SLEEVE_RADIAL_SCALE = 0.78
+SLEEVE_WRIST_OVERLAP = 1.2
+SLEEVE_WRIST_BLEND_LENGTH = 6.0
 SLEEVE_BLEND_LENGTH = 12.0
 # Negative extension pulls the cuffs back toward/behind the first-person camera
 # so the tubes never end inside the visible frame, and the drop pushes them
@@ -114,6 +117,65 @@ def extend_authored_sleeves() -> None:
             falloff = normalized * normalized * (3.0 - 2.0 * normalized)
             vertex.co.y -= SLEEVE_EXTENSION * falloff
             vertex.co.z -= SLEEVE_DROP * falloff
+    mesh.update()
+
+
+def refine_authored_sleeves() -> None:
+    """Slim the authored sleeves and overlap their cuffs with the gloves."""
+    arms = bpy.data.objects["Object_7"]
+    mesh = arms.data
+    adjacency: dict[int, set[int]] = {index: set() for index in range(len(mesh.vertices))}
+    for edge in mesh.edges:
+        left, right = edge.vertices
+        adjacency[left].add(right)
+        adjacency[right].add(left)
+
+    unseen = set(adjacency)
+    components: list[set[int]] = []
+    while unseen:
+        seed = unseen.pop()
+        component = {seed}
+        stack = [seed]
+        while stack:
+            vertex = stack.pop()
+            for neighbor in adjacency[vertex]:
+                if neighbor in unseen:
+                    unseen.remove(neighbor)
+                    component.add(neighbor)
+                    stack.append(neighbor)
+        components.append(component)
+
+    for component in sorted(components, key=len, reverse=True)[:2]:
+        minimum_y = min(mesh.vertices[index].co.y for index in component)
+        maximum_y = max(mesh.vertices[index].co.y for index in component)
+        sample_step = 2.0
+        sample_count = max(2, math.ceil((maximum_y - minimum_y) / sample_step) + 1)
+        centers: list[Vector] = []
+        for sample_index in range(sample_count):
+            sample_y = minimum_y + sample_index * sample_step
+            nearby = [
+                mesh.vertices[index].co
+                for index in component
+                if abs(mesh.vertices[index].co.y - sample_y) <= sample_step * 1.5
+            ]
+            if not nearby:
+                nearby = [mesh.vertices[index].co for index in component]
+            centers.append(sum(nearby, Vector()) / len(nearby))
+
+        for index in component:
+            vertex = mesh.vertices[index]
+            sample_position = max(0.0, (vertex.co.y - minimum_y) / sample_step)
+            lower = min(sample_count - 1, int(sample_position))
+            upper = min(sample_count - 1, lower + 1)
+            blend = sample_position - lower
+            center = centers[lower].lerp(centers[upper], blend)
+            vertex.co.x = center.x + (vertex.co.x - center.x) * SLEEVE_RADIAL_SCALE
+            vertex.co.z = center.z + (vertex.co.z - center.z) * SLEEVE_RADIAL_SCALE
+            wrist_factor = max(
+                0.0,
+                1.0 - (vertex.co.y - minimum_y) / SLEEVE_WRIST_BLEND_LENGTH,
+            )
+            vertex.co.y -= SLEEVE_WRIST_OVERLAP * wrist_factor
     mesh.update()
 
 
@@ -351,8 +413,9 @@ def prepare_first_person_hierarchy() -> bpy.types.Object:
 
 def build_first_person() -> None:
     import_source(SOURCE_RELOAD_START_FRAME)
-    extend_authored_sleeves()
-    cap_authored_sleeves()
+    # Preserve the authored animation and weights while correcting the oversized
+    # sleeves and closing the visible glove/cuff gap in the bind mesh.
+    refine_authored_sleeves()
     root = prepare_first_person_hierarchy()
     base = bpy.data.objects["base"]
     muzzle = bpy.data.objects.new("Muzzle", None)
@@ -437,8 +500,7 @@ def build_field_weapon() -> None:
 
 def save_editable_source() -> None:
     import_source(SOURCE_IDLE_FRAME)
-    extend_authored_sleeves()
-    cap_authored_sleeves()
+    refine_authored_sleeves()
     SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
 

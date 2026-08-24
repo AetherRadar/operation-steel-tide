@@ -23,11 +23,10 @@ The runtime models in this directory are adapted from **fps animated smg** by
 Attribution: **"fps animated smg" by DJMaesen, licensed under CC BY 4.0.**
 
 The original GLB embeds the creator, source URL, title, and `CC-BY-4.0`
-license in `asset.extras`. `smg45_first_person.glb`, `first_person_arms.glb`,
-and `smg45_weapon.glb` are Blender-generated adaptations that retain the
-authored two-handed reload action, extend the first-person sleeves beyond the
-camera to hide their source cut surfaces, and separate the first-person rig
-from the field weapon. The
+license in `asset.extras`. `smg45_first_person.glb` retains the original
+authored arm proportions and two-handed reload action without sleeve extension
+or boundary capping. `first_person_arms.glb` is the older split-arm adaptation,
+and `smg45_weapon.glb` separates the field weapon from the first-person rig. The
 three static arm variants are separate Blender-generated evaluations of the
 same authored mesh: a rifle pose, a compact service-pistol two-handed stance,
 and a large-pistol two-handed stance. They intentionally do not apply the

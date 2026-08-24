@@ -185,8 +185,7 @@ def export_static_arms(kind: str, output_name: str) -> None:
     bpy.ops.object.select_all(action="DESELECT")
     root.select_set(True)
     for child in root.children_recursive:
-        if child.type != "EMPTY":
-            child.select_set(True)
+        child.select_set(True)
     bpy.context.view_layer.objects.active = root
     bpy.ops.export_scene.gltf(
         filepath=str(output_path),

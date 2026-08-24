@@ -25,6 +25,14 @@ public partial class FreightTerminalWorld
         _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
         await WaitFrames(8);
         SaveViewportImage("res://open_hand_ak74_validation.png");
+        platform = WeaponPlatform.M3A1;
+        _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
+        await WaitFrames(8);
+        SaveViewportImage("res://open_hand_m3a1_validation.png");
+        _player.SetReloadPoseForDiagnostics(0.46f);
+        await WaitFrames(2);
+        SaveViewportImage("res://open_hand_m3a1_reload_validation.png");
+        _player.ClearReloadPoseForDiagnostics();
         GD.Print("OPEN_HAND_CAPTURE done");
         GetTree().Quit(0);
     }
