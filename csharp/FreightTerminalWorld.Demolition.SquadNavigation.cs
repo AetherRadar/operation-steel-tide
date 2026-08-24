@@ -9,8 +9,15 @@ public partial class FreightTerminalWorld
     private const float DemolitionSquadRouteIntermediateTolerance = 0.7f;
     private const float DemolitionSquadRouteFinalTolerance = 1.15f;
     private const float DemolitionSquadRouteTickSeconds = 1.0f / 60.0f;
+    private const int DemolitionSquadRouteMaximumAuthoredReplans = 3;
+
+    private readonly record struct DemolitionSquadRouteFallback(
+        Vector3 Destination,
+        int ReplanCount);
 
     private readonly Dictionary<SquadMate, DemolitionRouteCursor> _demolitionSquadRoutes = new();
+    private readonly Dictionary<SquadMate, DemolitionSquadRouteFallback>
+        _demolitionSquadRouteFallbacks = new();
 
     internal int DemolitionSquadRoutePlansForDiagnostics { get; private set; }
     internal int DemolitionSquadRouteReusesForDiagnostics { get; private set; }
@@ -27,6 +34,19 @@ public partial class FreightTerminalWorld
             || !DemolitionLayout().IsInsideArena(destination, margin: 4.0f))
         {
             return false;
+        }
+
+        if (_demolitionSquadRouteFallbacks.TryGetValue(mate, out var fallback))
+        {
+            if (fallback.Destination.DistanceSquaredTo(destination)
+                <= DemolitionSquadRouteReuseDistance * DemolitionSquadRouteReuseDistance)
+            {
+                // This destination exhausted the authored arena graph.  Returning false
+                // hands the same request to the shared trail/grid navigator and avoids
+                // rebuilding the identical failed route every 0.75 seconds.
+                return false;
+            }
+            _demolitionSquadRouteFallbacks.Remove(mate);
         }
 
         const string routeKey = "squad_demolition";
@@ -50,6 +70,15 @@ public partial class FreightTerminalWorld
             PlanDemolitionSquadRoute(cursor, mate, destination, routeKey, countAsReplan: true);
         }
 
+        if (cursor.ReplanCount >= DemolitionSquadRouteMaximumAuthoredReplans)
+        {
+            return YieldDemolitionSquadRouteToGenericNavigation(
+                mate,
+                destination,
+                cursor.ReplanCount,
+                out directive);
+        }
+
         cursor.Advance(
             mate.GlobalPosition,
             DemolitionSquadRouteIntermediateTolerance,
@@ -69,11 +98,17 @@ public partial class FreightTerminalWorld
                     mate.GlobalPosition,
                     DemolitionSquadRouteIntermediateTolerance,
                     DemolitionSquadRouteFinalTolerance);
+                if (cursor.ReplanCount >= DemolitionSquadRouteMaximumAuthoredReplans)
+                {
+                    return YieldDemolitionSquadRouteToGenericNavigation(
+                        mate,
+                        destination,
+                        cursor.ReplanCount,
+                        out directive);
+                }
             }
             if (cursor.Complete)
             {
-                // The planner returned a safe frontier, so do not push the capsule into
-                // a known blocker while waiting for the next bounded retry.
                 directive = SquadNavigationDirective.Walk(mate.GlobalPosition);
                 return true;
             }
@@ -99,13 +134,33 @@ public partial class FreightTerminalWorld
         DemolitionSquadRoutePlansForDiagnostics++;
     }
 
+    private bool YieldDemolitionSquadRouteToGenericNavigation(
+        SquadMate mate,
+        Vector3 destination,
+        int replanCount,
+        out SquadNavigationDirective directive)
+    {
+        _demolitionSquadRoutes.Remove(mate);
+        _demolitionSquadRouteFallbacks[mate] = new DemolitionSquadRouteFallback(
+            destination,
+            replanCount);
+        directive = default;
+        return false;
+    }
+
     private void ClearDemolitionSquadRoute(SquadMate mate)
     {
         _demolitionSquadRoutes.Remove(mate);
     }
 
+    private void ClearDemolitionSquadRouteFallback(SquadMate mate)
+    {
+        _demolitionSquadRouteFallbacks.Remove(mate);
+    }
+
     private void ClearDemolitionSquadRoutes()
     {
         _demolitionSquadRoutes.Clear();
+        _demolitionSquadRouteFallbacks.Clear();
     }
 }

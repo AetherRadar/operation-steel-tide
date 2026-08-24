@@ -34,6 +34,13 @@ public partial class FreightTerminalWorld
 
     private async void ValidateSquadPerformance()
     {
+        // This diagnostic measures squad CPU/physics work, not the renderer or
+        // whatever other Godot instances happen to share the GPU.  Keep the
+        // render loop off for the isolated benchmark; the process exits below.
+        if (RenderingServer.RenderLoopEnabled)
+        {
+            RenderingServer.SetRenderLoopEnabled(false);
+        }
         var mates = _squadMates
             .Where(mate => IsInstanceValid(mate) && !mate.IsHumanProxy && !mate.IsDowned)
             .Take(2)
@@ -76,6 +83,50 @@ public partial class FreightTerminalWorld
             out var start,
             out _);
         await WaitFrames(3);
+        // WaitFrames observes ProcessFrame; physics bodies added by the fixture are
+        // not queryable until the physics server has stepped at least once.
+        await WaitSquadTraversalPhysicsFrames(2);
+        // Isolate the squad movement hot path from unrelated world actors and
+        // per-frame world orchestration before warming or measuring navigation.
+        // Otherwise ambient enemies/civilians can consume the same physics budget
+        // and make a valid route appear to time out.
+        foreach (var enemy in _enemies)
+        {
+            if (IsInstanceValid(enemy))
+            {
+                enemy.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        foreach (var civilian in _civilians)
+        {
+            if (IsInstanceValid(civilian))
+            {
+                civilian.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        foreach (var squadMate in _squadMates)
+        {
+            if (IsInstanceValid(squadMate) && Array.IndexOf(mates, squadMate) < 0)
+            {
+                squadMate.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        foreach (var vehicle in _vehicles)
+        {
+            if (IsInstanceValid(vehicle))
+            {
+                vehicle.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        if (IsInstanceValid(_aircraft))
+        {
+            _aircraft.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        if (IsInstanceValid(_missionDirector))
+        {
+            _missionDirector.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        SetProcess(false);
         SetSquadLeaderTrailForDiagnostics(Array.Empty<Vector3>());
         _squadNavNextNormalPlanMilliseconds = 0;
 
@@ -84,7 +135,9 @@ public partial class FreightTerminalWorld
         // warm-up; counting it as every actor's first chase frame makes the
         // diagnostic depend on machine startup timing rather than steady-state
         // navigation cost.
-        var warmupBudget = new SquadNavSearchBudget(12000, 500.0);
+        mates[0].GlobalPosition = start;
+        mates[0].Velocity = Vector3.Zero;
+        var warmupBudget = new SquadNavSearchBudget(60000, 5000.0);
         _ = TryBuildSquadGridWaypoints(
             mates[0],
             destination,

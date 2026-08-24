@@ -474,16 +474,33 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             objectivePriority = hostile is null
                 || GlobalPosition.DistanceTo(hostile.GlobalPosition) > 14.0f;
         }
-        if (Main.ShouldPrioritizeDemolitionObjective(this, hostile))
+        if (Main.IsDemolitionMode
+            && Main.TryGetDemolitionObjectiveDestination(this, out var demolitionObjectiveDestination))
         {
-            destination = ResolveFormationDestination();
+            destination = demolitionObjectiveDestination;
             objectivePriority = true;
         }
-        else if (Main.TryGetDemolitionEscortTarget(this, out var escortPos))
+        else if (Main.IsDemolitionMode
+            && Main.TryGetDemolitionEscortTarget(
+                     this,
+                     out var escortLeader,
+                     out var escortObjectivePriority))
         {
-            var offset = new Vector3((SquadSlot % 2 == 0 ? 1.8f : -1.8f), 0, -2.2f);
-            destination = escortPos + offset;
-            objectivePriority = true;
+            var forward = ResolveDemolitionEscortForward(escortLeader);
+            var right = new Vector3(-forward.Z, 0.0f, forward.X);
+            var back = -forward;
+            var escortIndex = SquadSlot > 0 ? SquadSlot - 1 : 0;
+            var escortRow = escortIndex / 2;
+            var escortSide = escortIndex % 2 == 0 ? -1.0f : 1.0f;
+            var lateralOffset = escortSide * (1.8f + escortRow * 0.65f);
+            var rearOffset = 2.2f + escortRow * 1.8f;
+            destination = escortLeader.GlobalPosition
+                + right * lateralOffset
+                + back * rearOffset;
+            destination.Y = GlobalPosition.Y;
+            // Keep the carrier as the engagement anchor under contact, but let the
+            // combat layer maneuver around that anchor while a threat is actionable.
+            objectivePriority = escortObjectivePriority;
         }
         var reviveTargetNode = ActiveReviveTargetNode;
         if (reviveTargetNode is not null)

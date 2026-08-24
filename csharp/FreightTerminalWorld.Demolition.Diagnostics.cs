@@ -771,6 +771,10 @@ public partial class FreightTerminalWorld
             pair => pair.Value.CloneForDiagnostics());
         var savedSquadTargets = _demolitionSquadAssignmentTargets.ToArray();
         var savedCombatBreakoffs = _demolitionCombatBreakoffs.ToArray();
+        var savedSquadCombatBreakoffs = _demolitionSquadCombatBreakoffs.ToArray();
+        var savedSquadPostTargets = _demolitionSquadActivePostTargets.ToArray();
+        var savedSquadPostTimers = _demolitionSquadPostHoldTimers.ToArray();
+        var savedSquadPostSteps = _demolitionSquadPostPatrolSteps.ToArray();
         var savedSquadTrailPaths = _squadTrailPaths.ToDictionary(
             pair => pair.Key,
             pair => new SquadTrailPathState
@@ -786,6 +790,7 @@ public partial class FreightTerminalWorld
         var savedSquadRoutes = _demolitionSquadRoutes.ToDictionary(
             pair => pair.Key,
             pair => pair.Value.CloneForDiagnostics());
+        var savedSquadRouteFallbacks = _demolitionSquadRouteFallbacks.ToArray();
         var savedSquadRoutePlans = DemolitionSquadRoutePlansForDiagnostics;
         var savedSquadRouteReuses = DemolitionSquadRouteReusesForDiagnostics;
         var savedOpponentNavigation = _demolitionOpponents
@@ -943,7 +948,7 @@ public partial class FreightTerminalWorld
                 && _demolitionSquadAssignmentTargets.TryGetValue(postedMate, out var targetKey))
             {
                 postedMate.GlobalPosition = DemolitionLayout().StrategyTarget(targetKey);
-                UpdateDemolitionSquadPosts();
+                UpdateDemolitionSquadPosts(ignoreEscort: true);
                 postsConverted = postedMate.Order == SquadOrder.Hold;
             }
 
@@ -951,6 +956,11 @@ public partial class FreightTerminalWorld
             // return a cached authored-lane waypoint instead of holding at spawn.
             var squadRouteNavigation = false;
             var squadRouteReuse = false;
+            var frontierFallback = false;
+            var frontierFallbackStable = false;
+            var reachableRoutePreserved = false;
+            var frontierReplans = -1;
+            var frontierDirectiveDistance = 0.0f;
             var routeMate = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate)
                 && !mate.IsHumanProxy
                 && !mate.IsDowned
@@ -974,6 +984,48 @@ public partial class FreightTerminalWorld
                 squadRouteNavigation = routeDirective.Target.DistanceTo(routeMate.GlobalPosition) > 0.25f;
                 squadRouteReuse = routePlansAfter == routePlansBefore + 1
                     && DemolitionSquadRouteReusesForDiagnostics > routeReusesBefore;
+                reachableRoutePreserved = _demolitionSquadRoutes.TryGetValue(
+                        routeMate,
+                        out var reachableCursor)
+                    && reachableCursor.ReachesDestination
+                    && reachableCursor.ReplanCount == 0
+                    && !_demolitionSquadRouteFallbacks.ContainsKey(routeMate);
+
+                // An unreachable frontier is allowed a few cheap authored-route retries,
+                // then must yield to the shared trail/grid navigator.  The fallback is
+                // destination-scoped so the failed arena route is not rebuilt forever.
+                routeMate.GlobalPosition = layout.AttackSpawn;
+                routeMate.Velocity = Vector3.Zero;
+                ClearSquadNavigation(routeMate);
+                ClearDemolitionSquadRouteFallback(routeMate);
+                for (var frame = 0; frame < 220; frame++)
+                {
+                    var fallbackDirective = ResolveSquadNavigationDestination(
+                        routeMate,
+                        blockedDestination,
+                        emergency: false);
+                    frontierDirectiveDistance = fallbackDirective.Target.DistanceTo(
+                        routeMate.GlobalPosition);
+                    if (_demolitionSquadRouteFallbacks.TryGetValue(
+                            routeMate,
+                            out var fallbackState))
+                    {
+                        frontierFallback = true;
+                        frontierReplans = fallbackState.ReplanCount;
+                        break;
+                    }
+                }
+                if (frontierFallback)
+                {
+                    var plansAtFallback = DemolitionSquadRoutePlansForDiagnostics;
+                    _ = ResolveSquadNavigationDestination(
+                        routeMate,
+                        blockedDestination,
+                        emergency: false);
+                    frontierFallbackStable = plansAtFallback
+                            == DemolitionSquadRoutePlansForDiagnostics
+                        && !_demolitionSquadRoutes.ContainsKey(routeMate);
+                }
             }
 
             // Shared intelligence: the pure planner must avoid a site stacked with known
@@ -1205,10 +1257,185 @@ public partial class FreightTerminalWorld
                     && _demolitionActiveSite == friendlySiteIndex;
             }
 
+            // Deterministic ownership arbitration: an AI carrier must be the anchor for
+            // its escorts, while a player carrier remains a valid fallback leader.  This
+            // catches the old `as SquadMate` lookup that silently returned to formation.
+            var carrierDestinationFollowsDevice = false;
+            var aiCarrierEscort = false;
+            var playerCarrierEscort = false;
+            var groundedPlayerRunnerReleased = false;
+            var hiddenThreatIgnored = false;
+            var visibleThreatYields = false;
+            var postPatrolReactivated = false;
+            var postPatrolSecondHop = false;
+            var staleMoveRecovered = false;
+            var defuserPostProtected = false;
+            var postPatrolLayouts = ValidateDemolitionPostPatrolLayout(layout)
+                && ValidateDemolitionPostPatrolLayout(
+                    new DemolitionArenaLayout(
+                        DemolitionMapCatalog.HarborLocksId,
+                        layout.Origin));
+            var aiCarrier = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate)
+                && !mate.IsHumanProxy
+                && !mate.IsDowned
+                && !mate.IsBodyBag);
+            var escortMate = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate)
+                && mate != aiCarrier
+                && !mate.IsHumanProxy
+                && !mate.IsDowned
+                && !mate.IsBodyBag);
+            if (aiCarrier is not null && escortMate is not null)
+            {
+                _demolitionDevicePlanted = false;
+                aiCarrier.GlobalPosition = layout.AttackSpawn;
+                escortMate.GlobalPosition = layout.AttackSpawn + new Vector3(8.0f, 0.0f, 0.0f);
+                aiCarrier.SetDemolitionThreatForDiagnostics(null, hasSight: false, threatAge: 100.0f);
+                escortMate.SetDemolitionThreatForDiagnostics(null, hasSight: false, threatAge: 100.0f);
+                _demolitionSquadCombatBreakoffs.Remove(aiCarrier);
+                _demolitionSquadCombatBreakoffs.Remove(escortMate);
+                ForceDemolitionDeviceCarrierForDiagnostics(aiCarrier);
+                var plannedSite = Mathf.Clamp(
+                    _demolitionAttackerPlan?.PrimarySiteIndex ?? 0,
+                    0,
+                    layout.SitePositions.Count - 1);
+                carrierDestinationFollowsDevice = TryGetDemolitionObjectiveDestination(
+                    aiCarrier,
+                    out var carrierDestination)
+                    && carrierDestination.DistanceTo(layout.SitePositions[plannedSite]) < 0.5f;
+                aiCarrierEscort = TryGetDemolitionEscortTarget(escortMate, out var aiLeader)
+                    && ReferenceEquals(aiLeader, aiCarrier);
+
+                // Cached combat memory behind solid geometry is not an actionable
+                // contact.  It must not detach an escort or freeze a post forever.
+                escortMate.GlobalPosition = layout.Origin + new Vector3(-6.0f, 0.2f, -13.5f);
+                probe.GlobalPosition = layout.Origin + new Vector3(6.0f, 0.2f, -13.5f);
+                var coreBlocksSight = !escortMate.HasCombatLineOfSightForDiagnostics(probe);
+                escortMate.SetDemolitionThreatForDiagnostics(
+                    probe,
+                    hasSight: false,
+                    threatAge: 2.0f);
+                _demolitionSquadCombatBreakoffs.Remove(escortMate);
+                hiddenThreatIgnored = coreBlocksSight
+                    && TryGetDemolitionEscortTarget(
+                        escortMate,
+                        out var hiddenThreatLeader,
+                        out var hiddenThreatPriority)
+                    && hiddenThreatPriority
+                    && ReferenceEquals(hiddenThreatLeader, aiCarrier);
+                escortMate.SetDemolitionThreatForDiagnostics(
+                    probe,
+                    hasSight: true,
+                    threatAge: 2.0f);
+                _demolitionSquadCombatBreakoffs.Remove(escortMate);
+                visibleThreatYields = TryGetDemolitionEscortTarget(
+                        escortMate,
+                        out var visibleThreatLeader,
+                        out var visibleThreatPriority)
+                    && !visibleThreatPriority
+                    && ReferenceEquals(visibleThreatLeader, aiCarrier);
+                escortMate.SetDemolitionThreatForDiagnostics(
+                    null,
+                    hasSight: false,
+                    threatAge: 100.0f);
+                _demolitionSquadCombatBreakoffs.Remove(escortMate);
+
+                // A grounded PLAYER runner who is away from the case cannot be driven.
+                // Reassign the autonomous mate at the case before choosing an escort.
+                aiCarrier.GlobalPosition = _demolitionDeviceGroundPosition - Vector3.Up * 0.16f;
+                _player.GlobalPosition = _demolitionDeviceGroundPosition
+                    + new Vector3(18.0f, 0.0f, 0.0f);
+                ForceDemolitionDevicePickupRunnerForDiagnostics(_player);
+                EnsureDemolitionDevicePickupRunner();
+                groundedPlayerRunnerReleased = _demolitionDeviceLifecycle.PickupRunnerMemberId
+                        == DemolitionMemberId(aiCarrier)
+                    && TryGetDemolitionEscortTarget(escortMate, out var groundedLeader)
+                    && ReferenceEquals(groundedLeader, aiCarrier);
+
+                ForceDemolitionDeviceCarrierForDiagnostics(_player);
+                playerCarrierEscort = TryGetDemolitionEscortTarget(escortMate, out var playerLeader)
+                    && ReferenceEquals(playerLeader, _player);
+
+                // A post Hold is intentionally brief.  After its dwell expires the mate
+                // receives the next authored cover target instead of remaining idle.
+                foreach (var assignment in _demolitionSquadAssignmentTargets.ToArray())
+                {
+                    var postMate = assignment.Key;
+                    if (!IsInstanceValid(postMate)
+                        || postMate.IsDowned
+                        || postMate.IsBodyBag
+                        || postMate == aiCarrier)
+                    {
+                        continue;
+                    }
+                    var postTarget = layout.StrategyTarget(assignment.Value);
+                    _demolitionDevicePlanted = true;
+                    _demolitionSquadActivePostTargets[postMate] = assignment.Value;
+                    _demolitionSquadPostHoldTimers[postMate] = 0.0f;
+                    _demolitionSquadPostPatrolSteps[postMate] = 0;
+                    postMate.GlobalPosition = postTarget;
+                    postMate.Velocity = Vector3.Zero;
+                    postMate.SetDemolitionThreatForDiagnostics(
+                        null,
+                        hasSight: false,
+                        threatAge: 100.0f);
+                    _demolitionSquadCombatBreakoffs.Remove(postMate);
+                    postMate.SetOrder(SquadOrder.Move, postTarget);
+                    UpdateDemolitionSquadPosts(0.05f, ignoreEscort: true, ignoreThreat: false);
+                    var convertedToHold = postMate.Order == SquadOrder.Hold;
+                    UpdateDemolitionSquadPosts(
+                        DemolitionPostHoldDuration + 0.1f,
+                        ignoreEscort: true,
+                        ignoreThreat: false);
+                    postPatrolReactivated = convertedToHold
+                        && postMate.Order == SquadOrder.Move
+                        && postMate.DemolitionOrderPositionForDiagnostics.DistanceTo(postTarget) > 2.5f;
+
+                    var firstPatrolTarget = postMate.DemolitionOrderPositionForDiagnostics;
+                    postMate.SetOrder(
+                        SquadOrder.Move,
+                        firstPatrolTarget + new Vector3(11.0f, 0.0f, 0.0f));
+                    UpdateDemolitionSquadPosts(
+                        0.05f,
+                        ignoreEscort: true,
+                        ignoreThreat: false);
+                    staleMoveRecovered = postMate.DemolitionMoveTargets(firstPatrolTarget);
+
+                    postMate.GlobalPosition = firstPatrolTarget;
+                    UpdateDemolitionSquadPosts(
+                        0.05f,
+                        ignoreEscort: true,
+                        ignoreThreat: false);
+                    var firstPatrolHeld = postMate.Order == SquadOrder.Hold;
+                    UpdateDemolitionSquadPosts(
+                        DemolitionPostHoldDuration + 0.1f,
+                        ignoreEscort: true,
+                        ignoreThreat: false);
+                    postPatrolSecondHop = firstPatrolHeld
+                        && postMate.Order == SquadOrder.Move
+                        && postMate.DemolitionOrderPositionForDiagnostics.DistanceTo(
+                            firstPatrolTarget) > 2.5f;
+
+                    var defuseTarget = layout.SitePositions[0];
+                    _demolitionSquadObjectiveMate = postMate;
+                    _demolitionSquadAssignmentTargets[postMate] = assignment.Value;
+                    _demolitionSquadActivePostTargets[postMate] = assignment.Value;
+                    postMate.SetOrder(SquadOrder.Move, defuseTarget);
+                    UpdateDemolitionSquadPosts(
+                        0.05f,
+                        ignoreEscort: true,
+                        ignoreThreat: false);
+                    defuserPostProtected = postMate.DemolitionMoveTargets(defuseTarget)
+                        && !_demolitionSquadActivePostTargets.ContainsKey(postMate);
+                    _demolitionSquadObjectiveMate = null;
+                    break;
+                }
+            }
+
             var valid = yieldedToCombat && resumedObjective && channelHoldsUnderFire
                 && smokeResumesObjective
                 && switchedUnderPressure && detourRoutesAroundWall && unreachableSafe && unreachableRetries
-                && routeRecovery && runtimeRoute && postsConverted
+                && routeRecovery && runtimeRoute && frontierFallback && frontierFallbackStable
+                && reachableRoutePreserved && postsConverted
                 && squadRouteNavigation && squadRouteReuse
                 && openingPatterns
                 && objectiveChannels
@@ -1217,8 +1444,19 @@ public partial class FreightTerminalWorld
                 && strategyRefreshPreservesChannel
                 && strategyRefreshReassignsLostChannel
                 && strategyRefreshClearsChangedPhase
-                && friendlyAiPlantsDevice;
-            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} friendly_ai_plant={friendlyAiPlantsDevice} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} opening_patterns={openingPatterns} posts={postsConverted} squad_route={squadRouteNavigation} squad_route_reuse={squadRouteReuse} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
+                && friendlyAiPlantsDevice
+                && carrierDestinationFollowsDevice
+                && aiCarrierEscort
+                && playerCarrierEscort
+                && groundedPlayerRunnerReleased
+                && hiddenThreatIgnored
+                && visibleThreatYields
+                && postPatrolReactivated
+                && postPatrolSecondHop
+                && staleMoveRecovered
+                && defuserPostProtected
+                && postPatrolLayouts;
+            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} friendly_ai_plant={friendlyAiPlantsDevice} carrier_destination={carrierDestinationFollowsDevice} ai_carrier_escort={aiCarrierEscort} player_carrier_escort={playerCarrierEscort} grounded_player_reassigned={groundedPlayerRunnerReleased} hidden_threat_ignored={hiddenThreatIgnored} visible_threat_yields={visibleThreatYields} post_patrol={postPatrolReactivated} post_second_hop={postPatrolSecondHop} stale_move_recovered={staleMoveRecovered} defuser_post_protected={defuserPostProtected} post_layouts={postPatrolLayouts} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} frontier_fallback={frontierFallback} frontier_stable={frontierFallbackStable} frontier_replans={frontierReplans} frontier_directive_distance={frontierDirectiveDistance:0.00} reachable_route_preserved={reachableRoutePreserved} opening_patterns={openingPatterns} posts={postsConverted} squad_route={squadRouteNavigation} squad_route_reuse={squadRouteReuse} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
             return valid;
         }
         finally
@@ -1266,6 +1504,11 @@ public partial class FreightTerminalWorld
             {
                 _demolitionCombatBreakoffs.Add(opponent);
             }
+            _demolitionSquadCombatBreakoffs.Clear();
+            foreach (var mate in savedSquadCombatBreakoffs)
+            {
+                _demolitionSquadCombatBreakoffs.Add(mate);
+            }
             foreach (var (opponent, sentryMode) in savedSentryModes)
             {
                 if (IsInstanceValid(opponent))
@@ -1307,12 +1550,32 @@ public partial class FreightTerminalWorld
             {
                 _demolitionSquadRoutes[mate] = route;
             }
+            _demolitionSquadRouteFallbacks.Clear();
+            foreach (var (mate, fallback) in savedSquadRouteFallbacks)
+            {
+                _demolitionSquadRouteFallbacks[mate] = fallback;
+            }
             DemolitionSquadRoutePlansForDiagnostics = savedSquadRoutePlans;
             DemolitionSquadRouteReusesForDiagnostics = savedSquadRouteReuses;
             _demolitionSquadAssignmentTargets.Clear();
             foreach (var (mate, targetKey) in savedSquadTargets)
             {
                 _demolitionSquadAssignmentTargets[mate] = targetKey;
+            }
+            _demolitionSquadActivePostTargets.Clear();
+            foreach (var (mate, targetKey) in savedSquadPostTargets)
+            {
+                _demolitionSquadActivePostTargets[mate] = targetKey;
+            }
+            _demolitionSquadPostHoldTimers.Clear();
+            foreach (var (mate, timer) in savedSquadPostTimers)
+            {
+                _demolitionSquadPostHoldTimers[mate] = timer;
+            }
+            _demolitionSquadPostPatrolSteps.Clear();
+            foreach (var (mate, step) in savedSquadPostSteps)
+            {
+                _demolitionSquadPostPatrolSteps[mate] = step;
             }
         }
     }

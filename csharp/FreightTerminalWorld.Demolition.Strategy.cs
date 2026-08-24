@@ -319,11 +319,7 @@ public partial class FreightTerminalWorld
     {
         foreach (var assignment in plan.Assignments)
         {
-            if (!assignment.MemberId.StartsWith("MATE:", System.StringComparison.Ordinal))
-            {
-                continue;
-            }
-            if (!int.TryParse(assignment.MemberId.Substring(5), out var slot))
+            if (!TryParseDemolitionMateSlot(assignment.MemberId, out var slot))
             {
                 continue;
             }
@@ -335,16 +331,22 @@ public partial class FreightTerminalWorld
             {
                 continue;
             }
-            if (IsDemolitionSquadDeviceObjectiveMate(mate))
+            if (HasDemolitionSquadObjectiveDuty(mate))
             {
+                _demolitionSquadAssignmentTargets.Remove(mate);
+                ClearDemolitionSquadPostState(mate);
                 continue;
             }
             if (_demolitionSquadAssignmentTargets.TryGetValue(mate, out var current)
                 && current == assignment.TargetKey)
             {
+                _demolitionSquadActivePostTargets.TryAdd(mate, assignment.TargetKey);
                 continue;
             }
             _demolitionSquadAssignmentTargets[mate] = assignment.TargetKey;
+            _demolitionSquadActivePostTargets[mate] = assignment.TargetKey;
+            _demolitionSquadPostHoldTimers[mate] = 0.0f;
+            _demolitionSquadPostPatrolSteps[mate] = 0;
             // Move clears the old post; once the mate arrives it converts to Hold so the
             // assignment behaves like an anchored position instead of a perpetual walk.
             mate.SetOrder(SquadOrder.Move, layout.StrategyTarget(assignment.TargetKey));
@@ -430,6 +432,11 @@ public partial class FreightTerminalWorld
                 .Where(mate => IsInstanceValid(mate) && !mate.IsDowned && !mate.IsBodyBag)
                 .OrderBy(mate => mate.GlobalPosition.DistanceSquaredTo(site))
                 .FirstOrDefault();
+            if (_demolitionSquadObjectiveMate is not null)
+            {
+                _demolitionSquadAssignmentTargets.Remove(_demolitionSquadObjectiveMate);
+                ClearDemolitionSquadPostState(_demolitionSquadObjectiveMate);
+            }
             _demolitionSquadPlantProgress = 0.0f;
             _demolitionSquadDefuseProgress = 0.0f;
         }
@@ -442,7 +449,7 @@ public partial class FreightTerminalWorld
         var flatDestination = new Vector3(destination.X, carrier.GlobalPosition.Y, destination.Z);
         if (carrier.GlobalPosition.DistanceTo(flatDestination) > 2.2f)
         {
-            if (carrier.Order != SquadOrder.Move || carrier.GlobalPosition.DistanceTo(flatDestination) > 6.0f)
+            if (!carrier.DemolitionMoveTargets(destination))
             {
                 carrier.SetOrder(SquadOrder.Move, destination);
             }
@@ -451,6 +458,10 @@ public partial class FreightTerminalWorld
         if (carrier.Order == SquadOrder.Move)
         {
             carrier.SetOrder(SquadOrder.Hold, carrier.GlobalPosition);
+        }
+        if (carrier.IsRevivingFriendly || ShouldYieldDemolitionSquadToCombat(carrier))
+        {
+            return;
         }
         var progress = !_demolitionDevicePlanted
             ? _demolitionSquadPlantProgress += delta / DemolitionPlantDuration
@@ -471,27 +482,6 @@ public partial class FreightTerminalWorld
                     _languageSetting,
                     "SITE {0} DEVICE DEFUSED",
                     siteName));
-        }
-    }
-
-    private void UpdateDemolitionSquadPosts()
-    {
-        if (!_demolitionRoundActive)
-        {
-            return;
-        }
-        foreach (var mate in _squadMates.Where(IsInstanceValid))
-        {
-            if (mate.Order != SquadOrder.Move
-                || !_demolitionSquadAssignmentTargets.TryGetValue(mate, out var targetKey))
-            {
-                continue;
-            }
-            var target = DemolitionLayout().StrategyTarget(targetKey);
-            if (mate.GlobalPosition.DistanceTo(target) <= 3.0f)
-            {
-                mate.SetOrder(SquadOrder.Hold, mate.GlobalPosition);
-            }
         }
     }
 

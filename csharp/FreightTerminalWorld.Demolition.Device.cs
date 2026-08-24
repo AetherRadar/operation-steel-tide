@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
@@ -77,7 +78,14 @@ public partial class FreightTerminalWorld
     private void AssignInitialDemolitionDeviceCarrier()
     {
         var attackers = LivingDemolitionAttackers().ToList();
-        var memberIds = attackers
+        // The opening device belongs to an autonomous teammate whenever one is
+        // available.  Randomly handing it to the human made every escort fall back to
+        // the player formation and left the AI carrier assignment undefined at spawn.
+        var automatedAttackers = attackers
+            .Where(IsAutomatedDemolitionAttacker)
+            .ToList();
+        var assignmentPool = automatedAttackers.Count > 0 ? automatedAttackers : attackers;
+        var memberIds = assignmentPool
             .Select(DemolitionMemberId)
             .Where(memberId => memberId is not null)
             .Select(memberId => memberId!)
@@ -100,12 +108,21 @@ public partial class FreightTerminalWorld
             return;
         }
         var runner = ResolveDemolitionAttacker(_demolitionDeviceLifecycle.PickupRunnerMemberId);
-        if (IsLivingDemolitionAttacker(runner))
+        if (IsDemolitionDeviceRunnerEligible(runner))
         {
             ApplyDemolitionDevicePickupAssignment(runner);
             return;
         }
-        var replacement = NearestLivingDemolitionAttacker(_demolitionDeviceGroundPosition, runner);
+        // Grounded hand-offs must prefer an autonomous runner.  Assigning a distant
+        // living player is a no-op (we cannot drive the player to the device) and used
+        // to make every AI escort that player while the device stayed on the floor.
+        var replacement = NearestLivingAutomatedDemolitionAttacker(
+                _demolitionDeviceGroundPosition,
+                runner)
+            ?? (IsDemolitionDeviceRunnerEligible(runner) ? runner : null)
+            ?? NearestLivingDemolitionAttackerWithinPickupRange(
+                _demolitionDeviceGroundPosition,
+                runner);
         _demolitionDeviceLifecycle.ClearPickupRunner();
         if (replacement is not null
             && _demolitionDeviceLifecycle.AssignPickupRunner(DemolitionMemberId(replacement)))
@@ -124,6 +141,7 @@ public partial class FreightTerminalWorld
         {
             _demolitionSquadObjectiveMate = mate;
             _demolitionSquadAssignmentTargets.Remove(mate);
+            ClearDemolitionSquadPostState(mate);
             if (!mate.DemolitionMoveTargets(_demolitionDeviceGroundPosition))
             {
                 mate.SetOrder(SquadOrder.Move, _demolitionDeviceGroundPosition);
@@ -195,6 +213,8 @@ public partial class FreightTerminalWorld
         {
             _demolitionSquadObjectiveMate = mate;
             _demolitionSquadPlantProgress = 0.0f;
+            _demolitionSquadAssignmentTargets.Remove(mate);
+            ClearDemolitionSquadPostState(mate);
         }
         SyncDemolitionDeviceVisual();
         if (LocalDemolitionSide == DemolitionTeam.Attackers)
@@ -223,7 +243,8 @@ public partial class FreightTerminalWorld
         // 掉在墙内则向最近空旷侧探1.5m，避免全员对墙罚站
         dropOrigin = FindFreeDemolitionDropPosition(dropOrigin);
         _demolitionDeviceGroundPosition = dropOrigin + Vector3.Up * DemolitionDeviceGroundHeight;
-        var replacement = NearestLivingDemolitionAttacker(dropOrigin, carrier);
+        var replacement = NearestLivingAutomatedDemolitionAttacker(dropOrigin, carrier)
+            ?? NearestLivingDemolitionAttackerWithinPickupRange(dropOrigin, carrier);
         var replacementId = DemolitionMemberId(replacement);
         if (!_demolitionDeviceLifecycle.TryDrop(carrierId, replacementId))
         {
@@ -373,6 +394,44 @@ public partial class FreightTerminalWorld
             .ThenBy(candidate => DemolitionMemberId(candidate), System.StringComparer.Ordinal)
             .FirstOrDefault();
 
+    private Node3D? NearestLivingAutomatedDemolitionAttacker(Vector3 origin, Node3D? excluded)
+        => LivingDemolitionAttackers()
+            .Where(candidate => candidate != excluded && IsAutomatedDemolitionAttacker(candidate))
+            .OrderBy(candidate => candidate.GlobalPosition.DistanceSquaredTo(origin))
+            .ThenBy(candidate => DemolitionMemberId(candidate), System.StringComparer.Ordinal)
+            .FirstOrDefault();
+
+    private Node3D? NearestLivingDemolitionAttackerWithinPickupRange(
+        Vector3 origin,
+        Node3D? excluded)
+        => LivingDemolitionAttackers()
+            .Where(candidate => candidate != excluded
+                && !IsAutomatedDemolitionAttacker(candidate)
+                && HorizontalDistance(candidate.GlobalPosition, origin) <= DemolitionDevicePickupRadius
+                && Mathf.Abs(candidate.GlobalPosition.Y - origin.Y) < 2.0f)
+            .OrderBy(candidate => candidate.GlobalPosition.DistanceSquaredTo(origin))
+            .ThenBy(candidate => DemolitionMemberId(candidate), System.StringComparer.Ordinal)
+            .FirstOrDefault();
+
+    private static bool IsAutomatedDemolitionAttacker(Node3D? actor)
+        => actor switch
+        {
+            TacticalPlayer => false,
+            SquadMate mate => !mate.IsNetworkProxy && !mate.IsHumanProxy,
+            EnemyOperator opponent => !opponent.IsNetworkProxy && !opponent.IsHumanProxy,
+            _ => false
+        };
+
+    private bool IsDemolitionDeviceRunnerEligible(Node3D? runner)
+        => IsLivingDemolitionAttacker(runner)
+            && (IsAutomatedDemolitionAttacker(runner!)
+                || IsWithinDemolitionDevicePickupRange(runner!));
+
+    private bool IsWithinDemolitionDevicePickupRange(Node3D runner)
+        => HorizontalDistance(runner.GlobalPosition, _demolitionDeviceGroundPosition)
+                <= DemolitionDevicePickupRadius
+            && Mathf.Abs(runner.GlobalPosition.Y - _demolitionDeviceGroundPosition.Y) < 2.0f;
+
     private bool IsLivingDemolitionAttacker(Node3D? actor)
         => actor switch
         {
@@ -407,17 +466,47 @@ public partial class FreightTerminalWorld
         {
             return LocalDemolitionSide == DemolitionTeam.Attackers ? _player : null;
         }
-        if (memberId.StartsWith("MATE:", System.StringComparison.Ordinal)
-            && int.TryParse(memberId.Substring(5), out var slot))
+        if (TryParseDemolitionMateSlot(memberId, out var slot))
         {
-            return LocalDemolitionSide == DemolitionTeam.Attackers
-                ? _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && mate.SquadSlot == slot)
-                : null;
+            if (LocalDemolitionSide != DemolitionTeam.Attackers)
+            {
+                return null;
+            }
+            for (var index = 0; index < _squadMates.Count; index++)
+            {
+                var mate = _squadMates[index];
+                if (IsInstanceValid(mate) && mate.SquadSlot == slot)
+                {
+                    return mate;
+                }
+            }
+            return null;
         }
-        return LocalDemolitionSide == DemolitionTeam.Defenders
-            ? _demolitionOpponents.FirstOrDefault(opponent => IsInstanceValid(opponent)
-                && string.Equals(opponent.Name.ToString(), memberId, System.StringComparison.Ordinal))
-            : null;
+        if (LocalDemolitionSide != DemolitionTeam.Defenders)
+        {
+            return null;
+        }
+        for (var index = 0; index < _demolitionOpponents.Count; index++)
+        {
+            var opponent = _demolitionOpponents[index];
+            if (IsInstanceValid(opponent)
+                && string.Equals(
+                    opponent.Name.ToString(),
+                    memberId,
+                    StringComparison.Ordinal))
+            {
+                return opponent;
+            }
+        }
+        return null;
+    }
+
+    private static bool TryParseDemolitionMateSlot(string? memberId, out int slot)
+    {
+        slot = -1;
+        return memberId is not null
+            && memberId.StartsWith("MATE:", System.StringComparison.Ordinal)
+            && int.TryParse(memberId.AsSpan(5), out slot);
     }
 
     private string DemolitionMemberDisplayName(Node3D actor)
@@ -437,14 +526,99 @@ public partial class FreightTerminalWorld
 
     private bool IsDemolitionSquadDeviceObjectiveMate(SquadMate mate)
     {
-        var memberId = DemolitionMemberId(mate);
         return !_demolitionDevicePlanted
             && LocalDemolitionSide == DemolitionTeam.Attackers
-            && (memberId == _demolitionDeviceLifecycle.CarrierMemberId
-                || memberId == _demolitionDeviceLifecycle.PickupRunnerMemberId);
+            && ((TryParseDemolitionMateSlot(
+                        _demolitionDeviceLifecycle.CarrierMemberId,
+                        out var carrierSlot)
+                    && carrierSlot == mate.SquadSlot)
+                || (TryParseDemolitionMateSlot(
+                        _demolitionDeviceLifecycle.PickupRunnerMemberId,
+                        out var runnerSlot)
+                    && runnerSlot == mate.SquadSlot));
     }
 
-    internal bool ShouldPrioritizeDemolitionObjective(SquadMate mate, EnemyOperator? hostile)
+    private bool HasDemolitionSquadObjectiveDuty(SquadMate mate)
+        => IsDemolitionSquadDeviceObjectiveMate(mate)
+            || ReferenceEquals(_demolitionSquadObjectiveMate, mate);
+
+    /// <summary>
+    /// Resolves the live device leader without assuming that the leader is an AI mate.
+    /// During the grounded phase the pickup runner is the tactical leader; once picked
+    /// up, the carrier is.  Keeping this lookup in one place prevents followers from
+    /// silently falling back to the human formation anchor when the device belongs to
+    /// the player or when a hand-off is still being applied.
+    /// </summary>
+    private Node3D? ResolveDemolitionDeviceLeader()
+    {
+        if (!_demolitionMode
+            || !_demolitionRoundActive
+            || _demolitionDevicePlanted
+            || LocalDemolitionSide != DemolitionTeam.Attackers)
+        {
+            return null;
+        }
+
+        var memberId = _demolitionDeviceLifecycle.IsCarried
+            ? _demolitionDeviceLifecycle.CarrierMemberId
+            : _demolitionDeviceLifecycle.IsGrounded
+                ? _demolitionDeviceLifecycle.PickupRunnerMemberId
+                : null;
+        // A grounded player assignment is not a leader yet: unlike an AI runner, the
+        // game cannot move the player to the device.  Once the player actually picks it
+        // up, the carried phase resolves them normally.
+        if (_demolitionDeviceLifecycle.IsGrounded && memberId == "PLAYER")
+        {
+            return null;
+        }
+        var resolved = ResolveDemolitionAttacker(memberId);
+        if (IsLivingDemolitionAttacker(resolved))
+        {
+            return resolved;
+        }
+        return null;
+    }
+
+    internal bool TryGetDemolitionObjectiveDestination(
+        SquadMate mate,
+        out Vector3 destination)
+    {
+        destination = default;
+        if (!ShouldPrioritizeDemolitionObjective(mate))
+        {
+            return false;
+        }
+
+        var layout = DemolitionLayout();
+        if (_demolitionDeviceLifecycle.IsGrounded)
+        {
+            destination = _demolitionDeviceGroundPosition;
+            return true;
+        }
+
+        if (_demolitionDeviceLifecycle.IsCarried)
+        {
+            var siteIndex = Mathf.Clamp(
+                _demolitionAttackerPlan?.PrimarySiteIndex ?? _demolitionEnemyTargetSite,
+                0,
+                layout.SitePositions.Count - 1);
+            destination = layout.SitePositions[siteIndex];
+            return true;
+        }
+
+        if (_demolitionDevicePlanted
+            && LocalDemolitionSide == DemolitionTeam.Defenders
+            && _demolitionActiveSite >= 0)
+        {
+            destination = layout.SitePositions[
+                Mathf.Clamp(_demolitionActiveSite, 0, layout.SitePositions.Count - 1)];
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool ShouldPrioritizeDemolitionObjective(SquadMate mate)
     {
         if (!_demolitionMode || !_demolitionRoundActive || mate.IsDowned || mate.IsBodyBag)
         {
@@ -458,38 +632,62 @@ public partial class FreightTerminalWorld
         {
             return false;
         }
-        return hostile is null
-            || !IsInstanceValid(hostile)
-            || hostile.IsDead
-            || mate.GlobalPosition.DistanceTo(hostile.GlobalPosition) >= DemolitionCombatEngageRange;
+        return !ShouldYieldDemolitionSquadToCombat(mate);
     }
 
-    internal bool TryGetDemolitionEscortTarget(SquadMate mate, out Vector3 escortPos)
+    internal bool TryGetDemolitionEscortTarget(
+        SquadMate mate,
+        out Node3D leader,
+        out bool objectivePriority)
     {
-        escortPos = default;
-        if (!_demolitionMode || !_demolitionRoundActive || mate.IsDowned || mate.IsBodyBag || _demolitionDevicePlanted)
+        leader = null!;
+        objectivePriority = false;
+        if (!_demolitionMode
+            || !_demolitionRoundActive
+            || mate.IsDowned
+            || mate.IsBodyBag
+            || _demolitionDevicePlanted)
         {
             return false;
         }
-        if (IsDemolitionSquadDeviceObjectiveMate(mate) || LocalDemolitionSide != DemolitionTeam.Attackers)
+        if (IsDemolitionSquadDeviceObjectiveMate(mate)
+            || LocalDemolitionSide != DemolitionTeam.Attackers)
         {
             return false;
         }
-        var carrier = ResolveDemolitionAttacker(_demolitionDeviceLifecycle.CarrierMemberId) as SquadMate;
-        if (carrier is null || !IsInstanceValid(carrier) || carrier.IsDowned || carrier.IsBodyBag)
-        {
-            carrier = ResolveDemolitionAttacker(_demolitionDeviceLifecycle.PickupRunnerMemberId) as SquadMate;
-            if (carrier is null || !IsInstanceValid(carrier) || carrier.IsDowned || carrier.IsBodyBag)
-            {
-                return false;
-            }
-        }
-        if (carrier == mate)
+
+        var resolved = ResolveDemolitionDeviceLeader();
+        if (resolved is null || resolved == mate)
         {
             return false;
         }
-        escortPos = carrier.GlobalPosition;
+        leader = resolved;
+        objectivePriority = !ShouldYieldDemolitionSquadToCombat(mate);
         return true;
+    }
+
+    internal bool TryGetDemolitionEscortTarget(SquadMate mate, out Node3D leader)
+        => TryGetDemolitionEscortTarget(mate, out leader, out _);
+
+    private bool ShouldYieldDemolitionSquadToCombat(SquadMate mate)
+    {
+        if (!IsInstanceValid(mate) || mate.IsDowned || mate.IsBodyBag)
+        {
+            _demolitionSquadCombatBreakoffs.Remove(mate);
+            return false;
+        }
+
+        var alreadyYielding = _demolitionSquadCombatBreakoffs.Contains(mate);
+        var range = alreadyYielding
+            ? DemolitionCombatResumeRange
+            : DemolitionCombatEngageRange;
+        if (mate.HasDemolitionThreatWithin(range))
+        {
+            _demolitionSquadCombatBreakoffs.Add(mate);
+            return true;
+        }
+        _demolitionSquadCombatBreakoffs.Remove(mate);
+        return false;
     }
 
     private bool TryUpdateDemolitionSquadDeviceObjective(float delta)
@@ -539,7 +737,8 @@ public partial class FreightTerminalWorld
         {
             carrier.SetOrder(SquadOrder.Hold, carrier.GlobalPosition);
         }
-        if (carrier.HasDemolitionThreatWithin(DemolitionChannelGuardRange))
+        if (carrier.IsRevivingFriendly
+            || carrier.HasDemolitionThreatWithin(DemolitionChannelGuardRange))
         {
             return true;
         }

@@ -24,6 +24,7 @@ public partial class FreightTerminalWorld
     private readonly Dictionary<EnemyOperator, DemolitionRouteCursor> _demolitionOpponentRoutes = new();
     private readonly Dictionary<SquadMate, string> _demolitionSquadAssignmentTargets = new();
     private readonly HashSet<EnemyOperator> _demolitionCombatBreakoffs = new();
+    private readonly HashSet<SquadMate> _demolitionSquadCombatBreakoffs = new();
     private readonly DemolitionMatchState _demolitionMatch = new();
     private readonly DemolitionStrategyPlanner _demolitionStrategyPlanner = new();
     private readonly DemolitionObjectiveChannelCoordinator _demolitionObjectiveChannelCoordinator = new();
@@ -234,6 +235,8 @@ public partial class FreightTerminalWorld
         _demolitionOpponentRoutes.Clear();
         ClearDemolitionSquadRoutes();
         _demolitionSquadAssignmentTargets.Clear();
+        ClearDemolitionSquadPostStates();
+        _demolitionSquadCombatBreakoffs.Clear();
         _reinforcementPending = false;
         _reinforcementCountdown = 0.0f;
         _levelRoot.Visible = false;
@@ -367,7 +370,9 @@ public partial class FreightTerminalWorld
         _demolitionStrategyRemaining = 0.0f;
         _demolitionEnemyTargetSite = _demolitionMatch.CompletedRounds % 2;
         _demolitionSquadAssignmentTargets.Clear();
+        ClearDemolitionSquadPostStates();
         _demolitionCombatBreakoffs.Clear();
+        _demolitionSquadCombatBreakoffs.Clear();
         _demolitionOpponentRoutes.Clear();
         ClearDemolitionSquadRoutes();
         _demolitionSquadObjectiveMate = null;
@@ -768,7 +773,7 @@ public partial class FreightTerminalWorld
         {
             RefreshDemolitionStrategies(false);
         }
-        UpdateDemolitionSquadPosts();
+        UpdateDemolitionSquadPosts(delta);
         UpdateDemolitionSquadObjectiveRelay(delta);
         if (!_demolitionDevicePlanted)
         {
