@@ -232,6 +232,7 @@ public partial class FreightTerminalWorld
         _demolitionDefenderPlan = null;
         _demolitionOpponentAssignments.Clear();
         _demolitionOpponentRoutes.Clear();
+        ClearDemolitionSquadRoutes();
         _demolitionSquadAssignmentTargets.Clear();
         _reinforcementPending = false;
         _reinforcementCountdown = 0.0f;
@@ -368,6 +369,7 @@ public partial class FreightTerminalWorld
         _demolitionSquadAssignmentTargets.Clear();
         _demolitionCombatBreakoffs.Clear();
         _demolitionOpponentRoutes.Clear();
+        ClearDemolitionSquadRoutes();
         _demolitionSquadObjectiveMate = null;
         _demolitionSquadObjectiveSite = -1;
         _demolitionObjectiveSpectatorActive = false;

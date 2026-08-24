@@ -185,6 +185,13 @@ public partial class FreightTerminalWorld
             return SquadNavigationDirective.Walk(destination);
         }
 
+        if (_demolitionMode
+            && _demolitionRoundActive
+            && TryResolveDemolitionSquadNavigation(mate, destination, out var demolitionDirective))
+        {
+            return demolitionDirective;
+        }
+
         var id = mate.GetInstanceId();
         if (HasPendingRequiredSquadDirective(mate)
             && TryResolveSquadGridNavigation(mate, destination, emergency, out var requiredDirective))
@@ -1029,6 +1036,7 @@ public partial class FreightTerminalWorld
     {
         if (IsInstanceValid(mate))
         {
+            ClearDemolitionSquadRoute(mate);
             var id = mate.GetInstanceId();
             _squadTrailPaths.Remove(id);
             _squadGridPaths.Remove(id);

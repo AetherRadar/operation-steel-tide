@@ -783,6 +783,11 @@ public partial class FreightTerminalWorld
                 Destination = pair.Value.Destination,
                 NextDirectCheckMilliseconds = pair.Value.NextDirectCheckMilliseconds
             });
+        var savedSquadRoutes = _demolitionSquadRoutes.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value.CloneForDiagnostics());
+        var savedSquadRoutePlans = DemolitionSquadRoutePlansForDiagnostics;
+        var savedSquadRouteReuses = DemolitionSquadRouteReusesForDiagnostics;
         var savedOpponentNavigation = _demolitionOpponents
             .Where(IsInstanceValid)
             .ToDictionary(
@@ -931,7 +936,8 @@ public partial class FreightTerminalWorld
             var routeRecovery = stalled && routeCursor.ReplanCount == 1;
             // Squad posts: a mate standing on the assignment target converts its Move
             // order into Hold so it anchors the position instead of milling around.
-            var postedMate = _squadMates.FirstOrDefault(IsInstanceValid);
+            var postedMate = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate)
+                && _demolitionSquadAssignmentTargets.ContainsKey(mate));
             var postsConverted = false;
             if (postedMate is not null
                 && _demolitionSquadAssignmentTargets.TryGetValue(postedMate, out var targetKey))
@@ -939,6 +945,35 @@ public partial class FreightTerminalWorld
                 postedMate.GlobalPosition = DemolitionLayout().StrategyTarget(targetKey);
                 UpdateDemolitionSquadPosts();
                 postsConverted = postedMate.Order == SquadOrder.Hold;
+            }
+
+            // Explosion-map squad navigation must leave the off-map generic grid and
+            // return a cached authored-lane waypoint instead of holding at spawn.
+            var squadRouteNavigation = false;
+            var squadRouteReuse = false;
+            var routeMate = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate)
+                && !mate.IsHumanProxy
+                && !mate.IsDowned
+                && !mate.IsBodyBag);
+            if (routeMate is not null)
+            {
+                routeMate.GlobalPosition = layout.AttackSpawn;
+                routeMate.Velocity = Vector3.Zero;
+                ClearSquadNavigation(routeMate);
+                var routePlansBefore = DemolitionSquadRoutePlansForDiagnostics;
+                var routeDirective = ResolveSquadNavigationDestination(
+                    routeMate,
+                    layout.SitePositions[0],
+                    emergency: false);
+                var routePlansAfter = DemolitionSquadRoutePlansForDiagnostics;
+                var routeReusesBefore = DemolitionSquadRouteReusesForDiagnostics;
+                _ = ResolveSquadNavigationDestination(
+                    routeMate,
+                    layout.SitePositions[0],
+                    emergency: false);
+                squadRouteNavigation = routeDirective.Target.DistanceTo(routeMate.GlobalPosition) > 0.25f;
+                squadRouteReuse = routePlansAfter == routePlansBefore + 1
+                    && DemolitionSquadRouteReusesForDiagnostics > routeReusesBefore;
             }
 
             // Shared intelligence: the pure planner must avoid a site stacked with known
@@ -1174,6 +1209,7 @@ public partial class FreightTerminalWorld
                 && smokeResumesObjective
                 && switchedUnderPressure && detourRoutesAroundWall && unreachableSafe && unreachableRetries
                 && routeRecovery && runtimeRoute && postsConverted
+                && squadRouteNavigation && squadRouteReuse
                 && openingPatterns
                 && objectiveChannels
                 && plannerAvoidsStackedSite && blackboardSeesAlertedOpponents && relayTakesOver
@@ -1182,7 +1218,7 @@ public partial class FreightTerminalWorld
                 && strategyRefreshReassignsLostChannel
                 && strategyRefreshClearsChangedPhase
                 && friendlyAiPlantsDevice;
-            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} friendly_ai_plant={friendlyAiPlantsDevice} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} opening_patterns={openingPatterns} posts={postsConverted} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
+            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} friendly_ai_plant={friendlyAiPlantsDevice} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} opening_patterns={openingPatterns} posts={postsConverted} squad_route={squadRouteNavigation} squad_route_reuse={squadRouteReuse} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
             return valid;
         }
         finally
@@ -1266,6 +1302,13 @@ public partial class FreightTerminalWorld
             {
                 _squadTrailPaths[mateId] = trailState;
             }
+            _demolitionSquadRoutes.Clear();
+            foreach (var (mate, route) in savedSquadRoutes)
+            {
+                _demolitionSquadRoutes[mate] = route;
+            }
+            DemolitionSquadRoutePlansForDiagnostics = savedSquadRoutePlans;
+            DemolitionSquadRouteReusesForDiagnostics = savedSquadRouteReuses;
             _demolitionSquadAssignmentTargets.Clear();
             foreach (var (mate, targetKey) in savedSquadTargets)
             {

@@ -46,6 +46,10 @@ public sealed class DemolitionRouteCursor
         => string.Equals(RouteKey, routeKey, StringComparison.Ordinal)
             && HorizontalDistanceSquared(Destination, destination) <= DestinationMatchDistanceSquared;
 
+    public bool MatchesWithin(string routeKey, Vector3 destination, float tolerance)
+        => string.Equals(RouteKey, routeKey, StringComparison.Ordinal)
+            && HorizontalDistanceSquared(Destination, destination) <= tolerance * tolerance;
+
     public void Reset(
         string routeKey,
         Vector3 start,
