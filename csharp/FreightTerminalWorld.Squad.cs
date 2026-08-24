@@ -816,11 +816,13 @@ public partial class FreightTerminalWorld
             var mate = _squadMates[i];
             if (!IsInstanceValid(mate))
             {
+                ClearDemolitionSquadMateState(mate);
                 _squadMates.RemoveAt(i);
                 continue;
             }
             if ((mate.SquadSlot < firstSlot || mate.SquadSlot > lastSlot) && !mate.IsHumanProxy)
             {
+                ClearDemolitionSquadMateState(mate);
                 mate.QueueFree();
                 _squadMates.RemoveAt(i);
             }
