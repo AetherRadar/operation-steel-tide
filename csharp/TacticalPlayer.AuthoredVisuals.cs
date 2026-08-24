@@ -469,11 +469,11 @@ public partial class TacticalPlayer
             return;
         }
 
-        // The Blender output is authored at real-world scale. Only a fixed 180-degree
-        // presentation flip and translation are allowed here; changing scale would
-        // shrink the full forearms and recreates the old cartoon pistol proportions.
+        // The Blender exports already use the camera-facing handedness. Apply only
+        // the weapon-root translation and preserve authored scale; an extra 180° Y
+        // flip mirrors the palms and makes the forearms curl back toward the camera.
         var authoredScale = arms.Root.Transform.Basis.Scale;
-        var basis = new Basis(Vector3.Up, Mathf.Pi).Scaled(authoredScale);
+        var basis = Basis.Identity.Scaled(authoredScale);
         var rightPalm = arms.RightPalmTransformInRoot.Origin;
         var gripAnchor = FirstPersonRightHandAnchor(EquippedWeapon.Platform);
         arms.Root.Transform = new Transform3D(
