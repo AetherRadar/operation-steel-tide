@@ -19,11 +19,13 @@ public partial class FreightTerminalWorld
 
         var results = new List<string>();
         var posesValid = true;
+        var authoredRigValid = true;
         foreach (var platform in Enum.GetValues<WeaponPlatform>())
         {
             _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
             await WaitFrames(8);
             posesValid &= _player.WeaponHandPoseValidForDiagnostics;
+            authoredRigValid &= platform == WeaponPlatform.M3A1 || _player.UsesAuthoredHandRigForDiagnostics;
             // Ensure arms are refreshed
             var useAuthoredM4 = platform == WeaponPlatform.M4A1;
             var useAuthoredSmg = platform == WeaponPlatform.M3A1;
@@ -79,9 +81,10 @@ public partial class FreightTerminalWorld
             results.Add($"{platform}: procArmsVis={procArmsVisible} rightVis={rightHandVisible} leftVis={leftHandVisible} supHandPos={supportHandPos} weaponVis={_player.UsesAuthoredWeaponPlatformForDiagnostics(platform)}");
         }
         foreach (var line in results) GD.Print(line);
-        GD.Print($"HAND_POSE_CHECK valid={posesValid} samples={results.Count}");
-        GD.Print($"HAND_POSE_PASS valid={posesValid}");
+        var valid = posesValid && authoredRigValid;
+        GD.Print($"HAND_POSE_CHECK valid={valid} procedural_pose={posesValid} authored_rig={authoredRigValid} samples={results.Count}");
+        GD.Print($"HAND_POSE_PASS valid={valid}");
         GD.Print($"HAND_DIAGNOSTICS_DONE count={results.Count}");
-        GetTree().Quit(posesValid ? 0 : 2);
+        GetTree().Quit(valid ? 0 : 2);
     }
 }

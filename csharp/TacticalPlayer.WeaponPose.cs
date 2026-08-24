@@ -36,13 +36,13 @@ public partial class TacticalPlayer
         {
             var pistolSightHeight = EquippedWeapon.Platform switch
             {
-                WeaponPlatform.DesertEagle => 0.118f,
-                WeaponPlatform.GSh18 => 0.122f,
-                WeaponPlatform.P226 => 0.120f,
-                WeaponPlatform.M1911 => 0.124f,
-                _ => 0.120f
+                WeaponPlatform.DesertEagle => 0.18f,
+                WeaponPlatform.GSh18 => 0.205f,
+                WeaponPlatform.P226 => 0.19f,
+                WeaponPlatform.M1911 => 0.22f,
+                _ => 0.20f
             };
-            return new Vector3(0.08f, -pistolSightHeight * _weaponRoot.Scale.Y - 0.045f, -0.84f);
+            return new Vector3(0.16f, -pistolSightHeight * _weaponRoot.Scale.Y, -0.94f);
         }
         var sightHeight = IsInstanceValid(_opticRoot) && _opticRoot.Visible
             ? _opticRoot.Position.Y

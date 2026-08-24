@@ -78,6 +78,10 @@ public partial class TacticalPlayer
             return separation >= expectedRange.X && separation <= expectedRange.Y;
         }
     }
+    internal bool UsesAuthoredHandRigForDiagnostics
+        => EquippedWeapon.Platform != WeaponPlatform.M3A1
+            && IsInstanceValid(_authoredRifleArms?.Root)
+            && _authoredRifleArms.Root.Visible;
 
     private void BuildAuthoredPrimaryWeapon()
     {
@@ -106,7 +110,7 @@ public partial class TacticalPlayer
         var useAuthoredGsh18 = EquippedWeapon.Platform == WeaponPlatform.GSh18;
         var wantsAuthoredDesertEagle = EquippedWeapon.Platform == WeaponPlatform.DesertEagle;
         var useAuthoredDesertEagle = wantsAuthoredDesertEagle;
-        if (useAuthoredM4)
+        if (EquippedWeapon.Platform != WeaponPlatform.M3A1)
         {
             EnsureAuthoredRifleArms();
         }
@@ -182,11 +186,15 @@ public partial class TacticalPlayer
             EquippedWeapon.Platform,
             out var activePlatformWeapon)
             && IsInstanceValid(activePlatformWeapon.Root);
-        var useAuthoredRifleArms = useAuthoredM4
+        var useAuthoredRifleArms = EquippedWeapon.Platform != WeaponPlatform.M3A1
             && IsInstanceValid(_authoredRifleArms?.Root);
         if (IsInstanceValid(_authoredRifleArms?.Root))
         {
-            _authoredRifleArms.Root.Visible = useAuthoredM4;
+            _authoredRifleArms.Root.Visible = useAuthoredRifleArms;
+            if (useAuthoredRifleArms)
+            {
+                AlignRifleArmsToWeapon();
+            }
         }
         if (IsInstanceValid(_proceduralFirstPersonArms))
         {
@@ -323,8 +331,9 @@ public partial class TacticalPlayer
         var toLocal = _weaponRoot.GlobalTransform.AffineInverse();
         var right = toLocal * _authoredRifleArms.PalmPosition("R_palm_039");
         var left = toLocal * _authoredRifleArms.PalmPosition("L_palm_015");
+        var (gripAnchor, supportAnchor) = FirstPersonHandAnchors(EquippedWeapon.Platform);
         var current = left - right;
-        var target = RifleForegripAnchor - RifleGripAnchor;
+        var target = supportAnchor - gripAnchor;
         var currentFlat = new Vector2(current.X, current.Z);
         var targetFlat = new Vector2(target.X, target.Z);
         if (currentFlat.Length() < 0.0001f || targetFlat.Length() < 0.0001f)
@@ -335,11 +344,28 @@ public partial class TacticalPlayer
         var yaw = currentFlat.AngleTo(targetFlat);
         var basis = new Basis(Vector3.Up, yaw).Scaled(Vector3.One * scale);
         _authoredRifleArms.Root.Basis = basis;
-        _authoredRifleArms.Root.Position = RifleGripAnchor - basis * right;
+        _authoredRifleArms.Root.Position = gripAnchor - basis * right;
         var toLocalAfter = _weaponRoot.GlobalTransform.AffineInverse();
-        var residual = (toLocalAfter * _authoredRifleArms.PalmPosition("R_palm_039") - RifleGripAnchor).Length();
+        var residual = (toLocalAfter * _authoredRifleArms.PalmPosition("R_palm_039") - gripAnchor).Length();
         GD.Print($"RIFLE_ARMS_ALIGN grip_residual={residual:F4} scale={scale:F3} yaw_deg={Mathf.RadToDeg(yaw):F1}");
     }
+
+    private static (Vector3 Grip, Vector3 Support) FirstPersonHandAnchors(WeaponPlatform platform)
+        => platform switch
+        {
+            WeaponPlatform.P226 or WeaponPlatform.M1911 or WeaponPlatform.GSh18
+                or WeaponPlatform.DesertEagle
+                => (new Vector3(0.105f, -0.17f, 0.035f), new Vector3(-0.075f, -0.19f, -0.19f)),
+            WeaponPlatform.MP5A5 or WeaponPlatform.M3A1
+                => (new Vector3(0.105f, -0.18f, -0.08f), new Vector3(-0.035f, -0.19f, -0.42f)),
+            WeaponPlatform.M24 or WeaponPlatform.AXMC
+                => (new Vector3(0.0f, -0.17f, 0.02f), new Vector3(-0.02f, -0.19f, -0.72f)),
+            WeaponPlatform.AWM
+                => (new Vector3(0.0f, -0.17f, 0.02f), new Vector3(-0.02f, -0.19f, -0.86f)),
+            WeaponPlatform.VSS
+                => (new Vector3(0.0f, -0.16f, -0.02f), new Vector3(-0.02f, -0.18f, -0.62f)),
+            _ => (RifleGripAnchor, RifleForegripAnchor)
+        };
 
     private void EnsureAuthoredDesertEagleWeapon()
     {
