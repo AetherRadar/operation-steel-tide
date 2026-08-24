@@ -395,6 +395,7 @@ public partial class SquadMate
     {
         var destination = anchorDestination;
         if (Order == SquadOrder.Follow
+            && !objectivePriority
             && hostile is null
             && !Leader.IsDead
             && GlobalPosition.DistanceTo(Leader.GlobalPosition) > 42.0f)
@@ -433,8 +434,7 @@ public partial class SquadMate
                 _combatRecoveryTimer = 0.0f;
                 _combatRecoveryDirection = Vector3.Zero;
             }
-            else if ((!objectivePriority || reviveTargetNode is not null)
-                && _combatRecoveryTimer > 0.0f
+            else if (_combatRecoveryTimer > 0.0f
                 && _combatRecoveryDirection.LengthSquared() > 0.01f)
             {
                 desired = _combatRecoveryDirection;

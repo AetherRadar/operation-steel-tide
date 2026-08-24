@@ -274,6 +274,7 @@ public partial class FreightTerminalWorld
                 | ExtractionSquadNetworkFlags.Down
                 | ExtractionSquadNetworkFlags.BodyBag
                 | ExtractionSquadNetworkFlags.ReviveUsed));
+        ClearDemolitionSquadMateState(remote);
         _squadMates.Remove(remote);
         OnRemoteSquadState(
             remote.NetworkPeerId,
@@ -288,6 +289,7 @@ public partial class FreightTerminalWorld
         _extractionNetworkDiagnosticTombstoneGuarded = staleReplacement is null;
         if (staleReplacement is not null)
         {
+            ClearDemolitionSquadMateState(staleReplacement);
             _squadMates.Remove(staleReplacement);
             staleReplacement.QueueFree();
         }

@@ -4,20 +4,69 @@ namespace OperationSteelTide;
 
 public partial class SquadMate
 {
+    private const float DemolitionRecentDamageThreatSeconds = 1.25f;
+    private Vector3 _demolitionEscortForward = Vector3.Forward;
+    private bool _demolitionEscortForwardInitialized;
+
     internal Vector3 DemolitionOrderPositionForDiagnostics => _orderPosition;
+
+    private Vector3 ResolveDemolitionEscortForward(Node3D leader)
+    {
+        var candidate = leader is CharacterBody3D movingLeader
+            ? movingLeader.Velocity
+            : Vector3.Zero;
+        candidate.Y = 0.0f;
+        if (candidate.LengthSquared() >= 0.16f)
+        {
+            candidate = candidate.Normalized();
+            if (!_demolitionEscortForwardInitialized)
+            {
+                _demolitionEscortForward = candidate;
+                _demolitionEscortForwardInitialized = true;
+            }
+            else
+            {
+                var blended = _demolitionEscortForward.Lerp(candidate, 0.22f);
+                if (blended.LengthSquared() > 0.01f)
+                {
+                    _demolitionEscortForward = blended.Normalized();
+                }
+            }
+        }
+        else if (!_demolitionEscortForwardInitialized)
+        {
+            candidate = -leader.GlobalBasis.Z;
+            candidate.Y = 0.0f;
+            _demolitionEscortForward = candidate.LengthSquared() > 0.01f
+                ? candidate.Normalized()
+                : Vector3.Forward;
+            _demolitionEscortForwardInitialized = true;
+        }
+        return _demolitionEscortForward;
+    }
+
+    private void ResetDemolitionEscortForward()
+    {
+        _demolitionEscortForward = Vector3.Forward;
+        _demolitionEscortForwardInitialized = false;
+    }
 
     internal bool HasDemolitionThreatWithin(float range)
     {
         if (_combatTarget is not null
             && IsInstanceValid(_combatTarget)
             && !_combatTarget.IsDead
-            && GlobalPosition.DistanceTo(_combatTarget.GlobalPosition) < range)
+            && GlobalPosition.DistanceTo(_combatTarget.GlobalPosition) < range
+            && (_combatHasSight
+                || ReferenceEquals(_combatTarget, _combatThreat)
+                    && _combatThreatAge <= DemolitionRecentDamageThreatSeconds))
         {
             return true;
         }
         return _combatThreat is not null
             && IsInstanceValid(_combatThreat)
             && !_combatThreat.IsDead
+            && _combatThreatAge <= DemolitionRecentDamageThreatSeconds
             && GlobalPosition.DistanceTo(_combatThreat.GlobalPosition) < range;
     }
 
@@ -119,6 +168,7 @@ public partial class SquadMate
         _muzzle.Visible = HasFireablePrimary;
         _nameLabel.Visible = true;
         _healthFill.Visible = true;
+        ResetDemolitionEscortForward();
         ResetMovementProgress();
         InitializeCombatTactics();
         SetOrder(SquadOrder.Follow, spawn);

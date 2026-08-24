@@ -139,6 +139,7 @@ public partial class FreightTerminalWorld
             && !mate.IsHumanProxy && mate.SquadSlot == _demolitionLocalNetworkSlot);
         if (conflictingAi is not null)
         {
+            ClearDemolitionSquadMateState(conflictingAi);
             _squadMates.Remove(conflictingAi);
             conflictingAi.QueueFree();
         }
@@ -164,6 +165,7 @@ public partial class FreightTerminalWorld
                     && candidate.SquadSlot == state.Slot);
                 if (ai is not null)
                 {
+                    ClearDemolitionSquadMateState(ai);
                     _squadMates.Remove(ai);
                     ai.QueueFree();
                 }

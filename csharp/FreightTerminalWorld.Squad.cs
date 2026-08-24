@@ -816,11 +816,13 @@ public partial class FreightTerminalWorld
             var mate = _squadMates[i];
             if (!IsInstanceValid(mate))
             {
+                ClearDemolitionSquadMateState(mate);
                 _squadMates.RemoveAt(i);
                 continue;
             }
             if ((mate.SquadSlot < firstSlot || mate.SquadSlot > lastSlot) && !mate.IsHumanProxy)
             {
+                ClearDemolitionSquadMateState(mate);
                 mate.QueueFree();
                 _squadMates.RemoveAt(i);
             }
@@ -905,6 +907,7 @@ public partial class FreightTerminalWorld
             var ai = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && !mate.IsHumanProxy && mate.SquadSlot == slot);
             if (ai is not null)
             {
+                ClearDemolitionSquadMateState(ai);
                 _squadMates.Remove(ai);
                 ai.QueueFree();
             }
@@ -932,6 +935,7 @@ public partial class FreightTerminalWorld
         if (proxy is not null)
         {
             _extractionSquadTombstones.Remove(proxy.SquadSlot);
+            ClearDemolitionSquadMateState(proxy);
             _squadMates.Remove(proxy);
             proxy.QueueFree();
         }
@@ -2256,6 +2260,7 @@ public partial class FreightTerminalWorld
                     CaptureExtractionLootSourceState(sourceId, bag, granted: false));
             }
         }
+        ClearDemolitionSquadMateState(mate);
         _squadMates.Remove(mate);
     }
 

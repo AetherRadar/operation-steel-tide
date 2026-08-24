@@ -339,6 +339,7 @@ public partial class FreightTerminalWorld
             {
                 continue;
             }
+            ClearDemolitionSquadMateState(mate);
             _squadMates.RemoveAt(index);
             mate.QueueFree();
         }
