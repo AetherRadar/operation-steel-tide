@@ -4,7 +4,10 @@ namespace OperationSteelTide;
 
 public partial class TacticalPlayer
 {
-    private static readonly Vector3 HipWeaponPosition = new(0.34f, -0.33f, -0.58f);
+    // Keep the complete first-person presentation in the lower third of the
+    // view. The old mount put the authored palms below the HUD, so the weapon
+    // looked detached even though its grip anchors were mathematically exact.
+    private static readonly Vector3 HipWeaponPosition = new(0.34f, -0.15f, -0.58f);
     private static readonly Vector3 ReloadWeaponPosition = new(0.18f, -0.23f, -0.86f);
     private static readonly Vector3 SearchWeaponStart = new(0.5f, -0.58f, -0.48f);
     private static readonly Vector3 SearchWeaponEnd = new(0.32f, -0.48f, -0.72f);

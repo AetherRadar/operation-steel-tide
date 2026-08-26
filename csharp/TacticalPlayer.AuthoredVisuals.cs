@@ -86,6 +86,39 @@ public partial class TacticalPlayer
     internal AuthoredFirstPersonArmsVisual? ActiveAuthoredArmsForDiagnostics
         => ActiveAuthoredArms();
 
+    internal Node3D? ActiveAuthoredWeaponRootForDiagnostics
+        => EquippedWeapon.Platform switch
+        {
+            WeaponPlatform.M4A1 when IsInstanceValid(_authoredPrimaryWeapon?.Root)
+                => _authoredPrimaryWeapon.Root,
+            WeaponPlatform.M3A1 when IsInstanceValid(_authoredFirstPersonSmg?.WeaponBody)
+                => _authoredFirstPersonSmg.WeaponBody,
+            WeaponPlatform.GSh18 when IsInstanceValid(_authoredGsh18Weapon?.Root)
+                => _authoredGsh18Weapon.Root,
+            WeaponPlatform.DesertEagle when IsInstanceValid(_authoredDesertEagleWeapon?.Root)
+                => _authoredDesertEagleWeapon.Root,
+            _ when _authoredPlatformWeapons.TryGetValue(EquippedWeapon.Platform, out var visual)
+                && IsInstanceValid(visual.Root)
+                => visual.Root,
+            _ => null
+        };
+
+    internal Node3D? ActiveAuthoredForegripForDiagnostics
+        => EquippedWeapon.Platform == WeaponPlatform.M4A1
+            ? _authoredPrimaryWeapon?.Foregrip
+            : _authoredPlatformWeapons.TryGetValue(EquippedWeapon.Platform, out var visual)
+                ? visual.Foregrip
+                : null;
+
+    internal Node3D? ActiveAuthoredMuzzleForDiagnostics
+        => EquippedWeapon.Platform == WeaponPlatform.M4A1
+            ? _authoredPrimaryWeapon?.MuzzleDevice
+            : _authoredPlatformWeapons.TryGetValue(EquippedWeapon.Platform, out var visual)
+                ? visual.MuzzleDevice
+                : null;
+
+    internal Transform3D WeaponRootGlobalTransformForDiagnostics => _weaponRoot.GlobalTransform;
+
     internal FirstPersonHandPoseInspection InspectAuthoredHandPoseForDiagnostics()
     {
         var arms = ActiveAuthoredArms();
@@ -124,6 +157,8 @@ public partial class TacticalPlayer
             && leftScreen.X <= viewportSize.X * 1.15f
             && leftScreen.Y >= -viewportSize.Y * 0.15f
             && leftScreen.Y <= viewportSize.Y * 1.15f;
+        var presentationZoneValid = rightScreen.Y <= viewportSize.Y * 0.92f
+            && leftScreen.Y <= viewportSize.Y * 0.92f;
         var scaleValid = worldScale.X > 0.35f
             && worldScale.X < 2.2f
             && worldScale.DistanceTo(new Vector3(worldScale.X, worldScale.X, worldScale.X)) <= 0.002f;
@@ -135,7 +170,8 @@ public partial class TacticalPlayer
             && scaleValid
             && determinant > 0.01f
             && wristContinuity
-            && screenValid;
+            && screenValid
+            && presentationZoneValid;
         return new FirstPersonHandPoseInspection(
             valid,
             gripResidual,
@@ -500,8 +536,20 @@ public partial class TacticalPlayer
         {
             return;
         }
+
+        // Match each weapon-family palm span with a uniform scale. This preserves
+        // the authored proportions while keeping the support palm on the weapon;
+        // a single scale for every platform makes compact guns and long rifles
+        // miss their front grip by a visible amount.
         var scale = target.Length() / current.Length();
         var rotation = new Quaternion(current.Normalized(), target.Normalized());
+        if (Mathf.Abs(pose.RollDegrees) > 0.01f)
+        {
+            var roll = new Quaternion(
+                target.Normalized(),
+                Mathf.DegToRad(pose.RollDegrees));
+            rotation = roll * rotation;
+        }
         var basis = new Basis(rotation).Scaled(Vector3.One * scale);
         arms.Root.Transform = new Transform3D(
             basis,

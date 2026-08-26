@@ -96,22 +96,24 @@ def add_pistol_ik(
 
 def evaluate_pose(kind: str) -> None:
     armature = bpy.data.objects["Object_4"]
-    bpy.context.scene.frame_set(0)
+    # Frame 155 is the source asset's stable two-hand firing pose. Frame 0 is
+    # the reload-start pose with the support arm lifted away from the weapon.
+    bpy.context.scene.frame_set(155)
     if kind == "pistol_service":
-        # The right hand stays in a compact firing grip.  The left wrist is
-        # pulled back beside it, with the elbow kept low and outside the sight
-        # line so the two hands form a stable isosceles stance.
+        # Keep the source firing pose and pull the support wrist toward the
+        # pistol's short frame. This keeps both elbows below the sight line
+        # instead of folding the support arm across the primary hand.
         add_pistol_ik(
             armature,
-            Vector((-13.0, -1.5, 2.8)),
-            Vector((12.0, 8.0, -12.0)),
+            Vector((-7.0, -10.0, 1.0)),
+            Vector((12.0, -2.0, -12.0)),
             180.0,
         )
     elif kind == "pistol_large":
         add_pistol_ik(
             armature,
-            Vector((-12.0, -1.5, 2.8)),
-            Vector((14.0, 8.0, -12.0)),
+            Vector((-7.0, -10.5, 1.0)),
+            Vector((14.0, -2.0, -12.0)),
             180.0,
         )
     bpy.context.view_layer.update()
@@ -132,9 +134,61 @@ def mesh_copy_evaluated(source: bpy.types.Object) -> bpy.types.Object:
     return result
 
 
+def evaluated_component_centers(source: bpy.types.Object) -> list[tuple[int, Vector, list[int]]]:
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    evaluated = source.evaluated_get(depsgraph)
+    mesh = evaluated.to_mesh()
+    try:
+        adjacency = {index: set() for index in range(len(mesh.vertices))}
+        for edge in mesh.edges:
+            left, right = edge.vertices
+            adjacency[left].add(right)
+            adjacency[right].add(left)
+
+        unseen = set(adjacency)
+        components: list[set[int]] = []
+        while unseen:
+            seed = unseen.pop()
+            component = {seed}
+            stack = [seed]
+            while stack:
+                vertex = stack.pop()
+                for neighbor in adjacency[vertex]:
+                    if neighbor in unseen:
+                        unseen.remove(neighbor)
+                        component.add(neighbor)
+                        stack.append(neighbor)
+            if len(component) >= 100:
+                components.append(component)
+
+        result = []
+        for component in components:
+            center = sum((mesh.vertices[index].co for index in component), Vector()) / len(component)
+            result.append((len(component), center, sorted(component)))
+        return sorted(result, key=lambda item: item[0], reverse=True)
+    finally:
+        evaluated.to_mesh_clear()
+
+
+def hand_contact_center(
+    components: list[tuple[int, Vector, list[int]]],
+    palm_origin: Vector,
+) -> Vector:
+    # Each glove is split into a palm and finger component in the source GLB.
+    # Pick the two components nearest the palm bone and average their actual
+    # evaluated vertices instead of using the wrist/palm bone origin.
+    nearest = sorted(
+        components,
+        key=lambda item: (item[1] - palm_origin).length,
+    )[:2]
+    total = sum(item[0] for item in nearest)
+    return sum((item[1] * item[0] for item in nearest), Vector()) / total
+
+
 def add_marker(
     root: bpy.types.Object,
     name: str,
+    position_source: Vector,
     transform_source: Matrix,
 ) -> bpy.types.Object:
     marker = bpy.data.objects.new(name, None)
@@ -142,11 +196,14 @@ def add_marker(
     marker.empty_display_size = 0.04
     bpy.context.collection.objects.link(marker)
     marker.parent = root
-    source_position = transform_source.translation * SOURCE_TO_METERS
-    source_basis = transform_source.to_3x3()
-    marker.location = source_position
+    # The glTF exporter applies a 180-degree Z axis conversion to this baked
+    # mesh. Apply the same conversion to markers before export; otherwise the
+    # marker nodes keep their source Y sign and land outside the visible hand.
+    export_basis = Matrix.Rotation(math.pi, 4, "Z")
+    converted = export_basis @ transform_source
+    marker.location = (export_basis @ position_source) * SOURCE_TO_METERS
     marker.rotation_mode = "QUATERNION"
-    marker.rotation_quaternion = source_basis.to_quaternion()
+    marker.rotation_quaternion = converted.to_quaternion()
     return marker
 
 
@@ -155,6 +212,13 @@ def export_static_arms(kind: str, output_name: str) -> None:
     evaluate_pose(kind)
     armature = bpy.data.objects["Object_4"]
     source_mesh = bpy.data.objects["Object_7"]
+    components = evaluated_component_centers(source_mesh)
+    right_palm = bone_world_matrix(armature, "R_palm_039")
+    left_palm = bone_world_matrix(armature, "L_palm_015")
+    right_palm_contact = hand_contact_center(components, right_palm.translation)
+    left_palm_contact = hand_contact_center(components, left_palm.translation)
+    right_wrist = bone_world_matrix(armature, "R_wrist_026")
+    left_wrist = bone_world_matrix(armature, "L_wrist_03")
 
     root = bpy.data.objects.new("StaticFirstPersonArms", None)
     root.empty_display_type = "PLAIN_AXES"
@@ -170,10 +234,15 @@ def export_static_arms(kind: str, output_name: str) -> None:
     for polygon in mesh.data.polygons:
         polygon.use_smooth = True
 
-    add_marker(root, "RightPalmFrame", bone_world_matrix(armature, "R_palm_039"))
-    add_marker(root, "LeftPalmFrame", bone_world_matrix(armature, "L_palm_015"))
-    add_marker(root, "RightWristFrame", bone_world_matrix(armature, "R_wrist_026"))
-    add_marker(root, "LeftWristFrame", bone_world_matrix(armature, "L_wrist_03"))
+    add_marker(root, "RightPalmFrame", right_palm_contact, right_palm)
+    add_marker(
+        root,
+        "LeftPalmFrame",
+        left_palm_contact,
+        left_palm,
+    )
+    add_marker(root, "RightWristFrame", right_wrist.translation, right_wrist)
+    add_marker(root, "LeftWristFrame", left_wrist.translation, left_wrist)
 
     for obj in list(bpy.context.scene.objects):
         if obj is root or obj in root.children_recursive:
