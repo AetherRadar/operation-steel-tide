@@ -80,8 +80,7 @@ public partial class FreightTerminalWorld
         }
         foreach (var mate in _squadMates.Where(IsInstanceValid))
         {
-            mate.ProcessMode = ProcessModeEnum.Inherit;
-            mate.SetPhysicsProcess(true);
+            mate.ResumeFromExtractionDeployment();
         }
         _missionDirector.ProcessMode = _squadNetwork.IsHost
             ? ProcessModeEnum.Always

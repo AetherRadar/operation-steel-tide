@@ -858,7 +858,8 @@ public partial class FreightTerminalWorld
         var mate = new SquadMate
         {
             Name = human ? $"NetworkSquadmate_{peerId}" : $"AiSquadmate_{slot}",
-            Position = position
+            Position = position,
+            Rotation = new Vector3(0.0f, _player.Rotation.Y, 0.0f)
         };
         var sign = callsigns[Mathf.Clamp(slot, 0, callsigns.Length - 1)];
         mate.Configure(this, _player, slot, role, sign, human, peerId, networkProxy);

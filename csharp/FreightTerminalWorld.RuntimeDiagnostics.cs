@@ -77,6 +77,7 @@ public partial class FreightTerminalWorld
             ("--validate-goal-pack", static world => world.ValidateGoalPack()),
             ("--validate-extraction-spawns", static world => world.ValidateExtractionSpawns()),
             ("--validate-extraction-ai", static world => world.ValidateExtractionAi()),
+            ("--validate-extraction-ai-deployment", static world => world.ValidateExtractionAiDeployment()),
             ("--validate-ai-navigation", static world => world.ValidateAiNavigation()),
             ("--validate-extraction-loot", static world => world.ValidateExtractionLoot()),
             ("--validate-extraction-loadout", static world => world.ValidateExtractionLoadout()),

@@ -894,6 +894,37 @@ public partial class SquadMate
         _followFormationSettled = false;
     }
 
+    internal void ResumeFromExtractionDeployment()
+    {
+        if (IsExtractionPassenger || IsBodyBag)
+        {
+            return;
+        }
+
+        ProcessMode = ProcessModeEnum.Inherit;
+        SetPhysicsProcess(true);
+        Velocity = Vector3.Zero;
+        _reviveTarget = null;
+        _revivePoseBlend = 0.0f;
+        _lootHuntSource = null;
+        _doorWaitTimer = 0.0f;
+        _skillActionTime = 0.0f;
+        _overdriveTime = 0.0f;
+        _combatThreat = null;
+        _combatThreatAge = 0.0f;
+        _combatTargetScanTimer = 0.0f;
+        _combatSightTimer = 0.0f;
+        _combatMemoryRemaining = 0.0f;
+        ClearCombatTarget();
+        ResetMovementProgress();
+        if (IsInstanceValid(Main))
+        {
+            Main.ClearSquadNavigation(this);
+        }
+        _remotePosition = GlobalPosition;
+        _remoteRotation = Rotation;
+    }
+
     internal bool HasCombatLineOfSightForDiagnostics(EnemyOperator hostile)
         => IsInstanceValid(hostile) && !hostile.IsDead && HasLineOfSight(hostile);
 
