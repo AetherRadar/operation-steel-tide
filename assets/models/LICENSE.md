@@ -22,7 +22,7 @@ The City Kit (Industrial) 1.0 model set is distributed by Kenney under CC0 1.0:
 - Local assets: `kenney_city_kit_industrial/*.glb`
 - License copy: `kenney_city_kit_industrial/KENNEY_LICENSE.txt`
 
-The complete GLB set is retained so authored demolition layouts can combine the pack's buildings, chimneys, and tank detail without modifying third-party geometry.
+The complete GLB set is retained so Tideforge, Harbor Locks, the freight terminal, and residential rooftop dressing can combine the pack's buildings, chimneys, and tank detail without modifying third-party geometry. Runtime placement is visual-only where an existing collision shell already owns gameplay geometry.
 
 The Factory Kit 3.0 model set is distributed by Kenney under CC0 1.0:
 
@@ -63,7 +63,7 @@ The standard free version of the Downtown City MegaKit is distributed by Quatern
 - Local assets: `quaternius_downtown_city/*.gltf`, matching `.bin` buffers, and shared 1K texture maps
 - License copy and processing record: `quaternius_downtown_city/QUATERNIUS_LICENSE.txt` and `quaternius_downtown_city/README.md`
 
-The repository contains 21 selected modular scenes and 26 shared textures for composing Saint Marais Old Town. The user-provided CS:GO Town Sketchfab page was treated as layout reference only; no geometry, textures, or other files from that page are included.
+The repository contains 21 selected modular scenes and 26 shared textures for composing Saint Marais Old Town. The metal wall modules are also reused as visual facades on the Tideforge and Harbor Locks collision shells. The user-provided CS:GO Town Sketchfab page was treated as layout reference only; no geometry, textures, or other files from that page are included.
 
 ## TastyTony CC BY 4.0 model
 

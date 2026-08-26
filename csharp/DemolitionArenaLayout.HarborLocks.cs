@@ -19,11 +19,11 @@ public sealed partial class DemolitionArenaLayout
 
             // Visible sightline annexes replace invisible air walls: they extend the
             // authored buildings so spawn-to-site vision is blocked by readable geometry.
-            Box("SightBlockWestTurbine", new(-42.3f, 2.5f, -3.0f), new(13.7f, 5.0f, 15.3f), "concrete_dark", visible: true),
-            Box("SightBlockSouthAnnex", new(-8.0f, 2.5f, 33.0f), new(17.5f, 5.0f, 9.0f), "concrete_dark", visible: true),
+            Box("SightBlockWestTurbine", new(-42.3f, 2.5f, -3.0f), new(13.7f, 5.0f, 15.3f), "concrete_dark", visible: false),
+            Box("SightBlockSouthAnnex", new(-8.0f, 2.5f, 33.0f), new(17.5f, 5.0f, 9.0f), "concrete_dark", visible: false),
 
-            Box("WestLockGate", new(-31.0f, 1.7f, 0.0f), new(16.0f, 3.4f, 0.8f), "steel_dark"),
-            Box("EastLockGate", new(31.0f, 1.7f, 0.0f), new(16.0f, 3.4f, 0.8f), "steel_dark"),
+            Box("WestLockGate", new(-31.0f, 1.7f, 0.0f), new(16.0f, 3.4f, 0.8f), "steel_dark", visible: false),
+            Box("EastLockGate", new(31.0f, 1.7f, 0.0f), new(16.0f, 3.4f, 0.8f), "steel_dark", visible: false),
             Box("WestBridgeAbutmentNorth", new(-20.0f, 1.25f, -4.2f), new(4.0f, 2.5f, 1.0f), "concrete"),
             Box("WestBridgeAbutmentSouth", new(-20.0f, 1.25f, 4.2f), new(4.0f, 2.5f, 1.0f), "concrete"),
             Box("EastBridgeAbutmentNorth", new(20.0f, 1.25f, -4.2f), new(4.0f, 2.5f, 1.0f), "concrete"),

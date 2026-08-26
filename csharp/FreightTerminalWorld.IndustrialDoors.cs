@@ -9,6 +9,8 @@ public partial class FreightTerminalWorld
         "res://assets/models/kenney_factory_kit/door-wide-closed.glb";
 
     private int _industrialAuthoredLandmarkCount;
+    private int _industrialAuthoredDressingCount;
+    private int _industrialAuthoredDressingSceneCount;
 
     private void BuildFreightAuthoredLandmarks()
     {
@@ -65,6 +67,10 @@ public partial class FreightTerminalWorld
             body.AddToGroup("freight_authored_landmark");
             _industrialAuthoredLandmarkCount++;
         }
+
+        var dressing = new FreightTerminalArtDressingBuilder().Build(_levelRoot);
+        _industrialAuthoredDressingCount = dressing.AuthoredModelCount;
+        _industrialAuthoredDressingSceneCount = dressing.ScenePaths.Count;
     }
 
     private void BuildFreightTerminalDoors()

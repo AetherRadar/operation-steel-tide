@@ -110,6 +110,14 @@ public partial class FreightTerminalWorld
             && arena.ActiveCollisionBodyCount == arena.CollisionBodyCount
             && arena.AllStaticBodiesUseWorldLayer()
             && arena.Sites.Count == 2;
+        var dressingRoot = arena.Root.GetNodeOrNull<Node3D>("DemolitionAuthoredDressing");
+        var authoredModelCount = dressingRoot?.GetMeta("authored_model_count").AsInt32() ?? 0;
+        var missingModelCount = dressingRoot?.GetMeta("missing_model_count").AsInt32() ?? -1;
+        var uniqueSceneCount = dressingRoot?.GetMeta("unique_scene_count").AsInt32() ?? 0;
+        var authoredDressingReady = IsInstanceValid(dressingRoot)
+            && authoredModelCount >= 15
+            && missingModelCount == 0
+            && uniqueSceneCount >= 5;
         var valid = initiallyIsolated
             && catalogReady
             && localizationReady
@@ -123,8 +131,9 @@ public partial class FreightTerminalWorld
             && defenderBClear
             && rotationClear
             && navigationReady
-            && runtimeReady;
-        GD.Print($"HARBOR_LOCKS_CHECK valid={valid} catalog={catalogReady} localization={localizationReady} assets={assetsReady} imported={importedModels}/{layout.Props.Count} independent={independentTopology} large_buildings={largeBuildings} bounds={propsInsideBounds} separated={propsSeparated} overlap={overlapPair} site_clear={sitesClear} spawn_clear={spawnsClear} collision_coverage={collisionCoverage} collision_failures={string.Join('|', collisionCoverageFailures)} topology={topologyReady} navigation={navigationReady} routes={routeAClear}/{routeBClear}/{routeMidClear}/{defenderAClear}/{defenderBClear}/{rotationClear} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{defenderABlocker}|{defenderBBlocker}|{rotationBlocker} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} sites={arena.Sites.Count}");
+            && runtimeReady
+            && authoredDressingReady;
+        GD.Print($"HARBOR_LOCKS_CHECK valid={valid} catalog={catalogReady} localization={localizationReady} assets={assetsReady} imported={importedModels}/{layout.Props.Count} independent={independentTopology} large_buildings={largeBuildings} bounds={propsInsideBounds} separated={propsSeparated} overlap={overlapPair} site_clear={sitesClear} spawn_clear={spawnsClear} collision_coverage={collisionCoverage} collision_failures={string.Join('|', collisionCoverageFailures)} topology={topologyReady} navigation={navigationReady} routes={routeAClear}/{routeBClear}/{routeMidClear}/{defenderAClear}/{defenderBClear}/{rotationClear} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{defenderABlocker}|{defenderBBlocker}|{rotationBlocker} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} sites={arena.Sites.Count} authored={authoredDressingReady} authored_models={authoredModelCount} authored_scenes={uniqueSceneCount} missing_models={missingModelCount}");
         GD.Print($"HARBOR_LOCKS_PASS valid={valid}");
 
         arena.SetActive(false);

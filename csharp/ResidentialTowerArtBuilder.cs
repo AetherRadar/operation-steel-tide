@@ -12,7 +12,6 @@ internal sealed record ResidentialTowerArtResult(
 internal sealed class ResidentialTowerArtBuilder
 {
     private const string CityRoot = "res://assets/models/kenney_city_kit_industrial";
-    private const string FactoryRoot = "res://assets/models/kenney_factory_kit";
 
     private static readonly ModelAsset FamilyAnnex = City(
         "building-t.glb", new Vector3(1.72f, 1.01f, 1.39f), new Vector3(0, 0.505f, 0));
@@ -32,14 +31,14 @@ internal sealed class ResidentialTowerArtBuilder
         "detail-tank.glb", new Vector3(0.85f, 0.42f, 0.52f), new Vector3(0, 0.21f, 0));
     private static readonly ModelAsset RelayMast = City(
         "chimney-small.glb", new Vector3(0.3f, 0.75f, 0.3f), new Vector3(0, 0.375f, 0));
-    private static readonly ModelAsset WorkshopMachine = Factory(
-        "machine.glb", new Vector3(1.2f, 1.3f, 1.5f), new Vector3(0, 0.65f, 0));
-    private static readonly ModelAsset ClinicMachine = Factory(
-        "machine-window.glb", new Vector3(1.2f, 1.29f, 1.5f), new Vector3(0, 0.645f, 0));
-    private static readonly ModelAsset ShelterHopper = Factory(
-        "hopper-high-round.glb", new Vector3(1.12f, 1.5f, 1.12f), new Vector3(0, 0.75f, 0));
-    private static readonly ModelAsset WorkshopPipe = Factory(
-        "pipe-large-bend.glb", new Vector3(1.9f, 1.0f, 1.9f), new Vector3(0.05f, 0.5f, -0.45f));
+    private static readonly ModelAsset WorkshopMachine = City(
+        "detail-tank.glb", new Vector3(0.85f, 0.42f, 0.52f), new Vector3(0, 0.21f, 0));
+    private static readonly ModelAsset ClinicMachine = City(
+        "building-j.glb", new Vector3(1.03f, 0.86f, 1.3f), new Vector3(-0.435f, 0.43f, 0.27f));
+    private static readonly ModelAsset ShelterHopper = City(
+        "chimney-medium.glb", new Vector3(0.46f, 1.0f, 0.46f), new Vector3(0, 0.5f, 0));
+    private static readonly ModelAsset WorkshopPipe = City(
+        "chimney-basic.glb", new Vector3(0.64f, 0.82f, 0.64f), new Vector3(0, 0.41f, 0));
 
     private readonly Dictionary<string, PackedScene> _scenes = new();
 
@@ -225,9 +224,6 @@ internal sealed class ResidentialTowerArtBuilder
 
     private static ModelAsset City(string file, Vector3 size, Vector3 center)
         => new($"{CityRoot}/{file}", size, center);
-
-    private static ModelAsset Factory(string file, Vector3 size, Vector3 center)
-        => new($"{FactoryRoot}/{file}", size, center);
 
     private readonly record struct ModelAsset(string Path, Vector3 Size, Vector3 Center);
 

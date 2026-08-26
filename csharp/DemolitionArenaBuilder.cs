@@ -51,6 +51,8 @@ public sealed partial class DemolitionArenaBuilder
         BuildCentralCoverDetails(root, layout, materials);
         BuildRouteGuidance(root, layout);
         BuildLighting(root, layout, materials);
+        var dressing = new DemolitionArenaDressingBuilder().Build(root, layout);
+        _visualPartCount += dressing.AuthoredModelCount;
         return new DemolitionArenaRuntime(layout, root, sites, _staticBodies, _visualPartCount);
     }
 
