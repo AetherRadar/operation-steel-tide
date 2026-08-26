@@ -1859,6 +1859,14 @@ public partial class FreightTerminalWorld
         {
             return false;
         }
+        // Demolition has its own live phase instead of transitioning the shared
+        // mission state through CONTACT/COMBAT.  Once the round is live, nearby
+        // opponents are actionable even before they have returned fire or raised
+        // an alert; otherwise the squad can walk past an enemy at close range.
+        if (_demolitionMode && _demolitionRoundActive)
+        {
+            return true;
+        }
         return enemy.IsWorldBoss || enemy.Alerted || _missionPhase is "CONTACT" or "COMBAT";
     }
 
