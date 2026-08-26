@@ -99,28 +99,47 @@ public partial class TacticalPlayer
         var rightWrist = arms.RightWristFrame.GlobalPosition;
         var leftWrist = arms.LeftWristFrame.GlobalPosition;
         var rightPalmInWeaponRoot = _weaponRoot.GlobalTransform.AffineInverse() * rightPalm;
-        var gripResidual = rightPalmInWeaponRoot.DistanceTo(
-            FirstPersonRightHandAnchor(EquippedWeapon.Platform));
+        var leftPalmInWeaponRoot = _weaponRoot.GlobalTransform.AffineInverse() * leftPalm;
+        var pose = FirstPersonArmPoseCatalog.For(EquippedWeapon.Platform);
+        var gripResidual = rightPalmInWeaponRoot.DistanceTo(pose.PrimaryGrip);
+        var supportGripResidual = leftPalmInWeaponRoot.DistanceTo(pose.SupportGrip);
         var palmSeparation = rightPalm.DistanceTo(leftPalm);
+        var localPalmSeparation = rightPalmInWeaponRoot.DistanceTo(leftPalmInWeaponRoot);
         var rightWristLength = rightPalm.DistanceTo(rightWrist);
         var leftWristLength = leftPalm.DistanceTo(leftWrist);
         var worldScale = arms.Root.GlobalTransform.Basis.Scale.Abs();
         var determinant = arms.Root.GlobalTransform.Basis.Determinant();
-        var expectedSeparation = WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
-            ? new Vector2(0.055f, 0.14f)
-            : new Vector2(0.30f, 0.62f);
-        var scaleValid = worldScale.DistanceTo(Vector3.One) <= 0.002f;
-        var wristContinuity = rightWristLength is >= 0.06f and <= 0.16f
-            && leftWristLength is >= 0.06f and <= 0.16f;
+        var viewportSize = _camera.GetViewport().GetVisibleRect().Size;
+        var rightScreen = _camera.UnprojectPosition(rightPalm);
+        var leftScreen = _camera.UnprojectPosition(leftPalm);
+        var screenValid = viewportSize.X > 0.0f
+            && viewportSize.Y > 0.0f
+            && !_camera.IsPositionBehind(rightPalm)
+            && !_camera.IsPositionBehind(leftPalm)
+            && rightScreen.X >= -viewportSize.X * 0.15f
+            && rightScreen.X <= viewportSize.X * 1.15f
+            && rightScreen.Y >= -viewportSize.Y * 0.15f
+            && rightScreen.Y <= viewportSize.Y * 1.15f
+            && leftScreen.X >= -viewportSize.X * 0.15f
+            && leftScreen.X <= viewportSize.X * 1.15f
+            && leftScreen.Y >= -viewportSize.Y * 0.15f
+            && leftScreen.Y <= viewportSize.Y * 1.15f;
+        var scaleValid = worldScale.X > 0.35f
+            && worldScale.X < 2.2f
+            && worldScale.DistanceTo(new Vector3(worldScale.X, worldScale.X, worldScale.X)) <= 0.002f;
+        var wristContinuity = rightWristLength is >= 0.045f and <= 0.28f
+            && leftWristLength is >= 0.045f and <= 0.28f;
         var valid = gripResidual <= 0.004f
-            && palmSeparation >= expectedSeparation.X
-            && palmSeparation <= expectedSeparation.Y
+            && supportGripResidual <= 0.06f
+            && Mathf.Abs(localPalmSeparation - pose.PrimaryGrip.DistanceTo(pose.SupportGrip)) <= 0.01f
             && scaleValid
-            && determinant > 0.95f
-            && wristContinuity;
+            && determinant > 0.01f
+            && wristContinuity
+            && screenValid;
         return new FirstPersonHandPoseInspection(
             valid,
             gripResidual,
+            supportGripResidual,
             palmSeparation,
             rightWristLength,
             leftWristLength,
@@ -472,13 +491,21 @@ public partial class TacticalPlayer
         // The Blender exports already use the camera-facing handedness. Apply only
         // the weapon-root translation and preserve authored scale; an extra 180° Y
         // flip mirrors the palms and makes the forearms curl back toward the camera.
-        var authoredScale = arms.Root.Transform.Basis.Scale;
-        var basis = Basis.Identity.Scaled(authoredScale);
+        var pose = FirstPersonArmPoseCatalog.For(EquippedWeapon.Platform);
         var rightPalm = arms.RightPalmTransformInRoot.Origin;
-        var gripAnchor = FirstPersonRightHandAnchor(EquippedWeapon.Platform);
+        var leftPalm = arms.LeftPalmTransformInRoot.Origin;
+        var current = leftPalm - rightPalm;
+        var target = pose.SupportGrip - pose.PrimaryGrip;
+        if (current.LengthSquared() <= 0.0001f || target.LengthSquared() <= 0.0001f)
+        {
+            return;
+        }
+        var scale = target.Length() / current.Length();
+        var rotation = new Quaternion(current.Normalized(), target.Normalized());
+        var basis = new Basis(rotation).Scaled(Vector3.One * scale);
         arms.Root.Transform = new Transform3D(
             basis,
-            gripAnchor - basis * rightPalm);
+            pose.PrimaryGrip - basis * rightPalm);
     }
 
     private void PrepareAuthoredArmsPresentation(AuthoredFirstPersonArmsVisual arms)
@@ -488,21 +515,7 @@ public partial class TacticalPlayer
     }
 
     private static Vector3 FirstPersonRightHandAnchor(WeaponPlatform platform)
-        => platform switch
-        {
-            WeaponPlatform.P226 or WeaponPlatform.M1911 or WeaponPlatform.GSh18
-                or WeaponPlatform.DesertEagle
-                => new Vector3(0.105f, -0.17f, 0.035f),
-            WeaponPlatform.MP5A5 or WeaponPlatform.M3A1
-                => new Vector3(0.105f, -0.18f, -0.08f),
-            WeaponPlatform.M24 or WeaponPlatform.AXMC
-                => new Vector3(0.0f, -0.17f, 0.02f),
-            WeaponPlatform.AWM
-                => new Vector3(0.0f, -0.17f, 0.02f),
-            WeaponPlatform.VSS
-                => new Vector3(0.0f, -0.16f, -0.02f),
-            _ => RifleGripAnchor
-        };
+        => FirstPersonArmPoseCatalog.For(platform).PrimaryGrip;
 
     private void EnsureAuthoredDesertEagleWeapon()
     {
@@ -575,6 +588,7 @@ public partial class TacticalPlayer
 internal readonly record struct FirstPersonHandPoseInspection(
     bool Valid,
     float GripResidual,
+    float SupportGripResidual,
     float PalmSeparation,
     float RightWristLength,
     float LeftWristLength,

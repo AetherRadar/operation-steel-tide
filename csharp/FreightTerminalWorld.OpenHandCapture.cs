@@ -33,6 +33,14 @@ public partial class FreightTerminalWorld
         await WaitFrames(2);
         SaveViewportImage("res://open_hand_m3a1_reload_validation.png");
         _player.ClearReloadPoseForDiagnostics();
+        platform = WeaponPlatform.P226;
+        _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
+        await WaitFrames(8);
+        SaveViewportImage("res://open_hand_p226_validation.png");
+        platform = WeaponPlatform.DesertEagle;
+        _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
+        await WaitFrames(8);
+        SaveViewportImage("res://open_hand_desert_eagle_validation.png");
         GD.Print("OPEN_HAND_CAPTURE done");
         GetTree().Quit(0);
     }
