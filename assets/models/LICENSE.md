@@ -29,10 +29,19 @@ The Factory Kit 3.0 model set is distributed by Kenney under CC0 1.0:
 - Source: https://kenney.nl/assets/factory-kit
 - Download: https://kenney.nl/media/pages/assets/factory-kit/edaac9d4f6-1777639602/kenney_factory-kit_3.0.zip
 - Acquisition date: 2026-08-19
-- Local assets: `kenney_factory_kit/door-wide-closed.glb` and its original `kenney_factory_kit/Textures/colormap.png` material atlas
+- Local assets: selected `kenney_factory_kit/*.glb` models and the original `kenney_factory_kit/Textures/colormap.png` material atlas
 - License copy: `kenney_factory_kit/KENNEY_LICENSE.txt`
 
 The authored overhead door is used for the interactive entrances to the Grand Hotel and Municipal Treasury in Saint Marais Old Town.
+
+The Furniture Kit 1.0 model set is distributed by Kenney under CC0 1.0:
+
+- Source: https://kenney.nl/assets/furniture-kit
+- Acquisition date: 2026-08-26
+- Local assets: selected `kenney_furniture_kit/*.glb` interior props used by searchable furniture and apartment room dressing
+- License copy: `kenney_furniture_kit/KENNEY_LICENSE.txt`
+
+Selected cabinets, desks, beds, tables, fridges, and crates replace programmer-art boxes inside enterable residential rooms.
 
 ## Quaternius CC0 models
 

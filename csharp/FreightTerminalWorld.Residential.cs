@@ -931,28 +931,28 @@ public partial class FreightTerminalWorld
         switch (archetype)
         {
             case ResidentialRoomArchetype.MedicalClinic:
-                ExpansionBox(tower, "ClinicCotN", new Vector3(innerX, floorY + 0.34f, northZ), new Vector3(1.9f, 0.45f, 0.72f), pale);
-                ExpansionBox(tower, "ClinicCotS", new Vector3(innerX, floorY + 0.34f, southZ), new Vector3(1.9f, 0.45f, 0.72f), pale);
+                AuthoredInteriorBox(tower, "ClinicCotN", new Vector3(innerX, floorY + 0.34f, northZ), new Vector3(1.9f, 0.45f, 0.72f), pale);
+                AuthoredInteriorBox(tower, "ClinicCotS", new Vector3(innerX, floorY + 0.34f, southZ), new Vector3(1.9f, 0.45f, 0.72f), pale);
                 MeshBox(tower, new Vector3(innerX, floorY + 0.61f, northZ), new Vector3(1.72f, 0.08f, 0.58f), accentMat);
                 MeshBox(tower, new Vector3(innerX, floorY + 0.61f, southZ), new Vector3(1.72f, 0.08f, 0.58f), accentMat);
-                ExpansionBox(tower, "ClinicScreen", new Vector3(outerX, floorY + 1.05f, northZ + 1.0f), new Vector3(0.08f, 1.8f, 1.65f), accentMat);
+                AuthoredInteriorBox(tower, "ClinicScreen", new Vector3(outerX, floorY + 1.05f, northZ + 1.0f), new Vector3(0.08f, 1.8f, 1.65f), accentMat);
                 MeshBox(tower, new Vector3(outerX, floorY + 1.42f, southZ - 0.8f), new Vector3(0.08f, 0.48f, 0.48f), glow);
                 break;
             case ResidentialRoomArchetype.EvacuationShelter:
                 foreach (var z in new[] { northZ, southZ })
                 {
-                    ExpansionBox(tower, "EvacBunkLow", new Vector3(innerX, floorY + 0.28f, z), new Vector3(1.95f, 0.34f, 0.72f), dark);
-                    ExpansionBox(tower, "EvacBunkHigh", new Vector3(innerX, floorY + 1.28f, z), new Vector3(1.95f, 0.2f, 0.72f), dark);
+                    AuthoredInteriorBox(tower, "EvacBunkLow", new Vector3(innerX, floorY + 0.28f, z), new Vector3(1.95f, 0.34f, 0.72f), dark);
+                    AuthoredInteriorBox(tower, "EvacBunkHigh", new Vector3(innerX, floorY + 1.28f, z), new Vector3(1.95f, 0.2f, 0.72f), dark);
                     MeshBox(tower, new Vector3(innerX, floorY + 0.5f, z), new Vector3(1.78f, 0.08f, 0.58f), accentMat);
                     MeshBox(tower, new Vector3(innerX, floorY + 1.43f, z), new Vector3(1.78f, 0.08f, 0.58f), accentMat);
                 }
-                ExpansionBox(tower, "EvacLuggage", new Vector3(outerX, floorY + 0.35f, northZ + 1.1f), new Vector3(0.82f, 0.62f, 0.52f), accentMat);
-                ExpansionBox(tower, "EvacRationStack", new Vector3(outerX, floorY + 0.4f, southZ - 1.0f), new Vector3(0.9f, 0.72f, 0.72f), dark);
+                AuthoredInteriorBox(tower, "EvacLuggage", new Vector3(outerX, floorY + 0.35f, northZ + 1.1f), new Vector3(0.82f, 0.62f, 0.52f), accentMat);
+                AuthoredInteriorBox(tower, "EvacRationStack", new Vector3(outerX, floorY + 0.4f, southZ - 1.0f), new Vector3(0.9f, 0.72f, 0.72f), dark);
                 break;
             case ResidentialRoomArchetype.MaintenanceWorkshop:
-                ExpansionBox(tower, "WorkshopBenchN", new Vector3(innerX, floorY + 0.48f, northZ), new Vector3(2.2f, 0.78f, 0.72f), dark);
-                ExpansionBox(tower, "WorkshopBenchS", new Vector3(innerX, floorY + 0.48f, southZ), new Vector3(2.2f, 0.78f, 0.72f), dark);
-                ExpansionBox(tower, "WorkshopLocker", new Vector3(outerX, floorY + 1.0f, northZ + 1.0f), new Vector3(0.75f, 1.8f, 0.58f), accentMat);
+                AuthoredInteriorBox(tower, "WorkshopBenchN", new Vector3(innerX, floorY + 0.48f, northZ), new Vector3(2.2f, 0.78f, 0.72f), dark);
+                AuthoredInteriorBox(tower, "WorkshopBenchS", new Vector3(innerX, floorY + 0.48f, southZ), new Vector3(2.2f, 0.78f, 0.72f), dark);
+                AuthoredInteriorBox(tower, "WorkshopLocker", new Vector3(outerX, floorY + 1.0f, northZ + 1.0f), new Vector3(0.75f, 1.8f, 0.58f), accentMat);
                 for (var pipe = -1; pipe <= 1; pipe++)
                 {
                     MeshBox(tower, new Vector3(innerX + pipe * 0.34f, floorY + 1.18f, southZ - 0.1f), new Vector3(0.16f, 0.16f, 1.65f), pale);
@@ -960,35 +960,35 @@ public partial class FreightTerminalWorld
                 MeshBox(tower, new Vector3(outerX, floorY + 1.55f, southZ - 0.9f), new Vector3(0.08f, 0.72f, 0.72f), glow);
                 break;
             case ResidentialRoomArchetype.CommunitySecurity:
-                ExpansionBox(tower, "SecurityDesk", new Vector3(innerX, floorY + 0.48f, southZ - 0.45f), new Vector3(2.15f, 0.78f, 0.72f), dark);
+                AuthoredInteriorBox(tower, "SecurityDesk", new Vector3(innerX, floorY + 0.48f, southZ - 0.45f), new Vector3(2.15f, 0.78f, 0.72f), dark);
                 for (var screenIndex = -1; screenIndex <= 1; screenIndex++)
                 {
                     MeshBox(tower, new Vector3(innerX + screenIndex * 0.62f, floorY + 1.16f, southZ - 0.72f), new Vector3(0.5f, 0.4f, 0.06f), glow);
                 }
-                ExpansionBox(tower, "SecurityLocker", new Vector3(outerX, floorY + 1.0f, northZ), new Vector3(0.78f, 1.8f, 0.65f), accentMat);
-                ExpansionBox(tower, "SecurityShieldRack", new Vector3(innerX, floorY + 0.8f, northZ + 0.9f), new Vector3(1.6f, 1.35f, 0.18f), dark);
+                AuthoredInteriorBox(tower, "SecurityLocker", new Vector3(outerX, floorY + 1.0f, northZ), new Vector3(0.78f, 1.8f, 0.65f), accentMat);
+                AuthoredInteriorBox(tower, "SecurityShieldRack", new Vector3(innerX, floorY + 0.8f, northZ + 0.9f), new Vector3(1.6f, 1.35f, 0.18f), dark);
                 break;
             case ResidentialRoomArchetype.SmugglerDen:
                 foreach (var offset in new[] { -0.75f, 0.0f, 0.75f })
                 {
-                    ExpansionBox(tower, "ContrabandCrate", new Vector3(innerX + offset, floorY + 0.36f, northZ), new Vector3(0.62f, 0.62f, 0.62f), dark);
+                    AuthoredInteriorBox(tower, "ContrabandCrate", new Vector3(innerX + offset, floorY + 0.36f, northZ), new Vector3(0.62f, 0.62f, 0.62f), dark);
                 }
-                ExpansionBox(tower, "SmugglerWorkbench", new Vector3(innerX, floorY + 0.5f, southZ), new Vector3(2.25f, 0.82f, 0.7f), accentMat);
+                AuthoredInteriorBox(tower, "SmugglerWorkbench", new Vector3(innerX, floorY + 0.5f, southZ), new Vector3(2.25f, 0.82f, 0.7f), accentMat);
                 MeshBox(tower, new Vector3(innerX, floorY + 0.96f, southZ), new Vector3(1.7f, 0.06f, 0.5f), glow);
                 MeshBox(tower, new Vector3(outerX, floorY + 1.3f, northZ + 1.1f), new Vector3(0.08f, 0.8f, 1.4f), accentMat);
                 break;
             case ResidentialRoomArchetype.CommunityKitchen:
-                ExpansionBox(tower, "KitchenIslandN", new Vector3(innerX, floorY + 0.52f, northZ), new Vector3(2.25f, 0.86f, 0.82f), pale);
-                ExpansionBox(tower, "KitchenIslandS", new Vector3(innerX, floorY + 0.52f, southZ), new Vector3(2.25f, 0.86f, 0.82f), pale);
-                ExpansionBox(tower, "KitchenColdStore", new Vector3(outerX, floorY + 1.0f, northZ + 1.0f), new Vector3(0.86f, 1.82f, 0.72f), accentMat);
+                AuthoredInteriorBox(tower, "KitchenIslandN", new Vector3(innerX, floorY + 0.52f, northZ), new Vector3(2.25f, 0.86f, 0.82f), pale);
+                AuthoredInteriorBox(tower, "KitchenIslandS", new Vector3(innerX, floorY + 0.52f, southZ), new Vector3(2.25f, 0.86f, 0.82f), pale);
+                AuthoredInteriorBox(tower, "KitchenColdStore", new Vector3(outerX, floorY + 1.0f, northZ + 1.0f), new Vector3(0.86f, 1.82f, 0.72f), accentMat);
                 foreach (var z in new[] { -depth * 0.12f, depth * 0.18f })
                 {
-                    ExpansionBox(tower, "KitchenDiningTable", new Vector3(innerX, floorY + 0.42f, z), new Vector3(1.75f, 0.12f, 0.76f), dark);
+                    AuthoredInteriorBox(tower, "KitchenDiningTable", new Vector3(innerX, floorY + 0.42f, z), new Vector3(1.75f, 0.12f, 0.76f), dark);
                 }
                 break;
             default:
-                ExpansionBox(tower, "FamilyDiningTable", new Vector3(innerX, floorY + 0.42f, southZ - 0.85f), new Vector3(1.65f, 0.12f, 0.82f), accentMat);
-                ExpansionBox(tower, "FamilyToyChest", new Vector3(outerX, floorY + 0.3f, northZ + 1.0f), new Vector3(0.75f, 0.48f, 0.58f), accentMat);
+                AuthoredInteriorBox(tower, "FamilyDiningTable", new Vector3(innerX, floorY + 0.42f, southZ - 0.85f), new Vector3(1.65f, 0.12f, 0.82f), accentMat);
+                AuthoredInteriorBox(tower, "FamilyToyChest", new Vector3(outerX, floorY + 0.3f, northZ + 1.0f), new Vector3(0.75f, 0.48f, 0.58f), accentMat);
                 MeshBox(tower, new Vector3(outerX, floorY + 1.42f, southZ - 0.9f), new Vector3(0.08f, 0.68f, 0.9f), glow);
                 break;
         }

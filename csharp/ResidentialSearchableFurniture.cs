@@ -20,6 +20,7 @@ public partial class ResidentialSearchableFurniture : StaticBody3D, ILootSource
     internal static void ReleaseSharedResources()
     {
         SharedBoxMeshes.Clear();
+        ResidentialAuthoredPropLibrary.ReleaseSharedResources();
     }
 
     public event Action<ResidentialSearchableFurniture>? FirstSearched;
@@ -126,6 +127,18 @@ public partial class ResidentialSearchableFurniture : StaticBody3D, ILootSource
             Shape = new BoxShape3D { Size = size }
         });
 
+        Node3D? authoredModel = null;
+        if (ResidentialAuthoredPropLibrary.TryCreateVisual(
+                ResidentialAuthoredPropLibrary.PathFor(Kind),
+                size,
+                out var model,
+                out var meshCount))
+        {
+            authoredModel = model;
+            _partCounter += meshCount;
+            SetMeta("residential_authored_furniture", ResidentialAuthoredPropLibrary.PathFor(Kind));
+        }
+
         var shellColor = Kind switch
         {
             ResidentialFurnitureKind.Refrigerator => new Color(0.42f, 0.45f, 0.43f),
@@ -135,7 +148,6 @@ public partial class ResidentialSearchableFurniture : StaticBody3D, ILootSource
         };
         var shell = Material(shellColor, Kind == ResidentialFurnitureKind.Refrigerator ? 0.5f : 0.05f, 0.74f);
         var trim = Material(new Color(0.055f, 0.062f, 0.06f), 0.7f, 0.32f);
-        Part(this, SharedBox(size), center, shell);
 
         _movingPart = new Node3D
         {
@@ -144,15 +156,31 @@ public partial class ResidentialSearchableFurniture : StaticBody3D, ILootSource
         };
         AddChild(_movingPart);
 
-        if (Kind == ResidentialFurnitureKind.DeskDrawers || Kind == ResidentialFurnitureKind.Nightstand)
+        if (authoredModel is not null)
+        {
+            if (Kind == ResidentialFurnitureKind.DeskDrawers || Kind == ResidentialFurnitureKind.Nightstand)
+            {
+                _movingPart.Position = new Vector3(0, size.Y * 0.67f, -size.Z * 0.51f);
+                _openOffset = new Vector3(0, 0, -0.28f);
+            }
+            else
+            {
+                _openRotation = new Vector3(0, -0.22f, 0);
+            }
+            authoredModel.Position += center - _movingPart.Position;
+            _movingPart.AddChild(authoredModel);
+        }
+        else if (Kind == ResidentialFurnitureKind.DeskDrawers || Kind == ResidentialFurnitureKind.Nightstand)
         {
             _movingPart.Position = new Vector3(0, size.Y * 0.67f, -size.Z * 0.51f);
+            Part(this, SharedBox(size), center, shell);
             Part(_movingPart, SharedBox(new Vector3(size.X - 0.08f, size.Y * 0.28f, 0.045f)), Vector3.Zero, shell);
             Part(_movingPart, SharedBox(new Vector3(0.16f, 0.045f, 0.055f)), new Vector3(0, 0, -0.04f), trim);
             _openOffset = new Vector3(0, 0, -0.28f);
         }
         else
         {
+            Part(this, SharedBox(size), center, shell);
             Part(
                 _movingPart,
                 SharedBox(new Vector3(size.X - 0.07f, size.Y - 0.1f, 0.045f)),
