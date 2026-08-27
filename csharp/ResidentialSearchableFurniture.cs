@@ -112,22 +112,9 @@ public partial class ResidentialSearchableFurniture : StaticBody3D, ILootSource
 
     private void BuildFurniture()
     {
-        var size = Kind switch
-        {
-            ResidentialFurnitureKind.Refrigerator => new Vector3(0.72f, 1.78f, 0.68f),
-            ResidentialFurnitureKind.Wardrobe => new Vector3(0.78f, 1.94f, 0.58f),
-            ResidentialFurnitureKind.DeskDrawers => new Vector3(0.76f, 0.64f, 0.56f),
-            _ => new Vector3(0.5f, 0.5f, 0.44f)
-        };
-        var center = Vector3.Up * (size.Y * 0.5f);
-        AddChild(new CollisionShape3D
-        {
-            Name = "FurnitureCollision",
-            Position = center,
-            Shape = new BoxShape3D { Size = size }
-        });
-
+        var size = SizeFor(Kind);
         Node3D? authoredModel = null;
+        var authoredMeshCount = 0;
         if (ResidentialAuthoredPropLibrary.TryCreateVisual(
                 ResidentialAuthoredPropLibrary.PathFor(Kind),
                 size,
@@ -135,19 +122,23 @@ public partial class ResidentialSearchableFurniture : StaticBody3D, ILootSource
                 out var meshCount))
         {
             authoredModel = model;
-            _partCounter += meshCount;
+            authoredMeshCount = meshCount;
             SetMeta("residential_authored_furniture", ResidentialAuthoredPropLibrary.PathFor(Kind));
         }
 
-        var shellColor = Kind switch
+        BuildFurnitureNodes(size, authoredModel, authoredMeshCount);
+    }
+
+    private void BuildFurnitureNodes(Vector3 size, Node3D? authoredModel, int authoredMeshCount)
+    {
+        var center = Vector3.Up * (size.Y * 0.5f);
+        AddChild(new CollisionShape3D
         {
-            ResidentialFurnitureKind.Refrigerator => new Color(0.42f, 0.45f, 0.43f),
-            ResidentialFurnitureKind.Wardrobe => new Color(0.24f, 0.16f, 0.1f),
-            ResidentialFurnitureKind.DeskDrawers => new Color(0.2f, 0.14f, 0.09f),
-            _ => new Color(0.27f, 0.18f, 0.11f)
-        };
-        var shell = Material(shellColor, Kind == ResidentialFurnitureKind.Refrigerator ? 0.5f : 0.05f, 0.74f);
-        var trim = Material(new Color(0.055f, 0.062f, 0.06f), 0.7f, 0.32f);
+            Name = "FurnitureCollision",
+            Position = center,
+            Shape = new BoxShape3D { Size = size }
+        });
+        _partCounter += authoredModel is null ? 0 : authoredMeshCount;
 
         _movingPart = new Node3D
         {
@@ -173,28 +164,14 @@ public partial class ResidentialSearchableFurniture : StaticBody3D, ILootSource
         else if (Kind == ResidentialFurnitureKind.DeskDrawers || Kind == ResidentialFurnitureKind.Nightstand)
         {
             _movingPart.Position = new Vector3(0, size.Y * 0.67f, -size.Z * 0.51f);
-            Part(this, SharedBox(size), center, shell);
-            Part(_movingPart, SharedBox(new Vector3(size.X - 0.08f, size.Y * 0.28f, 0.045f)), Vector3.Zero, shell);
-            Part(_movingPart, SharedBox(new Vector3(0.16f, 0.045f, 0.055f)), new Vector3(0, 0, -0.04f), trim);
             _openOffset = new Vector3(0, 0, -0.28f);
         }
         else
         {
-            Part(this, SharedBox(size), center, shell);
-            Part(
-                _movingPart,
-                SharedBox(new Vector3(size.X - 0.07f, size.Y - 0.1f, 0.045f)),
-                new Vector3(size.X * 0.5f, 0, 0),
-                shell);
-            Part(
-                _movingPart,
-                SharedBox(new Vector3(0.055f, size.Y * 0.34f, 0.06f)),
-                new Vector3(size.X - 0.14f, 0, -0.04f),
-                trim);
             _openRotation = new Vector3(0, -1.22f, 0);
         }
 
-        if (EventKind == ResidentialRoomEventKind.None)
+        if (EventKind == ResidentialRoomEventKind.None || authoredModel is null)
         {
             return;
         }
@@ -213,6 +190,60 @@ public partial class ResidentialSearchableFurniture : StaticBody3D, ILootSource
                 : new Vector3(0.055f, 0.055f, 0.035f)),
             new Vector3(0, Mathf.Min(size.Y - 0.12f, 0.72f), -size.Z * 0.55f),
             clue);
+    }
+
+    private static Vector3 SizeFor(ResidentialFurnitureKind kind) => kind switch
+    {
+        ResidentialFurnitureKind.Refrigerator => new Vector3(0.72f, 1.78f, 0.68f),
+        ResidentialFurnitureKind.Wardrobe => new Vector3(0.78f, 1.94f, 0.58f),
+        ResidentialFurnitureKind.DeskDrawers => new Vector3(0.76f, 0.64f, 0.56f),
+        _ => new Vector3(0.5f, 0.5f, 0.44f)
+    };
+
+    internal static MissingAuthoredVisualInspection InspectMissingAuthoredVisualForDiagnostics()
+    {
+        var collisionReady = true;
+        var interactionReady = true;
+        var primitiveVisualsHidden = true;
+        var visualStateHonest = true;
+        foreach (var kind in Enum.GetValues<ResidentialFurnitureKind>())
+        {
+            var furniture = new ResidentialSearchableFurniture
+            {
+                Kind = kind,
+                EventKind = ResidentialRoomEventKind.Alarm
+            };
+            var size = SizeFor(kind);
+            furniture.BuildFurnitureNodes(size, authoredModel: null, authoredMeshCount: 0);
+            var collision = furniture.GetNodeOrNull<CollisionShape3D>("FurnitureCollision");
+            collisionReady &= collision?.Shape is BoxShape3D box
+                && box.Size.DistanceTo(size) <= 0.001f;
+            interactionReady &= IsInstanceValid(furniture._movingPart)
+                && (furniture._openOffset != Vector3.Zero || furniture._openRotation != Vector3.Zero);
+            var meshes = furniture.FindChildren("*", "MeshInstance3D", recursive: true, owned: false);
+            using var meshesBacking = meshes.AsDisposable();
+            primitiveVisualsHidden &= meshes.Count == 0;
+            visualStateHonest &= !furniture.VisualReady;
+            furniture.Free();
+        }
+
+        return new MissingAuthoredVisualInspection(
+            collisionReady,
+            interactionReady,
+            primitiveVisualsHidden,
+            visualStateHonest);
+    }
+
+    internal readonly record struct MissingAuthoredVisualInspection(
+        bool CollisionReady,
+        bool InteractionReady,
+        bool PrimitiveVisualsHidden,
+        bool VisualStateHonest)
+    {
+        public bool Valid => CollisionReady
+            && InteractionReady
+            && PrimitiveVisualsHidden
+            && VisualStateHonest;
     }
 
     private static StandardMaterial3D Material(Color color, float metallic, float roughness, bool emission = false)

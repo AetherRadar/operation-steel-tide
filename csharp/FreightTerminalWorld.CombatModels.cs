@@ -240,6 +240,8 @@ public partial class FreightTerminalWorld
             && rivals.Any(enemy =>
                 ColorDistance(enemy.AuthoredTeamColorForDiagnostics, garrisonColor) > 0.55f)
             && rivals.Select(enemy => enemy.AuthoredTeamColorForDiagnostics).Distinct().Count() >= 2;
+        var previewFailureHandling = InventoryOperatorPreviewRecovery.InspectFailureHandlingForDiagnostics();
+        var previewOwnership = CombatModelLibrary.InspectPreviewOperatorOwnershipForDiagnostics();
         var valid = weaponGeometry
             && platformGeometry.Values.All(value => value)
             && lineupCaptured
@@ -253,7 +255,9 @@ public partial class FreightTerminalWorld
             && playerAuthored
             && squadAuthored
             && enemiesAuthored
-            && factionAppearance;
+            && factionAppearance
+            && previewFailureHandling.Valid
+            && previewOwnership.Valid;
 
         GD.Print(
             $"COMBAT_MODELS_CHECK weapon_loaded={weapon.Loaded} weapon_nodes={weapon.RequiredNodes} "
@@ -283,7 +287,20 @@ public partial class FreightTerminalWorld
             + $"player_authored={playerAuthored} squad_authored={squadAuthored} "
             + $"enemies_authored={enemiesAuthored} enemies={livingEnemies.Length} "
             + $"faction_appearance={factionAppearance} garrison_color={garrisonColor} "
-            + $"rival_colors={rivals.Select(enemy => enemy.AuthoredTeamColorForDiagnostics).Distinct().Count()}");
+            + $"rival_colors={rivals.Select(enemy => enemy.AuthoredTeamColorForDiagnostics).Distinct().Count()} "
+            + $"preview_failure_safe={previewFailureHandling.Valid} "
+            + $"preview_fallback_attempts={previewFailureHandling.FallbackPrimaryAttempts}/"
+            + $"{previewFailureHandling.FallbackGarrisonAttempts} "
+            + $"preview_fallback_reports={previewFailureHandling.FallbackFailureReports} "
+            + $"preview_empty_attempts={previewFailureHandling.EmptyPrimaryAttempts}/"
+            + $"{previewFailureHandling.EmptyGarrisonAttempts} "
+            + $"preview_empty_reports={previewFailureHandling.EmptyFailureReports} "
+            + $"preview_ownership={previewOwnership.Valid} "
+            + $"preview_source_cleanup={previewOwnership.SourceFreedBeforeWrapper} "
+            + $"preview_wrapper_cleanup={previewOwnership.WrapperFreedAfterOwnership}/"
+            + $"{previewOwnership.WrappedSourceFreed} "
+            + $"preview_success_transfer={previewOwnership.SuccessOwnershipTransferred}/"
+            + $"{previewOwnership.CallerCleanupReleasesTree}");
         GD.Print($"COMBAT_MODELS_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }

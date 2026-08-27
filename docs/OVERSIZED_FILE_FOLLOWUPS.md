@@ -5,6 +5,7 @@ The files below exceed 800 lines after the current gameplay work. They were alre
 | File | Why it remains oversized in this change | Required extraction follow-up |
 | --- | --- | --- |
 | `csharp/CombatHUD.cs` | Legacy HUD compatibility facade and shared binding owner. | Move the remaining loot/backpack composition and diagnostics into focused view controllers, leaving only scene binding and delegation. |
+| `csharp/CombatModelLibrary.cs` | Legacy authored operator and weapon factories still share resource validation, bounds, sockets, and presentation assembly; this change only makes preview ownership exception-safe. | Move operator construction and its shared bounds helpers into a focused `CombatModelLibrary.Operator.cs` partial, then separate the remaining weapon-family factories without changing their public contracts. |
 | `csharp/EnemyOperator.cs` | Legacy enemy lifecycle, combat, loot, and movement aggregate. | Extract loot acquisition and loadout state into a regular C# controller, then move the remaining authored-visual hooks to the existing visual partial. |
 | `csharp/FreightTerminalWorld.Demolition.Diagnostics.cs` | Deterministic demolition scenarios still share one fixture lifecycle. | Split round-flow, tactical-route, and economy scenarios into separate diagnostic partial files with one shared setup helper. |
 | `csharp/FreightTerminalWorld.Demolition.cs` | Compatibility coordinator for the existing demolition mode. | Extract round transitions and spectator state into a bounded demolition match coordinator. |

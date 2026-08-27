@@ -1,7 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
-using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -11,15 +12,43 @@ namespace OperationSteelTide;
 
 public sealed class BackendClient : IDisposable
 {
+    internal const string InstanceEnvironmentVariable = "STEEL_TIDE_BACKEND_INSTANCE";
+    internal const string OfflineEnvironmentVariable = "STEEL_TIDE_BACKEND_OFFLINE";
+
     private readonly HttpClient _http;
+    private readonly string? _expectedInstance;
+    private readonly bool _offline;
 
     public BackendClient(string baseUrl = "http://127.0.0.1:8787")
+        : this(baseUrl, new HttpClientHandler())
     {
-        _http = new HttpClient
+    }
+
+    internal BackendClient(string baseUrl, HttpMessageHandler handler)
+        : this(
+            baseUrl,
+            handler,
+            Environment.GetEnvironmentVariable(InstanceEnvironmentVariable),
+            string.Equals(
+                Environment.GetEnvironmentVariable(OfflineEnvironmentVariable),
+                "1",
+                StringComparison.Ordinal))
+    {
+    }
+
+    private BackendClient(
+        string baseUrl,
+        HttpMessageHandler handler,
+        string? expectedInstance,
+        bool offline)
+    {
+        _http = new HttpClient(handler, disposeHandler: true)
         {
             BaseAddress = new Uri(baseUrl),
             Timeout = TimeSpan.FromMilliseconds(1500)
         };
+        _expectedInstance = expectedInstance;
+        _offline = offline;
     }
 
     public async Task<StartPayload?> StartSessionAsync(
@@ -27,13 +56,25 @@ public sealed class BackendClient : IDisposable
         string missionId,
         CancellationToken cancellationToken = default)
     {
-        var request = new StartRequest(playerId, missionId, "normal");
-        using var response = await _http.PostAsJsonAsync("/api/v1/sessions", request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        if (!await CanWriteAsync(cancellationToken))
         {
             return null;
         }
-        return await response.Content.ReadFromJsonAsync<StartPayload>(cancellationToken: cancellationToken);
+
+        try
+        {
+            var request = new StartRequest(playerId, missionId, "normal");
+            using var response = await _http.PostAsJsonAsync("/api/v1/sessions", request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+            return await response.Content.ReadFromJsonAsync<StartPayload>(cancellationToken: cancellationToken);
+        }
+        catch (Exception exception) when (IsSafeOfflineFailure(exception))
+        {
+            return null;
+        }
     }
 
     public async Task<bool> CompleteSessionAsync(
@@ -41,14 +82,76 @@ public sealed class BackendClient : IDisposable
         CompleteRequest result,
         CancellationToken cancellationToken = default)
     {
-        using var response = await _http.PostAsJsonAsync(
-            $"/api/v1/sessions/{Uri.EscapeDataString(sessionId)}/complete",
-            result,
-            cancellationToken);
-        return response.IsSuccessStatusCode;
+        if (!await CanWriteAsync(cancellationToken))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var response = await _http.PostAsJsonAsync(
+                $"/api/v1/sessions/{Uri.EscapeDataString(sessionId)}/complete",
+                result,
+                cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception exception) when (IsSafeOfflineFailure(exception))
+        {
+            return false;
+        }
     }
 
     public void Dispose() => _http.Dispose();
+
+    private async Task<bool> CanWriteAsync(CancellationToken cancellationToken)
+    {
+        if (_offline)
+        {
+            return false;
+        }
+        if (string.IsNullOrEmpty(_expectedInstance))
+        {
+            return true;
+        }
+
+        try
+        {
+            using var response = await _http.GetAsync("/api/v1/health", cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return false;
+            }
+            var health = await response.Content.ReadFromJsonAsync<HealthPayload>(
+                cancellationToken: cancellationToken);
+            return health is not null
+                && string.Equals(health.Status, "ok", StringComparison.Ordinal)
+                && string.Equals(health.Service, "steel-tide-backend", StringComparison.Ordinal)
+                && string.Equals(health.Instance, _expectedInstance, StringComparison.Ordinal);
+        }
+        catch (Exception exception) when (IsSafeOfflineFailure(exception))
+        {
+            return false;
+        }
+    }
+
+    private static bool IsSafeOfflineFailure(Exception exception) =>
+        exception is HttpRequestException
+            or IOException
+            or JsonException
+            or NotSupportedException
+            or OperationCanceledException;
+
+    private sealed class HealthPayload
+    {
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = string.Empty;
+
+        [JsonPropertyName("service")]
+        public string Service { get; set; } = string.Empty;
+
+        [JsonPropertyName("instance")]
+        public string Instance { get; set; } = string.Empty;
+    }
 }
 
 public sealed record StartRequest(

@@ -11,16 +11,44 @@ import (
 	"testing"
 )
 
-func testServer(t *testing.T) (*Server, *httptest.Server) {
+func testServer(t *testing.T, options ...ServerOption) (*Server, *httptest.Server) {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	server, err := NewServer(filepath.Join(t.TempDir(), "state.json"), logger)
+	server, err := NewServer(filepath.Join(t.TempDir(), "state.json"), logger, options...)
 	if err != nil {
 		t.Fatal(err)
 	}
 	httpServer := httptest.NewServer(server.Handler())
 	t.Cleanup(httpServer.Close)
 	return server, httpServer
+}
+
+func TestHealthReportsConfiguredInstance(t *testing.T) {
+	const instance = "startup-health-test"
+	_, server := testServer(t, WithInstance(instance))
+	response, err := http.Get(server.URL + "/api/v1/health")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.StatusCode)
+	}
+	var payload struct {
+		Status   string `json:"status"`
+		Service  string `json:"service"`
+		Version  string `json:"version"`
+		Instance string `json:"instance"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Status != "ok" || payload.Service != "steel-tide-backend" || payload.Version != "1.0.0" {
+		t.Fatalf("health contract changed: %+v", payload)
+	}
+	if payload.Instance != instance {
+		t.Fatalf("health instance = %q, want %q", payload.Instance, instance)
+	}
 }
 
 func TestMissionsExposeInfiltrationRules(t *testing.T) {

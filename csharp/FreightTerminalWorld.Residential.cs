@@ -1653,6 +1653,9 @@ public partial class FreightTerminalWorld
             roles.Add(civilian.Role);
             upperFloorPopulation |= civilian.FloorIndex >= 4;
         }
+        var authoredPropFailureCache = ResidentialAuthoredPropLibrary.InspectFailureCacheForDiagnostics();
+        var missingFurnitureVisual = ResidentialSearchableFurniture.InspectMissingAuthoredVisualForDiagnostics();
+        var missingInteriorVisual = InspectMissingAuthoredInteriorForDiagnostics();
         var valid = ResidentialTowerCount == ResidentialTowerSpecs.Length
             && _residentialFloorCount == expectedFloors
             && _residentialStairFlightCount == expectedFloors * 2
@@ -1672,14 +1675,38 @@ public partial class FreightTerminalWorld
             && ResidentialCivilianCount >= ResidentialTowerSpecs.Length * 3
             && ResidentialSpecialCivilianCount >= ResidentialTowerSpecs.Length * 2
             && roles.Count == Enum.GetValues<CivilianRole>().Length
-            && upperFloorPopulation;
-        GD.Print($"RESIDENTIAL_CHECK valid={valid} towers={ResidentialTowerCount}/{ResidentialTowerSpecs.Length} floors={_residentialFloorCount}/{expectedFloors} stair_flights={_residentialStairFlightCount} stair_details={_residentialStairDetailCount}/{expectedFloors} stair_panels_absent={stairWallPanelsAbsent} infill={_residentialInfillModuleCount}/{ResidentialTowerSpecs.Length * 4} entry_open={entryOpen} standing_door={standingDoorClear} stair_door_clear={stairDoorClear} stair_door_samples={stairDoorClearSamples}/{expectedStairDoorClearSamples} stair_door_supported={stairDoorSupported} stair_support_samples={stairDoorSupportSamples}/{expectedStairDoorSupportSamples} step_collision={stepCollision} step_hit={stepName} player_climbed={playerClimbedRamp} climb_height={climbHeight:0.00} hedges_solid={hedgesSolid} hedge_hits={hedgeCollisionCount}/{hedgeColliders.Count} rooftops={_residentialRoofAccessCount} civilians={ResidentialCivilianCount} special={ResidentialSpecialCivilianCount} roles={roles.Count} upper_floors={upperFloorPopulation}");
+            && upperFloorPopulation
+            && authoredPropFailureCache.Valid
+            && missingFurnitureVisual.Valid
+            && missingInteriorVisual.PrimitiveHidden
+            && missingInteriorVisual.CollisionReady
+            && missingInteriorVisual.MetadataReady;
+        GD.Print($"RESIDENTIAL_CHECK valid={valid} towers={ResidentialTowerCount}/{ResidentialTowerSpecs.Length} floors={_residentialFloorCount}/{expectedFloors} stair_flights={_residentialStairFlightCount} stair_details={_residentialStairDetailCount}/{expectedFloors} stair_panels_absent={stairWallPanelsAbsent} infill={_residentialInfillModuleCount}/{ResidentialTowerSpecs.Length * 4} entry_open={entryOpen} standing_door={standingDoorClear} stair_door_clear={stairDoorClear} stair_door_samples={stairDoorClearSamples}/{expectedStairDoorClearSamples} stair_door_supported={stairDoorSupported} stair_support_samples={stairDoorSupportSamples}/{expectedStairDoorSupportSamples} step_collision={stepCollision} step_hit={stepName} player_climbed={playerClimbedRamp} climb_height={climbHeight:0.00} hedges_solid={hedgesSolid} hedge_hits={hedgeCollisionCount}/{hedgeColliders.Count} rooftops={_residentialRoofAccessCount} civilians={ResidentialCivilianCount} special={ResidentialSpecialCivilianCount} roles={roles.Count} upper_floors={upperFloorPopulation} authored_failure_cache={authoredPropFailureCache.Valid} authored_load_attempts={authoredPropFailureCache.LoadAttempts} authored_failure_reports={authoredPropFailureCache.FailureReports} authored_retry_after_release={authoredPropFailureCache.RetriedAfterRelease} authored_build_loads={authoredPropFailureCache.BuildLoadAttempts} authored_build_attempts={authoredPropFailureCache.BuildAttempts} authored_build_reports={authoredPropFailureCache.BuildFailureReports} authored_build_suppressed={authoredPropFailureCache.BuildFailureSuppressed} authored_bad_scene_evicted={authoredPropFailureCache.InvalidSceneEvicted} authored_temp_freed={authoredPropFailureCache.TemporaryRootsFreed} authored_no_failed_visual={authoredPropFailureCache.NoFailedVisualReturned} authored_build_retry={authoredPropFailureCache.BuildRetriedAfterRelease} missing_furniture_safe={missingFurnitureVisual.Valid} missing_furniture_collision={missingFurnitureVisual.CollisionReady} missing_furniture_interaction={missingFurnitureVisual.InteractionReady} missing_furniture_meshless={missingFurnitureVisual.PrimitiveVisualsHidden} missing_interior_hidden={missingInteriorVisual.PrimitiveHidden} missing_interior_collision={missingInteriorVisual.CollisionReady} missing_interior_metadata={missingInteriorVisual.MetadataReady}");
         if (!valid)
         {
             GD.PushError("Residential community validation failed.");
         }
         GD.Print($"RESIDENTIAL_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private static (bool PrimitiveHidden, bool CollisionReady, bool MetadataReady)
+        InspectMissingAuthoredInteriorForDiagnostics()
+    {
+        const string missingPath = "res://__diagnostics__/missing_residential_interior.glb";
+        var body = new StaticBody3D();
+        var primitive = new MeshInstance3D { Mesh = new BoxMesh { Size = Vector3.One } };
+        var collision = new CollisionShape3D { Shape = new BoxShape3D { Size = Vector3.One } };
+        body.AddChild(primitive);
+        body.AddChild(collision);
+        HideMissingAuthoredInteriorVisual(body, missingPath);
+        var inspection = (
+            PrimitiveHidden: !primitive.Visible,
+            CollisionReady: IsInstanceValid(collision) && collision.Shape is BoxShape3D,
+            MetadataReady: body.GetMeta("residential_authored_visual_missing", string.Empty).AsString()
+                == missingPath);
+        body.Free();
+        return inspection;
     }
 
     private (int Count, int Expected, bool Chinese, Label3D? EnglishLeak) CheckResidentialLocalization()

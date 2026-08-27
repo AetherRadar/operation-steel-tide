@@ -20,13 +20,22 @@ import (
 type Server struct {
 	mu       sync.RWMutex
 	dataPath string
+	instance string
 	logger   *slog.Logger
 	profiles map[string]Profile
 	sessions map[string]Session
 	missions []Mission
 }
 
-func NewServer(dataPath string, logger *slog.Logger) (*Server, error) {
+type ServerOption func(*Server)
+
+func WithInstance(instance string) ServerOption {
+	return func(server *Server) {
+		server.instance = instance
+	}
+}
+
+func NewServer(dataPath string, logger *slog.Logger, options ...ServerOption) (*Server, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
 	}
@@ -36,6 +45,11 @@ func NewServer(dataPath string, logger *slog.Logger) (*Server, error) {
 		profiles: make(map[string]Profile),
 		sessions: make(map[string]Session),
 		missions: defaultMissions(),
+	}
+	for _, configure := range options {
+		if configure != nil {
+			configure(s)
+		}
 	}
 	if err := s.load(); err != nil {
 		return nil, err
@@ -97,7 +111,12 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
-	s.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "service": "steel-tide-backend", "version": "1.0.0"})
+	s.writeJSON(w, http.StatusOK, map[string]any{
+		"status":   "ok",
+		"service":  "steel-tide-backend",
+		"version":  "1.0.0",
+		"instance": s.instance,
+	})
 }
 
 func (s *Server) listMissions(w http.ResponseWriter, _ *http.Request) {

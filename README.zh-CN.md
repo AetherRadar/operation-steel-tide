@@ -41,7 +41,9 @@
 
 安装 Godot 4.6.3 Mono 和 .NET 8 SDK。离线后备模式不强制要求 Go，但本地任务和进度服务需要 Go。
 
-双击 `START_GAME.bat`。启动器会通过 `GODOT_MONO`、PATH 或默认下载目录查找 Godot Mono。检测到 Go 后，它会构建并启动监听 `127.0.0.1:8787` 的服务，等待服务就绪后再启动 Godot。关闭游戏会同时关闭服务并删除 `backend/backend.pid`。
+双击 `START_GAME.bat`。启动器会通过 `GODOT_MONO`、PATH 或默认下载目录查找兼容的 Godot 4.6 Mono，阻止同一检出目录重复启动游戏，构建 C# 程序集，并在进入游戏前等待 Godot 完成资源导入。全新检出第一次运行时需要导入正式模型和纹理，因此可能稍慢。每次实际启动都会把独立的导入和运行日志，以及本次启动器自建后端的日志写入 `logs/startup/<run-id>`，并在启动前显示该目录。启动器只保留最近 20 个运行目录；即使 Godot 自身返回 0，只要日志出现顶层错误，本次启动仍会明确失败。
+
+如果 `127.0.0.1:8787` 已有属于同一检出目录的健康 Steel Tide 服务，启动器会直接复用；否则在 Go 可用时重新构建并启动本地服务，等待健康检查通过，并在游戏关闭后只停止本次启动器创建的进程。来自其他检出目录或旧版不兼容启动器的服务会保持不动，客户端改用内置离线任务流程，不会串用其存档或覆盖其 PID 状态。
 
 启动前指定特定的 Godot 可执行文件：
 
@@ -61,6 +63,7 @@ go build -o ..\steel-tide-server.exe ./cmd/server
 
 ```bash
 dotnet build OperationSteelTide.csproj
+godot --headless --path . --import
 godot --path .
 ```
 

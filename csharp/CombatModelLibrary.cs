@@ -576,46 +576,83 @@ internal static partial class CombatModelLibrary
     public static AuthoredPreviewOperatorVisual InstantiatePreviewOperator(
         OperatorVisualId visualId,
         WeaponBuild? weaponBuild = null)
-    {
-        var asset = OperatorVisualAsset(visualId);
-        var source = InstantiateRequired(
-            asset.PreviewScenePath,
-            asset.PreviewNodes);
-        var sourceBounds = asset.UsesQuaterniusRig
-            ? ComputeBounds(source)
-            : (MeshCount: 1, Size: PreviewOperatorSourceSize, Center: PreviewOperatorSourceCenter);
-        if (sourceBounds.MeshCount == 0 || sourceBounds.Size.Y <= 0.01f)
-        {
-            source.Free();
-            throw new InvalidOperationException($"Operator preview {visualId} has no usable geometry bounds.");
-        }
-        source.Position = -sourceBounds.Center;
-        if (asset.UsesQuaterniusRig)
-        {
-            var animationPlayer = RequireAnimationPlayer(source);
-            animationPlayer.Play("idle");
-            animationPlayer.Seek(0.45, update: true);
-            animationPlayer.Pause();
+        => InstantiatePreviewOperator(visualId, weaponBuild, buildObserver: null);
 
-            if (weaponBuild is not null)
+    private static AuthoredPreviewOperatorVisual InstantiatePreviewOperator(
+        OperatorVisualId visualId,
+        Action<PreviewOperatorBuildStage, Node3D, Node3D?> buildObserver)
+        => InstantiatePreviewOperator(visualId, weaponBuild: null, buildObserver: buildObserver);
+
+    private static AuthoredPreviewOperatorVisual InstantiatePreviewOperator(
+        OperatorVisualId visualId,
+        WeaponBuild? weaponBuild,
+        Action<PreviewOperatorBuildStage, Node3D, Node3D?>? buildObserver)
+    {
+        Node3D? source = null;
+        Node3D? wrapper = null;
+        AuthoredWeaponVisual? pendingWeapon = null;
+        try
+        {
+            var asset = OperatorVisualAsset(visualId);
+            source = InstantiateRequired(
+                asset.PreviewScenePath,
+                asset.PreviewNodes);
+            buildObserver?.Invoke(PreviewOperatorBuildStage.SourceCreated, source, null);
+            var sourceBounds = asset.UsesQuaterniusRig
+                ? ComputeBounds(source)
+                : (MeshCount: 1, Size: PreviewOperatorSourceSize, Center: PreviewOperatorSourceCenter);
+            if (sourceBounds.MeshCount == 0 || sourceBounds.Size.Y <= 0.01f)
             {
-                var previewVisual = new AuthoredOperatorVisual(source, visualId);
-                previewVisual.AttachWeapon(
-                    InstantiateWeapon(weaponBuild.Platform, firstPerson: false),
-                    weaponBuild);
-                previewVisual.SetWeaponReadied(false);
+                throw new InvalidOperationException(
+                    $"Operator preview {visualId} has no usable geometry bounds.");
+            }
+
+            source.Position = -sourceBounds.Center;
+            if (asset.UsesQuaterniusRig)
+            {
+                var animationPlayer = RequireAnimationPlayer(source);
+                animationPlayer.Play("idle");
+                animationPlayer.Seek(0.45, update: true);
+                animationPlayer.Pause();
+
+                if (weaponBuild is not null)
+                {
+                    var previewVisual = new AuthoredOperatorVisual(source, visualId);
+                    pendingWeapon = InstantiateWeapon(weaponBuild.Platform, firstPerson: false);
+                    previewVisual.AttachWeapon(pendingWeapon, weaponBuild);
+                    previewVisual.SetWeaponReadied(false);
+                    pendingWeapon = null;
+                }
+            }
+
+            wrapper = new Node3D();
+            wrapper.Name = "AuthoredPreviewOperatorVisual";
+            wrapper.Scale = Vector3.One * (OperatorPreviewHeight / sourceBounds.Size.Y);
+            wrapper.AddChild(source);
+            buildObserver?.Invoke(PreviewOperatorBuildStage.WrapperOwnsSource, source, wrapper);
+            var visual = new AuthoredPreviewOperatorVisual(
+                wrapper,
+                visualId,
+                hasWeapon: asset.UsesQuaterniusRig && weaponBuild is not null);
+            source = null;
+            wrapper = null;
+            return visual;
+        }
+        finally
+        {
+            if (GodotObject.IsInstanceValid(pendingWeapon?.Root))
+            {
+                pendingWeapon!.Root.Free();
+            }
+            if (GodotObject.IsInstanceValid(wrapper))
+            {
+                wrapper!.Free();
+            }
+            if (GodotObject.IsInstanceValid(source))
+            {
+                source!.Free();
             }
         }
-        var wrapper = new Node3D
-        {
-            Name = "AuthoredPreviewOperatorVisual",
-            Scale = Vector3.One * (OperatorPreviewHeight / sourceBounds.Size.Y)
-        };
-        wrapper.AddChild(source);
-        return new AuthoredPreviewOperatorVisual(
-            wrapper,
-            visualId,
-            hasWeapon: asset.UsesQuaterniusRig && weaponBuild is not null);
     }
 
     public static AuthoredGsh18Visual InstantiateGsh18(bool firstPerson)

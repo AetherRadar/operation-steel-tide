@@ -178,9 +178,10 @@ public partial class InventoryModelPreview : SubViewportContainer
 
     private void BuildOperator(Node3D root)
     {
-        root.AddChild(CombatModelLibrary.InstantiatePreviewOperator(
+        InventoryOperatorPreviewRecovery.Build(
+            root,
             OperatorRoles.Spec(_operatorRole).VisualId,
-            _weapon).Root);
+            _weapon);
     }
 
     private void BuildRifle(Node3D root)

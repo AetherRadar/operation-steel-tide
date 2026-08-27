@@ -18,18 +18,26 @@ public partial class FreightTerminalWorld
         }
 
         var body = ExpansionBox(parent, name, position, size, fallbackMaterial, rotation);
+        var scenePath = ResidentialAuthoredPropLibrary.PathForRoomProp(name);
         if (!ResidentialAuthoredPropLibrary.TryCreateVisual(
-                ResidentialAuthoredPropLibrary.PathForRoomProp(name),
+                scenePath,
                 size,
                 out var model,
                 out _))
         {
+            HideMissingAuthoredInteriorVisual(body, scenePath);
             return body;
         }
 
         body.AddChild(model);
         ResidentialAuthoredPropLibrary.HidePrimitiveMeshes(body);
-        body.SetMeta("residential_authored_interior", ResidentialAuthoredPropLibrary.PathForRoomProp(name));
+        body.SetMeta("residential_authored_interior", scenePath);
         return body;
+    }
+
+    private static void HideMissingAuthoredInteriorVisual(StaticBody3D body, string scenePath)
+    {
+        ResidentialAuthoredPropLibrary.HidePrimitiveMeshes(body);
+        body.SetMeta("residential_authored_visual_missing", scenePath);
     }
 }

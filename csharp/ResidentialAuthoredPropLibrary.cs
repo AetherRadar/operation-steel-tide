@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -7,11 +8,12 @@ namespace OperationSteelTide;
 /// Shared Kenney Furniture Kit loader for searchable furniture and room dressing.
 /// Collision stays on the caller; this only instantiates authored visuals.
 /// </summary>
-internal static class ResidentialAuthoredPropLibrary
+internal static partial class ResidentialAuthoredPropLibrary
 {
     public const string FurnitureRoot = "res://assets/models/kenney_furniture_kit";
 
     private static readonly Dictionary<string, PackedScene> Scenes = new();
+    private static readonly HashSet<string> FailedScenePaths = new(StringComparer.Ordinal);
 
     public static string PathFor(ResidentialFurnitureKind kind) => kind switch
     {
@@ -86,36 +88,82 @@ internal static class ResidentialAuthoredPropLibrary
     }
 
     public static bool TryCreateVisual(string scenePath, Vector3 targetSize, out Node3D visual, out int meshCount)
+        => TryCreateVisual(
+            scenePath,
+            targetSize,
+            static path => GD.Load<PackedScene>(path),
+            static scene => scene.Instantiate(),
+            ReportUnavailableModel,
+            out visual,
+            out meshCount);
+
+    private static bool TryCreateVisual(
+        string scenePath,
+        Vector3 targetSize,
+        Func<string, PackedScene?> load,
+        Func<PackedScene, Node?> instantiate,
+        Action<string, Exception?> reportFailure,
+        out Node3D visual,
+        out int meshCount)
     {
         visual = null!;
         meshCount = 0;
-        if (!TryLoad(scenePath, out var scene) || scene.Instantiate() is not Node3D model)
+        if (!TryLoad(scenePath, load, reportFailure, out var scene))
         {
             return false;
         }
 
-        model.Name = "AuthoredModel";
-        var bounds = CollectAabb(model, Transform3D.Identity);
-        if (bounds.Size.X <= 0.001f || bounds.Size.Y <= 0.001f || bounds.Size.Z <= 0.001f)
+        Node? temporaryRoot = null;
+        try
         {
-            model.QueueFree();
+            temporaryRoot = instantiate(scene);
+            if (temporaryRoot is not Node3D model)
+            {
+                var rootType = temporaryRoot?.GetType().Name ?? "null";
+                throw new InvalidOperationException(
+                    $"Residential authored model root must be Node3D, got {rootType}.");
+            }
+
+            model.Name = "AuthoredModel";
+            var bounds = CollectAabb(model, Transform3D.Identity);
+            if (bounds.Size.X <= 0.001f || bounds.Size.Y <= 0.001f || bounds.Size.Z <= 0.001f)
+            {
+                throw new InvalidOperationException(
+                    "Residential authored model has no usable three-dimensional bounds.");
+            }
+
+            var scale = new Vector3(
+                targetSize.X / bounds.Size.X,
+                targetSize.Y / bounds.Size.Y,
+                targetSize.Z / bounds.Size.Z);
+            model.Scale = scale;
+            var scaledCenter = bounds.GetCenter() * scale;
+            model.Position = new Vector3(
+                -scaledCenter.X,
+                -targetSize.Y * 0.5f - bounds.Position.Y * scale.Y,
+                -scaledCenter.Z);
+            ConfigureVisuals(model);
+            var builtMeshCount = CountMeshes(model);
+            if (builtMeshCount <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Residential authored model contains no renderable mesh instances.");
+            }
+
+            visual = model;
+            meshCount = builtMeshCount;
+            temporaryRoot = null;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            RememberFailure(scenePath, exception, reportFailure);
             return false;
         }
-
-        var scale = new Vector3(
-            targetSize.X / bounds.Size.X,
-            targetSize.Y / bounds.Size.Y,
-            targetSize.Z / bounds.Size.Z);
-        model.Scale = scale;
-        var scaledCenter = bounds.GetCenter() * scale;
-        model.Position = new Vector3(
-            -scaledCenter.X,
-            -targetSize.Y * 0.5f - bounds.Position.Y * scale.Y,
-            -scaledCenter.Z);
-        ConfigureVisuals(model);
-        meshCount = CountMeshes(model);
-        visual = model;
-        return meshCount > 0;
+        finally
+        {
+            FreeTemporaryNode(temporaryRoot);
+        }
     }
 
     public static void HidePrimitiveMeshes(Node root)
@@ -139,24 +187,98 @@ internal static class ResidentialAuthoredPropLibrary
     public static void ReleaseSharedResources()
     {
         Scenes.Clear();
+        FailedScenePaths.Clear();
     }
 
-    private static bool TryLoad(string path, out PackedScene scene)
+    private static bool TryLoad(
+        string path,
+        Func<string, PackedScene?> load,
+        Action<string, Exception?> reportFailure,
+        out PackedScene scene)
     {
+        if (FailedScenePaths.Contains(path))
+        {
+            scene = null!;
+            return false;
+        }
+
         if (Scenes.TryGetValue(path, out scene!))
         {
             return true;
         }
 
-        scene = GD.Load<PackedScene>(path);
-        if (scene is null)
+        PackedScene? loadedScene = null;
+        Exception? loadException = null;
+        try
         {
-            GD.PushError($"Residential authored furniture is missing: {path}");
+            loadedScene = load(path);
+        }
+        catch (Exception exception)
+        {
+            loadException = exception;
+        }
+
+        if (loadedScene is null)
+        {
+            RememberFailure(
+                path,
+                loadException ?? new InvalidOperationException("Resource loader returned no PackedScene."),
+                reportFailure);
+            scene = null!;
             return false;
         }
 
-        Scenes[path] = scene;
+        scene = loadedScene;
+        Scenes[path] = loadedScene;
         return true;
+    }
+
+    private static void RememberFailure(
+        string path,
+        Exception exception,
+        Action<string, Exception?> reportFailure)
+    {
+        Scenes.Remove(path);
+        if (!FailedScenePaths.Add(path))
+        {
+            return;
+        }
+
+        try
+        {
+            reportFailure(path, exception);
+        }
+        catch
+        {
+            // Resource recovery must never fail world initialization because reporting failed.
+        }
+    }
+
+    private static void ReportUnavailableModel(string scenePath, Exception? exception)
+    {
+        var detail = exception is null
+            ? string.Empty
+            : $" ({exception.GetType().Name}: {exception.Message})";
+        GD.PushError(
+            "Residential authored furniture model unavailable; matching props will retain "
+            + $"gameplay collision but have no authored visual: {scenePath}{detail}");
+    }
+
+    private static void FreeTemporaryNode(Node? node)
+    {
+        if (!GodotObject.IsInstanceValid(node))
+        {
+            return;
+        }
+
+        try
+        {
+            node!.Free();
+        }
+        catch
+        {
+            // Preserve the original build failure and never let cleanup interrupt _Ready.
+        }
     }
 
     private static void ConfigureVisuals(Node node)

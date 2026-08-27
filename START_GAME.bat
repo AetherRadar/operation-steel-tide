@@ -1,68 +1,19 @@
 @echo off
 setlocal
-set "PROJECT=%~dp0"
-if "%PROJECT:~-1%"=="\" set "PROJECT=%PROJECT:~0,-1%"
-set "GODOT=%GODOT_MONO%"
-if not defined GODOT for /f "delims=" %%G in ('where Godot_v4.6.3-stable_mono_win64.exe 2^>nul') do if not defined GODOT set "GODOT=%%G"
-if not defined GODOT for /f "delims=" %%G in ('where godot4.exe 2^>nul') do if not defined GODOT set "GODOT=%%G"
-if not defined GODOT for /f "delims=" %%G in ('where godot.exe 2^>nul') do if not defined GODOT set "GODOT=%%G"
-if not defined GODOT set "GODOT=%USERPROFILE%\Downloads\Godot_v4.6.3-stable_mono_win64\Godot_v4.6.3-stable_mono_win64\Godot_v4.6.3-stable_mono_win64.exe"
-set "STEEL_TIDE_SERVER=%PROJECT%\steel-tide-server.exe"
-set "STEEL_TIDE_DATA=%PROJECT%\backend\data\state.json"
-set "STEEL_TIDE_BACKEND_LOG=%PROJECT%\backend\backend.log"
-set "STEEL_TIDE_BACKEND_ERROR=%PROJECT%\backend\backend-error.log"
-set "STEEL_TIDE_BACKEND_PID_FILE=%PROJECT%\backend\backend.pid"
-set "BACKEND_PID="
-if not exist "%GODOT%" (
-  echo Godot Mono was not found. Add it to PATH or set GODOT_MONO to the executable path.
+set "LAUNCHER=%~dp0scripts\Start-Game.ps1"
+
+if not exist "%LAUNCHER%" (
+  echo Launcher helper is missing: "%LAUNCHER%"
   pause
   exit /b 1
 )
-where dotnet.exe >nul 2>&1
-if errorlevel 1 (
-  echo .NET SDK was not found. Install .NET 8 SDK or add dotnet.exe to PATH.
-  pause
-  exit /b 1
-)
-echo Updating the C# game assembly...
-echo   Project: %PROJECT%\OperationSteelTide.csproj
-for /f "delims=" %%C in ('git -C "%PROJECT%" log --oneline -1 2^>nul') do echo   Commit: %%C
-dotnet build "%PROJECT%\OperationSteelTide.csproj" --nologo --verbosity minimal
-if errorlevel 1 (
-  echo.
-  echo The C# game assembly could not be updated.
-  pause
-  exit /b 1
-) else (
-  echo   Build succeeded - Harbor 8.0/7.8 + AI 14/18m + drop 1.5m + escort 1.8m included.
-)
-if not exist "%STEEL_TIDE_SERVER%" (
-  where go.exe >nul 2>&1
-  if not errorlevel 1 (
-    echo Building the Go mission service...
-    pushd "%PROJECT%\backend"
-    go build -o "%STEEL_TIDE_SERVER%" ./cmd/server
-    popd
-  )
-)
-if exist "%STEEL_TIDE_SERVER%" (
-  if exist "%STEEL_TIDE_BACKEND_PID_FILE%" del /q "%STEEL_TIDE_BACKEND_PID_FILE%"
-  powershell.exe -NoProfile -Command "$p=Start-Process -FilePath $env:STEEL_TIDE_SERVER -ArgumentList @('-addr','127.0.0.1:8787','-data',$env:STEEL_TIDE_DATA) -RedirectStandardOutput $env:STEEL_TIDE_BACKEND_LOG -RedirectStandardError $env:STEEL_TIDE_BACKEND_ERROR -WindowStyle Hidden -PassThru; Set-Content -LiteralPath $env:STEEL_TIDE_BACKEND_PID_FILE -Value $p.Id"
-  if exist "%STEEL_TIDE_BACKEND_PID_FILE%" set /p BACKEND_PID=<"%STEEL_TIDE_BACKEND_PID_FILE%"
-  powershell.exe -NoProfile -Command "Start-Sleep -Milliseconds 800"
-) else (
-  echo Go mission service not found; starting with the built-in offline mission fallback.
-)
-echo Starting Operation Steel Tide...
-echo   Tip: In the Operations Office lobby use TIME to cycle Day/Dusk/Night/Dawn - the sky updates live. For direct launch use: START_GAME.bat -- --time=Night  (also --time=Day/Dusk/Dawn, --night/--dusk/--dawn, --tod=Night)
-start "" /wait "%GODOT%" --path "%PROJECT%" --log-file "%PROJECT%\runtime.log" -- %*
+
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%LAUNCHER%" %*
 set "EXIT_CODE=%ERRORLEVEL%"
-if defined BACKEND_PID taskkill /PID %BACKEND_PID% /T /F >nul 2>&1
-if exist "%STEEL_TIDE_BACKEND_PID_FILE%" del /q "%STEEL_TIDE_BACKEND_PID_FILE%"
 if not "%EXIT_CODE%"=="0" (
   echo.
-  echo The game exited with error code %EXIT_CODE%.
-  echo See "%PROJECT%\runtime.log" for details.
+  echo Operation Steel Tide launcher exited with code %EXIT_CODE%.
   pause
 )
+
 endlocal & exit /b %EXIT_CODE%

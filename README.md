@@ -41,7 +41,9 @@ For internet co-op without router port forwarding, the host can run a [playit.gg
 
 Install Godot 4.6.3 Mono and the .NET 8 SDK. Go is optional for the offline fallback, but required for the local mission and progression service.
 
-Double-click `START_GAME.bat`. The launcher locates Godot Mono through `GODOT_MONO`, PATH, or the default Downloads location. When Go is available, it builds and starts the service on `127.0.0.1:8787`, waits for the process, then launches Godot. Closing the game closes the service and removes `backend/backend.pid`.
+Double-click `START_GAME.bat`. The launcher locates a compatible Godot 4.6 Mono executable through `GODOT_MONO`, PATH, or the default Downloads location, refuses a second game from the same checkout, builds the C# assembly, and completes Godot's resource import before play. A fresh checkout can take longer on its first run while authored models and textures are imported. Each actual launch writes separate import and runtime logs, plus logs for any launcher-owned backend, under `logs/startup/<run-id>` and prints that directory before launching. The launcher retains the most recent 20 run directories and treats top-level Godot errors as startup failures even when Godot itself exits with code 0.
+
+If a healthy Steel Tide service for the same checkout is already listening on `127.0.0.1:8787`, the launcher reuses it. Otherwise, when Go is available it rebuilds and starts the local service, waits for the health endpoint, and stops only that launcher-owned process when the game closes. A service owned by another checkout or an incompatible older launcher is left untouched, and the client uses the built-in offline mission flow instead of sharing its save data or overwriting its PID state.
 
 To select a specific Godot executable before launching:
 
@@ -61,6 +63,7 @@ On macOS or Linux, build and launch the client directly with the platform's Godo
 
 ```bash
 dotnet build OperationSteelTide.csproj
+godot --headless --path . --import
 godot --path .
 ```
 
