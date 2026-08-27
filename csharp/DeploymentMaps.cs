@@ -31,9 +31,9 @@ public static class DeploymentMapCatalog
             BlackwaterRefineryId,
             "MAP 02",
             "map_blackwater_refinery",
-            "SAINT MARAIS OLD TOWN",
+            "JIANGHAI OLD CITY",
             "map_blackwater_refinery_subtitle",
-            "GRAND HOTEL  //  MUNICIPAL TREASURY",
+            "GUANGCHANG PAWNSHOP  //  RED STAR ELECTRONICS",
             true),
         new DeploymentMapOffer(
             "orbital_complex",

@@ -6,7 +6,10 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private const string RefineryDoorScenePath =
-        "res://assets/models/kenney_factory_kit/door-wide-closed.glb";
+        "res://assets/models/jianghai_old_city/rollershutter_window_03.glb";
+    private const float RefineryDoorSourceWidth = 0.9763f;
+    private const float RefineryDoorSourceHeight = 1.5463f;
+    private const float RefineryDoorSourceDepthCenter = 0.0755f;
     private readonly System.Collections.Generic.List<InteractiveBuildingDoor> _refineryDoors = new();
 
     private void BuildOldTownLandmarkDoors(
@@ -53,7 +56,11 @@ public partial class FreightTerminalWorld
             doorwayWidth: 7.6f,
             doorwayHeight: 4.3f,
             frontZ: 0.0f,
-            visibilityRange: 220.0f);
+            visibilityRange: 220.0f,
+            visualScenePath: RefineryDoorScenePath,
+            sourceWidth: RefineryDoorSourceWidth,
+            sourceHeight: RefineryDoorSourceHeight,
+            sourceDepthCenter: RefineryDoorSourceDepthCenter);
         mount.AddChild(door);
         _refineryDoors.Add(door);
 
@@ -239,7 +246,7 @@ public partial class FreightTerminalWorld
         {
             GD.Print("REFINERY_DOORS_CHECK valid=False reason=no_doors");
             GD.Print("REFINERY_DOORS_PASS valid=False");
-            GetTree().Quit(2);
+            QuitDiagnosticAfterSceneCleanup(2);
             return;
         }
 
@@ -329,6 +336,6 @@ public partial class FreightTerminalWorld
             && aiLinkReady && aiOpened && aiContinued;
         GD.Print($"REFINERY_DOORS_CHECK valid={valid} doors={_refineryDoors.Count}/{expectedDoorCount} ids={idsReady} authored={authoredReady} closed_initial={initiallyClosed} prompt_en={englishPromptReady} prompt_zh={chinesePromptReady} nearest={nearestReady} closed_block={closedBlocks} opening={openingStarted} opened={opened} angle={first.MotionAngleDegrees:0.0} open_clear={openClears} close_prompt={closePromptReady} occupied_rejected={occupiedCloseRejected} closing={closingStarted} closed_again={closedAgain} closed_block_again={closedAgainBlocks} ai_link={aiLinkReady} ai_opened={aiOpened} ai_continued={aiContinued} motions={string.Join(',', _refineryDoors.Select(door => door.CompletedMotionCount))}");
         GD.Print($"REFINERY_DOORS_PASS valid={valid}");
-        GetTree().Quit(valid ? 0 : 2);
+        QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }
 }

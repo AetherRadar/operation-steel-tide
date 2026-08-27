@@ -156,6 +156,9 @@ public partial class FreightTerminalWorld : Node3D
     {
         var args = OS.GetCmdlineUserArgs();
         _activeRuntimeMapId = DeploymentMapRuntime.ResolveStartupMap(args);
+        _diagnosticSceneLoadFallbackAllowed = Array.Exists(
+            args,
+            argument => argument.StartsWith("--validate-", StringComparison.Ordinal));
         var worldSeed = DeploymentMapRuntime.CurrentWorldSeed;
         if (worldSeed != 0)
         {
@@ -178,8 +181,8 @@ public partial class FreightTerminalWorld : Node3D
         {
             _deploymentTimeOfDay = startupTimeOfDay;
             _hud.SetDeploymentTimeForDiagnostics(startupTimeOfDay);
-            ApplyTimeOfDay(startupTimeOfDay);
         }
+        ApplyTimeOfDay(startupTimeOfDay);
         BuildOperationsOffice();
         BuildSquadSystem();
         SpawnLootCases();
@@ -194,10 +197,7 @@ public partial class FreightTerminalWorld : Node3D
         _hud.SetMissionPhase(_missionPhase, _missionDirector.SpawnProtectionSeconds, _missionOnline);
         ApplyQuality(_qualitySetting);
         // Re-apply time after quality (quality rebuilds some sky state) so Night stays dark even on low quality.
-        if (startupTimeOfDay != DeploymentTimeOfDay.Day)
-        {
-            ApplyTimeOfDay(startupTimeOfDay);
-        }
+        ApplyTimeOfDay(startupTimeOfDay);
 
         InitializeOperationsOfficeState(args);
         RuntimeDiagnosticRunner.RunFirst(this, args);
@@ -231,6 +231,10 @@ public partial class FreightTerminalWorld : Node3D
                 }
             }
             _objectiveScreens.Clear();
+            _jianghaiOldCitySceneLoader.ResetTerminalStatuses();
+            _jianghaiOldCitySceneLoader.ReleaseReferences();
+            _jianghaiOldCityAtmosphere.ReleaseReferences();
+            _jianghaiOldCityScene = null;
             _materials.Clear();
             _modelScenes.Clear();
             ReleaseSharedBoxMeshes();
@@ -2538,6 +2542,7 @@ public partial class FreightTerminalWorld : Node3D
         var screen = _objectiveScreens[_objectiveStage];
         screen.AlbedoColor = new Color(0.1f, 0.9f, 0.58f);
         screen.Emission = new Color(0.04f, 0.95f, 0.5f);
+        _jianghaiOldCitySceneLoader.SetTerminalCompleted(_objectiveStage);
         _objectiveLights[_objectiveStage].LightColor = new Color(0.06f, 1.0f, 0.5f);
         if (_objectiveStage == 0 && !_reinforcementsDeployed && !_reinforcementPending)
         {
@@ -2689,15 +2694,22 @@ public partial class FreightTerminalWorld : Node3D
             SetIfSupported(_environmentRef, "volumetric_fog_enabled", _qualitySetting >= 2);
             if (_environmentRef.Sky is Sky sky)
             {
-                sky.ProcessMode = _qualitySetting >= 2
-                    ? Sky.ProcessModeEnum.Realtime
-                    : Sky.ProcessModeEnum.Incremental;
-                sky.RadianceSize = new[]
+                var radianceSize = new[]
                 {
                     Sky.RadianceSizeEnum.Size64,
                     Sky.RadianceSizeEnum.Size128,
                     Sky.RadianceSizeEnum.Size256
                 }[_qualitySetting];
+                if (_qualitySetting >= 2)
+                {
+                    sky.RadianceSize = radianceSize;
+                    sky.ProcessMode = Sky.ProcessModeEnum.Realtime;
+                }
+                else
+                {
+                    sky.ProcessMode = Sky.ProcessModeEnum.Incremental;
+                    sky.RadianceSize = radianceSize;
+                }
             }
         }
         GetViewport().Scaling3DScale = new[] { 0.74f, 0.88f, 1.0f }[_qualitySetting];
@@ -2721,6 +2733,7 @@ public partial class FreightTerminalWorld : Node3D
         }
         ApplyMapDetailQuality();
         ApplyLowPolyBuildingQuality();
+        _jianghaiOldCitySceneLoader.ApplyQuality(_qualitySetting);
         SaveSettings();
     }
 

@@ -6,10 +6,25 @@ The Steel Tide M4A1 and operator models are generated from `scripts/blender/gene
 
 ## Poly Haven CC0 models
 
-The following models are from [Poly Haven](https://polyhaven.com/) and are dedicated to the public domain under CC0:
+The following two [Poly Haven](https://polyhaven.com/) models adapted into
+Jianghai Old City were acquired on 2026-08-06:
 
-- Old Military Crate: https://polyhaven.com/a/old_military_crate
-- Concrete Road Barrier: https://polyhaven.com/a/concrete_road_barrier
+| Model | Creator | Official source | Repository-local source mapping |
+| --- | --- | --- | --- |
+| Old Military Crate | Jack Mava | https://polyhaven.com/a/old_military_crate | `old_military_crate/old_military_crate.gltf`, `old_military_crate/old_military_crate.bin`, and `old_military_crate/textures/old_military_crate_{arm,diff,nor_gl}_1k.jpg` |
+| Concrete Road Barrier | Amal Kumar | https://polyhaven.com/a/concrete_road_barrier | `concrete_road_barrier/concrete_road_barrier.gltf`, `concrete_road_barrier/concrete_road_barrier.bin`, and `concrete_road_barrier/textures/concrete_road_barrier_{arm,diff,nor_gl}_1k.jpg` |
+
+Exact license: CC0 1.0 Universal,
+https://creativecommons.org/publicdomain/zero/1.0/. Attribution is not
+required; creator names are retained as provenance and courtesy credit. The
+Jianghai Old City adaptation of both models is packed into
+`../../source_art/world/jianghai_old_city/jianghai_old_city.blend` and exported
+to `jianghai_old_city/jianghai_old_city.glb`.
+
+### Poly Haven residential-street additions
+
+The following six models were acquired on 2026-08-28:
+
 - Street Lamp 01: https://polyhaven.com/a/street_lamp_01
 - Metal Trash Can: https://polyhaven.com/a/metal_trash_can
 - Coffee Cart 01: https://polyhaven.com/a/CoffeeCart_01
@@ -17,12 +32,196 @@ The following models are from [Poly Haven](https://polyhaven.com/) and are dedic
 - Plastic Crate 01: https://polyhaven.com/a/plastic_crate_01
 - Wicker Basket 01: https://polyhaven.com/a/wicker_basket_01
 
-License: https://polyhaven.com/license
+Each is dedicated to the public domain under CC0 1.0 Universal; Poly Haven's
+official license is https://polyhaven.com/license. Creator credits, exact CC0
+terms, official API revision identifiers, source-to-runtime mapping, per-file
+MD5 and SHA-256 evidence, and Blender processing details are recorded in
+`polyhaven_residential_street/LICENSE.md`.
 
-The six residential-street additions were acquired on 2026-08-28. Creator
-credits, exact CC0 terms, official API revision identifiers, source-to-runtime
-mapping, per-file MD5 and SHA-256 evidence, and Blender processing details are
-recorded in `polyhaven_residential_street/LICENSE.md`.
+### Jianghai Old City authored-asset pass
+
+The following finished Poly Haven assets were acquired as 1K glTF bundles on
+2026-08-28 for the Jianghai Old City authored-asset pass:
+
+| Model | Creator | Official source | Repository-external acquisition input |
+| --- | --- | --- | --- |
+| Television 02 | Benny Weimer | https://polyhaven.com/a/television_02 | `poly_haven/television_02/television_02_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Exterior Aircon Unit | Monsta3D | https://polyhaven.com/a/exterior_aircon_unit | `poly_haven/exterior_aircon_unit/exterior_aircon_unit_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Rollershutter Window 03 | MP | https://polyhaven.com/a/rollershutter_window_03 | `poly_haven/rollershutter_window_03/rollershutter_window_03_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Trashbag | Benny Weimer | https://polyhaven.com/a/trashbag | `poly_haven/trashbag/trashbag_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Utility Box 01 | James Ray Cock | https://polyhaven.com/a/utility_box_01 | `poly_haven/utility_box_01/utility_box_01_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Barrel 03 | Serhii Khromov | https://polyhaven.com/a/barrel_03 | `poly_haven/barrel_03/barrel_03_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Plastic Crate 02 | Fabi_G | https://polyhaven.com/a/plastic_crate_02 | `poly_haven/plastic_crate_02/plastic_crate_02_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Security Camera 01 | Alexander Otterbeck (modeling and texturing); Yann Kervran (rigging) | https://polyhaven.com/a/security_camera_01 | `poly_haven/security_camera_01/security_camera_01_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+
+Each bundle is CC0 1.0 Universal under
+https://creativecommons.org/publicdomain/zero/1.0/. Attribution is not
+required; the contributor names are retained as provenance and courtesy
+credit. The acquisition bundles remain in the external cache and are not
+committed as separate raw files. Adapted geometry and materials are packed
+into `../../source_art/world/jianghai_old_city/jianghai_old_city.blend` and
+exported to `jianghai_old_city/jianghai_old_city.glb`; exact cache hashes and
+the packed-output mapping are recorded in the scene's `LICENSE_EVIDENCE.md`.
+
+Rollershutter Window 03 also has a repository-local derived runtime mapping:
+`jianghai_old_city/rollershutter_window_03.glb` (1,587,684 bytes; SHA-256
+`48E78DFC37FF6310151B18BEA8AC8B080BE31ABED4BD882C0FA3F46E19B0B4B1`).
+The export script reproducibly selects the adapted
+`JianghaiArtPass_EastShutter00` mesh from the authoritative packed `.blend`,
+normalizes a temporary copy, and exports its PBR geometry and materials. This
+standalone GLB supplies only the visible art for the two Old City
+`InteractiveBuildingDoor` instances, replacing the enlarged Kenney
+`door-wide-closed` visual. Their collision, animation, network state, and AI
+traversal remain project gameplay behavior. The derived file retains MP's
+Poly Haven CC0 provenance and is not relicensed as project-authored MIT art.
+
+## Jianghai Old City authored composite
+
+The Jianghai Old City extraction-map visual is a project-authored Blender
+composition that adapts redistributable third-party source assets into one
+static runtime scene:
+
+- Runtime output: `jianghai_old_city/jianghai_old_city.glb`
+- Interactive-door visual output: `jianghai_old_city/rollershutter_window_03.glb`
+- Authoritative editable DCC source: `../../source_art/world/jianghai_old_city/jianghai_old_city.blend`
+- Runtime export script: `../../scripts/blender/export_jianghai_old_city.py`
+- Source and license evidence: `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md`
+- Initial external inputs were acquired on 2026-08-27; the additional
+  BlenderKit and Poly Haven assets identified below were acquired on
+  2026-08-28.
+
+The packed `.blend` is the authoritative hand-edited scene. The export script
+validates and exports that scene; it does not generate or reconstruct the
+map. No script reconstructs the complete map; further composition and modeling
+work starts from the saved hand-edited DCC source.
+
+The runtime export policy caps the longest texture dimension at 1024 pixels
+and recompresses eligible high-resolution runtime images as JPEG quality 90.
+A 2026-08-28 Blender audit recorded all seven required runtime anchors, 429
+mesh objects, 176 unique mesh datablocks, 4,664,722 object-instance triangles,
+and 863,620 unique DCC-mesh triangles. The final packed `.blend` is 82,347,471
+bytes with SHA-256
+`3881F3653188A00328C85829FE06C7C61AD07510495791DD8537A38EB7816EF6`.
+The final 95,837,888-byte GLB has SHA-256
+`F61D82D77311BF1C2F8A3ACE1C0FFE967EC415220DABA9BF840237EC797CD0FA`
+and contains 525 nodes, 264 unique mesh resources, 515 mesh nodes, 275
+serialized glTF primitives, 50 materials, 100 images, 898,994 triangles counted
+once per unique mesh resource, and 4,700,072 triangles across all mesh-node
+instances. The matching Godot refinery-map validation passes with 515 authored
+meshes, 575 material-backed surfaces, the same 4,700,072 authored instance
+triangles, and 413 detail meshes. The full runtime scene contains 934 nodes and
+625 mesh instances; that broader count
+includes meshes outside the authored-map import. Route validation reports
+`routes=True`, `route_probes=14`, and `route_blocker=none`; the Victory truck
+envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and
+`y=2.6`. The final shadow tiers are 102/207/373, with quality tier 1 still at
+207. High tier disables shadows only for fine decorative meshes; model
+geometry, materials, and visibility ranges are unchanged. Final capture tuples
+(draw calls / objects / primitives) are Overview 627/784/8,249,404, Victory
+street 832/1,086/9,596,938, Guangchang pawnshop 253/534/2,980,673, Red Star
+factory 443/632/4,743,175, and Market footbridge 503/747/4,684,143. All pass;
+video memory is 1,061.0 MB and texture memory is 919.5 MB. Detailed DCC, GLB,
+and runtime counting scopes are kept in
+`../../source_art/world/jianghai_old_city/README.md`.
+
+In the final DCC placement, the Municipal terminal root has no duplicate
+180-degree rotation and its screen faces opposite the Grand terminal. The 22
+Rollershutter Window 03 and Exterior Aircon Unit instances are rotated flush
+against actual tenement facades; none occupies `CentralAvenue`.
+Final DCC QA removes the redundant `JianghaiArtPass_FactoryHeroShutter`
+instance because the red-brick factory facade already contains an embedded
+industrial roller shutter. Keeping the existing facade shutter avoids a
+second overlapping dark door while the Rollershutter Window 03 source remains
+used on the tenement facades recorded above.
+The factory interactive shutter is framed by a five-object portal composed in
+the authoritative Blender scene from reused DCC-authored brick piers, pier
+caps, and a corrugated roof. The Blender audit reports
+`factory_gate_portal=5/5` and `factory_gate_portal_aligned=True`. This portal is
+authored final visible art, not a code-built primitive or procedural runtime
+model; reused packed materials retain their recorded source licenses.
+
+The project-authored portions include the complete map layout, street and
+supporting geometry, district composition, material adaptations, art
+direction, sign wording and placement, the objective terminals' small status
+screens and adaptation work, the factory-gate portal geometry/composition, and
+DCC integration work. The two terminal bodies combine the CC0 Utility Box 01
+and Television 02 sources recorded above. The project-authored portions are
+covered by the repository's root MIT license, subject to the disclosure in
+`docs/CONTENT_PROVENANCE.md`; reused portal materials retain their recorded
+source licenses.
+
+The delivered composite incorporates adapted geometry and materials from these
+CC0 sources acquired on 2026-08-27:
+
+- **Modular Factory Facade**, by **James Ray Cock**, from Poly Haven:
+  https://polyhaven.com/a/modular_factory_facade
+- **Chinese Temple 2**, by **Free poly**, from BlenderKit; `assetBaseId`
+  `8701a79a-1635-437c-b1d2-6b14f14fc351`:
+  https://www.blenderkit.com/asset-gallery-detail/8701a79a-1635-437c-b1d2-6b14f14fc351/
+- **Chinese red lamp**, by **Kin Chen**, from BlenderKit; `assetBaseId`
+  `b97e433c-2eb1-46b8-9633-5bdee21e4e7a`:
+  https://www.blenderkit.com/asset-gallery-detail/b97e433c-2eb1-46b8-9633-5bdee21e4e7a/
+
+Additional CC0 BlenderKit inputs acquired on 2026-08-28 and incorporated into
+the delivered composite are:
+
+- **Old Urban building**, by **Abobla O.S**; `assetBaseId`
+  `8177ff94-1645-4b50-95cc-cb05a336e34d`:
+  https://www.blenderkit.com/asset-gallery-detail/8177ff94-1645-4b50-95cc-cb05a336e34d/
+- **Scan Old brick building red small**, by **Free poly**; `assetBaseId`
+  `fc8376f8-7c79-48b3-8a3c-bf061ace53e0`:
+  https://www.blenderkit.com/asset-gallery-detail/fc8376f8-7c79-48b3-8a3c-bf061ace53e0/
+- **Scan Old Building Street**, by **Free poly**; `assetBaseId`
+  `d8c0ffa6-7b7d-47e9-8554-2d3bbcc82030`:
+  https://www.blenderkit.com/asset-gallery-detail/d8c0ffa6-7b7d-47e9-8554-2d3bbcc82030/
+- **Chinese Wood House Wall**, by **Free poly**; `assetBaseId`
+  `7c4def52-e40b-4b77-bd89-44985e00375b`:
+  https://www.blenderkit.com/asset-gallery-detail/7c4def52-e40b-4b77-bd89-44985e00375b/
+- **Chinese Porcelain Lion**, by **Free poly**; `assetBaseId`
+  `50b661cb-119d-4e80-8a9c-5c6996cbb0c8`:
+  https://www.blenderkit.com/asset-gallery-detail/50b661cb-119d-4e80-8a9c-5c6996cbb0c8/
+
+The official pages identify the delivered BlenderKit assets as Creative
+Commons Zero and free. For the five assets acquired on 2026-08-28, the
+official API also reported `license=cc_zero` and `isFree=true`. Attribution is
+not required by CC0, but creator credits and exact source identifiers are
+retained as provenance. The final DCC scene also contains adapted instances of
+the eight Poly Haven CC0 authored-pass assets acquired on 2026-08-28 and the
+already tracked Poly Haven CC0 Old Military Crate and Concrete Road Barrier
+listed above.
+
+**Modular Urban Apartments Facade**, by **James Ray Cock**, was acquired and
+evaluated on 2026-08-27 from
+https://polyhaven.com/a/modular_urban_apartments_facade. It is CC0, but it is
+not imported or embedded in the current delivered `jianghai_old_city.blend`
+or `jianghai_old_city.glb`. The GLB may retain an
+`evaluated_not_used` provenance field naming the evaluation, but contains no
+apartment geometry, materials, or textures. Acquisition hashes are retained
+solely to preserve the evaluation trail.
+
+License text: https://creativecommons.org/publicdomain/zero/1.0/
+
+During DCC authoring, the 2026-08-27 acquisition used the Simplified Chinese
+variable subset of
+**Noto Sans SC** from the Google Noto / `notofonts` project, licensed under the
+SIL Open Font License 1.1. The source font is used only during the Blender
+editing process to convert Chinese sign text to static glyph meshes. The
+original `.otf` is not included in the authoritative `.blend`, runtime `.glb`,
+or repository, and the export script rejects non-built-in font datablocks.
+The sign wording and layout are project-authored. Source and license:
+
+- https://github.com/notofonts/noto-cjk/blob/main/Sans/README.md
+- https://github.com/notofonts/noto-cjk/blob/main/Sans/LICENSE
+
+The map also reuses the already tracked Poly Haven CC0 surface textures listed
+in `../textures/LICENSE.md`: Asphalt 03, Concrete Floor, Gravel Embedded
+Concrete, and Corrugated Iron.
+
+The source models, their materials, and the Noto font remain governed by their
+respective source rights. Inclusion in the packed `.blend` or exported `.glb`
+does not relicense any third-party contribution under the repository's MIT
+license, and the root MIT license is not asserted to replace those source
+licenses.
 
 ## Kenney CC0 models
 

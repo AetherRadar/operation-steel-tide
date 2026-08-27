@@ -27,6 +27,42 @@ internal sealed class OldTownLandmarksBuilder
     private static readonly Vector3 TreasuryCenter = RefineryExtractionMapBuilder.TreasuryCenter;
     private const float RooftopZ = -126.0f;
 
+    public OldTownLandmarksResult BuildGameplayScaffolding(Node3D parent)
+    {
+        var root = new Node3D { Name = "OldTownLandmarks" };
+        root.AddToGroup("refinery_gameplay_scaffold");
+        root.AddToGroup("old_town_landmarks");
+        parent.AddChild(root);
+
+        var collisionBody = new StaticBody3D
+        {
+            Name = "OldTownLandmarkCollision",
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        root.AddChild(collisionBody);
+
+        var counts = new BuildCounts();
+        AddCourtyardCollision(collisionBody, "Hotel", HotelCenter, entrySouth: true, counts);
+        AddCourtyardCollision(collisionBody, "Treasury", TreasuryCenter, entrySouth: false, counts);
+        var rooftopRoute = AddMarketRooftopCollision(collisionBody, counts);
+        return new OldTownLandmarksResult(
+            3,
+            2,
+            0,
+            counts.CollisionShapes,
+            2,
+            1,
+            HotelCenter,
+            HotelCenter + new Vector3(0, 1.0f, 13.8f),
+            HotelCenter + new Vector3(0, 1.0f, 7.0f),
+            TreasuryCenter,
+            TreasuryCenter + new Vector3(0, 1.0f, -13.8f),
+            TreasuryCenter + new Vector3(0, 1.0f, -7.0f),
+            rooftopRoute,
+            new HashSet<string>());
+    }
+
     public OldTownLandmarksResult Build(Node3D parent)
     {
         var root = new Node3D { Name = "OldTownLandmarks" };
@@ -144,6 +180,13 @@ internal sealed class OldTownLandmarksBuilder
                 new Vector3(34.0f - step * 3.4f, rise, RooftopZ), new Vector3(0, 90, 0), 1.4f, counts);
         }
 
+        return AddMarketRooftopCollision(collisionBody, counts);
+    }
+
+    private static IReadOnlyList<Vector3> AddMarketRooftopCollision(
+        StaticBody3D collisionBody,
+        BuildCounts counts)
+    {
         AddCollision(collisionBody, "RooftopDeckCollision", new Vector3(0, 4.14f, RooftopZ),
             new Vector3(45.0f, 0.34f, 4.4f), Vector3.Zero, counts);
         AddCollision(collisionBody, "RooftopNorthGuard", new Vector3(0, 5.1f, RooftopZ - 2.15f),
@@ -273,9 +316,9 @@ internal sealed class OldTownLandmarksBuilder
 
     private static void AddDistrictLabels(Node3D root)
     {
-        AddLabel(root, "GrandHotelLabel", HotelCenter + new Vector3(0, 7.2f, 12.4f), "GRAND HOTEL  //  HIGH VALUE");
-        AddLabel(root, "TreasuryLabel", TreasuryCenter + new Vector3(0, 7.2f, -12.4f), "MUNICIPAL TREASURY  //  HIGH VALUE");
-        AddLabel(root, "RooftopLabel", new Vector3(0, 6.9f, RooftopZ), "MARKET ROOFTOP");
+        AddLabel(root, "GrandHotelLabel", HotelCenter + new Vector3(0, 7.2f, 12.4f), "GUANGCHANG PAWNSHOP  //  HIGH VALUE");
+        AddLabel(root, "TreasuryLabel", TreasuryCenter + new Vector3(0, 7.2f, -12.4f), "RED STAR ELECTRONICS  //  HIGH VALUE");
+        AddLabel(root, "RooftopLabel", new Vector3(0, 6.9f, RooftopZ), "MARKET FOOTBRIDGE");
     }
 
     private static void AddLabel(Node3D root, string name, Vector3 position, string text)

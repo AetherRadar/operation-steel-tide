@@ -46,7 +46,7 @@ public sealed record RefineryExtractionMapLayout(
     Vector3 ManifestTerminal);
 
 /// <summary>
-/// Authored placement data for Saint Marais Old Town. The legacy refinery type and map ID
+/// Legacy collision and gameplay placement data for Jianghai Old City. The refinery type and map ID
 /// remain stable for saves, command-line diagnostics, and extraction network messages.
 /// </summary>
 public sealed class RefineryExtractionMapBuilder
@@ -484,18 +484,18 @@ public sealed class RefineryExtractionMapBuilder
 
     private static IReadOnlyList<RefineryLootPlacement> LootPlacements() => new[]
     {
-        Loot(new(-91, 0.2f, -122), LootGrade.Legendary, "Grand Hotel master safe", "\u5927\u9152\u5e97\u4e3b\u4fdd\u9669\u67dc"),
-        Loot(new(-80, 0.2f, -128), LootGrade.Epic, "Grand Hotel jewelry case", "\u5927\u9152\u5e97\u73e0\u5b9d\u7bb1"),
-        Loot(new(-94, 0.2f, -113), LootGrade.Epic, "Concierge strongbox", "\u793c\u5bbe\u53f0\u91cd\u5323"),
-        Loot(new(-76, 0.2f, -115), LootGrade.Rare, "Hotel service cache", "\u9152\u5e97\u52e4\u52a1\u7269\u8d44"),
-        Loot(new(91, 0.2f, 4), LootGrade.Legendary, "Municipal treasury vault", "\u5e02\u653f\u91d1\u5e93"),
-        Loot(new(80, 0.2f, 9), LootGrade.Epic, "Treasury bond case", "\u91d1\u5e93\u503a\u5238\u7bb1"),
+        Loot(new(-91, 0.2f, -122), LootGrade.Legendary, "Guangchang Pawnshop master safe", "\u5e7f\u660c\u5f53\u94fa\u4e3b\u4fdd\u9669\u67dc"),
+        Loot(new(-80, 0.2f, -128), LootGrade.Epic, "Pawnshop jewelry case", "\u5f53\u94fa\u73e0\u5b9d\u7bb1"),
+        Loot(new(-94, 0.2f, -113), LootGrade.Epic, "Pawnshop counter strongbox", "\u5f53\u94fa\u67dc\u53f0\u91cd\u5323"),
+        Loot(new(-76, 0.2f, -115), LootGrade.Rare, "Pawnshop service cache", "\u5f53\u94fa\u540e\u573a\u7269\u8d44"),
+        Loot(new(91, 0.2f, 4), LootGrade.Legendary, "Red Star Electronics secure vault", "\u7ea2\u661f\u7535\u5b50\u5382\u4fdd\u5bc6\u67dc"),
+        Loot(new(80, 0.2f, 9), LootGrade.Epic, "Factory payroll case", "\u7535\u5b50\u5382\u5de5\u8d44\u7bb1"),
         Loot(new(94, 0.2f, -5), LootGrade.Epic, "Archive cipher locker", "\u6863\u6848\u5bc6\u7801\u67dc"),
         Loot(new(76, 0.2f, -7), LootGrade.Rare, "Clerk security cache", "\u804c\u5458\u5b89\u4fdd\u7269\u8d44"),
-        Loot(new(-17, 0.2f, -74), LootGrade.Rare, "Founders market lockbox", "\u5f00\u57ce\u5e02\u96c6\u9501\u7bb1"),
-        Loot(new(18, 0.2f, -47), LootGrade.Uncommon, "Plaza vendor crate", "\u5e7f\u573a\u5546\u8d29\u7269\u8d44"),
-        Loot(new(-42, 0.2f, -88), LootGrade.Rare, "Canal pharmacy cabinet", "\u8fd0\u6cb3\u836f\u623f\u67dc"),
-        Loot(new(42, 0.2f, -32), LootGrade.Rare, "Garden electronics cache", "\u82b1\u56ed\u7535\u5b50\u7269\u8d44"),
+        Loot(new(-17, 0.2f, -74), LootGrade.Rare, "Jianghai market lockbox", "\u6c5f\u6d77\u5e02\u96c6\u9501\u7bb1"),
+        Loot(new(18, 0.2f, -47), LootGrade.Uncommon, "Jianghai Square vendor crate", "\u6c5f\u6d77\u5e7f\u573a\u5546\u8d29\u7269\u8d44"),
+        Loot(new(-42, 0.2f, -88), LootGrade.Rare, "West Arcade pharmacy cabinet", "\u897f\u5173\u9a91\u697c\u836f\u623f\u67dc"),
+        Loot(new(42, 0.2f, -32), LootGrade.Rare, "Factory Row electronics cache", "\u7ea2\u661f\u5382\u8857\u7535\u5b50\u7269\u8d44"),
         Loot(new(-116, 0.2f, -70), LootGrade.Uncommon, "West alley toolbox", "\u897f\u5df7\u5de5\u5177\u7bb1"),
         Loot(new(116, 0.2f, -101), LootGrade.Uncommon, "East alley supply", "\u4e1c\u5df7\u8865\u7ed9"),
         Loot(new(-44, 0.2f, -166), LootGrade.Rare, "North gate luggage", "\u5317\u95e8\u884c\u674e"),
@@ -525,6 +525,14 @@ public sealed class RefineryExtractionMapBuilder
 
     private static IReadOnlyList<RefineryRouteProbe> RouteProbes() => new[]
     {
+        new RefineryRouteProbe("victory_truck_center_mid", new Vector3(-0.5f, 1.1f, 88), new Vector3(-0.5f, 1.1f, -212)),
+        new RefineryRouteProbe("victory_truck_left_low", new Vector3(-2.0f, 0.45f, 88), new Vector3(-2.0f, 0.45f, -212)),
+        new RefineryRouteProbe("victory_truck_right_low", new Vector3(1.0f, 0.45f, 88), new Vector3(1.0f, 0.45f, -212)),
+        new RefineryRouteProbe("victory_truck_left_mid", new Vector3(-2.0f, 1.4f, 88), new Vector3(-2.0f, 1.4f, -212)),
+        new RefineryRouteProbe("victory_truck_right_mid", new Vector3(1.0f, 1.4f, 88), new Vector3(1.0f, 1.4f, -212)),
+        new RefineryRouteProbe("victory_truck_left_high", new Vector3(-2.0f, 2.6f, 88), new Vector3(-2.0f, 2.6f, -212)),
+        new RefineryRouteProbe("victory_truck_center_high", new Vector3(-0.5f, 2.6f, 88), new Vector3(-0.5f, 2.6f, -212)),
+        new RefineryRouteProbe("victory_truck_right_high", new Vector3(1.0f, 2.6f, 88), new Vector3(1.0f, 2.6f, -212)),
         new RefineryRouteProbe("victory_west_lane", new Vector3(-4.2f, 1.1f, 88), new Vector3(-4.2f, 1.1f, -212)),
         new RefineryRouteProbe("victory_east_lane", new Vector3(4.2f, 1.1f, 88), new Vector3(4.2f, 1.1f, -212)),
         new RefineryRouteProbe("hotel_entry", new Vector3(-86, 1.1f, -98.4f), new Vector3(-86, 1.1f, -111)),

@@ -31,6 +31,11 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
     private float _visibilityRange;
     private Vector3 _mountPosition;
     private float _mountYaw;
+    private string _visualScenePath = OverheadDoorScenePath;
+    private float _sourceWidth = OverheadSourceWidth;
+    private float _sourceHeight = OverheadSourceHeight;
+    private float _sourceDepthCenter = OverheadSourceDepthCenter;
+    private bool _usesCustomVisualScene;
     private Vector3 _interactionLocal;
     private CollisionShape3D _doorCollision = null!;
     private Node3D _authoredVisual = null!;
@@ -67,7 +72,11 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         float visibilityRange,
         BuildingDoorMotionStyle motionStyle = BuildingDoorMotionStyle.Overhead,
         Vector3 mountPosition = default,
-        float mountYaw = 0.0f)
+        float mountYaw = 0.0f,
+        string? visualScenePath = null,
+        float? sourceWidth = null,
+        float? sourceHeight = null,
+        float? sourceDepthCenter = null)
     {
         DoorId = doorId;
         _width = Mathf.Max(1.0f, doorwayWidth * 0.96f);
@@ -77,6 +86,24 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         _motionStyle = motionStyle;
         _mountPosition = mountPosition;
         _mountYaw = mountYaw;
+        _usesCustomVisualScene = !string.IsNullOrWhiteSpace(visualScenePath);
+        _visualScenePath = string.IsNullOrWhiteSpace(visualScenePath)
+            ? motionStyle == BuildingDoorMotionStyle.Hinged
+                ? HingedDoorScenePath
+                : OverheadDoorScenePath
+            : visualScenePath!;
+        var defaultSourceWidth = motionStyle == BuildingDoorMotionStyle.Hinged
+            ? HingedSourceWidth
+            : OverheadSourceWidth;
+        var defaultSourceHeight = motionStyle == BuildingDoorMotionStyle.Hinged
+            ? HingedSourceHeight
+            : OverheadSourceHeight;
+        var defaultSourceDepthCenter = motionStyle == BuildingDoorMotionStyle.Hinged
+            ? 0.0f
+            : OverheadSourceDepthCenter;
+        _sourceWidth = Mathf.Max(0.01f, sourceWidth ?? defaultSourceWidth);
+        _sourceHeight = Mathf.Max(0.01f, sourceHeight ?? defaultSourceHeight);
+        _sourceDepthCenter = sourceDepthCenter ?? defaultSourceDepthCenter;
         _interactionLocal = new Vector3(0, Mathf.Min(1.35f, _height * 0.5f), frontZ);
         var pivot = motionStyle == BuildingDoorMotionStyle.Hinged
             ? new Vector3(-_width * 0.5f, 0.0f, frontZ)
@@ -210,10 +237,7 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
 
     private void BuildAuthoredVisual()
     {
-        var scenePath = _motionStyle == BuildingDoorMotionStyle.Hinged
-            ? HingedDoorScenePath
-            : OverheadDoorScenePath;
-        var scene = GD.Load<PackedScene>(scenePath);
+        var scene = GD.Load<PackedScene>(_visualScenePath);
         if (scene?.Instantiate() is not Node3D visual)
         {
             return;
@@ -224,17 +248,17 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
             visual.Name = "AuthoredHingedDoor";
             visual.Position = new Vector3(_width * 0.5f, 0, 0);
             visual.Scale = new Vector3(
-                _width / HingedSourceWidth,
-                _height / HingedSourceHeight,
+                _width / _sourceWidth,
+                _height / _sourceHeight,
                 0.72f);
         }
         else
         {
             visual.Name = "AuthoredOverheadDoor";
-            visual.Position = new Vector3(0, -_height, -OverheadSourceDepthCenter);
+            visual.Position = new Vector3(0, -_height, -_sourceDepthCenter);
             visual.Scale = new Vector3(
-                _width / OverheadSourceWidth,
-                _height / OverheadSourceHeight,
+                _width / _sourceWidth,
+                _height / _sourceHeight,
                 1.0f);
         }
         visual.AddToGroup("refinery_door_authored");
@@ -250,7 +274,8 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
             visual.VisibilityRangeEnd = _visibilityRange;
             visual.VisibilityRangeEndMargin = Mathf.Min(18.0f, _visibilityRange * 0.12f);
         }
-        if (node is MeshInstance3D { Mesh: not null } meshInstance)
+        if (!_usesCustomVisualScene
+            && node is MeshInstance3D { Mesh: not null } meshInstance)
         {
             for (var surface = 0; surface < meshInstance.Mesh.GetSurfaceCount(); surface++)
             {

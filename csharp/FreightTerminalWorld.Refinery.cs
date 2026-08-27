@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -6,12 +7,15 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private RefineryExtractionMapLayout? _refineryLayout;
-    private int _refineryAuthoredModelCount;
     private int _refineryCollisionProxyCount;
-    private int _refineryTallSceneCount;
     private OldTownLandmarksResult? _oldTownLandmarks;
+    private JianghaiOldCitySceneLoadResult? _jianghaiOldCityScene;
+    private bool _diagnosticSceneLoadFallbackAllowed;
+    private string? _jianghaiOldCitySceneLoadError;
     private readonly OldTownLandmarksBuilder _oldTownLandmarksBuilder = new();
-    private readonly HashSet<string> _refineryModelScenes = new();
+    private readonly JianghaiOldCitySceneLoader _jianghaiOldCitySceneLoader = new(
+        JianghaiOldCitySceneLoader.DefaultScenePath);
+    private readonly JianghaiOldCityAtmosphere _jianghaiOldCityAtmosphere = new();
     private readonly HashSet<string> _oldTownDistricts = new();
 
     private bool IsBlackwaterRefineryMap
@@ -24,25 +28,28 @@ public partial class FreightTerminalWorld
     {
         _levelRoot = new Node3D { Name = "SaintMaraisOldTown" };
         AddChild(_levelRoot);
+        try
+        {
+            _jianghaiOldCityScene = _jianghaiOldCitySceneLoader.LoadOnce(_levelRoot);
+        }
+        catch (Exception exception) when (_diagnosticSceneLoadFallbackAllowed)
+        {
+            _jianghaiOldCitySceneLoadError = exception.Message;
+            GD.PrintErr($"REFINERY_AUTHORED_SCENE_ERROR {_jianghaiOldCitySceneLoadError}");
+        }
 
-        var asphalt = GroundMaterial("asphalt", new Color(0.34f, 0.37f, 0.38f), 0.91f);
         var concrete = GroundMaterial("concrete", new Color(0.57f, 0.58f, 0.54f), 0.86f);
-        var oldStone = Mat("old_town_stone", new Color(0.22f, 0.235f, 0.22f), 0.04f, 0.94f);
         var iron = Mat("old_town_iron", new Color(0.075f, 0.09f, 0.085f), 0.72f, 0.38f);
-        var lamp = Mat(
-            "old_town_lamp",
-            new Color(0.72f, 0.6f, 0.34f),
-            0.18f,
-            0.35f,
-            new Color(1.0f, 0.65f, 0.28f));
         var yellow = Mat("old_town_warning", new Color(0.78f, 0.52f, 0.07f), 0.16f, 0.58f);
         var white = Mat("old_town_marking", new Color(0.76f, 0.77f, 0.72f), 0.02f, 0.8f);
 
-        StaticBox("OldTownGround", new Vector3(0, -0.55f, MapCenterZ), new Vector3(MapWidthMeters, 1, MapDepthMeters), asphalt);
-        _levelRoot.AddChild(OceanBackdropFactory.Create(new Vector3(0, -0.18f, MapCenterZ)));
-        BuildOldTownPerimeter(oldStone);
+        AddInvisibleCollisionBox(
+            "OldTownGround",
+            new Vector3(0, -0.55f, MapCenterZ),
+            new Vector3(MapWidthMeters, 1, MapDepthMeters));
+        BuildOldTownPerimeter();
         BuildRefineryModelAssembly();
-        _oldTownLandmarks = _oldTownLandmarksBuilder.Build(_levelRoot);
+        _oldTownLandmarks = _oldTownLandmarksBuilder.BuildGameplayScaffolding(_levelRoot);
         BuildOldTownLandmarkDoors(_levelRoot, _oldTownLandmarks);
         if (_oldTownLandmarks.RooftopRoute.Count >= 2)
         {
@@ -53,100 +60,96 @@ public partial class FreightTerminalWorld
                 _oldTownLandmarks.RooftopRoute,
                 costMultiplier: 1.08f);
         }
-        BuildOldTownLighting(iron, lamp);
-        BuildOldTownSigns();
+        BuildOldTownLighting();
         BuildRefineryMissionTerminals();
         BuildExtraction(concrete, iron, yellow, white);
+        HideLegacyExtractionArt();
         SpawnDriveableVehicle(
             new Vector3(-0.5f, 0, 72.0f),
-            "OLD TOWN RESPONSE TRUCK",
+            "JIANGHAI RESPONSE TRUCK",
             new Color(0.18f, 0.27f, 0.24f),
             yaw: 0.0f,
             maxHealth: 190.0f);
         _extractionMarker.Visible = true;
     }
 
-    private void BuildOldTownPerimeter(Godot.Material stone)
+    private void BuildOldTownPerimeter()
     {
         var north = MapCenterZ - MapDepthMeters * 0.5f;
         var south = MapCenterZ + MapDepthMeters * 0.5f;
         var side = MapWidthMeters * 0.5f;
-        StaticBox("OldTownNorthBoundary", new Vector3(0, 1.8f, north), new Vector3(MapWidthMeters, 4.2f, 1.0f), stone);
-        StaticBox("OldTownWestBoundary", new Vector3(-side, 1.8f, MapCenterZ), new Vector3(1.0f, 4.2f, MapDepthMeters), stone);
-        StaticBox("OldTownEastBoundary", new Vector3(side, 1.8f, MapCenterZ), new Vector3(1.0f, 4.2f, MapDepthMeters), stone);
-        StaticBox("OldTownSouthBoundaryWest", new Vector3(-90, 1.8f, south), new Vector3(160, 4.2f, 1.0f), stone);
-        StaticBox("OldTownSouthBoundaryEast", new Vector3(90, 1.8f, south), new Vector3(160, 4.2f, 1.0f), stone);
+        AddInvisibleCollisionBox(
+            "OldTownNorthBoundary",
+            new Vector3(0, 1.8f, north),
+            new Vector3(MapWidthMeters, 4.2f, 1.0f));
+        AddInvisibleCollisionBox(
+            "OldTownWestBoundary",
+            new Vector3(-side, 1.8f, MapCenterZ),
+            new Vector3(1.0f, 4.2f, MapDepthMeters));
+        AddInvisibleCollisionBox(
+            "OldTownEastBoundary",
+            new Vector3(side, 1.8f, MapCenterZ),
+            new Vector3(1.0f, 4.2f, MapDepthMeters));
+        AddInvisibleCollisionBox(
+            "OldTownSouthBoundaryWest",
+            new Vector3(-90, 1.8f, south),
+            new Vector3(160, 4.2f, 1.0f));
+        AddInvisibleCollisionBox(
+            "OldTownSouthBoundaryEast",
+            new Vector3(90, 1.8f, south),
+            new Vector3(160, 4.2f, 1.0f));
     }
 
     private void BuildRefineryModelAssembly()
     {
-        _refineryAuthoredModelCount = 0;
         _refineryCollisionProxyCount = 0;
-        _refineryTallSceneCount = 0;
         _refineryDoors.Clear();
-        _refineryModelScenes.Clear();
         _oldTownDistricts.Clear();
 
         foreach (var placement in RefineryLayout.Models)
         {
-            var modelRoot = placement.HasCollision
-                ? ModelProp(
-                    placement.ScenePath,
-                    placement.Position,
-                    placement.Yaw,
-                    placement.Scale,
-                    placement.CollisionSize,
-                    placement.CollisionOffset,
-                    placement.VisibilityRange,
-                    placement.CastShadow)
-                : AddOldTownVisualModel(placement);
-            OldTownLandmarksBuilder.ConfigureImportedModel(
-                modelRoot,
-                placement.VisibilityRange,
-                placement.CastShadow);
-            modelRoot.Name = placement.Name;
-            modelRoot.AddToGroup("refinery_authored_model");
-            modelRoot.AddToGroup("old_town_authored_model");
             if (placement.HasCollision)
             {
-                modelRoot.AddToGroup("old_town_collision_proxy");
+                AddRefineryCollisionScaffold(placement);
                 _refineryCollisionProxyCount++;
             }
-            if (placement.IsTallScene)
-            {
-                modelRoot.AddToGroup("refinery_tall_scene");
-                _refineryTallSceneCount++;
-            }
-            _refineryAuthoredModelCount++;
-            _refineryModelScenes.Add(placement.ScenePath);
             _oldTownDistricts.Add(placement.District);
         }
     }
 
-    private Node3D AddOldTownVisualModel(RefineryModelPlacement placement)
+    private void AddRefineryCollisionScaffold(RefineryModelPlacement placement)
     {
-        var root = new Node3D
+        var body = new StaticBody3D
         {
             Name = placement.Name,
             Position = placement.Position,
-            Rotation = new Vector3(0, placement.Yaw, 0)
+            Rotation = new Vector3(0, placement.Yaw, 0),
+            CollisionLayer = 1,
+            CollisionMask = 0
         };
-        if (!_modelScenes.TryGetValue(placement.ScenePath, out var scene))
+        body.AddToGroup("refinery_legacy_collision_proxy");
+        var scaledSize = placement.CollisionSize * placement.Scale;
+        var scaledOffset = placement.CollisionOffset * placement.Scale;
+        foreach (var collision in _authoredBuildingCollisionPlanner.Plan(
+                     scaledSize,
+                     scaledOffset,
+                     hasDoorway: false))
         {
-            scene = GD.Load<PackedScene>(placement.ScenePath);
-            if (scene is not null)
+            if (collision.Size.X <= 0.01f
+                || collision.Size.Y <= 0.01f
+                || collision.Size.Z <= 0.01f)
             {
-                _modelScenes[placement.ScenePath] = scene;
+                continue;
             }
+
+            body.AddChild(new CollisionShape3D
+            {
+                Name = collision.Name,
+                Position = collision.Position,
+                Shape = new BoxShape3D { Size = collision.Size }
+            });
         }
-        if (scene?.Instantiate() is Node3D model)
-        {
-            model.Scale = Vector3.One * placement.Scale;
-            ConfigureAuthoredMapModel(model, placement.VisibilityRange, placement.CastShadow);
-            root.AddChild(model);
-        }
-        _levelRoot.AddChild(root);
-        return root;
+        _levelRoot.AddChild(body);
     }
 
     private void BuildRefineryMissionTerminals()
@@ -155,88 +158,160 @@ public partial class FreightTerminalWorld
             "GrandHotelSecurityTerminal",
             RefineryLayout.RelayTerminal,
             Mathf.Pi,
-            relay: true);
+            relay: true,
+            authoredCollisionSize: new Vector3(0.86f, 2.05f, 0.84f));
         BuildObjectiveTerminal(
             "MunicipalTreasuryManifestTerminal",
             RefineryLayout.ManifestTerminal,
             0.0f,
-            relay: false);
+            relay: false,
+            authoredCollisionSize: new Vector3(0.86f, 2.05f, 0.84f));
+        HideLegacyScaffoldVisuals(_levelRoot.GetNode<Node3D>("GrandHotelSecurityTerminal"));
+        HideLegacyScaffoldVisuals(_levelRoot.GetNode<Node3D>("MunicipalTreasuryManifestTerminal"));
     }
 
-    private void BuildOldTownLighting(Godot.Material iron, Godot.Material lamp)
+    private void BuildOldTownLighting()
     {
         var positions = new[]
         {
-            new Vector3(-112, 0, 62), new Vector3(112, 0, 62),
-            new Vector3(-28, 0, 38), new Vector3(28, 0, 38),
-            new Vector3(-28, 0, -36), new Vector3(28, 0, -36),
-            new Vector3(-108, 0, -88), new Vector3(108, 0, -88),
-            new Vector3(-95, 0, -101), new Vector3(95, 0, -19),
-            new Vector3(-28, 0, -144), new Vector3(28, 0, -144)
+            new Vector3(-13.5f, 0, 78.0f), new Vector3(13.5f, 0, 52.0f),
+            new Vector3(-13.5f, 0, 22.0f), new Vector3(13.5f, 0, -9.0f),
+            new Vector3(-15.0f, 0, -46.0f), new Vector3(15.0f, 0, -74.0f),
+            new Vector3(-13.5f, 0, -112.0f), new Vector3(13.5f, 0, -151.0f),
+            new Vector3(-13.5f, 0, -190.0f), new Vector3(-73.0f, 0, -99.0f),
+            new Vector3(73.0f, 0, -20.0f)
         };
         for (var index = 0; index < positions.Length; index++)
         {
             var position = positions[index];
-            StaticCylinder("OldTownLampPost", position + Vector3.Up * 3.6f, 0.075f, 7.2f, iron);
-            var fixture = MeshBox(
-                _levelRoot,
-                position + new Vector3(0, 7.05f, 0),
-                new Vector3(0.52f, 0.24f, 0.52f),
-                lamp);
-            fixture.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
             _levelRoot.AddChild(new OmniLight3D
             {
                 Name = $"OldTownLamp_{index + 1:00}",
-                Position = position + new Vector3(0, 6.75f, 0),
+                Position = position + new Vector3(0.65f, 4.3f, 0),
                 LightColor = new Color(1.0f, 0.67f, 0.36f),
-                LightEnergy = 2.2f,
-                OmniRange = 17.0f,
+                LightEnergy = 2.0f,
+                OmniRange = 14.0f,
+                ShadowEnabled = false
+            });
+        }
+
+        var landmarkAccents = new[]
+        {
+            ("PawnshopCourt", new Vector3(-86.0f, 5.0f, -119.0f), new Color(1.0f, 0.28f, 0.09f), 4.8f, 15.0f),
+            ("PawnshopGate", new Vector3(-86.0f, 3.8f, -109.0f), new Color(1.0f, 0.48f, 0.18f), 3.8f, 11.0f),
+            ("FactoryLoading", new Vector3(86.0f, 5.2f, -2.0f), new Color(1.0f, 0.32f, 0.10f), 4.6f, 16.0f),
+            ("MarketWest", new Vector3(-13.0f, 6.2f, -126.0f), new Color(1.0f, 0.35f, 0.10f), 3.6f, 11.0f),
+            ("MarketEast", new Vector3(13.0f, 6.2f, -126.0f), new Color(1.0f, 0.35f, 0.10f), 3.6f, 11.0f)
+        };
+        foreach (var accent in landmarkAccents)
+        {
+            _levelRoot.AddChild(new OmniLight3D
+            {
+                Name = $"OldTownAccent_{accent.Item1}",
+                Position = accent.Item2,
+                LightColor = accent.Item3,
+                LightEnergy = accent.Item4,
+                OmniRange = accent.Item5,
                 ShadowEnabled = false
             });
         }
     }
 
-    private void BuildOldTownSigns()
+    private void ApplyJianghaiOldCityAtmosphere(DeploymentTimeOfDay timeOfDay)
     {
-        AddRefinerySign(
-            "OldTownTitle",
-            new Vector3(0, 7.0f, 84),
-            "SAINT MARAIS OLD TOWN  //  OT-02",
-            0.0f,
-            new Color(1.0f, 0.72f, 0.3f));
-        AddRefinerySign(
-            "HotelDistrictSign",
-            new Vector3(-86, 5.7f, -96),
-            "GRAND HOTEL  //  HIGH VALUE",
-            0.0f,
-            new Color(0.95f, 0.48f, 0.25f));
-        AddRefinerySign(
-            "TreasuryDistrictSign",
-            new Vector3(86, 5.7f, -24),
-            "MUNICIPAL TREASURY  //  HIGH VALUE",
-            Mathf.Pi,
-            new Color(0.95f, 0.48f, 0.25f));
-        AddRefinerySign(
-            "MarketDistrictSign",
-            new Vector3(0, 6.3f, -109),
-            "NORTH MARKET  //  ROOFTOP ROUTE",
-            0.0f,
-            new Color(0.42f, 0.88f, 1.0f));
+        _jianghaiOldCityAtmosphere.Apply(
+            IsBlackwaterRefineryMap,
+            timeOfDay,
+            _qualitySetting,
+            _environmentRef,
+            _sunLight,
+            _fillLight);
     }
 
-    private void AddRefinerySign(string name, Vector3 position, string text, float yaw, Color color)
+    private StaticBody3D AddInvisibleCollisionBox(
+        string name,
+        Vector3 position,
+        Vector3 size,
+        Vector3 rotation = default)
     {
-        _levelRoot.AddChild(new Label3D
+        var body = new StaticBody3D
         {
             Name = name,
             Position = position,
-            Rotation = new Vector3(0, yaw, 0),
-            Text = text,
-            FontSize = 42,
-            Modulate = color,
-            OutlineSize = 8,
-            VisibilityRangeEnd = 170.0f
+            Rotation = rotation,
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        body.AddChild(new CollisionShape3D
+        {
+            Name = "Collision",
+            Shape = new BoxShape3D { Size = size }
         });
+        _levelRoot.AddChild(body);
+        return body;
+    }
+
+    private void HideLegacyExtractionArt()
+    {
+        var site = _levelRoot.GetNode<Node3D>("ExtractionSite");
+        var children = site.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
+        {
+            if (child is not Node childNode
+                || childNode == _extractionArea
+                || childNode == _extractionMarker)
+            {
+                continue;
+            }
+
+            HideLegacyScaffoldVisuals(childNode);
+        }
+    }
+
+    private static void HideLegacyScaffoldVisuals(Node root)
+    {
+        root.AddToGroup("refinery_legacy_visual_scaffold");
+        HideGeometryRecursive(root);
+    }
+
+    private static void RetainLegacyLandmarkCollisionOnly(Node3D root)
+    {
+        root.AddToGroup("refinery_legacy_visual_scaffold");
+        var children = root.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
+        {
+            if (child is not Node childNode || childNode is CollisionObject3D)
+            {
+                continue;
+            }
+
+            HideGeometryRecursive(childNode);
+            childNode.QueueFree();
+        }
+    }
+
+    private static void HideGeometryRecursive(Node node)
+    {
+        if (node is GeometryInstance3D geometry)
+        {
+            geometry.Visible = false;
+        }
+        else if (node is Light3D light)
+        {
+            light.Visible = false;
+        }
+
+        var children = node.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
+        {
+            if (child is Node childNode)
+            {
+                HideGeometryRecursive(childNode);
+            }
+        }
     }
 
     private void ResumePendingExtractionDeployment()

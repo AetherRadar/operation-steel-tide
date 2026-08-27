@@ -260,6 +260,7 @@ public partial class FreightTerminalWorld
                 SetIfSupported(_environmentRef, "adjustment_saturation", 1.12f);
                 SetIfSupported(_environmentRef, "volumetric_fog_density", 0.0032f);
             }
+            ApplyJianghaiOldCityAtmosphere(timeOfDay);
             if (_nvgActive)
             {
                 ApplyNightVisionOverride();
@@ -737,8 +738,14 @@ void sky() {
         BuildObjectiveTerminal("ManifestTerminal", new Vector3(-31, 0, -7), -Mathf.Pi / 2, false);
     }
 
-    private void BuildObjectiveTerminal(string nodeName, Vector3 position, float yaw, bool relay)
+    private void BuildObjectiveTerminal(
+        string nodeName,
+        Vector3 position,
+        float yaw,
+        bool relay,
+        Vector3? authoredCollisionSize = null)
     {
+        var collisionSize = authoredCollisionSize ?? new Vector3(0.82f, 1.0f, 0.42f);
         var terminal = new Node3D
         {
             Name = nodeName,
@@ -751,11 +758,11 @@ void sky() {
         MeshBox(terminal, new Vector3(0, 0.5f, 0), new Vector3(0.82f, 1, 0.42f), shell);
         var body = new StaticBody3D
         {
-            Position = new Vector3(0, 0.5f, 0),
+            Position = new Vector3(0, collisionSize.Y * 0.5f, 0),
             CollisionLayer = 1,
             CollisionMask = 0
         };
-        body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(0.82f, 1, 0.42f) } });
+        body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = collisionSize } });
         terminal.AddChild(body);
         MeshBox(terminal, new Vector3(0, 1.05f, -0.08f), new Vector3(0.96f, 0.16f, 0.48f), trim);
         var screen = new StandardMaterial3D

@@ -415,6 +415,7 @@ public partial class FreightTerminalWorld
 
     private void ApplyNetworkObjectiveVisuals(int completedCount)
     {
+        _jianghaiOldCitySceneLoader.ApplyTerminalStatuses(completedCount);
         for (var index = 0; index < _objectiveScreens.Count; index++)
         {
             if (index >= completedCount)

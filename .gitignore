@@ -4,6 +4,7 @@
 **/obj/
 
 *.import
+*.blend1
 *.log
 *.pid
 *.pdb
@@ -30,3 +31,12 @@ __pycache__/
 /validation_frame.png
 /roof_access_*.png
 /tideglass_reactor_*.png
+
+# The Godot glTF importer may extract temporary copies of images embedded in the
+# authored Jianghai GLB. The runtime model remains self-contained.
+/assets/models/jianghai_old_city/jianghai_old_city_*.jpg
+/assets/models/jianghai_old_city/jianghai_old_city_*.png
+/assets/models/jianghai_old_city/jianghai_old_city_*.webp
+/assets/models/jianghai_old_city/rollershutter_window_03_*.jpg
+/assets/models/jianghai_old_city/rollershutter_window_03_*.png
+/assets/models/jianghai_old_city/rollershutter_window_03_*.webp
