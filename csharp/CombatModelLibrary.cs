@@ -329,17 +329,26 @@ internal sealed class AuthoredOperatorVisual
     public void SetFactionAppearance(Color patchColor, Color gearTint)
     {
         SetTeamColor(patchColor);
-        GearTintForDiagnostics = gearTint;
+        var preserveOperatorMaterials = CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId);
+        var appliedGearTint = preserveOperatorMaterials
+            ? new Color(gearTint.R, gearTint.G, gearTint.B, Mathf.Min(gearTint.A, 0.16f))
+            : gearTint;
+        GearTintForDiagnostics = appliedGearTint;
         GearOverlayCountForDiagnostics = 0;
         var gearOverlay = new StandardMaterial3D
         {
-            AlbedoColor = gearTint,
+            AlbedoColor = appliedGearTint,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             Metallic = 0.08f,
             Roughness = 0.72f
         };
         foreach (var mesh in CombatModelLibrary.MeshesBelow(Root))
         {
+            if (preserveOperatorMaterials && mesh.Name == "OperatorHead")
+            {
+                mesh.MaterialOverlay = null;
+                continue;
+            }
             mesh.MaterialOverlay = gearOverlay;
             GearOverlayCountForDiagnostics += Mathf.Max(1, mesh.Mesh?.GetSurfaceCount() ?? 0);
         }
@@ -377,7 +386,9 @@ internal readonly record struct CombatModelInspection(
     bool RequiredNodes,
     int MeshCount,
     int MaterialCount,
-    Vector3 Size);
+    Vector3 Size,
+    int VertexCount = 0,
+    int TriangleCount = 0);
 
 internal static partial class CombatModelLibrary
 {
@@ -806,16 +817,19 @@ internal static partial class CombatModelLibrary
         Node3D? root = null;
         try
         {
-            root = InstantiateOperator(visualId).Root;
+            root = InstantiateOperator(visualId, attachDefaultWeapon: false).Root;
             var size = !UsesQuaterniusOperatorRig(visualId)
                 ? PreviewOperatorSourceSize * (AnimatedOperatorHeight / PreviewOperatorSourceSize.Y)
                 : ComputeBounds(root).Size;
+            var geometry = CountOperatorGeometry(root);
             return new CombatModelInspection(
                 true,
                 true,
                 MeshesBelow(root).Count(),
                 CountMaterials(root),
-                size);
+                size,
+                geometry.VertexCount,
+                geometry.TriangleCount);
         }
         catch
         {
@@ -839,12 +853,15 @@ internal static partial class CombatModelLibrary
             var size = !UsesQuaterniusOperatorRig(visualId)
                 ? PreviewOperatorSourceSize * (OperatorPreviewHeight / PreviewOperatorSourceSize.Y)
                 : ComputeBounds(root).Size;
+            var geometry = CountOperatorGeometry(root);
             return new CombatModelInspection(
                 true,
                 true,
                 MeshesBelow(root).Count(),
                 CountMaterials(root),
-                size);
+                size,
+                geometry.VertexCount,
+                geometry.TriangleCount);
         }
         catch
         {
@@ -1046,6 +1063,46 @@ internal static partial class CombatModelLibrary
         return meshCount == 0
             ? (0, Vector3.Zero, Vector3.Zero)
             : (meshCount, maximum - minimum, (minimum + maximum) * 0.5f);
+    }
+
+    private static (int VertexCount, int TriangleCount) CountOperatorGeometry(Node3D root)
+    {
+        var characterMeshes = new[]
+        {
+            "OperatorBody", "OperatorFeet", "OperatorHead", "OperatorLegs"
+        }
+            .Select(name => FindNode(root, name))
+            .OfType<MeshInstance3D>()
+            .ToArray();
+        return CountGeometry(characterMeshes.Length == 4
+            ? characterMeshes
+            : MeshesBelow(root));
+    }
+
+    private static (int VertexCount, int TriangleCount) CountGeometry(
+        IEnumerable<MeshInstance3D> meshInstances)
+    {
+        var vertexCount = 0;
+        var triangleCount = 0;
+        foreach (var meshInstance in meshInstances)
+        {
+            if (meshInstance.Mesh is not ArrayMesh mesh)
+            {
+                continue;
+            }
+            for (var surface = 0; surface < mesh.GetSurfaceCount(); surface++)
+            {
+                if (mesh.SurfaceGetPrimitiveType(surface) != Mesh.PrimitiveType.Triangles)
+                {
+                    continue;
+                }
+                var vertices = mesh.SurfaceGetArrayLen(surface);
+                var indices = mesh.SurfaceGetArrayIndexLen(surface);
+                vertexCount += vertices;
+                triangleCount += (indices > 0 ? indices : vertices) / 3;
+            }
+        }
+        return (vertexCount, triangleCount);
     }
 
     private static void AccumulateBounds(

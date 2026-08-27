@@ -98,6 +98,8 @@ public partial class FreightTerminalWorld
                 && inspection.RequiredNodes
                 && inspection.MeshCount >= 4
                 && inspection.MaterialCount >= 4
+                && inspection.VertexCount >= 20_000
+                && inspection.TriangleCount is >= 40_000 and <= 105_000
                 && inspection.Size.Y > 0.5f
                 && animationCount >= 25
                 && transitions.SequenceEqual(new[]
@@ -111,6 +113,7 @@ public partial class FreightTerminalWorld
             rosterModelsReady &= modelReady;
             visualReports.Add(
                 $"{role}:{visualId}:ok={modelReady}:meshes={inspection.MeshCount}:materials={inspection.MaterialCount}:"
+                + $"vertices={inspection.VertexCount}:triangles={inspection.TriangleCount}:"
                 + $"animations={animationCount}:preview={previewIdle}/{previewWeapon}:"
                 + $"fit={string.Join(',', movementFits)}");
         }
@@ -270,7 +273,7 @@ public partial class FreightTerminalWorld
 
             var footer = new Label
             {
-                Text = $"VISUAL  {spec.VisualId}  //  AUTHORED CC0",
+                Text = $"VISUAL  {spec.VisualId}  //  HIGH-DETAIL AUTHORED CC0",
                 Position = new Vector2(14.0f, 892.0f),
                 Size = new Vector2(330.0f, 25.0f),
                 HorizontalAlignment = HorizontalAlignment.Center

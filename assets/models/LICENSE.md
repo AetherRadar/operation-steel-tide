@@ -70,9 +70,15 @@ CC0 1.0 Universal:
 - Editable source: `source_art/third_party/quaternius_modular_women/`
 
 Five different authored presets supply distinct heads, clothing, equipment
-silhouettes, and materials for the complete extraction roster. Their 25 runtime
-actions are retargeted from the CC0 Quaternius Universal Animation Library.
-Attribution is not required; creator credit is retained as a courtesy.
+silhouettes, and materials for the complete extraction roster. The runtime
+files remain derived from those same five Quaternius presets; they are refined
+in Blender through selective subdivision, shape-preserving creases, smooth
+shading, role-aware scalar PBR material parameters, and four-influence
+normalized skinning before re-export. This adaptation adds no image textures
+or new UV artwork and preserves the shared node, equipment-socket, and
+25-action animation contract. The actions are retargeted from the CC0
+Quaternius Universal Animation Library. Attribution is not required; creator
+credit is retained as a courtesy.
 
 The Ultimate Guns Pack is distributed by Quaternius under CC0 1.0 Universal:
 

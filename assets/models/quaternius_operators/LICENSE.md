@@ -20,18 +20,28 @@ identifies this character pack as CC0.
 
 | Runtime file | Operator | Authored source preset | DCC adaptation |
 | --- | --- | --- | --- |
-| `viper.glb` | VIPER / Assault | `Soldier.blend` | Orange/charcoal assault palette |
-| `heron.glb` | HERON / Medic | `Worker.blend` | Teal/white rescue-medic palette |
-| `lynx.glb` | LYNX / Recon | `SciFi.blend` | Cyan/navy sensor-operator palette |
-| `magpie.glb` | MAGPIE / Scavenger | `Adventurer.blend` | Ochre/olive expedition palette |
-| `jackal.glb` | JACKAL / Locksmith | `Punk.blend` | Violet/black infiltration palette |
+| `viper.glb` | VIPER / Assault | `Soldier.blend` | Refined existing mesh; orange/charcoal assault palette |
+| `heron.glb` | HERON / Medic | `Worker.blend` | Refined existing mesh; teal/white rescue-medic palette |
+| `lynx.glb` | LYNX / Recon | `SciFi.blend` | Refined existing mesh; cyan/navy sensor-operator palette |
+| `magpie.glb` | MAGPIE / Scavenger | `Adventurer.blend` | Refined existing mesh; ochre/olive expedition palette |
+| `jackal.glb` | JACKAL / Locksmith | `Punk.blend` | Refined existing mesh; violet/black infiltration palette |
 
 Each preset contributes its own authored head, body, legs, feet, hair or
-headgear, clothing silhouette, and materials. The Blender build applies the
-role palette, normalizes the shared humanoid rig, adds runtime equipment
-sockets, and retargets 25 actions from the separately recorded CC0 Quaternius
-Universal Animation Library. No code-generated primitive geometry is used for
-these character visuals.
+headgear, clothing silhouette, and materials. These are refinements of the
+same five Quaternius models, not replacements sourced from another character
+pack. The reproducible Blender build increases surface density with selective
+per-mesh subdivision, adds shape-preserving edge creases and smooth shading,
+and configures role-aware Principled PBR values for skin, hair, fabric, armor,
+polymer, metal, and leather. No image textures or newly authored UV artwork are
+introduced by this adaptation.
+
+After subdivision, the build keeps the strongest four deform-bone influences
+per vertex and normalizes those weights before export; non-deforming selection
+and control groups are deliberately excluded. It retains the runtime root, rig, four
+character mesh nodes, equipment sockets, and 25-action animation contract while
+normalizing the shared humanoid rig and retargeting the separately recorded CC0
+Quaternius Universal Animation Library actions. No code-generated primitive
+geometry is used for these character visuals.
 
 Editable source files and the supplied license evidence are retained in
 `source_art/third_party/quaternius_modular_women/`. Rebuild all five GLBs with:

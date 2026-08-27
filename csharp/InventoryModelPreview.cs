@@ -25,6 +25,7 @@ public partial class InventoryModelPreview : SubViewportContainer
     private Node3D? _modelRoot;
     private Camera3D? _camera;
     private int _renderRevision;
+    private static Sky? _operatorSky;
 
     public void Configure(
         InventoryPreviewKind kind,
@@ -51,23 +52,22 @@ public partial class InventoryModelPreview : SubViewportContainer
     {
         MouseFilter = MouseFilterEnum.Ignore;
         Stretch = true;
+        var operatorPreview = _kind == InventoryPreviewKind.Operator;
+        var constrainedRenderer = RenderingServer.GetCurrentRenderingMethod() != "forward_plus";
         _viewport = new SubViewport
         {
             TransparentBg = true,
             OwnWorld3D = true,
+            Msaa3D = operatorPreview
+                ? constrainedRenderer ? Viewport.Msaa.Msaa2X : Viewport.Msaa.Msaa4X
+                : Viewport.Msaa.Disabled,
             RenderTargetUpdateMode = SubViewport.UpdateMode.Always
         };
         AddChild(_viewport);
 
-        var environment = new Godot.Environment
-        {
-            BackgroundMode = Godot.Environment.BGMode.Color,
-            BackgroundColor = new Color(0, 0, 0, 0),
-            AmbientLightSource = Godot.Environment.AmbientSource.Color,
-            AmbientLightColor = new Color(0.58f, 0.68f, 0.65f),
-            AmbientLightEnergy = 1.15f,
-            ReflectedLightSource = Godot.Environment.ReflectionSource.Disabled
-        };
+        var environment = operatorPreview
+            ? BuildOperatorEnvironment(constrainedRenderer)
+            : BuildCompactEnvironment();
         _viewport.AddChild(new WorldEnvironment { Environment = environment });
         _modelRoot = new Node3D();
         _viewport.AddChild(_modelRoot);
@@ -83,21 +83,79 @@ public partial class InventoryModelPreview : SubViewportContainer
         _camera.LookAt(Vector3.Zero, Vector3.Up);
         var keyLight = new DirectionalLight3D
         {
-            LightColor = new Color(0.9f, 0.98f, 0.95f),
-            LightEnergy = 1.8f,
-            RotationDegrees = new Vector3(-34, -28, 0),
-            ShadowEnabled = false
+            LightColor = new Color(1.0f, 0.93f, 0.84f),
+            LightEnergy = operatorPreview ? 2.15f : 1.8f,
+            RotationDegrees = new Vector3(-38, -34, -5),
+            ShadowEnabled = operatorPreview && !constrainedRenderer
         };
         _viewport.AddChild(keyLight);
         _viewport.AddChild(new OmniLight3D
         {
-            Position = new Vector3(-1.5f, -0.3f, 2.0f),
-            LightColor = new Color(0.3f, 0.7f, 1.0f),
-            LightEnergy = 1.6f,
+            Position = new Vector3(-1.8f, 0.35f, 2.4f),
+            LightColor = new Color(0.38f, 0.68f, 1.0f),
+            LightEnergy = operatorPreview ? 0.72f : 1.05f,
             OmniRange = 5.0f
         });
+        if (operatorPreview)
+        {
+            _viewport.AddChild(new DirectionalLight3D
+            {
+                LightColor = new Color(0.46f, 0.92f, 0.82f),
+                LightEnergy = 1.1f,
+                RotationDegrees = new Vector3(18, 148, 7),
+                ShadowEnabled = false
+            });
+        }
         RebuildModel();
     }
+
+    private static Godot.Environment BuildOperatorEnvironment(bool constrainedRenderer)
+    {
+        _operatorSky ??= new Sky
+        {
+            SkyMaterial = new ProceduralSkyMaterial
+            {
+                SkyTopColor = new Color(0.12f, 0.18f, 0.24f),
+                SkyHorizonColor = new Color(0.42f, 0.54f, 0.57f),
+                GroundBottomColor = new Color(0.025f, 0.035f, 0.04f),
+                GroundHorizonColor = new Color(0.16f, 0.21f, 0.22f),
+                SkyEnergyMultiplier = 0.62f,
+                GroundEnergyMultiplier = 0.38f
+            }
+        };
+        return new Godot.Environment
+        {
+            BackgroundMode = Godot.Environment.BGMode.Color,
+            BackgroundColor = new Color(0, 0, 0, 0),
+            Sky = _operatorSky,
+            AmbientLightSource = Godot.Environment.AmbientSource.Sky,
+            AmbientLightColor = new Color(0.34f, 0.42f, 0.44f),
+            AmbientLightSkyContribution = 0.72f,
+            AmbientLightEnergy = 0.62f,
+            ReflectedLightSource = Godot.Environment.ReflectionSource.Sky,
+            TonemapMode = Godot.Environment.ToneMapper.Aces,
+            TonemapExposure = 0.92f,
+            TonemapWhite = constrainedRenderer ? 1.8f : 4.0f,
+            SsaoEnabled = !constrainedRenderer,
+            SsaoRadius = 0.32f,
+            SsaoIntensity = 1.2f,
+            SsaoPower = 1.35f
+        };
+    }
+
+    private static Godot.Environment BuildCompactEnvironment()
+        => new()
+        {
+            BackgroundMode = Godot.Environment.BGMode.Color,
+            BackgroundColor = new Color(0, 0, 0, 0),
+            AmbientLightSource = Godot.Environment.AmbientSource.Color,
+            AmbientLightColor = new Color(0.58f, 0.68f, 0.65f),
+            AmbientLightEnergy = 1.05f,
+            ReflectedLightSource = Godot.Environment.ReflectionSource.Disabled,
+            TonemapMode = Godot.Environment.ToneMapper.Aces,
+            TonemapExposure = 0.92f,
+            TonemapWhite = 1.8f
+        };
 
     private void RebuildModel()
     {
@@ -169,7 +227,8 @@ public partial class InventoryModelPreview : SubViewportContainer
 
     private async void FreezeRenderAfterWarmup(int revision)
     {
-        await ToSignal(GetTree().CreateTimer(0.16f), SceneTreeTimer.SignalName.Timeout);
+        var warmupSeconds = _kind == InventoryPreviewKind.Operator ? 0.28f : 0.12f;
+        await ToSignal(GetTree().CreateTimer(warmupSeconds), SceneTreeTimer.SignalName.Timeout);
         if (revision == _renderRevision && IsInstanceValid(_viewport))
         {
             _viewport!.RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled;
