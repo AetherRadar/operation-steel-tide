@@ -35,6 +35,63 @@ internal sealed class AuthoredFirstPersonSmgVisual
     public float ReloadAnimationDuration
         => (float)AnimationPlayer.GetAnimation(ReloadAnimationName).Length;
 
+    public Vector3 ArmBoundsSizeInRoot()
+    {
+        var minimum = new Vector3(
+            float.PositiveInfinity,
+            float.PositiveInfinity,
+            float.PositiveInfinity);
+        var maximum = new Vector3(
+            float.NegativeInfinity,
+            float.NegativeInfinity,
+            float.NegativeInfinity);
+        var hasBounds = false;
+        AccumulateNodeBounds(Root, Transform3D.Identity, insideArms: false);
+
+        return hasBounds ? maximum - minimum : Vector3.Zero;
+
+        void AccumulateNodeBounds(
+            Node3D node,
+            Transform3D parentTransform,
+            bool insideArms)
+        {
+            var transform = ReferenceEquals(node, Root)
+                ? parentTransform
+                : parentTransform * node.Transform;
+            insideArms |= ReferenceEquals(node, Arms);
+            if (insideArms && node is MeshInstance3D { Mesh: not null } mesh)
+            {
+                var bounds = mesh.Mesh.GetAabb();
+                for (var x = 0; x <= 1; x++)
+                {
+                    for (var y = 0; y <= 1; y++)
+                    {
+                        for (var z = 0; z <= 1; z++)
+                        {
+                            var local = bounds.Position + new Vector3(
+                                bounds.Size.X * x,
+                                bounds.Size.Y * y,
+                                bounds.Size.Z * z);
+                            var point = transform * local;
+                            minimum = minimum.Min(point);
+                            maximum = maximum.Max(point);
+                            hasBounds = true;
+                        }
+                    }
+                }
+            }
+            var children = node.GetChildren();
+            using var childrenBacking = children.AsDisposable();
+            foreach (var child in children)
+            {
+                if (child is Node3D child3D)
+                {
+                    AccumulateNodeBounds(child3D, transform, insideArms);
+                }
+            }
+        }
+    }
+
     public void SyncMechanisms()
     {
         Magazine.Visible = true;
@@ -81,7 +138,8 @@ internal sealed class AuthoredFirstPersonSmgVisual
             true,
             ReloadAnimationDuration,
             supportArmRotation,
-            magazineTravel);
+            magazineTravel,
+            ArmBoundsSizeInRoot());
     }
 }
 
@@ -123,7 +181,8 @@ internal readonly record struct FirstPersonSmgReloadInspection(
     bool Loaded,
     float Duration,
     float SupportArmRotation,
-    float MagazineTravel);
+    float MagazineTravel,
+    Vector3 ArmBoundsSize);
 
 internal static partial class CombatModelLibrary
 {
@@ -222,7 +281,12 @@ internal static partial class CombatModelLibrary
         }
         catch (Exception)
         {
-            return new FirstPersonSmgReloadInspection(false, 0.0f, 0.0f, 0.0f);
+            return new FirstPersonSmgReloadInspection(
+                false,
+                0.0f,
+                0.0f,
+                0.0f,
+                Vector3.Zero);
         }
         finally
         {

@@ -30,14 +30,8 @@ SOURCE_TO_METERS = 0.015
 SLEEVE_RADIAL_SCALE = 0.78
 SLEEVE_WRIST_OVERLAP = 1.2
 SLEEVE_WRIST_BLEND_LENGTH = 6.0
-SLEEVE_BLEND_LENGTH = 12.0
-# Negative extension pulls the cuffs back toward/behind the first-person camera
-# so the tubes never end inside the visible frame, and the drop pushes them
-# below the bottom edge of the camera frustum across the reload animation.
-# Increased from -60/240 to -120/400 to fully hide cuffs during SMG-45 reload
-# where support arm is extended and viewed at an oblique angle.
-SLEEVE_EXTENSION = -120.0
-SLEEVE_DROP = 400.0
+SLEEVE_SHOULDER_BLEND_LENGTH = 24.0
+SLEEVE_SHOULDER_EXTENSION = 64.0
 FIELD_ROTATION = Matrix.Rotation(math.radians(90.0), 4, "Z")
 WEAPON_MESH_NAMES = (
     "base_smg45_0",
@@ -82,7 +76,7 @@ def import_source(frame: int = SOURCE_IDLE_FRAME) -> None:
 
 
 def extend_authored_sleeves() -> None:
-    """Move the two upper-sleeve cuffs behind the first-person camera."""
+    """Extend each authored sleeve from its shoulder end toward the camera."""
     arms = bpy.data.objects["Object_7"]
     mesh = arms.data
     adjacency: dict[int, set[int]] = {index: set() for index in range(len(mesh.vertices))}
@@ -106,17 +100,28 @@ def extend_authored_sleeves() -> None:
                     stack.append(neighbor)
         components.append(component)
 
+    # The two largest components are the cloth sleeves. Their low-Y ends meet
+    # the gloves; the high-Y ends are the open shoulder cuts visible in a
+    # narrow-FOV view. Earlier revisions accidentally stretched the low-Y wrist
+    # ends, which left the shoulder cuts floating in-frame. Blend the authored
+    # upper-arm surface into a longer continuation instead, without changing
+    # topology, UVs, skin weights, or the reload animation.
     for component in sorted(components, key=len, reverse=True)[:2]:
-        minimum_y = min(mesh.vertices[index].co.y for index in component)
-        blend_end = minimum_y + SLEEVE_BLEND_LENGTH
+        maximum_y = max(mesh.vertices[index].co.y for index in component)
+        blend_start = maximum_y - SLEEVE_SHOULDER_BLEND_LENGTH
         for index in component:
             vertex = mesh.vertices[index]
-            if vertex.co.y >= blend_end:
+            if vertex.co.y <= blend_start:
                 continue
-            normalized = min(1.0, max(0.0, (blend_end - vertex.co.y) / SLEEVE_BLEND_LENGTH))
+            normalized = min(
+                1.0,
+                max(
+                    0.0,
+                    (vertex.co.y - blend_start) / SLEEVE_SHOULDER_BLEND_LENGTH,
+                ),
+            )
             falloff = normalized * normalized * (3.0 - 2.0 * normalized)
-            vertex.co.y -= SLEEVE_EXTENSION * falloff
-            vertex.co.z -= SLEEVE_DROP * falloff
+            vertex.co.y += SLEEVE_SHOULDER_EXTENSION * falloff
     mesh.update()
 
 
@@ -416,6 +421,7 @@ def build_first_person() -> None:
     # Preserve the authored animation and weights while correcting the oversized
     # sleeves and closing the visible glove/cuff gap in the bind mesh.
     refine_authored_sleeves()
+    extend_authored_sleeves()
     root = prepare_first_person_hierarchy()
     base = bpy.data.objects["base"]
     muzzle = bpy.data.objects.new("Muzzle", None)
@@ -501,6 +507,7 @@ def build_field_weapon() -> None:
 def save_editable_source() -> None:
     import_source(SOURCE_IDLE_FRAME)
     refine_authored_sleeves()
+    extend_authored_sleeves()
     SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
 

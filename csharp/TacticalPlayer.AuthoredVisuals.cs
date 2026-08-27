@@ -83,6 +83,21 @@ public partial class TacticalPlayer
             && IsInstanceValid(arms.Root)
             && arms.Root.Visible;
 
+    internal bool SmgReloadPresentationValidForDiagnostics
+        => EquippedWeapon.Platform == WeaponPlatform.M3A1
+            && _isReloading
+            && IsInstanceValid(_authoredFirstPersonSmg?.Root)
+            && _authoredFirstPersonSmg.Root.Visible
+            && _authoredFirstPersonSmg.Arms.Visible
+            && _authoredFirstPersonSmg.WeaponBody.Visible
+            && WeaponViewPositionTarget().DistanceTo(HipWeaponPosition) <= 0.001f
+            && WeaponViewRotationTarget().Length() <= 0.001f;
+
+    internal Vector3 SmgArmBoundsSizeForDiagnostics
+        => IsInstanceValid(_authoredFirstPersonSmg?.Root)
+            ? _authoredFirstPersonSmg.ArmBoundsSizeInRoot()
+            : Vector3.Zero;
+
     internal AuthoredFirstPersonArmsVisual? ActiveAuthoredArmsForDiagnostics
         => ActiveAuthoredArms();
 

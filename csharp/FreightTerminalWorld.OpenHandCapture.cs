@@ -29,8 +29,13 @@ public partial class FreightTerminalWorld
         _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
         await WaitFrames(8);
         SaveViewportImage("res://open_hand_m3a1_validation.png");
+        Input.ActionPress("aim");
+        await WaitFrames(90);
+        SaveViewportImage("res://open_hand_m3a1_ads_validation.png");
+        Input.ActionRelease("aim");
+        await WaitFrames(12);
         _player.SetReloadPoseForDiagnostics(0.46f);
-        await WaitFrames(2);
+        await WaitFrames(4);
         SaveViewportImage("res://open_hand_m3a1_reload_validation.png");
         _player.ClearReloadPoseForDiagnostics();
         platform = WeaponPlatform.P226;

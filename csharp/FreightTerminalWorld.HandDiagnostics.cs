@@ -101,9 +101,29 @@ public partial class FreightTerminalWorld
             catch (Exception e) { results.Add($"{platform}: exception {e.Message}"); continue; }
             results.Add($"{platform}: procArmsVis={procArmsVisible} rightVis={rightHandVisible} leftVis={leftHandVisible} supHandPos={supportHandPos} weaponVis={_player.UsesAuthoredWeaponPlatformForDiagnostics(platform)}");
         }
+        _player.GrantFireablePrimaryForDiagnostics(
+            WeaponCatalog.Build(WeaponPlatform.M3A1, 0));
+        await WaitFrames(8);
+        var reloadPoseSet = _player.SetReloadPoseForDiagnostics(0.46f);
+        await WaitFrames(4);
+        var smgArmBounds = _player.SmgArmBoundsSizeForDiagnostics;
+        // The long axis is Z after Godot's Y-up conversion. In the imported
+        // SMG root scale the original short sleeves measured about 0.021; the
+        // corrected shoulder continuation must exceed 0.030.
+        var smgSleeveReach = smgArmBounds.Z >= 0.03f;
+        var smgReloadPresentation = reloadPoseSet
+            && _player.SmgReloadPresentationValidForDiagnostics;
+        _player.ClearReloadPoseForDiagnostics();
         foreach (var line in results) GD.Print(line);
-        var valid = posesValid && authoredRigValid;
-        GD.Print($"HAND_POSE_CHECK valid={valid} procedural_pose={posesValid} authored_rig={authoredRigValid} samples={results.Count}");
+        var valid = posesValid
+            && authoredRigValid
+            && smgSleeveReach
+            && smgReloadPresentation;
+        GD.Print(
+            $"HAND_POSE_CHECK valid={valid} procedural_pose={posesValid} "
+            + $"authored_rig={authoredRigValid} smg_sleeve_reach={smgSleeveReach} "
+            + $"smg_arm_bounds={smgArmBounds} "
+            + $"smg_reload_presentation={smgReloadPresentation} samples={results.Count}");
         GD.Print($"HAND_POSE_PASS valid={valid}");
         GD.Print($"HAND_DIAGNOSTICS_DONE count={results.Count}");
         GetTree().Quit(valid ? 0 : 2);

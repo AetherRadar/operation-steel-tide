@@ -19,19 +19,23 @@ The runtime models in this directory are adapted from **fps animated smg** by
 - Build scripts: `scripts/blender/build_djmaesen_smg45.py` and
   `scripts/blender/build_first_person_arms.py`
 - Static pose variants generated: 2026-08-24
+- Animated first-person sleeve fit revised: 2026-08-27
 
 Attribution: **"fps animated smg" by DJMaesen, licensed under CC BY 4.0.**
 
 The original GLB embeds the creator, source URL, title, and `CC-BY-4.0`
-license in `asset.extras`. `smg45_first_person.glb` retains the original
-authored arm proportions and two-handed reload action without sleeve extension
-or boundary capping. `first_person_arms.glb` is the older split-arm adaptation,
-and `smg45_weapon.glb` separates the field weapon from the first-person rig. The
+license in `asset.extras`. `smg45_first_person.glb` retains the authored
+materials, skin weights, and two-handed reload action. Its cloth sleeves are
+slimmed at the wrist and their shoulder-side vertices are extended through a
+smooth Blender deformation so the open source-mesh cuts remain below the
+first-person camera at idle, ADS, and throughout reload. The adaptation does
+not add boundary caps or replace the authored topology, UVs, or animation.
+`first_person_arms.glb` is the older split-arm adaptation, and
+`smg45_weapon.glb` separates the field weapon from the first-person rig. The
 three static arm variants are separate Blender-generated evaluations of the
 same authored mesh: a rifle pose, a compact service-pistol two-handed stance,
-and a large-pistol two-handed stance. They intentionally do not apply the
-historical sleeve-extension/capping pass; each exports explicit palm and
-wrist frame markers so runtime code can translate the pose without scaling or
-accumulating rotations on the arm mesh. The original model and all derived
-geometry remain copyright DJMaesen and are not covered by the repository's MIT
-license.
+and a large-pistol two-handed stance. They do not apply the animated SMG sleeve
+extension; each exports explicit palm and wrist frame markers so runtime code
+can translate the pose without accumulating rotations on the arm mesh. The
+original model and all derived geometry remain copyright DJMaesen and are not
+covered by the repository's MIT license.

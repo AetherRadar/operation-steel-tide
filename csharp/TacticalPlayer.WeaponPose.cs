@@ -19,7 +19,12 @@ public partial class TacticalPlayer
             : HipWeaponPosition;
         if (_isReloading)
         {
-            return ReloadWeaponPosition;
+            // SMG-45 already has a complete authored reload clip. Moving the
+            // whole view model to the generic reload mount on top of that clip
+            // lifts and rolls both upper arms into view.
+            return EquippedWeapon.Platform == WeaponPlatform.M3A1
+                ? HipWeaponPosition
+                : ReloadWeaponPosition;
         }
         if (_searchPose > 0.0f)
         {
@@ -64,7 +69,9 @@ public partial class TacticalPlayer
     {
         if (_isReloading)
         {
-            return new Vector3(-0.13f, 0.0f, -0.32f);
+            return EquippedWeapon.Platform == WeaponPlatform.M3A1
+                ? Vector3.Zero
+                : new Vector3(-0.13f, 0.0f, -0.32f);
         }
 
         var searchPitch = _searchPose > 0.0f ? 0.34f : 0.0f;
