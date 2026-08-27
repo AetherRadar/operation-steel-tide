@@ -185,6 +185,7 @@ public partial class FreightTerminalWorld : Node3D
         SpawnLootCases();
         SpawnBuildingGradedLoot();
         SpawnCivilianValuableLoot();
+        SpawnIndustrialInteriorContent();
         SpawnEnemies();
         SpawnHostileOperatorSquads();
         SpawnWorldBoss();
@@ -4879,7 +4880,12 @@ public partial class FreightTerminalWorld : Node3D
         // Two rivals from different teams — must fight each other via raw Engage/FireAtNode.
         var teamA = _hostileSquads.FirstOrDefault(s => s.TeamId == 1);
         var teamB = _hostileSquads.FirstOrDefault(s => s.TeamId == 2);
-        var npc = _enemies.FirstOrDefault(e => IsInstanceValid(e) && !e.IsRivalSquad && !e.IsDead);
+        var npc = _enemies.FirstOrDefault(e =>
+            IsInstanceValid(e)
+            && !e.IsRivalSquad
+            && !e.SentryMode
+            && !e.IsWorldBoss
+            && !e.IsDead);
         var rivalA = teamA?.Members.FirstOrDefault(m => IsInstanceValid(m) && !m.IsDead);
         var rivalB = teamB?.Members.FirstOrDefault(m => IsInstanceValid(m) && !m.IsDead);
         if (rivalA is null || rivalB is null || npc is null)

@@ -254,6 +254,8 @@ Godot_console.exe --path . -- --validate-deployment-ui
 Godot_console.exe --path . -- --validate-refinery-map
 Godot_console.exe --path . -- --capture-refinery-map
 Godot_console.exe --resolution 1600x900 --path . -- --capture-promotion
+Godot_console.exe --path . -- --validate-industrial-interiors
+Godot_console.exe --path . -- --capture-industrial-interiors
 Godot_console.exe --path . -- --validate-residential
 Godot_console.exe --path . -- --validate-performance
 Godot_console.exe --path . -- --validate-residential-gameplay
@@ -290,6 +292,8 @@ Godot_console.exe --headless --path . -- --validate-extraction-network-client
 `--validate-operator-roster` verifies five unique non-garrison player visual IDs, all five authored GLBs, 25-action animation contracts, movement-time rifle fit, role-aware armed previews, random player/AI/rival selection, fixed garrison identity, and the existing Scavenger and Locksmith loot benefits. `--capture-operator-roster` saves a five-column player-camera preview for visual comparison.
 
 `--validate-refinery-map` boots Saint Marais Old Town through the legacy map ID and verifies its authored model placements, CC0 source coverage, scene caching, distance culling, box-only collision proxies, distinct districts, separated high-value loot zones, clear vehicle routes, rooftop squad traversal, loot/garrison/minimap integration, and strict node/body/mesh/light budgets. `--capture-refinery-map` retains the compatibility command and legacy output names while saving an overhead composition frame, a street-level approach, both high-value courtyards, and the rooftop route. `--capture-promotion` uses fixed staging and camera positions to reproduce the 1600 x 900 HUD-free hero, garrison, city, and arsenal images under `docs/media`, plus the 1280 x 640 social preview.
+
+`--validate-industrial-interiors` verifies all 23 Blender-edited freight buildings, 63 new hinged or overhead doors, open/closed ballistic clearance, 276 enclosed-room wall rays, floor and roof collision, AI door traversal, and the seeded 8-cache/3-guard/12-empty room distribution. `--capture-industrial-interiors` saves closed/open mixed-door facades plus representative authored cache and resting-guard rooms.
 
 `--validate-pause-ui` verifies the authored pause scene, required control bindings, signal-free settings synchronization, English and Chinese labels, pause visibility and mouse release, and the existing resume event path.
 

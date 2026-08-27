@@ -30,10 +30,12 @@ The City Kit (Industrial) 1.0 model set is distributed by Kenney under CC0 1.0:
 
 - Source: https://kenney.nl/assets/city-kit-industrial
 - Download: https://kenney.nl/media/pages/assets/city-kit-industrial/5fcb837741-1750838303/kenney_city-kit-industrial_1.0.zip
-- Local assets: `kenney_city_kit_industrial/*.glb`
+- Local assets: `kenney_city_kit_industrial/*.glb`, the edited
+  `kenney_city_kit_industrial/enterable/*.glb` variants, and their extracted
+  colormap textures
 - License copy: `kenney_city_kit_industrial/KENNEY_LICENSE.txt`
 
-The complete GLB set is retained so Tideforge, Harbor Locks, the freight terminal, and residential rooftop dressing can combine the pack's buildings, chimneys, and tank detail without modifying third-party geometry. Runtime placement is visual-only where an existing collision shell already owns gameplay geometry.
+The complete GLB set is retained so Tideforge, Harbor Locks, the freight terminal, and residential rooftop dressing can combine the pack's buildings, chimneys, and tank detail. On 2026-08-27, Blender 4.5 was used to cut 35 real door apertures across 13 building variants for the freight terminal. The reproducible edit and aperture checks are in `tools/build_enterable_industrial_buildings.py`; `enterable_layouts.json` is shared by Blender and the Godot runtime. The edited buildings retain Kenney's CC0 license.
 
 The Factory Kit 3.0 model set is distributed by Kenney under CC0 1.0:
 
@@ -43,7 +45,7 @@ The Factory Kit 3.0 model set is distributed by Kenney under CC0 1.0:
 - Local assets: selected `kenney_factory_kit/*.glb` models and the original `kenney_factory_kit/Textures/colormap.png` material atlas
 - License copy: `kenney_factory_kit/KENNEY_LICENSE.txt`
 
-The authored overhead door is used for the interactive entrances to the Grand Hotel and Municipal Treasury in Saint Marais Old Town.
+The authored overhead door is used for interactive industrial and Old Town entrances. The Factory Kit personnel door was additionally acquired from the same official archive on 2026-08-27 as `door.glb`; Blender removes the archive's sample-scene objects and exports the side-pivoted runtime derivative `door-hinged.glb` plus its extracted colormap. No attribution is required for these CC0 assets, and Kenney is credited as a provenance courtesy.
 
 The Furniture Kit 1.0 model set is distributed by Kenney under CC0 1.0:
 

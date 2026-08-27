@@ -5,9 +5,6 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
-    private const string IndustrialDoorScenePath =
-        "res://assets/models/kenney_factory_kit/door-wide-closed.glb";
-
     private int _industrialAuthoredLandmarkCount;
     private int _industrialAuthoredDressingCount;
     private int _industrialAuthoredDressingSceneCount;
@@ -18,66 +15,24 @@ public partial class FreightTerminalWorld
         _industrialAuthoredLandmarkCount = 0;
         _industrialWeatheredBuildingCount = 0;
         var palette = new FreightIndustrialPalette();
-        var landmarks = new[]
-        {
-            (
-                Name: "WestRailAdministrationTower",
-                File: "building-q.glb",
-                Position: new Vector3(-128, 0.02f, -48),
-                Yaw: 0.0f,
-                Scale: 8.0f,
-                CollisionSize: new Vector3(2.14f, 0.88f, 1.77f),
-                CollisionOffset: new Vector3(-0.228f, 0.44f, 0.011f)),
-            (
-                Name: "EastTankProcessTower",
-                File: "building-l.glb",
-                Position: new Vector3(128, 0.02f, -48),
-                Yaw: Mathf.Pi,
-                Scale: 7.8f,
-                CollisionSize: new Vector3(2.08f, 1.92f, 1.87f),
-                CollisionOffset: new Vector3(-0.422f, 0.96f, 0.224f)),
-            (
-                Name: "SouthFreightControlTower",
-                File: "building-a.glb",
-                Position: new Vector3(-125, 0.02f, 34),
-                Yaw: 0.0f,
-                Scale: 8.2f,
-                CollisionSize: new Vector3(2.08f, 1.47f, 1.24f),
-                CollisionOffset: new Vector3(0, 0.735f, 0)),
-            (
-                Name: "NorthQuaySignalTower",
-                File: "building-r.glb",
-                Position: new Vector3(38, 0.02f, -192),
-                Yaw: Mathf.Pi,
-                Scale: 7.4f,
-                CollisionSize: new Vector3(2.48f, 1.39f, 1.27f),
-                CollisionOffset: new Vector3(0, 0.695f, 0))
-        };
-
-        foreach (var landmark in landmarks)
-        {
-            var body = ModelProp(
-                $"res://assets/models/kenney_city_kit_industrial/{landmark.File}",
-                landmark.Position,
-                landmark.Yaw,
-                landmark.Scale,
-                landmark.CollisionSize,
-                landmark.CollisionOffset,
-                visibilityRange: 320.0f,
-                castShadow: true,
-                hasDoorway: false);
-            body.Name = landmark.Name;
-            body.AddToGroup("freight_authored_landmark");
-            if (palette.Apply(body, landmark.Name) > 0)
-            {
-                _industrialWeatheredBuildingCount++;
-            }
-            _industrialAuthoredLandmarkCount++;
-        }
+        _industrialInteriors = new FreightIndustrialInteriorBuilder(palette).Build(
+            _levelRoot,
+            _refineryDoors.Count + 1);
+        _refineryDoors.AddRange(_industrialInteriors.Doors);
+        _industrialAuthoredLandmarkCount = _industrialInteriors.LandmarkCount;
+        _industrialWeatheredBuildingCount = _industrialInteriors.PalettedBuildingCount;
+        _industrialInteriorSeed = unchecked((int)_rng.Randi());
+        _industrialRoomContentPlans = FreightIndustrialRoomContentPlanner.Plan(
+            _industrialInteriorSeed,
+            _industrialInteriors.Rooms);
 
         var dressing = new FreightTerminalArtDressingBuilder(palette).Build(_levelRoot);
-        _industrialAuthoredDressingCount = dressing.AuthoredModelCount;
-        _industrialAuthoredDressingSceneCount = dressing.ScenePaths.Count;
+        _industrialAuthoredDressingCount = dressing.AuthoredModelCount
+            + _industrialInteriors.AuthoredBuildingCount;
+        _industrialAuthoredDressingSceneCount = dressing.ScenePaths
+            .Concat(_industrialInteriors.ScenePaths)
+            .Distinct()
+            .Count();
         _industrialWeatheredBuildingCount += dressing.PalettedBuildingCount;
     }
 
@@ -125,12 +80,34 @@ public partial class FreightTerminalWorld
     private async void ValidateFreightTerminalDoors()
     {
         await WaitFrames(6);
-        var expectedDoorCount = 11;
+        foreach (var mate in _squadMates)
+        {
+            if (IsInstanceValid(mate))
+            {
+                mate.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        foreach (var enemy in _enemies)
+        {
+            if (IsInstanceValid(enemy))
+            {
+                enemy.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        foreach (var civilian in _civilians)
+        {
+            if (IsInstanceValid(civilian))
+            {
+                civilian.ProcessMode = ProcessModeEnum.Disabled;
+            }
+        }
+        const int expectedDoorCount = 74;
         var countReady = _refineryDoors.Count == expectedDoorCount;
         var idsReady = _refineryDoors.Select(door => door.DoorId).Distinct().Count() == expectedDoorCount
             && _refineryDoors.Select(door => door.DoorId).OrderBy(id => id)
                 .SequenceEqual(Enumerable.Range(1, expectedDoorCount));
-        var authoredReady = ResourceLoader.Exists(IndustrialDoorScenePath)
+        var authoredReady = ResourceLoader.Exists(InteractiveBuildingDoor.OverheadDoorScenePath)
+            && ResourceLoader.Exists(InteractiveBuildingDoor.HingedDoorScenePath)
             && _refineryDoors.All(door => door.UsesAuthoredVisual && door.HasBoxCollision);
         var initiallyClosed = _refineryDoors.All(door => !door.IsOpen && !door.IsAnimating);
         var closedBlocks = _refineryDoors.All(door => PhysicsRaycast.HasHit(
@@ -141,7 +118,9 @@ public partial class FreightTerminalWorld
 
         var openingStarted = _refineryDoors.All(door =>
             door.TrySetOpen(true, bypassClearance: true));
-        for (var frame = 0; frame < 120 && _refineryDoors.Any(door => door.IsAnimating); frame++)
+        var openingDeadline = Time.GetTicksMsec() + 3000UL;
+        while (_refineryDoors.Any(door => door.IsAnimating)
+            && Time.GetTicksMsec() < openingDeadline)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         }
@@ -152,6 +131,17 @@ public partial class FreightTerminalWorld
             door.OutsideProbe,
             door.InsideProbe,
             1));
+        var blockedOpenDoors = _refineryDoors
+            .Select(door => PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    door.OutsideProbe,
+                    door.InsideProbe,
+                    1,
+                    out var hit)
+                ? $"{door.DoorId}:{door.Name}:{door.MotionStyle}:{(hit.Collider as Node)?.Name}"
+                : string.Empty)
+            .Where(value => value.Length > 0)
+            .ToArray();
 
         var first = _refineryDoors.FirstOrDefault();
         var playerPosition = _player.GlobalPosition;
@@ -167,7 +157,9 @@ public partial class FreightTerminalWorld
 
         var closingStarted = _refineryDoors.All(door =>
             door.TrySetOpen(false, bypassClearance: true));
-        for (var frame = 0; frame < 120 && _refineryDoors.Any(door => door.IsAnimating); frame++)
+        var closingDeadline = Time.GetTicksMsec() + 3000UL;
+        while (_refineryDoors.Any(door => door.IsAnimating)
+            && Time.GetTicksMsec() < closingDeadline)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         }
@@ -183,7 +175,7 @@ public partial class FreightTerminalWorld
         var valid = countReady && idsReady && authoredReady && initiallyClosed
             && closedBlocks && openingStarted && opened && openClears
             && occupiedCloseRejected && closingStarted && closedAgain && closedAgainBlocks;
-        GD.Print($"FREIGHT_TERMINAL_DOORS_CHECK valid={valid} doors={_refineryDoors.Count}/{expectedDoorCount} ids={idsReady} authored={authoredReady} closed_initial={initiallyClosed} closed_block={closedBlocks} opening={openingStarted} opened={opened} open_clear={openClears} occupied_rejected={occupiedCloseRejected} closing={closingStarted} closed_again={closedAgain} closed_block_again={closedAgainBlocks} landmarks={_industrialAuthoredLandmarkCount}");
+        GD.Print($"FREIGHT_TERMINAL_DOORS_CHECK valid={valid} doors={_refineryDoors.Count}/{expectedDoorCount} ids={idsReady} authored={authoredReady} closed_initial={initiallyClosed} closed_block={closedBlocks} opening={openingStarted} opened={opened} open_clear={openClears} blocked_open={string.Join(',', blockedOpenDoors)} occupied_rejected={occupiedCloseRejected} closing={closingStarted} closed_again={closedAgain} closed_block_again={closedAgainBlocks} landmarks={_industrialAuthoredLandmarkCount}");
         GD.Print($"FREIGHT_TERMINAL_DOORS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

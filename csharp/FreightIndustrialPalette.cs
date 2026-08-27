@@ -12,7 +12,7 @@ internal sealed class FreightIndustrialPalette
         "res://assets/models/kenney_city_kit_industrial/Textures/colormap.png";
 
     private const string ShaderCode = @"shader_type spatial;
-render_mode depth_draw_opaque;
+render_mode cull_disabled, depth_draw_opaque;
 
 uniform sampler2D albedo_texture : source_color, filter_nearest_mipmap;
 uniform vec4 facade_light : source_color;

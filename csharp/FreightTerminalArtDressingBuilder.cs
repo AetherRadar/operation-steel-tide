@@ -10,7 +10,7 @@ internal sealed record FreightTerminalArtDressingResult(
     int PalettedBuildingCount,
     IReadOnlyCollection<string> ScenePaths);
 
-/// <summary>Adds licensed industrial silhouettes to existing freight-terminal collision shells.</summary>
+/// <summary>Adds licensed tanks and stacks around the enterable industrial buildings.</summary>
 internal sealed class FreightTerminalArtDressingBuilder
 {
     private const string IndustrialRoot = "res://assets/models/kenney_city_kit_industrial";
@@ -120,34 +120,10 @@ internal sealed class FreightTerminalArtDressingBuilder
 
     private static readonly ModelPlacement[] Placements =
     {
-        new("RailDispatchPlant", "building-j.glb", new Vector3(-105.0f, 0.02f, -72.0f), 0.0f, 6.2f),
-        new("RailLoadingPlant", "building-c.glb", new Vector3(-43.0f, 0.02f, -91.0f), Mathf.Pi, 6.6f),
-        new("RailNorthProcess", "building-e.glb", new Vector3(-104.0f, 0.02f, -160.0f), Mathf.Pi, 6.8f),
-        new("RailSignalOffice", "building-h.glb", new Vector3(-49.0f, 0.02f, -154.0f), Mathf.Pi * 0.5f, 5.6f),
-
-        new("MaintenanceAssemblyPlant", "building-a.glb", new Vector3(-6.0f, 0.02f, -82.0f), 0.0f, 6.4f),
-        new("MaintenanceServicePlant", "building-t.glb", new Vector3(27.0f, 0.02f, -92.0f), Mathf.Pi, 5.7f),
-        new("CentralPumpHouse", "building-f.glb", new Vector3(21.0f, 0.02f, -118.0f), Mathf.Pi * 0.5f, 5.7f),
-        new("CentralControlOffice", "building-j.glb", new Vector3(-19.0f, 0.02f, -119.0f), -Mathf.Pi * 0.5f, 5.8f),
-
-        new("FuelProcessPlant", "building-l.glb", new Vector3(111.0f, 0.02f, -103.0f), Mathf.Pi, 6.3f),
-        new("FuelControlPlant", "building-n.glb", new Vector3(108.0f, 0.02f, -140.0f), Mathf.Pi, 5.8f),
         new("FuelTankWest", "detail-tank.glb", new Vector3(58.0f, 0.02f, -108.0f), 0.0f, 8.0f),
         new("FuelTankEast", "detail-tank.glb", new Vector3(87.0f, 0.02f, -108.0f), Mathf.Pi * 0.5f, 8.0f),
         new("FuelStack", "chimney-large.glb", new Vector3(115.0f, 0.02f, -151.0f), 0.0f, 7.2f),
-
-        new("QuayBondedPlant", "building-r.glb", new Vector3(16.0f, 0.02f, -174.0f), 0.0f, 6.6f),
-        new("QuayServicePlant", "building-g.glb", new Vector3(54.0f, 0.02f, -174.0f), 0.0f, 6.4f),
-        new("QuayPumpPlant", "building-b.glb", new Vector3(102.0f, 0.02f, -175.0f), 0.0f, 6.4f),
         new("QuayStack", "chimney-medium.glb", new Vector3(127.0f, 0.02f, -179.0f), 0.0f, 6.5f),
-
-        new("SouthCustomsPlant", "building-q.glb", new Vector3(-78.0f, 0.02f, 53.0f), Mathf.Pi, 6.4f),
-        new("SouthWorkshopPlant", "building-g.glb", new Vector3(-31.0f, 0.02f, 62.0f), Mathf.Pi, 6.0f),
-        new("SouthSecurityPlant", "building-h.glb", new Vector3(31.0f, 0.02f, 62.0f), Mathf.Pi, 6.0f),
-        new("SouthCommandPlant", "building-a.glb", new Vector3(82.0f, 0.02f, 58.0f), Mathf.Pi, 6.4f),
-
-        new("WestBoundaryPlant", "building-c.glb", new Vector3(-158.0f, 0.02f, -137.0f), Mathf.Pi * 0.5f, 7.0f),
-        new("EastBoundaryPlant", "building-e.glb", new Vector3(158.0f, 0.02f, -136.0f), -Mathf.Pi * 0.5f, 7.0f),
         new("WestBoundaryStack", "chimney-large.glb", new Vector3(-158.0f, 0.02f, -181.0f), 0.0f, 7.4f),
         new("EastBoundaryStack", "chimney-large.glb", new Vector3(158.0f, 0.02f, -181.0f), 0.0f, 7.4f)
     };

@@ -9,7 +9,7 @@ public partial class FreightTerminalWorld
 
     /// <summary>
     /// Opens the authored door intersected by an actor's next navigation segment.
-    /// The refinery door list is persistent and tiny, so this bounded index scan
+    /// The building door list is persistent and bounded, so this index scan
     /// stays allocation-free without a scene-tree lookup on the physics hot path.
     /// </summary>
     internal bool TryPrepareAiDoorTraversal(
@@ -18,7 +18,7 @@ public partial class FreightTerminalWorld
         out bool waiting)
     {
         waiting = false;
-        if (!IsBlackwaterRefineryMap || IsExtractionNetworkClient)
+        if (IsExtractionNetworkClient)
         {
             return false;
         }
