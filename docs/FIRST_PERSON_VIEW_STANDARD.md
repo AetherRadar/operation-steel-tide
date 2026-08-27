@@ -14,7 +14,8 @@ This document defines the runtime contract for visible first-person arms and wea
 - Visible first-person arms must come from an authored, redistributable asset.
 - The procedural arm mesh remains diagnostic scaffolding and is always hidden in normal play.
 - The authored arm asset exposes unique `RightArm` and `LeftArm` mount nodes, each with a named palm marker.
-- Arm roots keep a fixed authored scale. Weapon-specific alignment changes only the two mount positions.
+- The complete authored pose is rigidly mounted from its source weapon frame to the active primary grip at a fixed presentation scale.
+- The support arm may translate from its authored mount to the active foregrip, but neither arm mesh may receive an independent rotation or non-uniform scale.
 - `FirstPersonArmPoseCatalog` is the single source of truth for pose families:
   - `Sidearm`: P226, M1911, GSh-18, Desert Eagle
   - `Compact`: MP5A5, M3A1
@@ -34,8 +35,9 @@ Before delivery, run:
 ```text
 --validate-combat-models
 --validate-hand-diagnostics
+--validate-hand-diagnostics-narrow
 --validate-weapon-ui
 --validate-equipment
 ```
 
-`HAND_POSE_CHECK valid=true` additionally requires authored selection, hidden procedural arms, grip residuals at or below `0.002 m`, finite uniform root scale, on-screen palm markers, and idempotent weapon switching.
+`HAND_POSE_CHECK valid=true` additionally requires authored selection, hidden procedural arms, grip residuals at or below `0.004 m`, finite uniform root scale, both palms within the weapon-surface contact envelope, on-screen palm markers, and idempotent weapon switching.

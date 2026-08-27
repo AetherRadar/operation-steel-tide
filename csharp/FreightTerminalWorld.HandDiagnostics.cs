@@ -6,8 +6,14 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
-    private async void ValidateHandDiagnostics()
+    private async void ValidateHandDiagnostics(bool narrow = false)
     {
+        if (narrow)
+        {
+            var window = GetWindow();
+            window.ContentScaleAspect = Window.ContentScaleAspectEnum.Ignore;
+            window.Size = new Vector2I(985, 847);
+        }
         await WaitFrames(4);
         // Move player to open area away from walls for clear view
         _player.GlobalPosition = new Vector3(0, 0.2f, 40.0f);
@@ -20,86 +26,76 @@ public partial class FreightTerminalWorld
         var results = new List<string>();
         var posesValid = true;
         var authoredRigValid = true;
-        foreach (var platform in Enum.GetValues<WeaponPlatform>())
+        var platforms = Enum.GetValues<WeaponPlatform>();
+        var proceduralArms = _player.GetNodeOrNull<Node3D>(
+            "Camera3D/WeaponRoot/ProceduralFirstPersonArms");
+        foreach (var platform in platforms)
         {
             _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
             await WaitFrames(8);
-            posesValid &= _player.WeaponHandPoseValidForDiagnostics;
-            authoredRigValid &= platform == WeaponPlatform.M3A1 || _player.UsesAuthoredHandRigForDiagnostics;
-            var handInspection = _player.InspectAuthoredHandPoseForDiagnostics();
-            // Ensure arms are refreshed
-            var useAuthoredM4 = platform == WeaponPlatform.M4A1;
-            var useAuthoredSmg = platform == WeaponPlatform.M3A1;
-            var useAuthoredPlatform = platform is not WeaponPlatform.M4A1 and not WeaponPlatform.M3A1 and not WeaponPlatform.GSh18 and not WeaponPlatform.DesertEagle;
-            var procArmsVisible = IsInstanceValid(_player.GetNodeOrNull<Node3D>("Camera3D/WeaponRoot/ProceduralFirstPersonArms")) ? _player.GetNodeOrNull<Node3D>("Camera3D/WeaponRoot/ProceduralFirstPersonArms")?.Visible : false;
-            // Try to get support hand global pos via reflection (private fields)
-            var supportHandPos = Vector3.Zero;
-            var supportForearmPos = Vector3.Zero;
-            var rightHandVisible = false;
-            var leftHandVisible = false;
-            try
+            var proceduralVisible = IsInstanceValid(proceduralArms)
+                && proceduralArms.Visible;
+            var weaponVisible = _player.UsesAuthoredWeaponPlatformForDiagnostics(platform);
+            posesValid &= !proceduralVisible && weaponVisible;
+            if (platform == WeaponPlatform.M3A1)
             {
-                var type = typeof(TacticalPlayer);
-                var fArms = type.GetField("_proceduralFirstPersonArms", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var fSupportHand = type.GetField("_supportHand", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var fSupportForearm = type.GetField("_supportForearm", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var fCamera = type.GetField("_camera", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var fArmsNode = fArms?.GetValue(_player) as Node3D;
-                var supHand = fSupportHand?.GetValue(_player) as Node3D;
-                var supFore = fSupportForearm?.GetValue(_player) as Node3D;
-                var cam = fCamera?.GetValue(_player) as Camera3D;
-                if (fArmsNode != null) procArmsVisible = fArmsNode.Visible;
-                Vector2 supHandScreen = Vector2.Zero;
-                Vector2 rightHandScreen = Vector2.Zero;
-                bool supHandBehind = false;
-                bool rightHandBehind = false;
-                if (supHand != null) { supportHandPos = supHand.GlobalPosition; leftHandVisible = supHand.Visible; if (cam != null) { var pos = cam.UnprojectPosition(supportHandPos); supHandScreen = pos; supHandBehind = cam.IsPositionBehind(supportHandPos); } }
-                if (supFore != null) supportForearmPos = supFore.GlobalPosition;
-                // right hand is sibling of support hand, find by name
-                Node3D? rightNode = null;
-                if (fArmsNode != null)
-                {
-                    rightNode = fArmsNode.GetNodeOrNull<Node3D>("RightTacticalHand");
-                    if (rightNode != null) { rightHandVisible = rightNode.Visible; if (cam != null) { var rp = rightNode.GlobalPosition; rightHandScreen = cam.UnprojectPosition(rp); rightHandBehind = cam.IsPositionBehind(rp); } }
-                }
-                // authored arms (the active pose may be rifle, service pistol, or large pistol)
-                var authArms = _player.ActiveAuthoredArmsForDiagnostics;
-                if (authArms != null && IsInstanceValid(authArms.Root))
-                {
-                    var authVisible = authArms.Root.Visible;
-                    var armBounds = AuthoredArmWorldBounds(authArms.Root);
-                    var weaponRoot = _player.ActiveAuthoredWeaponRootForDiagnostics;
-                    var weaponBounds = weaponRoot is not null
-                        ? AuthoredArmWorldBounds(weaponRoot)
-                        : new Aabb();
-                    var weaponRootInverse = _player.WeaponRootGlobalTransformForDiagnostics.AffineInverse();
-                    var weaponLocalTransform = weaponRoot is not null
-                        ? weaponRootInverse * weaponRoot.GlobalTransform
-                        : Transform3D.Identity;
-                    var foregrip = _player.ActiveAuthoredForegripForDiagnostics;
-                    var muzzle = _player.ActiveAuthoredMuzzleForDiagnostics;
-                    var foregripLocal = foregrip is not null
-                        ? weaponRootInverse * foregrip.GlobalTransform
-                        : Transform3D.Identity;
-                    var muzzleLocal = muzzle is not null
-                        ? weaponRootInverse * muzzle.GlobalTransform
-                        : Transform3D.Identity;
-                    var rightPalmLocal = weaponRootInverse * authArms.RightPalmFrame.GlobalTransform;
-                    var leftPalmLocal = weaponRootInverse * authArms.LeftPalmFrame.GlobalTransform;
-                    var rPalm = authArms.RightPalmFrame.GlobalPosition;
-                    var lPalm = authArms.LeftPalmFrame.GlobalPosition;
-                    var rStaticLocal = authArms.RightPalmTransformInRoot.Origin;
-                    var lStaticLocal = authArms.LeftPalmTransformInRoot.Origin;
-                    var rPalmScreen = cam != null ? cam.UnprojectPosition(rPalm) : Vector2.Zero;
-                    var lPalmScreen = cam != null ? cam.UnprojectPosition(lPalm) : Vector2.Zero;
-                    var rBehind = cam != null ? cam.IsPositionBehind(rPalm) : false;
-                    var lBehind = cam != null ? cam.IsPositionBehind(lPalm) : false;
-                    results.Add($"{platform}: procArmsVis={procArmsVisible} authArmsVis={authVisible} rightVis={rightHandVisible} leftVis={leftHandVisible} supHandPos={supportHandPos} supHandScreen={supHandScreen} behind={supHandBehind} rightScreen={rightHandScreen} rightBehind={rightHandBehind} rPalm={rPalm} rStaticLocal={rStaticLocal} rPalmLocal={rightPalmLocal.Origin} rScreen={rPalmScreen} rBehind={rBehind} lPalm={lPalm} lStaticLocal={lStaticLocal} lPalmLocal={leftPalmLocal.Origin} lScreen={lPalmScreen} lBehind={lBehind} gripResidual={handInspection.GripResidual:F4} supportResidual={handInspection.SupportGripResidual:F4} palmSeparation={handInspection.PalmSeparation:F4} wristLengths=({handInspection.RightWristLength:F4},{handInspection.LeftWristLength:F4}) scale={handInspection.RootScale} determinant={handInspection.RootDeterminant:F3} rootBasis={handInspection.RootTransform.Basis} armBounds=({armBounds.Position},{armBounds.End}) weaponLocal=({weaponLocalTransform.Origin}) weaponBasis=({weaponLocalTransform.Basis}) weaponBounds=({weaponBounds.Position},{weaponBounds.End}) foregripLocal=({foregripLocal.Origin}) muzzleLocal=({muzzleLocal.Origin}) handValid={handInspection.Valid} weaponVis={_player.UsesAuthoredWeaponPlatformForDiagnostics(platform)}");
-                    continue;
-                }
+                var nativeRigValid = _player.WeaponHandPoseValidForDiagnostics;
+                posesValid &= nativeRigValid;
+                results.Add(
+                    $"{platform}: nativeRig={nativeRigValid} "
+                    + $"proceduralVisible={proceduralVisible} weaponVisible={weaponVisible}");
+                continue;
             }
-            catch (Exception e) { results.Add($"{platform}: exception {e.Message}"); continue; }
-            results.Add($"{platform}: procArmsVis={procArmsVisible} rightVis={rightHandVisible} leftVis={leftHandVisible} supHandPos={supportHandPos} weaponVis={_player.UsesAuthoredWeaponPlatformForDiagnostics(platform)}");
+
+            var handInspection = _player.InspectAuthoredHandPoseForDiagnostics();
+            var arms = _player.ActiveAuthoredArmsForDiagnostics;
+            if (arms is null || !IsInstanceValid(arms.Root))
+            {
+                posesValid = false;
+                authoredRigValid = false;
+                results.Add($"{platform}: authoredRig=false weaponVisible={weaponVisible}");
+                continue;
+            }
+
+            var rootVisible = arms.Root.IsVisibleInTree();
+            var rightVisible = arms.RightArm.IsVisibleInTree();
+            var leftVisible = arms.LeftArm.IsVisibleInTree();
+            authoredRigValid &= rootVisible
+                && rightVisible
+                && leftVisible
+                && _player.UsesAuthoredHandRigForDiagnostics;
+            var realigned = _player.RealignAuthoredHandsForDiagnostics();
+            var idempotent = handInspection.RootTransform.Origin.DistanceTo(realigned.Origin) <= 0.0001f
+                && handInspection.RootTransform.Basis.X.DistanceTo(realigned.Basis.X) <= 0.0001f
+                && handInspection.RootTransform.Basis.Y.DistanceTo(realigned.Basis.Y) <= 0.0001f
+                && handInspection.RootTransform.Basis.Z.DistanceTo(realigned.Basis.Z) <= 0.0001f;
+            posesValid &= handInspection.Valid && idempotent;
+
+            var weaponRootInverse = _player.WeaponRootGlobalTransformForDiagnostics.AffineInverse();
+            var weaponRoot = _player.ActiveAuthoredWeaponRootForDiagnostics;
+            var weaponBounds = weaponRoot is not null
+                ? AuthoredArmWorldBounds(weaponRoot)
+                : new Aabb();
+            var foregrip = _player.ActiveAuthoredForegripForDiagnostics;
+            var muzzle = _player.ActiveAuthoredMuzzleForDiagnostics;
+            var rightPalmLocal = weaponRootInverse * handInspection.RightPalm;
+            var leftPalmLocal = weaponRootInverse * handInspection.LeftPalm;
+            var rightGripLocal = weaponRootInverse * arms.RightGripFrame.GlobalPosition;
+            var leftGripLocal = weaponRootInverse * arms.LeftGripFrame.GlobalPosition;
+            var foregripLocal = foregrip is not null
+                ? weaponRootInverse * foregrip.GlobalPosition
+                : Vector3.Zero;
+            var muzzleLocal = muzzle is not null
+                ? weaponRootInverse * muzzle.GlobalPosition
+                : Vector3.Zero;
+            results.Add(
+                $"{platform}: handValid={handInspection.Valid} idempotent={idempotent} "
+                + $"proceduralVisible={proceduralVisible} authoredVisible=({rootVisible},{rightVisible},{leftVisible}) "
+                + $"weaponVisible={weaponVisible} gripResidual=({handInspection.GripResidual:F4},{handInspection.SupportGripResidual:F4}) "
+                + $"surfaceDistance=({handInspection.PrimarySurfaceDistance:F4},{handInspection.SupportSurfaceDistance:F4}) "
+                + $"surfaceOffset=({handInspection.PrimarySurfaceOffset},{handInspection.SupportSurfaceOffset}) "
+                + $"palms=({rightPalmLocal},{leftPalmLocal}) grips=({rightGripLocal},{leftGripLocal}) "
+                + $"foregrip={foregripLocal} muzzle={muzzleLocal} weaponBounds=({weaponBounds.Position},{weaponBounds.End})");
         }
         _player.GrantFireablePrimaryForDiagnostics(
             WeaponCatalog.Build(WeaponPlatform.M3A1, 0));
@@ -121,13 +117,15 @@ public partial class FreightTerminalWorld
             && authoredRigValid
             && smgSleeveReach
             && smgSleeveVolume
-            && smgReloadPresentation;
+            && smgReloadPresentation
+            && results.Count == platforms.Length;
         GD.Print(
             $"HAND_POSE_CHECK valid={valid} procedural_pose={posesValid} "
             + $"authored_rig={authoredRigValid} smg_sleeve_reach={smgSleeveReach} "
             + $"smg_sleeve_volume={smgSleeveVolume} "
             + $"smg_arm_bounds={smgArmBounds} "
-            + $"smg_reload_presentation={smgReloadPresentation} samples={results.Count}");
+            + $"smg_reload_presentation={smgReloadPresentation} "
+            + $"samples={results.Count} viewport={(narrow ? "985x847" : "default")}");
         GD.Print($"HAND_POSE_PASS valid={valid}");
         GD.Print($"HAND_DIAGNOSTICS_DONE count={results.Count}");
         GetTree().Quit(valid ? 0 : 2);

@@ -4,9 +4,17 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
-    private async void CaptureOpenHandValidation()
+    private async void CaptureOpenHandValidation(bool narrow = false)
     {
+        if (narrow)
+        {
+            var window = GetWindow();
+            window.ContentScaleAspect = Window.ContentScaleAspectEnum.Ignore;
+            window.Size = new Vector2I(985, 847);
+            await WaitFrames(4);
+        }
         Input.MouseMode = Input.MouseModeEnum.Visible;
+        var suffix = narrow ? "_narrow_validation.png" : "_validation.png";
         foreach (var enemy in _enemies) if (IsInstanceValid(enemy)) enemy.ProcessMode = ProcessModeEnum.Disabled;
         foreach (var mate in _squadMates) if (IsInstanceValid(mate)) mate.ProcessMode = ProcessModeEnum.Disabled;
         _missionDirector.ExitDeploymentZone();
@@ -14,53 +22,79 @@ public partial class FreightTerminalWorld
         _player.Velocity = Vector3.Zero;
         _player.FaceWorldPointForDiagnostics(new Vector3(0, 0.2f, -40.0f));
         await WaitFrames(6);
-        var platform = WeaponPlatform.ScarL;
-        _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
+        var captures = new (WeaponPlatform Platform, string FileStem)[]
+        {
+            (WeaponPlatform.M4A1, "m4a1"),
+            (WeaponPlatform.AK74, "ak74"),
+            (WeaponPlatform.ScarL, "scarl"),
+            (WeaponPlatform.MP5A5, "mp5a5"),
+            (WeaponPlatform.M3A1, "m3a1"),
+            (WeaponPlatform.VSS, "vss"),
+            (WeaponPlatform.M24, "m24"),
+            (WeaponPlatform.AXMC, "axmc"),
+            (WeaponPlatform.AWM, "awm"),
+            (WeaponPlatform.P226, "p226"),
+            (WeaponPlatform.M1911, "m1911"),
+            (WeaponPlatform.GSh18, "gsh18"),
+            (WeaponPlatform.DesertEagle, "desert_eagle")
+        };
+        foreach (var capture in captures)
+        {
+            _player.GrantFireablePrimaryForDiagnostics(
+                WeaponCatalog.Build(capture.Platform, 0));
+            await WaitFrames(8);
+            SaveViewportImage($"res://open_hand_{capture.FileStem}{suffix}");
+        }
+
+        _player.GrantFireablePrimaryForDiagnostics(
+            WeaponCatalog.Build(WeaponPlatform.M3A1, 0));
         await WaitFrames(8);
-        SaveViewportImage("res://open_hand_scarl_validation.png");
-        platform = WeaponPlatform.M4A1;
-        _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
-        await WaitFrames(8);
-        SaveViewportImage("res://open_hand_m4a1_validation.png");
-        platform = WeaponPlatform.AK74;
-        _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
-        await WaitFrames(8);
-        SaveViewportImage("res://open_hand_ak74_validation.png");
-        platform = WeaponPlatform.M3A1;
-        _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
-        await WaitFrames(8);
-        SaveViewportImage("res://open_hand_m3a1_validation.png");
         _player.SetViewPitchForDiagnostics(-0.68f);
         await WaitFrames(4);
-        SaveViewportImage("res://open_hand_m3a1_downward_validation.png");
-        _player.SetViewPitchForDiagnostics(0.0f);
-        Input.ActionPress("aim");
-        await WaitFrames(90);
-        SaveViewportImage("res://open_hand_m3a1_ads_validation.png");
-        Input.ActionRelease("aim");
-        await WaitFrames(12);
-        _player.SetViewPitchForDiagnostics(-0.68f);
-        foreach (var (progress, path) in new[]
+        SaveViewportImage($"res://open_hand_m3a1_downward{suffix}");
+        foreach (var (progress, fileStem) in new[]
         {
-            (0.18f, "res://open_hand_m3a1_reload_early_validation.png"),
-            (0.46f, "res://open_hand_m3a1_reload_validation.png"),
-            (0.78f, "res://open_hand_m3a1_reload_late_validation.png")
+            (0.18f, "m3a1_reload_early"),
+            (0.46f, "m3a1_reload"),
+            (0.78f, "m3a1_reload_late")
         })
         {
             _player.SetReloadPoseForDiagnostics(progress);
             await WaitFrames(4);
-            SaveViewportImage(path);
+            SaveViewportImage($"res://open_hand_{fileStem}{suffix}");
         }
         _player.ClearReloadPoseForDiagnostics();
         _player.SetViewPitchForDiagnostics(0.0f);
-        platform = WeaponPlatform.P226;
-        _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
-        await WaitFrames(8);
-        SaveViewportImage("res://open_hand_p226_validation.png");
-        platform = WeaponPlatform.DesertEagle;
-        _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
-        await WaitFrames(8);
-        SaveViewportImage("res://open_hand_desert_eagle_validation.png");
+
+        var aimedCaptures = new (WeaponPlatform Platform, string FileStem)[]
+        {
+            (WeaponPlatform.M3A1, "m3a1"),
+            (WeaponPlatform.M4A1, "m4a1"),
+            (WeaponPlatform.AK74, "ak74"),
+            (WeaponPlatform.AWM, "awm"),
+            (WeaponPlatform.M1911, "m1911"),
+            (WeaponPlatform.GSh18, "gsh18")
+        };
+        _player.UiLocked = false;
+        Input.MouseMode = Input.MouseModeEnum.Captured;
+        Input.ActionRelease("aim");
+        foreach (var capture in aimedCaptures)
+        {
+            _player.GrantFireablePrimaryForDiagnostics(
+                WeaponCatalog.Build(capture.Platform, 0));
+            await WaitFrames(8);
+            Input.ActionPress("aim");
+            for (var frame = 0; frame < 90; frame++)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            }
+            SaveViewportImage($"res://open_hand_{capture.FileStem}_ads{suffix}");
+            Input.ActionRelease("aim");
+            for (var frame = 0; frame < 12; frame++)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            }
+        }
         GD.Print("OPEN_HAND_CAPTURE done");
         GetTree().Quit(0);
     }

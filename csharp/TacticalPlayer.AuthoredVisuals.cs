@@ -7,6 +7,7 @@ namespace OperationSteelTide;
 public partial class TacticalPlayer
 {
     private const float AuthoredSmgPresentationScale = 0.72f;
+    private const float AuthoredArmPresentationScale = 0.72f;
     private static readonly Vector3 AuthoredSmgCameraPosition = new(0.34f, -0.45f, -0.72f);
 
     private Node3D _proceduralWeaponVisual = null!;
@@ -144,19 +145,28 @@ public partial class TacticalPlayer
 
         var rightPalm = arms.RightPalmFrame.GlobalPosition;
         var leftPalm = arms.LeftPalmFrame.GlobalPosition;
+        var rightGrip = arms.RightGripFrame.GlobalPosition;
+        var leftGrip = arms.LeftGripFrame.GlobalPosition;
         var rightWrist = arms.RightWristFrame.GlobalPosition;
         var leftWrist = arms.LeftWristFrame.GlobalPosition;
-        var rightPalmInWeaponRoot = _weaponRoot.GlobalTransform.AffineInverse() * rightPalm;
-        var leftPalmInWeaponRoot = _weaponRoot.GlobalTransform.AffineInverse() * leftPalm;
+        var weaponRootInverse = _weaponRoot.GlobalTransform.AffineInverse();
+        var rightGripInWeaponRoot = weaponRootInverse * rightGrip;
+        var leftGripInWeaponRoot = weaponRootInverse * leftGrip;
         var pose = FirstPersonArmPoseCatalog.For(EquippedWeapon.Platform);
-        var gripResidual = rightPalmInWeaponRoot.DistanceTo(pose.PrimaryGrip);
-        var supportGripResidual = leftPalmInWeaponRoot.DistanceTo(pose.SupportGrip);
+        var gripResidual = rightGripInWeaponRoot.DistanceTo(pose.PrimaryGrip);
+        var supportGripResidual = leftGripInWeaponRoot.DistanceTo(pose.SupportGrip);
         var palmSeparation = rightPalm.DistanceTo(leftPalm);
-        var localPalmSeparation = rightPalmInWeaponRoot.DistanceTo(leftPalmInWeaponRoot);
+        var localGripSeparation = rightGripInWeaponRoot.DistanceTo(leftGripInWeaponRoot);
         var rightWristLength = rightPalm.DistanceTo(rightWrist);
         var leftWristLength = leftPalm.DistanceTo(leftWrist);
         var worldScale = arms.Root.GlobalTransform.Basis.Scale.Abs();
+        var supportWorldScale = arms.LeftArm.GlobalTransform.Basis.Scale.Abs();
         var determinant = arms.Root.GlobalTransform.Basis.Determinant();
+        var weaponRoot = ActiveAuthoredWeaponRootForDiagnostics;
+        var primaryContact = InspectVisibleMeshSurface(weaponRoot, rightPalm);
+        var supportContact = InspectVisibleMeshSurface(weaponRoot, leftPalm);
+        var primarySurfaceOffset = weaponRootInverse.Basis * primaryContact.Offset;
+        var supportSurfaceOffset = weaponRootInverse.Basis * supportContact.Offset;
         var viewportSize = _camera.GetViewport().GetVisibleRect().Size;
         var rightScreen = _camera.UnprojectPosition(rightPalm);
         var leftScreen = _camera.UnprojectPosition(leftPalm);
@@ -176,15 +186,18 @@ public partial class TacticalPlayer
             && leftScreen.Y <= viewportSize.Y * 0.92f;
         var scaleValid = worldScale.X > 0.35f
             && worldScale.X < 2.2f
-            && worldScale.DistanceTo(new Vector3(worldScale.X, worldScale.X, worldScale.X)) <= 0.002f;
+            && worldScale.DistanceTo(new Vector3(worldScale.X, worldScale.X, worldScale.X)) <= 0.002f
+            && supportWorldScale.DistanceTo(worldScale) <= 0.002f;
         var wristContinuity = rightWristLength is >= 0.045f and <= 0.28f
             && leftWristLength is >= 0.045f and <= 0.28f;
         var valid = gripResidual <= 0.004f
-            && supportGripResidual <= 0.06f
-            && Mathf.Abs(localPalmSeparation - pose.PrimaryGrip.DistanceTo(pose.SupportGrip)) <= 0.01f
+            && supportGripResidual <= 0.004f
+            && Mathf.Abs(localGripSeparation - pose.PrimaryGrip.DistanceTo(pose.SupportGrip)) <= 0.01f
             && scaleValid
             && determinant > 0.01f
             && wristContinuity
+            && primaryContact.Distance <= 0.10f
+            && supportContact.Distance <= 0.10f
             && screenValid
             && presentationZoneValid;
         return new FirstPersonHandPoseInspection(
@@ -198,13 +211,154 @@ public partial class TacticalPlayer
             determinant,
             arms.Root.Transform,
             rightPalm,
-            leftPalm);
+            leftPalm,
+            primaryContact.Distance,
+            supportContact.Distance,
+            primarySurfaceOffset,
+            supportSurfaceOffset);
     }
 
     internal Transform3D RealignAuthoredHandsForDiagnostics()
     {
         AlignAuthoredArmsToWeapon();
         return ActiveAuthoredArms()?.Root.Transform ?? Transform3D.Identity;
+    }
+
+    private static (float Distance, Vector3 Offset) InspectVisibleMeshSurface(
+        Node3D? root,
+        Vector3 point)
+    {
+        if (root is null || !IsInstanceValid(root))
+        {
+            return (float.PositiveInfinity, Vector3.Zero);
+        }
+
+        var closestSquared = float.PositiveInfinity;
+        var closestPoint = point;
+        foreach (var meshInstance in CombatModelLibrary.MeshesBelow(root))
+        {
+            if (!meshInstance.IsVisibleInTree() || meshInstance.Mesh is not { } mesh)
+            {
+                continue;
+            }
+
+            var faces = mesh.GetFaces();
+            for (var index = 0; index + 2 < faces.Length; index += 3)
+            {
+                var a = meshInstance.GlobalTransform * faces[index];
+                var b = meshInstance.GlobalTransform * faces[index + 1];
+                var c = meshInstance.GlobalTransform * faces[index + 2];
+                var candidate = ClosestPointOnTriangle(point, a, b, c);
+                var distanceSquared = point.DistanceSquaredTo(candidate);
+                if (float.IsFinite(distanceSquared))
+                {
+                    if (distanceSquared < closestSquared)
+                    {
+                        closestSquared = distanceSquared;
+                        closestPoint = candidate;
+                    }
+                }
+            }
+        }
+        return (Mathf.Sqrt(closestSquared), closestPoint - point);
+    }
+
+    private static Vector3 ClosestPointOnTriangle(
+        Vector3 point,
+        Vector3 a,
+        Vector3 b,
+        Vector3 c)
+    {
+        var ab = b - a;
+        var ac = c - a;
+        var ap = point - a;
+        if (ab.Cross(ac).LengthSquared() <= 0.0000000001f)
+        {
+            var abPoint = ClosestPointOnSegment(point, a, b);
+            var bcPoint = ClosestPointOnSegment(point, b, c);
+            var caPoint = ClosestPointOnSegment(point, c, a);
+            var closest = abPoint;
+            if (point.DistanceSquaredTo(bcPoint) < point.DistanceSquaredTo(closest))
+            {
+                closest = bcPoint;
+            }
+            if (point.DistanceSquaredTo(caPoint) < point.DistanceSquaredTo(closest))
+            {
+                closest = caPoint;
+            }
+            return closest;
+        }
+
+        var d1 = ab.Dot(ap);
+        var d2 = ac.Dot(ap);
+        if (d1 <= 0.0f && d2 <= 0.0f)
+        {
+            return a;
+        }
+
+        var bp = point - b;
+        var d3 = ab.Dot(bp);
+        var d4 = ac.Dot(bp);
+        if (d3 >= 0.0f && d4 <= d3)
+        {
+            return b;
+        }
+
+        var vc = d1 * d4 - d3 * d2;
+        if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
+        {
+            var projection = d1 / (d1 - d3);
+            return a + projection * ab;
+        }
+
+        var cp = point - c;
+        var d5 = ab.Dot(cp);
+        var d6 = ac.Dot(cp);
+        if (d6 >= 0.0f && d5 <= d6)
+        {
+            return c;
+        }
+
+        var vb = d5 * d2 - d1 * d6;
+        if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
+        {
+            var projection = d2 / (d2 - d6);
+            return a + projection * ac;
+        }
+
+        var va = d3 * d6 - d5 * d4;
+        if (va <= 0.0f && d4 - d3 >= 0.0f && d5 - d6 >= 0.0f)
+        {
+            var projection = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+            return b + projection * (c - b);
+        }
+
+        var divisor = va + vb + vc;
+        if (Mathf.Abs(divisor) <= 0.0000000001f)
+        {
+            return ClosestPointOnSegment(point, a, b);
+        }
+
+        var denominator = 1.0f / divisor;
+        var v = vb * denominator;
+        var w = vc * denominator;
+        return a + ab * v + ac * w;
+    }
+
+    private static Vector3 ClosestPointOnSegment(
+        Vector3 point,
+        Vector3 start,
+        Vector3 end)
+    {
+        var segment = end - start;
+        var lengthSquared = segment.LengthSquared();
+        if (lengthSquared <= 0.0000000001f)
+        {
+            return start;
+        }
+
+        var amount = Mathf.Clamp((point - start).Dot(segment) / lengthSquared, 0.0f, 1.0f);
+        return start + segment * amount;
     }
 
     private void BuildAuthoredPrimaryWeapon()
@@ -454,7 +608,6 @@ public partial class TacticalPlayer
         try
         {
             var arms = CombatModelLibrary.InstantiateFirstPersonRifleArms();
-            PrepareAuthoredArmsPresentation(arms);
             _weaponRoot.AddChild(arms.Root);
             _authoredRifleArms = arms;
         }
@@ -475,7 +628,6 @@ public partial class TacticalPlayer
         try
         {
             var arms = CombatModelLibrary.InstantiateFirstPersonPistolServiceArms();
-            PrepareAuthoredArmsPresentation(arms);
             _weaponRoot.AddChild(arms.Root);
             _authoredPistolServiceArms = arms;
         }
@@ -496,7 +648,6 @@ public partial class TacticalPlayer
         try
         {
             var arms = CombatModelLibrary.InstantiateFirstPersonPistolLargeArms();
-            PrepareAuthoredArmsPresentation(arms);
             _weaponRoot.AddChild(arms.Root);
             _authoredPistolLargeArms = arms;
         }
@@ -539,46 +690,21 @@ public partial class TacticalPlayer
             return;
         }
 
-        // The Blender exports already use the camera-facing handedness. Apply only
-        // the weapon-root translation and preserve authored scale; an extra 180° Y
-        // flip mirrors the palms and makes the forearms curl back toward the camera.
         var pose = FirstPersonArmPoseCatalog.For(EquippedWeapon.Platform);
-        var rightPalm = arms.RightPalmTransformInRoot.Origin;
-        var leftPalm = arms.LeftPalmTransformInRoot.Origin;
-        var current = leftPalm - rightPalm;
-        var target = pose.SupportGrip - pose.PrimaryGrip;
-        if (current.LengthSquared() <= 0.0001f || target.LengthSquared() <= 0.0001f)
-        {
-            return;
-        }
-
-        // Match each weapon-family palm span with a uniform scale. This preserves
-        // the authored proportions while keeping the support palm on the weapon;
-        // a single scale for every platform makes compact guns and long rifles
-        // miss their front grip by a visible amount.
-        var scale = target.Length() / current.Length();
-        var rotation = new Quaternion(current.Normalized(), target.Normalized());
-        if (Mathf.Abs(pose.RollDegrees) > 0.01f)
-        {
-            var roll = new Quaternion(
-                target.Normalized(),
-                Mathf.DegToRad(pose.RollDegrees));
-            rotation = roll * rotation;
-        }
-        var basis = new Basis(rotation).Scaled(Vector3.One * scale);
-        arms.Root.Transform = new Transform3D(
-            basis,
-            pose.PrimaryGrip - basis * rightPalm);
-    }
-
-    private void PrepareAuthoredArmsPresentation(AuthoredFirstPersonArmsVisual arms)
-    {
         var inheritedScale = Mathf.Max(0.0001f, _weaponRoot.Scale.X);
-        arms.Root.Scale = Vector3.One / inheritedScale;
+        arms.RightArm.Transform = Transform3D.Identity;
+        arms.LeftArm.Transform = Transform3D.Identity;
+        arms.RightArm.Visible = true;
+        arms.LeftArm.Visible = true;
+        var targetFrame = new Transform3D(
+            new Basis(Vector3.Up, Mathf.Pi).Scaled(
+                Vector3.One * (AuthoredArmPresentationScale / inheritedScale)),
+            pose.PrimaryGrip);
+        arms.Root.Transform = targetFrame * arms.RightGripTransformInRoot.AffineInverse();
+        var supportTargetInArms = arms.Root.Transform.AffineInverse() * pose.SupportGrip;
+        var supportGripInArms = arms.MarkerTransformInRoot(arms.LeftGripFrame).Origin;
+        arms.LeftArm.Position += supportTargetInArms - supportGripInArms;
     }
-
-    private static Vector3 FirstPersonRightHandAnchor(WeaponPlatform platform)
-        => FirstPersonArmPoseCatalog.For(platform).PrimaryGrip;
 
     private void EnsureAuthoredDesertEagleWeapon()
     {
@@ -659,4 +785,8 @@ internal readonly record struct FirstPersonHandPoseInspection(
     float RootDeterminant,
     Transform3D RootTransform,
     Vector3 RightPalm,
-    Vector3 LeftPalm);
+    Vector3 LeftPalm,
+    float PrimarySurfaceDistance,
+    float SupportSurfaceDistance,
+    Vector3 PrimarySurfaceOffset,
+    Vector3 SupportSurfaceOffset);

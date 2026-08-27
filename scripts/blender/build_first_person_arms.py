@@ -2,9 +2,9 @@
 
 The tracked runtime SMG asset deliberately contains an animated rig.  This
 builder takes the unmodified source GLB, evaluates a single authored pose, and
-exports a small static GLB with the production arm mesh plus explicit palm and
-wrist frames.  Runtime code can then translate the pose to a weapon grip without
-ever scaling or accumulating rotations on the arm mesh.
+exports a small static GLB with separate production arm meshes plus explicit
+palm, wrist, and source-weapon grip frames. Runtime code can rigidly mount the
+pose at the primary grip and translate only the support arm for each gun family.
 
 Run from the repository root with Blender 4.5 LTS or newer:
     blender --background --factory-startup --python scripts/blender/build_first_person_arms.py
@@ -14,9 +14,14 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+import sys
 
+import bmesh
 import bpy
 from mathutils import Matrix, Vector
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from build_djmaesen_smg45 import cap_authored_sleeves
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -119,7 +124,11 @@ def evaluate_pose(kind: str) -> None:
     bpy.context.view_layer.update()
 
 
-def mesh_copy_evaluated(source: bpy.types.Object) -> bpy.types.Object:
+def mesh_copy_evaluated(
+    source: bpy.types.Object,
+    object_name: str,
+    retained_vertices: set[int],
+) -> bpy.types.Object:
     depsgraph = bpy.context.evaluated_depsgraph_get()
     evaluated = source.evaluated_get(depsgraph)
     mesh = bpy.data.meshes.new_from_object(
@@ -127,8 +136,20 @@ def mesh_copy_evaluated(source: bpy.types.Object) -> bpy.types.Object:
         preserve_all_data_layers=True,
         depsgraph=depsgraph,
     )
-    mesh.name = "AuthoredArmsMesh"
-    result = bpy.data.objects.new("AuthoredArms", mesh)
+    mesh.name = f"{object_name}Mesh"
+    edit_mesh = bmesh.new()
+    edit_mesh.from_mesh(mesh)
+    edit_mesh.verts.ensure_lookup_table()
+    discarded = [
+        vertex
+        for vertex in edit_mesh.verts
+        if vertex.index not in retained_vertices
+    ]
+    bmesh.ops.delete(edit_mesh, geom=discarded, context="VERTS")
+    edit_mesh.to_mesh(mesh)
+    edit_mesh.free()
+    mesh.update()
+    result = bpy.data.objects.new(object_name, mesh)
     bpy.context.collection.objects.link(result)
     result.matrix_world = source.matrix_world.copy()
     return result
@@ -185,6 +206,99 @@ def hand_contact_center(
     return sum((item[1] * item[0] for item in nearest), Vector()) / total
 
 
+def frame_at(position: Vector, basis_source: Matrix) -> Matrix:
+    result = basis_source.to_3x3().to_4x4()
+    result.translation = position
+    return result
+
+
+def weapon_cross_section_frame(
+    weapon_frame: Matrix,
+    contact_position: Vector,
+) -> Matrix:
+    weapon_inverse = weapon_frame.inverted()
+    contact_local = weapon_inverse @ contact_position
+    weapon_mesh = bpy.data.objects["base_smg45_0"]
+    vertices_local = [
+        weapon_inverse @ (weapon_mesh.matrix_world @ vertex.co)
+        for vertex in weapon_mesh.data.vertices
+    ]
+    nearby = [
+        vertex
+        for vertex in vertices_local
+        if abs(vertex.y - contact_local.y) <= 3.0
+    ]
+    if not nearby:
+        raise RuntimeError("Unable to resolve authored support-hand weapon section")
+    section_local = Vector(
+        (
+            (min(vertex.x for vertex in nearby) + max(vertex.x for vertex in nearby)) * 0.5,
+            contact_local.y,
+            (min(vertex.z for vertex in nearby) + max(vertex.z for vertex in nearby)) * 0.5,
+        )
+    )
+    result = weapon_frame.copy()
+    result.translation = weapon_frame @ section_local
+    return result
+
+
+def arm_component_vertices(
+    components: list[tuple[int, Vector, list[int]]],
+    armature: bpy.types.Object,
+) -> tuple[set[int], set[int]]:
+    right_palm = bone_world_matrix(armature, "R_palm_039").translation
+    left_palm = bone_world_matrix(armature, "L_palm_015").translation
+    right_hand = sorted(
+        range(len(components)),
+        key=lambda index: (components[index][1] - right_palm).length,
+    )[:2]
+    left_hand = sorted(
+        range(len(components)),
+        key=lambda index: (components[index][1] - left_palm).length,
+    )[:2]
+    if set(right_hand) & set(left_hand):
+        raise RuntimeError("Unable to separate authored left and right glove components")
+
+    right_chain = sum(
+        (
+            bone_world_matrix(armature, bone).translation
+            for bone in ("R_arm_024", "R_elbow_025", "R_wrist_026")
+        ),
+        Vector(),
+    ) / 3.0
+    left_chain = sum(
+        (
+            bone_world_matrix(armature, bone).translation
+            for bone in ("L_arm_01", "L_elbow_02", "L_wrist_03")
+        ),
+        Vector(),
+    ) / 3.0
+    assigned = set(right_hand) | set(left_hand)
+    right_components = list(right_hand)
+    left_components = list(left_hand)
+    for index, (_, center, _) in enumerate(components):
+        if index in assigned:
+            continue
+        if (center - right_chain).length <= (center - left_chain).length:
+            right_components.append(index)
+        else:
+            left_components.append(index)
+
+    right_vertices = {
+        vertex
+        for index in right_components
+        for vertex in components[index][2]
+    }
+    left_vertices = {
+        vertex
+        for index in left_components
+        for vertex in components[index][2]
+    }
+    if not right_vertices or not left_vertices or right_vertices & left_vertices:
+        raise RuntimeError("Authored arm component partition is invalid")
+    return right_vertices, left_vertices
+
+
 def add_marker(
     root: bpy.types.Object,
     name: str,
@@ -209,14 +323,35 @@ def add_marker(
 
 def export_static_arms(kind: str, output_name: str) -> None:
     import_source(0)
-    evaluate_pose(kind)
+    cap_authored_sleeves()
     armature = bpy.data.objects["Object_4"]
     source_mesh = bpy.data.objects["Object_7"]
+    bpy.context.scene.frame_set(155)
+    bpy.context.view_layer.update()
+    reference_components = evaluated_component_centers(source_mesh)
+    reference_left_palm = bone_world_matrix(armature, "L_palm_015")
+    reference_left_contact = hand_contact_center(
+        reference_components,
+        reference_left_palm.translation,
+    )
+    reference_contact_frame = frame_at(reference_left_contact, reference_left_palm)
+    reference_weapon_frame = bpy.data.objects["smg45"].matrix_world.copy()
+    reference_support_frame = weapon_cross_section_frame(
+        reference_weapon_frame,
+        reference_left_contact,
+    )
+    contact_to_support = reference_contact_frame.inverted() @ reference_support_frame
+
+    evaluate_pose(kind)
     components = evaluated_component_centers(source_mesh)
+    right_vertices, left_vertices = arm_component_vertices(components, armature)
     right_palm = bone_world_matrix(armature, "R_palm_039")
     left_palm = bone_world_matrix(armature, "L_palm_015")
+    weapon_grip = bpy.data.objects["smg45"].matrix_world.copy()
     right_palm_contact = hand_contact_center(components, right_palm.translation)
     left_palm_contact = hand_contact_center(components, left_palm.translation)
+    left_contact_frame = frame_at(left_palm_contact, left_palm)
+    left_grip = left_contact_frame @ contact_to_support
     right_wrist = bone_world_matrix(armature, "R_wrist_026")
     left_wrist = bone_world_matrix(armature, "L_wrist_03")
 
@@ -225,24 +360,38 @@ def export_static_arms(kind: str, output_name: str) -> None:
     root.empty_display_size = 0.08
     bpy.context.collection.objects.link(root)
 
-    mesh = mesh_copy_evaluated(source_mesh)
-    mesh.parent = root
-    mesh.location = Vector((0.0, 0.0, 0.0))
-    mesh.rotation_mode = "QUATERNION"
-    mesh.rotation_quaternion = (0.0, 0.0, 0.0, 1.0)
-    mesh.scale = Vector((SOURCE_TO_METERS, SOURCE_TO_METERS, SOURCE_TO_METERS))
-    for polygon in mesh.data.polygons:
-        polygon.use_smooth = True
+    right_arm = bpy.data.objects.new("RightArm", None)
+    left_arm = bpy.data.objects.new("LeftArm", None)
+    for arm in (right_arm, left_arm):
+        arm.empty_display_type = "PLAIN_AXES"
+        arm.empty_display_size = 0.06
+        bpy.context.collection.objects.link(arm)
+        arm.parent = root
 
-    add_marker(root, "RightPalmFrame", right_palm_contact, right_palm)
+    for arm, object_name, retained_vertices in (
+        (right_arm, "RightArmMesh", right_vertices),
+        (left_arm, "LeftArmMesh", left_vertices),
+    ):
+        mesh = mesh_copy_evaluated(source_mesh, object_name, retained_vertices)
+        mesh.parent = arm
+        mesh.location = Vector((0.0, 0.0, 0.0))
+        mesh.rotation_mode = "QUATERNION"
+        mesh.rotation_quaternion = (0.0, 0.0, 0.0, 1.0)
+        mesh.scale = Vector((SOURCE_TO_METERS, SOURCE_TO_METERS, SOURCE_TO_METERS))
+        for polygon in mesh.data.polygons:
+            polygon.use_smooth = True
+
+    add_marker(right_arm, "RightPalmFrame", right_palm_contact, right_palm)
     add_marker(
-        root,
+        left_arm,
         "LeftPalmFrame",
         left_palm_contact,
         left_palm,
     )
-    add_marker(root, "RightWristFrame", right_wrist.translation, right_wrist)
-    add_marker(root, "LeftWristFrame", left_wrist.translation, left_wrist)
+    add_marker(right_arm, "RightWristFrame", right_wrist.translation, right_wrist)
+    add_marker(left_arm, "LeftWristFrame", left_wrist.translation, left_wrist)
+    add_marker(right_arm, "RightGripFrame", weapon_grip.translation, weapon_grip)
+    add_marker(left_arm, "LeftGripFrame", left_grip.translation, left_grip)
 
     for obj in list(bpy.context.scene.objects):
         if obj is root or obj in root.children_recursive:
@@ -273,8 +422,8 @@ def export_static_arms(kind: str, output_name: str) -> None:
 def main() -> None:
     if not SOURCE_GLB.exists():
         raise FileNotFoundError(SOURCE_GLB)
-    # The runtime source is CC BY 4.0 and may be adapted, but never run the
-    # historical sleeve-extension/capping pass for these static poses.
+    # The runtime source is CC BY 4.0 and may be adapted. The existing DCC cap
+    # pass closes the authored sleeve openings before the static export.
     export_static_arms("rifle", "smg45_rifle_arms.glb")
     export_static_arms("pistol_service", "smg45_pistol_service_arms.glb")
     export_static_arms("pistol_large", "smg45_pistol_large_arms.glb")

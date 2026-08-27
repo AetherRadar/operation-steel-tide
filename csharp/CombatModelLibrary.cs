@@ -388,10 +388,12 @@ internal static partial class CombatModelLibrary
     internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/gsh18_runtime.glb";
     internal const string DesertEagleScenePath = "res://assets/models/elizion_desert_eagle/desert_eagle.glb";
 
-    private const float Gsh18FirstPersonLength = 0.64f;
+    private const float Gsh18FirstPersonLength = 0.38f;
     private const float Gsh18PreviewLength = 0.78f;
-    private const float DesertEagleFirstPersonLength = 0.82f;
+    private const float DesertEagleFirstPersonLength = 0.48f;
     private const float DesertEaglePreviewLength = 1.05f;
+    private const float ServicePistolFirstPersonLength = 0.40f;
+    private const float ServicePistolPreviewLength = 0.7616f;
     private const float OperatorPreviewHeight = 2.55f;
     private const float AnimatedOperatorHeight = 1.86f;
     private static readonly Vector3 PreviewOperatorSourceSize = new(1.3053f, 2.1079f, 0.4252f);
@@ -739,13 +741,19 @@ internal static partial class CombatModelLibrary
 
     private static float WeaponPresentationLength(WeaponPlatform platform, bool firstPerson)
     {
+        if (platform is WeaponPlatform.P226 or WeaponPlatform.M1911)
+        {
+            return firstPerson
+                ? ServicePistolFirstPersonLength
+                : ServicePistolPreviewLength;
+        }
+
         var length = platform switch
         {
             WeaponPlatform.AWM => 1.9f,
             WeaponPlatform.M24 or WeaponPlatform.AXMC => 1.62f,
             WeaponPlatform.AK74 or WeaponPlatform.ScarL or WeaponPlatform.VSS => 1.42f,
             WeaponPlatform.MP5A5 or WeaponPlatform.M3A1 => 1.08f,
-            WeaponPlatform.P226 or WeaponPlatform.M1911 => 0.68f,
             WeaponPlatform.GSh18 => Gsh18FirstPersonLength,
             WeaponPlatform.DesertEagle => DesertEagleFirstPersonLength,
             _ => 1.36f

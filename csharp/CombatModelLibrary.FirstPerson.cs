@@ -148,19 +148,25 @@ internal sealed class AuthoredFirstPersonArmsVisual
     public AuthoredFirstPersonArmsVisual(Node3D root)
     {
         Root = root;
-        Arms = CombatModelLibrary.RequireNode(root, "AuthoredArms");
+        RightArm = CombatModelLibrary.RequireNode(root, "RightArm");
+        LeftArm = CombatModelLibrary.RequireNode(root, "LeftArm");
         RightPalmFrame = CombatModelLibrary.RequireNode(root, "RightPalmFrame");
         LeftPalmFrame = CombatModelLibrary.RequireNode(root, "LeftPalmFrame");
         RightWristFrame = CombatModelLibrary.RequireNode(root, "RightWristFrame");
         LeftWristFrame = CombatModelLibrary.RequireNode(root, "LeftWristFrame");
+        RightGripFrame = CombatModelLibrary.RequireNode(root, "RightGripFrame");
+        LeftGripFrame = CombatModelLibrary.RequireNode(root, "LeftGripFrame");
     }
 
     public Node3D Root { get; }
-    public Node3D Arms { get; }
+    public Node3D RightArm { get; }
+    public Node3D LeftArm { get; }
     public Node3D RightPalmFrame { get; }
     public Node3D LeftPalmFrame { get; }
     public Node3D RightWristFrame { get; }
     public Node3D LeftWristFrame { get; }
+    public Node3D RightGripFrame { get; }
+    public Node3D LeftGripFrame { get; }
 
     public Transform3D MarkerTransformInRoot(Node3D marker)
         => Root.GlobalTransform.AffineInverse() * marker.GlobalTransform;
@@ -170,6 +176,9 @@ internal sealed class AuthoredFirstPersonArmsVisual
 
     public Transform3D LeftPalmTransformInRoot
         => MarkerTransformInRoot(LeftPalmFrame);
+
+    public Transform3D RightGripTransformInRoot
+        => MarkerTransformInRoot(RightGripFrame);
 
     public Vector3 PalmPosition(string boneName)
         => boneName.StartsWith("L_", StringComparison.Ordinal)
@@ -205,7 +214,9 @@ internal static partial class CombatModelLibrary
 
     private static readonly string[] StaticFirstPersonArmsNodes =
     {
-        "AuthoredArms"
+        "RightArm", "LeftArm", "RightArmMesh", "LeftArmMesh",
+        "RightPalmFrame", "LeftPalmFrame", "RightWristFrame", "LeftWristFrame",
+        "RightGripFrame", "LeftGripFrame"
     };
 
     public static AuthoredFirstPersonSmgVisual InstantiateFirstPersonSmg45()
