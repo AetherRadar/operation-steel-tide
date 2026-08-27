@@ -92,7 +92,7 @@ internal sealed class FreightTerminalArtDressingBuilder
         ConfigureVisuals(model);
         if (placement.File.StartsWith("building-", StringComparison.Ordinal))
         {
-            paletteApplied = _palette.Apply(model) > 0;
+            paletteApplied = _palette.Apply(model, placement.Name) > 0;
         }
         root.AddChild(model);
         scenePaths.Add(path);

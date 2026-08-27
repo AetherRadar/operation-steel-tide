@@ -78,7 +78,7 @@ public partial class FreightTerminalWorld
         BuildTankFarmDistrict(concrete, steel, steelDark, rust, yellow);
         BuildSeawallDistrict(concrete, steel, steelDark, yellow, white, corrugated);
         BuildSpecialLandmarks(concrete, steel, steelDark, rust, yellow, corrugated);
-        BuildComplexDistrictBuildings(concrete, steel, steelDark, yellow, corrugated, rust);
+        BuildComplexDistrictBuildings(concrete, steel, steelDark, yellow, rust);
         BuildExpansionCover(concreteDark);
         BuildExpansionLights();
     }
@@ -88,7 +88,6 @@ public partial class FreightTerminalWorld
         Godot.Material steel,
         Godot.Material steelDark,
         Godot.Material yellow,
-        Godot.Material corrugated,
         Godot.Material rust)
     {
         _complexLootPlacements.Clear();
@@ -106,7 +105,6 @@ public partial class FreightTerminalWorld
             new Vector3(-55, 0, -28),
             new Vector2(28, 22),
             6.4f,
-            corrugated,
             concrete,
             steelDark,
             wood,
@@ -121,7 +119,6 @@ public partial class FreightTerminalWorld
             new Vector3(48, 0, -48),
             new Vector2(22, 18),
             5.8f,
-            steel,
             concrete,
             steelDark,
             wood,
@@ -137,7 +134,6 @@ public partial class FreightTerminalWorld
             new Vector3(58, 0, -118),
             new Vector2(26, 16),
             6.0f,
-            corrugated,
             concrete,
             rust,
             wood,
@@ -152,7 +148,6 @@ public partial class FreightTerminalWorld
             new Vector3(18, 0, -148),
             new Vector2(24, 14),
             5.6f,
-            steelDark,
             concrete,
             steel,
             wood,
@@ -170,7 +165,6 @@ public partial class FreightTerminalWorld
         Vector3 center,
         Vector2 footprint,
         float wallHeight,
-        Godot.Material exterior,
         Godot.Material floorMat,
         Godot.Material trim,
         Godot.Material wood,
@@ -186,6 +180,7 @@ public partial class FreightTerminalWorld
 
         var width = footprint.X;
         var depth = footprint.Y;
+        var shellMaterial = _lowPolyBuildingArtBuilder.IndustrialFacadeMaterial(name);
         const float wallT = 0.22f;
         const float doorW = 3.6f;
         const float doorH = 2.7f;
@@ -232,14 +227,14 @@ public partial class FreightTerminalWorld
                 ExpansionBox(root, $"ComplexFloor_G{floor}", new Vector3(0, y0 + 0.06f, 0), new Vector3(width, 0.12f, depth), floorMat);
             }
             // North / west / east solid walls
-            ExpansionBox(root, "ComplexNorth", new Vector3(0, y0 + wallHeight * 0.5f, -depth * 0.5f), new Vector3(width, wallHeight, wallT), exterior);
-            ExpansionBox(root, "ComplexWest", new Vector3(-width * 0.5f, y0 + wallHeight * 0.5f, 0), new Vector3(wallT, wallHeight, depth), exterior);
-            ExpansionBox(root, "ComplexEast", new Vector3(width * 0.5f, y0 + wallHeight * 0.5f, 0), new Vector3(wallT, wallHeight, depth), exterior);
+            ExpansionBox(root, "ComplexNorth", new Vector3(0, y0 + wallHeight * 0.5f, -depth * 0.5f), new Vector3(width, wallHeight, wallT), shellMaterial);
+            ExpansionBox(root, "ComplexWest", new Vector3(-width * 0.5f, y0 + wallHeight * 0.5f, 0), new Vector3(wallT, wallHeight, depth), shellMaterial);
+            ExpansionBox(root, "ComplexEast", new Vector3(width * 0.5f, y0 + wallHeight * 0.5f, 0), new Vector3(wallT, wallHeight, depth), shellMaterial);
             // South wall with doorway
             var side = (width - doorW) * 0.5f;
-            ExpansionBox(root, "ComplexSouthL", new Vector3(-(doorW + side) * 0.5f, y0 + wallHeight * 0.5f, depth * 0.5f), new Vector3(side, wallHeight, wallT), exterior);
-            ExpansionBox(root, "ComplexSouthR", new Vector3((doorW + side) * 0.5f, y0 + wallHeight * 0.5f, depth * 0.5f), new Vector3(side, wallHeight, wallT), exterior);
-            ExpansionBox(root, "ComplexDoorHeader", new Vector3(0, y0 + doorH + (wallHeight - doorH) * 0.5f, depth * 0.5f), new Vector3(doorW, wallHeight - doorH, wallT), exterior);
+            ExpansionBox(root, "ComplexSouthL", new Vector3(-(doorW + side) * 0.5f, y0 + wallHeight * 0.5f, depth * 0.5f), new Vector3(side, wallHeight, wallT), shellMaterial);
+            ExpansionBox(root, "ComplexSouthR", new Vector3((doorW + side) * 0.5f, y0 + wallHeight * 0.5f, depth * 0.5f), new Vector3(side, wallHeight, wallT), shellMaterial);
+            ExpansionBox(root, "ComplexDoorHeader", new Vector3(0, y0 + doorH + (wallHeight - doorH) * 0.5f, depth * 0.5f), new Vector3(doorW, wallHeight - doorH, wallT), shellMaterial);
 
             // Interior room grid
             var cellW = (width - 1.2f) / roomsX;
@@ -328,7 +323,7 @@ public partial class FreightTerminalWorld
         }
 
         var roofY = floors * (wallHeight + 0.2f);
-        ExpansionBox(root, "ComplexRoof", new Vector3(0, roofY, 0), new Vector3(width + 0.6f, 0.28f, depth + 0.6f), exterior);
+        ExpansionBox(root, "ComplexRoof", new Vector3(0, roofY, 0), new Vector3(width + 0.6f, 0.28f, depth + 0.6f), shellMaterial);
         ExpansionBox(root, "ComplexCanopy", new Vector3(0, 2.9f, depth * 0.5f + 1.1f), new Vector3(doorW + 1.4f, 0.14f, 2.2f), trim);
         AddIndustrialDoor(
             root,
@@ -337,6 +332,16 @@ public partial class FreightTerminalWorld
             doorW,
             doorH,
             visibilityRange: 250.0f);
+        var accentColor = accent is StandardMaterial3D accentMaterial
+            ? accentMaterial.AlbedoColor
+            : new Color(0.72f, 0.5f, 0.12f);
+        _lowPolyBuildingArtBuilder.BuildIndustrialDetails(
+            root,
+            name,
+            footprint,
+            roofY,
+            floors,
+            accentColor);
         root.AddChild(new Label3D
         {
             Position = new Vector3(0, 3.4f, depth * 0.5f + 0.3f),

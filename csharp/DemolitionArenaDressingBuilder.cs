@@ -6,6 +6,7 @@ namespace OperationSteelTide;
 internal sealed record DemolitionArenaDressingResult(
     int AuthoredModelCount,
     int MissingModelCount,
+    int PalettedBuildingCount,
     IReadOnlyCollection<string> ScenePaths);
 
 /// <summary>Layers licensed authored art over the demolition arenas without changing gameplay collision.</summary>
@@ -16,6 +17,12 @@ internal sealed class DemolitionArenaDressingBuilder
     private const string FactoryRoot = "res://assets/models/kenney_factory_kit";
 
     private readonly Dictionary<string, PackedScene> _scenes = new();
+    private readonly FreightIndustrialPalette _palette;
+
+    public DemolitionArenaDressingBuilder(FreightIndustrialPalette palette)
+    {
+        _palette = palette;
+    }
 
     public DemolitionArenaDressingResult Build(Node3D parent, DemolitionArenaLayout layout)
     {
@@ -29,11 +36,16 @@ internal sealed class DemolitionArenaDressingBuilder
             : TideforgePlacements(layout.Origin);
         var authoredModelCount = 0;
         var missingModelCount = 0;
+        var palettedBuildingCount = 0;
         foreach (var placement in placements)
         {
-            if (TryAddModel(root, placement, scenePaths))
+            if (TryAddModel(root, placement, scenePaths, out var paletteApplied))
             {
                 authoredModelCount++;
+                if (paletteApplied)
+                {
+                    palettedBuildingCount++;
+                }
             }
             else
             {
@@ -44,11 +56,21 @@ internal sealed class DemolitionArenaDressingBuilder
         root.SetMeta("authored_model_count", authoredModelCount);
         root.SetMeta("missing_model_count", missingModelCount);
         root.SetMeta("unique_scene_count", scenePaths.Count);
-        return new DemolitionArenaDressingResult(authoredModelCount, missingModelCount, scenePaths);
+        root.SetMeta("paletted_building_count", palettedBuildingCount);
+        return new DemolitionArenaDressingResult(
+            authoredModelCount,
+            missingModelCount,
+            palettedBuildingCount,
+            scenePaths);
     }
 
-    private bool TryAddModel(Node3D root, ModelPlacement placement, HashSet<string> scenePaths)
+    private bool TryAddModel(
+        Node3D root,
+        ModelPlacement placement,
+        HashSet<string> scenePaths,
+        out bool paletteApplied)
     {
+        paletteApplied = false;
         var path = placement.Source switch
         {
             ModelSource.Downtown => $"{DowntownRoot}/{placement.File}",
@@ -78,6 +100,11 @@ internal sealed class DemolitionArenaDressingBuilder
         model.AddToGroup("demolition_authored_model");
         model.SetMeta("demolition_scene_path", path);
         ConfigureVisuals(model);
+        if (placement.Source == ModelSource.Industrial
+            && placement.File.StartsWith("building-", System.StringComparison.Ordinal))
+        {
+            paletteApplied = _palette.Apply(model, placement.Name) > 0;
+        }
         root.AddChild(model);
         scenePaths.Add(path);
         return true;

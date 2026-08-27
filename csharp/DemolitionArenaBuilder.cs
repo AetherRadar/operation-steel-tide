@@ -11,7 +11,9 @@ public sealed partial class DemolitionArenaBuilder
     private readonly Func<string, Color, float, StandardMaterial3D> _groundMaterial;
     private readonly Dictionary<Vector3, BoxMesh> _boxMeshes = new();
     private readonly List<StaticBody3D> _staticBodies = new();
+    private readonly FreightIndustrialPalette _industrialPalette = new();
     private int _visualPartCount;
+    private int _palettedBuildingCount;
 
     public DemolitionArenaBuilder(
         Func<string, Color, float, float, Color, StandardMaterial3D> material,
@@ -25,6 +27,7 @@ public sealed partial class DemolitionArenaBuilder
     {
         _staticBodies.Clear();
         _visualPartCount = 0;
+        _palettedBuildingCount = 0;
         var root = new Node3D
         {
             Name = layout.MapId == DemolitionMapCatalog.HarborLocksId
@@ -51,8 +54,10 @@ public sealed partial class DemolitionArenaBuilder
         BuildCentralCoverDetails(root, layout, materials);
         BuildRouteGuidance(root, layout);
         BuildLighting(root, layout, materials);
-        var dressing = new DemolitionArenaDressingBuilder().Build(root, layout);
+        var dressing = new DemolitionArenaDressingBuilder(_industrialPalette).Build(root, layout);
         _visualPartCount += dressing.AuthoredModelCount;
+        _palettedBuildingCount += dressing.PalettedBuildingCount;
+        root.SetMeta("low_poly_paletted_building_count", _palettedBuildingCount);
         return new DemolitionArenaRuntime(layout, root, sites, _staticBodies, _visualPartCount);
     }
 
@@ -63,9 +68,9 @@ public sealed partial class DemolitionArenaBuilder
             ["ground"] = _groundMaterial("demolition_arena_ground", new Color(0.44f, 0.45f, 0.42f), 0.9f),
             ["concrete"] = _groundMaterial("demolition_arena_concrete", new Color(0.58f, 0.58f, 0.54f), 0.84f),
             ["concrete_dark"] = _material("demolition_arena_concrete_dark", new Color(0.12f, 0.14f, 0.135f), 0.08f, 0.88f, default),
-            ["steel"] = _material("demolition_arena_steel", new Color(0.11f, 0.14f, 0.14f), 0.78f, 0.34f, default),
-            ["steel_dark"] = _material("demolition_arena_steel_dark", new Color(0.027f, 0.039f, 0.04f), 0.84f, 0.3f, default),
-            ["rust"] = _material("demolition_arena_rust", new Color(0.34f, 0.105f, 0.048f), 0.5f, 0.7f, default),
+            ["steel"] = _material("demolition_arena_steel", new Color(0.11f, 0.14f, 0.14f), 0.36f, 0.68f, default),
+            ["steel_dark"] = _material("demolition_arena_steel_dark", new Color(0.027f, 0.039f, 0.04f), 0.44f, 0.64f, default),
+            ["rust"] = _material("demolition_arena_rust", new Color(0.34f, 0.105f, 0.048f), 0.24f, 0.82f, default),
             ["warning"] = _material("demolition_arena_warning", new Color(0.92f, 0.5f, 0.06f), 0.16f, 0.48f, new Color(0.46f, 0.11f, 0.01f)),
             ["cyan"] = _material("demolition_arena_cyan", new Color(0.08f, 0.52f, 0.63f), 0.3f, 0.4f, new Color(0.01f, 0.14f, 0.18f)),
             ["marking"] = _material("demolition_arena_marking", new Color(0.74f, 0.77f, 0.7f), 0.03f, 0.74f, default),
@@ -186,6 +191,13 @@ public sealed partial class DemolitionArenaBuilder
         {
             model.Name = "Model";
             model.Scale = Vector3.One * definition.Scale;
+            if (definition.ScenePath.Contains(
+                    "/kenney_city_kit_industrial/building-",
+                    StringComparison.Ordinal)
+                && _industrialPalette.Apply(model, definition.Name) > 0)
+            {
+                _palettedBuildingCount++;
+            }
             body.AddChild(model);
             _visualPartCount++;
         }

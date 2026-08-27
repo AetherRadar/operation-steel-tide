@@ -15,25 +15,29 @@ public partial class FreightTerminalWorld
         var width = spec.Footprint.X;
         var depth = spec.Footprint.Y;
         var buildingHeight = spec.Floors * ResidentialFloorHeight;
-        var bandMaterial = PaintedMetal(
+        var bandMaterial = Mat(
             $"residential_facade_band_{towerIndex % 4}",
             new Color(
                 Mathf.Lerp(0.2f, accent.R, 0.22f),
                 Mathf.Lerp(0.22f, accent.G, 0.22f),
-                Mathf.Lerp(0.22f, accent.B, 0.22f)));
+                Mathf.Lerp(0.22f, accent.B, 0.22f)),
+            0.04f,
+            0.9f);
         var accentMaterial = Mat(
             $"residential_facade_accent_{towerIndex % 5}",
-            accent.Darkened(0.22f),
-            0.42f,
-            0.4f);
-        var utilityMaterial = PaintedMetal(
+            accent.Darkened(0.22f).Lerp(new Color(0.34f, 0.39f, 0.39f), 0.34f),
+            0.08f,
+            0.84f);
+        var utilityMaterial = Mat(
             "residential_facade_utility",
-            new Color(0.34f, 0.39f, 0.39f));
+            new Color(0.34f, 0.39f, 0.39f),
+            0.06f,
+            0.88f);
         var ventMaterial = Mat(
             "residential_facade_vent",
             new Color(0.045f, 0.06f, 0.062f),
-            0.74f,
-            0.3f);
+            0.22f,
+            0.76f);
 
         var bands = new List<Transform3D>(spec.Floors * 4 + 10);
         for (var floor = 1; floor <= spec.Floors; floor++)

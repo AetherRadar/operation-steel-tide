@@ -7,6 +7,8 @@ public partial class FreightTerminalWorld
 {
     private static readonly StringName MapDetailVisualGroup = "map_detail_visuals";
     private static readonly float[] MapDetailVisibilityRanges = { 34.0f, 58.0f, 84.0f };
+    private static readonly StringName LowPolyBuildingVisualGroup = "low_poly_building_visuals";
+    private static readonly float[] LowPolyBuildingVisibilityRanges = { 190.0f, 275.0f, 360.0f };
 
     private struct MapRuntimeCounts
     {
@@ -21,6 +23,7 @@ public partial class FreightTerminalWorld
         public int ResidentialStairShapes;
         public int ResidentialStairVisuals;
         public int MapDetailVisuals;
+        public int LowPolyBuildingVisuals;
         public int BreakableGlassFields;
         public int BreakableGlassPanes;
     }
@@ -90,6 +93,37 @@ public partial class FreightTerminalWorld
         }
     }
 
+    private void ConfigureLowPolyBuildingVisual(GeometryInstance3D visual)
+    {
+        var maximumRange = (float)visual
+            .GetMeta("low_poly_max_visibility_range", 360.0f)
+            .AsDouble();
+        visual.VisibilityRangeEnd = Mathf.Min(
+            maximumRange,
+            LowPolyBuildingVisibilityRanges[Mathf.Clamp(_qualitySetting, 0, 2)]);
+        visual.VisibilityRangeEndMargin = _qualitySetting == 0 ? 8.0f : 16.0f;
+        visual.CastShadow = _qualitySetting >= 2
+            ? GeometryInstance3D.ShadowCastingSetting.On
+            : GeometryInstance3D.ShadowCastingSetting.Off;
+    }
+
+    private void ApplyLowPolyBuildingQuality()
+    {
+        if (!IsInsideTree())
+        {
+            return;
+        }
+        var visualNodes = GetTree().GetNodesInGroup(LowPolyBuildingVisualGroup);
+        using var visualNodesBacking = visualNodes.AsDisposable();
+        foreach (var node in visualNodes)
+        {
+            if (node is GeometryInstance3D visual && IsInstanceValid(visual))
+            {
+                ConfigureLowPolyBuildingVisual(visual);
+            }
+        }
+    }
+
     private static void CountMapRuntimeNodes(
         Node node,
         ref MapRuntimeCounts counts,
@@ -137,6 +171,10 @@ public partial class FreightTerminalWorld
         if (node.IsInGroup(MapDetailVisualGroup))
         {
             counts.MapDetailVisuals++;
+        }
+        if (node.IsInGroup(LowPolyBuildingVisualGroup))
+        {
+            counts.LowPolyBuildingVisuals++;
         }
         if (node is BreakableGlassField glassField)
         {
@@ -212,6 +250,29 @@ public partial class FreightTerminalWorld
                     : GeometryInstance3D.ShadowCastingSetting.Off);
         }
         var detailCullingReady = counts.MapDetailVisuals >= expectedFloors * 20 && detailQualityReady;
+        var lowPolyQualityReady = true;
+        var lowPolyNodes = GetTree().GetNodesInGroup(LowPolyBuildingVisualGroup);
+        using var lowPolyNodesBacking = lowPolyNodes.AsDisposable();
+        foreach (var node in lowPolyNodes)
+        {
+            if (node is not GeometryInstance3D visual)
+            {
+                lowPolyQualityReady = false;
+                break;
+            }
+            var maximumRange = (float)visual
+                .GetMeta("low_poly_max_visibility_range", 360.0f)
+                .AsDouble();
+            var expectedRange = Mathf.Min(
+                maximumRange,
+                LowPolyBuildingVisibilityRanges[Mathf.Clamp(_qualitySetting, 0, 2)]);
+            lowPolyQualityReady &= Mathf.IsEqualApprox(visual.VisibilityRangeEnd, expectedRange)
+                && visual.CastShadow == (_qualitySetting >= 2
+                    ? GeometryInstance3D.ShadowCastingSetting.On
+                    : GeometryInstance3D.ShadowCastingSetting.Off);
+        }
+        var lowPolyCullingReady = counts.LowPolyBuildingVisuals >= 51
+            && lowPolyQualityReady;
         var nodeBudgetMet = counts.Nodes < 40000;
         var staticBodyBudgetMet = counts.StaticBodies < 7500;
         var boxMeshBudgetMet = boxMeshResources.Count < 3000;
@@ -231,6 +292,7 @@ public partial class FreightTerminalWorld
             && stairBodiesConsolidated
             && stairVisualsBatched
             && detailCullingReady
+            && lowPolyCullingReady
             && nodeBudgetMet
             && staticBodyBudgetMet
             && boxMeshBudgetMet
@@ -238,7 +300,7 @@ public partial class FreightTerminalWorld
             && skyQualityReady
             && counts.CollisionShapes > 0
             && counts.MeshInstances > 0;
-        GD.Print($"PERFORMANCE_CHECK valid={valid} nodes={counts.Nodes} node_budget={nodeBudgetMet} static_bodies={counts.StaticBodies} static_budget={staticBodyBudgetMet} collision_shapes={counts.CollisionShapes} mesh_instances={counts.MeshInstances} multimesh_instances={counts.MultiMeshInstances} box_mesh_resources={boxMeshResources.Count} box_mesh_budget={boxMeshBudgetMet} detail_visuals={counts.MapDetailVisuals} detail_culling={detailCullingReady} quality_scale={qualityScaleReady} sky_quality={skyQualityReady} stair_batched={stairVisualsBatched} glass_fields={counts.BreakableGlassFields} glass_panes={counts.BreakableGlassPanes} labels={counts.Labels} lights={counts.Lights} stair_bodies={counts.ResidentialStairBodies} stair_consolidated={stairBodiesConsolidated} stair_shapes={counts.ResidentialStairShapes} stair_visuals={counts.ResidentialStairVisuals} residential={residentialReady}");
+        GD.Print($"PERFORMANCE_CHECK valid={valid} nodes={counts.Nodes} node_budget={nodeBudgetMet} static_bodies={counts.StaticBodies} static_budget={staticBodyBudgetMet} collision_shapes={counts.CollisionShapes} mesh_instances={counts.MeshInstances} multimesh_instances={counts.MultiMeshInstances} box_mesh_resources={boxMeshResources.Count} box_mesh_budget={boxMeshBudgetMet} detail_visuals={counts.MapDetailVisuals} detail_culling={detailCullingReady} low_poly_visuals={counts.LowPolyBuildingVisuals} low_poly_culling={lowPolyCullingReady} quality_scale={qualityScaleReady} sky_quality={skyQualityReady} stair_batched={stairVisualsBatched} glass_fields={counts.BreakableGlassFields} glass_panes={counts.BreakableGlassPanes} labels={counts.Labels} lights={counts.Lights} stair_bodies={counts.ResidentialStairBodies} stair_consolidated={stairBodiesConsolidated} stair_shapes={counts.ResidentialStairShapes} stair_visuals={counts.ResidentialStairVisuals} residential={residentialReady}");
         GD.Print($"PERFORMANCE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

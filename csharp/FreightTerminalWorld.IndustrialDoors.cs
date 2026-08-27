@@ -68,7 +68,7 @@ public partial class FreightTerminalWorld
                 hasDoorway: false);
             body.Name = landmark.Name;
             body.AddToGroup("freight_authored_landmark");
-            if (palette.Apply(body) > 0)
+            if (palette.Apply(body, landmark.Name) > 0)
             {
                 _industrialWeatheredBuildingCount++;
             }

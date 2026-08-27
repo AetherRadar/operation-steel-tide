@@ -326,10 +326,14 @@ public partial class FreightTerminalWorld
         var authoredModelCount = dressingRoot?.GetMeta("authored_model_count").AsInt32() ?? 0;
         var missingModelCount = dressingRoot?.GetMeta("missing_model_count").AsInt32() ?? -1;
         var uniqueSceneCount = dressingRoot?.GetMeta("unique_scene_count").AsInt32() ?? 0;
+        var palettedBuildingCount = arena.Root
+            .GetMeta("low_poly_paletted_building_count", 0)
+            .AsInt32();
         var authoredDressingReady = IsInstanceValid(dressingRoot)
             && authoredModelCount >= 45
             && missingModelCount == 0
-            && uniqueSceneCount >= 12;
+            && uniqueSceneCount >= 12
+            && palettedBuildingCount >= 11;
 
         arena.SetActive(false);
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
@@ -343,7 +347,7 @@ public partial class FreightTerminalWorld
             && extendedTravel && rotationReady && clearanceReady && navigationReady && strategyNavigationReady
             && centralCollisionVisualsReady
             && markersReady && spatialIsolation && sitesReady && authoredDressingReady;
-        GD.Print($"DEMOLITION_ARENA_CHECK valid={valid} lifecycle={lifecycleReady} inactive={initiallyIsolated} active={collisionReady} deactivated={deactivatedCleanly} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} routes={routesReady} navigation={navigationReady} navigation_details={navigationDetails} strategy_targets={strategyNavigationReady} strategy_blocked={blockedStrategyTargets} density={densityReady} mid_cover={layout.CentralCoverBodyCount} cover_points={layout.CoverPoints.Count} prop_clear={layout.CentralPropsDoNotOverlap} shaped_cover={centralCollisionVisualsReady} extended={extendedTravel} site_gap={layout.SiteSeparation:0.00} spawn_gap={HorizontalDistance(layout.AttackSpawn, layout.DefenderSpawn):0.00} path_a={layout.AttackToALength:0.00} path_b={layout.AttackToBLength:0.00} difference={layout.SiteTravelDifferenceRatio:P1} sightlines={sightlinesBlocked} rotation={layout.RotationLength:0.00} clearance={clearanceReady} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{rotationBlocker} markers={markersReady} isolation={spatialIsolation} sites={sitesReady} authored={authoredDressingReady} authored_models={authoredModelCount} authored_scenes={uniqueSceneCount} missing_models={missingModelCount}");
+        GD.Print($"DEMOLITION_ARENA_CHECK valid={valid} lifecycle={lifecycleReady} inactive={initiallyIsolated} active={collisionReady} deactivated={deactivatedCleanly} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} routes={routesReady} navigation={navigationReady} navigation_details={navigationDetails} strategy_targets={strategyNavigationReady} strategy_blocked={blockedStrategyTargets} density={densityReady} mid_cover={layout.CentralCoverBodyCount} cover_points={layout.CoverPoints.Count} prop_clear={layout.CentralPropsDoNotOverlap} shaped_cover={centralCollisionVisualsReady} extended={extendedTravel} site_gap={layout.SiteSeparation:0.00} spawn_gap={HorizontalDistance(layout.AttackSpawn, layout.DefenderSpawn):0.00} path_a={layout.AttackToALength:0.00} path_b={layout.AttackToBLength:0.00} difference={layout.SiteTravelDifferenceRatio:P1} sightlines={sightlinesBlocked} rotation={layout.RotationLength:0.00} clearance={clearanceReady} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{rotationBlocker} markers={markersReady} isolation={spatialIsolation} sites={sitesReady} authored={authoredDressingReady} authored_models={authoredModelCount} authored_scenes={uniqueSceneCount} missing_models={missingModelCount} paletted_buildings={palettedBuildingCount}");
         GD.Print($"DEMOLITION_ARENA_PASS valid={valid}");
         var arenaRoot = arena.Root;
         _demolitionArena = null;
@@ -403,7 +407,12 @@ public partial class FreightTerminalWorld
         await WaitFrames(48);
         var cameraCurrent = GetViewport().GetCamera3D() == camera;
         SaveViewportImage("res://demolition_arena_validation.png");
-        GD.Print($"DEMOLITION_ARENA_CAPTURE valid={cameraCurrent} camera={cameraCurrent} bodies={_demolitionArena.CollisionBodyCount} visuals={_demolitionArena.VisualPartCount} path=demolition_arena_validation.png");
+        camera.GlobalPosition = layout.Origin + new Vector3(-84.0f, 18.0f, 88.0f);
+        camera.LookAt(layout.Origin + new Vector3(-6.0f, 5.0f, 2.0f), Vector3.Up);
+        camera.Fov = 46.0f;
+        await WaitFrames(28);
+        SaveViewportImage("res://demolition_arena_oblique_validation.png");
+        GD.Print($"DEMOLITION_ARENA_CAPTURE valid={cameraCurrent} camera={cameraCurrent} bodies={_demolitionArena.CollisionBodyCount} visuals={_demolitionArena.VisualPartCount} paths=demolition_arena_validation.png,demolition_arena_oblique_validation.png");
         _demolitionArena.SetActive(false);
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         var arenaRoot = _demolitionArena.Root;

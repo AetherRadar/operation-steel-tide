@@ -53,6 +53,31 @@ public partial class FreightTerminalWorld
         });
         var assetsReady = layout.Props.Count >= 25
             && importedModels == layout.Props.Count;
+        var industrialBuildingProps = layout.Props
+            .Where(prop => prop.ScenePath.Contains(
+                "/kenney_city_kit_industrial/building-",
+                System.StringComparison.Ordinal))
+            .ToList();
+        var palettedBuildings = industrialBuildingProps.Count(prop =>
+        {
+            var model = arena.Root
+                .GetNodeOrNull<StaticBody3D>(prop.Name)?
+                .GetNodeOrNull<Node3D>("Model");
+            if (!IsInstanceValid(model))
+            {
+                return false;
+            }
+            var variant = model!.GetMeta("freight_palette_variant", -1).AsInt32();
+            return model.GetMeta("freight_palette", string.Empty).AsString()
+                    == FreightIndustrialPalette.PaletteId
+                && variant >= 0
+                && variant < FreightIndustrialPalette.VariantCount
+                && model.GetMeta("freight_palette_visuals", 0).AsInt32() > 0;
+        });
+        var paletteReady = industrialBuildingProps.Count >= 8
+            && palettedBuildings == industrialBuildingProps.Count
+            && arena.Root.GetMeta("low_poly_paletted_building_count", 0).AsInt32()
+                >= palettedBuildings;
         var tideforge = new DemolitionArenaLayout(DemolitionMapCatalog.TideforgeId, layout.Origin);
         var independentTopology = layout.WorldBounds.Size.X > layout.WorldBounds.Size.Y
             && tideforge.WorldBounds.Size.X < tideforge.WorldBounds.Size.Y
@@ -122,6 +147,7 @@ public partial class FreightTerminalWorld
             && catalogReady
             && localizationReady
             && assetsReady
+            && paletteReady
             && geometryReady
             && topologyReady
             && routeAClear
@@ -133,7 +159,7 @@ public partial class FreightTerminalWorld
             && navigationReady
             && runtimeReady
             && authoredDressingReady;
-        GD.Print($"HARBOR_LOCKS_CHECK valid={valid} catalog={catalogReady} localization={localizationReady} assets={assetsReady} imported={importedModels}/{layout.Props.Count} independent={independentTopology} large_buildings={largeBuildings} bounds={propsInsideBounds} separated={propsSeparated} overlap={overlapPair} site_clear={sitesClear} spawn_clear={spawnsClear} collision_coverage={collisionCoverage} collision_failures={string.Join('|', collisionCoverageFailures)} topology={topologyReady} navigation={navigationReady} routes={routeAClear}/{routeBClear}/{routeMidClear}/{defenderAClear}/{defenderBClear}/{rotationClear} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{defenderABlocker}|{defenderBBlocker}|{rotationBlocker} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} sites={arena.Sites.Count} authored={authoredDressingReady} authored_models={authoredModelCount} authored_scenes={uniqueSceneCount} missing_models={missingModelCount}");
+        GD.Print($"HARBOR_LOCKS_CHECK valid={valid} catalog={catalogReady} localization={localizationReady} assets={assetsReady} imported={importedModels}/{layout.Props.Count} palette={paletteReady} paletted_buildings={palettedBuildings}/{industrialBuildingProps.Count} independent={independentTopology} large_buildings={largeBuildings} bounds={propsInsideBounds} separated={propsSeparated} overlap={overlapPair} site_clear={sitesClear} spawn_clear={spawnsClear} collision_coverage={collisionCoverage} collision_failures={string.Join('|', collisionCoverageFailures)} topology={topologyReady} navigation={navigationReady} routes={routeAClear}/{routeBClear}/{routeMidClear}/{defenderAClear}/{defenderBClear}/{rotationClear} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{defenderABlocker}|{defenderBBlocker}|{rotationBlocker} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} sites={arena.Sites.Count} authored={authoredDressingReady} authored_models={authoredModelCount} authored_scenes={uniqueSceneCount} missing_models={missingModelCount}");
         GD.Print($"HARBOR_LOCKS_PASS valid={valid}");
 
         arena.SetActive(false);

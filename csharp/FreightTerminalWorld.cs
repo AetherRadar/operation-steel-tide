@@ -2719,6 +2719,7 @@ public partial class FreightTerminalWorld : Node3D
             _sunLight.DirectionalShadowPancakeSize = 20.0f;
         }
         ApplyMapDetailQuality();
+        ApplyLowPolyBuildingQuality();
         SaveSettings();
     }
 
@@ -4734,6 +4735,20 @@ public partial class FreightTerminalWorld : Node3D
         var authoredDressing = _industrialAuthoredDressingCount >= 25
             && _industrialAuthoredDressingSceneCount >= 10
             && _industrialWeatheredBuildingCount >= 23;
+        var lowPolyIndustrialNodes = GetTree().GetNodesInGroup("low_poly_industrial_building");
+        using var lowPolyIndustrialBacking = lowPolyIndustrialNodes.AsDisposable();
+        var lowPolyIndustrialBuildings = lowPolyIndustrialNodes
+            .OfType<Node3D>()
+            .Where(IsInstanceValid)
+            .ToList();
+        var lowPolyArchitecture = lowPolyIndustrialBuildings.Count >= 6
+            && lowPolyIndustrialBuildings.All(node =>
+                node.GetMeta("low_poly_style", string.Empty).AsString() == LowPolyBuildingArtBuilder.StyleId
+                && node.GetMeta("low_poly_detail_count", 0).AsInt32() >= 12
+                && LowPolyBuildingArtValidation.IsRenderable(
+                    node,
+                    "low_poly_industrial_art",
+                    12));
         var buildingLootReachable = 0;
         var unreachableBuildingLoot = new List<string>();
         foreach (var pickup in _lootSources.OfType<GradedLootPickup>())
@@ -4763,8 +4778,9 @@ public partial class FreightTerminalWorld : Node3D
             && hangarEnriched
             && ResidentialTowerCount >= 11
             && specialLandmarks
-            && authoredDressing;
-        GD.Print($"MAP_DENSITY_CHECK valid={valid} buildings={ComplexBuildingCount} rooms={ComplexRoomCount} room_loot={ComplexRoomLootCount}/{ComplexRoomCount} building_loot={_buildingLootPickupCount}/{ComplexRoomCount + FixedBuildingLootPlacementCount} reachable_loot={buildingLootReachable}/{_buildingLootPickupCount} unreachable={string.Join(';', unreachableBuildingLoot)} props={ComplexInteriorPropCount} customs={customs} ops={ops} fuel={fuel} quay={quay} hangar={hangarEnriched} towers={ResidentialTowerCount} special_landmarks={SpecialLandmarkCount} special_loot={SpecialLandmarkLootCount} vertical_routes={SpecialLandmarkVerticalRouteCount} authored_dressing={_industrialAuthoredDressingCount} authored_scenes={_industrialAuthoredDressingSceneCount} weathered_buildings={_industrialWeatheredBuildingCount}");
+            && authoredDressing
+            && lowPolyArchitecture;
+        GD.Print($"MAP_DENSITY_CHECK valid={valid} buildings={ComplexBuildingCount} rooms={ComplexRoomCount} room_loot={ComplexRoomLootCount}/{ComplexRoomCount} building_loot={_buildingLootPickupCount}/{ComplexRoomCount + FixedBuildingLootPlacementCount} reachable_loot={buildingLootReachable}/{_buildingLootPickupCount} unreachable={string.Join(';', unreachableBuildingLoot)} props={ComplexInteriorPropCount} customs={customs} ops={ops} fuel={fuel} quay={quay} hangar={hangarEnriched} towers={ResidentialTowerCount} special_landmarks={SpecialLandmarkCount} special_loot={SpecialLandmarkLootCount} vertical_routes={SpecialLandmarkVerticalRouteCount} authored_dressing={_industrialAuthoredDressingCount} authored_scenes={_industrialAuthoredDressingSceneCount} weathered_buildings={_industrialWeatheredBuildingCount} low_poly_industrial={lowPolyIndustrialBuildings.Count}/6 low_poly_ready={lowPolyArchitecture}");
         GD.Print($"MAP_DENSITY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

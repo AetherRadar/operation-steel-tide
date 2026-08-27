@@ -7,6 +7,7 @@ public partial class FreightTerminalWorld
 {
     private static readonly Dictionary<Vector3, BoxMesh> SharedBoxMeshes = new();
     private readonly AuthoredBuildingCollisionPlanner _authoredBuildingCollisionPlanner = new();
+    private readonly LowPolyBuildingArtBuilder _lowPolyBuildingArtBuilder = new();
 
     private static void ReleaseSharedBoxMeshes()
     {
@@ -548,9 +549,9 @@ void sky() {
         var asphalt = GroundMaterial("asphalt", new Color(0.45f, 0.49f, 0.5f), 0.88f);
         var concrete = GroundMaterial("concrete", new Color(0.66f, 0.67f, 0.61f), 0.82f);
         var concreteDark = Mat("concrete_dark", new Color(0.16f, 0.175f, 0.17f), 0.05f, 0.87f);
-        var steel = Mat("steel", new Color(0.115f, 0.14f, 0.14f), 0.78f, 0.32f);
-        var steelDark = Mat("steel_dark", new Color(0.035f, 0.048f, 0.05f), 0.83f, 0.28f);
-        var rust = Mat("rust", new Color(0.31f, 0.105f, 0.055f), 0.48f, 0.73f);
+        var steel = Mat("steel", new Color(0.115f, 0.14f, 0.14f), 0.38f, 0.68f);
+        var steelDark = Mat("steel_dark", new Color(0.035f, 0.048f, 0.05f), 0.46f, 0.64f);
+        var rust = Mat("rust", new Color(0.31f, 0.105f, 0.055f), 0.24f, 0.82f);
         var yellow = Mat("warning", new Color(0.74f, 0.51f, 0.055f), 0.22f, 0.55f);
         var white = Mat("marking", new Color(0.72f, 0.75f, 0.69f), 0.05f, 0.72f);
 
@@ -579,7 +580,7 @@ void sky() {
             }
         }
 
-        BuildWarehouse(concrete, steel, steelDark, yellow);
+        BuildWarehouse(concrete, steel, yellow);
         var interiorWall = Mat("loot_room_wall", new Color(0.38f, 0.41f, 0.39f), 0.04f, 0.9f);
         var interiorTrim = Mat("loot_room_trim", new Color(0.15f, 0.18f, 0.18f), 0.55f, 0.48f);
         BuildLootRooms(concrete, interiorWall, interiorTrim, yellow);
@@ -783,14 +784,15 @@ void sky() {
         _objectiveLights.Add(statusLight);
     }
 
-    private void BuildWarehouse(Godot.Material concrete, Godot.Material steel, Godot.Material dark, Godot.Material yellow)
+    private void BuildWarehouse(Godot.Material concrete, Godot.Material steel, Godot.Material yellow)
     {
+        var shell = _lowPolyBuildingArtBuilder.IndustrialFacadeMaterial("CentralWarehouse");
         StaticBox("WarehouseFloor", new Vector3(23.5f, 0.08f, -5), new Vector3(31, 0.18f, 42), concrete);
-        StaticBox("WarehouseEast", new Vector3(39, 4.5f, -5), new Vector3(0.6f, 9, 42), dark);
-        StaticBox("WarehouseNorth", new Vector3(23.5f, 4.5f, -26), new Vector3(31, 9, 0.6f), dark);
-        StaticBox("WarehouseSouthA", new Vector3(33.5f, 4.5f, 16), new Vector3(11, 9, 0.6f), dark);
-        StaticBox("WarehouseSouthB", new Vector3(16, 4.5f, 16), new Vector3(10, 9, 0.6f), dark);
-        StaticBox("WarehouseRoof", new Vector3(23.5f, 9, -5), new Vector3(31, 0.35f, 42), steel);
+        StaticBox("WarehouseEast", new Vector3(39, 4.5f, -5), new Vector3(0.6f, 9, 42), shell);
+        StaticBox("WarehouseNorth", new Vector3(23.5f, 4.5f, -26), new Vector3(31, 9, 0.6f), shell);
+        StaticBox("WarehouseSouthA", new Vector3(33.5f, 4.5f, 16), new Vector3(11, 9, 0.6f), shell);
+        StaticBox("WarehouseSouthB", new Vector3(16, 4.5f, 16), new Vector3(10, 9, 0.6f), shell);
+        StaticBox("WarehouseRoof", new Vector3(23.5f, 9, -5), new Vector3(31, 0.35f, 42), shell);
         AddIndustrialDoor(
             _levelRoot,
             "WarehouseLoadingDoor",
@@ -809,6 +811,19 @@ void sky() {
         }
         StaticBox("LoadingDock", new Vector3(9.7f, 0.8f, -7), new Vector3(4, 1.6f, 21), concrete);
         StaticBox("LoadingRamp", new Vector3(7.7f, 0.35f, 4.5f), new Vector3(4.2f, 0.4f, 5), concrete, new Vector3(0, 0, Mathf.DegToRad(-8)));
+        var artAnchor = new Node3D
+        {
+            Name = "CentralWarehouseLowPolyShell",
+            Position = new Vector3(23.5f, 0, -5)
+        };
+        _levelRoot.AddChild(artAnchor);
+        _lowPolyBuildingArtBuilder.BuildIndustrialDetails(
+            artAnchor,
+            "CentralWarehouse",
+            new Vector2(31, 42),
+            9.0f,
+            1,
+            new Color(0.74f, 0.51f, 0.055f));
     }
 
     private void BuildContainerYard(Godot.Material dark)
@@ -947,14 +962,15 @@ void sky() {
         const float width = 17.0f;
         const float depth = 7.4f;
         const float height = 3.0f;
+        var shell = _lowPolyBuildingArtBuilder.IndustrialFacadeMaterial("CentralBarracks");
         StaticBox("BarracksFloor", center + new Vector3(0, 0.06f, 0), new Vector3(width, 0.12f, depth), floor);
-        StaticBox("BarracksRoof", center + new Vector3(0, height, 0), new Vector3(width, 0.18f, depth), wall);
-        StaticBox("BarracksNorth", center + new Vector3(0, height * 0.5f, -depth * 0.5f), new Vector3(width, height, 0.18f), wall);
-        StaticBox("BarracksWest", center + new Vector3(-width * 0.5f, height * 0.5f, 0), new Vector3(0.18f, height, depth), wall);
-        StaticBox("BarracksEast", center + new Vector3(width * 0.5f, height * 0.5f, 0), new Vector3(0.18f, height, depth), wall);
-        StaticBox("BarracksSouthL", center + new Vector3(-5.15f, height * 0.5f, depth * 0.5f), new Vector3(6.7f, height, 0.18f), wall);
-        StaticBox("BarracksSouthR", center + new Vector3(5.15f, height * 0.5f, depth * 0.5f), new Vector3(6.7f, height, 0.18f), wall);
-        StaticBox("BarracksDoorHeader", center + new Vector3(0, 2.68f, depth * 0.5f), new Vector3(3.6f, 0.64f, 0.18f), wall);
+        StaticBox("BarracksRoof", center + new Vector3(0, height, 0), new Vector3(width, 0.18f, depth), shell);
+        StaticBox("BarracksNorth", center + new Vector3(0, height * 0.5f, -depth * 0.5f), new Vector3(width, height, 0.18f), shell);
+        StaticBox("BarracksWest", center + new Vector3(-width * 0.5f, height * 0.5f, 0), new Vector3(0.18f, height, depth), shell);
+        StaticBox("BarracksEast", center + new Vector3(width * 0.5f, height * 0.5f, 0), new Vector3(0.18f, height, depth), shell);
+        StaticBox("BarracksSouthL", center + new Vector3(-5.15f, height * 0.5f, depth * 0.5f), new Vector3(6.7f, height, 0.18f), shell);
+        StaticBox("BarracksSouthR", center + new Vector3(5.15f, height * 0.5f, depth * 0.5f), new Vector3(6.7f, height, 0.18f), shell);
+        StaticBox("BarracksDoorHeader", center + new Vector3(0, 2.68f, depth * 0.5f), new Vector3(3.6f, 0.64f, 0.18f), shell);
         AddIndustrialDoor(
             _levelRoot,
             "BarracksEntryDoor",
@@ -987,6 +1003,19 @@ void sky() {
                 ShadowEnabled = false
             });
         }
+        var artAnchor = new Node3D
+        {
+            Name = "CentralBarracksLowPolyShell",
+            Position = center
+        };
+        _levelRoot.AddChild(artAnchor);
+        _lowPolyBuildingArtBuilder.BuildIndustrialDetails(
+            artAnchor,
+            "CentralBarracks",
+            new Vector2(width, depth),
+            height,
+            1,
+            new Color(0.74f, 0.51f, 0.055f));
     }
 
     private void BuildCantileverCommandHub(

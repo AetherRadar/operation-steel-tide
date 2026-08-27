@@ -219,7 +219,9 @@ internal sealed class ResidentialTowerArtBuilder
         ConfigureVisuals(model);
         if (placement.Asset.Path.StartsWith($"{CityRoot}/building-", StringComparison.Ordinal))
         {
-            paletteApplied = _palette.Apply(model) > 0;
+            paletteApplied = _palette.Apply(
+                model,
+                $"residential_{towerIndex}_{placement.Name}") > 0;
         }
         body.AddChild(model);
         body.AddChild(new CollisionShape3D

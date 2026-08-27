@@ -99,6 +99,23 @@ public partial class FreightTerminalWorld
             .Where(tower => tower.HasMeta("residential_roof_style"))
             .Select(tower => tower.GetMeta("residential_roof_style").AsString())
             .ToHashSet(StringComparer.Ordinal);
+        var lowPolyTowers = _residentialTowers.Where(tower =>
+            tower.GetMeta("low_poly_style", string.Empty).AsString() == LowPolyBuildingArtBuilder.StyleId
+            && tower.GetMeta("low_poly_kind", string.Empty).AsString() == "residential"
+            && tower.GetMeta("low_poly_detail_count", 0).AsInt32() >= 14
+            && LowPolyBuildingArtValidation.IsRenderable(
+                tower,
+                "low_poly_residential_art",
+                14))
+            .ToList();
+        var lowPolyRoofStyles = lowPolyTowers
+            .Select(tower => tower.GetMeta("low_poly_roof_style", string.Empty).AsString())
+            .ToHashSet(StringComparer.Ordinal);
+        var expectedLowPolyRoofStyles = Enum
+            .GetNames<ResidentialRoofStyle>()
+            .ToHashSet(StringComparer.Ordinal);
+        var lowPolyArchitectureReady = lowPolyTowers.Count == ResidentialTowerSpecs.Length
+            && lowPolyRoofStyles.SetEquals(expectedLowPolyRoofStyles);
 
         var authoredNodes = GetTree().GetNodesInGroup("residential_authored_dressing");
         using var authoredNodesBacking = authoredNodes.AsDisposable();
@@ -148,7 +165,8 @@ public partial class FreightTerminalWorld
             && modelScenesReady
             && paletteReady
             && collisionsReady
-            && artResultsReady;
+            && artResultsReady
+            && lowPolyArchitectureReady;
         GD.Print(
             $"RESIDENTIAL_DIVERSITY_CHECK valid={valid} profiles={profileSignatures.Count}/{ResidentialTowerSpecs.Length} "
             + $"facades={facadeStyles.Count}/{Enum.GetValues<ResidentialFacadeStyle>().Length} "
@@ -158,7 +176,9 @@ public partial class FreightTerminalWorld
             + $"authored={authored.Count}/{ResidentialTowerSpecs.Length * 4} every_tower={everyTowerAuthored} "
             + $"sources={sourcePaths.Count}/{ResidentialTowerArtBuilder.ExpectedSourceSceneCount} "
             + $"models={modelScenesReady} palette={paletteReady} "
-            + $"paletted={authoredBuildings.Count} collision={collisionsReady} results={artResultsReady}");
+            + $"paletted={authoredBuildings.Count} collision={collisionsReady} results={artResultsReady} "
+            + $"low_poly={lowPolyTowers.Count}/{ResidentialTowerSpecs.Length} "
+            + $"low_poly_roofs={lowPolyRoofStyles.Count}/{Enum.GetValues<ResidentialRoofStyle>().Length}");
         GD.Print($"RESIDENTIAL_DIVERSITY_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }
