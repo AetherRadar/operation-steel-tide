@@ -1,4 +1,4 @@
-OPERATION STEEL TIDE 1.3.6 - WINDOWS X64
+OPERATION STEEL TIDE 1.4.0 - WINDOWS X64
 
 Run PLAY.bat. Godot, .NET, and Go do not need to be installed.
 
@@ -24,7 +24,7 @@ The included local mission service stores progression under backend\data.
 Deleting that folder resets the local profile. The game still has an offline
 mission fallback if the service cannot start.
 
-This is an AI-assisted programmer-art prototype. Expect rough animation and
-placeholder presentation. See the GitHub repository for source, known scope,
-architecture, and third-party asset attribution:
+This is an AI-assisted playable work in progress with authored characters,
+weapons, and environments alongside areas that still need an art pass. See the
+GitHub repository for source, scope, architecture, and content attribution:
 https://github.com/AetherRadar/operation-steel-tide

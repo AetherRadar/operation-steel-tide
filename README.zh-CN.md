@@ -4,16 +4,18 @@
 
 **一款使用 Godot 4.6 与 C# 开发的开源战术撤离 FPS：指挥三人干员小队，带走成功撤离的装备，或进入独立的 5v5 爆破对局。**
 
-![Saint Marais 老城中的第一人称交战](docs/media/hero.webp)
+![江海旧城中的 Operation Steel Tide 项目封面图](docs/media/cover.png)
 
-[下载 Windows 版本](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [查看引擎实拍](#引擎实拍) · [查看小队 AI 源码](csharp/FreightTerminalWorld.Squad.cs) · [阅读架构说明](ARCHITECTURE.md)
+*基于江海旧城制作的 AI 辅助项目封面图；当前版本的真实引擎实拍见下方链接。*
+
+[下载 Windows 版本](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [下载 macOS 版本](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [查看项目画廊](#项目画廊) · [查看小队 AI 源码](csharp/FreightTerminalWorld.Squad.cs) · [阅读架构说明](ARCHITECTURE.md)
 
 [![Godot 4.6](https://img.shields.io/badge/Godot-4.6-478CBF?logo=godot-engine&logoColor=white)](https://godotengine.org/)
 [![.NET 8](https://img.shields.io/badge/.NET-8-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-42e7c1.svg)](LICENSE)
 
-> **一分钟内开始游戏：** 下载最新的 Windows ZIP，完整解压后运行 `PLAY.bat`。便携版本免安装，也不要求本机安装 Godot、.NET 或 Go。
+> **一分钟内开始游戏：** 下载最新的 Windows x64 或 macOS 通用 ZIP。完整解压后，在 Windows 运行 `PLAY.bat`，或在 macOS 打开 `Operation Steel Tide.app`；两种版本都不要求预装 Godot 或 .NET。
 
 ## 玩法亮点
 
@@ -25,15 +27,35 @@
 
 > **仍在制作中：** 这是一个可以游玩的重系统原型，并非完成度达到商业发行标准的游戏。正式角色、武器和城市模块已经接入，但部分载具与世界区域仍需继续进行美术替换。可以尝试完成一次行动、检查源码，并[报告你遇到的第一个问题](https://github.com/AetherRadar/operation-steel-tide/issues)。
 
+## 项目画廊
+
+封面与下方小队主视觉均为 AI 辅助宣传图，取材自本项目的江海旧城环境和真实引擎截图；它们不会被冒充为游戏实机画面。
+
+![三名干员在江海旧城街区推进](docs/media/squad-key-art.png)
+
+**小队推进。** 三人火力组沿雨后的江海骑楼街道接近高架市集。
+
+如需查看当前版本的精确画面，可打开由 Godot 使用 `--capture-promotion` 直接生成的[小队推进](docs/media/squad.webp)、[市集天桥](docs/media/city.webp)与[庙宇入口](docs/media/hero.webp)截图；这些开发实拍与宣传图始终分开标注。
+
 > **开发说明：** 这是一个使用 AI 辅助开发的个人原型。AI 工具参与了部分实现和文档工作；仓库所有者仍对设计决策、集成、调试和验证负责。本项目不声称自身是一套可直接用于生产环境的架构范例。当前边界、重构规则和已发布内容的已知来源，请参阅 [ARCHITECTURE.md](ARCHITECTURE.md)、[工程规范](docs/ENGINEERING_STANDARDS.md)和[内容来源记录](docs/CONTENT_PROVENANCE.md)。
 
-## 运行 Windows 版本
+## 运行发行版
+
+### Windows
 
 1. 打开[最新版本页面](https://github.com/AetherRadar/operation-steel-tide/releases/latest)。
 2. 下载 Windows x64 ZIP，以及可选的 `.sha256` 文件。
 3. 将完整 ZIP 解压到可写目录，然后运行 `PLAY.bat`。
 
 发行包包含游戏、所需的 .NET 运行时文件，以及本地任务和进度服务。它不含安装程序，也不会请求管理员权限。由于这个原型没有进行代码签名，Windows SmartScreen 可能显示“未知发布者”警告；用于检查的源码、打包脚本、发行说明和校验值均可在本仓库中找到。
+
+### macOS
+
+1. 打开[最新版本页面](https://github.com/AetherRadar/operation-steel-tide/releases/latest)。
+2. 下载 macOS 通用 ZIP，以及可选的 `.sha256` 文件。
+3. 解压 ZIP，然后打开 `Operation Steel Tide.app`。
+
+通用应用同时包含 Intel 与 Apple Silicon 代码以及所需运行时文件。可选本地服务未运行时，游戏使用内置离线任务与进度后备流程。当前应用尚未签名或公证，因此 macOS 首次启动时可能要求用户明确批准。
 
 通过互联网联机但不想配置路由器端口转发时，主机玩家可以运行 [playit.gg](https://playit.gg/) UDP 隧道，将其指向 `127.0.0.1:28960`；只有主机需要安装客户端。其他玩家在 `JOIN GAME` 中输入完整的公网端点，例如 `example.gl.at.ply.gg:41237`。准确配置步骤、当前服务限制和专用网络替代方案请参阅 [ONLINE_PLAY.md](ONLINE_PLAY.md)。
 
@@ -82,24 +104,6 @@ godot --path .
 blender --background --factory-startup --python scripts/blender/build_extraction_aircraft.py
 ```
 
-## 引擎实拍
-
-以下图片均直接截取自实际运行的 Godot 项目。宣传截图命令只会隐藏 HUD 并使用固定机位，不会用离线渲染替换游戏画面。
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/media/squad.webp" alt="Saint Marais 老城中的三名持枪驻军干员"><br><sub>正式干员模型支持战斗、移动、蹲伏、倒地和救援动画状态。</sub></td>
-    <td width="50%"><img src="docs/media/city.webp" alt="Saint Marais 老城街道全景"><br><sub>Saint Marais 将授权模块化城市资产重新组合为可玩的撤离区域。</sub></td>
-  </tr>
-  <tr>
-    <td colspan="2"><img src="docs/media/arsenal.webp" alt="M4A1、AK74、AWM 与 Desert Eagle 的引擎内陈列"><br><sub>十三种枪械平台覆盖模块化步枪、冲锋枪、精确武器和副武器。</sub></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/media/inventory.webp" alt="显示武器、弹药、护甲、配件和背包价值的战场物品栏"><br><sub>搜刮武器、部件、护甲、弹药、医疗物品和稀有刀具涂装。</sub></td>
-    <td width="50%"><img src="docs/media/medical-wheel.webp" alt="包含绷带、战地医疗包和肾上腺素注射器的医疗轮盘"><br><sub>治疗会消耗真实物品堆叠，并可能被来袭火力打断。</sub></td>
-  </tr>
-</table>
-
 <details>
 <summary><strong>展开完整操作和玩法系统参考</strong></summary>
 
@@ -140,9 +144,9 @@ AI 队友默认跟随玩家，只会在部署保护结束且发生接触后参�
 
 部署大厅同时也是持久化装备市场。玩家使用 18,000 点初始资金购买六种枪械之一（M4A1、AK-74N、SCAR-L、MP5A5、M24 或 AXMC）、一套护甲、五个弹药品级之一，以及 30/60/90/180 发弹药包。弹药价格根据品级、数量和口径分别计算；选择拾荒者套装时仍可只带刀进入战场搜刮。友方 AI 队友和敌对撤离干员会携带武器部署；玩家购买的选择只有在本地档案完成原子化保存后才会应用。成功撤离时，只有高于部署基准的价值会存入 `user://operator_profile.json`，防止购买的装备被再次计为利润。
 
-同一大厅还包含部署地图选择器。`MAP 01 // FREIGHT TERMINAL` 和 `MAP 02 // BLACKWATER REFINERY` 是可玩的撤离行动，`MAP 03 // ORBITAL COMPLEX` 则保持可见但锁定。选择另一张可玩地图后会准备小队和配装并重新加载世界，因此任一时刻只会驻留一张 340 米 x 320 米的撤离地图。
+同一大厅还包含部署地图选择器。`MAP 01 // FREIGHT TERMINAL` 和 `MAP 02 // JIANGHAI OLD CITY` 是可玩的撤离行动，`MAP 03 // ORBITAL COMPLEX` 则保持可见但锁定。选择另一张可玩地图后会准备小队和配装并重新加载世界，因此任一时刻只会驻留一张 340 米 x 320 米的撤离地图。
 
-Blackwater Refinery 将 Kenney 和 Poly Haven 提供的 26 个 CC0 源场景重新组合成 90 个工业建筑、储罐、烟囱、道路障碍和军用箱。进料场、两个泵区、裂解场和涡轮机区围绕一条畅通的中央车辆通道，各自拥有独立的战利品和驻军路线。导入视觉资产使用缓存场景、距离剔除、降低的道具阴影，以及每个放置物体一个缩放后的盒形碰撞代理；该地图的运行时检查目前保持在 900 个节点、125 个静态物体、500 个网格实例和 20 盏灯以内。
+江海旧城已经取代原有 Blackwater 工业视觉：单一 DCC 正式场景由项目构图与已记录的 CC0 来源资产共同组成。密集骑楼街巷串联广昌当铺、红星电子厂、庙宇院落、灯火市集天桥、两个彼此分离的高价值区域和实体任务终端。缓存场景加载、分级阴影剔除、简化碰撞代理、畅通车辆路线、屋顶通行、战利品、驻军和小地图地标共同保证地图可玩且可验证；旧地图 ID 与 `--validate-refinery-map` 命令继续保留，以兼容存档和诊断。
 
 行动办公室还可以从十二张地图组成的池中启动独立爆破比赛。任务简报通过前后按钮一次展示一张地图：`TIDEFORGE ARENA`、`HARBOR LOCKS` 和 `TIDEGLASS REACTOR` 当前可玩，其余九个位置在对应几何资源完成前保持可见但锁定。Tideforge 的两个目标点分别位于开放式铸造厂和封闭装配车间。Harbor Locks 将 Kenney 的 CC0 City Kit (Industrial) 模型重新组合成一片船闸区，包含泵站、控制建筑、两条狭长岸边水道、三条进攻路线和硬掩体转点路线。Tideglass Reactor 完全弃用那套反复出现的蓝色工业包：施工塔楼与吊机、完整砖砌反应堆大楼、市政十字路口、两座各不相同的边界闸门、橙灰色模块化厂房和街道设施由七套 CC0 来源中的 46 个互不重复模型文件组成。六条可供角色胶囊体通行的路线连接两个目标点，并保留不同的进攻与转点选择。每场比赛采用 MR12 5v5：玩家和四名 AI 队友对阵五名敌人，先赢 13 回合者获胜；中场交换阵营并将资金重置为 $800；加时要求净胜两回合，且每四回合交换阵营。每回合开始前有 15 秒购买阶段，期间战斗冻结，界面按准确价格提供副武器、主武器、护甲和手雷。初始 $800 可购买 P226 或 M1911，但买不起主武器；确认购买只扣除一次校验后的总价，超时则接受当前可负担的选择，或仅持刀开始。回合胜利奖励 $3,000；失败基础奖励为 $1,900，并按连败增加 $500；安放或拆除奖励 $300；资金上限为 $9,000。敌人使用相同价格阶梯购买装备，爆破模式与撤离模式的进度和资金彼此隔离。玩家小队防守时，敌方 AI 会选择炸弹携带者按路线行进并安放炸弹，其他进攻者架枪；进攻方会借助掩体完成拆除，防守方则进行转点回防。
 
@@ -281,7 +285,7 @@ Godot_console.exe --headless --path . -- --validate-extraction-network-client
 
 `--validate-deployment-ui` 验证完整干员预览、六项市场条目、四套快捷配装预设、四种弹药数量、独立的品级/数量定价、三槽地图选择器、锁定地图拒绝逻辑、配装成本和预计部署后余额。
 
-`--validate-refinery-map` 通过旧地图 ID 启动 Saint Marais Old Town，并验证正式模型布置、CC0 来源覆盖、场景缓存、距离剔除、仅使用盒体的碰撞代理、独立区域、高价值战利品区、车辆路线、屋顶小队通行、战利品/驻军/小地图集成，以及严格的节点、物体、网格和灯光预算。`--capture-refinery-map` 保留兼容命令和旧输出名，同时保存俯视构图、玩家高度道路、两个高价值庭院和屋顶路线。`--capture-promotion` 使用固定布置与机位，在 `docs/media` 下重复生成 1600 x 900 无 HUD 主视觉、驻军、城市和武器图片，并输出 1280 x 640 社交封面。
+`--validate-refinery-map` 通过旧地图 ID 启动江海旧城，并验证正式模型布置、CC0 来源覆盖、场景缓存、质量等级、仅使用盒体的碰撞代理、独立区域、高价值战利品区、车辆路线、屋顶小队通行、战利品/驻军/小地图集成，以及严格渲染预算。`--capture-refinery-map` 保留兼容命令和旧输出名，同时保存俯视构图、玩家高度道路、两个高价值院落和屋顶路线。`--capture-promotion` 使用固定布置与机位，在 `docs/media` 下重复生成 1600 x 900 无 HUD 主视觉、小队推进和市集天桥图片，并输出 1280 x 640 社交封面。
 
 `--validate-pause-ui` 验证正式制作的暂停场景、必需控件绑定、不产生信号反馈的设置同步、中英文标签、暂停可见状态和鼠标释放，以及现有继续游戏事件路径。
 

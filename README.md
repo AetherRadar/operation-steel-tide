@@ -4,16 +4,18 @@ English | [简体中文](README.zh-CN.md)
 
 **An open-source tactical extraction FPS built with Godot 4.6 and C#: command a three-operator squad, keep the gear you extract, or enter a separate 5v5 demolition match.**
 
-![First-person combat in Saint Marais Old Town](docs/media/hero.webp)
+![Operation Steel Tide key art in Jianghai Old City](docs/media/cover.png)
 
-[Download the Windows build](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [View the in-engine gallery](#in-engine-gallery) · [Explore the squad AI](csharp/FreightTerminalWorld.Squad.cs) · [Read the architecture notes](ARCHITECTURE.md)
+*AI-assisted project key art based on Jianghai Old City; direct captures from the current build are linked below.*
+
+[Download for Windows](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [Download for macOS](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [View the presentation gallery](#presentation-gallery) · [Explore the squad AI](csharp/FreightTerminalWorld.Squad.cs) · [Read the architecture notes](ARCHITECTURE.md)
 
 [![Godot 4.6](https://img.shields.io/badge/Godot-4.6-478CBF?logo=godot-engine&logoColor=white)](https://godotengine.org/)
 [![.NET 8](https://img.shields.io/badge/.NET-8-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-42e7c1.svg)](LICENSE)
 
-> **Play in under a minute:** download the latest Windows ZIP, extract the folder, and run `PLAY.bat`. The portable build needs no installer, Godot, .NET, or Go.
+> **Play in under a minute:** download the latest Windows x64 or macOS universal ZIP. Extract it, then run `PLAY.bat` on Windows or open `Operation Steel Tide.app` on macOS. Neither build requires Godot or .NET to be installed.
 
 ## What Makes It Different
 
@@ -25,15 +27,35 @@ English | [简体中文](README.zh-CN.md)
 
 > **Work in progress:** this is a playable systems-heavy prototype, not a finished commercial game. Authored characters, weapons, and city modules are in place, while several vehicles and world areas still need another art pass. Try a run, inspect the source, and [report the first thing that breaks](https://github.com/AetherRadar/operation-steel-tide/issues).
 
+## Presentation Gallery
+
+The cover and squad still are AI-assisted promotional art derived from this project's Jianghai environment and direct captures; they are not presented as gameplay screenshots.
+
+![Three operators advancing through Jianghai Old City](docs/media/squad-key-art.png)
+
+**Squad advance.** A three-operator fireteam approaches the elevated market through Jianghai's rain-soaked shophouse avenue.
+
+For an exact look at the current build, open the deterministic [squad advance](docs/media/squad.webp), [market footbridge](docs/media/city.webp), or [temple approach](docs/media/hero.webp) captures. They are generated directly by Godot with `--capture-promotion` and intentionally remain separate from the promotional art.
+
 > **Development disclosure:** This is an AI-assisted solo prototype. AI tools were used for portions of implementation and documentation; the repository owner remains responsible for design decisions, integration, debugging, and validation. It is not presented as a production-ready architecture reference. See [ARCHITECTURE.md](ARCHITECTURE.md), [Engineering Standards](docs/ENGINEERING_STANDARDS.md), and [Content Provenance](docs/CONTENT_PROVENANCE.md) for the current boundaries, refactor rules, and known origin of shipped content.
 
-## Run the Windows build
+## Run a release build
+
+### Windows
 
 1. Open [the latest release](https://github.com/AetherRadar/operation-steel-tide/releases/latest).
 2. Download the Windows x64 ZIP and its optional `.sha256` file.
 3. Extract the complete ZIP to a writable folder and run `PLAY.bat`.
 
 The package contains the game, required .NET runtime files, and local mission/progression service. It has no installer and does not request administrator access. Because this prototype is not code-signed, Windows SmartScreen may show an unknown-publisher warning; the source, packaging script, release notes, and checksum are all available in this repository for inspection.
+
+### macOS
+
+1. Open [the latest release](https://github.com/AetherRadar/operation-steel-tide/releases/latest).
+2. Download the macOS universal ZIP and its optional `.sha256` file.
+3. Extract the ZIP and open `Operation Steel Tide.app`.
+
+The universal app includes both Intel and Apple Silicon code plus its required runtime files. It uses the built-in offline mission/progression path when the optional local service is not running. The current build is unsigned and not notarized, so macOS may require explicit approval before the first launch.
 
 For internet co-op without router port forwarding, the host can run a [playit.gg](https://playit.gg/) UDP tunnel to `127.0.0.1:28960`; only the host installs the agent. Other players enter the complete public endpoint, such as `example.gl.at.ply.gg:41237`, in `JOIN GAME`. See [ONLINE_PLAY.md](ONLINE_PLAY.md) for the exact setup, current service limits, and private-network alternatives.
 
@@ -82,24 +104,6 @@ The rescue tilt-rotor is an editable Blender asset rather than runtime programme
 blender --background --factory-startup --python scripts/blender/build_extraction_aircraft.py
 ```
 
-## In-Engine Gallery
-
-These are direct captures from the running Godot project. The promotional capture hides the HUD and stages deterministic camera positions; it does not replace the game with offline renders.
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/media/squad.webp" alt="Three armed garrison operators staged in Saint Marais Old Town"><br><sub>Authored operators use combat, movement, crouch, downed, and revive animation states.</sub></td>
-    <td width="50%"><img src="docs/media/city.webp" alt="Wide street-level view of Saint Marais Old Town"><br><sub>Saint Marais recomposes licensed modular city assets into a playable extraction district.</sub></td>
-  </tr>
-  <tr>
-    <td colspan="2"><img src="docs/media/arsenal.webp" alt="In-engine presentation of the M4A1, AK74, AWM, and Desert Eagle"><br><sub>Thirteen firearm platforms span modular rifles, SMGs, precision weapons, and sidearms.</sub></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/media/inventory.webp" alt="Field inventory showing weapons, ammunition, armor, attachments, and backpack value"><br><sub>Loot weapons, parts, armor, ammunition, medical items, and rare knife finishes.</sub></td>
-    <td width="50%"><img src="docs/media/medical-wheel.webp" alt="Medical selector with bandage, trauma kit, and adrenaline injector"><br><sub>Treatment consumes real inventory stacks and can be interrupted by incoming fire.</sub></td>
-  </tr>
-</table>
-
 <details>
 <summary><strong>Open the full controls and gameplay systems reference</strong></summary>
 
@@ -144,9 +148,9 @@ AI squadmates follow by default, engage only after deployment protection ends an
 
 The deployment lobby doubles as a persistent equipment market. Players spend an 18,000-credit starting balance on one of six firearms (M4A1, AK-74N, SCAR-L, MP5A5, M24, or AXMC), an armor package, one of five ammunition tiers, and a 30/60/90/180-round ammunition pack. Ammunition cost scales independently with grade, quantity, and caliber; choosing the scavenger kit still supports a knife-only loot run. Friendly AI teammates and rival extraction operators deploy armed, while the player's purchased selection is applied only after the local profile is atomically saved. Successful extraction banks only value gained above the deployment baseline into `user://operator_profile.json`, preventing purchased gear from being credited back as profit.
 
-The same lobby now includes a deployment-map selector. `MAP 01 // FREIGHT TERMINAL` and `MAP 02 // SAINT MARAIS OLD TOWN` are playable extraction operations, while `MAP 03 // ORBITAL COMPLEX` remains visibly locked. Selecting a different playable map stages the squad/loadout and reloads the world, so only one 340 m x 320 m extraction map is resident at a time.
+The same lobby now includes a deployment-map selector. `MAP 01 // FREIGHT TERMINAL` and `MAP 02 // JIANGHAI OLD CITY` are playable extraction operations, while `MAP 03 // ORBITAL COMPLEX` remains visibly locked. Selecting a different playable map stages the squad/loadout and reloads the world, so only one 340 m x 320 m extraction map is resident at a time.
 
-Saint Marais Old Town is a complete visual and tactical replacement for the legacy Blackwater Refinery layout. It recomposes 21 selected CC0 glTF modules from Quaternius' Downtown City MegaKit into a dense street grid, Founders Plaza, two cross-town approach routes, a physical market-rooftop traversal, and two separated high-value compounds: the Grand Hotel courtyard and Municipal Treasury courtyard. Each high-value area has its own Epic/Legendary caches, premium valuables, guards, cover, objective access, and minimap identity. Imported visuals use cached scenes, distance culling, authored modular facades, and simple box collision scaffolding; `--validate-refinery-map` keeps the compatibility command while enforcing the old-town identity, route clearance, two-zone separation, rooftop traversal, gameplay integration, and budgets below 1,900 nodes, 125 static bodies, 760 mesh instances, and 32 lights.
+Jianghai Old City replaces the legacy Blackwater visual identity with a single DCC-authored district assembled from project-authored composition and recorded CC0 source assets. Dense shophouse streets connect Guangchang Pawnshop, Red Star Electronics, a temple compound, the lit market footbridge, two separated high-value zones, and physical objective terminals. Cached scene loading, quality-tier shadow culling, simple collision proxies, clear vehicle routes, rooftop traversal, loot, guards, and minimap landmarks keep the detailed map playable and testable; the legacy map ID and `--validate-refinery-map` command remain stable for saves and diagnostics.
 
 The Operations Office also launches the separate demolition match from a twelve-map pool. Its briefing shows one map at a time with previous/next controls: `TIDEFORGE ARENA`, `HARBOR LOCKS`, and `TIDEGLASS REACTOR` are playable, while the other nine slots remain visibly locked until their geometry ships. Tideforge splits its sites across an open foundry and enclosed assembly hall. Harbor Locks recomposes Kenney's CC0 City Kit (Industrial) models into a lock-gate district with pump stations, control buildings, two long quayside channels, three attack routes, and hard-cover rotations. Tideglass Reactor abandons that blue industrial kit entirely: its construction tower and crane, complete brick reactor hall, civic crossroad, distinct perimeter gates, orange-gray modular halls, and street furniture combine 46 unique authored model files from seven CC0 source collections without repeating a scene. Six capsule-clear routes connect the two sites while preserving distinct approach and rotation choices. Each match is MR12 5v5: the player plus four AI teammates against five opponents, first to 13 rounds, halftime side swap with wallets reset to $800, and a win-by-two overtime that swaps sides every four rounds. A 15-second buy phase freezes combat before every round and presents sidearms, primary weapons, armor, and grenades with exact prices. The opening $800 can buy a P226 or M1911 but cannot buy a primary; confirming deducts the validated total once, while timeout accepts the current affordable selection or starts knife-only. Round wins pay $3,000, losses start at $1,900 plus a $500 loss-streak escalation, planting or defusing pays $300, and wallets cap at $9,000. Opponents purchase from the same price ladder, while extraction progression and its wallet remain isolated. When the player squad defends, enemy AI picks a carrier who walks a route, plants, and the remaining attackers hold angles; attackers defuse through cover while defenders rotate.
 
@@ -293,7 +297,7 @@ Godot_console.exe --headless --path . -- --validate-extraction-network-client
 
 `--validate-operator-roster` verifies five unique non-garrison player visual IDs, all five authored GLBs, 25-action animation contracts, movement-time rifle fit, role-aware armed previews, random player/AI/rival selection, fixed garrison identity, and the existing Scavenger and Locksmith loot benefits. `--capture-operator-roster` saves a five-column player-camera preview for visual comparison.
 
-`--validate-refinery-map` boots Saint Marais Old Town through the legacy map ID and verifies its authored model placements, CC0 source coverage, scene caching, distance culling, box-only collision proxies, distinct districts, separated high-value loot zones, clear vehicle routes, rooftop squad traversal, loot/garrison/minimap integration, and strict node/body/mesh/light budgets. `--capture-refinery-map` retains the compatibility command and legacy output names while saving an overhead composition frame, a street-level approach, both high-value courtyards, and the rooftop route. `--capture-promotion` uses fixed staging and camera positions to reproduce the 1600 x 900 HUD-free hero, garrison, city, and arsenal images under `docs/media`, plus the 1280 x 640 social preview.
+`--validate-refinery-map` boots Jianghai Old City through the legacy map ID and verifies its authored model placements, CC0 source coverage, scene caching, quality tiers, box-only collision proxies, distinct districts, separated high-value loot zones, clear vehicle routes, rooftop squad traversal, loot/garrison/minimap integration, and strict rendering budgets. `--capture-refinery-map` retains the compatibility command and legacy output names while saving an overhead composition frame, street-level approaches, both high-value compounds, and the rooftop route. `--capture-promotion` uses fixed staging and camera positions to reproduce the 1600 x 900 HUD-free hero, squad-advance, and market-footbridge images under `docs/media`, plus the 1280 x 640 social preview.
 
 `--validate-industrial-interiors` verifies all 23 Blender-edited freight buildings, 63 new hinged or overhead doors, open/closed ballistic clearance, 276 enclosed-room wall rays, floor and roof collision, AI door traversal, and the seeded 8-cache/3-guard/12-empty room distribution. `--capture-industrial-interiors` saves closed/open mixed-door facades plus representative authored cache and resting-guard rooms.
 
