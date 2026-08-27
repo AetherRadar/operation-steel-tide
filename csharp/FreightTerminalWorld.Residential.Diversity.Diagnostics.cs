@@ -111,11 +111,19 @@ public partial class FreightTerminalWorld
         var lowPolyRoofStyles = lowPolyTowers
             .Select(tower => tower.GetMeta("low_poly_roof_style", string.Empty).AsString())
             .ToHashSet(StringComparer.Ordinal);
+        var lowPolyMassingStyles = lowPolyTowers
+            .Select(tower => tower.GetMeta("low_poly_massing_style", string.Empty).AsString())
+            .ToHashSet(StringComparer.Ordinal);
+        var lowPolyArchitectureSignatures = lowPolyTowers
+            .Select(tower => tower.GetMeta("low_poly_architecture_signature", string.Empty).AsString())
+            .ToHashSet(StringComparer.Ordinal);
         var expectedLowPolyRoofStyles = Enum
             .GetNames<ResidentialRoofStyle>()
             .ToHashSet(StringComparer.Ordinal);
         var lowPolyArchitectureReady = lowPolyTowers.Count == ResidentialTowerSpecs.Length
-            && lowPolyRoofStyles.SetEquals(expectedLowPolyRoofStyles);
+            && lowPolyRoofStyles.SetEquals(expectedLowPolyRoofStyles)
+            && lowPolyMassingStyles.Count >= 8
+            && lowPolyArchitectureSignatures.Count == ResidentialTowerSpecs.Length;
 
         var authoredNodes = GetTree().GetNodesInGroup("residential_authored_dressing");
         using var authoredNodesBacking = authoredNodes.AsDisposable();
@@ -139,7 +147,9 @@ public partial class FreightTerminalWorld
             && authoredBuildings.All(node =>
                 node.GetNodeOrNull<Node3D>("Model") is { } model
                 && model.GetMeta("freight_palette", string.Empty).AsString()
-                    == FreightIndustrialPalette.PaletteId);
+                    == FreightIndustrialPalette.PaletteId
+                && model.GetMeta("freight_palette_gradient", false).AsBool()
+                && model.GetMeta("freight_palette_gradient_height", 0.0f).AsSingle() > 0.0f);
         var collisionsReady = authored.All(node =>
             node.GetNodeOrNull<CollisionShape3D>("Collision")?.Shape is BoxShape3D box
             && box.Size.X > 0.1f
@@ -178,6 +188,7 @@ public partial class FreightTerminalWorld
             + $"models={modelScenesReady} palette={paletteReady} "
             + $"paletted={authoredBuildings.Count} collision={collisionsReady} results={artResultsReady} "
             + $"low_poly={lowPolyTowers.Count}/{ResidentialTowerSpecs.Length} "
+            + $"low_poly_massing={lowPolyMassingStyles.Count}/8 low_poly_signatures={lowPolyArchitectureSignatures.Count}/{ResidentialTowerSpecs.Length} "
             + $"low_poly_roofs={lowPolyRoofStyles.Count}/{Enum.GetValues<ResidentialRoofStyle>().Length}");
         GD.Print($"RESIDENTIAL_DIVERSITY_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);

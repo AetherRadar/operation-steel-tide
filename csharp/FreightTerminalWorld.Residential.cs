@@ -389,7 +389,12 @@ public partial class FreightTerminalWorld
         community.AddChild(tower);
         _residentialTowers.Add(tower);
 
-        var facade = _lowPolyBuildingArtBuilder.ResidentialFacadeMaterial(index, spec.Accent);
+        var facadeHeight = spec.Floors * ResidentialFloorHeight;
+        var facade = _lowPolyBuildingArtBuilder.ResidentialFacadeMaterial(
+            index,
+            spec.Accent,
+            spec.Position.Y,
+            facadeHeight);
         var interiorWall = Mat("residential_interior_wall", new Color(0.63f, 0.65f, 0.6f), 0.01f, 0.92f);
         var interiorFloor = Mat("residential_interior_floor", new Color(0.31f, 0.29f, 0.24f), 0.02f, 0.78f);
         var stair = Mat("residential_stair", new Color(0.39f, 0.42f, 0.4f), 0.12f, 0.76f);

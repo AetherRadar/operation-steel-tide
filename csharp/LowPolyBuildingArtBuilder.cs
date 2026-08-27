@@ -5,58 +5,108 @@ namespace OperationSteelTide;
 
 internal readonly record struct LowPolyBuildingArtResult(int BatchCount, int DetailPartCount);
 
-/// <summary>Builds a batched, collision-neutral low-poly art layer over existing gameplay shells.</summary>
-internal sealed class LowPolyBuildingArtBuilder
+/// <summary>Builds batched architectural massing and material variation over gameplay shells.</summary>
+internal sealed partial class LowPolyBuildingArtBuilder
 {
-    public const string StyleId = "faceted_lowpoly_v1";
+    public const string StyleId = "architectural_lowpoly_v2";
 
     private const string ShaderCode = @"shader_type spatial;
 render_mode depth_draw_opaque;
 
-uniform vec4 base_color : source_color;
+uniform vec4 lower_color : source_color;
+uniform vec4 middle_color : source_color;
+uniform vec4 upper_color : source_color;
+uniform vec4 weather_color : source_color;
+uniform float gradient_origin;
+uniform float gradient_height;
+uniform float variation_phase;
+uniform float variation_strength;
+varying vec3 world_position;
 varying vec3 world_normal;
 
 void vertex() {
+    world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
     world_normal = normalize(mat3(MODEL_MATRIX) * NORMAL);
 }
 
 void fragment() {
-    float facing = dot(normalize(world_normal), normalize(vec3(-0.48, 0.78, 0.39)));
-    float facet_step = floor(clamp(facing * 0.5 + 0.5, 0.0, 0.999) * 4.0) / 3.0;
-    float roof_lift = step(0.64, world_normal.y) * 0.06;
-    ALBEDO = base_color.rgb * (mix(0.78, 1.04, facet_step) + roof_lift);
+    float height_t = clamp((world_position.y - gradient_origin) / max(gradient_height, 0.1), 0.0, 1.0);
+    vec3 color = mix(lower_color.rgb, middle_color.rgb, smoothstep(0.02, 0.58, height_t));
+    color = mix(color, upper_color.rgb, smoothstep(0.44, 0.98, height_t));
+
+    float broad_variation = sin(world_position.x * 0.055 + variation_phase) * 0.52
+        + cos(world_position.z * 0.071 - variation_phase * 1.37) * 0.31
+        + sin(world_position.y * 0.12 + variation_phase * 0.63) * 0.17;
+    float orientation = dot(normalize(world_normal), normalize(vec3(-0.42, 0.22, 0.51)));
+    float ground_weather = pow(1.0 - height_t, 3.2) * (0.18 + 0.05 * broad_variation);
+    color = mix(color, weather_color.rgb, clamp(ground_weather, 0.0, 0.24));
+    color *= 1.0 + broad_variation * variation_strength;
+    color *= 1.0 + orientation * 0.035;
+    color *= mix(0.97, 1.04, smoothstep(0.55, 0.9, world_normal.y));
+
+    ALBEDO = color;
     METALLIC = 0.0;
-    ROUGHNESS = 0.96;
-    SPECULAR = 0.18;
+    ROUGHNESS = mix(0.96, 0.82, height_t);
+    SPECULAR = 0.2;
 }";
 
-    private static readonly Color[] IndustrialShellColors =
+    private static readonly BuildingGradient[] IndustrialGradients =
     {
-        new(0.37f, 0.42f, 0.39f),
-        new(0.43f, 0.36f, 0.27f),
-        new(0.29f, 0.40f, 0.37f),
-        new(0.40f, 0.31f, 0.29f)
+        new(new(0.18f, 0.27f, 0.26f), new(0.35f, 0.45f, 0.41f), new(0.51f, 0.54f, 0.46f), new(0.10f, 0.15f, 0.14f)),
+        new(new(0.30f, 0.22f, 0.14f), new(0.50f, 0.40f, 0.27f), new(0.61f, 0.53f, 0.36f), new(0.17f, 0.13f, 0.10f)),
+        new(new(0.18f, 0.25f, 0.31f), new(0.34f, 0.43f, 0.48f), new(0.50f, 0.56f, 0.57f), new(0.10f, 0.14f, 0.18f)),
+        new(new(0.30f, 0.19f, 0.16f), new(0.51f, 0.34f, 0.28f), new(0.60f, 0.47f, 0.37f), new(0.17f, 0.11f, 0.09f)),
+        new(new(0.20f, 0.27f, 0.17f), new(0.39f, 0.46f, 0.29f), new(0.55f, 0.57f, 0.39f), new(0.12f, 0.15f, 0.09f)),
+        new(new(0.14f, 0.27f, 0.29f), new(0.29f, 0.45f, 0.46f), new(0.45f, 0.58f, 0.56f), new(0.08f, 0.15f, 0.16f))
     };
 
     private readonly Dictionary<string, ShaderMaterial> _materials = new();
     private readonly BoxMesh _unitBox = new() { Size = Vector3.One };
+    private readonly PrismMesh _unitPrism = new()
+    {
+        Size = Vector3.One,
+        LeftToRight = 0.5f
+    };
+    private readonly CylinderMesh _unitHex = new()
+    {
+        TopRadius = 0.5f,
+        BottomRadius = 0.5f,
+        Height = 1.0f,
+        RadialSegments = 6,
+        Rings = 1
+    };
     private readonly Shader _shader = new() { Code = ShaderCode };
 
-    public ShaderMaterial IndustrialFacadeMaterial(string identity)
+    public ShaderMaterial IndustrialFacadeMaterial(
+        string identity,
+        float worldBaseY,
+        float facadeHeight)
     {
-        var variant = StableVariant(identity, IndustrialShellColors.Length);
-        return Material($"industrial_shell_{variant}", IndustrialShellColors[variant]);
+        var profile = IndustrialArchitecture(identity);
+        return GradientMaterial(
+            $"industrial_shell_{identity}",
+            IndustrialGradients[profile.PaletteIndex],
+            worldBaseY,
+            facadeHeight,
+            StableUnit($"{identity}:shell"),
+            0.075f);
     }
 
-    public ShaderMaterial ResidentialFacadeMaterial(int towerIndex, Color accent)
+    public ShaderMaterial ResidentialFacadeMaterial(
+        int towerIndex,
+        Color accent,
+        float worldBaseY,
+        float facadeHeight)
     {
-        var neutral = (towerIndex % 3) switch
-        {
-            0 => new Color(0.40f, 0.40f, 0.36f),
-            1 => new Color(0.35f, 0.40f, 0.38f),
-            _ => new Color(0.40f, 0.35f, 0.33f)
-        };
-        return Material($"residential_shell_{towerIndex}", neutral.Lerp(accent.Darkened(0.24f), 0.12f));
+        var profile = ResidentialArchitecture(towerIndex);
+        var gradient = ResidentialGradient(profile.PaletteIndex, accent);
+        return GradientMaterial(
+            $"residential_shell_{towerIndex}",
+            gradient,
+            worldBaseY,
+            facadeHeight,
+            StableUnit($"residential_{towerIndex}:shell"),
+            0.082f);
     }
 
     public LowPolyBuildingArtResult BuildIndustrialDetails(
@@ -75,11 +125,14 @@ void fragment() {
         parent.AddToGroup("low_poly_building");
         parent.AddToGroup("low_poly_industrial_building");
 
+        var architecture = IndustrialArchitecture(identity);
         var width = footprint.X;
         var depth = footprint.Y;
         var halfWidth = width * 0.5f;
         var halfDepth = depth * 0.5f;
-        var structure = new List<Transform3D>(24);
+        var structure = new List<Transform3D>(48);
+        var massingCollision = new List<Transform3D>(16);
+        var massingFacetCollision = new List<Transform3D>(4);
         AddEntranceBaseBand(
             structure,
             width,
@@ -88,14 +141,24 @@ void fragment() {
             0.72f,
             0.34f,
             Mathf.Min(9.2f, width * 0.60f));
-        foreach (var x in new[] { -halfWidth - 0.22f, halfWidth + 0.22f })
+        var industrialCorners = new[]
         {
-            foreach (var z in new[] { -halfDepth - 0.22f, halfDepth + 0.22f })
+            new Vector2(-halfWidth - 0.22f, -halfDepth - 0.22f),
+            new Vector2(halfWidth + 0.22f, -halfDepth - 0.22f),
+            new Vector2(-halfWidth - 0.22f, halfDepth + 0.22f),
+            new Vector2(halfWidth + 0.22f, halfDepth + 0.22f)
+        };
+        for (var cornerIndex = 0; cornerIndex < industrialCorners.Length; cornerIndex++)
+        {
+            if ((cornerIndex + architecture.MassingIndex) % industrialCorners.Length == 3)
             {
-                structure.Add(Part(
-                    new Vector3(x, roofY * 0.5f, z),
-                    new Vector3(0.58f, roofY, 0.58f)));
+                continue;
             }
+            var corner = industrialCorners[cornerIndex];
+            var pierHeight = roofY * (0.62f + 0.13f * ((cornerIndex + architecture.MassingIndex) % 3));
+            structure.Add(Part(
+                new Vector3(corner.X, pierHeight * 0.5f, corner.Y),
+                new Vector3(0.58f, pierHeight, 0.58f)));
         }
         for (var floor = 1; floor < floors; floor++)
         {
@@ -109,7 +172,8 @@ void fragment() {
         }
         AddPerimeterBand(structure, width, depth, roofY + 0.02f, 0.34f, 0.48f);
 
-        var accents = new List<Transform3D>(10);
+        var accents = new List<Transform3D>(24);
+        var facets = new List<Transform3D>(16);
         var frontZ = halfDepth + 0.25f;
         var finX = Mathf.Min(width * 0.28f, halfWidth - 1.2f);
         foreach (var x in new[] { -finX, finX })
@@ -121,24 +185,64 @@ void fragment() {
         accents.Add(Part(
             new Vector3(-halfWidth - 0.25f, roofY * 0.67f, -depth * 0.18f),
             new Vector3(0.28f, Mathf.Max(2.2f, roofY * 0.34f), Mathf.Min(5.2f, depth * 0.3f))));
-
-        var roof = new List<Transform3D>(8);
-        BuildIndustrialRoofProfile(
-            roof,
-            StableVariant(identity, IndustrialShellColors.Length),
+        var massingCount = BuildIndustrialMassing(
+            structure,
+            massingCollision,
+            massingFacetCollision,
+            accents,
+            facets,
+            identity,
+            architecture.MassingIndex,
             width,
             depth,
             roofY);
 
-        var shellColor = IndustrialShellColors[StableVariant(identity, IndustrialShellColors.Length)];
+        var roof = new List<Transform3D>(12);
+        var roofFacets = new List<Transform3D>(10);
+        var utilities = new List<Transform3D>(8);
+        BuildIndustrialRoofProfile(
+            roof,
+            roofFacets,
+            utilities,
+            architecture.RoofIndex,
+            width,
+            depth,
+            roofY);
+        facets.AddRange(roofFacets);
+
+        var gradientOrigin = parent.GlobalPosition.Y;
+        var shellGradient = IndustrialGradients[architecture.PaletteIndex];
         var batchCount = 0;
-        batchCount += AddBatch(root, "StructuralRelief", Material($"{identity}_structure", shellColor.Darkened(0.24f)), structure, 340.0f);
-        batchCount += AddBatch(root, "AccentRelief", Material($"{identity}_accent", accent.Darkened(0.16f)), accents, 300.0f);
-        batchCount += AddBatch(root, "RoofProfile", Material($"{identity}_roof", shellColor.Lightened(0.08f)), roof, 360.0f);
-        var roofCollisionCount = AddRoofCollision(root, "IndustrialRoofCollision", roof);
-        var detailCount = structure.Count + accents.Count + roof.Count;
-        SetMetadata(parent, "industrial", identity, detailCount);
+        batchCount += AddBatch(root, "StructuralRelief", _unitBox, GradientMaterial($"{identity}_structure", shellGradient.Darkened(0.16f), gradientOrigin, roofY, StableUnit($"{identity}:structure"), 0.062f), structure, 340.0f);
+        batchCount += AddBatch(root, "AccentRelief", _unitBox, GradientMaterial($"{identity}_accent", AccentGradient(shellGradient, accent), gradientOrigin, roofY, StableUnit($"{identity}:accent"), 0.072f), accents, 300.0f);
+        batchCount += AddBatch(root, "RoofProfile", _unitBox, GradientMaterial($"{identity}_roof", shellGradient.Lightened(0.035f), gradientOrigin, roofY + 3.0f, StableUnit($"{identity}:roof"), 0.052f), roof, 360.0f);
+        batchCount += AddBatch(root, "FacetedVolumes", _unitPrism, GradientMaterial($"{identity}_facets", shellGradient.Lightened(0.025f), gradientOrigin, roofY + 4.0f, StableUnit($"{identity}:facets"), 0.058f), facets, 360.0f);
+        batchCount += AddBatch(root, "FacetedUtilities", _unitHex, GradientMaterial($"{identity}_utilities", AccentGradient(shellGradient.Darkened(0.08f), accent.Darkened(0.12f)), gradientOrigin, roofY + 4.0f, StableUnit($"{identity}:utilities"), 0.06f), utilities, 330.0f);
+        var roofCollisionCount = AddCollision(
+            root,
+            "IndustrialRoofCollision",
+            "low_poly_roof_collision",
+            roof,
+            roofFacets,
+            utilities);
+        var massingCollisionCount = AddCollision(
+            root,
+            "IndustrialMassingCollision",
+            "low_poly_massing_collision",
+            massingCollision,
+            massingFacetCollision,
+            System.Array.Empty<Transform3D>());
+        var detailCount = structure.Count + accents.Count + roof.Count + facets.Count + utilities.Count;
+        SetMetadata(
+            parent,
+            "industrial",
+            identity,
+            architecture.MassingStyle,
+            architecture.Signature,
+            detailCount,
+            massingCount);
         parent.SetMeta("low_poly_roof_collision_count", roofCollisionCount);
+        parent.SetMeta("low_poly_massing_collision_count", massingCollisionCount);
         return new LowPolyBuildingArtResult(batchCount, detailCount);
     }
 
@@ -157,11 +261,14 @@ void fragment() {
         parent.AddToGroup("low_poly_building");
         parent.AddToGroup("low_poly_residential_building");
 
+        var architecture = ResidentialArchitecture(profile.TowerIndex);
         var width = footprint.X;
         var depth = footprint.Y;
         var halfWidth = width * 0.5f;
         var halfDepth = depth * 0.5f;
-        var structure = new List<Transform3D>(30);
+        var structure = new List<Transform3D>(52);
+        var massingCollision = new List<Transform3D>(18);
+        var massingFacetCollision = new List<Transform3D>(4);
         AddEntranceBaseBand(
             structure,
             width,
@@ -170,230 +277,118 @@ void fragment() {
             0.78f,
             0.36f,
             Mathf.Min(5.2f, width * 0.42f));
-        foreach (var x in new[] { -halfWidth - 0.24f, halfWidth + 0.24f })
+        var residentialCorners = new[]
         {
-            foreach (var z in new[] { -halfDepth - 0.24f, halfDepth + 0.24f })
+            new Vector2(-halfWidth - 0.24f, -halfDepth - 0.24f),
+            new Vector2(halfWidth + 0.24f, -halfDepth - 0.24f),
+            new Vector2(-halfWidth - 0.24f, halfDepth + 0.24f),
+            new Vector2(halfWidth + 0.24f, halfDepth + 0.24f)
+        };
+        for (var cornerIndex = 0; cornerIndex < residentialCorners.Length; cornerIndex++)
+        {
+            if ((cornerIndex + architecture.MassingIndex) % 4 == 2)
             {
-                structure.Add(Part(
-                    new Vector3(x, roofY * 0.5f, z),
-                    new Vector3(0.62f, roofY, 0.62f)));
+                continue;
             }
+            var corner = residentialCorners[cornerIndex];
+            var pierHeight = roofY * (0.58f + 0.12f * ((cornerIndex + profile.TowerIndex) % 3));
+            var pierBase = roofY * (((cornerIndex + profile.TowerIndex) % 2) * 0.08f);
+            structure.Add(Part(
+                new Vector3(corner.X, pierBase + pierHeight * 0.5f, corner.Y),
+                new Vector3(0.62f, pierHeight, 0.62f)));
         }
         AddPerimeterBand(structure, width, depth, roofY - 0.28f, 0.42f, 0.52f);
         AddPerimeterBand(structure, width, depth, roofY + 0.18f, 0.20f, 0.68f);
 
-        var accents = new List<Transform3D>(18);
+        var accents = new List<Transform3D>(28);
+        var facets = new List<Transform3D>(18);
+        var massingCount = BuildResidentialMassing(
+            structure,
+            massingCollision,
+            massingFacetCollision,
+            accents,
+            facets,
+            architecture.MassingIndex,
+            width,
+            depth,
+            roofY,
+            profile.TowerIndex);
         BuildResidentialFacadeProfile(accents, profile.Facade, width, depth, roofY);
-        var roof = new List<Transform3D>(16);
-        BuildResidentialRoofProfile(roof, profile.Roof, width, depth, roofY, profile.TowerIndex);
+        var roof = new List<Transform3D>(18);
+        var roofFacets = new List<Transform3D>(10);
+        var utilities = new List<Transform3D>(8);
+        BuildResidentialRoofProfile(
+            roof,
+            roofFacets,
+            utilities,
+            profile.Roof,
+            width,
+            depth,
+            roofY,
+            profile.TowerIndex);
+        facets.AddRange(roofFacets);
 
-        var shell = new Color(0.32f, 0.35f, 0.34f).Lerp(accent.Darkened(0.48f), 0.28f);
+        var gradientOrigin = parent.GlobalPosition.Y;
+        var shellGradient = ResidentialGradient(architecture.PaletteIndex, accent);
         var batchCount = 0;
-        batchCount += AddBatch(root, "ResidentialMassing", Material($"residential_structure_{profile.TowerIndex}", shell), structure, 330.0f);
-        var mutedAccent = accent.Darkened(0.18f).Lerp(shell, 0.34f);
-        batchCount += AddBatch(root, "ResidentialColorBlocks", Material($"residential_accent_{profile.TowerIndex}", mutedAccent), accents, 280.0f);
-        batchCount += AddBatch(root, "ResidentialRoofSilhouette", Material($"residential_roof_{profile.TowerIndex}", shell.Lightened(0.12f)), roof, 360.0f);
-        var roofCollisionCount = AddRoofCollision(root, "ResidentialRoofCollision", roof);
-        var detailCount = structure.Count + accents.Count + roof.Count;
-        SetMetadata(parent, "residential", profile.Signature, detailCount);
+        batchCount += AddBatch(root, "ResidentialMassing", _unitBox, GradientMaterial($"residential_structure_{profile.TowerIndex}", shellGradient.Darkened(0.12f), gradientOrigin, roofY, StableUnit($"residential_{profile.TowerIndex}:structure"), 0.068f), structure, 330.0f);
+        batchCount += AddBatch(root, "ResidentialRecessBands", _unitBox, GradientMaterial($"residential_accent_{profile.TowerIndex}", RecessGradient(shellGradient, accent), gradientOrigin, roofY, StableUnit($"residential_{profile.TowerIndex}:accent"), 0.058f), accents, 300.0f);
+        batchCount += AddBatch(root, "ResidentialRoofSilhouette", _unitBox, GradientMaterial($"residential_roof_{profile.TowerIndex}", shellGradient.Lightened(0.045f), gradientOrigin, roofY + 4.0f, StableUnit($"residential_{profile.TowerIndex}:roof"), 0.052f), roof, 360.0f);
+        batchCount += AddBatch(root, "ResidentialFacetedVolumes", _unitPrism, GradientMaterial($"residential_facets_{profile.TowerIndex}", shellGradient.Lightened(0.028f), gradientOrigin, roofY + 5.0f, StableUnit($"residential_{profile.TowerIndex}:facets"), 0.058f), facets, 360.0f);
+        batchCount += AddBatch(root, "ResidentialFacetedUtilities", _unitHex, GradientMaterial($"residential_utilities_{profile.TowerIndex}", AccentGradient(shellGradient.Darkened(0.06f), accent.Darkened(0.14f)), gradientOrigin, roofY + 5.0f, StableUnit($"residential_{profile.TowerIndex}:utilities"), 0.06f), utilities, 330.0f);
+        var roofCollisionCount = AddCollision(
+            root,
+            "ResidentialRoofCollision",
+            "low_poly_roof_collision",
+            roof,
+            roofFacets,
+            utilities);
+        var massingCollisionCount = AddCollision(
+            root,
+            "ResidentialMassingCollision",
+            "low_poly_massing_collision",
+            massingCollision,
+            massingFacetCollision,
+            System.Array.Empty<Transform3D>());
+        var detailCount = structure.Count + accents.Count + roof.Count + facets.Count + utilities.Count;
+        var architectureSignature = $"{architecture.Signature}:{profile.Facade}:{profile.Roof}";
+        SetMetadata(
+            parent,
+            "residential",
+            profile.Signature,
+            architecture.MassingStyle,
+            architectureSignature,
+            detailCount,
+            massingCount);
         parent.SetMeta("low_poly_roof_style", profile.Roof.ToString());
         parent.SetMeta("low_poly_roof_collision_count", roofCollisionCount);
+        parent.SetMeta("low_poly_massing_collision_count", massingCollisionCount);
         return new LowPolyBuildingArtResult(batchCount, detailCount);
     }
 
-    private static void BuildIndustrialRoofProfile(
-        List<Transform3D> parts,
-        int variant,
-        float width,
-        float depth,
-        float roofY)
-    {
-        switch (variant)
-        {
-            case 0:
-                for (var index = -1; index <= 1; index++)
-                {
-                    parts.Add(Part(
-                        new Vector3(index * width * 0.22f, roofY + 0.7f, -depth * 0.16f),
-                        new Vector3(width * 0.14f, 1.05f + (index == 0 ? 0.30f : 0), depth * 0.34f)));
-                }
-                break;
-            case 1:
-                parts.Add(Part(new Vector3(0, roofY + 0.34f, -depth * 0.13f), new Vector3(width * 0.44f, 0.62f, depth * 0.38f)));
-                parts.Add(Part(new Vector3(0, roofY + 0.78f, -depth * 0.13f), new Vector3(width * 0.28f, 0.42f, depth * 0.24f)));
-                break;
-            case 2:
-                for (var index = -2; index <= 2; index++)
-                {
-                    parts.Add(Part(
-                        new Vector3(index * width * 0.17f, roofY + 0.52f, -depth * 0.12f),
-                        new Vector3(width * 0.16f, 0.20f, depth * 0.44f),
-                        new Vector3(0, 0, index % 2 == 0 ? 0.16f : -0.16f)));
-                }
-                break;
-            default:
-                parts.Add(Part(new Vector3(-width * 0.12f, roofY + 0.56f, -depth * 0.16f), new Vector3(width * 0.35f, 0.92f, depth * 0.30f)));
-                parts.Add(Part(new Vector3(width * 0.27f, roofY + 0.84f, -depth * 0.20f), new Vector3(width * 0.10f, 1.46f, depth * 0.14f)));
-                break;
-        }
-    }
-
-    private static void BuildResidentialFacadeProfile(
-        List<Transform3D> parts,
-        ResidentialFacadeStyle style,
-        float width,
-        float depth,
-        float roofY)
-    {
-        var front = depth * 0.5f + 0.24f;
-        var rear = -depth * 0.5f - 0.24f;
-        switch (style)
-        {
-            case ResidentialFacadeStyle.RibbonGlass:
-                foreach (var y in new[] { roofY * 0.34f, roofY * 0.67f })
-                {
-                    parts.Add(Part(new Vector3(0, y, front), new Vector3(width * 0.72f, 0.48f, 0.28f)));
-                    parts.Add(Part(new Vector3(0, y, rear), new Vector3(width * 0.72f, 0.48f, 0.28f)));
-                }
-                break;
-            case ResidentialFacadeStyle.VerticalBays:
-                foreach (var x in new[] { -width * 0.29f, width * 0.29f })
-                {
-                    parts.Add(Part(new Vector3(x, roofY * 0.5f, front), new Vector3(0.54f, roofY * 0.84f, 0.28f)));
-                    parts.Add(Part(new Vector3(x, roofY * 0.5f, rear), new Vector3(0.54f, roofY * 0.84f, 0.28f)));
-                }
-                break;
-            case ResidentialFacadeStyle.StaggeredGrid:
-                parts.Add(Part(new Vector3(-width * 0.28f, roofY * 0.34f, front), new Vector3(width * 0.24f, roofY * 0.22f, 0.28f)));
-                parts.Add(Part(new Vector3(width * 0.28f, roofY * 0.66f, front), new Vector3(width * 0.24f, roofY * 0.22f, 0.28f)));
-                parts.Add(Part(new Vector3(0, roofY * 0.5f, rear), new Vector3(width * 0.16f, roofY * 0.54f, 0.28f)));
-                break;
-            case ResidentialFacadeStyle.ServiceBands:
-                for (var index = 1; index <= 3; index++)
-                {
-                    var y = roofY * index * 0.25f;
-                    parts.Add(Part(new Vector3(0, y, front), new Vector3(width * 0.58f, 0.7f, 0.3f)));
-                }
-                break;
-            case ResidentialFacadeStyle.TerracedWindows:
-                for (var level = 0; level < 3; level++)
-                {
-                    var side = level % 2 == 0 ? -1.0f : 1.0f;
-                    parts.Add(Part(
-                        new Vector3(side * width * 0.27f, roofY * (0.28f + level * 0.23f), front),
-                        new Vector3(width * (0.18f + level * 0.035f), 0.62f, 0.34f)));
-                }
-                break;
-            default:
-                foreach (var x in new[] { -width * 0.34f, 0.0f, width * 0.34f })
-                {
-                    parts.Add(Part(new Vector3(x, roofY * 0.54f, front), new Vector3(0.46f, roofY * 0.62f, 0.28f)));
-                }
-                break;
-        }
-    }
-
-    private static void BuildResidentialRoofProfile(
-        List<Transform3D> parts,
-        ResidentialRoofStyle style,
-        float width,
-        float depth,
-        float roofY,
-        int towerIndex)
-    {
-        var mirror = towerIndex % 2 == 0 ? -1.0f : 1.0f;
-        switch (style)
-        {
-            case ResidentialRoofStyle.GardenServices:
-                foreach (var x in new[] { -width * 0.32f, width * 0.32f })
-                {
-                    parts.Add(Part(new Vector3(x, roofY + 0.82f, depth * 0.5f + 0.26f), new Vector3(width * 0.18f, 1.25f, 0.62f)));
-                }
-                parts.Add(Part(new Vector3(0, roofY + 1.42f, depth * 0.5f + 0.35f), new Vector3(width * 0.78f, 0.18f, 0.8f)));
-                break;
-            case ResidentialRoofStyle.ClinicMechanical:
-                for (var index = -2; index <= 2; index++)
-                {
-                    parts.Add(Part(new Vector3(index * width * 0.14f, roofY + 0.9f, -depth * 0.5f - 0.32f), new Vector3(width * 0.08f, 1.45f, 0.74f)));
-                }
-                break;
-            case ResidentialRoofStyle.MarketCanopy:
-                parts.Add(Part(new Vector3(-width * 0.2f, roofY + 0.94f, depth * 0.5f + 1.1f), new Vector3(width * 0.42f, 0.18f, 2.3f), new Vector3(0, 0, 0.13f)));
-                parts.Add(Part(new Vector3(width * 0.2f, roofY + 0.94f, depth * 0.5f + 1.1f), new Vector3(width * 0.42f, 0.18f, 2.3f), new Vector3(0, 0, -0.13f)));
-                break;
-            case ResidentialRoofStyle.WorkshopPlant:
-                for (var index = -2; index <= 2; index++)
-                {
-                    parts.Add(Part(
-                        new Vector3(index * width * 0.16f, roofY + 0.66f, -depth * 0.62f + 0.05f),
-                        new Vector3(width * 0.17f, 0.22f, depth * 0.24f),
-                        new Vector3(0, 0, index % 2 == 0 ? 0.18f : -0.18f)));
-                }
-                break;
-            case ResidentialRoofStyle.ShelterCrown:
-                parts.Add(Part(new Vector3(0, roofY + 0.48f, -depth * 0.5f - 0.35f), new Vector3(width * 0.72f, 0.72f, 0.8f)));
-                parts.Add(Part(new Vector3(0, roofY + 0.98f, -depth * 0.5f - 0.28f), new Vector3(width * 0.46f, 0.34f, 0.66f)));
-                break;
-            default:
-                parts.Add(Part(new Vector3(mirror * (width * 0.5f + 0.21f), roofY + 1.2f, -depth * 0.18f), new Vector3(0.52f, 2.1f, depth * 0.28f)));
-                parts.Add(Part(new Vector3(mirror * (width * 0.58f - 0.05f), roofY + 2.1f, -depth * 0.18f), new Vector3(width * 0.16f, 0.22f, depth * 0.28f)));
-                break;
-        }
-    }
-
-    private static void AddPerimeterBand(
-        List<Transform3D> parts,
-        float width,
-        float depth,
-        float y,
-        float height,
-        float projection)
-    {
-        parts.Add(Part(new Vector3(0, y, -depth * 0.5f - projection * 0.5f), new Vector3(width + projection * 2.0f, height, projection)));
-        parts.Add(Part(new Vector3(0, y, depth * 0.5f + projection * 0.5f), new Vector3(width + projection * 2.0f, height, projection)));
-        parts.Add(Part(new Vector3(-width * 0.5f - projection * 0.5f, y, 0), new Vector3(projection, height, depth)));
-        parts.Add(Part(new Vector3(width * 0.5f + projection * 0.5f, y, 0), new Vector3(projection, height, depth)));
-    }
-
-    private static void AddEntranceBaseBand(
-        List<Transform3D> parts,
-        float width,
-        float depth,
-        float y,
-        float height,
-        float projection,
-        float openingWidth)
-    {
-        var halfDepth = depth * 0.5f;
-        var totalWidth = width + projection * 2.0f;
-        var clampedOpening = Mathf.Clamp(openingWidth, 0.0f, totalWidth - projection * 2.0f);
-        var sideWidth = (totalWidth - clampedOpening) * 0.5f;
-        var sideOffset = clampedOpening * 0.5f + sideWidth * 0.5f;
-        parts.Add(Part(
-            new Vector3(0, y, -halfDepth - projection * 0.5f),
-            new Vector3(totalWidth, height, projection)));
-        parts.Add(Part(
-            new Vector3(-sideOffset, y, halfDepth + projection * 0.5f),
-            new Vector3(sideWidth, height, projection)));
-        parts.Add(Part(
-            new Vector3(sideOffset, y, halfDepth + projection * 0.5f),
-            new Vector3(sideWidth, height, projection)));
-        parts.Add(Part(
-            new Vector3(-width * 0.5f - projection * 0.5f, y, 0),
-            new Vector3(projection, height, depth)));
-        parts.Add(Part(
-            new Vector3(width * 0.5f + projection * 0.5f, y, 0),
-            new Vector3(projection, height, depth)));
-    }
-
-    private ShaderMaterial Material(string id, Color color)
+    private ShaderMaterial GradientMaterial(
+        string id,
+        BuildingGradient gradient,
+        float gradientOrigin,
+        float gradientHeight,
+        float phase,
+        float variationStrength)
     {
         if (_materials.TryGetValue(id, out var cached))
         {
             return cached;
         }
         var material = new ShaderMaterial { Shader = _shader };
-        material.SetShaderParameter("base_color", color);
+        material.SetShaderParameter("lower_color", gradient.Lower);
+        material.SetShaderParameter("middle_color", gradient.Middle);
+        material.SetShaderParameter("upper_color", gradient.Upper);
+        material.SetShaderParameter("weather_color", gradient.Weather);
+        material.SetShaderParameter("gradient_origin", gradientOrigin);
+        material.SetShaderParameter("gradient_height", Mathf.Max(gradientHeight, 0.1f));
+        material.SetShaderParameter("variation_phase", phase * Mathf.Tau);
+        material.SetShaderParameter("variation_strength", variationStrength);
+        material.SetMeta("low_poly_gradient", true);
+        material.SetMeta("low_poly_gradient_height", gradientHeight);
         _materials[id] = material;
         return material;
     }
@@ -401,6 +396,7 @@ void fragment() {
     private int AddBatch(
         Node3D parent,
         string name,
+        Mesh mesh,
         Godot.Material material,
         IReadOnlyList<Transform3D> transforms,
         float visibilityRange)
@@ -413,7 +409,7 @@ void fragment() {
         {
             TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
             InstanceCount = transforms.Count,
-            Mesh = _unitBox
+            Mesh = mesh
         };
         for (var index = 0; index < transforms.Count; index++)
         {
@@ -435,44 +431,35 @@ void fragment() {
         return 1;
     }
 
-    private static int AddRoofCollision(
-        Node3D parent,
-        string name,
-        IReadOnlyList<Transform3D> transforms)
-    {
-        var body = new StaticBody3D
-        {
-            Name = name,
-            CollisionLayer = 1,
-            CollisionMask = 0
-        };
-        body.AddToGroup("low_poly_roof_collision");
-        parent.AddChild(body);
-        for (var index = 0; index < transforms.Count; index++)
-        {
-            var transform = transforms[index];
-            body.AddChild(new CollisionShape3D
-            {
-                Name = $"RoofShape{index:00}",
-                Transform = new Transform3D(transform.Basis.Orthonormalized(), transform.Origin),
-                Shape = new BoxShape3D { Size = transform.Basis.Scale.Abs() }
-            });
-        }
-        return transforms.Count;
-    }
-
     private static Transform3D Part(Vector3 position, Vector3 size, Vector3 rotation = default)
         => new(Basis.FromEuler(rotation).ScaledLocal(size), position);
 
-    private static void SetMetadata(Node3D parent, string kind, string profile, int detailCount)
+    private static void SetMetadata(
+        Node3D parent,
+        string kind,
+        string profile,
+        string massingStyle,
+        string architectureSignature,
+        int detailCount,
+        int massingCount)
     {
         parent.SetMeta("low_poly_style", StyleId);
         parent.SetMeta("low_poly_kind", kind);
         parent.SetMeta("low_poly_profile", profile);
+        parent.SetMeta("low_poly_massing_style", massingStyle);
+        parent.SetMeta("low_poly_architecture_signature", architectureSignature);
         parent.SetMeta("low_poly_detail_count", detailCount);
+        parent.SetMeta("low_poly_massing_count", massingCount);
+        parent.SetMeta("low_poly_gradient", true);
     }
 
     private static int StableVariant(string identity, int count)
+        => (int)(StableHash(identity) % (uint)count);
+
+    private static float StableUnit(string identity)
+        => (StableHash(identity) & 0x00ffffffu) / 16777215.0f;
+
+    private static uint StableHash(string identity)
     {
         var hash = 2166136261u;
         foreach (var character in identity)
@@ -480,6 +467,6 @@ void fragment() {
             hash ^= character;
             hash *= 16777619u;
         }
-        return (int)(hash % (uint)count);
+        return hash;
     }
 }

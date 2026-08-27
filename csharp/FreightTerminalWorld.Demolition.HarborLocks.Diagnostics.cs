@@ -72,7 +72,9 @@ public partial class FreightTerminalWorld
                     == FreightIndustrialPalette.PaletteId
                 && variant >= 0
                 && variant < FreightIndustrialPalette.VariantCount
-                && model.GetMeta("freight_palette_visuals", 0).AsInt32() > 0;
+                && model.GetMeta("freight_palette_visuals", 0).AsInt32() > 0
+                && model.GetMeta("freight_palette_gradient", false).AsBool()
+                && model.GetMeta("freight_palette_gradient_height", 0.0f).AsSingle() > 0.0f;
         });
         var paletteReady = industrialBuildingProps.Count >= 8
             && palettedBuildings == industrialBuildingProps.Count

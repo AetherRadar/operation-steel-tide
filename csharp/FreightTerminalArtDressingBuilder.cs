@@ -90,11 +90,11 @@ internal sealed class FreightTerminalArtDressingBuilder
         model.AddToGroup("freight_authored_model");
         model.SetMeta("freight_scene_path", path);
         ConfigureVisuals(model);
+        root.AddChild(model);
         if (placement.File.StartsWith("building-", StringComparison.Ordinal))
         {
             paletteApplied = _palette.Apply(model, placement.Name) > 0;
         }
-        root.AddChild(model);
         scenePaths.Add(path);
         return true;
     }

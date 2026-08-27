@@ -4742,9 +4742,21 @@ public partial class FreightTerminalWorld : Node3D
             .OfType<Node3D>()
             .Where(IsInstanceValid)
             .ToList();
+        var lowPolyMassingStyles = lowPolyIndustrialBuildings
+            .Select(node => node.GetMeta("low_poly_massing_style", string.Empty).AsString())
+            .Where(style => !string.IsNullOrWhiteSpace(style))
+            .ToHashSet(StringComparer.Ordinal);
+        var lowPolyArchitectureSignatures = lowPolyIndustrialBuildings
+            .Select(node => node.GetMeta("low_poly_architecture_signature", string.Empty).AsString())
+            .Where(signature => !string.IsNullOrWhiteSpace(signature))
+            .ToHashSet(StringComparer.Ordinal);
         var lowPolyArchitecture = lowPolyIndustrialBuildings.Count >= 6
+            && lowPolyMassingStyles.Count >= 6
+            && lowPolyArchitectureSignatures.Count >= 6
             && lowPolyIndustrialBuildings.All(node =>
                 node.GetMeta("low_poly_style", string.Empty).AsString() == LowPolyBuildingArtBuilder.StyleId
+                && node.GetMeta("low_poly_gradient", false).AsBool()
+                && node.GetMeta("low_poly_massing_count", 0).AsInt32() >= 6
                 && node.GetMeta("low_poly_detail_count", 0).AsInt32() >= 12
                 && LowPolyBuildingArtValidation.IsRenderable(
                     node,
@@ -4781,7 +4793,7 @@ public partial class FreightTerminalWorld : Node3D
             && specialLandmarks
             && authoredDressing
             && lowPolyArchitecture;
-        GD.Print($"MAP_DENSITY_CHECK valid={valid} buildings={ComplexBuildingCount} rooms={ComplexRoomCount} room_loot={ComplexRoomLootCount}/{ComplexRoomCount} building_loot={_buildingLootPickupCount}/{ComplexRoomCount + FixedBuildingLootPlacementCount} reachable_loot={buildingLootReachable}/{_buildingLootPickupCount} unreachable={string.Join(';', unreachableBuildingLoot)} props={ComplexInteriorPropCount} customs={customs} ops={ops} fuel={fuel} quay={quay} hangar={hangarEnriched} towers={ResidentialTowerCount} special_landmarks={SpecialLandmarkCount} special_loot={SpecialLandmarkLootCount} vertical_routes={SpecialLandmarkVerticalRouteCount} authored_dressing={_industrialAuthoredDressingCount} authored_scenes={_industrialAuthoredDressingSceneCount} weathered_buildings={_industrialWeatheredBuildingCount} low_poly_industrial={lowPolyIndustrialBuildings.Count}/6 low_poly_ready={lowPolyArchitecture}");
+        GD.Print($"MAP_DENSITY_CHECK valid={valid} buildings={ComplexBuildingCount} rooms={ComplexRoomCount} room_loot={ComplexRoomLootCount}/{ComplexRoomCount} building_loot={_buildingLootPickupCount}/{ComplexRoomCount + FixedBuildingLootPlacementCount} reachable_loot={buildingLootReachable}/{_buildingLootPickupCount} unreachable={string.Join(';', unreachableBuildingLoot)} props={ComplexInteriorPropCount} customs={customs} ops={ops} fuel={fuel} quay={quay} hangar={hangarEnriched} towers={ResidentialTowerCount} special_landmarks={SpecialLandmarkCount} special_loot={SpecialLandmarkLootCount} vertical_routes={SpecialLandmarkVerticalRouteCount} authored_dressing={_industrialAuthoredDressingCount} authored_scenes={_industrialAuthoredDressingSceneCount} weathered_buildings={_industrialWeatheredBuildingCount} low_poly_industrial={lowPolyIndustrialBuildings.Count}/6 low_poly_massing={lowPolyMassingStyles.Count}/6 low_poly_signatures={lowPolyArchitectureSignatures.Count}/6 low_poly_ready={lowPolyArchitecture}");
         GD.Print($"MAP_DENSITY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -6093,7 +6105,8 @@ public partial class FreightTerminalWorld : Node3D
         var entered = vehicle.TryEnter(_player);
         await WaitFrames(3);
 
-        var forwardStart = vehicle.GlobalPosition;
+        var driveStartTransform = vehicle.GlobalTransform;
+        var forwardStart = driveStartTransform.Origin;
         Input.ActionPress("move_forward");
         Node3D? firstBlocker = null;
         for (var frame = 0; frame < 300; frame++)
@@ -6111,10 +6124,15 @@ public partial class FreightTerminalWorld : Node3D
         var forwardDistance = vehicle.GlobalPosition.DistanceTo(forwardStart);
         var curbCleared = (vehicle.GlobalPosition - curb.GlobalPosition).Dot(forward) > 0.0f;
 
-        // Isolated reverse check on open ground (the straight -Z run ends in the extraction pad).
-        vehicle.GlobalPosition = new Vector3(8.0f, 0.05f, -8.0f);
-        vehicle.Rotation = Vector3.Zero;
-        await WaitFrames(3);
+        // Return to the known-clear spawn lane and let forward momentum settle before
+        // reversing away from the synthetic curb. The former (8, -8) fixture point
+        // overlaps the warehouse loading dock and could never exercise reverse drive.
+        vehicle.GlobalTransform = driveStartTransform;
+        vehicle.Velocity = Vector3.Zero;
+        for (var frame = 0; frame < 90; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
         var reverseStart = vehicle.GlobalPosition;
         Input.ActionPress("move_backward");
         for (var frame = 0; frame < 120; frame++)

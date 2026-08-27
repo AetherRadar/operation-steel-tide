@@ -787,7 +787,10 @@ void sky() {
 
     private void BuildWarehouse(Godot.Material concrete, Godot.Material steel, Godot.Material yellow)
     {
-        var shell = _lowPolyBuildingArtBuilder.IndustrialFacadeMaterial("CentralWarehouse");
+        var shell = _lowPolyBuildingArtBuilder.IndustrialFacadeMaterial(
+            "CentralWarehouse",
+            0.0f,
+            9.0f);
         StaticBox("WarehouseFloor", new Vector3(23.5f, 0.08f, -5), new Vector3(31, 0.18f, 42), concrete);
         StaticBox("WarehouseEast", new Vector3(39, 4.5f, -5), new Vector3(0.6f, 9, 42), shell);
         StaticBox("WarehouseNorth", new Vector3(23.5f, 4.5f, -26), new Vector3(31, 9, 0.6f), shell);
@@ -963,7 +966,10 @@ void sky() {
         const float width = 17.0f;
         const float depth = 7.4f;
         const float height = 3.0f;
-        var shell = _lowPolyBuildingArtBuilder.IndustrialFacadeMaterial("CentralBarracks");
+        var shell = _lowPolyBuildingArtBuilder.IndustrialFacadeMaterial(
+            "CentralBarracks",
+            center.Y,
+            height);
         StaticBox("BarracksFloor", center + new Vector3(0, 0.06f, 0), new Vector3(width, 0.12f, depth), floor);
         StaticBox("BarracksRoof", center + new Vector3(0, height, 0), new Vector3(width, 0.18f, depth), shell);
         StaticBox("BarracksNorth", center + new Vector3(0, height * 0.5f, -depth * 0.5f), new Vector3(width, height, 0.18f), shell);

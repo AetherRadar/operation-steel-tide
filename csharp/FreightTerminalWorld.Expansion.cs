@@ -180,7 +180,11 @@ public partial class FreightTerminalWorld
 
         var width = footprint.X;
         var depth = footprint.Y;
-        var shellMaterial = _lowPolyBuildingArtBuilder.IndustrialFacadeMaterial(name);
+        var shellHeight = floors * (wallHeight + 0.2f);
+        var shellMaterial = _lowPolyBuildingArtBuilder.IndustrialFacadeMaterial(
+            name,
+            center.Y,
+            shellHeight);
         const float wallT = 0.22f;
         const float doorW = 3.6f;
         const float doorH = 2.7f;
@@ -322,7 +326,7 @@ public partial class FreightTerminalWorld
             }
         }
 
-        var roofY = floors * (wallHeight + 0.2f);
+        var roofY = shellHeight;
         ExpansionBox(root, "ComplexRoof", new Vector3(0, roofY, 0), new Vector3(width + 0.6f, 0.28f, depth + 0.6f), shellMaterial);
         ExpansionBox(root, "ComplexCanopy", new Vector3(0, 2.9f, depth * 0.5f + 1.1f), new Vector3(doorW + 1.4f, 0.14f, 2.2f), trim);
         AddIndustrialDoor(

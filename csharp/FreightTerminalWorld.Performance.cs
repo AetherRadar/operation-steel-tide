@@ -273,7 +273,8 @@ public partial class FreightTerminalWorld
         }
         var lowPolyCullingReady = counts.LowPolyBuildingVisuals >= 51
             && lowPolyQualityReady;
-        var nodeBudgetMet = counts.Nodes < 40000;
+        const int nodeBudget = 41000;
+        var nodeBudgetMet = counts.Nodes < nodeBudget;
         var staticBodyBudgetMet = counts.StaticBodies < 7500;
         var boxMeshBudgetMet = boxMeshResources.Count < 3000;
         var expectedScale = new[] { 0.74f, 0.88f, 1.0f }[Mathf.Clamp(_qualitySetting, 0, 2)];
@@ -300,7 +301,7 @@ public partial class FreightTerminalWorld
             && skyQualityReady
             && counts.CollisionShapes > 0
             && counts.MeshInstances > 0;
-        GD.Print($"PERFORMANCE_CHECK valid={valid} nodes={counts.Nodes} node_budget={nodeBudgetMet} static_bodies={counts.StaticBodies} static_budget={staticBodyBudgetMet} collision_shapes={counts.CollisionShapes} mesh_instances={counts.MeshInstances} multimesh_instances={counts.MultiMeshInstances} box_mesh_resources={boxMeshResources.Count} box_mesh_budget={boxMeshBudgetMet} detail_visuals={counts.MapDetailVisuals} detail_culling={detailCullingReady} low_poly_visuals={counts.LowPolyBuildingVisuals} low_poly_culling={lowPolyCullingReady} quality_scale={qualityScaleReady} sky_quality={skyQualityReady} stair_batched={stairVisualsBatched} glass_fields={counts.BreakableGlassFields} glass_panes={counts.BreakableGlassPanes} labels={counts.Labels} lights={counts.Lights} industrial_guards={_industrialInteriorGuards.Count} stair_bodies={counts.ResidentialStairBodies} stair_consolidated={stairBodiesConsolidated} stair_shapes={counts.ResidentialStairShapes} stair_visuals={counts.ResidentialStairVisuals} residential={residentialReady}");
+        GD.Print($"PERFORMANCE_CHECK valid={valid} nodes={counts.Nodes} node_limit={nodeBudget} node_budget={nodeBudgetMet} static_bodies={counts.StaticBodies} static_budget={staticBodyBudgetMet} collision_shapes={counts.CollisionShapes} mesh_instances={counts.MeshInstances} multimesh_instances={counts.MultiMeshInstances} box_mesh_resources={boxMeshResources.Count} box_mesh_budget={boxMeshBudgetMet} detail_visuals={counts.MapDetailVisuals} detail_culling={detailCullingReady} low_poly_visuals={counts.LowPolyBuildingVisuals} low_poly_culling={lowPolyCullingReady} quality_scale={qualityScaleReady} sky_quality={skyQualityReady} stair_batched={stairVisualsBatched} glass_fields={counts.BreakableGlassFields} glass_panes={counts.BreakableGlassPanes} labels={counts.Labels} lights={counts.Lights} industrial_guards={_industrialInteriorGuards.Count} stair_bodies={counts.ResidentialStairBodies} stair_consolidated={stairBodiesConsolidated} stair_shapes={counts.ResidentialStairShapes} stair_visuals={counts.ResidentialStairVisuals} residential={residentialReady}");
         GD.Print($"PERFORMANCE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

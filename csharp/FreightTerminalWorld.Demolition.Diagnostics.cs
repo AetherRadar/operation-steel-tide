@@ -329,11 +329,20 @@ public partial class FreightTerminalWorld
         var palettedBuildingCount = arena.Root
             .GetMeta("low_poly_paletted_building_count", 0)
             .AsInt32();
+        var paletteNodes = arena.Root.FindChildren("*", "Node3D", true, false);
+        using var paletteNodesBacking = paletteNodes.AsDisposable();
+        var gradientPalettedBuildingCount = paletteNodes
+            .OfType<Node3D>()
+            .Count(node => node.GetMeta("freight_palette", string.Empty).AsString()
+                    == FreightIndustrialPalette.PaletteId
+                && node.GetMeta("freight_palette_gradient", false).AsBool()
+                && node.GetMeta("freight_palette_gradient_height", 0.0f).AsSingle() > 0.0f);
         var authoredDressingReady = IsInstanceValid(dressingRoot)
             && authoredModelCount >= 45
             && missingModelCount == 0
             && uniqueSceneCount >= 12
-            && palettedBuildingCount >= 11;
+            && palettedBuildingCount >= 11
+            && gradientPalettedBuildingCount >= 11;
 
         arena.SetActive(false);
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
@@ -347,7 +356,7 @@ public partial class FreightTerminalWorld
             && extendedTravel && rotationReady && clearanceReady && navigationReady && strategyNavigationReady
             && centralCollisionVisualsReady
             && markersReady && spatialIsolation && sitesReady && authoredDressingReady;
-        GD.Print($"DEMOLITION_ARENA_CHECK valid={valid} lifecycle={lifecycleReady} inactive={initiallyIsolated} active={collisionReady} deactivated={deactivatedCleanly} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} routes={routesReady} navigation={navigationReady} navigation_details={navigationDetails} strategy_targets={strategyNavigationReady} strategy_blocked={blockedStrategyTargets} density={densityReady} mid_cover={layout.CentralCoverBodyCount} cover_points={layout.CoverPoints.Count} prop_clear={layout.CentralPropsDoNotOverlap} shaped_cover={centralCollisionVisualsReady} extended={extendedTravel} site_gap={layout.SiteSeparation:0.00} spawn_gap={HorizontalDistance(layout.AttackSpawn, layout.DefenderSpawn):0.00} path_a={layout.AttackToALength:0.00} path_b={layout.AttackToBLength:0.00} difference={layout.SiteTravelDifferenceRatio:P1} sightlines={sightlinesBlocked} rotation={layout.RotationLength:0.00} clearance={clearanceReady} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{rotationBlocker} markers={markersReady} isolation={spatialIsolation} sites={sitesReady} authored={authoredDressingReady} authored_models={authoredModelCount} authored_scenes={uniqueSceneCount} missing_models={missingModelCount} paletted_buildings={palettedBuildingCount}");
+        GD.Print($"DEMOLITION_ARENA_CHECK valid={valid} lifecycle={lifecycleReady} inactive={initiallyIsolated} active={collisionReady} deactivated={deactivatedCleanly} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} routes={routesReady} navigation={navigationReady} navigation_details={navigationDetails} strategy_targets={strategyNavigationReady} strategy_blocked={blockedStrategyTargets} density={densityReady} mid_cover={layout.CentralCoverBodyCount} cover_points={layout.CoverPoints.Count} prop_clear={layout.CentralPropsDoNotOverlap} shaped_cover={centralCollisionVisualsReady} extended={extendedTravel} site_gap={layout.SiteSeparation:0.00} spawn_gap={HorizontalDistance(layout.AttackSpawn, layout.DefenderSpawn):0.00} path_a={layout.AttackToALength:0.00} path_b={layout.AttackToBLength:0.00} difference={layout.SiteTravelDifferenceRatio:P1} sightlines={sightlinesBlocked} rotation={layout.RotationLength:0.00} clearance={clearanceReady} blockers={routeABlocker}|{routeBBlocker}|{routeMidBlocker}|{rotationBlocker} markers={markersReady} isolation={spatialIsolation} sites={sitesReady} authored={authoredDressingReady} authored_models={authoredModelCount} authored_scenes={uniqueSceneCount} missing_models={missingModelCount} paletted_buildings={palettedBuildingCount} gradient_buildings={gradientPalettedBuildingCount}");
         GD.Print($"DEMOLITION_ARENA_PASS valid={valid}");
         var arenaRoot = arena.Root;
         _demolitionArena = null;

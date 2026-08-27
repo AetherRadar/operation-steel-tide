@@ -217,20 +217,20 @@ internal sealed class ResidentialTowerArtBuilder
         model.Name = "Model";
         model.Scale = Vector3.One * placement.Scale;
         ConfigureVisuals(model);
+        body.AddChild(model);
+        tower.AddChild(body);
         if (placement.Asset.Path.StartsWith($"{CityRoot}/building-", StringComparison.Ordinal))
         {
             paletteApplied = _palette.Apply(
                 model,
                 $"residential_{towerIndex}_{placement.Name}") > 0;
         }
-        body.AddChild(model);
         body.AddChild(new CollisionShape3D
         {
             Name = "Collision",
             Position = placement.Asset.Center * placement.Scale,
             Shape = new BoxShape3D { Size = placement.Asset.Size * placement.Scale }
         });
-        tower.AddChild(body);
         scenePaths.Add(placement.Asset.Path);
         return true;
     }

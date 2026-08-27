@@ -186,11 +186,13 @@ public sealed partial class DemolitionArenaBuilder
             CollisionLayer = 1,
             CollisionMask = 0
         };
+        root.AddChild(body);
         var scene = GD.Load<PackedScene>(definition.ScenePath);
         if (scene?.Instantiate() is Node3D model)
         {
             model.Name = "Model";
             model.Scale = Vector3.One * definition.Scale;
+            body.AddChild(model);
             if (definition.ScenePath.Contains(
                     "/kenney_city_kit_industrial/building-",
                     StringComparison.Ordinal)
@@ -198,7 +200,6 @@ public sealed partial class DemolitionArenaBuilder
             {
                 _palettedBuildingCount++;
             }
-            body.AddChild(model);
             _visualPartCount++;
         }
         body.AddChild(new CollisionShape3D
@@ -207,7 +208,6 @@ public sealed partial class DemolitionArenaBuilder
             Position = definition.CollisionOffset * definition.Scale,
             Shape = new BoxShape3D { Size = definition.CollisionSize * definition.Scale }
         });
-        root.AddChild(body);
         _staticBodies.Add(body);
     }
 

@@ -100,12 +100,12 @@ internal sealed class DemolitionArenaDressingBuilder
         model.AddToGroup("demolition_authored_model");
         model.SetMeta("demolition_scene_path", path);
         ConfigureVisuals(model);
+        root.AddChild(model);
         if (placement.Source == ModelSource.Industrial
             && placement.File.StartsWith("building-", System.StringComparison.Ordinal))
         {
             paletteApplied = _palette.Apply(model, placement.Name) > 0;
         }
-        root.AddChild(model);
         scenePaths.Add(path);
         return true;
     }
