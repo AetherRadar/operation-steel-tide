@@ -16,6 +16,20 @@ public partial class TacticalPlayer
         => EquippedWeapon.Platform == WeaponPlatform.GSh18
         && IsInstanceValid(_gunAudio)
         && _gunAudio.Stream is AudioStreamWav { Data.Length: > 14000 };
+    internal bool PlayerWeaponAudioReadyForDiagnostics
+        => IsInstanceValid(_gunAudio)
+        && _gunAudio.Stream is AudioStreamWav { Data.Length: > 14000 }
+        && _gunAudio.VolumeDb >= -6.5f;
+    internal bool PlayerWeaponAudioIsLocalForDiagnostics
+        => IsInstanceValid(_gunAudio) && ReferenceEquals(_gunAudio.GetParent(), _camera);
+    internal bool PlayerWeaponAudioPlayingForDiagnostics
+        => IsInstanceValid(_gunAudio) && _gunAudio.Playing;
+    internal float PlayerWeaponAudioVolumeDbForDiagnostics
+        => IsInstanceValid(_gunAudio) ? _gunAudio.VolumeDb : float.NegativeInfinity;
+    internal int PlayerWeaponAudioSignatureForDiagnostics
+        => PlayerWeaponAudioReadyForDiagnostics
+            ? SoundLab.WeaponShotSignature(EquippedWeapon)
+            : 0;
 
     private void RefreshPlatformSignatureVisual()
     {

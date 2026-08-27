@@ -240,7 +240,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private Node3D _scopeSightModel = null!;
     private MeshInstance3D _chargingHandle = null!;
     private Marker3D _ejectMarker = null!;
-    private AudioStreamPlayer3D _gunAudio = null!;
+    private AudioStreamPlayer _gunAudio = null!;
     private AudioStreamPlayer _reloadAudio = null!;
     private AudioStreamPlayer _glassBreakAudio = null!;
     private AudioStreamPlayer3D _footstepAudio = null!;
@@ -654,13 +654,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             ShadowEnabled = false
         });
 
-        _gunAudio = new AudioStreamPlayer3D
+        _gunAudio = new AudioStreamPlayer
         {
+            Name = "LocalWeaponReportAudio",
             Stream = SoundLab.WeaponShot(EquippedWeapon),
-            VolumeDb = SoundLab.WeaponShotVolumeDb(EquippedWeapon),
-            MaxDistance = 80.0f
+            VolumeDb = SoundLab.PlayerWeaponShotVolumeDb(EquippedWeapon)
         };
-        _muzzle.AddChild(_gunAudio);
+        _camera.AddChild(_gunAudio);
         _reloadAudio = new AudioStreamPlayer { Stream = SoundLab.ReloadClick(), VolumeDb = -8.0f };
         AddChild(_reloadAudio);
         _glassBreakAudio = new AudioStreamPlayer
@@ -1092,9 +1092,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _weaponLight.Position = isPistol
             ? new Vector3(0.065f, -0.04f, -0.28f)
             : new Vector3(0.09f, -0.015f, -0.5f - barrelLength * 0.45f);
-        _gunAudio.MaxDistance = stats.SoundRadius * 1.9f;
         _gunAudio.Stream = SoundLab.WeaponShot(EquippedWeapon);
-        _gunAudio.VolumeDb = SoundLab.WeaponShotVolumeDb(EquippedWeapon);
+        _gunAudio.VolumeDb = SoundLab.PlayerWeaponShotVolumeDb(EquippedWeapon);
         Ammo = Mathf.Min(Ammo, stats.MagazineSize);
         RefreshPlatformSignatureVisual();
         RefreshAuthoredPrimaryWeapon();
@@ -2102,6 +2101,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _fireCooldown = stats.FireInterval * RoleFireIntervalMultiplier;
         Main?.ReportGunshot(GlobalPosition, stats.SoundRadius);
         Main?.NotifyAircraftOperatorAttack(this, GlobalPosition, stats.SoundRadius);
+        _gunAudio.Stop();
         _gunAudio.PitchScale = _rng.RandfRange(0.94f, 1.06f);
         _gunAudio.Play();
         _muzzleFlash.LightEnergy = 7.0f;

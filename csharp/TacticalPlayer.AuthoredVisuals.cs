@@ -100,6 +100,11 @@ public partial class TacticalPlayer
             ? _authoredFirstPersonSmg.ArmBoundsSizeInRoot()
             : Vector3.Zero;
 
+    internal Vector3 SmgWeaponBoundsSizeForDiagnostics
+        => IsInstanceValid(_authoredFirstPersonSmg?.Root)
+            ? _authoredFirstPersonSmg.WeaponBoundsSizeInRoot()
+            : Vector3.Zero;
+
     internal AuthoredFirstPersonArmsVisual? ActiveAuthoredArmsForDiagnostics
         => ActiveAuthoredArms();
 

@@ -36,6 +36,12 @@ internal sealed class AuthoredFirstPersonSmgVisual
         => (float)AnimationPlayer.GetAnimation(ReloadAnimationName).Length;
 
     public Vector3 ArmBoundsSizeInRoot()
+        => BoundsSizeInRoot(Arms);
+
+    public Vector3 WeaponBoundsSizeInRoot()
+        => BoundsSizeInRoot(WeaponBody);
+
+    private Vector3 BoundsSizeInRoot(Node3D subtree)
     {
         var minimum = new Vector3(
             float.PositiveInfinity,
@@ -46,20 +52,20 @@ internal sealed class AuthoredFirstPersonSmgVisual
             float.NegativeInfinity,
             float.NegativeInfinity);
         var hasBounds = false;
-        AccumulateNodeBounds(Root, Transform3D.Identity, insideArms: false);
+        AccumulateNodeBounds(Root, Transform3D.Identity, insideSubtree: false);
 
         return hasBounds ? maximum - minimum : Vector3.Zero;
 
         void AccumulateNodeBounds(
             Node3D node,
             Transform3D parentTransform,
-            bool insideArms)
+            bool insideSubtree)
         {
             var transform = ReferenceEquals(node, Root)
                 ? parentTransform
                 : parentTransform * node.Transform;
-            insideArms |= ReferenceEquals(node, Arms);
-            if (insideArms && node is MeshInstance3D { Mesh: not null } mesh)
+            insideSubtree |= ReferenceEquals(node, subtree);
+            if (insideSubtree && node is MeshInstance3D { Mesh: not null } mesh)
             {
                 var bounds = mesh.Mesh.GetAabb();
                 for (var x = 0; x <= 1; x++)
@@ -86,7 +92,7 @@ internal sealed class AuthoredFirstPersonSmgVisual
             {
                 if (child is Node3D child3D)
                 {
-                    AccumulateNodeBounds(child3D, transform, insideArms);
+                    AccumulateNodeBounds(child3D, transform, insideSubtree);
                 }
             }
         }
@@ -139,7 +145,8 @@ internal sealed class AuthoredFirstPersonSmgVisual
             ReloadAnimationDuration,
             supportArmRotation,
             magazineTravel,
-            ArmBoundsSizeInRoot());
+            ArmBoundsSizeInRoot(),
+            WeaponBoundsSizeInRoot());
     }
 }
 
@@ -191,7 +198,8 @@ internal readonly record struct FirstPersonSmgReloadInspection(
     float Duration,
     float SupportArmRotation,
     float MagazineTravel,
-    Vector3 ArmBoundsSize);
+    Vector3 ArmBoundsSize,
+    Vector3 WeaponBoundsSize);
 
 internal static partial class CombatModelLibrary
 {
@@ -297,6 +305,7 @@ internal static partial class CombatModelLibrary
                 0.0f,
                 0.0f,
                 0.0f,
+                Vector3.Zero,
                 Vector3.Zero);
         }
         finally

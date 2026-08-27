@@ -220,7 +220,8 @@ public partial class FreightTerminalWorld
             && firstPersonSmgReload.SupportArmRotation >= 0.2f
             && firstPersonSmgReload.MagazineTravel >= 0.12f
             && firstPersonSmgReload.ArmBoundsSize.Z >= 0.04f
-            && firstPersonSmgReload.ArmBoundsSize.Y >= 0.006f;
+            && firstPersonSmgReload.ArmBoundsSize.Y >= 0.0069f
+            && firstPersonSmgReload.WeaponBoundsSize.Z >= 1.22f;
         var playerAuthored = _player.UsesAuthoredPrimaryWeaponForDiagnostics;
         var squadAuthored = _squadMates.Count > 0
             && _squadMates.Where(IsInstanceValid).All(mate => mate.UsesAuthoredOperatorForDiagnostics);
@@ -281,6 +282,7 @@ public partial class FreightTerminalWorld
             + $"smg45_support_rotation={firstPersonSmgReload.SupportArmRotation:F3} "
             + $"smg45_magazine_travel={firstPersonSmgReload.MagazineTravel:F3} "
             + $"smg45_arm_bounds={firstPersonSmgReload.ArmBoundsSize} "
+            + $"smg45_weapon_bounds={firstPersonSmgReload.WeaponBoundsSize} "
             + $"platforms={string.Join(',', platformInspections.Select(pair => $"{pair.Key}:{FormatWeaponInspection(pair.Value, platformGeometry[pair.Key])}"))} "
             + $"lineup={lineupCaptured} "
             + $"first_person={string.Join(',', firstPersonCaptures.Select(pair => $"{pair.Key}:{pair.Value}"))} "

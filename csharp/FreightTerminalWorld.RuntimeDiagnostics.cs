@@ -63,6 +63,7 @@ public partial class FreightTerminalWorld
             ("--capture-extraction", static world => world.CaptureExtractionFrame()),
             ("--validate-large-map", static world => world.ValidateLargeMapFlow()),
             ("--validate-weapon-ui", static world => world.ValidateWeaponUiFlow()),
+            ("--validate-weapon-audio", static world => world.ValidateWeaponAudio()),
             ("--validate-quick-slots", static world => world.ValidateQuickSlots()),
             ("--validate-arsenal", static world => world.ValidateArsenalFlow()),
             ("--validate-combat-models", static world => world.ValidateCombatModels()),

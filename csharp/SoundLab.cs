@@ -101,6 +101,9 @@ public static class SoundLab
         return volume;
     }
 
+    public static float PlayerWeaponShotVolumeDb(WeaponBuild build)
+        => Mathf.Min(1.5f, WeaponShotVolumeDb(build) + 4.0f);
+
     public static int WeaponShotSignature(WeaponBuild build, bool distant = false)
     {
         var data = WeaponShot(build, distant).Data;

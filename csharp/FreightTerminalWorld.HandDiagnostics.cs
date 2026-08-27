@@ -110,12 +110,14 @@ public partial class FreightTerminalWorld
         var reloadPoseSet = _player.SetReloadPoseForDiagnostics(0.46f);
         await WaitFrames(4);
         var smgArmBounds = _player.SmgArmBoundsSizeForDiagnostics;
+        var smgWeaponBounds = _player.SmgWeaponBoundsSizeForDiagnostics;
         // Z is the sleeve reach and Y captures its camera-facing depth after
         // Godot's Y-up conversion. The first correction reached 0.0315 by
         // stretching a thin open cut; the full upper-arm continuation must
         // remain both longer and materially deeper than that profile.
         var smgSleeveReach = smgArmBounds.Z >= 0.04f;
-        var smgSleeveVolume = smgArmBounds.Y >= 0.006f;
+        var smgSleeveVolume = smgArmBounds.Y >= 0.0069f;
+        var smgWeaponSize = smgWeaponBounds.Z >= 1.22f;
         var smgReloadPresentation = reloadPoseSet
             && _player.SmgReloadPresentationValidForDiagnostics;
         _player.ClearReloadPoseForDiagnostics();
@@ -125,6 +127,7 @@ public partial class FreightTerminalWorld
             && servicePistolCorrectionValid
             && smgSleeveReach
             && smgSleeveVolume
+            && smgWeaponSize
             && smgReloadPresentation
             && results.Count == platforms.Length;
         GD.Print(
@@ -133,6 +136,7 @@ public partial class FreightTerminalWorld
             + $"service_pistol_correction={servicePistolCorrectionValid} "
             + $"smg_sleeve_volume={smgSleeveVolume} "
             + $"smg_arm_bounds={smgArmBounds} "
+            + $"smg_weapon_size={smgWeaponSize} smg_weapon_bounds={smgWeaponBounds} "
             + $"smg_reload_presentation={smgReloadPresentation} "
             + $"samples={results.Count} viewport={(narrow ? "985x847" : "default")}");
         GD.Print($"HAND_POSE_PASS valid={valid}");

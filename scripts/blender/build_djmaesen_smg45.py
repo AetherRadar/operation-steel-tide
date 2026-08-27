@@ -27,14 +27,18 @@ SOURCE_IDLE_FRAME = 155
 SOURCE_RELOAD_START_FRAME = 0
 SOURCE_RELOAD_END_FRAME = 64
 SOURCE_TO_METERS = 0.015
-SLEEVE_RADIAL_SCALE = 0.78
+SLEEVE_WRIST_RADIAL_SCALE = 0.80
+SLEEVE_FOREARM_RADIAL_SCALE = 0.90
+SLEEVE_WRIST_RADIAL_BLEND_LENGTH = 18.0
 SLEEVE_WRIST_OVERLAP = 1.2
 SLEEVE_WRIST_BLEND_LENGTH = 6.0
 SLEEVE_SHOULDER_BLEND_LENGTH = 26.0
 SLEEVE_SHOULDER_PLATEAU_LENGTH = 18.0
 SLEEVE_SHOULDER_EXTENSION = 104.0
 SLEEVE_SHOULDER_DROP = 18.0
-SLEEVE_SHOULDER_RADIAL_SCALE = 1.20
+SLEEVE_SHOULDER_RADIAL_SCALE = 1.22
+FIRST_PERSON_WEAPON_SCALE = 1.08
+FIRST_PERSON_MUZZLE_SOURCE = Vector((0.0, -49.60, 4.93))
 FIELD_ROTATION = Matrix.Rotation(math.radians(90.0), 4, "Z")
 WEAPON_MESH_NAMES = (
     "base_smg45_0",
@@ -201,8 +205,16 @@ def refine_authored_sleeves() -> None:
             upper = min(sample_count - 1, lower + 1)
             blend = sample_position - lower
             center = centers[lower].lerp(centers[upper], blend)
-            vertex.co.x = center.x + (vertex.co.x - center.x) * SLEEVE_RADIAL_SCALE
-            vertex.co.z = center.z + (vertex.co.z - center.z) * SLEEVE_RADIAL_SCALE
+            wrist_progress = min(
+                1.0,
+                max(0.0, (vertex.co.y - minimum_y) / SLEEVE_WRIST_RADIAL_BLEND_LENGTH),
+            )
+            wrist_blend = wrist_progress * wrist_progress * (3.0 - 2.0 * wrist_progress)
+            radial_scale = SLEEVE_WRIST_RADIAL_SCALE + (
+                SLEEVE_FOREARM_RADIAL_SCALE - SLEEVE_WRIST_RADIAL_SCALE
+            ) * wrist_blend
+            vertex.co.x = center.x + (vertex.co.x - center.x) * radial_scale
+            vertex.co.z = center.z + (vertex.co.z - center.z) * radial_scale
             wrist_factor = max(
                 0.0,
                 1.0 - (vertex.co.y - minimum_y) / SLEEVE_WRIST_BLEND_LENGTH,
@@ -320,6 +332,35 @@ def cap_authored_sleeves() -> None:
 
     for component in sorted(components, key=len, reverse=True):
         _cap_boundary_loops(mesh, component)
+
+
+def first_person_palm_center() -> Vector:
+    armature = next(obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE")
+    right_palm = (
+        armature.matrix_world @ armature.pose.bones["R_palm_039"].matrix
+    ).translation
+    left_palm = (
+        armature.matrix_world @ armature.pose.bones["L_palm_015"].matrix
+    ).translation
+    return (right_palm + left_palm) * 0.5
+
+
+def scale_first_person_weapon() -> Vector:
+    """Uniformly enlarge the first-person weapon around the two-hand grip center."""
+    pivot = first_person_palm_center()
+    scale_about_grips = (
+        Matrix.Translation(pivot)
+        @ Matrix.Scale(FIRST_PERSON_WEAPON_SCALE, 4)
+        @ Matrix.Translation(-pivot)
+    )
+    for source_name in WEAPON_MESH_NAMES:
+        weapon = bpy.data.objects[source_name]
+        local_to_world = weapon.matrix_world.copy()
+        world_to_local = local_to_world.inverted()
+        for vertex in weapon.data.vertices:
+            vertex.co = world_to_local @ scale_about_grips @ local_to_world @ vertex.co
+        weapon.data.update()
+    return pivot
 
 
 def evaluated_mesh_copy(source: bpy.types.Object, name: str) -> bpy.types.Object:
@@ -450,6 +491,7 @@ def build_first_person() -> None:
     refine_authored_sleeves()
     extend_authored_sleeves()
     cap_authored_sleeves()
+    weapon_pivot = scale_first_person_weapon()
     root = prepare_first_person_hierarchy()
     base = bpy.data.objects["base"]
     muzzle = bpy.data.objects.new("Muzzle", None)
@@ -457,7 +499,10 @@ def build_first_person() -> None:
     muzzle.empty_display_size = 0.035
     bpy.context.collection.objects.link(muzzle)
     muzzle.parent = base
-    muzzle.location = base.matrix_world.inverted() @ Vector((0.0, -49.60, 4.93))
+    muzzle_world = weapon_pivot + (
+        FIRST_PERSON_MUZZLE_SOURCE - weapon_pivot
+    ) * FIRST_PERSON_WEAPON_SCALE
+    muzzle.location = base.matrix_world.inverted() @ muzzle_world
     export_root(root, FIRST_PERSON_GLB, animated=True)
 
 
@@ -537,6 +582,7 @@ def save_editable_source() -> None:
     refine_authored_sleeves()
     extend_authored_sleeves()
     cap_authored_sleeves()
+    scale_first_person_weapon()
     SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
 
