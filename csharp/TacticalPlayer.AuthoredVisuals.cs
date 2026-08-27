@@ -8,6 +8,7 @@ public partial class TacticalPlayer
 {
     private const float AuthoredSmgPresentationScale = 0.72f;
     private const float AuthoredArmPresentationScale = 0.72f;
+    internal const float MaxServicePistolSupportArmCorrection = 0.03f;
     private static readonly Vector3 AuthoredSmgCameraPosition = new(0.34f, -0.45f, -0.72f);
 
     private Node3D _proceduralWeaponVisual = null!;
@@ -161,6 +162,8 @@ public partial class TacticalPlayer
         var leftWristLength = leftPalm.DistanceTo(leftWrist);
         var worldScale = arms.Root.GlobalTransform.Basis.Scale.Abs();
         var supportWorldScale = arms.LeftArm.GlobalTransform.Basis.Scale.Abs();
+        var supportArmCorrection = (
+            arms.Root.GlobalTransform.Basis * arms.LeftArm.Position).Length();
         var determinant = arms.Root.GlobalTransform.Basis.Determinant();
         var weaponRoot = ActiveAuthoredWeaponRootForDiagnostics;
         var primaryContact = InspectVisibleMeshSurface(weaponRoot, rightPalm);
@@ -190,12 +193,16 @@ public partial class TacticalPlayer
             && supportWorldScale.DistanceTo(worldScale) <= 0.002f;
         var wristContinuity = rightWristLength is >= 0.045f and <= 0.28f
             && leftWristLength is >= 0.045f and <= 0.28f;
+        var supportArmCorrectionValid = EquippedWeapon.Platform
+            is not (WeaponPlatform.P226 or WeaponPlatform.M1911 or WeaponPlatform.GSh18)
+            || supportArmCorrection <= MaxServicePistolSupportArmCorrection;
         var valid = gripResidual <= 0.004f
             && supportGripResidual <= 0.004f
             && Mathf.Abs(localGripSeparation - pose.PrimaryGrip.DistanceTo(pose.SupportGrip)) <= 0.01f
             && scaleValid
             && determinant > 0.01f
             && wristContinuity
+            && supportArmCorrectionValid
             && primaryContact.Distance <= 0.10f
             && supportContact.Distance <= 0.10f
             && screenValid
@@ -215,7 +222,8 @@ public partial class TacticalPlayer
             primaryContact.Distance,
             supportContact.Distance,
             primarySurfaceOffset,
-            supportSurfaceOffset);
+            supportSurfaceOffset,
+            supportArmCorrection);
     }
 
     internal Transform3D RealignAuthoredHandsForDiagnostics()
@@ -789,4 +797,5 @@ internal readonly record struct FirstPersonHandPoseInspection(
     float PrimarySurfaceDistance,
     float SupportSurfaceDistance,
     Vector3 PrimarySurfaceOffset,
-    Vector3 SupportSurfaceOffset);
+    Vector3 SupportSurfaceOffset,
+    float SupportArmCorrection);

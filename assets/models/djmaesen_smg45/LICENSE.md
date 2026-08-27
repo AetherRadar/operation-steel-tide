@@ -20,6 +20,7 @@ The runtime models in this directory are adapted from **fps animated smg** by
   `scripts/blender/build_first_person_arms.py`
 - Static pose variants generated: 2026-08-24
 - Animated first-person sleeve fit and upper-arm volume revised: 2026-08-27
+- Service-pistol support-arm pose revised in Blender: 2026-08-28
 
 Attribution: **"fps animated smg" by DJMaesen, licensed under CC BY 4.0.**
 
@@ -40,5 +41,9 @@ same authored mesh: a rifle pose, a compact service-pistol two-handed stance,
 and a large-pistol two-handed stance. They do not apply the animated SMG sleeve
 extension; each exports explicit palm and wrist frame markers so runtime code
 can translate the pose without accumulating rotations on the arm mesh. The
-original model and all derived geometry remain copyright DJMaesen and are not
+service-pistol variant offsets the authored shoulder and bakes a new wrist IK
+target and elbow pole so P226, M1911, and GSh-18 use a bent support arm without
+pulling the complete limb toward the camera. This revision changes only the
+evaluated skeletal pose and marker placement; it does not add source geometry.
+The original model and all derived geometry remain copyright DJMaesen and are not
 covered by the repository's MIT license.

@@ -47,6 +47,17 @@ public partial class FreightTerminalWorld
         }
 
         _player.GrantFireablePrimaryForDiagnostics(
+            WeaponCatalog.Build(WeaponPlatform.M1911, 0));
+        await WaitFrames(8);
+        _player.SetViewPitchForDiagnostics(-0.68f);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await WaitFrames(1);
+        SaveViewportImage($"res://open_hand_m1911_downward{suffix}");
+        _player.SetViewPitchForDiagnostics(0.0f);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+        _player.GrantFireablePrimaryForDiagnostics(
             WeaponCatalog.Build(WeaponPlatform.M3A1, 0));
         await WaitFrames(8);
         _player.SetViewPitchForDiagnostics(-0.68f);

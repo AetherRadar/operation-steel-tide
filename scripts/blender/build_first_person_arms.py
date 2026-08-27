@@ -64,6 +64,37 @@ def bone_world_matrix(armature: bpy.types.Object, bone_name: str) -> Matrix:
     return armature.matrix_world @ armature.pose.bones[bone_name].matrix
 
 
+def offset_pose_bone_world(
+    armature: bpy.types.Object,
+    bone_name: str,
+    offset: Vector,
+) -> None:
+    pose_bone = armature.pose.bones[bone_name]
+    world_matrix = armature.matrix_world @ pose_bone.matrix
+    world_matrix.translation += offset
+    pose_bone.matrix = armature.matrix_world.inverted() @ world_matrix
+
+
+def validate_support_elbow_angle(
+    armature: bpy.types.Object,
+    minimum_degrees: float,
+    maximum_degrees: float,
+) -> None:
+    shoulder = bone_world_matrix(armature, "L_arm_01").translation
+    elbow = bone_world_matrix(armature, "L_elbow_02").translation
+    wrist = bone_world_matrix(armature, "L_wrist_03").translation
+    upper_direction = (shoulder - elbow).normalized()
+    forearm_direction = (wrist - elbow).normalized()
+    angle_degrees = math.degrees(upper_direction.angle(forearm_direction))
+    if not minimum_degrees <= angle_degrees <= maximum_degrees:
+        raise RuntimeError(
+            "Service-pistol support elbow angle "
+            f"{angle_degrees:.2f} is outside "
+            f"{minimum_degrees:.2f}..{maximum_degrees:.2f} degrees"
+        )
+    print(f"SERVICE_PISTOL_ELBOW angle={angle_degrees:.2f} valid=True")
+
+
 def add_pistol_ik(
     armature: bpy.types.Object,
     wrist_target: Vector,
@@ -105,13 +136,20 @@ def evaluate_pose(kind: str) -> None:
     # the reload-start pose with the support arm lifted away from the weapon.
     bpy.context.scene.frame_set(155)
     if kind == "pistol_service":
-        # Keep the source firing pose and pull the support wrist toward the
-        # pistol's short frame. This keeps both elbows below the sight line
-        # instead of folding the support arm across the primary hand.
+        # Bake the support wrist directly onto the compact two-hand grip. The
+        # old target sat too far down-range, so runtime alignment shifted the
+        # complete left arm toward the camera and flattened it in screen space.
+        # Moving the shoulder outward preserves a natural elbow bend while the
+        # new pole sends the forearm into camera depth instead of across it.
+        offset_pose_bone_world(
+            armature,
+            "L_arm_01",
+            Vector((10.0, 0.0, -8.0)),
+        )
         add_pistol_ik(
             armature,
-            Vector((-7.0, -10.0, 1.0)),
-            Vector((12.0, -2.0, -12.0)),
+            Vector((3.0, 0.0, 5.0)),
+            Vector((12.0, 20.0, -12.0)),
             180.0,
         )
     elif kind == "pistol_large":
@@ -122,6 +160,8 @@ def evaluate_pose(kind: str) -> None:
             180.0,
         )
     bpy.context.view_layer.update()
+    if kind == "pistol_service":
+        validate_support_elbow_angle(armature, 60.0, 90.0)
 
 
 def mesh_copy_evaluated(

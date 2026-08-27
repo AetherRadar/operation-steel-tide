@@ -26,6 +26,7 @@ public partial class FreightTerminalWorld
         var results = new List<string>();
         var posesValid = true;
         var authoredRigValid = true;
+        var servicePistolCorrectionValid = true;
         var platforms = Enum.GetValues<WeaponPlatform>();
         var proceduralArms = _player.GetNodeOrNull<Node3D>(
             "Camera3D/WeaponRoot/ProceduralFirstPersonArms");
@@ -70,6 +71,11 @@ public partial class FreightTerminalWorld
                 && handInspection.RootTransform.Basis.Y.DistanceTo(realigned.Basis.Y) <= 0.0001f
                 && handInspection.RootTransform.Basis.Z.DistanceTo(realigned.Basis.Z) <= 0.0001f;
             posesValid &= handInspection.Valid && idempotent;
+            if (platform is WeaponPlatform.P226 or WeaponPlatform.M1911 or WeaponPlatform.GSh18)
+            {
+                servicePistolCorrectionValid &= handInspection.SupportArmCorrection
+                    <= TacticalPlayer.MaxServicePistolSupportArmCorrection;
+            }
 
             var weaponRootInverse = _player.WeaponRootGlobalTransformForDiagnostics.AffineInverse();
             var weaponRoot = _player.ActiveAuthoredWeaponRootForDiagnostics;
@@ -92,6 +98,7 @@ public partial class FreightTerminalWorld
                 $"{platform}: handValid={handInspection.Valid} idempotent={idempotent} "
                 + $"proceduralVisible={proceduralVisible} authoredVisible=({rootVisible},{rightVisible},{leftVisible}) "
                 + $"weaponVisible={weaponVisible} gripResidual=({handInspection.GripResidual:F4},{handInspection.SupportGripResidual:F4}) "
+                + $"supportArmCorrection={handInspection.SupportArmCorrection:F4} "
                 + $"surfaceDistance=({handInspection.PrimarySurfaceDistance:F4},{handInspection.SupportSurfaceDistance:F4}) "
                 + $"surfaceOffset=({handInspection.PrimarySurfaceOffset},{handInspection.SupportSurfaceOffset}) "
                 + $"palms=({rightPalmLocal},{leftPalmLocal}) grips=({rightGripLocal},{leftGripLocal}) "
@@ -115,6 +122,7 @@ public partial class FreightTerminalWorld
         foreach (var line in results) GD.Print(line);
         var valid = posesValid
             && authoredRigValid
+            && servicePistolCorrectionValid
             && smgSleeveReach
             && smgSleeveVolume
             && smgReloadPresentation
@@ -122,6 +130,7 @@ public partial class FreightTerminalWorld
         GD.Print(
             $"HAND_POSE_CHECK valid={valid} procedural_pose={posesValid} "
             + $"authored_rig={authoredRigValid} smg_sleeve_reach={smgSleeveReach} "
+            + $"service_pistol_correction={servicePistolCorrectionValid} "
             + $"smg_sleeve_volume={smgSleeveVolume} "
             + $"smg_arm_bounds={smgArmBounds} "
             + $"smg_reload_presentation={smgReloadPresentation} "
