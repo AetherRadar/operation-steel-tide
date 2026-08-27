@@ -108,10 +108,26 @@ function New-BackendInstanceId {
 }
 
 function Get-ProjectMutexName {
-    param([Parameter(Mandatory = $true)][string]$ProjectRoot)
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectRoot,
+        [Parameter(Mandatory = $true)][ValidateSet('Preparation', 'Runtime')][string]$Scope
+    )
 
     $pathHash = Get-ProjectPathHash -ProjectRoot $ProjectRoot
-    return "Local\OperationSteelTide-$($pathHash.Substring(0, 24))"
+    return "Local\OperationSteelTide-$Scope-$($pathHash.Substring(0, 24))"
+}
+
+function Get-GameRuntimePolicy {
+    param(
+        [Parameter(Mandatory = $true)][bool]$OwnsRuntimeMutex,
+        [ValidateRange(0, [int]::MaxValue)][int]$RunningProjectInstanceCount
+    )
+
+    $parallel = -not $OwnsRuntimeMutex -or $RunningProjectInstanceCount -gt 0
+    return [PSCustomObject]@{
+        Parallel = $parallel
+        BackendAllowed = -not $parallel
+    }
 }
 
 function Test-IsFullyQualifiedWindowsPath {
@@ -122,10 +138,19 @@ function Test-IsFullyQualifiedWindowsPath {
         $Path.StartsWith('//')
 }
 
+function Test-GodotRuntimeCommandLine {
+    param([Parameter(Mandatory = $true)][string]$CommandLine)
+
+    return -not [System.Text.RegularExpressions.Regex]::IsMatch(
+        $CommandLine,
+        '(?i)(?:^|\s)(?:--editor|-e|--project-manager|-p|--import)(?=\s|$)')
+}
+
 function Get-RunningGodotProcessesForProject {
     param(
         [Parameter(Mandatory = $true)][string]$ProjectRoot,
-        [AllowEmptyCollection()][AllowNull()][object[]]$Processes
+        [AllowEmptyCollection()][AllowNull()][object[]]$Processes,
+        [switch]$RuntimeOnly
     )
 
     $canonicalRoot = Get-CanonicalProjectPath -Path $ProjectRoot
@@ -139,6 +164,9 @@ function Get-RunningGodotProcessesForProject {
     foreach ($process in $godotProcesses) {
         $commandLine = [string]$process.CommandLine
         if ([string]::IsNullOrWhiteSpace($commandLine)) {
+            continue
+        }
+        if ($RuntimeOnly -and -not (Test-GodotRuntimeCommandLine -CommandLine $commandLine)) {
             continue
         }
 
@@ -399,20 +427,105 @@ function Get-GodotTopLevelLogErrors {
         -CaseSensitive)
 }
 
+function ConvertTo-WindowsProcessArgument {
+    param([AllowEmptyString()][AllowNull()][string]$Argument)
+
+    if ($null -eq $Argument) {
+        $Argument = ''
+    }
+    if ($Argument.Length -gt 0 -and $Argument -notmatch '[\s"]') {
+        return $Argument
+    }
+
+    $backslash = [char]92
+    $quote = [char]34
+    $builder = [System.Text.StringBuilder]::new()
+    $null = $builder.Append($quote)
+    $backslashCount = 0
+    foreach ($character in $Argument.ToCharArray()) {
+        if ($character -eq $backslash) {
+            $backslashCount++
+            continue
+        }
+        if ($character -eq $quote) {
+            $null = $builder.Append($backslash, ($backslashCount * 2) + 1)
+            $null = $builder.Append($quote)
+            $backslashCount = 0
+            continue
+        }
+        if ($backslashCount -gt 0) {
+            $null = $builder.Append($backslash, $backslashCount)
+            $backslashCount = 0
+        }
+        $null = $builder.Append($character)
+    }
+    if ($backslashCount -gt 0) {
+        $null = $builder.Append($backslash, $backslashCount * 2)
+    }
+    $null = $builder.Append($quote)
+    return $builder.ToString()
+}
+
+function Join-WindowsProcessArguments {
+    param([Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Arguments)
+
+    return (@($Arguments | ForEach-Object { ConvertTo-WindowsProcessArgument -Argument $_ }) -join ' ')
+}
+
+function Wait-GodotRuntimeReady {
+    param(
+        [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        [ValidateRange(1000, 120000)][int]$TimeoutMilliseconds = 120000
+    )
+
+    $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        if (Test-Path -LiteralPath $LogPath -PathType Leaf) {
+            try {
+                if (Select-String `
+                    -LiteralPath $LogPath `
+                    -SimpleMatch 'STEEL_TIDE_RUNTIME_READY' `
+                    -Quiet) {
+                    return $true
+                }
+            }
+            catch {
+                # Godot may briefly hold the new log exclusively while opening it.
+            }
+        }
+
+        $Process.Refresh()
+        if ($Process.HasExited) {
+            return $false
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    return $false
+}
+
 function Set-GameBackendEnvironment {
     param(
         [Parameter(Mandatory = $true)][string]$InstanceId,
-        [Parameter(Mandatory = $true)][bool]$Offline
+        [Parameter(Mandatory = $true)][bool]$Offline,
+        [AllowEmptyString()][string]$ParallelInstanceId = ''
     )
 
     $snapshot = [PSCustomObject]@{
         Instance = [Environment]::GetEnvironmentVariable('STEEL_TIDE_BACKEND_INSTANCE', 'Process')
         Offline = [Environment]::GetEnvironmentVariable('STEEL_TIDE_BACKEND_OFFLINE', 'Process')
+        ParallelInstance = [Environment]::GetEnvironmentVariable(
+            'STEEL_TIDE_PARALLEL_INSTANCE',
+            'Process')
     }
     [Environment]::SetEnvironmentVariable('STEEL_TIDE_BACKEND_INSTANCE', $InstanceId, 'Process')
     [Environment]::SetEnvironmentVariable(
         'STEEL_TIDE_BACKEND_OFFLINE',
         $(if ($Offline) { '1' } else { '0' }),
+        'Process')
+    [Environment]::SetEnvironmentVariable(
+        'STEEL_TIDE_PARALLEL_INSTANCE',
+        $(if ([string]::IsNullOrWhiteSpace($ParallelInstanceId)) { $null } else { $ParallelInstanceId }),
         'Process')
     return $snapshot
 }
@@ -427,6 +540,10 @@ function Restore-GameBackendEnvironment {
     [Environment]::SetEnvironmentVariable(
         'STEEL_TIDE_BACKEND_OFFLINE',
         $Snapshot.Offline,
+        'Process')
+    [Environment]::SetEnvironmentVariable(
+        'STEEL_TIDE_PARALLEL_INSTANCE',
+        $Snapshot.ParallelInstance,
         'Process')
 }
 
@@ -450,6 +567,24 @@ function Test-StartupRunDirectoryName {
         [ref]$timestamp)
 }
 
+function Get-StartupRunDirectoryProcessId {
+    param([Parameter(Mandatory = $true)][string]$Name)
+
+    $nameMatch = [System.Text.RegularExpressions.Regex]::Match(
+        $Name,
+        '^\d{8}-\d{6}-\d{3}-(?<pid>\d+)-[0-9a-f]{8}$',
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    if (-not $nameMatch.Success) {
+        return $null
+    }
+
+    $processId = 0
+    if (-not [int]::TryParse($nameMatch.Groups['pid'].Value, [ref]$processId) -or $processId -le 0) {
+        return $null
+    }
+    return $processId
+}
+
 function Remove-OldStartupRunLogs {
     param(
         [Parameter(Mandatory = $true)][string]$StartupLogRoot,
@@ -468,6 +603,12 @@ function Remove-OldStartupRunLogs {
         foreach ($directory in (Get-ChildItem -LiteralPath $canonicalRoot -Directory -Force)) {
             if (-not (Test-StartupRunDirectoryName -Name $directory.Name) -or
                 ($directory.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                continue
+            }
+
+            $launcherProcessId = Get-StartupRunDirectoryProcessId -Name $directory.Name
+            if ($null -ne $launcherProcessId -and
+                $null -ne (Get-Process -Id $launcherProcessId -ErrorAction SilentlyContinue)) {
                 continue
             }
 
@@ -549,6 +690,31 @@ function Stop-OwnedBackend {
     }
 }
 
+function Remove-ParallelRuntimeProfile {
+    param([Parameter(Mandatory = $true)][string]$RunLogDirectory)
+
+    try {
+        $canonicalRunDirectory = Get-CanonicalProjectPath -Path $RunLogDirectory
+        foreach ($fileName in @('operator_profile_parallel.json', 'operator_profile_parallel.json.tmp')) {
+            $candidatePath = [System.IO.Path]::GetFullPath((Join-Path $canonicalRunDirectory $fileName))
+            $candidateParent = Get-CanonicalProjectPath -Path (
+                [System.IO.Directory]::GetParent($candidatePath).FullName)
+            if (-not [string]::Equals(
+                $candidateParent,
+                $canonicalRunDirectory,
+                [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Parallel profile escaped its run-log directory: '$candidatePath'."
+            }
+            if (Test-Path -LiteralPath $candidatePath -PathType Leaf) {
+                Remove-Item -LiteralPath $candidatePath -Force -ErrorAction Stop
+            }
+        }
+    }
+    catch {
+        Write-Warning "Could not clean the parallel runtime profile: $($_.Exception.Message)"
+    }
+}
+
 function Invoke-LauncherSelfTest {
     $failures = [System.Collections.Generic.List[string]]::new()
     $testProjectRoot = 'C:\OperationSteelTideLauncherSelfTest'
@@ -559,7 +725,11 @@ function Invoke-LauncherSelfTest {
     }
     $absoluteProcess = [PSCustomObject]@{
         ProcessId = 202
-        CommandLine = '"C:\Godot.exe" --path "C:\OperationSteelTideLauncherSelfTest"'
+        CommandLine = '"C:\Godot.exe" --path="C:\OperationSteelTideLauncherSelfTest\" --editor'
+    }
+    $runtimeProcess = [PSCustomObject]@{
+        ProcessId = 303
+        CommandLine = '"C:\Godot.exe" --path "C:\OperationSteelTideLauncherSelfTest" --log-file "C:\runtime.log" --'
     }
     $relativeMatches = @(Get-RunningGodotProcessesForProject `
         -ProjectRoot $testProjectRoot `
@@ -567,11 +737,66 @@ function Invoke-LauncherSelfTest {
     $absoluteMatches = @(Get-RunningGodotProcessesForProject `
         -ProjectRoot $testProjectRoot `
         -Processes @($absoluteProcess))
+    $editorRuntimeMatches = @(Get-RunningGodotProcessesForProject `
+        -ProjectRoot $testProjectRoot `
+        -Processes @($absoluteProcess) `
+        -RuntimeOnly)
+    $runtimeMatches = @(Get-RunningGodotProcessesForProject `
+        -ProjectRoot $testProjectRoot `
+        -Processes @($runtimeProcess) `
+        -RuntimeOnly)
     if ($relativeMatches.Count -ne 0) {
         $failures.Add('Relative Godot --path was incorrectly resolved against the launcher process.')
     }
     if ($absoluteMatches.Count -ne 1 -or $absoluteMatches[0].ProcessId -ne 202) {
         $failures.Add('Absolute matching Godot --path was not detected.')
+    }
+    if ($editorRuntimeMatches.Count -ne 0 -or
+        $runtimeMatches.Count -ne 1 -or
+        $runtimeMatches[0].ProcessId -ne 303) {
+        $failures.Add('Godot editor/import filtering did not preserve actual runtime detection.')
+    }
+
+    $quotedPlain = ConvertTo-WindowsProcessArgument -Argument 'plain'
+    $quotedEmpty = ConvertTo-WindowsProcessArgument -Argument ''
+    $quotedTrailingSlash = ConvertTo-WindowsProcessArgument -Argument 'C:\Path With Space\'
+    $quotedEmbeddedQuote = ConvertTo-WindowsProcessArgument -Argument 'say"hi'
+    if ($quotedPlain -cne 'plain' -or
+        $quotedEmpty -cne '""' -or
+        $quotedTrailingSlash -cne '"C:\Path With Space\\"' -or
+        $quotedEmbeddedQuote -cne '"say\"hi"') {
+        $failures.Add('Windows child-process argument quoting is not command-line safe.')
+    }
+
+    $preparationMutexName = Get-ProjectMutexName `
+        -ProjectRoot ($testProjectRoot + '\') `
+        -Scope Preparation
+    $caseVariantPreparationMutexName = Get-ProjectMutexName `
+        -ProjectRoot $testProjectRoot.ToLowerInvariant() `
+        -Scope Preparation
+    $runtimeMutexName = Get-ProjectMutexName -ProjectRoot $testProjectRoot -Scope Runtime
+    $otherPreparationMutexName = Get-ProjectMutexName `
+        -ProjectRoot 'C:\OperationSteelTideLauncherSelfTestSibling' `
+        -Scope Preparation
+    if ($preparationMutexName -cne $caseVariantPreparationMutexName -or
+        $preparationMutexName -ceq $runtimeMutexName -or
+        $preparationMutexName -ceq $otherPreparationMutexName) {
+        $failures.Add('Preparation/runtime mutex names are not stable and project-scoped.')
+    }
+
+    $primaryPolicy = Get-GameRuntimePolicy `
+        -OwnsRuntimeMutex $true `
+        -RunningProjectInstanceCount 0
+    $parallelByMutexPolicy = Get-GameRuntimePolicy `
+        -OwnsRuntimeMutex $false `
+        -RunningProjectInstanceCount 0
+    $parallelByProcessPolicy = Get-GameRuntimePolicy `
+        -OwnsRuntimeMutex $true `
+        -RunningProjectInstanceCount 1
+    if (-not $primaryPolicy.BackendAllowed -or $primaryPolicy.Parallel -or
+        $parallelByMutexPolicy.BackendAllowed -or -not $parallelByMutexPolicy.Parallel -or
+        $parallelByProcessPolicy.BackendAllowed -or -not $parallelByProcessPolicy.Parallel) {
+        $failures.Add('Parallel runtime policy did not reserve the backend for one primary game.')
     }
 
     $pathHash = Get-ProjectPathHash -ProjectRoot $testProjectRoot
@@ -643,6 +868,9 @@ function Invoke-LauncherSelfTest {
     $originalEnvironmentOffline = [Environment]::GetEnvironmentVariable(
         'STEEL_TIDE_BACKEND_OFFLINE',
         'Process')
+    $originalParallelInstance = [Environment]::GetEnvironmentVariable(
+        'STEEL_TIDE_PARALLEL_INSTANCE',
+        'Process')
     $backendEnvironmentSnapshot = $null
     try {
         [Environment]::SetEnvironmentVariable(
@@ -653,15 +881,24 @@ function Invoke-LauncherSelfTest {
             'STEEL_TIDE_BACKEND_OFFLINE',
             'self-test-sentinel-offline',
             'Process')
-        $backendEnvironmentSnapshot = Set-GameBackendEnvironment -InstanceId $instanceA -Offline $true
+        [Environment]::SetEnvironmentVariable(
+            'STEEL_TIDE_PARALLEL_INSTANCE',
+            'self-test-sentinel-parallel',
+            'Process')
+        $backendEnvironmentSnapshot = Set-GameBackendEnvironment `
+            -InstanceId $instanceA `
+            -Offline $true `
+            -ParallelInstanceId '20260827-221530-123-4567-a1b2c3d4'
         $environmentApplied =
             [Environment]::GetEnvironmentVariable('STEEL_TIDE_BACKEND_INSTANCE', 'Process') -ceq $instanceA -and
-            [Environment]::GetEnvironmentVariable('STEEL_TIDE_BACKEND_OFFLINE', 'Process') -ceq '1'
+            [Environment]::GetEnvironmentVariable('STEEL_TIDE_BACKEND_OFFLINE', 'Process') -ceq '1' -and
+            [Environment]::GetEnvironmentVariable('STEEL_TIDE_PARALLEL_INSTANCE', 'Process') -ceq '20260827-221530-123-4567-a1b2c3d4'
         Restore-GameBackendEnvironment -Snapshot $backendEnvironmentSnapshot
         $backendEnvironmentSnapshot = $null
         $environmentRestored =
             [Environment]::GetEnvironmentVariable('STEEL_TIDE_BACKEND_INSTANCE', 'Process') -ceq 'self-test-sentinel-instance' -and
-            [Environment]::GetEnvironmentVariable('STEEL_TIDE_BACKEND_OFFLINE', 'Process') -ceq 'self-test-sentinel-offline'
+            [Environment]::GetEnvironmentVariable('STEEL_TIDE_BACKEND_OFFLINE', 'Process') -ceq 'self-test-sentinel-offline' -and
+            [Environment]::GetEnvironmentVariable('STEEL_TIDE_PARALLEL_INSTANCE', 'Process') -ceq 'self-test-sentinel-parallel'
         if (-not $environmentApplied -or -not $environmentRestored) {
             $failures.Add('Game backend environment was not applied or restored exactly.')
         }
@@ -677,6 +914,10 @@ function Invoke-LauncherSelfTest {
         [Environment]::SetEnvironmentVariable(
             'STEEL_TIDE_BACKEND_OFFLINE',
             $originalEnvironmentOffline,
+            'Process')
+        [Environment]::SetEnvironmentVariable(
+            'STEEL_TIDE_PARALLEL_INSTANCE',
+            $originalParallelInstance,
             'Process')
     }
 
@@ -702,8 +943,12 @@ function Invoke-LauncherSelfTest {
         $failures.Add('Godot version selection accepted a non-4.6 Mono build.')
     }
 
-    if (-not (Test-StartupRunDirectoryName -Name '20260827-221530-123-4567-a1b2c3d4') -or
-        (Test-StartupRunDirectoryName -Name 'startup-validation')) {
+    $validRunDirectoryName = '20260827-221530-123-4567-a1b2c3d4'
+    $runDirectoryProcessId = Get-StartupRunDirectoryProcessId -Name $validRunDirectoryName
+    if (-not (Test-StartupRunDirectoryName -Name $validRunDirectoryName) -or
+        $runDirectoryProcessId -ne 4567 -or
+        (Test-StartupRunDirectoryName -Name 'startup-validation') -or
+        $null -ne (Get-StartupRunDirectoryProcessId -Name 'startup-validation')) {
         $failures.Add('Startup log directory name safety filter is incorrect.')
     }
 
@@ -714,7 +959,7 @@ function Invoke-LauncherSelfTest {
         return 1
     }
 
-    Write-Host 'SELF_TEST_PASS relative_path=True absolute_path=True backend_identity=True source_change=True filesystem_hash=True backend_environment=True godot_version=True log_filter=True'
+    Write-Host 'SELF_TEST_PASS relative_path=True absolute_path=True editor_filter=True argument_quote=True preparation_mutex=True runtime_parallel=True backend_identity=True source_change=True filesystem_hash=True backend_environment=True godot_version=True active_log_filter=True'
     return 0
 }
 
@@ -722,30 +967,44 @@ function Invoke-OperationSteelTideLauncher {
     param([string[]]$GameArguments)
 
     $projectRoot = Get-CanonicalProjectPath -Path (Join-Path $PSScriptRoot '..')
-    $mutex = New-Object System.Threading.Mutex($false, (Get-ProjectMutexName -ProjectRoot $projectRoot))
-    $ownsMutex = $false
+    $preparationMutex = New-Object System.Threading.Mutex(
+        $false,
+        (Get-ProjectMutexName -ProjectRoot $projectRoot -Scope Preparation))
+    $runtimeMutex = New-Object System.Threading.Mutex(
+        $false,
+        (Get-ProjectMutexName -ProjectRoot $projectRoot -Scope Runtime))
+    $ownsPreparationMutex = $false
+    $ownsRuntimeMutex = $false
     $ownedBackendProcess = $null
+    $gameProcess = $null
+    $gameProcessStarted = $false
+    $gameProcessExited = $false
     $gameEnvironmentSnapshot = $null
+    $parallelProfileRunDirectory = $null
 
     try {
         try {
-            $ownsMutex = $mutex.WaitOne(0, $false)
+            $ownsPreparationMutex = $preparationMutex.WaitOne(0, $false)
         }
         catch [System.Threading.AbandonedMutexException] {
-            $ownsMutex = $true
+            $ownsPreparationMutex = $true
         }
 
-        if (-not $ownsMutex) {
-            [Console]::Error.WriteLine('Operation Steel Tide is already starting or running from this project directory.')
-            return 3
-        }
-
-        $runningProjectInstances = @(Get-RunningGodotProcessesForProject -ProjectRoot $projectRoot)
-        if ($runningProjectInstances.Count -gt 0) {
-            $runningPids = ($runningProjectInstances.ProcessId | Sort-Object) -join ', '
-            [Console]::Error.WriteLine(
-                "Godot is already running this project directory (PID(s): $runningPids). Close that instance before starting another one.")
-            return 3
+        if (-not $ownsPreparationMutex) {
+            Write-Host (
+                'Another launcher is building or importing this project. ' +
+                'Waiting for the shared preparation step to finish...')
+            try {
+                $ownsPreparationMutex = $preparationMutex.WaitOne(900000, $false)
+            }
+            catch [System.Threading.AbandonedMutexException] {
+                $ownsPreparationMutex = $true
+            }
+            if (-not $ownsPreparationMutex) {
+                [Console]::Error.WriteLine(
+                    'Timed out after 15 minutes while waiting for project build/import preparation.')
+                return 3
+            }
         }
 
         $godot = Resolve-GodotExecutable
@@ -825,135 +1084,167 @@ function Invoke-OperationSteelTideLauncher {
             return 1
         }
 
+        $runningProjectInstances = @(Get-RunningGodotProcessesForProject `
+            -ProjectRoot $projectRoot `
+            -RuntimeOnly)
+        try {
+            $ownsRuntimeMutex = $runtimeMutex.WaitOne(0, $false)
+        }
+        catch [System.Threading.AbandonedMutexException] {
+            $ownsRuntimeMutex = $true
+        }
+        $runtimePolicy = Get-GameRuntimePolicy `
+            -OwnsRuntimeMutex $ownsRuntimeMutex `
+            -RunningProjectInstanceCount $runningProjectInstances.Count
+        $parallelInstanceId = ''
+        if ($runtimePolicy.Parallel) {
+            $parallelInstanceId = $runId
+            $parallelProfileRunDirectory = $runLogDirectory
+            $runningPids = if ($runningProjectInstances.Count -gt 0) {
+                ($runningProjectInstances.ProcessId | Sort-Object -Unique) -join ', '
+            }
+            else {
+                'coordinated launcher instance'
+            }
+            Write-Host (
+                "Parallel runtime mode enabled (existing: $runningPids). " +
+                'This game will use isolated temporary progression and the offline mission fallback.')
+        }
+
         $serverPath = Join-Path $projectRoot 'steel-tide-server.exe'
         $backendDataPath = Join-Path $projectRoot 'backend\data\state.json'
         $backendInstanceId = Get-BackendInstanceId -ProjectRoot $projectRoot
         $backendOffline = $true
         Write-Host "Backend instance: $backendInstanceId"
-        $backendHealth = Get-SteelTideBackendHealth -ExpectedInstanceId $backendInstanceId
-        if ($backendHealth.CanReuse) {
-            $backendOffline = $false
-            Write-Host 'Using the matching healthy Steel Tide mission service on 127.0.0.1:8787.'
-        }
-        elseif ($backendHealth.Reachable) {
-            if ($backendHealth.IsSteelTide) {
-                $reportedInstance = if ([string]::IsNullOrWhiteSpace($backendHealth.Instance)) {
-                    '<missing>'
-                }
-                else {
-                    $backendHealth.Instance
-                }
-                Write-Warning (
-                    'A Steel Tide mission service from another checkout or an incompatible launcher ' +
-                    "is already listening on 127.0.0.1:8787 (status='$($backendHealth.Status)', " +
-                    "instance='$reportedInstance', expected='$backendInstanceId'). " +
-                    'This launch will use the offline fallback without binding to or stopping that service.')
-            }
-            else {
-                Write-Warning (
-                    "Another service answered the backend health URL (service='$($backendHealth.Service)'). " +
-                    'This launch will use the offline fallback without binding to or stopping it.')
-            }
+        if (-not $runtimePolicy.BackendAllowed) {
+            Write-Host 'Parallel instances do not start, reuse, or stop the shared mission service.'
         }
         else {
-            $serverUsable = $false
-            $go = Get-Command 'go.exe' -CommandType Application -ErrorAction SilentlyContinue |
-                Select-Object -First 1
-            if ($null -ne $go) {
-                Write-Host 'Building the Go mission service...'
-                $identityBeforeBuild = Get-BackendInstanceId -ProjectRoot $projectRoot
-                $goBuildExitCode = 1
-                Push-Location (Join-Path $projectRoot 'backend')
-                try {
-                    & $go.Source build -o $serverPath ./cmd/server | Out-Host
-                    $goBuildExitCode = $LASTEXITCODE
-                }
-                finally {
-                    Pop-Location
-                }
-                $identityAfterBuild = Get-BackendInstanceId -ProjectRoot $projectRoot
-                $sourceStableDuringBuild = $identityBeforeBuild -ceq $identityAfterBuild
-                $serverUsable = $goBuildExitCode -eq 0 -and
-                    $sourceStableDuringBuild -and
-                    (Test-Path -LiteralPath $serverPath -PathType Leaf)
-                if ($goBuildExitCode -ne 0) {
+            $backendHealth = Get-SteelTideBackendHealth -ExpectedInstanceId $backendInstanceId
+            if ($backendHealth.CanReuse) {
+                $backendOffline = $false
+                Write-Host 'Using the matching healthy Steel Tide mission service on 127.0.0.1:8787.'
+            }
+            elseif ($backendHealth.Reachable) {
+                if ($backendHealth.IsSteelTide) {
+                    $reportedInstance = if ([string]::IsNullOrWhiteSpace($backendHealth.Instance)) {
+                        '<missing>'
+                    }
+                    else {
+                        $backendHealth.Instance
+                    }
                     Write-Warning (
-                        "The Go mission service build failed with exit code $goBuildExitCode. " +
-                        'A pre-existing executable will not be used.')
-                }
-                elseif (-not $sourceStableDuringBuild) {
-                    Write-Warning (
-                        'Backend sources changed during the Go build. The resulting executable will not be started.')
-                }
-                elseif (-not $serverUsable) {
-                    Write-Warning 'The Go build did not produce the expected mission service executable.'
+                        'A Steel Tide mission service from another checkout or an incompatible launcher ' +
+                        "is already listening on 127.0.0.1:8787 (status='$($backendHealth.Status)', " +
+                        "instance='$reportedInstance', expected='$backendInstanceId'). " +
+                        'This launch will use the offline fallback without binding to or stopping that service.')
                 }
                 else {
-                    if ($backendInstanceId -cne $identityAfterBuild) {
-                        Write-Host "Backend instance after source refresh: $identityAfterBuild"
-                    }
-                    $backendInstanceId = $identityAfterBuild
+                    Write-Warning (
+                        "Another service answered the backend health URL (service='$($backendHealth.Service)'). " +
+                        'This launch will use the offline fallback without binding to or stopping it.')
                 }
             }
             else {
-                Write-Warning (
-                    'Go is unavailable, so no local mission service can be built. ' +
-                    'A pre-existing on-disk executable will not be started.')
-            }
-
-            if ($serverUsable) {
-                try {
-                    Write-Host 'Starting the Steel Tide mission service...'
-                    Write-Host "  Backend log:       $backendLog"
-                    Write-Host "  Backend error log: $backendErrorLog"
-                    $backendArguments = @(
-                        '-addr',
-                        '127.0.0.1:8787',
-                        '-data',
-                        ('"{0}"' -f $backendDataPath),
-                        '-instance',
-                        $backendInstanceId
-                    )
-                    $ownedBackendProcess = Start-Process `
-                        -FilePath $serverPath `
-                        -WorkingDirectory $projectRoot `
-                        -ArgumentList $backendArguments `
-                        -RedirectStandardOutput $backendLog `
-                        -RedirectStandardError $backendErrorLog `
-                        -WindowStyle Hidden `
-                        -PassThru
-
-                    if (Wait-SteelTideBackendHealth `
-                        -Process $ownedBackendProcess `
-                        -ExpectedInstanceId $backendInstanceId) {
-                        $backendOffline = $false
-                        Write-Host "  Mission service ready (PID $($ownedBackendProcess.Id))."
+                $serverUsable = $false
+                $go = Get-Command 'go.exe' -CommandType Application -ErrorAction SilentlyContinue |
+                    Select-Object -First 1
+                if ($null -ne $go) {
+                    Write-Host 'Building the Go mission service...'
+                    $identityBeforeBuild = Get-BackendInstanceId -ProjectRoot $projectRoot
+                    $goBuildExitCode = 1
+                    Push-Location (Join-Path $projectRoot 'backend')
+                    try {
+                        & $go.Source build -o $serverPath ./cmd/server | Out-Host
+                        $goBuildExitCode = $LASTEXITCODE
+                    }
+                    finally {
+                        Pop-Location
+                    }
+                    $identityAfterBuild = Get-BackendInstanceId -ProjectRoot $projectRoot
+                    $sourceStableDuringBuild = $identityBeforeBuild -ceq $identityAfterBuild
+                    $serverUsable = $goBuildExitCode -eq 0 -and
+                        $sourceStableDuringBuild -and
+                        (Test-Path -LiteralPath $serverPath -PathType Leaf)
+                    if ($goBuildExitCode -ne 0) {
+                        Write-Warning (
+                            "The Go mission service build failed with exit code $goBuildExitCode. " +
+                            'A pre-existing executable will not be used.')
+                    }
+                    elseif (-not $sourceStableDuringBuild) {
+                        Write-Warning (
+                            'Backend sources changed during the Go build. The resulting executable will not be started.')
+                    }
+                    elseif (-not $serverUsable) {
+                        Write-Warning 'The Go build did not produce the expected mission service executable.'
                     }
                     else {
-                        $ownedBackendProcess.Refresh()
-                        $backendStatus = if ($ownedBackendProcess.HasExited) {
-                            "exited with code $($ownedBackendProcess.ExitCode)"
+                        if ($backendInstanceId -cne $identityAfterBuild) {
+                            Write-Host "Backend instance after source refresh: $identityAfterBuild"
+                        }
+                        $backendInstanceId = $identityAfterBuild
+                    }
+                }
+                else {
+                    Write-Warning (
+                        'Go is unavailable, so no local mission service can be built. ' +
+                        'A pre-existing on-disk executable will not be started.')
+                }
+
+                if ($serverUsable) {
+                    try {
+                        Write-Host 'Starting the Steel Tide mission service...'
+                        Write-Host "  Backend log:       $backendLog"
+                        Write-Host "  Backend error log: $backendErrorLog"
+                        $backendArguments = @(
+                            '-addr',
+                            '127.0.0.1:8787',
+                            '-data',
+                            ('"{0}"' -f $backendDataPath),
+                            '-instance',
+                            $backendInstanceId
+                        )
+                        $ownedBackendProcess = Start-Process `
+                            -FilePath $serverPath `
+                            -WorkingDirectory $projectRoot `
+                            -ArgumentList $backendArguments `
+                            -RedirectStandardOutput $backendLog `
+                            -RedirectStandardError $backendErrorLog `
+                            -WindowStyle Hidden `
+                            -PassThru
+
+                        if (Wait-SteelTideBackendHealth `
+                            -Process $ownedBackendProcess `
+                            -ExpectedInstanceId $backendInstanceId) {
+                            $backendOffline = $false
+                            Write-Host "  Mission service ready (PID $($ownedBackendProcess.Id))."
                         }
                         else {
-                            'did not become healthy within 10 seconds'
+                            $ownedBackendProcess.Refresh()
+                            $backendStatus = if ($ownedBackendProcess.HasExited) {
+                                "exited with code $($ownedBackendProcess.ExitCode)"
+                            }
+                            else {
+                                'did not become healthy within 10 seconds'
+                            }
+                            Write-Warning (
+                                "The mission service $backendStatus. " +
+                                'Starting with the built-in offline mission fallback.')
+                            Stop-OwnedBackend -Process $ownedBackendProcess
+                            $ownedBackendProcess = $null
                         }
+                    }
+                    catch {
                         Write-Warning (
-                            "The mission service $backendStatus. " +
+                            "The mission service could not be started: $($_.Exception.Message). " +
                             'Starting with the built-in offline mission fallback.')
                         Stop-OwnedBackend -Process $ownedBackendProcess
                         $ownedBackendProcess = $null
                     }
                 }
-                catch {
-                    Write-Warning (
-                        "The mission service could not be started: $($_.Exception.Message). " +
-                        'Starting with the built-in offline mission fallback.')
-                    Stop-OwnedBackend -Process $ownedBackendProcess
-                    $ownedBackendProcess = $null
+                else {
+                    Write-Host 'Mission service unavailable; starting with the built-in offline mission fallback.'
                 }
-            }
-            else {
-                Write-Host 'Mission service unavailable; starting with the built-in offline mission fallback.'
             }
         }
 
@@ -961,13 +1252,45 @@ function Invoke-OperationSteelTideLauncher {
         Write-Host '  Tip: In the Operations Office lobby use TIME to cycle Day/Dusk/Night/Dawn.'
         $gameEnvironmentSnapshot = Set-GameBackendEnvironment `
             -InstanceId $backendInstanceId `
-            -Offline $backendOffline
+            -Offline $backendOffline `
+            -ParallelInstanceId $parallelInstanceId
         Write-Host (
             '  Backend environment: STEEL_TIDE_BACKEND_OFFLINE=' +
             $(if ($backendOffline) { '1 (offline fallback)' } else { '0 (matching instance)' }))
         $godotArguments = @('--path', $projectRoot, '--log-file', $runtimeLog, '--') + $GameArguments
-        & $godot @godotArguments | Out-Host
-        $gameExitCode = $LASTEXITCODE
+        $godotCommandLine = Join-WindowsProcessArguments -Arguments $godotArguments
+        $gameProcess = Start-Process `
+            -FilePath $godot `
+            -WorkingDirectory $projectRoot `
+            -ArgumentList $godotCommandLine `
+            -NoNewWindow `
+            -PassThru
+        $gameProcessStarted = $true
+        $runtimeReady = Wait-GodotRuntimeReady -Process $gameProcess -LogPath $runtimeLog
+        if (-not $runtimeReady) {
+            $gameProcess.Refresh()
+            if ($gameProcess.HasExited) {
+                Write-Warning 'Godot exited before reporting that the C# runtime was ready.'
+            }
+            else {
+                Write-Warning (
+                    'Godot did not report C# runtime readiness within 120 seconds. ' +
+                    'Releasing shared preparation so other launchers are not blocked indefinitely.')
+            }
+        }
+        if ($ownsPreparationMutex) {
+            $preparationMutex.ReleaseMutex()
+            $ownsPreparationMutex = $false
+        }
+        if ($runtimeReady) {
+            Write-Host '  C# runtime loaded; other launchers may now build and import in parallel.'
+        }
+        else {
+            Write-Host '  Shared preparation released; other launchers may now continue.'
+        }
+        $gameProcess.WaitForExit()
+        $gameProcessExited = $true
+        $gameExitCode = $gameProcess.ExitCode
         if ($gameExitCode -ne 0) {
             [Console]::Error.WriteLine(
                 "The game exited with code $gameExitCode. See '$runtimeLog'.")
@@ -998,11 +1321,27 @@ function Invoke-OperationSteelTideLauncher {
         if ($null -ne $gameEnvironmentSnapshot) {
             Restore-GameBackendEnvironment -Snapshot $gameEnvironmentSnapshot
         }
-        Stop-OwnedBackend -Process $ownedBackendProcess
-        if ($ownsMutex) {
-            $mutex.ReleaseMutex()
+        if ($null -ne $parallelProfileRunDirectory) {
+            if (-not $gameProcessStarted -or $gameProcessExited) {
+                Remove-ParallelRuntimeProfile -RunLogDirectory $parallelProfileRunDirectory
+            }
+            else {
+                Write-Warning (
+                    "Parallel profile cleanup deferred because Godot is still running: '$parallelProfileRunDirectory'.")
+            }
         }
-        $mutex.Dispose()
+        Stop-OwnedBackend -Process $ownedBackendProcess
+        if ($ownsRuntimeMutex) {
+            $runtimeMutex.ReleaseMutex()
+        }
+        if ($ownsPreparationMutex) {
+            $preparationMutex.ReleaseMutex()
+        }
+        if ($null -ne $gameProcess) {
+            $gameProcess.Dispose()
+        }
+        $runtimeMutex.Dispose()
+        $preparationMutex.Dispose()
     }
 }
 

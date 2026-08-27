@@ -21,6 +21,7 @@
 
 /backend/data/
 /data/
+/logs/
 /steel-tide-server.exe*
 /build/
 /dist/

@@ -8,7 +8,8 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private OperatorProfileStore _operatorProfileStore = null!;
-    private string? _diagnosticProfilePath;
+    private string? _isolatedProfilePath;
+    private bool _cleanupIsolatedProfileOnExit;
     private int _deploymentBaselineValue = -1;
     private bool _deploymentPurchaseCommitted;
     private bool _extractionValueCommitted;
@@ -21,20 +22,31 @@ public partial class FreightTerminalWorld
             || value.StartsWith("--capture", StringComparison.Ordinal));
         if (isolatedRun)
         {
-            _diagnosticProfilePath = Path.Combine(
+            _cleanupIsolatedProfileOnExit = true;
+            _isolatedProfilePath = Path.Combine(
                 OS.GetUserDataDir(),
                 $"operator_profile_runtime_validation_{System.Environment.ProcessId}.json");
-            TryDeleteProfile(_diagnosticProfilePath);
         }
-        _operatorProfileStore = new OperatorProfileStore(_diagnosticProfilePath);
+        else if (RuntimeLaunchIsolation.GetInstanceId() is { } parallelInstanceId)
+        {
+            _isolatedProfilePath = RuntimeLaunchIsolation.GetOperatorProfilePath(
+                ProjectSettings.GlobalizePath("res://"),
+                parallelInstanceId);
+            GD.Print($"Parallel runtime progression isolated as '{Path.GetFileName(_isolatedProfilePath)}'.");
+        }
+        if (_cleanupIsolatedProfileOnExit && !string.IsNullOrEmpty(_isolatedProfilePath))
+        {
+            TryDeleteProfile(_isolatedProfilePath);
+        }
+        _operatorProfileStore = new OperatorProfileStore(_isolatedProfilePath);
     }
 
     private void CleanupOperatorProgression()
     {
-        if (!string.IsNullOrEmpty(_diagnosticProfilePath))
+        if (_cleanupIsolatedProfileOnExit && !string.IsNullOrEmpty(_isolatedProfilePath))
         {
-            TryDeleteProfile(_diagnosticProfilePath);
-            TryDeleteProfile(_diagnosticProfilePath + ".tmp");
+            TryDeleteProfile(_isolatedProfilePath);
+            TryDeleteProfile(_isolatedProfilePath + ".tmp");
         }
     }
 

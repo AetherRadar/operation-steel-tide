@@ -2805,6 +2805,10 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SaveSettings()
     {
+        if (!RuntimeLaunchIsolation.ShouldPersistSharedSettings)
+        {
+            return;
+        }
         var config = new ConfigFile();
         config.SetValue("controls", "sensitivity", _sensitivitySetting);
         config.SetValue("graphics", "quality", _qualitySetting);
