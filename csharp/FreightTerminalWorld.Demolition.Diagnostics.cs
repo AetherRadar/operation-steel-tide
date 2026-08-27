@@ -645,6 +645,20 @@ public partial class FreightTerminalWorld
                 opponent.ProcessMode = ProcessModeEnum.Disabled;
             }
         }
+        var runningMate = _squadMates.FirstOrDefault(mate =>
+            IsInstanceValid(mate)
+            && !mate.IsDowned
+            && !mate.IsBodyBag
+            && mate.UsesAuthoredOperatorForDiagnostics);
+        if (runningMate is not null)
+        {
+            runningMate.Velocity = Vector3.Right * 4.0f;
+            runningMate.SetAuthoredMovementPoseForDiagnostics(4.0f);
+        }
+        var teammateRunningBeforeRoundEnd = runningMate is not null
+            && runningMate.AuthoredAnimationForDiagnostics.Contains(
+                "run",
+                System.StringComparison.Ordinal);
         var detonationsBefore = _demolitionDetonationCount;
         _demolitionRemaining = 0.05f;
         UpdateDemolitionRound(0.1f);
@@ -654,6 +668,24 @@ public partial class FreightTerminalWorld
             && !_demolitionDevice!.Visible;
         var playerFundsAfterWin = DemolitionPlayerFunds;
         var opponentFundsAfterLoss = DemolitionOpponentFunds;
+        var roundResultPresented = _hud.IsDemolitionRoundResultVisible
+            && _hud.DemolitionRoundResultUiReady
+            && _hud.DemolitionRoundResultUsesPackedScene
+            && _hud.DemolitionRoundResultLanguageReady
+            && _hud.DemolitionRoundResultVictory
+            && _hud.DemolitionRoundResultScore.Contains("1", System.StringComparison.Ordinal)
+            && _hud.DemolitionRoundResultScore.Contains("0", System.StringComparison.Ordinal)
+            && Mathf.IsEqualApprox(
+                _hud.DemolitionRoundResultSeconds,
+                DemolitionIntermissionDuration);
+        var actorsFrozenAtRoundEnd = _player.ProcessMode == ProcessModeEnum.Disabled
+            && _player.Velocity.LengthSquared() <= 0.0001f
+            && _squadMates.Where(IsInstanceValid).All(mate =>
+                mate.ProcessMode == ProcessModeEnum.Disabled
+                && mate.IsDemolitionRoundFrozenPoseForDiagnostics)
+            && _demolitionOpponents.Where(IsInstanceValid).All(opponent =>
+                opponent.ProcessMode == ProcessModeEnum.Disabled
+                && opponent.Velocity.LengthSquared() <= 0.0001f);
         var roundRecorded = !_missionEnded
             && !_demolitionRoundActive
             && !_hud.IsMissionResultVisible
@@ -669,6 +701,7 @@ public partial class FreightTerminalWorld
         var roundReset = _demolitionBuyPhaseActive
             && !_demolitionRoundActive
             && _hud.IsDemolitionBuyVisible
+            && !_hud.IsDemolitionRoundResultVisible
             && !_demolitionDevicePlanted
             && DemolitionRoundNumber == 2
             && DemolitionOpponentCount == 5
@@ -728,9 +761,10 @@ public partial class FreightTerminalWorld
             && minimapReady && hostileAircraftIsolated && reinforcementsIsolated
             && directorIsolation && playerBoughtPistol && nonCarrierPlayerRejected
             && playerPickedUpDevice && carrierDropHandoff && planted && retakeStrategy && defuseAi
-            && deviceDetonated && roundRecorded && roundReset && roundTwoLive && attackTimeoutFails
+            && deviceDetonated && teammateRunningBeforeRoundEnd && roundResultPresented
+            && actorsFrozenAtRoundEnd && roundRecorded && roundReset && roundTwoLive && attackTimeoutFails
             && tacticalAi && defenseRound && matchRules && economyRules;
-        GD.Print($"DEMOLITION_CHECK valid={valid} entry_button={entryButton} briefing={briefingSelection} buy_phase={buyTimerPrecedesRound} device_assigned={deviceAssignedDuringBuy} device_compact={compactDevice} initial_carrier={DemolitionMemberId(initialDeviceCarrier)} deployed={deployed} arena={IsDemolitionArenaActive} gameplay={_hud.IsGameplayHudVisible} squad={DemolitionSquadSizeTotal} opponents={DemolitionOpponentCount} opponent_pistols={opponentOpeningPistols} pistol_kit={pistolKit} slots={weaponSlots} bindings={slotBindings} economy={isolatedEconomy} opening_strategy={openingStrategy} retake_strategy={retakeStrategy} assignments={DemolitionStrategyAssignmentCount} minimap={minimapReady} aircraft_isolated={hostileAircraftIsolated} reinforcements_isolated={reinforcementsIsolated} director_isolation={directorIsolation} sites={DemolitionSiteCount} sites_clear={sitesClear} funds_after_buy={fundsAfterOpeningBuy} pistol_buy={playerBoughtPistol} noncarrier_rejected={nonCarrierPlayerRejected} player_pickup={playerPickedUpDevice} handoff={carrierDropHandoff} planted={planted} plant_steps={plantSteps} detonated={deviceDetonated} defuse_ai={defuseAi} defuse_distance={initialDefuserDistance:0.00}->{finalDefuserDistance:0.00} defuse_progress={_demolitionDefuseProgress:0.00} defuse_frames={defuseFrames}/600 round_recorded={roundRecorded} round_reset={roundReset} round_two_live={roundTwoLive} attack_timeout={attackTimeoutFails} tactical_ai={tacticalAi} defense_round={defenseRound} match_rules={matchRules} economy_rules={economyRules} score={DemolitionPlayerScore}:{DemolitionOpponentScore} round={DemolitionRoundNumber} result={_hud.IsMissionResultVisible}");
+        GD.Print($"DEMOLITION_CHECK valid={valid} entry_button={entryButton} briefing={briefingSelection} buy_phase={buyTimerPrecedesRound} device_assigned={deviceAssignedDuringBuy} device_compact={compactDevice} initial_carrier={DemolitionMemberId(initialDeviceCarrier)} deployed={deployed} arena={IsDemolitionArenaActive} gameplay={_hud.IsGameplayHudVisible} squad={DemolitionSquadSizeTotal} opponents={DemolitionOpponentCount} opponent_pistols={opponentOpeningPistols} pistol_kit={pistolKit} slots={weaponSlots} bindings={slotBindings} economy={isolatedEconomy} opening_strategy={openingStrategy} retake_strategy={retakeStrategy} assignments={DemolitionStrategyAssignmentCount} minimap={minimapReady} aircraft_isolated={hostileAircraftIsolated} reinforcements_isolated={reinforcementsIsolated} director_isolation={directorIsolation} sites={DemolitionSiteCount} sites_clear={sitesClear} funds_after_buy={fundsAfterOpeningBuy} pistol_buy={playerBoughtPistol} noncarrier_rejected={nonCarrierPlayerRejected} player_pickup={playerPickedUpDevice} handoff={carrierDropHandoff} planted={planted} plant_steps={plantSteps} detonated={deviceDetonated} defuse_ai={defuseAi} defuse_distance={initialDefuserDistance:0.00}->{finalDefuserDistance:0.00} defuse_progress={_demolitionDefuseProgress:0.00} defuse_frames={defuseFrames}/600 teammate_running={teammateRunningBeforeRoundEnd} round_result={roundResultPresented} actors_frozen={actorsFrozenAtRoundEnd} round_recorded={roundRecorded} round_reset={roundReset} round_two_live={roundTwoLive} attack_timeout={attackTimeoutFails} tactical_ai={tacticalAi} defense_round={defenseRound} match_rules={matchRules} economy_rules={economyRules} score={DemolitionPlayerScore}:{DemolitionOpponentScore} round={DemolitionRoundNumber} result={_hud.IsMissionResultVisible}");
         GD.Print($"DEMOLITION_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

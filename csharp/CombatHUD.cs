@@ -556,7 +556,7 @@ public partial class CombatHUD : CanvasLayer
         BuildLootOverlay(root);
         BuildSquadHud(canvasRoot);
         BuildOperationsOfficeHud(canvasRoot);
-        BuildDemolitionBuyHud(canvasRoot);
+        BuildDemolitionHud(canvasRoot);
         root.MoveChild(_lootOverlay, root.GetChildCount() - 1);
     }
 

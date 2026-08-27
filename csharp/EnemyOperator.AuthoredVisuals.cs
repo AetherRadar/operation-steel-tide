@@ -66,6 +66,27 @@ public partial class EnemyOperator
     private void HoldAuthoredAimAfterShot()
         => _authoredAimHoldRemaining = Mathf.Max(_authoredAimHoldRemaining, 0.36f);
 
+    internal void SetDemolitionRoundFrozenPose()
+    {
+        Velocity = Vector3.Zero;
+        if (IsDead)
+        {
+            return;
+        }
+
+        _authoredAimHoldRemaining = 0.0f;
+        if (UsesAuthoredOperatorForDiagnostics)
+        {
+            var weaponReadied = HasFireablePrimary;
+            _authoredOperatorVisual.SetWeaponReadied(weaponReadied);
+            _authoredOperatorAnimator.SetRestingPose(weaponReadied);
+        }
+        else if (UsesTideHunterMonsterForDiagnostics)
+        {
+            UpdateTideHunterVisual(0.0f);
+        }
+    }
+
     private void AnimateAuthoredOperator(float delta, float speed)
     {
         _authoredAimHoldRemaining = Mathf.Max(0.0f, _authoredAimHoldRemaining - delta);

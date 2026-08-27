@@ -308,6 +308,7 @@ public partial class CombatHUD
     public void ShowDemolitionResult(bool victory, string reason)
     {
         HideOperationsMenus();
+        HideDemolitionRoundResult();
         _gameplayHudRoot.Visible = true;
         _downedBanner.Visible = false;
         _stateOverlay.Visible = true;

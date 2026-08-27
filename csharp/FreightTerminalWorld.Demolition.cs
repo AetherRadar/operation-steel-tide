@@ -517,6 +517,7 @@ public partial class FreightTerminalWorld
             return;
         }
         _demolitionIntermissionRemaining = Mathf.Max(0.0f, _demolitionIntermissionRemaining - delta);
+        _hud.UpdateDemolitionRoundResult(_demolitionIntermissionRemaining);
         var label = GameLocalization.IsChinese(_languageSetting)
             ? $"下一局  //  {_demolitionIntermissionRemaining:0.0}s  //  己方 {LocalDemolitionScore}:{OpposingDemolitionScore} 敌方"
             : $"NEXT ROUND  //  {_demolitionIntermissionRemaining:0.0}s  //  YOU {LocalDemolitionScore}:{OpposingDemolitionScore} ENEMY";
@@ -885,23 +886,7 @@ public partial class FreightTerminalWorld
         }
         _demolitionRoundActive = false;
         _player.EjectFromVehicleIfAny();
-        _player.UiLocked = true;
-        _player.DisarmFireInput();
-        _player.DisarmMovementInput();
-        foreach (var opponent in _demolitionOpponents)
-        {
-            if (IsInstanceValid(opponent))
-            {
-                opponent.ProcessMode = ProcessModeEnum.Disabled;
-            }
-        }
-        foreach (var mate in _squadMates)
-        {
-            if (IsInstanceValid(mate))
-            {
-                mate.ProcessMode = ProcessModeEnum.Disabled;
-            }
-        }
+        SetDemolitionActorsFrozen(true);
 
         var defused = _demolitionPlayerDefuseProgress >= 1.0f;
         var playerPlanted = _demolitionDevicePlanted
@@ -945,6 +930,12 @@ public partial class FreightTerminalWorld
         var roundMessage = GameLocalization.IsChinese(_languageSetting)
             ? $"本局结束  //  {reason}  //  己方 {result.PlayerScore}:{result.OpponentScore} 敌方{swap}{overtime}  //  ${_demolitionPlayerEconomy.Funds}"
             : $"ROUND COMPLETE  //  {reason}  //  YOU {result.PlayerScore}:{result.OpponentScore} ENEMY{swap}{overtime}  //  ${_demolitionPlayerEconomy.Funds}";
+        _hud.ShowDemolitionRoundResult(
+            playerWon,
+            reason,
+            LocalDemolitionScore,
+            OpposingDemolitionScore,
+            _demolitionIntermissionRemaining);
         _hud.ShowRadioMessage(roundMessage, playerWon
             ? new Color(1.0f, 0.62f, 0.22f)
             : new Color(0.35f, 0.85f, 0.7f));

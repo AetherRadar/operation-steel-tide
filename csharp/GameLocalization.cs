@@ -540,6 +540,11 @@ public static class GameLocalization
         Chinese["demolition_minimap_defend"] = "\u9632\u5b88\u65b9";
         Chinese["demolition_success"] = "\u6bd4\u8d5b\u80dc\u5229";
         Chinese["demolition_failed"] = "\u6bd4\u8d5b\u5931\u5229";
+        Chinese["demolition_round_victory"] = "\u56de\u5408\u80dc\u5229";
+        Chinese["demolition_round_defeat"] = "\u56de\u5408\u5931\u5229";
+        Chinese["demolition_round_score"] = "\u5df1\u65b9  {0} : {1}  \u654c\u65b9";
+        Chinese["demolition_next_round_countdown"] = "\u4e0b\u4e00\u56de\u5408  {0:0.0} \u79d2";
+        Chinese["demolition_round_complete"] = "\u672c\u56de\u5408\u7ed3\u675f";
         Chinese["demolition_result_economy"] = "\u7ade\u6280\u914d\u88c5\u5df2\u56de\u6536  //  \u6478\u91d1\u8d44\u91d1\u672a\u53d8\u52a8";
         Chinese["demolition_objective_plant"] = "\u9009\u62e9 A \u6216 B \u70b9  //  \u6309\u4f4f F \u5b89\u88c5\u88c5\u7f6e";
         Chinese["demolition_round_objective"] = "{0}  //  \u9009\u62e9 A \u6216 B \u70b9  //  \u6309\u4f4f F \u5b89\u88c5\u88c5\u7f6e";

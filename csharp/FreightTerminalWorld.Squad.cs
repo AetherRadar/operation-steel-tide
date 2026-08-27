@@ -112,6 +112,7 @@ public partial class FreightTerminalWorld
             || value == "--validate-demolition-arena"
             || value == "--validate-demolition-briefing"
             || value == "--validate-demolition-buy"
+            || value == "--validate-demolition-round-result"
             || value == "--validate-demolition-network-host"
             || value == "--validate-demolition-network-client"
             || value == "--validate-demolition-network-alpha-host"
@@ -124,6 +125,7 @@ public partial class FreightTerminalWorld
             || value == "--capture-operations-office"
             || value == "--capture-demolition-briefing"
             || value == "--capture-demolition-buy"
+            || value == "--capture-demolition-round-result"
             || value == "--capture-demolition-arena");
         var diagnostic = Array.Exists(args, value =>
             value.StartsWith("--capture", StringComparison.Ordinal)

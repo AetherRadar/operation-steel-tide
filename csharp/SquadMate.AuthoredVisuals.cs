@@ -20,6 +20,13 @@ public partial class SquadMate
             ? _authoredOperatorAnimator.AnimationCount
             : 0;
 
+    internal bool IsDemolitionRoundFrozenPoseForDiagnostics
+        => new Vector2(Velocity.X, Velocity.Z).LengthSquared() <= 0.0001f
+        && (IsDowned
+            || IsBodyBag
+            || !UsesAuthoredOperatorForDiagnostics
+            || AuthoredAnimationForDiagnostics is "idle" or "ready_idle");
+
     internal void SetAuthoredMovementPoseForDiagnostics(float speed, bool aiming = false)
     {
         if (!UsesAuthoredOperatorForDiagnostics)
@@ -42,6 +49,29 @@ public partial class SquadMate
 
     private void HoldAuthoredAimAfterShot()
         => _authoredAimHoldRemaining = Mathf.Max(_authoredAimHoldRemaining, 0.36f);
+
+    internal void SetDemolitionRoundFrozenPose()
+    {
+        Velocity = Vector3.Zero;
+        if (IsDowned || IsBodyBag)
+        {
+            return;
+        }
+
+        _authoredAimHoldRemaining = 0.0f;
+        if (UsesAuthoredOperatorForDiagnostics)
+        {
+            var weaponReadied = HasFireablePrimary;
+            _authoredOperatorVisual.SetWeaponReadied(weaponReadied);
+            _authoredOperatorAnimator.SetRestingPose(weaponReadied);
+            return;
+        }
+
+        _rig.Rotation = Vector3.Zero;
+        var rigPosition = _rig.Position;
+        rigPosition.Y = 0.0f;
+        _rig.Position = rigPosition;
+    }
 
     private void AnimateAuthoredOperator(float delta, float speed)
     {

@@ -5,7 +5,9 @@ namespace OperationSteelTide;
 public partial class CombatHUD
 {
     private const string DemolitionBuyViewScenePath = "res://ui/DemolitionBuyView.tscn";
+    private const string DemolitionRoundResultViewScenePath = "res://ui/DemolitionRoundResultView.tscn";
     private DemolitionBuyView _demolitionBuyView = null!;
+    private DemolitionRoundResultView _demolitionRoundResultView = null!;
     private bool _demolitionGameplayPresentation;
     private int _demolitionSmokeGrenades;
     private int _radioMessageDiagnosticSuppressionDepth;
@@ -21,6 +23,30 @@ public partial class CombatHUD
         => IsInstanceValid(_demolitionBuyView) && _demolitionBuyView.IntentSignalsConnected;
     public bool DemolitionBuyLanguageReady
         => IsInstanceValid(_demolitionBuyView) && _demolitionBuyView.LanguageMatches(_language);
+    public bool IsDemolitionRoundResultVisible
+        => IsInstanceValid(_demolitionRoundResultView) && _demolitionRoundResultView.Visible;
+    public bool DemolitionRoundResultUiReady
+        => IsInstanceValid(_demolitionRoundResultView) && _demolitionRoundResultView.UiReady;
+    public bool DemolitionRoundResultUsesPackedScene
+        => IsInstanceValid(_demolitionRoundResultView)
+        && _demolitionRoundResultView.SceneFilePath == DemolitionRoundResultViewScenePath;
+    public bool DemolitionRoundResultLanguageReady
+        => IsInstanceValid(_demolitionRoundResultView)
+        && _demolitionRoundResultView.LanguageMatches(_language);
+    public bool DemolitionRoundResultVictory
+        => IsInstanceValid(_demolitionRoundResultView) && _demolitionRoundResultView.Victory;
+    public string DemolitionRoundResultTitle
+        => IsInstanceValid(_demolitionRoundResultView)
+            ? _demolitionRoundResultView.TitleText
+            : string.Empty;
+    public string DemolitionRoundResultScore
+        => IsInstanceValid(_demolitionRoundResultView)
+            ? _demolitionRoundResultView.ScoreText
+            : string.Empty;
+    public float DemolitionRoundResultSeconds
+        => IsInstanceValid(_demolitionRoundResultView)
+            ? _demolitionRoundResultView.DisplayedSeconds
+            : 0.0f;
     public DemolitionPurchaseSelection DemolitionBuySelection
         => IsInstanceValid(_demolitionBuyView)
             ? _demolitionBuyView.CurrentSelection
@@ -66,6 +92,16 @@ public partial class CombatHUD
     public string QuickSlotText(int slot)
         => IsInstanceValid(_quickSlotBar) ? _quickSlotBar.SlotText(slot) : string.Empty;
 
+    private void BuildDemolitionHud(Control root)
+    {
+        BuildDemolitionBuyHud(root);
+        var scene = GD.Load<PackedScene>(DemolitionRoundResultViewScenePath)
+            ?? throw new System.InvalidOperationException(
+                $"Unable to load {DemolitionRoundResultViewScenePath}");
+        _demolitionRoundResultView = scene.Instantiate<DemolitionRoundResultView>();
+        root.AddChild(_demolitionRoundResultView);
+    }
+
     private void BuildDemolitionBuyHud(Control root)
     {
         var scene = GD.Load<PackedScene>(DemolitionBuyViewScenePath)
@@ -90,6 +126,10 @@ public partial class CombatHUD
     public void SetDemolitionGameplayPresentation(bool active)
     {
         _demolitionGameplayPresentation = active;
+        if (!active && IsInstanceValid(_demolitionRoundResultView))
+        {
+            _demolitionRoundResultView.HideResult();
+        }
         RefreshQuickSlotBar();
         if (IsInstanceValid(_squadRoster))
         {
@@ -138,8 +178,44 @@ public partial class CombatHUD
         HideOperationsMenus();
         _gameplayHudRoot.Visible = true;
         _stateOverlay.Visible = false;
+        HideDemolitionRoundResult();
         _demolitionBuyView.SetLanguage(_language);
         _demolitionBuyView.BeginRound(snapshot);
+    }
+
+    public void ShowDemolitionRoundResult(
+        bool victory,
+        string reason,
+        int playerScore,
+        int opponentScore,
+        float secondsRemaining)
+    {
+        HideDemolitionBuy();
+        _gameplayHudRoot.Visible = true;
+        _demolitionRoundResultView.SetLanguage(_language);
+        _demolitionRoundResultView.ShowResult(
+            victory,
+            reason,
+            playerScore,
+            opponentScore,
+            secondsRemaining);
+    }
+
+    public void UpdateDemolitionRoundResult(float secondsRemaining)
+    {
+        if (IsInstanceValid(_demolitionRoundResultView)
+            && _demolitionRoundResultView.Visible)
+        {
+            _demolitionRoundResultView.UpdateCountdown(secondsRemaining);
+        }
+    }
+
+    public void HideDemolitionRoundResult()
+    {
+        if (IsInstanceValid(_demolitionRoundResultView))
+        {
+            _demolitionRoundResultView.HideResult();
+        }
     }
 
     public void UpdateDemolitionBuy(DemolitionBuySnapshot snapshot)
@@ -189,6 +265,10 @@ public partial class CombatHUD
         if (IsInstanceValid(_demolitionBuyView))
         {
             _demolitionBuyView.SetLanguage(_language);
+        }
+        if (IsInstanceValid(_demolitionRoundResultView))
+        {
+            _demolitionRoundResultView.SetLanguage(_language);
         }
     }
 }

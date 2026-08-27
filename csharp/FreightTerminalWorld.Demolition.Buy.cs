@@ -40,6 +40,7 @@ public partial class FreightTerminalWorld
         _demolitionPurchasePending = false;
         _demolitionBuyReadyPeers.Clear();
         SetDemolitionActorsFrozen(true);
+        _hud.HideDemolitionRoundResult();
         _hud.ShowDemolitionBuy(DemolitionBuyState());
         Input.MouseMode = Input.MouseModeEnum.Visible;
     }
@@ -371,7 +372,14 @@ public partial class FreightTerminalWorld
         {
             if (IsInstanceValid(mate))
             {
-                mate.Velocity = Vector3.Zero;
+                if (frozen)
+                {
+                    mate.SetDemolitionRoundFrozenPose();
+                }
+                else
+                {
+                    mate.Velocity = Vector3.Zero;
+                }
                 mate.ProcessMode = frozen ? ProcessModeEnum.Disabled : ProcessModeEnum.Inherit;
             }
         }
@@ -379,7 +387,14 @@ public partial class FreightTerminalWorld
         {
             if (IsInstanceValid(opponent))
             {
-                opponent.Velocity = Vector3.Zero;
+                if (frozen)
+                {
+                    opponent.SetDemolitionRoundFrozenPose();
+                }
+                else
+                {
+                    opponent.Velocity = Vector3.Zero;
+                }
                 opponent.ProcessMode = frozen ? ProcessModeEnum.Disabled : ProcessModeEnum.Inherit;
             }
         }

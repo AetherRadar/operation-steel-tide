@@ -444,6 +444,8 @@ public partial class FreightTerminalWorld
         }
         var previousRound = _demolitionNetworkRound;
         var previousPhase = _demolitionNetworkPhase;
+        var previousLocalScore = LocalDemolitionScore;
+        var previousOpponentScore = OpposingDemolitionScore;
         _demolitionNetworkRound = state.CurrentRound;
         _demolitionNetworkPhase = state.Phase;
         _demolitionMatch.ApplyNetworkState(
@@ -466,6 +468,26 @@ public partial class FreightTerminalWorld
             state,
             previousRound != state.CurrentRound,
             previousPhase != state.Phase);
+        if (state.Phase == DemolitionNetworkPhase.Intermission
+            && previousPhase != DemolitionNetworkPhase.Intermission)
+        {
+            var localWon = LocalDemolitionScore == previousLocalScore + 1
+                && OpposingDemolitionScore == previousOpponentScore;
+            var localLost = OpposingDemolitionScore == previousOpponentScore + 1
+                && LocalDemolitionScore == previousLocalScore;
+            if (localWon || localLost)
+            {
+                _hud.ShowDemolitionRoundResult(
+                    localWon,
+                    GameLocalization.Get(
+                        "demolition_round_complete",
+                        _languageSetting,
+                        "ROUND COMPLETE"),
+                    LocalDemolitionScore,
+                    OpposingDemolitionScore,
+                    state.PhaseRemaining);
+            }
+        }
         if ((state.Complete || state.Phase == DemolitionNetworkPhase.Complete) && !_missionEnded)
         {
             CompleteDemolitionMatch(GameLocalization.Get(
@@ -538,6 +560,7 @@ public partial class FreightTerminalWorld
 
     private void UpdateDemolitionNetworkIntermissionHud()
     {
+        _hud.UpdateDemolitionRoundResult(_demolitionIntermissionRemaining);
         var label = GameLocalization.IsChinese(_languageSetting)
             ? $"\u4e0b\u4e00\u5c40  //  {_demolitionIntermissionRemaining:0.0}s  //  \u5df1\u65b9 {LocalDemolitionScore}:{OpposingDemolitionScore} \u654c\u65b9"
             : $"NEXT ROUND  //  {_demolitionIntermissionRemaining:0.0}s  //  YOU {LocalDemolitionScore}:{OpposingDemolitionScore} ENEMY";

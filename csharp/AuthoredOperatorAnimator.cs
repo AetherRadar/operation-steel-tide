@@ -132,6 +132,13 @@ internal sealed class AuthoredOperatorAnimator
         string unarmedPose)
         => aiming ? aimPose : weaponReadied ? readyPose : unarmedPose;
 
+    public void SetRestingPose(bool weaponReadied)
+    {
+        _overrideRemaining = 0.0f;
+        _hitCooldownRemaining = 0.0f;
+        Play(weaponReadied ? "ready_idle" : "idle", 1.0f, immediate: true);
+    }
+
     public bool PlayHit()
     {
         if (_hitCooldownRemaining > 0.0f)
