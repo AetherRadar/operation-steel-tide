@@ -442,7 +442,7 @@ public partial class FreightTerminalWorld
         ResidentialTowerSpec spec,
         int towerIndex)
     {
-        _residentialTowerArtBuilder ??= new ResidentialTowerArtBuilder();
+        _residentialTowerArtBuilder ??= new ResidentialTowerArtBuilder(new FreightIndustrialPalette());
         var profile = ResidentialTowerDiversityPlan.ForTower(towerIndex);
         _residentialTowerArtResults.Add(_residentialTowerArtBuilder.Build(
             tower,

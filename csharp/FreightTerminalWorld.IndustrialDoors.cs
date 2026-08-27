@@ -11,10 +11,13 @@ public partial class FreightTerminalWorld
     private int _industrialAuthoredLandmarkCount;
     private int _industrialAuthoredDressingCount;
     private int _industrialAuthoredDressingSceneCount;
+    private int _industrialWeatheredBuildingCount;
 
     private void BuildFreightAuthoredLandmarks()
     {
         _industrialAuthoredLandmarkCount = 0;
+        _industrialWeatheredBuildingCount = 0;
+        var palette = new FreightIndustrialPalette();
         var landmarks = new[]
         {
             (
@@ -65,12 +68,17 @@ public partial class FreightTerminalWorld
                 hasDoorway: false);
             body.Name = landmark.Name;
             body.AddToGroup("freight_authored_landmark");
+            if (palette.Apply(body) > 0)
+            {
+                _industrialWeatheredBuildingCount++;
+            }
             _industrialAuthoredLandmarkCount++;
         }
 
-        var dressing = new FreightTerminalArtDressingBuilder().Build(_levelRoot);
+        var dressing = new FreightTerminalArtDressingBuilder(palette).Build(_levelRoot);
         _industrialAuthoredDressingCount = dressing.AuthoredModelCount;
         _industrialAuthoredDressingSceneCount = dressing.ScenePaths.Count;
+        _industrialWeatheredBuildingCount += dressing.PalettedBuildingCount;
     }
 
     private void BuildFreightTerminalDoors()

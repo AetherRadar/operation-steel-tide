@@ -201,7 +201,7 @@ public partial class FreightTerminalWorld
         _residentialGlassFields.Clear();
         _residentialRoomArchetypes.Clear();
         _residentialTowerArtResults.Clear();
-        _residentialTowerArtBuilder = new ResidentialTowerArtBuilder();
+        _residentialTowerArtBuilder = new ResidentialTowerArtBuilder(new FreightIndustrialPalette());
         _residentialFurnitureEventCount = 0;
         _residentialChestEventCount = 0;
         _residentialGuardAmbushSpawnCount = 0;
@@ -2801,6 +2801,17 @@ public partial class FreightTerminalWorld
         await WaitFrames(32);
         SaveViewportImage("res://residential_exterior_validation.png");
 
+        var clinicAnnex = _residentialTowers[1]
+            .GetNodeOrNull<Node3D>("ResidentialAuthored_T02_Annex");
+        if (clinicAnnex is not null)
+        {
+            camera.GlobalPosition = clinicAnnex.ToGlobal(new Vector3(5.8f, 2.0f, -9.5f));
+            camera.LookAt(clinicAnnex.ToGlobal(new Vector3(0, 1.8f, 0)), Vector3.Up);
+            camera.Fov = 62.0f;
+            await WaitFrames(20);
+            SaveViewportImage("res://residential_annex_palette_validation.png");
+        }
+
         const int towerIndex = 8;
         var tower = _residentialTowers[towerIndex];
         var spec = ResidentialTowerSpecs[towerIndex];
@@ -2840,7 +2851,7 @@ public partial class FreightTerminalWorld
         camera.Fov = 62.0f;
         await WaitFrames(20);
         SaveViewportImage("res://residential_rooftop_validation.png");
-        GD.Print($"RESIDENTIAL_CAPTURE towers={ResidentialTowerCount} floors={_residentialFloorCount} civilians={ResidentialCivilianCount} paths=residential_exterior_validation.png,residential_interior_validation.png,residential_occupants_validation.png,residential_rooftop_validation.png");
+        GD.Print($"RESIDENTIAL_CAPTURE towers={ResidentialTowerCount} floors={_residentialFloorCount} civilians={ResidentialCivilianCount} paths=residential_exterior_validation.png,residential_annex_palette_validation.png,residential_interior_validation.png,residential_occupants_validation.png,residential_rooftop_validation.png");
         GetTree().Quit();
     }
 

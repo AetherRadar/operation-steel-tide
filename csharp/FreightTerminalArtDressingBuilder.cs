@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -6,6 +7,7 @@ namespace OperationSteelTide;
 internal sealed record FreightTerminalArtDressingResult(
     int AuthoredModelCount,
     int MissingModelCount,
+    int PalettedBuildingCount,
     IReadOnlyCollection<string> ScenePaths);
 
 /// <summary>Adds licensed industrial silhouettes to existing freight-terminal collision shells.</summary>
@@ -13,6 +15,12 @@ internal sealed class FreightTerminalArtDressingBuilder
 {
     private const string IndustrialRoot = "res://assets/models/kenney_city_kit_industrial";
     private readonly Dictionary<string, PackedScene> _scenes = new();
+    private readonly FreightIndustrialPalette _palette;
+
+    public FreightTerminalArtDressingBuilder(FreightIndustrialPalette palette)
+    {
+        _palette = palette;
+    }
 
     public FreightTerminalArtDressingResult Build(Node3D parent)
     {
@@ -23,11 +31,16 @@ internal sealed class FreightTerminalArtDressingBuilder
         var scenePaths = new HashSet<string>();
         var authoredModelCount = 0;
         var missingModelCount = 0;
+        var palettedBuildingCount = 0;
         foreach (var placement in Placements)
         {
-            if (TryAddModel(root, placement, scenePaths))
+            if (TryAddModel(root, placement, scenePaths, out var paletteApplied))
             {
                 authoredModelCount++;
+                if (paletteApplied)
+                {
+                    palettedBuildingCount++;
+                }
             }
             else
             {
@@ -38,11 +51,21 @@ internal sealed class FreightTerminalArtDressingBuilder
         root.SetMeta("authored_model_count", authoredModelCount);
         root.SetMeta("missing_model_count", missingModelCount);
         root.SetMeta("unique_scene_count", scenePaths.Count);
-        return new FreightTerminalArtDressingResult(authoredModelCount, missingModelCount, scenePaths);
+        root.SetMeta("paletted_building_count", palettedBuildingCount);
+        return new FreightTerminalArtDressingResult(
+            authoredModelCount,
+            missingModelCount,
+            palettedBuildingCount,
+            scenePaths);
     }
 
-    private bool TryAddModel(Node3D root, ModelPlacement placement, HashSet<string> scenePaths)
+    private bool TryAddModel(
+        Node3D root,
+        ModelPlacement placement,
+        HashSet<string> scenePaths,
+        out bool paletteApplied)
     {
+        paletteApplied = false;
         var path = $"{IndustrialRoot}/{placement.File}";
         if (!_scenes.TryGetValue(path, out var scene))
         {
@@ -67,6 +90,10 @@ internal sealed class FreightTerminalArtDressingBuilder
         model.AddToGroup("freight_authored_model");
         model.SetMeta("freight_scene_path", path);
         ConfigureVisuals(model);
+        if (placement.File.StartsWith("building-", StringComparison.Ordinal))
+        {
+            paletteApplied = _palette.Apply(model) > 0;
+        }
         root.AddChild(model);
         scenePaths.Add(path);
         return true;

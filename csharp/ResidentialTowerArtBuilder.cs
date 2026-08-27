@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -6,11 +7,14 @@ namespace OperationSteelTide;
 internal sealed record ResidentialTowerArtResult(
     int AuthoredModelCount,
     int CollisionShapeCount,
+    int PalettedBuildingCount,
     IReadOnlyCollection<string> ScenePaths);
 
 /// <summary>Places licensed authored annex and rooftop models around an enterable tower shell.</summary>
 internal sealed class ResidentialTowerArtBuilder
 {
+    public const int ExpectedSourceSceneCount = 11;
+
     private const string CityRoot = "res://assets/models/kenney_city_kit_industrial";
 
     private static readonly ModelAsset FamilyAnnex = City(
@@ -41,6 +45,12 @@ internal sealed class ResidentialTowerArtBuilder
         "chimney-basic.glb", new Vector3(0.64f, 0.82f, 0.64f), new Vector3(0, 0.41f, 0));
 
     private readonly Dictionary<string, PackedScene> _scenes = new();
+    private readonly FreightIndustrialPalette _palette;
+
+    public ResidentialTowerArtBuilder(FreightIndustrialPalette palette)
+    {
+        _palette = palette;
+    }
 
     public ResidentialTowerArtResult Build(
         Node3D tower,
@@ -52,16 +62,30 @@ internal sealed class ResidentialTowerArtBuilder
         var scenePaths = new HashSet<string>();
         var modelCount = 0;
         var collisionCount = 0;
+        var palettedBuildingCount = 0;
         foreach (var placement in placements)
         {
-            if (!TryAddModel(tower, profile.TowerIndex, placement, scenePaths))
+            if (!TryAddModel(
+                    tower,
+                    profile.TowerIndex,
+                    placement,
+                    scenePaths,
+                    out var paletteApplied))
             {
                 continue;
             }
             modelCount++;
             collisionCount++;
+            if (paletteApplied)
+            {
+                palettedBuildingCount++;
+            }
         }
-        return new ResidentialTowerArtResult(modelCount, collisionCount, scenePaths);
+        return new ResidentialTowerArtResult(
+            modelCount,
+            collisionCount,
+            palettedBuildingCount,
+            scenePaths);
     }
 
     private static List<ModelPlacement> BuildPlacements(
@@ -157,8 +181,10 @@ internal sealed class ResidentialTowerArtBuilder
         Node3D tower,
         int towerIndex,
         ModelPlacement placement,
-        HashSet<string> scenePaths)
+        HashSet<string> scenePaths,
+        out bool paletteApplied)
     {
+        paletteApplied = false;
         if (!_scenes.TryGetValue(placement.Asset.Path, out var scene))
         {
             scene = GD.Load<PackedScene>(placement.Asset.Path);
@@ -191,6 +217,10 @@ internal sealed class ResidentialTowerArtBuilder
         model.Name = "Model";
         model.Scale = Vector3.One * placement.Scale;
         ConfigureVisuals(model);
+        if (placement.Asset.Path.StartsWith($"{CityRoot}/building-", StringComparison.Ordinal))
+        {
+            paletteApplied = _palette.Apply(model) > 0;
+        }
         body.AddChild(model);
         body.AddChild(new CollisionShape3D
         {

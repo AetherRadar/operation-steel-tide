@@ -4432,6 +4432,18 @@ public partial class FreightTerminalWorld : Node3D
         await WaitFrames(22);
         SaveViewportImage("res://cover_density_validation.png");
 
+        overview.GlobalPosition = new Vector3(9.5f, 2.25f, -103.0f);
+        overview.Fov = 58.0f;
+        overview.LookAt(new Vector3(-6.0f, 4.3f, -82.0f), Vector3.Up);
+        await WaitFrames(22);
+        SaveViewportImage("res://industrial_palette_validation.png");
+
+        overview.GlobalPosition = new Vector3(-60.5f, 2.2f, 34.0f);
+        overview.Fov = 60.0f;
+        overview.LookAt(new Vector3(-78.0f, 3.1f, 53.0f), Vector3.Up);
+        await WaitFrames(22);
+        SaveViewportImage("res://industrial_residential_edge_validation.png");
+
         overview.GlobalPosition = new Vector3(-18.0f, 58.0f, 28.0f);
         overview.Fov = 64.0f;
         overview.LookAt(new Vector3(2.0f, 5.0f, -68.0f), Vector3.Up);
@@ -4713,7 +4725,8 @@ public partial class FreightTerminalWorld : Node3D
             && SpecialLandmarkLootCount >= 28
             && SpecialLandmarkVerticalRouteCount >= 5;
         var authoredDressing = _industrialAuthoredDressingCount >= 25
-            && _industrialAuthoredDressingSceneCount >= 10;
+            && _industrialAuthoredDressingSceneCount >= 10
+            && _industrialWeatheredBuildingCount >= 23;
         var buildingLootReachable = 0;
         var unreachableBuildingLoot = new List<string>();
         foreach (var pickup in _lootSources.OfType<GradedLootPickup>())
@@ -4744,7 +4757,7 @@ public partial class FreightTerminalWorld : Node3D
             && ResidentialTowerCount >= 11
             && specialLandmarks
             && authoredDressing;
-        GD.Print($"MAP_DENSITY_CHECK valid={valid} buildings={ComplexBuildingCount} rooms={ComplexRoomCount} room_loot={ComplexRoomLootCount}/{ComplexRoomCount} building_loot={_buildingLootPickupCount}/{ComplexRoomCount + FixedBuildingLootPlacementCount} reachable_loot={buildingLootReachable}/{_buildingLootPickupCount} unreachable={string.Join(';', unreachableBuildingLoot)} props={ComplexInteriorPropCount} customs={customs} ops={ops} fuel={fuel} quay={quay} hangar={hangarEnriched} towers={ResidentialTowerCount} special_landmarks={SpecialLandmarkCount} special_loot={SpecialLandmarkLootCount} vertical_routes={SpecialLandmarkVerticalRouteCount} authored_dressing={_industrialAuthoredDressingCount} authored_scenes={_industrialAuthoredDressingSceneCount}");
+        GD.Print($"MAP_DENSITY_CHECK valid={valid} buildings={ComplexBuildingCount} rooms={ComplexRoomCount} room_loot={ComplexRoomLootCount}/{ComplexRoomCount} building_loot={_buildingLootPickupCount}/{ComplexRoomCount + FixedBuildingLootPlacementCount} reachable_loot={buildingLootReachable}/{_buildingLootPickupCount} unreachable={string.Join(';', unreachableBuildingLoot)} props={ComplexInteriorPropCount} customs={customs} ops={ops} fuel={fuel} quay={quay} hangar={hangarEnriched} towers={ResidentialTowerCount} special_landmarks={SpecialLandmarkCount} special_loot={SpecialLandmarkLootCount} vertical_routes={SpecialLandmarkVerticalRouteCount} authored_dressing={_industrialAuthoredDressingCount} authored_scenes={_industrialAuthoredDressingSceneCount} weathered_buildings={_industrialWeatheredBuildingCount}");
         GD.Print($"MAP_DENSITY_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

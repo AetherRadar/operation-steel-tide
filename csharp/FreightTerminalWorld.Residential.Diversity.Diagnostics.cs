@@ -114,6 +114,15 @@ public partial class FreightTerminalWorld
             .Select(node => node.GetMeta("residential_scene_path").AsString())
             .ToHashSet(StringComparer.Ordinal);
         var modelScenesReady = authored.All(node => node.GetNodeOrNull<Node3D>("Model") is not null);
+        var authoredBuildings = authored
+            .Where(node => node.GetMeta("residential_scene_path").AsString()
+                .Contains("/building-", StringComparison.Ordinal))
+            .ToList();
+        var paletteReady = authoredBuildings.Count >= ResidentialTowerSpecs.Length * 2
+            && authoredBuildings.All(node =>
+                node.GetNodeOrNull<Node3D>("Model") is { } model
+                && model.GetMeta("freight_palette", string.Empty).AsString()
+                    == FreightIndustrialPalette.PaletteId);
         var collisionsReady = authored.All(node =>
             node.GetNodeOrNull<CollisionShape3D>("Collision")?.Shape is BoxShape3D box
             && box.Size.X > 0.1f
@@ -122,7 +131,8 @@ public partial class FreightTerminalWorld
         var artResultsReady = _residentialTowerArtResults.Count == ResidentialTowerSpecs.Length
             && _residentialTowerArtResults.All(result =>
                 result.AuthoredModelCount >= 4
-                && result.AuthoredModelCount == result.CollisionShapeCount);
+                && result.AuthoredModelCount == result.CollisionShapeCount
+                && result.PalettedBuildingCount >= 2);
 
         var valid = ResidentialTowerDiversityPlan.All.Count == ResidentialTowerSpecs.Length
             && profileSignatures.Count == ResidentialTowerSpecs.Length
@@ -134,8 +144,9 @@ public partial class FreightTerminalWorld
             && towerLayoutCoverage
             && authored.Count >= ResidentialTowerSpecs.Length * 4
             && everyTowerAuthored
-            && sourcePaths.Count >= 12
+            && sourcePaths.Count >= ResidentialTowerArtBuilder.ExpectedSourceSceneCount
             && modelScenesReady
+            && paletteReady
             && collisionsReady
             && artResultsReady;
         GD.Print(
@@ -145,7 +156,9 @@ public partial class FreightTerminalWorld
             + $"layouts={layouts.Count}/{Enum.GetValues<ResidentialFloorLayout>().Length} "
             + $"floors={floors.Count}/{expectedFloors} floor_counts={floorCountsReady} tower_layouts={towerLayoutCoverage} "
             + $"authored={authored.Count}/{ResidentialTowerSpecs.Length * 4} every_tower={everyTowerAuthored} "
-            + $"sources={sourcePaths.Count}/12 models={modelScenesReady} collision={collisionsReady} results={artResultsReady}");
+            + $"sources={sourcePaths.Count}/{ResidentialTowerArtBuilder.ExpectedSourceSceneCount} "
+            + $"models={modelScenesReady} palette={paletteReady} "
+            + $"paletted={authoredBuildings.Count} collision={collisionsReady} results={artResultsReady}");
         GD.Print($"RESIDENTIAL_DIVERSITY_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }
