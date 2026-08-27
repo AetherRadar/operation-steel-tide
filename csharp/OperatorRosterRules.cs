@@ -37,9 +37,10 @@ public static class OperatorRosterRules
     }
 
     public static OperatorVisualId RivalVisual(ulong seed)
-        => StableIndex(seed, 2) == 0
-            ? OperatorVisualId.Garrison
-            : OperatorVisualId.FemaleFieldOperator;
+    {
+        var roles = OperatorRoles.ExtractionRoles;
+        return OperatorRoles.Spec(roles[StableIndex(seed, roles.Length)]).VisualId;
+    }
 
     private static int StableIndex(ulong seed, int count)
         => (int)(Mix(seed == 0 ? 0xD1B54A32D192ED03UL : seed) % (ulong)count);

@@ -126,7 +126,7 @@ Every deployment uses a three-operator squad drawn from five roles. The deployme
 - Scavenger carries four extra loot stacks, searches faster, and uses Fortune Finder to appraise and mark up to eight of the richest nearby searchable caches.
 - Locksmith carries two extra loot stacks and searches faster. `H` activates Skeleton Key for a short burst of rapid unlocking and searching.
 
-Medic, Recon, and Scavenger use the authored female field-operator model. Assault and Locksmith use the original field-operator model. Garrison defenders deliberately retain one fixed authored defender model, while rival operators may draw from either field silhouette.
+Every player role now has its own authored character silhouette and palette: VIPER uses the armored Soldier preset, HERON the rescue-worker preset, LYNX the Sci-Fi sensor suit, MAGPIE the equipped Adventurer, and JACKAL the lightweight Punk preset. The deployment preview switches the complete character model and carries the selected primary weapon, while AI teammates and rival operators use the same role-specific appearance in the field. Garrison defenders deliberately retain one separate fixed authored defender model.
 
 AI squadmates follow by default, engage only after deployment protection ends and contact begins, fight nearby hostiles, and use their class abilities. Downed operators crawl slowly while waiting for help; hold `F` near a downed teammate to revive them with a progress bar. When the player is downed, the nearest living AI squadmate automatically sprints over, kneels, and channels a revive; if that rescuer falls, the next living teammate takes over. Each operator can be revived only once per life — a second down cannot be revived again. AI Medics can still spray trauma medicine, but revive uses the same once-per-life budget. AI class skills have twice the player cooldown, begin with staggered timers, and cannot be triggered twice in succession; the roster shows `H READY` or each member's remaining seconds. The hostile tilt-rotor patrols and fires on operators inside its engagement range until destroyed. Network peers relay operator transform, role, health, class actions, visible gunfire, and player hit damage through the host, which also rejects class actions sent before cooldown expires.
 
@@ -239,6 +239,7 @@ Godot_console.exe --path . -- --validate-quick-slots
 Godot_console.exe --path . -- --validate-arsenal
 Godot_console.exe --path . -- --validate-combat-models
 Godot_console.exe --path . -- --validate-operator-animations
+Godot_console.exe --path . -- --validate-operator-roster
 Godot_console.exe --path . -- --validate-boss
 Godot_console.exe --path . -- --capture-boss
 Godot_console.exe --path . -- --validate-squad
@@ -268,6 +269,7 @@ Godot_console.exe --path . -- --capture-skybridge-access
 Godot_console.exe --path . -- --validate-skybridge-access
 Godot_console.exe --path . -- --validate-vehicle-drive
 Godot_console.exe --path . -- --capture-squad-lobby
+Godot_console.exe --path . -- --capture-operator-roster
 Godot_console.exe --path . -- --capture-squad
 Godot_console.exe --path . -- --validate-network-endpoint
 Godot_console.exe --headless --path . -- --validate-network-host
@@ -277,6 +279,8 @@ Godot_console.exe --headless --path . -- --validate-extraction-network-client
 ```
 
 `--validate-deployment-ui` verifies the full operator preview, six market entries, four quick-kit presets, four ammunition quantities, independent grade/quantity pricing, the three-slot map selector, locked-map rejection, kit cost, and projected post-deployment balance.
+
+`--validate-operator-roster` verifies five unique non-garrison player visual IDs, all five authored GLBs, 25-action animation contracts, movement-time rifle fit, role-aware armed previews, random player/AI/rival selection, fixed garrison identity, and the existing Scavenger and Locksmith loot benefits. `--capture-operator-roster` saves a five-column player-camera preview for visual comparison.
 
 `--validate-refinery-map` boots Saint Marais Old Town through the legacy map ID and verifies its authored model placements, CC0 source coverage, scene caching, distance culling, box-only collision proxies, distinct districts, separated high-value loot zones, clear vehicle routes, rooftop squad traversal, loot/garrison/minimap integration, and strict node/body/mesh/light budgets. `--capture-refinery-map` retains the compatibility command and legacy output names while saving an overhead composition frame, a street-level approach, both high-value courtyards, and the rooftop route.
 

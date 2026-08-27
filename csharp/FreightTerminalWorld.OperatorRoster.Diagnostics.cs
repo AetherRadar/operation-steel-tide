@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 
@@ -11,10 +12,12 @@ public partial class FreightTerminalWorld
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 
         var roles = OperatorRoles.ExtractionRoles;
+        var playerVisuals = roles.Select(role => OperatorRoles.Spec(role).VisualId).ToArray();
         var identityReady = roles.Length == 5
             && roles.Select(OperatorRoles.Callsign).Distinct().Count() == roles.Length
             && roles.Select(role => OperatorRoles.SkillName(role, "en")).Distinct().Count() == roles.Length
-            && roles.Count(role => OperatorRoles.Spec(role).VisualId == OperatorVisualId.FemaleFieldOperator) >= 2
+            && playerVisuals.Distinct().Count() == roles.Length
+            && playerVisuals.All(visual => visual != OperatorVisualId.Garrison)
             && roles.Count(role => OperatorRoles.Spec(role).BackpackCapacityBonus > 0
                 || OperatorRoles.Spec(role).SearchDurationMultiplier < 1.0f) >= 3;
         var localizationReady = roles.All(role =>
@@ -33,82 +36,84 @@ public partial class FreightTerminalWorld
                 && assigned.All(role => role != player);
         }));
 
-        AuthoredOperatorVisual? femaleVisual = null;
-        AuthoredPreviewOperatorVisual? femalePreview = null;
-        var femaleInspection = CombatModelLibrary.InspectOperator(OperatorVisualId.FemaleFieldOperator);
-        var femaleAnimations = 0;
-        var femaleTransitions = Array.Empty<string>();
-        var femaleRifleFit = default(OperatorRifleFitInspection);
-        var femaleRifleFits = Array.Empty<OperatorRifleFitInspection>();
-        var femalePreviewIdle = false;
-        try
+        var rosterModelsReady = true;
+        var visualReports = new List<string>(roles.Length);
+        foreach (var role in roles)
         {
-            femaleVisual = CombatModelLibrary.InstantiateOperator(
-                OperatorVisualId.FemaleFieldOperator,
-                WeaponCatalog.Build(WeaponPlatform.AK74, 0));
-            AddChild(femaleVisual.Root);
-            var animator = new AuthoredOperatorAnimator(femaleVisual);
-            femaleAnimations = animator.AnimationCount;
-            femaleVisual.SetWeaponReadied(true);
-            var sampled = new System.Collections.Generic.List<string>();
-            var sampledFits = new System.Collections.Generic.List<OperatorRifleFitInspection>();
-            animator.Update(1.0f, 0.0f, true, false, false, false, false, false, false);
-            femaleVisual.AnimationPlayer.Advance(0.2);
-            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-            sampled.Add(animator.CurrentAnimation);
-            sampledFits.Add(femaleVisual.InspectRifleFit());
-            animator.Update(1.0f, 1.8f, true, false, false, false, false, false, false);
-            femaleVisual.AnimationPlayer.Advance(0.2);
-            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-            sampled.Add(animator.CurrentAnimation);
-            sampledFits.Add(femaleVisual.InspectRifleFit());
-            animator.Update(1.0f, 3.4f, true, false, false, false, false, false, false);
-            femaleVisual.AnimationPlayer.Advance(0.2);
-            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-            sampled.Add(animator.CurrentAnimation);
-            sampledFits.Add(femaleVisual.InspectRifleFit());
-            animator.Update(1.0f, 1.8f, true, false, false, true, false, false, false);
-            femaleVisual.AnimationPlayer.Advance(0.2);
-            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-            sampled.Add(animator.CurrentAnimation);
-            sampledFits.Add(femaleVisual.InspectRifleFit());
-            femaleTransitions = sampled.ToArray();
-            femaleRifleFits = sampledFits.ToArray();
-            femaleRifleFit = femaleVisual.InspectRifleFit();
-
-            femalePreview = CombatModelLibrary.InstantiatePreviewOperator(
-                OperatorVisualId.FemaleFieldOperator);
-            AddChild(femalePreview.Root);
-            femalePreviewIdle = CombatModelLibrary.RequireAnimationPlayer(femalePreview.Root)
-                .AssignedAnimation == "idle";
-        }
-        finally
-        {
-            femaleVisual?.Root.QueueFree();
-            femalePreview?.Root.QueueFree();
-        }
-        var femaleMovementFitValid = femaleRifleFits.Select((fit, index) =>
-            index < femaleTransitions.Length
-            && (femaleTransitions[index].StartsWith("ready_", StringComparison.Ordinal)
-                ? fit.PrimaryHandDistance <= 0.025f
-                    && fit.SupportHandDistance <= 0.16f
-                    && fit.HandSeparation >= 0.22f
-                    && fit.MuzzleOffset.Z <= -0.38f
-                : fit.Valid)).ToArray();
-        var femaleModelReady = femaleInspection.Loaded
-            && femaleInspection.RequiredNodes
-            && femaleInspection.MeshCount >= 4
-            && femaleInspection.MaterialCount >= 4
-            && femaleInspection.Size.Y > 0.5f
-            && femaleAnimations >= 25
-            && femaleTransitions.SequenceEqual(new[]
+            var visualId = OperatorRoles.Spec(role).VisualId;
+            var inspection = CombatModelLibrary.InspectOperator(visualId);
+            AuthoredOperatorVisual? runtimeVisual = null;
+            AuthoredPreviewOperatorVisual? previewVisual = null;
+            var animationCount = 0;
+            var transitions = Array.Empty<string>();
+            var rifleFits = Array.Empty<OperatorRifleFitInspection>();
+            var previewIdle = false;
+            var previewWeapon = false;
+            try
             {
-                "ready_idle", "ready_walk", "ready_run", "aim_walk"
-            })
-            && femaleRifleFits.Length == femaleTransitions.Length
-            && femaleMovementFitValid.All(valid => valid)
-            && femaleRifleFit.Valid
-            && femalePreviewIdle;
+                var rifle = WeaponCatalog.Build(WeaponPlatform.AK74, 0);
+                runtimeVisual = CombatModelLibrary.InstantiateOperator(visualId, rifle);
+                AddChild(runtimeVisual.Root);
+                var animator = new AuthoredOperatorAnimator(runtimeVisual);
+                animationCount = animator.AnimationCount;
+                runtimeVisual.SetWeaponReadied(true);
+                var sampledTransitions = new List<string>(4);
+                var sampledFits = new List<OperatorRifleFitInspection>(4);
+                var samples = new (float Speed, bool Aiming)[]
+                {
+                    (0.0f, false), (1.8f, false), (3.4f, false), (1.8f, true)
+                };
+                foreach (var sample in samples)
+                {
+                    animator.Update(1.0f, sample.Speed, true, false, false, sample.Aiming, false, false, false);
+                    runtimeVisual.AnimationPlayer.Advance(0.2);
+                    await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                    sampledTransitions.Add(animator.CurrentAnimation);
+                    sampledFits.Add(runtimeVisual.InspectRifleFit());
+                }
+                transitions = sampledTransitions.ToArray();
+                rifleFits = sampledFits.ToArray();
+
+                previewVisual = CombatModelLibrary.InstantiatePreviewOperator(visualId, rifle);
+                AddChild(previewVisual.Root);
+                previewIdle = CombatModelLibrary.RequireAnimationPlayer(previewVisual.Root)
+                    .AssignedAnimation == "idle";
+                previewWeapon = previewVisual.HasWeapon;
+            }
+            finally
+            {
+                runtimeVisual?.Root.QueueFree();
+                previewVisual?.Root.QueueFree();
+            }
+
+            var movementFits = rifleFits.Select((fit, index) =>
+                index < transitions.Length
+                && (transitions[index].StartsWith("ready_", StringComparison.Ordinal)
+                    ? fit.PrimaryHandDistance <= 0.025f
+                        && fit.SupportHandDistance <= 0.16f
+                        && fit.HandSeparation >= 0.22f
+                        && fit.MuzzleOffset.Z <= -0.38f
+                    : fit.Valid)).ToArray();
+            var modelReady = inspection.Loaded
+                && inspection.RequiredNodes
+                && inspection.MeshCount >= 4
+                && inspection.MaterialCount >= 4
+                && inspection.Size.Y > 0.5f
+                && animationCount >= 25
+                && transitions.SequenceEqual(new[]
+                {
+                    "ready_idle", "ready_walk", "ready_run", "aim_walk"
+                })
+                && rifleFits.Length == transitions.Length
+                && movementFits.All(valid => valid)
+                && previewIdle
+                && previewWeapon;
+            rosterModelsReady &= modelReady;
+            visualReports.Add(
+                $"{role}:{visualId}:ok={modelReady}:meshes={inspection.MeshCount}:materials={inspection.MaterialCount}:"
+                + $"animations={animationCount}:preview={previewIdle}/{previewWeapon}:"
+                + $"fit={string.Join(',', movementFits)}");
+        }
 
         var garrison = _enemies.Where(IsInstanceValid)
             .Where(enemy => !enemy.IsWorldBoss && !enemy.IsRivalSquad)
@@ -123,9 +128,9 @@ public partial class FreightTerminalWorld
             && Enumerable.Range(1, 64)
                 .Select(seed => OperatorRosterRules.RivalVisual((ulong)seed))
                 .Distinct()
-                .Count() == 2
-            && rivals.All(enemy => enemy.OperatorVisual is OperatorVisualId.Garrison
-                or OperatorVisualId.FemaleFieldOperator);
+                .Count() == playerVisuals.Length
+            && rivals.All(enemy => playerVisuals.Contains(enemy.OperatorVisual)
+                && enemy.AuthoredVisualIdForDiagnostics == enemy.OperatorVisual);
 
         _player.ConfigureRole(OperatorRole.Assault);
         var assaultCapacity = _player.BackpackCapacity;
@@ -158,36 +163,127 @@ public partial class FreightTerminalWorld
             && localizationReady
             && randomPlayerRoles == roles.Length
             && randomAiValid
-            && femaleModelReady
+            && rosterModelsReady
             && fixedGarrison
             && rivalVariety
             && lootSkillReady
             && locksmithReady
             && uiReady;
-        var femaleMovementFit = string.Join(',', femaleRifleFits.Select((fit, index) =>
-            $"{femaleTransitions[index]}:{femaleMovementFitValid[index]}:support={fit.SupportHandDistance:F3}:"
-            + $"muzzle={fit.MuzzleOffset}:stock={fit.StockOffset}"));
         GD.Print(
             $"OPERATOR_ROSTER_CHECK roles={roles.Length} identity={identityReady} localization={localizationReady} "
             + $"random_player_roles={randomPlayerRoles} random_ai={randomAiValid} "
-            + $"female_loaded={femaleInspection.Loaded} female_nodes={femaleInspection.RequiredNodes} "
-            + $"female_meshes={femaleInspection.MeshCount} female_materials={femaleInspection.MaterialCount} "
-            + $"female_size={femaleInspection.Size} female_animations={femaleAnimations} "
-            + $"female_transitions={string.Join('>', femaleTransitions)} female_rifle_fit={femaleRifleFit.Valid} "
-            + $"female_movement_fit={femaleMovementFit} "
-            + $"female_primary={femaleRifleFit.PrimaryHandDistance:F3} "
-            + $"female_primary_offset={femaleRifleFit.PrimaryHandOffset} "
-            + $"female_primary_rotation={femaleRifleFit.PrimaryHandRotation} "
-            + $"female_support={femaleRifleFit.SupportHandDistance:F3} "
-            + $"female_support_offset={femaleRifleFit.SupportHandOffset} "
-            + $"female_support_target={femaleRifleFit.SupportHandTargetOffset} "
-            + $"female_muzzle={femaleRifleFit.MuzzleOffset} female_stock={femaleRifleFit.StockOffset} "
-            + $"female_preview_idle={femalePreviewIdle} "
+            + $"unique_visuals={playerVisuals.Distinct().Count()} roster_models={rosterModelsReady} "
+            + $"visuals={string.Join(';', visualReports)} "
             + $"garrison={garrison.Length} fixed_garrison={fixedGarrison} rivals={rivals.Length} rival_variety={rivalVariety} "
             + $"scavenger_capacity={scavengerCapacity}/{assaultCapacity} scavenger_search={scavengerSearch:F2} "
             + $"loot_revealed={LastOperatorLootScanForDiagnostics.RevealedCount} loot_value={LastOperatorLootScanForDiagnostics.TotalValue} "
             + $"locksmith_search={locksmithPassive:F2}/{locksmithActive:F2} ui_cards={_hud.OperatorRoleCardCountForDiagnostics}");
         GD.Print($"OPERATOR_ROSTER_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
+    }
+
+    private async void CaptureOperatorRosterFrame()
+    {
+        var canvas = new CanvasLayer { Layer = 120 };
+        AddChild(canvas);
+        var background = new ColorRect
+        {
+            Color = new Color(0.006f, 0.012f, 0.014f, 1.0f)
+        };
+        background.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        canvas.AddChild(background);
+
+        var title = new Label
+        {
+            Text = "OPERATION STEEL TIDE  //  UNIQUE OPERATOR ROSTER",
+            Position = new Vector2(34.0f, 22.0f),
+            Size = new Vector2(1600.0f, 42.0f)
+        };
+        title.AddThemeFontSizeOverride("font_size", 26);
+        title.AddThemeColorOverride("font_color", new Color(0.35f, 0.92f, 0.78f));
+        background.AddChild(title);
+
+        var row = new HBoxContainer
+        {
+            Position = new Vector2(28.0f, 76.0f),
+            Size = new Vector2(1864.0f, 962.0f)
+        };
+        row.AddThemeConstantOverride("separation", 14);
+        background.AddChild(row);
+        var weapons = new[]
+        {
+            WeaponPlatform.M4A1,
+            WeaponPlatform.MP5A5,
+            WeaponPlatform.VSS,
+            WeaponPlatform.AK74,
+            WeaponPlatform.P226
+        };
+
+        for (var index = 0; index < OperatorRoles.ExtractionRoles.Length; index++)
+        {
+            var role = OperatorRoles.ExtractionRoles[index];
+            var spec = OperatorRoles.Spec(role);
+            var panel = new ColorRect
+            {
+                CustomMinimumSize = new Vector2(360.0f, 940.0f),
+                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+                Color = new Color(0.012f, 0.026f, 0.029f, 1.0f)
+            };
+            row.AddChild(panel);
+            panel.AddChild(new ColorRect
+            {
+                Position = Vector2.Zero,
+                Size = new Vector2(360.0f, 5.0f),
+                Color = spec.Accent
+            });
+
+            var name = new Label
+            {
+                Text = $"{spec.Callsign}  //  {spec.Name}",
+                Position = new Vector2(14.0f, 18.0f),
+                Size = new Vector2(330.0f, 34.0f)
+            };
+            name.AddThemeFontSizeOverride("font_size", 19);
+            name.AddThemeColorOverride("font_color", spec.Accent.Lightened(0.18f));
+            panel.AddChild(name);
+
+            var skill = new Label
+            {
+                Text = spec.SkillName,
+                Position = new Vector2(14.0f, 50.0f),
+                Size = new Vector2(330.0f, 24.0f)
+            };
+            skill.AddThemeFontSizeOverride("font_size", 12);
+            skill.AddThemeColorOverride("font_color", new Color(0.72f, 0.82f, 0.79f));
+            panel.AddChild(skill);
+
+            var preview = new InventoryModelPreview
+            {
+                Position = new Vector2(8.0f, 82.0f),
+                Size = new Vector2(344.0f, 792.0f)
+            };
+            preview.Configure(
+                InventoryPreviewKind.Operator,
+                weapon: WeaponCatalog.Build(weapons[index], 0),
+                role: role);
+            panel.AddChild(preview);
+
+            var footer = new Label
+            {
+                Text = $"VISUAL  {spec.VisualId}  //  AUTHORED CC0",
+                Position = new Vector2(14.0f, 892.0f),
+                Size = new Vector2(330.0f, 25.0f),
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            footer.AddThemeFontSizeOverride("font_size", 11);
+            footer.AddThemeColorOverride("font_color", new Color(0.47f, 0.62f, 0.58f));
+            panel.AddChild(footer);
+        }
+
+        await ToSignal(GetTree().CreateTimer(1.1f), SceneTreeTimer.SignalName.Timeout);
+        var image = GetViewport().GetTexture().GetImage();
+        image.SavePng("user://operator_roster_validation.png");
+        GD.Print("CAPTURE_OPERATOR_ROSTER user://operator_roster_validation.png");
+        GetTree().Quit();
     }
 }

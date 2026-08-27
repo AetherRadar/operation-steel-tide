@@ -13,8 +13,13 @@ public enum OperatorRole
 
 public enum OperatorVisualId
 {
-    Garrison,
-    FemaleFieldOperator
+    Garrison = 0,
+    Viper = 1,
+    FemaleFieldOperator = Viper,
+    Heron = 2,
+    Lynx = 3,
+    Magpie = 4,
+    Jackal = 5
 }
 
 public enum SquadOrder
@@ -108,7 +113,7 @@ public static class OperatorRoles
             1.0f,
             18.0f,
             1.25f,
-            OperatorVisualId.FemaleFieldOperator,
+            OperatorVisualId.Heron,
             1,
             0.92f),
         OperatorRole.Recon => new OperatorRoleSpec(
@@ -123,7 +128,7 @@ public static class OperatorRoles
             0.94f,
             24.0f,
             2.1f,
-            OperatorVisualId.FemaleFieldOperator,
+            OperatorVisualId.Lynx,
             0,
             0.94f),
         OperatorRole.Scavenger => new OperatorRoleSpec(
@@ -138,7 +143,7 @@ public static class OperatorRoles
             0.96f,
             22.0f,
             2.0f,
-            OperatorVisualId.FemaleFieldOperator,
+            OperatorVisualId.Magpie,
             4,
             0.72f),
         OperatorRole.Locksmith => new OperatorRoleSpec(
@@ -153,7 +158,7 @@ public static class OperatorRoles
             0.9f,
             26.0f,
             9.0f,
-            OperatorVisualId.Garrison,
+            OperatorVisualId.Jackal,
             2,
             0.78f),
         _ => new OperatorRoleSpec(
@@ -168,7 +173,7 @@ public static class OperatorRoles
             0.9f,
             28.0f,
             10.0f,
-            OperatorVisualId.Garrison,
+            OperatorVisualId.Viper,
             0,
             1.0f)
     };

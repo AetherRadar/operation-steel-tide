@@ -84,14 +84,19 @@ internal sealed class AuthoredDesertEagleVisual
 
 internal sealed class AuthoredPreviewOperatorVisual
 {
-    public AuthoredPreviewOperatorVisual(Node3D root, OperatorVisualId visualId)
+    public AuthoredPreviewOperatorVisual(
+        Node3D root,
+        OperatorVisualId visualId,
+        bool hasWeapon = false)
     {
         Root = root;
         VisualId = visualId;
+        HasWeapon = hasWeapon;
     }
 
     public Node3D Root { get; }
     public OperatorVisualId VisualId { get; }
+    public bool HasWeapon { get; }
 }
 
 internal sealed class AuthoredOperatorVisual
@@ -163,7 +168,7 @@ internal sealed class AuthoredOperatorVisual
         var primaryHandRotation = rightHand.Basis.Orthonormalized().GetRotationQuaternion();
         var muzzleOffset = weapon.MuzzleDevice.GlobalPosition - weaponOrigin;
         var stockOffset = weapon.Stock.GlobalPosition - weaponOrigin;
-        var minimumStockOffset = VisualId == OperatorVisualId.FemaleFieldOperator ? 0.1f : 0.14f;
+        var minimumStockOffset = CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId) ? 0.1f : 0.14f;
         var valid = primaryHandDistance <= 0.025f
             && supportHandDistance <= 0.16f
             && muzzleOffset.Z <= -0.44f
@@ -225,14 +230,14 @@ internal sealed class AuthoredOperatorVisual
         }
         _weapon.Root.Position = Vector3.Zero;
         _weapon.Root.Quaternion = readied
-            ? VisualId == OperatorVisualId.FemaleFieldOperator
+            ? CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId)
                 ? FemaleReadiedWeaponRotation
                 : ReadiedWeaponRotation
             : Quaternion.Identity;
         var socketRelativeToRoot = TransformRelativeToAncestor(socket, Root);
         var inheritedScale = Mathf.Max(0.0001f, socketRelativeToRoot.Basis.Scale.X);
         _weapon.Root.Scale = Vector3.One * (FieldWeaponScale / inheritedScale);
-        if (readied && VisualId == OperatorVisualId.FemaleFieldOperator)
+        if (readied && CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId))
         {
             var rightHandIndex = ResolveBoneIndex(_skeleton, "mixamorig:RightHand");
             var rightHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(rightHandIndex);
@@ -380,7 +385,6 @@ internal static partial class CombatModelLibrary
     private const string QuaterniusWeaponRoot = "res://assets/models/quaternius_ultimate_guns";
     internal const string OperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier_animated.glb";
     internal const string PreviewOperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier.glb";
-    internal const string FemaleOperatorScenePath = "res://assets/models/quaternius_female_operator/quaternius_female_operator.glb";
     internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/gsh18_runtime.glb";
     internal const string DesertEagleScenePath = "res://assets/models/elizion_desert_eagle/desert_eagle.glb";
 
@@ -411,10 +415,10 @@ internal static partial class CombatModelLibrary
         "BamenMilitarySoldier", "BamenMilitarySoldierRig", "BamenMilitarySoldierMesh"
     };
 
-    private static readonly string[] FemaleOperatorNodes =
+    private static readonly string[] QuaterniusOperatorNodes =
     {
-        "QuaterniusFemaleOperator", "QuaterniusFemaleOperatorRig",
-        "FemaleOperatorBody", "FemaleOperatorFeet", "FemaleOperatorHead", "FemaleOperatorLegs",
+        "QuaterniusOperator", "QuaterniusOperatorRig",
+        "OperatorBody", "OperatorFeet", "OperatorHead", "OperatorLegs",
         "WeaponSocket", "BackWeaponSocket", "HeadSocket", "VestSocket",
         "BackpackSocket", "TeamPatchSocket"
     };
@@ -460,17 +464,18 @@ internal static partial class CombatModelLibrary
 
     public static AuthoredOperatorVisual InstantiateOperator(
         OperatorVisualId visualId,
-        WeaponBuild? weaponBuild = null)
+        WeaponBuild? weaponBuild = null,
+        bool attachDefaultWeapon = true)
     {
-        var female = visualId == OperatorVisualId.FemaleFieldOperator;
+        var asset = OperatorVisualAsset(visualId);
         var source = InstantiateRequired(
-            female ? FemaleOperatorScenePath : OperatorScenePath,
-            female ? FemaleOperatorNodes : OperatorNodes);
-        var sourceBounds = female ? ComputeBounds(source) : default;
-        if (female && (sourceBounds.MeshCount == 0 || sourceBounds.Size.Y <= 0.01f))
+            asset.RuntimeScenePath,
+            asset.RuntimeNodes);
+        var sourceBounds = asset.UsesQuaterniusRig ? ComputeBounds(source) : default;
+        if (asset.UsesQuaterniusRig && (sourceBounds.MeshCount == 0 || sourceBounds.Size.Y <= 0.01f))
         {
             source.Free();
-            throw new InvalidOperationException("Female operator model has no usable geometry bounds.");
+            throw new InvalidOperationException($"Operator model {visualId} has no usable geometry bounds.");
         }
         var wrapper = new Node3D { Name = "AuthoredOperatorVisual" };
         var sourcePresentation = new Node3D
@@ -478,15 +483,18 @@ internal static partial class CombatModelLibrary
             Name = "AnimatedOperatorPresentation",
             RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f),
             Scale = Vector3.One * (AnimatedOperatorHeight /
-                (female ? sourceBounds.Size.Y : PreviewOperatorSourceSize.Y))
+                (asset.UsesQuaterniusRig ? sourceBounds.Size.Y : PreviewOperatorSourceSize.Y))
         };
         sourcePresentation.AddChild(source);
         wrapper.AddChild(sourcePresentation);
         var visual = new AuthoredOperatorVisual(wrapper, visualId);
-        var carriedBuild = weaponBuild ?? WeaponCatalog.Build(WeaponPlatform.M4A1, 0);
-        visual.AttachWeapon(
-            InstantiateWeapon(carriedBuild.Platform, firstPerson: false),
-            carriedBuild);
+        if (weaponBuild is not null || attachDefaultWeapon)
+        {
+            var carriedBuild = weaponBuild ?? WeaponCatalog.Build(WeaponPlatform.M4A1, 0);
+            visual.AttachWeapon(
+                InstantiateWeapon(carriedBuild.Platform, firstPerson: false),
+                carriedBuild);
+        }
         return visual;
     }
 
@@ -563,13 +571,15 @@ internal static partial class CombatModelLibrary
     public static AuthoredPreviewOperatorVisual InstantiatePreviewOperator()
         => InstantiatePreviewOperator(OperatorVisualId.Garrison);
 
-    public static AuthoredPreviewOperatorVisual InstantiatePreviewOperator(OperatorVisualId visualId)
+    public static AuthoredPreviewOperatorVisual InstantiatePreviewOperator(
+        OperatorVisualId visualId,
+        WeaponBuild? weaponBuild = null)
     {
-        var female = visualId == OperatorVisualId.FemaleFieldOperator;
+        var asset = OperatorVisualAsset(visualId);
         var source = InstantiateRequired(
-            female ? FemaleOperatorScenePath : PreviewOperatorScenePath,
-            female ? FemaleOperatorNodes : PreviewOperatorNodes);
-        var sourceBounds = female
+            asset.PreviewScenePath,
+            asset.PreviewNodes);
+        var sourceBounds = asset.UsesQuaterniusRig
             ? ComputeBounds(source)
             : (MeshCount: 1, Size: PreviewOperatorSourceSize, Center: PreviewOperatorSourceCenter);
         if (sourceBounds.MeshCount == 0 || sourceBounds.Size.Y <= 0.01f)
@@ -578,12 +588,21 @@ internal static partial class CombatModelLibrary
             throw new InvalidOperationException($"Operator preview {visualId} has no usable geometry bounds.");
         }
         source.Position = -sourceBounds.Center;
-        if (female)
+        if (asset.UsesQuaterniusRig)
         {
             var animationPlayer = RequireAnimationPlayer(source);
             animationPlayer.Play("idle");
             animationPlayer.Seek(0.45, update: true);
             animationPlayer.Pause();
+
+            if (weaponBuild is not null)
+            {
+                var previewVisual = new AuthoredOperatorVisual(source, visualId);
+                previewVisual.AttachWeapon(
+                    InstantiateWeapon(weaponBuild.Platform, firstPerson: false),
+                    weaponBuild);
+                previewVisual.SetWeaponReadied(false);
+            }
         }
         var wrapper = new Node3D
         {
@@ -591,7 +610,10 @@ internal static partial class CombatModelLibrary
             Scale = Vector3.One * (OperatorPreviewHeight / sourceBounds.Size.Y)
         };
         wrapper.AddChild(source);
-        return new AuthoredPreviewOperatorVisual(wrapper, visualId);
+        return new AuthoredPreviewOperatorVisual(
+            wrapper,
+            visualId,
+            hasWeapon: asset.UsesQuaterniusRig && weaponBuild is not null);
     }
 
     public static AuthoredGsh18Visual InstantiateGsh18(bool firstPerson)
@@ -740,7 +762,7 @@ internal static partial class CombatModelLibrary
         try
         {
             root = InstantiateOperator(visualId).Root;
-            var size = visualId == OperatorVisualId.Garrison
+            var size = !UsesQuaterniusOperatorRig(visualId)
                 ? PreviewOperatorSourceSize * (AnimatedOperatorHeight / PreviewOperatorSourceSize.Y)
                 : ComputeBounds(root).Size;
             return new CombatModelInspection(
@@ -769,7 +791,7 @@ internal static partial class CombatModelLibrary
         try
         {
             root = InstantiatePreviewOperator(visualId).Root;
-            var size = visualId == OperatorVisualId.Garrison
+            var size = !UsesQuaterniusOperatorRig(visualId)
                 ? PreviewOperatorSourceSize * (OperatorPreviewHeight / PreviewOperatorSourceSize.Y)
                 : ComputeBounds(root).Size;
             return new CombatModelInspection(

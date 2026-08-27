@@ -52,12 +52,15 @@ CC0 1.0 Universal:
 - Source: https://quaternius.com/packs/ultimatemodularwomen.html
 - License: CC0 1.0 Universal, https://creativecommons.org/publicdomain/zero/1.0/
 - Acquisition date: 2026-08-27
-- Runtime asset: `quaternius_female_operator/quaternius_female_operator.glb`
-- License, source mapping, and rebuild record: `quaternius_female_operator/LICENSE.md`
+- Runtime assets: `quaternius_operators/viper.glb`, `heron.glb`,
+  `lynx.glb`, `magpie.glb`, and `jackal.glb`
+- License, per-role source mapping, and rebuild record:
+  `quaternius_operators/LICENSE.md`
 - Editable source: `source_art/third_party/quaternius_modular_women/`
 
-The Soldier model supplies the authored female field-operator silhouette. Its
-25 actions are retargeted from the CC0 Quaternius Universal Animation Library.
+Five different authored presets supply distinct heads, clothing, equipment
+silhouettes, and materials for the complete extraction roster. Their 25 runtime
+actions are retargeted from the CC0 Quaternius Universal Animation Library.
 Attribution is not required; creator credit is retained as a courtesy.
 
 The Ultimate Guns Pack is distributed by Quaternius under CC0 1.0 Universal:

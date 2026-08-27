@@ -134,6 +134,7 @@ public partial class FreightTerminalWorld
             ("--capture-squad", static world => world.CaptureSquadFrame()),
             ("--capture-squad-spectator", static world => world.CaptureSquadSpectatorFrame()),
             ("--capture-squad-lobby", static world => world.CaptureSquadLobbyFrame()),
+            ("--capture-operator-roster", static world => world.CaptureOperatorRosterFrame()),
             ("--capture-tactical-hud", static world => world.CaptureTacticalHud()),
             ("--capture-boss", static world => world.CaptureWorldBoss())
         };
