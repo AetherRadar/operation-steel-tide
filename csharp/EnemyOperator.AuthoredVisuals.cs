@@ -32,6 +32,10 @@ public partial class EnemyOperator
         => UsesAuthoredOperatorForDiagnostics
             ? _authoredOperatorAnimator.AnimationCount
             : 0;
+    internal OperatorVisualId AuthoredVisualIdForDiagnostics
+        => UsesAuthoredOperatorForDiagnostics
+            ? _authoredOperatorVisual.VisualId
+            : OperatorVisual;
     internal bool UsesTideHunterMonsterForDiagnostics
         => IsInstanceValid(_tideHunterMonsterVisual?.Root);
     internal int TideHunterMonsterMeshCountForDiagnostics
@@ -119,7 +123,7 @@ public partial class EnemyOperator
         AuthoredOperatorVisual? authoredOperator = null;
         try
         {
-            authoredOperator = CombatModelLibrary.InstantiateOperator(CarriedWeapon);
+            authoredOperator = CombatModelLibrary.InstantiateOperator(OperatorVisual, CarriedWeapon);
             _bodyRoot.AddChild(authoredOperator.Root);
             var authoredAnimator = new AuthoredOperatorAnimator(authoredOperator);
             _authoredOperatorVisual = authoredOperator;

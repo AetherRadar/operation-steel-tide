@@ -444,7 +444,9 @@ def author_rifle_hold(
     for side in ("Left", "Right"):
         for finger, angles in finger_curls.items():
             for segment, angle in enumerate(angles, start=1):
-                bone = armature.pose.bones[f"mixamorig:{side}Hand{finger}{segment}"]
+                bone = armature.pose.bones.get(f"mixamorig:{side}Hand{finger}{segment}")
+                if bone is None:
+                    continue
                 bone.rotation_mode = "XYZ"
                 if side == "Left":
                     bone.rotation_euler.z = math.radians(-angle)
@@ -589,6 +591,7 @@ def cleanup_sources(sources: list[bpy.types.Object]) -> None:
 def set_action_export_metadata() -> None:
     for action in bpy.data.actions:
         action.asset_mark()
+        action.use_fake_user = True
         if action.name in LOOP_ACTIONS:
             action["loop"] = True
 

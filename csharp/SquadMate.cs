@@ -206,6 +206,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             OperatorRole.Medic => WeaponPlatform.ScarL,
             OperatorRole.Recon => WeaponPlatform.VSS,
+            OperatorRole.Scavenger => WeaponPlatform.AK74,
+            OperatorRole.Locksmith => WeaponPlatform.MP5A5,
             _ => WeaponPlatform.M4A1
         }, 0);
         var spec = OperatorRoles.Spec(role);
@@ -563,6 +565,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
         MaintainStairNavigation(destination, dt);
         ConsiderMedicSupport(patient);
+        ConsiderLootSupport(hostile);
         if (hostile is not null && !hostile.IsDead)
         {
             TryFire(hostile);
@@ -785,6 +788,37 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
                     TriggerRoleAbility(hostile.GlobalPosition);
                 }
                 break;
+            case OperatorRole.Scavenger:
+                if (!hasSight)
+                {
+                    TriggerRoleAbility(GlobalPosition);
+                }
+                break;
+            case OperatorRole.Locksmith:
+                if (_lootHuntSource is not null)
+                {
+                    TriggerRoleAbility(_lootHuntSource.LootNode.GlobalPosition);
+                }
+                break;
+        }
+    }
+
+    private void ConsiderLootSupport(EnemyOperator? hostile)
+    {
+        if (_skillCooldown > 0.0f || _skillActionTime > 0.0f || _decisionTimer > 0.0f
+            || hostile is not null && GlobalPosition.DistanceTo(hostile.GlobalPosition) < 18.0f)
+        {
+            return;
+        }
+        if (Role == OperatorRole.Scavenger)
+        {
+            _decisionTimer = 1.0f;
+            TriggerRoleAbility(GlobalPosition);
+        }
+        else if (Role == OperatorRole.Locksmith && _lootHuntSource is not null)
+        {
+            _decisionTimer = 1.0f;
+            TriggerRoleAbility(_lootHuntSource.LootNode.GlobalPosition);
         }
     }
 
@@ -811,7 +845,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         var spec = OperatorRoles.Spec(Role);
         _skillCooldown = SkillCooldownDuration;
         _skillEffectApplied = false;
-        if (Role == OperatorRole.Assault)
+        if (Role is OperatorRole.Assault or OperatorRole.Locksmith)
         {
             _overdriveTime = spec.SkillDuration;
             Main.SpawnRoleActivationPulse(GlobalPosition + Vector3.Up, spec.Accent, 2.6f);
@@ -837,7 +871,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         var started = TriggerRoleAbility(origin + forward * 5.0f);
         if (started)
         {
-            _networkAbilityPending = Role != OperatorRole.Assault;
+            _networkAbilityPending = Role is not OperatorRole.Assault and not OperatorRole.Locksmith;
             _networkAbilityApplyEffect = applyEffect;
             _networkAbilityOrigin = origin;
             _networkAbilityForward = forward.Normalized();
@@ -878,12 +912,17 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
                     Main.ApplyMedicSpray(this, GlobalPosition + Vector3.Up * 1.2f, forward);
                 }
             }
-            else
+            else if (Role == OperatorRole.Recon)
             {
                 if (!_networkAbilityPending || _networkAbilityApplyEffect)
                 {
                     Main.PerformReconScan(this, _networkAbilityPending ? _networkAbilityOrigin : GlobalPosition);
                 }
+            }
+            else if (Role == OperatorRole.Scavenger
+                && (!_networkAbilityPending || _networkAbilityApplyEffect))
+            {
+                Main.PerformLootScan(this, _networkAbilityPending ? _networkAbilityOrigin : GlobalPosition);
             }
         }
         if (_skillActionTime <= 0.0f)
@@ -1178,7 +1217,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             Part(_roleDevice, Cylinder(0.045f, 0.25f), new Vector3(0.0f, 0.0f, -0.17f),
                 Mat(accent, 0.0f, 0.3f, true), new Vector3(Mathf.Pi / 2.0f, 0.0f, 0.0f));
         }
-        else if (Role == OperatorRole.Recon)
+        else if (Role is OperatorRole.Recon or OperatorRole.Scavenger)
         {
             Part(_roleDevice, Box(new Vector3(0.21f, 0.12f, 0.012f)), new Vector3(0.0f, 0.0f, -0.055f),
                 Mat(accent, 0.0f, 0.25f, true));

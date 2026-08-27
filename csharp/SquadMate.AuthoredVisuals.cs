@@ -101,6 +101,7 @@ public partial class SquadMate
         try
         {
             authoredOperator = CombatModelLibrary.InstantiateOperator(
+                OperatorRoles.Spec(Role).VisualId,
                 WeaponCatalog.Build(WeaponPlatform.M4A1, 0));
             _rig.AddChild(authoredOperator.Root);
             var authoredAnimator = new AuthoredOperatorAnimator(authoredOperator);

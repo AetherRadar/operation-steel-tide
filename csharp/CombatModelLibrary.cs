@@ -84,12 +84,14 @@ internal sealed class AuthoredDesertEagleVisual
 
 internal sealed class AuthoredPreviewOperatorVisual
 {
-    public AuthoredPreviewOperatorVisual(Node3D root)
+    public AuthoredPreviewOperatorVisual(Node3D root, OperatorVisualId visualId)
     {
         Root = root;
+        VisualId = visualId;
     }
 
     public Node3D Root { get; }
+    public OperatorVisualId VisualId { get; }
 }
 
 internal sealed class AuthoredOperatorVisual
@@ -100,13 +102,23 @@ internal sealed class AuthoredOperatorVisual
         0.0130106f,
         0.0974600f,
         0.0586704f);
+    // The Quaternius hand bones use a different roll from the Mixamo-authored
+    // garrison rig. This inverse reference-hand rotation keeps the weapon root
+    // aligned to operator-forward while the authored upper-body clips drive
+    // the wrist.
+    private static readonly Quaternion FemaleReadiedWeaponRotation = new(
+        -0.6417337f,
+        -0.0994191f,
+        -0.7585650f,
+        0.0535996f);
     private readonly Skeleton3D _skeleton;
     private AuthoredWeaponVisual? _weapon;
     private bool _weaponReadied;
 
-    public AuthoredOperatorVisual(Node3D root)
+    public AuthoredOperatorVisual(Node3D root, OperatorVisualId visualId = OperatorVisualId.Garrison)
     {
         Root = root;
+        VisualId = visualId;
         AnimationPlayer = CombatModelLibrary.RequireAnimationPlayer(root);
         _skeleton = CombatModelLibrary.RequireSkeleton(root);
         WeaponSocket = CreateBoneAttachment(_skeleton, "RuntimeWeaponSocket", "mixamorig:RightHand");
@@ -118,6 +130,7 @@ internal sealed class AuthoredOperatorVisual
     }
 
     public Node3D Root { get; }
+    public OperatorVisualId VisualId { get; }
     public AnimationPlayer AnimationPlayer { get; }
     public Node3D WeaponSocket { get; }
     public Node3D BackWeaponSocket { get; }
@@ -141,23 +154,30 @@ internal sealed class AuthoredOperatorVisual
         var rightHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(rightHandIndex);
         var leftHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(leftHandIndex);
         var weaponOrigin = weapon.Root.GlobalPosition;
-        var primaryHandDistance = rightHand.Origin.DistanceTo(weaponOrigin);
+        var primaryHandOffset = weaponOrigin - rightHand.Origin;
+        var primaryHandDistance = primaryHandOffset.Length();
         var supportHandOffset = weapon.Foregrip.GlobalPosition - leftHand.Origin;
         var supportHandDistance = supportHandOffset.Length();
-        var handSeparation = rightHand.Origin.DistanceTo(leftHand.Origin);
+        var supportHandTargetOffset = leftHand.Origin - rightHand.Origin;
+        var handSeparation = supportHandTargetOffset.Length();
+        var primaryHandRotation = rightHand.Basis.Orthonormalized().GetRotationQuaternion();
         var muzzleOffset = weapon.MuzzleDevice.GlobalPosition - weaponOrigin;
         var stockOffset = weapon.Stock.GlobalPosition - weaponOrigin;
+        var minimumStockOffset = VisualId == OperatorVisualId.FemaleFieldOperator ? 0.1f : 0.14f;
         var valid = primaryHandDistance <= 0.025f
             && supportHandDistance <= 0.16f
             && muzzleOffset.Z <= -0.44f
             && Mathf.Abs(muzzleOffset.X) <= 0.16f
             && Mathf.Abs(muzzleOffset.Y) <= 0.12f
-            && stockOffset.Z >= 0.14f;
+            && stockOffset.Z >= minimumStockOffset;
         return new OperatorRifleFitInspection(
             valid,
             primaryHandDistance,
+            primaryHandOffset,
+            primaryHandRotation,
             supportHandDistance,
             supportHandOffset,
+            supportHandTargetOffset,
             handSeparation,
             weaponOrigin,
             muzzleOffset,
@@ -205,11 +225,19 @@ internal sealed class AuthoredOperatorVisual
         }
         _weapon.Root.Position = Vector3.Zero;
         _weapon.Root.Quaternion = readied
-            ? ReadiedWeaponRotation
+            ? VisualId == OperatorVisualId.FemaleFieldOperator
+                ? FemaleReadiedWeaponRotation
+                : ReadiedWeaponRotation
             : Quaternion.Identity;
         var socketRelativeToRoot = TransformRelativeToAncestor(socket, Root);
         var inheritedScale = Mathf.Max(0.0001f, socketRelativeToRoot.Basis.Scale.X);
         _weapon.Root.Scale = Vector3.One * (FieldWeaponScale / inheritedScale);
+        if (readied && VisualId == OperatorVisualId.FemaleFieldOperator)
+        {
+            var rightHandIndex = ResolveBoneIndex(_skeleton, "mixamorig:RightHand");
+            var rightHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(rightHandIndex);
+            _weapon.Root.GlobalPosition = rightHand.Origin;
+        }
     }
 
     private static Transform3D TransformRelativeToAncestor(Node3D node, Node3D ancestor)
@@ -329,8 +357,11 @@ internal sealed class AuthoredOperatorVisual
 internal readonly record struct OperatorRifleFitInspection(
     bool Valid,
     float PrimaryHandDistance,
+    Vector3 PrimaryHandOffset,
+    Quaternion PrimaryHandRotation,
     float SupportHandDistance,
     Vector3 SupportHandOffset,
+    Vector3 SupportHandTargetOffset,
     float HandSeparation,
     Vector3 WeaponOrigin,
     Vector3 MuzzleOffset,
@@ -349,6 +380,7 @@ internal static partial class CombatModelLibrary
     private const string QuaterniusWeaponRoot = "res://assets/models/quaternius_ultimate_guns";
     internal const string OperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier_animated.glb";
     internal const string PreviewOperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier.glb";
+    internal const string FemaleOperatorScenePath = "res://assets/models/quaternius_female_operator/quaternius_female_operator.glb";
     internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/gsh18_runtime.glb";
     internal const string DesertEagleScenePath = "res://assets/models/elizion_desert_eagle/desert_eagle.glb";
 
@@ -377,6 +409,14 @@ internal static partial class CombatModelLibrary
     private static readonly string[] PreviewOperatorNodes =
     {
         "BamenMilitarySoldier", "BamenMilitarySoldierRig", "BamenMilitarySoldierMesh"
+    };
+
+    private static readonly string[] FemaleOperatorNodes =
+    {
+        "QuaterniusFemaleOperator", "QuaterniusFemaleOperatorRig",
+        "FemaleOperatorBody", "FemaleOperatorFeet", "FemaleOperatorHead", "FemaleOperatorLegs",
+        "WeaponSocket", "BackWeaponSocket", "HeadSocket", "VestSocket",
+        "BackpackSocket", "TeamPatchSocket"
     };
 
     private static readonly string[] Gsh18Nodes =
@@ -416,18 +456,33 @@ internal static partial class CombatModelLibrary
     }
 
     public static AuthoredOperatorVisual InstantiateOperator(WeaponBuild? weaponBuild = null)
+        => InstantiateOperator(OperatorVisualId.Garrison, weaponBuild);
+
+    public static AuthoredOperatorVisual InstantiateOperator(
+        OperatorVisualId visualId,
+        WeaponBuild? weaponBuild = null)
     {
-        var source = InstantiateRequired(OperatorScenePath, OperatorNodes);
+        var female = visualId == OperatorVisualId.FemaleFieldOperator;
+        var source = InstantiateRequired(
+            female ? FemaleOperatorScenePath : OperatorScenePath,
+            female ? FemaleOperatorNodes : OperatorNodes);
+        var sourceBounds = female ? ComputeBounds(source) : default;
+        if (female && (sourceBounds.MeshCount == 0 || sourceBounds.Size.Y <= 0.01f))
+        {
+            source.Free();
+            throw new InvalidOperationException("Female operator model has no usable geometry bounds.");
+        }
         var wrapper = new Node3D { Name = "AuthoredOperatorVisual" };
         var sourcePresentation = new Node3D
         {
             Name = "AnimatedOperatorPresentation",
             RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f),
-            Scale = Vector3.One * (AnimatedOperatorHeight / PreviewOperatorSourceSize.Y)
+            Scale = Vector3.One * (AnimatedOperatorHeight /
+                (female ? sourceBounds.Size.Y : PreviewOperatorSourceSize.Y))
         };
         sourcePresentation.AddChild(source);
         wrapper.AddChild(sourcePresentation);
-        var visual = new AuthoredOperatorVisual(wrapper);
+        var visual = new AuthoredOperatorVisual(wrapper, visualId);
         var carriedBuild = weaponBuild ?? WeaponCatalog.Build(WeaponPlatform.M4A1, 0);
         visual.AttachWeapon(
             InstantiateWeapon(carriedBuild.Platform, firstPerson: false),
@@ -506,16 +561,37 @@ internal static partial class CombatModelLibrary
     }
 
     public static AuthoredPreviewOperatorVisual InstantiatePreviewOperator()
+        => InstantiatePreviewOperator(OperatorVisualId.Garrison);
+
+    public static AuthoredPreviewOperatorVisual InstantiatePreviewOperator(OperatorVisualId visualId)
     {
-        var source = InstantiateRequired(PreviewOperatorScenePath, PreviewOperatorNodes);
-        source.Position = -PreviewOperatorSourceCenter;
+        var female = visualId == OperatorVisualId.FemaleFieldOperator;
+        var source = InstantiateRequired(
+            female ? FemaleOperatorScenePath : PreviewOperatorScenePath,
+            female ? FemaleOperatorNodes : PreviewOperatorNodes);
+        var sourceBounds = female
+            ? ComputeBounds(source)
+            : (MeshCount: 1, Size: PreviewOperatorSourceSize, Center: PreviewOperatorSourceCenter);
+        if (sourceBounds.MeshCount == 0 || sourceBounds.Size.Y <= 0.01f)
+        {
+            source.Free();
+            throw new InvalidOperationException($"Operator preview {visualId} has no usable geometry bounds.");
+        }
+        source.Position = -sourceBounds.Center;
+        if (female)
+        {
+            var animationPlayer = RequireAnimationPlayer(source);
+            animationPlayer.Play("idle");
+            animationPlayer.Seek(0.45, update: true);
+            animationPlayer.Pause();
+        }
         var wrapper = new Node3D
         {
             Name = "AuthoredPreviewOperatorVisual",
-            Scale = Vector3.One * (OperatorPreviewHeight / PreviewOperatorSourceSize.Y)
+            Scale = Vector3.One * (OperatorPreviewHeight / sourceBounds.Size.Y)
         };
         wrapper.AddChild(source);
-        return new AuthoredPreviewOperatorVisual(wrapper);
+        return new AuthoredPreviewOperatorVisual(wrapper, visualId);
     }
 
     public static AuthoredGsh18Visual InstantiateGsh18(bool firstPerson)
@@ -656,18 +732,23 @@ internal static partial class CombatModelLibrary
     }
 
     public static CombatModelInspection InspectOperator()
+        => InspectOperator(OperatorVisualId.Garrison);
+
+    public static CombatModelInspection InspectOperator(OperatorVisualId visualId)
     {
         Node3D? root = null;
         try
         {
-            root = InstantiateOperator().Root;
-            var scale = AnimatedOperatorHeight / PreviewOperatorSourceSize.Y;
+            root = InstantiateOperator(visualId).Root;
+            var size = visualId == OperatorVisualId.Garrison
+                ? PreviewOperatorSourceSize * (AnimatedOperatorHeight / PreviewOperatorSourceSize.Y)
+                : ComputeBounds(root).Size;
             return new CombatModelInspection(
                 true,
                 true,
                 MeshesBelow(root).Count(),
                 CountMaterials(root),
-                PreviewOperatorSourceSize * scale);
+                size);
         }
         catch
         {
@@ -680,18 +761,23 @@ internal static partial class CombatModelLibrary
     }
 
     public static CombatModelInspection InspectPreviewOperator()
+        => InspectPreviewOperator(OperatorVisualId.Garrison);
+
+    public static CombatModelInspection InspectPreviewOperator(OperatorVisualId visualId)
     {
         Node3D? root = null;
         try
         {
-            root = InstantiatePreviewOperator().Root;
-            var scale = OperatorPreviewHeight / PreviewOperatorSourceSize.Y;
+            root = InstantiatePreviewOperator(visualId).Root;
+            var size = visualId == OperatorVisualId.Garrison
+                ? PreviewOperatorSourceSize * (OperatorPreviewHeight / PreviewOperatorSourceSize.Y)
+                : ComputeBounds(root).Size;
             return new CombatModelInspection(
                 true,
                 true,
                 MeshesBelow(root).Count(),
                 CountMaterials(root),
-                PreviewOperatorSourceSize * scale);
+                size);
         }
         catch
         {

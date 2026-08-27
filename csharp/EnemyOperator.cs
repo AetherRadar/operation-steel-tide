@@ -23,6 +23,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     public bool SentryMode { get; set; }
     public int NetworkId { get; set; } = -1;
     public ulong SimulationSeed { get; set; }
+    /// <summary>Authored character identity chosen before _Ready; garrison defenders never randomize.</summary>
+    public OperatorVisualId OperatorVisual { get; set; } = OperatorVisualId.Garrison;
     /// <summary>0 = legacy map NPC garrison. ≥1 = rival extraction squad team.</summary>
     public int TeamId { get; set; }
     public bool IsRivalSquad => TeamId > 0;

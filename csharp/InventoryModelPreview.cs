@@ -20,6 +20,7 @@ public partial class InventoryModelPreview : SubViewportContainer
     private EquipmentItem? _equipment;
     private WeaponBuild? _weapon;
     private string _knifeSkinId = KnifeSkinCatalog.DefaultId;
+    private OperatorRole _operatorRole = OperatorRole.Assault;
     private SubViewport? _viewport;
     private Node3D? _modelRoot;
     private Camera3D? _camera;
@@ -39,6 +40,7 @@ public partial class InventoryModelPreview : SubViewportContainer
         _equipment = equipment?.Clone();
         _weapon = weapon?.Clone();
         _knifeSkinId = knifeSkinId;
+        _operatorRole = role;
         if (IsInsideTree())
         {
             RebuildModel();
@@ -176,7 +178,8 @@ public partial class InventoryModelPreview : SubViewportContainer
 
     private void BuildOperator(Node3D root)
     {
-        root.AddChild(CombatModelLibrary.InstantiatePreviewOperator().Root);
+        root.AddChild(CombatModelLibrary.InstantiatePreviewOperator(
+            OperatorRoles.Spec(_operatorRole).VisualId).Root);
     }
 
     private void BuildRifle(Node3D root)

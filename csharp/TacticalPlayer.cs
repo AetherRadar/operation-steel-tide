@@ -77,7 +77,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public WeaponBuild EquippedWeapon { get; private set; } = WeaponCatalog.StarterWeapon();
     public LootGrade EquippedWeaponGrade { get; private set; } = LootGrade.Rare;
     public List<LootItem> Backpack { get; } = new();
-    public int BackpackCapacity => 6 + EquippedBackpack.Definition.CapacityBonus;
+    public int BackpackCapacity => 6
+        + EquippedBackpack.Definition.CapacityBonus
+        + OperatorRoles.Spec(Role).BackpackCapacityBonus;
     public PlayerStance Stance => _stance;
     public bool IsCrouched => _stance == PlayerStance.Crouched;
     public bool IsProne => _stance == PlayerStance.Prone;

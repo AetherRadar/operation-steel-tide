@@ -1298,21 +1298,27 @@ public partial class FreightTerminalWorld : Node3D
         int teamId = 0,
         WeaponBuild? initialWeapon = null,
         bool sentryMode = false,
-        float? detectionRange = null)
+        float? detectionRange = null,
+        OperatorVisualId? operatorVisual = null)
     {
         var networkId = _nextEnemyNetworkId++;
+        var simulationSeed = ExtractionEntitySeed(networkId);
         var enemy = new EnemyOperator
         {
             Position = position,
             NetworkId = networkId,
-            SimulationSeed = ExtractionEntitySeed(networkId),
+            SimulationSeed = simulationSeed,
             Player = _player,
             Main = this,
             MissionDirector = _missionDirector,
             DetectionRange = detectionRange ?? _missionDetectionRange,
             AccuracyBonus = ThreatLevels.AccuracyBonus(_deploymentThreatLevel),
             TeamId = teamId,
-            SentryMode = sentryMode
+            SentryMode = sentryMode,
+            OperatorVisual = operatorVisual
+                ?? (teamId == 0 || sentryMode
+                    ? OperatorVisualId.Garrison
+                    : OperatorRosterRules.RivalVisual(simulationSeed))
         };
         if (initialWeapon is not null)
         {
@@ -2038,7 +2044,8 @@ public partial class FreightTerminalWorld : Node3D
             {
                 var searching = Input.IsActionPressed(GameInputActions.Interact) && !_interactReleaseRequired;
                 _interactionProgress = searching
-                    ? Mathf.Min(1.0f, _interactionProgress + delta / nearest.SearchDuration)
+                    ? Mathf.Min(1.0f, _interactionProgress
+                        + delta / (nearest.SearchDuration * _player.RoleSearchDurationMultiplier))
                     : Mathf.Max(0.0f, _interactionProgress - delta * 2.2f);
                 _player.SetSearchPose(_interactionProgress > 0.02f, _interactionProgress);
                 var interaction = unopenedContainer

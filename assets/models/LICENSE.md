@@ -45,6 +45,21 @@ Selected cabinets, desks, beds, tables, fridges, and crates replace programmer-a
 
 ## Quaternius CC0 models
 
+The Ultimate Modular Women character pack is distributed by Quaternius under
+CC0 1.0 Universal:
+
+- Creator: Quaternius (`@Quaternius`)
+- Source: https://quaternius.com/packs/ultimatemodularwomen.html
+- License: CC0 1.0 Universal, https://creativecommons.org/publicdomain/zero/1.0/
+- Acquisition date: 2026-08-27
+- Runtime asset: `quaternius_female_operator/quaternius_female_operator.glb`
+- License, source mapping, and rebuild record: `quaternius_female_operator/LICENSE.md`
+- Editable source: `source_art/third_party/quaternius_modular_women/`
+
+The Soldier model supplies the authored female field-operator silhouette. Its
+25 actions are retargeted from the CC0 Quaternius Universal Animation Library.
+Attribution is not required; creator credit is retained as a courtesy.
+
 The Ultimate Guns Pack is distributed by Quaternius under CC0 1.0 Universal:
 
 - Source: https://poly.pizza/bundle/Ultimate-Guns-Pack-cpgUfI4t2F

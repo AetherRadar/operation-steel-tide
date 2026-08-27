@@ -16,7 +16,9 @@ public partial class TacticalPlayer
     public float RoleReloadMultiplier => OperatorRoles.Spec(Role).ReloadMultiplier
         * (Role == OperatorRole.Assault && _skillActiveRemaining > 0.0f ? 0.75f : 1.0f);
     public float RoleRecoilMultiplier => Role == OperatorRole.Assault && _skillActiveRemaining > 0.0f ? 0.72f : 1.0f;
-    public bool RoleActionBlocksWeapon => _roleActionRemaining > 0.0f && Role != OperatorRole.Assault;
+    public float RoleSearchDurationMultiplier => OperatorRoles.Spec(Role).SearchDurationMultiplier
+        * (Role == OperatorRole.Locksmith && _skillActiveRemaining > 0.0f ? 0.32f : 1.0f);
+    public bool RoleActionBlocksWeapon => _roleActionRemaining > 0.0f;
 
     public Node3D CombatNode => this;
     public bool CombatDead => IsDead;
@@ -110,14 +112,24 @@ public partial class TacticalPlayer
         var spec = OperatorRoles.Spec(Role);
         _skillCooldownRemaining = spec.SkillCooldown;
         _roleEffectApplied = false;
-        if (Role == OperatorRole.Assault)
+        if (Role is OperatorRole.Assault or OperatorRole.Locksmith)
         {
             _skillActiveRemaining = spec.SkillDuration;
-            _assaultInjector.Visible = true;
-            Hud?.ShowLocalizedMessage(
-                "assault_overdrive",
-                "COMBAT OVERDRIVE  //  SPEED + FIRE RATE + HANDLING",
-                spec.Accent);
+            if (Role == OperatorRole.Assault)
+            {
+                _assaultInjector.Visible = true;
+                Hud?.ShowLocalizedMessage(
+                    "assault_overdrive",
+                    "COMBAT OVERDRIVE  //  SPEED + FIRE RATE + HANDLING",
+                    spec.Accent);
+            }
+            else
+            {
+                Hud?.ShowLocalizedMessage(
+                    "skeleton_key_active",
+                    "SKELETON KEY  //  RAPID UNLOCK + SEARCH ACTIVE",
+                    spec.Accent);
+            }
             Main?.SpawnRoleActivationPulse(GlobalPosition + Vector3.Up, spec.Accent, 3.2f);
         }
         else
@@ -167,6 +179,10 @@ public partial class TacticalPlayer
                 {
                     Main?.PerformReconScan(this, GlobalPosition);
                 }
+                else if (Role == OperatorRole.Scavenger)
+                {
+                    Main?.PerformLootScan(this, GlobalPosition);
+                }
             }
 
             if (_roleActionRemaining <= 0.0f)
@@ -193,6 +209,9 @@ public partial class TacticalPlayer
             _skillActiveRemaining > 0.0f,
             _roleActionRemaining > 0.0f);
     }
+
+    internal void AdvanceRoleAbilityForDiagnostics(float delta)
+        => UpdateRoleAbility(delta);
 
     private void BuildRoleDevices()
     {
@@ -290,7 +309,7 @@ public partial class TacticalPlayer
                 delta * 13.0f);
             _medicSprayer.Rotation = new Vector3(-0.18f + Mathf.Sin(progress * 22.0f) * 0.025f, -0.16f, -0.06f);
         }
-        else if (Role == OperatorRole.Recon)
+        else if (Role is OperatorRole.Recon or OperatorRole.Scavenger)
         {
             _reconScanner.Position = _reconScanner.Position.Lerp(
                 new Vector3(0.08f, -0.16f, -0.58f),
@@ -303,7 +322,7 @@ public partial class TacticalPlayer
     {
         var actionVisible = _roleActionRemaining > 0.0f;
         _medicSprayer.Visible = actionVisible && Role == OperatorRole.Medic;
-        _reconScanner.Visible = actionVisible && Role == OperatorRole.Recon;
+        _reconScanner.Visible = actionVisible && Role is OperatorRole.Recon or OperatorRole.Scavenger;
         _assaultInjector.Visible = Role == OperatorRole.Assault && _skillActiveRemaining > 0.0f;
     }
 

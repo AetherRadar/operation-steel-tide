@@ -31,6 +31,8 @@ public partial class FreightTerminalWorld
     private PendingExtractionDeployment? _networkLobbyDeployment;
     private int _extractionLocalSquadSlot;
     private bool _networkMatchReloadQueued;
+    private ulong _operatorRosterSeed;
+    private bool _deterministicOperatorRoster;
 
     public int ActiveSquadCount => 1 + _squadMates.Count(mate => IsInstanceValid(mate));
     public int AiSquadCount => _squadMates.Count(mate => IsInstanceValid(mate) && !mate.IsHumanProxy);
@@ -136,6 +138,8 @@ public partial class FreightTerminalWorld
             && !extractionNetworkCheck
             && !demolitionNetworkCheck
             && !operationsOfficeCommand;
+        _deterministicOperatorRoster = diagnostic;
+        _operatorRosterSeed = diagnostic ? 0x535445454C544944UL : Time.GetTicksUsec();
         if (diagnostic)
         {
             var mode = networkHostCheck
@@ -150,6 +154,7 @@ public partial class FreightTerminalWorld
         }
         else
         {
+            _hud.RandomizeSquadOperator(_operatorRosterSeed);
             _player.UiLocked = true;
             _player.DisarmFireInput();
             _player.DisarmMovementInput();
@@ -833,16 +838,21 @@ public partial class FreightTerminalWorld
 
     private OperatorRole RoleForSlot(int slot)
     {
-        // AI always takes the two roles the player did not pick.
-        var remaining = new List<OperatorRole>();
-        foreach (OperatorRole role in Enum.GetValues<OperatorRole>())
+        if (_demolitionMode || _deterministicOperatorRoster)
         {
-            if (role != _player.Role)
+            // Preserve the established combat-only fill for demolition and deterministic diagnostics.
+            var combat = new List<OperatorRole>();
+            foreach (var role in OperatorRoles.CombatRoles)
             {
-                remaining.Add(role);
+                if (role != _player.Role)
+                {
+                    combat.Add(role);
+                }
             }
+            return combat[Mathf.Clamp(slot - 1, 0, combat.Count - 1)];
         }
-        return remaining[Mathf.Clamp(slot - 1, 0, remaining.Count - 1)];
+        var roles = OperatorRosterRules.SelectAiRoles(_player.Role, _operatorRosterSeed);
+        return roles[Mathf.Clamp(slot - 1, 0, roles.Count - 1)];
     }
 
     private SquadMate SpawnSquadMate(
@@ -852,7 +862,6 @@ public partial class FreightTerminalWorld
         long peerId,
         bool networkProxy = false)
     {
-        var callsigns = new[] { "RAVEN", "ECHO", "VIPER" };
         var position = ExtractionSpawnPads.FriendlyMemberPosition(
             _player.GlobalPosition,
             _player.GlobalBasis,
@@ -863,7 +872,7 @@ public partial class FreightTerminalWorld
             Position = position,
             Rotation = new Vector3(0.0f, _player.Rotation.Y, 0.0f)
         };
-        var sign = callsigns[Mathf.Clamp(slot, 0, callsigns.Length - 1)];
+        var sign = OperatorRoles.Callsign(role);
         mate.Configure(this, _player, slot, role, sign, human, peerId, networkProxy);
         AddChild(mate);
         mate.SetOrder(_squadOrder, _squadMovePoint);
@@ -1798,7 +1807,7 @@ public partial class FreightTerminalWorld
         var views = new List<SquadMemberView>
         {
             new(
-                "RAVEN",
+                OperatorRoles.Callsign(_player.Role),
                 _player.Role,
                 _player.Health,
                 _player.MaxHealth,

@@ -6,7 +6,15 @@ public enum OperatorRole
 {
     Assault,
     Medic,
-    Recon
+    Recon,
+    Scavenger,
+    Locksmith
+}
+
+public enum OperatorVisualId
+{
+    Garrison,
+    FemaleFieldOperator
 }
 
 public enum SquadOrder
@@ -43,18 +51,19 @@ public interface ISquadCombatant
 
 public readonly record struct OperatorRoleSpec(
     string Name,
-    string ChineseName,
+    string Callsign,
     string SkillName,
-    string ChineseSkillName,
     string Description,
-    string ChineseDescription,
     Color Accent,
     float MaxHealth,
     float MovementMultiplier,
     float FireIntervalMultiplier,
     float ReloadMultiplier,
     float SkillCooldown,
-    float SkillDuration);
+    float SkillDuration,
+    OperatorVisualId VisualId,
+    int BackpackCapacityBonus,
+    float SearchDurationMultiplier);
 
 public readonly record struct SquadMemberView(
     string Callsign,
@@ -69,69 +78,111 @@ public readonly record struct SquadMemberView(
 
 public static class OperatorRoles
 {
+    public static readonly OperatorRole[] ExtractionRoles =
+    {
+        OperatorRole.Assault,
+        OperatorRole.Medic,
+        OperatorRole.Recon,
+        OperatorRole.Scavenger,
+        OperatorRole.Locksmith
+    };
+
+    public static readonly OperatorRole[] CombatRoles =
+    {
+        OperatorRole.Assault,
+        OperatorRole.Medic,
+        OperatorRole.Recon
+    };
+
     public static OperatorRoleSpec Spec(OperatorRole role) => role switch
     {
         OperatorRole.Medic => new OperatorRoleSpec(
             "MEDIC",
-            "\u533b\u7597",
+            "HERON",
             "MEDICAL SPRAY",
-            "\u533b\u7597\u55b7\u96fe",
             "Spray trauma medicine onto yourself or a nearby teammate.",
-            "\u5411\u81ea\u5df1\u6216\u9644\u8fd1\u961f\u53cb\u55b7\u6d12\u6025\u6551\u836f\u5242\u3002",
             new Color(0.28f, 0.9f, 0.58f),
             112.0f,
             1.0f,
             1.0f,
             1.0f,
             18.0f,
-            1.25f),
+            1.25f,
+            OperatorVisualId.FemaleFieldOperator,
+            1,
+            0.92f),
         OperatorRole.Recon => new OperatorRoleSpec(
             "RECON",
-            "\u4fa6\u5bdf",
+            "LYNX",
             "PULSE SCANNER",
-            "\u8109\u51b2\u4fa6\u5bdf",
             "Raise the scanner and reveal hostile movement through cover.",
-            "\u4e3e\u8d77\u4fa6\u5bdf\u8bbe\u5907\uff0c\u6807\u8bb0\u63a9\u4f53\u540e\u7684\u654c\u4eba\u3002",
             new Color(0.28f, 0.72f, 1.0f),
             100.0f,
             1.04f,
             1.0f,
             0.94f,
             24.0f,
-            2.1f),
+            2.1f,
+            OperatorVisualId.FemaleFieldOperator,
+            0,
+            0.94f),
+        OperatorRole.Scavenger => new OperatorRoleSpec(
+            "SCAVENGER",
+            "MAGPIE",
+            "FORTUNE FINDER",
+            "Appraise and mark the richest nearby loot; carries four extra stacks.",
+            new Color(0.96f, 0.76f, 0.24f),
+            102.0f,
+            1.03f,
+            1.0f,
+            0.96f,
+            22.0f,
+            2.0f,
+            OperatorVisualId.FemaleFieldOperator,
+            4,
+            0.72f),
+        OperatorRole.Locksmith => new OperatorRoleSpec(
+            "LOCKSMITH",
+            "JACKAL",
+            "SKELETON KEY",
+            "Bypass locks and search containers rapidly; carries two extra stacks.",
+            new Color(0.72f, 0.55f, 1.0f),
+            108.0f,
+            1.02f,
+            0.98f,
+            0.9f,
+            26.0f,
+            9.0f,
+            OperatorVisualId.Garrison,
+            2,
+            0.78f),
         _ => new OperatorRoleSpec(
             "ASSAULT",
-            "\u6218\u58eb",
+            "VIPER",
             "COMBAT OVERDRIVE",
-            "\u6218\u6597\u8d85\u9a71",
             "Boost movement, rate of fire, reload speed, and weapon handling.",
-            "\u77ed\u65f6\u63d0\u5347\u79fb\u52a8\u3001\u5c04\u901f\u3001\u6362\u5f39\u548c\u64cd\u63a7\u3002",
             new Color(1.0f, 0.58f, 0.2f),
             125.0f,
             1.08f,
             0.93f,
             0.9f,
             28.0f,
-            10.0f)
+            10.0f,
+            OperatorVisualId.Garrison,
+            0,
+            1.0f)
     };
 
     public static string RoleName(OperatorRole role, string language)
-    {
-        var spec = Spec(role);
-        return GameLocalization.IsChinese(language) ? spec.ChineseName : spec.Name;
-    }
+        => GameLocalization.Get($"operator_role_{role.ToString().ToLowerInvariant()}", language, Spec(role).Name);
 
     public static string SkillName(OperatorRole role, string language)
-    {
-        var spec = Spec(role);
-        return GameLocalization.IsChinese(language) ? spec.ChineseSkillName : spec.SkillName;
-    }
+        => GameLocalization.Get($"operator_skill_{role.ToString().ToLowerInvariant()}", language, Spec(role).SkillName);
 
     public static string Description(OperatorRole role, string language)
-    {
-        var spec = Spec(role);
-        return GameLocalization.IsChinese(language) ? spec.ChineseDescription : spec.Description;
-    }
+        => GameLocalization.Get($"operator_description_{role.ToString().ToLowerInvariant()}", language, Spec(role).Description);
+
+    public static string Callsign(OperatorRole role) => Spec(role).Callsign;
 
     public static string OrderName(SquadOrder order, string language)
     {
