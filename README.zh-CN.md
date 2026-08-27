@@ -1,29 +1,29 @@
-# Operation Steel Tide - 开源 Godot 战术撤离射击游戏
+# Operation Steel Tide
 
 [English](README.md) | 简体中文
 
-**Operation Steel Tide 是一款使用 Godot 4.6 和 C# 开发的开源战术撤离射击游戏（FPS），包含 AI 队友、在线合作多人游戏、持久化战利品与配装，以及独立的 5v5 爆破模式。** AI 队友能够服从命令、参与战斗、使用职业技能、救援玩家，并在联机队友掉线后接管其位置。潜入一片 340 米 x 320 米的港区，完成需要实际操作的任务目标，带走成功撤离的战利品，并让整支突击小队活着登上救援飞机。
+**一款使用 Godot 4.6 与 C# 开发的开源战术撤离 FPS：指挥三人干员小队，带走成功撤离的装备，或进入独立的 5v5 爆破对局。**
 
-[下载 Windows 版本](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [查看真实引擎截图](#真实引擎截图) · [查看小队 AI 源码](csharp/FreightTerminalWorld.Squad.cs) · [阅读架构说明](ARCHITECTURE.md)
+![Saint Marais 老城中的第一人称交战](docs/media/hero.webp)
 
-![Operation Steel Tide 的配装、撤离和空中连桥玩法](docs/media/hero.webp)
-
-> **一分钟内开始游戏：** 下载最新的 Windows ZIP，完整解压后运行 `PLAY.bat`。这是免安装的便携版本，不需要安装 Godot、.NET 或 Go。ZIP 旁同时提供 SHA256 文件，可在启动前验证下载内容。
+[下载 Windows 版本](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [查看引擎实拍](#引擎实拍) · [查看小队 AI 源码](csharp/FreightTerminalWorld.Squad.cs) · [阅读架构说明](ARCHITECTURE.md)
 
 [![Godot 4.6](https://img.shields.io/badge/Godot-4.6-478CBF?logo=godot-engine&logoColor=white)](https://godotengine.org/)
 [![.NET 8](https://img.shields.io/badge/.NET-8-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-42e7c1.svg)](LICENSE)
 
-## Godot 4 撤离射击游戏特色
+> **一分钟内开始游戏：** 下载最新的 Windows ZIP，完整解压后运行 `PLAY.bat`。便携版本免安装，也不要求本机安装 Godot、.NET 或 Go。
 
-- **掉线后仍能继续行动的小队：** 选择突击兵、医疗兵或侦察兵；AI 会补齐空位，执行跟随、原地防守和移动命令，使用职业技能，救援倒地队友，并在真人玩家掉线后接管其位置，无需重启任务。
-- **完整的撤离循环：** 潜入区域、关闭通信中继、窃取货运清单、抵御增援、搜刮建筑和阵亡干员，最后守住撤离区。
-- **独立的爆破比赛：** 在十二张地图中逐张浏览并选择战场（目前可玩 TIDEFORGE ARENA 和 HARBOR LOCKS），随后进入 MR12 规则的 5v5 对局：先赢 13 回合者获胜，中场交换阵营，平局进入净胜两回合的加时。每回合开始前有 15 秒手动购买阶段；初始资金为 $800，只买得起手枪，无法购买主武器，后续则依靠回合奖励和连败补偿购置装备。AI 会根据实时队伍状态分配突破、支援、侦察、锚点、转点、回防、掩护、侧翼、安放和拆除职责。
-- **有实际取舍的配装：** 购买枪械、护甲、不同品级的弹药和不同容量的弹药包；自定义武器部件，并且只能存入高于部署基准价值的撤离收益。
-- **真正具有敌意的世界，而不是射击靶场：** 敌对撤离小队、驻军、平民、三阶段游荡 Boss、敌对飞机、可驾驶车辆和 22 座玻璃空中连桥共同存在于同一片区域。
+## 玩法亮点
 
-本项目目前仍以程序员美术为主，并非完成度达到商业发行标准的游戏。更值得关注的问题是各套系统能否可靠协同：尝试完成一次行动、检查源码，并[报告你遇到的第一个问题](https://github.com/AetherRadar/operation-steel-tide/issues)。欢迎为仓库点 Star，以关注后续重构和新行动。
+- **真正承担职责的小队：** 五种干员职业、跟随/驻守/移动命令、职业技能、战斗、救援，以及联机玩家掉线后的 AI 自动接管。
+- **有代价的撤离循环：** 操作实体任务目标，搜索建筑和阵亡干员，抵御增援，并且只存入高于部署基准的撤离收益。
+- **另一套完整对局：** 独立爆破模式包含 MR12 5v5、手动购买、半场换边、加时、安放、拆除和按职责行动的战术 AI。
+- **有实际取舍的配装：** 枪械、配件、护甲、背包、弹药口径与弹药品级共同影响持久化部署经济。
+- **持续运转的敌对世界：** 敌对小队、驻军、平民、三阶段游荡 Boss、敌对飞机、车辆和高空路线会在任务周围同时活动。
+
+> **仍在制作中：** 这是一个可以游玩的重系统原型，并非完成度达到商业发行标准的游戏。正式角色、武器和城市模块已经接入，但部分载具与世界区域仍需继续进行美术替换。可以尝试完成一次行动、检查源码，并[报告你遇到的第一个问题](https://github.com/AetherRadar/operation-steel-tide/issues)。
 
 > **开发说明：** 这是一个使用 AI 辅助开发的个人原型。AI 工具参与了部分实现和文档工作；仓库所有者仍对设计决策、集成、调试和验证负责。本项目不声称自身是一套可直接用于生产环境的架构范例。当前边界、重构规则和已发布内容的已知来源，请参阅 [ARCHITECTURE.md](ARCHITECTURE.md)、[工程规范](docs/ENGINEERING_STANDARDS.md)和[内容来源记录](docs/CONTENT_PROVENANCE.md)。
 
@@ -82,20 +82,21 @@ godot --path .
 blender --background --factory-startup --python scripts/blender/build_extraction_aircraft.py
 ```
 
-## 真实引擎截图
+## 引擎实拍
+
+以下图片均直接截取自实际运行的 Godot 项目。宣传截图命令只会隐藏 HUD 并使用固定机位，不会用离线渲染替换游戏画面。
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/media/loadout.webp" alt="干员职业、武器市场、防护、弹药和联机配装界面"><br><sub>选择职业、防护、武器、弹药品级和小队模式。</sub></td>
-    <td width="50%"><img src="docs/media/extraction.webp" alt="停在绿色撤离信标内的救援倾转旋翼机"><br><sub>完成两个目标，并在小队登机期间守住救援区。</sub></td>
+    <td width="50%"><img src="docs/media/squad.webp" alt="Saint Marais 老城中的三名持枪驻军干员"><br><sub>正式干员模型支持战斗、移动、蹲伏、倒地和救援动画状态。</sub></td>
+    <td width="50%"><img src="docs/media/city.webp" alt="Saint Marais 老城街道全景"><br><sub>Saint Marais 将授权模块化城市资产重新组合为可玩的撤离区域。</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/media/arsenal.webp" alt="M4A1、AK74、AWM 与 Desert Eagle 的引擎内陈列"><br><sub>十三种枪械平台覆盖模块化步枪、冲锋枪、精确武器和副武器。</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/media/inventory.webp" alt="显示武器、弹药、护甲、配件和背包价值的战场物品栏"><br><sub>搜刮武器、部件、护甲、弹药、医疗物品和稀有刀具涂装。</sub></td>
     <td width="50%"><img src="docs/media/medical-wheel.webp" alt="包含绷带、战地医疗包和肾上腺素注射器的医疗轮盘"><br><sub>治疗会消耗真实物品堆叠，并可能被来袭火力打断。</sub></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/media/skylink.webp" alt="连接住宅塔楼的长距离玻璃空中连桥"><br><sub>22 座可通行的玻璃空中连桥组成高空路线和狙击线。</sub></td>
-    <td width="50%"><img src="docs/media/reload.webp" alt="第一人称分阶段弹匣换弹"><br><sub>武器具有可见部件、按口径区分的弹药、瞄具、射击模式和分阶段换弹。</sub></td>
   </tr>
 </table>
 
@@ -247,6 +248,7 @@ Godot_console.exe --path . -- --validate-progression
 Godot_console.exe --path . -- --validate-deployment-ui
 Godot_console.exe --path . -- --validate-refinery-map
 Godot_console.exe --path . -- --capture-refinery-map
+Godot_console.exe --resolution 1600x900 --path . -- --capture-promotion
 Godot_console.exe --path . -- --validate-residential
 Godot_console.exe --path . -- --validate-performance
 Godot_console.exe --path . -- --validate-residential-gameplay
@@ -277,7 +279,7 @@ Godot_console.exe --headless --path . -- --validate-extraction-network-client
 
 `--validate-deployment-ui` 验证完整干员预览、六项市场条目、四套快捷配装预设、四种弹药数量、独立的品级/数量定价、三槽地图选择器、锁定地图拒绝逻辑、配装成本和预计部署后余额。
 
-`--validate-refinery-map` 直接启动 Blackwater Refinery，并验证全部 90 个正式布置的模型、CC0 来源覆盖、场景缓存、距离剔除、仅使用盒体的碰撞代理、战利品/驻军/小地图集成、中央车辆通道，以及严格的节点、物体、网格和灯光预算。`--capture-refinery-map` 同时保存俯视构图画面和玩家高度的道路视图。
+`--validate-refinery-map` 通过旧地图 ID 启动 Saint Marais Old Town，并验证正式模型布置、CC0 来源覆盖、场景缓存、距离剔除、仅使用盒体的碰撞代理、独立区域、高价值战利品区、车辆路线、屋顶小队通行、战利品/驻军/小地图集成，以及严格的节点、物体、网格和灯光预算。`--capture-refinery-map` 保留兼容命令和旧输出名，同时保存俯视构图、玩家高度道路、两个高价值庭院和屋顶路线。`--capture-promotion` 使用固定布置与机位，在 `docs/media` 下重复生成 1600 x 900 无 HUD 主视觉、驻军、城市和武器图片，并输出 1280 x 640 社交封面。
 
 `--validate-pause-ui` 验证正式制作的暂停场景、必需控件绑定、不产生信号反馈的设置同步、中英文标签、暂停可见状态和鼠标释放，以及现有继续游戏事件路径。
 

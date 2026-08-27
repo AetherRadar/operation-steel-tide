@@ -93,6 +93,7 @@ public partial class FreightTerminalWorld
             ("--validate-extraction-sequence", static world => world.ValidateExtractionSequence()),
             ("--capture-extraction-flight", static world => world.CaptureExtractionFlight()),
             ("--capture-refinery-map", static world => world.CaptureRefineryMap()),
+            ("--capture-promotion", static world => world.CapturePromotionMedia()),
             ("--validate-tactical-hud", static world => world.ValidateTacticalHud()),
             ("--validate-hud-performance", static world => world.ValidateHudPerformance()),
             ("--validate-progression", static world => world.ValidateProgressionFlow()),

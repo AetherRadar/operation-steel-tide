@@ -1,29 +1,29 @@
-# Operation Steel Tide - Open-Source Godot Extraction Shooter
+# Operation Steel Tide
 
 English | [简体中文](README.zh-CN.md)
 
-**Operation Steel Tide is an open-source Godot 4.6 C# tactical extraction shooter and FPS with AI squadmates, online co-op multiplayer, persistent loot and loadouts, and a separate 5v5 demolition mode.** AI squadmates follow orders, fight, use class abilities, revive the player, and replace disconnected co-op teammates. Infiltrate a 340 m x 320 m harbor district, complete physical objectives, keep the loot you extract, and get the whole strike team onto the rescue aircraft alive.
+**An open-source tactical extraction FPS built with Godot 4.6 and C#: command a three-operator squad, keep the gear you extract, or enter a separate 5v5 demolition match.**
 
-[Download the Windows build](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [See real in-engine captures](#real-in-engine-screenshots) · [Inspect the squad AI](csharp/FreightTerminalWorld.Squad.cs) · [Read the architecture notes](ARCHITECTURE.md)
+![First-person combat in Saint Marais Old Town](docs/media/hero.webp)
 
-![Operation Steel Tide — loadout, extraction, and skybridge gameplay](docs/media/hero.webp)
-
-> **Play in under a minute:** download the latest Windows ZIP, extract the complete folder, and run `PLAY.bat`. It is a portable build with no installer and does not require Godot, .NET, or Go. A SHA256 file is published beside the ZIP so the download can be verified before launch.
+[Download the Windows build](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [View the in-engine gallery](#in-engine-gallery) · [Explore the squad AI](csharp/FreightTerminalWorld.Squad.cs) · [Read the architecture notes](ARCHITECTURE.md)
 
 [![Godot 4.6](https://img.shields.io/badge/Godot-4.6-478CBF?logo=godot-engine&logoColor=white)](https://godotengine.org/)
 [![.NET 8](https://img.shields.io/badge/.NET-8-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-42e7c1.svg)](LICENSE)
 
-## Godot 4 extraction shooter features
+> **Play in under a minute:** download the latest Windows ZIP, extract the folder, and run `PLAY.bat`. The portable build needs no installer, Godot, .NET, or Go.
 
-- **The squad survives disconnects:** deploy as Assault, Medic, Recon, Scavenger, or Locksmith; the lobby starts on a random operator and AI draws two distinct remaining roles, obeys follow/hold/move orders, uses class skills, revives downed teammates, and takes over a disconnected human slot without restarting the mission.
-- **A complete extraction loop:** infiltrate, disable the relay, steal the manifest, survive reinforcements, loot buildings and fallen operators, then hold the extraction zone.
-- **A separate demolition match:** browse a twelve-map pool one arena at a time (TIDEFORGE ARENA and HARBOR LOCKS playable today), then deploy into an MR12 5v5 match: first to 13 rounds, halftime side swap, and win-by-two overtime. Every round opens with a 15-second manual buy phase; the $800 opening wallet can afford a pistol but no primary weapon, while round rewards and loss-streak bonuses fund later equipment. AI assigns entry, support, recon, anchor, rotation, retake, cover, flank, plant, and defuse duties from the live team state.
-- **Meaningful loadouts:** buy firearms, armor, ammunition grades, and pack sizes; customize weapon parts and bank only the value extracted above your deployment baseline.
-- **A hostile world, not a shooting gallery:** rival squads, garrison troops, civilians, a roaming three-phase Boss, a hostile aircraft, drivable vehicles, and 22 glass skybridges share the same district.
+## What Makes It Different
 
-This is still an art-production work in progress, not a finished commercial game. Deployment previews and field squads now use redistributable authored tactical characters, while several weapons, vehicles, and world modules still need the same Blender-led replacement pass. The useful question is whether the systems hold together: try a run, inspect the source, and [report the first thing that breaks](https://github.com/AetherRadar/operation-steel-tide/issues). If you want to follow the refactor and future operations, star the repository.
+- **A squad that carries its weight:** five operator roles, follow/hold/move orders, class abilities, combat, revives, and automatic AI takeover when a co-op player disconnects.
+- **Extraction with consequences:** complete physical objectives, search buildings and bodies, survive reinforcements, and bank only the value brought out above the deployment baseline.
+- **A second competitive ruleset:** the separate demolition mode implements MR12 5v5 rounds, manual purchases, side swaps, overtime, planting, defusing, and role-aware tactical AI.
+- **Loadouts with real tradeoffs:** weapons, attachments, armor, packs, ammunition calibers, and ammunition grades all feed the persistent deployment economy.
+- **One shared hostile simulation:** rival squads, garrison troops, civilians, a roaming three-phase Boss, hostile aircraft, vehicles, and elevated routes remain active around the mission.
+
+> **Work in progress:** this is a playable systems-heavy prototype, not a finished commercial game. Authored characters, weapons, and city modules are in place, while several vehicles and world areas still need another art pass. Try a run, inspect the source, and [report the first thing that breaks](https://github.com/AetherRadar/operation-steel-tide/issues).
 
 > **Development disclosure:** This is an AI-assisted solo prototype. AI tools were used for portions of implementation and documentation; the repository owner remains responsible for design decisions, integration, debugging, and validation. It is not presented as a production-ready architecture reference. See [ARCHITECTURE.md](ARCHITECTURE.md), [Engineering Standards](docs/ENGINEERING_STANDARDS.md), and [Content Provenance](docs/CONTENT_PROVENANCE.md) for the current boundaries, refactor rules, and known origin of shipped content.
 
@@ -82,20 +82,21 @@ The rescue tilt-rotor is an editable Blender asset rather than runtime programme
 blender --background --factory-startup --python scripts/blender/build_extraction_aircraft.py
 ```
 
-## Real in-engine screenshots
+## In-Engine Gallery
+
+These are direct captures from the running Godot project. The promotional capture hides the HUD and stages deterministic camera positions; it does not replace the game with offline renders.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/media/loadout.webp" alt="Operator class, weapon market, protection, ammunition, and online loadout screen"><br><sub>Choose a role, protection, weapon, ammunition grade, and squad mode.</sub></td>
-    <td width="50%"><img src="docs/media/extraction.webp" alt="Rescue tilt-rotor waiting inside a green extraction beacon"><br><sub>Finish both objectives and hold the rescue zone while the squad boards.</sub></td>
+    <td width="50%"><img src="docs/media/squad.webp" alt="Three armed garrison operators staged in Saint Marais Old Town"><br><sub>Authored operators use combat, movement, crouch, downed, and revive animation states.</sub></td>
+    <td width="50%"><img src="docs/media/city.webp" alt="Wide street-level view of Saint Marais Old Town"><br><sub>Saint Marais recomposes licensed modular city assets into a playable extraction district.</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/media/arsenal.webp" alt="In-engine presentation of the M4A1, AK74, AWM, and Desert Eagle"><br><sub>Thirteen firearm platforms span modular rifles, SMGs, precision weapons, and sidearms.</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/media/inventory.webp" alt="Field inventory showing weapons, ammunition, armor, attachments, and backpack value"><br><sub>Loot weapons, parts, armor, ammunition, medical items, and rare knife finishes.</sub></td>
     <td width="50%"><img src="docs/media/medical-wheel.webp" alt="Medical selector with bandage, trauma kit, and adrenaline injector"><br><sub>Treatment consumes real inventory stacks and can be interrupted by incoming fire.</sub></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/media/skylink.webp" alt="Long glass skybridge connecting residential towers"><br><sub>Twenty-two walkable glass skybridges form elevated routes and sniper lanes.</sub></td>
-    <td width="50%"><img src="docs/media/reload.webp" alt="First-person staged magazine reload"><br><sub>Weapons have visible parts, caliber-specific ammunition, optics, fire modes, and staged reloads.</sub></td>
   </tr>
 </table>
 
@@ -252,6 +253,7 @@ Godot_console.exe --path . -- --validate-progression
 Godot_console.exe --path . -- --validate-deployment-ui
 Godot_console.exe --path . -- --validate-refinery-map
 Godot_console.exe --path . -- --capture-refinery-map
+Godot_console.exe --resolution 1600x900 --path . -- --capture-promotion
 Godot_console.exe --path . -- --validate-residential
 Godot_console.exe --path . -- --validate-performance
 Godot_console.exe --path . -- --validate-residential-gameplay
@@ -285,7 +287,7 @@ Godot_console.exe --headless --path . -- --validate-extraction-network-client
 
 `--validate-operator-roster` verifies five unique non-garrison player visual IDs, all five authored GLBs, 25-action animation contracts, movement-time rifle fit, role-aware armed previews, random player/AI/rival selection, fixed garrison identity, and the existing Scavenger and Locksmith loot benefits. `--capture-operator-roster` saves a five-column player-camera preview for visual comparison.
 
-`--validate-refinery-map` boots Saint Marais Old Town through the legacy map ID and verifies its authored model placements, CC0 source coverage, scene caching, distance culling, box-only collision proxies, distinct districts, separated high-value loot zones, clear vehicle routes, rooftop squad traversal, loot/garrison/minimap integration, and strict node/body/mesh/light budgets. `--capture-refinery-map` retains the compatibility command and legacy output names while saving an overhead composition frame, a street-level approach, both high-value courtyards, and the rooftop route.
+`--validate-refinery-map` boots Saint Marais Old Town through the legacy map ID and verifies its authored model placements, CC0 source coverage, scene caching, distance culling, box-only collision proxies, distinct districts, separated high-value loot zones, clear vehicle routes, rooftop squad traversal, loot/garrison/minimap integration, and strict node/body/mesh/light budgets. `--capture-refinery-map` retains the compatibility command and legacy output names while saving an overhead composition frame, a street-level approach, both high-value courtyards, and the rooftop route. `--capture-promotion` uses fixed staging and camera positions to reproduce the 1600 x 900 HUD-free hero, garrison, city, and arsenal images under `docs/media`, plus the 1280 x 640 social preview.
 
 `--validate-pause-ui` verifies the authored pause scene, required control bindings, signal-free settings synchronization, English and Chinese labels, pause visibility and mouse release, and the existing resume event path.
 
