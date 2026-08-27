@@ -19,17 +19,20 @@ The runtime models in this directory are adapted from **fps animated smg** by
 - Build scripts: `scripts/blender/build_djmaesen_smg45.py` and
   `scripts/blender/build_first_person_arms.py`
 - Static pose variants generated: 2026-08-24
-- Animated first-person sleeve fit revised: 2026-08-27
+- Animated first-person sleeve fit and upper-arm volume revised: 2026-08-27
 
 Attribution: **"fps animated smg" by DJMaesen, licensed under CC BY 4.0.**
 
 The original GLB embeds the creator, source URL, title, and `CC-BY-4.0`
 license in `asset.extras`. `smg45_first_person.glb` retains the authored
 materials, skin weights, and two-handed reload action. Its cloth sleeves are
-slimmed at the wrist and their shoulder-side vertices are extended through a
-smooth Blender deformation so the open source-mesh cuts remain below the
-first-person camera at idle, ADS, and throughout reload. The adaptation does
-not add boundary caps or replace the authored topology, UVs, or animation.
+slimmed at the wrist, while their shoulder-side vertices use a plateaued smooth
+Blender deformation with modest radial expansion so the full circumference
+continues below the first-person camera at idle, ADS, and throughout reload.
+The source mesh's existing open boundary loops are sealed with Blender fill
+faces so an oblique camera cannot reveal hollow sleeve cuts. This preserves the
+authored vertex set, UV layers, skin weights, materials, and animation while
+adding only the closure faces needed by the first-person adaptation.
 `first_person_arms.glb` is the older split-arm adaptation, and
 `smg45_weapon.glb` separates the field weapon from the first-person rig. The
 three static arm variants are separate Blender-generated evaluations of the

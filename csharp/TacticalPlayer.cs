@@ -326,6 +326,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
     }
 
+    public void SetViewPitchForDiagnostics(float pitch)
+    {
+        _pitch = Mathf.Clamp(pitch, -1.38f, 1.38f);
+        _recoilPitch = 0.0f;
+        _damageKickPitch = 0.0f;
+    }
+
     public void EnterVehicle(DriveableVehicle vehicle, Node3D seat)
     {
         if (IsDead || vehicle.IsDestroyed)

@@ -30,8 +30,11 @@ SOURCE_TO_METERS = 0.015
 SLEEVE_RADIAL_SCALE = 0.78
 SLEEVE_WRIST_OVERLAP = 1.2
 SLEEVE_WRIST_BLEND_LENGTH = 6.0
-SLEEVE_SHOULDER_BLEND_LENGTH = 24.0
-SLEEVE_SHOULDER_EXTENSION = 64.0
+SLEEVE_SHOULDER_BLEND_LENGTH = 26.0
+SLEEVE_SHOULDER_PLATEAU_LENGTH = 18.0
+SLEEVE_SHOULDER_EXTENSION = 104.0
+SLEEVE_SHOULDER_DROP = 18.0
+SLEEVE_SHOULDER_RADIAL_SCALE = 1.20
 FIELD_ROTATION = Matrix.Rotation(math.radians(90.0), 4, "Z")
 WEAPON_MESH_NAMES = (
     "base_smg45_0",
@@ -76,7 +79,7 @@ def import_source(frame: int = SOURCE_IDLE_FRAME) -> None:
 
 
 def extend_authored_sleeves() -> None:
-    """Extend each authored sleeve from its shoulder end toward the camera."""
+    """Build a full upper-arm continuation that exits below the camera."""
     arms = bpy.data.objects["Object_7"]
     mesh = arms.data
     adjacency: dict[int, set[int]] = {index: set() for index in range(len(mesh.vertices))}
@@ -102,26 +105,50 @@ def extend_authored_sleeves() -> None:
 
     # The two largest components are the cloth sleeves. Their low-Y ends meet
     # the gloves; the high-Y ends are the open shoulder cuts visible in a
-    # narrow-FOV view. Earlier revisions accidentally stretched the low-Y wrist
-    # ends, which left the shoulder cuts floating in-frame. Blend the authored
-    # upper-arm surface into a longer continuation instead, without changing
-    # topology, UVs, skin weights, or the reload animation.
+    # narrow-FOV view. Keep a translated plateau around each shoulder cut so
+    # its complete circumference moves as one piece instead of stretching into
+    # thin points. A longer blend then grows back toward the authored forearm,
+    # while a modest radial expansion restores upper-arm volume lost when the
+    # oversized source sleeves were globally slimmed.
     for component in sorted(components, key=len, reverse=True)[:2]:
+        minimum_y = min(mesh.vertices[index].co.y for index in component)
         maximum_y = max(mesh.vertices[index].co.y for index in component)
-        blend_start = maximum_y - SLEEVE_SHOULDER_BLEND_LENGTH
+        plateau_start = maximum_y - SLEEVE_SHOULDER_PLATEAU_LENGTH
+        blend_start = plateau_start - SLEEVE_SHOULDER_BLEND_LENGTH
+        sample_step = 2.0
+        sample_count = max(2, math.ceil((maximum_y - minimum_y) / sample_step) + 1)
+        centers: list[Vector] = []
+        for sample_index in range(sample_count):
+            sample_y = minimum_y + sample_index * sample_step
+            nearby = [
+                mesh.vertices[index].co
+                for index in component
+                if abs(mesh.vertices[index].co.y - sample_y) <= sample_step * 1.5
+            ]
+            if not nearby:
+                nearby = [mesh.vertices[index].co for index in component]
+            centers.append(sum(nearby, Vector()) / len(nearby))
+
         for index in component:
             vertex = mesh.vertices[index]
             if vertex.co.y <= blend_start:
                 continue
-            normalized = min(
+            original_y = vertex.co.y
+            normalized = 1.0 if original_y >= plateau_start else min(
                 1.0,
-                max(
-                    0.0,
-                    (vertex.co.y - blend_start) / SLEEVE_SHOULDER_BLEND_LENGTH,
-                ),
+                max(0.0, (original_y - blend_start) / SLEEVE_SHOULDER_BLEND_LENGTH),
             )
             falloff = normalized * normalized * (3.0 - 2.0 * normalized)
+            sample_position = max(0.0, (original_y - minimum_y) / sample_step)
+            lower = min(sample_count - 1, int(sample_position))
+            upper = min(sample_count - 1, lower + 1)
+            blend = sample_position - lower
+            center = centers[lower].lerp(centers[upper], blend)
+            radial_scale = 1.0 + (SLEEVE_SHOULDER_RADIAL_SCALE - 1.0) * falloff
+            vertex.co.x = center.x + (vertex.co.x - center.x) * radial_scale
+            vertex.co.z = center.z + (vertex.co.z - center.z) * radial_scale
             vertex.co.y += SLEEVE_SHOULDER_EXTENSION * falloff
+            vertex.co.z -= SLEEVE_SHOULDER_DROP * falloff
     mesh.update()
 
 
@@ -422,6 +449,7 @@ def build_first_person() -> None:
     # sleeves and closing the visible glove/cuff gap in the bind mesh.
     refine_authored_sleeves()
     extend_authored_sleeves()
+    cap_authored_sleeves()
     root = prepare_first_person_hierarchy()
     base = bpy.data.objects["base"]
     muzzle = bpy.data.objects.new("Muzzle", None)
@@ -508,6 +536,7 @@ def save_editable_source() -> None:
     import_source(SOURCE_IDLE_FRAME)
     refine_authored_sleeves()
     extend_authored_sleeves()
+    cap_authored_sleeves()
     SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
 

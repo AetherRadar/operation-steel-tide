@@ -107,10 +107,12 @@ public partial class FreightTerminalWorld
         var reloadPoseSet = _player.SetReloadPoseForDiagnostics(0.46f);
         await WaitFrames(4);
         var smgArmBounds = _player.SmgArmBoundsSizeForDiagnostics;
-        // The long axis is Z after Godot's Y-up conversion. In the imported
-        // SMG root scale the original short sleeves measured about 0.021; the
-        // corrected shoulder continuation must exceed 0.030.
-        var smgSleeveReach = smgArmBounds.Z >= 0.03f;
+        // Z is the sleeve reach and Y captures its camera-facing depth after
+        // Godot's Y-up conversion. The first correction reached 0.0315 by
+        // stretching a thin open cut; the full upper-arm continuation must
+        // remain both longer and materially deeper than that profile.
+        var smgSleeveReach = smgArmBounds.Z >= 0.04f;
+        var smgSleeveVolume = smgArmBounds.Y >= 0.006f;
         var smgReloadPresentation = reloadPoseSet
             && _player.SmgReloadPresentationValidForDiagnostics;
         _player.ClearReloadPoseForDiagnostics();
@@ -118,10 +120,12 @@ public partial class FreightTerminalWorld
         var valid = posesValid
             && authoredRigValid
             && smgSleeveReach
+            && smgSleeveVolume
             && smgReloadPresentation;
         GD.Print(
             $"HAND_POSE_CHECK valid={valid} procedural_pose={posesValid} "
             + $"authored_rig={authoredRigValid} smg_sleeve_reach={smgSleeveReach} "
+            + $"smg_sleeve_volume={smgSleeveVolume} "
             + $"smg_arm_bounds={smgArmBounds} "
             + $"smg_reload_presentation={smgReloadPresentation} samples={results.Count}");
         GD.Print($"HAND_POSE_PASS valid={valid}");

@@ -219,7 +219,8 @@ public partial class FreightTerminalWorld
             && firstPersonSmgReload.Duration is >= 2.4f and <= 2.9f
             && firstPersonSmgReload.SupportArmRotation >= 0.2f
             && firstPersonSmgReload.MagazineTravel >= 0.12f
-            && firstPersonSmgReload.ArmBoundsSize.Z >= 0.03f;
+            && firstPersonSmgReload.ArmBoundsSize.Z >= 0.04f
+            && firstPersonSmgReload.ArmBoundsSize.Y >= 0.006f;
         var playerAuthored = _player.UsesAuthoredPrimaryWeaponForDiagnostics;
         var squadAuthored = _squadMates.Count > 0
             && _squadMates.Where(IsInstanceValid).All(mate => mate.UsesAuthoredOperatorForDiagnostics);
