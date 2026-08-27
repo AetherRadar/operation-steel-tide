@@ -1,0 +1,357 @@
+{
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v1.6.16",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0,
+        1,
+        2
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "CoffeeCart_01_cart"
+    },
+    {
+      "mesh": 1,
+      "name": "CoffeeCart_01_props"
+    },
+    {
+      "mesh": 2,
+      "name": "CoffeeCart_01_mugs"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "CoffeeCart_01_cart",
+      "normalTexture": {
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "CoffeeCart_01_props",
+      "normalTexture": {
+        "index": 3
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 4
+        },
+        "metallicRoughnessTexture": {
+          "index": 5
+        }
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "CoffeeCart_01_mugs",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.800000011920929,
+          0.800000011920929,
+          0.800000011920929,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 0.15454545617103577
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Bottom_Cart",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "Top_Cart",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 4,
+            "NORMAL": 5,
+            "TEXCOORD_0": 6
+          },
+          "indices": 7,
+          "material": 1
+        }
+      ]
+    },
+    {
+      "name": "Mugs",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 8,
+            "NORMAL": 9,
+            "TEXCOORD_0": 10
+          },
+          "indices": 11,
+          "material": 2
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    },
+    {
+      "sampler": 0,
+      "source": 3
+    },
+    {
+      "sampler": 0,
+      "source": 4
+    },
+    {
+      "sampler": 0,
+      "source": 5
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "CoffeeCart_01_cart_nor_gl",
+      "uri": "textures/CoffeeCart_01_cart_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "CoffeeCart_01_cart_diff",
+      "uri": "textures/CoffeeCart_01_cart_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "CoffeeCart_01_cart_metallic-CoffeeCart_01_cart_roughness",
+      "uri": "textures/CoffeeCart_01_cart_arm_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "CoffeeCart_01_props_nor_gl",
+      "uri": "textures/CoffeeCart_01_props_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "CoffeeCart_01_props_diff",
+      "uri": "textures/CoffeeCart_01_props_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "CoffeeCart_01_props_metallic-CoffeeCart_01_props_roughness",
+      "uri": "textures/CoffeeCart_01_props_arm_1k.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 7928,
+      "max": [
+        0.7705622315406799,
+        1.0565910339355469,
+        0.5094195008277893
+      ],
+      "min": [
+        -0.6708963513374329,
+        0.004307919647544622,
+        -0.20712579786777496
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 7928,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 7928,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 26910,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 12787,
+      "max": [
+        0.6110244393348694,
+        1.721980333328247,
+        0.5157865881919861
+      ],
+      "min": [
+        -1.397074580192566,
+        0.17277592420578003,
+        -0.5575034618377686
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 12787,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 12787,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5123,
+      "count": 50787,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 1152,
+      "max": [
+        0.6225864291191101,
+        1.1751478910446167,
+        0.4638267457485199
+      ],
+      "min": [
+        0.20148180425167084,
+        1.0557500123977661,
+        -0.11585871875286102
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 1152,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 10,
+      "componentType": 5126,
+      "count": 1152,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 11,
+      "componentType": 5123,
+      "count": 5280,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 95136,
+      "byteOffset": 0
+    },
+    {
+      "buffer": 0,
+      "byteLength": 95136,
+      "byteOffset": 95136
+    },
+    {
+      "buffer": 0,
+      "byteLength": 63424,
+      "byteOffset": 190272
+    },
+    {
+      "buffer": 0,
+      "byteLength": 53820,
+      "byteOffset": 253696
+    },
+    {
+      "buffer": 0,
+      "byteLength": 153444,
+      "byteOffset": 307516
+    },
+    {
+      "buffer": 0,
+      "byteLength": 153444,
+      "byteOffset": 460960
+    },
+    {
+      "buffer": 0,
+      "byteLength": 102296,
+      "byteOffset": 614404
+    },
+    {
+      "buffer": 0,
+      "byteLength": 101574,
+      "byteOffset": 716700
+    },
+    {
+      "buffer": 0,
+      "byteLength": 13824,
+      "byteOffset": 818276
+    },
+    {
+      "buffer": 0,
+      "byteLength": 13824,
+      "byteOffset": 832100
+    },
+    {
+      "buffer": 0,
+      "byteLength": 9216,
+      "byteOffset": 845924
+    },
+    {
+      "buffer": 0,
+      "byteLength": 10560,
+      "byteOffset": 855140
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 865700,
+      "uri": "CoffeeCart_01.bin"
+    }
+  ]
+}

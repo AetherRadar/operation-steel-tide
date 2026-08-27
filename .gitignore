@@ -10,6 +10,14 @@
 *.suo
 *.user
 
+# Godot 4.6 cache copies extracted from embedded trash-can GLB textures.
+/assets/models/polyhaven_residential_street/metal_trash_can/metal_trash_can_clean_metal_trash_can_arm_1k.jpg
+/assets/models/polyhaven_residential_street/metal_trash_can/metal_trash_can_clean_metal_trash_can_diff_1k.jpg
+/assets/models/polyhaven_residential_street/metal_trash_can/metal_trash_can_clean_metal_trash_can_nor_gl_1k.jpg
+/assets/models/polyhaven_residential_street/metal_trash_can/metal_trash_can_rust_metal_trash_can_rust_arm_1k.jpg
+/assets/models/polyhaven_residential_street/metal_trash_can/metal_trash_can_rust_metal_trash_can_rust_diff_1k.jpg
+/assets/models/polyhaven_residential_street/metal_trash_can/metal_trash_can_rust_metal_trash_can_rust_nor_gl_1k.jpg
+
 /backend/data/
 /data/
 /steel-tide-server.exe*

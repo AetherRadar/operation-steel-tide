@@ -10,8 +10,19 @@ The following models are from [Poly Haven](https://polyhaven.com/) and are dedic
 
 - Old Military Crate: https://polyhaven.com/a/old_military_crate
 - Concrete Road Barrier: https://polyhaven.com/a/concrete_road_barrier
+- Street Lamp 01: https://polyhaven.com/a/street_lamp_01
+- Metal Trash Can: https://polyhaven.com/a/metal_trash_can
+- Coffee Cart 01: https://polyhaven.com/a/CoffeeCart_01
+- Wooden Crate 01: https://polyhaven.com/a/wooden_crate_01
+- Plastic Crate 01: https://polyhaven.com/a/plastic_crate_01
+- Wicker Basket 01: https://polyhaven.com/a/wicker_basket_01
 
 License: https://polyhaven.com/license
+
+The six residential-street additions were acquired on 2026-08-28. Creator
+credits, exact CC0 terms, official API revision identifiers, source-to-runtime
+mapping, per-file MD5 and SHA-256 evidence, and Blender processing details are
+recorded in `polyhaven_residential_street/LICENSE.md`.
 
 ## Kenney CC0 models
 

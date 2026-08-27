@@ -142,6 +142,7 @@ public partial class FreightTerminalWorld
     private int _residentialFurnitureEventCount;
     private int _residentialChestEventCount;
     private int _residentialGuardAmbushSpawnCount;
+    private ResidentialStreetArtBuildResult? _residentialStreetArtResult;
 
     public int ResidentialTowerCount => _residentialTowers.Count;
     public int ResidentialCivilianCount => _civilians.Count;
@@ -332,70 +333,32 @@ public partial class FreightTerminalWorld
         SpawnDriveableVehicle(new Vector3(-136, 0, 20), "SOUTH UTILITY", new Color(0.3f, 0.4f, 0.28f), yaw: -Mathf.Pi * 0.5f, maxHealth: 175.0f);
         SpawnDriveableVehicle(new Vector3(12, 0, 76), "COURT SEDAN", new Color(0.18f, 0.2f, 0.24f), yaw: Mathf.Pi, maxHealth: 140.0f);
 
-        // Street life so the ring reads inhabited: lamps, market stalls, bins, cable trays, gate arches.
-        var lampPost = Mat("residential_lamp_post", new Color(0.16f, 0.17f, 0.18f), 0.4f, 0.6f);
-        var lampHead = Mat("residential_lamp_head", new Color(0.98f, 0.85f, 0.55f), 0.1f, 0.4f, new Color(1.0f, 0.75f, 0.35f));
-        var stallWood = Mat("residential_stall", new Color(0.55f, 0.35f, 0.2f), 0.05f, 0.85f);
-        var stallCanopy = Mat("residential_stall_canopy", new Color(0.25f, 0.45f, 0.5f), 0.05f, 0.8f);
-        var binMat = Mat("residential_bin", new Color(0.2f, 0.35f, 0.22f), 0.1f, 0.7f);
-        foreach (var x in new[] { -140f, -100f, -60f, -20f, 20f, 60f, 100f })
+        _residentialStreetArtResult = new ResidentialStreetArtBuilder().Build(community);
+        foreach (var sign in new (string Support, Vector3 FallbackPosition, string District, float Yaw)[]
         {
-            foreach (var z in new[] { -201.2f, -184.8f })
-            {
-                MeshBox(community, new Vector3(x, 1.6f, z), new Vector3(0.12f, 3.2f, 0.12f), lampPost);
-                MeshBox(community, new Vector3(x, 3.25f, z), new Vector3(0.5f, 0.12f, 0.24f), lampHead);
-            }
-        }
-        foreach (var x in new[] { -110f, -70f, -30f, 10f, 50f, 90f })
-        {
-            foreach (var z in new[] { 67.8f, 84.2f })
-            {
-                MeshBox(community, new Vector3(x, 1.6f, z), new Vector3(0.12f, 3.2f, 0.12f), lampPost);
-                MeshBox(community, new Vector3(x, 3.25f, z), new Vector3(0.5f, 0.12f, 0.24f), lampHead);
-            }
-        }
-        foreach (var stall in new (float X, float Z)[]
-        {
-            (-98, -181.5f), (-52, -181.5f), (-6, -181.5f), (44, -181.5f),
-            (-66, 70.5f), (-12, 70.5f), (28, 70.5f), (74, 70.5f)
+            ("ResidentialStreetLamp_19", new Vector3(-45, 0.25f, 67.8f), "SOUTH COURT", 0.0f),
+            ("ResidentialStreetLamp_08", new Vector3(2, 0.25f, -184.8f), "NORTH QUAY", 180.0f)
         })
         {
-            ExpansionBox(community, "MarketStall", new Vector3(stall.X, 0.5f, stall.Z), new Vector3(2.4f, 0.8f, 1.1f), stallWood);
-            MeshBox(community, new Vector3(stall.X, 1.9f, stall.Z), new Vector3(2.7f, 0.08f, 1.5f), stallCanopy);
-            MeshBox(community, new Vector3(stall.X - 1.1f, 0.95f, stall.Z - 0.4f), new Vector3(0.08f, 1.9f, 0.08f), stallWood);
-            MeshBox(community, new Vector3(stall.X + 1.1f, 0.95f, stall.Z - 0.4f), new Vector3(0.08f, 1.9f, 0.08f), stallWood);
-            ExpansionBox(community, "MarketCrate", new Vector3(stall.X + 1.8f, 0.35f, stall.Z), new Vector3(0.6f, 0.5f, 0.6f), binMat);
-        }
-        foreach (var x in new[] { -80f, -30f, 20f, 70f })
-        {
-            MeshBox(community, new Vector3(x, 5.4f, -193), new Vector3(0.18f, 0.5f, 22f), lampPost);
-            MeshBox(community, new Vector3(x, 2.7f, -202.5f), new Vector3(0.18f, 5.4f, 0.18f), lampPost);
-            MeshBox(community, new Vector3(x, 2.7f, -183.5f), new Vector3(0.18f, 5.4f, 0.18f), lampPost);
-            MeshBox(community, new Vector3(x, 5.4f, 76), new Vector3(0.18f, 0.5f, 22f), lampPost);
-            MeshBox(community, new Vector3(x, 2.7f, 66.5f), new Vector3(0.18f, 5.4f, 0.18f), lampPost);
-            MeshBox(community, new Vector3(x, 2.7f, 85.5f), new Vector3(0.18f, 5.4f, 0.18f), lampPost);
-        }
-        foreach (var pos in new Vector3[]
-        {
-            new(-52, 0.45f, 60), new(8, 0.45f, 62), new(62, 0.45f, 58), new(-40, 0.45f, -175), new(40, 0.45f, -177)
-        })
-        {
-            ExpansionBox(community, "AlleyBin", pos, new Vector3(1.6f, 0.9f, 0.9f), binMat);
-        }
-        foreach (var arch in new (float X, float Z, string Name)[] { (-45, 76, "SOUTH COURT"), (2, -193, "NORTH QUAY") })
-        {
-            MeshBox(community, new Vector3(arch.X, 2.6f, arch.Z - 8.6f), new Vector3(0.5f, 5.2f, 0.5f), lampPost);
-            MeshBox(community, new Vector3(arch.X, 2.6f, arch.Z + 8.6f), new Vector3(0.5f, 5.2f, 0.5f), lampPost);
-            MeshBox(community, new Vector3(arch.X, 5.3f, arch.Z), new Vector3(0.7f, 0.9f, 18.2f), lampPost);
-            var districtName = arch.Name;
-            community.AddChild(RegisterResidentialLocalizedLabel(new Label3D
+            var support = community.GetNodeOrNull<Node3D>(
+                $"ResidentialStreetAuthoredArt/{sign.Support}");
+            var anchor = new Node3D
             {
-                Name = $"ResidentialDistrictSign_{districtName.Replace(" ", string.Empty)}",
-                Position = new Vector3(arch.X, 5.3f, arch.Z),
+                Name = $"ResidentialDistrictSignAnchor_{sign.District.Replace(" ", string.Empty)}",
+                Position = support is null ? sign.FallbackPosition : new Vector3(0.16f, 2.45f, 0)
+            };
+            anchor.SetMeta("district_sign_layout", support is null ? "low_landmark" : "authored_lamp_banner");
+            (support ?? community).AddChild(anchor);
+            var districtName = sign.District;
+            anchor.AddChild(RegisterResidentialLocalizedLabel(new Label3D
+            {
+                Name = "DistrictLabel",
+                Visible = support is not null,
+                RotationDegrees = new Vector3(0, sign.Yaw, 0),
                 FontSize = 26,
                 OutlineSize = 7,
+                HorizontalAlignment = HorizontalAlignment.Left,
                 Modulate = new Color(0.9f, 0.7f, 0.4f),
-                Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
                 VisibilityRangeEnd = 70.0f
             }, language => ResidentialBlockName(districtName, language)));
         }

@@ -60,6 +60,7 @@ public partial class FreightTerminalWorld
         var asset = id switch
         {
             "asphalt" => "asphalt_03",
+            "residential_road" => "asphalt_03",
             "gravel" => "gravel_embedded_concrete",
             _ => "concrete_floor"
         };
