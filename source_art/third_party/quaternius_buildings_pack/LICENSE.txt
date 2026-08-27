@@ -1,0 +1,23 @@
+Quaternius Buildings Pack source record
+
+Creator: Quaternius
+Official source: https://quaternius.com/packs/buildings.html
+Exact license: CC0 1.0 Universal
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+Acquisition date: 2026-08-28
+Attribution requirement: None. Creator credit is retained for provenance.
+
+The retained SOURCE_PAGE.html is an offline snapshot of the official pack page.
+It identifies the creator and links the pack to the CC0 1.0 Universal deed.
+PREVIEW_1.jpg is the official first pack preview retained as visual evidence.
+
+Selected unmodified source files and runtime mappings:
+
+- Building1_Large.fbx -> assets/models/quaternius_buildings_pack/building1-large.glb
+- Building3_Big.fbx -> assets/models/quaternius_buildings_pack/building3-big.glb
+- Building4.fbx -> assets/models/quaternius_buildings_pack/building4.glb
+- House2.fbx -> assets/models/quaternius_buildings_pack/house2.glb
+
+The remaining FBX files are retained unmodified as part of the downloaded
+official source selection. All files remain covered by Quaternius's CC0
+dedication and are not relicensed by the repository's MIT license.

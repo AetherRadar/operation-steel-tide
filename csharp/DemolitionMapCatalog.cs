@@ -22,6 +22,7 @@ public static class DemolitionMapCatalog
 {
     public const string TideforgeId = "tideforge";
     public const string HarborLocksId = "harbor_locks";
+    public const string TideglassReactorId = "tideglass_reactor";
     public const int PoolSize = 12;
 
     public static readonly IReadOnlyList<DemolitionMapOffer> Maps = new[]
@@ -45,13 +46,15 @@ public static class DemolitionMapCatalog
             "demolition_map_harbor_locks_profile",
             "THREE LOCK LANES  //  HARD COVER ROTATIONS  //  LONG QUAYSIDE ANGLES\nA  WEST CONTROL YARD  //  B  EAST PUMP ANNEX"),
         new DemolitionMapOffer(
-            "tideglass_reactor",
+            TideglassReactorId,
             "MAP 03",
             "demolition_map_tideglass_reactor",
             "TIDEGLASS REACTOR",
-            "demolition_map_locked_subtitle",
-            "COOLING PLANT  //  IN CONSTRUCTION",
-            false),
+            "demolition_map_tideglass_reactor_subtitle",
+            "CONSTRUCTION QUARTER  //  OLD BRICK WORKS",
+            true,
+            "demolition_map_tideglass_reactor_profile",
+            "DIAGONAL URBAN ASSAULT  //  FOUR DISTINCT DISTRICTS  //  CROSSROAD ROTATIONS\nA  CONSTRUCTION COURT  //  B  OLD REACTOR LOADING YARD"),
         new DemolitionMapOffer(
             "drydock_yard",
             "MAP 04",

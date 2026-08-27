@@ -15,6 +15,9 @@ internal sealed class DemolitionArenaDressingBuilder
     private const string IndustrialRoot = "res://assets/models/kenney_city_kit_industrial";
     private const string DowntownRoot = "res://assets/models/quaternius_downtown_city";
     private const string FactoryRoot = "res://assets/models/kenney_factory_kit";
+    private const string MajadroidRoot = "res://assets/models/majadroid_construction_site";
+    private const string RoadsRoot = "res://assets/models/kenney_city_kit_roads";
+    private const string TreyIndustrialRoot = "res://assets/models/trey_modular_industrial";
 
     private readonly Dictionary<string, PackedScene> _scenes = new();
     private readonly FreightIndustrialPalette _palette;
@@ -33,7 +36,9 @@ internal sealed class DemolitionArenaDressingBuilder
         var scenePaths = new HashSet<string>();
         var placements = layout.MapId == DemolitionMapCatalog.HarborLocksId
             ? HarborLocksPlacements(layout.Origin)
-            : TideforgePlacements(layout.Origin);
+            : layout.MapId == DemolitionMapCatalog.TideglassReactorId
+                ? TideglassReactorPlacements(layout.Origin)
+                : TideforgePlacements(layout.Origin);
         var authoredModelCount = 0;
         var missingModelCount = 0;
         var palettedBuildingCount = 0;
@@ -75,6 +80,9 @@ internal sealed class DemolitionArenaDressingBuilder
         {
             ModelSource.Downtown => $"{DowntownRoot}/{placement.File}",
             ModelSource.Factory => $"{FactoryRoot}/{placement.File}",
+            ModelSource.Majadroid => $"{MajadroidRoot}/{placement.File}",
+            ModelSource.Roads => $"{RoadsRoot}/{placement.File}",
+            ModelSource.TreyIndustrial => $"{TreyIndustrialRoot}/{placement.File}",
             _ => $"{IndustrialRoot}/{placement.File}"
         };
         if (!_scenes.TryGetValue(path, out var scene))
@@ -171,6 +179,43 @@ internal sealed class DemolitionArenaDressingBuilder
         return placements;
     }
 
+    private static IReadOnlyList<ModelPlacement> TideglassReactorPlacements(Vector3 origin)
+    {
+        return new[]
+        {
+            Authored("TideglassRoadBase", "road.glb", origin, new(0.0f, -0.136f, 0.0f), 0.0f, new Vector3(0.82f, 0.78f, 0.70f), ModelSource.Majadroid),
+            Authored("TideglassPerimeterFence", "fence.glb", origin, new(0.0f, 0.02f, 0.0f), 0.0f, new Vector3(1.109f, 1.5f, 0.949f), ModelSource.Majadroid),
+            Authored("EastPerimeterSecurityGate", "east-security-gate.glb", origin, new(55.5f, 0.02f, -23.63f), -90.0f, new Vector3(1.009f, 0.9375f, 1.0f), ModelSource.TreyIndustrial),
+            Authored("WestPerimeterServiceGate", "west-service-gate.glb", origin, new(-55.5f, 0.02f, -37.96f), 90.0f, new Vector3(0.988f, 0.9375f, 1.0f), ModelSource.TreyIndustrial),
+            Authored("ConstructionGround", "ground.glb", origin, new(-31.0f, 0.02f, 18.0f), 0.0f, 0.34f, ModelSource.Majadroid),
+            Authored("ConstructionBuilding", "building.glb", origin, new(-45.0f, 0.02f, 18.0f), 90.0f, 1.0f, ModelSource.Majadroid),
+            Authored("ConstructionCrane", "crane-on-ground.glb", origin, new(-39.0f, 0.02f, -6.2f), -12.0f, 0.85f, ModelSource.Majadroid),
+
+            Authored("OldBrickReactorHall", "Building_Large_2.gltf", origin, new(43.0f, 0.02f, -9.75f), -90.0f, 0.75f, ModelSource.Downtown),
+
+            Authored("OrangeArchGateway", "arch-gateway.glb", origin, new(0.0f, 0.02f, -31.5f), 0.0f, 1.25f, ModelSource.TreyIndustrial),
+            Authored("CivicElevatedWalkway", "elevated-walkway.glb", origin, new(0.0f, 0.02f, 26.5f), 0.0f, 1.15f, ModelSource.TreyIndustrial),
+
+            Authored("CivicRoadNorthWest", "road-side.glb", origin, new(-18.0f, -0.095f, 18.0f), 0.0f, new Vector3(18.0f, 6.0f, 18.0f), ModelSource.Roads),
+            Authored("CivicRoadNorth", "road-straight.glb", origin, new(0.0f, -0.095f, 18.0f), 0.0f, new Vector3(18.0f, 6.0f, 18.0f), ModelSource.Roads),
+            Authored("CivicRoadNorthEast", "road-intersection.glb", origin, new(18.0f, -0.095f, 18.0f), 90.0f, new Vector3(18.0f, 6.0f, 18.0f), ModelSource.Roads),
+            Authored("CivicRoadWest", "road-bend.glb", origin, new(-18.0f, -0.095f, 0.0f), 0.0f, new Vector3(18.0f, 6.0f, 18.0f), ModelSource.Roads),
+            Authored("CivicCrossroad", "road-crossroad.glb", origin, new(0.0f, -0.095f, 0.0f), 0.0f, new Vector3(18.0f, 6.0f, 18.0f), ModelSource.Roads),
+            Authored("CivicRoadEast", "road-crossing.glb", origin, new(18.0f, -0.095f, 0.0f), 90.0f, new Vector3(18.0f, 6.0f, 18.0f), ModelSource.Roads),
+            Authored("CivicRoadSouthWest", "road-driveway-double.glb", origin, new(-18.0f, -0.095f, -18.0f), 180.0f, new Vector3(18.0f, 6.0f, 18.0f), ModelSource.Roads),
+            Authored("CivicRoadSouthEast", "road-square.glb", origin, new(18.0f, -0.095f, -18.0f), 0.0f, new Vector3(18.0f, 6.0f, 18.0f), ModelSource.Roads),
+
+            Authored("ConstructionCone", "construction-cone.glb", origin, new(-25.0f, 0.02f, 12.0f), 0.0f, 1.2f, ModelSource.Roads),
+            Authored("ConstructionWorkLight", "construction-light.glb", origin, new(-25.0f, 0.02f, 22.0f), 0.0f, 1.4f, ModelSource.Roads),
+            Authored("CivicPowerPole", "electricity-pole-wide.glb", origin, new(19.0f, 0.02f, 24.0f), 90.0f, 1.4f, ModelSource.Roads),
+            Authored("ConstructionStreetlight", "light-curved.glb", origin, new(-32.0f, 0.02f, 7.0f), 0.0f, 1.35f, ModelSource.Roads),
+            Authored("ReactorStreetlight", "light-square-double.glb", origin, new(35.0f, 0.02f, -29.0f), 0.0f, 1.35f, ModelSource.Roads),
+            Authored("ConstructionWarningSign", "road-sign-warning.glb", origin, new(-24.0f, 0.02f, 31.0f), 35.0f, 1.3f, ModelSource.Roads),
+            Authored("CrossingStopSign", "road-sign-stop.glb", origin, new(10.0f, 0.02f, 3.0f), -90.0f, 1.3f, ModelSource.Roads),
+            Authored("ReactorHangingSignal", "traffic-light-hanging.glb", origin, new(27.0f, 0.02f, -7.0f), 90.0f, 1.0f, ModelSource.Roads)
+        };
+    }
+
     private static void AddPanelRun(
         List<ModelPlacement> placements,
         string prefix,
@@ -212,6 +257,26 @@ internal sealed class DemolitionArenaDressingBuilder
         ModelSource source)
         => new(name, file, origin + localPosition, yawDegrees, scale, source);
 
+    private static ModelPlacement Authored(
+        string name,
+        string file,
+        Vector3 origin,
+        Vector3 localPosition,
+        float yawDegrees,
+        float scale,
+        ModelSource source)
+        => new(name, file, origin + localPosition, yawDegrees, Vector3.One * scale, source);
+
+    private static ModelPlacement Authored(
+        string name,
+        string file,
+        Vector3 origin,
+        Vector3 localPosition,
+        float yawDegrees,
+        Vector3 scale,
+        ModelSource source)
+        => new(name, file, origin + localPosition, yawDegrees, scale, source);
+
     private static void ConfigureVisuals(Node node)
     {
         if (node is GeometryInstance3D visual)
@@ -235,7 +300,10 @@ internal sealed class DemolitionArenaDressingBuilder
     {
         Industrial,
         Downtown,
-        Factory
+        Factory,
+        Majadroid,
+        Roads,
+        TreyIndustrial
     }
 
     private readonly record struct ModelPlacement(

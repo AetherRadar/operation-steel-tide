@@ -32,7 +32,9 @@ public sealed partial class DemolitionArenaBuilder
         {
             Name = layout.MapId == DemolitionMapCatalog.HarborLocksId
                 ? "HarborLocksArena"
-                : "TideforgeArena"
+                : layout.MapId == DemolitionMapCatalog.TideglassReactorId
+                    ? "TideglassReactorArena"
+                    : "TideforgeArena"
         };
         parent.AddChild(root);
         var materials = BuildMaterials();
@@ -58,6 +60,10 @@ public sealed partial class DemolitionArenaBuilder
         _visualPartCount += dressing.AuthoredModelCount;
         _palettedBuildingCount += dressing.PalettedBuildingCount;
         root.SetMeta("low_poly_paletted_building_count", _palettedBuildingCount);
+        if (layout.MapId == DemolitionMapCatalog.TideglassReactorId)
+        {
+            BuildTideglassAuthoredCollision(root);
+        }
         return new DemolitionArenaRuntime(layout, root, sites, _staticBodies, _visualPartCount);
     }
 
@@ -263,6 +269,11 @@ public sealed partial class DemolitionArenaBuilder
         DemolitionArenaLayout layout,
         IReadOnlyDictionary<string, StandardMaterial3D> materials)
     {
+        if (layout.MapId == DemolitionMapCatalog.TideglassReactorId)
+        {
+            BuildTideglassReactorLandmarks(root, layout);
+            return;
+        }
         if (layout.MapId == DemolitionMapCatalog.HarborLocksId)
         {
             BuildHarborLocksLandmarks(root, layout, materials);
@@ -303,6 +314,11 @@ public sealed partial class DemolitionArenaBuilder
         DemolitionArenaLayout layout,
         IReadOnlyDictionary<string, StandardMaterial3D> materials)
     {
+        if (layout.MapId == DemolitionMapCatalog.TideglassReactorId)
+        {
+            BuildTideglassReactorCoverDetails(root, layout);
+            return;
+        }
         if (layout.MapId == DemolitionMapCatalog.HarborLocksId)
         {
             BuildHarborLocksCoverDetails(root, layout, materials);
@@ -368,6 +384,11 @@ public sealed partial class DemolitionArenaBuilder
 
     private void BuildRouteGuidance(Node3D root, DemolitionArenaLayout layout)
     {
+        if (layout.MapId == DemolitionMapCatalog.TideglassReactorId)
+        {
+            BuildTideglassReactorRouteGuidance(root, layout);
+            return;
+        }
         if (layout.MapId == DemolitionMapCatalog.HarborLocksId)
         {
             BuildHarborLocksRouteGuidance(root, layout);
@@ -407,6 +428,11 @@ public sealed partial class DemolitionArenaBuilder
         DemolitionArenaLayout layout,
         IReadOnlyDictionary<string, StandardMaterial3D> materials)
     {
+        if (layout.MapId == DemolitionMapCatalog.TideglassReactorId)
+        {
+            BuildTideglassReactorLighting(root, layout);
+            return;
+        }
         var positions = new[]
         {
             new Vector3(-31, 8.5f, 21), new Vector3(33, 8.5f, -19),

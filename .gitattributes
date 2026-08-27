@@ -1,3 +1,8 @@
 *.cs text eol=crlf whitespace=cr-at-eol
 *.py text eol=crlf whitespace=cr-at-eol
 assets/models/polyhaven_residential_street/**/*.gltf -text
+assets/models/kenney_city_kit_roads/KENNEY_LICENSE.txt whitespace=-blank-at-eol
+source_art/third_party/majadroid_construction_site/INFO.txt whitespace=-blank-at-eol
+source_art/third_party/quaternius_buildings_pack/SOURCE_PAGE.html whitespace=-blank-at-eol,-space-before-tab
+source_art/third_party/trey_modular_industrial/ORIGINAL_README.txt whitespace=-blank-at-eol
+source_art/third_party/trey_modular_industrial/SOURCE_PAGE.html whitespace=-blank-at-eol

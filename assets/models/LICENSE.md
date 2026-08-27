@@ -45,7 +45,7 @@ The Factory Kit 3.0 model set is distributed by Kenney under CC0 1.0:
 - Local assets: selected `kenney_factory_kit/*.glb` models and the original `kenney_factory_kit/Textures/colormap.png` material atlas
 - License copy: `kenney_factory_kit/KENNEY_LICENSE.txt`
 
-The authored overhead door is used for interactive industrial and Old Town entrances. The Factory Kit personnel door was additionally acquired from the same official archive on 2026-08-27 as `door.glb`; Blender removes the archive's sample-scene objects and exports the side-pivoted runtime derivative `door-hinged.glb` plus its extracted colormap. No attribution is required for these CC0 assets, and Kenney is credited as a provenance courtesy.
+The authored overhead door is used for interactive industrial and Old Town entrances. The Factory Kit personnel door was additionally acquired from the same official archive on 2026-08-27 as `door.glb`; Blender removes the archive's sample-scene objects and exports the side-pivoted runtime derivative `door-hinged.glb` plus its extracted colormap. Tideglass Reactor additionally uses the selected `machine.glb`, `hopper-high-round.glb`, and `machine-window.glb` models as three distinct collision-backed midfield covers. No attribution is required for these CC0 assets, and Kenney is credited as a provenance courtesy.
 
 The Furniture Kit 1.0 model set is distributed by Kenney under CC0 1.0:
 
@@ -55,6 +55,63 @@ The Furniture Kit 1.0 model set is distributed by Kenney under CC0 1.0:
 - License copy: `kenney_furniture_kit/KENNEY_LICENSE.txt`
 
 Selected cabinets, desks, beds, tables, fridges, and crates replace programmer-art boxes inside enterable residential rooms.
+
+The City Kit Roads model set is distributed by Kenney under CC0 1.0:
+
+- Source: https://kenney.nl/assets/city-kit-roads
+- Download: https://kenney.nl/media/pages/assets/city-kit-roads/74288c9459-1787042796/kenney_city-kit-roads.zip
+- Acquisition date: 2026-08-27
+- Local assets: twenty selected `kenney_city_kit_roads/*.glb` road and street-furniture models plus the original `kenney_city_kit_roads/Textures/colormap.png` material atlas
+- License and package evidence: `kenney_city_kit_roads/KENNEY_LICENSE.txt` and `kenney_city_kit_roads/PACK_PREVIEW.png`
+- Local mapping: `kenney_city_kit_roads/README.md`
+
+The selected authored barriers, lights, utility poles, signs, and traffic lights dress the Tideglass Reactor streets.
+
+The third-party raw asset files listed in this document retain their stated source licenses or public-domain dedications. They are not relicensed under the repository's root MIT license.
+
+## Majadroid CC0 construction-site models
+
+The 3D House Construction Site - LowPoly CC0 art package is published by Majadroid / Maik Hoffmann under CC0 1.0:
+
+- Source: https://opengameart.org/content/3d-house-construction-site-lowpoly-cc0
+- Download: https://opengameart.org/sites/default/files/lowpoly-house-construction-site-by-majadroid_2.zip
+- Acquisition date: 2026-08-27
+- Local source selection: `source_art/third_party/majadroid_construction_site/`
+- Godot-ready assets: nine converted GLBs and their palette textures in `majadroid_construction_site/`
+- License and creator evidence: `source_art/third_party/majadroid_construction_site/INFO.txt` and `Overview.png`
+- Reproducible conversion: `scripts/blender/build_tideglass_map_assets.py`
+
+The source package credits Imphenzia for its color palette. The runtime conversion selects one office-container stack, one cargo-container stack, one concrete truck, and three distinct material props instead of bundling overlapping source variants. Attribution is not required under the package's CC0 dedication, but both creator credits are retained for provenance.
+
+## Trey Ramm CC0 modular industrial models
+
+The Modular Industrial Kit is published by Trey Ramm, OpenGameArt user `minime453`, under CC0 1.0:
+
+- Source: https://opengameart.org/content/modular-industrial-kit
+- Download: https://opengameart.org/sites/default/files/modular_industrial_pieces.zip
+- Acquisition date: 2026-08-27
+- Local source selection: `source_art/third_party/trey_modular_industrial/`
+- Godot-ready compositions: `trey_modular_industrial/*.glb`
+- License and creator evidence: `source_art/third_party/trey_modular_industrial/SOURCE_PAGE.html` and `ORIGINAL_README.txt`
+- Source atlas and preview: `source_art/third_party/trey_modular_industrial/PacificNorthwestGradientAtlas.png` and `ASSET_OVERVIEW.png`
+- Reproducible conversion: `scripts/blender/build_trey_modular_industrial.py`
+
+The runtime scenes combine selected authored modules from the source kit, including two distinct closed perimeter-gate compositions and four closed one-storey industrial buildings for Tideglass Reactor. Attribution is not required under CC0, but Trey Ramm's requested courtesy credit is retained.
+
+## Quaternius CC0 Buildings Pack models
+
+The Buildings Pack is published by Quaternius under CC0 1.0 Universal:
+
+- Creator: Quaternius (`@Quaternius`)
+- Official source: https://quaternius.com/packs/buildings.html
+- Exact license: CC0 1.0 Universal, https://creativecommons.org/publicdomain/zero/1.0/
+- Acquisition date: 2026-08-28
+- Local source selection and official evidence: `source_art/third_party/quaternius_buildings_pack/`
+- Godot-ready assets: `quaternius_buildings_pack/building1-large.glb`, `building3-big.glb`, `building4.glb`, and `house2.glb`
+- Local mapping and verification record: `quaternius_buildings_pack/README.md`
+- Reproducible conversion: `scripts/blender/build_quaternius_buildings_pack.py`
+
+The conversion preserves Quaternius's authored geometry, scale, material colors, and PBR values, while correcting the FBX importer's zero-alpha solid materials to fully opaque. It centers and grounds each scene, embeds the creator, official source URL, exact license, original filename, and acquisition date, then verifies those properties through a Blender glTF round trip. Attribution is not required under CC0, but the creator credit is retained for provenance.
 
 ## Quaternius CC0 models
 
