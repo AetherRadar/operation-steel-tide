@@ -110,19 +110,23 @@ MD5 and SHA-256 evidence, and Blender processing details are recorded in
 
 ### Jianghai Old City authored-asset pass
 
-The following finished Poly Haven assets were acquired as 1K glTF bundles on
-2026-08-28 for the Jianghai Old City authored-asset pass:
+The following finished Poly Haven assets were acquired as 1K glTF bundles for
+the Jianghai Old City authored-asset and urban-life passes:
 
-| Model | Creator | Official source | Repository-external acquisition input |
-| --- | --- | --- | --- |
-| Television 02 | Benny Weimer | https://polyhaven.com/a/television_02 | `poly_haven/television_02/television_02_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
-| Exterior Aircon Unit | Monsta3D | https://polyhaven.com/a/exterior_aircon_unit | `poly_haven/exterior_aircon_unit/exterior_aircon_unit_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
-| Rollershutter Window 03 | MP | https://polyhaven.com/a/rollershutter_window_03 | `poly_haven/rollershutter_window_03/rollershutter_window_03_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
-| Trashbag | Benny Weimer | https://polyhaven.com/a/trashbag | `poly_haven/trashbag/trashbag_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
-| Utility Box 01 | James Ray Cock | https://polyhaven.com/a/utility_box_01 | `poly_haven/utility_box_01/utility_box_01_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
-| Barrel 03 | Serhii Khromov | https://polyhaven.com/a/barrel_03 | `poly_haven/barrel_03/barrel_03_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
-| Plastic Crate 02 | Fabi_G | https://polyhaven.com/a/plastic_crate_02 | `poly_haven/plastic_crate_02/plastic_crate_02_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
-| Security Camera 01 | Alexander Otterbeck (modeling and texturing); Yann Kervran (rigging) | https://polyhaven.com/a/security_camera_01 | `poly_haven/security_camera_01/security_camera_01_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Model | Creator | Acquired | Official source | Repository-external acquisition input |
+| --- | --- | --- | --- | --- |
+| Modular Urban Apartments Facade | James Ray Cock | 2026-08-27 | https://polyhaven.com/a/modular_urban_apartments_facade | `poly_haven/modular_urban_apartments_facade/modular_urban_apartments_facade_1k.gltf`, its `.bin`, and `textures/*` |
+| Television 02 | Benny Weimer | 2026-08-28 | https://polyhaven.com/a/television_02 | `poly_haven/television_02/television_02_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Exterior Aircon Unit | Monsta3D | 2026-08-28 | https://polyhaven.com/a/exterior_aircon_unit | `poly_haven/exterior_aircon_unit/exterior_aircon_unit_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Rollershutter Window 03 | MP | 2026-08-28 | https://polyhaven.com/a/rollershutter_window_03 | `poly_haven/rollershutter_window_03/rollershutter_window_03_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Trashbag | Benny Weimer | 2026-08-28 | https://polyhaven.com/a/trashbag | `poly_haven/trashbag/trashbag_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Utility Box 01 | James Ray Cock | 2026-08-28 | https://polyhaven.com/a/utility_box_01 | `poly_haven/utility_box_01/utility_box_01_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Barrel 03 | Serhii Khromov | 2026-08-28 | https://polyhaven.com/a/barrel_03 | `poly_haven/barrel_03/barrel_03_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Plastic Crate 02 | Fabi_G | 2026-08-28 | https://polyhaven.com/a/plastic_crate_02 | `poly_haven/plastic_crate_02/plastic_crate_02_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Security Camera 01 | Alexander Otterbeck (modeling and texturing); Yann Kervran (rigging) | 2026-08-28 | https://polyhaven.com/a/security_camera_01 | `poly_haven/security_camera_01/security_camera_01_1k.gltf`, its `.bin`, and `textures/*_1k.jpg` |
+| Chinese Tea Table | Kirill Sannikov | 2026-08-28 | https://polyhaven.com/a/chinese_tea_table | `poly_haven/chinese_tea_table/chinese_tea_table_1k.gltf`, its `.bin`, and three 1K texture sidecars |
+| Chinese Stool | Kirill Sannikov | 2026-08-28 | https://polyhaven.com/a/chinese_stool | `poly_haven/chinese_stool/chinese_stool_1k.gltf`, its `.bin`, and three 1K texture sidecars |
+| Hand Truck | Mutanzom3D | 2026-08-28 | https://polyhaven.com/a/hand_truck | `poly_haven/hand_truck/hand_truck_1k.gltf`, its `.bin`, and three 1K texture sidecars |
 
 Each bundle is CC0 1.0 Universal under
 https://creativecommons.org/publicdomain/zero/1.0/. Attribution is not
@@ -132,10 +136,18 @@ committed as separate raw files. Adapted geometry and materials are packed
 into `../../source_art/world/jianghai_old_city/jianghai_old_city.blend` and
 exported to `jianghai_old_city/jianghai_old_city.glb`; exact cache hashes and
 the packed-output mapping are recorded in the scene's `LICENSE_EVIDENCE.md`.
+For Security Camera 01, the delivered composite contains only static geometry,
+materials, and textures; the source rig and animations are not shipped in the
+packed scene or runtime export.
+
+The urban-life pass additionally embeds the already tracked Coffee Cart 01 by
+Joe Seabuhr and Wicker Basket 01 by Kuutti Siitonen from
+`polyhaven_residential_street/`. Their existing per-file evidence remains in
+`polyhaven_residential_street/LICENSE.md` and is not duplicated here.
 
 Rollershutter Window 03 also has a repository-local derived runtime mapping:
-`jianghai_old_city/rollershutter_window_03.glb` (1,587,684 bytes; SHA-256
-`48E78DFC37FF6310151B18BEA8AC8B080BE31ABED4BD882C0FA3F46E19B0B4B1`).
+`jianghai_old_city/rollershutter_window_03.glb` (187,940 bytes; SHA-256
+`C4884AFCD7560E4BB23320A8C311DB0011504F7C5FEE30D58C266D54F7C6B166`).
 The export script reproducibly selects the adapted
 `JianghaiArtPass_EastShutter00` mesh from the authoritative packed `.blend`,
 normalizes a temporary copy, and exports its PBR geometry and materials. This
@@ -153,6 +165,9 @@ static runtime scene:
 
 - Runtime output: `jianghai_old_city/jianghai_old_city.glb`
 - Interactive-door visual output: `jianghai_old_city/rollershutter_window_03.glb`
+- Runtime dusk panorama: `../textures/kloppenheim_06_puresky_1k.hdr`; Poly
+  Haven CC0 evidence is in `../textures/LICENSE.md`, and the file is loaded by
+  `JianghaiOldCityAtmosphere` rather than embedded in the map GLB.
 - Authoritative editable DCC source: `../../source_art/world/jianghai_old_city/jianghai_old_city.blend`
 - Runtime export script: `../../scripts/blender/export_jianghai_old_city.py`
 - Source and license evidence: `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md`
@@ -161,36 +176,33 @@ static runtime scene:
   2026-08-28.
 
 The packed `.blend` is the authoritative hand-edited scene. The export script
-validates and exports that scene; it does not generate or reconstruct the
-map. No script reconstructs the complete map; further composition and modeling
-work starts from the saved hand-edited DCC source.
+does not procedurally generate the city layout; it enforces the documented
+cleared-asset substitutions, sign cleanup, material tuning, and export policy.
+Further composition and modeling work starts from the saved hand-edited DCC
+source.
 
 The runtime export policy caps the longest texture dimension at 1024 pixels
 and recompresses eligible high-resolution runtime images as JPEG quality 90.
-A 2026-08-28 Blender audit recorded all seven required runtime anchors, 429
-mesh objects, 176 unique mesh datablocks, 4,664,722 object-instance triangles,
-and 863,620 unique DCC-mesh triangles. The final packed `.blend` is 82,347,471
-bytes with SHA-256
-`3881F3653188A00328C85829FE06C7C61AD07510495791DD8537A38EB7816EF6`.
-The final 95,837,888-byte GLB has SHA-256
-`F61D82D77311BF1C2F8A3ACE1C0FFE967EC415220DABA9BF840237EC797CD0FA`
-and contains 525 nodes, 264 unique mesh resources, 515 mesh nodes, 275
-serialized glTF primitives, 50 materials, 100 images, 898,994 triangles counted
-once per unique mesh resource, and 4,700,072 triangles across all mesh-node
-instances. The matching Godot refinery-map validation passes with 515 authored
-meshes, 575 material-backed surfaces, the same 4,700,072 authored instance
-triangles, and 413 detail meshes. The full runtime scene contains 934 nodes and
-625 mesh instances; that broader count
-includes meshes outside the authored-map import. Route validation reports
+A 2026-08-28 Blender audit recorded all seven required runtime anchors, 425
+mesh objects, 167 unique mesh datablocks, 4,472,384 raw mesh-object triangles,
+and 660,493 triangles counted once per unique mesh. Dependency-graph evaluation
+and the runtime export produce 488 mesh nodes and 4,502,190 instance triangles.
+The final packed `.blend` is 51,188,489 bytes with SHA-256
+`ABCA4AD0B6DDE3283EE2CC85DE40BE33DC39A6DFDC633300A99F36648E6E3D1A`.
+The final 58,070,456-byte GLB has SHA-256
+`6B8C5D35F0224D81125B44B304B5FE03E6F2523062F3BFB0861A00258CF66663`.
+The matching Godot refinery-map validation passes with 488 authored meshes,
+556 material-backed surfaces, 386 detail meshes, and the same 4,502,190
+authored instance triangles. Route validation reports
 `routes=True`, `route_probes=14`, and `route_blocker=none`; the Victory truck
 envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and
-`y=2.6`. The final shadow tiers are 102/207/373, with quality tier 1 still at
-207. High tier disables shadows only for fine decorative meshes; model
+`y=2.6`. High tier disables shadows only for fine decorative meshes; model
 geometry, materials, and visibility ranges are unchanged. Final capture tuples
-(draw calls / objects / primitives) are Overview 627/784/8,249,404, Victory
-street 832/1,086/9,596,938, Guangchang pawnshop 253/534/2,980,673, Red Star
-factory 443/632/4,743,175, and Market footbridge 503/747/4,684,143. All pass;
-video memory is 1,061.0 MB and texture memory is 919.5 MB. Detailed DCC, GLB,
+(draw calls / objects / primitives) are Overview 349/539/4,209,048, Victory
+street 427/547/3,947,301, Street-life bicycle close-up 255/304/3,265,850,
+Guangchang pawnshop 218/390/2,046,993, Red Star factory 343/403/4,032,380,
+and Market footbridge 424/663/4,680,828. All pass; video memory is 825.2 MB
+and texture memory is 701.2 MB. Detailed DCC, GLB,
 and runtime counting scopes are kept in
 `../../source_art/world/jianghai_old_city/README.md`.
 
@@ -199,24 +211,39 @@ In the final DCC placement, the Municipal terminal root has no duplicate
 Rollershutter Window 03 and Exterior Aircon Unit instances are rotated flush
 against actual tenement facades; none occupies `CentralAvenue`.
 Final DCC QA removes the redundant `JianghaiArtPass_FactoryHeroShutter`
-instance because the red-brick factory facade already contains an embedded
-industrial roller shutter. Keeping the existing facade shutter avoids a
-second overlapping dark door while the Rollershutter Window 03 source remains
-used on the tenement facades recorded above.
-The factory interactive shutter is framed by a five-object portal composed in
-the authoritative Blender scene from reused DCC-authored brick piers, pier
-caps, and a corrugated roof. The Blender audit reports
+instance because it became obsolete when the damaged factory shell was
+replaced by the five finished CC0 buildings recorded below. Rollershutter
+Window 03 remains used on the tenement facades and the two standalone Old City
+interactive-door visuals recorded above. The factory landmark entry is framed
+by a five-object portal composed in the authoritative Blender scene from reused
+DCC-authored brick piers, pier caps, and a corrugated roof. The Blender audit reports
 `factory_gate_portal=5/5` and `factory_gate_portal_aligned=True`. This portal is
 authored final visible art, not a code-built primitive or procedural runtime
 model; reused packed materials retain their recorded source licenses.
 
+The delivered urban-life expansion is authored in the authoritative
+`.blend`: 36 apartment-facade objects create two asymmetrical 3-by-3 tenement
+overlays; three adapted Pink city bicycles line the sidewalks; a Coffee Cart
+01 and Wicker Basket 01 form the market tea cart; a Chinese Tea Table and three
+Chinese Stools dress the pawnshop; and a Hand Truck dresses the factory. The
+cleared storefront composition adds a finished CC0 pawnshop frontage, five
+market shops (three adapted Old Urban building instances and two Scan Old
+Building Street instances), two Old Urban building rear houses, and five
+Chinese red lamps. The former damaged factory shell is replaced with three Old
+Urban building office/admin instances and two Scan Old Building Street workshops.
+The `.blend` remains the authoritative hand-edited DCC source. The export
+script additionally reapplies the documented factory-frontage substitution and
+cleanup so those five transforms remain deterministic; it does not
+procedurally generate the city or the urban-life layout.
+
 The project-authored portions include the complete map layout, street and
 supporting geometry, district composition, material adaptations, art
 direction, sign wording and placement, the objective terminals' small status
-screens and adaptation work, the factory-gate portal geometry/composition, and
-DCC integration work. The two terminal bodies combine the CC0 Utility Box 01
-and Television 02 sources recorded above. The project-authored portions are
-covered by the repository's root MIT license, subject to the disclosure in
+screens and adaptation work, the urban-life composition, the factory-gate
+portal geometry/composition, and DCC integration work. The two terminal bodies
+combine the CC0 Utility Box 01 and Television 02 sources recorded above. The
+project-authored portions are covered by the repository's root MIT license,
+subject to the disclosure in
 `docs/CONTENT_PROVENANCE.md`; reused portal materials retain their recorded
 source licenses.
 
@@ -225,6 +252,8 @@ CC0 sources acquired on 2026-08-27:
 
 - **Modular Factory Facade**, by **James Ray Cock**, from Poly Haven:
   https://polyhaven.com/a/modular_factory_facade
+- **Modular Urban Apartments Facade**, by **James Ray Cock**, from Poly Haven:
+  https://polyhaven.com/a/modular_urban_apartments_facade
 - **Chinese Temple 2**, by **Free poly**, from BlenderKit; `assetBaseId`
   `8701a79a-1635-437c-b1d2-6b14f14fc351`:
   https://www.blenderkit.com/asset-gallery-detail/8701a79a-1635-437c-b1d2-6b14f14fc351/
@@ -238,36 +267,28 @@ the delivered composite are:
 - **Old Urban building**, by **Abobla O.S**; `assetBaseId`
   `8177ff94-1645-4b50-95cc-cb05a336e34d`:
   https://www.blenderkit.com/asset-gallery-detail/8177ff94-1645-4b50-95cc-cb05a336e34d/
-- **Scan Old brick building red small**, by **Free poly**; `assetBaseId`
-  `fc8376f8-7c79-48b3-8a3c-bf061ace53e0`:
-  https://www.blenderkit.com/asset-gallery-detail/fc8376f8-7c79-48b3-8a3c-bf061ace53e0/
 - **Scan Old Building Street**, by **Free poly**; `assetBaseId`
   `d8c0ffa6-7b7d-47e9-8554-2d3bbcc82030`:
   https://www.blenderkit.com/asset-gallery-detail/d8c0ffa6-7b7d-47e9-8554-2d3bbcc82030/
-- **Chinese Wood House Wall**, by **Free poly**; `assetBaseId`
-  `7c4def52-e40b-4b77-bd89-44985e00375b`:
-  https://www.blenderkit.com/asset-gallery-detail/7c4def52-e40b-4b77-bd89-44985e00375b/
 - **Chinese Porcelain Lion**, by **Free poly**; `assetBaseId`
   `50b661cb-119d-4e80-8a9c-5c6996cbb0c8`:
   https://www.blenderkit.com/asset-gallery-detail/50b661cb-119d-4e80-8a9c-5c6996cbb0c8/
+- **Pink city bicycle**, by **Kin Chen**; `assetBaseId`
+  `4c1a83c1-829f-4c00-878e-9e73c6b89c3b`:
+  https://www.blenderkit.com/asset-gallery-detail/4c1a83c1-829f-4c00-878e-9e73c6b89c3b/
 
 The official pages identify the delivered BlenderKit assets as Creative
-Commons Zero and free. For the five assets acquired on 2026-08-28, the
+Commons Zero and free. For the four assets acquired on 2026-08-28, the
 official API also reported `license=cc_zero` and `isFree=true`. Attribution is
 not required by CC0, but creator credits and exact source identifiers are
 retained as provenance. The final DCC scene also contains adapted instances of
-the eight Poly Haven CC0 authored-pass assets acquired on 2026-08-28 and the
-already tracked Poly Haven CC0 Old Military Crate and Concrete Road Barrier
-listed above.
-
-**Modular Urban Apartments Facade**, by **James Ray Cock**, was acquired and
-evaluated on 2026-08-27 from
-https://polyhaven.com/a/modular_urban_apartments_facade. It is CC0, but it is
-not imported or embedded in the current delivered `jianghai_old_city.blend`
-or `jianghai_old_city.glb`. The GLB may retain an
-`evaluated_not_used` provenance field naming the evaluation, but contains no
-apartment geometry, materials, or textures. Acquisition hashes are retained
-solely to preserve the evaluation trail.
+the Poly Haven CC0 authored-pass assets listed above and the already tracked
+Poly Haven CC0 Old Military Crate, Concrete Road Barrier, Coffee Cart 01, and
+Wicker Basket 01. Modular Urban Apartments Facade is delivered as 36 adapted
+facade objects in two asymmetrical 3-by-3 overlays. Chinese Tea Table and three
+Chinese Stool instances are placed at the pawnshop, and Hand Truck is placed at
+the factory. Exact acquisition and bundle hashes are retained in
+`../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md`.
 
 License text: https://creativecommons.org/publicdomain/zero/1.0/
 

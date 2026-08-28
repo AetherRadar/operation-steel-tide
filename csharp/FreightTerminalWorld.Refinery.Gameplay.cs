@@ -321,34 +321,42 @@ public partial class FreightTerminalWorld
             _hud.Visible = false;
             var camera = new Camera3D { Name = "OldTownCaptureCamera", Fov = 52.0f, Far = 560.0f };
             AddChild(camera);
-            camera.GlobalPosition = new Vector3(82.0f, 42.0f, 48.0f);
-            camera.LookAt(new Vector3(0, 2.0f, -55.0f), Vector3.Up);
-            camera.Fov = 45.0f;
+            camera.GlobalPosition = new Vector3(17.5f, 6.0f, -117.0f);
+            camera.LookAt(new Vector3(1.5f, 4.8f, -128.2f), Vector3.Up);
+            camera.Fov = 35.0f;
             camera.MakeCurrent();
+            await WaitFrames(2);
+            ApplyTimeOfDay(DeploymentTimeOfDay.Dusk);
             await WaitFrames(16);
             performanceReady = PrintRefineryRenderingSnapshot("overview");
             SaveViewportImage("res://refinery_map_validation.png");
-            camera.GlobalPosition = new Vector3(0, 1.72f, 64.0f);
-            camera.LookAt(new Vector3(0, 1.55f, -68.0f), Vector3.Up);
-            camera.Fov = 58.0f;
+            camera.GlobalPosition = new Vector3(9.0f, 1.65f, 33.0f);
+            camera.LookAt(new Vector3(-8.0f, 2.40f, 18.0f), Vector3.Up);
+            camera.Fov = 42.0f;
             await WaitFrames(10);
             performanceReady &= PrintRefineryRenderingSnapshot("victory_street");
             SaveViewportImage("res://refinery_ground_validation.png");
-            camera.GlobalPosition = new Vector3(-68.0f, 2.25f, -98.0f);
-            camera.LookAt(RefineryExtractionMapBuilder.HotelCenter + Vector3.Up * 2.35f, Vector3.Up);
-            camera.Fov = 56.0f;
+            camera.GlobalPosition = new Vector3(-3.2f, 1.65f, 32.6f);
+            camera.LookAt(new Vector3(-11.7f, 1.85f, 28.5f), Vector3.Up);
+            camera.Fov = 40.0f;
+            await WaitFrames(10);
+            performanceReady &= PrintRefineryRenderingSnapshot("street_life");
+            SaveViewportImage("res://jianghai_street_life_validation.png");
+            camera.GlobalPosition = new Vector3(-71.5f, 1.75f, -103.5f);
+            camera.LookAt(new Vector3(-85.5f, 2.55f, -116.5f), Vector3.Up);
+            camera.Fov = 39.0f;
             await WaitFrames(10);
             performanceReady &= PrintRefineryRenderingSnapshot("guangchang_pawnshop");
             SaveViewportImage("res://refinery_hall_validation.png");
-            camera.GlobalPosition = new Vector3(104.0f, 5.2f, -22.0f);
-            camera.LookAt(RefineryExtractionMapBuilder.TreasuryCenter + new Vector3(-2.0f, 5.2f, 0), Vector3.Up);
-            camera.Fov = 48.0f;
+            camera.GlobalPosition = new Vector3(105.0f, 2.20f, -13.0f);
+            camera.LookAt(new Vector3(97.0f, 2.60f, -2.0f), Vector3.Up);
+            camera.Fov = 38.0f;
             await WaitFrames(10);
             performanceReady &= PrintRefineryRenderingSnapshot("red_star_factory");
             SaveViewportImage("res://refinery_wonders_validation.png");
-            camera.GlobalPosition = new Vector3(20.0f, 6.6f, -110.0f);
-            camera.LookAt(new Vector3(0, 5.25f, -126.0f), Vector3.Up);
-            camera.Fov = 52.0f;
+            camera.GlobalPosition = new Vector3(13.5f, 5.55f, -124.2f);
+            camera.LookAt(new Vector3(4.5f, 5.0f, -127.0f), Vector3.Up);
+            camera.Fov = 34.0f;
             await WaitFrames(10);
             performanceReady &= PrintRefineryRenderingSnapshot("market_footbridge");
             SaveViewportImage("res://old_town_rooftop_validation.png");
@@ -370,7 +378,7 @@ public partial class FreightTerminalWorld
                 SaveViewportImage("res://refinery_door_open_validation.png");
                 captureDoor.SetOpenImmediate(false);
             }
-            GD.Print($"REFINERY_MAP_CAPTURE valid={performanceReady} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city time=dusk authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} doors={_refineryDoors.Count} paths=refinery_map_validation.png,refinery_ground_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,refinery_door_closed_validation.png,refinery_door_open_validation.png");
+            GD.Print($"REFINERY_MAP_CAPTURE valid={performanceReady} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city time=dusk authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} doors={_refineryDoors.Count} paths=refinery_map_validation.png,refinery_ground_validation.png,jianghai_street_life_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,refinery_door_closed_validation.png,refinery_door_open_validation.png");
         }
         finally
         {

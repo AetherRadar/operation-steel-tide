@@ -8,8 +8,9 @@ The scene is a project-authored 1990s Lingnan river-industrial city
 composition. The complete layout, streets, supporting geometry, district
 assembly, material adaptations, art direction, Chinese sign wording and
 placement, lighting used for review renders, objective-terminal status screens
-and adaptations, factory-gate portal composition, and integration of licensed
-source modules are produced for Operation Steel Tide. Each terminal body
+and adaptations, factory-gate portal composition, urban-life dressing, facade
+expansion, and integration of licensed source modules are produced for
+Operation Steel Tide. Each terminal body
 combines the CC0 Utility Box 01 and Television 02 sources recorded below; only
 its small status screen and adaptation work are project-authored. Godot
 continues to own gameplay collision, navigation, loot, spawning, doors, and
@@ -27,6 +28,18 @@ to the original `JIANGHAI_ACQUISITION_ROOT` cache.
 poly_haven/modular_factory_facade/modular_factory_facade_1k.gltf
 poly_haven/modular_factory_facade/modular_factory_facade.bin
 poly_haven/modular_factory_facade/textures/*
+poly_haven/modular_urban_apartments_facade/modular_urban_apartments_facade_1k.gltf
+poly_haven/modular_urban_apartments_facade/modular_urban_apartments_facade.bin
+poly_haven/modular_urban_apartments_facade/textures/*
+poly_haven/chinese_tea_table/chinese_tea_table_1k.gltf
+poly_haven/chinese_tea_table/chinese_tea_table.bin
+poly_haven/chinese_tea_table/textures/*_1k.jpg
+poly_haven/chinese_stool/chinese_stool_1k.gltf
+poly_haven/chinese_stool/chinese_stool.bin
+poly_haven/chinese_stool/textures/*_1k.jpg
+poly_haven/hand_truck/hand_truck_1k.gltf
+poly_haven/hand_truck/hand_truck.bin
+poly_haven/hand_truck/textures/*_1k.jpg
 poly_haven/television_02/television_02_1k.gltf
 poly_haven/television_02/television_02.bin
 poly_haven/television_02/textures/*_1k.jpg
@@ -54,10 +67,10 @@ poly_haven/security_camera_01/textures/*_1k.jpg
 blenderkit/chinese_temple_2.glb
 blenderkit/chinese_red_lamp.glb
 blenderkit/old_urban_building_1k.blend
-blenderkit/scan_old_brick_building_red_small.blend
 blenderkit/scan_old_building_street.glb
-blenderkit/chinese_wood_house_wall_1k.blend
 blenderkit/chinese_porcelain_lion.glb
+blenderkit/pink_city_bicycle/pink_city_bicycle_0_5k.blend
+blenderkit/pink_city_bicycle/official_api_search.json
 NotoSansSC-VF.otf
 ```
 
@@ -66,17 +79,28 @@ sets under `assets/textures/`: Asphalt 03, Concrete Floor, Gravel Embedded
 Concrete, and Corrugated Iron. Rusty Painted Metal remains a tracked project
 texture but is not part of the current Jianghai scene. The scene also contains
 adapted instances of the already tracked Poly Haven CC0 Old Military Crate and
-Concrete Road Barrier models under `assets/models/`, plus the eight external
-Poly Haven CC0 1K glTF bundles listed above. All eight were acquired on
-2026-08-28; exact creators, official URLs, bundle hashes, and mappings are in
-`LICENSE_EVIDENCE.md`.
+Concrete Road Barrier models under `assets/models/`. The urban-life pass also
+embeds the repository's existing Poly Haven CC0 Coffee Cart 01 and Wicker
+Basket 01 sources from `assets/models/polyhaven_residential_street/`. The
+external Poly Haven and BlenderKit acquisition files listed above were packed
+only after their official CC0 records were checked. Exact creators, official
+URLs, acquisition dates, hashes, and mappings are in `LICENSE_EVIDENCE.md`.
 
-The Poly Haven **Modular Urban Apartments Facade** bundle was acquired and
-evaluated on 2026-08-27, but it is not part of the authoritative `.blend` or
-runtime GLB. The GLB contains no apartment nodes, meshes, materials, images,
-or other asset payload. An `evaluated_not_used` provenance field may name the
-evaluation; its source record and cache hashes remain in
-`LICENSE_EVIDENCE.md` solely as an audit trail.
+The dusk sky uses the repository-local Poly Haven CC0 HDRI **Kloppenheim 06
+(Pure Sky)** by Greg Zaal (Original), with sky edits by Jarod Guest. It was
+acquired on 2026-08-28 from
+https://polyhaven.com/a/kloppenheim_06_puresky. The official 1K HDR download is
+https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloppenheim_06_puresky_1k.hdr;
+the local `assets/textures/kloppenheim_06_puresky_1k.hdr` is 1,173,154 bytes,
+has SHA-256
+`206C67E3A1B992282821CF06662BDD69BBB4915C1C4444A66338A40D6A7D4E34`,
+and matches official API MD5 `995d68b1656f26452572645c0ffe898b`.
+`JianghaiOldCityAtmosphere` loads it at runtime. It is not packed into the
+authoritative `.blend` or embedded in the map GLB.
+
+The Poly Haven **Modular Urban Apartments Facade** is a delivered source.
+Thirty-six adapted facade objects form two asymmetrical 3-by-3 overlays on the
+west and east tenements in the authoritative `.blend` and runtime GLB.
 
 The repository-external cache is neither a runtime lookup nor an export
 dependency. The authoritative `.blend` already contains the adapted source
@@ -94,7 +118,9 @@ repository root, export that saved scene with:
 blender --background source_art/world/jianghai_old_city/jianghai_old_city.blend --python scripts/blender/export_jianghai_old_city.py
 ```
 
-The export script verifies that the authoritative scene is open, flattens any
+The export script verifies that the authoritative scene is open, removes the
+documented obsolete signs and retired asset metadata, reapplies the cleared
+five-building factory frontage and runtime material tuning, flattens any
 remaining tiled images, caps the longest runtime-texture dimension at 1024
 pixels, recompresses eligible high-resolution runtime images as JPEG quality
 90, rejects non-built-in font datablocks, packs external data, saves the
@@ -106,24 +132,53 @@ pixels, recompresses eligible high-resolution runtime images as JPEG quality
 The second output is a reproducible standalone PBR door visual. The script
 selects `JianghaiArtPass_EastShutter00`, makes a temporary normalized copy, and
 exports only that adapted Rollershutter Window 03 mesh and its materials. The
-result is 1,587,684 bytes with SHA-256
-`48E78DFC37FF6310151B18BEA8AC8B080BE31ABED4BD882C0FA3F46E19B0B4B1`.
+result is 187,940 bytes with SHA-256
+`C4884AFCD7560E4BB23320A8C311DB0011504F7C5FEE30D58C266D54F7C6B166`.
 Two Old City `InteractiveBuildingDoor` instances use this GLB in place of the
 enlarged Kenney `door-wide-closed` visible placeholder that appeared as an
 olive-colored panel. Only the visible art changes: the existing gameplay door
 keeps collision, animation, network state, and AI traversal.
 
-It is an export/validation step, not an authoring or scene-generation system.
-No script reconstructs the complete map. All further composition and modeling
-work starts from the hand-edited `.blend`. Review PNGs under `previews/` are
-maintained separately.
+It is an export/cleanup/validation step, not a procedural city-generation system. It
+deterministically reapplies the documented factory-frontage substitution, sign
+cleanup, material tuning, and export policy. All further layout composition and
+modeling work starts from the hand-edited `.blend`. Review PNGs under
+`previews/` are maintained separately.
 
 The main GLB contains the final static map geometry, materials, textures, and
 custom provenance metadata. It excludes preview cameras and lights, the
-unselected Modular Urban Apartments Facade asset payload, and the original
-Noto font. Chinese sign outlines are ordinary static mesh geometry. The
+original Noto font, and all acquisition-only rig/source scaffolding. Chinese
+sign outlines are ordinary static mesh geometry. The
 standalone door GLB retains MP / Poly Haven CC0 provenance through its source
 mesh in the authoritative packed scene.
+Security Camera 01 is delivered only as static geometry, materials, and
+textures; its source rig and animations are not shipped.
+
+### Urban-life and facade expansion
+
+The 2026-08-28 DCC expansion makes the central city blocks read as inhabited
+and locally specific while keeping gameplay scaffolding in Godot. It adds:
+
+- 36 adapted Modular Urban Apartments Facade objects arranged as two
+  asymmetrical 3-by-3 tenement overlays;
+- three instances of Kin Chen's Pink city bicycle, converted to a static rest
+  pose, stripped of its rig, given weathered teal material adaptations, and
+  cleaned to 11,825 triangles per instance;
+- a Coffee Cart 01 and Wicker Basket 01 market tea stall, a Chinese Tea Table
+  with three Chinese Stools at the pawnshop, and a Hand Truck at the factory;
+- a finished CC0 pawnshop storefront, five market shops made from three Old
+  Urban building and two Scan Old Building Street instances, and two Old Urban
+  building rear houses;
+- replacement of the former damaged factory shell with three Old Urban
+  building office/admin instances and two Scan Old Building Street workshops;
+  and
+- five Chinese red lamps distributed across the cleared storefront
+  composition.
+
+These are saved DCC placements and adaptations. The `.blend` remains the
+authoritative hand-edited source; the export script only enforces the targeted
+cleanup and cleared-asset substitution described above rather than generating
+the city layout.
 
 ## Runtime contract and geometry audit
 
@@ -148,10 +203,10 @@ Rollershutter Window 03 and Exterior Aircon Unit instances from the central
 lane to actual tenement facades and rotates them flush to the walls; none of
 these props occupies `CentralAvenue` in the saved scene.
 Final DCC QA deletes the redundant `JianghaiArtPass_FactoryHeroShutter`
-overlay. The red-brick factory facade already contains an embedded industrial
-roller shutter, so retaining that existing authored opening avoids a second
-overlapping dark door in player-height and acceptance-review views.
-The factory interactive shutter is framed by five visible objects authored and
+overlay because it became obsolete when the damaged factory shell was replaced
+by five finished CC0 buildings. Rollershutter Window 03 remains used on the
+tenement facades and the two standalone Old City interactive-door visuals.
+The factory landmark entry is framed by five visible objects authored and
 aligned in Blender: two reused DCC brick piers, two pier caps, and a corrugated
 roof. Their portal composition is final DCC art, not code-built primitive or
 procedural visible geometry. Reused packed materials keep their recorded
@@ -162,35 +217,37 @@ runtime results:
 
 | Audit layer | Verified result |
 | --- | --- |
-| Authoritative Blender source | 429 mesh objects; 176 unique mesh datablocks; 4,664,722 object-instance triangles; 863,620 unique DCC-mesh triangles; all seven required anchors; 82,347,471 bytes; SHA-256 `3881F3653188A00328C85829FE06C7C61AD07510495791DD8537A38EB7816EF6` |
+| Authoritative Blender source | 425 mesh objects; 167 unique mesh datablocks; 4,472,384 raw mesh-object triangles; 660,493 triangles counted once per unique mesh; 488 evaluated/runtime mesh instances and 4,502,190 instance triangles; all seven required anchors; 51,188,489 bytes; SHA-256 `ABCA4AD0B6DDE3283EE2CC85DE40BE33DC39A6DFDC633300A99F36648E6E3D1A` |
 | Factory-gate portal | `factory_gate_portal=5/5`; `factory_gate_portal_aligned=True`; DCC-authored brick piers, caps, and corrugated roof frame the interactive PBR shutter |
-| Serialized GLB | 95,837,888 bytes; SHA-256 `F61D82D77311BF1C2F8A3ACE1C0FFE967EC415220DABA9BF840237EC797CD0FA`; 525 nodes; 264 unique mesh resources; 515 mesh nodes; 275 glTF primitives; 50 materials; 100 images; 898,994 triangles counted once per unique mesh resource; 4,700,072 triangles across all mesh-node instances; maximum texture dimension 1024 pixels |
-| Godot authored-map import | `--validate-refinery-map` PASS; 515 authored meshes; 575 surfaces; 575 material-backed surfaces; 4,700,072 authored instance triangles; 413 detail meshes; 7/7 authored anchors; terminal checks 2/2/2/2; authored status screens 2/2 |
+| Delivered urban-life expansion | 36/36 apartment-facade objects; two asymmetrical 3-by-3 overlays; three static 11,825-triangle bicycles; market tea cart and basket; pawnshop tea table and three stools; factory hand truck; finished CC0 pawnshop storefront; five market shops (three Old Urban building and two Scan Old Building Street instances); two Old Urban building rear houses; five Chinese red lamps; factory replacement with three Old Urban building office/admin instances and two Scan Old Building Street workshops |
+| Serialized GLB | 58,070,456 bytes; SHA-256 `6B8C5D35F0224D81125B44B304B5FE03E6F2523062F3BFB0861A00258CF66663`; 488 mesh nodes; 4,502,190 mesh-node instance triangles; maximum texture dimension 1024 pixels |
+| Godot authored-map import | `--validate-refinery-map` PASS; 488 authored meshes; 556 surfaces; every audited surface is material-backed; 386 detail meshes; 4,502,190 authored instance triangles; 7/7 authored anchors; terminal checks 2/2/2/2; authored status screens 2/2 |
 | Godot route clearance | `routes=True`; `route_probes=14`; `route_blocker=none`; the Victory truck envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and `y=2.6` |
-| Godot quality and full runtime | Quality tier 1 with a shadow count of 207; tier probe counts 102/207/373 and restores tier 1; 934 total runtime nodes; 625 total runtime mesh instances |
+| Godot quality and full runtime | Quality tier 1 is restored after the capture probes; all six representative views pass their configured budgets |
 
-The 275 GLB primitives are serialized surface-equivalents counted once across
-the 264 unique GLB mesh resources. The Godot diagnostic instead sums surfaces
-across the 515 imported authored meshes, producing 575 runtime surfaces; all
-575 have materials. These are different scopes rather than conflicting counts.
-The full runtime total of 625 mesh instances is broader again because it also
-includes scene meshes outside the authored-map import.
+The Blender source count is based on saved mesh objects, while the 660,493
+unique-mesh figure counts each shared datablock once. Dependency-graph
+evaluation and export resolve the scene to 488 runtime mesh instances and
+4,502,190 instance triangles. The Godot diagnostic imports those same 488
+meshes and sums 556 material-backed runtime surfaces. These scopes are
+intentionally different rather than conflicting.
 
 ### Final capture performance
 
 The final high-tier policy disables shadows only on fine decorative meshes.
-Model geometry, materials, and visibility ranges are unchanged. All five
+Model geometry, materials, and visibility ranges are unchanged. All six
 representative captures pass their budgets:
 
 | View | Draw calls | Objects | Primitives | Result |
 | --- | ---: | ---: | ---: | --- |
-| Overview | 627 | 784 | 8,249,404 | PASS |
-| Victory street | 832 | 1,086 | 9,596,938 | PASS |
-| Guangchang pawnshop | 253 | 534 | 2,980,673 | PASS |
-| Red Star factory | 443 | 632 | 4,743,175 | PASS |
-| Market footbridge | 503 | 747 | 4,684,143 | PASS |
+| Overview | 349 | 539 | 4,209,048 | PASS |
+| Victory street | 427 | 547 | 3,947,301 | PASS |
+| Street-life bicycle close-up | 255 | 304 | 3,265,850 | PASS |
+| Guangchang pawnshop | 218 | 390 | 2,046,993 | PASS |
+| Red Star factory | 343 | 403 | 4,032,380 | PASS |
+| Market footbridge | 424 | 663 | 4,680,828 | PASS |
 
-The capture reports 1,061.0 MB video memory and 919.5 MB texture memory.
+The capture reports 825.2 MB video memory and 701.2 MB texture memory.
 
 ## Rights boundary
 
@@ -200,7 +257,8 @@ Noto Sans SC is licensed under SIL OFL 1.1 and was used only during DCC
 authoring to convert the required Chinese sign text to static glyph meshes.
 The original font file is not committed or present in the final `.blend` or
 GLB, and the export script enforces that boundary. The existing Poly Haven
-surface textures are also CC0.
+surface textures and the separately loaded Kloppenheim 06 (Pure Sky) HDRI are
+also CC0. The HDRI remains outside the `.blend` and map GLB.
 
 The project-authored layout, adaptation work, objective-terminal status
 screens, and factory-gate portal geometry/composition are covered by the

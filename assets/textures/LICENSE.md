@@ -16,6 +16,26 @@ Exact license: CC0 1.0 Universal,
 https://creativecommons.org/publicdomain/zero/1.0/. Attribution is not
 required; creator names are retained as provenance and courtesy credit.
 
+## Jianghai dusk HDRI
+
+**Kloppenheim 06 (Pure Sky)** was created by Greg Zaal (Original), with sky
+edits by Jarod Guest, and acquired from Poly Haven on 2026-08-28:
+
+- Official asset page: https://polyhaven.com/a/kloppenheim_06_puresky
+- Exact license: CC0 1.0 Universal
+- Official 1K HDR download:
+  https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloppenheim_06_puresky_1k.hdr
+- Repository-local mapping: `kloppenheim_06_puresky_1k.hdr`
+- Bytes: 1,173,154
+- SHA-256:
+  `206C67E3A1B992282821CF06662BDD69BBB4915C1C4444A66338A40D6A7D4E34`
+- Official API MD5: `995d68b1656f26452572645c0ffe898b`
+
+`JianghaiOldCityAtmosphere` loads this HDRI at runtime for the dusk sky. The
+file is not packed into `jianghai_old_city.blend` and is not embedded in the
+Jianghai map GLB. Attribution is not required by CC0; the contributor roles are
+retained as provenance and courtesy credit.
+
 ## Jianghai Old City reuse
 
 The authoritative Jianghai Old City Blender scene reuses four tracked CC0
@@ -41,20 +61,22 @@ official URLs, exact CC0 1.0 Universal license, acquisition hashes, and mapping
 from the external cache into the packed `.blend` and runtime GLB are recorded
 in `assets/models/LICENSE.md` and
 `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md`.
+For Security Camera 01, only the static geometry, materials, and textures are
+delivered; the source rig and animations are not shipped.
 
-The final 95,837,888-byte post-fix GLB has SHA-256
-`F61D82D77311BF1C2F8A3ACE1C0FFE967EC415220DABA9BF840237EC797CD0FA`
-and reports 100 serialized image resources in total. That total combines the
-packed images used by all model and surface contributions in the composite; it
-is not a count of standalone source assets and does not change the four
-delivered reusable surface sets identified above.
+The final 58,070,456-byte GLB has SHA-256
+`6B8C5D35F0224D81125B44B304B5FE03E6F2523062F3BFB0861A00258CF66663`.
+Its packed images combine the model and surface contributions in the
+composite; the separately loaded HDRI remains outside the GLB and does not
+change the four delivered reusable surface sets identified above.
 Moving the 22 Rollershutter Window 03 and Exterior Aircon Unit instances from
 the central avenue onto tenement facades changes only DCC placement, not the
 source, license, or packed texture provenance. Final DCC QA deletes the
-redundant `JianghaiArtPass_FactoryHeroShutter` instance and retains the
-red-brick factory facade's existing embedded shutter. The removed duplicate
-does not remove or replace any texture source because Rollershutter Window 03
-remains used on the tenement facades.
+redundant `JianghaiArtPass_FactoryHeroShutter` instance after the damaged
+factory shell is replaced by five finished CC0 buildings. That cleanup does not
+remove or replace any texture source because Rollershutter Window 03 remains
+used on the tenement facades and the two standalone Old City interactive-door
+visuals.
 
 The final factory-gate portal adds no untracked texture source. Its five
 visible Blender objects reuse DCC-authored brick piers, caps, and a corrugated
@@ -65,9 +87,9 @@ art, not a visible primitive or procedural runtime substitute.
 
 The Rollershutter Window 03 PBR maps are also embedded in the reproducibly
 derived runtime door visual
-`assets/models/jianghai_old_city/rollershutter_window_03.glb` (1,587,684 bytes;
+`assets/models/jianghai_old_city/rollershutter_window_03.glb` (187,940 bytes;
 SHA-256
-`48E78DFC37FF6310151B18BEA8AC8B080BE31ABED4BD882C0FA3F46E19B0B4B1`).
+`C4884AFCD7560E4BB23320A8C311DB0011504F7C5FEE30D58C266D54F7C6B166`).
 That local mapping lets two Old City `InteractiveBuildingDoor` instances use
 the finished shutter art without introducing a new texture source or changing
 the MP / Poly Haven CC0 license. Door collision, animation, networking, and AI
@@ -76,8 +98,9 @@ traversal remain separate project gameplay behavior.
 The final performance policy changes only high-tier shadow casting on fine
 decorative meshes; models, materials, visibility ranges, and texture mappings
 are unchanged. Capture tuples (draw calls / objects / primitives) are Overview
-627/784/8,249,404, Victory street 838/1,093/9,599,741, Guangchang pawnshop
-253/534/2,980,673, Red Star factory 444/628/4,705,187, and Market footbridge
-514/764/4,843,093. All pass. The run reports 1,008.1 MB video memory and 862.4
-MB texture memory; full capture evidence is retained in the Jianghai DCC
+349/539/4,209,048, Victory street 427/547/3,947,301, Street-life bicycle
+close-up 255/304/3,265,850, Guangchang pawnshop 218/390/2,046,993, Red Star
+factory 343/403/4,032,380, and Market footbridge 424/663/4,680,828. All pass.
+The run reports 825.2 MB video memory and 701.2 MB texture memory; full capture
+evidence is retained in the Jianghai DCC
 `README.md` and `LICENSE_EVIDENCE.md`.
