@@ -107,7 +107,31 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             PlayerWeaponSlot.Sidearm => _sidearmWeaponSlot is not null,
             _ => false
         };
-    public bool UiLocked { get; set; }
+    private bool _uiLocked;
+    public bool UiLocked
+    {
+        get => _uiLocked;
+        set
+        {
+            if (_uiLocked == value)
+            {
+                return;
+            }
+            _uiLocked = value;
+            if (value)
+            {
+                // Any modal UI stops first-person actions instead of allowing
+                // them to consume supplies or freeze a mechanism off-screen.
+                CancelFieldUse(false);
+                CancelReload();
+                return;
+            }
+            // Restore the selected held item immediately when the modal closes;
+            // waiting for a later physics tick made this state frame-rate
+            // dependent in both gameplay and deterministic diagnostics.
+            UpdateHeldItemVisibility();
+        }
+    }
     public bool SprintRecoveryRequired => _sprintRecoveryRequired || _sprintRecoveryDelay > 0.0f;
     public bool IsInVehicle => _vehicle is not null && GodotObject.IsInstanceValid(_vehicle);
     public DriveableVehicle? CurrentVehicle => IsInVehicle ? _vehicle : null;
@@ -349,7 +373,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
         _vehicle = vehicle;
         CloseMedicalWheelWithoutUse();
-        CancelMedicalUse(false);
+        CancelFieldUse(false);
+        CancelReload();
+        UpdateHeldThrowableVisual();
         _vehicleCameraFollow = true;
         Velocity = Vector3.Zero;
         _isAiming = false;
@@ -411,6 +437,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             _knifeRoot.Visible = _activeQuickSlot == PlayerQuickSlot.Melee;
         }
+        UpdateHeldThrowableVisual();
         if (!IsDead)
         {
             RestoreMovementInput();
@@ -1171,7 +1198,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 CancelLowObstacleVault("death");
             }
             CloseMedicalWheelWithoutUse();
-            CancelMedicalUse(false);
+            CancelFieldUse(false);
+            CancelReload();
             UpdateDownedCrawl(dt);
             return;
         }
@@ -1421,6 +1449,25 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             _knifeRoot.Visible = false;
         }
+        UpdateHeldThrowableVisual();
+
+        if (IsFirearmQuickSlotSelected
+            && !RoleActionBlocksWeapon
+            && Input.IsActionJustPressed(GameInputActions.Reload))
+        {
+            StartReload();
+        }
+        if (_isReloading)
+        {
+            _reloadTime -= delta;
+            if (_reloadTime <= 0.0f)
+            {
+                FinishReload();
+            }
+        }
+        UpdateReloadAnimation();
+        SyncAuthoredPrimaryWeapon();
+        UpdateAuthoredM4ReloadSupportArm();
 
         if (!_fireInputArmed)
         {
@@ -1884,8 +1931,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var targetFov = _isAiming ? AimFieldOfView() : _slideTime > 0.0f ? 84.0f : horizontalSpeed > 7.0f ? 82.0f : 76.0f;
         var handling = EquippedWeapon.Stats().Handling;
         _camera.Fov = Mathf.Lerp(_camera.Fov, targetFov, SmoothFactor(6.5f + handling * 5.0f, delta));
-        _weaponRoot.Visible = IsFirearmQuickSlotSelected && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
-        _knifeRoot.Visible = _activeQuickSlot == PlayerQuickSlot.Melee && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
+        _weaponRoot.Visible = IsFirearmQuickSlotSelected
+            && !_isPlating
+            && !RoleActionBlocksWeapon
+            && !MedicalActionBlocksWeapon;
+        _knifeRoot.Visible = _activeQuickSlot == PlayerQuickSlot.Melee
+            && !_isPlating
+            && !RoleActionBlocksWeapon
+            && !MedicalActionBlocksWeapon;
         UpdateHeldThrowableVisual();
         UpdateKnifeAnimation(delta);
         var targetPosition = WeaponViewPositionTarget();
@@ -2319,7 +2372,16 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     private bool StartPlate(string preferredItemId = "")
     {
-        if (_isPlating || _isReloading || MedicalActionBlocksWeapon || ArmorPlates <= 0 || Armor >= 99.0f || IsDead)
+        if (_isPlating
+            || _isReloading
+            || MedicalActionBlocksWeapon
+            || RoleActionBlocksWeapon
+            || IsInVehicle
+            || IsExtractionPassenger
+            || UiLocked
+            || ArmorPlates <= 0
+            || Armor >= 99.0f
+            || IsDead)
         {
             return false;
         }
@@ -2346,11 +2408,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             return false;
         }
         var plate = Backpack[plateIndex];
+        _isAiming = false;
+        _slideTime = 0.0f;
         _isPlating = true;
         _plateDuration = Mathf.Max(1.65f, 2.55f - (int)plate.Grade * 0.16f);
         _plateTime = _plateDuration;
         _plateRepairFraction = ArmorPlateSupplies.RepairFraction(plate.Grade);
         _plateItemId = plate.Id;
+        SetMedicalDeviceVisibility();
         Hud?.SetEquipmentActionLocalized("applying_armor_cancel", "APPLYING ARMOR  //  X CANCEL", 0.0f, true);
         return true;
     }
@@ -2362,6 +2427,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             return;
         }
         _plateTime -= delta;
+        SetMedicalDeviceVisibility();
         Hud?.SetEquipmentActionLocalized("applying_armor_cancel", "APPLYING ARMOR  //  X CANCEL", 1.0f - _plateTime / Mathf.Max(0.01f, _plateDuration), true);
         if (_plateTime > 0.0f)
         {
@@ -2387,6 +2453,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _plateTime = 0.0f;
         _plateDuration = 0.0f;
         _plateItemId = string.Empty;
+        SetMedicalDeviceVisibility();
         Hud?.SetEquipmentAction(string.Empty, 0.0f, false);
         Hud?.SetBackpackValuePlayer(this);
         Hud?.SetMedicalInventory(this);
@@ -2403,6 +2470,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _plateTime = 0.0f;
         _plateDuration = 0.0f;
         _plateItemId = string.Empty;
+        SetMedicalDeviceVisibility();
         Hud?.SetEquipmentAction(string.Empty, 0.0f, false);
         if (notify)
         {
@@ -2875,6 +2943,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         if (Health <= 0.0f)
         {
             Health = 0.0f;
+            CloseMedicalWheelWithoutUse();
+            CancelReload();
             IsDead = true;
             EjectFromVehicleIfAny();
             Velocity = Vector3.Zero;

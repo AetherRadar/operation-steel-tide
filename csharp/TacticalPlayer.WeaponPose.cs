@@ -14,7 +14,6 @@ public partial class TacticalPlayer
         -0.29f,
         -0.68f);
     private static readonly Vector3 SidearmHipWeaponPosition = new(0.30f, -0.24f, -0.64f);
-    private static readonly Vector3 ReloadWeaponPosition = new(0.18f, -0.23f, -0.86f);
     private static readonly Vector3 SearchWeaponStart = new(0.5f, -0.58f, -0.48f);
     private static readonly Vector3 SearchWeaponEnd = new(0.32f, -0.48f, -0.72f);
     private float _viewmodelKickback;
@@ -31,13 +30,13 @@ public partial class TacticalPlayer
                 : HipWeaponPositionForCurrentPlatform();
         if (_isReloading)
         {
-            // Authored long-gun arms already occupy the full first-person
-            // frame. Moving them to the generic reload mount lifts and rolls
-            // both sleeve openings into view; keep the weapon at its hip mount
-            // while the authored clip or M4 mechanism animation plays.
-            return EquippedWeapon.Platform is WeaponPlatform.M3A1 or WeaponPlatform.M4A1
-                ? HipWeaponPosition
-                : ReloadWeaponPosition;
+            // The authored arm meshes include the complete forearm and capped
+            // upper sleeve. Keep their shoulder end at the camera-bottom mount
+            // throughout every reload; lifting the complete rig used to expose
+            // both sleeve caps as detached black circles in the centre of view.
+            return WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
+                ? SidearmHipWeaponPosition
+                : HipWeaponPosition;
         }
         if (_searchPose > 0.0f)
         {
@@ -121,9 +120,10 @@ public partial class TacticalPlayer
     {
         if (_isReloading)
         {
-            return EquippedWeapon.Platform is WeaponPlatform.M3A1 or WeaponPlatform.M4A1
-                ? Vector3.Zero
-                : new Vector3(-0.13f, 0.0f, -0.32f);
+            // Reload motion belongs to the support arm and weapon mechanisms.
+            // Rolling the shared root also rolls the right hand off the pistol
+            // grip and turns the sleeve openings toward the camera.
+            return Vector3.Zero;
         }
 
         var searchPitch = _searchPose > 0.0f ? 0.34f : 0.0f;
@@ -212,6 +212,16 @@ public partial class TacticalPlayer
     {
         _weaponRoot.Position = position;
         _weaponRoot.Rotation = rotation;
+    }
+
+    internal void SetAimingPoseForDiagnostics(bool aiming)
+    {
+        _isAiming = aiming;
+        _weaponRoot.Position = WeaponViewPositionTarget();
+        _weaponRoot.Rotation = WeaponViewRotationTarget();
+        ApplyProceduralHandPose();
+        SyncAuthoredPrimaryWeapon();
+        _opticReticle.Visible = aiming && IsFirearmQuickSlotSelected;
     }
 
     internal Vector3 WeaponRotationForDiagnostics => _weaponRoot.Rotation;

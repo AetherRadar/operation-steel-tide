@@ -61,7 +61,13 @@ public partial class TacticalPlayer
         {
             return;
         }
-        var canShow = !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && !IsDead;
+        var canShow = !IsInVehicle
+            && !IsExtractionPassenger
+            && !UiLocked
+            && !_isPlating
+            && !RoleActionBlocksWeapon
+            && !MedicalActionBlocksWeapon
+            && !IsDead;
         var fragVisible = canShow
             && _activeQuickSlot == PlayerQuickSlot.FragmentationGrenade
             && Grenades > 0;

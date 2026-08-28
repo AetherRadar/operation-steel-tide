@@ -17,6 +17,9 @@ public partial class TacticalPlayer
         EjectFromVehicleIfAny();
         CancelLadderClimb(notify: false);
         CancelLowObstacleVault("demolition_round_reset");
+        CloseMedicalWheelWithoutUse();
+        ResetFieldUseForRound();
+        CancelReload();
         ConfigureRole(role);
         ApplyDemolitionRoundLoadout(loadout, grenadeCount, smokeGrenadeCount);
         GlobalPosition = spawn;
@@ -33,8 +36,6 @@ public partial class TacticalPlayer
         CollisionMask = 1 | 2;
         _collider.Disabled = false;
         _stance = PlayerStance.Standing;
-        _isReloading = false;
-        _reloadTime = 0.0f;
         _isPlating = false;
         _plateTime = 0.0f;
         _isAiming = false;
@@ -44,6 +45,7 @@ public partial class TacticalPlayer
         _weaponRoot.Visible = HasActiveFirearm;
         _knifeRoot.Visible = _knifeEquipped;
         _weaponLight.Visible = _flashlightOn && HasActiveFirearm;
+        UpdateHeldThrowableVisual();
         if (IsInstanceValid(_camera))
         {
             _camera.Current = true;
@@ -59,6 +61,9 @@ public partial class TacticalPlayer
         Health = Mathf.Clamp(health, 0.0f, MaxHealth);
         if (dead)
         {
+            CloseMedicalWheelWithoutUse();
+            CancelFieldUse(false);
+            CancelReload();
             if (!IsDead)
             {
                 IsDead = true;
@@ -89,11 +94,12 @@ public partial class TacticalPlayer
         ReviveUsed = reviveUsed;
         if (authoritativeDown)
         {
+            CloseMedicalWheelWithoutUse();
+            CancelFieldUse(false);
+            CancelReload();
             if (becameDown)
             {
                 Main?.InterruptLootForIncomingDamage();
-                CancelPlate();
-                CancelMedicalUse();
                 EjectFromVehicleIfAny();
             }
             IsDead = true;
@@ -148,6 +154,9 @@ public partial class TacticalPlayer
         {
             return;
         }
+        CloseMedicalWheelWithoutUse();
+        CancelFieldUse(false);
+        CancelReload();
         ReviveUsed = true;
         CancelLadderClimb(notify: false);
         CancelLowObstacleVault("demolition_eliminated");

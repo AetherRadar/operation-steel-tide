@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace OperationSteelTide;
@@ -20,10 +21,7 @@ public partial class TacticalPlayer
         ? 1.0f - _medicalActionRemaining / Mathf.Max(0.01f, _medicalActionDuration)
         : 0.0f;
 
-    private Node3D _medicalDeviceRoot = null!;
-    private Node3D _bandageDevice = null!;
-    private Node3D _medkitDevice = null!;
-    private Node3D _adrenalineDevice = null!;
+    private FirstPersonFieldUsePresentation? _fieldUsePresentation;
     private float _medicalActionRemaining;
     private float _medicalActionDuration;
     private MedicalItemKind _medicalActionKind;
@@ -242,7 +240,10 @@ public partial class TacticalPlayer
 
     private void CancelMedicalUse(bool notify = true)
     {
-        if (!MedicalActionBlocksWeapon)
+        // CompleteMedicalUse can discover that the selected stack was removed
+        // after the timer reached zero. Duration remains the lifecycle token in
+        // that path, so cleanup must not depend on Remaining alone.
+        if (!MedicalActionBlocksWeapon && _medicalActionDuration <= 0.0f)
         {
             return;
         }
@@ -331,61 +332,68 @@ public partial class TacticalPlayer
 
     private void BuildMedicalDevices()
     {
-        _medicalDeviceRoot = new Node3D
+        try
         {
-            Name = "MedicalUseDevices",
-            Position = new Vector3(0.23f, -0.26f, -0.58f),
-            Visible = false
-        };
-        _camera.AddChild(_medicalDeviceRoot);
+            _fieldUsePresentation = new FirstPersonFieldUsePresentation(_camera);
+        }
+        catch (Exception exception)
+        {
+            _fieldUsePresentation = null;
+            GD.PushWarning($"Authored field-use presentation unavailable: {exception.Message}");
+        }
+    }
 
-        _bandageDevice = new Node3D { Name = "BandageDevice" };
-        _medicalDeviceRoot.AddChild(_bandageDevice);
-        var bandageFabric = Material(new Color(0.76f, 0.82f, 0.78f), 0.02f, 0.94f);
-        var bandageMark = Material(new Color(0.22f, 0.72f, 0.46f), 0.05f, 0.62f);
-        MeshPart(_bandageDevice, Box(new Vector3(0.28f, 0.16f, 0.18f)), Vector3.Zero, new Vector3(0.1f, 0.2f, 0.3f), bandageFabric);
-        MeshPart(_bandageDevice, Box(new Vector3(0.06f, 0.18f, 0.19f)), Vector3.Zero, new Vector3(0.1f, 0.2f, 0.3f), bandageMark);
-
-        _medkitDevice = new Node3D { Name = "MedkitDevice" };
-        _medicalDeviceRoot.AddChild(_medkitDevice);
-        var kit = Material(new Color(0.1f, 0.34f, 0.22f), 0.22f, 0.62f);
-        var kitGlow = Material(new Color(0.3f, 0.95f, 0.6f), 0.02f, 0.34f);
-        MeshPart(_medkitDevice, Box(new Vector3(0.34f, 0.25f, 0.16f)), Vector3.Zero, new Vector3(-0.08f, 0.16f, 0.1f), kit);
-        MeshPart(_medkitDevice, Box(new Vector3(0.16f, 0.05f, 0.17f)), new Vector3(0, 0, -0.085f), Vector3.Zero, kitGlow);
-        MeshPart(_medkitDevice, Box(new Vector3(0.05f, 0.16f, 0.17f)), new Vector3(0, 0, -0.09f), Vector3.Zero, kitGlow);
-
-        _adrenalineDevice = new Node3D { Name = "AdrenalineDevice" };
-        _medicalDeviceRoot.AddChild(_adrenalineDevice);
-        var injector = Material(new Color(0.18f, 0.22f, 0.21f), 0.5f, 0.38f);
-        var stimulant = Material(new Color(0.95f, 0.57f, 0.12f), 0.08f, 0.3f);
-        MeshPart(_adrenalineDevice, Cylinder(0.045f, 0.36f), Vector3.Zero, new Vector3(0, 0, Mathf.Pi / 2.0f), injector);
-        MeshPart(_adrenalineDevice, Cylinder(0.033f, 0.23f), Vector3.Zero, new Vector3(0, 0, Mathf.Pi / 2.0f), stimulant);
-        MeshPart(_adrenalineDevice, Box(new Vector3(0.08f, 0.08f, 0.08f)), new Vector3(0.23f, 0, 0), Vector3.Zero, injector);
+    private void CancelFieldUse(bool notify = false)
+    {
+        CancelMedicalUse(notify);
+        CancelPlate(notify);
         SetMedicalDeviceVisibility();
+    }
+
+    private void ResetFieldUseForRound()
+    {
+        CancelFieldUse(false);
+        _adrenalineRemaining = 0.0f;
     }
 
     private void SetMedicalDeviceVisibility()
     {
-        if (!IsInstanceValid(_medicalDeviceRoot))
+        if (_fieldUsePresentation is null)
         {
             return;
         }
-        _medicalDeviceRoot.Visible = MedicalActionBlocksWeapon;
-        _bandageDevice.Visible = MedicalActionBlocksWeapon && _medicalActionKind == MedicalItemKind.Bandage;
-        _medkitDevice.Visible = MedicalActionBlocksWeapon && _medicalActionKind == MedicalItemKind.FieldMedkit;
-        _adrenalineDevice.Visible = MedicalActionBlocksWeapon && _medicalActionKind == MedicalItemKind.Adrenaline;
+        if (MedicalActionBlocksWeapon)
+        {
+            _weaponRoot.Visible = false;
+            _knifeRoot.Visible = false;
+            UpdateHeldThrowableVisual();
+            _fieldUsePresentation.Present(
+                _medicalActionKind switch
+                {
+                    MedicalItemKind.FieldMedkit => FirstPersonFieldUsePresentationKind.FieldMedkit,
+                    MedicalItemKind.Adrenaline => FirstPersonFieldUsePresentationKind.Adrenaline,
+                    _ => FirstPersonFieldUsePresentationKind.Bandage
+                },
+                MedicalUseProgress);
+            return;
+        }
+        if (_isPlating)
+        {
+            _weaponRoot.Visible = false;
+            _knifeRoot.Visible = false;
+            UpdateHeldThrowableVisual();
+            _fieldUsePresentation.Present(
+                FirstPersonFieldUsePresentationKind.ArmorPlate,
+                1.0f - _plateTime / Mathf.Max(0.01f, _plateDuration));
+            return;
+        }
+        _fieldUsePresentation.Hide();
+        UpdateHeldItemVisibility();
     }
 
     private void AnimateMedicalDevice()
     {
-        if (!IsInstanceValid(_medicalDeviceRoot))
-        {
-            return;
-        }
-        var progress = MedicalUseProgress;
-        var pulse = Mathf.Sin(progress * Mathf.Pi * 6.0f) * 0.035f;
-        _medicalDeviceRoot.Position = new Vector3(0.23f, -0.28f + pulse, -0.58f + progress * 0.08f);
-        _medicalDeviceRoot.Rotation = new Vector3(-0.18f + progress * 0.3f, -0.22f, 0.16f + pulse);
+        SetMedicalDeviceVisibility();
     }
 
     internal void GrantMedicalItemForDiagnostics(MedicalItemKind kind, int quantity)
@@ -439,6 +447,8 @@ public partial class TacticalPlayer
     internal float SprintRecoveryThresholdForDiagnostics => SprintRecoveryThreshold;
 
     internal bool IsPlateUseActiveForDiagnostics => _isPlating;
+
+    internal float PlateUseRemainingForDiagnostics => _plateTime;
 
     internal void SetArmorForDiagnostics(float percent)
     {

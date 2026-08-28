@@ -94,6 +94,25 @@ public partial class FreightTerminalWorld
         _player.ClearReloadPoseForDiagnostics();
         _player.SetViewPitchForDiagnostics(0.0f);
 
+        _player.GrantFireablePrimaryForDiagnostics(
+            WeaponCatalog.Build(WeaponPlatform.AK74, 0));
+        await WaitFrames(8);
+        _player.SetViewPitchForDiagnostics(-0.42f);
+        await WaitFrames(4);
+        foreach (var (progress, fileStem) in new[]
+        {
+            (0.28f, "ak74_reload_remove"),
+            (0.64f, "ak74_reload_insert"),
+            (0.86f, "ak74_reload_charge")
+        })
+        {
+            _player.SetReloadPoseForDiagnostics(progress);
+            await WaitFrames(4);
+            SaveViewportImage($"res://open_hand_{fileStem}{suffix}");
+        }
+        _player.ClearReloadPoseForDiagnostics();
+        _player.SetViewPitchForDiagnostics(0.0f);
+
         var aimedCaptures = new (WeaponPlatform Platform, string FileStem)[]
         {
             (WeaponPlatform.M3A1, "m3a1"),

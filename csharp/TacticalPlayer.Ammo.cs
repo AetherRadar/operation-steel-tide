@@ -168,9 +168,24 @@ public partial class TacticalPlayer
         return true;
     }
 
+    private void CancelReload()
+    {
+        if (!_isReloading)
+        {
+            return;
+        }
+
+        _isReloading = false;
+        _reloadTime = 0.0f;
+        _activeReloadDuration = 0.0f;
+        _reloadSoundStage = 0;
+        ResetReloadRig();
+    }
+
     internal bool SetReloadPoseForDiagnostics(float progress)
     {
-        if (EquippedWeapon.Platform != WeaponPlatform.M3A1)
+        if (EquippedWeapon.Platform != WeaponPlatform.M3A1
+            && !UsesPlatformReloadPresentation())
         {
             return false;
         }
@@ -179,6 +194,7 @@ public partial class TacticalPlayer
         _reloadTime = _activeReloadDuration * (1.0f - Mathf.Clamp(progress, 0.0f, 1.0f));
         UpdateReloadAnimation();
         SyncAuthoredPrimaryWeapon();
+        UpdateAuthoredM4ReloadSupportArm();
         return true;
     }
 

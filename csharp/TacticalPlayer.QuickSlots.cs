@@ -78,15 +78,7 @@ public partial class TacticalPlayer
     }
 
     private void CancelReloadForQuickSlot()
-    {
-        if (!_isReloading)
-        {
-            return;
-        }
-        _isReloading = false;
-        _reloadTime = 0.0f;
-        ResetReloadRig();
-    }
+        => CancelReload();
 
     private void ReturnFromThrowableSlot()
     {
@@ -99,8 +91,16 @@ public partial class TacticalPlayer
 
     private void UpdateHeldItemVisibility()
     {
-        var firearmVisible = IsFirearmQuickSlotSelected && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
-        var knifeVisible = _activeQuickSlot == PlayerQuickSlot.Melee && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon;
+        var firearmVisible = IsFirearmQuickSlotSelected
+            && !UiLocked
+            && !_isPlating
+            && !RoleActionBlocksWeapon
+            && !MedicalActionBlocksWeapon;
+        var knifeVisible = _activeQuickSlot == PlayerQuickSlot.Melee
+            && !UiLocked
+            && !_isPlating
+            && !RoleActionBlocksWeapon
+            && !MedicalActionBlocksWeapon;
         if (IsInstanceValid(_weaponRoot))
         {
             _weaponRoot.Visible = firearmVisible;

@@ -64,6 +64,9 @@ internal sealed class AuthoredWeaponVisual
     public Node3D SuppressorTip { get; }
     public Node3D OpticReticleAnchor { get; }
     public Node3D ActiveMuzzleTip => Suppressor.Visible ? SuppressorTip : MuzzleDeviceTip;
+    public bool HasVisibleMagazineMechanism
+        => CombatModelLibrary.MeshesBelow(Magazine).Any(mesh => mesh.Mesh is not null)
+            && CombatModelLibrary.MeshesBelow(SpareMagazine).Any(mesh => mesh.Mesh is not null);
     public VssIntegratedScopeInspection IntegratedOpticInspection
         => Platform == WeaponPlatform.VSS
             ? CombatModelLibrary.InspectVssIntegratedScope(Root, OpticReticleAnchor)
@@ -803,7 +806,15 @@ internal static partial class CombatModelLibrary
         }
         presentation.AddChild(source);
         root.AddChild(presentation);
-        var opticMount = AddWeaponMarkers(root, targetLength);
+        var (authoredMagazine, authoredSpareMagazine) = AttachReloadableMagazine(
+            root,
+            source,
+            platform);
+        var opticMount = AddWeaponMarkers(
+            root,
+            targetLength,
+            authoredMagazine,
+            authoredSpareMagazine);
         if (platform == WeaponPlatform.VSS)
         {
             var aperture = InspectVssIntegratedScope(root);
@@ -833,10 +844,74 @@ internal static partial class CombatModelLibrary
         return new AuthoredWeaponVisual(root, platform);
     }
 
-    private static Node3D AddWeaponMarkers(Node3D root, float length)
+    private static (Node3D? Magazine, Node3D? SpareMagazine) AttachReloadableMagazine(
+        Node3D root,
+        Node3D source,
+        WeaponPlatform platform)
     {
-        AddMarker(root, "Magazine", new Vector3(0.0f, -0.2f, -0.18f));
-        AddMarker(root, "SpareMagazine", new Vector3(-0.3f, -0.62f, -0.18f));
+        if (platform != WeaponPlatform.AK74)
+        {
+            return (null, null);
+        }
+
+        var magazineGeometry = FindOptionalNode(source, "MagazineGeometry")
+            ?? throw new InvalidOperationException(
+                "Reloadable AK-74N asset is missing MagazineGeometry.");
+        var geometryInWeaponRoot = TransformBelowAncestor(
+            magazineGeometry,
+            root);
+        var magazine = new Node3D
+        {
+            Name = "Magazine",
+            Position = new Vector3(0.0f, -0.2f, -0.31f)
+        };
+        root.AddChild(magazine);
+        magazineGeometry.Owner = null;
+        magazineGeometry.Reparent(magazine, keepGlobalTransform: false);
+        magazineGeometry.Transform = magazine.Transform.AffineInverse()
+            * geometryInWeaponRoot;
+
+        var spareMagazine = new Node3D
+        {
+            Name = "SpareMagazine",
+            Position = new Vector3(-0.3f, -0.62f, -0.18f),
+            Visible = false
+        };
+        root.AddChild(spareMagazine);
+        var spareGeometry = (Node3D)magazineGeometry.Duplicate();
+        spareGeometry.Name = "SpareMagazineGeometry";
+        spareMagazine.AddChild(spareGeometry);
+        spareGeometry.Transform = magazineGeometry.Transform;
+        return (magazine, spareMagazine);
+    }
+
+    private static Transform3D TransformBelowAncestor(
+        Node3D node,
+        Node3D ancestor)
+    {
+        var transform = node.Transform;
+        for (var parent = node.GetParent() as Node3D;
+             parent is not null && !ReferenceEquals(parent, ancestor);
+             parent = parent.GetParent() as Node3D)
+        {
+            transform = parent.Transform * transform;
+        }
+        return transform;
+    }
+
+    private static Node3D AddWeaponMarkers(
+        Node3D root,
+        float length,
+        Node3D? authoredMagazine = null,
+        Node3D? authoredSpareMagazine = null)
+    {
+        // Match TacticalPlayer's mechanism rest frame. Keeping adapted weapons
+        // 0.13 m forward of that source frame made the visible support hand miss
+        // the authored magazine marker throughout non-M4 reloads.
+        _ = authoredMagazine
+            ?? AddMarker(root, "Magazine", new Vector3(0.0f, -0.2f, -0.31f));
+        _ = authoredSpareMagazine
+            ?? AddMarker(root, "SpareMagazine", new Vector3(-0.3f, -0.62f, -0.18f));
         AddMarker(root, "ChargingHandle", new Vector3(0.075f, 0.085f, -0.05f));
         AddMarker(root, "Stock", new Vector3(0.0f, 0.0f, 0.28f));
         AddMarker(root, "Foregrip", new Vector3(0.0f, -0.16f, 0.18f - length * 0.55f));
@@ -1107,7 +1182,8 @@ internal static partial class CombatModelLibrary
             WeaponPlatform.M4A1 => WeaponScenePath,
             WeaponPlatform.GSh18 => Gsh18ScenePath,
             WeaponPlatform.DesertEagle => DesertEagleScenePath,
-            WeaponPlatform.AK74 => $"{QuaterniusWeaponRoot}/ak74.glb",
+            WeaponPlatform.AK74 =>
+                "res://assets/models/steel_tide_ak74/ak74_reloadable.glb",
             WeaponPlatform.ScarL => $"{QuaterniusWeaponRoot}/scarl.glb",
             WeaponPlatform.M24 => $"{QuaterniusWeaponRoot}/m24.glb",
             WeaponPlatform.MP5A5 => $"{QuaterniusWeaponRoot}/mp5a5.glb",

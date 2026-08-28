@@ -3082,7 +3082,10 @@ public partial class FreightTerminalWorld : Node3D
         Input.ActionRelease("use_plate");
         await WaitFrames(2);
         var restarted = _player.IsPlateUseActiveForDiagnostics;
-        var deadline = Time.GetTicksMsec() + 4000;
+        // This check runs against the full rendered freight terminal. On slower
+        // validation frames Godot intentionally caps physics catch-up, so allow
+        // enough wall time for the authored 2.2 s plate action to finish.
+        var deadline = Time.GetTicksMsec() + 10000;
         while (_player.ArmorPlates == platesBefore && Time.GetTicksMsec() < deadline)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -3118,7 +3121,7 @@ public partial class FreightTerminalWorld : Node3D
             && plateAction
             && plateKeyBound
             && secondaryControlsWorked;
-        GD.Print($"EQUIPMENT_CHECK valid={valid} plate_started={plateStarted} movement_allowed={movementAllowed} cancel_hint={cancelHintVisible} cancelled_by_x={cancelledByKey} restarted={restarted} completed={completed} plates={platesBefore}->{_player.ArmorPlates} armor={armorBefore:0.0}->{_player.Armor:0.0} action={plateAction} key_x={plateKeyBound} mode={_player.FireMode} light={_player.FlashlightOn}");
+        GD.Print($"EQUIPMENT_CHECK valid={valid} plate_started={plateStarted} movement_allowed={movementAllowed} cancel_hint={cancelHintVisible} cancelled_by_x={cancelledByKey} restarted={restarted} completed={completed} plates={platesBefore}->{_player.ArmorPlates} armor={armorBefore:0.0}->{_player.Armor:0.0} plate_active={_player.IsPlateUseActiveForDiagnostics} plate_remaining={_player.PlateUseRemainingForDiagnostics:0.000} ui_locked={_player.UiLocked} medical_wheel={_hud.IsMedicalWheelVisible} role_action={_player.RoleActionBlocksWeapon} in_vehicle={_player.IsInVehicle} process_mode={_player.ProcessMode} action={plateAction} key_x={plateKeyBound} mode={_player.FireMode} light={_player.FlashlightOn}");
         GD.Print($"EQUIPMENT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

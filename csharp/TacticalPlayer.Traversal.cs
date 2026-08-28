@@ -136,12 +136,7 @@ public partial class TacticalPlayer
         {
             CancelPlate(notify: false);
         }
-        if (_isReloading)
-        {
-            _isReloading = false;
-            _reloadTime = 0.0f;
-            ResetReloadRig();
-        }
+        CancelReload();
         _isAiming = false;
         _slideTime = 0.0f;
         _stance = PlayerStance.Standing;

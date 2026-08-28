@@ -70,7 +70,8 @@ public partial class TacticalPlayer
 
         EjectFromVehicleIfAny();
         CloseMedicalWheelWithoutUse();
-        CancelMedicalUse(false);
+        CancelFieldUse(false);
+        CancelReload();
         UiLocked = true;
         DisarmFireInput();
         DisarmMovementInput();
@@ -99,6 +100,7 @@ public partial class TacticalPlayer
         Position = Vector3.Zero;
         Rotation = Vector3.Zero;
         IsExtractionPassenger = true;
+        UpdateHeldThrowableVisual();
         SetPhysicsProcess(false);
     }
 
@@ -137,11 +139,7 @@ public partial class TacticalPlayer
             _roleActionRemaining = spec.SkillDuration;
             _roleActionElapsed = 0.0f;
             _isAiming = false;
-            if (_isReloading)
-            {
-                _isReloading = false;
-                ResetReloadRig();
-            }
+            CancelReload();
             SetRoleDeviceVisibility();
         }
 

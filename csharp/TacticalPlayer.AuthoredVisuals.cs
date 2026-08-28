@@ -800,6 +800,10 @@ public partial class TacticalPlayer
         _primaryForearm.Rotation = new Vector3(-0.18f, 0.05f, -0.3f);
         _supportForearm.Position = support + new Vector3(-0.09f, -0.24f, 0.1f);
         _supportForearm.Rotation = new Vector3(0.22f, 0.05f, -0.28f);
+        if (_isReloading && UsesPlatformReloadPresentation())
+        {
+            UpdatePlatformReloadAnimation();
+        }
     }
 
     private void EnsureAuthoredFirstPersonSmg()
@@ -991,13 +995,17 @@ public partial class TacticalPlayer
     }
 
     private void UpdateAuthoredM4ReloadSupportArm()
+        => UpdateAuthoredReloadSupportArm();
+
+    private void UpdateAuthoredReloadSupportArm()
     {
         if (!_isReloading
-            || EquippedWeapon.Platform != WeaponPlatform.M4A1
+            || (EquippedWeapon.Platform != WeaponPlatform.M4A1
+                && !UsesPlatformReloadPresentation())
             || ActiveAuthoredArms() is not { } arms
             || !IsInstanceValid(arms.Root)
             || !arms.Root.Visible
-            || !IsInstanceValid(_authoredPrimaryWeapon?.Root))
+            || !IsInstanceValid(ActiveAuthoredWeaponRootForDiagnostics))
         {
             return;
         }
@@ -1012,7 +1020,7 @@ public partial class TacticalPlayer
         var restTransform = arms.LeftArm.Transform;
         var restGripInArms = arms.MarkerTransformInRoot(arms.LeftGripFrame).Origin;
         var targetInArms = arms.Root.GlobalTransform.AffineInverse()
-            * M4ReloadSupportTargetGlobal();
+            * ReloadSupportTargetGlobal();
         var restReach = restGripInArms - restTransform.Origin;
         var targetReach = targetInArms - restTransform.Origin;
         if (restReach.LengthSquared() > 0.000001f
@@ -1029,13 +1037,16 @@ public partial class TacticalPlayer
     }
 
     private Vector3 M4ReloadSupportTargetGlobal()
+        => ReloadSupportTargetGlobal();
+
+    private Vector3 ReloadSupportTargetGlobal()
         => IsInstanceValid(_supportHand)
             ? _supportHand.GlobalPosition
             : Vector3.Zero;
 
     private void ResetAuthoredM4ReloadSupportArm()
     {
-        if (EquippedWeapon.Platform == WeaponPlatform.M4A1)
+        if (ActiveAuthoredArms() is { } arms && IsInstanceValid(arms.Root))
         {
             AlignAuthoredArmsToWeapon();
         }
@@ -1114,7 +1125,7 @@ public partial class TacticalPlayer
         {
             return;
         }
-        authoredWeapon.SyncMechanismState(_magazine, _spareMagazine, _chargingHandle);
+        authoredWeapon.SyncMechanisms(_magazine, _spareMagazine, _chargingHandle);
         if (EquippedWeapon.Platform == WeaponPlatform.VSS
             && _opticRoot.Visible
             && EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Optic, out var opticId)

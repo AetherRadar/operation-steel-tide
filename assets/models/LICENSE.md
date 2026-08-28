@@ -44,6 +44,45 @@ mapping, acquisition date, license, output hashes, removed source-glass panes,
 and physically open aperture checks are recorded in
 `steel_tide_optics/LICENSE.md` and `../../source_art/combat_optics/README.md`.
 
+The mechanism-ready Steel Tide AK-74N is a Blender adaptation of the same
+tracked Quaternius Ultimate Guns Pack AK source. It preserves all 1,382 CC0
+source triangles and five materials while separating the existing 227-triangle
+curved magazine into independently animated runtime geometry. Its runtime
+output is `steel_tide_ak74/ak74_reloadable.glb`, its editable source is
+`../../source_art/reloadable_weapons/ak74_reloadable.blend`, and its
+reproducible adaptation is `../../scripts/blender/build_reloadable_ak74.py`.
+Exact hashes, source mapping, topology checks, acquisition and adaptation dates,
+and the CC0 record are in `steel_tide_ak74/LICENSE.md` and
+`../../source_art/reloadable_weapons/README.md`.
+
+## Project-authored first-person field-use props
+
+The trauma kit, dressing packet, injector, curved armor plate, plate carrier,
+materials, moving lids, and six contact markers were created for Operation
+Steel Tide in Blender 4.5 on 2026-08-28. They contain no third-party geometry,
+textures, logos, or marketplace content and are covered by the repository's
+root MIT license, subject to the disclosure in `docs/CONTENT_PROVENANCE.md`.
+
+- Creator: Operation Steel Tide project contributors, with the AI-assisted DCC
+  workflow disclosed in `docs/CONTENT_PROVENANCE.md`.
+- Official source URL: not applicable; this is repository-original content.
+- Exact license: the repository root MIT license.
+- Required attribution: preserve the root MIT copyright and permission notice;
+  no additional third-party attribution is required.
+- Creation date: 2026-08-28.
+- Editable source: `../../source_art/field_use/field_use_props.blend`.
+- Runtime output: `steel_tide_field_use/field_use_props.glb`.
+- Studio preview: `steel_tide_field_use/field_use_props_preview.png`.
+- Reproducible build: `../../scripts/blender/build_field_use_props.py`.
+- Detailed local record: `steel_tide_field_use/LICENSE.md` and
+  `../../source_art/field_use/README.md`.
+
+The verified runtime GLB contains 138 authored meshes, 22,276 triangles, and 17
+PBR materials within a 0.380 by 0.241 by 0.487 metre set. The Blender build
+saves the authoritative source and embedded GLB, renders the preview, reimports
+the GLB, and rejects missing contract nodes, external payloads, material drift,
+changed bounds, or an out-of-budget mesh.
+
 The legacy Steel Tide operator model remains project-authored by
 `scripts/blender/generate_combat_models.py`. Its editable source is
 `../../source_art/combat_models/steel_tide_operator.blend`, and its generated

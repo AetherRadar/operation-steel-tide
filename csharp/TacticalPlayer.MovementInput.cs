@@ -234,12 +234,7 @@ public partial class TacticalPlayer
             _isVaulting = true;
             _isAiming = false;
             CancelMeleeAction();
-            if (_isReloading)
-            {
-                _isReloading = false;
-                _reloadTime = 0.0f;
-                ResetReloadRig();
-            }
+            CancelReload();
             DisarmFireInput();
             if (IsInstanceValid(_weaponLight))
             {

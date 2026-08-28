@@ -12,17 +12,17 @@ public partial class FreightTerminalWorld
             ? new Vector2I(2048, 621)
             : narrow
                 ? new Vector2I(985, 847)
-                : GetWindow().Size;
-        if (narrow || ultrawide)
-        {
-            var window = GetWindow();
-            window.ContentScaleMode = Window.ContentScaleModeEnum.CanvasItems;
-            window.ContentScaleAspect = Window.ContentScaleAspectEnum.Ignore;
-            window.Size = requestedWindowSize;
-        }
+                : new Vector2I(1280, 720);
+        // The headless display driver otherwise exposes a 64x64 or zero-sized
+        // surface, making every screen-projection assertion fail without ever
+        // exercising the real pose. Give all variants a deterministic render
+        // target; narrow and ultrawide still retain their distinct aspect gates.
+        var window = GetWindow();
+        window.ContentScaleMode = Window.ContentScaleModeEnum.CanvasItems;
+        window.ContentScaleAspect = Window.ContentScaleAspectEnum.Ignore;
+        window.Size = requestedWindowSize;
         await WaitFrames(4);
-        var layoutValid = (!narrow && !ultrawide)
-            || GetWindow().Size == requestedWindowSize;
+        var layoutValid = GetWindow().Size == requestedWindowSize;
         Input.ActionRelease("aim");
         // Move player to open area away from walls for clear view
         _player.GlobalPosition = new Vector3(0, 0.2f, 40.0f);
@@ -44,17 +44,8 @@ public partial class FreightTerminalWorld
         foreach (var platform in platforms)
         {
             _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
-            if (WeaponCatalog.IsSidearm(platform))
-            {
-                for (var frame = 0; frame < 90; frame++)
-                {
-                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-                }
-            }
-            else
-            {
-                await WaitFrames(8);
-            }
+            _player.SetAimingPoseForDiagnostics(false);
+            await WaitFrames(4);
             var proceduralVisible = IsInstanceValid(proceduralArms)
                 && proceduralArms.Visible;
             var weaponVisible = _player.UsesAuthoredWeaponPlatformForDiagnostics(platform);
@@ -134,16 +125,12 @@ public partial class FreightTerminalWorld
             {
                 sidearmHip = _player.InspectSidearmPresentationForDiagnostics();
                 Input.ActionPress("aim");
-                for (var frame = 0; frame < 90; frame++)
-                {
-                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-                }
+                _player.SetAimingPoseForDiagnostics(true);
+                await WaitFrames(4);
                 sidearmAds = _player.InspectSidearmPresentationForDiagnostics();
                 Input.ActionRelease("aim");
-                for (var frame = 0; frame < 12; frame++)
-                {
-                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-                }
+                _player.SetAimingPoseForDiagnostics(false);
+                await WaitFrames(2);
                 sidearmPresentationValid &= sidearmHip.Valid && sidearmAds.Valid;
             }
             else
@@ -198,6 +185,162 @@ public partial class FreightTerminalWorld
         var smgReloadPresentation = reloadPoseSet
             && _player.SmgReloadPresentationValidForDiagnostics;
         _player.ClearReloadPoseForDiagnostics();
+
+        _player.GrantFireablePrimaryForDiagnostics(
+            WeaponCatalog.Build(WeaponPlatform.AK74, 0));
+        await WaitFrames(8);
+        var akIdle = _player.InspectAuthoredPlatformReloadForDiagnostics();
+        var akReloadPoseSet = true;
+        var akReloadArmsActive = true;
+        var akReloadPrimaryGripFixed = true;
+        var akReloadSupportTracks = true;
+        var akReloadMechanismState = true;
+        var akReloadLeftArmMoves = true;
+        var akReloadSleevesContinuous = true;
+        var akReloadSleevesAtBottom = true;
+        var akReloadViewStable = true;
+        var akReloadIdempotent = true;
+        var akReloadMaximumGripResidual = 0.0f;
+        var akReloadMaximumSupportDistance = 0.0f;
+        var akReloadMaximumMagazineDistance = 0.0f;
+        var akReloadMinimumLeftArmMotion = float.PositiveInfinity;
+        var akReloadSampleCount = 0;
+        foreach (var progress in new[] { 0.28f, 0.44f, 0.64f })
+        {
+            var poseSet = _player.SetReloadPoseForDiagnostics(progress);
+            var first = _player.InspectAuthoredPlatformReloadForDiagnostics();
+            var repeatedPoseSet = _player.SetReloadPoseForDiagnostics(progress);
+            var repeated = _player.InspectAuthoredPlatformReloadForDiagnostics();
+            var primaryGripFixed = first.RightGripResidual <= 0.004f
+                && repeated.RightGripResidual <= 0.004f
+                && first.RightGrip.DistanceTo(akIdle.RightGrip) <= 0.002f
+                && HandTransformsMatch(
+                    akIdle.RightArmTransform,
+                    first.RightArmTransform);
+            var supportTracks = first.SupportTargetDistance <= 0.002f
+                && repeated.SupportTargetDistance <= 0.002f
+                && first.ActiveMagazineDistance <= 0.11f
+                && repeated.ActiveMagazineDistance <= 0.11f;
+            var expectedPrimaryVisible = progress < 0.50f;
+            var mechanismState = first.PrimaryMagazineVisible == expectedPrimaryVisible
+                && first.SpareMagazineVisible == !expectedPrimaryVisible
+                && first.SeparateMagazineNodes
+                && first.VisibleMagazineMechanism
+                && first.PrimaryMagazinePosition.DistanceTo(first.SpareMagazinePosition) >= 0.03f;
+            var leftArmMotion = HandBasisDelta(
+                    akIdle.LeftArmTransform.Basis,
+                    first.LeftArmTransform.Basis)
+                + akIdle.LeftArmTransform.Origin.DistanceTo(
+                    first.LeftArmTransform.Origin);
+            var sleevesContinuous = first.LeftSleeveWristLength is >= 0.045f and <= 0.28f
+                && first.RightSleeveWristLength is >= 0.045f and <= 0.28f
+                && Mathf.Abs(first.LeftSleeveWristLength - akIdle.LeftSleeveWristLength) <= 0.001f
+                && Mathf.Abs(first.RightSleeveWristLength - akIdle.RightSleeveWristLength) <= 0.001f;
+            var viewStable = first.ReloadViewTarget.DistanceTo(
+                    new Vector3(0.26f, -0.30f, -0.72f)) <= 0.001f
+                && first.ReloadRotationTarget.Length() <= 0.001f;
+            var idempotent = HandTransformsMatch(
+                    first.RightArmTransform,
+                    repeated.RightArmTransform)
+                && HandTransformsMatch(
+                    first.LeftArmTransform,
+                    repeated.LeftArmTransform)
+                && first.RightGrip.DistanceTo(repeated.RightGrip) <= 0.0001f
+                && first.LeftGrip.DistanceTo(repeated.LeftGrip) <= 0.0001f
+                && first.SupportTarget.DistanceTo(repeated.SupportTarget) <= 0.0001f
+                && first.PrimaryMagazinePosition.DistanceTo(
+                    repeated.PrimaryMagazinePosition) <= 0.0001f
+                && first.SpareMagazinePosition.DistanceTo(
+                    repeated.SpareMagazinePosition) <= 0.0001f;
+            var sampleValid = poseSet
+                && repeatedPoseSet
+                && first.AuthoredArmsActive
+                && primaryGripFixed
+                && supportTracks
+                && mechanismState
+                && leftArmMotion >= 0.05f
+                && sleevesContinuous
+                && first.SleevesReachFrameBottom
+                && viewStable
+                && idempotent;
+            akReloadPoseSet &= poseSet && repeatedPoseSet;
+            akReloadArmsActive &= first.AuthoredArmsActive;
+            akReloadPrimaryGripFixed &= primaryGripFixed;
+            akReloadSupportTracks &= supportTracks;
+            akReloadMechanismState &= mechanismState;
+            akReloadLeftArmMoves &= leftArmMotion >= 0.05f;
+            akReloadSleevesContinuous &= sleevesContinuous;
+            akReloadSleevesAtBottom &= first.SleevesReachFrameBottom;
+            akReloadViewStable &= viewStable;
+            akReloadIdempotent &= idempotent;
+            akReloadMaximumGripResidual = Mathf.Max(
+                akReloadMaximumGripResidual,
+                first.RightGripResidual);
+            akReloadMaximumSupportDistance = Mathf.Max(
+                akReloadMaximumSupportDistance,
+                first.SupportTargetDistance);
+            akReloadMaximumMagazineDistance = Mathf.Max(
+                akReloadMaximumMagazineDistance,
+                first.ActiveMagazineDistance);
+            akReloadMinimumLeftArmMotion = Mathf.Min(
+                akReloadMinimumLeftArmMotion,
+                leftArmMotion);
+            akReloadSampleCount++;
+            GD.Print(
+                $"AK_RELOAD_ARM_SAMPLE progress={progress:F2} valid={sampleValid} "
+                + $"authored_active={first.AuthoredArmsActive} "
+                + $"right_grip_residual={first.RightGripResidual:F6} "
+                + $"support_target_distance={first.SupportTargetDistance:F6} "
+                + $"active_magazine_distance={first.ActiveMagazineDistance:F6} "
+                + $"primary_magazine_visible={first.PrimaryMagazineVisible} "
+                + $"spare_magazine_visible={first.SpareMagazineVisible} "
+                + $"visible_magazine_mechanism={first.VisibleMagazineMechanism} "
+                + $"left_arm_motion={leftArmMotion:F6} "
+                + $"sleeves_bottom={first.SleevesReachFrameBottom} "
+                + $"view_stable={viewStable} idempotent={idempotent}");
+        }
+        _player.ClearReloadPoseForDiagnostics();
+        var akReset = _player.InspectAuthoredPlatformReloadForDiagnostics();
+        var akReloadReset = akReset.AuthoredArmsActive
+            && akReset.PrimaryMagazineVisible
+            && !akReset.SpareMagazineVisible
+            && HandTransformsMatch(
+                akIdle.RightArmTransform,
+                akReset.RightArmTransform)
+            && HandTransformsMatch(
+                akIdle.LeftArmTransform,
+                akReset.LeftArmTransform)
+            && akIdle.RightGrip.DistanceTo(akReset.RightGrip) <= 0.0001f
+            && akIdle.LeftGrip.DistanceTo(akReset.LeftGrip) <= 0.0001f;
+        var akReloadValid = akIdle.AuthoredArmsActive
+            && akReloadPoseSet
+            && akReloadArmsActive
+            && akReloadPrimaryGripFixed
+            && akReloadSupportTracks
+            && akReloadMechanismState
+            && akReloadLeftArmMoves
+            && akReloadSleevesContinuous
+            && akReloadSleevesAtBottom
+            && akReloadViewStable
+            && akReloadIdempotent
+            && akReloadReset
+            && akReloadSampleCount == 3;
+        GD.Print(
+            $"AK_RELOAD_ARM_CHECK valid={akReloadValid} samples={akReloadSampleCount} "
+            + $"pose_set={akReloadPoseSet} authored_active={akReloadArmsActive} "
+            + $"primary_grip_fixed={akReloadPrimaryGripFixed} "
+            + $"support_tracks={akReloadSupportTracks} "
+            + $"mechanism_state={akReloadMechanismState} "
+            + $"left_arm_moves={akReloadLeftArmMoves} "
+            + $"sleeves_continuous={akReloadSleevesContinuous} "
+            + $"sleeves_bottom={akReloadSleevesAtBottom} "
+            + $"view_stable={akReloadViewStable} "
+            + $"idempotent={akReloadIdempotent} reset={akReloadReset} "
+            + $"max_grip_residual={akReloadMaximumGripResidual:F6} "
+            + $"max_support_distance={akReloadMaximumSupportDistance:F6} "
+            + $"max_magazine_distance={akReloadMaximumMagazineDistance:F6} "
+            + $"min_left_arm_motion={akReloadMinimumLeftArmMotion:F6}");
+        GD.Print($"AK_RELOAD_ARM_PASS valid={akReloadValid}");
 
         _player.GrantFireablePrimaryForDiagnostics(
             WeaponCatalog.Build(WeaponPlatform.M4A1, 0));
@@ -408,6 +551,7 @@ public partial class FreightTerminalWorld
             && smgSleeveVolume
             && smgWeaponSize
             && smgReloadPresentation
+            && akReloadValid
             && m4ReloadValid
             && layoutValid
             && results.Count == platforms.Length;
@@ -421,6 +565,7 @@ public partial class FreightTerminalWorld
             + $"smg_arm_bounds={smgArmBounds} "
             + $"smg_weapon_size={smgWeaponSize} smg_weapon_bounds={smgWeaponBounds} "
             + $"smg_reload_presentation={smgReloadPresentation} "
+            + $"ak_reload_arm={akReloadValid} "
             + $"m4_reload_arm={m4ReloadValid} "
             + $"layout_valid={layoutValid} samples={results.Count} "
             + $"requested_window={(ultrawide || narrow ? requestedWindowSize.ToString() : "default")} "

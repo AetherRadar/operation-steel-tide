@@ -283,12 +283,7 @@ public partial class TacticalPlayer
         {
             return true;
         }
-        if (_isReloading)
-        {
-            _isReloading = false;
-            _reloadTime = 0.0f;
-            ResetReloadRig();
-        }
+        CancelReload();
         if (storeCurrent)
         {
             StoreActiveFirearmState();
