@@ -20,6 +20,25 @@ internal sealed record JianghaiOldCitySceneLoadResult(
     int AuthoredStatusScreenCount,
     int AuthoredStatusScreenTotal,
     int DetailMeshCount,
+    int ValleyFoundationMeshCount,
+    long ValleyFoundationTriangleCount,
+    int ValleyMountainMeshCount,
+    long ValleyInstanceTriangleCount,
+    Aabb ValleyWorldBounds,
+    Aabb ValleyFoundationWorldBounds,
+    Aabb ValleyMountainWorldBounds,
+    int ValleyExpectedMountainNameCount,
+    int ValleyUniqueMountainMeshCount,
+    int ValleyCollisionNodeCount,
+    bool ValleyHierarchyReady,
+    bool ValleyMountainsOutsidePlayableBounds,
+    float ValleyMountainMaxAngularGapRadians,
+    int ValleyFoundationVertexCount,
+    float ValleyFoundationMinHeight,
+    float ValleyFoundationMaxHeight,
+    bool ValleyFoundationGeometryReady,
+    bool ValleyFoundationMaterialsReady,
+    bool ValleyFoundationUvReady,
     IReadOnlyDictionary<string, Aabb> AuthoredTerminalWorldBounds)
 {
     public int QualityTier { get; internal set; } = 2;
@@ -41,6 +60,7 @@ internal sealed class JianghaiOldCitySceneLoader
     private static readonly HashSet<string> RequiredAnchorNames = new(StringComparer.Ordinal)
     {
         "AuthoredStreetNetwork",
+        "JianghaiValleyEnvironment",
         "JianghaiTenementDistrict",
         "RedStarElectronicsFactory",
         "GuangchangPawnshop",
@@ -68,7 +88,6 @@ internal sealed class JianghaiOldCitySceneLoader
         ["GrandHotelSecurityTerminalVisual_AuthoredStatusScreen"] = 0,
         ["MunicipalTreasuryManifestTerminalVisual_AuthoredStatusScreen"] = 1
     };
-
     private readonly string _scenePath;
     private readonly List<MeshQualityProfile> _meshQualityProfiles = new();
     private readonly List<TerminalScreenMaterialBinding>[] _terminalScreenBindings =
@@ -125,6 +144,7 @@ internal sealed class JianghaiOldCitySceneLoader
 
         var statistics = new SceneStatistics();
         InspectScene(cityRoot, statistics);
+        var valley = JianghaiOldCityValleyInspector.Inspect(cityRoot);
         var terminalCount = 0;
         var visibleTerminalCount = 0;
         var alignedTerminalCount = 0;
@@ -173,6 +193,25 @@ internal sealed class JianghaiOldCitySceneLoader
             statistics.AuthoredStatusScreens.Count,
             AuthoredStatusScreenIndices.Count,
             statistics.DetailMeshCount,
+            valley.FoundationMeshCount,
+            valley.FoundationTriangleCount,
+            valley.MountainMeshCount,
+            valley.InstanceTriangleCount,
+            valley.WorldBounds,
+            valley.FoundationWorldBounds,
+            valley.MountainWorldBounds,
+            valley.ExpectedMountainNameCount,
+            valley.UniqueMountainMeshCount,
+            valley.CollisionNodeCount,
+            valley.HierarchyReady,
+            valley.MountainsOutsidePlayableBounds,
+            valley.MountainMaxAngularGapRadians,
+            valley.FoundationVertexCount,
+            valley.FoundationMinHeight,
+            valley.FoundationMaxHeight,
+            valley.FoundationGeometryReady,
+            valley.FoundationMaterialsReady,
+            valley.FoundationUvReady,
             terminalWorldBounds);
         ApplyQuality(_qualityTier);
         ResetTerminalStatuses();
@@ -285,8 +324,7 @@ internal sealed class JianghaiOldCitySceneLoader
         var nodeName = node.Name.ToString();
         if (RequiredAnchorNames.Contains(nodeName))
         {
-            statistics.RequiredAnchors.Add(nodeName);
-            if (node is Node3D anchor)
+            if (statistics.RequiredAnchors.Add(nodeName) && node is Node3D anchor)
             {
                 statistics.AnchorNodes[nodeName] = anchor;
             }
@@ -294,6 +332,10 @@ internal sealed class JianghaiOldCitySceneLoader
 
         if (node is MeshInstance3D { Mesh: { } mesh } meshInstance)
         {
+            if (nodeName.StartsWith("JianghaiPerimeterGround", StringComparison.Ordinal))
+            {
+                ConfigureValleyGroundFiltering(meshInstance, mesh);
+            }
             statistics.MeshInstanceCount++;
             var profile = CreateQualityProfile(meshInstance);
             _meshQualityProfiles.Add(profile);
@@ -336,6 +378,26 @@ internal sealed class JianghaiOldCitySceneLoader
         }
     }
 
+    private static void ConfigureValleyGroundFiltering(MeshInstance3D ground, Mesh mesh)
+    {
+        for (var surfaceIndex = 0; surfaceIndex < mesh.GetSurfaceCount(); surfaceIndex++)
+        {
+            if (ground.GetActiveMaterial(surfaceIndex) is not BaseMaterial3D sourceMaterial)
+            {
+                continue;
+            }
+
+            var localMaterial = sourceMaterial.Duplicate() as BaseMaterial3D;
+            if (localMaterial is null)
+            {
+                continue;
+            }
+            localMaterial.TextureFilter =
+                BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic;
+            ground.SetSurfaceOverrideMaterial(surfaceIndex, localMaterial);
+        }
+    }
+
     private static MeshQualityProfile CreateQualityProfile(MeshInstance3D meshInstance)
     {
         var localSize = meshInstance.GetAabb().Size;
@@ -345,14 +407,19 @@ internal sealed class JianghaiOldCitySceneLoader
             localSize.Y * globalScale.Y,
             localSize.Z * globalScale.Z);
         var diagonal = worldSize.Length();
-        var baseVisibilityRange = diagonal switch
+        var name = meshInstance.Name.ToString();
+        var isValleyEnvironment = ContainsAny(
+            name,
+            "OldCityFoundation",
+            "JianghaiPerimeterGround",
+            "JianghaiMountainMassif");
+        var baseVisibilityRange = isValleyEnvironment ? 1200.0f : diagonal switch
         {
             <= 1.2f => 105.0f,
             <= 4.0f => 180.0f,
             <= 12.0f => 285.0f,
             _ => 460.0f
         };
-        var name = meshInstance.Name.ToString();
         var isFineDetail = diagonal <= 1.2f
             || ContainsAny(name, "Screen", "Indicator", "Fastener", "Text", "Cable", "Lens");
         var isDetail = diagonal <= 12.0f
@@ -366,7 +433,8 @@ internal sealed class JianghaiOldCitySceneLoader
                 "Crate",
                 "SecurityCamera",
                 "Television");
-        var alwaysDisableShadow = diagonal <= 0.45f
+        var alwaysDisableShadow = isValleyEnvironment
+            || diagonal <= 0.45f
             || ContainsAny(name, "ScreenTrace", "StatusScreen", "Indicator", "Fastener", "Text");
         return new MeshQualityProfile(
             meshInstance,
@@ -466,7 +534,7 @@ internal sealed class JianghaiOldCitySceneLoader
         if (!initialized)
         {
             throw new InvalidOperationException(
-                $"Authored terminal '{node.Name}' has no visible mesh bounds.");
+                $"Authored scene node '{node.Name}' has no visible mesh bounds.");
         }
         return new Aabb(minimum, maximum - minimum);
     }

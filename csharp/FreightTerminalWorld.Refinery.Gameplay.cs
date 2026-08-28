@@ -6,6 +6,11 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    // File-size exception (docs/ENGINEERING_STANDARDS.md): this legacy partial still
+    // couples refinery spawning with the existing end-to-end map diagnostic helpers.
+    // This change moves capture and valley inspection into focused partials; the next
+    // refinery-diagnostic edit must extract ValidateRefineryMap and its helper cohort
+    // into FreightTerminalWorld.Refinery.Validation.cs before adding another validator.
     private static readonly Vector3[] RefineryWorldBossPatrolRoute =
     {
         new(-132, 0.2f, 40), new(-86, 0.2f, 31), new(-24, 0.2f, 28),
@@ -263,6 +268,30 @@ public partial class FreightTerminalWorld
             && authored.AuthoredStatusScreenCount == authored.AuthoredStatusScreenTotal
             && authored.AuthoredStatusScreenTotal == 2
             && authored.DetailMeshCount > 0
+            && authored.ValleyFoundationMeshCount == 1
+            && authored.ValleyMountainMeshCount == 12
+            && authored.ValleyExpectedMountainNameCount == 12
+            && authored.ValleyUniqueMountainMeshCount == 1
+            && authored.ValleyCollisionNodeCount == 0
+            && authored.ValleyHierarchyReady
+            && authored.ValleyMountainsOutsidePlayableBounds
+            && authored.ValleyMountainMaxAngularGapRadians <= 0.55f
+            && authored.ValleyInstanceTriangleCount is >= 300_000 and <= 380_000
+            && authored.ValleyWorldBounds.Size.X >= 900.0f
+            && authored.ValleyWorldBounds.Size.Y >= 60.0f
+            && authored.ValleyWorldBounds.Size.Z >= 900.0f
+            && authored.ValleyFoundationWorldBounds.Size.X is >= 339.0f and <= 341.0f
+            && authored.ValleyFoundationWorldBounds.Size.Y is >= 0.10f and <= 0.14f
+            && authored.ValleyFoundationWorldBounds.Size.Z is >= 319.0f and <= 321.0f
+            && authored.ValleyFoundationVertexCount == 112
+            && authored.ValleyFoundationTriangleCount == 188
+            && authored.ValleyFoundationGeometryReady
+            && authored.ValleyFoundationMinHeight is >= -0.20f and <= -0.15f
+            && authored.ValleyFoundationMaxHeight is >= -0.08f and <= -0.04f
+            && authored.ValleyFoundationMaxHeight
+                - authored.ValleyFoundationMinHeight is >= 0.10f and <= 0.14f
+            && authored.ValleyFoundationMaterialsReady
+            && authored.ValleyFoundationUvReady
             && counts.AuthoredSceneRoots == 1
             && counts.AuthoredSceneMeshes == authored.MeshInstanceCount
             && counts.VisibleAuthoredSceneMeshes == counts.AuthoredSceneMeshes;
@@ -357,149 +386,14 @@ public partial class FreightTerminalWorld
             && legacyScaffoldsHidden && interactiveDoorsReady && districtsReady
             && highValueReady && highValueAccessReady && routeReady
             && landmarkReady && authoredQualityReady && gameplayReady && deploymentReady && performanceReady;
+        var valleyBoundsSummary = _jianghaiOldCityScene is { } valleyScene
+            ? $"{valleyScene.ValleyWorldBounds.Size}:{valleyScene.ValleyFoundationWorldBounds.Size}"
+            : "missing";
 
-        GD.Print($"REFINERY_MAP_CHECK valid={valid} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city root={rootsReady} localization={localizationReady} authored={authoredReady} authored_path={_jianghaiOldCityScene?.ScenePath ?? "missing"} authored_error={(_jianghaiOldCitySceneLoadError is null ? "none" : "load_failed")} authored_roots={counts.AuthoredSceneRoots} authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} authored_material_surfaces={_jianghaiOldCityScene?.MaterialSurfaceCount ?? 0} authored_triangles={_jianghaiOldCityScene?.InstanceTriangleCount ?? 0} authored_anchors={_jianghaiOldCityScene?.RequiredAnchorCount ?? 0}/{_jianghaiOldCityScene?.RequiredAnchorTotal ?? 0} authored_terminals={_jianghaiOldCityScene?.AuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.VisibleAuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.AlignedAuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.AuthoredTerminalTotal ?? 0} authored_screens={_jianghaiOldCityScene?.AuthoredStatusScreenCount ?? 0}/{_jianghaiOldCityScene?.AuthoredStatusScreenTotal ?? 0} terminal_statuses={terminalStatusesReady}:{terminalStatusSummary} authored_detail={_jianghaiOldCityScene?.DetailMeshCount ?? 0} authored_quality={_jianghaiOldCityScene?.QualityTier ?? -1} authored_shadows={_jianghaiOldCityScene?.ShadowCasterMeshCount ?? 0} authored_quality_tiers={authoredQualityReady}:{authoredQualitySummary} terminal_collision={terminalCollisionReady} terminal_collision_aligned={alignedTerminalCollisions}/2 authored_building_collision={authoredBuildingCollisionReady} authored_building_shapes={counts.AuthoredCollisionShapes}/{_jianghaiAuthoredBuildingCollision?.CollisionShapeCount ?? 0} authored_building_sources={_jianghaiAuthoredBuildingCollision?.SourceMeshCount ?? 0}:{_jianghaiAuthoredBuildingCollision?.StructuralSourceMeshCount ?? 0}/{_jianghaiAuthoredBuildingCollision?.DetailSourceMeshCount ?? 0} authored_building_anchors={tenementCollisionShapes}/{factoryCollisionShapes}/{pawnshopCollisionShapes}/{marketCollisionShapes} authored_building_shared={_jianghaiAuthoredBuildingCollision?.SharedShapeCount ?? 0} authored_building_baked={_jianghaiAuthoredBuildingCollision?.BakedShapeCount ?? 0} authored_building_unique={_jianghaiAuthoredBuildingCollision?.UniqueMeshCount ?? 0} authored_building_triangles={_jianghaiAuthoredBuildingCollision?.InstanceTriangleCount ?? 0} authored_building_error={(_jianghaiAuthoredBuildingCollisionError is null ? "none" : "build_failed")} building_physics={buildingPhysicsReady}:{buildingHitCount}/5:{buildingClearCount}/3:{buildingPhysicsSummary} legacy_visible={counts.VisibleLegacyScaffoldGeometry} scaffolds_hidden={legacyScaffoldsHidden} proxies={counts.LegacyCollisionShapes}/{_refineryCollisionProxyCount} expected_proxies={expectedCollisionProxies} proxy_boxes={proxiesReady} districts={_oldTownDistricts.Count} district_ready={districtsReady} doors={_refineryDoors.Count}/{_oldTownLandmarks?.EntryCount ?? 0} doors_ready={interactiveDoorsReady} interior_residents={_oldTownInteriorResidentCount}/4:{interiorResidentsReady} high_value={highValueReady} high_value_access={highValueAccessReady}:{accessibleHighValueLoot}/12:{highValueAccessBlocker} zone_separation={zoneSeparation:0.0} zone_summary={zoneSummary} routes={routeReady} route_probes={routeProbeCount} route_blocker={routeBlocker} landmarks={landmarkReady} landmark_collision={_oldTownLandmarks?.CollisionShapeCount ?? 0} rooftop_routes={_oldTownLandmarks?.RooftopRouteCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
+        GD.Print($"REFINERY_MAP_CHECK valid={valid} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city root={rootsReady} localization={localizationReady} authored={authoredReady} authored_path={_jianghaiOldCityScene?.ScenePath ?? "missing"} authored_error={(_jianghaiOldCitySceneLoadError is null ? "none" : "load_failed")} authored_roots={counts.AuthoredSceneRoots} authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} authored_material_surfaces={_jianghaiOldCityScene?.MaterialSurfaceCount ?? 0} authored_triangles={_jianghaiOldCityScene?.InstanceTriangleCount ?? 0} authored_anchors={_jianghaiOldCityScene?.RequiredAnchorCount ?? 0}/{_jianghaiOldCityScene?.RequiredAnchorTotal ?? 0} authored_terminals={_jianghaiOldCityScene?.AuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.VisibleAuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.AlignedAuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.AuthoredTerminalTotal ?? 0} authored_screens={_jianghaiOldCityScene?.AuthoredStatusScreenCount ?? 0}/{_jianghaiOldCityScene?.AuthoredStatusScreenTotal ?? 0} terminal_statuses={terminalStatusesReady}:{terminalStatusSummary} authored_detail={_jianghaiOldCityScene?.DetailMeshCount ?? 0} valley={_jianghaiOldCityScene?.ValleyFoundationMeshCount ?? 0}/{_jianghaiOldCityScene?.ValleyMountainMeshCount ?? 0}:{_jianghaiOldCityScene?.ValleyInstanceTriangleCount ?? 0} valley_bounds={valleyBoundsSummary} valley_contract={_jianghaiOldCityScene?.ValleyHierarchyReady ?? false}:{_jianghaiOldCityScene?.ValleyExpectedMountainNameCount ?? 0}/{_jianghaiOldCityScene?.ValleyUniqueMountainMeshCount ?? 0}:collision={_jianghaiOldCityScene?.ValleyCollisionNodeCount ?? -1}:outside={_jianghaiOldCityScene?.ValleyMountainsOutsidePlayableBounds ?? false}:gap={_jianghaiOldCityScene?.ValleyMountainMaxAngularGapRadians ?? -1.0f:0.000}:foundation={_jianghaiOldCityScene?.ValleyFoundationVertexCount ?? 0}/{_jianghaiOldCityScene?.ValleyFoundationTriangleCount ?? 0}:{_jianghaiOldCityScene?.ValleyFoundationMinHeight ?? 0.0f:0.000}/{_jianghaiOldCityScene?.ValleyFoundationMaxHeight ?? 0.0f:0.000}:material={_jianghaiOldCityScene?.ValleyFoundationMaterialsReady ?? false}:uv={_jianghaiOldCityScene?.ValleyFoundationUvReady ?? false} authored_quality={_jianghaiOldCityScene?.QualityTier ?? -1} authored_shadows={_jianghaiOldCityScene?.ShadowCasterMeshCount ?? 0} authored_quality_tiers={authoredQualityReady}:{authoredQualitySummary} terminal_collision={terminalCollisionReady} terminal_collision_aligned={alignedTerminalCollisions}/2 authored_building_collision={authoredBuildingCollisionReady} authored_building_shapes={counts.AuthoredCollisionShapes}/{_jianghaiAuthoredBuildingCollision?.CollisionShapeCount ?? 0} authored_building_sources={_jianghaiAuthoredBuildingCollision?.SourceMeshCount ?? 0}:{_jianghaiAuthoredBuildingCollision?.StructuralSourceMeshCount ?? 0}/{_jianghaiAuthoredBuildingCollision?.DetailSourceMeshCount ?? 0} authored_building_anchors={tenementCollisionShapes}/{factoryCollisionShapes}/{pawnshopCollisionShapes}/{marketCollisionShapes} authored_building_shared={_jianghaiAuthoredBuildingCollision?.SharedShapeCount ?? 0} authored_building_baked={_jianghaiAuthoredBuildingCollision?.BakedShapeCount ?? 0} authored_building_unique={_jianghaiAuthoredBuildingCollision?.UniqueMeshCount ?? 0} authored_building_triangles={_jianghaiAuthoredBuildingCollision?.InstanceTriangleCount ?? 0} authored_building_error={(_jianghaiAuthoredBuildingCollisionError is null ? "none" : "build_failed")} building_physics={buildingPhysicsReady}:{buildingHitCount}/5:{buildingClearCount}/3:{buildingPhysicsSummary} legacy_visible={counts.VisibleLegacyScaffoldGeometry} scaffolds_hidden={legacyScaffoldsHidden} proxies={counts.LegacyCollisionShapes}/{_refineryCollisionProxyCount} expected_proxies={expectedCollisionProxies} proxy_boxes={proxiesReady} districts={_oldTownDistricts.Count} district_ready={districtsReady} doors={_refineryDoors.Count}/{_oldTownLandmarks?.EntryCount ?? 0} doors_ready={interactiveDoorsReady} interior_residents={_oldTownInteriorResidentCount}/4:{interiorResidentsReady} high_value={highValueReady} high_value_access={highValueAccessReady}:{accessibleHighValueLoot}/12:{highValueAccessBlocker} zone_separation={zoneSeparation:0.0} zone_summary={zoneSummary} routes={routeReady} route_probes={routeProbeCount} route_blocker={routeBlocker} landmarks={landmarkReady} landmark_collision={_oldTownLandmarks?.CollisionShapeCount ?? 0} rooftop_routes={_oldTownLandmarks?.RooftopRouteCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
         GD.Print($"REFINERY_MAP_PASS valid={valid}");
         await WaitFrames(4);
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
-    }
-
-    private async void CaptureRefineryMap()
-    {
-        var previousQualitySetting = _qualitySetting;
-        var performanceReady = false;
-        try
-        {
-            ApplyQuality(2);
-            ApplyTimeOfDay(DeploymentTimeOfDay.Dusk);
-            foreach (var enemy in _enemies)
-            {
-                if (IsInstanceValid(enemy))
-                {
-                    enemy.ProcessMode = ProcessModeEnum.Disabled;
-                    enemy.Visible = false;
-                }
-            }
-            foreach (var squadMate in _squadMates)
-            {
-                if (IsInstanceValid(squadMate))
-                {
-                    squadMate.Visible = false;
-                }
-            }
-            foreach (var vehicle in _vehicles)
-            {
-                if (IsInstanceValid(vehicle))
-                {
-                    vehicle.Visible = false;
-                }
-            }
-            if (IsInstanceValid(_extractionMarker))
-            {
-                _extractionMarker.Visible = false;
-                HideGeometryRecursive(_extractionMarker);
-            }
-            if (_extractionAircraft is not null && IsInstanceValid(_extractionAircraft))
-            {
-                _extractionAircraft.Visible = false;
-            }
-            _player.Visible = false;
-            _hud.Visible = false;
-            var camera = new Camera3D { Name = "OldTownCaptureCamera", Fov = 52.0f, Far = 560.0f };
-            AddChild(camera);
-            camera.GlobalPosition = new Vector3(17.5f, 6.0f, -117.0f);
-            camera.LookAt(new Vector3(1.5f, 4.8f, -128.2f), Vector3.Up);
-            camera.Fov = 35.0f;
-            camera.MakeCurrent();
-            await WaitFrames(2);
-            ApplyTimeOfDay(DeploymentTimeOfDay.Dusk);
-            await WaitFrames(16);
-            performanceReady = PrintRefineryRenderingSnapshot("overview");
-            SaveViewportImage("res://refinery_map_validation.png");
-            camera.GlobalPosition = new Vector3(9.0f, 1.65f, 33.0f);
-            camera.LookAt(new Vector3(-8.0f, 2.40f, 18.0f), Vector3.Up);
-            camera.Fov = 42.0f;
-            await WaitFrames(10);
-            performanceReady &= PrintRefineryRenderingSnapshot("victory_street");
-            SaveViewportImage("res://refinery_ground_validation.png");
-            camera.GlobalPosition = new Vector3(-3.2f, 1.65f, 32.6f);
-            camera.LookAt(new Vector3(-11.7f, 1.85f, 28.5f), Vector3.Up);
-            camera.Fov = 40.0f;
-            await WaitFrames(10);
-            performanceReady &= PrintRefineryRenderingSnapshot("street_life");
-            SaveViewportImage("res://jianghai_street_life_validation.png");
-            camera.GlobalPosition = new Vector3(-71.5f, 1.75f, -103.5f);
-            camera.LookAt(new Vector3(-85.5f, 2.55f, -116.5f), Vector3.Up);
-            camera.Fov = 39.0f;
-            await WaitFrames(10);
-            performanceReady &= PrintRefineryRenderingSnapshot("guangchang_pawnshop");
-            SaveViewportImage("res://refinery_hall_validation.png");
-            camera.GlobalPosition = new Vector3(105.0f, 2.20f, -13.0f);
-            camera.LookAt(new Vector3(97.0f, 2.60f, -2.0f), Vector3.Up);
-            camera.Fov = 38.0f;
-            await WaitFrames(10);
-            performanceReady &= PrintRefineryRenderingSnapshot("red_star_factory");
-            SaveViewportImage("res://refinery_wonders_validation.png");
-            camera.GlobalPosition = new Vector3(13.5f, 5.55f, -124.2f);
-            camera.LookAt(new Vector3(4.5f, 5.0f, -127.0f), Vector3.Up);
-            camera.Fov = 34.0f;
-            await WaitFrames(10);
-            performanceReady &= PrintRefineryRenderingSnapshot("market_footbridge");
-            SaveViewportImage("res://old_town_rooftop_validation.png");
-            camera.GlobalPosition = new Vector3(-122.0f, 2.0f, -174.0f);
-            camera.LookAt(new Vector3(-68.0f, 4.0f, -194.0f), Vector3.Up);
-            camera.Fov = 40.0f;
-            await WaitFrames(10);
-            performanceReady &= PrintRefineryRenderingSnapshot("north_ward_density");
-            SaveViewportImage("res://jianghai_density_validation.png");
-            ApplyTimeOfDay(DeploymentTimeOfDay.Day);
-            camera.GlobalPosition = new Vector3(36.0f, 10.0f, 32.0f);
-            camera.LookAt(new Vector3(0.0f, 3.0f, -55.0f), Vector3.Up);
-            camera.Fov = 40.0f;
-            await WaitFrames(14);
-            performanceReady &= PrintRefineryRenderingSnapshot("daylight_overview");
-            SaveViewportImage("res://jianghai_day_validation.png");
-            var captureDoor = _refineryDoors.FirstOrDefault();
-            if (captureDoor is not null)
-            {
-                var outward = (captureDoor.OutsideProbe - captureDoor.InsideProbe).Normalized();
-                camera.GlobalPosition = captureDoor.InteractionPoint + outward * 7.0f + Vector3.Up * 1.7f;
-                camera.LookAt(captureDoor.InteractionPoint + Vector3.Up * 0.6f, Vector3.Up);
-                camera.Fov = 56.0f;
-                await WaitFrames(8);
-                SaveViewportImage("res://refinery_door_closed_validation.png");
-                captureDoor.TrySetOpen(true, bypassClearance: true);
-                for (var frame = 0; frame < 120 && captureDoor.IsAnimating; frame++)
-                {
-                    await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-                }
-                await WaitFrames(4);
-                SaveViewportImage("res://refinery_door_open_validation.png");
-                captureDoor.SetOpenImmediate(false);
-            }
-            GD.Print($"REFINERY_MAP_CAPTURE valid={performanceReady} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city time=dusk+day authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} doors={_refineryDoors.Count} paths=refinery_map_validation.png,refinery_ground_validation.png,jianghai_street_life_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,jianghai_density_validation.png,jianghai_day_validation.png,refinery_door_closed_validation.png,refinery_door_open_validation.png");
-        }
-        finally
-        {
-            ApplyQuality(previousQualitySetting);
-        }
-        QuitDiagnosticAfterSceneCleanup(performanceReady ? 0 : 2);
-    }
-
-    private static bool PrintRefineryRenderingSnapshot(string view)
-    {
-        var drawCalls = Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame);
-        var objects = Performance.GetMonitor(Performance.Monitor.RenderTotalObjectsInFrame);
-        var primitives = Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame);
-        var videoMemoryMb = Performance.GetMonitor(Performance.Monitor.RenderVideoMemUsed) / (1024.0 * 1024.0);
-        var textureMemoryMb = Performance.GetMonitor(Performance.Monitor.RenderTextureMemUsed) / (1024.0 * 1024.0);
-        var withinBudget = drawCalls <= 2400
-            && objects <= 2200
-            && primitives <= 10_500_000
-            && videoMemoryMb <= 1536.0
-            && textureMemoryMb <= 1152.0;
-        GD.Print($"REFINERY_RENDER_CHECK valid={withinBudget} view={view} draw_calls={drawCalls:0}/2400 objects={objects:0}/2200 primitives={primitives:0}/10500000 video_mem_mb={videoMemoryMb:0.0}/1536 texture_mem_mb={textureMemoryMb:0.0}/1152");
-        return withinBudget;
     }
 
     private bool ValidateAuthoredTerminalStatusTransitions(out string summary)

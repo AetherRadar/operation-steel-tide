@@ -227,6 +227,92 @@ a 10-object DCC composition containing nine brick modules and one doorframe.
 The source modules retain Quaternius's CC0 license and are not relicensed as
 project-authored MIT art.
 
+### Jianghai Old City valley environment inputs
+
+The shipped valley pass adapts two Poly Haven surface sets acquired on
+2026-08-28, one finished Poly Haven photogrammetry model acquired on
+2026-08-29, and one complete mountain model acquired from Sketchfab on
+2026-08-29. The raw downloads are retained under the separate private
+`JIANGHAI_VALLEY_ACQUISITION_ROOT`, not as repository-local source bundles:
+
+| Source | Creator | Official source and license | Private-cache input | Delivered mapping |
+| --- | --- | --- | --- | --- |
+| Rocky Terrain | Amal Kumar | https://polyhaven.com/a/rocky_terrain | 2K diffuse, displacement, OpenGL-normal, and roughness maps under `rocky_terrain/textures/` | Diffuse, normal, and roughness remain adapted to the sides of the project-authored `OldCityFoundation`. Capped 1024-pixel DCC images are packed into the `.blend` and main GLB. The verified displacement input remains private and is not embedded or used to generate visible geometry |
+| Gravel Floor 03 | Charlotte Baglioni | https://polyhaven.com/a/gravel_floor_03 | 2K diffuse, displacement, OpenGL-normal, and roughness maps under `gravel_floor_03/textures/` | Diffuse, normal, and roughness dress both the top of the project-authored `OldCityFoundation` and the single Coast-Line-derived perimeter-ground composite. The ground material uses base-color factor `(0.92, 0.78, 0.62, 1.0)` and a 7-meter affine world-XY UV layout. Capped 1024-pixel DCC images are packed into the `.blend` and main GLB. The verified displacement input remains private and is not embedded or used to generate visible geometry |
+| Coast Line 01 | Rob Tuytel (photography and processing); Rico Cilliers (cleanup) | https://polyhaven.com/a/coast_line_01; CC0 1.0 Universal under https://polyhaven.com/license | One 2K glTF, binary buffer, and diffuse/ARM/OpenGL-normal sidecars under `coast_line_01/` | Geometry-only source for `JianghaiPerimeterGroundComposite`, a single 84,960-vertex, 168,480-triangle modeled ground mesh assembled in Blender from eight Coast Line 01 scan placements. Its source material and images are not embedded; the delivered visible surface uses Charlotte Baglioni's CC0 Gravel Floor 03 PBR maps |
+| Hero Mountain | solararchitect | https://sketchfab.com/3d-models/hero-mountain-83b3fd690ea44e988d086d5165a5f2ca; CC BY 4.0 under http://creativecommons.org/licenses/by/4.0/ | Original-format Sketchfab download retained privately under `hero_mountain/`; the selected OBJ plus Color, Normal, and Roughness maps are the delivery inputs | The complete mountain is decimated to one shared 14,000-triangle distant LOD, its PBR graph is rebuilt from the selected maps with a 1024-pixel pack cap, and 12 visual-only instances form staggered inner and outer six-mountain rings. The source AO, height, and displacement maps remain private and are not embedded or used to generate geometry |
+
+The final Coast-derived ground is real authored DCC geometry, not camera
+masking and not a primitive or runtime-procedural visible substitute. Eight
+modeled Coast Line 01 scan placements are joined and shaped into the single
+`JianghaiPerimeterGroundComposite`. Its saved topology is one connected
+component with 84,960 vertices, 168,480 triangles, two boundary loops totaling
+1,440 edges, zero degenerate triangles, and zero invalid face normals. Bounds
+are X `-600.878..600.853`, Y `-540.340..660.056`, and Z
+`-12.7965..5.0390` meters, for 17.835 meters of modeled vertical relief.
+
+The continuity deformation is driven by signed distance from the actual
+projected top footprint of `OldCityFoundation`, rather than a generic radial
+mask. It keeps the footprint and safety margin below the platform and blends
+the authored Coast relief outward. Coverage is 1.000, maximum audited
+foundation gap is 0.103 meters, and the safe-area highest ground is -0.120
+meters. Relief is 0.969 meters within 0-60 meters of the foundation and 3.955
+meters from 60-160 meters. The ground slope RMS/p90/p99/maximum is
+0.0579/0.0869/0.2331/0.6620, and the full ring-coverage gate passes
+7,920/7,920 probes.
+
+The visible surface uses the Gravel Floor 03 diffuse, OpenGL-normal, and
+roughness maps, with base-color factor `(0.92, 0.78, 0.62, 1.0)`. Its affine
+world-XY UV scale is 7 meters; the DCC and serialized-GLB coordinate errors are
+`3.27e-6` and `4.36e-6`, within the `1.2e-5` gate, and both Jacobian checks pass.
+No Coast source material or image datablock is embedded in the packed `.blend`
+or runtime GLB. The final DCC pass also tapers and buries the north-end vertical
+caps of `AuthoredStreetNetwork/CentralAvenueCurbW` and
+`AuthoredStreetNetwork/CentralAvenueCurbE`; DCC and GLB ray gates report zero
+exposed curb-side hits at that road end.
+
+The three Poly Haven cliff scans below were acquired and evaluated during the
+2026-08-29 art search, but they are not embedded in the final packed `.blend`
+or runtime GLB and are not inputs to the shipped valley composition:
+
+| Evaluated source | Creator | Official source | Final status |
+| --- | --- | --- | --- |
+| Coastal Cliff 01 | Rob Tuytel (photography and processing); Rico Cilliers (cleanup) | https://polyhaven.com/a/coastal_cliff_01 | Private evaluation source only; no geometry, material, or texture from this asset is present in the delivered artifact |
+| Coastal Cliff 02 | Rob Tuytel | https://polyhaven.com/a/coastal_cliff_02 | Private evaluation source only; no geometry, material, or texture from this asset is present in the delivered artifact |
+| Namaqualand Cliff 02 | Dario Barresi (photography); Rico Cilliers (modeling) | https://polyhaven.com/a/namaqualand_cliff_02 | Private evaluation source only; no geometry, material, or texture from this asset is present in the delivered artifact |
+
+Rocky Terrain, Gravel Floor 03, Coast Line 01, and the three evaluated cliff
+scans are CC0 1.0 Universal under https://polyhaven.com/license and
+https://creativecommons.org/publicdomain/zero/1.0/. Attribution is not
+required for those Poly Haven sources; all creator credits are retained as
+provenance. Hero Mountain is licensed separately under CC BY 4.0: distributions
+of the adapted mountain must credit **solararchitect**, retain the Hero
+Mountain source and CC BY 4.0 links above, and indicate that Operation Steel
+Tide modified the source by decimation, PBR-node reconstruction, 1024-pixel
+texture capping/packing, uniform scaling, rotation, and multi-instance valley
+composition. Hero Mountain and its adapted geometry and textures are not
+relicensed as MIT.
+
+The raw source files remain private and uncommitted. The `OldCityFoundation`
+geometry, its applied hand chamfer, UV layout, material split, placement, scale,
+the composition and deformation of the single ground mesh assembled from eight
+Coast Line 01 scan placements, and the placement/orientation composition of 12
+Hero Mountain instances are project-authored DCC work covered
+by the root MIT license, subject to the AI-assistance disclosure in
+`../../docs/CONTENT_PROVENANCE.md`; packing does not relicense any underlying
+third-party contribution. No displacement map is used to generate delivered
+visible geometry.
+
+`../../scripts/blender/build_jianghai_valley_environment.py` performs the
+offline Blender authoring pass against the authoritative `.blend`. It requires
+`JIANGHAI_VALLEY_ACQUISITION_ROOT`, verifies the 17 selected private authoring
+inputs against the recorded source digests, updates the valley hierarchy and
+existing authored foundation, validates ground coverage, the staggered two-ring
+mountain composition, visual bounds, material/rights metadata, and triangle
+budgets, and saves the packed DCC result. Exact private-file hashes, official API and
+license-evidence hashes, and the private-cache-to-delivery mapping are in
+`../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md`.
+
 ## Jianghai Old City authored composite
 
 The Jianghai Old City extraction-map visual is a project-authored Blender
@@ -236,17 +322,30 @@ static runtime scene:
 - Runtime output: `jianghai_old_city/jianghai_old_city.glb`
 - Current interactive-door visual: `kenney_factory_kit/door-hinged.glb`
 - Retained alternate/legacy shutter derivative: `jianghai_old_city/rollershutter_window_03.glb`
-- Runtime dusk panorama: `../textures/kloppenheim_06_puresky_1k.hdr`; Poly
-  Haven CC0 evidence is in `../textures/LICENSE.md`, and the file is loaded by
-  `JianghaiOldCityAtmosphere` rather than embedded in the map GLB.
+- Retained CC0 sky evidence: `../textures/kloppenheim_06_puresky_1k.hdr`; Poly
+  Haven evidence is in `../textures/LICENSE.md`. It is not embedded in the map
+  GLB, and the current `JianghaiOldCityAtmosphere` uses a procedural sky rather
+  than loading this panorama.
 - Authoritative editable DCC source: `../../source_art/world/jianghai_old_city/jianghai_old_city.blend`
+- Valley DCC build script: `../../scripts/blender/build_jianghai_valley_environment.py`
+- Valley private input contract: `JIANGHAI_VALLEY_ACQUISITION_ROOT`; raw
+  Coast Line 01, Hero Mountain, Rocky Terrain, and Gravel Floor 03 delivery
+  inputs are not committed. Retained Coastal Cliff 01, Coastal Cliff 02, and
+  Namaqualand Cliff 02 evaluation downloads are likewise private but are not
+  embedded in or required by the final delivered artifact.
 - Runtime export script: `../../scripts/blender/export_jianghai_old_city.py`
 - Source and license evidence: `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md`
 - Initial external inputs were acquired on 2026-08-27; the additional
   BlenderKit and Poly Haven assets identified below were acquired on
-  2026-08-28.
+  2026-08-28. Coast Line 01, the three evaluated-only cliff scans, and
+  solararchitect's Hero Mountain were acquired on 2026-08-29.
 
-The packed `.blend` is the authoritative DCC scene. The Blender export script
+The packed `.blend` is the authoritative DCC scene. The valley build is an
+offline DCC authoring step that adapts the existing project-authored foundation
+and serializes one modeled ground composite assembled from eight Coast Line 01
+scan placements plus a 12-instance, staggered two-ring Hero Mountain
+composition into that scene. The
+Blender export script
 does not generate runtime procedural geometry: it reapplies the documented
 explicit, non-random building-transform table, cleared-asset and street-cadence
 substitutions, sign cleanup, material tuning, and export policy, then serializes
@@ -254,21 +353,22 @@ the result in the packed source and runtime GLB.
 
 The runtime export policy caps the longest texture dimension at 1024 pixels
 and recompresses eligible high-resolution runtime images as JPEG quality 90.
-A 2026-08-28 Blender audit recorded all seven required runtime anchors, 487
-mesh objects, 196 unique mesh datablocks, 4,471,243 raw mesh-object triangles,
+The upstream pre-valley 2026-08-28 integration audit recorded all seven
+then-required runtime anchors, 487 mesh objects, 196 unique mesh datablocks,
+4,471,243 raw mesh-object triangles,
 and 821,213 triangles counted once per unique mesh. Dependency-graph evaluation
-and the runtime export produce 550 mesh nodes and 4,500,345 instance triangles.
-The final packed `.blend` is 61,677,884 bytes with SHA-256
+and the runtime export produced 550 mesh nodes and 4,500,345 instance triangles.
+That upstream packed `.blend` is 61,677,884 bytes with SHA-256
 `C7E9FAE468FFD9C15C8D1FCED165839F007FF6D7DBC2695FDB3041039E1510D7`.
-The final 73,809,716-byte GLB has SHA-256
+That upstream 73,809,716-byte GLB has SHA-256
 `2681C3F5F5332C1B2F8E5CA11B470C9A62EF39B8E4F76FA06365886A6FFE890A`.
-The matching Godot refinery-map validation passes with 550 imported authored
-meshes, 770 surfaces, all 770 surfaces material-backed, and the same 4,500,345
+The matching upstream Godot refinery-map validation passed with 550 imported
+authored meshes, 770 surfaces, all 770 surfaces material-backed, and the same 4,500,345
 authored instance triangles. Route validation reports
 `routes=True`, `route_probes=14`, and `route_blocker=none`; the Victory truck
 envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and
 `y=2.6`. High tier disables shadows only for fine decorative meshes; model
-geometry, materials, and visibility ranges are unchanged. The current
+geometry, materials, and visibility ranges are unchanged. The upstream
 2026-08-28 capture tuples (draw calls / objects / primitives) are Overview
 582/808/4,286,647, Victory street 750/890/4,207,438, Street-life bicycle
 close-up 421/466/3,322,262, Guangchang pawnshop 511/740/2,230,125, Red Star
@@ -276,8 +376,52 @@ factory 561/623/4,265,595, Market footbridge 739/1,030/4,707,642, north-ward
 density 352/478/2,512,297, and daylight overview
 1,014/1,271/7,113,753. All eight passed after the 20 entry-facade objects,
 hinged doors, interior loot, and four authored residents were active; peak video
-memory was 1,001.8 MB and peak texture memory was 852.7 MB. Detailed DCC, GLB,
-and runtime counting scopes are kept in
+memory was 1,001.8 MB and peak texture memory was 852.7 MB.
+
+The subsequent 2026-08-29 valley pre-rebase evidence is recorded separately
+because neither historical binary hash represents the regenerated post-rebase
+artifact.
+
+The 2026-08-29 final pre-rebase valley DCC audit records a 96-source-vertex,
+188-triangle project-authored foundation; one 84,960-vertex,
+168,480-triangle Coast-Line-derived ground composite; and 12 instances of one
+shared 14,000-triangle Hero Mountain mesh arranged as staggered six-object inner
+and outer rings. The valley totals 336,668 instance triangles and the full
+scene totals 4,835,033, below the 5,000,000-triangle gate. The ground bounds are
+X `-600.878..600.853`, Y `-540.340..660.056`, and Z
+`-12.7965..5.0390` meters, with 17.835 meters of relief. Signed-distance,
+coverage, slope, topology, material, UV, north-road-endcap, mountain burial,
+and DCC-to-GLB round-trip gates all pass. The final pre-rebase main GLB is
+76,862,308 bytes with SHA-256
+`0C0174672630957390A959BC3BD71DB3F4849CC7CABE0AFADFDD12273DFE02A5`;
+the final pre-rebase packed `.blend` is 74,037,661 bytes with SHA-256
+`C9BAC433CF77791B3730E309A5E0BEEF6CF4849593D44018FD2CDFE5AC8FAA08`.
+The final post-rebase packed `.blend` is 81,861,168 bytes with SHA-256
+`7CA84CD2B17C3872323D8A5EE7B1A4BA5BCB360F4326FB2331327BED4F493461`.
+Its DCC audit records 500 mesh objects, 198 unique mesh datablocks, 4,807,899
+mesh-object triangles, 1,003,869 triangles counted once per unique mesh, and
+563 evaluated objects totaling 4,836,825 instance triangles. The final
+84,723,312-byte GLB has SHA-256
+`7E2BB712BCF031692FAFB0E4E0FA59F3E75CE340B2748F5EDBDB7B105D9B2965`.
+All eight anchors and every builder, read-only audit, export, and serialized-GLB
+round-trip gate pass.
+
+After an explicit Godot editor reimport and a second no-op import, runtime
+validation reports 563 authored meshes, 784 surfaces, 784 material-backed
+surfaces, 4,836,825 authored triangles, 8/8 anchors, 419 detail meshes, 406
+shadow casters, quality tiers 130/226/406, the one-ground-plus-12-mountain
+valley contract at 336,668 triangles, four of four residents, hinged doors at
+96 degrees, collision 240/240, and route probes 14 with no blocker. Day and the
+always-procedural Dusk atmosphere both pass with a continuous sky/ground horizon
+and no panorama. The `refinery-map`, `refinery-collision`, `refinery-doors`,
+`refinery-atmosphere`, `map-density`, `large-map`, `residential`, `stairs`,
+`skylinks`, and `vehicle-drive` diagnostics all exit 0.
+
+Final capture budgets pass at a peak 1,087.0 MB video memory of 1,536 MB and
+900.9 MB texture memory of 1,152 MB. Independent visual review is DELIVERABLE:
+no sky/terrain seam, radial pattern, skirt, z-fighting, trench, floating
+platform, or material south-line blocker remains. Detailed DCC, GLB, runtime,
+and per-view capture counting scopes are kept in
 `../../source_art/world/jianghai_old_city/README.md`.
 
 Runtime collision is generated from the actual exported geometry: 107

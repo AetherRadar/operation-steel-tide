@@ -50,9 +50,28 @@ public partial class FreightTerminalWorld
 
         ApplyTimeOfDay(DeploymentTimeOfDay.Dusk);
         await WaitFrames(3);
-        var duskReady = _environmentRef.Sky?.SkyMaterial is PanoramaSkyMaterial
-            && _environmentRef.AmbientLightEnergy < 0.85f
-            && _sunLight.LightEnergy < 0.80f;
+        var duskSky = _environmentRef.Sky?.SkyMaterial as ProceduralSkyMaterial;
+        var duskSkyHorizon = duskSky?.SkyHorizonColor ?? Colors.Black;
+        var duskGroundHorizon = duskSky?.GroundHorizonColor ?? Colors.White;
+        var duskHorizonContinuous = duskSky is not null
+            && Mathf.IsEqualApprox(duskSkyHorizon.R, duskGroundHorizon.R)
+            && Mathf.IsEqualApprox(duskSkyHorizon.G, duskGroundHorizon.G)
+            && Mathf.IsEqualApprox(duskSkyHorizon.B, duskGroundHorizon.B);
+        var duskEnvironmentReady = _environmentRef.BackgroundMode
+                == Godot.Environment.BGMode.Sky
+            && _environmentRef.AmbientLightSource == Godot.Environment.AmbientSource.Sky
+            && _environmentRef.ReflectedLightSource
+                == Godot.Environment.ReflectionSource.Sky
+            && _environmentRef.BackgroundEnergyMultiplier >= 0.99f
+            && _environmentRef.FogSkyAffect is >= 0.17f and <= 0.19f;
+        var duskReady = duskSky is not null
+            && duskSky.SkyEnergyMultiplier is >= 0.60f and <= 0.64f
+            && duskHorizonContinuous
+            && _environmentRef.AmbientLightEnergy is >= 0.75f and <= 0.82f
+            && _environmentRef.FogDensity is >= 0.0011f and <= 0.0013f
+            && _sunLight.LightEnergy < 0.80f
+            && _fillLight.LightEnergy < 0.40f
+            && duskEnvironmentReady;
 
         ApplyTimeOfDay(originalTime);
         var valid = dayReady && duskReady;
@@ -65,7 +84,9 @@ public partial class FreightTerminalWorld
             + $"fog={dayFog:0.00000} "
             + $"exposure={dayExposure:0.00} "
             + $"sun={daySun:0.00} fill={dayFill:0.00} "
-            + $"dusk_panorama={duskReady}");
+            + $"dusk_procedural={duskReady} "
+            + $"dusk_environment={duskEnvironmentReady} "
+            + $"dusk_horizon_continuous={duskHorizonContinuous}");
         GD.Print($"REFINERY_ATMOSPHERE_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }

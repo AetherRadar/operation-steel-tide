@@ -5,21 +5,15 @@ namespace OperationSteelTide;
 /// <summary>Applies the authored Jianghai old-city lighting and weather treatment.</summary>
 internal sealed class JianghaiOldCityAtmosphere
 {
-    private const string DuskPanoramaPath = "res://assets/textures/kloppenheim_06_puresky_1k.hdr";
-
     private Godot.Environment? _boundEnvironment;
     private Sky? _sky;
     private ProceduralSkyMaterial? _proceduralSkyMaterial;
-    private PanoramaSkyMaterial? _duskSkyMaterial;
-    private Texture2D? _duskPanorama;
 
     public void ReleaseReferences()
     {
         _boundEnvironment = null;
         _sky = null;
         _proceduralSkyMaterial = null;
-        _duskSkyMaterial = null;
-        _duskPanorama = null;
     }
 
     public void Apply(
@@ -39,47 +33,34 @@ internal sealed class JianghaiOldCityAtmosphere
 
         var style = GetStyle(timeOfDay);
         var sky = EnsureSky(environment);
+        ApplyProceduralSky(sky, style);
         environment.BackgroundMode = Godot.Environment.BGMode.Sky;
         environment.AmbientLightSource = Godot.Environment.AmbientSource.Sky;
         environment.ReflectedLightSource = Godot.Environment.ReflectionSource.Sky;
-        var usingDuskPanorama = timeOfDay == DeploymentTimeOfDay.Dusk
-            && TryApplyDuskPanorama(sky, style.SkyEnergy);
-        if (usingDuskPanorama)
-        {
-            environment.SkyRotation = new Vector3(0.0f, Mathf.DegToRad(32.0f), 0.0f);
-            environment.BackgroundMode = Godot.Environment.BGMode.Sky;
-            environment.BackgroundEnergyMultiplier = 0.67f;
-        }
-        else
-        {
-            ApplyProceduralSky(sky, style);
-            environment.SkyRotation = Vector3.Zero;
-            environment.BackgroundEnergyMultiplier = 1.0f;
-        }
+        environment.SkyRotation = Vector3.Zero;
+        environment.BackgroundEnergyMultiplier = 1.0f;
 
         var highQuality = Mathf.Clamp(qualitySetting, 0, 2) >= 2;
-        sky.ProcessMode = usingDuskPanorama
-            ? Sky.ProcessModeEnum.Quality
-            : highQuality
-                ? Sky.ProcessModeEnum.Realtime
-                : Sky.ProcessModeEnum.Incremental;
+        sky.ProcessMode = highQuality
+            ? Sky.ProcessModeEnum.Realtime
+            : Sky.ProcessModeEnum.Incremental;
 
         environment.AmbientLightEnergy = style.AmbientEnergy;
         environment.FogLightColor = style.FogColor;
         environment.FogLightEnergy = style.FogEnergy;
         environment.FogDensity = style.FogDensity;
         var fullDaylight = timeOfDay == DeploymentTimeOfDay.Day;
-        environment.FogSkyAffect = usingDuskPanorama ? 0.0f : fullDaylight ? 0.08f : 0.18f;
+        environment.FogSkyAffect = fullDaylight ? 0.08f : 0.18f;
         environment.TonemapExposure = style.Exposure;
         SetIfSupported(
             environment,
             "ambient_light_sky_contribution",
-            usingDuskPanorama ? 0.70f : fullDaylight ? 0.92f : 0.55f);
+            fullDaylight ? 0.92f : 0.55f);
         SetIfSupported(environment, "adjustment_enabled", true);
         SetIfSupported(environment, "adjustment_brightness", style.Brightness);
         SetIfSupported(environment, "adjustment_contrast", style.Contrast);
         SetIfSupported(environment, "adjustment_saturation", style.Saturation);
-        SetIfSupported(environment, "volumetric_fog_enabled", highQuality && !usingDuskPanorama);
+        SetIfSupported(environment, "volumetric_fog_enabled", highQuality);
         SetIfSupported(environment, "volumetric_fog_density", style.VolumetricDensity);
         SetIfSupported(environment, "volumetric_fog_ambient_inject", 0.30f);
 
@@ -106,51 +87,9 @@ internal sealed class JianghaiOldCityAtmosphere
             _sky = IsValid(environmentSky) ? environmentSky : new Sky();
             environment.Sky = _sky;
             _proceduralSkyMaterial = _sky.SkyMaterial as ProceduralSkyMaterial;
-            _duskSkyMaterial = null;
         }
 
         return _sky!;
-    }
-
-    private bool TryApplyDuskPanorama(Sky sky, float energyMultiplier)
-    {
-        if (!IsValid(_duskPanorama))
-        {
-            if (!ResourceLoader.Exists(DuskPanoramaPath))
-            {
-                GD.PushWarning($"Jianghai dusk panorama is unavailable: {DuskPanoramaPath}");
-                return false;
-            }
-
-            _duskPanorama = ResourceLoader.Load<Texture2D>(DuskPanoramaPath);
-            if (!IsValid(_duskPanorama))
-            {
-                GD.PushWarning($"Jianghai dusk panorama failed to load: {DuskPanoramaPath}");
-            }
-        }
-
-        if (!IsValid(_duskPanorama))
-        {
-            return false;
-        }
-
-        if (!IsValid(_duskSkyMaterial))
-        {
-            _duskSkyMaterial = new PanoramaSkyMaterial
-            {
-                Filter = true,
-                Panorama = _duskPanorama,
-            };
-        }
-
-        _duskSkyMaterial!.Panorama = _duskPanorama;
-        _duskSkyMaterial.EnergyMultiplier = energyMultiplier;
-        if (!IsSameInstance(sky.SkyMaterial, _duskSkyMaterial))
-        {
-            sky.SkyMaterial = _duskSkyMaterial;
-        }
-
-        return true;
     }
 
     private void ApplyProceduralSky(Sky sky, JianghaiAtmosphereStyle style)
@@ -166,7 +105,7 @@ internal sealed class JianghaiOldCityAtmosphere
         skyMaterial.SkyCurve = 0.22f;
         skyMaterial.SkyEnergyMultiplier = style.SkyEnergy;
         skyMaterial.GroundBottomColor = style.GroundBottom;
-        skyMaterial.GroundHorizonColor = style.GroundHorizon;
+        skyMaterial.GroundHorizonColor = style.SkyHorizon;
         skyMaterial.GroundCurve = 0.18f;
         skyMaterial.GroundEnergyMultiplier = style.SkyEnergy * 0.55f;
         skyMaterial.SunAngleMax = 5.5f;
