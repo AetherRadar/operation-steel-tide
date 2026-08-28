@@ -49,6 +49,10 @@ public partial class FreightTerminalWorld
         _squadNetwork.RemotePeerLeft += OnRemoteSquadPeerLeft;
         _squadNetwork.RemoteAbilityReceived += OnRemoteSquadAbility;
         _squadNetwork.RemoteShotReceived += OnRemoteSquadShot;
+        _squadNetwork.RemoteMeleeLoadoutReceived += OnRemoteMeleeLoadout;
+        _squadNetwork.RemoteMeleeSwingStarted += OnRemoteMeleeSwingStarted;
+        _squadNetwork.RemoteMeleeHitRequested += OnRemoteMeleeHitRequested;
+        _squadNetwork.RemoteMeleeHitConfirmed += OnRemoteMeleeHitConfirmed;
         _squadNetwork.DemolitionLobbyMemberReceived += OnDemolitionLobbyMember;
         _squadNetwork.DemolitionLobbyStateReceived += OnDemolitionLobbyState;
         _squadNetwork.DemolitionMatchStartReceived += OnDemolitionMatchStart;
@@ -597,6 +601,10 @@ public partial class FreightTerminalWorld
         _squadNetwork.RemotePeerLeft -= OnRemoteSquadPeerLeft;
         _squadNetwork.RemoteAbilityReceived -= OnRemoteSquadAbility;
         _squadNetwork.RemoteShotReceived -= OnRemoteSquadShot;
+        _squadNetwork.RemoteMeleeLoadoutReceived -= OnRemoteMeleeLoadout;
+        _squadNetwork.RemoteMeleeSwingStarted -= OnRemoteMeleeSwingStarted;
+        _squadNetwork.RemoteMeleeHitRequested -= OnRemoteMeleeHitRequested;
+        _squadNetwork.RemoteMeleeHitConfirmed -= OnRemoteMeleeHitConfirmed;
         _squadNetwork.DemolitionLobbyMemberReceived -= OnDemolitionLobbyMember;
         _squadNetwork.DemolitionLobbyStateReceived -= OnDemolitionLobbyState;
         _squadNetwork.DemolitionMatchStartReceived -= OnDemolitionMatchStart;
@@ -883,7 +891,13 @@ public partial class FreightTerminalWorld
     }
 
     private void OnRemoteSquadState(long peerId, OperatorRole role, Vector3 position, Vector3 rotation, float health, bool down)
-        => TryApplyRemoteSquadState(peerId, role, position, rotation, health, down);
+    {
+        if (down)
+        {
+            ClearRemoteMeleeTransientState(peerId);
+        }
+        TryApplyRemoteSquadState(peerId, role, position, rotation, health, down);
+    }
 
     private bool TryApplyRemoteSquadState(long peerId, OperatorRole role, Vector3 position, Vector3 rotation, float health, bool down)
     {
@@ -943,6 +957,7 @@ public partial class FreightTerminalWorld
 
     private void OnRemoteSquadPeerLeft(long peerId)
     {
+        ForgetRemoteMeleePeer(peerId);
         var demolitionLobby = !_demolitionMode && _demolitionLobbyDeployment is not null;
         var demolitionPlayer = _demolitionNetworkPlayers.GetValueOrDefault(peerId);
         var proxy = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate) && mate.IsHumanProxy && mate.NetworkPeerId == peerId);
@@ -3755,7 +3770,7 @@ public partial class FreightTerminalWorld
 
     private async void ValidateNetworkSession(string mode)
     {
-        var connectionDeadline = Time.GetTicksMsec() + 20000;
+        var connectionDeadline = Time.GetTicksMsec() + 30000;
         var connected = false;
         while (Time.GetTicksMsec() < connectionDeadline)
         {
@@ -3770,6 +3785,40 @@ public partial class FreightTerminalWorld
         }
         await ToSignal(GetTree().CreateTimer(0.35f), SceneTreeTimer.SignalName.Timeout);
         _squadNetwork.BroadcastShot(_player.GlobalPosition + Vector3.Up, _player.GlobalPosition - Vector3.Forward * 4.0f, -1, 0.0f);
+        if (mode == "host")
+        {
+            _squadNetwork.BroadcastMeleeHitConfirmation(
+                _squadNetwork.LocalPeerId,
+                _player.GlobalPosition + Vector3.Up,
+                -1,
+                0.0f,
+                "knife_zhanma",
+                0,
+                1,
+                true,
+                true,
+                0);
+        }
+        else
+        {
+            var meleeStartedAtMsec = (long)Time.GetTicksMsec();
+            _squadNetwork.PublishMeleeLoadout("knife_zhanma");
+            _squadNetwork.PublishMeleeSwingStart(
+                "knife_zhanma",
+                0,
+                1,
+                meleeStartedAtMsec,
+                0);
+            _squadNetwork.RequestMeleeHit(
+                _player.GlobalPosition + Vector3.Up,
+                _player.GlobalPosition - Vector3.Forward * 1.2f + Vector3.Up,
+                -1,
+                "knife_zhanma",
+                0,
+                1,
+                meleeStartedAtMsec + 420L,
+                0);
+        }
         _squadNetwork.BroadcastAbility(OperatorRole.Assault, _player.GlobalPosition + Vector3.Up, -Vector3.Forward);
         if (mode == "client")
         {
@@ -3778,8 +3827,12 @@ public partial class FreightTerminalWorld
         await ToSignal(GetTree().CreateTimer(mode == "host" ? 1.5f : 1.7f), SceneTreeTimer.SignalName.Timeout);
         var remoteHumans = _squadMates.Count(mate => IsInstanceValid(mate) && mate.IsHumanProxy);
         var cooldownGate = _remoteNetworkAbilityCount == 1;
-        var valid = connected && cooldownGate && remoteHumans == 1;
-        GD.Print($"NETWORK_CHECK mode={mode} valid={valid} connected={connected} online={_squadNetwork.IsOnline} peers={_squadNetwork.ConnectedPeerCount} remote_humans={remoteHumans} remote_shots={_remoteNetworkShotCount} remote_abilities={_remoteNetworkAbilityCount} cooldown_gate={cooldownGate} members={ActiveSquadCount} ai={AiSquadCount}");
+        var meleeRelayed = mode == "host"
+            ? _remoteNetworkMeleeRequestCount == 1
+            : _remoteNetworkMeleeConfirmationCount == 1
+                && _remoteNetworkMeleeFeedbackFlagsReceived;
+        var valid = connected && cooldownGate && meleeRelayed && remoteHumans == 1;
+        GD.Print($"NETWORK_CHECK mode={mode} valid={valid} connected={connected} online={_squadNetwork.IsOnline} peers={_squadNetwork.ConnectedPeerCount} remote_humans={remoteHumans} remote_shots={_remoteNetworkShotCount} melee_requests={_remoteNetworkMeleeRequestCount} melee_confirmations={_remoteNetworkMeleeConfirmationCount} melee_feedback_flags={_remoteNetworkMeleeFeedbackFlagsReceived} remote_abilities={_remoteNetworkAbilityCount} cooldown_gate={cooldownGate} melee_relay={meleeRelayed} members={ActiveSquadCount} ai={AiSquadCount}");
         if (mode == "host")
         {
             await ToSignal(GetTree().CreateTimer(2.5f), SceneTreeTimer.SignalName.Timeout);

@@ -5,6 +5,10 @@ namespace OperationSteelTide;
 public partial class SquadMate
 {
     public bool IsNetworkProxy { get; private set; }
+    internal Vector3 NetworkAuthoritativePosition
+        => IsNetworkProxy ? _remotePosition : GlobalPosition;
+    internal Vector3 NetworkAuthoritativeRotation
+        => IsNetworkProxy ? _remoteRotation : Rotation;
     private bool _networkAbilityApplyEffect;
 
     private void CommitAuthoritativeRemoteCombatState()

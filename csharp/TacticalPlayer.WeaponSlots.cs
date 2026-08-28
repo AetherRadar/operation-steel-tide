@@ -294,7 +294,11 @@ public partial class TacticalPlayer
         _returnQuickSlot = _activeQuickSlot;
         _knifeEquipped = melee;
         _isAiming = false;
-        _knifeTime = 0.0f;
+        CancelMeleeAction();
+        if (melee)
+        {
+            BeginMeleeDraw();
+        }
         if (!melee)
         {
             EquippedWeapon = build!.Clone();
@@ -314,7 +318,7 @@ public partial class TacticalPlayer
             {
                 PlayerWeaponSlot.Secondary => ("secondary_ready", "SECONDARY WEAPON READY"),
                 PlayerWeaponSlot.Sidearm => ("sidearm_ready", "SIDEARM READY"),
-                PlayerWeaponSlot.Melee => ("knife_ready", "TACTICAL KNIFE READY"),
+                PlayerWeaponSlot.Melee => ("melee_ready", "MELEE WEAPON READY"),
                 _ => ("primary_ready", "PRIMARY WEAPON READY")
             };
             Hud?.ShowLocalizedMessage(key, english, new Color(0.42f, 0.9f, 0.73f));

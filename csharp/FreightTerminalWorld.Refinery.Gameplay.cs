@@ -26,22 +26,22 @@ public partial class FreightTerminalWorld
                 new Vector3(-91, 0.02f, -122), 0.0f,
                 "Guangchang Pawnshop security armory", "\u5e7f\u660c\u5f53\u94fa\u5b89\u4fdd\u519b\u68b0\u5e93",
                 WeaponCatalog.Build(WeaponPlatform.M4A1, 2),
-                new[] { "optic_holo", "mag_extended" }, new[] { "armor_heavy" }, "knife_crimson"),
+                new[] { "optic_holo", "mag_extended" }, new[] { "armor_heavy" }, "knife_zhanma"),
             new RefineryWeaponCaseDefinition(
                 new Vector3(-77, 0.02f, -116), Mathf.Pi,
                 "Pawnshop counter response case", "\u5f53\u94fa\u67dc\u53f0\u5e94\u6025\u7bb1",
                 WeaponCatalog.Build(WeaponPlatform.MP5A5, 2),
-                new[] { "optic_micro", "muzzle_suppressor" }, new[] { "helmet_light" }, string.Empty),
+                new[] { "optic_micro", "muzzle_suppressor" }, new[] { "helmet_light" }, "knife_crimson"),
             new RefineryWeaponCaseDefinition(
                 new Vector3(91, 0.02f, 4), Mathf.Pi,
                 "Red Star Electronics tactical vault", "\u7ea2\u661f\u7535\u5b50\u5382\u6218\u672f\u67dc",
                 WeaponCatalog.Build(WeaponPlatform.ScarL, 2),
-                new[] { "optic_scope", "stock_precision" }, new[] { "armor_heavy", "pack_heavy" }, "knife_arctic"),
+                new[] { "optic_scope", "stock_precision" }, new[] { "armor_heavy", "pack_heavy" }, "knife_tianxuan"),
             new RefineryWeaponCaseDefinition(
                 new Vector3(77, 0.02f, -4), 0.0f,
                 "Factory guard locker", "\u7535\u5b50\u5382\u8b66\u536b\u67dc",
                 WeaponCatalog.Build(WeaponPlatform.AK74, 2),
-                new[] { "muzzle_brake", "grip_vertical" }, new[] { "helmet_heavy" }, string.Empty),
+                new[] { "muzzle_brake", "grip_vertical" }, new[] { "helmet_heavy" }, "knife_arctic"),
             new RefineryWeaponCaseDefinition(
                 new Vector3(-14, 4.45f, -126), Mathf.Pi * 0.5f,
                 "Old City footbridge marksman case", "\u65e7\u57ce\u5929\u6865\u5e02\u96c6\u5c04\u624b\u7bb1",

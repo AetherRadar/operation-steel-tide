@@ -312,9 +312,13 @@ public sealed class KnifeSkinDefinition
     public required string Id { get; init; }
     public required string Name { get; init; }
     public required string LocalizationKey { get; init; }
+    public required MeleeWeaponStyle Style { get; init; }
     public required Color BladeColor { get; init; }
     public required Color EdgeColor { get; init; }
     public required Color GripColor { get; init; }
+    public required float Reach { get; init; }
+    public required float BaseDamage { get; init; }
+    public required bool TwoHanded { get; init; }
 
     public string DisplayName(string language) => GameLocalization.Get(LocalizationKey, language, Name);
 }
@@ -325,24 +329,42 @@ public static class KnifeSkinCatalog
 
     private static readonly Dictionary<string, KnifeSkinDefinition> Definitions = new(StringComparer.OrdinalIgnoreCase)
     {
-        [DefaultId] = Skin(DefaultId, "Carbon Black", "knife_skin_carbon", new Color(0.09f, 0.12f, 0.115f), new Color(0.48f, 0.58f, 0.56f), new Color(0.025f, 0.035f, 0.032f)),
-        ["knife_crimson"] = Skin("knife_crimson", "Crimson Circuit", "knife_skin_crimson", new Color(0.38f, 0.035f, 0.045f), new Color(1.0f, 0.24f, 0.16f), new Color(0.09f, 0.018f, 0.022f)),
-        ["knife_arctic"] = Skin("knife_arctic", "Arctic Glass", "knife_skin_arctic", new Color(0.22f, 0.58f, 0.72f), new Color(0.72f, 0.96f, 1.0f), new Color(0.055f, 0.13f, 0.17f)),
-        ["knife_hazard"] = Skin("knife_hazard", "Hazard Stripe", "knife_skin_hazard", new Color(0.72f, 0.52f, 0.04f), new Color(1.0f, 0.82f, 0.18f), new Color(0.08f, 0.075f, 0.025f)),
-        ["knife_tidehunter"] = Skin("knife_tidehunter", "Tide Hunter", "knife_skin_tidehunter", new Color(0.035f, 0.22f, 0.24f), new Color(0.18f, 1.0f, 0.82f), new Color(0.025f, 0.055f, 0.06f))
+        [DefaultId] = Skin(DefaultId, "Carbon Black", "knife_skin_carbon", MeleeWeaponStyle.TacticalKnife, new Color(0.09f, 0.12f, 0.115f), new Color(0.48f, 0.58f, 0.56f), new Color(0.025f, 0.035f, 0.032f), 2.55f, 62.0f),
+        ["knife_crimson"] = Skin("knife_crimson", "Crimson Circuit", "knife_skin_crimson", MeleeWeaponStyle.TacticalKnife, new Color(0.38f, 0.035f, 0.045f), new Color(1.0f, 0.24f, 0.16f), new Color(0.09f, 0.018f, 0.022f), 2.55f, 62.0f),
+        ["knife_arctic"] = Skin("knife_arctic", "Arctic Glass", "knife_skin_arctic", MeleeWeaponStyle.TacticalKnife, new Color(0.22f, 0.58f, 0.72f), new Color(0.72f, 0.96f, 1.0f), new Color(0.055f, 0.13f, 0.17f), 2.55f, 62.0f),
+        ["knife_hazard"] = Skin("knife_hazard", "Hazard Stripe", "knife_skin_hazard", MeleeWeaponStyle.TacticalKnife, new Color(0.72f, 0.52f, 0.04f), new Color(1.0f, 0.82f, 0.18f), new Color(0.08f, 0.075f, 0.025f), 2.55f, 62.0f),
+        ["knife_tidehunter"] = Skin("knife_tidehunter", "Tide Hunter", "knife_skin_tidehunter", MeleeWeaponStyle.TacticalKnife, new Color(0.035f, 0.22f, 0.24f), new Color(0.18f, 1.0f, 0.82f), new Color(0.025f, 0.055f, 0.06f), 2.65f, 68.0f),
+        ["knife_zhanma"] = Skin("knife_zhanma", "Zhanma Dao", "knife_skin_zhanma", MeleeWeaponStyle.ZhanmaDao, new Color(0.12f, 0.14f, 0.135f), new Color(0.82f, 0.74f, 0.5f), new Color(0.12f, 0.055f, 0.025f), 3.15f, 76.0f, twoHanded: true),
+        ["knife_tianxuan"] = Skin("knife_tianxuan", "Tianxuan Dao", "knife_skin_tianxuan", MeleeWeaponStyle.TianxuanDao, new Color(0.025f, 0.045f, 0.07f), new Color(0.18f, 0.86f, 1.0f), new Color(0.025f, 0.035f, 0.055f), 3.0f, 70.0f, twoHanded: true)
     };
 
     public static KnifeSkinDefinition Definition(string id) => Definitions[id];
+    public static bool TryDefinition(string id, out KnifeSkinDefinition definition)
+        => Definitions.TryGetValue(id, out definition!);
     public static IReadOnlyCollection<KnifeSkinDefinition> All => Definitions.Values;
 
-    private static KnifeSkinDefinition Skin(string id, string name, string localizationKey, Color blade, Color edge, Color grip) => new()
+    private static KnifeSkinDefinition Skin(
+        string id,
+        string name,
+        string localizationKey,
+        MeleeWeaponStyle style,
+        Color blade,
+        Color edge,
+        Color grip,
+        float reach,
+        float baseDamage,
+        bool twoHanded = false) => new()
     {
         Id = id,
         Name = name,
         LocalizationKey = localizationKey,
+        Style = style,
         BladeColor = blade,
         EdgeColor = edge,
-        GripColor = grip
+        GripColor = grip,
+        Reach = reach,
+        BaseDamage = baseDamage,
+        TwoHanded = twoHanded
     };
 }
 
@@ -371,7 +393,7 @@ public sealed class LootItem
             LootItemKind.ArmorPlate => GameLocalization.IsChinese(language) ? $"复合护甲板 x{Quantity}" : $"Composite armor plate x{Quantity}",
             LootItemKind.Equipment => Equipment?.DisplayName(language) ?? (GameLocalization.IsChinese(language) ? "装备" : "Equipment"),
             LootItemKind.KnifeSkin => string.IsNullOrEmpty(KnifeSkinId)
-                ? GameLocalization.Get("knife_skin", language, "Knife finish")
+                ? GameLocalization.Get("knife_skin", language, "Melee weapon")
                 : KnifeSkinCatalog.Definition(KnifeSkinId).DisplayName(language),
             LootItemKind.Medical => $"{MedicalItems.DisplayName(MedicalKind, language)} x{Quantity}",
             LootItemKind.Valuable => $"{ValuableItems.DisplayName(ValuableKind, language)} x{Quantity}",
@@ -406,7 +428,7 @@ public sealed class LootItem
         }
         if (Kind == LootItemKind.KnifeSkin && !string.IsNullOrEmpty(KnifeSkinId))
         {
-            return GameLocalization.Get("knife_skin_detail", language, "Equips a permanent tactical knife finish") + "  " + valueLine;
+            return GameLocalization.Get("knife_skin_detail", language, "Equips this melee weapon") + "  " + valueLine;
         }
         if (Kind == LootItemKind.Medical)
         {

@@ -65,7 +65,7 @@ public partial class TacticalPlayer
         _activeQuickSlot = slot;
         _knifeEquipped = false;
         _isAiming = false;
-        _knifeTime = 0.0f;
+        CancelMeleeAction();
         UpdateHeldItemVisibility();
         if (!notify)
         {

@@ -954,13 +954,39 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         return GlobalPosition + Vector3.Up * height;
     }
 
-    public bool TakeCombatDamage(float amount, Vector3 hitPosition, Node? attacker = null)
+    public bool TakeCombatDamage(
+        float amount,
+        Vector3 hitPosition,
+        Node? attacker = null)
+        => TakeCombatDamageInternal(
+            amount,
+            hitPosition,
+            attacker,
+            verifyBallisticPath: true);
+
+    internal bool TakeMeleeCombatDamage(
+        float amount,
+        Vector3 hitPosition,
+        Node? attacker = null)
+        => TakeCombatDamageInternal(
+            amount,
+            hitPosition,
+            attacker,
+            verifyBallisticPath: false);
+
+    private bool TakeCombatDamageInternal(
+        float amount,
+        Vector3 hitPosition,
+        Node? attacker,
+        bool verifyBallisticPath)
     {
         if (IsBodyBag)
         {
             return true;
         }
-        if (attacker is EnemyOperator enemy && !enemy.HasClearBallisticPath(this, hitPosition))
+        if (verifyBallisticPath
+            && attacker is EnemyOperator enemy
+            && !enemy.HasClearBallisticPath(this, hitPosition))
         {
             return false;
         }

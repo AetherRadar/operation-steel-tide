@@ -33,6 +33,7 @@ public partial class FreightTerminalWorld
 
     private void BeginDemolitionBuyPhase(float secondsRemaining = DemolitionBuyDuration)
     {
+        ClearAllRemoteMeleeTransientState();
         _demolitionBuyPhaseActive = true;
         _demolitionBuyRemaining = Mathf.Clamp(secondsRemaining, 0.0f, DemolitionBuyDuration);
         _demolitionRoundActive = false;
@@ -163,6 +164,7 @@ public partial class FreightTerminalWorld
 
     private void BeginDemolitionLivePhase()
     {
+        ClearAllRemoteMeleeTransientState();
         _demolitionBuyPhaseActive = false;
         _demolitionBuyRemaining = 0.0f;
         _demolitionRoundActive = true;

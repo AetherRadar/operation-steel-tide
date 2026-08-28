@@ -20,6 +20,8 @@ public static class SoundLab
 
     private static readonly Dictionary<(WeaponPlatform Platform, bool Suppressed, bool Distant), AudioStreamWav>
         WeaponShotCache = new();
+    private static readonly Dictionary<(MeleeWeaponStyle Style, int AttackIndex), AudioStreamWav>
+        MeleeSwingCache = new();
 
     private static AudioStreamWav MakeStream(float[] samples, int rate = 22050)
     {
@@ -197,6 +199,61 @@ public static class SoundLab
             }
         }
         return MakeStream(samples, rate);
+    }
+
+    public static AudioStreamWav MeleeSwing(MeleeWeaponStyle style, int attackIndex)
+    {
+        var key = (style, Mathf.Abs(attackIndex) % 3);
+        if (MeleeSwingCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        const int rate = 44100;
+        var heavy = style == MeleeWeaponStyle.ZhanmaDao;
+        var duration = heavy ? 0.54f : style == MeleeWeaponStyle.TianxuanDao ? 0.42f : 0.34f;
+        var samples = new float[(int)(rate * duration)];
+        var rng = new RandomNumberGenerator
+        {
+            Seed = (ulong)(77431 + (int)style * 997 + key.Item2 * 71)
+        };
+        var air = 0.0f;
+        var peak = 0.0f;
+        for (var index = 0; index < samples.Length; index++)
+        {
+            var t = (float)index / rate;
+            var phase = t / duration;
+            var envelope = Mathf.Pow(Mathf.Sin(Mathf.Pi * Mathf.Clamp(phase, 0.0f, 1.0f)), 1.65f);
+            var white = rng.RandfRange(-1.0f, 1.0f);
+            air = Mathf.Lerp(air, white, heavy ? 0.055f : 0.095f);
+            var sweepFrequency = Mathf.Lerp(
+                heavy ? 160.0f : 260.0f,
+                heavy ? 620.0f : 1120.0f,
+                phase);
+            var bladeTone = Mathf.Sin(Mathf.Tau * sweepFrequency * t)
+                + Mathf.Sin(Mathf.Tau * sweepFrequency * 1.93f * t) * 0.26f;
+            var shimmer = style == MeleeWeaponStyle.TianxuanDao
+                ? Mathf.Sin(Mathf.Tau * (1480.0f + phase * 920.0f) * t) * 0.16f
+                : 0.0f;
+            var sample = (air * (heavy ? 1.18f : 0.92f)
+                + white * 0.24f
+                + bladeTone * (heavy ? 0.2f : 0.28f)
+                + shimmer) * envelope;
+            samples[index] = Mathf.Tanh(sample * 1.45f) * 0.82f;
+            peak = Mathf.Max(peak, Mathf.Abs(samples[index]));
+        }
+        if (peak > 0.001f)
+        {
+            var normalization = 0.88f / peak;
+            for (var index = 0; index < samples.Length; index++)
+            {
+                samples[index] *= normalization;
+            }
+        }
+
+        var stream = MakeStream(samples, rate);
+        MeleeSwingCache[key] = stream;
+        return stream;
     }
 
     public static AudioStreamWav ReloadClick()

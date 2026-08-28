@@ -40,6 +40,40 @@ output is `steel_tide_operator/steel_tide_operator.glb`. Those operator files
 contain no copied third-party geometry or textures and are covered by the root
 MIT license, subject to the disclosure in `docs/CONTENT_PROVENANCE.md`.
 
+## Project-authored melee weapons
+
+The tactical knife, Zhanma Dao, and Tianxuan Dao were created for Operation
+Steel Tide in Blender 4.5 on 2026-08-28. They contain no third-party geometry,
+textures, or marketplace content and are covered by the repository's root MIT
+license, subject to the disclosure in `docs/CONTENT_PROVENANCE.md`.
+
+- Creator: Operation Steel Tide project contributors, with the AI-assisted DCC
+  workflow disclosed in `docs/CONTENT_PROVENANCE.md`.
+- Official source URL: not applicable; these are repository-original assets.
+  The canonical editable sources are the local `source_art/melee_weapons/*.blend`
+  files mapped below.
+- Exact license: the repository root MIT license.
+- Required attribution: redistributions must preserve the root MIT copyright
+  and permission notice; no additional third-party attribution is required.
+- Creation/acquisition date: 2026-08-28.
+
+| Asset | Editable Blender source | Runtime GLB | Meshes | Triangles | Materials |
+| --- | --- | --- | ---: | ---: | ---: |
+| Tactical knife | `../../source_art/melee_weapons/tactical_knife.blend` | `steel_tide_melee/tactical_knife.glb` | 15 | 13,216 | 4 |
+| Zhanma Dao | `../../source_art/melee_weapons/zhanma_dao.blend` | `steel_tide_melee/zhanma_dao.glb` | 14 | 17,548 | 4 |
+| Tianxuan Dao | `../../source_art/melee_weapons/tianxuan_dao.blend` | `steel_tide_melee/tianxuan_dao.glb` | 19 | 18,212 | 4 |
+
+The reproducible Blender DCC workflow is implemented by
+`../../scripts/blender/build_melee_weapons.py`. It authors the blade profiles,
+edge geometry, guards, collars, grips, wraps, pommels, decorative fittings, and
+four scalar PBR materials as native Blender meshes and materials; applies
+beveling and smooth shading; places named gameplay markers at both grips and
+the blade endpoints; saves the editable `.blend` scenes; exports the runtime
+GLBs; and renders the studio previews beside them. It then re-imports every GLB
+and rejects missing roots, markers, materials, triangle-count drift, or an
+out-of-budget mesh. The triangle counts above are the exact triangulated GLB
+counts verified by that round-trip, not estimates.
+
 ## Poly Haven CC0 models
 
 The following two [Poly Haven](https://polyhaven.com/) models adapted into

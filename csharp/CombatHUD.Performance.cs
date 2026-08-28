@@ -215,10 +215,10 @@ public partial class CombatHUD
                 "SEMI" => Text("semi", "SEMI"),
                 "GRENADE" => Text("quick_throw", "THROW"),
                 "UTILITY" => Text("quick_deploy", "DEPLOY"),
+                "MELEE" => Text("knife", "MELEE"),
                 _ => Text("knife", "KNIFE")
             };
-            var displayWeapon = fireMode == "KNIFE" ? Text("tactical_knife", "TACTICAL KNIFE") : weaponName;
-            _weaponModeLabel.Text = $"{displayWeapon}   {mode}";
+            _weaponModeLabel.Text = $"{weaponName}   {mode}";
         }
 
         _equipmentArmorPlates = armorPlates;

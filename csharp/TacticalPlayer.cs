@@ -38,7 +38,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private const float ProneSpeed = 1.65f;
     private const float Gravity = 22.0f;
     private const float ReloadDuration = 2.45f;
-    private const float KnifeAttackDuration = 0.64f;
     private const float SprintRecoveryThreshold = 28.0f;
     private const float SprintRecoveryDelay = 0.8f;
     private const int MaxArmorPlates = 3;
@@ -72,6 +71,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     public int ArmorPlates
         => CaptureFieldSupplySnapshot().ArmorPlates;
     public bool IsDead { get; set; }
+    public bool LastHitWasArmored { get; private set; }
     public bool HasMovementIntent { get; private set; }
     public bool IsAiming => _isAiming;
     public bool IsReloading => _isReloading;
@@ -179,8 +179,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private bool _automaticFire = true;
     private bool _flashlightOn;
     private bool _nvgOn;
-    private bool _knifeEquipped;
-    private bool _knifeHitApplied;
     private bool _fireInputArmed;
     private bool _movementInputArmed;
     private readonly Dictionary<AttachmentSlot, LootGrade> _equippedAttachmentGrades = new();
@@ -207,14 +205,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private float _slideTime;
     private Vector3 _slideDirection;
     private float _leanValue;
-    private float _knifeTime;
     private float _searchPose;
     private PlayerStance _stance = PlayerStance.Standing;
 
     private Node3D _head = null!;
     private Camera3D _camera = null!;
     private Node3D _weaponRoot = null!;
-    private Node3D _knifeRoot = null!;
     private Marker3D _muzzle = null!;
     private OmniLight3D _muzzleFlash = null!;
     private MeshInstance3D _muzzleBloom = null!;
@@ -1110,34 +1106,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         RefreshAuthoredPrimaryWeapon();
     }
 
-    private void BuildKnife()
-    {
-        _knifeRoot = new Node3D
-        {
-            Name = "TacticalKnife",
-            Position = new Vector3(0.24f, -0.32f, -0.68f),
-            Scale = Vector3.One * 0.78f,
-            Visible = false
-        };
-        _camera.AddChild(_knifeRoot);
-        var skin = KnifeSkinCatalog.Definition(EquippedKnifeSkinId);
-        var steel = Material(skin.BladeColor, 0.92f, 0.18f);
-        var edge = Material(skin.EdgeColor, 0.96f, 0.08f);
-        var grip = Material(skin.GripColor, 0.16f, 0.82f);
-        var glove = GloveFabric(new Color(0.115f, 0.13f, 0.108f));
-        var gloveArmor = Material(new Color(0.022f, 0.03f, 0.028f), 0.15f, 0.72f);
-        MeshPart(_knifeRoot, Box(new Vector3(0.09f, 0.09f, 0.3f)), new Vector3(0, 0, 0.08f), Vector3.Zero, grip);
-        for (var ring = -2; ring <= 2; ring++)
-        {
-            MeshPart(_knifeRoot, Box(new Vector3(0.105f, 0.018f, 0.025f)), new Vector3(0, 0.052f, 0.08f + ring * 0.048f), Vector3.Zero, edge);
-        }
-        MeshPart(_knifeRoot, Box(new Vector3(0.22f, 0.035f, 0.055f)), new Vector3(0, 0, -0.095f), Vector3.Zero, steel);
-        MeshPart(_knifeRoot, new PrismMesh { Size = new Vector3(0.115f, 0.018f, 0.62f) }, new Vector3(0, 0, -0.42f), new Vector3(0, Mathf.Pi, 0), steel);
-        MeshPart(_knifeRoot, Box(new Vector3(0.012f, 0.022f, 0.49f)), new Vector3(-0.052f, -0.004f, -0.39f), Vector3.Zero, edge);
-        BuildTacticalHand(_knifeRoot, false, new Vector3(0.015f, -0.04f, 0.1f), new Vector3(0.04f, 0, 0), glove, gloveArmor);
-        BuildSleevedForearm(_knifeRoot, new Vector3(0.11f, -0.25f, 0.21f), new Vector3(-0.16f, 0, -0.24f), glove, gloveArmor);
-    }
-
     public override void _UnhandledInput(InputEvent @event)
     {
         if (@event is not InputEventMouseMotion motion
@@ -1380,7 +1348,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             fieldSupplies.ArmorPlates,
             _activeQuickSlot switch
             {
-                PlayerQuickSlot.Melee => "KNIFE",
+                PlayerQuickSlot.Melee => "MELEE",
                 PlayerQuickSlot.FragmentationGrenade => "GRENADE",
                 PlayerQuickSlot.Utility => "UTILITY",
                 _ => _automaticFire ? "AUTO" : "SEMI"
@@ -1389,6 +1357,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             {
                 PlayerQuickSlot.FragmentationGrenade => GameLocalization.Get("grenade", Hud?.CurrentLanguage ?? "en", "FRAG GRENADE"),
                 PlayerQuickSlot.Utility => GameLocalization.Get("smoke_grenade", Hud?.CurrentLanguage ?? "en", "SMOKE GRENADE"),
+                PlayerQuickSlot.Melee => CurrentMeleeDefinition.DisplayName(Hud?.CurrentLanguage ?? "en"),
                 _ => EquippedWeapon.DisplayName(Hud?.CurrentLanguage ?? "en")
             },
             PrimaryWeaponForHud,
@@ -1953,143 +1922,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private void SwitchWeapon(bool useKnife)
     {
         ActivateWeaponSlot(useKnife ? PlayerWeaponSlot.Melee : PlayerWeaponSlot.Primary, true);
-    }
-
-    private void StartKnifeAttack()
-    {
-        if (_knifeTime > 0.0f || _fireCooldown > 0.0f)
-        {
-            return;
-        }
-        _knifeTime = KnifeAttackDuration;
-        _fireCooldown = KnifeAttackDuration;
-        _knifeHitApplied = false;
-    }
-
-    private void UpdateKnifeAnimation(float delta)
-    {
-        var restingPosition = new Vector3(0.24f, -0.32f, -0.68f);
-        var restingRotation = new Vector3(0.1f, -0.18f, -0.08f);
-        if (!_knifeEquipped || _knifeTime <= 0.0f)
-        {
-            _knifeRoot.Position = _knifeRoot.Position.Lerp(restingPosition, delta * 12.0f);
-            _knifeRoot.Rotation = _knifeRoot.Rotation.Lerp(restingRotation, delta * 12.0f);
-            return;
-        }
-
-        var progress = 1.0f - _knifeTime / KnifeAttackDuration;
-        var windupPosition = new Vector3(0.46f, -0.34f, -0.58f);
-        var windupRotation = new Vector3(0.2f, 0.18f, 0.54f);
-        var followPosition = new Vector3(-0.08f, 0.08f, -0.94f);
-        var followRotation = new Vector3(0.48f, -0.82f, -0.58f);
-        Vector3 targetPosition;
-        Vector3 targetRotation;
-        if (progress < 0.23f)
-        {
-            var phase = Mathf.SmoothStep(0.0f, 1.0f, progress / 0.23f);
-            targetPosition = restingPosition.Lerp(windupPosition, phase);
-            targetRotation = restingRotation.Lerp(windupRotation, phase);
-        }
-        else if (progress < 0.64f)
-        {
-            var phase = Mathf.SmoothStep(0.0f, 1.0f, (progress - 0.23f) / 0.41f);
-            targetPosition = windupPosition.Lerp(followPosition, phase);
-            targetRotation = windupRotation.Lerp(followRotation, phase);
-        }
-        else
-        {
-            var phase = Mathf.SmoothStep(0.0f, 1.0f, (progress - 0.64f) / 0.36f);
-            targetPosition = followPosition.Lerp(restingPosition, phase);
-            targetRotation = followRotation.Lerp(restingRotation, phase);
-        }
-        _knifeRoot.Position = targetPosition;
-        _knifeRoot.Rotation = targetRotation;
-        if (!_knifeHitApplied && progress >= 0.42f)
-        {
-            _knifeHitApplied = true;
-            ResolveKnifeHit();
-        }
-    }
-
-    private void ResolveKnifeHit()
-    {
-        var from = _camera.GlobalPosition + _camera.GlobalBasis.X * 0.3f - _camera.GlobalBasis.Y * 0.18f;
-        var to = _camera.GlobalPosition
-            - _camera.GlobalBasis.Z * 2.55f
-            - _camera.GlobalBasis.X * 0.22f
-            + _camera.GlobalBasis.Y * 0.18f;
-        if (BreakableGlassField.TryShatterAlongRay(
-            GetWorld3D(),
-            from,
-            to,
-            24.0f,
-            from.DirectionTo(to),
-            out _))
-        {
-            PlayLocalGlassBreak();
-            return;
-        }
-        if (!PhysicsRaycast.TryHit(
-                GetWorld3D(),
-                from,
-                to,
-                GetRid(),
-                uint.MaxValue,
-                out var hit)
-            && !PhysicsRaycast.TryHit(
-                GetWorld3D(),
-                _camera.GlobalPosition,
-                _camera.GlobalPosition - _camera.GlobalBasis.Z * 2.4f,
-                GetRid(),
-                uint.MaxValue,
-                out hit))
-        {
-            return;
-        }
-        var point = hit.Position;
-        var target = hit.Collider;
-        if (target is EnemyOperator enemy)
-        {
-            // Strikes from behind the target's facing hit an unguarded side.
-            var toAttacker = GlobalPosition - enemy.GlobalPosition;
-            var facing = -enemy.GlobalBasis.Z;
-            toAttacker.Y = 0.0f;
-            facing.Y = 0.0f;
-            var backstab = facing.LengthSquared() > 0.01f
-                && toAttacker.LengthSquared() > 0.01f
-                && facing.Normalized().Dot(toAttacker.Normalized()) < -0.35f;
-            var killed = enemy.TakeDamage(
-                _rng.RandfRange(56.0f, 68.0f) * (backstab ? 1.6f : 1.0f),
-                point,
-                this);
-            EmitSignal(SignalName.HitConfirmed, killed, enemy.LastHitWasHeadshot, enemy.LastHitWasArmored);
-        }
-        else if (target is CivilianNpc civilian)
-        {
-            var killed = civilian.TakeDamage(_rng.RandfRange(42.0f, 58.0f), point, this);
-            EmitSignal(SignalName.HitConfirmed, killed, false, false);
-        }
-        else if (target is ExplosiveBarrel barrel)
-        {
-            barrel.TakeDamage(24.0f, point, this);
-            EmitSignal(SignalName.HitConfirmed, false, false, false);
-        }
-        else if (target is DriveableVehicle vehicle)
-        {
-            var destroyed = vehicle.TakeDamage(40.0f, point, this);
-            EmitSignal(SignalName.HitConfirmed, destroyed, false, false);
-        }
-        else if (target is DestructibleAircraft aircraft)
-        {
-            var destroyed = aircraft.TakeDamage(48.0f, point, this);
-            EmitSignal(SignalName.HitConfirmed, destroyed, false, false);
-        }
-        else if (target is AircraftShell shell)
-        {
-            var destroyed = shell.TakeDamage(48.0f, point, this);
-            EmitSignal(SignalName.HitConfirmed, destroyed, false, false);
-        }
-        Main?.SpawnImpact(point, hit.Normal);
     }
 
     public void Fire()
@@ -2687,7 +2519,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             EquippedKnifeSkinId = item.KnifeSkinId;
             EquippedKnifeGrade = item.Grade;
             RebuildKnife();
-            Hud?.ShowLocalizedMessage("knife_skin_equipped", "KNIFE FINISH EQUIPPED", new Color(0.88f, 0.42f, 0.34f));
+            Hud?.ShowLocalizedMessage("knife_skin_equipped", "MELEE WEAPON EQUIPPED", new Color(0.88f, 0.72f, 0.34f));
             return new LootItem { Kind = LootItemKind.KnifeSkin, KnifeSkinId = previousSkin, Grade = previousGrade };
         }
         if (item.Kind == LootItemKind.ArmorPlate && TryCollectArmorPlate(item.Grade, item.Quantity))
@@ -2755,6 +2587,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     public LootItem? EquipFromLootToWeaponSlot(LootItem item, PlayerWeaponSlot slot)
     {
+        if (slot == PlayerWeaponSlot.Melee)
+        {
+            return item.Kind == LootItemKind.KnifeSkin
+                ? EquipFromLoot(item)
+                : item;
+        }
         if (slot is not (PlayerWeaponSlot.Primary or PlayerWeaponSlot.Secondary or PlayerWeaponSlot.Sidearm))
         {
             return item;
@@ -2899,17 +2737,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         return equipment.Definition.Slot == EquipmentSlot.BodyArmor ? LootGrade.Rare : LootGrade.Uncommon;
     }
 
-    private void RebuildKnife()
-    {
-        var visible = IsInstanceValid(_knifeRoot) && _knifeRoot.Visible;
-        if (IsInstanceValid(_knifeRoot))
-        {
-            _knifeRoot.QueueFree();
-        }
-        BuildKnife();
-        _knifeRoot.Visible = visible;
-    }
-
     private bool ThrowGrenade()
     {
         if (Grenades <= 0 || _isReloading || MedicalActionBlocksWeapon || IsDead || Main is null)
@@ -2942,6 +2769,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     public bool TakeDamage(float amount, Vector3 hitPosition = default, Node? attacker = null)
     {
+        LastHitWasArmored = false;
         if (IsDead)
         {
             return true;
@@ -2985,6 +2813,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             _ => null
         };
         var armorHit = protectiveGear is not null && protectiveGear.Durability > 0.0f;
+        LastHitWasArmored = armorHit;
         if (protectiveGear is not null)
         {
             adjustedDamage = ApplyProtection(protectiveGear, adjustedDamage);

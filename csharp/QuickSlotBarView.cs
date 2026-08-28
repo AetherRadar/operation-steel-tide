@@ -179,7 +179,7 @@ public partial class QuickSlotBarView : Control
         _buttons[0].TooltipText = Text("select_primary", "SELECT PRIMARY WEAPON");
         _buttons[1].TooltipText = Text("select_secondary", "SELECT SECONDARY WEAPON");
         _buttons[2].TooltipText = Text("select_sidearm", "SELECT SIDEARM");
-        _buttons[3].TooltipText = Text("select_knife", "SELECT TACTICAL KNIFE");
+        _buttons[3].TooltipText = Text("select_melee_weapon", "SELECT MELEE WEAPON");
         _buttons[4].TooltipText = Text("select_frag_grenade", "SELECT FRAGMENTATION GRENADE");
         _buttons[5].TooltipText = Text("select_utility", "SELECT UTILITY ITEM");
 

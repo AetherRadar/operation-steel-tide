@@ -675,7 +675,12 @@ public partial class FreightTerminalWorld
         }
     }
 
-    private void ApplyDemolitionNetworkDamage(int actorId, float damage, Vector3 hitPosition, Node? attacker)
+    private void ApplyDemolitionNetworkDamage(
+        int actorId,
+        float damage,
+        Vector3 hitPosition,
+        Node? attacker,
+        bool melee = false)
     {
         if (!_demolitionMode || actorId < DemolitionAlphaActorBase || damage <= 0.0f)
         {
@@ -692,7 +697,14 @@ public partial class FreightTerminalWorld
             }
             var mate = _squadMates.FirstOrDefault(candidate => IsInstanceValid(candidate)
                 && candidate.SquadSlot == slot);
-            mate?.TakeCombatDamage(damage, hitPosition, attacker);
+            if (melee)
+            {
+                mate?.TakeMeleeCombatDamage(damage, hitPosition, attacker);
+            }
+            else
+            {
+                mate?.TakeCombatDamage(damage, hitPosition, attacker);
+            }
             return;
         }
         var opponent = _demolitionOpponents.FirstOrDefault(candidate => IsInstanceValid(candidate)

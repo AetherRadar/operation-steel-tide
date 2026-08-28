@@ -51,7 +51,7 @@ public static class LootInteractionPolicy
     public static LootBackpackMenuCapabilities GetBackpackMenuCapabilities(LootItemKind itemKind)
     {
         return new LootBackpackMenuCapabilities(
-            CanEquip: itemKind == LootItemKind.Weapon,
+            CanEquip: itemKind is LootItemKind.Weapon or LootItemKind.KnifeSkin,
             CanDrop: true);
     }
 }

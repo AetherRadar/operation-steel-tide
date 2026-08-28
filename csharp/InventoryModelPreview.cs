@@ -187,8 +187,9 @@ public partial class InventoryModelPreview : SubViewportContainer
                 break;
             case InventoryPreviewKind.Knife:
                 BuildKnife(_modelRoot);
-                _camera.Size = 2.05f;
-                _modelRoot.RotationDegrees = new Vector3(-11, 18, 5);
+                var meleeStyle = KnifeSkinCatalog.Definition(_knifeSkinId).Style;
+                _camera.Size = meleeStyle == MeleeWeaponStyle.TacticalKnife ? 0.82f : 2.05f;
+                _modelRoot.RotationDegrees = new Vector3(-8, -12, -24);
                 break;
             case InventoryPreviewKind.Helmet:
                 BuildHelmet(_modelRoot);
@@ -412,22 +413,18 @@ public partial class InventoryModelPreview : SubViewportContainer
     private void BuildKnife(Node3D root)
     {
         var skin = KnifeSkinCatalog.Definition(_knifeSkinId);
-        var steel = skin.BladeColor;
-        var edge = skin.EdgeColor;
-        var grip = skin.GripColor;
-        Box(root, new Vector3(1.0f, 0.16f, 0.065f), new Vector3(-0.36f, 0.02f, 0), steel, 0.9f, rotation: new Vector3(0, 0, -0.035f));
-        Box(root, new Vector3(0.8f, 0.025f, 0.075f), new Vector3(-0.48f, -0.065f, 0.002f), edge, 0.95f);
-        Box(root, new Vector3(0.09f, 0.38f, 0.09f), new Vector3(0.18f, 0, 0), steel.Darkened(0.25f), 0.75f);
-        Cylinder(root, 0.12f, 0.72f, new Vector3(0.58f, 0, 0), new Vector3(0, 0, Mathf.Pi / 2), grip, 0.05f, 0.88f);
-        for (var ring = 0; ring < 5; ring++)
+        var authored = CombatModelLibrary.InstantiateMelee(skin);
+        var orientation = new Node3D
         {
-            Box(root, new Vector3(0.035f, 0.245f, 0.16f), new Vector3(0.3f + ring * 0.14f, 0, 0), grip.Lightened(0.14f), 0.08f);
-        }
-        Cylinder(root, 0.135f, 0.08f, new Vector3(0.98f, 0, 0), new Vector3(0, 0, Mathf.Pi / 2), steel.Darkened(0.22f), 0.65f, 0.68f);
-        for (var tooth = 0; tooth < 4; tooth++)
-        {
-            Box(root, new Vector3(0.07f, 0.035f, 0.08f), new Vector3(-0.23f - tooth * 0.12f, 0.115f, 0), steel.Darkened(0.12f), 0.8f);
-        }
+            Name = $"{skin.Style}PreviewOrientation",
+            RotationDegrees = new Vector3(0, -90, 0)
+        };
+        authored.Root.Position = new Vector3(
+            0,
+            0,
+            skin.Style == MeleeWeaponStyle.TacticalKnife ? 0.22f : 0.71f);
+        orientation.AddChild(authored.Root);
+        root.AddChild(orientation);
     }
 
     private void BuildHelmet(Node3D root)

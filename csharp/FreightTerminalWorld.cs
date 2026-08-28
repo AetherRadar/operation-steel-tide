@@ -852,7 +852,7 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.M24, 2),
                 Parts = new[] { "muzzle_suppressor", "optic_scope" },
                 Equipment = new[] { "armor_heavy" },
-                KnifeSkin = "knife_crimson",
+                KnifeSkin = "knife_zhanma",
                 SecureRoom = true
             },
             new
@@ -864,7 +864,7 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.M4A1, 1),
                 Parts = new[] { "optic_holo", "mag_extended" },
                 Equipment = new[] { "pack_heavy" },
-                KnifeSkin = string.Empty,
+                KnifeSkin = "knife_crimson",
                 SecureRoom = true
             },
             new
@@ -912,7 +912,7 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.ScarL, 1),
                 Parts = new[] { "stock_precision", "optic_holo" },
                 Equipment = new[] { "helmet_heavy", "armor_heavy" },
-                KnifeSkin = string.Empty,
+                KnifeSkin = "knife_arctic",
                 SecureRoom = false
             },
             new
@@ -924,7 +924,7 @@ public partial class FreightTerminalWorld : Node3D
                 Weapon = WeaponCatalog.Build(WeaponPlatform.AK74, 2),
                 Parts = new[] { "optic_scope", "stock_precision" },
                 Equipment = new[] { "pack_heavy" },
-                KnifeSkin = "knife_arctic",
+                KnifeSkin = "knife_tianxuan",
                 SecureRoom = false
             },
             new
@@ -2322,10 +2322,6 @@ public partial class FreightTerminalWorld : Node3D
         }
         var origin = (LootDragOrigin)originValue;
         var slot = (PlayerWeaponSlot)slotValue;
-        if (slot == PlayerWeaponSlot.Melee)
-        {
-            return;
-        }
         if (origin == LootDragOrigin.Backpack)
         {
             if (_player.UseBackpackItemInWeaponSlot(itemId, slot))

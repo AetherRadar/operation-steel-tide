@@ -233,7 +233,7 @@ public partial class TacticalPlayer
             _vaultPathBlocker = string.Empty;
             _isVaulting = true;
             _isAiming = false;
-            _knifeTime = 0.0f;
+            CancelMeleeAction();
             if (_isReloading)
             {
                 _isReloading = false;

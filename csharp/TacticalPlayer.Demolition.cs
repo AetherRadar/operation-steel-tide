@@ -39,7 +39,7 @@ public partial class TacticalPlayer
         _plateTime = 0.0f;
         _isAiming = false;
         _slideTime = 0.0f;
-        _knifeTime = 0.0f;
+        CancelMeleeAction();
         ResetReloadRig();
         _weaponRoot.Visible = HasActiveFirearm;
         _knifeRoot.Visible = _knifeEquipped;
