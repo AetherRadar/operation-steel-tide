@@ -370,12 +370,12 @@ public partial class FreightTerminalWorld
             var spoke = new MeshInstance3D { Mesh = SharedBoxMesh(new Vector3(0.42f, 0.06f, 0.06f)), MaterialOverride = handleMat, Position = new Vector3(Mathf.Cos(ang) * 0.0f, 0.62f, 0.51f), Rotation = new Vector3(0, 0, ang) };
             // offset outward
             spoke.Position = new Vector3(Mathf.Cos(ang) * 0.18f, 0.42f + Mathf.Sin(ang) * 0.05f + 0.2f, 0.52f);
-            // Simpler: place wheel at center
-            var wheel = new MeshInstance3D { Mesh = new TorusMesh { InnerRadius = 0.18f, OuterRadius = 0.22f, Rings = 24, RingSegments = 10 }, MaterialOverride = handleMat, Position = new Vector3(0, 0.42f, 0.52f), Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0) };
-            if (i == 0) root.AddChild(wheel);
+            root.AddChild(spoke);
             var knob = new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.06f, Height = 0.12f, RadialSegments = 10, Rings = 6 }, MaterialOverride = boltMat, Position = new Vector3(Mathf.Cos(ang) * 0.22f, 0.42f + Mathf.Sin(ang) * 0.22f, 0.52f) };
             root.AddChild(knob);
         }
+        var wheel = new MeshInstance3D { Mesh = new TorusMesh { InnerRadius = 0.18f, OuterRadius = 0.22f, Rings = 24, RingSegments = 10 }, MaterialOverride = handleMat, Position = new Vector3(0, 0.42f, 0.52f), Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0) };
+        root.AddChild(wheel);
         // Keypad emissive
         var keypad = new MeshInstance3D { Mesh = SharedBoxMesh(new Vector3(0.24f, 0.16f, 0.02f)), MaterialOverride = keypadMat, Position = new Vector3(0.32f, 0.72f, 0.51f) };
         root.AddChild(keypad);
