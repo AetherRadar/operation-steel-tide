@@ -1,10 +1,11 @@
-"""Generate the project-authored combat weapon and operator GLBs.
+"""Generate the project-authored legacy operator GLB.
 
 Run from the repository root with Blender 4.5 LTS or newer:
     blender --background --factory-startup --python scripts/blender/generate_combat_models.py
 
-Godot owns gameplay, collision, audio, and animation state. The exported node
-names are the runtime contract used by CombatModelLibrary.
+The CC0 authored M4A1 has a separate reproducible adaptation pipeline in
+``build_nisu_m4a1.py``. Keeping the operator generator separate prevents this
+legacy procedural character build from overwriting the production rifle.
 """
 
 from __future__ import annotations
@@ -17,7 +18,6 @@ from mathutils import Vector
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WEAPON_DIR = REPO_ROOT / "assets" / "models" / "steel_tide_m4a1"
 OPERATOR_DIR = REPO_ROOT / "assets" / "models" / "steel_tide_operator"
 SOURCE_DIR = REPO_ROOT / "source_art" / "combat_models"
 PREVIEW_DIR = REPO_ROOT / "build" / "art-previews"
@@ -213,93 +213,6 @@ def join_direct_meshes(parent: bpy.types.Object, name: str) -> None:
     meshes[0].name = name
 
 
-def add_magazine_geometry(parent: bpy.types.Object, mats: dict[str, bpy.types.Material]) -> None:
-    cube("MagazineUpper", parent, (0.0, 0.0, -0.065), (0.092, 0.145, 0.135), mats["polymer"], bevel=0.012)
-    cube("MagazineLower", parent, (0.0, 0.022, -0.185), (0.086, 0.135, 0.13), mats["polymer"], rotation=(math.radians(-8), 0, 0), bevel=0.011)
-    cube("MagazineFloor", parent, (0.0, 0.038, -0.263), (0.103, 0.15, 0.025), mats["steel"], rotation=(math.radians(-8), 0, 0), bevel=0.004)
-    for side in (-1.0, 1.0):
-        for index in range(3):
-            cube(
-                f"MagazineRib_{side}_{index}", parent,
-                (side * 0.047, -0.035 + index * 0.044, -0.14),
-                (0.006, 0.017, 0.19), mats["steel"], bevel=0.001,
-            )
-    join_direct_meshes(parent, "MagazineGeometry")
-
-
-def build_weapon() -> bpy.types.Object:
-    clear_scene()
-    scene = bpy.context.scene
-    scene.unit_settings.system = "METRIC"
-    scene.unit_settings.scale_length = 1.0
-    mats = {
-        "phosphate": make_material("PhosphateBlack", (0.025, 0.031, 0.03, 1.0), 0.78, 0.27),
-        "steel": make_material("MachinedSteel", (0.13, 0.15, 0.145, 1.0), 0.9, 0.2),
-        "polymer": make_material("ReinforcedPolymer", (0.035, 0.043, 0.04, 1.0), 0.08, 0.66),
-        "tan": make_material("FieldTan", (0.29, 0.255, 0.17, 1.0), 0.06, 0.72),
-        "mark": make_material("SafetyMark", (0.82, 0.25, 0.055, 1.0), 0.15, 0.35),
-    }
-    root = empty("SteelTideM4A1")
-
-    tapered_box("UpperReceiver", root, (0, 0.0, 0.035), (0.07, 0.23), (0.064, 0.225), 0.115, mats["phosphate"], 0.009)
-    tapered_box("LowerReceiver", root, (0, -0.015, -0.045), (0.062, 0.18), (0.067, 0.2), 0.105, mats["phosphate"], 0.008)
-    cube("TopRail", root, (0, 0.08, 0.112), (0.13, 0.62, 0.035), mats["steel"], bevel=0.003)
-    for index in range(13):
-        cube(f"RailTooth_{index}", root, (0, -0.19 + index * 0.044, 0.14), (0.145, 0.021, 0.024), mats["phosphate"], bevel=0.002)
-    cube("HandguardCore", root, (0, 0.47, 0.015), (0.155, 0.47, 0.13), mats["tan"], bevel=0.016)
-    for side in (-1.0, 1.0):
-        for index in range(4):
-            cube(f"Mlok_{side}_{index}", root, (side * 0.079, 0.31 + index * 0.095, 0.015), (0.008, 0.058, 0.024), mats["phosphate"], bevel=0.004)
-    cylinder("Barrel", root, (0, 0.91, 0.015), 0.023, 0.61, mats["steel"], (math.pi / 2, 0, 0), 20)
-    cube("GasBlock", root, (0, 0.755, 0.035), (0.075, 0.08, 0.09), mats["phosphate"], bevel=0.008)
-    cylinder("BufferTube", root, (0, -0.42, 0.025), 0.038, 0.46, mats["steel"], (math.pi / 2, 0, 0), 18)
-    cube("StockCheek", root, (0, -0.49, 0.055), (0.14, 0.39, 0.105), mats["polymer"], bevel=0.018)
-    cube("StockButt", root, (0, -0.69, -0.005), (0.16, 0.075, 0.25), mats["polymer"], rotation=(math.radians(-7), 0, 0), bevel=0.015)
-    tapered_box("PistolGrip", root, (0, 0.0, -0.205), (0.052, 0.07), (0.043, 0.058), 0.29, mats["polymer"], 0.012)
-    cube("TriggerGuard", root, (0, 0.105, -0.13), (0.025, 0.19, 0.035), mats["steel"], bevel=0.006)
-    cube("EjectionPort", root, (0.071, 0.035, 0.048), (0.011, 0.17, 0.058), mats["steel"], bevel=0.003)
-    cylinder("ForwardAssist", root, (0.082, -0.115, 0.025), 0.022, 0.035, mats["steel"], (0, math.pi / 2, 0), 12)
-    cylinder("Selector", root, (0.074, -0.04, -0.055), 0.019, 0.025, mats["mark"], (0, math.pi / 2, 0), 12)
-
-    magazine = empty("Magazine", root)
-    magazine.location = (0.0, 0.31, -0.2)
-    add_magazine_geometry(magazine, mats)
-    spare = empty("SpareMagazine", root)
-    spare.location = (-0.3, 0.18, -0.62)
-    add_magazine_geometry(spare, mats)
-
-    charging = empty("ChargingHandle", root)
-    charging.location = (0.075, 0.05, 0.085)
-    cube("ChargingStem", charging, (0, 0, 0), (0.028, 0.11, 0.028), mats["steel"], bevel=0.004)
-    cube("ChargingLatch", charging, (-0.035, -0.035, 0), (0.082, 0.034, 0.035), mats["steel"], bevel=0.005)
-
-    stock = empty("Stock", root)
-    stock.location = (0, -0.49, 0.0)
-    cube("StockAdjustmentLever", stock, (0, 0.02, -0.11), (0.065, 0.14, 0.035), mats["steel"], bevel=0.005)
-    foregrip = empty("Foregrip", root)
-    foregrip.location = (0, 0.58, -0.17)
-    tapered_box("AngledForegrip", foregrip, (0, 0, 0), (0.045, 0.075), (0.038, 0.065), 0.19, mats["polymer"], 0.01)
-    optic = empty("OpticMount", root)
-    optic.location = (0, 0.25, 0.145)
-    cube("OpticRiser", optic, (0, 0, 0), (0.11, 0.16, 0.035), mats["phosphate"], bevel=0.005)
-
-    muzzle = empty("MuzzleDevice", root)
-    muzzle.location = (0, 1.205, 0.015)
-    cylinder("ThreePortBrake", muzzle, (0, 0, 0), 0.043, 0.15, mats["phosphate"], (math.pi / 2, 0, 0), 20)
-    for index in (-1, 0, 1):
-        cube(f"BrakePort_{index}", muzzle, (0.035, index * 0.038, 0.012), (0.018, 0.022, 0.025), mats["steel"], bevel=0.002)
-    join_direct_meshes(muzzle, "MuzzleDeviceGeometry")
-    suppressor = empty("Suppressor", root)
-    suppressor.location = (0, 1.26, 0.015)
-    cylinder("SuppressorBody", suppressor, (0, 0, 0), 0.055, 0.28, mats["phosphate"], (math.pi / 2, 0, 0), 24)
-    for index in range(4):
-        cylinder("SuppressorRing_%d" % index, suppressor, (0, -0.095 + index * 0.062, 0), 0.058, 0.018, mats["steel"], (math.pi / 2, 0, 0), 24, 0.002)
-    join_direct_meshes(suppressor, "SuppressorGeometry")
-
-    join_direct_meshes(root, "WeaponBodyGeometry")
-    return root
-
-
 def add_operator_leg(
     name: str,
     root: bpy.types.Object,
@@ -486,15 +399,6 @@ def add_preview_stage(
 
 def main() -> None:
     bpy.context.preferences.filepaths.save_version = 0
-    build_weapon()
-    weapon_meshes, weapon_triangles = export_current_scene(
-        WEAPON_DIR / "steel_tide_m4a1.glb",
-        SOURCE_DIR / "steel_tide_m4a1.blend",
-    )
-    bpy.data.objects["SpareMagazine"].hide_render = True
-    bpy.data.objects["Suppressor"].hide_render = True
-    add_preview_stage((0, 0.25, 0), (2.25, -2.8, 1.45), -0.38, PREVIEW_DIR / "steel_tide_m4a1.png")
-
     build_operator()
     operator_meshes, operator_triangles = export_current_scene(
         OPERATOR_DIR / "steel_tide_operator.glb",
@@ -503,7 +407,6 @@ def main() -> None:
     add_preview_stage((0, 0, 1.0), (3.1, 5.0, 2.35), -0.01, PREVIEW_DIR / "steel_tide_operator.png")
     print(
         "COMBAT_MODELS_EXPORT "
-        f"weapon_meshes={weapon_meshes} weapon_triangles={weapon_triangles} "
         f"operator_meshes={operator_meshes} operator_triangles={operator_triangles}"
     )
 

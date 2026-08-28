@@ -6,10 +6,14 @@ namespace OperationSteelTide;
 
 public partial class TacticalPlayer
 {
+    // This compatibility partial stays above 800 lines while authored weapon and
+    // hand rigs share TacticalPlayer's private lifecycle. Follow-up: extract the
+    // per-platform presentation controllers once that lifecycle has a stable API.
     private const float AuthoredSmgPresentationScale = 0.72f;
     private const float AuthoredArmPresentationScale = 0.72f;
     internal const float MaxServicePistolSupportArmCorrection = 0.03f;
     private static readonly Vector3 AuthoredSmgCameraPosition = new(0.34f, -0.45f, -0.72f);
+    private static readonly Vector3 M4ReloadMagazineGripOffset = new(-0.06f, 0.08f, -0.02f);
 
     private Node3D _proceduralWeaponVisual = null!;
     private Node3D _proceduralFirstPersonArms = null!;
@@ -35,6 +39,46 @@ public partial class TacticalPlayer
     internal bool UsesAuthoredPrimaryWeaponForDiagnostics
         => IsInstanceValid(_authoredPrimaryWeapon?.Root)
         && EquippedWeapon.Platform == WeaponPlatform.M4A1;
+    internal bool AuthoredM4AttachmentPresentationValidForDiagnostics
+    {
+        get
+        {
+            if (!UsesAuthoredPrimaryWeaponForDiagnostics
+                || !IsInstanceValid(_muzzle)
+                || !IsInstanceValid(_opticRoot)
+                || !IsInstanceValid(_opticReticle))
+            {
+                return false;
+            }
+
+            var suppressed = EquippedWeapon.Attachments.TryGetValue(
+                    AttachmentSlot.Muzzle,
+                    out var muzzleId)
+                && muzzleId == "muzzle_suppressor";
+            var hasOptic = EquippedWeapon.Attachments.ContainsKey(AttachmentSlot.Optic);
+            var expectedMuzzleTip = suppressed
+                ? _authoredPrimaryWeapon.SuppressorTip
+                : _authoredPrimaryWeapon.MuzzleDeviceTip;
+            var authoredVisibility = _authoredPrimaryWeapon.MuzzleDevice.Visible == !suppressed
+                && _authoredPrimaryWeapon.Suppressor.Visible == suppressed
+                && _authoredPrimaryWeapon.OpticMount.Visible == hasOptic;
+            var proceduralOpticsHidden = !_reflexSightModel.Visible
+                && !_holoSightModel.Visible
+                && !_scopeSightModel.Visible;
+            var muzzleAligned = _muzzle.GlobalPosition.DistanceTo(
+                expectedMuzzleTip.GlobalPosition) <= 0.001f;
+            var opticAligned = !hasOptic
+                || (_opticRoot.Visible
+                    && _opticRoot.GlobalPosition.DistanceTo(
+                        _authoredPrimaryWeapon.OpticReticleAnchor.GlobalPosition) <= 0.001f
+                    && _opticReticle.GlobalPosition.DistanceTo(
+                        _authoredPrimaryWeapon.OpticReticleAnchor.GlobalPosition) <= 0.001f);
+            return authoredVisibility
+                && proceduralOpticsHidden
+                && muzzleAligned
+                && opticAligned;
+        }
+    }
     internal bool UsesAuthoredGsh18ForDiagnostics
         => IsInstanceValid(_authoredGsh18Weapon?.Root)
         && EquippedWeapon.Platform == WeaponPlatform.GSh18
@@ -235,6 +279,42 @@ public partial class TacticalPlayer
     {
         AlignAuthoredArmsToWeapon();
         return ActiveAuthoredArms()?.Root.Transform ?? Transform3D.Identity;
+    }
+
+    internal AuthoredM4ReloadArmInspection InspectAuthoredM4ReloadArmForDiagnostics()
+    {
+        var arms = ActiveAuthoredArms();
+        if (EquippedWeapon.Platform != WeaponPlatform.M4A1
+            || arms is null
+            || !IsInstanceValid(arms.Root)
+            || !IsInstanceValid(_authoredPrimaryWeapon?.Root))
+        {
+            return default;
+        }
+
+        var leftGrip = arms.LeftGripFrame.GlobalPosition;
+        var supportTarget = M4ReloadSupportTargetGlobal();
+        var primaryMagazinePosition = _authoredPrimaryWeapon.Magazine.GlobalPosition;
+        var spareMagazinePosition = _authoredPrimaryWeapon.SpareMagazine.GlobalPosition;
+        return new AuthoredM4ReloadArmInspection(
+            arms.Root.IsVisibleInTree()
+                && arms.LeftArm.IsVisibleInTree()
+                && arms.LeftGripFrame.IsVisibleInTree()
+                && UsesAuthoredHandRigForDiagnostics,
+            arms.LeftArm.IsVisibleInTree(),
+            arms.LeftGripFrame.IsVisibleInTree(),
+            _authoredPrimaryWeapon.Magazine.IsVisibleInTree(),
+            _authoredPrimaryWeapon.SpareMagazine.IsVisibleInTree(),
+            _authoredPrimaryWeapon.Magazine.GetInstanceId()
+                != _authoredPrimaryWeapon.SpareMagazine.GetInstanceId(),
+            leftGrip,
+            supportTarget,
+            primaryMagazinePosition,
+            spareMagazinePosition,
+            leftGrip.DistanceTo(supportTarget),
+            leftGrip.DistanceTo(spareMagazinePosition),
+            arms.LeftPalmFrame.GlobalPosition.DistanceTo(arms.LeftWristFrame.GlobalPosition),
+            arms.LeftArm.Transform);
     }
 
     private static (float Distance, Vector3 Offset) InspectVisibleMeshSurface(
@@ -719,6 +799,57 @@ public partial class TacticalPlayer
         arms.LeftArm.Position += supportTargetInArms - supportGripInArms;
     }
 
+    private void UpdateAuthoredM4ReloadSupportArm()
+    {
+        if (!_isReloading
+            || EquippedWeapon.Platform != WeaponPlatform.M4A1
+            || ActiveAuthoredArms() is not { } arms
+            || !IsInstanceValid(arms.Root)
+            || !arms.Root.Visible
+            || !IsInstanceValid(_authoredPrimaryWeapon?.Root))
+        {
+            return;
+        }
+
+        // Start from the authored two-hand hold every frame so fixed diagnostic
+        // samples and normal playback produce the same pose. Swing the complete
+        // arm around its authored node pivot before applying the small reach
+        // correction that puts the visible grip marker on the magazine handoff.
+        // Because the sleeve, hand, wrist and markers share LeftArm as their
+        // parent, this keeps the authored sleeve continuous throughout the move.
+        AlignAuthoredArmsToWeapon();
+        var restTransform = arms.LeftArm.Transform;
+        var restGripInArms = arms.MarkerTransformInRoot(arms.LeftGripFrame).Origin;
+        var targetInArms = arms.Root.GlobalTransform.AffineInverse()
+            * M4ReloadSupportTargetGlobal();
+        var restReach = restGripInArms - restTransform.Origin;
+        var targetReach = targetInArms - restTransform.Origin;
+        if (restReach.LengthSquared() > 0.000001f
+            && targetReach.LengthSquared() > 0.000001f)
+        {
+            var pivotSwing = new Quaternion(restReach.Normalized(), targetReach.Normalized());
+            arms.LeftArm.Transform = new Transform3D(
+                new Basis(pivotSwing) * restTransform.Basis,
+                restTransform.Origin);
+        }
+
+        var rotatedGripInArms = arms.MarkerTransformInRoot(arms.LeftGripFrame).Origin;
+        arms.LeftArm.Position += targetInArms - rotatedGripInArms;
+    }
+
+    private Vector3 M4ReloadSupportTargetGlobal()
+        => IsInstanceValid(_supportHand)
+            ? _supportHand.GlobalPosition
+            : Vector3.Zero;
+
+    private void ResetAuthoredM4ReloadSupportArm()
+    {
+        if (EquippedWeapon.Platform == WeaponPlatform.M4A1)
+        {
+            AlignAuthoredArmsToWeapon();
+        }
+    }
+
     private void EnsureAuthoredDesertEagleWeapon()
     {
         if (_desertEagleLoadAttempted || IsInstanceValid(_authoredDesertEagleWeapon?.Root))
@@ -765,6 +896,12 @@ public partial class TacticalPlayer
             && IsInstanceValid(_authoredPrimaryWeapon?.Root))
         {
             _authoredPrimaryWeapon.SyncMechanisms(_magazine, _spareMagazine, _chargingHandle);
+            _muzzle.GlobalTransform = _authoredPrimaryWeapon.ActiveMuzzleTip.GlobalTransform;
+            if (_authoredPrimaryWeapon.OpticMount.Visible && _opticRoot.Visible)
+            {
+                _opticRoot.GlobalPosition = _authoredPrimaryWeapon.OpticReticleAnchor.GlobalPosition;
+                _opticReticle.Position = Vector3.Zero;
+            }
         }
         if (EquippedWeapon.Platform == WeaponPlatform.M3A1
             && IsInstanceValid(_authoredFirstPersonSmg?.Root))
@@ -804,3 +941,19 @@ internal readonly record struct FirstPersonHandPoseInspection(
     Vector3 PrimarySurfaceOffset,
     Vector3 SupportSurfaceOffset,
     float SupportArmCorrection);
+
+internal readonly record struct AuthoredM4ReloadArmInspection(
+    bool AuthoredArmActive,
+    bool LeftArmVisible,
+    bool LeftGripFrameActive,
+    bool PrimaryMagazineVisible,
+    bool SpareMagazineVisible,
+    bool SeparateMagazineNodes,
+    Vector3 LeftGrip,
+    Vector3 SupportTarget,
+    Vector3 PrimaryMagazinePosition,
+    Vector3 SpareMagazinePosition,
+    float SupportTargetDistance,
+    float ActiveMagazineDistance,
+    float SleeveWristLength,
+    Transform3D LeftArmTransform);

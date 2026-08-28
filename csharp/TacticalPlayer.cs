@@ -3,6 +3,12 @@ using Godot;
 
 namespace OperationSteelTide;
 
+// File-size retention: TacticalPlayer remains the legacy gameplay compatibility
+// facade, and this change only reconnects its existing weapon nodes to authored
+// visuals. Follow-up: extract first-person weapon construction and optic setup to
+// TacticalPlayer.WeaponVisualSetup.cs, keeping lifecycle ownership here and
+// protecting the move with hand, optics, reload, equipment, and HUD diagnostics.
+
 public enum PlayerStance
 {
     Standing,
@@ -1076,9 +1082,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 ? precisionOpticHeight
                 : 0.205f,
             -0.25f);
-        _reflexSightModel.Visible = opticId == "optic_micro";
-        _holoSightModel.Visible = opticId == "optic_holo";
-        _scopeSightModel.Visible = opticId is "optic_scope" or "optic_7x" or "optic_sniper";
+        // The M4 GLB owns its finished authored optic. Keep this root only as
+        // a gameplay reticle carrier; never layer the legacy primitive sight
+        // housing over the production model.
+        var usesAuthoredM4Optic = EquippedWeapon.Platform == WeaponPlatform.M4A1;
+        _reflexSightModel.Visible = !usesAuthoredM4Optic && opticId == "optic_micro";
+        _holoSightModel.Visible = !usesAuthoredM4Optic && opticId == "optic_holo";
+        _scopeSightModel.Visible = !usesAuthoredM4Optic
+            && opticId is "optic_scope" or "optic_7x" or "optic_sniper";
         _opticReticle.Position = opticId switch
         {
             "optic_scope" => new Vector3(0, 0, -0.255f),
@@ -1904,6 +1915,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _opticReticle.Visible = _isAiming && IsFirearmQuickSlotSelected;
         UpdateReloadAnimation();
         SyncAuthoredPrimaryWeapon();
+        UpdateAuthoredM4ReloadSupportArm();
     }
 
     private float AimFieldOfView()
@@ -2284,23 +2296,50 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             return;
         }
-        if (EquippedWeapon.Platform != WeaponPlatform.M4A1)
+        if (EquippedWeapon.Platform == WeaponPlatform.M4A1)
         {
-            // The M4 hand-off animation is authored for its magazine geometry only.
-            // Keep every other platform in its correct two-hand hold until its own
-            // authored reload clip is available instead of moving the support hand
-            // through the rifle's magwell.
-            ApplyProceduralHandPose();
+            UpdateM4ReloadAnimation();
             return;
         }
 
+        // The coordinates below are authored for the M4 magazine geometry only.
+        // Other platforms retain their established reload presentation until
+        // they receive a platform-specific authored clip.
+        ApplyProceduralHandPose();
+    }
+
+    private void UpdateM4ReloadAnimation()
+    {
         var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
         var magazineHome = new Vector3(0, -0.2f, -0.31f);
-        var magazineRotation = EquippedWeapon.Platform == WeaponPlatform.AK74
-            ? new Vector3(-0.29f, 0, 0)
-            : new Vector3(-0.19f, 0, 0);
+        var magazineRotation = new Vector3(-0.19f, 0, 0);
         var handHome = new Vector3(-0.03f, -0.2f, -0.58f);
-        var handAtWell = new Vector3(-0.11f, -0.22f, -0.31f);
+        var handAtWell = magazineHome + M4ReloadMagazineGripOffset;
+        var droppedMagazine = new Vector3(-0.1f, -0.43f, -0.38f);
+        var sparePickup = new Vector3(-0.2f, -0.42f, -0.42f);
+        var spareReady = new Vector3(-0.14f, -0.32f, -0.36f);
+        var removedMagazineGrip = droppedMagazine + M4ReloadMagazineGripOffset;
+
+        // Establish the complete mechanism state on every update. Besides
+        // making fixed-progress diagnostics deterministic, this avoids a
+        // one-frame stale magazine when a reload pose is restored or sampled.
+        _magazine.Visible = progress < 0.43f || progress >= 0.78f;
+        _magazine.Position = progress is >= 0.43f and < 0.78f
+            ? droppedMagazine
+            : magazineHome;
+        _magazine.Rotation = progress is >= 0.43f and < 0.78f
+            ? new Vector3(0.62f, 0.08f, 0.36f)
+            : magazineRotation;
+        _spareMagazine.Visible = progress is >= 0.43f and < 0.78f;
+        _spareMagazine.Position = progress >= 0.78f
+            ? magazineHome
+            : new Vector3(-0.3f, -0.62f, -0.18f);
+        _spareMagazine.Rotation = progress >= 0.78f
+            ? magazineRotation
+            : new Vector3(0.35f, 0, 0.35f);
+        _chargingHandle.Position = new Vector3(0.075f, 0.085f, -0.05f);
+        _supportHand.Position = handHome;
+        _supportHand.Rotation = new Vector3(0.2f, 0, 0.05f);
 
         if (progress < 0.18f)
         {
@@ -2312,10 +2351,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         else if (progress < 0.43f)
         {
             var t = SmoothStep((progress - 0.18f) / 0.25f);
-            var dropped = new Vector3(-0.13f, -0.58f, -0.24f);
-            _magazine.Position = magazineHome.Lerp(dropped, t);
+            _magazine.Position = magazineHome.Lerp(droppedMagazine, t);
             _magazine.Rotation = magazineRotation.Lerp(new Vector3(0.62f, 0.08f, 0.36f), t);
-            _supportHand.Position = handAtWell.Lerp(dropped + new Vector3(-0.08f, 0.04f, 0.02f), t);
+            _supportHand.Position = _magazine.Position + M4ReloadMagazineGripOffset;
+            _supportHand.Rotation = new Vector3(0.42f, 0.08f, 0.22f);
             if (_reloadSoundStage == 0 && progress > 0.3f)
             {
                 _reloadSoundStage = 1;
@@ -2325,31 +2364,26 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
         else if (progress < 0.55f)
         {
-            _magazine.Visible = false;
-            _spareMagazine.Visible = true;
             var t = SmoothStep((progress - 0.43f) / 0.12f);
-            var pickup = new Vector3(-0.3f, -0.62f, -0.18f);
-            var ready = new Vector3(-0.18f, -0.46f, -0.25f);
-            _spareMagazine.Position = pickup.Lerp(ready, t);
-            _supportHand.Position = _spareMagazine.Position + new Vector3(-0.08f, 0.04f, 0.02f);
+            _spareMagazine.Position = sparePickup.Lerp(spareReady, t);
+            var spareMagazineGrip = _spareMagazine.Position + M4ReloadMagazineGripOffset;
+            _supportHand.Position = removedMagazineGrip.Lerp(spareMagazineGrip, t);
+            _supportHand.Rotation = new Vector3(0.42f, 0.08f, 0.22f);
         }
         else if (progress < 0.78f)
         {
             var t = SmoothStep((progress - 0.55f) / 0.23f);
-            var ready = new Vector3(-0.18f, -0.46f, -0.25f);
-            _spareMagazine.Position = ready.Lerp(magazineHome, t);
+            _spareMagazine.Position = spareReady.Lerp(magazineHome, t);
             _spareMagazine.Rotation = new Vector3(0.35f, 0, 0.35f).Lerp(magazineRotation, t);
-            _supportHand.Position = _spareMagazine.Position + new Vector3(-0.08f, 0.04f, 0.02f);
+            _supportHand.Position = _spareMagazine.Position + M4ReloadMagazineGripOffset;
+            _supportHand.Rotation = new Vector3(0.42f, 0.08f, 0.22f);
         }
         else if (progress < 0.9f)
         {
-            _magazine.Visible = true;
-            _magazine.Position = magazineHome;
-            _magazine.Rotation = magazineRotation;
-            _spareMagazine.Visible = false;
             var t = SmoothStep((progress - 0.78f) / 0.12f);
             var handleGrip = new Vector3(0.0f, 0.02f, -0.02f);
             _supportHand.Position = handAtWell.Lerp(handleGrip, t);
+            _supportHand.Rotation = new Vector3(0.42f, 0.08f, 0.22f);
             _chargingHandle.Position = new Vector3(0.075f, 0.085f, -0.05f).Lerp(new Vector3(0.075f, 0.085f, 0.08f), t);
             if (_reloadSoundStage == 1)
             {
@@ -2387,6 +2421,32 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _supportForearm.Rotation = new Vector3(0.25f, 0, -0.26f);
         _chargingHandle.Position = new Vector3(0.075f, 0.085f, -0.05f);
         SyncAuthoredPrimaryWeapon();
+        ResetAuthoredM4ReloadSupportArm();
+    }
+
+    internal bool SetM4ReloadPoseForDiagnostics(float progress)
+    {
+        if (EquippedWeapon.Platform != WeaponPlatform.M4A1)
+        {
+            return false;
+        }
+
+        _isReloading = true;
+        _activeReloadDuration = ReloadDuration * RoleReloadMultiplier;
+        _reloadTime = _activeReloadDuration
+            * (1.0f - Mathf.Clamp(progress, 0.0f, 1.0f));
+        ApplyProceduralHandPose();
+        UpdateReloadAnimation();
+        SyncAuthoredPrimaryWeapon();
+        UpdateAuthoredM4ReloadSupportArm();
+        return true;
+    }
+
+    internal void ClearM4ReloadPoseForDiagnostics()
+    {
+        _isReloading = false;
+        _reloadTime = 0.0f;
+        ResetReloadRig();
     }
 
     private static float SmoothStep(float value)

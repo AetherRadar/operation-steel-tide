@@ -16,10 +16,11 @@ public partial class TacticalPlayer
             : HipWeaponPosition;
         if (_isReloading)
         {
-            // SMG-45 already has a complete authored reload clip. Moving the
-            // whole view model to the generic reload mount on top of that clip
-            // lifts and rolls both upper arms into view.
-            return EquippedWeapon.Platform == WeaponPlatform.M3A1
+            // Authored long-gun arms already occupy the full first-person
+            // frame. Moving them to the generic reload mount lifts and rolls
+            // both sleeve openings into view; keep the weapon at its hip mount
+            // while the authored clip or M4 mechanism animation plays.
+            return EquippedWeapon.Platform is WeaponPlatform.M3A1 or WeaponPlatform.M4A1
                 ? HipWeaponPosition
                 : ReloadWeaponPosition;
         }
@@ -66,7 +67,7 @@ public partial class TacticalPlayer
     {
         if (_isReloading)
         {
-            return EquippedWeapon.Platform == WeaponPlatform.M3A1
+            return EquippedWeapon.Platform is WeaponPlatform.M3A1 or WeaponPlatform.M4A1
                 ? Vector3.Zero
                 : new Vector3(-0.13f, 0.0f, -0.32f);
         }

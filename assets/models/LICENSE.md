@@ -1,8 +1,44 @@
 # Model Asset Licenses
 
-## Project-authored combat models
+## Steel Tide combat models
 
-The Steel Tide M4A1 and operator models are generated from `scripts/blender/generate_combat_models.py`. Their editable `.blend` sources are tracked under `source_art/combat_models/`. They contain no copied third-party geometry or textures and are covered by the repository's root MIT license, subject to the disclosure in `docs/CONTENT_PROVENANCE.md`.
+The Steel Tide M4A1 is a composite adaptation of **M4A1 Assault Rifle** by
+OpenGameArt creator/uploader **nisu** and finished attachment components from
+the **Quaternius Ultimate Guns Pack**. Both sources are published under CC0 1.0
+Universal:
+
+- Source: https://opengameart.org/content/m4a1-assault-rifle
+- Official download: https://opengameart.org/sites/default/files/m4a1_0.zip
+- Original publication date: 2022-04-24
+- Acquisition date: 2026-08-28
+- Exact license: CC0 1.0 Universal,
+  https://creativecommons.org/publicdomain/zero/1.0/
+- Attachment creator: Quaternius (`@Quaternius`)
+- Attachment source:
+  https://poly.pizza/bundle/Ultimate-Guns-Pack-cpgUfI4t2F
+- Attachment acquisition date: 2026-08-20
+- Attachment source mapping: `quaternius_ultimate_guns/LICENSE.md`
+- Runtime output: `steel_tide_m4a1/steel_tide_m4a1.glb`
+- Editable adaptation: `../../source_art/combat_models/steel_tide_m4a1.blend`
+- Raw source and evidence: `../../source_art/third_party/nisu_m4a1/`
+- Reproducible adaptation: `../../scripts/blender/build_nisu_m4a1.py`
+- Detailed license and mapping record: `steel_tide_m4a1/LICENSE.md`
+
+The main rifle uses nisu's textured source. The short foregrip comes from
+`scarl.glb`, the rounder suppressor from `mp5a5.glb`, and the glass-bearing
+optic from `axmc.glb`; the normal muzzle remains selected nisu geometry. Exact
+source objects, runtime nodes, and transform-only muzzle/reticle markers are
+recorded in `steel_tide_m4a1/LICENSE.md`. Both source collections, the editable
+composite, and the runtime model remain CC0 and are not relicensed as MIT. The
+project-authored adaptation script remains covered by the repository's root MIT
+license, subject to the disclosure in `docs/CONTENT_PROVENANCE.md`.
+
+The legacy Steel Tide operator model remains project-authored by
+`scripts/blender/generate_combat_models.py`. Its editable source is
+`../../source_art/combat_models/steel_tide_operator.blend`, and its generated
+output is `steel_tide_operator/steel_tide_operator.glb`. Those operator files
+contain no copied third-party geometry or textures and are covered by the root
+MIT license, subject to the disclosure in `docs/CONTENT_PROVENANCE.md`.
 
 ## Poly Haven CC0 models
 

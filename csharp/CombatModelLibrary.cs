@@ -5,9 +5,17 @@ using Godot;
 
 namespace OperationSteelTide;
 
+// File-size retention: this legacy compatibility facade still owns stable model
+// node contracts used by every weapon platform, so extracting it inside an asset
+// replacement would unnecessarily widen the migration risk. Follow-up: move
+// AuthoredWeaponVisual and the inspection records/helpers into
+// AuthoredWeaponVisual.cs and CombatModelInspection.cs, preserving this API and
+// the --validate-combat-models contract.
+
 internal sealed class AuthoredWeaponVisual
 {
-    private readonly Vector3 _chargingHandleRestPosition;
+    private readonly MechanismTransforms _authoredMechanismRest;
+    private MechanismTransforms? _sourceMechanismRest;
 
     public AuthoredWeaponVisual(Node3D root)
     {
@@ -20,7 +28,13 @@ internal sealed class AuthoredWeaponVisual
         MuzzleDevice = CombatModelLibrary.RequireNode(root, "MuzzleDevice");
         Suppressor = CombatModelLibrary.RequireNode(root, "Suppressor");
         OpticMount = CombatModelLibrary.RequireNode(root, "OpticMount");
-        _chargingHandleRestPosition = ChargingHandle.Position;
+        MuzzleDeviceTip = CombatModelLibrary.RequireNode(root, "MuzzleDeviceTip");
+        SuppressorTip = CombatModelLibrary.RequireNode(root, "SuppressorTip");
+        OpticReticleAnchor = CombatModelLibrary.RequireNode(root, "OpticReticleAnchor");
+        _authoredMechanismRest = CaptureMechanismTransforms(
+            Magazine,
+            SpareMagazine,
+            ChargingHandle);
     }
 
     public Node3D Root { get; }
@@ -32,6 +46,10 @@ internal sealed class AuthoredWeaponVisual
     public Node3D MuzzleDevice { get; }
     public Node3D Suppressor { get; }
     public Node3D OpticMount { get; }
+    public Node3D MuzzleDeviceTip { get; }
+    public Node3D SuppressorTip { get; }
+    public Node3D OpticReticleAnchor { get; }
+    public Node3D ActiveMuzzleTip => Suppressor.Visible ? SuppressorTip : MuzzleDeviceTip;
 
     public void Configure(WeaponBuild build)
     {
@@ -46,11 +64,31 @@ internal sealed class AuthoredWeaponVisual
 
     public void SyncMechanisms(Node3D magazine, Node3D spareMagazine, Node3D chargingHandle)
     {
-        Magazine.Transform = magazine.Transform;
-        Magazine.Visible = magazine.Visible;
-        SpareMagazine.Transform = spareMagazine.Transform;
-        SpareMagazine.Visible = spareMagazine.Visible;
-        ChargingHandle.Transform = chargingHandle.Transform;
+        var sourceTransforms = CaptureMechanismTransforms(
+            magazine,
+            spareMagazine,
+            chargingHandle);
+        if (_sourceMechanismRest is not { } sourceRest)
+        {
+            _sourceMechanismRest = sourceTransforms;
+            CopyMechanismVisibility(magazine, spareMagazine, chargingHandle);
+            return;
+        }
+
+        // Transfer only the procedural root-space delta onto each DCC-authored rest pose.
+        Magazine.Transform = ApplyRootSpaceDelta(
+            sourceTransforms.Magazine,
+            sourceRest.Magazine,
+            _authoredMechanismRest.Magazine);
+        SpareMagazine.Transform = ApplyRootSpaceDelta(
+            sourceTransforms.SpareMagazine,
+            sourceRest.SpareMagazine,
+            _authoredMechanismRest.SpareMagazine);
+        ChargingHandle.Transform = ApplyRootSpaceDelta(
+            sourceTransforms.ChargingHandle,
+            sourceRest.ChargingHandle,
+            _authoredMechanismRest.ChargingHandle);
+        CopyMechanismVisibility(magazine, spareMagazine, chargingHandle);
     }
 
     public void SyncMechanismState(Node3D magazine, Node3D spareMagazine, Node3D chargingHandle)
@@ -58,8 +96,39 @@ internal sealed class AuthoredWeaponVisual
         Magazine.Visible = magazine.Visible;
         SpareMagazine.Visible = spareMagazine.Visible;
         var reloadOffset = chargingHandle.Position.Z + 0.05f;
-        ChargingHandle.Position = _chargingHandleRestPosition + new Vector3(0.0f, 0.0f, reloadOffset);
+        ChargingHandle.Position = _authoredMechanismRest.ChargingHandle.Origin
+            + new Vector3(0.0f, 0.0f, reloadOffset);
     }
+
+    private void CopyMechanismVisibility(
+        Node3D magazine,
+        Node3D spareMagazine,
+        Node3D chargingHandle)
+    {
+        Magazine.Visible = magazine.Visible;
+        SpareMagazine.Visible = spareMagazine.Visible;
+        ChargingHandle.Visible = chargingHandle.Visible;
+    }
+
+    private static MechanismTransforms CaptureMechanismTransforms(
+        Node3D magazine,
+        Node3D spareMagazine,
+        Node3D chargingHandle)
+        => new(
+            magazine.Transform,
+            spareMagazine.Transform,
+            chargingHandle.Transform);
+
+    private static Transform3D ApplyRootSpaceDelta(
+        Transform3D sourceTransform,
+        Transform3D sourceRest,
+        Transform3D authoredRest)
+        => sourceTransform * sourceRest.AffineInverse() * authoredRest;
+
+    private readonly record struct MechanismTransforms(
+        Transform3D Magazine,
+        Transform3D SpareMagazine,
+        Transform3D ChargingHandle);
 }
 
 internal sealed class AuthoredGsh18Visual
@@ -482,7 +551,30 @@ internal readonly record struct CombatModelInspection(
     int MaterialCount,
     Vector3 Size,
     int VertexCount = 0,
-    int TriangleCount = 0);
+    int TriangleCount = 0,
+    int TexturedMaterialCount = 0,
+    WeaponAttachmentGeometryInspection AttachmentGeometry = default);
+
+internal readonly record struct WeaponAttachmentGeometryInspection(
+    int ForegripMeshCount,
+    int MuzzleDeviceMeshCount,
+    int SuppressorMeshCount,
+    int OpticMountMeshCount)
+{
+    public bool Valid => ForegripMeshCount > 0
+        && MuzzleDeviceMeshCount > 0
+        && SuppressorMeshCount > 0
+        && OpticMountMeshCount > 0;
+}
+
+internal readonly record struct WeaponAttachmentConfigurationInspection(
+    bool Loaded,
+    bool BareValid,
+    bool StandardValid,
+    bool SuppressedValid)
+{
+    public bool Valid => Loaded && BareValid && StandardValid && SuppressedValid;
+}
 
 internal static partial class CombatModelLibrary
 {
@@ -507,7 +599,8 @@ internal static partial class CombatModelLibrary
     private static readonly string[] WeaponNodes =
     {
         "SteelTideM4A1", "Magazine", "SpareMagazine", "ChargingHandle",
-        "Stock", "Foregrip", "MuzzleDevice", "Suppressor", "OpticMount"
+        "Stock", "Foregrip", "MuzzleDevice", "Suppressor", "OpticMount",
+        "MuzzleDeviceTip", "SuppressorTip", "OpticReticleAnchor"
     };
 
     private static readonly string[] OperatorNodes =
@@ -665,14 +758,25 @@ internal static partial class CombatModelLibrary
         AddMarker(root, "ChargingHandle", new Vector3(0.075f, 0.085f, -0.05f));
         AddMarker(root, "Stock", new Vector3(0.0f, 0.0f, 0.28f));
         AddMarker(root, "Foregrip", new Vector3(0.0f, -0.16f, 0.18f - length * 0.55f));
-        AddMarker(root, "MuzzleDevice", new Vector3(0.0f, 0.0f, 0.28f - length));
-        AddMarker(root, "Suppressor", new Vector3(0.0f, 0.0f, 0.28f - length));
-        AddMarker(root, "OpticMount", new Vector3(0.0f, 0.16f, -0.16f));
+        var muzzleDevice = AddMarker(
+            root,
+            "MuzzleDevice",
+            new Vector3(0.0f, 0.0f, 0.28f - length));
+        AddMarker(muzzleDevice, "MuzzleDeviceTip", Vector3.Zero);
+        var suppressor = AddMarker(
+            root,
+            "Suppressor",
+            new Vector3(0.0f, 0.0f, 0.28f - length));
+        AddMarker(suppressor, "SuppressorTip", Vector3.Zero);
+        var opticMount = AddMarker(root, "OpticMount", new Vector3(0.0f, 0.16f, -0.16f));
+        AddMarker(opticMount, "OpticReticleAnchor", Vector3.Zero);
     }
 
-    private static void AddMarker(Node3D root, string name, Vector3 position)
+    private static Node3D AddMarker(Node3D root, string name, Vector3 position)
     {
-        root.AddChild(new Marker3D { Name = name, Position = position });
+        var marker = new Marker3D { Name = name, Position = position };
+        root.AddChild(marker);
+        return marker;
     }
 
     public static AuthoredPreviewOperatorVisual InstantiatePreviewOperator()
@@ -832,6 +936,45 @@ internal static partial class CombatModelLibrary
     public static CombatModelInspection InspectWeapon()
         => Inspect(WeaponScenePath, WeaponNodes);
 
+    public static WeaponAttachmentConfigurationInspection InspectM4AttachmentConfiguration()
+    {
+        AuthoredWeaponVisual? visual = null;
+        try
+        {
+            visual = InstantiateWeapon(firstPerson: false);
+            visual.Configure(new WeaponBuild { Platform = WeaponPlatform.M4A1 });
+            var bareValid = visual.MuzzleDevice.Visible
+                && !visual.Suppressor.Visible
+                && !visual.Foregrip.Visible
+                && !visual.OpticMount.Visible;
+
+            visual.Configure(WeaponCatalog.Build(WeaponPlatform.M4A1, 0));
+            var standardValid = visual.MuzzleDevice.Visible
+                && !visual.Suppressor.Visible
+                && visual.Foregrip.Visible
+                && visual.OpticMount.Visible;
+
+            visual.Configure(WeaponCatalog.Build(WeaponPlatform.M4A1, 2));
+            var suppressedValid = !visual.MuzzleDevice.Visible
+                && visual.Suppressor.Visible
+                && visual.Foregrip.Visible
+                && visual.OpticMount.Visible;
+            return new WeaponAttachmentConfigurationInspection(
+                true,
+                bareValid,
+                standardValid,
+                suppressedValid);
+        }
+        catch
+        {
+            return default;
+        }
+        finally
+        {
+            visual?.Root.Free();
+        }
+    }
+
     public static CombatModelInspection InspectWeapon(WeaponPlatform platform)
     {
         Node3D? root = null;
@@ -845,12 +988,19 @@ internal static partial class CombatModelLibrary
                 _ => InstantiateWeapon(platform, firstPerson: false).Root
             };
             var bounds = ComputeBounds(root);
+            var geometry = CountGeometry(MeshesBelow(root));
             return new CombatModelInspection(
                 true,
                 true,
                 bounds.MeshCount,
                 CountMaterials(root),
-                bounds.Size);
+                bounds.Size,
+                geometry.VertexCount,
+                geometry.TriangleCount,
+                CountTexturedMaterials(root),
+                platform == WeaponPlatform.M4A1
+                    ? InspectWeaponAttachmentGeometry(root)
+                    : default);
         }
         catch
         {
@@ -923,7 +1073,8 @@ internal static partial class CombatModelLibrary
                 CountMaterials(root),
                 size,
                 geometry.VertexCount,
-                geometry.TriangleCount);
+                geometry.TriangleCount,
+                CountTexturedMaterials(root));
         }
         catch
         {
@@ -955,7 +1106,8 @@ internal static partial class CombatModelLibrary
                 CountMaterials(root),
                 size,
                 geometry.VertexCount,
-                geometry.TriangleCount);
+                geometry.TriangleCount,
+                CountTexturedMaterials(root));
         }
         catch
         {
@@ -974,12 +1126,16 @@ internal static partial class CombatModelLibrary
         {
             root = InstantiateGsh18(firstPerson: false).Root;
             var bounds = ComputeBounds(root);
+            var geometry = CountGeometry(MeshesBelow(root));
             return new CombatModelInspection(
                 true,
                 true,
                 bounds.MeshCount,
                 CountMaterials(root),
-                bounds.Size);
+                bounds.Size,
+                geometry.VertexCount,
+                geometry.TriangleCount,
+                CountTexturedMaterials(root));
         }
         catch
         {
@@ -998,12 +1154,16 @@ internal static partial class CombatModelLibrary
         {
             root = InstantiateDesertEagle(firstPerson: false).Root;
             var bounds = ComputeBounds(root);
+            var geometry = CountGeometry(MeshesBelow(root));
             return new CombatModelInspection(
                 true,
                 true,
                 bounds.MeshCount,
                 CountMaterials(root),
-                bounds.Size);
+                bounds.Size,
+                geometry.VertexCount,
+                geometry.TriangleCount,
+                CountTexturedMaterials(root));
         }
         catch
         {
@@ -1110,12 +1270,19 @@ internal static partial class CombatModelLibrary
                 required &= FindNode(root, nodeName) is not null;
             }
             var bounds = ComputeBounds(root);
+            var geometry = CountGeometry(MeshesBelow(root));
             return new CombatModelInspection(
                 true,
                 required,
                 bounds.MeshCount,
                 CountMaterials(root),
-                bounds.Size);
+                bounds.Size,
+                geometry.VertexCount,
+                geometry.TriangleCount,
+                CountTexturedMaterials(root),
+                string.Equals(path, WeaponScenePath, StringComparison.Ordinal)
+                    ? InspectWeaponAttachmentGeometry(root)
+                    : default);
         }
         finally
         {
@@ -1147,6 +1314,61 @@ internal static partial class CombatModelLibrary
         }
         return materialCount;
     }
+
+    private static int CountTexturedMaterials(Node root)
+    {
+        var materialCount = 0;
+        foreach (var meshInstance in MeshesBelow(root))
+        {
+            if (meshInstance.Mesh is not { } mesh)
+            {
+                continue;
+            }
+            var surfaceCount = mesh.GetSurfaceCount();
+            if (meshInstance.MaterialOverride is { } materialOverride)
+            {
+                if (IsTexturedPbrMaterial(materialOverride))
+                {
+                    materialCount += Mathf.Max(1, surfaceCount);
+                }
+                continue;
+            }
+            for (var surface = 0; surface < surfaceCount; surface++)
+            {
+                var material = meshInstance.GetSurfaceOverrideMaterial(surface)
+                    ?? mesh.SurfaceGetMaterial(surface);
+                if (material is not null && IsTexturedPbrMaterial(material))
+                {
+                    materialCount++;
+                }
+            }
+        }
+        return materialCount;
+    }
+
+    private static WeaponAttachmentGeometryInspection InspectWeaponAttachmentGeometry(Node3D root)
+        => new(
+            CountRenderableMeshesBelow(FindNode(root, "Foregrip")),
+            CountRenderableMeshesBelow(FindNode(root, "MuzzleDevice")),
+            CountRenderableMeshesBelow(FindNode(root, "Suppressor")),
+            CountRenderableMeshesBelow(FindNode(root, "OpticMount")));
+
+    private static int CountRenderableMeshesBelow(Node3D? root)
+    {
+        if (root is null)
+        {
+            return 0;
+        }
+        return MeshesBelow(root).Count(mesh => CountGeometry(new[] { mesh }).TriangleCount > 0);
+    }
+
+    private static bool IsTexturedPbrMaterial(Material material)
+        => material is BaseMaterial3D baseMaterial
+            && baseMaterial.AlbedoTexture is not null
+            && baseMaterial.NormalTexture is not null
+            && (baseMaterial.OrmTexture is not null
+                || baseMaterial.MetallicTexture is not null
+                || baseMaterial.RoughnessTexture is not null);
 
     private static (int MeshCount, Vector3 Size, Vector3 Center) ComputeBounds(Node3D root)
     {

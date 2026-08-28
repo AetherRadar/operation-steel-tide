@@ -166,6 +166,7 @@ public partial class FreightTerminalWorld
         var platformGeometry = platformInspections.ToDictionary(
             pair => pair.Key,
             pair => IsValidPlatformWeapon(pair.Key, pair.Value));
+        var m4AttachmentConfiguration = CombatModelLibrary.InspectM4AttachmentConfiguration();
         var lineupCaptured = await CaptureAuthoredWeaponLineup();
         var firstPersonCaptures = await CaptureFirstPersonWeaponViews();
         var operatorModel = CombatModelLibrary.InspectOperator();
@@ -174,9 +175,7 @@ public partial class FreightTerminalWorld
         var desertEagle = CombatModelLibrary.InspectDesertEagle();
         var firstPersonSmg = CombatModelLibrary.InspectFirstPersonSmg45();
         var firstPersonSmgReload = CombatModelLibrary.InspectFirstPersonSmg45Reload();
-        var weaponGeometry = weapon.Loaded
-            && weapon.RequiredNodes
-            && weapon.MeshCount >= 8
+        var weaponGeometry = IsValidPlatformWeapon(WeaponPlatform.M4A1, weapon)
             && weapon.Size.X is >= 0.15f and <= 0.8f
             && weapon.Size.Y is >= 0.25f and <= 1.15f
             && weapon.Size.Z is >= 1.4f and <= 2.5f;
@@ -223,6 +222,7 @@ public partial class FreightTerminalWorld
             && firstPersonSmgReload.ArmBoundsSize.Y >= 0.0069f
             && firstPersonSmgReload.WeaponBoundsSize.Z >= 1.22f;
         var playerAuthored = _player.UsesAuthoredPrimaryWeaponForDiagnostics;
+        var playerAuthoredAttachments = _player.AuthoredM4AttachmentPresentationValidForDiagnostics;
         var squadAuthored = _squadMates.Count > 0
             && _squadMates.Where(IsInstanceValid).All(mate => mate.UsesAuthoredOperatorForDiagnostics);
         var livingEnemies = _enemies.Where(IsInstanceValid).ToArray();
@@ -245,6 +245,7 @@ public partial class FreightTerminalWorld
         var previewOwnership = CombatModelLibrary.InspectPreviewOperatorOwnershipForDiagnostics();
         var valid = weaponGeometry
             && platformGeometry.Values.All(value => value)
+            && m4AttachmentConfiguration.Valid
             && lineupCaptured
             && firstPersonCaptures.Values.All(value => value)
             && operatorGeometry
@@ -254,6 +255,7 @@ public partial class FreightTerminalWorld
             && firstPersonSmgGeometry
             && firstPersonSmgReloadGeometry
             && playerAuthored
+            && playerAuthoredAttachments
             && squadAuthored
             && enemiesAuthored
             && factionAppearance
@@ -262,7 +264,15 @@ public partial class FreightTerminalWorld
 
         GD.Print(
             $"COMBAT_MODELS_CHECK weapon_loaded={weapon.Loaded} weapon_nodes={weapon.RequiredNodes} "
-            + $"weapon_meshes={weapon.MeshCount} weapon_size={weapon.Size} "
+            + $"weapon_meshes={weapon.MeshCount} weapon_materials={weapon.MaterialCount} "
+            + $"weapon_textured_materials={weapon.TexturedMaterialCount} "
+            + $"weapon_vertices={weapon.VertexCount} weapon_triangles={weapon.TriangleCount} "
+            + $"weapon_attachment_meshes="
+            + $"{weapon.AttachmentGeometry.ForegripMeshCount}/"
+            + $"{weapon.AttachmentGeometry.MuzzleDeviceMeshCount}/"
+            + $"{weapon.AttachmentGeometry.SuppressorMeshCount}/"
+            + $"{weapon.AttachmentGeometry.OpticMountMeshCount} "
+            + $"weapon_size={weapon.Size} "
             + $"operator_loaded={operatorModel.Loaded} operator_nodes={operatorModel.RequiredNodes} "
             + $"operator_meshes={operatorModel.MeshCount} operator_materials={operatorModel.MaterialCount} "
             + $"operator_size={operatorModel.Size} "
@@ -284,9 +294,15 @@ public partial class FreightTerminalWorld
             + $"smg45_arm_bounds={firstPersonSmgReload.ArmBoundsSize} "
             + $"smg45_weapon_bounds={firstPersonSmgReload.WeaponBoundsSize} "
             + $"platforms={string.Join(',', platformInspections.Select(pair => $"{pair.Key}:{FormatWeaponInspection(pair.Value, platformGeometry[pair.Key])}"))} "
+            + $"m4_attachment_configuration={m4AttachmentConfiguration.Valid}/"
+            + $"{m4AttachmentConfiguration.BareValid}/"
+            + $"{m4AttachmentConfiguration.StandardValid}/"
+            + $"{m4AttachmentConfiguration.SuppressedValid} "
             + $"lineup={lineupCaptured} "
             + $"first_person={string.Join(',', firstPersonCaptures.Select(pair => $"{pair.Key}:{pair.Value}"))} "
-            + $"player_authored={playerAuthored} squad_authored={squadAuthored} "
+            + $"player_authored={playerAuthored} "
+            + $"player_authored_attachments={playerAuthoredAttachments} "
+            + $"squad_authored={squadAuthored} "
             + $"enemies_authored={enemiesAuthored} enemies={livingEnemies.Length} "
             + $"faction_appearance={factionAppearance} garrison_color={garrisonColor} "
             + $"rival_colors={rivals.Select(enemy => enemy.AuthoredTeamColorForDiagnostics).Distinct().Count()} "
@@ -354,12 +370,7 @@ public partial class FreightTerminalWorld
             var row = index / 4;
             var x = (column - 1.5f) * 2.75f;
             var y = (1.5f - row) * 1.55f;
-            var weapon = platform switch
-            {
-                WeaponPlatform.GSh18 => CombatModelLibrary.InstantiateGsh18(firstPerson: false).Root,
-                WeaponPlatform.DesertEagle => CombatModelLibrary.InstantiateDesertEagle(firstPerson: false).Root,
-                _ => CombatModelLibrary.InstantiateWeapon(platform, firstPerson: false).Root
-            };
+            var weapon = InstantiateLineupWeapon(platform);
             var mount = new Node3D
             {
                 Name = $"{platform}LineupMount",
@@ -388,6 +399,22 @@ public partial class FreightTerminalWorld
         var saved = !image.IsEmpty() && image.SavePng(path) == Error.Ok;
         viewport.QueueFree();
         return saved;
+    }
+
+    private static Node3D InstantiateLineupWeapon(WeaponPlatform platform)
+    {
+        if (platform == WeaponPlatform.GSh18)
+        {
+            return CombatModelLibrary.InstantiateGsh18(firstPerson: false).Root;
+        }
+        if (platform == WeaponPlatform.DesertEagle)
+        {
+            return CombatModelLibrary.InstantiateDesertEagle(firstPerson: false).Root;
+        }
+
+        var visual = CombatModelLibrary.InstantiateWeapon(platform, firstPerson: false);
+        visual.Configure(WeaponCatalog.Build(platform, 0));
+        return visual.Root;
     }
 
     private async System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<WeaponPlatform, bool>>
@@ -423,6 +450,23 @@ public partial class FreightTerminalWorld
             captures[platform] = _player.UsesAuthoredWeaponPlatformForDiagnostics(platform)
                 && System.IO.File.Exists(absolutePath)
                 && new System.IO.FileInfo(absolutePath).Length > 0;
+            if (platform == WeaponPlatform.M4A1)
+            {
+                captures[platform] &= _player.AuthoredM4AttachmentPresentationValidForDiagnostics;
+                var suppressedPath = "res://first_person_m4a1_suppressed_validation.png";
+                var suppressedAbsolutePath = ProjectSettings.GlobalizePath(suppressedPath);
+                if (System.IO.File.Exists(suppressedAbsolutePath))
+                {
+                    System.IO.File.Delete(suppressedAbsolutePath);
+                }
+                _player.GrantFireablePrimaryForDiagnostics(
+                    WeaponCatalog.Build(WeaponPlatform.M4A1, 2));
+                await WaitFrames(4);
+                SaveViewportImage(suppressedPath);
+                captures[platform] &= _player.AuthoredM4AttachmentPresentationValidForDiagnostics
+                    && System.IO.File.Exists(suppressedAbsolutePath)
+                    && new System.IO.FileInfo(suppressedAbsolutePath).Length > 0;
+            }
             if (platform == WeaponPlatform.M3A1)
             {
                 var reloadPath = "res://first_person_m3a1_reload_validation.png";
@@ -462,15 +506,22 @@ public partial class FreightTerminalWorld
     {
         var minimumMeshes = platform switch
         {
-            WeaponPlatform.M4A1 => 8,
+            WeaponPlatform.M4A1 => 18,
             WeaponPlatform.GSh18 => 10,
             WeaponPlatform.DesertEagle => 20,
             _ => 1
         };
+        var productionM4 = platform != WeaponPlatform.M4A1
+            || (inspection.MeshCount <= 20
+                && inspection.VertexCount is >= 12000 and <= 13500
+                && inspection.TriangleCount is >= 10500 and <= 11500
+                && inspection.TexturedMaterialCount >= 10
+                && inspection.AttachmentGeometry.Valid);
         return inspection.Loaded
             && inspection.RequiredNodes
             && inspection.MeshCount >= minimumMeshes
             && inspection.MaterialCount >= 1
+            && productionM4
             && inspection.Size.X > 0.001f
             && inspection.Size.Y > 0.001f
             && inspection.Size.Z > 0.001f;
@@ -479,7 +530,15 @@ public partial class FreightTerminalWorld
     private static string FormatWeaponInspection(
         CombatModelInspection inspection,
         bool valid)
-        => $"valid={valid};loaded={inspection.Loaded};nodes={inspection.RequiredNodes};meshes={inspection.MeshCount};bounds={inspection.Size}";
+        => $"valid={valid};loaded={inspection.Loaded};nodes={inspection.RequiredNodes};"
+            + $"meshes={inspection.MeshCount};materials={inspection.MaterialCount};"
+            + $"textured_materials={inspection.TexturedMaterialCount};"
+            + $"vertices={inspection.VertexCount};triangles={inspection.TriangleCount};"
+            + $"attachment_meshes={inspection.AttachmentGeometry.ForegripMeshCount}/"
+            + $"{inspection.AttachmentGeometry.MuzzleDeviceMeshCount}/"
+            + $"{inspection.AttachmentGeometry.SuppressorMeshCount}/"
+            + $"{inspection.AttachmentGeometry.OpticMountMeshCount};"
+            + $"bounds={inspection.Size}";
 
     private static float ColorDistance(Color left, Color right)
     {

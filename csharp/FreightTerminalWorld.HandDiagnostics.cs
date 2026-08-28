@@ -121,6 +121,206 @@ public partial class FreightTerminalWorld
         var smgReloadPresentation = reloadPoseSet
             && _player.SmgReloadPresentationValidForDiagnostics;
         _player.ClearReloadPoseForDiagnostics();
+
+        _player.GrantFireablePrimaryForDiagnostics(
+            WeaponCatalog.Build(WeaponPlatform.M4A1, 0));
+        await WaitFrames(8);
+        var m4IdleArm = _player.InspectAuthoredM4ReloadArmForDiagnostics();
+        var m4IdleHandValid = _player.InspectAuthoredHandPoseForDiagnostics().Valid;
+        var m4ReloadPoseSet = true;
+        var m4ReloadAuthoredArmActive = true;
+        var m4ReloadTargetClose = true;
+        var m4ReloadMagazineClose = true;
+        var m4ReloadMagazineState = true;
+        var m4ReloadPivotMotion = true;
+        var m4ReloadSleeveContinuity = true;
+        var m4ReloadIdempotent = true;
+        var m4ReloadSampleCount = 0;
+        var m4ReloadMaximumTargetDistance = 0.0f;
+        var m4ReloadMaximumMagazineDistance = 0.0f;
+        var m4ReloadMinimumPivotDelta = float.PositiveInfinity;
+        var m4ReloadMaximumWristDelta = 0.0f;
+        foreach (var progress in new[] { 0.46f, 0.63f })
+        {
+            var poseSet = _player.SetM4ReloadPoseForDiagnostics(progress);
+            var first = _player.InspectAuthoredM4ReloadArmForDiagnostics();
+            var repeatedPoseSet = _player.SetM4ReloadPoseForDiagnostics(progress);
+            var repeated = _player.InspectAuthoredM4ReloadArmForDiagnostics();
+            var authoredArmActive = first.AuthoredArmActive
+                && first.LeftArmVisible
+                && first.LeftGripFrameActive;
+            var targetDistance = Mathf.Max(
+                first.SupportTargetDistance,
+                repeated.SupportTargetDistance);
+            var magazineDistance = Mathf.Max(
+                first.ActiveMagazineDistance,
+                repeated.ActiveMagazineDistance);
+            var magazineState = !first.PrimaryMagazineVisible
+                && first.SpareMagazineVisible
+                && first.SeparateMagazineNodes
+                && first.PrimaryMagazinePosition.DistanceTo(first.SpareMagazinePosition) >= 0.03f;
+            var pivotDelta = HandBasisDelta(
+                m4IdleArm.LeftArmTransform.Basis,
+                first.LeftArmTransform.Basis);
+            var wristDelta = Mathf.Abs(
+                first.SleeveWristLength - m4IdleArm.SleeveWristLength);
+            var sleeveContinuous = first.SleeveWristLength is >= 0.045f and <= 0.28f
+                && wristDelta <= 0.001f;
+            var idempotent = HandTransformsMatch(
+                    first.LeftArmTransform,
+                    repeated.LeftArmTransform)
+                && first.LeftGrip.DistanceTo(repeated.LeftGrip) <= 0.0001f
+                && first.SupportTarget.DistanceTo(repeated.SupportTarget) <= 0.0001f
+                && first.SpareMagazinePosition.DistanceTo(repeated.SpareMagazinePosition) <= 0.0001f
+                && first.PrimaryMagazineVisible == repeated.PrimaryMagazineVisible
+                && first.SpareMagazineVisible == repeated.SpareMagazineVisible;
+            var sampleValid = poseSet
+                && repeatedPoseSet
+                && authoredArmActive
+                && targetDistance <= 0.002f
+                && magazineDistance <= 0.08f
+                && magazineState
+                && pivotDelta >= 0.08f
+                && sleeveContinuous
+                && idempotent;
+            m4ReloadPoseSet &= poseSet && repeatedPoseSet;
+            m4ReloadAuthoredArmActive &= authoredArmActive;
+            m4ReloadTargetClose &= targetDistance <= 0.002f;
+            m4ReloadMagazineClose &= magazineDistance <= 0.08f;
+            m4ReloadMagazineState &= magazineState;
+            m4ReloadPivotMotion &= pivotDelta >= 0.08f;
+            m4ReloadSleeveContinuity &= sleeveContinuous;
+            m4ReloadIdempotent &= idempotent;
+            m4ReloadSampleCount++;
+            m4ReloadMaximumTargetDistance = Mathf.Max(
+                m4ReloadMaximumTargetDistance,
+                targetDistance);
+            m4ReloadMaximumMagazineDistance = Mathf.Max(
+                m4ReloadMaximumMagazineDistance,
+                magazineDistance);
+            m4ReloadMinimumPivotDelta = Mathf.Min(
+                m4ReloadMinimumPivotDelta,
+                pivotDelta);
+            m4ReloadMaximumWristDelta = Mathf.Max(
+                m4ReloadMaximumWristDelta,
+                wristDelta);
+            GD.Print(
+                $"M4_RELOAD_ARM_SAMPLE progress={progress:F2} valid={sampleValid} "
+                + $"authored_active={authoredArmActive} left_arm_visible={first.LeftArmVisible} "
+                + $"left_grip_active={first.LeftGripFrameActive} "
+                + $"grip_target_distance={targetDistance:F6} "
+                + $"active_magazine_distance={magazineDistance:F6} "
+                + $"primary_magazine_visible={first.PrimaryMagazineVisible} "
+                + $"spare_magazine_visible={first.SpareMagazineVisible} "
+                + $"magazines_separate={magazineState} pivot_delta={pivotDelta:F6} "
+                + $"wrist_delta={wristDelta:F6} idempotent={idempotent}");
+        }
+        var m4ReloadBoundaryContinuity = true;
+        var m4ReloadBoundarySampleCount = 0;
+        var m4ReloadMaximumGripStep = 0.0f;
+        var m4ReloadMaximumBasisStep = 0.0f;
+        foreach (var sample in new[]
+        {
+            (Boundary: 0.43f, Before: 0.42f, After: 0.44f),
+            (Boundary: 0.78f, Before: 0.77f, After: 0.79f)
+        })
+        {
+            var beforePoseSet = _player.SetM4ReloadPoseForDiagnostics(sample.Before);
+            var before = _player.InspectAuthoredM4ReloadArmForDiagnostics();
+            var afterPoseSet = _player.SetM4ReloadPoseForDiagnostics(sample.After);
+            var after = _player.InspectAuthoredM4ReloadArmForDiagnostics();
+            var gripStep = before.LeftGrip.DistanceTo(after.LeftGrip);
+            var basisStep = HandBasisDelta(
+                before.LeftArmTransform.Basis,
+                after.LeftArmTransform.Basis);
+            var targetDistance = Mathf.Max(
+                before.SupportTargetDistance,
+                after.SupportTargetDistance);
+            var authoredArmActive = before.AuthoredArmActive
+                && after.AuthoredArmActive
+                && before.LeftGripFrameActive
+                && after.LeftGripFrameActive;
+            var mechanismTransition = sample.Boundary < 0.5f
+                ? before.PrimaryMagazineVisible
+                    && !before.SpareMagazineVisible
+                    && !after.PrimaryMagazineVisible
+                    && after.SpareMagazineVisible
+                : !before.PrimaryMagazineVisible
+                    && before.SpareMagazineVisible
+                    && after.PrimaryMagazineVisible
+                    && !after.SpareMagazineVisible;
+            var continuous = beforePoseSet
+                && afterPoseSet
+                && authoredArmActive
+                && mechanismTransition
+                && targetDistance <= 0.002f
+                && gripStep <= 0.02f
+                && basisStep <= 0.16f;
+            m4ReloadBoundaryContinuity &= continuous;
+            m4ReloadBoundarySampleCount++;
+            m4ReloadMaximumGripStep = Mathf.Max(m4ReloadMaximumGripStep, gripStep);
+            m4ReloadMaximumBasisStep = Mathf.Max(m4ReloadMaximumBasisStep, basisStep);
+            GD.Print(
+                $"M4_RELOAD_ARM_CONTINUITY_SAMPLE boundary={sample.Boundary:F2} "
+                + $"before={sample.Before:F2} after={sample.After:F2} valid={continuous} "
+                + $"authored_active={authoredArmActive} mechanism_transition={mechanismTransition} "
+                + $"grip_step={gripStep:F6} basis_step={basisStep:F6} "
+                + $"max_target_distance={targetDistance:F6}");
+        }
+        _player.ClearM4ReloadPoseForDiagnostics();
+        var m4ResetArm = _player.InspectAuthoredM4ReloadArmForDiagnostics();
+        var m4ResetHandValid = _player.InspectAuthoredHandPoseForDiagnostics().Valid;
+        _player.ClearM4ReloadPoseForDiagnostics();
+        var m4RepeatedResetArm = _player.InspectAuthoredM4ReloadArmForDiagnostics();
+        var m4ResetOriginDistance = m4IdleArm.LeftArmTransform.Origin.DistanceTo(
+            m4ResetArm.LeftArmTransform.Origin);
+        var m4ResetBasisDelta = HandBasisDelta(
+            m4IdleArm.LeftArmTransform.Basis,
+            m4ResetArm.LeftArmTransform.Basis);
+        var m4ReloadReset = m4ResetArm.AuthoredArmActive
+            && m4ResetArm.PrimaryMagazineVisible
+            && !m4ResetArm.SpareMagazineVisible
+            && m4ResetHandValid
+            && HandTransformsMatch(
+                m4IdleArm.LeftArmTransform,
+                m4ResetArm.LeftArmTransform)
+            && HandTransformsMatch(
+                m4ResetArm.LeftArmTransform,
+                m4RepeatedResetArm.LeftArmTransform)
+            && m4ResetArm.LeftGrip.DistanceTo(m4RepeatedResetArm.LeftGrip) <= 0.0001f;
+        var m4ReloadValid = m4IdleArm.AuthoredArmActive
+            && m4IdleHandValid
+            && m4ReloadPoseSet
+            && m4ReloadAuthoredArmActive
+            && m4ReloadTargetClose
+            && m4ReloadMagazineClose
+            && m4ReloadMagazineState
+            && m4ReloadPivotMotion
+            && m4ReloadSleeveContinuity
+            && m4ReloadIdempotent
+            && m4ReloadBoundaryContinuity
+            && m4ReloadReset
+            && m4ReloadSampleCount == 2
+            && m4ReloadBoundarySampleCount == 2;
+        GD.Print(
+            $"M4_RELOAD_ARM_CHECK valid={m4ReloadValid} samples={m4ReloadSampleCount} "
+            + $"pose_set={m4ReloadPoseSet} authored_left_active={m4ReloadAuthoredArmActive} "
+            + $"target_close={m4ReloadTargetClose} magazine_close={m4ReloadMagazineClose} "
+            + $"magazine_state={m4ReloadMagazineState} pivot_motion={m4ReloadPivotMotion} "
+            + $"sleeve_continuity={m4ReloadSleeveContinuity} "
+            + $"idempotent={m4ReloadIdempotent} "
+            + $"boundary_continuity={m4ReloadBoundaryContinuity} "
+            + $"boundary_samples={m4ReloadBoundarySampleCount} reset={m4ReloadReset} "
+            + $"idle_hand={m4IdleHandValid} reset_hand={m4ResetHandValid} "
+            + $"max_target_distance={m4ReloadMaximumTargetDistance:F6} "
+            + $"max_magazine_distance={m4ReloadMaximumMagazineDistance:F6} "
+            + $"min_pivot_delta={m4ReloadMinimumPivotDelta:F6} "
+            + $"max_wrist_delta={m4ReloadMaximumWristDelta:F6} "
+            + $"max_grip_step={m4ReloadMaximumGripStep:F6} "
+            + $"max_basis_step={m4ReloadMaximumBasisStep:F6} "
+            + $"reset_origin_distance={m4ResetOriginDistance:F6} "
+            + $"reset_basis_delta={m4ResetBasisDelta:F6}");
+        GD.Print($"M4_RELOAD_ARM_PASS valid={m4ReloadValid}");
         foreach (var line in results) GD.Print(line);
         var valid = posesValid
             && authoredRigValid
@@ -129,6 +329,7 @@ public partial class FreightTerminalWorld
             && smgSleeveVolume
             && smgWeaponSize
             && smgReloadPresentation
+            && m4ReloadValid
             && results.Count == platforms.Length;
         GD.Print(
             $"HAND_POSE_CHECK valid={valid} procedural_pose={posesValid} "
@@ -138,6 +339,7 @@ public partial class FreightTerminalWorld
             + $"smg_arm_bounds={smgArmBounds} "
             + $"smg_weapon_size={smgWeaponSize} smg_weapon_bounds={smgWeaponBounds} "
             + $"smg_reload_presentation={smgReloadPresentation} "
+            + $"m4_reload_arm={m4ReloadValid} "
             + $"samples={results.Count} viewport={(narrow ? "985x847" : "default")}");
         GD.Print($"HAND_POSE_PASS valid={valid}");
         GD.Print($"HAND_DIAGNOSTICS_DONE count={results.Count}");
@@ -177,4 +379,13 @@ public partial class FreightTerminalWorld
         }
         return bounds;
     }
+
+    private static float HandBasisDelta(Basis left, Basis right)
+        => left.X.DistanceTo(right.X)
+            + left.Y.DistanceTo(right.Y)
+            + left.Z.DistanceTo(right.Z);
+
+    private static bool HandTransformsMatch(Transform3D left, Transform3D right)
+        => left.Origin.DistanceTo(right.Origin) <= 0.0001f
+            && HandBasisDelta(left.Basis, right.Basis) <= 0.0003f;
 }

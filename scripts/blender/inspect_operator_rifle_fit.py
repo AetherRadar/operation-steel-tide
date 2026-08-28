@@ -31,6 +31,10 @@ def import_weapon() -> bpy.types.Object:
     spare_magazine.hide_render = True
     for child in spare_magazine.children_recursive:
         child.hide_render = True
+    suppressor = bpy.data.objects["Suppressor"]
+    suppressor.hide_render = True
+    for child in suppressor.children_recursive:
+        child.hide_render = True
     rifle_right = RIFLE_FORWARD.cross(RIFLE_UP).normalized()
     rifle_up = rifle_right.cross(RIFLE_FORWARD).normalized()
     rifle_matrix = Matrix((rifle_right, RIFLE_FORWARD, rifle_up)).transposed().to_4x4()
@@ -50,7 +54,7 @@ def setup_scene() -> tuple[bpy.types.Object, bpy.types.Object]:
     weapon = import_weapon()
 
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE"
+    scene.render.engine = "BLENDER_EEVEE_NEXT"
     scene.render.resolution_x = 720
     scene.render.resolution_y = 720
     scene.render.resolution_percentage = 100
