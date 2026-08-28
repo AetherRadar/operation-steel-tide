@@ -39,7 +39,8 @@ public static class DeploymentMapRuntime
                 value is "--validate-refinery-map"
                     or "--validate-refinery-doors"
                     or "--capture-refinery-map"
-                    or "--capture-promotion"))
+                    or "--capture-promotion"
+                    or "--capture-readme-zh"))
         {
             SelectMap(DeploymentMapCatalog.BlackwaterRefineryId);
         }
