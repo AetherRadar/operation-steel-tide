@@ -182,6 +182,12 @@ public partial class FreightTerminalWorld
     /// <summary>Re-lights the map for the deploy-time selection; called once at mission load.</summary>
     private void ApplyTimeOfDay(DeploymentTimeOfDay timeOfDay)
     {
+        if (_demolitionMode)
+        {
+            ApplyDemolitionLighting();
+            return;
+        }
+
         var style = TimeOfDayStyles.Style(timeOfDay);
         if (IsInstanceValid(_sunLight))
         {

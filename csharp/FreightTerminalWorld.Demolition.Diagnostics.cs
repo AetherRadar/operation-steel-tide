@@ -402,6 +402,8 @@ public partial class FreightTerminalWorld
             return;
         }
 
+        ApplyDemolitionLighting();
+
         GetTree().Paused = false;
         DisableActorsForSurvivalDiagnostics();
         _levelRoot.Visible = false;
@@ -440,7 +442,12 @@ public partial class FreightTerminalWorld
         camera.Fov = 46.0f;
         await WaitFrames(28);
         SaveViewportImage("res://demolition_arena_oblique_validation.png");
-        GD.Print($"DEMOLITION_ARENA_CAPTURE valid={cameraCurrent} camera={cameraCurrent} bodies={_demolitionArena.CollisionBodyCount} visuals={_demolitionArena.VisualPartCount} paths=demolition_arena_validation.png,demolition_arena_oblique_validation.png");
+        camera.GlobalPosition = layout.AttackSpawn + Vector3.Up * 1.57f;
+        camera.LookAt(layout.Midpoint + Vector3.Up * 1.45f, Vector3.Up);
+        camera.Fov = 68.0f;
+        await WaitFrames(28);
+        SaveViewportImage("res://demolition_arena_player_validation.png");
+        GD.Print($"DEMOLITION_ARENA_CAPTURE valid={cameraCurrent} camera={cameraCurrent} bodies={_demolitionArena.CollisionBodyCount} visuals={_demolitionArena.VisualPartCount} paths=demolition_arena_validation.png,demolition_arena_oblique_validation.png,demolition_arena_player_validation.png");
         _demolitionArena.SetActive(false);
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         var arenaRoot = _demolitionArena.Root;

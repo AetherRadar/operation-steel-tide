@@ -2771,6 +2771,10 @@ public partial class FreightTerminalWorld : Node3D
         ApplyMapDetailQuality();
         ApplyLowPolyBuildingQuality();
         _jianghaiOldCitySceneLoader.ApplyQuality(_qualitySetting);
+        if (_demolitionMode)
+        {
+            ApplyDemolitionLighting();
+        }
         SaveSettings();
     }
 

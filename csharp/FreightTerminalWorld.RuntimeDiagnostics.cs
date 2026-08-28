@@ -15,6 +15,7 @@ public partial class FreightTerminalWorld
             ("--validate-operations-office", static world => world.ValidateOperationsOffice()),
             ("--validate-pause-ui", static world => world.ValidatePauseUi()),
             ("--validate-demolition", static world => world.ValidateDemolitionMode()),
+            ("--validate-demolition-lighting", static world => world.ValidateDemolitionLighting()),
             ("--validate-demolition-rules", static world => world.ValidateDemolitionRules()),
             ("--validate-demolition-arena", static world => world.ValidateDemolitionArena()),
             ("--validate-harbor-locks", static world => world.ValidateHarborLocks()),

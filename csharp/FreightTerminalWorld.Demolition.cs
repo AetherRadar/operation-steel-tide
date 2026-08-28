@@ -209,7 +209,9 @@ public partial class FreightTerminalWorld
         {
             throw new System.InvalidOperationException("Demolition arena was not built before deployment.");
         }
+        _nvgActive = false;
         _demolitionMode = true;
+        ApplyDemolitionLighting();
         _demolitionRoundActive = false;
         _demolitionMatch.Reset();
         _demolitionPlayerEconomy.Reset();
