@@ -16,6 +16,7 @@ repository-local sources that predate this map composition.
 | --- | --- | --- | --- | --- | --- | --- |
 | Modular Factory Facade | James Ray Cock / Poly Haven | https://polyhaven.com/a/modular_factory_facade | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `poly_haven/modular_factory_facade/modular_factory_facade_1k.gltf`, its `.bin`, and 15 1K texture sidecars | Adapted into the current packed `.blend` and runtime `.glb` |
 | Modular Urban Apartments Facade | James Ray Cock / Poly Haven | https://polyhaven.com/a/modular_urban_apartments_facade | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `poly_haven/modular_urban_apartments_facade/modular_urban_apartments_facade_1k.gltf`, its `.bin`, and 12 1K texture sidecars | Adapted into 36 delivered facade objects forming two asymmetrical 3-by-3 overlays in the packed `.blend` and runtime `.glb` |
+| Chinese Four-corner Pavilion - Free | VVayToyek / itch.io | https://vvaytoyek.itch.io/chinese-four-corner-pavilion-free | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `itch/vvaytoyek_chinese_four_corner_pavilion/Chinese Four-corner Pavilion.zip`; extracted `fbx_only/四角亭.fbx`; page evidence `itch_license_evidence.html` | Fifteen modeled timber, tile, column, rafter, lattice, bracket, and ornament parts are adapted into the pawnshop gate canopy; raw source remains external, while adapted geometry is packed into the `.blend` and runtime GLB |
 | Chinese Temple 2 | Free poly / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/8701a79a-1635-437c-b1d2-6b14f14fc351/; `assetBaseId` `8701a79a-1635-437c-b1d2-6b14f14fc351` | Creative Commons Zero / CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `blenderkit/chinese_temple_2.glb` | Adapted into the current packed `.blend` and runtime `.glb` |
 | Chinese red lamp | Kin Chen / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/b97e433c-2eb1-46b8-9633-5bdee21e4e7a/; `assetBaseId` `b97e433c-2eb1-46b8-9633-5bdee21e4e7a` | Creative Commons Zero / CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `blenderkit/chinese_red_lamp.glb` | Adapted into five storefront instances in the current packed `.blend` and runtime `.glb` |
 | Pink city bicycle | Kin Chen / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/4c1a83c1-829f-4c00-878e-9e73c6b89c3b/; `assetBaseId` `4c1a83c1-829f-4c00-878e-9e73c6b89c3b` | Creative Commons Zero / CC0 1.0 Universal; official API `license=cc_zero`, `isFree=true`; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `blenderkit/pink_city_bicycle/pink_city_bicycle_0_5k.blend`; API evidence `blenderkit/pink_city_bicycle/official_api_search.json` | Converted to a static rest pose, stripped of its rig, given adapted weathered materials, cleaned to 11,825 triangles, and delivered as three instances in the packed `.blend` and runtime `.glb` |
@@ -51,8 +52,10 @@ also preserve the copyright and SIL OFL 1.1 license notice and comply with the
 OFL conditions. The project does not imply endorsement by any source creator.
 
 The Poly Haven source pages identify the creators and contributor roles
-recorded above and display the CC0 license. The six delivered BlenderKit
-pages display their named creators and "Creative commons zero"; for the four
+recorded above and display the CC0 license. VVayToyek's official itch.io page
+states CC0, identifies Blender as the authoring tool, and marks generative AI as
+not used. The six delivered BlenderKit pages display their named creators and
+"Creative commons zero"; for the four
 assets acquired on 2026-08-28, the official API also reported
 `license=cc_zero` and `isFree=true`. Attribution is not required for these CC0
 sources, but creator names and identifiers are retained as provenance. The
@@ -71,6 +74,9 @@ DCC authoring.
 | `blenderkit/chinese_porcelain_lion.glb` | 3,765,324 | `04928FF357D07EFF63CA5326D7B3988C32BCB527FFDB4408C6CED60EEEF3A41D` |
 | `blenderkit/pink_city_bicycle/pink_city_bicycle_0_5k.blend` | 4,138,682 | `F7AE33ACCDE2EC56AF3BD4C0A45F46658E816C8E3000DF29BF5BAB4B6CA53AA2` |
 | `blenderkit/pink_city_bicycle/official_api_search.json` | 14,880 | `83473363A4CCC0AE156B8C2F88C5059F16486740C38717FE692A8869AD262758` |
+| `itch/vvaytoyek_chinese_four_corner_pavilion/Chinese Four-corner Pavilion.zip` | 2,777,866 | `008FB5C4508CE57C4203E5763FD01A177DED16CA94FD5DE34EA26C422B483EFA` |
+| `itch/vvaytoyek_chinese_four_corner_pavilion/fbx_only/四角亭.fbx` | 2,040,044 | `E5A745FCEEF8EB0E4B45230E4D964F618C64AB0981F098E1E329C982C159E89C` |
+| `itch/vvaytoyek_chinese_four_corner_pavilion/itch_license_evidence.html` | 24,086 | `F3AC17F9DE33C21C3780623844C868EBDAFA0FB4C4248905716E3A93688A49E0` |
 | `NotoSansSC-VF.otf` | 15,054,748 | `D13ED01EC8AA45D6178999B648E96FB92150683E9F8E2A581F2ACF208DCBE44B` |
 | `poly_haven/modular_factory_facade/modular_factory_facade_1k.gltf` | 372,666 | `41FF58B722F9CB3E9DB8BCACAE3163946603AE99A1D42BB6F9045D7C4EC0F179` |
 | `poly_haven/modular_factory_facade/modular_factory_facade.bin` | 6,269,260 | `12702FB065A838695E0621E1AAC3947AF92D32C439FB965C8B0563AD691FED70` |
@@ -125,15 +131,16 @@ by LF before hashing as UTF-8:
 
 | Output | Bytes | SHA-256 | Reproducible derivation and use |
 | --- | ---: | --- | --- |
-| `source_art/world/jianghai_old_city/jianghai_old_city.blend` | 51,188,489 | `ABCA4AD0B6DDE3283EE2CC85DE40BE33DC39A6DFDC633300A99F36648E6E3D1A` | Authoritative packed, hand-edited DCC source; includes the aligned five-object factory-gate portal, delivered urban-life/facade expansion, and replacement of the former damaged factory shell with three Old Urban building and two Scan Old Building Street instances |
-| `assets/models/jianghai_old_city/jianghai_old_city.glb` | 58,070,456 | `6B8C5D35F0224D81125B44B304B5FE03E6F2523062F3BFB0861A00258CF66663` | Main static runtime map exported by `scripts/blender/export_jianghai_old_city.py` |
+| `source_art/world/jianghai_old_city/jianghai_old_city.blend` | 49,787,440 | `9E49EF372F3609EBDF0A68CA8A5F4EF5A0D38E08B5B28F9A463707E04F550CD5` | Authoritative packed, hand-edited DCC source; includes the 15-part VVayToyek pawnshop canopy, 16 solid facade/insert wing objects, aligned five-object factory-gate portal, delivered urban-life/facade expansion, and replacement of the former damaged factory shell with three Old Urban building and two Scan Old Building Street instances |
+| `assets/models/jianghai_old_city/jianghai_old_city.glb` | 59,205,576 | `E9CF20F1A1FFFAFBB12F233B21852B458ED361DDA9D10D2A77A24791BFD75307` | Main static runtime map exported by `scripts/blender/export_jianghai_old_city.py` |
 | `assets/models/jianghai_old_city/rollershutter_window_03.glb` | 187,940 | `C4884AFCD7560E4BB23320A8C311DB0011504F7C5FEE30D58C266D54F7C6B166` | `scripts/blender/export_jianghai_old_city.py` selects the packed scene's adapted `JianghaiArtPass_EastShutter00` mesh, normalizes a temporary copy, and exports its PBR geometry and materials for the two Old City `InteractiveBuildingDoor` visuals |
 
 This derived GLB retains the Rollershutter Window 03 provenance and MP / Poly
-Haven CC0 1.0 Universal license recorded above. It replaces only the enlarged
-Kenney `door-wide-closed` visible art. Door collision, animation, network
-state, and AI traversal remain project gameplay behavior and are not derived
-from the Poly Haven model.
+Haven CC0 1.0 Universal license recorded above. Each Old City doorway creates
+three separately positioned instances of the model, with maximum aspect
+distortion 1.094 instead of one enlarged slab. Door collision, animation,
+network state, and AI traversal remain project gameplay behavior and are not
+derived from the Poly Haven model.
 
 ## Runtime and editable mapping
 
@@ -144,7 +151,9 @@ The authoritative editable source is:
 Composition, modeling, material, lighting, and sign changes are made directly
 in that packed Blender scene. The deterministic export/cleanup script
 `scripts/blender/export_jianghai_old_city.py` reapplies the documented targeted
-cleanup and factory-frontage substitution, then validates and exports it to:
+cleanup and factory-frontage substitution, rejects legacy pawnshop boards and
+zero-thickness walls, validates the authored canopy and wings, then exports it
+to:
 
 - `assets/models/jianghai_old_city/jianghai_old_city.glb`
 - `assets/models/jianghai_old_city/rollershutter_window_03.glb`
@@ -217,19 +226,20 @@ packed materials retain their existing provenance. The final audit layers are:
 
 | Audit layer | Verified result |
 | --- | --- |
-| Authoritative Blender source | 425 mesh objects; 167 unique mesh datablocks; 4,472,384 raw mesh-object triangles; 660,493 triangles counted once per unique mesh; 488 evaluated/runtime mesh instances and 4,502,190 instance triangles; seven required anchors; packed `.blend` size 51,188,489 bytes; SHA-256 `ABCA4AD0B6DDE3283EE2CC85DE40BE33DC39A6DFDC633300A99F36648E6E3D1A` |
+| Authoritative Blender source | 438 mesh objects; 184 unique mesh datablocks; 4,526,960 raw mesh-object triangles; 688,637 triangles counted once per unique mesh; 501 evaluated/runtime mesh instances and 4,556,062 instance triangles; seven required anchors; packed `.blend` size 49,787,440 bytes; SHA-256 `9E49EF372F3609EBDF0A68CA8A5F4EF5A0D38E08B5B28F9A463707E04F550CD5` |
 | Factory-gate portal | `factory_gate_portal=5/5`; `factory_gate_portal_aligned=True`; DCC-authored brick piers, caps, and corrugated roof frame the interactive PBR shutter |
-| Delivered urban-life expansion | 36/36 apartment-facade objects; two asymmetrical 3-by-3 overlays; three static 11,825-triangle bicycles; market tea cart and basket; pawnshop tea table and three stools; factory hand truck; finished CC0 pawnshop storefront; five market shops (three Old Urban building and two Scan Old Building Street instances); two Old Urban building rear houses; five Chinese red lamps; replacement of the former damaged factory shell with three Old Urban building office/admin instances and two Scan Old Building Street workshops |
-| Serialized GLB | 58,070,456 bytes; SHA-256 `6B8C5D35F0224D81125B44B304B5FE03E6F2523062F3BFB0861A00258CF66663`; 488 mesh nodes; 4,502,190 instance triangles; maximum texture dimension 1024 pixels |
-| Godot authored-map import | `--validate-refinery-map` PASS; 488 authored meshes; 556 surfaces; all surfaces pass the material-backing structural audit; 386 detail meshes; 4,502,190 authored instance triangles; authored anchors 7/7; terminal checks 2/2/2/2; authored status screens 2/2 |
+| Pawnshop hero entrance | `pawnshop_frontage_ready=True`; 15/15 modeled canopy parts; 15,492 canopy triangles; 8/8 solid wall modules and 8/8 authored inserts; 0 legacy visible gate/wall objects; columns clear the 7.6-meter doorway |
+| Delivered urban-life expansion | 36/36 apartment-facade objects; two asymmetrical 3-by-3 overlays; three static 11,825-triangle bicycles; market tea cart and basket; pawnshop tea table and three stools; factory hand truck; finished CC0 pawnshop backdrop and modeled pavilion gate; five market shops (three Old Urban building and two Scan Old Building Street instances); two Old Urban building rear houses; five Chinese red lamps; replacement of the former damaged factory shell with three Old Urban building office/admin instances and two Scan Old Building Street workshops |
+| Serialized GLB | 59,205,576 bytes; SHA-256 `E9CF20F1A1FFFAFBB12F233B21852B458ED361DDA9D10D2A77A24791BFD75307`; 501 mesh nodes; 4,556,062 instance triangles; maximum texture dimension 1024 pixels |
+| Godot authored-map import | `--validate-refinery-map` PASS; 501 authored meshes; 583 surfaces; all surfaces pass the material-backing structural audit; 4,556,062 authored instance triangles; authored anchors 7/7; terminal checks 2/2/2/2; authored status screens 2/2 |
 | Godot route clearance | `routes=True`; `route_probes=14`; `route_blocker=none`; the Victory truck envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and `y=2.6` |
 | Godot quality and full runtime | Quality tier 1 is restored after capture probes; all six representative views pass their configured budgets |
 
-The Blender source count is based on saved mesh objects, while the 660,493
+The Blender source count is based on saved mesh objects, while the 688,637
 unique-mesh figure counts each shared datablock once. Dependency-graph
-evaluation and export resolve the scene to 488 runtime mesh instances and
-4,502,190 instance triangles. The Godot diagnostic imports those same 488
-meshes and sums 556 material-backed runtime surfaces. These scopes are
+evaluation and export resolve the scene to 501 runtime mesh instances and
+4,556,062 instance triangles. The Godot diagnostic imports those same 501
+meshes and sums 583 material-backed runtime surfaces. These scopes are
 intentionally different rather than conflicting.
 
 The final high-tier performance policy disables shadows only for fine
@@ -238,20 +248,21 @@ ranges. Representative capture evidence is:
 
 | View | Draw calls | Objects | Primitives | Result |
 | --- | ---: | ---: | ---: | --- |
-| Overview | 349 | 539 | 4,209,048 | PASS |
-| Victory street | 427 | 547 | 3,947,301 | PASS |
-| Street-life bicycle close-up | 255 | 304 | 3,265,850 | PASS |
-| Guangchang pawnshop | 218 | 390 | 2,046,993 | PASS |
-| Red Star factory | 343 | 403 | 4,032,380 | PASS |
-| Market footbridge | 424 | 663 | 4,680,828 | PASS |
+| Overview | 416 | 612 | 4,267,626 | PASS |
+| Victory street | 500 | 630 | 4,288,357 | PASS |
+| Street-life bicycle close-up | 279 | 331 | 3,256,046 | PASS |
+| Guangchang pawnshop | 308 | 478 | 2,139,132 | PASS |
+| Red Star factory | 340 | 401 | 4,021,716 | PASS |
+| Market footbridge | 512 | 756 | 4,612,312 | PASS |
 
-The same capture run reports 825.2 MB video memory and 701.2 MB texture
+The same capture run reports 955.7 MB video memory and 813.2 MB texture
 memory. All six views pass their configured budgets.
 
 The map's complete layout, supporting geometry, district composition, material
 adaptation, art direction, sign wording, sign placement, objective-terminal
-status screens, terminal adaptations, urban-life composition, and factory-gate
-portal geometry/composition are project work. The terminal bodies and other
+status screens, terminal adaptations, urban-life composition, pawnshop
+adaptation/composition, and factory-gate portal geometry/composition are project
+work. The terminal bodies and other
 imported third-party geometry, materials, and textures retain their source rights and
 are not relicensed as MIT merely because adapted copies are packed, reused by
 the portal, or exported in the delivered outputs. The Noto source remains

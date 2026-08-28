@@ -10,6 +10,8 @@ public partial class FreightTerminalWorld
     private const float RefineryDoorSourceWidth = 0.9763f;
     private const float RefineryDoorSourceHeight = 1.5463f;
     private const float RefineryDoorSourceDepthCenter = 0.0755f;
+    private const int RefineryDoorVisualPanelCount = 3;
+    private const float RefineryDoorMaxAspectDistortion = 1.1f;
     private readonly System.Collections.Generic.List<InteractiveBuildingDoor> _refineryDoors = new();
 
     private void BuildOldTownLandmarkDoors(
@@ -60,7 +62,8 @@ public partial class FreightTerminalWorld
             visualScenePath: RefineryDoorScenePath,
             sourceWidth: RefineryDoorSourceWidth,
             sourceHeight: RefineryDoorSourceHeight,
-            sourceDepthCenter: RefineryDoorSourceDepthCenter);
+            sourceDepthCenter: RefineryDoorSourceDepthCenter,
+            visualPanelCount: RefineryDoorVisualPanelCount);
         mount.AddChild(door);
         _refineryDoors.Add(door);
 
@@ -240,6 +243,14 @@ public partial class FreightTerminalWorld
                 .SequenceEqual(Enumerable.Range(1, expectedDoorCount));
         var authoredReady = ResourceLoader.Exists(RefineryDoorScenePath)
             && _refineryDoors.All(door => door.UsesAuthoredVisual && door.HasBoxCollision);
+        var panelLayoutReady = countReady && _refineryDoors.All(door =>
+            door.HasValidAuthoredVisualPanelLayout
+            && door.AuthoredVisualPanelCount == RefineryDoorVisualPanelCount
+            && door.MaxAuthoredVisualAspectDistortion
+                <= RefineryDoorMaxAspectDistortion);
+        var maxAspectDistortion = _refineryDoors.Count > 0
+            ? _refineryDoors.Max(door => door.MaxAuthoredVisualAspectDistortion)
+            : float.PositiveInfinity;
         var initiallyClosed = _refineryDoors.All(door => !door.IsOpen && !door.IsAnimating);
         var first = _refineryDoors.FirstOrDefault();
         if (first is null)
@@ -329,12 +340,13 @@ public partial class FreightTerminalWorld
         first.SetOpenImmediate(false);
         _player.GlobalPosition = playerPosition;
 
-        var valid = countReady && idsReady && authoredReady && initiallyClosed
+        var valid = countReady && idsReady && authoredReady && panelLayoutReady
+            && initiallyClosed
             && englishPromptReady && chinesePromptReady && nearestReady
             && closedBlocks && openingStarted && opened && openClears && closePromptReady
             && occupiedCloseRejected && closingStarted && closedAgain && closedAgainBlocks
             && aiLinkReady && aiOpened && aiContinued;
-        GD.Print($"REFINERY_DOORS_CHECK valid={valid} doors={_refineryDoors.Count}/{expectedDoorCount} ids={idsReady} authored={authoredReady} closed_initial={initiallyClosed} prompt_en={englishPromptReady} prompt_zh={chinesePromptReady} nearest={nearestReady} closed_block={closedBlocks} opening={openingStarted} opened={opened} angle={first.MotionAngleDegrees:0.0} open_clear={openClears} close_prompt={closePromptReady} occupied_rejected={occupiedCloseRejected} closing={closingStarted} closed_again={closedAgain} closed_block_again={closedAgainBlocks} ai_link={aiLinkReady} ai_opened={aiOpened} ai_continued={aiContinued} motions={string.Join(',', _refineryDoors.Select(door => door.CompletedMotionCount))}");
+        GD.Print($"REFINERY_DOORS_CHECK valid={valid} doors={_refineryDoors.Count}/{expectedDoorCount} ids={idsReady} authored={authoredReady} panels={string.Join(',', _refineryDoors.Select(door => door.AuthoredVisualPanelCount))} panel_layout={panelLayoutReady} aspect_distortion_max={maxAspectDistortion:0.000} closed_initial={initiallyClosed} prompt_en={englishPromptReady} prompt_zh={chinesePromptReady} nearest={nearestReady} closed_block={closedBlocks} opening={openingStarted} opened={opened} angle={first.MotionAngleDegrees:0.0} open_clear={openClears} close_prompt={closePromptReady} occupied_rejected={occupiedCloseRejected} closing={closingStarted} closed_again={closedAgain} closed_block_again={closedAgainBlocks} ai_link={aiLinkReady} ai_opened={aiOpened} ai_continued={aiContinued} motions={string.Join(',', _refineryDoors.Select(door => door.CompletedMotionCount))}");
         GD.Print($"REFINERY_DOORS_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }

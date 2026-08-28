@@ -69,6 +69,20 @@ FACTORY_BUILDING_LAYOUT = (
     ("JianghaiCleared_FactoryWorkshopEast", "JianghaiCleared_MarketShop03", (95.5, -7.0, 0.04), (0.65, 0.82, 0.96)),
     ("JianghaiCleared_FactoryOfficeEast", "JianghaiCleared_MarketShop04", (105.0, -7.0, 0.04), (0.48, 0.58, 0.82)),
 )
+PAWNSHOP_LEGACY_VISIBLE_NAMES = (
+    "GuangchangPawnshopSignBacking",
+    "GuangchangPawnshopDangPlaqueBacking",
+    "PawnshopGatePierL",
+    "PawnshopGatePierR",
+    "PawnshopGatePierCapL",
+    "PawnshopGatePierCapR",
+)
+PAWNSHOP_LEGACY_WALL_PREFIXES = (
+    "PawnshopSouthEast_",
+    "PawnshopSouthEastCap_",
+    "PawnshopSouthWest_",
+    "PawnshopSouthWestCap_",
+)
 
 
 def tune_runtime_emissions() -> int:
@@ -179,6 +193,45 @@ def rebuild_factory_frontage() -> tuple[int, int]:
     if sign_text is not None:
         sign_text.location = (85.5, -3.81, 7.35)
     return removed, rebuilt
+
+
+def validate_pawnshop_frontage() -> tuple[int, int]:
+    legacy = [
+        obj.name
+        for obj in bpy.data.objects
+        if obj.name in PAWNSHOP_LEGACY_VISIBLE_NAMES
+        or obj.name.startswith(PAWNSHOP_LEGACY_WALL_PREFIXES)
+    ]
+    canopy_root = bpy.data.objects.get("PawnshopAuthoredPavilionGate")
+    canopy = [
+        obj for obj in bpy.data.objects if obj.name.startswith("PawnshopAuthoredCanopy_")
+    ]
+    wings = [
+        obj for obj in bpy.data.objects if obj.name.startswith("PawnshopAuthoredWing_")
+    ]
+    if legacy:
+        raise RuntimeError(f"Legacy pawnshop programmer art remains visible: {legacy}")
+    if (
+        canopy_root is None
+        or canopy_root.get("source_license") != "CC0 1.0 Universal"
+        or canopy_root.get("source_creator") != "VVayToyek"
+        or canopy_root.get("source_url")
+        != "https://vvaytoyek.itch.io/chinese-four-corner-pavilion-free"
+        or len(canopy) != 15
+        or len(wings) != 16
+        or any(
+            wing.get("source_creator") != "James Ray Cock"
+            or wing.get("source_url")
+            != "https://polyhaven.com/a/modular_urban_apartments_facade"
+            or wing.get("source_license") != "CC0 1.0 Universal"
+            for wing in wings
+        )
+    ):
+        raise RuntimeError(
+            "Authored pawnshop frontage is incomplete: "
+            f"root={canopy_root is not None} canopy={len(canopy)}/15 wings={len(wings)}/16"
+        )
+    return len(canopy), len(wings)
 
 
 def flatten_tiled_images() -> int:
@@ -329,6 +382,7 @@ def main() -> None:
     removed_floating_signs = remove_floating_market_signs()
     removed_retired_metadata = remove_retired_asset_metadata()
     removed_factory_shells, rebuilt_factory_buildings = rebuild_factory_frontage()
+    pawnshop_canopy_parts, pawnshop_wings = validate_pawnshop_frontage()
     flattened = flatten_tiled_images()
     with tempfile.TemporaryDirectory(prefix="jianghai-runtime-textures-") as cache:
         resized, recompressed = optimize_runtime_textures(Path(cache))
@@ -365,6 +419,7 @@ def main() -> None:
         f"removed_retired_metadata={removed_retired_metadata} flattened_udim={flattened} "
         f"removed_factory_shells={removed_factory_shells} "
         f"rebuilt_factory_buildings={rebuilt_factory_buildings} "
+        f"pawnshop_canopy_parts={pawnshop_canopy_parts} pawnshop_wings={pawnshop_wings} "
         f"resized_textures={resized} recompressed_textures={recompressed} "
         f"meshes={meshes} evaluated_objects={evaluated_objects} "
         f"evaluated_triangles={evaluated_triangles} materials={materials} glb_bytes={glb_size} "

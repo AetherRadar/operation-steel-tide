@@ -35,6 +35,7 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
     private float _sourceWidth = OverheadSourceWidth;
     private float _sourceHeight = OverheadSourceHeight;
     private float _sourceDepthCenter = OverheadSourceDepthCenter;
+    private int _visualPanelCount = 1;
     private bool _usesCustomVisualScene;
     private Vector3 _interactionLocal;
     private CollisionShape3D _doorCollision = null!;
@@ -48,6 +49,11 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
     public bool TargetOpen { get; private set; }
     public int CompletedMotionCount { get; private set; }
     public bool UsesAuthoredVisual => IsInstanceValid(_authoredVisual);
+    public int AuthoredVisualPanelCount => GetAuthoredVisualPanelCount();
+    public float MaxAuthoredVisualAspectDistortion
+        => GetMaxAuthoredVisualAspectDistortion();
+    public bool HasValidAuthoredVisualPanelLayout
+        => ValidateAuthoredVisualPanelLayout();
     public bool HasBoxCollision => IsInstanceValid(_doorCollision)
         && _doorCollision.Shape is BoxShape3D;
     public float MotionAngleDegrees => _motionStyle == BuildingDoorMotionStyle.Hinged
@@ -76,7 +82,8 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         string? visualScenePath = null,
         float? sourceWidth = null,
         float? sourceHeight = null,
-        float? sourceDepthCenter = null)
+        float? sourceDepthCenter = null,
+        int visualPanelCount = 1)
     {
         DoorId = doorId;
         _width = Mathf.Max(1.0f, doorwayWidth * 0.96f);
@@ -104,6 +111,7 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         _sourceWidth = Mathf.Max(0.01f, sourceWidth ?? defaultSourceWidth);
         _sourceHeight = Mathf.Max(0.01f, sourceHeight ?? defaultSourceHeight);
         _sourceDepthCenter = sourceDepthCenter ?? defaultSourceDepthCenter;
+        _visualPanelCount = Mathf.Max(1, visualPanelCount);
         _interactionLocal = new Vector3(0, Mathf.Min(1.35f, _height * 0.5f), frontZ);
         var pivot = motionStyle == BuildingDoorMotionStyle.Hinged
             ? new Vector3(-_width * 0.5f, 0.0f, frontZ)
@@ -238,32 +246,132 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
     private void BuildAuthoredVisual()
     {
         var scene = GD.Load<PackedScene>(_visualScenePath);
-        if (scene?.Instantiate() is not Node3D visual)
+        if (scene is null)
         {
             return;
         }
-        _authoredVisual = visual;
         if (_motionStyle == BuildingDoorMotionStyle.Hinged)
         {
+            if (scene.Instantiate() is not Node3D visual)
+            {
+                return;
+            }
+            _authoredVisual = visual;
             visual.Name = "AuthoredHingedDoor";
             visual.Position = new Vector3(_width * 0.5f, 0, 0);
-            visual.Scale = new Vector3(
-                _width / _sourceWidth,
-                _height / _sourceHeight,
-                0.72f);
+            var horizontalScale = _width / _sourceWidth;
+            var verticalScale = _height / _sourceHeight;
+            visual.Scale = new Vector3(horizontalScale, verticalScale, 0.72f);
+            visual.AddToGroup("refinery_door_authored");
+            ConfigureVisuals(visual);
+            AddChild(visual);
+            return;
         }
-        else
+
+        var panelRoot = new Node3D
         {
-            visual.Name = "AuthoredOverheadDoor";
-            visual.Position = new Vector3(0, -_height, -_sourceDepthCenter);
-            visual.Scale = new Vector3(
-                _width / _sourceWidth,
-                _height / _sourceHeight,
+            Name = "AuthoredOverheadDoorPanels",
+            Position = new Vector3(0, -_height, -_sourceDepthCenter)
+        };
+        var panelWidth = _width / _visualPanelCount;
+        var panelHorizontalScale = panelWidth / _sourceWidth;
+        var panelVerticalScale = _height / _sourceHeight;
+        var firstPanelCenter = -_width * 0.5f + panelWidth * 0.5f;
+        for (var index = 0; index < _visualPanelCount; index++)
+        {
+            if (scene.Instantiate() is not Node3D panel)
+            {
+                panelRoot.Free();
+                return;
+            }
+            panel.Name = $"AuthoredOverheadDoorPanel{index + 1:00}";
+            panel.Position = new Vector3(firstPanelCenter + panelWidth * index, 0, 0);
+            panel.Scale = new Vector3(
+                panelHorizontalScale,
+                panelVerticalScale,
                 1.0f);
+            panelRoot.AddChild(panel);
         }
-        visual.AddToGroup("refinery_door_authored");
-        ConfigureVisuals(visual);
-        AddChild(visual);
+        _authoredVisual = panelRoot;
+        panelRoot.AddToGroup("refinery_door_authored");
+        ConfigureVisuals(panelRoot);
+        AddChild(panelRoot);
+    }
+
+    private static float AspectDistortion(float horizontalScale, float verticalScale)
+        => Mathf.Max(horizontalScale, verticalScale)
+            / Mathf.Max(0.0001f, Mathf.Min(horizontalScale, verticalScale));
+
+    private int GetAuthoredVisualPanelCount()
+    {
+        if (!IsInstanceValid(_authoredVisual))
+        {
+            return 0;
+        }
+        return _motionStyle == BuildingDoorMotionStyle.Hinged
+            ? 1
+            : _authoredVisual.GetChildCount();
+    }
+
+    private float GetMaxAuthoredVisualAspectDistortion()
+    {
+        if (!IsInstanceValid(_authoredVisual))
+        {
+            return float.PositiveInfinity;
+        }
+        if (_motionStyle == BuildingDoorMotionStyle.Hinged)
+        {
+            return AspectDistortion(_authoredVisual.Scale.X, _authoredVisual.Scale.Y);
+        }
+
+        var maximum = 0.0f;
+        for (var index = 0; index < _authoredVisual.GetChildCount(); index++)
+        {
+            if (_authoredVisual.GetChild(index) is not Node3D panel)
+            {
+                return float.PositiveInfinity;
+            }
+            maximum = Mathf.Max(maximum, AspectDistortion(panel.Scale.X, panel.Scale.Y));
+        }
+        return maximum > 0.0f ? maximum : float.PositiveInfinity;
+    }
+
+    private bool ValidateAuthoredVisualPanelLayout()
+    {
+        if (!IsInstanceValid(_authoredVisual) || _authoredVisual.GetParent() != this)
+        {
+            return false;
+        }
+        if (_motionStyle == BuildingDoorMotionStyle.Hinged)
+        {
+            return _authoredVisual.Name == "AuthoredHingedDoor";
+        }
+        if (_authoredVisual.Name != "AuthoredOverheadDoorPanels"
+            || _authoredVisual.GetChildCount() != _visualPanelCount
+            || !_authoredVisual.Position.IsEqualApprox(
+                new Vector3(0, -_height, -_sourceDepthCenter)))
+        {
+            return false;
+        }
+
+        var panelWidth = _width / _visualPanelCount;
+        var panelHorizontalScale = panelWidth / _sourceWidth;
+        var panelVerticalScale = _height / _sourceHeight;
+        var firstPanelCenter = -_width * 0.5f + panelWidth * 0.5f;
+        for (var index = 0; index < _visualPanelCount; index++)
+        {
+            if (_authoredVisual.GetChild(index) is not Node3D panel
+                || panel.GetParent() != _authoredVisual
+                || panel.Name != $"AuthoredOverheadDoorPanel{index + 1:00}"
+                || !panel.Position.IsEqualApprox(
+                    new Vector3(firstPanelCenter + panelWidth * index, 0, 0))
+                || !panel.Scale.IsEqualApprox(
+                    new Vector3(panelHorizontalScale, panelVerticalScale, 1.0f)))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void ConfigureVisuals(Node node)

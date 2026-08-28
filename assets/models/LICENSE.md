@@ -140,6 +140,16 @@ For Security Camera 01, the delivered composite contains only static geometry,
 materials, and textures; the source rig and animations are not shipped in the
 packed scene or runtime export.
 
+The pawnshop gate canopy additionally adapts **Chinese Four-corner Pavilion -
+Free** by **VVayToyek**, acquired from
+https://vvaytoyek.itch.io/chinese-four-corner-pavilion-free on 2026-08-28. The
+official page dedicates the asset to the public domain under CC0 1.0 Universal.
+Fifteen modeled timber, tile, column, lattice, rafter, and ornament parts are
+retained and reshaped in Blender; the raw ZIP and FBX stay in the external
+acquisition cache. Exact hashes, license-page evidence, and the packed-output
+mapping are recorded in the scene's `LICENSE_EVIDENCE.md`. The reproducible DCC
+adaptation is `../../scripts/blender/rebuild_pawnshop_frontage.py`.
+
 The urban-life pass additionally embeds the already tracked Coffee Cart 01 by
 Joe Seabuhr and Wicker Basket 01 by Kuutti Siitonen from
 `polyhaven_residential_street/`. Their existing per-file evidence remains in
@@ -152,10 +162,12 @@ The export script reproducibly selects the adapted
 `JianghaiArtPass_EastShutter00` mesh from the authoritative packed `.blend`,
 normalizes a temporary copy, and exports its PBR geometry and materials. This
 standalone GLB supplies only the visible art for the two Old City
-`InteractiveBuildingDoor` instances, replacing the enlarged Kenney
-`door-wide-closed` visual. Their collision, animation, network state, and AI
-traversal remain project gameplay behavior. The derived file retains MP's
-Poly Haven CC0 provenance and is not relicensed as project-authored MIT art.
+`InteractiveBuildingDoor` instances. Each 7.6-meter opening now uses three
+separately positioned instances of the authored shutter, keeping maximum X/Y
+scale distortion at 1.094 instead of stretching one mesh into a flat slab.
+Their collision, animation, network state, and AI traversal remain project
+gameplay behavior. The derived file retains MP's Poly Haven CC0 provenance and
+is not relicensed as project-authored MIT art.
 
 ## Jianghai Old City authored composite
 
@@ -183,26 +195,26 @@ source.
 
 The runtime export policy caps the longest texture dimension at 1024 pixels
 and recompresses eligible high-resolution runtime images as JPEG quality 90.
-A 2026-08-28 Blender audit recorded all seven required runtime anchors, 425
-mesh objects, 167 unique mesh datablocks, 4,472,384 raw mesh-object triangles,
-and 660,493 triangles counted once per unique mesh. Dependency-graph evaluation
-and the runtime export produce 488 mesh nodes and 4,502,190 instance triangles.
-The final packed `.blend` is 51,188,489 bytes with SHA-256
-`ABCA4AD0B6DDE3283EE2CC85DE40BE33DC39A6DFDC633300A99F36648E6E3D1A`.
-The final 58,070,456-byte GLB has SHA-256
-`6B8C5D35F0224D81125B44B304B5FE03E6F2523062F3BFB0861A00258CF66663`.
-The matching Godot refinery-map validation passes with 488 authored meshes,
-556 material-backed surfaces, 386 detail meshes, and the same 4,502,190
-authored instance triangles. Route validation reports
+A 2026-08-28 Blender audit recorded all seven required runtime anchors, 438
+mesh objects, 184 unique mesh datablocks, 4,526,960 raw mesh-object triangles,
+and 688,637 triangles counted once per unique mesh. Dependency-graph evaluation
+and the runtime export produce 501 mesh nodes and 4,556,062 instance triangles.
+The final packed `.blend` is 49,787,440 bytes with SHA-256
+`9E49EF372F3609EBDF0A68CA8A5F4EF5A0D38E08B5B28F9A463707E04F550CD5`.
+The final 59,205,576-byte GLB has SHA-256
+`E9CF20F1A1FFFAFBB12F233B21852B458ED361DDA9D10D2A77A24791BFD75307`.
+The matching Godot refinery-map validation passes with 501 authored meshes,
+583 material-backed surfaces and the same 4,556,062 authored instance
+triangles. Route validation reports
 `routes=True`, `route_probes=14`, and `route_blocker=none`; the Victory truck
 envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and
 `y=2.6`. High tier disables shadows only for fine decorative meshes; model
 geometry, materials, and visibility ranges are unchanged. Final capture tuples
-(draw calls / objects / primitives) are Overview 349/539/4,209,048, Victory
-street 427/547/3,947,301, Street-life bicycle close-up 255/304/3,265,850,
-Guangchang pawnshop 218/390/2,046,993, Red Star factory 343/403/4,032,380,
-and Market footbridge 424/663/4,680,828. All pass; video memory is 825.2 MB
-and texture memory is 701.2 MB. Detailed DCC, GLB,
+(draw calls / objects / primitives) are Overview 416/612/4,267,626, Victory
+street 500/630/4,288,357, Street-life bicycle close-up 279/331/3,256,046,
+Guangchang pawnshop 308/478/2,139,132, Red Star factory 340/401/4,021,716,
+and Market footbridge 512/756/4,612,312. All pass; video memory is 955.7 MB
+and texture memory is 813.2 MB. Detailed DCC, GLB,
 and runtime counting scopes are kept in
 `../../source_art/world/jianghai_old_city/README.md`.
 
@@ -226,10 +238,13 @@ The delivered urban-life expansion is authored in the authoritative
 overlays; three adapted Pink city bicycles line the sidewalks; a Coffee Cart
 01 and Wicker Basket 01 form the market tea cart; a Chinese Tea Table and three
 Chinese Stools dress the pawnshop; and a Hand Truck dresses the factory. The
-cleared storefront composition adds a finished CC0 pawnshop frontage, five
+cleared storefront composition adds a finished CC0 pawnshop backdrop, five
 market shops (three adapted Old Urban building instances and two Scan Old
 Building Street instances), two Old Urban building rear houses, and five
-Chinese red lamps. The former damaged factory shell is replaced with three Old
+Chinese red lamps. The pawnshop hero entrance replaces six flat gate boards and
+twelve zero-thickness wall pieces with 15 modeled pavilion parts, eight solid
+facade modules and eight authored window/door inserts. The former damaged
+factory shell is replaced with three Old
 Urban building office/admin instances and two Scan Old Building Street workshops.
 The `.blend` remains the authoritative hand-edited DCC source. The export
 script additionally reapplies the documented factory-frontage substitution and
@@ -260,6 +275,8 @@ CC0 sources acquired on 2026-08-27:
 - **Chinese red lamp**, by **Kin Chen**, from BlenderKit; `assetBaseId`
   `b97e433c-2eb1-46b8-9633-5bdee21e4e7a`:
   https://www.blenderkit.com/asset-gallery-detail/b97e433c-2eb1-46b8-9633-5bdee21e4e7a/
+- **Chinese Four-corner Pavilion - Free**, by **VVayToyek**, from itch.io:
+  https://vvaytoyek.itch.io/chinese-four-corner-pavilion-free
 
 Additional CC0 BlenderKit inputs acquired on 2026-08-28 and incorporated into
 the delivered composite are:
@@ -287,7 +304,8 @@ Poly Haven CC0 Old Military Crate, Concrete Road Barrier, Coffee Cart 01, and
 Wicker Basket 01. Modular Urban Apartments Facade is delivered as 36 adapted
 facade objects in two asymmetrical 3-by-3 overlays. Chinese Tea Table and three
 Chinese Stool instances are placed at the pawnshop, and Hand Truck is placed at
-the factory. Exact acquisition and bundle hashes are retained in
+the factory. The VVayToyek pavilion contributes 15 adapted modeled parts to the
+pawnshop canopy. Exact acquisition and bundle hashes are retained in
 `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md`.
 
 License text: https://creativecommons.org/publicdomain/zero/1.0/

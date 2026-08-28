@@ -21,9 +21,10 @@ Consequently, this repository must not be described as satisfying policies that 
 | Steel Tide M4A1 `.blend` and `.glb` model | Textured `M4A1 Assault Rifle` by OpenGameArt creator/uploader `nisu`, plus a SCAR-L grip component, MP5A5 front muzzle assembly, and AXMC glass-bearing scope component by Quaternius, composed in Blender for the runtime hierarchy and first-person scale | Both sources are CC0 1.0 Universal; no attribution required, both creator credits retained as provenance; sources and composite outputs are not relicensed as MIT | nisu source published 2022-04-24 and acquired 2026-08-28 from `https://opengameart.org/content/m4a1-assault-rifle`; Quaternius Ultimate Guns Pack components acquired 2026-08-20 from `https://poly.pizza/bundle/Ultimate-Guns-Pack-cpgUfI4t2F`; exact source objects, license records, hashes, component mappings, acquisition evidence, authored muzzle/reticle markers, and the deliberate shared-geometry fallback for stat variants are recorded in `assets/models/steel_tide_m4a1/LICENSE.md`, `assets/models/quaternius_ultimate_guns/LICENSE.md`, and `source_art/third_party/nisu_m4a1/LICENSE_EVIDENCE.md`; reproducible build is `scripts/blender/build_nisu_m4a1.py` |
 | Legacy Steel Tide operator `.blend` and `.glb` model | Project-authored in Blender from the checked-in procedural modeling script, with disclosed AI assistance; no third-party geometry or textures copied | Included under the root MIT license, subject to the limitation above | `scripts/blender/generate_combat_models.py`, `source_art/combat_models/steel_tide_operator.blend`, and Git history |
 | Tactical knife, Zhanma Dao, and Tianxuan Dao `.blend` and `.glb` models | Creator: Operation Steel Tide project contributors. Project-authored in Blender 4.5 on 2026-08-28 from the checked-in DCC generator, with disclosed AI assistance; no external source URL applies and no third-party geometry or textures are present | Root MIT license; required attribution is preservation of the root MIT copyright and permission notice, with no additional third-party credit required | Canonical local sources `source_art/melee_weapons/{tactical_knife,zhanma_dao,tianxuan_dao}.blend`; reproducible build and GLB round-trip validation in `scripts/blender/build_melee_weapons.py`; runtime outputs `assets/models/steel_tide_melee/{tactical_knife,zhanma_dao,tianxuan_dao}.glb`; exact triangulated counts are 13,216, 17,548, and 18,212 respectively; additional workflow notes are in `source_art/melee_weapons/README.md` and `assets/models/LICENSE.md` |
-| Jianghai Old City map layout, street and supporting geometry, district composition, material adaptations, art direction, sign wording and placement, objective-terminal status screens and adaptations, urban-life composition, facade expansion, cleared storefront composition, and factory-gate portal composition | Project-authored, hand-edited DCC composition in Blender, with disclosed AI assistance; the two terminal bodies combine the CC0 Utility Box 01 and Television 02 sources recorded below, while the factory portal reuses DCC-authored brick piers, caps, and corrugated-roof geometry; finished CC0 facades, shops, houses, lamps, and street-life sources are adapted and composed in the saved scene, with the five-building factory replacement also enforced deterministically by the export/cleanup script | Project-authored portions are included under the root MIT license, subject to the limitation above; embedded third-party contributions and reused materials retain the licenses recorded in the rows below | Authoritative DCC source `source_art/world/jianghai_old_city/jianghai_old_city.blend`, deterministic export/cleanup script `scripts/blender/export_jianghai_old_city.py`, main runtime `assets/models/jianghai_old_city/jianghai_old_city.glb`, interactive-door visual `assets/models/jianghai_old_city/rollershutter_window_03.glb`, and `source_art/world/jianghai_old_city/README.md` |
+| Jianghai Old City map layout, street and supporting geometry, district composition, material adaptations, art direction, sign wording and placement, objective-terminal status screens and adaptations, urban-life composition, facade expansion, pawnshop entrance adaptation/composition, cleared storefront composition, and factory-gate portal composition | Project-authored, hand-edited DCC composition in Blender, with disclosed AI assistance; the pawnshop adapts the CC0 pavilion and facade sources recorded below into a 15-part canopy and 16-piece solid-wing assembly, while each interactive opening tiles three authored shutters; finished CC0 facades, shops, houses, lamps, and street-life sources are adapted and composed in the saved scene, with the five-building factory replacement also enforced deterministically by the export/cleanup script | Project-authored portions are included under the root MIT license, subject to the limitation above; embedded third-party contributions and reused materials retain the licenses recorded in the rows below | Authoritative DCC source `source_art/world/jianghai_old_city/jianghai_old_city.blend`, pawnshop adaptation `scripts/blender/rebuild_pawnshop_frontage.py`, deterministic export/cleanup script `scripts/blender/export_jianghai_old_city.py`, main runtime `assets/models/jianghai_old_city/jianghai_old_city.glb`, interactive-door visual `assets/models/jianghai_old_city/rollershutter_window_03.glb`, and `source_art/world/jianghai_old_city/README.md` |
 | Modular Factory Facade geometry and materials embedded in Jianghai Old City | James Ray Cock on Poly Haven | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-27 from `https://polyhaven.com/a/modular_factory_facade`; exact hashes and local mapping are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
 | Modular Urban Apartments Facade geometry, materials, and textures embedded in Jianghai Old City as 36 adapted facade objects in two asymmetrical 3-by-3 overlays | James Ray Cock on Poly Haven | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-27 from `https://polyhaven.com/a/modular_urban_apartments_facade`; source bundle hashes, DCC mapping, and delivered expansion audit are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
+| Chinese Four-corner Pavilion - Free modeled geometry embedded in Jianghai Old City as the 15-part pawnshop gate canopy | VVayToyek on itch.io | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-28 from `https://vvaytoyek.itch.io/chinese-four-corner-pavilion-free`; official-page evidence, ZIP/FBX hashes, retained-part mapping, and packed-output mapping are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md`; raw source remains in the external acquisition cache |
 | Chinese Temple 2 geometry and materials embedded in Jianghai Old City | Free poly on BlenderKit, `assetBaseId` `8701a79a-1635-437c-b1d2-6b14f14fc351` | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-27 from the BlenderKit asset page recorded in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
 | Chinese red lamp geometry and materials embedded as five Jianghai storefront instances | Kin Chen on BlenderKit, `assetBaseId` `b97e433c-2eb1-46b8-9633-5bdee21e4e7a` | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-27 from the BlenderKit asset page recorded in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
 | Pink city bicycle geometry embedded in Jianghai Old City as three static sidewalk instances | Kin Chen on BlenderKit, `assetBaseId` `4c1a83c1-829f-4c00-878e-9e73c6b89c3b` | CC0 1.0 Universal; official API `license=cc_zero`, `isFree=true`; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-28 from `https://www.blenderkit.com/asset-gallery-detail/4c1a83c1-829f-4c00-878e-9e73c6b89c3b/`; converted to a static rest pose, stripped of its rig, given weathered material adaptations, and cleaned to 11,825 triangles before three-instance placement; input/API hashes and output mapping are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
@@ -32,7 +33,7 @@ Consequently, this repository must not be described as satisfying policies that 
 | Chinese Porcelain Lion geometry and materials embedded in Jianghai Old City | Free poly on BlenderKit, `assetBaseId` `50b661cb-119d-4e80-8a9c-5c6996cbb0c8` | CC0 1.0 Universal; official API `license=cc_zero`, `isFree=true`; not relicensed as MIT | Acquired 2026-08-28 from the official BlenderKit asset page; local cache hash and output mapping are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
 | Television 02 geometry, materials, and textures embedded in Jianghai Old City | Benny Weimer on Poly Haven | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-28 from `https://polyhaven.com/a/television_02`; external 1K glTF cache and packed `.blend`/runtime GLB mapping are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
 | Exterior Aircon Unit geometry, materials, and textures embedded in Jianghai Old City | Monsta3D on Poly Haven | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-28 from `https://polyhaven.com/a/exterior_aircon_unit`; external 1K glTF cache and packed `.blend`/runtime GLB mapping are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
-| Rollershutter Window 03 geometry, materials, and textures embedded in Jianghai Old City and exported as the two Old City interactive doors' standalone visible-art GLB | MP on Poly Haven | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-28 from `https://polyhaven.com/a/rollershutter_window_03`; external 1K glTF cache, packed `.blend`, main runtime GLB, and derived `assets/models/jianghai_old_city/rollershutter_window_03.glb` mappings are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
+| Rollershutter Window 03 geometry, materials, and textures embedded in Jianghai Old City and exported as the two Old City interactive doors' standalone visible-art GLB, instanced as three panels per opening | MP on Poly Haven | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-28 from `https://polyhaven.com/a/rollershutter_window_03`; external 1K glTF cache, packed `.blend`, main runtime GLB, derived `assets/models/jianghai_old_city/rollershutter_window_03.glb`, three-panel runtime layout, and 1.094 maximum aspect-distortion mapping are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
 | Trashbag geometry, materials, and textures embedded in Jianghai Old City | Benny Weimer on Poly Haven | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-28 from `https://polyhaven.com/a/trashbag`; external 1K glTF cache and packed `.blend`/runtime GLB mapping are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
 | Utility Box 01 geometry, materials, and textures embedded in Jianghai Old City | James Ray Cock on Poly Haven | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-28 from `https://polyhaven.com/a/utility_box_01`; external 1K glTF cache and packed `.blend`/runtime GLB mapping are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
 | Barrel 03 geometry, materials, and textures embedded in Jianghai Old City | Serhii Khromov on Poly Haven | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-28 from `https://polyhaven.com/a/barrel_03`; external 1K glTF cache and packed `.blend`/runtime GLB mapping are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
@@ -69,18 +70,18 @@ Consequently, this repository must not be described as satisfying policies that 
 | Kloppenheim 06 (Pure Sky) 1K HDRI loaded by `JianghaiOldCityAtmosphere`; not embedded in the Jianghai `.blend` or map GLB | Greg Zaal (Original) and Jarod Guest (Sky Edits) on Poly Haven | CC0 1.0 Universal; no attribution required, contributor credits retained as provenance; not relicensed as MIT | Acquired 2026-08-28 from `https://polyhaven.com/a/kloppenheim_06_puresky`; local `assets/textures/kloppenheim_06_puresky_1k.hdr` is 1,173,154 bytes with SHA-256 `206C67E3A1B992282821CF06662BDD69BBB4915C1C4444A66338A40D6A7D4E34`; official API MD5 `995d68b1656f26452572645c0ffe898b`; official download `https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloppenheim_06_puresky_1k.hdr` |
 | Runtime primitive meshes, materials, UI, effects, and synthesized sounds | Generated by project code at runtime | Project-authored implementation, with disclosed AI assistance | Source files and Git history |
 
-The final Jianghai files are a 51,188,489-byte packed `.blend` with SHA-256
-`ABCA4AD0B6DDE3283EE2CC85DE40BE33DC39A6DFDC633300A99F36648E6E3D1A`
-and a 58,070,456-byte GLB with SHA-256
-`6B8C5D35F0224D81125B44B304B5FE03E6F2523062F3BFB0861A00258CF66663`.
-The source audit records 425 mesh objects, 167 unique mesh datablocks,
-4,472,384 raw mesh-object triangles, and 660,493 triangles counted once per
-unique mesh. Dependency-graph evaluation and the runtime export produce 488
-mesh nodes and 4,502,190 instance triangles. The matching Godot
-`--validate-refinery-map` diagnostic passes with 488 authored meshes, 556
-material-backed surfaces, 386 detail meshes, 4,502,190 authored instance
-triangles, 7/7 authored anchors, terminal checks of 2/2/2/2, and 2/2 authored
-status screens. Route validation reports `routes=True`,
+The final Jianghai files are a 49,787,440-byte packed `.blend` with SHA-256
+`9E49EF372F3609EBDF0A68CA8A5F4EF5A0D38E08B5B28F9A463707E04F550CD5`
+and a 59,205,576-byte GLB with SHA-256
+`E9CF20F1A1FFFAFBB12F233B21852B458ED361DDA9D10D2A77A24791BFD75307`.
+The source audit records 438 mesh objects, 184 unique mesh datablocks,
+4,526,960 raw mesh-object triangles, and 688,637 triangles counted once per
+unique mesh. Dependency-graph evaluation and the runtime export produce 501
+mesh nodes and 4,556,062 instance triangles. The matching Godot
+`--validate-refinery-map` diagnostic passes with 501 authored meshes, 583
+material-backed surfaces, 4,556,062 authored instance triangles, 7/7 authored
+anchors, terminal checks of 2/2/2/2, and 2/2 authored status screens. Route
+validation reports `routes=True`,
 `route_probes=14`, and
 `route_blocker=none`; the Victory truck envelope `x[-2,1]` is sampled at
 multiple points for `y=0.45`, `y=1.4`, and `y=2.6`.
@@ -98,7 +99,11 @@ substitute; reused packed materials retain their existing license records. The
 delivered urban-life pass adds 36 adapted apartment-facade objects in two
 asymmetrical 3-by-3 overlays, three static Pink city bicycles, a market tea cart
 and basket, a pawnshop tea table and three stools, a factory hand truck, a
-finished CC0 pawnshop storefront, five market shops (three
+finished CC0 pawnshop backdrop, and a hero entrance built in Blender from 15
+modeled VVayToyek pavilion parts plus eight solid facade modules and eight
+authored inserts. Six flat gate boards and twelve zero-thickness south-wall
+objects are removed and rejected by the export/audit guard. The expansion also
+includes five market shops (three
 Old Urban building and two Scan Old Building Street instances), two Old Urban
 building rear houses, and five Chinese red lamps. The former damaged factory
 shell is replaced by three Old Urban building office/admin instances and two
@@ -110,19 +115,20 @@ The same export script
 reproducibly derives `assets/models/jianghai_old_city/rollershutter_window_03.glb`
 (187,940 bytes; SHA-256
 `C4884AFCD7560E4BB23320A8C311DB0011504F7C5FEE30D58C266D54F7C6B166`)
-from the packed scene's `JianghaiArtPass_EastShutter00` PBR mesh. It replaces
-only the enlarged Kenney `door-wide-closed` visible art on the two Old City
-`InteractiveBuildingDoor` instances; their collision, animation, network
-state, and AI traversal remain project gameplay behavior. Full evidence is in
+from the packed scene's `JianghaiArtPass_EastShutter00` PBR mesh. Each Old City
+`InteractiveBuildingDoor` creates three instances across the opening, with
+actual child transforms checked by `--validate-refinery-doors`; their collision,
+animation, network state, and AI traversal remain project gameplay behavior.
+Full evidence is in
 `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md`.
 
 High tier disables shadows only on fine decorative meshes; model geometry,
 materials, and visibility ranges are unchanged. Final capture tuples (draw
-calls / objects / primitives) are Overview 349/539/4,209,048, Victory street
-427/547/3,947,301, Street-life bicycle close-up 255/304/3,265,850,
-Guangchang pawnshop 218/390/2,046,993, Red Star factory 343/403/4,032,380,
-and Market footbridge 424/663/4,680,828. All six pass; the run reports 825.2 MB
-video memory and 701.2 MB texture memory.
+calls / objects / primitives) are Overview 416/612/4,267,626, Victory street
+500/630/4,288,357, Street-life bicycle close-up 279/331/3,256,046,
+Guangchang pawnshop 308/478/2,139,132, Red Star factory 340/401/4,021,716,
+and Market footbridge 512/756/4,612,312. All six pass; the run reports 955.7 MB
+video memory and 813.2 MB texture memory.
 
 No separate third-party music, font, or stock-image collection is currently tracked in the repository. Noto Sans SC was a repository-external DCC-authoring input used only to create the static Jianghai sign glyph meshes documented above; the original font is not tracked and is absent from both the final `.blend` and GLB. The Quaternius CC0 animation libraries listed above are the tracked animation pack.
 
@@ -140,7 +146,7 @@ The root MIT license covers project-authored material only. It does not relicens
 - Credit DJMaesen for the FPS animated SMG source and retain the CC BY 4.0 license record in distributions.
 - Poly Haven assets are CC0; retain the linked source and hash records whenever a platform requires source disclosure.
 - Credit Poly Haven as a courtesy and retain the delivered Modular Factory Facade and Modular Urban Apartments Facade records whenever a platform requires source disclosure; the apartments facade now ships as 36 adapted objects in the Jianghai composite.
-- Retain the Jianghai Old City evidence record with distributions so its Poly Haven and BlenderKit CC0 inputs, Noto Sans SC DCC-authoring use, and project-authored portions remain distinguishable. Courtesy credit to James Ray Cock, Abobla O.S, Free poly, Kin Chen, Kirill Sannikov, Mutanzom3D, Joe Seabuhr, Kuutti Siitonen, Benny Weimer, Monsta3D, MP, Serhii Khromov, Fabi_G, Alexander Otterbeck, Yann Kervran, Greg Zaal, Jarod Guest, Poly Haven, BlenderKit, and the Google Noto / `notofonts` contributors is recommended even where the source license does not require attribution.
+- Retain the Jianghai Old City evidence record with distributions so its Poly Haven, BlenderKit, and VVayToyek itch.io CC0 inputs, Noto Sans SC DCC-authoring use, and project-authored portions remain distinguishable. Courtesy credit to VVayToyek, James Ray Cock, Abobla O.S, Free poly, Kin Chen, Kirill Sannikov, Mutanzom3D, Joe Seabuhr, Kuutti Siitonen, Benny Weimer, Monsta3D, MP, Serhii Khromov, Fabi_G, Alexander Otterbeck, Yann Kervran, Greg Zaal, Jarod Guest, Poly Haven, BlenderKit, and the Google Noto / `notofonts` contributors is recommended even where the source license does not require attribution.
 - Kenney's City Kit Roads assets are CC0; retaining the pack link and bundled license evidence is recommended for provenance even though attribution is not required.
 - Majadroid's construction-site package and Trey Ramm's Modular Industrial Kit are CC0; retaining both creator credits and the original package evidence is recommended for provenance even though attribution is not required.
 - Quaternius's Buildings Pack is CC0; retain the official pack page, original-file mapping, and creator credit for provenance even though attribution is not required.

@@ -322,6 +322,79 @@ floating_market_signs_removed = not any(
     )
 )
 replacement_pawnshop = bpy.data.objects.get("JianghaiCleared_PawnshopStorefront")
+pawnshop_root = bpy.data.objects.get("GuangchangPawnshop")
+pawnshop_legacy_gate_names = {
+    "GuangchangPawnshopSignBacking",
+    "GuangchangPawnshopDangPlaqueBacking",
+    "PawnshopGatePierL",
+    "PawnshopGatePierR",
+    "PawnshopGatePierCapL",
+    "PawnshopGatePierCapR",
+}
+pawnshop_legacy_visible_names = pawnshop_legacy_gate_names.intersection(bpy.data.objects.keys())
+pawnshop_legacy_visible_names.update(
+    obj.name
+    for obj in bpy.data.objects
+    if obj.name.startswith(
+        (
+            "PawnshopSouthEast_",
+            "PawnshopSouthEastCap_",
+            "PawnshopSouthWest_",
+            "PawnshopSouthWestCap_",
+        )
+    )
+)
+pawnshop_canopy_root = bpy.data.objects.get("PawnshopAuthoredPavilionGate")
+pawnshop_canopy_parts = sorted(
+    (
+        obj
+        for obj in bpy.data.objects
+        if obj.name.startswith("PawnshopAuthoredCanopy_")
+    ),
+    key=lambda obj: obj.name,
+)
+pawnshop_wings = sorted(
+    (
+        obj
+        for obj in bpy.data.objects
+        if obj.name.startswith("PawnshopAuthoredWing_")
+    ),
+    key=lambda obj: obj.name,
+)
+pawnshop_canopy_triangles = sum(triangle_count(obj.data) for obj in pawnshop_canopy_parts)
+pawnshop_wall_wings = [obj for obj in pawnshop_wings if obj.name.endswith("_Wall")]
+pawnshop_insert_wings = [obj for obj in pawnshop_wings if obj.name.endswith("_Insert")]
+pawnshop_columns_clear = all(
+    not (-90.0 < obj.matrix_world.translation.x < -82.0)
+    for obj in pawnshop_canopy_parts
+    if str(obj.get("source_part_name", "")).startswith("檐柱")
+)
+pawnshop_frontage_ready = (
+    not pawnshop_legacy_visible_names
+    and pawnshop_root is not None
+    and pawnshop_canopy_root is not None
+    and pawnshop_canopy_root.parent == pawnshop_root
+    and pawnshop_canopy_root.get("source_license") == "CC0 1.0 Universal"
+    and pawnshop_canopy_root.get("source_creator") == "VVayToyek"
+    and pawnshop_canopy_root.get("source_url")
+    == "https://vvaytoyek.itch.io/chinese-four-corner-pavilion-free"
+    and len(pawnshop_canopy_parts) == 15
+    and pawnshop_canopy_triangles >= 15_000
+    and all(obj.parent == pawnshop_canopy_root for obj in pawnshop_canopy_parts)
+    and all(obj.type == "MESH" and len(obj.data.vertices) > 8 for obj in pawnshop_canopy_parts)
+    and len(pawnshop_wall_wings) == 8
+    and len(pawnshop_insert_wings) == 8
+    and all(obj.parent == pawnshop_root for obj in pawnshop_wings)
+    and all(
+        obj.get("source_creator") == "James Ray Cock"
+        and obj.get("source_url")
+        == "https://polyhaven.com/a/modular_urban_apartments_facade"
+        and obj.get("source_license") == "CC0 1.0 Universal"
+        for obj in pawnshop_wings
+    )
+    and all(min(obj.dimensions.x, obj.dimensions.y) >= 0.17 for obj in pawnshop_wall_wings)
+    and pawnshop_columns_clear
+)
 replacement_market_shops = sorted(
     (
         obj
@@ -412,6 +485,7 @@ valid = (
     and facade_expansion_count == 36
     and facade_expansion_aligned
     and replacement_storefronts_ready
+    and pawnshop_frontage_ready
     and replacement_factory_ready
     and root_provenance_ready
 )
@@ -430,6 +504,12 @@ print(
     f"urban_life={urban_life_ready} facade_expansion={facade_expansion_count}/36 "
     f"facade_expansion_aligned={facade_expansion_aligned} "
     f"replacement_storefronts_ready={replacement_storefronts_ready} "
+    f"pawnshop_frontage_ready={pawnshop_frontage_ready} "
+    f"pawnshop_canopy={len(pawnshop_canopy_parts)}/15 "
+    f"pawnshop_canopy_triangles={pawnshop_canopy_triangles}/15000 "
+    f"pawnshop_wings={len(pawnshop_wings)}/16 "
+    f"pawnshop_legacy_visible={len(pawnshop_legacy_visible_names)} "
+    f"pawnshop_columns_clear={pawnshop_columns_clear} "
     f"replacement_factory_ready={replacement_factory_ready} "
     f"root_provenance_ready={root_provenance_ready}"
 )
