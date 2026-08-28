@@ -4020,6 +4020,18 @@ public partial class FreightTerminalWorld : Node3D
         await WaitFrames(4);
         var paperDollVisible = _hud.LootPaperDollReady;
         var backpackSlotSeparated = _hud.LootBackpackSlotSeparated;
+        await ToSignal(GetTree().CreateTimer(0.2f), SceneTreeTimer.SignalName.Timeout);
+        var previewCount = _hud.LootSourceModelPreviewCountForDiagnostics;
+        var previewsFrozenBeforeResize = previewCount >= 3
+            && !_hud.LootSourceModelPreviewsRefreshingForDiagnostics;
+        var resizedPreviewCount = _hud.ResizeLootSourceModelPreviewsForDiagnostics();
+        await WaitFrames(2);
+        var previewResizeRefreshTriggered = resizedPreviewCount == previewCount
+            && _hud.LootSourceModelPreviewsRefreshingForDiagnostics;
+        await ToSignal(GetTree().CreateTimer(0.24f), SceneTreeTimer.SignalName.Timeout);
+        await WaitFrames(2);
+        var previewResizeStable = _hud.LootSourceModelPreviewSizesMatchForDiagnostics
+            && !_hud.LootSourceModelPreviewsRefreshingForDiagnostics;
         SaveViewportImage("res://corpse_loot_validation.png");
         var equipmentCount = target.Loot.FindAll(item => item.Kind == LootItemKind.Equipment).Count;
         target.Loot.Clear();
@@ -4062,8 +4074,11 @@ public partial class FreightTerminalWorld : Node3D
             && !target.CarriedWeaponVisible
             && paperDollVisible
             && backpackSlotSeparated
+            && previewsFrozenBeforeResize
+            && previewResizeRefreshTriggered
+            && previewResizeStable
             && diagnosticResetClearedBackpack;
-        GD.Print($"CORPSE_LOOT_CHECK valid={valid} dead_before_reset={targetDeadBeforeReset} target_matched={targetMatched} body_bag_closed={bodyBagClosedVisualReady} body_bag_open={bodyBagOpenVisualReady} body_bag_flap_parts={bodyBagFlapParts} backpack_alive_hidden={backpackHiddenWhileAlive} backpack_closed={closedBackpackReady} search_concealed={contentsConcealedDuringSearch} first_open_ms={firstOpenMilliseconds} open={opened} backpack_open={openedBackpackReady} reset_cleared={diagnosticResetClearedBackpack} open_requests={backpackOpenRequests} open_blocked_dead={backpackOpenBlockedDead} open_blocked_visual={backpackOpenBlockedVisual} flap={backpackFlapRotation:0.000} reopened_empty={reopenedEmpty} weapon_visible={target.CarriedWeaponVisible} equipment={equipmentCount} items={target.Loot.Count} paper_doll={paperDollVisible} backpack_isolated={backpackSlotSeparated} equipped={_player.EquippedWeapon.Platform}");
+        GD.Print($"CORPSE_LOOT_CHECK valid={valid} dead_before_reset={targetDeadBeforeReset} target_matched={targetMatched} body_bag_closed={bodyBagClosedVisualReady} body_bag_open={bodyBagOpenVisualReady} body_bag_flap_parts={bodyBagFlapParts} backpack_alive_hidden={backpackHiddenWhileAlive} backpack_closed={closedBackpackReady} search_concealed={contentsConcealedDuringSearch} first_open_ms={firstOpenMilliseconds} open={opened} backpack_open={openedBackpackReady} reset_cleared={diagnosticResetClearedBackpack} open_requests={backpackOpenRequests} open_blocked_dead={backpackOpenBlockedDead} open_blocked_visual={backpackOpenBlockedVisual} flap={backpackFlapRotation:0.000} reopened_empty={reopenedEmpty} weapon_visible={target.CarriedWeaponVisible} equipment={equipmentCount} items={target.Loot.Count} paper_doll={paperDollVisible} backpack_isolated={backpackSlotSeparated} preview_count={previewCount} preview_frozen={previewsFrozenBeforeResize} preview_resized={resizedPreviewCount} preview_refresh={previewResizeRefreshTriggered} preview_stable={previewResizeStable} equipped={_player.EquippedWeapon.Platform}");
         GD.Print($"CORPSE_LOOT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

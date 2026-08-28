@@ -122,6 +122,7 @@ public partial class LootDragCard : PanelContainer
     public int ComparisonCount { get; private set; }
     public bool HasUpgradeComparison { get; private set; }
     public bool HasDowngradeComparison { get; private set; }
+    internal InventoryModelPreview? ModelPreviewForDiagnostics { get; private set; }
     public int RenderedComparisonCount
     {
         get
@@ -371,6 +372,7 @@ public partial class LootDragCard : PanelContainer
         details.Pressed += () => DetailsRequested?.Invoke(weapon.Clone());
         header.AddChild(details);
         var preview = new InventoryModelPreview { CustomMinimumSize = new Vector2(220, 48), SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        ModelPreviewForDiagnostics = preview;
         preview.Configure(InventoryPreviewKind.Rifle, weapon: weapon);
         box.AddChild(preview);
         var detailLabel = new Label
@@ -400,6 +402,7 @@ public partial class LootDragCard : PanelContainer
             CustomMinimumSize = new Vector2(86, 78),
             SizeFlagsVertical = SizeFlags.ExpandFill
         };
+        ModelPreviewForDiagnostics = preview;
         preview.Configure(equipment.Definition.Slot switch
         {
             EquipmentSlot.Helmet => InventoryPreviewKind.Helmet,

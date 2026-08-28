@@ -27,6 +27,18 @@ public partial class InventoryModelPreview : SubViewportContainer
     private int _renderRevision;
     private static Sky? _operatorSky;
 
+    internal bool RenderRefreshActiveForDiagnostics
+        => IsInstanceValid(_viewport)
+            && _viewport!.RenderTargetUpdateMode != SubViewport.UpdateMode.Disabled;
+
+    internal bool RenderTargetMatchesControlForDiagnostics
+        => RenderTargetMatchesControl;
+
+    private bool RenderTargetMatchesControl
+        => IsInstanceValid(_viewport)
+            && Mathf.Abs(_viewport!.Size.X - Size.X) <= 1.0f
+            && Mathf.Abs(_viewport.Size.Y - Size.Y) <= 1.0f;
+
     public void Configure(
         InventoryPreviewKind kind,
         EquipmentItem? equipment = null,
@@ -106,7 +118,20 @@ public partial class InventoryModelPreview : SubViewportContainer
                 ShadowEnabled = false
             });
         }
+        // Stretch can reallocate the render target after layout changes, so wake the
+        // viewport before a newly sized texture is presented from frozen GPU memory.
+        Resized += HandlePreviewResized;
+        VisibilityChanged += HandlePreviewVisibilityChanged;
         RebuildModel();
+    }
+
+    public override void _ExitTree()
+    {
+        _renderRevision++;
+        if (IsInstanceValid(_viewport))
+        {
+            _viewport!.RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled;
+        }
     }
 
     private static Godot.Environment BuildOperatorEnvironment(bool constrainedRenderer)
@@ -218,21 +243,55 @@ public partial class InventoryModelPreview : SubViewportContainer
 
     private void RequestRender()
     {
-        if (_viewport is null)
+        if (!IsInstanceValid(_viewport))
         {
             return;
         }
-        _viewport.RenderTargetUpdateMode = SubViewport.UpdateMode.Always;
+        _viewport!.RenderTargetUpdateMode = SubViewport.UpdateMode.Always;
         FreezeRenderAfterWarmup(++_renderRevision);
     }
 
     private async void FreezeRenderAfterWarmup(int revision)
     {
         var warmupSeconds = _kind == InventoryPreviewKind.Operator ? 0.28f : 0.12f;
-        await ToSignal(GetTree().CreateTimer(warmupSeconds), SceneTreeTimer.SignalName.Timeout);
-        if (revision == _renderRevision && IsInstanceValid(_viewport))
+        var tree = GetTree();
+        await ToSignal(tree.CreateTimer(warmupSeconds), SceneTreeTimer.SignalName.Timeout);
+        if (!CanFinalizeRender(revision))
         {
-            _viewport!.RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled;
+            return;
+        }
+
+        var stableSize = _viewport!.Size;
+        for (var frame = 0; frame < 2; frame++)
+        {
+            await ToSignal(tree, SceneTree.SignalName.ProcessFrame);
+            if (!CanFinalizeRender(revision))
+            {
+                return;
+            }
+            if (_viewport!.Size != stableSize)
+            {
+                RequestRender();
+                return;
+            }
+        }
+
+        _viewport!.RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled;
+    }
+
+    private bool CanFinalizeRender(int revision)
+        => revision == _renderRevision
+            && IsInsideTree()
+            && IsInstanceValid(_viewport);
+
+    private void HandlePreviewResized()
+        => RequestRender();
+
+    private void HandlePreviewVisibilityChanged()
+    {
+        if (IsVisibleInTree())
+        {
+            RequestRender();
         }
     }
 

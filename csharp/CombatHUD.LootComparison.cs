@@ -198,6 +198,64 @@ public partial class CombatHUD
         }
     }
 
+    public int LootSourceModelPreviewCountForDiagnostics
+    {
+        get
+        {
+            var count = 0;
+            foreach (var _ in LootSourceModelPreviewsForDiagnostics())
+            {
+                count++;
+            }
+            return count;
+        }
+    }
+
+    public bool LootSourceModelPreviewsRefreshingForDiagnostics
+    {
+        get
+        {
+            var found = false;
+            foreach (var preview in LootSourceModelPreviewsForDiagnostics())
+            {
+                found = true;
+                if (!preview.RenderRefreshActiveForDiagnostics)
+                {
+                    return false;
+                }
+            }
+            return found;
+        }
+    }
+
+    public bool LootSourceModelPreviewSizesMatchForDiagnostics
+    {
+        get
+        {
+            var found = false;
+            foreach (var preview in LootSourceModelPreviewsForDiagnostics())
+            {
+                found = true;
+                if (!preview.RenderTargetMatchesControlForDiagnostics)
+                {
+                    return false;
+                }
+            }
+            return found;
+        }
+    }
+
+    public int ResizeLootSourceModelPreviewsForDiagnostics()
+    {
+        var resized = 0;
+        foreach (var preview in LootSourceModelPreviewsForDiagnostics())
+        {
+            preview.CustomMinimumSize += new Vector2(3.0f, 2.0f);
+            resized++;
+        }
+        return resized;
+    }
+
     private IReadOnlyList<LootStatComparison> BuildLootComparisons(LootItem item)
     {
         var comparisons = new List<LootStatComparison>(4);
@@ -351,6 +409,24 @@ public partial class CombatHUD
                 {
                     yield return card;
                 }
+            }
+        }
+    }
+
+    private IEnumerable<InventoryModelPreview> LootSourceModelPreviewsForDiagnostics()
+    {
+        if (!IsInstanceValid(_lootSourceList))
+        {
+            yield break;
+        }
+        var children = _lootSourceList.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
+        {
+            if (child is LootDragCard { ModelPreviewForDiagnostics: { } preview }
+                && IsInstanceValid(preview))
+            {
+                yield return preview;
             }
         }
     }
