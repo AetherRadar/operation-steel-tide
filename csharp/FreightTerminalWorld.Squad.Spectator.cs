@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Godot;
 
@@ -34,14 +35,7 @@ public partial class FreightTerminalWorld
             return;
         }
 
-        var spectatorCamera = EnsureSquadSpectatorCamera();
-
-        SnapSquadSpectatorCamera();
-        spectatorCamera.MakeCurrent();
-        _hud.ShowLocalizedMessage(
-            "spectating_teammate",
-            $"SPECTATING  //  {_spectatedMate.Callsign}",
-            OperatorRoles.Spec(_spectatedMate.Role).Accent);
+        ActivateSquadMateView();
     }
 
     private void UpdateSquadSpectatorCamera()
@@ -52,16 +46,12 @@ public partial class FreightTerminalWorld
             return;
         }
 
-        if (_spectatedMate is null || !IsInstanceValid(_spectatedMate)
-            || _spectatedMate.IsDowned || _spectatedMate.IsBodyBag)
+        if (!IsLivingSpectatorTarget(_spectatedMate))
         {
             _spectatedMate = FindLivingSpectatorTarget();
             if (_spectatedMate is not null)
             {
-                _hud.ShowLocalizedMessage(
-                    "spectating_teammate",
-                    $"SPECTATING  //  {_spectatedMate.Callsign}",
-                    OperatorRoles.Spec(_spectatedMate.Role).Accent);
+                AnnounceSpectatedMate();
             }
         }
         if (_spectatedMate is null)
@@ -72,6 +62,8 @@ public partial class FreightTerminalWorld
             }
             return;
         }
+        TryHandleSquadSpectatorCycleInput(
+            Input.IsActionJustPressed(GameInputActions.Aim));
 
         SnapSquadSpectatorCamera();
         if (!_squadSpectatorCamera.Current)
@@ -83,9 +75,87 @@ public partial class FreightTerminalWorld
     private SquadMate? FindLivingSpectatorTarget()
     {
         return _squadMates
-            .Where(mate => IsInstanceValid(mate) && !mate.IsDowned && !mate.IsBodyBag)
+            .Where(IsLivingSpectatorTarget)
             .OrderBy(mate => mate.GlobalPosition.DistanceSquaredTo(_player.GlobalPosition))
             .FirstOrDefault();
+    }
+
+    private SquadMate[] LivingSpectatorTargetsBySlot()
+    {
+        return _squadMates
+            .Where(IsLivingSpectatorTarget)
+            .OrderBy(mate => mate.SquadSlot)
+            .ToArray();
+    }
+
+    private static bool IsLivingSpectatorTarget(SquadMate? mate)
+    {
+        return mate is not null
+            && GodotObject.IsInstanceValid(mate)
+            && !mate.IsDowned
+            && !mate.IsBodyBag;
+    }
+
+    private bool TryHandleSquadSpectatorCycleInput(bool aimJustPressed)
+    {
+        if (!aimJustPressed || (!_localPlayerDowned && !_localPlayerEliminated))
+        {
+            return false;
+        }
+
+        return CycleLivingSpectatorTarget();
+    }
+
+    private bool CycleLivingSpectatorTarget()
+    {
+        var livingTargets = LivingSpectatorTargetsBySlot();
+        if (livingTargets.Length == 0)
+        {
+            _spectatedMate = null;
+            return false;
+        }
+
+        var currentIndex = Array.FindIndex(
+            livingTargets,
+            candidate => ReferenceEquals(candidate, _spectatedMate));
+        var nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % livingTargets.Length;
+        var nextMate = livingTargets[nextIndex];
+        if (ReferenceEquals(nextMate, _spectatedMate))
+        {
+            return false;
+        }
+
+        _spectatedMate = nextMate;
+        ActivateSquadMateView();
+        return true;
+    }
+
+    private void ActivateSquadMateView()
+    {
+        if (!IsLivingSpectatorTarget(_spectatedMate))
+        {
+            return;
+        }
+
+        var spectatorCamera = EnsureSquadSpectatorCamera();
+        SnapSquadSpectatorCamera();
+        spectatorCamera.MakeCurrent();
+        AnnounceSpectatedMate();
+    }
+
+    private void AnnounceSpectatedMate()
+    {
+        var mate = _spectatedMate;
+        if (mate is null || !IsLivingSpectatorTarget(mate))
+        {
+            return;
+        }
+
+        _hud.ShowLocalizedFormattedMessage(
+            "spectating_teammate_named",
+            "SPECTATING  //  {0}",
+            OperatorRoles.Spec(mate.Role).Accent,
+            mate.Callsign);
     }
 
     private Camera3D EnsureSquadSpectatorCamera()
@@ -314,10 +384,7 @@ public partial class FreightTerminalWorld
         _squadSpectatorCamera is not null
         && IsInstanceValid(_squadSpectatorCamera)
         && GetViewport().GetCamera3D() == _squadSpectatorCamera
-        && _spectatedMate is not null
-        && IsInstanceValid(_spectatedMate)
-        && !_spectatedMate.IsDowned
-        && !_spectatedMate.IsBodyBag;
+        && IsLivingSpectatorTarget(_spectatedMate);
 
     private bool IsLocalPlayerViewCurrent
     {
@@ -363,7 +430,7 @@ public partial class FreightTerminalWorld
         }
 
         var mate = _squadMates
-            .Where(candidate => IsInstanceValid(candidate) && !candidate.IsDowned)
+            .Where(IsLivingSpectatorTarget)
             .OrderBy(candidate => candidate.SquadSlot)
             .FirstOrDefault();
         if (mate is null)

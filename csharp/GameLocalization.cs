@@ -183,6 +183,8 @@ public static class GameLocalization
         Chinese["vehicle_blocked"] = "\u8f7d\u5177\u53d7\u963b  //  \u5012\u8f66\u8131\u56f0";
         Chinese["mate_reviving_you"] = "\u961f\u53cb\u6b63\u5728\u8d76\u6765\u6551\u63f4  //  \u575a\u6301\u4f4f";
         Chinese["spectating_teammate"] = "\u6b63\u5728\u89c2\u6218\u961f\u53cb";
+        Chinese["spectating_teammate_named"] = "\u6b63\u5728\u89c2\u6218  //  {0}";
+        Chinese["spectator_switch_hint"] = "\u53f3\u952e\u5207\u6362\u5b58\u6d3b\u961f\u53cb";
         Chinese["weapon_m24"] = "M24 \u7cbe\u786e\u5c04\u624b\u6b65\u67aa";
         Chinese["weapon_p226"] = "P226 \u5236\u5f0f\u624b\u67aa";
         Chinese["weapon_m1911"] = "M1911 \u6218\u672f\u624b\u67aa";

@@ -1473,6 +1473,15 @@ public partial class CombatHUD : CanvasLayer
         ShowRadioMessage(Text(key, english), color);
     }
 
+    internal void ShowLocalizedFormattedMessage(
+        string key,
+        string english,
+        Color color,
+        params object[] args)
+    {
+        ShowRadioMessage(GameLocalization.Format(key, _language, english, args), color);
+    }
+
     public void SetEquipmentActionLocalized(string key, string english, float progress, bool active)
     {
         SetEquipmentAction(active ? Text(key, english) : string.Empty, progress, active);
@@ -1543,6 +1552,7 @@ public partial class CombatHUD : CanvasLayer
         }
         _downedTitle.Text = Text("downed_title", "OPERATOR DOWNED");
         _downedSubtitle.Text = $"{Text("spectating_teammate", "SPECTATING TEAMMATE")}  //  "
+            + $"{Text("spectator_switch_hint", "RMB SWITCH TEAMMATE")}  //  "
             + $"{Text("downed_wait", "AWAITING MEDIC")}  {Mathf.CeilToInt(Mathf.Max(0.0f, reviveWindowSeconds))}s";
     }
 
