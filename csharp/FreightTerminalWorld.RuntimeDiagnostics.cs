@@ -69,6 +69,8 @@ public partial class FreightTerminalWorld
             ("--validate-combat-models", static world => world.ValidateCombatModels()),
             ("--validate-operator-roster", static world => world.ValidateOperatorRoster()),
             ("--validate-operator-animations", static world => world.ValidateOperatorAnimations()),
+            ("--validate-operator-carry", static world => world.ValidateOperatorCarry()),
+            ("--capture-operator-carry", static world => world.CaptureOperatorCarry()),
             ("--validate-boss", static world => world.ValidateWorldBoss()),
             ("--validate-squad", static world => world.ValidateSquadFlow()),
             ("--validate-squad-tactics", static world => world.ValidateSquadTactics()),

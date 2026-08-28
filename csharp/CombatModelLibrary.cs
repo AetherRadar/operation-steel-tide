@@ -189,6 +189,78 @@ internal sealed class AuthoredOperatorVisual
             stockOffset);
     }
 
+    public OperatorCarryInspection InspectRifleCarry()
+    {
+        var weapon = _weapon;
+        if (weapon is null)
+        {
+            return default;
+        }
+
+        var rightShoulder = BoneWorldPosition("mixamorig:RightArm");
+        var rightElbow = BoneWorldPosition("mixamorig:RightForeArm");
+        var rightWrist = BoneWorldPosition("mixamorig:RightHand");
+        var leftShoulder = BoneWorldPosition("mixamorig:LeftArm");
+        var leftElbow = BoneWorldPosition("mixamorig:LeftForeArm");
+        var leftWrist = BoneWorldPosition("mixamorig:LeftHand");
+        var headBase = BoneWorldPosition("mixamorig:Head");
+        var stock = weapon.Stock.GlobalPosition;
+        var muzzle = weapon.MuzzleDevice.GlobalPosition;
+        return new OperatorCarryInspection(
+            Available: true,
+            rightShoulder,
+            rightElbow,
+            rightWrist,
+            leftShoulder,
+            leftElbow,
+            leftWrist,
+            headBase,
+            RightElbowAngleDegrees: JointAngleDegrees(rightShoulder, rightElbow, rightWrist),
+            LeftElbowAngleDegrees: JointAngleDegrees(leftShoulder, leftElbow, leftWrist),
+            RightWristBelowHead: headBase.Y - rightWrist.Y,
+            LeftWristBelowHead: headBase.Y - leftWrist.Y,
+            StockToRightShoulderDistance: stock.DistanceTo(rightShoulder),
+            HeadToWeaponLineClearance: DistanceToSegment(headBase, stock, muzzle),
+            PrimaryHandToWeaponDistance: rightWrist.DistanceTo(weapon.Root.GlobalPosition),
+            SupportHandToForegripDistance: leftWrist.DistanceTo(weapon.Foregrip.GlobalPosition),
+            SupportHandOffset: weapon.Foregrip.GlobalPosition - leftWrist,
+            weapon.Root.GlobalPosition,
+            stock,
+            muzzle);
+    }
+
+    private Vector3 BoneWorldPosition(string boneName)
+    {
+        var index = ResolveBoneIndex(_skeleton, boneName);
+        return (_skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(index)).Origin;
+    }
+
+    private static float JointAngleDegrees(Vector3 proximal, Vector3 joint, Vector3 distal)
+    {
+        var proximalVector = proximal - joint;
+        var distalVector = distal - joint;
+        if (proximalVector.IsZeroApprox() || distalVector.IsZeroApprox())
+        {
+            return 0.0f;
+        }
+
+        var cosine = Mathf.Clamp(proximalVector.Normalized().Dot(distalVector.Normalized()), -1.0f, 1.0f);
+        return Mathf.RadToDeg(Mathf.Acos(cosine));
+    }
+
+    private static float DistanceToSegment(Vector3 point, Vector3 start, Vector3 end)
+    {
+        var segment = end - start;
+        var lengthSquared = segment.LengthSquared();
+        if (lengthSquared <= 0.000001f)
+        {
+            return point.DistanceTo(start);
+        }
+
+        var travel = Mathf.Clamp((point - start).Dot(segment) / lengthSquared, 0.0f, 1.0f);
+        return point.DistanceTo(start + segment * travel);
+    }
+
     public void AttachWeapon(AuthoredWeaponVisual weapon, WeaponBuild build)
     {
         _weapon = weapon;
@@ -380,6 +452,28 @@ internal readonly record struct OperatorRifleFitInspection(
     Vector3 WeaponOrigin,
     Vector3 MuzzleOffset,
     Vector3 StockOffset);
+
+internal readonly record struct OperatorCarryInspection(
+    bool Available,
+    Vector3 RightShoulder,
+    Vector3 RightElbow,
+    Vector3 RightWrist,
+    Vector3 LeftShoulder,
+    Vector3 LeftElbow,
+    Vector3 LeftWrist,
+    Vector3 HeadBase,
+    float RightElbowAngleDegrees,
+    float LeftElbowAngleDegrees,
+    float RightWristBelowHead,
+    float LeftWristBelowHead,
+    float StockToRightShoulderDistance,
+    float HeadToWeaponLineClearance,
+    float PrimaryHandToWeaponDistance,
+    float SupportHandToForegripDistance,
+    Vector3 SupportHandOffset,
+    Vector3 WeaponRoot,
+    Vector3 WeaponStock,
+    Vector3 WeaponMuzzle);
 
 internal readonly record struct CombatModelInspection(
     bool Loaded,

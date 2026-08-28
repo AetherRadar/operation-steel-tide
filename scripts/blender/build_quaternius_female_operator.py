@@ -18,13 +18,21 @@ from pathlib import Path
 import sys
 
 import bpy
-from mathutils import Matrix, Vector
+from mathutils import Matrix, Quaternion, Vector
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = REPO_ROOT / "source_art" / "third_party" / "quaternius_modular_women"
 OUTPUT_ROOT = REPO_ROOT / "assets" / "models" / "quaternius_operators"
 HELPER_PATH = Path(__file__).with_name("build_animated_bamen_operator.py")
+
+
+QUATERNIUS_AIM_CHEST_OFFSET = Vector((0.06, -0.27, -0.10))
+QUATERNIUS_READY_CHEST_OFFSET = Vector((0.04, -0.23, -0.20))
+QUATERNIUS_AIM_SUPPORT_HAND_OFFSET = Vector((-0.01562, 0.01559, 0.08699))
+QUATERNIUS_READY_SUPPORT_HAND_OFFSET = Vector((-0.22, 0.0, 0.105))
+QUATERNIUS_VIPER_AIM_SUPPORT_HAND_OFFSET = Vector((-0.02979, 0.01925, 0.08770))
+QUATERNIUS_VIPER_READY_SUPPORT_HAND_OFFSET = Vector((-0.2536, 0.0045, 0.1079))
 
 
 VARIANTS = {
@@ -498,6 +506,58 @@ def load_animation_helpers(output_glb: Path, output_blend: Path):
     module.OUTPUT_BLEND = output_blend
     module.OUTPUT_GLB = output_glb
     return module
+
+
+def configure_quaternius_rifle_origins(target: bpy.types.Object, helpers) -> None:
+    """Place both rifle grips ahead of this rig's upper-chest anatomy."""
+
+    upper_chest = (
+        target.matrix_world
+        @ target.data.bones["mixamorig:Spine2"].head_local
+    )
+    helpers.RIFLE_AIM_ORIGIN = upper_chest + QUATERNIUS_AIM_CHEST_OFFSET
+    helpers.RIFLE_READY_ORIGIN = upper_chest + QUATERNIUS_READY_CHEST_OFFSET
+    print(
+        "QUATERNIUS_RIFLE_ORIGINS "
+        f"aim={tuple(round(value, 4) for value in helpers.RIFLE_AIM_ORIGIN)} "
+        f"ready={tuple(round(value, 4) for value in helpers.RIFLE_READY_ORIGIN)}"
+    )
+
+
+def capture_aim_hand_rotation(
+    target: bpy.types.Object,
+    source: bpy.types.Action,
+    helpers,
+    slug: str,
+    rifle_origin: Vector,
+    label: str,
+) -> Quaternion:
+    """Capture the rig-specific wrist roll from a temporary rifle pose."""
+
+    reference = helpers.author_rifle_hold(
+        target,
+        source,
+        f"aim_rotation_{label}",
+        rifle_origin,
+        helpers.RIFLE_AIM_FORWARD,
+        helpers.RIFLE_AIM_UP,
+        Vector((0.0, -0.50, 0.866)),
+        Vector((0.0, -0.62, 0.785)),
+    )
+    target.animation_data.action = reference
+    bpy.context.scene.frame_set(0)
+    bpy.context.view_layer.update()
+    rotation = helpers.rotation_only(
+        target.matrix_world @ target.pose.bones["mixamorig:RightHand"].matrix
+    ).normalized()
+    target.animation_data.action = None
+    bpy.data.actions.remove(reference)
+    print(
+        "QUATERNIUS_AIM_HAND_ROTATION "
+        f"variant={slug} pose={label} "
+        f"wxyz=({rotation.w:.9f},{rotation.x:.9f},{rotation.y:.9f},{rotation.z:.9f})"
+    )
+    return rotation
 
 
 def rename_target_rig(target: bpy.types.Object) -> None:
@@ -1467,6 +1527,23 @@ def build_variant(
             output_name,
         )
 
+    reference_aim_hand_rotation = capture_aim_hand_rotation(
+        target,
+        generated["aim_idle"],
+        helpers,
+        slug,
+        helpers.RIFLE_AIM_ORIGIN,
+        "reference",
+    )
+    configure_quaternius_rifle_origins(target, helpers)
+    lowered_aim_hand_rotation = capture_aim_hand_rotation(
+        target,
+        generated["aim_idle"],
+        helpers,
+        slug,
+        helpers.RIFLE_AIM_ORIGIN,
+        "lowered",
+    )
     generated["aim_idle"] = helpers.author_rifle_hold(
         target,
         generated["aim_idle"],
@@ -1476,18 +1553,18 @@ def build_variant(
         helpers.RIFLE_AIM_UP,
         Vector((0.0, -0.50, 0.866)),
         Vector((0.0, -0.62, 0.785)),
+        support_hand_offset=(
+            QUATERNIUS_VIPER_AIM_SUPPORT_HAND_OFFSET
+            if slug == "viper"
+            else QUATERNIUS_AIM_SUPPORT_HAND_OFFSET
+        ),
+        right_hand_world_rotation=reference_aim_hand_rotation,
         remove_source=True,
-    )
-    target.animation_data.action = generated["aim_idle"]
-    scene.frame_set(0)
-    bpy.context.view_layer.update()
-    aim_hand_rotation = helpers.rotation_only(
-        target.matrix_world @ target.pose.bones["mixamorig:RightHand"].matrix
     )
     ready_hand_rotation = (
         helpers.rifle_world_rotation(helpers.RIFLE_READY_FORWARD, helpers.RIFLE_READY_UP)
         @ helpers.rifle_world_rotation(helpers.RIFLE_AIM_FORWARD, helpers.RIFLE_AIM_UP).inverted()
-        @ aim_hand_rotation
+        @ lowered_aim_hand_rotation
     ).normalized()
     generated["ready_idle"] = helpers.author_rifle_hold(
         target,
@@ -1498,6 +1575,11 @@ def build_variant(
         helpers.RIFLE_READY_UP,
         Vector((0.0, -0.12, 0.993)).normalized(),
         Vector((0.0, -0.18, 0.984)).normalized(),
+        support_hand_offset=(
+            QUATERNIUS_VIPER_READY_SUPPORT_HAND_OFFSET
+            if slug == "viper"
+            else QUATERNIUS_READY_SUPPORT_HAND_OFFSET
+        ),
         right_hand_world_rotation=ready_hand_rotation,
     )
     for output_name, source_name in helpers.READY_LOCOMOTION_SOURCES.items():
