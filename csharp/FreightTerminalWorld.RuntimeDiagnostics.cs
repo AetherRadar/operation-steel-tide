@@ -104,6 +104,7 @@ public partial class FreightTerminalWorld
             ("--validate-refinery-map", static world => world.ValidateRefineryMap()),
             ("--validate-refinery-collision", static world => world.ValidateRefineryCollision()),
             ("--validate-refinery-doors", static world => world.ValidateRefineryDoors()),
+            ("--validate-refinery-atmosphere", static world => world.ValidateRefineryAtmosphere()),
             ("--validate-freight-terminal-doors", static world => world.ValidateFreightTerminalDoors()),
             ("--validate-industrial-interiors", static world => world.ValidateIndustrialInteriors()),
             ("--validate-extraction-sequence", static world => world.ValidateExtractionSequence()),

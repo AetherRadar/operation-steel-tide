@@ -20,6 +20,7 @@ public partial class FreightTerminalWorld
         JianghaiOldCitySceneLoader.DefaultScenePath);
     private readonly JianghaiOldCityAtmosphere _jianghaiOldCityAtmosphere = new();
     private readonly HashSet<string> _oldTownDistricts = new();
+    private int _oldTownInteriorResidentCount;
 
     private bool IsBlackwaterRefineryMap
         => _activeRuntimeMapId == DeploymentMapCatalog.BlackwaterRefineryId;
@@ -72,6 +73,7 @@ public partial class FreightTerminalWorld
         BuildRefineryModelAssembly();
         _oldTownLandmarks = _oldTownLandmarksBuilder.BuildGameplayScaffolding(_levelRoot);
         BuildOldTownLandmarkDoors(_levelRoot, _oldTownLandmarks);
+        SpawnOldTownInteriorResidents();
         if (_oldTownLandmarks.RooftopRoute.Count >= 2)
         {
             RegisterSquadTraversalLink(

@@ -161,7 +161,18 @@ public partial class FreightTerminalWorld
             && locksmithPassive <= 0.79f
             && locksmithActive <= 0.26f;
 
-        var uiReady = _hud.OperatorRoleCardCountForDiagnostics == roles.Length;
+        var singleSelectionReady = true;
+        foreach (var role in roles)
+        {
+            _hud.SelectSquadRoleForDiagnostics(role);
+            singleSelectionReady &= _hud.SelectedOperatorRole == role
+                && _hud.SelectedOperatorRoleCardCountForDiagnostics == 1
+                && _hud.VisibleOperatorRoleSelectionTagCountForDiagnostics == 1;
+        }
+        _hud.SelectSquadRoleForDiagnostics(OperatorRole.Assault);
+        var uiReady = _hud.OperatorRoleCardCountForDiagnostics == roles.Length
+            && singleSelectionReady
+            && _hud.OperatorRoleHoverDistinctFromSelectionForDiagnostics;
         var valid = identityReady
             && localizationReady
             && randomPlayerRoles == roles.Length
@@ -180,7 +191,11 @@ public partial class FreightTerminalWorld
             + $"garrison={garrison.Length} fixed_garrison={fixedGarrison} rivals={rivals.Length} rival_variety={rivalVariety} "
             + $"scavenger_capacity={scavengerCapacity}/{assaultCapacity} scavenger_search={scavengerSearch:F2} "
             + $"loot_revealed={LastOperatorLootScanForDiagnostics.RevealedCount} loot_value={LastOperatorLootScanForDiagnostics.TotalValue} "
-            + $"locksmith_search={locksmithPassive:F2}/{locksmithActive:F2} ui_cards={_hud.OperatorRoleCardCountForDiagnostics}");
+            + $"locksmith_search={locksmithPassive:F2}/{locksmithActive:F2} "
+            + $"ui_cards={_hud.OperatorRoleCardCountForDiagnostics} ui_single={singleSelectionReady} "
+            + $"ui_pressed={_hud.SelectedOperatorRoleCardCountForDiagnostics} "
+            + $"ui_tag={_hud.VisibleOperatorRoleSelectionTagCountForDiagnostics} "
+            + $"ui_hover_distinct={_hud.OperatorRoleHoverDistinctFromSelectionForDiagnostics}");
         GD.Print($"OPERATOR_ROSTER_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }

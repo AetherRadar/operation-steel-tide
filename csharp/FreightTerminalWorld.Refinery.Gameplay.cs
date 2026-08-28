@@ -161,6 +161,40 @@ public partial class FreightTerminalWorld
         }
     }
 
+    private void SpawnOldTownInteriorResidents()
+    {
+        _oldTownInteriorResidentCount = 0;
+        var residents = new (Vector3 Position, CivilianRole Role, Vector2 Roam, OperatorVisualId Visual)[]
+        {
+            (new Vector3(-85.4f, 0.14f, -119.5f), CivilianRole.Resident, new Vector2(0.8f, 1.0f), OperatorVisualId.Magpie),
+            (new Vector3(-90.5f, 0.14f, -126.0f), CivilianRole.VolunteerMedic, new Vector2(1.2f, 1.4f), OperatorVisualId.Heron),
+            (new Vector3(85.4f, 0.14f, -1.0f), CivilianRole.UtilityWorker, new Vector2(0.8f, 1.0f), OperatorVisualId.Jackal),
+            (new Vector3(90.0f, 0.14f, 1.5f), CivilianRole.CommunityGuard, new Vector2(1.2f, 1.3f), OperatorVisualId.Viper)
+        };
+        for (var index = 0; index < residents.Length; index++)
+        {
+            var placement = residents[index];
+            var civilian = new CivilianNpc
+            {
+                Name = $"JianghaiInteriorResident_{index + 1:00}"
+            };
+            civilian.UseAuthoredVisual(placement.Visual);
+            civilian.Configure(
+                this,
+                placement.Role,
+                100 + index,
+                0,
+                Transform3D.Identity,
+                placement.Position,
+                placement.Roam);
+            RegisterResidentialLanguageRefresher(civilian.SetLanguage);
+            _levelRoot.AddChild(civilian);
+            civilian.AddToGroup("jianghai_interior_resident");
+            _civilians.Add(civilian);
+            _oldTownInteriorResidentCount++;
+        }
+    }
+
     private void ConfigureRefineryMinimap()
     {
         var landmarks = new List<TacticalMapLandmark>
@@ -250,9 +284,9 @@ public partial class FreightTerminalWorld
             && IsInstanceValid(buildingCollision.Body)
             && buildingCollision.Body.CollisionLayer == 1
             && buildingCollision.Body.CollisionMask == 0
-            && buildingCollision.SourceMeshCount == 220
+            && buildingCollision.SourceMeshCount == 240
             && buildingCollision.StructuralSourceMeshCount == 107
-            && buildingCollision.DetailSourceMeshCount == 113
+            && buildingCollision.DetailSourceMeshCount == 133
             && buildingCollision.CollisionShapeCount == buildingCollision.SourceMeshCount
             && buildingCollision.ConcaveShapeCount == buildingCollision.CollisionShapeCount
             && buildingCollision.SharedShapeCount > 0
@@ -260,8 +294,8 @@ public partial class FreightTerminalWorld
             && buildingCollision.UniqueMeshCount >= 6
             && buildingCollision.InstanceTriangleCount > 0
             && tenementCollisionShapes == 94
-            && factoryCollisionShapes == 11
-            && pawnshopCollisionShapes == 73
+            && factoryCollisionShapes == 21
+            && pawnshopCollisionShapes == 83
             && marketCollisionShapes == 42
             && counts.AuthoredCollisionBodies == 1
             && counts.AuthoredCollisionShapes == buildingCollision.CollisionShapeCount
@@ -272,7 +306,16 @@ public partial class FreightTerminalWorld
             && _refineryDoors.Count == landmarks.EntryCount
             && _refineryDoors.All(door => IsInstanceValid(door)
                 && door.UsesAuthoredVisual
-                && door.HasBoxCollision);
+                && door.HasBoxCollision
+                && door.MotionStyle == BuildingDoorMotionStyle.Hinged);
+        var interiorResidents = _civilians.Where(civilian =>
+            IsInstanceValid(civilian)
+            && civilian.IsInGroup("jianghai_interior_resident")).ToArray();
+        var interiorResidentsReady = _oldTownInteriorResidentCount == 4
+            && interiorResidents.Length == 4
+            && interiorResidents.All(civilian =>
+                civilian.UsesAuthoredVisualForDiagnostics
+                && civilian.AuthoredVisualIdForDiagnostics is not null);
         var districtsReady = _oldTownDistricts.Count >= 10
             && _oldTownDistricts.Contains("grand_hotel")
             && _oldTownDistricts.Contains("municipal_treasury")
@@ -298,7 +341,8 @@ public partial class FreightTerminalWorld
             && _buildingLootPickupCount == RefineryLayout.LootPlacements.Count
             && _lootSources.Count >= 32
             && _enemies.Count >= RefineryLayout.GarrisonSpawns.Count
-            && _hud.MinimapLandmarkCount >= 10;
+            && _hud.MinimapLandmarkCount >= 10
+            && interiorResidentsReady;
         var deploymentReady = DeploymentPoint.DistanceTo(ExtractionPoint) > 80.0f;
         var performanceReady = counts.Nodes < 1900
             && counts.StaticBodies < 125
@@ -314,7 +358,7 @@ public partial class FreightTerminalWorld
             && highValueReady && highValueAccessReady && routeReady
             && landmarkReady && authoredQualityReady && gameplayReady && deploymentReady && performanceReady;
 
-        GD.Print($"REFINERY_MAP_CHECK valid={valid} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city root={rootsReady} localization={localizationReady} authored={authoredReady} authored_path={_jianghaiOldCityScene?.ScenePath ?? "missing"} authored_error={(_jianghaiOldCitySceneLoadError is null ? "none" : "load_failed")} authored_roots={counts.AuthoredSceneRoots} authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} authored_material_surfaces={_jianghaiOldCityScene?.MaterialSurfaceCount ?? 0} authored_triangles={_jianghaiOldCityScene?.InstanceTriangleCount ?? 0} authored_anchors={_jianghaiOldCityScene?.RequiredAnchorCount ?? 0}/{_jianghaiOldCityScene?.RequiredAnchorTotal ?? 0} authored_terminals={_jianghaiOldCityScene?.AuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.VisibleAuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.AlignedAuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.AuthoredTerminalTotal ?? 0} authored_screens={_jianghaiOldCityScene?.AuthoredStatusScreenCount ?? 0}/{_jianghaiOldCityScene?.AuthoredStatusScreenTotal ?? 0} terminal_statuses={terminalStatusesReady}:{terminalStatusSummary} authored_detail={_jianghaiOldCityScene?.DetailMeshCount ?? 0} authored_quality={_jianghaiOldCityScene?.QualityTier ?? -1} authored_shadows={_jianghaiOldCityScene?.ShadowCasterMeshCount ?? 0} authored_quality_tiers={authoredQualityReady}:{authoredQualitySummary} terminal_collision={terminalCollisionReady} terminal_collision_aligned={alignedTerminalCollisions}/2 authored_building_collision={authoredBuildingCollisionReady} authored_building_shapes={counts.AuthoredCollisionShapes}/{_jianghaiAuthoredBuildingCollision?.CollisionShapeCount ?? 0} authored_building_sources={_jianghaiAuthoredBuildingCollision?.SourceMeshCount ?? 0}:{_jianghaiAuthoredBuildingCollision?.StructuralSourceMeshCount ?? 0}/{_jianghaiAuthoredBuildingCollision?.DetailSourceMeshCount ?? 0} authored_building_anchors={tenementCollisionShapes}/{factoryCollisionShapes}/{pawnshopCollisionShapes}/{marketCollisionShapes} authored_building_shared={_jianghaiAuthoredBuildingCollision?.SharedShapeCount ?? 0} authored_building_baked={_jianghaiAuthoredBuildingCollision?.BakedShapeCount ?? 0} authored_building_unique={_jianghaiAuthoredBuildingCollision?.UniqueMeshCount ?? 0} authored_building_triangles={_jianghaiAuthoredBuildingCollision?.InstanceTriangleCount ?? 0} authored_building_error={(_jianghaiAuthoredBuildingCollisionError is null ? "none" : "build_failed")} building_physics={buildingPhysicsReady}:{buildingHitCount}/5:{buildingClearCount}/3:{buildingPhysicsSummary} legacy_visible={counts.VisibleLegacyScaffoldGeometry} scaffolds_hidden={legacyScaffoldsHidden} proxies={counts.LegacyCollisionShapes}/{_refineryCollisionProxyCount} expected_proxies={expectedCollisionProxies} proxy_boxes={proxiesReady} districts={_oldTownDistricts.Count} district_ready={districtsReady} doors={_refineryDoors.Count}/{_oldTownLandmarks?.EntryCount ?? 0} doors_ready={interactiveDoorsReady} high_value={highValueReady} high_value_access={highValueAccessReady}:{accessibleHighValueLoot}/12:{highValueAccessBlocker} zone_separation={zoneSeparation:0.0} zone_summary={zoneSummary} routes={routeReady} route_probes={routeProbeCount} route_blocker={routeBlocker} landmarks={landmarkReady} landmark_collision={_oldTownLandmarks?.CollisionShapeCount ?? 0} rooftop_routes={_oldTownLandmarks?.RooftopRouteCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
+        GD.Print($"REFINERY_MAP_CHECK valid={valid} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city root={rootsReady} localization={localizationReady} authored={authoredReady} authored_path={_jianghaiOldCityScene?.ScenePath ?? "missing"} authored_error={(_jianghaiOldCitySceneLoadError is null ? "none" : "load_failed")} authored_roots={counts.AuthoredSceneRoots} authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} authored_material_surfaces={_jianghaiOldCityScene?.MaterialSurfaceCount ?? 0} authored_triangles={_jianghaiOldCityScene?.InstanceTriangleCount ?? 0} authored_anchors={_jianghaiOldCityScene?.RequiredAnchorCount ?? 0}/{_jianghaiOldCityScene?.RequiredAnchorTotal ?? 0} authored_terminals={_jianghaiOldCityScene?.AuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.VisibleAuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.AlignedAuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.AuthoredTerminalTotal ?? 0} authored_screens={_jianghaiOldCityScene?.AuthoredStatusScreenCount ?? 0}/{_jianghaiOldCityScene?.AuthoredStatusScreenTotal ?? 0} terminal_statuses={terminalStatusesReady}:{terminalStatusSummary} authored_detail={_jianghaiOldCityScene?.DetailMeshCount ?? 0} authored_quality={_jianghaiOldCityScene?.QualityTier ?? -1} authored_shadows={_jianghaiOldCityScene?.ShadowCasterMeshCount ?? 0} authored_quality_tiers={authoredQualityReady}:{authoredQualitySummary} terminal_collision={terminalCollisionReady} terminal_collision_aligned={alignedTerminalCollisions}/2 authored_building_collision={authoredBuildingCollisionReady} authored_building_shapes={counts.AuthoredCollisionShapes}/{_jianghaiAuthoredBuildingCollision?.CollisionShapeCount ?? 0} authored_building_sources={_jianghaiAuthoredBuildingCollision?.SourceMeshCount ?? 0}:{_jianghaiAuthoredBuildingCollision?.StructuralSourceMeshCount ?? 0}/{_jianghaiAuthoredBuildingCollision?.DetailSourceMeshCount ?? 0} authored_building_anchors={tenementCollisionShapes}/{factoryCollisionShapes}/{pawnshopCollisionShapes}/{marketCollisionShapes} authored_building_shared={_jianghaiAuthoredBuildingCollision?.SharedShapeCount ?? 0} authored_building_baked={_jianghaiAuthoredBuildingCollision?.BakedShapeCount ?? 0} authored_building_unique={_jianghaiAuthoredBuildingCollision?.UniqueMeshCount ?? 0} authored_building_triangles={_jianghaiAuthoredBuildingCollision?.InstanceTriangleCount ?? 0} authored_building_error={(_jianghaiAuthoredBuildingCollisionError is null ? "none" : "build_failed")} building_physics={buildingPhysicsReady}:{buildingHitCount}/5:{buildingClearCount}/3:{buildingPhysicsSummary} legacy_visible={counts.VisibleLegacyScaffoldGeometry} scaffolds_hidden={legacyScaffoldsHidden} proxies={counts.LegacyCollisionShapes}/{_refineryCollisionProxyCount} expected_proxies={expectedCollisionProxies} proxy_boxes={proxiesReady} districts={_oldTownDistricts.Count} district_ready={districtsReady} doors={_refineryDoors.Count}/{_oldTownLandmarks?.EntryCount ?? 0} doors_ready={interactiveDoorsReady} interior_residents={_oldTownInteriorResidentCount}/4:{interiorResidentsReady} high_value={highValueReady} high_value_access={highValueAccessReady}:{accessibleHighValueLoot}/12:{highValueAccessBlocker} zone_separation={zoneSeparation:0.0} zone_summary={zoneSummary} routes={routeReady} route_probes={routeProbeCount} route_blocker={routeBlocker} landmarks={landmarkReady} landmark_collision={_oldTownLandmarks?.CollisionShapeCount ?? 0} rooftop_routes={_oldTownLandmarks?.RooftopRouteCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
         GD.Print($"REFINERY_MAP_PASS valid={valid}");
         await WaitFrames(4);
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
@@ -408,6 +452,13 @@ public partial class FreightTerminalWorld
             await WaitFrames(10);
             performanceReady &= PrintRefineryRenderingSnapshot("north_ward_density");
             SaveViewportImage("res://jianghai_density_validation.png");
+            ApplyTimeOfDay(DeploymentTimeOfDay.Day);
+            camera.GlobalPosition = new Vector3(36.0f, 10.0f, 32.0f);
+            camera.LookAt(new Vector3(0.0f, 3.0f, -55.0f), Vector3.Up);
+            camera.Fov = 40.0f;
+            await WaitFrames(14);
+            performanceReady &= PrintRefineryRenderingSnapshot("daylight_overview");
+            SaveViewportImage("res://jianghai_day_validation.png");
             var captureDoor = _refineryDoors.FirstOrDefault();
             if (captureDoor is not null)
             {
@@ -426,7 +477,7 @@ public partial class FreightTerminalWorld
                 SaveViewportImage("res://refinery_door_open_validation.png");
                 captureDoor.SetOpenImmediate(false);
             }
-            GD.Print($"REFINERY_MAP_CAPTURE valid={performanceReady} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city time=dusk authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} doors={_refineryDoors.Count} paths=refinery_map_validation.png,refinery_ground_validation.png,jianghai_street_life_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,jianghai_density_validation.png,refinery_door_closed_validation.png,refinery_door_open_validation.png");
+            GD.Print($"REFINERY_MAP_CAPTURE valid={performanceReady} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city time=dusk+day authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} doors={_refineryDoors.Count} paths=refinery_map_validation.png,refinery_ground_validation.png,jianghai_street_life_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,jianghai_density_validation.png,jianghai_day_validation.png,refinery_door_closed_validation.png,refinery_door_open_validation.png");
         }
         finally
         {
@@ -918,6 +969,13 @@ public partial class FreightTerminalWorld
             if (IsInstanceValid(mate))
             {
                 exclusions.Add(mate.GetRid());
+            }
+        }
+        foreach (var civilian in _civilians)
+        {
+            if (IsInstanceValid(civilian))
+            {
+                exclusions.Add(civilian.GetRid());
             }
         }
         foreach (var vehicle in _vehicles)

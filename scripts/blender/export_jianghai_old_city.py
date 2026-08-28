@@ -223,6 +223,16 @@ CROSS_STREET_INTRUSION_NAMES = (
     "OuterEastSouthResidence",
 )
 PAWNSHOP_DOORWAY_CUT_VERSION = 2
+ENTRY_FACADE_WALL_SOURCE = (
+    REPO_ROOT / "assets" / "models" / "quaternius_downtown_city" / "Brick_Plain_1.gltf"
+)
+ENTRY_FACADE_FRAME_SOURCE = (
+    REPO_ROOT / "assets" / "models" / "quaternius_downtown_city" / "DoorFrame_Trim.gltf"
+)
+ENTRY_FACADE_LAYOUT = (
+    ("PawnshopEntryFacade", "GuangchangPawnshop", -86.0, 112.0),
+    ("FactoryEntryFacade", "RedStarElectronicsFactory", 86.0, 7.86),
+)
 
 
 def tune_runtime_emissions() -> int:
@@ -628,6 +638,118 @@ def rebuild_dense_perimeter() -> tuple[int, int, dict[str, int]]:
     return removed, created, profile_counts
 
 
+def load_entry_facade_module(source_path: Path, mesh_name: str) -> bpy.types.Mesh:
+    """Copy one finished Quaternius module into the packed Jianghai DCC scene."""
+
+    if not source_path.is_file():
+        raise RuntimeError(f"CC0 entry-facade source is missing: {source_path}")
+    old_mesh = bpy.data.meshes.get(mesh_name)
+    if old_mesh is not None:
+        if old_mesh.users != 0:
+            raise RuntimeError(f"Entry-facade mesh still has live users: {mesh_name}")
+        bpy.data.meshes.remove(old_mesh)
+
+    before_objects = set(bpy.data.objects)
+    before_meshes = set(bpy.data.meshes)
+    before_materials = set(bpy.data.materials)
+    bpy.ops.import_scene.gltf(filepath=str(source_path))
+    imported_objects = [obj for obj in bpy.data.objects if obj not in before_objects]
+    imported_meshes = [mesh for mesh in bpy.data.meshes if mesh not in before_meshes]
+    imported_materials = [mat for mat in bpy.data.materials if mat not in before_materials]
+    mesh_sources = [obj for obj in imported_objects if obj.type == "MESH"]
+    if len(mesh_sources) != 1:
+        raise RuntimeError(
+            f"Expected one mesh in entry-facade module {source_path}, found {len(mesh_sources)}"
+        )
+
+    mesh = mesh_sources[0].data.copy()
+    mesh.name = mesh_name
+    mesh["source_asset"] = f"Downtown City MegaKit / {source_path.stem}"
+    mesh["source_creator"] = "Quaternius"
+    mesh["source_url"] = "https://quaternius.com/packs/downtowncitymegakit.html"
+    mesh["license"] = "CC0 1.0 Universal"
+    mesh["authored_derivation"] = (
+        "Finished CC0 modular facade component fitted in Blender for a hinged entry"
+    )
+
+    for obj in imported_objects:
+        if obj.name in bpy.data.objects:
+            bpy.data.objects.remove(obj, do_unlink=True)
+    for imported_mesh in imported_meshes:
+        if imported_mesh.name in bpy.data.meshes and imported_mesh.users == 0:
+            bpy.data.meshes.remove(imported_mesh)
+    for imported_material in imported_materials:
+        if imported_material.name in bpy.data.materials and imported_material.users == 0:
+            bpy.data.materials.remove(imported_material)
+    return mesh
+
+
+def rebuild_hinged_entry_facades() -> tuple[int, int]:
+    """Close the former roller-shutter bays around normal human-scale door apertures."""
+
+    removed = 0
+    prefixes = tuple(layout[0] for layout in ENTRY_FACADE_LAYOUT)
+    for obj in list(bpy.data.objects):
+        if not obj.name.startswith(prefixes):
+            continue
+        bpy.data.objects.remove(obj, do_unlink=True)
+        removed += 1
+
+    wall_mesh = load_entry_facade_module(
+        ENTRY_FACADE_WALL_SOURCE,
+        "JianghaiEntryFacade_BrickPlain",
+    )
+    frame_mesh = load_entry_facade_module(
+        ENTRY_FACADE_FRAME_SOURCE,
+        "JianghaiEntryFacade_DoorFrameTrim",
+    )
+    created = 0
+    for prefix, parent_name, center_x, facade_y in ENTRY_FACADE_LAYOUT:
+        parent = bpy.data.objects.get(parent_name)
+        if parent is None:
+            raise RuntimeError(f"Entry-facade parent is missing: {parent_name}")
+
+        for side_name, side_sign in (("West", -1.0), ("East", 1.0)):
+            for row in range(4):
+                wall = bpy.data.objects.new(
+                    f"{prefix}_Wall_{side_name}_{row:02d}",
+                    wall_mesh,
+                )
+                bpy.context.scene.collection.objects.link(wall)
+                wall.parent = parent
+                wall.location = (center_x + side_sign * 2.6, facade_y, float(row))
+                wall.scale = (1.6, 1.0, 1.0)
+                created += 1
+
+        lintel = bpy.data.objects.new(f"{prefix}_Wall_Lintel", wall_mesh)
+        bpy.context.scene.collection.objects.link(lintel)
+        lintel.parent = parent
+        lintel.location = (center_x, facade_y, 3.0)
+        created += 1
+
+        frame = bpy.data.objects.new(f"{prefix}_DoorFrame", frame_mesh)
+        bpy.context.scene.collection.objects.link(frame)
+        frame.parent = parent
+        frame.location = (center_x, facade_y - 0.015, 0.0)
+        created += 1
+
+        for obj in [
+            child
+            for child in parent.children
+            if child.name.startswith(prefix)
+        ]:
+            obj["source_asset"] = "Downtown City MegaKit modular facade"
+            obj["source_creator"] = "Quaternius"
+            obj["source_url"] = "https://quaternius.com/packs/downtowncitymegakit.html"
+            obj["license"] = "CC0 1.0 Universal"
+            obj["authored_adaptation"] = (
+                "DCC-fitted brick infill and trim around a normal hinged doorway"
+            )
+            obj["collision_role"] = "entry_facade"
+            obj["entry_motion"] = "hinged"
+    return removed, created
+
+
 def cut_pawnshop_doorway() -> int:
     """Bisect a real passage through the storefront behind the interactive shutter."""
 
@@ -877,6 +999,7 @@ def main() -> None:
     adjusted_market_furniture = clear_market_walkway()
     removed_density, rebuilt_density, density_profile_counts = rebuild_dense_perimeter()
     pawnshop_doorway_cut = cut_pawnshop_doorway()
+    removed_entry_facades, rebuilt_entry_facades = rebuild_hinged_entry_facades()
     pawnshop_canopy_parts, pawnshop_wings = validate_pawnshop_frontage()
     flattened = flatten_tiled_images()
     with tempfile.TemporaryDirectory(prefix="jianghai-runtime-textures-") as cache:
@@ -920,6 +1043,8 @@ def main() -> None:
         f"removed_density={removed_density} rebuilt_density={rebuilt_density} "
         f"density_profiles={','.join(f'{name}:{count}' for name, count in density_profile_counts.items())} "
         f"pawnshop_doorway_cut={pawnshop_doorway_cut} "
+        f"removed_entry_facades={removed_entry_facades} "
+        f"rebuilt_entry_facades={rebuilt_entry_facades} "
         f"pawnshop_canopy_parts={pawnshop_canopy_parts} pawnshop_wings={pawnshop_wings} "
         f"resized_textures={resized} recompressed_textures={recompressed} "
         f"meshes={meshes} evaluated_objects={evaluated_objects} "

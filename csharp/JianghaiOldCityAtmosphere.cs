@@ -39,6 +39,9 @@ internal sealed class JianghaiOldCityAtmosphere
 
         var style = GetStyle(timeOfDay);
         var sky = EnsureSky(environment);
+        environment.BackgroundMode = Godot.Environment.BGMode.Sky;
+        environment.AmbientLightSource = Godot.Environment.AmbientSource.Sky;
+        environment.ReflectedLightSource = Godot.Environment.ReflectionSource.Sky;
         var usingDuskPanorama = timeOfDay == DeploymentTimeOfDay.Dusk
             && TryApplyDuskPanorama(sky, style.SkyEnergy);
         if (usingDuskPanorama)
@@ -65,9 +68,13 @@ internal sealed class JianghaiOldCityAtmosphere
         environment.FogLightColor = style.FogColor;
         environment.FogLightEnergy = style.FogEnergy;
         environment.FogDensity = style.FogDensity;
-        environment.FogSkyAffect = usingDuskPanorama ? 0.0f : 0.18f;
+        var fullDaylight = timeOfDay == DeploymentTimeOfDay.Day;
+        environment.FogSkyAffect = usingDuskPanorama ? 0.0f : fullDaylight ? 0.08f : 0.18f;
         environment.TonemapExposure = style.Exposure;
-        SetIfSupported(environment, "ambient_light_sky_contribution", usingDuskPanorama ? 0.70f : 0.55f);
+        SetIfSupported(
+            environment,
+            "ambient_light_sky_contribution",
+            usingDuskPanorama ? 0.70f : fullDaylight ? 0.92f : 0.55f);
         SetIfSupported(environment, "adjustment_enabled", true);
         SetIfSupported(environment, "adjustment_brightness", style.Brightness);
         SetIfSupported(environment, "adjustment_contrast", style.Contrast);
@@ -232,24 +239,24 @@ internal sealed class JianghaiOldCityAtmosphere
                 0.46f,
                 0.11f),
             _ => new JianghaiAtmosphereStyle(
-                new Color(0.12f, 0.22f, 0.32f),
-                new Color(0.38f, 0.45f, 0.48f),
-                new Color(0.055f, 0.075f, 0.085f),
-                new Color(0.20f, 0.25f, 0.26f),
-                new Color(0.34f, 0.42f, 0.43f),
-                new Color(0.78f, 0.86f, 0.90f),
-                new Color(0.28f, 0.39f, 0.50f),
-                0.94f,
+                new Color(0.12f, 0.36f, 0.68f),
+                new Color(0.55f, 0.72f, 0.86f),
+                new Color(0.09f, 0.12f, 0.14f),
+                new Color(0.40f, 0.48f, 0.52f),
+                new Color(0.55f, 0.68f, 0.76f),
+                new Color(0.98f, 0.90f, 0.78f),
+                new Color(0.55f, 0.66f, 0.82f),
+                1.00f,
+                1.18f,
+                0.38f,
+                0.0010f,
                 0.98f,
-                0.52f,
-                0.0024f,
+                1.02f,
                 0.98f,
-                0.98f,
-                1.08f,
-                0.90f,
-                0.0048f,
-                0.84f,
-                0.25f)
+                1.04f,
+                0.0022f,
+                1.03f,
+                0.62f)
         };
 
     private static void SetIfSupported(GodotObject target, string propertyName, Variant value)

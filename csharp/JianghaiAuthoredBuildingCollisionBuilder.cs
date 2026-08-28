@@ -26,7 +26,7 @@ internal sealed class JianghaiAuthoredBuildingCollisionBuilder
     private const float MinimumFootprint = 4.0f;
     private const float UniformScaleTolerance = 0.001f;
     private const int ExpectedStructuralSourceCount = 107;
-    private const int ExpectedDetailSourceCount = 113;
+    private const int ExpectedDetailSourceCount = 133;
 
     private static readonly string[] StructuralAnchorNames =
     {
@@ -40,8 +40,8 @@ internal sealed class JianghaiAuthoredBuildingCollisionBuilder
         = new Dictionary<string, int>(StringComparer.Ordinal)
         {
             ["JianghaiTenementDistrict"] = 94,
-            ["RedStarElectronicsFactory"] = 11,
-            ["GuangchangPawnshop"] = 73,
+            ["RedStarElectronicsFactory"] = 21,
+            ["GuangchangPawnshop"] = 83,
             ["OldCityMarketBridge"] = 42
         };
 
@@ -253,7 +253,8 @@ internal sealed class JianghaiAuthoredBuildingCollisionBuilder
         return anchorName switch
         {
             "RedStarElectronicsFactory" => name.StartsWith(
-                "FactoryGatePortal_", StringComparison.Ordinal),
+                    "FactoryGatePortal_", StringComparison.Ordinal)
+                || name.StartsWith("FactoryEntryFacade_", StringComparison.Ordinal),
             "GuangchangPawnshop" => name.StartsWith(
                     "PawnshopAuthoredCanopy_", StringComparison.Ordinal)
                 || (name.StartsWith("PawnshopAuthoredWing_", StringComparison.Ordinal)
@@ -263,7 +264,8 @@ internal sealed class JianghaiAuthoredBuildingCollisionBuilder
                 || name.StartsWith("PawnshopWestWall_", StringComparison.Ordinal)
                 || name.StartsWith("PawnshopWestWallCap_", StringComparison.Ordinal)
                 || name.StartsWith("PawnshopEastWall_", StringComparison.Ordinal)
-                || name.StartsWith("PawnshopEastWallCap_", StringComparison.Ordinal),
+                || name.StartsWith("PawnshopEastWallCap_", StringComparison.Ordinal)
+                || name.StartsWith("PawnshopEntryFacade_", StringComparison.Ordinal),
             "OldCityMarketBridge" => name.StartsWith("MarketRail_", StringComparison.Ordinal)
                 || name.StartsWith("MarketRailPost_", StringComparison.Ordinal)
                 || name is "MarketBridgeDeck" or "MarketEastRamp" or "MarketWestRamp",

@@ -6,12 +6,9 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private const string RefineryDoorScenePath =
-        "res://assets/models/jianghai_old_city/rollershutter_window_03.glb";
-    private const float RefineryDoorSourceWidth = 0.9763f;
-    private const float RefineryDoorSourceHeight = 1.5463f;
-    private const float RefineryDoorSourceDepthCenter = 0.0755f;
-    private const int RefineryDoorVisualPanelCount = 3;
-    private const float RefineryDoorMaxAspectDistortion = 1.1f;
+        InteractiveBuildingDoor.HingedDoorScenePath;
+    private const int RefineryDoorVisualPanelCount = 1;
+    private const float RefineryDoorMaxAspectDistortion = 1.12f;
     private readonly System.Collections.Generic.List<InteractiveBuildingDoor> _refineryDoors = new();
 
     private void BuildOldTownLandmarkDoors(
@@ -55,15 +52,11 @@ public partial class FreightTerminalWorld
         };
         door.Configure(
             _refineryDoors.Count + 1,
-            doorwayWidth: 7.6f,
-            doorwayHeight: 4.3f,
+            doorwayWidth: 1.45f,
+            doorwayHeight: 2.65f,
             frontZ: 0.0f,
             visibilityRange: 220.0f,
-            visualScenePath: RefineryDoorScenePath,
-            sourceWidth: RefineryDoorSourceWidth,
-            sourceHeight: RefineryDoorSourceHeight,
-            sourceDepthCenter: RefineryDoorSourceDepthCenter,
-            visualPanelCount: RefineryDoorVisualPanelCount);
+            motionStyle: BuildingDoorMotionStyle.Hinged);
         mount.AddChild(door);
         _refineryDoors.Add(door);
 
@@ -243,6 +236,8 @@ public partial class FreightTerminalWorld
                 .SequenceEqual(Enumerable.Range(1, expectedDoorCount));
         var authoredReady = ResourceLoader.Exists(RefineryDoorScenePath)
             && _refineryDoors.All(door => door.UsesAuthoredVisual && door.HasBoxCollision);
+        var hingedReady = _refineryDoors.All(door =>
+            door.MotionStyle == BuildingDoorMotionStyle.Hinged);
         var panelLayoutReady = countReady && _refineryDoors.All(door =>
             door.HasValidAuthoredVisualPanelLayout
             && door.AuthoredVisualPanelCount == RefineryDoorVisualPanelCount
@@ -271,6 +266,52 @@ public partial class FreightTerminalWorld
             door.OutsideProbe,
             door.InsideProbe,
             1));
+        var collisionProbeEnemy = _enemies.FirstOrDefault(enemy =>
+            IsInstanceValid(enemy) && enemy.IsInsideTree());
+        var collisionProbeEnemyTransform = collisionProbeEnemy?.GlobalTransform ?? Transform3D.Identity;
+        var enemyClosedDoorBlockCount = 0;
+        var enemyWallBlockCount = 0;
+        if (collisionProbeEnemy is not null)
+        {
+            // Disabled process mode removes a CharacterBody3D from its physics space,
+            // so keep this probe registered while suppressing its gameplay updates.
+            collisionProbeEnemy.ProcessMode = ProcessModeEnum.Inherit;
+            collisionProbeEnemy.SetProcess(false);
+            collisionProbeEnemy.SetPhysicsProcess(false);
+            foreach (var door in _refineryDoors)
+            {
+                var enemyOutside = door.OutsideProbe;
+                enemyOutside.Y = 0.12f;
+                var enemyInside = door.InsideProbe;
+                enemyInside.Y = 0.12f;
+                collisionProbeEnemy.GlobalPosition = enemyOutside;
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                if (collisionProbeEnemy.WouldWorldMovementCollideForDiagnostics(
+                        enemyInside - enemyOutside))
+                {
+                    enemyClosedDoorBlockCount++;
+                }
+
+                var traversal = enemyInside - enemyOutside;
+                var tangent = new Vector3(traversal.Z, 0, -traversal.X).Normalized();
+                foreach (var side in new[] { -1.0f, 1.0f })
+                {
+                    var facadeOffset = door.WidthForNavigation * 1.65f * side;
+                    var wallOutside = enemyOutside + tangent * facadeOffset;
+                    var wallInside = enemyInside + tangent * facadeOffset;
+                    collisionProbeEnemy.GlobalPosition = wallOutside;
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                    if (collisionProbeEnemy.WouldWorldMovementCollideForDiagnostics(
+                            wallInside - wallOutside))
+                    {
+                        enemyWallBlockCount++;
+                    }
+                }
+            }
+        }
+        var enemyClosedDoorBlocks = enemyClosedDoorBlockCount == _refineryDoors.Count;
+        var expectedEnemyWallBlocks = _refineryDoors.Count * 2;
+        var enemyWallsBlock = enemyWallBlockCount == expectedEnemyWallBlocks;
 
         var openingStarted = _refineryDoors.All(door =>
             door.TrySetOpen(true, bypassClearance: true));
@@ -288,6 +329,27 @@ public partial class FreightTerminalWorld
             door.OutsideProbe,
             door.InsideProbe,
             1));
+        var enemyOpenDoorClearCount = 0;
+        if (collisionProbeEnemy is not null)
+        {
+            foreach (var door in _refineryDoors)
+            {
+                var enemyOutside = door.OutsideProbe;
+                enemyOutside.Y = 0.12f;
+                var enemyInside = door.InsideProbe;
+                enemyInside.Y = 0.12f;
+                collisionProbeEnemy.GlobalPosition = enemyOutside;
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                if (!collisionProbeEnemy.WouldWorldMovementCollideForDiagnostics(
+                        enemyInside - enemyOutside))
+                {
+                    enemyOpenDoorClearCount++;
+                }
+            }
+            collisionProbeEnemy.GlobalTransform = collisionProbeEnemyTransform;
+            collisionProbeEnemy.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        var enemyOpenDoorClears = enemyOpenDoorClearCount == _refineryDoors.Count;
         var closePromptReady = _refineryDoors.All(door =>
             door.InteractionLabel("en") == "CLOSE DOOR");
 
@@ -340,13 +402,14 @@ public partial class FreightTerminalWorld
         first.SetOpenImmediate(false);
         _player.GlobalPosition = playerPosition;
 
-        var valid = countReady && idsReady && authoredReady && panelLayoutReady
+        var valid = countReady && idsReady && authoredReady && hingedReady && panelLayoutReady
             && initiallyClosed
             && englishPromptReady && chinesePromptReady && nearestReady
-            && closedBlocks && openingStarted && opened && openClears && closePromptReady
+            && closedBlocks && enemyClosedDoorBlocks && enemyWallsBlock
+            && openingStarted && opened && openClears && enemyOpenDoorClears && closePromptReady
             && occupiedCloseRejected && closingStarted && closedAgain && closedAgainBlocks
             && aiLinkReady && aiOpened && aiContinued;
-        GD.Print($"REFINERY_DOORS_CHECK valid={valid} doors={_refineryDoors.Count}/{expectedDoorCount} ids={idsReady} authored={authoredReady} panels={string.Join(',', _refineryDoors.Select(door => door.AuthoredVisualPanelCount))} panel_layout={panelLayoutReady} aspect_distortion_max={maxAspectDistortion:0.000} closed_initial={initiallyClosed} prompt_en={englishPromptReady} prompt_zh={chinesePromptReady} nearest={nearestReady} closed_block={closedBlocks} opening={openingStarted} opened={opened} angle={first.MotionAngleDegrees:0.0} open_clear={openClears} close_prompt={closePromptReady} occupied_rejected={occupiedCloseRejected} closing={closingStarted} closed_again={closedAgain} closed_block_again={closedAgainBlocks} ai_link={aiLinkReady} ai_opened={aiOpened} ai_continued={aiContinued} motions={string.Join(',', _refineryDoors.Select(door => door.CompletedMotionCount))}");
+        GD.Print($"REFINERY_DOORS_CHECK valid={valid} doors={_refineryDoors.Count}/{expectedDoorCount} ids={idsReady} authored={authoredReady} hinged={hingedReady} panels={string.Join(',', _refineryDoors.Select(door => door.AuthoredVisualPanelCount))} panel_layout={panelLayoutReady} aspect_distortion_max={maxAspectDistortion:0.000} closed_initial={initiallyClosed} prompt_en={englishPromptReady} prompt_zh={chinesePromptReady} nearest={nearestReady} closed_block={closedBlocks} enemy_closed_block={enemyClosedDoorBlocks}:{enemyClosedDoorBlockCount}/{_refineryDoors.Count} enemy_wall_block={enemyWallsBlock}:{enemyWallBlockCount}/{expectedEnemyWallBlocks} opening={openingStarted} opened={opened} angle={first.MotionAngleDegrees:0.0} open_clear={openClears} enemy_open_clear={enemyOpenDoorClears}:{enemyOpenDoorClearCount}/{_refineryDoors.Count} close_prompt={closePromptReady} occupied_rejected={occupiedCloseRejected} closing={closingStarted} closed_again={closedAgain} closed_block_again={closedAgainBlocks} ai_link={aiLinkReady} ai_opened={aiOpened} ai_continued={aiContinued} motions={string.Join(',', _refineryDoors.Select(door => door.CompletedMotionCount))}");
         GD.Print($"REFINERY_DOORS_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }

@@ -28,22 +28,22 @@ public partial class FreightTerminalWorld
             && IsInstanceValid(authored.Body)
             && authored.Body.CollisionLayer == 1
             && authored.Body.CollisionMask == 0
-            && authored.SourceMeshCount == 220
+            && authored.SourceMeshCount == 240
             && authored.StructuralSourceMeshCount == 107
-            && authored.DetailSourceMeshCount == 113
-            && authored.CollisionShapeCount == 220
-            && authored.ConcaveShapeCount == 220
+            && authored.DetailSourceMeshCount == 133
+            && authored.CollisionShapeCount == 240
+            && authored.ConcaveShapeCount == 240
             && authored.SharedShapeCount > 0
             && authored.BakedShapeCount > 0
             && authored.UniqueMeshCount >= 6
             && authored.InstanceTriangleCount > 0
             && tenementShapes == 94
-            && factoryShapes == 11
-            && pawnshopShapes == 73
+            && factoryShapes == 21
+            && pawnshopShapes == 83
             && marketShapes == 42
             && counts.AuthoredCollisionBodies == 1
-            && counts.AuthoredCollisionShapes == 220
-            && counts.AuthoredConcaveCollisionShapes == 220
+            && counts.AuthoredCollisionShapes == 240
+            && counts.AuthoredConcaveCollisionShapes == 240
             && counts.AuthoredNonConcaveCollisionShapes == 0;
         var legacyReady = expectedLegacyProxies == 0
             && _refineryCollisionProxyCount == expectedLegacyProxies
@@ -64,8 +64,8 @@ public partial class FreightTerminalWorld
 
         GD.Print(
             $"REFINERY_COLLISION_CHECK valid={valid} authored={authoredReady} "
-            + $"body={counts.AuthoredCollisionBodies}/1 shapes={counts.AuthoredCollisionShapes}/220 "
-            + $"concave={counts.AuthoredConcaveCollisionShapes}/220 "
+            + $"body={counts.AuthoredCollisionBodies}/1 shapes={counts.AuthoredCollisionShapes}/240 "
+            + $"concave={counts.AuthoredConcaveCollisionShapes}/240 "
             + $"sources={_jianghaiAuthoredBuildingCollision?.StructuralSourceMeshCount ?? 0}/"
             + $"{_jianghaiAuthoredBuildingCollision?.DetailSourceMeshCount ?? 0} "
             + $"anchors={tenementShapes}/{factoryShapes}/{pawnshopShapes}/{marketShapes} "

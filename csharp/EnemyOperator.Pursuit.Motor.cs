@@ -158,6 +158,15 @@ public partial class EnemyOperator
             maxCollisions: 4);
     }
 
+    internal bool WouldWorldMovementCollideForDiagnostics(Vector3 motion)
+        => TestMove(
+            GlobalTransform,
+            motion,
+            null,
+            0.01f,
+            recoveryAsCollision: false,
+            maxCollisions: 4);
+
     private void RecoverPursuitNavigationRoute()
     {
         _pursuitRouteStallCount++;

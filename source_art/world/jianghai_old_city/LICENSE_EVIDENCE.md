@@ -1,7 +1,8 @@
 # Jianghai Old City License Evidence
 
 This record identifies the external assets used in the authoritative Jianghai
-Old City DCC scene and the delivered urban-life and facade expansion.
+Old City DCC scene and the delivered urban-life, facade, and hinged-entry
+expansion.
 The existing Poly Haven models and surface sets reused by this scene were
 acquired on 2026-08-06. Initial map-specific source files were acquired on
 2026-08-27; further delivered BlenderKit and finished Poly Haven assets were
@@ -25,7 +26,7 @@ repository-local sources that predate this map composition.
 | Chinese Porcelain Lion | Free poly / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/50b661cb-119d-4e80-8a9c-5c6996cbb0c8/; `assetBaseId` `50b661cb-119d-4e80-8a9c-5c6996cbb0c8` | Creative Commons Zero / CC0 1.0 Universal; API `license=cc_zero`, `isFree=true`; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `blenderkit/chinese_porcelain_lion.glb` | Adapted into the current packed `.blend` and runtime `.glb` |
 | Television 02 | Benny Weimer / Poly Haven | https://polyhaven.com/a/television_02 | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `poly_haven/television_02/television_02_1k.gltf`, its `.bin`, and three 1K texture sidecars | Adapted into the current packed `.blend` and runtime `.glb`; used with Utility Box 01 for both objective-terminal bodies |
 | Exterior Aircon Unit | Monsta3D / Poly Haven | https://polyhaven.com/a/exterior_aircon_unit | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `poly_haven/exterior_aircon_unit/exterior_aircon_unit_1k.gltf`, its `.bin`, and 12 1K texture sidecars | Adapted into the current packed `.blend` and runtime `.glb` |
-| Rollershutter Window 03 | MP / Poly Haven | https://polyhaven.com/a/rollershutter_window_03 | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `poly_haven/rollershutter_window_03/rollershutter_window_03_1k.gltf`, its `.bin`, and four 1K texture sidecars | Adapted into the current packed `.blend` and main runtime `.glb`; `JianghaiArtPass_EastShutter00` is also reproducibly exported as the standalone Old City interactive-door visual `assets/models/jianghai_old_city/rollershutter_window_03.glb` |
+| Rollershutter Window 03 | MP / Poly Haven | https://polyhaven.com/a/rollershutter_window_03 | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `poly_haven/rollershutter_window_03/rollershutter_window_03_1k.gltf`, its `.bin`, and four 1K texture sidecars | Adapted into the current packed `.blend` and main runtime `.glb`; `JianghaiArtPass_EastShutter00` is still reproducibly exported as `assets/models/jianghai_old_city/rollershutter_window_03.glb`, but that derivative is retained only as an alternate/legacy asset and is no longer the current interactive-door visual |
 | Trashbag | Benny Weimer / Poly Haven | https://polyhaven.com/a/trashbag | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `poly_haven/trashbag/trashbag_1k.gltf`, its `.bin`, and three 1K texture sidecars | Adapted into the current packed `.blend` and runtime `.glb` |
 | Utility Box 01 | James Ray Cock / Poly Haven | https://polyhaven.com/a/utility_box_01 | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `poly_haven/utility_box_01/utility_box_01_1k.gltf`, its `.bin`, and three 1K texture sidecars | Adapted into the current packed `.blend` and runtime `.glb`; used with Television 02 for both objective-terminal bodies |
 | Barrel 03 | Serhii Khromov / Poly Haven | https://polyhaven.com/a/barrel_03 | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `poly_haven/barrel_03/barrel_03_1k.gltf`, its `.bin`, and three 1K texture sidecars | Adapted into the current packed `.blend` and runtime `.glb` |
@@ -40,6 +41,8 @@ repository-local sources that predate this map composition.
 | Coffee Cart 01 | Joe Seabuhr / Poly Haven | https://polyhaven.com/a/CoffeeCart_01 | CC0 1.0 Universal; https://polyhaven.com/license | 2026-08-28 | `assets/models/polyhaven_residential_street/CoffeeCart_01/`; exact file evidence is in `assets/models/polyhaven_residential_street/LICENSE.md` | Existing repository-local source adapted into the Jianghai market tea stall and packed into the `.blend` and runtime `.glb` |
 | Wicker Basket 01 | Kuutti Siitonen / Poly Haven | https://polyhaven.com/a/wicker_basket_01 | CC0 1.0 Universal; https://polyhaven.com/license | 2026-08-28 | `assets/models/polyhaven_residential_street/wicker_basket_01/`; exact file evidence is in `assets/models/polyhaven_residential_street/LICENSE.md` | Existing repository-local source adapted into the Jianghai market tea stall and packed into the `.blend` and runtime `.glb` |
 | Buildings Pack selections | Quaternius | https://quaternius.com/packs/buildings.html | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `assets/models/quaternius_buildings_pack/{building1-large,building3-big,building4,house2}.glb`; exact FBX mapping, source-page snapshot, license copy, and conversion evidence are in `source_art/third_party/quaternius_buildings_pack/` and `assets/models/quaternius_buildings_pack/README.md` | Existing repository-local authored buildings adapted into fourteen perimeter-density instances and three full street-cadence replacements in the packed `.blend` and runtime `.glb` |
+| Downtown City MegaKit selections | Quaternius | https://quaternius.com/packs/downtowncitymegakit.html | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-19 | `assets/models/quaternius_downtown_city/Brick_Plain_1.gltf` and `assets/models/quaternius_downtown_city/DoorFrame_Trim.gltf`; license copy and selection record are in `assets/models/quaternius_downtown_city/` | Existing repository-local finished modules embedded in the packed `.blend` and runtime GLB as 18 `Brick_Plain_1` instances and two `DoorFrame_Trim` instances: nine brick modules plus one doorframe at each of the pawnshop and factory hinged-entry facades |
+| Factory Kit personnel door | Kenney | https://kenney.nl/assets/factory-kit | CC0 1.0 Universal; local copy `assets/models/kenney_factory_kit/KENNEY_LICENSE.txt` | 2026-08-27 | `assets/models/kenney_factory_kit/door-hinged.glb` and `door-hinged_colormap.png`; the derivative is built from the official archive's `door.glb` as recorded in `assets/models/LICENSE.md` | Current visible art for both Jianghai `InteractiveBuildingDoor` instances; each uses a human-scale 1.45-by-2.65-meter opening and a normal 96-degree side-hinged swing; this runtime door is separate from the static map GLB |
 | Asphalt 03 | Charlotte Baglioni (photography), Dario Barresi (processing) / Poly Haven | https://polyhaven.com/a/asphalt_03 | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-06 | `assets/textures/asphalt_03_{diff,normal,rough}_1k.jpg` | Repository-local surface set adapted into the current packed `.blend` and runtime `.glb` |
 | Concrete Floor | eye-candy.xyz / Poly Haven | https://polyhaven.com/a/concrete_floor | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-06 | `assets/textures/concrete_floor_{diff,normal,rough}_1k.jpg` | Repository-local surface set adapted into the current packed `.blend` and runtime `.glb` |
 | Corrugated Iron | Dimitrios Savva (photography), Jenelle van Heerden (processing) / Poly Haven | https://polyhaven.com/a/corrugated_iron | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-06 | `assets/textures/corrugated_iron_{diff,normal,rough}_1k.jpg` | Repository-local surface set adapted into the current packed `.blend` and runtime `.glb` |
@@ -118,7 +121,7 @@ by LF before hashing as UTF-8:
 | `modular_urban_apartments_facade` | 14 | 16,488,693 | `27A46C87BE8D073F642DE3E5CA8AD7185D4DCA1377796CAF570E91105E87472C` | Delivered source adapted into 36 facade objects in the packed `.blend` and GLB |
 | `television_02` | 5 | 1,239,955 | `7468FF9CBE3054DF27CEC531CD871C5DD221147144DE37BE4A9A509221F96827` | Delivered source packed into `.blend` and GLB |
 | `exterior_aircon_unit` | 14 | 7,667,928 | `A2706A633554EF4960A78BF6B152A246A00A8D0ADA10E8245A8486767AD58AC0` | Delivered source packed into `.blend` and GLB |
-| `rollershutter_window_03` | 6 | 2,283,373 | `5EF72962E7C4214475AA076B62604A7300C1F6FF7F0824A7E416E221D52B9D82` | Delivered source packed into `.blend` and main GLB, with a derived standalone interactive-door GLB |
+| `rollershutter_window_03` | 6 | 2,283,373 | `5EF72962E7C4214475AA076B62604A7300C1F6FF7F0824A7E416E221D52B9D82` | Delivered source packed into `.blend` and main GLB, with a retained standalone alternate/legacy shutter derivative |
 | `trashbag` | 5 | 1,699,464 | `612CB0B526A3771F83C9359439D24938478D1351E78A59CE1B4FCF1EAD90AA86` | Delivered source packed into `.blend` and GLB |
 | `utility_box_01` | 5 | 1,977,061 | `D1868A98D66CF3ABC57277240E0AE82B3A2924AF46731CE017BFEFAEA426D978` | Delivered source packed into `.blend` and GLB |
 | `barrel_03` | 5 | 574,136 | `B381E09529939827DB81C28367034EC67EA7B38253E66226141935E2415DF311` | Delivered source packed into `.blend` and GLB |
@@ -132,16 +135,17 @@ by LF before hashing as UTF-8:
 
 | Output | Bytes | SHA-256 | Reproducible derivation and use |
 | --- | ---: | --- | --- |
-| `source_art/world/jianghai_old_city/jianghai_old_city.blend` | 53,839,913 | `A81831913A08505AA0A4457745ACF3DD7040FA872091399B1217726F3BADC59A` | Authoritative packed DCC source; includes the 15-part VVayToyek pawnshop canopy, 16 solid facade/insert wing objects around the modeled doorway, aligned five-object factory-gate portal, delivered urban-life/facade expansion, 36 complete six-profile perimeter buildings, four full-mesh street-cadence replacements, and the five-building factory replacement |
-| `assets/models/jianghai_old_city/jianghai_old_city.glb` | 65,948,744 | `DA9B7F16F85D133698D26CBEA2E11495F05BA9ADA5F6CEBB1F0E3C76CB5A27A3` | Main static runtime map exported by `scripts/blender/export_jianghai_old_city.py` |
-| `assets/models/jianghai_old_city/rollershutter_window_03.glb` | 187,940 | `C4884AFCD7560E4BB23320A8C311DB0011504F7C5FEE30D58C266D54F7C6B166` | `scripts/blender/export_jianghai_old_city.py` selects the packed scene's adapted `JianghaiArtPass_EastShutter00` mesh, normalizes a temporary copy, and exports its PBR geometry and materials for the two Old City `InteractiveBuildingDoor` visuals |
+| `source_art/world/jianghai_old_city/jianghai_old_city.blend` | 61,677,884 | `C7E9FAE468FFD9C15C8D1FCED165839F007FF6D7DBC2695FDB3041039E1510D7` | Authoritative packed DCC source; includes the 15-part VVayToyek pawnshop canopy, 16 solid facade/insert wing objects around the original large opening, the aligned five-object factory-gate portal, two ten-piece Quaternius hinged-entry facades, the delivered urban-life/facade expansion, 36 complete six-profile perimeter buildings, four full-mesh street-cadence replacements, and the five-building factory replacement |
+| `assets/models/jianghai_old_city/jianghai_old_city.glb` | 73,809,716 | `2681C3F5F5332C1B2F8E5CA11B470C9A62EF39B8E4F76FA06365886A6FFE890A` | Main static runtime map exported by `scripts/blender/export_jianghai_old_city.py`; contains the 20 finished Quaternius entry-facade modules but not the separately instanced interactive doors |
+| `assets/models/jianghai_old_city/rollershutter_window_03.glb` | 187,940 | `C4884AFCD7560E4BB23320A8C311DB0011504F7C5FEE30D58C266D54F7C6B166` | `scripts/blender/export_jianghai_old_city.py` selects the packed scene's adapted `JianghaiArtPass_EastShutter00` mesh, normalizes a temporary copy, and exports its PBR geometry and materials; the derivative remains tracked but no longer supplies the current Jianghai interactive-door visuals |
 
-This derived GLB retains the Rollershutter Window 03 provenance and MP / Poly
-Haven CC0 1.0 Universal license recorded above. Each Old City doorway creates
-three separately positioned instances of the model, with maximum aspect
-distortion 1.094 instead of one enlarged slab. Door collision, animation,
-network state, and AI traversal remain project gameplay behavior and are not
-derived from the Poly Haven model.
+This retained derivative preserves the Rollershutter Window 03 provenance and
+MP / Poly Haven CC0 1.0 Universal license recorded above. It is no longer
+instanced by either current Old City entrance. Both entrances now use Kenney's
+CC0 `door-hinged.glb` at a 1.45-by-2.65-meter runtime opening with a normal
+96-degree side swing. Door collision, animation, network state, and AI
+traversal remain project gameplay behavior and are not derived from either
+visible-art source.
 
 ## Runtime and editable mapping
 
@@ -166,8 +170,12 @@ before packing. The two visible objective-terminal bodies combine the CC0
 Utility Box 01 and Television 02 sources; their small status screens and
 adaptation work are project-authored in the authoritative `.blend`.
 
-The export script does not reconstruct the map from acquisition-cache files or
-generate runtime procedural city geometry. It deterministically reapplies the
+The same export step rebuilds two serialized ten-piece entry facades from the
+repository-local Quaternius Downtown City MegaKit sources: 18 instances of
+`Brick_Plain_1.gltf` and two instances of `DoorFrame_Trim.gltf`, divided as nine
+brick modules and one doorframe per entrance. The export script does not
+reconstruct the map from acquisition-cache files or generate runtime procedural
+city geometry. It deterministically reapplies the
 documented explicit non-random density transform table, street-cadence and
 factory-frontage substitutions, sign cleanup, material tuning, and export
 policy. The packed `.blend` remains the authoritative serialized DCC source.
@@ -200,8 +208,9 @@ non-built-in Blender font datablock before packing or exporting.
 A read-only audit on 2026-08-28 opened the authoritative `.blend` in Blender
 4.5 and confirmed that the apartment source is intentionally delivered as 36
 adapted facade objects arranged in two asymmetrical 3-by-3 overlays. It also
-found all three static bicycle instances, the finished pawnshop storefront,
-five market shops, two rear houses, five Chinese red lamps, 36 complete
+found both ten-piece hinged-entry facades, all three static bicycle instances,
+the finished pawnshop storefront, five market shops, two rear houses, five
+Chinese red lamps, 36 complete
 perimeter buildings across six CC0 profiles, four full-mesh street-cadence
 replacements, and the market, pawnshop, and factory authored-prop clusters
 described above. The density audit records zero intersections with the existing
@@ -222,48 +231,57 @@ none remains in `CentralAvenue`. Final DCC QA deletes the redundant
 `JianghaiArtPass_FactoryHeroShutter` overlay because it became obsolete when
 the damaged factory shell was replaced by five finished CC0 buildings. That
 cleanup does not change the Rollershutter Window 03 source record or license;
-the asset remains in tenement-facade placements and the two standalone Old City
-interactive-door visuals. The factory landmark entry is framed by five
+the asset remains in tenement-facade placements and as a retained standalone
+derivative, but is no longer used by either current interactive entrance. The
+factory landmark entry is framed by five
 Blender-authored visible objects: reused DCC brick piers, pier caps, and a
-corrugated roof. The portal is authored final art rather
+corrugated roof. Both this outer factory portal and the pawnshop frontage now
+lead into a ten-piece authored facade: nine Quaternius `Brick_Plain_1` modules
+and one `DoorFrame_Trim` module at each entrance. The portal and entry facades
+are authored final art rather
 than a code-built primitive or procedural visible substitute, while reused
 packed materials retain their existing provenance. The final audit layers are:
 
 | Audit layer | Verified result |
 | --- | --- |
-| Authoritative Blender source | 467 mesh objects; 194 unique mesh datablocks; 4,469,451 raw mesh-object triangles; 820,349 triangles counted once per unique mesh; 530 evaluated/runtime mesh instances and 4,498,553 instance triangles; seven required anchors; packed `.blend` size 53,839,913 bytes; SHA-256 `A81831913A08505AA0A4457745ACF3DD7040FA872091399B1217726F3BADC59A` |
-| Factory-gate portal | `factory_gate_portal=5/5`; `factory_gate_portal_aligned=True`; DCC-authored brick piers, caps, and corrugated roof frame the interactive PBR shutter |
-| Pawnshop hero entrance | `pawnshop_frontage_ready=True`; 15/15 modeled canopy parts; 15,492 canopy triangles; 8/8 solid wall modules and 8/8 authored inserts; 0 legacy visible gate/wall objects; a real 7.6-by-4.2-meter mesh opening aligns to the shutter |
+| Authoritative Blender source | 487 mesh objects; 196 unique mesh datablocks; 4,471,243 raw mesh-object triangles; 821,213 triangles counted once per unique mesh; 550 evaluated/runtime mesh instances and 4,500,345 instance triangles; seven required anchors; packed `.blend` size 61,677,884 bytes; SHA-256 `C7E9FAE468FFD9C15C8D1FCED165839F007FF6D7DBC2695FDB3041039E1510D7` |
+| Factory-gate portal | `factory_gate_portal=5/5`; `factory_gate_portal_aligned=True`; DCC-authored brick piers, caps, and corrugated roof frame the new ten-piece personnel-door facade and its hinged runtime door |
+| Hinged-entry facades | `entry_facades_ready=True`; two facades at 10/10 finished CC0 objects each; 18 `Brick_Plain_1` instances and two `DoorFrame_Trim` instances total; each leaves a human-scale 1.45-by-2.65-meter runtime door opening |
+| Pawnshop hero entrance | `pawnshop_frontage_ready=True`; 15/15 modeled canopy parts; 15,492 canopy triangles; 8/8 solid wall modules and 8/8 authored inserts; 0 legacy visible gate/wall objects; the original large storefront opening is visually and physically infilled by the ten-piece hinged-entry facade around the central personnel door |
 | Delivered urban-life and density expansion | 36/36 apartment-facade objects; 36/36 complete perimeter buildings across six CC0 profiles; `density_intersections=0`; four full-mesh street-cadence replacements; three static 11,825-triangle bicycles; market tea cart and basket; pawnshop tea table and three stools; factory hand truck; finished CC0 pawnshop backdrop and modeled pavilion gate; five market shops; two rear houses; five Chinese red lamps; five-building factory replacement |
-| Serialized GLB | 65,948,744 bytes; SHA-256 `DA9B7F16F85D133698D26CBEA2E11495F05BA9ADA5F6CEBB1F0E3C76CB5A27A3`; 530 mesh nodes; 4,498,553 instance triangles; maximum texture dimension 1024 pixels |
-| Godot authored-map import | `--validate-refinery-map` PASS; 530 authored meshes; 726 surfaces; all surfaces pass the material-backing structural audit; 4,498,553 authored instance triangles; authored anchors 7/7; terminal checks 2/2/2/2; authored status screens 2/2 |
-| Godot authored collision | `--validate-refinery-collision` PASS; 220/220 exact concave shapes from 107 structural and 113 authored-detail meshes across 94/11/73/42 anchors; 0 legacy model-placement boxes; 0 landmark proxy boxes; pawnshop air-clear 3/3 and visible-wall block 3/3; factory air-clear 5/5 and visible-gate block 3/3; market rail block 4/4, rail-post block 2/2, and rail-gap clear 2/2; building ballistic block 5/5; high-value loot capsule access 12/12 |
+| Serialized GLB | 73,809,716 bytes; SHA-256 `2681C3F5F5332C1B2F8E5CA11B470C9A62EF39B8E4F76FA06365886A6FFE890A`; 550 mesh nodes; 4,500,345 instance triangles; maximum texture dimension 1024 pixels |
+| Godot authored-map import | `--validate-refinery-map` PASS; 550 imported authored meshes; 770 surfaces; 770 material-backed surfaces; 4,500,345 authored instance triangles; authored anchors 7/7; terminal checks 2/2/2/2; authored status screens 2/2; four interior residents |
+| Godot authored collision | `--validate-refinery-collision` PASS; 240/240 exact concave shapes from 107 structural and 133 authored-detail meshes across 94/21/83/42 anchors; collision cache 104 shared meshes, 76 baked instances, and 77 unique shapes; 3,560,137 collision-instance triangles; 0 legacy model-placement boxes; 0 landmark proxy boxes; doorway facade and ballistic probes block the closed structures while the opened human-scale door route clears; market rail block 4/4, rail-post block 2/2, and rail-gap clear 2/2; high-value loot capsule access 12/12 |
+| Runtime interactive doors and interiors | Two Kenney CC0 `door-hinged.glb` visuals; 1.45-by-2.65-meter doorway per entrance; normal 96-degree side swing; closed-door enemy capsule blocked and open-door route clear; four animated, unarmed Quaternius CC0 operator-model reuses as interior residents plus the existing interior loot placements |
 | Godot route clearance | `routes=True`; `route_probes=14`; `route_blocker=none`; the Victory truck envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and `y=2.6` |
-| Godot quality and full runtime | Quality tier 1 is restored after capture probes; all seven representative views pass their configured budgets |
+| Godot quality and full runtime | Current eight-view capture PASS after the 20 entry-facade objects, hinged doors, interior loot, and four authored residents; peak 1,014 draw calls, 1,271 objects, 7,113,753 primitives, 1,001.8 MB video memory, and 852.7 MB texture memory |
 
-The Blender source count is based on saved mesh objects, while the 820,349
+The Blender source count is based on saved mesh objects, while the 821,213
 unique-mesh figure counts each shared datablock once. Dependency-graph
-evaluation and export resolve the scene to 530 runtime mesh instances and
-4,498,553 instance triangles. The Godot diagnostic imports those same 530
-meshes and sums 726 material-backed runtime surfaces. These scopes are
+evaluation and export resolve the scene to 550 runtime mesh instances and
+4,500,345 instance triangles. The Godot diagnostic imports those same 550
+meshes and sums 770 material-backed runtime surfaces. These scopes are
 intentionally different rather than conflicting.
 
-The final high-tier performance policy disables shadows only for fine
-decorative meshes; it does not change model geometry, materials, or visibility
-ranges. Representative capture evidence is:
+The following figures were captured on 2026-08-28 after the 20-object facade
+addition, hinged doors, interior loot, and four authored residents were active.
+The high-tier performance policy disables shadows only for fine decorative
+meshes; it does not change model geometry, materials, or visibility ranges.
+Representative capture evidence is:
 
 | View | Draw calls | Objects | Primitives | Result |
 | --- | ---: | ---: | ---: | --- |
-| Overview | 490 | 684 | 4,269,341 | PASS |
-| Victory street | 666 | 788 | 4,231,293 | PASS |
-| Street-life bicycle close-up | 424 | 468 | 3,380,228 | PASS |
-| Guangchang pawnshop | 359 | 531 | 2,182,037 | PASS |
-| Red Star factory | 429 | 491 | 4,189,103 | PASS |
-| Market footbridge | 599 | 850 | 4,828,993 | PASS |
-| North-ward density | 299 | 411 | 2,498,114 | PASS |
+| Overview | 582 | 808 | 4,286,647 | PASS |
+| Victory street | 750 | 890 | 4,207,438 | PASS |
+| Street-life bicycle close-up | 421 | 466 | 3,322,262 | PASS |
+| Guangchang pawnshop | 511 | 740 | 2,230,125 | PASS |
+| Red Star factory | 561 | 623 | 4,265,595 | PASS |
+| Market footbridge | 739 | 1,030 | 4,707,642 | PASS |
+| North-ward density | 352 | 478 | 2,512,297 | PASS |
+| Daylight overview | 1,014 | 1,271 | 7,113,753 | PASS |
 
-The same capture run reports 961.9 MB video memory and 813.2 MB texture
-memory. All seven views pass their configured budgets.
+The capture reports a 1,001.8 MB peak video-memory reading and an 852.7 MB peak
+texture-memory reading. All eight views passed their configured budgets.
 
 The map's complete layout, supporting geometry, district composition, material
 adaptation, art direction, sign wording, sign placement, objective-terminal
@@ -294,8 +312,11 @@ is not embedded in either final DCC/runtime map binary.
 The authoritative DCC scene also contains adapted instances of the already
 tracked Poly Haven Old Military Crate by Jack Mava and Concrete Road Barrier
 by Amal Kumar, plus Coffee Cart 01 by Joe Seabuhr and Wicker Basket 01 by
-Kuutti Siitonen. All are CC0 1.0 Universal; attribution is not required, but
-creator credit is retained as provenance. Exact evidence for the cart and
-basket remains in `assets/models/polyhaven_residential_street/LICENSE.md` so
-this map record does not duplicate or contradict its per-file hashes. Their
-packed `.blend`/GLB mapping is recorded above and in `assets/models/LICENSE.md`.
+Kuutti Siitonen. It additionally embeds the 18 brick and two doorframe instances
+from Quaternius's Downtown City MegaKit recorded above. The current two runtime
+doors use Kenney's separate `door-hinged.glb`. All are CC0 1.0 Universal;
+attribution is not required, but creator credit is retained as provenance.
+Exact evidence for the cart and basket remains in
+`assets/models/polyhaven_residential_street/LICENSE.md` so this map record does
+not duplicate or contradict its per-file hashes. Their packed `.blend`/GLB or
+runtime mapping is recorded above and in `assets/models/LICENSE.md`.

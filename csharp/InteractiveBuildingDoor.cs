@@ -217,15 +217,22 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         {
             excludes.Add(parentCollider.GetRid());
         }
+        var hingedSweep = _motionStyle == BuildingDoorMotionStyle.Hinged;
+        var queryCenter = hingedSweep
+            ? ParentPoint(new Vector3(0, _height * 0.5f, _frontZ - _width * 0.5f))
+            : InteractionPoint;
+        var querySize = hingedSweep
+            ? new Vector3(_width, _height * 0.9f, _width)
+            : new Vector3(_width * 0.78f, _height * 0.82f, 1.15f);
         var query = new PhysicsShapeQueryParameters3D
         {
-            Shape = new BoxShape3D
-            {
-                Size = new Vector3(_width * 0.78f, _height * 0.82f, 1.15f)
-            },
+            // A hinged leaf sweeps a full doorway-width square between its
+            // closed and open poses. Query that volume so it cannot close
+            // through a character standing behind the leaf.
+            Shape = new BoxShape3D { Size = querySize },
             Transform = new Transform3D(
                 parent.GlobalBasis * new Basis(Vector3.Up, _mountYaw),
-                InteractionPoint),
+                queryCenter),
             CollisionMask = 1 | 2 | 4,
             CollideWithAreas = false,
             CollideWithBodies = true,

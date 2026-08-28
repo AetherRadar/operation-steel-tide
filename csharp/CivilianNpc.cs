@@ -49,6 +49,11 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
     private Node3D _rightLeg = null!;
     private Label3D _roleLabel = null!;
     private string _language = "en";
+    private OperatorVisualId? _requestedAuthoredVisual;
+    private AuthoredOperatorAnimator? _authoredAnimator;
+
+    internal bool UsesAuthoredVisualForDiagnostics => _authoredAnimator is not null;
+    internal OperatorVisualId? AuthoredVisualIdForDiagnostics => _requestedAuthoredVisual;
 
     public void Configure(
         FreightTerminalWorld main,
@@ -78,6 +83,15 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         RefreshRoleLabel();
     }
 
+    internal void UseAuthoredVisual(OperatorVisualId visualId)
+    {
+        if (IsInsideTree())
+        {
+            throw new System.InvalidOperationException("Civilian authored visuals must be selected before entering the scene tree.");
+        }
+        _requestedAuthoredVisual = visualId;
+    }
+
     public override void _Ready()
     {
         _rng.Randomize();
@@ -90,7 +104,15 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         {
             AddToGroup("special_civilians");
         }
-        BuildCivilian();
+        if (!BuildCivilian())
+        {
+            CollisionLayer = 0;
+            CollisionMask = 0;
+            SetProcess(false);
+            SetPhysicsProcess(false);
+            QueueFree();
+            return;
+        }
         BuildPersonalLoot();
         PickWanderTarget();
     }
@@ -253,7 +275,21 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         CollisionLayer = 1;
         CollisionMask = 0;
         SetPhysicsProcess(false);
-        if (IsInstanceValid(_rig))
+        if (_authoredAnimator is not null)
+        {
+            _authoredAnimator.Update(
+                0.01f,
+                0.0f,
+                weaponReadied: false,
+                prone: false,
+                crouched: false,
+                aiming: false,
+                downed: false,
+                reviving: false,
+                dead: true);
+            _rig.Position = Vector3.Zero;
+        }
+        else if (IsInstanceValid(_rig))
         {
             _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
             _rig.Position = new Vector3(0.0f, 0.28f, 0.0f);
@@ -403,6 +439,21 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
     private void AnimateCivilian(float delta)
     {
         var speed = new Vector2(Velocity.X, Velocity.Z).Length();
+        if (_requestedAuthoredVisual is not null)
+        {
+            _authoredAnimator?.Update(
+                    delta,
+                    speed,
+                    weaponReadied: false,
+                    prone: false,
+                    crouched: _cowering,
+                    aiming: false,
+                    downed: false,
+                    reviving: false,
+                    dead: false);
+            _rig.Position = Vector3.Zero;
+            return;
+        }
         _animationTime += delta * (2.2f + speed * 5.0f);
         var stride = _cowering ? 0.0f : Mathf.Sin(_animationTime) * Mathf.Clamp(speed, 0.0f, 1.0f) * 0.48f;
         _leftLeg.Rotation = new Vector3(stride, 0, 0);
@@ -412,7 +463,7 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         _rig.Position = new Vector3(0, Mathf.Lerp(_rig.Position.Y, _cowering ? -0.42f : 0.0f, delta * 6.0f), 0);
     }
 
-    private void BuildCivilian()
+    private bool BuildCivilian()
     {
         AddChild(new CollisionShape3D
         {
@@ -421,25 +472,46 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         });
         _rig = new Node3D { Name = "CivilianRig" };
         AddChild(_rig);
-
-        var palette = RolePalette();
-        var trousers = Material(new Color(0.12f, 0.15f, 0.16f), 0.0f, 0.9f);
-        var skin = Material(new Color(0.5f, 0.34f, 0.24f), 0.0f, 0.95f);
-        Part(_rig, new CapsuleMesh { Radius = 0.24f, Height = 0.76f, RadialSegments = 12, Rings = 6 }, new Vector3(0, 1.08f, 0), palette);
-        Part(_rig, new SphereMesh { Radius = 0.16f, Height = 0.32f, RadialSegments = 12, Rings = 6 }, new Vector3(0, 1.68f, 0), skin);
-        _leftLeg = new Node3D { Position = new Vector3(-0.15f, 0.76f, 0) };
-        _rightLeg = new Node3D { Position = new Vector3(0.15f, 0.76f, 0) };
-        _leftArm = new Node3D { Position = new Vector3(-0.31f, 1.32f, 0) };
-        _rightArm = new Node3D { Position = new Vector3(0.31f, 1.32f, 0) };
-        _rig.AddChild(_leftLeg);
-        _rig.AddChild(_rightLeg);
-        _rig.AddChild(_leftArm);
-        _rig.AddChild(_rightArm);
-        Part(_leftLeg, new CapsuleMesh { Radius = 0.1f, Height = 0.7f, RadialSegments = 10, Rings = 5 }, new Vector3(0, -0.34f, 0), trousers);
-        Part(_rightLeg, new CapsuleMesh { Radius = 0.1f, Height = 0.7f, RadialSegments = 10, Rings = 5 }, new Vector3(0, -0.34f, 0), trousers);
-        Part(_leftArm, new CapsuleMesh { Radius = 0.08f, Height = 0.56f, RadialSegments = 10, Rings = 5 }, new Vector3(0, -0.25f, 0), palette);
-        Part(_rightArm, new CapsuleMesh { Radius = 0.08f, Height = 0.56f, RadialSegments = 10, Rings = 5 }, new Vector3(0, -0.25f, 0), palette);
-        BuildRoleAccessory(palette);
+        if (_requestedAuthoredVisual is { } visualId)
+        {
+            AuthoredOperatorVisual? visual = null;
+            try
+            {
+                visual = CombatModelLibrary.InstantiateOperator(
+                    visualId,
+                    attachDefaultWeapon: false);
+                visual.Root.Name = "AuthoredCivilianVisual";
+                _rig.AddChild(visual.Root);
+                _authoredAnimator = new AuthoredOperatorAnimator(visual);
+            }
+            catch (System.Exception exception)
+            {
+                visual?.Root.QueueFree();
+                GD.PushError($"Authored civilian visual {visualId} is unavailable: {exception.Message}");
+                return false;
+            }
+        }
+        else
+        {
+            var palette = RolePalette();
+            var trousers = Material(new Color(0.12f, 0.15f, 0.16f), 0.0f, 0.9f);
+            var skin = Material(new Color(0.5f, 0.34f, 0.24f), 0.0f, 0.95f);
+            Part(_rig, new CapsuleMesh { Radius = 0.24f, Height = 0.76f, RadialSegments = 12, Rings = 6 }, new Vector3(0, 1.08f, 0), palette);
+            Part(_rig, new SphereMesh { Radius = 0.16f, Height = 0.32f, RadialSegments = 12, Rings = 6 }, new Vector3(0, 1.68f, 0), skin);
+            _leftLeg = new Node3D { Position = new Vector3(-0.15f, 0.76f, 0) };
+            _rightLeg = new Node3D { Position = new Vector3(0.15f, 0.76f, 0) };
+            _leftArm = new Node3D { Position = new Vector3(-0.31f, 1.32f, 0) };
+            _rightArm = new Node3D { Position = new Vector3(0.31f, 1.32f, 0) };
+            _rig.AddChild(_leftLeg);
+            _rig.AddChild(_rightLeg);
+            _rig.AddChild(_leftArm);
+            _rig.AddChild(_rightArm);
+            Part(_leftLeg, new CapsuleMesh { Radius = 0.1f, Height = 0.7f, RadialSegments = 10, Rings = 5 }, new Vector3(0, -0.34f, 0), trousers);
+            Part(_rightLeg, new CapsuleMesh { Radius = 0.1f, Height = 0.7f, RadialSegments = 10, Rings = 5 }, new Vector3(0, -0.34f, 0), trousers);
+            Part(_leftArm, new CapsuleMesh { Radius = 0.08f, Height = 0.56f, RadialSegments = 10, Rings = 5 }, new Vector3(0, -0.25f, 0), palette);
+            Part(_rightArm, new CapsuleMesh { Radius = 0.08f, Height = 0.56f, RadialSegments = 10, Rings = 5 }, new Vector3(0, -0.25f, 0), palette);
+            BuildRoleAccessory(palette);
+        }
 
         _roleLabel = new Label3D
         {
@@ -456,6 +528,7 @@ public partial class CivilianNpc : CharacterBody3D, ILootSource
         };
         _roleLabel.AddToGroup("residential_localized_labels");
         AddChild(_roleLabel);
+        return true;
     }
 
     private void BuildRoleAccessory(Godot.Material clothing)

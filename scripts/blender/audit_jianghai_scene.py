@@ -599,7 +599,7 @@ collision_sources = [
 factory_detail_collision_sources = [
     obj
     for obj in bpy.data.objects
-    if obj.name.startswith("FactoryGatePortal_")
+    if obj.name.startswith(("FactoryGatePortal_", "FactoryEntryFacade_"))
 ]
 pawnshop_detail_collision_sources = [
     obj
@@ -616,6 +616,7 @@ pawnshop_detail_collision_sources = [
         or obj.name.startswith("PawnshopWestWallCap_")
         or obj.name.startswith("PawnshopEastWall_")
         or obj.name.startswith("PawnshopEastWallCap_")
+        or obj.name.startswith("PawnshopEntryFacade_")
     )
 ]
 market_detail_collision_sources = [
@@ -636,6 +637,26 @@ detail_collision_sources = (
     factory_detail_collision_sources
     + pawnshop_detail_collision_sources
     + market_detail_collision_sources
+)
+entry_facade_objects = {
+    prefix: sorted(
+        (obj for obj in bpy.data.objects if obj.name.startswith(prefix)),
+        key=lambda obj: obj.name,
+    )
+    for prefix in ("PawnshopEntryFacade_", "FactoryEntryFacade_")
+}
+entry_facades_ready = all(
+    len(objects) == 10
+    and sum(obj.name.endswith("DoorFrame") for obj in objects) == 1
+    and sum("_Wall_" in obj.name for obj in objects) == 9
+    and all(
+        obj.type == "MESH"
+        and obj.get("source_creator") == "Quaternius"
+        and obj.get("license") == "CC0 1.0 Universal"
+        and obj.get("entry_motion") == "hinged"
+        for obj in objects
+    )
+    for objects in entry_facade_objects.values()
 )
 density_intersections = []
 for density in density_buildings:
@@ -740,13 +761,14 @@ authored_collision_sources_ready = (
         "GuangchangPawnshop": 2,
         "OldCityMarketBridge": 5,
     }
-    and len(detail_collision_sources) == 113
+    and len(detail_collision_sources) == 133
     and detail_collision_source_counts
     == {
-        "RedStarElectronicsFactory": 5,
-        "GuangchangPawnshop": 71,
+        "RedStarElectronicsFactory": 15,
+        "GuangchangPawnshop": 81,
         "OldCityMarketBridge": 37,
     }
+    and entry_facades_ready
     and cross_street_clear
     and pawnshop_doorway_clear
     and density_intersections_ready
@@ -816,8 +838,10 @@ print(
     f"cross_street_clear={cross_street_clear} pawnshop_doorway_clear={pawnshop_doorway_clear} "
     f"collision_sources={len(collision_sources)}/107 "
     f"collision_source_counts={','.join(f'{key}:{value}' for key, value in collision_source_counts.items())} "
-    f"detail_collision_sources={len(detail_collision_sources)}/113 "
+    f"detail_collision_sources={len(detail_collision_sources)}/133 "
     f"detail_collision_source_counts={','.join(f'{key}:{value}' for key, value in detail_collision_source_counts.items())} "
+    f"entry_facades={entry_facades_ready}:"
+    f"{','.join(f'{key}:{len(value)}' for key, value in entry_facade_objects.items())} "
     f"authored_collision_sources_ready={authored_collision_sources_ready} "
     f"root_provenance_ready={root_provenance_ready}"
 )

@@ -516,6 +516,23 @@ public partial class CombatHUD
         return button;
     }
 
+    private static Button OperatorRoleSegment(Vector2 position, Vector2 size, Color accent)
+    {
+        var button = DeploymentSegment(position, size, accent);
+        button.AddThemeStyleboxOverride(
+            "hover",
+            FlatStyle(
+                new Color(0.048f, 0.066f, 0.063f),
+                new Color(0.26f, 0.38f, 0.35f)));
+        button.AddThemeStyleboxOverride(
+            "pressed",
+            FlatStyle(new Color(0.055f, 0.085f, 0.076f), accent, 3));
+        button.AddThemeStyleboxOverride(
+            "hover_pressed",
+            FlatStyle(new Color(0.065f, 0.1f, 0.09f), accent.Lightened(0.08f), 3));
+        return button;
+    }
+
     private static StyleBoxFlat FlatStyle(Color background, Color border, int borderWidth = 1)
     {
         return new StyleBoxFlat

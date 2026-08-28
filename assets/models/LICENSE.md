@@ -172,13 +172,21 @@ Rollershutter Window 03 also has a repository-local derived runtime mapping:
 The export script reproducibly selects the adapted
 `JianghaiArtPass_EastShutter00` mesh from the authoritative packed `.blend`,
 normalizes a temporary copy, and exports its PBR geometry and materials. This
-standalone GLB supplies only the visible art for the two Old City
-`InteractiveBuildingDoor` instances. Each 7.6-meter opening now uses three
-separately positioned instances of the authored shutter, keeping maximum X/Y
-scale distortion at 1.094 instead of stretching one mesh into a flat slab.
+standalone GLB is retained as an alternate/legacy asset but no longer supplies
+either current Old City `InteractiveBuildingDoor` visual. The current doors use
+Kenney's CC0 `kenney_factory_kit/door-hinged.glb` at two
+1.45-by-2.65-meter personnel openings and swing sideways through 96 degrees.
 Their collision, animation, network state, and AI traversal remain project
-gameplay behavior. The derived file retains MP's Poly Haven CC0 provenance and
-is not relicensed as project-authored MIT art.
+gameplay behavior. The retained shutter derivative keeps MP's Poly Haven CC0
+provenance and is not relicensed as project-authored MIT art.
+
+The two current static entry facades reuse finished CC0 Downtown City MegaKit
+modules by Quaternius: 18 packed instances of
+`quaternius_downtown_city/Brick_Plain_1.gltf` and two packed instances of
+`quaternius_downtown_city/DoorFrame_Trim.gltf`. Each pawnshop/factory facade is
+a 10-object DCC composition containing nine brick modules and one doorframe.
+The source modules retain Quaternius's CC0 license and are not relicensed as
+project-authored MIT art.
 
 ## Jianghai Old City authored composite
 
@@ -187,7 +195,8 @@ composition that adapts redistributable third-party source assets into one
 static runtime scene:
 
 - Runtime output: `jianghai_old_city/jianghai_old_city.glb`
-- Interactive-door visual output: `jianghai_old_city/rollershutter_window_03.glb`
+- Current interactive-door visual: `kenney_factory_kit/door-hinged.glb`
+- Retained alternate/legacy shutter derivative: `jianghai_old_city/rollershutter_window_03.glb`
 - Runtime dusk panorama: `../textures/kloppenheim_06_puresky_1k.hdr`; Poly
   Haven CC0 evidence is in `../textures/LICENSE.md`, and the file is loaded by
   `JianghaiOldCityAtmosphere` rather than embedded in the map GLB.
@@ -206,37 +215,44 @@ the result in the packed source and runtime GLB.
 
 The runtime export policy caps the longest texture dimension at 1024 pixels
 and recompresses eligible high-resolution runtime images as JPEG quality 90.
-A 2026-08-28 Blender audit recorded all seven required runtime anchors, 467
-mesh objects, 194 unique mesh datablocks, 4,469,451 raw mesh-object triangles,
-and 820,349 triangles counted once per unique mesh. Dependency-graph evaluation
-and the runtime export produce 530 mesh nodes and 4,498,553 instance triangles.
-The final packed `.blend` is 53,839,913 bytes with SHA-256
-`A81831913A08505AA0A4457745ACF3DD7040FA872091399B1217726F3BADC59A`.
-The final 65,948,744-byte GLB has SHA-256
-`DA9B7F16F85D133698D26CBEA2E11495F05BA9ADA5F6CEBB1F0E3C76CB5A27A3`.
-The matching Godot refinery-map validation passes with 530 authored meshes,
-726 material-backed surfaces and the same 4,498,553 authored instance
-triangles. Route validation reports
+A 2026-08-28 Blender audit recorded all seven required runtime anchors, 487
+mesh objects, 196 unique mesh datablocks, 4,471,243 raw mesh-object triangles,
+and 821,213 triangles counted once per unique mesh. Dependency-graph evaluation
+and the runtime export produce 550 mesh nodes and 4,500,345 instance triangles.
+The final packed `.blend` is 61,677,884 bytes with SHA-256
+`C7E9FAE468FFD9C15C8D1FCED165839F007FF6D7DBC2695FDB3041039E1510D7`.
+The final 73,809,716-byte GLB has SHA-256
+`2681C3F5F5332C1B2F8E5CA11B470C9A62EF39B8E4F76FA06365886A6FFE890A`.
+The matching Godot refinery-map validation passes with 550 imported authored
+meshes, 770 surfaces, all 770 surfaces material-backed, and the same 4,500,345
+authored instance triangles. Route validation reports
 `routes=True`, `route_probes=14`, and `route_blocker=none`; the Victory truck
 envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and
 `y=2.6`. High tier disables shadows only for fine decorative meshes; model
-geometry, materials, and visibility ranges are unchanged. Final capture tuples
-(draw calls / objects / primitives) are Overview 490/684/4,269,341, Victory
-street 666/788/4,231,293, Street-life bicycle close-up 424/468/3,380,228,
-Guangchang pawnshop 359/531/2,182,037, Red Star factory 429/491/4,189,103,
-Market footbridge 599/850/4,828,993, and north-ward density
-299/411/2,498,114. All pass; video memory is 961.9 MB
-and texture memory is 813.2 MB. Detailed DCC, GLB,
+geometry, materials, and visibility ranges are unchanged. The current
+2026-08-28 capture tuples (draw calls / objects / primitives) are Overview
+582/808/4,286,647, Victory street 750/890/4,207,438, Street-life bicycle
+close-up 421/466/3,322,262, Guangchang pawnshop 511/740/2,230,125, Red Star
+factory 561/623/4,265,595, Market footbridge 739/1,030/4,707,642, north-ward
+density 352/478/2,512,297, and daylight overview
+1,014/1,271/7,113,753. All eight passed after the 20 entry-facade objects,
+hinged doors, interior loot, and four authored residents were active; peak video
+memory was 1,001.8 MB and peak texture memory was 852.7 MB. Detailed DCC, GLB,
 and runtime counting scopes are kept in
 `../../source_art/world/jianghai_old_city/README.md`.
 
 Runtime collision is generated from the actual exported geometry: 107
-structural meshes plus 113 explicitly selected factory-gate,
-pawnshop-canopy/wing/low-wall, and market deck/ramp/rail detail meshes. The 220
+structural meshes plus 133 explicitly selected factory-gate, hinged-entry,
+pawnshop-canopy/wing/low-wall, and market deck/ramp/rail detail meshes. The 240
 concave shapes replace all former broad model-placement and landmark proxy
 boxes. Deterministic probes verify visible surfaces block movement and bullets,
-open pawnshop/market/factory air remains clear, rail gaps remain penetrable, and
-all 12 Epic/Legendary high-value placements have player-capsule access.
+opened door/market air remains clear, rail gaps remain penetrable, and all 12
+Epic/Legendary high-value placements have player-capsule access. The four anchor
+shape counts are 94/21/83/42. Runtime instrumentation records 104 shared
+collision meshes, 76 baked instances, 77 unique shapes, and 3,560,137
+collision-instance triangles. Closed-door enemy capsule probes block and opened
+door routes clear. The two interiors contain four residents in total alongside
+their existing loot placements.
 
 In the final DCC placement, the Municipal terminal root has no duplicate
 180-degree rotation and its screen faces opposite the Grand terminal. The 22
@@ -245,13 +261,17 @@ against actual tenement facades; none occupies `CentralAvenue`.
 Final DCC QA removes the redundant `JianghaiArtPass_FactoryHeroShutter`
 instance because it became obsolete when the damaged factory shell was
 replaced by the five finished CC0 buildings recorded below. Rollershutter
-Window 03 remains used on the tenement facades and the two standalone Old City
-interactive-door visuals recorded above. The factory landmark entry is framed
+Window 03 remains used on the tenement facades and as the retained standalone
+derivative recorded above, but no longer supplies either current interactive
+door. The factory landmark entry is framed
 by a five-object portal composed in the authoritative Blender scene from reused
 DCC-authored brick piers, pier caps, and a corrugated roof. The Blender audit reports
 `factory_gate_portal=5/5` and `factory_gate_portal_aligned=True`. This portal is
 authored final visible art, not a code-built primitive or procedural runtime
-model; reused packed materials retain their recorded source licenses.
+model; reused packed materials retain their recorded source licenses. Behind
+the portal is one of the two 10-object Quaternius personnel-door facades; the
+other is at the pawnshop. The current Kenney personnel doors use normal
+96-degree side-hinged motion rather than the former shutter motion.
 
 The delivered urban-life expansion is authored in the authoritative
 `.blend`: 36 apartment-facade objects create two asymmetrical 3-by-3 tenement
@@ -263,7 +283,10 @@ market shops (three adapted Old Urban building instances and two Scan Old
 Building Street instances), two Old Urban building rear houses, and five
 Chinese red lamps. The pawnshop hero entrance replaces six flat gate boards and
 twelve zero-thickness wall pieces with 15 modeled pavilion parts, eight solid
-facade modules and eight authored window/door inserts. The former damaged
+facade modules, eight authored window/door inserts, and a ten-piece Quaternius
+entry facade. The paired factory facade brings the entry total to 18
+`Brick_Plain_1` and two `DoorFrame_Trim` instances around two
+1.45-by-2.65-meter human-scale openings. The former damaged
 factory shell is replaced with three Old
 Urban building office/admin instances and two Scan Old Building Street workshops.
 The density pass adds 36 complete perimeter buildings from six CC0 profiles:
@@ -376,7 +399,7 @@ The Factory Kit 3.0 model set is distributed by Kenney under CC0 1.0:
 - Local assets: selected `kenney_factory_kit/*.glb` models and the original `kenney_factory_kit/Textures/colormap.png` material atlas
 - License copy: `kenney_factory_kit/KENNEY_LICENSE.txt`
 
-The authored overhead door is used for interactive industrial and Old Town entrances. The Factory Kit personnel door was additionally acquired from the same official archive on 2026-08-27 as `door.glb`; Blender removes the archive's sample-scene objects and exports the side-pivoted runtime derivative `door-hinged.glb` plus its extracted colormap. Tideglass Reactor additionally uses the selected `machine.glb`, `hopper-high-round.glb`, and `machine-window.glb` models as three distinct collision-backed midfield covers. No attribution is required for these CC0 assets, and Kenney is credited as a provenance courtesy.
+The authored overhead door is used for interactive industrial entrances. The Factory Kit personnel door was additionally acquired from the same official archive on 2026-08-27 as `door.glb`; Blender removes the archive's sample-scene objects and exports the side-pivoted runtime derivative `door-hinged.glb` plus its extracted colormap. Jianghai Old City currently instances that finished CC0 personnel door at both the pawnshop and factory entrances, each configured for a 1.45-by-2.65-meter opening and a normal 96-degree side swing. Tideglass Reactor additionally uses the selected `machine.glb`, `hopper-high-round.glb`, and `machine-window.glb` models as three distinct collision-backed midfield covers. No attribution is required for these CC0 assets, and Kenney is credited as a provenance courtesy.
 
 The Furniture Kit 2.0 model set is distributed by Kenney under CC0 1.0:
 
@@ -503,7 +526,9 @@ normalized skinning before re-export. This adaptation adds no image textures
 or new UV artwork and preserves the shared node, equipment-socket, and
 25-action animation contract. The actions are retargeted from the CC0
 Quaternius Universal Animation Library. Attribution is not required; creator
-credit is retained as a courtesy.
+credit is retained as a courtesy. Jianghai Old City also reuses the unarmed
+MAGPIE, HERON, JACKAL, and VIPER variants as its four animated indoor
+residents; no additional third-party character files are introduced.
 
 The Ultimate Guns Pack is distributed by Quaternius under CC0 1.0 Universal:
 
@@ -532,7 +557,7 @@ The standard free version of the Downtown City MegaKit is distributed by Quatern
 - Local assets: `quaternius_downtown_city/*.gltf`, matching `.bin` buffers, and shared 1K texture maps
 - License copy and processing record: `quaternius_downtown_city/QUATERNIUS_LICENSE.txt` and `quaternius_downtown_city/README.md`
 
-The repository contains 21 selected modular scenes and 26 shared textures for composing Saint Marais Old Town. The metal wall modules are also reused as visual facades on the Tideforge and Harbor Locks collision shells. The user-provided CS:GO Town Sketchfab page was treated as layout reference only; no geometry, textures, or other files from that page are included.
+The repository contains 21 selected modular scenes and 26 shared textures for composing Saint Marais Old Town. The metal wall modules are also reused as visual facades on the Tideforge and Harbor Locks collision shells. Jianghai Old City reuses `Brick_Plain_1.gltf` 18 times and `DoorFrame_Trim.gltf` twice in its packed DCC source/runtime GLB, divided into two 10-object personnel-entry facades (nine brick modules plus one doorframe each). The user-provided CS:GO Town Sketchfab page was treated as layout reference only; no geometry, textures, or other files from that page are included.
 
 ## TastyTony CC BY 4.0 model
 

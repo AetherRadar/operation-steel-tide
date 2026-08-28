@@ -21,6 +21,54 @@ public partial class CombatHUD
     public OperatorRole SelectedOperatorRole => _selectedRole;
     internal int OperatorRoleCardCountForDiagnostics
         => _roleButtons.Length;
+    internal int SelectedOperatorRoleCardCountForDiagnostics
+    {
+        get
+        {
+            var count = 0;
+            foreach (var button in _roleButtons)
+            {
+                if (IsInstanceValid(button) && button.ButtonPressed)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+    }
+    internal int VisibleOperatorRoleSelectionTagCountForDiagnostics
+    {
+        get
+        {
+            var count = 0;
+            foreach (var label in _roleSelectedLabels)
+            {
+                if (IsInstanceValid(label) && label.Visible)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+    }
+    internal bool OperatorRoleHoverDistinctFromSelectionForDiagnostics
+    {
+        get
+        {
+            foreach (var button in _roleButtons)
+            {
+                if (!IsInstanceValid(button)
+                    || button.GetThemeStylebox("hover") is not StyleBoxFlat hover
+                    || button.GetThemeStylebox("pressed") is not StyleBoxFlat selected
+                    || hover.BorderColor.IsEqualApprox(selected.BorderColor)
+                    || hover.BorderWidthLeft >= selected.BorderWidthLeft)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
     public string SquadNetworkAddress
         => IsInstanceValid(_squadAddress) ? _squadAddress.Text.Trim() : string.Empty;
 
@@ -40,6 +88,7 @@ public partial class CombatHUD
     private readonly Label[] _roleNameLabels = new Label[OperatorRoles.ExtractionRoles.Length];
     private readonly Label[] _roleSkillLabels = new Label[OperatorRoles.ExtractionRoles.Length];
     private readonly Label[] _roleDescriptions = new Label[OperatorRoles.ExtractionRoles.Length];
+    private readonly Label[] _roleSelectedLabels = new Label[OperatorRoles.ExtractionRoles.Length];
     private Control _squadRoster = null!;
     private Label _squadRosterTitle = null!;
     private readonly Label[] _squadMemberLabels = new Label[3];
@@ -255,7 +304,10 @@ public partial class CombatHUD
         {
             var role = roles[i];
             var spec = OperatorRoles.Spec(role);
-            _roleButtons[i] = DeploymentSegment(new Vector2(12, 38 + i * 84), new Vector2(194, 78), spec.Accent);
+            _roleButtons[i] = OperatorRoleSegment(
+                new Vector2(12, 38 + i * 84),
+                new Vector2(194, 78),
+                spec.Accent);
             _roleButtons[i].ToggleMode = true;
             _roleButtons[i].ButtonGroup = group;
             _roleButtons[i].FocusMode = Control.FocusModeEnum.None;
@@ -278,10 +330,17 @@ public partial class CombatHUD
             _roleButtons[i].AddChild(glyph);
             _roleNameLabels[i] = Label($"{spec.Callsign} // {spec.Name}", 11, spec.Accent.Lightened(0.15f));
             _roleNameLabels[i].Position = new Vector2(42, 5);
-            _roleNameLabels[i].Size = new Vector2(144, 18);
+            _roleNameLabels[i].Size = new Vector2(124, 18);
             _roleNameLabels[i].ClipText = true;
             _roleNameLabels[i].MouseFilter = Control.MouseFilterEnum.Ignore;
             _roleButtons[i].AddChild(_roleNameLabels[i]);
+            _roleSelectedLabels[i] = Label("\u2713", 10, spec.Accent.Lightened(0.2f));
+            _roleSelectedLabels[i].Position = new Vector2(168, 4);
+            _roleSelectedLabels[i].Size = new Vector2(18, 18);
+            _roleSelectedLabels[i].HorizontalAlignment = HorizontalAlignment.Right;
+            _roleSelectedLabels[i].MouseFilter = Control.MouseFilterEnum.Ignore;
+            _roleSelectedLabels[i].Visible = false;
+            _roleButtons[i].AddChild(_roleSelectedLabels[i]);
             _roleSkillLabels[i] = Label(spec.SkillName, 9, new Color(0.55f, 0.68f, 0.64f));
             _roleSkillLabels[i].Position = new Vector2(42, 25);
             _roleSkillLabels[i].Size = new Vector2(144, 16);
@@ -295,7 +354,6 @@ public partial class CombatHUD
             _roleDescriptions[i].MouseFilter = Control.MouseFilterEnum.Ignore;
             _roleButtons[i].AddChild(_roleDescriptions[i]);
         }
-        _roleButtons[0].ButtonPressed = true;
         BuildDeploymentStore(panel);
 
         var sessionBand = new ColorRect
@@ -376,6 +434,7 @@ public partial class CombatHUD
         _deploySquadButton.Pressed += RequestSquadDeployment;
         sessionBand.AddChild(_deploySquadButton);
         SelectSessionMode(SquadSessionMode.Local);
+        SelectSquadRole(_selectedRole);
     }
 
     private void SelectSquadRole(OperatorRole role)
@@ -385,6 +444,12 @@ public partial class CombatHUD
             return;
         }
         _selectedRole = role;
+        for (var index = 0; index < _roleButtons.Length; index++)
+        {
+            var selected = OperatorRoles.ExtractionRoles[index] == role;
+            _roleButtons[index].SetPressedNoSignal(selected);
+            _roleSelectedLabels[index].Visible = selected;
+        }
         var spec = OperatorRoles.Spec(role);
         _squadSessionStatus.Text = GameLocalization.IsChinese(_language)
             ? $"\u5df2\u9009\u62e9 {OperatorRoles.RoleName(role, _language)}  //  \u53ef\u5355\u4eba\u5e26 AI \u6216\u52a0\u5165\u5c40\u57df\u7f51"
@@ -396,13 +461,11 @@ public partial class CombatHUD
     public void RandomizeSquadOperator(ulong seed)
     {
         var role = OperatorRosterRules.RandomPlayerRole(seed);
-        var index = Array.IndexOf(OperatorRoles.ExtractionRoles, role);
-        if (index >= 0 && index < _roleButtons.Length && IsInstanceValid(_roleButtons[index]))
-        {
-            _roleButtons[index].SetPressedNoSignal(true);
-        }
         SelectSquadRole(role);
     }
+
+    internal void SelectSquadRoleForDiagnostics(OperatorRole role)
+        => SelectSquadRole(role);
 
     private void SelectSessionMode(SquadSessionMode mode)
     {
@@ -767,6 +830,7 @@ public partial class CombatHUD
             _roleNameLabels[i].Text = $"{OperatorRoles.Callsign(roles[i])} // {OperatorRoles.RoleName(roles[i], _language)}";
             _roleSkillLabels[i].Text = OperatorRoles.SkillName(roles[i], _language);
             _roleDescriptions[i].Text = OperatorRoles.Description(roles[i], _language);
+            _roleSelectedLabels[i].Text = "\u2713";
         }
         SelectSessionMode(_selectedSessionMode);
         SetSquadOrder(_displayedOrder);
