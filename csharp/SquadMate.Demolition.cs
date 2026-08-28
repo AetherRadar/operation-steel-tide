@@ -87,6 +87,36 @@ public partial class SquadMate
     internal bool AreDemolitionCollisionShapesEnabledForDiagnostics
         => CollisionShapesMatchForDiagnostics(disabled: false);
 
+    internal bool DemolitionNameplateShowsEliminatedForDiagnostics
+        => IsDowned
+            && ReviveUsed
+            && IsInstanceValid(_nameLabel)
+            && _nameLabel.Text.EndsWith("//  ELIMINATED", System.StringComparison.Ordinal);
+
+    public void SetDemolitionRemoteState(
+        OperatorRole role,
+        Vector3 position,
+        Vector3 rotation,
+        float health,
+        bool eliminated)
+    {
+        SetRemoteState(role, position, rotation, health, eliminated);
+        if (!IsNetworkProxy || !eliminated || ReviveUsed)
+        {
+            return;
+        }
+
+        // Demolition's network Dead flag means permanent elimination for this round,
+        // unlike extraction's revivable Down flag. Snap the final authoritative pose
+        // before physics is disabled so a remote proxy cannot freeze at an old run frame.
+        GlobalPosition = position;
+        Rotation = rotation;
+        Health = Mathf.Clamp(health, 0.0f, MaxHealth);
+        IsDowned = true;
+        IsBodyBag = false;
+        EliminateForDemolitionRound();
+    }
+
     private bool CollisionShapesMatchForDiagnostics(bool disabled)
     {
         var foundShape = false;
@@ -114,7 +144,7 @@ public partial class SquadMate
             return;
         }
         ReviveUsed = true;
-        Velocity = Vector3.Zero;
+        SetDemolitionEliminatedPose();
         SetPhysicsProcess(false);
         CollisionLayer = 0;
         CollisionMask = 0;
@@ -147,6 +177,7 @@ public partial class SquadMate
         _skillActionTime = 0.0f;
         _overdriveTime = 0.0f;
         _weaponCooldown = 0.0f;
+        SetHoldFire(false);
         ProcessMode = ProcessModeEnum.Inherit;
         SetPhysicsProcess(true);
         Visible = true;
@@ -164,6 +195,10 @@ public partial class SquadMate
         _rig.Visible = true;
         _rig.Position = Vector3.Zero;
         _rig.Rotation = Vector3.Zero;
+        if (UsesAuthoredOperatorForDiagnostics)
+        {
+            _authoredOperatorAnimator.SetRestingPose(HasFireablePrimary);
+        }
         _weapon.Visible = HasFireablePrimary;
         _muzzle.Visible = HasFireablePrimary;
         _nameLabel.Visible = true;

@@ -173,6 +173,14 @@ public partial class CombatHUD
         }
     }
 
+    internal string DemolitionObjectiveTextForDiagnostics
+        => IsInstanceValid(_objectiveLabel) ? _objectiveLabel.Text : string.Empty;
+
+    internal bool DemolitionRadioShowsSquadEliminatedForDiagnostics
+        => IsInstanceValid(_radioLabel)
+            && _radioLabel.Visible
+            && _radioLabel.Text.Contains("SQUAD ELIMINATED", System.StringComparison.Ordinal);
+
     public void ShowDemolitionBuy(DemolitionBuySnapshot snapshot)
     {
         HideOperationsMenus();

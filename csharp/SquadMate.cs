@@ -1324,7 +1324,9 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             return;
         }
         var source = IsHumanProxy ? "HUMAN" : "AI";
-        var state = IsDowned ? "  //  DOWN" : string.Empty;
+        var state = IsDowned
+            ? ReviveUsed ? "  //  ELIMINATED" : "  //  DOWN"
+            : string.Empty;
         _nameLabel.Text = $"{Callsign}  [{OperatorRoles.Spec(Role).Name}]  {source}{state}";
         _nameLabel.Modulate = IsDowned ? new Color(1.0f, 0.3f, 0.2f) : OperatorRoles.Spec(Role).Accent;
     }

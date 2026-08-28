@@ -22,10 +22,16 @@ public partial class SquadMate
 
     internal bool IsDemolitionRoundFrozenPoseForDiagnostics
         => new Vector2(Velocity.X, Velocity.Z).LengthSquared() <= 0.0001f
-        && (IsDowned
-            || IsBodyBag
-            || !UsesAuthoredOperatorForDiagnostics
-            || AuthoredAnimationForDiagnostics is "idle" or "ready_idle");
+        && (IsBodyBag
+            || IsDowned && IsDemolitionEliminatedPoseForDiagnostics
+            || !IsDowned && (!UsesAuthoredOperatorForDiagnostics
+                || AuthoredAnimationForDiagnostics is "idle" or "ready_idle"));
+
+    internal bool IsDemolitionEliminatedPoseForDiagnostics
+        => UsesAuthoredOperatorForDiagnostics
+            ? AuthoredAnimationForDiagnostics is "death" or "downed"
+            : IsInstanceValid(_rig)
+                && Mathf.Abs(Mathf.Abs(_rig.Rotation.X) - Mathf.Pi * 0.5f) <= 0.02f;
 
     internal void SetAuthoredMovementPoseForDiagnostics(float speed, bool aiming = false)
     {
@@ -50,11 +56,43 @@ public partial class SquadMate
     private void HoldAuthoredAimAfterShot()
         => _authoredAimHoldRemaining = Mathf.Max(_authoredAimHoldRemaining, 0.36f);
 
+    private void SetDemolitionEliminatedPose()
+    {
+        Velocity = Vector3.Zero;
+        _authoredAimHoldRemaining = 0.0f;
+        _revivePoseBlend = 0.0f;
+        if (UsesAuthoredOperatorForDiagnostics)
+        {
+            _authoredOperatorVisual.SetWeaponReadied(false);
+            _authoredOperatorAnimator.Update(
+                0.0f,
+                0.0f,
+                weaponReadied: false,
+                prone: false,
+                crouched: false,
+                aiming: false,
+                downed: !ReviveUsed,
+                reviving: false,
+                dead: ReviveUsed);
+            return;
+        }
+
+        _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
+        var rigPosition = _rig.Position;
+        rigPosition.Y = 0.0f;
+        _rig.Position = rigPosition;
+    }
+
     internal void SetDemolitionRoundFrozenPose()
     {
         Velocity = Vector3.Zero;
-        if (IsDowned || IsBodyBag)
+        if (IsBodyBag)
         {
+            return;
+        }
+        if (IsDowned)
+        {
+            SetDemolitionEliminatedPose();
             return;
         }
 

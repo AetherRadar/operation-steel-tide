@@ -181,7 +181,7 @@ public partial class FreightTerminalWorld
                 Dead = authoritativeDead
             };
             _demolitionNetworkPlayers[state.PeerId] = acceptedState;
-            mate.SetRemoteState(
+            mate.SetDemolitionRemoteState(
                 acceptedState.Role,
                 acceptedState.Position,
                 acceptedState.Rotation,
@@ -423,7 +423,12 @@ public partial class FreightTerminalWorld
             {
                 mate = SpawnSquadMate(slot, state.Role, true, -state.ActorId);
             }
-            mate.SetRemoteState(state.Role, state.Position, state.Rotation, state.Health, state.Dead);
+            mate.SetDemolitionRemoteState(
+                state.Role,
+                state.Position,
+                state.Rotation,
+                state.Health,
+                state.Dead);
             return;
         }
         var opponent = _demolitionOpponents.FirstOrDefault(candidate => IsInstanceValid(candidate)
@@ -608,12 +613,17 @@ public partial class FreightTerminalWorld
                 "  //  DEFUSE {0:00}%",
                 Mathf.RoundToInt(_demolitionPlayerDefuseProgress * 100.0f))
             : string.Empty;
-        var objectiveKey = defending
-            ? "demolition_defuse_hold"
-            : "demolition_defend";
-        var objectiveEnglish = defending
-            ? "DEFUSE SITE {0}  //  {1:00.0}s{2}"
-            : "DEFEND SITE {0}  //  {1:00.0}s{2}";
+        var squadEliminated = IsLocalDemolitionSquadEliminated();
+        var objectiveKey = squadEliminated
+            ? "demolition_squad_eliminated_device_objective"
+            : defending
+                ? "demolition_defuse_hold"
+                : "demolition_defend";
+        var objectiveEnglish = squadEliminated
+            ? "SQUAD ELIMINATED  //  DEVICE ACTIVE AT {0}  //  {1:00.0}s{2}"
+            : defending
+                ? "DEFUSE SITE {0}  //  {1:00.0}s{2}"
+                : "DEFEND SITE {0}  //  {1:00.0}s{2}";
         _hud.SetObjective(GameLocalization.Format(
             objectiveKey,
             _languageSetting,

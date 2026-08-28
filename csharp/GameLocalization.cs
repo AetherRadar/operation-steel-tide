@@ -629,6 +629,8 @@ public static class GameLocalization
         Chinese["quick_deploy"] = "\u4f7f\u7528";
         Chinese["demolition_teammate_eliminated"] = "\u961f\u53cb\u672c\u56de\u5408\u9635\u4ea1  //  \u65e0\u6cd5\u6551\u63f4";
         Chinese["demolition_spectating_device"] = "\u6b63\u5728\u89c2\u6218  //  \u5df2\u5b89\u653e\u7684\u70b8\u5f39";
+        Chinese["demolition_squad_eliminated_device_active"] = "\u5df1\u65b9\u5c0f\u961f\u5df2\u5168\u90e8\u6d88\u706d  //  \u88c5\u7f6e\u4ecd\u5728\u8fd0\u884c";
+        Chinese["demolition_squad_eliminated_device_objective"] = "\u5df1\u65b9\u5c0f\u961f\u5df2\u5168\u90e8\u6d88\u706d  //  {0} \u70b9\u88c5\u7f6e\u8fd0\u884c\u4e2d  //  {1:00.0}s{2}";
         Chinese["demolition_buy_knife_live"] = "\u56de\u5408\u5f00\u59cb  //  \u4ec5\u6218\u672f\u5200  //  \u82b1\u8d39 ${0}";
         Chinese["demolition_buy_ak74"] = "AK-74N";
         Chinese["demolition_buy_m4a1"] = "M4A1";

@@ -389,6 +389,8 @@ public partial class FreightTerminalWorld
 
     private void ResetDemolitionSquad()
     {
+        _squadHoldFire = false;
+        _hud.SetSquadFireStance(false);
         foreach (var source in _lootSources.OfType<SquadBodyBag>().ToArray())
         {
             _lootSources.Remove(source);
@@ -444,6 +446,12 @@ public partial class FreightTerminalWorld
         => _demolitionDevicePlanted
         && LocalDemolitionSide == DemolitionTeam.Attackers;
 
+    private bool IsLocalDemolitionSquadEliminated()
+        => _player.IsDead
+        && _squadMates
+            .Where(IsInstanceValid)
+            .All(mate => mate.IsDowned || mate.IsBodyBag);
+
     private void BeginDemolitionObjectiveView()
     {
         if (!ShouldObservePlantedDemolitionDevice() || _demolitionActiveSite < 0)
@@ -466,10 +474,17 @@ public partial class FreightTerminalWorld
         camera.LookAt(focus + Vector3.Up * 0.55f, Vector3.Up);
         camera.MakeCurrent();
         _demolitionObjectiveSpectatorActive = true;
+        var squadEliminated = IsLocalDemolitionSquadEliminated();
         _hud.ShowLocalizedMessage(
-            "demolition_spectating_device",
-            "SPECTATING  //  PLANTED DEVICE",
-            new Color(1.0f, 0.62f, 0.24f));
+            squadEliminated
+                ? "demolition_squad_eliminated_device_active"
+                : "demolition_spectating_device",
+            squadEliminated
+                ? "SQUAD ELIMINATED  //  DEVICE STILL ACTIVE"
+                : "SPECTATING  //  PLANTED DEVICE",
+            squadEliminated
+                ? new Color(1.0f, 0.34f, 0.22f)
+                : new Color(1.0f, 0.62f, 0.24f));
     }
 
     private void ClearDemolitionDevice()
@@ -743,9 +758,7 @@ public partial class FreightTerminalWorld
 
         var playerSide = _demolitionMatch.PlayerSide;
         var opponentsAlive = DemolitionOpponentCount;
-        var playerSquadEliminated = _player.IsDead && _squadMates
-            .Where(IsInstanceValid)
-            .All(mate => mate.IsDowned || mate.IsBodyBag);
+        var playerSquadEliminated = IsLocalDemolitionSquadEliminated();
         if (playerSquadEliminated
             && DemolitionRoundRules.EliminationEndsRound(playerSide, _demolitionDevicePlanted))
         {
@@ -817,12 +830,16 @@ public partial class FreightTerminalWorld
                 "  //  DEFUSE {0:00}%",
                 Mathf.RoundToInt(defusePercent * 100.0f))
             : string.Empty;
-        var objectiveKey = playerSide == DemolitionTeam.Attackers
-            ? "demolition_defend"
-            : "demolition_defuse_hold";
-        var objectiveEnglish = playerSide == DemolitionTeam.Attackers
-            ? "DEFEND SITE {0}  //  {1:00.0}s{2}"
-            : "DEFUSE SITE {0}  //  {1:00.0}s{2}";
+        var objectiveKey = playerSquadEliminated
+            ? "demolition_squad_eliminated_device_objective"
+            : playerSide == DemolitionTeam.Attackers
+                ? "demolition_defend"
+                : "demolition_defuse_hold";
+        var objectiveEnglish = playerSquadEliminated
+            ? "SQUAD ELIMINATED  //  DEVICE ACTIVE AT {0}  //  {1:00.0}s{2}"
+            : playerSide == DemolitionTeam.Attackers
+                ? "DEFEND SITE {0}  //  {1:00.0}s{2}"
+                : "DEFUSE SITE {0}  //  {1:00.0}s{2}";
         _hud.SetObjective(GameLocalization.Format(
             objectiveKey,
             _languageSetting,

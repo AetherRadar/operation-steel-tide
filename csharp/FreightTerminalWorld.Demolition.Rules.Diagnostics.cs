@@ -10,7 +10,14 @@ public partial class FreightTerminalWorld
         await WaitFrames(3);
         _demolitionMode = true;
         _demolitionRoundActive = true;
+        EnsureDemolitionArenaBuilt();
+        _demolitionArena?.SetActive(true);
         DeploySquad(OperatorRole.Recon, SquadSessionMode.Local, "127.0.0.1");
+        SpawnDemolitionOpponents();
+        foreach (var rulesOpponent in _demolitionOpponents.Where(IsInstanceValid))
+        {
+            rulesOpponent.ProcessMode = ProcessModeEnum.Disabled;
+        }
         _hud.SetDemolitionGameplayPresentation(true);
         _hud.SetLanguage("en");
         _hud.SetDemolitionSmokeGrenades(1);
@@ -77,6 +84,19 @@ public partial class FreightTerminalWorld
                 "zh",
                 "SPECTATING  //  PLANTED DEVICE")
             .Contains("\u5df2\u5b89\u653e", System.StringComparison.Ordinal);
+        var eliminatedDeviceSpectatorLocalized = GameLocalization.Get(
+                "demolition_squad_eliminated_device_active",
+                "zh",
+                "SQUAD ELIMINATED  //  DEVICE STILL ACTIVE")
+            .Contains("\u88c5\u7f6e\u4ecd\u5728\u8fd0\u884c", System.StringComparison.Ordinal)
+            && GameLocalization.Format(
+                    "demolition_squad_eliminated_device_objective",
+                    "zh",
+                    "SQUAD ELIMINATED  //  DEVICE ACTIVE AT {0}  //  {1:00.0}s{2}",
+                    "A",
+                    12.0f,
+                    string.Empty)
+                .Contains("A \u70b9\u88c5\u7f6e\u8fd0\u884c\u4e2d", System.StringComparison.Ordinal);
 
         var reconTargets = _enemies
             .Where(enemy => IsInstanceValid(enemy) && !enemy.IsDead && !enemy.IsScanned)
@@ -112,18 +132,29 @@ public partial class FreightTerminalWorld
         var mate = _squadMates.FirstOrDefault(candidate => IsInstanceValid(candidate) && !candidate.IsDowned);
         var mateEliminationPosition = Vector3.Zero;
         var mateEliminated = false;
+        var mateWasRunningBeforeElimination = false;
         if (mate is not null)
         {
+            mate.Velocity = Vector3.Right * 4.0f;
+            mate.SetAuthoredMovementPoseForDiagnostics(4.0f);
+            mateWasRunningBeforeElimination = mate.UsesAuthoredOperatorForDiagnostics
+                && mate.AuthoredAnimationForDiagnostics.Contains(
+                    "run",
+                    System.StringComparison.Ordinal);
+            mate.SetHoldFire(true);
             mate.TakeCombatDamage(9999.0f, mate.HitPoint(HitRegion.Torso), this);
             mateEliminationPosition = mate.GlobalPosition;
             var mateCollisionShapesDisabledAfterElimination =
                 mate.AreDemolitionCollisionShapesDisabledForDiagnostics;
-            mateEliminated = mate.IsDowned
+            mateEliminated = mateWasRunningBeforeElimination
+                && mate.IsDowned
                 && mate.ReviveUsed
                 && !mate.CanBeRevived
                 && mate.CollisionLayer == 0
                 && mate.CollisionMask == 0
                 && mateCollisionShapesDisabledAfterElimination
+                && mate.IsDemolitionEliminatedPoseForDiagnostics
+                && mate.DemolitionNameplateShowsEliminatedForDiagnostics
                 && !mate.TryReceiveRevive(50.0f)
                 && !mate.IsBodyBag;
         }
@@ -136,7 +167,8 @@ public partial class FreightTerminalWorld
             && !mate.IsPhysicsProcessing()
             && mate.GlobalPosition.DistanceTo(mateEliminationPosition) <= 0.01f
             && mate.Velocity.LengthSquared() <= 0.0001f
-            && mate.AreDemolitionCollisionShapesDisabledForDiagnostics;
+            && mate.AreDemolitionCollisionShapesDisabledForDiagnostics
+            && mate.IsDemolitionEliminatedPoseForDiagnostics;
         var playerEliminationCollision = $"{_player.CollisionLayer}/{_player.CollisionMask}";
         var playerColliderDisabled = _player.DemolitionColliderDisabledForDiagnostics;
         var mateEliminationCollision = mate is null
@@ -166,10 +198,69 @@ public partial class FreightTerminalWorld
             && mate.IsPhysicsProcessing()
             && !mate.IsDowned
             && !mate.ReviveUsed
+            && !mate.HoldFireActive
             && mate.CollisionLayer == 4
             && mate.CollisionMask == 1
             && mate.AreDemolitionCollisionShapesEnabledForDiagnostics
             && mate.Velocity.LengthSquared() <= 0.0001f;
+
+        // Exercise the real planted-device branch from living actors through permanent
+        // elimination, spectator hand-off, and the persistent objective HUD. Attackers
+        // remain out of the round while the already-planted device continues to resolve.
+        var plantedWipeScore = _demolitionMatch.PlayerScore;
+        var plantedWipeStarted = ForceDemolitionDeviceCarrierForDiagnostics(_player);
+        PlantDemolitionDevice(0, byPlayerTeam: true, _player);
+        plantedWipeStarted &= _demolitionDevicePlanted && _demolitionActiveSite == 0;
+        var plantedWipeMates = _squadMates
+            .Where(candidate => IsInstanceValid(candidate))
+            .ToArray();
+        foreach (var plantedMate in plantedWipeMates)
+        {
+            if (!plantedMate.IsDowned && !plantedMate.IsBodyBag)
+            {
+                plantedMate.TakeCombatDamage(
+                    9999.0f,
+                    plantedMate.HitPoint(HitRegion.Torso),
+                    this);
+            }
+        }
+        _player.SetHealthForDiagnostics(_player.MaxHealth);
+        _player.TakeDamage(9999.0f, _player.HitPoint(HitRegion.Torso), this);
+        var plantedWipeFuseBefore = _demolitionRemaining;
+        UpdateDemolitionRound(0.1f);
+        var expectedPlantedWipeObjective = GameLocalization.Format(
+            "demolition_squad_eliminated_device_objective",
+            _languageSetting,
+            "SQUAD ELIMINATED  //  DEVICE ACTIVE AT {0}  //  {1:00.0}s{2}",
+            "A",
+            _demolitionRemaining,
+            string.Empty);
+        var plantedWipeDeviceContinues = plantedWipeStarted
+            && plantedWipeMates.Length > 0
+            && plantedWipeMates.All(candidate => candidate.IsDowned && candidate.ReviveUsed)
+            && IsLocalDemolitionSquadEliminated()
+            && _player.IsDead
+            && _player.ReviveUsed
+            && _demolitionRoundActive
+            && _demolitionDevicePlanted
+            && _demolitionMatch.PlayerScore == plantedWipeScore
+            && _demolitionObjectiveSpectatorActive
+            && _demolitionRemaining < plantedWipeFuseBefore
+            && _hud.DemolitionRadioShowsSquadEliminatedForDiagnostics
+            && string.Equals(
+                _hud.DemolitionObjectiveTextForDiagnostics,
+                expectedPlantedWipeObjective,
+                System.StringComparison.Ordinal);
+        GD.Print($"DEMOLITION_PLANTED_WIPE_CHECK valid={plantedWipeDeviceContinues} started={plantedWipeStarted} mates={plantedWipeMates.Length} mates_eliminated={plantedWipeMates.All(candidate => candidate.IsDowned && candidate.ReviveUsed)} squad_eliminated={IsLocalDemolitionSquadEliminated()} player_dead={_player.IsDead} revive_used={_player.ReviveUsed} round_active={_demolitionRoundActive} planted={_demolitionDevicePlanted} score={_demolitionMatch.PlayerScore}/{plantedWipeScore} spectator={_demolitionObjectiveSpectatorActive} fuse={plantedWipeFuseBefore:0.00}->{_demolitionRemaining:0.00} radio={_hud.DemolitionRadioShowsSquadEliminatedForDiagnostics} objective={_hud.DemolitionObjectiveTextForDiagnostics}");
+
+        _squadHoldFire = true;
+        ClearDemolitionDevice();
+        ResetDemolitionSquad();
+        _demolitionRoundActive = true;
+        var demolitionFireStanceReset = !_squadHoldFire
+            && _squadMates
+                .Where(IsInstanceValid)
+                .All(candidate => !candidate.HoldFireActive);
 
         // Deterministic last-operator branch: eliminate every teammate first so the
         // player cannot enter spectator mode and must take the hard round-finish path.
@@ -223,6 +314,7 @@ public partial class FreightTerminalWorld
             && eliminationRules
             && deviceLifecycleValid
             && spectatorLocalized
+            && eliminatedDeviceSpectatorLocalized
             && reconBoundary
             && playerEliminated
             && mateEliminated
@@ -230,10 +322,12 @@ public partial class FreightTerminalWorld
             && mateFrozenAfterElimination
             && playerRestoredForNextRound
             && mateRestoredForNextRound
+            && plantedWipeDeviceContinues
+            && demolitionFireStanceReset
             && noAllyPlayerEliminated
             && smokePresentationAligned
             && presentationRestored;
-        GD.Print($"DEMOLITION_RULES_CHECK valid={valid} roster_hidden={rosterHidden} skill_hud={skillHudVisible} orders_hidden={ordersHidden} utility={utilityHudVisible} footer_separated={demolitionFooterSeparated} recon_range={DemolitionReconScanRange:0.0} recon_boundary={reconBoundary} inputs={roleRules} elimination_rules={eliminationRules} device_lifecycle={deviceLifecycleValid} spectator_localized={spectatorLocalized} player_eliminated={playerEliminated} player_frozen={playerFrozenAfterElimination} player_collision={playerEliminationCollision} player_collider_disabled={playerColliderDisabled} player_reset={playerRestoredForNextRound} mate_eliminated={mateEliminated} mate_frozen={mateFrozenAfterElimination} mate_collision={mateEliminationCollision} mate_shapes_disabled={mateCollisionShapesDisabled} mate_reset={mateRestoredForNextRound} no_ally_eliminated={noAllyPlayerEliminated} no_ally_mates={noAllyMatesEliminated} smoke_aligned={smokePresentationAligned} presentation_restored={presentationRestored} round_active={_demolitionRoundActive}");
+        GD.Print($"DEMOLITION_RULES_CHECK valid={valid} roster_hidden={rosterHidden} skill_hud={skillHudVisible} orders_hidden={ordersHidden} utility={utilityHudVisible} footer_separated={demolitionFooterSeparated} recon_range={DemolitionReconScanRange:0.0} recon_boundary={reconBoundary} inputs={roleRules} elimination_rules={eliminationRules} device_lifecycle={deviceLifecycleValid} spectator_localized={spectatorLocalized} eliminated_device_localized={eliminatedDeviceSpectatorLocalized} player_eliminated={playerEliminated} player_frozen={playerFrozenAfterElimination} player_collision={playerEliminationCollision} player_collider_disabled={playerColliderDisabled} player_reset={playerRestoredForNextRound} mate_running_before_elimination={mateWasRunningBeforeElimination} mate_eliminated={mateEliminated} mate_frozen={mateFrozenAfterElimination} mate_collision={mateEliminationCollision} mate_shapes_disabled={mateCollisionShapesDisabled} mate_reset={mateRestoredForNextRound} planted_wipe_continues={plantedWipeDeviceContinues} fire_stance_reset={demolitionFireStanceReset} no_ally_eliminated={noAllyPlayerEliminated} no_ally_mates={noAllyMatesEliminated} smoke_aligned={smokePresentationAligned} presentation_restored={presentationRestored} round_active={_demolitionRoundActive}");
         GD.Print($"DEMOLITION_RULES_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
