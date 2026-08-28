@@ -37,7 +37,8 @@ introduced by this adaptation.
 
 After subdivision, the build keeps the strongest four deform-bone influences
 per vertex and normalizes those weights before export; non-deforming selection
-and control groups are deliberately excluded. It retains the runtime root, rig, four
+and control groups are removed before export so they cannot become glTF skin joints.
+It retains the runtime root, rig, four
 character mesh nodes, equipment sockets, and 25-action animation contract while
 normalizing the shared humanoid rig and retargeting the separately recorded CC0
 Quaternius Universal Animation Library actions. No code-generated primitive

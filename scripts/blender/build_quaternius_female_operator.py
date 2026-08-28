@@ -14,8 +14,10 @@ from __future__ import annotations
 import argparse
 import importlib.util
 from math import exp
+import os
 from pathlib import Path
 import sys
+import traceback
 
 import bpy
 from mathutils import Matrix, Quaternion, Vector
@@ -1158,15 +1160,94 @@ def author_operator_lips(meshes: list[bpy.types.Object], slug: str) -> None:
     )
 
 
-def deform_group_indices(mesh: bpy.types.Object) -> set[int]:
+def runtime_armature_and_bones(
+    mesh: bpy.types.Object,
+) -> tuple[bpy.types.Object, list[bpy.types.Bone]]:
     armature_modifier = next(
         (modifier for modifier in mesh.modifiers if modifier.type == "ARMATURE" and modifier.object is not None),
         None,
     )
     if armature_modifier is None:
         raise RuntimeError(f"{mesh.name} has no armature modifier")
-    deform_bones = {bone.name for bone in armature_modifier.object.data.bones if bone.use_deform}
-    return {group.index for group in mesh.vertex_groups if group.name in deform_bones}
+    # The reusable source files disagree about whether controller bones such
+    # as Body and Root have use_deform enabled.  Runtime skinning is contracted
+    # to the normalized Mixamo hierarchy, so only those groups may survive.
+    deform_bones = [
+        bone
+        for bone in armature_modifier.object.data.bones
+        if bone.use_deform and bone.name.startswith("mixamorig:")
+    ]
+    if not deform_bones:
+        raise RuntimeError(f"{mesh.name} has no runtime Mixamo deform bones")
+    return armature_modifier.object, deform_bones
+
+
+def deform_group_indices(mesh: bpy.types.Object) -> set[int]:
+    _, deform_bones = runtime_armature_and_bones(mesh)
+    deform_bone_names = {bone.name for bone in deform_bones}
+    return {
+        group.index
+        for group in mesh.vertex_groups
+        if group.name in deform_bone_names
+    }
+
+
+def point_segment_distance(point: Vector, start: Vector, end: Vector) -> float:
+    segment = end - start
+    length_squared = segment.length_squared
+    if length_squared <= 1.0e-12:
+        return (point - start).length
+    factor = max(0.0, min(1.0, (point - start).dot(segment) / length_squared))
+    return (point - (start + segment * factor)).length
+
+
+def repair_missing_runtime_weights(mesh: bpy.types.Object, slug: str) -> int:
+    """Bind controller-only source vertices to nearby runtime bones.
+
+    Some Quaternius clothing vertices are weighted exclusively to a reusable
+    source controller named Body or Root.  Those controllers must not ship as
+    glTF skin joints, but simply deleting them would leave the vertices
+    unbound.  Rebinding to the two nearest rest-pose segments preserves a
+    smooth garment transition without inventing a runtime controller.
+    """
+
+    armature, deform_bones = runtime_armature_and_bones(mesh)
+    deform_bone_names = {bone.name for bone in deform_bones}
+    mesh_to_armature = armature.matrix_world.inverted() @ mesh.matrix_world
+    repaired = 0
+    for vertex in mesh.data.vertices:
+        has_runtime_weight = any(
+            membership.weight > 1.0e-8
+            and mesh.vertex_groups[membership.group].name in deform_bone_names
+            for membership in vertex.groups
+        )
+        if has_runtime_weight:
+            continue
+        point = mesh_to_armature @ vertex.co
+        nearest = sorted(
+            (
+                point_segment_distance(point, bone.head_local, bone.tail_local),
+                bone.name,
+            )
+            for bone in deform_bones
+        )[:2]
+        # A small distance floor prevents one coincident segment from making
+        # the hand-authored surface discontinuous at the next vertex.
+        scores = [1.0 / ((distance + 0.025) ** 2) for distance, _ in nearest]
+        score_sum = sum(scores)
+        for score, (_, bone_name) in zip(scores, nearest):
+            group = mesh.vertex_groups.get(bone_name)
+            if group is None:
+                group = mesh.vertex_groups.new(name=bone_name)
+            group.add([vertex.index], score / score_sum, "REPLACE")
+        repaired += 1
+    if repaired:
+        mesh.data.update()
+        print(
+            "QUATERNIUS_OPERATOR_WEIGHT_REPAIR "
+            f"variant={slug} mesh={mesh.name} vertices={repaired} method=nearest_runtime_bones"
+        )
+    return repaired
 
 
 def skinning_weight_stats(
@@ -1198,6 +1279,7 @@ def normalize_skinning_weights(meshes: list[bpy.types.Object], slug: str) -> Non
     """Keep runtime skinning deterministic and within glTF's four-joint limit."""
 
     for mesh in meshes:
+        repaired_vertices = repair_missing_runtime_weights(mesh, slug)
         deform_groups = deform_group_indices(mesh)
         before = skinning_weight_stats(mesh, deform_groups)
         # Work directly on deform-bone groups.  The Quaternius sources also
@@ -1247,21 +1329,98 @@ def normalize_skinning_weights(meshes: list[bpy.types.Object], slug: str) -> Non
                 f"Invalid normalized weights for {mesh.name}: "
                 f"max_influences={after[0]} sum={after[2]:.6f}..{after[3]:.6f}"
             )
+        deform_group_names = {
+            mesh.vertex_groups[index].name
+            for index in deform_groups
+        }
+        non_deform_group_names = [
+            group.name
+            for group in mesh.vertex_groups
+            if group.name not in deform_group_names
+        ]
+        for group_name in non_deform_group_names:
+            mesh.vertex_groups.remove(mesh.vertex_groups[group_name])
+        remaining_non_deform_groups = [
+            group.name
+            for group in mesh.vertex_groups
+            if group.name not in deform_group_names
+        ]
+        if remaining_non_deform_groups:
+            raise RuntimeError(
+                f"Non-deforming vertex groups remain on {mesh.name}: "
+                f"{remaining_non_deform_groups}"
+            )
+        mesh.data.update()
         print(
             "QUATERNIUS_OPERATOR_WEIGHTS "
             f"variant={slug} mesh={mesh.name} "
             f"before_max_influences={before[0]} before_over_limit={before[1]} "
             f"before_sum={before[2]:.6f}..{before[3]:.6f} "
             f"after_max_influences={after[0]} after_over_limit={after[1]} "
-            f"after_sum={after[2]:.6f}..{after[3]:.6f}"
+            f"after_sum={after[2]:.6f}..{after[3]:.6f} "
+            f"repaired_vertices={repaired_vertices} "
+            f"removed_non_deform={','.join(non_deform_group_names) or 'none'}"
         )
 
 
-def operator_bounds(meshes: list[bpy.types.Object]) -> tuple[Vector, Vector]:
-    points = [mesh.matrix_world @ Vector(corner) for mesh in meshes for corner in mesh.bound_box]
+def evaluated_operator_metrics(
+    meshes: list[bpy.types.Object],
+) -> tuple[Vector, Vector, float]:
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    points: list[Vector] = []
+    maximum_edge = 0.0
+    for mesh in meshes:
+        evaluated = mesh.evaluated_get(depsgraph)
+        evaluated_mesh = evaluated.to_mesh()
+        try:
+            mesh_points = [
+                evaluated.matrix_world @ vertex.co
+                for vertex in evaluated_mesh.vertices
+            ]
+            points.extend(mesh_points)
+            for polygon in evaluated_mesh.polygons:
+                indices = tuple(polygon.vertices)
+                for index, first in enumerate(indices):
+                    second = indices[(index + 1) % len(indices)]
+                    maximum_edge = max(
+                        maximum_edge,
+                        (mesh_points[first] - mesh_points[second]).length,
+                    )
+        finally:
+            evaluated.to_mesh_clear()
     minimum = Vector(tuple(min(point[index] for point in points) for index in range(3)))
     maximum = Vector(tuple(max(point[index] for point in points) for index in range(3)))
+    return minimum, maximum, maximum_edge
+
+
+def operator_bounds(meshes: list[bpy.types.Object]) -> tuple[Vector, Vector]:
+    minimum, maximum, _ = evaluated_operator_metrics(meshes)
     return minimum, maximum
+
+
+def validate_downed_deformation(
+    armature: bpy.types.Object,
+    meshes: list[bpy.types.Object],
+    action: bpy.types.Action,
+    slug: str,
+) -> None:
+    armature.animation_data.action = action
+    bpy.context.scene.frame_set(round(action.frame_range[0]))
+    bpy.context.view_layer.update()
+    minimum, maximum, maximum_edge = evaluated_operator_metrics(meshes)
+    size = maximum - minimum
+    valid = size.z <= 0.45 and maximum_edge <= 0.20
+    print(
+        "QUATERNIUS_DOWNED_DEFORMATION_CHECK "
+        f"variant={slug} valid={valid} "
+        f"size={tuple(round(value, 5) for value in size)} "
+        f"max_edge={maximum_edge:.5f}"
+    )
+    if not valid:
+        raise RuntimeError(
+            f"{slug.title()} downed pose contains a skinning spike: "
+            f"size={tuple(size)} max_edge={maximum_edge:.5f}"
+        )
 
 
 def point_at(obj: bpy.types.Object, target: Vector) -> None:
@@ -1304,6 +1463,10 @@ def render_operator_qa(
         distance = max(0.52, height * 2.55, width * 3.15, depth * 2.8)
         camera_offset = Vector((width * 1.55, -distance, height * 0.03))
         camera_lens = 72.0
+    elif view == "downed":
+        distance = max(2.4, width * 2.0, depth * 1.65)
+        camera_offset = Vector((width * 0.75, -distance, max(1.5, distance * 0.72)))
+        camera_lens = 58.0
     else:
         distance = max(height * 1.85, width * 2.4, depth * 2.4)
         camera_x = width * 0.62 if view == "aim" else 0.0
@@ -1613,6 +1776,16 @@ def build_variant(
         "prone_idle",
     )
     helpers.author_downed_hold(target, generated["death"])
+    downed_action = next(action for action in bpy.data.actions if action.name == "downed")
+    validate_downed_deformation(target, meshes, downed_action, slug)
+    if qa_render:
+        render_operator_qa(
+            meshes,
+            slug,
+            "after_downed",
+            qa_output_dir,
+            view="downed",
+        )
     helpers.reset_pose(target)
     helpers.cleanup_sources([ual1, ual2])
     if qa_render:
@@ -1704,4 +1877,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        traceback.print_exc()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(2)
