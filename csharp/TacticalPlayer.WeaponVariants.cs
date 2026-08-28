@@ -1,10 +1,14 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace OperationSteelTide;
 
 public partial class TacticalPlayer
 {
+    private const int LocalWeaponReportVoiceCount = 5;
     private Node3D _platformSignatureRoot = null!;
+    private readonly List<AudioStreamPlayer> _gunAudioVoices = new();
+    private int _nextGunAudioVoice;
 
     internal int WeaponSignaturePartCountForDiagnostics
         => IsInstanceValid(_platformSignatureRoot) ? _platformSignatureRoot.GetChildCount() : 0;
@@ -23,13 +27,57 @@ public partial class TacticalPlayer
     internal bool PlayerWeaponAudioIsLocalForDiagnostics
         => IsInstanceValid(_gunAudio) && ReferenceEquals(_gunAudio.GetParent(), _camera);
     internal bool PlayerWeaponAudioPlayingForDiagnostics
-        => IsInstanceValid(_gunAudio) && _gunAudio.Playing;
+        => ActiveWeaponAudioVoiceCountForDiagnostics > 0;
+    internal int WeaponAudioVoiceCountForDiagnostics => _gunAudioVoices.Count;
+    internal int ActiveWeaponAudioVoiceCountForDiagnostics
+    {
+        get
+        {
+            var active = 0;
+            foreach (var voice in _gunAudioVoices)
+            {
+                if (IsInstanceValid(voice) && voice.Playing)
+                {
+                    active++;
+                }
+            }
+            return active;
+        }
+    }
     internal float PlayerWeaponAudioVolumeDbForDiagnostics
         => IsInstanceValid(_gunAudio) ? _gunAudio.VolumeDb : float.NegativeInfinity;
     internal int PlayerWeaponAudioSignatureForDiagnostics
         => PlayerWeaponAudioReadyForDiagnostics
             ? SoundLab.WeaponShotSignature(EquippedWeapon)
             : 0;
+
+    private void PlayLocalWeaponReport()
+    {
+        if (_gunAudioVoices.Count == 0)
+        {
+            return;
+        }
+
+        var selectedIndex = _nextGunAudioVoice % _gunAudioVoices.Count;
+        for (var offset = 0; offset < _gunAudioVoices.Count; offset++)
+        {
+            var candidateIndex = (_nextGunAudioVoice + offset) % _gunAudioVoices.Count;
+            if (!_gunAudioVoices[candidateIndex].Playing)
+            {
+                selectedIndex = candidateIndex;
+                break;
+            }
+        }
+
+        var voice = _gunAudioVoices[selectedIndex];
+        if (voice.Playing)
+        {
+            voice.Stop();
+        }
+        voice.PitchScale = _rng.RandfRange(0.96f, 1.04f);
+        voice.Play();
+        _nextGunAudioVoice = (selectedIndex + 1) % _gunAudioVoices.Count;
+    }
 
     private void RefreshPlatformSignatureVisual()
     {

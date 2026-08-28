@@ -16,6 +16,7 @@ public partial class TacticalPlayer
     private const float AuthoredLargeSidearmArmPresentationScale = 0.50f;
     private const float AuthoredLargeSidearmArmPitchRadians = 0.80f;
     private const float SidearmBottomScreenBandStartRatio = 0.96f;
+    private const float MaxAuthoredPalmSurfaceGap = 0.018f;
     internal const float MaxServicePistolSupportArmCorrection = 0.03f;
     private static readonly Vector3 AuthoredSmgCameraPosition = new(0.34f, -0.45f, -0.72f);
     private static readonly Vector3 M4ReloadMagazineGripOffset = new(-0.06f, 0.08f, -0.02f);
@@ -233,6 +234,16 @@ public partial class TacticalPlayer
                 screenSize));
     }
 
+    internal VisibleMeshScreenProjection InspectWeaponPresentationForDiagnostics()
+    {
+        var logicalViewportSize = _camera.GetViewport().GetVisibleRect().Size;
+        var windowSize = GetWindow().Size;
+        return InspectVisibleMeshScreenProjection(
+            ActiveAuthoredWeaponRootForDiagnostics,
+            logicalViewportSize,
+            new Vector2(windowSize.X, windowSize.Y));
+    }
+
     private VisibleMeshScreenProjection InspectVisibleMeshScreenProjection(
         Node3D? root,
         Vector2 logicalViewportSize,
@@ -412,8 +423,8 @@ public partial class TacticalPlayer
             && determinant > 0.01f
             && wristContinuity
             && supportArmCorrectionValid
-            && primaryContact.Distance <= 0.10f
-            && supportContact.Distance <= 0.10f
+            && primaryContact.Distance <= MaxAuthoredPalmSurfaceGap
+            && supportContact.Distance <= MaxAuthoredPalmSurfaceGap
             && screenValid
             && presentationZoneValid;
         return new FirstPersonHandPoseInspection(

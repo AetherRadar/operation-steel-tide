@@ -46,6 +46,7 @@ public partial class FreightTerminalWorld
             TacticalPlayer.FirstPersonOpticClearanceInspection Inspection,
             Vector2 ScreenOffset)>();
         var stancesReady = true;
+        var opticSamplesSettled = true;
 
         await MeasureAfterInheritedPose(
             new Vector3(0.5f, -0.72f, -0.42f),
@@ -168,7 +169,8 @@ public partial class FreightTerminalWorld
         const float screenTolerancePixels = 1.5f;
         const float yawToleranceRadians = 0.001f;
         const float opticMountClearanceMeters = 0.05f;
-        var opticClearanceValid = opticClearanceSamples.Count == opticClearanceMatrix.Length;
+        var opticClearanceValid = opticSamplesSettled
+            && opticClearanceSamples.Count == opticClearanceMatrix.Length;
         foreach (var sample in opticClearanceSamples)
         {
             var clearanceRequired = !sample.Inspection.IntegratedOptic;
@@ -192,7 +194,7 @@ public partial class FreightTerminalWorld
 
         await WaitFrames(2);
         SaveViewportImage("res://ads_alignment_validation.png");
-        GD.Print($"ADS_ALIGNMENT_CHECK valid={valid} samples={offsets.Count} stances={stancesReady} reload={reloadCompleted} max_offset_px={maxOffset:0.000} max_yaw_rad={maxYaw:0.000000} offsets={FormatOffsets(offsets)} vss_compatibility={vssAttachmentCompatibilityValid} vss_compatibility_samples={FormatAttachmentCompatibilitySamples(vssAttachmentCompatibilitySamples)} vss_rejection_paths=direct:{directPathRejected};slot:{slotPathRejected} optic_clearance={opticClearanceValid} optic_samples={FormatOpticClearanceSamples(opticClearanceSamples)}");
+        GD.Print($"ADS_ALIGNMENT_CHECK valid={valid} samples={offsets.Count} stances={stancesReady} reload={reloadCompleted} max_offset_px={maxOffset:0.000} max_yaw_rad={maxYaw:0.000000} offsets={FormatOffsets(offsets)} vss_compatibility={vssAttachmentCompatibilityValid} vss_compatibility_samples={FormatAttachmentCompatibilitySamples(vssAttachmentCompatibilitySamples)} vss_rejection_paths=direct:{directPathRejected};slot:{slotPathRejected} optic_settled={opticSamplesSettled} optic_clearance={opticClearanceValid} optic_samples={FormatOpticClearanceSamples(opticClearanceSamples)}");
         GD.Print($"ADS_ALIGNMENT_PASS valid={valid}");
         Input.ActionRelease("aim");
         Input.ActionRelease("lean_left");
@@ -223,10 +225,7 @@ public partial class FreightTerminalWorld
                 Input.ActionPress(leanAction);
             }
             Input.ActionPress("aim");
-            for (var frame = 0; frame < 90; frame++)
-            {
-                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-            }
+            stancesReady &= await WaitForAimSettlement();
             offsets.Add(_player.OpticScreenOffsetForDiagnostics());
             yawResiduals.Add(_player.WeaponRotationForDiagnostics.Y);
             if (!keepAiming)
@@ -255,10 +254,7 @@ public partial class FreightTerminalWorld
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             }
             Input.ActionPress("aim");
-            for (var frame = 0; frame < 90; frame++)
-            {
-                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-            }
+            opticSamplesSettled &= await WaitForAimSettlement();
             opticClearanceSamples.Add((
                 platform,
                 opticId,
@@ -269,6 +265,36 @@ public partial class FreightTerminalWorld
             {
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             }
+        }
+
+        async System.Threading.Tasks.Task<bool> WaitForAimSettlement()
+        {
+            const int minimumFrames = 20;
+            const int maximumFrames = 240;
+            const int stableFramesRequired = 4;
+            const float settledOffsetPixels = 0.25f;
+            const float settledYawRadians = 0.0005f;
+            var stableFrames = 0;
+            for (var frame = 0; frame < maximumFrames; frame++)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                if (frame < minimumFrames)
+                {
+                    continue;
+                }
+
+                var offset = _player.OpticScreenOffsetForDiagnostics();
+                var yaw = Mathf.Abs(_player.WeaponRotationForDiagnostics.Y);
+                stableFrames = offset.Length() <= settledOffsetPixels
+                    && yaw <= settledYawRadians
+                    ? stableFrames + 1
+                    : 0;
+                if (stableFrames >= stableFramesRequired)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 

@@ -70,6 +70,7 @@ public partial class FreightTerminalWorld
             ("--validate-melee", static world => world.ValidateMelee()),
             ("--validate-melee-impact", static world => world.ValidateMeleeImpact()),
             ("--validate-weapon-audio", static world => world.ValidateWeaponAudio()),
+            ("--validate-weapon-impact", static world => world.ValidateWeaponImpact()),
             ("--validate-quick-slots", static world => world.ValidateQuickSlots()),
             ("--validate-arsenal", static world => world.ValidateArsenalFlow()),
             ("--validate-combat-models", static world => world.ValidateCombatModels()),

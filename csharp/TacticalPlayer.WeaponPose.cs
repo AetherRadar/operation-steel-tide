@@ -5,10 +5,22 @@ namespace OperationSteelTide;
 public partial class TacticalPlayer
 {
     private static readonly Vector3 HipWeaponPosition = new(0.26f, -0.30f, -0.72f);
+    private static readonly Vector3 ImpactRifleHipWeaponPosition = new(
+        0.22f,
+        -0.27f,
+        -0.64f);
+    private static readonly Vector3 PrecisionRifleHipWeaponPosition = new(
+        0.22f,
+        -0.29f,
+        -0.68f);
     private static readonly Vector3 SidearmHipWeaponPosition = new(0.30f, -0.24f, -0.64f);
     private static readonly Vector3 ReloadWeaponPosition = new(0.18f, -0.23f, -0.86f);
     private static readonly Vector3 SearchWeaponStart = new(0.5f, -0.58f, -0.48f);
     private static readonly Vector3 SearchWeaponEnd = new(0.32f, -0.48f, -0.72f);
+    private float _viewmodelKickback;
+    private float _viewmodelKickPitch;
+    private float _viewmodelKickRoll;
+    private float _viewmodelKickSide;
 
     private Vector3 WeaponViewPositionTarget()
     {
@@ -16,7 +28,7 @@ public partial class TacticalPlayer
             ? AimWeaponPosition()
             : WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
                 ? SidearmHipWeaponPosition
-                : HipWeaponPosition;
+                : HipWeaponPositionForCurrentPlatform();
         if (_isReloading)
         {
             // Authored long-gun arms already occupy the full first-person
@@ -35,8 +47,20 @@ public partial class TacticalPlayer
         {
             target += new Vector3(0.22f, -0.34f, 0.12f);
         }
-        return target;
+        return target + new Vector3(
+            _viewmodelKickSide * 0.24f,
+            -_viewmodelKickback * 0.08f,
+            _viewmodelKickback);
     }
+
+    private Vector3 HipWeaponPositionForCurrentPlatform()
+        => EquippedWeapon.Platform switch
+        {
+            WeaponPlatform.M4A1 or WeaponPlatform.M3A1 => HipWeaponPosition,
+            WeaponPlatform.M24 or WeaponPlatform.AXMC or WeaponPlatform.AWM
+                => PrecisionRifleHipWeaponPosition,
+            _ => ImpactRifleHipWeaponPosition
+        };
 
     private Vector3 AimWeaponPosition()
     {
@@ -76,15 +100,15 @@ public partial class TacticalPlayer
             // The compact AK receiver and fixed rear sight rise above the legacy
             // 0.205 m mount. These platform-specific risers keep the complete
             // lower half of each sight window clear instead of merely moving the dot.
-            (WeaponPlatform.AK74, "optic_micro") => 0.28f,
-            (WeaponPlatform.AK74, "optic_holo") => 0.30f,
-            (WeaponPlatform.AK74, _) => 0.32f,
-            (WeaponPlatform.ScarL, "optic_micro") => 0.31f,
-            (WeaponPlatform.ScarL, "optic_holo") => 0.32f,
-            (WeaponPlatform.ScarL, _) => 0.34f,
-            (WeaponPlatform.MP5A5, "optic_micro") => 0.31f,
-            (WeaponPlatform.MP5A5, "optic_holo") => 0.32f,
-            (WeaponPlatform.MP5A5, _) => 0.34f,
+            (WeaponPlatform.AK74, "optic_micro") => 0.29f,
+            (WeaponPlatform.AK74, "optic_holo") => 0.31f,
+            (WeaponPlatform.AK74, _) => 0.33f,
+            (WeaponPlatform.ScarL, "optic_micro") => 0.33f,
+            (WeaponPlatform.ScarL, "optic_holo") => 0.34f,
+            (WeaponPlatform.ScarL, _) => 0.36f,
+            (WeaponPlatform.MP5A5, "optic_micro") => 0.325f,
+            (WeaponPlatform.MP5A5, "optic_holo") => 0.335f,
+            (WeaponPlatform.MP5A5, _) => 0.355f,
             (WeaponPlatform.M4A1, "optic_micro") => 0.167f,
             (WeaponPlatform.M4A1, "optic_holo") => 0.24f,
             (WeaponPlatform.M4A1, _) => 0.25f,
@@ -105,10 +129,84 @@ public partial class TacticalPlayer
         var searchPitch = _searchPose > 0.0f ? 0.34f : 0.0f;
         var searchRoll = _searchPose > 0.0f ? -0.42f : 0.0f;
         return new Vector3(
-            searchPitch + _recoilPitch * 0.55f,
+            searchPitch + _recoilPitch * 0.25f + _viewmodelKickPitch,
             0.0f,
-            searchRoll + _recoilSide * 0.35f);
+            searchRoll + _recoilSide * 0.22f + _viewmodelKickRoll);
     }
+
+    private void UpdateViewmodelShotImpulse(float delta)
+    {
+        _viewmodelKickback = Mathf.Lerp(
+            _viewmodelKickback,
+            0.0f,
+            SmoothFactor(16.0f, delta));
+        _viewmodelKickPitch = Mathf.Lerp(
+            _viewmodelKickPitch,
+            0.0f,
+            SmoothFactor(13.0f, delta));
+        _viewmodelKickRoll = Mathf.Lerp(
+            _viewmodelKickRoll,
+            0.0f,
+            SmoothFactor(18.0f, delta));
+        _viewmodelKickSide = Mathf.Lerp(
+            _viewmodelKickSide,
+            0.0f,
+            SmoothFactor(19.0f, delta));
+    }
+
+    private void ApplyViewmodelShotImpulse(float recoil, float stanceRecoil)
+    {
+        var carryScale = EquippedWeapon.Platform switch
+        {
+            WeaponPlatform.MP5A5 or WeaponPlatform.P226 or WeaponPlatform.GSh18 => 0.9f,
+            WeaponPlatform.M24 or WeaponPlatform.AXMC or WeaponPlatform.AWM
+                or WeaponPlatform.DesertEagle => 1.08f,
+            _ => 1.0f
+        };
+        var aimScale = _isAiming ? 0.58f : 1.0f;
+        var strength = Mathf.Sqrt(Mathf.Max(0.25f, recoil))
+            * stanceRecoil
+            * RoleRecoilMultiplier
+            * carryScale
+            * aimScale;
+        var kickback = _rng.RandfRange(0.054f, 0.068f) * strength;
+        var pitch = _rng.RandfRange(0.026f, 0.036f) * strength;
+        var side = _rng.RandfRange(-0.018f, 0.018f) * strength;
+        var roll = -side * _rng.RandfRange(0.72f, 1.05f);
+        _viewmodelKickback = Mathf.Min(0.19f, _viewmodelKickback + kickback);
+        _viewmodelKickPitch = Mathf.Max(-0.16f, _viewmodelKickPitch - pitch);
+        _viewmodelKickSide = Mathf.Clamp(_viewmodelKickSide + side, -0.055f, 0.055f);
+        _viewmodelKickRoll = Mathf.Clamp(_viewmodelKickRoll + roll, -0.075f, 0.075f);
+
+        // Apply most of the first-frame impulse immediately. The tracked values
+        // above hold the pose briefly and then return independently from camera
+        // recoil, so the firearm reads as a physical object reacting in the hands.
+        _weaponRoot.Position += new Vector3(
+            side * 0.12f,
+            -kickback * 0.035f,
+            kickback * 0.62f);
+        _weaponRoot.Rotation += new Vector3(
+            -pitch * 0.58f,
+            0.0f,
+            roll * 0.46f);
+    }
+
+    private void ResetViewmodelShotImpulse()
+    {
+        _viewmodelKickback = 0.0f;
+        _viewmodelKickPitch = 0.0f;
+        _viewmodelKickRoll = 0.0f;
+        _viewmodelKickSide = 0.0f;
+    }
+
+    internal ViewmodelShotImpulseInspection InspectViewmodelShotImpulseForDiagnostics()
+        => new(
+            _viewmodelKickback,
+            _viewmodelKickPitch,
+            _viewmodelKickRoll,
+            _viewmodelKickSide,
+            _muzzleBloom.Visible,
+            _muzzleFlash.LightEnergy);
 
     internal void SeedWeaponPoseForDiagnostics(Vector3 position, Vector3 rotation)
     {
@@ -244,3 +342,11 @@ public partial class TacticalPlayer
         Vector2 IntegratedApertureSize,
         float IntegratedAnchorResidual);
 }
+
+internal readonly record struct ViewmodelShotImpulseInspection(
+    float Kickback,
+    float Pitch,
+    float Roll,
+    float Side,
+    bool MuzzleBloomVisible,
+    float MuzzleLightEnergy);

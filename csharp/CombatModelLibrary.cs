@@ -1131,10 +1131,17 @@ internal static partial class CombatModelLibrary
 
         var length = platform switch
         {
-            WeaponPlatform.AWM => 1.9f,
-            WeaponPlatform.M24 or WeaponPlatform.AXMC => 1.62f,
-            WeaponPlatform.AK74 or WeaponPlatform.ScarL or WeaponPlatform.VSS => 1.42f,
-            WeaponPlatform.MP5A5 or WeaponPlatform.M3A1 => 1.08f,
+            // The marketplace models are normalized from their source bounds. Their
+            // former first-person lengths made the receiver and controls visibly
+            // smaller than the authored M4 while sharing the same camera mount.
+            // Give each carry class enough silhouette mass without changing the
+            // third-person dimensions used by operators and world previews.
+            WeaponPlatform.AWM => firstPerson ? 2.0f : 1.9f,
+            WeaponPlatform.M24 or WeaponPlatform.AXMC => firstPerson ? 1.74f : 1.62f,
+            WeaponPlatform.AK74 or WeaponPlatform.ScarL or WeaponPlatform.VSS
+                => firstPerson ? 1.58f : 1.42f,
+            WeaponPlatform.MP5A5 => firstPerson ? 1.17f : 1.08f,
+            WeaponPlatform.M3A1 => 1.08f,
             WeaponPlatform.GSh18 => Gsh18FirstPersonLength,
             WeaponPlatform.DesertEagle => DesertEagleFirstPersonLength,
             _ => 1.36f

@@ -656,13 +656,19 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             ShadowEnabled = false
         });
 
-        _gunAudio = new AudioStreamPlayer
+        _gunAudioVoices.Clear();
+        for (var voiceIndex = 0; voiceIndex < LocalWeaponReportVoiceCount; voiceIndex++)
         {
-            Name = "LocalWeaponReportAudio",
-            Stream = SoundLab.WeaponShot(EquippedWeapon),
-            VolumeDb = SoundLab.PlayerWeaponShotVolumeDb(EquippedWeapon)
-        };
-        _camera.AddChild(_gunAudio);
+            var voice = new AudioStreamPlayer
+            {
+                Name = $"LocalWeaponReportAudio{voiceIndex + 1}",
+                Stream = SoundLab.WeaponShot(EquippedWeapon),
+                VolumeDb = SoundLab.PlayerWeaponShotVolumeDb(EquippedWeapon)
+            };
+            _camera.AddChild(voice);
+            _gunAudioVoices.Add(voice);
+        }
+        _gunAudio = _gunAudioVoices[0];
         _reloadAudio = new AudioStreamPlayer { Stream = SoundLab.ReloadClick(), VolumeDb = -8.0f };
         AddChild(_reloadAudio);
         _glassBreakAudio = new AudioStreamPlayer
@@ -1103,8 +1109,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _weaponLight.Position = isPistol
             ? new Vector3(0.065f, -0.04f, -0.28f)
             : new Vector3(0.09f, -0.015f, -0.5f - barrelLength * 0.45f);
-        _gunAudio.Stream = SoundLab.WeaponShot(EquippedWeapon);
-        _gunAudio.VolumeDb = SoundLab.PlayerWeaponShotVolumeDb(EquippedWeapon);
+        foreach (var voice in _gunAudioVoices)
+        {
+            voice.Stop();
+            voice.Stream = SoundLab.WeaponShot(EquippedWeapon);
+            voice.VolumeDb = SoundLab.PlayerWeaponShotVolumeDb(EquippedWeapon);
+        }
+        _nextGunAudioVoice = 0;
+        ResetViewmodelShotImpulse();
         Ammo = Mathf.Min(Ammo, stats.MagazineSize);
         RefreshPlatformSignatureVisual();
         RefreshAuthoredPrimaryWeapon();
@@ -1836,6 +1848,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         UpdateDamageKick(delta);
         _recoilPitch = Mathf.Lerp(_recoilPitch, 0.0f, SmoothFactor(11.0f, delta));
         _recoilSide = Mathf.Lerp(_recoilSide, 0.0f, SmoothFactor(13.0f, delta));
+        UpdateViewmodelShotImpulse(delta);
         var leanInput = Input.GetActionStrength(GameInputActions.LeanRight)
             - Input.GetActionStrength(GameInputActions.LeanLeft);
         _leanValue = Mathf.Lerp(_leanValue, _slideTime <= 0.0f ? leanInput : 0.0f, SmoothFactor(9.0f, delta));
@@ -1949,18 +1962,33 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _fireCooldown = stats.FireInterval * RoleFireIntervalMultiplier;
         Main?.ReportGunshot(GlobalPosition, stats.SoundRadius);
         Main?.NotifyAircraftOperatorAttack(this, GlobalPosition, stats.SoundRadius);
-        _gunAudio.Stop();
-        _gunAudio.PitchScale = _rng.RandfRange(0.94f, 1.06f);
-        _gunAudio.Play();
-        _muzzleFlash.LightEnergy = 7.0f;
+        PlayLocalWeaponReport();
+        var shotImpact = Mathf.Sqrt(Mathf.Max(0.25f, stats.Recoil));
+        var suppressedFlash = SoundLab.IsSuppressed(EquippedWeapon) ? 0.48f : 1.0f;
+        _muzzleFlash.LightEnergy = Mathf.Lerp(
+            7.5f,
+            11.5f,
+            Mathf.Clamp((shotImpact - 0.7f) / 1.2f, 0.0f, 1.0f))
+            * suppressedFlash;
         _muzzleBloom.Visible = true;
-        _muzzleBloom.Scale = Vector3.One * _rng.RandfRange(0.78f, 1.22f);
+        _muzzleBloom.Scale = Vector3.One
+            * _rng.RandfRange(0.88f, 1.16f)
+            * Mathf.Lerp(0.9f, 1.28f, Mathf.Clamp(shotImpact - 0.65f, 0.0f, 1.0f))
+            * Mathf.Lerp(0.72f, 1.0f, suppressedFlash);
         var bloomRotation = _muzzleBloom.Rotation;
         bloomRotation.Z = _rng.RandfRange(0.0f, Mathf.Tau);
         _muzzleBloom.Rotation = bloomRotation;
         var flashTween = CreateTween();
-        flashTween.TweenProperty(_muzzleFlash, "light_energy", 0.0f, 0.045f);
-        flashTween.Parallel().TweenProperty(_muzzleBloom, "scale", Vector3.One * 0.15f, 0.055f);
+        var flashDuration = Mathf.Lerp(
+            0.042f,
+            0.062f,
+            Mathf.Clamp(shotImpact - 0.7f, 0.0f, 1.0f));
+        flashTween.TweenProperty(_muzzleFlash, "light_energy", 0.0f, flashDuration);
+        flashTween.Parallel().TweenProperty(
+            _muzzleBloom,
+            "scale",
+            Vector3.One * 0.15f,
+            flashDuration + 0.018f);
         flashTween.TweenCallback(Callable.From(() => _muzzleBloom.Visible = false));
 
         var shellVelocity = _camera.GlobalBasis.X * 3.0f + Vector3.Up * 1.25f - _camera.GlobalBasis.Z * 0.45f;
@@ -2081,9 +2109,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         };
         _recoilPitch -= _rng.RandfRange(0.012f, 0.021f) * stats.Recoil * (_isAiming ? 0.55f : 1.0f) * stanceRecoil * RoleRecoilMultiplier;
         _recoilSide += _rng.RandfRange(-0.018f, 0.018f) * stats.Recoil * stanceRecoil * RoleRecoilMultiplier;
-        var weaponPosition = _weaponRoot.Position;
-        weaponPosition.Z += 0.055f;
-        _weaponRoot.Position = weaponPosition;
+        ApplyViewmodelShotImpulse(stats.Recoil, stanceRecoil);
     }
 
     private void PlayLocalGlassBreak()

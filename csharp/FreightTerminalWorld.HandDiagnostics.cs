@@ -37,6 +37,7 @@ public partial class FreightTerminalWorld
         var authoredRigValid = true;
         var servicePistolCorrectionValid = true;
         var sidearmPresentationValid = true;
+        var longGunPresentationValid = true;
         var platforms = Enum.GetValues<WeaponPlatform>();
         var proceduralArms = _player.GetNodeOrNull<Node3D>(
             "Camera3D/WeaponRoot/ProceduralFirstPersonArms");
@@ -116,6 +117,19 @@ public partial class FreightTerminalWorld
                 : Vector3.Zero;
             var sidearmHip = default(SidearmPresentationInspection);
             var sidearmAds = default(SidearmPresentationInspection);
+            var weaponPresentation = _player.InspectWeaponPresentationForDiagnostics();
+            var screenSize = new Vector2(GetWindow().Size.X, GetWindow().Size.Y);
+            var weaponScreenWidthRatio = screenSize.X > 0.0f
+                ? weaponPresentation.Bounds.Size.X / screenSize.X
+                : 0.0f;
+            var weaponScreenHeightRatio = screenSize.Y > 0.0f
+                ? weaponPresentation.Bounds.Size.Y / screenSize.Y
+                : 0.0f;
+            var weaponScreenAreaRatio = screenSize.X > 0.0f && screenSize.Y > 0.0f
+                ? weaponPresentation.Bounds.Size.X * weaponPresentation.Bounds.Size.Y
+                    / (screenSize.X * screenSize.Y)
+                : 0.0f;
+            var longGunReadable = true;
             if (WeaponCatalog.IsSidearm(platform))
             {
                 sidearmHip = _player.InspectSidearmPresentationForDiagnostics();
@@ -132,6 +146,21 @@ public partial class FreightTerminalWorld
                 }
                 sidearmPresentationValid &= sidearmHip.Valid && sidearmAds.Valid;
             }
+            else
+            {
+                longGunReadable = weaponPresentation.Available
+                    && weaponPresentation.ProjectedVertexCount >= 100
+                    && weaponScreenWidthRatio >= 0.13f
+                    && weaponScreenHeightRatio >= 0.34f
+                    && weaponScreenAreaRatio >= 0.05f;
+                longGunPresentationValid &= longGunReadable;
+            }
+            if (!narrow
+                && !ultrawide
+                && platform is WeaponPlatform.AK74 or WeaponPlatform.ScarL)
+            {
+                SaveViewportImage($"res://weapon_{platform.ToString().ToLowerInvariant()}_validation.png");
+            }
             results.Add(
                 $"{platform}: handValid={handInspection.Valid} idempotent={idempotent} "
                 + $"proceduralVisible={proceduralVisible} authoredVisible=({rootVisible},{rightVisible},{leftVisible}) "
@@ -141,6 +170,14 @@ public partial class FreightTerminalWorld
                 + $"surfaceOffset=({handInspection.PrimarySurfaceOffset},{handInspection.SupportSurfaceOffset}) "
                 + $"palms=({rightPalmLocal},{leftPalmLocal}) grips=({rightGripLocal},{leftGripLocal}) "
                 + $"foregrip={foregripLocal} muzzle={muzzleLocal} weaponBounds=({weaponBounds.Position},{weaponBounds.End}) "
+                + $"weaponScreen=({weaponPresentation.Bounds.Position},{weaponPresentation.Bounds.End}) "
+                + $"weaponScreenWidthH={weaponPresentation.WidthViewportHeights(GetWindow().Size.Y):F4} "
+                + $"weaponScreenHeightH={weaponPresentation.HeightViewportHeights(GetWindow().Size.Y):F4} "
+                + $"weaponScreenAreaH2={weaponPresentation.AreaViewportHeightsSquared(GetWindow().Size.Y):F4} "
+                + $"weaponScreenWidthRatio={weaponScreenWidthRatio:F4} "
+                + $"weaponScreenHeightRatio={weaponScreenHeightRatio:F4} "
+                + $"weaponScreenAreaRatio={weaponScreenAreaRatio:F4} "
+                + $"weaponScreenValid={longGunReadable} "
                 + SidearmScreenMetrics("sidearm_hip", sidearmHip)
                 + SidearmScreenMetrics("sidearm_ads", sidearmAds));
         }
@@ -366,6 +403,7 @@ public partial class FreightTerminalWorld
             && authoredRigValid
             && servicePistolCorrectionValid
             && sidearmPresentationValid
+            && longGunPresentationValid
             && smgSleeveReach
             && smgSleeveVolume
             && smgWeaponSize
@@ -378,6 +416,7 @@ public partial class FreightTerminalWorld
             + $"authored_rig={authoredRigValid} smg_sleeve_reach={smgSleeveReach} "
             + $"service_pistol_correction={servicePistolCorrectionValid} "
             + $"sidearm_presentation={sidearmPresentationValid} "
+            + $"long_gun_presentation={longGunPresentationValid} "
             + $"smg_sleeve_volume={smgSleeveVolume} "
             + $"smg_arm_bounds={smgArmBounds} "
             + $"smg_weapon_size={smgWeaponSize} smg_weapon_bounds={smgWeaponBounds} "
