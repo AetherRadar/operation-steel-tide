@@ -26,3 +26,10 @@ the following selected, unmodified GLB files under platform-oriented names:
 
 The gameplay names describe silhouette mappings. They do not claim that the
 generic pack models are manufacturer-authenticated replicas.
+
+The VSS source already includes a finished authored scope. First-person VSS
+presentation keeps that native scope, suppresses the separate shared scope
+attachment to avoid a doubled sight, and applies an instance-only translucent
+material override to the source surface named `Glass`. The tracked `vss.glb`
+is unchanged; its authored housing, aperture geometry, and CC0 provenance are
+preserved.

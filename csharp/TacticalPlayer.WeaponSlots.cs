@@ -131,6 +131,11 @@ public partial class TacticalPlayer
             return item;
         }
         var attachment = WeaponCatalog.Attachment(item.AttachmentId);
+        if (!WeaponCatalog.CanEquipAttachment(build.Platform, attachment.Id))
+        {
+            ShowIncompatibleAttachmentMessage();
+            return item;
+        }
         var grades = AttachmentGradesForSlot(slot);
         LootItem? previous = null;
         if (build.Attachments.TryGetValue(attachment.Slot, out var previousId))

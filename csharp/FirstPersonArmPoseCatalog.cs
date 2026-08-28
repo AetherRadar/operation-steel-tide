@@ -43,11 +43,6 @@ internal static class FirstPersonArmPoseCatalog
         new Vector3(0.0f, -0.03f, 0.245f),
         new Vector3(-0.12f, -0.04f, 0.24f));
 
-    private static readonly FirstPersonArmPoseDefinition Gsh18Sidearm = new(
-        FirstPersonArmPoseKind.Sidearm,
-        new Vector3(0.0f, -0.03f, 0.03f),
-        new Vector3(-0.12f, -0.04f, 0.025f));
-
     private static readonly FirstPersonArmPoseDefinition Compact = new(
         FirstPersonArmPoseKind.Compact,
         new Vector3(0.0f, -0.16f, -0.05f),
@@ -76,8 +71,8 @@ internal static class FirstPersonArmPoseCatalog
     public static FirstPersonArmPoseDefinition For(WeaponPlatform platform)
         => platform switch
         {
-            WeaponPlatform.GSh18 => Gsh18Sidearm,
-            WeaponPlatform.P226 or WeaponPlatform.M1911 or WeaponPlatform.DesertEagle
+            WeaponPlatform.P226 or WeaponPlatform.M1911
+                or WeaponPlatform.GSh18 or WeaponPlatform.DesertEagle
                 => Sidearm,
             WeaponPlatform.MP5A5 or WeaponPlatform.M3A1 => Compact,
             WeaponPlatform.AWM => AwmLongRifle,

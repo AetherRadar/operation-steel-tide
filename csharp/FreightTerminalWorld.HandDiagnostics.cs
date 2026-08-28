@@ -6,15 +6,24 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
-    private async void ValidateHandDiagnostics(bool narrow = false)
+    private async void ValidateHandDiagnostics(bool narrow = false, bool ultrawide = false)
     {
-        if (narrow)
+        var requestedWindowSize = ultrawide
+            ? new Vector2I(2048, 621)
+            : narrow
+                ? new Vector2I(985, 847)
+                : GetWindow().Size;
+        if (narrow || ultrawide)
         {
             var window = GetWindow();
+            window.ContentScaleMode = Window.ContentScaleModeEnum.CanvasItems;
             window.ContentScaleAspect = Window.ContentScaleAspectEnum.Ignore;
-            window.Size = new Vector2I(985, 847);
+            window.Size = requestedWindowSize;
         }
         await WaitFrames(4);
+        var layoutValid = (!narrow && !ultrawide)
+            || GetWindow().Size == requestedWindowSize;
+        Input.ActionRelease("aim");
         // Move player to open area away from walls for clear view
         _player.GlobalPosition = new Vector3(0, 0.2f, 40.0f);
         _player.Velocity = Vector3.Zero;
@@ -27,13 +36,24 @@ public partial class FreightTerminalWorld
         var posesValid = true;
         var authoredRigValid = true;
         var servicePistolCorrectionValid = true;
+        var sidearmPresentationValid = true;
         var platforms = Enum.GetValues<WeaponPlatform>();
         var proceduralArms = _player.GetNodeOrNull<Node3D>(
             "Camera3D/WeaponRoot/ProceduralFirstPersonArms");
         foreach (var platform in platforms)
         {
             _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
-            await WaitFrames(8);
+            if (WeaponCatalog.IsSidearm(platform))
+            {
+                for (var frame = 0; frame < 90; frame++)
+                {
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                }
+            }
+            else
+            {
+                await WaitFrames(8);
+            }
             var proceduralVisible = IsInstanceValid(proceduralArms)
                 && proceduralArms.Visible;
             var weaponVisible = _player.UsesAuthoredWeaponPlatformForDiagnostics(platform);
@@ -94,6 +114,24 @@ public partial class FreightTerminalWorld
             var muzzleLocal = muzzle is not null
                 ? weaponRootInverse * muzzle.GlobalPosition
                 : Vector3.Zero;
+            var sidearmHip = default(SidearmPresentationInspection);
+            var sidearmAds = default(SidearmPresentationInspection);
+            if (WeaponCatalog.IsSidearm(platform))
+            {
+                sidearmHip = _player.InspectSidearmPresentationForDiagnostics();
+                Input.ActionPress("aim");
+                for (var frame = 0; frame < 90; frame++)
+                {
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                }
+                sidearmAds = _player.InspectSidearmPresentationForDiagnostics();
+                Input.ActionRelease("aim");
+                for (var frame = 0; frame < 12; frame++)
+                {
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                }
+                sidearmPresentationValid &= sidearmHip.Valid && sidearmAds.Valid;
+            }
             results.Add(
                 $"{platform}: handValid={handInspection.Valid} idempotent={idempotent} "
                 + $"proceduralVisible={proceduralVisible} authoredVisible=({rootVisible},{rightVisible},{leftVisible}) "
@@ -102,7 +140,9 @@ public partial class FreightTerminalWorld
                 + $"surfaceDistance=({handInspection.PrimarySurfaceDistance:F4},{handInspection.SupportSurfaceDistance:F4}) "
                 + $"surfaceOffset=({handInspection.PrimarySurfaceOffset},{handInspection.SupportSurfaceOffset}) "
                 + $"palms=({rightPalmLocal},{leftPalmLocal}) grips=({rightGripLocal},{leftGripLocal}) "
-                + $"foregrip={foregripLocal} muzzle={muzzleLocal} weaponBounds=({weaponBounds.Position},{weaponBounds.End})");
+                + $"foregrip={foregripLocal} muzzle={muzzleLocal} weaponBounds=({weaponBounds.Position},{weaponBounds.End}) "
+                + SidearmScreenMetrics("sidearm_hip", sidearmHip)
+                + SidearmScreenMetrics("sidearm_ads", sidearmAds));
         }
         _player.GrantFireablePrimaryForDiagnostics(
             WeaponCatalog.Build(WeaponPlatform.M3A1, 0));
@@ -325,22 +365,28 @@ public partial class FreightTerminalWorld
         var valid = posesValid
             && authoredRigValid
             && servicePistolCorrectionValid
+            && sidearmPresentationValid
             && smgSleeveReach
             && smgSleeveVolume
             && smgWeaponSize
             && smgReloadPresentation
             && m4ReloadValid
+            && layoutValid
             && results.Count == platforms.Length;
         GD.Print(
             $"HAND_POSE_CHECK valid={valid} procedural_pose={posesValid} "
             + $"authored_rig={authoredRigValid} smg_sleeve_reach={smgSleeveReach} "
             + $"service_pistol_correction={servicePistolCorrectionValid} "
+            + $"sidearm_presentation={sidearmPresentationValid} "
             + $"smg_sleeve_volume={smgSleeveVolume} "
             + $"smg_arm_bounds={smgArmBounds} "
             + $"smg_weapon_size={smgWeaponSize} smg_weapon_bounds={smgWeaponBounds} "
             + $"smg_reload_presentation={smgReloadPresentation} "
             + $"m4_reload_arm={m4ReloadValid} "
-            + $"samples={results.Count} viewport={(narrow ? "985x847" : "default")}");
+            + $"layout_valid={layoutValid} samples={results.Count} "
+            + $"requested_window={(ultrawide || narrow ? requestedWindowSize.ToString() : "default")} "
+            + $"window_size={GetWindow().Size} "
+            + $"logical_viewport={GetViewport().GetVisibleRect().Size}");
         GD.Print($"HAND_POSE_PASS valid={valid}");
         GD.Print($"HAND_DIAGNOSTICS_DONE count={results.Count}");
         GetTree().Quit(valid ? 0 : 2);
@@ -378,6 +424,38 @@ public partial class FreightTerminalWorld
             }
         }
         return bounds;
+    }
+
+    private static string SidearmScreenMetrics(
+        string label,
+        SidearmPresentationInspection inspection)
+    {
+        var viewportHeight = inspection.ScreenSize.Y;
+        return $"{label}_valid={inspection.Valid} "
+            + $"{label}_settled={inspection.Settled} "
+            + $"{label}_sleeves_bottom={inspection.SleevesReachBottom} "
+            + $"{label}_support_shape={inspection.SupportArmShapeValid} "
+            + $"{label}_weapon_readable={inspection.WeaponReadable} "
+            + $"{label}_logical_viewport={inspection.LogicalViewportSize} "
+            + $"{label}_screen={inspection.ScreenSize} "
+            + $"{label}_right_bounds=({inspection.RightArm.Bounds.Position},{inspection.RightArm.Bounds.End}) "
+            + $"{label}_right_bottom_gap={inspection.RightArm.BottomGapRatio:F4} "
+            + $"{label}_right_bottom_span_h={inspection.RightArm.BottomSpanViewportHeights:F4} "
+            + $"{label}_right_bottom_vertices={inspection.RightArm.BottomBandVertexCount} "
+            + $"{label}_right_projected_vertices={inspection.RightArm.ProjectedVertexCount} "
+            + $"{label}_left_bounds=({inspection.LeftArm.Bounds.Position},{inspection.LeftArm.Bounds.End}) "
+            + $"{label}_left_bottom_gap={inspection.LeftArm.BottomGapRatio:F4} "
+            + $"{label}_left_bottom_span_h={inspection.LeftArm.BottomSpanViewportHeights:F4} "
+            + $"{label}_left_bottom_vertices={inspection.LeftArm.BottomBandVertexCount} "
+            + $"{label}_left_projected_vertices={inspection.LeftArm.ProjectedVertexCount} "
+            + $"{label}_left_width_h={inspection.LeftArm.WidthViewportHeights(viewportHeight):F4} "
+            + $"{label}_left_height_h={inspection.LeftArm.HeightViewportHeights(viewportHeight):F4} "
+            + $"{label}_left_aspect={inspection.LeftArm.PixelAspect:F4} "
+            + $"{label}_weapon_bounds=({inspection.Weapon.Bounds.Position},{inspection.Weapon.Bounds.End}) "
+            + $"{label}_weapon_width_h={inspection.Weapon.WidthViewportHeights(viewportHeight):F4} "
+            + $"{label}_weapon_height_h={inspection.Weapon.HeightViewportHeights(viewportHeight):F4} "
+            + $"{label}_weapon_area_h2={inspection.Weapon.AreaViewportHeightsSquared(viewportHeight):F4} "
+            + $"{label}_weapon_projected_vertices={inspection.Weapon.ProjectedVertexCount} ";
     }
 
     private static float HandBasisDelta(Basis left, Basis right)

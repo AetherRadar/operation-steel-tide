@@ -692,6 +692,13 @@ public static class WeaponCatalog
     public static bool IsSidearm(WeaponPlatform platform)
         => Weapon(platform).CarryClass == WeaponCarryClass.Sidearm;
     public static AttachmentDefinition Attachment(string id) => Attachments[id];
+    public static bool CanEquipAttachment(WeaponPlatform platform, string attachmentId)
+    {
+        var attachment = Attachment(attachmentId);
+        return platform != WeaponPlatform.VSS
+            || attachment.Slot != AttachmentSlot.Optic
+            || attachment.Id is "optic_scope" or "optic_7x" or "optic_sniper";
+    }
     public static IReadOnlyCollection<WeaponDefinition> AllWeapons => Weapons.Values;
     public static IReadOnlyCollection<AttachmentDefinition> AllAttachments => Attachments.Values;
 

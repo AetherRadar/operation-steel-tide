@@ -4,17 +4,24 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
-    private async void CaptureOpenHandValidation(bool narrow = false)
+    private async void CaptureOpenHandValidation(bool narrow = false, bool ultrawide = false)
     {
-        if (narrow)
+        if (narrow || ultrawide)
         {
             var window = GetWindow();
+            window.ContentScaleMode = Window.ContentScaleModeEnum.CanvasItems;
             window.ContentScaleAspect = Window.ContentScaleAspectEnum.Ignore;
-            window.Size = new Vector2I(985, 847);
+            window.Size = ultrawide
+                ? new Vector2I(2048, 621)
+                : new Vector2I(985, 847);
             await WaitFrames(4);
         }
         Input.MouseMode = Input.MouseModeEnum.Visible;
-        var suffix = narrow ? "_narrow_validation.png" : "_validation.png";
+        var suffix = ultrawide
+            ? "_ultrawide_validation.png"
+            : narrow
+                ? "_narrow_validation.png"
+                : "_validation.png";
         foreach (var enemy in _enemies) if (IsInstanceValid(enemy)) enemy.ProcessMode = ProcessModeEnum.Disabled;
         foreach (var mate in _squadMates) if (IsInstanceValid(mate)) mate.ProcessMode = ProcessModeEnum.Disabled;
         _missionDirector.ExitDeploymentZone();
@@ -46,14 +53,24 @@ public partial class FreightTerminalWorld
             SaveViewportImage($"res://open_hand_{capture.FileStem}{suffix}");
         }
 
-        _player.GrantFireablePrimaryForDiagnostics(
-            WeaponCatalog.Build(WeaponPlatform.M1911, 0));
-        await WaitFrames(8);
         _player.SetViewPitchForDiagnostics(-0.68f);
-        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-        await WaitFrames(1);
-        SaveViewportImage($"res://open_hand_m1911_downward{suffix}");
+        var downwardSidearmCaptures = new (WeaponPlatform Platform, string FileStem)[]
+        {
+            (WeaponPlatform.P226, "p226"),
+            (WeaponPlatform.M1911, "m1911"),
+            (WeaponPlatform.GSh18, "gsh18"),
+            (WeaponPlatform.DesertEagle, "desert_eagle")
+        };
+        foreach (var capture in downwardSidearmCaptures)
+        {
+            _player.GrantFireablePrimaryForDiagnostics(
+                WeaponCatalog.Build(capture.Platform, 0));
+            await WaitFrames(8);
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            await WaitFrames(1);
+            SaveViewportImage($"res://open_hand_{capture.FileStem}_downward{suffix}");
+        }
         _player.SetViewPitchForDiagnostics(0.0f);
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
 
@@ -83,8 +100,10 @@ public partial class FreightTerminalWorld
             (WeaponPlatform.M4A1, "m4a1"),
             (WeaponPlatform.AK74, "ak74"),
             (WeaponPlatform.AWM, "awm"),
+            (WeaponPlatform.P226, "p226"),
             (WeaponPlatform.M1911, "m1911"),
-            (WeaponPlatform.GSh18, "gsh18")
+            (WeaponPlatform.GSh18, "gsh18"),
+            (WeaponPlatform.DesertEagle, "desert_eagle")
         };
         _player.UiLocked = false;
         Input.MouseMode = Input.MouseModeEnum.Captured;

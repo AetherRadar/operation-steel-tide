@@ -167,6 +167,8 @@ public partial class FreightTerminalWorld
             pair => pair.Key,
             pair => IsValidPlatformWeapon(pair.Key, pair.Value));
         var m4AttachmentConfiguration = CombatModelLibrary.InspectM4AttachmentConfiguration();
+        var authoredOptics = CombatModelLibrary.InspectAuthoredOptics();
+        var vssIntegratedScope = CombatModelLibrary.InspectVssIntegratedScope();
         var lineupCaptured = await CaptureAuthoredWeaponLineup();
         var firstPersonCaptures = await CaptureFirstPersonWeaponViews();
         var operatorModel = CombatModelLibrary.InspectOperator();
@@ -246,6 +248,8 @@ public partial class FreightTerminalWorld
         var valid = weaponGeometry
             && platformGeometry.Values.All(value => value)
             && m4AttachmentConfiguration.Valid
+            && authoredOptics.Valid
+            && vssIntegratedScope.Valid
             && lineupCaptured
             && firstPersonCaptures.Values.All(value => value)
             && operatorGeometry
@@ -298,6 +302,20 @@ public partial class FreightTerminalWorld
             + $"{m4AttachmentConfiguration.BareValid}/"
             + $"{m4AttachmentConfiguration.StandardValid}/"
             + $"{m4AttachmentConfiguration.SuppressedValid} "
+            + $"authored_optics={authoredOptics.Valid}/"
+            + $"{authoredOptics.MeshCount}/"
+            + $"{authoredOptics.MaterialCount}/"
+            + $"{authoredOptics.VertexCount}/"
+            + $"{authoredOptics.TriangleCount} "
+            + $"authored_optic_sizes={authoredOptics.MicroSize}/"
+            + $"{authoredOptics.HoloSize}/"
+            + $"{authoredOptics.ScopeSize} "
+            + $"vss_scope={vssIntegratedScope.Valid}/"
+            + $"surfaces={vssIntegratedScope.GlassSurfaceCount}/"
+            + $"rear_vertices={vssIntegratedScope.RearApertureVertexCount}/"
+            + $"size={vssIntegratedScope.RearApertureSize}/"
+            + $"material={vssIntegratedScope.ClearMaterialValid}/"
+            + $"marker={vssIntegratedScope.MarkerAligned} "
             + $"lineup={lineupCaptured} "
             + $"first_person={string.Join(',', firstPersonCaptures.Select(pair => $"{pair.Key}:{pair.Value}"))} "
             + $"player_authored={playerAuthored} "
@@ -448,6 +466,7 @@ public partial class FreightTerminalWorld
             }
             SaveViewportImage(path);
             captures[platform] = _player.UsesAuthoredWeaponPlatformForDiagnostics(platform)
+                && _player.AuthoredOpticPresentationValidForDiagnostics
                 && System.IO.File.Exists(absolutePath)
                 && new System.IO.FileInfo(absolutePath).Length > 0;
             if (platform == WeaponPlatform.M4A1)

@@ -16,10 +16,13 @@ internal sealed class AuthoredWeaponVisual
 {
     private readonly MechanismTransforms _authoredMechanismRest;
     private MechanismTransforms? _sourceMechanismRest;
+    private readonly Node3D? _legacyRearIronSightPrimary;
+    private readonly Node3D? _legacyRearIronSightSecondary;
 
-    public AuthoredWeaponVisual(Node3D root)
+    public AuthoredWeaponVisual(Node3D root, WeaponPlatform platform)
     {
         Root = root;
+        Platform = platform;
         Magazine = CombatModelLibrary.RequireNode(root, "Magazine");
         SpareMagazine = CombatModelLibrary.RequireNode(root, "SpareMagazine");
         ChargingHandle = CombatModelLibrary.RequireNode(root, "ChargingHandle");
@@ -28,6 +31,14 @@ internal sealed class AuthoredWeaponVisual
         MuzzleDevice = CombatModelLibrary.RequireNode(root, "MuzzleDevice");
         Suppressor = CombatModelLibrary.RequireNode(root, "Suppressor");
         OpticMount = CombatModelLibrary.RequireNode(root, "OpticMount");
+        RearIronSight = CombatModelLibrary.FindOptionalNode(root, "RearIronSight");
+        _legacyRearIronSightPrimary = CombatModelLibrary.FindOptionalNode(
+            root,
+            "M4A1Body_05_Sight");
+        _legacyRearIronSightSecondary = CombatModelLibrary.FindOptionalNode(
+            root,
+            "M4A1Body_06_Sight_2");
+        FrontIronSight = CombatModelLibrary.FindOptionalNode(root, "FrontIronSight");
         MuzzleDeviceTip = CombatModelLibrary.RequireNode(root, "MuzzleDeviceTip");
         SuppressorTip = CombatModelLibrary.RequireNode(root, "SuppressorTip");
         OpticReticleAnchor = CombatModelLibrary.RequireNode(root, "OpticReticleAnchor");
@@ -38,6 +49,7 @@ internal sealed class AuthoredWeaponVisual
     }
 
     public Node3D Root { get; }
+    public WeaponPlatform Platform { get; }
     public Node3D Magazine { get; }
     public Node3D SpareMagazine { get; }
     public Node3D ChargingHandle { get; }
@@ -46,10 +58,18 @@ internal sealed class AuthoredWeaponVisual
     public Node3D MuzzleDevice { get; }
     public Node3D Suppressor { get; }
     public Node3D OpticMount { get; }
+    public Node3D? RearIronSight { get; }
+    public Node3D? FrontIronSight { get; }
     public Node3D MuzzleDeviceTip { get; }
     public Node3D SuppressorTip { get; }
     public Node3D OpticReticleAnchor { get; }
     public Node3D ActiveMuzzleTip => Suppressor.Visible ? SuppressorTip : MuzzleDeviceTip;
+    public VssIntegratedScopeInspection IntegratedOpticInspection
+        => Platform == WeaponPlatform.VSS
+            ? CombatModelLibrary.InspectVssIntegratedScope(Root, OpticReticleAnchor)
+            : default;
+    public bool IntegratedOpticPresentationValid
+        => Platform != WeaponPlatform.VSS || IntegratedOpticInspection.Valid;
 
     public void Configure(WeaponBuild build)
     {
@@ -59,7 +79,27 @@ internal sealed class AuthoredWeaponVisual
         MuzzleDevice.Visible = !suppressed;
         Suppressor.Visible = suppressed;
         Foregrip.Visible = hasForegrip;
-        OpticMount.Visible = build.Attachments.ContainsKey(AttachmentSlot.Optic);
+        var hasOptic = build.Attachments.TryGetValue(
+            AttachmentSlot.Optic,
+            out var opticId);
+        var hasDedicatedIronVisibility = GodotObject.IsInstanceValid(RearIronSight)
+            && GodotObject.IsInstanceValid(FrontIronSight);
+        var usesIntegratedOptic = hasOptic
+            && (!hasDedicatedIronVisibility || opticId == "optic_micro");
+        OpticMount.Visible = usesIntegratedOptic;
+        // Preserve the authored iron sights for the bare rifle, but fold them out
+        // of the optical sight picture. Both assemblies remain in the GLB and are
+        // restored when the optic is removed.
+        if (GodotObject.IsInstanceValid(RearIronSight))
+        {
+            RearIronSight!.Visible = !hasOptic;
+        }
+        else
+        {
+            CombatModelLibrary.SetOptionalVisibility(_legacyRearIronSightPrimary, !hasOptic);
+            CombatModelLibrary.SetOptionalVisibility(_legacyRearIronSightSecondary, !hasOptic);
+        }
+        CombatModelLibrary.SetOptionalVisibility(FrontIronSight, !hasOptic);
     }
 
     public void SyncMechanisms(Node3D magazine, Node3D spareMagazine, Node3D chargingHandle)
@@ -602,7 +642,7 @@ internal static partial class CombatModelLibrary
     internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/gsh18_runtime.glb";
     internal const string DesertEagleScenePath = "res://assets/models/elizion_desert_eagle/desert_eagle.glb";
 
-    private const float Gsh18FirstPersonLength = 0.38f;
+    private const float Gsh18FirstPersonLength = 0.43f;
     private const float Gsh18PreviewLength = 0.78f;
     private const float DesertEagleFirstPersonLength = 0.48f;
     private const float DesertEaglePreviewLength = 1.05f;
@@ -617,6 +657,7 @@ internal static partial class CombatModelLibrary
     {
         "SteelTideM4A1", "Magazine", "SpareMagazine", "ChargingHandle",
         "Stock", "Foregrip", "MuzzleDevice", "Suppressor", "OpticMount",
+        "RearIronSight", "FrontIronSight",
         "MuzzleDeviceTip", "SuppressorTip", "OpticReticleAnchor"
     };
 
@@ -668,7 +709,7 @@ internal static partial class CombatModelLibrary
                 geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
             }
         }
-        var visual = new AuthoredWeaponVisual(root);
+        var visual = new AuthoredWeaponVisual(root, WeaponPlatform.M4A1);
         if (!firstPerson)
         {
             visual.SpareMagazine.Visible = false;
@@ -731,6 +772,11 @@ internal static partial class CombatModelLibrary
             source = InstantiateRequired(WeaponScenePathFor(platform), Array.Empty<string>());
         }
 
+        if (platform == WeaponPlatform.VSS)
+        {
+            ConfigureVssIntegratedScopeGlass(source);
+        }
+
         var sourceBounds = ComputeBounds(source);
         if (sourceBounds.MeshCount == 0 || sourceBounds.Size.X <= 0.001f)
         {
@@ -757,7 +803,26 @@ internal static partial class CombatModelLibrary
         }
         presentation.AddChild(source);
         root.AddChild(presentation);
-        AddWeaponMarkers(root, targetLength);
+        var opticMount = AddWeaponMarkers(root, targetLength);
+        if (platform == WeaponPlatform.VSS)
+        {
+            var aperture = InspectVssIntegratedScope(root);
+            if (!aperture.GeometryValid)
+            {
+                root.Free();
+                throw new InvalidOperationException(
+                    "Authored VSS scope rear aperture could not be derived from its clear lens geometry.");
+            }
+            opticMount.Position = aperture.RearApertureCenter;
+            var reticleAnchor = RequireNode(root, "OpticReticleAnchor");
+            var verified = InspectVssIntegratedScope(root, reticleAnchor);
+            if (!verified.Valid)
+            {
+                root.Free();
+                throw new InvalidOperationException(
+                    "Authored VSS scope marker does not match its clear rear aperture.");
+            }
+        }
         if (firstPerson)
         {
             foreach (var geometry in GeometryBelow(root))
@@ -765,10 +830,10 @@ internal static partial class CombatModelLibrary
                 geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
             }
         }
-        return new AuthoredWeaponVisual(root);
+        return new AuthoredWeaponVisual(root, platform);
     }
 
-    private static void AddWeaponMarkers(Node3D root, float length)
+    private static Node3D AddWeaponMarkers(Node3D root, float length)
     {
         AddMarker(root, "Magazine", new Vector3(0.0f, -0.2f, -0.18f));
         AddMarker(root, "SpareMagazine", new Vector3(-0.3f, -0.62f, -0.18f));
@@ -787,6 +852,7 @@ internal static partial class CombatModelLibrary
         AddMarker(suppressor, "SuppressorTip", Vector3.Zero);
         var opticMount = AddMarker(root, "OpticMount", new Vector3(0.0f, 0.16f, -0.16f));
         AddMarker(opticMount, "OpticReticleAnchor", Vector3.Zero);
+        return opticMount;
     }
 
     private static Node3D AddMarker(Node3D root, string name, Vector3 position)
@@ -963,19 +1029,25 @@ internal static partial class CombatModelLibrary
             var bareValid = visual.MuzzleDevice.Visible
                 && !visual.Suppressor.Visible
                 && !visual.Foregrip.Visible
-                && !visual.OpticMount.Visible;
+                && !visual.OpticMount.Visible
+                && visual.RearIronSight is { Visible: true }
+                && visual.FrontIronSight is { Visible: true };
 
             visual.Configure(WeaponCatalog.Build(WeaponPlatform.M4A1, 0));
             var standardValid = visual.MuzzleDevice.Visible
                 && !visual.Suppressor.Visible
                 && visual.Foregrip.Visible
-                && visual.OpticMount.Visible;
+                && visual.OpticMount.Visible
+                && visual.RearIronSight is { Visible: false }
+                && visual.FrontIronSight is { Visible: false };
 
             visual.Configure(WeaponCatalog.Build(WeaponPlatform.M4A1, 2));
             var suppressedValid = !visual.MuzzleDevice.Visible
                 && visual.Suppressor.Visible
                 && visual.Foregrip.Visible
-                && visual.OpticMount.Visible;
+                && !visual.OpticMount.Visible
+                && visual.RearIronSight is { Visible: false }
+                && visual.FrontIronSight is { Visible: false };
             return new WeaponAttachmentConfigurationInspection(
                 true,
                 bareValid,
@@ -1198,6 +1270,17 @@ internal static partial class CombatModelLibrary
         return node ?? throw new InvalidOperationException(
             $"Combat model {root.Name} is missing required node {name}.");
     }
+
+    internal static void SetOptionalVisibility(Node3D? node, bool visible)
+    {
+        if (GodotObject.IsInstanceValid(node))
+        {
+            node!.Visible = visible;
+        }
+    }
+
+    internal static Node3D? FindOptionalNode(Node3D root, string name)
+        => FindNode(root, name);
 
     internal static AnimationPlayer RequireAnimationPlayer(Node root)
     {

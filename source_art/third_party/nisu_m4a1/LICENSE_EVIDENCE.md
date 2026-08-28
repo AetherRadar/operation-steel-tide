@@ -39,13 +39,24 @@ height map remains among the tracked acquisition inputs. The script applies the
 project's `2.36` authored-space scale, removes zero-area faces, and reorganizes
 the source meshes under the project's stable weapon nodes. In particular, the
 active `Magazine`, `SpareMagazine`, `ChargingHandle`, and `Stock` nodes own
-movable nisu geometry. The normal `MuzzleDevice` is split from the nisu
-`Barrel`; the complete `Foregrip`, `Suppressor`, and `OpticMount` geometry is
+movable nisu geometry. The source `Sight` and `Sight_2` objects are preserved
+under the dedicated `RearIronSight` visibility node. The original front tower
+and post are similarly separated from `Barrel` beneath `FrontIronSight`. The
+runtime can therefore clear both authored irons from the optic window while
+retaining the complete original sight set for the no-optic configuration. The
+normal `MuzzleDevice` is split from the nisu `Barrel`; the complete `Foregrip`,
+`Suppressor`, and `OpticMount` geometry is
 adapted from the separately tracked Quaternius CC0 `scarl.glb`, `mp5a5.glb`,
 and `axmc.glb` sources. Their exact source-pack filenames, objects, acquisition
 date, license, and runtime mapping are recorded in
 `../../../assets/models/steel_tide_m4a1/LICENSE.md` and
 `../../../assets/models/quaternius_ultimate_guns/LICENSE.md`.
+
+The AXMC component's original glass faces are used only to derive the stable
+`OpticReticleAnchor`. The reproducible adaptation then removes both end panes
+from the runtime optic while preserving the authored housing and mount, leaving
+a physically open sight channel. The unmodified Quaternius source GLB remains
+tracked separately; no source geometry is overwritten.
 
 The reproducible outputs are:
 

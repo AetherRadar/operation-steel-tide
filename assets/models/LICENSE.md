@@ -25,13 +25,24 @@ Universal:
 - Detailed license and mapping record: `steel_tide_m4a1/LICENSE.md`
 
 The main rifle uses nisu's textured source. The short foregrip comes from
-`scarl.glb`, the rounder suppressor from `mp5a5.glb`, and the glass-bearing
-optic from `axmc.glb`; the normal muzzle remains selected nisu geometry. Exact
-source objects, runtime nodes, and transform-only muzzle/reticle markers are
-recorded in `steel_tide_m4a1/LICENSE.md`. Both source collections, the editable
-composite, and the runtime model remain CC0 and are not relicensed as MIT. The
+`scarl.glb`, the rounder suppressor from `mp5a5.glb`, and the open-aperture
+optic housing from `axmc.glb`; the normal muzzle remains selected nisu
+geometry. Exact source objects, runtime nodes, removed source-glass panes, and
+transform-only muzzle/reticle markers are recorded in
+`steel_tide_m4a1/LICENSE.md`. Both source collections, the editable composite,
+and the runtime model remain CC0 and are not relicensed as MIT. The
 project-authored adaptation script remains covered by the repository's root MIT
 license, subject to the disclosure in `docs/CONTENT_PROVENANCE.md`.
+
+The shared first-person micro, holographic, and magnified optic set is likewise
+adapted in Blender from finished Quaternius Ultimate Guns Pack components. Its
+runtime output is `steel_tide_optics/steel_tide_optics.glb`, its authoritative
+editable source is `../../source_art/combat_optics/steel_tide_optics.blend`, and
+its reproducible adaptation is `../../scripts/blender/build_authored_optics.py`.
+All three source components are CC0 1.0 Universal. Their exact source-object
+mapping, acquisition date, license, output hashes, removed source-glass panes,
+and physically open aperture checks are recorded in
+`steel_tide_optics/LICENSE.md` and `../../source_art/combat_optics/README.md`.
 
 The legacy Steel Tide operator model remains project-authored by
 `scripts/blender/generate_combat_models.py`. Its editable source is

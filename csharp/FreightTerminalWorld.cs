@@ -3019,18 +3019,6 @@ public partial class FreightTerminalWorld : Node3D
         }
     }
 
-    private async void CaptureAdsFrame()
-    {
-        _player.GrantFireablePrimaryForDiagnostics();
-        await WaitFrames(16);
-        Input.ActionPress("aim");
-        await WaitFrames(50);
-        SaveViewportImage("res://ads_validation.png");
-        GD.Print($"ADS_CHECK aiming={_player.IsAiming} ammo={_player.Ammo} phase={_missionPhase}");
-        Input.ActionRelease("aim");
-        GetTree().Quit();
-    }
-
     private async void ValidateEquipmentFlow()
     {
         _player.GrantFireablePrimaryForDiagnostics();
@@ -4367,39 +4355,6 @@ public partial class FreightTerminalWorld : Node3D
         GD.Print($"ARSENAL_CHECK valid={valid} catalog={catalogOk} sniper={sniperEquipped} dedicated_ammo={wrongCaliberSeparated && sniperAmmoLoaded} smg={independentSmgReserve} magnum={magnumEquipped} optic_7x={hasSevenPowerOptic} ads_fov={_player.CurrentAimFieldOfView:0.0} skins={KnifeSkinCatalog.All.Count} world_m24={worldM24} world_mp5={worldMp5} world_sniper_ammo={worldSniperAmmo} world_skins={worldKnifeSkins} boss_reward={bossRewardReady}");
         GD.Print($"ARSENAL_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
-    }
-
-    private async void CaptureOpticsFrames()
-    {
-        foreach (var enemy in _enemies)
-        {
-            enemy.ProcessMode = ProcessModeEnum.Disabled;
-        }
-        var optics = new[]
-        {
-            (Id: "optic_micro", File: "optic_micro_validation.png", Platform: WeaponPlatform.M4A1),
-            (Id: "optic_holo", File: "optic_holo_validation.png", Platform: WeaponPlatform.M4A1),
-            (Id: "optic_scope", File: "optic_scope_validation.png", Platform: WeaponPlatform.ScarL),
-            (Id: "optic_7x", File: "optic_7x_validation.png", Platform: WeaponPlatform.AXMC),
-            (Id: "optic_7x", File: "awm_optic_7x_validation.png", Platform: WeaponPlatform.AWM),
-            (Id: "optic_sniper", File: "optic_sniper_validation.png", Platform: WeaponPlatform.M24)
-        };
-        foreach (var optic in optics)
-        {
-            var build = WeaponCatalog.Build(optic.Platform, 3);
-            build.Attachments[AttachmentSlot.Optic] = optic.Id;
-            _player.EquipFromLoot(new LootItem { Kind = LootItemKind.Weapon, Weapon = build });
-            await WaitFrames(28);
-            SaveViewportImage("res://" + optic.File);
-            Input.ActionPress("aim");
-            await WaitFrames(38);
-            SaveViewportImage("res://" + optic.File.Replace("_validation", "_ads_validation"));
-            var aiming = _player.IsAiming;
-            Input.ActionRelease("aim");
-            await WaitFrames(16);
-            GD.Print($"OPTIC_CHECK id={optic.Id} platform={optic.Platform} visible=true aiming={aiming} handling={_player.CurrentWeaponStats.Handling:0.00}");
-        }
-        GetTree().Quit();
     }
 
     private async void ValidateStanceAndArmorFlow()

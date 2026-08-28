@@ -11,6 +11,11 @@ public partial class TacticalPlayer
     // per-platform presentation controllers once that lifecycle has a stable API.
     private const float AuthoredSmgPresentationScale = 0.72f;
     private const float AuthoredArmPresentationScale = 0.72f;
+    private const float AuthoredSidearmArmPresentationScale = 0.64f;
+    private const float AuthoredSidearmArmPitchRadians = 0.30f;
+    private const float AuthoredLargeSidearmArmPresentationScale = 0.50f;
+    private const float AuthoredLargeSidearmArmPitchRadians = 0.80f;
+    private const float SidearmBottomScreenBandStartRatio = 0.96f;
     internal const float MaxServicePistolSupportArmCorrection = 0.03f;
     private static readonly Vector3 AuthoredSmgCameraPosition = new(0.34f, -0.45f, -0.72f);
     private static readonly Vector3 M4ReloadMagazineGripOffset = new(-0.06f, 0.08f, -0.02f);
@@ -56,23 +61,30 @@ public partial class TacticalPlayer
                     out var muzzleId)
                 && muzzleId == "muzzle_suppressor";
             var hasOptic = EquippedWeapon.Attachments.ContainsKey(AttachmentSlot.Optic);
+            EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Optic, out var opticId);
+            var usesIntegratedOptic = hasOptic && opticId == "optic_micro";
             var expectedMuzzleTip = suppressed
                 ? _authoredPrimaryWeapon.SuppressorTip
                 : _authoredPrimaryWeapon.MuzzleDeviceTip;
             var authoredVisibility = _authoredPrimaryWeapon.MuzzleDevice.Visible == !suppressed
                 && _authoredPrimaryWeapon.Suppressor.Visible == suppressed
-                && _authoredPrimaryWeapon.OpticMount.Visible == hasOptic;
+                && _authoredPrimaryWeapon.OpticMount.Visible == usesIntegratedOptic
+                && _authoredPrimaryWeapon.RearIronSight?.Visible == !hasOptic
+                && _authoredPrimaryWeapon.FrontIronSight?.Visible == !hasOptic;
             var proceduralOpticsHidden = !_reflexSightModel.Visible
                 && !_holoSightModel.Visible
                 && !_scopeSightModel.Visible;
             var muzzleAligned = _muzzle.GlobalPosition.DistanceTo(
                 expectedMuzzleTip.GlobalPosition) <= 0.001f;
             var opticAligned = !hasOptic
-                || (_opticRoot.Visible
+                || (usesIntegratedOptic
+                    && _opticRoot.Visible
                     && _opticRoot.GlobalPosition.DistanceTo(
                         _authoredPrimaryWeapon.OpticReticleAnchor.GlobalPosition) <= 0.001f
                     && _opticReticle.GlobalPosition.DistanceTo(
-                        _authoredPrimaryWeapon.OpticReticleAnchor.GlobalPosition) <= 0.001f);
+                        _authoredPrimaryWeapon.OpticReticleAnchor.GlobalPosition) <= 0.001f)
+                || (!usesIntegratedOptic
+                    && AuthoredOpticPresentationValidForDiagnostics);
             return authoredVisibility
                 && proceduralOpticsHidden
                 && muzzleAligned
@@ -184,6 +196,154 @@ public partial class TacticalPlayer
                 : null;
 
     internal Transform3D WeaponRootGlobalTransformForDiagnostics => _weaponRoot.GlobalTransform;
+
+    internal SidearmPresentationInspection InspectSidearmPresentationForDiagnostics()
+    {
+        var sidearm = WeaponCatalog.IsSidearm(EquippedWeapon.Platform);
+        var arms = ActiveAuthoredArms();
+        var weapon = ActiveAuthoredWeaponRootForDiagnostics;
+        var armsVisible = sidearm
+            && arms is not null
+            && IsInstanceValid(arms.Root)
+            && arms.Root.IsVisibleInTree()
+            && arms.RightArm.IsVisibleInTree()
+            && arms.LeftArm.IsVisibleInTree();
+        var logicalViewportSize = _camera.GetViewport().GetVisibleRect().Size;
+        var windowSize = GetWindow().Size;
+        var screenSize = new Vector2(windowSize.X, windowSize.Y);
+        return new SidearmPresentationInspection(
+            sidearm,
+            armsVisible,
+            _isAiming,
+            _weaponRoot.Position,
+            WeaponViewPositionTarget(),
+            logicalViewportSize,
+            screenSize,
+            InspectVisibleMeshScreenProjection(
+                arms?.RightArm,
+                logicalViewportSize,
+                screenSize),
+            InspectVisibleMeshScreenProjection(
+                arms?.LeftArm,
+                logicalViewportSize,
+                screenSize),
+            InspectVisibleMeshScreenProjection(
+                weapon,
+                logicalViewportSize,
+                screenSize));
+    }
+
+    private VisibleMeshScreenProjection InspectVisibleMeshScreenProjection(
+        Node3D? root,
+        Vector2 logicalViewportSize,
+        Vector2 screenSize)
+    {
+        if (root is null
+            || !IsInstanceValid(root)
+            || !root.IsVisibleInTree()
+            || !IsInstanceValid(_camera)
+            || logicalViewportSize.X <= 0.0f
+            || logicalViewportSize.Y <= 0.0f
+            || screenSize.X <= 0.0f
+            || screenSize.Y <= 0.0f)
+        {
+            return default;
+        }
+
+        var minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+        var maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+        var bottomMinimumX = float.PositiveInfinity;
+        var bottomMaximumX = float.NegativeInfinity;
+        var projectedVertexCount = 0;
+        var bottomBandVertexCount = 0;
+        var bottomBandStart = screenSize.Y * SidearmBottomScreenBandStartRatio;
+        var screenScale = new Vector2(
+            screenSize.X / logicalViewportSize.X,
+            screenSize.Y / logicalViewportSize.Y);
+        var cameraInverse = _camera.GlobalTransform.AffineInverse();
+
+        if (root is MeshInstance3D rootMesh)
+        {
+            AccumulateMesh(rootMesh);
+        }
+        foreach (var mesh in CombatModelLibrary.MeshesBelow(root))
+        {
+            AccumulateMesh(mesh);
+        }
+
+        if (projectedVertexCount == 0
+            || maximum.X < 0.0f
+            || maximum.Y < 0.0f
+            || minimum.X > screenSize.X
+            || minimum.Y > screenSize.Y)
+        {
+            return default;
+        }
+
+        var visibleMinimum = new Vector2(
+            Mathf.Clamp(minimum.X, 0.0f, screenSize.X),
+            Mathf.Clamp(minimum.Y, 0.0f, screenSize.Y));
+        var visibleMaximum = new Vector2(
+            Mathf.Clamp(maximum.X, 0.0f, screenSize.X),
+            Mathf.Clamp(maximum.Y, 0.0f, screenSize.Y));
+        var bounds = new Rect2(visibleMinimum, visibleMaximum - visibleMinimum);
+        var bottomGapRatio = Mathf.Max(0.0f, screenSize.Y - maximum.Y)
+            / screenSize.Y;
+        var bottomSpanViewportHeights = bottomBandVertexCount > 0
+            ? (bottomMaximumX - bottomMinimumX) / screenSize.Y
+            : 0.0f;
+        return new VisibleMeshScreenProjection(
+            true,
+            bounds,
+            projectedVertexCount,
+            bottomBandVertexCount,
+            bottomGapRatio,
+            bottomSpanViewportHeights);
+
+        void AccumulateMesh(MeshInstance3D mesh)
+        {
+            if (mesh.Mesh is null || !mesh.IsVisibleInTree())
+            {
+                return;
+            }
+
+            for (var surface = 0; surface < mesh.Mesh.GetSurfaceCount(); surface++)
+            {
+                using var arrays = mesh.Mesh.SurfaceGetArrays(surface);
+                var vertices = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+                foreach (var vertex in vertices)
+                {
+                    var worldPoint = mesh.GlobalTransform * vertex;
+                    var cameraPoint = cameraInverse * worldPoint;
+                    if (cameraPoint.Z > -_camera.Near
+                        || _camera.IsPositionBehind(worldPoint))
+                    {
+                        continue;
+                    }
+
+                    var screenPoint = _camera.UnprojectPosition(worldPoint) * screenScale;
+                    if (!float.IsFinite(screenPoint.X) || !float.IsFinite(screenPoint.Y))
+                    {
+                        continue;
+                    }
+
+                    minimum = minimum.Min(screenPoint);
+                    maximum = maximum.Max(screenPoint);
+                    projectedVertexCount++;
+                    if (screenPoint.Y < bottomBandStart
+                        || screenPoint.X < 0.0f
+                        || screenPoint.X > screenSize.X)
+                    {
+                        continue;
+                    }
+
+                    bottomMinimumX = Mathf.Min(bottomMinimumX, screenPoint.X);
+                    bottomMaximumX = Mathf.Max(bottomMaximumX, screenPoint.X);
+                    bottomBandVertexCount++;
+                }
+            }
+        }
+    }
 
     internal FirstPersonHandPoseInspection InspectAuthoredHandPoseForDiagnostics()
     {
@@ -785,13 +945,33 @@ public partial class TacticalPlayer
 
         var pose = FirstPersonArmPoseCatalog.For(EquippedWeapon.Platform);
         var inheritedScale = Mathf.Max(0.0001f, _weaponRoot.Scale.X);
+        var sidearm = WeaponCatalog.IsSidearm(EquippedWeapon.Platform);
+        var largeSidearm = EquippedWeapon.Platform == WeaponPlatform.DesertEagle;
+        var presentationScale = largeSidearm
+            ? AuthoredLargeSidearmArmPresentationScale
+            : sidearm
+                ? AuthoredSidearmArmPresentationScale
+                : AuthoredArmPresentationScale;
         arms.RightArm.Transform = Transform3D.Identity;
         arms.LeftArm.Transform = Transform3D.Identity;
         arms.RightArm.Visible = true;
         arms.LeftArm.Visible = true;
+        var presentationBasis = new Basis(Vector3.Up, Mathf.Pi);
+        if (sidearm)
+        {
+            // Rotate the complete authored two-arm pose around its grip frame.
+            // This sends both elbows and capped sleeve openings back toward the
+            // chest instead of projecting a straight arm across an ultrawide
+            // viewport. Palm anchors remain rigidly attached to the weapon.
+            var pitch = largeSidearm
+                ? AuthoredLargeSidearmArmPitchRadians
+                : AuthoredSidearmArmPitchRadians;
+            presentationBasis = new Basis(Vector3.Right, pitch)
+                * presentationBasis;
+        }
         var targetFrame = new Transform3D(
-            new Basis(Vector3.Up, Mathf.Pi).Scaled(
-                Vector3.One * (AuthoredArmPresentationScale / inheritedScale)),
+            presentationBasis.Scaled(
+                Vector3.One * (presentationScale / inheritedScale)),
             pose.PrimaryGrip);
         arms.Root.Transform = targetFrame * arms.RightGripTransformInRoot.AffineInverse();
         var supportTargetInArms = arms.Root.Transform.AffineInverse() * pose.SupportGrip;
@@ -880,7 +1060,10 @@ public partial class TacticalPlayer
         try
         {
             var authoredWeapon = CombatModelLibrary.InstantiateGsh18(firstPerson: true);
-            authoredWeapon.Root.Position = new Vector3(0.0f, -0.04f, -0.16f);
+            // Centre the compact source close to the service-pistol grip frame.
+            // The old -0.16 m offset pushed an already short slide much farther
+            // from the camera than the P226/M1911 and made it read as a toy.
+            authoredWeapon.Root.Position = new Vector3(0.0f, -0.04f, 0.03f);
             _weaponRoot.AddChild(authoredWeapon.Root);
             _authoredGsh18Weapon = authoredWeapon;
         }
@@ -921,6 +1104,17 @@ public partial class TacticalPlayer
             return;
         }
         authoredWeapon.SyncMechanismState(_magazine, _spareMagazine, _chargingHandle);
+        if (EquippedWeapon.Platform == WeaponPlatform.VSS
+            && _opticRoot.Visible
+            && EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Optic, out var opticId)
+            && WeaponUsesIntegratedOptic(WeaponPlatform.VSS, opticId))
+        {
+            // The marker is derived at load time from the rear clear-lens
+            // vertices of the authored VSS mesh, so runtime alignment cannot
+            // drift away from the actual scope aperture.
+            _opticRoot.GlobalPosition = authoredWeapon.OpticReticleAnchor.GlobalPosition;
+            _opticReticle.Position = Vector3.Zero;
+        }
     }
 }
 
@@ -941,6 +1135,85 @@ internal readonly record struct FirstPersonHandPoseInspection(
     Vector3 PrimarySurfaceOffset,
     Vector3 SupportSurfaceOffset,
     float SupportArmCorrection);
+
+internal readonly record struct VisibleMeshScreenProjection(
+    bool Available,
+    Rect2 Bounds,
+    int ProjectedVertexCount,
+    int BottomBandVertexCount,
+    float BottomGapRatio,
+    float BottomSpanViewportHeights)
+{
+    public float WidthViewportHeights(float viewportHeight)
+        => viewportHeight > 0.0f ? Bounds.Size.X / viewportHeight : 0.0f;
+
+    public float HeightViewportHeights(float viewportHeight)
+        => viewportHeight > 0.0f ? Bounds.Size.Y / viewportHeight : 0.0f;
+
+    public float PixelAspect
+        => Bounds.Size.Y > 0.0f ? Bounds.Size.X / Bounds.Size.Y : float.PositiveInfinity;
+
+    public float AreaViewportHeightsSquared(float viewportHeight)
+        => viewportHeight > 0.0f
+            ? Bounds.Size.X * Bounds.Size.Y / (viewportHeight * viewportHeight)
+            : 0.0f;
+}
+
+internal readonly record struct SidearmPresentationInspection(
+    bool Available,
+    bool ArmsVisible,
+    bool Aiming,
+    Vector3 WeaponPosition,
+    Vector3 TargetPosition,
+    Vector2 LogicalViewportSize,
+    Vector2 ScreenSize,
+    VisibleMeshScreenProjection RightArm,
+    VisibleMeshScreenProjection LeftArm,
+    VisibleMeshScreenProjection Weapon)
+{
+    private const float MaxSleeveBottomGapRatio = 0.03f;
+    private const float MinSleeveBottomSpanViewportHeights = 0.08f;
+    private const float MaxSupportArmWidthViewportHeights = 1.45f;
+    private const float MinSupportArmHeightViewportHeights = 0.18f;
+    private const float MaxSupportArmPixelAspect = 5.80f;
+    private const float MinWeaponWidthViewportHeights = 0.035f;
+    private const float MinWeaponHeightViewportHeights = 0.22f;
+    private const float MinWeaponAreaViewportHeightsSquared = 0.0095f;
+
+    public bool Settled
+        => WeaponPosition.DistanceTo(TargetPosition) <= 0.012f;
+
+    public bool SleevesReachBottom
+        => RightArm.BottomGapRatio <= MaxSleeveBottomGapRatio
+            && LeftArm.BottomGapRatio <= MaxSleeveBottomGapRatio
+            && RightArm.BottomBandVertexCount > 0
+            && LeftArm.BottomBandVertexCount > 0
+            && RightArm.BottomSpanViewportHeights >= MinSleeveBottomSpanViewportHeights
+            && LeftArm.BottomSpanViewportHeights >= MinSleeveBottomSpanViewportHeights;
+
+    public bool SupportArmShapeValid
+        => LeftArm.WidthViewportHeights(ScreenSize.Y) <= MaxSupportArmWidthViewportHeights
+            && LeftArm.HeightViewportHeights(ScreenSize.Y) >= MinSupportArmHeightViewportHeights
+            && LeftArm.PixelAspect <= MaxSupportArmPixelAspect;
+
+    public bool WeaponReadable
+        => Weapon.WidthViewportHeights(ScreenSize.Y) >= MinWeaponWidthViewportHeights
+            && Weapon.HeightViewportHeights(ScreenSize.Y) >= MinWeaponHeightViewportHeights
+            && Weapon.AreaViewportHeightsSquared(ScreenSize.Y)
+                >= MinWeaponAreaViewportHeightsSquared;
+
+    public bool Valid
+        => Available
+            && ArmsVisible
+            && Settled
+            && ScreenSize.Y > 0.0f
+            && RightArm.Available
+            && LeftArm.Available
+            && Weapon.Available
+            && SleevesReachBottom
+            && SupportArmShapeValid
+            && WeaponReadable;
+}
 
 internal readonly record struct AuthoredM4ReloadArmInspection(
     bool AuthoredArmActive,

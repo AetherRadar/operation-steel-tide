@@ -12,12 +12,15 @@ Godot -Z-forward, +Y-up convention used by the first-person weapon rig.
 from __future__ import annotations
 
 from collections import defaultdict
+import json
 from math import pi
 from pathlib import Path
+import struct
 
 import bpy
 import bmesh
 from mathutils import Matrix, Vector
+from mathutils.bvhtree import BVHTree
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -30,6 +33,9 @@ OPTIC_SOURCE_GLB = QUATERNIUS_GUN_DIR / "axmc.glb"
 OUTPUT_GLB = REPO_ROOT / "assets" / "models" / "steel_tide_m4a1" / "steel_tide_m4a1.glb"
 OUTPUT_BLEND = REPO_ROOT / "source_art" / "combat_models" / "steel_tide_m4a1.blend"
 PREVIEW_PATH = REPO_ROOT / "build" / "art-previews" / "steel_tide_m4a1.png"
+ADS_PREVIEW_PATH = (
+    REPO_ROOT / "build" / "art-previews" / "steel_tide_m4a1_ads.png"
+)
 
 # The source model is authored at a real 0.859 m length. Existing first-person
 # weapon transforms expect an authored-space length of about 2.03 m before the
@@ -56,6 +62,8 @@ MAGAZINE_ORIGIN = Vector((0.0, 0.31, -0.2))
 SPARE_MAGAZINE_ORIGIN = Vector((-0.3, 0.18, -0.62))
 CHARGING_HANDLE_ORIGIN = Vector((0.075, 0.05, 0.085))
 STOCK_ORIGIN = Vector((0.0, -0.49, 0.0))
+REAR_IRON_ORIGIN = Vector((0.0, -0.16, 0.15))
+FRONT_IRON_ORIGIN = Vector((0.0, 0.78, 0.14))
 FOREGRIP_ORIGIN = Vector((0.0, 0.58, -0.17))
 MUZZLE_ORIGIN = Vector((0.0, 1.205, 0.015))
 SUPPRESSOR_ORIGIN = Vector((0.0, 1.26, 0.015))
@@ -86,7 +94,7 @@ ATTACHMENT_SOURCE_INFO = {
     ),
     "OpticMount": (
         "assets/models/quaternius_ultimate_guns/axmc.glb",
-        f"{OPTIC_SOURCE_OBJECT}:glass-bearing authored scope component",
+        f"{OPTIC_SOURCE_OBJECT}:authored scope housing with source glass removed at runtime",
     ),
 }
 
@@ -530,16 +538,106 @@ def add_optic_reticle_anchor(
         raise RuntimeError(
             f"Cannot derive optic reticle anchor outside {parent.name}."
         )
-    marker = empty(
-        "OpticReticleAnchor",
-        parent,
-        authored_optic_reticle_location(geometry, glass_material_index),
+    authored_glass_center = authored_optic_reticle_location(
+        geometry,
+        glass_material_index,
     )
+    marker = empty("OpticReticleAnchor", parent, authored_glass_center)
     marker["runtime_asset"] = True
     marker["derived_from_mesh"] = geometry.name
     marker["derived_from_material"] = geometry.data.materials[glass_material_index].name
-    marker["derived_from_surface"] = "-Y eyepiece glass"
+    marker["derived_from_surface"] = "-Y source eyepiece glass before pane removal"
+    marker["authored_glass_center"] = list(authored_glass_center)
     return marker
+
+
+def remove_authored_optic_glass(
+    geometry: bpy.types.Object,
+    glass_material_index: int,
+) -> None:
+    if geometry.type != "MESH":
+        raise RuntimeError("Cannot open an optic aperture on non-mesh geometry.")
+    mesh = geometry.data
+    if glass_material_index >= len(mesh.materials):
+        raise RuntimeError("Compact optic glass material slot is missing.")
+    glass_material_name = mesh.materials[glass_material_index].name
+    glass_polygons = [
+        polygon
+        for polygon in mesh.polygons
+        if polygon.material_index == glass_material_index
+    ]
+    glass_vertices = {
+        vertex_index
+        for polygon in glass_polygons
+        for vertex_index in polygon.vertices
+    }
+    glass_triangles = sum(len(polygon.vertices) - 2 for polygon in glass_polygons)
+    if (len(glass_polygons), len(glass_vertices), glass_triangles) != (12, 16, 12):
+        raise RuntimeError(
+            "Unexpected compact optic source-glass topology: "
+            f"faces={len(glass_polygons)}/12 "
+            f"vertices={len(glass_vertices)}/16 triangles={glass_triangles}/12"
+        )
+
+    topology = bmesh.new()
+    topology.from_mesh(mesh)
+    glass_faces = [
+        face
+        for face in topology.faces
+        if face.material_index == glass_material_index
+    ]
+    bmesh.ops.delete(topology, geom=glass_faces, context="FACES")
+    loose_vertices = [vertex for vertex in topology.verts if not vertex.link_faces]
+    if loose_vertices:
+        bmesh.ops.delete(topology, geom=loose_vertices, context="VERTS")
+    topology.to_mesh(mesh)
+    topology.free()
+    mesh.materials.pop(index=glass_material_index)
+    mesh.validate(clean_customdata=False)
+    mesh.update()
+    mesh.calc_loop_triangles()
+
+    geometry["removed_source_glass_material"] = glass_material_name
+    geometry["removed_source_glass_faces"] = len(glass_polygons)
+    geometry["removed_source_glass_vertices"] = len(glass_vertices)
+    geometry["removed_source_glass_triangles"] = glass_triangles
+
+
+def validate_open_optic_aperture() -> None:
+    geometry = bpy.data.objects["OpticMountGeometry"]
+    reticle_anchor = bpy.data.objects["OpticReticleAnchor"]
+    if geometry.parent != reticle_anchor.parent:
+        raise RuntimeError("Optic geometry and reticle anchor no longer share a parent.")
+    if any("Glass" in material.name for material in geometry.data.materials):
+        raise RuntimeError("Runtime optic still contains a glass material slot.")
+    if geometry.get("removed_source_glass_faces") != 12:
+        raise RuntimeError("Runtime optic did not remove both authored glass panes.")
+
+    vertices = [
+        geometry.matrix_local @ vertex.co
+        for vertex in geometry.data.vertices
+    ]
+    polygons = [tuple(polygon.vertices) for polygon in geometry.data.polygons]
+    aperture = BVHTree.FromPolygons(vertices, polygons, all_triangles=False)
+    center = reticle_anchor.location
+    bounds_min_y = min(position.y for position in vertices)
+    bounds_max_y = max(position.y for position in vertices)
+    ray_origin = Vector((center.x, bounds_min_y - 0.01, center.z))
+    hit_location, _, _, _ = aperture.ray_cast(
+        ray_origin,
+        Vector((0.0, 1.0, 0.0)),
+        bounds_max_y - bounds_min_y + 0.02,
+    )
+    if hit_location is not None:
+        raise RuntimeError(
+            "Runtime optic centerline remains blocked after glass removal: "
+            f"hit={tuple(hit_location)}"
+        )
+    print(
+        "M4A1_OPTIC_APERTURE "
+        "glass_faces=0 removed_faces=12 removed_triangles=12 "
+        "centerline_clear=True"
+    )
 
 
 def evaluated_mesh_copy(
@@ -682,20 +780,13 @@ def build_runtime_asset() -> bpy.types.Object:
         0.3,
         OPTIC_SOURCE_GLB,
     )
-    optic_glass_material = build_scalar_pbr_material(
-        "QuaterniusCompactOpticGlass",
-        (0.004, 0.018, 0.03, 1.0),
+    optic_source_glass_material = build_scalar_pbr_material(
+        "QuaterniusSourceGlassSelection",
+        (0.0, 0.0, 0.0, 0.0),
         0.0,
-        0.08,
+        0.0,
         OPTIC_SOURCE_GLB,
     )
-    optic_glass_principled = optic_glass_material.node_tree.nodes.get(
-        "Principled BSDF"
-    )
-    if optic_glass_principled is None:
-        raise RuntimeError("Compact optic glass material is missing Principled BSDF.")
-    optic_glass_principled.inputs["Coat Weight"].default_value = 0.38
-    optic_glass_principled.inputs["Coat Roughness"].default_value = 0.08
 
     muzzle_faces = select_face_components(
         source_meshes["Barrel"],
@@ -709,7 +800,27 @@ def build_runtime_asset() -> bpy.types.Object:
         expected_vertices=123,
         expected_triangles=250,
     )
-    barrel_body_faces = set(range(len(source_meshes["Barrel"].data.polygons))) - muzzle_faces
+    front_iron_faces = select_face_components(
+        source_meshes["Barrel"],
+        lambda minimum, maximum: (
+            minimum.y >= 0.31
+            and maximum.y <= 0.356
+            and maximum.z >= 0.072
+        ),
+        expected_component_count=3,
+    )
+    require_source_face_statistics(
+        "FrontIronSight",
+        source_meshes["Barrel"],
+        front_iron_faces,
+        expected_vertices=236,
+        expected_triangles=454,
+    )
+    barrel_body_faces = (
+        set(range(len(source_meshes["Barrel"].data.polygons)))
+        - muzzle_faces
+        - front_iron_faces
+    )
 
     foregrip_faces = select_face_components(
         foregrip_source,
@@ -776,7 +887,10 @@ def build_runtime_asset() -> bpy.types.Object:
     root["attachment_source_license"] = "CC0-1.0"
 
     mechanism_sources = {"Magazine", "Charging_Handle", "Stock"}
-    for index, source_name in enumerate(sorted(EXPECTED_SOURCE_MESHES - mechanism_sources)):
+    rear_iron_sources = {"Sight", "Sight_2"}
+    for index, source_name in enumerate(
+        sorted(EXPECTED_SOURCE_MESHES - mechanism_sources - rear_iron_sources)
+    ):
         if source_name == "Barrel":
             body = mesh_copy_from_faces(
                 source_meshes[source_name],
@@ -844,6 +958,45 @@ def build_runtime_asset() -> bpy.types.Object:
         STOCK_ORIGIN,
     )
     stock_geometry["runtime_asset"] = True
+
+    rear_iron_sight = empty("RearIronSight", root, REAR_IRON_ORIGIN)
+    rear_iron_sight["runtime_asset"] = True
+    rear_iron_sight["source_creator"] = "nisu"
+    rear_iron_sight["source_file"] = SOURCE_FBX.relative_to(REPO_ROOT).as_posix()
+    rear_iron_sight["source_objects"] = "Sight,Sight_2"
+    rear_iron_sight["source_license"] = "CC0-1.0"
+    for source_name in sorted(rear_iron_sources):
+        rear_geometry = evaluated_mesh_copy(
+            source_meshes[source_name],
+            f"RearIronSightGeometry_{source_name}",
+            rear_iron_sight,
+            material,
+            REAR_IRON_ORIGIN,
+        )
+        rear_geometry["runtime_asset"] = True
+
+    front_iron_sight = empty("FrontIronSight", root, FRONT_IRON_ORIGIN)
+    front_iron_sight["runtime_asset"] = True
+    front_iron_sight["source_creator"] = "nisu"
+    front_iron_sight["source_file"] = SOURCE_FBX.relative_to(REPO_ROOT).as_posix()
+    front_iron_sight["source_object"] = "Barrel"
+    front_iron_sight["source_selection"] = "authored front-sight components"
+    front_iron_sight["source_license"] = "CC0-1.0"
+    front_iron_geometry = mesh_copy_from_faces(
+        source_meshes["Barrel"],
+        "FrontIronSightGeometry",
+        front_iron_sight,
+        front_iron_faces,
+        Matrix.Translation(-FRONT_IRON_ORIGIN)
+        @ Matrix.Scale(SOURCE_SCALE, 4)
+        @ source_meshes["Barrel"].matrix_world,
+        (material,),
+        {
+            material_index: 0
+            for material_index in range(len(source_meshes["Barrel"].data.materials))
+        },
+    )
+    front_iron_geometry["runtime_asset"] = True
 
     foregrip = empty("Foregrip", root, FOREGRIP_ORIGIN)
     muzzle_device = empty("MuzzleDevice", root, MUZZLE_ORIGIN)
@@ -949,7 +1102,7 @@ def build_runtime_asset() -> bpy.types.Object:
         (
             optic_housing_material,
             optic_hardware_material,
-            optic_glass_material,
+            optic_source_glass_material,
         ),
         {0: 0, 1: 1, 2: 2, 3: 0, 4: 1},
         require_uv=False,
@@ -959,7 +1112,7 @@ def build_runtime_asset() -> bpy.types.Object:
     optic_geometry["source_file"] = OPTIC_SOURCE_GLB.relative_to(REPO_ROOT).as_posix()
     optic_geometry["source_object"] = OPTIC_SOURCE_OBJECT
     optic_geometry["source_selection"] = (
-        "glass-bearing authored scope component adapted as compact tube optic"
+        "authored scope housing; source glass used for anchor then removed"
     )
     optic_geometry["source_license"] = "CC0-1.0"
     optic_reticle_anchor = add_optic_reticle_anchor(
@@ -967,12 +1120,15 @@ def build_runtime_asset() -> bpy.types.Object:
         optic_geometry,
         glass_material_index=2,
     )
+    remove_authored_optic_glass(optic_geometry, glass_material_index=2)
 
     remove_imported_objects()
     magazine.name = "Magazine"
     spare_magazine.name = "SpareMagazine"
     charging_handle.name = "ChargingHandle"
     stock.name = "Stock"
+    rear_iron_sight.name = "RearIronSight"
+    front_iron_sight.name = "FrontIronSight"
     foregrip.name = "Foregrip"
     muzzle_device.name = "MuzzleDevice"
     suppressor.name = "Suppressor"
@@ -1046,11 +1202,7 @@ def validate_authored_markers() -> None:
     optic_mount = bpy.data.objects["OpticMount"]
     if reticle_anchor.parent != optic_mount:
         raise RuntimeError("OpticReticleAnchor is not a direct child of OpticMount.")
-    optic_geometry = bpy.data.objects[reticle_anchor["derived_from_mesh"]]
-    expected_reticle = authored_optic_reticle_location(
-        optic_geometry,
-        glass_material_index=2,
-    )
+    expected_reticle = Vector(reticle_anchor["authored_glass_center"])
     if (reticle_anchor.location - expected_reticle).length > 1.0e-8:
         raise RuntimeError(
             "OpticReticleAnchor no longer matches the authored eyepiece glass center."
@@ -1090,6 +1242,68 @@ def export_asset(root: bpy.types.Object) -> None:
     )
 
 
+def validate_exported_optic_aperture() -> None:
+    payload = OUTPUT_GLB.read_bytes()
+    if len(payload) < 20:
+        raise RuntimeError("Exported M4A1 GLB is truncated.")
+    magic, version, declared_length = struct.unpack_from("<4sII", payload, 0)
+    if magic != b"glTF" or version != 2 or declared_length != len(payload):
+        raise RuntimeError(
+            "Exported M4A1 GLB header is invalid: "
+            f"magic={magic!r} version={version} "
+            f"length={declared_length}/{len(payload)}"
+        )
+
+    document = None
+    offset = 12
+    while offset + 8 <= len(payload):
+        chunk_length, chunk_type = struct.unpack_from("<II", payload, offset)
+        offset += 8
+        chunk = payload[offset:offset + chunk_length]
+        offset += chunk_length
+        if chunk_type == 0x4E4F534A:
+            document = json.loads(chunk.rstrip(b"\x00\x20\t\r\n").decode("utf-8"))
+            break
+    if document is None:
+        raise RuntimeError("Exported M4A1 GLB has no JSON chunk.")
+
+    materials = document.get("materials", [])
+    material_names = [material.get("name", "") for material in materials]
+    if any("Glass" in name for name in material_names):
+        raise RuntimeError(
+            "Exported M4A1 GLB still contains a glass material: "
+            f"materials={material_names}"
+        )
+    optic_meshes = [
+        mesh
+        for mesh in document.get("meshes", [])
+        if mesh.get("name") == "OpticMountGeometryMesh"
+    ]
+    if len(optic_meshes) != 1:
+        raise RuntimeError(
+            "Exported M4A1 GLB optic mesh contract changed: "
+            f"count={len(optic_meshes)}"
+        )
+    primitive_material_names = [
+        material_names[primitive["material"]]
+        for primitive in optic_meshes[0].get("primitives", [])
+        if "material" in primitive
+    ]
+    if primitive_material_names != [
+        "QuaterniusCompactOpticHousing",
+        "QuaterniusCompactOpticHardware",
+    ]:
+        raise RuntimeError(
+            "Exported M4A1 optic has unexpected runtime surfaces: "
+            f"materials={primitive_material_names}"
+        )
+    print(
+        "M4A1_EXPORTED_OPTIC_APERTURE "
+        "glass_materials=0 glass_primitives=0 "
+        f"runtime_materials={primitive_material_names}"
+    )
+
+
 def save_source() -> None:
     OUTPUT_BLEND.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.file.pack_all()
@@ -1123,6 +1337,10 @@ def add_preview_stage(root: bpy.types.Object) -> None:
     set_hierarchy_render_visibility(bpy.data.objects["SpareMagazine"], False)
     set_hierarchy_render_visibility(bpy.data.objects["MuzzleDevice"], False)
     set_hierarchy_render_visibility(bpy.data.objects["Suppressor"], True)
+    rear_iron_sight = bpy.data.objects["RearIronSight"]
+    front_iron_sight = bpy.data.objects["FrontIronSight"]
+    set_hierarchy_render_visibility(rear_iron_sight, False)
+    set_hierarchy_render_visibility(front_iron_sight, False)
 
     world = bpy.context.scene.world
     world.use_nodes = True
@@ -1175,6 +1393,16 @@ def add_preview_stage(root: bpy.types.Object) -> None:
     scene.render.film_transparent = False
     scene.view_settings.look = "AgX - Medium High Contrast"
     bpy.ops.render.render(write_still=True)
+
+    reticle = bpy.data.objects["OpticReticleAnchor"].matrix_world.translation
+    camera.location = Vector((reticle.x, -0.72, reticle.z))
+    ads_target = Vector((reticle.x, 2.6, reticle.z))
+    camera.rotation_euler = (ads_target - camera.location).to_track_quat("-Z", "Y").to_euler()
+    camera_data.lens = 58.0
+    scene.render.filepath = str(ADS_PREVIEW_PATH)
+    bpy.ops.render.render(write_still=True)
+    set_hierarchy_render_visibility(rear_iron_sight, True)
+    set_hierarchy_render_visibility(front_iron_sight, True)
     root.hide_render = False
 
 
@@ -1190,6 +1418,8 @@ def main() -> None:
         "SpareMagazine",
         "ChargingHandle",
         "Stock",
+        "RearIronSight",
+        "FrontIronSight",
         "Foregrip",
         "MuzzleDevice",
         "Suppressor",
@@ -1215,8 +1445,33 @@ def main() -> None:
                 f"parent={node.parent.name if node.parent else None} "
                 f"location={tuple(node.location)} expected={tuple(expected_location)}"
             )
+    rear_iron_sight = bpy.data.objects["RearIronSight"]
+    if (
+        rear_iron_sight.parent != root
+        or (rear_iron_sight.location - REAR_IRON_ORIGIN).length > 1.0e-8
+        or mesh_statistics(rear_iron_sight)[0] != 2
+    ):
+        raise RuntimeError(
+            "Runtime rear iron sight contract changed: "
+            f"parent={rear_iron_sight.parent.name if rear_iron_sight.parent else None} "
+            f"location={tuple(rear_iron_sight.location)} "
+            f"meshes={mesh_statistics(rear_iron_sight)[0]}"
+        )
+    front_iron_sight = bpy.data.objects["FrontIronSight"]
+    if (
+        front_iron_sight.parent != root
+        or (front_iron_sight.location - FRONT_IRON_ORIGIN).length > 1.0e-8
+        or mesh_statistics(front_iron_sight)[0] != 1
+    ):
+        raise RuntimeError(
+            "Runtime front iron sight contract changed: "
+            f"parent={front_iron_sight.parent.name if front_iron_sight.parent else None} "
+            f"location={tuple(front_iron_sight.location)} "
+            f"meshes={mesh_statistics(front_iron_sight)[0]}"
+        )
     validate_attachment_geometry()
     validate_authored_markers()
+    validate_open_optic_aperture()
     mesh_count, vertex_count, triangle_count = mesh_statistics(root)
     if mesh_count < 18 or vertex_count < 5_000 or triangle_count < 9_000:
         raise RuntimeError(
@@ -1224,12 +1479,14 @@ def main() -> None:
             f"meshes={mesh_count} vertices={vertex_count} triangles={triangle_count}"
         )
     export_asset(root)
+    validate_exported_optic_aperture()
     save_source()
     add_preview_stage(root)
     print(
         "NISU_M4A1_EXPORT "
         f"meshes={mesh_count} vertices={vertex_count} triangles={triangle_count} "
-        f"glb={OUTPUT_GLB} blend={OUTPUT_BLEND} preview={PREVIEW_PATH}"
+        f"glb={OUTPUT_GLB} blend={OUTPUT_BLEND} preview={PREVIEW_PATH} "
+        f"ads_preview={ADS_PREVIEW_PATH}"
     )
 
 

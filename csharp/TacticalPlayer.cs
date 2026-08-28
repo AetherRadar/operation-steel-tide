@@ -901,11 +901,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         };
         _opticReticle = MeshPart(
             sight,
-            new SphereMesh { Radius = 0.006f, Height = 0.012f, RadialSegments = 10, Rings = 5 },
+            new SphereMesh { Radius = 0.003f, Height = 0.006f, RadialSegments = 10, Rings = 5 },
             new Vector3(0, 0, -0.052f),
             Vector3.Zero,
             reticleMaterial);
         _opticReticle.Visible = false;
+        InitializeAuthoredOptics();
     }
 
     private void ApplyWeaponBuildVisuals()
@@ -1069,31 +1070,34 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             : 0.0f;
         _opticRoot.Visible = opticScale > 0.0f;
         _opticRoot.Scale = Vector3.One;
-        var precisionOpticHeight = EquippedWeapon.Platform == WeaponPlatform.AWM
-            ? 0.38f
-            : 0.225f;
+        var usesIntegratedWeaponOptic = WeaponUsesIntegratedOptic(
+            EquippedWeapon.Platform,
+            opticId);
         _opticRoot.Position = new Vector3(
             0,
-            opticId is "optic_scope" or "optic_7x" or "optic_sniper"
-                ? precisionOpticHeight
-                : 0.205f,
+            OpticMountHeight(EquippedWeapon.Platform, opticId),
             -0.25f);
-        // The M4 GLB owns its finished authored optic. Keep this root only as
-        // a gameplay reticle carrier; never layer the legacy primitive sight
-        // housing over the production model.
-        var usesAuthoredM4Optic = EquippedWeapon.Platform == WeaponPlatform.M4A1;
-        _reflexSightModel.Visible = !usesAuthoredM4Optic && opticId == "optic_micro";
-        _holoSightModel.Visible = !usesAuthoredM4Optic && opticId == "optic_holo";
-        _scopeSightModel.Visible = !usesAuthoredM4Optic
-            && opticId is "optic_scope" or "optic_7x" or "optic_sniper";
-        _opticReticle.Position = opticId switch
+        // Finished DCC assets own every visible sight housing. The retained
+        // legacy nodes are invisible compatibility scaffolding only.
+        _reflexSightModel.Visible = false;
+        _holoSightModel.Visible = false;
+        _scopeSightModel.Visible = false;
+        var usesExternalAuthoredOptic = RefreshAuthoredOpticPresentation(
+            opticId,
+            usesIntegratedWeaponOptic);
+        if (!usesExternalAuthoredOptic)
         {
-            "optic_scope" => new Vector3(0, 0, -0.255f),
-            "optic_7x" => new Vector3(0, 0, -0.255f),
-            "optic_sniper" => new Vector3(0, 0, -0.255f),
-            "optic_holo" => new Vector3(0, 0, -0.078f),
-            _ => new Vector3(0, 0, -0.052f)
-        };
+            _opticReticle.Position = usesIntegratedWeaponOptic
+                ? Vector3.Zero
+                : opticId switch
+            {
+                "optic_scope" => new Vector3(0, 0, -0.255f),
+                "optic_7x" => new Vector3(0, 0, -0.255f),
+                "optic_sniper" => new Vector3(0, 0, -0.255f),
+                "optic_holo" => new Vector3(0, 0, -0.078f),
+                _ => new Vector3(0, 0, -0.052f)
+            };
+        }
 
         _weaponLight.SpotRange = stats.EffectiveRange * 0.28f;
         _weaponLight.Position = isPistol
@@ -2488,6 +2492,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         if (item.Kind == LootItemKind.Attachment)
         {
             var attachment = WeaponCatalog.Attachment(item.AttachmentId);
+            if (!WeaponCatalog.CanEquipAttachment(EquippedWeapon.Platform, attachment.Id))
+            {
+                ShowIncompatibleAttachmentMessage();
+                return item;
+            }
             LootItem? previous = null;
             if (EquippedWeapon.Attachments.TryGetValue(attachment.Slot, out var previousId))
             {
@@ -2583,6 +2592,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 };
         }
         return item;
+    }
+
+    private void ShowIncompatibleAttachmentMessage()
+    {
+        Hud?.ShowLocalizedMessage(
+            "part_incompatible",
+            "PART INCOMPATIBLE WITH THIS WEAPON",
+            new Color(1.0f, 0.48f, 0.28f));
     }
 
     public LootItem? EquipFromLootToWeaponSlot(LootItem item, PlayerWeaponSlot slot)
