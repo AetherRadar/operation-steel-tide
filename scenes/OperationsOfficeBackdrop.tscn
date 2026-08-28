@@ -1,0 +1,48 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://csharp/OperationsOfficeBackdrop.cs" id="1_backdrop"]
+[ext_resource type="PackedScene" path="res://assets/models/operations_office/operations_office_set.glb" id="2_authored_set"]
+
+[node name="OperationsOfficeBackdrop" type="Node3D"]
+process_mode = 3
+script = ExtResource("1_backdrop")
+
+[node name="AuthoredSet" parent="." instance=ExtResource("2_authored_set")]
+
+[node name="OperationsOfficeCamera" type="Camera3D" parent="."]
+keep_aspect = 1
+fov = 48.0
+near = 0.08
+far = 480.0
+
+[node name="Lighting" type="Node3D" parent="."]
+
+[node name="AmbientFill" type="OmniLight3D" parent="Lighting"]
+position = Vector3(0, 2.1, -0.6)
+light_color = Color(0.56, 0.7, 0.67, 1)
+light_energy = 0.86
+omni_range = 18.0
+shadow_enabled = false
+
+[node name="NeutralKeyLight" type="OmniLight3D" parent="Lighting"]
+light_color = Color(0.68, 0.79, 0.76, 1)
+light_energy = 0.58
+omni_range = 22.0
+omni_attenuation = 1.35
+shadow_enabled = false
+
+[node name="QuickFocusLight" type="SpotLight3D" parent="Lighting"]
+light_color = Color(0.28, 0.82, 0.64, 1)
+light_energy = 0.9
+spot_range = 13.0
+spot_angle = 48.0
+spot_angle_attenuation = 1.4
+shadow_enabled = true
+
+[node name="DemolitionFocusLight" type="SpotLight3D" parent="Lighting"]
+light_color = Color(0.94, 0.42, 0.16, 1)
+light_energy = 0.65
+spot_range = 13.5
+spot_angle = 50.0
+spot_angle_attenuation = 1.5
+shadow_enabled = true

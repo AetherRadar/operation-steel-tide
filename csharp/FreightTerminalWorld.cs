@@ -2775,6 +2775,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             ApplyDemolitionLighting();
         }
+        if (IsInstanceValid(_operationsOfficeBackdrop))
+        {
+            _operationsOfficeBackdrop.ApplyQuality(_qualitySetting);
+        }
         SaveSettings();
     }
 

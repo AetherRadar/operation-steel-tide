@@ -15,14 +15,18 @@ public partial class CombatHUD
     private Label _operationsCredits = null!;
     private Label _operationsRecord = null!;
     private Label _operationsStatus = null!;
+    private Label _quickStartIndex = null!;
     private Label _quickStartTitle = null!;
     private Label _quickStartDetail = null!;
+    private Label _demolitionEntryIndex = null!;
     private Label _demolitionEntryTitle = null!;
     private Label _demolitionEntryDetail = null!;
     private Button _quickStartButton = null!;
     private Button _demolitionModeButton = null!;
     private Button _operationsQuitButton = null!;
     private Button _resultOfficeButton = null!;
+    private OperationsOfficeFocus _operationsOfficeHoverFocus;
+    private OperationsOfficeFocus _operationsOfficeKeyboardFocus;
 
     public bool IsOperationsOfficeVisible
         => IsInstanceValid(_operationsOfficeRoot) && _operationsOfficeRoot.Visible;
@@ -41,7 +45,9 @@ public partial class CombatHUD
         => IsInstanceValid(_quickStartButton)
         && IsInstanceValid(_demolitionModeButton)
         && IsInstanceValid(_operationsCredits)
-        && IsInstanceValid(_resultOfficeButton);
+        && IsInstanceValid(_resultOfficeButton)
+        && _quickStartButton.FocusMode == Control.FocusModeEnum.All
+        && _demolitionModeButton.FocusMode == Control.FocusModeEnum.All;
     public bool OperationsOfficeUsesPackedScene
         => IsInstanceValid(_operationsOfficeRoot)
         && _operationsOfficeRoot.SceneFilePath == OperationsOfficeViewScenePath
@@ -134,8 +140,38 @@ public partial class CombatHUD
         => IsInstanceValid(_demolitionBriefingView) && _demolitionBriefingView.IsDeployEnabled;
     public bool OperationsOfficeLanguageReady
         => IsInstanceValid(_operationsOfficeTitle)
+        && _operationsOfficeSection.Text == Text(
+            "operations_section",
+            "SPECIAL OPERATIONS CENTER  //  EAST WING")
         && _operationsOfficeTitle.Text == Text("operations_office", "OPERATIONS OFFICE")
+        && _operationsOfficeSubtitle.Text == Text("operations_subtitle", "OPERATION STEEL TIDE")
+        && _quickStartIndex.Text == Text("operations_quick_index", "01  //  EXTRACTION")
         && _quickStartTitle.Text == Text("operations_quick_title", "QUICK EXTRACTION")
+        && _quickStartDetail.Text == Text(
+            "operations_quick_detail",
+            "ENTER LOADOUT  //  SQUAD UP  //  LOOT AND EXTRACT")
+        && _demolitionEntryIndex.Text == Text("operations_demolition_index", "02  //  DEMOLITION")
+        && _demolitionEntryTitle.Text == Text("operations_demolition_title", "DEMOLITION")
+        && _demolitionEntryDetail.Text == Text(
+            "operations_demolition_detail",
+            "5 V 5  //  FIRST TO 13  //  12-MAP POOL")
+        && _operationsStatus.Text == Text(
+            "operations_status_ready",
+            "FIELD TEAM STANDING BY  //  HELIPAD CLEAR")
+        && _operationsCredits.Text.StartsWith(
+            Text("operations_available_funds", "AVAILABLE FUNDS"),
+            System.StringComparison.Ordinal)
+        && _operationsRecord.Text.Contains(
+            Text("operations_extractions", "EXTRACTIONS"),
+            System.StringComparison.Ordinal)
+        && _operationsRecord.Text.Contains(
+            Text("operations_lifetime_value", "LIFETIME VALUE"),
+            System.StringComparison.Ordinal)
+        && _operationsQuitButton.Text == Text("operations_exit", "EXIT TO DESKTOP")
+        && _quickStartButton.Text == _quickStartTitle.Text
+        && _demolitionModeButton.Text == _demolitionEntryTitle.Text
+        && _quickStartButton.TooltipText == _quickStartTitle.Text
+        && _demolitionModeButton.TooltipText == _demolitionEntryTitle.Text
         && DemolitionBriefingLanguageReady
         && (!GameLocalization.IsChinese(_language)
             || (_operationsOfficeTitle.Text != "OPERATIONS OFFICE"
@@ -163,9 +199,11 @@ public partial class CombatHUD
         _operationsCredits = rail.GetNode<Label>("OperationsCredits");
         _operationsRecord = rail.GetNode<Label>("OperationsRecord");
         _quickStartButton = rail.GetNode<Button>("QuickStartButton");
+        _quickStartIndex = _quickStartButton.GetNode<Label>("QuickStartIndex");
         _quickStartTitle = _quickStartButton.GetNode<Label>("QuickStartTitle");
         _quickStartDetail = _quickStartButton.GetNode<Label>("QuickStartDetail");
         _demolitionModeButton = rail.GetNode<Button>("DemolitionModeButton");
+        _demolitionEntryIndex = _demolitionModeButton.GetNode<Label>("DemolitionEntryIndex");
         _demolitionEntryTitle = _demolitionModeButton.GetNode<Label>("DemolitionEntryTitle");
         _demolitionEntryDetail = _demolitionModeButton.GetNode<Label>("DemolitionEntryDetail");
         _operationsStatus = rail.GetNode<Label>("OperationsStatus");
@@ -174,6 +212,8 @@ public partial class CombatHUD
         _quickStartButton.Pressed += () => EmitSignal(SignalName.OperationsQuickStartRequested);
         _demolitionModeButton.Pressed += () => EmitSignal(SignalName.DemolitionModeRequested);
         _operationsQuitButton.Pressed += () => EmitSignal(SignalName.QuitRequested);
+        BindOperationsFocus(_quickStartButton, OperationsOfficeFocus.QuickExtraction);
+        BindOperationsFocus(_demolitionModeButton, OperationsOfficeFocus.Demolition);
     }
 
     private void BuildDemolitionBriefingView(Control root)
@@ -223,9 +263,12 @@ public partial class CombatHUD
         _gameplayHudRoot.Visible = false;
         _classSkillRoot.Visible = false;
         _squadRoster.Visible = false;
-        _operationsStatus.Text = status;
+        _operationsStatus.Text = Text("operations_status_ready", status);
         RefreshOperationsOfficeProfile();
         RefreshOperationsOfficeLanguage();
+        _operationsOfficeKeyboardFocus = OperationsOfficeFocus.QuickExtraction;
+        _quickStartButton.GrabFocus();
+        RefreshOperationsBackdropFocus();
     }
 
     public void ShowDemolitionBriefing()
@@ -237,6 +280,7 @@ public partial class CombatHUD
         _gameplayHudRoot.Visible = false;
         _classSkillRoot.Visible = false;
         _squadRoster.Visible = false;
+        ResetOperationsBackdropFocus();
         SelectDemolitionRole(SelectedDemolitionRole);
         RefreshOperationsOfficeLanguage();
     }
@@ -247,6 +291,7 @@ public partial class CombatHUD
         {
             _operationsOfficeRoot.Visible = false;
         }
+        ResetOperationsBackdropFocus();
         if (IsInstanceValid(_demolitionBriefingView))
         {
             _demolitionBriefingView.Visible = false;
@@ -266,6 +311,19 @@ public partial class CombatHUD
 
     public void PressDemolitionModeForDiagnostics()
         => PressButtonForDiagnostics(_demolitionModeButton);
+
+    public void FocusOperationsModeForDiagnostics(OperationsOfficeFocus focus)
+    {
+        switch (focus)
+        {
+            case OperationsOfficeFocus.QuickExtraction:
+                _quickStartButton.GrabFocus();
+                break;
+            case OperationsOfficeFocus.Demolition:
+                _demolitionModeButton.GrabFocus();
+                break;
+        }
+    }
 
     public void PressDemolitionRoleForDiagnostics(OperatorRole role)
         => _demolitionBriefingView.PressRoleForDiagnostics(role);
@@ -303,6 +361,54 @@ public partial class CombatHUD
         {
             button.EmitSignal(Godot.Button.SignalName.Pressed);
         }
+    }
+
+    private void BindOperationsFocus(Button button, OperationsOfficeFocus focus)
+    {
+        button.MouseEntered += () =>
+        {
+            _operationsOfficeHoverFocus = focus;
+            RefreshOperationsBackdropFocus();
+        };
+        button.MouseExited += () =>
+        {
+            if (_operationsOfficeHoverFocus == focus)
+            {
+                _operationsOfficeHoverFocus = OperationsOfficeFocus.Neutral;
+                RefreshOperationsBackdropFocus();
+            }
+        };
+        button.FocusEntered += () =>
+        {
+            _operationsOfficeHoverFocus = OperationsOfficeFocus.Neutral;
+            _operationsOfficeKeyboardFocus = focus;
+            RefreshOperationsBackdropFocus();
+        };
+        button.FocusExited += () =>
+        {
+            if (_operationsOfficeKeyboardFocus == focus)
+            {
+                _operationsOfficeKeyboardFocus = OperationsOfficeFocus.Neutral;
+                RefreshOperationsBackdropFocus();
+            }
+        };
+    }
+
+    private void ResetOperationsBackdropFocus()
+    {
+        _operationsOfficeHoverFocus = OperationsOfficeFocus.Neutral;
+        _operationsOfficeKeyboardFocus = OperationsOfficeFocus.Neutral;
+        EmitSignal(
+            SignalName.OperationsBackdropFocusChanged,
+            (int)OperationsOfficeFocus.Neutral);
+    }
+
+    private void RefreshOperationsBackdropFocus()
+    {
+        var focus = _operationsOfficeHoverFocus != OperationsOfficeFocus.Neutral
+            ? _operationsOfficeHoverFocus
+            : _operationsOfficeKeyboardFocus;
+        EmitSignal(SignalName.OperationsBackdropFocusChanged, (int)focus);
     }
 
     public void ShowDemolitionResult(bool victory, string reason)
@@ -343,11 +449,20 @@ public partial class CombatHUD
         _operationsOfficeSection.Text = Text("operations_section", "SPECIAL OPERATIONS CENTER  //  EAST WING");
         _operationsOfficeTitle.Text = Text("operations_office", "OPERATIONS OFFICE");
         _operationsOfficeSubtitle.Text = Text("operations_subtitle", "OPERATION STEEL TIDE");
+        _quickStartIndex.Text = Text("operations_quick_index", "01  //  EXTRACTION");
         _quickStartTitle.Text = Text("operations_quick_title", "QUICK EXTRACTION");
         _quickStartDetail.Text = Text("operations_quick_detail", "ENTER LOADOUT  //  SQUAD UP  //  LOOT AND EXTRACT");
+        _demolitionEntryIndex.Text = Text("operations_demolition_index", "02  //  DEMOLITION");
         _demolitionEntryTitle.Text = Text("operations_demolition_title", "DEMOLITION");
         _demolitionEntryDetail.Text = Text("operations_demolition_detail", "5 V 5  //  FIRST TO 13  //  12-MAP POOL");
         _operationsQuitButton.Text = Text("operations_exit", "EXIT TO DESKTOP");
+        _operationsStatus.Text = Text(
+            "operations_status_ready",
+            "FIELD TEAM STANDING BY  //  HELIPAD CLEAR");
+        _quickStartButton.Text = _quickStartTitle.Text;
+        _demolitionModeButton.Text = _demolitionEntryTitle.Text;
+        _quickStartButton.TooltipText = _quickStartTitle.Text;
+        _demolitionModeButton.TooltipText = _demolitionEntryTitle.Text;
         _demolitionBriefingView.SetLanguage(_language);
         _resultOfficeButton.Text = Text("operations_return", "RETURN TO OPERATIONS OFFICE");
         RefreshOperationsOfficeProfile();

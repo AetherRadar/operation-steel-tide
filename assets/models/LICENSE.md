@@ -366,7 +366,7 @@ The Factory Kit 3.0 model set is distributed by Kenney under CC0 1.0:
 
 The authored overhead door is used for interactive industrial and Old Town entrances. The Factory Kit personnel door was additionally acquired from the same official archive on 2026-08-27 as `door.glb`; Blender removes the archive's sample-scene objects and exports the side-pivoted runtime derivative `door-hinged.glb` plus its extracted colormap. Tideglass Reactor additionally uses the selected `machine.glb`, `hopper-high-round.glb`, and `machine-window.glb` models as three distinct collision-backed midfield covers. No attribution is required for these CC0 assets, and Kenney is credited as a provenance courtesy.
 
-The Furniture Kit 1.0 model set is distributed by Kenney under CC0 1.0:
+The Furniture Kit 2.0 model set is distributed by Kenney under CC0 1.0:
 
 - Source: https://kenney.nl/assets/furniture-kit
 - Acquisition date: 2026-08-26
@@ -416,6 +416,41 @@ The Modular Industrial Kit is published by Trey Ramm, OpenGameArt user `minime45
 - Reproducible conversion: `scripts/blender/build_trey_modular_industrial.py`
 
 The runtime scenes combine selected authored modules from the source kit, including two distinct closed perimeter-gate compositions and four closed one-storey industrial buildings for Tideglass Reactor. Attribution is not required under CC0, but Trey Ramm's requested courtesy credit is retained.
+
+### Special Operations command hall composition
+
+The authored Special Operations home-screen set combines selected Trey Ramm
+Modular Industrial Kit modules with selected Kenney Furniture Kit 2.0 props.
+Every visible mesh in the composite comes from those finished CC0 sources; the
+Blender composition adds transforms, material tuning, named runtime anchors,
+and an embedded export without replacing the source art with generated
+primitive geometry.
+
+- Runtime output: `operations_office/operations_office_set.glb`
+- Local source mapping and verification record:
+  `operations_office/README.md`
+- Authoritative editable source:
+  `../../source_art/operations_office/operations_office_set.blend`
+- Reproducible Blender build:
+  `../../scripts/blender/build_operations_office_set.py`
+- Trey creator and source: Trey Ramm / OpenGameArt user `minime453`,
+  https://opengameart.org/content/modular-industrial-kit
+- Trey acquisition date and evidence: 2026-08-27;
+  `../../source_art/third_party/trey_modular_industrial/SOURCE_PAGE.html` and
+  `ORIGINAL_README.txt`
+- Kenney creator and source: Kenney,
+  https://kenney.nl/assets/furniture-kit
+- Kenney acquisition date and evidence: 2026-08-26;
+  `kenney_furniture_kit/KENNEY_LICENSE.txt`
+- Exact license for both source collections: CC0 1.0 Universal,
+  https://creativecommons.org/publicdomain/zero/1.0/
+- Required attribution: none; both creator credits are retained as provenance
+  courtesy.
+
+The underlying source geometry and materials retain their CC0 dedications.
+The project-authored scene composition and rebuild script are covered by the
+repository's root MIT license, subject to the AI-assistance disclosure in
+`docs/CONTENT_PROVENANCE.md`.
 
 ## Quaternius CC0 Buildings Pack models
 

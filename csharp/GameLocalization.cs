@@ -501,8 +501,10 @@ public static class GameLocalization
         Chinese["operations_extractions"] = "\u6210\u529f\u64a4\u79bb";
         Chinese["operations_lifetime_value"] = "\u7d2f\u8ba1\u5e26\u51fa";
         Chinese["operations_quick_title"] = "\u5feb\u901f\u6478\u91d1";
+        Chinese["operations_quick_index"] = "01  //  \u64a4\u79bb\u884c\u52a8";
         Chinese["operations_quick_detail"] = "\u8fdb\u5165\u6574\u5907  //  \u7ec4\u961f  //  \u641c\u522e\u5e76\u64a4\u79bb";
         Chinese["operations_demolition_title"] = "\u7206\u7834\u6a21\u5f0f";
+        Chinese["operations_demolition_index"] = "02  //  \u7206\u7834\u884c\u52a8";
         Chinese["operations_demolition_detail"] = "5 v 5  //  \u5148\u5f97 13 \u5206  //  12 \u5f20\u5730\u56fe\u6c60";
         Chinese["operations_status_ready"] = "\u5916\u52e4\u5c0f\u961f\u5f85\u547d  //  \u505c\u673a\u576a\u5df2\u51c0\u7a7a";
         Chinese["operations_quick_status"] = "\u672c\u5730\u5c0f\u961f  //  3 \u4eba\u7f16\u5236  //  \u4f60\u9009\u804c\u4e1a\uff0cAI \u8865\u9f50\u5176\u4f59";

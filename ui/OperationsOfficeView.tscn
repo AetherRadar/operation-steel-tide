@@ -1,88 +1,97 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_mode_normal"]
-bg_color = Color(0.035, 0.05, 0.049, 1)
+bg_color = Color(0.024, 0.031, 0.031, 0.94)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.11, 0.16, 0.15, 1)
+border_color = Color(0.12, 0.18, 0.17, 0.92)
 corner_radius_top_left = 3
 corner_radius_top_right = 3
 corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_quick_hover"]
-bg_color = Color(0.045, 0.075, 0.068, 0.98)
+bg_color = Color(0.032, 0.068, 0.054, 0.98)
 border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.28, 0.9, 0.67, 1)
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.24, 0.88, 0.63, 1)
 corner_radius_top_left = 3
 corner_radius_top_right = 3
 corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_quick_pressed"]
-bg_color = Color(0.055, 0.085, 0.076, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.28, 0.9, 0.67, 1)
-corner_radius_top_left = 3
-corner_radius_top_right = 3
-corner_radius_bottom_right = 3
-corner_radius_bottom_left = 3
-
-[sub_resource type="StyleBoxFlat" id="StyleBox_quick_hover_pressed"]
-bg_color = Color(0.065, 0.1, 0.09, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.28, 0.9, 0.67, 1)
+bg_color = Color(0.045, 0.088, 0.07, 1)
+border_width_left = 3
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.34, 1, 0.73, 1)
 corner_radius_top_left = 3
 corner_radius_top_right = 3
 corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_demolition_hover"]
-bg_color = Color(0.045, 0.075, 0.068, 0.98)
+bg_color = Color(0.077, 0.049, 0.029, 0.98)
 border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.58, 0.22, 1)
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.53, 0.18, 1)
 corner_radius_top_left = 3
 corner_radius_top_right = 3
 corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_demolition_pressed"]
-bg_color = Color(0.055, 0.085, 0.076, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.58, 0.22, 1)
+bg_color = Color(0.1, 0.061, 0.032, 1)
+border_width_left = 3
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.66, 0.28, 1)
 corner_radius_top_left = 3
 corner_radius_top_right = 3
 corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 
-[sub_resource type="StyleBoxFlat" id="StyleBox_demolition_hover_pressed"]
-bg_color = Color(0.065, 0.1, 0.09, 1)
+[sub_resource type="StyleBoxFlat" id="StyleBox_quit_normal"]
+bg_color = Color(0.035, 0.042, 0.041, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.13, 0.18, 0.17, 0.9)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_quit_hover"]
+bg_color = Color(0.05, 0.073, 0.066, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.78, 0.61, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_profile"]
+bg_color = Color(0.018, 0.027, 0.027, 0.88)
 border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.58, 0.22, 1)
-corner_radius_top_left = 3
-corner_radius_top_right = 3
-corner_radius_bottom_right = 3
-corner_radius_bottom_left = 3
+border_color = Color(0.18, 0.42, 0.34, 0.82)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
 
 [node name="OperationsOfficeMenu" type="ColorRect"]
 visible = false
@@ -91,222 +100,339 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 0
-color = Color(0.002, 0.006, 0.007, 0.16)
+mouse_filter = 2
+color = Color(0.002, 0.005, 0.006, 0.07)
+
+[node name="ViewportTopBand" type="ColorRect" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+offset_bottom = 72.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(0.004, 0.008, 0.009, 0.2)
+
+[node name="ViewportBottomBand" type="ColorRect" parent="."]
+layout_mode = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -48.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+color = Color(0.004, 0.008, 0.009, 0.24)
 
 [node name="Rail" type="ColorRect" parent="."]
 layout_mode = 0
 anchor_bottom = 1.0
-offset_right = 520.0
+offset_right = 480.0
 grow_vertical = 2
+mouse_filter = 1
+color = Color(0.006, 0.011, 0.012, 0.935)
+
+[node name="TopAccent" type="ColorRect" parent="Rail"]
+layout_mode = 0
+offset_right = 480.0
+offset_bottom = 3.0
 mouse_filter = 2
-color = Color(0.008, 0.014, 0.015, 0.91)
+color = Color(0.25, 0.86, 0.64, 0.92)
 
 [node name="EdgeAccent" type="ColorRect" parent="Rail"]
 layout_mode = 0
-offset_left = 519.0
-offset_right = 520.0
+offset_left = 478.0
+offset_right = 480.0
 offset_bottom = 1080.0
 mouse_filter = 2
-color = Color(0.25, 0.78, 0.62, 0.72)
+color = Color(0.22, 0.65, 0.52, 0.68)
 
 [node name="OperationsOfficeSection" type="Label" parent="Rail"]
 layout_mode = 0
-offset_left = 42.0
-offset_top = 46.0
-offset_right = 472.0
-offset_bottom = 68.0
-theme_override_colors/font_color = Color(0.38, 0.78, 0.65, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+offset_left = 40.0
+offset_top = 40.0
+offset_right = 436.0
+offset_bottom = 61.0
+theme_override_colors/font_color = Color(0.4, 0.82, 0.68, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 14
 text = "SPECIAL OPERATIONS CENTER  //  EAST WING"
 
 [node name="OperationsOfficeTitle" type="Label" parent="Rail"]
 layout_mode = 0
-offset_left = 40.0
-offset_top = 76.0
-offset_right = 480.0
-offset_bottom = 124.0
-theme_override_colors/font_color = Color(0.9, 0.97, 0.94, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+offset_left = 38.0
+offset_top = 72.0
+offset_right = 442.0
+offset_bottom = 123.0
+theme_override_colors/font_color = Color(0.92, 0.98, 0.95, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.92)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 35
+theme_override_font_sizes/font_size = 39
 text = "OPERATIONS OFFICE"
 
 [node name="OperationsOfficeSubtitle" type="Label" parent="Rail"]
 layout_mode = 0
-offset_left = 42.0
+offset_left = 41.0
 offset_top = 126.0
-offset_right = 472.0
-offset_bottom = 152.0
-theme_override_colors/font_color = Color(0.5, 0.66, 0.61, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+offset_right = 438.0
+offset_bottom = 151.0
+theme_override_colors/font_color = Color(0.54, 0.68, 0.63, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.88)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 15
 text = "OPERATION STEEL TIDE"
 
-[node name="ProfileDivider" type="ColorRect" parent="Rail"]
+[node name="ProfileBand" type="Panel" parent="Rail"]
 layout_mode = 0
-offset_left = 40.0
-offset_top = 174.0
-offset_right = 470.0
-offset_bottom = 175.0
+offset_left = 28.0
+offset_top = 176.0
+offset_right = 450.0
+offset_bottom = 264.0
 mouse_filter = 2
-color = Color(0.18, 0.32, 0.28, 0.82)
+theme_override_styles/panel = SubResource("StyleBox_profile")
 
 [node name="OperationsCredits" type="Label" parent="Rail"]
 layout_mode = 0
 offset_left = 42.0
-offset_top = 196.0
-offset_right = 472.0
-offset_bottom = 222.0
-theme_override_colors/font_color = Color(0.96, 0.8, 0.31, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+offset_top = 194.0
+offset_right = 430.0
+offset_bottom = 221.0
+theme_override_colors/font_color = Color(0.98, 0.82, 0.36, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 17
 text = "AVAILABLE FUNDS  18000"
 
 [node name="OperationsRecord" type="Label" parent="Rail"]
 layout_mode = 0
 offset_left = 42.0
-offset_top = 228.0
-offset_right = 472.0
-offset_bottom = 250.0
+offset_top = 229.0
+offset_right = 430.0
+offset_bottom = 251.0
 theme_override_colors/font_color = Color(0.58, 0.72, 0.67, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.88)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 14
 text = "EXTRACTIONS  0  //  LIFETIME VALUE  0"
 
 [node name="QuickStartButton" type="Button" parent="Rail"]
 layout_mode = 0
-offset_left = 40.0
-offset_top = 294.0
-offset_right = 470.0
-offset_bottom = 382.0
-focus_mode = 0
-theme_override_colors/font_color = Color(0.72, 0.8, 0.77, 1)
-theme_override_colors/font_hover_color = Color(0.92, 0.98, 0.95, 1)
-theme_override_colors/font_pressed_color = Color(0.28, 0.9, 0.67, 1)
-theme_override_font_sizes/font_size = 10
+offset_left = 28.0
+offset_top = 300.0
+offset_right = 450.0
+offset_bottom = 416.0
+focus_neighbor_bottom = NodePath("../DemolitionModeButton")
+focus_mode = 2
+theme_override_colors/font_color = Color(0, 0, 0, 0)
+theme_override_colors/font_hover_color = Color(0, 0, 0, 0)
+theme_override_colors/font_pressed_color = Color(0, 0, 0, 0)
+theme_override_colors/font_focus_color = Color(0, 0, 0, 0)
+theme_override_font_sizes/font_size = 1
 theme_override_styles/normal = SubResource("StyleBox_mode_normal")
 theme_override_styles/hover = SubResource("StyleBox_quick_hover")
 theme_override_styles/pressed = SubResource("StyleBox_quick_pressed")
-theme_override_styles/hover_pressed = SubResource("StyleBox_quick_hover_pressed")
+theme_override_styles/focus = SubResource("StyleBox_quick_hover")
+
+[node name="QuickAccent" type="ColorRect" parent="Rail/QuickStartButton"]
+layout_mode = 0
+offset_right = 4.0
+offset_bottom = 116.0
+mouse_filter = 2
+color = Color(0.22, 0.9, 0.64, 1)
+
+[node name="QuickStartIndex" type="Label" parent="Rail/QuickStartButton"]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 13.0
+offset_right = 360.0
+offset_bottom = 31.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.32, 0.82, 0.63, 1)
+theme_override_font_sizes/font_size = 13
+text = "01  //  EXTRACTION"
 
 [node name="QuickStartTitle" type="Label" parent="Rail/QuickStartButton"]
 layout_mode = 0
-offset_left = 24.0
-offset_top = 17.0
-offset_right = 384.0
-offset_bottom = 45.0
+offset_left = 21.0
+offset_top = 38.0
+offset_right = 352.0
+offset_bottom = 67.0
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.75, 1, 0.88, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_colors/font_color = Color(0.78, 1, 0.9, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 22
 text = "QUICK EXTRACTION"
 
 [node name="QuickStartDetail" type="Label" parent="Rail/QuickStartButton"]
 layout_mode = 0
-offset_left = 25.0
-offset_top = 52.0
-offset_right = 375.0
-offset_bottom = 73.0
+offset_left = 22.0
+offset_top = 78.0
+offset_right = 366.0
+offset_bottom = 99.0
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.48, 0.68, 0.61, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_colors/font_color = Color(0.49, 0.7, 0.62, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.86)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 11
-text = "ENTER LOADOUT  //  SQUAD UP  //  LOOT AND EXTRACT"
+theme_override_font_sizes/font_size = 13
+text = "ENTER LOADOUT  //  SQUAD UP  //  EXTRACT"
+
+[node name="QuickArrow" type="Label" parent="Rail/QuickStartButton"]
+layout_mode = 0
+offset_left = 382.0
+offset_top = 43.0
+offset_right = 405.0
+offset_bottom = 73.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.36, 0.94, 0.7, 1)
+theme_override_font_sizes/font_size = 22
+text = ">"
+horizontal_alignment = 1
 
 [node name="DemolitionModeButton" type="Button" parent="Rail"]
 layout_mode = 0
-offset_left = 40.0
-offset_top = 402.0
-offset_right = 470.0
-offset_bottom = 490.0
-focus_mode = 0
-theme_override_colors/font_color = Color(0.72, 0.8, 0.77, 1)
-theme_override_colors/font_hover_color = Color(0.92, 0.98, 0.95, 1)
-theme_override_colors/font_pressed_color = Color(1, 0.58, 0.22, 1)
-theme_override_font_sizes/font_size = 10
+offset_left = 28.0
+offset_top = 436.0
+offset_right = 450.0
+offset_bottom = 552.0
+focus_neighbor_top = NodePath("../QuickStartButton")
+focus_neighbor_bottom = NodePath("../OperationsQuitButton")
+focus_mode = 2
+theme_override_colors/font_color = Color(0, 0, 0, 0)
+theme_override_colors/font_hover_color = Color(0, 0, 0, 0)
+theme_override_colors/font_pressed_color = Color(0, 0, 0, 0)
+theme_override_colors/font_focus_color = Color(0, 0, 0, 0)
+theme_override_font_sizes/font_size = 1
 theme_override_styles/normal = SubResource("StyleBox_mode_normal")
 theme_override_styles/hover = SubResource("StyleBox_demolition_hover")
 theme_override_styles/pressed = SubResource("StyleBox_demolition_pressed")
-theme_override_styles/hover_pressed = SubResource("StyleBox_demolition_hover_pressed")
+theme_override_styles/focus = SubResource("StyleBox_demolition_hover")
+
+[node name="DemolitionAccent" type="ColorRect" parent="Rail/DemolitionModeButton"]
+layout_mode = 0
+offset_right = 4.0
+offset_bottom = 116.0
+mouse_filter = 2
+color = Color(1, 0.5, 0.16, 1)
+
+[node name="DemolitionEntryIndex" type="Label" parent="Rail/DemolitionModeButton"]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 13.0
+offset_right = 360.0
+offset_bottom = 31.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.94, 0.55, 0.24, 1)
+theme_override_font_sizes/font_size = 13
+text = "02  //  DEMOLITION"
 
 [node name="DemolitionEntryTitle" type="Label" parent="Rail/DemolitionModeButton"]
 layout_mode = 0
-offset_left = 24.0
-offset_top = 17.0
-offset_right = 384.0
-offset_bottom = 45.0
+offset_left = 21.0
+offset_top = 38.0
+offset_right = 352.0
+offset_bottom = 67.0
 mouse_filter = 2
-theme_override_colors/font_color = Color(1, 0.82, 0.58, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_colors/font_color = Color(1, 0.85, 0.64, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 22
 text = "DEMOLITION"
 
 [node name="DemolitionEntryDetail" type="Label" parent="Rail/DemolitionModeButton"]
 layout_mode = 0
-offset_left = 25.0
-offset_top = 52.0
-offset_right = 375.0
-offset_bottom = 73.0
+offset_left = 22.0
+offset_top = 78.0
+offset_right = 366.0
+offset_bottom = 99.0
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.7, 0.6, 0.47, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_colors/font_color = Color(0.72, 0.62, 0.49, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.86)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 11
-text = "FIXED KIT  //  PLANT OR DEFUSE  //  A / B SITES"
+theme_override_font_sizes/font_size = 13
+text = "5 V 5  //  FIRST TO 13  //  12-MAP POOL"
+
+[node name="DemolitionArrow" type="Label" parent="Rail/DemolitionModeButton"]
+layout_mode = 0
+offset_left = 382.0
+offset_top = 43.0
+offset_right = 405.0
+offset_bottom = 73.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.6, 0.24, 1)
+theme_override_font_sizes/font_size = 22
+text = ">"
+horizontal_alignment = 1
+
+[node name="StatusDivider" type="ColorRect" parent="Rail"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 600.0
+offset_right = 440.0
+offset_bottom = 601.0
+mouse_filter = 2
+color = Color(0.17, 0.32, 0.28, 0.82)
+
+[node name="StatusPulse" type="ColorRect" parent="Rail"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 632.0
+offset_right = 47.0
+offset_bottom = 639.0
+mouse_filter = 2
+color = Color(0.24, 0.9, 0.64, 1)
 
 [node name="OperationsStatus" type="Label" parent="Rail"]
 layout_mode = 0
-offset_left = 42.0
-offset_top = 534.0
-offset_right = 472.0
-offset_bottom = 576.0
-theme_override_colors/font_color = Color(0.42, 0.82, 0.67, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+offset_left = 60.0
+offset_top = 622.0
+offset_right = 432.0
+offset_bottom = 678.0
+theme_override_colors/font_color = Color(0.48, 0.86, 0.7, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 15
 text = "FIELD TEAM STANDING BY  //  HELIPAD CLEAR"
 autowrap_mode = 3
+vertical_alignment = 1
 
 [node name="OperationsQuitButton" type="Button" parent="Rail"]
 layout_mode = 0
 offset_left = 40.0
 offset_top = 970.0
-offset_right = 244.0
-offset_bottom = 1014.0
-theme_override_colors/font_color = Color(0.82, 0.9, 0.87, 1)
-theme_override_colors/font_hover_color = Color(0.19, 0.9, 0.69, 1)
+offset_right = 234.0
+offset_bottom = 1016.0
+focus_neighbor_top = NodePath("../DemolitionModeButton")
+focus_mode = 2
+theme_override_colors/font_color = Color(0.76, 0.84, 0.81, 1)
+theme_override_colors/font_hover_color = Color(0.38, 0.94, 0.72, 1)
+theme_override_colors/font_focus_color = Color(0.38, 0.94, 0.72, 1)
 theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBox_quit_normal")
+theme_override_styles/hover = SubResource("StyleBox_quit_hover")
+theme_override_styles/pressed = SubResource("StyleBox_quit_hover")
+theme_override_styles/focus = SubResource("StyleBox_quit_hover")
 text = "EXIT TO DESKTOP"
 
 [node name="BuildVersion" type="Label" parent="Rail"]
 layout_mode = 0
-offset_left = 264.0
-offset_top = 982.0
-offset_right = 469.0
-offset_bottom = 1002.0
-theme_override_colors/font_color = Color(0.3, 0.42, 0.38, 1)
+offset_left = 242.0
+offset_top = 985.0
+offset_right = 450.0
+offset_bottom = 1004.0
+theme_override_colors/font_color = Color(0.32, 0.44, 0.4, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 10
-text = "FORWARD+  //  OPERATIONS BUILD 1.2"
+theme_override_font_sizes/font_size = 11
+text = "FORWARD+  //  OPERATIONS BUILD 1.4"
 horizontal_alignment = 2
