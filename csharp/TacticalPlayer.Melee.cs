@@ -28,12 +28,16 @@ public partial class TacticalPlayer
     private readonly List<Rid> _meleeHitTargetRids = new();
     private Vector3 _previousMeleeBladeBase;
     private Vector3 _previousMeleeBladeTip;
+    private Vector3 _previousRawMeleeBladeBase;
+    private Vector3 _previousRawMeleeBladeTip;
     private float _previousMeleeAttackProgress;
+    private float _previousRawMeleeAttackProgress;
     private float _meleeWallObstruction;
     private int _meleeSwingSequence;
     private long _meleeSwingStartedAtMsec;
     private long _meleeSweepSampleAtMsec;
     private bool _meleeSweepPrimed;
+    private bool _rawMeleeContactPrimed;
     private bool _meleeBladeSweepResolved;
     private bool _meleeWorldImpactSpawned;
     private bool _meleeClearanceSuppressed;
@@ -56,6 +60,7 @@ public partial class TacticalPlayer
     internal bool MeleeAttackActiveForDiagnostics => _meleeAttackActive;
     internal int MeleeTrailSampleCountForDiagnostics => _meleeTrailSamples.Count;
     internal bool MeleeBladeSweepResolvedForDiagnostics => _meleeBladeSweepResolved;
+    internal bool MeleeClearanceSuppressedForDiagnostics => _meleeClearanceSuppressed;
     internal int MeleeSweepRayCountForDiagnostics => _meleeSweepRayCount;
 
     private void BuildKnife()
@@ -168,6 +173,7 @@ public partial class TacticalPlayer
         _meleeAttackActive = false;
         _meleeAttackQueued = false;
         _meleeSweepPrimed = false;
+        _rawMeleeContactPrimed = false;
         _meleeBladeSweepResolved = false;
         _meleeWorldImpactSpawned = false;
         _meleeClearanceSuppressed = false;
@@ -221,6 +227,7 @@ public partial class TacticalPlayer
         _meleeAttackActive = true;
         _meleeAttackQueued = false;
         _meleeSweepPrimed = false;
+        _rawMeleeContactPrimed = false;
         _meleeBladeSweepResolved = false;
         _meleeWorldImpactSpawned = false;
         _meleeSweepRayCount = 0;
@@ -270,6 +277,12 @@ public partial class TacticalPlayer
                 1.0f);
             var rawTarget = AttackPose(presentation.Rest, attack, progress);
             SetMeleePose(rawTarget);
+            var rawBladeBase = IsInstanceValid(_authoredMelee?.BladeBase)
+                ? _authoredMelee.BladeBase.GlobalPosition
+                : Vector3.Zero;
+            var rawBladeTip = IsInstanceValid(_authoredMelee?.BladeTip)
+                ? _authoredMelee.BladeTip.GlobalPosition
+                : Vector3.Zero;
             var restingPose = ApplyMeleeWallClearance(
                 presentation.Rest,
                 definition,
@@ -286,6 +299,13 @@ public partial class TacticalPlayer
                 target,
                 presentation.Rest,
                 definition);
+            UpdateMeleeWallContactFeedback(
+                definition,
+                attack,
+                progress,
+                rawBladeBase,
+                rawBladeTip,
+                clearanceSafe);
             UpdateMeleeTrail(clearanceSafe && progress is >= 0.18f and <= 0.76f);
             UpdateMeleeBladeSweep(
                 definition,
@@ -296,6 +316,7 @@ public partial class TacticalPlayer
             {
                 _meleeAttackActive = false;
                 _meleeSweepPrimed = false;
+                _rawMeleeContactPrimed = false;
                 if (_meleeAttackQueued)
                 {
                     BeginMeleeAttack(
@@ -310,6 +331,7 @@ public partial class TacticalPlayer
         }
 
         _meleeSweepPrimed = false;
+        _rawMeleeContactPrimed = false;
         ClearMeleeTrail();
         if (_meleeDrawTime > 0.0f)
         {
@@ -455,4 +477,13 @@ public partial class TacticalPlayer
     }
 
     internal void StartMeleeAttackForDiagnostics() => StartKnifeAttack();
+
+    internal void HideMeleePresentationForDiagnostics()
+    {
+        if (IsInstanceValid(_knifeRoot))
+        {
+            _knifeRoot.Visible = false;
+        }
+        ClearMeleeTrail();
+    }
 }

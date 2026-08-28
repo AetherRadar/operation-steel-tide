@@ -11,6 +11,13 @@ public enum MeleeWeaponStyle
     TianxuanDao
 }
 
+internal enum MeleeImpactSurface
+{
+    Masonry,
+    Metal,
+    Wood
+}
+
 internal readonly record struct MeleePose(Vector3 Position, Vector3 Rotation);
 
 internal readonly record struct MeleeAttackDefinition(

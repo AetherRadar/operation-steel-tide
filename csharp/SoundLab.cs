@@ -22,6 +22,8 @@ public static class SoundLab
         WeaponShotCache = new();
     private static readonly Dictionary<(MeleeWeaponStyle Style, int AttackIndex), AudioStreamWav>
         MeleeSwingCache = new();
+    private static readonly Dictionary<(MeleeImpactSurface Surface, MeleeWeaponStyle Style), AudioStreamWav>
+        MeleeSurfaceImpactCache = new();
 
     private static AudioStreamWav MakeStream(float[] samples, int rate = 22050)
     {
@@ -254,6 +256,211 @@ public static class SoundLab
         var stream = MakeStream(samples, rate);
         MeleeSwingCache[key] = stream;
         return stream;
+    }
+
+    internal static AudioStreamWav MeleeSurfaceImpact(
+        MeleeImpactSurface surface,
+        MeleeWeaponStyle style)
+    {
+        var key = (surface, style);
+        if (MeleeSurfaceImpactCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var stream = BuildMeleeSurfaceImpact(surface, style);
+        MeleeSurfaceImpactCache[key] = stream;
+        return stream;
+    }
+
+    internal static ulong MeleeSurfaceImpactSignatureForDiagnostics(
+        MeleeImpactSurface surface,
+        MeleeWeaponStyle style)
+    {
+        var data = MeleeSurfaceImpact(surface, style).Data;
+        var hash = 14695981039346656037UL;
+        hash = unchecked((hash ^ (ulong)data.Length) * 1099511628211UL);
+        for (var index = 0; index < data.Length; index++)
+        {
+            hash = unchecked((hash ^ data[index]) * 1099511628211UL);
+        }
+        return hash;
+    }
+
+    private static AudioStreamWav BuildMeleeSurfaceImpact(
+        MeleeImpactSurface surface,
+        MeleeWeaponStyle style)
+    {
+        const int rate = 44100;
+        const float scrapeStart = 0.036f;
+        var duration = surface switch
+        {
+            MeleeImpactSurface.Metal => 0.5f,
+            MeleeImpactSurface.Wood => 0.34f,
+            _ => 0.42f
+        };
+        duration += style switch
+        {
+            MeleeWeaponStyle.ZhanmaDao => 0.03f,
+            MeleeWeaponStyle.TianxuanDao => 0.016f,
+            _ => 0.0f
+        };
+
+        var bladeWeight = style switch
+        {
+            MeleeWeaponStyle.ZhanmaDao => 1.18f,
+            MeleeWeaponStyle.TianxuanDao => 1.07f,
+            _ => 0.92f
+        };
+        var samples = new float[(int)(rate * duration)];
+        var rng = new RandomNumberGenerator
+        {
+            Seed = (ulong)(82643 + (int)surface * 1601 + (int)style * 197)
+        };
+        var lowNoise = 0.0f;
+        var midNoise = 0.0f;
+        var peak = 0.0f;
+        for (var index = 0; index < samples.Length; index++)
+        {
+            var t = (float)index / rate;
+            var white = rng.RandfRange(-1.0f, 1.0f);
+            lowNoise = Mathf.Lerp(lowNoise, white, 0.028f);
+            midNoise = Mathf.Lerp(midNoise, white, 0.18f);
+            var brightNoise = white - midNoise;
+            var scrapeTime = Mathf.Max(0.0f, t - scrapeStart);
+            var scrapeProgress = scrapeTime / (duration - scrapeStart);
+            var scrapeEnvelope = t < scrapeStart
+                ? 0.0f
+                : (1.0f - Mathf.Exp(-scrapeTime * 125.0f))
+                    * Mathf.Pow(Mathf.Max(0.0f, 1.0f - scrapeProgress), 0.72f);
+
+            var sample = surface switch
+            {
+                MeleeImpactSurface.Metal => BuildMetalBladeContact(
+                    t,
+                    bladeWeight,
+                    brightNoise,
+                    scrapeEnvelope),
+                MeleeImpactSurface.Wood => BuildWoodBladeContact(
+                    t,
+                    bladeWeight,
+                    white,
+                    lowNoise,
+                    midNoise,
+                    scrapeEnvelope),
+                _ => BuildMasonryBladeContact(
+                    t,
+                    bladeWeight,
+                    white,
+                    lowNoise,
+                    midNoise,
+                    brightNoise,
+                    scrapeEnvelope)
+            };
+            samples[index] = Mathf.Tanh(sample * 1.22f);
+            peak = Mathf.Max(peak, Mathf.Abs(samples[index]));
+        }
+
+        if (peak > 0.001f)
+        {
+            var targetPeak = style switch
+            {
+                MeleeWeaponStyle.ZhanmaDao => 0.94f,
+                MeleeWeaponStyle.TianxuanDao => 0.9f,
+                _ => 0.86f
+            };
+            var normalization = targetPeak / peak;
+            for (var index = 0; index < samples.Length; index++)
+            {
+                samples[index] *= normalization;
+            }
+        }
+
+        return MakeStream(samples, rate);
+    }
+
+    private static float BuildMasonryBladeContact(
+        float t,
+        float bladeWeight,
+        float white,
+        float lowNoise,
+        float midNoise,
+        float brightNoise,
+        float scrapeEnvelope)
+    {
+        var impactEnvelope = Mathf.Exp(-t * 31.0f);
+        var crack = (white * 0.9f + midNoise * 0.48f)
+            * Mathf.Exp(-t * 96.0f);
+        var body = (Mathf.Sin(Mathf.Tau * (128.0f - t * 54.0f) * t) * 0.72f
+            + lowNoise * 0.58f)
+            * impactEnvelope
+            * bladeWeight;
+        var brittleRing = Mathf.Sin(Mathf.Tau * 910.0f * t)
+            * Mathf.Exp(-t * 27.0f)
+            * 0.16f;
+        var aggregatePulse = 0.58f
+            + 0.42f * Mathf.Abs(Mathf.Sin(Mathf.Tau * 43.0f * t));
+        var scrape = (midNoise * 0.78f
+            + brightNoise * 0.2f
+            + Mathf.Sin(Mathf.Tau * (520.0f + t * 210.0f) * t) * 0.08f)
+            * aggregatePulse
+            * scrapeEnvelope
+            * 0.62f;
+        return crack + body + brittleRing + scrape;
+    }
+
+    private static float BuildMetalBladeContact(
+        float t,
+        float bladeWeight,
+        float brightNoise,
+        float scrapeEnvelope)
+    {
+        var strike = brightNoise * Mathf.Exp(-t * 132.0f) * 0.82f;
+        var body = Mathf.Sin(Mathf.Tau * (286.0f - t * 82.0f) * t)
+            * Mathf.Exp(-t * 24.0f)
+            * 0.34f
+            * bladeWeight;
+        var ring = (Mathf.Sin(Mathf.Tau * 2140.0f * t)
+            + Mathf.Sin(Mathf.Tau * 3370.0f * t) * 0.58f
+            + Mathf.Sin(Mathf.Tau * 4720.0f * t) * 0.22f)
+            * Mathf.Exp(-t * 8.6f)
+            * 0.38f;
+        var scrapePulse = 0.72f
+            + 0.28f * Mathf.Abs(Mathf.Sin(Mathf.Tau * 71.0f * t));
+        var scrape = (brightNoise * 0.72f
+            + Mathf.Sin(Mathf.Tau * (2480.0f + t * 860.0f) * t) * 0.2f
+            + Mathf.Sin(Mathf.Tau * 5660.0f * t) * 0.08f)
+            * scrapePulse
+            * scrapeEnvelope
+            * 0.52f;
+        return strike + body + ring + scrape;
+    }
+
+    private static float BuildWoodBladeContact(
+        float t,
+        float bladeWeight,
+        float white,
+        float lowNoise,
+        float midNoise,
+        float scrapeEnvelope)
+    {
+        var knockEnvelope = Mathf.Exp(-t * 29.0f);
+        var knock = (Mathf.Sin(Mathf.Tau * (176.0f - t * 58.0f) * t) * 0.76f
+            + Mathf.Sin(Mathf.Tau * 612.0f * t) * 0.18f
+            + lowNoise * 0.48f)
+            * knockEnvelope
+            * bladeWeight;
+        var split = (white * 0.52f + midNoise * 0.36f)
+            * Mathf.Exp(-t * 88.0f);
+        var grainPulse = 0.48f
+            + 0.52f * Mathf.Pow(Mathf.Abs(Mathf.Sin(Mathf.Tau * 31.0f * t)), 2.0f);
+        var scrape = (midNoise * 0.68f
+            + lowNoise * 0.52f
+            + Mathf.Sin(Mathf.Tau * (360.0f + t * 120.0f) * t) * 0.07f)
+            * grainPulse
+            * scrapeEnvelope
+            * 0.48f;
+        return knock + split + scrape;
     }
 
     public static AudioStreamWav ReloadClick()

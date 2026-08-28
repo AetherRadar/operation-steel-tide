@@ -4,6 +4,107 @@ namespace OperationSteelTide;
 
 public partial class TacticalPlayer
 {
+    private void UpdateMeleeWallContactFeedback(
+        KnifeSkinDefinition definition,
+        MeleeAttackDefinition attack,
+        float progress,
+        Vector3 rawBladeBase,
+        Vector3 rawBladeTip,
+        bool clearanceSafe)
+    {
+        if (!IsInstanceValid(_authoredMelee?.BladeBase)
+            || !IsInstanceValid(_authoredMelee?.BladeTip))
+        {
+            _rawMeleeContactPrimed = false;
+            return;
+        }
+        if (!_rawMeleeContactPrimed)
+        {
+            _previousRawMeleeBladeBase = rawBladeBase;
+            _previousRawMeleeBladeTip = rawBladeTip;
+            _previousRawMeleeAttackProgress = progress;
+            _rawMeleeContactPrimed = true;
+            return;
+        }
+
+        var damageWindowStart = Mathf.Max(0.18f, attack.HitProgress - 0.12f);
+        var damageWindowEnd = Mathf.Min(0.78f, attack.HitProgress + 0.16f);
+        var crossesDamageWindow = progress >= damageWindowStart
+            && _previousRawMeleeAttackProgress <= damageWindowEnd;
+        if ((!clearanceSafe || _meleeWallObstruction > 0.015f)
+            && !_meleeWorldImpactSpawned
+            && crossesDamageWindow
+            && TryFindMeleeWallContact(
+                rawBladeBase,
+                rawBladeTip,
+                out var hit,
+                out var bladeTravel))
+        {
+            SpawnMeleeWorldImpact(hit, bladeTravel, definition);
+            _meleeWorldImpactSpawned = true;
+        }
+
+        _previousRawMeleeBladeBase = rawBladeBase;
+        _previousRawMeleeBladeTip = rawBladeTip;
+        _previousRawMeleeAttackProgress = progress;
+    }
+
+    private bool TryFindMeleeWallContact(
+        Vector3 rawBladeBase,
+        Vector3 rawBladeTip,
+        out PhysicsRaycastHit closestHit,
+        out Vector3 bladeTravel)
+    {
+        closestHit = default;
+        bladeTravel = Vector3.Zero;
+        var closestDistanceSquared = float.MaxValue;
+        var found = false;
+        for (var sample = 0; sample <= 4; sample++)
+        {
+            var weight = sample / 4.0f;
+            var rawPoint = rawBladeBase.Lerp(rawBladeTip, weight);
+            if (!PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    _camera.GlobalPosition,
+                    rawPoint,
+                    GetRid(),
+                    uint.MaxValue,
+                    out var hit)
+                || hit.Collider is null)
+            {
+                continue;
+            }
+
+            var distanceSquared = _camera.GlobalPosition.DistanceSquaredTo(hit.Position);
+            if (distanceSquared >= closestDistanceSquared)
+            {
+                continue;
+            }
+            closestDistanceSquared = distanceSquared;
+            closestHit = hit;
+            var previousRawPoint = _previousRawMeleeBladeBase.Lerp(
+                _previousRawMeleeBladeTip,
+                weight);
+            bladeTravel = rawPoint - previousRawPoint;
+            found = true;
+        }
+        if (found && IsLivingMeleeContact(closestHit.Collider))
+        {
+            return false;
+        }
+        if (found && bladeTravel.LengthSquared() <= 0.0001f)
+        {
+            bladeTravel = rawBladeTip - rawBladeBase;
+        }
+        return found;
+    }
+
+    private static bool IsLivingMeleeContact(GodotObject? target)
+        => target is EnemyOperator
+            or CivilianNpc
+            or SquadMate
+            or TacticalPlayer;
+
     private void UpdateMeleeBladeSweep(
         KnifeSkinDefinition definition,
         MeleeAttackDefinition attack,
@@ -169,7 +270,7 @@ public partial class TacticalPlayer
             if (!impactSpawned && anchorBlocker.Collider is not null)
             {
                 impactSpawned = true;
-                Main?.SpawnImpact(anchorBlocker.Position, anchorBlocker.Normal);
+                SpawnMeleeWorldImpact(anchorBlocker, to - from, definition);
             }
             return true;
         }
@@ -212,7 +313,7 @@ public partial class TacticalPlayer
             if (!impactSpawned && blocker.Collider is not null)
             {
                 impactSpawned = true;
-                Main?.SpawnImpact(blocker.Position, blocker.Normal);
+                SpawnMeleeWorldImpact(blocker, to - from, definition);
             }
             return false;
         }
@@ -229,15 +330,41 @@ public partial class TacticalPlayer
                 _meleeHitTargetRids.Add(targetRid);
                 exclude.Add(targetRid);
             }
-            Main?.SpawnImpact(hit.Position, hit.Normal);
+            if (target is EnemyOperator or CivilianNpc)
+            {
+                Main?.SpawnImpact(hit.Position, hit.Normal);
+            }
+            else if (!impactSpawned)
+            {
+                impactSpawned = true;
+                SpawnMeleeWorldImpact(hit, to - from, definition);
+            }
             return _meleeHitTargets.Count >= attack.MaxTargets;
         }
         if (!impactSpawned)
         {
             impactSpawned = true;
-            Main?.SpawnImpact(hit.Position, hit.Normal);
+            SpawnMeleeWorldImpact(hit, to - from, definition);
         }
         return false;
+    }
+
+    private void SpawnMeleeWorldImpact(
+        PhysicsRaycastHit hit,
+        Vector3 bladeTravel,
+        KnifeSkinDefinition definition)
+    {
+        if (hit.Collider is null)
+        {
+            return;
+        }
+        Main?.SpawnMeleeSurfaceImpact(
+            hit.Position,
+            hit.Normal,
+            bladeTravel,
+            hit.Collider,
+            hit.Shape,
+            definition.Style);
     }
 
     private bool MeleeDamageLineClear(
@@ -436,10 +563,42 @@ public partial class TacticalPlayer
         return _meleeHitTargets.Count;
     }
 
+    internal bool ResolveSuppressedMeleeWallContactForDiagnostics(
+        string definitionId,
+        int attackIndex,
+        Vector3 previousBase,
+        Vector3 previousTip,
+        Vector3 currentBase,
+        Vector3 currentTip)
+    {
+        var definition = KnifeSkinCatalog.Definition(definitionId);
+        var attack = MeleeAttackCatalog.AttackFor(definition.Style, attackIndex);
+        var windowStart = Mathf.Max(0.18f, attack.HitProgress - 0.12f);
+        _rawMeleeContactPrimed = false;
+        _meleeWorldImpactSpawned = false;
+        _meleeBladeSweepResolved = false;
+        UpdateMeleeWallContactFeedback(
+            definition,
+            attack,
+            windowStart - 0.01f,
+            previousBase,
+            previousTip,
+            clearanceSafe: false);
+        UpdateMeleeWallContactFeedback(
+            definition,
+            attack,
+            attack.HitProgress,
+            currentBase,
+            currentTip,
+            clearanceSafe: false);
+        return _meleeWorldImpactSpawned;
+    }
+
     internal void PrepareMeleeCombatFixtureForDiagnostics()
     {
         CancelMeleeAction();
         _fireCooldown = 0.0f;
+        SetPhysicsProcess(false);
     }
 
     internal void ConfirmAuthoritativeMeleeHit(bool killed, bool armorHit)
