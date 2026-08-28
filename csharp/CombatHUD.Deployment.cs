@@ -74,7 +74,9 @@ public partial class CombatHUD
         EmitSignal(SignalName.DeploymentTimeOfDayChanged, (int)_selectedTimeOfDay);
     }
     public bool IsDeploymentThreatLocked(DeploymentThreatLevel level)
-        => DeploymentRankLevel < ThreatLevels.RequiredReputationLevel(level);
+        => DeploymentAccessPolicy.IsReputationLocked(
+            DeploymentRankLevel,
+            ThreatLevels.RequiredReputationLevel(level));
     public void SetDeploymentThreatForDiagnostics(DeploymentThreatLevel level)
     {
         if (IsDeploymentThreatLocked(level))
@@ -85,14 +87,28 @@ public partial class CombatHUD
         RefreshDeploymentStore();
     }
     public bool IsDeploymentWeaponLocked(string weaponId)
-        => DeploymentRankLevel < OperatorReputation.RequiredLevelForWeapon(weaponId);
+        => DeploymentAccessPolicy.IsReputationLocked(
+            DeploymentRankLevel,
+            OperatorReputation.RequiredLevelForWeapon(weaponId));
+    public bool IsDeploymentArmorLocked(string armorId)
+        => DeploymentAccessPolicy.IsReputationLocked(
+            DeploymentRankLevel,
+            OperatorReputation.RequiredLevelForArmor(armorId));
     public bool IsDeploymentAmmoGradeLocked(LootGrade grade)
-        => DeploymentRankLevel < OperatorReputation.RequiredLevelForAmmoGrade(grade);
+        => DeploymentAccessPolicy.IsReputationLocked(
+            DeploymentRankLevel,
+            OperatorReputation.RequiredLevelForAmmoGrade(grade));
+    public bool IsDeploymentPresetLocked(string presetId)
+        => DeploymentAccessPolicy.IsReputationLocked(
+            DeploymentRankLevel,
+            OperatorReputation.RequiredLevelForPreset(DeploymentCatalog.Preset(presetId)));
     public bool DeploymentMapAvailable => IsMapSelectable(_selectedDeploymentMapId);
 
     private bool IsMapSelectable(string mapId)
         => DeploymentMapCatalog.IsAvailable(mapId)
-            && DeploymentRankLevel >= OperatorReputation.RequiredLevelForMap(mapId);
+            && !DeploymentAccessPolicy.IsReputationLocked(
+                DeploymentRankLevel,
+                OperatorReputation.RequiredLevelForMap(mapId));
 
     private void BuildDeploymentStore(Control panel)
     {
@@ -605,9 +621,14 @@ public partial class CombatHUD
             : $"THREAT  {ThreatLevels.DisplayName(_selectedThreatLevel, _language)}  //  PAYOUT +{payoutPercent}%";
         var detectionPercent = Mathf.RoundToInt((ThreatLevels.DetectionMultiplier(_selectedThreatLevel) - 1.0f) * 100.0f);
         var accuracyPercent = Mathf.RoundToInt(ThreatLevels.AccuracyBonus(_selectedThreatLevel) * 100.0f);
+        var accessHint = DeploymentAccessPolicy.ReputationRestrictionsEnabled
+            ? chinese
+                ? $"\u5347\u7ea7\u5a01\u80c1\u9700\u58f0\u671b L{ThreatLevels.RequiredReputationLevel(DeploymentThreatLevel.Elevated)}  \u6700\u9ad8\u5a01\u80c1\u9700 L{ThreatLevels.RequiredReputationLevel(DeploymentThreatLevel.Maximum)}"
+                : $"ELEVATED NEEDS REP L{ThreatLevels.RequiredReputationLevel(DeploymentThreatLevel.Elevated)}  MAXIMUM NEEDS L{ThreatLevels.RequiredReputationLevel(DeploymentThreatLevel.Maximum)}"
+            : Text("deployment_rank_limits_off", "REPUTATION LIMITS DISABLED");
         _deploymentThreatButton.TooltipText = chinese
-            ? $"\u4fa6\u6d4b +{detectionPercent}%  \u7cbe\u5ea6 +{accuracyPercent}%  \u5feb\u901f\u53cd\u5e94\u90e8\u961f\u66f4\u9891  //  \u5347\u7ea7\u5a01\u80c1\u9700\u58f0\u671b L{ThreatLevels.RequiredReputationLevel(DeploymentThreatLevel.Elevated)}  \u6700\u9ad8\u5a01\u80c1\u9700 L{ThreatLevels.RequiredReputationLevel(DeploymentThreatLevel.Maximum)}"
-            : $"DETECTION +{detectionPercent}%  AIM +{accuracyPercent}%  FASTER QRF  //  ELEVATED NEEDS REP L{ThreatLevels.RequiredReputationLevel(DeploymentThreatLevel.Elevated)}  MAXIMUM NEEDS L{ThreatLevels.RequiredReputationLevel(DeploymentThreatLevel.Maximum)}";
+            ? $"\u4fa6\u6d4b +{detectionPercent}%  \u7cbe\u5ea6 +{accuracyPercent}%  \u5feb\u901f\u53cd\u5e94\u90e8\u961f\u66f4\u9891  //  {accessHint}"
+            : $"DETECTION +{detectionPercent}%  AIM +{accuracyPercent}%  FASTER QRF  //  {accessHint}";
     }
 
     private void ClearDeploymentError() => _deploymentError = string.Empty;
@@ -675,7 +696,7 @@ public partial class CombatHUD
         foreach (var preset in DeploymentCatalog.Presets)
         {
             var button = _deploymentPresetButtons[preset.Id];
-            var presetLocked = DeploymentRankLevel < OperatorReputation.RequiredLevelForPreset(preset);
+            var presetLocked = IsDeploymentPresetLocked(preset.Id);
             button.SetPressedNoSignal(preset.Id == matchingPreset);
             button.Disabled = presetLocked;
             button.Text = presetLocked
@@ -690,7 +711,7 @@ public partial class CombatHUD
             button.SetPressedNoSignal(map.Id == selectedMap.Id);
             button.Disabled = mapLocked;
             button.Text = DeploymentMapButtonText(map);
-            var lockHint = !map.Available
+            var lockHint = !map.Available || !DeploymentAccessPolicy.ReputationRestrictionsEnabled
                 ? string.Empty
                 : $"REQUIRES REP L{OperatorReputation.RequiredLevelForMap(map.Id)}\n";
             button.TooltipText = $"{map.Code}  //  {Text(map.LocalizationKey, map.EnglishName)}\n{lockHint}{Text(map.SubtitleLocalizationKey, map.EnglishSubtitle)}";
@@ -718,7 +739,7 @@ public partial class CombatHUD
         foreach (var offer in DeploymentCatalog.Armor)
         {
             var selectedOffer = string.Equals(offer.Id, _selectedArmorId, StringComparison.OrdinalIgnoreCase);
-            var armorLocked = DeploymentRankLevel < OperatorReputation.RequiredLevelForArmor(offer.Id);
+            var armorLocked = IsDeploymentArmorLocked(offer.Id);
             _deploymentArmorButtons[offer.Id].Disabled = armorLocked;
             _deploymentArmorButtons[offer.Id].SetPressedNoSignal(selectedOffer);
             _deploymentArmorNames[offer.Id].Text = Text(offer.LocalizationKey, offer.EnglishName);
@@ -861,6 +882,12 @@ public partial class CombatHUD
     {
         var points = _displayedProfile.ReputationPoints;
         var level = OperatorReputation.LevelForPoints(points);
+        if (!DeploymentAccessPolicy.ReputationRestrictionsEnabled)
+        {
+            return chinese
+                ? $"\u58f0\u671b L{level}  //  {Text("deployment_rank_limits_off", "REPUTATION LIMITS DISABLED")}"
+                : $"REP L{level}  //  {Text("deployment_rank_limits_off", "REPUTATION LIMITS DISABLED")}";
+        }
         if (level >= OperatorReputation.MaxLevel)
         {
             return chinese ? $"\u58f0\u671b L{level}  //  \u5df2\u6ee1\u7ea7" : $"REP L{level}  //  MAX";

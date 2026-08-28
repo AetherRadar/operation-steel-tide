@@ -312,7 +312,7 @@ Godot_console.exe --headless --path . -- --validate-extraction-network-host
 Godot_console.exe --headless --path . -- --validate-extraction-network-client
 ```
 
-`--validate-deployment-ui` 验证完整干员预览、六项市场条目、四套快捷配装预设、四种弹药数量、独立的品级/数量定价、三槽地图选择器、锁定地图拒绝逻辑、配装成本和预计部署后余额。
+`--validate-deployment-ui` 验证完整干员预览、六项市场条目、四套快捷配装预设、四种弹药数量、独立的品级/数量定价、三槽地图选择器、摸金声望等级门槛关闭、未开放地图拒绝逻辑、配装成本和预计部署后余额。当前测试阶段保留声望成长与等级奖励，但地图、武器、护甲、弹药、预设和威胁等级不再受声望等级限制。
 
 `--validate-refinery-map` 通过旧地图 ID 启动江海旧城，并验证正式模型布置、CC0 来源覆盖、场景缓存、质量等级、仅使用盒体的碰撞代理、独立区域、高价值战利品区、车辆路线、屋顶小队通行、战利品/驻军/小地图集成，以及严格渲染预算。`--capture-refinery-map` 保留兼容命令和旧输出名，同时保存俯视构图、玩家高度道路、两个高价值院落和屋顶路线。`--capture-promotion` 使用固定布置与机位，在 `docs/media` 下重复生成 1600 x 900 无 HUD 主视觉、小队推进和市集天桥图片，并输出 1280 x 640 社交封面。`--capture-readme-zh` 则以中文 HUD 确定性生成首页所用的小队、战术态势、交火、背包和爆破买装五张实机图。
 

@@ -90,7 +90,8 @@ public sealed class OperatorProfileData
 
 /// <summary>
 /// Reputation levels convert extracted loot value into a long-term progression curve.
-/// Higher levels unlock market stock, the second deployment map, and starting perks.
+/// Higher levels grant starting perks; deployment access requirements are owned by
+/// <see cref="DeploymentAccessPolicy"/> and may be disabled independently.
 /// </summary>
 public static class OperatorReputation
 {
@@ -420,7 +421,7 @@ public sealed class OperatorProfileStore
                 Math.Max(
                     OperatorReputation.RequiredLevelForArmor(loadout.Selection.ArmorId),
                     OperatorReputation.RequiredLevelForAmmoGrade(loadout.Selection.AmmoGrade)));
-            if (reputationLevel < requiredLevel)
+            if (DeploymentAccessPolicy.IsReputationLocked(reputationLevel, requiredLevel))
             {
                 failure = "reputation_locked";
                 return false;

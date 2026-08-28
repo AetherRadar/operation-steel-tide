@@ -168,7 +168,7 @@ public partial class FreightTerminalWorld
         var insufficientRejected = !extractedStore.TryCommitDeployment(expensive, out _, out var failure)
             && failure == "insufficient_credits";
 
-        // Reputation: curve math, level gating, and extraction point gains.
+        // Reputation: curve math and perk levels remain active while deployment gates are disabled.
         var reputationCurve = OperatorReputation.LevelForPoints(0) == 1
             && OperatorReputation.LevelForPoints(3999) == 1
             && OperatorReputation.LevelForPoints(4000) == 2
@@ -178,15 +178,16 @@ public partial class FreightTerminalWorld
         var reputationPath = profilePath + ".rep.json";
         TryDeleteProfile(reputationPath);
         var reputationStore = new OperatorProfileStore(reputationPath);
-        var repLockedRejected = !reputationStore.TryCommitDeployment(
+        var rankRestrictionsDisabled = !DeploymentAccessPolicy.ReputationRestrictionsEnabled;
+        var lowRankKitAccepted = reputationStore.TryCommitDeployment(
             new DeploymentLoadoutSelection("scarl", "patrol", LootGrade.Common, 30),
-            out _,
-            out var reputationFailure)
-            && reputationFailure == "reputation_locked";
+            out var lowRankLoadout,
+            out _)
+            && lowRankLoadout.ReputationLevel == 1;
         var repPointsGained = reputationStore.CreditExtraction(4500)
             && reputationStore.Profile.ReputationPoints == 4500
             && OperatorReputation.LevelForPoints(reputationStore.Profile.ReputationPoints) == 2;
-        var repUnlockAccepted = reputationStore.TryCommitDeployment(
+        var progressedKitAccepted = reputationStore.TryCommitDeployment(
             new DeploymentLoadoutSelection("scarl", "patrol", LootGrade.Common, 30),
             out var reputationLoadout,
             out _)
@@ -213,9 +214,10 @@ public partial class FreightTerminalWorld
 
         var valid = purchase && persisted && playerEquipped && squadAiArmed && rivalAiArmed
             && ammoTiers && minimap && extractSaved && insufficientRejected
-            && reputationCurve && repLockedRejected && repPointsGained && repUnlockAccepted && perkLevelReached
+            && reputationCurve && rankRestrictionsDisabled && lowRankKitAccepted
+            && repPointsGained && progressedKitAccepted && perkLevelReached
             && perkPlatesGranted;
-        GD.Print($"PROGRESSION_CHECK valid={valid} purchase={purchase} persisted={persisted} player_equipped={playerEquipped} weapon_grade={_player.EquippedWeaponGrade}/{expectedWeaponGrade} squad_ai_armed={squadAiArmed} rival_ai_armed={rivalAiArmed} ammo_tiers={ammoTiers} minimap={minimap} landmarks={_hud.MinimapLandmarkCount} extract_saved={extractSaved} insufficient_rejected={insufficientRejected} reputation_curve={reputationCurve} rep_locked={repLockedRejected} rep_points={repPointsGained} rep_unlock={repUnlockAccepted} perk_level={perkLevelReached} perk_plates={perkPlatesGranted}");
+        GD.Print($"PROGRESSION_CHECK valid={valid} purchase={purchase} persisted={persisted} player_equipped={playerEquipped} weapon_grade={_player.EquippedWeaponGrade}/{expectedWeaponGrade} squad_ai_armed={squadAiArmed} rival_ai_armed={rivalAiArmed} ammo_tiers={ammoTiers} minimap={minimap} landmarks={_hud.MinimapLandmarkCount} extract_saved={extractSaved} insufficient_rejected={insufficientRejected} reputation_curve={reputationCurve} rank_restrictions_off={rankRestrictionsDisabled} low_rank_kit={lowRankKitAccepted} rep_points={repPointsGained} progressed_kit={progressedKitAccepted} perk_level={perkLevelReached} perk_plates={perkPlatesGranted}");
         GD.Print($"PROGRESSION_PASS valid={valid}");
         TryDeleteProfile(profilePath);
         TryDeleteProfile(profilePath + ".tmp");
@@ -295,46 +297,54 @@ public partial class FreightTerminalWorld
         var mapCatalog = _hud.DeploymentMapCount == 3
             && _hud.SelectedDeploymentMapId == DeploymentMapCatalog.FreightTerminalId
             && _hud.DeploymentMapAvailable;
-        var weaponLocksFresh = _hud.IsDeploymentWeaponLocked("m24")
+        var rankRestrictionsDisabled = !DeploymentAccessPolicy.ReputationRestrictionsEnabled;
+        var rankRestrictionLocalization = GameLocalization.Get(
+                "deployment_rank_limits_off",
+                "zh",
+                "REPUTATION LIMITS DISABLED") == "\u7b49\u7ea7\u9650\u5236\u5df2\u5173\u95ed"
+            && GameLocalization.Get(
+                "deployment_rank_limits_off",
+                "en",
+                "REPUTATION LIMITS DISABLED") == "REPUTATION LIMITS DISABLED";
+        var rankGatesOpenFresh = !_hud.IsDeploymentWeaponLocked("m24")
             && !_hud.IsDeploymentWeaponLocked("m3a1")
-            && _hud.IsDeploymentAmmoGradeLocked(LootGrade.Legendary)
+            && !_hud.IsDeploymentArmorLocked("heavy")
+            && !_hud.IsDeploymentAmmoGradeLocked(LootGrade.Legendary)
             && !_hud.IsDeploymentAmmoGradeLocked(LootGrade.Common)
+            && !_hud.IsDeploymentPresetLocked("overwatch")
             && _hud.DeploymentRankLevel == 1;
         var threatDefault = _hud.SelectedDeploymentThreatLevel == DeploymentThreatLevel.Standard
-            && _hud.IsDeploymentThreatLocked(DeploymentThreatLevel.Elevated)
-            && _hud.IsDeploymentThreatLocked(DeploymentThreatLevel.Maximum);
+            && !_hud.IsDeploymentThreatLocked(DeploymentThreatLevel.Elevated)
+            && !_hud.IsDeploymentThreatLocked(DeploymentThreatLevel.Maximum);
         _hud.SetDeploymentThreatForDiagnostics(DeploymentThreatLevel.Maximum);
-        var threatLockedRejected = _hud.SelectedDeploymentThreatLevel == DeploymentThreatLevel.Standard;
+        var threatMaximumAccepted = _hud.SelectedDeploymentThreatLevel == DeploymentThreatLevel.Maximum;
         var timeDefault = _hud.SelectedDeploymentTimeOfDay == DeploymentTimeOfDay.Day
             && TimeOfDayStyles.Style(DeploymentTimeOfDay.Night).DetectionMultiplier
                 < TimeOfDayStyles.Style(DeploymentTimeOfDay.Day).DetectionMultiplier;
         _hud.SetDeploymentTimeForDiagnostics(DeploymentTimeOfDay.Night);
         var timeCycled = _hud.SelectedDeploymentTimeOfDay == DeploymentTimeOfDay.Night;
         _hud.ApplyDeploymentMapForDiagnostics(DeploymentMapCatalog.BlackwaterRefineryId);
-        var refineryLockedRejected = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.FreightTerminalId;
-        var promotedProfile = new OperatorProfileData { ReputationPoints = OperatorReputation.PointsForLevel(2) };
-        _hud.SetOperatorProfile(promotedProfile);
-        _hud.ApplyDeploymentMapForDiagnostics(DeploymentMapCatalog.BlackwaterRefineryId);
-        var refineryMapAccepted = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.BlackwaterRefineryId
+        var refineryMapAcceptedAtLevelOne = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.BlackwaterRefineryId
             && _hud.DeploymentMapAvailable
-            && _hud.DeploymentRankLevel == 2;
+            && _hud.DeploymentRankLevel == 1;
         _hud.SetDeploymentThreatForDiagnostics(DeploymentThreatLevel.Elevated);
         var threatElevatedAccepted = _hud.SelectedDeploymentThreatLevel == DeploymentThreatLevel.Elevated;
         _hud.SetDeploymentThreatForDiagnostics(DeploymentThreatLevel.Maximum);
-        var threatMaximumStillLocked = _hud.SelectedDeploymentThreatLevel == DeploymentThreatLevel.Elevated;
+        var threatMaximumStillAccepted = _hud.SelectedDeploymentThreatLevel == DeploymentThreatLevel.Maximum;
         _hud.ApplyDeploymentMapForDiagnostics("orbital_complex");
         var lockedMapRejected = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.BlackwaterRefineryId;
         var valid = uiReady && presetCount && weaponCount && armorCount && ammoPackCount && presetSelected
             && loadoutSelected && cost && projectedBalance && quantityPricing && gradePricing
-            && mapCatalog && refineryMapAccepted && lockedMapRejected && refineryLockedRejected
-            && weaponLocksFresh && threatDefault && threatLockedRejected
-            && threatElevatedAccepted && threatMaximumStillLocked
+            && mapCatalog && refineryMapAcceptedAtLevelOne && lockedMapRejected
+            && rankRestrictionsDisabled && rankRestrictionLocalization && rankGatesOpenFresh
+            && threatDefault && threatMaximumAccepted
+            && threatElevatedAccepted && threatMaximumStillAccepted
             && timeDefault && timeCycled
             && starterPresetSelected && freeStarter
             && weakStarter && starterUpgradesPriced && starterEquipped
             && starterWeaponGrade && selectedWeaponGrade;
 
-        GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} weapon_count={DeploymentCatalog.Weapons.Count} armor_count={DeploymentCatalog.Armor.Count} ammo_pack_count={_hud.DeploymentAmmoPackCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} quantity={selection.AmmoQuantity} quantity_pricing={quantityPricing} grade_pricing={gradePricing} weapon_grades={starterWeaponGrade}/{selectedWeaponGrade} map_count={_hud.DeploymentMapCount} selected_map={_hud.SelectedDeploymentMapId} map_available={_hud.DeploymentMapAvailable} refinery_locked={refineryLockedRejected} refinery_map={refineryMapAccepted} locked_map_rejected={lockedMapRejected} weapon_locks={weaponLocksFresh} rank_level={_hud.DeploymentRankLevel} threat_default={threatDefault} threat_locked={threatLockedRejected} threat_elevated={threatElevatedAccepted} threat_max_locked={threatMaximumStillLocked} time_default={timeDefault} time_cycled={timeCycled} starter_preset={starterPresetSelected} starter_free={freeStarter} starter_weak={weakStarter} starter_upgrades_priced={starterUpgradesPriced} starter_equipped={starterEquipped} starter_damage={starterLoadout.Weapon?.Stats().Damage:0} starter_armor={starterArmor.Protection * 100.0f:0} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
+        GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} weapon_count={DeploymentCatalog.Weapons.Count} armor_count={DeploymentCatalog.Armor.Count} ammo_pack_count={_hud.DeploymentAmmoPackCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} quantity={selection.AmmoQuantity} quantity_pricing={quantityPricing} grade_pricing={gradePricing} weapon_grades={starterWeaponGrade}/{selectedWeaponGrade} map_count={_hud.DeploymentMapCount} selected_map={_hud.SelectedDeploymentMapId} map_available={_hud.DeploymentMapAvailable} rank_restrictions_off={rankRestrictionsDisabled} rank_localization={rankRestrictionLocalization} rank_gates_open={rankGatesOpenFresh} refinery_level_one={refineryMapAcceptedAtLevelOne} locked_map_rejected={lockedMapRejected} rank_level={_hud.DeploymentRankLevel} threat_default={threatDefault} threat_max={threatMaximumAccepted}/{threatMaximumStillAccepted} threat_elevated={threatElevatedAccepted} time_default={timeDefault} time_cycled={timeCycled} starter_preset={starterPresetSelected} starter_free={freeStarter} starter_weak={weakStarter} starter_upgrades_priced={starterUpgradesPriced} starter_equipped={starterEquipped} starter_damage={starterLoadout.Weapon?.Stats().Damage:0} starter_armor={starterArmor.Protection * 100.0f:0} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
         GD.Print($"DEPLOYMENT_UI_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }

@@ -430,6 +430,7 @@ public static class GameLocalization
         Chinese["preset_breacher"] = "\u7a81\u7834\u624b";
         Chinese["preset_overwatch"] = "\u8fdc\u7a0b\u76d1\u89c6";
         Chinese["deployment_strike_team"] = "\u7a81\u51fb\u5c0f\u961f";
+        Chinese["deployment_rank_limits_off"] = "\u7b49\u7ea7\u9650\u5236\u5df2\u5173\u95ed";
         Chinese["loadout_knife_only"] = "\u6218\u672f\u5200";
         Chinese["loadout_insufficient"] = "\u4f59\u989d\u4e0d\u8db3  //  \u8bf7\u9009\u62e9\u66f4\u4fbf\u5b9c\u7684\u6574\u5907";
         Chinese["loadout_reputation_locked"] = "\u58f0\u671b\u7b49\u7ea7\u4e0d\u8db3  //  \u8bf7\u5148\u63d0\u5347\u5e72\u5458\u7b49\u7ea7";
