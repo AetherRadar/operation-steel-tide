@@ -131,13 +131,13 @@ public partial class AircraftShell : CharacterBody3D
 
         var radius = airBurst ? AirBurstRadius : BlastRadius;
         var damage = airBurst ? Damage * AirBurstDamageScale : Damage;
-        Main?.Explode(GlobalPosition + Vector3.Up * (airBurst ? 0.4f : 0.2f), radius, damage, OwnerAircraft ?? this);
-        if (!airBurst)
-        {
-            // Extra operator splash through the dedicated aircraft strike path.
-            Main?.ApplyAircraftStrike(GlobalPosition, radius * 0.85f, damage * 0.55f, OwnerAircraft ?? this);
-        }
-        else
+        Main?.Explode(
+            GlobalPosition + Vector3.Up * (airBurst ? 0.4f : 0.2f),
+            radius,
+            damage,
+            OwnerAircraft ?? this,
+            this);
+        if (airBurst)
         {
             Main?.SpawnImpact(GlobalPosition, Vector3.Up);
         }

@@ -33,6 +33,8 @@ QUATERNIUS_AIM_SUPPORT_HAND_OFFSET = Vector((-0.01562, 0.01559, 0.08699))
 QUATERNIUS_READY_SUPPORT_HAND_OFFSET = Vector((-0.22, 0.0, 0.105))
 QUATERNIUS_VIPER_AIM_SUPPORT_HAND_OFFSET = Vector((-0.02979, 0.01925, 0.08770))
 QUATERNIUS_VIPER_READY_SUPPORT_HAND_OFFSET = Vector((-0.2536, 0.0045, 0.1079))
+QUATERNIUS_RIGHT_ELBOW_POLE_OFFSET = Vector((-0.42, -0.34, -0.08))
+QUATERNIUS_RIGHT_ELBOW_POLE_ANGLE_DEGREES = 90.0
 
 
 VARIANTS = {
@@ -1581,6 +1583,8 @@ def build_variant(
             else QUATERNIUS_READY_SUPPORT_HAND_OFFSET
         ),
         right_hand_world_rotation=ready_hand_rotation,
+        right_elbow_pole_offset=QUATERNIUS_RIGHT_ELBOW_POLE_OFFSET,
+        right_elbow_pole_angle_degrees=QUATERNIUS_RIGHT_ELBOW_POLE_ANGLE_DEGREES,
     )
     for output_name, source_name in helpers.READY_LOCOMOTION_SOURCES.items():
         generated[output_name] = helpers.author_upper_body_locomotion(

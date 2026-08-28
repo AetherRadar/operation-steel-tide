@@ -83,6 +83,7 @@ public partial class FreightTerminalWorld
             ("--validate-lan-discovery", static world => world.ValidateLanRoomDiscovery()),
             ("--validate-aircraft-behavior", static world => world.ValidateAircraftBehavior()),
             ("--validate-aircraft-combat", static world => world.ValidateAircraftCombat()),
+            ("--validate-explosion-cover", static world => world.ValidateExplosionCover()),
             ("--validate-map-density", static world => world.ValidateMapDensity()),
             ("--validate-district-network", static world => world.ValidateDistrictNetwork()),
             ("--validate-special-landmarks", static world => world.ValidateSpecialLandmarks()),

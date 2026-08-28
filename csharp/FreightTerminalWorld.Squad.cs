@@ -2075,9 +2075,40 @@ public partial class FreightTerminalWorld
                 continue;
             }
             var falloff = 1.0f - distance / Mathf.Max(0.01f, radius);
-            friendly.TakeCombatDamage(damage * falloff, impact, source);
+            var exposure = ExplosionExposureResolver.ResolveCombatant(
+                GetWorld3D(),
+                impact,
+                friendly,
+                source);
+            if (exposure.IsExposed)
+            {
+                ApplyExplosionCombatDamage(
+                    friendly,
+                    damage * falloff * exposure.Fraction,
+                    source);
+            }
         }
     }
+
+    private static bool ApplyExplosionCombatDamage(
+        ISquadCombatant target,
+        float damage,
+        Node? source)
+        => target switch
+        {
+            SquadMate mate => mate.TakeExplosionCombatDamage(
+                damage,
+                mate.HitPoint(HitRegion.Torso),
+                source),
+            TacticalPlayer player => player.TakeDamage(
+                damage,
+                player.HitPoint(HitRegion.Torso),
+                source),
+            _ => target.TakeCombatDamage(
+                damage,
+                target.HitPoint(HitRegion.Torso),
+                source)
+        };
 
     public void PerformReconScan(ISquadCombatant source, Vector3 origin)
     {
@@ -2207,7 +2238,12 @@ public partial class FreightTerminalWorld
         };
     }
 
-    private void DamageSquadFromExplosion(Vector3 position, float radius, float maxDamage, Node? source)
+    private void DamageSquadFromExplosion(
+        Vector3 position,
+        float radius,
+        float maxDamage,
+        Node? source,
+        Node? blastEmitter = null)
     {
         foreach (var mate in _squadMates.ToArray())
         {
@@ -2218,7 +2254,19 @@ public partial class FreightTerminalWorld
             var distance = mate.GlobalPosition.DistanceTo(position);
             if (distance < radius)
             {
-                mate.TakeCombatDamage(maxDamage * 0.72f * (1.0f - distance / radius), position, source);
+                var exposure = ExplosionExposureResolver.ResolveCombatant(
+                    GetWorld3D(),
+                    position,
+                    mate,
+                    source,
+                    blastEmitter);
+                if (exposure.IsExposed)
+                {
+                    mate.TakeExplosionCombatDamage(
+                        maxDamage * 0.72f * (1.0f - distance / radius) * exposure.Fraction,
+                        mate.HitPoint(HitRegion.Torso),
+                        source);
+                }
             }
         }
     }

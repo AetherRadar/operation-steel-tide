@@ -180,7 +180,7 @@ public partial class DestructibleAircraft : StaticBody3D
         IsDestroyed = true;
         SetPhysicsProcess(false);
         var crashPosition = GlobalPosition;
-        Main?.Explode(crashPosition + Vector3.Up * 1.2f, 14.0f, 160.0f, this);
+        Main?.Explode(crashPosition + Vector3.Up * 1.2f, 14.0f, 160.0f, this, this);
         _visual.Visible = false;
         _collider.Disabled = true;
         CollisionLayer = 0;

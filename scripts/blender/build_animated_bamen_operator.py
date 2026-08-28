@@ -374,6 +374,8 @@ def author_rifle_hold(
     head_direction: Vector,
     support_hand_offset: Vector | None = None,
     right_hand_world_rotation: Quaternion | None = None,
+    right_elbow_pole_offset: Vector | None = None,
+    right_elbow_pole_angle_degrees: float = 0.0,
     remove_source: bool = False,
 ) -> bpy.types.Action:
     armature.animation_data.action = source
@@ -407,6 +409,17 @@ def author_rifle_hold(
         constraint.target = target
         constraint.chain_count = 2
         constraint.use_tail = True
+        if bone_name == "mixamorig:RightForeArm" and right_elbow_pole_offset is not None:
+            pole = bpy.data.objects.new("mixamorig:RightForeArm_RifleAimPole", None)
+            bpy.context.collection.objects.link(pole)
+            right_shoulder = armature.pose.bones["mixamorig:RightArm"]
+            pole.location = (
+                armature.matrix_world @ right_shoulder.head
+                + armature.matrix_world.to_3x3() @ right_elbow_pole_offset
+            )
+            constraint.pole_target = pole
+            constraint.pole_angle = math.radians(right_elbow_pole_angle_degrees)
+            targets.append(pole)
         constraints.append((armature.pose.bones[bone_name], constraint))
         targets.append(target)
     bpy.context.view_layer.update()

@@ -66,7 +66,7 @@ public partial class FragGrenade : RigidBody3D
             return;
         }
         _armed = false;
-        Main?.Explode(GlobalPosition, 8.5f, 125.0f, OwnerBody ?? this);
+        Main?.Explode(GlobalPosition, 8.5f, 125.0f, OwnerBody ?? this, this);
         QueueFree();
     }
 

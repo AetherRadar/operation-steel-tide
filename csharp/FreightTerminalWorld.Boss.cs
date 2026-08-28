@@ -122,8 +122,20 @@ public partial class FreightTerminalWorld
             var distance = enemy.GlobalPosition.DistanceTo(position);
             if (distance < radius)
             {
-                var damage = maxDamage * (1.0f - distance / radius);
-                enemy.TakeDamage(damage, enemy.GlobalPosition + Vector3.Up, boss, 0.35f);
+                var exposure = ExplosionExposureResolver.ResolveStandingTarget(
+                    GetWorld3D(),
+                    position,
+                    enemy,
+                    boss);
+                if (exposure.IsExposed)
+                {
+                    var damage = maxDamage * (1.0f - distance / radius) * exposure.Fraction;
+                    enemy.TakeDamage(
+                        damage,
+                        enemy.GlobalPosition + Vector3.Up * 1.02f,
+                        boss,
+                        0.35f);
+                }
             }
         }
 
@@ -134,7 +146,18 @@ public partial class FreightTerminalWorld
                 var playerDistance = _player.GlobalPosition.DistanceTo(position);
                 if (playerDistance < radius)
                 {
-                    _player.TakeDamage(maxDamage * 0.72f * (1.0f - playerDistance / radius), position, boss);
+                    var exposure = ExplosionExposureResolver.ResolveCombatant(
+                        GetWorld3D(),
+                        position,
+                        _player,
+                        boss);
+                    if (exposure.IsExposed)
+                    {
+                        _player.TakeDamage(
+                            maxDamage * 0.72f * (1.0f - playerDistance / radius) * exposure.Fraction,
+                            _player.HitPoint(HitRegion.Torso),
+                            boss);
+                    }
                 }
             }
             DamageSquadFromExplosion(position, radius, maxDamage, boss);

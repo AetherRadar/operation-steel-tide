@@ -72,7 +72,12 @@ public partial class ExplosiveBarrel : StaticBody3D
         if (_health <= 0.0f)
         {
             Exploded = true;
-            Main?.Explode(GlobalPosition + Vector3.Up * 0.5f, 9.0f, 135.0f, attacker ?? this);
+            Main?.Explode(
+                GlobalPosition + Vector3.Up * 0.5f,
+                9.0f,
+                135.0f,
+                attacker ?? this,
+                this);
             QueueFree();
         }
         return false;

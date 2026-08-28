@@ -104,7 +104,8 @@ internal static class PhysicsRaycast
         Godot.Collections.Array<Rid> exclude,
         uint collisionMask,
         bool collideWithAreas = false,
-        bool collideWithBodies = true)
+        bool collideWithBodies = true,
+        bool hitFromInside = false)
         => HasHit(
             world.DirectSpaceState,
             from,
@@ -112,7 +113,8 @@ internal static class PhysicsRaycast
             exclude,
             collisionMask,
             collideWithAreas,
-            collideWithBodies);
+            collideWithBodies,
+            hitFromInside);
 
     public static bool HasHit(
         PhysicsDirectSpaceState3D space,
@@ -121,7 +123,8 @@ internal static class PhysicsRaycast
         Godot.Collections.Array<Rid> exclude,
         uint collisionMask,
         bool collideWithAreas = false,
-        bool collideWithBodies = true)
+        bool collideWithBodies = true,
+        bool hitFromInside = false)
     {
         var query = _threadQuery ??= new PhysicsRayQueryParameters3D();
         query.From = from;
@@ -130,6 +133,7 @@ internal static class PhysicsRaycast
         query.Exclude = exclude;
         query.CollideWithAreas = collideWithAreas;
         query.CollideWithBodies = collideWithBodies;
+        query.HitFromInside = hitFromInside;
         try
         {
             using var result = space.IntersectRay(query);
@@ -138,6 +142,7 @@ internal static class PhysicsRaycast
         finally
         {
             query.Exclude = ThreadEmptyExclude();
+            query.HitFromInside = false;
         }
     }
 

@@ -182,6 +182,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     private Godot.Collections.Array<Rid>? _navigationProbeExclusions;
 
     internal bool LeaderCollisionExcludedForDiagnostics { get; private set; }
+    internal HitRegion LastDamageRegionForDiagnostics { get; private set; } = HitRegion.Torso;
 
     public void Configure(
         FreightTerminalWorld main,
@@ -974,11 +975,23 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             attacker,
             verifyBallisticPath: false);
 
+    internal bool TakeExplosionCombatDamage(
+        float amount,
+        Vector3 hitPosition,
+        Node? attacker = null)
+        => TakeCombatDamageInternal(
+            amount,
+            hitPosition,
+            attacker,
+            verifyBallisticPath: false,
+            forcedRegion: HitRegion.Torso);
+
     private bool TakeCombatDamageInternal(
         float amount,
         Vector3 hitPosition,
         Node? attacker,
-        bool verifyBallisticPath)
+        bool verifyBallisticPath,
+        HitRegion? forcedRegion = null)
     {
         if (IsBodyBag)
         {
@@ -999,10 +1012,15 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             // Already waiting for revive — extra hits do not convert yet.
             return true;
         }
-        var localHeight = hitPosition.Y - GlobalPosition.Y;
-        var region = localHeight > 1.5f
-            ? HitRegion.Head
-            : localHeight < 0.58f ? HitRegion.Limbs : HitRegion.Torso;
+        var region = forcedRegion ?? HitRegion.Torso;
+        if (!forcedRegion.HasValue && attacker is EnemyOperator)
+        {
+            var localHeight = hitPosition.Y - GlobalPosition.Y;
+            region = localHeight > 1.5f
+                ? HitRegion.Head
+                : localHeight < 0.58f ? HitRegion.Limbs : HitRegion.Torso;
+        }
+        LastDamageRegionForDiagnostics = region;
         var multiplier = region switch
         {
             HitRegion.Head => 1.65f,

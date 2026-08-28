@@ -435,7 +435,12 @@ public partial class DriveableVehicle : CharacterBody3D
             ExitDriver(forced: true);
         }
 
-        Main?.Explode(GlobalPosition + Vector3.Up * 0.8f, 7.5f, 95.0f, attacker ?? this);
+        Main?.Explode(
+            GlobalPosition + Vector3.Up * 0.8f,
+            7.5f,
+            95.0f,
+            attacker ?? this,
+            this);
         _prompt.Visible = false;
         _bodyRoot.Visible = false;
         if (IsInstanceValid(_cabinInterior))

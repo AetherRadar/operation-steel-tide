@@ -25,6 +25,10 @@ public partial class FreightTerminalWorld
     private const float OperatorCarryAimSprintMuzzleVerticalMaximum = 0.22f;
     private const float OperatorCarryAimStockRearwardMinimum = 0.10f;
     private const float OperatorCarryReadyHandSeparationMinimum = 0.22f;
+    private const float OperatorCarryRightElbowForwardMinimum = 0.015f;
+    private const float OperatorCarryRightElbowOutwardMinimum = 0.030f;
+    private const float OperatorCarryRightWristForwardMinimum = 0.020f;
+    private const float OperatorCarryWeaponRootForwardMinimum = 0.020f;
 
     private static readonly OperatorVisualId[] OperatorCarryVisuals =
     {
@@ -135,6 +139,10 @@ public partial class FreightTerminalWorld
                             + $"primary_hand={inspection.PrimaryHandToWeaponDistance:F3} "
                             + $"support_hand={inspection.SupportHandToForegripDistance:F3} "
                             + $"support_offset={inspection.SupportHandOffset} "
+                            + $"right_elbow_forward={inspection.RightElbowForwardOfShoulder:F3} "
+                            + $"right_elbow_outward={inspection.RightElbowOutwardOfShoulder:F3} "
+                            + $"right_wrist_forward={inspection.RightWristForwardOfChest:F3} "
+                            + $"weapon_root_forward={inspection.WeaponRootForwardOfChest:F3} "
                             + $"hand_separation={inspection.RightWrist.DistanceTo(inspection.LeftWrist):F3} "
                             + $"muzzle_offset={muzzleOffset} stock_offset={stockOffset}");
                     }
@@ -173,6 +181,14 @@ public partial class FreightTerminalWorld
             + $"support_hand_range={MetricRange(samples, sample => sample.Inspection.SupportHandToForegripDistance, "F3")} "
             + $"hand_separation_range={MetricRange(samples, sample =>
                 sample.Inspection.RightWrist.DistanceTo(sample.Inspection.LeftWrist), "F3")} "
+            + $"right_elbow_forward_range={MetricRange(samples, sample =>
+                sample.Inspection.RightElbowForwardOfShoulder, "F3")} "
+            + $"right_elbow_outward_range={MetricRange(samples, sample =>
+                sample.Inspection.RightElbowOutwardOfShoulder, "F3")} "
+            + $"right_wrist_forward_range={MetricRange(samples, sample =>
+                sample.Inspection.RightWristForwardOfChest, "F3")} "
+            + $"weapon_root_forward_range={MetricRange(samples, sample =>
+                sample.Inspection.WeaponRootForwardOfChest, "F3")} "
             + $"muzzle_forward_range={MetricRange(samples, sample =>
                 -(sample.Inspection.WeaponMuzzle - sample.Inspection.WeaponRoot).Z, "F3")} "
             + $"muzzle_lateral_range={MetricRange(samples, sample =>
@@ -195,7 +211,11 @@ public partial class FreightTerminalWorld
             + $"aim_muzzle_vertical_max:{OperatorCarryAimMuzzleVerticalMaximum:F2},"
             + $"aim_sprint_muzzle_vertical_max:{OperatorCarryAimSprintMuzzleVerticalMaximum:F2},"
             + $"aim_stock_rearward_min:{OperatorCarryAimStockRearwardMinimum:F2},"
-            + $"ready_hand_separation_min:{OperatorCarryReadyHandSeparationMinimum:F2} "
+            + $"ready_hand_separation_min:{OperatorCarryReadyHandSeparationMinimum:F2},"
+            + $"right_elbow_forward_min:{OperatorCarryRightElbowForwardMinimum:F3},"
+            + $"right_elbow_outward_min:{OperatorCarryRightElbowOutwardMinimum:F3},"
+            + $"right_wrist_forward_min:{OperatorCarryRightWristForwardMinimum:F3},"
+            + $"weapon_root_forward_min:{OperatorCarryWeaponRootForwardMinimum:F3} "
             + $"failures={string.Join('|', failures)}");
         GD.Print($"OPERATOR_CARRY_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
@@ -232,6 +252,10 @@ public partial class FreightTerminalWorld
             && inspection.HeadToWeaponLineClearance >= OperatorCarryHeadClearanceMinimum
             && inspection.PrimaryHandToWeaponDistance <= OperatorCarryPrimaryHandDistanceMaximum
             && inspection.SupportHandToForegripDistance <= OperatorCarrySupportHandDistanceMaximum
+            && inspection.RightElbowForwardOfShoulder >= OperatorCarryRightElbowForwardMinimum
+            && inspection.RightElbowOutwardOfShoulder >= OperatorCarryRightElbowOutwardMinimum
+            && inspection.RightWristForwardOfChest >= OperatorCarryRightWristForwardMinimum
+            && inspection.WeaponRootForwardOfChest >= OperatorCarryWeaponRootForwardMinimum
             && weaponDirectionValid;
     }
 
@@ -277,7 +301,8 @@ public partial class FreightTerminalWorld
         {
             new OperatorCarryCaptureView("front", new Vector3(0.0f, 1.18f, -4.6f)),
             new OperatorCarryCaptureView("three_quarter", new Vector3(3.2f, 1.32f, -3.2f)),
-            new OperatorCarryCaptureView("side", new Vector3(4.6f, 1.18f, 0.0f))
+            new OperatorCarryCaptureView("side", new Vector3(4.6f, 1.18f, 0.0f)),
+            new OperatorCarryCaptureView("rear", new Vector3(0.0f, 1.18f, 4.6f))
         };
 
         foreach (var visualId in OperatorCarryVisuals)

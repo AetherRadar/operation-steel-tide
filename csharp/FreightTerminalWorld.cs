@@ -664,7 +664,12 @@ public partial class FreightTerminalWorld : Node3D
         }
     }
 
-    public void Explode(Vector3 position, float radius, float maxDamage, Node? source = null)
+    public void Explode(
+        Vector3 position,
+        float radius,
+        float maxDamage,
+        Node? source = null,
+        Node? blastEmitter = null)
     {
         ReportGunshot(position, 70.0f);
         var glassEffectBudget = 12;
@@ -686,7 +691,19 @@ public partial class FreightTerminalWorld : Node3D
                 var distance = enemy.GlobalPosition.DistanceTo(position);
                 if (distance < radius)
                 {
-                    enemy.TakeDamage(maxDamage * (1.0f - distance / radius), enemy.GlobalPosition + Vector3.Up, source);
+                    var exposure = ExplosionExposureResolver.ResolveStandingTarget(
+                        GetWorld3D(),
+                        position,
+                        enemy,
+                        source,
+                        blastEmitter);
+                    if (exposure.IsExposed)
+                    {
+                        enemy.TakeDamage(
+                            maxDamage * (1.0f - distance / radius) * exposure.Fraction,
+                            enemy.GlobalPosition + Vector3.Up * 1.02f,
+                            source);
+                    }
                 }
             }
         }
@@ -695,13 +712,37 @@ public partial class FreightTerminalWorld : Node3D
             var distance = _player.GlobalPosition.DistanceTo(position);
             if (distance < radius)
             {
-                _player.TakeDamage(maxDamage * 0.72f * (1.0f - distance / radius), position, source);
+                var exposure = ExplosionExposureResolver.ResolveCombatant(
+                    GetWorld3D(),
+                    position,
+                    _player,
+                    source,
+                    blastEmitter);
+                if (exposure.IsExposed)
+                {
+                    _player.TakeDamage(
+                        maxDamage * 0.72f * (1.0f - distance / radius) * exposure.Fraction,
+                        _player.HitPoint(HitRegion.Torso),
+                        source);
+                }
             }
         }
-        DamageSquadFromExplosion(position, radius, maxDamage, source);
+        DamageSquadFromExplosion(position, radius, maxDamage, source, blastEmitter);
         foreach (var barrel in _barrels.ToArray())
         {
-            if (IsInstanceValid(barrel) && !barrel.Exploded && barrel.GlobalPosition.DistanceTo(position) < radius * 0.65f)
+            if (!IsInstanceValid(barrel)
+                || barrel.Exploded
+                || barrel.GlobalPosition.DistanceTo(position) >= radius * 0.65f)
+            {
+                continue;
+            }
+            var exposure = ExplosionExposureResolver.ResolveLowTarget(
+                GetWorld3D(),
+                position,
+                barrel,
+                source,
+                blastEmitter);
+            if (exposure.IsExposed)
             {
                 barrel.CallDeferred(nameof(ExplosiveBarrel.TakeDamage), 100.0f, position, source ?? this);
             }

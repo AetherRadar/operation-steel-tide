@@ -273,8 +273,16 @@ internal sealed class AuthoredOperatorVisual
         var leftElbow = BoneWorldPosition("mixamorig:LeftForeArm");
         var leftWrist = BoneWorldPosition("mixamorig:LeftHand");
         var headBase = BoneWorldPosition("mixamorig:Head");
+        var chest = BoneWorldPosition("mixamorig:Spine2");
         var stock = weapon.Stock.GlobalPosition;
         var muzzle = weapon.MuzzleDevice.GlobalPosition;
+        var rootInverse = Root.GlobalTransform.AffineInverse();
+        var rightShoulderLocal = rootInverse * rightShoulder;
+        var rightElbowLocal = rootInverse * rightElbow;
+        var rightWristLocal = rootInverse * rightWrist;
+        var chestLocal = rootInverse * chest;
+        var weaponRootLocal = rootInverse * weapon.Root.GlobalPosition;
+        var rightSideSign = Mathf.Sign(rightShoulderLocal.X - chestLocal.X);
         return new OperatorCarryInspection(
             Available: true,
             rightShoulder,
@@ -295,7 +303,12 @@ internal sealed class AuthoredOperatorVisual
             SupportHandOffset: weapon.Foregrip.GlobalPosition - leftWrist,
             weapon.Root.GlobalPosition,
             stock,
-            muzzle);
+            muzzle,
+            RightElbowForwardOfShoulder: rightShoulderLocal.Z - rightElbowLocal.Z,
+            RightElbowOutwardOfShoulder:
+                (rightElbowLocal.X - rightShoulderLocal.X) * rightSideSign,
+            RightWristForwardOfChest: chestLocal.Z - rightWristLocal.Z,
+            WeaponRootForwardOfChest: chestLocal.Z - weaponRootLocal.Z);
     }
 
     private Vector3 BoneWorldPosition(string boneName)
@@ -542,7 +555,11 @@ internal readonly record struct OperatorCarryInspection(
     Vector3 SupportHandOffset,
     Vector3 WeaponRoot,
     Vector3 WeaponStock,
-    Vector3 WeaponMuzzle);
+    Vector3 WeaponMuzzle,
+    float RightElbowForwardOfShoulder,
+    float RightElbowOutwardOfShoulder,
+    float RightWristForwardOfChest,
+    float WeaponRootForwardOfChest);
 
 internal readonly record struct CombatModelInspection(
     bool Loaded,
