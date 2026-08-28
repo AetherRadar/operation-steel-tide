@@ -9,10 +9,11 @@
 - 提交和交付前必须通过 `dotnet build OperationSteelTide.csproj`（0 警告、0 错误）以及与改动相关的全部 `--validate-*` 诊断（退出码 0）。
 - `main` 是唯一交付分支。提交后执行 `git fetch origin`，并用 `git merge-base --is-ancestor origin/main HEAD` 确认任务基于最新 `origin/main`；若不是，必须把任务提交 rebase 到最新 `origin/main`，重新运行构建和相关诊断，再继续交付。
 - 使用普通非强制推送 `git push origin HEAD:main` 交付。若因另一并发任务先更新 `origin/main` 而被拒绝，必须重新 fetch、rebase、验证并重试；严禁 force push `main`。若分支保护要求 PR，则推送唯一的 `codex/<task>` 分支并等待 PR 实际合入，未合入不得宣称完成。
-- 远端推送或 PR 合入成功后，使用 `git worktree list --porcelain` 动态找到持有 `refs/heads/main` 的主检出；确认它仍在 `main` 且工作区完全干净后，执行 fetch，并以 `git merge --ff-only origin/main` 同步，使用户的常用本地目录立即看到已交付改动。
+- 远端推送或 PR 合入成功后，必须使用 `git worktree list --porcelain` 动态找到持有 `refs/heads/main` 的主检出并完成本地 `main` 同步，使用户的常用本地目录立即看到已交付改动；本地 `main` 未同步完成时不得宣称交付完成。
 - 主检出的同步是唯一允许串行等待的步骤；其他 worktree 的开发、构建和诊断必须继续并行。若检测到另一个同步过程或 Git 锁，等待并有限重试，禁止删除锁文件或强杀进程。
-- 若主检出存在 tracked/untracked 改动、merge/rebase 状态、无法快进，必须停止并报告；禁止自动 stash、reset、checkout、覆盖或提交用户改动。
-- 最终必须再次 `git fetch origin` 并确认：本任务实际落地 commit 是 `origin/main` 的祖先（直接推送时为任务 commit；squash/rebase PR 时为平台生成的落地 commit）；主检出 `HEAD` 与 `origin/main` 完全一致；主检出和任务 worktree 均干净；主检出 `git status --short --branch` 不显示 ahead/behind。认证、网络、分支保护、并发冲突或本地同步失败时，任务不得宣称已经交付完成。
+- 同步前必须检查主检出的分支、工作区和 Git 状态。若存在 tracked/untracked 改动、merge/rebase 状态或无法快进，不得以此为由跳过同步；先研究本地与远端内容的来源和意图，保全所有独有内容，再逐项解决冲突并完成合并。与即将同步的 tracked 内容逐字节相同的未跟踪文件，可在校验一致后移除并由同步恢复；任何有独有内容的本地改动必须先保存到可恢复的专用备份分支/提交或明确备份路径，再同步并重新应用或合并。
+- 解决同步冲突后必须运行受影响的构建和诊断。严禁使用 hard reset、force checkout、整批覆盖或 force push `main` 来丢弃任一侧内容。只有认证、网络或仓库损坏等外部问题在合理重试后仍无法克服时，才可停止并报告准确阻塞原因。
+- 最终必须再次 `git fetch origin` 并确认：本任务实际落地 commit 是 `origin/main` 的祖先（直接推送时为任务 commit；squash/rebase PR 时为平台生成的落地 commit）；主检出 `HEAD` 与 `origin/main` 完全一致；主检出和任务 worktree 均干净；主检出 `git status --short --branch` 不显示 ahead/behind。
 
 ## 构建与验证 / Build & validation
 
