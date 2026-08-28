@@ -406,7 +406,11 @@ public partial class SquadMate
 
         var flatDestination = FlattenToCurrentHeight(destination);
         var distance = GlobalPosition.DistanceTo(flatDestination);
-        var stopDistance = navigationKind == SquadTraversalKind.Step ? 0.2f : 0.75f;
+        // Precise and required walk points use a 0.62-0.65 m arrival tolerance.
+        // Stop inside that radius so movement cannot deadlock just outside the waypoint.
+        var stopDistance = navigationKind == SquadTraversalKind.Step
+            ? 0.2f
+            : navigationPreciseTrail ? 0.55f : 0.75f;
         var desired = distance > stopDistance
             ? GlobalPosition.DirectionTo(flatDestination)
             : Vector3.Zero;

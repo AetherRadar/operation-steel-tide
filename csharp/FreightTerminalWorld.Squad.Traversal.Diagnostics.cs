@@ -6,6 +6,8 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    private const double SquadTraversalProductionDiagnosticBudgetMilliseconds = 2000.0;
+
     private async void ValidateSquadTraversal()
     {
         var sameXzBlocked = false;
@@ -117,7 +119,9 @@ public partial class FreightTerminalWorld
                 productionComponentRoute = TryPlanSquadLayeredRoute(
                     mate,
                     productionGoal,
-                    SquadNavGrid.DefaultExpansionCap,
+                    new SquadNavSearchBudget(
+                        SquadNavGrid.DefaultExpansionCap,
+                        SquadTraversalProductionDiagnosticBudgetMilliseconds),
                     out var productionDirectives,
                     out _);
                 productionComponentStep = productionDirectives.Any(directive =>

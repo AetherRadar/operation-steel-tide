@@ -20,6 +20,7 @@ public partial class FreightTerminalWorld
     private const float SquadNavigationDecisionReuseDistanceSquared = 0.81f;
     private const float SquadTrailVisibilityProbeRangeSquared = 324.0f;
     private const int SquadTrailVisibilityProbeLimit = 12;
+    private const int SquadTrailEmergencyEntryProbeLimit = 12;
 
     private sealed class SquadTrailPathState
     {
@@ -242,6 +243,27 @@ public partial class FreightTerminalWorld
                 emergency,
                 now,
                 SquadNavigationDirective.Walk(destination, steppedDirect: true));
+        }
+
+        // Breadcrumbs describe where the leader walked, but residential
+        // switchbacks need authored Step directives to negotiate their landings.
+        // During a cross-floor rescue, take the layered route to the destination
+        // floor first; once both actors share a height band, the trail resumes for
+        // the final doorway or room approach.
+        if (emergency
+            && Mathf.Abs(mate.GlobalPosition.Y - destination.Y) > SquadNavGoalHeight
+            && TryResolveSquadGridNavigation(
+                mate,
+                destination,
+                emergency: true,
+                out var floorTransferDirective))
+        {
+            return CacheSquadNavigationDecision(
+                mate,
+                destination,
+                emergency,
+                now,
+                floorTransferDirective);
         }
 
         if (_squadLeaderTrail.Count > 0)
@@ -555,7 +577,7 @@ public partial class FreightTerminalWorld
         Vector3 destination,
         bool emergency)
     {
-        var cursor = FindLatestVisibleTrailIndex(mate);
+        var cursor = FindLatestVisibleTrailIndex(mate, emergency);
         if (cursor < 0)
         {
             // Off-trail: the grid planner owns the approach (or hands back to the
@@ -626,9 +648,11 @@ public partial class FreightTerminalWorld
         return -1;
     }
 
-    private int FindLatestVisibleTrailIndex(SquadMate mate)
+    private int FindLatestVisibleTrailIndex(SquadMate mate, bool emergency)
     {
         var probes = 0;
+        var oldestEligibleIndex = -1;
+        var newestProbeFloorIndex = _squadLeaderTrail.Count;
         for (var index = _squadLeaderTrail.Count - 1; index >= 0; index--)
         {
             var point = _squadLeaderTrail[index];
@@ -640,11 +664,48 @@ public partial class FreightTerminalWorld
             {
                 continue;
             }
+            oldestEligibleIndex = index;
             if (probes >= SquadTrailVisibilityProbeLimit)
             {
-                break;
+                if (!emergency)
+                {
+                    break;
+                }
+                continue;
             }
             probes++;
+            newestProbeFloorIndex = index;
+            if (IsSquadMovementCorridorClear(mate.GlobalPosition, point, mate))
+            {
+                return index;
+            }
+        }
+
+        if (!emergency || oldestEligibleIndex < 0)
+        {
+            return -1;
+        }
+
+        // A downed leader may have left more than one probe window of breadcrumbs
+        // inside a building. The newest same-floor samples are then all hidden by
+        // the facade, even though an older doorway sample is visible to the mate.
+        // Probe a second bounded window from the oldest in-range sample forward so
+        // emergency navigation can attach at that entrance without turning every
+        // ordinary follow update into an unbounded set of physics sweeps.
+        var entryProbes = 0;
+        for (var index = oldestEligibleIndex;
+             index < newestProbeFloorIndex
+                 && entryProbes < SquadTrailEmergencyEntryProbeLimit;
+             index++)
+        {
+            var point = _squadLeaderTrail[index];
+            if (Mathf.Abs(point.Y - mate.GlobalPosition.Y) > 1.8f
+                || mate.GlobalPosition.DistanceSquaredTo(point)
+                    > SquadTrailVisibilityProbeRangeSquared)
+            {
+                continue;
+            }
+            entryProbes++;
             if (IsSquadMovementCorridorClear(mate.GlobalPosition, point, mate))
             {
                 return index;
@@ -923,7 +984,7 @@ public partial class FreightTerminalWorld
             return mate.GlobalPosition.DistanceTo(destination);
         }
 
-        var cursor = FindLatestVisibleTrailIndex(mate);
+        var cursor = FindLatestVisibleTrailIndex(mate, emergency: true);
         var endCursor = cursor < 0 ? -1 : FindClosestDestinationTrailIndex(destination, mate);
         if (cursor < 0 || endCursor < 0 || !IsSquadTrailSpanTraversable(cursor, endCursor))
         {

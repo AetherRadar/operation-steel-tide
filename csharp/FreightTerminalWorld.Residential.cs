@@ -439,11 +439,58 @@ public partial class FreightTerminalWorld
         BuildResidentialAuthoredDressing(tower, spec, index);
         _residentialRoofAccessCount++;
 
+        var entranceRoute = BuildResidentialEntranceNavigationRoute(tower, spec, stairCoreZ);
+        RegisterSquadTraversalLink(
+            $"residential_entry:{tower.Name}",
+            SquadTraversalKind.Walk,
+            bidirectional: true,
+            entranceRoute,
+            costMultiplier: 1.0f);
+        var entranceHandoffIndex = Math.Max(1, entranceRoute.Count - 5);
+        RegisterSquadTraversalLink(
+            $"residential_entry_handoff:{tower.Name}",
+            SquadTraversalKind.Walk,
+            bidirectional: true,
+            entranceRoute.GetRange(
+                entranceHandoffIndex,
+                entranceRoute.Count - entranceHandoffIndex),
+            costMultiplier: 1.0f);
+
         var basis = Basis.FromEuler(new Vector3(0, yaw, 0));
         var towerTransform = new Transform3D(basis, spec.Position);
-        _residentialEntrances.Add(towerTransform * new Vector3(0, 0.18f, spec.Footprint.Y * 0.5f + 1.4f));
+        _residentialEntrances.Add(entranceRoute[0]);
         _residentialRooftops.Add(towerTransform * new Vector3(0, spec.Floors * ResidentialFloorHeight + 0.2f, 0));
         SpawnResidentialOccupants(towerTransform, spec, index);
+    }
+
+    private static List<Vector3> BuildResidentialEntranceNavigationRoute(
+        Node3D tower,
+        ResidentialTowerSpec spec,
+        float coreZ)
+    {
+        var depth = spec.Footprint.Y;
+        var corridorStartZ = depth * 0.5f - 1.2f;
+        var stairThresholdZ = coreZ + ResidentialStairOpeningSouthDepth + 0.55f;
+        var stairAlignmentZ = coreZ + ResidentialStairOpeningSouthDepth + 1.35f;
+        var stairStartZ = coreZ + ResidentialStairRun * 0.5f + 0.35f;
+        var points = new List<Vector3>
+        {
+            tower.ToGlobal(new Vector3(0.0f, 0.12f, depth * 0.5f + 1.4f)),
+            tower.ToGlobal(new Vector3(0.0f, 0.12f, depth * 0.5f + 0.65f)),
+            tower.ToGlobal(new Vector3(0.0f, 0.12f, corridorStartZ))
+        };
+        for (var z = corridorStartZ - 3.0f; z > stairAlignmentZ; z -= 3.0f)
+        {
+            points.Add(tower.ToGlobal(new Vector3(0.0f, 0.12f, z)));
+        }
+        // Align with the lower-flight lane before reaching the open shaft. Turning
+        // at the former 0.55 m approach sometimes let a fast mate overshoot the
+        // required center waypoint and fall into the opposite side of the stairwell.
+        points.Add(tower.ToGlobal(new Vector3(0.0f, 0.12f, stairAlignmentZ)));
+        points.Add(tower.ToGlobal(new Vector3(-1.45f, 0.12f, stairAlignmentZ)));
+        points.Add(tower.ToGlobal(new Vector3(-1.45f, 0.12f, stairThresholdZ)));
+        points.Add(tower.ToGlobal(new Vector3(-1.45f, 0.12f, stairStartZ)));
+        return points;
     }
 
     private void BuildTowerFloorSlab(

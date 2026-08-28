@@ -185,6 +185,61 @@ public partial class FreightTerminalWorld
         var exclude = BuildSquadNavExclusions();
         using var excludeBacking = exclude.AsDisposable();
 
+        // A mate following breadcrumbs normally reaches an authored doorway or
+        // stair endpoint within movement tolerance, not at the exact floating-
+        // point coordinate. Attach that short, clear final gap directly to the
+        // authored graph before spending the bounded budget ranking every portal
+        // component. This lets emergency floor transfers take over immediately at
+        // the entrance while still rejecting endpoints hidden across a wall.
+        var authoredStartPortal = FindReachableSquadPortalNode(
+            navigator.GlobalPosition,
+            portalNodeCount,
+            nodes,
+            exclude,
+            budget);
+        var authoredGoalPortal = FindReachableSquadPortalNode(
+            destination,
+            portalNodeCount,
+            nodes,
+            exclude,
+            budget);
+        if (authoredStartPortal >= 0)
+        {
+            var startPortalPosition = nodes[authoredStartPortal].Position;
+            graphEdges.Add(new SquadNavigationGraphEdge(
+                startNode,
+                authoredStartPortal,
+                navigator.GlobalPosition.DistanceTo(startPortalPosition),
+                navigator.GlobalPosition.DistanceSquaredTo(startPortalPosition) <= 0.0001f
+                    ? Array.Empty<SquadNavigationDirective>()
+                    : new[] { SquadNavigationDirective.Walk(startPortalPosition) }));
+        }
+        if (authoredGoalPortal >= 0)
+        {
+            var goalPortalPosition = nodes[authoredGoalPortal].Position;
+            graphEdges.Add(new SquadNavigationGraphEdge(
+                authoredGoalPortal,
+                goalNode,
+                goalPortalPosition.DistanceTo(destination),
+                goalPortalPosition.DistanceSquaredTo(destination) <= 0.0001f
+                    ? Array.Empty<SquadNavigationDirective>()
+                    : new[] { SquadNavigationDirective.Walk(destination) }));
+        }
+        if (authoredStartPortal >= 0 && authoredGoalPortal >= 0)
+        {
+            var authoredRoute = SquadNavigationGraph.FindShortestPath(
+                nodes.Count,
+                startNode,
+                goalNode,
+                graphEdges,
+                out cost);
+            if (authoredRoute is { Length: > 0 })
+            {
+                directives = authoredRoute;
+                return true;
+            }
+        }
+
         AddSquadPortalWalkConnectors(
             portalNodeCount,
             nodes,
@@ -192,39 +247,6 @@ public partial class FreightTerminalWorld
         if (budget.IsExhausted)
         {
             return false;
-        }
-
-        var exactStartPortal = FindExactSquadPortalNode(
-            navigator.GlobalPosition,
-            portalNodeCount,
-            nodes);
-        var exactGoalPortal = FindExactSquadPortalNode(
-            destination,
-            portalNodeCount,
-            nodes);
-        if (exactStartPortal >= 0 && exactGoalPortal >= 0)
-        {
-            graphEdges.Add(new SquadNavigationGraphEdge(
-                startNode,
-                exactStartPortal,
-                0.0f,
-                Array.Empty<SquadNavigationDirective>()));
-            graphEdges.Add(new SquadNavigationGraphEdge(
-                exactGoalPortal,
-                goalNode,
-                0.0f,
-                Array.Empty<SquadNavigationDirective>()));
-            var exactRoute = SquadNavigationGraph.FindShortestPath(
-                nodes.Count,
-                startNode,
-                goalNode,
-                graphEdges,
-                out cost);
-            if (exactRoute is { Length: > 0 })
-            {
-                directives = exactRoute;
-                return true;
-            }
         }
 
         var portalComponents = BuildSquadPortalComponentMap(portalNodeCount, graphEdges);
@@ -563,6 +585,50 @@ public partial class FreightTerminalWorld
             }
         }
         return -1;
+    }
+
+    private int FindReachableSquadPortalNode(
+        Vector3 endpoint,
+        int portalNodeCount,
+        IReadOnlyList<SquadPortalNode> nodes,
+        Godot.Collections.Array<Rid> exclude,
+        SquadNavSearchBudget budget)
+    {
+        var exact = FindExactSquadPortalNode(endpoint, portalNodeCount, nodes);
+        if (exact >= 0)
+        {
+            return exact;
+        }
+
+        const float attachmentDistanceSquared = 0.85f * 0.85f;
+        const float snapDistanceSquared = 0.15f * 0.15f;
+        var bucket = SquadTraversalBucket(endpoint);
+        var best = -1;
+        var bestDistanceSquared = attachmentDistanceSquared;
+        for (var node = 0; node < portalNodeCount; node++)
+        {
+            if (nodes[node].Bucket != bucket)
+            {
+                continue;
+            }
+            var distanceSquared = nodes[node].Position.DistanceSquaredTo(endpoint);
+            if (distanceSquared <= snapDistanceSquared)
+            {
+                return node;
+            }
+            if (distanceSquared >= bestDistanceSquared
+                || !IsSquadMovementCorridorClearExcluding(
+                    endpoint,
+                    nodes[node].Position,
+                    exclude,
+                    budget))
+            {
+                continue;
+            }
+            best = node;
+            bestDistanceSquared = distanceSquared;
+        }
+        return best;
     }
 
     private static int SquadTraversalBucket(Vector3 position)

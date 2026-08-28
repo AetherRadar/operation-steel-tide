@@ -547,13 +547,16 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             _doorWaitTimer = 0.0f;
         }
+        // Required authored routes must not be displaced by generic obstacle avoidance;
+        // doing so can leave the mate circling outside a valid doorway or stair path.
+        var followPreciseNavigation = navigationDirective.PreciseTrail || navigationDirective.Required;
         UpdateTacticalMovement(
             destination,
             hostile,
             objectivePriority,
             navigationDirective.Kind,
             navigationDirective.SteppedDirect,
-            navigationDirective.PreciseTrail,
+            followPreciseNavigation,
             dt);
         if (TryBeginNavigationTraversal(navigationDirective)
             || navigationDirective.Kind == SquadTraversalKind.Walk
@@ -576,7 +579,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         TryNavigationStepUp(
             navigationDirective.Kind == SquadTraversalKind.Step
                 || navigationDirective.SteppedDirect
-                || navigationDirective.PreciseTrail
+                || followPreciseNavigation
                 ? _combatPathDirection
                 : _combatDesiredDirection,
             destination);

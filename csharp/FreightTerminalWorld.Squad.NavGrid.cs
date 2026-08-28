@@ -242,10 +242,25 @@ public partial class FreightTerminalWorld
             emergency
                 ? SquadNavEmergencyPlanBudgetMilliseconds
                 : SquadNavFollowPlanBudgetMilliseconds);
-        if (Mathf.Abs(mate.GlobalPosition.Y - destination.Y) <= SquadNavSameBandHeight
+        var requiresFloorTransfer = Mathf.Abs(mate.GlobalPosition.Y - destination.Y)
+            > (emergency ? SquadNavGoalHeight : SquadNavSameBandHeight);
+        if (!requiresFloorTransfer
             && TryBuildSquadGridWaypoints(mate, destination, budget, out var direct))
         {
             state.Directives = BuildSquadWalkDirectives(direct);
+            return true;
+        }
+        if (requiresFloorTransfer
+            && TryFindClosestSquadFloorTransferPortal(destination, out var floorPortal)
+            && !budget.IsExhausted
+            && TryPlanSquadLayeredRoute(
+                mate,
+                floorPortal,
+                budget,
+                out var floorTransfer,
+                out _))
+        {
+            state.Directives = floorTransfer;
             return true;
         }
         if (!budget.IsExhausted
@@ -279,6 +294,44 @@ public partial class FreightTerminalWorld
             return true;
         }
         return false;
+    }
+
+    private bool TryFindClosestSquadFloorTransferPortal(
+        Vector3 destination,
+        out Vector3 portal)
+    {
+        portal = default;
+        var bestDistanceSquared = SquadNavTrailHandoffRange * SquadNavTrailHandoffRange;
+        var found = false;
+        foreach (var link in _squadTraversalLinks)
+        {
+            var first = link.ForwardPoints[0];
+            if (Mathf.Abs(first.Y - destination.Y) <= SquadNavGoalHeight)
+            {
+                var distanceSquared = first.DistanceSquaredTo(destination);
+                if (distanceSquared < bestDistanceSquared)
+                {
+                    bestDistanceSquared = distanceSquared;
+                    portal = first;
+                    found = true;
+                }
+            }
+
+            var last = link.ForwardPoints[^1];
+            if (Mathf.Abs(last.Y - destination.Y) > SquadNavGoalHeight)
+            {
+                continue;
+            }
+            var lastDistanceSquared = last.DistanceSquaredTo(destination);
+            if (lastDistanceSquared >= bestDistanceSquared)
+            {
+                continue;
+            }
+            bestDistanceSquared = lastDistanceSquared;
+            portal = last;
+            found = true;
+        }
+        return found;
     }
 
     private List<Vector3> FindSquadGridTrailEntryCandidates(SquadMate mate)
@@ -569,9 +622,10 @@ public partial class FreightTerminalWorld
             position.Z - directive.Target.Z).Length();
         var elevationDirection = 0.0f;
         var traversalDirection = Vector2.Zero;
-        if (cursor + 1 < directives.Length
+        var continuesEdge = cursor + 1 < directives.Length
             && directives[cursor + 1].Kind == SquadTraversalKind.Step
-            && directives[cursor + 1].DirectedEdgeId == directive.DirectedEdgeId)
+            && directives[cursor + 1].DirectedEdgeId == directive.DirectedEdgeId;
+        if (continuesEdge)
         {
             elevationDirection = directives[cursor + 1].Target.Y - directive.Target.Y;
             traversalDirection = new Vector2(
@@ -594,7 +648,11 @@ public partial class FreightTerminalWorld
         {
             return false;
         }
-        if (horizontal <= 0.65f)
+        // A capsule can settle on the destination slab a few centimeters behind
+        // the authored endpoint after the final stair step. Intermediate points
+        // remain strict so this does not skip treads or switchback turns.
+        var horizontalTolerance = continuesEdge ? 0.65f : 0.85f;
+        if (horizontal <= horizontalTolerance)
         {
             return true;
         }
