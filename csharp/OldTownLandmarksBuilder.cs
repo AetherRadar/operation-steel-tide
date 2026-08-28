@@ -34,18 +34,8 @@ internal sealed class OldTownLandmarksBuilder
         root.AddToGroup("old_town_landmarks");
         parent.AddChild(root);
 
-        var collisionBody = new StaticBody3D
-        {
-            Name = "OldTownLandmarkCollision",
-            CollisionLayer = 1,
-            CollisionMask = 0
-        };
-        root.AddChild(collisionBody);
-
         var counts = new BuildCounts();
-        AddCourtyardCollision(collisionBody, "Hotel", HotelCenter, entrySouth: true, counts);
-        AddCourtyardCollision(collisionBody, "Treasury", TreasuryCenter, entrySouth: false, counts);
-        var rooftopRoute = AddMarketRooftopCollision(collisionBody, counts);
+        var rooftopRoute = MarketRooftopRoute();
         return new OldTownLandmarksResult(
             3,
             2,
@@ -198,19 +188,22 @@ internal sealed class OldTownLandmarksBuilder
         AddCollision(collisionBody, "RooftopEastRamp", new Vector3(29.0f, 2.05f, RooftopZ),
             new Vector3(12.5f, 0.38f, 4.0f), new Vector3(0, 0, -18.7f), counts);
 
-        return new[]
+        return MarketRooftopRoute();
+    }
+
+    private static IReadOnlyList<Vector3> MarketRooftopRoute()
+        => new[]
         {
             new Vector3(-36.0f, 0.2f, RooftopZ),
             new Vector3(-31.0f, 1.35f, RooftopZ),
-            new Vector3(-26.0f, 3.0f, RooftopZ),
-            new Vector3(-21.0f, 4.45f, RooftopZ),
-            new Vector3(0, 4.45f, RooftopZ),
-            new Vector3(21.0f, 4.45f, RooftopZ),
-            new Vector3(26.0f, 3.0f, RooftopZ),
+            new Vector3(-26.0f, 3.0f, -125.5f),
+            new Vector3(-21.0f, 4.45f, -124.65f),
+            new Vector3(0, 4.45f, -124.65f),
+            new Vector3(21.0f, 4.45f, -124.65f),
+            new Vector3(26.0f, 3.0f, -125.5f),
             new Vector3(31.0f, 1.35f, RooftopZ),
             new Vector3(36.0f, 0.2f, RooftopZ)
         };
-    }
 
     private static void AddCourtyardFloor(
         Node3D root,

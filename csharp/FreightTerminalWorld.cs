@@ -235,6 +235,7 @@ public partial class FreightTerminalWorld : Node3D
             _jianghaiOldCitySceneLoader.ReleaseReferences();
             _jianghaiOldCityAtmosphere.ReleaseReferences();
             _jianghaiOldCityScene = null;
+            _jianghaiAuthoredBuildingCollision = null;
             _materials.Clear();
             _modelScenes.Clear();
             ReleaseSharedBoxMeshes();

@@ -153,10 +153,11 @@ horizontal/vertical scale distortion is 1.094, avoiding the former single
 stretched slab. Only the visible art changes: the existing gameplay door keeps
 collision, animation, network state, and AI traversal.
 
-It is an export/cleanup/validation step, not a procedural city-generation system. It
-deterministically reapplies the documented factory-frontage substitution, sign
-cleanup, material tuning, and export policy. All further layout composition and
-modeling work starts from the hand-edited `.blend`. Review PNGs under
+It is a deterministic Blender DCC export/cleanup/validation step, not a runtime
+procedural city-generation system. It reapplies the documented explicit
+building-transform table, factory-frontage substitution, sign cleanup, material
+tuning, and export policy without randomness. The resulting placements and
+mesh edits are serialized in the packed `.blend`. Review PNGs under
 `previews/` are maintained separately.
 
 The main GLB contains the final static map geometry, materials, textures, and
@@ -188,14 +189,21 @@ and locally specific while keeping gameplay scaffolding in Godot. It adds:
   three-panel interactive Rollershutter Window 03 door;
 - replacement of the former damaged factory shell with three Old Urban
   building office/admin instances and two Scan Old Building Street workshops;
-  and
+- 36 complete perimeter-density buildings from six CC0 profiles: eight Old
+  Urban, fourteen Scan Old, four Quaternius Building1 Large, three Building3
+  Big, three Building4, and four House2 instances, positioned by an explicit
+  reviewed transform table with zero density intersections;
+- four full-mesh replacements in the repeated near-street row, giving the six
+  reviewed buildings five distinct modeled silhouettes; and
+- a real 7.6-by-4.2-meter doorway cut through the pawnshop storefront mesh,
+  aligned with its three-panel interactive shutter; and
 - five Chinese red lamps distributed across the cleared storefront
   composition.
 
 These are saved DCC placements and adaptations. The `.blend` remains the
-authoritative hand-edited source; the export script only enforces the targeted
-cleanup and cleared-asset substitution described above rather than generating
-the city layout.
+authoritative source; the export script enforces the explicit reviewed
+transform table, targeted cleanup, and cleared-asset substitutions rather than
+generating runtime city geometry.
 
 ## Runtime contract and geometry audit
 
@@ -229,43 +237,58 @@ roof. Their portal composition is final DCC art, not code-built primitive or
 procedural visible geometry. Reused packed materials keep their recorded
 third-party provenance.
 
+Godot derives exact static collision from 107 named authored structural meshes
+and 113 explicitly selected authored details. The 220 concave shapes are split
+94/11/73/42 across `JianghaiTenementDistrict`,
+`RedStarElectronicsFactory`, `GuangchangPawnshop`, and
+`OldCityMarketBridge`. The detail meshes comprise the five-piece factory gate,
+71 pawnshop canopy/wing/low-wall pieces, and 37 market deck/ramp/rail pieces.
+The same layer-1 geometry blocks traversal and ballistic world queries while
+preserving the real doorway and rail gaps. Successful authored collision
+suppresses all former broad model-placement and landmark proxy boxes. The
+central rooftop path is verified with a 0.5-meter-radius capsule sweep, and all
+12 Epic/Legendary high-value placements have player-capsule routes in open
+space.
+
 Read-only audits on 2026-08-28 recorded these matching source, serialized, and
 runtime results:
 
 | Audit layer | Verified result |
 | --- | --- |
-| Authoritative Blender source | 438 mesh objects; 184 unique mesh datablocks; 4,526,960 raw mesh-object triangles; 688,637 triangles counted once per unique mesh; 501 evaluated/runtime mesh instances and 4,556,062 instance triangles; all seven required anchors; 49,787,440 bytes; SHA-256 `9E49EF372F3609EBDF0A68CA8A5F4EF5A0D38E08B5B28F9A463707E04F550CD5` |
+| Authoritative Blender source | 467 mesh objects; 194 unique mesh datablocks; 4,469,451 raw mesh-object triangles; 820,349 triangles counted once per unique mesh; 530 evaluated/runtime mesh instances and 4,498,553 instance triangles; all seven required anchors; 53,839,913 bytes; SHA-256 `A81831913A08505AA0A4457745ACF3DD7040FA872091399B1217726F3BADC59A` |
 | Factory-gate portal | `factory_gate_portal=5/5`; `factory_gate_portal_aligned=True`; DCC-authored brick piers, caps, and corrugated roof frame the interactive PBR shutter |
-| Pawnshop hero entrance | `pawnshop_frontage_ready=True`; 15/15 modeled canopy parts; 15,492 canopy triangles; 8/8 solid wall modules; 8/8 authored inserts; 0 legacy visible gate/wall objects; columns clear the 7.6-meter doorway |
-| Delivered urban-life expansion | 36/36 apartment-facade objects; two asymmetrical 3-by-3 overlays; three static 11,825-triangle bicycles; market tea cart and basket; pawnshop tea table and three stools; factory hand truck; finished CC0 pawnshop backdrop and modeled pavilion gate; five market shops (three Old Urban building and two Scan Old Building Street instances); two Old Urban building rear houses; five Chinese red lamps; factory replacement with three Old Urban building office/admin instances and two Scan Old Building Street workshops |
-| Serialized GLB | 59,205,576 bytes; SHA-256 `E9CF20F1A1FFFAFBB12F233B21852B458ED361DDA9D10D2A77A24791BFD75307`; 501 mesh nodes; 4,556,062 mesh-node instance triangles; maximum texture dimension 1024 pixels |
-| Godot authored-map import | `--validate-refinery-map` PASS; 501 authored meshes; 583 surfaces; every audited surface is material-backed; 4,556,062 authored instance triangles; 7/7 authored anchors; terminal checks 2/2/2/2; authored status screens 2/2 |
+| Pawnshop hero entrance | `pawnshop_frontage_ready=True`; 15/15 modeled canopy parts; 15,492 canopy triangles; 8/8 solid wall modules; 8/8 authored inserts; 0 legacy visible gate/wall objects; storefront mesh has a real 7.6-by-4.2-meter opening and the columns remain clear |
+| Delivered urban-life and density expansion | 36/36 apartment-facade objects; 36/36 complete perimeter buildings across six licensed profiles with `density_intersections=0`; four full-mesh street-cadence replacements; three static 11,825-triangle bicycles; market and frontage props; finished CC0 pawnshop backdrop and modeled pavilion gate; five market shops; two rear houses; five Chinese red lamps; five-building factory replacement |
+| Serialized GLB | 65,948,744 bytes; SHA-256 `DA9B7F16F85D133698D26CBEA2E11495F05BA9ADA5F6CEBB1F0E3C76CB5A27A3`; 530 mesh nodes; 4,498,553 mesh-node instance triangles; maximum texture dimension 1024 pixels |
+| Godot authored-map import | `--validate-refinery-map` PASS; 530 authored meshes; 726 surfaces; every audited surface is material-backed; 4,498,553 authored instance triangles; 7/7 authored anchors; terminal checks 2/2/2/2; authored status screens 2/2 |
+| Godot authored collision | `--validate-refinery-collision` PASS; 220/220 exact concave shapes from 107 structural and 113 detail meshes across 94/11/73/42 anchors; 0 legacy model-placement boxes; 0 landmark proxy boxes; three former pawnshop and five former factory air-wall probes clear; visible pawnshop walls 3/3; market rails 4/4 and posts 2/2 block while rail gaps 2/2 stay clear; building ballistic probes 5/5; high-value loot access 12/12 |
 | Godot route clearance | `routes=True`; `route_probes=14`; `route_blocker=none`; the Victory truck envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and `y=2.6` |
-| Godot quality and full runtime | Quality tier 1 is restored after the capture probes; all six representative views pass their configured budgets |
+| Godot quality and full runtime | Quality tier 1 is restored after the capture probes; all seven representative views pass their configured budgets |
 
-The Blender source count is based on saved mesh objects, while the 688,637
+The Blender source count is based on saved mesh objects, while the 820,349
 unique-mesh figure counts each shared datablock once. Dependency-graph
-evaluation and export resolve the scene to 501 runtime mesh instances and
-4,556,062 instance triangles. The Godot diagnostic imports those same 501
-meshes and sums 583 material-backed runtime surfaces. These scopes are
+evaluation and export resolve the scene to 530 runtime mesh instances and
+4,498,553 instance triangles. The Godot diagnostic imports those same 530
+meshes and sums 726 material-backed runtime surfaces. These scopes are
 intentionally different rather than conflicting.
 
 ### Final capture performance
 
 The final high-tier policy disables shadows only on fine decorative meshes.
-Model geometry, materials, and visibility ranges are unchanged. All six
+Model geometry, materials, and visibility ranges are unchanged. All seven
 representative captures pass their budgets:
 
 | View | Draw calls | Objects | Primitives | Result |
 | --- | ---: | ---: | ---: | --- |
-| Overview | 416 | 612 | 4,267,626 | PASS |
-| Victory street | 500 | 630 | 4,288,357 | PASS |
-| Street-life bicycle close-up | 279 | 331 | 3,256,046 | PASS |
-| Guangchang pawnshop | 308 | 478 | 2,139,132 | PASS |
-| Red Star factory | 340 | 401 | 4,021,716 | PASS |
-| Market footbridge | 512 | 756 | 4,612,312 | PASS |
+| Overview | 490 | 684 | 4,269,341 | PASS |
+| Victory street | 666 | 788 | 4,231,293 | PASS |
+| Street-life bicycle close-up | 424 | 468 | 3,380,228 | PASS |
+| Guangchang pawnshop | 359 | 531 | 2,182,037 | PASS |
+| Red Star factory | 429 | 491 | 4,189,103 | PASS |
+| Market footbridge | 599 | 850 | 4,828,993 | PASS |
+| North-ward density | 299 | 411 | 2,498,114 | PASS |
 
-The capture reports 955.7 MB video memory and 813.2 MB texture memory.
+The capture reports 961.9 MB video memory and 813.2 MB texture memory.
 
 ## Rights boundary
 

@@ -198,36 +198,45 @@ static runtime scene:
   BlenderKit and Poly Haven assets identified below were acquired on
   2026-08-28.
 
-The packed `.blend` is the authoritative hand-edited scene. The export script
-does not procedurally generate the city layout; it enforces the documented
-cleared-asset substitutions, sign cleanup, material tuning, and export policy.
-Further composition and modeling work starts from the saved hand-edited DCC
-source.
+The packed `.blend` is the authoritative DCC scene. The Blender export script
+does not generate runtime procedural geometry: it reapplies the documented
+explicit, non-random building-transform table, cleared-asset and street-cadence
+substitutions, sign cleanup, material tuning, and export policy, then serializes
+the result in the packed source and runtime GLB.
 
 The runtime export policy caps the longest texture dimension at 1024 pixels
 and recompresses eligible high-resolution runtime images as JPEG quality 90.
-A 2026-08-28 Blender audit recorded all seven required runtime anchors, 438
-mesh objects, 184 unique mesh datablocks, 4,526,960 raw mesh-object triangles,
-and 688,637 triangles counted once per unique mesh. Dependency-graph evaluation
-and the runtime export produce 501 mesh nodes and 4,556,062 instance triangles.
-The final packed `.blend` is 49,787,440 bytes with SHA-256
-`9E49EF372F3609EBDF0A68CA8A5F4EF5A0D38E08B5B28F9A463707E04F550CD5`.
-The final 59,205,576-byte GLB has SHA-256
-`E9CF20F1A1FFFAFBB12F233B21852B458ED361DDA9D10D2A77A24791BFD75307`.
-The matching Godot refinery-map validation passes with 501 authored meshes,
-583 material-backed surfaces and the same 4,556,062 authored instance
+A 2026-08-28 Blender audit recorded all seven required runtime anchors, 467
+mesh objects, 194 unique mesh datablocks, 4,469,451 raw mesh-object triangles,
+and 820,349 triangles counted once per unique mesh. Dependency-graph evaluation
+and the runtime export produce 530 mesh nodes and 4,498,553 instance triangles.
+The final packed `.blend` is 53,839,913 bytes with SHA-256
+`A81831913A08505AA0A4457745ACF3DD7040FA872091399B1217726F3BADC59A`.
+The final 65,948,744-byte GLB has SHA-256
+`DA9B7F16F85D133698D26CBEA2E11495F05BA9ADA5F6CEBB1F0E3C76CB5A27A3`.
+The matching Godot refinery-map validation passes with 530 authored meshes,
+726 material-backed surfaces and the same 4,498,553 authored instance
 triangles. Route validation reports
 `routes=True`, `route_probes=14`, and `route_blocker=none`; the Victory truck
 envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and
 `y=2.6`. High tier disables shadows only for fine decorative meshes; model
 geometry, materials, and visibility ranges are unchanged. Final capture tuples
-(draw calls / objects / primitives) are Overview 416/612/4,267,626, Victory
-street 500/630/4,288,357, Street-life bicycle close-up 279/331/3,256,046,
-Guangchang pawnshop 308/478/2,139,132, Red Star factory 340/401/4,021,716,
-and Market footbridge 512/756/4,612,312. All pass; video memory is 955.7 MB
+(draw calls / objects / primitives) are Overview 490/684/4,269,341, Victory
+street 666/788/4,231,293, Street-life bicycle close-up 424/468/3,380,228,
+Guangchang pawnshop 359/531/2,182,037, Red Star factory 429/491/4,189,103,
+Market footbridge 599/850/4,828,993, and north-ward density
+299/411/2,498,114. All pass; video memory is 961.9 MB
 and texture memory is 813.2 MB. Detailed DCC, GLB,
 and runtime counting scopes are kept in
 `../../source_art/world/jianghai_old_city/README.md`.
+
+Runtime collision is generated from the actual exported geometry: 107
+structural meshes plus 113 explicitly selected factory-gate,
+pawnshop-canopy/wing/low-wall, and market deck/ramp/rail detail meshes. The 220
+concave shapes replace all former broad model-placement and landmark proxy
+boxes. Deterministic probes verify visible surfaces block movement and bullets,
+open pawnshop/market/factory air remains clear, rail gaps remain penetrable, and
+all 12 Epic/Legendary high-value placements have player-capsule access.
 
 In the final DCC placement, the Municipal terminal root has no duplicate
 180-degree rotation and its screen faces opposite the Grand terminal. The 22
@@ -257,10 +266,13 @@ twelve zero-thickness wall pieces with 15 modeled pavilion parts, eight solid
 facade modules and eight authored window/door inserts. The former damaged
 factory shell is replaced with three Old
 Urban building office/admin instances and two Scan Old Building Street workshops.
-The `.blend` remains the authoritative hand-edited DCC source. The export
-script additionally reapplies the documented factory-frontage substitution and
-cleanup so those five transforms remain deterministic; it does not
-procedurally generate the city or the urban-life layout.
+The density pass adds 36 complete perimeter buildings from six CC0 profiles:
+eight Old Urban, fourteen Scan Old, four Quaternius Building1 Large, three
+Building3 Big, three Building4, and four House2 instances. Four repeated
+near-street buildings are replaced by full Scan Old or Quaternius meshes. The
+`.blend` remains the authoritative DCC source. The export script reapplies the
+explicit reviewed transforms and material/mesh adaptations without randomness;
+it does not create runtime procedural city geometry.
 
 The project-authored portions include the complete map layout, street and
 supporting geometry, district composition, material adaptations, art
@@ -465,7 +477,7 @@ The Buildings Pack is published by Quaternius under CC0 1.0 Universal:
 - Local mapping and verification record: `quaternius_buildings_pack/README.md`
 - Reproducible conversion: `scripts/blender/build_quaternius_buildings_pack.py`
 
-The conversion preserves Quaternius's authored geometry, scale, material colors, and PBR values, while correcting the FBX importer's zero-alpha solid materials to fully opaque. It centers and grounds each scene, embeds the creator, official source URL, exact license, original filename, and acquisition date, then verifies those properties through a Blender glTF round trip. Attribution is not required under CC0, but the creator credit is retained for provenance.
+The conversion preserves Quaternius's authored geometry, scale, material colors, and PBR values, while correcting the FBX importer's zero-alpha solid materials to fully opaque. It centers and grounds each scene, embeds the creator, official source URL, exact license, original filename, and acquisition date, then verifies those properties through a Blender glTF round trip. Jianghai Old City further adapts these four selections into fourteen perimeter-density buildings (four Building1 Large, three Building3 Big, three Building4, and four House2) and three full street-cadence replacements in its packed DCC source and runtime GLB. Attribution is not required under CC0, but the creator credit is retained for provenance.
 
 ## Quaternius CC0 models
 

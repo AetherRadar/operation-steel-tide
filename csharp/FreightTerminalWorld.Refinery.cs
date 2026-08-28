@@ -10,9 +10,12 @@ public partial class FreightTerminalWorld
     private int _refineryCollisionProxyCount;
     private OldTownLandmarksResult? _oldTownLandmarks;
     private JianghaiOldCitySceneLoadResult? _jianghaiOldCityScene;
+    private JianghaiAuthoredBuildingCollisionResult? _jianghaiAuthoredBuildingCollision;
     private bool _diagnosticSceneLoadFallbackAllowed;
     private string? _jianghaiOldCitySceneLoadError;
+    private string? _jianghaiAuthoredBuildingCollisionError;
     private readonly OldTownLandmarksBuilder _oldTownLandmarksBuilder = new();
+    private readonly JianghaiAuthoredBuildingCollisionBuilder _jianghaiBuildingCollisionBuilder = new();
     private readonly JianghaiOldCitySceneLoader _jianghaiOldCitySceneLoader = new(
         JianghaiOldCitySceneLoader.DefaultScenePath);
     private readonly JianghaiOldCityAtmosphere _jianghaiOldCityAtmosphere = new();
@@ -28,6 +31,9 @@ public partial class FreightTerminalWorld
     {
         _levelRoot = new Node3D { Name = "SaintMaraisOldTown" };
         AddChild(_levelRoot);
+        _jianghaiOldCitySceneLoadError = null;
+        _jianghaiAuthoredBuildingCollisionError = null;
+        _jianghaiAuthoredBuildingCollision = null;
         try
         {
             _jianghaiOldCityScene = _jianghaiOldCitySceneLoader.LoadOnce(_levelRoot);
@@ -36,6 +42,21 @@ public partial class FreightTerminalWorld
         {
             _jianghaiOldCitySceneLoadError = exception.Message;
             GD.PrintErr($"REFINERY_AUTHORED_SCENE_ERROR {_jianghaiOldCitySceneLoadError}");
+        }
+        if (_jianghaiOldCityScene is { } authoredScene)
+        {
+            try
+            {
+                _jianghaiAuthoredBuildingCollision = _jianghaiBuildingCollisionBuilder.Build(
+                    authoredScene.Root,
+                    _levelRoot);
+            }
+            catch (Exception exception)
+            {
+                _jianghaiAuthoredBuildingCollisionError = exception.Message;
+                GD.PrintErr(
+                    $"REFINERY_AUTHORED_COLLISION_ERROR {_jianghaiAuthoredBuildingCollisionError}");
+            }
         }
 
         var concrete = GroundMaterial("concrete", new Color(0.57f, 0.58f, 0.54f), 0.86f);
@@ -105,10 +126,12 @@ public partial class FreightTerminalWorld
         _refineryCollisionProxyCount = 0;
         _refineryDoors.Clear();
         _oldTownDistricts.Clear();
+        var authoredBuildingCollisionReady = _jianghaiAuthoredBuildingCollision is { } authoredCollision
+            && GodotObject.IsInstanceValid(authoredCollision.Body);
 
         foreach (var placement in RefineryLayout.Models)
         {
-            if (placement.HasCollision)
+            if (placement.HasCollision && !authoredBuildingCollisionReady)
             {
                 AddRefineryCollisionScaffold(placement);
                 _refineryCollisionProxyCount++;

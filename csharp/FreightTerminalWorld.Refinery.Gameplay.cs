@@ -183,8 +183,10 @@ public partial class FreightTerminalWorld
     private async void ValidateRefineryMap()
     {
         await WaitFrames(8);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         var counts = new RefineryRuntimeCounts();
-        CountRefineryNodes(_levelRoot, false, false, false, ref counts);
+        CountRefineryNodes(_levelRoot, false, false, false, false, ref counts);
 
         var rootsReady = IsBlackwaterRefineryMap
             && _levelRoot.Name == "SaintMaraisOldTown"
@@ -230,10 +232,41 @@ public partial class FreightTerminalWorld
             && counts.AuthoredSceneRoots == 1
             && counts.AuthoredSceneMeshes == authored.MeshInstanceCount
             && counts.VisibleAuthoredSceneMeshes == counts.AuthoredSceneMeshes;
-        var expectedCollisionProxies = RefineryLayout.Models.Count(placement => placement.HasCollision);
+        var authoredCollisionAvailable = _jianghaiAuthoredBuildingCollision is { } collision
+            && IsInstanceValid(collision.Body);
+        var expectedCollisionProxies = authoredCollisionAvailable
+            ? 0
+            : RefineryLayout.Models.Count(placement => placement.HasCollision);
         var proxiesReady = _refineryCollisionProxyCount == expectedCollisionProxies
             && counts.LegacyCollisionShapes == _refineryCollisionProxyCount
+            && counts.LegacyCollisionBodies == _refineryCollisionProxyCount
             && counts.NonBoxLegacyCollisionShapes == 0;
+        var tenementCollisionShapes = AuthoredCollisionAnchorCount("JianghaiTenementDistrict");
+        var factoryCollisionShapes = AuthoredCollisionAnchorCount("RedStarElectronicsFactory");
+        var pawnshopCollisionShapes = AuthoredCollisionAnchorCount("GuangchangPawnshop");
+        var marketCollisionShapes = AuthoredCollisionAnchorCount("OldCityMarketBridge");
+        var authoredBuildingCollisionReady = _jianghaiAuthoredBuildingCollision is { } buildingCollision
+            && _jianghaiAuthoredBuildingCollisionError is null
+            && IsInstanceValid(buildingCollision.Body)
+            && buildingCollision.Body.CollisionLayer == 1
+            && buildingCollision.Body.CollisionMask == 0
+            && buildingCollision.SourceMeshCount == 220
+            && buildingCollision.StructuralSourceMeshCount == 107
+            && buildingCollision.DetailSourceMeshCount == 113
+            && buildingCollision.CollisionShapeCount == buildingCollision.SourceMeshCount
+            && buildingCollision.ConcaveShapeCount == buildingCollision.CollisionShapeCount
+            && buildingCollision.SharedShapeCount > 0
+            && buildingCollision.BakedShapeCount > 0
+            && buildingCollision.UniqueMeshCount >= 6
+            && buildingCollision.InstanceTriangleCount > 0
+            && tenementCollisionShapes == 94
+            && factoryCollisionShapes == 11
+            && pawnshopCollisionShapes == 73
+            && marketCollisionShapes == 42
+            && counts.AuthoredCollisionBodies == 1
+            && counts.AuthoredCollisionShapes == buildingCollision.CollisionShapeCount
+            && counts.AuthoredConcaveCollisionShapes == counts.AuthoredCollisionShapes
+            && counts.AuthoredNonConcaveCollisionShapes == 0;
         var legacyScaffoldsHidden = counts.VisibleLegacyScaffoldGeometry == 0;
         var interactiveDoorsReady = _oldTownLandmarks is { } landmarks
             && _refineryDoors.Count == landmarks.EntryCount
@@ -245,7 +278,14 @@ public partial class FreightTerminalWorld
             && _oldTownDistricts.Contains("municipal_treasury")
             && _oldTownDistricts.Contains("founders_plaza");
         var highValueReady = ValidateOldTownHighValueZones(out var zoneSeparation, out var zoneSummary);
+        var highValueAccessReady = ValidateHighValueLootAccess(
+            out var accessibleHighValueLoot,
+            out var highValueAccessBlocker);
         var routeReady = ValidateOldTownRouteProbes(out var routeProbeCount, out var routeBlocker);
+        var buildingPhysicsReady = ValidateJianghaiBuildingCollision(
+            out var buildingHitCount,
+            out var buildingClearCount,
+            out var buildingPhysicsSummary);
         var landmarkReady = ValidateOldTownLandmarks();
         var terminalCollisionReady = ValidateRefineryTerminalCollisions(out var alignedTerminalCollisions);
         var terminalStatusesReady = ValidateAuthoredTerminalStatusTransitions(out var terminalStatusSummary);
@@ -269,10 +309,12 @@ public partial class FreightTerminalWorld
             && performanceScene.ShadowCasterMeshCount > 0
             && performanceScene.ShadowCasterMeshCount < performanceScene.MeshInstanceCount;
         var valid = rootsReady && localizationReady && authoredReady && proxiesReady
-            && legacyScaffoldsHidden && interactiveDoorsReady && districtsReady && highValueReady && routeReady
+            && authoredBuildingCollisionReady && buildingPhysicsReady
+            && legacyScaffoldsHidden && interactiveDoorsReady && districtsReady
+            && highValueReady && highValueAccessReady && routeReady
             && landmarkReady && authoredQualityReady && gameplayReady && deploymentReady && performanceReady;
 
-        GD.Print($"REFINERY_MAP_CHECK valid={valid} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city root={rootsReady} localization={localizationReady} authored={authoredReady} authored_path={_jianghaiOldCityScene?.ScenePath ?? "missing"} authored_error={(_jianghaiOldCitySceneLoadError is null ? "none" : "load_failed")} authored_roots={counts.AuthoredSceneRoots} authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} authored_material_surfaces={_jianghaiOldCityScene?.MaterialSurfaceCount ?? 0} authored_triangles={_jianghaiOldCityScene?.InstanceTriangleCount ?? 0} authored_anchors={_jianghaiOldCityScene?.RequiredAnchorCount ?? 0}/{_jianghaiOldCityScene?.RequiredAnchorTotal ?? 0} authored_terminals={_jianghaiOldCityScene?.AuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.VisibleAuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.AlignedAuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.AuthoredTerminalTotal ?? 0} authored_screens={_jianghaiOldCityScene?.AuthoredStatusScreenCount ?? 0}/{_jianghaiOldCityScene?.AuthoredStatusScreenTotal ?? 0} terminal_statuses={terminalStatusesReady}:{terminalStatusSummary} authored_detail={_jianghaiOldCityScene?.DetailMeshCount ?? 0} authored_quality={_jianghaiOldCityScene?.QualityTier ?? -1} authored_shadows={_jianghaiOldCityScene?.ShadowCasterMeshCount ?? 0} authored_quality_tiers={authoredQualityReady}:{authoredQualitySummary} terminal_collision={terminalCollisionReady} terminal_collision_aligned={alignedTerminalCollisions}/2 legacy_visible={counts.VisibleLegacyScaffoldGeometry} scaffolds_hidden={legacyScaffoldsHidden} proxies={counts.LegacyCollisionShapes}/{_refineryCollisionProxyCount} expected_proxies={expectedCollisionProxies} proxy_boxes={proxiesReady} districts={_oldTownDistricts.Count} district_ready={districtsReady} doors={_refineryDoors.Count}/{_oldTownLandmarks?.EntryCount ?? 0} doors_ready={interactiveDoorsReady} high_value={highValueReady} zone_separation={zoneSeparation:0.0} zone_summary={zoneSummary} routes={routeReady} route_probes={routeProbeCount} route_blocker={routeBlocker} landmarks={landmarkReady} landmark_collision={_oldTownLandmarks?.CollisionShapeCount ?? 0} rooftop_routes={_oldTownLandmarks?.RooftopRouteCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
+        GD.Print($"REFINERY_MAP_CHECK valid={valid} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city root={rootsReady} localization={localizationReady} authored={authoredReady} authored_path={_jianghaiOldCityScene?.ScenePath ?? "missing"} authored_error={(_jianghaiOldCitySceneLoadError is null ? "none" : "load_failed")} authored_roots={counts.AuthoredSceneRoots} authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} authored_material_surfaces={_jianghaiOldCityScene?.MaterialSurfaceCount ?? 0} authored_triangles={_jianghaiOldCityScene?.InstanceTriangleCount ?? 0} authored_anchors={_jianghaiOldCityScene?.RequiredAnchorCount ?? 0}/{_jianghaiOldCityScene?.RequiredAnchorTotal ?? 0} authored_terminals={_jianghaiOldCityScene?.AuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.VisibleAuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.AlignedAuthoredTerminalCount ?? 0}/{_jianghaiOldCityScene?.AuthoredTerminalTotal ?? 0} authored_screens={_jianghaiOldCityScene?.AuthoredStatusScreenCount ?? 0}/{_jianghaiOldCityScene?.AuthoredStatusScreenTotal ?? 0} terminal_statuses={terminalStatusesReady}:{terminalStatusSummary} authored_detail={_jianghaiOldCityScene?.DetailMeshCount ?? 0} authored_quality={_jianghaiOldCityScene?.QualityTier ?? -1} authored_shadows={_jianghaiOldCityScene?.ShadowCasterMeshCount ?? 0} authored_quality_tiers={authoredQualityReady}:{authoredQualitySummary} terminal_collision={terminalCollisionReady} terminal_collision_aligned={alignedTerminalCollisions}/2 authored_building_collision={authoredBuildingCollisionReady} authored_building_shapes={counts.AuthoredCollisionShapes}/{_jianghaiAuthoredBuildingCollision?.CollisionShapeCount ?? 0} authored_building_sources={_jianghaiAuthoredBuildingCollision?.SourceMeshCount ?? 0}:{_jianghaiAuthoredBuildingCollision?.StructuralSourceMeshCount ?? 0}/{_jianghaiAuthoredBuildingCollision?.DetailSourceMeshCount ?? 0} authored_building_anchors={tenementCollisionShapes}/{factoryCollisionShapes}/{pawnshopCollisionShapes}/{marketCollisionShapes} authored_building_shared={_jianghaiAuthoredBuildingCollision?.SharedShapeCount ?? 0} authored_building_baked={_jianghaiAuthoredBuildingCollision?.BakedShapeCount ?? 0} authored_building_unique={_jianghaiAuthoredBuildingCollision?.UniqueMeshCount ?? 0} authored_building_triangles={_jianghaiAuthoredBuildingCollision?.InstanceTriangleCount ?? 0} authored_building_error={(_jianghaiAuthoredBuildingCollisionError is null ? "none" : "build_failed")} building_physics={buildingPhysicsReady}:{buildingHitCount}/5:{buildingClearCount}/3:{buildingPhysicsSummary} legacy_visible={counts.VisibleLegacyScaffoldGeometry} scaffolds_hidden={legacyScaffoldsHidden} proxies={counts.LegacyCollisionShapes}/{_refineryCollisionProxyCount} expected_proxies={expectedCollisionProxies} proxy_boxes={proxiesReady} districts={_oldTownDistricts.Count} district_ready={districtsReady} doors={_refineryDoors.Count}/{_oldTownLandmarks?.EntryCount ?? 0} doors_ready={interactiveDoorsReady} high_value={highValueReady} high_value_access={highValueAccessReady}:{accessibleHighValueLoot}/12:{highValueAccessBlocker} zone_separation={zoneSeparation:0.0} zone_summary={zoneSummary} routes={routeReady} route_probes={routeProbeCount} route_blocker={routeBlocker} landmarks={landmarkReady} landmark_collision={_oldTownLandmarks?.CollisionShapeCount ?? 0} rooftop_routes={_oldTownLandmarks?.RooftopRouteCount ?? 0} nodes={counts.Nodes} static_bodies={counts.StaticBodies} mesh_instances={counts.MeshInstances} lights={counts.Lights} loot={_lootSources.Count} graded_loot={_buildingLootPickupCount} garrison={_enemies.Count} minimap={_hud.MinimapLandmarkCount} deployment_distance={DeploymentPoint.DistanceTo(ExtractionPoint):0.0} performance={performanceReady}");
         GD.Print($"REFINERY_MAP_PASS valid={valid}");
         await WaitFrames(4);
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
@@ -360,6 +402,12 @@ public partial class FreightTerminalWorld
             await WaitFrames(10);
             performanceReady &= PrintRefineryRenderingSnapshot("market_footbridge");
             SaveViewportImage("res://old_town_rooftop_validation.png");
+            camera.GlobalPosition = new Vector3(-122.0f, 2.0f, -174.0f);
+            camera.LookAt(new Vector3(-68.0f, 4.0f, -194.0f), Vector3.Up);
+            camera.Fov = 40.0f;
+            await WaitFrames(10);
+            performanceReady &= PrintRefineryRenderingSnapshot("north_ward_density");
+            SaveViewportImage("res://jianghai_density_validation.png");
             var captureDoor = _refineryDoors.FirstOrDefault();
             if (captureDoor is not null)
             {
@@ -378,7 +426,7 @@ public partial class FreightTerminalWorld
                 SaveViewportImage("res://refinery_door_open_validation.png");
                 captureDoor.SetOpenImmediate(false);
             }
-            GD.Print($"REFINERY_MAP_CAPTURE valid={performanceReady} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city time=dusk authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} doors={_refineryDoors.Count} paths=refinery_map_validation.png,refinery_ground_validation.png,jianghai_street_life_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,refinery_door_closed_validation.png,refinery_door_open_validation.png");
+            GD.Print($"REFINERY_MAP_CAPTURE valid={performanceReady} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city time=dusk authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} doors={_refineryDoors.Count} paths=refinery_map_validation.png,refinery_ground_validation.png,jianghai_street_life_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,jianghai_density_validation.png,refinery_door_closed_validation.png,refinery_door_open_validation.png");
         }
         finally
         {
@@ -479,6 +527,150 @@ public partial class FreightTerminalWorld
         return valid;
     }
 
+    private int AuthoredCollisionAnchorCount(string anchorName)
+        => _jianghaiAuthoredBuildingCollision is { } collision
+            && collision.AnchorShapeCounts.TryGetValue(anchorName, out var count)
+                ? count
+                : 0;
+
+    private bool ValidateHighValueLootAccess(
+        out int accessibleLoot,
+        out string firstBlocker)
+    {
+        accessibleLoot = 0;
+        firstBlocker = "none";
+        var exclusions = BuildRefineryLaneExclusions();
+        foreach (var lootSource in _lootSources)
+        {
+            if (lootSource.LootNode is CollisionObject3D collisionObject
+                && IsInstanceValid(collisionObject)
+                && !exclusions.Contains(collisionObject.GetRid()))
+            {
+                exclusions.Add(collisionObject.GetRid());
+            }
+        }
+        using var exclusionsBacking = exclusions.AsDisposable();
+        using var capsule = new CapsuleShape3D { Radius = 0.38f, Height = 1.75f };
+        using var query = new PhysicsShapeQueryParameters3D
+        {
+            Shape = capsule,
+            CollisionMask = 1,
+            CollideWithAreas = false,
+            CollideWithBodies = true,
+            Margin = 0.005f,
+            Exclude = exclusions
+        };
+        var space = GetWorld3D().DirectSpaceState;
+        foreach (var zone in RefineryLayout.HighValueZones)
+        {
+            var origin = zone.Id == "grand_hotel"
+                ? new Vector3(-86.0f, 0.2f, -118.1f)
+                : new Vector3(86.0f, 0.2f, -2.0f);
+            var positions = RefineryLayout.LootPlacements
+                .Where(loot => loot.Grade >= LootGrade.Epic
+                    && HorizontalDistance(loot.Position, zone.Center) <= zone.Radius)
+                .Select(loot => loot.Position)
+                .Concat(RefineryLayout.ValuablePlacements
+                    .Where(loot => loot.Grade >= LootGrade.Epic
+                        && HorizontalDistance(loot.Position, zone.Center) <= zone.Radius)
+                    .Select(loot => loot.Position))
+                .ToArray();
+            if (positions.Length != 6)
+            {
+                firstBlocker = $"{zone.Id}:count_{positions.Length}";
+                return false;
+            }
+
+            foreach (var target in positions)
+            {
+                var samples = Mathf.Max(1, Mathf.CeilToInt(origin.DistanceTo(target) / 0.45f));
+                for (var sample = 0; sample <= samples; sample++)
+                {
+                    var feet = origin.Lerp(target, sample / (float)samples);
+                    query.Transform = new Transform3D(
+                        Basis.Identity,
+                        feet + Vector3.Up * 0.915f);
+                    var hits = space.IntersectShape(query, 8);
+                    using var hitsBacking = hits.AsDisposable();
+                    if (hits.Count == 0)
+                    {
+                        continue;
+                    }
+                    using var hit = hits[0];
+                    using var colliderValue = hit[GodotPhysicsResultKeys.Collider];
+                    firstBlocker = colliderValue.AsGodotObject() is Node collider
+                        ? $"{zone.Id}:{target.X:0.0},{target.Z:0.0}:{collider.Name}"
+                        : $"{zone.Id}:{target.X:0.0},{target.Z:0.0}:unknown";
+                    return false;
+                }
+                accessibleLoot++;
+            }
+        }
+        return accessibleLoot == 12;
+    }
+
+    private bool ValidateJianghaiBuildingCollision(
+        out int blockingHits,
+        out int clearRoutes,
+        out string summary)
+    {
+        blockingHits = 0;
+        clearRoutes = 0;
+        summary = "ok";
+        var exclusions = BuildRefineryLaneExclusions();
+        using var exclusionsBacking = exclusions.AsDisposable();
+        var blockingProbes = new[]
+        {
+            ("west_clock", new Vector3(-8, 1.35f, 26), new Vector3(-24, 1.35f, 26)),
+            ("east_hardware", new Vector3(8, 1.35f, -36), new Vector3(26, 1.35f, -36)),
+            ("pawnshop_clan_hall", new Vector3(-101, 8.0f, -128.6f), new Vector3(-86, 8.0f, -128.6f)),
+            ("factory_admin", new Vector3(85.5f, 1.35f, 0), new Vector3(85.5f, 1.35f, 10)),
+            ("market_rooftop_shop", new Vector3(0, 6.5f, -122), new Vector3(0, 6.5f, -134))
+        };
+        foreach (var probe in blockingProbes)
+        {
+            if (!PhysicsRaycast.TryHit(
+                    GetWorld3D().DirectSpaceState,
+                    probe.Item2,
+                    probe.Item3,
+                    exclusions,
+                    1,
+                    out var hit)
+                || hit.Collider is not Node collider
+                || !collider.IsInGroup(JianghaiAuthoredBuildingCollisionBuilder.CollisionGroup))
+            {
+                summary = $"block:{probe.Item1}";
+                return false;
+            }
+            blockingHits++;
+        }
+
+        var clearProbes = new[]
+        {
+            ("truck_low", new Vector3(-2.0f, 0.45f, 88), new Vector3(-2.0f, 0.45f, -212)),
+            ("truck_mid", new Vector3(-0.5f, 1.4f, 88), new Vector3(-0.5f, 1.4f, -212)),
+            ("truck_high", new Vector3(1.0f, 2.6f, 88), new Vector3(1.0f, 2.6f, -212))
+        };
+        foreach (var probe in clearProbes)
+        {
+            if (PhysicsRaycast.TryHit(
+                    GetWorld3D().DirectSpaceState,
+                    probe.Item2,
+                    probe.Item3,
+                    exclusions,
+                    1,
+                    out var hit))
+            {
+                summary = hit.Collider is Node blocker
+                    ? $"clear:{probe.Item1}:{blocker.Name}"
+                    : $"clear:{probe.Item1}:unknown";
+                return false;
+            }
+            clearRoutes++;
+        }
+        return blockingHits == blockingProbes.Length && clearRoutes == clearProbes.Length;
+    }
+
     private bool ValidateOldTownRouteProbes(out int checkedProbes, out string firstBlocker)
     {
         checkedProbes = 0;
@@ -521,24 +713,130 @@ public partial class FreightTerminalWorld
             GetWorld3D(), landmarks.TreasuryEntry, landmarks.TreasuryInterior, exclusions, 1);
         var hotelWallBlocks = PhysicsRaycast.HasHit(
             GetWorld3D(), landmarks.HotelCenter + new Vector3(-14, 1.2f, 0), landmarks.HotelCenter, 1);
-        var treasuryWallBlocks = PhysicsRaycast.HasHit(
-            GetWorld3D(), landmarks.TreasuryCenter + new Vector3(14, 1.2f, 0), landmarks.TreasuryCenter, 1);
+        var pawnshopAirProbes = new[]
+        {
+            (From: new Vector3(-86, 3.0f, -135.4f), To: new Vector3(-86, 3.0f, -136.6f)),
+            (From: new Vector3(-98.0f, 3.0f, -122.1f), To: new Vector3(-98.0f, 3.0f, -122.9f)),
+            (From: new Vector3(-94.5f, 3.5f, -111.4f), To: new Vector3(-94.5f, 3.5f, -112.3f))
+        };
+        var pawnshopAirClear = pawnshopAirProbes.All(probe =>
+            !PhysicsRaycast.HasHit(GetWorld3D(), probe.From, probe.To, exclusions, 1));
+        var pawnshopVisibleBlocks = new[]
+        {
+            (From: new Vector3(-86, 1.0f, -135.4f), To: new Vector3(-86, 1.0f, -136.6f)),
+            (From: new Vector3(-98.0f, 1.0f, -122.1f), To: new Vector3(-98.0f, 1.0f, -122.9f)),
+            (From: new Vector3(-94.5f, 1.0f, -111.4f), To: new Vector3(-94.5f, 1.0f, -112.3f))
+        }.Count(probe => PhysicsRaycast.HasHit(
+            GetWorld3D(), probe.From, probe.To, exclusions, 1));
+        var factoryAirWallProbes = new[]
+        {
+            (From: new Vector3(77, 1.2f, -10), To: new Vector3(77, 1.2f, -6)),
+            (From: new Vector3(95, 1.2f, -10), To: new Vector3(95, 1.2f, -6)),
+            (From: new Vector3(72, 1.2f, -1), To: new Vector3(76, 1.2f, -1)),
+            (From: new Vector3(96, 1.2f, -1), To: new Vector3(100, 1.2f, -1)),
+            (From: new Vector3(86, 1.2f, 13), To: new Vector3(86, 1.2f, 18))
+        };
+        var factoryAirWallsClear = factoryAirWallProbes.All(probe =>
+            !PhysicsRaycast.HasHit(GetWorld3D(), probe.From, probe.To, exclusions, 1));
+        var factoryGateBlocks = new[]
+        {
+            (From: new Vector3(80.6f, 2.2f, -7.924f), To: new Vector3(83.0f, 2.2f, -7.924f)),
+            (From: new Vector3(89.0f, 2.2f, -7.924f), To: new Vector3(91.4f, 2.2f, -7.924f)),
+            (From: new Vector3(85.9f, 6.5f, -7.924f), To: new Vector3(85.9f, 4.0f, -7.924f))
+        }.Count(probe => PhysicsRaycast.HasHit(GetWorld3D(), probe.From, probe.To, 1));
         var rooftopDeckBlocks = PhysicsRaycast.HasHit(
             GetWorld3D(), new Vector3(0, 7.0f, -126), new Vector3(0, 2.0f, -126), 1);
-        var rooftopWalkClear = !PhysicsRaycast.HasHit(
-            GetWorld3D(), new Vector3(-20, 5.7f, -126), new Vector3(20, 5.7f, -126), 1);
+        var marketRailBlocks = new[]
+        {
+            (From: new Vector3(1.5f, 4.845f, -123.5f), To: new Vector3(1.5f, 4.845f, -124.3f)),
+            (From: new Vector3(1.5f, 5.445f, -123.5f), To: new Vector3(1.5f, 5.445f, -124.3f)),
+            (From: new Vector3(1.5f, 4.845f, -127.7f), To: new Vector3(1.5f, 4.845f, -128.4f)),
+            (From: new Vector3(1.5f, 5.445f, -127.7f), To: new Vector3(1.5f, 5.445f, -128.4f))
+        }.Count(probe => PhysicsRaycast.HasHit(
+            GetWorld3D(), probe.From, probe.To, exclusions, 1));
+        var marketRailGapsClear = new[]
+        {
+            (From: new Vector3(1.5f, 5.15f, -123.5f), To: new Vector3(1.5f, 5.15f, -124.3f)),
+            (From: new Vector3(1.5f, 5.15f, -127.7f), To: new Vector3(1.5f, 5.15f, -128.4f))
+        }.All(probe => !PhysicsRaycast.HasHit(
+            GetWorld3D(), probe.From, probe.To, exclusions, 1));
+        var marketRailPostsBlock = new[]
+        {
+            (From: new Vector3(0, 5.15f, -123.5f), To: new Vector3(0, 5.15f, -124.3f)),
+            (From: new Vector3(0, 5.15f, -127.7f), To: new Vector3(0, 5.15f, -128.4f))
+        }.Count(probe => PhysicsRaycast.HasHit(
+            GetWorld3D(), probe.From, probe.To, exclusions, 1));
+        var rooftopWalkClear = ValidateRooftopCapsuleRoute(
+            landmarks.RooftopRoute,
+            out var rooftopBlocker);
         var traversalRegistered = _squadTraversalLinks.Any(link =>
             link.Source == "old_town_market_rooftop"
             && link.Bidirectional
             && link.ForwardPoints.Length >= 8);
         var countsReady = landmarks.LandmarkCount == 3
             && landmarks.HighValueZoneCount == 2
-            && landmarks.CollisionShapeCount >= 17
+            && landmarks.CollisionShapeCount == 0
             && landmarks.EntryCount == 2
             && landmarks.RooftopRouteCount == 1;
-        GD.Print($"OLD_TOWN_LANDMARK_CHECK hotel_entry={hotelEntryClear} treasury_entry={treasuryEntryClear} hotel_wall={hotelWallBlocks} treasury_wall={treasuryWallBlocks} rooftop_deck={rooftopDeckBlocks} rooftop_clear={rooftopWalkClear} traversal={traversalRegistered} counts={countsReady}");
-        return hotelEntryClear && treasuryEntryClear && hotelWallBlocks && treasuryWallBlocks
-            && rooftopDeckBlocks && rooftopWalkClear && traversalRegistered && countsReady;
+        GD.Print($"OLD_TOWN_LANDMARK_CHECK hotel_entry={hotelEntryClear} treasury_entry={treasuryEntryClear} hotel_wall={hotelWallBlocks} pawnshop_air_clear={pawnshopAirClear}:3 pawnshop_visible={pawnshopVisibleBlocks}/3 factory_air_clear={factoryAirWallsClear}:5 factory_gate={factoryGateBlocks}/3 rooftop_deck={rooftopDeckBlocks} rail_blocks={marketRailBlocks}/4 rail_gaps={marketRailGapsClear}:2 rail_posts={marketRailPostsBlock}/2 rooftop_clear={rooftopWalkClear}:{rooftopBlocker} traversal={traversalRegistered} counts={countsReady}:0");
+        return hotelEntryClear && treasuryEntryClear && hotelWallBlocks
+            && pawnshopAirClear && pawnshopVisibleBlocks == 3
+            && factoryAirWallsClear && factoryGateBlocks == 3
+            && rooftopDeckBlocks && marketRailBlocks == 4
+            && marketRailGapsClear && marketRailPostsBlock == 2
+            && rooftopWalkClear && traversalRegistered && countsReady;
+    }
+
+    private bool ValidateRooftopCapsuleRoute(
+        IReadOnlyList<Vector3> route,
+        out string blocker)
+    {
+        blocker = "none";
+        if (route.Count < 8)
+        {
+            blocker = "route_missing";
+            return false;
+        }
+
+        const float capsuleHeight = 1.75f;
+        using var capsule = new CapsuleShape3D { Radius = 0.50f, Height = capsuleHeight };
+        using var query = new PhysicsShapeQueryParameters3D
+        {
+            Shape = capsule,
+            CollisionMask = 1,
+            CollideWithAreas = false,
+            CollideWithBodies = true,
+            Margin = 0.005f
+        };
+        var space = GetWorld3D().DirectSpaceState;
+        const int firstElevatedDeckPoint = 3;
+        var lastElevatedDeckPoint = route.Count - 4;
+        for (var segment = firstElevatedDeckPoint; segment < lastElevatedDeckPoint; segment++)
+        {
+            var from = route[segment];
+            var to = route[segment + 1];
+            var samples = Mathf.Max(1, Mathf.CeilToInt(from.DistanceTo(to) / 0.50f));
+            for (var sample = 0; sample <= samples; sample++)
+            {
+                var feet = from.Lerp(to, sample / (float)samples);
+                query.Transform = new Transform3D(
+                    Basis.Identity,
+                    feet + Vector3.Up * (capsuleHeight * 0.5f + 0.04f));
+                var hits = space.IntersectShape(query, 8);
+                using var hitsBacking = hits.AsDisposable();
+                if (hits.Count == 0)
+                {
+                    continue;
+                }
+                using var hit = hits[0];
+                using var colliderValue = hit[GodotPhysicsResultKeys.Collider];
+                blocker = colliderValue.AsGodotObject() is Node collider
+                    ? $"segment_{segment}:{collider.Name}"
+                    : $"segment_{segment}:unknown";
+                return false;
+            }
+        }
+        return true;
     }
 
     private bool ValidateRefineryTerminalCollisions(out int alignedCollisions)
@@ -660,6 +958,7 @@ public partial class FreightTerminalWorld
         bool insideAuthoredScene,
         bool insideLegacyVisualScaffold,
         bool insideLegacyCollisionProxy,
+        bool insideAuthoredCollision,
         ref RefineryRuntimeCounts counts)
     {
         counts.Nodes++;
@@ -669,6 +968,9 @@ public partial class FreightTerminalWorld
             || node.IsInGroup("refinery_legacy_visual_scaffold");
         var legacyCollision = insideLegacyCollisionProxy
             || node.IsInGroup("refinery_legacy_collision_proxy");
+        var authoredCollisionRoot = node.IsInGroup(
+            JianghaiAuthoredBuildingCollisionBuilder.CollisionGroup);
+        var authoredCollision = insideAuthoredCollision || authoredCollisionRoot;
         if (authoredRoot)
         {
             counts.AuthoredSceneRoots++;
@@ -676,6 +978,14 @@ public partial class FreightTerminalWorld
         if (node is StaticBody3D)
         {
             counts.StaticBodies++;
+            if (authoredCollisionRoot)
+            {
+                counts.AuthoredCollisionBodies++;
+            }
+            if (legacyCollision)
+            {
+                counts.LegacyCollisionBodies++;
+            }
         }
         if (node is Light3D)
         {
@@ -706,6 +1016,18 @@ public partial class FreightTerminalWorld
                 counts.NonBoxLegacyCollisionShapes++;
             }
         }
+        if (authoredCollision && node is CollisionShape3D authoredCollisionShape)
+        {
+            counts.AuthoredCollisionShapes++;
+            if (authoredCollisionShape.Shape is ConcavePolygonShape3D)
+            {
+                counts.AuthoredConcaveCollisionShapes++;
+            }
+            else
+            {
+                counts.AuthoredNonConcaveCollisionShapes++;
+            }
+        }
         var children = node.GetChildren();
         using var childrenBacking = children.AsDisposable();
         foreach (var child in children)
@@ -717,6 +1039,7 @@ public partial class FreightTerminalWorld
                     authored,
                     legacyVisual,
                     legacyCollision,
+                    authoredCollision,
                     ref counts);
             }
         }
@@ -743,6 +1066,11 @@ public partial class FreightTerminalWorld
         public int VisibleAuthoredSceneMeshes;
         public int VisibleLegacyScaffoldGeometry;
         public int LegacyCollisionShapes;
+        public int LegacyCollisionBodies;
         public int NonBoxLegacyCollisionShapes;
+        public int AuthoredCollisionBodies;
+        public int AuthoredCollisionShapes;
+        public int AuthoredConcaveCollisionShapes;
+        public int AuthoredNonConcaveCollisionShapes;
     }
 }

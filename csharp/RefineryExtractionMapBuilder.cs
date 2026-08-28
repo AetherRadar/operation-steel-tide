@@ -484,12 +484,12 @@ public sealed class RefineryExtractionMapBuilder
 
     private static IReadOnlyList<RefineryLootPlacement> LootPlacements() => new[]
     {
-        Loot(new(-91, 0.2f, -122), LootGrade.Legendary, "Guangchang Pawnshop master safe", "\u5e7f\u660c\u5f53\u94fa\u4e3b\u4fdd\u9669\u67dc"),
-        Loot(new(-80, 0.2f, -128), LootGrade.Epic, "Pawnshop jewelry case", "\u5f53\u94fa\u73e0\u5b9d\u7bb1"),
-        Loot(new(-94, 0.2f, -113), LootGrade.Epic, "Pawnshop counter strongbox", "\u5f53\u94fa\u67dc\u53f0\u91cd\u5323"),
+        Loot(new(-92.5f, 0.2f, -118.35f), LootGrade.Legendary, "Guangchang Pawnshop master safe", "\u5e7f\u660c\u5f53\u94fa\u4e3b\u4fdd\u9669\u67dc"),
+        Loot(new(-89.8f, 0.2f, -117.95f), LootGrade.Epic, "Pawnshop jewelry case", "\u5f53\u94fa\u73e0\u5b9d\u7bb1"),
+        Loot(new(-87.2f, 0.2f, -118.45f), LootGrade.Epic, "Pawnshop counter strongbox", "\u5f53\u94fa\u67dc\u53f0\u91cd\u5323"),
         Loot(new(-76, 0.2f, -115), LootGrade.Rare, "Pawnshop service cache", "\u5f53\u94fa\u540e\u573a\u7269\u8d44"),
-        Loot(new(91, 0.2f, 4), LootGrade.Legendary, "Red Star Electronics secure vault", "\u7ea2\u661f\u7535\u5b50\u5382\u4fdd\u5bc6\u67dc"),
-        Loot(new(80, 0.2f, 9), LootGrade.Epic, "Factory payroll case", "\u7535\u5b50\u5382\u5de5\u8d44\u7bb1"),
+        Loot(new(91, 0.2f, -1.5f), LootGrade.Legendary, "Red Star Electronics secure vault", "\u7ea2\u661f\u7535\u5b50\u5382\u4fdd\u5bc6\u67dc"),
+        Loot(new(80, 0.2f, -1.5f), LootGrade.Epic, "Factory payroll case", "\u7535\u5b50\u5382\u5de5\u8d44\u7bb1"),
         Loot(new(94, 0.2f, -5), LootGrade.Epic, "Archive cipher locker", "\u6863\u6848\u5bc6\u7801\u67dc"),
         Loot(new(76, 0.2f, -7), LootGrade.Rare, "Clerk security cache", "\u804c\u5458\u5b89\u4fdd\u7269\u8d44"),
         Loot(new(-17, 0.2f, -74), LootGrade.Rare, "Jianghai market lockbox", "\u6c5f\u6d77\u5e02\u96c6\u9501\u7bb1"),
@@ -509,13 +509,13 @@ public sealed class RefineryExtractionMapBuilder
 
     private static IReadOnlyList<(Vector3, ValuableItemKind, LootGrade)> ValuablePlacements() => new[]
     {
-        (new Vector3(-88, 0.2f, -121), ValuableItemKind.AntiqueClock, LootGrade.Legendary),
-        (new Vector3(-82, 0.2f, -130), ValuableItemKind.GoldJewelry, LootGrade.Legendary),
-        (new Vector3(-95, 0.2f, -116), ValuableItemKind.CollectorCoin, LootGrade.Epic),
+        (new Vector3(-84.7f, 0.2f, -117.9f), ValuableItemKind.AntiqueClock, LootGrade.Legendary),
+        (new Vector3(-82.1f, 0.2f, -118.5f), ValuableItemKind.GoldJewelry, LootGrade.Legendary),
+        (new Vector3(-79.5f, 0.2f, -118.1f), ValuableItemKind.CollectorCoin, LootGrade.Epic),
         (new Vector3(-77, 0.2f, -116), ValuableItemKind.DesignerPerfume, LootGrade.Rare),
         (new Vector3(88, 0.2f, 1), ValuableItemKind.EncryptedDrive, LootGrade.Epic),
-        (new Vector3(82, 0.2f, 10), ValuableItemKind.GoldJewelry, LootGrade.Legendary),
-        (new Vector3(95, 0.2f, 6), ValuableItemKind.CollectorCoin, LootGrade.Epic),
+        (new Vector3(82, 0.2f, 0.5f), ValuableItemKind.GoldJewelry, LootGrade.Legendary),
+        (new Vector3(95, 0.2f, 0.5f), ValuableItemKind.CollectorCoin, LootGrade.Epic),
         (new Vector3(77, 0.2f, -4), ValuableItemKind.Wristwatch, LootGrade.Rare),
         (new Vector3(-38, 0.2f, -89), ValuableItemKind.VintageCamera, LootGrade.Rare),
         (new Vector3(38, 0.2f, -31), ValuableItemKind.GraphicsCard, LootGrade.Rare),

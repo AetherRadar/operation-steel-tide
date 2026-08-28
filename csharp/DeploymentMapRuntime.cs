@@ -37,6 +37,7 @@ public static class DeploymentMapRuntime
 
         if (Array.Exists(args, value =>
                 value is "--validate-refinery-map"
+                    or "--validate-refinery-collision"
                     or "--validate-refinery-doors"
                     or "--capture-refinery-map"
                     or "--capture-promotion"

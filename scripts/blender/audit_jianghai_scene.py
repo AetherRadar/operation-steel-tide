@@ -9,11 +9,32 @@ import sys
 
 import bpy
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 
 
 def triangle_count(mesh: bpy.types.Mesh) -> int:
     mesh.calc_loop_triangles()
     return len(mesh.loop_triangles)
+
+
+def object_world_bounds(obj: bpy.types.Object) -> tuple[Vector, Vector]:
+    corners = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
+    return (
+        Vector(tuple(min(point[axis] for point in corners) for axis in range(3))),
+        Vector(tuple(max(point[axis] for point in corners) for axis in range(3))),
+    )
+
+
+def overlap_depths(first: bpy.types.Object, second: bpy.types.Object) -> Vector:
+    first_min, first_max = object_world_bounds(first)
+    second_min, second_max = object_world_bounds(second)
+    return Vector(
+        tuple(
+            min(first_max[axis], second_max[axis])
+            - max(first_min[axis], second_min[axis])
+            for axis in range(3)
+        )
+    )
 
 
 def evaluated_geometry_statistics() -> tuple[int, int, Counter[str]]:
@@ -161,16 +182,9 @@ factory_gate_portal_ready = all(obj is not None for obj in factory_gate_objects)
 if factory_gate_portal_ready:
     left_pier, right_pier, left_cap, right_cap, roof = factory_gate_objects
 
-    def world_bounds(obj: bpy.types.Object) -> tuple[Vector, Vector]:
-        corners = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
-        return (
-            Vector(tuple(min(point[axis] for point in corners) for axis in range(3))),
-            Vector(tuple(max(point[axis] for point in corners) for axis in range(3))),
-        )
-
-    left_min, left_max = world_bounds(left_pier)
-    right_min, right_max = world_bounds(right_pier)
-    roof_min, roof_max = world_bounds(roof)
+    left_min, left_max = object_world_bounds(left_pier)
+    right_min, right_max = object_world_bounds(right_pier)
+    roof_min, roof_max = object_world_bounds(roof)
     door_half_width = 7.2956 * 0.5
     factory_gate_portal_ready &= (
         all(obj.parent == factory_gate_root for obj in factory_gate_objects)
@@ -419,7 +433,11 @@ def is_cleared_authored_storefront(obj, expected_parent):
         obj is not None
         and obj.type == "MESH"
         and obj.data is not None
-        and obj.data.name in {"Cube.286", "hhugu.001"}
+        and obj.data.name in {
+            "Cube.286",
+            "hhugu.001",
+            "JianghaiPawnshopStorefrontDoorway",
+        }
         and obj.parent == expected_parent
         and len(obj.material_slots) > 0
         and "cc0" in str(obj.get("license", "")).lower()
@@ -459,6 +477,282 @@ replacement_factory_ready = (
     )
     and not any(obj.name.startswith("RedStarMainFacade_") for obj in bpy.data.objects)
 )
+
+
+def is_structural_building(obj):
+    return (
+        obj.type == "MESH"
+        and obj.dimensions.z >= 4.5
+        and min(obj.dimensions.x, obj.dimensions.y) >= 4.0
+    )
+
+
+def segment_hits_mesh(obj, start, end, depsgraph):
+    inverse = obj.matrix_world.inverted_safe()
+    local_start = inverse @ start
+    local_end = inverse @ end
+    local_ray = local_end - local_start
+    if local_ray.length_squared <= 0.000001:
+        return False
+    tree = BVHTree.FromObject(obj, depsgraph)
+    if tree is None:
+        return False
+    hit, _, _, _ = tree.ray_cast(local_start, local_ray.normalized(), local_ray.length)
+    return hit is not None
+
+
+density_buildings = sorted(
+    (
+        obj
+        for obj in bpy.context.scene.objects
+        if obj.name.startswith("JianghaiDensity_")
+    ),
+    key=lambda obj: obj.name,
+)
+density_spawn_clearances = (
+    Vector((-148.0, 198.0, 0.0)),
+    Vector((148.0, 198.0, 0.0)),
+    Vector((-148.0, -72.0, 0.0)),
+    Vector((148.0, -72.0, 0.0)),
+    Vector((0.0, 215.0, 0.0)),
+    Vector((0.0, -80.0, 0.0)),
+    Vector((-155.0, 60.0, 0.0)),
+    Vector((155.0, 60.0, 0.0)),
+)
+density_ready = (
+    len(density_buildings) == 36
+    and sum(obj.data.name == "JianghaiDensity_OldUrban_LOD" for obj in density_buildings) == 8
+    and sum(obj.data.name == "JianghaiDensity_ScanStreet_LOD" for obj in density_buildings) == 14
+    and sum(
+        obj.data.name == "JianghaiDensity_QuaterniusBuilding1Large_LOD"
+        for obj in density_buildings
+    )
+    == 4
+    and sum(
+        obj.data.name == "JianghaiDensity_QuaterniusBuilding3Big_LOD"
+        for obj in density_buildings
+    )
+    == 3
+    and sum(
+        obj.data.name == "JianghaiDensity_QuaterniusBuilding4_LOD"
+        for obj in density_buildings
+    )
+    == 3
+    and sum(
+        obj.data.name == "JianghaiDensity_QuaterniusHouse2_LOD"
+        for obj in density_buildings
+    )
+    == 4
+    and all(obj.parent == bpy.data.objects.get("JianghaiTenementDistrict") for obj in density_buildings)
+    and all(obj.get("license") == "CC0 1.0 Universal" for obj in density_buildings)
+    and all(
+        obj.get("source_creator") in {"Abobla O.S", "Free poly", "Quaternius"}
+        for obj in density_buildings
+    )
+    and all(obj.get("collision_role") == "building_shell" for obj in density_buildings)
+    and all(obj.get("building_id") == obj.name for obj in density_buildings)
+    and all(
+        isclose(obj.scale.x, obj.scale.y, abs_tol=0.0001)
+        and isclose(obj.scale.y, obj.scale.z, abs_tol=0.0001)
+        for obj in density_buildings
+    )
+    and all(
+        min((obj.matrix_world.translation - spawn).xy.length for spawn in density_spawn_clearances)
+        >= 24.0
+        for obj in density_buildings
+    )
+)
+cross_street_intrusions_removed = not any(
+    object_name in bpy.data.objects
+    for object_name in (
+        "WestTheatreRow01",
+        "EastHardwareRow00",
+        "OuterWestMidResidence",
+        "OuterEastSquareResidence",
+        "WestSouthRow01",
+        "EastSouthRow01",
+        "OuterEastSouthResidence",
+    )
+)
+structural_anchors = {
+    name: bpy.data.objects.get(name)
+    for name in (
+        "JianghaiTenementDistrict",
+        "RedStarElectronicsFactory",
+        "GuangchangPawnshop",
+        "OldCityMarketBridge",
+    )
+}
+collision_source_counts = {
+    name: sum(is_structural_building(obj) for obj in anchor.children_recursive)
+    if anchor is not None
+    else 0
+    for name, anchor in structural_anchors.items()
+}
+collision_sources = [
+    obj
+    for anchor in structural_anchors.values()
+    if anchor is not None
+    for obj in anchor.children_recursive
+    if is_structural_building(obj)
+]
+factory_detail_collision_sources = [
+    obj
+    for obj in bpy.data.objects
+    if obj.name.startswith("FactoryGatePortal_")
+]
+pawnshop_detail_collision_sources = [
+    obj
+    for obj in bpy.data.objects
+    if (
+        obj.name.startswith("PawnshopAuthoredCanopy_")
+        or (
+            obj.name.startswith("PawnshopAuthoredWing_")
+            and obj.name.endswith("_Wall")
+        )
+        or obj.name.startswith("PawnshopNorthWall_")
+        or obj.name.startswith("PawnshopNorthWallCap_")
+        or obj.name.startswith("PawnshopWestWall_")
+        or obj.name.startswith("PawnshopWestWallCap_")
+        or obj.name.startswith("PawnshopEastWall_")
+        or obj.name.startswith("PawnshopEastWallCap_")
+    )
+]
+market_detail_collision_sources = [
+    obj
+    for obj in bpy.data.objects
+    if (
+        obj.name.startswith("MarketRail_")
+        or obj.name.startswith("MarketRailPost_")
+        or obj.name in {"MarketBridgeDeck", "MarketEastRamp", "MarketWestRamp"}
+    )
+]
+detail_collision_source_counts = {
+    "RedStarElectronicsFactory": len(factory_detail_collision_sources),
+    "GuangchangPawnshop": len(pawnshop_detail_collision_sources),
+    "OldCityMarketBridge": len(market_detail_collision_sources),
+}
+detail_collision_sources = (
+    factory_detail_collision_sources
+    + pawnshop_detail_collision_sources
+    + market_detail_collision_sources
+)
+density_intersections = []
+for density in density_buildings:
+    for other in collision_sources:
+        if other == density or other.name.startswith("JianghaiDensity_"):
+            continue
+        overlap = overlap_depths(density, other)
+        if overlap.x > 0.40 and overlap.y > 0.40 and overlap.z > 0.40:
+            density_intersections.append(
+                (density.name, other.name, tuple(round(value, 3) for value in overlap))
+            )
+for index, density in enumerate(density_buildings):
+    for other in density_buildings[index + 1 :]:
+        overlap = overlap_depths(density, other)
+        if overlap.x > 0.40 and overlap.y > 0.40 and overlap.z > 0.40:
+            density_intersections.append(
+                (density.name, other.name, tuple(round(value, 3) for value in overlap))
+            )
+density_intersections_ready = not density_intersections
+
+street_cadence_expectations = {
+    "WestClockRow01": ("JianghaiStreetCadence_Building1Large", Vector((-12.20, -24.0, 0.03))),
+    "WestMedicineRow01": ("hhugu.001", Vector((-18.50, 0.0, 0.03))),
+    "WestMedicineRow02": ("JianghaiStreetCadence_Building4", Vector((-12.70, 12.0, 0.03))),
+    "WestTheatreRow02": ("JianghaiStreetCadence_House2", Vector((-14.25, 48.0, 0.03))),
+}
+street_cadence_objects = {
+    name: bpy.data.objects.get(name) for name in street_cadence_expectations
+}
+street_cadence_ready = all(
+    obj is not None
+    and obj.data.name == street_cadence_expectations[name][0]
+    and (obj.location - street_cadence_expectations[name][1]).length <= 0.001
+    and obj.get("license") == "CC0 1.0 Universal"
+    and obj.get("collision_role") == "building_shell"
+    and obj.get("building_id") == obj.name
+    for name, obj in street_cadence_objects.items()
+)
+street_cadence_row = [
+    bpy.data.objects.get(name)
+    for name in (
+        "WestClockRow01",
+        "WestMedicineHouse",
+        "WestMedicineRow01",
+        "WestMedicineRow02",
+        "WestTheatreHouse",
+        "WestTheatreRow02",
+    )
+]
+street_cadence_ready &= (
+    all(obj is not None for obj in street_cadence_row)
+    and len({obj.data.name for obj in street_cadence_row if obj is not None}) == 5
+    and sum(obj.data.name == "Cube.286" for obj in street_cadence_row if obj is not None) == 2
+)
+
+market_walkway_names = {
+    "JianghaiExpansion_MarketTeaCart",
+    "JianghaiExpansion_MarketWickerBasket",
+    "JianghaiCleared_MarketTeaTable",
+    "JianghaiCleared_MarketStool00",
+    "JianghaiCleared_MarketStool01",
+    "JianghaiCleared_MarketStool02",
+}
+market_walkway_objects = [bpy.data.objects.get(name) for name in market_walkway_names]
+market_walkway_meshes = [
+    mesh
+    for obj in market_walkway_objects
+    if obj is not None
+    for mesh in (obj, *obj.children_recursive)
+    if mesh.type == "MESH"
+]
+market_walkway_ready = (
+    all(obj is not None for obj in market_walkway_objects)
+    and market_walkway_meshes
+    and min(object_world_bounds(mesh)[0].y for mesh in market_walkway_meshes) >= 125.25
+)
+depsgraph = bpy.context.evaluated_depsgraph_get()
+cross_street_clear = all(
+    not any(segment_hits_mesh(obj, start, end, depsgraph) for obj in collision_sources)
+    for start, end in (
+        (Vector((-160.0, 21.6, 1.35)), Vector((160.0, 21.6, 1.35))),
+        (Vector((-160.0, 98.4, 1.35)), Vector((160.0, 98.4, 1.35))),
+    )
+)
+pawnshop_doorway_clear = (
+    replacement_pawnshop is not None
+    and replacement_pawnshop.get("doorway_cut_version") == 2
+    and segment_hits_mesh(
+        replacement_pawnshop,
+        Vector((-86.0, 110.9, 1.35)),
+        Vector((-86.0, 113.1, 1.35)),
+        depsgraph,
+    )
+    is False
+)
+authored_collision_sources_ready = (
+    len(collision_sources) == 107
+    and collision_source_counts
+    == {
+        "JianghaiTenementDistrict": 94,
+        "RedStarElectronicsFactory": 6,
+        "GuangchangPawnshop": 2,
+        "OldCityMarketBridge": 5,
+    }
+    and len(detail_collision_sources) == 113
+    and detail_collision_source_counts
+    == {
+        "RedStarElectronicsFactory": 5,
+        "GuangchangPawnshop": 71,
+        "OldCityMarketBridge": 37,
+    }
+    and cross_street_clear
+    and pawnshop_doorway_clear
+    and density_intersections_ready
+    and street_cadence_ready
+    and market_walkway_ready
+)
 root = bpy.data.objects.get("JianghaiOldCityAuthoredScene")
 root_provenance_ready = (
     root is not None
@@ -487,6 +781,9 @@ valid = (
     and replacement_storefronts_ready
     and pawnshop_frontage_ready
     and replacement_factory_ready
+    and density_ready
+    and cross_street_intrusions_removed
+    and authored_collision_sources_ready
     and root_provenance_ready
 )
 print(
@@ -511,9 +808,25 @@ print(
     f"pawnshop_legacy_visible={len(pawnshop_legacy_visible_names)} "
     f"pawnshop_columns_clear={pawnshop_columns_clear} "
     f"replacement_factory_ready={replacement_factory_ready} "
+    f"density={len(density_buildings)}/36 density_ready={density_ready} "
+    f"density_intersections={len(density_intersections)} "
+    f"street_cadence={street_cadence_ready}:{len(street_cadence_objects)}/4 "
+    f"market_walkway_clear={market_walkway_ready} "
+    f"cross_street_intrusions_removed={cross_street_intrusions_removed} "
+    f"cross_street_clear={cross_street_clear} pawnshop_doorway_clear={pawnshop_doorway_clear} "
+    f"collision_sources={len(collision_sources)}/107 "
+    f"collision_source_counts={','.join(f'{key}:{value}' for key, value in collision_source_counts.items())} "
+    f"detail_collision_sources={len(detail_collision_sources)}/113 "
+    f"detail_collision_source_counts={','.join(f'{key}:{value}' for key, value in detail_collision_source_counts.items())} "
+    f"authored_collision_sources_ready={authored_collision_sources_ready} "
     f"root_provenance_ready={root_provenance_ready}"
 )
 for source_name, tokens in marketplace_marker_hits:
     print(f"JIANGHAI_MARKETPLACE_MARKER source={source_name!r} tokens={','.join(tokens)}")
+for first_name, second_name, overlap in density_intersections:
+    print(
+        f"JIANGHAI_DENSITY_INTERSECTION first={first_name!r} second={second_name!r} "
+        f"overlap={overlap}"
+    )
 if not valid:
     sys.exit(2)
