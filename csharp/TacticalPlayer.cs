@@ -2335,6 +2335,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _supportForearm.Position = new Vector3(-0.12f, -0.42f, -0.47f);
         _supportForearm.Rotation = new Vector3(0.25f, 0, -0.26f);
         _chargingHandle.Position = new Vector3(0.075f, 0.085f, -0.05f);
+        if (WeaponCatalog.IsSidearm(EquippedWeapon.Platform))
+        {
+            _supportHand.Position = SidearmSupportHandHome;
+            _supportHand.Rotation = SidearmSupportHandRestRotation();
+            _supportForearm.Position = _supportHand.Position + new Vector3(-0.08f, -0.23f, 0.10f);
+            _supportForearm.Rotation = new Vector3(0.18f, 0.06f, -0.24f);
+        }
         SyncAuthoredPrimaryWeapon();
         ResetAuthoredM4ReloadSupportArm();
     }

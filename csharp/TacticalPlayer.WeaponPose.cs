@@ -41,7 +41,7 @@ public partial class TacticalPlayer
             // throughout every reload; lifting the complete rig used to expose
             // both sleeve caps as detached black circles in the centre of view.
             return WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
-                ? SidearmHipWeaponPosition
+                ? SidearmHipWeaponPosition + SidearmReloadViewPositionOffset()
                 : HipWeaponPosition;
         }
         if (_searchPose > 0.0f)
@@ -147,7 +147,9 @@ public partial class TacticalPlayer
             // Reload motion belongs to the support arm and weapon mechanisms.
             // Rolling the shared root also rolls the right hand off the pistol
             // grip and turns the sleeve openings toward the camera.
-            return Vector3.Zero;
+            return WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
+                ? SidearmReloadViewRotation()
+                : Vector3.Zero;
         }
 
         var searchPitch = _searchPose > 0.0f ? 0.34f : 0.0f;

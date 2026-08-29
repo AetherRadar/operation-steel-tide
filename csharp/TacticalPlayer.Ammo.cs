@@ -185,7 +185,8 @@ public partial class TacticalPlayer
     internal bool SetReloadPoseForDiagnostics(float progress)
     {
         if (EquippedWeapon.Platform != WeaponPlatform.M3A1
-            && !UsesPlatformReloadPresentation())
+            && !UsesPlatformReloadPresentation()
+            && !UsesSidearmReloadPresentation())
         {
             return false;
         }

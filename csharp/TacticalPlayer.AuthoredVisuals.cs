@@ -800,7 +800,11 @@ public partial class TacticalPlayer
         _primaryForearm.Rotation = new Vector3(-0.18f, 0.05f, -0.3f);
         _supportForearm.Position = support + new Vector3(-0.09f, -0.24f, 0.1f);
         _supportForearm.Rotation = new Vector3(0.22f, 0.05f, -0.28f);
-        if (_isReloading && UsesPlatformReloadPresentation())
+        if (_isReloading && UsesSidearmReloadPresentation())
+        {
+            UpdateSidearmReloadAnimation();
+        }
+        else if (_isReloading && UsesPlatformReloadPresentation())
         {
             UpdatePlatformReloadAnimation();
         }
@@ -1001,7 +1005,8 @@ public partial class TacticalPlayer
     {
         if (!_isReloading
             || (EquippedWeapon.Platform != WeaponPlatform.M4A1
-                && !UsesPlatformReloadPresentation())
+                && !UsesPlatformReloadPresentation()
+                && !UsesSidearmReloadPresentation())
             || ActiveAuthoredArms() is not { } arms
             || !IsInstanceValid(arms.Root)
             || !arms.Root.Visible

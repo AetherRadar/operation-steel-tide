@@ -7,12 +7,134 @@ public partial class TacticalPlayer
     private static readonly Vector3 PlatformMagazineHome = new(0.0f, -0.2f, -0.31f);
     private static readonly Vector3 PlatformSpareMagazineHome = new(-0.3f, -0.62f, -0.18f);
     private static readonly Vector3 PlatformChargingHandleHome = new(0.075f, 0.085f, -0.05f);
+    private static readonly Vector3 SidearmSupportHandHome = new(-0.035f, -0.14f, -0.13f);
+    private static readonly Vector3 SidearmMagazineWellGrip = new(0.035f, -0.235f, 0.005f);
+    private static readonly Vector3 SidearmRemovedMagazineGrip = new(-0.015f, -0.43f, 0.035f);
+    private static readonly Vector3 SidearmMagazinePouchGrip = new(-0.19f, -0.58f, 0.07f);
+    private static readonly Vector3 SidearmSlideGrip = new(0.015f, 0.005f, -0.045f);
 
     private bool UsesPlatformReloadPresentation()
         => EquippedWeapon.Platform is WeaponPlatform.AK74
             or WeaponPlatform.ScarL
             or WeaponPlatform.MP5A5
             or WeaponPlatform.VSS;
+
+    private bool UsesSidearmReloadPresentation()
+        => WeaponCatalog.IsSidearm(EquippedWeapon.Platform);
+
+    private void UpdateSidearmReloadAnimation()
+    {
+        var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
+        var magazineRotation = new Vector3(-0.19f, 0.0f, 0.0f);
+        var removedMagazine = PlatformMagazineHome + new Vector3(-0.04f, -0.24f, 0.03f);
+        var pocketMagazine = PlatformMagazineHome + new Vector3(-0.17f, -0.39f, 0.09f);
+
+        // Keep the logical mechanism state deterministic even when an authored
+        // sidearm does not expose a detachable magazine mesh. The visible left
+        // arm follows the same staged handoff for every pistol, so reload input
+        // can never look like an ignored key press.
+        _magazine.Visible = progress < 0.43f || progress >= 0.78f;
+        _magazine.Position = progress is >= 0.43f and < 0.78f
+            ? pocketMagazine
+            : PlatformMagazineHome;
+        _magazine.Rotation = progress is >= 0.43f and < 0.78f
+            ? new Vector3(0.42f, 0.08f, 0.28f)
+            : magazineRotation;
+        _spareMagazine.Visible = progress is >= 0.43f and < 0.78f;
+        _spareMagazine.Position = PlatformSpareMagazineHome;
+        _spareMagazine.Rotation = new Vector3(0.30f, 0.0f, 0.24f);
+        _chargingHandle.Position = PlatformChargingHandleHome;
+        _supportHand.Position = SidearmSupportHandHome;
+        _supportHand.Rotation = SidearmSupportHandRestRotation();
+
+        if (progress < 0.14f)
+        {
+            var t = SmoothStep(progress / 0.14f);
+            _supportHand.Position = SidearmSupportHandHome.Lerp(SidearmMagazineWellGrip, t);
+            _supportHand.Rotation = SidearmSupportHandRestRotation()
+                .Lerp(SidearmMagazineHandRotation(), t);
+        }
+        else if (progress < 0.43f)
+        {
+            var t = SmoothStep((progress - 0.14f) / 0.29f);
+            _magazine.Position = PlatformMagazineHome.Lerp(removedMagazine, t);
+            _magazine.Rotation = magazineRotation.Lerp(
+                new Vector3(0.42f, 0.08f, 0.28f),
+                t);
+            _supportHand.Position = SidearmMagazineWellGrip.Lerp(
+                SidearmRemovedMagazineGrip,
+                t);
+            _supportHand.Rotation = SidearmMagazineHandRotation();
+            PlayPlatformReloadSound(stage: 0, progress, threshold: 0.24f, pitch: 0.94f);
+        }
+        else if (progress < 0.55f)
+        {
+            var t = SmoothStep((progress - 0.43f) / 0.12f);
+            _supportHand.Position = SidearmRemovedMagazineGrip.Lerp(
+                SidearmMagazinePouchGrip,
+                t);
+            _supportHand.Rotation = SidearmMagazineHandRotation();
+        }
+        else if (progress < 0.78f)
+        {
+            var t = SmoothStep((progress - 0.55f) / 0.23f);
+            _spareMagazine.Position = pocketMagazine.Lerp(PlatformMagazineHome, t);
+            _spareMagazine.Rotation = new Vector3(0.30f, 0.0f, 0.24f)
+                .Lerp(magazineRotation, t);
+            _supportHand.Position = SidearmMagazinePouchGrip.Lerp(
+                SidearmMagazineWellGrip,
+                t);
+            _supportHand.Rotation = SidearmMagazineHandRotation();
+            PlayPlatformReloadSound(stage: 1, progress, threshold: 0.68f, pitch: 1.02f);
+        }
+        else if (progress < 0.90f)
+        {
+            var t = SmoothStep((progress - 0.78f) / 0.12f);
+            _supportHand.Position = SidearmMagazineWellGrip.Lerp(SidearmSlideGrip, t);
+            _supportHand.Rotation = SidearmMagazineHandRotation()
+                .Lerp(SidearmSlideHandRotation(), t);
+            _chargingHandle.Position = PlatformChargingHandleHome.Lerp(
+                PlatformChargingHandleHome + new Vector3(0.0f, 0.0f, 0.085f),
+                t);
+            PlayPlatformReloadSound(stage: 2, progress, threshold: 0.84f, pitch: 1.10f);
+        }
+        else
+        {
+            var t = SmoothStep((progress - 0.90f) / 0.10f);
+            _chargingHandle.Position = (PlatformChargingHandleHome
+                    + new Vector3(0.0f, 0.0f, 0.085f))
+                .Lerp(PlatformChargingHandleHome, t);
+            _supportHand.Position = SidearmSlideGrip.Lerp(SidearmSupportHandHome, t);
+            _supportHand.Rotation = SidearmSlideHandRotation()
+                .Lerp(SidearmSupportHandRestRotation(), t);
+        }
+
+        _supportForearm.Position = _supportHand.Position + new Vector3(-0.08f, -0.23f, 0.10f);
+        _supportForearm.Rotation = new Vector3(0.18f, 0.06f, -0.24f);
+    }
+
+    private static Vector3 SidearmSupportHandRestRotation()
+        => new(0.16f, -0.04f, 0.18f);
+
+    private static Vector3 SidearmMagazineHandRotation()
+        => new(0.52f, 0.10f, 0.32f);
+
+    private static Vector3 SidearmSlideHandRotation()
+        => new(0.30f, -0.14f, 0.08f);
+
+    private Vector3 SidearmReloadViewPositionOffset()
+    {
+        var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
+        var emphasis = Mathf.Sin(progress * Mathf.Pi);
+        return new Vector3(-0.025f, -0.018f, 0.045f) * emphasis;
+    }
+
+    private Vector3 SidearmReloadViewRotation()
+    {
+        var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
+        var emphasis = Mathf.Sin(progress * Mathf.Pi);
+        return new Vector3(-0.055f, 0.025f, -0.075f) * emphasis;
+    }
 
     private void UpdatePlatformReloadAnimation()
     {
@@ -237,6 +359,43 @@ public partial class TacticalPlayer
             InspectVisibleMeshScreenProjection(arms.RightArm, logicalViewportSize, screenSize),
             InspectVisibleMeshScreenProjection(arms.LeftArm, logicalViewportSize, screenSize));
     }
+
+    internal SidearmReloadInspection InspectSidearmReloadForDiagnostics()
+    {
+        var arms = ActiveAuthoredArms();
+        if (!UsesSidearmReloadPresentation()
+            || arms is null
+            || !IsInstanceValid(arms.Root)
+            || !IsInstanceValid(ActiveAuthoredWeaponRootForDiagnostics))
+        {
+            return default;
+        }
+
+        var weaponRootInverse = _weaponRoot.GlobalTransform.AffineInverse();
+        var pose = FirstPersonArmPoseCatalog.For(EquippedWeapon.Platform);
+        var rightGrip = arms.RightGripFrame.GlobalPosition;
+        var leftGrip = arms.LeftGripFrame.GlobalPosition;
+        var supportTarget = ReloadSupportTargetGlobal();
+        return new SidearmReloadInspection(
+            arms.Root.IsVisibleInTree()
+                && arms.RightArm.IsVisibleInTree()
+                && arms.LeftArm.IsVisibleInTree()
+                && UsesAuthoredHandRigForDiagnostics,
+            _isReloading,
+            ReloadProgress,
+            (weaponRootInverse * rightGrip).DistanceTo(pose.PrimaryGrip),
+            leftGrip.DistanceTo(supportTarget),
+            rightGrip,
+            leftGrip,
+            supportTarget,
+            arms.RightArm.Transform,
+            arms.LeftArm.Transform,
+            _magazine.Visible,
+            _spareMagazine.Visible,
+            _chargingHandle.Position.DistanceTo(PlatformChargingHandleHome),
+            WeaponViewPositionTarget(),
+            WeaponViewRotationTarget());
+    }
 }
 
 internal readonly record struct AuthoredPlatformReloadInspection(
@@ -268,3 +427,20 @@ internal readonly record struct AuthoredPlatformReloadInspection(
             && RightArmScreen.BottomGapRatio <= 0.05f
             && LeftArmScreen.BottomGapRatio <= 0.08f;
 }
+
+internal readonly record struct SidearmReloadInspection(
+    bool AuthoredArmsActive,
+    bool Reloading,
+    float Progress,
+    float RightGripResidual,
+    float SupportTargetDistance,
+    Vector3 RightGrip,
+    Vector3 LeftGrip,
+    Vector3 SupportTarget,
+    Transform3D RightArmTransform,
+    Transform3D LeftArmTransform,
+    bool PrimaryMagazineVisible,
+    bool SpareMagazineVisible,
+    float SlideTravel,
+    Vector3 ReloadViewTarget,
+    Vector3 ReloadRotationTarget);
