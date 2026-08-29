@@ -86,6 +86,8 @@ public partial class FreightTerminalWorld
             ("--validate-squad-performance", static world => world.ValidateSquadPerformance()),
             ("--validate-squad-traversal", static world => world.ValidateSquadTraversal()),
             ("--validate-squad-indoor-revive", static world => world.ValidateSquadIndoorRevive()),
+            ("--validate-squad-door-rescue", static world => world.ValidateSquadDoorRescue()),
+            ("--validate-squad-glass-rescue", static world => world.ValidateSquadGlassRescue()),
             ("--validate-residential-squad-stairs", static world => world.ValidateResidentialSquadStairs()),
             ("--validate-network-endpoint", static world => world.ValidateNetworkEndpoint()),
             ("--validate-lan-discovery", static world => world.ValidateLanRoomDiscovery()),

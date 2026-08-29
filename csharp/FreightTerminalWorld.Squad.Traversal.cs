@@ -22,6 +22,7 @@ public partial class FreightTerminalWorld
         _squadTraversalLinks.Clear();
         _squadTraversalFailures.Clear();
         _squadTraversalRecoveryAttempts.Clear();
+        ResetSquadEmergencyEgressRuntime();
         ResetSquadPortalWalkConnectorCache();
     }
 

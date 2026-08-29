@@ -17,6 +17,7 @@ public partial class FreightTerminalWorld
     private const ulong SquadNavigationDecisionCacheMilliseconds = 120;
     private const ulong SquadNavigationHoldCacheMilliseconds = 240;
     private const ulong SquadNavigationEmergencyCacheMilliseconds = 80;
+    private const float SquadRescueEgressNoProgressSeconds = 1.0f;
     private const float SquadNavigationDecisionReuseDistanceSquared = 0.81f;
     private const float SquadTrailVisibilityProbeRangeSquared = 324.0f;
     private const int SquadTrailVisibilityProbeLimit = 12;
@@ -194,6 +195,15 @@ public partial class FreightTerminalWorld
         }
 
         var id = mate.GetInstanceId();
+        if (emergency
+            && ReferenceEquals(_leaderReviver, mate)
+            && TryContinueSquadEmergencyRescueEgress(
+                mate,
+                destination,
+                out var pendingEgressDirective))
+        {
+            return pendingEgressDirective;
+        }
         if (HasPendingRequiredSquadDirective(mate)
             && TryResolveSquadGridNavigation(mate, destination, emergency, out var requiredDirective))
         {
@@ -243,6 +253,28 @@ public partial class FreightTerminalWorld
                 emergency,
                 now,
                 SquadNavigationDirective.Walk(destination, steppedDirect: true));
+        }
+
+        // Once a committed rescuer stops making route progress, perform one bounded
+        // low-rate indoor recovery probe. It locks onto a door, authored connector,
+        // breadcrumb handoff, safe breakable-window drop, or supported open corridor
+        // in that order instead of choosing a new avoidance point every frame.
+        if (emergency
+            && ReferenceEquals(_leaderReviver, mate)
+            && _reviverNoProgressTime >= SquadRescueEgressNoProgressSeconds
+            && TryResolveSquadEmergencyRescueEgress(
+                mate,
+                destination,
+                out var rescueEgressDirective))
+        {
+            _squadTrailPaths.Remove(id);
+            _squadGridPaths.Remove(id);
+            return CacheSquadNavigationDecision(
+                mate,
+                destination,
+                emergency,
+                now,
+                rescueEgressDirective);
         }
 
         // Breadcrumbs describe where the leader walked, but residential
@@ -1040,6 +1072,8 @@ public partial class FreightTerminalWorld
         _leaderRescueUsedGrid = false;
         _squadTrailPaths.Remove(mate.GetInstanceId());
         _squadNavigationDecisions.Remove(mate.GetInstanceId());
+        ResetSquadEmergencyEgressPlan(mate);
+        mate.ResetEmergencyGlassEgressPlan();
         if (PreserveActiveSquadTraversalForEmergency(mate, destination))
         {
             _leaderRescueUsedGrid = true;
@@ -1068,6 +1102,8 @@ public partial class FreightTerminalWorld
         _squadTrailPaths.Remove(mate.GetInstanceId());
         _squadGridPaths.Remove(mate.GetInstanceId());
         _squadNavigationDecisions.Remove(mate.GetInstanceId());
+        RejectSquadEmergencyEgressPlan(mate);
+        mate.ResetEmergencyGlassEgressPlan();
         mate.RequestNavigationRecovery(forceEscape: true);
     }
 
@@ -1104,6 +1140,8 @@ public partial class FreightTerminalWorld
             _squadCorridorQueries.Remove(id);
             _squadSupportQueries.Remove(id);
             _squadNavigationDecisions.Remove(id);
+            ResetSquadEmergencyEgressPlan(mate);
+            mate.ResetEmergencyGlassEgressPlan();
         }
     }
 

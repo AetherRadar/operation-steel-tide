@@ -354,6 +354,17 @@ public partial class BreakableGlassField : Area3D
         return paneIndex >= 0 && paneIndex < _panes.Count && _panes[paneIndex].Shattered;
     }
 
+    internal bool IsShapeShattered(int shapeIndex)
+    {
+        if (!_committed || shapeIndex < 0)
+        {
+            return false;
+        }
+        var owner = ShapeFindOwner(shapeIndex);
+        return _paneByShapeOwner.TryGetValue(owner, out var paneIndex)
+            && IsPaneShattered(paneIndex);
+    }
+
     public int ShatterWithinRadius(Vector3 worldPosition, float radius, int effectBudget, out int effectsUsed)
     {
         var shattered = 0;

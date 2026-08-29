@@ -350,12 +350,14 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             return;
         }
+        ResetEmergencyGlassEgressPlan();
         _reviveTarget = target;
     }
 
     public void EndSquadRevive()
     {
         _reviveTarget = null;
+        ResetEmergencyGlassEgressPlan();
         CancelNavigationTraversal();
         _revivePoseBlend = 0.0f;
         if (IsInstanceValid(_rig))

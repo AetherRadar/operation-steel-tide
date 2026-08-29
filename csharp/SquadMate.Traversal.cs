@@ -71,7 +71,8 @@ public partial class SquadMate
             }
             var target = EvaluateNavigationTraversal(toProgress);
             var motion = target - GlobalPosition;
-            var collision = motion.LengthSquared() > 0.000001f
+            var collision = !_navigationTraversalBypassesWindowBarrier
+                && motion.LengthSquared() > 0.000001f
                 ? MoveAndCollide(
                     motion,
                     testOnly: false,
@@ -79,6 +80,10 @@ public partial class SquadMate
                     recoveryAsCollision: false,
                     maxCollisions: 4)
                 : null;
+            if (_navigationTraversalBypassesWindowBarrier)
+            {
+                GlobalPosition = target;
+            }
             if (collision is not null)
             {
                 CancelNavigationTraversal($"runtime:{DescribeNavigationTraversalCollision(collision)}");
@@ -429,6 +434,7 @@ public partial class SquadMate
             -0.1f,
             _navigationTraversalDirection.Z * 2.4f);
         _navigationTraversalDirectedEdgeId = -1;
+        _navigationTraversalBypassesWindowBarrier = false;
         ResetMovementProgress();
     }
 
@@ -443,6 +449,7 @@ public partial class SquadMate
             Main.ReportSquadTraversalFailure(this, _navigationTraversalDirectedEdgeId);
         }
         _navigationTraversalDirectedEdgeId = -1;
+        _navigationTraversalBypassesWindowBarrier = false;
         RequestNavigationRecovery(forceEscape: true);
     }
 
@@ -457,6 +464,7 @@ public partial class SquadMate
         _navigationTraversalActive = false;
         _navigationTraversalDirectedEdgeId = -1;
         _navigationTraversalBlocker = string.Empty;
+        _navigationTraversalBypassesWindowBarrier = false;
     }
 
     internal bool BeginNavigationVaultForDiagnostics(Vector3 direction)
