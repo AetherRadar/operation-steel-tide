@@ -57,6 +57,7 @@ public partial class FreightTerminalWorld
     private string _demolitionSelectedMapId = DemolitionMapCatalog.TideforgeId;
     private DemolitionStrategyPlan? _demolitionAttackerPlan;
     private DemolitionStrategyPlan? _demolitionDefenderPlan;
+    private string? _demolitionAttackerPlanObjectiveMemberId;
 
     public bool IsDemolitionMode => _demolitionMode;
     public bool IsDemolitionRoundActive => _demolitionRoundActive;
@@ -370,7 +371,10 @@ public partial class FreightTerminalWorld
         _demolitionPulse = 0.0f;
         _demolitionIntermissionRemaining = 0.0f;
         _demolitionStrategyRemaining = 0.0f;
-        _demolitionEnemyTargetSite = _demolitionMatch.CompletedRounds % 2;
+        _demolitionAttackerPlan = null;
+        _demolitionDefenderPlan = null;
+        _demolitionAttackerPlanObjectiveMemberId = null;
+        _demolitionEnemyTargetSite = -1;
         _demolitionSquadAssignmentTargets.Clear();
         ClearDemolitionSquadPostStates();
         _demolitionCombatBreakoffs.Clear();

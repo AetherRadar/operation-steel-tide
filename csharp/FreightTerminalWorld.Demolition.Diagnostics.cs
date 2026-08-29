@@ -858,6 +858,7 @@ public partial class FreightTerminalWorld
         var savedStrategyRemaining = _demolitionStrategyRemaining;
         var savedAttackerPlan = _demolitionAttackerPlan;
         var savedDefenderPlan = _demolitionDefenderPlan;
+        var savedAttackerPlanObjectiveMemberId = _demolitionAttackerPlanObjectiveMemberId;
         var savedRelayMate = _demolitionSquadObjectiveMate;
         var savedRelaySite = _demolitionSquadObjectiveSite;
         var savedSquadPlantProgress = _demolitionSquadPlantProgress;
@@ -961,13 +962,19 @@ public partial class FreightTerminalWorld
             // Clock pressure: with the planned site unreachable in the remaining time,
             // the carrier commits to the closest site that still fits the clock.
             var carrierPosition = probe.GlobalPosition;
-            float TravelSeconds(Vector3 site)
+            var routePlanner = new DemolitionRoutePlanner(layout);
+            float TravelSeconds(int siteIndex)
             {
-                var flat = new Vector3(site.X, carrierPosition.Y, site.Z);
-                return carrierPosition.DistanceTo(flat) / 5.1f + DemolitionPlantDuration;
+                var route = routePlanner.Plan(
+                    carrierPosition,
+                    layout.SitePositions[siteIndex],
+                    DemolitionTeam.Attackers);
+                return route.ReachesDestination
+                    ? route.Length / 5.1f + DemolitionPlantDuration
+                    : float.PositiveInfinity;
             }
             var orderedSites = layout.SitePositions
-                .Select((site, index) => (Index: index, Travel: TravelSeconds(site)))
+                .Select((_, index) => (Index: index, Travel: TravelSeconds(index)))
                 .OrderBy(entry => entry.Travel)
                 .ToList();
             _demolitionEnemyTargetSite = orderedSites[^1].Index;
@@ -980,7 +987,6 @@ public partial class FreightTerminalWorld
             // Route planning: a straight corridor through the east route wall must
             // produce a clear multi-waypoint route around the blocking geometry.
             probe.GlobalPosition = layout.Origin + new Vector3(15.0f, 0.2f, 6.0f);
-            var routePlanner = new DemolitionRoutePlanner(layout);
             var detourResult = routePlanner.Plan(probe.GlobalPosition, layout.SitePositions[1]);
             var detourRoutesAroundWall = detourResult.Waypoints.Count >= 2
                 && detourResult.ReachesDestination
@@ -1005,6 +1011,28 @@ public partial class FreightTerminalWorld
                 && routePlanner.IsRouteClear(layout.AttackSpawn, unreachableResult.Waypoints)
                 && unreachableResult.Waypoints.All(point =>
                     HorizontalDistance(point, blockedDestination) > 0.5f);
+            var teamAwareUnreachableResult = routePlanner.Plan(
+                layout.DefenderSpawn,
+                blockedDestination,
+                DemolitionTeam.Defenders);
+            var teamAwareUnreachableSafe = !teamAwareUnreachableResult.ReachesDestination
+                && routePlanner.IsRouteClear(
+                    layout.DefenderSpawn,
+                    teamAwareUnreachableResult.Waypoints)
+                && teamAwareUnreachableResult.Waypoints.All(point =>
+                    HorizontalDistance(point, blockedDestination) > 0.5f);
+            var softPenaltyStart = layout.AttackSpawn + new Vector3(0.8f, 0.0f, -0.8f);
+            var softPenaltyDestination = softPenaltyStart + Vector3.Right * 0.5f;
+            var softPenaltyDirectRoute = routePlanner.Plan(
+                softPenaltyStart,
+                softPenaltyDestination,
+                DemolitionTeam.Defenders);
+            var softPenaltyDirectReachable = softPenaltyDirectRoute.ReachesDestination
+                && softPenaltyDirectRoute.Waypoints.Count == 1
+                && softPenaltyDirectRoute.Length <= 0.51f
+                && routePlanner.IsRouteClear(
+                    softPenaltyStart,
+                    softPenaltyDirectRoute.Waypoints);
             var unreachableCursor = new DemolitionRouteCursor();
             unreachableCursor.Reset(
                 "blocked_diagnostic",
@@ -1037,6 +1065,355 @@ public partial class FreightTerminalWorld
                 detourResult,
                 countAsReplan: stalled);
             var routeRecovery = stalled && routeCursor.ReplanCount == 1;
+
+            // A deterministic round preference gives both sites opening variety while
+            // real route cost remains a hard sanity check. A grossly longer or unreachable
+            // preferred route must lose rather than sending the carrier on a comedy lap.
+            var tideglassLayout = new DemolitionArenaLayout(
+                DemolitionMapCatalog.TideglassReactorId,
+                layout.Origin);
+            var tideglassPlanner = new DemolitionRoutePlanner(tideglassLayout);
+            var tideglassCarrierSpawn = tideglassLayout.AttackSpawns
+                .OrderByDescending(spawn => spawn.X)
+                .First();
+            var tideglassRoutes = tideglassLayout.SitePositions
+                .Select(site => tideglassPlanner.Plan(
+                    tideglassCarrierSpawn,
+                    site,
+                    DemolitionTeam.Attackers))
+                .ToArray();
+            var tideglassRouteLengths = tideglassRoutes
+                .Select(route => route.ReachesDestination
+                    ? route.Length
+                    : float.PositiveInfinity)
+                .ToArray();
+            var tideglassCarrier = new List<DemolitionAgentSnapshot>
+            {
+                new(
+                    "CARRIER",
+                    DemolitionTeam.Attackers,
+                    OperatorRole.Recon,
+                    1.0f,
+                    165.0f,
+                    true,
+                    false,
+                    tideglassCarrierSpawn.X - tideglassLayout.Origin.X,
+                    tideglassCarrierSpawn.Z - tideglassLayout.Origin.Z)
+            };
+            var roundPreferredSites = Enumerable.Range(0, 2)
+                .Select(seed => _demolitionStrategyPlanner.Plan(
+                    DemolitionTeam.Attackers,
+                    DemolitionStrategyPhase.Opening,
+                    tideglassCarrier,
+                    strategySeed: seed,
+                    siteCenters: tideglassLayout.LocalSiteCoordinates,
+                    objectiveMemberId: "CARRIER",
+                    objectiveRouteLengths: tideglassRouteLengths).PrimarySiteIndex)
+                .ToArray();
+            var roundSiteVariety = tideglassRoutes.All(route => route.ReachesDestination)
+                && roundPreferredSites.OrderBy(site => site).SequenceEqual(new[] { 0, 1 });
+            var routeCostOverridesRoundPreference = _demolitionStrategyPlanner.Plan(
+                    DemolitionTeam.Attackers,
+                    DemolitionStrategyPhase.Opening,
+                    tideglassCarrier,
+                    strategySeed: 1,
+                    siteCenters: tideglassLayout.LocalSiteCoordinates,
+                    objectiveMemberId: "CARRIER",
+                    objectiveRouteLengths: new[] { 10.0f, 80.0f })
+                .PrimarySiteIndex == 0;
+            var unreachableRouteOverridesRoundPreference = _demolitionStrategyPlanner.Plan(
+                    DemolitionTeam.Attackers,
+                    DemolitionStrategyPhase.Opening,
+                    tideglassCarrier,
+                    strategySeed: 1,
+                    siteCenters: tideglassLayout.LocalSiteCoordinates,
+                    objectiveMemberId: "CARRIER",
+                    objectiveRouteLengths: new[] { 10.0f, float.PositiveInfinity })
+                .PrimarySiteIndex == 0;
+            var reachableSiteThreats = Enumerable.Range(0, 5)
+                .Select(index => new DemolitionAgentSnapshot(
+                    $"UNIQUE_DEFENDER_{index}",
+                    DemolitionTeam.Defenders,
+                    OperatorRole.Assault,
+                    1.0f,
+                    100.0f,
+                    true,
+                    false,
+                    tideglassLayout.LocalSiteCoordinates[0].X,
+                    tideglassLayout.LocalSiteCoordinates[0].Y))
+                .ToArray();
+            var unreachableRouteRemainsExcluded = _demolitionStrategyPlanner.Plan(
+                    DemolitionTeam.Attackers,
+                    DemolitionStrategyPhase.Opening,
+                    tideglassCarrier,
+                    knownOpponents: reachableSiteThreats,
+                    strategySeed: 1,
+                    siteCenters: tideglassLayout.LocalSiteCoordinates,
+                    objectiveMemberId: "CARRIER",
+                    objectiveRouteLengths: new[] { 10.0f, float.PositiveInfinity })
+                .PrimarySiteIndex == 0;
+
+            // Once committed, an ordinary strategy tick keeps the execute. A defender
+            // standing on the selected site is strong enough evidence to justify a rotate.
+            var committedSiteStable = _demolitionStrategyPlanner.Plan(
+                DemolitionTeam.Attackers,
+                DemolitionStrategyPhase.Opening,
+                tideglassCarrier,
+                strategySeed: 1,
+                siteCenters: tideglassLayout.LocalSiteCoordinates,
+                objectiveMemberId: "CARRIER",
+                committedSiteIndex: 0,
+                objectiveRouteLengths: tideglassRouteLengths).PrimarySiteIndex == 0;
+            var siteA = tideglassLayout.LocalSiteCoordinates[0];
+            var confirmedSiteAThreat = new List<DemolitionAgentSnapshot>
+            {
+                new(
+                    "DEFENDER_A",
+                    DemolitionTeam.Defenders,
+                    OperatorRole.Assault,
+                    1.0f,
+                    100.0f,
+                    true,
+                    false,
+                    siteA.X,
+                    siteA.Y)
+            };
+            var confirmedThreatRotates = _demolitionStrategyPlanner.Plan(
+                DemolitionTeam.Attackers,
+                DemolitionStrategyPhase.Opening,
+                tideglassCarrier,
+                knownOpponents: confirmedSiteAThreat,
+                strategySeed: 1,
+                siteCenters: tideglassLayout.LocalSiteCoordinates,
+                objectiveMemberId: "CARRIER",
+                committedSiteIndex: 0,
+                objectiveRouteLengths: tideglassRouteLengths).PrimarySiteIndex == 1;
+            var duplicateReporterThreats = Enumerable.Range(0, 5)
+                .Select(_ => new DemolitionAgentSnapshot(
+                    "SAME_TARGET",
+                    DemolitionTeam.Defenders,
+                    OperatorRole.Assault,
+                    1.0f,
+                    100.0f,
+                    true,
+                    false,
+                    siteA.X + 19.0f,
+                    siteA.Y))
+                .ToArray();
+            var duplicateThreatReportsDeduplicated = _demolitionStrategyPlanner.Plan(
+                DemolitionTeam.Attackers,
+                DemolitionStrategyPhase.Opening,
+                tideglassCarrier,
+                knownOpponents: duplicateReporterThreats,
+                siteCenters: tideglassLayout.LocalSiteCoordinates,
+                objectiveMemberId: "CARRIER",
+                committedSiteIndex: 0,
+                objectiveRouteLengths: new[] { 50.0f, 50.0f }).PrimarySiteIndex == 0;
+            var urgentCommitmentPreserved = _demolitionStrategyPlanner.Plan(
+                DemolitionTeam.Attackers,
+                DemolitionStrategyPhase.Opening,
+                tideglassCarrier,
+                strategySeed: 1,
+                siteCenters: tideglassLayout.LocalSiteCoordinates,
+                remainingSeconds: tideglassRouteLengths[0] / 5.1f + 5.9f,
+                objectiveMemberId: "CARRIER",
+                committedSiteIndex: 0,
+                objectiveRouteLengths: tideglassRouteLengths).PrimarySiteIndex == 0;
+            var plantChannelLocksSite = _demolitionStrategyPlanner.Plan(
+                DemolitionTeam.Attackers,
+                DemolitionStrategyPhase.Opening,
+                tideglassCarrier,
+                knownOpponents: confirmedSiteAThreat,
+                strategySeed: 1,
+                siteCenters: tideglassLayout.LocalSiteCoordinates,
+                objectiveMemberId: "CARRIER",
+                committedSiteIndex: 0,
+                objectiveRouteLengths: tideglassRouteLengths,
+                lockCommittedSite: true).PrimarySiteIndex == 0;
+            var carrierCommitmentScoped = ShouldRetainDemolitionSiteCommitment(
+                    deviceCarried: true,
+                    plannedObjectiveMemberId: "CARRIER_A",
+                    currentObjectiveMemberId: "CARRIER_A")
+                && !ShouldRetainDemolitionSiteCommitment(
+                    deviceCarried: true,
+                    plannedObjectiveMemberId: "CARRIER_A",
+                    currentObjectiveMemberId: "CARRIER_B")
+                && !ShouldRetainDemolitionSiteCommitment(
+                    deviceCarried: false,
+                    plannedObjectiveMemberId: "CARRIER_A",
+                    currentObjectiveMemberId: "CARRIER_A");
+
+            // Production routing is validated from every attacker spawn on every map.
+            // This exposes the real approach timings (rather than only the legacy authored
+            // balance paths), and rejects opposite-side openings, blocked routes, deep
+            // objective overshoot, enemy-spawn laps, and excessive visibility-graph detours.
+            var tideforgeLayout = new DemolitionArenaLayout(
+                DemolitionMapCatalog.TideforgeId,
+                layout.Origin);
+            var tideforgePlanner = new DemolitionRoutePlanner(tideforgeLayout);
+            var tideforgeRightSpawn = tideforgeLayout.AttackSpawns
+                .OrderByDescending(spawn => spawn.X)
+                .First();
+            var tideforgeRightRoute = tideforgePlanner.Plan(
+                tideforgeRightSpawn,
+                tideforgeLayout.SitePositions[1],
+                DemolitionTeam.Attackers);
+            var rightLaneOpensRight = tideforgeRightRoute.ReachesDestination
+                && tideforgeRightRoute.Waypoints.Count > 0
+                && tideforgeRightRoute.Waypoints[0].X >= tideforgeRightSpawn.X - 0.25f;
+            var demolitionLayouts = new[]
+            {
+                tideforgeLayout,
+                new DemolitionArenaLayout(DemolitionMapCatalog.HarborLocksId, layout.Origin),
+                tideglassLayout
+            };
+            var productionRoutes = demolitionLayouts.SelectMany(map =>
+            {
+                var planner = new DemolitionRoutePlanner(map);
+                return map.AttackSpawns.SelectMany((spawn, spawnIndex) =>
+                    map.SitePositions.Select((site, siteIndex) =>
+                    {
+                        var route = planner.Plan(spawn, site, DemolitionTeam.Attackers);
+                        var directDistance = HorizontalDistance(spawn, site);
+                        var approach = siteIndex == 0
+                            ? map.AttackApproachToAPath
+                            : map.AttackApproachToBPath;
+                        var expectedLateral = approach.Count >= 2
+                            ? approach[1].X - approach[0].X
+                            : site.X - map.AttackSpawn.X;
+                        var actualLateral = route.Waypoints.Count > 0
+                            ? route.Waypoints[0].X - spawn.X
+                            : 0.0f;
+                        return new
+                        {
+                            map.MapId,
+                            SpawnIndex = spawnIndex,
+                            SiteIndex = siteIndex,
+                            Route = route,
+                            Clear = planner.IsRouteClear(spawn, route.Waypoints),
+                            Stretch = route.Length / Mathf.Max(0.1f, directDistance),
+                            DefenderClearance = map.DefenderSpawns.Min(defenderSpawn =>
+                                MinimumHorizontalRouteClearance(
+                                    spawn,
+                                    route.Waypoints,
+                                    defenderSpawn)),
+                            DepthOvershoot = MaximumAttackerRouteDepthOvershoot(
+                                map,
+                                spawn,
+                                route.Waypoints,
+                                site),
+                            OpensCorrectSide = Mathf.Abs(actualLateral) <= 0.25f
+                                || expectedLateral * actualLateral > 0.0f
+                        };
+                    }));
+            }).ToArray();
+            var productionApproachesClear = demolitionLayouts.All(map =>
+                map.HasCapsuleClearance(map.AttackApproachToAPath, out _)
+                && map.HasCapsuleClearance(map.AttackApproachToBPath, out _));
+            var productionRoutesValid = productionRoutes.Length == 30
+                && productionRoutes.All(route => route.Route.ReachesDestination && route.Clear);
+            var productionRoutesOpenCorrectSide = productionRoutes.All(route => route.OpensCorrectSide);
+            var productionRoutesDepthSafe = productionRoutes.All(route => route.DepthOvershoot <= 0.25f);
+            var productionRoutesEfficient = productionRoutes.All(route => route.Stretch <= 1.35f);
+            var attackerRoutesAvoidDefenderSpawn = productionRoutes.All(route =>
+                route.DefenderClearance >= 10.0f);
+            var productionRouteProfiles = string.Join(",", demolitionLayouts.Select(map =>
+            {
+                var routes = productionRoutes.Where(route => route.MapId == map.MapId).ToArray();
+                var siteA = routes.Where(route => route.SiteIndex == 0).Select(route => route.Route.Length).ToArray();
+                var siteB = routes.Where(route => route.SiteIndex == 1).Select(route => route.Route.Length).ToArray();
+                return $"{map.MapId}:A={siteA.Min():0.0}-{siteA.Max():0.0}/B={siteB.Min():0.0}-{siteB.Max():0.0}";
+            }));
+            var defenderProductionRoutes = demolitionLayouts.SelectMany(map =>
+            {
+                var planner = new DemolitionRoutePlanner(map);
+                return map.DefenderSpawns.SelectMany((spawn, spawnIndex) =>
+                    map.SitePositions.Select((site, siteIndex) =>
+                    {
+                        var route = planner.Plan(spawn, site, DemolitionTeam.Defenders);
+                        return new
+                        {
+                            map.MapId,
+                            SpawnIndex = spawnIndex,
+                            SiteIndex = siteIndex,
+                            Route = route,
+                            Clear = planner.IsRouteClear(spawn, route.Waypoints),
+                            Stretch = route.Length / Mathf.Max(0.1f, HorizontalDistance(spawn, site)),
+                            AttackerClearance = map.AttackSpawns.Min(attackerSpawn =>
+                                MinimumHorizontalRouteClearance(
+                                    spawn,
+                                    route.Waypoints,
+                                    attackerSpawn))
+                        };
+                    }));
+            }).ToArray();
+            var defenderProductionRoutesValid = defenderProductionRoutes.Length == 30
+                && defenderProductionRoutes.All(route => route.Route.ReachesDestination && route.Clear);
+            var defenderProductionRoutesEfficient = defenderProductionRoutes.All(route =>
+                route.Stretch <= 1.40f);
+            var defenderRoutesAvoidAttackerSpawn = defenderProductionRoutes.All(route =>
+                route.AttackerClearance >= 10.0f);
+            var tideforgeSelectionStable = tideforgeLayout.AttackSpawns.All(spawn =>
+            {
+                var routeLengths = tideforgeLayout.SitePositions.Select(site =>
+                {
+                    var route = tideforgePlanner.Plan(spawn, site, DemolitionTeam.Attackers);
+                    return route.ReachesDestination ? route.Length : float.PositiveInfinity;
+                }).ToArray();
+                var carrier = new[]
+                {
+                    new DemolitionAgentSnapshot(
+                        "TIDEFORGE_CARRIER",
+                        DemolitionTeam.Attackers,
+                        OperatorRole.Assault,
+                        1.0f,
+                        100.0f,
+                        true,
+                        false,
+                        spawn.X - tideforgeLayout.Origin.X,
+                        spawn.Z - tideforgeLayout.Origin.Z)
+                };
+                var seededSites = Enumerable.Range(0, 2).Select(seed =>
+                    _demolitionStrategyPlanner.Plan(
+                        DemolitionTeam.Attackers,
+                        DemolitionStrategyPhase.Opening,
+                        carrier,
+                        strategySeed: seed,
+                        siteCenters: tideforgeLayout.LocalSiteCoordinates,
+                        objectiveMemberId: "TIDEFORGE_CARRIER",
+                        objectiveRouteLengths: routeLengths).PrimarySiteIndex).ToArray();
+                var committedA = _demolitionStrategyPlanner.Plan(
+                    DemolitionTeam.Attackers,
+                    DemolitionStrategyPhase.Opening,
+                    carrier,
+                    siteCenters: tideforgeLayout.LocalSiteCoordinates,
+                    objectiveMemberId: "TIDEFORGE_CARRIER",
+                    committedSiteIndex: 0,
+                    objectiveRouteLengths: routeLengths).PrimarySiteIndex;
+                var committedB = _demolitionStrategyPlanner.Plan(
+                    DemolitionTeam.Attackers,
+                    DemolitionStrategyPhase.Opening,
+                    carrier,
+                    siteCenters: tideforgeLayout.LocalSiteCoordinates,
+                    objectiveMemberId: "TIDEFORGE_CARRIER",
+                    committedSiteIndex: 1,
+                    objectiveRouteLengths: routeLengths).PrimarySiteIndex;
+                return seededSites.OrderBy(site => site).SequenceEqual(new[] { 0, 1 })
+                    && committedA == 0
+                    && committedB == 1;
+            });
+            var overshotStart = tideforgeLayout.Origin + new Vector3(-23.0f, 0.2f, 10.0f);
+            var overshotRetreatRoute = tideforgePlanner.Plan(
+                overshotStart,
+                tideforgeLayout.SitePositions[0],
+                DemolitionTeam.Attackers);
+            var overshotCarrierRetreats = overshotRetreatRoute.ReachesDestination
+                && tideforgePlanner.IsRouteClear(overshotStart, overshotRetreatRoute.Waypoints)
+                && overshotRetreatRoute.Waypoints.Count > 0
+                && MaximumAdditionalAttackerRouteDepth(
+                    tideforgeLayout,
+                    overshotStart,
+                    overshotRetreatRoute.Waypoints) <= 0.25f;
             // Squad posts: a mate standing on the assignment target converts its Move
             // order into Hold so it anchors the position instead of milling around.
             var postedMate = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate)
@@ -1561,10 +1938,33 @@ public partial class FreightTerminalWorld
             var valid = yieldedToCombat && resumedObjective && channelHoldsUnderFire
                 && smokeResumesObjective
                 && switchedUnderPressure && detourRoutesAroundWall && unreachableSafe && unreachableRetries
+                && teamAwareUnreachableSafe && softPenaltyDirectReachable
                 && routeRecovery && runtimeRoute && frontierFallback && frontierFallbackStable
                 && reachableRoutePreserved && postsConverted
                 && squadRouteNavigation && squadRouteReuse
                 && openingPatterns
+                && roundSiteVariety
+                && routeCostOverridesRoundPreference
+                && unreachableRouteOverridesRoundPreference
+                && unreachableRouteRemainsExcluded
+                && committedSiteStable
+                && confirmedThreatRotates
+                && duplicateThreatReportsDeduplicated
+                && urgentCommitmentPreserved
+                && plantChannelLocksSite
+                && carrierCommitmentScoped
+                && rightLaneOpensRight
+                && productionApproachesClear
+                && productionRoutesValid
+                && productionRoutesOpenCorrectSide
+                && productionRoutesDepthSafe
+                && productionRoutesEfficient
+                && attackerRoutesAvoidDefenderSpawn
+                && defenderProductionRoutesValid
+                && defenderProductionRoutesEfficient
+                && defenderRoutesAvoidAttackerSpawn
+                && tideforgeSelectionStable
+                && overshotCarrierRetreats
                 && objectiveChannels
                 && plannerAvoidsStackedSite && blackboardSeesAlertedOpponents && relayTakesOver
                 && carrierTransferResetsChannel
@@ -1584,7 +1984,7 @@ public partial class FreightTerminalWorld
                 && staleMoveRecovered
                 && defuserPostProtected
                 && postPatrolLayouts;
-            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} friendly_ai_plant_under_contact={friendlyAiPlantsDevice} carrier_destination={carrierDestinationFollowsDevice} carrier_contact_priority={carrierThreatKeepsObjective} ai_carrier_escort={aiCarrierEscort} player_carrier_escort={playerCarrierEscort} grounded_player_reassigned={groundedPlayerRunnerReleased} hidden_threat_ignored={hiddenThreatIgnored} visible_threat_yields={visibleThreatYields} post_patrol={postPatrolReactivated} post_second_hop={postPatrolSecondHop} stale_move_recovered={staleMoveRecovered} defuser_post_protected={defuserPostProtected} post_layouts={postPatrolLayouts} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} frontier_fallback={frontierFallback} frontier_stable={frontierFallbackStable} frontier_replans={frontierReplans} frontier_directive_distance={frontierDirectiveDistance:0.00} reachable_route_preserved={reachableRoutePreserved} opening_patterns={openingPatterns} posts={postsConverted} squad_route={squadRouteNavigation} squad_route_reuse={squadRouteReuse} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
+            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} friendly_ai_plant_under_contact={friendlyAiPlantsDevice} carrier_destination={carrierDestinationFollowsDevice} carrier_contact_priority={carrierThreatKeepsObjective} ai_carrier_escort={aiCarrierEscort} player_carrier_escort={playerCarrierEscort} grounded_player_reassigned={groundedPlayerRunnerReleased} hidden_threat_ignored={hiddenThreatIgnored} visible_threat_yields={visibleThreatYields} post_patrol={postPatrolReactivated} post_second_hop={postPatrolSecondHop} stale_move_recovered={staleMoveRecovered} defuser_post_protected={defuserPostProtected} post_layouts={postPatrolLayouts} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} team_unreachable={teamAwareUnreachableSafe} soft_direct={softPenaltyDirectReachable} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} frontier_fallback={frontierFallback} frontier_stable={frontierFallbackStable} frontier_replans={frontierReplans} frontier_directive_distance={frontierDirectiveDistance:0.00} reachable_route_preserved={reachableRoutePreserved} opening_patterns={openingPatterns} round_sites={roundSiteVariety}:{roundPreferredSites[0]}/{roundPreferredSites[1]} route_cost_override={routeCostOverridesRoundPreference} unreachable_override={unreachableRouteOverridesRoundPreference} unreachable_excluded={unreachableRouteRemainsExcluded} committed_site_stable={committedSiteStable} confirmed_threat_rotates={confirmedThreatRotates} threat_deduplicated={duplicateThreatReportsDeduplicated} urgent_commitment={urgentCommitmentPreserved} plant_channel_lock={plantChannelLocksSite} carrier_commitment_scoped={carrierCommitmentScoped} tideforge_selection={tideforgeSelectionStable} right_lane_opening={rightLaneOpensRight} approaches_clear={productionApproachesClear} production_routes={productionRoutesValid}:count={productionRoutes.Length}:profiles={productionRouteProfiles} opening_sides={productionRoutesOpenCorrectSide} route_depth={productionRoutesDepthSafe} route_efficiency={productionRoutesEfficient}:max={productionRoutes.Max(route => route.Stretch):0.000} spawn_avoidance={attackerRoutesAvoidDefenderSpawn} defender_routes={defenderProductionRoutesValid}:count={defenderProductionRoutes.Length} defender_efficiency={defenderProductionRoutesEfficient}:max={defenderProductionRoutes.Max(route => route.Stretch):0.000} defender_spawn_avoidance={defenderRoutesAvoidAttackerSpawn} overshot_retreat={overshotCarrierRetreats} posts={postsConverted} squad_route={squadRouteNavigation} squad_route_reuse={squadRouteReuse} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
             return valid;
         }
         finally
@@ -1611,6 +2011,7 @@ public partial class FreightTerminalWorld
             _demolitionStrategyRemaining = savedStrategyRemaining;
             _demolitionAttackerPlan = savedAttackerPlan;
             _demolitionDefenderPlan = savedDefenderPlan;
+            _demolitionAttackerPlanObjectiveMemberId = savedAttackerPlanObjectiveMemberId;
             _demolitionSquadObjectiveMate = savedRelayMate;
             _demolitionSquadObjectiveSite = savedRelaySite;
             _demolitionSquadPlantProgress = savedSquadPlantProgress;
@@ -1707,6 +2108,95 @@ public partial class FreightTerminalWorld
             }
         }
     }
+
+    private static float MinimumHorizontalRouteClearance(
+        Vector3 start,
+        IReadOnlyList<Vector3> waypoints,
+        Vector3 point)
+    {
+        var clearance = float.PositiveInfinity;
+        var previous = start;
+        foreach (var waypoint in waypoints)
+        {
+            clearance = Mathf.Min(
+                clearance,
+                HorizontalDistanceToRouteSegment(point, previous, waypoint));
+            previous = waypoint;
+        }
+        return clearance;
+    }
+
+    private static float HorizontalDistanceToRouteSegment(
+        Vector3 point,
+        Vector3 start,
+        Vector3 end)
+    {
+        var segmentX = end.X - start.X;
+        var segmentZ = end.Z - start.Z;
+        var segmentLengthSquared = segmentX * segmentX + segmentZ * segmentZ;
+        if (segmentLengthSquared <= 0.0001f)
+        {
+            return HorizontalDistance(point, start);
+        }
+        var amount = Mathf.Clamp(
+            ((point.X - start.X) * segmentX + (point.Z - start.Z) * segmentZ)
+                / segmentLengthSquared,
+            0.0f,
+            1.0f);
+        var closest = new Vector3(
+            start.X + segmentX * amount,
+            point.Y,
+            start.Z + segmentZ * amount);
+        return HorizontalDistance(point, closest);
+    }
+
+    private static float MaximumAttackerRouteDepthOvershoot(
+        DemolitionArenaLayout layout,
+        Vector3 start,
+        IReadOnlyList<Vector3> waypoints,
+        Vector3 destination)
+    {
+        var axis = new Vector2(
+            layout.DefenderSpawn.X - layout.AttackSpawn.X,
+            layout.DefenderSpawn.Z - layout.AttackSpawn.Z).Normalized();
+        var origin = new Vector2(layout.AttackSpawn.X, layout.AttackSpawn.Z);
+        var destinationDepth = axis.Dot(
+            new Vector2(destination.X, destination.Z) - origin);
+        var maximumDepth = AttackerRouteDepth(axis, origin, start);
+        foreach (var waypoint in waypoints)
+        {
+            maximumDepth = Mathf.Max(
+                maximumDepth,
+                AttackerRouteDepth(axis, origin, waypoint));
+        }
+        return Mathf.Max(0.0f, maximumDepth - destinationDepth);
+    }
+
+    private static float MaximumAdditionalAttackerRouteDepth(
+        DemolitionArenaLayout layout,
+        Vector3 start,
+        IReadOnlyList<Vector3> waypoints)
+    {
+        var axis = new Vector2(
+            layout.DefenderSpawn.X - layout.AttackSpawn.X,
+            layout.DefenderSpawn.Z - layout.AttackSpawn.Z).Normalized();
+        var origin = new Vector2(layout.AttackSpawn.X, layout.AttackSpawn.Z);
+        var startDepth = AttackerRouteDepth(axis, origin, start);
+        var maximumDepth = startDepth;
+        foreach (var waypoint in waypoints)
+        {
+            maximumDepth = Mathf.Max(
+                maximumDepth,
+                AttackerRouteDepth(axis, origin, waypoint));
+        }
+        return Mathf.Max(0.0f, maximumDepth - startDepth);
+    }
+
+    private static float AttackerRouteDepth(
+        Vector2 axis,
+        Vector2 origin,
+        Vector3 point)
+        => axis.Dot(new Vector2(point.X, point.Z) - origin);
 
     private static bool ValidateDemolitionObjectiveChannelCoordinator()
     {

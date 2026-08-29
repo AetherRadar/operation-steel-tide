@@ -78,6 +78,8 @@ public sealed partial class DemolitionArenaLayout
     public IReadOnlyList<DemolitionArenaMarker> Markers { get; }
     public IReadOnlyList<Vector3> AttackToAPath { get; }
     public IReadOnlyList<Vector3> AttackToBPath { get; }
+    public IReadOnlyList<Vector3> AttackApproachToAPath { get; }
+    public IReadOnlyList<Vector3> AttackApproachToBPath { get; }
     public IReadOnlyList<Vector3> AttackMidPath { get; }
     public IReadOnlyList<Vector3> DefenderToAPath { get; }
     public IReadOnlyList<Vector3> DefenderToBPath { get; }
@@ -262,6 +264,28 @@ public sealed partial class DemolitionArenaLayout
             new(15, 0.2f, 10), new(15, 0.2f, 5),
             new(25, 0.2f, 5), new(25, 0.2f, -4),
             new(29, 0.2f, -10), new(33, 0.2f, -19));
+        AttackApproachToAPath = harborLocks || tideglassReactor
+            ? AttackToAPath
+            : WorldPoints(
+                new(-3, 0.2f, 54), new(-6, 0.2f, 46),
+                new(-14, 0.2f, 46), new(-20, 0.2f, 42),
+                new(-24, 0.2f, 38), new(-25, 0.2f, 30),
+                new(-33, 0.2f, 21));
+        AttackApproachToBPath = harborLocks
+            ? AttackToBPath
+            : tideglassReactor
+                ? WorldPoints(
+                    new(40.0f, 0.2f, 40.0f),
+                    new(45.0f, 0.2f, 4.0f),
+                    new(31.0f, 0.2f, -18.0f))
+                : WorldPoints(
+                    new(3, 0.2f, 51), new(9, 0.2f, 48),
+                    new(13, 0.2f, 43), new(16, 0.2f, 35),
+                    new(16, 0.2f, 29), new(13, 0.2f, 24),
+                    new(12, 0.2f, 17),
+                    new(15, 0.2f, 10), new(15, 0.2f, 5),
+                    new(25, 0.2f, 5), new(25, 0.2f, -4),
+                    new(29, 0.2f, -10), new(33, 0.2f, -19));
         AttackMidPath = harborLocks ? BuildHarborLocksAttackMidPath()
             : tideglassReactor ? BuildTideglassReactorAttackMidPath() : WorldPoints(
             new(0, 0.2f, 54), new(0, 0.2f, 46),

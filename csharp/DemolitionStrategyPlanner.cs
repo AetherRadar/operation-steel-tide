@@ -67,6 +67,14 @@ public sealed record DemolitionStrategyPlan(
 /// </summary>
 public sealed class DemolitionStrategyPlanner
 {
+    private const float AttackerSiteThreatRadius = 38.0f;
+    private const float AttackerSiteThreatPenalty = 52.0f;
+    private const float AttackerSiteSwitchPenalty = 40.0f;
+    private const float AttackerRoundSitePreference = 24.0f;
+    private const float AttackerUrgentThresholdSeconds = 35.0f;
+    private const float AttackerPlantAndSettleSeconds = 5.4f;
+    private const float AttackerEstimatedMoveSpeed = 5.1f;
+
     public DemolitionStrategyPlan Plan(
         DemolitionTeam team,
         DemolitionStrategyPhase phase,
@@ -75,7 +83,11 @@ public sealed class DemolitionStrategyPlanner
         IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents = null,
         int strategySeed = 0,
         IReadOnlyList<Vector2>? siteCenters = null,
-        float remainingSeconds = 100.0f)
+        float remainingSeconds = 100.0f,
+        string? objectiveMemberId = null,
+        int committedSiteIndex = -1,
+        IReadOnlyList<float>? objectiveRouteLengths = null,
+        bool lockCommittedSite = false)
     {
         siteCenters ??= DemolitionArenaLayout.LocalSiteCenters;
         var available = members
@@ -93,7 +105,16 @@ public sealed class DemolitionStrategyPlanner
         {
             return phase == DemolitionStrategyPhase.PostPlant && plantedSiteIndex >= 0
                 ? PlanAttackerPostPlant(available, plantedSiteIndex)
-                : PlanAttackerOpening(available, knownOpponents, strategySeed, siteCenters, remainingSeconds);
+                : PlanAttackerOpening(
+                    available,
+                    knownOpponents,
+                    strategySeed,
+                    siteCenters,
+                    remainingSeconds,
+                    objectiveMemberId,
+                    committedSiteIndex,
+                    objectiveRouteLengths,
+                    lockCommittedSite);
         }
         return phase == DemolitionStrategyPhase.PostPlant && plantedSiteIndex >= 0
             ? PlanDefenderRetake(available, plantedSiteIndex, siteCenters)
@@ -101,66 +122,133 @@ public sealed class DemolitionStrategyPlanner
     }
 
     /// <summary>
-    /// Shared-intelligence site choice, the YaPB-style danger heuristic: with no contacts
-    /// keep the loadout-based default, but once defenders are sighted around one site,
-    /// attack the other. Under time pressure (&lt;35s) the nearest site wins regardless
-    /// of loadout, so the team still reaches a plant before the clock expires.
+    /// Chooses an execute around the device runner rather than the team centroid. Actual
+    /// authored-route cost constrains a stable per-round site preference, known defenders
+    /// can justify a rotation, and the committed site adds enough hysteresis to prevent a
+    /// 1.5-second strategy refresh from causing a cross-map U-turn.
+    /// Under clock pressure a reachable commitment is preserved and only an impossible
+    /// plant is redirected to the shortest site that can still finish.
     /// </summary>
     private static int ChooseAttackerSite(
         List<DemolitionAgentSnapshot> members,
         IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents,
         IReadOnlyList<Vector2> siteCenters,
         float remainingSeconds = 100.0f,
-        int strategySeed = 0)
+        int strategySeed = 0,
+        string? objectiveMemberId = null,
+        int committedSiteIndex = -1,
+        IReadOnlyList<float>? objectiveRouteLengths = null,
+        bool lockCommittedSite = false)
     {
-        // Time pressure overrides loadout: if clock barely covers walk+plant, pick the geometrically nearest site.
-        if (remainingSeconds < 35.0f && members.Count > 0)
+        var objective = members.FirstOrDefault(member => string.Equals(
+            member.MemberId,
+            objectiveMemberId,
+            StringComparison.Ordinal));
+        var hasObjective = !string.IsNullOrWhiteSpace(objective.MemberId);
+        var originX = hasObjective ? objective.PositionX : members.Average(member => member.PositionX);
+        var originZ = hasObjective ? objective.PositionZ : members.Average(member => member.PositionZ);
+        var routeLengths = new float[siteCenters.Count];
+        for (var site = 0; site < siteCenters.Count; site++)
         {
-            var avgX = 0.0f;
-            var avgZ = 0.0f;
-            foreach (var m in members)
+            var center = siteCenters[site];
+            var dx = originX - center.X;
+            var dz = originZ - center.Y;
+            var geometricLength = MathF.Sqrt(dx * dx + dz * dz);
+            if (objectiveRouteLengths is null)
             {
-                avgX += m.PositionX;
-                avgZ += m.PositionZ;
+                routeLengths[site] = geometricLength;
             }
-            avgX /= members.Count;
-            avgZ /= members.Count;
-            var dx0 = avgX - siteCenters[0].X;
-            var dz0 = avgZ - siteCenters[0].Y;
-            var dx1 = avgX - siteCenters[1].X;
-            var dz1 = avgZ - siteCenters[1].Y;
-            return dx0 * dx0 + dz0 * dz0 < dx1 * dx1 + dz1 * dz1 ? 0 : 1;
-        }
-        var averageRange = members.Average(member => member.WeaponRange);
-        // 加入回合哈希扰动，避免前2局全A的固定fallback
-        var hash = Math.Abs((long)strategySeed * 0x9e3779b1L) % 100L;
-        var hashBias = hash < 12L ? 1 : 0;
-        var reconWeight = members.Count(member => member.Role == OperatorRole.Recon) * 0.18f;
-        var weakenedLeft = members.Count(member => member.PositionX < 0.0f && member.HealthRatio < 0.58f);
-        var weakenedRight = members.Count(member => member.PositionX >= 0.0f && member.HealthRatio < 0.58f);
-        var baseFallback = averageRange >= 135.0f || reconWeight > 0.0f && weakenedLeft <= weakenedRight ? 0 : 1;
-        var fallback = (baseFallback + hashBias) % 2;
-        if (knownOpponents is null || knownOpponents.Count == 0)
-        {
-            return fallback;
-        }
-        var threats = new int[siteCenters.Count];
-        foreach (var opponent in knownOpponents)
-        {
-            for (var site = 0; site < threats.Length; site++)
+            else if (site < objectiveRouteLengths.Count
+                && float.IsFinite(objectiveRouteLengths[site])
+                && objectiveRouteLengths[site] >= 0.0f)
             {
-                if (IsNearSite(opponent, site, 30.0f, siteCenters))
+                routeLengths[site] = objectiveRouteLengths[site];
+            }
+            else
+            {
+                routeLengths[site] = float.PositiveInfinity;
+            }
+        }
+
+        var committedSite = committedSiteIndex >= 0 && committedSiteIndex < siteCenters.Count
+            ? committedSiteIndex
+            : -1;
+        if (lockCommittedSite && committedSite >= 0)
+        {
+            return committedSite;
+        }
+        if (remainingSeconds < AttackerUrgentThresholdSeconds)
+        {
+            if (committedSite >= 0 && CanFinishPlant(routeLengths[committedSite], remainingSeconds))
+            {
+                return committedSite;
+            }
+
+            var feasibleSite = -1;
+            var feasibleLength = float.PositiveInfinity;
+            for (var site = 0; site < routeLengths.Length; site++)
+            {
+                if (CanFinishPlant(routeLengths[site], remainingSeconds)
+                    && routeLengths[site] < feasibleLength)
                 {
-                    threats[site]++;
+                    feasibleSite = site;
+                    feasibleLength = routeLengths[site];
+                }
+            }
+            if (feasibleSite >= 0)
+            {
+                return feasibleSite;
+            }
+        }
+
+        var hash = Math.Abs((long)strategySeed * 0x9e3779b1L);
+        var seededSite = (int)(hash % Math.Max(1, siteCenters.Count));
+        var scores = new float[siteCenters.Count];
+        for (var site = 0; site < scores.Length; site++)
+        {
+            scores[site] = routeLengths[site]
+                + (committedSite < 0
+                    ? site == seededSite
+                        ? -AttackerRoundSitePreference
+                        : AttackerRoundSitePreference
+                    : 0.0f)
+                + (committedSite >= 0 && site != committedSite
+                    ? AttackerSiteSwitchPenalty
+                    : 0.0f);
+            if (knownOpponents is null)
+            {
+                continue;
+            }
+            var center = siteCenters[site];
+            foreach (var opponent in knownOpponents
+                .GroupBy(opponent => opponent.MemberId, StringComparer.Ordinal)
+                .Select(group => group.First()))
+            {
+                var dx = opponent.PositionX - center.X;
+                var dz = opponent.PositionZ - center.Y;
+                var distance = MathF.Sqrt(dx * dx + dz * dz);
+                if (distance < AttackerSiteThreatRadius)
+                {
+                    scores[site] += AttackerSiteThreatPenalty
+                        * (1.0f - distance / AttackerSiteThreatRadius);
                 }
             }
         }
-        if (threats[0] == threats[1])
+
+        var selected = 0;
+        for (var site = 1; site < scores.Length; site++)
         {
-            return fallback;
+            if (scores[site] < scores[selected])
+            {
+                selected = site;
+            }
         }
-        return threats[0] < threats[1] ? 0 : 1;
+        return selected;
     }
+
+    private static bool CanFinishPlant(float routeLength, float remainingSeconds)
+        => routeLength / AttackerEstimatedMoveSpeed + AttackerPlantAndSettleSeconds
+            <= remainingSeconds;
 
     /// <summary>The site currently under contact, driving pre-plant defensive rotation.</summary>
     private static int ThreatenedSite(
@@ -230,9 +318,22 @@ public sealed class DemolitionStrategyPlanner
         IReadOnlyList<DemolitionAgentSnapshot>? knownOpponents,
         int strategySeed,
         IReadOnlyList<Vector2> siteCenters,
-        float remainingSeconds = 100.0f)
+        float remainingSeconds = 100.0f,
+        string? objectiveMemberId = null,
+        int committedSiteIndex = -1,
+        IReadOnlyList<float>? objectiveRouteLengths = null,
+        bool lockCommittedSite = false)
     {
-        var primarySite = ChooseAttackerSite(members, knownOpponents, siteCenters, remainingSeconds, strategySeed);
+        var primarySite = ChooseAttackerSite(
+            members,
+            knownOpponents,
+            siteCenters,
+            remainingSeconds,
+            strategySeed,
+            objectiveMemberId,
+            committedSiteIndex,
+            objectiveRouteLengths,
+            lockCommittedSite);
         var openingPattern = remainingSeconds < 25.0f ? DemolitionOpeningPattern.FullExecute : ChooseOpeningPattern(members, strategySeed);
 
         var entry = members

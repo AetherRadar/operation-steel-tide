@@ -18,6 +18,11 @@ public sealed class DemolitionRoutePlanner
     private const float MaximumVisibilityEdge = 24.0f;
     private const float MaximumEndpointEdge = 34.0f;
     private const float DuplicatePointDistanceSquared = 0.08f * 0.08f;
+    private const float OpponentSpawnAvoidanceRadius = 20.0f;
+    private const float OpponentSpawnMaximumPenalty = 90.0f;
+    private const float OpeningLanePolicyRadius = 18.0f;
+    private const float OpeningLaneReversePenalty = 70.0f;
+    private const float ObjectiveDepthTolerance = 4.0f;
 
     private readonly DemolitionArenaLayout _layout;
     private readonly Vector3[] _nodes;
@@ -30,6 +35,8 @@ public sealed class DemolitionRoutePlanner
         var authoredLinks = new List<(int From, int To)>();
         AddAuthoredPath(nodes, authoredLinks, layout.AttackToAPath);
         AddAuthoredPath(nodes, authoredLinks, layout.AttackToBPath);
+        AddAuthoredPath(nodes, authoredLinks, layout.AttackApproachToAPath);
+        AddAuthoredPath(nodes, authoredLinks, layout.AttackApproachToBPath);
         AddAuthoredPath(nodes, authoredLinks, layout.AttackMidPath);
         AddAuthoredPath(nodes, authoredLinks, layout.DefenderToAPath);
         AddAuthoredPath(nodes, authoredLinks, layout.DefenderToBPath);
@@ -58,10 +65,14 @@ public sealed class DemolitionRoutePlanner
         }
     }
 
-    public DemolitionRouteResult Plan(Vector3 start, Vector3 destination)
+    public DemolitionRouteResult Plan(
+        Vector3 start,
+        Vector3 destination,
+        DemolitionTeam? movingTeam = null)
     {
         destination.Y = start.Y;
-        if (CanTraverse(start, destination))
+        if (CanTraverse(start, destination)
+            && TacticalSegmentPenalty(start, destination, destination, movingTeam) <= 0.001f)
         {
             return new DemolitionRouteResult(
                 new[] { destination },
@@ -69,11 +80,30 @@ public sealed class DemolitionRoutePlanner
                 HorizontalDistance(start, destination));
         }
 
+        if (movingTeam == DemolitionTeam.Attackers
+            && TryMatchSiteDestination(destination, out var attackSiteIndex)
+            && TryPlanAuthoredAttackLane(
+                start,
+                destination,
+                attackSiteIndex,
+                out var attackRoute))
+        {
+            return attackRoute;
+        }
+
         var startIndex = _nodes.Length;
         var destinationIndex = startIndex + 1;
         var edges = CloneEdgesWithEndpoints();
         ConnectEndpoint(edges, startIndex, start, MaximumEndpointEdge);
         ConnectEndpoint(edges, destinationIndex, destination, MaximumEndpointEdge);
+        if (CanTraverse(start, destination))
+        {
+            AddBidirectionalEdge(
+                edges,
+                startIndex,
+                destinationIndex,
+                HorizontalDistance(start, destination));
+        }
         if (edges[startIndex].Count == 0)
         {
             ConnectEndpoint(edges, startIndex, start, float.PositiveInfinity);
@@ -83,7 +113,13 @@ public sealed class DemolitionRoutePlanner
             ConnectEndpoint(edges, destinationIndex, destination, float.PositiveInfinity);
         }
 
-        var search = FindShortestPath(edges, startIndex, destinationIndex);
+        var search = FindShortestPath(
+            edges,
+            startIndex,
+            destinationIndex,
+            start,
+            destination,
+            movingTeam);
         if (search.Previous[destinationIndex] < 0)
         {
             var frontierIndex = FindClosestReachableFrontier(search.Distances, destination);
@@ -103,7 +139,11 @@ public sealed class DemolitionRoutePlanner
                 frontierIndex,
                 start,
                 frontier);
-            var safeRoute = SimplifyRoute(start, frontierRoute);
+            var safeRoute = SimplifyRoute(
+                start,
+                frontierRoute,
+                destination,
+                movingTeam);
             return new DemolitionRouteResult(
                 safeRoute,
                 false,
@@ -111,7 +151,7 @@ public sealed class DemolitionRoutePlanner
         }
 
         var route = ReconstructRoute(search.Previous, startIndex, destinationIndex, start, destination);
-        var simplified = SimplifyRoute(start, route);
+        var simplified = SimplifyRoute(start, route, destination, movingTeam);
         return new DemolitionRouteResult(simplified, true, RouteLength(start, simplified));
     }
 
@@ -129,6 +169,115 @@ public sealed class DemolitionRoutePlanner
             from = to;
         }
         return true;
+    }
+
+    private bool TryPlanAuthoredAttackLane(
+        Vector3 start,
+        Vector3 destination,
+        int siteIndex,
+        out DemolitionRouteResult route)
+    {
+        var authoredPath = siteIndex == 0
+            ? _layout.AttackApproachToAPath
+            : _layout.AttackApproachToBPath;
+        var bestEntry = -1;
+        var bestCost = float.PositiveInfinity;
+        for (var entry = 0; entry < authoredPath.Count; entry++)
+        {
+            var waypoint = authoredPath[entry];
+            waypoint.Y = start.Y;
+            if (!CanTraverse(start, waypoint))
+            {
+                continue;
+            }
+            var tacticalCost = TacticalSegmentPenalty(
+                start,
+                waypoint,
+                destination,
+                DemolitionTeam.Attackers);
+            var previous = waypoint;
+            for (var index = entry + 1;
+                index < authoredPath.Count && !float.IsPositiveInfinity(tacticalCost);
+                index++)
+            {
+                tacticalCost += TacticalSegmentPenalty(
+                    previous,
+                    authoredPath[index],
+                    destination,
+                    DemolitionTeam.Attackers);
+                previous = authoredPath[index];
+            }
+            if (float.IsPositiveInfinity(tacticalCost))
+            {
+                continue;
+            }
+            var cost = HorizontalDistance(start, waypoint)
+                + AuthoredPathRemainingLength(authoredPath, entry)
+                + tacticalCost;
+            if (cost < bestCost)
+            {
+                bestEntry = entry;
+                bestCost = cost;
+            }
+        }
+        if (bestEntry < 0)
+        {
+            route = default;
+            return false;
+        }
+
+        var lane = new List<Vector3>(authoredPath.Count - bestEntry + 1);
+        for (var index = bestEntry; index < authoredPath.Count; index++)
+        {
+            var waypoint = authoredPath[index];
+            waypoint.Y = start.Y;
+            lane.Add(waypoint);
+        }
+        if (lane.Count == 0
+            || HorizontalDistanceSquared(lane[^1], destination)
+                > DuplicatePointDistanceSquared)
+        {
+            lane.Add(destination);
+        }
+        else
+        {
+            lane[^1] = destination;
+        }
+        if (!IsRouteClear(start, lane))
+        {
+            route = default;
+            return false;
+        }
+
+        var simplified = SimplifyRoute(
+            start,
+            lane,
+            destination,
+            DemolitionTeam.Attackers);
+        route = new DemolitionRouteResult(
+            simplified,
+            true,
+            RouteLength(start, simplified));
+        return true;
+    }
+
+    private bool TryMatchSiteDestination(Vector3 destination, out int siteIndex)
+    {
+        siteIndex = ClosestSiteIndex(destination);
+        return HorizontalDistanceSquared(destination, _layout.SitePositions[siteIndex])
+            <= 0.75f * 0.75f;
+    }
+
+    private static float AuthoredPathRemainingLength(
+        IReadOnlyList<Vector3> path,
+        int startIndex)
+    {
+        var length = 0.0f;
+        for (var index = startIndex + 1; index < path.Count; index++)
+        {
+            length += HorizontalDistance(path[index - 1], path[index]);
+        }
+        return length;
     }
 
     private List<RouteEdge>[] CloneEdgesWithEndpoints()
@@ -161,7 +310,10 @@ public sealed class DemolitionRoutePlanner
     private RouteSearchResult FindShortestPath(
         List<RouteEdge>[] edges,
         int startIndex,
-        int destinationIndex)
+        int destinationIndex,
+        Vector3 start,
+        Vector3 destination,
+        DemolitionTeam? movingTeam)
     {
         var distances = new float[edges.Length];
         var previous = new int[edges.Length];
@@ -190,7 +342,20 @@ public sealed class DemolitionRoutePlanner
             visited[current] = true;
             foreach (var edge in edges[current])
             {
-                var candidateDistance = currentDistance + edge.Cost;
+                var from = RoutePoint(
+                    current,
+                    startIndex,
+                    destinationIndex,
+                    start,
+                    destination);
+                var to = RoutePoint(
+                    edge.To,
+                    startIndex,
+                    destinationIndex,
+                    start,
+                    destination);
+                var candidateDistance = currentDistance + edge.Cost
+                    + TacticalSegmentPenalty(from, to, destination, movingTeam);
                 if (candidateDistance + 0.001f >= distances[edge.To])
                 {
                     continue;
@@ -200,6 +365,133 @@ public sealed class DemolitionRoutePlanner
             }
         }
         return new RouteSearchResult(previous, distances);
+    }
+
+    private float TacticalSegmentPenalty(
+        Vector3 from,
+        Vector3 to,
+        Vector3 destination,
+        DemolitionTeam? movingTeam)
+    {
+        if (movingTeam is null)
+        {
+            return 0.0f;
+        }
+        var originSpawn = movingTeam == DemolitionTeam.Attackers
+            ? _layout.AttackSpawn
+            : _layout.DefenderSpawn;
+        var opposingSpawn = movingTeam == DemolitionTeam.Attackers
+            ? _layout.DefenderSpawn
+            : _layout.AttackSpawn;
+        var penalty = 0.0f;
+        var clearance = HorizontalDistanceToSegment(opposingSpawn, from, to);
+        if (clearance < OpponentSpawnAvoidanceRadius)
+        {
+            var depth = 1.0f - clearance / OpponentSpawnAvoidanceRadius;
+            penalty += OpponentSpawnMaximumPenalty * depth * depth;
+        }
+
+        var attackSiteIndex = -1;
+        var attackerSiteObjective = movingTeam == DemolitionTeam.Attackers
+            && TryMatchSiteDestination(destination, out attackSiteIndex);
+        var attackAxis = new Vector2(
+            opposingSpawn.X - originSpawn.X,
+            opposingSpawn.Z - originSpawn.Z);
+        if (attackerSiteObjective
+            && attackAxis.LengthSquared() > 0.001f)
+        {
+            attackAxis = attackAxis.Normalized();
+            var destinationDepth = attackAxis.Dot(new Vector2(
+                destination.X - originSpawn.X,
+                destination.Z - originSpawn.Z));
+            var fromDepth = attackAxis.Dot(new Vector2(
+                from.X - originSpawn.X,
+                from.Z - originSpawn.Z));
+            var toDepth = attackAxis.Dot(new Vector2(
+                to.X - originSpawn.X,
+                to.Z - originSpawn.Z));
+            var maximumDepth = destinationDepth + ObjectiveDepthTolerance;
+            if (toDepth > maximumDepth
+                && toDepth > fromDepth + 0.001f)
+            {
+                return float.PositiveInfinity;
+            }
+        }
+
+        if (attackerSiteObjective
+            && HorizontalDistance(from, _layout.AttackSpawn) <= OpeningLanePolicyRadius)
+        {
+            var openingPath = attackSiteIndex == 0
+                ? _layout.AttackApproachToAPath
+                : _layout.AttackApproachToBPath;
+            var expectedLateral = openingPath.Count >= 2
+                ? openingPath[1].X - openingPath[0].X
+                : _layout.SitePositions[attackSiteIndex].X - _layout.AttackSpawn.X;
+            var actualLateral = to.X - from.X;
+            if (Mathf.Abs(expectedLateral) >= 1.0f
+                && expectedLateral * actualLateral < -0.25f)
+            {
+                penalty += OpeningLaneReversePenalty
+                    + Mathf.Abs(actualLateral) * 5.0f;
+            }
+        }
+        return penalty;
+    }
+
+    private int ClosestSiteIndex(Vector3 destination)
+    {
+        var closest = 0;
+        var closestDistance = float.PositiveInfinity;
+        for (var index = 0; index < _layout.SitePositions.Count; index++)
+        {
+            var distance = HorizontalDistanceSquared(destination, _layout.SitePositions[index]);
+            if (distance < closestDistance)
+            {
+                closest = index;
+                closestDistance = distance;
+            }
+        }
+        return closest;
+    }
+
+    private Vector3 RoutePoint(
+        int index,
+        int startIndex,
+        int destinationIndex,
+        Vector3 start,
+        Vector3 destination)
+    {
+        if (index == startIndex)
+        {
+            return start;
+        }
+        if (index == destinationIndex)
+        {
+            return destination;
+        }
+        return _nodes[index];
+    }
+
+    private static float HorizontalDistanceToSegment(Vector3 point, Vector3 start, Vector3 end)
+    {
+        var segmentX = end.X - start.X;
+        var segmentZ = end.Z - start.Z;
+        var segmentLengthSquared = segmentX * segmentX + segmentZ * segmentZ;
+        if (segmentLengthSquared <= 0.0001f)
+        {
+            return HorizontalDistance(point, start);
+        }
+        var pointX = point.X - start.X;
+        var pointZ = point.Z - start.Z;
+        var amount = Mathf.Clamp(
+            (pointX * segmentX + pointZ * segmentZ) / segmentLengthSquared,
+            0.0f,
+            1.0f);
+        var closest = new Vector3(
+            start.X + segmentX * amount,
+            point.Y,
+            start.Z + segmentZ * amount);
+        return HorizontalDistance(point, closest);
     }
 
     private int FindClosestReachableFrontier(IReadOnlyList<float> distances, Vector3 destination)
@@ -248,7 +540,11 @@ public sealed class DemolitionRoutePlanner
         return reversed.ToArray();
     }
 
-    private Vector3[] SimplifyRoute(Vector3 start, IReadOnlyList<Vector3> route)
+    private Vector3[] SimplifyRoute(
+        Vector3 start,
+        IReadOnlyList<Vector3> route,
+        Vector3 destination,
+        DemolitionTeam? movingTeam)
     {
         var simplified = new List<Vector3>();
         var anchor = start;
@@ -258,7 +554,12 @@ public sealed class DemolitionRoutePlanner
             var furthest = index;
             for (var candidate = route.Count - 1; candidate > index; candidate--)
             {
-                if (CanTraverse(anchor, route[candidate]))
+                if (CanTraverse(anchor, route[candidate])
+                    && TacticalSegmentPenalty(
+                        anchor,
+                        route[candidate],
+                        destination,
+                        movingTeam) <= 0.001f)
                 {
                     furthest = candidate;
                     break;

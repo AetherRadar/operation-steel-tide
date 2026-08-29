@@ -129,7 +129,10 @@ public partial class FreightTerminalWorld
         {
             return;
         }
-        var route = _demolitionRoutePlanner.Plan(mate.GlobalPosition, destination);
+        var route = _demolitionRoutePlanner.Plan(
+            mate.GlobalPosition,
+            destination,
+            LocalDemolitionSide);
         cursor.Reset(routeKey, mate.GlobalPosition, destination, route, countAsReplan);
         DemolitionSquadRoutePlansForDiagnostics++;
     }

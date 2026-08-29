@@ -24,6 +24,27 @@ public partial class FreightTerminalWorld
 
         var playerTeamSide = playerSide;
         var opponentTeamSide = DemolitionOtherSide(playerSide);
+        var objectiveMemberId = CurrentDemolitionAttackerObjectiveMemberId();
+        var commitmentOwnerMatches = phase == DemolitionStrategyPhase.Opening
+            && ShouldRetainDemolitionSiteCommitment(
+                _demolitionDeviceLifecycle.IsCarried,
+                _demolitionAttackerPlanObjectiveMemberId,
+                objectiveMemberId);
+        var committedAttackerSite = commitmentOwnerMatches
+            ? _demolitionAttackerPlan?.PrimarySiteIndex ?? -1
+            : -1;
+        if (commitmentOwnerMatches
+            && opponentTeamSide == DemolitionTeam.Attackers
+            && _demolitionEnemyTargetSite >= 0)
+        {
+            committedAttackerSite = _demolitionEnemyTargetSite;
+        }
+        var channelSite = CurrentDemolitionAttackerPlantChannelSite(layout);
+        var plantChannelLocked = channelSite >= 0;
+        if (plantChannelLocked)
+        {
+            committedAttackerSite = channelSite;
+        }
         var playerSnapshots = new List<DemolitionAgentSnapshot>
         {
             Snapshot(
@@ -58,7 +79,18 @@ public partial class FreightTerminalWorld
             CollectDemolitionSightings(opponentTeamSide, playerTeamSide, layout),
             strategySeed: _demolitionMatch.CurrentRound,
             siteCenters: layout.LocalSiteCoordinates,
-            remainingSeconds: _demolitionRemaining);
+            remainingSeconds: _demolitionRemaining,
+            objectiveMemberId: playerTeamSide == DemolitionTeam.Attackers
+                ? objectiveMemberId
+                : null,
+            committedSiteIndex: playerTeamSide == DemolitionTeam.Attackers
+                ? committedAttackerSite
+                : -1,
+            objectiveRouteLengths: playerTeamSide == DemolitionTeam.Attackers
+                ? EstimateDemolitionAttackerSiteRouteLengths(objectiveMemberId, layout)
+                : null,
+            lockCommittedSite: playerTeamSide == DemolitionTeam.Attackers
+                && plantChannelLocked);
         _demolitionAttackerPlan = playerTeamSide == DemolitionTeam.Attackers ? playerPlan : _demolitionAttackerPlan;
         _demolitionDefenderPlan = playerTeamSide == DemolitionTeam.Defenders ? playerPlan : _demolitionDefenderPlan;
         ApplyDemolitionSquadPlan(playerPlan, layout);
@@ -89,9 +121,24 @@ public partial class FreightTerminalWorld
             CollectDemolitionSightings(playerTeamSide, opponentTeamSide, layout),
             strategySeed: _demolitionMatch.CurrentRound,
             siteCenters: layout.LocalSiteCoordinates,
-            remainingSeconds: _demolitionRemaining);
+            remainingSeconds: _demolitionRemaining,
+            objectiveMemberId: opponentTeamSide == DemolitionTeam.Attackers
+                ? objectiveMemberId
+                : null,
+            committedSiteIndex: opponentTeamSide == DemolitionTeam.Attackers
+                ? committedAttackerSite
+                : -1,
+            objectiveRouteLengths: opponentTeamSide == DemolitionTeam.Attackers
+                ? EstimateDemolitionAttackerSiteRouteLengths(objectiveMemberId, layout)
+                : null,
+            lockCommittedSite: opponentTeamSide == DemolitionTeam.Attackers
+                && plantChannelLocked);
         _demolitionAttackerPlan = opponentTeamSide == DemolitionTeam.Attackers ? opponentPlan : _demolitionAttackerPlan;
         _demolitionDefenderPlan = opponentTeamSide == DemolitionTeam.Defenders ? opponentPlan : _demolitionDefenderPlan;
+        _demolitionAttackerPlanObjectiveMemberId = phase == DemolitionStrategyPhase.Opening
+            && _demolitionDeviceLifecycle.IsCarried
+            ? objectiveMemberId
+            : null;
 
         ResolveAndApplyDemolitionObjectiveChannels(opponentPlan);
         if (opponentTeamSide == DemolitionTeam.Attackers && !_demolitionDevicePlanted)
@@ -148,13 +195,16 @@ public partial class FreightTerminalWorld
             return sightings;
         }
         // Enemy team reporting: engage targets of its alerted members.
+        var reportedTargets = new HashSet<Node3D>();
         foreach (var opponent in _demolitionOpponents.Where(opponent => IsInstanceValid(opponent) && opponent.Alerted))
         {
             var target = opponent.EngageTargetNode;
-            if (target is not null && IsInstanceValid(target))
+            if (target is not null && IsInstanceValid(target) && reportedTargets.Add(target))
             {
+                var targetMemberId = DemolitionMemberId(target)
+                    ?? target.GetInstanceId().ToString(System.Globalization.CultureInfo.InvariantCulture);
                 sightings.Add(Snapshot(
-                    $"KNOWN_P:{opponent.Name}",
+                    $"KNOWN_P:{targetMemberId}",
                     sightedSide,
                     OperatorRole.Recon,
                     1.0f,
@@ -171,6 +221,97 @@ public partial class FreightTerminalWorld
     private void SelectDemolitionCarrier(DemolitionStrategyPlan opponentPlan)
     {
         ResolveAndApplyDemolitionObjectiveChannels(opponentPlan);
+    }
+
+    private string? CurrentDemolitionAttackerObjectiveMemberId()
+        => _demolitionDeviceLifecycle.IsCarried
+            ? _demolitionDeviceLifecycle.CarrierMemberId
+            : _demolitionDeviceLifecycle.IsGrounded
+                ? _demolitionDeviceLifecycle.PickupRunnerMemberId
+                : null;
+
+    private static bool ShouldRetainDemolitionSiteCommitment(
+        bool deviceCarried,
+        string? plannedObjectiveMemberId,
+        string? currentObjectiveMemberId)
+        => deviceCarried
+            && !string.IsNullOrWhiteSpace(plannedObjectiveMemberId)
+            && string.Equals(
+                plannedObjectiveMemberId,
+                currentObjectiveMemberId,
+                System.StringComparison.Ordinal);
+
+    private int CurrentDemolitionAttackerPlantChannelSite(DemolitionArenaLayout layout)
+    {
+        if (LocalDemolitionSide == DemolitionTeam.Defenders)
+        {
+            return _demolitionEnemyPlantProgress > 0.0f
+                ? _demolitionEnemyTargetSite
+                : -1;
+        }
+        if (_demolitionSquadPlantProgress > 0.0f && _demolitionSquadObjectiveSite >= 0)
+        {
+            return _demolitionSquadObjectiveSite;
+        }
+        if (_demolitionPlantProgress <= 0.0f)
+        {
+            return -1;
+        }
+
+        var nearestSite = -1;
+        var nearestDistance = 3.25f;
+        for (var site = 0; site < layout.SitePositions.Count; site++)
+        {
+            var distance = HorizontalDistance(_player.GlobalPosition, layout.SitePositions[site]);
+            if (distance < nearestDistance)
+            {
+                nearestSite = site;
+                nearestDistance = distance;
+            }
+        }
+        return nearestSite;
+    }
+
+    private float[]? EstimateDemolitionAttackerSiteRouteLengths(
+        string? objectiveMemberId,
+        DemolitionArenaLayout layout)
+    {
+        var objective = ResolveDemolitionAttacker(objectiveMemberId);
+        if (!IsLivingDemolitionAttacker(objective))
+        {
+            return null;
+        }
+
+        var planner = _demolitionRoutePlanner ??= new DemolitionRoutePlanner(layout);
+        var routeOrigin = objective!.GlobalPosition;
+        var pickupRouteLength = 0.0f;
+        if (_demolitionDeviceLifecycle.IsGrounded)
+        {
+            var pickupRoute = planner.Plan(
+                routeOrigin,
+                _demolitionDeviceGroundPosition,
+                DemolitionTeam.Attackers);
+            if (!pickupRoute.ReachesDestination)
+            {
+                return Enumerable.Repeat(
+                    float.PositiveInfinity,
+                    layout.SitePositions.Count).ToArray();
+            }
+            pickupRouteLength = pickupRoute.Length;
+            routeOrigin = _demolitionDeviceGroundPosition;
+        }
+        var routeLengths = new float[layout.SitePositions.Count];
+        for (var site = 0; site < routeLengths.Length; site++)
+        {
+            var route = planner.Plan(
+                routeOrigin,
+                layout.SitePositions[site],
+                DemolitionTeam.Attackers);
+            routeLengths[site] = route.ReachesDestination
+                ? pickupRouteLength + route.Length
+                : float.PositiveInfinity;
+        }
+        return routeLengths;
     }
 
     private void ResolveAndApplyDemolitionObjectiveChannels(DemolitionStrategyPlan opponentPlan)
@@ -287,13 +428,22 @@ public partial class FreightTerminalWorld
         }
         var layout = DemolitionLayout();
         var carrierPosition = _demolitionCarrier.GlobalPosition;
-        float TravelSeconds(Vector3 site)
+        var planner = _demolitionRoutePlanner ??= new DemolitionRoutePlanner(layout);
+        float TravelSeconds(int siteIndex)
         {
-            var flat = new Vector3(site.X, carrierPosition.Y, site.Z);
-            return carrierPosition.DistanceTo(flat) / 5.1f + DemolitionPlantDuration;
+            var route = planner.Plan(
+                carrierPosition,
+                layout.SitePositions[siteIndex],
+                DemolitionTeam.Attackers);
+            return route.ReachesDestination
+                ? route.Length / 5.1f + DemolitionPlantDuration
+                : float.PositiveInfinity;
         }
-        var planned = layout.SitePositions[Mathf.Clamp(_demolitionEnemyTargetSite, 0, layout.SitePositions.Count - 1)];
-        if (TravelSeconds(planned) + 2.0f <= _demolitionRemaining)
+        var plannedSite = Mathf.Clamp(
+            _demolitionEnemyTargetSite,
+            0,
+            layout.SitePositions.Count - 1);
+        if (TravelSeconds(plannedSite) + 2.0f <= _demolitionRemaining)
         {
             return;
         }
@@ -301,7 +451,7 @@ public partial class FreightTerminalWorld
         var nearestTravel = float.PositiveInfinity;
         for (var index = 0; index < layout.SitePositions.Count; index++)
         {
-            var travel = TravelSeconds(layout.SitePositions[index]);
+            var travel = TravelSeconds(index);
             if (travel + 2.0f <= _demolitionRemaining && travel < nearestTravel)
             {
                 nearestTravel = travel;
@@ -672,7 +822,7 @@ public partial class FreightTerminalWorld
         return true;
     }
 
-    private static void ResetDemolitionRouteCursor(
+    private void ResetDemolitionRouteCursor(
         EnemyOperator opponent,
         DemolitionRouteCursor cursor,
         DemolitionRoutePlanner planner,
@@ -680,7 +830,10 @@ public partial class FreightTerminalWorld
         Vector3 destination,
         bool countAsReplan)
     {
-        var route = planner.Plan(opponent.GlobalPosition, destination);
+        var route = planner.Plan(
+            opponent.GlobalPosition,
+            destination,
+            DemolitionOtherSide(_demolitionMatch.PlayerSide));
         cursor.Reset(routeKey, opponent.GlobalPosition, destination, route, countAsReplan);
         opponent.ResetScriptedObjectiveNavigation();
     }
