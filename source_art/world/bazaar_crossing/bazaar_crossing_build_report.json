@@ -5,26 +5,26 @@
   "source_blend_sha256": "1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9",
   "blend": {
     "path": "source_art/world/bazaar_crossing/bazaar_crossing.blend",
-    "bytes": 50379943,
-    "sha256": "A4459F775CF846D0EDD98302E1750BFEB0CDED1C0FD8DA2DE422420F3DD7B720"
+    "bytes": 50976665,
+    "sha256": "E70280A5766BB8F807A247455C0B5227B235F38D8171731D33A8AE266EF35A95"
   },
   "glb": {
     "path": "assets/models/bazaar_crossing/bazaar_crossing.glb",
-    "bytes": 112618852,
-    "sha256": "CA68AC570E2FAA9FF284FBB25909888BE4AC93F9C661106525A6204801C43164"
+    "bytes": 115853196,
+    "sha256": "741CD2546064219A27BE67B5449DD966DC531BC820AD1C7208FA3387CAD8E03A"
   },
   "scene": {
     "revision": "V2 dense enterable interiors",
-    "object_count": 759,
-    "mesh_object_count": 729,
-    "unique_mesh_count": 669,
+    "object_count": 803,
+    "mesh_object_count": 770,
+    "unique_mesh_count": 709,
     "material_count": 49,
     "texture_count": 58,
-    "draw_node_count": 729,
-    "surface_draw_count": 1032,
+    "draw_node_count": 770,
+    "surface_draw_count": 1061,
     "raw_source_triangles": 252707,
-    "unique_triangles": 850309,
-    "instance_triangles": 1148671,
+    "unique_triangles": 873789,
+    "instance_triangles": 1172379,
     "texture_memory_bytes_estimate_rgba8_mips": 213356866,
     "texture_memory_mib_estimate_rgba8_mips": 203.473,
     "blender_bounds_min": [
@@ -44,23 +44,23 @@
       "Defender_BackMarket",
       "Mid_IndoorConnector"
     ],
-    "architectural_cover_object_count": 741,
+    "architectural_cover_object_count": 765,
     "prop_cover_object_count": 0,
     "architectural_cover_ratio": 1.0,
     "art_polish_object_counts": {
-      "shop_signs": 31,
-      "wall_shelves": 105,
-      "wall_awnings": 10,
+      "shop_signs": 35,
+      "wall_shelves": 108,
+      "wall_awnings": 11,
       "roof_parapets": 110,
       "rooftop_lantern_parts": 60,
       "upper_privacy_screen_parts": 8,
       "stair_tread_nosing_assemblies": 6,
-      "continuous_storage_parts": 135,
-      "continuous_shopfront_parts": 108,
+      "continuous_storage_parts": 140,
+      "continuous_shopfront_parts": 112,
       "skyline_articulation_parts": 109,
       "back_service_gate_parts": 4
     },
-    "roofed_footprint_m2": 9997.683,
+    "roofed_footprint_m2": 10046.703,
     "legacy_outer_facade_count": 4,
     "closed_modular_block_count": 37,
     "stairs": {
@@ -108,7 +108,7 @@
     },
     "authored_module_contract": {
       "visible_mesh_origin_counts": {
-        "cc0": 729,
+        "cc0": 770,
         "project_authored": 0,
         "procedural": 0
       },
@@ -124,26 +124,26 @@
     "draw_node_optimization": {
       "strategy": "same collection, spatial region, authored responsibility, source provenance, and material signature",
       "spatial_bucket_m": 32.0,
-      "merged_group_count": 338,
-      "merged_source_node_count": 1101,
-      "pre_draw_nodes": 1492,
-      "post_draw_nodes": 729,
-      "pre_surface_draw_count": 2129,
-      "post_surface_draw_count": 1032,
-      "pre_unique_triangles": 850309,
-      "post_unique_triangles": 850309,
-      "pre_instance_triangles": 1148671,
-      "post_instance_triangles": 1148671,
+      "merged_group_count": 339,
+      "merged_source_node_count": 1116,
+      "pre_draw_nodes": 1547,
+      "post_draw_nodes": 770,
+      "pre_surface_draw_count": 2160,
+      "post_surface_draw_count": 1061,
+      "pre_unique_triangles": 873789,
+      "post_unique_triangles": 873789,
+      "pre_instance_triangles": 1172379,
+      "post_instance_triangles": 1172379,
       "triangle_and_bounds_preserved": true
     }
   },
   "round_trip": {
-    "object_count": 741,
-    "mesh_object_count": 729,
-    "unique_mesh_count": 669,
-    "material_count": 47,
+    "object_count": 782,
+    "mesh_object_count": 770,
+    "unique_mesh_count": 709,
+    "material_count": 48,
     "texture_count": 56,
-    "instance_triangles": 1148671,
+    "instance_triangles": 1172379,
     "bounds_min": [
       -68.0,
       -56.2,
@@ -183,6 +183,8 @@
     "source_art/world/bazaar_crossing/previews/03_b_interior.png",
     "source_art/world/bazaar_crossing/previews/04_mid_s_bend.png",
     "source_art/world/bazaar_crossing/previews/05_mid_north_connector.png",
-    "source_art/world/bazaar_crossing/previews/06_back_market.png"
+    "source_art/world/bazaar_crossing/previews/06_back_market.png",
+    "source_art/world/bazaar_crossing/previews/07_b_service_link.png",
+    "source_art/world/bazaar_crossing/previews/08_b_stair_vestibule.png"
   ]
 }

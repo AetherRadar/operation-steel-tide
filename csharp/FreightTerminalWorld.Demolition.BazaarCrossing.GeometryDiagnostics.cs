@@ -51,6 +51,67 @@ public partial class FreightTerminalWorld
         };
     }
 
+    private static IReadOnlyList<Vector3> BazaarBServiceRoute(
+        DemolitionArenaLayout layout)
+        => new[]
+        {
+            layout.Origin + new Vector3(49.8f, 0.2f, 6.2f),
+            layout.Origin + new Vector3(53.0f, 0.2f, 6.2f),
+            layout.Origin + new Vector3(53.0f, 0.2f, 4.8f),
+            layout.Origin + new Vector3(55.2f, 0.2f, 4.8f),
+            layout.Origin + new Vector3(55.6f, 0.2f, 2.0f)
+        };
+
+    private static bool BazaarBServiceGeometryReady(
+        DemolitionArenaLayout layout,
+        out string failures)
+    {
+        var failed = new List<string>();
+        var boxes = layout.CollisionBoxes.ToDictionary(box => box.Name, StringComparer.Ordinal);
+        var exactContracts = new[]
+        {
+            (Name: "WallEastServicePocketClosure", Center: new Vector3(56.0f, 4.0f, 9.4f), Size: new Vector3(8.0f, 8.0f, 0.42f)),
+            (Name: "CoverB_ServiceCounter", Center: new Vector3(58.5f, 0.58f, 3.7f), Size: new Vector3(0.62f, 1.16f, 4.6f)),
+            (Name: "WallBSouthStairVestibuleOuter_Segment00", Center: new Vector3(56.0f, 3.2f, 5.8f), Size: new Vector3(3.6f, 6.4f, 0.42f)),
+            (Name: "RoofBSouthStairVestibule", Center: new Vector3(56.0f, 6.47f, -0.1f), Size: new Vector3(3.8f, 0.14f, 11.8f))
+        };
+        foreach (var contract in exactContracts)
+        {
+            if (!boxes.TryGetValue(contract.Name, out var box))
+            {
+                failed.Add($"missing-{contract.Name}");
+                continue;
+            }
+            var localCenter = box.Center - layout.Origin;
+            if (localCenter.DistanceTo(contract.Center) > 0.002f
+                || box.Size.DistanceTo(contract.Size) > 0.002f)
+            {
+                failed.Add($"contract-{contract.Name}-{localCenter}-{box.Size}");
+            }
+        }
+
+        var eastReturnSegments = boxes.Values
+            .Where(box => box.Name.StartsWith(
+                "WallEastApproachSightReturn_Segment", StringComparison.Ordinal))
+            .OrderBy(box => box.Center.Z)
+            .ToArray();
+        var bVestibuleWestSegments = boxes.Values
+            .Where(box => box.Name.StartsWith(
+                "WallBSouthStairVestibuleWest_Segment", StringComparison.Ordinal))
+            .OrderBy(box => box.Center.Z)
+            .ToArray();
+        if (eastReturnSegments.Length != 2
+            || bVestibuleWestSegments.Length != 2
+            || eastReturnSegments.Any(box => !Mathf.IsEqualApprox(box.Size.X, 0.42f))
+            || bVestibuleWestSegments.Any(box => !Mathf.IsEqualApprox(box.Size.X, 0.42f)))
+        {
+            failed.Add($"door-segments-{eastReturnSegments.Length}-{bVestibuleWestSegments.Length}");
+        }
+
+        failures = string.Join('|', failed);
+        return failed.Count == 0;
+    }
+
     private static IReadOnlyList<BazaarStairRun> BazaarStairRuns(
         DemolitionArenaLayout layout)
     {
@@ -357,6 +418,10 @@ public partial class FreightTerminalWorld
             "Bazaar_Defender_Spawn_Paving",
             "Bazaar_A_InteriorFloor",
             "Bazaar_B_InteriorFloor",
+            "Bazaar_B_ServicePassage_Floor",
+            "Bazaar_A_SouthStair_Floor",
+            "Bazaar_B_SouthStair_Floor",
+            "Bazaar_Mid_SouthStair_Floor",
             "Bazaar_B_WarehouseRoof",
             "Bazaar_Mid_NorthConnector_Roof",
             "Bazaar_Mid_NorthTeaHall_Roof",

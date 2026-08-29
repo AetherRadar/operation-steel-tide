@@ -10,7 +10,7 @@ public sealed partial class DemolitionArenaBuilder
             root,
             "BazaarArenaTitle",
             layout.Origin + new Vector3(0.0f, 5.4f, -54.9f),
-            "BAZAAR CROSSING  //  BC-06",
+            "BAZAAR CROSSING  //  BC-01",
             0.0f,
             new Color(0.96f, 0.72f, 0.28f));
         AddSign(
@@ -144,7 +144,10 @@ public sealed partial class DemolitionArenaBuilder
             new Vector3(-17.0f, 2.8f, -47.0f),
             new Vector3(17.0f, 2.8f, -47.0f),
             new Vector3(-40.0f, 2.8f, -38.0f),
-            new Vector3(40.0f, 2.8f, -38.0f)
+            new Vector3(40.0f, 2.8f, -38.0f),
+            new Vector3(-56.0f, 3.2f, 3.1f),
+            new Vector3(56.0f, 3.2f, 2.5f),
+            new Vector3(-6.0f, 3.2f, 41.85f)
         };
         for (var index = 0; index < interiorPracticals.Length; index++)
         {

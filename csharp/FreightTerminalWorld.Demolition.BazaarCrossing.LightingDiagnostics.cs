@@ -31,7 +31,10 @@ public partial class FreightTerminalWorld
             new Vector3(-17.0f, 2.8f, -47.0f),
             new Vector3(17.0f, 2.8f, -47.0f),
             new Vector3(-40.0f, 2.8f, -38.0f),
-            new Vector3(40.0f, 2.8f, -38.0f)
+            new Vector3(40.0f, 2.8f, -38.0f),
+            new Vector3(-56.0f, 3.2f, 3.1f),
+            new Vector3(56.0f, 3.2f, 2.5f),
+            new Vector3(-6.0f, 3.2f, 41.85f)
         };
         var failures = new List<string>();
         var metadataCount = arenaRoot.HasMeta("bazaar_interior_practical_count")

@@ -70,7 +70,7 @@ public partial class FreightTerminalWorld
 
         var offer = DemolitionMapCatalog.Resolve(DemolitionMapCatalog.BazaarCrossingId);
         var catalogReady = offer.Id == DemolitionMapCatalog.BazaarCrossingId
-            && offer.Code == "MAP 06"
+            && offer.Code == "MAP 01"
             && offer.Available
             && offer.EnglishName == "BAZAAR CROSSING"
             && offer.EnglishSubtitle == "OLD-CITY MARKET  //  GALLERIES AND BRIDGES"
@@ -130,6 +130,16 @@ public partial class FreightTerminalWorld
         var groundRouteFailures = string.Join('|', groundRouteChecks
             .Where(check => !check.LayoutClear || !check.PhysicalClear)
             .Select(check => $"{check.Name}:{check.LayoutBlocker}:{check.PhysicalBlocker}"));
+        var serviceRoutePoints = BazaarBServiceRoute(layout);
+        var serviceGeometryReady = BazaarBServiceGeometryReady(
+            layout, out var serviceGeometryFailures);
+        var serviceLayoutClear = layout.HasCapsuleClearance(
+            serviceRoutePoints, out var serviceLayoutBlocker);
+        var servicePhysicalClear = BazaarPhysicalRouteClear(
+            GetWorld3D(), serviceRoutePoints, out var servicePhysicalBlocker);
+        var serviceRouteReady = serviceGeometryReady
+            && serviceLayoutClear
+            && servicePhysicalClear;
         var retakeChoicesReady = layout.SiteRotationPath.Count >= 10
             && layout.AuxiliaryPaths.Count == 4
             && layout.AuxiliaryPaths[0].All(point => Mathf.Abs(point.Y - layout.Origin.Y) <= 0.3f)
@@ -291,6 +301,7 @@ public partial class FreightTerminalWorld
             && spawnAndSiteReady
             && routeTimingReady
             && groundRoutesReady
+            && serviceRouteReady
             && retakeChoicesReady
             && sightlinesReady
             && density.Ready
@@ -312,6 +323,8 @@ public partial class FreightTerminalWorld
             + $"bounds={boundsReady}:136x112 root={arena.Root.Name} spawns_sites={spawnAndSiteReady}:5v5:2 "
             + $"timing={routeTimingReady}:{layout.AttackToALength:0.00}:{layout.AttackToBLength:0.00}:{layout.SiteTravelDifferenceRatio:0.000} "
             + $"ground_routes={groundRoutesReady}:7 failures={groundRouteFailures} retakes={retakeChoicesReady}:2 "
+            + $"b_service={serviceRouteReady}:{serviceGeometryReady}:{serviceLayoutClear}:{servicePhysicalClear} "
+            + $"service_failures={serviceGeometryFailures}:{serviceLayoutBlocker}:{servicePhysicalBlocker} "
             + $"sightlines={sightlinesReady} spawn_pair={spawnPairsBlocked} attack_sites={attackSpawnToSitesBlocked} "
             + $"defender_sites={defenderSpawnToSitesBlocked} site_pair={sitesMutuallyBlocked} "
             + $"density={density.Ready} site_visible={density.SiteVisiblePairs}/{density.SitePairCount} "

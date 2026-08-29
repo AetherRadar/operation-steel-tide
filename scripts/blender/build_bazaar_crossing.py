@@ -805,7 +805,7 @@ def clone_approved_materials() -> dict[str, bpy.types.Material]:
         "BazaarWarmPlaster",
         (0.46, 0.30, 0.18, 1.0),
         0.88,
-        tint_strength=0.48,
+        tint_strength=0.34,
     )
     # V2 roof, stair, and shopfront accents remain adaptations of the packed
     # Poly Haven surface set.  Keeping the source colour/normal texture graph
@@ -823,7 +823,7 @@ def clone_approved_materials() -> dict[str, bpy.types.Material]:
         "BazaarRoofSlate",
         (0.28, 0.43, 0.50, 1.0),
         0.78,
-        tint_strength=0.56,
+        tint_strength=0.42,
     )
     materials["BazaarRoofSandstone"] = make_tinted_pbr_material(
         materials["BazaarStonePaving"],
@@ -838,7 +838,7 @@ def clone_approved_materials() -> dict[str, bpy.types.Material]:
         (0.18, 0.31, 0.36, 1.0),
         0.64,
         metallic=0.18,
-        tint_strength=0.52,
+        tint_strength=0.38,
     )
     materials["BazaarSignOchre"] = make_tinted_pbr_material(
         materials["BazaarStonePaving"],
@@ -866,7 +866,7 @@ def clone_approved_materials() -> dict[str, bpy.types.Material]:
         "BazaarInteriorSlate",
         (0.20, 0.29, 0.31, 1.0),
         0.84,
-        tint_strength=0.38,
+        tint_strength=0.28,
     )
     materials["BazaarInteriorSand"] = make_tinted_pbr_material(
         materials["BazaarStonePaving"],
@@ -2068,6 +2068,8 @@ def make_segmented_wall(
     *,
     role: str,
     material: bpy.types.Material | None = None,
+    nominal_cell: float = 2.0,
+    depth_scale: float = 1.0,
 ) -> list[bpy.types.Object]:
     """Build a wall while leaving exact distance-along-run gameplay openings."""
     dx, dz = end[0] - start[0], end[1] - start[1]
@@ -2099,6 +2101,8 @@ def make_segmented_wall(
                     root,
                     role=role,
                     material=material,
+                    nominal_cell=nominal_cell,
+                    depth_scale=depth_scale,
                 )
             )
             section += 1
@@ -4795,13 +4799,188 @@ def build_map_v2(
         "finished_cc0_full_height_approach_facade_return",
         sign_face=-1.0,
     )
+
+    # The east return now contains a deliberate service door. It turns the
+    # former blind pocket into a short L-shaped route to the B stair vestibule
+    # while preserving the full-height sightline break on either side.
+    east_return_start = (52.0, -6.0)
+    east_return_end = (52.0, 12.0)
+    east_return_height = 8.0
+    east_service_center_z = 6.2
+    east_service_width = 3.2
+    east_opening = (
+        (
+            east_service_center_z - east_return_start[1] - east_service_width * 0.5,
+            east_service_center_z - east_return_start[1] + east_service_width * 0.5,
+        ),
+    )
+    east_return_bounds = (
+        f"{east_return_start[0]:.3f},{east_return_start[1]:.3f},"
+        f"{east_return_end[0]:.3f},{east_return_end[1]:.3f}"
+    )
+    for tier_index, (bottom, height, key, tier_material) in enumerate(
+        (
+            (0.0, 4.0, "quat_window_trim", warm),
+            (4.0, 4.0, "quat_metal_window", floor_slate),
+        )
+    ):
+        module_depth = source_dimensions(templates[key]).y
+        east_return_objects = make_segmented_wall(
+            f"Bazaar_EastApproachServiceReturn_{'Lower' if tier_index == 0 else 'Upper'}",
+            east_return_start,
+            east_return_end,
+            east_opening,
+            bottom,
+            height,
+            (key,),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_full_height_approach_service_return",
+            material=tier_material,
+            nominal_cell=2.35,
+            depth_scale=0.42 / module_depth,
+        )
+        for wall_object in east_return_objects:
+            wall_object["runtime_wall_thickness_m"] = 0.42
+            wall_object["runtime_wall_bounds_xz"] = east_return_bounds
+
+    east_service_edges = (-6.0, 4.6, 7.8, 12.0)
+    create_authored_column_set(
+        "Bazaar_EastApproachServiceReturn_Piers",
+        tuple((52.0, z, 0.0, east_return_height) for z in east_service_edges),
+        0.28,
+        templates,
+        specs,
+        roof_sand,
+        architecture,
+        root,
+        role="finished_cc0_approach_service_return_piers",
+    )
+    trim_depth = source_dimensions(templates["trey_roof_trim"]).y
+    for segment_index, (zmin, zmax) in enumerate(((-6.0, 4.6), (7.8, 12.0))):
+        for trim_index, trim_bottom in enumerate((0.10, 3.86, 7.70)):
+            make_module_run(
+                f"Bazaar_EastApproachServiceReturn_Segment{segment_index:02d}Trim{trim_index:02d}",
+                (52.0, zmin),
+                (52.0, zmax),
+                trim_bottom,
+                0.22,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_approach_service_return_cornice",
+                material=painted_steel,
+                nominal_cell=2.4,
+                depth_scale=0.42 / trim_depth,
+            )
+    make_portal(
+        "Bazaar_EastApproachServiceReturn_Portal",
+        (52.0, 0.0, east_service_center_z),
+        90.0,
+        east_service_width,
+        templates,
+        specs,
+        architecture,
+        root,
+        region="B_ServicePassage",
+    )
+
+    # A complete shopfront at the north end removes the leftover no-purpose
+    # cavity. Shelving and a runtime-aligned half-height counter make the new
+    # link read as a usable service stall rather than a collision correction.
     make_articulated_facade_return(
-        "Bazaar_EastApproachFacadeReturn",
-        (52.0, -6.0),
-        (52.0, 12.0),
+        "Bazaar_EastServicePocketClosure",
+        (52.0, 9.4),
+        (60.0, 9.4),
         8.0,
-        sign_teal,
-        "finished_cc0_full_height_approach_facade_return",
+        sign_ochre,
+        "finished_cc0_full_height_service_shopfront_closure",
+        sign_face=-1.0,
+    )
+    add_upper_shopfront_band(
+        "Bazaar_EastServicePocketClosure_InnerShopfront",
+        (52.4, 9.16),
+        (59.6, 9.16),
+        floor_sand,
+        bottom=4.16,
+        height=1.66,
+    )
+    make_tiled_patch(
+        "Bazaar_B_ServicePassage_Floor",
+        "quat_floor",
+        56.0,
+        4.0,
+        7.6,
+        10.4,
+        0.035,
+        0.12,
+        templates,
+        specs,
+        surface,
+        root,
+        role="finished_cc0_enterable_service_passage_floor",
+        material=floor_slate,
+    )
+    foundation_depth = source_dimensions(templates["trey_foundation"]).y
+    make_module_run(
+        "Bazaar_B_ServiceCounter",
+        (58.5, 1.4),
+        (58.5, 6.0),
+        0.0,
+        1.16,
+        ("trey_foundation",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_architectural_counter_cover",
+        material=painted_steel,
+        nominal_cell=2.3,
+        depth_scale=0.62 / foundation_depth,
+    )
+    add_wall_storage_rack(
+        "Bazaar_B_ServiceStallRack",
+        (59.48, 1.55),
+        (59.48, 5.85),
+        dark_timber,
+        shelf_levels=(0.70, 1.40, 2.10),
+        post_top=2.76,
+    )
+    make_module_run(
+        "Bazaar_B_ServiceStallAwning",
+        (59.38, 1.45),
+        (59.38, 5.95),
+        2.86,
+        0.34,
+        ("trey_roof_trim",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_wall_attached_market_awning",
+        material=roof_slate,
+        nominal_cell=2.25,
+        depth_scale=0.86,
+    )
+    make_module_run(
+        "Bazaar_B_ServiceStallSign",
+        (59.62, 1.70),
+        (59.62, 5.70),
+        3.38,
+        0.72,
+        ("trey_foundation",),
+        templates,
+        specs,
+        dressing,
+        root,
+        role="finished_cc0_wall_mounted_shop_sign",
+        material=sign_teal,
+        nominal_cell=2.0,
+        depth_scale=0.26,
     )
 
     # The Carpet Hall south return is an authored continuation of its façade,
@@ -5130,35 +5309,113 @@ def build_map_v2(
             root,
         )
 
-    # The three approach-side stairs enter through attached, roofed vestibules;
-    # the remaining flights sit inside their parent warehouse/arcade shells.
-    for vestibule_name, center_x, outer_z, building_z, roof_y, region in (
-        ("A_SouthStair", -56.0, 2.1, -4.0, 6.3, "A_Caravanserai"),
-        ("B_SouthStair", 56.0, 1.5, -6.0, 6.4, "B_MarketWarehouse"),
-        ("Mid_SouthStair", -6.0, 40.85, 34.0, 6.1, "Mid_IndoorConnector"),
-    ):
-        zmin, zmax = min(outer_z, building_z), max(outer_z, building_z)
-        for side_index, side_x in enumerate((center_x - 1.8, center_x + 1.8)):
-            make_module_run(
-                f"Bazaar_{vestibule_name}_SideWall{side_index:02d}",
-                (side_x, zmin),
-                (side_x, zmax),
-                0.0,
-                3.0,
-                ("trey_foundation", "quat_window_trim"),
+    # The three approach-side flights now use a real landing vestibule with a
+    # side entry. Players step into a small room and turn onto the stairs, so
+    # the doorway frame can no longer overlap the first treads.
+    def build_approach_stair_vestibule(
+        vestibule_name: str,
+        center_x: float,
+        building_z: float,
+        stair_bottom_z: float,
+        roof_y: float,
+        entry_on_east: bool,
+        region: str,
+        wall_material: bpy.types.Material,
+        roof_material: bpy.types.Material,
+        floor_material: bpy.types.Material,
+        sign_material: bpy.types.Material,
+    ) -> None:
+        half_width = 1.8
+        entry_width = 3.2
+        outer_z = stair_bottom_z + 4.3
+        entry_center_z = stair_bottom_z + 2.2
+        west_x = center_x - half_width
+        east_x = center_x + half_width
+        opening = (
+            (
+                entry_center_z - entry_width * 0.5 - building_z,
+                entry_center_z + entry_width * 0.5 - building_z,
+            ),
+        )
+        wall_bounds = f"{building_z:.3f},{outer_z:.3f}"
+        for side_name, side_x, has_entry in (
+            ("West", west_x, not entry_on_east),
+            ("East", east_x, entry_on_east),
+        ):
+            side_openings = opening if has_entry else ()
+            for tier_name, bottom, height, key, tier_material in (
+                ("Lower", 0.0, 3.0, "trey_foundation", wall_material),
+                ("Upper", 3.0, roof_y - 3.0, "quat_window_trim", floor_material),
+            ):
+                module_depth = source_dimensions(templates[key]).y
+                wall_objects = make_segmented_wall(
+                    f"Bazaar_{vestibule_name}_{side_name}{tier_name}",
+                    (side_x, building_z),
+                    (side_x, outer_z),
+                    side_openings,
+                    bottom,
+                    height,
+                    (key,),
+                    templates,
+                    specs,
+                    architecture,
+                    root,
+                    role="finished_cc0_attached_stair_vestibule_wall",
+                    material=tier_material,
+                    nominal_cell=2.2,
+                    depth_scale=0.42 / module_depth,
+                )
+                for wall_object in wall_objects:
+                    wall_object["runtime_wall_thickness_m"] = 0.42
+                    wall_object["runtime_wall_bounds_z"] = wall_bounds
+
+        for tier_name, bottom, height, key, tier_material in (
+            ("Lower", 0.0, 3.0, "trey_foundation", wall_material),
+            ("Upper", 3.0, roof_y - 3.0, "quat_metal_window", floor_material),
+        ):
+            module_depth = source_dimensions(templates[key]).y
+            outer_objects = make_module_run(
+                f"Bazaar_{vestibule_name}_Outer{tier_name}",
+                (west_x, outer_z),
+                (east_x, outer_z),
+                bottom,
+                height,
+                (key,),
                 templates,
                 specs,
                 architecture,
                 root,
-                role="finished_cc0_attached_stair_vestibule_wall",
+                role="finished_cc0_attached_stair_vestibule_outer_wall",
+                material=tier_material,
+                nominal_cell=1.8,
+                depth_scale=0.42 / module_depth,
             )
+            for wall_object in outer_objects:
+                wall_object["runtime_wall_thickness_m"] = 0.42
+
+        make_tiled_patch(
+            f"Bazaar_{vestibule_name}_Floor",
+            "quat_floor",
+            center_x,
+            (building_z + outer_z) * 0.5,
+            half_width * 2.0,
+            outer_z - building_z,
+            0.035,
+            0.12,
+            templates,
+            specs,
+            surface,
+            root,
+            role="finished_cc0_attached_stair_vestibule_floor",
+            material=floor_material,
+        )
         make_tiled_patch(
             f"Bazaar_{vestibule_name}_Roof",
             "quat_floor",
             center_x,
-            (zmin + zmax) * 0.5,
-            3.8,
-            zmax - zmin,
+            (building_z + outer_z) * 0.5,
+            half_width * 2.0 + 0.2,
+            outer_z - building_z,
             roof_y,
             0.14,
             templates,
@@ -5166,19 +5423,75 @@ def build_map_v2(
             architecture,
             root,
             role="finished_cc0_attached_stair_vestibule_roof",
-            material=roof_sand,
+            material=roof_material,
         )
+        entry_x = east_x if entry_on_east else west_x
         make_portal(
-            f"Bazaar_{vestibule_name}_EntryPortal",
-            (center_x, 0.0, outer_z),
-            0.0,
-            3.2,
+            f"Bazaar_{vestibule_name}_SideEntryPortal",
+            (entry_x, 0.0, entry_center_z),
+            90.0,
+            entry_width,
             templates,
             specs,
             architecture,
             root,
             region=region,
         )
+        create_authored_column_set(
+            f"Bazaar_{vestibule_name}_CornerPiers",
+            tuple(
+                (x, z, 0.0, roof_y)
+                for x in (west_x, east_x)
+                for z in (building_z, outer_z)
+            ),
+            0.24,
+            templates,
+            specs,
+            roof_sand,
+            architecture,
+            root,
+            role="finished_cc0_attached_stair_vestibule_corner_piers",
+        )
+        make_module_run(
+            f"Bazaar_{vestibule_name}_OuterSign",
+            (center_x - 1.32, outer_z - 0.02),
+            (center_x + 1.32, outer_z - 0.02),
+            3.26,
+            0.68,
+            ("trey_foundation",),
+            templates,
+            specs,
+            dressing,
+            root,
+            role="finished_cc0_wall_mounted_shop_sign",
+            material=sign_material,
+            nominal_cell=1.32,
+            depth_scale=0.26,
+        )
+        for trim_index, trim_bottom in enumerate((0.10, 2.88, roof_y - 0.28)):
+            make_module_run(
+                f"Bazaar_{vestibule_name}_OuterTrim{trim_index:02d}",
+                (west_x, outer_z - 0.02),
+                (east_x, outer_z - 0.02),
+                trim_bottom,
+                0.22,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_attached_stair_vestibule_cornice",
+                material=painted_steel,
+                nominal_cell=1.8,
+                depth_scale=0.72,
+            )
+
+    for vestibule_args in (
+        ("A_SouthStair", -56.0, -4.0, 2.1, 6.3, True, "A_Caravanserai", warm, roof_clay, floor_terracotta, sign_ochre),
+        ("B_SouthStair", 56.0, -6.0, 1.5, 6.4, False, "B_MarketWarehouse", concrete, roof_slate, floor_slate, sign_teal),
+        ("Mid_SouthStair", -6.0, 34.0, 40.85, 6.1, True, "Mid_IndoorConnector", warm, roof_sand, floor_sand, sign_ochre),
+    ):
+        build_approach_stair_vestibule(*vestibule_args)
 
     # Defender back market: three roofed transfer halls replace the former
     # exposed cross-map court. The spawn remains a small central breathing bay.
@@ -5668,6 +5981,9 @@ def add_review_lighting(collection: bpy.types.Collection) -> None:
             (38.0, 3.2, -18.0),
             (46.0, 3.2, -18.0),
             (55.0, 3.2, -18.0),
+            (53.6, 2.8, 6.2),
+            (56.0, 3.0, 2.5),
+            (58.4, 2.8, 5.4),
             (0.0, 3.0, -15.5),
             (-3.0, 3.0, -1.0),
             (3.0, 3.0, 12.0),
@@ -5713,8 +6029,17 @@ def render_previews(collection: bpy.types.Collection) -> None:
         ("04_mid_s_bend.png", (6.0, -18.5, 1.68), (-3.5, 1.45, 4.0), 31.0),
         ("05_mid_north_connector.png", (-6.0, 14.0, 1.68), (5.0, 1.45, -18.5), 28.0),
         ("06_back_market.png", (-50.0, 38.0, 1.68), (-29.0, 1.4, -38.0), 32.0),
+        ("07_b_service_link.png", (49.0, -8.0, 1.72), (54.2, 1.35, 5.3), 34.0),
+        ("08_b_stair_vestibule.png", (52.7, -4.8, 1.62), (55.8, 1.35, 1.0), 31.0),
     )
+    preview_filter = {
+        filename.strip()
+        for filename in os.environ.get("BAZAAR_PREVIEW_FILTER", "").split(",")
+        if filename.strip()
+    }
     for filename, blender_location, target, lens in views:
+        if preview_filter and filename not in preview_filter:
+            continue
         camera.location = blender_location
         camera_data.lens = lens
         point_camera(camera, target)
@@ -6353,8 +6678,19 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
         "Bazaar_Mid_EastConnectorReturn_Tier01_metal_window",
         "Bazaar_WestApproachFacadeReturn_Tier00_window_trim",
         "Bazaar_WestApproachFacadeReturn_Tier01_metal_window",
-        "Bazaar_EastApproachFacadeReturn_Tier00_window_trim",
-        "Bazaar_EastApproachFacadeReturn_Tier01_metal_window",
+        "Bazaar_EastApproachServiceReturn_Lower_Section00_window_trim",
+        "Bazaar_EastApproachServiceReturn_Lower_Section01_window_trim",
+        "Bazaar_EastApproachServiceReturn_Upper_Section00_metal_window",
+        "Bazaar_EastApproachServiceReturn_Upper_Section01_metal_window",
+        "Bazaar_EastApproachServiceReturn_Portal",
+        "Bazaar_EastServicePocketClosure_Tier00_window_trim",
+        "Bazaar_EastServicePocketClosure_Tier01_metal_window",
+        "Bazaar_A_SouthStair_Roof",
+        "Bazaar_A_SouthStair_SideEntryPortal",
+        "Bazaar_B_SouthStair_Roof",
+        "Bazaar_B_SouthStair_SideEntryPortal",
+        "Bazaar_Mid_SouthStair_Roof",
+        "Bazaar_Mid_SouthStair_SideEntryPortal",
         "Bazaar_MidCarpetSouthFacadeReturn_Tier00_window_trim",
         "Bazaar_MidCarpetSouthFacadeReturn_Tier01_metal_window",
         "Bazaar_Defender_WestFoyerPier_Tier00_window_trim",
@@ -6592,7 +6928,9 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
 
     for wall_name, expected_bounds in (
         ("Bazaar_WestApproachFacadeReturn_Tier00_window_trim", "-49.000,-4.000,-49.000,12.000"),
-        ("Bazaar_EastApproachFacadeReturn_Tier00_window_trim", "52.000,-6.000,52.000,12.000"),
+        ("Bazaar_EastApproachServiceReturn_Lower_Section00_window_trim", "52.000,-6.000,52.000,12.000"),
+        ("Bazaar_EastApproachServiceReturn_Lower_Section01_window_trim", "52.000,-6.000,52.000,12.000"),
+        ("Bazaar_EastServicePocketClosure_Tier00_window_trim", "52.000,9.400,60.000,9.400"),
         ("Bazaar_Mid_WestConnectorReturn_Tier00_window_trim", "-20.000,-21.000,-20.000,-17.800"),
         ("Bazaar_Mid_EastConnectorReturn_Tier00_window_trim", "20.000,-14.800,20.000,-12.000"),
         ("Bazaar_MidCarpetSouthFacadeReturn_Tier00_window_trim", "3.000,34.000,8.000,34.000"),
@@ -6607,6 +6945,44 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
             or wall.get("runtime_wall_bounds_xz") != expected_bounds
         ):
             raise RuntimeError(f"Runtime facade-return contract drifted: {wall_name}")
+
+    for vestibule_name, expected_entry_x, expected_entry_z, expected_roof_y in (
+        ("A_SouthStair", -54.2, 4.3, 6.3),
+        ("B_SouthStair", 54.2, 3.7, 6.4),
+        ("Mid_SouthStair", -4.2, 43.05, 6.1),
+    ):
+        portal = bpy.data.objects[f"Bazaar_{vestibule_name}_SideEntryPortal"]
+        roof = bpy.data.objects[f"Bazaar_{vestibule_name}_Roof"]
+        expected_portal_location = godot_to_blender(expected_entry_x, 0.0, expected_entry_z)
+        if (
+            (portal.location - expected_portal_location).length > 0.002
+            or abs(float(portal.get("clear_opening_width_m", 0.0)) - 3.2) > 0.001
+        ):
+            raise RuntimeError(f"Stair vestibule side-entry contract drifted: {vestibule_name}")
+        roof_top = max((roof.matrix_world @ Vector(corner)).z for corner in roof.bound_box)
+        if abs(roof_top - (expected_roof_y + 0.14)) > 0.012:
+            raise RuntimeError(f"Stair vestibule roof contract drifted: {vestibule_name}")
+
+    service_counter = bpy.data.objects["Bazaar_B_ServiceCounter_foundation"]
+    service_counter_points = [
+        service_counter.matrix_world @ Vector(corner) for corner in service_counter.bound_box
+    ]
+    service_counter_bounds = (
+        min(point.x for point in service_counter_points),
+        max(point.x for point in service_counter_points),
+        min(-point.y for point in service_counter_points),
+        max(-point.y for point in service_counter_points),
+        max(point.z for point in service_counter_points),
+    )
+    expected_service_counter_bounds = (58.19, 58.81, 1.4, 6.0, 1.16)
+    if any(
+        abs(actual - expected) > 0.012
+        for actual, expected in zip(service_counter_bounds, expected_service_counter_bounds)
+    ):
+        raise RuntimeError(
+            "B service counter drifted from runtime cover: "
+            f"actual={service_counter_bounds} expected={expected_service_counter_bounds}"
+        )
 
     platform_contract = {
         "Bazaar_A_Gallery_Deck": 3.6,

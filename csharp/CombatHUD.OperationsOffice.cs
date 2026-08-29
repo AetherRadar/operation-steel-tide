@@ -117,7 +117,7 @@ public partial class CombatHUD
     public string SelectedDemolitionMapId
         => IsInstanceValid(_demolitionBriefingView)
             ? _demolitionBriefingView.SelectedMapId
-            : DemolitionMapCatalog.TideforgeId;
+            : DemolitionMapCatalog.BazaarCrossingId;
     public SquadSessionMode SelectedDemolitionSessionMode
         => IsInstanceValid(_demolitionBriefingView)
             ? _demolitionBriefingView.SelectedSessionMode
@@ -131,7 +131,7 @@ public partial class CombatHUD
     public string BrowsedDemolitionMapId
         => IsInstanceValid(_demolitionBriefingView)
             ? _demolitionBriefingView.BrowsedMapId
-            : DemolitionMapCatalog.TideforgeId;
+            : DemolitionMapCatalog.BazaarCrossingId;
     public int BrowsedDemolitionMapIndex
         => IsInstanceValid(_demolitionBriefingView) ? _demolitionBriefingView.BrowsedMapIndex : 0;
     public bool BrowsedDemolitionMapAvailable

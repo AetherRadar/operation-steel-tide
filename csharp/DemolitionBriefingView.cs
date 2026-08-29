@@ -54,7 +54,7 @@ public partial class DemolitionBriefingView : ColorRect
     private readonly Label[] _roleNames = new Label[3];
     private readonly Label[] _roleDetails = new Label[3];
     private OperatorRole _selectedRole = OperatorRole.Assault;
-    private string _selectedMapId = DemolitionMapCatalog.TideforgeId;
+    private string _selectedMapId = DemolitionMapCatalog.BazaarCrossingId;
     private int _browsedMapIndex;
     private string _language = "en";
     private SquadSessionMode _sessionMode = SquadSessionMode.Local;

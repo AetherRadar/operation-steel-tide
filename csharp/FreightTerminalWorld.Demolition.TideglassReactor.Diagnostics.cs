@@ -34,7 +34,7 @@ public partial class FreightTerminalWorld
 
         var offer = DemolitionMapCatalog.Resolve(DemolitionMapCatalog.TideglassReactorId);
         var catalogReady = offer.Id == DemolitionMapCatalog.TideglassReactorId
-            && offer.Code == "MAP 03"
+            && offer.Code == "MAP 04"
             && offer.Available
             && offer.LocalizationKey == "demolition_map_tideglass_reactor"
             && offer.SubtitleLocalizationKey == "demolition_map_tideglass_reactor_subtitle"

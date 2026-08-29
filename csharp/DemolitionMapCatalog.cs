@@ -29,8 +29,18 @@ public static class DemolitionMapCatalog
     public static readonly IReadOnlyList<DemolitionMapOffer> Maps = new[]
     {
         new DemolitionMapOffer(
-            TideforgeId,
+            BazaarCrossingId,
             "MAP 01",
+            "demolition_map_bazaar_crossing",
+            "BAZAAR CROSSING",
+            "demolition_map_bazaar_crossing_subtitle",
+            "OLD-CITY MARKET  //  GALLERIES AND BRIDGES",
+            true,
+            "demolition_map_bazaar_crossing_profile",
+            "THREE-LANE OLD-CITY ASSAULT  //  BROKEN SIGHTLINES  //  THREE PLAYABLE ELEVATIONS\nA  WEST GALLERY COURT  //  B  EAST BALCONY MARKET"),
+        new DemolitionMapOffer(
+            TideforgeId,
+            "MAP 02",
             "demolition_map_tideforge",
             "TIDEFORGE ARENA",
             "demolition_map_tideforge_subtitle",
@@ -38,7 +48,7 @@ public static class DemolitionMapCatalog
             true),
         new DemolitionMapOffer(
             HarborLocksId,
-            "MAP 02",
+            "MAP 03",
             "demolition_map_harbor_locks",
             "HARBOR LOCKS",
             "demolition_map_harbor_locks_subtitle",
@@ -48,7 +58,7 @@ public static class DemolitionMapCatalog
             "THREE LOCK LANES  //  HARD COVER ROTATIONS  //  LONG QUAYSIDE ANGLES\nA  WEST CONTROL YARD  //  B  EAST PUMP ANNEX"),
         new DemolitionMapOffer(
             TideglassReactorId,
-            "MAP 03",
+            "MAP 04",
             "demolition_map_tideglass_reactor",
             "TIDEGLASS REACTOR",
             "demolition_map_tideglass_reactor_subtitle",
@@ -58,7 +68,7 @@ public static class DemolitionMapCatalog
             "DIAGONAL URBAN ASSAULT  //  FOUR DISTINCT DISTRICTS  //  CROSSROAD ROTATIONS\nA  CONSTRUCTION COURT  //  B  OLD REACTOR LOADING YARD"),
         new DemolitionMapOffer(
             "drydock_yard",
-            "MAP 04",
+            "MAP 05",
             "demolition_map_drydock_yard",
             "DRYDOCK YARD",
             "demolition_map_locked_subtitle",
@@ -66,22 +76,12 @@ public static class DemolitionMapCatalog
             false),
         new DemolitionMapOffer(
             "observatory_ridge",
-            "MAP 05",
+            "MAP 06",
             "demolition_map_observatory_ridge",
             "OBSERVATORY RIDGE",
             "demolition_map_locked_subtitle",
             "HILLSIDE RELAY  //  IN CONSTRUCTION",
             false),
-        new DemolitionMapOffer(
-            BazaarCrossingId,
-            "MAP 06",
-            "demolition_map_bazaar_crossing",
-            "BAZAAR CROSSING",
-            "demolition_map_bazaar_crossing_subtitle",
-            "OLD-CITY MARKET  //  GALLERIES AND BRIDGES",
-            true,
-            "demolition_map_bazaar_crossing_profile",
-            "THREE-LANE OLD-CITY ASSAULT  //  BROKEN SIGHTLINES  //  THREE PLAYABLE ELEVATIONS\nA  WEST GALLERY COURT  //  B  EAST BALCONY MARKET"),
         new DemolitionMapOffer(
             "skybridge_terminal",
             "MAP 07",

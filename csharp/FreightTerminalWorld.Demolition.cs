@@ -54,7 +54,7 @@ public partial class FreightTerminalWorld
     private float _demolitionIntermissionRemaining;
     private float _demolitionStrategyRemaining;
     private OperatorRole _demolitionPlayerRole = OperatorRole.Assault;
-    private string _demolitionSelectedMapId = DemolitionMapCatalog.TideforgeId;
+    private string _demolitionSelectedMapId = DemolitionMapCatalog.BazaarCrossingId;
     private DemolitionStrategyPlan? _demolitionAttackerPlan;
     private DemolitionStrategyPlan? _demolitionDefenderPlan;
     private string? _demolitionAttackerPlanObjectiveMemberId;

@@ -18,9 +18,12 @@ retained as provenance.
 - map-local source palette SHA-256:
   `1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9`;
 - generated packed Blend SHA-256:
-  `A4459F775CF846D0EDD98302E1750BFEB0CDED1C0FD8DA2DE422420F3DD7B720`;
+  `E70280A5766BB8F807A247455C0B5227B235F38D8171731D33A8AE266EF35A95`;
 - generated runtime GLB SHA-256:
-  `CA68AC570E2FAA9FF284FBB25909888BE4AC93F9C661106525A6204801C43164`.
+  `741CD2546064219A27BE67B5449DD966DC531BC820AD1C7208FA3387CAD8E03A`.
+
+The packed artifacts were regenerated on 2026-08-30 after the authored stair
+vestibule, B service passage, and material-balance refinement.
 
 The GLB is exported without `KHR_draco_mesh_compression`; disabling a binary
 compression extension does not alter the source licenses or provenance.
