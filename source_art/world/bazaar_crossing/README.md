@@ -1,16 +1,17 @@
-# Bazaar Crossing DCC Source
+# Bazaar Crossing V2 DCC Source
 
-`bazaar_crossing_source_palette.blend` is the authoritative, map-local Blender
-4.5 LTS input for Bazaar Crossing. It contains only the exact audited CC0
-source objects, materials, and packed textures used by this map. Its SHA-256
-is `0073ADE0E13682C47A07CCBE02B499BFF8FBD25C0C98DA908BB58A94FEE4F1F4`.
-Daily rebuilds do not open or depend on the mutable Jianghai Old City Blend.
+`bazaar_crossing_source_palette.blend` is the immutable, map-local Blender 4.5
+LTS input for Bazaar Crossing V2. It contains only audited CC0 source objects,
+materials, and packed textures used by this map. Its SHA-256 is
+`1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9`.
+Daily rebuilds never open the mutable Jianghai Old City Blend.
 
-`scripts/blender/build_bazaar_crossing.py` validates that pinned palette,
-arranges and adapts finished CC0 modules, renders four review views, saves the
-packed `bazaar_crossing.blend`, exports the runtime GLB, imports the GLB again,
-and writes a deterministic validation report. It rejects every exported visible
-mesh whose origin is not CC0.
+`scripts/blender/build_bazaar_crossing.py` validates that palette, assembles
+finished CC0 modules into the dense arena, renders six review views, saves the
+packed DCC source, exports a Godot-compatible non-Draco runtime GLB, imports
+the GLB again, and writes `bazaar_crossing_build_report.json`. It rejects every
+visible mesh whose source is not CC0 and parses the exported GLB JSON to reject
+`KHR_draco_mesh_compression` in required, used, or per-primitive extensions.
 
 ## Rebuild
 
@@ -25,79 +26,98 @@ From the repository root:
 
 Generated artifacts:
 
-- `source_art/world/bazaar_crossing/bazaar_crossing.blend`
-- `source_art/world/bazaar_crossing/bazaar_crossing_build_report.json`
-- `source_art/world/bazaar_crossing/previews/*.png`
-- `assets/models/bazaar_crossing/bazaar_crossing.glb`
+- `source_art/world/bazaar_crossing/bazaar_crossing.blend`;
+- `source_art/world/bazaar_crossing/bazaar_crossing_build_report.json`;
+- `source_art/world/bazaar_crossing/previews/*.png`;
+- `assets/models/bazaar_crossing/bazaar_crossing.glb`.
 
-The build prints `BAZAAR_DCC_PASS` only after the authored-source, UV/material,
-budget, bounds, exact GLB round-trip triangle, and provenance gates all pass.
+Set the task-specific environment variable `BAZAAR_SKIP_PREVIEWS=1` only for a
+fast structural iteration. A delivery build must render the review views.
 
-## Authored module contract
+## V2 architectural contract
 
-The three decks, bridge, six stairs, fourteen runtime-aligned guardrail runs,
-supports, fascia, and canopy are arrangements or DCC adaptations of finished
-Trey Ramm/minime453 Modular Industrial Pieces modules under CC0. The pinned
-palette includes exactly these seven structural sources:
+V2 does not use the former copied boundary-building grid or three exposed
+industrial plates. Its main combat spaces are complete modular buildings:
 
-- `IndStairsWideFull` for the six stair assemblies;
-- `IndFloorGreyPlatformFull` for ground, route, site-pad, deck-top, and deck-
-  underside surfaces;
-- `IndRoofTrimBStraightFull` for open rails, stair rails, fascia, and canopy
-  trim;
-- `IndColumnFree` for deck, canopy, guardrail, stair, and lantern supports;
-- `IndColumnFreeCap` for deck capitals;
-- `IndFoundationAStraightFull` for deck edges and stair stringer/foundation
-  mass;
-- `IndRoofDarkGreyAngledFull` for the Mid market canopy.
+| Region | Footprint and identity | Elevated route |
+|---|---|---|
+| A Caravanserai | `x[-60,-34] z[-31,-4]`; two-storey perimeter, open `10 x 10 m` courtyard, covered arcades, vestibule, and divided rear warehouse | Gallery `x[-59,-53] z[-27,-9]`, top `y=3.6` |
+| B Market Warehouse | `x[34,60] z[-30,-6]`; fully roofed hall, 12-column grid, loading arcade, stock room, counters, beams, and clerestory | Balcony `x[53,59] z[-27,-9]`, top `y=3.4` |
+| Mid Indoor Connector | Three staggered market halls plus north junction `x[-9,9] z[-24,-7]`; offset A/B doors and two internal baffles prevent a site-to-site view | Mezzanine `x[-9,-3] z[17,31]`, top `y=3.2`, facing Mid only |
+| Defender Back Market | Four roofed transfer halls bounded by seven full-height rear city blocks; 5-7 m folded retake lanes and a 14 m spawn breathing bay | Ground route |
 
-The report records the exact source-object and module-instance mapping for all
-six stairs, three decks, fourteen guardrails, and the canopy. No programmatic
-box, prism, CSG, or generated mesh is exported as visible art. Project-authored
-MIT work is limited to layout, transforms, UV/material retargeting, metadata,
-review lighting/cameras, validation, and invisible gameplay scaffolding.
+The arena additionally contains 37 coherent closed modular blocks with complete
+facades, returns, cornices, and roofs. Only four legacy Old City buildings
+remain, all as distant perimeter landmarks. Props are landmarks and dressing;
+the report's cover gate requires at least 70% of cover contributors to be
+walls, arcades, columns, counters, partitions, portals, or kiosks.
+
+## Authored source modules
+
+The palette pins 16 Trey Ramm Modular Industrial Pieces sources: the original
+stair, platform floor, rail, column, column cap, foundation, and angled roof,
+plus wall, double arch, arch columns, arch cap, door frame, flat roof, solid
+floor, window, and roof-trim modules. Six Quaternius Downtown City MegaKit
+sources add red-brick wall panels, detailed door frames, two window families,
+industrial first-floor windows, and double-sided interior floor/ceiling tiles.
+
+Large visible components are arrangements or real DCC adaptations of those
+finished modules. There is no exported primitive, CSG, procedural box, or
+stretched whole-building shell. Poly Haven and BlenderKit CC0 props provide
+limited room landmarks and the four outer facades. Exact paths and mappings are
+in `LICENSE.md`.
 
 ## Coordinate and traversal contract
 
 One Blender unit is one meter. Godot local `(x, y, z)` is authored in Blender
-as `(x, -z, y)`. The exported root remains at the origin with unit scale.
+as `(x, -z, y)`. The root remains at the origin with unit scale.
 
-| Structure | Godot top center / footprint | Visual stairs |
+| Stair | Visual low -> high | Width / slope |
 |---|---|---|
-| A Gallery | `(-57, 3, -20)`, `12 x 20 m` | South and east; 18 steps, 3.2 m wide, 9.72 m run |
-| Mid Bridge | `(0, 3, 0)`, `26 x 3.6 m` | West and east; 18 steps, 3.2 m wide, 9.72 m run |
-| B Balcony | `(57, 2.6, -22)`, `12 x 18 m` | South and west; 16 steps, 3.2 m wide, 8.32 m run |
+| A South | `(-56,0,2.1)` -> `(-56,3.6,-9)` | `3.2 m` / `17.9691 deg` |
+| A Rear | `(-41.9,0,-27)` -> `(-53,3.6,-27)` | `3.2 m` / `17.9691 deg` |
+| B South | `(56,0,1.5)` -> `(56,3.4,-9)` | `3.2 m` / `17.9424 deg` |
+| B Rear | `(42.5,0,-27)` -> `(53,3.4,-27)` | `3.2 m` / `17.9424 deg` |
+| Mid South | `(-6,0,40.85)` -> `(-6,3.2,31)` | `3.2 m` / `17.9976 deg` |
+| Mid North | `(-6,0,7.15)` -> `(-6,3.2,17)` | `3.2 m` / `17.9976 deg` |
 
-The six named visual stairs retain the frozen runtime endpoints. Deck top and
-underside modules explain the full invisible collision thickness. Open authored
-rails preserve every exact 3.2 m stair gap. Godot continues to own collision,
-navigation, spawns, bomb sites, and smooth traversal ramps.
-
-The map also provides finished CC0 visible explanations for all eleven runtime
-architecture AABBs, four bomb-site cover clusters, four elevated barrel banks,
-two Coffee Cart covers, and `SightBlockSitePair`. Eight elevated market props
-and seven visibly supported lanterns reduce empty deck silhouettes.
+The three approach-side flights occupy attached, roofed stair vestibules. Rear
+flights are inside their parent buildings. Inner rails leave landing gaps.
+Godot owns collision, navigation, spawns, sites, and smooth route surfaces;
+visual low points correspond to runtime route points at `y=0.2`.
 
 ## Current verified budget
 
-The current report records `BAZAAR_DCC_PASS` with:
+The V2 report records:
 
-- 277 visible mesh nodes, 116 unique meshes, and 298 material surfaces;
-- 249,216 raw whitelisted-source triangles;
-- 272,916 unique delivered triangles and 2,771,825 instanced triangles;
-- 28 DCC materials and 46 DCC textures;
-- 127.473 MiB estimated RGBA8 plus full-mip-chain texture memory;
-- 31,089,036-byte GLB and 22,580,020-byte packed output Blend;
-- Blender bounds X `[-68, 68]`, Y `[-56, 56]`, Z `[-0.16, 7.5021]`.
+- 1,492 -> 729 visible mesh draw nodes and 2,129 -> 1,032 material surfaces
+  after same-region, same-material, same-responsibility static consolidation;
+- 669 unique meshes in the final packed DCC scene;
+- 252,707 raw whitelisted-source triangles;
+- 850,309 unique and 1,148,671 delivered instance triangles, unchanged by
+  draw-node consolidation and GLB round trip;
+- 49 DCC materials and 58 DCC textures;
+- 203.473 MiB estimated RGBA8 plus full-mip-chain texture memory;
+- 112,618,852-byte non-Draco GLB, SHA-256
+  `CA68AC570E2FAA9FF284FBB25909888BE4AC93F9C661106525A6204801C43164`;
+- 50,379,943-byte packed Blend, SHA-256
+  `A4459F775CF846D0EDD98302E1750BFEB0CDED1C0FD8DA2DE422420F3DD7B720`;
+- bounds X `[-68,68]`, Blender Y `[-56.2,56.2]`, Z `[-0.16,9.46]`;
+- four complete enterable interiors and 9,997.683 square metres of roofed
+  footprint;
+- 135 continuous storage parts, 108 continuous shopfront parts, 109 skyline
+  articulation parts, and four back-service gate parts;
+- exact required-object, bounds, and triangle preservation after GLB
+  round-trip import;
+- no `KHR_draco_mesh_compression`; the only required GLB extension is
+  `EXT_texture_webp`.
 
-Every texture is at most 1024 px. Every visible mesh is CC0-sourced,
-triangulated, material-backed, UV-complete, and provenance-complete after GLB
-round-trip import. The JSON report is the authority if these numbers change.
+Every texture is at most 1024 px. The JSON report remains authoritative if a
+rebuild changes byte counts or hashes.
 
 ## Editing policy
 
 The build script is the reproducible source of composition and source
 selection. Any hand edit to a generated artifact must be reflected in the
-script. Do not append unrelated source collections, mountains, private assets,
-or unclear-license content. See `LICENSE.md` for the complete local source
-record.
+script. Do not append private, paid, unclear-license, CC BY, mountain, or
+untracked marketplace content.

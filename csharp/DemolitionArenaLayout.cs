@@ -193,7 +193,7 @@ public sealed partial class DemolitionArenaLayout
         {
             AttackSpawn = World(new Vector3(0.0f, 0.22f, 49.0f));
             DefenderSpawn = World(new Vector3(0.0f, 0.22f, -49.0f));
-            Midpoint = World(new Vector3(0.0f, 0.2f, -6.0f));
+            Midpoint = World(new Vector3(0.0f, 0.2f, -14.5f));
             WorldBounds = new Rect2(Origin.X - 68.0f, Origin.Z - 56.0f, 136.0f, 112.0f);
             LocalSiteCoordinates = BuildBazaarCrossingLocalSiteCoordinates();
             SitePositions = BuildBazaarCrossingSitePositions();
@@ -349,14 +349,14 @@ public sealed partial class DemolitionArenaLayout
             : tideglassReactor
                 ? new[] { 3.4f, 3.8f, 4.6f, 5.4f, 7.0f }
                 : bazaarCrossing
-                    ? new[] { 3.2f, 3.4f, 3.8f, 5.2f, 7.0f }
+                    ? BuildBazaarCrossingCriticalPassageWidths()
                     : new[] { 3.8f, 4.2f, 4.5f, 5.2f, 6.0f };
         CriticalPassageHeights = harborLocks
             ? new[] { 3.0f, 3.8f, 5.0f, 7.5f }
             : tideglassReactor
                 ? new[] { 3.0f, 3.6f, 4.8f, 8.0f }
                 : bazaarCrossing
-                    ? new[] { 2.7f, 3.0f, 3.2f, 5.0f }
+                    ? BuildBazaarCrossingCriticalPassageHeights()
                     : new[] { 2.7f, 3.2f, 4.2f, 6.0f };
     }
 
@@ -461,7 +461,12 @@ public sealed partial class DemolitionArenaLayout
         }
         foreach (var wall in CollisionBoxes)
         {
-            if (!wall.Name.StartsWith("SightBlock", StringComparison.Ordinal))
+            var bazaarArchitecture = MapId == DemolitionMapCatalog.BazaarCrossingId
+                && (wall.Name.StartsWith("Mass", StringComparison.Ordinal)
+                    || wall.Name.StartsWith("Wall", StringComparison.Ordinal)
+                    || wall.Name.StartsWith("Partition", StringComparison.Ordinal));
+            if (!wall.Name.StartsWith("SightBlock", StringComparison.Ordinal)
+                && !bazaarArchitecture)
             {
                 continue;
             }

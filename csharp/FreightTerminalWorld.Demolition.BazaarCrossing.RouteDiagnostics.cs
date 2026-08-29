@@ -96,7 +96,9 @@ public partial class FreightTerminalWorld
             }
 
             var firstDirection = stair.Points[1] - stair.Low;
-            var side = new Vector3(-firstDirection.Z, 0.0f, firstDirection.X).Normalized() * 1.8f;
+            // Probe both halves from inside the 3.04 m guarded channel. A 1.0 m
+            // offset preserves more than a player radius to either inner rail face.
+            var side = new Vector3(-firstDirection.Z, 0.0f, firstDirection.X).Normalized() * 1.0f;
             var sideCenter = stair.Points[1];
             sideCenter.Y = layout.Origin.Y + 0.2f;
             foreach (var probe in new[]

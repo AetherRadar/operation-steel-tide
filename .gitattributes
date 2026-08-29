@@ -1,5 +1,6 @@
 *.cs text eol=crlf whitespace=cr-at-eol
 *.py text eol=crlf whitespace=cr-at-eol
+assets/models/bazaar_crossing/bazaar_crossing.glb filter=lfs diff=lfs merge=lfs -text
 assets/models/polyhaven_residential_street/**/*.gltf -text
 assets/models/kenney_city_kit_roads/KENNEY_LICENSE.txt whitespace=-blank-at-eol
 source_art/third_party/majadroid_construction_site/INFO.txt whitespace=-blank-at-eol

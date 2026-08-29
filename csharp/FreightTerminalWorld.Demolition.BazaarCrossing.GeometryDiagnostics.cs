@@ -46,7 +46,7 @@ public partial class FreightTerminalWorld
         return new[]
         {
             ("a-gallery", layout.AuxiliaryPaths[1]),
-            ("mid-bridge", layout.AuxiliaryPaths[2]),
+            ("mid-mezzanine", layout.AuxiliaryPaths[2]),
             ("b-balcony", layout.AuxiliaryPaths[3])
         };
     }
@@ -118,10 +118,18 @@ public partial class FreightTerminalWorld
         var boxes = layout.TraversalBoxes;
         var decks = boxes.Where(box => box.Name.EndsWith("Deck", StringComparison.Ordinal)).ToArray();
         var ramps = boxes.Where(box => box.Name.EndsWith("Ramp", StringComparison.Ordinal)).ToArray();
+        var guardRails = layout.CollisionBoxes
+            .Where(box => box.Name.StartsWith("GuardRail", StringComparison.Ordinal))
+            .ToArray();
         var failed = new List<string>();
         if (boxes.Count != 9 || decks.Length != 3 || ramps.Length != 6)
         {
             failed.Add($"counts-{boxes.Count}-{decks.Length}-{ramps.Length}");
+        }
+        if (guardRails.Length != 15
+            || boxes.Any(box => box.Name.StartsWith("GuardRail", StringComparison.Ordinal)))
+        {
+            failed.Add($"guardrail-separation-{guardRails.Length}");
         }
         if (boxes.Any(box => box.Visible))
         {
@@ -293,13 +301,13 @@ public partial class FreightTerminalWorld
         {
             (Art: "Bazaar_A_Gallery_Deck", Box: "TraversalAGalleryDeck", Stair: (string?)null),
             (Art: "Bazaar_A_Gallery_South_Stair", Box: "TraversalAGallerySouthRamp", Stair: "a-gallery-entry-1"),
-            (Art: "Bazaar_A_Gallery_East_Stair", Box: "TraversalAGalleryEastRamp", Stair: "a-gallery-entry-2"),
-            (Art: "Bazaar_Mid_Bridge_Deck", Box: "TraversalMidBridgeDeck", Stair: (string?)null),
-            (Art: "Bazaar_Mid_Bridge_West_Stair", Box: "TraversalMidBridgeWestRamp", Stair: "mid-bridge-entry-1"),
-            (Art: "Bazaar_Mid_Bridge_East_Stair", Box: "TraversalMidBridgeEastRamp", Stair: "mid-bridge-entry-2"),
+            (Art: "Bazaar_A_Gallery_Rear_Stair", Box: "TraversalAGalleryRearRamp", Stair: "a-gallery-entry-2"),
+            (Art: "Bazaar_Mid_Mezzanine_Deck", Box: "TraversalMidMezzanineDeck", Stair: (string?)null),
+            (Art: "Bazaar_Mid_Mezzanine_South_Stair", Box: "TraversalMidMezzanineSouthRamp", Stair: "mid-mezzanine-entry-1"),
+            (Art: "Bazaar_Mid_Mezzanine_North_Stair", Box: "TraversalMidMezzanineNorthRamp", Stair: "mid-mezzanine-entry-2"),
             (Art: "Bazaar_B_Balcony_Deck", Box: "TraversalBBalconyDeck", Stair: (string?)null),
             (Art: "Bazaar_B_Balcony_South_Stair", Box: "TraversalBBalconySouthRamp", Stair: "b-balcony-entry-1"),
-            (Art: "Bazaar_B_Balcony_West_Stair", Box: "TraversalBBalconyWestRamp", Stair: "b-balcony-entry-2")
+            (Art: "Bazaar_B_Balcony_Rear_Stair", Box: "TraversalBBalconyRearRamp", Stair: "b-balcony-entry-2")
         };
         var detailedStairs = BazaarDetailedStairRuns(layout);
         foreach (var contract in traversalContracts)
@@ -342,14 +350,22 @@ public partial class FreightTerminalWorld
         var texturedSurfaces = traversalContracts.Select(entry => entry.Art).Concat(new[]
         {
             "BazaarGroundAuthoredMesh",
-            "Bazaar_A_Long_Paving",
-            "Bazaar_Mid_Paving",
-            "Bazaar_B_Banana_Paving",
-            "Bazaar_Attacker_Court",
-            "Bazaar_Defender_Court"
+            "Bazaar_Attacker_Foyer_Paving",
+            "Bazaar_A_Approach_Paving",
+            "Bazaar_Mid_Approach_Paving",
+            "Bazaar_B_Approach_Paving",
+            "Bazaar_Defender_Spawn_Paving",
+            "Bazaar_A_InteriorFloor",
+            "Bazaar_B_InteriorFloor",
+            "Bazaar_B_WarehouseRoof",
+            "Bazaar_Mid_NorthConnector_Roof",
+            "Bazaar_Mid_NorthTeaHall_Roof",
+            "Bazaar_Mid_CenterProduceHall_Roof",
+            "Bazaar_Mid_SouthCarpetHall_Roof"
         }).ToArray();
         var roadSurfaces = new HashSet<string>(texturedSurfaces.Where(name =>
-            name == "BazaarGroundAuthoredMesh" || name.EndsWith("Paving", StringComparison.Ordinal)));
+            name == "BazaarGroundAuthoredMesh"
+            || name.EndsWith("Paving", StringComparison.Ordinal)));
         foreach (var surfaceName in texturedSurfaces)
         {
             var mesh = meshes.SingleOrDefault(candidate => candidate.Name == surfaceName);
@@ -388,9 +404,9 @@ public partial class FreightTerminalWorld
                 failed.Add($"texture-{surfaceName}");
             }
         }
-        if (visibleMeshCount != 277)
+        if (visibleMeshCount is < 500 or > 800)
         {
-            failed.Add($"visible-mesh-count-{visibleMeshCount}/277");
+            failed.Add($"visible-mesh-count-{visibleMeshCount}/500-800");
         }
         failures = string.Join('|', failed.Take(24));
         return failed.Count == 0;

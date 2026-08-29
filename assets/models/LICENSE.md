@@ -159,50 +159,107 @@ and rejects missing roots, markers, materials, triangle-count drift, or an
 out-of-budget mesh. The triangle counts above are the exact triangulated GLB
 counts verified by that round-trip, not estimates.
 
-## Bazaar Crossing authored demolition-map composite
+## Bazaar Crossing V2 authored demolition-map composite
 
-Bazaar Crossing is a Blender 4.5 composition created on 2026-08-28 for the
+Bazaar Crossing V2 is a Blender 4.5 composition created on 2026-08-28 for the
 sixth demolition-map slot. The project-authored layout, transforms, material
-adaptations, metadata, invisible gameplay scaffolding, and deterministic DCC
-workflow are covered by the repository's root MIT license, subject to the
-disclosure in `../../docs/CONTENT_PROVENANCE.md`. Every exported visible mesh,
-including the connected ground, three elevated combat decks, six stairways,
-railings, supports, canopy, and cover, remains an arrangement or adaptation of
-a finished CC0 source mesh and is not relicensed as MIT.
+and UV adaptations, metadata, invisible gameplay scaffolding, review setup,
+and deterministic DCC workflow are covered by the repository's root MIT
+license, subject to the disclosure in `../../docs/CONTENT_PROVENANCE.md`.
+Every exported visible mesh remains an arrangement or real DCC adaptation of
+a finished source dedicated to **CC0 1.0 Universal**
+(`https://creativecommons.org/publicdomain/zero/1.0/`) and is not relicensed
+as MIT. CC0 requires no attribution; the creator credits below are retained
+for provenance.
 
-The production structure, facades, and street dressing embedded in the
-composite are limited to the CC0 1.0 Universal sources recorded in
-`../../source_art/world/bazaar_crossing/LICENSE.md`: Old Urban building by
-Abobla O.S; Scan Old Building Street by Free poly; Chinese red lamp and Pink
-city bicycle by Kin Chen; Coffee Cart 01 by Joe Seabuhr; Chinese Tea Table and
-Chinese Stool by Kirill Sannikov; Wicker Basket 01 by Kuutti Siitonen; Hand
-Truck by Mutanzom3D; Old Military Crate by Jack Mava; Barrel 03 by Serhii
-Khromov; Plastic Crate 02 by Fabi_G; selected stairs, floors, foundations,
-trims, columns, caps, and roof modules from Trey Ramm's Modular Industrial Kit;
-and the Asphalt 03, Gravel Embedded Concrete, and Concrete Floor PBR surface
-sets. Attribution is not required by CC0, but all creator names and official
-source URLs are retained as provenance.
+The immutable palette pins these structural sources and maps them to named
+source objects before composition:
 
-- Runtime output: `bazaar_crossing/bazaar_crossing.glb`.
+| Source / creator | Official source / acquired | Repository-local source -> pinned Bazaar object | Bazaar V2 use |
+| --- | --- | --- | --- |
+| **Modular Industrial Pieces**, Trey Ramm (`minime453`) | `https://opengameart.org/content/modular-industrial-kit`; 2026-08-27 | `../../source_art/third_party/trey_modular_industrial/Meshes/Details/IndStairsWideFull.fbx` -> `BazaarSource_IndStairsWideFull` | Six exact-endpoint stair assemblies |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Floors/IndFloorGreyPlatformFull.fbx` -> `BazaarSource_IndFloorGreyPlatformFull` | Ground, paving, and painted site surfaces |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Trims/IndRoofTrimBStraightFull.fbx` -> `BazaarSource_IndRoofTrimBStraightFull` | Rails and stair guardrails |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Details/IndColumnFree.fbx` -> `BazaarSource_IndColumnFree` | Warehouse/back-market columns, newels, and lamp supports |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Details/IndColumnFreeCap.fbx` -> `BazaarSource_IndColumnFreeCap` | Structural capitals |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Foundation/IndFoundationAStraightFull.fbx` -> `BazaarSource_IndFoundationAStraightFull` | Thick walls, counters, partitions, rack posts, and stair foundations |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Roofs/IndRoofDarkGreyAngledFull.fbx` -> `BazaarSource_IndRoofDarkGreyAngledFull` | Retained roof vocabulary |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Walls/IndWallFull.fbx` -> `BazaarSource_IndWallFull` | Interior wall vocabulary |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Walls/IndWallArchDouble.fbx` -> `BazaarSource_IndWallArchDouble` | A courtyard, B loading, and back-market arcades; open portals |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Walls/IndWallArchDoubleColumns.fbx` -> `BazaarSource_IndWallArchDoubleColumns` | Arcade structural vocabulary |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Walls/IndWallArchDoubleCapGrey.fbx` -> `BazaarSource_IndWallArchDoubleCapGrey` | Arcade caps |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Doors/IndDoorFrameSingle.fbx` -> `BazaarSource_IndDoorFrameSingle` | Door and partition frames |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Roofs/IndRoofDarkGreyFull.fbx` -> `BazaarSource_IndRoofDarkGreyFull` | Closed-block, warehouse, stair-hall, and market roofs |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Floors/IndFloorGreyFull.fbx` -> `BazaarSource_IndFloorGreyFull` | Solid floor/ceiling and continuous storage-shelf vocabulary |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Windows/IndWindowBFull.fbx` -> `BazaarSource_IndWindowBFull` | Industrial facade and clerestory windows |
+| Same | Same | `../../source_art/third_party/trey_modular_industrial/Meshes/Trims/IndRoofTrimAStraight.fbx` -> `BazaarSource_IndRoofTrimAStraight` | Cornices, roof ridges, shop fascias, awnings, and interior beams |
+| **Downtown City MegaKit**, Quaternius (`@Quaternius`) | `https://quaternius.com/packs/downtowncitymegakit.html`; 2026-08-19 | `quaternius_downtown_city/Brick_Plain_1.gltf` -> `BazaarSource_QuatBrickPlain` | Red-brick wall vocabulary |
+| Same | Same | `quaternius_downtown_city/DoorFrame_Trim.gltf` -> `BazaarSource_QuatDoorFrameTrim` | Detailed personnel doors and partition rhythm |
+| Same | Same | `quaternius_downtown_city/Brick_Window_CurvedDouble.gltf` -> `BazaarSource_QuatBrickWindowCurvedDouble` | Curved brick windows for Mid and varied closed blocks |
+| Same | Same | `quaternius_downtown_city/Brick_Window_Trim.gltf` -> `BazaarSource_QuatBrickWindowTrim` | A, Mid, back-market, boundary, shopfront-band, and closed-block facades |
+| Same | Same | `quaternius_downtown_city/Floor_4x4.gltf` -> `BazaarSource_QuatFloor4x4` | Double-sided interior floors, ceilings, decks, roofs, and rooftop monitor caps |
+| Same | Same | `quaternius_downtown_city/Metal_FirstFloor_Window.gltf` -> `BazaarSource_QuatMetalFirstFloorWindow` | B warehouse, rooftop monitors, and east industrial facade vocabulary |
+
+Quaternius's local license evidence is
+`quaternius_downtown_city/QUATERNIUS_LICENSE.txt`; the Trey source folder
+retains the creator's original README, source-page evidence, and CC0 record.
+
+The palette also pins the following CC0 facade, prop, and PBR sources. The
+last column records their repository-local source mapping and their exact V2
+role; all are copied into
+`../../source_art/world/bazaar_crossing/bazaar_crossing_source_palette.blend`
+before the deterministic build runs.
+
+| Source | Creator / official source | Acquired | Repository-local mapping -> Bazaar V2 use |
+| --- | --- | --- | --- |
+| Old Urban building | Abobla O.S / `https://www.blenderkit.com/asset-gallery-detail/8177ff94-1645-4b50-95cc-cb05a336e34d/` | 2026-08-28 | Source evidence in `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` -> packed Bazaar palette -> two of four outer landmark facades |
+| Scan Old Building Street | Free poly / `https://www.blenderkit.com/asset-gallery-detail/d8c0ffa6-7b7d-47e9-8554-2d3bbcc82030/` | 2026-08-28 | Source evidence in `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` -> packed Bazaar palette -> one outer landmark facade |
+| Chinese red lamp | Kin Chen / `https://www.blenderkit.com/asset-gallery-detail/b97e433c-2eb1-46b8-9633-5bdee21e4e7a/` | 2026-08-27 | Source evidence in `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` -> packed Bazaar palette -> 18 visibly supported interior lamps |
+| Pink city bicycle | Kin Chen / `https://www.blenderkit.com/asset-gallery-detail/4c1a83c1-829f-4c00-878e-9e73c6b89c3b/` | 2026-08-28 | Source evidence in `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` -> packed Bazaar palette -> back-market landmark |
+| Coffee Cart 01 | Joe Seabuhr / Poly Haven / `https://polyhaven.com/a/CoffeeCart_01` | 2026-08-28 | `polyhaven_residential_street/CoffeeCart_01/` -> all three original parts as a B-hall landmark |
+| Chinese Tea Table | Kirill Sannikov / Poly Haven / `https://polyhaven.com/a/chinese_tea_table` | 2026-08-28 | Source bundle/hash record in `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` -> packed Bazaar palette -> A-courtyard landmark |
+| Chinese Stool | Kirill Sannikov / Poly Haven / `https://polyhaven.com/a/chinese_stool` | 2026-08-28 | Source bundle/hash record in `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` -> packed Bazaar palette -> A-courtyard landmarks |
+| Wicker Basket 01 | Kuutti Siitonen / Poly Haven / `https://polyhaven.com/a/wicker_basket_01` | 2026-08-28 | `polyhaven_residential_street/wicker_basket_01/` -> B and back-market dressing |
+| Hand Truck | Mutanzom3D / Poly Haven / `https://polyhaven.com/a/hand_truck` | 2026-08-28 | Source bundle/hash record in `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` -> packed Bazaar palette -> A-warehouse landmark |
+| Old Military Crate | Jack Mava / Poly Haven / `https://polyhaven.com/a/old_military_crate` | 2026-08-06 | `old_military_crate/` -> limited A-warehouse dressing |
+| Barrel 03 | Serhii Khromov / Poly Haven / `https://polyhaven.com/a/barrel_03` | 2026-08-28 | Source bundle/hash record in `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` -> packed Bazaar palette -> retained source, not primary V2 cover |
+| Plastic Crate 02 | Fabi_G / Poly Haven / `https://polyhaven.com/a/plastic_crate_02` | 2026-08-28 | Source bundle/hash record in `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` -> packed Bazaar palette -> Mid produce landmark |
+| Asphalt 03 | Charlotte Baglioni and Dario Barresi / Poly Haven / `https://polyhaven.com/a/asphalt_03` | 2026-08-06 | `../textures/asphalt_03_{diff,normal,rough}_1k.jpg` -> `BazaarWetAsphalt` ground PBR |
+| Gravel Embedded Concrete | Charlotte Baglioni / Poly Haven / `https://polyhaven.com/a/gravel_embedded_concrete` | 2026-08-06 | `../textures/gravel_embedded_concrete_{diff,normal,rough}_1k.jpg` -> `BazaarStonePaving` route/stair PBR |
+| Concrete Floor | eye-candy.xyz / Poly Haven / `https://polyhaven.com/a/concrete_floor` | 2026-08-06 | `../textures/concrete_floor_{diff,normal,rough}_1k.jpg` -> `BazaarWeatheredConcrete` structural PBR |
+
+Artifact and audit mapping:
+
+- Runtime output: `bazaar_crossing/bazaar_crossing.glb`, 112,618,852 bytes,
+  SHA-256
+  `CA68AC570E2FAA9FF284FBB25909888BE4AC93F9C661106525A6204801C43164`.
 - Immutable map-local source palette:
-  `../../source_art/world/bazaar_crossing/bazaar_crossing_source_palette.blend`.
-- Editable source: `../../source_art/world/bazaar_crossing/bazaar_crossing.blend`.
+  `../../source_art/world/bazaar_crossing/bazaar_crossing_source_palette.blend`,
+  SHA-256
+  `1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9`.
+- Editable packed source:
+  `../../source_art/world/bazaar_crossing/bazaar_crossing.blend`, 50,379,943
+  bytes, SHA-256
+  `A4459F775CF846D0EDD98302E1750BFEB0CDED1C0FD8DA2DE422420F3DD7B720`.
 - Reproducible build: `../../scripts/blender/build_bazaar_crossing.py`.
-- Rights and source mapping: `bazaar_crossing/LICENSE.md` and
+- Rights and exact source-object mapping: `bazaar_crossing/LICENSE.md` and
   `../../source_art/world/bazaar_crossing/LICENSE.md`.
 - Deterministic report:
   `../../source_art/world/bazaar_crossing/bazaar_crossing_build_report.json`.
 
-The verified editable scene contains 277 visible mesh nodes, 298 material
-surfaces, 116 shared unique meshes, 272,916 unique triangles, and 2,771,825
-instanced triangles. Its 46 source textures are capped at 1024 pixels and have
-an estimated 127.473 MiB RGBA8 plus full-mip-chain cost. The DCC round trip
-retains all 277 visible meshes and the exact instanced-triangle count, and
-checks meter scale, scene bounds, UV and material coverage, three deck heights,
-all six 3.2-meter stair openings, explicit CC0 provenance for every visible
-mesh, and the absence of Hero Mountain, Coast Line, CC BY, paid, editorial,
-private-store, or unclear-license content. The complete Jianghai Old City
-runtime GLB is neither embedded nor referenced.
+The final V2 scene contains 729 exported visible mesh nodes, 669 unique meshes,
+1,032 material surfaces, 49 DCC materials, 58 DCC textures, 850,309 unique
+triangles, and 1,148,671 delivered instance triangles. The textures are capped
+at 1024 pixels and have an estimated 203.473 MiB RGBA8 plus full-mip-chain
+cost. Static consolidation reduced 1,492 draw nodes to 729 and 2,129 surfaces
+to 1,032 without changing either triangle count. The GLB is exported without
+`KHR_draco_mesh_compression`; `EXT_texture_webp` is its only required
+extension. Its round trip retains all 729 visible meshes and the exact
+instance-triangle count while checking scene bounds, four complete enterable
+interiors, three deck heights, all six 3.2-meter stairs, UV/material coverage,
+explicit CC0 provenance, and absence of Hero Mountain, Coast Line, all CC BY,
+paid, editorial, private-store, or unclear-license content. The complete
+Jianghai Old City runtime GLB is neither embedded nor referenced.
 
 ## Poly Haven CC0 models
 

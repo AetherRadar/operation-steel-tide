@@ -121,6 +121,7 @@ public partial class FreightTerminalWorld
             || value == "--validate-demolition-arena"
             || value == "--validate-tideglass-reactor"
             || value == "--validate-bazaar-crossing"
+            || value == "--validate-bazaar-density"
             || value == "--validate-demolition-briefing"
             || value == "--validate-demolition-buy"
             || value == "--validate-demolition-team-status"

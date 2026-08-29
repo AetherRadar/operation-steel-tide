@@ -11,7 +11,24 @@ public partial class FreightTerminalWorld
         Vector3 Position,
         Vector3 Target,
         float Fov,
-        bool StrictTopdown = false);
+        bool StrictTopdown = false,
+        bool RequireReadableInterior = false,
+        bool RequireClearTarget = true);
+
+    private readonly record struct BazaarCaptureImageResult(
+        bool Saved,
+        float MinimumLuminance,
+        float MaximumLuminance,
+        float MeanLuminance,
+        float LowerQuartileLuminance,
+        float VeryDarkSampleFraction)
+    {
+        public float DynamicRange => MaximumLuminance - MinimumLuminance;
+
+        public bool InteriorReadable => MeanLuminance >= 0.16f
+            && LowerQuartileLuminance >= 0.09f
+            && VeryDarkSampleFraction <= 0.15f;
+    }
 
     private async void CaptureBazaarCrossing()
     {
@@ -67,67 +84,110 @@ public partial class FreightTerminalWorld
                 "res://bazaar_crossing_oblique.png",
                 new Vector3(0.0f, 86.0f, 94.0f),
                 new Vector3(0.0f, 1.0f, -4.0f),
-                62.0f),
+                62.0f,
+                RequireClearTarget: false),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_site_a.png",
-                new Vector3(-49.0f, eye, -5.0f),
-                new Vector3(-43.0f, 1.1f, -22.0f),
-                68.0f),
+                new Vector3(-46.0f, eye, -15.0f),
+                new Vector3(-46.0f, 1.1f, -21.0f),
+                68.0f,
+                RequireReadableInterior: true),
+            new BazaarCaptureFrame(
+                "res://bazaar_crossing_a_rear_interior.png",
+                new Vector3(-56.0f, eye, -26.0f),
+                new Vector3(-56.0f, 1.2f, -18.0f),
+                68.0f,
+                RequireReadableInterior: true),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_site_b.png",
-                new Vector3(49.0f, eye, -5.0f),
-                new Vector3(43.0f, 1.1f, -22.0f),
-                68.0f),
+                new Vector3(43.0f, eye, -10.0f),
+                new Vector3(50.0f, 1.1f, -21.0f),
+                68.0f,
+                RequireReadableInterior: true),
             new BazaarCaptureFrame(
-                "res://bazaar_crossing_mid.png",
-                new Vector3(0.0f, eye, 18.0f),
-                new Vector3(0.0f, 2.6f, 0.0f),
-                70.0f),
+                "res://bazaar_crossing_b_stockroom.png",
+                new Vector3(56.0f, eye, -24.0f),
+                new Vector3(47.0f, 1.2f, -23.4f),
+                68.0f,
+                RequireReadableInterior: true),
+            new BazaarCaptureFrame(
+                "res://bazaar_crossing_mid_s_bend.png",
+                new Vector3(0.0f, eye, 30.0f),
+                new Vector3(1.0f, 1.4f, 19.0f),
+                72.0f,
+                RequireReadableInterior: true),
+            new BazaarCaptureFrame(
+                "res://bazaar_crossing_mid_north_connector.png",
+                new Vector3(-5.0f, eye, -10.0f),
+                new Vector3(8.0f, 1.4f, -21.0f),
+                70.0f,
+                RequireReadableInterior: true),
+            new BazaarCaptureFrame(
+                "res://bazaar_crossing_back_market_west.png",
+                new Vector3(-28.0f, eye, -41.0f),
+                new Vector3(-44.4f, 1.4f, -37.5f),
+                70.0f,
+                RequireReadableInterior: true),
+            new BazaarCaptureFrame(
+                "res://bazaar_crossing_back_market_east.png",
+                new Vector3(28.0f, eye, -41.0f),
+                new Vector3(36.0f, 1.4f, -37.5f),
+                70.0f,
+                RequireReadableInterior: true),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_a_gallery.png",
-                new Vector3(-59.0f, 3.2f + eye, -13.0f),
-                new Vector3(-54.0f, 3.8f, -25.0f),
-                68.0f),
+                new Vector3(-56.0f, 3.6f + eye, -10.5f),
+                new Vector3(-56.0f, 3.8f, -24.0f),
+                68.0f,
+                RequireReadableInterior: true),
             new BazaarCaptureFrame(
-                "res://bazaar_crossing_mid_bridge.png",
-                new Vector3(-10.0f, 3.2f + eye, 0.0f),
-                new Vector3(10.0f, 3.8f, 0.0f),
-                68.0f),
+                "res://bazaar_crossing_mid_mezzanine.png",
+                new Vector3(-6.0f, 3.2f + eye, 29.5f),
+                new Vector3(-6.0f, 4.2f, 22.0f),
+                68.0f,
+                RequireReadableInterior: true),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_b_balcony.png",
-                new Vector3(59.0f, 2.8f + eye, -15.0f),
-                new Vector3(54.0f, 3.4f, -26.0f),
-                68.0f),
+                new Vector3(56.0f, 3.4f + eye, -10.5f),
+                new Vector3(56.0f, 3.6f, -24.0f),
+                68.0f,
+                RequireReadableInterior: true),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_a_gallery_south_stair.png",
-                new Vector3(-59.0f, eye, 2.0f),
-                new Vector3(-59.0f, 3.3f, -11.0f),
-                66.0f),
+                new Vector3(-56.0f, eye, 3.5f),
+                new Vector3(-56.0f, 3.7f, -9.0f),
+                66.0f,
+                RequireReadableInterior: true),
             new BazaarCaptureFrame(
-                "res://bazaar_crossing_a_gallery_east_stair.png",
-                new Vector3(-39.0f, eye, -27.0f),
-                new Vector3(-52.0f, 3.3f, -27.0f),
-                66.0f),
+                "res://bazaar_crossing_a_gallery_rear_stair.png",
+                new Vector3(-40.5f, eye, -27.0f),
+                new Vector3(-53.0f, 3.7f, -27.0f),
+                66.0f,
+                RequireReadableInterior: true),
             new BazaarCaptureFrame(
-                "res://bazaar_crossing_mid_west_stair.png",
-                new Vector3(-25.0f, eye, 0.0f),
-                new Vector3(-12.0f, 3.3f, 0.0f),
-                66.0f),
+                "res://bazaar_crossing_mid_south_stair.png",
+                new Vector3(-6.0f, eye, 42.0f),
+                new Vector3(-6.0f, 3.3f, 31.0f),
+                66.0f,
+                RequireReadableInterior: true),
             new BazaarCaptureFrame(
-                "res://bazaar_crossing_mid_east_stair.png",
-                new Vector3(25.0f, eye, 0.0f),
-                new Vector3(12.0f, 3.3f, 0.0f),
-                66.0f),
+                "res://bazaar_crossing_mid_north_stair.png",
+                new Vector3(-6.0f, eye, 6.0f),
+                new Vector3(-6.0f, 3.3f, 17.0f),
+                66.0f,
+                RequireReadableInterior: true),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_b_balcony_south_stair.png",
-                new Vector3(59.0f, eye, -2.5f),
-                new Vector3(59.0f, 2.9f, -14.0f),
-                66.0f),
+                new Vector3(56.0f, eye, 3.0f),
+                new Vector3(56.0f, 3.5f, -9.0f),
+                66.0f,
+                RequireReadableInterior: true),
             new BazaarCaptureFrame(
-                "res://bazaar_crossing_b_balcony_west_stair.png",
-                new Vector3(40.5f, eye, -27.0f),
-                new Vector3(52.0f, 2.9f, -27.0f),
-                66.0f),
+                "res://bazaar_crossing_b_balcony_rear_stair.png",
+                new Vector3(41.0f, eye, -27.0f),
+                new Vector3(53.0f, 3.5f, -27.0f),
+                66.0f,
+                RequireReadableInterior: true),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_attack_spawn.png",
                 new Vector3(0.0f, 0.22f + eye, 49.0f),
@@ -135,8 +195,8 @@ public partial class FreightTerminalWorld
                 70.0f),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_defender_spawn.png",
-                new Vector3(0.0f, 0.22f + eye, -49.0f),
-                new Vector3(0.0f, 1.4f, -30.0f),
+                new Vector3(0.0f, 0.22f + eye, -52.0f),
+                new Vector3(-6.0f, 1.4f, -44.6f),
                 70.0f)
         };
 
@@ -150,13 +210,26 @@ public partial class FreightTerminalWorld
                 frame.StrictTopdown ? Vector3.Forward : Vector3.Up);
             await WaitFrames(18);
             var image = GetViewport().GetTexture().GetImage();
-            var framingReady = !frame.StrictTopdown
-                || BazaarTopdownContainsArena(camera, layout, 20.0f);
-            var saved = BazaarSaveCaptureFrame(frame.Path, image);
-            validity[frame.Path] = framingReady && saved;
+            var target = layout.Origin + frame.Target;
+            var framingBlocker = "none";
+            var framingReady = frame.StrictTopdown
+                ? BazaarTopdownContainsArena(camera, layout, 20.0f)
+                : BazaarPerspectiveFrameReady(
+                    GetWorld3D(),
+                    camera,
+                    target,
+                    frame.RequireClearTarget,
+                    20.0f,
+                    out framingBlocker);
+            var result = BazaarSaveCaptureFrame(frame.Path, image);
+            var readabilityReady = !frame.RequireReadableInterior || result.InteriorReadable;
+            validity[frame.Path] = framingReady && result.Saved && readabilityReady;
             GD.Print(
-                $"BAZAAR_CAPTURE_FRAME path={frame.Path} saved={saved} framing={framingReady} "
-                + $"position={camera.GlobalPosition} target={layout.Origin + frame.Target}");
+                $"BAZAAR_CAPTURE_FRAME path={frame.Path} saved={result.Saved} framing={framingReady} "
+                + $"readable={readabilityReady} mean={result.MeanLuminance:0.000} "
+                + $"p25={result.LowerQuartileLuminance:0.000} "
+                + $"dark075={result.VeryDarkSampleFraction:0.000} range={result.DynamicRange:0.000} "
+                + $"blocker={framingBlocker} position={camera.GlobalPosition} target={target}");
         }
 
         var valid = GetViewport().GetCamera3D() == camera
@@ -181,32 +254,92 @@ public partial class FreightTerminalWorld
         GetTree().Quit(valid ? 0 : 2);
     }
 
-    private static bool BazaarSaveCaptureFrame(string path, Image? image)
+    private static BazaarCaptureImageResult BazaarSaveCaptureFrame(string path, Image? image)
     {
         if (image is null || image.IsEmpty() || image.GetWidth() < 640 || image.GetHeight() < 360)
         {
-            return false;
+            return default;
         }
         var minimumLuminance = 1.0f;
         var maximumLuminance = 0.0f;
+        var totalLuminance = 0.0f;
+        var luminances = new List<float>();
         var stepX = Mathf.Max(1, image.GetWidth() / 24);
         var stepY = Mathf.Max(1, image.GetHeight() / 14);
-        for (var y = stepY / 2; y < image.GetHeight(); y += stepY)
+        var sampleMinimumX = Mathf.FloorToInt(image.GetWidth() * 0.1f);
+        var sampleMaximumX = Mathf.CeilToInt(image.GetWidth() * 0.9f);
+        var sampleMinimumY = Mathf.FloorToInt(image.GetHeight() * 0.1f);
+        var sampleMaximumY = Mathf.CeilToInt(image.GetHeight() * 0.9f);
+        for (var y = sampleMinimumY; y < sampleMaximumY; y += stepY)
         {
-            for (var x = stepX / 2; x < image.GetWidth(); x += stepX)
+            for (var x = sampleMinimumX; x < sampleMaximumX; x += stepX)
             {
                 var color = image.GetPixel(x, y);
                 var luminance = (color.R + color.G + color.B) / 3.0f;
                 minimumLuminance = Mathf.Min(minimumLuminance, luminance);
                 maximumLuminance = Mathf.Max(maximumLuminance, luminance);
+                totalLuminance += luminance;
+                luminances.Add(luminance);
             }
         }
+        luminances.Sort();
+        var sampleCount = luminances.Count;
+        var lowerQuartile = sampleCount > 0
+            ? luminances[Mathf.FloorToInt((sampleCount - 1) * 0.25f)]
+            : 0.0f;
+        var veryDarkSamples = luminances.Count(luminance => luminance < 0.075f);
         var saveResult = image.SavePng(path);
         var absolutePath = ProjectSettings.GlobalizePath(path);
-        return saveResult == Error.Ok
+        var saved = saveResult == Error.Ok
             && System.IO.File.Exists(absolutePath)
             && new System.IO.FileInfo(absolutePath).Length >= 10_000
             && maximumLuminance - minimumLuminance >= 0.08f;
+        return new BazaarCaptureImageResult(
+            saved,
+            minimumLuminance,
+            maximumLuminance,
+            sampleCount > 0 ? totalLuminance / sampleCount : 0.0f,
+            lowerQuartile,
+            sampleCount > 0 ? veryDarkSamples / (float)sampleCount : 1.0f);
+    }
+
+    private static bool BazaarPerspectiveFrameReady(
+        World3D world,
+        Camera3D camera,
+        Vector3 target,
+        bool requireClearTarget,
+        float margin,
+        out string blocker)
+    {
+        blocker = "none";
+        if (camera.IsPositionBehind(target))
+        {
+            return false;
+        }
+        var distance = camera.GlobalPosition.DistanceTo(target);
+        var viewport = camera.GetViewport().GetVisibleRect().Size;
+        var screen = camera.UnprojectPosition(target);
+        var forward = -camera.GlobalBasis.Z.Normalized();
+        var direction = camera.GlobalPosition.DirectionTo(target);
+        PhysicsRaycastHit hit = default;
+        var targetClear = !requireClearTarget
+            || !PhysicsRaycast.TryHit(
+                world,
+                camera.GlobalPosition,
+                target,
+                1u,
+                out hit);
+        if (!targetClear)
+        {
+            blocker = hit.Collider is Node node ? node.Name : "unknown";
+        }
+        return targetClear
+            && distance is >= 4.0f and <= 180.0f
+            && forward.Dot(direction) >= 0.995f
+            && screen.X >= margin
+            && screen.Y >= margin
+            && screen.X <= viewport.X - margin
+            && screen.Y <= viewport.Y - margin;
     }
 
     private static bool BazaarTopdownContainsArena(

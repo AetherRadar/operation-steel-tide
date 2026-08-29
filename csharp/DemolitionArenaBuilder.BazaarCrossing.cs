@@ -127,6 +127,55 @@ public sealed partial class DemolitionArenaBuilder
 
         AddBazaarSiteLight(root, layout, "BazaarSiteAAccent", 0, new Color(1.0f, 0.43f, 0.13f));
         AddBazaarSiteLight(root, layout, "BazaarSiteBAccent", 1, new Color(0.18f, 0.68f, 1.0f));
+
+        var interiorPracticals = new[]
+        {
+            new Vector3(-55.0f, 3.0f, -18.0f),
+            new Vector3(-52.0f, 2.8f, -27.0f),
+            new Vector3(-37.5f, 3.0f, -16.0f),
+            new Vector3(38.0f, 3.2f, -18.0f),
+            new Vector3(46.0f, 3.2f, -18.0f),
+            new Vector3(55.0f, 3.2f, -18.0f),
+            new Vector3(0.0f, 3.0f, -15.5f),
+            new Vector3(-3.0f, 3.0f, -1.0f),
+            new Vector3(3.0f, 3.0f, 12.0f),
+            new Vector3(-3.0f, 3.0f, 27.0f),
+            new Vector3(0.0f, 3.0f, -18.0f),
+            new Vector3(-17.0f, 2.8f, -47.0f),
+            new Vector3(17.0f, 2.8f, -47.0f),
+            new Vector3(-40.0f, 2.8f, -38.0f),
+            new Vector3(40.0f, 2.8f, -38.0f)
+        };
+        for (var index = 0; index < interiorPracticals.Length; index++)
+        {
+            AddBazaarInteriorPractical(
+                root,
+                layout,
+                $"BazaarInteriorPractical{index:00}",
+                interiorPracticals[index]);
+        }
+        root.SetMeta("bazaar_interior_practical_count", interiorPracticals.Length);
+    }
+
+    private void AddBazaarInteriorPractical(
+        Node3D root,
+        DemolitionArenaLayout layout,
+        string name,
+        Vector3 localPosition)
+    {
+        root.AddChild(new OmniLight3D
+        {
+            Name = name,
+            Position = layout.Origin + localPosition,
+            LightColor = new Color(1.0f, 0.74f, 0.52f),
+            LightEnergy = 1.8f,
+            OmniRange = 10.5f,
+            ShadowEnabled = false,
+            DistanceFadeEnabled = true,
+            DistanceFadeBegin = 48.0f,
+            DistanceFadeLength = 16.0f
+        });
+        _visualPartCount++;
     }
 
     private void AddBazaarSiteLight(

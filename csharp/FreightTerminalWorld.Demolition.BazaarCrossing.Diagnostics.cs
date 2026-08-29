@@ -8,18 +8,25 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
-    private async void ValidateBazaarCrossing()
+    private void ValidateBazaarCrossing()
+        => ValidateBazaarCrossing(densityOnly: false);
+
+    private void ValidateBazaarCrossingDensity()
+        => ValidateBazaarCrossing(densityOnly: true);
+
+    private async void ValidateBazaarCrossing(bool densityOnly)
     {
+        var diagnosticName = densityOnly ? "BAZAAR_DENSITY" : "BAZAAR_CROSSING";
         try
         {
-            await ValidateBazaarCrossingCore();
+            await ValidateBazaarCrossingCore(densityOnly);
         }
         catch (Exception exception)
         {
             GD.PushError($"Bazaar Crossing diagnostic failed: {exception}");
             GD.Print(
-                $"BAZAAR_CROSSING_CHECK valid=False exception={exception.GetType().Name}");
-            GD.Print("BAZAAR_CROSSING_PASS valid=False");
+                $"{diagnosticName}_CHECK valid=False exception={exception.GetType().Name}");
+            GD.Print($"{diagnosticName}_PASS valid=False");
             try
             {
                 CleanupBazaarCrossingDiagnostic();
@@ -35,15 +42,16 @@ public partial class FreightTerminalWorld
         }
     }
 
-    private async Task ValidateBazaarCrossingCore()
+    private async Task ValidateBazaarCrossingCore(bool densityOnly)
     {
         await WaitFrames(3);
         _demolitionSelectedMapId = DemolitionMapCatalog.BazaarCrossingId;
         EnsureDemolitionArenaBuilt();
         if (_demolitionArena is null)
         {
-            GD.Print("BAZAAR_CROSSING_CHECK valid=False built=False");
-            GD.Print("BAZAAR_CROSSING_PASS valid=False");
+            var diagnosticName = densityOnly ? "BAZAAR_DENSITY" : "BAZAAR_CROSSING";
+            GD.Print($"{diagnosticName}_CHECK valid=False built=False");
+            GD.Print($"{diagnosticName}_PASS valid=False");
             QuitDiagnosticAfterSceneCleanup(2);
             return;
         }
@@ -144,8 +152,34 @@ public partial class FreightTerminalWorld
             && sitesMutuallyBlocked
             && !layout.HasSpawnSightlineToSite(0)
             && !layout.HasSpawnSightlineToSite(1);
+        var density = BazaarV2DensityReady(layout);
+        if (densityOnly)
+        {
+            var densityCheckLine =
+                $"BAZAAR_DENSITY_CHECK valid={density.Ready} "
+                + $"site_visible={density.SiteVisiblePairs}/{density.SitePairCount} "
+                + $"high_violations={density.HighVisibilityViolations} "
+                + $"longest_los={density.LongestSightline:0.00} "
+                + $"open_diameter={density.LargestOpenDiameter:0.00} "
+                + $"indoor_ratio={density.InteriorRatio:0.000} "
+                + $"plant_coverage={density.PlantZoneACoverage:0.000}/{density.PlantZoneBCoverage:0.000} "
+                + $"interiors={density.InteriorContractReady} "
+                + $"plants={density.PlantZoneCoverageReady} "
+                + $"doors={density.GroundDoorContractReady} "
+                + $"def_route={density.DefenderRoutesEfficient}:{density.MaximumDefenderRouteStretch:0.000}:"
+                + $"{density.DefenderRouteProfile} failures={density.Failures}";
+            CleanupBazaarCrossingDiagnostic();
+            arena = null!;
+            layout = null!;
+            GD.Print(densityCheckLine);
+            GD.Print($"BAZAAR_DENSITY_PASS valid={density.Ready}");
+            QuitDiagnosticAfterSceneCleanup(density.Ready ? 0 : 2);
+            return;
+        }
 
         var traversalReady = BazaarTraversalGeometryReady(layout, out var traversalFailures);
+        var guardRails = BazaarGuardRailPhysicsReady(GetWorld3D(), arena);
+        var interiorLighting = BazaarInteriorLightingReady(arena.Root, layout);
         var planner = new DemolitionRoutePlanner(layout);
         var verticalPlannerReady = BazaarVerticalPlannerReady(
             layout, planner, out var verticalPlannerFailures);
@@ -259,7 +293,10 @@ public partial class FreightTerminalWorld
             && groundRoutesReady
             && retakeChoicesReady
             && sightlinesReady
+            && density.Ready
             && traversalReady
+            && guardRails.Ready
+            && interiorLighting.Ready
             && verticalPlannerReady
             && elevatedStrategiesReady
             && allStrategiesReady
@@ -270,14 +307,30 @@ public partial class FreightTerminalWorld
             && siblingNamesReady
             && runtimeReady
             && deactivatedReady;
-        GD.Print(
+        var checkLine =
             $"BAZAAR_CROSSING_CHECK valid={valid} catalog={catalogReady} localization={localizationReady} "
             + $"bounds={boundsReady}:136x112 root={arena.Root.Name} spawns_sites={spawnAndSiteReady}:5v5:2 "
             + $"timing={routeTimingReady}:{layout.AttackToALength:0.00}:{layout.AttackToBLength:0.00}:{layout.SiteTravelDifferenceRatio:0.000} "
             + $"ground_routes={groundRoutesReady}:7 failures={groundRouteFailures} retakes={retakeChoicesReady}:2 "
             + $"sightlines={sightlinesReady} spawn_pair={spawnPairsBlocked} attack_sites={attackSpawnToSitesBlocked} "
             + $"defender_sites={defenderSpawnToSitesBlocked} site_pair={sitesMutuallyBlocked} "
+            + $"density={density.Ready} site_visible={density.SiteVisiblePairs}/{density.SitePairCount} "
+            + $"high_violations={density.HighVisibilityViolations} longest_los={density.LongestSightline:0.00} "
+            + $"open_diameter={density.LargestOpenDiameter:0.00} indoor_ratio={density.InteriorRatio:0.000} "
+            + $"plant_coverage={density.PlantZoneACoverage:0.000}/{density.PlantZoneBCoverage:0.000} "
+            + $"interiors={density.InteriorContractReady} plants={density.PlantZoneCoverageReady} "
+            + $"doors={density.GroundDoorContractReady} "
+            + $"def_route={density.DefenderRoutesEfficient}:{density.MaximumDefenderRouteStretch:0.000}:"
+            + $"{density.DefenderRouteProfile} failures={density.Failures} "
             + $"traversal={traversalReady}:decks3:ramps6 failures={traversalFailures} "
+            + $"guardrails={guardRails.Ready}:{guardRails.RailCount} "
+            + $"rail_contract={guardRails.ContractReady} rail_runtime={guardRails.RuntimeReady} "
+            + $"rail_edge={guardRails.EdgeCoverageReady}:{guardRails.EdgeBarrierHits}/{guardRails.RailCount} "
+            + $"rail_rays={guardRails.ExactRayHits}/{guardRails.RailCount} "
+            + $"rail_channel={guardRails.ChannelReady}:{guardRails.MinimumChannelClearance:0.00} "
+            + $"guardrail_failures={guardRails.Failures} "
+            + $"interior_lighting={interiorLighting.Ready}:{interiorLighting.LightCount} "
+            + $"lighting_failures={interiorLighting.Failures} "
             + $"vertical_planner={verticalPlannerReady} failures={verticalPlannerFailures} "
             + $"elevated_strategies={elevatedStrategiesReady}:3 failures={elevatedStrategyFailures} "
             + $"all_strategies={allStrategiesReady}:{allStrategyRouteChecks.Length} failures={allStrategyFailures} "
@@ -286,13 +339,14 @@ public partial class FreightTerminalWorld
             + $"player_stairs={playerStairsReady}:{stairWalks.Count} failures={stairWalkFailures} "
             + $"authored={authoredVisualsReady}:1/{missingModelCount} meshes={visibleMeshCount} failures={authoredVisualFailures} "
             + $"siblings={siblingNamesReady} sibling_failures={siblingFailures} "
-            + $"runtime={runtimeReady} lifecycle={initiallyIsolated}/{deactivatedReady} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} sites={arena.Sites.Count}");
-        GD.Print($"BAZAAR_CROSSING_PASS valid={valid}");
+            + $"runtime={runtimeReady} lifecycle={initiallyIsolated}/{deactivatedReady} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} sites={arena.Sites.Count}";
 
         CleanupBazaarCrossingDiagnostic();
         dressingRoot = null;
         arena = null!;
         layout = null!;
+        GD.Print(checkLine);
+        GD.Print($"BAZAAR_CROSSING_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }
 

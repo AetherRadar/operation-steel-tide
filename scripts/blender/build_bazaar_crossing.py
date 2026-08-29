@@ -34,7 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_SOURCE_DIR = REPO_ROOT / "source_art" / "world" / "bazaar_crossing"
 SOURCE_BLEND = OUTPUT_SOURCE_DIR / "bazaar_crossing_source_palette.blend"
 EXPECTED_SOURCE_BLEND_SHA256 = (
-    "0073ADE0E13682C47A07CCBE02B499BFF8FBD25C0C98DA908BB58A94FEE4F1F4"
+    "1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9"
 )
 OUTPUT_BLEND = OUTPUT_SOURCE_DIR / "bazaar_crossing.blend"
 PREVIEW_DIR = OUTPUT_SOURCE_DIR / "previews"
@@ -46,12 +46,17 @@ MAP_X_MIN = -68.0
 MAP_X_MAX = 68.0
 MAP_Z_MIN = -56.0
 MAP_Z_MAX = 56.0
-MAX_GLB_BYTES = 55_000_000
+# Godot 4.6 cannot import Blender's KHR_draco_mesh_compression output.  The
+# runtime GLB therefore keeps its vertex streams uncompressed; the higher cap
+# reflects that compatible representation without relaxing geometry budgets.
+MAX_GLB_BYTES = 120_000_000
 MAX_BLEND_BYTES = 85_000_000
 MAX_INSTANCE_TRIANGLES = 3_000_000
-MAX_UNIQUE_TRIANGLES = 420_000
+MAX_UNIQUE_TRIANGLES = 900_000
+MAX_EXPORT_DRAW_NODES = 800
+TARGET_EXPORT_DRAW_NODES = 780
 MAX_TEXTURE_DIMENSION = 1024
-MAX_TEXTURE_MEMORY_MIB = 180.0
+MAX_TEXTURE_MEMORY_MIB = 240.0
 
 CC0_LICENSE = "CC0 1.0 Universal"
 PROJECT_LICENSE = "Project-authored layout/build adaptation (MIT repository)"
@@ -270,6 +275,147 @@ SOURCE_SPECS = (
         2,
         ("BazaarTreyGradientSource",),
     ),
+    SourceSpec(
+        "trey_wall",
+        "BazaarSource_IndWallFull",
+        "Modular Industrial Pieces / IndWallFull",
+        "Trey Ramm (minime453)",
+        "https://opengameart.org/content/modular-industrial-kit",
+        2,
+        ("BazaarTreyGradientSource",),
+    ),
+    SourceSpec(
+        "trey_arch",
+        "BazaarSource_IndWallArchDouble",
+        "Modular Industrial Pieces / IndWallArchDouble",
+        "Trey Ramm (minime453)",
+        "https://opengameart.org/content/modular-industrial-kit",
+        228,
+        ("BazaarTreyGradientSource",),
+    ),
+    SourceSpec(
+        "trey_arch_columns",
+        "BazaarSource_IndWallArchDoubleColumns",
+        "Modular Industrial Pieces / IndWallArchDoubleColumns",
+        "Trey Ramm (minime453)",
+        "https://opengameart.org/content/modular-industrial-kit",
+        28,
+        ("BazaarTreyGradientSource",),
+    ),
+    SourceSpec(
+        "trey_arch_cap",
+        "BazaarSource_IndWallArchDoubleCapGrey",
+        "Modular Industrial Pieces / IndWallArchDoubleCapGrey",
+        "Trey Ramm (minime453)",
+        "https://opengameart.org/content/modular-industrial-kit",
+        20,
+        ("BazaarTreyGradientSource",),
+    ),
+    SourceSpec(
+        "trey_door_frame",
+        "BazaarSource_IndDoorFrameSingle",
+        "Modular Industrial Pieces / IndDoorFrameSingle",
+        "Trey Ramm (minime453)",
+        "https://opengameart.org/content/modular-industrial-kit",
+        42,
+        ("BazaarTreyGradientSource",),
+    ),
+    SourceSpec(
+        "trey_roof",
+        "BazaarSource_IndRoofDarkGreyFull",
+        "Modular Industrial Pieces / IndRoofDarkGreyFull",
+        "Trey Ramm (minime453)",
+        "https://opengameart.org/content/modular-industrial-kit",
+        4,
+        ("BazaarTreyGradientSource",),
+    ),
+    SourceSpec(
+        "trey_floor_solid",
+        "BazaarSource_IndFloorGreyFull",
+        "Modular Industrial Pieces / IndFloorGreyFull",
+        "Trey Ramm (minime453)",
+        "https://opengameart.org/content/modular-industrial-kit",
+        4,
+        ("BazaarTreyGradientSource",),
+    ),
+    SourceSpec(
+        "trey_window",
+        "BazaarSource_IndWindowBFull",
+        "Modular Industrial Pieces / IndWindowBFull",
+        "Trey Ramm (minime453)",
+        "https://opengameart.org/content/modular-industrial-kit",
+        322,
+        ("BazaarTreyGradientSource",),
+    ),
+    SourceSpec(
+        "trey_roof_trim",
+        "BazaarSource_IndRoofTrimAStraight",
+        "Modular Industrial Pieces / IndRoofTrimAStraight",
+        "Trey Ramm (minime453)",
+        "https://opengameart.org/content/modular-industrial-kit",
+        16,
+        ("BazaarTreyGradientSource",),
+    ),
+    SourceSpec(
+        "quat_brick_plain",
+        "BazaarSource_QuatBrickPlain",
+        "Downtown City MegaKit / Brick_Plain_1",
+        "Quaternius (@Quaternius)",
+        "https://quaternius.com/packs/downtowncitymegakit.html",
+        4,
+        ("MI_RedBrick", "MI_InteriorWall"),
+    ),
+    SourceSpec(
+        "quat_door_frame",
+        "BazaarSource_QuatDoorFrameTrim",
+        "Downtown City MegaKit / DoorFrame_Trim",
+        "Quaternius (@Quaternius)",
+        "https://quaternius.com/packs/downtowncitymegakit.html",
+        860,
+        ("MI_Trim_Green", "MI_Glass", "MI_Trim", "MI_InteriorWall"),
+    ),
+    SourceSpec(
+        "quat_curved_window",
+        "BazaarSource_QuatBrickWindowCurvedDouble",
+        "Downtown City MegaKit / Brick_Window_CurvedDouble",
+        "Quaternius (@Quaternius)",
+        "https://quaternius.com/packs/downtowncitymegakit.html",
+        1137,
+        (
+            "MI_RedBrick_Pale",
+            "MI_InteriorWall",
+            "MI_Trim_MetalConcrete",
+            "MI_Glass",
+            "MI_FakeInterior",
+        ),
+    ),
+    SourceSpec(
+        "quat_window_trim",
+        "BazaarSource_QuatBrickWindowTrim",
+        "Downtown City MegaKit / Brick_Window_Trim",
+        "Quaternius (@Quaternius)",
+        "https://quaternius.com/packs/downtowncitymegakit.html",
+        652,
+        ("MI_RedBrick", "MI_Trim", "MI_Glass", "MI_FakeInterior", "MI_InteriorWall"),
+    ),
+    SourceSpec(
+        "quat_floor",
+        "BazaarSource_QuatFloor4x4",
+        "Downtown City MegaKit / Floor_4x4",
+        "Quaternius (@Quaternius)",
+        "https://quaternius.com/packs/downtowncitymegakit.html",
+        16,
+        ("MI_InteriorFloor", "MI_InteriorRoof"),
+    ),
+    SourceSpec(
+        "quat_metal_window",
+        "BazaarSource_QuatMetalFirstFloorWindow",
+        "Downtown City MegaKit / Metal_FirstFloor_Window",
+        "Quaternius (@Quaternius)",
+        "https://quaternius.com/packs/downtowncitymegakit.html",
+        156,
+        ("MI_Trim_Dark", "MI_Trim_MetalConcrete", "MI_Glass", "MI_FakeInterior", "MI_InteriorWall"),
+    ),
 )
 
 COFFEE_CART_SOURCE_SPECS = (
@@ -310,75 +456,74 @@ SURFACE_MATERIAL_SOURCES = {
 }
 
 STAIRS = (
-    StairSpec("Bazaar_A_Gallery_South_Stair", -59.0, -0.28, -59.0, -10.0, 3.0, 3.2, 18, 0.54, "A_Gallery"),
-    StairSpec("Bazaar_A_Gallery_East_Stair", -41.28, -27.0, -51.0, -27.0, 3.0, 3.2, 18, 0.54, "A_Gallery"),
-    StairSpec("Bazaar_Mid_Bridge_West_Stair", -22.72, 0.0, -13.0, 0.0, 3.0, 3.2, 18, 0.54, "Mid_Bridge"),
-    StairSpec("Bazaar_Mid_Bridge_East_Stair", 22.72, 0.0, 13.0, 0.0, 3.0, 3.2, 18, 0.54, "Mid_Bridge"),
-    StairSpec("Bazaar_B_Balcony_South_Stair", 59.0, -4.68, 59.0, -13.0, 2.6, 3.2, 16, 0.52, "B_Balcony"),
-    StairSpec("Bazaar_B_Balcony_West_Stair", 42.68, -27.0, 51.0, -27.0, 2.6, 3.2, 16, 0.52, "B_Balcony"),
+    StairSpec("Bazaar_A_Gallery_South_Stair", -56.0, 2.1, -56.0, -9.0, 3.6, 3.2, 20, 0.555, "A_Gallery"),
+    StairSpec("Bazaar_A_Gallery_Rear_Stair", -41.9, -27.0, -53.0, -27.0, 3.6, 3.2, 20, 0.555, "A_Gallery"),
+    StairSpec("Bazaar_B_Balcony_South_Stair", 56.0, 1.5, 56.0, -9.0, 3.4, 3.2, 20, 0.525, "B_Balcony"),
+    StairSpec("Bazaar_B_Balcony_Rear_Stair", 42.5, -27.0, 53.0, -27.0, 3.4, 3.2, 20, 0.525, "B_Balcony"),
+    StairSpec("Bazaar_Mid_Mezzanine_South_Stair", -6.0, 40.85, -6.0, 31.0, 3.2, 3.2, 18, 9.85 / 18.0, "Mid_Mezzanine"),
+    StairSpec("Bazaar_Mid_Mezzanine_North_Stair", -6.0, 7.15, -6.0, 17.0, 3.2, 3.2, 18, 9.85 / 18.0, "Mid_Mezzanine"),
 )
 
 # Frozen invisible runtime-collision contract supplied by the Bazaar gameplay
 # builder.  The DCC scene places finished CC0 building masses or authored cover
 # at every one of these footprints so players never meet an unexplained wall.
 RUNTIME_ARCHITECTURE_AABBS = (
-    ("Attack_West", -18.0, 31.0, 18.0, 12.0, 6.0),
-    ("Attack_East", 18.0, 31.0, 18.0, 12.0, 6.0),
-    ("West_Split_South", -24.0, 10.0, 20.0, 12.0, 6.1),
-    ("West_Split_North", -25.0, -10.0, 18.0, 12.0, 6.1),
-    ("East_Split_South", 25.0, 10.0, 18.0, 12.0, 6.1),
-    ("East_Split_North", 24.0, -10.0, 20.0, 12.0, 6.1),
-    ("Defender_Arcade_West", -22.0, -37.0, 18.0, 8.0, 6.0),
-    ("Defender_Arcade_East", 22.0, -37.0, 18.0, 8.0, 6.0),
-    ("Mid_Chicane_South", 6.5, 23.0, 7.0, 9.0, 5.8),
-    ("Mid_Chicane_Center", -6.5, 10.0, 7.0, 7.0, 5.8),
-    ("Mid_Chicane_North", 0.0, -16.0, 12.0, 7.0, 5.9),
+    ("AttackWest", -36.5, 48.5, 43.0, 13.0, 7.4),
+    ("AttackEast", 36.5, 48.5, 43.0, 13.0, 7.6),
+    ("AttackWestEntryWing", -12.0, 48.25, 6.0, 13.5, 8.0),
+    ("AttackEastEntryWing", 12.0, 48.25, 6.0, 13.5, 8.0),
+    ("WestLaneLink", -46.0, 39.25, 6.0, 5.5, 8.4),
+    ("EastLaneLink", 46.0, 39.25, 6.0, 5.5, 8.4),
+    ("MidWestSouthFrontageBaffle", -10.5, 36.5, 0.42, 5.0, 8.0),
+    ("MidEastSouthFrontageBaffle", 10.5, 36.5, 0.42, 5.0, 8.0),
+    ("WestApproachFacadeReturn", -49.0, 4.0, 0.42, 16.0, 8.0),
+    ("EastApproachFacadeReturn", 52.0, 3.0, 0.42, 18.0, 8.0),
+    ("WestConnectorReturn", -20.0, -19.4, 0.42, 3.2, 8.0),
+    ("EastConnectorReturn", 20.0, -13.4, 0.42, 2.8, 8.0),
+    ("MidCarpetSouthFacadeReturn", 5.5, 34.0, 5.0, 0.42, 6.2),
+    ("DefenderWestFoyerPier", -20.0, -51.1, 0.42, 9.8, 7.6),
+    ("DefenderEastFoyerPier", 20.0, -51.1, 0.42, 9.8, 7.6),
+    ("DefenderWestFoyerReturn", -13.75, -46.2, 12.5, 0.42, 7.6),
+    ("DefenderEastFoyerReturn", 13.75, -46.2, 12.5, 0.42, 7.6),
+    ("SouthWest", -37.0, 24.25, 42.0, 24.5, 8.0),
+    ("SouthEast", 37.0, 24.25, 42.0, 24.5, 8.2),
+    ("SeparationWestNorth", -19.25, -26.0, 19.5, 10.0, 7.4),
+    ("SeparationWestSouth", -19.25, -4.5, 19.5, 21.0, 6.4),
+    ("SeparationEastNorth", 19.25, -24.5, 19.5, 13.0, 7.8),
+    ("SeparationEastSouth", 19.25, -3.0, 19.5, 18.0, 6.6),
+    ("BoundaryWest", -65.5, 0.0, 3.0, 112.0, 8.3),
+    ("BoundaryEast", 65.5, 0.0, 3.0, 112.0, 8.3),
+    ("WestServiceClosure", -62.0, 4.0, 4.0, 16.0, 8.0),
+    ("EastServiceClosure", 62.0, 4.0, 4.0, 16.0, 8.0),
+    ("RearFarWest", -58.5, -43.5, 11.0, 25.0, 8.1),
+    ("RearWest", -44.0, -49.0, 18.0, 14.0, 7.4),
+    ("RearWestSpawn", -12.0, -37.0, 10.0, 12.0, 6.6),
+    ("RearDefenderGuild", 0.0, -37.0, 14.0, 12.0, 7.2),
+    ("RearEastSpawn", 13.5, -37.0, 13.0, 12.0, 6.9),
+    ("RearEast", 44.0, -49.0, 18.0, 14.0, 7.7),
+    ("RearFarEast", 58.5, -45.0, 11.0, 22.0, 8.3),
 )
 
-RUNTIME_SITE_COVER_AABBS = (
-    ("A_Site_Cover_West", -49.0, -18.0, 2.4, 3.2, 1.28),
-    ("A_Site_Cover_East", -37.5, -27.5, 3.0, 2.4, 1.22),
-    ("B_Site_Cover_East", 49.0, -18.0, 2.4, 3.2, 1.28),
-    ("B_Site_Cover_West", 37.5, -27.5, 3.0, 2.4, 1.22),
-)
+RUNTIME_SITE_COVER_AABBS = ()
 
-RUNTIME_HIGH_COVER_AABBS = (
-    ("A_High_Cover_West", -62.0, -20.0, 1.5, 4.0, 3.0, 4.20),
-    ("A_High_Cover_North", -56.0, -29.0, 3.0, 1.4, 3.0, 4.16),
-    ("B_High_Cover_East", 62.0, -21.0, 1.5, 4.0, 2.6, 3.80),
-    ("B_High_Cover_North", 56.0, -30.0, 3.0, 1.4, 2.6, 3.76),
-)
+RUNTIME_HIGH_COVER_AABBS = ()
 
-RUNTIME_MID_COVER_AABBS = (
-    ("MidCoverWestMarketCart", -12.0, 20.0, 2.6, 2.2, 0.0, 2.0),
-    ("MidCoverEastMarketCart", 12.0, 16.0, 2.6, 2.2, 0.0, 2.0),
-)
+RUNTIME_MID_COVER_AABBS = ()
 
 RUNTIME_SITE_PAIR_SIGHT_BLOCK = (
     "SightBlockSitePair",
     0.0,
-    -22.0,
-    10.0,
-    4.0,
+    -15.5,
+    18.0,
+    17.0,
     0.0,
-    6.4,
+    6.2,
 )
 
 RUNTIME_RAIL_SPECS = (
-    ("Bazaar_A_Gallery_West_Parapet", (-63.0, -30.0), (-63.0, -10.0), 3.0, 4.10),
-    ("Bazaar_A_Gallery_North_Parapet", (-63.0, -30.0), (-51.0, -30.0), 3.0, 4.10),
-    ("Bazaar_A_Gallery_South_West_Parapet", (-63.0, -10.0), (-60.6, -10.0), 3.0, 4.10),
-    ("Bazaar_A_Gallery_South_East_Parapet", (-57.4, -10.0), (-51.0, -10.0), 3.0, 4.10),
-    ("Bazaar_A_Gallery_East_North_Parapet", (-51.0, -30.0), (-51.0, -28.6), 3.0, 4.10),
-    ("Bazaar_A_Gallery_East_South_Parapet", (-51.0, -25.4), (-51.0, -10.0), 3.0, 4.10),
-    ("Bazaar_Mid_Bridge_North_Parapet", (-13.0, -1.65), (13.0, -1.65), 3.0, 4.10),
-    ("Bazaar_Mid_Bridge_South_Parapet", (-13.0, 1.65), (13.0, 1.65), 3.0, 4.10),
-    ("Bazaar_B_Balcony_East_Parapet", (63.0, -31.0), (63.0, -13.0), 2.6, 3.70),
-    ("Bazaar_B_Balcony_North_Parapet", (51.0, -31.0), (63.0, -31.0), 2.6, 3.70),
-    ("Bazaar_B_Balcony_South_West_Parapet", (51.0, -13.0), (57.4, -13.0), 2.6, 3.70),
-    ("Bazaar_B_Balcony_South_East_Parapet", (60.6, -13.0), (63.0, -13.0), 2.6, 3.70),
-    ("Bazaar_B_Balcony_West_North_Parapet", (51.0, -31.0), (51.0, -28.6), 2.6, 3.70),
-    ("Bazaar_B_Balcony_West_South_Parapet", (51.0, -25.4), (51.0, -13.0), 2.6, 3.70),
+    ("Bazaar_A_Gallery_Inner_Rail", (-53.0, -23.8), (-53.0, -9.0), 3.6, 4.7),
+    ("Bazaar_B_Balcony_Inner_Rail", (53.0, -9.0), (53.0, -23.8), 3.4, 4.5),
+    ("Bazaar_Mid_Mezzanine_Inner_Rail", (-3.0, 17.0), (-3.0, 31.0), 3.2, 4.3),
 )
 
 
@@ -543,18 +688,20 @@ def clean_source_scene(templates: dict[str, bpy.types.Mesh]) -> None:
     scene.unit_settings.scale_length = 1.0
     scene.unit_settings.length_unit = "METERS"
     scene.render.engine = "BLENDER_EEVEE_NEXT"
-    scene.render.resolution_x = 960
-    scene.render.resolution_y = 640
+    scene.render.resolution_x = 800
+    scene.render.resolution_y = 500
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
     scene.render.film_transparent = False
     scene.render.image_settings.color_mode = "RGBA"
+    scene.eevee.taa_render_samples = 16
     scene.view_settings.look = "AgX - Medium High Contrast"
+    scene.view_settings.exposure = 0.60
     scene.world = bpy.data.worlds.new("BazaarCrossing_World")
     scene.world.use_nodes = True
     background = scene.world.node_tree.nodes.get("Background")
     background.inputs["Color"].default_value = (0.045, 0.07, 0.095, 1.0)
-    background.inputs["Strength"].default_value = 0.32
+    background.inputs["Strength"].default_value = 0.44
 
 
 def make_collection(name: str) -> bpy.types.Collection:
@@ -632,17 +779,108 @@ def clone_approved_materials() -> dict[str, bpy.types.Material]:
         materials[target_name] = material
         source.use_fake_user = False
 
-    materials["BazaarSiteA_Paint"] = make_simple_material(
-        "BazaarSiteA_Paint", (0.55, 0.105, 0.055, 1.0), 0.55, 0.0
+    materials["BazaarSiteA_Paint"] = make_tinted_pbr_material(
+        materials["BazaarStonePaving"],
+        "BazaarSiteA_Paint",
+        (0.48, 0.13, 0.07, 1.0),
+        0.82,
+        tint_strength=0.54,
     )
-    materials["BazaarSiteB_Paint"] = make_simple_material(
-        "BazaarSiteB_Paint", (0.045, 0.25, 0.38, 1.0), 0.5, 0.0
+    materials["BazaarSiteB_Paint"] = make_tinted_pbr_material(
+        materials["BazaarStonePaving"],
+        "BazaarSiteB_Paint",
+        (0.08, 0.28, 0.34, 1.0),
+        0.80,
+        tint_strength=0.52,
     )
-    materials["BazaarAwningCanvas"] = make_simple_material(
-        "BazaarAwningCanvas", (0.29, 0.045, 0.038, 1.0), 0.88, 0.0
+    materials["BazaarAwningCanvas"] = make_tinted_pbr_material(
+        materials["BazaarWeatheredConcrete"],
+        "BazaarAwningCanvas",
+        (0.32, 0.08, 0.05, 1.0),
+        0.90,
+        tint_strength=0.58,
     )
-    materials["BazaarWarmPlaster"] = make_simple_material(
-        "BazaarWarmPlaster", (0.34, 0.22, 0.13, 1.0), 0.86, 0.0
+    materials["BazaarWarmPlaster"] = make_tinted_pbr_material(
+        materials["BazaarWeatheredConcrete"],
+        "BazaarWarmPlaster",
+        (0.46, 0.30, 0.18, 1.0),
+        0.88,
+        tint_strength=0.48,
+    )
+    # V2 roof, stair, and shopfront accents remain adaptations of the packed
+    # Poly Haven surface set.  Keeping the source colour/normal texture graph
+    # makes the overview read as a material palette instead of alternating
+    # featureless white and black slabs.
+    materials["BazaarRoofClay"] = make_tinted_pbr_material(
+        materials["BazaarWeatheredConcrete"],
+        "BazaarRoofClay",
+        (0.72, 0.30, 0.18, 1.0),
+        0.82,
+        tint_strength=0.62,
+    )
+    materials["BazaarRoofSlate"] = make_tinted_pbr_material(
+        materials["BazaarWeatheredConcrete"],
+        "BazaarRoofSlate",
+        (0.28, 0.43, 0.50, 1.0),
+        0.78,
+        tint_strength=0.56,
+    )
+    materials["BazaarRoofSandstone"] = make_tinted_pbr_material(
+        materials["BazaarStonePaving"],
+        "BazaarRoofSandstone",
+        (0.78, 0.62, 0.42, 1.0),
+        0.84,
+        tint_strength=0.54,
+    )
+    materials["BazaarPaintedSteel"] = make_tinted_pbr_material(
+        materials["BazaarWeatheredConcrete"],
+        "BazaarPaintedSteel",
+        (0.18, 0.31, 0.36, 1.0),
+        0.64,
+        metallic=0.18,
+        tint_strength=0.52,
+    )
+    materials["BazaarSignOchre"] = make_tinted_pbr_material(
+        materials["BazaarStonePaving"],
+        "BazaarSignOchre",
+        (0.92, 0.48, 0.12, 1.0),
+        0.72,
+        tint_strength=0.62,
+    )
+    materials["BazaarSignTeal"] = make_tinted_pbr_material(
+        materials["BazaarStonePaving"],
+        "BazaarSignTeal",
+        (0.10, 0.52, 0.54, 1.0),
+        0.70,
+        tint_strength=0.60,
+    )
+    materials["BazaarInteriorTerracotta"] = make_tinted_pbr_material(
+        materials["BazaarStonePaving"],
+        "BazaarInteriorTerracotta",
+        (0.45, 0.24, 0.15, 1.0),
+        0.88,
+        tint_strength=0.42,
+    )
+    materials["BazaarInteriorSlate"] = make_tinted_pbr_material(
+        materials["BazaarWeatheredConcrete"],
+        "BazaarInteriorSlate",
+        (0.20, 0.29, 0.31, 1.0),
+        0.84,
+        tint_strength=0.38,
+    )
+    materials["BazaarInteriorSand"] = make_tinted_pbr_material(
+        materials["BazaarStonePaving"],
+        "BazaarInteriorSand",
+        (0.54, 0.40, 0.25, 1.0),
+        0.90,
+        tint_strength=0.34,
+    )
+    materials["BazaarDarkTimber"] = make_tinted_pbr_material(
+        materials["BazaarWeatheredConcrete"],
+        "BazaarDarkTimber",
+        (0.20, 0.105, 0.055, 1.0),
+        0.86,
+        tint_strength=0.56,
     )
     return materials
 
@@ -661,6 +899,61 @@ def make_simple_material(
     principled.inputs["Metallic"].default_value = metallic
     material["license"] = PROJECT_LICENSE
     material["bazaar_material_role"] = "authored physically based finish"
+    return material
+
+
+def make_tinted_pbr_material(
+    source: bpy.types.Material,
+    name: str,
+    tint: tuple[float, float, float, float],
+    roughness: float,
+    *,
+    metallic: float = 0.0,
+    tint_strength: float = 0.62,
+) -> bpy.types.Material:
+    """Create a texture-preserving colourway from one approved packed PBR."""
+    material = source.copy()
+    material.name = name
+    material.use_nodes = True
+    nodes = material.node_tree.nodes
+    links = material.node_tree.links
+    principled = next(
+        (node for node in nodes if node.type == "BSDF_PRINCIPLED"),
+        None,
+    )
+    if principled is None:
+        raise RuntimeError(f"Cannot tint PBR without Principled shader: {source.name}")
+    base = principled.inputs.get("Base Color")
+    if base is None:
+        raise RuntimeError(f"Cannot tint PBR without Base Color socket: {source.name}")
+    incoming = base.links[0] if base.links else None
+    colour = nodes.new("ShaderNodeMixRGB")
+    colour.name = f"{name}_TextureTint"
+    colour.label = "Bazaar texture-preserving tint"
+    colour.blend_type = "MIX"
+    # Preserve enough albedo variation to keep the packed texture readable,
+    # while letting the architectural colourway lift originally near-black
+    # concrete into a legible roof/stair/shopfront palette.
+    colour.inputs[0].default_value = tint_strength
+    colour.inputs[2].default_value = tint
+    if incoming is not None:
+        source_socket = incoming.from_socket
+        links.remove(incoming)
+        links.new(source_socket, colour.inputs[1])
+    else:
+        colour.inputs[1].default_value = base.default_value
+    links.new(colour.outputs[0], base)
+    for socket_name, value in (("Roughness", roughness), ("Metallic", metallic)):
+        socket = principled.inputs.get(socket_name)
+        if socket is None:
+            continue
+        for link in list(socket.links):
+            links.remove(link)
+        socket.default_value = value
+    material["license"] = CC0_LICENSE
+    material["source_material"] = source.name
+    material["bazaar_material_role"] = "texture-preserving CC0 PBR colourway"
+    material["bazaar_tint_strength"] = tint_strength
     return material
 
 
@@ -786,7 +1079,7 @@ def create_authored_module_assembly(
     template: bpy.types.Mesh,
     transforms: list[Matrix],
     source: SourceSpec,
-    side_material: bpy.types.Material,
+    side_material: bpy.types.Material | None,
     collection: bpy.types.Collection,
     root: bpy.types.Object,
     *,
@@ -799,6 +1092,10 @@ def create_authored_module_assembly(
     """Arrange, edit, and consolidate finished CC0 modules without primitive substitutes."""
     if not transforms:
         raise ValueError(f"Authored module assembly {name} has no placements")
+    if side_material is None and additional_modules:
+        raise ValueError(
+            f"Source-material assembly {name} must use exactly one module type"
+        )
     builder = bmesh.new()
     module_groups = [(template, transforms, source)]
     if additional_modules:
@@ -825,14 +1122,28 @@ def create_authored_module_assembly(
     mesh = bpy.data.meshes.new(f"{name}_Mesh")
     builder.to_mesh(mesh)
     builder.free()
-    mesh.materials.append(side_material)
-    if top_material is not None and top_material != side_material:
-        mesh.materials.append(top_material)
+    if side_material is None:
+        for material in template.materials:
+            if material is not None:
+                mesh.materials.append(material)
+        if not mesh.materials:
+            raise RuntimeError(f"Source-material assembly {name} has no authored materials")
+    else:
+        mesh.materials.append(side_material)
+        if top_material is not None and top_material != side_material:
+            mesh.materials.append(top_material)
     mesh.validate(verbose=False)
     mesh.update(calc_edges=True)
-    if top_material is not None and top_material != side_material:
-        for polygon in mesh.polygons:
-            polygon.material_index = 1 if polygon.normal.z > 0.52 else 0
+    if side_material is not None:
+        if top_material is not None and top_material != side_material:
+            for polygon in mesh.polygons:
+                polygon.material_index = 1 if polygon.normal.z > 0.52 else 0
+        else:
+            # Imported modules may carry two or more source slots.  A Bazaar
+            # colourway intentionally replaces the full finish, so normalize
+            # every inherited face index to the single adapted PBR slot.
+            for polygon in mesh.polygons:
+                polygon.material_index = 0
     obj = bpy.data.objects.new(name, mesh)
     link_object(obj, collection, root)
     set_asset_metadata(obj, origin="cc0", role=role)
@@ -842,7 +1153,8 @@ def create_authored_module_assembly(
     obj["source_object"] = " | ".join(group_source.object_name for _, _, group_source in module_groups)
     obj["authored_module_instances"] = sum(len(group_transforms) for _, group_transforms, _ in module_groups)
     obj["authored_module_types"] = len(module_groups)
-    assign_box_uv(mesh, uv_tile)
+    if side_material is not None:
+        assign_box_uv(mesh, uv_tile)
     return obj
 
 
@@ -1017,7 +1329,7 @@ def create_authored_stair(
     root: bpy.types.Object,
 ) -> bpy.types.Object:
     source_steps = 10
-    if spec.steps <= source_steps or spec.steps >= source_steps * 2:
+    if spec.steps <= source_steps or spec.steps > source_steps * 2:
         raise RuntimeError(f"Unsupported authored stair adaptation count: {spec.steps}")
     dx, dz = spec.top_x - spec.bottom_x, spec.top_z - spec.bottom_z
     run = sqrt(dx * dx + dz * dz)
@@ -1239,24 +1551,27 @@ def create_authored_stair_rails(
     lateral = Vector((-horizontal.y, horizontal.x, 0.0))
     slope = Vector((ux, -uz, spec.top_height / run)).normalized()
     normal = slope.cross(lateral).normalized()
+    up = Vector((0.0, 0.0, 1.0))
     slope_length = sqrt(run * run + spec.top_height * spec.top_height)
     tiles = max(2, int(round(run / 2.0)))
     cell = slope_length / tiles
     bottom = godot_to_blender(spec.bottom_x, 0.0, spec.bottom_z)
     transforms: list[Matrix] = []
-    rail_offset = spec.width * 0.5 + 0.09
+    rail_offset = spec.width * 0.5 + 0.06
+    rail_levels = (0.48, 0.92)
     for side_sign in (-1.0, 1.0):
         base = bottom + lateral * rail_offset * side_sign
-        for index in range(tiles):
-            transforms.append(
-                authored_basis_matrix(
-                    base + slope * (cell * (index + 0.5)),
-                    slope,
-                    lateral,
-                    normal,
-                    (cell * 0.5, 0.16 / 0.30, 0.94 / 1.20),
+        for rail_level in rail_levels:
+            for index in range(tiles):
+                transforms.append(
+                    authored_basis_matrix(
+                        base + slope * (cell * (index + 0.5)) + up * rail_level,
+                        slope,
+                        lateral,
+                        normal,
+                        (cell * 0.5, 0.13 / 0.30, 0.13 / 1.20),
+                    )
                 )
-            )
     rails = create_authored_module_assembly(
         f"{spec.name}_AuthoredTreyRails",
         templates["trey_rail"],
@@ -1270,17 +1585,24 @@ def create_authored_stair_rails(
         uv_tile=0.62,
     )
     rails["stair_contract"] = spec.name
+    rails["open_rail_rows"] = len(rail_levels)
 
     newel_positions: list[tuple[float, float, float, float]] = []
+    post_segments = max(3, int(round(run / 2.7)))
     for side_sign in (-1.0, 1.0):
         side = rail_offset * side_sign
         px, pz = -uz, ux
-        newel_positions.extend(
-            (
-                (spec.bottom_x + px * side, spec.bottom_z + pz * side, 0.0, 0.98),
-                (spec.top_x + px * side, spec.top_z + pz * side, spec.top_height, spec.top_height + 0.98),
+        for post_index in range(post_segments + 1):
+            fraction = post_index / post_segments
+            step_height = spec.top_height * fraction
+            newel_positions.append(
+                (
+                    spec.bottom_x + dx * fraction + px * side,
+                    spec.bottom_z + dz * fraction + pz * side,
+                    step_height,
+                    step_height + 1.02,
+                )
             )
-        )
     newels = create_authored_column_set(
         f"{spec.name}_AuthoredTreyNewels",
         tuple(newel_positions),
@@ -1293,7 +1615,130 @@ def create_authored_stair_rails(
         role="finished_cc0_authored_stair_newels",
     )
     newels["stair_contract"] = spec.name
+    newels["post_segments"] = post_segments
     return rails, newels
+
+
+def create_authored_stair_supports(
+    spec: StairSpec,
+    templates: dict[str, bpy.types.Mesh],
+    specs: dict[str, SourceSpec],
+    material: bpy.types.Material,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+) -> bpy.types.Object:
+    """Give each long stair visible Trey stringers and grounded support posts."""
+    dx, dz = spec.top_x - spec.bottom_x, spec.top_z - spec.bottom_z
+    run = sqrt(dx * dx + dz * dz)
+    ux, uz = dx / run, dz / run
+    horizontal = Vector((ux, -uz, 0.0))
+    lateral = Vector((-horizontal.y, horizontal.x, 0.0))
+    slope = Vector((ux, -uz, spec.top_height / run)).normalized()
+    normal = slope.cross(lateral).normalized()
+    up = Vector((0.0, 0.0, 1.0))
+    bottom = godot_to_blender(spec.bottom_x, 0.0, spec.bottom_z)
+    slope_length = sqrt(run * run + spec.top_height * spec.top_height)
+    tiles = max(2, int(round(run / 2.0)))
+    cell = slope_length / tiles
+    stringer_offset = spec.width * 0.5 - 0.16
+    stringer_transforms = [
+        authored_basis_matrix(
+            bottom
+            + lateral * stringer_offset * side_sign
+            + slope * (cell * (index + 0.5))
+            + up * 0.03,
+            slope,
+            lateral,
+            normal,
+            (cell * 0.5, 0.20 / 0.30, 0.24 / 1.20),
+        )
+        for side_sign in (-1.0, 1.0)
+        for index in range(tiles)
+    ]
+    support_transforms: list[Matrix] = []
+    support_count = 0
+    for fraction in (0.34, 0.67, 0.94):
+        support_top = max(0.34, spec.top_height * fraction - 0.12)
+        for side_sign in (-1.0, 1.0):
+            side = stringer_offset * side_sign
+            px, pz = -uz, ux
+            x = spec.bottom_x + dx * fraction + px * side
+            z = spec.bottom_z + dz * fraction + pz * side
+            support_transforms.append(
+                authored_basis_matrix(
+                    godot_to_blender(x, 0.0, z),
+                    Vector((1.0, 0.0, 0.0)),
+                    Vector((0.0, 1.0, 0.0)),
+                    up,
+                    (0.24 / 0.40, 0.24 / 0.40, support_top / 3.0),
+                )
+            )
+            support_count += 1
+    supports = create_authored_module_assembly(
+        f"{spec.name}_AuthoredTreySupports",
+        templates["trey_rail"],
+        stringer_transforms,
+        specs["trey_rail"],
+        material,
+        collection,
+        root,
+        role="finished_cc0_authored_stair_stringers_and_supports",
+        additional_modules=[
+            (templates["trey_column"], support_transforms, specs["trey_column"])
+        ],
+        weld=False,
+        uv_tile=0.72,
+    )
+    supports["stair_contract"] = spec.name
+    supports["stringer_module_instances"] = len(stringer_transforms)
+    supports["ground_support_instances"] = support_count
+    return supports
+
+
+def create_authored_stair_tread_nosings(
+    spec: StairSpec,
+    templates: dict[str, bpy.types.Mesh],
+    specs: dict[str, SourceSpec],
+    material: bpy.types.Material,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+) -> bpy.types.Object:
+    """Expose every tread edge with a thin finished Trey trim module."""
+    dx, dz = spec.top_x - spec.bottom_x, spec.top_z - spec.bottom_z
+    run = sqrt(dx * dx + dz * dz)
+    ux, uz = dx / run, dz / run
+    horizontal = Vector((ux, -uz, 0.0))
+    lateral = Vector((-horizontal.y, horizontal.x, 0.0))
+    up = Vector((0.0, 0.0, 1.0))
+    bottom = godot_to_blender(spec.bottom_x, 0.0, spec.bottom_z)
+    rise = spec.top_height / spec.steps
+    transforms = [
+        authored_basis_matrix(
+            bottom
+            + horizontal * (spec.tread * (step_index + 0.96))
+            + up * (rise * (step_index + 1) - 0.025),
+            lateral,
+            horizontal,
+            up,
+            (spec.width * 0.5, 0.10 / 0.30, 0.055 / 1.20),
+        )
+        for step_index in range(spec.steps)
+    ]
+    nosings = create_authored_module_assembly(
+        f"{spec.name}_AuthoredTreyTreadNosings",
+        templates["trey_rail"],
+        transforms,
+        specs["trey_rail"],
+        material,
+        collection,
+        root,
+        role="finished_cc0_authored_stair_tread_nosings",
+        weld=False,
+        uv_tile=0.52,
+    )
+    nosings["stair_contract"] = spec.name
+    nosings["tread_nosing_instances"] = len(transforms)
+    return nosings
 
 
 def create_authored_canopy(
@@ -1512,6 +1957,420 @@ def add_marker(
     marker["marker_role"] = marker_role
     marker["godot_xyz"] = f"{position[0]:.3f},{position[1]:.3f},{position[2]:.3f}"
     return marker
+
+
+def source_dimensions(mesh: bpy.types.Mesh) -> Vector:
+    minimum = Vector(
+        (
+            min(vertex.co.x for vertex in mesh.vertices),
+            min(vertex.co.y for vertex in mesh.vertices),
+            min(vertex.co.z for vertex in mesh.vertices),
+        )
+    )
+    maximum = Vector(
+        (
+            max(vertex.co.x for vertex in mesh.vertices),
+            max(vertex.co.y for vertex in mesh.vertices),
+            max(vertex.co.z for vertex in mesh.vertices),
+        )
+    )
+    return maximum - minimum
+
+
+def make_module_run(
+    name: str,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    bottom: float,
+    height: float,
+    pattern: tuple[str, ...],
+    templates: dict[str, bpy.types.Mesh],
+    specs: dict[str, SourceSpec],
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    *,
+    role: str,
+    material: bpy.types.Material | None = None,
+    nominal_cell: float = 2.0,
+    depth_scale: float = 1.0,
+) -> list[bpy.types.Object]:
+    """Compose one thick, authored wall/beam run from finished CC0 modules."""
+    dx, dz = end[0] - start[0], end[1] - start[1]
+    length = sqrt(dx * dx + dz * dz)
+    if length < 0.12:
+        return []
+    ux, uz = dx / length, dz / length
+    forward = Vector((ux, -uz, 0.0))
+    depth_axis = Vector((uz, ux, 0.0))
+    up = Vector((0.0, 0.0, 1.0))
+    cell_count = max(1, int(round(length / nominal_cell)))
+    cell = length / cell_count
+    grouped: dict[str, list[Matrix]] = {key: [] for key in pattern}
+    for index in range(cell_count):
+        key = pattern[index % len(pattern)]
+        dimensions = source_dimensions(templates[key])
+        if dimensions.x <= 0.001 or dimensions.z <= 0.001:
+            raise RuntimeError(f"Degenerate authored run source {key}")
+        center_distance = cell * (index + 0.5)
+        x = start[0] + ux * center_distance
+        z = start[1] + uz * center_distance
+        grouped[key].append(
+            authored_basis_matrix(
+                godot_to_blender(x, bottom, z),
+                forward,
+                depth_axis,
+                up,
+                (
+                    cell / dimensions.x,
+                    depth_scale,
+                    height / dimensions.z,
+                ),
+            )
+        )
+
+    objects: list[bpy.types.Object] = []
+    for key, transforms in grouped.items():
+        if not transforms:
+            continue
+        suffix = key.removeprefix("quat_").removeprefix("trey_")
+        obj = create_authored_module_assembly(
+            f"{name}_{suffix}",
+            templates[key],
+            transforms,
+            specs[key],
+            material,
+            collection,
+            root,
+            role=role,
+            weld=False,
+            uv_tile=1.5,
+        )
+        obj["godot_run_start_xz"] = f"{start[0]:.3f},{start[1]:.3f}"
+        obj["godot_run_end_xz"] = f"{end[0]:.3f},{end[1]:.3f}"
+        obj["run_bottom_top_y"] = f"{bottom:.3f},{bottom + height:.3f}"
+        obj["module_cell_m"] = round(cell, 5)
+        objects.append(obj)
+    return objects
+
+
+def make_segmented_wall(
+    name: str,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    openings: tuple[tuple[float, float], ...],
+    bottom: float,
+    height: float,
+    pattern: tuple[str, ...],
+    templates: dict[str, bpy.types.Mesh],
+    specs: dict[str, SourceSpec],
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    *,
+    role: str,
+    material: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Build a wall while leaving exact distance-along-run gameplay openings."""
+    dx, dz = end[0] - start[0], end[1] - start[1]
+    length = sqrt(dx * dx + dz * dz)
+    ux, uz = dx / length, dz / length
+    clipped = sorted(
+        (max(0.0, low), min(length, high))
+        for low, high in openings
+        if high > 0.0 and low < length
+    )
+    cursor = 0.0
+    objects: list[bpy.types.Object] = []
+    section = 0
+    for low, high in (*clipped, (length, length)):
+        if low - cursor > 0.12:
+            section_start = (start[0] + ux * cursor, start[1] + uz * cursor)
+            section_end = (start[0] + ux * low, start[1] + uz * low)
+            objects.extend(
+                make_module_run(
+                    f"{name}_Section{section:02d}",
+                    section_start,
+                    section_end,
+                    bottom,
+                    height,
+                    pattern,
+                    templates,
+                    specs,
+                    collection,
+                    root,
+                    role=role,
+                    material=material,
+                )
+            )
+            section += 1
+        cursor = max(cursor, high)
+    return objects
+
+
+def make_tiled_patch(
+    name: str,
+    key: str,
+    center_x: float,
+    center_z: float,
+    size_x: float,
+    size_z: float,
+    bottom: float,
+    thickness: float,
+    templates: dict[str, bpy.types.Mesh],
+    specs: dict[str, SourceSpec],
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    *,
+    role: str,
+    material: bpy.types.Material | None = None,
+) -> bpy.types.Object:
+    dimensions = source_dimensions(templates[key])
+    columns = max(1, int(round(size_x / dimensions.x)))
+    rows = max(1, int(round(size_z / dimensions.y)))
+    cell_x, cell_z = size_x / columns, size_z / rows
+    transforms: list[Matrix] = []
+    for row in range(rows):
+        for column in range(columns):
+            x = center_x - size_x * 0.5 + cell_x * (column + 0.5)
+            z = center_z - size_z * 0.5 + cell_z * (row + 0.5)
+            transforms.append(
+                authored_basis_matrix(
+                    godot_to_blender(x, bottom, z),
+                    Vector((1.0, 0.0, 0.0)),
+                    Vector((0.0, 1.0, 0.0)),
+                    Vector((0.0, 0.0, 1.0)),
+                    (
+                        cell_x / dimensions.x,
+                        cell_z / dimensions.y,
+                        thickness / dimensions.z,
+                    ),
+                )
+            )
+    obj = create_authored_module_assembly(
+        name,
+        templates[key],
+        transforms,
+        specs[key],
+        material,
+        collection,
+        root,
+        role=role,
+        weld=True,
+        uv_tile=2.0,
+    )
+    obj["godot_center_xz"] = f"{center_x:.3f},{center_z:.3f}"
+    obj["footprint_m"] = f"{size_x:.3f},{size_z:.3f}"
+    obj["bottom_top_y"] = f"{bottom:.3f},{bottom + thickness:.3f}"
+    obj["source_tile_grid"] = f"{columns}x{rows}"
+    return obj
+
+
+def make_portal(
+    name: str,
+    position: tuple[float, float, float],
+    yaw_degrees: float,
+    opening_width: float,
+    templates: dict[str, bpy.types.Mesh],
+    specs: dict[str, SourceSpec],
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    *,
+    region: str,
+) -> bpy.types.Object:
+    dimensions = source_dimensions(templates["trey_arch"])
+    portal = place_source(
+        templates,
+        specs,
+        "trey_arch",
+        name,
+        position,
+        yaw_degrees,
+        (opening_width / dimensions.x, 1.0, 0.42 / dimensions.y),
+        collection,
+        root,
+        role="finished_cc0_runtime_door_portal",
+    )
+    portal["interior_region"] = region
+    portal["clear_opening_width_m"] = opening_width
+    return portal
+
+
+def make_closed_block(
+    name: str,
+    bounds: tuple[float, float, float, float],
+    height: float,
+    facade_pattern: tuple[str, ...],
+    templates: dict[str, bpy.types.Mesh],
+    specs: dict[str, SourceSpec],
+    roof_material: bpy.types.Material,
+    wall_material: bpy.types.Material,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+) -> None:
+    xmin, xmax, zmin, zmax = bounds
+    sides = (
+        ((xmin, zmin), (xmax, zmin)),
+        ((xmax, zmin), (xmax, zmax)),
+        ((xmax, zmax), (xmin, zmax)),
+        ((xmin, zmax), (xmin, zmin)),
+    )
+    for index, (start, end) in enumerate(sides):
+        pattern = facade_pattern if index in (0, 2) else ("trey_foundation",)
+        material = None if any(key.startswith("quat_") for key in pattern) else wall_material
+        make_module_run(
+            f"{name}_Wall{index:02d}",
+            start,
+            end,
+            0.0,
+            height,
+            pattern,
+            templates,
+            specs,
+            collection,
+            root,
+            role="finished_cc0_closed_urban_block_wall",
+            material=material,
+        )
+    make_tiled_patch(
+        f"{name}_Roof",
+        "trey_roof",
+        (xmin + xmax) * 0.5,
+        (zmin + zmax) * 0.5,
+        xmax - xmin,
+        zmax - zmin,
+        height,
+        0.18,
+        templates,
+        specs,
+        collection,
+        root,
+        role="finished_cc0_closed_urban_block_roof",
+        material=roof_material,
+    )
+    for index, (start, end) in enumerate(sides):
+        make_module_run(
+            f"{name}_Cornice{index:02d}",
+            start,
+            end,
+            height - 0.06,
+            0.32,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            collection,
+            root,
+            role="finished_cc0_urban_block_cornice",
+            material=roof_material,
+        )
+    # A second, narrower eave/parapet band breaks the former one-piece slab
+    # silhouette without duplicating an entire building kit.  Opposing sides
+    # keep roof drainage/readability and give the overview a consistent scale.
+    for index in (0, 2):
+        start, end = sides[index]
+        make_module_run(
+            f"{name}_Parapet{index:02d}",
+            start,
+            end,
+            height + 0.18,
+            0.34,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            collection,
+            root,
+            role="finished_cc0_urban_block_roof_parapet",
+            material=roof_material,
+            depth_scale=0.72,
+        )
+
+    # Attached roof-trim ridges subdivide broad roof planes at overview scale.
+    # They sit directly on the authored roof skin and follow the long axis, so
+    # they read as drainage/vent spines rather than floating decorative bars.
+    span_x, span_z = xmax - xmin, zmax - zmin
+    ridge_offsets = (0.0,)
+    if max(span_x, span_z) > 18.0:
+        ridge_offsets = (-0.16, 0.16)
+    for ridge_index, offset_ratio in enumerate(ridge_offsets):
+        if span_x >= span_z:
+            ridge_z = (zmin + zmax) * 0.5 + span_z * offset_ratio
+            ridge_start = (xmin + 0.8, ridge_z)
+            ridge_end = (xmax - 0.8, ridge_z)
+        else:
+            ridge_x = (xmin + xmax) * 0.5 + span_x * offset_ratio
+            ridge_start = (ridge_x, zmin + 0.8)
+            ridge_end = (ridge_x, zmax - 0.8)
+        make_module_run(
+            f"{name}_SkylineRidge{ridge_index:02d}",
+            ridge_start,
+            ridge_end,
+            height + 0.20,
+            0.24,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            collection,
+            root,
+            role="finished_cc0_attached_skyline_ridge",
+            material=roof_material,
+            nominal_cell=3.0,
+            depth_scale=0.76,
+        )
+
+    # Roughly one building in three receives a low rooftop lantern/vent house.
+    # The deterministic name signature creates skyline variety while retaining
+    # finished Trey walls, roof, UVs, and the frozen gameplay footprint below.
+    signature = sum(ord(character) for character in name)
+    if signature % 3 == 0:
+        cap_x = min(4.2, max(2.3, span_x * 0.24))
+        cap_z = min(4.2, max(2.3, span_z * 0.24))
+        offset_x = (0.12 if signature % 2 else -0.12) * max(0.0, span_x - cap_x)
+        offset_z = (-0.10 if signature % 5 else 0.10) * max(0.0, span_z - cap_z)
+        center_x = (xmin + xmax) * 0.5 + offset_x
+        center_z = (zmin + zmax) * 0.5 + offset_z
+        cap_bounds = (
+            center_x - cap_x * 0.5,
+            center_x + cap_x * 0.5,
+            center_z - cap_z * 0.5,
+            center_z + cap_z * 0.5,
+        )
+        cap_sides = (
+            ((cap_bounds[0], cap_bounds[2]), (cap_bounds[1], cap_bounds[2])),
+            ((cap_bounds[1], cap_bounds[2]), (cap_bounds[1], cap_bounds[3])),
+            ((cap_bounds[1], cap_bounds[3]), (cap_bounds[0], cap_bounds[3])),
+            ((cap_bounds[0], cap_bounds[3]), (cap_bounds[0], cap_bounds[2])),
+        )
+        for index, (start, end) in enumerate(cap_sides):
+            make_module_run(
+                f"{name}_RoofLanternWall{index:02d}",
+                start,
+                end,
+                height + 0.20,
+                0.72,
+                ("trey_foundation",),
+                templates,
+                specs,
+                collection,
+                root,
+                role="finished_cc0_rooftop_lantern_wall",
+                material=wall_material,
+                nominal_cell=2.2,
+                depth_scale=0.62,
+            )
+        make_tiled_patch(
+            f"{name}_RoofLanternCap",
+            "trey_roof",
+            center_x,
+            center_z,
+            cap_x,
+            cap_z,
+            height + 0.92,
+            0.14,
+            templates,
+            specs,
+            collection,
+            root,
+            role="finished_cc0_rooftop_lantern_roof",
+            material=roof_material,
+        )
 
 
 def build_map(
@@ -2107,21 +2966,2727 @@ def build_map(
     return root, collections
 
 
+def build_rect_perimeter(
+    name: str,
+    bounds: tuple[float, float, float, float],
+    doors: dict[str, tuple[tuple[float, float], ...]],
+    height: float,
+    lower_pattern: tuple[str, ...],
+    upper_pattern: tuple[str, ...],
+    templates: dict[str, bpy.types.Mesh],
+    specs: dict[str, SourceSpec],
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    *,
+    region: str,
+) -> None:
+    xmin, xmax, zmin, zmax = bounds
+    side_specs = (
+        ("South", (xmin, zmax), (xmax, zmax), "south", xmin, 0.0),
+        ("North", (xmin, zmin), (xmax, zmin), "north", xmin, 0.0),
+        ("West", (xmin, zmin), (xmin, zmax), "west", zmin, 90.0),
+        ("East", (xmax, zmin), (xmax, zmax), "east", zmin, 90.0),
+    )
+    for side_name, start, end, key, axis_minimum, portal_yaw in side_specs:
+        door_specs = doors.get(key, ())
+        openings = tuple(
+            (
+                center - axis_minimum - width * 0.5,
+                center - axis_minimum + width * 0.5,
+            )
+            for center, width in door_specs
+        )
+        make_segmented_wall(
+            f"{name}_{side_name}_Lower",
+            start,
+            end,
+            openings,
+            0.0,
+            3.0,
+            lower_pattern,
+            templates,
+            specs,
+            collection,
+            root,
+            role="finished_cc0_enterable_building_lower_wall",
+        )
+        make_module_run(
+            f"{name}_{side_name}_Upper",
+            start,
+            end,
+            3.0,
+            height - 3.0,
+            upper_pattern,
+            templates,
+            specs,
+            collection,
+            root,
+            role="finished_cc0_enterable_building_upper_wall",
+        )
+        for door_index, (center, width) in enumerate(door_specs):
+            position = (
+                (center, 0.0, start[1])
+                if key in ("south", "north")
+                else (start[0], 0.0, center)
+            )
+            make_portal(
+                f"{name}_{side_name}_Portal{door_index:02d}",
+                position,
+                portal_yaw,
+                width,
+                templates,
+                specs,
+                collection,
+                root,
+                region=region,
+            )
+
+
+def build_map_v2(
+    templates: dict[str, bpy.types.Mesh],
+    materials: dict[str, bpy.types.Material],
+) -> tuple[bpy.types.Object, dict[str, bpy.types.Collection]]:
+    """Compose Bazaar Crossing V2 as a dense, enterable urban interior map."""
+    root = bpy.data.objects.new("BazaarCrossing", None)
+    bpy.context.scene.collection.objects.link(root)
+    set_asset_metadata(root, origin="project_authored", role="map_root")
+    root["map_name"] = "Bazaar Crossing V2"
+    root["map_bounds_godot_xz"] = "X[-68,68], Z[-56,56]"
+    root["authoring_axis_conversion"] = "Blender=(GodotX,-GodotZ,GodotY)"
+    root["scale_meters"] = 1.0
+    root["design_revision"] = "V2 dense enterable interiors"
+
+    collections = {
+        key: make_collection(name)
+        for key, name in (
+            ("surface", "Bazaar_01_Surface"),
+            ("architecture", "Bazaar_02_CC0_Architecture"),
+            ("elevation", "Bazaar_03_Elevation"),
+            ("dressing", "Bazaar_04_CC0_Dressing"),
+            ("markers", "Bazaar_05_Layout_Markers"),
+            ("review", "Bazaar_99_Review_Lighting"),
+        )
+    }
+    specs = {spec.key: spec for spec in (*SOURCE_SPECS, *COFFEE_CART_SOURCE_SPECS)}
+    surface = collections["surface"]
+    architecture = collections["architecture"]
+    elevation = collections["elevation"]
+    dressing = collections["dressing"]
+    markers = collections["markers"]
+    asphalt = materials["BazaarWetAsphalt"]
+    paving = materials["BazaarStonePaving"]
+    concrete = materials["BazaarWeatheredConcrete"]
+    steel = materials["BazaarBlackenedSteel"]
+    warm = materials["BazaarWarmPlaster"]
+    canvas = materials["BazaarAwningCanvas"]
+    roof_clay = materials["BazaarRoofClay"]
+    roof_slate = materials["BazaarRoofSlate"]
+    roof_sand = materials["BazaarRoofSandstone"]
+    painted_steel = materials["BazaarPaintedSteel"]
+    sign_ochre = materials["BazaarSignOchre"]
+    sign_teal = materials["BazaarSignTeal"]
+    floor_terracotta = materials["BazaarInteriorTerracotta"]
+    floor_slate = materials["BazaarInteriorSlate"]
+    floor_sand = materials["BazaarInteriorSand"]
+    dark_timber = materials["BazaarDarkTimber"]
+
+    def add_wall_storage_rack(
+        name: str,
+        start: tuple[float, float],
+        end: tuple[float, float],
+        shelf_material: bpy.types.Material,
+        *,
+        shelf_levels: tuple[float, ...] = (0.70, 1.42, 2.14),
+        post_top: float = 2.72,
+    ) -> None:
+        """Attach one continuous finished-module storage rhythm to a wall."""
+        dx, dz = end[0] - start[0], end[1] - start[1]
+        length = sqrt(dx * dx + dz * dz)
+        if length < 1.0:
+            raise RuntimeError(f"Wall rack is too short: {name}")
+        for shelf_index, shelf_bottom in enumerate(shelf_levels):
+            create_authored_horizontal_strip(
+                f"{name}_Shelf{shelf_index:02d}",
+                start,
+                end,
+                shelf_bottom,
+                0.14,
+                0.34,
+                templates,
+                specs,
+                shelf_material,
+                dressing,
+                root,
+                role="finished_cc0_continuous_wall_storage_shelf",
+            )
+        post_count = max(2, int(length / 2.35) + 1)
+        post_positions = tuple(
+            (
+                start[0] + dx * index / (post_count - 1),
+                start[1] + dz * index / (post_count - 1),
+                0.24,
+                post_top,
+            )
+            for index in range(post_count)
+        )
+        create_authored_column_set(
+            f"{name}_Posts",
+            post_positions,
+            0.15,
+            templates,
+            specs,
+            painted_steel,
+            dressing,
+            root,
+            role="finished_cc0_continuous_wall_storage_posts",
+        )
+        make_module_run(
+            f"{name}_TopFascia",
+            start,
+            end,
+            post_top,
+            0.20,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            dressing,
+            root,
+            role="finished_cc0_continuous_wall_storage_fascia",
+            material=dark_timber,
+            nominal_cell=2.5,
+            depth_scale=0.62,
+        )
+
+    def add_upper_shopfront_band(
+        name: str,
+        start: tuple[float, float],
+        end: tuple[float, float],
+        band_material: bpy.types.Material,
+        *,
+        bottom: float = 3.25,
+        height: float = 2.10,
+    ) -> None:
+        """Overlay a shallow Quaternius window band with Trey framing."""
+        module_depth = source_dimensions(templates["quat_window_trim"]).y
+        make_module_run(
+            f"{name}_WindowBand",
+            start,
+            end,
+            bottom,
+            height,
+            ("quat_window_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_continuous_upper_shopfront_band",
+            material=band_material,
+            nominal_cell=2.8,
+            depth_scale=0.20 / module_depth,
+        )
+        dx, dz = end[0] - start[0], end[1] - start[1]
+        length = sqrt(dx * dx + dz * dz)
+        frame_count = max(2, int(length / 3.0) + 1)
+        create_authored_column_set(
+            f"{name}_BandPiers",
+            tuple(
+                (
+                    start[0] + dx * index / (frame_count - 1),
+                    start[1] + dz * index / (frame_count - 1),
+                    bottom - 0.08,
+                    bottom + height + 0.18,
+                )
+                for index in range(frame_count)
+            ),
+            0.16,
+            templates,
+            specs,
+            roof_sand,
+            architecture,
+            root,
+            role="finished_cc0_continuous_upper_shopfront_piers",
+        )
+        for trim_index, trim_bottom in enumerate((bottom - 0.10, bottom + height)):
+            make_module_run(
+                f"{name}_BandTrim{trim_index:02d}",
+                start,
+                end,
+                trim_bottom,
+                0.20,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_continuous_upper_shopfront_cornice",
+                material=dark_timber,
+                nominal_cell=2.8,
+                depth_scale=0.58,
+            )
+
+    def add_rooftop_monitor(
+        name: str,
+        bounds: tuple[float, float, float, float],
+        base_y: float,
+        wall_material: bpy.types.Material,
+        cap_material: bpy.types.Material,
+    ) -> None:
+        """Build an attached low clerestory/vent monitor from finished modules."""
+        xmin, xmax, zmin, zmax = bounds
+        monitor_height = 0.82
+        module_depth = source_dimensions(templates["quat_metal_window"]).y
+        for side_index, (start, end, key) in enumerate(
+            (
+                ((xmin, zmin), (xmax, zmin), "quat_metal_window"),
+                ((xmax, zmin), (xmax, zmax), "trey_foundation"),
+                ((xmax, zmax), (xmin, zmax), "quat_metal_window"),
+                ((xmin, zmax), (xmin, zmin), "trey_foundation"),
+            )
+        ):
+            depth = module_depth if key == "quat_metal_window" else source_dimensions(templates[key]).y
+            make_module_run(
+                f"{name}_MonitorWall{side_index:02d}",
+                start,
+                end,
+                base_y,
+                monitor_height,
+                (key,),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_skyline_monitor_wall",
+                material=wall_material,
+                nominal_cell=2.4,
+                depth_scale=0.22 / depth,
+            )
+        make_tiled_patch(
+            f"{name}_MonitorCap",
+            "quat_floor",
+            (xmin + xmax) * 0.5,
+            (zmin + zmax) * 0.5,
+            xmax - xmin + 0.18,
+            zmax - zmin + 0.18,
+            base_y + monitor_height,
+            0.14,
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_skyline_monitor_cap",
+            material=cap_material,
+        )
+        make_module_run(
+            f"{name}_MonitorRidge",
+            ((xmin + xmax) * 0.5, zmin + 0.18),
+            ((xmin + xmax) * 0.5, zmax - 0.18),
+            base_y + monitor_height + 0.12,
+            0.22,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_attached_skyline_ridge",
+            material=cap_material,
+            nominal_cell=2.4,
+            depth_scale=0.68,
+        )
+
+    create_authored_surface_patch(
+        "BazaarGroundAuthoredMesh",
+        0.0,
+        0.0,
+        136.0,
+        112.0,
+        0.0,
+        templates,
+        specs,
+        asphalt,
+        surface,
+        root,
+        role="finished_cc0_authored_ground_tiles",
+        uv_tile=4.5,
+    )
+
+    # Narrow paving bands make the 4.5-6 m tactical lanes readable without
+    # visually reopening the whole arena into a parking lot.
+    for name, x, z, sx, sz in (
+        ("Bazaar_Attacker_Foyer_Paving", 0.0, 48.5, 28.0, 9.0),
+        ("Bazaar_A_Approach_Paving", -46.0, 24.0, 7.0, 25.0),
+        ("Bazaar_Mid_Approach_Paving", 0.0, 25.0, 7.0, 25.0),
+        ("Bazaar_B_Approach_Paving", 46.0, 24.0, 7.0, 25.0),
+        ("Bazaar_Defender_Spawn_Paving", 0.0, -49.0, 15.0, 9.0),
+    ):
+        create_authored_surface_patch(
+            name,
+            x,
+            z,
+            sx,
+            sz,
+            0.025,
+            templates,
+            specs,
+            paving,
+            surface,
+            root,
+            role="finished_cc0_authored_confined_route_tiles",
+            uv_tile=2.5,
+        )
+
+    # The large gameplay blockers are expressed as coherent modular city
+    # blocks with roofs, returns, cornices, and varied elevations. They are not
+    # scaled copies of a single closed building.
+    closed_blocks = (
+        ("AttackWestInn", (-58.0, -43.0, 42.0, 55.0), 6.2, ("quat_window_trim", "trey_foundation"), warm),
+        ("AttackWestBaths", (-43.0, -29.0, 42.0, 55.0), 7.4, ("quat_curved_window",), concrete),
+        ("AttackWestShops", (-29.0, -15.0, 42.0, 55.0), 6.7, ("quat_window_trim", "trey_foundation"), warm),
+        ("AttackEastHotel", (15.0, 31.0, 42.0, 55.0), 7.0, ("quat_metal_window", "trey_foundation"), steel),
+        ("AttackEastGuild", (31.0, 45.0, 42.0, 55.0), 6.1, ("quat_window_trim",), warm),
+        ("AttackEastFoundry", (45.0, 58.0, 42.0, 55.0), 7.6, ("quat_metal_window", "trey_window"), steel),
+        ("AttackWestEntryWing", (-15.0, -9.0, 41.5, 55.0), 8.0, ("quat_curved_window", "trey_foundation"), concrete),
+        ("AttackEastEntryWing", (9.0, 15.0, 41.5, 55.0), 8.0, ("quat_metal_window", "trey_foundation"), steel),
+        ("WestLaneLink", (-49.0, -43.0, 36.5, 42.0), 8.4, ("quat_window_trim", "trey_foundation"), warm),
+        ("EastLaneLink", (43.0, 49.0, 36.5, 42.0), 8.4, ("quat_metal_window", "trey_foundation"), steel),
+        ("SouthWestCaravan", (-58.0, -37.0, 12.0, 36.5), 6.8, ("quat_window_trim", "trey_foundation"), warm),
+        ("SouthWestArchive", (-37.0, -16.0, 12.0, 36.5), 8.0, ("quat_curved_window",), concrete),
+        ("SouthEastTextile", (16.0, 38.0, 12.0, 36.5), 7.2, ("quat_window_trim", "trey_foundation"), warm),
+        ("SouthEastMetalworks", (38.0, 58.0, 12.0, 36.5), 8.2, ("quat_metal_window", "trey_window"), steel),
+        ("SeparationWestNorth", (-29.0, -9.5, -31.0, -21.0), 7.4, ("quat_window_trim", "trey_foundation"), warm),
+        ("SeparationWestSouth", (-29.0, -9.5, -15.0, 6.0), 6.4, ("quat_curved_window",), concrete),
+        ("SeparationEastNorth", (9.5, 29.0, -31.0, -18.0), 7.8, ("quat_metal_window", "trey_foundation"), steel),
+        ("SeparationEastSouth", (9.5, 29.0, -12.0, 6.0), 6.6, ("quat_window_trim",), warm),
+        ("WestServiceClosure", (-64.0, -60.0, -4.0, 12.0), 8.0, ("quat_window_trim", "trey_foundation"), warm),
+        ("EastServiceClosure", (60.0, 64.0, -4.0, 12.0), 8.0, ("quat_metal_window", "trey_foundation"), steel),
+    )
+    roof_cycle = (roof_clay, roof_slate, roof_sand, roof_slate)
+    for block_index, (name, bounds, height, pattern, wall_material) in enumerate(closed_blocks):
+        make_closed_block(
+            f"BazaarBlock_{name}",
+            bounds,
+            height,
+            pattern,
+            templates,
+            specs,
+            roof_cycle[block_index % len(roof_cycle)],
+            wall_material,
+            architecture,
+            root,
+        )
+
+    # Side boundary rows remain a continuous urban edge, but use five distinct
+    # rooflines per side rather than dozens of duplicated whole-building props.
+    for side_name, xmin, xmax, pattern in (
+        ("West", -67.0, -64.0, ("quat_window_trim", "trey_foundation")),
+        ("East", 64.0, 67.0, ("quat_metal_window", "trey_foundation")),
+    ):
+        for index, (zmin, zmax, height) in enumerate(
+            ((-56.0, -34.0, 7.0), (-34.0, -12.0, 8.3), (-12.0, 10.0, 6.5), (10.0, 34.0, 7.6), (34.0, 56.0, 6.9))
+        ):
+            make_closed_block(
+                f"BazaarBoundary_{side_name}_{index:02d}",
+                (xmin, xmax, zmin, zmax),
+                height,
+                pattern,
+                templates,
+                specs,
+                (roof_clay, roof_slate, roof_sand)[(index + (0 if side_name == "West" else 1)) % 3],
+                warm if side_name == "West" else concrete,
+                architecture,
+                root,
+            )
+
+    # A: a two-storey caravanserai. The bomb site is a small open courtyard;
+    # all four surrounding wings are enterable and roofed.
+    build_rect_perimeter(
+        "Bazaar_A_Caravanserai",
+        (-60.0, -34.0, -31.0, -4.0),
+        {
+            "south": ((-56.0, 3.2), (-47.0, 3.4)),
+            "west": ((-12.0, 3.2),),
+            "east": ((-10.0, 3.2),),
+            "north": ((-52.0, 3.2), (-37.0, 3.2)),
+        },
+        6.4,
+        ("trey_foundation", "quat_door_frame"),
+        ("quat_window_trim", "trey_foundation"),
+        templates,
+        specs,
+        architecture,
+        root,
+        region="A_Caravanserai",
+    )
+    make_tiled_patch(
+        "Bazaar_A_InteriorFloor",
+        "quat_floor",
+        -47.0,
+        -17.5,
+        25.2,
+        26.2,
+        0.035,
+        0.12,
+        templates,
+        specs,
+        surface,
+        root,
+        role="finished_cc0_enterable_A_floor",
+        material=floor_terracotta,
+    )
+    for roof_name, x, z, sx, sz, roof_material in (
+        ("WestArcade", -55.5, -17.5, 9.0, 27.0, roof_clay),
+        ("EastRooms", -37.5, -17.5, 7.0, 27.0, roof_slate),
+        ("RearWarehouse", -46.0, -27.0, 10.0, 8.0, roof_sand),
+        ("SouthVestibule", -46.0, -8.5, 10.0, 9.0, roof_clay),
+    ):
+        make_tiled_patch(
+            f"Bazaar_A_Roof_{roof_name}",
+            "quat_floor",
+            x,
+            z,
+            sx,
+            sz,
+            6.3,
+            0.14,
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_enterable_A_roof",
+            material=roof_material,
+        )
+        roof_edges = (
+            ((x - sx * 0.5, z - sz * 0.5), (x + sx * 0.5, z - sz * 0.5)),
+            ((x + sx * 0.5, z - sz * 0.5), (x + sx * 0.5, z + sz * 0.5)),
+            ((x + sx * 0.5, z + sz * 0.5), (x - sx * 0.5, z + sz * 0.5)),
+            ((x - sx * 0.5, z + sz * 0.5), (x - sx * 0.5, z - sz * 0.5)),
+        )
+        for edge_index, (edge_start, edge_end) in enumerate(roof_edges):
+            make_module_run(
+                f"Bazaar_A_Roof_{roof_name}_Parapet{edge_index:02d}",
+                edge_start,
+                edge_end,
+                6.48,
+                0.32,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_enterable_A_roof_parapet",
+                material=roof_material,
+                depth_scale=0.70,
+            )
+    add_rooftop_monitor(
+        "Bazaar_A_WestArcade",
+        (-57.1, -53.9, -23.0, -12.0),
+        6.54,
+        floor_slate,
+        roof_clay,
+    )
+    add_rooftop_monitor(
+        "Bazaar_A_EastRooms",
+        (-39.4, -35.8, -22.5, -13.0),
+        6.54,
+        floor_sand,
+        roof_slate,
+    )
+    # Courtyard arcades and warehouse rooms create local cover without crates.
+    make_module_run(
+        "Bazaar_A_Courtyard_West_Arcade",
+        (-51.0, -23.0),
+        (-51.0, -13.0),
+        0.0,
+        3.0,
+        ("trey_arch",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_A_courtyard_arcade",
+        material=roof_sand,
+        nominal_cell=4.0,
+    )
+    make_module_run(
+        "Bazaar_A_Courtyard_East_Arcade",
+        (-41.0, -13.0),
+        (-41.0, -23.0),
+        0.0,
+        3.0,
+        ("trey_arch",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_A_courtyard_arcade",
+        material=roof_sand,
+        nominal_cell=4.0,
+    )
+    make_segmented_wall(
+        "Bazaar_A_RearWarehouse_Partition",
+        (-60.0, -23.0),
+        (-34.0, -23.0),
+        ((2.4, 5.6), (12.4, 15.6), (20.4, 23.6)),
+        0.0,
+        3.0,
+        ("trey_foundation",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_A_warehouse_partition",
+        material=warm,
+    )
+    make_portal(
+        "Bazaar_A_RearWarehouse_CenterPortal",
+        (-46.0, 0.0, -23.0),
+        0.0,
+        3.2,
+        templates,
+        specs,
+        architecture,
+        root,
+        region="A_Caravanserai",
+    )
+    make_segmented_wall(
+        "Bazaar_A_Warehouse_Bays",
+        (-47.0, -31.0),
+        (-47.0, -23.0),
+        ((2.4, 5.6),),
+        0.0,
+        3.0,
+        ("trey_foundation",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_A_warehouse_bay_wall",
+        material=warm,
+    )
+    for counter_name, start, end in (
+        ("A_SpiceCounter", (-49.8, -15.0), (-49.8, -20.8)),
+        ("A_WarehouseDesk", (-35.5, -29.5), (-35.5, -24.5)),
+        ("A_EntryDesk", (-48.7, -9.5), (-44.0, -9.5)),
+    ):
+        make_module_run(
+            f"Bazaar_{counter_name}",
+            start,
+            end,
+            0.0,
+            1.18,
+            ("trey_foundation",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_architectural_counter_cover",
+            material=concrete,
+        )
+
+    # The warehouse partition is gameplay-critical, so all three runtime bays
+    # receive a visible arch frame, upper signboard, pilasters, and cornice.
+    for portal_x in (-56.0, -38.0):
+        make_portal(
+            f"Bazaar_A_RearWarehouse_Portal_{portal_x:+05.1f}",
+            (portal_x, 0.0, -23.0),
+            0.0,
+            3.2,
+            templates,
+            specs,
+            architecture,
+            root,
+            region="A_Caravanserai",
+        )
+    for sign_index, (sign_x, sign_material) in enumerate(
+        ((-56.0, sign_ochre), (-46.0, sign_teal), (-38.0, roof_clay))
+    ):
+        make_module_run(
+            f"Bazaar_A_RearWarehouse_Sign{sign_index:02d}",
+            (sign_x - 1.8, -22.76),
+            (sign_x + 1.8, -22.76),
+            3.28,
+            0.70,
+            ("trey_foundation",),
+            templates,
+            specs,
+            dressing,
+            root,
+            role="finished_cc0_wall_mounted_shop_sign",
+            material=sign_material,
+            nominal_cell=1.8,
+            depth_scale=0.26,
+        )
+    create_authored_column_set(
+        "Bazaar_A_RearWarehouse_Pilasters",
+        tuple((x, -22.78, 0.0, 3.14) for x in (-59.0, -52.0, -49.5, -42.5, -40.0, -35.0)),
+        0.28,
+        templates,
+        specs,
+        roof_sand,
+        architecture,
+        root,
+        role="finished_cc0_shopfront_pilasters",
+    )
+    make_module_run(
+        "Bazaar_A_RearWarehouse_Cornice",
+        (-59.5, -22.80),
+        (-34.5, -22.80),
+        3.02,
+        0.28,
+        ("trey_roof_trim",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_interior_shopfront_cornice",
+        material=painted_steel,
+        depth_scale=0.74,
+    )
+    for band_name, start, end, band_material in (
+        ("RearShopWest", (-59.2, -22.70), (-52.1, -22.70), floor_sand),
+        ("RearShopEast", (-41.9, -22.70), (-34.8, -22.70), floor_slate),
+    ):
+        add_upper_shopfront_band(
+            f"Bazaar_A_{band_name}",
+            start,
+            end,
+            band_material,
+            bottom=3.42,
+            height=1.78,
+        )
+    add_wall_storage_rack(
+        "Bazaar_A_RearDisplayWest",
+        (-59.0, -22.48),
+        (-52.2, -22.48),
+        dark_timber,
+    )
+    add_wall_storage_rack(
+        "Bazaar_A_RearDisplayEast",
+        (-41.8, -22.48),
+        (-35.0, -22.48),
+        roof_sand,
+    )
+    add_wall_storage_rack(
+        "Bazaar_A_CourtyardSpiceRack",
+        (-50.62, -20.5),
+        (-50.62, -14.0),
+        dark_timber,
+        shelf_levels=(0.78, 1.48, 2.18),
+        post_top=2.78,
+    )
+    for banner_index, (zmin, zmax, banner_material) in enumerate(
+        ((-21.2, -18.2, sign_ochre), (-16.8, -13.8, sign_teal))
+    ):
+        make_module_run(
+            f"Bazaar_A_Gallery_HangingBanner{banner_index:02d}",
+            (-52.76, zmin),
+            (-52.76, zmax),
+            2.18,
+            0.66,
+            ("trey_foundation",),
+            templates,
+            specs,
+            dressing,
+            root,
+            role="finished_cc0_gallery_hanging_shop_sign",
+            material=banner_material,
+            nominal_cell=1.5,
+            depth_scale=0.24,
+        )
+    make_module_run(
+        "Bazaar_A_SpiceCounter_Awning",
+        (-50.72, -20.5),
+        (-50.72, -15.3),
+        2.86,
+        0.34,
+        ("trey_roof_trim",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_wall_attached_market_awning",
+        material=roof_clay,
+        nominal_cell=2.6,
+        depth_scale=0.86,
+    )
+    for beam_index, beam_z in enumerate((-14.0, -21.5)):
+        make_module_run(
+            f"Bazaar_A_Courtyard_UpperBeam{beam_index:02d}",
+            (-50.7, beam_z),
+            (-41.3, beam_z),
+            5.24,
+            0.28,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_A_visible_courtyard_beam",
+            material=painted_steel,
+            depth_scale=1.05,
+        )
+
+    # B: a fully roofed market warehouse with a readable column grid and
+    # clerestory, loading vestibule, main hall, stock room, and east mezzanine.
+    build_rect_perimeter(
+        "Bazaar_B_MarketWarehouse",
+        (34.0, 60.0, -30.0, -6.0),
+        {
+            "south": ((46.0, 3.4), (56.0, 3.2)),
+            "west": ((-14.0, 3.2),),
+            "east": ((-12.0, 3.2),),
+            "north": ((40.0, 3.2), (55.0, 3.2)),
+        },
+        6.5,
+        ("trey_foundation", "quat_metal_window"),
+        ("quat_metal_window", "trey_window"),
+        templates,
+        specs,
+        architecture,
+        root,
+        region="B_MarketWarehouse",
+    )
+    make_tiled_patch(
+        "Bazaar_B_InteriorFloor",
+        "quat_floor",
+        47.0,
+        -18.0,
+        25.2,
+        23.2,
+        0.035,
+        0.12,
+        templates,
+        specs,
+        surface,
+        root,
+        role="finished_cc0_enterable_B_floor",
+        material=floor_slate,
+    )
+    for site_name, site_x, site_material in (
+        ("A", -46.0, materials["BazaarSiteA_Paint"]),
+        ("B", 46.0, materials["BazaarSiteB_Paint"]),
+    ):
+        create_authored_surface_patch(
+            f"Bazaar_{site_name}_Site_Pad",
+            site_x,
+            -18.0,
+            8.0,
+            8.0,
+            0.17,
+            templates,
+            specs,
+            site_material,
+            surface,
+            root,
+            role="finished_cc0_authored_interior_bomb_site_tiles",
+            uv_tile=2.0,
+        )
+    make_tiled_patch(
+        "Bazaar_B_WarehouseRoof",
+        "trey_roof",
+        47.0,
+        -18.0,
+        26.0,
+        24.0,
+        6.4,
+        0.18,
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_enterable_B_roof",
+        material=roof_slate,
+    )
+    create_authored_column_set(
+        "Bazaar_B_Warehouse_ColumnGrid",
+        tuple(
+            (x, z, 0.0, 6.25)
+            for x in (39.0, 45.0, 51.0, 57.0)
+            for z in (-25.5, -17.5, -9.5)
+        ),
+        0.52,
+        templates,
+        specs,
+        roof_sand,
+        architecture,
+        root,
+        role="finished_cc0_B_structural_column_grid",
+    )
+    make_segmented_wall(
+        "Bazaar_B_LoadingBay_Partition",
+        (40.0, -28.0),
+        (40.0, -6.0),
+        ((1.0, 4.4), (12.0, 15.2)),
+        0.0,
+        3.0,
+        ("trey_arch",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_B_loading_arcade",
+        material=concrete,
+    )
+    make_segmented_wall(
+        "Bazaar_B_Stockroom_Partition",
+        (52.0, -30.0),
+        (52.0, -6.0),
+        ((1.4, 4.6), (5.0, 8.2), (16.0, 19.2)),
+        0.0,
+        3.0,
+        ("trey_foundation",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_B_stockroom_partition",
+        material=concrete,
+    )
+    for counter_name, start, end in (
+        ("B_FishCounter", (42.0, -14.0), (42.0, -21.0)),
+        ("B_TextileCounter", (47.0, -11.0), (51.0, -11.0)),
+        ("B_LoadingDesk", (35.8, -19.0), (39.0, -19.0)),
+    ):
+        make_module_run(
+            f"Bazaar_{counter_name}",
+            start,
+            end,
+            0.0,
+            1.16,
+            ("trey_foundation",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_architectural_counter_cover",
+            material=painted_steel,
+        )
+    for beam_index, z in enumerate((-27.0, -21.0, -15.0, -9.0)):
+        make_module_run(
+            f"Bazaar_B_RoofBeam_{beam_index:02d}",
+            (34.4, z),
+            (59.6, z),
+            5.75,
+            0.38,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_B_visible_roof_beam",
+            material=painted_steel,
+        )
+    for truss_index, z in enumerate((-24.0, -18.0, -12.0)):
+        make_module_run(
+            f"Bazaar_B_LowerTruss_{truss_index:02d}",
+            (34.8, z),
+            (59.2, z),
+            4.48,
+            0.26,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_B_visible_loading_truss",
+            material=dark_timber,
+            nominal_cell=3.0,
+            depth_scale=0.92,
+        )
+
+    # Make both runtime-aligned partitions explicit at player height.  Arched
+    # frames mark every loading/stockroom opening; signs and wall shelves occupy
+    # the high wall band instead of consuming the clean navigation floor.
+    for partition_name, portal_x, portal_centers in (
+        ("Loading", 40.0, (-25.3, -14.4)),
+        ("Stockroom", 52.0, (-27.0, -23.4, -12.4)),
+    ):
+        for portal_index, portal_z in enumerate(portal_centers):
+            make_portal(
+                f"Bazaar_B_{partition_name}_Portal{portal_index:02d}",
+                (portal_x, 0.0, portal_z),
+                90.0,
+                3.2,
+                templates,
+                specs,
+                architecture,
+                root,
+                region="B_MarketWarehouse",
+            )
+            sign_material = sign_teal if (portal_index + (0 if partition_name == "Loading" else 1)) % 2 == 0 else sign_ochre
+            sign_x = portal_x + (0.24 if partition_name == "Loading" else -0.24)
+            make_module_run(
+                f"Bazaar_B_{partition_name}_Sign{portal_index:02d}",
+                (sign_x, portal_z - 1.65),
+                (sign_x, portal_z + 1.65),
+                3.22,
+                0.68,
+                ("trey_foundation",),
+                templates,
+                specs,
+                dressing,
+                root,
+                role="finished_cc0_wall_mounted_shop_sign",
+                material=sign_material,
+                nominal_cell=1.65,
+                depth_scale=0.26,
+            )
+
+    for shelf_name, start, end in (
+        ("NorthMain", (42.0, -29.54), (50.0, -29.54)),
+        ("Loading", (40.24, -21.8), (40.24, -17.2)),
+        ("Stockroom", (51.76, -20.6), (51.76, -16.0)),
+        ("EastWall", (59.55, -20.5), (59.55, -15.0)),
+    ):
+        for shelf_index, shelf_bottom in enumerate((1.18, 2.02)):
+            create_authored_horizontal_strip(
+                f"Bazaar_B_{shelf_name}_HighShelf{shelf_index:02d}",
+                start,
+                end,
+                shelf_bottom,
+                0.17,
+                0.38,
+                templates,
+                specs,
+                roof_sand,
+                dressing,
+                root,
+                role="finished_cc0_high_wall_market_shelf",
+            )
+
+    for rack_name, start, end, rack_material in (
+        ("LoadingRack", (40.30, -21.6), (40.30, -16.4), dark_timber),
+        ("StockroomRack", (51.70, -21.4), (51.70, -16.0), roof_sand),
+        ("EastWallRack", (59.48, -26.0), (59.48, -18.2), dark_timber),
+        ("NorthWallRack", (42.0, -29.48), (49.3, -29.48), roof_sand),
+    ):
+        add_wall_storage_rack(
+            f"Bazaar_B_{rack_name}",
+            start,
+            end,
+            rack_material,
+            shelf_levels=(0.66, 1.36, 2.06),
+            post_top=2.70,
+        )
+
+    for band_name, start, end, band_material in (
+        ("NorthClerestoryWest", (34.8, -29.68), (39.0, -29.68), floor_sand),
+        ("NorthClerestoryCenter", (41.8, -29.68), (50.2, -29.68), floor_slate),
+        ("NorthClerestoryEast", (56.8, -29.68), (59.2, -29.68), floor_sand),
+    ):
+        add_upper_shopfront_band(
+            f"Bazaar_B_{band_name}",
+            start,
+            end,
+            band_material,
+            bottom=3.34,
+            height=1.86,
+        )
+
+    for awning_name, start, end, awning_material in (
+        ("FishCounter", (40.24, -20.5), (40.24, -14.5), roof_slate),
+        ("TextileCounter", (47.0, -11.24), (51.0, -11.24), roof_clay),
+    ):
+        make_module_run(
+            f"Bazaar_B_{awning_name}_Awning",
+            start,
+            end,
+            2.86,
+            0.34,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_wall_attached_market_awning",
+            material=awning_material,
+            nominal_cell=2.0,
+            depth_scale=0.86,
+        )
+
+    for sign_index, (start, end, sign_material, sign_bottom) in enumerate(
+        (
+            ((42.5, -14.0), (46.5, -14.0), sign_teal, 3.58),
+            ((45.0, -24.0), (49.0, -24.0), sign_ochre, 3.72),
+        )
+    ):
+        make_module_run(
+            f"Bazaar_B_HangingAisleSign{sign_index:02d}",
+            start,
+            end,
+            sign_bottom,
+            0.66,
+            ("trey_foundation",),
+            templates,
+            specs,
+            dressing,
+            root,
+            role="finished_cc0_hanging_market_sign",
+            material=sign_material,
+            nominal_cell=2.0,
+            depth_scale=0.24,
+        )
+        create_authored_column_set(
+            f"Bazaar_B_HangingAisleSign{sign_index:02d}_Rods",
+            (
+                (start[0], start[1], sign_bottom + 0.66, 5.52),
+                (end[0], end[1], sign_bottom + 0.66, 5.52),
+            ),
+            0.13,
+            templates,
+            specs,
+            painted_steel,
+            dressing,
+            root,
+            role="finished_cc0_hanging_market_sign_rods",
+        )
+
+    b_roof_edges = (
+        ((34.2, -29.8), (59.8, -29.8)),
+        ((59.8, -29.8), (59.8, -6.2)),
+        ((59.8, -6.2), (34.2, -6.2)),
+        ((34.2, -6.2), (34.2, -29.8)),
+    )
+    for edge_index, (start, end) in enumerate(b_roof_edges):
+        make_module_run(
+            f"Bazaar_B_WarehouseRoof_Parapet{edge_index:02d}",
+            start,
+            end,
+            6.58,
+            0.36,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_enterable_B_roof_parapet",
+            material=roof_slate,
+            depth_scale=0.74,
+        )
+    for ridge_index, (ridge_x, ridge_material) in enumerate(((43.0, roof_sand), (51.0, roof_clay))):
+        make_tiled_patch(
+            f"Bazaar_B_WarehouseRoof_RaisedRidge{ridge_index:02d}",
+            "trey_canopy",
+            ridge_x,
+            -18.0,
+            3.2,
+            17.5,
+            6.72,
+            0.28,
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_enterable_B_roof_clerestory_ridge",
+            material=ridge_material,
+        )
+        ridge_edges = (
+            ((ridge_x - 1.6, -26.75), (ridge_x + 1.6, -26.75)),
+            ((ridge_x + 1.6, -26.75), (ridge_x + 1.6, -9.25)),
+            ((ridge_x + 1.6, -9.25), (ridge_x - 1.6, -9.25)),
+            ((ridge_x - 1.6, -9.25), (ridge_x - 1.6, -26.75)),
+        )
+        for edge_index, (start, end) in enumerate(ridge_edges):
+            make_module_run(
+                f"Bazaar_B_WarehouseRoof_RaisedRidge{ridge_index:02d}_Support{edge_index:02d}",
+                start,
+                end,
+                6.44,
+                0.30,
+                ("trey_foundation",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_enterable_B_roof_clerestory_support",
+                material=ridge_material,
+                nominal_cell=2.5,
+                depth_scale=0.54,
+            )
+        ridge_window_depth = source_dimensions(templates["quat_metal_window"]).y
+        for window_index, window_x in enumerate((ridge_x - 1.58, ridge_x + 1.58)):
+            make_module_run(
+                f"Bazaar_B_WarehouseRoof_RaisedRidge{ridge_index:02d}_Clerestory{window_index:02d}",
+                (window_x, -26.5),
+                (window_x, -9.5),
+                6.54,
+                0.44,
+                ("quat_metal_window",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_B_roof_clerestory_window_band",
+                material=floor_slate if ridge_index == 0 else floor_terracotta,
+                nominal_cell=2.8,
+                depth_scale=0.20 / ridge_window_depth,
+            )
+
+    # Winning Mid opens an offset indoor junction to A and B. West/east doors
+    # sit four metres apart in Z and two half-width partitions force another
+    # S-turn, so the junction never exposes a direct site-to-site sightline.
+    build_rect_perimeter(
+        "Bazaar_Mid_NorthConnector",
+        (-9.0, 9.0, -24.0, -7.0),
+        {
+            "west": ((-18.0, 3.2),),
+            "east": ((-14.0, 3.2),),
+            "south": ((-5.0, 3.2),),
+            "north": ((4.0, 3.2),),
+        },
+        6.2,
+        ("trey_foundation",),
+        ("quat_curved_window", "trey_foundation"),
+        templates,
+        specs,
+        architecture,
+        root,
+        region="Mid_NorthConnector",
+    )
+    make_tiled_patch(
+        "Bazaar_Mid_NorthConnector_Floor",
+        "quat_floor",
+        0.0,
+        -15.5,
+        17.2,
+        16.2,
+        0.035,
+        0.12,
+        templates,
+        specs,
+        surface,
+        root,
+        role="finished_cc0_enterable_Mid_floor",
+        material=floor_sand,
+    )
+    make_tiled_patch(
+        "Bazaar_Mid_NorthConnector_Roof",
+        "quat_floor",
+        0.0,
+        -15.5,
+        18.0,
+        17.0,
+        6.1,
+        0.14,
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_enterable_Mid_roof",
+        material=roof_slate,
+    )
+    for edge_index, (start, end) in enumerate(
+        (
+            ((-8.8, -23.8), (8.8, -23.8)),
+            ((8.8, -23.8), (8.8, -7.2)),
+            ((8.8, -7.2), (-8.8, -7.2)),
+            ((-8.8, -7.2), (-8.8, -23.8)),
+        )
+    ):
+        make_module_run(
+            f"Bazaar_Mid_NorthConnector_RoofParapet{edge_index:02d}",
+            start,
+            end,
+            6.24,
+            0.34,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_enterable_Mid_roof_parapet",
+            material=roof_slate,
+            depth_scale=0.72,
+        )
+    make_module_run(
+        "Bazaar_Mid_NorthConnector_WestBaffle",
+        (-8.8, -16.7),
+        (1.5, -16.7),
+        0.0,
+        3.0,
+        ("trey_foundation", "quat_door_frame"),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_Mid_offset_partition_wall",
+    )
+    make_module_run(
+        "Bazaar_Mid_NorthConnector_EastBaffle",
+        (-1.5, -12.7),
+        (8.8, -12.7),
+        0.0,
+        3.0,
+        ("trey_foundation", "quat_door_frame"),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_Mid_offset_partition_wall",
+    )
+    add_upper_shopfront_band(
+        "Bazaar_Mid_ConnectorWestBaffle",
+        (-8.2, -16.48),
+        (0.9, -16.48),
+        floor_terracotta,
+        bottom=3.20,
+        height=1.82,
+    )
+    add_upper_shopfront_band(
+        "Bazaar_Mid_ConnectorEastBaffle",
+        (-0.9, -12.48),
+        (8.2, -12.48),
+        floor_slate,
+        bottom=3.20,
+        height=1.82,
+    )
+    add_wall_storage_rack(
+        "Bazaar_Mid_ConnectorWestRack",
+        (-7.8, -16.28),
+        (-2.0, -16.28),
+        dark_timber,
+        shelf_levels=(0.68, 1.36, 2.04),
+    )
+    add_wall_storage_rack(
+        "Bazaar_Mid_ConnectorEastRack",
+        (2.0, -12.48),
+        (7.8, -12.48),
+        roof_sand,
+        shelf_levels=(0.68, 1.36, 2.04),
+    )
+    for beam_index, beam_z in enumerate((-21.3, -17.8, -10.0)):
+        make_module_run(
+            f"Bazaar_Mid_ConnectorCrossBeam{beam_index:02d}",
+            (-8.4, beam_z),
+            (8.4, beam_z),
+            4.48,
+            0.26,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_mid_shop_ceiling_beam",
+            material=dark_timber,
+            nominal_cell=2.8,
+            depth_scale=0.92,
+        )
+    add_rooftop_monitor(
+        "Bazaar_Mid_NorthConnector",
+        (-4.2, 4.2, -21.4, -17.4),
+        6.34,
+        floor_slate,
+        roof_slate,
+    )
+
+    # Mid is an indoor S-connector. Its three overlapping halls alternate
+    # laterally, so neither site nor either spawn can see through it.
+    mid_halls = (
+        ("NorthTeaHall", (-9.0, 3.0, -8.0, 6.0), ((-1.0, 3.2),), ((-5.0, 3.2),)),
+        ("CenterProduceHall", (-3.0, 9.0, 5.0, 20.0), ((1.0, 3.2),), ((0.0, 3.2),)),
+        ("SouthCarpetHall", (-9.0, 3.0, 19.0, 34.0), ((-6.0, 3.2), (0.0, 3.2)), ((0.0, 3.2),)),
+    )
+    mid_roof_materials = {
+        "NorthTeaHall": roof_sand,
+        "CenterProduceHall": roof_clay,
+        "SouthCarpetHall": roof_slate,
+    }
+    mid_floor_materials = {
+        "NorthTeaHall": floor_sand,
+        "CenterProduceHall": floor_terracotta,
+        "SouthCarpetHall": floor_slate,
+    }
+    for hall_name, bounds, south_doors, north_doors in mid_halls:
+        build_rect_perimeter(
+            f"Bazaar_Mid_{hall_name}",
+            bounds,
+            {"south": south_doors, "north": north_doors},
+            6.2,
+            ("trey_foundation",),
+            ("quat_curved_window", "trey_foundation"),
+            templates,
+            specs,
+            architecture,
+            root,
+            region=f"Mid_{hall_name}",
+        )
+        xmin, xmax, zmin, zmax = bounds
+        make_tiled_patch(
+            f"Bazaar_Mid_{hall_name}_Floor",
+            "quat_floor",
+            (xmin + xmax) * 0.5,
+            (zmin + zmax) * 0.5,
+            xmax - xmin - 0.4,
+            zmax - zmin - 0.4,
+            0.035,
+            0.12,
+            templates,
+            specs,
+            surface,
+            root,
+            role="finished_cc0_enterable_Mid_floor",
+            material=mid_floor_materials[hall_name],
+        )
+        make_tiled_patch(
+            f"Bazaar_Mid_{hall_name}_Roof",
+            "quat_floor",
+            (xmin + xmax) * 0.5,
+            (zmin + zmax) * 0.5,
+            xmax - xmin,
+            zmax - zmin,
+            6.1,
+            0.14,
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_enterable_Mid_roof",
+            material=mid_roof_materials[hall_name],
+        )
+        roof_edges = (
+            ((xmin + 0.2, zmin + 0.2), (xmax - 0.2, zmin + 0.2)),
+            ((xmax - 0.2, zmin + 0.2), (xmax - 0.2, zmax - 0.2)),
+            ((xmax - 0.2, zmax - 0.2), (xmin + 0.2, zmax - 0.2)),
+            ((xmin + 0.2, zmax - 0.2), (xmin + 0.2, zmin + 0.2)),
+        )
+        for edge_index, (start, end) in enumerate(roof_edges):
+            make_module_run(
+                f"Bazaar_Mid_{hall_name}_RoofParapet{edge_index:02d}",
+                start,
+                end,
+                6.24,
+                0.34,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_enterable_Mid_roof_parapet",
+                material=mid_roof_materials[hall_name],
+                depth_scale=0.72,
+            )
+        for side_index, (wall_x, band_material, rack_material) in enumerate(
+            (
+                (xmin + 0.34, floor_sand, dark_timber),
+                (xmax - 0.34, floor_slate, roof_sand),
+            )
+        ):
+            side_start = (wall_x, zmin + 1.05)
+            side_end = (wall_x, zmax - 1.05)
+            add_upper_shopfront_band(
+                f"Bazaar_Mid_{hall_name}_Side{side_index:02d}",
+                side_start,
+                side_end,
+                band_material,
+                bottom=3.24,
+                height=1.78,
+            )
+            add_wall_storage_rack(
+                f"Bazaar_Mid_{hall_name}_SideRack{side_index:02d}",
+                (wall_x, zmin + 1.35),
+                (wall_x, zmax - 1.35),
+                rack_material,
+                shelf_levels=(0.66, 1.34, 2.02),
+                post_top=2.66,
+            )
+        for beam_index, beam_z in enumerate(
+            (
+                zmin + (zmax - zmin) * 0.32,
+                zmin + (zmax - zmin) * 0.68,
+            )
+        ):
+            make_module_run(
+                f"Bazaar_Mid_{hall_name}_CrossBeam{beam_index:02d}",
+                (xmin + 0.35, beam_z),
+                (xmax - 0.35, beam_z),
+                4.46,
+                0.26,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_mid_shop_ceiling_beam",
+                material=dark_timber,
+                nominal_cell=2.8,
+                depth_scale=0.92,
+            )
+    add_rooftop_monitor(
+        "Bazaar_Mid_CenterProduceHall",
+        (1.0, 5.0, 9.0, 16.0),
+        6.34,
+        floor_terracotta,
+        roof_clay,
+    )
+    add_rooftop_monitor(
+        "Bazaar_Mid_SouthCarpetHall",
+        (-6.0, -2.0, 22.0, 30.0),
+        6.34,
+        floor_slate,
+        roof_slate,
+    )
+    make_module_run(
+        "Bazaar_Mid_ProduceCounter",
+        (1.0, 9.0),
+        (6.5, 9.0),
+        0.0,
+        1.15,
+        ("trey_foundation",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_architectural_counter_cover",
+        material=warm,
+    )
+    make_module_run(
+        "Bazaar_Mid_CarpetDivider",
+        (-7.0, 23.0),
+        (-7.0, 28.5),
+        0.0,
+        1.18,
+        ("trey_foundation",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_architectural_counter_cover",
+        material=warm,
+    )
+
+    # Player-eye landmarks turn the Mid route into three distinct shops rather
+    # than a sequence of blank white rooms.  Every sign, beam, shelf, and wall
+    # base is a DCC assembly of finished Trey modules, kept tight to the walls
+    # so the 5.5-7 m clean combat lane remains unobstructed.
+    for beam_name, start, end in (
+        ("NorthConnector", (-8.4, -20.5), (8.4, -20.5)),
+        ("NorthTea", (-8.4, -1.0), (2.4, -1.0)),
+        ("CenterProduce", (-2.4, 13.0), (8.4, 13.0)),
+        ("SouthCarpet", (-8.4, 26.0), (2.4, 26.0)),
+    ):
+        make_module_run(
+            f"Bazaar_Mid_{beam_name}_CeilingBeam",
+            start,
+            end,
+            4.58,
+            0.30,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_mid_shop_ceiling_beam",
+            material=painted_steel,
+            depth_scale=1.15,
+        )
+
+    mid_signs = (
+        ("ConnectorSpice", (-7.2, -16.42), (-3.0, -16.42), sign_ochre),
+        ("ConnectorWayfinding", (-1.2, -16.42), (1.15, -16.42), roof_clay),
+        ("ConnectorTextile", (2.6, -12.42), (6.8, -12.42), sign_teal),
+        ("TeaHouse", (-8.56, -4.8), (-8.56, -0.4), sign_ochre),
+        ("Produce", (-2.56, 10.0), (-2.56, 14.5), sign_teal),
+        ("Carpet", (-8.56, 23.0), (-8.56, 27.4), roof_clay),
+    )
+    for sign_name, start, end, sign_material in mid_signs:
+        make_module_run(
+            f"Bazaar_Mid_Sign_{sign_name}",
+            start,
+            end,
+            2.22,
+            0.78,
+            ("trey_foundation",),
+            templates,
+            specs,
+            dressing,
+            root,
+            role="finished_cc0_wall_mounted_shop_sign",
+            material=sign_material,
+            nominal_cell=2.2,
+            depth_scale=0.28,
+        )
+        create_authored_column_set(
+            f"Bazaar_Mid_Sign_{sign_name}_SidePosts",
+            (
+                (start[0], start[1], 2.14, 3.08),
+                (end[0], end[1], 2.14, 3.08),
+            ),
+            0.18,
+            templates,
+            specs,
+            painted_steel,
+            dressing,
+            root,
+            role="finished_cc0_shop_sign_frame_posts",
+        )
+        make_module_run(
+            f"Bazaar_Mid_Sign_{sign_name}_Cornice",
+            start,
+            end,
+            3.02,
+            0.18,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            dressing,
+            root,
+            role="finished_cc0_shop_sign_frame_cornice",
+            material=roof_sand,
+            nominal_cell=2.2,
+            depth_scale=0.46,
+        )
+
+    for awning_name, start, end, awning_material in (
+        ("TeaHouse", (-8.56, -5.2), (-8.56, 0.0), roof_clay),
+        ("Produce", (-2.56, 10.4), (-2.56, 15.6), roof_slate),
+        ("Carpet", (2.56, 23.6), (2.56, 29.0), roof_clay),
+    ):
+        make_module_run(
+            f"Bazaar_Mid_{awning_name}_WallAwning",
+            start,
+            end,
+            3.16,
+            0.34,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_wall_attached_market_awning",
+            material=awning_material,
+            nominal_cell=2.6,
+            depth_scale=0.82,
+        )
+
+    for shelf_name, start, end in (
+        ("Connector", (-7.2, -16.24), (-2.2, -16.24)),
+        ("TeaHouse", (-8.32, -5.0), (-8.32, 2.0)),
+        ("Produce", (-2.32, 9.5), (-2.32, 17.0)),
+        ("Carpet", (2.32, 22.5), (2.32, 30.0)),
+    ):
+        for shelf_index, shelf_bottom in enumerate((0.68, 1.48)):
+            create_authored_horizontal_strip(
+                f"Bazaar_Mid_{shelf_name}_WallShelf{shelf_index:02d}",
+                start,
+                end,
+                shelf_bottom,
+                0.16,
+                0.34,
+                templates,
+                specs,
+                roof_sand,
+                dressing,
+                root,
+                role="finished_cc0_wall_mounted_market_shelf",
+            )
+
+    for base_name, start, end in (
+        ("ConnectorWest", (-8.4, -16.5), (1.2, -16.5)),
+        ("ConnectorEast", (-1.2, -12.5), (8.4, -12.5)),
+        ("TeaWest", (-8.5, -6.8), (-8.5, 4.8)),
+        ("ProduceWest", (-2.5, 7.0), (-2.5, 18.0)),
+        ("CarpetWest", (-8.5, 21.0), (-8.5, 32.0)),
+    ):
+        make_module_run(
+            f"Bazaar_Mid_{base_name}_WallBase",
+            start,
+            end,
+            0.10,
+            0.34,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_interior_wall_base",
+            material=roof_sand,
+            depth_scale=0.76,
+        )
+
+    # Two thin two-storey shop-wall extensions mirror the final LOS baffles at
+    # the Mid south frontage.  Stacked Quaternius façades, Trey cornices/posts,
+    # and coloured sign piers articulate the 420 mm wall instead of exposing a
+    # featureless collision slab; the north tips remain clear for attack routes.
+    trim_depth = source_dimensions(templates["trey_roof_trim"]).y
+    for side_name, wall_x, sign_material in (
+        ("West", -10.5, sign_ochre),
+        ("East", 10.5, sign_teal),
+    ):
+        for tier_index, (bottom, height, key) in enumerate(
+            ((0.0, 4.0, "quat_window_trim"), (4.0, 4.0, "quat_metal_window"))
+        ):
+            module_depth = source_dimensions(templates[key]).y
+            wall_objects = make_module_run(
+                f"Bazaar_Mid_{side_name}SouthFrontageBaffle_Tier{tier_index:02d}",
+                (wall_x, 34.0),
+                (wall_x, 39.0),
+                bottom,
+                height,
+                (key,),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_full_height_shop_wall_extension",
+                nominal_cell=2.5,
+                depth_scale=0.42 / module_depth,
+            )
+            for wall_object in wall_objects:
+                wall_object["runtime_wall_thickness_m"] = 0.42
+                wall_object["runtime_wall_bounds_xz"] = f"{wall_x:.3f},34.000,{wall_x:.3f},39.000"
+        for trim_index, trim_bottom in enumerate((0.10, 3.86, 7.70)):
+            make_module_run(
+                f"Bazaar_Mid_{side_name}SouthFrontageBaffle_Trim{trim_index:02d}",
+                (wall_x, 34.0),
+                (wall_x, 39.0),
+                trim_bottom,
+                0.24,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_shop_wall_cornice",
+                material=painted_steel,
+                nominal_cell=2.5,
+                depth_scale=0.42 / trim_depth,
+            )
+        create_authored_column_set(
+            f"Bazaar_Mid_{side_name}SouthFrontageBaffle_Piers",
+            tuple((wall_x, z, 0.0, 8.0) for z in (34.0, 36.5, 39.0)),
+            0.28,
+            templates,
+            specs,
+            roof_sand,
+            architecture,
+            root,
+            role="finished_cc0_shop_wall_sign_piers",
+        )
+        foundation_depth = source_dimensions(templates["trey_foundation"]).y
+        make_module_run(
+            f"Bazaar_Mid_{side_name}SouthFrontageBaffle_Sign",
+            (wall_x + (0.02 if wall_x < 0.0 else -0.02), 35.15),
+            (wall_x + (0.02 if wall_x < 0.0 else -0.02), 37.85),
+            2.62,
+            0.82,
+            ("trey_foundation",),
+            templates,
+            specs,
+            dressing,
+            root,
+            role="finished_cc0_wall_mounted_shop_sign",
+            material=sign_material,
+            nominal_cell=1.35,
+            depth_scale=0.42 / foundation_depth,
+        )
+
+    def make_articulated_facade_return(
+        prefix: str,
+        start: tuple[float, float],
+        end: tuple[float, float],
+        height: float,
+        sign_material: bpy.types.Material,
+        wall_role: str,
+        sign_face: float = 1.0,
+    ) -> None:
+        """Build one exact 420 mm runtime return from finished CC0 modules."""
+        dx = end[0] - start[0]
+        dz = end[1] - start[1]
+        span = sqrt(dx * dx + dz * dz)
+        if span <= 0.01:
+            raise RuntimeError(f"Degenerate articulated facade return: {prefix}")
+        tangent_x, tangent_z = dx / span, dz / span
+        normal_x, normal_z = -tangent_z * sign_face, tangent_x * sign_face
+        center_x = (start[0] + end[0]) * 0.5
+        center_z = (start[1] + end[1]) * 0.5
+        nominal_cell = max(1.25, span * 0.5)
+        tier_height = height * 0.5
+        bounds_metadata = (
+            f"{start[0]:.3f},{start[1]:.3f},{end[0]:.3f},{end[1]:.3f}"
+        )
+        for tier_index, key in enumerate(("quat_window_trim", "quat_metal_window")):
+            module_depth = source_dimensions(templates[key]).y
+            wall_objects = make_module_run(
+                f"{prefix}_Tier{tier_index:02d}",
+                start,
+                end,
+                tier_height * tier_index,
+                tier_height,
+                (key,),
+                templates,
+                specs,
+                architecture,
+                root,
+                role=wall_role,
+                nominal_cell=nominal_cell,
+                depth_scale=0.42 / module_depth,
+            )
+            for wall_object in wall_objects:
+                wall_object["runtime_wall_thickness_m"] = 0.42
+                wall_object["runtime_wall_bounds_xz"] = bounds_metadata
+        for trim_index, trim_bottom in enumerate(
+            (0.10, tier_height - 0.14, height - 0.30)
+        ):
+            make_module_run(
+                f"{prefix}_Trim{trim_index:02d}",
+                start,
+                end,
+                trim_bottom,
+                0.24,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_articulated_facade_return_cornice",
+                material=painted_steel,
+                nominal_cell=nominal_cell,
+                depth_scale=0.42 / trim_depth,
+            )
+        create_authored_column_set(
+            f"{prefix}_Piers",
+            (
+                (start[0], start[1], 0.0, height),
+                (center_x, center_z, 0.0, height),
+                (end[0], end[1], 0.0, height),
+            ),
+            0.28,
+            templates,
+            specs,
+            roof_sand,
+            architecture,
+            root,
+            role="finished_cc0_articulated_facade_return_piers",
+        )
+        sign_half_span = min(1.15, span * 0.28)
+        foundation_depth = source_dimensions(templates["trey_foundation"]).y
+        sign_start = (
+            center_x - tangent_x * sign_half_span + normal_x * 0.02,
+            center_z - tangent_z * sign_half_span + normal_z * 0.02,
+        )
+        sign_end = (
+            center_x + tangent_x * sign_half_span + normal_x * 0.02,
+            center_z + tangent_z * sign_half_span + normal_z * 0.02,
+        )
+        make_module_run(
+            f"{prefix}_Sign",
+            sign_start,
+            sign_end,
+            min(2.62, height - 1.10),
+            min(0.80, height * 0.12),
+            ("trey_foundation",),
+            templates,
+            specs,
+            dressing,
+            root,
+            role="finished_cc0_wall_mounted_shop_sign",
+            material=sign_material,
+            nominal_cell=max(0.70, sign_half_span),
+            depth_scale=0.42 / foundation_depth,
+        )
+
+    # Approach returns close long side-court sightlines without narrowing the
+    # intended route around their north ends.
+    make_articulated_facade_return(
+        "Bazaar_WestApproachFacadeReturn",
+        (-49.0, -4.0),
+        (-49.0, 12.0),
+        8.0,
+        sign_ochre,
+        "finished_cc0_full_height_approach_facade_return",
+        sign_face=-1.0,
+    )
+    make_articulated_facade_return(
+        "Bazaar_EastApproachFacadeReturn",
+        (52.0, -6.0),
+        (52.0, 12.0),
+        8.0,
+        sign_teal,
+        "finished_cc0_full_height_approach_facade_return",
+    )
+
+    # The Carpet Hall south return is an authored continuation of its façade,
+    # not a freestanding collision plate in the attack foyer.
+    make_articulated_facade_return(
+        "Bazaar_MidCarpetSouthFacadeReturn",
+        (3.0, 34.0),
+        (8.0, 34.0),
+        6.2,
+        sign_ochre,
+        "finished_cc0_mid_carpet_south_facade_return",
+    )
+
+    # Short articulated returns project from the separation blocks into the
+    # staggered connector vestibules.  They preserve both 6 m door gaps while
+    # breaking the direct A-to-B rotation sightline with finished shopfronts.
+    for side_name, wall_x, zmin, zmax, sign_material in (
+        ("West", -20.0, -21.0, -17.8, sign_ochre),
+        ("East", 20.0, -14.8, -12.0, sign_teal),
+    ):
+        span = zmax - zmin
+        center_z = (zmin + zmax) * 0.5
+        nominal_cell = span * 0.5
+        for tier_index, (bottom, height, key) in enumerate(
+            ((0.0, 4.0, "quat_window_trim"), (4.0, 4.0, "quat_metal_window"))
+        ):
+            module_depth = source_dimensions(templates[key]).y
+            return_objects = make_module_run(
+                f"Bazaar_Mid_{side_name}ConnectorReturn_Tier{tier_index:02d}",
+                (wall_x, zmin),
+                (wall_x, zmax),
+                bottom,
+                height,
+                (key,),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_full_height_connector_return_shop_wall",
+                nominal_cell=nominal_cell,
+                depth_scale=0.42 / module_depth,
+            )
+            for return_object in return_objects:
+                return_object["runtime_wall_thickness_m"] = 0.42
+                return_object["runtime_wall_bounds_xz"] = (
+                    f"{wall_x:.3f},{zmin:.3f},{wall_x:.3f},{zmax:.3f}"
+                )
+        for trim_index, trim_bottom in enumerate((0.10, 3.86, 7.70)):
+            make_module_run(
+                f"Bazaar_Mid_{side_name}ConnectorReturn_Trim{trim_index:02d}",
+                (wall_x, zmin),
+                (wall_x, zmax),
+                trim_bottom,
+                0.24,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_connector_return_cornice",
+                material=painted_steel,
+                nominal_cell=nominal_cell,
+                depth_scale=0.42 / trim_depth,
+            )
+        create_authored_column_set(
+            f"Bazaar_Mid_{side_name}ConnectorReturn_Piers",
+            tuple((wall_x, z, 0.0, 8.0) for z in (zmin, center_z, zmax)),
+            0.28,
+            templates,
+            specs,
+            roof_sand,
+            architecture,
+            root,
+            role="finished_cc0_connector_return_sign_piers",
+        )
+        foundation_depth = source_dimensions(templates["trey_foundation"]).y
+        sign_half_span = min(0.70, span * 0.30)
+        make_module_run(
+            f"Bazaar_Mid_{side_name}ConnectorReturn_Sign",
+            (wall_x + (0.02 if wall_x < 0.0 else -0.02), center_z - sign_half_span),
+            (wall_x + (0.02 if wall_x < 0.0 else -0.02), center_z + sign_half_span),
+            2.62,
+            0.78,
+            ("trey_foundation",),
+            templates,
+            specs,
+            dressing,
+            root,
+            role="finished_cc0_wall_mounted_shop_sign",
+            material=sign_material,
+            nominal_cell=sign_half_span,
+            depth_scale=0.42 / foundation_depth,
+        )
+
+    # Symmetric defender-foyer piers split the rear court into three authored
+    # vestibules.  Like the Mid baffles, they are stacked shopfront modules with
+    # cornice bands and sign frames, never featureless full-height boards.
+    for side_name, wall_x, sign_material in (
+        ("West", -20.0, sign_ochre),
+        ("East", 20.0, sign_teal),
+    ):
+        for tier_index, (bottom, height, key) in enumerate(
+            ((0.0, 3.8, "quat_window_trim"), (3.8, 3.8, "quat_metal_window"))
+        ):
+            module_depth = source_dimensions(templates[key]).y
+            pier_objects = make_module_run(
+                f"Bazaar_Defender_{side_name}FoyerPier_Tier{tier_index:02d}",
+                (wall_x, -56.0),
+                (wall_x, -46.2),
+                bottom,
+                height,
+                (key,),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_full_height_defender_foyer_shop_wall",
+                nominal_cell=2.75,
+                depth_scale=0.42 / module_depth,
+            )
+            for pier_object in pier_objects:
+                pier_object["runtime_wall_thickness_m"] = 0.42
+                pier_object["runtime_wall_bounds_xz"] = f"{wall_x:.3f},-56.000,{wall_x:.3f},-46.200"
+        for trim_index, trim_bottom in enumerate((0.10, 3.66, 7.30)):
+            make_module_run(
+                f"Bazaar_Defender_{side_name}FoyerPier_Trim{trim_index:02d}",
+                (wall_x, -56.0),
+                (wall_x, -46.2),
+                trim_bottom,
+                0.22,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_defender_foyer_pier_cornice",
+                material=painted_steel,
+                nominal_cell=2.75,
+                depth_scale=0.42 / trim_depth,
+            )
+        create_authored_column_set(
+            f"Bazaar_Defender_{side_name}FoyerPier_Frames",
+            tuple((wall_x, z, 0.0, 7.6) for z in (-56.0, -51.1, -46.2)),
+            0.28,
+            templates,
+            specs,
+            roof_sand,
+            architecture,
+            root,
+            role="finished_cc0_defender_foyer_sign_piers",
+        )
+        make_module_run(
+            f"Bazaar_Defender_{side_name}FoyerPier_Sign",
+            (wall_x + (0.02 if wall_x < 0.0 else -0.02), -52.30),
+            (wall_x + (0.02 if wall_x < 0.0 else -0.02), -49.90),
+            2.54,
+            0.80,
+            ("trey_foundation",),
+            templates,
+            specs,
+            dressing,
+            root,
+            role="finished_cc0_wall_mounted_shop_sign",
+            material=sign_material,
+            nominal_cell=1.20,
+            depth_scale=0.42 / foundation_depth,
+        )
+
+    # Horizontal L returns complete the rear defender vestibules at z=-46.2.
+    # Their inner tips stop at x=+-7.5, leaving the central spawn bay intact.
+    make_articulated_facade_return(
+        "Bazaar_Defender_WestFoyerReturn",
+        (-20.0, -46.2),
+        (-7.5, -46.2),
+        7.6,
+        sign_ochre,
+        "finished_cc0_full_height_defender_foyer_return",
+    )
+    make_articulated_facade_return(
+        "Bazaar_Defender_EastFoyerReturn",
+        (7.5, -46.2),
+        (20.0, -46.2),
+        7.6,
+        sign_teal,
+        "finished_cc0_full_height_defender_foyer_return",
+    )
+
+    # Elevated combat spaces are embedded inside their parent buildings.
+    platform_specs = (
+        ("Bazaar_A_Gallery_Deck", "A_Gallery", -56.0, -18.0, 6.0, 18.0, 3.6),
+        ("Bazaar_B_Balcony_Deck", "B_Balcony", 56.0, -18.0, 6.0, 18.0, 3.4),
+        ("Bazaar_Mid_Mezzanine_Deck", "Mid_Mezzanine", -6.0, 24.0, 6.0, 14.0, 3.2),
+    )
+    for deck_name, platform, x, z, sx, sz, top in platform_specs:
+        deck = make_tiled_patch(
+            deck_name,
+            "quat_floor",
+            x,
+            z,
+            sx,
+            sz,
+            top - 0.12,
+            0.12,
+            templates,
+            specs,
+            elevation,
+            root,
+            role="finished_cc0_authored_interior_deck",
+        )
+        deck["platform"] = platform
+        deck["top_height_m"] = top
+
+    for name, start, end, bottom, top in RUNTIME_RAIL_SPECS:
+        rail = create_authored_open_guardrail(
+            name,
+            start,
+            end,
+            bottom,
+            top,
+            templates,
+            specs,
+            painted_steel,
+            elevation,
+            root,
+        )
+        rail["interior_sightline_only"] = True
+
+    # Upper-only privacy screens close the diagnostic high sightlines while
+    # retaining both ground-floor routes.  Finished Quaternius shop windows
+    # form the lattice field; Trey trims and posts make the 420 mm assembly
+    # read as an authored gallery/shopfront screen rather than a blank blocker.
+    window_depth = source_dimensions(templates["quat_metal_window"]).y
+    trim_depth = source_dimensions(templates["trey_roof_trim"]).y
+    for screen_name, screen_x, zmin, zmax, bottom, top, frame_material in (
+        ("A_Gallery", -51.0, -26.0, -8.8, 3.6, 6.4, sign_ochre),
+        ("B_Balcony", 53.0, -24.5, -9.0, 3.4, 6.5, sign_teal),
+    ):
+        screen_objects = make_module_run(
+            f"Bazaar_{screen_name}_UpperPrivacyScreen",
+            (screen_x, zmin),
+            (screen_x, zmax),
+            bottom,
+            top - bottom,
+            ("quat_metal_window",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_upper_privacy_lattice_shopfront",
+            nominal_cell=2.2,
+            depth_scale=0.42 / window_depth,
+        )
+        for screen_object in screen_objects:
+            screen_object["runtime_screen_thickness_m"] = 0.42
+            screen_object["upper_only_bottom_top_y"] = f"{bottom:.3f},{top:.3f}"
+        for trim_index, trim_bottom in enumerate((bottom, top - 0.20)):
+            make_module_run(
+                f"Bazaar_{screen_name}_UpperPrivacyTrim{trim_index:02d}",
+                (screen_x, zmin),
+                (screen_x, zmax),
+                trim_bottom,
+                0.20,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_upper_privacy_screen_trim",
+                material=frame_material,
+                nominal_cell=2.2,
+                depth_scale=0.42 / trim_depth,
+            )
+        post_count = max(3, int(round((zmax - zmin) / 4.0)))
+        create_authored_column_set(
+            f"Bazaar_{screen_name}_UpperPrivacyPosts",
+            tuple(
+                (
+                    screen_x,
+                    zmin + (zmax - zmin) * post_index / post_count,
+                    bottom,
+                    top,
+                )
+                for post_index in range(post_count + 1)
+            ),
+            0.24,
+            templates,
+            specs,
+            painted_steel,
+            architecture,
+            root,
+            role="finished_cc0_upper_privacy_screen_posts",
+        )
+
+    for stair in STAIRS:
+        create_authored_stair(
+            stair,
+            templates,
+            specs,
+            roof_sand,
+            paving,
+            elevation,
+            root,
+        )
+        create_authored_stair_rails(
+            stair,
+            templates,
+            specs,
+            painted_steel,
+            elevation,
+            root,
+        )
+        create_authored_stair_supports(
+            stair,
+            templates,
+            specs,
+            painted_steel,
+            elevation,
+            root,
+        )
+        create_authored_stair_tread_nosings(
+            stair,
+            templates,
+            specs,
+            painted_steel,
+            elevation,
+            root,
+        )
+
+    # The three approach-side stairs enter through attached, roofed vestibules;
+    # the remaining flights sit inside their parent warehouse/arcade shells.
+    for vestibule_name, center_x, outer_z, building_z, roof_y, region in (
+        ("A_SouthStair", -56.0, 2.1, -4.0, 6.3, "A_Caravanserai"),
+        ("B_SouthStair", 56.0, 1.5, -6.0, 6.4, "B_MarketWarehouse"),
+        ("Mid_SouthStair", -6.0, 40.85, 34.0, 6.1, "Mid_IndoorConnector"),
+    ):
+        zmin, zmax = min(outer_z, building_z), max(outer_z, building_z)
+        for side_index, side_x in enumerate((center_x - 1.8, center_x + 1.8)):
+            make_module_run(
+                f"Bazaar_{vestibule_name}_SideWall{side_index:02d}",
+                (side_x, zmin),
+                (side_x, zmax),
+                0.0,
+                3.0,
+                ("trey_foundation", "quat_window_trim"),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_attached_stair_vestibule_wall",
+            )
+        make_tiled_patch(
+            f"Bazaar_{vestibule_name}_Roof",
+            "quat_floor",
+            center_x,
+            (zmin + zmax) * 0.5,
+            3.8,
+            zmax - zmin,
+            roof_y,
+            0.14,
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_attached_stair_vestibule_roof",
+            material=roof_sand,
+        )
+        make_portal(
+            f"Bazaar_{vestibule_name}_EntryPortal",
+            (center_x, 0.0, outer_z),
+            0.0,
+            3.2,
+            templates,
+            specs,
+            architecture,
+            root,
+            region=region,
+        )
+
+    # Defender back market: three roofed transfer halls replace the former
+    # exposed cross-map court. The spawn remains a small central breathing bay.
+    back_halls = (
+        ("WestRearMarket", -40.0, -38.0, 26.0, 8.0),
+        ("WestSpawnArcade", -17.0, -47.0, 20.0, 8.0),
+        ("EastSpawnArcade", 17.0, -47.0, 20.0, 8.0),
+        ("EastRearMarket", 40.0, -38.0, 26.0, 8.0),
+    )
+    back_roof_materials = (roof_clay, roof_sand, roof_slate, roof_clay)
+    back_floor_materials = (floor_terracotta, floor_sand, floor_slate, floor_terracotta)
+    for hall_index, (hall_name, x, z, sx, sz) in enumerate(back_halls):
+        make_tiled_patch(
+            f"Bazaar_Back_{hall_name}_Floor",
+            "quat_floor",
+            x,
+            z,
+            sx,
+            sz,
+            0.035,
+            0.12,
+            templates,
+            specs,
+            surface,
+            root,
+            role="finished_cc0_enterable_back_market_floor",
+            material=back_floor_materials[hall_index],
+        )
+        make_tiled_patch(
+            f"Bazaar_Back_{hall_name}_Roof",
+            "trey_roof",
+            x,
+            z,
+            sx,
+            sz,
+            4.15,
+            0.16,
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_enterable_back_market_roof",
+            material=back_roof_materials[hall_index],
+        )
+        xmin, xmax = x - sx * 0.5, x + sx * 0.5
+        zmin, zmax = z - sz * 0.5, z + sz * 0.5
+        # Arcaded north wall and staggered south kiosks create a protected,
+        # non-linear retake route while retaining multiple 3.2 m doorways.
+        make_module_run(
+            f"Bazaar_Back_{hall_name}_NorthArcade",
+            (xmin, zmin),
+            (xmax, zmin),
+            0.0,
+            3.0,
+            ("trey_arch",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_back_market_arcade",
+            material=warm,
+            nominal_cell=4.0,
+        )
+        make_segmented_wall(
+            f"Bazaar_Back_{hall_name}_SouthKiosks",
+            (xmin, zmax),
+            (xmax, zmax),
+            ((sx * 0.33 - 1.6, sx * 0.33 + 1.6), (sx * 0.76 - 1.6, sx * 0.76 + 1.6)),
+            0.0,
+            3.0,
+            ("trey_foundation", "quat_window_trim"),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_back_market_kiosk_wall",
+        )
+        create_authored_column_set(
+            f"Bazaar_Back_{hall_name}_Columns",
+            tuple((column_x, zmin + 0.25, 0.0, 4.05) for column_x in (xmin + 1.0, x, xmax - 1.0)),
+            0.44,
+            templates,
+            specs,
+            roof_sand,
+            architecture,
+            root,
+            role="finished_cc0_back_market_columns",
+        )
+        make_module_run(
+            f"Bazaar_Back_{hall_name}_CrossBeam",
+            (xmin + 0.5, z),
+            (xmax - 0.5, z),
+            3.48,
+            0.30,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_back_market_visible_beam",
+            material=painted_steel,
+            depth_scale=1.10,
+        )
+        sign_material = sign_ochre if hall_index % 2 == 0 else sign_teal
+        make_module_run(
+            f"Bazaar_Back_{hall_name}_ShopSign",
+            (x - 2.5, zmax - 0.20),
+            (x + 2.5, zmax - 0.20),
+            2.20,
+            0.74,
+            ("trey_foundation",),
+            templates,
+            specs,
+            dressing,
+            root,
+            role="finished_cc0_wall_mounted_shop_sign",
+            material=sign_material,
+            nominal_cell=2.5,
+            depth_scale=0.28,
+        )
+        shelf_end = min(xmax - 2.2, xmin + 9.0)
+        for shelf_index, shelf_bottom in enumerate((0.66, 1.42)):
+            create_authored_horizontal_strip(
+                f"Bazaar_Back_{hall_name}_WallShelf{shelf_index:02d}",
+                (xmin + 2.2, zmax - 0.36),
+                (shelf_end, zmax - 0.36),
+                shelf_bottom,
+                0.15,
+                0.36,
+                templates,
+                specs,
+                roof_sand,
+                dressing,
+                root,
+                role="finished_cc0_wall_mounted_market_shelf",
+            )
+        make_module_run(
+            f"Bazaar_Back_{hall_name}_WallBase",
+            (xmin + 0.5, zmax - 0.24),
+            (xmax - 0.5, zmax - 0.24),
+            0.10,
+            0.32,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_interior_wall_base",
+            material=roof_sand,
+            depth_scale=0.72,
+        )
+        make_module_run(
+            f"Bazaar_Back_{hall_name}_WallAwning",
+            (x - 2.8, zmax - 0.22),
+            (x + 2.8, zmax - 0.22),
+            3.04,
+            0.34,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_wall_attached_market_awning",
+            material=back_roof_materials[hall_index],
+            nominal_cell=2.8,
+            depth_scale=0.82,
+        )
+        for beam_index, beam_x in enumerate((x - sx * 0.24, x + sx * 0.24)):
+            make_module_run(
+                f"Bazaar_Back_{hall_name}_LongBeam{beam_index:02d}",
+                (beam_x, zmin + 0.35),
+                (beam_x, zmax - 0.35),
+                3.52,
+                0.24,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_back_market_visible_beam",
+                material=painted_steel,
+                depth_scale=0.92,
+            )
+        solid_segments = (
+            (xmin + 0.8, xmin + sx * 0.33 - 1.95),
+            (xmin + sx * 0.33 + 1.95, xmin + sx * 0.76 - 1.95),
+            (xmin + sx * 0.76 + 1.95, xmax - 0.8),
+        )
+        for segment_index, (segment_min, segment_max) in enumerate(solid_segments):
+            if segment_max - segment_min < 1.5:
+                continue
+            add_wall_storage_rack(
+                f"Bazaar_Back_{hall_name}_KioskRack{segment_index:02d}",
+                (segment_min, zmax - 0.34),
+                (segment_max, zmax - 0.34),
+                dark_timber if segment_index % 2 == 0 else roof_sand,
+                shelf_levels=(0.62, 1.26, 1.90),
+                post_top=2.54,
+            )
+            add_upper_shopfront_band(
+                f"Bazaar_Back_{hall_name}_KioskUpper{segment_index:02d}",
+                (segment_min, zmax - 0.25),
+                (segment_max, zmax - 0.25),
+                floor_sand if segment_index % 2 == 0 else floor_slate,
+                bottom=2.72,
+                height=0.88,
+            )
+        for extra_beam_index, beam_x in enumerate((x - sx * 0.12, x + sx * 0.12)):
+            make_module_run(
+                f"Bazaar_Back_{hall_name}_MarketAisleBeam{extra_beam_index:02d}",
+                (beam_x, zmin + 0.4),
+                (beam_x, zmax - 0.4),
+                2.92,
+                0.20,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_back_market_visible_beam",
+                material=dark_timber,
+                nominal_cell=2.4,
+                depth_scale=0.72,
+            )
+        for ridge_index, ridge_z in enumerate((z - 1.15, z + 1.15)):
+            make_module_run(
+                f"Bazaar_Back_{hall_name}_SkylineRidge{ridge_index:02d}",
+                (xmin + 0.7, ridge_z),
+                (xmax - 0.7, ridge_z),
+                4.32,
+                0.22,
+                ("trey_roof_trim",),
+                templates,
+                specs,
+                architecture,
+                root,
+                role="finished_cc0_attached_skyline_ridge",
+                material=back_roof_materials[hall_index],
+                nominal_cell=3.0,
+                depth_scale=0.68,
+            )
+
+    # False arched shop niches and framed signs resolve the long-hall end walls
+    # without claiming a new runtime doorway through the closed link masses.
+    for niche_name, niche_x, niche_z, sign_material in (
+        ("WestTerminus", -27.18, -38.0, sign_ochre),
+        ("EastTerminus", 27.18, -38.0, sign_teal),
+    ):
+        make_portal(
+            f"Bazaar_Back_{niche_name}_ArchedNiche",
+            (niche_x, 0.0, niche_z),
+            90.0,
+            3.2,
+            templates,
+            specs,
+            architecture,
+            root,
+            region="Defender_BackMarket",
+        )
+        sign_x = niche_x + (0.22 if niche_x < 0.0 else -0.22)
+        make_module_run(
+            f"Bazaar_Back_{niche_name}_UpperSign",
+            (sign_x, niche_z - 2.2),
+            (sign_x, niche_z + 2.2),
+            2.58,
+            0.72,
+            ("trey_foundation",),
+            templates,
+            specs,
+            dressing,
+            root,
+            role="finished_cc0_wall_mounted_shop_sign",
+            material=sign_material,
+            nominal_cell=2.2,
+            depth_scale=0.26,
+        )
+        gate_x = niche_x + (0.18 if niche_x < 0.0 else -0.18)
+        add_upper_shopfront_band(
+            f"Bazaar_Back_{niche_name}_ServiceGate",
+            (gate_x, niche_z - 3.55),
+            (gate_x, niche_z + 3.55),
+            floor_slate if niche_x < 0.0 else floor_terracotta,
+            bottom=3.02,
+            height=0.82,
+        )
+        create_authored_column_set(
+            f"Bazaar_Back_{niche_name}_ServiceGatePiers",
+            tuple((gate_x, z, 0.0, 4.02) for z in (niche_z - 3.5, niche_z, niche_z + 3.5)),
+            0.24,
+            templates,
+            specs,
+            roof_sand,
+            architecture,
+            root,
+            role="finished_cc0_back_market_service_gate_piers",
+        )
+        make_module_run(
+            f"Bazaar_Back_{niche_name}_ServiceGateCornice",
+            (gate_x, niche_z - 3.6),
+            (gate_x, niche_z + 3.6),
+            3.86,
+            0.22,
+            ("trey_roof_trim",),
+            templates,
+            specs,
+            architecture,
+            root,
+            role="finished_cc0_back_market_service_gate_cornice",
+            material=dark_timber,
+            nominal_cell=2.4,
+            depth_scale=0.70,
+        )
+
+    # Full-height rear city blocks bound the back-market folds. Their southern
+    # faces leave a deliberate 5-7 m transfer corridor; only the 14 m defender
+    # breathing bay remains open at the centre.
+    rear_blocks = (
+        ("FarWestGate", (-64.0, -53.0, -56.0, -31.0), 8.1, ("quat_window_trim", "trey_foundation"), warm),
+        ("FarWestInn", (-53.0, -35.0, -56.0, -42.0), 7.4, ("quat_curved_window",), concrete),
+        ("WestSpawnStore", (-17.0, -7.0, -43.0, -31.0), 6.6, ("quat_window_trim", "trey_foundation"), warm),
+        ("DefenderGuild", (-7.0, 7.0, -43.0, -31.0), 7.2, ("quat_curved_window",), concrete),
+        ("EastSpawnStore", (7.0, 20.0, -43.0, -31.0), 6.9, ("quat_metal_window", "trey_foundation"), steel),
+        ("FarEastGuild", (35.0, 53.0, -56.0, -42.0), 7.7, ("quat_window_trim",), warm),
+        ("FarEastGate", (53.0, 64.0, -56.0, -34.0), 8.3, ("quat_metal_window", "trey_window"), steel),
+    )
+    rear_roof_materials = (roof_slate, roof_clay, roof_sand, roof_slate, roof_clay, roof_sand, roof_slate)
+    for block_index, (name, bounds, height, pattern, wall_material) in enumerate(rear_blocks):
+        make_closed_block(
+            f"BazaarRearBlock_{name}",
+            bounds,
+            height,
+            pattern,
+            templates,
+            specs,
+            rear_roof_materials[block_index],
+            wall_material,
+            architecture,
+            root,
+        )
+
+    # Four legacy Old City facades survive only as distant perimeter anchors.
+    for key, name, position, yaw, scale in (
+        ("old_urban", "BazaarLandmark_WestGateHouse", (-62.0, 0.0, -49.0), 90.0, 0.62),
+        ("scan_old", "BazaarLandmark_WestClockHouse", (-62.0, 0.0, 4.0), 90.0, 0.58),
+        ("old_urban", "BazaarLandmark_EastGateHouse", (62.0, 0.0, -49.0), -90.0, 0.62),
+        ("pawnshop", "BazaarLandmark_EastPawnSign", (62.0, 0.0, 3.0), -90.0, 0.58),
+    ):
+        place_source(
+            templates,
+            specs,
+            key,
+            name,
+            position,
+            yaw,
+            scale,
+            architecture,
+            root,
+            role="finished_cc0_outer_landmark_facade",
+        )
+
+    # Props are landmarks and readable market clutter, never the primary cover.
+    prop_layout = (
+        ("tea_table", "Bazaar_A_Courtyard_TeaTable", (-46.0, 0.16, -18.0), 12.0, 0.92),
+        ("stool", "Bazaar_A_Courtyard_Stool00", (-47.2, 0.16, -17.0), 28.0, 0.92),
+        ("stool", "Bazaar_A_Courtyard_Stool01", (-44.8, 0.16, -17.2), -20.0, 0.92),
+        ("wicker_basket", "Bazaar_A_SpiceRack_Basket00", (-49.75, 0.16, -19.7), 18.0, 0.78),
+        ("wicker_basket", "Bazaar_A_SpiceRack_Basket01", (-49.72, 0.16, -18.7), -12.0, 0.72),
+        ("hand_truck", "Bazaar_A_Warehouse_HandTruck", (-56.5, 0.16, -27.0), 15.0, 0.88),
+        ("military_crate", "Bazaar_A_Warehouse_Crate", (-53.7, 0.16, -27.5), -8.0, 1.0),
+        ("coffee_cart_bottom", "Bazaar_B_CoffeeCart_Base", (56.2, 0.16, -18.5), 0.0, 0.92),
+        ("coffee_cart_top", "Bazaar_B_CoffeeCart_Top", (56.2, 0.16, -18.5), 0.0, 0.92),
+        ("coffee_cart_mugs", "Bazaar_B_CoffeeCart_Mugs", (56.2, 0.16, -18.5), 0.0, 0.92),
+        ("wicker_basket", "Bazaar_B_ProduceBasket00", (55.2, 0.16, -16.9), 28.0, 0.82),
+        ("wicker_basket", "Bazaar_B_ProduceBasket01", (56.4, 0.16, -16.7), -18.0, 0.76),
+        ("hand_truck", "Bazaar_B_Loading_HandTruck", (36.6, 0.16, -24.2), 8.0, 0.82),
+        ("plastic_crate", "Bazaar_Mid_ProduceCrate", (7.6, 0.16, 13.2), -10.0, 0.82),
+        ("bicycle", "Bazaar_Back_West_Bicycle", (-29.1, 0.16, -40.1), 82.0, 0.88),
+        ("wicker_basket", "Bazaar_Back_West_Basket", (-30.2, 0.16, -41.0), 16.0, 0.78),
+        ("wicker_basket", "Bazaar_Back_East_Basket", (30.2, 0.16, -41.0), -16.0, 0.78),
+    )
+    for key, name, position, yaw, scale in prop_layout:
+        place_source(
+            templates,
+            specs,
+            key,
+            name,
+            position,
+            yaw,
+            scale,
+            dressing,
+            root,
+            role="finished_cc0_interior_landmark_prop",
+        )
+
+    # Suspended lamps give each main interior a distinct warm landmark and
+    # visibly attach to authored beams rather than floating in space.
+    supported_lanterns = (
+        ((-50.5, 5.6, -18.0), (-48.5, 5.6, -18.0), 0.45),
+        ((-39.5, 5.5, -26.0), (-41.0, 5.5, -26.0), 0.42),
+        ((-55.5, 5.45, -12.5), (-53.8, 5.45, -12.5), 0.40),
+        ((-45.5, 5.45, -22.0), (-44.0, 5.45, -22.0), 0.40),
+        ((43.0, 5.7, -18.0), (45.0, 5.7, -18.0), 0.42),
+        ((54.5, 5.7, -13.0), (52.5, 5.7, -13.0), 0.42),
+        ((39.0, 5.48, -10.0), (40.6, 5.48, -10.0), 0.40),
+        ((47.0, 5.48, -25.0), (48.6, 5.48, -25.0), 0.40),
+        ((57.0, 5.48, -20.0), (55.4, 5.48, -20.0), 0.40),
+        ((-1.5, 5.4, 12.0), (0.0, 5.4, 12.0), 0.40),
+        ((-5.0, 5.4, 26.0), (-3.5, 5.4, 26.0), 0.40),
+        ((-1.5, 5.3, -18.0), (0.0, 5.3, -18.0), 0.40),
+        ((-6.5, 5.18, -2.0), (-5.0, 5.18, -2.0), 0.38),
+        ((4.5, 5.18, 14.0), (3.0, 5.18, 14.0), 0.38),
+        ((-17.8, 3.65, -47.0), (-16.2, 3.65, -47.0), 0.36),
+        ((16.2, 3.65, -47.0), (17.8, 3.65, -47.0), 0.36),
+        ((-39.0, 3.65, -38.0), (-37.5, 3.65, -38.0), 0.36),
+        ((39.0, 3.65, -38.0), (37.5, 3.65, -38.0), 0.36),
+    )
+    for index, (anchor, hook, drop) in enumerate(supported_lanterns):
+        place_supported_lantern(
+            templates,
+            specs,
+            f"BazaarInteriorLantern_{index:02d}",
+            anchor,
+            hook,
+            drop,
+            0.58,
+            steel,
+            dressing,
+            root,
+        )
+
+    for name, position, role in (
+        ("Marker_AttackerSpawn", (0.0, 0.22, 49.0), "attacker_spawn"),
+        ("Marker_DefenderSpawn", (0.0, 0.22, -49.0), "defender_spawn"),
+        ("Marker_BombSite_A", (-46.0, 0.18, -18.0), "bomb_site_a"),
+        ("Marker_BombSite_B", (46.0, 0.18, -18.0), "bomb_site_b"),
+        ("Marker_A_Gallery_Top", (-56.0, 3.6, -18.0), "high_ground"),
+        ("Marker_B_Balcony_Top", (56.0, 3.4, -18.0), "high_ground"),
+        ("Marker_Mid_Mezzanine_Top", (-6.0, 3.2, 24.0), "high_ground"),
+    ):
+        add_marker(name, position, role, markers, root)
+
+    for region_name, bounds, region_kind in (
+        ("A_Caravanserai", (-60.0, -34.0, -31.0, -4.0), "two_storey_courtyard_arcade_warehouse"),
+        ("B_MarketWarehouse", (34.0, 60.0, -30.0, -6.0), "roofed_column_hall_mezzanine"),
+        ("Mid_IndoorConnector", (-9.0, 9.0, -8.0, 34.0), "three_hall_s_connector"),
+        ("Defender_BackMarket", (-53.0, 53.0, -51.0, -34.0), "roofed_transfer_corridors"),
+    ):
+        marker = add_marker(
+            f"Marker_Interior_{region_name}",
+            ((bounds[0] + bounds[1]) * 0.5, 0.18, (bounds[2] + bounds[3]) * 0.5),
+            "complete_enterable_interior",
+            markers,
+            root,
+        )
+        marker["interior_region"] = region_name
+        marker["interior_kind"] = region_kind
+        marker["godot_bounds_xz"] = ",".join(f"{value:.3f}" for value in bounds)
+
+    for mesh in templates.values():
+        mesh.use_fake_user = False
+    return root, collections
+
+
 def add_review_lighting(collection: bpy.types.Collection) -> None:
     sun_data = bpy.data.lights.new("BazaarReviewSun", "SUN")
-    sun_data.energy = 2.0
+    sun_data.energy = 2.65
     sun_data.angle = radians(22.0)
     sun = bpy.data.objects.new("BazaarReviewSun", sun_data)
     collection.objects.link(sun)
     sun.rotation_euler = (radians(32.0), radians(-18.0), radians(138.0))
 
     area_data = bpy.data.lights.new("BazaarReviewFill", "AREA")
-    area_data.energy = 1800.0
+    area_data.energy = 2100.0
     area_data.shape = "DISK"
-    area_data.size = 34.0
+    area_data.size = 42.0
     area = bpy.data.objects.new("BazaarReviewFill", area_data)
     collection.objects.link(area)
     area.location = (0.0, -8.0, 38.0)
+
+    # Review-only practicals reveal the authored interior combat band. Runtime
+    # lighting stays Godot-owned and these lights are excluded from the GLB.
+    for index, position in enumerate(
+        (
+            (-55.0, 3.0, -18.0),
+            (-46.0, 3.0, -27.0),
+            (-37.5, 3.0, -16.0),
+            (38.0, 3.2, -18.0),
+            (46.0, 3.2, -18.0),
+            (55.0, 3.2, -18.0),
+            (0.0, 3.0, -15.5),
+            (-3.0, 3.0, -1.0),
+            (3.0, 3.0, 12.0),
+            (-3.0, 3.0, 27.0),
+            (0.0, 3.0, -18.0),
+            (-17.0, 2.8, -47.0),
+            (17.0, 2.8, -47.0),
+            (-40.0, 2.8, -38.0),
+            (40.0, 2.8, -38.0),
+        )
+    ):
+        light_data = bpy.data.lights.new(f"BazaarReviewInterior_{index:02d}", "POINT")
+        light_data.energy = 720.0
+        light_data.color = (1.0, 0.74, 0.52)
+        light_data.shadow_soft_size = 2.2
+        light_data.use_shadow = True
+        light = bpy.data.objects.new(f"BazaarReviewInterior_{index:02d}", light_data)
+        collection.objects.link(light)
+        light.location = godot_to_blender(*position)
 
 
 def point_camera(camera: bpy.types.Object, target_godot: tuple[float, float, float]) -> None:
@@ -2142,10 +5707,12 @@ def render_previews(collection: bpy.types.Collection) -> None:
     scene.camera = camera
 
     views = (
-        ("01_overview.png", (0.0, -88.0, 96.0), (0.0, 0.8, 0.0), 47.0),
-        ("02_a_gallery.png", (-45.0, 3.0, 8.5), (-57.5, 1.5, -10.5), 46.0),
-        ("03_mid_bridge.png", (12.0, -12.0, 6.5), (8.0, 2.0, 0.0), 40.0),
-        ("04_b_balcony.png", (39.0, 19.0, 7.5), (52.0, 1.4, -25.5), 46.0),
+        ("01_overview.png", (98.0, -122.0, 112.0), (0.0, 1.0, -4.0), 45.0),
+        ("02_a_interior.png", (-46.5, 11.0, 1.72), (-47.0, 1.45, -23.0), 32.0),
+        ("03_b_interior.png", (46.0, 8.0, 1.68), (46.0, 1.45, -22.0), 31.0),
+        ("04_mid_s_bend.png", (6.0, -18.5, 1.68), (-3.5, 1.45, 4.0), 31.0),
+        ("05_mid_north_connector.png", (-6.0, 14.0, 1.68), (5.0, 1.45, -18.5), 28.0),
+        ("06_back_market.png", (-50.0, 38.0, 1.68), (-29.0, 1.4, -38.0), 32.0),
     )
     for filename, blender_location, target, lens in views:
         camera.location = blender_location
@@ -2741,6 +6308,722 @@ def validate_authored_scene(root: bpy.types.Object) -> dict[str, object]:
     }
 
 
+def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
+    scene_objects = list(bpy.context.scene.objects)
+    mesh_objects = [obj for obj in scene_objects if obj.type == "MESH" and obj.parent == root]
+    if len(mesh_objects) < 160:
+        raise RuntimeError(f"Bazaar V2 scene unexpectedly sparse: {len(mesh_objects)} meshes")
+    if any(
+        obj.parent != root
+        for obj in scene_objects
+        if obj.name.startswith("Bazaar")
+        and obj != root
+        and obj.type in {"MESH", "EMPTY"}
+    ):
+        raise RuntimeError("Bazaar V2 export hierarchy must remain flat under the map root")
+
+    names = {obj.name for obj in scene_objects}
+    required = {
+        "BazaarGroundAuthoredMesh",
+        "Bazaar_A_InteriorFloor",
+        "Bazaar_A_Gallery_Deck",
+        "Bazaar_B_InteriorFloor",
+        "Bazaar_B_WarehouseRoof",
+        "Bazaar_B_Balcony_Deck",
+        "Bazaar_Mid_Mezzanine_Deck",
+        "Bazaar_Mid_NorthConnector_Roof",
+        "Bazaar_Mid_NorthTeaHall_Roof",
+        "Bazaar_Mid_CenterProduceHall_Roof",
+        "Bazaar_Mid_SouthCarpetHall_Roof",
+        "BazaarBlock_AttackWestEntryWing_Roof",
+        "BazaarBlock_AttackEastEntryWing_Roof",
+        "BazaarBlock_WestLaneLink_Roof",
+        "BazaarBlock_EastLaneLink_Roof",
+        "BazaarBlock_WestServiceClosure_Roof",
+        "BazaarBlock_EastServiceClosure_Roof",
+        "Bazaar_A_Gallery_UpperPrivacyScreen_metal_window",
+        "Bazaar_B_Balcony_UpperPrivacyScreen_metal_window",
+        "Bazaar_Mid_WestSouthFrontageBaffle_Tier00_window_trim",
+        "Bazaar_Mid_WestSouthFrontageBaffle_Tier01_metal_window",
+        "Bazaar_Mid_EastSouthFrontageBaffle_Tier00_window_trim",
+        "Bazaar_Mid_EastSouthFrontageBaffle_Tier01_metal_window",
+        "Bazaar_Mid_WestConnectorReturn_Tier00_window_trim",
+        "Bazaar_Mid_WestConnectorReturn_Tier01_metal_window",
+        "Bazaar_Mid_EastConnectorReturn_Tier00_window_trim",
+        "Bazaar_Mid_EastConnectorReturn_Tier01_metal_window",
+        "Bazaar_WestApproachFacadeReturn_Tier00_window_trim",
+        "Bazaar_WestApproachFacadeReturn_Tier01_metal_window",
+        "Bazaar_EastApproachFacadeReturn_Tier00_window_trim",
+        "Bazaar_EastApproachFacadeReturn_Tier01_metal_window",
+        "Bazaar_MidCarpetSouthFacadeReturn_Tier00_window_trim",
+        "Bazaar_MidCarpetSouthFacadeReturn_Tier01_metal_window",
+        "Bazaar_Defender_WestFoyerPier_Tier00_window_trim",
+        "Bazaar_Defender_WestFoyerPier_Tier01_metal_window",
+        "Bazaar_Defender_EastFoyerPier_Tier00_window_trim",
+        "Bazaar_Defender_EastFoyerPier_Tier01_metal_window",
+        "Bazaar_Defender_WestFoyerReturn_Tier00_window_trim",
+        "Bazaar_Defender_WestFoyerReturn_Tier01_metal_window",
+        "Bazaar_Defender_EastFoyerReturn_Tier00_window_trim",
+        "Bazaar_Defender_EastFoyerReturn_Tier01_metal_window",
+        "Marker_Interior_A_Caravanserai",
+        "Marker_Interior_B_MarketWarehouse",
+        "Marker_Interior_Mid_IndoorConnector",
+        "Marker_Interior_Defender_BackMarket",
+        *(stair.name for stair in STAIRS),
+        *(f"{stair.name}_AuthoredTreyTreadNosings" for stair in STAIRS),
+    }
+    missing = sorted(required - names)
+    if missing:
+        raise RuntimeError(f"Missing required Bazaar V2 objects: {missing}")
+
+    validated_meshes: set[bpy.types.Mesh] = set()
+    for obj in mesh_objects:
+        origin = str(obj.get("bazaar_asset_origin", ""))
+        if origin != "cc0":
+            raise RuntimeError(
+                f"Visible Bazaar V2 mesh must come from a finished CC0 module: "
+                f"{obj.name} origin={origin!r}"
+            )
+        searchable = " ".join(
+            str(obj.get(key, ""))
+            for key in ("source_asset", "source_creator", "source_url", "license")
+        ).lower()
+        if any(token in searchable for token in FORBIDDEN_SOURCE_TOKENS):
+            raise RuntimeError(f"Forbidden non-CC0 source token on {obj.name}: {searchable}")
+        for metadata_key in (
+            "license",
+            "source_asset",
+            "source_object",
+            "source_creator",
+            "source_url",
+        ):
+            if not str(obj.get(metadata_key, "")).strip():
+                raise RuntimeError(f"CC0 instance lacks {metadata_key} provenance: {obj.name}")
+        if "CC0" not in str(obj.get("license", "")):
+            raise RuntimeError(f"CC0 instance lacks license metadata: {obj.name}")
+        if not obj.data.uv_layers:
+            raise RuntimeError(f"Visible mesh lacks UVs: {obj.name}")
+        if not any(material is not None for material in obj.data.materials):
+            raise RuntimeError(f"Visible mesh lacks material: {obj.name}")
+        if obj.data in validated_meshes:
+            continue
+        validated_meshes.add(obj.data)
+        mesh = obj.data
+        if not mesh.vertices or not mesh.polygons:
+            raise RuntimeError(f"Visible mesh has no renderable surface: {obj.name}")
+        if len(mesh.uv_layers.active.data) != len(mesh.loops):
+            raise RuntimeError(f"Visible mesh UV loop coverage failed: {obj.name}")
+        if any(
+            not isfinite(value)
+            for uv_loop in mesh.uv_layers.active.data
+            for value in uv_loop.uv
+        ):
+            raise RuntimeError(f"Visible mesh has non-finite UVs: {obj.name}")
+        for polygon in mesh.polygons:
+            if (
+                polygon.material_index >= len(mesh.materials)
+                or mesh.materials[polygon.material_index] is None
+            ):
+                raise RuntimeError(f"Visible mesh polygon lacks material: {obj.name}")
+
+    interior_markers = [
+        obj
+        for obj in scene_objects
+        if obj.type == "EMPTY" and obj.get("marker_role") == "complete_enterable_interior"
+    ]
+    if len(interior_markers) != 4:
+        raise RuntimeError(
+            f"Bazaar V2 must retain four complete enterable interiors, found {len(interior_markers)}"
+        )
+    expected_regions = {
+        "A_Caravanserai",
+        "B_MarketWarehouse",
+        "Mid_IndoorConnector",
+        "Defender_BackMarket",
+    }
+    actual_regions = {str(marker.get("interior_region", "")) for marker in interior_markers}
+    if actual_regions != expected_regions:
+        raise RuntimeError(f"Interior-region contract drifted: {sorted(actual_regions)}")
+
+    legacy_facades = [
+        obj for obj in mesh_objects if obj.get("bazaar_role") == "finished_cc0_outer_landmark_facade"
+    ]
+    if len(legacy_facades) != 4:
+        raise RuntimeError(
+            f"Legacy whole-building facades must remain four outer landmarks, found {len(legacy_facades)}"
+        )
+    if any("finished_boundary_shophouse" == obj.get("bazaar_role") for obj in mesh_objects):
+        raise RuntimeError("V1 repeated boundary shophouses survived the V2 rebuild")
+
+    architectural_cover_tokens = (
+        "wall",
+        "arcade",
+        "column",
+        "counter",
+        "partition",
+        "portal",
+        "kiosk",
+    )
+    architectural_cover = [
+        obj
+        for obj in mesh_objects
+        if any(token in str(obj.get("bazaar_role", "")) for token in architectural_cover_tokens)
+    ]
+    prop_cover = [
+        obj
+        for obj in mesh_objects
+        if "cover" in str(obj.get("bazaar_role", ""))
+        and obj not in architectural_cover
+    ]
+    cover_ratio = len(architectural_cover) / max(1, len(architectural_cover) + len(prop_cover))
+    if cover_ratio < 0.70:
+        raise RuntimeError(f"Architectural cover ratio below 70%: {cover_ratio:.3f}")
+
+    art_polish_counts = {
+        "shop_signs": sum(
+            obj.get("bazaar_role") == "finished_cc0_wall_mounted_shop_sign"
+            for obj in mesh_objects
+        ),
+        "wall_shelves": sum(
+            "shelf" in str(obj.get("bazaar_role", ""))
+            for obj in mesh_objects
+        ),
+        "wall_awnings": sum(
+            obj.get("bazaar_role") == "finished_cc0_wall_attached_market_awning"
+            for obj in mesh_objects
+        ),
+        "roof_parapets": sum(
+            "roof_parapet" in str(obj.get("bazaar_role", ""))
+            for obj in mesh_objects
+        ),
+        "rooftop_lantern_parts": sum(
+            "rooftop_lantern" in str(obj.get("bazaar_role", ""))
+            for obj in mesh_objects
+        ),
+        "upper_privacy_screen_parts": sum(
+            "upper_privacy" in str(obj.get("bazaar_role", ""))
+            for obj in mesh_objects
+        ),
+        "stair_tread_nosing_assemblies": sum(
+            obj.get("bazaar_role") == "finished_cc0_authored_stair_tread_nosings"
+            for obj in mesh_objects
+        ),
+        "continuous_storage_parts": sum(
+            "continuous_wall_storage" in str(obj.get("bazaar_role", ""))
+            for obj in mesh_objects
+        ),
+        "continuous_shopfront_parts": sum(
+            "continuous_upper_shopfront" in str(obj.get("bazaar_role", ""))
+            for obj in mesh_objects
+        ),
+        "skyline_articulation_parts": sum(
+            any(
+                token in str(obj.get("bazaar_role", ""))
+                for token in ("skyline", "clerestory")
+            )
+            for obj in mesh_objects
+        ),
+        "back_service_gate_parts": sum(
+            "back_market_service_gate" in str(obj.get("bazaar_role", ""))
+            for obj in mesh_objects
+        ),
+    }
+    polish_minimums = {
+        "shop_signs": 18,
+        "wall_shelves": 20,
+        "wall_awnings": 10,
+        "roof_parapets": 40,
+        "rooftop_lantern_parts": 8,
+        "upper_privacy_screen_parts": 8,
+        "stair_tread_nosing_assemblies": len(STAIRS),
+        "continuous_storage_parts": 80,
+        "continuous_shopfront_parts": 60,
+        "skyline_articulation_parts": 45,
+        "back_service_gate_parts": 4,
+    }
+    for polish_key, minimum in polish_minimums.items():
+        if art_polish_counts[polish_key] < minimum:
+            raise RuntimeError(
+                f"Bazaar V2 art polish gate failed for {polish_key}: "
+                f"{art_polish_counts[polish_key]} < {minimum}"
+            )
+
+    mid_wall_groups = (
+        "Bazaar_Mid_NorthConnector",
+        "Bazaar_Mid_NorthTeaHall",
+        "Bazaar_Mid_CenterProduceHall",
+        "Bazaar_Mid_SouthCarpetHall",
+    )
+    for prefix in mid_wall_groups:
+        walls = [
+            obj
+            for obj in mesh_objects
+            if obj.name.startswith(prefix)
+            and "wall" in str(obj.get("bazaar_role", "")).lower()
+        ]
+        if len(walls) < 4:
+            raise RuntimeError(f"Indoor Mid hall lacks four-sided sight block: {prefix}")
+
+    for stair in STAIRS:
+        obj = bpy.data.objects[stair.name]
+        if obj.get("bazaar_role") != "finished_cc0_authored_stair_assembly":
+            raise RuntimeError(f"Stair is not a finished CC0 assembly: {stair.name}")
+        slope = float(obj["slope_degrees"])
+        if slope > 18.1 or abs(float(obj["path_width_m"]) - stair.width) > 0.0001:
+            raise RuntimeError(f"Stair traversal gate failed for {stair.name}: slope={slope:.3f}")
+        if bpy.data.objects.get(f"{stair.name}_AuthoredTreyRails") is None:
+            raise RuntimeError(f"Stair lacks authored guardrails: {stair.name}")
+        if bpy.data.objects.get(f"{stair.name}_AuthoredTreyNewels") is None:
+            raise RuntimeError(f"Stair lacks authored newels: {stair.name}")
+        nosings = bpy.data.objects.get(f"{stair.name}_AuthoredTreyTreadNosings")
+        if nosings is None or int(nosings.get("tread_nosing_instances", 0)) != stair.steps:
+            raise RuntimeError(f"Stair lacks one authored tread nosing per step: {stair.name}")
+
+    for screen_name, expected_thickness, expected_band in (
+        ("Bazaar_A_Gallery_UpperPrivacyScreen_metal_window", 0.42, "3.600,6.400"),
+        ("Bazaar_B_Balcony_UpperPrivacyScreen_metal_window", 0.42, "3.400,6.500"),
+    ):
+        screen = bpy.data.objects[screen_name]
+        if (
+            abs(float(screen.get("runtime_screen_thickness_m", 0.0)) - expected_thickness) > 0.001
+            or screen.get("upper_only_bottom_top_y") != expected_band
+        ):
+            raise RuntimeError(f"Upper privacy-screen contract drifted: {screen_name}")
+
+    for wall_name, expected_bounds in (
+        ("Bazaar_WestApproachFacadeReturn_Tier00_window_trim", "-49.000,-4.000,-49.000,12.000"),
+        ("Bazaar_EastApproachFacadeReturn_Tier00_window_trim", "52.000,-6.000,52.000,12.000"),
+        ("Bazaar_Mid_WestConnectorReturn_Tier00_window_trim", "-20.000,-21.000,-20.000,-17.800"),
+        ("Bazaar_Mid_EastConnectorReturn_Tier00_window_trim", "20.000,-14.800,20.000,-12.000"),
+        ("Bazaar_MidCarpetSouthFacadeReturn_Tier00_window_trim", "3.000,34.000,8.000,34.000"),
+        ("Bazaar_Defender_WestFoyerPier_Tier00_window_trim", "-20.000,-56.000,-20.000,-46.200"),
+        ("Bazaar_Defender_EastFoyerPier_Tier00_window_trim", "20.000,-56.000,20.000,-46.200"),
+        ("Bazaar_Defender_WestFoyerReturn_Tier00_window_trim", "-20.000,-46.200,-7.500,-46.200"),
+        ("Bazaar_Defender_EastFoyerReturn_Tier00_window_trim", "7.500,-46.200,20.000,-46.200"),
+    ):
+        wall = bpy.data.objects[wall_name]
+        if (
+            abs(float(wall.get("runtime_wall_thickness_m", 0.0)) - 0.42) > 0.001
+            or wall.get("runtime_wall_bounds_xz") != expected_bounds
+        ):
+            raise RuntimeError(f"Runtime facade-return contract drifted: {wall_name}")
+
+    platform_contract = {
+        "Bazaar_A_Gallery_Deck": 3.6,
+        "Bazaar_B_Balcony_Deck": 3.4,
+        "Bazaar_Mid_Mezzanine_Deck": 3.2,
+    }
+    for name, expected_top in platform_contract.items():
+        obj = bpy.data.objects[name]
+        actual_top = max((obj.matrix_world @ Vector(corner)).z for corner in obj.bound_box)
+        if abs(actual_top - expected_top) > 0.012:
+            raise RuntimeError(f"Interior platform height drifted for {name}: {actual_top:.4f}")
+
+    minimum, maximum = object_world_bounds(mesh_objects)
+    if minimum.x < MAP_X_MIN - 0.25 or maximum.x > MAP_X_MAX + 0.25:
+        raise RuntimeError(f"Bazaar V2 X bounds escaped frame: {minimum.x}..{maximum.x}")
+    if minimum.y < -MAP_Z_MAX - 0.25 or maximum.y > -MAP_Z_MIN + 0.25:
+        raise RuntimeError(
+            f"Bazaar V2 Z bounds escaped frame: Blender Y {minimum.y}..{maximum.y}"
+        )
+    if minimum.z < -0.35 or maximum.z > 10.5:
+        raise RuntimeError(f"Bazaar V2 vertical bounds invalid: {minimum.z}..{maximum.z}")
+
+    unique_meshes = {obj.data for obj in mesh_objects}
+    unique_triangles = sum(mesh_triangles(mesh) for mesh in unique_meshes)
+    instance_triangles = sum(mesh_triangles(obj.data) for obj in mesh_objects)
+    if unique_triangles > MAX_UNIQUE_TRIANGLES:
+        raise RuntimeError(f"Unique triangle budget exceeded: {unique_triangles}")
+    if instance_triangles > MAX_INSTANCE_TRIANGLES:
+        raise RuntimeError(f"Instance triangle budget exceeded: {instance_triangles}")
+
+    materials = {
+        material for obj in mesh_objects for material in obj.data.materials if material is not None
+    }
+    images = {
+        node.image
+        for material in materials
+        if material.use_nodes
+        for node in material.node_tree.nodes
+        if node.type == "TEX_IMAGE" and node.image is not None
+    }
+    for image in images:
+        ensure_image_pixels_loaded(image)
+        if max(image.size) > MAX_TEXTURE_DIMENSION:
+            raise RuntimeError(f"Texture exceeds runtime cap: {image.name} {tuple(image.size)}")
+    texture_memory_bytes_estimate = sum(
+        int(image.size[0] * image.size[1] * 4 * (4.0 / 3.0)) for image in images
+    )
+    texture_memory_mib_estimate = texture_memory_bytes_estimate / (1024.0 * 1024.0)
+    if texture_memory_mib_estimate > MAX_TEXTURE_MEMORY_MIB:
+        raise RuntimeError(
+            "Estimated RGBA8+mips texture memory exceeds "
+            f"{MAX_TEXTURE_MEMORY_MIB:.0f} MiB: {texture_memory_mib_estimate:.2f}"
+        )
+    surface_draw_count = sum(
+        len({polygon.material_index for polygon in obj.data.polygons}) for obj in mesh_objects
+    )
+    raw_source_triangles = sum(
+        spec.expected_triangles for spec in (*SOURCE_SPECS, *COFFEE_CART_SOURCE_SPECS)
+    )
+    roof_footprint_m2 = 0.0
+    for obj in mesh_objects:
+        role = str(obj.get("bazaar_role", ""))
+        footprint = str(obj.get("footprint_m", ""))
+        if "roof" not in role or "," not in footprint:
+            continue
+        size_x, size_z = (float(value) for value in footprint.split(",", 1))
+        roof_footprint_m2 += size_x * size_z
+
+    return {
+        "revision": "V2 dense enterable interiors",
+        "object_count": len(scene_objects),
+        "mesh_object_count": len(mesh_objects),
+        "unique_mesh_count": len(unique_meshes),
+        "material_count": len(materials),
+        "texture_count": len(images),
+        "draw_node_count": len(mesh_objects),
+        "surface_draw_count": surface_draw_count,
+        "raw_source_triangles": raw_source_triangles,
+        "unique_triangles": unique_triangles,
+        "instance_triangles": instance_triangles,
+        "texture_memory_bytes_estimate_rgba8_mips": texture_memory_bytes_estimate,
+        "texture_memory_mib_estimate_rgba8_mips": round(texture_memory_mib_estimate, 3),
+        "blender_bounds_min": [round(value, 4) for value in minimum],
+        "blender_bounds_max": [round(value, 4) for value in maximum],
+        "complete_enterable_interior_count": len(interior_markers),
+        "interior_regions": sorted(actual_regions),
+        "architectural_cover_object_count": len(architectural_cover),
+        "prop_cover_object_count": len(prop_cover),
+        "architectural_cover_ratio": round(cover_ratio, 4),
+        "art_polish_object_counts": art_polish_counts,
+        "roofed_footprint_m2": round(roof_footprint_m2, 3),
+        "legacy_outer_facade_count": len(legacy_facades),
+        "closed_modular_block_count": len(
+            [obj for obj in mesh_objects if obj.get("bazaar_role") == "finished_cc0_closed_urban_block_roof"]
+        ),
+        "stairs": {
+            stair.name: {
+                "width_m": float(bpy.data.objects[stair.name]["path_width_m"]),
+                "run_m": float(bpy.data.objects[stair.name]["run_m"]),
+                "slope_degrees": round(
+                    float(bpy.data.objects[stair.name]["slope_degrees"]), 4
+                ),
+                "steps": int(bpy.data.objects[stair.name]["step_count"]),
+            }
+            for stair in STAIRS
+        },
+        "platform_top_m": platform_contract,
+        "authored_module_contract": {
+            "visible_mesh_origin_counts": {
+                "cc0": len(mesh_objects),
+                "project_authored": 0,
+                "procedural": 0,
+            },
+            "quaternius_downtown_sources": 6,
+            "trey_structural_sources": 16,
+            "complete_interior_regions": sorted(actual_regions),
+        },
+    }
+
+
+def optimize_static_draw_nodes_v2(
+    root: bpy.types.Object,
+    scene_stats: dict[str, object],
+) -> dict[str, object]:
+    """Batch compatible static art without changing triangles or materials.
+
+    Batches never cross a DCC collection, spatial region, authored
+    responsibility, source/provenance identity, or material signature.
+    Runtime-contract walls, roofs, decks, and stair assemblies retain stable
+    object names for inspection and round-trip checks. Shared mesh instances
+    are deliberately left instanced so batching cannot inflate the
+    unique-triangle budget.
+    """
+    protected_names = {
+        "BazaarGroundAuthoredMesh",
+        "Bazaar_A_Gallery_Deck",
+        "Bazaar_B_Balcony_Deck",
+        "Bazaar_Mid_Mezzanine_Deck",
+        "Bazaar_B_WarehouseRoof",
+        "Bazaar_Mid_NorthConnector_Roof",
+        "Bazaar_Mid_NorthTeaHall_Roof",
+        "Bazaar_Mid_CenterProduceHall_Roof",
+        "Bazaar_Mid_SouthCarpetHall_Roof",
+        "BazaarBlock_AttackWestEntryWing_Roof",
+        "BazaarBlock_AttackEastEntryWing_Roof",
+        "BazaarBlock_WestLaneLink_Roof",
+        "BazaarBlock_EastLaneLink_Roof",
+        "BazaarBlock_WestServiceClosure_Roof",
+        "BazaarBlock_EastServiceClosure_Roof",
+        *(stair.name for stair in STAIRS),
+    }
+    pre_meshes = [
+        obj
+        for obj in bpy.context.scene.objects
+        if obj.type == "MESH" and obj.parent == root
+    ]
+    pre_bounds_min, pre_bounds_max = object_world_bounds(pre_meshes)
+    pre_instance_triangles = sum(mesh_triangles(obj.data) for obj in pre_meshes)
+    pre_unique_triangles = sum(
+        mesh_triangles(mesh) for mesh in {obj.data for obj in pre_meshes}
+    )
+    pre_surface_count = sum(
+        len({polygon.material_index for polygon in obj.data.polygons})
+        for obj in pre_meshes
+    )
+
+    def is_protected(obj: bpy.types.Object) -> bool:
+        role = str(obj.get("bazaar_role", ""))
+        return (
+            obj.name in protected_names
+            or any(obj.name.startswith(stair.name) for stair in STAIRS)
+            or "deck" in role
+            or "upper_privacy" in role
+            or obj.get("runtime_wall_thickness_m") is not None
+            or obj.get("runtime_screen_thickness_m") is not None
+            or obj.data.users != 1
+            or obj.data.shape_keys is not None
+            or bool(obj.modifiers)
+        )
+
+    candidates = [obj for obj in pre_meshes if not is_protected(obj)]
+    protected_mesh_names = {obj.name for obj in pre_meshes if is_protected(obj)}
+    pre_runtime_wall_contract = sorted(
+        (
+            obj.name,
+            float(obj.get("runtime_wall_thickness_m", 0.0)),
+            str(obj.get("runtime_wall_bounds_xz", "")),
+        )
+        for obj in pre_meshes
+        if obj.get("runtime_wall_thickness_m") is not None
+    )
+    pre_runtime_screen_contract = sorted(
+        (
+            obj.name,
+            float(obj.get("runtime_screen_thickness_m", 0.0)),
+            str(obj.get("upper_only_bottom_top_y", "")),
+        )
+        for obj in pre_meshes
+        if obj.get("runtime_screen_thickness_m") is not None
+    )
+
+    def spatial_center(obj: bpy.types.Object) -> Vector:
+        corners = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
+        return sum(corners, Vector((0.0, 0.0, 0.0))) / len(corners)
+
+    def group_candidates(bucket_m: float) -> dict[tuple[object, ...], list[bpy.types.Object]]:
+        groups: dict[tuple[object, ...], list[bpy.types.Object]] = {}
+        for obj in candidates:
+            center = spatial_center(obj)
+            region_x = int((center.x - MAP_X_MIN) / bucket_m)
+            godot_z = -center.y
+            region_z = int((godot_z - MAP_Z_MIN) / bucket_m)
+            collection_name = sorted(collection.name for collection in obj.users_collection)[0]
+            material_signature = tuple(
+                material.name_full if material is not None else ""
+                for material in obj.data.materials
+            )
+            provenance_signature = tuple(
+                str(obj.get(key, ""))
+                for key in (
+                    "bazaar_asset_origin",
+                    "license",
+                    "source_asset",
+                    "source_object",
+                    "source_creator",
+                    "source_url",
+                )
+            )
+            key = (
+                collection_name,
+                region_x,
+                region_z,
+                str(obj.get("bazaar_role", "")),
+                material_signature,
+                provenance_signature,
+            )
+            groups.setdefault(key, []).append(obj)
+        return groups
+
+    chosen_bucket = 0.0
+    chosen_groups: dict[tuple[object, ...], list[bpy.types.Object]] = {}
+    predicted_nodes = len(pre_meshes)
+    for bucket_m in (18.0, 24.0, 32.0, 44.0, 64.0, 140.0):
+        groups = group_candidates(bucket_m)
+        predicted = len(pre_meshes) - sum(
+            len(group) - 1 for group in groups.values() if len(group) > 1
+        )
+        chosen_bucket = bucket_m
+        chosen_groups = groups
+        predicted_nodes = predicted
+        if predicted <= TARGET_EXPORT_DRAW_NODES:
+            break
+    if predicted_nodes > MAX_EXPORT_DRAW_NODES:
+        raise RuntimeError(
+            "Region/material batching cannot meet draw-node gate: "
+            f"predicted {predicted_nodes} > {MAX_EXPORT_DRAW_NODES}"
+        )
+
+    def normalize_material_slots(obj: bpy.types.Object) -> None:
+        mesh = obj.data
+        old_slots = list(mesh.materials)
+        polygon_materials = [old_slots[polygon.material_index] for polygon in mesh.polygons]
+        unique_materials: list[bpy.types.Material] = []
+        material_indices: dict[int, int] = {}
+        for material in polygon_materials:
+            if material is None:
+                raise RuntimeError(f"Batched mesh polygon lost material: {obj.name}")
+            pointer = material.as_pointer()
+            if pointer not in material_indices:
+                material_indices[pointer] = len(unique_materials)
+                unique_materials.append(material)
+        mesh.materials.clear()
+        for material in unique_materials:
+            mesh.materials.append(material)
+        for polygon, material in zip(mesh.polygons, polygon_materials, strict=True):
+            polygon.material_index = material_indices[material.as_pointer()]
+        mesh.update()
+
+    merged_groups = 0
+    merged_source_nodes = 0
+    for group in chosen_groups.values():
+        if len(group) < 2:
+            continue
+        live_group = [
+            obj
+            for obj in group
+            if bpy.context.scene.objects.get(obj.name) is obj
+        ]
+        if len(live_group) < 2:
+            continue
+        live_group.sort(key=lambda obj: obj.name)
+        leader = live_group[0]
+        role_set = sorted({str(obj.get("bazaar_role", "")) for obj in live_group})
+        source_names = "\n".join(obj.name for obj in live_group)
+        bpy.ops.object.select_all(action="DESELECT")
+        for obj in live_group:
+            obj.hide_set(False)
+            obj.hide_viewport = False
+            obj.select_set(True)
+        bpy.context.view_layer.objects.active = leader
+        result = bpy.ops.object.join()
+        if "FINISHED" not in result:
+            raise RuntimeError(f"Static art batching failed for {leader.name}: {result}")
+        normalize_material_slots(leader)
+        leader["dcc_batch_source_node_count"] = len(live_group)
+        leader["dcc_batch_source_names_sha256"] = sha256(
+            source_names.encode("utf-8")
+        ).hexdigest().upper()
+        leader["dcc_batch_roles"] = json.dumps(role_set, ensure_ascii=False)
+        leader["dcc_batch_spatial_bucket_m"] = chosen_bucket
+        merged_groups += 1
+        merged_source_nodes += len(live_group)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    bpy.context.view_layer.objects.active = None
+    bpy.context.view_layer.update()
+    post_meshes = [
+        obj
+        for obj in bpy.context.scene.objects
+        if obj.type == "MESH" and obj.parent == root
+    ]
+    post_unique_meshes = {obj.data for obj in post_meshes}
+    post_instance_triangles = sum(mesh_triangles(obj.data) for obj in post_meshes)
+    post_unique_triangles = sum(mesh_triangles(mesh) for mesh in post_unique_meshes)
+    post_surface_count = sum(
+        len({polygon.material_index for polygon in obj.data.polygons})
+        for obj in post_meshes
+    )
+    post_bounds_min, post_bounds_max = object_world_bounds(post_meshes)
+    post_names = {obj.name for obj in post_meshes}
+    missing_protected = sorted(protected_mesh_names - post_names)
+    if missing_protected:
+        raise RuntimeError(
+            "Static batching removed protected required objects: "
+            f"{missing_protected}"
+        )
+    post_runtime_wall_contract = sorted(
+        (
+            obj.name,
+            float(obj.get("runtime_wall_thickness_m", 0.0)),
+            str(obj.get("runtime_wall_bounds_xz", "")),
+        )
+        for obj in post_meshes
+        if obj.get("runtime_wall_thickness_m") is not None
+    )
+    post_runtime_screen_contract = sorted(
+        (
+            obj.name,
+            float(obj.get("runtime_screen_thickness_m", 0.0)),
+            str(obj.get("upper_only_bottom_top_y", "")),
+        )
+        for obj in post_meshes
+        if obj.get("runtime_screen_thickness_m") is not None
+    )
+    if post_runtime_wall_contract != pre_runtime_wall_contract:
+        raise RuntimeError("Static batching changed exact runtime wall metadata")
+    if post_runtime_screen_contract != pre_runtime_screen_contract:
+        raise RuntimeError("Static batching changed exact privacy-screen metadata")
+    if len(post_meshes) > MAX_EXPORT_DRAW_NODES:
+        raise RuntimeError(
+            f"Export draw-node gate failed: {len(post_meshes)} > {MAX_EXPORT_DRAW_NODES}"
+        )
+    if post_instance_triangles != pre_instance_triangles:
+        raise RuntimeError(
+            "Static art batching changed delivered triangles: "
+            f"{pre_instance_triangles} -> {post_instance_triangles}"
+        )
+    if post_unique_triangles != pre_unique_triangles:
+        raise RuntimeError(
+            "Static art batching changed unique triangles: "
+            f"{pre_unique_triangles} -> {post_unique_triangles}"
+        )
+    if (
+        (post_bounds_min - pre_bounds_min).length > 0.002
+        or (post_bounds_max - pre_bounds_max).length > 0.002
+    ):
+        raise RuntimeError("Static art batching changed authored map bounds")
+    for obj in post_meshes:
+        if str(obj.get("bazaar_asset_origin", "")) != "cc0":
+            raise RuntimeError(f"Batched export lost CC0 origin: {obj.name}")
+        if "CC0" not in str(obj.get("license", "")):
+            raise RuntimeError(f"Batched export lost CC0 license: {obj.name}")
+        if not obj.data.uv_layers:
+            raise RuntimeError(f"Batched export lost UVs: {obj.name}")
+
+    optimization = {
+        "strategy": (
+            "same collection, spatial region, authored responsibility, source "
+            "provenance, and material signature"
+        ),
+        "spatial_bucket_m": chosen_bucket,
+        "merged_group_count": merged_groups,
+        "merged_source_node_count": merged_source_nodes,
+        "pre_draw_nodes": len(pre_meshes),
+        "post_draw_nodes": len(post_meshes),
+        "pre_surface_draw_count": pre_surface_count,
+        "post_surface_draw_count": post_surface_count,
+        "pre_unique_triangles": pre_unique_triangles,
+        "post_unique_triangles": post_unique_triangles,
+        "pre_instance_triangles": pre_instance_triangles,
+        "post_instance_triangles": post_instance_triangles,
+        "triangle_and_bounds_preserved": True,
+    }
+    scene_stats["object_count"] = len(bpy.context.scene.objects)
+    scene_stats["mesh_object_count"] = len(post_meshes)
+    scene_stats["unique_mesh_count"] = len(post_unique_meshes)
+    scene_stats["draw_node_count"] = len(post_meshes)
+    scene_stats["surface_draw_count"] = post_surface_count
+    scene_stats["unique_triangles"] = post_unique_triangles
+    scene_stats["instance_triangles"] = post_instance_triangles
+    scene_stats["draw_node_optimization"] = optimization
+    scene_stats["authored_module_contract"]["visible_mesh_origin_counts"]["cc0"] = len(
+        post_meshes
+    )
+    return optimization
+
+
 def select_export_hierarchy(root: bpy.types.Object) -> None:
     bpy.ops.object.select_all(action="DESELECT")
     root.select_set(True)
@@ -2750,7 +7033,53 @@ def select_export_hierarchy(root: bpy.types.Object) -> None:
     bpy.context.view_layer.objects.active = root
 
 
-def pack_save_export(root: bpy.types.Object) -> None:
+def read_glb_json_document(path: Path) -> dict[str, object]:
+    data = path.read_bytes()
+    if len(data) < 20 or data[:4] != b"glTF":
+        raise RuntimeError(f"Exported file is not a valid GLB container: {path}")
+    version = int.from_bytes(data[4:8], "little")
+    declared_length = int.from_bytes(data[8:12], "little")
+    json_chunk_length = int.from_bytes(data[12:16], "little")
+    json_chunk_type = int.from_bytes(data[16:20], "little")
+    if version != 2:
+        raise RuntimeError(f"Exported GLB version must be 2, found {version}")
+    if declared_length != len(data):
+        raise RuntimeError(
+            f"Exported GLB length mismatch: header={declared_length}, file={len(data)}"
+        )
+    if json_chunk_type != 0x4E4F534A:
+        raise RuntimeError("Exported GLB first chunk is not JSON")
+    json_end = 20 + json_chunk_length
+    if json_end > len(data):
+        raise RuntimeError("Exported GLB JSON chunk exceeds file length")
+    document = json.loads(data[20:json_end].decode("utf-8").rstrip(" \t\r\n\0"))
+    if not isinstance(document, dict):
+        raise RuntimeError("Exported GLB JSON document is not an object")
+    return document
+
+
+def validate_glb_extension_contract() -> dict[str, object]:
+    document = read_glb_json_document(OUTPUT_GLB)
+    extensions_required = sorted(str(value) for value in document.get("extensionsRequired", []))
+    extensions_used = sorted(str(value) for value in document.get("extensionsUsed", []))
+    forbidden_extension = "KHR_draco_mesh_compression"
+    encoded_document = json.dumps(document, separators=(",", ":"), ensure_ascii=True)
+    if (
+        forbidden_extension in extensions_required
+        or forbidden_extension in extensions_used
+        or forbidden_extension in encoded_document
+    ):
+        raise RuntimeError(
+            f"Exported GLB contains unsupported extension {forbidden_extension}"
+        )
+    return {
+        "draco_mesh_compression_absent": True,
+        "extensions_required": extensions_required,
+        "extensions_used": extensions_used,
+    }
+
+
+def pack_save_export(root: bpy.types.Object) -> dict[str, object]:
     OUTPUT_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     OUTPUT_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     bpy.ops.file.pack_all()
@@ -2774,6 +7103,7 @@ def pack_save_export(root: bpy.types.Object) -> None:
         export_skins=False,
         export_animations=False,
         export_attributes=False,
+        export_draco_mesh_compression_enable=False,
     )
     if "FINISHED" not in result:
         raise RuntimeError(f"glTF export failed: {result}")
@@ -2783,6 +7113,7 @@ def pack_save_export(root: bpy.types.Object) -> None:
         raise RuntimeError(f"Bazaar GLB exceeds {MAX_GLB_BYTES} bytes")
     if OUTPUT_BLEND.stat().st_size > MAX_BLEND_BYTES:
         raise RuntimeError(f"Bazaar blend exceeds {MAX_BLEND_BYTES} bytes")
+    return validate_glb_extension_contract()
 
 
 def validate_round_trip(expected: dict[str, object]) -> dict[str, object]:
@@ -2892,7 +7223,106 @@ def validate_round_trip(expected: dict[str, object]) -> dict[str, object]:
     }
 
 
-def write_report(scene_stats: dict[str, object], round_trip: dict[str, object]) -> dict[str, object]:
+def validate_round_trip_v2(expected: dict[str, object]) -> dict[str, object]:
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    result = bpy.ops.import_scene.gltf(filepath=str(OUTPUT_GLB), import_pack_images=True)
+    if "FINISHED" not in result:
+        raise RuntimeError(f"GLB round-trip import failed: {result}")
+    objects = list(bpy.context.scene.objects)
+    meshes = [obj for obj in objects if obj.type == "MESH"]
+    names = {obj.name for obj in objects}
+    required = {
+        "BazaarGroundAuthoredMesh",
+        "Bazaar_A_Gallery_Deck",
+        "Bazaar_B_Balcony_Deck",
+        "Bazaar_Mid_Mezzanine_Deck",
+        "Bazaar_B_WarehouseRoof",
+        *(stair.name for stair in STAIRS),
+    }
+    missing = sorted(required - names)
+    if missing:
+        raise RuntimeError(f"Round-trip missing Bazaar V2 objects: {missing}")
+    if len(meshes) != int(expected["mesh_object_count"]):
+        raise RuntimeError(
+            f"Round-trip mesh count changed: expected {expected['mesh_object_count']}, "
+            f"found {len(meshes)}"
+        )
+    for obj in meshes:
+        if not obj.data.uv_layers:
+            raise RuntimeError(f"Round-trip UV missing: {obj.name}")
+        if len(obj.data.uv_layers.active.data) != len(obj.data.loops):
+            raise RuntimeError(f"Round-trip UV loop coverage changed: {obj.name}")
+        if any(
+            not isfinite(value)
+            for uv_loop in obj.data.uv_layers.active.data
+            for value in uv_loop.uv
+        ):
+            raise RuntimeError(f"Round-trip contains non-finite UVs: {obj.name}")
+        for polygon in obj.data.polygons:
+            if (
+                polygon.material_index >= len(obj.data.materials)
+                or obj.data.materials[polygon.material_index] is None
+            ):
+                raise RuntimeError(f"Round-trip polygon lacks material: {obj.name}")
+        if str(obj.get("bazaar_asset_origin", "")) != "cc0":
+            raise RuntimeError(f"Round-trip visible mesh lost CC0 origin: {obj.name}")
+        if "CC0" not in str(obj.get("license", "")):
+            raise RuntimeError(f"Round-trip visible mesh lost CC0 license: {obj.name}")
+        for metadata_key in (
+            "source_asset",
+            "source_object",
+            "source_creator",
+            "source_url",
+        ):
+            if not str(obj.get(metadata_key, "")).strip():
+                raise RuntimeError(
+                    f"Round-trip provenance metadata {metadata_key} missing: {obj.name}"
+                )
+
+    minimum, maximum = object_world_bounds(meshes)
+    expected_min = Vector(expected["blender_bounds_min"])
+    expected_max = Vector(expected["blender_bounds_max"])
+    if (minimum - expected_min).length > 0.02 or (maximum - expected_max).length > 0.02:
+        raise RuntimeError(
+            f"Round-trip bounds changed: {tuple(minimum)}..{tuple(maximum)} vs "
+            f"{tuple(expected_min)}..{tuple(expected_max)}"
+        )
+    materials = {material for obj in meshes for material in obj.data.materials if material}
+    images = {
+        node.image
+        for material in materials
+        if material.use_nodes
+        for node in material.node_tree.nodes
+        if node.type == "TEX_IMAGE" and node.image is not None
+    }
+    for image in images:
+        if min(image.size) <= 0 or not image.has_data:
+            raise RuntimeError(f"Round-trip embedded texture missing: {image.name}")
+    unique_meshes = {obj.data for obj in meshes}
+    instance_triangles = sum(mesh_triangles(obj.data) for obj in meshes)
+    if instance_triangles != int(expected["instance_triangles"]):
+        raise RuntimeError(
+            "Round-trip triangle count changed: "
+            f"expected {expected['instance_triangles']}, found {instance_triangles}"
+        )
+    return {
+        "object_count": len(objects),
+        "mesh_object_count": len(meshes),
+        "unique_mesh_count": len(unique_meshes),
+        "material_count": len(materials),
+        "texture_count": len(images),
+        "instance_triangles": instance_triangles,
+        "bounds_min": [round(value, 4) for value in minimum],
+        "bounds_max": [round(value, 4) for value in maximum],
+        "v2_required_objects_preserved": True,
+    }
+
+
+def write_report(
+    scene_stats: dict[str, object],
+    round_trip: dict[str, object],
+    glb_extension_gate: dict[str, object],
+) -> dict[str, object]:
     report = {
         "status": "BAZAAR_DCC_PASS",
         "blender_version": bpy.app.version_string,
@@ -2910,6 +7340,7 @@ def write_report(scene_stats: dict[str, object], round_trip: dict[str, object]) 
         },
         "scene": scene_stats,
         "round_trip": round_trip,
+        "glb_extension_gate": glb_extension_gate,
         "license_gate": (
             "Every exported visible mesh is an arrangement or adapted instance of a "
             "whitelisted finished CC0 source; project-authored work is limited to "
@@ -2935,28 +7366,35 @@ def main() -> None:
     templates = validate_and_extract_sources()
     clean_source_scene(templates)
     materials = clone_approved_materials()
-    root, collections = build_map(templates, materials)
+    root, collections = build_map_v2(templates, materials)
     triangulate_visible_meshes(root)
     bpy.context.view_layer.update()
-    render_previews(collections["review"])
-    scene_stats = validate_authored_scene(root)
-    pack_save_export(root)
-    round_trip = validate_round_trip(scene_stats)
-    report = write_report(scene_stats, round_trip)
+    if os.environ.get("BAZAAR_SKIP_PREVIEWS") != "1":
+        render_previews(collections["review"])
+    scene_stats = validate_authored_scene_v2(root)
+    optimization = optimize_static_draw_nodes_v2(root, scene_stats)
+    glb_extension_gate = pack_save_export(root)
+    round_trip = validate_round_trip_v2(scene_stats)
+    report = write_report(scene_stats, round_trip, glb_extension_gate)
     print(
         "BAZAAR_DCC_CHECK "
-        f"draw_nodes={scene_stats['draw_node_count']} surfaces={scene_stats['surface_draw_count']} "
+        f"draw_nodes_pre={optimization['pre_draw_nodes']} "
+        f"draw_nodes={scene_stats['draw_node_count']} "
+        f"surfaces_pre={optimization['pre_surface_draw_count']} "
+        f"surfaces={scene_stats['surface_draw_count']} "
         f"raw_source_tris={scene_stats['raw_source_triangles']} "
+        f"unique_tris_pre={optimization['pre_unique_triangles']} "
         f"unique_tris={scene_stats['unique_triangles']} "
+        f"instance_tris_pre={optimization['pre_instance_triangles']} "
         f"instance_tris={scene_stats['instance_triangles']} "
         f"materials={scene_stats['material_count']} textures={scene_stats['texture_count']} "
         f"texture_mib_rgba8_mips={scene_stats['texture_memory_mib_estimate_rgba8_mips']} "
         f"glb_bytes={report['glb']['bytes']} blend_bytes={report['blend']['bytes']}"
     )
     print(
-        "BAZAAR_DCC_PASS valid=True cc0_only=True stairs=6 platforms=3 "
-        "runtime_aabbs=11 mid_carts=2 site_pair_block=True rail_gaps=True "
-        "round_trip=True"
+        "BAZAAR_DCC_PASS valid=True cc0_only=True interiors=4 platforms=3 "
+        "dense_v2=True architectural_cover=True site_pair_block=True "
+        "round_trip=True draco_absent=True"
     )
 
 
