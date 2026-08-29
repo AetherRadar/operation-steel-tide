@@ -168,20 +168,23 @@ public partial class FreightTerminalWorld
 
         const float screenTolerancePixels = 1.5f;
         const float yawToleranceRadians = 0.001f;
-        const float opticMountClearanceMeters = 0.05f;
+        const float opticMountMaximumGapMeters = 0.02f;
+        const float opticMountMaximumIntersectionMeters = 0.03f;
         var opticClearanceValid = opticSamplesSettled
             && opticClearanceSamples.Count == opticClearanceMatrix.Length;
         foreach (var sample in opticClearanceSamples)
         {
-            var clearanceRequired = !sample.Inspection.IntegratedOptic;
+            var contactRequired = !sample.Inspection.IntegratedOptic;
             opticClearanceValid &= sample.Inspection.Available
                 && sample.Inspection.OpticVisible
                 && sample.Inspection.IronSightsClear
                 && sample.Inspection.AuthoredPresentationValid
                 && sample.Inspection.IntegratedApertureValid
                 && sample.Inspection.ReticleDiameter is > 0.0f and <= 0.007f
-                && (!clearanceRequired
-                    || sample.Inspection.MountClearance >= opticMountClearanceMeters)
+                && (!contactRequired
+                    || sample.Inspection.MountGap
+                        is >= -opticMountMaximumIntersectionMeters
+                        and <= opticMountMaximumGapMeters)
                 && sample.ScreenOffset.Length() <= screenTolerancePixels;
         }
         var valid = reloadCompleted
@@ -348,6 +351,9 @@ public partial class FreightTerminalWorld
                 + $"top={sample.Inspection.WeaponTop:0.000};"
                 + $"mount={sample.Inspection.MountHeight:0.000};"
                 + $"clearance={sample.Inspection.MountClearance:0.000};"
+                + $"surface={sample.Inspection.MountSurfaceHeight:0.000};"
+                + $"bottom={sample.Inspection.OpticBottom:0.000};"
+                + $"gap={sample.Inspection.MountGap:0.000};"
                 + $"offset={sample.ScreenOffset.Length():0.000}";
         }
         return string.Join(',', formatted);

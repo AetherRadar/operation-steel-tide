@@ -16,6 +16,12 @@ public partial class TacticalPlayer
     private static readonly Vector3 SidearmHipWeaponPosition = new(0.30f, -0.24f, -0.64f);
     private static readonly Vector3 SearchWeaponStart = new(0.5f, -0.58f, -0.48f);
     private static readonly Vector3 SearchWeaponEnd = new(0.32f, -0.48f, -0.72f);
+    private const float MicroOpticRailContactOffset = 0.070f;
+    private const float HoloOpticRailContactOffset = 0.092f;
+    private const float ScopeOpticRailContactOffset = 0.084f;
+    private const float M4A1IntegratedMicroOpticHeight = 0.167f;
+    private const float M4A1RailContactHeight =
+        M4A1IntegratedMicroOpticHeight - MicroOpticRailContactOffset;
     private float _viewmodelKickback;
     private float _viewmodelKickPitch;
     private float _viewmodelKickRoll;
@@ -108,12 +114,30 @@ public partial class TacticalPlayer
             (WeaponPlatform.MP5A5, "optic_micro") => 0.325f,
             (WeaponPlatform.MP5A5, "optic_holo") => 0.335f,
             (WeaponPlatform.MP5A5, _) => 0.355f,
-            (WeaponPlatform.M4A1, "optic_micro") => 0.167f,
-            (WeaponPlatform.M4A1, "optic_holo") => 0.24f,
-            (WeaponPlatform.M4A1, _) => 0.25f,
+            (WeaponPlatform.M4A1, _) => M4A1OpticMountHeight(opticId),
             (WeaponPlatform.AWM, "optic_scope" or "optic_7x" or "optic_sniper") => 0.38f,
             (_, "optic_scope" or "optic_7x" or "optic_sniper") => 0.225f,
             _ => 0.205f
+        };
+
+    private static float M4A1OpticMountHeight(string? opticId)
+        => opticId switch
+        {
+            "optic_micro" => M4A1IntegratedMicroOpticHeight,
+            "optic_holo" => M4A1RailContactHeight + HoloOpticRailContactOffset,
+            "optic_scope" or "optic_7x" or "optic_sniper"
+                => M4A1RailContactHeight + ScopeOpticRailContactOffset,
+            _ => M4A1IntegratedMicroOpticHeight
+        };
+
+    private static float AuthoredOpticRailContactOffset(string? opticId)
+        => opticId switch
+        {
+            "optic_micro" => MicroOpticRailContactOffset,
+            "optic_holo" => HoloOpticRailContactOffset,
+            "optic_scope" or "optic_7x" or "optic_sniper"
+                => ScopeOpticRailContactOffset,
+            _ => 0.0f
         };
 
     private Vector3 WeaponViewRotationTarget()
@@ -300,11 +324,23 @@ public partial class TacticalPlayer
         var integratedApertureValid = EquippedWeapon.Platform != WeaponPlatform.VSS
             || !integratedOptic
             || vssAperture.Valid;
+        var mountSurfaceHeight = weaponTop;
+        if (EquippedWeapon.Platform == WeaponPlatform.M4A1)
+        {
+            var integratedAnchor = weaponRootInverse
+                * visual.OpticReticleAnchor.GlobalPosition;
+            mountSurfaceHeight = integratedAnchor.Y - MicroOpticRailContactOffset;
+        }
+        var opticBottom = _opticRoot.Position.Y
+            - AuthoredOpticRailContactOffset(opticId);
         return new FirstPersonOpticClearanceInspection(
             true,
             weaponTop,
             _opticRoot.Position.Y,
             _opticRoot.Position.Y - weaponTop,
+            mountSurfaceHeight,
+            opticBottom,
+            opticBottom - mountSurfaceHeight,
             _opticRoot.Visible
                 && (integratedGeometryVisible
                     || (!integratedOptic
@@ -342,6 +378,9 @@ public partial class TacticalPlayer
         float WeaponTop,
         float MountHeight,
         float MountClearance,
+        float MountSurfaceHeight,
+        float OpticBottom,
+        float MountGap,
         bool OpticVisible,
         bool IronSightsClear,
         bool AuthoredPresentationValid,
