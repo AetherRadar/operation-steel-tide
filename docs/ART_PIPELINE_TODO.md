@@ -19,7 +19,8 @@ This list tracks the remaining replacement of programmer art with redistributabl
 ## First-person and vehicles
 
 - [x] Replace the procedural first-person arms with a licensed authored arm set, fixed-scale pose classes, and named runtime palm mounts.
-- [ ] Replace remaining procedural primary-weapon previews with licensed authored models, starting with AK-74N, SCAR-L, MP5A5, M24, and AXMC.
+- [x] Replace the active AK with separate high-detail FP/world CC0 models, authored mechanisms, PBR materials, and a mesh-derived optic contact marker.
+- [ ] Replace remaining procedural primary-weapon previews with licensed authored models, starting with SCAR-L, MP5A5, M24, and AXMC.
 - [ ] Rework the extraction tilt-rotor silhouette, landing gear, fuselage materials, rotor blur, and boarding interior in Blender.
 - [ ] Audit drivable vehicles and major visible props for remaining primitive presentation meshes.
 
@@ -34,5 +35,6 @@ This list tracks the remaining replacement of programmer art with redistributabl
 
 - [ ] Capture deployment, backpack, squad, enemy, and extraction frames at representative camera distances after each asset batch.
 - [x] Inspect Blender deformation, clipping, socket presence, collision dimensions, material response, and animation action coverage.
+- [x] Capture and inspect the AK at hip, ADS, optic-contact, fire, reload, and world/operator camera distances.
 - [x] Verify Godot crowd, squad, stairs, residential, skybridge, skylink, vehicle, and general performance diagnostics with the animated operator.
 - [ ] Confirm all imported files remain redistributable in this public repository before every push.

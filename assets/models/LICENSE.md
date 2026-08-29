@@ -44,15 +44,22 @@ mapping, acquisition date, license, output hashes, removed source-glass panes,
 and physically open aperture checks are recorded in
 `steel_tide_optics/LICENSE.md` and `../../source_art/combat_optics/README.md`.
 
-The mechanism-ready Steel Tide AK-74N is a Blender adaptation of the same
-tracked Quaternius Ultimate Guns Pack AK source. It preserves all 1,382 CC0
-source triangles and five materials while separating the existing 227-triangle
-curved magazine into independently animated runtime geometry. Its runtime
-output is `steel_tide_ak74/ak74_reloadable.glb`, its editable source is
-`../../source_art/reloadable_weapons/ak74_reloadable.blend`, and its
-reproducible adaptation is `../../scripts/blender/build_reloadable_ak74.py`.
-Exact hashes, source mapping, topology checks, acquisition and adaptation dates,
-and the CC0 record are in `steel_tide_ak74/LICENSE.md` and
+The active Steel Tide AK-47 is a Blender adaptation of taradavies' finished
+OpenGameArt AK-47, published under CC0 1.0 Universal. The raw source was
+published on 2023-04-15 and acquired on 2026-08-29 from
+https://opengameart.org/content/ak-47-1. The adaptation removes the source
+file's unpacked, unlicensed image references, rebuilds six PBR materials with
+two deterministic project-authored wood textures, separates real magazine,
+charging-handle, and iron-sight geometry, and refits an authored source
+component as the optic rail bridge. First-person and world exports contain
+97,372 and 24,488 unique triangles respectively. Their runtime outputs are
+`steel_tide_ak74/ak47_reloadable_{fp,world}.glb`, their authoritative editable
+source is `../../source_art/reloadable_weapons/ak47_reloadable.blend`, and the
+reproducible adaptation is
+`../../scripts/blender/build_taradavies_ak47.py`. Exact hashes, the source and
+license evidence, the excluded dependency record, hierarchy mapping, packed
+texture record, and rail-contact checks are in `steel_tide_ak74/LICENSE.md`,
+`../../source_art/third_party/taradavies_ak47/LICENSE_EVIDENCE.md`, and
 `../../source_art/reloadable_weapons/README.md`.
 
 ## Project-authored first-person field-use props
@@ -838,8 +845,10 @@ The Ultimate Guns Pack is distributed by Quaternius under CC0 1.0 Universal:
 - Local assets: `quaternius_ultimate_guns/*.glb`
 - License and source-file mapping: `quaternius_ultimate_guns/LICENSE.md`
 
-Ten selected authored models replace the runtime primitive visuals for AK-74N,
-SCAR-L, M24, AXMC, AWM, VSS, MP5A5, M3A1, P226, and M1911.
+Nine selected authored models remain active for SCAR-L, M24, AXMC, AWM, VSS,
+MP5A5, M3A1, P226, and M1911. The tracked Quaternius AK-74N is retained as a
+licensed legacy source, while the active AK-47 replacement is recorded in the
+Steel Tide combat-model section above.
 
 ## DJMaesen CC BY 4.0 first-person arms and SMG
 

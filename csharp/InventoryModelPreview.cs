@@ -319,6 +319,12 @@ public partial class InventoryModelPreview : SubViewportContainer
         {
             return;
         }
+        if (platform == WeaponPlatform.AK74)
+        {
+            // AK-47 is production-authored only. Leaving the preview empty makes
+            // an asset failure visible without substituting the legacy toy mesh.
+            return;
+        }
         if (WeaponCatalog.IsSidearm(platform))
         {
             BuildSidearm(root, platform);

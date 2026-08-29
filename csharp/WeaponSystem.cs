@@ -582,7 +582,7 @@ public static class WeaponCatalog
         },
         [WeaponPlatform.AK74] = new WeaponDefinition
         {
-            Platform = WeaponPlatform.AK74, Name = "AK-74N", ChineseName = "AK-74N 突击步枪",
+            Platform = WeaponPlatform.AK74, Name = "AK-47", ChineseName = "AK-47 \u7a81\u51fb\u6b65\u67aa",
             Damage = 35, EffectiveRange = 150, Recoil = 1.22f, Handling = 0.78f,
             FireInterval = 0.105f, MagazineSize = 30, SoundRadius = 46, ReceiverLength = 0.5f, BarrelLength = 0.62f
         },

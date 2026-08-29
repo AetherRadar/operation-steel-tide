@@ -85,7 +85,7 @@ public static class DemolitionBuyCatalog
         new DemolitionBuyOffer(Mp5Id, DemolitionBuyCategory.Primary, WeaponPlatform.MP5A5,
             1700, 120, "weapon_mp5a5", "MP5A5"),
         new DemolitionBuyOffer(Ak74Id, DemolitionBuyCategory.Primary, WeaponPlatform.AK74,
-            2900, 90, "demolition_buy_ak74", "AK-74N"),
+            2900, 90, "demolition_buy_ak74", "AK-47"),
         new DemolitionBuyOffer(M4A1Id, DemolitionBuyCategory.Primary, WeaponPlatform.M4A1,
             3100, 90, "demolition_buy_m4a1", "M4A1"),
         new DemolitionBuyOffer(ScarLId, DemolitionBuyCategory.Primary, WeaponPlatform.ScarL,

@@ -748,7 +748,8 @@ public partial class TacticalPlayer
         {
             _proceduralFirstPersonArms.Visible = !useAuthoredSmg && !useAuthoredArms;
         }
-        _proceduralWeaponVisual.Visible = !useAuthoredM4
+        _proceduralWeaponVisual.Visible = EquippedWeapon.Platform != WeaponPlatform.AK74
+            && !useAuthoredM4
             && !useAuthoredSmg
             && !useAuthoredGsh18
             && !wantsAuthoredDesertEagle
@@ -1045,9 +1046,57 @@ public partial class TacticalPlayer
         => ReloadSupportTargetGlobal();
 
     private Vector3 ReloadSupportTargetGlobal()
-        => IsInstanceValid(_supportHand)
+    {
+        var proceduralTarget = IsInstanceValid(_supportHand)
             ? _supportHand.GlobalPosition
             : Vector3.Zero;
+        if (EquippedWeapon.Platform != WeaponPlatform.AK74
+            || !_isReloading
+            || !_authoredPlatformWeapons.TryGetValue(
+                WeaponPlatform.AK74,
+                out var authoredWeapon))
+        {
+            return proceduralTarget;
+        }
+
+        var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
+        var primaryGrip = authoredWeapon.MagazineGrip;
+        var spareGrip = authoredWeapon.SpareMagazineGrip;
+        if (!IsInstanceValid(primaryGrip) || !IsInstanceValid(spareGrip))
+        {
+            return proceduralTarget;
+        }
+        if (progress < 0.08f)
+        {
+            return proceduralTarget;
+        }
+        if (progress < 0.22f)
+        {
+            var acquire = SmoothStep((progress - 0.08f) / 0.14f);
+            return proceduralTarget.Lerp(primaryGrip!.GlobalPosition, acquire);
+        }
+        if (progress < 0.45f)
+        {
+            return primaryGrip!.GlobalPosition;
+        }
+        if (progress < 0.65f)
+        {
+            var handoff = SmoothStep((progress - 0.45f) / 0.20f);
+            return primaryGrip!.GlobalPosition.Lerp(
+                spareGrip!.GlobalPosition,
+                handoff);
+        }
+        if (progress < 0.75f)
+        {
+            return spareGrip!.GlobalPosition;
+        }
+        if (progress < 0.78f)
+        {
+            var release = SmoothStep((progress - 0.75f) / 0.03f);
+            return spareGrip!.GlobalPosition.Lerp(proceduralTarget, release);
+        }
+        return proceduralTarget;
+    }
 
     private void ResetAuthoredM4ReloadSupportArm()
     {
@@ -1131,6 +1180,30 @@ public partial class TacticalPlayer
             return;
         }
         authoredWeapon.SyncMechanisms(_magazine, _spareMagazine, _chargingHandle);
+        if (EquippedWeapon.Platform == WeaponPlatform.AK74)
+        {
+            // The replacement AK owns its presentation frame, so effects and
+            // external attachments follow the DCC-authored hardware instead of
+            // the legacy procedural receiver dimensions.
+            _muzzle.GlobalTransform = authoredWeapon.ActiveMuzzleTip.GlobalTransform;
+            if (authoredWeapon.EjectionPort is { } ejectionPort
+                && IsInstanceValid(ejectionPort))
+            {
+                _ejectMarker.GlobalTransform = ejectionPort.GlobalTransform;
+            }
+            if (_opticRoot.Visible
+                && authoredWeapon.OpticRailContact is { } opticRailContact
+                && IsInstanceValid(opticRailContact))
+            {
+                EquippedWeapon.Attachments.TryGetValue(
+                    AttachmentSlot.Optic,
+                    out var akOpticId);
+                var railContactInWeaponRoot = _weaponRoot.GlobalTransform.AffineInverse()
+                    * opticRailContact.GlobalPosition;
+                _opticRoot.Position = railContactInWeaponRoot
+                    + Vector3.Up * AuthoredOpticRailContactOffset(akOpticId);
+            }
+        }
         if (EquippedWeapon.Platform == WeaponPlatform.VSS
             && _opticRoot.Visible
             && EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Optic, out var opticId)

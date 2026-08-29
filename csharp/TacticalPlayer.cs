@@ -1058,6 +1058,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var muzzleZ = barrelBase - barrelLength - muzzleLength * 0.5f;
         _muzzlePart.Position = new Vector3(0, 0.015f, muzzleZ);
         _muzzle.Position = new Vector3(0, 0.015f, muzzleZ - muzzleLength * 0.55f);
+        _muzzle.Rotation = Vector3.Zero;
+        _muzzle.Scale = Vector3.One;
+        _ejectMarker.Position = new Vector3(0.13f, 0.08f, -0.12f);
+        _ejectMarker.Rotation = Vector3.Zero;
+        _ejectMarker.Scale = Vector3.One;
 
         var stockScale = EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Stock, out var stockId)
             ? WeaponCatalog.Attachment(stockId).VisualScale

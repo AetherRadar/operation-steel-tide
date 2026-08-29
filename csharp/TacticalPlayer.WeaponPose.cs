@@ -105,12 +105,6 @@ public partial class TacticalPlayer
     private static float OpticMountHeight(WeaponPlatform platform, string? opticId)
         => (platform, opticId) switch
         {
-            // The compact AK receiver and fixed rear sight rise above the legacy
-            // 0.205 m mount. These platform-specific risers keep the complete
-            // lower half of each sight window clear instead of merely moving the dot.
-            (WeaponPlatform.AK74, "optic_micro") => 0.29f,
-            (WeaponPlatform.AK74, "optic_holo") => 0.31f,
-            (WeaponPlatform.AK74, _) => 0.33f,
             (WeaponPlatform.ScarL, "optic_micro") => 0.33f,
             (WeaponPlatform.ScarL, "optic_holo") => 0.34f,
             (WeaponPlatform.ScarL, _) => 0.36f,
@@ -134,14 +128,7 @@ public partial class TacticalPlayer
         };
 
     private static float AuthoredOpticRailContactOffset(string? opticId)
-        => opticId switch
-        {
-            "optic_micro" => MicroOpticRailContactOffset,
-            "optic_holo" => HoloOpticRailContactOffset,
-            "optic_scope" or "optic_7x" or "optic_sniper"
-                => ScopeOpticRailContactOffset,
-            _ => 0.0f
-        };
+        => CombatModelLibrary.AuthoredOpticRailContactOffset(opticId);
 
     private Vector3 WeaponViewRotationTarget()
     {
@@ -328,7 +315,9 @@ public partial class TacticalPlayer
             return default;
         }
 
-        var m4IronSightsClear = EquippedWeapon.Platform != WeaponPlatform.M4A1
+        var hasDedicatedIronSights = IsInstanceValid(visual.RearIronSight)
+            || IsInstanceValid(visual.FrontIronSight);
+        var ironSightsClear = !hasDedicatedIronSights
             || (visual.RearIronSight is { Visible: false }
                 && visual.FrontIronSight is { Visible: false });
         var authoredPresentationValid = EquippedWeapon.Platform == WeaponPlatform.M4A1
@@ -359,6 +348,12 @@ public partial class TacticalPlayer
                 * visual.OpticReticleAnchor.GlobalPosition;
             mountSurfaceHeight = integratedAnchor.Y - MicroOpticRailContactOffset;
         }
+        else if (visual.OpticRailContact is { } opticRailContact
+            && IsInstanceValid(opticRailContact))
+        {
+            mountSurfaceHeight = (weaponRootInverse
+                * opticRailContact.GlobalPosition).Y;
+        }
         var opticBottom = _opticRoot.Position.Y
             - AuthoredOpticRailContactOffset(opticId);
         return new FirstPersonOpticClearanceInspection(
@@ -373,7 +368,7 @@ public partial class TacticalPlayer
                 && (integratedGeometryVisible
                     || (!integratedOptic
                         && HasVisibleAuthoredOpticGeometryForDiagnostics)),
-            m4IronSightsClear,
+            ironSightsClear,
             authoredPresentationValid,
             reticleDiameter,
             integratedOptic,

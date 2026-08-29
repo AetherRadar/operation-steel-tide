@@ -18,6 +18,8 @@ internal sealed class AuthoredWeaponVisual
     private MechanismTransforms? _sourceMechanismRest;
     private readonly Node3D? _legacyRearIronSightPrimary;
     private readonly Node3D? _legacyRearIronSightSecondary;
+    private AuthoredOpticsVisual? _worldExternalOptics;
+    private bool _expectsWorldExternalOptics;
 
     public AuthoredWeaponVisual(Node3D root, WeaponPlatform platform)
     {
@@ -25,6 +27,8 @@ internal sealed class AuthoredWeaponVisual
         Platform = platform;
         Magazine = CombatModelLibrary.RequireNode(root, "Magazine");
         SpareMagazine = CombatModelLibrary.RequireNode(root, "SpareMagazine");
+        MagazineGrip = CombatModelLibrary.FindOptionalNode(root, "MagazineGrip");
+        SpareMagazineGrip = CombatModelLibrary.FindOptionalNode(root, "SpareMagazineGrip");
         ChargingHandle = CombatModelLibrary.RequireNode(root, "ChargingHandle");
         Stock = CombatModelLibrary.RequireNode(root, "Stock");
         Foregrip = CombatModelLibrary.RequireNode(root, "Foregrip");
@@ -42,6 +46,8 @@ internal sealed class AuthoredWeaponVisual
         MuzzleDeviceTip = CombatModelLibrary.RequireNode(root, "MuzzleDeviceTip");
         SuppressorTip = CombatModelLibrary.RequireNode(root, "SuppressorTip");
         OpticReticleAnchor = CombatModelLibrary.RequireNode(root, "OpticReticleAnchor");
+        OpticRailContact = CombatModelLibrary.FindOptionalNode(root, "OpticRailContact");
+        EjectionPort = CombatModelLibrary.FindOptionalNode(root, "EjectionPort");
         _authoredMechanismRest = CaptureMechanismTransforms(
             Magazine,
             SpareMagazine,
@@ -52,6 +58,10 @@ internal sealed class AuthoredWeaponVisual
     public WeaponPlatform Platform { get; }
     public Node3D Magazine { get; }
     public Node3D SpareMagazine { get; }
+    public Node3D? MagazineGrip { get; }
+    public Node3D? SpareMagazineGrip { get; }
+    public Node3D? ActiveMagazineGrip
+        => SpareMagazine.Visible ? SpareMagazineGrip : MagazineGrip;
     public Node3D ChargingHandle { get; }
     public Node3D Stock { get; }
     public Node3D Foregrip { get; }
@@ -63,6 +73,8 @@ internal sealed class AuthoredWeaponVisual
     public Node3D MuzzleDeviceTip { get; }
     public Node3D SuppressorTip { get; }
     public Node3D OpticReticleAnchor { get; }
+    public Node3D? OpticRailContact { get; }
+    public Node3D? EjectionPort { get; }
     public Node3D ActiveMuzzleTip => Suppressor.Visible ? SuppressorTip : MuzzleDeviceTip;
     public bool HasVisibleMagazineMechanism
         => CombatModelLibrary.MeshesBelow(Magazine).Any(mesh => mesh.Mesh is not null)
@@ -73,6 +85,24 @@ internal sealed class AuthoredWeaponVisual
             : default;
     public bool IntegratedOpticPresentationValid
         => Platform != WeaponPlatform.VSS || IntegratedOpticInspection.Valid;
+
+    public void AttachWorldExternalOptics(AuthoredOpticsVisual? optics)
+    {
+        _expectsWorldExternalOptics = true;
+        if (optics is null)
+        {
+            return;
+        }
+        if (!GodotObject.IsInstanceValid(OpticRailContact))
+        {
+            optics.Root.Free();
+            return;
+        }
+
+        OpticRailContact!.AddChild(optics.Root);
+        optics.Root.Transform = Transform3D.Identity;
+        _worldExternalOptics = optics;
+    }
 
     public void Configure(WeaponBuild build)
     {
@@ -85,24 +115,37 @@ internal sealed class AuthoredWeaponVisual
         var hasOptic = build.Attachments.TryGetValue(
             AttachmentSlot.Optic,
             out var opticId);
+        var worldExternalOpticVisible = false;
+        if (_worldExternalOptics is not null
+            && GodotObject.IsInstanceValid(_worldExternalOptics.Root))
+        {
+            worldExternalOpticVisible = _worldExternalOptics.Configure(
+                opticId,
+                showExternalModel: hasOptic);
+            _worldExternalOptics.Root.Position = Vector3.Up
+                * CombatModelLibrary.AuthoredOpticRailContactOffset(opticId);
+        }
         var hasDedicatedIronVisibility = GodotObject.IsInstanceValid(RearIronSight)
             && GodotObject.IsInstanceValid(FrontIronSight);
         var usesIntegratedOptic = hasOptic
+            && Platform != WeaponPlatform.AK74
             && (!hasDedicatedIronVisibility || opticId == "optic_micro");
         OpticMount.Visible = usesIntegratedOptic;
+        var hideIronSights = hasOptic
+            && (!_expectsWorldExternalOptics || worldExternalOpticVisible);
         // Preserve the authored iron sights for the bare rifle, but fold them out
         // of the optical sight picture. Both assemblies remain in the GLB and are
         // restored when the optic is removed.
         if (GodotObject.IsInstanceValid(RearIronSight))
         {
-            RearIronSight!.Visible = !hasOptic;
+            RearIronSight!.Visible = !hideIronSights;
         }
         else
         {
-            CombatModelLibrary.SetOptionalVisibility(_legacyRearIronSightPrimary, !hasOptic);
-            CombatModelLibrary.SetOptionalVisibility(_legacyRearIronSightSecondary, !hasOptic);
+            CombatModelLibrary.SetOptionalVisibility(_legacyRearIronSightPrimary, !hideIronSights);
+            CombatModelLibrary.SetOptionalVisibility(_legacyRearIronSightSecondary, !hideIronSights);
         }
-        CombatModelLibrary.SetOptionalVisibility(FrontIronSight, !hasOptic);
+        CombatModelLibrary.SetOptionalVisibility(FrontIronSight, !hideIronSights);
     }
 
     public void SyncMechanisms(Node3D magazine, Node3D spareMagazine, Node3D chargingHandle)
@@ -644,6 +687,10 @@ internal static partial class CombatModelLibrary
     internal const string PreviewOperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier.glb";
     internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/gsh18_runtime.glb";
     internal const string DesertEagleScenePath = "res://assets/models/elizion_desert_eagle/desert_eagle.glb";
+    internal const string Ak47FirstPersonScenePath =
+        "res://assets/models/steel_tide_ak74/ak47_reloadable_fp.glb";
+    internal const string Ak47WorldScenePath =
+        "res://assets/models/steel_tide_ak74/ak47_reloadable_world.glb";
 
     private const float Gsh18FirstPersonLength = 0.43f;
     private const float Gsh18PreviewLength = 0.78f;
@@ -655,6 +702,15 @@ internal static partial class CombatModelLibrary
     private const float AnimatedOperatorHeight = 1.86f;
     private static readonly Vector3 PreviewOperatorSourceSize = new(1.3053f, 2.1079f, 0.4252f);
     private static readonly Vector3 PreviewOperatorSourceCenter = new(0.0f, 1.04885f, 0.0258f);
+
+    internal static float AuthoredOpticRailContactOffset(string? opticId)
+        => opticId switch
+        {
+            "optic_micro" => 0.070f,
+            "optic_holo" => 0.092f,
+            "optic_scope" or "optic_7x" or "optic_sniper" => 0.084f,
+            _ => 0.0f
+        };
 
     private static readonly string[] WeaponNodes =
     {
@@ -699,6 +755,10 @@ internal static partial class CombatModelLibrary
 
     public static AuthoredWeaponVisual InstantiateWeapon(WeaponPlatform platform, bool firstPerson)
     {
+        if (platform == WeaponPlatform.AK74)
+        {
+            return InstantiateAk47(firstPerson);
+        }
         if (platform != WeaponPlatform.M4A1)
         {
             return InstantiateAdaptedWeapon(platform, firstPerson);
@@ -716,6 +776,42 @@ internal static partial class CombatModelLibrary
         if (!firstPerson)
         {
             visual.SpareMagazine.Visible = false;
+        }
+        return visual;
+    }
+
+    private static AuthoredWeaponVisual InstantiateAk47(bool firstPerson)
+    {
+        // This DCC-authored asset is already normalized to the project weapon
+        // frame and owns its reload mechanisms and gameplay markers. Loading it
+        // directly avoids wrapping, rotating, rescaling, duplicating its magazine,
+        // or stacking generic markers on top of the authored hierarchy.
+        var root = InstantiateRequired(
+            firstPerson ? Ak47FirstPersonScenePath : Ak47WorldScenePath,
+            Array.Empty<string>());
+        root.Name = "AuthoredAK47Visual";
+        if (firstPerson)
+        {
+            foreach (var geometry in GeometryBelow(root))
+            {
+                geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+            }
+        }
+        var visual = new AuthoredWeaponVisual(root, WeaponPlatform.AK74);
+        if (!firstPerson)
+        {
+            visual.SpareMagazine.Visible = false;
+            AuthoredOpticsVisual? worldOptics = null;
+            try
+            {
+                worldOptics = InstantiateAuthoredOptics(firstPerson: false);
+            }
+            catch (Exception exception)
+            {
+                GD.PushWarning(
+                    $"Authored AK-47 world optics unavailable; retaining iron sights: {exception.Message}");
+            }
+            visual.AttachWorldExternalOptics(worldOptics);
         }
         return visual;
     }
@@ -856,7 +952,7 @@ internal static partial class CombatModelLibrary
 
         var magazineGeometry = FindOptionalNode(source, "MagazineGeometry")
             ?? throw new InvalidOperationException(
-                "Reloadable AK-74N asset is missing MagazineGeometry.");
+                "Reloadable AK asset is missing MagazineGeometry.");
         var geometryInWeaponRoot = TransformBelowAncestor(
             magazineGeometry,
             root);
@@ -1182,8 +1278,7 @@ internal static partial class CombatModelLibrary
             WeaponPlatform.M4A1 => WeaponScenePath,
             WeaponPlatform.GSh18 => Gsh18ScenePath,
             WeaponPlatform.DesertEagle => DesertEagleScenePath,
-            WeaponPlatform.AK74 =>
-                "res://assets/models/steel_tide_ak74/ak74_reloadable.glb",
+            WeaponPlatform.AK74 => Ak47WorldScenePath,
             WeaponPlatform.ScarL => $"{QuaterniusWeaponRoot}/scarl.glb",
             WeaponPlatform.M24 => $"{QuaterniusWeaponRoot}/m24.glb",
             WeaponPlatform.MP5A5 => $"{QuaterniusWeaponRoot}/mp5a5.glb",

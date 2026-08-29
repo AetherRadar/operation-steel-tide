@@ -170,11 +170,18 @@ public partial class FreightTerminalWorld
         const float yawToleranceRadians = 0.001f;
         const float opticMountMaximumGapMeters = 0.02f;
         const float opticMountMaximumIntersectionMeters = 0.03f;
+        const float ak47OpticContactToleranceMeters = 0.003f;
         var opticClearanceValid = opticSamplesSettled
             && opticClearanceSamples.Count == opticClearanceMatrix.Length;
         foreach (var sample in opticClearanceSamples)
         {
             var contactRequired = !sample.Inspection.IntegratedOptic;
+            var maximumGap = sample.Platform == WeaponPlatform.AK74
+                ? ak47OpticContactToleranceMeters
+                : opticMountMaximumGapMeters;
+            var maximumIntersection = sample.Platform == WeaponPlatform.AK74
+                ? ak47OpticContactToleranceMeters
+                : opticMountMaximumIntersectionMeters;
             opticClearanceValid &= sample.Inspection.Available
                 && sample.Inspection.OpticVisible
                 && sample.Inspection.IronSightsClear
@@ -182,9 +189,8 @@ public partial class FreightTerminalWorld
                 && sample.Inspection.IntegratedApertureValid
                 && sample.Inspection.ReticleDiameter is > 0.0f and <= 0.007f
                 && (!contactRequired
-                    || sample.Inspection.MountGap
-                        is >= -opticMountMaximumIntersectionMeters
-                        and <= opticMountMaximumGapMeters)
+                    || (sample.Inspection.MountGap >= -maximumIntersection
+                        && sample.Inspection.MountGap <= maximumGap))
                 && sample.ScreenOffset.Length() <= screenTolerancePixels;
         }
         var valid = reloadCompleted
@@ -249,6 +255,7 @@ public partial class FreightTerminalWorld
             WeaponPlatform platform,
             string opticId)
         {
+            Input.ActionRelease("aim");
             var build = WeaponCatalog.Build(platform, 3);
             build.Attachments[AttachmentSlot.Optic] = opticId;
             _player.GrantFireablePrimaryForDiagnostics(build);
@@ -256,6 +263,12 @@ public partial class FreightTerminalWorld
             {
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             }
+            // Each matrix entry is a fresh presentation contract. Reset the
+            // inherited viewmodel transform before exercising the real ADS
+            // transition so one platform's interpolated pose cannot poison the
+            // next sample.
+            _player.SetAimingPoseForDiagnostics(false);
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             Input.ActionPress("aim");
             opticSamplesSettled &= await WaitForAimSettlement();
             opticClearanceSamples.Add((

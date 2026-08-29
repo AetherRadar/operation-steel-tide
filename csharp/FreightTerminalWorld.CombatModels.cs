@@ -177,6 +177,7 @@ public partial class FreightTerminalWorld
         var desertEagle = CombatModelLibrary.InspectDesertEagle();
         var firstPersonSmg = CombatModelLibrary.InspectFirstPersonSmg45();
         var firstPersonSmgReload = CombatModelLibrary.InspectFirstPersonSmg45Reload();
+        var ak47ModelQuality = InspectAk47ModelQuality();
         var weaponGeometry = IsValidPlatformWeapon(WeaponPlatform.M4A1, weapon)
             && weapon.Size.X is >= 0.15f and <= 0.8f
             && weapon.Size.Y is >= 0.25f and <= 1.15f
@@ -258,6 +259,7 @@ public partial class FreightTerminalWorld
             && desertEagleGeometry
             && firstPersonSmgGeometry
             && firstPersonSmgReloadGeometry
+            && ak47ModelQuality.Valid
             && playerAuthored
             && playerAuthoredAttachments
             && squadAuthored
@@ -266,6 +268,9 @@ public partial class FreightTerminalWorld
             && previewFailureHandling.Valid
             && previewOwnership.Valid;
 
+        GD.Print(
+            $"AK47_MODEL_CHECK {FormatAk47ModelQuality(ak47ModelQuality)}");
+        GD.Print($"AK47_MODEL_PASS valid={ak47ModelQuality.Valid}");
         GD.Print(
             $"COMBAT_MODELS_CHECK weapon_loaded={weapon.Loaded} weapon_nodes={weapon.RequiredNodes} "
             + $"weapon_meshes={weapon.MeshCount} weapon_materials={weapon.MaterialCount} "
@@ -297,6 +302,7 @@ public partial class FreightTerminalWorld
             + $"smg45_magazine_travel={firstPersonSmgReload.MagazineTravel:F3} "
             + $"smg45_arm_bounds={firstPersonSmgReload.ArmBoundsSize} "
             + $"smg45_weapon_bounds={firstPersonSmgReload.WeaponBoundsSize} "
+            + $"ak47_model={FormatAk47ModelQuality(ak47ModelQuality)} "
             + $"platforms={string.Join(',', platformInspections.Select(pair => $"{pair.Key}:{FormatWeaponInspection(pair.Value, platformGeometry[pair.Key])}"))} "
             + $"m4_attachment_configuration={m4AttachmentConfiguration.Valid}/"
             + $"{m4AttachmentConfiguration.BareValid}/"

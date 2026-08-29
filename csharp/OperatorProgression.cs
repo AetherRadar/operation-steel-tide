@@ -155,7 +155,7 @@ public static class DeploymentCatalog
         new DeploymentWeaponOffer("none", null, 0, 0, 0, "loadout_scavenger", "SCAVENGER / KNIFE ONLY"),
         new DeploymentWeaponOffer("m3a1", WeaponPlatform.M3A1, 0, 0, 60, "loadout_m3a1", "SMG-45 RECRUIT", 60),
         new DeploymentWeaponOffer("m4a1", WeaponPlatform.M4A1, 1, 4200, 90, "loadout_m4a1", "M4A1 ASSAULT"),
-        new DeploymentWeaponOffer("ak74", WeaponPlatform.AK74, 1, 3900, 90, "loadout_ak74", "AK-74N ASSAULT"),
+        new DeploymentWeaponOffer("ak74", WeaponPlatform.AK74, 1, 3900, 90, "loadout_ak74", "AK-47 ASSAULT"),
         new DeploymentWeaponOffer("scarl", WeaponPlatform.ScarL, 2, 6200, 60, "loadout_scarl", "SCAR-L SPECIALIST"),
         new DeploymentWeaponOffer("mp5a5", WeaponPlatform.MP5A5, 1, 3600, 120, "loadout_mp5", "MP5A5 CQB"),
         new DeploymentWeaponOffer("m24", WeaponPlatform.M24, 2, 7800, 60, "loadout_m24", "M24 PRECISION")

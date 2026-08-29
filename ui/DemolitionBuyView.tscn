@@ -280,7 +280,7 @@ theme_override_styles/hover = SubResource("Style_offer_hover")
 theme_override_styles/pressed = SubResource("Style_offer_pressed")
 theme_override_styles/hover_pressed = SubResource("Style_offer_pressed")
 theme_override_styles/disabled = SubResource("Style_offer_disabled")
-text = "AK-74N\n$2900"
+text = "AK-47\n$2900"
 
 [node name="M4A1Button" type="Button" parent="Panel/Offers"]
 layout_mode = 0

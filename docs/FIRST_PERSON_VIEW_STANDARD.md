@@ -19,7 +19,7 @@ This document defines the runtime contract for visible first-person arms and wea
 - `FirstPersonArmPoseCatalog` is the single source of truth for pose families:
   - `Sidearm`: P226, M1911, GSh-18, Desert Eagle
   - `Compact`: MP5A5, M3A1
-  - `Rifle`: M4A1, AK-74N, SCAR-L, VSS
+  - `Rifle`: M4A1, AK-47, SCAR-L, VSS
   - `LongRifle`: M24, AXMC, AWM
 
 ## Weapon Contract

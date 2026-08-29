@@ -146,6 +146,10 @@ public partial class TacticalPlayer
         var removedMagazine = PlatformRemovedMagazinePosition();
         var pocketMagazine = PlatformPocketMagazinePosition();
         var handleGrip = PlatformChargingHandleGrip();
+        var primaryPocketT = SmoothStep(Mathf.Clamp(
+            (progress - 0.36f) / 0.14f,
+            0.0f,
+            1.0f));
 
         // Re-establish every transform for fixed-progress diagnostics and normal
         // playback alike. The old non-M4 path never drove these mechanism nodes,
@@ -154,14 +158,16 @@ public partial class TacticalPlayer
         // The former 0.38-0.50 gap hid both magazine nodes while the hand still
         // travelled downward, producing a conspicuous empty-hand pop.
         _magazine.Visible = progress < 0.50f || progress >= 0.78f;
-        _magazine.Position = progress is >= 0.38f and < 0.78f
-            ? removedMagazine
+        _magazine.Position = progress is >= 0.36f and < 0.78f
+            ? removedMagazine.Lerp(pocketMagazine, primaryPocketT)
             : PlatformMagazineHome;
-        _magazine.Rotation = progress is >= 0.38f and < 0.78f
-            ? RemovedMagazineRotation()
+        _magazine.Rotation = progress is >= 0.36f and < 0.78f
+            ? RemovedMagazineRotation().Lerp(PocketMagazineRotation(), primaryPocketT)
             : magazineRotation;
         _spareMagazine.Visible = progress is >= 0.50f and < 0.78f;
-        _spareMagazine.Position = PlatformSpareMagazineHome;
+        _spareMagazine.Position = progress < 0.50f
+            ? pocketMagazine
+            : PlatformSpareMagazineHome;
         _spareMagazine.Rotation = PocketMagazineRotation();
         _chargingHandle.Position = PlatformChargingHandleHome;
         _supportHand.Position = handHome;
@@ -174,9 +180,9 @@ public partial class TacticalPlayer
             _supportHand.Rotation = PlatformSupportHandRestRotation()
                 .Lerp(PlatformMagazineHandRotation(), t);
         }
-        else if (progress < 0.38f)
+        else if (progress < 0.36f)
         {
-            var t = SmoothStep((progress - 0.15f) / 0.23f);
+            var t = SmoothStep((progress - 0.15f) / 0.21f);
             _magazine.Position = PlatformMagazineHome.Lerp(removedMagazine, t);
             _magazine.Rotation = magazineRotation.Lerp(RemovedMagazineRotation(), t);
             _supportHand.Position = _magazine.Position + gripOffset;
@@ -185,10 +191,6 @@ public partial class TacticalPlayer
         }
         else if (progress < 0.50f)
         {
-            var t = SmoothStep((progress - 0.38f) / 0.12f);
-            _magazine.Position = removedMagazine.Lerp(pocketMagazine, t);
-            _magazine.Rotation = RemovedMagazineRotation()
-                .Lerp(PocketMagazineRotation(), t);
             _supportHand.Position = _magazine.Position + gripOffset;
             _supportHand.Rotation = PlatformMagazineHandRotation();
         }
@@ -264,7 +266,7 @@ public partial class TacticalPlayer
     private Vector3 PlatformRemovedMagazinePosition()
         => EquippedWeapon.Platform switch
         {
-            WeaponPlatform.AK74 => new Vector3(-0.11f, -0.46f, -0.37f),
+            WeaponPlatform.AK74 => new Vector3(-0.11f, -0.36f, -0.37f),
             WeaponPlatform.MP5A5 => new Vector3(-0.08f, -0.43f, -0.33f),
             _ => new Vector3(-0.10f, -0.44f, -0.36f)
         };
@@ -272,6 +274,7 @@ public partial class TacticalPlayer
     private Vector3 PlatformPocketMagazinePosition()
         => EquippedWeapon.Platform switch
         {
+            WeaponPlatform.AK74 => new Vector3(-0.23f, -0.46f, -0.34f),
             WeaponPlatform.MP5A5 => new Vector3(-0.22f, -0.55f, -0.30f),
             _ => new Vector3(-0.23f, -0.56f, -0.34f)
         };
@@ -328,11 +331,19 @@ public partial class TacticalPlayer
         var primaryMagazine = weapon.Magazine.GlobalPosition;
         var spareMagazine = weapon.SpareMagazine.GlobalPosition;
         var activeMagazine = weapon.SpareMagazine.Visible
-            ? spareMagazine
-            : primaryMagazine;
+            ? weapon.SpareMagazine
+            : weapon.Magazine;
+        var leftPalm = arms.LeftPalmFrame.GlobalPosition;
+        var activeMagazineContact = InspectVisibleMeshSurface(
+            activeMagazine,
+            leftPalm);
         var logicalViewportSize = _camera.GetViewport().GetVisibleRect().Size;
         var windowSize = GetWindow().Size;
         var screenSize = new Vector2(windowSize.X, windowSize.Y);
+        var leftPalmViewport = _camera.UnprojectPosition(leftPalm);
+        var leftPalmScreen = new Vector2(
+            leftPalmViewport.X * screenSize.X / logicalViewportSize.X,
+            leftPalmViewport.Y * screenSize.Y / logicalViewportSize.Y);
         return new AuthoredPlatformReloadInspection(
             arms.Root.IsVisibleInTree()
                 && arms.RightArm.IsVisibleInTree()
@@ -345,12 +356,13 @@ public partial class TacticalPlayer
             rightGrip,
             leftGrip,
             supportTarget,
+            leftPalmScreen,
             primaryMagazine,
             spareMagazine,
             (weaponRootInverse * rightGrip).DistanceTo(pose.PrimaryGrip),
             leftGrip.DistanceTo(supportTarget),
-            leftGrip.DistanceTo(activeMagazine),
-            arms.LeftPalmFrame.GlobalPosition.DistanceTo(arms.LeftWristFrame.GlobalPosition),
+            activeMagazineContact.Distance,
+            leftPalm.DistanceTo(arms.LeftWristFrame.GlobalPosition),
             arms.RightPalmFrame.GlobalPosition.DistanceTo(arms.RightWristFrame.GlobalPosition),
             arms.RightArm.Transform,
             arms.LeftArm.Transform,
@@ -407,11 +419,12 @@ internal readonly record struct AuthoredPlatformReloadInspection(
     Vector3 RightGrip,
     Vector3 LeftGrip,
     Vector3 SupportTarget,
+    Vector2 LeftPalmScreen,
     Vector3 PrimaryMagazinePosition,
     Vector3 SpareMagazinePosition,
     float RightGripResidual,
     float SupportTargetDistance,
-    float ActiveMagazineDistance,
+    float ActiveMagazineSurfaceDistance,
     float LeftSleeveWristLength,
     float RightSleeveWristLength,
     Transform3D RightArmTransform,

@@ -78,7 +78,7 @@ internal static class FirstPersonArmPoseCatalog
     private static readonly FirstPersonArmPoseDefinition AkRifle = new(
         FirstPersonArmPoseKind.Rifle,
         new Vector3(0.0f, -0.07310f, -0.12176f),
-        new Vector3(0.0f, -0.01384f, -0.57308f));
+        new Vector3(-0.00120f, 0.01912f, -0.58830f));
 
     private static readonly FirstPersonArmPoseDefinition ScarRifle = new(
         FirstPersonArmPoseKind.Rifle,
