@@ -159,6 +159,12 @@ public partial class FreightTerminalWorld : Node3D
         _diagnosticSceneLoadFallbackAllowed = Array.Exists(
             args,
             argument => argument.StartsWith("--validate-", StringComparison.Ordinal));
+        _jianghaiDetailedSceneInspection = Array.Exists(
+            args,
+            argument => argument is "--validate-refinery-map"
+                or "--capture-refinery-map"
+                or "--capture-promotion"
+                or "--capture-readme-zh");
         var worldSeed = DeploymentMapRuntime.CurrentWorldSeed;
         if (worldSeed != 0)
         {
@@ -235,7 +241,7 @@ public partial class FreightTerminalWorld : Node3D
             _jianghaiOldCitySceneLoader.ReleaseReferences();
             _jianghaiOldCityAtmosphere.ReleaseReferences();
             _jianghaiOldCityScene = null;
-            _jianghaiAuthoredBuildingCollision = null;
+            _jianghaiGameplayCollision = null;
             _materials.Clear();
             _modelScenes.Clear();
             ReleaseSharedBoxMeshes();
@@ -253,6 +259,7 @@ public partial class FreightTerminalWorld : Node3D
 
     public override void _Process(double delta)
     {
+        JianghaiMapPreloadCache.Poll();
         if (_extractionWorldLaunchPending)
         {
             return;
@@ -805,10 +812,18 @@ public partial class FreightTerminalWorld : Node3D
 
     private void BuildHudAndPlayer()
     {
-        // Assign edge pads before the player exists so deploy position is match-randomized.
-        ExtractionSpawnPads.AssignMatchPads(_rng, out var playerPad, out var hostilePads);
-        DeploymentPoint = playerPad;
-        _assignedHostilePads = hostilePads;
+        if (IsBlackwaterRefineryMap)
+        {
+            DeploymentPoint = JianghaiExtractionSpawnLayout.PlayerPad;
+            _assignedHostilePads = new List<Vector3>(JianghaiExtractionSpawnLayout.HostilePads);
+        }
+        else
+        {
+            // Assign edge pads before the player exists so deploy position is match-randomized.
+            ExtractionSpawnPads.AssignMatchPads(_rng, out var playerPad, out var hostilePads);
+            DeploymentPoint = playerPad;
+            _assignedHostilePads = hostilePads;
+        }
 
         _hud = new CombatHUD { Name = "CombatHUD" };
         AddChild(_hud);
@@ -847,6 +862,9 @@ public partial class FreightTerminalWorld : Node3D
             Main = this,
             Hud = _hud,
             Position = DeploymentPoint,
+            Rotation = IsBlackwaterRefineryMap
+                ? new Vector3(0.0f, JianghaiExtractionSpawnLayout.PlayerYaw, 0.0f)
+                : Vector3.Zero,
             MouseSensitivity = 0.00165f * _sensitivitySetting
         };
         AddChild(_player);

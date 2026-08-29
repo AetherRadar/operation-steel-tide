@@ -20,18 +20,52 @@ are retained in a separate private evidence cache; paths beginning with
 private acquisition or evidence cache is committed or required to export the
 packed scene.
 
+## 2026-08-29 current Chinese district mapping
+
+The current project-authored Blender rebuild introduces no new external source.
+It reuses only the already verified sources in the table below: Free poly's CC0
+**Chinese Temple 2**, VVayToyek's CC0 **Chinese Four-corner Pavilion - Free**,
+the existing CC0 Chinese red lamp and porcelain lion dressing, Quaternius CC0
+Buildings Pack bodies, and the scene's previously registered Poly Haven
+modules/materials.
+
+The rebuild replaces 66 old visible anchors and authors 42 density placements,
+including west/east `Edge04`-`Edge06`. `JianghaiChineseTempleHall_LOD` is the
+Temple 2 LOD. `JianghaiChineseArcadeShop_LOD` and
+`JianghaiChineseGateHouse_LOD` combine clean Quaternius building bodies with
+adapted pavilion facade/eaves parts and an extracted, decimated Temple 2 roof.
+Repeated placements share mesh datablocks, use a deliberately small licensed
+material vocabulary, and are exported with a 512-pixel maximum runtime-texture
+dimension.
+
+The historical `Old Urban building` and `Scan Old Building Street` acquisition,
+hash, and CC0 records remain intact for audit continuity, but their delivery
+status is retired. The current authoritative `.blend` and runtime GLB contain
+zero visible instances of either source. Representative review evidence is
+`previews/12_chinese_edge_gate.png`, `previews/13_chinese_avenue.png`, and
+`previews/14_chinese_old_city_overview.png`. The final packed `.blend` is
+42,607,105 bytes with SHA-256
+`97226E2ED4860E676F27171F7AEF76B33AFF493AD991779887BE984B5DCF9F17`;
+the final GLB is 49,926,284 bytes with SHA-256
+`BAD4B6C18C8FC8488419ED9EB06F18F6C34544FEAC054EF71555F0D5EB2C0433`.
+Its round-trip audit reports 263 unique meshes across 569 mesh nodes, 378
+unique/1,517 instanced surfaces, 943,282 unique/3,015,841 instanced triangles,
+93 materials, 142 textures backed by 120 images, and maximum image dimension
+512. The scene audit passes with zero density intersections and zero visible
+retired-building instances.
+
 ## Source records
 
 | Source asset | Creator / publisher | Official source | Exact license | Acquired | Acquisition input | Delivery status |
 | --- | --- | --- | --- | --- | --- | --- |
 | Modular Factory Facade | James Ray Cock / Poly Haven | https://polyhaven.com/a/modular_factory_facade | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `poly_haven/modular_factory_facade/modular_factory_facade_1k.gltf`, its `.bin`, and 15 1K texture sidecars | Adapted into the current packed `.blend` and runtime `.glb` |
 | Modular Urban Apartments Facade | James Ray Cock / Poly Haven | https://polyhaven.com/a/modular_urban_apartments_facade | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `poly_haven/modular_urban_apartments_facade/modular_urban_apartments_facade_1k.gltf`, its `.bin`, and 12 1K texture sidecars | Adapted into 36 delivered facade objects forming two asymmetrical 3-by-3 overlays in the packed `.blend` and runtime `.glb` |
-| Chinese Four-corner Pavilion - Free | VVayToyek / itch.io | https://vvaytoyek.itch.io/chinese-four-corner-pavilion-free | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `itch/vvaytoyek_chinese_four_corner_pavilion/Chinese Four-corner Pavilion.zip`; extracted `fbx_only/四角亭.fbx`; page evidence `itch_license_evidence.html` | Fifteen modeled timber, tile, column, rafter, lattice, bracket, and ornament parts are adapted into the pawnshop gate canopy; raw source remains external, while adapted geometry is packed into the `.blend` and runtime GLB |
-| Chinese Temple 2 | Free poly / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/8701a79a-1635-437c-b1d2-6b14f14fc351/; `assetBaseId` `8701a79a-1635-437c-b1d2-6b14f14fc351` | Creative Commons Zero / CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `blenderkit/chinese_temple_2.glb` | Adapted into the current packed `.blend` and runtime `.glb` |
+| Chinese Four-corner Pavilion - Free | VVayToyek / itch.io | https://vvaytoyek.itch.io/chinese-four-corner-pavilion-free | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `itch/vvaytoyek_chinese_four_corner_pavilion/Chinese Four-corner Pavilion.zip`; extracted `fbx_only/四角亭.fbx`; page evidence `itch_license_evidence.html` | Fifteen modeled timber, tile, column, rafter, lattice, bracket, and ornament parts remain adapted into the pawnshop gate canopy and provide the facade/eaves vocabulary for the current arcade-shop and gate-house shared meshes; raw source remains external, while adapted geometry is packed into the `.blend` and runtime GLB |
+| Chinese Temple 2 | Free poly / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/8701a79a-1635-437c-b1d2-6b14f14fc351/; `assetBaseId` `8701a79a-1635-437c-b1d2-6b14f14fc351` | Creative Commons Zero / CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `blenderkit/chinese_temple_2.glb` | Adapted as `JianghaiChineseTempleHall_LOD`; its extracted and decimated roof also tops the current arcade-shop and gate-house shared meshes in the packed `.blend` and runtime `.glb` |
 | Chinese red lamp | Kin Chen / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/b97e433c-2eb1-46b8-9633-5bdee21e4e7a/; `assetBaseId` `b97e433c-2eb1-46b8-9633-5bdee21e4e7a` | Creative Commons Zero / CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `blenderkit/chinese_red_lamp.glb` | Adapted into five storefront instances in the current packed `.blend` and runtime `.glb` |
 | Pink city bicycle | Kin Chen / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/4c1a83c1-829f-4c00-878e-9e73c6b89c3b/; `assetBaseId` `4c1a83c1-829f-4c00-878e-9e73c6b89c3b` | Creative Commons Zero / CC0 1.0 Universal; official API `license=cc_zero`, `isFree=true`; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `blenderkit/pink_city_bicycle/pink_city_bicycle_0_5k.blend`; API evidence `blenderkit/pink_city_bicycle/official_api_search.json` | Converted to a static rest pose, stripped of its rig, given adapted weathered materials, cleaned to 11,825 triangles, and delivered as three instances in the packed `.blend` and runtime `.glb` |
-| Old Urban building | Abobla O.S / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/8177ff94-1645-4b50-95cc-cb05a336e34d/; `assetBaseId` `8177ff94-1645-4b50-95cc-cb05a336e34d` | Creative Commons Zero / CC0 1.0 Universal; API `license=cc_zero`, `isFree=true`; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `blenderkit/old_urban_building_1k.blend` | Adapted into the finished pawnshop storefront, three market shops, two rear houses, three factory office/admin buildings, two retained street-cadence anchors, and eight perimeter-density buildings in the packed `.blend` and runtime `.glb` |
-| Scan Old Building Street | Free poly / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/d8c0ffa6-7b7d-47e9-8554-2d3bbcc82030/; `assetBaseId` `d8c0ffa6-7b7d-47e9-8554-2d3bbcc82030` | Creative Commons Zero / CC0 1.0 Universal; API `license=cc_zero`, `isFree=true`; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `blenderkit/scan_old_building_street.glb` | Adapted into two market shops, two factory workshops, one full street-cadence replacement, and fourteen perimeter-density buildings in the packed `.blend` and runtime `.glb` |
+| Old Urban building | Abobla O.S / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/8177ff94-1645-4b50-95cc-cb05a336e34d/; `assetBaseId` `8177ff94-1645-4b50-95cc-cb05a336e34d` | Creative Commons Zero / CC0 1.0 Universal; API `license=cc_zero`, `isFree=true`; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `blenderkit/old_urban_building_1k.blend` | Historical source record retained. All former visible storefront, market, rear-house, factory, street-cadence, and density placements were retired by the 2026-08-29 Chinese district rebuild; current delivered visible instance count is zero |
+| Scan Old Building Street | Free poly / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/d8c0ffa6-7b7d-47e9-8554-2d3bbcc82030/; `assetBaseId` `d8c0ffa6-7b7d-47e9-8554-2d3bbcc82030` | Creative Commons Zero / CC0 1.0 Universal; API `license=cc_zero`, `isFree=true`; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `blenderkit/scan_old_building_street.glb` | Historical source record retained. All former visible market, factory, street-cadence, and density placements were retired by the 2026-08-29 Chinese district rebuild; current delivered visible instance count is zero |
 | Chinese Porcelain Lion | Free poly / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/50b661cb-119d-4e80-8a9c-5c6996cbb0c8/; `assetBaseId` `50b661cb-119d-4e80-8a9c-5c6996cbb0c8` | Creative Commons Zero / CC0 1.0 Universal; API `license=cc_zero`, `isFree=true`; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `blenderkit/chinese_porcelain_lion.glb` | Adapted into the current packed `.blend` and runtime `.glb` |
 | Television 02 | Benny Weimer / Poly Haven | https://polyhaven.com/a/television_02 | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `poly_haven/television_02/television_02_1k.gltf`, its `.bin`, and three 1K texture sidecars | Adapted into the current packed `.blend` and runtime `.glb`; used with Utility Box 01 for both objective-terminal bodies |
 | Exterior Aircon Unit | Monsta3D / Poly Haven | https://polyhaven.com/a/exterior_aircon_unit | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `poly_haven/exterior_aircon_unit/exterior_aircon_unit_1k.gltf`, its `.bin`, and 12 1K texture sidecars | Adapted into the current packed `.blend` and runtime `.glb` |
@@ -44,10 +78,10 @@ packed scene.
 | Chinese Tea Table | Kirill Sannikov / Poly Haven | https://polyhaven.com/a/chinese_tea_table | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `poly_haven/chinese_tea_table/chinese_tea_table_1k.gltf`, its `.bin`, and three 1K texture sidecars | Adapted into the pawnshop frontage in the packed `.blend` and runtime `.glb` |
 | Chinese Stool | Kirill Sannikov / Poly Haven | https://polyhaven.com/a/chinese_stool | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `poly_haven/chinese_stool/chinese_stool_1k.gltf`, its `.bin`, and three 1K texture sidecars | Adapted into the pawnshop frontage as three delivered instances in the packed `.blend` and runtime `.glb` |
 | Hand Truck | Mutanzom3D / Poly Haven | https://polyhaven.com/a/hand_truck | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `poly_haven/hand_truck/hand_truck_1k.gltf`, its `.bin`, and three 1K texture sidecars | Adapted into the factory frontage in the packed `.blend` and runtime `.glb` |
-| Rocky Terrain | Amal Kumar / Poly Haven | https://polyhaven.com/a/rocky_terrain | CC0 1.0 Universal; https://polyhaven.com/license and https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | Four 2K diffuse, displacement, OpenGL-normal, and roughness maps under `rocky_terrain/textures/` in `JIANGHAI_VALLEY_ACQUISITION_ROOT` | Diffuse, normal, and roughness remain adapted to the sides of the project-authored `OldCityFoundation`. DCC images are capped at 1024 pixels and packed into the delivered `.blend`/GLB. The verified displacement map remains private, uncommitted, and unused by delivered geometry |
-| Gravel Floor 03 | Charlotte Baglioni / Poly Haven | https://polyhaven.com/a/gravel_floor_03 | CC0 1.0 Universal; https://polyhaven.com/license and https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | Four 2K diffuse, displacement, OpenGL-normal, and roughness maps under `gravel_floor_03/textures/` in `JIANGHAI_VALLEY_ACQUISITION_ROOT` | Diffuse, normal, and roughness are adapted to the top of the project-authored `OldCityFoundation` and to the single Coast-derived perimeter-ground composite. The ground material uses base-color factor `(0.92, 0.78, 0.62, 1.0)` and 7-meter affine world-XY UVs. DCC images are capped at 1024 pixels and packed into the delivered `.blend`/GLB. The verified displacement map remains private, uncommitted, and unused by delivered geometry |
+| Rocky Terrain | Amal Kumar / Poly Haven | https://polyhaven.com/a/rocky_terrain | CC0 1.0 Universal; https://polyhaven.com/license and https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | Four 2K diffuse, displacement, OpenGL-normal, and roughness maps under `rocky_terrain/textures/` in `JIANGHAI_VALLEY_ACQUISITION_ROOT` | Diffuse, normal, and roughness remain adapted to the sides of the project-authored `OldCityFoundation`. Runtime images are capped at 512 pixels and packed into the delivered `.blend`/GLB. The verified displacement map remains private, uncommitted, and unused by delivered geometry |
+| Gravel Floor 03 | Charlotte Baglioni / Poly Haven | https://polyhaven.com/a/gravel_floor_03 | CC0 1.0 Universal; https://polyhaven.com/license and https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | Four 2K diffuse, displacement, OpenGL-normal, and roughness maps under `gravel_floor_03/textures/` in `JIANGHAI_VALLEY_ACQUISITION_ROOT` | Diffuse, normal, and roughness are adapted to the top of the project-authored `OldCityFoundation` and to the single Coast-derived perimeter-ground composite. The ground material uses base-color factor `(0.92, 0.78, 0.62, 1.0)` and 7-meter affine world-XY UVs. Runtime images are capped at 512 pixels and packed into the delivered `.blend`/GLB. The verified displacement map remains private, uncommitted, and unused by delivered geometry |
 | Coast Line 01 | Rob Tuytel (photography and processing), Rico Cilliers (cleanup) / Poly Haven | https://polyhaven.com/a/coast_line_01 | CC0 1.0 Universal; https://polyhaven.com/license and https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-29 | `coast_line_01/coast_line_01_2k.gltf`, `coast_line_01/coast_line_01.bin`, and 2K diffuse, ARM, and OpenGL-normal sidecars under `JIANGHAI_VALLEY_ACQUISITION_ROOT` | Geometry-only delivered source. Eight modeled scan placements are assembled and shaped in Blender into the single `JianghaiPerimeterGroundComposite`: 84,960 vertices, 168,480 triangles, one connected component, two boundary loops totaling 1,440 edges, zero degenerates, and zero invalid face normals. A signed-distance transition derived from the actual projected `OldCityFoundation` top footprint connects the playable platform to outward Coast relief. This is real authored connecting geometry, not camera masking or a primitive. The delivered surface uses Charlotte Baglioni's CC0 Gravel Floor 03 PBR maps; Coast material and images are not embedded, while the raw bundle remains private and uncommitted |
-| Hero Mountain | solararchitect / Sketchfab | https://sketchfab.com/3d-models/hero-mountain-83b3fd690ea44e988d086d5165a5f2ca; API https://api.sketchfab.com/v3/models/83b3fd690ea44e988d086d5165a5f2ca | Creative Commons Attribution / CC BY 4.0; http://creativecommons.org/licenses/by/4.0/ | 2026-08-29 | Original-format download obtained through an existing signed-in Edge session; private ZIP and inner RAR evidence plus selected `hero_mountain/Mesh_05K_hero_mountain01.obj`, `Color__hero_mountain01.jpg`, `Normal_hero_mountain01.png`, and `Roughness__hero_mountain01.jpg` build inputs | The complete mountain is decimated to one shared 14,000-triangle distant LOD and composed as 12 visual-only instances in staggered six-object inner and outer rings. Blender rebuilds its PBR nodes and caps/packs selected textures at 1024 pixels. Uniform scaling, rotation, and multi-instance composition are project modifications. The AO, height, and displacement sources remain private and unused. Attribution to solararchitect, source/license links, and an indication of these modifications are required; neither the source nor its adaptation is relicensed as MIT |
+| Hero Mountain | solararchitect / Sketchfab | https://sketchfab.com/3d-models/hero-mountain-83b3fd690ea44e988d086d5165a5f2ca; API https://api.sketchfab.com/v3/models/83b3fd690ea44e988d086d5165a5f2ca | Creative Commons Attribution / CC BY 4.0; http://creativecommons.org/licenses/by/4.0/ | 2026-08-29 | Original-format download obtained through an existing signed-in Edge session; private ZIP and inner RAR evidence plus selected `hero_mountain/Mesh_05K_hero_mountain01.obj`, `Color__hero_mountain01.jpg`, `Normal__hero_mountain01.png`, and `Roughness__hero_mountain01.jpg` build inputs | The complete mountain is decimated to one shared 14,000-triangle distant LOD and composed as 12 visual-only instances in staggered six-object inner and outer rings. Blender rebuilds its PBR nodes and the runtime export caps/packs selected textures at 512 pixels. Uniform scaling, rotation, and multi-instance composition are project modifications. The AO, height, and displacement sources remain private and unused. Attribution to solararchitect, source/license links, and an indication of these modifications are required; neither the source nor its adaptation is relicensed as MIT |
 | Coastal Cliff 01 | Rob Tuytel (photography and processing), Rico Cilliers (cleanup) / Poly Haven | https://polyhaven.com/a/coastal_cliff_01 | CC0 1.0 Universal; https://polyhaven.com/license and https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-29 | Private 2K glTF bundle and official API snapshots retained as evaluation evidence | Evaluated but rejected for the final mountain silhouette; no geometry, material, or texture from this source is embedded in the delivered `.blend` or runtime GLB |
 | Coastal Cliff 02 | Rob Tuytel / Poly Haven | https://polyhaven.com/a/coastal_cliff_02 | CC0 1.0 Universal; https://polyhaven.com/license and https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-29 | Private 2K glTF bundle and official API snapshots retained as evaluation evidence | Evaluated but rejected for the final mountain silhouette; no geometry, material, or texture from this source is embedded in the delivered `.blend` or runtime GLB |
 | Namaqualand Cliff 02 | Dario Barresi (photography), Rico Cilliers (modeling) / Poly Haven | https://polyhaven.com/a/namaqualand_cliff_02 | CC0 1.0 Universal; https://polyhaven.com/license and https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-29 | Private 2K glTF bundle and official API snapshots retained as evaluation evidence | Evaluated but rejected for the final mountain silhouette; no geometry, material, or texture from this source is embedded in the delivered `.blend` or runtime GLB |
@@ -56,7 +90,7 @@ packed scene.
 | Concrete Road Barrier | Amal Kumar / Poly Haven | https://polyhaven.com/a/concrete_road_barrier | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-06 | `assets/models/concrete_road_barrier/concrete_road_barrier.gltf`, `assets/models/concrete_road_barrier/concrete_road_barrier.bin`, and `assets/models/concrete_road_barrier/textures/concrete_road_barrier_{arm,diff,nor_gl}_1k.jpg` | Repository-local source adapted into the current packed `.blend` and runtime `.glb` |
 | Coffee Cart 01 | Joe Seabuhr / Poly Haven | https://polyhaven.com/a/CoffeeCart_01 | CC0 1.0 Universal; https://polyhaven.com/license | 2026-08-28 | `assets/models/polyhaven_residential_street/CoffeeCart_01/`; exact file evidence is in `assets/models/polyhaven_residential_street/LICENSE.md` | Existing repository-local source adapted into the Jianghai market tea stall and packed into the `.blend` and runtime `.glb` |
 | Wicker Basket 01 | Kuutti Siitonen / Poly Haven | https://polyhaven.com/a/wicker_basket_01 | CC0 1.0 Universal; https://polyhaven.com/license | 2026-08-28 | `assets/models/polyhaven_residential_street/wicker_basket_01/`; exact file evidence is in `assets/models/polyhaven_residential_street/LICENSE.md` | Existing repository-local source adapted into the Jianghai market tea stall and packed into the `.blend` and runtime `.glb` |
-| Buildings Pack selections | Quaternius | https://quaternius.com/packs/buildings.html | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `assets/models/quaternius_buildings_pack/{building1-large,building3-big,building4,house2}.glb`; exact FBX mapping, source-page snapshot, license copy, and conversion evidence are in `source_art/third_party/quaternius_buildings_pack/` and `assets/models/quaternius_buildings_pack/README.md` | Existing repository-local authored buildings adapted into fourteen perimeter-density instances and three full street-cadence replacements in the packed `.blend` and runtime `.glb` |
+| Buildings Pack selections | Quaternius | https://quaternius.com/packs/buildings.html | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `assets/models/quaternius_buildings_pack/{building1-large,building3-big,building4,house2}.glb`; exact FBX mapping, source-page snapshot, license copy, and conversion evidence are in `source_art/third_party/quaternius_buildings_pack/` and `assets/models/quaternius_buildings_pack/README.md` | Existing repository-local authored buildings remain adapted into fourteen perimeter-density instances and three full street-cadence replacements; clean Building4 and Building3 Big bodies additionally underlie the current Chinese arcade-shop and gate-house shared meshes |
 | Downtown City MegaKit selections | Quaternius | https://quaternius.com/packs/downtowncitymegakit.html | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-19 | `assets/models/quaternius_downtown_city/Brick_Plain_1.gltf` and `assets/models/quaternius_downtown_city/DoorFrame_Trim.gltf`; license copy and selection record are in `assets/models/quaternius_downtown_city/` | Existing repository-local finished modules embedded in the packed `.blend` and runtime GLB as 18 `Brick_Plain_1` instances and two `DoorFrame_Trim` instances: nine brick modules plus one doorframe at each of the pawnshop and factory hinged-entry facades |
 | Factory Kit personnel door | Kenney | https://kenney.nl/assets/factory-kit | CC0 1.0 Universal; local copy `assets/models/kenney_factory_kit/KENNEY_LICENSE.txt` | 2026-08-27 | `assets/models/kenney_factory_kit/door-hinged.glb` and `door-hinged_colormap.png`; the derivative is built from the official archive's `door.glb` as recorded in `assets/models/LICENSE.md` | Current visible art for both Jianghai `InteractiveBuildingDoor` instances; each uses a human-scale 1.45-by-2.65-meter opening and a normal 96-degree side-hinged swing; this runtime door is separate from the static map GLB |
 | Asphalt 03 | Charlotte Baglioni (photography), Dario Barresi (processing) / Poly Haven | https://polyhaven.com/a/asphalt_03 | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-06 | `assets/textures/asphalt_03_{diff,normal,rough}_1k.jpg` | Repository-local surface set adapted into the current packed `.blend` and runtime `.glb` |
@@ -69,7 +103,7 @@ None of the CC0 sources requires attribution; creator names are retained as
 provenance and courtesy credit. Hero Mountain is not CC0: CC BY 4.0 requires
 credit to solararchitect, a source/license link, and an indication that the
 delivered adaptation was modified through decimation, PBR-node reconstruction,
-1024-pixel texture capping/packing, uniform scaling, rotation, and
+512-pixel texture capping/packing, uniform scaling, rotation, and
 multi-instance valley composition. The raw Noto font is not redistributed. If a
 future distribution includes the original or modified font software, it must
 also preserve the copyright and SIL OFL 1.1 license notice and comply with the
@@ -261,7 +295,10 @@ by LF before hashing as UTF-8:
 | `chinese_stool` | 5 | 1,793,116 | `2FC56EAC8BA42C1B83C08CEA07180F2B706D1F11C504F22482E2B975A1C93898` | Delivered source packed into `.blend` and GLB |
 | `hand_truck` | 5 | 3,179,347 | `D4E33B9CD7B38811284E6846CAE61AC3FA4683D997AD32F1529DB6484325493D` | Delivered source packed into `.blend` and GLB |
 
-## Verified source and runtime hashes
+## Historical verified hashes and current audit ownership
+
+The earlier rows below are immutable historical snapshots. The final two rows
+record the current 2026-08-29 Chinese-district delivery.
 
 | Output | Bytes | SHA-256 | Reproducible derivation and use |
 | --- | ---: | --- | --- |
@@ -269,8 +306,10 @@ by LF before hashing as UTF-8:
 | `assets/models/jianghai_old_city/jianghai_old_city.glb` — upstream pre-valley snapshot | 73,809,716 | `2681C3F5F5332C1B2F8E5CA11B470C9A62EF39B8E4F76FA06365886A6FFE890A` | Runtime map exported by `scripts/blender/export_jianghai_old_city.py`; contains the 20 finished Quaternius entry-facade modules but not the separately instanced Kenney interactive doors |
 | `source_art/world/jianghai_old_city/jianghai_old_city.blend` — valley pre-rebase snapshot | 74,037,661 | `C9BAC433CF77791B3730E309A5E0BEEF6CF4849593D44018FD2CDFE5AC8FAA08` | Packed DCC source before integration with the upstream hinged-entry snapshot; includes the prior city art, project-authored `OldCityFoundation`, single 168,480-triangle Coast-Line-derived ground composite using Gravel Floor 03, and 12-instance staggered two-ring Hero Mountain composition built by `scripts/blender/build_jianghai_valley_environment.py`; builder and read-only audit PASS; the Hero Mountain contribution remains CC BY 4.0 and is not relicensed as MIT |
 | `assets/models/jianghai_old_city/jianghai_old_city.glb` — valley pre-rebase snapshot | 76,862,308 | `0C0174672630957390A959BC3BD71DB3F4849CC7CABE0AFADFDD12273DFE02A5` | Runtime map before integration with the upstream hinged-entry snapshot; export and DCC-to-GLB round-trip PASS; 4,835,033 evaluated full-scene instance triangles, below the 5,000,000 gate |
-| `source_art/world/jianghai_old_city/jianghai_old_city.blend` — final post-rebase delivery | 81,861,168 | `7CA84CD2B17C3872323D8A5EE7B1A4BA5BCB360F4326FB2331327BED4F493461` | Authoritative combined packed DCC source; 500 mesh objects, 198 unique mesh datablocks, 4,807,899 raw mesh-object triangles, 1,003,869 triangles counted once per unique mesh, and 563 evaluated objects totaling 4,836,825 instance triangles; 8/8 anchors; builder, read-only audit, export, and GLB-round-trip gates all PASS |
-| `assets/models/jianghai_old_city/jianghai_old_city.glb` — final post-rebase delivery | 84,723,312 | `7E2BB712BCF031692FAFB0E4E0FA59F3E75CE340B2748F5EDBDB7B105D9B2965` | Final combined runtime map; export and DCC-to-GLB round-trip gates PASS; 563 resolved mesh instances and 4,836,825 full-scene instance triangles |
+| `source_art/world/jianghai_old_city/jianghai_old_city.blend` — historical post-valley/pre-Chinese-rebuild delivery | 81,861,168 | `7CA84CD2B17C3872323D8A5EE7B1A4BA5BCB360F4326FB2331327BED4F493461` | Historical combined packed DCC source; 500 mesh objects, 198 unique mesh datablocks, 4,807,899 raw mesh-object triangles, 1,003,869 triangles counted once per unique mesh, and 563 evaluated objects totaling 4,836,825 instance triangles; superseded by the 2026-08-29 Chinese district rebuild |
+| `assets/models/jianghai_old_city/jianghai_old_city.glb` — historical post-valley/pre-Chinese-rebuild delivery | 84,723,312 | `7E2BB712BCF031692FAFB0E4E0FA59F3E75CE340B2748F5EDBDB7B105D9B2965` | Historical combined runtime map; superseded by the 2026-08-29 Chinese district rebuild |
+| `source_art/world/jianghai_old_city/jianghai_old_city.blend` — current Chinese-district delivery | 42,607,105 | `97226E2ED4860E676F27171F7AEF76B33AFF493AD991779887BE984B5DCF9F17` | Authoritative packed DCC source; 66/66 visible anchors replaced, 42/42 density placements, six west/east `Edge04`-`Edge06` placements, zero density intersections, and zero visible retired-building instances; read-only audit PASS |
+| `assets/models/jianghai_old_city/jianghai_old_city.glb` — current Chinese-district delivery | 49,926,284 | `BAD4B6C18C8FC8488419ED9EB06F18F6C34544FEAC054EF71555F0D5EB2C0433` | GLB round-trip PASS; 263 unique meshes/569 mesh nodes, 378 unique/1,517 instanced surfaces, 943,282 unique/3,015,841 instanced triangles, 93 materials, 142 textures/120 images, maximum image dimension 512 |
 | `assets/models/jianghai_old_city/rollershutter_window_03.glb` | 187,940 | `C4884AFCD7560E4BB23320A8C311DB0011504F7C5FEE30D58C266D54F7C6B166` | `scripts/blender/export_jianghai_old_city.py` selects the packed scene's adapted `JianghaiArtPass_EastShutter00` mesh, normalizes a temporary copy, and exports its PBR geometry and materials; the derivative remains tracked but no longer supplies the current Jianghai interactive-door visuals |
 
 This retained derivative preserves the Rollershutter Window 03 provenance and
@@ -281,10 +320,8 @@ CC0 `door-hinged.glb` at a 1.45-by-2.65-meter runtime opening with a normal
 traversal remain project gameplay behavior and are not derived from either
 visible-art source.
 
-The two historical main-artifact pairs above are verified pre-rebase evidence;
-neither pair represents the combined post-rebase scene. The final post-rebase
-rows are the current combined delivery artifacts, and their final Godot import,
-runtime validation, and capture evidence are recorded below.
+The pre-Chinese rows remain historical evidence; the two current-delivery rows
+are the authoritative 2026-08-29 artifacts.
 
 ## Runtime and editable mapping
 
@@ -338,16 +375,17 @@ delivered artifact. No displacement-generated visible geometry is created.
 
 Composition, modeling, material, lighting, and sign changes are serialized in
 that packed Blender scene. The deterministic DCC export/cleanup script
-`scripts/blender/export_jianghai_old_city.py` reapplies the documented explicit
-non-random density transform table, targeted cleanup, street-cadence and
-factory-frontage substitutions, rejects legacy pawnshop boards and
-zero-thickness walls, validates the authored canopy and wings, then exports it
+`scripts/blender/export_jianghai_old_city.py` validates the 66-anchor Chinese
+replacement, the explicit 42-placement density table and six west/east
+`Edge04`-`Edge06` placements, rejects both retired building sources plus legacy
+pawnshop boards and zero-thickness walls, validates the authored canopy and
+wings, then exports it
 to:
 
 - `assets/models/jianghai_old_city/jianghai_old_city.glb`
 - `assets/models/jianghai_old_city/rollershutter_window_03.glb`
 
-The export policy caps the longest runtime-texture dimension at 1024 pixels
+The export policy caps the longest runtime-texture dimension at 512 pixels
 and recompresses eligible high-resolution runtime images as JPEG quality 90
 before packing. The two visible objective-terminal bodies combine the CC0
 Utility Box 01 and Television 02 sources; their small status screens and
@@ -358,10 +396,10 @@ repository-local Quaternius Downtown City MegaKit sources: 18 instances of
 `Brick_Plain_1.gltf` and two instances of `DoorFrame_Trim.gltf`, divided as nine
 brick modules and one doorframe per entrance. The export script does not
 reconstruct the map from acquisition-cache files or generate runtime procedural
-city geometry. It deterministically reapplies the
-documented explicit non-random density transform table, street-cadence and
-factory-frontage substitutions, sign cleanup, material tuning, and export
-policy. The packed `.blend` remains the authoritative serialized DCC source.
+city geometry. It deterministically validates the reviewed Chinese-profile
+shared meshes, explicit non-random transform table, sign cleanup, material
+tuning, and export policy. The packed `.blend` remains the authoritative
+serialized DCC source.
 
 The earlier delivered Poly Haven bundles remain in the external cache as 1K glTF,
 `.bin`, and texture sidecars. Their adapted geometry, materials, and textures
@@ -394,10 +432,11 @@ The original Noto font is likewise absent from both final files. Only the
 converted static Chinese glyph meshes remain. The export script rejects any
 non-built-in Blender font datablock before packing or exporting.
 
-### Delivered expansion audit
+### Historical pre-Chinese-rebuild expansion audit
 
-A read-only audit through 2026-08-29 opened the authoritative `.blend` in
-Blender 4.5 and confirmed that the apartment source is intentionally delivered
+A read-only audit before the 2026-08-29 Chinese district rebuild opened the
+then-authoritative `.blend` in Blender 4.5 and confirmed that the apartment
+source was intentionally delivered
 as 36 adapted facade objects arranged in two asymmetrical 3-by-3 overlays. It
 also found both ten-piece hinged-entry facades, all three static bicycle
 instances, the finished pawnshop storefront, five market shops, two rear
@@ -486,34 +525,46 @@ The capture reports a 1,001.8 MB peak video-memory reading and an 852.7 MB peak
 texture-memory reading. All eight views passed their configured budgets. These
 figures remain historical pre-valley evidence.
 
-The valley pre-rebase evidence and the final combined delivery are kept
-separately because neither historical binary includes both sides of the rebased
-scene:
+The valley pre-rebase evidence and historical post-valley delivery are kept
+separately. Neither binary represents the current Chinese district:
 
 | Audit layer | Verified result |
 | --- | --- |
 | Valley pre-rebase Blender source | Historical snapshot: 74,037,661 bytes; SHA-256 `C9BAC433CF77791B3730E309A5E0BEEF6CF4849593D44018FD2CDFE5AC8FAA08`; Blender builder/audit/export PASS; 4,835,033 evaluated full-scene triangles, below the 5,000,000 gate; eight required anchors |
-| Final post-rebase Blender source | 81,861,168 bytes; SHA-256 `7CA84CD2B17C3872323D8A5EE7B1A4BA5BCB360F4326FB2331327BED4F493461`; 500 mesh objects; 198 unique mesh datablocks; 4,807,899 raw mesh-object triangles; 1,003,869 triangles counted once per unique mesh; dependency-graph evaluation resolves 563 objects and 4,836,825 instance triangles; 8/8 anchors; builder, read-only audit, export, and GLB-round-trip gates all PASS |
+| Historical post-valley Blender source | 81,861,168 bytes; SHA-256 `7CA84CD2B17C3872323D8A5EE7B1A4BA5BCB360F4326FB2331327BED4F493461`; 500 mesh objects; 198 unique mesh datablocks; 4,807,899 raw mesh-object triangles; 1,003,869 triangles counted once per unique mesh; dependency-graph evaluation resolves 563 objects and 4,836,825 instance triangles; 8/8 anchors; builder, read-only audit, export, and GLB-round-trip gates all PASS; superseded by the Chinese district rebuild |
 | Authored valley environment | `valley=True`; 188-triangle, 96-source-vertex project-authored `OldCityFoundation`; one 84,960-vertex, 168,480-triangle `JianghaiPerimeterGroundComposite` assembled from eight Coast Line 01 scan placements; one shared 14,000-triangle solararchitect Hero Mountain mesh composed as 12 instances divided six/six across staggered inner and outer rings; 336,668 total valley instance triangles. Ground bounds X `-600.878..600.853`, Y `-540.340..660.056`, Z `-12.7965..5.0390`; relief 17.835 meters; coverage 1.000; topology one component, two boundary loops/1,440 edges, zero degenerates, zero invalid normals; actual-foundation-footprint signed-distance transition; maximum foundation gap 0.103 meters; safe-area top -0.120 meters; 0-60/60-160-meter relief 0.969/3.955 meters; slope RMS/p90/p99/max 0.0579/0.0869/0.2331/0.6620; ring coverage 7,920/7,920. Gravel Floor 03 diffuse/normal/roughness, base-color factor `(0.92, 0.78, 0.62, 1.0)`, 7-meter affine world-XY UVs; DCC/GLB maximum UV errors `3.27e-6`/`4.36e-6` within `1.2e-5`; Jacobian 1/1; Coast material/image counts 0/0. North/south road ray gates 330/330 and 90/90 top hits with zero side hits; minimum mountain burial 4.942 meters; DCC and GLB round-trip gates PASS; all valley meshes visual-only; no displacement-generated visible geometry |
 | Factory-gate portal contract | `factory_gate_portal=5/5`; `factory_gate_portal_aligned=True`; DCC-authored brick piers, caps, and corrugated roof frame the ten-piece personnel-door facade and hinged runtime door |
 | Hinged-entry facade contract | `entry_facades_ready=True`; two facades at 10/10 finished CC0 objects each; 18 `Brick_Plain_1` instances and two `DoorFrame_Trim` instances total; each leaves a human-scale 1.45-by-2.65-meter runtime door opening |
 | Pawnshop hero entrance contract | `pawnshop_frontage_ready=True`; 15/15 modeled canopy parts; 15,492 canopy triangles; 8/8 solid wall modules and 8/8 authored inserts; 0 legacy visible gate/wall objects; the original large storefront opening is visually and physically infilled by the ten-piece hinged-entry facade around the central personnel door |
 | Delivered urban-life and density expansion | 36/36 apartment-facade objects; 36/36 complete perimeter buildings across six CC0 profiles; `density_intersections=0`; four full-mesh street-cadence replacements; three static 11,825-triangle bicycles; market tea cart and basket; pawnshop tea table and three stools; factory hand truck; finished CC0 pawnshop backdrop and modeled pavilion gate; five market shops; two rear houses; five Chinese red lamps; five-building factory replacement |
 | Valley pre-rebase serialized GLB | Historical snapshot: 76,862,308 bytes; SHA-256 `0C0174672630957390A959BC3BD71DB3F4849CC7CABE0AFADFDD12273DFE02A5`; export and DCC-to-GLB round-trip PASS; 4,835,033 full-scene instance triangles; maximum texture dimension 1024 pixels |
-| Final post-rebase serialized GLB | 84,723,312 bytes; SHA-256 `7E2BB712BCF031692FAFB0E4E0FA59F3E75CE340B2748F5EDBDB7B105D9B2965`; export and DCC-to-GLB round-trip gates PASS; 563 resolved mesh instances and 4,836,825 full-scene instance triangles |
-| Final Godot authored-map import | PASS after an explicit editor reimport followed by a second no-op import; 563 authored meshes; 784 surfaces, all 784 material-backed; 4,836,825 authored instance triangles; 8/8 anchors; 419 detail meshes; 406 shadow-casting meshes; quality-tier counts 130/226/406; valley contract one ground plus 12 mountains and 336,668 triangles; exactly one named 168,480-triangle perimeter-ground composite, 12 named mountains sharing one Hero Mountain mesh, the 188-triangle foundation, both ten-piece hinged-entry facades, four interior residents, CC0/CC BY rights metadata, Gravel Floor 03 PBR identity and affine UV contract, direct hierarchy, no valley collision, modeled-ground coverage, and mountain-ring orientation |
-| Final Godot authored collision | PASS 240/240 exact concave shapes: 107 structural plus 133 authored-detail meshes across 94/21/83/42 anchors; collision cache 104 shared meshes, 76 baked instances, and 77 unique shapes; 3,560,137 collision-instance triangles; both hinged-entry facades; exact closed/open door probes; zero legacy proxy boxes; market rail/gap probes; building ballistic probes; high-value loot access 12/12 |
+| Historical post-valley serialized GLB | 84,723,312 bytes; SHA-256 `7E2BB712BCF031692FAFB0E4E0FA59F3E75CE340B2748F5EDBDB7B105D9B2965`; export and DCC-to-GLB round-trip gates PASS; 563 resolved mesh instances and 4,836,825 full-scene instance triangles; superseded by the Chinese district rebuild |
+| Historical post-valley Godot authored-map import | PASS after an explicit editor reimport followed by a second no-op import; 563 authored meshes; 784 surfaces, all 784 material-backed; 4,836,825 authored instance triangles; 8/8 anchors; 419 detail meshes; 406 shadow-casting meshes; quality-tier counts 130/226/406; valley contract one ground plus 12 mountains and 336,668 triangles; exactly one named 168,480-triangle perimeter-ground composite, 12 named mountains sharing one Hero Mountain mesh, the 188-triangle foundation, both ten-piece hinged-entry facades, four interior residents, CC0/CC BY rights metadata, Gravel Floor 03 PBR identity and affine UV contract, direct hierarchy, no valley collision, modeled-ground coverage, and mountain-ring orientation |
+| Historical post-valley Godot authored collision | PASS 240/240 exact concave shapes: 107 structural plus 133 authored-detail meshes across 94/21/83/42 anchors; collision cache 104 shared meshes, 76 baked instances, and 77 unique shapes; 3,560,137 collision-instance triangles; both hinged-entry facades; exact closed/open door probes; zero legacy proxy boxes; market rail/gap probes; building ballistic probes; high-value loot access 12/12 |
 | Runtime interactive doors and interiors | `refinery-doors` PASS; two Kenney CC0 `door-hinged.glb` visuals; 1.45-by-2.65-meter doorway per entrance; normal 96-degree side swing; residents 4/4 using animated, unarmed Quaternius CC0 operator-model reuses alongside the existing interior loot placements |
-| Final Godot route clearance | PASS; `routes=14`; `route_blocker=none`; the Victory truck envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and `y=2.6` |
-| Final Godot atmosphere | PASS for Day and always-procedural Dusk; continuous sky/ground horizon; no panorama |
-| Final Godot quality and full runtime | All 11 representative captures PASS; 1,087.0 MB video memory of a 1,536 MB budget; 900.9 MB texture memory of a 1,152 MB budget; independent final visual review DELIVERABLE with no sky/terrain seam, radial pattern, skirt, z-fighting, trench, floating platform, or material south-line blocker |
-| Final diagnostics | `refinery-map`, `refinery-collision`, `refinery-doors`, `refinery-atmosphere`, `map-density`, `large-map`, `residential`, `stairs`, `skylinks`, and `vehicle-drive` all exit 0 |
+| Historical post-valley Godot route clearance | PASS; `routes=14`; `route_blocker=none`; the Victory truck envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and `y=2.6` |
+| Historical post-valley Godot atmosphere | PASS for Day and always-procedural Dusk; continuous sky/ground horizon; no panorama |
+| Historical post-valley Godot quality and full runtime | All 11 representative captures PASS; 1,087.0 MB video memory of a 1,536 MB budget; 900.9 MB texture memory of a 1,152 MB budget; independent final visual review DELIVERABLE with no sky/terrain seam, radial pattern, skirt, z-fighting, trench, floating platform, or material south-line blocker |
+| Historical post-valley diagnostics | `refinery-map`, `refinery-collision`, `refinery-doors`, `refinery-atmosphere`, `map-density`, `large-map`, `residential`, `stairs`, `skylinks`, and `vehicle-drive` all exit 0 |
 
-The final counting scopes intentionally differ: Blender's source count follows
+The historical counting scopes intentionally differ: Blender's source count follows
 saved mesh objects and unique datablocks, while dependency-graph, export, and
 runtime counts follow resolved instances.
 
-### Final post-rebase capture performance evidence
+### Current Chinese-district runtime evidence
+
+The current `BAD4B6C1...` GLB was explicitly reimported after the 2026-08-29
+Chinese-district rebuild. Runtime and capture diagnostics report:
+
+| Audit layer | Verified result |
+| --- | --- |
+| Godot authored-map import | 569 meshes; 1,517 material-backed surfaces; 3,015,841 instance triangles; 8/8 required anchors |
+| Gameplay collision | 122/122 box shapes: 102 placement/profile boxes plus 20 landmark facade/traversal boxes; zero concave shapes; door, rail, rooftop, ballistic, and 12/12 high-value-loot access probes pass |
+| Deployment loading | Threaded preload 502-1,069 ms across recorded verification runs; cached acquire 0 ms; reload-to-world-ready 1,535-2,913 ms across those runs |
+| Render batching | 283 safe repeated source meshes grouped into 71 spatial `MultiMesh` batches; all 71 batch origins match their source centroids, reconstructed pose error is at most 0.000002 meters, visibility-range shortfall is zero in all three quality tiers, and original diagnostic nodes remain on render layer zero |
+| Representative capture | All 11 views pass; overview 967 draw calls / 968 objects; mountain aerial 1,133-1,497 / 1,163-1,538 across final runs versus 1,562 / 2,867 before batching; daylight overview 1,534 / 1,558 versus 1,615 / 2,378 before batching; peak 793.3 MB video and 531.0 MB texture memory across the final verification runs |
+
+### Historical post-valley capture performance evidence
 
 After final export, explicit Godot editor reimport, and the second no-op import,
 all 11 representative captures passed their configured budgets:
@@ -532,10 +583,10 @@ all 11 representative captures passed their configured budgets:
 | `north_ward_density` | 382 | 514 | 2,795,341 | PASS |
 | `daylight_overview` | 1,005 | 1,274 | 7,351,237 | PASS |
 
-Video memory is 1,087.0 MB of the 1,536 MB budget; texture memory is 900.9 MB
-of the 1,152 MB budget. The final high-tier performance policy disables shadows
-only for fine decorative meshes; it does not change model geometry, materials,
-or visibility ranges. Independent final visual review is DELIVERABLE: no
+Video memory was 1,087.0 MB of the 1,536 MB budget; texture memory was 900.9 MB
+of the 1,152 MB budget. The historical high-tier performance policy disabled
+shadows only for fine decorative meshes; it did not change model geometry,
+materials, or visibility ranges. Independent visual review was DELIVERABLE: no
 sky/terrain seam, radial pattern, skirt, z-fighting, trench, floating platform,
 or material south-line blocker remains.
 

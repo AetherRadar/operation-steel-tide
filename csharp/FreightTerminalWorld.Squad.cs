@@ -31,6 +31,8 @@ public partial class FreightTerminalWorld
     private PendingExtractionDeployment? _networkLobbyDeployment;
     private int _extractionLocalSquadSlot;
     private bool _networkMatchReloadQueued;
+    private bool _jianghaiDeploymentLoadPending;
+    private int _deploymentLoadGeneration;
     private ulong _operatorRosterSeed;
     private bool _deterministicOperatorRoster;
 
@@ -89,6 +91,7 @@ public partial class FreightTerminalWorld
         _squadNetwork.ConnectionAttemptFailed += CancelPendingNetworkDeployment;
         _squadNetwork.ConnectionLost += OnSquadConnectionLost;
         _hud.SquadDeploymentRequested += OnSquadDeploymentRequested;
+        _hud.DeploymentMapSelectionChanged += OnDeploymentMapSelectionChanged;
         _hud.SquadOrderRequested += value => IssueSquadOrder((SquadOrder)value);
         _hud.SquadFireStanceRequested += ToggleSquadFireStance;
 
@@ -208,7 +211,7 @@ public partial class FreightTerminalWorld
         InputMap.ActionAddEvent(action, inputEvent);
     }
 
-    private void OnSquadDeploymentRequested(int role, int mode, string address)
+    private async void OnSquadDeploymentRequested(int role, int mode, string address)
     {
         if (_squadDeployed || _deploymentPurchaseCommitted)
         {
@@ -259,7 +262,45 @@ public partial class FreightTerminalWorld
         }
         if (!string.Equals(selectedMapId, _activeRuntimeMapId, StringComparison.OrdinalIgnoreCase))
         {
-            DeploymentMapRuntime.StageDeployment(deployment);
+            if (_jianghaiDeploymentLoadPending)
+            {
+                return;
+            }
+            _jianghaiDeploymentLoadPending = true;
+            var loadGeneration = ++_deploymentLoadGeneration;
+            var mapReady = await PrepareDeploymentMapAsync(selectedMapId);
+            if (!DeploymentLoadStillValid(loadGeneration)
+                || !string.Equals(
+                    _hud.SelectedDeploymentMapId,
+                    selectedMapId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            if (!mapReady)
+            {
+                _jianghaiDeploymentLoadPending = false;
+                _hud.SetSquadStatus(GameLocalization.Get(
+                    "squad_map_load_retry_deployment",
+                    _languageSetting,
+                    "MAP LOAD FAILED  //  RETRY DEPLOYMENT"));
+                return;
+            }
+            if (_hud.SelectedSquadSessionMode != SquadSessionMode.Local)
+            {
+                _jianghaiDeploymentLoadPending = false;
+                _hud.SetSquadStatus(GameLocalization.Get(
+                    "squad_deployment_changed",
+                    _languageSetting,
+                    "DEPLOYMENT CHANGED  //  CONFIRM AGAIN"));
+                return;
+            }
+            var refreshedDeployment = deployment with
+            {
+                Role = _hud.SelectedOperatorRole,
+                Loadout = _hud.SelectedDeploymentLoadout
+            };
+            DeploymentMapRuntime.StageDeployment(refreshedDeployment);
             GetTree().Paused = false;
             GetTree().ReloadCurrentScene();
             return;
@@ -391,10 +432,28 @@ public partial class FreightTerminalWorld
                 "ROOM OPEN  //  WAITING FOR ANOTHER PLAYER"));
     }
 
-    private void StartHostedExtractionMatch()
+    private async void StartHostedExtractionMatch()
     {
-        if (_networkLobbyDeployment is null)
+        if (_networkLobbyDeployment is not { } lobbyDeployment
+            || _jianghaiDeploymentLoadPending)
         {
+            return;
+        }
+        _jianghaiDeploymentLoadPending = true;
+        var loadGeneration = ++_deploymentLoadGeneration;
+        var mapReady = await PrepareDeploymentMapAsync(lobbyDeployment.MapId);
+        if (!DeploymentLoadStillValid(loadGeneration)
+            || _networkLobbyDeployment != lobbyDeployment)
+        {
+            return;
+        }
+        _jianghaiDeploymentLoadPending = false;
+        if (!mapReady)
+        {
+            _hud.SetSquadStatus(GameLocalization.Get(
+                "squad_map_load_retry_start",
+                _languageSetting,
+                "MAP LOAD FAILED  //  RETRY MATCH START"));
             return;
         }
         var seed = Random.Shared.NextInt64(1, long.MaxValue);
@@ -433,6 +492,8 @@ public partial class FreightTerminalWorld
 
     private void CancelPendingNetworkDeployment()
     {
+        _deploymentLoadGeneration++;
+        _jianghaiDeploymentLoadPending = false;
         _pendingNetworkExtractionDeployment = null;
         _networkLobbyDeployment = null;
         _hud.ClearSquadLobbyWaiting();
@@ -504,20 +565,20 @@ public partial class FreightTerminalWorld
         _extractionLocalSquadSlot = slot;
     }
 
-    private void OnExtractionMatchStart(string mapId, long worldSeed)
+    private async void OnExtractionMatchStart(string mapId, long worldSeed)
     {
         if (_networkMatchReloadQueued || _networkLobbyDeployment is null || worldSeed == 0)
         {
             return;
         }
         _networkMatchReloadQueued = true;
+        var loadGeneration = ++_deploymentLoadGeneration;
         var deployment = _networkLobbyDeployment with
         {
             MapId = mapId,
             WorldSeed = worldSeed,
             SquadSlot = _squadNetwork.LocalExtractionSlot
         };
-        DeploymentMapRuntime.StageDeployment(deployment);
         _hud.SetSquadLobbyWaiting(
             _squadNetwork.IsHost,
             _squadNetwork.RegisteredExtractionPlayerCount,
@@ -527,8 +588,77 @@ public partial class FreightTerminalWorld
                 "squad_lobby_loading",
                 _languageSetting,
                 "SYNCHRONIZING OPERATION  //  LOADING SHARED WORLD"));
+        var mapReady = await PrepareDeploymentMapAsync(mapId);
+        if (!DeploymentLoadStillValid(loadGeneration)
+            || _networkLobbyDeployment is null
+            || !_squadNetwork.ExtractionMatchStarted)
+        {
+            return;
+        }
+        if (!mapReady)
+        {
+            _networkMatchReloadQueued = false;
+            _networkLobbyDeployment = null;
+            _pendingNetworkExtractionDeployment = null;
+            _squadNetwork.Close();
+            _hud.ClearSquadLobbyWaiting();
+            _hud.SetSquadStatus(GameLocalization.Get(
+                "squad_map_load_rejoin",
+                _languageSetting,
+                "MAP LOAD FAILED  //  REJOIN THE ROOM"));
+            return;
+        }
+        DeploymentMapRuntime.StageDeployment(deployment);
         GetTree().Paused = false;
         CallDeferred(MethodName.ReloadNetworkMatchScene);
+    }
+
+    private void OnDeploymentMapSelectionChanged(string mapId)
+    {
+        _deploymentLoadGeneration++;
+        _jianghaiDeploymentLoadPending = false;
+        if (_diagnosticSceneLoadFallbackAllowed)
+        {
+            return;
+        }
+        if (string.Equals(
+                mapId,
+                DeploymentMapCatalog.BlackwaterRefineryId,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            JianghaiMapPreloadCache.Request();
+        }
+        else
+        {
+            JianghaiMapPreloadCache.Release();
+        }
+        _hud.SetSquadSessionStatus(GameLocalization.Get(
+            "squad_map_selected",
+            _languageSetting,
+            "MAP SELECTED  //  CONFIRM DEPLOYMENT"));
+    }
+
+    private bool DeploymentLoadStillValid(int generation)
+        => generation == _deploymentLoadGeneration
+            && IsInsideTree()
+            && IsInstanceValid(_hud)
+            && IsInstanceValid(_squadNetwork);
+
+    private async Task<bool> PrepareDeploymentMapAsync(string mapId)
+    {
+        if (!string.Equals(
+                mapId,
+                DeploymentMapCatalog.BlackwaterRefineryId,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        _hud.SetSquadStatus(GameLocalization.Get(
+            "squad_lobby_loading",
+            _languageSetting,
+            "SYNCHRONIZING OPERATION  //  LOADING SHARED WORLD"));
+        return await JianghaiMapPreloadCache.EnsureReadyAsync(GetTree());
     }
 
     private void ReloadNetworkMatchScene()
@@ -543,6 +673,8 @@ public partial class FreightTerminalWorld
 
     private void OnSquadConnectionLost(bool extractionSession)
     {
+        _deploymentLoadGeneration++;
+        _jianghaiDeploymentLoadPending = false;
         if (!extractionSession)
         {
             var demolitionSession = _demolitionJoinPending
@@ -593,6 +725,13 @@ public partial class FreightTerminalWorld
 
     private void DetachSquadNetworkEvents()
     {
+        _deploymentLoadGeneration++;
+        _jianghaiDeploymentLoadPending = false;
+        if (IsInstanceValid(_hud))
+        {
+            _hud.SquadDeploymentRequested -= OnSquadDeploymentRequested;
+            _hud.DeploymentMapSelectionChanged -= OnDeploymentMapSelectionChanged;
+        }
         if (!IsInstanceValid(_squadNetwork))
         {
             return;

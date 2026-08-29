@@ -13,42 +13,27 @@ public partial class FreightTerminalWorld
 
         var counts = new RefineryRuntimeCounts();
         CountRefineryNodes(_levelRoot, false, false, false, false, ref counts);
-        var authoredCollisionAvailable = _jianghaiAuthoredBuildingCollision is { } collision
-            && IsInstanceValid(collision.Body);
-        var expectedLegacyProxies = authoredCollisionAvailable
-            ? 0
-            : RefineryLayout.Models.Count(placement => placement.HasCollision);
-        var tenementShapes = AuthoredCollisionAnchorCount("JianghaiTenementDistrict");
-        var factoryShapes = AuthoredCollisionAnchorCount("RedStarElectronicsFactory");
-        var pawnshopShapes = AuthoredCollisionAnchorCount("GuangchangPawnshop");
-        var marketShapes = AuthoredCollisionAnchorCount("OldCityMarketBridge");
-        var authoredReady = IsBlackwaterRefineryMap
-            && _jianghaiAuthoredBuildingCollisionError is null
-            && _jianghaiAuthoredBuildingCollision is { } authored
-            && IsInstanceValid(authored.Body)
-            && authored.Body.CollisionLayer == 1
-            && authored.Body.CollisionMask == 0
-            && authored.SourceMeshCount == 240
-            && authored.StructuralSourceMeshCount == 107
-            && authored.DetailSourceMeshCount == 133
-            && authored.CollisionShapeCount == 240
-            && authored.ConcaveShapeCount == 240
-            && authored.SharedShapeCount > 0
-            && authored.BakedShapeCount > 0
-            && authored.UniqueMeshCount >= 6
-            && authored.InstanceTriangleCount > 0
-            && tenementShapes == 94
-            && factoryShapes == 21
-            && pawnshopShapes == 83
-            && marketShapes == 42
-            && counts.AuthoredCollisionBodies == 1
-            && counts.AuthoredCollisionShapes == 240
-            && counts.AuthoredConcaveCollisionShapes == 240
-            && counts.AuthoredNonConcaveCollisionShapes == 0;
-        var legacyReady = expectedLegacyProxies == 0
-            && _refineryCollisionProxyCount == expectedLegacyProxies
-            && counts.LegacyCollisionBodies == expectedLegacyProxies
-            && counts.LegacyCollisionShapes == expectedLegacyProxies
+        var expectedPlacements = RefineryLayout.Models.Count(placement => placement.HasCollision);
+        var expectedLandmarkShapes = _oldTownLandmarks?.CollisionShapeCount ?? 0;
+        var gameplayReady = IsBlackwaterRefineryMap
+            && _jianghaiGameplayCollisionError is null
+            && _jianghaiGameplayCollision is { } gameplay
+            && IsInstanceValid(gameplay.Body)
+            && gameplay.Body.CollisionLayer == 1
+            && gameplay.Body.CollisionMask == 0
+            && gameplay.SourcePlacementCount == expectedPlacements
+            && gameplay.AuthoredSourceMeshCount == 6
+            && gameplay.CollisionShapeCount == expectedPlacements + 6
+            && gameplay.BoxShapeCount == gameplay.CollisionShapeCount
+            && gameplay.ConcaveShapeCount == 0
+            && gameplay.DistrictShapeCounts.Count >= 10
+            && counts.GameplayCollisionBodies == 2
+            && counts.GameplayCollisionShapes
+                == gameplay.CollisionShapeCount + expectedLandmarkShapes
+            && counts.GameplayBoxCollisionShapes == counts.GameplayCollisionShapes
+            && counts.GameplayNonBoxCollisionShapes == 0;
+        var legacyReady = counts.LegacyCollisionBodies == 0
+            && counts.LegacyCollisionShapes == 0
             && counts.NonBoxLegacyCollisionShapes == 0;
         var physicsReady = ValidateJianghaiBuildingCollision(
             out var blockingHits,
@@ -59,23 +44,22 @@ public partial class FreightTerminalWorld
             out var lootAccessBlocker);
         var routeReady = ValidateOldTownRouteProbes(out var routeCount, out var routeBlocker);
         var landmarksReady = ValidateOldTownLandmarks();
-        var valid = authoredReady && legacyReady && physicsReady && lootAccessReady
+        var valid = gameplayReady && legacyReady && physicsReady && lootAccessReady
             && routeReady && landmarksReady;
 
         GD.Print(
-            $"REFINERY_COLLISION_CHECK valid={valid} authored={authoredReady} "
-            + $"body={counts.AuthoredCollisionBodies}/1 shapes={counts.AuthoredCollisionShapes}/240 "
-            + $"concave={counts.AuthoredConcaveCollisionShapes}/240 "
-            + $"sources={_jianghaiAuthoredBuildingCollision?.StructuralSourceMeshCount ?? 0}/"
-            + $"{_jianghaiAuthoredBuildingCollision?.DetailSourceMeshCount ?? 0} "
-            + $"anchors={tenementShapes}/{factoryShapes}/{pawnshopShapes}/{marketShapes} "
-            + $"shared={_jianghaiAuthoredBuildingCollision?.SharedShapeCount ?? 0} "
-            + $"baked={_jianghaiAuthoredBuildingCollision?.BakedShapeCount ?? 0} "
-            + $"unique={_jianghaiAuthoredBuildingCollision?.UniqueMeshCount ?? 0} "
-            + $"triangles={_jianghaiAuthoredBuildingCollision?.InstanceTriangleCount ?? 0} "
-            + $"legacy={legacyReady}:{counts.LegacyCollisionBodies}/{counts.LegacyCollisionShapes}/"
-            + $"{expectedLegacyProxies} ballistic={physicsReady}:{blockingHits}/5:{clearRoutes}/3:"
-            + $"{physicsSummary} routes={routeReady}:{routeCount}:{routeBlocker} "
+            $"REFINERY_COLLISION_CHECK valid={valid} gameplay={gameplayReady} "
+            + $"body={counts.GameplayCollisionBodies}/2 "
+            + $"shapes={counts.GameplayCollisionShapes}/"
+            + $"{(_jianghaiGameplayCollision?.CollisionShapeCount ?? 0) + expectedLandmarkShapes} "
+            + $"boxes={counts.GameplayBoxCollisionShapes}/{counts.GameplayCollisionShapes} "
+            + $"concave={_jianghaiGameplayCollision?.ConcaveShapeCount ?? -1}/0 "
+            + $"placements={_jianghaiGameplayCollision?.SourcePlacementCount ?? 0} "
+            + $"authored_proxies={_jianghaiGameplayCollision?.AuthoredSourceMeshCount ?? 0}/6 "
+            + $"districts={_jianghaiGameplayCollision?.DistrictShapeCounts.Count ?? 0} "
+            + $"legacy={legacyReady}:{counts.LegacyCollisionBodies}/{counts.LegacyCollisionShapes}/0 "
+            + $"ballistic={physicsReady}:{blockingHits}/11:{clearRoutes}/3:{physicsSummary} "
+            + $"routes={routeReady}:{routeCount}:{routeBlocker} "
             + $"loot_access={lootAccessReady}:{accessibleHighValueLoot}/12:{lootAccessBlocker} "
             + $"landmarks={landmarksReady}");
         GD.Print($"REFINERY_COLLISION_PASS valid={valid}");

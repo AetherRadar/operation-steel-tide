@@ -146,6 +146,11 @@ public static class GameLocalization
         Chinese["squad_lobby_waiting"] = "\u623f\u95f4\u5df2\u521b\u5efa  //  {0}/{1}  //  \u7b49\u5f85\u52a0\u5165";
         Chinese["squad_lobby_client_waiting"] = "\u5df2\u8fde\u63a5  //  {0}/{1}  //  \u7b49\u5f85\u4e3b\u673a\u5f00\u59cb";
         Chinese["squad_lobby_loading"] = "\u6b63\u5728\u540c\u6b65\u884c\u52a8  //  \u6b63\u5728\u52a0\u8f7d\u5171\u4eab\u4e16\u754c";
+        Chinese["squad_map_load_retry_deployment"] = "\u5730\u56fe\u52a0\u8f7d\u5931\u8d25  //  \u8bf7\u91cd\u8bd5\u90e8\u7f72";
+        Chinese["squad_deployment_changed"] = "\u90e8\u7f72\u9009\u9879\u5df2\u66f4\u6539  //  \u8bf7\u91cd\u65b0\u786e\u8ba4";
+        Chinese["squad_map_load_retry_start"] = "\u5730\u56fe\u52a0\u8f7d\u5931\u8d25  //  \u8bf7\u91cd\u8bd5\u5f00\u59cb\u884c\u52a8";
+        Chinese["squad_map_load_rejoin"] = "\u5730\u56fe\u52a0\u8f7d\u5931\u8d25  //  \u8bf7\u91cd\u65b0\u52a0\u5165\u623f\u95f4";
+        Chinese["squad_map_selected"] = "\u5730\u56fe\u5df2\u9009\u62e9  //  \u8bf7\u786e\u8ba4\u90e8\u7f72";
         Chinese["squad_world_wait_all"] = "\u4e16\u754c\u5df2\u5c31\u7eea  //  \u7b49\u5f85\u6240\u6709\u5e72\u5458";
         Chinese["squad_world_wait_host"] = "\u4e16\u754c\u5df2\u5c31\u7eea  //  \u7b49\u5f85\u4e3b\u673a";
         Chinese["squad_wait_connected_player"] = "\u7b49\u5f85\u73a9\u5bb6\u8fde\u63a5";

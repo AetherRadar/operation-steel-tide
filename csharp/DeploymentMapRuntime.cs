@@ -79,6 +79,8 @@ public static class DeploymentMapRuntime
         _selectedWorldSeed = 0;
     }
 
+    internal static void SelectMapForDiagnostics(string mapId) => SelectMap(mapId);
+
     private static void SelectMap(string mapId)
     {
         var map = DeploymentMapCatalog.Resolve(mapId);

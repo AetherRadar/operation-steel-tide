@@ -5,12 +5,15 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Mapping
 from math import atan2, cos, hypot, isclose, isfinite, pi, sin, sqrt, tan
+from pathlib import Path
 import sys
 
 import bmesh
 import bpy
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from jianghai_chinese_district_layout import JIANGHAI_DEPLOYMENT_POINTS
 
 
 GROUND_INSTANCE_COUNT = 1
@@ -111,7 +114,14 @@ MOUNTAIN_LAYOUT = tuple(
     )
     for index in range(6)
 )
-SCENE_TRIANGLE_BUDGET = 5_000_000
+SCENE_TRIANGLE_BUDGET = 3_200_000
+MAX_RUNTIME_TEXTURE_SIZE = 512
+RETIRED_VISIBLE_MESH_NAMES = {
+    "Cube.286",
+    "hhugu.001",
+    "JianghaiDensity_OldUrban_LOD",
+    "JianghaiDensity_ScanStreet_LOD",
+}
 
 
 def triangle_count(mesh: bpy.types.Mesh) -> int:
@@ -1737,8 +1747,13 @@ if factory_gate_portal_ready:
 
 object_triangles = sum(row[0] for row in rows)
 images_ready = all(
-    packed and width <= 1_024 and height <= 1_024
+    packed and width <= MAX_RUNTIME_TEXTURE_SIZE and height <= MAX_RUNTIME_TEXTURE_SIZE
     for _, width, height, _, packed, _, _ in images
+)
+retired_visible_objects = sorted(
+    obj.name
+    for obj in bpy.context.scene.objects
+    if obj.type == "MESH" and obj.data is not None and obj.data.name in RETIRED_VISIBLE_MESH_NAMES
 )
 forbidden_export_objects = sorted(
     obj.name
@@ -1958,23 +1973,16 @@ replacement_factory_buildings = sorted(
 
 
 def is_cleared_authored_storefront(obj, expected_parent):
-    source_url = str(obj.get("source_url", "")).lower() if obj is not None else ""
     return (
         obj is not None
         and obj.type == "MESH"
         and obj.data is not None
-        and obj.data.name in {
-            "Cube.286",
-            "hhugu.001",
-            "JianghaiPawnshopStorefrontDoorway",
-        }
+        and obj.data.get("jianghai_chinese_rebuild_version") == 1
+        and obj.data.name not in RETIRED_VISIBLE_MESH_NAMES
         and obj.parent == expected_parent
         and len(obj.material_slots) > 0
-        and "cc0" in str(obj.get("license", "")).lower()
-        and (
-            "blenderkit.com/asset-gallery-detail/8177ff94" in source_url
-            or "blenderkit.com/asset-gallery-detail/d8c0ffa6" in source_url
-        )
+        and obj.get("license") == "CC0 1.0 Universal"
+        and obj.get("source_creator") in {"Free poly", "VVayToyek; Quaternius; Free poly"}
         and all(isfinite(value) for row in obj.matrix_world for value in row)
     )
 
@@ -1982,8 +1990,6 @@ def is_cleared_authored_storefront(obj, expected_parent):
 replacement_storefronts_ready = (
     is_cleared_authored_storefront(replacement_pawnshop, bpy.data.objects.get("GuangchangPawnshop"))
     and len(replacement_market_shops) == 5
-    and sum(shop.data.name == "Cube.286" for shop in replacement_market_shops) == 3
-    and sum(shop.data.name == "hhugu.001" for shop in replacement_market_shops) == 2
     and all(
         is_cleared_authored_storefront(shop, bpy.data.objects.get("OldCityMarketBridge"))
         for shop in replacement_market_shops
@@ -1995,8 +2001,6 @@ replacement_storefronts_ready = (
 )
 replacement_factory_ready = (
     len(replacement_factory_buildings) == 5
-    and sum(building.data.name == "Cube.286" for building in replacement_factory_buildings) == 3
-    and sum(building.data.name == "hhugu.001" for building in replacement_factory_buildings) == 2
     and all(
         is_cleared_authored_storefront(building, bpy.data.objects.get("RedStarElectronicsFactory"))
         for building in replacement_factory_buildings
@@ -2039,20 +2043,12 @@ density_buildings = sorted(
     ),
     key=lambda obj: obj.name,
 )
-density_spawn_clearances = (
-    Vector((-148.0, 198.0, 0.0)),
-    Vector((148.0, 198.0, 0.0)),
-    Vector((-148.0, -72.0, 0.0)),
-    Vector((148.0, -72.0, 0.0)),
-    Vector((0.0, 215.0, 0.0)),
-    Vector((0.0, -80.0, 0.0)),
-    Vector((-155.0, 60.0, 0.0)),
-    Vector((155.0, 60.0, 0.0)),
-)
+density_spawn_clearances = tuple(Vector(point) for point in JIANGHAI_DEPLOYMENT_POINTS)
 density_ready = (
-    len(density_buildings) == 36
-    and sum(obj.data.name == "JianghaiDensity_OldUrban_LOD" for obj in density_buildings) == 8
-    and sum(obj.data.name == "JianghaiDensity_ScanStreet_LOD" for obj in density_buildings) == 14
+    len(density_buildings) == 42
+    and sum(obj.data.name == "JianghaiDensity_ChineseTempleHall_LOD" for obj in density_buildings) == 8
+    and sum(obj.data.name == "JianghaiDensity_ChineseArcadeShop_LOD" for obj in density_buildings) == 16
+    and sum(obj.data.name == "JianghaiDensity_ChineseGateHouse_LOD" for obj in density_buildings) == 4
     and sum(
         obj.data.name == "JianghaiDensity_QuaterniusBuilding1Large_LOD"
         for obj in density_buildings
@@ -2076,7 +2072,7 @@ density_ready = (
     and all(obj.parent == bpy.data.objects.get("JianghaiTenementDistrict") for obj in density_buildings)
     and all(obj.get("license") == "CC0 1.0 Universal" for obj in density_buildings)
     and all(
-        obj.get("source_creator") in {"Abobla O.S", "Free poly", "Quaternius"}
+        obj.get("source_creator") in {"Free poly", "VVayToyek; Quaternius; Free poly", "Quaternius"}
         for obj in density_buildings
     )
     and all(obj.get("collision_role") == "building_shell" for obj in density_buildings)
@@ -2090,6 +2086,12 @@ density_ready = (
         min((obj.matrix_world.translation - spawn).xy.length for spawn in density_spawn_clearances)
         >= 24.0
         for obj in density_buildings
+    )
+    and all(
+        bpy.data.objects.get(f"JianghaiDensity_{side}Edge{edge:02d}") is not None
+        and bpy.data.objects[f"JianghaiDensity_{side}Edge{edge:02d}"].get("jianghai_gameplay_proxy") is True
+        for side in ("West", "East")
+        for edge in range(4, 7)
     )
 )
 cross_street_intrusions_removed = not any(
@@ -2209,7 +2211,7 @@ density_intersections_ready = not density_intersections
 
 street_cadence_expectations = {
     "WestClockRow01": ("JianghaiStreetCadence_Building1Large", Vector((-12.20, -24.0, 0.03))),
-    "WestMedicineRow01": ("hhugu.001", Vector((-18.50, 0.0, 0.03))),
+    "WestMedicineRow01": ("JianghaiChineseArcadeShop_LOD", Vector((-18.50, 0.0, 0.03))),
     "WestMedicineRow02": ("JianghaiStreetCadence_Building4", Vector((-12.70, 12.0, 0.03))),
     "WestTheatreRow02": ("JianghaiStreetCadence_House2", Vector((-14.25, 48.0, 0.03))),
 }
@@ -2238,8 +2240,8 @@ street_cadence_row = [
 ]
 street_cadence_ready &= (
     all(obj is not None for obj in street_cadence_row)
-    and len({obj.data.name for obj in street_cadence_row if obj is not None}) == 5
-    and sum(obj.data.name == "Cube.286" for obj in street_cadence_row if obj is not None) == 2
+    and len({obj.data.name for obj in street_cadence_row if obj is not None}) >= 3
+    and not any(obj.data.name in RETIRED_VISIBLE_MESH_NAMES for obj in street_cadence_row if obj is not None)
 )
 
 market_walkway_names = {
@@ -2273,7 +2275,7 @@ cross_street_clear = all(
 )
 pawnshop_doorway_clear = (
     replacement_pawnshop is not None
-    and replacement_pawnshop.get("doorway_cut_version") == 2
+    and replacement_pawnshop.get("doorway_cut_version") == 3
     and segment_hits_mesh(
         replacement_pawnshop,
         Vector((-86.0, 110.9, 1.35)),
@@ -2283,12 +2285,12 @@ pawnshop_doorway_clear = (
     is False
 )
 authored_collision_sources_ready = (
-    len(collision_sources) == 107
+    len(collision_sources) == 112
     and collision_source_counts
     == {
-        "JianghaiTenementDistrict": 94,
+        "JianghaiTenementDistrict": 100,
         "RedStarElectronicsFactory": 6,
-        "GuangchangPawnshop": 2,
+        "GuangchangPawnshop": 1,
         "OldCityMarketBridge": 5,
     }
     and len(detail_collision_sources) == 133
@@ -2314,6 +2316,8 @@ root_provenance_ready = (
     and "poly_haven_apartments" in root
     and "cleared_storefront_pass" in root
     and "jianghai_valley_environment" in root
+    and root.get("chinese_district_rebuild_version") == 1
+    and root.get("retired_visible_asset_instances") == 0
 )
 valid = (
     not missing_anchors
@@ -2325,8 +2329,9 @@ valid = (
     and factory_gate_portal_ready
     and not legacy_wood_house_nodes
     and not marketplace_marker_hits
-    and evaluated_triangles <= 5_000_000
+    and evaluated_triangles <= SCENE_TRIANGLE_BUDGET
     and images_ready
+    and not retired_visible_objects
     and not forbidden_export_objects
     and finite_transforms
     and urban_life_ready
@@ -2478,7 +2483,8 @@ print(
     f"legacy_wood_house_nodes={len(legacy_wood_house_nodes)} "
     f"marketplace_marker_hits={len(marketplace_marker_hits)} "
     f"floating_market_signs_removed={floating_market_signs_removed} "
-    f"images_1k_packed={images_ready} evaluated_triangles={evaluated_triangles}/5000000 "
+    f"images_512_packed={images_ready} evaluated_triangles={evaluated_triangles}/{SCENE_TRIANGLE_BUDGET} "
+    f"retired_visible={len(retired_visible_objects)} "
     f"forbidden_export_objects={len(forbidden_export_objects)} finite_transforms={finite_transforms} "
     f"urban_life={urban_life_ready} facade_expansion={facade_expansion_count}/36 "
     f"facade_expansion_aligned={facade_expansion_aligned} "
@@ -2490,13 +2496,13 @@ print(
     f"pawnshop_legacy_visible={len(pawnshop_legacy_visible_names)} "
     f"pawnshop_columns_clear={pawnshop_columns_clear} "
     f"replacement_factory_ready={replacement_factory_ready} "
-    f"density={len(density_buildings)}/36 density_ready={density_ready} "
+    f"density={len(density_buildings)}/42 density_ready={density_ready} "
     f"density_intersections={len(density_intersections)} "
     f"street_cadence={street_cadence_ready}:{len(street_cadence_objects)}/4 "
     f"market_walkway_clear={market_walkway_ready} "
     f"cross_street_intrusions_removed={cross_street_intrusions_removed} "
     f"cross_street_clear={cross_street_clear} pawnshop_doorway_clear={pawnshop_doorway_clear} "
-    f"collision_sources={len(collision_sources)}/107 "
+    f"collision_sources={len(collision_sources)}/112 "
     f"collision_source_counts={','.join(f'{key}:{value}' for key, value in collision_source_counts.items())} "
     f"detail_collision_sources={len(detail_collision_sources)}/133 "
     f"detail_collision_source_counts={','.join(f'{key}:{value}' for key, value in detail_collision_source_counts.items())} "

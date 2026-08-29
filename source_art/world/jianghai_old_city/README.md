@@ -18,6 +18,55 @@ its small status screen and adaptation work are project-authored. Godot
 continues to own gameplay collision, navigation, loot, spawning, doors, and
 mission state.
 
+## 2026-08-29 Chinese district rebuild
+
+The current delivered district is the project-authored Blender rebuild made on
+2026-08-29. It replaces 66 previously visible building anchors with three
+reviewed Chinese-profile shared meshes and expands the authored perimeter table
+to 42 density placements, including the west/east `Edge04`, `Edge05`, and
+`Edge06` placements. The rebuild is serialized in the authoritative `.blend`
+and exported to the runtime GLB; it is not runtime procedural geometry.
+
+The source mapping is:
+
+- `JianghaiChineseTempleHall_LOD`: an adapted LOD of Free poly's CC0
+  **Chinese Temple 2**;
+- `JianghaiChineseArcadeShop_LOD`: a clean Quaternius Buildings Pack body
+  composed in Blender with adapted VVayToyek pavilion facade/eaves parts and an
+  extracted, decimated **Chinese Temple 2** roof; and
+- `JianghaiChineseGateHouse_LOD`: a second clean Quaternius Buildings Pack body
+  composed with the same licensed pavilion-detail and Temple-roof vocabulary.
+
+The existing CC0 Chinese red lamps and porcelain lions remain available as
+locally specific dressing, while the existing Poly Haven facade, prop, and PBR
+sources continue to serve the surrounding district. No new external asset was
+acquired for this rebuild. Repeated buildings share mesh datablocks, the runtime
+texture cap is 512 pixels, and the three profiles deliberately reuse a small
+licensed material vocabulary to reduce loading and rendering pressure.
+
+`Scan Old Building Street` and `Old Urban building` are retained below only as
+historical acquisition and license records. Their former placements were
+superseded by the rebuild: the current authoritative scene and delivered GLB
+contain zero visible instances of either retired building source.
+
+The authoritative outputs and representative player-scale review renders are:
+
+- `source_art/world/jianghai_old_city/jianghai_old_city.blend`
+- `assets/models/jianghai_old_city/jianghai_old_city.glb`
+- `previews/12_chinese_edge_gate.png`
+- `previews/13_chinese_avenue.png`
+- `previews/14_chinese_old_city_overview.png`
+
+The final packed `.blend` is 42,607,105 bytes with SHA-256
+`97226E2ED4860E676F27171F7AEF76B33AFF493AD991779887BE984B5DCF9F17`.
+The final GLB is 49,926,284 bytes with SHA-256
+`BAD4B6C18C8FC8488419ED9EB06F18F6C34544FEAC054EF71555F0D5EB2C0433`.
+Its round-trip audit reports 263 unique meshes across 569 mesh nodes, 378
+unique/1,517 instanced surfaces, 943,282 unique/3,015,841 instanced triangles,
+93 materials, 142 textures backed by 120 images, and a 512-pixel maximum image
+dimension. The scene audit passes with zero density intersections and zero
+visible retired-building instances.
+
 ## Authoritative source and provenance inputs
 
 `jianghai_old_city.blend` is the authoritative hand-edited DCC source. The
@@ -79,6 +128,11 @@ itch/vvaytoyek_chinese_four_corner_pavilion/fbx_only/四角亭.fbx
 itch/vvaytoyek_chinese_four_corner_pavilion/itch_license_evidence.html
 NotoSansSC-VF.otf
 ```
+
+The `old_urban_building_1k.blend` and `scan_old_building_street.glb` paths
+remain in this list as historical evidence for the superseded 2026-08-28
+layout. They are not required to rebuild or export the current Chinese district
+and contribute zero visible delivered instances.
 
 The valley authoring inputs remain in a separate private cache and use these
 paths relative to `JIANGHAI_VALLEY_ACQUISITION_ROOT`:
@@ -269,11 +323,11 @@ blender --background source_art/world/jianghai_old_city/jianghai_old_city.blend 
 ```
 
 The export script verifies that the authoritative scene is open, removes the
-documented obsolete signs and retired asset metadata, reapplies the cleared
-five-building factory frontage, validates the authored pawnshop canopy and
-wings, and applies runtime material tuning, then flattens any
-remaining tiled images, rebuilds the two ten-piece Quaternius entry facades,
-caps the longest runtime-texture dimension at 1024
+documented obsolete signs and retired asset metadata, validates the 66-anchor
+Chinese-profile replacement and the 42-placement density table, validates the
+authored pawnshop canopy and wings, and applies runtime material tuning, then
+flattens any remaining tiled images, rebuilds the two ten-piece Quaternius entry
+facades, caps the longest runtime-texture dimension at 512
 pixels, recompresses eligible high-resolution runtime images as JPEG quality
 90, rejects non-built-in font datablocks, packs external data, saves the
 `.blend`, and exports:
@@ -299,9 +353,11 @@ tuning, and export policy without randomness. The resulting placements and
 mesh edits are serialized in the packed `.blend`. Review PNGs under
 `previews/` are maintained separately.
 
-The main GLB contains the final static map geometry, including the 18
-Quaternius brick and two Quaternius doorframe instances, materials, textures, and
-custom provenance metadata. It excludes preview cameras and lights, the
+The main GLB contains the final static map geometry, including the three shared
+Chinese district profiles, 42 authored density placements, the 18 Quaternius
+brick and two Quaternius doorframe instances, materials, textures, and custom
+provenance metadata. It contains zero visible `Old Urban building` or `Scan Old
+Building Street` instances. It excludes preview cameras and lights, the
 original Noto font, and all acquisition-only rig/source scaffolding. Chinese
 sign outlines are ordinary static mesh geometry. The
 standalone shutter GLB retains MP / Poly Haven CC0 provenance through its source
@@ -309,10 +365,10 @@ mesh in the authoritative packed scene even though it is not the current door.
 Security Camera 01 is delivered only as static geometry, materials, and
 textures; its source rig and animations are not shipped.
 
-### Urban-life and facade expansion
+### Historical 2026-08-28 urban-life and facade expansion
 
-The 2026-08-28 DCC expansion makes the central city blocks read as inhabited
-and locally specific while keeping gameplay scaffolding in Godot. It adds:
+The 2026-08-28 DCC expansion was the source baseline for the current work. It
+added the following elements before the Chinese-profile building replacement:
 
 - 36 adapted Modular Urban Apartments Facade objects arranged as two
   asymmetrical 3-by-3 tenement overlays;
@@ -345,10 +401,23 @@ and locally specific while keeping gameplay scaffolding in Godot. It adds:
 - five Chinese red lamps distributed across the cleared storefront
   composition.
 
-These are saved DCC placements and adaptations. The `.blend` remains the
-authoritative source; the export script enforces the explicit reviewed
-transform table, targeted cleanup, and cleared-asset substitutions rather than
+The Old Urban and Scan Old building bullets above are retained solely to explain
+the historical source state. The 2026-08-29 rebuild supersedes every one of
+those visible placements with the three Chinese-profile shared meshes described
+above. The other urban-life, entrance, and prop adaptations remain saved DCC
+work. The `.blend` remains the authoritative source; the export script enforces
+the explicit reviewed transform table and targeted cleanup rather than
 generating runtime city geometry.
+
+### Current Chinese-profile density and replacement contract
+
+The current contract requires 66/66 replaced visible anchors, 42/42 authored
+density placements, all six west/east `Edge04`-`Edge06` placements, and zero
+visible instances of the two retired building sources. Hall instances use the
+Temple-derived LOD; arcade and gate-house instances use the Quaternius clean
+bodies plus pavilion facade/eaves parts and an extracted/decimated Temple roof.
+This retains finished authored silhouettes while sharing meshes and limiting
+runtime textures to 512 pixels.
 
 ## Runtime contract and geometry audit
 
@@ -404,25 +473,35 @@ procedural visible geometry. Reused packed materials keep their recorded
 third-party provenance. Behind that outer portal, and at the pawnshop, each
 current entrance adds a ten-piece Quaternius facade around a Kenney hinged door.
 
-Godot derives exact static collision from 107 named authored structural meshes
-and 133 explicitly selected authored details. The 240 concave shapes are split
-94/21/83/42 across `JianghaiTenementDistrict`,
-`RedStarElectronicsFactory`, `GuangchangPawnshop`, and
-`OldCityMarketBridge`. The detail meshes comprise the five-piece factory gate,
-the two ten-piece hinged-entry facades, 71 pawnshop canopy/wing/low-wall pieces,
-and 37 market deck/ramp/rail pieces.
-The same layer-1 geometry blocks traversal and ballistic world queries while
-preserving the real doorway and rail gaps. Successful authored collision
-suppresses all former broad model-placement and landmark proxy boxes. The
-central rooftop path is verified with a 0.5-meter-radius capsule sweep, and all
-12 Epic/Legendary high-value placements have player-capsule routes in open
-space. Runtime validation additionally confirms that the two closed doors block
-an enemy capsule, the opened 1.45-by-2.65-meter routes clear, and the two
-interiors contain four residents in total alongside their loot placements.
+Godot now builds a deliberately lightweight gameplay-collision layer instead of
+turning millions of authored render triangles into physics geometry. The current
+map uses 102 reviewed box shapes for placement/profile coverage plus 20 landmark
+facade and traversal boxes, all on world layer 1. It creates zero concave shapes.
+Deterministic probes still verify the visible walls, factory and pawnshop door
+openings, market deck/rails, central rooftop path, ballistic cover, and all 12
+Epic/Legendary high-value loot routes. Runtime validation also confirms that the
+two closed doors block an enemy capsule, the opened 1.45-by-2.65-meter routes
+clear, and the two interiors contain four residents in total alongside their
+loot placements.
 
-Read-only audits through 2026-08-29 recorded both the historical pre-rebase
-evidence and the final post-rebase delivery values below. The first table is
-retained as the upstream pre-valley baseline:
+The current runtime keeps the full DCC scene for visible art while batching 283
+safe repeated source meshes into 71 spatial `MultiMesh` batches. The original
+nodes remain available on render layer zero for authored-scene diagnostics. The
+latest explicit Godot reimport and runtime checks report:
+
+| Current runtime layer | Verified result |
+| --- | --- |
+| Authored-map import | 569 authored meshes; 1,517 material-backed surfaces; 3,015,841 authored instance triangles; all eight required anchors |
+| Gameplay collision | 122/122 box shapes across the gameplay and landmark bodies; zero concave shapes; 14 route probes and 12/12 high-value-loot routes pass |
+| Deployment loading | Threaded preload 502-1,069 ms across the recorded verification runs; cached acquire 0 ms; reload-to-world-ready 1,535-2,913 ms across those runs |
+| Render batching | 283 repeated source meshes replaced visually by 71 spatial batches with 71/71 non-origin centroids, 0.000002-meter maximum pose error, and zero visibility-range shortfall; overview 967 draw calls / 968 objects; mountain aerial 1,133-1,497 / 1,163-1,538 across final runs versus 1,562 / 2,867 before batching; daylight overview 1,534 / 1,558 versus 1,615 / 2,378 before batching |
+| Representative capture | All 11 views pass; peak 793.3 MB video memory and 531.0 MB texture memory |
+
+Read-only audits through the earlier 2026-08-29 valley integration recorded the
+historical pre-rebase and post-valley values below. Both tables predate the
+Chinese district rebuild and remain only as comparison/evidence; current
+artifact hashes and counts come from the final rebuild audit. The first table is
+the upstream pre-valley baseline:
 
 | Audit layer | Verified result |
 | --- | --- |
@@ -445,30 +524,29 @@ evaluation and export resolve the scene to 550 runtime mesh instances and
 meshes and sums 770 material-backed runtime surfaces. These scopes are
 intentionally different rather than conflicting.
 
-The later valley pre-rebase evidence and the final combined delivery are kept
-separately because neither historical binary includes both sides of the rebased
-scene:
+The later valley pre-rebase evidence and historical post-valley delivery are
+kept separately because neither binary represents the current Chinese district:
 
 | Audit layer | Verified result |
 | --- | --- |
 | Valley pre-rebase Blender source | Historical snapshot: 74,037,661 bytes; SHA-256 `C9BAC433CF77791B3730E309A5E0BEEF6CF4849593D44018FD2CDFE5AC8FAA08`; Blender builder/audit/export PASS; 4,835,033 evaluated full-scene triangles, below the 5,000,000 gate; eight required anchors |
-| Final post-rebase Blender source | 81,861,168 bytes; SHA-256 `7CA84CD2B17C3872323D8A5EE7B1A4BA5BCB360F4326FB2331327BED4F493461`; 500 mesh objects; 198 unique mesh datablocks; 4,807,899 raw mesh-object triangles; 1,003,869 triangles counted once per unique mesh; dependency-graph evaluation resolves 563 objects and 4,836,825 instance triangles; 8/8 anchors; builder, read-only audit, export, and GLB-round-trip gates all PASS |
+| Historical post-valley Blender source | 81,861,168 bytes; SHA-256 `7CA84CD2B17C3872323D8A5EE7B1A4BA5BCB360F4326FB2331327BED4F493461`; 500 mesh objects; 198 unique mesh datablocks; 4,807,899 raw mesh-object triangles; 1,003,869 triangles counted once per unique mesh; dependency-graph evaluation resolves 563 objects and 4,836,825 instance triangles; 8/8 anchors; builder, read-only audit, export, and GLB-round-trip gates all PASS; superseded by the 2026-08-29 Chinese district rebuild |
 | Authored valley environment | `valley=True`; 188-triangle, 96-source-vertex project-authored `OldCityFoundation`; one 84,960-vertex, 168,480-triangle `JianghaiPerimeterGroundComposite` assembled from eight Coast Line 01 scan placements; one shared 14,000-triangle solararchitect Hero Mountain mesh composed as 12 instances divided six/six across staggered inner and outer rings; 336,668 total valley instance triangles. Ground bounds X `-600.878..600.853`, Y `-540.340..660.056`, Z `-12.7965..5.0390`; relief 17.835 meters; coverage 1.000; topology one component, two boundary loops/1,440 edges, zero degenerates, zero invalid normals; actual-foundation-footprint signed-distance transition; maximum foundation gap 0.103 meters; safe-area top -0.120 meters; 0-60/60-160-meter relief 0.969/3.955 meters; slope RMS/p90/p99/max 0.0579/0.0869/0.2331/0.6620; ring coverage 7,920/7,920. Gravel Floor 03 diffuse/normal/roughness, base-color factor `(0.92, 0.78, 0.62, 1.0)`, 7-meter affine world-XY UVs; DCC/GLB maximum UV errors `3.27e-6`/`4.36e-6` within `1.2e-5`; Jacobian 1/1; Coast material/image counts 0/0. North/south road ray gates 330/330 and 90/90 top hits with zero side hits; minimum mountain burial 4.942 meters; DCC and GLB round-trip gates PASS; all valley meshes visual-only; no displacement-generated visible geometry |
 | Factory-gate portal contract | `factory_gate_portal=5/5`; `factory_gate_portal_aligned=True`; DCC-authored brick piers, caps, and corrugated roof frame the ten-piece personnel-door facade and hinged runtime door |
 | Hinged-entry facade contract | `entry_facades_ready=True`; two facades at 10/10 finished CC0 objects each; 18 Quaternius `Brick_Plain_1` instances and two `DoorFrame_Trim` instances total; nine bricks plus one doorframe at each entry |
 | Pawnshop hero entrance contract | `pawnshop_frontage_ready=True`; 15/15 modeled canopy parts; 15,492 canopy triangles; 8/8 solid wall modules; 8/8 authored inserts; 0 legacy visible gate/wall objects; the original large storefront opening is infilled by the ten-piece facade around the central 1.45-by-2.65-meter door |
 | Delivered urban-life and density expansion | 36/36 apartment-facade objects; 36/36 complete perimeter buildings across six licensed profiles with `density_intersections=0`; four full-mesh street-cadence replacements; three static 11,825-triangle bicycles; market and frontage props; finished CC0 pawnshop backdrop and modeled pavilion gate; five market shops; two rear houses; five Chinese red lamps; five-building factory replacement |
 | Valley pre-rebase serialized GLB | Historical snapshot: 76,862,308 bytes; SHA-256 `0C0174672630957390A959BC3BD71DB3F4849CC7CABE0AFADFDD12273DFE02A5`; export and DCC-to-GLB round-trip PASS; 4,835,033 full-scene instance triangles; maximum texture dimension 1024 pixels |
-| Final post-rebase serialized GLB | 84,723,312 bytes; SHA-256 `7E2BB712BCF031692FAFB0E4E0FA59F3E75CE340B2748F5EDBDB7B105D9B2965`; export and DCC-to-GLB round-trip gates PASS; 563 resolved mesh instances and 4,836,825 full-scene instance triangles |
-| Final Godot authored-map import | PASS after an explicit editor reimport followed by a second no-op import; 563 authored meshes; 784 surfaces, all 784 material-backed; 4,836,825 authored instance triangles; 8/8 anchors; 419 detail meshes; 406 shadow-casting meshes; quality-tier counts 130/226/406; valley contract one ground plus 12 mountains and 336,668 triangles; exactly one named 168,480-triangle perimeter-ground composite, 12 named mountains sharing one Hero Mountain mesh, the 188-triangle foundation, both ten-piece hinged-entry facades, CC0/CC BY rights metadata, Gravel Floor 03 PBR identity and affine UV contract, direct hierarchy, no valley collision, modeled-ground coverage, and mountain-ring orientation |
-| Final Godot authored collision | PASS 240/240 exact concave shapes: 107 structural plus 133 detail meshes across 94/21/83/42 anchors; collision cache 104 shared meshes, 76 baked instances, and 77 unique shapes; 3,560,137 collision-instance triangles; both hinged-entry facades; exact closed/open door probes; zero legacy proxy boxes; market rail/gap probes; building ballistic probes; high-value loot access 12/12 |
+| Historical post-valley serialized GLB | 84,723,312 bytes; SHA-256 `7E2BB712BCF031692FAFB0E4E0FA59F3E75CE340B2748F5EDBDB7B105D9B2965`; export and DCC-to-GLB round-trip gates PASS; 563 resolved mesh instances and 4,836,825 full-scene instance triangles; superseded by the 2026-08-29 Chinese district rebuild |
+| Historical post-valley Godot authored-map import | PASS after an explicit editor reimport followed by a second no-op import; 563 authored meshes; 784 surfaces, all 784 material-backed; 4,836,825 authored instance triangles; 8/8 anchors; 419 detail meshes; 406 shadow-casting meshes; quality-tier counts 130/226/406; valley contract one ground plus 12 mountains and 336,668 triangles; exactly one named 168,480-triangle perimeter-ground composite, 12 named mountains sharing one Hero Mountain mesh, the 188-triangle foundation, both ten-piece hinged-entry facades, CC0/CC BY rights metadata, Gravel Floor 03 PBR identity and affine UV contract, direct hierarchy, no valley collision, modeled-ground coverage, and mountain-ring orientation |
+| Historical post-valley Godot authored collision | PASS 240/240 exact concave shapes: 107 structural plus 133 detail meshes across 94/21/83/42 anchors; collision cache 104 shared meshes, 76 baked instances, and 77 unique shapes; 3,560,137 collision-instance triangles; both hinged-entry facades; exact closed/open door probes; zero legacy proxy boxes; market rail/gap probes; building ballistic probes; high-value loot access 12/12 |
 | Runtime doors and interiors | `refinery-doors` PASS; two Kenney CC0 `door-hinged.glb` visuals; 1.45-by-2.65-meter personnel openings; normal 96-degree side swing; residents 4/4 using animated, unarmed Quaternius CC0 operator-model reuses alongside the existing interior loot placements |
-| Final Godot route clearance | PASS; `routes=14`; `route_blocker=none`; the Victory truck envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and `y=2.6` |
-| Final Godot atmosphere | PASS for Day and always-procedural Dusk; continuous sky/ground horizon; no panorama |
-| Final Godot quality and full runtime | All 11 representative captures PASS; 1,087.0 MB video memory of a 1,536 MB budget; 900.9 MB texture memory of a 1,152 MB budget; independent final visual review DELIVERABLE with no sky/terrain seam, radial pattern, skirt, z-fighting, trench, floating platform, or material south-line blocker |
-| Final diagnostics | `refinery-map`, `refinery-collision`, `refinery-doors`, `refinery-atmosphere`, `map-density`, `large-map`, `residential`, `stairs`, `skylinks`, and `vehicle-drive` all exit 0 |
+| Historical post-valley Godot route clearance | PASS; `routes=14`; `route_blocker=none`; the Victory truck envelope `x[-2,1]` is sampled at multiple points for `y=0.45`, `y=1.4`, and `y=2.6` |
+| Historical post-valley Godot atmosphere | PASS for Day and always-procedural Dusk; continuous sky/ground horizon; no panorama |
+| Historical post-valley Godot quality and full runtime | All 11 representative captures PASS; 1,087.0 MB video memory of a 1,536 MB budget; 900.9 MB texture memory of a 1,152 MB budget; independent visual review DELIVERABLE with no sky/terrain seam, radial pattern, skirt, z-fighting, trench, floating platform, or material south-line blocker |
+| Historical post-valley diagnostics | `refinery-map`, `refinery-collision`, `refinery-doors`, `refinery-atmosphere`, `map-density`, `large-map`, `residential`, `stairs`, `skylinks`, and `vehicle-drive` all exit 0 |
 
-The final counting scopes intentionally differ: Blender's source count follows
+The historical counting scopes intentionally differ: Blender's source count follows
 saved mesh objects and unique datablocks, while dependency-graph, export, and
 runtime counts follow resolved instances.
 
@@ -494,10 +572,11 @@ The capture reports a 1,001.8 MB peak video-memory reading and an 852.7 MB peak
 texture-memory reading.
 This table is the upstream pre-valley baseline, not final delivery evidence.
 
-### Final post-rebase capture performance evidence
+### Historical post-valley capture performance evidence
 
-After final export, explicit Godot editor reimport, and the second no-op import,
-all 11 representative captures passed their configured budgets. The tuple
+Before the Chinese district rebuild, the post-valley export, explicit Godot
+editor reimport, and second no-op import produced 11 passing representative
+captures. The tuple
 columns below are draw calls, visible objects, and primitives:
 
 | View | Draw calls | Objects | Primitives | Result |
@@ -514,10 +593,10 @@ columns below are draw calls, visible objects, and primitives:
 | `north_ward_density` | 382 | 514 | 2,795,341 | PASS |
 | `daylight_overview` | 1,005 | 1,274 | 7,351,237 | PASS |
 
-Video memory is 1,087.0 MB of the 1,536 MB budget; texture memory is 900.9 MB
-of the 1,152 MB budget. The final high-tier policy disables shadows only on
-fine decorative meshes; model geometry, materials, and visibility ranges are
-unchanged. Independent final visual review is DELIVERABLE: no sky/terrain seam,
+Video memory was 1,087.0 MB of the 1,536 MB budget; texture memory was 900.9 MB
+of the 1,152 MB budget. The historical high-tier policy disabled shadows only on
+fine decorative meshes; model geometry, materials, and visibility ranges were
+unchanged. Independent visual review was DELIVERABLE: no sky/terrain seam,
 radial pattern, skirt, z-fighting, trench, floating platform, or material
 south-line blocker remains.
 
@@ -528,7 +607,7 @@ CC0. The exception is solararchitect's Hero Mountain, which is embedded under
 CC BY 4.0 and requires attribution, a link to
 http://creativecommons.org/licenses/by/4.0/, and an indication that Operation
 Steel Tide modified the source by decimation, PBR-node reconstruction,
-1024-pixel texture capping/packing, uniform scaling, rotation, and multi-instance
+512-pixel texture capping/packing, uniform scaling, rotation, and multi-instance
 valley composition. Hero Mountain and its adapted geometry and textures are not
 relicensed as MIT.
 Noto Sans SC is licensed under SIL OFL 1.1 and was used only during DCC
@@ -547,7 +626,8 @@ evaluation-only private records and
 contribute no delivered geometry, materials, or textures. The HDRI remains
 outside the `.blend` and map GLB.
 
-The project-authored layout, valley foundation and source-instance
+The project-authored layout, 2026-08-29 Chinese district rebuild, valley
+foundation and source-instance
 placement/orientation composition, adaptation work, objective-terminal status
 screens, pawnshop adaptation/composition, and factory-gate/hinged-entry
 geometry and composition are covered by the

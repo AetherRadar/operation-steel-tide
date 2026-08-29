@@ -114,6 +114,13 @@ public partial class FreightTerminalWorld
     private void OnOperationsQuickStartRequested()
     {
         _operationsOfficeBackdrop.SetPresentationActive(false);
+        if (string.Equals(
+                _hud.SelectedDeploymentMapId,
+                DeploymentMapCatalog.BlackwaterRefineryId,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            JianghaiMapPreloadCache.Request();
+        }
         _squadNetwork.StartLanRoomBrowsing();
         _hud.ShowSquadLobby(GameLocalization.Get(
             "operations_quick_status",
@@ -144,6 +151,11 @@ public partial class FreightTerminalWorld
             RestartMission();
             return;
         }
+        _deploymentLoadGeneration++;
+        _jianghaiDeploymentLoadPending = false;
+        _networkMatchReloadQueued = false;
+        JianghaiMapPreloadCache.Release();
+        DeploymentMapRuntime.ClearTransientDeployment();
         if (_networkLobbyDeployment is not null || _pendingNetworkExtractionDeployment is not null)
         {
             _networkLobbyDeployment = null;

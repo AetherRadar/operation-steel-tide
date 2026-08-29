@@ -684,6 +684,9 @@ public partial class CombatHUD
         }
     }
 
+    public void SetSquadSessionStatus(string status)
+        => _squadSessionStatus.Text = status;
+
     public void SetSquadConnectionPending(bool pending, string status)
     {
         _squadSessionStatus.Text = status;

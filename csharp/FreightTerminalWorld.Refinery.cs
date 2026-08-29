@@ -10,12 +10,13 @@ public partial class FreightTerminalWorld
     private int _refineryCollisionProxyCount;
     private OldTownLandmarksResult? _oldTownLandmarks;
     private JianghaiOldCitySceneLoadResult? _jianghaiOldCityScene;
-    private JianghaiAuthoredBuildingCollisionResult? _jianghaiAuthoredBuildingCollision;
+    private JianghaiGameplayCollisionResult? _jianghaiGameplayCollision;
     private bool _diagnosticSceneLoadFallbackAllowed;
+    private bool _jianghaiDetailedSceneInspection;
     private string? _jianghaiOldCitySceneLoadError;
-    private string? _jianghaiAuthoredBuildingCollisionError;
+    private string? _jianghaiGameplayCollisionError;
     private readonly OldTownLandmarksBuilder _oldTownLandmarksBuilder = new();
-    private readonly JianghaiAuthoredBuildingCollisionBuilder _jianghaiBuildingCollisionBuilder = new();
+    private readonly JianghaiGameplayCollisionBuilder _jianghaiCollisionBuilder = new();
     private readonly JianghaiOldCitySceneLoader _jianghaiOldCitySceneLoader = new(
         JianghaiOldCitySceneLoader.DefaultScenePath);
     private readonly JianghaiOldCityAtmosphere _jianghaiOldCityAtmosphere = new();
@@ -33,30 +34,43 @@ public partial class FreightTerminalWorld
         _levelRoot = new Node3D { Name = "SaintMaraisOldTown" };
         AddChild(_levelRoot);
         _jianghaiOldCitySceneLoadError = null;
-        _jianghaiAuthoredBuildingCollisionError = null;
-        _jianghaiAuthoredBuildingCollision = null;
+        _jianghaiGameplayCollisionError = null;
+        _jianghaiGameplayCollision = null;
         try
         {
-            _jianghaiOldCityScene = _jianghaiOldCitySceneLoader.LoadOnce(_levelRoot);
+            _jianghaiOldCityScene = _jianghaiOldCitySceneLoader.LoadOnce(
+                _levelRoot,
+                _jianghaiDetailedSceneInspection);
         }
         catch (Exception exception) when (_diagnosticSceneLoadFallbackAllowed)
         {
             _jianghaiOldCitySceneLoadError = exception.Message;
             GD.PrintErr($"REFINERY_AUTHORED_SCENE_ERROR {_jianghaiOldCitySceneLoadError}");
         }
-        if (_jianghaiOldCityScene is { } authoredScene)
+        try
         {
+            _jianghaiGameplayCollision = _jianghaiCollisionBuilder.Build(
+                RefineryLayout,
+                _jianghaiOldCityScene?.Root,
+                _levelRoot);
+        }
+        catch (Exception exception)
+        {
+            _jianghaiGameplayCollisionError = exception.Message;
+            GD.PrintErr($"REFINERY_GAMEPLAY_COLLISION_ERROR {_jianghaiGameplayCollisionError}");
             try
             {
-                _jianghaiAuthoredBuildingCollision = _jianghaiBuildingCollisionBuilder.Build(
-                    authoredScene.Root,
+                _jianghaiGameplayCollision = _jianghaiCollisionBuilder.BuildPlacementFallback(
+                    RefineryLayout,
                     _levelRoot);
-            }
-            catch (Exception exception)
-            {
-                _jianghaiAuthoredBuildingCollisionError = exception.Message;
                 GD.PrintErr(
-                    $"REFINERY_AUTHORED_COLLISION_ERROR {_jianghaiAuthoredBuildingCollisionError}");
+                    "REFINERY_GAMEPLAY_COLLISION_FALLBACK placement_boxes="
+                    + _jianghaiGameplayCollision.CollisionShapeCount);
+            }
+            catch (Exception fallbackException)
+            {
+                GD.PrintErr(
+                    $"REFINERY_GAMEPLAY_COLLISION_FALLBACK_ERROR {fallbackException.Message}");
             }
         }
 
@@ -125,56 +139,14 @@ public partial class FreightTerminalWorld
 
     private void BuildRefineryModelAssembly()
     {
-        _refineryCollisionProxyCount = 0;
+        _refineryCollisionProxyCount = _jianghaiGameplayCollision?.CollisionShapeCount ?? 0;
         _refineryDoors.Clear();
         _oldTownDistricts.Clear();
-        var authoredBuildingCollisionReady = _jianghaiAuthoredBuildingCollision is { } authoredCollision
-            && GodotObject.IsInstanceValid(authoredCollision.Body);
 
         foreach (var placement in RefineryLayout.Models)
         {
-            if (placement.HasCollision && !authoredBuildingCollisionReady)
-            {
-                AddRefineryCollisionScaffold(placement);
-                _refineryCollisionProxyCount++;
-            }
             _oldTownDistricts.Add(placement.District);
         }
-    }
-
-    private void AddRefineryCollisionScaffold(RefineryModelPlacement placement)
-    {
-        var body = new StaticBody3D
-        {
-            Name = placement.Name,
-            Position = placement.Position,
-            Rotation = new Vector3(0, placement.Yaw, 0),
-            CollisionLayer = 1,
-            CollisionMask = 0
-        };
-        body.AddToGroup("refinery_legacy_collision_proxy");
-        var scaledSize = placement.CollisionSize * placement.Scale;
-        var scaledOffset = placement.CollisionOffset * placement.Scale;
-        foreach (var collision in _authoredBuildingCollisionPlanner.Plan(
-                     scaledSize,
-                     scaledOffset,
-                     hasDoorway: false))
-        {
-            if (collision.Size.X <= 0.01f
-                || collision.Size.Y <= 0.01f
-                || collision.Size.Z <= 0.01f)
-            {
-                continue;
-            }
-
-            body.AddChild(new CollisionShape3D
-            {
-                Name = collision.Name,
-                Position = collision.Position,
-                Shape = new BoxShape3D { Size = collision.Size }
-            });
-        }
-        _levelRoot.AddChild(body);
     }
 
     private void BuildRefineryMissionTerminals()

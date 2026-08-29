@@ -1,8 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Godot;
 
 namespace OperationSteelTide;
+
+internal sealed record JianghaiSceneLoadMetrics(
+    bool UsedThreadedPreload,
+    bool PreloadReadyBeforeAcquire,
+    bool DetailedInspectionEnabled,
+    long PackedSceneAcquireMilliseconds,
+    long InstantiationMilliseconds,
+    long RuntimeConfigurationMilliseconds,
+    long DetailedInspectionMilliseconds,
+    long TotalMilliseconds);
 
 internal sealed record JianghaiOldCitySceneLoadResult(
     Node3D Root,
@@ -43,6 +54,16 @@ internal sealed record JianghaiOldCitySceneLoadResult(
 {
     public int QualityTier { get; internal set; } = 2;
     public int ShadowCasterMeshCount { get; internal set; }
+    public JianghaiRenderBatchValidation RenderBatchValidation { get; internal set; }
+    public JianghaiSceneLoadMetrics LoadMetrics { get; internal set; } = new(
+        false,
+        false,
+        false,
+        0,
+        0,
+        0,
+        0,
+        0);
 }
 
 /// <summary>Owns the single runtime instance of the DCC-authored Jianghai old-city scene.</summary>
@@ -90,6 +111,7 @@ internal sealed class JianghaiOldCitySceneLoader
     };
     private readonly string _scenePath;
     private readonly List<MeshQualityProfile> _meshQualityProfiles = new();
+    private readonly JianghaiAuthoredRenderBatcher _renderBatcher = new();
     private readonly List<TerminalScreenMaterialBinding>[] _terminalScreenBindings =
     {
         new(),
@@ -108,7 +130,9 @@ internal sealed class JianghaiOldCitySceneLoader
         _scenePath = scenePath;
     }
 
-    public JianghaiOldCitySceneLoadResult LoadOnce(Node3D parent)
+    public JianghaiOldCitySceneLoadResult LoadOnce(
+        Node3D parent,
+        bool detailedInspection)
     {
         ArgumentNullException.ThrowIfNull(parent);
 
@@ -125,12 +149,31 @@ internal sealed class JianghaiOldCitySceneLoader
         }
 
         _meshQualityProfiles.Clear();
+        _renderBatcher.Clear();
         ClearTerminalScreenBindings();
 
-        var packedScene = GD.Load<PackedScene>(_scenePath)
-            ?? throw new InvalidOperationException(
-                $"Unable to load the authored Jianghai old-city scene at '{_scenePath}'.");
+        var totalClock = Stopwatch.StartNew();
+        PackedScene packedScene;
+        JianghaiPackedSceneAcquisition acquisition;
+        if (string.Equals(_scenePath, DefaultScenePath, StringComparison.Ordinal))
+        {
+            packedScene = JianghaiMapPreloadCache.Acquire(out acquisition);
+        }
+        else
+        {
+            var acquireClock = Stopwatch.StartNew();
+            packedScene = GD.Load<PackedScene>(_scenePath)
+                ?? throw new InvalidOperationException(
+                    $"Unable to load the authored Jianghai scene at '{_scenePath}'.");
+            acquireClock.Stop();
+            acquisition = new JianghaiPackedSceneAcquisition(
+                false,
+                false,
+                acquireClock.ElapsedMilliseconds);
+        }
+        var instantiationClock = Stopwatch.StartNew();
         var instance = packedScene.Instantiate();
+        instantiationClock.Stop();
         if (instance is not Node3D cityRoot)
         {
             instance.Free();
@@ -142,6 +185,51 @@ internal sealed class JianghaiOldCitySceneLoader
         cityRoot.AddToGroup(AuthoredSceneGroup);
         parent.AddChild(cityRoot);
 
+        var runtimeClock = Stopwatch.StartNew();
+        if (!detailedInspection)
+        {
+            ConfigureRuntimeScene(cityRoot);
+        }
+        runtimeClock.Stop();
+        var detailedClock = Stopwatch.StartNew();
+        _loadedScene = detailedInspection
+            ? InspectDetailedScene(cityRoot)
+            : CreateRuntimeSceneResult(cityRoot);
+        detailedClock.Stop();
+        runtimeClock.Start();
+        _renderBatcher.Rebuild(cityRoot);
+        runtimeClock.Stop();
+        ApplyQuality(_qualityTier);
+        var renderBatchValidation = _renderBatcher.ValidateBatches();
+        if (!renderBatchValidation.Valid)
+        {
+            throw new InvalidOperationException(
+                "Jianghai authored render-batch origin validation failed: "
+                + $"batches={renderBatchValidation.BatchCount} "
+                + $"sources={renderBatchValidation.SourceCount} "
+                + $"non_origin={renderBatchValidation.NonOriginBatchCount} "
+                + $"centroid_error={renderBatchValidation.MaximumCentroidError:0.000000} "
+                + $"position_error={renderBatchValidation.MaximumPositionError:0.000000} "
+                + $"basis_error={renderBatchValidation.MaximumBasisError:0.000000} "
+                + $"range_shortfall={renderBatchValidation.MaximumVisibilityShortfall:0.000000}.");
+        }
+        _loadedScene.RenderBatchValidation = renderBatchValidation;
+        ResetTerminalStatuses();
+        totalClock.Stop();
+        _loadedScene.LoadMetrics = new JianghaiSceneLoadMetrics(
+            acquisition.UsedThreadedRequest,
+            acquisition.ReadyBeforeAcquire,
+            detailedInspection,
+            acquisition.AcquireMilliseconds,
+            instantiationClock.ElapsedMilliseconds,
+            runtimeClock.ElapsedMilliseconds,
+            detailedInspection ? detailedClock.ElapsedMilliseconds : 0,
+            totalClock.ElapsedMilliseconds);
+        return _loadedScene;
+    }
+
+    private JianghaiOldCitySceneLoadResult InspectDetailedScene(Node3D cityRoot)
+    {
         var statistics = new SceneStatistics();
         InspectScene(cityRoot, statistics);
         var valley = JianghaiOldCityValleyInspector.Inspect(cityRoot);
@@ -177,7 +265,7 @@ internal sealed class JianghaiOldCitySceneLoader
                 alignedTerminalCount++;
             }
         }
-        _loadedScene = new JianghaiOldCitySceneLoadResult(
+        return new JianghaiOldCitySceneLoadResult(
             cityRoot,
             _scenePath,
             statistics.MeshInstanceCount,
@@ -213,13 +301,73 @@ internal sealed class JianghaiOldCitySceneLoader
             valley.FoundationMaterialsReady,
             valley.FoundationUvReady,
             terminalWorldBounds);
-        ApplyQuality(_qualityTier);
-        ResetTerminalStatuses();
-        return _loadedScene;
+    }
+
+    private JianghaiOldCitySceneLoadResult CreateRuntimeSceneResult(Node3D cityRoot)
+        => new(
+            cityRoot,
+            _scenePath,
+            0,
+            0,
+            0,
+            0,
+            0,
+            RequiredAnchorNames.Count,
+            0,
+            0,
+            0,
+            ExpectedTerminalPositions.Count,
+            _terminalScreenBindings[0].Count > 0 && _terminalScreenBindings[1].Count > 0 ? 2 : 0,
+            AuthoredStatusScreenIndices.Count,
+            0,
+            0,
+            0,
+            0,
+            0,
+            default,
+            default,
+            default,
+            0,
+            0,
+            0,
+            false,
+            false,
+            0.0f,
+            0,
+            0.0f,
+            0.0f,
+            false,
+            false,
+            false,
+            new Dictionary<string, Aabb>(StringComparer.Ordinal));
+
+    private void ConfigureRuntimeScene(Node3D cityRoot)
+    {
+        var meshes = cityRoot.FindChildren("*", "MeshInstance3D", recursive: true, owned: false);
+        using var meshesBacking = meshes.AsDisposable();
+        foreach (var child in meshes)
+        {
+            if (child is not MeshInstance3D { Mesh: { } mesh } meshInstance)
+            {
+                continue;
+            }
+
+            var nodeName = meshInstance.Name.ToString();
+            if (nodeName.StartsWith("JianghaiPerimeterGround", StringComparison.Ordinal))
+            {
+                ConfigureValleyGroundFiltering(meshInstance, mesh);
+            }
+            _meshQualityProfiles.Add(CreateQualityProfile(meshInstance));
+            if (AuthoredStatusScreenIndices.TryGetValue(nodeName, out var terminalIndex))
+            {
+                BindTerminalStatusScreen(meshInstance, terminalIndex);
+            }
+        }
     }
 
     public void ReleaseReferences()
     {
+        _renderBatcher.Clear();
         _meshQualityProfiles.Clear();
         ClearTerminalScreenBindings();
         _loadedScene = null;
@@ -235,7 +383,7 @@ internal sealed class JianghaiOldCitySceneLoader
             1 => 0.84f,
             _ => 1.0f
         };
-        var shadowCasterCount = 0;
+        var shadowCasterCount = _renderBatcher.ApplyQuality(_qualityTier);
         foreach (var profile in _meshQualityProfiles)
         {
             if (!GodotObject.IsInstanceValid(profile.MeshInstance))
@@ -258,7 +406,8 @@ internal sealed class JianghaiOldCitySceneLoader
             meshInstance.CastShadow = profile.AlwaysDisableShadow || !allowAuthoredShadow
                 ? GeometryInstance3D.ShadowCastingSetting.Off
                 : profile.AuthoredShadowSetting;
-            if (meshInstance.CastShadow != GeometryInstance3D.ShadowCastingSetting.Off)
+            if (!_renderBatcher.IsBatchedSource(meshInstance)
+                && meshInstance.CastShadow != GeometryInstance3D.ShadowCastingSetting.Off)
             {
                 shadowCasterCount++;
             }
@@ -400,50 +549,15 @@ internal sealed class JianghaiOldCitySceneLoader
 
     private static MeshQualityProfile CreateQualityProfile(MeshInstance3D meshInstance)
     {
-        var localSize = meshInstance.GetAabb().Size;
-        var globalScale = meshInstance.GlobalTransform.Basis.Scale.Abs();
-        var worldSize = new Vector3(
-            localSize.X * globalScale.X,
-            localSize.Y * globalScale.Y,
-            localSize.Z * globalScale.Z);
-        var diagonal = worldSize.Length();
-        var name = meshInstance.Name.ToString();
-        var isValleyEnvironment = ContainsAny(
-            name,
-            "OldCityFoundation",
-            "JianghaiPerimeterGround",
-            "JianghaiMountainMassif");
-        var baseVisibilityRange = isValleyEnvironment ? 1200.0f : diagonal switch
-        {
-            <= 1.2f => 105.0f,
-            <= 4.0f => 180.0f,
-            <= 12.0f => 285.0f,
-            _ => 460.0f
-        };
-        var isFineDetail = diagonal <= 1.2f
-            || ContainsAny(name, "Screen", "Indicator", "Fastener", "Text", "Cable", "Lens");
-        var isDetail = diagonal <= 12.0f
-            || ContainsAny(
-                name,
-                "Aircon",
-                "Rollershutter",
-                "Trashbag",
-                "UtilityBox",
-                "Barrel",
-                "Crate",
-                "SecurityCamera",
-                "Television");
-        var alwaysDisableShadow = isValleyEnvironment
-            || diagonal <= 0.45f
-            || ContainsAny(name, "ScreenTrace", "StatusScreen", "Indicator", "Fastener", "Text");
+        var policy = JianghaiAuthoredRenderBatcher.CreateQualityPolicy(meshInstance);
         return new MeshQualityProfile(
             meshInstance,
-            diagonal,
-            baseVisibilityRange,
-            isDetail,
-            isFineDetail,
-            alwaysDisableShadow,
-            meshInstance.CastShadow);
+            policy.WorldDiagonal,
+            policy.BaseVisibilityRange,
+            policy.IsDetail,
+            policy.IsFineDetail,
+            policy.AlwaysDisableShadow,
+            policy.AuthoredShadowSetting);
     }
 
     private bool BindTerminalStatusScreen(MeshInstance3D screen, int terminalIndex)
@@ -492,18 +606,6 @@ internal sealed class JianghaiOldCitySceneLoader
         {
             bindings.Clear();
         }
-    }
-
-    private static bool ContainsAny(string value, params string[] fragments)
-    {
-        foreach (var fragment in fragments)
-        {
-            if (value.Contains(fragment, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static bool HasVisibleMesh(Node node)

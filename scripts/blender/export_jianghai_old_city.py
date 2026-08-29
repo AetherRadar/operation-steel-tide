@@ -5,11 +5,17 @@ from __future__ import annotations
 from math import atan2, cos, hypot, isfinite, pi, radians, sin, tan
 from pathlib import Path
 import re
+import sys
 import tempfile
 
 import bmesh
 import bpy
 from mathutils import Vector
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from jianghai_chinese_district_layout import (
+    DENSITY_BUILDING_LAYOUT,
+    PROFILE_BASE_SCALE,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -18,11 +24,11 @@ GLB_PATH = REPO_ROOT / "assets" / "models" / "jianghai_old_city" / "jianghai_old
 REFINERY_DOOR_GLB_PATH = (
     REPO_ROOT / "assets" / "models" / "jianghai_old_city" / "rollershutter_window_03.glb"
 )
-MAX_RUNTIME_TEXTURE_SIZE = 1024
+MAX_RUNTIME_TEXTURE_SIZE = 512
 MAX_DETAIL_TEXTURE_SIZE = 512
 MAX_SMALL_FURNITURE_TEXTURE_SIZE = 256
-MAX_RUNTIME_GLB_SIZE_BYTES = 99_000_000
-MAX_RUNTIME_INSTANCE_TRIANGLES = 5_000_000
+MAX_RUNTIME_GLB_SIZE_BYTES = 70_000_000
+MAX_RUNTIME_INSTANCE_TRIANGLES = 3_200_000
 GROUND_INSTANCE_COUNT = 1
 GROUND_EXPECTED_TRIANGLES = 168_480
 GROUND_EXPECTED_VERTICES = 84_960
@@ -186,37 +192,47 @@ PAWNSHOP_LEGACY_WALL_PREFIXES = (
     "PawnshopSouthWestCap_",
 )
 DENSITY_OBJECT_PREFIX = "JianghaiDensity_"
-DENSITY_URBAN_MESH_NAME = "JianghaiDensity_OldUrban_LOD"
-DENSITY_BRICK_MESH_NAME = "JianghaiDensity_ScanStreet_LOD"
+DENSITY_HALL_MESH_NAME = "JianghaiDensity_ChineseTempleHall_LOD"
+DENSITY_SHOP_MESH_NAME = "JianghaiDensity_ChineseArcadeShop_LOD"
+DENSITY_GATE_MESH_NAME = "JianghaiDensity_ChineseGateHouse_LOD"
 DENSITY_QUATERNIUS_LARGE_MESH_NAME = "JianghaiDensity_QuaterniusBuilding1Large_LOD"
 DENSITY_QUATERNIUS_BIG_MESH_NAME = "JianghaiDensity_QuaterniusBuilding3Big_LOD"
 DENSITY_QUATERNIUS_BUILDING4_MESH_NAME = "JianghaiDensity_QuaterniusBuilding4_LOD"
 DENSITY_QUATERNIUS_HOUSE2_MESH_NAME = "JianghaiDensity_QuaterniusHouse2_LOD"
 STREET_CADENCE_MESH_PREFIX = "JianghaiStreetCadence_"
 DENSITY_SOURCE_PROFILES = {
-    "urban": {
-        "source_object": "NorthwestGateHouse",
-        "mesh_name": DENSITY_URBAN_MESH_NAME,
-        "decimate_ratio": 0.16,
-        "base_scale": 1.0,
-        "asset_name": "Old Urban building",
-        "creator": "Abobla O.S",
-        "source_url": "https://www.blenderkit.com/asset-gallery-detail/8177ff94-1645-4b50-95cc-cb05a336e34d/",
-    },
-    "brick": {
-        "source_object": "WeatheredRollerShop00",
-        "mesh_name": DENSITY_BRICK_MESH_NAME,
-        "decimate_ratio": 0.065,
-        "base_scale": 1.0,
-        "asset_name": "Scan Old Building Street",
+    "chinese_hall": {
+        "source_object": "EastHarborResidence",
+        "mesh_name": DENSITY_HALL_MESH_NAME,
+        "decimate_ratio": 0.38,
+        "base_scale": PROFILE_BASE_SCALE["chinese_hall"],
+        "asset_name": "Chinese Temple 2",
         "creator": "Free poly",
-        "source_url": "https://www.blenderkit.com/asset-gallery-detail/d8c0ffa6-7b7d-47e9-8554-2d3bbcc82030/",
+        "source_url": "https://www.blenderkit.com/asset-gallery-detail/8701a79a-1635-437c-b1d2-6b14f14fc351/",
+    },
+    "chinese_shop": {
+        "source_object": "WeatheredRollerShop00",
+        "mesh_name": DENSITY_SHOP_MESH_NAME,
+        "decimate_ratio": 0.42,
+        "base_scale": PROFILE_BASE_SCALE["chinese_shop"],
+        "asset_name": "Chinese Four-corner Pavilion - Free; Quaternius Buildings Pack; Chinese Temple 2",
+        "creator": "VVayToyek; Quaternius; Free poly",
+        "source_url": "https://vvaytoyek.itch.io/chinese-four-corner-pavilion-free; https://quaternius.com/packs/buildings.html; https://www.blenderkit.com/asset-gallery-detail/8701a79a-1635-437c-b1d2-6b14f14fc351/",
+    },
+    "chinese_gate": {
+        "source_object": "EastGateRow00",
+        "mesh_name": DENSITY_GATE_MESH_NAME,
+        "decimate_ratio": 0.48,
+        "base_scale": PROFILE_BASE_SCALE["chinese_gate"],
+        "asset_name": "Chinese Four-corner Pavilion - Free; Quaternius Buildings Pack; Chinese Temple 2",
+        "creator": "VVayToyek; Quaternius; Free poly",
+        "source_url": "https://vvaytoyek.itch.io/chinese-four-corner-pavilion-free; https://quaternius.com/packs/buildings.html; https://www.blenderkit.com/asset-gallery-detail/8701a79a-1635-437c-b1d2-6b14f14fc351/",
     },
     "quaternius_large": {
         "runtime_glb": "assets/models/quaternius_buildings_pack/building1-large.glb",
         "mesh_name": DENSITY_QUATERNIUS_LARGE_MESH_NAME,
         "decimate_ratio": 0.16,
-        "base_scale": 1.90,
+        "base_scale": PROFILE_BASE_SCALE["quaternius_large"],
         "asset_name": "Buildings Pack / Building1_Large",
         "creator": "Quaternius",
         "source_url": "https://quaternius.com/packs/buildings.html",
@@ -227,7 +243,7 @@ DENSITY_SOURCE_PROFILES = {
         "runtime_glb": "assets/models/quaternius_buildings_pack/building3-big.glb",
         "mesh_name": DENSITY_QUATERNIUS_BIG_MESH_NAME,
         "decimate_ratio": 0.85,
-        "base_scale": 1.55,
+        "base_scale": PROFILE_BASE_SCALE["quaternius_big"],
         "asset_name": "Buildings Pack / Building3_Big",
         "creator": "Quaternius",
         "source_url": "https://quaternius.com/packs/buildings.html",
@@ -238,7 +254,7 @@ DENSITY_SOURCE_PROFILES = {
         "runtime_glb": "assets/models/quaternius_buildings_pack/building4.glb",
         "mesh_name": DENSITY_QUATERNIUS_BUILDING4_MESH_NAME,
         "decimate_ratio": 0.60,
-        "base_scale": 1.60,
+        "base_scale": PROFILE_BASE_SCALE["quaternius_building4"],
         "asset_name": "Buildings Pack / Building4",
         "creator": "Quaternius",
         "source_url": "https://quaternius.com/packs/buildings.html",
@@ -249,7 +265,7 @@ DENSITY_SOURCE_PROFILES = {
         "runtime_glb": "assets/models/quaternius_buildings_pack/house2.glb",
         "mesh_name": DENSITY_QUATERNIUS_HOUSE2_MESH_NAME,
         "decimate_ratio": 0.30,
-        "base_scale": 3.0,
+        "base_scale": PROFILE_BASE_SCALE["quaternius_house2"],
         "asset_name": "Buildings Pack / House2",
         "creator": "Quaternius",
         "source_url": "https://quaternius.com/packs/buildings.html",
@@ -258,50 +274,9 @@ DENSITY_SOURCE_PROFILES = {
     },
 }
 
-# Hand-placed perimeter blocks close the visible horizon without entering the two
-# cross streets, the central truck lane, or either high-value courtyard. These
-# are DCC placements of authored CC0 buildings, not runtime procedural geometry.
-DENSITY_BUILDING_LAYOUT = (
-    ("SouthWall01", "brick", (-103.0, -82.2, 0.03), 0.0, 1.10),
-    ("SouthWall02", "urban", (-78.0, -82.0, 0.03), 0.0, 0.96),
-    ("SouthWall03", "quaternius_large", (-51.0, -82.1, 0.03), 0.0, 1.08),
-    ("SouthWall04", "brick", (-25.0, -86.0, 0.03), 0.0, 1.14),
-    ("SouthWall05", "urban", (25.0, -86.6, 0.03), 0.0, 1.02),
-    ("SouthWall06", "brick", (51.0, -82.0, 0.03), 0.0, 1.12),
-    ("SouthWall07", "quaternius_building4", (78.0, -82.2, 0.03), 0.0, 0.98),
-    ("SouthWall08", "quaternius_house2", (100.0, -82.0, 0.03), 0.0, 1.10),
-    ("NorthWall01", "brick", (-105.0, 194.2, 0.03), 180.0, 1.14),
-    ("NorthWall02", "urban", (-78.0, 194.0, 0.03), 180.0, 0.98),
-    ("NorthWall03", "quaternius_large", (-51.0, 194.1, 0.03), 180.0, 1.06),
-    ("NorthWall04", "brick", (-25.0, 194.0, 0.03), 180.0, 1.12),
-    ("NorthWall05", "urban", (25.0, 194.1, 0.03), 180.0, 1.00),
-    ("NorthWall06", "brick", (51.0, 194.0, 0.03), 180.0, 1.16),
-    ("NorthWall07", "quaternius_big", (78.0, 194.2, 0.03), 180.0, 1.04),
-    ("NorthWall08", "quaternius_house2", (105.0, 194.0, 0.03), 180.0, 1.10),
-    ("WestEdge01", "brick", (-154.2, -40.0, 0.03), 90.0, 1.12),
-    ("WestEdge02", "quaternius_house2", (-154.0, -18.0, 0.03), 90.0, 0.98),
-    ("WestEdge03", "quaternius_large", (-154.1, 4.0, 0.03), 90.0, 1.08),
-    ("WestEdge07", "brick", (-154.1, 116.0, 0.03), 90.0, 1.10),
-    ("WestEdge08", "urban", (-154.0, 150.0, 0.03), 90.0, 1.08),
-    ("EastEdge01", "brick", (154.2, -40.0, 0.03), -90.0, 1.10),
-    ("EastEdge02", "quaternius_house2", (154.0, -18.0, 0.03), -90.0, 0.96),
-    ("EastEdge03", "quaternius_large", (154.1, 4.0, 0.03), -90.0, 1.06),
-    ("EastEdge07", "brick", (154.1, 116.0, 0.03), -90.0, 1.12),
-    ("EastEdge08", "urban", (154.0, 150.0, 0.03), -90.0, 1.04),
-    ("WestInfill00", "urban", (-116.0, -72.0, 0.03), 90.0, 1.04),
-    ("WestInfill01", "brick", (-116.0, -20.0, 0.03), 90.0, 1.12),
-    ("WestInfill02", "quaternius_big", (-116.0, 40.0, 0.03), 90.0, 1.00),
-    ("WestInfill03", "brick", (-134.0, 124.0, 0.03), 90.0, 1.10),
-    ("WestInfill04", "quaternius_building4", (-117.0, 150.0, 0.03), 90.0, 1.06),
-    ("EastInfill00", "urban", (116.0, -74.0, 0.03), -90.0, 1.06),
-    ("EastInfill01", "brick", (116.0, -22.0, 0.03), -90.0, 1.10),
-    ("EastInfill02", "quaternius_big", (116.0, 36.0, 0.03), -90.0, 1.02),
-    ("EastInfill03", "brick", (116.0, 124.0, 0.03), -90.0, 1.14),
-    ("EastInfill04", "quaternius_building4", (116.0, 150.0, 0.03), -90.0, 1.04),
-)
 STREET_CADENCE_LAYOUT = (
     ("WestClockRow01", "quaternius_large", (-12.20, -24.0, 0.03), 90.0, 1.90),
-    ("WestMedicineRow01", "brick", (-18.50, 0.0, 0.03), 90.0, 1.30),
+    ("WestMedicineRow01", "chinese_shop", (-18.50, 0.0, 0.03), 90.0, 1.30),
     ("WestMedicineRow02", "quaternius_building4", (-12.70, 12.0, 0.03), 90.0, 1.60),
     ("WestTheatreRow02", "quaternius_house2", (-14.25, 48.0, 0.03), 90.0, 3.00),
 )
@@ -322,7 +297,7 @@ CROSS_STREET_INTRUSION_NAMES = (
     "EastSouthRow01",
     "OuterEastSouthResidence",
 )
-PAWNSHOP_DOORWAY_CUT_VERSION = 2
+PAWNSHOP_DOORWAY_CUT_VERSION = 3
 ENTRY_FACADE_WALL_SOURCE = (
     REPO_ROOT / "assets" / "models" / "quaternius_downtown_city" / "Brick_Plain_1.gltf"
 )
@@ -418,23 +393,18 @@ def rebuild_factory_frontage() -> tuple[int, int]:
     if factory_root is None:
         raise RuntimeError("The Red Star factory root is missing")
 
-    rebuilt = 0
-    for object_name, source_name, location, scale in FACTORY_BUILDING_LAYOUT:
-        source = bpy.data.objects.get(source_name)
-        if source is None or source.type != "MESH":
-            raise RuntimeError(f"Factory replacement source is missing: {source_name}")
+    validated = 0
+    for object_name, _, _, _ in FACTORY_BUILDING_LAYOUT:
         replacement = bpy.data.objects.get(object_name)
-        if replacement is None:
-            replacement = source.copy()
-            replacement.data = source.data
-            replacement.name = object_name
-            bpy.context.scene.collection.objects.link(replacement)
-            rebuilt += 1
-        replacement.parent = factory_root
-        replacement.location = location
-        replacement.rotation_euler = (0.0, 0.0, 0.0)
-        replacement.scale = scale
+        if (
+            replacement is None
+            or replacement.type != "MESH"
+            or replacement.parent != factory_root
+            or replacement.data.get("jianghai_chinese_rebuild_version") != 1
+        ):
+            raise RuntimeError(f"Rebuilt Chinese factory frontage is invalid: {object_name}")
         replacement["district_role"] = "cleared_cc0_factory_frontage"
+        validated += 1
 
     sign_backing = bpy.data.objects.get("RedStarFactoryMarqueeBacking")
     sign_text = bpy.data.objects.get("RedStarFactoryMarqueeText")
@@ -442,7 +412,7 @@ def rebuild_factory_frontage() -> tuple[int, int]:
         sign_backing.location = (85.5, -3.90, 7.35)
     if sign_text is not None:
         sign_text.location = (85.5, -3.81, 7.35)
-    return removed, rebuilt
+    return removed, validated
 
 
 def clear_cross_street_intrusions() -> int:
@@ -627,58 +597,21 @@ def build_density_mesh(profile_name: str) -> bpy.types.Mesh:
 
 
 def rebuild_street_cadence() -> int:
-    """Break the cloned near-street row with four distinct full authored buildings."""
+    """Validate the rebuilt near-street row without changing reviewed transforms."""
 
-    base_source = bpy.data.objects.get("NorthwestGateHouse")
-    if base_source is None or base_source.type != "MESH":
-        raise RuntimeError("The Old Urban cadence reset source is missing")
-    targets = []
-    for object_name, _, _, _, _ in STREET_CADENCE_LAYOUT:
+    validated = 0
+    for object_name, profile_name, _, _, _ in STREET_CADENCE_LAYOUT:
         target = bpy.data.objects.get(object_name)
         if target is None or target.type != "MESH":
             raise RuntimeError(f"Street cadence target is missing: {object_name}")
-        target.data = base_source.data
-        targets.append(target)
-    for mesh in list(bpy.data.meshes):
-        if mesh.name.startswith(STREET_CADENCE_MESH_PREFIX) and mesh.users == 0:
-            bpy.data.meshes.remove(mesh)
-
-    meshes = {
-        "brick": bpy.data.objects["WeatheredRollerShop00"].data,
-        "quaternius_large": build_authored_profile_mesh(
-            "quaternius_large",
-            f"{STREET_CADENCE_MESH_PREFIX}Building1Large",
-            1.0,
-        ),
-        "quaternius_building4": build_authored_profile_mesh(
-            "quaternius_building4",
-            f"{STREET_CADENCE_MESH_PREFIX}Building4",
-            1.0,
-        ),
-        "quaternius_house2": build_authored_profile_mesh(
-            "quaternius_house2",
-            f"{STREET_CADENCE_MESH_PREFIX}House2",
-            1.0,
-        ),
-    }
-    for target, layout in zip(targets, STREET_CADENCE_LAYOUT, strict=True):
-        _, profile_name, location, yaw_degrees, scale = layout
-        profile = DENSITY_SOURCE_PROFILES[profile_name]
-        target.data = meshes[profile_name]
-        target.location = location
-        target.rotation_euler = (0.0, 0.0, radians(yaw_degrees))
-        target.scale = (scale, scale, scale)
-        target["source_asset"] = profile["asset_name"]
-        target["source_creator"] = profile["creator"]
-        target["source_url"] = profile["source_url"]
-        target["license"] = "CC0 1.0 Universal"
-        target["authored_adaptation"] = (
-            "Full authored CC0 building fitted and weathered in Blender to break street cadence"
-        )
-        target["district_role"] = "authored_street_cadence_building"
-        target["collision_role"] = "building_shell"
-        target["building_id"] = target.name
-    return len(targets)
+        chinese_ready = target.data.get("jianghai_chinese_rebuild_version") == 1
+        quaternius_ready = target.get("source_creator") == "Quaternius"
+        if profile_name.startswith("chinese_") and not chinese_ready:
+            raise RuntimeError(f"Chinese street-cadence profile is missing: {object_name}")
+        if profile_name.startswith("quaternius_") and not quaternius_ready:
+            raise RuntimeError(f"Quaternius street-cadence profile is missing: {object_name}")
+        validated += 1
+    return validated
 
 
 def clear_market_walkway() -> int:
@@ -733,6 +666,12 @@ def rebuild_dense_perimeter() -> tuple[int, int, dict[str, int]]:
         building["district_role"] = "authored_density_building"
         building["collision_role"] = "building_shell"
         building["building_id"] = building.name
+        if suffix in {
+            "WestEdge04", "WestEdge05", "WestEdge06",
+            "EastEdge04", "EastEdge05", "EastEdge06",
+        }:
+            building["jianghai_gameplay_proxy"] = True
+            building["jianghai_proxy_role"] = "edge_building"
         created += 1
         profile_counts[profile_name] += 1
     return removed, created, profile_counts

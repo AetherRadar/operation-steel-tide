@@ -20,7 +20,7 @@ internal sealed record OldTownLandmarksResult(
     IReadOnlyCollection<string> ScenePaths);
 
 /// <summary>Composes the two loot courtyards and the elevated market route from CC0 authored modules.</summary>
-internal sealed class OldTownLandmarksBuilder
+internal sealed partial class OldTownLandmarksBuilder
 {
     private const string ModelRoot = "res://assets/models/quaternius_downtown_city";
     private static readonly Vector3 HotelCenter = RefineryExtractionMapBuilder.HotelCenter;
@@ -35,7 +35,17 @@ internal sealed class OldTownLandmarksBuilder
         parent.AddChild(root);
 
         var counts = new BuildCounts();
-        var rooftopRoute = MarketRooftopRoute();
+        var collisionBody = new StaticBody3D
+        {
+            Name = "OldTownGameplayCollision",
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        collisionBody.AddToGroup(JianghaiGameplayCollisionBuilder.CollisionGroup);
+        root.AddChild(collisionBody);
+        AddPawnshopGameplayCollision(collisionBody, counts);
+        AddFactoryGateGameplayCollision(collisionBody, counts);
+        var rooftopRoute = AddMarketGameplayCollision(collisionBody, counts);
         return new OldTownLandmarksResult(
             3,
             2,

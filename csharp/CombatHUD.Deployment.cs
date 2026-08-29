@@ -6,6 +6,8 @@ namespace OperationSteelTide;
 
 public partial class CombatHUD
 {
+    public event Action<string>? DeploymentMapSelectionChanged;
+
     private readonly Dictionary<string, Button> _deploymentWeaponButtons = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Label> _deploymentWeaponNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Label> _deploymentWeaponDetails = new(StringComparer.OrdinalIgnoreCase);
@@ -601,9 +603,17 @@ public partial class CombatHUD
         {
             return;
         }
+        var changed = !string.Equals(
+            _selectedDeploymentMapId,
+            map.Id,
+            StringComparison.OrdinalIgnoreCase);
         _selectedDeploymentMapId = map.Id;
         ClearDeploymentError();
         RefreshDeploymentStore();
+        if (changed)
+        {
+            DeploymentMapSelectionChanged?.Invoke(map.Id);
+        }
     }
 
     private void CycleDeploymentThreat()
