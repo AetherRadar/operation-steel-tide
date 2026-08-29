@@ -152,6 +152,51 @@ and rejects missing roots, markers, materials, triangle-count drift, or an
 out-of-budget mesh. The triangle counts above are the exact triangulated GLB
 counts verified by that round-trip, not estimates.
 
+## Bazaar Crossing authored demolition-map composite
+
+Bazaar Crossing is a Blender 4.5 composition created on 2026-08-28 for the
+sixth demolition-map slot. The project-authored layout, transforms, material
+adaptations, metadata, invisible gameplay scaffolding, and deterministic DCC
+workflow are covered by the repository's root MIT license, subject to the
+disclosure in `../../docs/CONTENT_PROVENANCE.md`. Every exported visible mesh,
+including the connected ground, three elevated combat decks, six stairways,
+railings, supports, canopy, and cover, remains an arrangement or adaptation of
+a finished CC0 source mesh and is not relicensed as MIT.
+
+The production structure, facades, and street dressing embedded in the
+composite are limited to the CC0 1.0 Universal sources recorded in
+`../../source_art/world/bazaar_crossing/LICENSE.md`: Old Urban building by
+Abobla O.S; Scan Old Building Street by Free poly; Chinese red lamp and Pink
+city bicycle by Kin Chen; Coffee Cart 01 by Joe Seabuhr; Chinese Tea Table and
+Chinese Stool by Kirill Sannikov; Wicker Basket 01 by Kuutti Siitonen; Hand
+Truck by Mutanzom3D; Old Military Crate by Jack Mava; Barrel 03 by Serhii
+Khromov; Plastic Crate 02 by Fabi_G; selected stairs, floors, foundations,
+trims, columns, caps, and roof modules from Trey Ramm's Modular Industrial Kit;
+and the Asphalt 03, Gravel Embedded Concrete, and Concrete Floor PBR surface
+sets. Attribution is not required by CC0, but all creator names and official
+source URLs are retained as provenance.
+
+- Runtime output: `bazaar_crossing/bazaar_crossing.glb`.
+- Immutable map-local source palette:
+  `../../source_art/world/bazaar_crossing/bazaar_crossing_source_palette.blend`.
+- Editable source: `../../source_art/world/bazaar_crossing/bazaar_crossing.blend`.
+- Reproducible build: `../../scripts/blender/build_bazaar_crossing.py`.
+- Rights and source mapping: `bazaar_crossing/LICENSE.md` and
+  `../../source_art/world/bazaar_crossing/LICENSE.md`.
+- Deterministic report:
+  `../../source_art/world/bazaar_crossing/bazaar_crossing_build_report.json`.
+
+The verified editable scene contains 277 visible mesh nodes, 298 material
+surfaces, 116 shared unique meshes, 272,916 unique triangles, and 2,771,825
+instanced triangles. Its 46 source textures are capped at 1024 pixels and have
+an estimated 127.473 MiB RGBA8 plus full-mip-chain cost. The DCC round trip
+retains all 277 visible meshes and the exact instanced-triangle count, and
+checks meter scale, scene bounds, UV and material coverage, three deck heights,
+all six 3.2-meter stair openings, explicit CC0 provenance for every visible
+mesh, and the absence of Hero Mountain, Coast Line, CC BY, paid, editorial,
+private-store, or unclear-license content. The complete Jianghai Old City
+runtime GLB is neither embedded nor referenced.
+
 ## Poly Haven CC0 models
 
 The following two [Poly Haven](https://polyhaven.com/) models adapted into

@@ -52,6 +52,13 @@ public partial class FreightTerminalWorld
             && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.TideglassReactorId;
         var lockedMapRejected = _hud.PressDemolitionMapForDiagnostics("drydock_yard") == false
             && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.TideglassReactorId;
+        var bazaarCarousel = _hud.PressDemolitionMapForDiagnostics(
+                DemolitionMapCatalog.BazaarCrossingId)
+            && _hud.BrowsedDemolitionMapId == DemolitionMapCatalog.BazaarCrossingId
+            && _hud.BrowsedDemolitionMapIndex == 5
+            && _hud.BrowsedDemolitionMapAvailable
+            && _hud.DemolitionBriefingDeployEnabled
+            && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.BazaarCrossingId;
         _hud.PressDemolitionMapForDiagnostics(DemolitionMapCatalog.TideforgeId);
         var synchronizedWithoutDeployment = _hud.SelectedDemolitionRole == OperatorRole.Medic
             && _hud.SelectedDemolitionPrimary == WeaponPlatform.M4A1
@@ -185,21 +192,22 @@ public partial class FreightTerminalWorld
             && !_demolitionMode;
         _hud.SetLanguage(originalLanguage);
         _hud.PressDemolitionModeForDiagnostics();
-        var tideglassSelectedForDeployment = _hud.PressDemolitionMapForDiagnostics(
-            DemolitionMapCatalog.TideglassReactorId);
+        var bazaarSelectedForDeployment = _hud.PressDemolitionMapForDiagnostics(
+            DemolitionMapCatalog.BazaarCrossingId);
         _hud.PressDemolitionDeployForDiagnostics();
         await WaitFrames(5);
-        var tideglassDeploymentReady = tideglassSelectedForDeployment
-            && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.TideglassReactorId
+        var bazaarDeploymentReady = bazaarSelectedForDeployment
+            && _hud.SelectedDemolitionMapId == DemolitionMapCatalog.BazaarCrossingId
             && _demolitionMode
             && _squadDeployed
-            && _demolitionArena?.Layout.MapId == DemolitionMapCatalog.TideglassReactorId
-            && _demolitionArena.Root.Name == "TideglassReactorArena";
+            && _demolitionArena?.Layout.MapId == DemolitionMapCatalog.BazaarCrossingId
+            && _demolitionArena.Root.Name == "BazaarCrossingArena";
         var valid = sceneReady && chineseReady && englishReady && mapPoolReady && harborCarousel
             && tideglassCarousel && lockedCarousel && carouselReturned && lockedMapRejected
+            && bazaarCarousel
             && synchronizedWithoutDeployment && addressModes && networkLobbyState
-            && probeReady && backReady && tideglassDeploymentReady;
-        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} map_pool={mapPoolReady} harbor={harborCarousel} tideglass={tideglassCarousel} carousel_locked={lockedCarousel} carousel_return={carouselReturned} locked_rejected={lockedMapRejected} sync={synchronizedWithoutDeployment} address_modes={addressModes} network_lobby={networkLobbyState} probe={probeReady} back={backReady} tideglass_deployment={tideglassDeploymentReady}");
+            && probeReady && backReady && bazaarDeploymentReady;
+        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} map_pool={mapPoolReady} harbor={harborCarousel} tideglass={tideglassCarousel} bazaar={bazaarCarousel} carousel_locked={lockedCarousel} carousel_return={carouselReturned} locked_rejected={lockedMapRejected} sync={synchronizedWithoutDeployment} address_modes={addressModes} network_lobby={networkLobbyState} probe={probeReady} back={backReady} bazaar_deployment={bazaarDeploymentReady}");
         GD.Print($"DEMOLITION_BRIEFING_PASS valid={valid}");
         GetTree().Paused = false;
         await WaitFrames(180);
@@ -1265,8 +1273,16 @@ public partial class FreightTerminalWorld
             {
                 tideforgeLayout,
                 new DemolitionArenaLayout(DemolitionMapCatalog.HarborLocksId, layout.Origin),
-                tideglassLayout
+                tideglassLayout,
+                new DemolitionArenaLayout(DemolitionMapCatalog.BazaarCrossingId, layout.Origin)
             };
+            var productionMapCoverage = demolitionLayouts
+                .Select(map => map.MapId)
+                .OrderBy(mapId => mapId, StringComparer.Ordinal)
+                .SequenceEqual(DemolitionMapCatalog.Maps
+                    .Where(map => map.Available)
+                    .Select(map => map.Id)
+                    .OrderBy(mapId => mapId, StringComparer.Ordinal));
             var productionRoutes = demolitionLayouts.SelectMany(map =>
             {
                 var planner = new DemolitionRoutePlanner(map);
@@ -1310,7 +1326,10 @@ public partial class FreightTerminalWorld
             var productionApproachesClear = demolitionLayouts.All(map =>
                 map.HasCapsuleClearance(map.AttackApproachToAPath, out _)
                 && map.HasCapsuleClearance(map.AttackApproachToBPath, out _));
-            var productionRoutesValid = productionRoutes.Length == 30
+            var expectedProductionRouteCount = demolitionLayouts.Sum(map =>
+                map.AttackSpawns.Count * map.SitePositions.Count);
+            var productionRoutesValid = productionMapCoverage
+                && productionRoutes.Length == expectedProductionRouteCount
                 && productionRoutes.All(route => route.Route.ReachesDestination && route.Clear);
             var productionRoutesOpenCorrectSide = productionRoutes.All(route => route.OpensCorrectSide);
             var productionRoutesDepthSafe = productionRoutes.All(route => route.DepthOvershoot <= 0.25f);
@@ -1347,7 +1366,9 @@ public partial class FreightTerminalWorld
                         };
                     }));
             }).ToArray();
-            var defenderProductionRoutesValid = defenderProductionRoutes.Length == 30
+            var expectedDefenderRouteCount = demolitionLayouts.Sum(map =>
+                map.DefenderSpawns.Count * map.SitePositions.Count);
+            var defenderProductionRoutesValid = defenderProductionRoutes.Length == expectedDefenderRouteCount
                 && defenderProductionRoutes.All(route => route.Route.ReachesDestination && route.Clear);
             var defenderProductionRoutesEfficient = defenderProductionRoutes.All(route =>
                 route.Stretch <= 1.40f);
@@ -1764,6 +1785,10 @@ public partial class FreightTerminalWorld
                 && ValidateDemolitionPostPatrolLayout(
                     new DemolitionArenaLayout(
                         DemolitionMapCatalog.TideglassReactorId,
+                        layout.Origin))
+                && ValidateDemolitionPostPatrolLayout(
+                    new DemolitionArenaLayout(
+                        DemolitionMapCatalog.BazaarCrossingId,
                         layout.Origin));
             var aiCarrier = _squadMates.FirstOrDefault(mate => IsInstanceValid(mate)
                 && !mate.IsHumanProxy
@@ -1984,7 +2009,7 @@ public partial class FreightTerminalWorld
                 && staleMoveRecovered
                 && defuserPostProtected
                 && postPatrolLayouts;
-            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} friendly_ai_plant_under_contact={friendlyAiPlantsDevice} carrier_destination={carrierDestinationFollowsDevice} carrier_contact_priority={carrierThreatKeepsObjective} ai_carrier_escort={aiCarrierEscort} player_carrier_escort={playerCarrierEscort} grounded_player_reassigned={groundedPlayerRunnerReleased} hidden_threat_ignored={hiddenThreatIgnored} visible_threat_yields={visibleThreatYields} post_patrol={postPatrolReactivated} post_second_hop={postPatrolSecondHop} stale_move_recovered={staleMoveRecovered} defuser_post_protected={defuserPostProtected} post_layouts={postPatrolLayouts} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} team_unreachable={teamAwareUnreachableSafe} soft_direct={softPenaltyDirectReachable} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} frontier_fallback={frontierFallback} frontier_stable={frontierFallbackStable} frontier_replans={frontierReplans} frontier_directive_distance={frontierDirectiveDistance:0.00} reachable_route_preserved={reachableRoutePreserved} opening_patterns={openingPatterns} round_sites={roundSiteVariety}:{roundPreferredSites[0]}/{roundPreferredSites[1]} route_cost_override={routeCostOverridesRoundPreference} unreachable_override={unreachableRouteOverridesRoundPreference} unreachable_excluded={unreachableRouteRemainsExcluded} committed_site_stable={committedSiteStable} confirmed_threat_rotates={confirmedThreatRotates} threat_deduplicated={duplicateThreatReportsDeduplicated} urgent_commitment={urgentCommitmentPreserved} plant_channel_lock={plantChannelLocksSite} carrier_commitment_scoped={carrierCommitmentScoped} tideforge_selection={tideforgeSelectionStable} right_lane_opening={rightLaneOpensRight} approaches_clear={productionApproachesClear} production_routes={productionRoutesValid}:count={productionRoutes.Length}:profiles={productionRouteProfiles} opening_sides={productionRoutesOpenCorrectSide} route_depth={productionRoutesDepthSafe} route_efficiency={productionRoutesEfficient}:max={productionRoutes.Max(route => route.Stretch):0.000} spawn_avoidance={attackerRoutesAvoidDefenderSpawn} defender_routes={defenderProductionRoutesValid}:count={defenderProductionRoutes.Length} defender_efficiency={defenderProductionRoutesEfficient}:max={defenderProductionRoutes.Max(route => route.Stretch):0.000} defender_spawn_avoidance={defenderRoutesAvoidAttackerSpawn} overshot_retreat={overshotCarrierRetreats} posts={postsConverted} squad_route={squadRouteNavigation} squad_route_reuse={squadRouteReuse} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
+            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} friendly_ai_plant_under_contact={friendlyAiPlantsDevice} carrier_destination={carrierDestinationFollowsDevice} carrier_contact_priority={carrierThreatKeepsObjective} ai_carrier_escort={aiCarrierEscort} player_carrier_escort={playerCarrierEscort} grounded_player_reassigned={groundedPlayerRunnerReleased} hidden_threat_ignored={hiddenThreatIgnored} visible_threat_yields={visibleThreatYields} post_patrol={postPatrolReactivated} post_second_hop={postPatrolSecondHop} stale_move_recovered={staleMoveRecovered} defuser_post_protected={defuserPostProtected} post_layouts={postPatrolLayouts} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} team_unreachable={teamAwareUnreachableSafe} soft_direct={softPenaltyDirectReachable} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} frontier_fallback={frontierFallback} frontier_stable={frontierFallbackStable} frontier_replans={frontierReplans} frontier_directive_distance={frontierDirectiveDistance:0.00} reachable_route_preserved={reachableRoutePreserved} opening_patterns={openingPatterns} round_sites={roundSiteVariety}:{roundPreferredSites[0]}/{roundPreferredSites[1]} route_cost_override={routeCostOverridesRoundPreference} unreachable_override={unreachableRouteOverridesRoundPreference} unreachable_excluded={unreachableRouteRemainsExcluded} committed_site_stable={committedSiteStable} confirmed_threat_rotates={confirmedThreatRotates} threat_deduplicated={duplicateThreatReportsDeduplicated} urgent_commitment={urgentCommitmentPreserved} plant_channel_lock={plantChannelLocksSite} carrier_commitment_scoped={carrierCommitmentScoped} tideforge_selection={tideforgeSelectionStable} right_lane_opening={rightLaneOpensRight} production_maps={productionMapCoverage}:{demolitionLayouts.Length} approaches_clear={productionApproachesClear} production_routes={productionRoutesValid}:count={productionRoutes.Length}:profiles={productionRouteProfiles} opening_sides={productionRoutesOpenCorrectSide} route_depth={productionRoutesDepthSafe} route_efficiency={productionRoutesEfficient}:max={productionRoutes.Max(route => route.Stretch):0.000} spawn_avoidance={attackerRoutesAvoidDefenderSpawn} defender_routes={defenderProductionRoutesValid}:count={defenderProductionRoutes.Length} defender_efficiency={defenderProductionRoutesEfficient}:max={defenderProductionRoutes.Max(route => route.Stretch):0.000} defender_spawn_avoidance={defenderRoutesAvoidAttackerSpawn} overshot_retreat={overshotCarrierRetreats} posts={postsConverted} squad_route={squadRouteNavigation} squad_route_reuse={squadRouteReuse} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
             return valid;
         }
         finally

@@ -10,13 +10,17 @@ public readonly record struct DemolitionRouteResult(
     float Length);
 
 /// <summary>
-/// Pure arena route planner. It connects the authored lanes and cover posts into a small
-/// visibility graph, then finds a deterministic shortest route for objective movement.
+/// Pure arena route planner. It connects authored lanes, elevation transitions, and cover
+/// posts into a small 3D visibility graph, then finds a deterministic shortest route for
+/// objective movement. Automatic links stay on one walkable grade; only authored paths can
+/// bridge a full floor change.
 /// </summary>
 public sealed class DemolitionRoutePlanner
 {
     private const float MaximumVisibilityEdge = 24.0f;
     private const float MaximumEndpointEdge = 34.0f;
+    private const float MaximumAutomaticVerticalDelta = 0.65f;
+    private const float MaximumAuthoredGrade = 0.325f;
     private const float DuplicatePointDistanceSquared = 0.08f * 0.08f;
     private const float OpponentSpawnAvoidanceRadius = 20.0f;
     private const float OpponentSpawnMaximumPenalty = 90.0f;
@@ -27,12 +31,14 @@ public sealed class DemolitionRoutePlanner
     private readonly DemolitionArenaLayout _layout;
     private readonly Vector3[] _nodes;
     private readonly List<RouteEdge>[] _baseEdges;
+    private readonly DemolitionElevationTransitions _elevationTransitions;
 
     public DemolitionRoutePlanner(DemolitionArenaLayout layout)
     {
         _layout = layout ?? throw new ArgumentNullException(nameof(layout));
         var nodes = new List<Vector3>();
         var authoredLinks = new List<(int From, int To)>();
+        var auxiliaryNodePaths = new List<IReadOnlyList<int>>();
         AddAuthoredPath(nodes, authoredLinks, layout.AttackToAPath);
         AddAuthoredPath(nodes, authoredLinks, layout.AttackToBPath);
         AddAuthoredPath(nodes, authoredLinks, layout.AttackApproachToAPath);
@@ -41,6 +47,10 @@ public sealed class DemolitionRoutePlanner
         AddAuthoredPath(nodes, authoredLinks, layout.DefenderToAPath);
         AddAuthoredPath(nodes, authoredLinks, layout.DefenderToBPath);
         AddAuthoredPath(nodes, authoredLinks, layout.SiteRotationPath);
+        foreach (var path in layout.AuxiliaryPaths)
+        {
+            auxiliaryNodePaths.Add(AddAuthoredPath(nodes, authoredLinks, path));
+        }
         AddPoints(nodes, layout.AttackSpawns);
         AddPoints(nodes, layout.DefenderSpawns);
         AddPoints(nodes, layout.SitePositions);
@@ -48,18 +58,36 @@ public sealed class DemolitionRoutePlanner
         AddPoint(nodes, layout.Midpoint);
 
         _nodes = nodes.ToArray();
+        _elevationTransitions = DemolitionElevationTransitions.Create(
+            _nodes,
+            auxiliaryNodePaths,
+            layout.TraversalBoxes);
         _baseEdges = CreateEdgeLists(_nodes.Length);
         foreach (var link in authoredLinks)
         {
-            TryConnect(_baseEdges, link.From, link.To, _nodes[link.From], _nodes[link.To]);
+            TryConnect(
+                _baseEdges,
+                link.From,
+                link.To,
+                _nodes[link.From],
+                _nodes[link.To],
+                allowElevationChange: true);
         }
         for (var from = 0; from < _nodes.Length; from++)
         {
             for (var to = from + 1; to < _nodes.Length; to++)
             {
-                if (HorizontalDistance(_nodes[from], _nodes[to]) <= MaximumVisibilityEdge)
+                if (!_elevationTransitions.IsInteriorNode(from)
+                    && !_elevationTransitions.IsInteriorNode(to)
+                    && HorizontalDistance(_nodes[from], _nodes[to]) <= MaximumVisibilityEdge)
                 {
-                    TryConnect(_baseEdges, from, to, _nodes[from], _nodes[to]);
+                    TryConnect(
+                        _baseEdges,
+                        from,
+                        to,
+                        _nodes[from],
+                        _nodes[to],
+                        allowElevationChange: false);
                 }
             }
         }
@@ -70,14 +98,13 @@ public sealed class DemolitionRoutePlanner
         Vector3 destination,
         DemolitionTeam? movingTeam = null)
     {
-        destination.Y = start.Y;
-        if (CanTraverse(start, destination)
+        if (CanUseRouteSegment(start, destination)
             && TacticalSegmentPenalty(start, destination, destination, movingTeam) <= 0.001f)
         {
             return new DemolitionRouteResult(
                 new[] { destination },
                 true,
-                HorizontalDistance(start, destination));
+                start.DistanceTo(destination));
         }
 
         if (movingTeam == DemolitionTeam.Attackers
@@ -96,13 +123,13 @@ public sealed class DemolitionRoutePlanner
         var edges = CloneEdgesWithEndpoints();
         ConnectEndpoint(edges, startIndex, start, MaximumEndpointEdge);
         ConnectEndpoint(edges, destinationIndex, destination, MaximumEndpointEdge);
-        if (CanTraverse(start, destination))
+        if (CanUseRouteSegment(start, destination))
         {
             AddBidirectionalEdge(
                 edges,
                 startIndex,
                 destinationIndex,
-                HorizontalDistance(start, destination));
+                start.DistanceTo(destination));
         }
         if (edges[startIndex].Count == 0)
         {
@@ -132,7 +159,6 @@ public sealed class DemolitionRoutePlanner
             }
 
             var frontier = _nodes[frontierIndex];
-            frontier.Y = start.Y;
             var frontierRoute = ReconstructRoute(
                 search.Previous,
                 startIndex,
@@ -161,8 +187,7 @@ public sealed class DemolitionRoutePlanner
         for (var index = 0; index < waypoints.Count; index++)
         {
             var to = waypoints[index];
-            to.Y = from.Y;
-            if (!CanTraverse(from, to))
+            if (!CanUseRouteSegment(from, to))
             {
                 return false;
             }
@@ -185,8 +210,7 @@ public sealed class DemolitionRoutePlanner
         for (var entry = 0; entry < authoredPath.Count; entry++)
         {
             var waypoint = authoredPath[entry];
-            waypoint.Y = start.Y;
-            if (!CanTraverse(start, waypoint))
+            if (!CanUseRouteSegment(start, waypoint))
             {
                 continue;
             }
@@ -211,7 +235,7 @@ public sealed class DemolitionRoutePlanner
             {
                 continue;
             }
-            var cost = HorizontalDistance(start, waypoint)
+            var cost = start.DistanceTo(waypoint)
                 + AuthoredPathRemainingLength(authoredPath, entry)
                 + tacticalCost;
             if (cost < bestCost)
@@ -229,12 +253,10 @@ public sealed class DemolitionRoutePlanner
         var lane = new List<Vector3>(authoredPath.Count - bestEntry + 1);
         for (var index = bestEntry; index < authoredPath.Count; index++)
         {
-            var waypoint = authoredPath[index];
-            waypoint.Y = start.Y;
-            lane.Add(waypoint);
+            lane.Add(authoredPath[index]);
         }
         if (lane.Count == 0
-            || HorizontalDistanceSquared(lane[^1], destination)
+            || lane[^1].DistanceSquaredTo(destination)
                 > DuplicatePointDistanceSquared)
         {
             lane.Add(destination);
@@ -275,7 +297,7 @@ public sealed class DemolitionRoutePlanner
         var length = 0.0f;
         for (var index = startIndex + 1; index < path.Count; index++)
         {
-            length += HorizontalDistance(path[index - 1], path[index]);
+            length += path[index - 1].DistanceTo(path[index]);
         }
         return length;
     }
@@ -296,13 +318,47 @@ public sealed class DemolitionRoutePlanner
         Vector3 endpoint,
         float maximumDistance)
     {
+        if (_elevationTransitions.TryFindClosestSegment(endpoint, out var transition))
+        {
+            ConnectTransitionEndpoint(
+                edges,
+                endpointIndex,
+                endpoint,
+                transition.FromNode,
+                maximumDistance);
+            ConnectTransitionEndpoint(
+                edges,
+                endpointIndex,
+                endpoint,
+                transition.ToNode,
+                maximumDistance);
+            return;
+        }
+
         for (var nodeIndex = 0; nodeIndex < _nodes.Length; nodeIndex++)
         {
-            var distance = HorizontalDistance(endpoint, _nodes[nodeIndex]);
-            if (distance > maximumDistance || !CanTraverse(endpoint, _nodes[nodeIndex]))
+            var distance = endpoint.DistanceTo(_nodes[nodeIndex]);
+            if (distance > maximumDistance
+                || _elevationTransitions.IsInteriorNode(nodeIndex)
+                || !CanTraverse(endpoint, _nodes[nodeIndex], allowElevationChange: false))
             {
                 continue;
             }
+            AddBidirectionalEdge(edges, endpointIndex, nodeIndex, distance);
+        }
+    }
+
+    private void ConnectTransitionEndpoint(
+        List<RouteEdge>[] edges,
+        int endpointIndex,
+        Vector3 endpoint,
+        int nodeIndex,
+        float maximumDistance)
+    {
+        var distance = endpoint.DistanceTo(_nodes[nodeIndex]);
+        if (distance <= maximumDistance
+            && CanTraverse(endpoint, _nodes[nodeIndex], allowElevationChange: true))
+        {
             AddBidirectionalEdge(edges, endpointIndex, nodeIndex, distance);
         }
     }
@@ -507,7 +563,7 @@ public sealed class DemolitionRoutePlanner
                 continue;
             }
 
-            var destinationDistance = HorizontalDistanceSquared(_nodes[index], destination);
+            var destinationDistance = _nodes[index].DistanceSquaredTo(destination);
             if (destinationDistance + 0.001f < bestDestinationDistance
                 || Mathf.IsEqualApprox(destinationDistance, bestDestinationDistance)
                     && routeLength < bestRouteLength)
@@ -532,11 +588,18 @@ public sealed class DemolitionRoutePlanner
         while (current >= 0 && current != startIndex)
         {
             var point = _nodes[current];
-            point.Y = start.Y;
-            reversed.Add(point);
+            if (point.DistanceSquaredTo(reversed[^1]) > DuplicatePointDistanceSquared)
+            {
+                reversed.Add(point);
+            }
             current = previous[current];
         }
         reversed.Reverse();
+        if (reversed.Count > 0
+            && reversed[0].DistanceSquaredTo(start) <= DuplicatePointDistanceSquared)
+        {
+            reversed.RemoveAt(0);
+        }
         return reversed.ToArray();
     }
 
@@ -554,7 +617,7 @@ public sealed class DemolitionRoutePlanner
             var furthest = index;
             for (var candidate = route.Count - 1; candidate > index; candidate--)
             {
-                if (CanTraverse(anchor, route[candidate])
+                if (CanUseRouteSegment(anchor, route[candidate])
                     && TacticalSegmentPenalty(
                         anchor,
                         route[candidate],
@@ -566,7 +629,6 @@ public sealed class DemolitionRoutePlanner
                 }
             }
             var waypoint = route[furthest];
-            waypoint.Y = start.Y;
             simplified.Add(waypoint);
             anchor = waypoint;
             index = furthest + 1;
@@ -579,33 +641,81 @@ public sealed class DemolitionRoutePlanner
         int from,
         int to,
         Vector3 fromPoint,
-        Vector3 toPoint)
+        Vector3 toPoint,
+        bool allowElevationChange)
     {
-        if (from == to || edges[from].Exists(edge => edge.To == to) || !CanTraverse(fromPoint, toPoint))
+        if (from == to
+            || edges[from].Exists(edge => edge.To == to)
+            || !CanTraverse(fromPoint, toPoint, allowElevationChange))
         {
             return;
         }
-        AddBidirectionalEdge(edges, from, to, HorizontalDistance(fromPoint, toPoint));
+        AddBidirectionalEdge(edges, from, to, fromPoint.DistanceTo(toPoint));
     }
 
-    private bool CanTraverse(Vector3 from, Vector3 to)
-        => _layout.HasCapsuleClearance(new[] { from, to }, out _);
+    private bool CanUseRouteSegment(Vector3 from, Vector3 to)
+    {
+        var fromTransition = _elevationTransitions.IsNearTransition(from);
+        var toTransition = _elevationTransitions.IsNearTransition(to);
+        if (!fromTransition && !toTransition)
+        {
+            return CanTraverse(from, to, allowElevationChange: false);
+        }
+        if (_elevationTransitions.SharesSegment(from, to))
+        {
+            return CanTraverse(from, to, allowElevationChange: true);
+        }
 
-    private static void AddAuthoredPath(
+        var fromMayUseAutomaticEdge = !fromTransition
+            || _elevationTransitions.IsBoundaryPoint(from);
+        var toMayUseAutomaticEdge = !toTransition
+            || _elevationTransitions.IsBoundaryPoint(to);
+        return fromMayUseAutomaticEdge
+            && toMayUseAutomaticEdge
+            && CanTraverse(from, to, allowElevationChange: false);
+    }
+
+    private bool CanTraverse(Vector3 from, Vector3 to, bool allowElevationChange)
+    {
+        var verticalDelta = Mathf.Abs(to.Y - from.Y);
+        var horizontalDistance = HorizontalDistance(from, to);
+        if (allowElevationChange)
+        {
+            if (horizontalDistance <= 0.08f
+                ? verticalDelta > MaximumAutomaticVerticalDelta
+                : verticalDelta / horizontalDistance > MaximumAuthoredGrade + 0.001f)
+            {
+                return false;
+            }
+        }
+        else if (verticalDelta > MaximumAutomaticVerticalDelta
+            || (horizontalDistance <= 0.08f
+                ? verticalDelta > 0.25f
+                : verticalDelta / horizontalDistance > MaximumAuthoredGrade + 0.001f))
+        {
+            return false;
+        }
+        return _layout.HasCapsuleClearance(new[] { from, to }, out _);
+    }
+
+    private static int[] AddAuthoredPath(
         List<Vector3> nodes,
         List<(int From, int To)> links,
         IReadOnlyList<Vector3> path)
     {
+        var pathNodes = new int[path.Count];
         var previous = -1;
-        foreach (var point in path)
+        for (var index = 0; index < path.Count; index++)
         {
-            var current = AddPoint(nodes, point);
+            var current = AddPoint(nodes, path[index]);
+            pathNodes[index] = current;
             if (previous >= 0 && previous != current)
             {
                 links.Add((previous, current));
             }
             previous = current;
         }
+        return pathNodes;
     }
 
     private static void AddPoints(List<Vector3> nodes, IReadOnlyList<Vector3> points)
@@ -620,7 +730,7 @@ public sealed class DemolitionRoutePlanner
     {
         for (var index = 0; index < nodes.Count; index++)
         {
-            if (HorizontalDistanceSquared(nodes[index], point) <= DuplicatePointDistanceSquared)
+            if (nodes[index].DistanceSquaredTo(point) <= DuplicatePointDistanceSquared)
             {
                 return index;
             }
@@ -651,7 +761,7 @@ public sealed class DemolitionRoutePlanner
         var previous = start;
         foreach (var point in route)
         {
-            length += HorizontalDistance(previous, point);
+            length += previous.DistanceTo(point);
             previous = point;
         }
         return length;

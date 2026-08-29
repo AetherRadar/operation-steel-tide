@@ -781,7 +781,7 @@ public partial class FreightTerminalWorld
             opponent.GlobalPosition,
             DemolitionRouteCornerTolerance,
             cursor.ReachesDestination ? stoppingDistance : DemolitionRouteCornerTolerance);
-        var distance = HorizontalDistance(opponent.GlobalPosition, destination);
+        var distance = opponent.GlobalPosition.DistanceTo(destination);
         if (cursor.ReachesDestination && (cursor.Complete || distance <= stoppingDistance))
         {
             return MoveDemolitionOpponentToward(opponent, destination, delta, stoppingDistance, speed);

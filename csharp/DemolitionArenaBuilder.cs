@@ -34,12 +34,18 @@ public sealed partial class DemolitionArenaBuilder
                 ? "HarborLocksArena"
                 : layout.MapId == DemolitionMapCatalog.TideglassReactorId
                     ? "TideglassReactorArena"
-                    : "TideforgeArena"
+                    : layout.MapId == DemolitionMapCatalog.BazaarCrossingId
+                        ? "BazaarCrossingArena"
+                        : "TideforgeArena"
         };
         parent.AddChild(root);
         var materials = BuildMaterials();
 
         foreach (var definition in layout.CollisionBoxes)
+        {
+            AddStaticBox(root, definition, MaterialFor(materials, definition.Material));
+        }
+        foreach (var definition in layout.TraversalBoxes)
         {
             AddStaticBox(root, definition, MaterialFor(materials, definition.Material));
         }
@@ -269,6 +275,11 @@ public sealed partial class DemolitionArenaBuilder
         DemolitionArenaLayout layout,
         IReadOnlyDictionary<string, StandardMaterial3D> materials)
     {
+        if (layout.MapId == DemolitionMapCatalog.BazaarCrossingId)
+        {
+            BuildBazaarCrossingLandmarks(root, layout);
+            return;
+        }
         if (layout.MapId == DemolitionMapCatalog.TideglassReactorId)
         {
             BuildTideglassReactorLandmarks(root, layout);
@@ -314,6 +325,11 @@ public sealed partial class DemolitionArenaBuilder
         DemolitionArenaLayout layout,
         IReadOnlyDictionary<string, StandardMaterial3D> materials)
     {
+        if (layout.MapId == DemolitionMapCatalog.BazaarCrossingId)
+        {
+            BuildBazaarCrossingCoverDetails(root, layout);
+            return;
+        }
         if (layout.MapId == DemolitionMapCatalog.TideglassReactorId)
         {
             BuildTideglassReactorCoverDetails(root, layout);
@@ -384,6 +400,11 @@ public sealed partial class DemolitionArenaBuilder
 
     private void BuildRouteGuidance(Node3D root, DemolitionArenaLayout layout)
     {
+        if (layout.MapId == DemolitionMapCatalog.BazaarCrossingId)
+        {
+            BuildBazaarCrossingRouteGuidance(root, layout);
+            return;
+        }
         if (layout.MapId == DemolitionMapCatalog.TideglassReactorId)
         {
             BuildTideglassReactorRouteGuidance(root, layout);
@@ -428,6 +449,11 @@ public sealed partial class DemolitionArenaBuilder
         DemolitionArenaLayout layout,
         IReadOnlyDictionary<string, StandardMaterial3D> materials)
     {
+        if (layout.MapId == DemolitionMapCatalog.BazaarCrossingId)
+        {
+            BuildBazaarCrossingLighting(root, layout);
+            return;
+        }
         if (layout.MapId == DemolitionMapCatalog.TideglassReactorId)
         {
             BuildTideglassReactorLighting(root, layout);

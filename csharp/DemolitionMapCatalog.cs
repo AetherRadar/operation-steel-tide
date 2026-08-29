@@ -23,6 +23,7 @@ public static class DemolitionMapCatalog
     public const string TideforgeId = "tideforge";
     public const string HarborLocksId = "harbor_locks";
     public const string TideglassReactorId = "tideglass_reactor";
+    public const string BazaarCrossingId = "bazaar_crossing";
     public const int PoolSize = 12;
 
     public static readonly IReadOnlyList<DemolitionMapOffer> Maps = new[]
@@ -72,13 +73,15 @@ public static class DemolitionMapCatalog
             "HILLSIDE RELAY  //  IN CONSTRUCTION",
             false),
         new DemolitionMapOffer(
-            "bazaar_crossing",
+            BazaarCrossingId,
             "MAP 06",
             "demolition_map_bazaar_crossing",
             "BAZAAR CROSSING",
-            "demolition_map_locked_subtitle",
-            "SALVAGE MARKET  //  IN CONSTRUCTION",
-            false),
+            "demolition_map_bazaar_crossing_subtitle",
+            "OLD-CITY MARKET  //  GALLERIES AND BRIDGES",
+            true,
+            "demolition_map_bazaar_crossing_profile",
+            "THREE-LANE OLD-CITY ASSAULT  //  BROKEN SIGHTLINES  //  THREE PLAYABLE ELEVATIONS\nA  WEST GALLERY COURT  //  B  EAST BALCONY MARKET"),
         new DemolitionMapOffer(
             "skybridge_terminal",
             "MAP 07",

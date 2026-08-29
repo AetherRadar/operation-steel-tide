@@ -1,0 +1,337 @@
+{
+  "status": "BAZAAR_DCC_PASS",
+  "blender_version": "4.5.10 LTS",
+  "source_blend": "source_art/world/bazaar_crossing/bazaar_crossing_source_palette.blend",
+  "source_blend_sha256": "0073ADE0E13682C47A07CCBE02B499BFF8FBD25C0C98DA908BB58A94FEE4F1F4",
+  "blend": {
+    "path": "source_art/world/bazaar_crossing/bazaar_crossing.blend",
+    "bytes": 22580020,
+    "sha256": "AA809ADBD1502EB586F943D7AD3C1F09FB22B8FA67278D3C40A8CDBF312F7BFD"
+  },
+  "glb": {
+    "path": "assets/models/bazaar_crossing/bazaar_crossing.glb",
+    "bytes": 31089036,
+    "sha256": "70275C300CE245F7A9B25129E7FFE251F99C28DE2C401E383FB2851A4D82543E"
+  },
+  "scene": {
+    "object_count": 299,
+    "mesh_object_count": 277,
+    "unique_mesh_count": 116,
+    "material_count": 28,
+    "texture_count": 46,
+    "draw_node_count": 277,
+    "surface_draw_count": 298,
+    "raw_source_triangles": 249216,
+    "unique_triangles": 272916,
+    "instance_triangles": 2771825,
+    "texture_memory_bytes_estimate_rgba8_mips": 133665094,
+    "texture_memory_mib_estimate_rgba8_mips": 127.473,
+    "blender_bounds_min": [
+      -68.0,
+      -56.0,
+      -0.16
+    ],
+    "blender_bounds_max": [
+      68.0,
+      56.0,
+      7.5021
+    ],
+    "stairs": {
+      "Bazaar_A_Gallery_South_Stair": {
+        "width_m": 3.2,
+        "run_m": 9.72,
+        "slope_degrees": 17.1524,
+        "steps": 18
+      },
+      "Bazaar_A_Gallery_East_Stair": {
+        "width_m": 3.2,
+        "run_m": 9.719999999999999,
+        "slope_degrees": 17.1524,
+        "steps": 18
+      },
+      "Bazaar_Mid_Bridge_West_Stair": {
+        "width_m": 3.2,
+        "run_m": 9.719999999999999,
+        "slope_degrees": 17.1524,
+        "steps": 18
+      },
+      "Bazaar_Mid_Bridge_East_Stair": {
+        "width_m": 3.2,
+        "run_m": 9.719999999999999,
+        "slope_degrees": 17.1524,
+        "steps": 18
+      },
+      "Bazaar_B_Balcony_South_Stair": {
+        "width_m": 3.2,
+        "run_m": 8.32,
+        "slope_degrees": 17.354,
+        "steps": 16
+      },
+      "Bazaar_B_Balcony_West_Stair": {
+        "width_m": 3.2,
+        "run_m": 8.32,
+        "slope_degrees": 17.354,
+        "steps": 16
+      }
+    },
+    "platform_top_m": {
+      "Bazaar_A_Gallery_Deck": 3.0,
+      "Bazaar_Mid_Bridge_Deck": 3.0,
+      "Bazaar_B_Balcony_Deck": 2.6
+    },
+    "authored_module_contract": {
+      "visible_mesh_origin_counts": {
+        "cc0": 277,
+        "project_authored": 0,
+        "procedural": 0
+      },
+      "stairs": {
+        "Bazaar_A_Gallery_South_Stair": {
+          "primary_source_object": "BazaarSource_IndStairsWideFull",
+          "stair_module_instances": 2,
+          "foundation_module_instances": 5,
+          "foundation_source_object": "BazaarSource_IndFoundationAStraightFull",
+          "guardrail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "guardrail_module_instances": 10,
+          "newel_source_object": "BazaarSource_IndColumnFree",
+          "newel_module_instances": 4
+        },
+        "Bazaar_A_Gallery_East_Stair": {
+          "primary_source_object": "BazaarSource_IndStairsWideFull",
+          "stair_module_instances": 2,
+          "foundation_module_instances": 5,
+          "foundation_source_object": "BazaarSource_IndFoundationAStraightFull",
+          "guardrail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "guardrail_module_instances": 10,
+          "newel_source_object": "BazaarSource_IndColumnFree",
+          "newel_module_instances": 4
+        },
+        "Bazaar_Mid_Bridge_West_Stair": {
+          "primary_source_object": "BazaarSource_IndStairsWideFull",
+          "stair_module_instances": 2,
+          "foundation_module_instances": 5,
+          "foundation_source_object": "BazaarSource_IndFoundationAStraightFull",
+          "guardrail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "guardrail_module_instances": 10,
+          "newel_source_object": "BazaarSource_IndColumnFree",
+          "newel_module_instances": 4
+        },
+        "Bazaar_Mid_Bridge_East_Stair": {
+          "primary_source_object": "BazaarSource_IndStairsWideFull",
+          "stair_module_instances": 2,
+          "foundation_module_instances": 5,
+          "foundation_source_object": "BazaarSource_IndFoundationAStraightFull",
+          "guardrail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "guardrail_module_instances": 10,
+          "newel_source_object": "BazaarSource_IndColumnFree",
+          "newel_module_instances": 4
+        },
+        "Bazaar_B_Balcony_South_Stair": {
+          "primary_source_object": "BazaarSource_IndStairsWideFull",
+          "stair_module_instances": 2,
+          "foundation_module_instances": 4,
+          "foundation_source_object": "BazaarSource_IndFoundationAStraightFull",
+          "guardrail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "guardrail_module_instances": 8,
+          "newel_source_object": "BazaarSource_IndColumnFree",
+          "newel_module_instances": 4
+        },
+        "Bazaar_B_Balcony_West_Stair": {
+          "primary_source_object": "BazaarSource_IndStairsWideFull",
+          "stair_module_instances": 2,
+          "foundation_module_instances": 4,
+          "foundation_source_object": "BazaarSource_IndFoundationAStraightFull",
+          "guardrail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "guardrail_module_instances": 8,
+          "newel_source_object": "BazaarSource_IndColumnFree",
+          "newel_module_instances": 4
+        }
+      },
+      "decks": {
+        "Bazaar_A_Gallery_Deck": {
+          "floor_source_object": "BazaarSource_IndFloorGreyPlatformFull",
+          "foundation_source_object": "BazaarSource_IndFoundationAStraightFull",
+          "top_module_instances": 60,
+          "underside_module_instances": 60,
+          "foundation_module_instances": 32
+        },
+        "Bazaar_Mid_Bridge_Deck": {
+          "floor_source_object": "BazaarSource_IndFloorGreyPlatformFull",
+          "foundation_source_object": "BazaarSource_IndFoundationAStraightFull",
+          "top_module_instances": 26,
+          "underside_module_instances": 26,
+          "foundation_module_instances": 30
+        },
+        "Bazaar_B_Balcony_Deck": {
+          "floor_source_object": "BazaarSource_IndFloorGreyPlatformFull",
+          "foundation_source_object": "BazaarSource_IndFoundationAStraightFull",
+          "top_module_instances": 54,
+          "underside_module_instances": 54,
+          "foundation_module_instances": 30
+        }
+      },
+      "runtime_railings": {
+        "Bazaar_A_Gallery_West_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 20,
+          "cap_module_instances": 10,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 6
+        },
+        "Bazaar_A_Gallery_North_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 12,
+          "cap_module_instances": 6,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 4
+        },
+        "Bazaar_A_Gallery_South_West_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 2,
+          "cap_module_instances": 1,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 2
+        },
+        "Bazaar_A_Gallery_South_East_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 6,
+          "cap_module_instances": 3,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 2
+        },
+        "Bazaar_A_Gallery_East_North_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 2,
+          "cap_module_instances": 1,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 2
+        },
+        "Bazaar_A_Gallery_East_South_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 16,
+          "cap_module_instances": 8,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 5
+        },
+        "Bazaar_Mid_Bridge_North_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 26,
+          "cap_module_instances": 13,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 8
+        },
+        "Bazaar_Mid_Bridge_South_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 26,
+          "cap_module_instances": 13,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 8
+        },
+        "Bazaar_B_Balcony_East_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 18,
+          "cap_module_instances": 9,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 6
+        },
+        "Bazaar_B_Balcony_North_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 12,
+          "cap_module_instances": 6,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 4
+        },
+        "Bazaar_B_Balcony_South_West_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 6,
+          "cap_module_instances": 3,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 2
+        },
+        "Bazaar_B_Balcony_South_East_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 2,
+          "cap_module_instances": 1,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 2
+        },
+        "Bazaar_B_Balcony_West_North_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 2,
+          "cap_module_instances": 1,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 2
+        },
+        "Bazaar_B_Balcony_West_South_Parapet": {
+          "rail_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "rail_module_instances": 12,
+          "cap_module_instances": 6,
+          "cap_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+          "post_source_object": "BazaarSource_IndColumnFree",
+          "post_module_instances": 4
+        }
+      },
+      "canopy": {
+        "roof_source_object": "BazaarSource_IndRoofDarkGreyAngledFull",
+        "roof_module_instances": 16,
+        "post_source_object": "BazaarSource_IndColumnFree",
+        "post_module_instances": 4,
+        "trim_source_object": "BazaarSource_IndRoofTrimBStraightFull",
+        "trim_module_instances": 24
+      }
+    },
+    "runtime_architecture_aabbs": 11,
+    "runtime_site_cover_aabbs": 4,
+    "runtime_high_cover_aabbs": 4,
+    "runtime_mid_cover_aabbs": 2,
+    "runtime_railing_segments": 14,
+    "runtime_site_pair_sight_block": "SightBlockSitePair"
+  },
+  "round_trip": {
+    "object_count": 296,
+    "mesh_object_count": 277,
+    "unique_mesh_count": 116,
+    "material_count": 23,
+    "texture_count": 44,
+    "instance_triangles": 2771825,
+    "bounds_min": [
+      -68.0,
+      -56.0,
+      -0.16
+    ],
+    "bounds_max": [
+      68.0,
+      56.0,
+      7.5021
+    ]
+  },
+  "license_gate": "Every exported visible mesh is an arrangement or adapted instance of a whitelisted finished CC0 source; project-authored work is limited to materials, UV retargeting, metadata, and invisible layout scaffolding",
+  "forbidden_sources_absent": [
+    "hero mountain",
+    "hero_mountain",
+    "solararchitect",
+    "cc by",
+    "coast line",
+    "coast_line",
+    "mountain"
+  ],
+  "previews": [
+    "source_art/world/bazaar_crossing/previews/01_overview.png",
+    "source_art/world/bazaar_crossing/previews/02_a_gallery.png",
+    "source_art/world/bazaar_crossing/previews/03_mid_bridge.png",
+    "source_art/world/bazaar_crossing/previews/04_b_balcony.png"
+  ]
+}

@@ -32,6 +32,7 @@ __pycache__/
 /validation_frame.png
 /roof_access_*.png
 /tideglass_reactor_*.png
+/bazaar_crossing_*.png
 
 # The Godot glTF importer may extract temporary copies of images embedded in the
 # authored Jianghai GLB. The runtime model remains self-contained.
@@ -41,6 +42,13 @@ __pycache__/
 /assets/models/jianghai_old_city/rollershutter_window_03_*.jpg
 /assets/models/jianghai_old_city/rollershutter_window_03_*.png
 /assets/models/jianghai_old_city/rollershutter_window_03_*.webp
+
+# The Godot glTF importer may extract temporary copies of images embedded in
+# the self-contained Bazaar Crossing GLB.
+/assets/models/bazaar_crossing/bazaar_crossing_*.jpg
+/assets/models/bazaar_crossing/bazaar_crossing_*.jpeg
+/assets/models/bazaar_crossing/bazaar_crossing_*.png
+/assets/models/bazaar_crossing/bazaar_crossing_*.webp
 
 # Godot may extract a cache copy of the embedded operations-office atlas. The
 # authored runtime GLB remains self-contained.

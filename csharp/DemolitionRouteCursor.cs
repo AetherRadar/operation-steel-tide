@@ -44,11 +44,11 @@ public sealed class DemolitionRouteCursor
 
     public bool Matches(string routeKey, Vector3 destination)
         => string.Equals(RouteKey, routeKey, StringComparison.Ordinal)
-            && HorizontalDistanceSquared(Destination, destination) <= DestinationMatchDistanceSquared;
+            && Destination.DistanceSquaredTo(destination) <= DestinationMatchDistanceSquared;
 
     public bool MatchesWithin(string routeKey, Vector3 destination, float tolerance)
         => string.Equals(RouteKey, routeKey, StringComparison.Ordinal)
-            && HorizontalDistanceSquared(Destination, destination) <= tolerance * tolerance;
+            && Destination.DistanceSquaredTo(destination) <= tolerance * tolerance;
 
     public void Reset(
         string routeKey,
@@ -75,7 +75,7 @@ public sealed class DemolitionRouteCursor
             var tolerance = WaypointIndex == _waypoints.Length - 1
                 ? finalTolerance
                 : intermediateTolerance;
-            if (HorizontalDistanceSquared(position, CurrentWaypoint) > tolerance * tolerance)
+            if (position.DistanceSquaredTo(CurrentWaypoint) > tolerance * tolerance)
             {
                 break;
             }
@@ -100,7 +100,7 @@ public sealed class DemolitionRouteCursor
         {
             return false;
         }
-        var stalled = HorizontalDistanceSquared(_progressOrigin, position) < MinimumProgress * MinimumProgress;
+        var stalled = _progressOrigin.DistanceSquaredTo(position) < MinimumProgress * MinimumProgress;
         _progressOrigin = position;
         _progressTimer = 0.0f;
         return stalled;
@@ -131,12 +131,5 @@ public sealed class DemolitionRouteCursor
             copy[index] = source[index];
         }
         return copy;
-    }
-
-    private static float HorizontalDistanceSquared(Vector3 left, Vector3 right)
-    {
-        var dx = left.X - right.X;
-        var dz = left.Z - right.Z;
-        return dx * dx + dz * dz;
     }
 }

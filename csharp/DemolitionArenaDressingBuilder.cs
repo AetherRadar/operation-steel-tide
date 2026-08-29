@@ -18,6 +18,7 @@ internal sealed class DemolitionArenaDressingBuilder
     private const string MajadroidRoot = "res://assets/models/majadroid_construction_site";
     private const string RoadsRoot = "res://assets/models/kenney_city_kit_roads";
     private const string TreyIndustrialRoot = "res://assets/models/trey_modular_industrial";
+    private const string BazaarRoot = "res://assets/models/bazaar_crossing";
 
     private readonly Dictionary<string, PackedScene> _scenes = new();
     private readonly FreightIndustrialPalette _palette;
@@ -38,7 +39,9 @@ internal sealed class DemolitionArenaDressingBuilder
             ? HarborLocksPlacements(layout.Origin)
             : layout.MapId == DemolitionMapCatalog.TideglassReactorId
                 ? TideglassReactorPlacements(layout.Origin)
-                : TideforgePlacements(layout.Origin);
+                : layout.MapId == DemolitionMapCatalog.BazaarCrossingId
+                    ? BazaarCrossingPlacements(layout.Origin)
+                    : TideforgePlacements(layout.Origin);
         var authoredModelCount = 0;
         var missingModelCount = 0;
         var palettedBuildingCount = 0;
@@ -83,6 +86,7 @@ internal sealed class DemolitionArenaDressingBuilder
             ModelSource.Majadroid => $"{MajadroidRoot}/{placement.File}",
             ModelSource.Roads => $"{RoadsRoot}/{placement.File}",
             ModelSource.TreyIndustrial => $"{TreyIndustrialRoot}/{placement.File}",
+            ModelSource.BazaarCrossing => $"{BazaarRoot}/{placement.File}",
             _ => $"{IndustrialRoot}/{placement.File}"
         };
         if (!_scenes.TryGetValue(path, out var scene))
@@ -159,6 +163,21 @@ internal sealed class DemolitionArenaDressingBuilder
         AddPanelRun(placements, "AssemblySouthFacade", "Metal_Window.gltf", origin,
             new Vector3(20.0f, 0.0f, -3.04f), Vector3.Right * 4.0f, 4, 180);
         return placements;
+    }
+
+    private static IReadOnlyList<ModelPlacement> BazaarCrossingPlacements(Vector3 origin)
+    {
+        return new[]
+        {
+            Authored(
+                "BazaarCrossingAuthoredEnvironment",
+                "bazaar_crossing.glb",
+                origin,
+                Vector3.Zero,
+                0.0f,
+                1.0f,
+                ModelSource.BazaarCrossing)
+        };
     }
 
     private static IReadOnlyList<ModelPlacement> HarborLocksPlacements(Vector3 origin)
@@ -303,7 +322,8 @@ internal sealed class DemolitionArenaDressingBuilder
         Factory,
         Majadroid,
         Roads,
-        TreyIndustrial
+        TreyIndustrial,
+        BazaarCrossing
     }
 
     private readonly record struct ModelPlacement(

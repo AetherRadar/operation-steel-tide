@@ -39,7 +39,6 @@ public sealed partial class DemolitionArenaLayout
     public const float MinimumPassageHeight = 2.45f;
     public const float MaximumSiteTravelDifference = 0.12f;
     public const int MinimumCentralCoverBodyCount = 8;
-
     internal static IReadOnlyList<string> StrategyTargetKeys { get; } = Array.AsReadOnly(new[]
     {
         "attack_entry_a", "attack_entry_b", "attack_support_a", "attack_support_b", "attack_mid_recon",
@@ -72,6 +71,8 @@ public sealed partial class DemolitionArenaLayout
     public IReadOnlyList<Vector3> AttackSpawns { get; }
     public IReadOnlyList<Vector3> CoverPoints { get; }
     public IReadOnlyList<DemolitionArenaBox> CollisionBoxes { get; }
+    /// <summary>Walkable collision excluded from route-clearance blocker checks.</summary>
+    public IReadOnlyList<DemolitionArenaBox> TraversalBoxes { get; }
     public IReadOnlyList<DemolitionArenaBox> NavigationBoxes { get; }
     public IReadOnlyList<DemolitionArenaBox> DetailBoxes { get; }
     public IReadOnlyList<DemolitionArenaProp> Props { get; }
@@ -84,6 +85,8 @@ public sealed partial class DemolitionArenaLayout
     public IReadOnlyList<Vector3> DefenderToAPath { get; }
     public IReadOnlyList<Vector3> DefenderToBPath { get; }
     public IReadOnlyList<Vector3> SiteRotationPath { get; }
+    /// <summary>Additional authored graph links, including complete elevation transitions.</summary>
+    public IReadOnlyList<IReadOnlyList<Vector3>> AuxiliaryPaths { get; }
     public IReadOnlyList<float> CriticalPassageWidths { get; }
     public IReadOnlyList<float> CriticalPassageHeights { get; }
     public int CentralCoverBodyCount { get; }
@@ -100,10 +103,13 @@ public sealed partial class DemolitionArenaLayout
             ? DemolitionMapCatalog.HarborLocksId
             : string.Equals(mapId, DemolitionMapCatalog.TideglassReactorId, StringComparison.OrdinalIgnoreCase)
                 ? DemolitionMapCatalog.TideglassReactorId
-                : DemolitionMapCatalog.TideforgeId;
+                : string.Equals(mapId, DemolitionMapCatalog.BazaarCrossingId, StringComparison.OrdinalIgnoreCase)
+                    ? DemolitionMapCatalog.BazaarCrossingId
+                    : DemolitionMapCatalog.TideforgeId;
         Origin = origin ?? WorldOrigin;
         var harborLocks = MapId == DemolitionMapCatalog.HarborLocksId;
         var tideglassReactor = MapId == DemolitionMapCatalog.TideglassReactorId;
+        var bazaarCrossing = MapId == DemolitionMapCatalog.BazaarCrossingId;
         if (harborLocks)
         {
             AttackSpawn = World(new Vector3(-32.0f, 0.22f, 35.0f));
@@ -183,6 +189,18 @@ public sealed partial class DemolitionArenaLayout
                 new(-12.0f, 0.2f, 28.0f), new(12.0f, 0.2f, -28.0f),
                 new(-31.0f, 0.2f, 18.0f), new(31.0f, 0.2f, -18.0f));
         }
+        else if (bazaarCrossing)
+        {
+            AttackSpawn = World(new Vector3(0.0f, 0.22f, 49.0f));
+            DefenderSpawn = World(new Vector3(0.0f, 0.22f, -49.0f));
+            Midpoint = World(new Vector3(0.0f, 0.2f, -6.0f));
+            WorldBounds = new Rect2(Origin.X - 68.0f, Origin.Z - 56.0f, 136.0f, 112.0f);
+            LocalSiteCoordinates = BuildBazaarCrossingLocalSiteCoordinates();
+            SitePositions = BuildBazaarCrossingSitePositions();
+            AttackSpawns = BuildBazaarCrossingAttackSpawns();
+            DefenderSpawns = BuildBazaarCrossingDefenderSpawns();
+            CoverPoints = BuildBazaarCrossingCoverPoints();
+        }
         else
         {
             AttackSpawn = World(new Vector3(0.0f, 0.22f, 54.0f));
@@ -230,20 +248,23 @@ public sealed partial class DemolitionArenaLayout
             ? BuildHarborLocksCollisionBoxes()
             : tideglassReactor
                 ? BuildTideglassReactorCollisionBoxes()
-                : BuildCollisionBoxes();
+                : bazaarCrossing
+                    ? BuildBazaarCrossingCollisionBoxes()
+                    : BuildCollisionBoxes();
+        TraversalBoxes = bazaarCrossing
+            ? BuildBazaarCrossingTraversalBoxes()
+            : Array.Empty<DemolitionArenaBox>();
         NavigationBoxes = tideglassReactor
             ? BuildTideglassReactorNavigationBoxes()
             : Array.Empty<DemolitionArenaBox>();
-        DetailBoxes = harborLocks
-            ? BuildHarborLocksDetailBoxes()
-            : tideglassReactor
-                ? BuildTideglassReactorDetailBoxes()
-                : BuildDetailBoxes();
-        Props = harborLocks
-            ? BuildHarborLocksProps()
-            : tideglassReactor
-                ? BuildTideglassReactorProps()
-                : BuildProps();
+        DetailBoxes = bazaarCrossing ? Array.Empty<DemolitionArenaBox>()
+            : harborLocks ? BuildHarborLocksDetailBoxes()
+            : tideglassReactor ? BuildTideglassReactorDetailBoxes()
+            : BuildDetailBoxes();
+        Props = bazaarCrossing ? Array.Empty<DemolitionArenaProp>()
+            : harborLocks ? BuildHarborLocksProps()
+            : tideglassReactor ? BuildTideglassReactorProps()
+            : BuildProps();
         CentralCoverBodyCount = CollisionBoxes.Count(box => box.Name.StartsWith("MidCover", StringComparison.Ordinal))
             + Props.Count(prop => prop.Name.StartsWith("MidCover", StringComparison.Ordinal));
         CentralPropsDoNotOverlap = !Props.Any(prop => CollisionBoxes.Any(box =>
@@ -251,27 +272,29 @@ public sealed partial class DemolitionArenaLayout
             && GroundFootprintsOverlap(box, prop)));
         Markers = BuildMarkers();
         AttackToAPath = harborLocks ? BuildHarborLocksAttackToAPath()
-            : tideglassReactor ? BuildTideglassReactorAttackToAPath() : WorldPoints(
+            : tideglassReactor ? BuildTideglassReactorAttackToAPath()
+            : bazaarCrossing ? BuildBazaarCrossingAttackToAPath() : WorldPoints(
             new(0, 0.2f, 54), new(0, 0.2f, 46),
             new(-6, 0.2f, 36), new(-11, 0.2f, 26),
             new(-12, 0.2f, 10), new(-18, 0.2f, 5),
             new(-23, 0.2f, 10), new(-30, 0.2f, 15),
             new(-28, 0.2f, 18), new(-33, 0.2f, 21));
         AttackToBPath = harborLocks ? BuildHarborLocksAttackToBPath()
-            : tideglassReactor ? BuildTideglassReactorAttackToBPath() : WorldPoints(
+            : tideglassReactor ? BuildTideglassReactorAttackToBPath()
+            : bazaarCrossing ? BuildBazaarCrossingAttackToBPath() : WorldPoints(
             new(0, 0.2f, 54), new(0, 0.2f, 46),
             new(6, 0.2f, 33), new(8, 0.2f, 20),
             new(15, 0.2f, 10), new(15, 0.2f, 5),
             new(25, 0.2f, 5), new(25, 0.2f, -4),
             new(29, 0.2f, -10), new(33, 0.2f, -19));
-        AttackApproachToAPath = harborLocks || tideglassReactor
+        AttackApproachToAPath = harborLocks || tideglassReactor || bazaarCrossing
             ? AttackToAPath
             : WorldPoints(
                 new(-3, 0.2f, 54), new(-6, 0.2f, 46),
                 new(-14, 0.2f, 46), new(-20, 0.2f, 42),
                 new(-24, 0.2f, 38), new(-25, 0.2f, 30),
                 new(-33, 0.2f, 21));
-        AttackApproachToBPath = harborLocks
+        AttackApproachToBPath = harborLocks || bazaarCrossing
             ? AttackToBPath
             : tideglassReactor
                 ? WorldPoints(
@@ -287,12 +310,14 @@ public sealed partial class DemolitionArenaLayout
                     new(25, 0.2f, 5), new(25, 0.2f, -4),
                     new(29, 0.2f, -10), new(33, 0.2f, -19));
         AttackMidPath = harborLocks ? BuildHarborLocksAttackMidPath()
-            : tideglassReactor ? BuildTideglassReactorAttackMidPath() : WorldPoints(
+            : tideglassReactor ? BuildTideglassReactorAttackMidPath()
+            : bazaarCrossing ? BuildBazaarCrossingAttackMidPath() : WorldPoints(
             new(0, 0.2f, 54), new(0, 0.2f, 46),
             new(0, 0.2f, 38), new(0, 0.2f, 12),
             new(0, 0.2f, 4));
         DefenderToAPath = harborLocks ? BuildHarborLocksDefenderToAPath()
-            : tideglassReactor ? BuildTideglassReactorDefenderToAPath() : WorldPoints(
+            : tideglassReactor ? BuildTideglassReactorDefenderToAPath()
+            : bazaarCrossing ? BuildBazaarCrossingDefenderToAPath() : WorldPoints(
             new(0, 0.2f, -54), new(0, 0.2f, -46),
             new(0, 0.2f, -40), new(-4.0f, 0.2f, -35),
             new(-4.0f, 0.2f, -27), new(-8.0f, 0.2f, -22),
@@ -301,29 +326,38 @@ public sealed partial class DemolitionArenaLayout
             new(-24.0f, 0.2f, 16), new(-28.0f, 0.2f, 21),
             new(-33.0f, 0.2f, 21));
         DefenderToBPath = harborLocks ? BuildHarborLocksDefenderToBPath()
-            : tideglassReactor ? BuildTideglassReactorDefenderToBPath() : WorldPoints(
+            : tideglassReactor ? BuildTideglassReactorDefenderToBPath()
+            : bazaarCrossing ? BuildBazaarCrossingDefenderToBPath() : WorldPoints(
             new(0, 0.2f, -54), new(0, 0.2f, -46),
             new(7.0f, 0.2f, -43), new(11.0f, 0.2f, -39),
             new(11.0f, 0.2f, -28), new(20.0f, 0.2f, -24),
             new(28.0f, 0.2f, -20), new(33.0f, 0.2f, -19));
         SiteRotationPath = harborLocks ? BuildHarborLocksSiteRotationPath()
-            : tideglassReactor ? BuildTideglassReactorSiteRotationPath() : WorldPoints(
+            : tideglassReactor ? BuildTideglassReactorSiteRotationPath()
+            : bazaarCrossing ? BuildBazaarCrossingSiteRotationPath() : WorldPoints(
             new(-33, 0.2f, 21), new(-28, 0.2f, 21), new(-24, 0.2f, 16),
             new(-24, 0.2f, 4), new(-16, 0.2f, 3), new(-15, 0.2f, 0),
             new(-8, 0.2f, -1), new(-8, 0.2f, -5), new(0, 0.2f, -5),
             new(6, 0.2f, -1), new(14.6f, 0.2f, -1), new(15, 0.2f, 4),
             new(15, 0.2f, 6), new(21, 0.2f, 6), new(24, 0.2f, -2), new(24, 0.2f, -9),
             new(30, 0.2f, -11), new(33, 0.2f, -19));
+        AuxiliaryPaths = bazaarCrossing
+            ? BuildBazaarCrossingAuxiliaryPaths()
+            : Array.Empty<IReadOnlyList<Vector3>>();
         CriticalPassageWidths = harborLocks
             ? new[] { 3.2f, 3.8f, 4.4f, 5.0f, 7.2f }
             : tideglassReactor
                 ? new[] { 3.4f, 3.8f, 4.6f, 5.4f, 7.0f }
-                : new[] { 3.8f, 4.2f, 4.5f, 5.2f, 6.0f };
+                : bazaarCrossing
+                    ? new[] { 3.2f, 3.4f, 3.8f, 5.2f, 7.0f }
+                    : new[] { 3.8f, 4.2f, 4.5f, 5.2f, 6.0f };
         CriticalPassageHeights = harborLocks
             ? new[] { 3.0f, 3.8f, 5.0f, 7.5f }
             : tideglassReactor
                 ? new[] { 3.0f, 3.6f, 4.8f, 8.0f }
-                : new[] { 2.7f, 3.2f, 4.2f, 6.0f };
+                : bazaarCrossing
+                    ? new[] { 2.7f, 3.0f, 3.2f, 5.0f }
+                    : new[] { 2.7f, 3.2f, 4.2f, 6.0f };
     }
 
     public float AttackToALength => PathLength(AttackToAPath);
@@ -374,6 +408,10 @@ public sealed partial class DemolitionArenaLayout
         if (MapId == DemolitionMapCatalog.TideglassReactorId)
         {
             return TideglassReactorStrategyTarget(key);
+        }
+        if (MapId == DemolitionMapCatalog.BazaarCrossingId)
+        {
+            return BazaarCrossingStrategyTarget(key);
         }
         return key switch
         {
