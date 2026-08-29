@@ -10,15 +10,21 @@ public partial class FreightTerminalWorld
     private const string MeleeSurfaceMetadataKey = "melee_surface";
     private const int MeleeSurfaceMarkLimit = 64;
     private const int MeleeSurfaceAudioLimit = 12;
+    private const float ScratchSurfaceOffset = 0.0015f;
+    private const float ScratchHighlightDepth = 0.00035f;
+    private const float ScratchProbeDepth = 0.035f;
+    private const float ScratchProbeStep = 0.04f;
+    private const float ScratchEdgeInset = 0.003f;
+    private const int ScratchProbeRefinementSteps = 4;
     private static readonly StandardMaterial3D[] ScratchGrooveMaterials = [
-        CreateScratchMaterial(new Color(0.07f, 0.065f, 0.058f, 0.92f)),
-        CreateScratchMaterial(new Color(0.12f, 0.15f, 0.17f, 0.96f)),
-        CreateScratchMaterial(new Color(0.14f, 0.065f, 0.025f, 0.94f))
+        CreateScratchMaterial(new Color(0.07f, 0.065f, 0.058f, 0.68f)),
+        CreateScratchMaterial(new Color(0.12f, 0.15f, 0.17f, 0.72f)),
+        CreateScratchMaterial(new Color(0.14f, 0.065f, 0.025f, 0.7f))
     ];
     private static readonly StandardMaterial3D[] ScratchHighlightMaterials = [
-        CreateScratchMaterial(new Color(0.72f, 0.69f, 0.62f), 0.2f, transparent: false),
-        CreateScratchMaterial(new Color(0.86f, 0.93f, 0.98f), 1.25f, transparent: false),
-        CreateScratchMaterial(new Color(0.82f, 0.52f, 0.24f), 0.18f, transparent: false)
+        CreateScratchMaterial(new Color(0.58f, 0.55f, 0.49f, 0.38f)),
+        CreateScratchMaterial(new Color(0.65f, 0.7f, 0.72f, 0.44f), 0.08f),
+        CreateScratchMaterial(new Color(0.64f, 0.34f, 0.16f, 0.4f))
     ];
     private static readonly StandardMaterial3D MasonryDebrisMaterial = CreateTransientSurfaceMaterial(
         new Color(0.46f, 0.43f, 0.37f, 0.64f));
@@ -37,6 +43,9 @@ public partial class FreightTerminalWorld
     private double _lastMeleeImpactAudioLength;
     private bool _lastMeleeImpactAudioStarted;
     private bool _lastMeleeImpactAttachedToCollider;
+    private bool _lastMeleeScratchEdgeClipped;
+    private bool _lastMeleeScratchSurfaceSupported;
+    private float _lastMeleeScratchSurfaceOffset;
 
     internal int MeleeSurfaceImpactCountForDiagnostics => _meleeSurfaceImpactCount;
     internal int MeleeSurfaceMarkCountForDiagnostics => _meleeSurfaceMarkCount;
@@ -49,6 +58,16 @@ public partial class FreightTerminalWorld
     internal double LastMeleeImpactAudioLengthForDiagnostics => _lastMeleeImpactAudioLength;
     internal bool LastMeleeImpactAudioStartedForDiagnostics => _lastMeleeImpactAudioStarted;
     internal bool LastMeleeImpactAttachedToColliderForDiagnostics => _lastMeleeImpactAttachedToCollider;
+    internal bool LastMeleeScratchEdgeClippedForDiagnostics => _lastMeleeScratchEdgeClipped;
+    internal bool LastMeleeScratchSurfaceSupportedForDiagnostics => _lastMeleeScratchSurfaceSupported;
+    internal float LastMeleeScratchSurfaceOffsetForDiagnostics => _lastMeleeScratchSurfaceOffset;
+
+    private readonly record struct ScratchPlacement(
+        Vector3 Position,
+        float Length,
+        float WidthScale,
+        bool EdgeClipped,
+        bool SurfaceSupported);
 
     /// <summary>Creates presentation for one blade contact; callers own damage and deduplication.</summary>
     internal void SpawnMeleeSurfaceImpact(
@@ -64,24 +83,36 @@ public partial class FreightTerminalWorld
         var tangent = ResolveScratchTangent(impactNormal, bladeTravel);
         var bitangent = impactNormal.Cross(tangent).Normalized();
         var (length, strokeWidth) = ScratchDimensions(style);
-        var overallWidth = strokeWidth * 3.4f;
+        var placement = ResolveScratchPlacement(
+            position,
+            impactNormal,
+            tangent,
+            bitangent,
+            collider,
+            shape,
+            length,
+            strokeWidth);
+        var overallWidth = ScratchFootprintHalfWidth(placement.Length, strokeWidth)
+            * placement.WidthScale
+            * 2.0f;
         var anchor = ResolveMeleeImpactAnchor(collider);
 
         var markRoot = new Node3D { Name = "MeleeBladeScratch" };
         markRoot.AddToGroup(MeleeSurfaceMarkGroup);
         markRoot.SetMeta(MeleeSurfaceMetadataKey, surface.ToString().ToLowerInvariant());
-        markRoot.SetMeta("scratch_length", length);
+        markRoot.SetMeta("scratch_length", placement.Length);
         markRoot.SetMeta("scratch_width", overallWidth);
+        markRoot.SetMeta("edge_clipped", placement.EdgeClipped);
         markRoot.SetMeta("impact_shape", shape);
         anchor.AddChild(markRoot);
         markRoot.GlobalTransform = new Transform3D(
             new Basis(tangent, bitangent, impactNormal),
-            position + impactNormal * 0.014f);
+            placement.Position + impactNormal * ScratchSurfaceOffset);
 
         var scratch = new MeshInstance3D
         {
             Name = "MultiStrokeScratch",
-            Mesh = BuildScratchMesh(surface, length, strokeWidth),
+            Mesh = BuildScratchMesh(surface, placement.Length, strokeWidth, placement.WidthScale),
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
         };
         markRoot.AddChild(scratch);
@@ -113,13 +144,16 @@ public partial class FreightTerminalWorld
         _meleeSurfaceMarkCount++;
         _meleeSurfaceAudioCount++;
         _lastMeleeImpactSurface = surface;
-        _lastMeleeScratchLength = length;
+        _lastMeleeScratchLength = placement.Length;
         _lastMeleeScratchWidth = overallWidth;
         _lastMeleeImpactNormal = impactNormal;
         _lastMeleeImpactPosition = position;
         _lastMeleeImpactAudioLength = impactStream.GetLength();
         _lastMeleeImpactAudioStarted = impactAudio.Playing;
         _lastMeleeImpactAttachedToCollider = anchor != this;
+        _lastMeleeScratchEdgeClipped = placement.EdgeClipped;
+        _lastMeleeScratchSurfaceSupported = placement.SurfaceSupported;
+        _lastMeleeScratchSurfaceOffset = ScratchSurfaceOffset + ScratchHighlightDepth;
     }
 
     internal void ResetMeleeSurfaceImpactDiagnostics()
@@ -132,6 +166,8 @@ public partial class FreightTerminalWorld
         (_lastMeleeImpactNormal, _lastMeleeImpactPosition) = (Vector3.Zero, Vector3.Zero);
         _lastMeleeImpactAudioLength = 0.0;
         (_lastMeleeImpactAudioStarted, _lastMeleeImpactAttachedToCollider) = (false, false);
+        (_lastMeleeScratchEdgeClipped, _lastMeleeScratchSurfaceSupported) = (false, false);
+        _lastMeleeScratchSurfaceOffset = 0.0f;
     }
 
     private static void ReleaseTrackedEffects<T>(Queue<T> effects, string group)
@@ -187,19 +223,23 @@ public partial class FreightTerminalWorld
     }
 
     private static ImmediateMesh BuildScratchMesh(
-        MeleeImpactSurface surface, float length, float strokeWidth)
+        MeleeImpactSurface surface, float length, float strokeWidth, float widthScale)
     {
         var mesh = new ImmediateMesh();
+        if (length <= 0.001f || widthScale <= 0.001f)
+        {
+            return mesh;
+        }
         mesh.SurfaceBegin(Mesh.PrimitiveType.Triangles, ScratchGrooveMaterial(surface));
-        AddScratchStroke(mesh, length, strokeWidth, 0.0f, 0.025f, 0.0f, 0.0f);
-        AddScratchStroke(mesh, length * 0.79f, strokeWidth * 0.7f, 0.0f, -0.11f, strokeWidth * 1.35f, 0.0f);
-        AddScratchStroke(mesh, length * 0.66f, strokeWidth * 0.62f, -length * 0.08f, 0.13f, -strokeWidth * 1.35f, 0.0f);
+        AddScratchStroke(mesh, length, strokeWidth, 0.0f, 0.025f, 0.0f, 0.0f, widthScale);
+        AddScratchStroke(mesh, length * 0.79f, strokeWidth * 0.7f, 0.0f, -0.11f, strokeWidth * 1.35f, 0.0f, widthScale);
+        AddScratchStroke(mesh, length * 0.66f, strokeWidth * 0.62f, -length * 0.08f, 0.13f, -strokeWidth * 1.35f, 0.0f, widthScale);
         mesh.SurfaceEnd();
 
         mesh.SurfaceBegin(Mesh.PrimitiveType.Triangles, ScratchHighlightMaterial(surface));
-        AddScratchStroke(mesh, length * 0.88f, strokeWidth * 0.58f, length * 0.012f, 0.025f, strokeWidth * 0.12f, 0.003f);
-        AddScratchStroke(mesh, length * 0.68f, strokeWidth * 0.46f, length * 0.015f, -0.11f, strokeWidth * 1.45f, 0.003f);
-        AddScratchStroke(mesh, length * 0.54f, strokeWidth * 0.42f, -length * 0.05f, 0.13f, -strokeWidth * 1.28f, 0.003f);
+        AddScratchStroke(mesh, length * 0.88f, strokeWidth * 0.58f, length * 0.012f, 0.025f, strokeWidth * 0.12f, ScratchHighlightDepth, widthScale);
+        AddScratchStroke(mesh, length * 0.68f, strokeWidth * 0.46f, length * 0.015f, -0.11f, strokeWidth * 1.45f, ScratchHighlightDepth, widthScale);
+        AddScratchStroke(mesh, length * 0.54f, strokeWidth * 0.42f, -length * 0.05f, 0.13f, -strokeWidth * 1.28f, ScratchHighlightDepth, widthScale);
         mesh.SurfaceEnd();
         return mesh;
     }
@@ -211,22 +251,34 @@ public partial class FreightTerminalWorld
         float xOffset,
         float slope,
         float yOffset,
-        float depth)
+        float depth,
+        float widthScale)
     {
-        var start = new Vector2(-length * 0.5f + xOffset, yOffset - slope * length * 0.5f);
-        var end = new Vector2(length * 0.5f + xOffset, yOffset + slope * length * 0.5f);
+        var start = new Vector2(
+            -length * 0.5f + xOffset,
+            (yOffset - slope * length * 0.5f) * widthScale);
+        var end = new Vector2(
+            length * 0.5f + xOffset,
+            (yOffset + slope * length * 0.5f) * widthScale);
         var direction = (end - start).Normalized();
-        var perpendicular = new Vector2(-direction.Y, direction.X) * (width * 0.5f);
+        var perpendicular = new Vector2(-direction.Y, direction.X)
+            * (width * widthScale * 0.5f);
         var a = start - perpendicular;
         var b = start + perpendicular;
         var c = end + perpendicular;
         var d = end - perpendicular;
-        mesh.SurfaceAddVertex(new Vector3(a.X, a.Y, depth));
-        mesh.SurfaceAddVertex(new Vector3(b.X, b.Y, depth));
-        mesh.SurfaceAddVertex(new Vector3(c.X, c.Y, depth));
-        mesh.SurfaceAddVertex(new Vector3(a.X, a.Y, depth));
-        mesh.SurfaceAddVertex(new Vector3(c.X, c.Y, depth));
-        mesh.SurfaceAddVertex(new Vector3(d.X, d.Y, depth));
+        AddScratchVertex(mesh, a, depth);
+        AddScratchVertex(mesh, c, depth);
+        AddScratchVertex(mesh, b, depth);
+        AddScratchVertex(mesh, a, depth);
+        AddScratchVertex(mesh, d, depth);
+        AddScratchVertex(mesh, c, depth);
+    }
+
+    private static void AddScratchVertex(ImmediateMesh mesh, Vector2 point, float depth)
+    {
+        mesh.SurfaceSetNormal(Vector3.Back);
+        mesh.SurfaceAddVertex(new Vector3(point.X, point.Y, depth));
     }
 
     private static StandardMaterial3D ScratchGrooveMaterial(MeleeImpactSurface surface)
@@ -237,22 +289,234 @@ public partial class FreightTerminalWorld
 
     private static StandardMaterial3D CreateScratchMaterial(
         Color color,
-        float emission = 0.0f,
-        bool transparent = true)
+        float emission = 0.0f)
     {
         return new StandardMaterial3D
         {
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-            Transparency = transparent
-                ? BaseMaterial3D.TransparencyEnum.Alpha
-                : BaseMaterial3D.TransparencyEnum.Disabled,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.PerPixel,
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
             AlbedoColor = color,
+            Roughness = 0.9f,
             EmissionEnabled = emission > 0.0f,
             Emission = new Color(color.R, color.G, color.B),
             EmissionEnergyMultiplier = emission
         };
     }
+
+    private ScratchPlacement ResolveScratchPlacement(
+        Vector3 position,
+        Vector3 normal,
+        Vector3 tangent,
+        Vector3 bitangent,
+        GodotObject? collider,
+        int shape,
+        float length,
+        float strokeWidth)
+    {
+        if (collider is null
+            || !GodotObject.IsInstanceValid(collider)
+            || !ScratchPointMatchesSurface(position, normal, collider, shape))
+        {
+            return new ScratchPlacement(position, 0.0f, 0.0f, true, false);
+        }
+
+        var halfLength = length * 0.5f;
+        var halfWidth = ScratchFootprintHalfWidth(length, strokeWidth);
+        var negativeLength = InsetScratchExtent(
+            FindScratchSurfaceExtent(position, normal, -tangent, collider, shape, halfLength),
+            halfLength);
+        var positiveLength = InsetScratchExtent(
+            FindScratchSurfaceExtent(position, normal, tangent, collider, shape, halfLength),
+            halfLength);
+        var negativeWidth = InsetScratchExtent(
+            FindScratchSurfaceExtent(position, normal, -bitangent, collider, shape, halfWidth),
+            halfWidth);
+        var positiveWidth = InsetScratchExtent(
+            FindScratchSurfaceExtent(position, normal, bitangent, collider, shape, halfWidth),
+            halfWidth);
+
+        var clippedLength = Mathf.Max(0.004f, negativeLength + positiveLength);
+        var availableWidth = Mathf.Max(0.004f, negativeWidth + positiveWidth);
+        var center = position
+            + tangent * ((positiveLength - negativeLength) * 0.5f)
+            + bitangent * ((positiveWidth - negativeWidth) * 0.5f);
+        var widthScale = Mathf.Min(
+            1.0f,
+            availableWidth
+                / Mathf.Max(0.004f, ScratchFootprintHalfWidth(clippedLength, strokeWidth) * 2.0f));
+
+        if (!ScratchFootprintMatchesSurface(
+                center,
+                normal,
+                tangent,
+                bitangent,
+                collider,
+                shape,
+                clippedLength,
+                strokeWidth,
+                widthScale))
+        {
+            center = position;
+            clippedLength = Mathf.Max(0.004f, Mathf.Min(negativeLength, positiveLength) * 2.0f);
+            availableWidth = Mathf.Max(0.004f, Mathf.Min(negativeWidth, positiveWidth) * 2.0f);
+            widthScale = Mathf.Min(
+                1.0f,
+                availableWidth
+                    / Mathf.Max(
+                        0.004f,
+                        ScratchFootprintHalfWidth(clippedLength, strokeWidth) * 2.0f));
+        }
+
+        var supported = false;
+        for (var attempt = 0; attempt < 6; attempt++)
+        {
+            supported = ScratchFootprintMatchesSurface(
+                center,
+                normal,
+                tangent,
+                bitangent,
+                collider,
+                shape,
+                clippedLength,
+                strokeWidth,
+                widthScale);
+            if (supported)
+            {
+                break;
+            }
+            clippedLength *= 0.72f;
+            widthScale *= 0.72f;
+        }
+
+        var edgeClipped = clippedLength < length - 0.002f || widthScale < 0.98f;
+        return new ScratchPlacement(
+            center,
+            supported ? clippedLength : 0.0f,
+            supported ? widthScale : 0.0f,
+            edgeClipped,
+            supported);
+    }
+
+    private float FindScratchSurfaceExtent(
+        Vector3 position,
+        Vector3 normal,
+        Vector3 direction,
+        GodotObject collider,
+        int shape,
+        float maximumExtent)
+    {
+        var supportedExtent = 0.0f;
+        var candidate = Mathf.Min(ScratchProbeStep, maximumExtent);
+        while (candidate <= maximumExtent + 0.0001f)
+        {
+            if (!ScratchPointMatchesSurface(
+                    position + direction * candidate,
+                    normal,
+                    collider,
+                    shape))
+            {
+                var unsupportedExtent = candidate;
+                for (var refinement = 0; refinement < ScratchProbeRefinementSteps; refinement++)
+                {
+                    var midpoint = (supportedExtent + unsupportedExtent) * 0.5f;
+                    if (ScratchPointMatchesSurface(
+                            position + direction * midpoint,
+                            normal,
+                            collider,
+                            shape))
+                    {
+                        supportedExtent = midpoint;
+                    }
+                    else
+                    {
+                        unsupportedExtent = midpoint;
+                    }
+                }
+                return supportedExtent;
+            }
+
+            supportedExtent = candidate;
+            if (Mathf.IsEqualApprox(candidate, maximumExtent))
+            {
+                break;
+            }
+            candidate = Mathf.Min(candidate + ScratchProbeStep, maximumExtent);
+        }
+        return supportedExtent;
+    }
+
+    private static float InsetScratchExtent(float supportedExtent, float requestedExtent)
+        => supportedExtent < requestedExtent - 0.0005f
+            ? Mathf.Max(0.0f, supportedExtent - ScratchEdgeInset)
+            : requestedExtent;
+
+    private bool ScratchFootprintMatchesSurface(
+        Vector3 center,
+        Vector3 normal,
+        Vector3 tangent,
+        Vector3 bitangent,
+        GodotObject collider,
+        int shape,
+        float length,
+        float strokeWidth,
+        float widthScale)
+    {
+        var halfLength = length * 0.5f;
+        var halfWidth = ScratchFootprintHalfWidth(length, strokeWidth) * widthScale;
+        return ScratchPointMatchesSurface(center, normal, collider, shape)
+            && ScratchPointMatchesSurface(
+                center - tangent * halfLength - bitangent * halfWidth,
+                normal,
+                collider,
+                shape)
+            && ScratchPointMatchesSurface(
+                center - tangent * halfLength + bitangent * halfWidth,
+                normal,
+                collider,
+                shape)
+            && ScratchPointMatchesSurface(
+                center + tangent * halfLength - bitangent * halfWidth,
+                normal,
+                collider,
+                shape)
+            && ScratchPointMatchesSurface(
+                center + tangent * halfLength + bitangent * halfWidth,
+                normal,
+                collider,
+                shape);
+    }
+
+    private bool ScratchPointMatchesSurface(
+        Vector3 point,
+        Vector3 normal,
+        GodotObject collider,
+        int shape)
+    {
+        if (!PhysicsRaycast.TryHit(
+                GetWorld3D(),
+                point + normal * ScratchProbeDepth,
+                point - normal * ScratchProbeDepth,
+                uint.MaxValue,
+                out var hit,
+                collideWithAreas: true,
+                collideWithBodies: true)
+            || hit.Collider is null
+            || hit.Collider.GetInstanceId() != collider.GetInstanceId()
+            || shape >= 0 && hit.Shape >= 0 && hit.Shape != shape)
+        {
+            return false;
+        }
+        return hit.Normal.Dot(normal) >= 0.94f
+            && Mathf.Abs((hit.Position - point).Dot(normal)) <= 0.012f;
+    }
+
+    private static float ScratchFootprintHalfWidth(float length, float strokeWidth)
+        => Mathf.Max(
+            0.0125f * length + strokeWidth * 0.5f,
+            Mathf.Max(
+                0.04345f * length + strokeWidth * 1.7f,
+                0.0429f * length + strokeWidth * 1.66f));
 
     private static (float Length, float Width) ScratchDimensions(MeleeWeaponStyle style)
         => style switch

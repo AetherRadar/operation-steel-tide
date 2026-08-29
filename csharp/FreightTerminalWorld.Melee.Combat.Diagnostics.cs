@@ -15,6 +15,10 @@ public partial class FreightTerminalWorld
         bool ImpactDeduplicated,
         bool SurfaceProfilesDistinct,
         bool NearestHardTargetFeedback,
+        bool ScratchContained,
+        bool ScratchSurfaceHugging,
+        bool ScratchFollowsCollider,
+        bool ScratchProbeFailClosed,
         bool SuppressedWallFeedback,
         bool SuppressedWallPresentationOnly,
         bool SuppressedWallBlocked,
@@ -29,6 +33,10 @@ public partial class FreightTerminalWorld
             && ImpactDeduplicated
             && SurfaceProfilesDistinct
             && NearestHardTargetFeedback
+            && ScratchContained
+            && ScratchSurfaceHugging
+            && ScratchFollowsCollider
+            && ScratchProbeFailClosed
             && SuppressedWallFeedback
             && SuppressedWallPresentationOnly
             && SuppressedWallBlocked;
@@ -281,6 +289,73 @@ public partial class FreightTerminalWorld
         wall.QueueFree();
         await WaitFrames(2);
 
+        var narrowPost = CreateMeleeNarrowPostFixture(
+            new Vector3(2.0f, fixtureFloorY + 0.95f, 38.0f),
+            "metal");
+        AddChild(narrowPost);
+        await WaitFrames(2);
+        ResetMeleeSurfaceImpactDiagnostics();
+        var narrowImpactPosition = narrowPost.GlobalPosition
+            + Vector3.Right * 0.055f
+            + Vector3.Back * 0.11f;
+        SpawnMeleeSurfaceImpact(
+            narrowImpactPosition,
+            Vector3.Back,
+            Vector3.Right,
+            narrowPost,
+            0,
+            MeleeWeaponStyle.ZhanmaDao);
+        var scratchRoot = _meleeSurfaceMarks.LastOrDefault(mark => IsInstanceValid(mark));
+        var scratchMesh = scratchRoot?.GetNodeOrNull<MeshInstance3D>("MultiStrokeScratch");
+        var scratchContained = scratchRoot is not null
+            && scratchMesh?.Mesh is not null
+            && LastMeleeScratchEdgeClippedForDiagnostics
+            && LastMeleeScratchSurfaceSupportedForDiagnostics
+            && ScratchVerticesFitNarrowPost(scratchRoot, scratchMesh);
+        var scratchSurfaceHugging = LastMeleeScratchSurfaceOffsetForDiagnostics <= 0.002f
+            && ScratchGrooveMaterials.All(material =>
+                material.ShadingMode == BaseMaterial3D.ShadingModeEnum.PerPixel
+                && material.Transparency == BaseMaterial3D.TransparencyEnum.Alpha)
+            && ScratchHighlightMaterials.All(material =>
+                material.ShadingMode == BaseMaterial3D.ShadingModeEnum.PerPixel
+                && material.Transparency == BaseMaterial3D.TransparencyEnum.Alpha
+                && material.EmissionEnergyMultiplier <= 0.08f);
+        var scratchFollowsCollider = false;
+        if (scratchRoot is not null)
+        {
+            var markPositionBeforeMove = scratchRoot.GlobalPosition;
+            var markLocalTransformBeforeMove = scratchRoot.Transform;
+            var postMove = new Vector3(0.45f, 0.18f, -0.25f);
+            narrowPost.GlobalPosition += postMove;
+            await WaitFrames(2);
+            scratchFollowsCollider = scratchRoot.GlobalPosition.DistanceTo(
+                    markPositionBeforeMove + postMove) <= 0.002f
+                && scratchRoot.Transform.IsEqualApprox(markLocalTransformBeforeMove);
+        }
+
+        ResetMeleeSurfaceImpactDiagnostics();
+        await WaitFrames(1);
+        narrowImpactPosition = narrowPost.GlobalPosition
+            + Vector3.Right * 0.055f
+            + Vector3.Back * 0.11f;
+        SpawnMeleeSurfaceImpact(
+            narrowImpactPosition,
+            Vector3.Back,
+            Vector3.Right,
+            null,
+            -1,
+            MeleeWeaponStyle.ZhanmaDao);
+        var unsupportedScratchRoot = _meleeSurfaceMarks.LastOrDefault(mark => IsInstanceValid(mark));
+        var unsupportedScratchMesh = unsupportedScratchRoot?.GetNodeOrNull<MeshInstance3D>(
+            "MultiStrokeScratch");
+        var scratchProbeFailClosed = !LastMeleeScratchSurfaceSupportedForDiagnostics
+            && Mathf.IsZeroApprox(LastMeleeScratchLengthForDiagnostics)
+            && unsupportedScratchMesh?.Mesh is { } unsupportedMesh
+            && unsupportedMesh.GetSurfaceCount() == 0;
+        ResetMeleeSurfaceImpactDiagnostics();
+        narrowPost.QueueFree();
+        await WaitFrames(2);
+
         _player.PrepareMeleeCombatFixtureForDiagnostics();
         _player.GlobalPosition = new Vector3(0.0f, fixtureFloorY, 40.0f);
         _player.Velocity = Vector3.Zero;
@@ -335,6 +410,10 @@ public partial class FreightTerminalWorld
             impactDeduplicated,
             surfaceProfilesDistinct,
             nearestHardTargetFeedback,
+            scratchContained,
+            scratchSurfaceHugging,
+            scratchFollowsCollider,
+            scratchProbeFailClosed,
             suppressedWallFeedback,
             suppressedWallPresentationOnly,
             suppressedWallBlocked,
@@ -418,6 +497,60 @@ public partial class FreightTerminalWorld
         }
     }
 
+    private static StaticBody3D CreateMeleeNarrowPostFixture(
+        Vector3 position,
+        string surface)
+    {
+        var size = new Vector3(0.14f, 2.3f, 0.22f);
+        var post = new StaticBody3D
+        {
+            Name = "MeleeNarrowPostDiagnostic",
+            Position = position,
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        post.SetMeta("melee_surface", surface);
+        post.AddChild(new CollisionShape3D
+        {
+            Name = "MeleeNarrowPostShape",
+            Shape = new BoxShape3D { Size = size }
+        });
+        post.AddChild(new MeshInstance3D
+        {
+            Name = "MeleeNarrowPostVisual",
+            Mesh = new BoxMesh { Size = size }
+        });
+        return post;
+    }
+
+    private static bool ScratchVerticesFitNarrowPost(
+        Node3D scratchRoot,
+        MeshInstance3D scratchMesh)
+    {
+        const float halfWidth = 0.07f;
+        const float halfHeight = 1.15f;
+        const float frontSurface = 0.11f;
+        var vertexCount = 0;
+        for (var surface = 0; surface < scratchMesh.Mesh.GetSurfaceCount(); surface++)
+        {
+            using var arrays = scratchMesh.Mesh.SurfaceGetArrays(surface);
+            var vertices = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+            foreach (var vertex in vertices)
+            {
+                var postLocalVertex = scratchRoot.Transform * (scratchMesh.Transform * vertex);
+                if (Mathf.Abs(postLocalVertex.X) > halfWidth + 0.001f
+                    || Mathf.Abs(postLocalVertex.Y) > halfHeight + 0.001f
+                    || postLocalVertex.Z < frontSurface
+                    || postLocalVertex.Z > frontSurface + 0.002f)
+                {
+                    return false;
+                }
+                vertexCount++;
+            }
+        }
+        return vertexCount > 0;
+    }
+
     private void EquipTianxuanForMeleeImpactDiagnostics()
     {
         if (string.Equals(
@@ -441,6 +574,10 @@ public partial class FreightTerminalWorld
             + $"wall:{combat.WallBlocked};feedback:{combat.WallFeedback};"
             + $"impact_dedupe:{combat.ImpactDeduplicated};surfaces:{combat.SurfaceProfilesDistinct};"
             + $"nearest_hard_target:{combat.NearestHardTargetFeedback};"
+            + $"scratch_contained:{combat.ScratchContained};"
+            + $"scratch_surface_hugging:{combat.ScratchSurfaceHugging};"
+            + $"scratch_follows:{combat.ScratchFollowsCollider};"
+            + $"scratch_probe_fail_closed:{combat.ScratchProbeFailClosed};"
             + $"suppressed_feedback:{combat.SuppressedWallFeedback};"
             + $"suppressed_presentation_only:{combat.SuppressedWallPresentationOnly};"
             + $"suppressed_blocked:{combat.SuppressedWallBlocked};"

@@ -1187,6 +1187,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         RecordCombatMovementTrail();
         var dt = (float)delta;
+        AdvanceWeaponCycleInput(dt);
         if (IsDead)
         {
             if (_isClimbingLadder)
@@ -1289,7 +1290,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             SelectQuickSlot(PlayerQuickSlot.Utility);
         }
-        else if (!MedicalActionBlocksWeapon && Input.IsActionJustPressed(GameInputActions.WeaponCycle))
+        else if (!MedicalActionBlocksWeapon
+            && Input.IsActionJustPressed(GameInputActions.WeaponCycle)
+            && TryAcceptWeaponCycleInput(Input.IsActionPressed(GameInputActions.Fire)))
         {
             CycleWeaponSlots();
         }
