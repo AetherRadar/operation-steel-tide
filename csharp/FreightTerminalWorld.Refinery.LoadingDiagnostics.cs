@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using System.Linq;
 using Godot;
@@ -91,6 +92,14 @@ public partial class FreightTerminalWorld
         var metrics = scene?.LoadMetrics;
         var collision = _jianghaiGameplayCollision;
         var expectedPlacements = RefineryLayout.Models.Count(placement => placement.HasCollision);
+        var representedPlacements = collision?.Body.GetChildren()
+            .OfType<CollisionShape3D>()
+            .Where(shape => shape.HasMeta("gameplay_source_placement"))
+            .Select(shape => shape.GetMeta(
+                "gameplay_source_placement",
+                string.Empty).AsString())
+            .Distinct(StringComparer.Ordinal)
+            .Count() ?? 0;
         var reloadToWorldReadyMilliseconds = (long)Time.GetTicksMsec()
             - JianghaiLoadingDiagnosticRuntime.ReloadStartedAtMilliseconds;
         var preload = JianghaiLoadingDiagnosticRuntime.PreloadSnapshot;
@@ -106,10 +115,23 @@ public partial class FreightTerminalWorld
         var collisionReady = collision is not null
             && _jianghaiGameplayCollisionError is null
             && collision.SourcePlacementCount == expectedPlacements
+            && collision.SuppressedPlacementCount > 0
+            && collision.PlacementShapeCount >= expectedPlacements
+            && representedPlacements == expectedPlacements
             && collision.AuthoredSourceMeshCount
-                == JianghaiGameplayCollisionBuilder.ExpectedAuthoredProxyCount
+                == JianghaiGameplayCollisionContract.ExpectedAuthoredSourceCount
+            && collision.AuthoredShapeCount
+                == JianghaiGameplayCollisionContract.ExpectedAuthoredShapeCount
+            && collision.DensitySourceCount
+                == JianghaiGameplayCollisionContract.ExpectedDensitySourceCount
+            && collision.SolidSourceCount
+                == JianghaiGameplayCollisionContract.ExpectedSolidSourceCount
+            && collision.EnterableSourceCount
+                == JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount
+            && collision.EnterableShapeCount
+                == JianghaiGameplayCollisionContract.ExpectedEnterableShapeCount
             && collision.CollisionShapeCount
-                == expectedPlacements + JianghaiGameplayCollisionBuilder.ExpectedAuthoredProxyCount
+                == collision.PlacementShapeCount + collision.AuthoredShapeCount
             && collision.BoxShapeCount == collision.CollisionShapeCount
             && collision.ConcaveShapeCount == 0;
         var worldReady = IsBlackwaterRefineryMap
@@ -141,9 +163,16 @@ public partial class FreightTerminalWorld
             + $"{metrics?.DetailedInspectionMilliseconds ?? -1} "
             + $"scene_total_ms={metrics?.TotalMilliseconds ?? -1} "
             + $"collision={collisionReady}:shapes={collision?.CollisionShapeCount ?? 0}/"
-            + $"{expectedPlacements}+{JianghaiGameplayCollisionBuilder.ExpectedAuthoredProxyCount}:"
+            + $"{collision?.PlacementShapeCount ?? 0}+"
+            + $"{JianghaiGameplayCollisionContract.ExpectedAuthoredShapeCount}:"
             + $"boxes={collision?.BoxShapeCount ?? 0}:"
-            + $"authored={collision?.AuthoredSourceMeshCount ?? 0} "
+            + $"authored={collision?.AuthoredSourceMeshCount ?? 0}:"
+            + $"solid={collision?.SolidSourceCount ?? 0}/"
+            + $"{JianghaiGameplayCollisionContract.ExpectedSolidSourceCount}:"
+            + $"enterable={collision?.EnterableSourceCount ?? 0}/"
+            + $"{JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount}:"
+            + $"carved={collision?.SuppressedPlacementCount ?? 0}:"
+            + $"represented={representedPlacements}/{expectedPlacements} "
             + $"world_ready={worldReady}:ms={reloadToWorldReadyMilliseconds} "
             + $"loot={_lootSources.Count} enemies={_enemies.Count} "
             + $"error={(_jianghaiGameplayCollisionError is null ? "none" : "collision_fallback")}");

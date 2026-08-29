@@ -87,6 +87,7 @@ public partial class FreightTerminalWorld
         BuildRefineryModelAssembly();
         _oldTownLandmarks = _oldTownLandmarksBuilder.BuildGameplayScaffolding(_levelRoot);
         BuildOldTownLandmarkDoors(_levelRoot, _oldTownLandmarks);
+        BuildJianghaiResidentialInteriors();
         SpawnOldTownInteriorResidents();
         if (_oldTownLandmarks.RooftopRoute.Count >= 2)
         {

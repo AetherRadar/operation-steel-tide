@@ -1,17 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace OperationSteelTide;
-
-internal sealed record JianghaiGameplayCollisionResult(
-    StaticBody3D Body,
-    int SourcePlacementCount,
-    int AuthoredSourceMeshCount,
-    int CollisionShapeCount,
-    int BoxShapeCount,
-    int ConcaveShapeCount,
-    IReadOnlyDictionary<string, int> DistrictShapeCounts);
 
 /// <summary>
 /// Builds deterministic box-only gameplay collision from the stable extraction layout.
@@ -20,7 +12,6 @@ internal sealed record JianghaiGameplayCollisionResult(
 internal sealed class JianghaiGameplayCollisionBuilder
 {
     public const string CollisionGroup = "jianghai_gameplay_collision";
-    public const int ExpectedAuthoredProxyCount = 6;
 
     public JianghaiGameplayCollisionResult Build(
         RefineryExtractionMapLayout layout,
@@ -53,10 +44,29 @@ internal sealed class JianghaiGameplayCollisionBuilder
 
         var districtCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var placementCount = 0;
+        var placementShapeCount = 0;
+        var suppressedPlacementCount = 0;
+        var suppressedPlacementNames = new List<string>();
         var authoredSourceCount = 0;
+        var authoredShapeCount = 0;
+        var densitySourceCount = 0;
+        var solidSourceCount = 0;
+        var enterableSourceCount = 0;
+        var enterableShapeCount = 0;
         var shapeCount = 0;
+        var authoredSourceNames = new HashSet<string>(StringComparer.Ordinal);
         try
         {
+            var authoredSources = CollectAuthoredSources(authoredRoot);
+            var enterableSources = authoredSources
+                .Where(source => source.IsEnterable)
+                .ToArray();
+            var enterableFootprints = enterableSources
+                .Select(source => new JianghaiCollisionFootprint(
+                    source.Room.Center,
+                    source.Basis,
+                    source.Room.Size))
+                .ToArray();
             foreach (var placement in layout.Models)
             {
                 if (!placement.HasCollision)
@@ -72,63 +82,94 @@ internal sealed class JianghaiGameplayCollisionBuilder
                 }
 
                 var basis = Basis.FromEuler(new Vector3(0.0f, placement.Yaw, 0.0f));
-                var collision = new CollisionShape3D
-                {
-                    Name = $"GameplayProxy_{shapeCount + 1:000}_{placement.Name}",
-                    Shape = new BoxShape3D { Size = size },
-                    Transform = new Transform3D(
-                        basis,
-                        placement.Position + basis * offset)
-                };
-                collision.SetMeta("gameplay_source_placement", placement.Name);
-                collision.SetMeta("gameplay_district", placement.District);
-                body.AddChild(collision);
+                var center = placement.Position + basis * offset;
                 placementCount++;
-                shapeCount++;
-                districtCounts.TryGetValue(placement.District, out var districtCount);
-                districtCounts[placement.District] = districtCount + 1;
+                var carved = false;
+                IReadOnlyList<JianghaiPlacementCollisionFragment> fragments =
+                    placement.IsTallScene
+                    ? JianghaiGameplayCollisionGeometry.CarvePlacementProxy(
+                        center,
+                        basis,
+                        size,
+                        enterableFootprints,
+                        out carved)
+                    : new[] { new JianghaiPlacementCollisionFragment(center, size) };
+                if (placement.IsTallScene && carved)
+                {
+                    suppressedPlacementCount++;
+                    suppressedPlacementNames.Add(placement.Name);
+                }
+                if (fragments.Count == 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Jianghai placement carve removed every proxy fragment for '{placement.Name}'.");
+                }
+                for (var fragmentIndex = 0; fragmentIndex < fragments.Count; fragmentIndex++)
+                {
+                    var fragment = fragments[fragmentIndex];
+                    var collision = new CollisionShape3D
+                    {
+                        Name = $"GameplayProxy_{shapeCount + 1:000}_{placement.Name}_"
+                            + $"{fragmentIndex + 1:00}",
+                        Shape = new BoxShape3D { Size = fragment.Size },
+                        Transform = new Transform3D(basis, fragment.Center)
+                    };
+                    collision.SetMeta("gameplay_source_placement", placement.Name);
+                    collision.SetMeta("gameplay_district", placement.District);
+                    collision.SetMeta("gameplay_proxy_fragment", fragmentIndex);
+                    body.AddChild(collision);
+                    placementShapeCount++;
+                    shapeCount++;
+                    districtCounts.TryGetValue(placement.District, out var districtCount);
+                    districtCounts[placement.District] = districtCount + 1;
+                }
             }
 
-            if (authoredRoot is not null)
+            foreach (var source in authoredSources)
             {
-                var authoredMeshes = authoredRoot.FindChildren(
-                    "*", "MeshInstance3D", recursive: true, owned: false);
-                using var authoredMeshesBacking = authoredMeshes.AsDisposable();
-                foreach (var child in authoredMeshes)
+                var sourceName = source.Source.Name.ToString();
+                if (!authoredSourceNames.Add(sourceName))
                 {
-                    if (child is not MeshInstance3D { Mesh: not null } meshInstance
-                        || !RequestsGameplayProxy(meshInstance))
-                    {
-                        continue;
-                    }
-
-                    var localBounds = meshInstance.GetAabb();
-                    var worldScale = meshInstance.GlobalBasis.Scale.Abs();
-                    var worldSize = new Vector3(
-                        localBounds.Size.X * worldScale.X,
-                        localBounds.Size.Y * worldScale.Y,
-                        localBounds.Size.Z * worldScale.Z);
-                    if (worldSize.X <= 0.05f
-                        || worldSize.Y <= 0.05f
-                        || worldSize.Z <= 0.05f)
-                    {
-                        continue;
-                    }
-
-                    var basis = meshInstance.GlobalBasis.Orthonormalized();
-                    var center = meshInstance.GlobalTransform * localBounds.GetCenter();
-                    var doorway = meshInstance.HasMeta("jianghai_collision_doorway")
-                        && meshInstance.GetMeta("jianghai_collision_doorway").AsBool();
-                    shapeCount += doorway
-                        ? AddDoorwayProxy(body, meshInstance, basis, center, worldSize, shapeCount)
-                        : AddAuthoredBox(body, meshInstance, basis, center, worldSize, shapeCount);
-                    authoredSourceCount++;
+                    throw new InvalidOperationException(
+                        $"Duplicate Jianghai gameplay collision source '{sourceName}'.");
                 }
-                if (authoredSourceCount > 0)
+
+                var addedShapes = source.IsEnterable
+                    ? JianghaiEnterableCollisionShellBuilder.Build(
+                        body,
+                        source.Source,
+                        source.Basis,
+                        source.Room,
+                        shapeCount)
+                    : source.IsSolid
+                        ? AddAuthoredSolidBox(body, source, shapeCount)
+                        : AddAuthoredBox(
+                        body,
+                        source.Source,
+                        source.Basis,
+                        source.Center,
+                        source.Size,
+                        shapeCount);
+                shapeCount += addedShapes;
+                authoredShapeCount += addedShapes;
+                authoredSourceCount++;
+                if (source.IsEnterable)
                 {
-                    districtCounts["authored_edge"] = authoredSourceCount;
+                    enterableSourceCount++;
+                    enterableShapeCount += addedShapes;
+                }
+                else if (source.IsDensity)
+                {
+                    densitySourceCount++;
+                }
+                else if (source.IsSolid)
+                {
+                    solidSourceCount++;
                 }
             }
+            districtCounts["authored_density"] = densitySourceCount;
+            districtCounts["authored_solid"] = solidSourceCount;
+            districtCounts["authored_enterable"] = enterableShapeCount;
 
             var expectedPlacements = 0;
             foreach (var placement in layout.Models)
@@ -138,23 +179,77 @@ internal sealed class JianghaiGameplayCollisionBuilder
                     expectedPlacements++;
                 }
             }
+            var missingAuthoredSources = JianghaiGameplayCollisionContract
+                .ExpectedAuthoredSourceNames
+                .Where(name => !authoredSourceNames.Contains(name))
+                .ToArray();
+            var unexpectedAuthoredSources = authoredSourceNames
+                .Where(name => !JianghaiGameplayCollisionContract
+                    .IsExpectedAuthoredSource(name))
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray();
             if (placementCount != expectedPlacements
                 || requireAuthoredProxies
-                    && authoredSourceCount != ExpectedAuthoredProxyCount)
+                    && (authoredSourceCount
+                            != JianghaiGameplayCollisionContract.ExpectedAuthoredSourceCount
+                        || authoredShapeCount
+                            != JianghaiGameplayCollisionContract.ExpectedAuthoredShapeCount
+                        || densitySourceCount
+                            != JianghaiGameplayCollisionContract.ExpectedDensitySourceCount
+                        || solidSourceCount
+                            != JianghaiGameplayCollisionContract.ExpectedSolidSourceCount
+                        || enterableSourceCount
+                            != JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount
+                        || enterableShapeCount
+                            != JianghaiGameplayCollisionContract.ExpectedEnterableShapeCount
+                        || missingAuthoredSources.Length > 0
+                        || unexpectedAuthoredSources.Length > 0))
             {
                 throw new InvalidOperationException(
                     "Jianghai gameplay collision contract incomplete "
                     + $"(placements={placementCount}/{expectedPlacements}, "
-                    + $"authored={authoredSourceCount}/{ExpectedAuthoredProxyCount}).");
+                    + $"placement_shapes={placementShapeCount}, "
+                    + $"suppressed={suppressedPlacementCount}, "
+                    + $"authored_sources={authoredSourceCount}/"
+                    + $"{JianghaiGameplayCollisionContract.ExpectedAuthoredSourceCount}, "
+                    + $"authored_shapes={authoredShapeCount}/"
+                    + $"{JianghaiGameplayCollisionContract.ExpectedAuthoredShapeCount}, "
+                    + $"density={densitySourceCount}/"
+                    + $"{JianghaiGameplayCollisionContract.ExpectedDensitySourceCount}, "
+                    + $"solid={solidSourceCount}/"
+                    + $"{JianghaiGameplayCollisionContract.ExpectedSolidSourceCount}, "
+                    + $"enterable={enterableSourceCount}/"
+                    + $"{JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount}:"
+                    + $"{enterableShapeCount}/"
+                    + $"{JianghaiGameplayCollisionContract.ExpectedEnterableShapeCount}, "
+                    + $"missing={FormatSourceNames(missingAuthoredSources)}, "
+                    + $"unexpected={FormatSourceNames(unexpectedAuthoredSources)}).");
             }
 
             body.SetMeta("gameplay_source_placement_count", placementCount);
+            body.SetMeta("gameplay_placement_shape_count", placementShapeCount);
+            body.SetMeta("gameplay_suppressed_placement_count", suppressedPlacementCount);
+            body.SetMeta(
+                "gameplay_suppressed_placement_names",
+                string.Join(',', suppressedPlacementNames));
             body.SetMeta("gameplay_authored_source_mesh_count", authoredSourceCount);
+            body.SetMeta("gameplay_authored_shape_count", authoredShapeCount);
+            body.SetMeta("gameplay_solid_source_count", solidSourceCount);
+            body.SetMeta("gameplay_enterable_source_count", enterableSourceCount);
+            body.SetMeta("gameplay_enterable_shape_count", enterableShapeCount);
             body.SetMeta("gameplay_collision_shape_count", shapeCount);
             return new JianghaiGameplayCollisionResult(
                 body,
                 placementCount,
+                placementShapeCount,
+                suppressedPlacementCount,
+                suppressedPlacementNames,
                 authoredSourceCount,
+                authoredShapeCount,
+                densitySourceCount,
+                solidSourceCount,
+                enterableSourceCount,
+                enterableShapeCount,
                 shapeCount,
                 shapeCount,
                 0,
@@ -169,6 +264,12 @@ internal sealed class JianghaiGameplayCollisionBuilder
 
     private static bool RequestsGameplayProxy(MeshInstance3D meshInstance)
     {
+        if (IsAuthoredDensityBuilding(meshInstance)
+            || IsAuthoredSolidBuilding(meshInstance)
+            || IsEnterableBuilding(meshInstance))
+        {
+            return true;
+        }
         if (meshInstance.HasMeta("jianghai_gameplay_proxy")
             && meshInstance.GetMeta("jianghai_gameplay_proxy").AsBool())
         {
@@ -177,22 +278,99 @@ internal sealed class JianghaiGameplayCollisionBuilder
         var name = meshInstance.Name.ToString();
         return name.StartsWith("JianghaiGameplayProxy_", StringComparison.Ordinal)
             || name.StartsWith("ChineseEdgeBuilding_", StringComparison.Ordinal)
-            || IsDensityEdgeProxyName(name);
+            || JianghaiGameplayCollisionContract.IsExpectedAuthoredSource(name);
     }
 
-    private static bool IsDensityEdgeProxyName(string name)
+    private static bool IsAuthoredDensityBuilding(MeshInstance3D meshInstance)
     {
-        var isEdgeBuilding = name.StartsWith(
-                "JianghaiDensity_WestEdge",
+        var metadataReady = string.Equals(
+                meshInstance.GetMeta("district_role", string.Empty).AsString(),
+                JianghaiGameplayCollisionContract.AuthoredDensityDistrictRole,
                 StringComparison.Ordinal)
-            || name.StartsWith(
-                "JianghaiDensity_EastEdge",
+            && string.Equals(
+                meshInstance.GetMeta("collision_role", string.Empty).AsString(),
+                JianghaiGameplayCollisionContract.AuthoredDensityCollisionRole,
                 StringComparison.Ordinal);
-        return isEdgeBuilding
-            && (name.EndsWith("04", StringComparison.Ordinal)
-                || name.EndsWith("05", StringComparison.Ordinal)
-                || name.EndsWith("06", StringComparison.Ordinal));
+        return metadataReady || JianghaiGameplayCollisionContract.IsExpectedDensitySource(
+            meshInstance.Name.ToString());
     }
+
+    private static bool IsEnterableBuilding(MeshInstance3D meshInstance)
+        => meshInstance.GetMeta("jianghai_enterable", false).AsBool()
+            || JianghaiGameplayCollisionContract.IsExpectedEnterableSource(
+                meshInstance.Name.ToString());
+
+    private static bool IsAuthoredSolidBuilding(MeshInstance3D meshInstance)
+        => JianghaiGameplayCollisionContract.IsExpectedSolidSource(
+            meshInstance.Name.ToString());
+
+    private static List<AuthoredProxyGeometry> CollectAuthoredSources(Node3D? authoredRoot)
+    {
+        var sources = new List<AuthoredProxyGeometry>(
+            JianghaiGameplayCollisionContract.ExpectedAuthoredSourceCount);
+        if (authoredRoot is null)
+        {
+            return sources;
+        }
+
+        var authoredMeshes = authoredRoot.FindChildren(
+            "*", "MeshInstance3D", recursive: true, owned: false);
+        using var authoredMeshesBacking = authoredMeshes.AsDisposable();
+        foreach (var child in authoredMeshes)
+        {
+            if (child is not MeshInstance3D { Mesh: not null } meshInstance
+                || !RequestsGameplayProxy(meshInstance))
+            {
+                continue;
+            }
+
+            var localBounds = meshInstance.GetAabb();
+            var worldScale = meshInstance.GlobalBasis.Scale.Abs();
+            var worldSize = localBounds.Size * worldScale;
+            if (worldSize.X <= 0.05f || worldSize.Y <= 0.05f || worldSize.Z <= 0.05f)
+            {
+                continue;
+            }
+
+            var basis = meshInstance.GlobalBasis.Orthonormalized();
+            var center = meshInstance.GlobalTransform * localBounds.GetCenter();
+            var enterable = IsEnterableBuilding(meshInstance);
+            sources.Add(new AuthoredProxyGeometry(
+                meshInstance,
+                basis,
+                center,
+                worldSize,
+                IsAuthoredDensityBuilding(meshInstance),
+                IsAuthoredSolidBuilding(meshInstance),
+                enterable,
+                enterable
+                    ? JianghaiGameplayCollisionGeometry.ResolveEnterableRoom(
+                        meshInstance,
+                        basis,
+                        center,
+                        worldSize)
+                    : default));
+        }
+        return sources;
+    }
+
+    private static bool OverlapsFootprint(
+        Vector3 firstCenter,
+        Basis firstBasis,
+        Vector3 firstSize,
+        Vector3 secondCenter,
+        Basis secondBasis,
+        Vector3 secondSize)
+        => JianghaiGameplayCollisionGeometry.OverlapsFootprint(
+            firstCenter,
+            firstBasis,
+            firstSize,
+            secondCenter,
+            secondBasis,
+            secondSize);
+
+    private static string FormatSourceNames(IReadOnlyCollection<string> names)
+        => names.Count == 0 ? "none" : string.Join(',', names);
 
     private static int AddAuthoredBox(
         StaticBody3D body,
@@ -206,52 +384,26 @@ internal sealed class JianghaiGameplayCollisionBuilder
         return 1;
     }
 
-    private static int AddDoorwayProxy(
+    private static int AddAuthoredSolidBox(
         StaticBody3D body,
-        MeshInstance3D source,
-        Basis basis,
-        Vector3 center,
-        Vector3 size,
+        AuthoredProxyGeometry source,
         int shapeIndex)
     {
-        var doorwayWidth = Mathf.Clamp(size.X * 0.24f, 1.4f, 3.8f);
-        var doorwayHeight = Mathf.Clamp(size.Y * 0.34f, 2.2f, 3.8f);
-        var sideWidth = Mathf.Max(0.3f, (size.X - doorwayWidth) * 0.5f);
-        var sideOffset = (doorwayWidth + sideWidth) * 0.5f;
-        AddBox(
+        var geometry = JianghaiGameplayCollisionGeometry.ResolveSolidBuilding(
+            source.Source,
+            source.Basis,
+            source.Center,
+            source.Size);
+        return AddAuthoredBox(
             body,
-            source,
-            basis,
-            center + basis.X * -sideOffset,
-            new Vector3(sideWidth, size.Y, size.Z),
-            shapeIndex,
-            "door_left");
-        AddBox(
-            body,
-            source,
-            basis,
-            center + basis.X * sideOffset,
-            new Vector3(sideWidth, size.Y, size.Z),
-            shapeIndex + 1,
-            "door_right");
-        var lintelHeight = Mathf.Max(0.3f, size.Y - doorwayHeight);
-        var bottom = center.Y - size.Y * 0.5f;
-        var lintelCenter = new Vector3(
-            center.X,
-            bottom + doorwayHeight + lintelHeight * 0.5f,
-            center.Z);
-        AddBox(
-            body,
-            source,
-            basis,
-            lintelCenter,
-            new Vector3(doorwayWidth, lintelHeight, size.Z),
-            shapeIndex + 2,
-            "door_lintel");
-        return 3;
+            source.Source,
+            source.Basis,
+            geometry.Center,
+            geometry.Size,
+            shapeIndex);
     }
 
-    private static void AddBox(
+    private static CollisionShape3D AddBox(
         StaticBody3D body,
         MeshInstance3D source,
         Basis basis,
@@ -267,7 +419,36 @@ internal sealed class JianghaiGameplayCollisionBuilder
             Transform = new Transform3D(basis, center)
         };
         collision.SetMeta("gameplay_source_node", source.Name.ToString());
+        var densitySource = IsAuthoredDensityBuilding(source);
+        collision.SetMeta(
+            "gameplay_source_district_role",
+            densitySource
+                ? JianghaiGameplayCollisionContract.AuthoredDensityDistrictRole
+                : source.GetMeta(
+                    "district_role",
+                    "authored_chinese_shop").AsString());
+        collision.SetMeta(
+            "gameplay_source_collision_role",
+            JianghaiGameplayCollisionContract.AuthoredDensityCollisionRole);
+        collision.SetMeta(
+            "gameplay_source_kind",
+            IsEnterableBuilding(source)
+                ? "enterable"
+                : densitySource
+                    ? "density"
+                    : IsAuthoredSolidBuilding(source) ? "solid" : "legacy");
         collision.SetMeta("gameplay_proxy_role", role);
         body.AddChild(collision);
+        return collision;
     }
+
+    private readonly record struct AuthoredProxyGeometry(
+        MeshInstance3D Source,
+        Basis Basis,
+        Vector3 Center,
+        Vector3 Size,
+        bool IsDensity,
+        bool IsSolid,
+        bool IsEnterable,
+        JianghaiEnterableRoomGeometry Room);
 }

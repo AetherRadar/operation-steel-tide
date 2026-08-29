@@ -162,6 +162,7 @@ public partial class FreightTerminalWorld : Node3D
         _jianghaiDetailedSceneInspection = Array.Exists(
             args,
             argument => argument is "--validate-refinery-map"
+                or "--validate-jianghai-interiors"
                 or "--capture-refinery-map"
                 or "--capture-promotion"
                 or "--capture-readme-zh");
@@ -2043,27 +2044,21 @@ public partial class FreightTerminalWorld : Node3D
             return;
         }
 
-        if (TryHandleRefineryDoorInteraction())
+        var nearestCivilian = FindNearestAssistableCivilian(
+            _player.GlobalPosition,
+            2.85f,
+            out var nearestCivilianDistance);
+        var nearest = FindNearestInteractiveLoot(
+            _player.GlobalPosition,
+            2.85f,
+            out var nearestDistance);
+        if (TryHandleRefineryDoorInteraction(Mathf.Min(
+                nearestCivilianDistance,
+                nearestDistance)))
         {
             return;
         }
 
-        CivilianNpc? nearestCivilian = null;
-        var nearestCivilianDistance = 2.85f;
-        foreach (var civilian in _civilians)
-        {
-            if (!IsInstanceValid(civilian) || !civilian.CanOfferAssistance)
-            {
-                continue;
-            }
-            var distance = _player.GlobalPosition.DistanceTo(civilian.GlobalPosition);
-            if (distance >= nearestCivilianDistance)
-            {
-                continue;
-            }
-            nearestCivilian = civilian;
-            nearestCivilianDistance = distance;
-        }
         if (nearestCivilian is not null)
         {
             _lootSearchTarget = null;
@@ -2082,21 +2077,6 @@ public partial class FreightTerminalWorld : Node3D
             return;
         }
 
-        ILootSource? nearest = null;
-        var nearestDistance = 2.85f;
-        foreach (var source in _lootSources)
-        {
-            if (!source.IsSearchable || !IsInstanceValid(source.LootNode))
-            {
-                continue;
-            }
-            var distance = _player.GlobalPosition.DistanceTo(source.LootNode.GlobalPosition);
-            if (distance < nearestDistance && HasClearPlayerLootInteractionLineOfSight(source))
-            {
-                nearest = source;
-                nearestDistance = distance;
-            }
-        }
         if (nearest is not null)
         {
             if (!ReferenceEquals(_lootSearchTarget, nearest))
@@ -2748,7 +2728,14 @@ public partial class FreightTerminalWorld : Node3D
             SetIfSupported(_environmentRef, "ssil_enabled", _qualitySetting >= 2);
             SetIfSupported(_environmentRef, "ssr_enabled", _qualitySetting >= 1);
             SetIfSupported(_environmentRef, "volumetric_fog_enabled", _qualitySetting >= 2);
-            if (_environmentRef.Sky is Sky sky)
+            if (IsBlackwaterRefineryMap)
+            {
+                _jianghaiOldCityAtmosphere.ApplyQuality(
+                    true,
+                    _qualitySetting,
+                    _environmentRef);
+            }
+            else if (_environmentRef.Sky is Sky sky)
             {
                 var radianceSize = new[]
                 {

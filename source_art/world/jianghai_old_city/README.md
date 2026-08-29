@@ -24,8 +24,14 @@ The current delivered district is the project-authored Blender rebuild made on
 2026-08-29. It replaces 66 previously visible building anchors with three
 reviewed Chinese-profile shared meshes and expands the authored perimeter table
 to 42 density placements, including the west/east `Edge04`, `Edge05`, and
-`Edge06` placements. The rebuild is serialized in the authoritative `.blend`
-and exported to the runtime GLB; it is not runtime procedural geometry.
+`Edge06` placements. Six reviewed main-street shops additionally receive unique
+human-scale doorway apertures, authored offline by deterministic mesh-plane
+splitting and face removal so the non-manifold joined facades cannot retain an
+invisible boolean plug. The rebuild is serialized in the authoritative `.blend`
+and exported to the runtime GLB; it is not runtime procedural geometry. The
+final correction removes only the obsolete
+`JianghaiExpansion_Facade_EastPhoto_F0_C1_Insert` that covered the East Photo
+House opening, while the adjacent `F0_C1_Wall` and `WestClock` objects remain.
 
 The source mapping is:
 
@@ -53,19 +59,27 @@ The authoritative outputs and representative player-scale review renders are:
 
 - `source_art/world/jianghai_old_city/jianghai_old_city.blend`
 - `assets/models/jianghai_old_city/jianghai_old_city.glb`
+- `source_art/props/jianghai_lattice_door/jianghai_lattice_door.blend`
+- `assets/models/jianghai_old_city/jianghai_lattice_door.glb`
 - `previews/12_chinese_edge_gate.png`
 - `previews/13_chinese_avenue.png`
 - `previews/14_chinese_old_city_overview.png`
 
-The final packed `.blend` is 42,607,105 bytes with SHA-256
-`97226E2ED4860E676F27171F7AEF76B33AFF493AD991779887BE984B5DCF9F17`.
-The final GLB is 49,926,284 bytes with SHA-256
-`BAD4B6C18C8FC8488419ED9EB06F18F6C34544FEAC054EF71555F0D5EB2C0433`.
-Its round-trip audit reports 263 unique meshes across 569 mesh nodes, 378
-unique/1,517 instanced surfaces, 943,282 unique/3,015,841 instanced triangles,
-93 materials, 142 textures backed by 120 images, and a 512-pixel maximum image
-dimension. The scene audit passes with zero density intersections and zero
-visible retired-building instances.
+The final packed `.blend` is 49,398,104 bytes with SHA-256
+`AD6EEED449F47564131F961394F572A5327EAAB018CA5670F49A8F34173C3B6A`.
+It contains 505 objects, 206 unique mesh datablocks, 3,032,228 mesh-object
+triangles, and resolves to 568 evaluated mesh objects / 3,061,154 evaluated
+instance triangles. The final GLB is 58,571,556 bytes with SHA-256
+`B0D21C78C3996BF2AA2D0F78FA32199B0B4BF396B164E547CAE9498033F23139`.
+Its Blender round-trip audit reports 585 total nodes, 568 mesh nodes, 269 unique
+meshes, 449 primitives, and 1,070,770 unique / 3,059,538 instanced triangles,
+with 93 materials, 142 textures, 120 images, and a 512-pixel maximum image
+dimension. The authoritative scene audit passes with all 42 density placements
+marked for lightweight gameplay-proxy coverage, six enterable residences,
+18/18 building-body doorway samples, 18/18 structural wall/lintel samples,
+18/18 full-scene doorway samples, zero density intersections, and zero visible
+retired-building instances. A negative regression fixture proves the full-scene
+gate catches a 0.404-meter facade obstruction.
 
 ## Authoritative source and provenance inputs
 
@@ -276,6 +290,27 @@ opening. The two current runtime doors are separate Kenney Factory Kit CC0
 `assets/models/kenney_factory_kit/door-hinged.glb` instances that open with a
 normal 96-degree side-hinged swing.
 
+The six newly enterable main-street rooms use a separate red-and-gold composite
+door. Its retained finished geometry combines the same Kenney CC0 hinged leaf
+with material 2 of Free poly's CC0 **Chinese Temple 2**
+`GuangchangClanHall` / `网格.002` arched grille, reduced and fitted in Blender.
+Project-authored work is limited to the packed red-wood lacquer texture and
+material adaptation; no door component is generated from primitives. The
+brighter red-wood lacquer and dark-gold base colors preserve readability under
+the eaves without emission, additional lights, or runtime cost. The exact
+extraction, license mapping, and rebuild contract are in
+`source_art/props/jianghai_lattice_door/README.md`.
+
+The final door source is a 1,162,441-byte `.blend` with SHA-256
+`72D41DB8125BB5DDDEE04DE14E6AA5C9D8B1D4D5058823B74CC52968D78C9445`.
+Its 412,548-byte runtime GLB has SHA-256
+`FBE9FC3EBB1F8BB49842442F1A4AEF451E0F67E5B3FF95BBB16A6F01B84D5528`
+and contains three mesh nodes, two unique meshes/two surfaces, 5,745 unique /
+11,334 instanced triangles, two PBR materials, one 256-square texture/image, and
+two 18-frame, 0.6-second, 96-degree clips. The 63,926-byte source and Godot
+extraction-target red-wood textures are byte-identical with SHA-256
+`C75ED94A13A4F21CE518F455916802117D193FCE7A5731A0A4A602F82FD43834`.
+
 The repository-external cache is neither a runtime lookup nor an export
 dependency. The authoritative `.blend` already contains the adapted source
 geometry, materials, and textures. Do not replace an embedded source with a
@@ -342,9 +377,11 @@ result is 187,940 bytes with SHA-256
 `C4884AFCD7560E4BB23320A8C311DB0011504F7C5FEE30D58C266D54F7C6B166`.
 This derivative remains tracked for provenance and possible alternate use, but
 it no longer supplies either current Old City `InteractiveBuildingDoor` visual.
-The current doors use Kenney's CC0 `door-hinged.glb` at the two 1.45-by-2.65-meter
-personnel openings and swing sideways through 96 degrees. Collision, animation,
-network state, and AI traversal remain project gameplay behavior.
+The two existing pawnshop/factory doors use Kenney's CC0 `door-hinged.glb` at
+the 1.45-by-2.65-meter personnel openings; the six new enterable-room doors use
+the Kenney / Chinese Temple 2 composite documented above. All swing sideways
+through 96 degrees. Collision, animation, network state, and AI traversal remain
+project gameplay behavior.
 
 It is a deterministic Blender DCC export/cleanup/validation step, not a runtime
 procedural city-generation system. It reapplies the documented explicit
@@ -471,31 +508,35 @@ aligned in Blender: two reused DCC brick piers, two pier caps, and a corrugated
 roof. Their portal composition is final DCC art, not code-built primitive or
 procedural visible geometry. Reused packed materials keep their recorded
 third-party provenance. Behind that outer portal, and at the pawnshop, each
-current entrance adds a ten-piece Quaternius facade around a Kenney hinged door.
+existing entrance adds a ten-piece Quaternius facade around a Kenney hinged
+door. Six additional reviewed street buildings use the red-and-gold Kenney /
+Chinese Temple 2 composite doors described above.
 
 Godot now builds a deliberately lightweight gameplay-collision layer instead of
 turning millions of authored render triangles into physics geometry. The current
-map uses 102 reviewed box shapes for placement/profile coverage plus 20 landmark
-facade and traversal boxes, all on world layer 1. It creates zero concave shapes.
-Deterministic probes still verify the visible walls, factory and pawnshop door
-openings, market deck/rails, central rooftop path, ballistic cover, and all 12
-Epic/Legendary high-value loot routes. Runtime validation also confirms that the
-two closed doors block an enemy capsule, the opened 1.45-by-2.65-meter routes
-clear, and the two interiors contain four residents in total alongside their
-loot placements.
+map represents 107 reviewed collision sources with 315 gameplay box shapes plus
+20 landmark facade/traversal boxes, 335 total on world layer 1. It creates zero
+concave shapes. Deterministic probes verify visible walls, all eight closed/open
+door routes, market deck/rails, the central rooftop path, ballistic cover, 14
+route probes, and all 12 Epic/Legendary high-value-loot routes. Six newly
+enterable furnished rooms contain six Chinese doors, 24 finished Kenney
+furniture props represented by 49 mesh nodes, eight searchable loot placements,
+and four added residents, bringing the map total to eight residents. Six
+bidirectional door links let squad AI open and traverse the required room route.
 
-The current runtime keeps the full DCC scene for visible art while batching 283
+The current runtime keeps the full DCC scene for visible art while batching 277
 safe repeated source meshes into 71 spatial `MultiMesh` batches. The original
 nodes remain available on render layer zero for authored-scene diagnostics. The
 latest explicit Godot reimport and runtime checks report:
 
 | Current runtime layer | Verified result |
 | --- | --- |
-| Authored-map import | 569 authored meshes; 1,517 material-backed surfaces; 3,015,841 authored instance triangles; all eight required anchors |
-| Gameplay collision | 122/122 box shapes across the gameplay and landmark bodies; zero concave shapes; 14 route probes and 12/12 high-value-loot routes pass |
-| Deployment loading | Threaded preload 502-1,069 ms across the recorded verification runs; cached acquire 0 ms; reload-to-world-ready 1,535-2,913 ms across those runs |
-| Render batching | 283 repeated source meshes replaced visually by 71 spatial batches with 71/71 non-origin centroids, 0.000002-meter maximum pose error, and zero visibility-range shortfall; overview 967 draw calls / 968 objects; mountain aerial 1,133-1,497 / 1,163-1,538 across final runs versus 1,562 / 2,867 before batching; daylight overview 1,534 / 1,558 versus 1,615 / 2,378 before batching |
-| Representative capture | All 11 views pass; peak 793.3 MB video memory and 531.0 MB texture memory |
+| Authored-map import | 568 authored meshes; 1,493 material-backed surfaces; 3,059,538 authored instance triangles; all eight required anchors |
+| Runtime scene budget | 1,599 nodes; 46 static bodies; 777 mesh instances against an 820 budget; 26 lights; 44 loot placements; 33 garrison actors |
+| Gameplay collision | 107 reviewed sources; 315 gameplay plus 20 landmark boxes, 335 total; zero concave shapes; 14 route probes and 12/12 high-value-loot routes pass |
+| Enterable interiors | Six rooms; six red-and-gold Chinese doors; 24 finished Kenney furniture props / 49 mesh nodes; eight searchable loot placements; four added / eight total residents; six bidirectional AI door links |
+| Render batching and quality | 277 repeated source meshes represented by 71 spatial batches with 71/71 non-origin centroids; furniture visibility range 42 meters without shadows; incremental sky-radiance updates |
+| Representative capture | All 11 views pass the 2,400 draw-call / 2,200-object / 10.5-million-primitive / 1,536 MB video / 1,152 MB texture budgets; overview 1,001 / 1,005 / 2,774,257; peak daylight 1,904 / 1,939 / 3,069,532; peak 1,057.0 MB video and 663.3 MB texture memory |
 
 Read-only audits through the earlier 2026-08-29 valley integration recorded the
 historical pre-rebase and post-valley values below. Both tables predate the
@@ -638,4 +679,8 @@ their recorded source rights; packing, reusing a material on the portal, or expo
 relicense them as MIT content. See `LICENSE_EVIDENCE.md` for exact creators,
 URLs, asset IDs, hashes, and local mapping. In particular, the 18 brick and two
 doorframe facade instances remain Quaternius Downtown City MegaKit CC0 content,
-and the two current hinged runtime doors remain Kenney Factory Kit CC0 content.
+the two existing pawnshop/factory hinged doors remain Kenney Factory Kit CC0
+content, and each of the six new composite doors retains both Kenney Factory Kit
+and Free poly Chinese Temple 2 CC0 provenance. The packed red-wood lacquer and
+material adaptation are project-authored under the root MIT boundary described
+above.

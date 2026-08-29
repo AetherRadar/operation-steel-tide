@@ -48,6 +48,30 @@ public partial class FreightTerminalWorld
             && dayFill >= 0.60f
             && dayEnvironmentReady;
 
+        var qualityModesReady = true;
+        var qualitySizesReady = true;
+        var qualitySkyStable = true;
+        var daySkyResource = _environmentRef.Sky;
+        var qualityModes = new string[3];
+        var qualitySizes = new string[3];
+        for (var tier = 0; tier <= 2; tier++)
+        {
+            _jianghaiOldCityAtmosphere.ApplyQuality(
+                true,
+                tier,
+                _environmentRef);
+            var qualitySky = _environmentRef.Sky;
+            qualityModes[tier] = qualitySky?.ProcessMode.ToString() ?? "Missing";
+            qualitySizes[tier] = qualitySky?.RadianceSize.ToString() ?? "Missing";
+            qualityModesReady &= qualitySky?.ProcessMode
+                == Sky.ProcessModeEnum.Incremental;
+            qualitySizesReady &= qualitySky?.RadianceSize
+                == JianghaiOldCityAtmosphere.RadianceSizeForQuality(tier);
+            qualitySkyStable &= qualitySky is not null
+                && daySkyResource is not null
+                && qualitySky.GetInstanceId() == daySkyResource.GetInstanceId();
+        }
+
         ApplyTimeOfDay(DeploymentTimeOfDay.Dusk);
         await WaitFrames(3);
         var duskSky = _environmentRef.Sky?.SkyMaterial as ProceduralSkyMaterial;
@@ -74,7 +98,11 @@ public partial class FreightTerminalWorld
             && duskEnvironmentReady;
 
         ApplyTimeOfDay(originalTime);
-        var valid = dayReady && duskReady;
+        var valid = dayReady
+            && duskReady
+            && qualityModesReady
+            && qualitySizesReady
+            && qualitySkyStable;
         GD.Print(
             $"REFINERY_ATMOSPHERE_CHECK valid={valid} day={dayReady} "
             + $"environment={dayEnvironmentReady} "
@@ -86,7 +114,10 @@ public partial class FreightTerminalWorld
             + $"sun={daySun:0.00} fill={dayFill:0.00} "
             + $"dusk_procedural={duskReady} "
             + $"dusk_environment={duskEnvironmentReady} "
-            + $"dusk_horizon_continuous={duskHorizonContinuous}");
+            + $"dusk_horizon_continuous={duskHorizonContinuous} "
+            + $"quality_modes={string.Join(',', qualityModes)} "
+            + $"quality_sizes={string.Join(',', qualitySizes)} "
+            + $"quality_sky_stable={qualitySkyStable}");
         GD.Print($"REFINERY_ATMOSPHERE_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }

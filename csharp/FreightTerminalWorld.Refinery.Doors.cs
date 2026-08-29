@@ -81,14 +81,17 @@ public partial class FreightTerminalWorld
             costMultiplier: 1.04f);
     }
 
-    private bool TryHandleRefineryDoorInteraction()
+    private bool TryHandleRefineryDoorInteraction(float competingInteractionDistance)
     {
         if (_refineryDoors.Count == 0)
         {
             return false;
         }
-        var nearest = FindNearestRefineryDoor(_player.GlobalPosition, 3.25f);
-        if (nearest is null)
+        var nearest = FindNearestRefineryDoor(
+            _player.GlobalPosition,
+            3.25f,
+            out var nearestDoorDistance);
+        if (nearest is null || nearestDoorDistance > competingInteractionDistance)
         {
             return false;
         }
@@ -127,6 +130,12 @@ public partial class FreightTerminalWorld
     }
 
     private InteractiveBuildingDoor? FindNearestRefineryDoor(Vector3 origin, float range)
+        => FindNearestRefineryDoor(origin, range, out _);
+
+    private InteractiveBuildingDoor? FindNearestRefineryDoor(
+        Vector3 origin,
+        float range,
+        out float distance)
     {
         InteractiveBuildingDoor? nearest = null;
         var nearestDistanceSquared = range * range;
@@ -146,6 +155,9 @@ public partial class FreightTerminalWorld
             nearest = door;
             nearestDistanceSquared = distanceSquared;
         }
+        distance = nearest is null
+            ? float.PositiveInfinity
+            : Mathf.Sqrt(nearestDistanceSquared);
         return nearest;
     }
 
@@ -228,13 +240,15 @@ public partial class FreightTerminalWorld
                 enemy.ProcessMode = ProcessModeEnum.Disabled;
             }
         }
-        var expectedDoorCount = _oldTownLandmarks?.EntryCount ?? 0;
+        var expectedDoorCount = (_oldTownLandmarks?.EntryCount ?? 0)
+            + JianghaiInteriorPopulationService.ExpectedDoorCount;
         var countReady = _refineryDoors.Count == expectedDoorCount
-            && expectedDoorCount == 2;
+            && expectedDoorCount == 8;
         var idsReady = _refineryDoors.Select(door => door.DoorId).Distinct().Count() == expectedDoorCount
             && _refineryDoors.Select(door => door.DoorId).OrderBy(id => id)
                 .SequenceEqual(Enumerable.Range(1, expectedDoorCount));
         var authoredReady = ResourceLoader.Exists(RefineryDoorScenePath)
+            && ResourceLoader.Exists(JianghaiInteriorPopulationService.LatticeDoorScenePath)
             && _refineryDoors.All(door => door.UsesAuthoredVisual && door.HasBoxCollision);
         var hingedReady = _refineryDoors.All(door =>
             door.MotionStyle == BuildingDoorMotionStyle.Hinged);
@@ -242,7 +256,9 @@ public partial class FreightTerminalWorld
             door.HasValidAuthoredVisualPanelLayout
             && door.AuthoredVisualPanelCount == RefineryDoorVisualPanelCount
             && door.MaxAuthoredVisualAspectDistortion
-                <= RefineryDoorMaxAspectDistortion);
+                <= (door.IsInGroup("jianghai_enterable_door")
+                    ? 1.30f
+                    : RefineryDoorMaxAspectDistortion));
         var maxAspectDistortion = _refineryDoors.Count > 0
             ? _refineryDoors.Max(door => door.MaxAuthoredVisualAspectDistortion)
             : float.PositiveInfinity;

@@ -26,6 +26,7 @@ from jianghai_chinese_district_layout import (
     DENSITY_BUILDING_LAYOUT, JIANGHAI_DEPLOYMENT_POINTS, OLD_URBAN_TARGETS, PROFILE_BASE_SCALE,
     QUATERNIUS_DENSITY_MESHES, SHOP_TARGETS,
 )
+from jianghai_enterable_residences import apply_enterable_residences
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BLEND_PATH = REPO_ROOT / "source_art" / "world" / "jianghai_old_city" / "jianghai_old_city.blend"
 PREVIEW_DIR = BLEND_PATH.parent / "previews"
@@ -317,12 +318,8 @@ def rebuild_density(
         obj["district_role"] = "authored_density_building"
         obj["collision_role"] = "building_shell"
         obj["building_id"] = obj.name
-        if suffix in {
-            "WestEdge04", "WestEdge05", "WestEdge06",
-            "EastEdge04", "EastEdge05", "EastEdge06",
-        }:
-            obj["jianghai_gameplay_proxy"] = True
-            obj["jianghai_proxy_role"] = "edge_building"
+        obj["jianghai_gameplay_proxy"] = True
+        obj["jianghai_proxy_role"] = "density_building_shell"
         counts[profile] += 1
     return len(DENSITY_BUILDING_LAYOUT), counts
 
@@ -470,6 +467,7 @@ def main() -> None:
         "gate house",
     )
     replaced, object_profiles = replace_retired_buildings(hall_mesh, shop_mesh, gate_mesh)
+    enterable = apply_enterable_residences()
     density_shop = decimate_mesh(shop_mesh, DENSITY_SHOP_MESH_NAME, 0.42, "perimeter arcade shop LOD")
     density_gate = decimate_mesh(gate_mesh, DENSITY_GATE_MESH_NAME, 0.48, "perimeter gate house LOD")
     density_count, profile_counts = rebuild_density(density_hall, density_shop, density_gate)
@@ -492,6 +490,10 @@ def main() -> None:
         f"object_profiles={','.join(f'{name}:{count}' for name, count in object_profiles.items())} "
         f"profiles={','.join(f'{name}:{count}' for name, count in profile_counts.items())} "
         f"retired_blocks={retired_blocks} triangles={metrics['triangles']} "
+        f"enterable={enterable.residence_count} cuts={enterable.cut_count} "
+        f"door_samples={enterable.aperture_sample_count}/{enterable.wall_sample_count} "
+        f"scene_door_samples={enterable.scene_aperture_sample_count} "
+        f"removed_door_inserts={enterable.removed_insert_count} "
         f"previews={len(previews)} blend={BLEND_PATH}"
     )
 

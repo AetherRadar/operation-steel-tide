@@ -16,6 +16,7 @@ from jianghai_chinese_district_layout import (
     DENSITY_BUILDING_LAYOUT,
     PROFILE_BASE_SCALE,
 )
+from jianghai_enterable_residences import apply_enterable_residences
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -666,12 +667,8 @@ def rebuild_dense_perimeter() -> tuple[int, int, dict[str, int]]:
         building["district_role"] = "authored_density_building"
         building["collision_role"] = "building_shell"
         building["building_id"] = building.name
-        if suffix in {
-            "WestEdge04", "WestEdge05", "WestEdge06",
-            "EastEdge04", "EastEdge05", "EastEdge06",
-        }:
-            building["jianghai_gameplay_proxy"] = True
-            building["jianghai_proxy_role"] = "edge_building"
+        building["jianghai_gameplay_proxy"] = True
+        building["jianghai_proxy_role"] = "density_building_shell"
         created += 1
         profile_counts[profile_name] += 1
     return removed, created, profile_counts
@@ -2809,6 +2806,7 @@ def main() -> None:
     removed_factory_shells, rebuilt_factory_buildings = rebuild_factory_frontage()
     removed_cross_street_intrusions = clear_cross_street_intrusions()
     rebuilt_street_cadence = rebuild_street_cadence()
+    enterable = apply_enterable_residences()
     adjusted_market_furniture = clear_market_walkway()
     removed_density, rebuilt_density, density_profile_counts = rebuild_dense_perimeter()
     pawnshop_doorway_cut = cut_pawnshop_doorway()
@@ -2859,6 +2857,10 @@ def main() -> None:
         f"rebuilt_factory_buildings={rebuilt_factory_buildings} "
         f"removed_cross_street_intrusions={removed_cross_street_intrusions} "
         f"rebuilt_street_cadence={rebuilt_street_cadence} "
+        f"enterable={enterable.residence_count} cuts={enterable.cut_count} "
+        f"door_samples={enterable.aperture_sample_count}/{enterable.wall_sample_count} "
+        f"scene_door_samples={enterable.scene_aperture_sample_count} "
+        f"removed_door_inserts={enterable.removed_insert_count} "
         f"adjusted_market_furniture={adjusted_market_furniture} "
         f"removed_density={removed_density} rebuilt_density={rebuilt_density} "
         f"density_profiles={','.join(f'{name}:{count}' for name, count in density_profile_counts.items())} "

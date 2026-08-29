@@ -34,6 +34,7 @@ internal sealed class JianghaiOldCityAtmosphere
         var style = GetStyle(timeOfDay);
         var sky = EnsureSky(environment);
         ApplyProceduralSky(sky, style);
+        ApplyRadianceQuality(sky, qualitySetting);
         environment.BackgroundMode = Godot.Environment.BGMode.Sky;
         environment.AmbientLightSource = Godot.Environment.AmbientSource.Sky;
         environment.ReflectedLightSource = Godot.Environment.ReflectionSource.Sky;
@@ -41,9 +42,6 @@ internal sealed class JianghaiOldCityAtmosphere
         environment.BackgroundEnergyMultiplier = 1.0f;
 
         var highQuality = Mathf.Clamp(qualitySetting, 0, 2) >= 2;
-        sky.ProcessMode = highQuality
-            ? Sky.ProcessModeEnum.Realtime
-            : Sky.ProcessModeEnum.Incremental;
 
         environment.AmbientLightEnergy = style.AmbientEnergy;
         environment.FogLightColor = style.FogColor;
@@ -75,6 +73,21 @@ internal sealed class JianghaiOldCityAtmosphere
             fillLight.LightColor = style.FillColor;
             fillLight.LightEnergy = style.FillEnergy;
         }
+    }
+
+    public void ApplyQuality(
+        bool active,
+        int qualitySetting,
+        Godot.Environment? environment)
+    {
+        if (!active
+            || environment is null
+            || !GodotObject.IsInstanceValid(environment))
+        {
+            return;
+        }
+
+        ApplyRadianceQuality(EnsureSky(environment), qualitySetting);
     }
 
     private Sky EnsureSky(Godot.Environment environment)
@@ -116,6 +129,31 @@ internal sealed class JianghaiOldCityAtmosphere
             sky.SkyMaterial = skyMaterial;
         }
     }
+
+    private static void ApplyRadianceQuality(Sky sky, int qualitySetting)
+    {
+        var radianceSize = RadianceSizeForQuality(qualitySetting);
+        if (sky.RadianceSize != radianceSize)
+        {
+            sky.RadianceSize = radianceSize;
+        }
+
+        // This authored procedural sky changes only when deployment time, weather,
+        // or quality is applied. Incremental refreshes the dirty radiance map over
+        // several frames and then stops, unlike Realtime which filters it every frame.
+        if (sky.ProcessMode != Sky.ProcessModeEnum.Incremental)
+        {
+            sky.ProcessMode = Sky.ProcessModeEnum.Incremental;
+        }
+    }
+
+    internal static Sky.RadianceSizeEnum RadianceSizeForQuality(int qualitySetting)
+        => Mathf.Clamp(qualitySetting, 0, 2) switch
+        {
+            0 => Sky.RadianceSizeEnum.Size64,
+            1 => Sky.RadianceSizeEnum.Size128,
+            _ => Sky.RadianceSizeEnum.Size256
+        };
 
     private static JianghaiAtmosphereStyle GetStyle(DeploymentTimeOfDay timeOfDay)
         => timeOfDay switch

@@ -37,6 +37,7 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
     private float _sourceDepthCenter = OverheadSourceDepthCenter;
     private int _visualPanelCount = 1;
     private bool _usesCustomVisualScene;
+    private bool _hingedVisualUsesPivotOrigin;
     private Vector3 _interactionLocal;
     private CollisionShape3D _doorCollision = null!;
     private Node3D _authoredVisual = null!;
@@ -83,7 +84,8 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         float? sourceWidth = null,
         float? sourceHeight = null,
         float? sourceDepthCenter = null,
-        int visualPanelCount = 1)
+        int visualPanelCount = 1,
+        bool hingedVisualUsesPivotOrigin = false)
     {
         DoorId = doorId;
         _width = Mathf.Max(1.0f, doorwayWidth * 0.96f);
@@ -112,6 +114,7 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         _sourceHeight = Mathf.Max(0.01f, sourceHeight ?? defaultSourceHeight);
         _sourceDepthCenter = sourceDepthCenter ?? defaultSourceDepthCenter;
         _visualPanelCount = Mathf.Max(1, visualPanelCount);
+        _hingedVisualUsesPivotOrigin = hingedVisualUsesPivotOrigin;
         _interactionLocal = new Vector3(0, Mathf.Min(1.35f, _height * 0.5f), frontZ);
         var pivot = motionStyle == BuildingDoorMotionStyle.Hinged
             ? new Vector3(-_width * 0.5f, 0.0f, frontZ)
@@ -265,7 +268,9 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
             }
             _authoredVisual = visual;
             visual.Name = "AuthoredHingedDoor";
-            visual.Position = new Vector3(_width * 0.5f, 0, 0);
+            visual.Position = _hingedVisualUsesPivotOrigin
+                ? Vector3.Zero
+                : new Vector3(_width * 0.5f, 0, 0);
             var horizontalScale = _width / _sourceWidth;
             var verticalScale = _height / _sourceHeight;
             visual.Scale = new Vector3(horizontalScale, verticalScale, 0.72f);
@@ -351,7 +356,11 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         }
         if (_motionStyle == BuildingDoorMotionStyle.Hinged)
         {
-            return _authoredVisual.Name == "AuthoredHingedDoor";
+            var expectedPosition = _hingedVisualUsesPivotOrigin
+                ? Vector3.Zero
+                : new Vector3(_width * 0.5f, 0, 0);
+            return _authoredVisual.Name == "AuthoredHingedDoor"
+                && _authoredVisual.Position.IsEqualApprox(expectedPosition);
         }
         if (_authoredVisual.Name != "AuthoredOverheadDoorPanels"
             || _authoredVisual.GetChildCount() != _visualPanelCount

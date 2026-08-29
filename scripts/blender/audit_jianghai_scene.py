@@ -13,7 +13,11 @@ import bpy
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from jianghai_chinese_district_layout import JIANGHAI_DEPLOYMENT_POINTS
+from jianghai_chinese_district_layout import (
+    ENTERABLE_RESIDENCE_LAYOUT,
+    JIANGHAI_DEPLOYMENT_POINTS,
+)
+from jianghai_enterable_residences import validate_enterable_residences
 
 
 GROUND_INSTANCE_COUNT = 1
@@ -2087,12 +2091,8 @@ density_ready = (
         >= 24.0
         for obj in density_buildings
     )
-    and all(
-        bpy.data.objects.get(f"JianghaiDensity_{side}Edge{edge:02d}") is not None
-        and bpy.data.objects[f"JianghaiDensity_{side}Edge{edge:02d}"].get("jianghai_gameplay_proxy") is True
-        for side in ("West", "East")
-        for edge in range(4, 7)
-    )
+    and all(obj.get("jianghai_gameplay_proxy") is True for obj in density_buildings)
+    and all(obj.get("jianghai_proxy_role") == "density_building_shell" for obj in density_buildings)
 )
 cross_street_intrusions_removed = not any(
     object_name in bpy.data.objects
@@ -2319,6 +2319,15 @@ root_provenance_ready = (
     and root.get("chinese_district_rebuild_version") == 1
     and root.get("retired_visible_asset_instances") == 0
 )
+enterable_residences = validate_enterable_residences()
+enterable_residences_ready = (
+    enterable_residences.residence_count == len(ENTERABLE_RESIDENCE_LAYOUT)
+    and enterable_residences.aperture_sample_count == len(ENTERABLE_RESIDENCE_LAYOUT) * 3
+    and enterable_residences.wall_sample_count == len(ENTERABLE_RESIDENCE_LAYOUT) * 3
+    and enterable_residences.scene_aperture_sample_count
+    == len(ENTERABLE_RESIDENCE_LAYOUT) * 3
+    and enterable_residences.triangle_count > 0
+)
 valid = (
     not missing_anchors
     and valley_ready
@@ -2335,7 +2344,7 @@ valid = (
     and not forbidden_export_objects
     and finite_transforms
     and urban_life_ready
-    and facade_expansion_count == 36
+    and facade_expansion_count == 35
     and facade_expansion_aligned
     and replacement_storefronts_ready
     and pawnshop_frontage_ready
@@ -2343,6 +2352,7 @@ valid = (
     and density_ready
     and cross_street_intrusions_removed
     and authored_collision_sources_ready
+    and enterable_residences_ready
     and root_provenance_ready
 )
 valley_ground_band_report = ",".join(
@@ -2486,7 +2496,7 @@ print(
     f"images_512_packed={images_ready} evaluated_triangles={evaluated_triangles}/{SCENE_TRIANGLE_BUDGET} "
     f"retired_visible={len(retired_visible_objects)} "
     f"forbidden_export_objects={len(forbidden_export_objects)} finite_transforms={finite_transforms} "
-    f"urban_life={urban_life_ready} facade_expansion={facade_expansion_count}/36 "
+    f"urban_life={urban_life_ready} facade_expansion={facade_expansion_count}/35 "
     f"facade_expansion_aligned={facade_expansion_aligned} "
     f"replacement_storefronts_ready={replacement_storefronts_ready} "
     f"pawnshop_frontage_ready={pawnshop_frontage_ready} "
@@ -2497,6 +2507,10 @@ print(
     f"pawnshop_columns_clear={pawnshop_columns_clear} "
     f"replacement_factory_ready={replacement_factory_ready} "
     f"density={len(density_buildings)}/42 density_ready={density_ready} "
+    f"enterable_residences={enterable_residences.residence_count}/{len(ENTERABLE_RESIDENCE_LAYOUT)} "
+    f"enterable_door_samples={enterable_residences.aperture_sample_count}/"
+    f"{enterable_residences.wall_sample_count} "
+    f"enterable_scene_door_samples={enterable_residences.scene_aperture_sample_count} "
     f"density_intersections={len(density_intersections)} "
     f"street_cadence={street_cadence_ready}:{len(street_cadence_objects)}/4 "
     f"market_walkway_clear={market_walkway_ready} "

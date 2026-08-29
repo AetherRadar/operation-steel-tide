@@ -25,6 +25,7 @@ public partial class FreightTerminalWorld
             {
                 if (IsInstanceValid(squadMate))
                 {
+                    squadMate.ProcessMode = ProcessModeEnum.Disabled;
                     squadMate.Visible = false;
                 }
             }
@@ -32,6 +33,7 @@ public partial class FreightTerminalWorld
             {
                 if (IsInstanceValid(vehicle))
                 {
+                    vehicle.ProcessMode = ProcessModeEnum.Disabled;
                     vehicle.Visible = false;
                 }
             }
@@ -130,25 +132,48 @@ public partial class FreightTerminalWorld
             await WaitFrames(14);
             performanceReady &= PrintRefineryRenderingSnapshot("daylight_overview");
             SaveViewportImage("res://jianghai_day_validation.png");
-            var captureDoor = _refineryDoors.FirstOrDefault();
-            if (captureDoor is not null)
+            var captureRoom = _jianghaiInteriors?.Rooms.FirstOrDefault();
+            var captureDoor = captureRoom?.Door;
+            var doorCaptureReady = captureRoom is not null && captureDoor is not null;
+            performanceReady &= doorCaptureReady;
+            if (captureRoom is not null && captureDoor is not null)
             {
+                captureDoor.SetOpenImmediate(false);
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
                 var outward = (captureDoor.OutsideProbe - captureDoor.InsideProbe).Normalized();
                 camera.GlobalPosition = captureDoor.InteractionPoint + outward * 7.0f + Vector3.Up * 1.7f;
                 camera.LookAt(captureDoor.InteractionPoint + Vector3.Up * 0.6f, Vector3.Up);
                 camera.Fov = 56.0f;
                 await WaitFrames(8);
                 SaveViewportImage("res://refinery_door_closed_validation.png");
-                captureDoor.TrySetOpen(true, bypassClearance: true);
+                var doorTransitionStarted = captureDoor.TrySetOpen(
+                    true,
+                    bypassClearance: true);
                 for (var frame = 0; frame < 120 && captureDoor.IsAnimating; frame++)
                 {
                     await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
                 }
                 await WaitFrames(4);
+                doorCaptureReady = doorTransitionStarted
+                    && captureDoor.IsOpen
+                    && !captureDoor.IsAnimating
+                    && captureDoor.MotionAngleDegrees > 85.0f;
+                performanceReady &= doorCaptureReady;
                 SaveViewportImage("res://refinery_door_open_validation.png");
+                camera.GlobalPosition = captureRoom.Root.ToGlobal(
+                    new Vector3(0.0f, 1.55f, -0.95f));
+                camera.LookAt(
+                    captureRoom.Root.ToGlobal(new Vector3(
+                        0.0f,
+                        0.92f,
+                        -Mathf.Min(captureRoom.Depth * 0.66f, 3.4f))),
+                    Vector3.Up);
+                camera.Fov = 62.0f;
+                await WaitFrames(8);
+                SaveViewportImage("res://jianghai_interior_validation.png");
                 captureDoor.SetOpenImmediate(false);
             }
-            GD.Print($"REFINERY_MAP_CAPTURE valid={performanceReady} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city time=dusk+day authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} doors={_refineryDoors.Count} paths=refinery_map_validation.png,jianghai_valley_validation.png,jianghai_valley_player_south_validation.png,jianghai_valley_player_north_validation.png,refinery_ground_validation.png,jianghai_street_life_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,jianghai_density_validation.png,jianghai_day_validation.png,refinery_door_closed_validation.png,refinery_door_open_validation.png");
+            GD.Print($"REFINERY_MAP_CAPTURE valid={performanceReady} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city time=dusk+day authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} doors={_refineryDoors.Count} door_transition={doorCaptureReady} paths=refinery_map_validation.png,jianghai_valley_validation.png,jianghai_valley_player_south_validation.png,jianghai_valley_player_north_validation.png,refinery_ground_validation.png,jianghai_street_life_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,jianghai_density_validation.png,jianghai_day_validation.png,refinery_door_closed_validation.png,refinery_door_open_validation.png,jianghai_interior_validation.png");
         }
         finally
         {

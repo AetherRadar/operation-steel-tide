@@ -33,6 +33,61 @@ SHOP_TARGETS = {
     "WeatheredRollerShop03", "WestMedicineRow01",
 }
 
+# Full-resolution ground-floor arcade shops selected for real, furnished interiors.
+# These are deliberately excluded from the distant density ring: six interactive
+# rooms give the main avenue readable life without multiplying doors, animated
+# residents, and searchable containers across every background facade.
+ENTERABLE_RESIDENCE_LAYOUT = (
+    ("WeatheredRollerShop00", "family_shop"),
+    ("WeatheredRollerShop01", "family_shop"),
+    ("WeatheredRollerShop02", "tea_house"),
+    ("WeatheredRollerShop03", "repair_shop"),
+    ("EastPhotoHouse", "family_home"),
+    ("EastTeaHouse", "tea_house"),
+)
+
+# Reviewed one-storey interior envelopes in Godot metres.  These values stop
+# gameplay collision at the actual wall faces rather than at ornamental eaves
+# included in each full visual AABB.  Width is the complete interior span.
+ENTERABLE_COLLISION_LAYOUT = {
+    "WeatheredRollerShop00": (
+        0.77, 9.84, 4.55, 3.69, 2.80, 1.444, 4.792, 1.85, 4.20, 5.023, 1.934, 4.299,
+    ),
+    "WeatheredRollerShop01": (
+        0.80, 10.14, 4.72, 3.80, 2.80, 1.507, 5.000, 1.90, 4.40, 5.242, 2.022, 4.487,
+    ),
+    "WeatheredRollerShop02": (
+        0.78, 9.92, 4.62, 3.75, 2.80, 1.475, 4.896, 1.90, 4.30, 5.132, 1.980, 4.395,
+    ),
+    "WeatheredRollerShop03": (
+        0.78, 9.92, 4.62, 3.75, 2.80, 1.475, 4.896, 1.90, 4.30, 5.132, 1.980, 4.395,
+    ),
+    "EastPhotoHouse": (
+        1.29, 12.70, 7.47, 4.61, 4.00, 2.376, 7.886, 2.70, 6.20, 7.447, 3.186, 7.076,
+    ),
+    "EastTeaHouse": (
+        1.32, 13.11, 7.67, 4.68, 4.00, 2.422, 8.041, 2.70, 6.35, 7.593, 3.247, 7.217,
+    ),
+}
+
+# Four roller shops historically carried Euler values while remaining in
+# quaternion mode, so their visible transforms ignored the intended yaw.
+ENTERABLE_YAW_DEGREES = {
+    "WeatheredRollerShop00": 90.0,
+    "WeatheredRollerShop01": -90.0,
+    "WeatheredRollerShop02": 90.0,
+    "WeatheredRollerShop03": -90.0,
+    "EastPhotoHouse": -90.0,
+    "EastTeaHouse": -90.0,
+}
+
+# Shop01's dormant yaw made its original centre appear road-safe.  Once the
+# intended side-facing transform is active, this reviewed offset restores the
+# same 1.35 m clearance from the southern cross-street centreline.
+ENTERABLE_POSITION_OVERRIDES = {
+    "WeatheredRollerShop01": (31.0, 13.65, 0.035),
+}
+
 QUATERNIUS_DENSITY_MESHES = {
     "quaternius_large": "JianghaiDensity_QuaterniusBuilding1Large_LOD",
     "quaternius_big": "JianghaiDensity_QuaterniusBuilding3Big_LOD",

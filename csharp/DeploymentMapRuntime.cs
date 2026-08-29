@@ -39,6 +39,7 @@ public static class DeploymentMapRuntime
                 value is "--validate-refinery-map"
                     or "--validate-refinery-collision"
                     or "--validate-refinery-doors"
+                    or "--validate-jianghai-interiors"
                     or "--validate-refinery-atmosphere"
                     or "--capture-refinery-map"
                     or "--capture-promotion"
