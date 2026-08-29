@@ -8,9 +8,10 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private const float DemolitionDevicePickupRadius = 1.8f;
-    private const float DemolitionDeviceGroundHeight = 0.16f;
-    private const float DemolitionDeviceCarryHeight = 0.82f;
-    private const float DemolitionDeviceCarryOffset = 0.22f;
+    private const float DemolitionDeviceGroundHeight = 0.02f;
+    private const float DemolitionDeviceCarryHeight = 0.80f;
+    private const float DemolitionDeviceCarryOffset = 0.25f;
+    private const float DemolitionDeviceCarryBackOffset = 0.02f;
     private readonly DemolitionDeviceLifecycle _demolitionDeviceLifecycle = new();
     private Vector3 _demolitionDeviceGroundPosition;
     private Vector3 _demolitionDeviceLastCarrierPosition;
@@ -34,42 +35,21 @@ public partial class FreightTerminalWorld
         {
             return;
         }
-        var orange = Mat(
-            "demolition_device_orange",
-            new Color(1.0f, 0.24f, 0.04f),
-            0.16f,
-            0.24f,
-            new Color(1.0f, 0.05f, 0.01f));
-        var dark = Mat(
-            "demolition_device_dark",
-            new Color(0.018f, 0.025f, 0.023f),
-            0.72f,
-            0.3f);
         _demolitionDevice = new Node3D
         {
             Name = $"DemolitionDevice_{_demolitionMatch.CurrentRound:00}",
             Position = _demolitionDeviceGroundPosition
         };
         _demolitionArena!.Root.AddChild(_demolitionDevice);
-        OfficeBox(
-            _demolitionDevice,
-            "DeviceCase",
-            Vector3.Zero,
-            new Vector3(0.56f, 0.28f, 0.38f),
-            dark);
-        OfficeBox(
-            _demolitionDevice,
-            "DeviceScreen",
-            new Vector3(0.0f, 0.06f, -0.205f),
-            new Vector3(0.31f, 0.115f, 0.025f),
-            orange);
+        var authoredVisual = CombatModelLibrary.InstantiateDemolitionDevice();
+        _demolitionDevice.AddChild(authoredVisual.Root);
         _demolitionDeviceBeacon = new OmniLight3D
         {
             Name = "DeviceBeacon",
-            Position = new Vector3(0.0f, 0.28f, 0.0f),
-            LightColor = new Color(1.0f, 0.12f, 0.02f),
-            LightEnergy = 1.2f,
-            OmniRange = 5.0f,
+            Position = new Vector3(0.0f, 0.15f, 0.0f),
+            LightColor = new Color(1.0f, 0.32f, 0.025f),
+            LightEnergy = 2.4f,
+            OmniRange = 6.0f,
             ShadowEnabled = false
         };
         _demolitionDevice.AddChild(_demolitionDeviceBeacon);
@@ -338,7 +318,8 @@ public partial class FreightTerminalWorld
         if (_demolitionDeviceLifecycle.IsGrounded)
         {
             _demolitionDevice.GlobalPosition = _demolitionDeviceGroundPosition;
-            SetDemolitionDeviceBeacon(active: true, energy: 1.2f, range: 5.0f);
+            _demolitionDevice.GlobalBasis = Basis.Identity;
+            SetDemolitionDeviceBeacon(active: true, energy: 2.4f, range: 6.0f);
         }
         else if (_demolitionDeviceLifecycle.IsCarried)
         {
@@ -347,9 +328,12 @@ public partial class FreightTerminalWorld
             {
                 _demolitionDevice.GlobalPosition = carrier!.GlobalPosition
                     + Vector3.Up * DemolitionDeviceCarryHeight
-                    + carrier.GlobalBasis.X * DemolitionDeviceCarryOffset;
+                    + carrier.GlobalBasis.X * DemolitionDeviceCarryOffset
+                    + carrier.GlobalBasis.Z * DemolitionDeviceCarryBackOffset;
+                _demolitionDevice.GlobalBasis = carrier.GlobalBasis
+                    * new Basis(Vector3.Up, Mathf.Pi * 0.5f);
             }
-            SetDemolitionDeviceBeacon(active: false, energy: 0.0f, range: 5.0f);
+            SetDemolitionDeviceBeacon(active: true, energy: 0.8f, range: 2.8f);
         }
     }
 
@@ -632,6 +616,14 @@ public partial class FreightTerminalWorld
         {
             return false;
         }
+        if (ownsAttackObjective)
+        {
+            // The device runner/carrier owns the execute. Contact may trigger
+            // opportunistic fire, but it must never replace the route to the device
+            // or plant site with a generic combat maneuver.
+            _demolitionSquadCombatBreakoffs.Remove(mate);
+            return true;
+        }
         return !ShouldYieldDemolitionSquadToCombat(mate);
     }
 
@@ -737,8 +729,7 @@ public partial class FreightTerminalWorld
         {
             carrier.SetOrder(SquadOrder.Hold, carrier.GlobalPosition);
         }
-        if (carrier.IsRevivingFriendly
-            || carrier.HasDemolitionThreatWithin(DemolitionChannelGuardRange))
+        if (carrier.IsRevivingFriendly)
         {
             return true;
         }

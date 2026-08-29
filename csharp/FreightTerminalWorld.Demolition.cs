@@ -697,7 +697,9 @@ public partial class FreightTerminalWorld
             BuildDemolitionDeviceVisual();
         }
         _demolitionDevice!.Name = $"PlantedDemolitionDevice_{_demolitionMatch.CurrentRound:00}";
-        _demolitionDevice.GlobalPosition = layout.SitePositions[siteIndex] + Vector3.Up * 0.34f;
+        _demolitionDevice.GlobalPosition = layout.SitePositions[siteIndex]
+            + Vector3.Up * DemolitionDeviceGroundHeight;
+        _demolitionDevice.GlobalBasis = Basis.Identity;
         _demolitionDevice.Scale = Vector3.One;
         _demolitionDevice.Visible = true;
         SetDemolitionDeviceBeacon(active: true, energy: 5.5f, range: 9.0f);
@@ -738,6 +740,7 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        UpdateDemolitionTeamStatusHud();
         if (IsDemolitionNetworkClient)
         {
             UpdateDemolitionNetworkClientRound(delta);

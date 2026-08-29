@@ -482,9 +482,13 @@ public partial class FreightTerminalWorld
         var layout = DemolitionLayout();
         var initialDeviceCarrier = ResolveDemolitionAttacker(
             _demolitionDeviceLifecycle.CarrierMemberId);
-        var deviceCase = _demolitionDevice?.GetNodeOrNull<MeshInstance3D>("DeviceCase");
-        var compactDevice = deviceCase?.Mesh?.GetAabb().Size.X <= 0.6f
-            && deviceCase.Mesh.GetAabb().Size.Y <= 0.3f;
+        var deviceModel = CombatModelLibrary.InspectDemolitionDevice();
+        var compactDevice = deviceModel.Loaded
+            && deviceModel.ContractValid
+            && deviceModel.BoundsSize.X <= 0.38f
+            && deviceModel.BoundsSize.Y <= 0.22f
+            && deviceModel.BoundsSize.Z <= 0.24f
+            && deviceModel.HasEmission;
         var deviceAssignedDuringBuy = _demolitionDeviceLifecycle.IsCarried
             && IsInstanceValid(_demolitionDevice)
             && _demolitionDevice!.Visible
@@ -566,6 +570,13 @@ public partial class FreightTerminalWorld
             && !_hud.IsDemolitionBriefingVisible
             && !_hud.IsDemolitionBuyVisible
             && !GetTree().Paused;
+        var teamStatusReady = _hud.IsDemolitionTeamStatusVisible
+            && _hud.DemolitionTeamStatusUiReady
+            && _hud.DemolitionTeamStatusUsesPackedScene
+            && _hud.DemolitionFriendlyStatusCount == DemolitionSquadSize
+            && _hud.DemolitionEnemyStatusCount == DemolitionSquadSize
+            && _hud.DemolitionLocalPlayerMarkerCount == 1
+            && _hud.DemolitionDeviceMarkerCount == 1;
         var openingStrategy = _demolitionAttackerPlan is not null
             && _demolitionAttackerPlan.Assignments.Count == 5
             && _demolitionDefenderPlan is not null
@@ -801,14 +812,15 @@ public partial class FreightTerminalWorld
         var economyRules = ValidateDemolitionEconomyRules();
         var valid = entryButton && briefingSelection && buyTimerPrecedesRound && deviceAssignedDuringBuy
             && opponentOpeningPistols
-            && pistolKit && slotBindings && weaponSlots && isolatedEconomy && deployed && openingStrategy && sitesClear
+            && pistolKit && slotBindings && weaponSlots && isolatedEconomy && deployed && teamStatusReady
+            && openingStrategy && sitesClear
             && minimapReady && hostileAircraftIsolated && reinforcementsIsolated
             && directorIsolation && playerBoughtPistol && nonCarrierPlayerRejected
             && playerPickedUpDevice && carrierDropHandoff && planted && retakeStrategy && defuseAi
             && deviceDetonated && teammateRunningBeforeRoundEnd && roundResultPresented
             && actorsFrozenAtRoundEnd && roundRecorded && roundReset && roundTwoLive && attackTimeoutFails
             && tacticalAi && defenseRound && matchRules && economyRules;
-        GD.Print($"DEMOLITION_CHECK valid={valid} entry_button={entryButton} briefing={briefingSelection} buy_phase={buyTimerPrecedesRound} device_assigned={deviceAssignedDuringBuy} device_compact={compactDevice} initial_carrier={DemolitionMemberId(initialDeviceCarrier)} deployed={deployed} arena={IsDemolitionArenaActive} gameplay={_hud.IsGameplayHudVisible} squad={DemolitionSquadSizeTotal} opponents={DemolitionOpponentCount} opponent_pistols={opponentOpeningPistols} pistol_kit={pistolKit} slots={weaponSlots} bindings={slotBindings} economy={isolatedEconomy} opening_strategy={openingStrategy} retake_strategy={retakeStrategy} assignments={DemolitionStrategyAssignmentCount} minimap={minimapReady} aircraft_isolated={hostileAircraftIsolated} reinforcements_isolated={reinforcementsIsolated} director_isolation={directorIsolation} sites={DemolitionSiteCount} sites_clear={sitesClear} funds_after_buy={fundsAfterOpeningBuy} pistol_buy={playerBoughtPistol} noncarrier_rejected={nonCarrierPlayerRejected} player_pickup={playerPickedUpDevice} handoff={carrierDropHandoff} planted={planted} plant_steps={plantSteps} detonated={deviceDetonated} defuse_ai={defuseAi} defuse_distance={initialDefuserDistance:0.00}->{finalDefuserDistance:0.00} defuse_progress={_demolitionDefuseProgress:0.00} defuse_frames={defuseFrames}/600 teammate_running={teammateRunningBeforeRoundEnd} round_result={roundResultPresented} actors_frozen={actorsFrozenAtRoundEnd} round_recorded={roundRecorded} round_reset={roundReset} round_two_live={roundTwoLive} attack_timeout={attackTimeoutFails} tactical_ai={tacticalAi} defense_round={defenseRound} match_rules={matchRules} economy_rules={economyRules} score={DemolitionPlayerScore}:{DemolitionOpponentScore} round={DemolitionRoundNumber} result={_hud.IsMissionResultVisible}");
+        GD.Print($"DEMOLITION_CHECK valid={valid} entry_button={entryButton} briefing={briefingSelection} buy_phase={buyTimerPrecedesRound} device_assigned={deviceAssignedDuringBuy} device_compact={compactDevice} initial_carrier={DemolitionMemberId(initialDeviceCarrier)} deployed={deployed} team_status={teamStatusReady} arena={IsDemolitionArenaActive} gameplay={_hud.IsGameplayHudVisible} squad={DemolitionSquadSizeTotal} opponents={DemolitionOpponentCount} opponent_pistols={opponentOpeningPistols} pistol_kit={pistolKit} slots={weaponSlots} bindings={slotBindings} economy={isolatedEconomy} opening_strategy={openingStrategy} retake_strategy={retakeStrategy} assignments={DemolitionStrategyAssignmentCount} minimap={minimapReady} aircraft_isolated={hostileAircraftIsolated} reinforcements_isolated={reinforcementsIsolated} director_isolation={directorIsolation} sites={DemolitionSiteCount} sites_clear={sitesClear} funds_after_buy={fundsAfterOpeningBuy} pistol_buy={playerBoughtPistol} noncarrier_rejected={nonCarrierPlayerRejected} player_pickup={playerPickedUpDevice} handoff={carrierDropHandoff} planted={planted} plant_steps={plantSteps} detonated={deviceDetonated} defuse_ai={defuseAi} defuse_distance={initialDefuserDistance:0.00}->{finalDefuserDistance:0.00} defuse_progress={_demolitionDefuseProgress:0.00} defuse_frames={defuseFrames}/600 teammate_running={teammateRunningBeforeRoundEnd} round_result={roundResultPresented} actors_frozen={actorsFrozenAtRoundEnd} round_recorded={roundRecorded} round_reset={roundReset} round_two_live={roundTwoLive} attack_timeout={attackTimeoutFails} tactical_ai={tacticalAi} defense_round={defenseRound} match_rules={matchRules} economy_rules={economyRules} score={DemolitionPlayerScore}:{DemolitionOpponentScore} round={DemolitionRoundNumber} result={_hud.IsMissionResultVisible}");
         GD.Print($"DEMOLITION_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -1316,8 +1328,8 @@ public partial class FreightTerminalWorld
                 _demolitionActiveSite = -1;
                 _demolitionSquadObjectiveSite = -1;
                 _demolitionSquadPlantProgress = 0.0f;
-                // Preserve the relay's combat target and timers. Moving every referenced
-                // defender outside the plant guard radius makes the real AI channel deterministic.
+                // Preserve the relay's combat target and timers. One visible defender
+                // remains close enough to prove contact cannot cancel the carrier's plant.
                 for (var index = 0; index < _demolitionOpponents.Count; index++)
                 {
                     var opponent = _demolitionOpponents[index];
@@ -1337,16 +1349,27 @@ public partial class FreightTerminalWorld
                 relay.GlobalPosition = layout.SitePositions[friendlySiteIndex]
                     + new Vector3(0.0f, 0.2f, 0.4f);
                 relay.Velocity = Vector3.Zero;
+                probe.GlobalPosition = relay.GlobalPosition + Vector3.Right * 4.0f;
+                probe.Velocity = Vector3.Zero;
+                relay.SetDemolitionThreatForDiagnostics(
+                    probe,
+                    hasSight: true,
+                    threatAge: 0.0f);
                 TryUpdateDemolitionSquadDeviceObjective(DemolitionPlantDuration + 0.1f);
                 friendlyAiPlantsDevice = _demolitionDevicePlanted
                     && _demolitionDeviceLifecycle.IsPlanted
                     && _demolitionActiveSite == friendlySiteIndex;
+                relay.SetDemolitionThreatForDiagnostics(
+                    null,
+                    hasSight: false,
+                    threatAge: 100.0f);
             }
 
             // Deterministic ownership arbitration: an AI carrier must be the anchor for
             // its escorts, while a player carrier remains a valid fallback leader.  This
             // catches the old `as SquadMate` lookup that silently returned to formation.
             var carrierDestinationFollowsDevice = false;
+            var carrierThreatKeepsObjective = false;
             var aiCarrierEscort = false;
             var playerCarrierEscort = false;
             var groundedPlayerRunnerReleased = false;
@@ -1392,6 +1415,20 @@ public partial class FreightTerminalWorld
                     aiCarrier,
                     out var carrierDestination)
                     && carrierDestination.DistanceTo(layout.SitePositions[plannedSite]) < 0.5f;
+                probe.GlobalPosition = aiCarrier.GlobalPosition + Vector3.Right * 5.0f;
+                probe.Velocity = Vector3.Zero;
+                aiCarrier.SetDemolitionThreatForDiagnostics(
+                    probe,
+                    hasSight: true,
+                    threatAge: 0.0f);
+                carrierThreatKeepsObjective = TryGetDemolitionObjectiveDestination(
+                        aiCarrier,
+                        out var contactedCarrierDestination)
+                    && contactedCarrierDestination.DistanceTo(layout.SitePositions[plannedSite]) < 0.5f;
+                aiCarrier.SetDemolitionThreatForDiagnostics(
+                    null,
+                    hasSight: false,
+                    threatAge: 100.0f);
                 aiCarrierEscort = TryGetDemolitionEscortTarget(escortMate, out var aiLeader)
                     && ReferenceEquals(aiLeader, aiCarrier);
 
@@ -1536,6 +1573,7 @@ public partial class FreightTerminalWorld
                 && strategyRefreshClearsChangedPhase
                 && friendlyAiPlantsDevice
                 && carrierDestinationFollowsDevice
+                && carrierThreatKeepsObjective
                 && aiCarrierEscort
                 && playerCarrierEscort
                 && groundedPlayerRunnerReleased
@@ -1546,7 +1584,7 @@ public partial class FreightTerminalWorld
                 && staleMoveRecovered
                 && defuserPostProtected
                 && postPatrolLayouts;
-            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} friendly_ai_plant={friendlyAiPlantsDevice} carrier_destination={carrierDestinationFollowsDevice} ai_carrier_escort={aiCarrierEscort} player_carrier_escort={playerCarrierEscort} grounded_player_reassigned={groundedPlayerRunnerReleased} hidden_threat_ignored={hiddenThreatIgnored} visible_threat_yields={visibleThreatYields} post_patrol={postPatrolReactivated} post_second_hop={postPatrolSecondHop} stale_move_recovered={staleMoveRecovered} defuser_post_protected={defuserPostProtected} post_layouts={postPatrolLayouts} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} frontier_fallback={frontierFallback} frontier_stable={frontierFallbackStable} frontier_replans={frontierReplans} frontier_directive_distance={frontierDirectiveDistance:0.00} reachable_route_preserved={reachableRoutePreserved} opening_patterns={openingPatterns} posts={postsConverted} squad_route={squadRouteNavigation} squad_route_reuse={squadRouteReuse} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
+            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} friendly_ai_plant_under_contact={friendlyAiPlantsDevice} carrier_destination={carrierDestinationFollowsDevice} carrier_contact_priority={carrierThreatKeepsObjective} ai_carrier_escort={aiCarrierEscort} player_carrier_escort={playerCarrierEscort} grounded_player_reassigned={groundedPlayerRunnerReleased} hidden_threat_ignored={hiddenThreatIgnored} visible_threat_yields={visibleThreatYields} post_patrol={postPatrolReactivated} post_second_hop={postPatrolSecondHop} stale_move_recovered={staleMoveRecovered} defuser_post_protected={defuserPostProtected} post_layouts={postPatrolLayouts} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} frontier_fallback={frontierFallback} frontier_stable={frontierFallbackStable} frontier_replans={frontierReplans} frontier_directive_distance={frontierDirectiveDistance:0.00} reachable_route_preserved={reachableRoutePreserved} opening_patterns={openingPatterns} posts={postsConverted} squad_route={squadRouteNavigation} squad_route_reuse={squadRouteReuse} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
             return valid;
         }
         finally

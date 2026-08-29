@@ -1,0 +1,125 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://csharp/DemolitionTeamStatusView.cs" id="1_view"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBand"]
+bg_color = Color(0.006, 0.012, 0.014, 0.9)
+border_width_top = 2
+border_width_bottom = 2
+border_color = Color(0.2, 0.34, 0.34, 0.9)
+corner_radius_bottom_left = 5
+corner_radius_bottom_right = 5
+shadow_color = Color(0, 0, 0, 0.55)
+shadow_size = 7
+
+[sub_resource type="StyleBoxFlat" id="StyleCenter"]
+bg_color = Color(0.025, 0.045, 0.048, 0.98)
+border_width_left = 2
+border_width_right = 2
+border_color = Color(0.68, 0.77, 0.73, 0.58)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[node name="DemolitionTeamStatusView" type="Control"]
+visible = false
+z_index = 60
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_view")
+
+[node name="Band" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -630.0
+offset_top = 10.0
+offset_right = 630.0
+offset_bottom = 121.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBand")
+
+[node name="Margin" type="MarginContainer" parent="Band"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 6
+
+[node name="Layout" type="HBoxContainer" parent="Band/Margin"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 9
+
+[node name="Friendly" type="HBoxContainer" parent="Band/Margin/Layout"]
+custom_minimum_size = Vector2(500, 97)
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 5
+alignment = 2
+
+[node name="Center" type="PanelContainer" parent="Band/Margin/Layout"]
+custom_minimum_size = Vector2(184, 97)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleCenter")
+
+[node name="CenterStack" type="VBoxContainer" parent="Band/Margin/Layout/Center"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = -2
+alignment = 1
+
+[node name="Round" type="Label" parent="Band/Margin/Layout/Center/CenterStack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.58, 0.71, 0.68, 1)
+theme_override_font_sizes/font_size = 10
+text = "ROUND 1"
+horizontal_alignment = 1
+
+[node name="Score" type="Label" parent="Band/Margin/Layout/Center/CenterStack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.94, 0.98, 0.96, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 22
+text = "0  :  0"
+horizontal_alignment = 1
+
+[node name="Timer" type="Label" parent="Band/Margin/Layout/Center/CenterStack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.93, 0.97, 0.95, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 22
+text = "01:40"
+horizontal_alignment = 1
+
+[node name="Phase" type="Label" parent="Band/Margin/Layout/Center/CenterStack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.68, 0.18, 1)
+theme_override_font_sizes/font_size = 9
+text = "ATTACK"
+horizontal_alignment = 1
+
+[node name="Enemy" type="HBoxContainer" parent="Band/Margin/Layout"]
+custom_minimum_size = Vector2(500, 97)
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 5
+alignment = 0

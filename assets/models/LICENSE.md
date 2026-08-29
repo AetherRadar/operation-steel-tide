@@ -83,6 +83,34 @@ saves the authoritative source and embedded GLB, renders the preview, reimports
 the GLB, and rejects missing contract nodes, external payloads, material drift,
 changed bounds, or an out-of-budget mesh.
 
+## Project-authored demolition device
+
+The compact 5v5 objective device was created for Operation Steel Tide in
+Blender 4.5 on 2026-08-29. It contains no third-party geometry, textures, fonts,
+logos, or marketplace content and is covered by the repository's root MIT
+license, subject to the disclosure in `docs/CONTENT_PROVENANCE.md`.
+
+- Creator: Operation Steel Tide project contributors, with the AI-assisted DCC
+  workflow disclosed in `docs/CONTENT_PROVENANCE.md`.
+- Official source URL: not applicable; this is repository-original content.
+- Exact license: the repository root MIT license.
+- Required attribution: preserve the root MIT copyright and permission notice;
+  no additional third-party attribution is required.
+- Creation date: 2026-08-29.
+- Editable source: `../../source_art/demolition_device/demolition_device.blend`.
+- Runtime output: `steel_tide_demolition_device/demolition_device.glb`.
+- Studio preview: `steel_tide_demolition_device/demolition_device_preview.png`.
+- Reproducible build: `../../scripts/blender/build_demolition_device.py`.
+- Detailed local record: `steel_tide_demolition_device/LICENSE.md` and
+  `../../source_art/demolition_device/README.md`.
+
+The verified embedded GLB contains 48 authored meshes, 9,216 triangles, and
+nine scalar PBR materials within 0.344 by 0.201 by 0.164 metres. Its SHA-256 is
+`580F71F6ACED03888734BCD73C863A5CFB2DD35E33F415927EE899A7A8897A7F`.
+The Blender build saves the packed source, exports and reimports the runtime
+GLB, verifies the case/screen/status-light/carry-socket contract, enforces the
+asset budget and bounds, and renders the checked-in preview.
+
 The legacy Steel Tide operator model remains project-authored by
 `scripts/blender/generate_combat_models.py`. Its editable source is
 `../../source_art/combat_models/steel_tide_operator.blend`, and its generated

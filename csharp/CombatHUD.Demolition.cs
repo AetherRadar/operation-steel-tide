@@ -6,8 +6,10 @@ public partial class CombatHUD
 {
     private const string DemolitionBuyViewScenePath = "res://ui/DemolitionBuyView.tscn";
     private const string DemolitionRoundResultViewScenePath = "res://ui/DemolitionRoundResultView.tscn";
+    private const string DemolitionTeamStatusViewScenePath = "res://ui/DemolitionTeamStatusView.tscn";
     private DemolitionBuyView _demolitionBuyView = null!;
     private DemolitionRoundResultView _demolitionRoundResultView = null!;
+    private DemolitionTeamStatusView _demolitionTeamStatusView = null!;
     private bool _demolitionGameplayPresentation;
     private int _demolitionSmokeGrenades;
     private int _radioMessageDiagnosticSuppressionDepth;
@@ -35,6 +37,48 @@ public partial class CombatHUD
         && _demolitionRoundResultView.LanguageMatches(_language);
     public bool DemolitionRoundResultVictory
         => IsInstanceValid(_demolitionRoundResultView) && _demolitionRoundResultView.Victory;
+    public bool IsDemolitionTeamStatusVisible
+        => IsInstanceValid(_demolitionTeamStatusView) && _demolitionTeamStatusView.Visible;
+    public bool DemolitionTeamStatusUiReady
+        => IsInstanceValid(_demolitionTeamStatusView) && _demolitionTeamStatusView.UiReady;
+    public bool DemolitionTeamStatusUsesPackedScene
+        => IsInstanceValid(_demolitionTeamStatusView)
+        && _demolitionTeamStatusView.SceneFilePath == DemolitionTeamStatusViewScenePath;
+    public bool DemolitionTeamStatusLanguageReady
+        => IsInstanceValid(_demolitionTeamStatusView)
+        && _demolitionTeamStatusView.LanguageMatches(_language);
+    public int DemolitionFriendlyStatusCount
+        => IsInstanceValid(_demolitionTeamStatusView)
+            ? _demolitionTeamStatusView.FriendlyCount
+            : 0;
+    public int DemolitionEnemyStatusCount
+        => IsInstanceValid(_demolitionTeamStatusView)
+            ? _demolitionTeamStatusView.EnemyCount
+            : 0;
+    public int DemolitionLocalPlayerMarkerCount
+        => IsInstanceValid(_demolitionTeamStatusView)
+            ? _demolitionTeamStatusView.LocalPlayerMarkerCount
+            : 0;
+    public int DemolitionDeviceMarkerCount
+        => IsInstanceValid(_demolitionTeamStatusView)
+            ? _demolitionTeamStatusView.DeviceMarkerCount
+            : 0;
+    public int DemolitionOutStatusCount
+        => IsInstanceValid(_demolitionTeamStatusView)
+            ? _demolitionTeamStatusView.OutCount
+            : 0;
+    public string DemolitionTeamStatusScoreText
+        => IsInstanceValid(_demolitionTeamStatusView)
+            ? _demolitionTeamStatusView.ScoreText
+            : string.Empty;
+    public string DemolitionTeamStatusTimerText
+        => IsInstanceValid(_demolitionTeamStatusView)
+            ? _demolitionTeamStatusView.TimerText
+            : string.Empty;
+    public string DemolitionTeamStatusPhaseText
+        => IsInstanceValid(_demolitionTeamStatusView)
+            ? _demolitionTeamStatusView.PhaseText
+            : string.Empty;
     public string DemolitionRoundResultTitle
         => IsInstanceValid(_demolitionRoundResultView)
             ? _demolitionRoundResultView.TitleText
@@ -72,6 +116,13 @@ public partial class CombatHUD
         && IsInstanceValid(_squadOrderLabel)
         && !_squadOrderLabel.Visible
         && System.Array.TrueForAll(_orderButtons, button => IsInstanceValid(button) && !button.Visible);
+    public bool AreDemolitionLegacyTopLabelsHidden
+        => _demolitionGameplayPresentation
+        && IsInstanceValid(_objectiveLabel) && !_objectiveLabel.Visible
+        && IsInstanceValid(_enemiesLabel) && !_enemiesLabel.Visible
+        && IsInstanceValid(_phaseLabel) && !_phaseLabel.Visible
+        && IsInstanceValid(_compassLabel) && !_compassLabel.Visible
+        && IsInstanceValid(_alertLabel) && !_alertLabel.Visible;
     public string DemolitionUtilityHudText
         => IsInstanceValid(_quickSlotBar)
             ? $"5 {_quickSlotBar.SlotText(4)}  //  6 {_quickSlotBar.SlotText(5)}"
@@ -95,6 +146,11 @@ public partial class CombatHUD
     private void BuildDemolitionHud(Control root)
     {
         BuildDemolitionBuyHud(root);
+        var teamStatusScene = GD.Load<PackedScene>(DemolitionTeamStatusViewScenePath)
+            ?? throw new System.InvalidOperationException(
+                $"Unable to load {DemolitionTeamStatusViewScenePath}");
+        _demolitionTeamStatusView = teamStatusScene.Instantiate<DemolitionTeamStatusView>();
+        root.AddChild(_demolitionTeamStatusView);
         var scene = GD.Load<PackedScene>(DemolitionRoundResultViewScenePath)
             ?? throw new System.InvalidOperationException(
                 $"Unable to load {DemolitionRoundResultViewScenePath}");
@@ -126,6 +182,10 @@ public partial class CombatHUD
     public void SetDemolitionGameplayPresentation(bool active)
     {
         _demolitionGameplayPresentation = active;
+        if (IsInstanceValid(_demolitionTeamStatusView))
+        {
+            _demolitionTeamStatusView.Visible = active;
+        }
         if (!active && IsInstanceValid(_demolitionRoundResultView))
         {
             _demolitionRoundResultView.HideResult();
@@ -151,12 +211,37 @@ public partial class CombatHUD
                 button.Visible = !active;
             }
         }
+        CanvasItem[] legacyTopLabels =
+        {
+            _objectiveLabel,
+            _enemiesLabel,
+            _phaseLabel,
+            _compassLabel,
+            _alertLabel
+        };
+        foreach (var label in legacyTopLabels)
+        {
+            if (IsInstanceValid(label))
+            {
+                label.Visible = !active;
+            }
+        }
     }
 
     public void SetDemolitionSmokeGrenades(int count)
     {
         _demolitionSmokeGrenades = Mathf.Max(0, count);
         RefreshQuickSlotBar();
+    }
+
+    public void SetDemolitionTeamStatus(DemolitionTeamStatusSnapshot snapshot)
+    {
+        if (!IsInstanceValid(_demolitionTeamStatusView))
+        {
+            return;
+        }
+        _demolitionTeamStatusView.SetLanguage(_language);
+        _demolitionTeamStatusView.SetSnapshot(snapshot);
     }
 
     public void PressQuickSlotForDiagnostics(int slot)
@@ -277,6 +362,10 @@ public partial class CombatHUD
         if (IsInstanceValid(_demolitionRoundResultView))
         {
             _demolitionRoundResultView.SetLanguage(_language);
+        }
+        if (IsInstanceValid(_demolitionTeamStatusView))
+        {
+            _demolitionTeamStatusView.SetLanguage(_language);
         }
     }
 }

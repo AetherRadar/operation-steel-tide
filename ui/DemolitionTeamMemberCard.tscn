@@ -1,0 +1,151 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://csharp/DemolitionTeamMemberCard.cs" id="1_card"]
+[ext_resource type="Texture2D" path="res://assets/ui/demolition_operator_avatar.svg" id="2_avatar"]
+
+[sub_resource type="StyleBoxFlat" id="StyleCard"]
+bg_color = Color(0.018, 0.028, 0.031, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.23, 0.32, 0.32, 0.9)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleYouBadge"]
+bg_color = Color(0.08, 0.38, 0.36, 0.96)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleDeviceBadge"]
+bg_color = Color(0.82, 0.31, 0.025, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.77, 0.16, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[node name="DemolitionTeamMemberCard" type="PanelContainer"]
+custom_minimum_size = Vector2(94, 97)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleCard")
+script = ExtResource("1_card")
+
+[node name="Content" type="Control" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Accent" type="ColorRect" parent="Content"]
+layout_mode = 1
+anchors_preset = 6
+anchor_bottom = 1.0
+offset_right = 3.0
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.27, 0.9, 0.82, 1)
+
+[node name="PortraitBackdrop" type="ColorRect" parent="Content"]
+layout_mode = 0
+offset_left = 7.0
+offset_top = 7.0
+offset_right = 50.0
+offset_bottom = 61.0
+mouse_filter = 2
+color = Color(0.04, 0.15, 0.14, 0.96)
+
+[node name="Portrait" type="TextureRect" parent="Content"]
+layout_mode = 0
+offset_left = 9.0
+offset_top = 7.0
+offset_right = 48.0
+offset_bottom = 61.0
+mouse_filter = 2
+self_modulate = Color(0.27, 0.9, 0.82, 1)
+texture = ExtResource("2_avatar")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Role" type="Label" parent="Content"]
+layout_mode = 0
+offset_left = 53.0
+offset_top = 5.0
+offset_right = 90.0
+offset_bottom = 32.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.27, 0.9, 0.82, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.95)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 20
+text = "▲"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Status" type="Label" parent="Content"]
+layout_mode = 0
+offset_left = 50.0
+offset_top = 30.0
+offset_right = 93.0
+offset_bottom = 45.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.72, 0.82, 0.79, 1)
+theme_override_font_sizes/font_size = 8
+text = "READY"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="YouBadge" type="Label" parent="Content"]
+layout_mode = 0
+offset_left = 53.0
+offset_top = 46.0
+offset_right = 90.0
+offset_bottom = 62.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.86, 1, 0.96, 1)
+theme_override_font_sizes/font_size = 9
+theme_override_styles/normal = SubResource("StyleYouBadge")
+text = "YOU"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Name" type="Label" parent="Content"]
+layout_mode = 0
+offset_left = 5.0
+offset_top = 63.0
+offset_right = 91.0
+offset_bottom = 80.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.9, 0.95, 0.93, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 10
+text = "OPERATOR"
+horizontal_alignment = 1
+vertical_alignment = 1
+text_overrun_behavior = 3
+
+[node name="DeviceBadge" type="Label" parent="Content"]
+visible = false
+layout_mode = 0
+offset_left = 8.0
+offset_top = 80.0
+offset_right = 90.0
+offset_bottom = 95.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.96, 0.72, 1)
+theme_override_colors/font_outline_color = Color(0.1, 0.02, 0, 0.9)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 9
+theme_override_styles/normal = SubResource("StyleDeviceBadge")
+text = "DEVICE"
+horizontal_alignment = 1
+vertical_alignment = 1

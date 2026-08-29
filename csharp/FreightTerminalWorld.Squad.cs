@@ -122,6 +122,7 @@ public partial class FreightTerminalWorld
             || value == "--validate-tideglass-reactor"
             || value == "--validate-demolition-briefing"
             || value == "--validate-demolition-buy"
+            || value == "--validate-demolition-team-status"
             || value == "--validate-demolition-round-result"
             || value == "--validate-demolition-network-host"
             || value == "--validate-demolition-network-client"
@@ -136,6 +137,7 @@ public partial class FreightTerminalWorld
             || value == "--capture-demolition-briefing"
             || value == "--capture-demolition-buy"
             || value == "--capture-demolition-round-result"
+            || value == "--capture-demolition-device-status"
             || value == "--capture-demolition-arena"
             || value == "--capture-tideglass-reactor");
         var diagnostic = Array.Exists(args, value =>

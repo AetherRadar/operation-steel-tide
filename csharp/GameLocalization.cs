@@ -618,6 +618,14 @@ public static class GameLocalization
         Chinese["demolition_buy_round_score"] = "\u7b2c {0} \u5c40  //  \u6211\u65b9 {1}:{2} \u654c\u65b9";
         Chinese["demolition_buy_attack"] = "\u8fdb\u653b\u65b9";
         Chinese["demolition_buy_defend"] = "\u9632\u5b88\u65b9";
+        Chinese["demolition_device_badge"] = "\u7206\u80fd\u5668";
+        Chinese["demolition_enemy_slot"] = "\u654c\u65b9 {0}";
+        Chinese["demolition_team_round"] = "\u7b2c {0} \u5c40";
+        Chinese["demolition_team_ready"] = "\u5b58\u6d3b";
+        Chinese["demolition_team_out"] = "\u9635\u4ea1";
+        Chinese["demolition_team_device_active"] = "\u7206\u80fd\u5668\u5df2\u542f\u52a8";
+        Chinese["demolition_team_buy"] = "\u8d2d\u4e70\u9636\u6bb5";
+        Chinese["demolition_team_intermission"] = "\u56de\u5408\u7ed3\u675f";
         Chinese["demolition_buy_funds"] = "\u8d44\u91d1";
         Chinese["demolition_buy_countdown"] = "\u8d2d\u4e70  {0:0.0}s";
         Chinese["demolition_buy_balance"] = "\u603b\u4ef7  ${0}  //  \u4f59\u989d  ${1}";
