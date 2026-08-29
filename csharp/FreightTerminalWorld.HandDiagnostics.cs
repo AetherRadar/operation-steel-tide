@@ -237,7 +237,7 @@ public partial class FreightTerminalWorld
                 && Mathf.Abs(first.LeftSleeveWristLength - akIdle.LeftSleeveWristLength) <= 0.001f
                 && Mathf.Abs(first.RightSleeveWristLength - akIdle.RightSleeveWristLength) <= 0.001f;
             var viewStable = first.ReloadViewTarget.DistanceTo(
-                    new Vector3(0.26f, -0.30f, -0.72f)) <= 0.001f
+                    new Vector3(0.34f, -0.30f, -0.68f)) <= 0.001f
                 && first.ReloadRotationTarget.Length() <= 0.001f;
             var idempotent = HandTransformsMatch(
                     first.RightArmTransform,

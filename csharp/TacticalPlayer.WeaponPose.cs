@@ -4,18 +4,21 @@ namespace OperationSteelTide;
 
 public partial class TacticalPlayer
 {
-    private static readonly Vector3 HipWeaponPosition = new(0.26f, -0.30f, -0.72f);
+    private static readonly Vector3 HipWeaponPosition = new(0.34f, -0.30f, -0.68f);
     private static readonly Vector3 ImpactRifleHipWeaponPosition = new(
-        0.22f,
+        0.31f,
         -0.27f,
-        -0.64f);
+        -0.62f);
     private static readonly Vector3 PrecisionRifleHipWeaponPosition = new(
-        0.22f,
+        0.30f,
         -0.29f,
-        -0.68f);
-    private static readonly Vector3 SidearmHipWeaponPosition = new(0.30f, -0.24f, -0.64f);
+        -0.66f);
+    private static readonly Vector3 SidearmHipWeaponPosition = new(0.38f, -0.24f, -0.62f);
     private static readonly Vector3 SearchWeaponStart = new(0.5f, -0.58f, -0.48f);
     private static readonly Vector3 SearchWeaponEnd = new(0.32f, -0.48f, -0.72f);
+    private const float HipWeaponPitch = 0.018f;
+    private const float HipWeaponYaw = 0.045f;
+    private const float HipWeaponRoll = -0.018f;
     private const float MicroOpticRailContactOffset = 0.070f;
     private const float HoloOpticRailContactOffset = 0.092f;
     private const float ScopeOpticRailContactOffset = 0.084f;
@@ -154,10 +157,17 @@ public partial class TacticalPlayer
 
         var searchPitch = _searchPose > 0.0f ? 0.34f : 0.0f;
         var searchRoll = _searchPose > 0.0f ? -0.42f : 0.0f;
+        var useRightBiasedHipPose = !_isAiming && _searchPose <= 0.0f;
         return new Vector3(
-            searchPitch + _recoilPitch * 0.25f + _viewmodelKickPitch,
-            0.0f,
-            searchRoll + _recoilSide * 0.22f + _viewmodelKickRoll);
+            searchPitch
+                + (useRightBiasedHipPose ? HipWeaponPitch : 0.0f)
+                + _recoilPitch * 0.25f
+                + _viewmodelKickPitch,
+            useRightBiasedHipPose ? HipWeaponYaw : 0.0f,
+            searchRoll
+                + (useRightBiasedHipPose ? HipWeaponRoll : 0.0f)
+                + _recoilSide * 0.22f
+                + _viewmodelKickRoll);
     }
 
     private void UpdateViewmodelShotImpulse(float delta)
@@ -165,19 +175,19 @@ public partial class TacticalPlayer
         _viewmodelKickback = Mathf.Lerp(
             _viewmodelKickback,
             0.0f,
-            SmoothFactor(16.0f, delta));
+            SmoothFactor(14.0f, delta));
         _viewmodelKickPitch = Mathf.Lerp(
             _viewmodelKickPitch,
             0.0f,
-            SmoothFactor(13.0f, delta));
+            SmoothFactor(11.5f, delta));
         _viewmodelKickRoll = Mathf.Lerp(
             _viewmodelKickRoll,
             0.0f,
-            SmoothFactor(18.0f, delta));
+            SmoothFactor(15.0f, delta));
         _viewmodelKickSide = Mathf.Lerp(
             _viewmodelKickSide,
             0.0f,
-            SmoothFactor(19.0f, delta));
+            SmoothFactor(16.0f, delta));
     }
 
     private void ApplyViewmodelShotImpulse(float recoil, float stanceRecoil)
@@ -189,32 +199,32 @@ public partial class TacticalPlayer
                 or WeaponPlatform.DesertEagle => 1.08f,
             _ => 1.0f
         };
-        var aimScale = _isAiming ? 0.58f : 1.0f;
+        var aimScale = _isAiming ? 0.66f : 1.0f;
         var strength = Mathf.Sqrt(Mathf.Max(0.25f, recoil))
             * stanceRecoil
             * RoleRecoilMultiplier
             * carryScale
             * aimScale;
-        var kickback = _rng.RandfRange(0.054f, 0.068f) * strength;
-        var pitch = _rng.RandfRange(0.026f, 0.036f) * strength;
-        var side = _rng.RandfRange(-0.018f, 0.018f) * strength;
+        var kickback = _rng.RandfRange(0.072f, 0.088f) * strength;
+        var pitch = _rng.RandfRange(0.036f, 0.048f) * strength;
+        var side = _rng.RandfRange(-0.022f, 0.022f) * strength;
         var roll = -side * _rng.RandfRange(0.72f, 1.05f);
-        _viewmodelKickback = Mathf.Min(0.19f, _viewmodelKickback + kickback);
-        _viewmodelKickPitch = Mathf.Max(-0.16f, _viewmodelKickPitch - pitch);
-        _viewmodelKickSide = Mathf.Clamp(_viewmodelKickSide + side, -0.055f, 0.055f);
-        _viewmodelKickRoll = Mathf.Clamp(_viewmodelKickRoll + roll, -0.075f, 0.075f);
+        _viewmodelKickback = Mathf.Min(0.24f, _viewmodelKickback + kickback);
+        _viewmodelKickPitch = Mathf.Max(-0.20f, _viewmodelKickPitch - pitch);
+        _viewmodelKickSide = Mathf.Clamp(_viewmodelKickSide + side, -0.065f, 0.065f);
+        _viewmodelKickRoll = Mathf.Clamp(_viewmodelKickRoll + roll, -0.09f, 0.09f);
 
         // Apply most of the first-frame impulse immediately. The tracked values
         // above hold the pose briefly and then return independently from camera
         // recoil, so the firearm reads as a physical object reacting in the hands.
         _weaponRoot.Position += new Vector3(
-            side * 0.12f,
-            -kickback * 0.035f,
-            kickback * 0.62f);
+            side * 0.16f,
+            -kickback * 0.05f,
+            kickback * 0.74f);
         _weaponRoot.Rotation += new Vector3(
-            -pitch * 0.58f,
+            -pitch * 0.72f,
             0.0f,
-            roll * 0.46f);
+            roll * 0.58f);
     }
 
     private void ResetViewmodelShotImpulse()
@@ -231,6 +241,11 @@ public partial class TacticalPlayer
             _viewmodelKickPitch,
             _viewmodelKickRoll,
             _viewmodelKickSide,
+            _recoilPitch,
+            _recoilSide,
+            _weaponRoot.Position,
+            _weaponRoot.Rotation,
+            _head.Rotation,
             _muzzleBloom.Visible,
             _muzzleFlash.LightEnergy);
 
@@ -238,6 +253,17 @@ public partial class TacticalPlayer
     {
         _weaponRoot.Position = position;
         _weaponRoot.Rotation = rotation;
+    }
+
+    internal void SeedWeaponFeedbackForDiagnostics(ulong seed)
+        => _rng.Seed = seed;
+
+    internal void ResetWeaponFeedbackForDiagnostics()
+    {
+        _recoilPitch = 0.0f;
+        _recoilSide = 0.0f;
+        ResetViewmodelShotImpulse();
+        SetAimingPoseForDiagnostics(false);
     }
 
     internal void SetAimingPoseForDiagnostics(bool aiming)
@@ -399,5 +425,10 @@ internal readonly record struct ViewmodelShotImpulseInspection(
     float Pitch,
     float Roll,
     float Side,
+    float CameraPitch,
+    float CameraSide,
+    Vector3 ViewPosition,
+    Vector3 ViewRotation,
+    Vector3 HeadRotation,
     bool MuzzleBloomVisible,
     float MuzzleLightEnergy);

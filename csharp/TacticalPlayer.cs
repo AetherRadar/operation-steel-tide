@@ -689,7 +689,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             var voice = new AudioStreamPlayer
             {
                 Name = $"LocalWeaponReportAudio{voiceIndex + 1}",
-                Stream = SoundLab.WeaponShot(EquippedWeapon),
+                Stream = SoundLab.PlayerWeaponShot(EquippedWeapon),
                 VolumeDb = SoundLab.PlayerWeaponShotVolumeDb(EquippedWeapon)
             };
             _camera.AddChild(voice);
@@ -1139,7 +1139,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         foreach (var voice in _gunAudioVoices)
         {
             voice.Stop();
-            voice.Stream = SoundLab.WeaponShot(EquippedWeapon);
+            voice.Stream = SoundLab.PlayerWeaponShot(EquippedWeapon);
             voice.VolumeDb = SoundLab.PlayerWeaponShotVolumeDb(EquippedWeapon);
         }
         _nextGunAudioVoice = 0;
@@ -1901,8 +1901,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _leanValue = Mathf.Lerp(_leanValue, _slideTime <= 0.0f ? leanInput : 0.0f, SmoothFactor(9.0f, delta));
         _head.Rotation = new Vector3(
             _pitch + _recoilPitch + _damageKickPitch,
-            0.0f,
-            _recoilSide * 0.22f + _leanValue * 0.13f + _damageKickRoll);
+            _recoilSide * 0.32f,
+            _recoilSide * 0.24f + _leanValue * 0.13f + _damageKickRoll);
 
         var horizontalSpeed = new Vector2(Velocity.X, Velocity.Z).Length();
         var walking = IsOnFloor() && horizontalSpeed > 0.5f;
@@ -2019,22 +2019,22 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var shotImpact = Mathf.Sqrt(Mathf.Max(0.25f, stats.Recoil));
         var suppressedFlash = SoundLab.IsSuppressed(EquippedWeapon) ? 0.48f : 1.0f;
         _muzzleFlash.LightEnergy = Mathf.Lerp(
-            7.5f,
-            11.5f,
+            9.5f,
+            15.0f,
             Mathf.Clamp((shotImpact - 0.7f) / 1.2f, 0.0f, 1.0f))
             * suppressedFlash;
         _muzzleBloom.Visible = true;
         _muzzleBloom.Scale = Vector3.One
-            * _rng.RandfRange(0.88f, 1.16f)
-            * Mathf.Lerp(0.9f, 1.28f, Mathf.Clamp(shotImpact - 0.65f, 0.0f, 1.0f))
+            * _rng.RandfRange(1.02f, 1.32f)
+            * Mathf.Lerp(1.0f, 1.44f, Mathf.Clamp(shotImpact - 0.65f, 0.0f, 1.0f))
             * Mathf.Lerp(0.72f, 1.0f, suppressedFlash);
         var bloomRotation = _muzzleBloom.Rotation;
         bloomRotation.Z = _rng.RandfRange(0.0f, Mathf.Tau);
         _muzzleBloom.Rotation = bloomRotation;
         var flashTween = CreateTween();
         var flashDuration = Mathf.Lerp(
-            0.042f,
-            0.062f,
+            0.038f,
+            0.055f,
             Mathf.Clamp(shotImpact - 0.7f, 0.0f, 1.0f));
         flashTween.TweenProperty(_muzzleFlash, "light_energy", 0.0f, flashDuration);
         flashTween.Parallel().TweenProperty(
@@ -2046,7 +2046,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
         var shellVelocity = _camera.GlobalBasis.X * 3.0f + Vector3.Up * 1.25f - _camera.GlobalBasis.Z * 0.45f;
         Main?.SpawnShell(_ejectMarker.GlobalPosition, shellVelocity);
-        Hud?.PulseCrosshair();
 
         // Sprint or vehicle motion degrades accuracy instead of blocking the trigger.
         var movingPenalty = Mathf.Clamp(
@@ -2160,9 +2159,19 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             PlayerStance.Crouched => 0.82f,
             _ => 1.0f
         };
-        _recoilPitch -= _rng.RandfRange(0.012f, 0.021f) * stats.Recoil * (_isAiming ? 0.55f : 1.0f) * stanceRecoil * RoleRecoilMultiplier;
-        _recoilSide += _rng.RandfRange(-0.018f, 0.018f) * stats.Recoil * stanceRecoil * RoleRecoilMultiplier;
+        var verticalRecoil = _rng.RandfRange(0.014f, 0.024f)
+            * stats.Recoil
+            * (_isAiming ? 0.58f : 1.0f)
+            * stanceRecoil
+            * RoleRecoilMultiplier;
+        var horizontalRecoil = _rng.RandfRange(-0.021f, 0.021f)
+            * stats.Recoil
+            * stanceRecoil
+            * RoleRecoilMultiplier;
+        _recoilPitch -= verticalRecoil;
+        _recoilSide = Mathf.Clamp(_recoilSide + horizontalRecoil, -0.095f, 0.095f);
         ApplyViewmodelShotImpulse(stats.Recoil, stanceRecoil);
+        Hud?.PulseCrosshair(shotImpact, horizontalRecoil);
     }
 
     private void PlayLocalGlassBreak()

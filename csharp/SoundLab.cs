@@ -18,7 +18,9 @@ public static class SoundLab
         float MechanicalFrequency,
         int Seed);
 
-    private static readonly Dictionary<(WeaponPlatform Platform, bool Suppressed, bool Distant), AudioStreamWav>
+    private static readonly Dictionary<
+        (WeaponPlatform Platform, bool Suppressed, bool Distant, bool NearField),
+        AudioStreamWav>
         WeaponShotCache = new();
     private static readonly Dictionary<(MeleeWeaponStyle Style, int AttackIndex), AudioStreamWav>
         MeleeSwingCache = new();
@@ -62,16 +64,32 @@ public static class SoundLab
         return WeaponShot(build.Platform, suppressed, distant);
     }
 
+    public static AudioStreamWav PlayerWeaponShot(WeaponBuild build)
+    {
+        var suppressed = IsSuppressed(build);
+        return WeaponShot(build.Platform, suppressed, distant: false, nearField: true);
+    }
+
     public static AudioStreamWav WeaponShot(
         WeaponPlatform platform,
         bool suppressed = false,
         bool distant = false)
+        => WeaponShot(platform, suppressed, distant, nearField: false);
+
+    private static AudioStreamWav WeaponShot(
+        WeaponPlatform platform,
+        bool suppressed,
+        bool distant,
+        bool nearField)
     {
         suppressed |= platform == WeaponPlatform.VSS;
-        var key = (platform, suppressed, distant);
+        var key = (platform, suppressed, distant, nearField);
         if (!WeaponShotCache.TryGetValue(key, out var stream))
         {
-            stream = BuildWeaponShot(WeaponShotRecipeFor(platform, suppressed), distant);
+            stream = BuildWeaponShot(
+                WeaponShotRecipeFor(platform, suppressed),
+                distant,
+                nearField);
             WeaponShotCache[key] = stream;
         }
         return stream;
@@ -106,11 +124,68 @@ public static class SoundLab
     }
 
     public static float PlayerWeaponShotVolumeDb(WeaponBuild build)
-        => Mathf.Min(1.5f, WeaponShotVolumeDb(build) + 4.0f);
+        => Mathf.Min(2.5f, WeaponShotVolumeDb(build) + 5.5f);
 
     public static int WeaponShotSignature(WeaponBuild build, bool distant = false)
+        => WeaponShotSignature(WeaponShot(build, distant));
+
+    public static int PlayerWeaponShotSignature(WeaponBuild build)
+        => WeaponShotSignature(PlayerWeaponShot(build));
+
+    internal static float PlayerWeaponShotEffectivePeak(WeaponBuild build)
+        => PlayerWeaponShotBurstPeak(build, 1.0f, 1);
+
+    internal static float PlayerWeaponShotBurstPeak(
+        WeaponBuild build,
+        float fireIntervalSeconds,
+        int voiceCount)
     {
-        var data = WeaponShot(build, distant).Data;
+        var stream = PlayerWeaponShot(build);
+        var data = stream.Data;
+        var sampleCount = data.Length / 2;
+        var intervalSamples = Mathf.Max(
+            1,
+            Mathf.RoundToInt(fireIntervalSeconds * stream.MixRate));
+        var burstSampleCount = sampleCount
+            + Mathf.Max(0, voiceCount - 1) * intervalSamples
+            + Mathf.CeilToInt(sampleCount * (1.0f / 0.96f - 1.0f));
+        var peak = 0.0f;
+        for (var pitchPattern = 0; pitchPattern < 5; pitchPattern++)
+        {
+            for (var outputIndex = 0; outputIndex < burstSampleCount; outputIndex++)
+            {
+                var mixed = 0.0f;
+                for (var voiceIndex = 0; voiceIndex < voiceCount; voiceIndex++)
+                {
+                    var elapsedSamples = outputIndex - voiceIndex * intervalSamples;
+                    if (elapsedSamples < 0)
+                    {
+                        continue;
+                    }
+                    var sourcePosition = elapsedSamples
+                        * WeaponBurstPitchScale(pitchPattern, voiceIndex);
+                    if (sourcePosition >= sampleCount)
+                    {
+                        continue;
+                    }
+                    var lowerIndex = Mathf.FloorToInt(sourcePosition);
+                    var upperIndex = Mathf.Min(sampleCount - 1, lowerIndex + 1);
+                    mixed += Mathf.Lerp(
+                        ReadPcm16Sample(data, lowerIndex),
+                        ReadPcm16Sample(data, upperIndex),
+                        sourcePosition - lowerIndex);
+                }
+                peak = Mathf.Max(peak, Mathf.Abs(mixed));
+            }
+        }
+
+        var gain = Mathf.Pow(10.0f, PlayerWeaponShotVolumeDb(build) / 20.0f);
+        return peak * gain;
+    }
+
+    private static int WeaponShotSignature(AudioStreamWav stream)
+    {
+        var data = stream.Data;
         var hash = 17;
         var stride = Mathf.Max(1, data.Length / 32);
         for (var index = 0; index < data.Length; index += stride)
@@ -156,7 +231,10 @@ public static class SoundLab
             recipe.Seed + 9000);
     }
 
-    private static AudioStreamWav BuildWeaponShot(WeaponShotRecipe recipe, bool distant)
+    private static AudioStreamWav BuildWeaponShot(
+        WeaponShotRecipe recipe,
+        bool distant,
+        bool nearField)
     {
         const int rate = 44100;
         var samples = new float[(int)(rate * recipe.Duration)];
@@ -188,13 +266,28 @@ public static class SoundLab
                 * pressureLevel
                 * 0.22f
                 * Mathf.Exp(-t * (recipe.PressureDecay * 0.72f));
-            var sample = Mathf.Tanh((crack + pressure + tail + mechanical + sub) * 1.28f) * 0.94f;
+            var nearFieldBodyFrequency = Mathf.Max(
+                76.0f,
+                recipe.PressureFrequency * 1.18f);
+            var nearFieldBody = nearField
+                ? Mathf.Sin(Mathf.Tau * (nearFieldBodyFrequency - t * 18.0f) * t)
+                    * pressureLevel
+                    * 0.24f
+                    * Mathf.Exp(-t * (recipe.PressureDecay * 0.78f))
+                : 0.0f;
+            var drive = nearField ? 1.34f : 1.28f;
+            var sample = Mathf.Tanh(
+                    (crack + pressure + tail + mechanical + sub + nearFieldBody) * drive)
+                * 0.94f;
             samples[i] = sample;
             peak = Mathf.Max(peak, Mathf.Abs(sample));
         }
         if (peak > 0.001f)
         {
-            var normalization = 0.94f / peak;
+            // Automatic fire overlaps several local voices. Preserve headroom in
+            // the PCM while the near-field body layer and player gain carry weight.
+            var targetPeak = nearField ? 0.58f : 0.94f;
+            var normalization = targetPeak / peak;
             for (var i = 0; i < samples.Length; i++)
             {
                 samples[i] *= normalization;
@@ -202,6 +295,23 @@ public static class SoundLab
         }
         return MakeStream(samples, rate);
     }
+
+    private static float ReadPcm16Sample(byte[] data, int sampleIndex)
+    {
+        var byteIndex = sampleIndex * 2;
+        var sample = (short)(data[byteIndex] | data[byteIndex + 1] << 8);
+        return sample / 32768.0f;
+    }
+
+    private static float WeaponBurstPitchScale(int pattern, int voiceIndex)
+        => pattern switch
+        {
+            0 => 0.96f,
+            1 => 1.0f,
+            2 => 1.04f,
+            3 => voiceIndex % 2 == 0 ? 0.96f : 1.04f,
+            _ => voiceIndex % 2 == 0 ? 1.04f : 0.96f
+        };
 
     public static AudioStreamWav MeleeSwing(MeleeWeaponStyle style, int attackIndex)
     {

@@ -442,7 +442,7 @@ public partial class CombatHUD : CanvasLayer
 
         _crosshair = new Control();
         _crosshair.SetAnchorsPreset(Control.LayoutPreset.Center);
-        _crosshair.Position = new Vector2(-1, -1);
+        _crosshair.Position = CrosshairAnchorOffset;
         root.AddChild(_crosshair);
         foreach (var data in new[] { new Vector4(-13, 0, 7, 2), new Vector4(7, 0, 7, 2), new Vector4(0, -13, 2, 7), new Vector4(0, 7, 2, 7) })
         {
@@ -1421,18 +1421,6 @@ public partial class CombatHUD : CanvasLayer
             : Colors.White;
         _hitTween = CreateTween();
         _hitTween.TweenProperty(_hitmarker, "modulate:a", 0.0f, 0.22f);
-    }
-
-    public void PulseCrosshair()
-    {
-        if (_crosshairTween?.IsRunning() == true)
-        {
-            _crosshairTween.Kill();
-        }
-        _crosshair.Scale = Vector2.One * 1.55f;
-        _crosshairTween = CreateTween();
-        _crosshairTween.TweenProperty(_crosshair, "scale", Vector2.One, 0.12f)
-            .SetTrans(Tween.TransitionType.Expo).SetEase(Tween.EaseType.Out);
     }
 
     public void ShowDamage(float strength = 0.58f)

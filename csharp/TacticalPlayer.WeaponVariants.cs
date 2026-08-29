@@ -48,7 +48,7 @@ public partial class TacticalPlayer
         => IsInstanceValid(_gunAudio) ? _gunAudio.VolumeDb : float.NegativeInfinity;
     internal int PlayerWeaponAudioSignatureForDiagnostics
         => PlayerWeaponAudioReadyForDiagnostics
-            ? SoundLab.WeaponShotSignature(EquippedWeapon)
+            ? SoundLab.PlayerWeaponShotSignature(EquippedWeapon)
             : 0;
 
     private void PlayLocalWeaponReport()
