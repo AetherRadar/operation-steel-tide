@@ -9,11 +9,17 @@ public partial class FreightTerminalWorld
     private readonly record struct SquadSpectatorCycleDiagnosticResult(
         bool RightMouseBound,
         bool Advanced,
+        bool EliminatedMouseClick,
         bool SkippedDowned,
         bool Wrapped,
         bool Localized)
     {
-        public bool Valid => RightMouseBound && Advanced && SkippedDowned && Wrapped && Localized;
+        public bool Valid => RightMouseBound
+            && Advanced
+            && EliminatedMouseClick
+            && SkippedDowned
+            && Wrapped
+            && Localized;
     }
 
     private SquadSpectatorCycleDiagnosticResult ValidateSquadSpectatorCycleForDiagnostics(
@@ -33,6 +39,7 @@ public partial class FreightTerminalWorld
         var savedUiLocked = _player.UiLocked;
         var savedSpectatedMate = _spectatedMate;
         var savedObjectiveSpectator = _demolitionObjectiveSpectatorActive;
+        var savedClickPending = _spectatorCycleClickPending;
         var savedCamera = GetViewport().GetCamera3D();
         var rightMouseBound = InputMap.ActionGetEvents(GameInputActions.Aim)
             .Any(@event => @event is InputEventMouseButton
@@ -40,6 +47,7 @@ public partial class FreightTerminalWorld
                 ButtonIndex: MouseButton.Right
             });
         var advanced = false;
+        var eliminatedMouseClick = false;
         var skippedDowned = false;
         var wrapped = false;
         var localized = false;
@@ -60,13 +68,32 @@ public partial class FreightTerminalWorld
                 ? null
                 : livingTargets[(initialIndex + 1) % livingTargets.Length];
 
-            var advanceAccepted = TryHandleSquadSpectatorCycleInput(rightMouseBound);
             _localPlayerDowned = false;
-            advanced = advanceAccepted
-                && expectedNext is not null
-                && ReferenceEquals(_spectatedMate, expectedNext)
+            _localPlayerEliminated = true;
+            _Input(new InputEventMouseButton
+            {
+                ButtonIndex = MouseButton.Left,
+                Pressed = true
+            });
+            UpdateSquadSpectatorCamera();
+            var advanceAccepted = expectedNext is not null
+                && ReferenceEquals(_spectatedMate, expectedNext);
+            _localPlayerDowned = false;
+            _localPlayerEliminated = true;
+            eliminatedMouseClick = advanceAccepted
                 && IsLivingSpectatorTarget(_spectatedMate);
 
+            _Input(new InputEventMouseButton
+            {
+                ButtonIndex = MouseButton.Right,
+                Pressed = true
+            });
+            UpdateSquadSpectatorCamera();
+            advanced = eliminatedMouseClick
+                && ReferenceEquals(_spectatedMate, initialMate)
+                && IsLivingSpectatorTarget(_spectatedMate);
+
+            _spectatedMate = livingTargets[^1];
             var wrapAccepted = CycleLivingSpectatorTarget();
             skippedDowned = downedProbe.IsDowned
                 && !ReferenceEquals(_spectatedMate, downedProbe)
@@ -83,8 +110,8 @@ public partial class FreightTerminalWorld
                 && GameLocalization.Get(
                     "spectator_switch_hint",
                     "zh",
-                    "RMB SWITCH TEAMMATE")
-                == "\u53f3\u952e\u5207\u6362\u5b58\u6d3b\u961f\u53cb";
+                    "LMB/RMB SWITCH TEAMMATE")
+                == "\u9f20\u6807\u70b9\u51fb\u5207\u6362\u5b58\u6d3b\u961f\u53cb";
         }
         finally
         {
@@ -94,6 +121,7 @@ public partial class FreightTerminalWorld
             _player.UiLocked = savedUiLocked;
             _spectatedMate = savedSpectatedMate;
             _demolitionObjectiveSpectatorActive = savedObjectiveSpectator;
+            _spectatorCycleClickPending = savedClickPending;
             if (savedCamera is not null && IsInstanceValid(savedCamera))
             {
                 savedCamera.MakeCurrent();
@@ -107,6 +135,7 @@ public partial class FreightTerminalWorld
         return new SquadSpectatorCycleDiagnosticResult(
             rightMouseBound,
             advanced,
+            eliminatedMouseClick,
             skippedDowned,
             wrapped,
             localized);

@@ -1540,7 +1540,7 @@ public partial class CombatHUD : CanvasLayer
         }
         _downedTitle.Text = Text("downed_title", "OPERATOR DOWNED");
         _downedSubtitle.Text = $"{Text("spectating_teammate", "SPECTATING TEAMMATE")}  //  "
-            + $"{Text("spectator_switch_hint", "RMB SWITCH TEAMMATE")}  //  "
+            + $"{Text("spectator_switch_hint", "LMB/RMB SWITCH TEAMMATE")}  //  "
             + $"{Text("downed_wait", "AWAITING MEDIC")}  {Mathf.CeilToInt(Mathf.Max(0.0f, reviveWindowSeconds))}s";
     }
 

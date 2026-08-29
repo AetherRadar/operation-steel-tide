@@ -26,6 +26,25 @@ public partial class FreightTerminalWorld
     private Camera3D? _squadSpectatorCamera;
     private SquadMate? _spectatedMate;
     private bool _squadSpectatorCameraCollisionAdjustedForDiagnostics;
+    private bool _spectatorCycleClickPending;
+
+    public override void _Input(InputEvent @event)
+    {
+        if (@event is not InputEventMouseButton mouse
+            || !mouse.Pressed
+            || mouse.ButtonIndex is not (MouseButton.Left or MouseButton.Right)
+            || (!_localPlayerDowned && !_localPlayerEliminated)
+            || !IsLivingSpectatorTarget(_spectatedMate))
+        {
+            return;
+        }
+
+        // Mouse clicks are handled at the world level so a full-screen HUD control,
+        // captured cursor, or the eliminated player's disabled process cannot swallow
+        // the spectator switch. The pending flag is consumed once in _Process below.
+        _spectatorCycleClickPending = true;
+        GetViewport().SetInputAsHandled();
+    }
 
     private void BeginSquadMateView()
     {
@@ -62,8 +81,10 @@ public partial class FreightTerminalWorld
             }
             return;
         }
+        var clickPending = _spectatorCycleClickPending;
+        _spectatorCycleClickPending = false;
         TryHandleSquadSpectatorCycleInput(
-            Input.IsActionJustPressed(GameInputActions.Aim));
+            clickPending || Input.IsActionJustPressed(GameInputActions.Aim));
 
         SnapSquadSpectatorCamera();
         if (!_squadSpectatorCamera.Current)
@@ -375,6 +396,7 @@ public partial class FreightTerminalWorld
     private void RestoreLocalPlayerView()
     {
         _spectatedMate = null;
+        _spectatorCycleClickPending = false;
         _demolitionObjectiveSpectatorActive = false;
         var playerCamera = _player.GetNodeOrNull<Camera3D>("Head/CombatCamera");
         playerCamera?.MakeCurrent();
