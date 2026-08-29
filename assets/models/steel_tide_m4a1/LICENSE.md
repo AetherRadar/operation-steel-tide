@@ -76,6 +76,27 @@ then validates the imported GLB hierarchy, attachment geometry, configuration
 truth table, and active muzzle/reticle alignment. The final GLB contains 19 mesh
 instances, 12,414 imported vertices, and 10,617 triangles.
 
+Reload hand contacts are likewise transform-only and are derived from the
+actual nisu mechanism triangles rather than fallback bounds. In Blender
+mechanism-local coordinates, `MagazineGripSocket` is
+`(-0.026087064, -0.170000002, -0.059999987)` on the left wall of
+`MagazineGeometry`, while `ChargingHandleSocket` is
+`(-0.122946054, -0.300000012, 0.013999999)` on the rear-left wing of
+`ChargingHandleGeometry`. Their exported surface gaps are respectively
+`0.000000004` m and `0.000000001` m after Blender GLB round trip. The sockets
+do not add triangles or alter the stable mechanism roots:
+
+```text
+SteelTideM4A1
+|- Magazine                         (0.000, 0.310, -0.200)
+|  |- MagazineGeometry
+|  `- MagazineGripSocket
+|- SpareMagazine                   (-0.300, 0.180, -0.620)
+`- ChargingHandle                  (0.075, 0.050, 0.085)
+   |- ChargingHandleGeometry
+   `- ChargingHandleSocket
+```
+
 M4 barrel, stock, magazine, grip, and optic stat variants deliberately reuse
 the corresponding finished authored base component instead of exposing the
 hidden procedural variant meshes. The normal muzzle and suppressor do switch as
@@ -87,3 +108,10 @@ their CC0 provenance and are not represented as MIT-licensed project-authored
 art. The project-authored Blender adaptation script is covered by the
 repository's root MIT license, subject to the disclosure in
 `../../../docs/CONTENT_PROVENANCE.md`.
+
+## Delivered output identity
+
+| File | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Runtime `steel_tide_m4a1.glb` | 5,300,992 | `674C32712FFEB684C78E33411E5027852BE7F954098AD53BEDB72897F493DE06` |
+| DCC source `../../../source_art/combat_models/steel_tide_m4a1.blend` | 4,865,006 | `ED007B14A3B2C3B932624F75179A62E9575424B05B22ABF6FE28482CDFE71C0B` |

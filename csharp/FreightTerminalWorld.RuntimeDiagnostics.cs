@@ -136,6 +136,7 @@ public partial class FreightTerminalWorld
             ("--validate-hand-diagnostics-narrow", static world => world.ValidateHandDiagnostics(narrow: true)),
             ("--validate-hand-diagnostics-ultrawide", static world => world.ValidateHandDiagnostics(ultrawide: true)),
             ("--validate-sidearm-reload", static world => world.ValidateSidearmReloadDiagnostics()),
+            ("--validate-all-weapon-reloads", static world => world.ValidateAllWeaponReloads()),
             ("--capture-open-hand", static world => world.CaptureOpenHandValidation()),
             ("--capture-open-hand-narrow", static world => world.CaptureOpenHandValidation(narrow: true)),
             ("--capture-open-hand-ultrawide", static world => world.CaptureOpenHandValidation(ultrawide: true)),

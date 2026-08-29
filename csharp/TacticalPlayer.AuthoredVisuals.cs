@@ -15,6 +15,10 @@ public partial class TacticalPlayer
     private const float AuthoredSidearmArmPitchRadians = 0.30f;
     private const float AuthoredLargeSidearmArmPresentationScale = 0.50f;
     private const float AuthoredLargeSidearmArmPitchRadians = 0.80f;
+    private const float AnimatedScarReloadArmPresentationScale = 0.80f;
+    private const float AnimatedAwmReloadArmPresentationScale = 0.75f;
+    private const float AnimatedSidearmReloadArmPresentationScale = 0.70f;
+    private const float AnimatedLargeSidearmReloadArmPresentationScale = 0.56f;
     private const float SidearmBottomScreenBandStartRatio = 0.96f;
     private const float MaxAuthoredPalmSurfaceGap = 0.018f;
     internal const float MaxServicePistolSupportArmCorrection = 0.03f;
@@ -93,13 +97,19 @@ public partial class TacticalPlayer
         }
     }
     internal bool UsesAuthoredGsh18ForDiagnostics
-        => IsInstanceValid(_authoredGsh18Weapon?.Root)
-        && EquippedWeapon.Platform == WeaponPlatform.GSh18
-        && _authoredGsh18Weapon.Root.Visible;
+        => _authoredPlatformWeapons.TryGetValue(
+                WeaponPlatform.GSh18,
+                out var weapon)
+            && IsInstanceValid(weapon.Root)
+            && EquippedWeapon.Platform == WeaponPlatform.GSh18
+            && weapon.Root.Visible;
     internal bool UsesAuthoredDesertEagleForDiagnostics
-        => IsInstanceValid(_authoredDesertEagleWeapon?.Root)
-        && EquippedWeapon.Platform == WeaponPlatform.DesertEagle
-        && _authoredDesertEagleWeapon.Root.Visible;
+        => _authoredPlatformWeapons.TryGetValue(
+                WeaponPlatform.DesertEagle,
+                out var weapon)
+            && IsInstanceValid(weapon.Root)
+            && EquippedWeapon.Platform == WeaponPlatform.DesertEagle
+            && weapon.Root.Visible;
     internal bool UsesAuthoredWeaponPlatformForDiagnostics(WeaponPlatform platform)
         => platform switch
         {
@@ -172,10 +182,6 @@ public partial class TacticalPlayer
                 => _authoredPrimaryWeapon.Root,
             WeaponPlatform.M3A1 when IsInstanceValid(_authoredFirstPersonSmg?.WeaponBody)
                 => _authoredFirstPersonSmg.WeaponBody,
-            WeaponPlatform.GSh18 when IsInstanceValid(_authoredGsh18Weapon?.Root)
-                => _authoredGsh18Weapon.Root,
-            WeaponPlatform.DesertEagle when IsInstanceValid(_authoredDesertEagleWeapon?.Root)
-                => _authoredDesertEagleWeapon.Root,
             _ when _authoredPlatformWeapons.TryGetValue(EquippedWeapon.Platform, out var visual)
                 && IsInstanceValid(visual.Root)
                 => visual.Root,
@@ -455,25 +461,54 @@ public partial class TacticalPlayer
     internal AuthoredM4ReloadArmInspection InspectAuthoredM4ReloadArmForDiagnostics()
     {
         var arms = ActiveAuthoredArms();
+        var animatedArms = UsesAnimatedReloadArmsForDiagnostics
+            ? AnimatedReloadArmsForDiagnostics
+            : null;
         if (EquippedWeapon.Platform != WeaponPlatform.M4A1
-            || arms is null
-            || !IsInstanceValid(arms.Root)
+            || (animatedArms is null
+                && (arms is null || !IsInstanceValid(arms.Root)))
             || !IsInstanceValid(_authoredPrimaryWeapon?.Root))
         {
             return default;
         }
 
-        var leftGrip = arms.LeftGripFrame.GlobalPosition;
+        var leftGrip = animatedArms?.LeftPalmContactGlobalPosition
+            ?? arms!.LeftGripFrame.GlobalPosition;
         var supportTarget = M4ReloadSupportTargetGlobal();
         var primaryMagazinePosition = _authoredPrimaryWeapon.Magazine.GlobalPosition;
         var spareMagazinePosition = _authoredPrimaryWeapon.SpareMagazine.GlobalPosition;
+        var activeSpare = _authoredPrimaryWeapon.SpareMagazine.IsVisibleInTree();
+        var activeMagazineContact = activeSpare
+            && _authoredPrimaryWeapon.TryMagazineGripGlobalPosition(
+                spare: true,
+                out var spareContact)
+                ? spareContact
+                : !activeSpare
+                    && _authoredPrimaryWeapon.TryMagazineGripGlobalPosition(
+                        spare: false,
+                        out var primaryContact)
+                    ? primaryContact
+                    : activeSpare ? spareMagazinePosition : primaryMagazinePosition;
+        var weaponRootInverse = _weaponRoot.GlobalTransform.AffineInverse();
+        var leftArmTransform = animatedArms is not null
+            ? weaponRootInverse * animatedArms.LeftPalmContactGlobalTransform
+            : arms!.LeftArm.Transform;
+        var sleeveWristLength = animatedArms is not null
+            ? animatedArms.LeftPalmContactGlobalPosition.DistanceTo(
+                animatedArms.LeftWristGlobalPosition)
+            : arms!.LeftPalmFrame.GlobalPosition.DistanceTo(
+                arms.LeftWristFrame.GlobalPosition);
         return new AuthoredM4ReloadArmInspection(
-            arms.Root.IsVisibleInTree()
-                && arms.LeftArm.IsVisibleInTree()
-                && arms.LeftGripFrame.IsVisibleInTree()
-                && UsesAuthoredHandRigForDiagnostics,
-            arms.LeftArm.IsVisibleInTree(),
-            arms.LeftGripFrame.IsVisibleInTree(),
+            animatedArms is not null
+                ? animatedArms.Root.IsVisibleInTree()
+                    && animatedArms.Mesh.IsVisibleInTree()
+                : arms!.Root.IsVisibleInTree()
+                    && arms.LeftArm.IsVisibleInTree()
+                    && arms.LeftGripFrame.IsVisibleInTree()
+                    && UsesAuthoredHandRigForDiagnostics,
+            animatedArms?.Mesh.IsVisibleInTree() ?? arms!.LeftArm.IsVisibleInTree(),
+            animatedArms?.Root.IsVisibleInTree()
+                ?? arms!.LeftGripFrame.IsVisibleInTree(),
             _authoredPrimaryWeapon.Magazine.IsVisibleInTree(),
             _authoredPrimaryWeapon.SpareMagazine.IsVisibleInTree(),
             _authoredPrimaryWeapon.Magazine.GetInstanceId()
@@ -483,9 +518,9 @@ public partial class TacticalPlayer
             primaryMagazinePosition,
             spareMagazinePosition,
             leftGrip.DistanceTo(supportTarget),
-            leftGrip.DistanceTo(spareMagazinePosition),
-            arms.LeftPalmFrame.GlobalPosition.DistanceTo(arms.LeftWristFrame.GlobalPosition),
-            arms.LeftArm.Transform);
+            leftGrip.DistanceTo(activeMagazineContact),
+            sleeveWristLength,
+            leftArmTransform);
     }
 
     private static (float Distance, Vector3 Offset) InspectVisibleMeshSurface(
@@ -646,15 +681,17 @@ public partial class TacticalPlayer
         var wantsAuthoredSmg = EquippedWeapon.Platform == WeaponPlatform.M3A1;
         var useAuthoredSmg = wantsAuthoredSmg;
         var useAuthoredPlatform = EquippedWeapon.Platform is not WeaponPlatform.M4A1
-            and not WeaponPlatform.M3A1
-            and not WeaponPlatform.GSh18
-            and not WeaponPlatform.DesertEagle;
-        var useAuthoredGsh18 = EquippedWeapon.Platform == WeaponPlatform.GSh18;
-        var wantsAuthoredDesertEagle = EquippedWeapon.Platform == WeaponPlatform.DesertEagle;
-        var useAuthoredDesertEagle = wantsAuthoredDesertEagle;
+            and not WeaponPlatform.M3A1;
+        // GSh-18 and Desert Eagle now use the same reloadable authored-weapon
+        // adapter as every other platform so their DCC magazine and slide
+        // nodes participate in the real mechanism animation.
+        var useAuthoredGsh18 = false;
+        var wantsAuthoredDesertEagle = false;
+        var useAuthoredDesertEagle = false;
         if (EquippedWeapon.Platform != WeaponPlatform.M3A1)
         {
             EnsureAuthoredArmsForPlatform();
+            EnsureAuthoredAnimatedReloadArms();
         }
         if (useAuthoredGsh18)
         {
@@ -1004,6 +1041,10 @@ public partial class TacticalPlayer
 
     private void UpdateAuthoredReloadSupportArm()
     {
+        if (UpdateAnimatedReloadArmsPresentation())
+        {
+            return;
+        }
         if (!_isReloading
             || (EquippedWeapon.Platform != WeaponPlatform.M4A1
                 && !UsesPlatformReloadPresentation()
@@ -1047,59 +1088,116 @@ public partial class TacticalPlayer
 
     private Vector3 ReloadSupportTargetGlobal()
     {
-        var proceduralTarget = IsInstanceValid(_supportHand)
-            ? _supportHand.GlobalPosition
-            : Vector3.Zero;
-        if (EquippedWeapon.Platform != WeaponPlatform.AK74
-            || !_isReloading
-            || !_authoredPlatformWeapons.TryGetValue(
-                WeaponPlatform.AK74,
-                out var authoredWeapon))
+        var supportHome = IsInstanceValid(_weaponRoot)
+            ? _weaponRoot.GlobalTransform
+                * FirstPersonArmPoseCatalog.For(EquippedWeapon.Platform).SupportGrip
+            : IsInstanceValid(_supportHand)
+                ? _supportHand.GlobalPosition
+                : Vector3.Zero;
+        var fallback = supportHome;
+        if (!_isReloading
+            || EquippedWeapon.Platform == WeaponPlatform.M3A1
+            || ActiveAuthoredReloadWeapon() is not { } weapon
+            || !IsInstanceValid(weapon.Root))
         {
-            return proceduralTarget;
+            return fallback;
         }
 
+        var profile = FirstPersonReloadProfileCatalog.For(EquippedWeapon.Platform);
         var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
-        var primaryGrip = authoredWeapon.MagazineGrip;
-        var spareGrip = authoredWeapon.SpareMagazineGrip;
-        if (!IsInstanceValid(primaryGrip) || !IsInstanceValid(spareGrip))
+        var internalMagazine = profile.Mechanism
+            == FirstPersonReloadMechanism.InternalMagazine;
+
+        if (progress < profile.ReachEnd)
         {
-            return proceduralTarget;
+            var useSpare = internalMagazine;
+            if (weapon.TryMagazineGripGlobalPosition(useSpare, out var contact))
+            {
+                return fallback.Lerp(
+                    contact,
+                    SmoothSegment(progress, 0.0f, profile.ReachEnd));
+            }
+            return fallback;
         }
-        if (progress < 0.08f)
+
+        if (internalMagazine && progress < profile.SeatEnd)
         {
-            return proceduralTarget;
+            return weapon.TryMagazineGripGlobalPosition(true, out var contact)
+                ? contact
+                : fallback;
         }
-        if (progress < 0.22f)
+
+        if (!internalMagazine && progress < profile.StowEnd)
         {
-            var acquire = SmoothStep((progress - 0.08f) / 0.14f);
-            return proceduralTarget.Lerp(primaryGrip!.GlobalPosition, acquire);
+            return weapon.TryMagazineGripGlobalPosition(false, out var contact)
+                ? contact
+                : fallback;
         }
-        if (progress < 0.45f)
+
+        if (!internalMagazine && progress < profile.AcquireEnd)
         {
-            return primaryGrip!.GlobalPosition;
+            var fromContactAvailable = weapon.TryMagazineGripGlobalPosition(
+                false,
+                out var fromContact);
+            var toContactAvailable = weapon.TryMagazineGripGlobalPosition(
+                true,
+                out var toContact);
+            if (fromContactAvailable && toContactAvailable)
+            {
+                return fromContact.Lerp(
+                    toContact,
+                    SmoothSegment(progress, profile.StowEnd, profile.AcquireEnd));
+            }
+            return fallback;
         }
-        if (progress < 0.65f)
+
+        if (progress < profile.SeatEnd)
         {
-            var handoff = SmoothStep((progress - 0.45f) / 0.20f);
-            return primaryGrip!.GlobalPosition.Lerp(
-                spareGrip!.GlobalPosition,
-                handoff);
+            return weapon.TryMagazineGripGlobalPosition(true, out var contact)
+                ? contact
+                : fallback;
         }
-        if (progress < 0.75f)
+
+        if (progress < profile.ActionEnd)
         {
-            return spareGrip!.GlobalPosition;
+            var fromContact = weapon.TryMagazineGripGlobalPosition(
+                true,
+                out var magazineContact)
+                ? magazineContact
+                : fallback;
+            if (profile.UsesAction(_reloadStartedEmpty)
+                && weapon.TryActionGripGlobalPosition(out var actionContact))
+            {
+                var actionProgress = Mathf.InverseLerp(
+                    profile.SeatEnd,
+                    profile.ActionEnd,
+                    progress);
+                var reach = SmoothStep(Mathf.Clamp(
+                    actionProgress / 0.36f,
+                    0.0f,
+                    1.0f));
+                return fromContact.Lerp(actionContact, reach);
+            }
+            return fromContact.Lerp(
+                supportHome,
+                SmoothSegment(progress, profile.SeatEnd, profile.ActionEnd));
         }
-        if (progress < 0.78f)
+
+        if (profile.UsesAction(_reloadStartedEmpty))
         {
-            var release = SmoothStep((progress - 0.75f) / 0.03f);
-            return spareGrip!.GlobalPosition.Lerp(proceduralTarget, release);
+            if (weapon.TryActionGripGlobalPosition(out var actionContact))
+            {
+                return actionContact.Lerp(
+                    supportHome,
+                    SmoothSegment(progress, profile.ActionEnd, 1.0f));
+            }
         }
-        return proceduralTarget;
+        return supportHome;
     }
 
     private void ResetAuthoredM4ReloadSupportArm()
     {
+        ResetAnimatedReloadArmsPresentation();
         if (ActiveAuthoredArms() is { } arms && IsInstanceValid(arms.Root))
         {
             AlignAuthoredArmsToWeapon();
@@ -1180,6 +1278,10 @@ public partial class TacticalPlayer
             return;
         }
         authoredWeapon.SyncMechanisms(_magazine, _spareMagazine, _chargingHandle);
+        var hasOpticAttachment = EquippedWeapon.Attachments.TryGetValue(
+            AttachmentSlot.Optic,
+            out var opticId);
+        var hasVisibleOptic = _opticRoot.Visible && hasOpticAttachment;
         if (EquippedWeapon.Platform == WeaponPlatform.AK74)
         {
             // The replacement AK owns its presentation frame, so effects and
@@ -1191,22 +1293,30 @@ public partial class TacticalPlayer
             {
                 _ejectMarker.GlobalTransform = ejectionPort.GlobalTransform;
             }
-            if (_opticRoot.Visible
+            if (hasVisibleOptic
                 && authoredWeapon.OpticRailContact is { } opticRailContact
                 && IsInstanceValid(opticRailContact))
             {
-                EquippedWeapon.Attachments.TryGetValue(
-                    AttachmentSlot.Optic,
-                    out var akOpticId);
                 var railContactInWeaponRoot = _weaponRoot.GlobalTransform.AffineInverse()
                     * opticRailContact.GlobalPosition;
                 _opticRoot.Position = railContactInWeaponRoot
-                    + Vector3.Up * AuthoredOpticRailContactOffset(akOpticId);
+                    + Vector3.Up * AuthoredOpticRailContactOffset(opticId);
             }
         }
+        else if (hasVisibleOptic
+            && !WeaponUsesIntegratedOptic(EquippedWeapon.Platform, opticId))
+        {
+            var mountPosition = authoredWeapon.OpticRailContact is { } opticRailContact
+                    && IsInstanceValid(opticRailContact)
+                ? opticRailContact.GlobalPosition
+                : authoredWeapon.OpticMount.GlobalPosition;
+            var mountInWeaponRoot = _weaponRoot.GlobalTransform.AffineInverse()
+                * mountPosition;
+            _opticRoot.Position = mountInWeaponRoot
+                + Vector3.Up * AuthoredOpticRailContactOffset(opticId);
+        }
         if (EquippedWeapon.Platform == WeaponPlatform.VSS
-            && _opticRoot.Visible
-            && EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Optic, out var opticId)
+            && hasVisibleOptic
             && WeaponUsesIntegratedOptic(WeaponPlatform.VSS, opticId))
         {
             // The marker is derived at load time from the rear clear-lens

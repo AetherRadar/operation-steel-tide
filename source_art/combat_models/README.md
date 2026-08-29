@@ -17,7 +17,10 @@ blender --background --factory-startup --python scripts/blender/build_nisu_m4a1.
 
 The M4A1 GLB exposes `Magazine`, `SpareMagazine`, `ChargingHandle`, `Stock`,
 `RearIronSight`, `FrontIronSight`, `Foregrip`, `MuzzleDevice`, `Suppressor`, and
-`OpticMount`. `RearIronSight` owns both original nisu rear-aperture meshes and
+`OpticMount`. `MagazineGripSocket` is a direct child of `Magazine`, on the
+actual left magazine wall, and `ChargingHandleSocket` is a direct child of
+`ChargingHandle`, on the actual rear-left T-handle wing. `RearIronSight` owns
+both original nisu rear-aperture meshes and
 `FrontIronSight` owns the original front tower and post. The fitted-optic
 configuration can clear both irons from the optic window without deleting them
 from the no-optic build. These names are a stable runtime contract used by
@@ -44,6 +47,12 @@ validates the imported
 GLB hierarchy and runtime alignment. Gameplay stat variants deliberately share
 these finished authored slot visuals rather than enabling the hidden primitive
 variant meshes.
+
+The builder also locks all three mechanism-root transforms, projects each hand
+socket from a semantic grip seed onto the authored triangles with a BVH, checks
+sub-micrometre contact error, preserves the exact 19-mesh/10,617-triangle
+visible topology, and repeats the socket/hierarchy/topology audit after GLB
+export and Blender re-import.
 
 `steel_tide_operator.blend` is the editable source for the legacy
 project-authored operator output at

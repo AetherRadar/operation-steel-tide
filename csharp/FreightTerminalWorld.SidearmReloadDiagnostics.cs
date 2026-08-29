@@ -52,11 +52,14 @@ public partial class FreightTerminalWorld
             await WaitFrames(3);
 
             var idle = _player.InspectSidearmReloadForDiagnostics();
+            var idleHand = _player.InspectAuthoredHandPoseForDiagnostics();
             Input.ActionPress(GameInputActions.Reload);
             await WaitFrames(2);
             Input.ActionRelease(GameInputActions.Reload);
             var inputStarted = _player.IsReloading;
             _player.ProcessMode = ProcessModeEnum.Disabled;
+            _player.SetReloadPoseForDiagnostics(0.0f, emptyReload: true);
+            var baseline = _player.InspectAllWeaponReloadForDiagnostics();
 
             var poseSet = true;
             var armsActive = true;
@@ -65,65 +68,133 @@ public partial class FreightTerminalWorld
             var visibleMotion = true;
             var viewMotion = true;
             var mechanismStages = true;
+            var insertionReadable = true;
+            var extractionReadable = true;
+            var actionReadable = true;
+            var bodyContinuous = true;
+            var samplesValid = true;
             var maximumGripResidual = 0.0f;
             var maximumSupportDistance = 0.0f;
             var minimumArmMotion = float.PositiveInfinity;
             var minimumViewMotion = float.PositiveInfinity;
-            var samples = new[] { 0.28f, 0.64f, 0.88f };
-            foreach (var progress in samples)
+            var profile = FirstPersonReloadProfileCatalog.For(platform);
+            var samples = new[]
             {
-                var set = _player.SetReloadPoseForDiagnostics(progress);
-                var inspection = _player.InspectSidearmReloadForDiagnostics();
-                var armMotion = SidearmReloadTransformDelta(
-                    idle.LeftArmTransform,
-                    inspection.LeftArmTransform);
-                var targetMotion = inspection.ReloadViewTarget.DistanceTo(idle.ReloadViewTarget)
-                    + inspection.ReloadRotationTarget.DistanceTo(idle.ReloadRotationTarget);
-                var expectedMechanism = progress < 0.43f
-                    ? inspection.PrimaryMagazineVisible && !inspection.SpareMagazineVisible
-                    : progress < 0.78f
-                        ? !inspection.PrimaryMagazineVisible && inspection.SpareMagazineVisible
-                        : inspection.PrimaryMagazineVisible
-                            && !inspection.SpareMagazineVisible
-                            && inspection.SlideTravel >= 0.025f;
+                (Progress: (profile.ReachEnd + profile.ExtractEnd) * 0.5f,
+                    Stage: "extract"),
+                (Progress: (profile.InsertEnd + profile.SeatEnd) * 0.5f,
+                    Stage: "insert"),
+                (Progress: (profile.SeatEnd + profile.ActionEnd) * 0.5f,
+                    Stage: "action")
+            };
+            foreach (var sample in samples)
+            {
+                var set = _player.SetReloadPoseForDiagnostics(
+                    sample.Progress,
+                    emptyReload: true);
+                await WaitFrames(2);
+                var inspection = _player.InspectAllWeaponReloadForDiagnostics();
+                var viewInspection = _player.InspectSidearmReloadForDiagnostics();
+                var armMotion = inspection.LeftPalm.DistanceTo(baseline.LeftPalm);
+                var targetMotion = viewInspection.ReloadViewTarget.DistanceTo(
+                        idle.ReloadViewTarget)
+                    + viewInspection.ReloadRotationTarget.DistanceTo(
+                        idle.ReloadRotationTarget);
+                var supportDistance = inspection.LeftPalm.DistanceTo(
+                    inspection.SupportTarget);
+                var gripResidual = inspection.RightGrip.DistanceTo(
+                    inspection.PrimaryGrip);
+                var actionTravel = inspection.ActionPosition.DistanceTo(
+                    baseline.ActionPosition);
+                var expectedMechanism = sample.Stage switch
+                {
+                    "extract" => inspection.PrimaryMagazineVisible
+                        && !inspection.SpareMagazineVisible,
+                    "insert" => !inspection.PrimaryMagazineVisible
+                        && inspection.SpareMagazineVisible,
+                    _ => !inspection.PrimaryMagazineVisible
+                        && inspection.SpareMagazineVisible
+                        && actionTravel >= 0.025f
+                };
+                var sampleInsertionReadable = sample.Stage != "insert"
+                    || inspection.ScreenContact.InsertionReadable;
+                var sampleExtractionReadable = sample.Stage != "extract"
+                    || inspection.ScreenContact.ExtractionReadable;
+                var sampleActionReadable = sample.Stage != "action"
+                    || inspection.ScreenContact.ActionReadable;
+                var sampleBodyContinuous = ReloadBodyContinuityValid(inspection);
                 var sampleValid = set
-                    && inspection.AuthoredArmsActive
+                    && inspection.AnimatedRootActive
+                    && inspection.AnimatedMeshActive
+                    && !inspection.StaticArmsActive
                     && inspection.Reloading
-                    && Mathf.Abs(inspection.Progress - progress) <= 0.02f
-                    && inspection.RightGripResidual <= 0.002f
-                    && inspection.SupportTargetDistance <= 0.002f
-                    && armMotion >= 0.035f
+                    && Mathf.Abs(inspection.Progress - sample.Progress) <= 0.02f
+                    && gripResidual <= 0.004f
+                    && supportDistance <= 0.005f
+                    && armMotion >= 0.050f
                     && targetMotion >= 0.02f
-                    && expectedMechanism;
+                    && inspection.PrimaryMagazineGeometry
+                    && inspection.SpareMagazineGeometry
+                    && inspection.ActionGeometry
+                    && sampleBodyContinuous
+                    && expectedMechanism
+                    && sampleExtractionReadable
+                    && sampleInsertionReadable
+                    && sampleActionReadable;
+                samplesValid &= sampleValid;
                 poseSet &= set;
-                armsActive &= inspection.AuthoredArmsActive;
-                primaryGripFixed &= inspection.RightGripResidual <= 0.002f;
-                supportTracks &= inspection.SupportTargetDistance <= 0.002f;
-                visibleMotion &= armMotion >= 0.035f;
+                armsActive &= inspection.AnimatedRootActive
+                    && inspection.AnimatedMeshActive
+                    && !inspection.StaticArmsActive;
+                primaryGripFixed &= gripResidual <= 0.004f;
+                supportTracks &= supportDistance <= 0.005f;
+                visibleMotion &= armMotion >= 0.050f;
                 viewMotion &= targetMotion >= 0.02f;
                 mechanismStages &= expectedMechanism;
+                insertionReadable &= sampleInsertionReadable;
+                extractionReadable &= sampleExtractionReadable;
+                actionReadable &= sampleActionReadable;
+                bodyContinuous &= sampleBodyContinuous;
                 maximumGripResidual = Mathf.Max(
                     maximumGripResidual,
-                    inspection.RightGripResidual);
+                    gripResidual);
                 maximumSupportDistance = Mathf.Max(
                     maximumSupportDistance,
-                    inspection.SupportTargetDistance);
+                    supportDistance);
                 minimumArmMotion = Mathf.Min(minimumArmMotion, armMotion);
                 minimumViewMotion = Mathf.Min(minimumViewMotion, targetMotion);
                 GD.Print(
-                    $"SIDEARM_RELOAD_SAMPLE platform={platform} progress={progress:F2} "
-                    + $"valid={sampleValid} arms={inspection.AuthoredArmsActive} "
+                    $"SIDEARM_RELOAD_SAMPLE platform={platform} "
+                    + $"stage={sample.Stage} progress={sample.Progress:F2} "
+                    + $"valid={sampleValid} arms={inspection.AnimatedRootActive} "
                     + $"reloading={inspection.Reloading} actual_progress={inspection.Progress:F4} "
-                    + $"grip_residual={inspection.RightGripResidual:F6} "
-                    + $"support_distance={inspection.SupportTargetDistance:F6} "
+                    + $"grip_residual={gripResidual:F6} "
+                    + $"support_distance={supportDistance:F6} "
                     + $"arm_motion={armMotion:F6} view_motion={targetMotion:F6} "
                     + $"primary_mag={inspection.PrimaryMagazineVisible} "
                     + $"spare_mag={inspection.SpareMagazineVisible} "
-                    + $"slide_travel={inspection.SlideTravel:F6}");
-                if (Mathf.Abs(progress - 0.64f) <= 0.001f)
+                    + $"slide_travel={actionTravel:F6} "
+                    + $"extract_screen={sampleExtractionReadable} "
+                    + $"insert_screen={sampleInsertionReadable} "
+                    + $"action_screen={sampleActionReadable} "
+                    + $"palm_y={inspection.ScreenContact.LeftPalmYRatio:F3} "
+                    + $"mag_grip_y={inspection.ScreenContact.SpareMagazineGripYRatio:F3} "
+                    + $"action_grip_y={inspection.ScreenContact.ActionGripYRatio:F3} "
+                    + $"body_r={ReloadArmChainSummary(
+                        inspection.BodyContinuity.RightArm,
+                        inspection.BodyContinuity.ScreenSize)} "
+                    + $"body_l={ReloadArmChainSummary(
+                        inspection.BodyContinuity.LeftArm,
+                        inspection.BodyContinuity.ScreenSize)}");
+                if (sample.Stage == "insert")
                 {
                     SaveViewportImage(
                         $"res://sidearm_reload_{platform.ToString().ToLowerInvariant()}_validation.png");
+                }
+                else if (sample.Stage == "action")
+                {
+                    SaveViewportImage(
+                        $"res://sidearm_reload_{platform.ToString().ToLowerInvariant()}_empty_action_validation.png");
                 }
             }
 
@@ -136,7 +207,7 @@ public partial class FreightTerminalWorld
                 && !_player.IsReloading
                 && _player.Ammo == magazineSize
                 && _player.ReserveAmmo == reserveBefore - magazineSize;
-            var platformValid = idle.AuthoredArmsActive
+            var platformValid = idleHand.Valid
                 && inputStarted
                 && poseSet
                 && armsActive
@@ -145,6 +216,11 @@ public partial class FreightTerminalWorld
                 && visibleMotion
                 && viewMotion
                 && mechanismStages
+                && samplesValid
+                && bodyContinuous
+                && extractionReadable
+                && insertionReadable
+                && actionReadable
                 && ammoCompleted;
             valid &= platformValid;
             results.Add(
@@ -152,6 +228,10 @@ public partial class FreightTerminalWorld
                 + $"pose_set={poseSet} arms={armsActive} primary_grip={primaryGripFixed} "
                 + $"support_tracks={supportTracks} visible_motion={visibleMotion} "
                 + $"view_motion={viewMotion} mechanism_stages={mechanismStages} "
+                + $"samples={samplesValid} body_continuous={bodyContinuous} "
+                + $"extract_screen={extractionReadable} "
+                + $"insert_screen={insertionReadable} "
+                + $"action_screen={actionReadable} "
                 + $"ammo_completed={ammoCompleted} ammo={_player.Ammo} "
                 + $"reserve={_player.ReserveAmmo} max_grip_residual={maximumGripResidual:F6} "
                 + $"max_support_distance={maximumSupportDistance:F6} "
@@ -183,9 +263,4 @@ public partial class FreightTerminalWorld
         return false;
     }
 
-    private static float SidearmReloadTransformDelta(Transform3D idle, Transform3D current)
-        => idle.Origin.DistanceTo(current.Origin)
-            + idle.Basis.X.DistanceTo(current.Basis.X)
-            + idle.Basis.Y.DistanceTo(current.Basis.Y)
-            + idle.Basis.Z.DistanceTo(current.Basis.Z);
 }

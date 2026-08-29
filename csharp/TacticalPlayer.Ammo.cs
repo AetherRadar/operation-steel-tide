@@ -182,7 +182,21 @@ public partial class TacticalPlayer
         ResetReloadRig();
     }
 
-    internal bool SetReloadPoseForDiagnostics(float progress)
+    private void UpdateReloadTimer(float delta)
+    {
+        if (!_isReloading)
+        {
+            return;
+        }
+
+        _reloadTime -= delta;
+        if (_reloadTime <= 0.0f)
+        {
+            FinishReload();
+        }
+    }
+
+    internal bool SetReloadPoseForDiagnostics(float progress, bool emptyReload = false)
     {
         if (EquippedWeapon.Platform != WeaponPlatform.M3A1
             && !UsesPlatformReloadPresentation()
@@ -190,9 +204,37 @@ public partial class TacticalPlayer
         {
             return false;
         }
-        _isReloading = true;
+        var normalizedProgress = Mathf.Clamp(progress, 0.0f, 1.0f);
+        _reloadStartedEmpty = emptyReload;
+        _isReloading = false;
+        _isAiming = false;
         _activeReloadDuration = ReloadDuration * RoleReloadMultiplier;
-        _reloadTime = _activeReloadDuration * (1.0f - Mathf.Clamp(progress, 0.0f, 1.0f));
+        _reloadTime = _activeReloadDuration;
+        _weaponRoot.Position = WeaponViewPositionTarget();
+        _weaponRoot.Rotation = WeaponViewRotationTarget();
+        _isReloading = true;
+
+        // The auditors disable player processing to keep every mechanism
+        // sample deterministic. Recreate the complete runtime viewmodel path
+        // with the same response function instead of snapping to a target that
+        // moving gameplay would only approach. Fixed 60 Hz steps match the
+        // physics presentation loop and preserve its staging lag on the way
+        // into and back out of the reload workspace.
+        const float simulationStep = 1.0f / 60.0f;
+        var handling = EquippedWeapon.Stats().Handling;
+        UpdateWeaponViewPose(simulationStep, handling);
+        var lastVisibleProgress = LastVisibleReloadProgressForDiagnostics;
+        var viewProgress = Mathf.Min(normalizedProgress, lastVisibleProgress);
+        var targetElapsed = _activeReloadDuration * viewProgress;
+        var elapsed = 0.0f;
+        while (elapsed < targetElapsed)
+        {
+            var step = Mathf.Min(simulationStep, targetElapsed - elapsed);
+            elapsed += step;
+            _reloadTime = _activeReloadDuration - elapsed;
+            UpdateWeaponViewPose(step, handling);
+        }
+        _reloadTime = _activeReloadDuration * (1.0f - normalizedProgress);
         UpdateReloadAnimation();
         SyncAuthoredPrimaryWeapon();
         UpdateAuthoredM4ReloadSupportArm();
@@ -203,6 +245,28 @@ public partial class TacticalPlayer
     {
         _isReloading = false;
         _reloadTime = 0.0f;
+        _activeReloadDuration = 0.0f;
         ResetReloadRig();
+        UpdateWeaponViewPose(1.0f / 60.0f, EquippedWeapon.Stats().Handling);
+        ApplyProceduralHandPose();
+        SyncAuthoredPrimaryWeapon();
+        UpdateAuthoredM4ReloadSupportArm();
+    }
+
+    internal float LastVisibleReloadProgressForDiagnostics
+    {
+        get
+        {
+            const float simulationStep = 1.0f / 60.0f;
+            var duration = ReloadDuration * RoleReloadMultiplier;
+            var remaining = duration;
+            while (remaining - simulationStep > 0.0f)
+            {
+                remaining -= simulationStep;
+            }
+            return duration > 0.0f
+                ? Mathf.Clamp(1.0f - remaining / duration, 0.0f, 1.0f)
+                : 0.0f;
+        }
     }
 }

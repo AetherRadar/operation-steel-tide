@@ -82,18 +82,18 @@ internal static class FirstPersonArmPoseCatalog
 
     private static readonly FirstPersonArmPoseDefinition ScarRifle = new(
         FirstPersonArmPoseKind.Rifle,
-        new Vector3(0.0f, -0.09949f, -0.06684f),
-        new Vector3(0.0f, -0.01173f, -0.49201f));
+        new Vector3(-0.008427f, -0.162496f, -0.155166f),
+        new Vector3(-0.009328f, 0.102748f, -0.641900f));
 
     private static readonly FirstPersonArmPoseDefinition M24LongRifle = new(
         FirstPersonArmPoseKind.LongRifle,
         new Vector3(-0.00537f, -0.09765f, 0.04146f),
-        new Vector3(-0.02067f, 0.07128f, -0.71731f));
+        new Vector3(-0.02067f, 0.055f, -0.56f));
 
     private static readonly FirstPersonArmPoseDefinition AxmcLongRifle = new(
         FirstPersonArmPoseKind.LongRifle,
         new Vector3(-0.00473f, -0.10981f, -0.00562f),
-        new Vector3(-0.02440f, 0.03824f, -0.72f));
+        new Vector3(-0.02440f, 0.03824f, -0.60f));
 
     private static readonly FirstPersonArmPoseDefinition VssRifle = new(
         FirstPersonArmPoseKind.Rifle,
@@ -103,7 +103,7 @@ internal static class FirstPersonArmPoseCatalog
     private static readonly FirstPersonArmPoseDefinition AwmLongRifle = new(
         FirstPersonArmPoseKind.LongRifle,
         new Vector3(0.0f, -0.06961f, -0.06117f),
-        new Vector3(-0.05723f, 0.01712f, -0.92248f));
+        new Vector3(-0.00981f, 0.13367f, -0.65377f));
 
     public static FirstPersonArmPoseDefinition For(WeaponPlatform platform)
         => platform switch

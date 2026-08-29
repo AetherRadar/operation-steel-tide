@@ -15,11 +15,13 @@ namespace OperationSteelTide;
 internal sealed class AuthoredWeaponVisual
 {
     private readonly MechanismTransforms _authoredMechanismRest;
-    private MechanismTransforms? _sourceMechanismRest;
+    private readonly MechanismTransforms _sourceMechanismRest;
     private readonly Node3D? _legacyRearIronSightPrimary;
     private readonly Node3D? _legacyRearIronSightSecondary;
     private AuthoredOpticsVisual? _worldExternalOptics;
     private bool _expectsWorldExternalOptics;
+    private readonly Vector3? _magazineGripInMagazine;
+    private readonly Vector3? _actionGripInAction;
 
     public AuthoredWeaponVisual(Node3D root, WeaponPlatform platform)
     {
@@ -48,10 +50,50 @@ internal sealed class AuthoredWeaponVisual
         OpticReticleAnchor = CombatModelLibrary.RequireNode(root, "OpticReticleAnchor");
         OpticRailContact = CombatModelLibrary.FindOptionalNode(root, "OpticRailContact");
         EjectionPort = CombatModelLibrary.FindOptionalNode(root, "EjectionPort");
+        if (CombatModelLibrary.FindOptionalNode(Magazine, "MagazineGripSocket")
+            is { } magazineGripSocket)
+        {
+            _magazineGripInMagazine = CombatModelLibrary.TransformBelowAncestor(
+                magazineGripSocket,
+                Magazine).Origin;
+        }
+        else
+        {
+            var magazineBounds = CombatModelLibrary.ComputeLocalBounds(Magazine);
+            if (magazineBounds.MeshCount > 0)
+            {
+                // Legacy authored weapons predate explicit reload sockets. Put
+                // the palm on the magazine's left wall instead of silently
+                // falling back to a hand target unrelated to the moving part.
+                _magazineGripInMagazine = magazineBounds.Center
+                    + Vector3.Left * magazineBounds.Size.X * 0.5f;
+            }
+        }
+        if (CombatModelLibrary.FindOptionalNode(ChargingHandle, "ChargingHandleSocket")
+            is { } actionGripSocket)
+        {
+            _actionGripInAction = CombatModelLibrary.TransformBelowAncestor(
+                actionGripSocket,
+                ChargingHandle).Origin;
+        }
+        else
+        {
+            var actionBounds = CombatModelLibrary.ComputeLocalBounds(ChargingHandle);
+            if (actionBounds.MeshCount > 0)
+            {
+                // Approach the rear-left face so empty reloads visibly rack the
+                // real slide/bolt rather than moving the mechanism under a
+                // stationary support hand.
+                _actionGripInAction = actionBounds.Center
+                    + Vector3.Left * actionBounds.Size.X * 0.5f
+                    + Vector3.Back * actionBounds.Size.Z * 0.25f;
+            }
+        }
         _authoredMechanismRest = CaptureMechanismTransforms(
             Magazine,
             SpareMagazine,
             ChargingHandle);
+        _sourceMechanismRest = CanonicalSourceMechanismRest(platform);
     }
 
     public Node3D Root { get; }
@@ -104,6 +146,38 @@ internal sealed class AuthoredWeaponVisual
         _worldExternalOptics = optics;
     }
 
+    public bool TryMagazineGripGlobalPosition(bool spare, out Vector3 position)
+    {
+        var explicitGrip = spare ? SpareMagazineGrip : MagazineGrip;
+        if (GodotObject.IsInstanceValid(explicitGrip))
+        {
+            position = explicitGrip!.GlobalPosition;
+            return true;
+        }
+
+        if (_magazineGripInMagazine is not { } localContact)
+        {
+            position = default;
+            return false;
+        }
+
+        position = (spare ? SpareMagazine : Magazine).GlobalTransform
+            * localContact;
+        return true;
+    }
+
+    public bool TryActionGripGlobalPosition(out Vector3 position)
+    {
+        if (_actionGripInAction is not { } localContact)
+        {
+            position = default;
+            return false;
+        }
+
+        position = ChargingHandle.GlobalTransform * localContact;
+        return true;
+    }
+
     public void Configure(WeaponBuild build)
     {
         var suppressed = build.Attachments.TryGetValue(AttachmentSlot.Muzzle, out var muzzleId)
@@ -154,25 +228,24 @@ internal sealed class AuthoredWeaponVisual
             magazine,
             spareMagazine,
             chargingHandle);
-        if (_sourceMechanismRest is not { } sourceRest)
-        {
-            _sourceMechanismRest = sourceTransforms;
-            CopyMechanismVisibility(magazine, spareMagazine, chargingHandle);
-            return;
-        }
 
         // Transfer only the procedural root-space delta onto each DCC-authored rest pose.
         Magazine.Transform = ApplyRootSpaceDelta(
             sourceTransforms.Magazine,
-            sourceRest.Magazine,
+            _sourceMechanismRest.Magazine,
             _authoredMechanismRest.Magazine);
+        // The staged magazine starts at a pouch pose but finishes in the same
+        // physical magwell as the removed primary. Map its complete motion from
+        // the primary source/authored rest frames so SeatEnd is guaranteed to
+        // produce the exact installed DCC transform instead of preserving the
+        // staged root's unrelated authored rotation.
         SpareMagazine.Transform = ApplyRootSpaceDelta(
             sourceTransforms.SpareMagazine,
-            sourceRest.SpareMagazine,
-            _authoredMechanismRest.SpareMagazine);
+            _sourceMechanismRest.Magazine,
+            _authoredMechanismRest.Magazine);
         ChargingHandle.Transform = ApplyRootSpaceDelta(
             sourceTransforms.ChargingHandle,
-            sourceRest.ChargingHandle,
+            _sourceMechanismRest.ChargingHandle,
             _authoredMechanismRest.ChargingHandle);
         CopyMechanismVisibility(magazine, spareMagazine, chargingHandle);
     }
@@ -204,6 +277,20 @@ internal sealed class AuthoredWeaponVisual
             magazine.Transform,
             spareMagazine.Transform,
             chargingHandle.Transform);
+
+    private static MechanismTransforms CanonicalSourceMechanismRest(
+        WeaponPlatform platform)
+    {
+        var profile = FirstPersonReloadProfileCatalog.For(platform);
+        return new MechanismTransforms(
+            new Transform3D(
+                Basis.FromEuler(profile.MagazineRotation),
+                profile.MagazineHome),
+            new Transform3D(
+                Basis.FromEuler(profile.StowedRotation),
+                profile.SpareMagazineHome),
+            new Transform3D(Basis.Identity, profile.ActionHome));
+    }
 
     private static Transform3D ApplyRootSpaceDelta(
         Transform3D sourceTransform,
@@ -685,7 +772,8 @@ internal static partial class CombatModelLibrary
     private const string QuaterniusWeaponRoot = "res://assets/models/quaternius_ultimate_guns";
     internal const string OperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier_animated.glb";
     internal const string PreviewOperatorScenePath = "res://assets/models/bamen_military_soldier/bamen_military_soldier.glb";
-    internal const string Gsh18ScenePath = "res://assets/models/tastytony_gsh18/gsh18_runtime.glb";
+    internal const string Gsh18ScenePath =
+        "res://assets/models/steel_tide_reloadable_weapons/gsh18_reloadable.glb";
     internal const string DesertEagleScenePath = "res://assets/models/elizion_desert_eagle/desert_eagle.glb";
     internal const string Ak47FirstPersonScenePath =
         "res://assets/models/steel_tide_ak74/ak47_reloadable_fp.glb";
@@ -742,7 +830,9 @@ internal static partial class CombatModelLibrary
 
     private static readonly string[] Gsh18Nodes =
     {
-        "TastyTonyGsh18Runtime"
+        "SteelTideReloadableGSh18", "Magazine", "SpareMagazine",
+        "ChargingHandle", "PrimaryGripSocket", "MagazineGripSocket",
+        "ChargingHandleSocket"
     };
 
     private static readonly string[] DesertEagleNodes =
@@ -876,7 +966,9 @@ internal static partial class CombatModelLibrary
             ConfigureVssIntegratedScopeGlass(source);
         }
 
-        var sourceBounds = ComputeBounds(source);
+        var sourceBounds = FindOptionalNode(source, "WeaponBodyGeometry") is { } weaponBody
+            ? ComputeBounds(weaponBody)
+            : ComputeBounds(source);
         if (sourceBounds.MeshCount == 0 || sourceBounds.Size.X <= 0.001f)
         {
             source.Free();
@@ -884,19 +976,33 @@ internal static partial class CombatModelLibrary
         }
 
         var targetLength = WeaponPresentationLength(platform, firstPerson);
+        var usesRuntimeCoordinateContract = platform is WeaponPlatform.ScarL
+            or WeaponPlatform.MP5A5
+            or WeaponPlatform.M24
+            or WeaponPlatform.AXMC
+            or WeaponPlatform.AWM
+            or WeaponPlatform.VSS
+            or WeaponPlatform.P226
+            or WeaponPlatform.M1911
+            or WeaponPlatform.GSh18;
         var root = new Node3D { Name = $"Authored{platform}Visual" };
         var presentation = new Node3D
         {
             Name = $"{platform}Presentation",
-            Position = new Vector3(0.0f, 0.0f, 0.32f - targetLength * 0.5f),
+            Position = usesRuntimeCoordinateContract
+                ? Vector3.Zero
+                : new Vector3(0.0f, 0.0f, 0.32f - targetLength * 0.5f),
             RotationDegrees = platform is WeaponPlatform.GSh18 or WeaponPlatform.DesertEagle
+                    || usesRuntimeCoordinateContract
                 ? Vector3.Zero
                 : new Vector3(0.0f, 90.0f, 0.0f),
             Scale = platform is WeaponPlatform.GSh18 or WeaponPlatform.DesertEagle
+                    || usesRuntimeCoordinateContract
                 ? Vector3.One
                 : Vector3.One * (targetLength / sourceBounds.Size.X)
         };
-        if (platform is not WeaponPlatform.GSh18 and not WeaponPlatform.DesertEagle)
+        if (platform is not WeaponPlatform.GSh18 and not WeaponPlatform.DesertEagle
+            && !usesRuntimeCoordinateContract)
         {
             source.Position = -sourceBounds.Center;
         }
@@ -906,11 +1012,14 @@ internal static partial class CombatModelLibrary
             root,
             source,
             platform);
+        var authoredAction = AttachReloadableAction(root, source, platform);
         var opticMount = AddWeaponMarkers(
             root,
             targetLength,
             authoredMagazine,
-            authoredSpareMagazine);
+            authoredSpareMagazine,
+            authoredAction,
+            source);
         if (platform == WeaponPlatform.VSS)
         {
             var aperture = InspectVssIntegratedScope(root);
@@ -945,14 +1054,70 @@ internal static partial class CombatModelLibrary
         Node3D source,
         WeaponPlatform platform)
     {
-        if (platform != WeaponPlatform.AK74)
+        var authoredMagazine = FindOptionalNode(source, "Magazine");
+        var authoredSpareMagazine = FindOptionalNode(source, "SpareMagazine");
+        if (authoredMagazine is not null
+            && authoredSpareMagazine is not null
+            && MeshesBelow(authoredMagazine).Any()
+            && MeshesBelow(authoredSpareMagazine).Any())
+        {
+            var magazineInWeaponRoot = TransformBelowAncestor(authoredMagazine, root);
+            var spareInWeaponRoot = TransformBelowAncestor(authoredSpareMagazine, root);
+            authoredMagazine.Owner = null;
+            authoredMagazine.Reparent(root, keepGlobalTransform: false);
+            authoredMagazine.Transform = magazineInWeaponRoot;
+            authoredSpareMagazine.Owner = null;
+            authoredSpareMagazine.Reparent(root, keepGlobalTransform: false);
+            authoredSpareMagazine.Transform = spareInWeaponRoot;
+            authoredSpareMagazine.Visible = false;
+            return (authoredMagazine, authoredSpareMagazine);
+        }
+
+        var detachablePartNames = platform switch
+        {
+            WeaponPlatform.GSh18 => new[] { "GSh18_05" },
+            WeaponPlatform.DesertEagle => new[]
+            {
+                "Magazine_low", "MagazineBase_low", "BaseInside_low"
+            },
+            _ => Array.Empty<string>()
+        };
+        if (detachablePartNames.Length > 0)
+        {
+            var detachableParts = detachablePartNames
+                .Select(name => FindOptionalNode(source, name))
+                .ToArray();
+            if (detachableParts.Any(part => part is null))
+            {
+                throw new InvalidOperationException(
+                    $"Reloadable {platform} asset is missing a magazine component.");
+            }
+
+            var assembledMagazine = new Node3D { Name = "Magazine" };
+            root.AddChild(assembledMagazine);
+            foreach (var part in detachableParts)
+            {
+                var geometry = part!;
+                var partInWeaponRoot = TransformBelowAncestor(geometry, root);
+                geometry.Owner = null;
+                geometry.Reparent(assembledMagazine, keepGlobalTransform: false);
+                geometry.Transform = partInWeaponRoot;
+            }
+
+            var assembledSpareMagazine = (Node3D)assembledMagazine.Duplicate();
+            assembledSpareMagazine.Name = "SpareMagazine";
+            assembledSpareMagazine.Position = new Vector3(-0.30f, -0.42f, 0.13f);
+            assembledSpareMagazine.Visible = false;
+            root.AddChild(assembledSpareMagazine);
+            return (assembledMagazine, assembledSpareMagazine);
+        }
+
+        var magazineGeometry = FindOptionalNode(source, "MagazineGeometry");
+        if (magazineGeometry is null)
         {
             return (null, null);
         }
 
-        var magazineGeometry = FindOptionalNode(source, "MagazineGeometry")
-            ?? throw new InvalidOperationException(
-                "Reloadable AK asset is missing MagazineGeometry.");
         var geometryInWeaponRoot = TransformBelowAncestor(
             magazineGeometry,
             root);
@@ -981,7 +1146,7 @@ internal static partial class CombatModelLibrary
         return (magazine, spareMagazine);
     }
 
-    private static Transform3D TransformBelowAncestor(
+    internal static Transform3D TransformBelowAncestor(
         Node3D node,
         Node3D ancestor)
     {
@@ -995,11 +1160,35 @@ internal static partial class CombatModelLibrary
         return transform;
     }
 
+    private static Node3D? AttachReloadableAction(
+        Node3D root,
+        Node3D source,
+        WeaponPlatform platform)
+    {
+        var action = FindOptionalNode(source, "ChargingHandle")
+            ?? (platform == WeaponPlatform.DesertEagle
+                ? FindOptionalNode(source, "Group001")
+                : null);
+        if (action is null || !MeshesBelow(action).Any(mesh => mesh.Mesh is not null))
+        {
+            return null;
+        }
+
+        var actionInWeaponRoot = TransformBelowAncestor(action, root);
+        action.Owner = null;
+        action.Reparent(root, keepGlobalTransform: false);
+        action.Transform = actionInWeaponRoot;
+        action.Name = "ChargingHandle";
+        return action;
+    }
+
     private static Node3D AddWeaponMarkers(
         Node3D root,
         float length,
         Node3D? authoredMagazine = null,
-        Node3D? authoredSpareMagazine = null)
+        Node3D? authoredSpareMagazine = null,
+        Node3D? authoredAction = null,
+        Node3D? source = null)
     {
         // Match TacticalPlayer's mechanism rest frame. Keeping adapted weapons
         // 0.13 m forward of that source frame made the visible support hand miss
@@ -1008,22 +1197,59 @@ internal static partial class CombatModelLibrary
             ?? AddMarker(root, "Magazine", new Vector3(0.0f, -0.2f, -0.31f));
         _ = authoredSpareMagazine
             ?? AddMarker(root, "SpareMagazine", new Vector3(-0.3f, -0.62f, -0.18f));
-        AddMarker(root, "ChargingHandle", new Vector3(0.075f, 0.085f, -0.05f));
+        _ = authoredAction
+            ?? AddMarker(
+                root,
+                "ChargingHandle",
+                SocketPositionOr(
+                    source,
+                    root,
+                    "ChargingHandleSocket",
+                    new Vector3(0.075f, 0.085f, -0.05f)));
         AddMarker(root, "Stock", new Vector3(0.0f, 0.0f, 0.28f));
-        AddMarker(root, "Foregrip", new Vector3(0.0f, -0.16f, 0.18f - length * 0.55f));
+        AddMarker(
+            root,
+            "Foregrip",
+            SocketPositionOr(
+                source,
+                root,
+                "SupportGripSocket",
+                new Vector3(0.0f, -0.16f, 0.18f - length * 0.55f)));
         var muzzleDevice = AddMarker(
             root,
             "MuzzleDevice",
-            new Vector3(0.0f, 0.0f, 0.28f - length));
+            SocketPositionOr(
+                source,
+                root,
+                "MuzzleSocket",
+                new Vector3(0.0f, 0.0f, 0.28f - length)));
         AddMarker(muzzleDevice, "MuzzleDeviceTip", Vector3.Zero);
         var suppressor = AddMarker(
             root,
             "Suppressor",
             new Vector3(0.0f, 0.0f, 0.28f - length));
         AddMarker(suppressor, "SuppressorTip", Vector3.Zero);
-        var opticMount = AddMarker(root, "OpticMount", new Vector3(0.0f, 0.16f, -0.16f));
+        var opticRailContactPosition = SocketPositionOr(
+            source,
+            root,
+            "OpticRailSocket",
+            new Vector3(0.0f, 0.16f, -0.16f));
+        var opticMount = AddMarker(root, "OpticMount", opticRailContactPosition);
+        AddMarker(root, "OpticRailContact", opticRailContactPosition);
         AddMarker(opticMount, "OpticReticleAnchor", Vector3.Zero);
         return opticMount;
+    }
+
+    private static Vector3 SocketPositionOr(
+        Node3D? source,
+        Node3D root,
+        string socketName,
+        Vector3 fallback)
+    {
+        var socket = source is null ? null : FindOptionalNode(source, socketName);
+        return socket is null
+            ? fallback
+            : TransformBelowAncestor(socket, root).Origin;
     }
 
     private static Node3D AddMarker(Node3D root, string name, Vector3 position)
@@ -1121,9 +1347,10 @@ internal static partial class CombatModelLibrary
     public static AuthoredGsh18Visual InstantiateGsh18(bool firstPerson)
     {
         var source = InstantiateRequired(Gsh18ScenePath, Gsh18Nodes);
-        RemoveStagingNode(source, "Lamp");
-        RemoveStagingNode(source, "Camera");
-        var sourceBounds = ComputeBounds(source);
+        var weaponBody = FindOptionalNode(source, "WeaponBodyGeometry");
+        var sourceBounds = weaponBody is not null
+            ? ComputeBounds(weaponBody)
+            : ComputeBounds(source);
         if (sourceBounds.MeshCount == 0
             || sourceBounds.Size.X <= 0.001f
             || sourceBounds.Size.Y <= 0.001f
@@ -1133,20 +1360,17 @@ internal static partial class CombatModelLibrary
             throw new InvalidOperationException("GSh-18 model has no usable geometry bounds.");
         }
 
-        source.Position = -sourceBounds.Center;
         var targetLength = firstPerson ? Gsh18FirstPersonLength : Gsh18PreviewLength;
-        // Godot's glTF import contract is source X = barrel length, source Y =
-        // height, source Z = thickness. The presentation yaw maps those to
-        // world Z, Y, and X respectively. Length is the authoritative scale;
-        // preserving the authored aspect ratio keeps the slide and grip from
-        // becoming a distorted pillar.
-        var scale = targetLength / sourceBounds.Size.X;
+        // The reloadable DCC asset already uses the shared metre-space weapon
+        // contract: X is lateral, Y is up, and the muzzle points toward -Z.
+        // Keep its authored first-person origin and only enlarge world previews.
+        var scale = targetLength / sourceBounds.Size.Z;
         var wrapper = new Node3D
         {
             Name = "AuthoredGsh18Visual",
-            RotationDegrees = new Vector3(0.0f, 90.0f, 0.0f),
             Scale = Vector3.One * scale
         };
+        RequireNode(source, "SpareMagazine").Visible = false;
         wrapper.AddChild(source);
         if (firstPerson)
         {
@@ -1279,15 +1503,23 @@ internal static partial class CombatModelLibrary
             WeaponPlatform.GSh18 => Gsh18ScenePath,
             WeaponPlatform.DesertEagle => DesertEagleScenePath,
             WeaponPlatform.AK74 => Ak47WorldScenePath,
-            WeaponPlatform.ScarL => $"{QuaterniusWeaponRoot}/scarl.glb",
-            WeaponPlatform.M24 => $"{QuaterniusWeaponRoot}/m24.glb",
-            WeaponPlatform.MP5A5 => $"{QuaterniusWeaponRoot}/mp5a5.glb",
+            WeaponPlatform.ScarL =>
+                "res://assets/models/steel_tide_scarl/scarl_reloadable.glb",
+            WeaponPlatform.M24 =>
+                "res://assets/models/steel_tide_reloadable_weapons/m24_reloadable.glb",
+            WeaponPlatform.MP5A5 =>
+                "res://assets/models/steel_tide_reloadable_weapons/mp5a5_reloadable.glb",
             WeaponPlatform.M3A1 => Smg45WeaponScenePath,
-            WeaponPlatform.AXMC => $"{QuaterniusWeaponRoot}/axmc.glb",
-            WeaponPlatform.AWM => $"{QuaterniusWeaponRoot}/awm.glb",
-            WeaponPlatform.VSS => $"{QuaterniusWeaponRoot}/vss.glb",
-            WeaponPlatform.P226 => $"{QuaterniusWeaponRoot}/p226.glb",
-            WeaponPlatform.M1911 => $"{QuaterniusWeaponRoot}/m1911.glb",
+            WeaponPlatform.AXMC =>
+                "res://assets/models/steel_tide_reloadable_weapons/axmc_reloadable.glb",
+            WeaponPlatform.AWM =>
+                "res://assets/models/steel_tide_reloadable_weapons/awm_reloadable.glb",
+            WeaponPlatform.VSS =>
+                "res://assets/models/steel_tide_reloadable_weapons/vss_reloadable.glb",
+            WeaponPlatform.P226 =>
+                "res://assets/models/steel_tide_reloadable_weapons/p226_reloadable.glb",
+            WeaponPlatform.M1911 =>
+                "res://assets/models/steel_tide_reloadable_weapons/m1911_reloadable.glb",
             _ => WeaponScenePath
         };
 
@@ -1392,14 +1624,19 @@ internal static partial class CombatModelLibrary
         try
         {
             root = InstantiateGsh18(firstPerson: false).Root;
-            var bounds = ComputeBounds(root);
+            var allBounds = ComputeBounds(root);
+            var body = FindOptionalNode(root, "WeaponBodyGeometry");
+            var bodyBounds = body is not null
+                ? ComputeBounds(body)
+                : allBounds;
+            var size = bodyBounds.Size * root.Scale.Abs();
             var geometry = CountGeometry(MeshesBelow(root));
             return new CombatModelInspection(
                 true,
                 true,
-                bounds.MeshCount,
+                allBounds.MeshCount,
                 CountMaterials(root),
-                bounds.Size,
+                size,
                 geometry.VertexCount,
                 geometry.TriangleCount,
                 CountTexturedMaterials(root));
@@ -1648,12 +1885,28 @@ internal static partial class CombatModelLibrary
                 || baseMaterial.MetallicTexture is not null
                 || baseMaterial.RoughnessTexture is not null);
 
-    private static (int MeshCount, Vector3 Size, Vector3 Center) ComputeBounds(Node3D root)
+    internal static (int MeshCount, Vector3 Size, Vector3 Center) ComputeBounds(Node3D root)
+    {
+        return ComputeBounds(root, Transform3D.Identity);
+    }
+
+    internal static (int MeshCount, Vector3 Size, Vector3 Center) ComputeLocalBounds(
+        Node3D root)
+    {
+        // AccumulateBounds normally includes root.Transform and therefore
+        // reports bounds in the root's parent frame. Seed it with the inverse
+        // so fallback reload contacts are stored in the moving node's own frame.
+        return ComputeBounds(root, root.Transform.AffineInverse());
+    }
+
+    private static (int MeshCount, Vector3 Size, Vector3 Center) ComputeBounds(
+        Node3D root,
+        Transform3D initialTransform)
     {
         var minimum = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
         var maximum = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
         var meshCount = 0;
-        AccumulateBounds(root, Transform3D.Identity, ref minimum, ref maximum, ref meshCount);
+        AccumulateBounds(root, initialTransform, ref minimum, ref maximum, ref meshCount);
         return meshCount == 0
             ? (0, Vector3.Zero, Vector3.Zero)
             : (meshCount, maximum - minimum, (minimum + maximum) * 0.5f);

@@ -14,11 +14,16 @@ The runtime models in this directory are adapted from **fps animated smg** by
   `61F30D8980CE292869F97D98587A2736BAF719A19C0A32756838BD9EF2ADA83A`
 - Runtime adaptations: `smg45_first_person.glb`, `first_person_arms.glb`,
   `smg45_weapon.glb`, `smg45_rifle_arms.glb`,
-  `smg45_pistol_service_arms.glb`, and `smg45_pistol_large_arms.glb` (with
-  their generated `*_Image_*.png` texture sidecars)
-- Build scripts: `scripts/blender/build_djmaesen_smg45.py` and
-  `scripts/blender/build_first_person_arms.py`
+  `smg45_pistol_service_arms.glb`, `smg45_pistol_large_arms.glb`, and
+  `animated_reload_arms.glb` (with their generated `*_Image_*.png` texture
+  sidecars)
+- Build scripts: `scripts/blender/build_djmaesen_smg45.py`,
+  `scripts/blender/build_first_person_arms.py`, and
+  `scripts/blender/build_animated_reload_arms.py`
+- Animated arms reproducible DCC source:
+  `source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend`
 - Static pose variants generated: 2026-08-24
+- Animated reload-arm derivative generated: 2026-08-29
 - Animated first-person sleeve fit and upper-arm volume revised: 2026-08-28
 - Service-pistol support-arm pose revised in Blender: 2026-08-28
 - First-person weapon uniformly enlarged around the authored two-hand grip center: 2026-08-28
@@ -50,5 +55,13 @@ service-pistol variant offsets the authored shoulder and bakes a new wrist IK
 target and elbow pole so P226, M1911, and GSh-18 use a bent support arm without
 pulling the complete limb toward the camera. This revision changes only the
 evaluated skeletal pose and marker placement; it does not add source geometry.
+`animated_reload_arms.glb` is an arms-only skinned derivative that removes the
+visible SMG while retaining the authored glove/sleeve materials, finger bones,
+skin weights, and 13,700-triangle topology. The authored frame-155 two-hand
+surface is baked as the new bind pose, and 24 named tactical/empty reload clips
+cover M4A1, AK74, SCAR-L, MP5A5, M24, AXMC, AWM, VSS, P226, M1911, GSh-18, and
+Desert Eagle. Its palm markers use evaluated glove contact centers, while
+`RightGripFrame` preserves the source SMG's real primary-grip transform. No
+procedural replacement geometry is introduced.
 The original model and all derived geometry remain copyright DJMaesen and are not
 covered by the repository's MIT license.

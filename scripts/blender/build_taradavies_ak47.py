@@ -94,7 +94,11 @@ SPARE_MAGAZINE_PIVOT = Vector((-0.30, 0.18, -0.62))
 # rock-in pivot while giving the first-person rig explicit DCC-authored grips.
 # Blender +Y/+Z export to Godot -Z/+Y respectively.
 MAGAZINE_GRIP = Vector((-0.0055, 0.0148, -0.1244))
-SPARE_MAGAZINE_GRIP = Vector((-0.0440, 0.0068, 0.0559))
+# Both magazine nodes share the same authored geometry in their local frame,
+# so their palm contact must also be identical. A pouch-space coordinate here
+# makes the hand miss the spare magazine and leaves the contact misaligned
+# after that magazine is seated in the rifle.
+SPARE_MAGAZINE_GRIP = MAGAZINE_GRIP.copy()
 CHARGING_HANDLE_PIVOT = Vector((0.0370, 0.5307, 0.0437))
 MUZZLE_TIP = Vector((0.0, 1.260, 0.015))
 SUPPRESSOR_TIP = Vector((0.0, 1.395, 0.015))
@@ -192,6 +196,15 @@ def validate_blender_runtime_hierarchy(stage: str) -> None:
         },
         stage,
     )
+    grip_delta = (
+        bpy.data.objects["MagazineGrip"].location
+        - bpy.data.objects["SpareMagazineGrip"].location
+    ).length
+    if grip_delta > 0.000001:
+        raise RuntimeError(
+            "AK magazine palm contacts differ in their shared local geometry "
+            f"frame at {stage}: delta={grip_delta:.9f}"
+        )
 
 
 def require_source() -> None:
@@ -813,6 +826,24 @@ def validate_export(path: Path, level: int) -> tuple[int, int, int, int]:
     nodes = document.get("nodes", [])
     node_names = [node.get("name", "") for node in nodes]
     require_exact_node_names(node_names, f"exported {path.name}")
+    primary_grip_translation = Vector(
+        nodes[node_names.index("MagazineGrip")].get(
+            "translation",
+            (0.0, 0.0, 0.0),
+        )
+    )
+    spare_grip_translation = Vector(
+        nodes[node_names.index("SpareMagazineGrip")].get(
+            "translation",
+            (0.0, 0.0, 0.0),
+        )
+    )
+    grip_delta = (primary_grip_translation - spare_grip_translation).length
+    if grip_delta > 0.000001:
+        raise RuntimeError(
+            f"Exported {path.name} separates identical magazine palm contacts: "
+            f"delta={grip_delta:.9f}"
+        )
     actual_parents = {name: None for name in node_names}
     for parent_index, node in enumerate(nodes):
         parent_name = node_names[parent_index]

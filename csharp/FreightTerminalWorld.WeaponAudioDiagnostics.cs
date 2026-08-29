@@ -26,6 +26,7 @@ public partial class FreightTerminalWorld
         var reports = new List<string>(platforms.Length);
         var smgFired = false;
         var smgPlaying = false;
+        var smgTailPlaying = false;
         foreach (var sample in platforms)
         {
             var platform = sample.Platform;
@@ -54,8 +55,14 @@ public partial class FreightTerminalWorld
             if (platform == WeaponPlatform.M3A1)
             {
                 smgFired = _player.FireForDiagnostics();
-                await WaitFrames(2);
+                // Validate the actual trigger-to-voice handoff immediately.
+                // Two rendered world frames can exceed this short report's
+                // wall-clock duration on a cold, asset-heavy diagnostic run,
+                // which made a successful playback look like a failure after
+                // the stream had already completed normally.
                 smgPlaying = _player.PlayerWeaponAudioPlayingForDiagnostics;
+                await WaitFrames(2);
+                smgTailPlaying = _player.PlayerWeaponAudioPlayingForDiagnostics;
             }
             reports.Add(
                 $"{platform}:{ready}:{volume:0.0}:"
@@ -80,6 +87,7 @@ public partial class FreightTerminalWorld
             + $"near_field_distinct={nearFieldDistinct} "
             + $"headroom={headroomReady} "
             + $"smg_fired={smgFired} smg_playing={smgPlaying} "
+            + $"smg_tail_playing={smgTailPlaying} "
             + $"reports={string.Join(',', reports)}");
         GD.Print($"WEAPON_AUDIO_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);

@@ -62,6 +62,61 @@ texture record, and rail-contact checks are in `steel_tide_ak74/LICENSE.md`,
 `../../source_art/third_party/taradavies_ak47/LICENSE_EVIDENCE.md`, and
 `../../source_art/reloadable_weapons/README.md`.
 
+The mechanism-ready Steel Tide SCAR-L is a Blender adaptation of
+AdamKokrito's **ScarL**, acquired 2026-08-29 from
+`https://poly.pizza/m/ab1V8RlPDc` under CC BY 3.0. The source provides real
+independent magazine, bolt, and charging-handle meshes. The adaptation retains
+those mechanisms, adds an independent spare magazine, a conservative 1.4 mm
+two-segment bevel, weighted normals, differentiated scalar PBR parameters, and
+identity-ready metre sockets derived from the replacement mesh's actual grip,
+handguard, magazine, receiver rail, muzzle, and authored charging-handle origin.
+Distributions must credit AdamKokrito, link the source and CC BY 3.0, and
+disclose the modifications.
+Runtime/editable outputs are `steel_tide_scarl/scarl_reloadable.glb` and
+`../../source_art/reloadable_weapons/scarl_reloadable.blend`; the original
+redistributable GLB is retained at
+`../../source_art/third_party/adamkokrito_scarl/adamkokrito_scarl.glb`. Exact
+attribution, hashes, topology, hierarchy, bounds, and socket coordinates are in
+`steel_tide_scarl/LICENSE.md`.
+
+The mechanism-ready MP5A5 derives from Quaternius's CC0 Ultimate Guns Pack.
+Its complete authored 60-triangle magazine is separated by welded topology,
+duplicated as independent spare geometry, and conserved with the 1,314-triangle
+body. Because the static source welds its control into the receiver, the visible
+120-triangle tubular charging handle is hand-shaped in Blender as a swept
+five-ring hard-surface mesh with weighted normals and scalar metal PBR; it is
+not a runtime primitive or CSG object. Its action-hand socket is derived from
+the real outer terminal ring and verified against the visible triangle surface,
+not left at the mechanism pivot. Runtime/editable outputs are
+`steel_tide_reloadable_weapons/mp5a5_reloadable.glb` and
+`../../source_art/reloadable_weapons/mp5a5_reloadable.blend`. Exact hashes,
+source mapping, topology, hierarchy, bounds, sockets, and CC0/MIT division are
+in `steel_tide_reloadable_weapons/LICENSE.md`.
+
+The M24, AXMC, AWM, VSS, P226, and M1911 mechanism-ready derivatives retain
+every triangle of their tracked Quaternius CC0 sources and add Blender
+mechanisms on 2026-08-29. Custom five-section hard-surface lofts supply the
+visible loading components; M24 uses an internal floorplate/box plus five
+lathed cartridges instead of a fictitious detachable magazine; and the
+precision rifles use swept bolt/charging controls. The service pistols do not
+use proxy action blocks: the builder separates each complete authored source
+slide, including its sight/detail islands, from the fixed frame and cycles the
+436-triangle P226 or 572-triangle M1911 slide as one action. Applied bevels,
+weighted normals, and scalar PBR on project-authored parts are stored in the
+editable `.blend` files, not Godot primitive or CSG construction. Runtime GLBs
+place every long-gun action-hand socket on the real swept-control endpoint and
+enforce endpoint-region plus triangle-surface-distance gates. They also
+retain the shared mechanism-pivot contract while source-grip PCA aligns each
+pistol magazine mesh and hand socket to its authored magwell axis. The GLBs and
+review PNGs are under
+`steel_tide_reloadable_weapons/`, editable sources are under
+`../../source_art/reloadable_weapons/`, and the deterministic builder is
+`../../scripts/blender/build_supplemental_reload_mechanisms.py`. The original
+frames and slides remain CC0; the added loading parts and builder are MIT. Exact
+original and output hashes, pack-file/object mappings, target lengths, per-mesh
+triangle counts, and file paths are in
+`steel_tide_reloadable_weapons/LICENSE.md`.
+
 ## Project-authored first-person field-use props
 
 The trauma kit, dressing packet, injector, curved armor plate, plate carrier,
@@ -952,7 +1007,8 @@ residents; no additional third-party character files are introduced.
 
 The Ultimate Guns Pack is distributed by Quaternius under CC0 1.0 Universal:
 
-- Source: https://poly.pizza/bundle/Ultimate-Guns-Pack-cpgUfI4t2F
+- Official pack page: https://quaternius.com/packs/ultimategun.html
+- Tracked bundle page: https://poly.pizza/bundle/Ultimate-Guns-Pack-cpgUfI4t2F
 - License: CC0 1.0 Universal, https://creativecommons.org/publicdomain/zero/1.0/
 - Acquisition date: 2026-08-20
 - Local assets: `quaternius_ultimate_guns/*.glb`
@@ -966,9 +1022,43 @@ Steel Tide combat-model section above.
 ## DJMaesen CC BY 4.0 first-person arms and SMG
 
 The realistic first-person arms and SMG-45 visuals are adapted from **fps
-animated smg** by **DJMaesen**, licensed under **CC BY 4.0**. Full attribution,
-the original source mapping, and the reproducible Blender build are recorded in
-`djmaesen_smg45/LICENSE.md`.
+animated smg** by **DJMaesen**:
+
+- Creator profile: https://sketchfab.com/bumstrum
+- Official source:
+  https://sketchfab.com/3d-models/fps-animated-smg-ea3dad7478624495a5a46f40127b0579
+- Exact license: Creative Commons Attribution 4.0 International (CC BY 4.0),
+  https://creativecommons.org/licenses/by/4.0/
+- Source acquisition date: 2026-08-21.
+- Animated reload-arm derivative generated and reviewed: 2026-08-29.
+- Required attribution: **"fps animated smg" by DJMaesen, licensed under CC BY
+  4.0.** Indicate that Operation Steel Tide removed the visible SMG, baked the
+  authored frame-155 two-hand pose as the bind pose, and added platform-specific
+  reload clips and contract markers.
+
+`animated_reload_arms.glb` retains one 13,700-triangle skinned arms mesh, one
+skin, the authored glove/sleeve materials and skin weights, three embedded PNG
+images, and 24 tactical/empty reload clips across twelve profiles. Both shoulder
+roots and the right palm-to-grip relation remain fixed; the left arm is the
+moving reload limb. No project-authored replacement body geometry is introduced.
+The builder emits three extracted texture sidecars but no dedicated studio
+preview PNG; visual review uses the in-engine reload captures and deterministic
+diagnostic.
+
+| Animated reload-arm file | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Original `../../source_art/third_party/djmaesen_fps_smg45/fps_animated_smg.glb` | 22,128,372 | `61F30D8980CE292869F97D98587A2736BAF719A19C0A32756838BD9EF2ADA83A` |
+| Runtime `djmaesen_smg45/animated_reload_arms.glb` | 9,732,948 | `843CBA0BC3574B177374C7DCCFEE0875A7740CCEE05BD703FB0895D0E61762CC` |
+| Texture `djmaesen_smg45/animated_reload_arms_Image_0.png` | 1,913,243 | `3BC291E07FA1E04DC5CEE727297D7051966A8D8AC39FCCE622BFB7DC408CB002` |
+| Texture `djmaesen_smg45/animated_reload_arms_Image_1.png` | 3,561,679 | `92CF1397C106CF721902A676985E82253CEC6E526DBD25510BD4E8B8685EEEA1` |
+| Texture `djmaesen_smg45/animated_reload_arms_Image_2.png` | 3,527,986 | `ADD5B1429F735916033AE45BD755B6A6DA70A9EBD047EED38F78C7D64A967F08` |
+| DCC source `../../source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend` | 24,961,680 | `B5D80A4D4458720A6BEF709A890E61828E3E1DDBD29E7F5CB2E23BE56F9F3011` |
+
+The source and every derived arm mesh remain copyright DJMaesen and are not
+covered by the repository's MIT license. Full attribution, static adaptations,
+and the reproducible Blender mapping are recorded in
+`djmaesen_smg45/LICENSE.md`; the animated builder is
+`../../scripts/blender/build_animated_reload_arms.py`.
 
 The standard free version of the Downtown City MegaKit is distributed by Quaternius under CC0 1.0 Universal:
 
@@ -983,13 +1073,49 @@ The repository contains 21 selected modular scenes and 26 shared textures for co
 
 ## TastyTony CC BY 4.0 model
 
-The GSh-18 sidearm model is **Low-Poly GSh-18** by TastyTony and is used under Creative Commons Attribution 4.0 International:
+The GSh-18 sidearm model is **Low-Poly GSh-18** by TastyTony and is used under
+Creative Commons Attribution 4.0 International:
 
-- Source: https://sketchfab.com/3d-models/low-poly-gsh-18-7ce65f794f0e42f98f61a96026e4d75e
-- License: https://creativecommons.org/licenses/by/4.0/
-- Local asset and attribution: `tastytony_gsh18/low-poly_gsh-18.glb` and `tastytony_gsh18/LICENSE.md`
+- Creator profile: https://sketchfab.com/TastyTony
+- Official source:
+  https://sketchfab.com/3d-models/low-poly-gsh-18-7ce65f794f0e42f98f61a96026e4d75e
+- Exact license: CC BY 4.0,
+  https://creativecommons.org/licenses/by/4.0/
+- Source acquisition date established by the tracked adapter: 2026-08-20.
+- Reloadable DCC adaptation and review date: 2026-08-29.
+- Required attribution: credit **Low-Poly GSh-18** by TastyTony, link the
+  source and CC BY 4.0, and indicate the slide separation, metre normalization,
+  scalar-PBR tuning, source-rig/staging removal, and added magazine/pivot/socket
+  mechanisms.
+- Local asset and attribution: `tastytony_gsh18/low-poly_gsh-18.glb` and
+  `tastytony_gsh18/LICENSE.md`.
 
-The model remains credited to TastyTony and is not covered by the repository's MIT license.
+The reloadable Blender derivative conserves all 6,361 rendered source
+triangles: a complete 1,028-triangle authored slide moves independently from
+the 5,333-triangle fixed frame. Two independent project-authored 900-triangle
+magazines bring the runtime scene to 8,161 triangles. Runtime output and review
+are `steel_tide_reloadable_weapons/gsh18_reloadable.glb` and
+`steel_tide_reloadable_weapons/gsh18_reloadable_preview.png`; the editable
+source and reproducible builder are
+`../../source_art/reloadable_weapons/gsh18_reloadable.blend` and
+`../../scripts/blender/build_reloadable_gsh18.py`.
+The reload hand contacts are derived from the actual magazine side wall and
+the authored slide's left rear surface, with round-trip gaps below five
+nanometres and a mandatory stockward longitudinal fraction of at least `0.70`.
+
+| GSh-18 reloadable file | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Original `tastytony_gsh18/low-poly_gsh-18.glb` | 916,616 | `56E8CB31AE1CE1DEA689A3D890A95DAC7E1D30334C809CBB2D9E43038CBBC6B9` |
+| Runtime `steel_tide_reloadable_weapons/gsh18_reloadable.glb` | 499,464 | `887DD398F720393074335D31A210F4770A02AF4F4740FF5E5FD322E89FB2B405` |
+| Review `steel_tide_reloadable_weapons/gsh18_reloadable_preview.png` | 1,444,201 | `7BED8C18CE7019A8AD564A9C85F40F0AE7AF8015BE346015752DF8BEC67F1371` |
+| DCC source `../../source_art/reloadable_weapons/gsh18_reloadable.blend` | 2,423,327 | `E5ED7B0B155D85A31A11389FEC0B08E4A37196C8337721172BBBEF3972D049AA` |
+
+The retained frame, slide, and materials remain credited to TastyTony and are
+not covered by the repository's MIT license. The added magazines and builder
+are project MIT content; the combined derivative must retain the CC BY 4.0
+credit and modification notice. Exact topology, mixed-rights mapping, node
+contract, and validation are recorded in
+`steel_tide_reloadable_weapons/LICENSE.md`.
 
 ## ELIZION CC BY 4.0 model
 

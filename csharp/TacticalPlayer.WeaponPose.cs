@@ -45,7 +45,7 @@ public partial class TacticalPlayer
             // both sleeve caps as detached black circles in the centre of view.
             return WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
                 ? SidearmHipWeaponPosition + SidearmReloadViewPositionOffset()
-                : HipWeaponPosition;
+                : HipWeaponPosition + PlatformReloadViewPositionOffset();
         }
         if (_searchPose > 0.0f)
         {
@@ -156,6 +156,46 @@ public partial class TacticalPlayer
                 + _recoilSide * 0.22f
                 + _viewmodelKickRoll);
     }
+
+    private void UpdateWeaponViewPose(float delta, float handling)
+    {
+        var targetPosition = WeaponViewPositionTarget();
+        var positionResponse = _isAiming
+            ? 7.5f + handling * 6.0f
+            : 6.0f + handling * 3.0f;
+        _weaponRoot.Position = _weaponRoot.Position.Lerp(
+            targetPosition,
+            SmoothFactor(positionResponse, delta));
+        var weaponRotation = _weaponRoot.Rotation;
+        if (_isAiming)
+        {
+            // Vault and ladder poses can carry a temporary yaw; ADS must begin
+            // on the optic axis.
+            weaponRotation.Y = 0.0f;
+        }
+        _weaponRoot.Rotation = weaponRotation.Lerp(
+            WeaponViewRotationTarget(),
+            SmoothFactor(9.0f, delta));
+    }
+
+    private void UpdateHeldWeaponPresentation(float delta)
+    {
+        UpdateWeaponViewPose(delta, EquippedWeapon.Stats().Handling);
+        ApplyProceduralHandPose();
+        UpdateReloadAnimation();
+        SyncAuthoredPrimaryWeapon();
+        UpdateAuthoredM4ReloadSupportArm();
+    }
+
+    internal void AdvanceVehicleReloadPresentationForDiagnostics(float delta)
+    {
+        UpdateReloadTimer(delta);
+        UpdateHeldWeaponPresentation(delta);
+    }
+
+    internal float WeaponViewTargetPoseErrorForDiagnostics
+        => _weaponRoot.Position.DistanceTo(WeaponViewPositionTarget())
+            + _weaponRoot.Rotation.DistanceTo(WeaponViewRotationTarget());
 
     private void UpdateViewmodelShotImpulse(float delta)
     {

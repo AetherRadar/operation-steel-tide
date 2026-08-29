@@ -56,15 +56,15 @@ micro, holographic, and magnified optics to enforce a +/-3 mm contact gate.
 | File | Bytes | SHA-256 |
 | --- | ---: | --- |
 | Raw source `source_art/third_party/taradavies_ak47/ak47_taradavies.blend` | 2,044,772 | `F3E4D7708EEB95DBEBE9E240C868148C4F03BEDA363FB904141861FFC8EC1392` |
-| First-person `ak47_reloadable_fp.glb` | 2,263,784 | `BD741EAED011B581057C2D0B8C803F8F2E3B74ED8AFF129D0FA60B39FF775BE9` |
-| World `ak47_reloadable_world.glb` | 705,676 | `D0BC32F6B2D939787B0E6EA38E0814F1F4346A3D2594D558456C22FFC6E3CEE8` |
-| Editable `source_art/reloadable_weapons/ak47_reloadable.blend` | 5,647,790 | `02C085BC5AC9DCFA187C9C310D139F8A7D14F89741E59F9154B78351BC56E86D` |
-| Studio preview `ak47_studio_preview.png` | 1,020,161 | `483EAF0E72932F14385E296BAB89394E6A2F1CD62A5728A2D851299B7C661A96` |
+| First-person `ak47_reloadable_fp.glb` | 2,263,784 | `99DC2034324C6DF1DB72EAF0163B0D431073817EB1BBF5D715C8600E8E75117C` |
+| World `ak47_reloadable_world.glb` | 705,676 | `DED072F5627D3FAEFC4A6E6948CDEA9E36091609A623667F4A326404B806B9DB` |
+| Editable `source_art/reloadable_weapons/ak47_reloadable.blend` | 5,647,790 | `9FEEF0E48E568D0AF627001A659342A12106A1A3F76247CB71C27AB0BD840757` |
+| Studio preview `ak47_studio_preview.png` | 1,020,160 | `5D565FC8030DF4C1F100453A4C4F9FF5C80BDFFE1F02C7B5494C4795F717F1CD` |
 | Wood base color `source_art/reloadable_weapons/textures/ak47_laminated_wood_base_color.png` | 74,429 | `A42DC092BF14F8FA7F4FA2BE77E7BB1D9B9AAA286735D8262B65AB8516847F81` |
 | Wood roughness `source_art/reloadable_weapons/textures/ak47_laminated_wood_roughness.png` | 73,115 | `2CF47336790B4E6599AD98B1D309927CF4FDBC8E6FECCA6D66C7C36EB75DA852` |
 | Godot-extracted FP/world base-color copies (each) | 74,429 | `A42DC092BF14F8FA7F4FA2BE77E7BB1D9B9AAA286735D8262B65AB8516847F81` |
 | Godot-extracted FP/world roughness copies (each) | 66,424 | `E53F73BEF4C58464852C2A5110FBF61AB6C22E5698C2ACCE4A50FFC1AF1D687A` |
-| Build script `scripts/blender/build_taradavies_ak47.py` | 40,239 | `2DD591072F4D66E08EBEA299526CA8CFF3A92C82E3F064C6E060F5EFD037E1B2` |
+| Build script `scripts/blender/build_taradavies_ak47.py` | 41,469 | `88A74BF36393595211B1390694A6145403A1A7ECCBD5857344EE6120192D3B5B` |
 
 The official-page metadata, raw-source mapping, excluded dependencies, and
 source hash are preserved in

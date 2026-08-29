@@ -12,6 +12,7 @@ Godot -Z-forward, +Y-up convention used by the first-person weapon rig.
 from __future__ import annotations
 
 from collections import defaultdict
+import hashlib
 import json
 from math import pi
 from pathlib import Path
@@ -68,6 +69,16 @@ FOREGRIP_ORIGIN = Vector((0.0, 0.58, -0.17))
 MUZZLE_ORIGIN = Vector((0.0, 1.205, 0.015))
 SUPPRESSOR_ORIGIN = Vector((0.0, 1.26, 0.015))
 OPTIC_ORIGIN = Vector((0.0, 0.25, 0.145))
+
+# Surface queries are expressed in each mechanism parent's Blender-local frame.
+# The far-left X seed selects the support-hand side of the real mesh, while Y/Z
+# select the lower-middle magazine wall and the rear T-handle wing respectively.
+MAGAZINE_GRIP_TARGET = Vector((-1.0, -0.170, -0.060))
+CHARGING_HANDLE_GRIP_TARGET = Vector((-1.0, -0.300, 0.014))
+EXPECTED_DCC_MESH_COUNT = 19
+EXPECTED_DCC_VERTEX_COUNT = 6_797
+EXPECTED_GLB_VERTEX_COUNT = 12_414
+EXPECTED_TRIANGLE_COUNT = 10_617
 
 FOREGRIP_SOURCE_OBJECT = "AssaultRifle2_1"
 SUPPRESSOR_SOURCE_OBJECT = "SubmachineGun_2"
@@ -663,6 +674,63 @@ def evaluated_mesh_copy(
     )
 
 
+def mesh_surface_contact_in_parent(
+    geometry: bpy.types.Object,
+    target_in_parent: Vector,
+) -> tuple[Vector, Vector, int]:
+    if geometry.type != "MESH" or geometry.parent is None:
+        raise RuntimeError(f"Cannot derive mechanism contact from {geometry.name}.")
+    bpy.context.view_layer.update()
+    vertices = [
+        geometry.matrix_local @ vertex.co
+        for vertex in geometry.data.vertices
+    ]
+    surface = BVHTree.FromPolygons(
+        vertices,
+        [tuple(polygon.vertices) for polygon in geometry.data.polygons],
+        all_triangles=False,
+    )
+    location, normal, face_index, _ = surface.find_nearest(target_in_parent)
+    if location is None or normal is None or face_index is None:
+        raise RuntimeError(f"No surface contact found on {geometry.name}.")
+    return location, normal, face_index
+
+
+def mesh_surface_distance_in_parent(
+    geometry: bpy.types.Object,
+    point_in_parent: Vector,
+) -> float:
+    location, _, _ = mesh_surface_contact_in_parent(geometry, point_in_parent)
+    return (point_in_parent - location).length
+
+
+def add_surface_socket(
+    name: str,
+    parent: bpy.types.Object,
+    geometry: bpy.types.Object,
+    target_in_parent: Vector,
+    role: str,
+) -> bpy.types.Object:
+    if geometry.parent != parent:
+        raise RuntimeError(f"{geometry.name} is outside mechanism node {parent.name}.")
+    contact, normal, face_index = mesh_surface_contact_in_parent(
+        geometry,
+        target_in_parent,
+    )
+    if normal.x > -0.95:
+        raise RuntimeError(
+            f"{name} left the support-hand side of {geometry.name}: "
+            f"contact={tuple(contact)} normal={tuple(normal)} face={face_index}"
+        )
+    socket = empty(name, parent, contact)
+    socket["runtime_asset"] = True
+    socket["socket_role"] = role
+    socket["derived_from_mesh"] = geometry.name
+    socket["derived_from_face"] = face_index
+    socket["surface_target_in_parent"] = tuple(target_in_parent)
+    return socket
+
+
 def import_source() -> dict[str, bpy.types.Object]:
     require_file(SOURCE_FBX)
     bpy.ops.import_scene.fbx(filepath=str(SOURCE_FBX), use_anim=False)
@@ -925,6 +993,13 @@ def build_runtime_asset() -> bpy.types.Object:
         MAGAZINE_ORIGIN,
     )
     magazine_geometry["runtime_asset"] = True
+    add_surface_socket(
+        "MagazineGripSocket",
+        magazine,
+        magazine_geometry,
+        MAGAZINE_GRIP_TARGET,
+        "magazine_hand_contact",
+    )
 
     spare_magazine = empty("SpareMagazine", root, SPARE_MAGAZINE_ORIGIN)
     spare_magazine["runtime_asset"] = True
@@ -947,6 +1022,13 @@ def build_runtime_asset() -> bpy.types.Object:
         CHARGING_HANDLE_ORIGIN,
     )
     charging_geometry["runtime_asset"] = True
+    add_surface_socket(
+        "ChargingHandleSocket",
+        charging_handle,
+        charging_geometry,
+        CHARGING_HANDLE_GRIP_TARGET,
+        "action_hand_contact",
+    )
 
     stock = empty("Stock", root, STOCK_ORIGIN)
     stock["runtime_asset"] = True
@@ -1216,6 +1298,88 @@ def validate_authored_markers() -> None:
     )
 
 
+def require_unique_node(name: str) -> bpy.types.Object:
+    matches = [obj for obj in bpy.context.scene.objects if obj.name == name]
+    if len(matches) != 1:
+        raise RuntimeError(f"Expected one {name!r} node, found {len(matches)}.")
+    return matches[0]
+
+
+def validate_reload_sockets(
+    root: bpy.types.Object,
+    phase: str,
+) -> dict[str, Vector]:
+    bpy.context.view_layer.update()
+    mechanism_locations = {
+        "Magazine": MAGAZINE_ORIGIN,
+        "SpareMagazine": SPARE_MAGAZINE_ORIGIN,
+        "ChargingHandle": CHARGING_HANDLE_ORIGIN,
+    }
+    for name, expected_location in mechanism_locations.items():
+        mechanism = require_unique_node(name)
+        if (
+            mechanism.parent != root
+            or (mechanism.location - expected_location).length > 1.0e-8
+        ):
+            raise RuntimeError(
+                f"M4A1 {name} mechanism contract changed after {phase}: "
+                f"parent={mechanism.parent.name if mechanism.parent else None} "
+                f"location={tuple(mechanism.location)} "
+                f"expected={tuple(expected_location)}"
+            )
+
+    contacts: dict[str, Vector] = {}
+    socket_contracts = (
+        (
+            "MagazineGripSocket",
+            "Magazine",
+            "MagazineGeometry",
+            MAGAZINE_GRIP_TARGET,
+        ),
+        (
+            "ChargingHandleSocket",
+            "ChargingHandle",
+            "ChargingHandleGeometry",
+            CHARGING_HANDLE_GRIP_TARGET,
+        ),
+    )
+    for socket_name, parent_name, geometry_name, target in socket_contracts:
+        socket = require_unique_node(socket_name)
+        parent = require_unique_node(parent_name)
+        geometry = require_unique_node(geometry_name)
+        if socket.parent != parent or geometry.parent != parent:
+            raise RuntimeError(
+                f"M4A1 {socket_name} hierarchy changed after {phase}: "
+                f"socket_parent={socket.parent.name if socket.parent else None} "
+                f"geometry_parent={geometry.parent.name if geometry.parent else None}"
+            )
+        expected_contact, normal, face_index = mesh_surface_contact_in_parent(
+            geometry,
+            target,
+        )
+        drift = (socket.location - expected_contact).length
+        surface_distance = mesh_surface_distance_in_parent(
+            geometry,
+            socket.location,
+        )
+        if drift > 0.000001 or surface_distance > 0.000001 or normal.x > -0.95:
+            raise RuntimeError(
+                f"M4A1 {socket_name} left its authored support-hand surface "
+                f"after {phase}: drift={drift:.9f} "
+                f"distance={surface_distance:.9f} "
+                f"normal={tuple(normal)} face={face_index}"
+            )
+        contacts[socket_name] = socket.location.copy()
+        print(
+            "M4A1_RUNTIME_SOCKET "
+            f"phase={phase} node={socket_name} parent={parent_name} "
+            f"mesh={geometry_name} "
+            f"local={tuple(round(value, 9) for value in socket.location)} "
+            f"face={face_index} surface_distance={surface_distance:.9f}"
+        )
+    return contacts
+
+
 def select_hierarchy(root: bpy.types.Object) -> None:
     bpy.ops.object.select_all(action="DESELECT")
     root.select_set(True)
@@ -1240,6 +1404,31 @@ def export_asset(root: bpy.types.Object) -> None:
         export_extras=True,
         export_yup=True,
     )
+
+
+def validate_glb_roundtrip() -> bpy.types.Object:
+    clear_scene()
+    bpy.ops.import_scene.gltf(filepath=str(OUTPUT_GLB))
+    root = require_unique_node("SteelTideM4A1")
+    mesh_count, vertex_count, triangle_count = mesh_statistics(root)
+    if (
+        mesh_count,
+        vertex_count,
+        triangle_count,
+    ) != (
+        EXPECTED_DCC_MESH_COUNT,
+        EXPECTED_GLB_VERTEX_COUNT,
+        EXPECTED_TRIANGLE_COUNT,
+    ):
+        raise RuntimeError(
+            "M4A1 GLB round-trip topology changed: "
+            f"meshes={mesh_count}/{EXPECTED_DCC_MESH_COUNT} "
+            f"vertices={vertex_count}/{EXPECTED_GLB_VERTEX_COUNT} "
+            f"triangles={triangle_count}/{EXPECTED_TRIANGLE_COUNT}"
+        )
+    validate_reload_sockets(root, "glb_roundtrip")
+    root["reload_socket_roundtrip_verified"] = True
+    return root
 
 
 def validate_exported_optic_aperture() -> None:
@@ -1417,6 +1606,8 @@ def main() -> None:
         "Magazine",
         "SpareMagazine",
         "ChargingHandle",
+        "MagazineGripSocket",
+        "ChargingHandleSocket",
         "Stock",
         "RearIronSight",
         "FrontIronSight",
@@ -1471,20 +1662,36 @@ def main() -> None:
         )
     validate_attachment_geometry()
     validate_authored_markers()
+    validate_reload_sockets(root, "dcc_source")
     validate_open_optic_aperture()
     mesh_count, vertex_count, triangle_count = mesh_statistics(root)
-    if mesh_count < 18 or vertex_count < 5_000 or triangle_count < 9_000:
+    if (
+        mesh_count,
+        vertex_count,
+        triangle_count,
+    ) != (
+        EXPECTED_DCC_MESH_COUNT,
+        EXPECTED_DCC_VERTEX_COUNT,
+        EXPECTED_TRIANGLE_COUNT,
+    ):
         raise RuntimeError(
-            "Authored M4A1 complexity regression: "
-            f"meshes={mesh_count} vertices={vertex_count} triangles={triangle_count}"
+            "Authored M4A1 visible topology changed: "
+            f"meshes={mesh_count}/{EXPECTED_DCC_MESH_COUNT} "
+            f"vertices={vertex_count}/{EXPECTED_DCC_VERTEX_COUNT} "
+            f"triangles={triangle_count}/{EXPECTED_TRIANGLE_COUNT}"
         )
     export_asset(root)
     validate_exported_optic_aperture()
     save_source()
-    add_preview_stage(root)
+    roundtrip_root = validate_glb_roundtrip()
+    add_preview_stage(roundtrip_root)
     print(
         "NISU_M4A1_EXPORT "
         f"meshes={mesh_count} vertices={vertex_count} triangles={triangle_count} "
+        f"glb_sha256={hashlib.sha256(OUTPUT_GLB.read_bytes()).hexdigest()} "
+        f"blend_sha256={hashlib.sha256(OUTPUT_BLEND.read_bytes()).hexdigest()} "
+        f"preview_sha256={hashlib.sha256(PREVIEW_PATH.read_bytes()).hexdigest()} "
+        f"ads_preview_sha256={hashlib.sha256(ADS_PREVIEW_PATH.read_bytes()).hexdigest()} "
         f"glb={OUTPUT_GLB} blend={OUTPUT_BLEND} preview={PREVIEW_PATH} "
         f"ads_preview={ADS_PREVIEW_PATH}"
     )

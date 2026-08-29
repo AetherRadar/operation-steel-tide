@@ -124,6 +124,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 // them to consume supplies or freeze a mechanism off-screen.
                 CancelFieldUse(false);
                 CancelReload();
+                UpdateHeldItemVisibility();
                 return;
             }
             // Restore the selected held item immediately when the modal closes;
@@ -947,6 +948,16 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var definition = WeaponCatalog.Weapon(EquippedWeapon.Platform);
         var stats = EquippedWeapon.Stats();
         var isPistol = WeaponCatalog.IsSidearm(EquippedWeapon.Platform);
+        // Weapon-slot changes cancel reload before reaching this method. Reset
+        // the invisible compatibility mechanisms to the new platform's fixed
+        // source contract before an authored visual captures or synchronizes
+        // them, making first equip independent of the previously held weapon.
+        // Attachment refreshes may legally arrive mid-reload, in which case the
+        // current continuous mechanism pose must remain untouched.
+        if (!_isReloading)
+        {
+            ResetProfiledReloadRig();
+        }
         _weaponRoot.Name = definition.Name;
         var barrelPart = EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Barrel, out var barrelId)
             ? WeaponCatalog.Attachment(barrelId)
@@ -1092,9 +1103,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         ((BoxMesh)_spareMagazine.Mesh).Size = magazineSize;
         _magazine.MaterialOverride = EquippedWeapon.Platform == WeaponPlatform.AK74 ? furnitureMaterial : receiverMaterial;
         _spareMagazine.MaterialOverride = _magazine.MaterialOverride;
-        _magazine.Rotation = EquippedWeapon.Platform == WeaponPlatform.AK74
-            ? new Vector3(-0.29f, 0, 0)
-            : new Vector3(-0.19f, 0, 0);
 
         var gripScale = EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Grip, out var gripId)
             ? WeaponCatalog.Attachment(gripId).VisualScale
@@ -1206,6 +1214,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             CloseMedicalWheelWithoutUse();
             CancelFieldUse(false);
             CancelReload();
+            UpdateHeldWeaponPresentation(dt);
             UpdateDownedCrawl(dt);
             return;
         }
@@ -1246,6 +1255,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             Velocity = Vector3.Zero;
             _isAiming = false;
+            UpdateHeldWeaponPresentation(dt);
             Hud?.SetAiming(false);
             return;
         }
@@ -1357,14 +1367,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
 
         UpdatePlate(dt);
-        if (_isReloading)
-        {
-            _reloadTime -= dt;
-            if (_reloadTime <= 0.0f)
-            {
-                FinishReload();
-            }
-        }
+        UpdateReloadTimer(dt);
         if (IsFirearmQuickSlotSelected && !_isPlating && !RoleActionBlocksWeapon && !MedicalActionBlocksWeapon && Input.IsActionJustPressed(GameInputActions.Reload))
         {
             StartReload();
@@ -1459,23 +1462,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
         UpdateHeldThrowableVisual();
 
+        UpdateReloadTimer(delta);
         if (IsFirearmQuickSlotSelected
             && !RoleActionBlocksWeapon
             && Input.IsActionJustPressed(GameInputActions.Reload))
         {
             StartReload();
         }
-        if (_isReloading)
-        {
-            _reloadTime -= delta;
-            if (_reloadTime <= 0.0f)
-            {
-                FinishReload();
-            }
-        }
-        UpdateReloadAnimation();
-        SyncAuthoredPrimaryWeapon();
-        UpdateAuthoredM4ReloadSupportArm();
+        UpdateHeldWeaponPresentation(delta);
 
         if (!_fireInputArmed)
         {
@@ -1949,15 +1943,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             && !MedicalActionBlocksWeapon;
         UpdateHeldThrowableVisual();
         UpdateKnifeAnimation(delta);
-        var targetPosition = WeaponViewPositionTarget();
-        _weaponRoot.Position = _weaponRoot.Position.Lerp(targetPosition, SmoothFactor(_isAiming ? 7.5f + handling * 6.0f : 6.0f + handling * 3.0f, delta));
-        var weaponRotation = _weaponRoot.Rotation;
-        if (_isAiming)
-        {
-            // Vault and ladder poses can carry a temporary yaw; ADS must begin on the optic axis.
-            weaponRotation.Y = 0.0f;
-        }
-        _weaponRoot.Rotation = weaponRotation.Lerp(WeaponViewRotationTarget(), SmoothFactor(9.0f, delta));
+        UpdateWeaponViewPose(delta, handling);
         ApplyProceduralHandPose();
         _opticReticle.Visible = _isAiming && IsFirearmQuickSlotSelected;
         UpdateReloadAnimation();
@@ -2200,6 +2186,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             return;
         }
+        _reloadStartedEmpty = Ammo == 0;
         _isReloading = true;
         _activeReloadDuration = ReloadDuration * RoleReloadMultiplier;
         _reloadTime = _activeReloadDuration;
@@ -2224,20 +2211,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     private void UpdateReloadAnimation()
     {
-        if (!_isReloading)
+        if (!_isReloading || EquippedWeapon.Platform == WeaponPlatform.M3A1)
         {
             return;
         }
-        if (EquippedWeapon.Platform == WeaponPlatform.M4A1)
-        {
-            UpdateM4ReloadAnimation();
-            return;
-        }
-
-        // The coordinates below are authored for the M4 magazine geometry only.
-        // Other platforms retain their established reload presentation until
-        // they receive a platform-specific authored clip.
-        ApplyProceduralHandPose();
+        UpdateProfiledReloadAnimation();
     }
 
     private void UpdateM4ReloadAnimation()
@@ -2339,26 +2317,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
     private void ResetReloadRig()
     {
-        _magazine.Visible = true;
-        _magazine.Position = new Vector3(0, -0.2f, -0.31f);
-        _magazine.Rotation = EquippedWeapon.Platform == WeaponPlatform.AK74
-            ? new Vector3(-0.29f, 0, 0)
-            : new Vector3(-0.19f, 0, 0);
-        _spareMagazine.Visible = false;
-        _spareMagazine.Position = new Vector3(-0.3f, -0.62f, -0.18f);
-        _spareMagazine.Rotation = new Vector3(0.35f, 0, 0.35f);
-        _supportHand.Position = new Vector3(-0.03f, -0.2f, -0.58f);
-        _supportHand.Rotation = new Vector3(0.2f, 0, 0.05f);
+        ResetProfiledReloadRig();
         _supportForearm.Position = new Vector3(-0.12f, -0.42f, -0.47f);
         _supportForearm.Rotation = new Vector3(0.25f, 0, -0.26f);
-        _chargingHandle.Position = new Vector3(0.075f, 0.085f, -0.05f);
-        if (WeaponCatalog.IsSidearm(EquippedWeapon.Platform))
-        {
-            _supportHand.Position = SidearmSupportHandHome;
-            _supportHand.Rotation = SidearmSupportHandRestRotation();
-            _supportForearm.Position = _supportHand.Position + new Vector3(-0.08f, -0.23f, 0.10f);
-            _supportForearm.Rotation = new Vector3(0.18f, 0.06f, -0.24f);
-        }
         SyncAuthoredPrimaryWeapon();
         ResetAuthoredM4ReloadSupportArm();
     }
