@@ -13,6 +13,19 @@ public readonly record struct DemolitionArenaBox(
     Vector3 Rotation = default,
     bool Visible = true);
 
+public enum DemolitionArenaPropCollisionMode
+{
+    BoundsBox,
+    FootprintBox,
+    CompoundBoxes,
+    AuthoredConcave
+}
+
+public readonly record struct DemolitionArenaPropCollisionBox(
+    Vector3 Size,
+    Vector3 Offset,
+    Vector3 Rotation = default);
+
 public readonly record struct DemolitionArenaProp(
     string Name,
     string ScenePath,
@@ -20,7 +33,26 @@ public readonly record struct DemolitionArenaProp(
     float Yaw,
     float Scale,
     Vector3 CollisionSize,
-    Vector3 CollisionOffset);
+    Vector3 CollisionOffset,
+    DemolitionArenaPropCollisionMode CollisionMode = DemolitionArenaPropCollisionMode.BoundsBox,
+    IReadOnlyList<DemolitionArenaPropCollisionBox>? CollisionPieces = null,
+    bool AuthoredBackfaceCollision = false)
+{
+    public int CollisionPieceCount => CollisionPieces is { Count: > 0 } pieces ? pieces.Count : 1;
+
+    public DemolitionArenaPropCollisionBox CollisionPieceAt(int index)
+    {
+        if (CollisionPieces is { Count: > 0 } pieces)
+        {
+            return pieces[index];
+        }
+        if (index != 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+        return new DemolitionArenaPropCollisionBox(CollisionSize, CollisionOffset);
+    }
+}
 
 public readonly record struct DemolitionArenaMarker(
     Vector3 Position,
@@ -493,19 +525,25 @@ public sealed partial class DemolitionArenaLayout
             {
                 continue;
             }
-            var basis = new Basis(Vector3.Up, prop.Yaw);
-            var half = prop.CollisionSize * prop.Scale * 0.5f;
-            var center3 = prop.Position + basis * (prop.CollisionOffset * prop.Scale);
-            var extentX = Mathf.Abs(basis.X.X) * half.X + Mathf.Abs(basis.Z.X) * half.Z;
-            var extentZ = Mathf.Abs(basis.X.Z) * half.X + Mathf.Abs(basis.Z.Z) * half.Z;
-            var center = new Vector2(center3.X, center3.Z);
-            var extent = new Vector2(extentX, extentZ);
-            if (SegmentIntersectsRect(
-                    new Vector2(AttackSpawn.X, AttackSpawn.Z),
-                    new Vector2(site.X, site.Z),
-                    new Rect2(center - extent, extent * 2.0f)))
+            for (var pieceIndex = 0; pieceIndex < prop.CollisionPieceCount; pieceIndex++)
             {
-                return false;
+                PropCollisionBoxWorld(
+                    prop,
+                    prop.CollisionPieceAt(pieceIndex),
+                    out var center3,
+                    out var basis,
+                    out var half);
+                var extentX = Mathf.Abs(basis.X.X) * half.X + Mathf.Abs(basis.Z.X) * half.Z;
+                var extentZ = Mathf.Abs(basis.X.Z) * half.X + Mathf.Abs(basis.Z.Z) * half.Z;
+                var center = new Vector2(center3.X, center3.Z);
+                var extent = new Vector2(extentX, extentZ);
+                if (SegmentIntersectsRect(
+                        new Vector2(AttackSpawn.X, AttackSpawn.Z),
+                        new Vector2(site.X, site.Z),
+                        new Rect2(center - extent, extent * 2.0f)))
+                {
+                    return false;
+                }
             }
         }
         return true;
@@ -741,26 +779,38 @@ public sealed partial class DemolitionArenaLayout
 
         foreach (var prop in Props)
         {
-            var yaw = new Basis(Vector3.Up, prop.Yaw);
-            var half = prop.CollisionSize * prop.Scale * 0.5f;
-            var center = prop.Position + yaw * (prop.CollisionOffset * prop.Scale);
-            if (center.Y + half.Y < capsuleBottom || center.Y - half.Y > capsuleTop)
+            for (var pieceIndex = 0; pieceIndex < prop.CollisionPieceCount; pieceIndex++)
             {
-                continue;
-            }
-            var inverse = yaw.Inverse();
-            var localStart = inverse * (start - center);
-            var localEnd = inverse * (end - center);
-            var bounds = new Rect2(
-                new Vector2(-half.X - radius, -half.Z - radius),
-                new Vector2((half.X + radius) * 2.0f, (half.Z + radius) * 2.0f));
-            if (SegmentIntersectsRect(
-                    new Vector2(localStart.X, localStart.Z),
-                    new Vector2(localEnd.X, localEnd.Z),
-                    bounds))
-            {
-                blockerName = prop.Name;
-                return true;
+                PropCollisionBoxWorld(
+                    prop,
+                    prop.CollisionPieceAt(pieceIndex),
+                    out var center,
+                    out var basis,
+                    out var half);
+                var verticalExtent = Mathf.Abs(basis.X.Y) * half.X
+                    + Mathf.Abs(basis.Y.Y) * half.Y
+                    + Mathf.Abs(basis.Z.Y) * half.Z;
+                if (center.Y + verticalExtent < capsuleBottom
+                    || center.Y - verticalExtent > capsuleTop)
+                {
+                    continue;
+                }
+                var inverse = basis.Inverse();
+                var localStart = inverse * (start - center);
+                var localEnd = inverse * (end - center);
+                var bounds = new Rect2(
+                    new Vector2(-half.X - radius, -half.Z - radius),
+                    new Vector2((half.X + radius) * 2.0f, (half.Z + radius) * 2.0f));
+                if (SegmentIntersectsRect(
+                        new Vector2(localStart.X, localStart.Z),
+                        new Vector2(localEnd.X, localEnd.Z),
+                        bounds))
+                {
+                    blockerName = prop.CollisionPieceCount > 1
+                        ? $"{prop.Name}[{pieceIndex + 1}]"
+                        : prop.Name;
+                    return true;
+                }
             }
         }
 
@@ -788,13 +838,36 @@ public sealed partial class DemolitionArenaLayout
         var boxExtentX = Mathf.Abs(boxBasis.X.X) * boxHalf.X + Mathf.Abs(boxBasis.Z.X) * boxHalf.Z;
         var boxExtentZ = Mathf.Abs(boxBasis.X.Z) * boxHalf.X + Mathf.Abs(boxBasis.Z.Z) * boxHalf.Z;
 
+        for (var pieceIndex = 0; pieceIndex < prop.CollisionPieceCount; pieceIndex++)
+        {
+            PropCollisionBoxWorld(
+                prop,
+                prop.CollisionPieceAt(pieceIndex),
+                out var propCenter,
+                out var propBasis,
+                out var propHalf);
+            var propExtentX = Mathf.Abs(propBasis.X.X) * propHalf.X + Mathf.Abs(propBasis.Z.X) * propHalf.Z;
+            var propExtentZ = Mathf.Abs(propBasis.X.Z) * propHalf.X + Mathf.Abs(propBasis.Z.Z) * propHalf.Z;
+            if (Mathf.Abs(box.Center.X - propCenter.X) < boxExtentX + propExtentX + separationMargin
+                && Mathf.Abs(box.Center.Z - propCenter.Z) < boxExtentZ + propExtentZ + separationMargin)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void PropCollisionBoxWorld(
+        DemolitionArenaProp prop,
+        DemolitionArenaPropCollisionBox piece,
+        out Vector3 center,
+        out Basis basis,
+        out Vector3 half)
+    {
         var propBasis = new Basis(Vector3.Up, prop.Yaw);
-        var propHalf = prop.CollisionSize * prop.Scale * 0.5f;
-        var propCenter = prop.Position + propBasis * (prop.CollisionOffset * prop.Scale);
-        var propExtentX = Mathf.Abs(propBasis.X.X) * propHalf.X + Mathf.Abs(propBasis.Z.X) * propHalf.Z;
-        var propExtentZ = Mathf.Abs(propBasis.X.Z) * propHalf.X + Mathf.Abs(propBasis.Z.Z) * propHalf.Z;
-        return Mathf.Abs(box.Center.X - propCenter.X) < boxExtentX + propExtentX + separationMargin
-            && Mathf.Abs(box.Center.Z - propCenter.Z) < boxExtentZ + propExtentZ + separationMargin;
+        center = prop.Position + propBasis * (piece.Offset * prop.Scale);
+        basis = propBasis * new Basis(Quaternion.FromEuler(piece.Rotation));
+        half = piece.Size * prop.Scale * 0.5f;
     }
 
     private static bool SegmentIntersectsRect(Vector2 start, Vector2 end, Rect2 rect)

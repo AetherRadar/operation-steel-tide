@@ -64,7 +64,10 @@ public partial class FreightTerminalWorld
         float WestGain,
         bool EastReady,
         int EastFrames,
-        float EastGain)> TideglassWalkPlayerAcrossStairs(
+        float EastGain,
+        bool SiteOfficeReady,
+        int SiteOfficeFrames,
+        float SiteOfficeGain)> TideglassWalkPlayerAcrossStairs(
         DemolitionArenaLayout layout)
     {
         var west = await TideglassWalkPlayerAcrossStair(
@@ -75,20 +78,35 @@ public partial class FreightTerminalWorld
             layout,
             new Vector3(7.25f, 0.22f, 26.5f),
             new Vector3(3.75f, 2.35f, 26.5f));
+        var siteOffice = await TideglassWalkPlayerAcrossStair(
+            layout,
+            new Vector3(30.7f, 0.22f, 46.1f),
+            new Vector3(26.8f, 2.75f, 46.1f),
+            minimumDestinationHeight: 2.35f,
+            minimumGain: 2.05f,
+            horizontalTolerance: 0.85f,
+            maximumFrames: 300);
         return (
-            west.Ready && east.Ready,
+            west.Ready && east.Ready && siteOffice.Ready,
             west.Ready,
             west.Frames,
             west.Gain,
             east.Ready,
             east.Frames,
-            east.Gain);
+            east.Gain,
+            siteOffice.Ready,
+            siteOffice.Frames,
+            siteOffice.Gain);
     }
 
     private async Task<(bool Ready, int Frames, float Gain)> TideglassWalkPlayerAcrossStair(
         DemolitionArenaLayout layout,
         Vector3 startPosition,
-        Vector3 targetPosition)
+        Vector3 targetPosition,
+        float minimumDestinationHeight = 2.05f,
+        float minimumGain = 1.75f,
+        float horizontalTolerance = 0.7f,
+        int maximumFrames = 240)
     {
         Input.ActionRelease("move_forward");
         Input.ActionRelease("sprint");
@@ -105,7 +123,7 @@ public partial class FreightTerminalWorld
         var reached = false;
         var frames = 0;
         Input.ActionPress("move_forward");
-        for (; frames < 240; frames++)
+        for (; frames < maximumFrames; frames++)
         {
             _player.FaceWorldPointForDiagnostics(target);
             if (!_player.HasMovementIntent && frames > 2)
@@ -116,7 +134,8 @@ public partial class FreightTerminalWorld
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             var delta = target - _player.GlobalPosition;
             var horizontalDistance = new Vector2(delta.X, delta.Z).Length();
-            if (horizontalDistance < 0.7f && _player.GlobalPosition.Y >= layout.Origin.Y + 2.05f)
+            if (horizontalDistance < horizontalTolerance
+                && _player.GlobalPosition.Y >= layout.Origin.Y + minimumDestinationHeight)
             {
                 reached = true;
                 break;
@@ -126,9 +145,521 @@ public partial class FreightTerminalWorld
         Input.ActionRelease("sprint");
         var gain = _player.GlobalPosition.Y - start.Y;
         var ready = reached
-            && gain >= 1.75f
-            && _player.GlobalPosition.Y >= layout.Origin.Y + 2.05f;
+            && gain >= minimumGain
+            && _player.GlobalPosition.Y >= layout.Origin.Y + minimumDestinationHeight;
         return (ready, frames, gain);
+    }
+
+    private static bool TideglassPropsSeparated(
+        IReadOnlyList<DemolitionArenaProp> props,
+        out string overlapPair)
+    {
+        for (var first = 0; first < props.Count; first++)
+        {
+            for (var second = first + 1; second < props.Count; second++)
+            {
+                for (var firstPiece = 0; firstPiece < props[first].CollisionPieceCount; firstPiece++)
+                {
+                    for (var secondPiece = 0; secondPiece < props[second].CollisionPieceCount; secondPiece++)
+                    {
+                        if (!TideglassPropPiecesOverlap(
+                                props[first],
+                                props[first].CollisionPieceAt(firstPiece),
+                                props[second],
+                                props[second].CollisionPieceAt(secondPiece),
+                                0.25f))
+                        {
+                            continue;
+                        }
+                        overlapPair = $"{props[first].Name}[{firstPiece + 1}]|"
+                            + $"{props[second].Name}[{secondPiece + 1}]";
+                        return false;
+                    }
+                }
+            }
+        }
+        overlapPair = "none";
+        return true;
+    }
+
+    private static bool TideglassPropInsideBounds(
+        DemolitionArenaLayout layout,
+        DemolitionArenaProp prop)
+    {
+        for (var pieceIndex = 0; pieceIndex < prop.CollisionPieceCount; pieceIndex++)
+        {
+            var bounds = TideglassPropPieceBounds(prop, prop.CollisionPieceAt(pieceIndex), 0.25f);
+            if (bounds.Position.X < layout.WorldBounds.Position.X
+                || bounds.Position.Y < layout.WorldBounds.Position.Y
+                || bounds.End.X > layout.WorldBounds.End.X
+                || bounds.End.Y > layout.WorldBounds.End.Y)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool TideglassPointOverlapsProp(
+        Vector3 point,
+        float radius,
+        DemolitionArenaProp prop)
+    {
+        for (var pieceIndex = 0; pieceIndex < prop.CollisionPieceCount; pieceIndex++)
+        {
+            if (TideglassPropPieceBounds(
+                    prop,
+                    prop.CollisionPieceAt(pieceIndex),
+                    radius).HasPoint(new Vector2(point.X, point.Z)))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool TideglassPropPiecesOverlap(
+        DemolitionArenaProp firstProp,
+        DemolitionArenaPropCollisionBox firstPiece,
+        DemolitionArenaProp secondProp,
+        DemolitionArenaPropCollisionBox secondPiece,
+        float margin)
+    {
+        TideglassPropPieceWorld(firstProp, firstPiece, out var firstCenter, out var firstBasis, out var firstHalf);
+        TideglassPropPieceWorld(secondProp, secondPiece, out var secondCenter, out var secondBasis, out var secondHalf);
+        var firstVerticalExtent = Mathf.Abs(firstBasis.X.Y) * firstHalf.X
+            + Mathf.Abs(firstBasis.Y.Y) * firstHalf.Y
+            + Mathf.Abs(firstBasis.Z.Y) * firstHalf.Z;
+        var secondVerticalExtent = Mathf.Abs(secondBasis.X.Y) * secondHalf.X
+            + Mathf.Abs(secondBasis.Y.Y) * secondHalf.Y
+            + Mathf.Abs(secondBasis.Z.Y) * secondHalf.Z;
+        if (firstCenter.Y + firstVerticalExtent <= secondCenter.Y - secondVerticalExtent
+            || secondCenter.Y + secondVerticalExtent <= firstCenter.Y - firstVerticalExtent)
+        {
+            return false;
+        }
+        return TideglassPropPieceBounds(firstProp, firstPiece, margin)
+            .Intersects(TideglassPropPieceBounds(secondProp, secondPiece, margin));
+    }
+
+    private static Rect2 TideglassPropPieceBounds(
+        DemolitionArenaProp prop,
+        DemolitionArenaPropCollisionBox piece,
+        float margin)
+    {
+        TideglassPropPieceWorld(prop, piece, out var center, out var basis, out var half);
+        var extentX = Mathf.Abs(basis.X.X) * half.X
+            + Mathf.Abs(basis.Y.X) * half.Y
+            + Mathf.Abs(basis.Z.X) * half.Z
+            + margin;
+        var extentZ = Mathf.Abs(basis.X.Z) * half.X
+            + Mathf.Abs(basis.Y.Z) * half.Y
+            + Mathf.Abs(basis.Z.Z) * half.Z
+            + margin;
+        return new Rect2(
+            new Vector2(center.X - extentX, center.Z - extentZ),
+            new Vector2(extentX * 2.0f, extentZ * 2.0f));
+    }
+
+    private static void TideglassPropPieceWorld(
+        DemolitionArenaProp prop,
+        DemolitionArenaPropCollisionBox piece,
+        out Vector3 center,
+        out Basis basis,
+        out Vector3 half)
+    {
+        var propBasis = new Basis(Vector3.Up, prop.Yaw);
+        center = prop.Position + propBasis * (piece.Offset * prop.Scale);
+        basis = propBasis * new Basis(Quaternion.FromEuler(piece.Rotation));
+        half = piece.Size * prop.Scale * 0.5f;
+    }
+
+    private static bool TideglassPropCollisionMatchesDefinition(
+        Node3D root,
+        DemolitionArenaProp prop,
+        out int authoredTriangles,
+        out string failure)
+    {
+        authoredTriangles = 0;
+        failure = "none";
+        var body = root.GetNodeOrNull<StaticBody3D>(prop.Name);
+        var model = body?.GetNodeOrNull<Node3D>("Model");
+        if (!IsInstanceValid(body) || !IsInstanceValid(model))
+        {
+            failure = "missing-body-or-model";
+            return false;
+        }
+
+        var collisions = body!.GetChildren()
+            .OfType<CollisionShape3D>()
+            .OrderBy(collision => collision.Name.ToString(), StringComparer.Ordinal)
+            .ToArray();
+        if (!body.HasMeta("prop_collision_mode")
+            || body.GetMeta("prop_collision_mode").AsString() != prop.CollisionMode.ToString())
+        {
+            failure = "mode-metadata";
+            return false;
+        }
+        if (!body.HasMeta("analytical_collision_piece_count")
+            || body.GetMeta("analytical_collision_piece_count").AsInt32() != prop.CollisionPieceCount)
+        {
+            failure = "piece-metadata";
+            return false;
+        }
+
+        if (prop.CollisionMode == DemolitionArenaPropCollisionMode.AuthoredConcave)
+        {
+            if (collisions.Length != 1
+                || collisions[0].Name != "Collision"
+                || collisions[0].Shape is not ConcavePolygonShape3D concave)
+            {
+                failure = "authored-shape";
+                return false;
+            }
+            var collisionFaces = concave.GetFaces();
+            authoredTriangles = collisionFaces.Length / 3;
+            var sourceFaceCount = 0;
+            var meshes = model!.FindChildren("*", "MeshInstance3D", true, false);
+            using var meshesBacking = meshes.AsDisposable();
+            foreach (var child in meshes)
+            {
+                if (child is MeshInstance3D mesh && mesh.Mesh is not null)
+                {
+                    sourceFaceCount += mesh.Mesh.GetFaces().Length;
+                }
+            }
+            if (collisionFaces.Length < 3
+                || collisionFaces.Length != sourceFaceCount
+                || concave.BackfaceCollision != prop.AuthoredBackfaceCollision
+                || !collisions[0].Position.IsEqualApprox(Vector3.Zero)
+                || !collisions[0].Rotation.IsEqualApprox(Vector3.Zero))
+            {
+                failure = "authored-geometry";
+                return false;
+            }
+            if (!body.HasMeta("authored_collision_triangle_count")
+                || body.GetMeta("authored_collision_triangle_count").AsInt32() != authoredTriangles
+                || !body.HasMeta("authored_collision_backface")
+                || body.GetMeta("authored_collision_backface").AsBool()
+                    != prop.AuthoredBackfaceCollision)
+            {
+                failure = "authored-metadata";
+                return false;
+            }
+            return true;
+        }
+
+        if (collisions.Length != prop.CollisionPieceCount)
+        {
+            failure = $"box-count-{collisions.Length}";
+            return false;
+        }
+        for (var pieceIndex = 0; pieceIndex < prop.CollisionPieceCount; pieceIndex++)
+        {
+            var piece = prop.CollisionPieceAt(pieceIndex);
+            var collision = collisions[pieceIndex];
+            var expectedName = prop.CollisionPieceCount == 1
+                ? "Collision"
+                : $"Collision_{pieceIndex + 1:00}";
+            if (collision.Name != expectedName
+                || collision.Shape is not BoxShape3D box
+                || !box.Size.IsEqualApprox(piece.Size * prop.Scale)
+                || !collision.Position.IsEqualApprox(piece.Offset * prop.Scale)
+                || !collision.Rotation.IsEqualApprox(piece.Rotation))
+            {
+                failure = $"box-{pieceIndex + 1}";
+                return false;
+            }
+        }
+
+        if (prop.CollisionMode == DemolitionArenaPropCollisionMode.BoundsBox
+            && (!HarborPropCollisionCoversModel(root, prop)
+                || !TideglassPropCollisionTightlyFitsModel(root, prop)))
+        {
+            failure = "bounds-fit";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool TideglassCollisionProfilesReady(
+        DemolitionArenaLayout layout,
+        int authoredTriangles,
+        out string failures)
+    {
+        var failed = new List<string>();
+        var expectedBounds = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "MidCoverDumpster",
+            "MidCoverMachine",
+            "MidCoverCivicPlanter",
+            "MidCoverGenerator",
+            "DefenderCourtyardGenerator",
+            "ConstructionLaneGenerator",
+            "EastSiteGenerator",
+            "SouthPerimeterGenerator",
+            "MidCoverConcreteBarrier",
+            "ConstructionSupplyCrate"
+        };
+        var expectedCompound = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "NorthBrickOffices",
+            "NorthCustomsHouse",
+            "SouthGatehouse",
+            "EastInspectionOffice",
+            "SightBlockEastApproachOffices",
+            "DefenderServiceBlock",
+            "SouthwestWatchHouse",
+            "NorthFoundryTenement",
+            "SouthGlassworksOffice",
+            "WestFoundryInspectionAnnex",
+            "NorthFreightOffice",
+            "WestGateOffice"
+        };
+        var expectedAuthored = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "SightBlockConstructionSiteOffice",
+            "SightBlockReactorCargoContainers",
+            "ConstructionTruck",
+            "MidCoverConstructionSupplies",
+            "MidCoverHopper",
+            "MidCoverRoadBarrier",
+            "ReactorPipeManifold",
+            "CrossingTrafficLight"
+        };
+        var actualBounds = layout.Props
+            .Where(prop => prop.CollisionMode == DemolitionArenaPropCollisionMode.BoundsBox)
+            .Select(prop => prop.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        var actualCompound = layout.Props
+            .Where(prop => prop.CollisionMode == DemolitionArenaPropCollisionMode.CompoundBoxes)
+            .Select(prop => prop.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        var actualAuthored = layout.Props
+            .Where(prop => prop.CollisionMode == DemolitionArenaPropCollisionMode.AuthoredConcave)
+            .Select(prop => prop.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        if (!actualBounds.SetEquals(expectedBounds))
+        {
+            failed.Add($"bounds={string.Join(',', actualBounds.OrderBy(name => name))}");
+        }
+        if (!actualCompound.SetEquals(expectedCompound)
+            || layout.Props.Any(prop => prop.CollisionMode == DemolitionArenaPropCollisionMode.CompoundBoxes
+                && prop.CollisionPieceCount < 2))
+        {
+            failed.Add($"compound={string.Join(',', actualCompound.OrderBy(name => name))}");
+        }
+        if (!actualAuthored.SetEquals(expectedAuthored)
+            || layout.Props.Any(prop => prop.CollisionMode == DemolitionArenaPropCollisionMode.AuthoredConcave
+                && !prop.AuthoredBackfaceCollision))
+        {
+            failed.Add($"authored={string.Join(',', actualAuthored.OrderBy(name => name))}");
+        }
+        if (layout.Props.Any(prop => TideglassDensityIsMajorBuilding(prop)
+            && prop.CollisionMode == DemolitionArenaPropCollisionMode.BoundsBox))
+        {
+            failed.Add("major-bounds");
+        }
+        if (layout.Props.Any(prop => Enumerable.Range(0, prop.CollisionPieceCount)
+            .Select(prop.CollisionPieceAt)
+            .Any(piece => piece.Size.X <= 0.0f || piece.Size.Y <= 0.0f || piece.Size.Z <= 0.0f)))
+        {
+            failed.Add("invalid-piece");
+        }
+        if (authoredTriangles <= 0 || authoredTriangles > 5000)
+        {
+            failed.Add($"triangle-budget={authoredTriangles}");
+        }
+        failures = string.Join(';', failed);
+        return failed.Count == 0;
+    }
+
+    private static bool TideglassCollisionSilhouettesReady(
+        Node3D root,
+        DemolitionArenaLayout layout,
+        out string failures)
+    {
+        var failed = new List<string>();
+        var sampleHeights = new[] { 0.4f, 1.0f, 1.6f };
+        const float maximumCollisionOutset = 0.3f;
+        // Shallow roofs, trim and railings may remain non-solid; full missing walls still fail this guard.
+        const float maximumCollisionInset = 1.25f;
+        foreach (var prop in layout.Props.Where(prop =>
+                     prop.CollisionMode is DemolitionArenaPropCollisionMode.FootprintBox
+                         or DemolitionArenaPropCollisionMode.CompoundBoxes))
+        {
+            var body = root.GetNodeOrNull<StaticBody3D>(prop.Name);
+            var model = body?.GetNodeOrNull<Node3D>("Model");
+            if (!IsInstanceValid(body) || !IsInstanceValid(model))
+            {
+                failed.Add($"{prop.Name}:missing");
+                continue;
+            }
+            var collisionInset = prop.Name == "NorthFoundryTenement"
+                ? 1.75f // The decorative fire-escape rail projects beyond the five walkable concrete steps.
+                : maximumCollisionInset;
+            foreach (var sampleHeight in sampleHeights)
+            {
+                if (!TideglassTryGetCollisionSliceBounds(
+                        prop,
+                        sampleHeight,
+                        out var collisionMinimum,
+                        out var collisionMaximum)
+                    || !TideglassTryGetVisibleSliceBounds(
+                        body!,
+                        model!,
+                        sampleHeight,
+                        out var visibleMinimum,
+                        out var visibleMaximum))
+                {
+                    failed.Add($"{prop.Name}@{sampleHeight:0.0}:missing-slice");
+                    continue;
+                }
+                if (collisionMinimum.X < visibleMinimum.X - maximumCollisionOutset
+                    || collisionMinimum.Y < visibleMinimum.Y - maximumCollisionOutset
+                    || collisionMaximum.X > visibleMaximum.X + maximumCollisionOutset
+                    || collisionMaximum.Y > visibleMaximum.Y + maximumCollisionOutset
+                    || collisionMinimum.X > visibleMinimum.X + collisionInset
+                    || collisionMinimum.Y > visibleMinimum.Y + collisionInset
+                    || collisionMaximum.X < visibleMaximum.X - collisionInset
+                    || collisionMaximum.Y < visibleMaximum.Y - collisionInset)
+                {
+                    failed.Add(
+                        $"{prop.Name}@{sampleHeight:0.0}:"
+                        + $"collision={collisionMinimum}>{collisionMaximum}:"
+                        + $"visual={visibleMinimum}>{visibleMaximum}");
+                }
+            }
+        }
+        failures = string.Join('|', failed);
+        return failed.Count == 0;
+    }
+
+    private static bool TideglassTryGetCollisionSliceBounds(
+        DemolitionArenaProp prop,
+        float sampleHeight,
+        out Vector2 minimum,
+        out Vector2 maximum)
+    {
+        minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+        maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+        for (var pieceIndex = 0; pieceIndex < prop.CollisionPieceCount; pieceIndex++)
+        {
+            var piece = prop.CollisionPieceAt(pieceIndex);
+            var center = piece.Offset * prop.Scale;
+            var basis = new Basis(Quaternion.FromEuler(piece.Rotation));
+            var half = piece.Size * prop.Scale * 0.5f;
+            var extentX = Mathf.Abs(basis.X.X) * half.X
+                + Mathf.Abs(basis.Y.X) * half.Y
+                + Mathf.Abs(basis.Z.X) * half.Z;
+            var extentY = Mathf.Abs(basis.X.Y) * half.X
+                + Mathf.Abs(basis.Y.Y) * half.Y
+                + Mathf.Abs(basis.Z.Y) * half.Z;
+            var extentZ = Mathf.Abs(basis.X.Z) * half.X
+                + Mathf.Abs(basis.Y.Z) * half.Y
+                + Mathf.Abs(basis.Z.Z) * half.Z;
+            if (sampleHeight < center.Y - extentY - 0.01f
+                || sampleHeight > center.Y + extentY + 0.01f)
+            {
+                continue;
+            }
+            minimum = new Vector2(
+                Mathf.Min(minimum.X, center.X - extentX),
+                Mathf.Min(minimum.Y, center.Z - extentZ));
+            maximum = new Vector2(
+                Mathf.Max(maximum.X, center.X + extentX),
+                Mathf.Max(maximum.Y, center.Z + extentZ));
+        }
+        return !float.IsInfinity(minimum.X);
+    }
+
+    private static bool TideglassTryGetVisibleSliceBounds(
+        Node3D body,
+        Node3D model,
+        float sampleHeight,
+        out Vector2 minimum,
+        out Vector2 maximum)
+    {
+        minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+        maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+        var meshes = model.FindChildren("*", "MeshInstance3D", true, false);
+        using var meshesBacking = meshes.AsDisposable();
+        foreach (var child in meshes)
+        {
+            if (child is not MeshInstance3D mesh
+                || mesh.Mesh is null
+                || !mesh.Visible
+                || !mesh.IsVisibleInTree())
+            {
+                continue;
+            }
+            var meshToBody = body.GlobalTransform.AffineInverse() * mesh.GlobalTransform;
+            var faces = mesh.Mesh.GetFaces();
+            for (var faceIndex = 0; faceIndex + 2 < faces.Length; faceIndex += 3)
+            {
+                var a = meshToBody * faces[faceIndex];
+                var b = meshToBody * faces[faceIndex + 1];
+                var c = meshToBody * faces[faceIndex + 2];
+                TideglassAccumulateSliceEdge(
+                    a,
+                    b,
+                    sampleHeight,
+                    ref minimum,
+                    ref maximum);
+                TideglassAccumulateSliceEdge(
+                    b,
+                    c,
+                    sampleHeight,
+                    ref minimum,
+                    ref maximum);
+                TideglassAccumulateSliceEdge(
+                    c,
+                    a,
+                    sampleHeight,
+                    ref minimum,
+                    ref maximum);
+            }
+        }
+        return !float.IsInfinity(minimum.X);
+    }
+
+    private static void TideglassAccumulateSliceEdge(
+        Vector3 from,
+        Vector3 to,
+        float sampleHeight,
+        ref Vector2 minimum,
+        ref Vector2 maximum)
+    {
+        const float tolerance = 0.001f;
+        var fromOffset = from.Y - sampleHeight;
+        var toOffset = to.Y - sampleHeight;
+        if (Mathf.Abs(fromOffset) <= tolerance)
+        {
+            TideglassAccumulateSlicePoint(from, ref minimum, ref maximum);
+        }
+        if (Mathf.Abs(toOffset) <= tolerance)
+        {
+            TideglassAccumulateSlicePoint(to, ref minimum, ref maximum);
+        }
+        if (fromOffset * toOffset >= 0.0f || Mathf.Abs(to.Y - from.Y) <= tolerance)
+        {
+            return;
+        }
+        var weight = (sampleHeight - from.Y) / (to.Y - from.Y);
+        TideglassAccumulateSlicePoint(from.Lerp(to, weight), ref minimum, ref maximum);
+    }
+
+    private static void TideglassAccumulateSlicePoint(
+        Vector3 point,
+        ref Vector2 minimum,
+        ref Vector2 maximum)
+    {
+        minimum = new Vector2(
+            Mathf.Min(minimum.X, point.X),
+            Mathf.Min(minimum.Y, point.Z));
+        maximum = new Vector2(
+            Mathf.Max(maximum.X, point.X),
+            Mathf.Max(maximum.Y, point.Z));
     }
 
     private static bool TideglassPropCollisionTightlyFitsModel(

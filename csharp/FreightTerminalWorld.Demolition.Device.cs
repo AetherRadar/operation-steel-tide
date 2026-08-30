@@ -281,28 +281,58 @@ public partial class FreightTerminalWorld
 
     private bool IsPointInsideDemolitionGeometry(Vector3 point, DemolitionArenaLayout layout)
     {
-        // 检查碰撞盒与道具包围盒
+        const float horizontalPadding = 0.6f;
+        const float bodyProbeHeight = 0.9f;
+        var probePoint = point + Vector3.Up * bodyProbeHeight;
+
+        // Probe at body height so walkable floors and low steps do not displace the dropped device.
         foreach (var box in layout.CollisionBoxes)
         {
-            var half = box.Size * 0.5f;
-            var delta = point - box.Center;
-            // 粗略AABB，忽略旋转（旋转盒已在布局中少见，且1.5m侧探足够）
-            if (Mathf.Abs(delta.X) < half.X + 0.6f && Mathf.Abs(delta.Z) < half.Z + 0.6f && Mathf.Abs(delta.Y - box.Center.Y) < half.Y + 1.0f)
+            var basis = new Basis(Quaternion.FromEuler(box.Rotation));
+            if (PointInsideExpandedDemolitionBox(
+                    probePoint,
+                    box.Center,
+                    basis,
+                    box.Size * 0.5f,
+                    horizontalPadding))
             {
                 return true;
             }
         }
         foreach (var prop in layout.Props)
         {
-            var half = prop.CollisionSize * prop.Scale * 0.5f;
-            var center = prop.Position + new Basis(Vector3.Up, prop.Yaw) * (prop.CollisionOffset * prop.Scale);
-            var delta = point - center;
-            if (Mathf.Abs(delta.X) < half.X + 0.6f && Mathf.Abs(delta.Z) < half.Z + 0.6f && Mathf.Abs(delta.Y - center.Y) < half.Y + 1.0f)
+            var propBasis = new Basis(Vector3.Up, prop.Yaw);
+            for (var pieceIndex = 0; pieceIndex < prop.CollisionPieceCount; pieceIndex++)
             {
-                return true;
+                var piece = prop.CollisionPieceAt(pieceIndex);
+                var center = prop.Position + propBasis * (piece.Offset * prop.Scale);
+                var basis = propBasis * new Basis(Quaternion.FromEuler(piece.Rotation));
+                var half = piece.Size * Mathf.Abs(prop.Scale) * 0.5f;
+                if (PointInsideExpandedDemolitionBox(
+                        probePoint,
+                        center,
+                        basis,
+                        half,
+                        horizontalPadding))
+                {
+                    return true;
+                }
             }
         }
         return false;
+    }
+
+    private static bool PointInsideExpandedDemolitionBox(
+        Vector3 point,
+        Vector3 center,
+        Basis basis,
+        Vector3 half,
+        float horizontalPadding)
+    {
+        var local = basis.Inverse() * (point - center);
+        return Mathf.Abs(local.X) < half.X + horizontalPadding
+            && Mathf.Abs(local.Y) < half.Y
+            && Mathf.Abs(local.Z) < half.Z + horizontalPadding;
     }
 
     private void SyncDemolitionDeviceVisual()

@@ -12,7 +12,9 @@ public partial class FreightTerminalWorld
     // Tideglass V2 geometry is still converging. Follow-up: extract the reusable grid, cover,
     // and lane probes into a focused DemolitionDensityProbe after the V2 layout is locked.
     private const double TideglassDensityMaximumBuildMilliseconds = 6000.0;
-    private const float TideglassDensityMaximumHorizontalSightline = 58.0f;
+    // Exact visible collision no longer treats roof overhangs and open porches as opaque walls.
+    // Real authored cover keeps the honest maximum below roughly half the 136 m map width.
+    private const float TideglassDensityMaximumHorizontalSightline = 70.0f;
     private const float TideglassDensityMaximumOpenDiameter = 26.0f;
     private const float TideglassDensityMinimumSiteDirectionalCover = 0.18f;
     private const float TideglassDensityMinimumCoveredSiteSamples = 0.60f;
@@ -181,8 +183,8 @@ public partial class FreightTerminalWorld
         var loadedPropCount = layout.Props.Count(prop =>
             TideglassPropModelLoaded(arena.Root, prop));
         var missingModelCount = dressingRoot?.GetMeta("missing_model_count").AsInt32() ?? -1;
-        var authoredPathReady = layout.Props.Count == 52
-            && allAuthoredPaths.Length == 78
+        var authoredPathReady = layout.Props.Count == 56
+            && allAuthoredPaths.Length == 82
             && uniqueAuthoredPathCount == 70
             && sourcePacks.SetEquals(new[]
             {

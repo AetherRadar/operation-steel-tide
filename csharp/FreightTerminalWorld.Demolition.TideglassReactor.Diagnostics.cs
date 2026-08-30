@@ -62,25 +62,48 @@ public partial class FreightTerminalWorld
         var dressingRoot = arena.Root.GetNodeOrNull<Node3D>("DemolitionAuthoredDressing");
         var importedProps = layout.Props.Count(prop => TideglassPropModelLoaded(arena.Root, prop));
         var boundsFailures = layout.Props
-            .Where(prop => !HarborPropInsideBounds(layout, prop))
+            .Where(prop => !TideglassPropInsideBounds(layout, prop))
             .Select(prop => prop.Name)
             .ToArray();
         var propsInsideBounds = boundsFailures.Length == 0;
-        var propsSeparated = HarborPropsSeparated(layout.Props, out var overlapPair);
+        var propsSeparated = TideglassPropsSeparated(layout.Props, out var overlapPair);
         var sitesClear = layout.SitePositions.All(site => layout.Props.All(prop =>
-            !HarborPointOverlapsProp(site, 3.4f, prop)));
+            !TideglassPointOverlapsProp(site, 3.4f, prop)));
         var spawnsClear = layout.AttackSpawns.Concat(layout.DefenderSpawns).All(spawn =>
-            layout.Props.All(prop => !HarborPointOverlapsProp(spawn, 0.8f, prop)));
-        var collisionCoverageFailures = layout.Props
-            .Where(prop => !HarborPropCollisionCoversModel(arena.Root, prop))
-            .Select(prop => prop.Name)
-            .ToArray();
-        var tightCollisionFailures = layout.Props
-            .Where(prop => !TideglassPropCollisionTightlyFitsModel(arena.Root, prop))
-            .Select(prop => prop.Name)
-            .ToArray();
-        var collisionCoverage = collisionCoverageFailures.Length == 0
-            && tightCollisionFailures.Length == 0;
+            layout.Props.All(prop => !TideglassPointOverlapsProp(spawn, 0.8f, prop)));
+        var collisionDefinitionFailures = new List<string>();
+        var authoredCollisionTriangles = 0;
+        foreach (var prop in layout.Props)
+        {
+            if (!TideglassPropCollisionMatchesDefinition(
+                    arena.Root,
+                    prop,
+                    out var propAuthoredTriangles,
+                    out var failure))
+            {
+                collisionDefinitionFailures.Add($"{prop.Name}:{failure}");
+            }
+            authoredCollisionTriangles += propAuthoredTriangles;
+        }
+        var collisionProfilesReady = TideglassCollisionProfilesReady(
+            layout,
+            authoredCollisionTriangles,
+            out var collisionProfileFailures);
+        var collisionSilhouettesReady = TideglassCollisionSilhouettesReady(
+            arena.Root,
+            layout,
+            out var collisionSilhouetteFailures);
+        var collisionCoverage = collisionDefinitionFailures.Count == 0
+            && collisionProfilesReady
+            && collisionSilhouettesReady;
+        var boundsCollisionCount = layout.Props.Count(prop =>
+            prop.CollisionMode == DemolitionArenaPropCollisionMode.BoundsBox);
+        var footprintCollisionCount = layout.Props.Count(prop =>
+            prop.CollisionMode == DemolitionArenaPropCollisionMode.FootprintBox);
+        var compoundCollisionCount = layout.Props.Count(prop =>
+            prop.CollisionMode == DemolitionArenaPropCollisionMode.CompoundBoxes);
+        var authoredCollisionCount = layout.Props.Count(prop =>
+            prop.CollisionMode == DemolitionArenaPropCollisionMode.AuthoredConcave);
         var authoredCollisionOnly = layout.CollisionBoxes.All(box => !box.Visible)
             && layout.DetailBoxes.Count == 0;
         var dressingBoundsReady = TideglassDressingModelsInsideBounds(
@@ -145,7 +168,7 @@ public partial class FreightTerminalWorld
             && layout.NavigationBoxes[1].Name == "ConstructionSouthHillNavigation"
             && layout.NavigationBoxes[2].Name == "ConstructionNorthHillNavigation";
         var geometryReady = layout.CollisionBoxes.Count == 15
-            && layout.Props.Count == 52
+            && layout.Props.Count == 56
             && importedProps == layout.Props.Count
             && layout.CollisionBoxes.All(box => box.Size.X > 0.1f && box.Size.Y > 0.1f && box.Size.Z > 0.1f)
             && propsInsideBounds
@@ -350,6 +373,21 @@ public partial class FreightTerminalWorld
             .Where(check => !check.OwnerKnown || !check.Inside || !check.Route.ReachesDestination || !check.Clear || !check.PhysicalClear)
             .Select(check => $"{check.Key}:{check.PhysicalBlocker}"));
         var upwardBlock = TideglassWalkwayUpwardBlockReady(GetWorld3D(), layout);
+        var southHousePassage = new[]
+        {
+            layout.Origin + new Vector3(-31.56f, 0.2f, 43.3f),
+            layout.Origin + new Vector3(-31.56f, 0.2f, 40.8f)
+        };
+        var southHousePassageClear = TideglassPhysicalRouteClear(
+            GetWorld3D(),
+            southHousePassage,
+            out var southHousePassageBlocker);
+        var constructionOfficeOpenRamp = layout.Origin + new Vector3(30.7f, 0.22f, 46.1f);
+        var constructionOfficeSolidWall = layout.Origin + new Vector3(25.0f, 0.22f, 44.0f);
+        var deviceDropGeometryReady = !IsPointInsideDemolitionGeometry(
+                constructionOfficeOpenRamp,
+                layout)
+            && IsPointInsideDemolitionGeometry(constructionOfficeSolidWall, layout);
         var stairTraversal = await TideglassWalkPlayerAcrossStairs(layout);
 
         var authoredNodes = GetTree().GetNodesInGroup("demolition_authored_model");
@@ -394,8 +432,8 @@ public partial class FreightTerminalWorld
             && majorDressingCount == 2
             && majorBuildingCount == 41;
         var compositionReady = authoredModelCount == 26
-            && layout.Props.Count == 52
-            && allAuthoredPaths.Length == 78
+            && layout.Props.Count == 56
+            && allAuthoredPaths.Length == 82
             && allAuthoredPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 70
             && sceneReuse == 5
             && majorBuildingsReady
@@ -457,6 +495,8 @@ public partial class FreightTerminalWorld
             && navigationReady
             && strategyTargetsReady
             && upwardBlock.Ready
+            && southHousePassageClear
+            && deviceDropGeometryReady
             && stairTraversal.Ready
             && authoredDressingReady
             && runtimeReady;
@@ -466,7 +506,9 @@ public partial class FreightTerminalWorld
             + $"expansion={expansionReady}:{expandedDistrictBuildings.Length} major_buildings={majorBuildingsReady}:{majorBuildingCount} bounds_size={layout.WorldBounds.Size} site_separation={layout.SiteSeparation:0.00} route_lengths={layout.AttackToALength:0.00}/{layout.AttackToBLength:0.00} "
             + $"bounds={propsInsideBounds} bounds_failures={string.Join('|', boundsFailures)} separated={propsSeparated} overlap={overlapPair} site_clear={sitesClear} "
             + $"spawn_clear={spawnsClear} collision_coverage={collisionCoverage} "
-            + $"collision_failures={string.Join('|', collisionCoverageFailures)} tight_collision_failures={string.Join('|', tightCollisionFailures)} "
+            + $"collision_definition_failures={string.Join('|', collisionDefinitionFailures)} collision_profiles={collisionProfilesReady}:{collisionProfileFailures} "
+            + $"collision_silhouettes={collisionSilhouettesReady}:{collisionSilhouetteFailures} "
+            + $"collision_modes={boundsCollisionCount}/{footprintCollisionCount}/{compoundCollisionCount}/{authoredCollisionCount} authored_collision_triangles={authoredCollisionTriangles} "
             + $"dressing_bounds={dressingBoundsReady} dressing_bounds_failures={dressingBoundsFailures} perimeter_fence={perimeterFenceReady} "
             + $"perimeter_gates={perimeterGatesReady} perimeter_gate_failures={perimeterGateFailures} solid_materials={solidMaterialsReady} solid_material_failures={solidMaterialFailures} "
             + $"road_surfaces={roadSurfacesReady} road_surface_failures={roadSurfaceFailures} tower_collision={towerCollisionReady} authored_mesh_collision={authoredMeshCollisionReady} "
@@ -481,8 +523,11 @@ public partial class FreightTerminalWorld
             + $"physical_routes={physicalRouteAClear}/{physicalRouteBClear}/{physicalRouteMidClear}/{physicalDefenderAClear}/{physicalDefenderBClear}/{physicalRotationClear} "
             + $"physical_blockers={physicalRouteABlocker}|{physicalRouteBBlocker}|{physicalRouteMidBlocker}|{physicalDefenderABlocker}|{physicalDefenderBBlocker}|{physicalRotationBlocker} "
             + $"walkway_upward_block={upwardBlock.Ready}:{upwardBlock.SafeFraction:0.000}:{upwardBlock.Collider} "
+            + $"south_house_passage={southHousePassageClear}:{southHousePassageBlocker} "
+            + $"device_drop_geometry={deviceDropGeometryReady} "
             + $"stair_walk={stairTraversal.Ready} west_stair={stairTraversal.WestReady}:{stairTraversal.WestFrames}:{stairTraversal.WestGain:0.00} "
             + $"east_stair={stairTraversal.EastReady}:{stairTraversal.EastFrames}:{stairTraversal.EastGain:0.00} "
+            + $"site_office_stair={stairTraversal.SiteOfficeReady}:{stairTraversal.SiteOfficeFrames}:{stairTraversal.SiteOfficeGain:0.00} "
             + $"runtime={runtimeReady} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} sites={arena.Sites.Count} "
             + $"authored={authoredDressingReady} authored_models={authoredModelCount} authored_nodes={authoredModels.Length} "
             + $"dressing_scenes={uniqueSceneCount} dressing_packs={dressingSourcePacks.Count} dressing_reuse={dressingSceneReuse} "

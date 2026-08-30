@@ -207,8 +207,10 @@ public sealed partial class DemolitionArenaBuilder
         };
         root.AddChild(body);
         var scene = GD.Load<PackedScene>(definition.ScenePath);
-        if (scene?.Instantiate() is Node3D model)
+        Node3D? model = null;
+        if (scene?.Instantiate() is Node3D instantiatedModel)
         {
+            model = instantiatedModel;
             model.Name = "Model";
             model.Scale = Vector3.One * definition.Scale;
             body.AddChild(model);
@@ -221,12 +223,7 @@ public sealed partial class DemolitionArenaBuilder
             }
             _visualPartCount++;
         }
-        body.AddChild(new CollisionShape3D
-        {
-            Name = "Collision",
-            Position = definition.CollisionOffset * definition.Scale,
-            Shape = new BoxShape3D { Size = definition.CollisionSize * definition.Scale }
-        });
+        AddPropCollision(body, model, definition);
         _staticBodies.Add(body);
     }
 
