@@ -202,15 +202,15 @@ internal sealed class DemolitionArenaDressingBuilder
     {
         return new[]
         {
-            Authored("TideglassRoadBase", "road.glb", origin, new(0.0f, -0.136f, 0.0f), 0.0f, new Vector3(0.82f, 0.78f, 0.70f), ModelSource.Majadroid),
-            Authored("TideglassPerimeterFence", "fence.glb", origin, new(0.0f, 0.02f, 0.0f), 0.0f, new Vector3(1.109f, 1.5f, 0.949f), ModelSource.Majadroid),
-            Authored("EastPerimeterSecurityGate", "east-security-gate.glb", origin, new(55.5f, 0.02f, -23.63f), -90.0f, new Vector3(1.009f, 0.9375f, 1.0f), ModelSource.TreyIndustrial),
-            Authored("WestPerimeterServiceGate", "west-service-gate.glb", origin, new(-55.5f, 0.02f, -37.96f), 90.0f, new Vector3(0.988f, 0.9375f, 1.0f), ModelSource.TreyIndustrial),
-            Authored("ConstructionGround", "ground.glb", origin, new(-31.0f, 0.02f, 18.0f), 0.0f, 0.34f, ModelSource.Majadroid),
-            Authored("ConstructionBuilding", "building.glb", origin, new(-45.0f, 0.02f, 18.0f), 90.0f, 1.0f, ModelSource.Majadroid),
-            Authored("ConstructionCrane", "crane-on-ground.glb", origin, new(-39.0f, 0.02f, -6.2f), -12.0f, 0.85f, ModelSource.Majadroid),
+            Authored("TideglassRoadBase", "road.glb", origin, new(0.0f, -0.136f, 0.0f), 0.0f, new Vector3(0.996f, 0.78f, 0.817f), ModelSource.Majadroid),
+            Authored("TideglassPerimeterFence", "fence.glb", origin, new(0.0f, 0.02f, 0.0f), 0.0f, new Vector3(1.3488f, 1.5f, 1.1088f), ModelSource.Majadroid),
+            Authored("EastPerimeterSecurityGate", "east-security-gate.glb", origin, new(67.5f, 0.02f, -27.57f), -90.0f, new Vector3(1.177f, 0.9375f, 1.0f), ModelSource.TreyIndustrial),
+            Authored("WestPerimeterServiceGate", "west-service-gate.glb", origin, new(-67.5f, 0.02f, -44.29f), 90.0f, new Vector3(1.153f, 0.9375f, 1.0f), ModelSource.TreyIndustrial),
+            Authored("ConstructionGround", "ground.glb", origin, new(-41.0f, 0.02f, 22.0f), 0.0f, 0.34f, ModelSource.Majadroid),
+            Authored("ConstructionBuilding", "building.glb", origin, new(-55.0f, 0.02f, 22.0f), 90.0f, 1.0f, ModelSource.Majadroid),
+            Authored("ConstructionCrane", "crane-on-ground.glb", origin, new(-49.0f, 0.02f, -2.2f), -12.0f, 0.85f, ModelSource.Majadroid),
 
-            Authored("OldBrickReactorHall", "Building_Large_2.gltf", origin, new(43.0f, 0.02f, -9.75f), -90.0f, 0.75f, ModelSource.Downtown),
+            Authored("OldBrickReactorHall", "Building_Large_2.gltf", origin, new(52.0f, 0.02f, -13.0f), -90.0f, 0.75f, ModelSource.Downtown),
 
             Authored("OrangeArchGateway", "arch-gateway.glb", origin, new(0.0f, 0.02f, -31.5f), 0.0f, 1.25f, ModelSource.TreyIndustrial),
             Authored("CivicElevatedWalkway", "elevated-walkway.glb", origin, new(0.0f, 0.02f, 26.5f), 0.0f, 1.15f, ModelSource.TreyIndustrial),
@@ -227,9 +227,9 @@ internal sealed class DemolitionArenaDressingBuilder
             Authored("ConstructionCone", "construction-cone.glb", origin, new(-25.0f, 0.02f, 12.0f), 0.0f, 1.2f, ModelSource.Roads),
             Authored("ConstructionWorkLight", "construction-light.glb", origin, new(-25.0f, 0.02f, 22.0f), 0.0f, 1.4f, ModelSource.Roads),
             Authored("CivicPowerPole", "electricity-pole-wide.glb", origin, new(19.0f, 0.02f, 24.0f), 90.0f, 1.4f, ModelSource.Roads),
-            Authored("ConstructionStreetlight", "light-curved.glb", origin, new(-32.0f, 0.02f, 7.0f), 0.0f, 1.35f, ModelSource.Roads),
-            Authored("ReactorStreetlight", "light-square-double.glb", origin, new(35.0f, 0.02f, -29.0f), 0.0f, 1.35f, ModelSource.Roads),
-            Authored("ConstructionWarningSign", "road-sign-warning.glb", origin, new(-24.0f, 0.02f, 31.0f), 35.0f, 1.3f, ModelSource.Roads),
+            Authored("ConstructionStreetlight", "light-curved.glb", origin, new(-43.0f, 0.02f, 8.0f), 0.0f, 1.35f, ModelSource.Roads),
+            Authored("ReactorStreetlight", "light-square-double.glb", origin, new(43.0f, 0.02f, -37.0f), 0.0f, 1.35f, ModelSource.Roads),
+            Authored("ConstructionWarningSign", "road-sign-warning.glb", origin, new(-28.0f, 0.02f, 35.0f), 35.0f, 1.3f, ModelSource.Roads),
             Authored("CrossingStopSign", "road-sign-stop.glb", origin, new(10.0f, 0.02f, 3.0f), -90.0f, 1.3f, ModelSource.Roads),
             Authored("ReactorHangingSignal", "traffic-light-hanging.glb", origin, new(27.0f, 0.02f, -7.0f), 90.0f, 1.0f, ModelSource.Roads)
         };

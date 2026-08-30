@@ -145,18 +145,23 @@ public partial class FreightTerminalWorld
         });
     }
 
-    private static bool TideglassTreyAssembliesReady(Node3D root, out string failures)
+    private static bool TideglassTreyAssembliesReady(
+        Node3D root,
+        DemolitionArenaLayout layout,
+        out string failures)
     {
         var expected = new[]
         {
-            (Name: "NorthLoadingBay", Meshes: 20, Windows: 0, Roofs: 8, Height: 3.15f),
-            (Name: "SouthUtilityOffice", Meshes: 11, Windows: 1, Roofs: 2, Height: 3.3f),
-            (Name: "CentralServiceHall", Meshes: 20, Windows: 2, Roofs: 8, Height: 4.2f),
-            (Name: "WestWindowHall", Meshes: 21, Windows: 3, Roofs: 8, Height: 3.15f)
+            (Name: "NorthLoadingBay", Meshes: 20, Windows: 0, Roofs: 8),
+            (Name: "SouthUtilityOffice", Meshes: 11, Windows: 1, Roofs: 2),
+            (Name: "CentralServiceHall", Meshes: 20, Windows: 2, Roofs: 8),
+            (Name: "WestWindowHall", Meshes: 21, Windows: 3, Roofs: 8)
         };
         var failed = new List<string>();
         foreach (var item in expected)
         {
+            var prop = layout.Props.Single(prop => prop.Name == item.Name);
+            var expectedHeight = 3.0f * prop.Scale;
             var body = root.GetNodeOrNull<StaticBody3D>(item.Name);
             var model = body?.GetNodeOrNull<Node3D>("Model");
             if (!IsInstanceValid(body)
@@ -178,14 +183,16 @@ public partial class FreightTerminalWorld
                 && names.All(name => !name.Contains("IndWindowE", StringComparison.Ordinal))
                 && names.All(name => !name.Contains("IndRoofAngled", StringComparison.Ordinal))
                 && meshes.All(mesh => mesh.Visible && mesh.IsVisibleInTree() && (mesh.Layers & 1u) != 0)
+                && model!.Scale.IsEqualApprox(Vector3.One * prop.Scale)
                 && Mathf.Abs(minimum.Y) <= 0.03f
-                && Mathf.Abs(maximum.Y - item.Height) <= 0.04f;
+                && Mathf.Abs(maximum.Y - expectedHeight) <= 0.04f * prop.Scale;
             if (!ready)
             {
                 failed.Add(
                     $"{item.Name}:meshes={meshes.Length}/{item.Meshes}"
                     + $":windows={windowCount}/{item.Windows}:roofs={roofCount}/{item.Roofs}"
-                    + $":height={minimum.Y:0.000}..{maximum.Y:0.000}/{item.Height:0.000}");
+                    + $":scale={model!.Scale.X:0.000}/{prop.Scale:0.000}"
+                    + $":height={minimum.Y:0.000}..{maximum.Y:0.000}/{expectedHeight:0.000}");
             }
         }
         failures = string.Join('|', failed);

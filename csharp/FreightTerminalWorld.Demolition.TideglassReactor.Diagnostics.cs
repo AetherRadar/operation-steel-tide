@@ -34,7 +34,7 @@ public partial class FreightTerminalWorld
 
         var offer = DemolitionMapCatalog.Resolve(DemolitionMapCatalog.TideglassReactorId);
         var catalogReady = offer.Id == DemolitionMapCatalog.TideglassReactorId
-            && offer.Code == "MAP 04"
+            && offer.Code == "MAP 02"
             && offer.Available
             && offer.LocalizationKey == "demolition_map_tideglass_reactor"
             && offer.SubtitleLocalizationKey == "demolition_map_tideglass_reactor_subtitle"
@@ -122,6 +122,7 @@ public partial class FreightTerminalWorld
         var authoredMeshCollisionReady = TideglassAuthoredMeshCollisionReady(arena.Root);
         var treyAssembliesReady = TideglassTreyAssembliesReady(
             arena.Root,
+            layout,
             out var treyAssemblyFailures);
         var majadroidVariantsReady = TideglassMajadroidVariantsReady(
             arena.Root,
@@ -139,12 +140,12 @@ public partial class FreightTerminalWorld
             && layout.NavigationBoxes.Count == 13
             && layout.NavigationBoxes[0].Name == "CraneNavigationFootprint"
             && (layout.NavigationBoxes[0].Center - layout.Origin).IsEqualApprox(
-                new Vector3(-32.174f, 0.92f, -14.174f))
+                new Vector3(-42.174f, 0.92f, -10.174f))
             && layout.NavigationBoxes[0].Size.IsEqualApprox(new Vector3(6.3f, 1.8f, 6.3f))
             && layout.NavigationBoxes[1].Name == "ConstructionSouthHillNavigation"
             && layout.NavigationBoxes[2].Name == "ConstructionNorthHillNavigation";
         var geometryReady = layout.CollisionBoxes.Count == 15
-            && layout.Props.Count == 20
+            && layout.Props.Count == 52
             && importedProps == layout.Props.Count
             && layout.CollisionBoxes.All(box => box.Size.X > 0.1f && box.Size.Y > 0.1f && box.Size.Z > 0.1f)
             && propsInsideBounds
@@ -169,6 +170,48 @@ public partial class FreightTerminalWorld
             && broadConstructionShellsRemoved
             && noOrphanCover
             && collisionShellsMapped;
+
+        var expandedDistrictBuildings = new[]
+        {
+            "SouthRegistryHouse",
+            "SightBlockEastApproachOffices",
+            "MidTelegraphHouse",
+            "DefenderServiceBlock",
+            "SouthwestWatchHouse",
+            "DefenderArchiveBlock",
+            "NorthFoundryTenement",
+            "ConstructionTurbineWorkshop",
+            "ReactorAnnex",
+            "EastShiftOffice",
+            "EastInspectionOffice",
+            "MidCompressorHouse",
+            "ReactorBoilerWorkshop",
+            "EastSwitchgearHall",
+            "MidCrewCanteen",
+            "CivicUtilityOffice",
+            "CivicPumpHouse",
+            "SouthGlassworksOffice",
+            "MidControlRoom",
+            "EastTransformerWorks",
+            "CivicCoolingServiceHall",
+            "ReactorMaintenanceDepot",
+            "WestFoundryWarehouse",
+            "WestFoundryInspectionAnnex",
+            "NorthFreightOffice",
+            "EastOperationsOffice",
+            "SouthWorksOffice",
+            "WestGateOffice",
+            "SouthTransitOffice",
+            "MidDispatchOffice"
+        };
+        var expansionReady = layout.WorldBounds.Size.IsEqualApprox(new Vector2(136.0f, 112.0f))
+            && layout.SitePositions.Count == 2
+            && layout.SiteSeparation >= 80.0f
+            && layout.AttackToALength >= 90.0f
+            && layout.AttackToBLength >= 90.0f
+            && expandedDistrictBuildings.Length == 30
+            && expandedDistrictBuildings.All(name => layout.Props.Any(prop => prop.Name == name))
+            && expandedDistrictBuildings.All(name => TideglassPropModelLoaded(arena.Root, layout.Props.Single(prop => prop.Name == name)));
 
         var spawnAndSiteReady = layout.AttackSpawns.Count == 5
             && layout.DefenderSpawns.Count == 5
@@ -342,16 +385,26 @@ public partial class FreightTerminalWorld
             .Select(group => group.Count())
             .DefaultIfEmpty(0)
             .Max();
+        var majorPropCount = layout.Props.Count(TideglassDensityIsMajorBuilding);
+        var majorDressingCount = authoredModels.Count(model =>
+            model.Name == "ConstructionBuilding"
+            || model.Name == "OldBrickReactorHall");
+        var majorBuildingCount = majorPropCount + majorDressingCount;
+        var majorBuildingsReady = majorPropCount == 39
+            && majorDressingCount == 2
+            && majorBuildingCount == 41;
         var compositionReady = authoredModelCount == 26
-            && layout.Props.Count == 20
-            && allAuthoredPaths.Length == 46
-            && allAuthoredPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 46
-            && sceneReuse == 1
+            && layout.Props.Count == 52
+            && allAuthoredPaths.Length == 78
+            && allAuthoredPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 70
+            && sceneReuse == 5
+            && majorBuildingsReady
             && allSourcePacks.SetEquals(new[]
             {
                 "kenney_city_kit_roads",
                 "kenney_factory_kit",
                 "majadroid_construction_site",
+                "old_military_crate",
                 "concrete_road_barrier",
                 "quaternius_buildings_pack",
                 "quaternius_downtown_city",
@@ -391,6 +444,7 @@ public partial class FreightTerminalWorld
             && localizationReady
             && layoutsDistinct
             && geometryReady
+            && expansionReady
             && spawnAndSiteReady
             && topologyReady
             && routeAClear
@@ -409,6 +463,7 @@ public partial class FreightTerminalWorld
         GD.Print(
             $"TIDEGLASS_REACTOR_CHECK valid={valid} catalog={catalogReady} localization={localizationReady} "
             + $"layouts_distinct={layoutsDistinct} geometry={geometryReady} imported={importedProps}/{layout.Props.Count} "
+            + $"expansion={expansionReady}:{expandedDistrictBuildings.Length} major_buildings={majorBuildingsReady}:{majorBuildingCount} bounds_size={layout.WorldBounds.Size} site_separation={layout.SiteSeparation:0.00} route_lengths={layout.AttackToALength:0.00}/{layout.AttackToBLength:0.00} "
             + $"bounds={propsInsideBounds} bounds_failures={string.Join('|', boundsFailures)} separated={propsSeparated} overlap={overlapPair} site_clear={sitesClear} "
             + $"spawn_clear={spawnsClear} collision_coverage={collisionCoverage} "
             + $"collision_failures={string.Join('|', collisionCoverageFailures)} tight_collision_failures={string.Join('|', tightCollisionFailures)} "
@@ -431,7 +486,7 @@ public partial class FreightTerminalWorld
             + $"runtime={runtimeReady} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} sites={arena.Sites.Count} "
             + $"authored={authoredDressingReady} authored_models={authoredModelCount} authored_nodes={authoredModels.Length} "
             + $"dressing_scenes={uniqueSceneCount} dressing_packs={dressingSourcePacks.Count} dressing_reuse={dressingSceneReuse} "
-            + $"all_scenes={allAuthoredPaths.Length} all_packs={allSourcePacks.Count}:{string.Join('|', allSourcePacks.OrderBy(pack => pack))} "
+            + $"all_scene_refs={allAuthoredPaths.Length} distinct_scenes={allAuthoredPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count()} all_packs={allSourcePacks.Count}:{string.Join('|', allSourcePacks.OrderBy(pack => pack))} "
             + $"max_scene_reuse={sceneReuse} composition={compositionReady} no_industrial={noIndustrialKit} scenes_exist={scenesExist} missing_models={missingModelCount}");
         GD.Print($"TIDEGLASS_REACTOR_PASS valid={valid}");
 

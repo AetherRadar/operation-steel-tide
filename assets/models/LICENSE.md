@@ -935,7 +935,54 @@ The Modular Industrial Kit is published by Trey Ramm, OpenGameArt user `minime45
 - Source atlas and preview: `source_art/third_party/trey_modular_industrial/PacificNorthwestGradientAtlas.png` and `ASSET_OVERVIEW.png`
 - Reproducible conversion: `scripts/blender/build_trey_modular_industrial.py`
 
-The runtime scenes combine selected authored modules from the source kit, including two distinct closed perimeter-gate compositions and four closed one-storey industrial buildings for Tideglass Reactor. Attribution is not required under CC0, but Trey Ramm's requested courtesy credit is retained.
+The runtime scenes combine selected authored modules from the source kit,
+including two distinct closed perimeter-gate compositions and nineteen closed
+industrial buildings for Tideglass Reactor. The 2026-08-30 expansion adds three
+independent floor-wall-roof compositions: `reactor-annex.glb` (wide flat-roof
+hall, SHA-256
+`51687DA6FADDB6A1E9E66DED920745FE25829B5FC542B33BAF60C465FCBDBE99`),
+`shift-office.glb` (windowed corniced office, SHA-256
+`86B4FC5FBC1564EF9E677494D6BF0417529E7D3102083C80C516B7867D1D46B7`),
+and `turbine-workshop.glb` (twin-gable workshop, SHA-256
+`6B74C277967F376E9833F01EBACE2E940147DD203F1C4BEFF35AA6AB6A1F4FFB`).
+The follow-up sightline-blocker set brings the closed-building total to ten:
+`compressor-house.glb` (reinforced double-bay machine house, SHA-256
+`3BA6206AAE522FEDA537DC6C7410BA4D6680F4BE2E557838DDAF75EA871DF121`),
+`inspection-office.glb` (windowed office with authored entrance canopy,
+SHA-256
+`8AA2C47F558DAA0CE20C7407EA40D9A353537BC9FEB1A5C3ED26B4C58E6889D2`),
+and `boiler-workshop.glb` (two-storey-height workshop, SHA-256
+`5D9CB882ED3E0CD590BFF06255869F5A744467BA3C870FE10293B37A8C85183B`).
+The final grid-filler set brings the closed-building total to thirteen:
+`switchgear-hall.glb` (transverse-gabled electrical hall, SHA-256
+`673CE57EEE18D822666B0BF0FF378BFE230BECFA8D07E66851DB324EE08BD09F`),
+`crew-canteen.glb` (window-rich corniced canteen and office, SHA-256
+`F7079FC40C60824B0206C2BE97ADCB5CB883B2AD4ADDFE8F67BFC1D1AA1B1C49`),
+and `pump-house.glb` (broad-gabled pump house with two entrance types, SHA-256
+`2E2E109221315CB2E9ABC240D840EDA79C7C6260B430EFAA936F3B1FBDFCEAA8`).
+The street-blocker set brings the closed-building total to nineteen:
+`transformer-works.glb` (reinforced corniced works, SHA-256
+`A27D02F90CA903A4C64F2445DA72DCDFC0884DBBB6273FEF8A66FC59E022EE93`),
+`glassworks-office.glb` (window-rich canopied office, SHA-256
+`484729E304094E7D6B7D7AB6C620A3A8C9AC08333555697828EC6B1E80BA39E3`),
+`cooling-service-hall.glb` (triple-bay transverse-gabled hall, SHA-256
+`BCC3E72A8BF088AED9FF026C82AE5719095E1A167647DA2F7A3A33359BC4EDE6`),
+`control-room.glb` (two-storey windowed control block, SHA-256
+`5106C8590330ECC18204F5E5261F8CF67443568644EAC116D2616FAF71C0C0FA`),
+`maintenance-depot.glb` (broad-gabled depot, SHA-256
+`76302E049BA585DEBA43086A68FAE871FAB5AB231FBBAFBCB551F1266535DC63`),
+and `foundry-warehouse.glb` (three-ridge warehouse, SHA-256
+`EC2196B2B95D1F643DC25ACD66CFDF530F387E87A9D2DD4AF908001BBDEB2916`).
+Their exact module mappings, DCC and Godot bounds, statistics, deterministic
+round-trip evidence, and runtime filenames are recorded in
+`trey_modular_industrial/README.md`. All visible pieces remain authored Trey
+Ramm source modules. For complete end walls under the three new sloped-roof
+profiles, Blender deterministically merges the top corners of ten imported
+`IndWallFull` instances into triangular gable panels; their source identity,
+count, attachment, triangle topology, and GLB metadata are validated. The
+script otherwise adds composition transforms, validation, metadata, and export.
+Attribution is not required under CC0, but Trey Ramm's requested courtesy credit
+is retained.
 
 ### Special Operations command hall composition
 
@@ -981,11 +1028,14 @@ The Buildings Pack is published by Quaternius under CC0 1.0 Universal:
 - Exact license: CC0 1.0 Universal, https://creativecommons.org/publicdomain/zero/1.0/
 - Acquisition date: 2026-08-28
 - Local source selection and official evidence: `source_art/third_party/quaternius_buildings_pack/`
-- Godot-ready assets: `quaternius_buildings_pack/building1-large.glb`, `building3-big.glb`, `building4.glb`, and `house2.glb`
+- Godot-ready assets: all nine retained FBXs are mapped one-to-one as
+  `quaternius_buildings_pack/building1-large.glb`, `building1-small.glb`,
+  `building2-large.glb`, `building2-small.glb`, `building3-big.glb`,
+  `building3-small.glb`, `building4.glb`, `house1.glb`, and `house2.glb`
 - Local mapping and verification record: `quaternius_buildings_pack/README.md`
 - Reproducible conversion: `scripts/blender/build_quaternius_buildings_pack.py`
 
-The conversion preserves Quaternius's authored geometry, scale, material colors, and PBR values, while correcting the FBX importer's zero-alpha solid materials to fully opaque. It centers and grounds each scene, embeds the creator, official source URL, exact license, original filename, and acquisition date, then verifies those properties through a Blender glTF round trip. Jianghai Old City further adapts these four selections into fourteen perimeter-density buildings (four Building1 Large, three Building3 Big, three Building4, and four House2) and three full street-cadence replacements in its packed DCC source and runtime GLB. Clean Building4 and Building3 Big bodies also underpin the current Chinese arcade-shop and gate-house shared meshes, combined in Blender with the separately licensed pavilion details and Temple roof recorded above. Attribution is not required under CC0, but the creator credit is retained for provenance.
+The conversion preserves Quaternius's authored geometry, scale, material colors, and PBR values, while correcting the FBX importer's zero-alpha solid materials to fully opaque. It centers and grounds each of the nine scenes, embeds the creator, official source URL, exact license, original filename, and acquisition date, then verifies those properties through a Blender glTF round trip. Jianghai Old City further adapts four of the nine selections into fourteen perimeter-density buildings (four Building1 Large, three Building3 Big, three Building4, and four House2) and three full street-cadence replacements in its packed DCC source and runtime GLB. Clean Building4 and Building3 Big bodies also underpin the current Chinese arcade-shop and gate-house shared meshes, combined in Blender with the separately licensed pavilion details and Temple roof recorded above. The additional Building1 Small, Building2 Large, Building2 Small, Building3 Small, and House1 conversions are independently centered, grounded, and round-trip verified as five distinct Tideglass Reactor expansion buildings. Attribution is not required under CC0, but the creator credit is retained for provenance.
 
 ## Quaternius CC0 models
 

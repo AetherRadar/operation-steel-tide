@@ -152,8 +152,23 @@ public partial class FreightTerminalWorld
         var maximumPadding = collisionMaximum - maximum;
         const float coverageTolerance = -0.08f;
         const float maximumPaddingMeters = 0.22f;
-        return TideglassPaddingWithin(minimumPadding, coverageTolerance, maximumPaddingMeters)
-            && TideglassPaddingWithin(maximumPadding, coverageTolerance, maximumPaddingMeters);
+        var ready = TideglassPaddingWithin(
+                minimumPadding,
+                coverageTolerance,
+                maximumPaddingMeters)
+            && TideglassPaddingWithin(
+                maximumPadding,
+                coverageTolerance,
+                maximumPaddingMeters);
+        if (!ready)
+        {
+            GD.Print(
+                $"TIDEGLASS_TIGHT_COLLISION_CHECK prop={prop.Name} "
+                + $"model={minimum}..{maximum} "
+                + $"collision={collisionMinimum}..{collisionMaximum} "
+                + $"padding={minimumPadding}/{maximumPadding}");
+        }
+        return ready;
     }
 
     private static bool TideglassDressingModelsInsideBounds(
@@ -263,21 +278,21 @@ public partial class FreightTerminalWorld
         {
             (
                 Name: "EastPerimeterSecurityGate",
-                CenterX: 55.5f,
-                MinimumZ: -28.071f,
-                MaximumZ: -19.189f,
-                ViewX: 47.0f,
-                RayStartX: 54.0f,
-                RayEndX: 57.0f,
+                CenterX: 67.5f,
+                MinimumZ: -32.75f,
+                MaximumZ: -22.39f,
+                ViewX: 59.0f,
+                RayStartX: 66.0f,
+                RayEndX: 69.0f,
                 Collider: "EastPerimeter"),
             (
                 Name: "WestPerimeterServiceGate",
-                CenterX: -55.5f,
-                MinimumZ: -42.306f,
-                MaximumZ: -33.614f,
-                ViewX: -47.0f,
-                RayStartX: -54.0f,
-                RayEndX: -57.0f,
+                CenterX: -67.5f,
+                MinimumZ: -49.36f,
+                MaximumZ: -39.22f,
+                ViewX: -59.0f,
+                RayStartX: -66.0f,
+                RayEndX: -69.0f,
                 Collider: "WestPerimeter")
         };
         var fence = dressingRoot!.GetNodeOrNull<Node3D>("TideglassPerimeterFence");
@@ -463,7 +478,7 @@ public partial class FreightTerminalWorld
     {
         var foundation = layout.CollisionBoxes.SingleOrDefault(box => box.Name == "ConstructionTowerFoundation");
         if (foundation.Name != "ConstructionTowerFoundation"
-            || (foundation.Center - layout.Origin).DistanceTo(new Vector3(-45.0f, 0.2f, 18.0f)) > 0.01f
+            || (foundation.Center - layout.Origin).DistanceTo(new Vector3(-55.0f, 0.2f, 22.0f)) > 0.01f
             || !foundation.Size.IsEqualApprox(new Vector3(13.9f, 0.36f, 16.6f)))
         {
             return false;
@@ -475,12 +490,12 @@ public partial class FreightTerminalWorld
             .ToArray();
         var expected = new[]
         {
-            (Center: new Vector3(-51.75f, 23.22f, 9.9f), Height: 46.4f),
-            (Center: new Vector3(-51.75f, 23.06f, 18.0f), Height: 46.08f),
-            (Center: new Vector3(-51.75f, 14.26f, 26.1f), Height: 28.48f),
-            (Center: new Vector3(-38.25f, 23.22f, 9.9f), Height: 46.4f),
-            (Center: new Vector3(-38.25f, 23.06f, 18.0f), Height: 46.08f),
-            (Center: new Vector3(-38.25f, 14.26f, 26.1f), Height: 28.48f)
+            (Center: new Vector3(-61.75f, 23.22f, 13.9f), Height: 46.4f),
+            (Center: new Vector3(-61.75f, 23.06f, 22.0f), Height: 46.08f),
+            (Center: new Vector3(-61.75f, 14.26f, 30.1f), Height: 28.48f),
+            (Center: new Vector3(-48.25f, 23.22f, 13.9f), Height: 46.4f),
+            (Center: new Vector3(-48.25f, 23.06f, 22.0f), Height: 46.08f),
+            (Center: new Vector3(-48.25f, 14.26f, 30.1f), Height: 28.48f)
         };
         if (columns.Length != expected.Length)
         {

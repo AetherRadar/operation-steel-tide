@@ -4,7 +4,7 @@ Run with Blender 4.5 or newer:
     blender --background --python scripts/blender/build_quaternius_buildings_pack.py
 
 Pass ``-- --only building1-large house2`` to rebuild selected assets. Source
-FBXs remain untouched. Each output preserves the authored mesh and materials,
+FBXs remain untouched. Each output preserves the authored mesh and rendered materials,
 is centered on Blender's horizontal plane, grounded at Z=0, and carries its
 CC0 provenance as glTF extras.
 """
@@ -73,16 +73,46 @@ ASSETS = (
         "QuaterniusBuilding1Large",
     ),
     AssetSpec(
+        "building1-small",
+        "Building1_Small.fbx",
+        "building1-small.glb",
+        "QuaterniusBuilding1Small",
+    ),
+    AssetSpec(
+        "building2-large",
+        "Building2_Large.fbx",
+        "building2-large.glb",
+        "QuaterniusBuilding2Large",
+    ),
+    AssetSpec(
+        "building2-small",
+        "Building2_Small.fbx",
+        "building2-small.glb",
+        "QuaterniusBuilding2Small",
+    ),
+    AssetSpec(
         "building3-big",
         "Building3_Big.fbx",
         "building3-big.glb",
         "QuaterniusBuilding3Big",
     ),
     AssetSpec(
+        "building3-small",
+        "Building3_Small.fbx",
+        "building3-small.glb",
+        "QuaterniusBuilding3Small",
+    ),
+    AssetSpec(
         "building4",
         "Building4.fbx",
         "building4.glb",
         "QuaterniusBuilding4",
+    ),
+    AssetSpec(
+        "house1",
+        "House1.fbx",
+        "house1.glb",
+        "QuaterniusHouse1",
     ),
     AssetSpec(
         "house2",
@@ -241,6 +271,7 @@ def material_state(material: bpy.types.Material) -> MaterialState:
 
 def material_snapshot(
     objects: list[bpy.types.Object],
+    included_names: set[str] | None = None,
 ) -> dict[str, MaterialState]:
     materials = {
         material
@@ -248,6 +279,7 @@ def material_snapshot(
         if obj.type == "MESH"
         for material in obj.data.materials
         if material is not None
+        and (included_names is None or material.name in included_names)
     }
     if not materials:
         raise RuntimeError("The source contains no authored materials")
@@ -655,10 +687,10 @@ def build_asset(spec: AssetSpec) -> None:
     raw_minimum, raw_maximum = mesh_bounds(objects)
     raw_dimensions = raw_maximum - raw_minimum
     normalize_solid_materials(objects)
-    expected_materials = material_snapshot(objects)
+    expected_material_triangles = material_triangle_counts(objects)
+    expected_materials = material_snapshot(objects, set(expected_material_triangles))
     root = normalize_asset(objects, spec)
     normalized_dimensions = validate_normalization(objects, spec)
-    expected_material_triangles = material_triangle_counts(objects)
     expected_geometry = geometry_snapshot(objects)
     expected_geometry_digest = geometry_digest(expected_geometry)
     source_meshes, source_triangles = mesh_statistics(objects)
@@ -680,6 +712,8 @@ def build_asset(spec: AssetSpec) -> None:
             f"verified={verified_meshes}/{verified_triangles}"
         )
 
+    output_sha256 = hashlib.sha256(output_path.read_bytes()).hexdigest()
+
     print(
         "QUATERNIUS_BUILDING_ASSET "
         f"slug={spec.slug} source={spec.source_name} output={spec.output_name} "
@@ -687,8 +721,10 @@ def build_asset(spec: AssetSpec) -> None:
         f"normalized_m={normalized_dimensions.x:.3f}x{normalized_dimensions.y:.3f}x{normalized_dimensions.z:.3f} "
         f"verified_m={verified_dimensions.x:.3f}x{verified_dimensions.y:.3f}x{verified_dimensions.z:.3f} "
         f"meshes={source_meshes} triangles={source_triangles} "
-        f"materials={len(expected_materials)} geometry_sha256={verified_digest} "
-        f"metadata=verified bytes={output_path.stat().st_size}"
+        f"materials={len(expected_materials)} "
+        f"material_names={','.join(expected_materials)} "
+        f"geometry_sha256={verified_digest} "
+        f"sha256={output_sha256} metadata=verified bytes={output_path.stat().st_size}"
     )
 
 

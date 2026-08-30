@@ -373,7 +373,7 @@ public partial class FreightTerminalWorld
                 "192.168.10.42",
                 SquadNetwork.DefaultPort,
                 LanRoomKind.Demolition,
-                DemolitionMapCatalog.TideforgeId,
+                DemolitionMapCatalog.TideglassReactorId,
                 2,
                 SquadNetwork.DemolitionCapacity)
         });
@@ -381,6 +381,7 @@ public partial class FreightTerminalWorld
             SquadSessionMode.Join,
             DemolitionNetworkTeam.Alpha,
             string.Empty);
+        _hud.PressDemolitionMapForDiagnostics(DemolitionMapCatalog.TideglassReactorId);
         await WaitFrames(18);
         SaveViewportImage("res://demolition_briefing_validation.png");
         GD.Print("DEMOLITION_BRIEFING_CAPTURE path=demolition_briefing_validation.png");

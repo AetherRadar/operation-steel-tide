@@ -20,6 +20,7 @@ public partial class FreightTerminalWorld
             ("--validate-demolition-arena", static world => world.ValidateDemolitionArena()),
             ("--validate-harbor-locks", static world => world.ValidateHarborLocks()),
             ("--validate-tideglass-reactor", static world => world.ValidateTideglassReactor()),
+            ("--validate-tideglass-density", static world => world.ValidateTideglassReactorDensity()),
             ("--validate-bazaar-density", static world => world.ValidateBazaarCrossingDensity()),
             ("--validate-bazaar-crossing", static world => world.ValidateBazaarCrossing()),
             ("--validate-demolition-briefing", static world => world.ValidateDemolitionBriefing()),

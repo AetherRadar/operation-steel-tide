@@ -7,6 +7,7 @@ public sealed partial class DemolitionArenaLayout
 {
     private const string KenneyFactoryRoot = "res://assets/models/kenney_factory_kit";
     private const string KenneyRoadsRoot = "res://assets/models/kenney_city_kit_roads";
+    private const string OldMilitaryCrateRoot = "res://assets/models/old_military_crate";
     private const string MajadroidConstructionRoot = "res://assets/models/majadroid_construction_site";
     private const string PolyHavenBarrierRoot = "res://assets/models/concrete_road_barrier";
     private const string QuaterniusBuildingsRoot = "res://assets/models/quaternius_buildings_pack";
@@ -17,25 +18,25 @@ public sealed partial class DemolitionArenaLayout
     {
         var boxes = new List<DemolitionArenaBox>
         {
-            Box("ArenaFloor", new(0, -0.48f, 0), new(112, 1.0f, 96), "ground", visible: false),
-            Box("NorthPerimeter", new(0, 1.5f, -47.5f), new(112, 3.0f, 1.0f), "concrete_dark", visible: false),
-            Box("SouthPerimeter", new(0, 1.5f, 47.5f), new(112, 3.0f, 1.0f), "concrete_dark", visible: false),
-            Box("WestPerimeter", new(-55.5f, 1.5f, 0), new(1.0f, 3.0f, 96), "concrete_dark", visible: false),
-            Box("EastPerimeter", new(55.5f, 1.5f, 0), new(1.0f, 3.0f, 96), "concrete_dark", visible: false),
+            Box("ArenaFloor", new(0, -0.48f, 0), new(136, 1.0f, 112), "ground", visible: false),
+            Box("NorthPerimeter", new(0, 1.5f, -55.5f), new(136, 3.0f, 1.0f), "concrete_dark", visible: false),
+            Box("SouthPerimeter", new(0, 1.5f, 55.5f), new(136, 3.0f, 1.0f), "concrete_dark", visible: false),
+            Box("WestPerimeter", new(-67.5f, 1.5f, 0), new(1.0f, 3.0f, 112), "concrete_dark", visible: false),
+            Box("EastPerimeter", new(67.5f, 1.5f, 0), new(1.0f, 3.0f, 112), "concrete_dark", visible: false),
 
             // The open construction tower keeps its sightlines: only its floor and visible column grid collide.
-            Box("ConstructionTowerFoundation", new(-45.0f, 0.2f, 18.0f), new(13.9f, 0.36f, 16.6f), "concrete", visible: false),
-            Box("BrickFactoryShell", new(49.0f, 10.52f, -9.0f), new(12.5f, 21.0f, 15.5f), "rust", visible: false),
+            Box("ConstructionTowerFoundation", new(-55.0f, 0.2f, 22.0f), new(13.9f, 0.36f, 16.6f), "concrete", visible: false),
+            Box("BrickFactoryShell", new(58.0f, 10.52f, -12.25f), new(12.5f, 21.0f, 15.5f), "rust", visible: false),
             Box("GatewayWestPillar", new(-2.575f, 2.02f, -31.5f), new(0.85f, 4.0f, 0.75f), "rust", visible: false),
             Box("GatewayEastPillar", new(2.575f, 2.02f, -31.5f), new(0.85f, 4.0f, 0.75f), "rust", visible: false)
         };
 
-        var towerColumnXs = new[] { -51.75f, -38.25f };
+        var towerColumnXs = new[] { -61.75f, -48.25f };
         var towerColumnRows = new[]
         {
-            (Z: 9.9f, Height: 46.4f),
-            (Z: 18.0f, Height: 46.08f),
-            (Z: 26.1f, Height: 28.48f)
+            (Z: 13.9f, Height: 46.4f),
+            (Z: 22.0f, Height: 46.08f),
+            (Z: 30.1f, Height: 28.48f)
         };
         var towerColumnIndex = 0;
         foreach (var x in towerColumnXs)
@@ -64,20 +65,20 @@ public sealed partial class DemolitionArenaLayout
         {
             Box(
                 "CraneNavigationFootprint",
-                new(-32.174f, 0.92f, -14.174f),
+                new(-42.174f, 0.92f, -10.174f),
                 new(6.3f, 1.8f, 6.3f),
                 "warning",
                 rotation: new Vector3(0, Mathf.DegToRad(-12.0f), 0),
                 visible: false),
             Box(
                 "ConstructionSouthHillNavigation",
-                new(-32.71f, 0.45f, 4.38f),
+                new(-42.71f, 0.45f, 8.38f),
                 new(7.14f, 0.9f, 5.76f),
                 "ground",
                 visible: false),
             Box(
                 "ConstructionNorthHillNavigation",
-                new(-43.84f, 0.63f, 27.65f),
+                new(-53.84f, 0.63f, 31.65f),
                 new(6.87f, 1.26f, 12.35f),
                 "ground",
                 visible: false)
@@ -118,67 +119,123 @@ public sealed partial class DemolitionArenaLayout
     {
         return new[]
         {
-            TideglassAuthoredProp("NorthGuildHall", QuaterniusBuildingsRoot, "building1-large.glb", new(-20.0f, 0.02f, -40.0f), 0.0f, 1.8f, new(7.991f, 4.671f, 2.744f), new(0, 2.3355f, 0)),
-            TideglassAuthoredProp("NorthBrickOffices", QuaterniusBuildingsRoot, "building3-big.glb", new(0.0f, 0.02f, -40.0f), 0.0f, 1.9f, new(4.705f, 5.677f, 4.391f), new(0, 2.8385f, 0)),
-            TideglassAuthoredProp("NorthCustomsHouse", QuaterniusBuildingsRoot, "building4.glb", new(20.0f, 0.02f, -40.0f), 0.0f, 1.9f, new(4.644f, 5.487f, 3.856f), new(0, 2.7435f, 0)),
-            TideglassAuthoredProp("SouthGatehouse", QuaterniusBuildingsRoot, "house2.glb", new(-28.0f, 0.02f, 41.0f), 180.0f, 2.4f, new(3.644f, 2.926f, 3.084f), new(0, 1.463f, 0)),
-            TideglassIndustrial("NorthLoadingBay", "loading-bay.glb", new(40.0f, 0.02f, -42.0f), 0.0f, 1.05f, new(8.1f, 3.1f, 4.5f), new(0, 1.55f, 0)),
-            TideglassIndustrial("SouthUtilityOffice", "utility-office.glb", new(-8.0f, 0.02f, 42.0f), Mathf.Pi, 1.1f, new(4.45f, 3.1f, 2.42f), new(0, 1.55f, 0)),
-            TideglassIndustrial("CentralServiceHall", "sawtooth-service-hall.glb", new(0.0f, 0.02f, 0.0f), 0.0f, 1.4f, new(8.1f, 3.1f, 4.42f), new(0, 1.55f, 0)),
-            TideglassIndustrial("WestWindowHall", "window-hall.glb", new(-52.0f, 0.02f, 34.5f), Mathf.Pi * 0.5f, 1.05f, new(8.1f, 3.1f, 4.42f), new(0, 1.55f, 0)),
+            TideglassAuthoredProp("NorthGuildHall", QuaterniusBuildingsRoot, "building1-large.glb", new(-28.0f, 0.02f, -48.5f), 90.0f, 1.8f, new(7.991f, 4.671f, 2.744f), new(0, 2.3355f, 0)),
+            TideglassAuthoredProp("NorthBrickOffices", QuaterniusBuildingsRoot, "building3-big.glb", new(-7.0f, 0.02f, -50.65f), 0.0f, 1.9f, new(4.705f, 5.677f, 4.391f), new(0, 2.8385f, 0)),
+            TideglassAuthoredProp("NorthCustomsHouse", QuaterniusBuildingsRoot, "building4.glb", new(23.0f, 0.02f, -50.25f), 90.0f, 1.9f, new(4.644f, 5.487f, 3.856f), new(0, 2.7435f, 0)),
+            TideglassAuthoredProp("SouthGatehouse", QuaterniusBuildingsRoot, "house2.glb", new(-39.5f, 0.02f, 48.2f), 180.0f, 4.2f, new(3.644f, 2.926f, 3.084f), new(0, 1.463f, 0)),
+            TideglassIndustrial("NorthLoadingBay", "loading-bay.glb", new(52.5f, 0.02f, -49.2f), Mathf.Pi * 0.5f, 1.3f, new(8.1f, 3.1f, 4.5f), new(0, 1.55f, 0)),
+            TideglassIndustrial("SouthUtilityOffice", "utility-office.glb", new(-38.0f, 0.02f, 17.0f), Mathf.Pi * 0.5f, 1.3f, new(4.45f, 3.1f, 2.42f), new(0, 1.55f, 0)),
+            TideglassIndustrial("CentralServiceHall", "sawtooth-service-hall.glb", new(-3.0f, 0.02f, -0.8f), 0.0f, 1.5f, new(8.1f, 3.1f, 4.42f), new(0, 1.55f, 0)),
+            TideglassIndustrial("WestWindowHall", "window-hall.glb", new(-54.0f, 0.02f, -3.5f), Mathf.Pi * 0.5f, 2.5f, new(8.1f, 3.0f, 4.42f), new(0, 1.5f, 0)),
+            TideglassIndustrial("ConstructionTurbineWorkshop", "turbine-workshop.glb", new(-31.0f, 0.02f, 16.0f), 0.0f, 1.0f, new(8.0f, 4.5f, 6.6f), new(0, 2.25f, 0)),
+            TideglassIndustrial("ReactorAnnex", "reactor-annex.glb", new(31.0f, 0.02f, -21.5f), 0.0f, 1.4f, new(10.0f, 3.1f, 6.432f), new(0, 1.55f, 0)),
+            TideglassIndustrial("EastShiftOffice", "shift-office.glb", new(57.0f, 0.02f, 25.0f), 0.0f, 1.0f, new(6.6f, 3.5f, 4.6f), new(0, 1.75f, 0)),
+            TideglassIndustrial("EastInspectionOffice", "inspection-office.glb", new(56.0f, 0.02f, 18.3f), 0.0f, 1.0f, new(6.0f, 3.1f, 5.816f), new(0, 1.55f, 0)),
+            TideglassIndustrial("MidCompressorHouse", "compressor-house.glb", new(18.5f, 0.02f, -4.5f), Mathf.Pi * 0.5f, 2.0f, new(8.4f, 3.3f, 6.416f), new(0, 1.65f, 0)),
+            TideglassIndustrial("ReactorBoilerWorkshop", "boiler-workshop.glb", new(10.0f, 0.02f, -20.2f), Mathf.Pi * 0.5f, 1.25f, new(10.4f, 6.1f, 6.432f), new(0, 3.05f, 0)),
+            TideglassIndustrial("EastSwitchgearHall", "switchgear-hall.glb", new(37.0f, 0.02f, 31.0f), 0.0f, 1.0f, new(8.6f, 4.5f, 6.316f), new(0, 2.25f, 0)),
+            TideglassIndustrial("MidCrewCanteen", "crew-canteen.glb", new(0.0f, 0.02f, 12.25f), Mathf.Pi * 0.5f, 2.1f, new(8.6f, 3.5f, 6.6f), new(0, 1.75f, 0)),
+            TideglassIndustrial("CivicUtilityOffice", "utility-office.glb", new(-12.5f, 0.02f, 23.8f), -Mathf.Pi * 0.5f, 1.3f, new(4.45f, 3.1f, 2.42f), new(0, 1.55f, 0)),
+            TideglassIndustrial("CivicPumpHouse", "pump-house.glb", new(-18.5f, 0.02f, -23.5f), Mathf.Pi * 0.5f, 1.3f, new(6.0f, 4.5f, 6.6f), new(0, 2.25f, 0)),
+            TideglassIndustrial("SouthGlassworksOffice", "glassworks-office.glb", new(-6.0f, 0.02f, 34.5f), 0.0f, 1.2f, new(10.6f, 3.5f, 9.9f), new(0, 1.75f, 0)),
+            TideglassIndustrial("MidControlRoom", "control-room.glb", new(-15.4f, 0.02f, 3.0f), 0.0f, 1.2f, new(8.4f, 6.1f, 8.432f), new(0, 3.05f, 0)),
+            TideglassIndustrial("EastTransformerWorks", "transformer-works.glb", new(36.2f, 0.02f, -2.2f), 0.0f, 1.7f, new(12.6f, 3.5f, 8.6f), new(0, 1.75f, 0)),
+            TideglassIndustrial("CivicCoolingServiceHall", "cooling-service-hall.glb", new(16.0f, 0.02f, 26.0f), Mathf.Pi * 0.5f, 1.6f, new(12.6f, 4.5f, 8.416f), new(0, 2.25f, 0)),
+            TideglassIndustrial("ReactorMaintenanceDepot", "maintenance-depot.glb", new(39.0f, 0.02f, -40.5f), 0.0f, 2.0f, new(10.0f, 4.5f, 6.6f), new(0, 2.25f, 0)),
+            TideglassIndustrial("WestFoundryWarehouse", "foundry-warehouse.glb", new(-31.6f, 0.02f, 4.9f), 0.0f, 1.5f, new(12.0f, 4.5f, 8.6f), new(0, 2.25f, 0)),
+            TideglassIndustrial("WestFoundryInspectionAnnex", "inspection-office.glb", new(-44.54f, 0.02f, 0.0f), 0.0f, 1.12f, new(6.0f, 3.1f, 5.816f), new(0, 1.55f, 0)),
+            TideglassIndustrial("NorthFreightOffice", "inspection-office.glb", new(20.0f, 0.02f, -31.5f), 0.0f, 1.5f, new(6.0f, 3.1f, 5.816f), new(0, 1.55f, 0)),
+            TideglassIndustrial("EastOperationsOffice", "shift-office.glb", new(58.2f, 0.02f, 37.8f), 0.0f, 1.8f, new(6.6f, 3.5f, 4.6f), new(0, 1.75f, 0)),
+            TideglassIndustrial("SouthWorksOffice", "shift-office.glb", new(-14.0f, 0.02f, 16.0f), 0.0f, 1.4f, new(6.6f, 3.5f, 4.6f), new(0, 1.75f, 0)),
+            TideglassIndustrial("WestGateOffice", "inspection-office.glb", new(-55.0f, 0.02f, 42.5f), 0.0f, 1.8f, new(6.0f, 3.1f, 5.816f), new(0, 1.55f, 0)),
+            TideglassIndustrial("SouthTransitOffice", "shift-office.glb", new(10.0f, 0.02f, 42.5f), 0.0f, 1.5f, new(6.6f, 3.5f, 4.6f), new(0, 1.75f, 0)),
+            TideglassIndustrial("MidDispatchOffice", "shift-office.glb", new(-1.2f, 0.02f, -17.0f), 0.0f, 1.6f, new(6.6f, 3.5f, 4.6f), new(0, 1.75f, 0)),
 
-            TideglassAuthoredProp("SightBlockConstructionSiteOffice", MajadroidConstructionRoot, "containers-office.glb", new(20.0f, 0.02f, 33.0f), 0.0f, 0.75f, new(11.65f, 5.35f, 8.3f), new(0, 2.6f, 0)),
-            TideglassAuthoredProp("SightBlockReactorCargoContainers", MajadroidConstructionRoot, "containers-cargo.glb", new(36.0f, 0.02f, 14.0f), 90.0f, 0.82f, new(3.15f, 2.75f, 8.55f), new(0, 1.3f, 0)),
-            TideglassAuthoredProp("ConstructionTruck", MajadroidConstructionRoot, "concrete-truck-red.glb", new(-35.0f, 0.02f, 30.0f), 12.0f, 1.05f, new(3.25f, 3.9f, 7.3f), new(0, 1.9075f, 0)),
+            TideglassAuthoredProp("SouthRegistryHouse", QuaterniusBuildingsRoot, "building1-small.glb", new(7.0f, 0.02f, 51.0f), 180.0f, 1.9f, new(3.747f, 4.663f, 2.744f), new(0, 2.3315f, 0)),
+            TideglassAuthoredProp("SightBlockEastApproachOffices", QuaterniusBuildingsRoot, "building2-large.glb", new(48.0f, 0.02f, 24.0f), 0.0f, 1.6f, new(5.716f, 5.918f, 2.219f), new(0, 2.959f, 0)),
+            TideglassAuthoredProp("MidTelegraphHouse", QuaterniusBuildingsRoot, "building2-small.glb", new(-21.0f, 0.02f, -11.8f), 90.0f, 3.0f, new(3.584f, 4.968f, 2.486f), new(0, 2.484f, 0)),
+            TideglassAuthoredProp("DefenderServiceBlock", QuaterniusBuildingsRoot, "building3-small.glb", new(-61.1f, 0.02f, -29.5f), 90.0f, 3.0f, new(3.052f, 5.677f, 4.396f), new(0, 2.8385f, 0)),
+            TideglassAuthoredProp("SouthwestWatchHouse", QuaterniusBuildingsRoot, "house1.glb", new(-25.9f, 0.02f, 34.2f), 180.0f, 4.2f, new(2.557f, 3.179f, 3.870f), new(0, 1.5895f, 0)),
+            TideglassAuthoredProp("DefenderArchiveBlock", QuaterniusDowntownRoot, "Building_Medium_2_001.gltf", new(-42.0f, 0.02f, -14.7f), 0.0f, 1.0f, new(15.06f, 25.01f, 13.06f), new(0.0f, 12.5f, -5.96f)),
+            TideglassAuthoredProp("NorthFoundryTenement", QuaterniusDowntownRoot, "Building_Small_1.gltf", new(-17.5f, 0.02f, -31.2f), 0.0f, 1.0f, new(12.46f, 17.03f, 14.54f), new(-1.0f, 8.5f, -4.96f)),
+            TideglassAuthoredProp("SightBlockConstructionSiteOffice", MajadroidConstructionRoot, "containers-office.glb", new(24.5f, 0.02f, 42.6f), 0.0f, 1.0f, new(11.65f, 5.35f, 8.3f), new(0, 2.6f, 0)),
+            TideglassAuthoredProp("SightBlockReactorCargoContainers", MajadroidConstructionRoot, "containers-cargo.glb", new(52.0f, 0.02f, 5.0f), 90.0f, 0.82f, new(3.15f, 2.75f, 8.55f), new(0, 1.3f, 0)),
+            TideglassAuthoredProp("ConstructionTruck", MajadroidConstructionRoot, "concrete-truck-red.glb", new(-63.5f, 0.02f, 32.0f), 90.0f, 1.05f, new(3.25f, 3.9f, 7.3f), new(0, 1.9075f, 0)),
 
-            TideglassAuthoredProp("MidCoverConstructionSupplies", MajadroidConstructionRoot, "construction-materials.glb", new(-12.0f, 0.02f, 18.0f), 90.0f, 1.0f, new(1.65f, 1.32f, 8.75f), new(0, 0.6025f, 0)),
+            TideglassAuthoredProp("MidCoverConstructionSupplies", MajadroidConstructionRoot, "construction-materials.glb", new(-5.0f, 0.02f, 22.7f), 90.0f, 1.0f, new(1.65f, 1.32f, 8.75f), new(0, 0.6025f, 0)),
             TideglassAuthoredProp("MidCoverDumpster", KenneyRoadsRoot, "dumpster.glb", new(-13.0f, 0.02f, -10.0f), -18.0f, 6.0f, new(0.295f, 0.225f, 0.39f), new(0.0075f, 0.1047f, 0)),
-            TideglassAuthoredProp("MidCoverMachine", KenneyFactoryRoot, "machine.glb", new(8.0f, 0.02f, 17.0f), 15.0f, 2.0f, new(1.3f, 1.4f, 1.6f), new(0, 0.6499f, 0)),
+            TideglassAuthoredProp("MidCoverMachine", KenneyFactoryRoot, "machine.glb", new(46.5f, 0.02f, 41.0f), 15.0f, 2.0f, new(1.3f, 1.4f, 1.6f), new(0, 0.6499f, 0)),
             TideglassAuthoredProp("MidCoverHopper", KenneyFactoryRoot, "hopper-high-round.glb", new(17.0f, 0.02f, 9.0f), -12.0f, 1.8f, new(1.2f, 1.58f, 1.2f), new(0, 0.75f, 0)),
-            TideglassAuthoredProp("MidCoverCivicPlanter", QuaterniusDowntownRoot, "Prop_Planter_Single.gltf", new(17.0f, 0.02f, -3.0f), 90.0f, 2.3f, new(2.0f, 0.6f, 2.0f), new(0, 0.3f, 0)),
+            TideglassAuthoredProp("MidCoverCivicPlanter", QuaterniusDowntownRoot, "Prop_Planter_Single.gltf", new(52.0f, 0.02f, 9.2f), 90.0f, 2.3f, new(2.0f, 0.6f, 2.0f), new(0, 0.3f, 0)),
             TideglassAuthoredProp("MidCoverRoadBarrier", KenneyRoadsRoot, "construction-barrier.glb", new(7.0f, 0.02f, -11.0f), 90.0f, 10.0f, new(0.15f, 0.14f, 0.24f), new(0, 0.065f, 0)),
-            TideglassAuthoredProp("MidCoverGenerator", KenneyFactoryRoot, "machine-window.glb", new(-8.0f, 0.02f, -17.0f), 20.0f, 2.0f, new(1.3f, 1.38f, 1.6f), new(0, 0.6449f, 0)),
-            TideglassAuthoredProp("MidCoverConcreteBarrier", PolyHavenBarrierRoot, "concrete_road_barrier.gltf", new(-21.0f, 0.02f, 7.0f), 90.0f, 1.7f, new(1.55f, 0.84f, 0.64f), new(0, 0.41f, 0)),
-            TideglassAuthoredProp("CrossingTrafficLight", KenneyRoadsRoot, "traffic-light.glb", new(8.0f, 0.02f, -24.0f), 0.0f, 7.5f, new(0.13f, 0.53f, 0.1f), new(-0.0138f, 0.2575f, 0))
+            TideglassAuthoredProp("MidCoverGenerator", KenneyFactoryRoot, "machine-window.glb", new(2.5f, 0.02f, -39.0f), 20.0f, 2.0f, new(1.3f, 1.38f, 1.6f), new(0, 0.6449f, 0)),
+            TideglassAuthoredProp("MidCoverConcreteBarrier", PolyHavenBarrierRoot, "concrete_road_barrier.gltf", new(-25.0f, 0.02f, 13.2f), 90.0f, 1.7f, new(1.55f, 0.84f, 0.64f), new(0, 0.41f, 0)),
+            TideglassAuthoredProp("ConstructionSupplyCrate", OldMilitaryCrateRoot, "old_military_crate.gltf", new(-37.0f, 0.02f, 32.0f), 12.0f, 2.5f, new(1.8154f, 0.3009f, 0.9791f), new(-0.0053f, 0.1505f, -0.1809f)),
+            TideglassAuthoredProp("ReactorPipeManifold", KenneyFactoryRoot, "pipe-large-bend.glb", new(-46.0f, 0.02f, -39.0f), -90.0f, 1.6f, new(1.9f, 1.0002f, 1.9f), new(0.05f, 0.4999f, -0.45f)),
+            TideglassAuthoredProp("CrossingTrafficLight", KenneyRoadsRoot, "traffic-light.glb", new(8.0f, 0.02f, -28.0f), 0.0f, 7.5f, new(0.13f, 0.53f, 0.1f), new(-0.0138f, 0.2575f, 0))
         };
     }
 
     private IReadOnlyList<Vector3> BuildTideglassReactorAttackToAPath() => WorldPoints(
-        new(40.0f, 0.2f, 40.0f), new(31.0f, 0.2f, 31.0f),
-        new(28.0f, 0.2f, 25.0f), new(13.0f, 0.2f, 24.0f),
-        new(7.0f, 0.2f, 29.3f), new(-7.0f, 0.2f, 29.3f), new(-16.0f, 0.2f, 29.0f),
-        new(-23.0f, 0.2f, 24.0f), new(-31.0f, 0.2f, 18.0f));
+        new(52.0f, 0.2f, 48.0f), new(40.0f, 0.2f, 48.0f),
+        new(25.0f, 0.2f, 48.5f), new(16.0f, 0.2f, 47.0f),
+        new(3.0f, 0.2f, 47.0f), new(-12.0f, 0.2f, 42.0f),
+        new(-15.0f, 0.2f, 39.0f), new(-16.0f, 0.2f, 35.0f),
+        new(-18.0f, 0.2f, 24.0f),
+        new(-31.0f, 0.2f, 23.0f), new(-40.0f, 0.2f, 24.0f));
 
     private IReadOnlyList<Vector3> BuildTideglassReactorAttackToBPath() => WorldPoints(
-        new(40.0f, 0.2f, 40.0f), new(45.0f, 0.2f, 42.0f), new(50.0f, 0.2f, 40.0f),
-        new(51.0f, 0.2f, 28.0f), new(49.0f, 0.2f, 15.0f),
-        new(45.0f, 0.2f, 4.0f), new(41.5f, 0.2f, -1.0f), new(41.5f, 0.2f, -7.0f),
-        new(36.0f, 0.2f, -12.0f), new(31.0f, 0.2f, -18.0f));
+        new(52.0f, 0.2f, 48.0f), new(65.5f, 0.2f, 43.0f),
+        new(65.5f, 0.2f, 34.0f), new(65.5f, 0.2f, 22.0f),
+        new(63.0f, 0.2f, 12.0f), new(65.0f, 0.2f, 7.0f),
+        new(57.0f, 0.2f, 2.0f), new(49.0f, 0.2f, -5.0f),
+        new(49.0f, 0.2f, -10.0f), new(49.0f, 0.2f, -18.0f),
+        new(47.0f, 0.2f, -23.0f), new(42.0f, 0.2f, -25.0f));
 
     private IReadOnlyList<Vector3> BuildTideglassReactorAttackMidPath() => WorldPoints(
-        new(40.0f, 0.2f, 40.0f), new(31.0f, 0.2f, 31.0f),
-        new(24.0f, 0.2f, 24.0f), new(16.0f, 0.2f, 22.0f),
-        new(8.0f, 0.2f, 22.0f), new(0.0f, 0.2f, 20.0f),
-        new(3.0f, 0.2f, 13.0f), new(8.0f, 0.2f, 7.0f),
-        new(8.0f, 0.2f, -2.0f));
+        new(52.0f, 0.2f, 48.0f), new(44.0f, 0.2f, 46.0f),
+        new(36.0f, 0.2f, 40.0f), new(31.0f, 0.2f, 35.0f),
+        new(29.0f, 0.2f, 28.0f), new(27.0f, 0.2f, 22.0f),
+        new(24.0f, 0.2f, 15.0f), new(14.0f, 0.2f, 10.0f),
+        new(8.5f, 0.2f, 8.0f), new(8.5f, 0.2f, 5.0f),
+        new(8.5f, 0.2f, -5.0f), new(2.0f, 0.2f, -10.0f));
 
     private IReadOnlyList<Vector3> BuildTideglassReactorDefenderToAPath() => WorldPoints(
-        new(-40.0f, 0.2f, -40.0f), new(-32.0f, 0.2f, -31.0f),
-        new(-27.0f, 0.2f, -20.0f), new(-28.0f, 0.2f, -7.0f),
-        new(-27.0f, 0.2f, 5.0f), new(-31.0f, 0.2f, 18.0f));
+        new(-52.0f, 0.2f, -48.0f), new(-53.0f, 0.2f, -41.0f),
+        new(-53.0f, 0.2f, -34.0f), new(-53.0f, 0.2f, -24.0f),
+        new(-61.0f, 0.2f, -18.0f), new(-62.0f, 0.2f, -12.0f),
+        new(-62.0f, 0.2f, -4.0f), new(-62.0f, 0.2f, 2.0f),
+        new(-62.0f, 0.2f, 8.0f), new(-54.0f, 0.2f, 9.0f),
+        new(-48.0f, 0.2f, 10.0f),
+        new(-44.0f, 0.2f, 18.0f),
+        new(-40.0f, 0.2f, 24.0f));
 
     private IReadOnlyList<Vector3> BuildTideglassReactorDefenderToBPath() => WorldPoints(
-        new(-40.0f, 0.2f, -40.0f), new(-31.0f, 0.2f, -30.0f),
-        new(-18.0f, 0.2f, -28.0f), new(-5.0f, 0.2f, -29.0f),
-        new(8.0f, 0.2f, -30.0f), new(18.0f, 0.2f, -27.0f),
-        new(25.0f, 0.2f, -24.0f), new(31.0f, 0.2f, -18.0f));
+        new(-52.0f, 0.2f, -48.0f), new(-43.0f, 0.2f, -44.0f),
+        new(-35.0f, 0.2f, -34.0f), new(-29.0f, 0.2f, -30.0f),
+        new(-28.0f, 0.2f, -28.0f), new(-27.0f, 0.2f, -10.0f),
+        new(-25.0f, 0.2f, -5.3f), new(-16.0f, 0.2f, -5.3f),
+        new(-8.0f, 0.2f, -5.3f), new(-8.0f, 0.2f, -11.5f),
+        new(-8.0f, 0.2f, -24.0f), new(-7.0f, 0.2f, -28.0f),
+        new(-7.0f, 0.2f, -32.0f), new(-5.0f, 0.2f, -35.0f),
+        new(0.0f, 0.2f, -36.0f), new(8.0f, 0.2f, -35.0f),
+        new(13.0f, 0.2f, -38.0f), new(26.0f, 0.2f, -38.0f),
+        new(27.0f, 0.2f, -32.0f), new(40.5f, 0.2f, -29.0f),
+        new(42.0f, 0.2f, -25.0f));
 
     private IReadOnlyList<Vector3> BuildTideglassReactorSiteRotationPath() => WorldPoints(
-        new(-31.0f, 0.2f, 18.0f), new(-25.0f, 0.2f, 12.0f),
-        new(-24.0f, 0.2f, 2.0f), new(-14.0f, 0.2f, -2.0f),
-        new(-4.0f, 0.2f, -5.0f), new(2.0f, 0.2f, -15.0f),
-        new(14.0f, 0.2f, -19.0f), new(22.0f, 0.2f, -20.0f),
-        new(31.0f, 0.2f, -18.0f));
+        new(-40.0f, 0.2f, 24.0f), new(-34.0f, 0.2f, 24.0f),
+        new(-26.0f, 0.2f, 23.0f), new(-23.0f, 0.2f, 16.0f),
+        new(-21.5f, 0.2f, 12.0f), new(-21.5f, 0.2f, 9.0f),
+        new(-21.5f, 0.2f, 3.0f), new(-21.5f, 0.2f, -5.3f),
+        new(-16.0f, 0.2f, -5.3f),
+        new(-7.0f, 0.2f, -5.3f), new(-8.0f, 0.2f, -11.5f),
+        new(-8.0f, 0.2f, -24.0f), new(-7.0f, 0.2f, -29.0f),
+        new(-7.0f, 0.2f, -34.0f), new(0.0f, 0.2f, -34.0f),
+        new(7.0f, 0.2f, -36.0f),
+        new(13.0f, 0.2f, -38.0f), new(26.0f, 0.2f, -38.0f),
+        new(27.0f, 0.2f, -32.0f), new(40.5f, 0.2f, -29.0f),
+        new(42.0f, 0.2f, -25.0f));
 
     private DemolitionArenaProp TideglassIndustrial(
         string name,
@@ -221,28 +278,28 @@ public sealed partial class DemolitionArenaLayout
 
     private Vector3 TideglassReactorStrategyTarget(string key) => key switch
     {
-        "attack_entry_a" => World(new Vector3(-24.0f, 0.2f, 24.0f)),
-        "attack_entry_b" => World(new Vector3(39.0f, 0.2f, -11.0f)),
-        "attack_support_a" => World(new Vector3(-18.0f, 0.2f, 28.0f)),
-        "attack_support_b" => World(new Vector3(40.0f, 0.2f, -6.0f)),
-        "attack_mid_recon" => World(new Vector3(8.0f, 0.2f, -2.0f)),
-        "defense_anchor_a" => World(new Vector3(-34.0f, 0.2f, 12.0f)),
-        "defense_anchor_b" => World(new Vector3(34.0f, 0.2f, -22.0f)),
-        "defense_mid" => World(new Vector3(-3.0f, 0.2f, -7.0f)),
-        "defense_rotate_a" => World(new Vector3(-24.0f, 0.2f, 2.0f)),
-        "defense_rotate_b" => World(new Vector3(18.0f, 0.2f, -20.0f)),
-        "retake_entry_a" => World(new Vector3(-27.0f, 0.2f, 8.0f)),
-        "retake_entry_b" => World(new Vector3(25.0f, 0.2f, -24.0f)),
-        "retake_cover_a" => World(new Vector3(-31.0f, 0.2f, 28.0f)),
-        "retake_cover_b" => World(new Vector3(38.0f, 0.2f, -25.0f)),
-        "retake_flank_a" => World(new Vector3(-43.0f, 0.2f, 7.0f)),
-        "retake_flank_b" => World(new Vector3(40.0f, 0.2f, -3.0f)),
-        "postplant_guard_a" => World(new Vector3(-34.0f, 0.2f, 22.0f)),
-        "postplant_guard_b" => World(new Vector3(34.0f, 0.2f, -15.0f)),
-        "postplant_crossfire_a" => World(new Vector3(-25.0f, 0.2f, 24.0f)),
-        "postplant_crossfire_b" => World(new Vector3(25.0f, 0.2f, -24.0f)),
-        "postplant_lurk_a" => World(new Vector3(-15.0f, 0.2f, 28.0f)),
-        "postplant_lurk_b" => World(new Vector3(18.0f, 0.2f, -28.0f)),
+        "attack_entry_a" => World(new Vector3(-35.0f, 0.2f, 27.0f)),
+        "attack_entry_b" => World(new Vector3(46.0f, 0.2f, -10.0f)),
+        "attack_support_a" => World(new Vector3(-18.0f, 0.2f, 24.0f)),
+        "attack_support_b" => World(new Vector3(49.0f, 0.2f, 2.0f)),
+        "attack_mid_recon" => World(new Vector3(7.0f, 0.2f, -5.0f)),
+        "defense_anchor_a" => World(new Vector3(-46.0f, 0.2f, 16.0f)),
+        "defense_anchor_b" => World(new Vector3(42.0f, 0.2f, -30.0f)),
+        "defense_mid" => World(new Vector3(-7.0f, 0.2f, -8.0f)),
+        "defense_rotate_a" => World(new Vector3(-21.5f, 0.2f, 2.0f)),
+        "defense_rotate_b" => World(new Vector3(20.0f, 0.2f, -21.0f)),
+        "retake_entry_a" => World(new Vector3(-44.0f, 0.2f, 18.0f)),
+        "retake_entry_b" => World(new Vector3(40.0f, 0.2f, -28.0f)),
+        "retake_cover_a" => World(new Vector3(-46.0f, 0.2f, 32.0f)),
+        "retake_cover_b" => World(new Vector3(53.0f, 0.2f, -31.0f)),
+        "retake_flank_a" => World(new Vector3(-62.0f, 0.2f, 8.0f)),
+        "retake_flank_b" => World(new Vector3(56.0f, 0.2f, -1.0f)),
+        "postplant_guard_a" => World(new Vector3(-46.0f, 0.2f, 29.0f)),
+        "postplant_guard_b" => World(new Vector3(45.0f, 0.2f, -17.0f)),
+        "postplant_crossfire_a" => World(new Vector3(-31.0f, 0.2f, 24.0f)),
+        "postplant_crossfire_b" => World(new Vector3(42.0f, 0.2f, -18.0f)),
+        "postplant_lurk_a" => World(new Vector3(-18.0f, 0.2f, 31.0f)),
+        "postplant_lurk_b" => World(new Vector3(12.0f, 0.2f, -34.0f)),
         "site_a" => SitePositions[0],
         "site_b" => SitePositions[1],
         _ => Midpoint

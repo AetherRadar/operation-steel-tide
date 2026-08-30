@@ -120,6 +120,7 @@ public partial class FreightTerminalWorld
             || value == "--validate-demolition-rules"
             || value == "--validate-demolition-arena"
             || value == "--validate-tideglass-reactor"
+            || value == "--validate-tideglass-density"
             || value == "--validate-bazaar-crossing"
             || value == "--validate-bazaar-density"
             || value == "--validate-demolition-briefing"

@@ -152,42 +152,44 @@ public sealed partial class DemolitionArenaLayout
         }
         else if (tideglassReactor)
         {
-            AttackSpawn = World(new Vector3(40.0f, 0.22f, 40.0f));
-            DefenderSpawn = World(new Vector3(-40.0f, 0.22f, -40.0f));
+            AttackSpawn = World(new Vector3(52.0f, 0.22f, 48.0f));
+            DefenderSpawn = World(new Vector3(-52.0f, 0.22f, -48.0f));
             Midpoint = World(new Vector3(0.0f, 0.12f, 0.0f));
-            WorldBounds = new Rect2(Origin.X - 56.0f, Origin.Z - 48.0f, 112.0f, 96.0f);
+            WorldBounds = new Rect2(Origin.X - 68.0f, Origin.Z - 56.0f, 136.0f, 112.0f);
             LocalSiteCoordinates = Array.AsReadOnly(new[]
             {
-                new Vector2(-31.0f, 18.0f),
-                new Vector2(31.0f, -18.0f)
+                new Vector2(-40.0f, 24.0f),
+                new Vector2(42.0f, -25.0f)
             });
             SitePositions = WorldPoints(
-                new(-31.0f, 0.18f, 18.0f),
-                new(31.0f, 0.18f, -18.0f));
+                new(-40.0f, 0.18f, 24.0f),
+                new(42.0f, 0.18f, -25.0f));
             AttackSpawns = WorldPoints(
-                new(37.0f, 0.22f, 41.0f),
-                new(41.0f, 0.22f, 41.0f),
-                new(35.0f, 0.22f, 38.0f),
-                new(43.0f, 0.22f, 38.0f),
-                new(39.0f, 0.22f, 39.0f));
+                new(49.0f, 0.22f, 49.0f),
+                new(53.0f, 0.22f, 49.0f),
+                new(47.0f, 0.22f, 46.0f),
+                new(55.0f, 0.22f, 46.0f),
+                new(51.0f, 0.22f, 47.0f));
             DefenderSpawns = WorldPoints(
-                new(-43.0f, 0.22f, -41.0f),
-                new(-39.0f, 0.22f, -41.0f),
-                new(-45.0f, 0.22f, -38.0f),
-                new(-37.0f, 0.22f, -38.0f),
-                new(-41.0f, 0.22f, -39.0f));
+                new(-55.0f, 0.22f, -49.0f),
+                new(-51.0f, 0.22f, -49.0f),
+                new(-57.0f, 0.22f, -46.0f),
+                new(-49.0f, 0.22f, -46.0f),
+                new(-53.0f, 0.22f, -47.0f));
             CoverPoints = WorldPoints(
-                new(-30.0f, 0.2f, 28.0f), new(-34.0f, 0.2f, 11.0f),
-                new(-26.0f, 0.2f, 24.0f), new(-23.0f, 0.2f, 15.0f),
-                new(38.0f, 0.2f, -25.0f), new(34.0f, 0.2f, -11.0f),
-                new(25.0f, 0.2f, -24.0f), new(22.0f, 0.2f, -14.0f),
-                new(-16.0f, 0.2f, 4.0f), new(-9.0f, 0.2f, 13.0f),
-                new(-3.0f, 0.2f, -8.0f), new(5.0f, 0.2f, 8.0f),
-                new(12.0f, 0.2f, -11.0f), new(17.0f, 0.2f, 2.0f),
-                new(-27.0f, 0.2f, -5.0f), new(27.0f, 0.2f, 5.0f),
-                new(-45.0f, 0.2f, 2.0f), new(40.0f, 0.2f, -2.0f),
-                new(-12.0f, 0.2f, 28.0f), new(12.0f, 0.2f, -28.0f),
-                new(-31.0f, 0.2f, 18.0f), new(31.0f, 0.2f, -18.0f));
+                new(-46.0f, 0.2f, 32.0f), new(-44.0f, 0.2f, 15.0f),
+                new(-36.0f, 0.2f, 29.0f), new(-24.0f, 0.2f, 19.0f),
+                new(53.0f, 0.2f, -31.0f), new(45.0f, 0.2f, -17.0f),
+                new(42.0f, 0.2f, -30.0f), new(40.0f, 0.2f, -17.0f),
+                new(-21.5f, 0.2f, 5.0f), new(-22.0f, 0.2f, 10.0f),
+                new(-9.0f, 0.2f, -8.0f), new(8.5f, 0.2f, 9.0f),
+                new(27.0f, 0.2f, -12.0f), new(46.0f, 0.2f, 12.0f),
+                new(-37.0f, 0.2f, -7.0f), new(29.0f, 0.2f, 11.0f),
+                new(-55.0f, 0.2f, 8.0f), new(56.0f, 0.2f, -1.0f),
+                new(-14.0f, 0.2f, 31.0f), new(12.0f, 0.2f, -34.0f),
+                new(-40.0f, 0.2f, 24.0f), new(42.0f, 0.2f, -25.0f),
+                new(31.0f, 0.2f, 34.0f), new(-31.0f, 0.2f, -34.0f),
+                new(61.0f, 0.2f, 17.0f), new(-59.0f, 0.2f, -19.0f));
         }
         else if (bazaarCrossing)
         {
@@ -294,14 +296,9 @@ public sealed partial class DemolitionArenaLayout
                 new(-14, 0.2f, 46), new(-20, 0.2f, 42),
                 new(-24, 0.2f, 38), new(-25, 0.2f, 30),
                 new(-33, 0.2f, 21));
-        AttackApproachToBPath = harborLocks || bazaarCrossing
+        AttackApproachToBPath = harborLocks || tideglassReactor || bazaarCrossing
             ? AttackToBPath
-            : tideglassReactor
-                ? WorldPoints(
-                    new(40.0f, 0.2f, 40.0f),
-                    new(45.0f, 0.2f, 4.0f),
-                    new(31.0f, 0.2f, -18.0f))
-                : WorldPoints(
+            : WorldPoints(
                     new(3, 0.2f, 51), new(9, 0.2f, 48),
                     new(13, 0.2f, 43), new(16, 0.2f, 35),
                     new(16, 0.2f, 29), new(13, 0.2f, 24),

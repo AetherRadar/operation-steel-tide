@@ -11,13 +11,17 @@ The retained SOURCE_PAGE.html is an offline snapshot of the official pack page.
 It identifies the creator and links the pack to the CC0 1.0 Universal deed.
 PREVIEW_1.jpg is the official first pack preview retained as visual evidence.
 
-Selected unmodified source files and runtime mappings:
+All nine unmodified source files and runtime mappings:
 
 - Building1_Large.fbx -> assets/models/quaternius_buildings_pack/building1-large.glb
+- Building1_Small.fbx -> assets/models/quaternius_buildings_pack/building1-small.glb
+- Building2_Large.fbx -> assets/models/quaternius_buildings_pack/building2-large.glb
+- Building2_Small.fbx -> assets/models/quaternius_buildings_pack/building2-small.glb
 - Building3_Big.fbx -> assets/models/quaternius_buildings_pack/building3-big.glb
+- Building3_Small.fbx -> assets/models/quaternius_buildings_pack/building3-small.glb
 - Building4.fbx -> assets/models/quaternius_buildings_pack/building4.glb
+- House1.fbx -> assets/models/quaternius_buildings_pack/house1.glb
 - House2.fbx -> assets/models/quaternius_buildings_pack/house2.glb
 
-The remaining FBX files are retained unmodified as part of the downloaded
-official source selection. All files remain covered by Quaternius's CC0
-dedication and are not relicensed by the repository's MIT license.
+All files remain covered by Quaternius's CC0 dedication and are not relicensed
+by the repository's MIT license.

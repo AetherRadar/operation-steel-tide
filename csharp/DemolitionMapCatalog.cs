@@ -20,10 +20,10 @@ public sealed record DemolitionMapOffer(
 /// </summary>
 public static class DemolitionMapCatalog
 {
+    public const string BazaarCrossingId = "bazaar_crossing";
+    public const string TideglassReactorId = "tideglass_reactor";
     public const string TideforgeId = "tideforge";
     public const string HarborLocksId = "harbor_locks";
-    public const string TideglassReactorId = "tideglass_reactor";
-    public const string BazaarCrossingId = "bazaar_crossing";
     public const int PoolSize = 12;
 
     public static readonly IReadOnlyList<DemolitionMapOffer> Maps = new[]
@@ -39,8 +39,18 @@ public static class DemolitionMapCatalog
             "demolition_map_bazaar_crossing_profile",
             "THREE-LANE OLD-CITY ASSAULT  //  BROKEN SIGHTLINES  //  THREE PLAYABLE ELEVATIONS\nA  WEST GALLERY COURT  //  B  EAST BALCONY MARKET"),
         new DemolitionMapOffer(
-            TideforgeId,
+            TideglassReactorId,
             "MAP 02",
+            "demolition_map_tideglass_reactor",
+            "TIDEGLASS REACTOR",
+            "demolition_map_tideglass_reactor_subtitle",
+            "CONSTRUCTION QUARTER  //  OLD BRICK WORKS",
+            true,
+            "demolition_map_tideglass_reactor_profile",
+            "FULL-SCALE THREE-LANE ASSAULT  //  COMPACT MID  //  LONG-RANGE WINGS\nA  CONSTRUCTION COURT  //  B  OLD REACTOR LOADING YARD"),
+        new DemolitionMapOffer(
+            TideforgeId,
+            "MAP 03",
             "demolition_map_tideforge",
             "TIDEFORGE ARENA",
             "demolition_map_tideforge_subtitle",
@@ -48,7 +58,7 @@ public static class DemolitionMapCatalog
             true),
         new DemolitionMapOffer(
             HarborLocksId,
-            "MAP 03",
+            "MAP 04",
             "demolition_map_harbor_locks",
             "HARBOR LOCKS",
             "demolition_map_harbor_locks_subtitle",
@@ -56,16 +66,6 @@ public static class DemolitionMapCatalog
             true,
             "demolition_map_harbor_locks_profile",
             "THREE LOCK LANES  //  HARD COVER ROTATIONS  //  LONG QUAYSIDE ANGLES\nA  WEST CONTROL YARD  //  B  EAST PUMP ANNEX"),
-        new DemolitionMapOffer(
-            TideglassReactorId,
-            "MAP 04",
-            "demolition_map_tideglass_reactor",
-            "TIDEGLASS REACTOR",
-            "demolition_map_tideglass_reactor_subtitle",
-            "CONSTRUCTION QUARTER  //  OLD BRICK WORKS",
-            true,
-            "demolition_map_tideglass_reactor_profile",
-            "DIAGONAL URBAN ASSAULT  //  FOUR DISTINCT DISTRICTS  //  CROSSROAD ROTATIONS\nA  CONSTRUCTION COURT  //  B  OLD REACTOR LOADING YARD"),
         new DemolitionMapOffer(
             "drydock_yard",
             "MAP 05",

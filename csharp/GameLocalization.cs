@@ -558,7 +558,7 @@ public static class GameLocalization
         Chinese["demolition_map_harbor_locks_profile"] = "\u4e09\u6761\u6c34\u95f8\u901a\u8def  //  \u786c\u63a9\u4f53\u8f6c\u70b9  //  \u6e2f\u5cb8\u957f\u67aa\u7ebf\nA  \u897f\u4fa7\u63a7\u5236\u573a  //  B  \u4e1c\u4fa7\u6cf5\u7ad9\u9644\u697c";
         Chinese["demolition_map_tideglass_reactor"] = "\u6f6e\u73bb\u53cd\u5e94\u5806";
         Chinese["demolition_map_tideglass_reactor_subtitle"] = "\u65bd\u5de5\u8857\u533a  //  \u8001\u7816\u5382\u533a";
-        Chinese["demolition_map_tideglass_reactor_profile"] = "\u5bf9\u89d2\u57ce\u533a\u7a81\u51fb  //  \u56db\u7c7b\u72ec\u7acb\u8857\u533a  //  \u5341\u5b57\u8def\u8f6c\u70b9\nA  \u65bd\u5de5\u9662  //  B  \u65e7\u53cd\u5e94\u5806\u88c5\u5378\u573a";
+        Chinese["demolition_map_tideglass_reactor_profile"] = "\u5927\u578b\u4e09\u7ebf\u57ce\u533a\u7a81\u51fb  //  \u7d27\u51d1\u4e2d\u8def  //  \u53cc\u7ffc\u957f\u7ebf\nA  \u65bd\u5de5\u9662  //  B  \u65e7\u53cd\u5e94\u5806\u88c5\u5378\u573a";
         Chinese["demolition_map_drydock_yard"] = "\u5e72\u8239\u5742\u573a";
         Chinese["demolition_map_observatory_ridge"] = "\u89c2\u6d6a\u5c71\u810a";
         Chinese["demolition_map_bazaar_crossing"] = "\u65e7\u57ce\u96c6\u5e02";

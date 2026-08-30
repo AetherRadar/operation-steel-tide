@@ -83,9 +83,9 @@ public sealed partial class DemolitionArenaBuilder
 
     private void BuildTideglassReactorLandmarks(Node3D root, DemolitionArenaLayout layout)
     {
-        AddSign(root, "ArenaTitle", layout.Origin + new Vector3(0.0f, 6.4f, -46.6f), "TIDEGLASS REACTOR  //  TR-03", 0.0f, new Color(0.96f, 0.82f, 0.52f));
-        AddSign(root, "ConstructionCourtSign", layout.Origin + new Vector3(-38.0f, 4.8f, 6.0f), "A  //  CONSTRUCTION COURT", Mathf.Pi * 0.5f, new Color(1.0f, 0.64f, 0.18f));
-        AddSign(root, "BrickWorksSign", layout.Origin + new Vector3(44.0f, 5.2f, -9.0f), "B  //  OLD REACTOR YARD", -Mathf.Pi * 0.5f, new Color(0.82f, 0.34f, 0.18f));
+        AddSign(root, "ArenaTitle", layout.Origin + new Vector3(0.0f, 6.4f, -54.6f), "TIDEGLASS REACTOR  //  TR-02", 0.0f, new Color(0.96f, 0.82f, 0.52f));
+        AddSign(root, "ConstructionCourtSign", layout.Origin + new Vector3(-49.0f, 4.8f, 9.0f), "A  //  CONSTRUCTION COURT", Mathf.Pi * 0.5f, new Color(1.0f, 0.64f, 0.18f));
+        AddSign(root, "BrickWorksSign", layout.Origin + new Vector3(53.0f, 5.2f, -14.0f), "B  //  OLD REACTOR YARD", -Mathf.Pi * 0.5f, new Color(0.82f, 0.34f, 0.18f));
         AddSign(root, "CivicCrossingSign", layout.Origin + new Vector3(0.0f, 4.4f, 0.0f), "CIVIC CROSSING", Mathf.Pi, new Color(0.76f, 0.88f, 0.86f));
     }
 
@@ -98,22 +98,23 @@ public sealed partial class DemolitionArenaBuilder
 
     private void BuildTideglassReactorRouteGuidance(Node3D root, DemolitionArenaLayout layout)
     {
-        AddFloorLabel(root, "AttackFloorLabel", layout.Origin + new Vector3(39.0f, 0.09f, 34.0f), "ATTACK", new Color(0.56f, 0.92f, 0.86f), 76);
-        AddFloorLabel(root, "RouteALabel", layout.Origin + new Vector3(28.0f, 0.09f, 26.0f), "A  COURT", new Color(1.0f, 0.58f, 0.18f), 66);
+        AddFloorLabel(root, "AttackFloorLabel", layout.Origin + new Vector3(51.0f, 0.09f, 42.0f), "ATTACK", new Color(0.56f, 0.92f, 0.86f), 76);
+        AddFloorLabel(root, "RouteALabel", layout.Origin + new Vector3(22.0f, 0.09f, 50.0f), "A  COURT", new Color(1.0f, 0.58f, 0.18f), 66);
         AddFloorLabel(root, "RouteMidLabel", layout.Origin + new Vector3(5.0f, 0.09f, 22.0f), "CROSSING", new Color(0.9f, 0.88f, 0.68f), 58);
-        AddFloorLabel(root, "RouteBLabel", layout.Origin + new Vector3(45.0f, 0.09f, 5.0f), "B  WORKS", new Color(0.84f, 0.42f, 0.22f), 66);
-        AddFloorLabel(root, "DefendFloorLabel", layout.Origin + new Vector3(-38.0f, 0.09f, -34.0f), "DEFEND", new Color(0.46f, 0.94f, 0.68f), 72);
+        AddFloorLabel(root, "RouteBLabel", layout.Origin + new Vector3(58.0f, 0.09f, 9.0f), "B  WORKS", new Color(0.84f, 0.42f, 0.22f), 66);
+        AddFloorLabel(root, "DefendFloorLabel", layout.Origin + new Vector3(-50.0f, 0.09f, -42.0f), "DEFEND", new Color(0.46f, 0.94f, 0.68f), 72);
     }
 
     private void BuildTideglassReactorLighting(Node3D root, DemolitionArenaLayout layout)
     {
         var positions = new[]
         {
-            new Vector3(-33.0f, 8.5f, 18.0f),
-            new Vector3(33.0f, 8.5f, -18.0f),
+            new Vector3(-42.0f, 8.5f, 24.0f),
+            new Vector3(44.0f, 8.5f, -25.0f),
             new Vector3(-4.0f, 8.0f, 15.0f),
             new Vector3(15.0f, 8.0f, -4.0f),
-            new Vector3(-20.0f, 8.0f, -25.0f)
+            new Vector3(-24.0f, 8.0f, -34.0f),
+            new Vector3(34.0f, 8.0f, 36.0f)
         };
         for (var index = 0; index < positions.Length; index++)
         {

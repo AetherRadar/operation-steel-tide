@@ -11,11 +11,13 @@ the script only places, names, and exports those authored modules.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import bmesh
 import bpy
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
@@ -32,6 +34,8 @@ class Module:
     source: str
     location: tuple[float, float, float] = (0.0, 0.0, 0.0)
     yaw: float = 0.0
+    scale: tuple[float, float, float] = (1.0, 1.0, 1.0)
+    role: str = ""
 
 
 @dataclass(frozen=True)
@@ -224,7 +228,1247 @@ ASSEMBLIES = (
             Module("Meshes/Trims/IndCornerTrimBFull.fbx", (2.0, 0.0, 0.0), 90.0),
         ),
     ),
+    Assembly(
+        "reactor-annex",
+        "reactor-annex.glb",
+        "TreyIndustrialReactorAnnex",
+        (
+            Module("Meshes/Doors/IndGarageArchWhite.fbx", (-3.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageWhite.fbx", (-3.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (0.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (2.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorFrameSingle.fbx", (4.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorSingleRed.fbx", (4.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-4.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-2.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (0.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (2.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (4.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-5.0, 1.0, 0.0), 90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-5.0, 3.0, 0.0), 90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-5.0, 5.0, 0.0), 90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (5.0, 1.0, 0.0), -90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (5.0, 3.0, 0.0), -90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (5.0, 5.0, 0.0), -90.0),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0, 5.0)
+                for x in (-4.0, -2.0, 0.0, 2.0, 4.0)
+            ),
+            *(
+                Module("Meshes/Roofs/IndRoofDarkGreyFull.fbx", (x, y, 3.0))
+                for y in (1.0, 3.0, 5.0)
+                for x in (-4.0, -2.0, 0.0, 2.0, 4.0)
+            ),
+        ),
+    ),
+    Assembly(
+        "shift-office",
+        "shift-office.glb",
+        "TreyIndustrialShiftOffice",
+        (
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-2.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorFrameSingle.fbx", (0.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorSingleRed.fbx", (0.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (2.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-2.0, 4.0, 0.0), 180.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (0.0, 4.0, 0.0), 180.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (2.0, 4.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-3.0, 1.0, 0.0), 90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-3.0, 3.0, 0.0), 90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (3.0, 1.0, 0.0), -90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (3.0, 3.0, 0.0), -90.0),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0)
+                for x in (-2.0, 0.0, 2.0)
+            ),
+            *(
+                Module("Meshes/Roofs/IndRoofDarkGreyFull.fbx", (x, y, 3.0))
+                for y in (1.0, 3.0)
+                for x in (-2.0, 0.0, 2.0)
+            ),
+            Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (-2.0, 0.0, 3.0)),
+            Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (0.0, 0.0, 3.0)),
+            Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (2.0, 0.0, 3.0)),
+            Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (-2.0, 4.0, 3.0), 180.0),
+            Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (0.0, 4.0, 3.0), 180.0),
+            Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (2.0, 4.0, 3.0), 180.0),
+            Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (-3.0, 1.0, 3.0), -90.0),
+            Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (-3.0, 3.0, 3.0), -90.0),
+            Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (3.0, 1.0, 3.0), 90.0),
+            Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (3.0, 3.0, 3.0), 90.0),
+        ),
+    ),
+    Assembly(
+        "turbine-workshop",
+        "turbine-workshop.glb",
+        "TreyIndustrialTurbineWorkshop",
+        (
+            Module("Meshes/Doors/IndGarageArchWhite.fbx", (-2.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageWhite.fbx", (-2.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (1.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorFrameSingle.fbx", (3.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorSingleRed.fbx", (3.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-3.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-1.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (1.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (3.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-4.0, 1.0, 0.0), 90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-4.0, 3.0, 0.0), 90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-4.0, 5.0, 0.0), 90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (4.0, 1.0, 0.0), -90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (4.0, 3.0, 0.0), -90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (4.0, 5.0, 0.0), -90.0),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0, 5.0)
+                for x in (-3.0, -1.0, 1.0, 3.0)
+            ),
+            *(
+                Module(
+                    "Meshes/Roofs/IndRoofDarkGreyAngledFull.fbx",
+                    (x, y, 3.0),
+                    0.0 if x in (-3.0, 1.0) else 180.0,
+                )
+                for y in (1.0, 3.0, 5.0)
+                for x in (-3.0, -1.0, 1.0, 3.0)
+            ),
+            *(
+                Module(source, (ridge, y, 3.0), yaw)
+                for y, yaw in ((0.0, 0.0), (6.0, 180.0))
+                for ridge in (-2.0, 2.0)
+                for source in (
+                    "Meshes/Trims/IndRoofTrimAAngledL.fbx",
+                    "Meshes/Trims/IndRoofTrimAAngledR.fbx",
+                )
+            ),
+        ),
+    ),
+    Assembly(
+        "compressor-house",
+        "compressor-house.glb",
+        "TreyIndustrialCompressorHouse",
+        (
+            Module("Meshes/Doors/IndGarageArchWhite.fbx", (-2.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageWhite.fbx", (-2.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageArchWhite.fbx", (2.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageWhite.fbx", (2.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-3.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-1.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (1.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (3.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-4.0, 1.0, 0.0), 90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-4.0, 3.0, 0.0), 90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-4.0, 5.0, 0.0), 90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (4.0, 1.0, 0.0), -90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (4.0, 3.0, 0.0), -90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (4.0, 5.0, 0.0), -90.0),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0, 5.0)
+                for x in (-3.0, -1.0, 1.0, 3.0)
+            ),
+            *(
+                Module("Meshes/Roofs/IndRoofDarkGreyFull.fbx", (x, y, 3.0))
+                for y in (1.0, 3.0, 5.0)
+                for x in (-3.0, -1.0, 1.0, 3.0)
+            ),
+            *(
+                Module(source, (x, y, 0.0))
+                for x, y in ((-4.0, 0.0), (4.0, 0.0), (-4.0, 6.0), (4.0, 6.0))
+                for source in (
+                    "Meshes/Details/IndColumnFree.fbx",
+                    "Meshes/Details/IndColumnFreeCap.fbx",
+                )
+            ),
+        ),
+    ),
+    Assembly(
+        "inspection-office",
+        "inspection-office.glb",
+        "TreyIndustrialInspectionOffice",
+        (
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-2.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorFrameSingle.fbx", (0.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorSingleRed.fbx", (0.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (2.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-2.0, 4.0, 0.0), 180.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (0.0, 4.0, 0.0), 180.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (2.0, 4.0, 0.0), 180.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-3.0, 1.0, 0.0), 90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-3.0, 3.0, 0.0), 90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (3.0, 1.0, 0.0), -90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (3.0, 3.0, 0.0), -90.0),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0)
+                for x in (-2.0, 0.0, 2.0)
+            ),
+            *(
+                Module("Meshes/Roofs/IndRoofDarkGreyFull.fbx", (x, y, 3.0))
+                for y in (1.0, 3.0)
+                for x in (-2.0, 0.0, 2.0)
+            ),
+            Module(
+                "Meshes/Roofs/IndRoofDarkGreyFull.fbx",
+                (0.0, -0.6, 2.8),
+                0.0,
+                (1.0, 1.0, 1.0),
+                "canopy",
+            ),
+            Module(
+                "Meshes/Details/IndColumnFree.fbx",
+                (-0.8, -1.3, 0.0),
+                0.0,
+                (1.0, 1.0, 0.9),
+                "canopy",
+            ),
+            Module(
+                "Meshes/Details/IndColumnFree.fbx",
+                (0.8, -1.3, 0.0),
+                0.0,
+                (1.0, 1.0, 0.9),
+                "canopy",
+            ),
+        ),
+    ),
+    Assembly(
+        "boiler-workshop",
+        "boiler-workshop.glb",
+        "TreyIndustrialBoilerWorkshop",
+        (
+            Module("Meshes/Doors/IndGarageArchWhite.fbx", (-3.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageWhite.fbx", (-3.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (0.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (2.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorFrameSingle.fbx", (4.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorSingleRed.fbx", (4.0, 0.0, 0.0)),
+            *(
+                Module("Meshes/Windows/IndWindowETopFull.fbx", (x, 0.0, 3.0))
+                for x in (-4.0, -2.0, 0.0, 2.0, 4.0)
+            ),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-4.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-2.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (0.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (2.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (4.0, 6.0, 0.0), 180.0),
+            *(
+                Module("Meshes/Windows/IndWindowETopFull.fbx", (x, 6.0, 3.0), 180.0)
+                for x in (-4.0, -2.0, 0.0, 2.0, 4.0)
+            ),
+            Module("Meshes/Walls/IndWallFull.fbx", (-5.0, 1.0, 0.0), 90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-5.0, 3.0, 0.0), 90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-5.0, 5.0, 0.0), 90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-5.0, 1.0, 3.0), 90.0),
+            Module("Meshes/Windows/IndWindowETopFull.fbx", (-5.0, 3.0, 3.0), 90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-5.0, 5.0, 3.0), 90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (5.0, 1.0, 0.0), -90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (5.0, 3.0, 0.0), -90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (5.0, 5.0, 0.0), -90.0),
+            Module("Meshes/Windows/IndWindowETopFull.fbx", (5.0, 1.0, 3.0), -90.0),
+            Module("Meshes/Windows/IndWindowETopFull.fbx", (5.0, 3.0, 3.0), -90.0),
+            Module("Meshes/Windows/IndWindowETopFull.fbx", (5.0, 5.0, 3.0), -90.0),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0, 5.0)
+                for x in (-4.0, -2.0, 0.0, 2.0, 4.0)
+            ),
+            *(
+                Module("Meshes/Roofs/IndRoofDarkGreyFull.fbx", (x, y, 6.0))
+                for y in (1.0, 3.0, 5.0)
+                for x in (-4.0, -2.0, 0.0, 2.0, 4.0)
+            ),
+            *(
+                Module("Meshes/Trims/IndCornerTrimBFull.fbx", (x, y, z), yaw)
+                for z in (0.0, 3.0)
+                for x, y, yaw in (
+                    (-5.0, 0.0, 0.0),
+                    (5.0, 0.0, 90.0),
+                    (-5.0, 6.0, -90.0),
+                    (5.0, 6.0, 180.0),
+                )
+            ),
+        ),
+    ),
+    Assembly(
+        "switchgear-hall",
+        "switchgear-hall.glb",
+        "TreyIndustrialSwitchgearHall",
+        (
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-3.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-1.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorFrameSingle.fbx", (1.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorSingleRed.fbx", (1.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (3.0, 0.0, 0.0)),
+            Module("Meshes/Walls/IndWallFull.fbx", (-3.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-1.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (1.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (3.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-4.0, 1.0, 0.0), 90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-4.0, 3.0, 0.0), 90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-4.0, 5.0, 0.0), 90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (4.0, 1.0, 0.0), -90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (4.0, 3.0, 0.0), -90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (4.0, 5.0, 0.0), -90.0),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0, 5.0)
+                for x in (-3.0, -1.0, 1.0, 3.0)
+            ),
+            *(
+                Module(
+                    "Meshes/Roofs/IndRoofDarkGreyAngledFull.fbx",
+                    (x, y, 3.0),
+                    yaw,
+                    (1.5, 1.0, 1.0),
+                )
+                for x in (-3.0, -1.0, 1.0, 3.0)
+                for y, yaw in ((1.5, 90.0), (4.5, -90.0))
+            ),
+            *(
+                Module(source, (x, 3.0, 3.0), yaw, (1.5, 1.0, 1.0))
+                for x, yaw in ((-4.0, -90.0), (4.0, 90.0))
+                for source in (
+                    "Meshes/Trims/IndRoofTrimAAngledL.fbx",
+                    "Meshes/Trims/IndRoofTrimAAngledR.fbx",
+                )
+            ),
+        ),
+    ),
+    Assembly(
+        "crew-canteen",
+        "crew-canteen.glb",
+        "TreyIndustrialCrewCanteen",
+        (
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-3.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-1.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorFrameSingle.fbx", (1.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorSingleRed.fbx", (1.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (3.0, 0.0, 0.0)),
+            *(
+                Module("Meshes/Windows/IndWindowBFull.fbx", (x, 6.0, 0.0), 180.0)
+                for x in (-3.0, -1.0, 1.0, 3.0)
+            ),
+            *(
+                Module("Meshes/Windows/IndWindowBFull.fbx", (-4.0, y, 0.0), 90.0)
+                for y in (1.0, 3.0, 5.0)
+            ),
+            *(
+                Module("Meshes/Windows/IndWindowBFull.fbx", (4.0, y, 0.0), -90.0)
+                for y in (1.0, 3.0, 5.0)
+            ),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0, 5.0)
+                for x in (-3.0, -1.0, 1.0, 3.0)
+            ),
+            *(
+                Module("Meshes/Roofs/IndRoofDarkGreyFull.fbx", (x, y, 3.0))
+                for y in (1.0, 3.0, 5.0)
+                for x in (-3.0, -1.0, 1.0, 3.0)
+            ),
+            *(
+                Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (x, y, 3.0), yaw)
+                for y, yaw in ((0.0, 0.0), (6.0, 180.0))
+                for x in (-3.0, -1.0, 1.0, 3.0)
+            ),
+            *(
+                Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (x, y, 3.0), yaw)
+                for x, yaw in ((-4.0, -90.0), (4.0, 90.0))
+                for y in (1.0, 3.0, 5.0)
+            ),
+        ),
+    ),
+    Assembly(
+        "pump-house",
+        "pump-house.glb",
+        "TreyIndustrialPumpHouse",
+        (
+            Module("Meshes/Doors/IndGarageArchWhite.fbx", (-1.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageWhite.fbx", (-1.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorFrameSingle.fbx", (2.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorSingleRed.fbx", (2.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-2.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (0.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (2.0, 6.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-3.0, 1.0, 0.0), 90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-3.0, 3.0, 0.0), 90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-3.0, 5.0, 0.0), 90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (3.0, 1.0, 0.0), -90.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (3.0, 3.0, 0.0), -90.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (3.0, 5.0, 0.0), -90.0),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0, 5.0)
+                for x in (-2.0, 0.0, 2.0)
+            ),
+            *(
+                Module(
+                    "Meshes/Roofs/IndRoofDarkGreyAngledFull.fbx",
+                    (x, y, 3.0),
+                    yaw,
+                    (1.5, 1.0, 1.0),
+                )
+                for y in (1.0, 3.0, 5.0)
+                for x, yaw in ((-1.5, 0.0), (1.5, 180.0))
+            ),
+            *(
+                Module(source, (0.0, y, 3.0), yaw, (1.5, 1.0, 1.0))
+                for y, yaw in ((0.0, 0.0), (6.0, 180.0))
+                for source in (
+                    "Meshes/Trims/IndRoofTrimAAngledL.fbx",
+                    "Meshes/Trims/IndRoofTrimAAngledR.fbx",
+                )
+            ),
+        ),
+    ),
+    Assembly(
+        "transformer-works",
+        "transformer-works.glb",
+        "TreyIndustrialTransformerWorks",
+        (
+            Module("Meshes/Doors/IndGarageArchWhite.fbx", (-4.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageWhite.fbx", (-4.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageArchWhite.fbx", (0.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageWhite.fbx", (0.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (3.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorFrameSingle.fbx", (5.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorSingleRed.fbx", (5.0, 0.0, 0.0)),
+            *(
+                Module(source, (x, 8.0, 0.0), 180.0)
+                for x, source in zip(
+                    (-5.0, -3.0, -1.0, 1.0, 3.0, 5.0),
+                    (
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module(source, (-6.0, y, 0.0), 90.0)
+                for y, source in zip(
+                    (1.0, 3.0, 5.0, 7.0),
+                    (
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module(source, (6.0, y, 0.0), -90.0)
+                for y, source in zip(
+                    (1.0, 3.0, 5.0, 7.0),
+                    (
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0, 5.0, 7.0)
+                for x in (-5.0, -3.0, -1.0, 1.0, 3.0, 5.0)
+            ),
+            *(
+                Module("Meshes/Roofs/IndRoofDarkGreyFull.fbx", (x, y, 3.0))
+                for y in (1.0, 3.0, 5.0, 7.0)
+                for x in (-5.0, -3.0, -1.0, 1.0, 3.0, 5.0)
+            ),
+            *(
+                Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (x, y, 3.0), yaw)
+                for y, yaw in ((0.0, 0.0), (8.0, 180.0))
+                for x in (-5.0, -3.0, -1.0, 1.0, 3.0, 5.0)
+            ),
+            *(
+                Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (x, y, 3.0), yaw)
+                for x, yaw in ((-6.0, -90.0), (6.0, 90.0))
+                for y in (1.0, 3.0, 5.0, 7.0)
+            ),
+            *(
+                Module(source, (x, y, 0.0))
+                for x, y in ((-6.0, 0.0), (6.0, 0.0), (-6.0, 8.0), (6.0, 8.0))
+                for source in (
+                    "Meshes/Details/IndColumnFree.fbx",
+                    "Meshes/Details/IndColumnFreeCap.fbx",
+                )
+            ),
+        ),
+    ),
+    Assembly(
+        "glassworks-office",
+        "glassworks-office.glb",
+        "TreyIndustrialGlassworksOffice",
+        (
+            Module("Meshes/Windows/IndWindowEBottomFull.fbx", (-4.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowEBottomFull.fbx", (-2.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorFrameSingle.fbx", (0.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorSingleRed.fbx", (0.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowEBottomFull.fbx", (2.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowEBottomFull.fbx", (4.0, 0.0, 0.0)),
+            *(
+                Module("Meshes/Windows/IndWindowBFull.fbx", (x, 8.0, 0.0), 180.0)
+                for x in (-4.0, -2.0, 0.0, 2.0, 4.0)
+            ),
+            *(
+                Module("Meshes/Windows/IndWindowEBottomFull.fbx", (-5.0, y, 0.0), 90.0)
+                for y in (1.0, 3.0, 5.0, 7.0)
+            ),
+            *(
+                Module("Meshes/Windows/IndWindowBFull.fbx", (5.0, y, 0.0), -90.0)
+                for y in (1.0, 3.0, 5.0, 7.0)
+            ),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0, 5.0, 7.0)
+                for x in (-4.0, -2.0, 0.0, 2.0, 4.0)
+            ),
+            *(
+                Module("Meshes/Roofs/IndRoofDarkGreyFull.fbx", (x, y, 3.0))
+                for y in (1.0, 3.0, 5.0, 7.0)
+                for x in (-4.0, -2.0, 0.0, 2.0, 4.0)
+            ),
+            *(
+                Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (x, y, 3.0), yaw)
+                for y, yaw in ((0.0, 0.0), (8.0, 180.0))
+                for x in (-4.0, -2.0, 0.0, 2.0, 4.0)
+            ),
+            *(
+                Module("Meshes/Trims/IndRoofTrimAStraight.fbx", (x, y, 3.0), yaw)
+                for x, yaw in ((-5.0, -90.0), (5.0, 90.0))
+                for y in (1.0, 3.0, 5.0, 7.0)
+            ),
+            Module(
+                "Meshes/Roofs/IndRoofDarkGreyFull.fbx",
+                (0.0, -0.6, 2.8),
+                0.0,
+                (1.5, 1.0, 1.0),
+                "canopy",
+            ),
+            Module(
+                "Meshes/Details/IndColumnFree.fbx",
+                (-0.9, -1.3, 0.0),
+                0.0,
+                (1.0, 1.0, 0.9),
+                "canopy",
+            ),
+            Module(
+                "Meshes/Details/IndColumnFree.fbx",
+                (0.9, -1.3, 0.0),
+                0.0,
+                (1.0, 1.0, 0.9),
+                "canopy",
+            ),
+        ),
+    ),
+    Assembly(
+        "cooling-service-hall",
+        "cooling-service-hall.glb",
+        "TreyIndustrialCoolingServiceHall",
+        (
+            *(
+                Module(source, (x, 0.0, 0.0))
+                for x in (-4.0, 0.0, 4.0)
+                for source in (
+                    "Meshes/Doors/IndGarageArchWhite.fbx",
+                    "Meshes/Doors/IndGarageWhite.fbx",
+                )
+            ),
+            *(
+                Module(source, (x, 8.0, 0.0), 180.0)
+                for x, source in zip(
+                    (-5.0, -3.0, -1.0, 1.0, 3.0, 5.0),
+                    (
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module(source, (-6.0, y, 0.0), 90.0)
+                for y, source in zip(
+                    (1.0, 3.0, 5.0, 7.0),
+                    (
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module(source, (6.0, y, 0.0), -90.0)
+                for y, source in zip(
+                    (1.0, 3.0, 5.0, 7.0),
+                    (
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0, 5.0, 7.0)
+                for x in (-5.0, -3.0, -1.0, 1.0, 3.0, 5.0)
+            ),
+            *(
+                Module(
+                    "Meshes/Roofs/IndRoofDarkGreyAngledFull.fbx",
+                    (x, y, 3.0),
+                    yaw,
+                    (2.0, 1.0, 1.0),
+                )
+                for x in (-5.0, -3.0, -1.0, 1.0, 3.0, 5.0)
+                for y, yaw in ((2.0, 90.0), (6.0, -90.0))
+            ),
+            *(
+                Module(source, (x, 4.0, 3.0), yaw, (2.0, 1.0, 1.0))
+                for x, yaw in ((-6.0, -90.0), (6.0, 90.0))
+                for source in (
+                    "Meshes/Trims/IndRoofTrimAAngledL.fbx",
+                    "Meshes/Trims/IndRoofTrimAAngledR.fbx",
+                )
+            ),
+            Module(
+                "Meshes/Walls/IndWallFull.fbx",
+                (-6.0, 4.0, 3.0),
+                90.0,
+                (4.0, 1.0, 0.4666666667),
+                "gable_infill",
+            ),
+            Module(
+                "Meshes/Walls/IndWallFull.fbx",
+                (6.0, 4.0, 3.0),
+                -90.0,
+                (4.0, 1.0, 0.4666666667),
+                "gable_infill",
+            ),
+        ),
+    ),
+    Assembly(
+        "control-room",
+        "control-room.glb",
+        "TreyIndustrialControlRoom",
+        (
+            Module("Meshes/Windows/IndWindowEBottomFull.fbx", (-3.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowEBottomFull.fbx", (-1.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorFrameSingle.fbx", (1.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorSingleRed.fbx", (1.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowEBottomFull.fbx", (3.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (-3.0, 8.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (-1.0, 8.0, 0.0), 180.0),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (1.0, 8.0, 0.0), 180.0),
+            Module("Meshes/Walls/IndWallFull.fbx", (3.0, 8.0, 0.0), 180.0),
+            *(
+                Module(source, (-4.0, y, 0.0), 90.0)
+                for y, source in zip(
+                    (1.0, 3.0, 5.0, 7.0),
+                    (
+                        "Meshes/Windows/IndWindowEBottomFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowEBottomFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module(source, (4.0, y, 0.0), -90.0)
+                for y, source in zip(
+                    (1.0, 3.0, 5.0, 7.0),
+                    (
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowEBottomFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowEBottomFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module("Meshes/Windows/IndWindowETopFull.fbx", (x, 0.0, 3.0))
+                for x in (-3.0, -1.0, 1.0, 3.0)
+            ),
+            *(
+                Module("Meshes/Windows/IndWindowETopFull.fbx", (x, 8.0, 3.0), 180.0)
+                for x in (-3.0, -1.0, 1.0, 3.0)
+            ),
+            *(
+                Module("Meshes/Windows/IndWindowETopFull.fbx", (-4.0, y, 3.0), 90.0)
+                for y in (1.0, 3.0, 5.0, 7.0)
+            ),
+            *(
+                Module("Meshes/Windows/IndWindowETopFull.fbx", (4.0, y, 3.0), -90.0)
+                for y in (1.0, 3.0, 5.0, 7.0)
+            ),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0, 5.0, 7.0)
+                for x in (-3.0, -1.0, 1.0, 3.0)
+            ),
+            *(
+                Module("Meshes/Roofs/IndRoofDarkGreyFull.fbx", (x, y, 6.0))
+                for y in (1.0, 3.0, 5.0, 7.0)
+                for x in (-3.0, -1.0, 1.0, 3.0)
+            ),
+            *(
+                Module("Meshes/Trims/IndCornerTrimBFull.fbx", (x, y, z), yaw)
+                for z in (0.0, 3.0)
+                for x, y, yaw in (
+                    (-4.0, 0.0, 0.0),
+                    (4.0, 0.0, 90.0),
+                    (-4.0, 8.0, -90.0),
+                    (4.0, 8.0, 180.0),
+                )
+            ),
+        ),
+    ),
+    Assembly(
+        "maintenance-depot",
+        "maintenance-depot.glb",
+        "TreyIndustrialMaintenanceDepot",
+        (
+            Module("Meshes/Doors/IndGarageArchWhite.fbx", (-3.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageWhite.fbx", (-3.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (0.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorFrameSingle.fbx", (2.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorSingleRed.fbx", (2.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowBFull.fbx", (4.0, 0.0, 0.0)),
+            *(
+                Module(source, (x, 6.0, 0.0), 180.0)
+                for x, source in zip(
+                    (-4.0, -2.0, 0.0, 2.0, 4.0),
+                    (
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module(source, (-5.0, y, 0.0), 90.0)
+                for y, source in zip(
+                    (1.0, 3.0, 5.0),
+                    (
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module(source, (5.0, y, 0.0), -90.0)
+                for y, source in zip(
+                    (1.0, 3.0, 5.0),
+                    (
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0, 5.0)
+                for x in (-4.0, -2.0, 0.0, 2.0, 4.0)
+            ),
+            *(
+                Module(
+                    "Meshes/Roofs/IndRoofDarkGreyAngledFull.fbx",
+                    (x, y, 3.0),
+                    yaw,
+                    (2.5, 1.0, 1.0),
+                )
+                for y in (1.0, 3.0, 5.0)
+                for x, yaw in ((-2.5, 0.0), (2.5, 180.0))
+            ),
+            *(
+                Module(source, (0.0, y, 3.0), yaw, (2.5, 1.0, 1.0))
+                for y, yaw in ((0.0, 0.0), (6.0, 180.0))
+                for source in (
+                    "Meshes/Trims/IndRoofTrimAAngledL.fbx",
+                    "Meshes/Trims/IndRoofTrimAAngledR.fbx",
+                )
+            ),
+            Module(
+                "Meshes/Walls/IndWallFull.fbx",
+                (0.0, 0.0, 3.0),
+                0.0,
+                (5.0, 1.0, 0.4666666667),
+                "gable_infill",
+            ),
+            Module(
+                "Meshes/Walls/IndWallFull.fbx",
+                (0.0, 6.0, 3.0),
+                180.0,
+                (5.0, 1.0, 0.4666666667),
+                "gable_infill",
+            ),
+        ),
+    ),
+    Assembly(
+        "foundry-warehouse",
+        "foundry-warehouse.glb",
+        "TreyIndustrialFoundryWarehouse",
+        (
+            Module("Meshes/Doors/IndGarageArchWhite.fbx", (-4.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageWhite.fbx", (-4.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageArchWhite.fbx", (0.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndGarageWhite.fbx", (0.0, 0.0, 0.0)),
+            Module("Meshes/Windows/IndWindowEBottomFull.fbx", (3.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorFrameSingle.fbx", (5.0, 0.0, 0.0)),
+            Module("Meshes/Doors/IndDoorSingleRed.fbx", (5.0, 0.0, 0.0)),
+            *(
+                Module(source, (x, 8.0, 0.0), 180.0)
+                for x, source in zip(
+                    (-5.0, -3.0, -1.0, 1.0, 3.0, 5.0),
+                    (
+                        "Meshes/Windows/IndWindowEBottomFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowEBottomFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowEBottomFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module(source, (-6.0, y, 0.0), 90.0)
+                for y, source in zip(
+                    (1.0, 3.0, 5.0, 7.0),
+                    (
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module(source, (6.0, y, 0.0), -90.0)
+                for y, source in zip(
+                    (1.0, 3.0, 5.0, 7.0),
+                    (
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                        "Meshes/Windows/IndWindowBFull.fbx",
+                        "Meshes/Walls/IndWallFull.fbx",
+                    ),
+                )
+            ),
+            *(
+                Module("Meshes/Floors/IndFloorGreyFull.fbx", (x, y, 0.0))
+                for y in (1.0, 3.0, 5.0, 7.0)
+                for x in (-5.0, -3.0, -1.0, 1.0, 3.0, 5.0)
+            ),
+            *(
+                Module(
+                    "Meshes/Roofs/IndRoofDarkGreyAngledFull.fbx",
+                    (x, y, 3.0),
+                    0.0 if x in (-5.0, -1.0, 3.0) else 180.0,
+                )
+                for y in (1.0, 3.0, 5.0, 7.0)
+                for x in (-5.0, -3.0, -1.0, 1.0, 3.0, 5.0)
+            ),
+            *(
+                Module(source, (ridge, y, 3.0), yaw)
+                for y, yaw in ((0.0, 0.0), (8.0, 180.0))
+                for ridge in (-4.0, 0.0, 4.0)
+                for source in (
+                    "Meshes/Trims/IndRoofTrimAAngledL.fbx",
+                    "Meshes/Trims/IndRoofTrimAAngledR.fbx",
+                )
+            ),
+            *(
+                Module(
+                    "Meshes/Walls/IndWallFull.fbx",
+                    (ridge, y, 3.0),
+                    yaw,
+                    (2.0, 1.0, 0.4666666667),
+                    "gable_infill",
+                )
+                for y, yaw in ((0.0, 0.0), (8.0, 180.0))
+                for ridge in (-4.0, 0.0, 4.0)
+            ),
+        ),
+    ),
 )
+
+
+NEW_CLOSED_BUILDING_REQUIREMENTS = {
+    "reactor-annex": {
+        "footprint": (10.0, 6.0),
+        "floor_modules": 15,
+        "roof_modules": 15,
+        "window_modules": 6,
+        "door_modules": 4,
+        "roof_style": "flat",
+    },
+    "shift-office": {
+        "footprint": (6.0, 4.0),
+        "floor_modules": 6,
+        "roof_modules": 6,
+        "window_modules": 7,
+        "door_modules": 2,
+        "roof_style": "corniced-flat",
+    },
+    "turbine-workshop": {
+        "footprint": (8.0, 6.0),
+        "floor_modules": 12,
+        "roof_modules": 12,
+        "window_modules": 6,
+        "door_modules": 4,
+        "roof_style": "twin-gable",
+    },
+    "compressor-house": {
+        "footprint": (8.0, 6.0),
+        "floor_modules": 12,
+        "roof_modules": 12,
+        "window_modules": 4,
+        "door_modules": 4,
+        "roof_style": "reinforced-flat",
+    },
+    "inspection-office": {
+        "footprint": (6.0, 4.0),
+        "floor_modules": 6,
+        "roof_modules": 6,
+        "window_modules": 7,
+        "door_modules": 2,
+        "roof_style": "canopied-flat",
+    },
+    "boiler-workshop": {
+        "footprint": (10.0, 6.0),
+        "floor_modules": 15,
+        "roof_modules": 15,
+        "window_modules": 22,
+        "door_modules": 4,
+        "roof_style": "tall-flat",
+        "storeys": 2,
+    },
+    "switchgear-hall": {
+        "footprint": (8.0, 6.0),
+        "floor_modules": 12,
+        "roof_modules": 8,
+        "window_modules": 6,
+        "door_modules": 2,
+        "roof_style": "transverse-gable",
+    },
+    "crew-canteen": {
+        "footprint": (8.0, 6.0),
+        "floor_modules": 12,
+        "roof_modules": 12,
+        "window_modules": 13,
+        "door_modules": 2,
+        "roof_style": "canteen-cornice",
+    },
+    "pump-house": {
+        "footprint": (6.0, 6.0),
+        "floor_modules": 9,
+        "roof_modules": 6,
+        "window_modules": 6,
+        "door_modules": 4,
+        "roof_style": "broad-gable",
+    },
+    "transformer-works": {
+        "footprint": (12.0, 8.0),
+        "floor_modules": 24,
+        "roof_modules": 24,
+        "window_modules": 8,
+        "door_modules": 6,
+        "roof_style": "reinforced-cornice",
+    },
+    "glassworks-office": {
+        "footprint": (10.0, 8.0),
+        "floor_modules": 20,
+        "roof_modules": 20,
+        "window_modules": 17,
+        "door_modules": 2,
+        "roof_style": "glazed-canopy-cornice",
+    },
+    "cooling-service-hall": {
+        "footprint": (12.0, 8.0),
+        "floor_modules": 24,
+        "roof_modules": 12,
+        "window_modules": 7,
+        "door_modules": 6,
+        "roof_style": "wide-transverse-gable",
+        "gable_infills": 2,
+    },
+    "control-room": {
+        "footprint": (8.0, 8.0),
+        "floor_modules": 16,
+        "roof_modules": 16,
+        "window_modules": 25,
+        "door_modules": 2,
+        "roof_style": "two-storey-control",
+        "storeys": 2,
+    },
+    "maintenance-depot": {
+        "footprint": (10.0, 6.0),
+        "floor_modules": 15,
+        "roof_modules": 6,
+        "window_modules": 8,
+        "door_modules": 4,
+        "roof_style": "depot-gable",
+        "gable_infills": 2,
+    },
+    "foundry-warehouse": {
+        "footprint": (12.0, 8.0),
+        "floor_modules": 24,
+        "roof_modules": 24,
+        "window_modules": 8,
+        "door_modules": 6,
+        "roof_style": "triple-gable",
+        "gable_infills": 6,
+    },
+}
+
+
+def validate_new_assembly_definitions() -> None:
+    new_assemblies = [
+        assembly for assembly in ASSEMBLIES if assembly.slug in NEW_CLOSED_BUILDING_REQUIREMENTS
+    ]
+    if {assembly.slug for assembly in new_assemblies} != set(NEW_CLOSED_BUILDING_REQUIREMENTS):
+        raise RuntimeError("The Tideglass closed-building definitions are incomplete")
+    if len({assembly.output_name for assembly in ASSEMBLIES}) != len(ASSEMBLIES):
+        raise RuntimeError("Trey industrial output filenames must be unique")
+
+    signatures: set[tuple[Module, ...]] = set()
+    for assembly in new_assemblies:
+        requirement = NEW_CLOSED_BUILDING_REQUIREMENTS[assembly.slug]
+        signature = tuple(
+            sorted(
+                assembly.modules,
+                key=lambda module: (
+                    module.source,
+                    module.location,
+                    module.yaw,
+                    module.scale,
+                    module.role,
+                ),
+            )
+        )
+        if signature in signatures:
+            raise RuntimeError(f"{assembly.slug} duplicates another annex composition")
+        signatures.add(signature)
+
+        floor_modules = [
+            module for module in assembly.modules if "IndFloorGreyFull" in module.source
+        ]
+        roof_modules = [
+            module
+            for module in assembly.modules
+            if "/Roofs/IndRoofDarkGrey" in module.source.replace("\\", "/")
+            and module.role != "canopy"
+        ]
+        window_modules = [module for module in assembly.modules if "/Windows/" in module.source]
+        door_modules = [module for module in assembly.modules if "/Doors/" in module.source]
+        actual_counts = {
+            "floor_modules": len(floor_modules),
+            "roof_modules": len(roof_modules),
+            "window_modules": len(window_modules),
+            "door_modules": len(door_modules),
+        }
+        for field, actual in actual_counts.items():
+            if actual != requirement[field]:
+                raise RuntimeError(
+                    f"{assembly.slug} has {actual} {field}, expected {requirement[field]}"
+                )
+
+        floor_minimum = Vector(
+            (
+                min(module.location[0] - 1.0 for module in floor_modules),
+                min(module.location[1] - 1.0 for module in floor_modules),
+            )
+        )
+        floor_maximum = Vector(
+            (
+                max(module.location[0] + 1.0 for module in floor_modules),
+                max(module.location[1] + 1.0 for module in floor_modules),
+            )
+        )
+        footprint = floor_maximum - floor_minimum
+        expected_footprint = requirement["footprint"]
+        if (
+            abs(footprint.x - expected_footprint[0]) > 0.001
+            or abs(footprint.y - expected_footprint[1]) > 0.001
+        ):
+            raise RuntimeError(
+                f"{assembly.slug} footprint is {tuple(footprint)}, expected {expected_footprint}"
+            )
+
+        roof_style = requirement["roof_style"]
+        angled_roofs = [module for module in roof_modules if "Angled" in module.source]
+        straight_trims = [
+            module for module in assembly.modules if "IndRoofTrimAStraight" in module.source
+        ]
+        angled_trims = [
+            module for module in assembly.modules if "IndRoofTrimAAngled" in module.source
+        ]
+        columns = [
+            module for module in assembly.modules if module.source.endswith("IndColumnFree.fbx")
+        ]
+        column_caps = [
+            module for module in assembly.modules if module.source.endswith("IndColumnFreeCap.fbx")
+        ]
+        corner_trims = [
+            module for module in assembly.modules if module.source.endswith("IndCornerTrimBFull.fbx")
+        ]
+        canopy_modules = [module for module in assembly.modules if module.role == "canopy"]
+        gable_infills = [
+            module for module in assembly.modules if module.role == "gable_infill"
+        ]
+        bottom_windows = [
+            module for module in window_modules if "IndWindowEBottomFull" in module.source
+        ]
+        top_windows = [
+            module for module in window_modules if "IndWindowETopFull" in module.source
+        ]
+        style_valid = (
+            (roof_style == "flat" and not angled_roofs and not straight_trims and not angled_trims)
+            or (
+                roof_style == "corniced-flat"
+                and not angled_roofs
+                and len(straight_trims) == 10
+                and not angled_trims
+            )
+            or (
+                roof_style == "twin-gable"
+                and len(angled_roofs) == len(roof_modules)
+                and not straight_trims
+                and len(angled_trims) == 8
+            )
+            or (
+                roof_style == "reinforced-flat"
+                and not angled_roofs
+                and not straight_trims
+                and not angled_trims
+                and len(columns) == 4
+                and len(column_caps) == 4
+            )
+            or (
+                roof_style == "canopied-flat"
+                and not angled_roofs
+                and not straight_trims
+                and not angled_trims
+                and len(canopy_modules) == 3
+                and len([module for module in canopy_modules if "/Roofs/" in module.source]) == 1
+                and len([module for module in canopy_modules if "IndColumnFree" in module.source])
+                == 2
+            )
+            or (
+                roof_style == "tall-flat"
+                and not angled_roofs
+                and not straight_trims
+                and not angled_trims
+                and len(corner_trims) == 8
+                and requirement.get("storeys") == 2
+            )
+            or (
+                roof_style == "transverse-gable"
+                and len(angled_roofs) == len(roof_modules)
+                and not straight_trims
+                and len(angled_trims) == 4
+                and all(module.scale == (1.5, 1.0, 1.0) for module in roof_modules)
+                and all(module.yaw in (-90.0, 90.0) for module in roof_modules)
+                and all(module.scale == (1.5, 1.0, 1.0) for module in angled_trims)
+            )
+            or (
+                roof_style == "canteen-cornice"
+                and not angled_roofs
+                and len(straight_trims) == 14
+                and not angled_trims
+            )
+            or (
+                roof_style == "broad-gable"
+                and len(angled_roofs) == len(roof_modules)
+                and not straight_trims
+                and len(angled_trims) == 4
+                and all(module.scale == (1.5, 1.0, 1.0) for module in roof_modules)
+                and all(module.scale == (1.5, 1.0, 1.0) for module in angled_trims)
+            )
+            or (
+                roof_style == "reinforced-cornice"
+                and not angled_roofs
+                and len(straight_trims) == 20
+                and not angled_trims
+                and len(columns) == 4
+                and len(column_caps) == 4
+            )
+            or (
+                roof_style == "glazed-canopy-cornice"
+                and not angled_roofs
+                and len(straight_trims) == 18
+                and not angled_trims
+                and len(canopy_modules) == 3
+                and len([module for module in canopy_modules if "/Roofs/" in module.source]) == 1
+                and len([module for module in canopy_modules if "IndColumnFree" in module.source])
+                == 2
+                and len(bottom_windows) == 8
+            )
+            or (
+                roof_style == "wide-transverse-gable"
+                and len(angled_roofs) == len(roof_modules)
+                and not straight_trims
+                and len(angled_trims) == 4
+                and all(module.scale == (2.0, 1.0, 1.0) for module in roof_modules)
+                and all(module.yaw in (-90.0, 90.0) for module in roof_modules)
+                and all(module.scale == (2.0, 1.0, 1.0) for module in angled_trims)
+                and len(gable_infills) == 2
+            )
+            or (
+                roof_style == "two-storey-control"
+                and not angled_roofs
+                and not straight_trims
+                and not angled_trims
+                and len(corner_trims) == 8
+                and requirement.get("storeys") == 2
+                and len(bottom_windows) == 7
+                and len(top_windows) == 16
+            )
+            or (
+                roof_style == "depot-gable"
+                and len(angled_roofs) == len(roof_modules)
+                and not straight_trims
+                and len(angled_trims) == 4
+                and all(module.scale == (2.5, 1.0, 1.0) for module in roof_modules)
+                and all(module.scale == (2.5, 1.0, 1.0) for module in angled_trims)
+                and len(gable_infills) == 2
+            )
+            or (
+                roof_style == "triple-gable"
+                and len(angled_roofs) == len(roof_modules)
+                and not straight_trims
+                and len(angled_trims) == 12
+                and all(module.scale == (1.0, 1.0, 1.0) for module in roof_modules)
+                and all(module.scale == (1.0, 1.0, 1.0) for module in angled_trims)
+                and len(gable_infills) == 6
+            )
+        )
+        if not style_valid:
+            raise RuntimeError(f"{assembly.slug} does not satisfy its {roof_style} roof contract")
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest().upper()
 
 
 def parse_args() -> set[str]:
@@ -278,6 +1522,61 @@ def clear_scene() -> None:
                 collection.remove(block)
 
 
+def shape_authored_gable_infill(obj: bpy.types.Object) -> None:
+    if obj.type != "MESH":
+        return
+
+    world_vertices = [obj.matrix_world @ vertex.co for vertex in obj.data.vertices]
+    if len(world_vertices) != 4:
+        raise RuntimeError(
+            f"Gable infill source {obj.name} must be the authored four-corner wall panel"
+        )
+    minimum_z = min(vertex.z for vertex in world_vertices)
+    maximum_z = max(vertex.z for vertex in world_vertices)
+    top_indices = [
+        index
+        for index, vertex in enumerate(world_vertices)
+        if abs(vertex.z - maximum_z) <= 0.001
+    ]
+    bottom_indices = [
+        index
+        for index, vertex in enumerate(world_vertices)
+        if abs(vertex.z - minimum_z) <= 0.001
+    ]
+    if len(top_indices) != 2 or len(bottom_indices) != 2 or maximum_z - minimum_z < 1.0:
+        raise RuntimeError(f"Gable infill source {obj.name} has an unexpected wall profile")
+
+    span_x = max(vertex.x for vertex in world_vertices) - min(
+        vertex.x for vertex in world_vertices
+    )
+    span_y = max(vertex.y for vertex in world_vertices) - min(
+        vertex.y for vertex in world_vertices
+    )
+    ridge_axis = 0 if span_x >= span_y else 1
+    ridge_coordinate = sum(world_vertices[index][ridge_axis] for index in top_indices) * 0.5
+    inverse = obj.matrix_world.inverted()
+    for index in top_indices:
+        vertex = world_vertices[index].copy()
+        vertex[ridge_axis] = ridge_coordinate
+        obj.data.vertices[index].co = inverse @ vertex
+
+    mesh = bmesh.new()
+    mesh.from_mesh(obj.data)
+    bmesh.ops.remove_doubles(mesh, verts=list(mesh.verts), dist=0.0001)
+    mesh.normal_update()
+    mesh.to_mesh(obj.data)
+    mesh.free()
+    obj.data.validate(verbose=True)
+    obj.data.update()
+    obj["dcc_adaptation"] = "authored-wall-triangular-gable-infill"
+
+    obj.data.calc_loop_triangles()
+    if len(obj.data.vertices) != 3 or len(obj.data.loop_triangles) != 1:
+        raise RuntimeError(
+            f"Gable infill {obj.name} did not become one authored triangular facade"
+        )
+
+
 def import_module(module: Module, index: int) -> list[bpy.types.Object]:
     path = SOURCE_DIR / module.source
     before = set(bpy.data.objects)
@@ -303,11 +1602,19 @@ def import_module(module: Module, index: int) -> list[bpy.types.Object]:
     transform = Matrix.Translation(Vector(module.location)) @ Matrix.Rotation(
         math.radians(module.yaw), 4, "Z"
     )
+    if module.scale != (1.0, 1.0, 1.0):
+        transform @= Matrix.Diagonal((*module.scale, 1.0))
     imported_set = set(imported)
     for obj in imported:
         obj.name = f"Part_{index:02d}_{path.stem}_{obj.name}"
+        if module.role:
+            obj["assembly_role"] = module.role
     for obj in [candidate for candidate in imported if candidate.parent not in imported_set]:
         obj.matrix_world = transform @ obj.matrix_world
+    if module.role == "gable_infill":
+        bpy.context.view_layer.update()
+        for obj in imported:
+            shape_authored_gable_infill(obj)
     return imported
 
 
@@ -459,10 +1766,16 @@ def validate_closed_building_perimeter(
         "window-hall",
         "sawtooth-service-hall",
         "utility-office",
-    }:
+    } and assembly.slug not in NEW_CLOSED_BUILDING_REQUIREMENTS:
         return
 
-    roofs = [obj for obj in objects if obj.type == "MESH" and "IndRoof" in obj.name]
+    roofs = [
+        obj
+        for obj in objects
+        if obj.type == "MESH"
+        and "IndRoofDarkGrey" in obj.name
+        and obj.get("assembly_role") != "canopy"
+    ]
     perimeter = [
         obj
         for obj in objects
@@ -522,6 +1835,230 @@ def validate_closed_building_perimeter(
                 f"{assembly.slug} has an open {side} perimeter: "
                 f"expected={expected_start:.3f}..{expected_end:.3f} intervals={intervals}"
             )
+
+
+def xy_bounds_cover(
+    objects: list[bpy.types.Object],
+    minimum: Vector,
+    maximum: Vector,
+    sample_step: float = 0.5,
+) -> bool:
+    bounds = [object_bounds(obj) for obj in objects]
+    x = minimum.x + sample_step * 0.5
+    while x < maximum.x:
+        y = minimum.y + sample_step * 0.5
+        while y < maximum.y:
+            if not any(
+                obj_minimum.x - 0.005 <= x <= obj_maximum.x + 0.005
+                and obj_minimum.y - 0.005 <= y <= obj_maximum.y + 0.005
+                for obj_minimum, obj_maximum in bounds
+            ):
+                return False
+            y += sample_step
+        x += sample_step
+    return True
+
+
+def validate_new_building_shell(objects: list[bpy.types.Object], assembly: Assembly) -> None:
+    requirement = NEW_CLOSED_BUILDING_REQUIREMENTS.get(assembly.slug)
+    if requirement is None:
+        return
+
+    floors = [
+        obj for obj in objects if obj.type == "MESH" and "IndFloorGreyFull" in obj.name
+    ]
+    roofs = [
+        obj
+        for obj in objects
+        if obj.type == "MESH"
+        and "IndRoofDarkGrey" in obj.name
+        and obj.get("assembly_role") != "canopy"
+    ]
+    perimeter = [
+        obj
+        for obj in objects
+        if obj.type == "MESH"
+        and obj.get("assembly_role") != "gable_infill"
+        and any(marker in obj.name for marker in ("IndWall", "IndWindow", "IndDoor", "IndGarage"))
+    ]
+    windows = [obj for obj in perimeter if "IndWindow" in obj.name]
+    entrances = [
+        obj
+        for obj in perimeter
+        if any(marker in obj.name for marker in ("IndDoorSingle", "IndGarageWhite"))
+    ]
+    if not floors or not roofs or not perimeter or not windows or not entrances:
+        raise RuntimeError(f"{assembly.slug} lacks a visible floor, facade, entrance, window, or roof")
+
+    floor_minimum, floor_maximum = mesh_bounds(floors)
+    roof_minimum, roof_maximum = mesh_bounds(roofs)
+    wall_minimum, wall_maximum = mesh_bounds(perimeter)
+    footprint = requirement["footprint"]
+    storeys = int(requirement.get("storeys", 1))
+    horizontal_ready = (
+        abs((floor_maximum.x - floor_minimum.x) - footprint[0]) <= 0.01
+        and abs((floor_maximum.y - floor_minimum.y) - footprint[1]) <= 0.01
+        and abs(roof_minimum.x - floor_minimum.x) <= 0.01
+        and abs(roof_minimum.y - floor_minimum.y) <= 0.01
+        and abs(roof_maximum.x - floor_maximum.x) <= 0.01
+        and abs(roof_maximum.y - floor_maximum.y) <= 0.01
+        and xy_bounds_cover(floors, floor_minimum, floor_maximum)
+        and xy_bounds_cover(roofs, roof_minimum, roof_maximum)
+    )
+    vertical_ready = (
+        abs(floor_minimum.z) <= 0.005
+        and abs(floor_maximum.z - wall_minimum.z) <= 0.01
+        and abs(wall_maximum.z - (floor_maximum.z + storeys * 3.0)) <= 0.01
+        and roof_minimum.z >= wall_maximum.z - 0.12
+        and roof_minimum.z <= wall_maximum.z + 0.01
+    )
+    if not horizontal_ready or not vertical_ready:
+        raise RuntimeError(
+            f"{assembly.slug} does not form a closed floor-wall-roof shell: "
+            f"floor={tuple(floor_minimum)}..{tuple(floor_maximum)} "
+            f"walls={tuple(wall_minimum)}..{tuple(wall_maximum)} "
+            f"roof={tuple(roof_minimum)}..{tuple(roof_maximum)}"
+        )
+
+    plane_tolerance = 0.35
+    detached_panels: list[str] = []
+    for obj in perimeter:
+        obj_minimum, obj_maximum = object_bounds(obj)
+        center_x = (obj_minimum.x + obj_maximum.x) * 0.5
+        center_y = (obj_minimum.y + obj_maximum.y) * 0.5
+        if not any(
+            (
+                abs(center_x - floor_minimum.x) <= plane_tolerance,
+                abs(center_x - floor_maximum.x) <= plane_tolerance,
+                abs(center_y - floor_minimum.y) <= plane_tolerance,
+                abs(center_y - floor_maximum.y) <= plane_tolerance,
+            )
+        ):
+            detached_panels.append(obj.name)
+    if detached_panels:
+        raise RuntimeError(
+            f"{assembly.slug} contains facade panels detached from the perimeter: {detached_panels}"
+        )
+
+    wall_bounds = [(obj.name, *object_bounds(obj)) for obj in perimeter]
+    for level in range(storeys):
+        level_bottom = floor_maximum.z + level * 3.0
+        level_top = level_bottom + 3.0
+        level_bounds = [
+            (name, minimum, maximum)
+            for name, minimum, maximum in wall_bounds
+            if minimum.z <= level_bottom + 0.01 and maximum.z >= level_top - 0.01
+        ]
+        level_sides = {
+            "front": (
+                [
+                    (minimum.x, maximum.x)
+                    for _, minimum, maximum in level_bounds
+                    if abs((minimum.y + maximum.y) * 0.5 - floor_minimum.y)
+                    <= plane_tolerance
+                ],
+                floor_minimum.x,
+                floor_maximum.x,
+            ),
+            "back": (
+                [
+                    (minimum.x, maximum.x)
+                    for _, minimum, maximum in level_bounds
+                    if abs((minimum.y + maximum.y) * 0.5 - floor_maximum.y)
+                    <= plane_tolerance
+                ],
+                floor_minimum.x,
+                floor_maximum.x,
+            ),
+            "left": (
+                [
+                    (minimum.y, maximum.y)
+                    for _, minimum, maximum in level_bounds
+                    if abs((minimum.x + maximum.x) * 0.5 - floor_minimum.x)
+                    <= plane_tolerance
+                ],
+                floor_minimum.y,
+                floor_maximum.y,
+            ),
+            "right": (
+                [
+                    (minimum.y, maximum.y)
+                    for _, minimum, maximum in level_bounds
+                    if abs((minimum.x + maximum.x) * 0.5 - floor_maximum.x)
+                    <= plane_tolerance
+                ],
+                floor_minimum.y,
+                floor_maximum.y,
+            ),
+        }
+        for side, (intervals, expected_start, expected_end) in level_sides.items():
+            if not intervals_cover(intervals, expected_start, expected_end):
+                raise RuntimeError(
+                    f"{assembly.slug} has an open level-{level + 1} {side} facade: "
+                    f"expected={expected_start:.3f}..{expected_end:.3f} "
+                    f"intervals={intervals}"
+                )
+
+    expected_gable_infills = int(requirement.get("gable_infills", 0))
+    gable_infills = [
+        obj
+        for obj in objects
+        if obj.type == "MESH" and obj.get("assembly_role") == "gable_infill"
+    ]
+    if len(gable_infills) != expected_gable_infills:
+        raise RuntimeError(
+            f"{assembly.slug} has {len(gable_infills)} gable infills, "
+            f"expected {expected_gable_infills}"
+        )
+    wall_top = floor_maximum.z + storeys * 3.0
+    roof_profile_objects = roofs + [
+        obj
+        for obj in objects
+        if obj.type == "MESH" and "IndRoofTrimAAngled" in obj.name
+    ]
+    _, roof_profile_maximum = mesh_bounds(roof_profile_objects)
+    for infill in gable_infills:
+        infill_minimum, infill_maximum = object_bounds(infill)
+        infill.data.calc_loop_triangles()
+        center_x = (infill_minimum.x + infill_maximum.x) * 0.5
+        center_y = (infill_minimum.y + infill_maximum.y) * 0.5
+        on_shell_plane = any(
+            (
+                abs(center_x - floor_minimum.x) <= plane_tolerance,
+                abs(center_x - floor_maximum.x) <= plane_tolerance,
+                abs(center_y - floor_minimum.y) <= plane_tolerance,
+                abs(center_y - floor_maximum.y) <= plane_tolerance,
+            )
+        )
+        horizontal_span = max(
+            infill_maximum.x - infill_minimum.x,
+            infill_maximum.y - infill_minimum.y,
+        )
+        ready = (
+            infill.get("dcc_adaptation") == "authored-wall-triangular-gable-infill"
+            and len(infill.data.vertices) == 3
+            and len(infill.data.loop_triangles) == 1
+            and on_shell_plane
+            and horizontal_span >= 3.9
+            and abs(infill_minimum.z - wall_top) <= 0.01
+            and abs(infill_maximum.z - roof_profile_maximum.z) <= 0.01
+        )
+        if not ready:
+            raise RuntimeError(
+                f"{assembly.slug} has an invalid authored gable infill {infill.name}: "
+                f"bounds={tuple(infill_minimum)}..{tuple(infill_maximum)} "
+                f"vertices={len(infill.data.vertices)} triangles={len(infill.data.loop_triangles)} "
+                f"adaptation={infill.get('dcc_adaptation')} wall_top={wall_top:.3f} "
+                f"roof_profile_top={roof_profile_maximum.z:.3f} on_shell={on_shell_plane}"
+            )
+
+    print(
+        "TREY_CLOSED_SHELL_CHECK "
+        f"slug={assembly.slug} footprint_m={footprint[0]:.1f}x{footprint[1]:.1f} "
+        f"windows={requirement['window_modules']} entrances={len(entrances)} "
+        f"storeys={storeys} roof_style={requirement['roof_style']} "
+        f"gable_infills={len(gable_infills)}"
+    )
 
 
 def normalize_assembly(objects: list[bpy.types.Object], assembly: Assembly) -> bpy.types.Object:
@@ -754,6 +2291,78 @@ def mesh_statistics(objects: list[bpy.types.Object]) -> tuple[int, int, int]:
     return len(meshes), triangles, len(materials)
 
 
+def optimize_new_building_for_export(
+    objects: list[bpy.types.Object], assembly: Assembly
+) -> tuple[list[bpy.types.Object], tuple[int, int, int]]:
+    source_statistics = mesh_statistics(objects)
+    if assembly.slug not in NEW_CLOSED_BUILDING_REQUIREMENTS:
+        return objects, source_statistics
+
+    source_minimum, source_maximum = mesh_bounds(objects)
+    meshes = [obj for obj in objects if obj.type == "MESH"]
+    non_meshes = [obj for obj in objects if obj.type != "MESH"]
+    materials = sorted(
+        {
+            material
+            for obj in meshes
+            for material in obj.data.materials
+            if material is not None
+        },
+        key=lambda material: material.name,
+    )
+    if not meshes or not materials:
+        raise RuntimeError(f"{assembly.slug} has no source meshes or palette material to optimize")
+
+    canonical_material = materials[0]
+    for obj in meshes:
+        for slot in obj.material_slots:
+            slot.material = canonical_material
+
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in meshes:
+        obj.select_set(True)
+    joined = meshes[0]
+    bpy.context.view_layer.objects.active = joined
+    result = bpy.ops.object.join()
+    if "FINISHED" not in result:
+        raise RuntimeError(f"Blender could not join {assembly.slug} source modules: {result}")
+    joined.name = f"{assembly.root_name}Visual"
+    joined.data.name = f"{assembly.root_name}Mesh"
+    joined.data.materials.clear()
+    joined.data.materials.append(canonical_material)
+    for polygon in joined.data.polygons:
+        polygon.material_index = 0
+    optimized_objects = [*non_meshes, joined]
+    optimized_minimum, optimized_maximum = mesh_bounds(optimized_objects)
+    optimized_statistics = mesh_statistics(optimized_objects)
+    if any(
+        abs(source_minimum[index] - optimized_minimum[index]) > 0.001
+        or abs(source_maximum[index] - optimized_maximum[index]) > 0.001
+        for index in range(3)
+    ):
+        raise RuntimeError(
+            f"{assembly.slug} changed bounds during DCC mesh consolidation: "
+            f"source={tuple(source_minimum)}..{tuple(source_maximum)} "
+            f"optimized={tuple(optimized_minimum)}..{tuple(optimized_maximum)}"
+        )
+    if (
+        optimized_statistics[0] != 1
+        or optimized_statistics[1] != source_statistics[1]
+        or optimized_statistics[2] != 1
+    ):
+        raise RuntimeError(
+            f"{assembly.slug} failed DCC mesh/material consolidation: "
+            f"source={source_statistics} optimized={optimized_statistics}"
+        )
+    print(
+        "TREY_EXPORT_OPTIMIZATION "
+        f"slug={assembly.slug} source={source_statistics[0]}/{source_statistics[1]}/"
+        f"{source_statistics[2]} runtime={optimized_statistics[0]}/"
+        f"{optimized_statistics[1]}/{optimized_statistics[2]}"
+    )
+    return optimized_objects, source_statistics
+
+
 def export_glb(root: bpy.types.Object, objects: list[bpy.types.Object], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
@@ -778,7 +2387,13 @@ def export_glb(root: bpy.types.Object, objects: list[bpy.types.Object], output_p
         raise RuntimeError(f"Blender could not export {output_path.name}: {result}")
 
 
-def verify_glb(output_path: Path, expected_dimensions: Vector) -> tuple[Vector, int]:
+def verify_glb(
+    output_path: Path,
+    assembly: Assembly,
+    expected_dimensions: Vector,
+    expected_statistics: tuple[int, int, int],
+    expected_source_statistics: tuple[int, int, int],
+) -> tuple[Vector, int, tuple[int, int, int]]:
     clear_scene()
     configure_scene()
     before = set(bpy.data.objects)
@@ -807,7 +2422,48 @@ def verify_glb(output_path: Path, expected_dimensions: Vector) -> tuple[Vector, 
         raise RuntimeError(f"{output_path.name} has no readable embedded palette texture")
     if not any(obj.get("license") == "CC0-1.0" for obj in imported):
         raise RuntimeError(f"{output_path.name} lost its CC0 source metadata")
-    return dimensions, len(images)
+    verified_statistics = mesh_statistics(imported)
+    if verified_statistics != expected_statistics:
+        raise RuntimeError(
+            f"{output_path.name} changed mesh statistics during glTF round-trip: "
+            f"expected={expected_statistics} actual={verified_statistics}"
+        )
+    if assembly.slug in NEW_CLOSED_BUILDING_REQUIREMENTS:
+        roots = [obj for obj in imported if obj.get("assembly") == assembly.slug]
+        if len(roots) != 1 or not roots[0].get("closed_shell"):
+            raise RuntimeError(f"{output_path.name} lost its closed-shell metadata")
+        requirement = NEW_CLOSED_BUILDING_REQUIREMENTS[assembly.slug]
+        if "storeys" in requirement and roots[0].get("storeys") != int(requirement["storeys"]):
+            raise RuntimeError(f"{output_path.name} lost its storey-count metadata")
+        if "gable_infills" in requirement and roots[0].get("gable_infill_modules") != int(
+            requirement["gable_infills"]
+        ):
+            raise RuntimeError(f"{output_path.name} lost its authored gable-infill metadata")
+        source_contract = (
+            roots[0].get("source_meshes"),
+            roots[0].get("source_triangles"),
+            roots[0].get("source_materials"),
+        )
+        if roots[0].get("source_modules") != len(assembly.modules) or source_contract != (
+            expected_source_statistics
+        ):
+            raise RuntimeError(
+                f"{output_path.name} lost its source composition metadata: "
+                f"modules={roots[0].get('source_modules')} source={source_contract}"
+            )
+        size = list(roots[0].get("collision_aabb_size_godot", []))
+        offset = list(roots[0].get("collision_aabb_offset_godot", []))
+        expected_size = [expected_dimensions.x, expected_dimensions.z, expected_dimensions.y]
+        expected_offset = [0.0, expected_dimensions.z * 0.5, 0.0]
+        if len(size) != 3 or len(offset) != 3 or any(
+            abs(size[index] - expected_size[index]) > 0.001
+            or abs(offset[index] - expected_offset[index]) > 0.001
+            for index in range(3)
+        ):
+            raise RuntimeError(
+                f"{output_path.name} lost its Godot AABB metadata: size={size} offset={offset}"
+            )
+    return dimensions, len(images), verified_statistics
 
 
 def build_assembly(assembly: Assembly) -> None:
@@ -826,10 +2482,30 @@ def build_assembly(assembly: Assembly) -> None:
     validate_window_hall_parts(objects, assembly)
     validate_service_hall_parts(objects, assembly)
     validate_closed_building_perimeter(objects, assembly)
+    validate_new_building_shell(objects, assembly)
+    objects, source_statistics = optimize_new_building_for_export(objects, assembly)
     mesh_count, triangle_count, material_count = mesh_statistics(objects)
+    statistics = (mesh_count, triangle_count, material_count)
+    if assembly.slug in NEW_CLOSED_BUILDING_REQUIREMENTS:
+        root["closed_shell"] = True
+        requirement = NEW_CLOSED_BUILDING_REQUIREMENTS[assembly.slug]
+        root["roof_style"] = requirement["roof_style"]
+        if "storeys" in requirement:
+            root["storeys"] = int(requirement["storeys"])
+        if "gable_infills" in requirement:
+            root["gable_infill_modules"] = int(requirement["gable_infills"])
+            root["gable_infill_adaptation"] = "authored-wall-triangular-dcc-cut"
+        root["source_modules"] = len(assembly.modules)
+        root["source_meshes"] = source_statistics[0]
+        root["source_triangles"] = source_statistics[1]
+        root["source_materials"] = source_statistics[2]
+        root["collision_aabb_size_godot"] = [dimensions.x, dimensions.z, dimensions.y]
+        root["collision_aabb_offset_godot"] = [0.0, dimensions.z * 0.5, 0.0]
     output_path = OUTPUT_DIR / assembly.output_name
     export_glb(root, objects, output_path)
-    verified_dimensions, embedded_image_count = verify_glb(output_path, dimensions)
+    verified_dimensions, embedded_image_count, verified_statistics = verify_glb(
+        output_path, assembly, dimensions, statistics, source_statistics
+    )
     print(
         "TREY_INDUSTRIAL_ASSET "
         f"slug={assembly.slug} "
@@ -837,12 +2513,14 @@ def build_assembly(assembly: Assembly) -> None:
         f"verified_m={verified_dimensions.x:.3f}x{verified_dimensions.y:.3f}x{verified_dimensions.z:.3f} "
         f"modules={len(assembly.modules)} meshes={mesh_count} triangles={triangle_count} "
         f"materials={material_count} embedded_images={embedded_image_count} "
-        f"bytes={output_path.stat().st_size}"
+        f"roundtrip={verified_statistics[0]}/{verified_statistics[1]}/{verified_statistics[2]} "
+        f"bytes={output_path.stat().st_size} sha256={file_sha256(output_path)}"
     )
 
 
 def main() -> None:
     selected = parse_args()
+    validate_new_assembly_definitions()
     require_sources()
     for assembly in ASSEMBLIES:
         if assembly.slug in selected:
