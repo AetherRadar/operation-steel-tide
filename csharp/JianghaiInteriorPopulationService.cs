@@ -255,7 +255,10 @@ internal sealed class JianghaiInteriorPopulationService
             doorwayWidth: doorWidth,
             doorwayHeight: doorHeight,
             frontZ: 0.0f,
-            visibilityRange: 80.0f,
+            // The leaf follows the same distance policy as its authored host,
+            // avoiding both a doorless opening and a floating far-distance door.
+            visibilityRange: JianghaiAuthoredRenderBatcher
+                .CreateQualityPolicy(source).BaseVisibilityRange,
             motionStyle: BuildingDoorMotionStyle.Hinged,
             visualScenePath: LatticeDoorScenePath,
             sourceWidth: 0.8f,

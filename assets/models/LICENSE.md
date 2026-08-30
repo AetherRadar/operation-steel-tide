@@ -538,6 +538,10 @@ static runtime scene:
   Namaqualand Cliff 02 evaluation downloads are likewise private but are not
   embedded in or required by the final delivered artifact.
 - Runtime export script: `../../scripts/blender/export_jianghai_old_city.py`
+- Clan-hall portal authoring/audit:
+  `../../scripts/blender/jianghai_clan_hall_portal.py`
+- Retired photographed-facade contract:
+  `../../scripts/blender/jianghai_retired_facades.py`
 - Chinese district rebuild: `../../scripts/blender/rebuild_jianghai_chinese_district.py`
 - Source and license evidence: `../../source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md`
 - Initial external inputs were acquired on 2026-08-27; the additional
@@ -564,9 +568,12 @@ apertures and retained provenance metadata. Their surrounding facades still
 derive from the same registered Chinese-profile sources above; no new external
 building asset was acquired. The apertures are created offline by mesh-plane
 splitting and face removal so the non-manifold joined source meshes do not leave
-runtime or invisible boolean plugs. The final cleanup removes only the obsolete
-`JianghaiExpansion_Facade_EastPhoto_F0_C1_Insert` that covered the East Photo
-House opening; the adjacent `F0_C1_Wall` and `WestClock` facade art remain. The
+runtime or invisible boolean plugs. The final cleanup retires exactly 35
+obsolete photographed facade planes: 17 objects under
+`JianghaiExpansion_Facade_EastPhoto_` and 18 under
+`JianghaiExpansion_Facade_WestClock_`. No object with either prefix remains;
+the real `EastPhotoHouse` mesh doorway, the 16 `PawnshopAuthoredWing_` modules,
+road decals, and other legitimate thin authored details remain. The
 read-only audit passes 108/108 doorway probes on the 12 building bodies, 36/36
 structural wall/lintel probes, and 108/108 full-scene doorway probes. Twelve
 five-sided opaque DCC-authored liners share one 44-triangle mesh and two existing
@@ -599,6 +606,10 @@ Godot's byte-identical extracted runtime albedo is
 `jianghai_old_city/jianghai_lattice_door_JianghaiRedWoodAlbedo.png`, 63,926
 bytes with SHA-256
 `C75ED94A13A4F21CE518F455916802117D193FCE7A5731A0A4A602F82FD43834`.
+The current runtime creates 14 visual instances of this composite asset: 12
+single-leaf residence doors plus two independently hinged leaves forming one
+logical clan-hall double gate. The two Kenney-only pawnshop/factory personnel
+doors are separate and are not included in the 14-instance lattice total.
 
 No new external asset was acquired for this rebuild. Repeated placements share
 mesh datablocks, reuse a small licensed material set, and export with a maximum
@@ -612,20 +623,33 @@ renders are `previews/12_chinese_edge_gate.png`,
 The four Quaternius density profiles preserve exact face colors in glTF
 `COLOR_0` while using one opaque material each, reducing their 22 instances from
 131 to 22 material-backed surfaces with zero image or texture delta. The final
-packed `.blend` is 52,970,996 bytes with SHA-256
-`F4E5978182B744BD16741F298DC491F774EBF6E901B25D0890C292A97FA0B09D`.
-It contains 621 objects / 525 mesh objects, 210 unique mesh datablocks,
-3,123,494 mesh-object triangles, 1,113,692 unique triangles, and resolves to 588
-evaluated mesh objects / 3,152,420 evaluated instance triangles. The final GLB
-is 63,926,136 bytes with SHA-256
-`3A854DD94132775F008990D908BE32D4B25E72E45C4094E8F6D8167AE633DE8D`;
-its Blender round-trip audit reports 605 total nodes, 588 mesh nodes, 273 unique
-meshes, 469 primitives, 1,142,508 unique / 3,151,080 instanced triangles, 97
-materials, 142 textures, 120 images, and a 512-pixel maximum image dimension.
+packed `.blend` is 52,107,580 bytes with SHA-256
+`DA1907CE44D694960BB959460B6339C3796D31D76CB5111048DEDDD199D918CE`.
+It contains 587 objects / 490 mesh objects, 200 unique mesh datablocks,
+3,028,604 mesh-object triangles, 1,086,828 unique triangles, and resolves to 553
+evaluated mesh objects / 3,057,530 evaluated instance triangles. The final GLB
+is 63,204,100 bytes with SHA-256
+`33E2176E52D538123D45ABEEA61464EA8E7002854A2B1D47E5C5D560AD32D17E`;
+its Blender round-trip audit reports 571 total nodes, 553 mesh nodes, 263 unique
+meshes, 450 primitives, 1,115,644 unique / 3,056,190 instanced triangles, 96
+materials, 139 textures, 120 images, and a 512-pixel maximum image dimension.
 The scene audit passes with 50 density placements, 12 enterable residences,
 108/108 building-body doorway samples, 36/36 structural wall/lintel samples,
 108/108 full-scene doorway samples, 12/12 opaque interior liners, zero density
-intersections, and zero visible retired-building instances.
+intersections, zero visible retired-building instances, and zero retired
+photographed-facade residuals.
+
+The clan-hall correction is a DCC edit of the already registered Free poly CC0
+Chinese Temple 2 source, not a new source. It removes exactly 56 disconnected
+baked gate leaf/seam/hardware islands (425 vertices / 323 triangles) from
+`GuangchangClanHall`, while retaining its arched lintel, jambs, and threshold.
+The source and GLB contain one `JianghaiClanHallDoubleGateAnchor` at Godot
+position `(-86.001892, 1.278776, -122.576271)` with identity basis; `+X` spans
+the 3.687810-meter opening, `+Y` points up, and `+Z` points outward toward the
+south street. Its extras record width, 4.028527-meter height, floor elevation,
+axes, source identity, and the exact retired component counts. Audits prove
+0 residual gate islands, 9/9 opening rays clear, 6/6 jamb hits, 3/3 lintel hits,
+and 3/3 threshold hits.
 
 The packed `.blend` is the authoritative DCC scene. The valley build is an
 offline DCC authoring step that adapts the existing project-authored foundation
@@ -669,11 +693,22 @@ The subsequent 2026-08-29 valley pre-rebase evidence is recorded separately
 because neither historical binary hash represents the regenerated post-rebase
 artifact.
 
-The current expanded Chinese-district delivery is the 52,970,996-byte packed
-`.blend` and 63,926,136-byte runtime GLB identified above. After explicit Godot
-reimport, runtime validation reports 588 authored meshes and 1,450
-material-backed surfaces / 3,151,080 authored instance triangles. The runtime
-represents 292 safe repeated sources with 78 spatial `MultiMesh` batches;
+The current `33E2176E...` GLB explicitly imports in Godot as 553 authored
+meshes, 1,382 surfaces, and 3,056,190 authored instance triangles. The loader's
+established required-anchor set passes 8/8; the additional DCC anchor is
+independently consumed by the clan-hall gate contract. Runtime batching uses 69
+spatial batches for 272 safe source meshes and includes zero enterable sources.
+Gameplay collision maps 119 authored source meshes to 383 authored box shapes;
+490 gameplay boxes plus 29 landmark boxes produce 519 world collision boxes,
+with zero concave shapes. Runtime door mapping uses 12 single-leaf residence
+doors and two leaves in one logical clan-hall double gate, for 14
+Chinese-lattice composite visual instances.
+
+The superseded pre-portal runtime baseline belongs to the earlier
+52,970,996-byte `.blend` and 63,926,136-byte GLB, not to the current binaries
+identified above. Its explicit Godot reimport reported 588 authored meshes,
+1,450 material-backed surfaces / 3,151,080 authored instance triangles, and 292
+safe repeated sources in 78 spatial `MultiMesh` batches;
 production releases 290 layer-zero leaves after gameplay registration and
 retains two referenced room sources. Gameplay physics represents 115 authored
 collider sources plus 96 placement fragments with 486 gameplay box shapes and
@@ -763,8 +798,8 @@ the portal is one of the two 10-object Quaternius personnel-door facades; the
 other is at the pawnshop. The current Kenney personnel doors use normal
 96-degree side-hinged motion rather than the former shutter motion.
 
-The delivered urban-life expansion is authored in the authoritative `.blend`:
-36 apartment-facade objects create two asymmetrical 3-by-3 tenement overlays;
+The historical urban-life expansion was authored in the authoritative `.blend`:
+36 apartment-facade objects created two asymmetrical 3-by-3 tenement overlays;
 three adapted Pink city bicycles line the sidewalks; a Coffee Cart 01 and
 Wicker Basket 01 form the market tea cart; a Chinese Tea Table and three Chinese
 Stools dress the pawnshop; and a Hand Truck dresses the factory. Five Chinese
@@ -775,6 +810,11 @@ facade modules, eight authored window/door inserts, and a ten-piece Quaternius
 entry facade. The paired factory facade brings the entry total to 18
 `Brick_Plain_1` and two `DoorFrame_Trim` instances around two
 1.45-by-2.65-meter human-scale openings.
+
+The final 2026-08-30 cleanup retires the 17 EastPhoto and 18 WestClock overlay
+objects from that historical pass. Zero object with either exact prefix remains;
+the modeled pawnshop wings and the other licensed urban-life dressing above
+remain in the current composite.
 
 The 2026-08-29 building pass supersedes the former Old Urban/Scan Old
 storefronts, rear houses, factory buildings, street-cadence object, and density
@@ -840,8 +880,9 @@ retained as provenance. Retaining the Old Urban and Scan Old records does not
 mean those sources remain visibly delivered. The final DCC scene also contains adapted instances of
 the Poly Haven CC0 authored-pass assets listed above and the already tracked
 Poly Haven CC0 Old Military Crate, Concrete Road Barrier, Coffee Cart 01, and
-Wicker Basket 01. Modular Urban Apartments Facade is delivered as 36 adapted
-facade objects in two asymmetrical 3-by-3 overlays. Chinese Tea Table and three
+Wicker Basket 01. The Modular Urban Apartments Facade source record remains for
+the historical overlays and for 16 current modeled `PawnshopAuthoredWing_`
+modules; the 35 EastPhoto/WestClock planes are retired. Chinese Tea Table and three
 Chinese Stool instances are placed at the pawnshop, and Hand Truck is placed at
 the factory. The VVayToyek pavilion contributes 15 adapted modeled parts to the
 pawnshop canopy. Exact acquisition and bundle hashes are retained in

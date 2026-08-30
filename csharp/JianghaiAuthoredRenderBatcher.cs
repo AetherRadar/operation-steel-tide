@@ -16,6 +16,9 @@ internal readonly record struct JianghaiRenderBatchValidation(
     bool Valid,
     int BatchCount,
     int SourceCount,
+    int BatchedEnterableSourceCount,
+    int MultiMeshInstanceCount,
+    int UniqueSourceCount,
     int NonOriginBatchCount,
     float MaximumCentroidError,
     float MaximumPositionError,
@@ -30,11 +33,6 @@ internal readonly record struct JianghaiRenderBatchValidation(
 /// </summary>
 internal sealed partial class JianghaiAuthoredRenderBatcher
 {
-    public const int ExpectedBatchCount = 78;
-    public const int ExpectedSourceCount = 292;
-    public const int ExpectedProductionReleasedSourceCount = 290;
-    public const int ExpectedProductionRetainedSourceCount = 2;
-
     private const float CityBucketSize = 192.0f;
     private const float ValleyBucketSize = 420.0f;
     private const string BatchedSourceMeta = "jianghai_render_batched_source";
@@ -46,6 +44,7 @@ internal sealed partial class JianghaiAuthoredRenderBatcher
 
     public int SourceCount => _sources.Count;
     public int BatchCount => _batches.Count;
+    public int BatchedEnterableSourceCount { get; private set; }
 
     public void Rebuild(Node3D cityRoot)
     {
@@ -118,16 +117,25 @@ internal sealed partial class JianghaiAuthoredRenderBatcher
                 candidate.Source.SetMeta(SourceLayersMeta, sourceLayers);
                 candidate.Source.Layers = 0;
                 _sources.Add(new BatchedSource(candidate.Source, sourceLayers));
+                if (JianghaiInteriorPopulationService.IsExpectedSourceName(
+                        candidate.Source.Name.ToString()))
+                {
+                    BatchedEnterableSourceCount++;
+                }
             }
         }
 
         cityRoot.SetMeta("jianghai_render_batch_count", BatchCount);
         cityRoot.SetMeta("jianghai_render_batched_source_count", SourceCount);
+        cityRoot.SetMeta(
+            "jianghai_batched_enterable_source_count",
+            BatchedEnterableSourceCount);
     }
 
     public JianghaiRenderBatchValidation ValidateBatches()
     {
         var instanceCountsReady = true;
+        var multiMeshInstanceCount = 0;
         var nonOriginBatchCount = 0;
         var maximumCentroidError = 0.0f;
         var maximumPositionError = 0.0f;
@@ -145,6 +153,7 @@ internal sealed partial class JianghaiAuthoredRenderBatcher
             }
 
             var centroid = CalculateCentroid(batch.ExpectedRootTransforms);
+            multiMeshInstanceCount += multiMesh.InstanceCount;
             var batchOrigin = batch.Instance.Transform.Origin;
             maximumCentroidError = Mathf.Max(
                 maximumCentroidError,
@@ -174,10 +183,22 @@ internal sealed partial class JianghaiAuthoredRenderBatcher
                 batch.RequiredVisibilityRangeEnd - batch.Instance.VisibilityRangeEnd);
         }
 
+        var uniqueSourceIds = new HashSet<ulong>();
+        foreach (var source in _sources)
+        {
+            if (GodotObject.IsInstanceValid(source.Instance))
+            {
+                uniqueSourceIds.Add(source.Instance.GetInstanceId());
+            }
+        }
+        var sourceCoverageReady = multiMeshInstanceCount == SourceCount
+            && uniqueSourceIds.Count == SourceCount;
         var valid = BatchCount > 0
             && SourceCount > BatchCount
+            && BatchedEnterableSourceCount == 0
             && nonOriginBatchCount > 0
             && instanceCountsReady
+            && sourceCoverageReady
             && maximumCentroidError <= 0.001f
             && maximumPositionError <= 0.001f
             && maximumBasisError <= 0.001f
@@ -186,6 +207,9 @@ internal sealed partial class JianghaiAuthoredRenderBatcher
             valid,
             BatchCount,
             SourceCount,
+            BatchedEnterableSourceCount,
+            multiMeshInstanceCount,
+            uniqueSourceIds.Count,
             nonOriginBatchCount,
             maximumCentroidError,
             maximumPositionError,
@@ -195,48 +219,10 @@ internal sealed partial class JianghaiAuthoredRenderBatcher
     }
 
     public bool IsBatchedSource(MeshInstance3D source)
+        => HasBatchedSourceMarker(source);
+
+    public static bool HasBatchedSourceMarker(MeshInstance3D source)
         => source.HasMeta(BatchedSourceMeta) && source.GetMeta(BatchedSourceMeta).AsBool();
-
-    public int ApplyQuality(int qualityTier)
-    {
-        var normalizedTier = Mathf.Clamp(qualityTier, 0, 2);
-        var distanceScale = normalizedTier switch
-        {
-            0 => 0.68f,
-            1 => 0.84f,
-            _ => 1.0f
-        };
-        var shadowCasterSourceCount = 0;
-        foreach (var batch in _batches)
-        {
-            if (!GodotObject.IsInstanceValid(batch.Instance))
-            {
-                continue;
-            }
-
-            var endDistance = batch.Policy.BaseVisibilityRange * distanceScale
-                + batch.BatchRadius;
-            batch.RequiredVisibilityRangeEnd = endDistance;
-            batch.Instance.VisibilityRangeEnd = endDistance;
-            batch.Instance.VisibilityRangeEndMargin = Mathf.Min(28.0f, endDistance * 0.12f);
-            batch.Instance.VisibilityRangeFadeMode =
-                GeometryInstance3D.VisibilityRangeFadeModeEnum.Self;
-            var allowShadow = normalizedTier switch
-            {
-                0 => !batch.Policy.IsDetail,
-                1 => !batch.Policy.IsFineDetail && batch.Policy.WorldDiagonal > 4.0f,
-                _ => !batch.Policy.IsFineDetail
-            };
-            batch.Instance.CastShadow = batch.Policy.AlwaysDisableShadow || !allowShadow
-                ? GeometryInstance3D.ShadowCastingSetting.Off
-                : batch.Policy.AuthoredShadowSetting;
-            if (batch.Instance.CastShadow != GeometryInstance3D.ShadowCastingSetting.Off)
-            {
-                shadowCasterSourceCount += batch.ExpectedRootTransforms.Length;
-            }
-        }
-        return shadowCasterSourceCount;
-    }
 
     public void Clear()
     {
@@ -259,59 +245,7 @@ internal sealed partial class JianghaiAuthoredRenderBatcher
         }
         _sources.Clear();
         _batches.Clear();
-    }
-
-    public static JianghaiRenderQualityPolicy CreateQualityPolicy(
-        MeshInstance3D meshInstance)
-    {
-        var localSize = meshInstance.GetAabb().Size;
-        var globalScale = meshInstance.GlobalTransform.Basis.Scale.Abs();
-        var worldSize = new Vector3(
-            localSize.X * globalScale.X,
-            localSize.Y * globalScale.Y,
-            localSize.Z * globalScale.Z);
-        var diagonal = worldSize.Length();
-        var name = meshInstance.Name.ToString();
-        var isInteriorLiner = IsInteriorLiner(meshInstance);
-        var isValleyEnvironment = ContainsAny(
-            name,
-            "OldCityFoundation",
-            "JianghaiPerimeterGround",
-            "JianghaiMountainMassif");
-        var baseVisibilityRange = isInteriorLiner
-            ? JianghaiInteriorShellValidator.RequiredVisibilityRange
-            : isValleyEnvironment ? 1200.0f : diagonal switch
-        {
-            <= 1.2f => 105.0f,
-            <= 4.0f => 180.0f,
-            <= 12.0f => 285.0f,
-            _ => 460.0f
-        };
-        var isFineDetail = diagonal <= 1.2f
-            || ContainsAny(name, "Screen", "Indicator", "Fastener", "Text", "Cable", "Lens");
-        var isDetail = isInteriorLiner
-            || diagonal <= 12.0f
-            || ContainsAny(
-                name,
-                "Aircon",
-                "Rollershutter",
-                "Trashbag",
-                "UtilityBox",
-                "Barrel",
-                "Crate",
-                "SecurityCamera",
-                "Television");
-        var alwaysDisableShadow = isInteriorLiner
-            || isValleyEnvironment
-            || diagonal <= 0.45f
-            || ContainsAny(name, "ScreenTrace", "StatusScreen", "Indicator", "Fastener", "Text");
-        return new JianghaiRenderQualityPolicy(
-            diagonal,
-            baseVisibilityRange,
-            isDetail,
-            isFineDetail,
-            alwaysDisableShadow,
-            meshInstance.CastShadow);
+        BatchedEnterableSourceCount = 0;
     }
 
     private static List<BatchCandidate> CollectCandidates(
@@ -400,6 +334,8 @@ internal sealed partial class JianghaiAuthoredRenderBatcher
             || source.Layers == 0
             || source.GetChildCount() != 0
             || source.MaterialOverride is not null
+            || JianghaiInteriorPopulationService.IsExpectedSourceName(
+                source.Name.ToString())
             || IsTerminalVisual(source)
             || source.Name.ToString().Contains("StatusScreen", StringComparison.OrdinalIgnoreCase))
         {

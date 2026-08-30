@@ -5,7 +5,8 @@ namespace OperationSteelTide;
 public enum BuildingDoorMotionStyle
 {
     Overhead,
-    Hinged
+    Hinged,
+    DoubleHinged
 }
 
 /// <summary>An authored building door whose visual and collision move together.</summary>
@@ -28,7 +29,6 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
     private float _width;
     private float _height;
     private float _frontZ;
-    private float _visibilityRange;
     private Vector3 _mountPosition;
     private float _mountYaw;
     private string _visualScenePath = OverheadDoorScenePath;
@@ -44,28 +44,31 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
     private Node3D _authoredVisual = null!;
     private Tween? _motionTween;
     private BuildingDoorMotionStyle _motionStyle;
+    private bool _hasQueuedAuthoritativeState;
+    private bool _queuedAuthoritativeOpen;
 
     public int DoorId { get; private set; }
     public bool IsOpen { get; private set; }
     public bool IsAnimating { get; private set; }
     public bool TargetOpen { get; private set; }
     public int CompletedMotionCount { get; private set; }
-    public bool UsesAuthoredVisual => IsInstanceValid(_authoredVisual);
+    public bool UsesAuthoredVisual => _motionStyle == BuildingDoorMotionStyle.DoubleHinged
+        ? IsInstanceValid(_leftLeafVisual) && IsInstanceValid(_rightLeafVisual)
+        : IsInstanceValid(_authoredVisual);
     public int AuthoredVisualPanelCount => GetAuthoredVisualPanelCount();
     public float MaxAuthoredVisualAspectDistortion
         => GetMaxAuthoredVisualAspectDistortion();
     public bool HasValidAuthoredVisualPanelLayout
         => ValidateAuthoredVisualPanelLayout();
     public bool VisualShadowsDisabled => _disableVisualShadows;
-    public bool HasBoxCollision => IsInstanceValid(_doorCollision)
-        && _doorCollision.Shape is BoxShape3D;
-    public float MotionAngleDegrees => _motionStyle == BuildingDoorMotionStyle.Hinged
-        ? Mathf.Abs(Mathf.RadToDeg(Mathf.AngleDifference(_mountYaw, Rotation.Y)))
-        : Mathf.Abs(RotationDegrees.X);
     public BuildingDoorMotionStyle MotionStyle => _motionStyle;
     internal float WidthForNavigation => _width;
+    internal bool HasQueuedAuthoritativeState => _hasQueuedAuthoritativeState;
+    internal bool QueuedAuthoritativeOpen => _queuedAuthoritativeOpen;
 
     public Vector3 InteractionPoint => ParentPoint(_interactionLocal);
+    public Vector3 ThresholdPoint
+        => ParentPoint(new Vector3(0, 0.12f, _frontZ));
 
     public Vector3 OutsideProbe
         => ParentPoint(new Vector3(0, Mathf.Min(1.4f, _height * 0.5f), _frontZ + 0.72f));
@@ -88,41 +91,55 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         float? sourceDepthCenter = null,
         int visualPanelCount = 1,
         bool hingedVisualUsesPivotOrigin = false,
-        bool disableVisualShadows = false)
+        bool disableVisualShadows = false,
+        float widthFillRatio = 0.96f,
+        float heightFillRatio = 0.98f)
     {
         DoorId = doorId;
-        _width = Mathf.Max(1.0f, doorwayWidth * 0.96f);
-        _height = Mathf.Max(1.8f, doorwayHeight * 0.98f);
+        _width = Mathf.Max(1.0f, doorwayWidth * Mathf.Clamp(widthFillRatio, 0.5f, 1.0f));
+        _height = Mathf.Max(1.8f, doorwayHeight * Mathf.Clamp(heightFillRatio, 0.5f, 1.0f));
         _frontZ = frontZ;
-        _visibilityRange = Mathf.Max(80.0f, visibilityRange);
+        _baseVisibilityRange = Mathf.Max(80.0f, visibilityRange);
+        _effectiveVisibilityRange = _baseVisibilityRange;
         _motionStyle = motionStyle;
         _mountPosition = mountPosition;
         _mountYaw = mountYaw;
         _usesCustomVisualScene = !string.IsNullOrWhiteSpace(visualScenePath);
         _visualScenePath = string.IsNullOrWhiteSpace(visualScenePath)
-            ? motionStyle == BuildingDoorMotionStyle.Hinged
+            ? motionStyle is BuildingDoorMotionStyle.Hinged
+                or BuildingDoorMotionStyle.DoubleHinged
                 ? HingedDoorScenePath
                 : OverheadDoorScenePath
             : visualScenePath!;
-        var defaultSourceWidth = motionStyle == BuildingDoorMotionStyle.Hinged
+        var defaultSourceWidth = motionStyle is BuildingDoorMotionStyle.Hinged
+            or BuildingDoorMotionStyle.DoubleHinged
             ? HingedSourceWidth
             : OverheadSourceWidth;
-        var defaultSourceHeight = motionStyle == BuildingDoorMotionStyle.Hinged
+        var defaultSourceHeight = motionStyle is BuildingDoorMotionStyle.Hinged
+            or BuildingDoorMotionStyle.DoubleHinged
             ? HingedSourceHeight
             : OverheadSourceHeight;
-        var defaultSourceDepthCenter = motionStyle == BuildingDoorMotionStyle.Hinged
+        var defaultSourceDepthCenter = motionStyle is BuildingDoorMotionStyle.Hinged
+            or BuildingDoorMotionStyle.DoubleHinged
             ? 0.0f
             : OverheadSourceDepthCenter;
         _sourceWidth = Mathf.Max(0.01f, sourceWidth ?? defaultSourceWidth);
         _sourceHeight = Mathf.Max(0.01f, sourceHeight ?? defaultSourceHeight);
         _sourceDepthCenter = sourceDepthCenter ?? defaultSourceDepthCenter;
-        _visualPanelCount = Mathf.Max(1, visualPanelCount);
+        _visualPanelCount = motionStyle == BuildingDoorMotionStyle.DoubleHinged
+            ? 2
+            : Mathf.Max(1, visualPanelCount);
         _hingedVisualUsesPivotOrigin = hingedVisualUsesPivotOrigin;
         _disableVisualShadows = disableVisualShadows;
         _interactionLocal = new Vector3(0, Mathf.Min(1.35f, _height * 0.5f), frontZ);
-        var pivot = motionStyle == BuildingDoorMotionStyle.Hinged
-            ? new Vector3(-_width * 0.5f, 0.0f, frontZ)
-            : new Vector3(0, _height, frontZ);
+        var pivot = motionStyle switch
+        {
+            BuildingDoorMotionStyle.Hinged
+                => new Vector3(-_width * 0.5f, 0.0f, frontZ),
+            BuildingDoorMotionStyle.DoubleHinged
+                => new Vector3(0.0f, 0.0f, frontZ),
+            _ => new Vector3(0.0f, _height, frontZ)
+        };
         Position = MountPoint(pivot);
         Rotation = new Vector3(0, _mountYaw, 0);
     }
@@ -133,6 +150,12 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         CollisionMask = 0;
         SyncToPhysics = true;
         AddToGroup("refinery_interactive_door");
+        if (_motionStyle == BuildingDoorMotionStyle.DoubleHinged)
+        {
+            CollisionLayer = 0;
+            BuildDoubleHingedLeaves();
+            return;
+        }
         BuildAuthoredVisual();
         _doorCollision = new CollisionShape3D
         {
@@ -176,6 +199,10 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         _motionTween = CreateTween()
             .SetTrans(Tween.TransitionType.Quart)
             .SetEase(open ? Tween.EaseType.Out : Tween.EaseType.InOut);
+        if (_motionStyle == BuildingDoorMotionStyle.DoubleHinged)
+        {
+            return StartDoubleHingedMotion(open);
+        }
         var property = _motionStyle == BuildingDoorMotionStyle.Hinged
             ? "rotation:y"
             : "rotation:x";
@@ -191,14 +218,27 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         return true;
     }
 
+    internal void ApplyAuthoritativeOpenState(bool open)
+    {
+        _queuedAuthoritativeOpen = open;
+        _hasQueuedAuthoritativeState = true;
+        ConsumeQueuedAuthoritativeState();
+    }
+
     public void SetOpenImmediate(bool open)
     {
         _motionTween?.Kill();
         _motionTween = null;
+        _hasQueuedAuthoritativeState = false;
         TargetOpen = open;
         IsOpen = open;
         IsAnimating = false;
         var angle = Mathf.DegToRad(open ? OpenAngleDegrees : 0.0f);
+        if (_motionStyle == BuildingDoorMotionStyle.DoubleHinged)
+        {
+            SetDoubleHingedOpenImmediate(angle);
+            return;
+        }
         Rotation = _motionStyle == BuildingDoorMotionStyle.Hinged
             ? new Vector3(0, _mountYaw + angle, 0)
             : new Vector3(angle, _mountYaw, 0);
@@ -211,6 +251,25 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         IsAnimating = false;
         CompletedMotionCount++;
         _motionTween = null;
+        ConsumeQueuedAuthoritativeState();
+    }
+
+    private void ConsumeQueuedAuthoritativeState()
+    {
+        if (!_hasQueuedAuthoritativeState || IsAnimating)
+        {
+            return;
+        }
+
+        var open = _queuedAuthoritativeOpen;
+        _hasQueuedAuthoritativeState = false;
+        if (open != TargetOpen && !TrySetOpen(open, bypassClearance: true))
+        {
+            // A valid ready door can only reject here if its authored motion
+            // hierarchy disappeared. Keep the replicated state converged even
+            // in that degraded case; authored-layout diagnostics still fail.
+            SetOpenImmediate(open);
+        }
     }
 
     private bool CanCloseWithoutObstruction()
@@ -219,14 +278,21 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         {
             return false;
         }
-        var excludes = new Godot.Collections.Array<Rid> { GetRid() };
+        var excludes = new Godot.Collections.Array<Rid>();
+        AddCollisionExclusions(excludes);
         if (parent is CollisionObject3D parentCollider)
         {
             excludes.Add(parentCollider.GetRid());
         }
-        var hingedSweep = _motionStyle == BuildingDoorMotionStyle.Hinged;
+        var hingedSweep = _motionStyle is BuildingDoorMotionStyle.Hinged
+            or BuildingDoorMotionStyle.DoubleHinged;
         var queryCenter = hingedSweep
-            ? ParentPoint(new Vector3(0, _height * 0.5f, _frontZ - _width * 0.5f))
+            ? ParentPoint(new Vector3(
+                0,
+                _height * 0.5f,
+                _motionStyle == BuildingDoorMotionStyle.DoubleHinged
+                    ? _frontZ
+                    : _frontZ - _width * 0.5f))
             : InteractionPoint;
         var querySize = hingedSweep
             ? new Vector3(_width, _height * 0.9f, _width)
@@ -320,6 +386,10 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
 
     private int GetAuthoredVisualPanelCount()
     {
+        if (_motionStyle == BuildingDoorMotionStyle.DoubleHinged)
+        {
+            return GetDoubleHingedAuthoredVisualPanelCount();
+        }
         if (!IsInstanceValid(_authoredVisual))
         {
             return 0;
@@ -331,6 +401,10 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
 
     private float GetMaxAuthoredVisualAspectDistortion()
     {
+        if (_motionStyle == BuildingDoorMotionStyle.DoubleHinged)
+        {
+            return GetDoubleHingedMaxAspectDistortion();
+        }
         if (!IsInstanceValid(_authoredVisual))
         {
             return float.PositiveInfinity;
@@ -354,6 +428,10 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
 
     private bool ValidateAuthoredVisualPanelLayout()
     {
+        if (_motionStyle == BuildingDoorMotionStyle.DoubleHinged)
+        {
+            return ValidateDoubleHingedAuthoredVisualLayout();
+        }
         if (!IsInstanceValid(_authoredVisual) || _authoredVisual.GetParent() != this)
         {
             return false;
@@ -401,8 +479,7 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
             visual.CastShadow = _disableVisualShadows
                 ? GeometryInstance3D.ShadowCastingSetting.Off
                 : GeometryInstance3D.ShadowCastingSetting.On;
-            visual.VisibilityRangeEnd = _visibilityRange;
-            visual.VisibilityRangeEndMargin = Mathf.Min(18.0f, _visibilityRange * 0.12f);
+            ConfigureVisualVisibility(visual);
         }
         if (!_usesCustomVisualScene
             && node is MeshInstance3D { Mesh: not null } meshInstance)
@@ -414,7 +491,8 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
                 {
                     continue;
                 }
-                var tint = _motionStyle == BuildingDoorMotionStyle.Hinged
+                var tint = _motionStyle is BuildingDoorMotionStyle.Hinged
+                    or BuildingDoorMotionStyle.DoubleHinged
                     ? new Color(0.42f, 0.40f, 0.31f)
                     : new Color(0.36f, 0.38f, 0.31f);
                 finish.AlbedoColor = new Color(
@@ -446,7 +524,4 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
     private Vector3 MountPoint(Vector3 localPoint)
         => _mountPosition + new Basis(Vector3.Up, _mountYaw) * localPoint;
 
-    private float OpenAngleDegrees => _motionStyle == BuildingDoorMotionStyle.Hinged
-        ? HingedOpenRotationDegrees
-        : OverheadOpenRotationDegrees;
 }

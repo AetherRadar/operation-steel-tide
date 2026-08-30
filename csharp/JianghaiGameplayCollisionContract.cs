@@ -44,7 +44,8 @@ internal enum JianghaiSolidBuildingProfile
 {
     Hall,
     Shop,
-    Gate
+    Gate,
+    Chimney
 }
 
 internal static class JianghaiGameplayCollisionContract
@@ -52,7 +53,7 @@ internal static class JianghaiGameplayCollisionContract
     public const string AuthoredDensityDistrictRole = "authored_density_building";
     public const string AuthoredDensityCollisionRole = "building_shell";
     public const int ExpectedDensitySourceCount = 50;
-    public const int ExpectedSolidSourceCount = 53;
+    public const int ExpectedSolidSourceCount = 57;
     public const int ExpectedEnterableSourceCount = 12;
     public const int EnterableShapesPerSource = 23;
     public const int ExpectedAuthoredSourceCount =
@@ -152,6 +153,7 @@ internal static class JianghaiGameplayCollisionContract
         "FarEastSouthResidence",
         "FarWestNorthResidence",
         "FarWestResidence",
+        "FactoryChimney",
         "JianghaiCleared_FactoryAdmin",
         "JianghaiCleared_FactoryOfficeEast",
         "JianghaiCleared_FactoryOfficeWest",
@@ -180,15 +182,18 @@ internal static class JianghaiGameplayCollisionContract
         "OuterWestNorthResidence",
         "OuterWestSouthResidence",
         "WestClockHouse",
+        "WestClockRow01",
         "WestGateRow01",
         "WestGateRow02",
         "WestHarborResidence",
         "WestMarketRow01",
         "WestMedicineHouse",
+        "WestMedicineRow02",
         "WestSquareRow01",
         "WestSquareRow02",
         "WestTeaWarehouse",
-        "WestTheatreHouse"
+        "WestTheatreHouse",
+        "WestTheatreRow02"
     };
     private static readonly HashSet<string> ExplicitShopSourceNames = new(
         new[]
@@ -248,6 +253,10 @@ internal static class JianghaiGameplayCollisionContract
                 nameof(sourceName),
                 sourceName,
                 "Unknown Jianghai authored solid building.");
+        }
+        if (sourceName == "FactoryChimney")
+        {
+            return JianghaiSolidBuildingProfile.Chimney;
         }
         if (ExplicitShopSourceNames.Contains(sourceName)
             || sourceName.Sum(character => character) % 5 == 0)

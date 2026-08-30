@@ -390,6 +390,13 @@ internal sealed class JianghaiOldCitySceneLoader
         root?.SetMeta(
             "jianghai_blocked_batched_source_count",
             release.Blocked);
+        root?.SetMeta(
+            "jianghai_pre_release_batched_source_count",
+            release.PreReleaseSourceCount);
+        root?.SetMeta(
+            "jianghai_expected_retained_batched_source_count",
+            release.ExpectedRetained);
+        root?.SetMeta("jianghai_render_release_valid", release.Valid);
         return release.Released;
     }
 
@@ -397,12 +404,8 @@ internal sealed class JianghaiOldCitySceneLoader
     public void ApplyQuality(int qualityTier)
     {
         _qualityTier = Mathf.Clamp(qualityTier, 0, 2);
-        var distanceScale = _qualityTier switch
-        {
-            0 => 0.68f,
-            1 => 0.84f,
-            _ => 1.0f
-        };
+        var distanceScale = JianghaiAuthoredRenderBatcher.VisibilityDistanceScale(
+            _qualityTier);
         var shadowCasterCount = _renderBatcher.ApplyQuality(_qualityTier);
         foreach (var profile in _meshQualityProfiles)
         {

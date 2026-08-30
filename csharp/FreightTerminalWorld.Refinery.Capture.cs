@@ -71,15 +71,35 @@ public partial class FreightTerminalWorld
             var blockedSourceCount = _jianghaiOldCityScene?.Root.GetMeta(
                 "jianghai_blocked_batched_source_count",
                 0).AsInt32() ?? 0;
+            var preReleaseSourceCount = _jianghaiOldCityScene?.Root.GetMeta(
+                "jianghai_pre_release_batched_source_count",
+                0).AsInt32() ?? 0;
+            var expectedRetainedSourceCount = _jianghaiOldCityScene?.Root.GetMeta(
+                "jianghai_expected_retained_batched_source_count",
+                -1).AsInt32() ?? -1;
+            var sourceReleaseValid = _jianghaiOldCityScene?.Root.GetMeta(
+                "jianghai_render_release_valid",
+                false).AsBool() ?? false;
+            var batchedEnterableSourceCount = _jianghaiOldCityScene?.Root.GetMeta(
+                "jianghai_batched_enterable_source_count",
+                -1).AsInt32() ?? -1;
             var sourceCount = _jianghaiOldCityScene?.RenderBatchValidation.SourceCount ?? 0;
-            var sourceReleaseReady = sourceCount
-                    == JianghaiAuthoredRenderBatcher.ExpectedSourceCount
-                && releasedSourceCount
-                    == JianghaiAuthoredRenderBatcher.ExpectedProductionReleasedSourceCount
-                && retainedSourceCount
-                    == JianghaiAuthoredRenderBatcher.ExpectedProductionRetainedSourceCount
+            var sourceReleaseReady = sourceCount > 0
+                && sourceReleaseValid
+                && preReleaseSourceCount == sourceCount
+                && releasedSourceCount + retainedSourceCount + blockedSourceCount
+                    == preReleaseSourceCount
+                && expectedRetainedSourceCount == 0
+                && retainedSourceCount == 0
+                && retainedSourceCount == expectedRetainedSourceCount
                 && blockedSourceCount == 0
-                && releasedSourceCount + retainedSourceCount == sourceCount;
+                && batchedEnterableSourceCount == 0
+                && _jianghaiOldCityScene?.RenderBatchValidation
+                    .BatchedEnterableSourceCount == 0
+                && _jianghaiOldCityScene?.RenderBatchValidation.MultiMeshInstanceCount
+                    == sourceCount
+                && _jianghaiOldCityScene?.RenderBatchValidation.UniqueSourceCount
+                    == sourceCount;
             performanceReady = sourceReleaseReady
                 && PrintRefineryRenderingSnapshot("overview");
             SaveViewportImage("res://refinery_map_validation.png");
@@ -126,6 +146,12 @@ public partial class FreightTerminalWorld
             await WaitFrames(10);
             performanceReady &= PrintRefineryRenderingSnapshot("guangchang_pawnshop");
             SaveViewportImage("res://refinery_hall_validation.png");
+            ApplyTimeOfDay(DeploymentTimeOfDay.Day);
+            await WaitFrames(12);
+            var clanHallGateCaptureReady = await CaptureClanHallGate(camera);
+            performanceReady &= clanHallGateCaptureReady;
+            ApplyTimeOfDay(DeploymentTimeOfDay.Dusk);
+            await WaitFrames(10);
             camera.GlobalPosition = new Vector3(105.0f, 2.20f, -13.0f);
             camera.LookAt(new Vector3(97.0f, 2.60f, -2.0f), Vector3.Up);
             camera.Fov = 38.0f;
@@ -176,13 +202,87 @@ public partial class FreightTerminalWorld
             }
             performanceReady &= doorCaptureReady
                 && capturedRoomCount == representativeRoomNames.Length;
-            GD.Print($"REFINERY_MAP_CAPTURE valid={performanceReady} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city time=dusk+day authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} released_sources={releasedSourceCount}/{sourceCount} retained_sources={retainedSourceCount} blocked_sources={blockedSourceCount} doors={_refineryDoors.Count} door_transition={doorCaptureReady} interior_samples={capturedRoomCount}/{representativeRoomNames.Length} paths=refinery_map_validation.png,jianghai_valley_validation.png,jianghai_valley_player_south_validation.png,jianghai_valley_player_north_validation.png,refinery_ground_validation.png,jianghai_street_life_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,jianghai_density_validation.png,jianghai_day_validation.png,jianghai_room_*_closed_validation.png,jianghai_room_*_open_validation.png,jianghai_room_*_interior_validation.png");
+            GD.Print($"REFINERY_MAP_CAPTURE valid={performanceReady} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city time=dusk+day authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} release_valid={sourceReleaseReady} released_sources={releasedSourceCount}/{preReleaseSourceCount} retained_sources={retainedSourceCount}/{expectedRetainedSourceCount} blocked_sources={blockedSourceCount} batched_enterable_sources={batchedEnterableSourceCount} doors={_refineryDoors.Count} door_transition={doorCaptureReady} clan_hall_gate_transition={clanHallGateCaptureReady} interior_samples={capturedRoomCount}/{representativeRoomNames.Length} paths=refinery_map_validation.png,jianghai_valley_validation.png,jianghai_valley_player_south_validation.png,jianghai_valley_player_north_validation.png,refinery_ground_validation.png,jianghai_street_life_validation.png,refinery_hall_validation.png,jianghai_clan_hall_gate_closed_validation.png,jianghai_clan_hall_gate_open_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,jianghai_density_validation.png,jianghai_day_validation.png,jianghai_room_*_closed_validation.png,jianghai_room_*_open_validation.png,jianghai_room_*_interior_validation.png");
         }
         finally
         {
             ApplyQuality(previousQualitySetting);
         }
         QuitDiagnosticAfterSceneCleanup(performanceReady ? 0 : 2);
+    }
+
+    private async System.Threading.Tasks.Task<bool> CaptureClanHallGate(Camera3D camera)
+    {
+        if (_clanHallDoubleGate is not { } door || !IsInstanceValid(door))
+        {
+            GD.PrintErr("JIANGHAI_CLAN_HALL_GATE_CAPTURE valid=False reason=missing_gate");
+            return false;
+        }
+
+        door.SetOpenImmediate(false);
+        var capturedCivilians = _civilians.Where(civilian => IsInstanceValid(civilian))
+            .Select(civilian => (Civilian: civilian, WasVisible: civilian.Visible))
+            .ToArray();
+        foreach (var (civilian, _) in capturedCivilians)
+        {
+            civilian.Visible = false;
+        }
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        var outward = door.OutsideProbe - door.InsideProbe;
+        outward.Y = 0.0f;
+        outward = outward.Normalized();
+        var tangent = new Vector3(outward.Z, 0.0f, -outward.X);
+        camera.GlobalPosition = door.ThresholdPoint
+            + outward * 9.0f
+            + tangent * 2.2f
+            + Vector3.Up * 2.3f;
+        camera.LookAt(door.InteractionPoint + Vector3.Up * 0.5f, Vector3.Up);
+        camera.Fov = 45.0f;
+        await WaitFrames(10);
+        var batchedEnterableSourceCount = _jianghaiOldCityScene?.Root.GetMeta(
+            "jianghai_batched_enterable_source_count",
+            -1).AsInt32() ?? -1;
+        var visualReady = door.UsesAuthoredVisual
+            && door.AuthoredVisualPanelCount == 2
+            && door.HasRenderableAuthoredVisualGeometry
+            && door.AuthoredRenderableGeometryCount > 0
+            && door.HasValidAuthoredVisualPanelLayout
+            && door.HasAppliedAuthoredVisibilityRange
+            && batchedEnterableSourceCount == 0
+            && _jianghaiOldCityScene?.RenderBatchValidation
+                .BatchedEnterableSourceCount == 0;
+        var closedReady = !door.IsOpen
+            && !door.IsAnimating
+            && door.MotionStyle == BuildingDoorMotionStyle.DoubleHinged
+            && door.LeafCount == 2
+            && door.LeafCollisionCount == 2
+            && Mathf.Abs(door.LeftLeafAngleDegrees) < 0.5f
+            && Mathf.Abs(door.RightLeafAngleDegrees) < 0.5f
+            && visualReady;
+        SaveViewportImage("res://jianghai_clan_hall_gate_closed_validation.png");
+        var performanceReady = PrintRefineryRenderingSnapshot("clan_hall_gate_closed");
+
+        var transitionStarted = door.TrySetOpen(true, bypassClearance: true);
+        for (var frame = 0; frame < 120 && door.IsAnimating; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+        await WaitFrames(4);
+        var openReady = transitionStarted
+            && door.IsOpen
+            && !door.IsAnimating
+            && door.LeftLeafAngleDegrees > 85.0f
+            && door.RightLeafAngleDegrees < -85.0f
+            && visualReady;
+        SaveViewportImage("res://jianghai_clan_hall_gate_open_validation.png");
+        performanceReady &= PrintRefineryRenderingSnapshot("clan_hall_gate_open");
+        GD.Print($"JIANGHAI_CLAN_HALL_GATE_CAPTURE valid={closedReady && openReady && performanceReady} closed={closedReady} open={openReady} visual={visualReady}:geometry={door.AuthoredRenderableGeometryCount} batched_enterable_sources={batchedEnterableSourceCount} panels={door.AuthoredVisualPanelCount} layout={door.HasValidAuthoredVisualPanelLayout} visibility={door.HasAppliedAuthoredVisibilityRange} left_angle={door.LeftLeafAngleDegrees:0.0} right_angle={door.RightLeafAngleDegrees:0.0}");
+        door.SetOpenImmediate(false);
+        foreach (var (civilian, wasVisible) in capturedCivilians)
+        {
+            civilian.Visible = wasVisible;
+        }
+        return closedReady && openReady && performanceReady;
     }
 
     private async System.Threading.Tasks.Task<bool> CaptureJianghaiInterior(

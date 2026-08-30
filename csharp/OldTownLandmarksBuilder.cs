@@ -17,7 +17,8 @@ internal sealed record OldTownLandmarksResult(
     Vector3 TreasuryEntry,
     Vector3 TreasuryInterior,
     IReadOnlyList<Vector3> RooftopRoute,
-    IReadOnlyCollection<string> ScenePaths);
+    IReadOnlyCollection<string> ScenePaths,
+    string? GameplayCollisionContractError);
 
 /// <summary>Composes the two loot courtyards and the elevated market route from CC0 authored modules.</summary>
 internal sealed partial class OldTownLandmarksBuilder
@@ -27,7 +28,10 @@ internal sealed partial class OldTownLandmarksBuilder
     private static readonly Vector3 TreasuryCenter = RefineryExtractionMapBuilder.TreasuryCenter;
     private const float RooftopZ = -126.0f;
 
-    public OldTownLandmarksResult BuildGameplayScaffolding(Node3D parent)
+    public OldTownLandmarksResult BuildGameplayScaffolding(
+        Node3D parent,
+        Node3D? authoredRoot,
+        bool allowIncompleteAuthoredContract)
     {
         var root = new Node3D { Name = "OldTownLandmarks" };
         root.AddToGroup("refinery_gameplay_scaffold");
@@ -45,6 +49,17 @@ internal sealed partial class OldTownLandmarksBuilder
         root.AddChild(collisionBody);
         AddPawnshopGameplayCollision(collisionBody, counts);
         AddFactoryGateGameplayCollision(collisionBody, counts);
+        string? collisionContractError = null;
+        try
+        {
+            AddClanHallGameplayCollision(collisionBody, authoredRoot, counts);
+        }
+        catch (System.InvalidOperationException exception)
+            when (allowIncompleteAuthoredContract)
+        {
+            collisionContractError = exception.Message;
+            GD.PrintErr($"OLD_TOWN_LANDMARK_COLLISION_ERROR {collisionContractError}");
+        }
         var rooftopRoute = AddMarketGameplayCollision(collisionBody, counts);
         return new OldTownLandmarksResult(
             3,
@@ -60,7 +75,8 @@ internal sealed partial class OldTownLandmarksBuilder
             TreasuryCenter + new Vector3(0, 1.0f, -13.8f),
             TreasuryCenter + new Vector3(0, 1.0f, -7.0f),
             rooftopRoute,
-            new HashSet<string>());
+            new HashSet<string>(),
+            collisionContractError);
     }
 
     public OldTownLandmarksResult Build(Node3D parent)
@@ -100,7 +116,8 @@ internal sealed partial class OldTownLandmarksBuilder
             TreasuryCenter + new Vector3(0, 1.0f, -13.8f),
             TreasuryCenter + new Vector3(0, 1.0f, -7.0f),
             rooftopRoute,
-            sources);
+            sources,
+            null);
     }
 
     private static void BuildGrandHotel(
@@ -415,15 +432,25 @@ internal sealed partial class OldTownLandmarksBuilder
         Vector3 position,
         Vector3 size,
         Vector3 rotationDegrees,
-        BuildCounts counts)
+        BuildCounts counts,
+        string? sourceName = null,
+        string? proxyRole = null)
     {
-        body.AddChild(new CollisionShape3D
+        var collision = new CollisionShape3D
         {
             Name = name,
             Position = position,
             RotationDegrees = rotationDegrees,
             Shape = new BoxShape3D { Size = size }
-        });
+        };
+        if (!string.IsNullOrWhiteSpace(sourceName))
+        {
+            collision.SetMeta("gameplay_source_node", sourceName);
+            collision.SetMeta("gameplay_source_kind", "landmark_portal");
+            collision.SetMeta("gameplay_source_collision_role", "building_shell");
+            collision.SetMeta("gameplay_proxy_role", proxyRole ?? name);
+        }
+        body.AddChild(collision);
         counts.CollisionShapes++;
     }
 

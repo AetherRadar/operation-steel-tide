@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Godot;
 
@@ -9,7 +10,10 @@ public partial class FreightTerminalWorld
         InteractiveBuildingDoor.HingedDoorScenePath;
     private const int RefineryDoorVisualPanelCount = 1;
     private const float RefineryDoorMaxAspectDistortion = 1.12f;
+    private const float JianghaiLandmarkDoorVisibilityRange = 460.0f;
     private readonly System.Collections.Generic.List<InteractiveBuildingDoor> _refineryDoors = new();
+    private InteractiveBuildingDoor? _clanHallDoubleGate;
+    private string? _clanHallDoubleGateError;
 
     private void BuildOldTownLandmarkDoors(
         Node3D parent,
@@ -25,6 +29,72 @@ public partial class FreightTerminalWorld
             "MunicipalTreasuryDoor",
             landmarks.TreasuryEntry,
             landmarks.TreasuryInterior);
+        AddClanHallDoubleGate(parent);
+    }
+
+    private void AddClanHallDoubleGate(Node3D parent)
+    {
+        _clanHallDoubleGate = null;
+        _clanHallDoubleGateError = null;
+        if (!JianghaiClanHallGateContract.TryResolve(
+                _jianghaiOldCityScene?.Root,
+                out var gate,
+                out var error))
+        {
+            _clanHallDoubleGateError = error;
+            GD.PrintErr($"JIANGHAI_CLAN_HALL_GATE_ERROR {error}");
+            if (!_diagnosticSceneLoadFallbackAllowed)
+            {
+                throw new InvalidOperationException(error);
+            }
+            return;
+        }
+
+        var mount = new Node3D { Name = "JianghaiClanHallDoubleGateMount" };
+        mount.AddToGroup("refinery_accessible_building");
+        parent.AddChild(mount);
+        mount.GlobalTransform = new Transform3D(
+            gate.Basis,
+            gate.Position);
+
+        var door = new InteractiveBuildingDoor { Name = "JianghaiClanHallDoubleGate" };
+        door.Configure(
+            _refineryDoors.Count + 1,
+            doorwayWidth: gate.Width,
+            doorwayHeight: gate.Height,
+            frontZ: -JianghaiClanHallGateContract.DoorInset,
+            visibilityRange: JianghaiLandmarkDoorVisibilityRange,
+            motionStyle: BuildingDoorMotionStyle.DoubleHinged,
+            visualScenePath: JianghaiInteriorPopulationService.LatticeDoorScenePath,
+            sourceWidth: 0.8f,
+            sourceHeight: 1.6f,
+            hingedVisualUsesPivotOrigin: true,
+            disableVisualShadows: true,
+            widthFillRatio: 1.0f,
+            heightFillRatio: 1.0f);
+        door.SetMeta("jianghai_gate_anchor", JianghaiClanHallGateContract.AnchorName);
+        door.SetMeta("jianghai_gate_width_m", gate.Width);
+        door.SetMeta("jianghai_gate_height_m", gate.Height);
+        mount.AddChild(door);
+        _refineryDoors.Add(door);
+        _clanHallDoubleGate = door;
+
+        RegisterSquadTraversalLink(
+            $"refinery_door:{door.DoorId}",
+            SquadTraversalKind.Walk,
+            bidirectional: true,
+            new[]
+            {
+                JianghaiClanHallGateContract.RampTraversalPoint(gate, 4.20f),
+                JianghaiClanHallGateContract.RampTraversalPoint(gate, 3.40f),
+                JianghaiClanHallGateContract.RampTraversalPoint(gate, 2.60f),
+                JianghaiClanHallGateContract.RampTraversalPoint(gate, 1.80f),
+                JianghaiClanHallGateContract.RampTraversalPoint(gate, 1.00f),
+                JianghaiClanHallGateContract.RampTraversalPoint(gate, 0.20f),
+                JianghaiClanHallGateContract.RampTraversalPoint(gate, -0.72f),
+                JianghaiClanHallGateContract.RampTraversalPoint(gate, -1.65f)
+            },
+            costMultiplier: 1.02f);
     }
 
     private void AddOldTownLandmarkDoor(
@@ -55,7 +125,7 @@ public partial class FreightTerminalWorld
             doorwayWidth: 1.45f,
             doorwayHeight: 2.65f,
             frontZ: 0.0f,
-            visibilityRange: 220.0f,
+            visibilityRange: JianghaiLandmarkDoorVisibilityRange,
             motionStyle: BuildingDoorMotionStyle.Hinged);
         mount.AddChild(door);
         _refineryDoors.Add(door);
@@ -79,6 +149,19 @@ public partial class FreightTerminalWorld
                 new Vector3(interior.X, 0.12f, interior.Z)
             },
             costMultiplier: 1.04f);
+    }
+
+    private void ApplyRefineryDoorQuality(int qualityTier)
+    {
+        var distanceScale = JianghaiAuthoredRenderBatcher.VisibilityDistanceScale(
+            qualityTier);
+        foreach (var door in _refineryDoors)
+        {
+            if (IsInstanceValid(door))
+            {
+                door.ApplyVisibilityScale(distanceScale);
+            }
+        }
     }
 
     private bool TryHandleRefineryDoorInteraction(float competingInteractionDistance)
@@ -205,7 +288,7 @@ public partial class FreightTerminalWorld
         {
             return;
         }
-        door.TrySetOpen(open, bypassClearance: true);
+        door.ApplyAuthoritativeOpenState(open);
     }
 
     private void SendAllExtractionDoorStates(long peerId)
@@ -223,210 +306,4 @@ public partial class FreightTerminalWorld
         }
     }
 
-    private async void ValidateRefineryDoors()
-    {
-        await WaitFrames(6);
-        foreach (var mate in _squadMates)
-        {
-            if (IsInstanceValid(mate))
-            {
-                mate.ProcessMode = ProcessModeEnum.Disabled;
-            }
-        }
-        foreach (var enemy in _enemies)
-        {
-            if (IsInstanceValid(enemy))
-            {
-                enemy.ProcessMode = ProcessModeEnum.Disabled;
-            }
-        }
-        var expectedDoorCount = (_oldTownLandmarks?.EntryCount ?? 0)
-            + JianghaiInteriorPopulationService.ExpectedDoorCount;
-        var countReady = _refineryDoors.Count == expectedDoorCount
-            && expectedDoorCount == 14;
-        var idsReady = _refineryDoors.Select(door => door.DoorId).Distinct().Count() == expectedDoorCount
-            && _refineryDoors.Select(door => door.DoorId).OrderBy(id => id)
-                .SequenceEqual(Enumerable.Range(1, expectedDoorCount));
-        var authoredReady = ResourceLoader.Exists(RefineryDoorScenePath)
-            && ResourceLoader.Exists(JianghaiInteriorPopulationService.LatticeDoorScenePath)
-            && _refineryDoors.All(door => door.UsesAuthoredVisual && door.HasBoxCollision);
-        var hingedReady = _refineryDoors.All(door =>
-            door.MotionStyle == BuildingDoorMotionStyle.Hinged);
-        var panelLayoutReady = countReady && _refineryDoors.All(door =>
-            door.HasValidAuthoredVisualPanelLayout
-            && door.AuthoredVisualPanelCount == RefineryDoorVisualPanelCount
-            && door.MaxAuthoredVisualAspectDistortion
-                <= (door.IsInGroup("jianghai_enterable_door")
-                    ? 1.30f
-                    : RefineryDoorMaxAspectDistortion));
-        var maxAspectDistortion = _refineryDoors.Count > 0
-            ? _refineryDoors.Max(door => door.MaxAuthoredVisualAspectDistortion)
-            : float.PositiveInfinity;
-        var initiallyClosed = _refineryDoors.All(door => !door.IsOpen && !door.IsAnimating);
-        var first = _refineryDoors.FirstOrDefault();
-        if (first is null)
-        {
-            GD.Print("REFINERY_DOORS_CHECK valid=False reason=no_doors");
-            GD.Print("REFINERY_DOORS_PASS valid=False");
-            QuitDiagnosticAfterSceneCleanup(2);
-            return;
-        }
-
-        var englishPromptReady = first.InteractionLabel("en") == "OPEN DOOR";
-        var chinesePromptReady = first.InteractionLabel("zh") == "\u5f00\u95e8";
-        var nearestReady = ReferenceEquals(
-            FindNearestRefineryDoor(first.InteractionPoint, 0.5f),
-            first);
-        var closedBlocks = _refineryDoors.All(door => PhysicsRaycast.HasHit(
-            GetWorld3D(),
-            door.OutsideProbe,
-            door.InsideProbe,
-            1));
-        var collisionProbeEnemy = _enemies.FirstOrDefault(enemy =>
-            IsInstanceValid(enemy) && enemy.IsInsideTree());
-        var collisionProbeEnemyTransform = collisionProbeEnemy?.GlobalTransform ?? Transform3D.Identity;
-        var enemyClosedDoorBlockCount = 0;
-        var enemyWallBlockCount = 0;
-        if (collisionProbeEnemy is not null)
-        {
-            // Disabled process mode removes a CharacterBody3D from its physics space,
-            // so keep this probe registered while suppressing its gameplay updates.
-            collisionProbeEnemy.ProcessMode = ProcessModeEnum.Inherit;
-            collisionProbeEnemy.SetProcess(false);
-            collisionProbeEnemy.SetPhysicsProcess(false);
-            foreach (var door in _refineryDoors)
-            {
-                var enemyOutside = door.OutsideProbe;
-                enemyOutside.Y = 0.12f;
-                var enemyInside = door.InsideProbe;
-                enemyInside.Y = 0.12f;
-                collisionProbeEnemy.GlobalPosition = enemyOutside;
-                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-                if (collisionProbeEnemy.WouldWorldMovementCollideForDiagnostics(
-                        enemyInside - enemyOutside))
-                {
-                    enemyClosedDoorBlockCount++;
-                }
-
-                var traversal = enemyInside - enemyOutside;
-                var tangent = new Vector3(traversal.Z, 0, -traversal.X).Normalized();
-                foreach (var side in new[] { -1.0f, 1.0f })
-                {
-                    var facadeOffset = door.WidthForNavigation * 1.65f * side;
-                    var wallOutside = enemyOutside + tangent * facadeOffset;
-                    var wallInside = enemyInside + tangent * facadeOffset;
-                    collisionProbeEnemy.GlobalPosition = wallOutside;
-                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-                    if (collisionProbeEnemy.WouldWorldMovementCollideForDiagnostics(
-                            wallInside - wallOutside))
-                    {
-                        enemyWallBlockCount++;
-                    }
-                }
-            }
-        }
-        var enemyClosedDoorBlocks = enemyClosedDoorBlockCount == _refineryDoors.Count;
-        var expectedEnemyWallBlocks = _refineryDoors.Count * 2;
-        var enemyWallsBlock = enemyWallBlockCount == expectedEnemyWallBlocks;
-
-        var openingStarted = _refineryDoors.All(door =>
-            door.TrySetOpen(true, bypassClearance: true));
-        for (var frame = 0; frame < 120 && _refineryDoors.Any(door => door.IsAnimating); frame++)
-        {
-            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-        }
-        var opened = _refineryDoors.All(door =>
-            door.IsOpen
-            && !door.IsAnimating
-            && door.MotionAngleDegrees > 85.0f
-            && door.CompletedMotionCount == 1);
-        var openClears = _refineryDoors.All(door => !PhysicsRaycast.HasHit(
-            GetWorld3D(),
-            door.OutsideProbe,
-            door.InsideProbe,
-            1));
-        var enemyOpenDoorClearCount = 0;
-        if (collisionProbeEnemy is not null)
-        {
-            foreach (var door in _refineryDoors)
-            {
-                var enemyOutside = door.OutsideProbe;
-                enemyOutside.Y = 0.12f;
-                var enemyInside = door.InsideProbe;
-                enemyInside.Y = 0.12f;
-                collisionProbeEnemy.GlobalPosition = enemyOutside;
-                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-                if (!collisionProbeEnemy.WouldWorldMovementCollideForDiagnostics(
-                        enemyInside - enemyOutside))
-                {
-                    enemyOpenDoorClearCount++;
-                }
-            }
-            collisionProbeEnemy.GlobalTransform = collisionProbeEnemyTransform;
-            collisionProbeEnemy.ProcessMode = ProcessModeEnum.Disabled;
-        }
-        var enemyOpenDoorClears = enemyOpenDoorClearCount == _refineryDoors.Count;
-        var closePromptReady = _refineryDoors.All(door =>
-            door.InteractionLabel("en") == "CLOSE DOOR");
-
-        var playerPosition = _player.GlobalPosition;
-        _player.GlobalPosition = first.InteractionPoint;
-        await WaitFrames(3);
-        var occupiedCloseRejected = !first.TrySetOpen(false);
-        var outward = (first.OutsideProbe - first.InsideProbe).Normalized();
-        _player.GlobalPosition = first.OutsideProbe + outward * 4.0f;
-        await WaitFrames(3);
-        var closingStarted = _refineryDoors.All(door =>
-            door.TrySetOpen(false, bypassClearance: true));
-        for (var frame = 0; frame < 120 && _refineryDoors.Any(door => door.IsAnimating); frame++)
-        {
-            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-        }
-        await WaitFrames(3);
-        var closedAgain = _refineryDoors.All(door =>
-            !door.IsOpen
-            && !door.IsAnimating
-            && Mathf.Abs(door.MotionAngleDegrees) < 0.5f
-            && door.CompletedMotionCount == 2);
-        var closedAgainBlocks = _refineryDoors.All(door => PhysicsRaycast.HasHit(
-            GetWorld3D(),
-            door.OutsideProbe,
-            door.InsideProbe,
-            1));
-
-        var aiLinkReady = _squadTraversalLinks.Any(link =>
-            link.Source == $"refinery_door:{first.DoorId}"
-            && link.Kind == SquadTraversalKind.Walk
-            && link.Bidirectional);
-        var aiActorPosition = first.OutsideProbe;
-        var aiWaypoint = first.InsideProbe;
-        var aiOpened = TryPrepareAiDoorTraversal(
-            aiActorPosition,
-            aiWaypoint,
-            out var aiWaitingDuringMotion)
-            && aiWaitingDuringMotion;
-        for (var frame = 0; frame < 120 && first.IsAnimating; frame++)
-        {
-            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-        }
-        var aiContinued = TryPrepareAiDoorTraversal(
-            aiActorPosition,
-            aiWaypoint,
-            out var aiWaitingAfterMotion)
-            && first.IsOpen
-            && !aiWaitingAfterMotion;
-        first.SetOpenImmediate(false);
-        _player.GlobalPosition = playerPosition;
-
-        var valid = countReady && idsReady && authoredReady && hingedReady && panelLayoutReady
-            && initiallyClosed
-            && englishPromptReady && chinesePromptReady && nearestReady
-            && closedBlocks && enemyClosedDoorBlocks && enemyWallsBlock
-            && openingStarted && opened && openClears && enemyOpenDoorClears && closePromptReady
-            && occupiedCloseRejected && closingStarted && closedAgain && closedAgainBlocks
-            && aiLinkReady && aiOpened && aiContinued;
-        GD.Print($"REFINERY_DOORS_CHECK valid={valid} doors={_refineryDoors.Count}/{expectedDoorCount} ids={idsReady} authored={authoredReady} hinged={hingedReady} panels={string.Join(',', _refineryDoors.Select(door => door.AuthoredVisualPanelCount))} panel_layout={panelLayoutReady} aspect_distortion_max={maxAspectDistortion:0.000} closed_initial={initiallyClosed} prompt_en={englishPromptReady} prompt_zh={chinesePromptReady} nearest={nearestReady} closed_block={closedBlocks} enemy_closed_block={enemyClosedDoorBlocks}:{enemyClosedDoorBlockCount}/{_refineryDoors.Count} enemy_wall_block={enemyWallsBlock}:{enemyWallBlockCount}/{expectedEnemyWallBlocks} opening={openingStarted} opened={opened} angle={first.MotionAngleDegrees:0.0} open_clear={openClears} enemy_open_clear={enemyOpenDoorClears}:{enemyOpenDoorClearCount}/{_refineryDoors.Count} close_prompt={closePromptReady} occupied_rejected={occupiedCloseRejected} closing={closingStarted} closed_again={closedAgain} closed_block_again={closedAgainBlocks} ai_link={aiLinkReady} ai_opened={aiOpened} ai_continued={aiContinued} motions={string.Join(',', _refineryDoors.Select(door => door.CompletedMotionCount))}");
-        GD.Print($"REFINERY_DOORS_PASS valid={valid}");
-        QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
-    }
 }

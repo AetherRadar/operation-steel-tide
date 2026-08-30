@@ -86,10 +86,13 @@ public partial class FreightTerminalWorld
             && authored.ValleyFoundationMaterialsReady
             && authored.ValleyFoundationUvReady
             && authored.RenderBatchValidation.Valid
-            && authored.RenderBatchValidation.BatchCount
-                == JianghaiAuthoredRenderBatcher.ExpectedBatchCount
+            && authored.RenderBatchValidation.BatchCount > 0
             && authored.RenderBatchValidation.SourceCount
-                == JianghaiAuthoredRenderBatcher.ExpectedSourceCount
+                > authored.RenderBatchValidation.BatchCount
+            && authored.RenderBatchValidation.MultiMeshInstanceCount
+                == authored.RenderBatchValidation.SourceCount
+            && authored.RenderBatchValidation.UniqueSourceCount
+                == authored.RenderBatchValidation.SourceCount
             && authored.RenderBatchValidation.NonOriginBatchCount > 0
             && authored.RenderBatchValidation.MaximumCentroidError <= 0.001f
             && authored.RenderBatchValidation.MaximumPositionError <= 0.001f
@@ -149,15 +152,22 @@ public partial class FreightTerminalWorld
             && counts.NonBoxLegacyCollisionShapes == 0;
         var legacyScaffoldsHidden = counts.VisibleLegacyScaffoldGeometry == 0;
         var expectedInteractiveDoors = (_oldTownLandmarks?.EntryCount ?? 0)
-            + JianghaiInteriorPopulationService.ExpectedDoorCount;
+            + JianghaiInteriorPopulationService.ExpectedDoorCount
+            + 1;
         var interactiveDoorsReady = _oldTownLandmarks is not null
             && _jianghaiInteriors is { } interiors
             && interiors.Doors.Count == JianghaiInteriorPopulationService.ExpectedDoorCount
             && _refineryDoors.Count == expectedInteractiveDoors
             && _refineryDoors.All(door => IsInstanceValid(door)
                 && door.UsesAuthoredVisual
-                && door.HasBoxCollision
-                && door.MotionStyle == BuildingDoorMotionStyle.Hinged);
+                && door.HasRenderableAuthoredVisualGeometry
+                && door.AuthoredRenderableGeometryCount > 0
+                && door.HasBoxCollision)
+            && _clanHallDoubleGate is { } clanHallGate
+            && clanHallGate.MotionStyle == BuildingDoorMotionStyle.DoubleHinged
+            && clanHallGate.LeafCount == 2
+            && _refineryDoors.Where(door => !ReferenceEquals(door, clanHallGate))
+                .All(door => door.MotionStyle == BuildingDoorMotionStyle.Hinged);
         var interiorResidents = _civilians.Where(civilian =>
             IsInstanceValid(civilian)
             && civilian.IsInGroup("jianghai_interior_resident")).ToArray();
@@ -265,6 +275,9 @@ public partial class FreightTerminalWorld
             + $"render_batches={_jianghaiOldCityScene?.RenderBatchValidation.Valid ?? false}:"
             + $"{_jianghaiOldCityScene?.RenderBatchValidation.BatchCount ?? 0}/"
             + $"{_jianghaiOldCityScene?.RenderBatchValidation.SourceCount ?? 0}:"
+            + $"enterable={_jianghaiOldCityScene?.RenderBatchValidation.BatchedEnterableSourceCount ?? -1}:"
+            + $"instances={_jianghaiOldCityScene?.RenderBatchValidation.MultiMeshInstanceCount ?? 0}:"
+            + $"unique={_jianghaiOldCityScene?.RenderBatchValidation.UniqueSourceCount ?? 0}:"
             + $"non_origin={_jianghaiOldCityScene?.RenderBatchValidation.NonOriginBatchCount ?? 0}:"
             + $"centroid_error={_jianghaiOldCityScene?.RenderBatchValidation.MaximumCentroidError ?? -1.0f:0.000000}:"
             + $"position_error={_jianghaiOldCityScene?.RenderBatchValidation.MaximumPositionError ?? -1.0f:0.000000}:"

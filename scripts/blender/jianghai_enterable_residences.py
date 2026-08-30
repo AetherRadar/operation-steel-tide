@@ -30,6 +30,10 @@ from jianghai_enterable_interior_liners import (
     rebuild_interior_liners,
     validate_interior_liners,
 )
+from jianghai_retired_facades import (
+    RETIRED_FACADE_OVERLAY_COUNT,
+    validate_retired_facade_overlays,
+)
 
 
 ENTERABLE_VERSION = 2
@@ -43,13 +47,6 @@ FACADE_PROBE_LENGTH_METERS = 1.20
 SCENE_APERTURE_OUTSET_METERS = 0.55
 SCENE_APERTURE_CLEARANCE_METERS = 1.20
 SCENE_APERTURE_RAY_LENGTH_METERS = 12.0
-REPLACED_INSERT_VERSION = 1
-REPLACED_INSERT_NAME = "JianghaiExpansion_Facade_EastPhoto_F0_C1_Insert"
-REPLACED_INSERT_PARENT_NAME = "JianghaiExpansion_UrbanFacades"
-REPLACED_INSERT_MESH_NAME = "Cube.004"
-REPLACED_INSERT_SURVIVOR_NAME = "JianghaiExpansion_Facade_WestClock_F0_C1_Insert"
-RETAINED_INSERT_WALL_NAME = "JianghaiExpansion_Facade_EastPhoto_F0_C1_Wall"
-REPLACED_INSERT_MARKER = "jianghai_enterable_replaced_insert_version"
 ENTERABLE_MESH_SHARE_GROUPS = (
     ("EastPhotoHouse", "EastGateRow00"),
     ("OuterEastMidResidence", "OuterWestSquareResidence"),
@@ -65,13 +62,19 @@ class EnterableResidenceMetrics:
     wall_sample_count: int
     triangle_count: int
     scene_aperture_sample_count: int = 0
-    removed_insert_count: int = 0
+    retired_overlay_count: int = 0
     liner_count: int = 0
     liner_triangle_count: int = 0
     liner_closure_sample_count: int = 0
     liner_entry_sample_count: int = 0
     liner_opaque_material_count: int = 0
     shared_mesh_pair_count: int = 0
+
+    @property
+    def removed_insert_count(self) -> int:
+        """Compatibility alias: individual overlay inserts are no longer removed."""
+
+        return 0
 
 
 def _mesh_bounds(mesh: bpy.types.Mesh) -> tuple[Vector, Vector]:
@@ -97,111 +100,6 @@ def _apply_reviewed_orientation(obj: bpy.types.Object) -> None:
     obj.rotation_euler = Euler((0.0, 0.0, yaw), "XYZ")
     if obj.name in ENTERABLE_POSITION_OVERRIDES:
         obj.location = Vector(ENTERABLE_POSITION_OVERRIDES[obj.name])
-
-
-def _vector_matches(actual, expected: tuple[float, float, float]) -> bool:
-    return (Vector(actual) - Vector(expected)).length <= 0.0001
-
-
-def _validate_retained_insert_wall() -> None:
-    wall = bpy.data.objects.get(RETAINED_INSERT_WALL_NAME)
-    if wall is None or wall.type != "MESH":
-        raise RuntimeError(f"Retained East Photo facade wall is missing: {RETAINED_INSERT_WALL_NAME}")
-    if wall.parent is None or wall.parent.name != REPLACED_INSERT_PARENT_NAME:
-        raise RuntimeError(
-            f"Retained East Photo facade wall parent drifted: {wall.parent}"
-        )
-    if (
-        not _vector_matches(wall.location, (13.38, 1.50, 0.03))
-        or not _vector_matches(wall.rotation_euler, (0.0, 0.0, radians(90.0)))
-        or not _vector_matches(wall.scale, (1.0, 1.0, 1.0))
-        or not _vector_matches(wall.dimensions, (3.0, 0.0, 3.0))
-        or len(wall.data.polygons) != 2_256
-        or tuple(material.name for material in wall.data.materials if material)
-        != ("modular_urban_apartments_facade_plaster",)
-    ):
-        raise RuntimeError(
-            f"Retained East Photo facade wall contract drifted: {RETAINED_INSERT_WALL_NAME}"
-        )
-
-
-def _validate_replaced_insert_contract(obj: bpy.types.Object) -> None:
-    mesh_users = sorted(
-        candidate.name
-        for candidate in bpy.data.objects
-        if candidate.type == "MESH" and candidate.data == obj.data
-    )
-    materials = tuple(material.name for material in obj.data.materials if material)
-    if (
-        obj.type != "MESH"
-        or obj.parent is None
-        or obj.parent.name != REPLACED_INSERT_PARENT_NAME
-        or tuple(collection.name for collection in obj.users_collection) != ("Scene Collection",)
-        or obj.rotation_mode != "XYZ"
-        or not _vector_matches(obj.location, (13.38, 1.50, 0.03))
-        or not _vector_matches(obj.rotation_euler, (0.0, 0.0, radians(90.0)))
-        or not _vector_matches(obj.scale, (1.0, 1.0, 1.0))
-        or not _vector_matches(obj.dimensions, (2.0800056, 0.4400001, 2.8099997))
-        or obj.data.name != REPLACED_INSERT_MESH_NAME
-        or len(obj.data.vertices) != 2_263
-        or len(obj.data.polygons) != 1_711
-        or mesh_users != [REPLACED_INSERT_NAME, REPLACED_INSERT_SURVIVOR_NAME]
-        or materials
-        != (
-            "modular_urban_apartments_facade_objects",
-            "modular_urban_apartments_facade_glass",
-        )
-    ):
-        raise RuntimeError(
-            f"Legacy East Photo door insert contract drifted: {REPLACED_INSERT_NAME} "
-            f"mesh={obj.data.name} users={mesh_users} materials={materials}"
-        )
-
-
-def _replace_legacy_door_insert() -> int:
-    parent = bpy.data.objects.get(REPLACED_INSERT_PARENT_NAME)
-    if parent is None:
-        raise RuntimeError(f"Facade expansion root is missing: {REPLACED_INSERT_PARENT_NAME}")
-    _validate_retained_insert_wall()
-    insert = bpy.data.objects.get(REPLACED_INSERT_NAME)
-    if insert is None:
-        if parent.get(REPLACED_INSERT_MARKER) != REPLACED_INSERT_VERSION:
-            raise RuntimeError(
-                f"Legacy East Photo insert disappeared without replacement provenance: "
-                f"{REPLACED_INSERT_NAME}"
-            )
-        return 0
-    _validate_replaced_insert_contract(insert)
-    parent[REPLACED_INSERT_MARKER] = REPLACED_INSERT_VERSION
-    parent["jianghai_enterable_replaced_insert_name"] = REPLACED_INSERT_NAME
-    parent["jianghai_enterable_replacement_role"] = "hinged_chinese_lattice_door"
-    bpy.data.objects.remove(insert, do_unlink=True)
-    bpy.context.view_layer.update()
-    return 1
-
-
-def _validate_legacy_insert_replacement() -> None:
-    parent = bpy.data.objects.get(REPLACED_INSERT_PARENT_NAME)
-    if (
-        parent is None
-        or parent.get(REPLACED_INSERT_MARKER) != REPLACED_INSERT_VERSION
-        or parent.get("jianghai_enterable_replaced_insert_name") != REPLACED_INSERT_NAME
-        or parent.get("jianghai_enterable_replacement_role")
-        != "hinged_chinese_lattice_door"
-        or bpy.data.objects.get(REPLACED_INSERT_NAME) is not None
-    ):
-        raise RuntimeError("East Photo legacy door insert replacement provenance is invalid")
-    _validate_retained_insert_wall()
-    survivor = bpy.data.objects.get(REPLACED_INSERT_SURVIVOR_NAME)
-    if (
-        survivor is None
-        or survivor.type != "MESH"
-        or survivor.data.name != REPLACED_INSERT_MESH_NAME
-        or survivor.data.users != 1
-    ):
-        raise RuntimeError(
-            f"Shared West Clock facade insert was damaged: {REPLACED_INSERT_SURVIVOR_NAME}"
-        )
 
 
 def _cut_unique_mesh(obj: bpy.types.Object) -> None:
@@ -662,7 +560,7 @@ def _validate_residence(obj: bpy.types.Object) -> tuple[int, int, int, int]:
 
 
 def apply_enterable_residences() -> EnterableResidenceMetrics:
-    removed_insert_count = _replace_legacy_door_insert()
+    validate_retired_facade_overlays()
     cut_count = 0
     for object_name, archetype in ENTERABLE_RESIDENCE_LAYOUT:
         obj = bpy.data.objects.get(object_name)
@@ -684,7 +582,7 @@ def apply_enterable_residences() -> EnterableResidenceMetrics:
         metrics.wall_sample_count,
         metrics.triangle_count,
         metrics.scene_aperture_sample_count,
-        removed_insert_count,
+        RETIRED_FACADE_OVERLAY_COUNT,
         metrics.liner_count,
         metrics.liner_triangle_count,
         metrics.liner_closure_sample_count,
@@ -695,7 +593,7 @@ def apply_enterable_residences() -> EnterableResidenceMetrics:
 
 
 def validate_enterable_residences() -> EnterableResidenceMetrics:
-    _validate_legacy_insert_replacement()
+    validate_retired_facade_overlays()
     aperture_samples = 0
     wall_samples = 0
     triangles = 0
@@ -729,7 +627,7 @@ def validate_enterable_residences() -> EnterableResidenceMetrics:
         wall_samples,
         triangles,
         scene_aperture_samples,
-        0,
+        RETIRED_FACADE_OVERLAY_COUNT,
         liner_metrics.liner_count,
         liner_metrics.triangle_count,
         liner_metrics.closure_sample_count,

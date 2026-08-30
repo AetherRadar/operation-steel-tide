@@ -20,6 +20,19 @@ from jianghai_chinese_district_layout import (
 from jianghai_density_color0 import validate_density_color0_scene
 from jianghai_enterable_residences import validate_enterable_residences
 from jianghai_enterable_interior_liners import EXPECTED_TRIANGLES as INTERIOR_LINER_TRIANGLES
+from jianghai_clan_hall_portal import (
+    CLAN_HALL_GATE_ANCHOR_NAME,
+    CLAN_HALL_GATE_REMOVED_COMPONENTS,
+    CLAN_HALL_GATE_REMOVED_TRIANGLES,
+    CLAN_HALL_GATE_REMOVED_VERTICES,
+    validate_clan_hall_gate_glb,
+    validate_clan_hall_gate_portal,
+)
+from jianghai_retired_facades import (
+    RETIRED_FACADE_OVERLAY_COUNT,
+    RETIRED_FACADE_OVERLAY_PREFIXES,
+    validate_retired_facade_overlays,
+)
 
 
 GROUND_INSTANCE_COUNT = 1
@@ -128,6 +141,13 @@ RETIRED_VISIBLE_MESH_NAMES = {
     "JianghaiDensity_OldUrban_LOD",
     "JianghaiDensity_ScanStreet_LOD",
 }
+RUNTIME_GLB_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "assets"
+    / "models"
+    / "jianghai_old_city"
+    / "jianghai_old_city.glb"
+)
 
 
 def triangle_count(mesh: bpy.types.Mesh) -> int:
@@ -346,6 +366,7 @@ required_anchors = {
     "JianghaiTenementDistrict",
     "RedStarElectronicsFactory",
     "GuangchangPawnshop",
+    CLAN_HALL_GATE_ANCHOR_NAME,
     "OldCityMarketBridge",
     "GrandHotelSecurityTerminalVisual",
     "MunicipalTreasuryManifestTerminalVisual",
@@ -1852,24 +1873,12 @@ urban_life_ready = urban_life_names.issubset(bpy.data.objects.keys())
 facade_expansion = [
     obj
     for obj in bpy.context.scene.objects
-    if obj.name.startswith("JianghaiExpansion_Facade_")
+    if obj.name.startswith(RETIRED_FACADE_OVERLAY_PREFIXES)
 ]
 facade_expansion_count = len(facade_expansion)
-facade_expansion_aligned = all(
-    (
-        "_EastPhoto_" in obj.name
-        and isclose(obj.location.x, 13.38, abs_tol=0.001)
-        and isclose(obj.rotation_euler.z, pi * 0.5, abs_tol=0.001)
-        and min((obj.matrix_world @ Vector(corner)).x for corner in obj.bound_box) >= 13.0
-    )
-    or (
-        "_WestClock_" in obj.name
-        and isclose(obj.location.x, -13.48, abs_tol=0.001)
-        and isclose(obj.rotation_euler.z, -pi * 0.5, abs_tol=0.001)
-        and max((obj.matrix_world @ Vector(corner)).x for corner in obj.bound_box) <= -13.0
-    )
-    for obj in facade_expansion
-)
+retired_facade_overlay_residuals = validate_retired_facade_overlays()
+clan_hall_portal = validate_clan_hall_gate_portal()
+clan_hall_glb_anchor = validate_clan_hall_gate_glb(RUNTIME_GLB_PATH)
 legacy_wood_house_nodes = sorted(
     obj.name
     for obj in bpy.data.objects
@@ -2363,8 +2372,21 @@ valid = (
     and not forbidden_export_objects
     and finite_transforms
     and urban_life_ready
-    and facade_expansion_count == 35
-    and facade_expansion_aligned
+    and facade_expansion_count == 0
+    and retired_facade_overlay_residuals == 0
+    and clan_hall_portal["static_components"] == 0
+    and clan_hall_portal["static_vertices"] == 0
+    and clan_hall_portal["static_triangles"] == 0
+    and clan_hall_portal["aperture_clear"] == 9
+    and clan_hall_portal["jamb_hits"] == 6
+    and clan_hall_portal["lintel_hits"] == 3
+    and clan_hall_portal["threshold_hits"] == 3
+    and clan_hall_portal["anchor_ready"] is True
+    and clan_hall_portal["anchor_prefix_count"] == 1
+    and clan_hall_glb_anchor["anchor_count"] == 1
+    and clan_hall_glb_anchor["anchor_prefix_count"] == 1
+    and clan_hall_glb_anchor["parent_ready"] is True
+    and clan_hall_glb_anchor["transform_ready"] is True
     and replacement_storefronts_ready
     and pawnshop_frontage_ready
     and replacement_factory_ready
@@ -2516,8 +2538,23 @@ print(
     f"images_512_packed={images_ready} evaluated_triangles={evaluated_triangles}/{SCENE_TRIANGLE_BUDGET} "
     f"retired_visible={len(retired_visible_objects)} "
     f"forbidden_export_objects={len(forbidden_export_objects)} finite_transforms={finite_transforms} "
-    f"urban_life={urban_life_ready} facade_expansion={facade_expansion_count}/35 "
-    f"facade_expansion_aligned={facade_expansion_aligned} "
+    f"urban_life={urban_life_ready} retired_facade_overlays="
+    f"{facade_expansion_count}/0:retired={RETIRED_FACADE_OVERLAY_COUNT} "
+    f"clan_hall_static_gate={clan_hall_portal['static_components']}:"
+    f"{clan_hall_portal['static_vertices']}:"
+    f"{clan_hall_portal['static_triangles']} "
+    f"clan_hall_retired_gate={CLAN_HALL_GATE_REMOVED_COMPONENTS}:"
+    f"{CLAN_HALL_GATE_REMOVED_VERTICES}:"
+    f"{CLAN_HALL_GATE_REMOVED_TRIANGLES} "
+    f"clan_hall_portal=aperture={clan_hall_portal['aperture_clear']}/9:"
+    f"jambs={clan_hall_portal['jamb_hits']}/6:"
+    f"lintel={clan_hall_portal['lintel_hits']}/3:"
+    f"threshold={clan_hall_portal['threshold_hits']}/3:"
+    f"anchor={clan_hall_portal['anchor_ready']}:"
+    f"prefix={clan_hall_portal['anchor_prefix_count']}/1 "
+    f"clan_hall_glb_anchor={clan_hall_glb_anchor['anchor_count']}/1:"
+    f"prefix={clan_hall_glb_anchor['anchor_prefix_count']}/1:"
+    f"transform={clan_hall_glb_anchor['transform_ready']} "
     f"replacement_storefronts_ready={replacement_storefronts_ready} "
     f"pawnshop_frontage_ready={pawnshop_frontage_ready} "
     f"pawnshop_canopy={len(pawnshop_canopy_parts)}/15 "

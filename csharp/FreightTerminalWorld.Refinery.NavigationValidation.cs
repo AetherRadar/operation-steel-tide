@@ -259,15 +259,21 @@ public partial class FreightTerminalWorld
             link.Source == "old_town_market_rooftop"
             && link.Bidirectional
             && link.ForwardPoints.Length >= 8);
+        var clanHallReady = ValidateClanHallCollision(
+            out var clanHallWallHits,
+            out var clanHallRampHits,
+            out var clanHallSummary);
         var countsReady = landmarks.LandmarkCount == 3
             && landmarks.HighValueZoneCount == 2
-            && landmarks.CollisionShapeCount == 20
+            && landmarks.CollisionShapeCount == 29
             && landmarks.EntryCount == 2
-            && landmarks.RooftopRouteCount == 1;
-        GD.Print($"OLD_TOWN_LANDMARK_CHECK hotel_entry={hotelEntryClear} treasury_entry={treasuryEntryClear} hotel_wall={hotelWallBlocks} pawnshop_air_clear={pawnshopAirClear}:3 pawnshop_visible={pawnshopVisibleBlocks}/3 factory_air_clear={factoryAirWallsClear}:5 factory_gate={factoryGateBlocks}/3 rooftop_deck={rooftopDeckBlocks} rail_blocks={marketRailBlocks}/4 rail_gaps={marketRailGapsClear}:2 rail_posts={marketRailPostsBlock}/2 rooftop_clear={rooftopWalkClear}:{rooftopBlocker} traversal={traversalRegistered} counts={countsReady}:20");
+            && landmarks.RooftopRouteCount == 1
+            && landmarks.GameplayCollisionContractError is null;
+        GD.Print($"OLD_TOWN_LANDMARK_CHECK hotel_entry={hotelEntryClear} treasury_entry={treasuryEntryClear} hotel_wall={hotelWallBlocks} pawnshop_air_clear={pawnshopAirClear}:3 pawnshop_visible={pawnshopVisibleBlocks}/3 factory_air_clear={factoryAirWallsClear}:5 factory_gate={factoryGateBlocks}/3 clan_hall={clanHallReady}:walls={clanHallWallHits}/5:ramp={clanHallRampHits}/3:{clanHallSummary} rooftop_deck={rooftopDeckBlocks} rail_blocks={marketRailBlocks}/4 rail_gaps={marketRailGapsClear}:2 rail_posts={marketRailPostsBlock}/2 rooftop_clear={rooftopWalkClear}:{rooftopBlocker} traversal={traversalRegistered} counts={countsReady}:29 contract_error={landmarks.GameplayCollisionContractError ?? "none"}");
         return hotelEntryClear && treasuryEntryClear && hotelWallBlocks
             && pawnshopAirClear && pawnshopVisibleBlocks == 3
             && factoryAirWallsClear && factoryGateBlocks == 3
+            && clanHallReady
             && rooftopDeckBlocks && marketRailBlocks == 4
             && marketRailGapsClear && marketRailPostsBlock == 2
             && rooftopWalkClear && traversalRegistered && countsReady;
@@ -376,7 +382,7 @@ public partial class FreightTerminalWorld
         {
             if (IsInstanceValid(door))
             {
-                exclusions.Add(door.GetRid());
+                door.AddCollisionExclusions(exclusions);
             }
         }
         return exclusions;

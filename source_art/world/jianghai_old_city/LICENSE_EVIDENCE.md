@@ -20,7 +20,7 @@ are retained in a separate private evidence cache; paths beginning with
 private acquisition or evidence cache is committed or required to export the
 packed scene.
 
-## 2026-08-29 rebuild and 2026-08-30 expansion mapping
+## 2026-08-29 rebuild and 2026-08-30 expansion/portal mapping
 
 The current project-authored Blender rebuild introduces no new external source.
 It reuses only the already verified sources in the table below: Free poly's CC0
@@ -47,27 +47,52 @@ status is retired. The current authoritative `.blend` and runtime GLB contain
 zero visible instances of either source. Representative review evidence is
 `previews/12_chinese_edge_gate.png`, `previews/13_chinese_avenue.png`, and
 `previews/14_chinese_old_city_overview.png`. The final packed `.blend` is
-52,970,996 bytes with SHA-256
-`F4E5978182B744BD16741F298DC491F774EBF6E901B25D0890C292A97FA0B09D`;
-the final GLB is 63,926,136 bytes with SHA-256
-`3A854DD94132775F008990D908BE32D4B25E72E45C4094E8F6D8167AE633DE8D`.
-Its round-trip audit reports 605 nodes, 588 mesh nodes, 273 unique meshes, 469
-mesh primitives, 1,142,508 unique/3,151,080 instanced triangles, 97 materials,
-142 textures backed by 120 images, and maximum image dimension 512. The scene
+52,107,580 bytes with SHA-256
+`DA1907CE44D694960BB959460B6339C3796D31D76CB5111048DEDDD199D918CE`;
+the final GLB is 63,204,100 bytes with SHA-256
+`33E2176E52D538123D45ABEEA61464EA8E7002854A2B1D47E5C5D560AD32D17E`.
+Its round-trip audit reports 571 nodes, 553 mesh nodes, 263 unique meshes, 450
+mesh primitives, 1,115,644 unique/3,056,190 instanced triangles, 96 materials,
+139 textures backed by 120 images, and maximum image dimension 512. The scene
 audit passes with 50/50 density placements, 12/12 enterable residences, zero
 density intersections, zero visible retired-building instances, 108/108
 building-body apertures, 36/36 structural probes, 108/108 full-scene apertures,
 and 12/12 opaque interior liners; its negative aperture probe detects the
 intended 0.404-meter blocker.
 
+The final 2026-08-30 portal correction retires exactly 35 obsolete photographed
+apartment-facade overlay objects: 17 with the
+`JianghaiExpansion_Facade_EastPhoto_` prefix and 18 with the
+`JianghaiExpansion_Facade_WestClock_` prefix. The packed scene and runtime GLB
+contain zero objects with either prefix; the 16 modeled
+`PawnshopAuthoredWing_` modules, road decals, and the real `EastPhotoHouse`
+opening remain. This is a DCC retirement of previously adapted CC0 content, not
+a new acquisition or a license change.
+
+The same correction removes only the baked gate assembly from Free poly's CC0
+Chinese Temple 2 `GuangchangClanHall` mesh: 56 measured disconnected islands,
+425 vertices, and 323 triangles. The arched lintel, jambs, and threshold remain.
+One authored Empty, `JianghaiClanHallDoubleGateAnchor`, is exported at Godot
+position `(-86.001892, 1.278776, -122.576271)` with identity basis, 3.687810 m
+width, 4.028527 m height, and local `+Z` pointing outward toward the south
+street. Source and serialized-GLB audits prove 0 residual gate islands, 9/9
+clear opening rays, 6/6 jamb hits, 3/3 lintel hits, 3/3 threshold hits, and one
+exact anchor with its glTF extras intact.
+
+Godot maps the existing Chinese-lattice composite asset to 14 current visual
+instances: 12 single-leaf residence doors and two independently hinged leaves
+for one logical clan-hall double gate. The two Kenney-only landmark personnel
+doors remain separate from this lattice count. This reuse introduces no new
+source or license.
+
 ## Source records
 
 | Source asset | Creator / publisher | Official source | Exact license | Acquired | Acquisition input | Delivery status |
 | --- | --- | --- | --- | --- | --- | --- |
 | Modular Factory Facade | James Ray Cock / Poly Haven | https://polyhaven.com/a/modular_factory_facade | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `poly_haven/modular_factory_facade/modular_factory_facade_1k.gltf`, its `.bin`, and 15 1K texture sidecars | Adapted into the current packed `.blend` and runtime `.glb` |
-| Modular Urban Apartments Facade | James Ray Cock / Poly Haven | https://polyhaven.com/a/modular_urban_apartments_facade | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `poly_haven/modular_urban_apartments_facade/modular_urban_apartments_facade_1k.gltf`, its `.bin`, and 12 1K texture sidecars | Adapted into 36 delivered facade objects forming two asymmetrical 3-by-3 overlays in the packed `.blend` and runtime `.glb` |
+| Modular Urban Apartments Facade | James Ray Cock / Poly Haven | https://polyhaven.com/a/modular_urban_apartments_facade | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `poly_haven/modular_urban_apartments_facade/modular_urban_apartments_facade_1k.gltf`, its `.bin`, and 12 1K texture sidecars | Historical source for the former 36-object overlay pass. The final correction retires the exact 17 EastPhoto + 18 WestClock overlay objects; zero objects with those prefixes remain. Adapted source geometry/materials continue through the 16 modeled `PawnshopAuthoredWing_` modules |
 | Chinese Four-corner Pavilion - Free | VVayToyek / itch.io | https://vvaytoyek.itch.io/chinese-four-corner-pavilion-free | CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `itch/vvaytoyek_chinese_four_corner_pavilion/Chinese Four-corner Pavilion.zip`; extracted `fbx_only/四角亭.fbx`; page evidence `itch_license_evidence.html` | Fifteen modeled timber, tile, column, rafter, lattice, bracket, and ornament parts remain adapted into the pawnshop gate canopy and provide the facade/eaves vocabulary for the current arcade-shop and gate-house shared meshes; raw source remains external, while adapted geometry is packed into the `.blend` and runtime GLB |
-| Chinese Temple 2 | Free poly / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/8701a79a-1635-437c-b1d2-6b14f14fc351/; `assetBaseId` `8701a79a-1635-437c-b1d2-6b14f14fc351` | Creative Commons Zero / CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `blenderkit/chinese_temple_2.glb` | Adapted as `JianghaiChineseTempleHall_LOD`; its extracted and decimated roof also tops the current arcade-shop and gate-house shared meshes in the packed `.blend` and runtime `.glb` |
+| Chinese Temple 2 | Free poly / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/8701a79a-1635-437c-b1d2-6b14f14fc351/; `assetBaseId` `8701a79a-1635-437c-b1d2-6b14f14fc351` | Creative Commons Zero / CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `blenderkit/chinese_temple_2.glb` | Adapted as `JianghaiChineseTempleHall_LOD`; its extracted and decimated roof also tops the current arcade-shop and gate-house shared meshes. The final clan-hall DCC edit removes only the measured baked static gate leaf/seam/hardware islands and retains the source's arched structural portal |
 | Chinese red lamp | Kin Chen / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/b97e433c-2eb1-46b8-9633-5bdee21e4e7a/; `assetBaseId` `b97e433c-2eb1-46b8-9633-5bdee21e4e7a` | Creative Commons Zero / CC0 1.0 Universal; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-27 | `blenderkit/chinese_red_lamp.glb` | Adapted into five storefront instances in the current packed `.blend` and runtime `.glb` |
 | Pink city bicycle | Kin Chen / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/4c1a83c1-829f-4c00-878e-9e73c6b89c3b/; `assetBaseId` `4c1a83c1-829f-4c00-878e-9e73c6b89c3b` | Creative Commons Zero / CC0 1.0 Universal; official API `license=cc_zero`, `isFree=true`; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `blenderkit/pink_city_bicycle/pink_city_bicycle_0_5k.blend`; API evidence `blenderkit/pink_city_bicycle/official_api_search.json` | Converted to a static rest pose, stripped of its rig, given adapted weathered materials, cleaned to 11,825 triangles, and delivered as three instances in the packed `.blend` and runtime `.glb` |
 | Old Urban building | Abobla O.S / BlenderKit | https://www.blenderkit.com/asset-gallery-detail/8177ff94-1645-4b50-95cc-cb05a336e34d/; `assetBaseId` `8177ff94-1645-4b50-95cc-cb05a336e34d` | Creative Commons Zero / CC0 1.0 Universal; API `license=cc_zero`, `isFree=true`; https://creativecommons.org/publicdomain/zero/1.0/ | 2026-08-28 | `blenderkit/old_urban_building_1k.blend` | Historical source record retained. All former visible storefront, market, rear-house, factory, street-cadence, and density placements were retired by the 2026-08-29 Chinese district rebuild; current delivered visible instance count is zero |
@@ -288,7 +313,7 @@ by LF before hashing as UTF-8:
 | Bundle | Files | Bytes | Manifest SHA-256 | Status |
 | --- | ---: | ---: | --- | --- |
 | `modular_factory_facade` | 17 | 17,626,179 | `E153A2BF001C517C6C0A7C5B37C8A223C734147ADF07949D722D79A592568D23` | Delivered source |
-| `modular_urban_apartments_facade` | 14 | 16,488,693 | `27A46C87BE8D073F642DE3E5CA8AD7185D4DCA1377796CAF570E91105E87472C` | Delivered source adapted into 36 facade objects in the packed `.blend` and GLB |
+| `modular_urban_apartments_facade` | 14 | 16,488,693 | `27A46C87BE8D073F642DE3E5CA8AD7185D4DCA1377796CAF570E91105E87472C` | Verified delivered source: the former 36-object overlay pass is historical; the final packed `.blend`/GLB retain zero EastPhoto/WestClock overlay objects and keep the 16 modeled `PawnshopAuthoredWing_` modules |
 | `television_02` | 5 | 1,239,955 | `7468FF9CBE3054DF27CEC531CD871C5DD221147144DE37BE4A9A509221F96827` | Delivered source packed into `.blend` and GLB |
 | `exterior_aircon_unit` | 14 | 7,667,928 | `A2706A633554EF4960A78BF6B152A246A00A8D0ADA10E8245A8486767AD58AC0` | Delivered source packed into `.blend` and GLB |
 | `rollershutter_window_03` | 6 | 2,283,373 | `5EF72962E7C4214475AA076B62604A7300C1F6FF7F0824A7E416E221D52B9D82` | Delivered source packed into `.blend` and main GLB, with a retained standalone alternate/legacy shutter derivative |
@@ -304,7 +329,7 @@ by LF before hashing as UTF-8:
 ## Historical verified hashes and current audit ownership
 
 The earlier rows below are immutable historical snapshots. The final two rows
-record the current 2026-08-29 Chinese-district delivery.
+record the current 2026-08-30 Chinese-district portal delivery.
 
 | Output | Bytes | SHA-256 | Reproducible derivation and use |
 | --- | ---: | --- | --- |
@@ -314,8 +339,8 @@ record the current 2026-08-29 Chinese-district delivery.
 | `assets/models/jianghai_old_city/jianghai_old_city.glb` — valley pre-rebase snapshot | 76,862,308 | `0C0174672630957390A959BC3BD71DB3F4849CC7CABE0AFADFDD12273DFE02A5` | Runtime map before integration with the upstream hinged-entry snapshot; export and DCC-to-GLB round-trip PASS; 4,835,033 evaluated full-scene instance triangles, below the 5,000,000 gate |
 | `source_art/world/jianghai_old_city/jianghai_old_city.blend` — historical post-valley/pre-Chinese-rebuild delivery | 81,861,168 | `7CA84CD2B17C3872323D8A5EE7B1A4BA5BCB360F4326FB2331327BED4F493461` | Historical combined packed DCC source; 500 mesh objects, 198 unique mesh datablocks, 4,807,899 raw mesh-object triangles, 1,003,869 triangles counted once per unique mesh, and 563 evaluated objects totaling 4,836,825 instance triangles; superseded by the 2026-08-29 Chinese district rebuild |
 | `assets/models/jianghai_old_city/jianghai_old_city.glb` — historical post-valley/pre-Chinese-rebuild delivery | 84,723,312 | `7E2BB712BCF031692FAFB0E4E0FA59F3E75CE340B2748F5EDBDB7B105D9B2965` | Historical combined runtime map; superseded by the 2026-08-29 Chinese district rebuild |
-| `source_art/world/jianghai_old_city/jianghai_old_city.blend` — current Chinese-district delivery | 52,970,996 | `F4E5978182B744BD16741F298DC491F774EBF6E901B25D0890C292A97FA0B09D` | Authoritative packed DCC source; 621 objects/525 mesh objects/210 unique mesh datablocks/3,123,494 object triangles/1,113,692 unique triangles and 588 evaluated meshes/3,152,420 evaluated triangles; 66/66 visible anchors replaced, 50/50 density placements, 12 enterable placements, zero density intersections, zero visible retired-building instances, 108/108 building-body apertures, 36/36 structural probes, 108/108 full-scene apertures, and 12/12 opaque liners; read-only audit PASS |
-| `assets/models/jianghai_old_city/jianghai_old_city.glb` — current Chinese-district delivery | 63,926,136 | `3A854DD94132775F008990D908BE32D4B25E72E45C4094E8F6D8167AE633DE8D` | GLB round-trip PASS; 605 nodes/588 mesh nodes/273 unique meshes/469 primitives, 1,142,508 unique/3,151,080 instanced triangles, 97 materials, 142 textures/120 images, maximum image dimension 512 |
+| `source_art/world/jianghai_old_city/jianghai_old_city.blend` — current Chinese-district delivery | 52,107,580 | `DA1907CE44D694960BB959460B6339C3796D31D76CB5111048DEDDD199D918CE` | Authoritative packed DCC source; 587 objects/490 mesh objects/200 unique mesh datablocks/3,028,604 object triangles/1,086,828 unique triangles and 553 evaluated meshes/3,057,530 evaluated triangles; 35 exact photographed overlay objects retired with zero residuals; 16 `PawnshopAuthoredWing_` modules retained; 56/425/323 baked clan-hall gate components/vertices/triangles retired; 9/9 portal rays clear with 6/6 jamb, 3/3 lintel, and 3/3 threshold hits; one exact double-gate anchor; 50/50 density placements, 12 enterable placements, 108/108 building-body apertures, 36/36 structural probes, 108/108 full-scene apertures, and 12/12 opaque liners; read-only audit PASS |
+| `assets/models/jianghai_old_city/jianghai_old_city.glb` — current Chinese-district delivery | 63,204,100 | `33E2176E52D538123D45ABEEA61464EA8E7002854A2B1D47E5C5D560AD32D17E` | GLB round-trip PASS; 571 nodes/553 mesh nodes/263 unique meshes/450 primitives, 1,115,644 unique/3,056,190 instanced triangles, 96 materials, 139 textures/120 images, maximum image dimension 512; exactly one `JianghaiClanHallDoubleGateAnchor` with the measured transform and extras contract |
 | `assets/models/jianghai_old_city/rollershutter_window_03.glb` | 187,940 | `C4884AFCD7560E4BB23320A8C311DB0011504F7C5FEE30D58C266D54F7C6B166` | `scripts/blender/export_jianghai_old_city.py` selects the packed scene's adapted `JianghaiArtPass_EastShutter00` mesh, normalizes a temporary copy, and exports its PBR geometry and materials; the derivative remains tracked but no longer supplies the current Jianghai interactive-door visuals |
 
 This retained derivative preserves the Rollershutter Window 03 provenance and
@@ -386,7 +411,11 @@ replacement, the explicit 50-placement density table, six west/east
 `Edge04`-`Edge06` placements, and eight west/east `Infill05`-`Infill08`
 placements, rejects both retired building sources plus legacy
 pawnshop boards and zero-thickness walls, validates the authored canopy and
-wings, then exports it
+wings, and delegates the exact portal/facade contracts to
+`scripts/blender/jianghai_clan_hall_portal.py` and
+`scripts/blender/jianghai_retired_facades.py`. Those focused modules make the
+56-island clan-hall edit, single-anchor authoring, and 35-object overlay
+retirement idempotent, then the exporter writes the packed source and exports it
 to:
 
 - `assets/models/jianghai_old_city/jianghai_old_city.glb`
@@ -413,8 +442,10 @@ The earlier delivered Poly Haven bundles remain in the external cache as 1K glTF
 are packed into the authoritative `.blend` and then exported inside the runtime
 GLB; the repository does not need the external raw bundles to reproduce an
 export of the saved scene. The Modular Urban Apartments Facade is included in
-that delivered set as 36 adapted facade objects. Those earlier delivered inputs
-are CC0. The valley's separate private cache retains the Coast Line 01 2K glTF
+that verified input set, but its former 36-object overlay composition is
+historical: the exact 17 EastPhoto and 18 WestClock photographed planes are
+retired from the current delivery, while the 16 modeled pawnshop wing modules
+remain. Those earlier delivered inputs are CC0. The valley's separate private cache retains the Coast Line 01 2K glTF
 bundle, the selected Rocky Terrain and Gravel Floor 03 maps, the Hero Mountain
 original-format download/evidence chain and selected build inputs, and the three
 evaluated-only cliff bundles. The delivered valley contains adapted CC0 content
@@ -456,7 +487,7 @@ scene contains no font datablocks, armatures, linked-library objects, or
 forbidden acquisition-source scaffolding; inspection of the exported GLB JSON
 found no Noto font entry.
 
-The same audit now records eight required runtime anchors:
+That historical audit records eight then-required runtime anchors:
 `AuthoredStreetNetwork`, `JianghaiTenementDistrict`,
 `RedStarElectronicsFactory`, `GuangchangPawnshop`, `OldCityMarketBridge`,
 `GrandHotelSecurityTerminalVisual`, and
@@ -558,11 +589,25 @@ The historical counting scopes intentionally differ: Blender's source count foll
 saved mesh objects and unique datablocks, while dependency-graph, export, and
 runtime counts follow resolved instances.
 
-### Current Chinese-district runtime evidence
+### Current post-portal Chinese-district runtime evidence
 
-The current `3A854DD9...` GLB was explicitly reimported after the 2026-08-30
-infill and enterable-interior expansion. Runtime and capture diagnostics
-report:
+After explicit import of the current `33E2176E...` GLB, Godot reports 553
+authored meshes, 1,382 surfaces, and 3,056,190 authored instance triangles.
+The map loader's established required-anchor set passes 8/8; the additional DCC
+anchor is independently resolved as the clan-hall gate contract. Runtime
+batching groups 272 safe source meshes into 69 spatial batches and batches zero
+enterable sources. Gameplay collision maps 119 authored source meshes to 383
+authored box shapes; the main collision body contains 490 boxes and the 29
+landmark boxes bring the total to 519, with zero concave shapes. Door mapping
+is 12 single-leaf residence doors plus one logical clan-hall double gate using
+two composite leaves, for 14 Chinese-lattice visual instances.
+
+### Historical pre-portal Chinese-district runtime evidence
+
+The superseded `3A854DD9...` GLB was explicitly reimported after the 2026-08-30
+infill and enterable-interior expansion but before the clan-hall portal and
+35-object facade retirement. These counts are historical and do not describe
+the current `33E2176E...` GLB. Runtime and capture diagnostics reported:
 
 | Audit layer | Verified result |
 | --- | --- |

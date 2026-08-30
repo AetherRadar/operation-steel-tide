@@ -329,6 +329,12 @@ ENTRY_FACADE_LAYOUT = (
     ("PawnshopEntryFacade", "GuangchangPawnshop", -86.0, 112.0),
     ("FactoryEntryFacade", "RedStarElectronicsFactory", 86.0, 7.86),
 )
+from jianghai_clan_hall_portal import (
+    author_clan_hall_gate_portal,
+    validate_clan_hall_gate_glb,
+    validate_clan_hall_gate_portal,
+)
+from jianghai_retired_facades import remove_retired_facade_overlays
 
 
 def tune_runtime_emissions() -> int:
@@ -3001,6 +3007,9 @@ def main() -> None:
     tuned_materials = tune_runtime_materials()
     removed_floating_signs = remove_floating_market_signs()
     removed_retired_metadata = remove_retired_asset_metadata()
+    removed_facade_overlays = remove_retired_facade_overlays()
+    clan_hall_authored = author_clan_hall_gate_portal()
+    clan_hall_portal = validate_clan_hall_gate_portal()
     removed_factory_shells, rebuilt_factory_buildings = rebuild_factory_frontage()
     removed_cross_street_intrusions = clear_cross_street_intrusions()
     rebuilt_street_cadence = rebuild_street_cadence()
@@ -3037,6 +3046,7 @@ def main() -> None:
             export_extras=True,
         )
     glb_size = GLB_PATH.stat().st_size
+    clan_hall_glb_anchor = validate_clan_hall_gate_glb(GLB_PATH)
     if glb_size > MAX_RUNTIME_GLB_SIZE_BYTES:
         raise RuntimeError(
             f"Jianghai runtime GLB exceeds the public-repository budget: "
@@ -3054,6 +3064,21 @@ def main() -> None:
         f"tuned_emissions={tuned_emissions} tuned_materials={tuned_materials} "
         f"removed_floating_signs={removed_floating_signs} "
         f"removed_retired_metadata={removed_retired_metadata} flattened_udim={flattened} "
+        f"removed_facade_overlays={removed_facade_overlays} "
+        f"facade_overlay_contract={enterable.retired_overlay_count} "
+        f"clan_hall_removed={clan_hall_authored['removed_components']}:"
+        f"{clan_hall_authored['removed_vertices']}:"
+        f"{clan_hall_authored['removed_triangles']} "
+        f"clan_hall_portal={clan_hall_portal['static_components']}:"
+        f"aperture={clan_hall_portal['aperture_clear']}/9:"
+        f"jambs={clan_hall_portal['jamb_hits']}/6:"
+        f"lintel={clan_hall_portal['lintel_hits']}/3:"
+        f"threshold={clan_hall_portal['threshold_hits']}/3:"
+        f"anchor={clan_hall_portal['anchor_ready']}:"
+        f"prefix={clan_hall_portal['anchor_prefix_count']}/1 "
+        f"clan_hall_glb_anchor={clan_hall_glb_anchor['anchor_count']}:"
+        f"prefix={clan_hall_glb_anchor['anchor_prefix_count']}/1:"
+        f"transform={clan_hall_glb_anchor['transform_ready']} "
         f"removed_factory_shells={removed_factory_shells} "
         f"rebuilt_factory_buildings={rebuilt_factory_buildings} "
         f"removed_cross_street_intrusions={removed_cross_street_intrusions} "
@@ -3065,7 +3090,6 @@ def main() -> None:
         f"liner_closure={enterable.liner_closure_sample_count} "
         f"liner_entry={enterable.liner_entry_sample_count} "
         f"shared_enterable_mesh_pairs={enterable.shared_mesh_pair_count} "
-        f"removed_door_inserts={enterable.removed_insert_count} "
         f"adjusted_market_furniture={adjusted_market_furniture} "
         f"removed_density={removed_density} rebuilt_density={rebuilt_density} "
         f"density_profiles={','.join(f'{name}:{count}' for name, count in density_profile_counts.items())} "

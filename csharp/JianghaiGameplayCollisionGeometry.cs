@@ -314,6 +314,7 @@ internal static class JianghaiGameplayCollisionGeometry
             JianghaiSolidBuildingProfile.Hall => (0.735f, 0.706f, -0.250f),
             JianghaiSolidBuildingProfile.Shop => (0.776f, 0.523f, 0.0f),
             JianghaiSolidBuildingProfile.Gate => (0.773f, 0.688f, -0.425f),
+            JianghaiSolidBuildingProfile.Chimney => (1.0f, 1.0f, 0.0f),
             _ => throw new System.ArgumentOutOfRangeException(nameof(profile), profile, null)
         };
         return new JianghaiSolidBuildingGeometry(

@@ -32,9 +32,15 @@ plug. Each opening has a five-sided opaque DCC-authored liner sharing one small
 mesh and the existing brick material vocabulary, so a room cannot reveal the
 outside world through its walls. The rebuild is serialized in the authoritative
 `.blend` and exported to the runtime GLB; it is not runtime procedural geometry.
-The final correction removes only the obsolete
-`JianghaiExpansion_Facade_EastPhoto_F0_C1_Insert` that covered the East Photo
-House opening, while the adjacent `F0_C1_Wall` and `WestClock` objects remain.
+The final correction retires all 35 remaining photographic facade planes under
+the exact `JianghaiExpansion_Facade_EastPhoto_` (17 objects) and
+`JianghaiExpansion_Facade_WestClock_` (18 objects) prefixes. It does not touch
+the real `EastPhotoHouse` mesh doorway, the 16 `PawnshopAuthoredWing_` facade
+modules, road decals, or other legitimate thin authored details. The
+`GuangchangClanHall` source mesh also loses only its measured baked static gate
+assembly: 56 disconnected leaf/seam/hardware islands, 425 vertices, and 323
+triangles. Its authored jambs, arched lintel, and threshold remain around a
+3.687810-by-4.028527-meter opening.
 
 The source mapping is:
 
@@ -72,23 +78,49 @@ The authoritative outputs and representative player-scale review renders are:
 - `previews/13_chinese_avenue.png`
 - `previews/14_chinese_old_city_overview.png`
 
-The final packed `.blend` is 52,970,996 bytes with SHA-256
-`F4E5978182B744BD16741F298DC491F774EBF6E901B25D0890C292A97FA0B09D`.
-It contains 621 objects / 525 mesh objects, 210 unique mesh datablocks,
-3,123,494 mesh-object triangles, 1,113,692 triangles counted once per unique
-mesh, and resolves to 588 evaluated mesh objects / 3,152,420 evaluated instance
-triangles. The final GLB is 63,926,136 bytes with SHA-256
-`3A854DD94132775F008990D908BE32D4B25E72E45C4094E8F6D8167AE633DE8D`.
-Its Blender round-trip audit reports 605 total nodes, 588 mesh nodes, 273 unique
-meshes, 469 primitives, and 1,142,508 unique / 3,151,080 instanced triangles,
-with 97 materials, 142 textures, 120 images, and a 512-pixel maximum image
+The final packed `.blend` is 52,107,580 bytes with SHA-256
+`DA1907CE44D694960BB959460B6339C3796D31D76CB5111048DEDDD199D918CE`.
+It contains 587 objects / 490 mesh objects, 200 unique mesh datablocks,
+3,028,604 mesh-object triangles, 1,086,828 triangles counted once per unique
+mesh, and resolves to 553 evaluated mesh objects / 3,057,530 evaluated instance
+triangles. The final GLB is 63,204,100 bytes with SHA-256
+`33E2176E52D538123D45ABEEA61464EA8E7002854A2B1D47E5C5D560AD32D17E`.
+Its JSON audit reports 571 total nodes, 553 mesh nodes, 263 unique meshes, 450
+primitives, and 1,115,644 unique / 3,056,190 instanced triangles, with 96
+materials, 139 textures, 120 images, and a 512-pixel maximum image
 dimension. The authoritative scene audit passes with all 50 density placements
 marked for lightweight gameplay-proxy coverage, 12 enterable residences,
 108/108 building-body doorway samples, 36/36 structural wall/lintel samples,
 108/108 full-scene doorway samples, 12/12 opaque interior liners, zero density
-intersections, and zero visible retired-building instances. A negative
-regression fixture proves the full-scene gate catches a 0.404-meter facade
-obstruction.
+intersections, zero retired photographed facade objects, and zero visible
+retired-building instances. The clan-hall audit additionally proves 0 residual
+static gate islands, 9/9 open passage rays, 6/6 jamb rays, 3/3 lintel rays, and
+3/3 retained-threshold rays. A negative regression fixture proves the
+full-scene residence gate catches a 0.404-meter facade obstruction.
+
+Against the immediately preceding `F4E59781...` / `3A854DD9...` artifact, the
+correction changes the saved scene by -34 total objects (35 mesh overlays
+retired, one Empty anchor added), -35 mesh objects, -94,890 mesh-object and
+evaluated instance triangles, and -26,864 unique triangles. The GLB changes by
+-34 nodes, -35 mesh nodes, -10 unique meshes, -19 primitives, -94,890 instanced
+triangles, and -26,864 unique triangles. These deltas include both the 35
+overlay objects and the 323-triangle gate-island edit.
+
+`JianghaiClanHallDoubleGateAnchor` is the sole authored Empty for the new
+double-hinged gate. Its Blender floor-centre world position is
+`(-86.001892, 122.576271, 1.278776)`; Y-up glTF/Godot imports it at
+`(-86.001892, 1.278776, -122.576271)` with identity basis. In Godot, local
+`+X` spans the opening, `+Y` is up, and `+Z` points outward toward the south
+street (Blender `-Y`). Exported extras lock `gate_width_m=3.6878103066`,
+`gate_height_m=4.0285267088`, `gate_floor_y_m=1.2787764072`, and
+`gate_outward_axis=+Z`. Re-running the exporter records zero additional
+removals and repeats the complete source/GLB anchor and passage audit.
+
+Runtime uses 14 instances of the finished Chinese-lattice composite visual:
+12 single-leaf residence doors plus two independently hinged leaves forming one
+logical clan-hall double gate. The two existing Kenney-only pawnshop/factory
+personnel doors are separate and are not included in that 14-instance lattice
+count.
 
 ## Authoritative source and provenance inputs
 
@@ -277,9 +309,12 @@ It is not packed into the authoritative `.blend` or embedded in the map GLB.
 The current `JianghaiOldCityAtmosphere` uses a procedural sky and does not load
 this panorama.
 
-The Poly Haven **Modular Urban Apartments Facade** is a delivered source.
-Thirty-six adapted facade objects form two asymmetrical 3-by-3 overlays on the
-west and east tenements in the authoritative `.blend` and runtime GLB.
+The Poly Haven **Modular Urban Apartments Facade** remains a delivered source
+through the 16 solid/insert `PawnshopAuthoredWing_` modules and their packed
+materials. Its former 36-object east/west photographic overlay composition is
+historical: one East Photo insert was retired with the doorway pass, and the
+final DCC cleanup retires the remaining 35 overlay objects. None of those two
+exact overlay prefixes occurs in the authoritative `.blend` or runtime GLB.
 
 The Guangchang pawnshop gate uses 15 retained modeled components from
 VVayToyek's CC0 **Chinese Four-corner Pavilion - Free**. Blender reshapes its
@@ -367,11 +402,16 @@ blender --background source_art/world/jianghai_old_city/jianghai_old_city.blend 
 ```
 
 The export script verifies that the authoritative scene is open, removes the
-documented obsolete signs and retired asset metadata, validates the 66-anchor
-Chinese-profile replacement and the 50-placement density table, validates the
-authored pawnshop canopy and wings, and applies runtime material tuning, then
-flattens any remaining tiled images, rebuilds the two ten-piece Quaternius entry
-facades, caps the longest runtime-texture dimension at 512
+documented obsolete signs, retired asset metadata, and the exact 35-object
+photographic-facade retirement set. The focused
+`scripts/blender/jianghai_clan_hall_portal.py` helper removes or validates the
+56-island baked gate contract and authors the sole Empty anchor; the focused
+`scripts/blender/jianghai_retired_facades.py` helper owns the two exact overlay
+prefixes. The export then validates the 66-anchor Chinese-profile replacement,
+the 50-placement density table, authored pawnshop canopy/wings, 9/9 clan-hall
+passage probes, retained jamb/lintel/threshold probes, and raw GLB/Godot anchor
+transform. It applies runtime material tuning, flattens tiled images, rebuilds
+the two ten-piece Quaternius entry facades, caps runtime textures at 512
 pixels, recompresses eligible high-resolution runtime images as JPEG quality
 90, rejects non-built-in font datablocks, packs external data, saves the
 `.blend`, and exports:
@@ -524,25 +564,32 @@ Chinese Temple 2 composite doors described above.
 
 Godot now builds a deliberately lightweight gameplay-collision layer instead of
 turning millions of authored render triangles into physics geometry. The current
-map represents 115 authored collider sources plus 96 placement fragments with
-486 lightweight gameplay boxes and 20 landmark facade/traversal boxes, 506 total
-on world layer 1. It creates zero concave shapes. Deterministic probes verify
-visible walls, all 14 closed/open door routes, market deck/rails, the central
-rooftop path, ballistic cover, 14 route probes, and all 12 Epic/Legendary
-high-value-loot routes. Twelve enterable furnished rooms contain 12 Chinese
-doors, 48 finished Kenney furniture props / 95 authored mesh nodes, 12 searchable
-loot placements, and four added residents, bringing the map total to eight
-residents. Twelve bidirectional door links let squad AI open and traverse every
-required room route.
+contract maps 119 authored source meshes to 383 authored box shapes. The main
+gameplay-collision body contains 490 boxes; 29 landmark facade/traversal boxes
+bring the world-layer-1 total to 519, with zero concave shapes. Twelve enterable
+furnished rooms retain 12 single-leaf Chinese-lattice doors, 48 finished Kenney
+furniture props / 95 authored mesh nodes, 12 searchable loot placements, four
+added residents, and 12 bidirectional squad door links. The clan hall adds one
+logical double-hinged door using two further lattice visual instances.
 
-The current runtime batches 292 safe repeated source meshes into 78 spatial
-`MultiMesh` batches. Structural diagnostics retain the layer-zero originals;
-production and capture builds release 290 leaves after collision, doors,
-interiors, loot, and AI links have been registered, retaining only the two
-enterable source nodes still referenced by room records. The latest explicit
-Godot reimport and runtime checks report:
+The explicit post-import runtime diagnostics for the current `33E2176E...` GLB
+report:
 
-| Current runtime layer | Verified result |
+| Current post-portal runtime layer | Verified result |
+| --- | --- |
+| Authored-map import | 553 authored meshes; 1,382 surfaces; 3,056,190 authored instance triangles; 8/8 loader-required anchors. The ninth DCC anchor is the separately validated and consumed clan-hall gate contract |
+| Render batching | 272 safe source meshes represented by 69 spatial `MultiMesh` batches; zero enterable source meshes are batched |
+| Gameplay collision | 119 authored source meshes / 383 authored box shapes; 490 gameplay boxes plus 29 landmark boxes, 519 total; zero concave shapes |
+| Door visuals | 12 single-leaf residence doors plus one logical clan-hall double gate with two leaves; 14 Chinese-lattice visual instances total |
+
+The table below is the superseded pre-portal runtime baseline for the earlier
+`3A854DD9...` GLB. It is retained only for comparison and must not be read as
+the current import/batching count after the 35-node facade retirement and ninth
+authored anchor. Current DCC and serialized-GLB counts are recorded above;
+current runtime counts are recorded in the immediately preceding table from the
+post-import diagnostics.
+
+| Historical pre-portal runtime layer | Verified result |
 | --- | --- |
 | Authored-map import | 588 authored meshes; 1,450 material-backed surfaces; 3,151,080 authored instance triangles; all eight required anchors |
 | Runtime scene budget | Detailed structural diagnostics: 1,895 nodes, 76 static bodies, and 799 mesh instances against an 820 budget; production source release: 1,605 nodes and 509 mesh instances; 26 lights, 48 loot placements, and 33 garrison actors |

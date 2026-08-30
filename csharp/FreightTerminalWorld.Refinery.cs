@@ -58,6 +58,13 @@ public partial class FreightTerminalWorld
         {
             _jianghaiGameplayCollisionError = exception.Message;
             GD.PrintErr($"REFINERY_GAMEPLAY_COLLISION_ERROR {_jianghaiGameplayCollisionError}");
+            if (!_diagnosticSceneLoadFallbackAllowed)
+            {
+                throw new InvalidOperationException(
+                    "The authored Jianghai gameplay-collision contract failed. "
+                    + "Normal play cannot continue with placement-only collision.",
+                    exception);
+            }
             try
             {
                 _jianghaiGameplayCollision = _jianghaiCollisionBuilder.BuildPlacementFallback(
@@ -85,7 +92,10 @@ public partial class FreightTerminalWorld
             new Vector3(MapWidthMeters, 1, MapDepthMeters));
         BuildOldTownPerimeter();
         BuildRefineryModelAssembly();
-        _oldTownLandmarks = _oldTownLandmarksBuilder.BuildGameplayScaffolding(_levelRoot);
+        _oldTownLandmarks = _oldTownLandmarksBuilder.BuildGameplayScaffolding(
+            _levelRoot,
+            _jianghaiOldCityScene?.Root,
+            _diagnosticSceneLoadFallbackAllowed);
         BuildOldTownLandmarkDoors(_levelRoot, _oldTownLandmarks);
         BuildJianghaiResidentialInteriors();
         SpawnOldTownInteriorResidents();
