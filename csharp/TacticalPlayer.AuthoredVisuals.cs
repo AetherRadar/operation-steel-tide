@@ -17,8 +17,14 @@ public partial class TacticalPlayer
     private const float AuthoredLargeSidearmArmPitchRadians = 0.80f;
     private const float AnimatedScarReloadArmPresentationScale = 0.80f;
     private const float AnimatedAwmReloadArmPresentationScale = 0.75f;
-    private const float AnimatedSidearmReloadArmPresentationScale = 0.70f;
-    private const float AnimatedLargeSidearmReloadArmPresentationScale = 0.56f;
+    // A single uniform sidearm fit keeps the DCC sleeve tails beyond the frame
+    // bottom while both palms remain on their physical weapon/magazine contacts.
+    // Scaling individual bones instead would distort the forearm and reintroduce
+    // the near-plane sleeve sheet seen in the original reload presentation.
+    private const float AnimatedSidearmReloadArmPresentationScale = 0.76f;
+    private const float AnimatedSidearmReloadArmPitchRadians = 0.30f;
+    private const float AnimatedLargeSidearmReloadArmPresentationScale = 0.76f;
+    private const float AnimatedLargeSidearmReloadArmPitchRadians = 0.30f;
     private const float SidearmBottomScreenBandStartRatio = 0.96f;
     private const float MaxAuthoredPalmSurfaceGap = 0.018f;
     internal const float MaxServicePistolSupportArmCorrection = 0.03f;
@@ -1087,6 +1093,17 @@ public partial class TacticalPlayer
         => ReloadSupportTargetGlobal();
 
     private Vector3 ReloadSupportTargetGlobal()
+    {
+        var requestedTarget = RawReloadSupportTargetGlobal();
+        var animatedArms = AnimatedReloadArmsForDiagnostics;
+        return _isReloading
+            && UsesAnimatedReloadArmsForDiagnostics
+            && animatedArms is not null
+                ? animatedArms.ReachableLeftPalmTarget(requestedTarget)
+                : requestedTarget;
+    }
+
+    private Vector3 RawReloadSupportTargetGlobal()
     {
         var supportHome = IsInstanceValid(_weaponRoot)
             ? _weaponRoot.GlobalTransform

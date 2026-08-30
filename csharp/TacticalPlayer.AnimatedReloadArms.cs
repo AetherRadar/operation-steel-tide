@@ -19,6 +19,28 @@ public partial class TacticalPlayer
             && IsInstanceValid(_authoredAnimatedReloadArms?.Root)
             && _authoredAnimatedReloadArms.Root.IsVisibleInTree();
 
+    internal AnimatedReloadLeftArmPoseInspection
+        InspectAnimatedReloadLeftArmPoseForDiagnostics()
+    {
+        var arms = AnimatedReloadArmsForDiagnostics;
+        if (!UsesAnimatedReloadArmsForDiagnostics || arms is null)
+        {
+            return default;
+        }
+
+        var weaponRootInverse = _weaponRoot.GlobalTransform.AffineInverse();
+        Transform3D BoneInWeaponRoot(int bone)
+            => weaponRootInverse
+                * (arms.Skeleton.GlobalTransform
+                    * arms.Skeleton.GetBoneGlobalPose(bone));
+        return new AnimatedReloadLeftArmPoseInspection(
+            true,
+            BoneInWeaponRoot(arms.LeftShoulderBone),
+            BoneInWeaponRoot(arms.LeftElbowBone),
+            BoneInWeaponRoot(arms.LeftWristBone),
+            BoneInWeaponRoot(arms.LeftPalmBone));
+    }
+
     private void EnsureAuthoredAnimatedReloadArms()
     {
         if (_animatedReloadArmsLoadAttempted
@@ -73,7 +95,9 @@ public partial class TacticalPlayer
             EquippedWeapon.Platform,
             _reloadStartedEmpty,
             ReloadProgress);
-        animatedReloadArms.RetargetLeftPalm(ReloadSupportTargetGlobal());
+        animatedReloadArms.RetargetLeftPalm(
+            EquippedWeapon.Platform,
+            ReloadSupportTargetGlobal());
         return true;
     }
 
@@ -102,8 +126,8 @@ public partial class TacticalPlayer
         if (sidearm)
         {
             var pitch = largeSidearm
-                ? AuthoredLargeSidearmArmPitchRadians
-                : AuthoredSidearmArmPitchRadians;
+                ? AnimatedLargeSidearmReloadArmPitchRadians
+                : AnimatedSidearmReloadArmPitchRadians;
             presentationBasis = new Basis(Vector3.Right, pitch) * presentationBasis;
         }
 
@@ -138,3 +162,10 @@ public partial class TacticalPlayer
         }
     }
 }
+
+internal readonly record struct AnimatedReloadLeftArmPoseInspection(
+    bool Available,
+    Transform3D Shoulder,
+    Transform3D Elbow,
+    Transform3D Wrist,
+    Transform3D Palm);

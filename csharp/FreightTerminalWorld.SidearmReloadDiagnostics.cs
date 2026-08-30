@@ -5,6 +5,12 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
+    private const float SidearmReloadMaximumBoneStepRadians = 0.65f;
+    private const float SidearmReloadMaximumJointStepMeters = 0.21f;
+    private const float SidearmReloadMaximumPalmStepMeters = 0.15f;
+    private const int SidearmReloadMinimumContinuityFrames = 100;
+    private const int SidearmReloadMaximumContinuityFrames = 180;
+
     private async void ValidateSidearmReloadDiagnostics()
     {
         var window = GetWindow();
@@ -72,6 +78,7 @@ public partial class FreightTerminalWorld
             var extractionReadable = true;
             var actionReadable = true;
             var bodyContinuous = true;
+            var animationContinuous = true;
             var samplesValid = true;
             var maximumGripResidual = 0.0f;
             var maximumSupportDistance = 0.0f;
@@ -198,6 +205,112 @@ public partial class FreightTerminalWorld
                 }
             }
 
+            foreach (var emptyReload in new[] { false, true })
+            {
+                _player.SetReloadPoseForDiagnostics(0.0f, emptyReload);
+                var previousPose = _player
+                    .InspectAnimatedReloadLeftArmPoseForDiagnostics();
+                var maximumShoulderStep = 0.0f;
+                var maximumElbowStep = 0.0f;
+                var maximumWristStep = 0.0f;
+                var maximumPalmStep = 0.0f;
+                var maximumElbowPositionStep = 0.0f;
+                var maximumWristPositionStep = 0.0f;
+                var maximumPalmPositionStep = 0.0f;
+                var maximumStepProgress = 0.0f;
+                var continuityFrames = 0;
+                var continuitySamples = 0;
+                var poseUnavailableWhileReloading = !previousPose.Available;
+                while (_player.IsReloading
+                    && continuityFrames < SidearmReloadMaximumContinuityFrames)
+                {
+                    continuityFrames++;
+                    _player.AdvanceVehicleReloadPresentationForDiagnostics(
+                        1.0f / 60.0f);
+                    var currentPose = _player
+                        .InspectAnimatedReloadLeftArmPoseForDiagnostics();
+                    if (!previousPose.Available || !currentPose.Available)
+                    {
+                        poseUnavailableWhileReloading |= _player.IsReloading;
+                        previousPose = currentPose;
+                        continue;
+                    }
+
+                    var shoulderStep = SidearmBoneBasisStep(
+                        previousPose.Shoulder.Basis,
+                        currentPose.Shoulder.Basis);
+                    var elbowStep = SidearmBoneBasisStep(
+                        previousPose.Elbow.Basis,
+                        currentPose.Elbow.Basis);
+                    var wristStep = SidearmBoneBasisStep(
+                        previousPose.Wrist.Basis,
+                        currentPose.Wrist.Basis);
+                    var palmStep = SidearmBoneBasisStep(
+                        previousPose.Palm.Basis,
+                        currentPose.Palm.Basis);
+                    var elbowPositionStep = previousPose.Elbow.Origin.DistanceTo(
+                        currentPose.Elbow.Origin);
+                    var wristPositionStep = previousPose.Wrist.Origin.DistanceTo(
+                        currentPose.Wrist.Origin);
+                    var palmPositionStep = previousPose.Palm.Origin.DistanceTo(
+                        currentPose.Palm.Origin);
+                    var largestBasisStep = Mathf.Max(
+                        Mathf.Max(shoulderStep, elbowStep),
+                        Mathf.Max(wristStep, palmStep));
+                    if (largestBasisStep > Mathf.Max(
+                            Mathf.Max(maximumShoulderStep, maximumElbowStep),
+                            Mathf.Max(maximumWristStep, maximumPalmStep)))
+                    {
+                        maximumStepProgress = _player.ReloadProgress;
+                    }
+                    maximumShoulderStep = Mathf.Max(
+                        maximumShoulderStep,
+                        shoulderStep);
+                    maximumElbowStep = Mathf.Max(maximumElbowStep, elbowStep);
+                    maximumWristStep = Mathf.Max(maximumWristStep, wristStep);
+                    maximumPalmStep = Mathf.Max(maximumPalmStep, palmStep);
+                    maximumElbowPositionStep = Mathf.Max(
+                        maximumElbowPositionStep,
+                        elbowPositionStep);
+                    maximumWristPositionStep = Mathf.Max(
+                        maximumWristPositionStep,
+                        wristPositionStep);
+                    maximumPalmPositionStep = Mathf.Max(
+                        maximumPalmPositionStep,
+                        palmPositionStep);
+                    previousPose = currentPose;
+                    continuitySamples++;
+                }
+                var maximumBasisStep = Mathf.Max(
+                    Mathf.Max(maximumShoulderStep, maximumElbowStep),
+                    Mathf.Max(maximumWristStep, maximumPalmStep));
+                var maximumJointPositionStep = Mathf.Max(
+                    maximumElbowPositionStep,
+                    maximumWristPositionStep);
+                var continuityValid = !poseUnavailableWhileReloading
+                    && !_player.IsReloading
+                    && continuitySamples >= SidearmReloadMinimumContinuityFrames
+                    && maximumBasisStep
+                        <= SidearmReloadMaximumBoneStepRadians
+                    && maximumJointPositionStep
+                        <= SidearmReloadMaximumJointStepMeters
+                    && maximumPalmPositionStep
+                        <= SidearmReloadMaximumPalmStepMeters;
+                animationContinuous &= continuityValid;
+                GD.Print(
+                    $"SIDEARM_RELOAD_CONTINUITY platform={platform} "
+                    + $"variant={(emptyReload ? "empty" : "tactical")} "
+                    + $"valid={continuityValid} frames={continuityFrames} "
+                    + $"samples={continuitySamples} progress={maximumStepProgress:F4} "
+                    + $"shoulder_basis_step={maximumShoulderStep:F6} "
+                    + $"elbow_basis_step={maximumElbowStep:F6} "
+                    + $"wrist_basis_step={maximumWristStep:F6} "
+                    + $"palm_basis_step={maximumPalmStep:F6} "
+                    + $"elbow_position_step={maximumElbowPositionStep:F6} "
+                    + $"wrist_position_step={maximumWristPositionStep:F6} "
+                    + $"palm_position_step={maximumPalmPositionStep:F6}");
+            }
+
             _player.ProcessMode = ProcessModeEnum.Inherit;
             _player.ClearReloadPoseForDiagnostics();
             _player.SetAmmoGradeForDiagnostics(LootGrade.Common, magazineSize * 2);
@@ -221,6 +334,7 @@ public partial class FreightTerminalWorld
                 && extractionReadable
                 && insertionReadable
                 && actionReadable
+                && animationContinuous
                 && ammoCompleted;
             valid &= platformValid;
             results.Add(
@@ -229,6 +343,7 @@ public partial class FreightTerminalWorld
                 + $"support_tracks={supportTracks} visible_motion={visibleMotion} "
                 + $"view_motion={viewMotion} mechanism_stages={mechanismStages} "
                 + $"samples={samplesValid} body_continuous={bodyContinuous} "
+                + $"animation_continuous={animationContinuous} "
                 + $"extract_screen={extractionReadable} "
                 + $"insert_screen={insertionReadable} "
                 + $"action_screen={actionReadable} "
@@ -262,5 +377,10 @@ public partial class FreightTerminalWorld
         }
         return false;
     }
+
+    private static float SidearmBoneBasisStep(Basis previous, Basis current)
+        => previous.Orthonormalized()
+            .GetRotationQuaternion()
+            .AngleTo(current.Orthonormalized().GetRotationQuaternion());
 
 }

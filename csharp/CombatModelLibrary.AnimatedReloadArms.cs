@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace OperationSteelTide;
@@ -7,6 +8,7 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
 {
     private Vector3 _leftPalmContactInBone;
     private Vector3 _rightPalmContactInBone;
+    private readonly Dictionary<WeaponPlatform, Node3D> _leftElbowPoleFrames = new();
     private bool _contactPointsInitialized;
 
     public AuthoredAnimatedReloadArmsVisual(Node3D root)
@@ -28,6 +30,17 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
         LeftWristBone = Skeleton.FindBone("L_wrist_03");
         LeftPalmBone = Skeleton.FindBone("L_palm_015");
         RightPalmBone = Skeleton.FindBone("R_palm_039");
+        foreach (var platform in Enum.GetValues<WeaponPlatform>())
+        {
+            if (platform == WeaponPlatform.M3A1)
+            {
+                continue;
+            }
+            var clipStem = FirstPersonReloadProfileCatalog.For(platform).ClipStem;
+            _leftElbowPoleFrames[platform] = CombatModelLibrary.RequireNode(
+                root,
+                $"{clipStem}_ElbowPoleFrame");
+        }
         ValidateContract();
     }
 
@@ -113,14 +126,18 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
         AnimationPlayer.Pause();
     }
 
-    public void RetargetLeftPalm(Vector3 targetGlobalPosition)
+    public void RetargetLeftPalm(
+        WeaponPlatform platform,
+        Vector3 targetGlobalPosition)
     {
+        targetGlobalPosition = ReachableLeftPalmTarget(targetGlobalPosition);
         EnsureContactPointsInitialized();
         var targetInSkeleton = Skeleton.GlobalTransform.AffineInverse()
             * targetGlobalPosition;
         var shoulder = Skeleton.GetBoneGlobalPose(LeftShoulderBone);
         var elbow = Skeleton.GetBoneGlobalPose(LeftElbowBone);
         var wrist = Skeleton.GetBoneGlobalPose(LeftWristBone);
+        var originalElbowBasis = elbow.Basis;
         var originalWristBasis = wrist.Basis;
         var contactInSkeleton = Skeleton.GlobalTransform.AffineInverse()
             * LeftPalmContactGlobalPosition;
@@ -140,6 +157,7 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
 
         var direction = shoulderToTarget.Normalized();
         var requestedDistance = shoulderToTarget.Length();
+        var solvedShoulderOrigin = shoulder.Origin;
         var minimumDistance = Mathf.Abs(proximalLength - distalLength) + 0.0001f;
         var maximumDistance = proximalLength + distalLength - 0.0001f;
         var solvedDistance = Mathf.Clamp(
@@ -155,56 +173,126 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
             0.0f,
             proximalLength * proximalLength
                 - projectedElbowDistance * projectedElbowDistance));
-        var currentElbowPlane = elbow.Origin
-            - (shoulder.Origin
-                + direction * (elbow.Origin - shoulder.Origin).Dot(direction));
-        if (currentElbowPlane.LengthSquared() <= 0.000001f)
+        // Sidearms use the exact DCC pole that baked their clips. Their compact
+        // target path crosses a nearly straight-chain singularity where a tiny
+        // sign change otherwise flips the complete arm. Long guns retain the
+        // continuously baked elbow plane; forcing their distant sidearm-style
+        // pole pulls the upper sleeve through the camera near plane.
+        var elbowDirection = WeaponCatalog.IsSidearm(platform)
+            ? AuthoredElbowPoleDirection(platform, solvedShoulderOrigin, direction)
+            : elbow.Origin
+                - (solvedShoulderOrigin
+                    + direction
+                        * (elbow.Origin - solvedShoulderOrigin).Dot(direction));
+        if (elbowDirection.LengthSquared() <= 0.000001f)
         {
-            currentElbowPlane = Vector3.Up.Cross(direction);
-            if (currentElbowPlane.LengthSquared() <= 0.000001f)
-            {
-                currentElbowPlane = Vector3.Right.Cross(direction);
-            }
+            elbowDirection = AuthoredElbowPoleDirection(
+                platform,
+                solvedShoulderOrigin,
+                direction);
         }
-        var elbowDirection = currentElbowPlane.Normalized();
-        var desiredElbow = shoulder.Origin
+        if (elbowDirection.LengthSquared() <= 0.000001f)
+        {
+            var fallbackPole = Mathf.Abs(direction.Dot(Vector3.Up)) < 0.85f
+                ? Vector3.Up
+                : Vector3.Right;
+            elbowDirection = fallbackPole
+                - direction * fallbackPole.Dot(direction);
+        }
+        elbowDirection = elbowDirection.Normalized();
+        var desiredElbow = solvedShoulderOrigin
             + direction * projectedElbowDistance
             + elbowDirection * elbowHeight;
-        var desiredWrist = shoulder.Origin + direction * solvedDistance;
+        // Both articulated segments remain at their authored length, and the
+        // shoulder stays at its DCC-authored origin. Translating a skinned
+        // shoulder to make up an unreachable target stretches the sleeve away
+        // from the torso and can pull a large triangle through the near plane.
+        var desiredWrist = solvedShoulderOrigin + direction * solvedDistance;
 
         var shoulderSwing = new Quaternion(
             proximal.Normalized(),
-            (desiredElbow - shoulder.Origin).Normalized());
+            (desiredElbow - solvedShoulderOrigin).Normalized());
         Skeleton.SetBoneGlobalPose(
             LeftShoulderBone,
             new Transform3D(
-                new Basis(shoulderSwing) * shoulder.Basis,
-                shoulder.Origin));
+                (new Basis(shoulderSwing) * shoulder.Basis).Orthonormalized(),
+                solvedShoulderOrigin));
         Skeleton.ForceUpdateBoneChildTransform(LeftShoulderBone);
 
         var solvedElbow = Skeleton.GetBoneGlobalPose(LeftElbowBone);
-        var solvedWrist = Skeleton.GetBoneGlobalPose(LeftWristBone);
-        var solvedDistal = solvedWrist.Origin - solvedElbow.Origin;
         var desiredDistal = desiredWrist - solvedElbow.Origin;
-        if (solvedDistal.LengthSquared() > 0.000001f
+        if (distal.LengthSquared() > 0.000001f
             && desiredDistal.LengthSquared() > 0.000001f)
         {
             var elbowSwing = new Quaternion(
-                solvedDistal.Normalized(),
+                distal.Normalized(),
                 desiredDistal.Normalized());
             Skeleton.SetBoneGlobalPose(
                 LeftElbowBone,
                 new Transform3D(
-                    new Basis(elbowSwing) * solvedElbow.Basis,
+                    (new Basis(elbowSwing) * originalElbowBasis).Orthonormalized(),
                     solvedElbow.Origin));
             Skeleton.ForceUpdateBoneChildTransform(LeftElbowBone);
         }
 
-        solvedWrist = Skeleton.GetBoneGlobalPose(LeftWristBone);
+        var solvedWrist = Skeleton.GetBoneGlobalPose(LeftWristBone);
         Skeleton.SetBoneGlobalPose(
             LeftWristBone,
-            new Transform3D(originalWristBasis, solvedWrist.Origin));
+            new Transform3D(
+                originalWristBasis.Orthonormalized(),
+                solvedWrist.Origin));
         Skeleton.ForceUpdateBoneChildTransform(LeftWristBone);
+    }
+
+    private Vector3 AuthoredElbowPoleDirection(
+        WeaponPlatform platform,
+        Vector3 shoulderOrigin,
+        Vector3 armDirection)
+    {
+        var poleInSkeleton = Skeleton.GlobalTransform.AffineInverse()
+            * _leftElbowPoleFrames[platform].GlobalPosition;
+        var poleDirection = poleInSkeleton - shoulderOrigin;
+        return poleDirection
+            - armDirection * poleDirection.Dot(armDirection);
+    }
+
+    public Vector3 ReachableLeftPalmTarget(Vector3 requestedGlobalPosition)
+    {
+        EnsureContactPointsInitialized();
+        var requestedInSkeleton = Skeleton.GlobalTransform.AffineInverse()
+            * requestedGlobalPosition;
+        var shoulder = Skeleton.GetBoneGlobalPose(LeftShoulderBone);
+        var elbow = Skeleton.GetBoneGlobalPose(LeftElbowBone);
+        var wrist = Skeleton.GetBoneGlobalPose(LeftWristBone);
+        var contactInSkeleton = Skeleton.GlobalTransform.AffineInverse()
+            * LeftPalmContactGlobalPosition;
+        var wristToContact = contactInSkeleton - wrist.Origin;
+        var requestedWrist = requestedInSkeleton - wristToContact;
+        var shoulderToWrist = requestedWrist - shoulder.Origin;
+        var proximalLength = elbow.Origin.DistanceTo(shoulder.Origin);
+        var distalLength = wrist.Origin.DistanceTo(elbow.Origin);
+        if (proximalLength <= 0.0001f
+            || distalLength <= 0.0001f
+            || shoulderToWrist.LengthSquared() <= 0.000001f)
+        {
+            return requestedGlobalPosition;
+        }
+
+        var requestedDistance = shoulderToWrist.Length();
+        var minimumDistance = Mathf.Abs(proximalLength - distalLength) + 0.0001f;
+        var maximumDistance = proximalLength + distalLength - 0.0001f;
+        var solvedDistance = Mathf.Clamp(
+            requestedDistance,
+            minimumDistance,
+            maximumDistance);
+        if (Mathf.IsEqualApprox(requestedDistance, solvedDistance))
+        {
+            return requestedGlobalPosition;
+        }
+
+        var solvedWrist = shoulder.Origin
+            + shoulderToWrist.Normalized() * solvedDistance;
+        return Skeleton.GlobalTransform * (solvedWrist + wristToContact);
     }
 
     private Vector3 ContactPointInBone(Node3D marker, int bone)
@@ -296,7 +384,13 @@ internal static partial class CombatModelLibrary
         "RightGripFrame", "SupportGripFrame",
         "LeftPalmFrame", "RightPalmFrame",
         "LeftWristFrame", "RightWristFrame",
-        "LeftShoulderFrame", "RightShoulderFrame"
+        "LeftShoulderFrame", "RightShoulderFrame",
+        "m4a1_ElbowPoleFrame", "ak74_ElbowPoleFrame",
+        "scarl_ElbowPoleFrame", "mp5a5_ElbowPoleFrame",
+        "m24_ElbowPoleFrame", "axmc_ElbowPoleFrame",
+        "awm_ElbowPoleFrame", "vss_ElbowPoleFrame",
+        "p226_ElbowPoleFrame", "m1911_ElbowPoleFrame",
+        "gsh18_ElbowPoleFrame", "desert_eagle_ElbowPoleFrame"
     };
 
     public static AuthoredAnimatedReloadArmsVisual InstantiateAnimatedReloadArms()

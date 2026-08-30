@@ -61,6 +61,8 @@ MIN_PALM_OFFSET_METERS = 0.075
 MAX_PALM_OFFSET_METERS = 0.115
 MIN_GRIP_CONTACT_METERS = 0.015
 MAX_GRIP_CONTACT_METERS = 0.035
+MAX_LEFT_BONE_STEP_RADIANS = 0.55
+MAX_LEFT_PALM_STEP_METERS = 0.25
 
 
 @dataclass(frozen=True)
@@ -336,8 +338,22 @@ def bake_clip(
     ik.pole_angle = math.radians(90.0)
     ik.chain_count = 3
     ik.iterations = 256
-    ik.use_rotation = True
+    # Let IK solve position only. Matching the control's rotation through the
+    # IK constraint made Blender distribute wrist twist through the complete
+    # chain; the sidearm poses then crossed a solver singularity and flipped
+    # the shoulder/elbow by roughly 160 degrees in one frame. A separate wrist
+    # constraint preserves the authored hand orientation without twisting the
+    # upper arm.
+    ik.use_rotation = False
     ik.use_stretch = False
+    wrist_rotation = armature.pose.bones["L_wrist_03"].constraints.new(
+        "COPY_ROTATION"
+    )
+    wrist_rotation.name = f"{clip_name}_LeftWristRotation"
+    wrist_rotation.target = target
+    wrist_rotation.target_space = "WORLD"
+    wrist_rotation.owner_space = "WORLD"
+    wrist_rotation.mix_mode = "REPLACE"
 
     action = bpy.data.actions.new(clip_name)
     armature.animation_data_create()
@@ -357,12 +373,17 @@ def bake_clip(
         clear_constraints=True,
         clear_parents=False,
         use_current_action=True,
-        clean_curves=True,
+        # Keep the full sampled quaternion sets until their signs are made
+        # hemisphere-continuous below. Cleaning component curves independently
+        # can remove different frames from W/X/Y/Z and makes safe quaternion
+        # normalization impossible.
+        clean_curves=False,
         bake_types={"POSE"},
     )
     bpy.ops.object.mode_set(mode="OBJECT")
     action.name = clip_name
     action.use_fake_user = True
+    make_baked_quaternions_continuous(action)
     armature.animation_data.action = None
     control_action = target.animation_data.action
     target.animation_data_clear()
@@ -370,6 +391,59 @@ def bake_clip(
     bpy.data.objects.remove(target, do_unlink=True)
     bpy.data.objects.remove(pole, do_unlink=True)
     return action
+
+
+def make_baked_quaternions_continuous(action: bpy.types.Action) -> None:
+    """Keep adjacent baked quaternion keys in the same hemisphere.
+
+    Blender matrices treat q and -q as the same orientation, but glTF LINEAR
+    interpolation crosses through zero when adjacent component keys use
+    opposite signs. Normalizing every left-chain track before export prevents
+    a visually identical 30 Hz bake from twitching between its keyframes.
+    """
+    for bone_name in LEFT_CHAIN:
+        data_path = f'pose.bones["{bone_name}"].rotation_quaternion'
+        curves = [
+            next(
+                (
+                    curve
+                    for curve in action.fcurves
+                    if curve.data_path == data_path
+                    and curve.array_index == component
+                ),
+                None,
+            )
+            for component in range(4)
+        ]
+        if any(curve is None for curve in curves):
+            raise RuntimeError(
+                f"Baked clip {action.name} is missing {bone_name} quaternion curves"
+            )
+        typed_curves = [curve for curve in curves if curve is not None]
+        key_count = len(typed_curves[0].keyframe_points)
+        if any(len(curve.keyframe_points) != key_count for curve in typed_curves):
+            raise RuntimeError(
+                f"Baked clip {action.name} has mismatched {bone_name} quaternion keys"
+            )
+        previous = None
+        for key_index in range(key_count):
+            current = Quaternion(
+                tuple(
+                    curve.keyframe_points[key_index].co[1]
+                    for curve in typed_curves
+                )
+            )
+            current.normalize()
+            if previous is not None and previous.dot(current) < 0.0:
+                for curve in typed_curves:
+                    key = curve.keyframe_points[key_index]
+                    key.co[1] = -key.co[1]
+                    key.handle_left[1] = -key.handle_left[1]
+                    key.handle_right[1] = -key.handle_right[1]
+                current.negate()
+            previous = current
+        for curve in typed_curves:
+            curve.update()
 
 
 def add_static_marker(root: bpy.types.Object, name: str, transform: Matrix) -> None:
@@ -420,10 +494,21 @@ def add_contract_markers(
         add_bone_marker(armature, name, bone_name, transform)
     add_static_marker(root, "RightGripFrame", weapon_grip)
     add_static_marker(root, "SupportGripFrame", left_contact)
+    for profile in PROFILES:
+        add_static_marker(
+            root,
+            f"{profile.name}_ElbowPoleFrame",
+            Matrix.Translation(Vector(profile.pole)),
+        )
 
 
 def rotation_error(left: Matrix, right: Matrix) -> float:
     return left.to_quaternion().rotation_difference(right.to_quaternion()).angle
+
+
+def shortest_rotation_error(left: Matrix, right: Matrix) -> float:
+    raw = rotation_error(left, right)
+    return min(raw, abs(math.tau - raw))
 
 
 def validate_contact_contract(
@@ -490,6 +575,7 @@ def validate_clip(armature: bpy.types.Object, action: bpy.types.Action) -> None:
     start, end = (round(value) for value in action.frame_range)
     scene = bpy.context.scene
     left_positions = []
+    left_chain_frames = []
     left_shoulders = []
     right_shoulders = []
     right_palms = []
@@ -498,6 +584,9 @@ def validate_clip(armature: bpy.types.Object, action: bpy.types.Action) -> None:
         scene.frame_set(frame)
         bpy.context.view_layer.update()
         left_positions.append(bpy.data.objects["LeftPalmFrame"].matrix_world.translation.copy())
+        left_chain_frames.append(
+            [bone_world_matrix(armature, bone_name) for bone_name in LEFT_CHAIN]
+        )
         left_shoulders.append(bone_world_matrix(armature, LEFT_SHOULDER).translation)
         right_shoulders.append(bone_world_matrix(armature, RIGHT_SHOULDER).translation)
         right_palms.append(bpy.data.objects["RightPalmFrame"].matrix_world.copy())
@@ -525,6 +614,17 @@ def validate_clip(armature: bpy.types.Object, action: bpy.types.Action) -> None:
         (right - left).length for left, right in zip(left_positions, left_positions[1:])
     ) * SOURCE_TO_METERS
     return_error = (left_positions[-1] - left_positions[0]).length * SOURCE_TO_METERS
+    maximum_left_palm_step = max(
+        (right - left).length
+        for left, right in zip(left_positions, left_positions[1:])
+    ) * SOURCE_TO_METERS
+    maximum_left_bone_steps = [
+        max(
+            shortest_rotation_error(left[index], right[index])
+            for left, right in zip(left_chain_frames, left_chain_frames[1:])
+        )
+        for index in range(len(LEFT_CHAIN))
+    ]
     duration = (end - start) / FPS
     valid = (
         shoulder_drift <= MAX_FIXED_DRIFT_METERS
@@ -534,6 +634,8 @@ def validate_clip(armature: bpy.types.Object, action: bpy.types.Action) -> None:
         and right_grip_relation_angle <= MAX_FIXED_ROTATION_RADIANS
         and MIN_HAND_TRAVEL_METERS <= left_travel <= MAX_HAND_TRAVEL_METERS
         and return_error <= MAX_RETURN_ERROR_METERS
+        and maximum_left_palm_step <= MAX_LEFT_PALM_STEP_METERS
+        and max(maximum_left_bone_steps) <= MAX_LEFT_BONE_STEP_RADIANS
         and 1.70 <= duration <= 2.20
     )
     print(
@@ -547,6 +649,8 @@ def validate_clip(armature: bpy.types.Object, action: bpy.types.Action) -> None:
         f" grip_relation_angle_max={right_grip_relation_angle:.6f}"
         f" left_palm_travel={left_travel:.4f}"
         f" return_error={return_error:.6f}"
+        f" left_palm_step={maximum_left_palm_step:.6f}"
+        f" left_bone_steps={'/'.join(f'{value:.6f}' for value in maximum_left_bone_steps)}"
         f" valid={valid}"
     )
     if not valid:
@@ -604,6 +708,7 @@ def validate_export(actions: list[bpy.types.Action], expected_triangles: int) ->
         "WeaponRoot", "ReloadArmsSkeleton", "ReloadArmsMesh",
         "LeftPalmFrame", "RightPalmFrame", "LeftWristFrame", "RightWristFrame",
         "LeftShoulderFrame", "RightShoulderFrame", "RightGripFrame", "SupportGripFrame",
+        *(f"{profile.name}_ElbowPoleFrame" for profile in PROFILES),
     }
     valid = (
         magic == b"glTF" and version == 2 and chunk_type == 0x4E4F534A

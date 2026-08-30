@@ -344,7 +344,10 @@ public partial class FreightTerminalWorld
             + $"preview_success_transfer={previewOwnership.SuccessOwnershipTransferred}/"
             + $"{previewOwnership.CallerCleanupReleasesTree}");
         GD.Print($"COMBAT_MODELS_PASS valid={valid}");
-        QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
+        // This audit owns several temporary sub-viewports and large DCC scenes.
+        // Waiting synchronously for every managed Godot finalizer can deadlock
+        // diagnostic shutdown after PASS; the process exit releases them safely.
+        GetTree().Quit(valid ? 0 : 2);
     }
 
     private async System.Threading.Tasks.Task<bool> CaptureAuthoredWeaponLineup()

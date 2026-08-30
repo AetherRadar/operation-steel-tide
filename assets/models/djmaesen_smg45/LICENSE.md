@@ -24,6 +24,7 @@ The runtime models in this directory are adapted from **fps animated smg** by
   `source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend`
 - Static pose variants generated: 2026-08-24
 - Animated reload-arm derivative generated: 2026-08-29
+- Animated left-arm IK continuity and elbow-pole revision: 2026-08-30
 - Animated first-person sleeve fit and upper-arm volume revised: 2026-08-28
 - Service-pistol support-arm pose revised in Blender: 2026-08-28
 - First-person weapon uniformly enlarged around the authored two-hand grip center: 2026-08-28
@@ -62,6 +63,12 @@ surface is baked as the new bind pose, and 24 named tactical/empty reload clips
 cover M4A1, AK74, SCAR-L, MP5A5, M24, AXMC, AWM, VSS, P226, M1911, GSh-18, and
 Desert Eagle. Its palm markers use evaluated glove contact centers, while
 `RightGripFrame` preserves the source SMG's real primary-grip transform. No
-procedural replacement geometry is introduced.
+procedural replacement geometry is introduced. The 2026-08-30 DCC revision
+solves left-hand position separately from wrist rotation, makes every baked
+quaternion track hemisphere-continuous before glTF export, and exports one
+platform-specific elbow-pole marker per profile. The builder rejects any clip
+whose left shoulder/elbow/wrist rotation or palm translation exceeds the
+authored per-frame continuity limits; these changes preserve the same mesh,
+materials, skin, and arm hierarchy.
 The original model and all derived geometry remain copyright DJMaesen and are not
 covered by the repository's MIT license.

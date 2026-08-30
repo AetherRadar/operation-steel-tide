@@ -352,12 +352,23 @@ public partial class FreightTerminalWorld
             var targetDistance = Mathf.Max(
                 before.SupportTargetDistance,
                 after.SupportTargetDistance);
+            var magazineSurfaceDistance = Mathf.Max(
+                before.ActiveMagazineSurfaceDistance,
+                after.ActiveMagazineSurfaceDistance);
+            var requiresMagazineContact = Mathf.IsEqualApprox(
+                    sample.Boundary,
+                    akReloadProfile.ReachEnd)
+                || Mathf.IsEqualApprox(
+                    sample.Boundary,
+                    akReloadProfile.SeatEnd);
             var authoredArmsActive = before.AuthoredArmsActive
                 && after.AuthoredArmsActive;
             var continuous = beforePoseSet
                 && afterPoseSet
                 && authoredArmsActive
                 && targetDistance <= 0.002f
+                && (!requiresMagazineContact
+                    || magazineSurfaceDistance <= 0.018f)
                 && gripStep <= 0.025f
                 && basisStep <= 0.20f;
             akReloadBoundaryContinuity &= continuous;
@@ -372,7 +383,9 @@ public partial class FreightTerminalWorld
                 $"AK_RELOAD_ARM_CONTINUITY_SAMPLE boundary={sample.Boundary:F2} "
                 + $"before={sample.Before:F2} after={sample.After:F2} valid={continuous} "
                 + $"authored_active={authoredArmsActive} grip_step={gripStep:F6} "
-                + $"basis_step={basisStep:F6} max_target_distance={targetDistance:F6}");
+                + $"basis_step={basisStep:F6} max_target_distance={targetDistance:F6} "
+                + $"magazine_surface_distance={magazineSurfaceDistance:F6} "
+                + $"magazine_contact_required={requiresMagazineContact}");
         }
 
         (float Boundary, float Before, float After) ReloadBoundarySample(float boundary)
@@ -459,9 +472,9 @@ public partial class FreightTerminalWorld
         var m4ReloadMaximumWristDelta = 0.0f;
         foreach (var progress in new[] { 0.46f, 0.63f })
         {
-            var poseSet = _player.SetM4ReloadPoseForDiagnostics(progress);
+            var poseSet = _player.SetReloadPoseForDiagnostics(progress);
             var first = _player.InspectAuthoredM4ReloadArmForDiagnostics();
-            var repeatedPoseSet = _player.SetM4ReloadPoseForDiagnostics(progress);
+            var repeatedPoseSet = _player.SetReloadPoseForDiagnostics(progress);
             var repeated = _player.InspectAuthoredM4ReloadArmForDiagnostics();
             var authoredArmActive = first.AuthoredArmActive
                 && first.LeftArmVisible
@@ -481,8 +494,9 @@ public partial class FreightTerminalWorld
                 first.LeftArmTransform.Basis);
             var wristDelta = Mathf.Abs(
                 first.SleeveWristLength - m4IdleArm.SleeveWristLength);
-            var sleeveContinuous = ReloadBodyContinuityValid(
-                _player.InspectAllWeaponReloadForDiagnostics());
+            var reloadInspection = _player
+                .InspectAllWeaponReloadForDiagnostics();
+            var sleeveContinuous = ReloadBodyContinuityValid(reloadInspection);
             var idempotent = HandTransformsMatch(
                     first.LeftArmTransform,
                     repeated.LeftArmTransform)
@@ -530,7 +544,16 @@ public partial class FreightTerminalWorld
                 + $"primary_magazine_visible={first.PrimaryMagazineVisible} "
                 + $"spare_magazine_visible={first.SpareMagazineVisible} "
                 + $"magazines_separate={magazineState} pivot_delta={pivotDelta:F6} "
-                + $"wrist_delta={wristDelta:F6} idempotent={idempotent}");
+                + $"wrist_delta={wristDelta:F6} "
+                + $"body_mesh={reloadInspection.AnimatedMeshActive}/"
+                + $"{reloadInspection.BodyContinuity.AnimatedMeshUsesSkeleton} "
+                + $"body_r={ReloadArmChainSummary(
+                    reloadInspection.BodyContinuity.RightArm,
+                    reloadInspection.BodyContinuity.ScreenSize)} "
+                + $"body_l={ReloadArmChainSummary(
+                    reloadInspection.BodyContinuity.LeftArm,
+                    reloadInspection.BodyContinuity.ScreenSize)} "
+                + $"idempotent={idempotent}");
         }
         var m4ReloadBoundaryContinuity = true;
         var m4ReloadBoundarySampleCount = 0;
@@ -551,9 +574,9 @@ public partial class FreightTerminalWorld
                 After: m4ReloadProfile.SeatEnd + m4ReloadBoundaryEpsilon)
         })
         {
-            var beforePoseSet = _player.SetM4ReloadPoseForDiagnostics(sample.Before);
+            var beforePoseSet = _player.SetReloadPoseForDiagnostics(sample.Before);
             var before = _player.InspectAuthoredM4ReloadArmForDiagnostics();
-            var afterPoseSet = _player.SetM4ReloadPoseForDiagnostics(sample.After);
+            var afterPoseSet = _player.SetReloadPoseForDiagnostics(sample.After);
             var after = _player.InspectAuthoredM4ReloadArmForDiagnostics();
             var gripStep = before.LeftGrip.DistanceTo(after.LeftGrip);
             var basisStep = HandBasisDelta(
@@ -593,27 +616,31 @@ public partial class FreightTerminalWorld
                 + $"grip_step={gripStep:F6} basis_step={basisStep:F6} "
                 + $"max_target_distance={targetDistance:F6}");
         }
-        _player.ClearM4ReloadPoseForDiagnostics();
+        _player.ClearReloadPoseForDiagnostics();
         var m4ResetArm = _player.InspectAuthoredM4ReloadArmForDiagnostics();
         var m4ResetHandValid = _player.InspectAuthoredHandPoseForDiagnostics().Valid;
-        _player.ClearM4ReloadPoseForDiagnostics();
+        _player.ClearReloadPoseForDiagnostics();
         var m4RepeatedResetArm = _player.InspectAuthoredM4ReloadArmForDiagnostics();
         var m4ResetOriginDistance = m4IdleArm.LeftArmTransform.Origin.DistanceTo(
             m4ResetArm.LeftArmTransform.Origin);
         var m4ResetBasisDelta = HandBasisDelta(
             m4IdleArm.LeftArmTransform.Basis,
             m4ResetArm.LeftArmTransform.Basis);
+        var m4ResetMatchesIdle = HandTransformsMatch(
+            m4IdleArm.LeftArmTransform,
+            m4ResetArm.LeftArmTransform);
+        var m4RepeatedResetMatches = HandTransformsMatch(
+            m4ResetArm.LeftArmTransform,
+            m4RepeatedResetArm.LeftArmTransform);
+        var m4RepeatedResetGripMatches = m4ResetArm.LeftGrip.DistanceTo(
+                m4RepeatedResetArm.LeftGrip)
+            <= 0.0001f;
         var m4ReloadReset = m4ResetArm.AuthoredArmActive
             && m4ResetArm.PrimaryMagazineVisible
             && !m4ResetArm.SpareMagazineVisible
             && m4ResetHandValid
-            && HandTransformsMatch(
-                m4IdleArm.LeftArmTransform,
-                m4ResetArm.LeftArmTransform)
-            && HandTransformsMatch(
-                m4ResetArm.LeftArmTransform,
-                m4RepeatedResetArm.LeftArmTransform)
-            && m4ResetArm.LeftGrip.DistanceTo(m4RepeatedResetArm.LeftGrip) <= 0.0001f;
+            && m4ResetMatchesIdle
+            && m4RepeatedResetMatches;
         var m4ReloadValid = m4IdleArm.AuthoredArmActive
             && m4IdleHandValid
             && m4ReloadPoseSet
@@ -638,6 +665,12 @@ public partial class FreightTerminalWorld
             + $"boundary_continuity={m4ReloadBoundaryContinuity} "
             + $"boundary_samples={m4ReloadBoundarySampleCount} reset={m4ReloadReset} "
             + $"idle_hand={m4IdleHandValid} reset_hand={m4ResetHandValid} "
+            + $"reset_active={m4ResetArm.AuthoredArmActive} "
+            + $"reset_mag={m4ResetArm.PrimaryMagazineVisible}/"
+            + $"{m4ResetArm.SpareMagazineVisible} "
+            + $"reset_idle_match={m4ResetMatchesIdle} "
+            + $"reset_repeat_match={m4RepeatedResetMatches} "
+            + $"reset_grip_match={m4RepeatedResetGripMatches} "
             + $"max_target_distance={m4ReloadMaximumTargetDistance:F6} "
             + $"max_magazine_distance={m4ReloadMaximumMagazineDistance:F6} "
             + $"min_pivot_delta={m4ReloadMinimumPivotDelta:F6} "
