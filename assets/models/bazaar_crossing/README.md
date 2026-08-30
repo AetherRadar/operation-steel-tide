@@ -17,11 +17,11 @@ routes, and smooth traversal surfaces.
 
 Current verified export:
 
-- 111,564,672 bytes, SHA-256
-  `1B6F6B588B26AE708BA132FE15EC2CD98BBF6D971FC369C4B5B08E71E346E6AD`;
-- 713 visible mesh nodes / 659 unique meshes / 988 DCC material surfaces,
-  reduced from 1,476 nodes / 2,085 surfaces without changing triangles;
-- 843,171 unique and 1,140,165 delivered instance triangles;
+- 111,873,332 bytes, SHA-256
+  `B49CA049ABC5FD4E776877C8BCAEB5DC06379E1040AA19E49479436646A163D1`;
+- 717 visible mesh nodes / 663 unique meshes / 992 DCC material surfaces,
+  reduced from 1,492 nodes / 2,113 surfaces without changing triangles;
+- 845,147 unique and 1,142,141 delivered instance triangles;
 - four complete enterable interiors: A Caravanserai, B Market Warehouse, Mid
   Indoor Connector, and Defender Back Market;
 - 37 coherent closed modular city blocks with complete wall returns, cornices,

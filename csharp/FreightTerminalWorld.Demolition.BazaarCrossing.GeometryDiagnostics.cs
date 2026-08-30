@@ -104,6 +104,7 @@ public partial class FreightTerminalWorld
 
     private static bool BazaarOpenApproachStairEntriesReady(
         DemolitionArenaLayout layout,
+        World3D world,
         out string failures)
     {
         var failed = new List<string>();
@@ -125,23 +126,160 @@ public partial class FreightTerminalWorld
         const float clearHalfWidth = 2.2f;
         foreach (var entry in entries)
         {
-            var minimumZ = MathF.Min(entry.WallZ + 0.35f, entry.ApproachZ);
-            var maximumZ = MathF.Max(entry.WallZ + 0.35f, entry.ApproachZ);
+            var centerX = layout.Origin.X + entry.CenterX;
+            var wallZ = layout.Origin.Z + entry.WallZ;
+            var approachZ = layout.Origin.Z + entry.ApproachZ;
+            var minimumZ = MathF.Min(wallZ + 0.35f, approachZ);
+            var maximumZ = MathF.Max(wallZ + 0.35f, approachZ);
             var blockers = layout.CollisionBoxes.Where(box =>
             {
+                if (box.Name.StartsWith("GuardRail", StringComparison.Ordinal))
+                {
+                    return false;
+                }
                 var halfSize = box.Size * 0.5f;
-                var overlapsWidth = box.Center.X + halfSize.X > entry.CenterX - clearHalfWidth
-                    && box.Center.X - halfSize.X < entry.CenterX + clearHalfWidth;
+                if (box.Size.Y < 2.4f)
+                {
+                    return false;
+                }
+                var overlapsWidth = box.Center.X + halfSize.X > centerX - clearHalfWidth
+                    && box.Center.X - halfSize.X < centerX + clearHalfWidth;
                 var overlapsDepth = box.Center.Z + halfSize.Z > minimumZ
                     && box.Center.Z - halfSize.Z < maximumZ;
-                var overlapsPlayerHeight = box.Center.Y + halfSize.Y > 0.2f
-                    && box.Center.Y - halfSize.Y < 2.6f;
+                var overlapsPlayerHeight = box.Center.Y + halfSize.Y > layout.Origin.Y + 0.2f
+                    && box.Center.Y - halfSize.Y < layout.Origin.Y + 2.6f;
                 return overlapsWidth && overlapsDepth && overlapsPlayerHeight;
             }).Select(box => box.Name).ToArray();
             if (blockers.Length > 0)
             {
                 failed.Add($"{entry.Name}-{string.Join(',', blockers)}");
             }
+
+            var centerRoute = new[]
+            {
+                new Vector3(centerX, layout.Origin.Y + 0.2f, approachZ),
+                new Vector3(centerX, layout.Origin.Y + 0.2f, wallZ + 0.35f)
+            };
+            if (!layout.HasCapsuleClearance(centerRoute, out var routeBlocker))
+            {
+                failed.Add($"{entry.Name}-center-{routeBlocker}");
+            }
+        }
+
+        var westWing = layout.CollisionBoxes.SingleOrDefault(box =>
+            box.Name == "MassAttackWestEntryWingStairRecess");
+        var midWestRail = layout.CollisionBoxes.SingleOrDefault(box =>
+            box.Name == "GuardRailMidMezzanineSouthLeft");
+        if (string.IsNullOrEmpty(westWing.Name) || string.IsNullOrEmpty(midWestRail.Name))
+        {
+            failed.Add("mid-side-gap-missing-contract");
+        }
+        else
+        {
+            var recessReady = westWing.Size.X <= 4.21f
+                && westWing.Size.Z <= 3.01f
+                && MathF.Abs(westWing.Center.X - (layout.Origin.X - 12.9f)) <= 0.02f
+                && MathF.Abs(westWing.Center.Z - (layout.Origin.Z + 43.0f)) <= 0.02f;
+            if (!recessReady)
+            {
+                failed.Add("mid-side-gap-recess-contract");
+            }
+        }
+
+        var screenshotSideRoute = new[]
+        {
+            layout.Origin + new Vector3(-8.4f, 0.2f, 43.7f),
+            layout.Origin + new Vector3(-9.3f, 0.2f, 43.7f),
+            layout.Origin + new Vector3(-9.3f, 0.2f, 41.0f)
+        };
+        var sideLayoutClear = layout.HasCapsuleClearance(
+            screenshotSideRoute, out var sideLayoutBlocker);
+        var sidePhysicalClear = BazaarPhysicalRouteClear(
+            world, screenshotSideRoute, out var sidePhysicalBlocker);
+        if (!sideLayoutClear || !sidePhysicalClear)
+        {
+            failed.Add(
+                $"mid-side-route-{sideLayoutClear}:{sideLayoutBlocker}:"
+                + $"{sidePhysicalClear}:{sidePhysicalBlocker}");
+        }
+
+        failures = string.Join('|', failed);
+        return failed.Count == 0;
+    }
+
+    private static bool BazaarARearPortalsReady(
+        DemolitionArenaLayout layout,
+        World3D world,
+        out string failures)
+    {
+        var failed = new List<string>();
+        foreach (var centerX in new[] { -56.0f, -46.0f, -38.0f })
+        {
+            var route = new[]
+            {
+                layout.Origin + new Vector3(centerX, 0.2f, -21.2f),
+                layout.Origin + new Vector3(centerX, 0.2f, -24.8f)
+            };
+            var layoutClear = layout.HasCapsuleClearance(route, out var layoutBlocker);
+            var physicalClear = BazaarPhysicalRouteClear(world, route, out var physicalBlocker);
+            var shotBlocked = PhysicsRaycast.HasHit(
+                world,
+                route[0] + Vector3.Up * 1.37f,
+                route[1] + Vector3.Up * 1.37f,
+                1u);
+            if (!layoutClear || !physicalClear || shotBlocked)
+            {
+                failed.Add(
+                    $"{centerX:0}:{layoutClear}:{layoutBlocker}:{physicalClear}:{physicalBlocker}:{shotBlocked}");
+            }
+        }
+
+        var wallControl = new[]
+        {
+            layout.Origin + new Vector3(-48.0f, 0.2f, -21.2f),
+            layout.Origin + new Vector3(-48.0f, 0.2f, -24.8f)
+        };
+        var layoutControlBlocked = !layout.HasCapsuleClearance(wallControl, out _);
+        var physicalControlBlocked = !BazaarPhysicalRouteClear(world, wallControl, out _);
+        if (!layoutControlBlocked || !physicalControlBlocked)
+        {
+            failed.Add($"wall-control-{layoutControlBlocked}:{physicalControlBlocked}");
+        }
+
+        failures = string.Join('|', failed);
+        return failed.Count == 0;
+    }
+
+    private static bool BazaarMidMezzanineConnectionReady(
+        DemolitionArenaLayout layout,
+        World3D world,
+        out string failures)
+    {
+        var failed = new List<string>();
+        var route = new[]
+        {
+            layout.Origin + new Vector3(-6.0f, 3.4f, 30.5f),
+            layout.Origin + new Vector3(-6.0f, 3.4f, 17.5f)
+        };
+        if (!layout.HasCapsuleClearance(route, out var layoutBlocker))
+        {
+            failed.Add($"layout-{layoutBlocker}");
+        }
+        if (!BazaarPhysicalRouteClear(world, route, out var physicalBlocker))
+        {
+            failed.Add($"physical-{physicalBlocker}");
+        }
+        if (PhysicsRaycast.HasHit(
+                world,
+                route[0] + Vector3.Up * 0.6f,
+                route[1] + Vector3.Up * 0.6f,
+                1u))
+        {
+            failed.Add("shot-blocked");
+        }
+        if (layout.CollisionBoxes.Any(box => box.Name == "GuardRailMidMezzanineInner"))
+        {
+            failed.Add("obsolete-inner-rail");
         }
 
         failures = string.Join('|', failed);
@@ -243,7 +381,7 @@ public partial class FreightTerminalWorld
         {
             failed.Add($"counts-{boxes.Count}-{decks.Length}-{ramps.Length}");
         }
-        if (guardRails.Length != 15
+        if (guardRails.Length != 14
             || boxes.Any(box => box.Name.StartsWith("GuardRail", StringComparison.Ordinal)))
         {
             failed.Add($"guardrail-separation-{guardRails.Length}");
@@ -287,6 +425,19 @@ public partial class FreightTerminalWorld
         }
         failures = string.Join('|', failed);
         return failed.Count == 0;
+    }
+
+    private async Task<(bool Ready, string Summary)> BazaarWalkPlayerAcrossMidMezzanine(
+        DemolitionArenaLayout layout)
+    {
+        var south = layout.Origin + new Vector3(-6.0f, 3.4f, 30.5f);
+        var north = layout.Origin + new Vector3(-6.0f, 3.4f, 17.5f);
+        var forward = await BazaarWalkPlayer(south, north, ascending: true);
+        var reverse = await BazaarWalkPlayer(north, south, ascending: false);
+        return (
+            forward.Ready && reverse.Ready,
+            $"{forward.Ready}/{reverse.Ready}:{forward.Frames}/{reverse.Frames}:"
+                + $"{forward.HeightDelta:0.00}/{reverse.HeightDelta:0.00}");
     }
 
     private async Task<IReadOnlyList<BazaarWalkResult>> BazaarWalkAllStairs(
@@ -388,6 +539,11 @@ public partial class FreightTerminalWorld
         var meshNodes = model!.FindChildren("*", "MeshInstance3D", true, false);
         using var meshNodesBacking = meshNodes.AsDisposable();
         var meshes = meshNodes.OfType<MeshInstance3D>().ToArray();
+        if (meshes.Any(mesh => mesh.Name.ToString().StartsWith(
+                "Bazaar_Mid_Mezzanine_Inner_Rail", StringComparison.Ordinal)))
+        {
+            failed.Add("obsolete-mid-inner-rail");
+        }
         foreach (var meshInstance in meshes)
         {
             if (meshInstance.Mesh is null || !meshInstance.Visible || !meshInstance.IsVisibleInTree())

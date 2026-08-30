@@ -268,6 +268,21 @@ public partial class FreightTerminalWorld
             var down = await BazaarWalkSquadLeg(mate, stair.Low, false, delta);
             squadResults.Add(new BazaarActorRoundTripResult("squad", stair.Name, up, down));
         }
+        var midSouth = layout.Origin + new Vector3(-6.0f, 3.4f, 30.5f);
+        var midNorth = layout.Origin + new Vector3(-6.0f, 3.4f, 17.5f);
+        ClearDemolitionSquadRoute(mate);
+        ClearDemolitionSquadRouteFallback(mate);
+        mate.GlobalPosition = midSouth;
+        mate.Velocity = Vector3.Zero;
+        mate.ResetCombatTacticsForDiagnostics();
+        await BazaarSettleSquadMate(mate, delta);
+        var midForward = await BazaarWalkSquadLeg(mate, midNorth, true, delta);
+        ClearDemolitionSquadRoute(mate);
+        ClearDemolitionSquadRouteFallback(mate);
+        mate.ResetCombatTacticsForDiagnostics();
+        var midReverse = await BazaarWalkSquadLeg(mate, midSouth, false, delta);
+        squadResults.Add(new BazaarActorRoundTripResult(
+            "squad", "mid-mezzanine-cross", midForward, midReverse));
         var squadStepCount = mate.BazaarRoutePhysicsStepsForDiagnostics - squadStepsBefore;
         ClearDemolitionSquadRoute(mate);
         ClearDemolitionSquadRouteFallback(mate);
@@ -307,6 +322,17 @@ public partial class FreightTerminalWorld
                 enemy, stair.Low, false, $"bazaar-enemy-{stair.Name}-down", delta);
             enemyResults.Add(new BazaarActorRoundTripResult("enemy", stair.Name, up, down));
         }
+        _demolitionOpponentRoutes.Remove(enemy);
+        enemy.GlobalPosition = midSouth;
+        enemy.Velocity = Vector3.Zero;
+        await BazaarSettleEnemy(enemy, delta);
+        var enemyMidForward = await BazaarWalkEnemyLeg(
+            enemy, midNorth, true, "bazaar-enemy-mid-cross-forward", delta);
+        _demolitionOpponentRoutes.Remove(enemy);
+        var enemyMidReverse = await BazaarWalkEnemyLeg(
+            enemy, midSouth, false, "bazaar-enemy-mid-cross-reverse", delta);
+        enemyResults.Add(new BazaarActorRoundTripResult(
+            "enemy", "mid-mezzanine-cross", enemyMidForward, enemyMidReverse));
         var enemyStepCount = enemy.BazaarRoutePhysicsStepsForDiagnostics - enemyStepsBefore;
         _demolitionOpponentRoutes.Remove(enemy);
         enemy.QueueFree();
@@ -317,8 +343,8 @@ public partial class FreightTerminalWorld
         var expectedSquadSteps = squadResults.Sum(result => result.Up.Frames + result.Down.Frames);
         var expectedEnemySteps = enemyResults.Sum(result => result.Up.Frames + result.Down.Frames);
         var ready = squadBodyReady && enemyBodyReady
-            && squadResults.Count == stairs.Count
-            && enemyResults.Count == stairs.Count
+            && squadResults.Count == stairs.Count + 1
+            && enemyResults.Count == stairs.Count + 1
             && actorResults.All(result => result.Ready)
             && squadStepCount >= expectedSquadSteps
             && enemyStepCount >= expectedEnemySteps;

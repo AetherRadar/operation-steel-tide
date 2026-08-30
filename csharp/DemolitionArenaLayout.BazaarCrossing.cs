@@ -98,7 +98,8 @@ public sealed partial class DemolitionArenaLayout
             // South city masses split the attack foyer into three immediate commitments.
             BazaarCollisionBox("MassAttackWest", new(-36.5f, 4.0f, 48.5f), new(43.0f, 8.0f, 13.0f)),
             BazaarCollisionBox("MassAttackEast", new(36.5f, 4.0f, 48.5f), new(43.0f, 8.0f, 13.0f)),
-            BazaarCollisionBox("MassAttackWestEntryWing", new(-12.0f, 4.0f, 48.25f), new(6.0f, 8.0f, 13.5f)),
+            BazaarCollisionBox("MassAttackWestEntryWing", new(-12.0f, 4.0f, 49.75f), new(6.0f, 8.0f, 10.5f)),
+            BazaarCollisionBox("MassAttackWestEntryWingStairRecess", new(-12.9f, 4.0f, 43.0f), new(4.2f, 8.0f, 3.0f)),
             BazaarCollisionBox("MassAttackEastEntryWing", new(12.0f, 4.0f, 48.25f), new(6.0f, 8.0f, 13.5f)),
             BazaarCollisionBox("MassSouthWest", new(-37.0f, 4.2f, 24.25f), new(42.0f, 8.4f, 24.5f)),
             BazaarCollisionBox("MassSouthEast", new(37.0f, 4.2f, 24.25f), new(42.0f, 8.4f, 24.5f)),
@@ -145,12 +146,13 @@ public sealed partial class DemolitionArenaLayout
             BazaarCollisionBox("CoverA_SpiceCounter", new(-49.8f, 0.59f, -17.9f), new(0.62f, 1.18f, 5.8f)),
             BazaarCollisionBox("CoverA_WarehouseDesk", new(-35.5f, 0.59f, -27.0f), new(0.62f, 1.18f, 5.0f)),
             BazaarCollisionBox("CoverA_EntryDesk", new(-46.35f, 0.59f, -9.5f), new(4.7f, 1.18f, 0.62f)),
+            BazaarCollisionBox("CoverA_RearLedger", new(-42.8f, 0.875f, -24.2f), new(2.4f, 1.75f, 0.62f)),
             BazaarCollisionBox("CoverB_FishCounter", new(42.0f, 0.58f, -17.5f), new(0.62f, 1.16f, 7.0f)),
             BazaarCollisionBox("CoverB_TextileCounter", new(49.0f, 0.58f, -11.0f), new(4.0f, 1.16f, 0.62f)),
             BazaarCollisionBox("CoverB_LoadingDesk", new(37.4f, 0.58f, -19.0f), new(3.2f, 1.16f, 0.62f)),
             BazaarCollisionBox("CoverB_ServiceCounter", new(58.5f, 0.58f, 3.7f), new(0.62f, 1.16f, 4.6f)),
             BazaarCollisionBox("CoverMid_ProduceCounter", new(3.75f, 0.575f, 9.0f), new(5.5f, 1.15f, 0.62f)),
-            BazaarCollisionBox("CoverMid_CarpetDivider", new(-7.0f, 0.59f, 25.75f), new(0.62f, 1.18f, 5.5f)),
+            BazaarCollisionBox("CoverMid_CarpetDivider", new(-6.0f, 0.875f, 25.75f), new(0.62f, 1.75f, 5.5f)),
 
             // Hanging upper-storey screens stop one balcony from holding two
             // complete entrances while preserving the ground-level rooms.
@@ -177,7 +179,8 @@ public sealed partial class DemolitionArenaLayout
         AddBazaarVerticalWall(boxes, "WallA_East", -34.0f, -31.0f, -4.0f, 6.4f,
             new BazaarOpening(-10.0f, 3.2f));
         AddBazaarHorizontalWall(boxes, "PartitionA_Rear", -23.0f, -60.0f, -34.0f, 3.0f,
-            new BazaarOpening(-56.0f, 3.2f), new BazaarOpening(-38.0f, 3.2f));
+            new BazaarOpening(-56.0f, 3.2f), new BazaarOpening(-46.0f, 3.2f),
+            new BazaarOpening(-38.0f, 3.2f));
         AddBazaarVerticalWall(boxes, "PartitionA_Warehouse", -47.0f, -31.0f, -23.0f, 3.0f,
             new BazaarOpening(-27.0f, 3.2f));
         foreach (var x in new[] { -51.0f, -41.0f })
@@ -245,7 +248,7 @@ public sealed partial class DemolitionArenaLayout
         AddBazaarVerticalWall(boxes, "WallMidProduce_East", 9.0f, 5.0f, 20.0f, 6.2f);
 
         AddBazaarHorizontalWall(boxes, "WallMidCarpet_North", 19.0f, -9.0f, 3.0f, 6.2f,
-            new BazaarOpening(0.0f, 3.2f));
+            new BazaarOpening(-6.0f, 5.2f), new BazaarOpening(0.0f, 3.2f));
         AddBazaarHorizontalWall(boxes, "WallMidCarpet_South", 34.0f, -9.0f, 3.0f, 6.2f,
             new BazaarOpening(-6.0f, 5.2f), new BazaarOpening(0.0f, 3.2f));
         AddBazaarHorizontalWall(boxes, "WallMidCarpet_SouthReturn", 34.0f, 3.0f, 8.0f, 6.2f);
@@ -287,11 +290,6 @@ public sealed partial class DemolitionArenaLayout
             "GuardRailBBalconyInner",
             new(53.0f, 3.95f, -16.4f),
             new(BazaarGuardRailThickness, BazaarGuardRailHeight, 14.8f)));
-        boxes.Add(BazaarCollisionBox(
-            "GuardRailMidMezzanineInner",
-            new(-3.0f, 3.75f, 24.0f),
-            new(BazaarGuardRailThickness, BazaarGuardRailHeight, 14.0f)));
-
         AddBazaarStairGuardRails(
             boxes,
             "GuardRailAGallerySouth",
@@ -631,7 +629,8 @@ public sealed partial class DemolitionArenaLayout
 
     private IReadOnlyList<Vector3> BuildBazaarCrossingAttackToAPath() => WorldPoints(
         new(0.0f, 0.2f, 49.0f), new(-8.4f, 0.2f, 48.0f),
-        new(-8.4f, 0.2f, 41.0f), new(-11.5f, 0.2f, 40.0f), new(-12.5f, 0.2f, 38.5f),
+        new(-8.4f, 0.2f, 43.7f), new(-9.3f, 0.2f, 43.7f),
+        new(-9.3f, 0.2f, 41.0f), new(-11.5f, 0.2f, 40.0f), new(-12.5f, 0.2f, 38.5f),
         new(-12.5f, 0.2f, 20.0f), new(-15.5f, 0.2f, 11.2f),
         new(-24.0f, 0.2f, 9.0f), new(-37.0f, 0.2f, 9.0f),
         new(-47.0f, 0.2f, 8.0f), new(-47.0f, 0.2f, 1.0f),

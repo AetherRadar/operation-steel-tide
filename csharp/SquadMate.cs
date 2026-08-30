@@ -492,17 +492,23 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
                      out var escortObjectivePriority))
         {
             var forward = ResolveDemolitionEscortForward(escortLeader);
-            var right = new Vector3(-forward.Z, 0.0f, forward.X);
-            var back = -forward;
-            var escortIndex = SquadSlot > 0 ? SquadSlot - 1 : 0;
-            var escortRow = escortIndex / 2;
-            var escortSide = escortIndex % 2 == 0 ? -1.0f : 1.0f;
-            var lateralOffset = escortSide * (1.8f + escortRow * 0.65f);
-            var rearOffset = 2.2f + escortRow * 1.8f;
-            destination = escortLeader.GlobalPosition
-                + right * lateralOffset
-                + back * rearOffset;
-            destination.Y = GlobalPosition.Y;
+            var preferredEscortDestination = FreightTerminalWorld
+                .ResolveDemolitionEscortPreferredDestination(
+                    SquadSlot,
+                    escortLeader.GlobalPosition,
+                    forward);
+            if (!Main.TryResolveDemolitionEscortDestination(
+                    this,
+                    escortLeader,
+                    preferredEscortDestination,
+                    out destination))
+            {
+                // A missing physical landing is transient (airborne, boxed, or a moving
+                // blocker). Hold this frame and force a grounded escape before the short
+                // retry rather than walking toward self indefinitely or using a raw target.
+                destination = GlobalPosition;
+                Main.RequestDemolitionEscortNavigationRecovery(this);
+            }
             // Keep the carrier as the engagement anchor under contact, but let the
             // combat layer maneuver around that anchor while a threat is actionable.
             objectivePriority = escortObjectivePriority;

@@ -397,6 +397,16 @@ public sealed partial class DemolitionArenaLayout
         return true;
     }
 
+    public bool HasCapsulePointClearance(Vector3 point, out string blockerName)
+    {
+        if (!IsInsideArena(point))
+        {
+            blockerName = "outside_arena";
+            return false;
+        }
+        return !TryFindCapsuleSegmentBlocker(point, point, out blockerName);
+    }
+
     public Vector3 SitePosition(int index) => SitePositions[Mathf.Clamp(index, 0, SitePositions.Count - 1)];
 
     public Vector3 StrategyTarget(string key)

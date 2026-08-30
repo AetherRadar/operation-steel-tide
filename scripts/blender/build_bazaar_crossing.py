@@ -470,7 +470,8 @@ STAIRS = (
 RUNTIME_ARCHITECTURE_AABBS = (
     ("AttackWest", -36.5, 48.5, 43.0, 13.0, 7.4),
     ("AttackEast", 36.5, 48.5, 43.0, 13.0, 7.6),
-    ("AttackWestEntryWing", -12.0, 48.25, 6.0, 13.5, 8.0),
+    ("AttackWestEntryWing", -12.0, 49.75, 6.0, 10.5, 8.0),
+    ("AttackWestEntryWingStairRecess", -12.9, 43.0, 4.2, 3.0, 8.0),
     ("AttackEastEntryWing", 12.0, 48.25, 6.0, 13.5, 8.0),
     ("WestLaneLink", -45.5, 39.25, 7.0, 5.5, 8.4),
     ("EastLaneLink", 45.5, 39.25, 7.0, 5.5, 8.4),
@@ -521,7 +522,6 @@ RUNTIME_SITE_PAIR_SIGHT_BLOCK = (
 RUNTIME_RAIL_SPECS = (
     ("Bazaar_A_Gallery_Inner_Rail", (-53.0, -23.8), (-53.0, -9.0), 3.6, 4.7),
     ("Bazaar_B_Balcony_Inner_Rail", (53.0, -9.0), (53.0, -23.8), 3.4, 4.5),
-    ("Bazaar_Mid_Mezzanine_Inner_Rail", (-3.0, 17.0), (-3.0, 31.0), 3.2, 4.3),
 )
 
 
@@ -3374,7 +3374,8 @@ def build_map_v2(
         ("AttackEastHotel", (15.0, 31.0, 42.0, 55.0), 7.0, ("quat_metal_window", "trey_foundation"), steel),
         ("AttackEastGuild", (31.0, 45.0, 42.0, 55.0), 6.1, ("quat_window_trim",), warm),
         ("AttackEastFoundry", (45.0, 58.0, 42.0, 55.0), 7.6, ("quat_metal_window", "trey_window"), steel),
-        ("AttackWestEntryWing", (-15.0, -9.0, 41.5, 55.0), 8.0, ("quat_curved_window", "trey_foundation"), concrete),
+        ("AttackWestEntryWing", (-15.0, -9.0, 44.5, 55.0), 8.0, ("quat_curved_window", "trey_foundation"), concrete),
+        ("AttackWestEntryWingStairRecess", (-15.0, -10.8, 41.5, 44.5), 8.0, ("quat_curved_window", "trey_foundation"), concrete),
         ("AttackEastEntryWing", (9.0, 15.0, 41.5, 55.0), 8.0, ("quat_metal_window", "trey_foundation"), steel),
         ("WestLaneLink", (-49.0, -42.0, 36.5, 42.0), 8.4, ("quat_window_trim", "trey_foundation"), warm),
         ("EastLaneLink", (42.0, 49.0, 36.5, 42.0), 8.4, ("quat_metal_window", "trey_foundation"), steel),
@@ -3612,6 +3613,20 @@ def build_map_v2(
             role="finished_cc0_architectural_counter_cover",
             material=concrete,
         )
+    make_module_run(
+        "Bazaar_A_RearLedger",
+        (-44.0, -24.2),
+        (-41.6, -24.2),
+        0.0,
+        1.75,
+        ("trey_foundation",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_architectural_ledger_cover",
+        material=warm,
+    )
 
     # The warehouse partition is gameplay-critical, so all three runtime bays
     # receive a visible arch frame, upper signboard, pilasters, and cornice.
@@ -3686,14 +3701,14 @@ def build_map_v2(
         )
     add_wall_storage_rack(
         "Bazaar_A_RearDisplayWest",
-        (-59.0, -22.48),
-        (-52.2, -22.48),
+        (-54.1, -22.48),
+        (-48.0, -22.48),
         dark_timber,
     )
     add_wall_storage_rack(
         "Bazaar_A_RearDisplayEast",
-        (-41.8, -22.48),
-        (-35.0, -22.48),
+        (-44.1, -22.48),
+        (-40.0, -22.48),
         roof_sand,
     )
     add_wall_storage_rack(
@@ -4315,7 +4330,7 @@ def build_map_v2(
     mid_halls = (
         ("NorthTeaHall", (-9.0, 3.0, -8.0, 6.0), ((-1.0, 3.2),), ((-5.0, 3.2),)),
         ("CenterProduceHall", (-3.0, 9.0, 5.0, 20.0), ((1.0, 3.2),), ((0.0, 3.2),)),
-        ("SouthCarpetHall", (-9.0, 3.0, 19.0, 34.0), ((-6.0, 5.2), (0.0, 3.2)), ((0.0, 3.2),)),
+        ("SouthCarpetHall", (-9.0, 3.0, 19.0, 34.0), ((-6.0, 5.2), (0.0, 3.2)), ((-6.0, 5.2), (0.0, 3.2))),
     )
     mid_roof_materials = {
         "NorthTeaHall": roof_sand,
@@ -4340,7 +4355,9 @@ def build_map_v2(
             architecture,
             root,
             region=f"Mid_{hall_name}",
-            full_height_doors={"south": (-6.0,)} if hall_name == "SouthCarpetHall" else None,
+            full_height_doors={"south": (-6.0,), "north": (-6.0,)}
+            if hall_name == "SouthCarpetHall"
+            else None,
         )
         xmin, xmax, zmin, zmax = bounds
         make_tiled_patch(
@@ -4427,11 +4444,12 @@ def build_map_v2(
                 zmin + (zmax - zmin) * 0.68,
             )
         ):
+            beam_height = 5.62 if hall_name == "SouthCarpetHall" else 4.46
             make_module_run(
                 f"Bazaar_Mid_{hall_name}_CrossBeam{beam_index:02d}",
                 (xmin + 0.35, beam_z),
                 (xmax - 0.35, beam_z),
-                4.46,
+                beam_height,
                 0.26,
                 ("trey_roof_trim",),
                 templates,
@@ -4473,16 +4491,16 @@ def build_map_v2(
     )
     make_module_run(
         "Bazaar_Mid_CarpetDivider",
-        (-7.0, 23.0),
-        (-7.0, 28.5),
+        (-6.0, 23.0),
+        (-6.0, 28.5),
         0.0,
-        1.18,
+        1.75,
         ("trey_foundation",),
         templates,
         specs,
         architecture,
         root,
-        role="finished_cc0_architectural_counter_cover",
+        role="finished_cc0_tall_carpet_display_cover",
         material=warm,
     )
 
@@ -4496,11 +4514,12 @@ def build_map_v2(
         ("CenterProduce", (-2.4, 13.0), (8.4, 13.0)),
         ("SouthCarpet", (-8.4, 26.0), (2.4, 26.0)),
     ):
+        beam_height = 5.72 if beam_name == "SouthCarpet" else 4.58
         make_module_run(
             f"Bazaar_Mid_{beam_name}_CeilingBeam",
             start,
             end,
-            4.58,
+            beam_height,
             0.30,
             ("trey_roof_trim",),
             templates,
@@ -5712,6 +5731,8 @@ def add_review_lighting(collection: bpy.types.Collection) -> None:
             (-3.0, 3.0, -1.0),
             (3.0, 3.0, 12.0),
             (-3.0, 3.0, 27.0),
+            (-8.8, 2.8, 42.4),
+            (-6.0, 4.9, 24.0),
             (0.0, 3.0, -18.0),
             (-17.0, 2.8, -47.0),
             (17.0, 2.8, -47.0),
@@ -5755,6 +5776,9 @@ def render_previews(collection: bpy.types.Collection) -> None:
         ("06_back_market.png", (-50.0, 38.0, 1.68), (-29.0, 1.4, -38.0), 32.0),
         ("07_b_service_link.png", (49.0, -8.0, 1.72), (54.2, 1.35, 5.3), 34.0),
         ("08_b_stair_vestibule.png", (52.8, -8.0, 1.62), (56.0, 2.8, -5.0), 34.0),
+        ("09_mid_spawn_clearance.png", (-9.45, -43.8, 1.65), (-6.0, 1.8, 36.0), 32.0),
+        ("10_mid_upper_connection.png", (-6.0, -28.2, 4.72), (-6.0, 4.15, 16.6), 32.0),
+        ("11_a_rear_portals.png", (-47.0, 9.0, 1.65), (-47.0, 1.55, -23.4), 24.0),
     )
     preview_filter = {
         filename.strip()
@@ -6639,6 +6663,86 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
         nosings = bpy.data.objects.get(f"{stair.name}_AuthoredTreyTreadNosings")
         if nosings is None or int(nosings.get("tread_nosing_instances", 0)) != stair.steps:
             raise RuntimeError(f"Stair lacks one authored tread nosing per step: {stair.name}")
+
+    obsolete_mid_rail_parts = sorted(
+        obj.name
+        for obj in scene_objects
+        if obj.name.startswith("Bazaar_Mid_Mezzanine_Inner_Rail")
+    )
+    if obsolete_mid_rail_parts:
+        raise RuntimeError(
+            "Mid mezzanine retained the sight-blocking inner rail: "
+            f"{obsolete_mid_rail_parts}"
+        )
+
+    low_mid_mezzanine_beams: list[str] = []
+    for obj in mesh_objects:
+        if not (
+            obj.name.startswith("Bazaar_Mid_SouthCarpetHall_CrossBeam")
+            or obj.name.startswith("Bazaar_Mid_SouthCarpet_CeilingBeam")
+        ):
+            continue
+        points = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
+        if min(point.z for point in points) < 5.35:
+            low_mid_mezzanine_beams.append(obj.name)
+    if low_mid_mezzanine_beams:
+        raise RuntimeError(
+            "Mid mezzanine retained player-eye-height ceiling beams: "
+            f"{low_mid_mezzanine_beams}"
+        )
+
+    mid_connection_blockers: list[str] = []
+    for obj in mesh_objects:
+        if not obj.name.startswith("Bazaar_Mid_SouthCarpetHall_North"):
+            continue
+        points = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
+        minimum_x = min(point.x for point in points)
+        maximum_x = max(point.x for point in points)
+        minimum_height = min(point.z for point in points)
+        maximum_height = max(point.z for point in points)
+        minimum_godot_z = min(-point.y for point in points)
+        maximum_godot_z = max(-point.y for point in points)
+        if (
+            maximum_x > -8.25
+            and minimum_x < -3.75
+            and maximum_godot_z > 18.5
+            and minimum_godot_z < 19.5
+            and maximum_height > 0.25
+            and minimum_height < 5.75
+        ):
+            mid_connection_blockers.append(obj.name)
+    if mid_connection_blockers:
+        raise RuntimeError(
+            "Mid mezzanine north connection retained visible wall geometry: "
+            f"{mid_connection_blockers}"
+        )
+    if bpy.data.objects.get("Bazaar_Mid_SouthCarpetHall_North_Portal00") is not None:
+        raise RuntimeError("Mid mezzanine full-height north connection retained an arch portal")
+
+    # Collision-free dressing must not make the three A-rear routes look
+    # blocked. Sample the full player/shooting volume through every opening,
+    # rather than trusting object bounds that also include legitimate frames.
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    a_rear_visual_blockers: list[str] = []
+    for portal_x in (-56.0, -46.0, -38.0):
+        for x_offset in (-0.8, 0.0, 0.8):
+            for height in (0.55, 1.35, 2.15):
+                ray_origin = godot_to_blender(portal_x + x_offset, height, -21.2)
+                hit, _location, _normal, _face, hit_object, _matrix = bpy.context.scene.ray_cast(
+                    depsgraph,
+                    ray_origin,
+                    Vector((0.0, 1.0, 0.0)),
+                    distance=3.6,
+                )
+                if hit:
+                    a_rear_visual_blockers.append(
+                        f"{portal_x + x_offset:0.2f},{height:0.2f}:{hit_object.name}"
+                    )
+    if a_rear_visual_blockers:
+        raise RuntimeError(
+            "A rear portals retained visible dressing blockers: "
+            f"{a_rear_visual_blockers}"
+        )
 
     for screen_name, expected_thickness, expected_band in (
         ("Bazaar_A_Gallery_UpperPrivacyScreen_metal_window", 0.42, "3.600,6.400"),

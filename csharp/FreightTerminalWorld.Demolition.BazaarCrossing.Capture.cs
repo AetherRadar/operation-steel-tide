@@ -13,7 +13,8 @@ public partial class FreightTerminalWorld
         float Fov,
         bool StrictTopdown = false,
         bool RequireReadableInterior = false,
-        bool RequireClearTarget = true);
+        bool RequireClearTarget = true,
+        IReadOnlyList<Vector3>? RequiredClearTargets = null);
 
     private readonly record struct BazaarCaptureImageResult(
         bool Saved,
@@ -171,6 +172,18 @@ public partial class FreightTerminalWorld
                 72.0f,
                 RequireReadableInterior: true),
             new BazaarCaptureFrame(
+                "res://bazaar_crossing_mid_spawn_stair_clearance.png",
+                new Vector3(-9.3f, eye, 44.0f),
+                new Vector3(-9.3f, 1.45f, 39.5f),
+                76.0f,
+                RequireReadableInterior: true),
+            new BazaarCaptureFrame(
+                "res://bazaar_crossing_mid_upper_connection.png",
+                new Vector3(-6.0f, 3.2f + eye, 30.0f),
+                new Vector3(-6.0f, 4.0f, 17.5f),
+                70.0f,
+                RequireReadableInterior: true),
+            new BazaarCaptureFrame(
                 "res://bazaar_crossing_mid_north_stair.png",
                 new Vector3(-6.0f, eye, 6.0f),
                 new Vector3(-6.0f, 3.3f, 17.0f),
@@ -197,7 +210,19 @@ public partial class FreightTerminalWorld
                 "res://bazaar_crossing_defender_spawn.png",
                 new Vector3(0.0f, 0.22f + eye, -52.0f),
                 new Vector3(-6.0f, 1.4f, -44.6f),
-                70.0f)
+                70.0f),
+            new BazaarCaptureFrame(
+                "res://bazaar_crossing_a_rear_three_portals.png",
+                new Vector3(-46.0f, eye, -15.0f),
+                new Vector3(-46.0f, eye, -24.2f),
+                80.0f,
+                RequireReadableInterior: true,
+                RequiredClearTargets: new[]
+                {
+                    new Vector3(-56.0f, eye, -24.2f),
+                    new Vector3(-46.0f, eye, -24.2f),
+                    new Vector3(-38.0f, eye, -24.2f)
+                })
         };
 
         var validity = new Dictionary<string, bool>();
@@ -223,13 +248,24 @@ public partial class FreightTerminalWorld
                     out framingBlocker);
             var result = BazaarSaveCaptureFrame(frame.Path, image);
             var readabilityReady = !frame.RequireReadableInterior || result.InteriorReadable;
-            validity[frame.Path] = framingReady && result.Saved && readabilityReady;
+            var clearTargetsReady = BazaarCaptureClearTargetsReady(
+                GetWorld3D(),
+                camera.GlobalPosition,
+                layout,
+                frame.RequiredClearTargets,
+                out var clearTargetBlockers);
+            validity[frame.Path] = framingReady
+                && result.Saved
+                && readabilityReady
+                && clearTargetsReady;
             GD.Print(
                 $"BAZAAR_CAPTURE_FRAME path={frame.Path} saved={result.Saved} framing={framingReady} "
                 + $"readable={readabilityReady} mean={result.MeanLuminance:0.000} "
                 + $"p25={result.LowerQuartileLuminance:0.000} "
                 + $"dark075={result.VeryDarkSampleFraction:0.000} range={result.DynamicRange:0.000} "
-                + $"blocker={framingBlocker} position={camera.GlobalPosition} target={target}");
+                + $"blocker={framingBlocker} clear_targets={clearTargetsReady} "
+                + $"clear_target_blockers={clearTargetBlockers} "
+                + $"position={camera.GlobalPosition} target={target}");
         }
 
         var valid = GetViewport().GetCamera3D() == camera
@@ -252,6 +288,40 @@ public partial class FreightTerminalWorld
         camera.QueueFree();
         await WaitFrames(3);
         GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private static bool BazaarCaptureClearTargetsReady(
+        World3D world,
+        Vector3 cameraPosition,
+        DemolitionArenaLayout layout,
+        IReadOnlyList<Vector3>? localTargets,
+        out string blockers)
+    {
+        if (localTargets is null || localTargets.Count == 0)
+        {
+            blockers = "none";
+            return true;
+        }
+
+        var blockedTargets = new List<string>();
+        foreach (var localTarget in localTargets)
+        {
+            if (!PhysicsRaycast.TryHit(
+                    world,
+                    cameraPosition,
+                    layout.Origin + localTarget,
+                    1u,
+                    out var hit))
+            {
+                continue;
+            }
+
+            var collider = hit.Collider is Node node ? node.Name.ToString() : "unknown";
+            blockedTargets.Add($"{localTarget.X:0.0},{localTarget.Y:0.0},{localTarget.Z:0.0}:{collider}");
+        }
+
+        blockers = blockedTargets.Count == 0 ? "none" : string.Join('|', blockedTargets);
+        return blockedTargets.Count == 0;
     }
 
     private static BazaarCaptureImageResult BazaarSaveCaptureFrame(string path, Image? image)

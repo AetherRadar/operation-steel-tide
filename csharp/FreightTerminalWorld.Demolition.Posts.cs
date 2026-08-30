@@ -366,6 +366,7 @@ public partial class FreightTerminalWorld
         _demolitionSquadCombatBreakoffs.Remove(mate);
         ClearDemolitionSquadRoute(mate);
         ClearDemolitionSquadRouteFallback(mate);
+        ClearDemolitionEscortLifecycleState(mate);
         if (ReferenceEquals(_demolitionSquadObjectiveMate, mate))
         {
             _demolitionSquadObjectiveMate = null;

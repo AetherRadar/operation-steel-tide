@@ -92,18 +92,18 @@ visual low points correspond to runtime route points at `y=0.2`.
 
 The V2 report records:
 
-- 1,476 -> 713 visible mesh draw nodes and 2,085 -> 988 material surfaces
+- 1,492 -> 717 visible mesh draw nodes and 2,113 -> 992 material surfaces
   after same-region, same-material, same-responsibility static consolidation;
-- 659 unique meshes in the final packed DCC scene;
+- 663 unique meshes in the final packed DCC scene;
 - 252,707 raw whitelisted-source triangles;
-- 843,171 unique and 1,140,165 delivered instance triangles, unchanged by
+- 845,147 unique and 1,142,141 delivered instance triangles, unchanged by
   draw-node consolidation and GLB round trip;
 - 49 DCC materials and 58 DCC textures;
 - 203.473 MiB estimated RGBA8 plus full-mip-chain texture memory;
-- 111,564,672-byte non-Draco GLB, SHA-256
-  `1B6F6B588B26AE708BA132FE15EC2CD98BBF6D971FC369C4B5B08E71E346E6AD`;
-- 50,292,840-byte packed Blend, SHA-256
-  `A92B51DF62D4F6094E88ABD7091AE7DFD517679A11FC922CBEB50882836D36BB`;
+- 111,873,332-byte non-Draco GLB, SHA-256
+  `B49CA049ABC5FD4E776877C8BCAEB5DC06379E1040AA19E49479436646A163D1`;
+- 50,400,552-byte packed Blend, SHA-256
+  `551BB6258752F088C3D75DA0DFA84B9459AD1C4E38A5C1C36DFA056352354EE1`;
 - bounds X `[-68,68]`, Blender Y `[-56.2,56.2]`, Z `[-0.16,9.46]`;
 - four complete enterable interiors and 9,930.973 square metres of roofed
   footprint;

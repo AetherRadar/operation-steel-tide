@@ -40,9 +40,9 @@ public partial class FreightTerminalWorld
             .Where(box => box.Name.StartsWith("GuardRail", StringComparison.Ordinal))
             .ToArray();
         var failures = new List<string>();
-        var contractReady = expected.Count == 15
-            && definitions.Length == 15
-            && definitions.Select(box => box.Name).Distinct(StringComparer.Ordinal).Count() == 15
+        var contractReady = expected.Count == 14
+            && definitions.Length == 14
+            && definitions.Select(box => box.Name).Distinct(StringComparer.Ordinal).Count() == 14
             && layout.TraversalBoxes.All(box =>
                 !box.Name.StartsWith("GuardRail", StringComparison.Ordinal));
         if (!contractReady)
@@ -201,7 +201,7 @@ public partial class FreightTerminalWorld
     {
         const float thickness = 0.28f;
         const float height = 1.10f;
-        var rails = new List<BazaarGuardRailExpectation>(15)
+        var rails = new List<BazaarGuardRailExpectation>(14)
         {
             new(
                 "GuardRailAGalleryInner",
@@ -218,14 +218,6 @@ public partial class FreightTerminalWorld
                 new Vector3(thickness, height, 14.8f),
                 Vector3.Zero,
                 Vector3.Right,
-                false),
-            new(
-                "GuardRailMidMezzanineInner",
-                "TraversalMidMezzanineDeck",
-                layout.Origin + new Vector3(-3.0f, 3.75f, 24.0f),
-                new Vector3(thickness, height, 14.0f),
-                Vector3.Zero,
-                Vector3.Left,
                 false)
         };
         BazaarAddExpectedStairGuardRails(

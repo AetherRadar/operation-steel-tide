@@ -141,7 +141,7 @@ public partial class FreightTerminalWorld
             && serviceLayoutClear
             && servicePhysicalClear;
         var openApproachStairsReady = BazaarOpenApproachStairEntriesReady(
-            layout, out var openApproachStairFailures);
+            layout, GetWorld3D(), out var openApproachStairFailures);
         var retakeChoicesReady = layout.SiteRotationPath.Count >= 10
             && layout.AuxiliaryPaths.Count == 4
             && layout.AuxiliaryPaths[0].All(point => Mathf.Abs(point.Y - layout.Origin.Y) <= 0.3f)
@@ -190,6 +190,10 @@ public partial class FreightTerminalWorld
             return;
         }
 
+        var aRearPortalsReady = BazaarARearPortalsReady(
+            layout, GetWorld3D(), out var aRearPortalFailures);
+        var midMezzanineConnectionReady = BazaarMidMezzanineConnectionReady(
+            layout, GetWorld3D(), out var midMezzanineConnectionFailures);
         var traversalReady = BazaarTraversalGeometryReady(layout, out var traversalFailures);
         var guardRails = BazaarGuardRailPhysicsReady(GetWorld3D(), arena);
         var interiorLighting = BazaarInteriorLightingReady(arena.Root, layout);
@@ -258,6 +262,7 @@ public partial class FreightTerminalWorld
         var stairWalkFailures = string.Join('|', stairWalks
             .Where(walk => !walk.Ready)
             .Select(walk => $"{walk.Name}:{walk.Ascended}:{walk.Descended}:{walk.AscendGain:0.00}:{walk.DescendLoss:0.00}"));
+        var playerMidConnection = await BazaarWalkPlayerAcrossMidMezzanine(layout);
 
         var dressingRoot = arena.Root.GetNodeOrNull<Node3D>("DemolitionAuthoredDressing");
         var authoredModelCount = dressingRoot?.GetMeta("authored_model_count").AsInt32() ?? 0;
@@ -312,6 +317,8 @@ public partial class FreightTerminalWorld
             && retakeChoicesReady
             && sightlinesReady
             && density.Ready
+            && aRearPortalsReady
+            && midMezzanineConnectionReady
             && traversalReady
             && guardRails.Ready
             && interiorLighting.Ready
@@ -321,6 +328,7 @@ public partial class FreightTerminalWorld
             && postPatrolReady
             && aiDirectivesReady
             && playerStairsReady
+            && playerMidConnection.Ready
             && detachedFoyerBafflesRemoved
             && authoredVisualsReady
             && siblingNamesReady
@@ -345,6 +353,8 @@ public partial class FreightTerminalWorld
             + $"detached_baffles={density.DetachedFullHeightBaffleCount} "
             + $"def_route={density.DefenderRoutesEfficient}:{density.MaximumDefenderRouteStretch:0.000}:"
             + $"{density.DefenderRouteProfile} failures={density.Failures} "
+            + $"a_rear_portals={aRearPortalsReady} failures={aRearPortalFailures} "
+            + $"mid_connection={midMezzanineConnectionReady} failures={midMezzanineConnectionFailures} "
             + $"traversal={traversalReady}:decks3:ramps6 failures={traversalFailures} "
             + $"guardrails={guardRails.Ready}:{guardRails.RailCount} "
             + $"rail_contract={guardRails.ContractReady} rail_runtime={guardRails.RuntimeReady} "
@@ -360,6 +370,7 @@ public partial class FreightTerminalWorld
             + $"post_patrol={postPatrolReady} "
             + $"ai_directives={aiDirectivesReady} result={aiTraversal.Summary} failures={aiDirectiveFailures} "
             + $"player_stairs={playerStairsReady}:{stairWalks.Count} failures={stairWalkFailures} "
+            + $"player_mid_connection={playerMidConnection.Ready}:{playerMidConnection.Summary} "
             + $"detached_foyer_baffles_removed={detachedFoyerBafflesRemoved} "
             + $"authored={authoredVisualsReady}:1/{missingModelCount} meshes={visibleMeshCount} failures={authoredVisualFailures} "
             + $"siblings={siblingNamesReady} sibling_failures={siblingFailures} "

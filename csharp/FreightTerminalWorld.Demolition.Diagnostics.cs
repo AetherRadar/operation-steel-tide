@@ -906,8 +906,17 @@ public partial class FreightTerminalWorld
             pair => pair.Key,
             pair => pair.Value.CloneForDiagnostics());
         var savedSquadRouteFallbacks = _demolitionSquadRouteFallbacks.ToArray();
+        var savedEscortProjections = _demolitionEscortProjections.ToArray();
+        var savedEscortFanOut = _demolitionEscortOpeningFanOut.ToArray();
+        var savedEscortForcedRecoveryRetry = _demolitionEscortForcedRecoveryRetry.ToArray();
         var savedSquadRoutePlans = DemolitionSquadRoutePlansForDiagnostics;
         var savedSquadRouteReuses = DemolitionSquadRouteReusesForDiagnostics;
+        var savedEscortProjectionPlans = DemolitionEscortProjectionRoutePlansForDiagnostics;
+        var savedEscortProjectionMaximumPlans = DemolitionEscortProjectionMaximumPlansForDiagnostics;
+        var savedEscortTotalPlans = DemolitionEscortTotalRoutePlansForDiagnostics;
+        var savedEscortMaximumRefreshPlans = DemolitionEscortMaximumRefreshPlansForDiagnostics;
+        var savedEscortMaximumRefreshMicroseconds = DemolitionEscortMaximumRefreshMicrosecondsForDiagnostics;
+        var savedEscortForcedRecoveryRequests = DemolitionEscortForcedRecoveryRequestsForDiagnostics;
         var savedOpponentNavigation = _demolitionOpponents
             .Where(IsInstanceValid)
             .ToDictionary(
@@ -934,6 +943,12 @@ public partial class FreightTerminalWorld
         _hud.BeginRadioMessageSuppressionForDiagnostics();
         try
         {
+            DemolitionEscortProjectionRoutePlansForDiagnostics = 0;
+            DemolitionEscortProjectionMaximumPlansForDiagnostics = 0;
+            DemolitionEscortTotalRoutePlansForDiagnostics = 0;
+            DemolitionEscortMaximumRefreshPlansForDiagnostics = 0;
+            DemolitionEscortMaximumRefreshMicrosecondsForDiagnostics = 0;
+            DemolitionEscortForcedRecoveryRequestsForDiagnostics = 0;
             // Keep the live cursor object untouched so the diagnostic can restore the
             // exact pre-check route instead of returning a newly planned approximation.
             ResetDemolitionOpponentRoute(probe);
@@ -1334,6 +1349,148 @@ public partial class FreightTerminalWorld
             var productionApproachesClear = demolitionLayouts.All(map =>
                 map.HasCapsuleClearance(map.AttackApproachToAPath, out _)
                 && map.HasCapsuleClearance(map.AttackApproachToBPath, out _));
+            var productionEscortPoints = demolitionLayouts.SelectMany(map =>
+            {
+                var planner = new DemolitionRoutePlanner(map);
+                return map.AttackSpawns.SelectMany((carrierSpawn, carrierIndex) =>
+                {
+                    return map.SitePositions.SelectMany((site, siteIndex) =>
+                    {
+                        var approach = siteIndex == 0
+                            ? map.AttackApproachToAPath
+                            : map.AttackApproachToBPath;
+                        var laneForward = approach.Count >= 2
+                            ? approach[1] - approach[0]
+                            : site - carrierSpawn;
+                        var forwardVariants = new[]
+                        {
+                            (Name: "midpoint", Forward: map.Midpoint - carrierSpawn),
+                            (Name: "site", Forward: site - carrierSpawn),
+                            (Name: "lane", Forward: laneForward)
+                        };
+                        return forwardVariants.SelectMany(variant =>
+                            Enumerable.Range(1, map.AttackSpawns.Count - 1)
+                                .Where(escortSlot => escortSlot != carrierIndex)
+                                .Select(escortSlot =>
+                            {
+                                var escortStart = map.AttackSpawns[escortSlot];
+                                var preferred = ResolveDemolitionEscortPreferredDestination(
+                                    escortSlot,
+                                    carrierSpawn,
+                                    variant.Forward);
+                                var projected = TryProjectDemolitionEscortDestination(
+                                    map,
+                                    planner,
+                                    escortStart,
+                                    carrierSpawn,
+                                    preferred,
+                                    DemolitionTeam.Attackers,
+                                    out var resolved,
+                                    out var projectionPlans);
+                                var usedStrategyFallback = !projected;
+                                if (usedStrategyFallback)
+                                {
+                                    resolved = map.StrategyTarget(siteIndex == 0
+                                        ? "attack_support_a"
+                                        : "attack_support_b");
+                                }
+                                var route = planner.Plan(
+                                    escortStart,
+                                    resolved,
+                                    DemolitionTeam.Attackers);
+                                return new
+                                {
+                                    map.MapId,
+                                    CarrierIndex = carrierIndex,
+                                    CarrierX = carrierSpawn.X,
+                                    SiteIndex = siteIndex,
+                                    variant.Name,
+                                    EscortSlot = escortSlot,
+                                    ProjectionPlans = projectionPlans,
+                                    TotalPlans = projectionPlans + 1,
+                                    Resolved = projected || usedStrategyFallback,
+                                    Clear = map.HasCapsulePointClearance(resolved, out _),
+                                    Reachable = route.ReachesDestination
+                                        && planner.IsRouteClear(escortStart, route.Waypoints),
+                                    Moves = resolved.DistanceSquaredTo(escortStart) >= 1.0f
+                                };
+                            }));
+                    });
+                });
+            }).ToArray();
+            var expectedProductionEscortPointCount = demolitionLayouts.Sum(map =>
+                (map.AttackSpawns.Count - 1) * (map.AttackSpawns.Count - 1)
+                    * map.SitePositions.Count * 3);
+            var productionEscortPointsValid = productionEscortPoints.All(point =>
+                point.Resolved && point.Clear && point.Reachable && point.Moves)
+                && productionEscortPoints.Length == expectedProductionEscortPointCount;
+            var productionEscortProjectionBudget = productionEscortPoints.All(point =>
+                point.ProjectionPlans is >= 0 and <= DemolitionEscortMaximumProjectionRoutePlans
+                    && point.TotalPlans <= DemolitionEscortMaximumTotalRoutePlansPerRefresh);
+            var bazaarEscortPoints = productionEscortPoints
+                .Where(point => point.MapId == DemolitionMapCatalog.BazaarCrossingId)
+                .ToArray();
+            var bazaarLeftEdge = bazaarEscortPoints.Min(point => point.CarrierX);
+            var bazaarRightEdge = bazaarEscortPoints.Max(point => point.CarrierX);
+            var bazaarEdgeEscortPointsValid = bazaarEscortPoints
+                .Where(point => Mathf.IsEqualApprox(point.CarrierX, bazaarLeftEdge)
+                    || Mathf.IsEqualApprox(point.CarrierX, bazaarRightEdge))
+                .All(point => point.Resolved
+                    && point.Clear
+                    && point.Reachable
+                    && point.Moves
+                    && point.ProjectionPlans <= DemolitionEscortMaximumProjectionRoutePlans);
+            var bazaarWallEdgeLateralRecovery = false;
+            var bazaarWallEdgeLateralProfile = "none";
+            var bazaarLayout = demolitionLayouts.First(map =>
+                map.MapId == DemolitionMapCatalog.BazaarCrossingId);
+            var bazaarPlanner = new DemolitionRoutePlanner(bazaarLayout);
+            foreach (var wall in bazaarLayout.CollisionBoxes
+                         .Where(box => box.Size.Y >= 2.0f
+                             && Mathf.Min(box.Size.X, box.Size.Z) <= 0.65f
+                             && Mathf.Max(box.Size.X, box.Size.Z) >= 3.0f)
+                         .OrderBy(box => box.Name, StringComparer.Ordinal))
+            {
+                var basis = new Basis(Quaternion.FromEuler(wall.Rotation));
+                var longAxis = wall.Size.X >= wall.Size.Z
+                    ? basis * Vector3.Right
+                    : basis * Vector3.Forward;
+                longAxis.Y = 0.0f;
+                longAxis = longAxis.Normalized();
+                var preferred = wall.Center
+                    + longAxis * (Mathf.Max(wall.Size.X, wall.Size.Z) * 0.5f - 0.45f);
+                preferred.Y = bazaarLayout.AttackSpawn.Y;
+                if (bazaarLayout.HasCapsulePointClearance(preferred, out _))
+                {
+                    continue;
+                }
+                var start = bazaarLayout.AttackSpawns
+                    .OrderBy(spawn => spawn.DistanceSquaredTo(preferred))
+                    .First();
+                var projected = TryProjectDemolitionEscortDestination(
+                    bazaarLayout,
+                    bazaarPlanner,
+                    start,
+                    preferred + longAxis,
+                    preferred,
+                    DemolitionTeam.Attackers,
+                    out var resolved,
+                    out var projectionPlans);
+                var lateral = new Vector3(-longAxis.Z, 0.0f, longAxis.X);
+                var displacement = resolved - preferred;
+                var lateralDistance = Mathf.Abs(displacement.Dot(lateral));
+                var forwardDistance = Mathf.Abs(displacement.Dot(longAxis));
+                if (!projected
+                    || lateralDistance < 0.75f
+                    || forwardDistance > 0.25f
+                    || projectionPlans > DemolitionEscortMaximumProjectionRoutePlans)
+                {
+                    continue;
+                }
+                bazaarWallEdgeLateralRecovery = true;
+                bazaarWallEdgeLateralProfile = $"{wall.Name}:{projectionPlans}:{lateralDistance:0.00}";
+                break;
+            }
             var expectedProductionRouteCount = demolitionLayouts.Sum(map =>
                 map.AttackSpawns.Count * map.SitePositions.Count);
             var productionRoutesValid = productionMapCoverage
@@ -1778,6 +1935,17 @@ public partial class FreightTerminalWorld
             var carrierThreatKeepsObjective = false;
             var aiCarrierEscort = false;
             var playerCarrierEscort = false;
+            var openingEscortFansOut = false;
+            var openingEscortFanOutLatched = false;
+            var blockedEscortFallsBack = false;
+            var escortFallbackMoves = false;
+            var escortFallbackSupported = false;
+            var escortRouteRejectsVoid = false;
+            var physicalEscortLanding = false;
+            var runtimeEscortProjectionBudget = false;
+            var runtimeEscortTotalBudget = false;
+            var noSafeEscortHolds = false;
+            var noSafeEscortRetries = false;
             var groundedPlayerRunnerReleased = false;
             var hiddenThreatIgnored = false;
             var visibleThreatYields = false;
@@ -1841,6 +2009,194 @@ public partial class FreightTerminalWorld
                     threatAge: 100.0f);
                 aiCarrierEscort = TryGetDemolitionEscortTarget(escortMate, out var aiLeader)
                     && ReferenceEquals(aiLeader, aiCarrier);
+
+                var escortStrategyKey = _demolitionSquadAssignmentTargets.TryGetValue(
+                    escortMate,
+                    out var assignedEscortStrategy)
+                        ? assignedEscortStrategy
+                        : "attack_support_a";
+                _demolitionSquadAssignmentTargets[escortMate] = escortStrategyKey;
+                var escortStrategyTarget = layout.StrategyTarget(escortStrategyKey);
+                var edgeSpawns = layout.AttackSpawns
+                    .OrderBy(spawn => spawn.X)
+                    .ToArray();
+                aiCarrier.GlobalPosition = edgeSpawns[0];
+                escortMate.GlobalPosition = edgeSpawns[^1];
+                ClearSquadNavigation(escortMate);
+                var openingPreferred = aiCarrier.GlobalPosition
+                    + new Vector3(-4.0f, 0.0f, 2.0f);
+                openingEscortFansOut = TryResolveDemolitionEscortDestination(
+                        escortMate,
+                        aiCarrier,
+                        openingPreferred,
+                        out var openingResolved)
+                    && openingResolved.DistanceTo(escortStrategyTarget) < 0.25f;
+                escortMate.GlobalPosition = escortStrategyTarget;
+                var fanOutEgressDirection = edgeSpawns[0] - layout.AttackSpawn;
+                fanOutEgressDirection.Y = 0.0f;
+                fanOutEgressDirection = fanOutEgressDirection.LengthSquared() > 0.01f
+                    ? fanOutEgressDirection.Normalized()
+                    : Vector3.Left;
+                aiCarrier.GlobalPosition = edgeSpawns[0]
+                    + fanOutEgressDirection * 8.5f;
+                ClearSquadNavigation(escortMate);
+                var latchedEscortResolved = TryResolveDemolitionEscortDestination(
+                    escortMate,
+                    aiCarrier,
+                    openingPreferred,
+                    out var latchedResolved);
+                openingEscortFanOutLatched = layout.AttackSpawns.All(spawn =>
+                        HorizontalDistance(spawn, aiCarrier.GlobalPosition)
+                            > DemolitionEscortOpeningFanOutEnterRadius)
+                    && latchedEscortResolved
+                    && latchedResolved.DistanceTo(escortStrategyTarget) < 0.25f;
+
+                aiCarrier.GlobalPosition = layout.Midpoint;
+                escortMate.GlobalPosition = layout.AttackSpawn;
+                ClearSquadNavigation(escortMate);
+                var blockedPreferred = layout.Origin + new Vector3(400.0f, 0.2f, 400.0f);
+                blockedEscortFallsBack = TryResolveDemolitionEscortDestination(
+                        escortMate,
+                        aiCarrier,
+                        blockedPreferred,
+                        out var blockedResolved)
+                    && blockedResolved.DistanceTo(escortStrategyTarget) < 0.25f;
+                var fallbackDirective = ResolveSquadNavigationDestination(
+                    escortMate,
+                    blockedResolved,
+                    emergency: false);
+                escortFallbackMoves = fallbackDirective.Target.DistanceSquaredTo(
+                    escortMate.GlobalPosition) >= 0.25f;
+                var validatedFallbackRoute = routePlanner.Plan(
+                    escortMate.GlobalPosition,
+                    blockedResolved,
+                    DemolitionTeam.Attackers);
+                escortFallbackSupported = TryGroundDemolitionEscortPoint(
+                        escortMate,
+                        blockedResolved,
+                        out var groundedFallbackDirective)
+                    && groundedFallbackDirective.DistanceTo(blockedResolved) < 0.12f
+                    && validatedFallbackRoute.ReachesDestination
+                    && routePlanner.IsRouteClear(
+                        escortMate.GlobalPosition,
+                        validatedFallbackRoute.Waypoints)
+                    && IsDemolitionEscortRoutePhysicallyTraversable(
+                        escortMate,
+                        escortMate.GlobalPosition,
+                        validatedFallbackRoute.Waypoints);
+                var unsupportedVoidRoute = new[]
+                {
+                    escortMate.GlobalPosition + Vector3.Right * 1.5f,
+                    escortMate.GlobalPosition + Vector3.Right * 3.0f + Vector3.Up * 5.0f
+                };
+                escortRouteRejectsVoid = !IsDemolitionEscortRoutePhysicallyTraversable(
+                    escortMate,
+                    escortMate.GlobalPosition,
+                    unsupportedVoidRoute);
+
+                ClearSquadNavigation(escortMate);
+                var carrierForward = layout.SitePositions[plannedSite] - aiCarrier.GlobalPosition;
+                var physicalPreferred = ResolveDemolitionEscortPreferredDestination(
+                    escortMate.SquadSlot,
+                    aiCarrier.GlobalPosition,
+                    carrierForward);
+                var plansBeforePhysicalProjection = DemolitionEscortProjectionRoutePlansForDiagnostics;
+                var physicalEscortResolved = TryResolveDemolitionEscortDestination(
+                    escortMate,
+                    aiCarrier,
+                    physicalPreferred,
+                    out var physicalResolved);
+                var physicalRoute = routePlanner.Plan(
+                    escortMate.GlobalPosition,
+                    physicalResolved,
+                    DemolitionTeam.Attackers);
+                physicalEscortLanding = physicalEscortResolved
+                    && TryGroundDemolitionEscortPoint(
+                        escortMate,
+                        physicalResolved,
+                        out var groundedPhysicalResolved)
+                    && groundedPhysicalResolved.DistanceTo(physicalResolved) < 0.12f
+                    && layout.HasCapsulePointClearance(physicalResolved, out _)
+                    && physicalRoute.ReachesDestination
+                    && routePlanner.IsRouteClear(escortMate.GlobalPosition, physicalRoute.Waypoints)
+                    && IsDemolitionEscortRoutePhysicallyTraversable(
+                        escortMate,
+                        escortMate.GlobalPosition,
+                        physicalRoute.Waypoints);
+                runtimeEscortProjectionBudget = DemolitionEscortProjectionRoutePlansForDiagnostics
+                        - plansBeforePhysicalProjection
+                        <= DemolitionEscortMaximumProjectionRoutePlans
+                    && DemolitionEscortProjectionMaximumPlansForDiagnostics
+                        <= DemolitionEscortMaximumProjectionRoutePlans;
+                runtimeEscortTotalBudget = DemolitionEscortMaximumRefreshPlansForDiagnostics
+                        <= DemolitionEscortMaximumTotalRoutePlansPerRefresh
+                    && DemolitionEscortTotalRoutePlansForDiagnostics > 0
+                    && DemolitionEscortMaximumRefreshMicrosecondsForDiagnostics <= 50000;
+
+                // An airborne escort has no physically continuous route from its current
+                // capsule. This is a normal transient miss: it must return false without
+                // throwing, hold at the current point, request recovery, then succeed once
+                // grounded and the short retry window elapses.
+                ClearSquadNavigation(escortMate);
+                _demolitionEscortForcedRecoveryRetry.Remove(escortMate);
+                escortMate.GlobalPosition = layout.AttackSpawn + Vector3.Up * 8.0f;
+                aiCarrier.GlobalPosition = layout.Midpoint;
+                var airbornePreferred = ResolveDemolitionEscortPreferredDestination(
+                    escortMate.SquadSlot,
+                    aiCarrier.GlobalPosition,
+                    layout.SitePositions[plannedSite] - aiCarrier.GlobalPosition);
+                var recoveryRequestsBefore = DemolitionEscortForcedRecoveryRequestsForDiagnostics;
+                var airborneResolved = TryResolveDemolitionEscortDestination(
+                    escortMate,
+                    aiCarrier,
+                    airbornePreferred,
+                    out var airborneDestination);
+                if (!airborneResolved)
+                {
+                    RequestDemolitionEscortNavigationRecovery(escortMate);
+                }
+                ulong forcedRetryAt = 0;
+                noSafeEscortHolds = !airborneResolved
+                    && airborneDestination.DistanceSquaredTo(escortMate.GlobalPosition) < 0.01f
+                    && DemolitionEscortForcedRecoveryRequestsForDiagnostics
+                        == recoveryRequestsBefore + 1
+                    && _demolitionEscortForcedRecoveryRetry.TryGetValue(
+                        escortMate,
+                        out forcedRetryAt)
+                    && forcedRetryAt > Time.GetTicksMsec();
+                RequestDemolitionEscortNavigationRecovery(escortMate);
+                noSafeEscortHolds = noSafeEscortHolds
+                    && DemolitionEscortForcedRecoveryRequestsForDiagnostics
+                        == recoveryRequestsBefore + 1
+                    && _demolitionEscortForcedRecoveryRetry.TryGetValue(
+                        escortMate,
+                        out var unchangedRetryAt)
+                    && unchangedRetryAt == forcedRetryAt;
+
+                _demolitionEscortForcedRecoveryRetry.Remove(escortMate);
+                escortMate.GlobalPosition = layout.AttackSpawn;
+                ClearSquadNavigation(escortMate);
+                var groundedPreferred = ResolveDemolitionEscortPreferredDestination(
+                    escortMate.SquadSlot,
+                    aiCarrier.GlobalPosition,
+                    layout.SitePositions[plannedSite] - aiCarrier.GlobalPosition);
+                var groundedRetryResolved = TryResolveDemolitionEscortDestination(
+                    escortMate,
+                    aiCarrier,
+                    groundedPreferred,
+                    out var groundedRetryDestination);
+                var groundedRetryDirective = groundedRetryResolved
+                    ? ResolveSquadNavigationDestination(
+                        escortMate,
+                        groundedRetryDestination,
+                        emergency: false)
+                    : SquadNavigationDirective.Walk(escortMate.GlobalPosition);
+                noSafeEscortRetries = groundedRetryResolved
+                    && groundedRetryDestination.DistanceSquaredTo(escortMate.GlobalPosition)
+                        >= DemolitionEscortMinimumMoveDistance * DemolitionEscortMinimumMoveDistance
+                    && groundedRetryDirective.Target.DistanceSquaredTo(escortMate.GlobalPosition)
+                        >= 0.25f
+                    && !_demolitionEscortForcedRecoveryRetry.ContainsKey(escortMate);
 
                 // Cached combat memory behind solid geometry is not an actionable
                 // contact.  It must not detach an escort or freeze a post forever.
@@ -1988,6 +2344,10 @@ public partial class FreightTerminalWorld
                 && carrierCommitmentScoped
                 && rightLaneOpensRight
                 && productionApproachesClear
+                && productionEscortPointsValid
+                && productionEscortProjectionBudget
+                && bazaarEdgeEscortPointsValid
+                && bazaarWallEdgeLateralRecovery
                 && productionRoutesValid
                 && productionRoutesOpenCorrectSide
                 && productionRoutesDepthSafe
@@ -2009,6 +2369,17 @@ public partial class FreightTerminalWorld
                 && carrierThreatKeepsObjective
                 && aiCarrierEscort
                 && playerCarrierEscort
+                && openingEscortFansOut
+                && openingEscortFanOutLatched
+                && blockedEscortFallsBack
+                && escortFallbackMoves
+                && escortFallbackSupported
+                && escortRouteRejectsVoid
+                && physicalEscortLanding
+                && runtimeEscortProjectionBudget
+                && runtimeEscortTotalBudget
+                && noSafeEscortHolds
+                && noSafeEscortRetries
                 && groundedPlayerRunnerReleased
                 && hiddenThreatIgnored
                 && visibleThreatYields
@@ -2017,7 +2388,7 @@ public partial class FreightTerminalWorld
                 && staleMoveRecovered
                 && defuserPostProtected
                 && postPatrolLayouts;
-            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} friendly_ai_plant_under_contact={friendlyAiPlantsDevice} carrier_destination={carrierDestinationFollowsDevice} carrier_contact_priority={carrierThreatKeepsObjective} ai_carrier_escort={aiCarrierEscort} player_carrier_escort={playerCarrierEscort} grounded_player_reassigned={groundedPlayerRunnerReleased} hidden_threat_ignored={hiddenThreatIgnored} visible_threat_yields={visibleThreatYields} post_patrol={postPatrolReactivated} post_second_hop={postPatrolSecondHop} stale_move_recovered={staleMoveRecovered} defuser_post_protected={defuserPostProtected} post_layouts={postPatrolLayouts} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} team_unreachable={teamAwareUnreachableSafe} soft_direct={softPenaltyDirectReachable} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} frontier_fallback={frontierFallback} frontier_stable={frontierFallbackStable} frontier_replans={frontierReplans} frontier_directive_distance={frontierDirectiveDistance:0.00} reachable_route_preserved={reachableRoutePreserved} opening_patterns={openingPatterns} round_sites={roundSiteVariety}:{roundPreferredSites[0]}/{roundPreferredSites[1]} route_cost_override={routeCostOverridesRoundPreference} unreachable_override={unreachableRouteOverridesRoundPreference} unreachable_excluded={unreachableRouteRemainsExcluded} committed_site_stable={committedSiteStable} confirmed_threat_rotates={confirmedThreatRotates} threat_deduplicated={duplicateThreatReportsDeduplicated} urgent_commitment={urgentCommitmentPreserved} plant_channel_lock={plantChannelLocksSite} carrier_commitment_scoped={carrierCommitmentScoped} tideforge_selection={tideforgeSelectionStable} right_lane_opening={rightLaneOpensRight} production_maps={productionMapCoverage}:{demolitionLayouts.Length} approaches_clear={productionApproachesClear} production_routes={productionRoutesValid}:count={productionRoutes.Length}:profiles={productionRouteProfiles} opening_sides={productionRoutesOpenCorrectSide} route_depth={productionRoutesDepthSafe} route_efficiency={productionRoutesEfficient}:max={productionRoutes.Max(route => route.Stretch):0.000} spawn_avoidance={attackerRoutesAvoidDefenderSpawn} defender_routes={defenderProductionRoutesValid}:count={defenderProductionRoutes.Length} defender_efficiency={defenderProductionRoutesEfficient}:max={defenderProductionRoutes.Max(route => route.Stretch):0.000} defender_spawn_avoidance={defenderRoutesAvoidAttackerSpawn} overshot_retreat={overshotCarrierRetreats} posts={postsConverted} squad_route={squadRouteNavigation} squad_route_reuse={squadRouteReuse} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
+            GD.Print($"DEMOLITION_TACTICAL_AI_CHECK valid={valid} yield={yieldedToCombat} resume={resumedObjective} smoke_resume={smokeResumesObjective} channel_guard={channelHoldsUnderFire} carrier_transfer={carrierTransferResetsChannel} strategy_channel={strategyRefreshPreservesChannel} strategy_reassign={strategyRefreshReassignsLostChannel} strategy_phase_clear={strategyRefreshClearsChangedPhase} friendly_ai_plant_under_contact={friendlyAiPlantsDevice} carrier_destination={carrierDestinationFollowsDevice} carrier_contact_priority={carrierThreatKeepsObjective} ai_carrier_escort={aiCarrierEscort} player_carrier_escort={playerCarrierEscort} escort_fanout={openingEscortFansOut} escort_fanout_latched={openingEscortFanOutLatched} escort_fallback={blockedEscortFallsBack} escort_moves={escortFallbackMoves} escort_fallback_supported={escortFallbackSupported} escort_void_rejected={escortRouteRejectsVoid} escort_physical={physicalEscortLanding} escort_plan_budget={runtimeEscortProjectionBudget}:{DemolitionEscortProjectionMaximumPlansForDiagnostics} escort_total_budget={runtimeEscortTotalBudget}:{DemolitionEscortMaximumRefreshPlansForDiagnostics}/{DemolitionEscortMaximumTotalRoutePlansPerRefresh}:{DemolitionEscortMaximumRefreshMicrosecondsForDiagnostics}us escort_no_safe_hold={noSafeEscortHolds} escort_no_safe_retry={noSafeEscortRetries} grounded_player_reassigned={groundedPlayerRunnerReleased} hidden_threat_ignored={hiddenThreatIgnored} visible_threat_yields={visibleThreatYields} post_patrol={postPatrolReactivated} post_second_hop={postPatrolSecondHop} stale_move_recovered={staleMoveRecovered} defuser_post_protected={defuserPostProtected} post_layouts={postPatrolLayouts} pure_channels={objectiveChannels} time_pressure={switchedUnderPressure} detour_points={detourResult.Waypoints.Count} route_clear={detourRoutesAroundWall} unreachable_safe={unreachableSafe} team_unreachable={teamAwareUnreachableSafe} soft_direct={softPenaltyDirectReachable} unreachable_retry={unreachableRetries} route_recovery={routeRecovery} runtime_route={runtimeRoute} frontier_fallback={frontierFallback} frontier_stable={frontierFallbackStable} frontier_replans={frontierReplans} frontier_directive_distance={frontierDirectiveDistance:0.00} reachable_route_preserved={reachableRoutePreserved} opening_patterns={openingPatterns} round_sites={roundSiteVariety}:{roundPreferredSites[0]}/{roundPreferredSites[1]} route_cost_override={routeCostOverridesRoundPreference} unreachable_override={unreachableRouteOverridesRoundPreference} unreachable_excluded={unreachableRouteRemainsExcluded} committed_site_stable={committedSiteStable} confirmed_threat_rotates={confirmedThreatRotates} threat_deduplicated={duplicateThreatReportsDeduplicated} urgent_commitment={urgentCommitmentPreserved} plant_channel_lock={plantChannelLocksSite} carrier_commitment_scoped={carrierCommitmentScoped} tideforge_selection={tideforgeSelectionStable} right_lane_opening={rightLaneOpensRight} production_maps={productionMapCoverage}:{demolitionLayouts.Length} approaches_clear={productionApproachesClear} escort_points={productionEscortPointsValid}:count={productionEscortPoints.Length} escort_point_budget={productionEscortProjectionBudget}:max={productionEscortPoints.Max(point => point.ProjectionPlans)}/{productionEscortPoints.Max(point => point.TotalPlans)} bazaar_edge_escort={bazaarEdgeEscortPointsValid} bazaar_wall_lateral={bazaarWallEdgeLateralRecovery}:{bazaarWallEdgeLateralProfile} production_routes={productionRoutesValid}:count={productionRoutes.Length}:profiles={productionRouteProfiles} opening_sides={productionRoutesOpenCorrectSide} route_depth={productionRoutesDepthSafe} route_efficiency={productionRoutesEfficient}:max={productionRoutes.Max(route => route.Stretch):0.000} spawn_avoidance={attackerRoutesAvoidDefenderSpawn} defender_routes={defenderProductionRoutesValid}:count={defenderProductionRoutes.Length} defender_efficiency={defenderProductionRoutesEfficient}:max={defenderProductionRoutes.Max(route => route.Stretch):0.000} defender_spawn_avoidance={defenderRoutesAvoidAttackerSpawn} overshot_retreat={overshotCarrierRetreats} posts={postsConverted} squad_route={squadRouteNavigation} squad_route_reuse={squadRouteReuse} intel_avoids_stack={plannerAvoidsStackedSite} blackboard={blackboardSeesAlertedOpponents} relay={relayTakesOver}");
             return valid;
         }
         finally
@@ -2117,8 +2488,29 @@ public partial class FreightTerminalWorld
             {
                 _demolitionSquadRouteFallbacks[mate] = fallback;
             }
+            _demolitionEscortProjections.Clear();
+            foreach (var (mate, projection) in savedEscortProjections)
+            {
+                _demolitionEscortProjections[mate] = projection;
+            }
+            _demolitionEscortOpeningFanOut.Clear();
+            foreach (var (mate, leaderId) in savedEscortFanOut)
+            {
+                _demolitionEscortOpeningFanOut[mate] = leaderId;
+            }
+            _demolitionEscortForcedRecoveryRetry.Clear();
+            foreach (var (mate, retryAt) in savedEscortForcedRecoveryRetry)
+            {
+                _demolitionEscortForcedRecoveryRetry[mate] = retryAt;
+            }
             DemolitionSquadRoutePlansForDiagnostics = savedSquadRoutePlans;
             DemolitionSquadRouteReusesForDiagnostics = savedSquadRouteReuses;
+            DemolitionEscortProjectionRoutePlansForDiagnostics = savedEscortProjectionPlans;
+            DemolitionEscortProjectionMaximumPlansForDiagnostics = savedEscortProjectionMaximumPlans;
+            DemolitionEscortTotalRoutePlansForDiagnostics = savedEscortTotalPlans;
+            DemolitionEscortMaximumRefreshPlansForDiagnostics = savedEscortMaximumRefreshPlans;
+            DemolitionEscortMaximumRefreshMicrosecondsForDiagnostics = savedEscortMaximumRefreshMicroseconds;
+            DemolitionEscortForcedRecoveryRequestsForDiagnostics = savedEscortForcedRecoveryRequests;
             _demolitionSquadAssignmentTargets.Clear();
             foreach (var (mate, targetKey) in savedSquadTargets)
             {
