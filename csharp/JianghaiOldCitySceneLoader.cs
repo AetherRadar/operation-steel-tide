@@ -373,6 +373,26 @@ internal sealed class JianghaiOldCitySceneLoader
         _loadedScene = null;
     }
 
+    public int ReleaseBatchedSourceNodes()
+    {
+        var root = _loadedScene?.Root;
+        if (root?.HasMeta("jianghai_released_batched_source_count") == true)
+        {
+            return root.GetMeta("jianghai_released_batched_source_count").AsInt32();
+        }
+        var release = _renderBatcher.ReleaseLeafSourceNodes();
+        root?.SetMeta(
+            "jianghai_released_batched_source_count",
+            release.Released);
+        root?.SetMeta(
+            "jianghai_retained_batched_source_count",
+            release.Retained);
+        root?.SetMeta(
+            "jianghai_blocked_batched_source_count",
+            release.Blocked);
+        return release.Released;
+    }
+
     /// <summary>Applies authored-city visibility and shadow policy for the selected quality tier.</summary>
     public void ApplyQuality(int qualityTier)
     {

@@ -538,9 +538,10 @@ static runtime scene:
   solararchitect's Hero Mountain were acquired on 2026-08-29.
 
 The current visible-building delivery is the project-authored Blender rebuild
-completed on 2026-08-29. It replaces 66 old visible anchors with three shared
-Chinese-profile meshes and contains 42 authored density placements, including
-the west/east `Edge04`-`Edge06` placements. The source mapping is:
+completed on 2026-08-29 and expanded on 2026-08-30. It replaces 66 old visible
+anchors with three shared Chinese-profile meshes and contains 50 authored
+density placements, including the west/east `Edge04`-`Edge06` and
+`Infill05`-`Infill08` placements. The source mapping is:
 
 - the hall profile is an adapted LOD of Free poly's CC0 **Chinese Temple 2**;
 - the arcade-shop and gate-house profiles use clean Quaternius Buildings Pack
@@ -550,7 +551,7 @@ the west/east `Edge04`-`Edge06` placements. The source mapping is:
   assets remain available as the already licensed district dressing and
   supporting modules recorded below.
 
-Six reviewed main-street arcade shops have unique Blender-authored doorway
+Twelve reviewed shops and residences have unique Blender-authored doorway
 apertures and retained provenance metadata. Their surrounding facades still
 derive from the same registered Chinese-profile sources above; no new external
 building asset was acquired. The apertures are created offline by mesh-plane
@@ -558,8 +559,10 @@ splitting and face removal so the non-manifold joined source meshes do not leave
 runtime or invisible boolean plugs. The final cleanup removes only the obsolete
 `JianghaiExpansion_Facade_EastPhoto_F0_C1_Insert` that covered the East Photo
 House opening; the adjacent `F0_C1_Wall` and `WestClock` facade art remain. The
-read-only audit passes 18/18 doorway probes on the six building bodies, 18/18
-structural wall/lintel probes, and 18/18 full-scene doorway probes. Its negative
+read-only audit passes 108/108 doorway probes on the 12 building bodies, 36/36
+structural wall/lintel probes, and 108/108 full-scene doorway probes. Twelve
+five-sided opaque DCC-authored liners share one 44-triangle mesh and two existing
+brick materials; their 60 closure and 108 entry probes pass. The negative
 regression fixture is also proven to catch a 0.404-meter facade obstruction.
 
 The matching Chinese lattice door is a Blender DCC adaptation of two finished
@@ -598,19 +601,23 @@ remain documented as historical evidence only. Representative DCC review
 renders are `previews/12_chinese_edge_gate.png`,
 `previews/13_chinese_avenue.png`, and
 `previews/14_chinese_old_city_overview.png` under the Jianghai source directory.
-The final packed `.blend` is 49,398,104 bytes with SHA-256
-`AD6EEED449F47564131F961394F572A5327EAAB018CA5670F49A8F34173C3B6A`.
-It contains 505 objects, 206 unique mesh datablocks, 3,032,228 mesh-object
-triangles, and resolves to 568 evaluated mesh objects / 3,061,154 evaluated
-instance triangles. The final GLB is 58,571,556 bytes with SHA-256
-`B0D21C78C3996BF2AA2D0F78FA32199B0B4BF396B164E547CAE9498033F23139`;
-its Blender round-trip audit reports 585 total nodes, 568 mesh nodes, 269 unique
-meshes, 449 primitives, 1,070,770 unique / 3,059,538 instanced triangles, 93
+The four Quaternius density profiles preserve exact face colors in glTF
+`COLOR_0` while using one opaque material each, reducing their 22 instances from
+131 to 22 material-backed surfaces with zero image or texture delta. The final
+packed `.blend` is 52,970,996 bytes with SHA-256
+`F4E5978182B744BD16741F298DC491F774EBF6E901B25D0890C292A97FA0B09D`.
+It contains 621 objects / 525 mesh objects, 210 unique mesh datablocks,
+3,123,494 mesh-object triangles, 1,113,692 unique triangles, and resolves to 588
+evaluated mesh objects / 3,152,420 evaluated instance triangles. The final GLB
+is 63,926,136 bytes with SHA-256
+`3A854DD94132775F008990D908BE32D4B25E72E45C4094E8F6D8167AE633DE8D`;
+its Blender round-trip audit reports 605 total nodes, 588 mesh nodes, 273 unique
+meshes, 469 primitives, 1,142,508 unique / 3,151,080 instanced triangles, 97
 materials, 142 textures, 120 images, and a 512-pixel maximum image dimension.
-The scene audit passes with 42 density placements, six enterable residences,
-18/18 building-body doorway samples, 18/18 structural wall/lintel samples,
-18/18 full-scene doorway samples, zero density intersections, and zero visible
-retired-building instances.
+The scene audit passes with 50 density placements, 12 enterable residences,
+108/108 building-body doorway samples, 36/36 structural wall/lintel samples,
+108/108 full-scene doorway samples, 12/12 opaque interior liners, zero density
+intersections, and zero visible retired-building instances.
 
 The packed `.blend` is the authoritative DCC scene. The valley build is an
 offline DCC authoring step that adapts the existing project-authored foundation
@@ -654,26 +661,29 @@ The subsequent 2026-08-29 valley pre-rebase evidence is recorded separately
 because neither historical binary hash represents the regenerated post-rebase
 artifact.
 
-The current 2026-08-29 Chinese-district delivery is the 49,398,104-byte packed
-`.blend` and 58,571,556-byte runtime GLB identified above. After explicit Godot
-reimport, runtime validation reports 568 authored meshes and 1,493
-material-backed surfaces / 3,059,538 authored instance triangles. The runtime
-represents 277 safe repeated sources with 71 spatial `MultiMesh` batches and
-71/71 non-origin batch centroids. Gameplay physics represents 107 reviewed collision
-sources with 315 gameplay box shapes plus 20 landmark boxes, 335 boxes total and
-zero concave shapes; door, rail, ballistic, rooftop, 14 route, and 12/12
-high-value-loot access probes pass. Six furnished rooms contain six animated
-Chinese doors, 24 finished Kenney furniture props represented by 49 mesh nodes,
-eight searchable loot placements, and four added residents for eight total.
-Six bidirectional door links let squad AI open and traverse the required room
-route. Furniture uses a 42-meter visibility range without shadows, and sky
-radiance updates remain incremental.
+The current expanded Chinese-district delivery is the 52,970,996-byte packed
+`.blend` and 63,926,136-byte runtime GLB identified above. After explicit Godot
+reimport, runtime validation reports 588 authored meshes and 1,450
+material-backed surfaces / 3,151,080 authored instance triangles. The runtime
+represents 292 safe repeated sources with 78 spatial `MultiMesh` batches;
+production releases 290 layer-zero leaves after gameplay registration and
+retains two referenced room sources. Gameplay physics represents 115 authored
+collider sources plus 96 placement fragments with 486 gameplay box shapes and
+20 landmark boxes, 506 boxes total and zero concave shapes; door, rail,
+ballistic, rooftop, 14 route, and 12/12 high-value-loot access probes pass.
+Twelve furnished rooms contain 12 animated Chinese doors, 12 opaque liners, 48
+finished Kenney furniture props / 95 authored mesh nodes, 12 searchable loot
+placements, and four added residents for eight total. Twelve bidirectional door
+links let squad AI open and traverse every required room route. Thirty-six
+static furniture props resolve to 50 short-range batches / 62 instances without
+shadows, and sky-radiance updates remain incremental.
 
-All 11 representative captures pass the 2,400 draw-call, 2,200-object,
-10.5-million-primitive, 1,536 MB video-memory, and 1,152 MB texture-memory
-budgets. Overview records 1,001 draw calls / 1,005 objects / 2,774,257
-primitives; the peak daylight view records 1,904 / 1,939 / 3,069,532. Peak
-memory is 1,057.0 MB video and 663.3 MB texture. Detailed counts and historical
+All 19 measured representative views pass the 2,400 draw-call, 2,200-object,
+10.5-million-primitive, 1,250 MB video-memory, and 750 MB texture-memory budgets.
+Overview records 982 draw calls / 1,007 objects / 2,867,417 primitives; daylight
+records 1,797 / 1,844 / 3,054,463 and peak primitives are 3,121,853. Peak memory
+is 1,097.4 MB video and 719.2 MB texture; same-machine texture memory is
+unchanged from the pre-expansion baseline. Detailed counts and historical
 comparisons are kept in `../../source_art/world/jianghai_old_city/README.md`.
 
 The following valley-era results are retained as historical evidence and do not
@@ -761,10 +771,10 @@ entry facade. The paired factory facade brings the entry total to 18
 The 2026-08-29 building pass supersedes the former Old Urban/Scan Old
 storefronts, rear houses, factory buildings, street-cadence object, and density
 placements. All 66 affected visible anchors now use the Temple hall, Chinese
-arcade-shop, or Chinese gate-house shared mesh. The density pass contains 42
+arcade-shop, or Chinese gate-house shared mesh. The density pass contains 50
 complete buildings: eight Temple halls, sixteen arcade shops, four gate houses,
-and fourteen retained Quaternius placements (four Building1 Large, three
-Building3 Big, three Building4, and four House2). The `.blend` remains the
+and 22 retained Quaternius placements (six Building1 Large, five Building3 Big,
+five Building4, and six House2). The `.blend` remains the
 authoritative DCC source. The export script validates the explicit reviewed
 transforms and material/mesh adaptations without randomness; it does not create
 runtime procedural city geometry.

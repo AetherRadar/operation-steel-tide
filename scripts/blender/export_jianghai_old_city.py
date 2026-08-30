@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from math import atan2, cos, hypot, isfinite, pi, radians, sin, tan
 from pathlib import Path
 import re
@@ -14,9 +15,28 @@ from mathutils import Vector
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jianghai_chinese_district_layout import (
     DENSITY_BUILDING_LAYOUT,
+    DENSITY_COLOR0_ATTRIBUTE,
+    DENSITY_COLOR0_INFILL_SUFFIXES,
+    DENSITY_COLOR0_PROFILE_MATERIALS,
+    DENSITY_COLOR0_PROFILE_ROUGHNESS,
+    DENSITY_COLOR0_PROFILE_SOURCE_SURFACES,
+    ENTERABLE_RESIDENCE_LAYOUT,
     PROFILE_BASE_SCALE,
+    QUATERNIUS_DENSITY_MESHES,
 )
-from jianghai_enterable_residences import apply_enterable_residences
+from jianghai_density_color0 import (
+    consolidate_density_profile_mesh,
+    validate_density_color0_scene,
+)
+from jianghai_enterable_residences import (
+    ENTERABLE_MESH_SHARE_GROUPS,
+    apply_enterable_residences,
+)
+from jianghai_enterable_interior_liners import (
+    EXPECTED_TRIANGLES as INTERIOR_LINER_EXPECTED_TRIANGLES,
+    LINER_OBJECT_PREFIX,
+    LINER_VISIBILITY_METERS,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -575,6 +595,8 @@ def build_authored_profile_mesh(
     mesh["source_creator"] = profile["creator"]
     mesh["source_url"] = profile["source_url"]
     mesh["license"] = "CC0 1.0 Universal"
+    if profile_name in QUATERNIUS_DENSITY_MESHES:
+        consolidate_density_profile_mesh(mesh, profile_name)
     bpy.data.objects.remove(template, do_unlink=True)
     for obj in imported_objects:
         if obj.name in bpy.data.objects:
@@ -2478,8 +2500,104 @@ def export_refinery_door() -> None:
         bpy.data.objects.remove(duplicate, do_unlink=True)
 
 
+def validate_density_color0_glb() -> dict[str, int]:
+    data = GLB_PATH.read_bytes()
+    if data[:4] != b"glTF" or int.from_bytes(data[4:8], "little") != 2:
+        raise RuntimeError("Jianghai runtime output is not a GLB 2.0 file")
+    json_length = int.from_bytes(data[12:16], "little")
+    if data[16:20] != b"JSON":
+        raise RuntimeError("Jianghai runtime GLB is missing its JSON chunk")
+    document = json.loads(data[20 : 20 + json_length].decode("utf-8"))
+    nodes = {node.get("name"): node for node in document.get("nodes", [])}
+    meshes = document.get("meshes", [])
+    materials = document.get("materials", [])
+    accessors = document.get("accessors", [])
+    profile_meshes: dict[str, set[int]] = {
+        profile_name: set() for profile_name in QUATERNIUS_DENSITY_MESHES
+    }
+    profile_materials: dict[str, set[int]] = {
+        profile_name: set() for profile_name in QUATERNIUS_DENSITY_MESHES
+    }
+    instance_surfaces = 0
+    infill_surfaces = 0
+    expected_infill_names = {
+        f"JianghaiDensity_{suffix}" for suffix in DENSITY_COLOR0_INFILL_SUFFIXES
+    }
+    for suffix, profile_name, _, _, _ in DENSITY_BUILDING_LAYOUT:
+        if profile_name not in QUATERNIUS_DENSITY_MESHES:
+            continue
+        object_name = f"JianghaiDensity_{suffix}"
+        node = nodes.get(object_name)
+        if node is None or "mesh" not in node:
+            raise RuntimeError(f"GLB lost COLOR_0 density node: {object_name}")
+        mesh_index = int(node["mesh"])
+        profile_meshes[profile_name].add(mesh_index)
+        primitives = meshes[mesh_index].get("primitives", [])
+        if len(primitives) != 1:
+            raise RuntimeError(
+                f"GLB COLOR_0 density surface count drifted: {object_name} "
+                f"actual={len(primitives)} expected=1"
+            )
+        primitive = primitives[0]
+        attributes = primitive.get("attributes", {})
+        if DENSITY_COLOR0_ATTRIBUTE not in attributes:
+            raise RuntimeError(f"GLB lost COLOR_0 density colors: {object_name}")
+        color_accessor = accessors[int(attributes[DENSITY_COLOR0_ATTRIBUTE])]
+        if color_accessor.get("type") not in {"VEC3", "VEC4"}:
+            raise RuntimeError(
+                f"GLB density COLOR_0 format drifted: {object_name} "
+                f"type={color_accessor.get('type')}"
+            )
+        material_index = primitive.get("material")
+        if material_index is None:
+            raise RuntimeError(f"GLB density COLOR_0 material is missing: {object_name}")
+        material_index = int(material_index)
+        profile_materials[profile_name].add(material_index)
+        material = materials[material_index]
+        pbr = material.get("pbrMetallicRoughness", {})
+        if (
+            material.get("name") != DENSITY_COLOR0_PROFILE_MATERIALS[profile_name]
+            or material.get("alphaMode", "OPAQUE") != "OPAQUE"
+            or "baseColorTexture" in pbr
+            or abs(
+                float(pbr.get("roughnessFactor", 1.0))
+                - DENSITY_COLOR0_PROFILE_ROUGHNESS[profile_name]
+            )
+            > 1.0e-5
+            or abs(float(pbr.get("metallicFactor", 1.0))) > 1.0e-5
+        ):
+            raise RuntimeError(
+                f"GLB density COLOR_0 material contract drifted: {object_name}"
+            )
+        instance_surfaces += 1
+        if object_name in expected_infill_names:
+            infill_surfaces += 1
+    if (
+        any(len(indices) != 1 for indices in profile_meshes.values())
+        or len({next(iter(indices)) for indices in profile_meshes.values()}) != 4
+        or any(len(indices) != 1 for indices in profile_materials.values())
+        or len({next(iter(indices)) for indices in profile_materials.values()}) != 4
+        or instance_surfaces != 22
+        or infill_surfaces != 8
+    ):
+        raise RuntimeError(
+            "GLB density COLOR_0 sharing contract drifted: "
+            f"meshes={profile_meshes} materials={profile_materials} "
+            f"surfaces={instance_surfaces} infill={infill_surfaces}"
+        )
+    return {
+        "profiles": len(profile_meshes),
+        "profile_surfaces": len(profile_meshes),
+        "instances": instance_surfaces,
+        "instance_surfaces": instance_surfaces,
+        "infill_instances": len(expected_infill_names),
+        "infill_surfaces": infill_surfaces,
+    }
+
+
 def validate_runtime_glb_roundtrip() -> dict[str, float | int]:
     """Re-import the GLB and hard-lock the runtime Coast composite geometry."""
+    density_color0_glb = validate_density_color0_glb()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=str(GLB_PATH))
     ground = bpy.data.objects.get("JianghaiPerimeterGroundComposite")
@@ -2487,6 +2605,71 @@ def validate_runtime_glb_roundtrip() -> dict[str, float | int]:
     mountains = sorted(
         (obj for obj in bpy.data.objects if obj.name.startswith("JianghaiMountainMassif")),
         key=lambda obj: obj.name,
+    )
+    interior_liners = sorted(
+        (
+            obj
+            for obj in bpy.data.objects
+            if obj.name.startswith(LINER_OBJECT_PREFIX) and obj.type == "MESH"
+        ),
+        key=lambda obj: obj.name,
+    )
+    liner_meshes = {liner.data for liner in interior_liners}
+    liner_mesh = next(iter(liner_meshes), None)
+    if liner_mesh is not None:
+        liner_mesh.calc_loop_triangles()
+    liner_materials = (
+        [material for material in liner_mesh.materials if material is not None]
+        if liner_mesh is not None
+        else []
+    )
+    liner_materials_opaque = all(
+        material.diffuse_color[3] >= 0.9999
+        and all(
+            node.inputs.get("Alpha") is None
+            or (
+                not node.inputs["Alpha"].is_linked
+                and node.inputs["Alpha"].default_value >= 0.9999
+            )
+            for node in (
+                material.node_tree.nodes
+                if material.use_nodes and material.node_tree is not None
+                else []
+            )
+            if node.type == "BSDF_PRINCIPLED"
+        )
+        for material in liner_materials
+    )
+    liner_roundtrip_ready = (
+        len(interior_liners) == len(ENTERABLE_RESIDENCE_LAYOUT)
+        and len(liner_meshes) == 1
+        and liner_mesh is not None
+        and len(liner_mesh.loop_triangles) == INTERIOR_LINER_EXPECTED_TRIANGLES
+        and len(liner_materials) == 2
+        and liner_materials_opaque
+        and all(
+            liner.get("jianghai_interior_liner") is True
+            and liner.get("jianghai_liner_opaque") is True
+            and abs(
+                float(liner.get("jianghai_liner_visibility_m", 0.0))
+                - LINER_VISIBILITY_METERS
+            )
+            <= 0.0001
+            and liner.get("jianghai_liner_shadow_mode") == "off"
+            for liner in interior_liners
+        )
+    )
+    enterable_mesh_pairs_ready = all(
+        bpy.data.objects.get(leader_name) is not None
+        and bpy.data.objects.get(follower_name) is not None
+        and bpy.data.objects[leader_name].data == bpy.data.objects[follower_name].data
+        and sorted(
+            obj.name
+            for obj in bpy.data.objects
+            if obj.type == "MESH" and obj.data == bpy.data.objects[leader_name].data
+        )
+        == sorted((leader_name, follower_name))
+        for leader_name, follower_name in ENTERABLE_MESH_SHARE_GROUPS
     )
     if ground is None or ground.type != "MESH" or foundation is None:
         raise RuntimeError("GLB roundtrip lost the Coast composite or foundation")
@@ -2730,6 +2913,8 @@ def validate_runtime_glb_roundtrip() -> dict[str, float | int]:
         and len({mountain.data for mountain in mountains}) == 1
         and all(valley_triangle_count(mountain.data) == MOUNTAIN_EXPECTED_TRIANGLES
                 for mountain in mountains)
+        and liner_roundtrip_ready
+        and enterable_mesh_pairs_ready
     )
     screen_relief_report = ",".join(
         f"{metric['height_p10_p90']:.3f}/"
@@ -2784,7 +2969,18 @@ def validate_runtime_glb_roundtrip() -> dict[str, float | int]:
         f"{north_edge_seam['north_edge_samples']}:"
         f"side={north_edge_seam['north_edge_distant_side_hits']} "
         f"mountain_burial={mountain_burial_clearance:.3f} "
-        f"mountains={len(mountains)}"
+        f"mountains={len(mountains)} "
+        f"interior_liners={len(interior_liners)}:{len(liner_meshes)}:"
+        f"{len(liner_mesh.loop_triangles) if liner_mesh is not None else 0}:"
+        f"opaque={liner_materials_opaque} "
+        f"enterable_mesh_pairs={enterable_mesh_pairs_ready}:"
+        f"{len(ENTERABLE_MESH_SHARE_GROUPS)} "
+        f"density_color0={density_color0_glb['profiles']}:"
+        f"surfaces={density_color0_glb['profile_surfaces']}:"
+        f"instances={density_color0_glb['instances']}:"
+        f"instance_surfaces={density_color0_glb['instance_surfaces']}:"
+        f"infill={density_color0_glb['infill_instances']}:"
+        f"infill_surfaces={density_color0_glb['infill_surfaces']}"
     )
     if not valid:
         raise RuntimeError("Jianghai runtime GLB Coast composite roundtrip validation failed")
@@ -2792,6 +2988,8 @@ def validate_runtime_glb_roundtrip() -> dict[str, float | int]:
         "triangles": triangle_total,
         "vertices": len(mesh.vertices),
         "uv_error": uv_error,
+        "interior_liners": len(interior_liners),
+        "density_color0_surfaces": density_color0_glb["instance_surfaces"],
     }
 
 
@@ -2806,11 +3004,14 @@ def main() -> None:
     removed_factory_shells, rebuilt_factory_buildings = rebuild_factory_frontage()
     removed_cross_street_intrusions = clear_cross_street_intrusions()
     rebuilt_street_cadence = rebuild_street_cadence()
-    enterable = apply_enterable_residences()
     adjusted_market_furniture = clear_market_walkway()
     removed_density, rebuilt_density, density_profile_counts = rebuild_dense_perimeter()
+    density_color0 = validate_density_color0_scene()
     pawnshop_doorway_cut = cut_pawnshop_doorway()
     removed_entry_facades, rebuilt_entry_facades = rebuild_hinged_entry_facades()
+    # Build liners after entry facades so both systems reuse the exact packed
+    # Brick_Plain_1 materials and images instead of exporting duplicates.
+    enterable = apply_enterable_residences()
     pawnshop_canopy_parts, pawnshop_wings = validate_pawnshop_frontage()
     valley_ground_scans, valley_mountains, valley_triangles = validate_valley_environment()
     flattened = flatten_tiled_images()
@@ -2860,10 +3061,20 @@ def main() -> None:
         f"enterable={enterable.residence_count} cuts={enterable.cut_count} "
         f"door_samples={enterable.aperture_sample_count}/{enterable.wall_sample_count} "
         f"scene_door_samples={enterable.scene_aperture_sample_count} "
+        f"liners={enterable.liner_count} liner_triangles={enterable.liner_triangle_count} "
+        f"liner_closure={enterable.liner_closure_sample_count} "
+        f"liner_entry={enterable.liner_entry_sample_count} "
+        f"shared_enterable_mesh_pairs={enterable.shared_mesh_pair_count} "
         f"removed_door_inserts={enterable.removed_insert_count} "
         f"adjusted_market_furniture={adjusted_market_furniture} "
         f"removed_density={removed_density} rebuilt_density={rebuilt_density} "
         f"density_profiles={','.join(f'{name}:{count}' for name, count in density_profile_counts.items())} "
+        f"density_color0={density_color0.profile_count}:"
+        f"surfaces={density_color0.profile_surface_count}:"
+        f"instances={density_color0.instance_count}:"
+        f"instance_surfaces={density_color0.instance_surface_count}:"
+        f"infill={density_color0.infill_instance_count}:"
+        f"infill_surfaces={density_color0.infill_surface_count} "
         f"pawnshop_doorway_cut={pawnshop_doorway_cut} "
         f"removed_entry_facades={removed_entry_facades} "
         f"rebuilt_entry_facades={rebuilt_entry_facades} "
@@ -2874,6 +3085,8 @@ def main() -> None:
         f"meshes={meshes} evaluated_objects={evaluated_objects} "
         f"evaluated_triangles={evaluated_triangles} materials={materials} glb_bytes={glb_size} "
         f"roundtrip_ground={roundtrip['triangles']}:{roundtrip['vertices']} "
+        f"roundtrip_liners={roundtrip['interior_liners']} "
+        f"roundtrip_density_color0_surfaces={roundtrip['density_color0_surfaces']} "
         f"roundtrip_uv_error={roundtrip['uv_error']:.8f} "
         f"blend={BLEND_PATH} glb={GLB_PATH} refinery_door_glb={REFINERY_DOOR_GLB_PATH}"
     )

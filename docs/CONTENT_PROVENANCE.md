@@ -30,7 +30,7 @@ Consequently, this repository must not be described as satisfying policies that 
 | Compact 5v5 demolition objective device | Creator: Operation Steel Tide project contributors. Project-authored in Blender 4.5 on 2026-08-29 from the checked-in DCC generator, with disclosed AI assistance; no third-party geometry, textures, fonts, logos, or marketplace content are present | Root MIT license; required attribution is preservation of the root MIT copyright and permission notice, with no additional third-party credit required | Canonical source `source_art/demolition_device/demolition_device.blend`; runtime output and studio preview `assets/models/steel_tide_demolition_device/{demolition_device.glb,demolition_device_preview.png}`; reproducible build and GLB round-trip checks `scripts/blender/build_demolition_device.py`; verified 48 meshes, 9,216 triangles, nine PBR/emissive materials, named case/screen/status-light/carry-socket contract, 0.344 by 0.201 by 0.164 metre bounds, and SHA-256 `580F71F6ACED03888734BCD73C863A5CFB2DD35E33F415927EE899A7A8897A7F`; detailed record in `assets/models/steel_tide_demolition_device/LICENSE.md` and `source_art/demolition_device/README.md` |
 | Legacy Steel Tide operator `.blend` and `.glb` model | Project-authored in Blender from the checked-in procedural modeling script, with disclosed AI assistance; no third-party geometry or textures copied | Included under the root MIT license, subject to the limitation above | `scripts/blender/generate_combat_models.py`, `source_art/combat_models/steel_tide_operator.blend`, and Git history |
 | Tactical knife, Zhanma Dao, and Tianxuan Dao `.blend` and `.glb` models | Creator: Operation Steel Tide project contributors. Project-authored in Blender 4.5 on 2026-08-28 from the checked-in DCC generator, with disclosed AI assistance; no external source URL applies and no third-party geometry or textures are present | Root MIT license; required attribution is preservation of the root MIT copyright and permission notice, with no additional third-party credit required | Canonical local sources `source_art/melee_weapons/{tactical_knife,zhanma_dao,tianxuan_dao}.blend`; reproducible build and GLB round-trip validation in `scripts/blender/build_melee_weapons.py`; runtime outputs `assets/models/steel_tide_melee/{tactical_knife,zhanma_dao,tianxuan_dao}.glb`; exact triangulated counts are 13,216, 17,548, and 18,212 respectively; additional workflow notes are in `source_art/melee_weapons/README.md` and `assets/models/LICENSE.md` |
-| Jianghai Old City map layout, street and supporting geometry, district composition, 2026-08-29 Chinese district rebuild and enterable-shop apertures, material adaptations, art direction, sign wording and placement, objective-terminal status screens and adaptations, urban-life composition, facade expansion, pawnshop entrance adaptation/composition, factory-gate portal and hinged-entry composition, authored perimeter density, street-cadence replacements, and valley foundation/terrain composition | Project-authored DCC composition in Blender, with disclosed AI assistance. The current rebuild replaces 66 old visible anchors with shared Chinese Temple hall, arcade-shop, and gate-house meshes, authors 42 density placements, and gives six reviewed main-street shops unique mesh-plane-cut human-scale door apertures. The hall is a Temple 2 LOD; arcade/gate profiles combine clean Quaternius bodies, VVayToyek pavilion facade/eaves parts, and an extracted/decimated Temple 2 roof. Existing registered Chinese lamps/lions and Poly Haven modules provide surrounding dressing; no new external building asset was acquired. The pawnshop and two ten-piece entry facades, authored valley foundation, Coast-derived ground, and 12 Hero Mountain instances remain as recorded below. Shared meshes, a small licensed material vocabulary, 512-pixel runtime images, and box gameplay proxies reduce loading pressure without procedural runtime art | Project-authored portions are included under the root MIT license, subject to the limitation above; embedded third-party geometry, materials, and textures retain the licenses recorded in the rows below, including Quaternius/VVayToyek/BlenderKit/Poly Haven CC0 and Hero Mountain CC BY 4.0. `Old Urban building` and `Scan Old Building Street` retain historical CC0 records but have zero visible current instances | Authoritative DCC source `source_art/world/jianghai_old_city/jianghai_old_city.blend`; aperture authoring `scripts/blender/jianghai_enterable_residences.py`; Chinese rebuild `scripts/blender/rebuild_jianghai_chinese_district.py`; deterministic export `scripts/blender/export_jianghai_old_city.py`; runtime `assets/models/jianghai_old_city/jianghai_old_city.glb`; final `.blend` 49,398,104 bytes / SHA-256 `AD6EEED449F47564131F961394F572A5327EAAB018CA5670F49A8F34173C3B6A`; final GLB 58,571,556 bytes / SHA-256 `B0D21C78C3996BF2AA2D0F78FA32199B0B4BF396B164E547CAE9498033F23139`; Blender source audit 505 objects/206 unique mesh datablocks/3,032,228 object triangles and 568 evaluated meshes/3,061,154 evaluated triangles; GLB round-trip 585 nodes/568 mesh nodes/269 unique meshes/449 primitives and 1,070,770 unique/3,059,538 instanced triangles, with 93 materials/142 textures/120 images at maximum 512 pixels; only the obsolete `JianghaiExpansion_Facade_EastPhoto_F0_C1_Insert` is removed while `F0_C1_Wall` and `WestClock` remain; audit PASS with 42 density placements, six enterable residences, 18/18 building-body apertures, 18/18 structure probes, 18/18 full-scene apertures, and a 0.404-meter negative obstruction caught; complete mapping in `source_art/world/jianghai_old_city/{README.md,LICENSE_EVIDENCE.md}` |
+| Jianghai Old City map layout, street and supporting geometry, 2026-08-29 Chinese district rebuild, 2026-08-30 infill/interior expansion, material adaptations, art direction, signs, terminals, urban-life composition, facade and entrance work, authored density, and valley composition | Project-authored DCC composition in Blender, with disclosed AI assistance. The delivery replaces 66 old visible anchors with shared Chinese Temple hall, arcade-shop, and gate-house meshes; authors 50 density placements including eight new west/east infills; cuts 12 human-scale door apertures; and adds 12 five-sided opaque interior liners sharing one small mesh and existing brick materials. The hall is a Temple 2 LOD; arcade/gate profiles combine clean Quaternius bodies, VVayToyek pavilion details, and a Temple 2 roof. Existing registered dressing remains; no new external building asset or texture was acquired. Four Quaternius density profiles preserve exact face colors through glTF `COLOR_0`, reducing 22 instances from 131 to 22 surfaces. Shared meshes, 512-pixel runtime images, box gameplay proxies, and spatial runtime batching reduce loading pressure without procedural runtime art | Project-authored portions are included under the root MIT license, subject to the limitation above; embedded third-party geometry, materials, and textures retain the licenses recorded below, including Quaternius/VVayToyek/BlenderKit/Poly Haven CC0 and Hero Mountain CC BY 4.0. `Old Urban building` and `Scan Old Building Street` retain historical CC0 records but have zero visible current instances | Authoritative DCC source `source_art/world/jianghai_old_city/jianghai_old_city.blend`; aperture/liner authoring `scripts/blender/{jianghai_enterable_residences.py,jianghai_enterable_interior_liners.py}`; density color consolidation `scripts/blender/jianghai_density_color0.py`; Chinese rebuild `scripts/blender/rebuild_jianghai_chinese_district.py`; export `scripts/blender/export_jianghai_old_city.py`; runtime `assets/models/jianghai_old_city/jianghai_old_city.glb`; final `.blend` 52,970,996 bytes / SHA-256 `F4E5978182B744BD16741F298DC491F774EBF6E901B25D0890C292A97FA0B09D`; final GLB 63,926,136 bytes / SHA-256 `3A854DD94132775F008990D908BE32D4B25E72E45C4094E8F6D8167AE633DE8D`; Blender audit 621 objects/525 mesh objects/210 unique meshes/3,123,494 object triangles/1,113,692 unique triangles and 588 evaluated meshes/3,152,420 triangles; GLB round-trip 605 nodes/588 mesh nodes/273 meshes/469 primitives and 1,142,508 unique/3,151,080 instanced triangles, with 97 materials/142 textures/120 images at maximum 512 pixels; audit PASS with 50 density placements, 12 enterable residences, 108/108 body apertures, 36/36 structure probes, 108/108 full-scene apertures, 12/12 opaque liners, and the negative obstruction fixture caught; complete mapping in `source_art/world/jianghai_old_city/{README.md,LICENSE_EVIDENCE.md}` |
 | Jianghai Chinese lattice hinge door `.blend`, preview, and `.glb` | Blender DCC adaptation created 2026-08-29 from two finished CC0 sources: the existing Kenney Factory Kit `door-hinged.glb` leaf acquired 2026-08-27 and material 2 of Free poly's Chinese Temple 2 `GuangchangClanHall` / `网格.002` grille, DCC-reduced for the finished arched insert. Project-authored work is limited to the packed red-wood lacquer texture and material adaptation; no door part is generated from primitives | Both Kenney Factory Kit and Free poly Chinese Temple 2 are CC0 1.0 Universal; no attribution required, creator credits retained for provenance; project-authored lacquer/material adaptation is included under the root MIT license subject to the AI-assistance limitation, while the composite is not represented as relicensing either CC0 contribution | Sources `assets/models/kenney_factory_kit/door-hinged.glb` and the Chinese Temple 2 asset recorded in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md`; reproducible builder `scripts/blender/build_jianghai_lattice_door.py`; editable source and mapping in `source_art/props/jianghai_lattice_door/README.md`; runtime `assets/models/jianghai_old_city/jianghai_lattice_door.glb`, 412,548 bytes / SHA-256 `FBE9FC3EBB1F8BB49842442F1A4AEF451E0F67E5B3FF95BBB16A6F01B84D5528`; editable `.blend` 1,162,441 bytes / SHA-256 `72D41DB8125BB5DDDEE04DE14E6AA5C9D8B1D4D5058823B74CC52968D78C9445`; three mesh nodes/two unique meshes/two surfaces, 5,745 unique/11,334 instanced triangles, two PBR materials, one 256-square texture/image, and two 18-frame, 0.6-second, 96-degree clips; byte-identical 63,926-byte source and Godot extraction-target red-wood textures have SHA-256 `C75ED94A13A4F21CE518F455916802117D193FCE7A5731A0A4A602F82FD43834`; the brighter PBR red-wood lacquer and dark-gold base colors retain eave-shadow readability without emission, extra lights, or runtime cost |
 | Modular Factory Facade geometry and materials embedded in Jianghai Old City | James Ray Cock on Poly Haven | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-27 from `https://polyhaven.com/a/modular_factory_facade`; exact hashes and local mapping are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
 | Modular Urban Apartments Facade geometry, materials, and textures embedded in Jianghai Old City as 36 adapted facade objects in two asymmetrical 3-by-3 overlays | James Ray Cock on Poly Haven | CC0 1.0 Universal; no attribution required, creator credit retained as provenance; not relicensed as MIT | Acquired 2026-08-27 from `https://polyhaven.com/a/modular_urban_apartments_facade`; source bundle hashes, DCC mapping, and delivered expansion audit are in `source_art/world/jianghai_old_city/LICENSE_EVIDENCE.md` |
@@ -136,21 +136,24 @@ pass at 96 degrees, and Day plus always-procedural Dusk atmosphere checks pass
 with a continuous sky/ground horizon and no panorama.
 
 The current Chinese-district binaries and exact hashes are recorded in the
-inventory row above. Their explicit Godot reimport resolves 568 authored meshes
-and 1,493 material-backed surfaces / 3,059,538 authored instance triangles.
-Runtime batching represents 277 safe repeated sources in 71 spatial batches,
-with 71/71 non-origin centroids. Physics represents 107 reviewed collision
-sources with 315 gameplay boxes plus 20 landmark boxes, 335 total and zero
-concave shapes. Six furnished rooms contain six animated Chinese doors, 24
-finished Kenney furniture props represented by 49 mesh nodes, eight searchable
-loot placements, and four added residents for eight residents total. Six
-bidirectional AI door links allow required squad routes to open and traverse the
-rooms. Furniture is culled at 42 meters without shadows, while sky-radiance
-updates remain incremental. All 11 representative captures pass the 2,400
-draw-call, 2,200-object, 10.5-million-primitive, 1,536 MB video-memory, and
-1,152 MB texture-memory budgets; peak readings are 1,904 draw calls / 1,939
-objects / 3,069,532 primitives, 1,057.0 MB video memory, and 663.3 MB texture
-memory.
+inventory row above. Their explicit Godot reimport resolves 588 authored meshes
+and 1,450 material-backed surfaces / 3,151,080 authored instance triangles.
+Runtime batching represents 292 safe repeated sources in 78 spatial batches;
+production releases 290 layer-zero leaves after gameplay registration and
+retains two referenced room sources. Physics uses 486 gameplay boxes from 115
+authored collider sources plus 96 placement fragments, and 20 landmark boxes:
+506 total and zero concave shapes. Twelve furnished rooms contain 12 animated
+Chinese doors, 12 opaque liners, 48 finished Kenney furniture props / 95
+authored mesh nodes, 12 searchable loot placements, and four added residents for
+eight residents total. Twelve bidirectional AI door links allow required squad
+routes to open and traverse every room. Thirty-six static furniture props
+resolve to 50 short-range batches / 62 instances without shadows, while
+sky-radiance updates remain incremental. All 19 measured representative views
+pass the 2,400 draw-call, 2,200-object, 10.5-million-primitive, 1,250 MB
+video-memory, and 750 MB texture-memory budgets; overview is 982 / 1,007 /
+2,867,417, daylight is 1,797 / 1,844 / 3,054,463, peak primitives are 3,121,853,
+and peak memory is 1,097.4 MB video / 719.2 MB texture. Same-machine texture
+memory is unchanged from the pre-expansion baseline.
 
 The final pre-rebase valley DCC and serialized-GLB audits pass with a
 188-triangle, 96-source-vertex project-authored `OldCityFoundation`; one
@@ -224,13 +227,14 @@ deterministically reapplies these documented DCC adaptations, factory-frontage
 substitution, sign cleanup, and material tuning; it does not randomly or at
 runtime procedurally generate the city. The current rebuild supersedes every
 visible Old Urban and Scan Old building placement with the three Chinese-profile
-shared meshes and expands the reviewed density table to 42 placements.
+shared meshes and expands the reviewed density table to 50 placements.
 
 The historical runtime derived building physics from 107 structural and 133
 detail mesh instances, producing 240 concave shapes and 3,560,137
 collision-instance triangles. The current delivery removes that expensive
-builder and represents 107 reviewed sources with 315 gameplay box shapes plus
-20 landmark facade/traversal boxes, 335 total. Dedicated diagnostics verify
+builder and represents 115 authored collider sources plus 96 placement
+fragments with 486 gameplay box shapes and 20 landmark facade/traversal boxes,
+506 total. Dedicated diagnostics verify
 closed-door enemy-capsule blocking, opened-door clearance, visible wall and rail
 hits, rail-gap penetration, rooftop traversal, 14 route probes, 12/12 reachable
 high-value loot placements, and ballistic building probes with zero concave
@@ -242,7 +246,7 @@ reproducibly derives `assets/models/jianghai_old_city/rollershutter_window_03.gl
 from the packed scene's `JianghaiArtPass_EastShutter00` PBR mesh. Neither Old
 City entrance now instances this derivative; it is retained as an
 alternate/legacy asset. The current `InteractiveBuildingDoor` visuals are the
-two existing Kenney pawnshop/factory doors plus the six new finished Kenney /
+two existing Kenney pawnshop/factory doors plus the 12 finished Kenney /
 Free poly Chinese-lattice composite doors recorded above. Their collision,
 animation, network state, and AI traversal remain project gameplay behavior and
 are checked by `--validate-refinery-doors`.
@@ -276,14 +280,15 @@ platform, or material south-line blocker. The `refinery-map`,
 diagnostics all exit 0.
 
 For the current Chinese-district delivery, spatial `MultiMesh` batching
-represents 277 safe repeated authored sources in 71 batches with 71/71
-non-origin centroids. Furniture is culled at 42 meters without shadows, and
-sky-radiance updates remain incremental. A final capture
-run records overview at 1,001 draw calls / 1,005 objects / 2,774,257 primitives
-and the peak daylight view at 1,904 / 1,939 / 3,069,532. All 11 views pass the
-2,400 draw-call, 2,200-object, 10.5-million-primitive, 1,536 MB video-memory,
-and 1,152 MB texture-memory budgets. Peak memory is 1,057.0 MB video and 663.3 MB
-texture.
+represents 292 safe repeated authored sources in 78 batches. Production releases
+290 layer-zero source leaves and retains two referenced room sources; furniture
+uses 50 short-range batches / 62 instances without shadows, and sky-radiance
+updates remain incremental. A final capture run records overview at 982 draw
+calls / 1,007 objects / 2,867,417 primitives and daylight at 1,797 / 1,844 /
+3,054,463, with peak primitives at 3,121,853. All 19 measured views pass the
+2,400 draw-call, 2,200-object, 10.5-million-primitive, 1,250 MB video-memory, and
+750 MB texture-memory budgets. Peak memory is 1,097.4 MB video and 719.2 MB
+texture, with no same-machine texture-memory increase from baseline.
 
 No separate third-party music, font, or stock-image collection is currently tracked in the repository. Noto Sans SC was a repository-external DCC-authoring input used only to create the static Jianghai sign glyph meshes documented above; the original font is not tracked and is absent from both the final `.blend` and GLB. The Quaternius CC0 animation libraries listed above are the tracked animation pack.
 

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 
@@ -12,9 +13,9 @@ public partial class FreightTerminalWorld
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
 
         var build = _jianghaiInteriors;
-        if (build is null)
+        if (build is null || _jianghaiOldCityScene is not { } authoredScene)
         {
-            GD.Print("JIANGHAI_INTERIORS_CHECK valid=False reason=no_build_result");
+            GD.Print("JIANGHAI_INTERIORS_CHECK valid=False reason=no_build_result_or_scene");
             GD.Print("JIANGHAI_INTERIORS_PASS valid=False");
             QuitDiagnosticAfterSceneCleanup(2);
             return;
@@ -57,20 +58,46 @@ public partial class FreightTerminalWorld
                 && door.HasBoxCollision
                 && door.MotionStyle == BuildingDoorMotionStyle.Hinged
                 && door.AuthoredVisualPanelCount == 1
-                && door.HasValidAuthoredVisualPanelLayout);
+                && door.HasValidAuthoredVisualPanelLayout
+                && door.VisualShadowsDisabled);
         var furnitureCountReady = build.Rooms.All(room =>
                 room.Furniture.Count == JianghaiInteriorPopulationService.FurniturePerRoom)
             && build.Rooms.Sum(room => room.Furniture.Count)
                 == JianghaiInteriorPopulationService.ExpectedRoomCount
                     * JianghaiInteriorPopulationService.FurniturePerRoom;
-        var furnitureAuthoredReady = build.AuthoredFurnitureMeshCount >= 24
+        var furnitureAuthoredReady = build.AuthoredFurnitureMeshCount
+                >= JianghaiInteriorPopulationService.ExpectedRoomCount
+                    * JianghaiInteriorPopulationService.FurniturePerRoom
             && build.Rooms.SelectMany(room => room.Furniture).All(FurnitureAuthoredReady);
+        var furnitureBatchReady = build.StaticFurniturePropCount
+                == JianghaiInteriorPopulationService.ExpectedStaticFurnitureCount
+            && build.StaticFurnitureInstanceCount
+                >= JianghaiInteriorPopulationService.ExpectedStaticFurnitureCount
+            && build.StaticFurnitureBatches.Count > 0
+            && build.StaticFurnitureBatches.Count
+                < build.StaticFurnitureInstanceCount
+            && build.StaticFurnitureBatchValidationReady
+            && build.StaticFurnitureMaximumPositionError <= 0.001f
+            && build.StaticFurnitureMaximumBasisError <= 0.001f
+            && build.StaticFurnitureMaximumBatchRadius
+                <= JianghaiInteriorFurnitureBatcher.MaximumBatchRadius
+            && build.StaticFurnitureMaximumVisibilityRange
+                <= JianghaiInteriorFurnitureBatcher.MaximumVisibilityRange
+            && build.StaticFurnitureBatches.All(batch =>
+                batch.Multimesh is { } multiMesh
+                && multiMesh.InstanceCount > 0
+                && batch.CastShadow == GeometryInstance3D.ShadowCastingSetting.Off
+                && batch.VisibilityRangeEnd
+                    >= JianghaiInteriorPopulationService.InteriorVisibilityRange
+                && batch.GetMeta("jianghai_static_furniture_instance_count", 0).AsInt32()
+                    == multiMesh.InstanceCount);
         var visibilityReady = build.Rooms.SelectMany(room => room.Furniture)
             .SelectMany(VisibleFurnitureMeshes)
             .All(mesh =>
                 mesh.VisibilityRangeEnd >= 40.0f
                 && mesh.VisibilityRangeEnd <= 48.0f
                 && mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.Off);
+        var shellValidation = JianghaiInteriorShellValidator.Validate(authoredScene.Root);
         var searchableReady = build.Searchables.Count
                 == JianghaiInteriorPopulationService.ExpectedSearchableCount
             && build.Searchables.All(searchable =>
@@ -134,13 +161,19 @@ public partial class FreightTerminalWorld
         var originalPlayerProcessMode = _player.ProcessMode;
         _player.ProcessMode = ProcessModeEnum.Disabled;
         var lootPriorityChecks = 0;
+        var lootPriorityFailures = new List<string>();
         foreach (var room in build.Rooms)
         {
             foreach (var searchable in room.Searchables)
             {
-                var doorPoint = room.Door.InteractionPoint;
-                doorPoint.Y = searchable.GlobalPosition.Y;
-                var approach = searchable.GlobalPosition.Lerp(doorPoint, 0.44f);
+                // Compact roller shops recess their side furniture behind a real angled
+                // facade connector. Test from the reachable inner aisle, not through that wall.
+                var searchableLocal = room.Root.ToLocal(searchable.GlobalPosition);
+                var aislePoint = room.Root.ToGlobal(new Vector3(
+                    0.0f,
+                    searchableLocal.Y,
+                    searchableLocal.Z));
+                var approach = searchable.GlobalPosition.Lerp(aislePoint, 0.44f);
                 approach.Y = room.Root.GlobalPosition.Y + 0.12f;
                 _player.GlobalPosition = approach;
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
@@ -157,6 +190,15 @@ public partial class FreightTerminalWorld
                     && lootDistance + 0.10f < doorDistance)
                 {
                     lootPriorityChecks++;
+                }
+                else
+                {
+                    lootPriorityFailures.Add(
+                        $"{room.SourceName}:selected="
+                        + $"{(selectedLoot is null ? "none" : selectedLoot.LootNode.Name)}:"
+                        + $"loot={lootDistance:0.00}:door={selectedDoor?.DoorId ?? -1}:"
+                        + $"{doorDistance:0.00}:los={HasClearPlayerLootInteractionLineOfSight(searchable)}:"
+                        + $"blockers={DescribePlayerLootBlockers(searchable)}");
                 }
             }
         }
@@ -274,7 +316,9 @@ public partial class FreightTerminalWorld
             && doorVisualReady
             && furnitureCountReady
             && furnitureAuthoredReady
+            && furnitureBatchReady
             && visibilityReady
+            && shellValidation.Valid
             && searchableReady
             && residentsReady
             && reducedSimulationReady
@@ -298,11 +342,29 @@ public partial class FreightTerminalWorld
             + $"rooms={build.Rooms.Count}/{JianghaiInteriorPopulationService.ExpectedRoomCount} "
             + $"facades={alignedFacadeRooms}/{JianghaiInteriorPopulationService.ExpectedRoomCount} "
             + $"doors={build.Doors.Count}/{JianghaiInteriorPopulationService.ExpectedDoorCount} "
-            + $"door_visual={doorVisualReady} furniture={build.Rooms.Sum(room => room.Furniture.Count)}/24 "
-            + $"furniture_meshes={build.AuthoredFurnitureMeshCount} visibility={visibilityReady} "
+            + $"door_visual={doorVisualReady} furniture={build.Rooms.Sum(room => room.Furniture.Count)}/"
+            + $"{JianghaiInteriorPopulationService.ExpectedRoomCount * JianghaiInteriorPopulationService.FurniturePerRoom} "
+            + $"furniture_meshes={build.AuthoredFurnitureMeshCount} "
+            + $"furniture_batches={build.StaticFurnitureBatches.Count}:"
+            + $"{build.StaticFurnitureInstanceCount}:"
+            + $"{build.StaticFurniturePropCount}/{JianghaiInteriorPopulationService.ExpectedStaticFurnitureCount}:"
+            + $"{furnitureBatchReady}:errors={build.StaticFurnitureMaximumPositionError:0.000000}:"
+            + $"{build.StaticFurnitureMaximumBasisError:0.000000}:"
+            + $"radius={build.StaticFurnitureMaximumBatchRadius:0.00}/"
+            + $"{JianghaiInteriorFurnitureBatcher.MaximumBatchRadius:0.00}:"
+            + $"range={build.StaticFurnitureMaximumVisibilityRange:0.00}/"
+            + $"{JianghaiInteriorFurnitureBatcher.MaximumVisibilityRange:0.00} "
+            + $"visibility={visibilityReady} "
+            + $"liners={shellValidation.ShellCount}/{JianghaiInteriorPopulationService.ExpectedRoomCount}:"
+            + $"shared={shellValidation.SharedMeshCount}:batched={shellValidation.BatchedShellCount}:"
+            + $"closed={shellValidation.ClosedDirectionCount}/"
+            + $"{JianghaiInteriorPopulationService.ExpectedRoomCount * 5}:"
+            + $"opaque={shellValidation.OpaqueSurfaceCount}:triangles={shellValidation.TriangleCount}:"
+            + $"{shellValidation.Valid}:{shellValidation.Failure} "
             + $"loot={build.Searchables.Count}/{JianghaiInteriorPopulationService.ExpectedSearchableCount}:{searchableReady} "
             + $"residents={build.Residents.Count}/{JianghaiInteriorPopulationService.ExpectedResidentCount}:{residentsReady} "
-            + $"reduced_sim={reducedSimulationReady} traversal={build.TraversalLinkCount}/6:{traversalReady}:"
+            + $"reduced_sim={reducedSimulationReady} traversal={build.TraversalLinkCount}/"
+            + $"{JianghaiInteriorPopulationService.ExpectedDoorCount}:{traversalReady}:"
             + $"route={aiRouteReady}:{aiLinkSeen}:door={aiOpened}:{aiContinued} "
             + $"route_checks={aiRouteChecks}/{JianghaiInteriorPopulationService.ExpectedRoomCount}:"
             + $"{aiLinkChecks}/{JianghaiInteriorPopulationService.ExpectedRoomCount} "
@@ -311,7 +373,8 @@ public partial class FreightTerminalWorld
             + $"closed={initiallyClosed}:{closedBlocks} opening={openingStarted} opened={opened} open_clear={openClears} "
             + $"shell={closedShellBlocks}:{openShellClears} "
             + $"priority={lootPriorityChecks}/{JianghaiInteriorPopulationService.ExpectedSearchableCount}:"
-            + $"{residentPriorityChecks}/{JianghaiInteriorPopulationService.ExpectedResidentCount}");
+            + $"{residentPriorityChecks}/{JianghaiInteriorPopulationService.ExpectedResidentCount}:"
+            + $"{(lootPriorityFailures.Count == 0 ? "none" : string.Join('|', lootPriorityFailures))}");
         GD.Print($"JIANGHAI_INTERIORS_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }
@@ -405,43 +468,4 @@ public partial class FreightTerminalWorld
         => node.HasMeta(key)
             && Mathf.Abs(node.GetMeta(key).AsSingle() - expected) <= 0.011f;
 
-    private static bool FurnitureAuthoredReady(Node3D furniture)
-    {
-        var scenePath = furniture.GetMeta(
-            "jianghai_authored_furniture_scene",
-            string.Empty).AsString();
-        var meshes = VisibleFurnitureMeshes(furniture).ToArray();
-        return !string.IsNullOrWhiteSpace(scenePath)
-            && ResourceLoader.Exists(scenePath)
-            && furniture.FindChild("FurnitureCollision", recursive: true, owned: false)
-                is CollisionShape3D { Shape: BoxShape3D }
-            && meshes.Length > 0
-            && meshes.All(mesh => HasAuthoredModelAncestor(mesh, furniture));
-    }
-
-    private static System.Collections.Generic.IEnumerable<MeshInstance3D> VisibleFurnitureMeshes(
-        Node3D furniture)
-    {
-        var nodes = furniture.FindChildren("*", "MeshInstance3D", recursive: true, owned: false);
-        using var nodesBacking = nodes.AsDisposable();
-        foreach (var child in nodes)
-        {
-            if (child is MeshInstance3D { Visible: true } mesh)
-            {
-                yield return mesh;
-            }
-        }
-    }
-
-    private static bool HasAuthoredModelAncestor(Node node, Node stop)
-    {
-        for (var current = node.GetParent(); current is not null && current != stop; current = current.GetParent())
-        {
-            if (current.Name == "AuthoredModel")
-            {
-                return true;
-            }
-        }
-        return false;
-    }
 }

@@ -20,7 +20,7 @@ are retained in a separate private evidence cache; paths beginning with
 private acquisition or evidence cache is committed or required to export the
 packed scene.
 
-## 2026-08-29 current Chinese district mapping
+## 2026-08-29 rebuild and 2026-08-30 expansion mapping
 
 The current project-authored Blender rebuild introduces no new external source.
 It reuses only the already verified sources in the table below: Free poly's CC0
@@ -29,14 +29,17 @@ the existing CC0 Chinese red lamp and porcelain lion dressing, Quaternius CC0
 Buildings Pack bodies, and the scene's previously registered Poly Haven
 modules/materials.
 
-The rebuild replaces 66 old visible anchors and authors 42 density placements,
-including west/east `Edge04`-`Edge06`. `JianghaiChineseTempleHall_LOD` is the
+The rebuild replaces 66 old visible anchors and authors 50 density placements,
+including west/east `Edge04`-`Edge06` and `Infill05`-`Infill08`.
+`JianghaiChineseTempleHall_LOD` is the
 Temple 2 LOD. `JianghaiChineseArcadeShop_LOD` and
 `JianghaiChineseGateHouse_LOD` combine clean Quaternius building bodies with
 adapted pavilion facade/eaves parts and an extracted, decimated Temple 2 roof.
 Repeated placements share mesh datablocks, use a deliberately small licensed
 material vocabulary, and are exported with a 512-pixel maximum runtime-texture
-dimension.
+dimension. Four Quaternius density profiles retain exact per-face scalar colors
+through glTF `COLOR_0` and one opaque material each; their 22 instances fall
+from 131 to 22 material-backed surfaces with zero image or texture delta.
 
 The historical `Old Urban building` and `Scan Old Building Street` acquisition,
 hash, and CC0 records remain intact for audit continuity, but their delivery
@@ -44,16 +47,18 @@ status is retired. The current authoritative `.blend` and runtime GLB contain
 zero visible instances of either source. Representative review evidence is
 `previews/12_chinese_edge_gate.png`, `previews/13_chinese_avenue.png`, and
 `previews/14_chinese_old_city_overview.png`. The final packed `.blend` is
-49,398,104 bytes with SHA-256
-`AD6EEED449F47564131F961394F572A5327EAAB018CA5670F49A8F34173C3B6A`;
-the final GLB is 58,571,556 bytes with SHA-256
-`B0D21C78C3996BF2AA2D0F78FA32199B0B4BF396B164E547CAE9498033F23139`.
-Its round-trip audit reports 585 nodes, 568 mesh nodes, 269 unique meshes, 449
-mesh primitives, 1,070,770 unique/3,059,538 instanced triangles, 93 materials,
+52,970,996 bytes with SHA-256
+`F4E5978182B744BD16741F298DC491F774EBF6E901B25D0890C292A97FA0B09D`;
+the final GLB is 63,926,136 bytes with SHA-256
+`3A854DD94132775F008990D908BE32D4B25E72E45C4094E8F6D8167AE633DE8D`.
+Its round-trip audit reports 605 nodes, 588 mesh nodes, 273 unique meshes, 469
+mesh primitives, 1,142,508 unique/3,151,080 instanced triangles, 97 materials,
 142 textures backed by 120 images, and maximum image dimension 512. The scene
-audit passes with zero density intersections, zero visible retired-building
-instances, and all 18 building-body, structural, and full-scene doorway probes
-clear; its negative aperture probe detects the intended 0.404-meter blocker.
+audit passes with 50/50 density placements, 12/12 enterable residences, zero
+density intersections, zero visible retired-building instances, 108/108
+building-body apertures, 36/36 structural probes, 108/108 full-scene apertures,
+and 12/12 opaque interior liners; its negative aperture probe detects the
+intended 0.404-meter blocker.
 
 ## Source records
 
@@ -309,8 +314,8 @@ record the current 2026-08-29 Chinese-district delivery.
 | `assets/models/jianghai_old_city/jianghai_old_city.glb` — valley pre-rebase snapshot | 76,862,308 | `0C0174672630957390A959BC3BD71DB3F4849CC7CABE0AFADFDD12273DFE02A5` | Runtime map before integration with the upstream hinged-entry snapshot; export and DCC-to-GLB round-trip PASS; 4,835,033 evaluated full-scene instance triangles, below the 5,000,000 gate |
 | `source_art/world/jianghai_old_city/jianghai_old_city.blend` — historical post-valley/pre-Chinese-rebuild delivery | 81,861,168 | `7CA84CD2B17C3872323D8A5EE7B1A4BA5BCB360F4326FB2331327BED4F493461` | Historical combined packed DCC source; 500 mesh objects, 198 unique mesh datablocks, 4,807,899 raw mesh-object triangles, 1,003,869 triangles counted once per unique mesh, and 563 evaluated objects totaling 4,836,825 instance triangles; superseded by the 2026-08-29 Chinese district rebuild |
 | `assets/models/jianghai_old_city/jianghai_old_city.glb` — historical post-valley/pre-Chinese-rebuild delivery | 84,723,312 | `7E2BB712BCF031692FAFB0E4E0FA59F3E75CE340B2748F5EDBDB7B105D9B2965` | Historical combined runtime map; superseded by the 2026-08-29 Chinese district rebuild |
-| `source_art/world/jianghai_old_city/jianghai_old_city.blend` — current Chinese-district delivery | 49,398,104 | `AD6EEED449F47564131F961394F572A5327EAAB018CA5670F49A8F34173C3B6A` | Authoritative packed DCC source; 505 mesh objects/206 unique mesh datablocks/3,032,228 object triangles and 568 evaluated meshes/3,061,154 evaluated triangles; 66/66 visible anchors replaced, 42/42 density placements, six enterable main-street placements, zero density intersections, zero visible retired-building instances, 18/18 building-body apertures, 18/18 structural probes, and 18/18 full-scene apertures; read-only audit PASS |
-| `assets/models/jianghai_old_city/jianghai_old_city.glb` — current Chinese-district delivery | 58,571,556 | `B0D21C78C3996BF2AA2D0F78FA32199B0B4BF396B164E547CAE9498033F23139` | GLB round-trip PASS; 585 nodes/568 mesh nodes/269 unique meshes/449 primitives, 1,070,770 unique/3,059,538 instanced triangles, 93 materials, 142 textures/120 images, maximum image dimension 512 |
+| `source_art/world/jianghai_old_city/jianghai_old_city.blend` — current Chinese-district delivery | 52,970,996 | `F4E5978182B744BD16741F298DC491F774EBF6E901B25D0890C292A97FA0B09D` | Authoritative packed DCC source; 621 objects/525 mesh objects/210 unique mesh datablocks/3,123,494 object triangles/1,113,692 unique triangles and 588 evaluated meshes/3,152,420 evaluated triangles; 66/66 visible anchors replaced, 50/50 density placements, 12 enterable placements, zero density intersections, zero visible retired-building instances, 108/108 building-body apertures, 36/36 structural probes, 108/108 full-scene apertures, and 12/12 opaque liners; read-only audit PASS |
+| `assets/models/jianghai_old_city/jianghai_old_city.glb` — current Chinese-district delivery | 63,926,136 | `3A854DD94132775F008990D908BE32D4B25E72E45C4094E8F6D8167AE633DE8D` | GLB round-trip PASS; 605 nodes/588 mesh nodes/273 unique meshes/469 primitives, 1,142,508 unique/3,151,080 instanced triangles, 97 materials, 142 textures/120 images, maximum image dimension 512 |
 | `assets/models/jianghai_old_city/rollershutter_window_03.glb` | 187,940 | `C4884AFCD7560E4BB23320A8C311DB0011504F7C5FEE30D58C266D54F7C6B166` | `scripts/blender/export_jianghai_old_city.py` selects the packed scene's adapted `JianghaiArtPass_EastShutter00` mesh, normalizes a temporary copy, and exports its PBR geometry and materials; the derivative remains tracked but no longer supplies the current Jianghai interactive-door visuals |
 
 This retained derivative preserves the Rollershutter Window 03 provenance and
@@ -377,8 +382,9 @@ delivered artifact. No displacement-generated visible geometry is created.
 Composition, modeling, material, lighting, and sign changes are serialized in
 that packed Blender scene. The deterministic DCC export/cleanup script
 `scripts/blender/export_jianghai_old_city.py` validates the 66-anchor Chinese
-replacement, the explicit 42-placement density table and six west/east
-`Edge04`-`Edge06` placements, rejects both retired building sources plus legacy
+replacement, the explicit 50-placement density table, six west/east
+`Edge04`-`Edge06` placements, and eight west/east `Infill05`-`Infill08`
+placements, rejects both retired building sources plus legacy
 pawnshop boards and zero-thickness walls, validates the authored canopy and
 wings, then exports it
 to:
@@ -554,19 +560,19 @@ runtime counts follow resolved instances.
 
 ### Current Chinese-district runtime evidence
 
-The current `B0D21C78...` GLB was explicitly reimported after the 2026-08-29
-Chinese-district and enterable-interior rebuild. Runtime and capture diagnostics
+The current `3A854DD9...` GLB was explicitly reimported after the 2026-08-30
+infill and enterable-interior expansion. Runtime and capture diagnostics
 report:
 
 | Audit layer | Verified result |
 | --- | --- |
-| Godot authored-map import | 568 meshes; 1,493 material-backed surfaces; 3,059,538 instance triangles; 8/8 required anchors |
-| Gameplay collision | 335/335 box shapes from 107 collider sources: 315 gameplay boxes plus 20 landmark facade/traversal boxes; zero concave shapes; doors, rails, rooftops, ballistics, routes, interiors, and high-value-loot access probes pass |
-| Enterable interiors | Six aperture-aligned rooms, six finished Chinese lattice hinge doors, 24 finished Kenney furniture props represented by 49 mesh nodes, eight searchable loot sources, four animated residents, and six bidirectional squad traversal links all pass runtime validation |
-| Squad door traversal | The production layered-route planner selects the required link, opens the matching door, waits for its 96-degree motion, and continues into every one of the six rooms |
-| Deployment loading | Recorded final clean runs: threaded preload 853-1,151 ms; cached acquire 0 ms; instantiate 5-8 ms; runtime configuration 51-55 ms; scene total 65-68 ms; world ready 2,274-2,300 ms; 44 loot sources and 33 garrison enemies |
-| Render batching | 277 safe repeated source meshes grouped into 71 spatial `MultiMesh` batches; all batch-origin, reconstructed-pose, visibility-range, and diagnostic-layer guards pass |
-| Representative capture | All 11 views pass the 2,400-draw/2,200-object/10.5-million-primitive/1,536-MB-video/1,152-MB-texture budgets; overview 1,001 draw calls / 1,005 objects / 2,774,257 primitives; daylight overview 1,904 / 1,939 / 3,069,532; peak 1,057.0 MB video and 663.3 MB texture memory |
+| Godot authored-map import | 588 meshes; 1,450 material-backed surfaces; 3,151,080 instance triangles; 8/8 required anchors |
+| Gameplay collision | 506/506 box shapes: 486 gameplay boxes from 115 authored sources plus 96 placement fragments, and 20 landmark facade/traversal boxes; zero concave shapes; doors, rails, rooftops, ballistics, routes, interiors, and high-value-loot access probes pass |
+| Enterable interiors | 12 aperture-aligned rooms, 12 finished Chinese lattice hinge doors, 12 shared opaque liners, 48 finished Kenney furniture props / 95 authored mesh nodes, 12 searchable loot sources, four added animated residents, and 12 bidirectional squad traversal links all pass runtime validation |
+| Squad door traversal | The production layered-route planner selects the required link, opens the matching door, waits for its 96-degree motion, and continues through every one of the 12 rooms |
+| Deployment loading | Recorded final clean runs: threaded preload 777-1,014 ms; cached acquire 0 ms; instantiate 2-4 ms; runtime configuration 38-66 ms; scene total 44-77 ms; world ready 2,090-2,924 ms; 48 loot sources and 33 garrison enemies |
+| Render batching | 292 safe repeated source meshes grouped into 78 spatial `MultiMesh` batches; production releases 290 layer-zero leaves after gameplay registration and retains two referenced room sources; 36 static furniture props resolve to 50 short-range batches / 62 instances; all batch-origin, reconstructed-pose, visibility-range, and diagnostic-layer guards pass |
+| Representative capture | All 19 measured views pass the 2,400-draw/2,200-object/10.5-million-primitive/1,250-MB-video/750-MB-texture budgets; overview 982 draw calls / 1,007 objects / 2,867,417 primitives; daylight overview 1,797 / 1,844 / 3,054,463; peak primitives 3,121,853; peak 1,097.4 MB video and 719.2 MB texture memory; same-machine texture memory is unchanged from baseline |
 
 ### Historical post-valley capture performance evidence
 
@@ -626,7 +632,7 @@ tracked Poly Haven Old Military Crate by Jack Mava and Concrete Road Barrier
 by Amal Kumar, plus Coffee Cart 01 by Joe Seabuhr and Wicker Basket 01 by
 Kuutti Siitonen. It additionally embeds the 18 brick and two doorframe instances
 from Quaternius's Downtown City MegaKit recorded above. The two landmark runtime
-doors use Kenney's separate `door-hinged.glb`; the six enterable-room doors use
+doors use Kenney's separate `door-hinged.glb`; the 12 enterable-room doors use
 the finished Kenney leaf / Free poly Chinese Temple 2 grille composite recorded
 above. All are CC0 1.0 Universal; attribution is not required, but creator credit
 is retained as provenance.

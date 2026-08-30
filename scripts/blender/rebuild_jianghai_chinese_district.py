@@ -7,9 +7,10 @@ Run with Blender 4.5+::
         -- --render-previews
 
 The pass is deterministic and idempotent.  It replaces every delivered instance
-of the two retired ruin meshes, adds six set-back edge buildings, preserves the
-named gameplay anchors, and saves the authoritative blend.  No acquisition-cache
-asset is read: all geometry comes from CC0 sources already packed in the scene.
+of the two retired ruin meshes, maintains a fifty-building low-poly density
+layout, preserves the named gameplay anchors, and saves the authoritative blend.
+No acquisition-cache asset is read: all geometry comes from registered CC0
+sources already in the public repository.
 """
 
 from __future__ import annotations
@@ -25,6 +26,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jianghai_chinese_district_layout import (
     DENSITY_BUILDING_LAYOUT, JIANGHAI_DEPLOYMENT_POINTS, OLD_URBAN_TARGETS, PROFILE_BASE_SCALE,
     QUATERNIUS_DENSITY_MESHES, SHOP_TARGETS,
+)
+from jianghai_density_color0 import (
+    consolidate_density_profile_mesh,
+    validate_density_color0_scene,
 )
 from jianghai_enterable_residences import apply_enterable_residences
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -285,6 +290,7 @@ def rebuild_density(
         mesh = bpy.data.meshes.get(mesh_name)
         if mesh is None:
             raise RuntimeError(f"Packed Quaternius density mesh is missing: {mesh_name}")
+        consolidate_density_profile_mesh(mesh, profile)
         quaternius[profile] = mesh
     for obj in list(bpy.data.objects):
         if obj.name.startswith("JianghaiDensity_"):
@@ -382,7 +388,7 @@ def validate_delivery() -> dict[str, int | float]:
     valid = (
         not retired_instances
         and targets_ready
-        and len(density) == 42
+        and len(density) == 50
         and edge_names.issubset(bpy.data.objects.keys())
         and edge_clearance >= 24.0
         and triangles < MAX_INSTANCE_TRIANGLES
@@ -390,7 +396,7 @@ def validate_delivery() -> dict[str, int | float]:
     print(
         "JIANGHAI_CHINESE_DISTRICT_CHECK "
         f"valid={valid} replaced={len(OLD_URBAN_TARGETS)} retired_visible={len(retired_instances)} "
-        f"density={len(density)}/42 edge={len(edge_names)}/6 "
+        f"density={len(density)}/50 edge={len(edge_names)}/6 "
         f"deployment_pad_clearance={edge_clearance:.2f} triangles={triangles}/{MAX_INSTANCE_TRIANGLES}"
     )
     if not valid:
@@ -471,12 +477,13 @@ def main() -> None:
     density_shop = decimate_mesh(shop_mesh, DENSITY_SHOP_MESH_NAME, 0.42, "perimeter arcade shop LOD")
     density_gate = decimate_mesh(gate_mesh, DENSITY_GATE_MESH_NAME, 0.48, "perimeter gate house LOD")
     density_count, profile_counts = rebuild_density(density_hall, density_shop, density_gate)
+    density_color0 = validate_density_color0_scene()
     retired_blocks = purge_retired_data()
     root = bpy.data.objects.get("JianghaiOldCityAuthoredScene")
     if root is None:
         raise RuntimeError("Jianghai authored scene root is missing")
     root["chinese_district_rebuild_version"] = REBUILD_VERSION
-    root["chinese_district_authored_on"] = "2026-08-29"
+    root["chinese_district_authored_on"] = "2026-08-30"
     root["chinese_district_source"] = "Chinese Temple 2 plus retained Quaternius CC0 modules"
     root["retired_visible_assets"] = "Old Urban building; Scan Old Building Street"
     root["retired_visible_asset_instances"] = 0
@@ -489,10 +496,20 @@ def main() -> None:
         f"valid=True replaced={replaced} density={density_count} "
         f"object_profiles={','.join(f'{name}:{count}' for name, count in object_profiles.items())} "
         f"profiles={','.join(f'{name}:{count}' for name, count in profile_counts.items())} "
+        f"density_color0={density_color0.profile_count}:"
+        f"surfaces={density_color0.profile_surface_count}:"
+        f"instances={density_color0.instance_count}:"
+        f"instance_surfaces={density_color0.instance_surface_count}:"
+        f"infill={density_color0.infill_instance_count}:"
+        f"infill_surfaces={density_color0.infill_surface_count} "
         f"retired_blocks={retired_blocks} triangles={metrics['triangles']} "
         f"enterable={enterable.residence_count} cuts={enterable.cut_count} "
         f"door_samples={enterable.aperture_sample_count}/{enterable.wall_sample_count} "
         f"scene_door_samples={enterable.scene_aperture_sample_count} "
+        f"liners={enterable.liner_count} liner_triangles={enterable.liner_triangle_count} "
+        f"liner_closure={enterable.liner_closure_sample_count} "
+        f"liner_entry={enterable.liner_entry_sample_count} "
+        f"shared_enterable_mesh_pairs={enterable.shared_mesh_pair_count} "
         f"removed_door_inserts={enterable.removed_insert_count} "
         f"previews={len(previews)} blend={BLEND_PATH}"
     )

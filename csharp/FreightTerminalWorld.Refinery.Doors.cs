@@ -243,7 +243,7 @@ public partial class FreightTerminalWorld
         var expectedDoorCount = (_oldTownLandmarks?.EntryCount ?? 0)
             + JianghaiInteriorPopulationService.ExpectedDoorCount;
         var countReady = _refineryDoors.Count == expectedDoorCount
-            && expectedDoorCount == 8;
+            && expectedDoorCount == 14;
         var idsReady = _refineryDoors.Select(door => door.DoorId).Distinct().Count() == expectedDoorCount
             && _refineryDoors.Select(door => door.DoorId).OrderBy(id => id)
                 .SequenceEqual(Enumerable.Range(1, expectedDoorCount));

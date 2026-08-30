@@ -17,7 +17,9 @@ from jianghai_chinese_district_layout import (
     ENTERABLE_RESIDENCE_LAYOUT,
     JIANGHAI_DEPLOYMENT_POINTS,
 )
+from jianghai_density_color0 import validate_density_color0_scene
 from jianghai_enterable_residences import validate_enterable_residences
+from jianghai_enterable_interior_liners import EXPECTED_TRIANGLES as INTERIOR_LINER_TRIANGLES
 
 
 GROUND_INSTANCE_COUNT = 1
@@ -2049,7 +2051,7 @@ density_buildings = sorted(
 )
 density_spawn_clearances = tuple(Vector(point) for point in JIANGHAI_DEPLOYMENT_POINTS)
 density_ready = (
-    len(density_buildings) == 42
+    len(density_buildings) == 50
     and sum(obj.data.name == "JianghaiDensity_ChineseTempleHall_LOD" for obj in density_buildings) == 8
     and sum(obj.data.name == "JianghaiDensity_ChineseArcadeShop_LOD" for obj in density_buildings) == 16
     and sum(obj.data.name == "JianghaiDensity_ChineseGateHouse_LOD" for obj in density_buildings) == 4
@@ -2057,22 +2059,22 @@ density_ready = (
         obj.data.name == "JianghaiDensity_QuaterniusBuilding1Large_LOD"
         for obj in density_buildings
     )
-    == 4
+    == 6
     and sum(
         obj.data.name == "JianghaiDensity_QuaterniusBuilding3Big_LOD"
         for obj in density_buildings
     )
-    == 3
+    == 5
     and sum(
         obj.data.name == "JianghaiDensity_QuaterniusBuilding4_LOD"
         for obj in density_buildings
     )
-    == 3
+    == 5
     and sum(
         obj.data.name == "JianghaiDensity_QuaterniusHouse2_LOD"
         for obj in density_buildings
     )
-    == 4
+    == 6
     and all(obj.parent == bpy.data.objects.get("JianghaiTenementDistrict") for obj in density_buildings)
     and all(obj.get("license") == "CC0 1.0 Universal" for obj in density_buildings)
     and all(
@@ -2211,7 +2213,7 @@ density_intersections_ready = not density_intersections
 
 street_cadence_expectations = {
     "WestClockRow01": ("JianghaiStreetCadence_Building1Large", Vector((-12.20, -24.0, 0.03))),
-    "WestMedicineRow01": ("JianghaiChineseArcadeShop_LOD", Vector((-18.50, 0.0, 0.03))),
+    "WestMedicineRow01": ("JianghaiEnterable_WestMedicineRow01_LOD", Vector((-18.50, 0.0, 0.03))),
     "WestMedicineRow02": ("JianghaiStreetCadence_Building4", Vector((-12.70, 12.0, 0.03))),
     "WestTheatreRow02": ("JianghaiStreetCadence_House2", Vector((-14.25, 48.0, 0.03))),
 }
@@ -2285,10 +2287,10 @@ pawnshop_doorway_clear = (
     is False
 )
 authored_collision_sources_ready = (
-    len(collision_sources) == 112
+    len(collision_sources) == 120
     and collision_source_counts
     == {
-        "JianghaiTenementDistrict": 100,
+        "JianghaiTenementDistrict": 108,
         "RedStarElectronicsFactory": 6,
         "GuangchangPawnshop": 1,
         "OldCityMarketBridge": 5,
@@ -2320,13 +2322,30 @@ root_provenance_ready = (
     and root.get("retired_visible_asset_instances") == 0
 )
 enterable_residences = validate_enterable_residences()
+density_color0 = validate_density_color0_scene()
+density_color0_ready = (
+    density_color0.profile_count == 4
+    and density_color0.profile_surface_count == 4
+    and density_color0.instance_count == 22
+    and density_color0.instance_surface_count == 22
+    and density_color0.infill_instance_count == 8
+    and density_color0.infill_surface_count == 8
+)
 enterable_residences_ready = (
     enterable_residences.residence_count == len(ENTERABLE_RESIDENCE_LAYOUT)
-    and enterable_residences.aperture_sample_count == len(ENTERABLE_RESIDENCE_LAYOUT) * 3
+    and enterable_residences.aperture_sample_count == len(ENTERABLE_RESIDENCE_LAYOUT) * 9
     and enterable_residences.wall_sample_count == len(ENTERABLE_RESIDENCE_LAYOUT) * 3
     and enterable_residences.scene_aperture_sample_count
-    == len(ENTERABLE_RESIDENCE_LAYOUT) * 3
+    == len(ENTERABLE_RESIDENCE_LAYOUT) * 9
     and enterable_residences.triangle_count > 0
+    and enterable_residences.liner_count == len(ENTERABLE_RESIDENCE_LAYOUT)
+    and enterable_residences.liner_triangle_count == INTERIOR_LINER_TRIANGLES
+    and enterable_residences.liner_closure_sample_count
+    == len(ENTERABLE_RESIDENCE_LAYOUT) * 5
+    and enterable_residences.liner_entry_sample_count
+    == len(ENTERABLE_RESIDENCE_LAYOUT) * 9
+    and enterable_residences.liner_opaque_material_count == 2
+    and enterable_residences.shared_mesh_pair_count == 3
 )
 valid = (
     not missing_anchors
@@ -2353,6 +2372,7 @@ valid = (
     and cross_street_intrusions_removed
     and authored_collision_sources_ready
     and enterable_residences_ready
+    and density_color0_ready
     and root_provenance_ready
 )
 valley_ground_band_report = ",".join(
@@ -2506,17 +2526,29 @@ print(
     f"pawnshop_legacy_visible={len(pawnshop_legacy_visible_names)} "
     f"pawnshop_columns_clear={pawnshop_columns_clear} "
     f"replacement_factory_ready={replacement_factory_ready} "
-    f"density={len(density_buildings)}/42 density_ready={density_ready} "
+    f"density={len(density_buildings)}/50 density_ready={density_ready} "
     f"enterable_residences={enterable_residences.residence_count}/{len(ENTERABLE_RESIDENCE_LAYOUT)} "
     f"enterable_door_samples={enterable_residences.aperture_sample_count}/"
     f"{enterable_residences.wall_sample_count} "
     f"enterable_scene_door_samples={enterable_residences.scene_aperture_sample_count} "
+    f"enterable_liners={enterable_residences.liner_count}:"
+    f"{enterable_residences.liner_triangle_count}:"
+    f"closure={enterable_residences.liner_closure_sample_count}:"
+    f"entry={enterable_residences.liner_entry_sample_count}:"
+    f"opaque={enterable_residences.liner_opaque_material_count} "
+    f"enterable_shared_mesh_pairs={enterable_residences.shared_mesh_pair_count} "
+    f"density_color0={density_color0.profile_count}:"
+    f"surfaces={density_color0.profile_surface_count}:"
+    f"instances={density_color0.instance_count}:"
+    f"instance_surfaces={density_color0.instance_surface_count}:"
+    f"infill={density_color0.infill_instance_count}:"
+    f"infill_surfaces={density_color0.infill_surface_count} "
     f"density_intersections={len(density_intersections)} "
     f"street_cadence={street_cadence_ready}:{len(street_cadence_objects)}/4 "
     f"market_walkway_clear={market_walkway_ready} "
     f"cross_street_intrusions_removed={cross_street_intrusions_removed} "
     f"cross_street_clear={cross_street_clear} pawnshop_doorway_clear={pawnshop_doorway_clear} "
-    f"collision_sources={len(collision_sources)}/112 "
+    f"collision_sources={len(collision_sources)}/120 "
     f"collision_source_counts={','.join(f'{key}:{value}' for key, value in collision_source_counts.items())} "
     f"detail_collision_sources={len(detail_collision_sources)}/133 "
     f"detail_collision_source_counts={','.join(f'{key}:{value}' for key, value in detail_collision_source_counts.items())} "

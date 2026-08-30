@@ -1,15 +1,18 @@
 """Author and validate real ground-floor apertures for selected Jianghai shops.
 
-The Chinese district uses three shared meshes for most street buildings.  A
-door cut on a shared mesh would open every copy, so this module duplicates only
-the six reviewed main-street objects before applying an exact Blender boolean.
-The resulting unique meshes remain part of the authoritative Old City blend.
+The Chinese district uses shared meshes for most street buildings.  A door cut
+on a shared mesh would open every copy, so this module duplicates only the
+twelve reviewed street objects before applying an exact Blender cut.  The
+resulting unique facades and one shared modular interior liner remain part of
+the authoritative Old City blend.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import blake2b
 from math import atan2, cos, radians, sin
+from struct import pack
 
 import bmesh
 import bpy
@@ -23,9 +26,14 @@ from jianghai_chinese_district_layout import (
     ENTERABLE_RESIDENCE_LAYOUT,
     ENTERABLE_YAW_DEGREES,
 )
+from jianghai_enterable_interior_liners import (
+    rebuild_interior_liners,
+    validate_interior_liners,
+)
 
 
-ENTERABLE_VERSION = 1
+ENTERABLE_VERSION = 2
+LEGACY_ENTERABLE_VERSION = 1
 DOOR_WIDTH_METERS = 1.58
 DOOR_HEIGHT_METERS = 2.48
 DOOR_FLOOR_OVERLAP_METERS = 0.04
@@ -42,6 +50,11 @@ REPLACED_INSERT_MESH_NAME = "Cube.004"
 REPLACED_INSERT_SURVIVOR_NAME = "JianghaiExpansion_Facade_WestClock_F0_C1_Insert"
 RETAINED_INSERT_WALL_NAME = "JianghaiExpansion_Facade_EastPhoto_F0_C1_Wall"
 REPLACED_INSERT_MARKER = "jianghai_enterable_replaced_insert_version"
+ENTERABLE_MESH_SHARE_GROUPS = (
+    ("EastPhotoHouse", "EastGateRow00"),
+    ("OuterEastMidResidence", "OuterWestSquareResidence"),
+    ("WeatheredRollerShop02", "WeatheredRollerShop03"),
+)
 
 
 @dataclass(frozen=True)
@@ -53,6 +66,12 @@ class EnterableResidenceMetrics:
     triangle_count: int
     scene_aperture_sample_count: int = 0
     removed_insert_count: int = 0
+    liner_count: int = 0
+    liner_triangle_count: int = 0
+    liner_closure_sample_count: int = 0
+    liner_entry_sample_count: int = 0
+    liner_opaque_material_count: int = 0
+    shared_mesh_pair_count: int = 0
 
 
 def _mesh_bounds(mesh: bpy.types.Mesh) -> tuple[Vector, Vector]:
@@ -264,6 +283,115 @@ def _cut_unique_mesh(obj: bpy.types.Object) -> None:
         mesh_data.free()
 
 
+def _ensure_enterable_mesh(obj: bpy.types.Object) -> bool:
+    """Cut untouched facades and migrate already-cut v1 meshes without recutting."""
+
+    mesh_version = obj.data.get("jianghai_enterable_mesh_version")
+    if mesh_version is None:
+        _cut_unique_mesh(obj)
+        return True
+    if int(mesh_version) == LEGACY_ENTERABLE_VERSION:
+        if obj.data.users != 1:
+            raise RuntimeError(
+                f"Legacy enterable mesh is unexpectedly shared: {obj.name} users={obj.data.users}"
+            )
+        obj.data["jianghai_enterable_mesh_version"] = ENTERABLE_VERSION
+        obj.data["authored_derivation"] = (
+            "Blender-authored unique Chinese arcade-shop mesh with a real human-scale doorway; "
+            "v2 adds a shared opaque modular interior liner without recutting the facade"
+        )
+        return False
+    if int(mesh_version) != ENTERABLE_VERSION:
+        raise RuntimeError(
+            f"Unsupported enterable mesh version: {obj.name} version={mesh_version}"
+        )
+    return False
+
+
+def _mesh_geometry_digest(mesh: bpy.types.Mesh) -> str:
+    digest = blake2b(digest_size=20)
+    digest.update(pack("<II", len(mesh.vertices), len(mesh.polygons)))
+    for vertex in mesh.vertices:
+        digest.update(pack("<3d", vertex.co.x, vertex.co.y, vertex.co.z))
+    for polygon in mesh.polygons:
+        digest.update(pack("<II", polygon.material_index, len(polygon.vertices)))
+        for vertex_index in polygon.vertices:
+            digest.update(pack("<I", vertex_index))
+    return digest.hexdigest()
+
+
+def _share_compatible_enterable_meshes() -> int:
+    """Instance only reviewed cut meshes whose source and local cut are identical."""
+
+    shared_pairs = 0
+    for leader_name, follower_name in ENTERABLE_MESH_SHARE_GROUPS:
+        leader = bpy.data.objects.get(leader_name)
+        follower = bpy.data.objects.get(follower_name)
+        if (
+            leader is None
+            or follower is None
+            or leader.type != "MESH"
+            or follower.type != "MESH"
+        ):
+            raise RuntimeError(
+                f"Reviewed enterable mesh pair is missing: {leader_name}/{follower_name}"
+            )
+        if (_world_scale(leader) - _world_scale(follower)).length > 0.0001:
+            raise RuntimeError(
+                f"Enterable mesh pair scale drifted: {leader_name}/{follower_name}"
+            )
+        if ENTERABLE_COLLISION_LAYOUT[leader_name] != ENTERABLE_COLLISION_LAYOUT[follower_name]:
+            raise RuntimeError(
+                f"Enterable mesh pair collision contract drifted: {leader_name}/{follower_name}"
+            )
+        if leader.data != follower.data:
+            if tuple(leader.data.materials) != tuple(follower.data.materials):
+                raise RuntimeError(
+                    f"Enterable mesh pair materials differ: {leader_name}/{follower_name}"
+                )
+            if _mesh_geometry_digest(leader.data) != _mesh_geometry_digest(follower.data):
+                raise RuntimeError(
+                    f"Enterable mesh pair geometry differs: {leader_name}/{follower_name}"
+                )
+            redundant_mesh = follower.data
+            follower.data = leader.data
+            if redundant_mesh.users == 0:
+                bpy.data.meshes.remove(redundant_mesh)
+        leader.data["jianghai_enterable_shared_instances"] = (
+            f"{leader_name};{follower_name}"
+        )
+        shared_pairs += 1
+    return shared_pairs
+
+
+def _validate_shared_enterable_meshes() -> int:
+    for leader_name, follower_name in ENTERABLE_MESH_SHARE_GROUPS:
+        leader = bpy.data.objects.get(leader_name)
+        follower = bpy.data.objects.get(follower_name)
+        if leader is None or follower is None or leader.data != follower.data:
+            raise RuntimeError(
+                f"Reviewed enterable mesh pair is no longer instanced: "
+                f"{leader_name}/{follower_name}"
+            )
+        mesh_users = sorted(
+            obj.name
+            for obj in bpy.data.objects
+            if obj.type == "MESH" and obj.data == leader.data
+        )
+        if mesh_users != sorted((leader_name, follower_name)):
+            raise RuntimeError(
+                f"Enterable mesh leaked to an unreviewed solid building: "
+                f"pair={leader_name}/{follower_name} users={mesh_users}"
+            )
+        if leader.data.get("jianghai_enterable_shared_instances") != (
+            f"{leader_name};{follower_name}"
+        ):
+            raise RuntimeError(
+                f"Enterable mesh sharing provenance drifted: {leader_name}/{follower_name}"
+            )
+    return len(ENTERABLE_MESH_SHARE_GROUPS)
+
+
 def _set_runtime_metadata(obj: bpy.types.Object, archetype: str) -> None:
     scale = _world_scale(obj)
     minimum, maximum = _mesh_bounds(obj.data)
@@ -275,8 +403,6 @@ def _set_runtime_metadata(obj: bpy.types.Object, archetype: str) -> None:
     obj["jianghai_door_width_m"] = DOOR_WIDTH_METERS
     obj["jianghai_door_height_m"] = DOOR_HEIGHT_METERS
     obj["jianghai_door_front"] = "local_positive_z_godot"
-    obj["jianghai_room_width_m"] = min(max(world_width - 1.2, 3.8), 7.2)
-    obj["jianghai_room_depth_m"] = min(max(world_depth - 1.3, MINIMUM_INTERIOR_DEPTH_METERS), 6.4)
     (
         front_inset,
         collision_width,
@@ -291,6 +417,19 @@ def _set_runtime_metadata(obj: bpy.types.Object, archetype: str) -> None:
         side_front_inset,
         side_rear_inset,
     ) = ENTERABLE_COLLISION_LAYOUT[obj.name]
+    # Keep the visible liner just inside the reviewed gameplay envelope.  This
+    # guarantees the visible side/rear surfaces and collision agree even in the
+    # compact roller shops, whose ornamental exterior AABB is much deeper.
+    obj["jianghai_room_width_m"] = min(
+        max(world_width - 1.2, 3.8),
+        7.2,
+        collision_width - 0.35,
+    )
+    obj["jianghai_room_depth_m"] = min(
+        max(world_depth - 1.3, MINIMUM_INTERIOR_DEPTH_METERS),
+        6.4,
+        collision_depth - 0.30,
+    )
     obj["jianghai_door_front_inset_m"] = front_inset
     obj["jianghai_collision_width_m"] = collision_width
     obj["jianghai_collision_depth_m"] = collision_depth
@@ -320,42 +459,46 @@ def _validate_scene_aperture(
     depsgraph = bpy.context.evaluated_depsgraph_get()
     outward = Vector((0.0, -1.0, 0.0))
     inward = -outward
+    tangent = Vector((1.0, 0.0, 0.0))
     samples = 0
-    for height in (0.45, 1.20, 2.18):
-        center = facade + Vector((0.0, 0.0, height / scale.z))
-        # Start beyond the complete ornamental AABB, then follow the true
-        # doorway centreline through the authored scene.  This catches detached
-        # facade inserts in front of the structural wall; a legitimate rear
-        # wall several metres inside the room remains outside the 1.2 m guard.
-        origin = obj.matrix_world @ (
-            center
-            + outward
-            * ((front_inset + SCENE_APERTURE_OUTSET_METERS) / scale.y)
-        )
-        end = obj.matrix_world @ (
-            center
-            + inward
-            * (
-                (SCENE_APERTURE_RAY_LENGTH_METERS - front_inset)
-                / scale.y
+    for lateral in (-0.42, 0.0, 0.42):
+        for height in (0.45, 1.20, 2.18):
+            center = facade + tangent * (lateral / scale.x)
+            center += Vector((0.0, 0.0, height / scale.z))
+            # Start beyond the complete ornamental AABB, then follow the true
+            # doorway through the authored scene.  Three lateral by three
+            # vertical samples catch narrow leftover facade strips as well as
+            # detached inserts; the rear liner remains outside the 1.2 m guard.
+            origin = obj.matrix_world @ (
+                center
+                + outward
+                * ((front_inset + SCENE_APERTURE_OUTSET_METERS) / scale.y)
             )
-        )
-        ray = end - origin
-        hit, location, _, _, blocker, _ = bpy.context.scene.ray_cast(
-            depsgraph,
-            origin,
-            ray.normalized(),
-            distance=ray.length,
-        )
-        if hit:
-            distance = (location - origin).length
-            if distance < SCENE_APERTURE_CLEARANCE_METERS - 0.0001:
-                blocker_name = blocker.name if blocker is not None else "unknown"
-                raise RuntimeError(
-                    f"Door approach remains blocked: {obj.name} height={height:.2f} "
-                    f"distance={distance:.3f}m blocker={blocker_name}"
+            end = obj.matrix_world @ (
+                center
+                + inward
+                * (
+                    (SCENE_APERTURE_RAY_LENGTH_METERS - front_inset)
+                    / scale.y
                 )
-        samples += 1
+            )
+            ray = end - origin
+            hit, location, _, _, blocker, _ = bpy.context.scene.ray_cast(
+                depsgraph,
+                origin,
+                ray.normalized(),
+                distance=ray.length,
+            )
+            if hit:
+                distance = (location - origin).length
+                if distance < SCENE_APERTURE_CLEARANCE_METERS - 0.0001:
+                    blocker_name = blocker.name if blocker is not None else "unknown"
+                    raise RuntimeError(
+                        f"Door approach remains blocked: {obj.name} x={lateral:.2f} "
+                        f"height={height:.2f} distance={distance:.3f}m "
+                        f"blocker={blocker_name}"
+                    )
+            samples += 1
     return samples
 
 
@@ -405,6 +548,19 @@ def _validate_residence(obj: bpy.types.Object) -> tuple[int, int, int, int]:
             f"Enterable residence collision envelope drifted: {obj.name} "
             f"actual={actual_collision} expected={expected_collision}"
         )
+    room_width = float(obj.get("jianghai_room_width_m", 0.0))
+    room_depth = float(obj.get("jianghai_room_depth_m", 0.0))
+    if (
+        room_width < 3.8
+        or room_width > expected_collision[1] - 0.35 + 0.0001
+        or room_depth < MINIMUM_INTERIOR_DEPTH_METERS
+        or room_depth > expected_collision[2] - 0.30 + 0.0001
+    ):
+        raise RuntimeError(
+            f"Visible room exceeds its collision envelope: {obj.name} "
+            f"room=({room_width:.3f},{room_depth:.3f}) "
+            f"collision=({expected_collision[1]:.3f},{expected_collision[2]:.3f})"
+        )
     tree = BVHTree.FromPolygons(
         [vertex.co.copy() for vertex in obj.data.vertices],
         [tuple(polygon.vertices) for polygon in obj.data.polygons],
@@ -428,21 +584,24 @@ def _validate_residence(obj: bpy.types.Object) -> tuple[int, int, int, int]:
     )
 
     aperture_samples = 0
-    for height in (0.45, 1.20, 2.18):
-        center = facade + Vector((0.0, 0.0, height / scale.z))
-        aperture_origin = center + outward * (FACADE_PROBE_OUTSET_METERS / scale.y)
-        aperture_hit = tree.ray_cast(
-            aperture_origin,
-            inward,
-            FACADE_PROBE_LENGTH_METERS / scale.y,
-        )[0]
-        if aperture_hit is not None:
-            facade_depth = (aperture_hit.y - facade.y) * scale.y
-            raise RuntimeError(
-                f"Door aperture remains blocked: {obj.name} height={height:.2f} "
-                f"facade_depth={facade_depth:.2f}m"
+    for lateral in (-0.42, 0.0, 0.42):
+        for height in (0.45, 1.20, 2.18):
+            center = facade + Vector(
+                (lateral / scale.x, 0.0, height / scale.z)
             )
-        aperture_samples += 1
+            aperture_origin = center + outward * (FACADE_PROBE_OUTSET_METERS / scale.y)
+            aperture_hit = tree.ray_cast(
+                aperture_origin,
+                inward,
+                FACADE_PROBE_LENGTH_METERS / scale.y,
+            )[0]
+            if aperture_hit is not None:
+                facade_depth = (aperture_hit.y - facade.y) * scale.y
+                raise RuntimeError(
+                    f"Door aperture remains blocked: {obj.name} x={lateral:.2f} "
+                    f"height={height:.2f} facade_depth={facade_depth:.2f}m"
+                )
+            aperture_samples += 1
 
     tangent = Vector((1.0, 0.0, 0.0))
     wall_samples = 0
@@ -510,10 +669,13 @@ def apply_enterable_residences() -> EnterableResidenceMetrics:
         if obj is None or obj.type != "MESH":
             raise RuntimeError(f"Enterable Jianghai residence is missing: {object_name}")
         _apply_reviewed_orientation(obj)
-        if obj.data.get("jianghai_enterable_mesh_version") != ENTERABLE_VERSION:
-            _cut_unique_mesh(obj)
+        if _ensure_enterable_mesh(obj):
             cut_count += 1
         _set_runtime_metadata(obj, archetype)
+    _share_compatible_enterable_meshes()
+    rebuild_interior_liners(
+        tuple(object_name for object_name, _ in ENTERABLE_RESIDENCE_LAYOUT)
+    )
     metrics = validate_enterable_residences()
     return EnterableResidenceMetrics(
         metrics.residence_count,
@@ -523,6 +685,12 @@ def apply_enterable_residences() -> EnterableResidenceMetrics:
         metrics.triangle_count,
         metrics.scene_aperture_sample_count,
         removed_insert_count,
+        metrics.liner_count,
+        metrics.liner_triangle_count,
+        metrics.liner_closure_sample_count,
+        metrics.liner_entry_sample_count,
+        metrics.liner_opaque_material_count,
+        metrics.shared_mesh_pair_count,
     )
 
 
@@ -550,6 +718,10 @@ def validate_enterable_residences() -> EnterableResidenceMetrics:
         wall_samples += wall_count
         triangles += triangle_count
         scene_aperture_samples += scene_aperture_count
+    liner_metrics = validate_interior_liners(
+        tuple(object_name for object_name, _ in ENTERABLE_RESIDENCE_LAYOUT)
+    )
+    shared_mesh_pairs = _validate_shared_enterable_meshes()
     return EnterableResidenceMetrics(
         len(ENTERABLE_RESIDENCE_LAYOUT),
         0,
@@ -557,4 +729,11 @@ def validate_enterable_residences() -> EnterableResidenceMetrics:
         wall_samples,
         triangles,
         scene_aperture_samples,
+        0,
+        liner_metrics.liner_count,
+        liner_metrics.triangle_count,
+        liner_metrics.closure_sample_count,
+        liner_metrics.entry_sample_count,
+        liner_metrics.opaque_material_count,
+        shared_mesh_pairs,
     )

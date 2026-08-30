@@ -5,17 +5,22 @@ using Godot;
 namespace OperationSteelTide;
 
 /// <summary>
-/// Populates the six DCC-authored Old City shops without adding visible primitives.
+/// Populates the twelve DCC-authored Old City shops without adding visible primitives.
 /// The source mesh supplies orientation and doorway metadata; all furnishing visuals
-/// come from the existing redistributable Kenney Furniture Kit.
+/// come from the existing redistributable Kenney Furniture Kit and static props are
+/// folded into short-range spatial render batches.
 /// </summary>
 internal sealed class JianghaiInteriorPopulationService
 {
-    public const int ExpectedRoomCount = 6;
-    public const int ExpectedDoorCount = 6;
-    public const int ExpectedSearchableCount = 8;
+    public const int ExpectedRoomCount = 12;
+    public const int ExpectedDoorCount = 12;
+    public const int ExpectedSearchableCount = 12;
     public const int ExpectedResidentCount = 4;
     public const int FurniturePerRoom = 4;
+    public const int StaticFurniturePerRoom = FurniturePerRoom - 1;
+    public const int ExpectedStaticFurnitureCount =
+        ExpectedRoomCount * StaticFurniturePerRoom;
+    public const string EnterableSourceGroup = "jianghai_enterable_source";
     public const float InteriorVisibilityRange = 42.0f;
     public const string LatticeDoorScenePath =
         "res://assets/models/jianghai_old_city/jianghai_lattice_door.glb";
@@ -28,18 +33,19 @@ internal sealed class JianghaiInteriorPopulationService
     private static readonly IReadOnlyDictionary<string, string> ExpectedSources =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
+            ["EastGateRow00"] = "family_shop",
             ["EastPhotoHouse"] = "family_home",
             ["EastTeaHouse"] = "tea_house",
+            ["NorthwestGateHouse"] = "family_home",
+            ["OuterEastMidResidence"] = "family_home",
+            ["OuterWestSquareResidence"] = "family_home",
             ["WeatheredRollerShop00"] = "family_shop",
             ["WeatheredRollerShop01"] = "family_shop",
             ["WeatheredRollerShop02"] = "tea_house",
-            ["WeatheredRollerShop03"] = "repair_shop"
+            ["WeatheredRollerShop03"] = "repair_shop",
+            ["WestMarketResidence"] = "family_home",
+            ["WestMedicineRow01"] = "repair_shop"
         };
-
-    private readonly record struct StaticFurnitureSpec(
-        string Name,
-        string ScenePath,
-        Vector3 Size);
 
     public JianghaiInteriorBuildResult Build(
         Node3D authoredRoot,
@@ -52,6 +58,7 @@ internal sealed class JianghaiInteriorPopulationService
         ArgumentNullException.ThrowIfNull(createLoot);
 
         var result = new JianghaiInteriorBuildResult();
+        var staticFurnitureBatcher = new JianghaiInteriorFurnitureBatcher(parent);
         var sources = FindEnterableSources(authoredRoot, out var unexpectedSourceCount);
         result.SourceCount = sources.Count;
         result.UnexpectedSourceCount = unexpectedSourceCount;
@@ -63,8 +70,10 @@ internal sealed class JianghaiInteriorPopulationService
                 firstDoorId + roomIndex,
                 roomIndex,
                 createLoot,
+                staticFurnitureBatcher,
                 result);
         }
+        staticFurnitureBatcher.Build(result);
         return result;
     }
 
@@ -97,7 +106,7 @@ internal sealed class JianghaiInteriorPopulationService
                 continue;
             }
             ApplyImportedContractFallback(source, fallbackArchetype, hasImportedMetadata);
-            source.AddToGroup("jianghai_enterable_source");
+            source.AddToGroup(EnterableSourceGroup);
             result.Add(source);
         }
         result.Sort(static (left, right) => string.Compare(
@@ -144,6 +153,8 @@ internal sealed class JianghaiInteriorPopulationService
                 source.Name.ToString(),
                 out var collisionContract))
         {
+            source.SetMeta("jianghai_room_width_m", collisionContract.InteriorWidth);
+            source.SetMeta("jianghai_room_depth_m", collisionContract.InteriorDepth);
             SetMetaFallback(
                 source,
                 "jianghai_door_front_inset_m",
@@ -204,6 +215,7 @@ internal sealed class JianghaiInteriorPopulationService
         int doorId,
         int roomIndex,
         Func<ResidentialFurnitureKind, string, int, int, IEnumerable<LootItem>> createLoot,
+        JianghaiInteriorFurnitureBatcher staticFurnitureBatcher,
         JianghaiInteriorBuildResult result)
     {
         var bounds = source.GetAabb();
@@ -248,7 +260,8 @@ internal sealed class JianghaiInteriorPopulationService
             visualScenePath: LatticeDoorScenePath,
             sourceWidth: 0.8f,
             sourceHeight: 1.6f,
-            hingedVisualUsesPivotOrigin: true);
+            hingedVisualUsesPivotOrigin: true,
+            disableVisualShadows: true);
         door.AddToGroup("jianghai_enterable_door");
         door.SetMeta("jianghai_door_visual_scene", LatticeDoorScenePath);
         roomRoot.AddChild(door);
@@ -260,6 +273,7 @@ internal sealed class JianghaiInteriorPopulationService
             roomWidth,
             roomDepth,
             createLoot,
+            staticFurnitureBatcher,
             out var searchables,
             out var authoredMeshCount);
         result.AuthoredFurnitureMeshCount += authoredMeshCount;
@@ -289,30 +303,43 @@ internal sealed class JianghaiInteriorPopulationService
         float width,
         float depth,
         Func<ResidentialFurnitureKind, string, int, int, IEnumerable<LootItem>> createLoot,
+        JianghaiInteriorFurnitureBatcher staticFurnitureBatcher,
         out List<ResidentialSearchableFurniture> searchables,
         out int authoredMeshCount)
     {
         var furniture = new List<Node3D>(FurniturePerRoom);
         searchables = new List<ResidentialSearchableFurniture>();
         authoredMeshCount = 0;
-        var searchableCount = roomIndex < 2 ? 2 : 1;
-        var staticSpecs = StaticSpecs(archetype);
+        const int searchableCount = 1;
+        var staticSpecs = JianghaiInteriorFurnitureLayout.StaticSpecs(archetype);
         var staticCount = FurniturePerRoom - searchableCount;
         for (var index = 0; index < staticCount; index++)
         {
             var spec = staticSpecs[index % staticSpecs.Count];
-            var local = StaticSlot(index, width, depth);
-            var prop = CreateStaticFurniture(spec, local.Position, local.Yaw, out var meshCount);
+            var local = JianghaiInteriorFurnitureLayout.StaticSlot(index, width, depth);
+            var prop = CreateStaticFurniture(
+                spec,
+                local.Position,
+                local.Yaw,
+                out var authoredVisual,
+                out var meshCount);
             roomRoot.AddChild(prop);
-            ConfigureInteriorVisuals(prop);
+            if (authoredVisual is not null)
+            {
+                ConfigureInteriorVisuals(authoredVisual);
+                staticFurnitureBatcher.Capture(prop, authoredVisual);
+            }
             furniture.Add(prop);
             authoredMeshCount += meshCount;
         }
 
         for (var index = 0; index < searchableCount; index++)
         {
-            var kind = SearchableKind(archetype, roomIndex, index);
-            var local = SearchableSlot(index, width, depth);
+            var kind = JianghaiInteriorFurnitureLayout.SearchableKind(
+                archetype,
+                roomIndex,
+                index);
+            var local = JianghaiInteriorFurnitureLayout.SearchableSlot(index, width, depth);
             var searchable = new ResidentialSearchableFurniture
             {
                 Name = $"JianghaiSearchable_{roomIndex + 1:00}_{index + 1:00}_{kind}",
@@ -340,11 +367,13 @@ internal sealed class JianghaiInteriorPopulationService
     }
 
     private static Node3D CreateStaticFurniture(
-        StaticFurnitureSpec spec,
+        JianghaiStaticFurnitureSpec spec,
         Vector3 position,
         float yaw,
+        out Node3D? authoredVisual,
         out int meshCount)
     {
+        authoredVisual = null;
         var body = new StaticBody3D
         {
             Name = spec.Name,
@@ -356,12 +385,12 @@ internal sealed class JianghaiInteriorPopulationService
         body.AddToGroup("jianghai_interior_furniture");
         body.SetMeta("jianghai_authored_furniture_scene", spec.ScenePath);
         body.SetMeta("jianghai_non_primitive_visual", true);
-        body.AddChild(new CollisionShape3D
-        {
-            Name = "FurnitureCollision",
-            Position = Vector3.Up * (spec.Size.Y * 0.5f),
-            Shape = new BoxShape3D { Size = spec.Size }
-        });
+        var shapeOwner = body.CreateShapeOwner(body);
+        body.ShapeOwnerSetTransform(
+            shapeOwner,
+            new Transform3D(Basis.Identity, Vector3.Up * (spec.Size.Y * 0.5f)));
+        body.ShapeOwnerAddShape(shapeOwner, new BoxShape3D { Size = spec.Size });
+        body.SetMeta("jianghai_static_furniture_shape_owner", shapeOwner);
         if (!ResidentialAuthoredPropLibrary.TryCreateVisual(
                 spec.ScenePath,
                 spec.Size,
@@ -373,74 +402,9 @@ internal sealed class JianghaiInteriorPopulationService
         }
         visual.Position += Vector3.Up * (spec.Size.Y * 0.5f);
         body.AddChild(visual);
+        authoredVisual = visual;
         return body;
     }
-
-    private static IReadOnlyList<StaticFurnitureSpec> StaticSpecs(string archetype)
-    {
-        var root = ResidentialAuthoredPropLibrary.FurnitureRoot;
-        return archetype switch
-        {
-            "tea_house" => new[]
-            {
-                new StaticFurnitureSpec("TeaTable", $"{root}/table.glb", new Vector3(1.2f, 0.72f, 0.82f)),
-                new StaticFurnitureSpec("TeaSofa", $"{root}/loungeSofa.glb", new Vector3(1.55f, 0.82f, 0.74f)),
-                new StaticFurnitureSpec("TeaBookcase", $"{root}/bookcaseClosedDoors.glb", new Vector3(0.82f, 1.72f, 0.42f))
-            },
-            "repair_shop" => new[]
-            {
-                new StaticFurnitureSpec("RepairDesk", $"{root}/desk.glb", new Vector3(1.35f, 0.76f, 0.72f)),
-                new StaticFurnitureSpec("RepairBookcase", $"{root}/bookcaseClosedDoors.glb", new Vector3(0.84f, 1.76f, 0.44f)),
-                new StaticFurnitureSpec("RepairTable", $"{root}/table.glb", new Vector3(1.15f, 0.72f, 0.78f))
-            },
-            _ => new[]
-            {
-                new StaticFurnitureSpec("ResidentBed", $"{root}/bedSingle.glb", new Vector3(1.82f, 0.52f, 0.84f)),
-                new StaticFurnitureSpec("ResidentTable", $"{root}/table.glb", new Vector3(1.08f, 0.72f, 0.78f)),
-                new StaticFurnitureSpec("ResidentSofa", $"{root}/loungeSofa.glb", new Vector3(1.58f, 0.82f, 0.74f))
-            }
-        };
-    }
-
-    private static (Vector3 Position, float Yaw) StaticSlot(int index, float width, float depth)
-    {
-        var side = Mathf.Max(0.9f, width * 0.31f);
-        var back = Mathf.Min(depth * 0.72f, depth - 0.62f);
-        return index switch
-        {
-            0 => (new Vector3(0, 0.02f, -back), 0.0f),
-            1 => (new Vector3(-side, 0.02f, -depth * 0.46f), -Mathf.Pi * 0.5f),
-            _ => (new Vector3(side, 0.02f, -depth * 0.5f), Mathf.Pi * 0.5f)
-        };
-    }
-
-    private static (Vector3 Position, float Yaw) SearchableSlot(int index, float width, float depth)
-    {
-        var side = Mathf.Max(0.82f, width * 0.29f);
-        return index == 0
-            ? (new Vector3(-side, 0.02f, -depth * 0.25f), 0.0f)
-            : (new Vector3(side, 0.02f, -depth * 0.27f), Mathf.Pi);
-    }
-
-    private static ResidentialFurnitureKind SearchableKind(
-        string archetype,
-        int roomIndex,
-        int itemIndex)
-        => archetype switch
-        {
-            "tea_house" => itemIndex == 0
-                ? ResidentialFurnitureKind.Refrigerator
-                : ResidentialFurnitureKind.DeskDrawers,
-            "repair_shop" => itemIndex == 0
-                ? ResidentialFurnitureKind.DeskDrawers
-                : ResidentialFurnitureKind.Wardrobe,
-            "family_shop" => itemIndex == 0
-                ? ResidentialFurnitureKind.Wardrobe
-                : ResidentialFurnitureKind.Nightstand,
-            _ => (ResidentialFurnitureKind)Mathf.PosMod(
-                roomIndex + itemIndex,
-                Enum.GetValues<ResidentialFurnitureKind>().Length)
-        };
 
     private static void ConfigureInteriorVisuals(Node node)
     {

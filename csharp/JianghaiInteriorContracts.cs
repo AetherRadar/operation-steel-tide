@@ -25,8 +25,16 @@ internal sealed class JianghaiInteriorBuildResult
     public List<InteractiveBuildingDoor> Doors { get; } = new();
     public List<ResidentialSearchableFurniture> Searchables { get; } = new();
     public List<CivilianNpc> Residents { get; } = new();
+    public List<MultiMeshInstance3D> StaticFurnitureBatches { get; } = new();
     public int SourceCount { get; internal set; }
     public int UnexpectedSourceCount { get; internal set; }
     public int AuthoredFurnitureMeshCount { get; internal set; }
+    public int StaticFurniturePropCount { get; internal set; }
+    public int StaticFurnitureInstanceCount { get; internal set; }
+    public bool StaticFurnitureBatchValidationReady { get; internal set; }
+    public float StaticFurnitureMaximumPositionError { get; internal set; }
+    public float StaticFurnitureMaximumBasisError { get; internal set; }
+    public float StaticFurnitureMaximumBatchRadius { get; internal set; }
+    public float StaticFurnitureMaximumVisibilityRange { get; internal set; }
     public int TraversalLinkCount { get; internal set; }
 }

@@ -30,13 +30,15 @@ SHOP_TARGETS = {
     "JianghaiCleared_FactoryWorkshopEast", "JianghaiCleared_FactoryWorkshopWest",
     "JianghaiCleared_MarketShop01", "JianghaiCleared_MarketShop03",
     "WeatheredRollerShop00", "WeatheredRollerShop01", "WeatheredRollerShop02",
-    "WeatheredRollerShop03", "WestMedicineRow01",
+    "WeatheredRollerShop03", "EastPhotoHouse", "EastTeaHouse", "EastGateRow00",
+    "NorthwestGateHouse", "WestMedicineRow01", "WestMarketResidence",
+    "OuterEastMidResidence", "OuterWestSquareResidence",
 }
 
 # Full-resolution ground-floor arcade shops selected for real, furnished interiors.
-# These are deliberately excluded from the distant density ring: six interactive
-# rooms give the main avenue readable life without multiplying doors, animated
-# residents, and searchable containers across every background facade.
+# The twelve anchors cover the avenue, gate, market, and two outer residential
+# lanes.  They share one low-cost modular interior liner at runtime, so expanding
+# usable street frontage does not multiply unique meshes or texture memory.
 ENTERABLE_RESIDENCE_LAYOUT = (
     ("WeatheredRollerShop00", "family_shop"),
     ("WeatheredRollerShop01", "family_shop"),
@@ -44,6 +46,12 @@ ENTERABLE_RESIDENCE_LAYOUT = (
     ("WeatheredRollerShop03", "repair_shop"),
     ("EastPhotoHouse", "family_home"),
     ("EastTeaHouse", "tea_house"),
+    ("EastGateRow00", "family_shop"),
+    ("NorthwestGateHouse", "family_home"),
+    ("WestMedicineRow01", "repair_shop"),
+    ("WestMarketResidence", "family_home"),
+    ("OuterEastMidResidence", "family_home"),
+    ("OuterWestSquareResidence", "family_home"),
 )
 
 # Reviewed one-storey interior envelopes in Godot metres.  These values stop
@@ -68,6 +76,24 @@ ENTERABLE_COLLISION_LAYOUT = {
     "EastTeaHouse": (
         1.32, 13.11, 7.67, 4.68, 4.00, 2.422, 8.041, 2.70, 6.35, 7.593, 3.247, 7.217,
     ),
+    "EastGateRow00": (
+        1.290, 12.700, 7.470, 4.610, 4.000, 2.376, 7.886, 2.700, 6.200, 7.447, 3.186, 7.076,
+    ),
+    "NorthwestGateHouse": (
+        1.366, 13.447, 7.909, 4.881, 4.235, 2.516, 8.350, 2.859, 6.565, 7.885, 3.373, 7.492,
+    ),
+    "WestMedicineRow01": (
+        1.108, 12.103, 6.414, 5.109, 3.812, 2.040, 6.772, 2.573, 5.909, 7.097, 2.736, 6.076,
+    ),
+    "WestMarketResidence": (
+        1.391, 13.696, 8.056, 4.972, 4.314, 2.562, 8.505, 2.912, 6.686, 8.031, 3.436, 7.631,
+    ),
+    "OuterEastMidResidence": (
+        1.341, 13.198, 7.763, 4.791, 4.157, 2.469, 8.196, 2.806, 6.443, 7.739, 3.311, 7.354,
+    ),
+    "OuterWestSquareResidence": (
+        1.341, 13.198, 7.763, 4.791, 4.157, 2.469, 8.196, 2.806, 6.443, 7.739, 3.311, 7.354,
+    ),
 }
 
 # Four roller shops historically carried Euler values while remaining in
@@ -79,6 +105,12 @@ ENTERABLE_YAW_DEGREES = {
     "WeatheredRollerShop03": -90.0,
     "EastPhotoHouse": -90.0,
     "EastTeaHouse": -90.0,
+    "EastGateRow00": -90.0,
+    "NorthwestGateHouse": 90.0,
+    "WestMedicineRow01": 90.0,
+    "WestMarketResidence": 90.0,
+    "OuterEastMidResidence": 180.0,
+    "OuterWestSquareResidence": 0.0,
 }
 
 # Shop01's dormant yaw made its original centre appear road-safe.  Once the
@@ -94,6 +126,42 @@ QUATERNIUS_DENSITY_MESHES = {
     "quaternius_building4": "JianghaiDensity_QuaterniusBuilding4_LOD",
     "quaternius_house2": "JianghaiDensity_QuaterniusHouse2_LOD",
 }
+
+# The Quaternius density shells use scalar-only, texture-free materials.  Keep
+# their exact per-face palette in one active corner-color layer, leaving one
+# opaque material/surface per shared profile mesh.  This preserves the authored
+# colors and profile roughness while preventing every density instance from
+# submitting four to seven material surfaces to the four-split sun shadow pass.
+DENSITY_COLOR0_VERSION = 1
+DENSITY_COLOR0_ATTRIBUTE = "COLOR_0"
+DENSITY_COLOR0_PROFILE_MATERIALS = {
+    "quaternius_large": "JianghaiDensity_QuaterniusLarge_COLOR0",
+    "quaternius_big": "JianghaiDensity_QuaterniusBig_COLOR0",
+    "quaternius_building4": "JianghaiDensity_QuaterniusBuilding4_COLOR0",
+    "quaternius_house2": "JianghaiDensity_QuaterniusHouse2_COLOR0",
+}
+DENSITY_COLOR0_PROFILE_ROUGHNESS = {
+    "quaternius_large": 0.82,
+    "quaternius_big": 0.84,
+    "quaternius_building4": 0.86,
+    "quaternius_house2": 0.88,
+}
+DENSITY_COLOR0_PROFILE_SOURCE_SURFACES = {
+    "quaternius_large": 7,
+    "quaternius_big": 6,
+    "quaternius_building4": 7,
+    "quaternius_house2": 4,
+}
+DENSITY_COLOR0_INFILL_SUFFIXES = (
+    "WestInfill05",
+    "WestInfill06",
+    "WestInfill07",
+    "WestInfill08",
+    "EastInfill05",
+    "EastInfill06",
+    "EastInfill07",
+    "EastInfill08",
+)
 
 PROFILE_BASE_SCALE = {
     "chinese_hall": 1.28,
@@ -156,4 +224,15 @@ DENSITY_BUILDING_LAYOUT = (
     ("EastInfill02", "quaternius_big", (116.0, 36.0, 0.03), -90.0, 1.02),
     ("EastInfill03", "chinese_shop", (116.0, 124.0, 0.03), -90.0, 1.14),
     ("EastInfill04", "quaternius_building4", (116.0, 150.0, 0.03), -90.0, 1.04),
+    # A second sparse inner ring closes long skyline gaps with eight shared,
+    # low-poly Quaternius meshes.  The pairs stop short of both cross streets
+    # and remain more than 24 m from every deployment point.
+    ("WestInfill05", "quaternius_large", (-92.0, -65.0, 0.03), 90.0, 1.00),
+    ("WestInfill06", "quaternius_big", (-92.0, 52.0, 0.03), 90.0, 1.00),
+    ("WestInfill07", "quaternius_building4", (-92.0, 78.0, 0.03), 90.0, 1.00),
+    ("WestInfill08", "quaternius_house2", (-92.0, 158.0, 0.03), 90.0, 1.00),
+    ("EastInfill05", "quaternius_large", (92.0, -65.0, 0.03), -90.0, 1.00),
+    ("EastInfill06", "quaternius_big", (92.0, 52.0, 0.03), -90.0, 1.00),
+    ("EastInfill07", "quaternius_building4", (92.0, 78.0, 0.03), -90.0, 1.00),
+    ("EastInfill08", "quaternius_house2", (92.0, 158.0, 0.03), -90.0, 1.00),
 )

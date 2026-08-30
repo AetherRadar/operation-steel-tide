@@ -283,6 +283,8 @@ internal static class JianghaiEnterableCollisionShellBuilder
         lintel.SetMeta("gameplay_side_half_width", room.SideHalfWidth);
         lintel.SetMeta("gameplay_side_front_inset", room.SideFrontInset);
         lintel.SetMeta("gameplay_side_rear_inset", room.SideRearInset);
+        lintel.SetMeta("gameplay_interior_width", room.InteriorWidth);
+        lintel.SetMeta("gameplay_interior_depth", room.InteriorDepth);
         AddBox(
             body,
             source,
@@ -291,6 +293,45 @@ internal static class JianghaiEnterableCollisionShellBuilder
             new Vector3(room.SideHalfWidth * 2.0f, roofThickness, sideSpan),
             shapeIndex + 18,
             "ceiling");
+        var interiorHeight = Mathf.Min(3.0f, size.Y - 0.05f);
+        var interiorCenter = roomFront - basis.Z * (room.InteriorDepth * 0.5f);
+        interiorCenter.Y = bottom + interiorHeight * 0.5f;
+        AddBox(
+            body,
+            source,
+            basis,
+            interiorCenter - basis.X * (room.InteriorWidth * 0.5f),
+            new Vector3(wallThickness, interiorHeight, room.InteriorDepth),
+            shapeIndex + 19,
+            "liner_left");
+        AddBox(
+            body,
+            source,
+            basis,
+            interiorCenter + basis.X * (room.InteriorWidth * 0.5f),
+            new Vector3(wallThickness, interiorHeight, room.InteriorDepth),
+            shapeIndex + 20,
+            "liner_right");
+        var interiorBack = roomFront - basis.Z * room.InteriorDepth;
+        interiorBack.Y = bottom + interiorHeight * 0.5f;
+        AddBox(
+            body,
+            source,
+            basis,
+            interiorBack,
+            new Vector3(room.InteriorWidth, interiorHeight, wallThickness),
+            shapeIndex + 21,
+            "liner_back");
+        var interiorCeiling = interiorCenter;
+        interiorCeiling.Y = bottom + interiorHeight;
+        AddBox(
+            body,
+            source,
+            basis,
+            interiorCeiling,
+            new Vector3(room.InteriorWidth, roofThickness, room.InteriorDepth),
+            shapeIndex + 22,
+            "liner_ceiling");
         return JianghaiGameplayCollisionContract.EnterableShapesPerSource;
     }
 

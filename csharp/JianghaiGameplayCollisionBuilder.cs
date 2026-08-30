@@ -12,6 +12,7 @@ namespace OperationSteelTide;
 internal sealed class JianghaiGameplayCollisionBuilder
 {
     public const string CollisionGroup = "jianghai_gameplay_collision";
+    private const float EnterableDoorApproachDepth = 2.0f;
 
     public JianghaiGameplayCollisionResult Build(
         RefineryExtractionMapLayout layout,
@@ -63,9 +64,11 @@ internal sealed class JianghaiGameplayCollisionBuilder
                 .ToArray();
             var enterableFootprints = enterableSources
                 .Select(source => new JianghaiCollisionFootprint(
-                    source.Room.Center,
+                    source.Room.Center
+                        + source.Basis.Z * (EnterableDoorApproachDepth * 0.5f),
                     source.Basis,
-                    source.Room.Size))
+                    source.Room.Size
+                        + new Vector3(0.0f, 0.0f, EnterableDoorApproachDepth)))
                 .ToArray();
             foreach (var placement in layout.Models)
             {

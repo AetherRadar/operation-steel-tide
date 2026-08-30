@@ -15,6 +15,8 @@ internal readonly record struct JianghaiEnterableRoomGeometry(
     float SideHalfWidth,
     float SideFrontInset,
     float SideRearInset,
+    float InteriorWidth,
+    float InteriorDepth,
     float DoorWidth,
     float DoorHeight);
 
@@ -84,6 +86,18 @@ internal static class JianghaiGameplayCollisionGeometry
                 hasContract ? contract.CollisionHeight : 3.05f).AsSingle(),
             doorHeight + 0.3f,
             visualSize.Y);
+        var interiorWidth = Mathf.Clamp(
+            source.GetMeta(
+                "jianghai_room_width_m",
+                hasContract ? contract.InteriorWidth : roomWidth - 0.8f).AsSingle(),
+            doorWidth + 0.4f,
+            Mathf.Max(doorWidth + 0.4f, roomWidth - 0.35f));
+        var interiorDepth = Mathf.Clamp(
+            source.GetMeta(
+                "jianghai_room_depth_m",
+                hasContract ? contract.InteriorDepth : roomDepth - 0.5f).AsSingle(),
+            2.8f,
+            Mathf.Max(2.8f, roomDepth - 0.30f));
         var facadeWidth = Mathf.Clamp(
             source.GetMeta(
                 "jianghai_collision_facade_width_m",
@@ -145,6 +159,10 @@ internal static class JianghaiGameplayCollisionGeometry
         var front = visualFront - basis.Z * frontInset;
         var roomCenter = front - basis.Z * (roomDepth * 0.5f);
         roomCenter.Y = bottom + roomHeight * 0.5f;
+        // Keep the later interior population pass on the exact same authored-to-physics
+        // contract, including when Godot omits Blender custom properties on GLB import.
+        source.SetMeta("jianghai_room_width_m", interiorWidth);
+        source.SetMeta("jianghai_room_depth_m", interiorDepth);
         return new JianghaiEnterableRoomGeometry(
             roomCenter,
             new Vector3(roomWidth, roomHeight, roomDepth),
@@ -157,6 +175,8 @@ internal static class JianghaiGameplayCollisionGeometry
             sideHalfWidth,
             sideFrontInset,
             sideRearInset,
+            interiorWidth,
+            interiorDepth,
             doorWidth,
             Mathf.Min(doorHeight, roomHeight - 0.3f));
     }

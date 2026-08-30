@@ -62,7 +62,26 @@ public partial class FreightTerminalWorld
             await WaitFrames(2);
             ApplyTimeOfDay(DeploymentTimeOfDay.Dusk);
             await WaitFrames(16);
-            performanceReady = PrintRefineryRenderingSnapshot("overview");
+            var releasedSourceCount = _jianghaiOldCityScene?.Root.GetMeta(
+                "jianghai_released_batched_source_count",
+                0).AsInt32() ?? 0;
+            var retainedSourceCount = _jianghaiOldCityScene?.Root.GetMeta(
+                "jianghai_retained_batched_source_count",
+                0).AsInt32() ?? 0;
+            var blockedSourceCount = _jianghaiOldCityScene?.Root.GetMeta(
+                "jianghai_blocked_batched_source_count",
+                0).AsInt32() ?? 0;
+            var sourceCount = _jianghaiOldCityScene?.RenderBatchValidation.SourceCount ?? 0;
+            var sourceReleaseReady = sourceCount
+                    == JianghaiAuthoredRenderBatcher.ExpectedSourceCount
+                && releasedSourceCount
+                    == JianghaiAuthoredRenderBatcher.ExpectedProductionReleasedSourceCount
+                && retainedSourceCount
+                    == JianghaiAuthoredRenderBatcher.ExpectedProductionRetainedSourceCount
+                && blockedSourceCount == 0
+                && releasedSourceCount + retainedSourceCount == sourceCount;
+            performanceReady = sourceReleaseReady
+                && PrintRefineryRenderingSnapshot("overview");
             SaveViewportImage("res://refinery_map_validation.png");
 
             ApplyTimeOfDay(DeploymentTimeOfDay.Day);
@@ -132,54 +151,79 @@ public partial class FreightTerminalWorld
             await WaitFrames(14);
             performanceReady &= PrintRefineryRenderingSnapshot("daylight_overview");
             SaveViewportImage("res://jianghai_day_validation.png");
-            var captureRoom = _jianghaiInteriors?.Rooms.FirstOrDefault();
-            var captureDoor = captureRoom?.Door;
-            var doorCaptureReady = captureRoom is not null && captureDoor is not null;
-            performanceReady &= doorCaptureReady;
-            if (captureRoom is not null && captureDoor is not null)
+            var representativeRoomNames = new[]
             {
-                captureDoor.SetOpenImmediate(false);
-                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-                var outward = (captureDoor.OutsideProbe - captureDoor.InsideProbe).Normalized();
-                camera.GlobalPosition = captureDoor.InteractionPoint + outward * 7.0f + Vector3.Up * 1.7f;
-                camera.LookAt(captureDoor.InteractionPoint + Vector3.Up * 0.6f, Vector3.Up);
-                camera.Fov = 56.0f;
-                await WaitFrames(8);
-                SaveViewportImage("res://refinery_door_closed_validation.png");
-                var doorTransitionStarted = captureDoor.TrySetOpen(
-                    true,
-                    bypassClearance: true);
-                for (var frame = 0; frame < 120 && captureDoor.IsAnimating; frame++)
+                "EastPhotoHouse",
+                "EastGateRow00",
+                "WestMedicineRow01",
+                "OuterWestSquareResidence"
+            };
+            var capturedRoomCount = 0;
+            var doorCaptureReady = _jianghaiInteriors is not null;
+            foreach (var roomName in representativeRoomNames)
+            {
+                var room = _jianghaiInteriors?.Rooms.SingleOrDefault(candidate =>
+                    candidate.SourceName == roomName);
+                if (room is null)
                 {
-                    await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                    doorCaptureReady = false;
+                    continue;
                 }
-                await WaitFrames(4);
-                doorCaptureReady = doorTransitionStarted
-                    && captureDoor.IsOpen
-                    && !captureDoor.IsAnimating
-                    && captureDoor.MotionAngleDegrees > 85.0f;
-                performanceReady &= doorCaptureReady;
-                SaveViewportImage("res://refinery_door_open_validation.png");
-                camera.GlobalPosition = captureRoom.Root.ToGlobal(
-                    new Vector3(0.0f, 1.55f, -0.95f));
-                camera.LookAt(
-                    captureRoom.Root.ToGlobal(new Vector3(
-                        0.0f,
-                        0.92f,
-                        -Mathf.Min(captureRoom.Depth * 0.66f, 3.4f))),
-                    Vector3.Up);
-                camera.Fov = 62.0f;
-                await WaitFrames(8);
-                SaveViewportImage("res://jianghai_interior_validation.png");
-                captureDoor.SetOpenImmediate(false);
+                var captureReady = await CaptureJianghaiInterior(camera, room);
+                doorCaptureReady &= captureReady;
+                performanceReady &= captureReady;
+                capturedRoomCount++;
             }
-            GD.Print($"REFINERY_MAP_CAPTURE valid={performanceReady} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city time=dusk+day authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} doors={_refineryDoors.Count} door_transition={doorCaptureReady} paths=refinery_map_validation.png,jianghai_valley_validation.png,jianghai_valley_player_south_validation.png,jianghai_valley_player_north_validation.png,refinery_ground_validation.png,jianghai_street_life_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,jianghai_density_validation.png,jianghai_day_validation.png,refinery_door_closed_validation.png,refinery_door_open_validation.png,jianghai_interior_validation.png");
+            performanceReady &= doorCaptureReady
+                && capturedRoomCount == representativeRoomNames.Length;
+            GD.Print($"REFINERY_MAP_CAPTURE valid={performanceReady} map_id={DeploymentMapCatalog.BlackwaterRefineryId} identity=jianghai_old_city time=dusk+day authored_meshes={_jianghaiOldCityScene?.MeshInstanceCount ?? 0} authored_surfaces={_jianghaiOldCityScene?.SurfaceCount ?? 0} released_sources={releasedSourceCount}/{sourceCount} retained_sources={retainedSourceCount} blocked_sources={blockedSourceCount} doors={_refineryDoors.Count} door_transition={doorCaptureReady} interior_samples={capturedRoomCount}/{representativeRoomNames.Length} paths=refinery_map_validation.png,jianghai_valley_validation.png,jianghai_valley_player_south_validation.png,jianghai_valley_player_north_validation.png,refinery_ground_validation.png,jianghai_street_life_validation.png,refinery_hall_validation.png,refinery_wonders_validation.png,old_town_rooftop_validation.png,jianghai_density_validation.png,jianghai_day_validation.png,jianghai_room_*_closed_validation.png,jianghai_room_*_open_validation.png,jianghai_room_*_interior_validation.png");
         }
         finally
         {
             ApplyQuality(previousQualitySetting);
         }
         QuitDiagnosticAfterSceneCleanup(performanceReady ? 0 : 2);
+    }
+
+    private async System.Threading.Tasks.Task<bool> CaptureJianghaiInterior(
+        Camera3D camera,
+        JianghaiInteriorRoom room)
+    {
+        var door = room.Door;
+        door.SetOpenImmediate(false);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        var outward = (door.OutsideProbe - door.InsideProbe).Normalized();
+        camera.GlobalPosition = door.InteractionPoint + outward * 7.0f + Vector3.Up * 1.7f;
+        camera.LookAt(door.InteractionPoint + Vector3.Up * 0.6f, Vector3.Up);
+        camera.Fov = 56.0f;
+        await WaitFrames(8);
+        var fileStem = room.SourceName.ToSnakeCase();
+        SaveViewportImage($"res://jianghai_room_{fileStem}_closed_validation.png");
+        var transitionStarted = door.TrySetOpen(true, bypassClearance: true);
+        for (var frame = 0; frame < 120 && door.IsAnimating; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+        await WaitFrames(4);
+        var opened = transitionStarted
+            && door.IsOpen
+            && !door.IsAnimating
+            && door.MotionAngleDegrees > 85.0f;
+        SaveViewportImage($"res://jianghai_room_{fileStem}_open_validation.png");
+        var performanceReady = PrintRefineryRenderingSnapshot($"room_open_{fileStem}");
+        camera.GlobalPosition = room.Root.ToGlobal(new Vector3(0.0f, 1.55f, -0.95f));
+        camera.LookAt(
+            room.Root.ToGlobal(new Vector3(
+                0.0f,
+                0.92f,
+                -Mathf.Min(room.Depth * 0.66f, 3.4f))),
+            Vector3.Up);
+        camera.Fov = 62.0f;
+        await WaitFrames(8);
+        SaveViewportImage($"res://jianghai_room_{fileStem}_interior_validation.png");
+        performanceReady &= PrintRefineryRenderingSnapshot($"room_inside_{fileStem}");
+        door.SetOpenImmediate(false);
+        return opened && performanceReady;
     }
 
     private static bool PrintRefineryRenderingSnapshot(string view)
@@ -189,12 +233,29 @@ public partial class FreightTerminalWorld
         var primitives = Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame);
         var videoMemoryMb = Performance.GetMonitor(Performance.Monitor.RenderVideoMemUsed) / (1024.0 * 1024.0);
         var textureMemoryMb = Performance.GetMonitor(Performance.Monitor.RenderTextureMemUsed) / (1024.0 * 1024.0);
+        var baselineDeltaReady = view switch
+        {
+            // Same-machine pre-change baseline: 1001 / 1005 / 2,774,257.
+            // These caps include the measured twelve-room/eight-infill result
+            // plus three percent headroom without replacing the hard budgets.
+            "overview" => drawCalls <= 1070
+                && objects <= 1095
+                && primitives <= 2_960_000,
+            "daylight_overview" => drawCalls <= 1962
+                && objects <= 1998
+                && primitives <= 3_161_618,
+            _ => true
+        };
         var withinBudget = drawCalls <= 2400
             && objects <= 2200
             && primitives <= 10_500_000
-            && videoMemoryMb <= 1536.0
-            && textureMemoryMb <= 1152.0;
-        GD.Print($"REFINERY_RENDER_CHECK valid={withinBudget} view={view} draw_calls={drawCalls:0}/2400 objects={objects:0}/2200 primitives={primitives:0}/10500000 video_mem_mb={videoMemoryMb:0.0}/1536 texture_mem_mb={textureMemoryMb:0.0}/1152");
+            && videoMemoryMb <= 1250.0
+            && textureMemoryMb <= 750.0
+            && baselineDeltaReady;
+        GD.Print($"REFINERY_RENDER_CHECK valid={withinBudget} view={view} "
+            + $"draw_calls={drawCalls:0}/2400 objects={objects:0}/2200 "
+            + $"primitives={primitives:0}/10500000 video_mem_mb={videoMemoryMb:0.0}/1250 "
+            + $"texture_mem_mb={textureMemoryMb:0.0}/750 baseline_delta={baselineDeltaReady}");
         return withinBudget;
     }
 }

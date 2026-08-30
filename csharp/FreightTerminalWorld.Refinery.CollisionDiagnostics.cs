@@ -33,6 +33,7 @@ public partial class FreightTerminalWorld
             out var enterableFacadeHits,
             out var enterableSideHits,
             out var enterableBackHits,
+            out var enterableLinerHits,
             out var enterableWingHits,
             out var enterableOverhangClears,
             out var authoredSourceSummary);
@@ -116,6 +117,7 @@ public partial class FreightTerminalWorld
             + $"facades={enterableFacadeHits}/{JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount * 10}:"
             + $"sides={enterableSideHits}/{JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount * 2}:"
             + $"backs={enterableBackHits}/{JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount}:"
+            + $"liners={enterableLinerHits}/{JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount * 4}:"
             + $"wings={enterableWingHits}/{JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount * 4}:"
             + $"overhangs={enterableOverhangClears}/{JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount * 4}:"
             + $"{authoredSourceSummary} "
@@ -139,6 +141,7 @@ public partial class FreightTerminalWorld
         out int facadeWallHits,
         out int sideWallHits,
         out int backWallHits,
+        out int linerSurfaceHits,
         out int wingWallHits,
         out int overhangClears,
         out string summary)
@@ -149,6 +152,7 @@ public partial class FreightTerminalWorld
         facadeWallHits = 0;
         sideWallHits = 0;
         backWallHits = 0;
+        linerSurfaceHits = 0;
         wingWallHits = 0;
         overhangClears = 0;
         summary = "missing_body";
@@ -281,6 +285,7 @@ public partial class FreightTerminalWorld
                 out facadeWallHits,
                 out sideWallHits,
                 out backWallHits,
+                out linerSurfaceHits,
                 out wingWallHits,
                 out overhangClears,
                 out summary))
@@ -333,7 +338,11 @@ public partial class FreightTerminalWorld
             "rear_outer_connector_left",
             "rear_outer_connector_right",
             "front_lintel",
-            "ceiling"
+            "ceiling",
+            "liner_left",
+            "liner_right",
+            "liner_back",
+            "liner_ceiling"
         });
     }
 

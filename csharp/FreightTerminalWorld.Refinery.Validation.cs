@@ -7,9 +7,9 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
-    // The six short-range, shadowless furnished interiors add 49 authored
-    // mesh nodes. Preserve the previous structural headroom while the capture
-    // diagnostic continues to enforce frame-level draw/object/memory budgets.
+    // Twelve furnished interiors retain this limit by batching their static
+    // furniture and shared shadowless visual liners. The capture diagnostic also
+    // enforces frame-level draw, object, primitive, and memory budgets.
     private const int RefineryRuntimeMeshInstanceBudget = 820;
 
     private async void ValidateRefineryMap()
@@ -86,9 +86,10 @@ public partial class FreightTerminalWorld
             && authored.ValleyFoundationMaterialsReady
             && authored.ValleyFoundationUvReady
             && authored.RenderBatchValidation.Valid
-            && authored.RenderBatchValidation.BatchCount > 0
+            && authored.RenderBatchValidation.BatchCount
+                == JianghaiAuthoredRenderBatcher.ExpectedBatchCount
             && authored.RenderBatchValidation.SourceCount
-                > authored.RenderBatchValidation.BatchCount
+                == JianghaiAuthoredRenderBatcher.ExpectedSourceCount
             && authored.RenderBatchValidation.NonOriginBatchCount > 0
             && authored.RenderBatchValidation.MaximumCentroidError <= 0.001f
             && authored.RenderBatchValidation.MaximumPositionError <= 0.001f

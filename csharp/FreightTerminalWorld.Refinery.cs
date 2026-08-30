@@ -109,6 +109,15 @@ public partial class FreightTerminalWorld
             yaw: 0.0f,
             maxHealth: 190.0f);
         _extractionMarker.Visible = true;
+        var diagnosticArguments = OS.GetCmdlineUserArgs();
+        var retainAuthoredSources = Array.Exists(
+            diagnosticArguments,
+            argument => argument is "--validate-refinery-map"
+                or "--validate-jianghai-interiors");
+        if (!retainAuthoredSources)
+        {
+            _jianghaiOldCitySceneLoader.ReleaseBatchedSourceNodes();
+        }
     }
 
     private void BuildOldTownPerimeter()

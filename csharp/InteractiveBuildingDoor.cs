@@ -38,6 +38,7 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
     private int _visualPanelCount = 1;
     private bool _usesCustomVisualScene;
     private bool _hingedVisualUsesPivotOrigin;
+    private bool _disableVisualShadows;
     private Vector3 _interactionLocal;
     private CollisionShape3D _doorCollision = null!;
     private Node3D _authoredVisual = null!;
@@ -55,6 +56,7 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         => GetMaxAuthoredVisualAspectDistortion();
     public bool HasValidAuthoredVisualPanelLayout
         => ValidateAuthoredVisualPanelLayout();
+    public bool VisualShadowsDisabled => _disableVisualShadows;
     public bool HasBoxCollision => IsInstanceValid(_doorCollision)
         && _doorCollision.Shape is BoxShape3D;
     public float MotionAngleDegrees => _motionStyle == BuildingDoorMotionStyle.Hinged
@@ -85,7 +87,8 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         float? sourceHeight = null,
         float? sourceDepthCenter = null,
         int visualPanelCount = 1,
-        bool hingedVisualUsesPivotOrigin = false)
+        bool hingedVisualUsesPivotOrigin = false,
+        bool disableVisualShadows = false)
     {
         DoorId = doorId;
         _width = Mathf.Max(1.0f, doorwayWidth * 0.96f);
@@ -115,6 +118,7 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
         _sourceDepthCenter = sourceDepthCenter ?? defaultSourceDepthCenter;
         _visualPanelCount = Mathf.Max(1, visualPanelCount);
         _hingedVisualUsesPivotOrigin = hingedVisualUsesPivotOrigin;
+        _disableVisualShadows = disableVisualShadows;
         _interactionLocal = new Vector3(0, Mathf.Min(1.35f, _height * 0.5f), frontZ);
         var pivot = motionStyle == BuildingDoorMotionStyle.Hinged
             ? new Vector3(-_width * 0.5f, 0.0f, frontZ)
@@ -394,7 +398,9 @@ public partial class InteractiveBuildingDoor : AnimatableBody3D
     {
         if (node is GeometryInstance3D visual)
         {
-            visual.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
+            visual.CastShadow = _disableVisualShadows
+                ? GeometryInstance3D.ShadowCastingSetting.Off
+                : GeometryInstance3D.ShadowCastingSetting.On;
             visual.VisibilityRangeEnd = _visibilityRange;
             visual.VisibilityRangeEndMargin = Mathf.Min(18.0f, _visibilityRange * 0.12f);
         }

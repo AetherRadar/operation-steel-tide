@@ -25,11 +25,16 @@ internal readonly record struct JianghaiRenderBatchValidation(
 
 /// <summary>
 /// Replaces safe repeated authored render instances with spatially culled MultiMesh batches.
-/// Source nodes stay in the scene on render layer zero so diagnostics, authored bounds, and
-/// gameplay-proxy discovery can continue to inspect the exact imported hierarchy.
+/// Source nodes stay on render layer zero while gameplay proxies are built. Structural
+/// diagnostics retain them; production releases safe leaves after the MultiMeshes take over.
 /// </summary>
-internal sealed class JianghaiAuthoredRenderBatcher
+internal sealed partial class JianghaiAuthoredRenderBatcher
 {
+    public const int ExpectedBatchCount = 78;
+    public const int ExpectedSourceCount = 292;
+    public const int ExpectedProductionReleasedSourceCount = 290;
+    public const int ExpectedProductionRetainedSourceCount = 2;
+
     private const float CityBucketSize = 192.0f;
     private const float ValleyBucketSize = 420.0f;
     private const string BatchedSourceMeta = "jianghai_render_batched_source";
@@ -63,7 +68,7 @@ internal sealed class JianghaiAuthoredRenderBatcher
         var batchIndex = 0;
         foreach (var group in groups.Values)
         {
-            if (group.Count < 2)
+            if (group.Count < 2 && !IsInteriorLiner(group[0].Source))
             {
                 continue;
             }
@@ -267,12 +272,15 @@ internal sealed class JianghaiAuthoredRenderBatcher
             localSize.Z * globalScale.Z);
         var diagonal = worldSize.Length();
         var name = meshInstance.Name.ToString();
+        var isInteriorLiner = IsInteriorLiner(meshInstance);
         var isValleyEnvironment = ContainsAny(
             name,
             "OldCityFoundation",
             "JianghaiPerimeterGround",
             "JianghaiMountainMassif");
-        var baseVisibilityRange = isValleyEnvironment ? 1200.0f : diagonal switch
+        var baseVisibilityRange = isInteriorLiner
+            ? JianghaiInteriorShellValidator.RequiredVisibilityRange
+            : isValleyEnvironment ? 1200.0f : diagonal switch
         {
             <= 1.2f => 105.0f,
             <= 4.0f => 180.0f,
@@ -281,7 +289,8 @@ internal sealed class JianghaiAuthoredRenderBatcher
         };
         var isFineDetail = diagonal <= 1.2f
             || ContainsAny(name, "Screen", "Indicator", "Fastener", "Text", "Cable", "Lens");
-        var isDetail = diagonal <= 12.0f
+        var isDetail = isInteriorLiner
+            || diagonal <= 12.0f
             || ContainsAny(
                 name,
                 "Aircon",
@@ -292,7 +301,8 @@ internal sealed class JianghaiAuthoredRenderBatcher
                 "Crate",
                 "SecurityCamera",
                 "Television");
-        var alwaysDisableShadow = isValleyEnvironment
+        var alwaysDisableShadow = isInteriorLiner
+            || isValleyEnvironment
             || diagonal <= 0.45f
             || ContainsAny(name, "ScreenTrace", "StatusScreen", "Indicator", "Fastener", "Text");
         return new JianghaiRenderQualityPolicy(
@@ -388,6 +398,7 @@ internal sealed class JianghaiAuthoredRenderBatcher
     {
         if (!source.Visible
             || source.Layers == 0
+            || source.GetChildCount() != 0
             || source.MaterialOverride is not null
             || IsTerminalVisual(source)
             || source.Name.ToString().Contains("StatusScreen", StringComparison.OrdinalIgnoreCase))
@@ -417,6 +428,12 @@ internal sealed class JianghaiAuthoredRenderBatcher
         }
         return false;
     }
+
+    private static bool IsInteriorLiner(MeshInstance3D meshInstance)
+        => meshInstance.Name.ToString().StartsWith(
+                "JianghaiInteriorShell_",
+                StringComparison.OrdinalIgnoreCase)
+            || meshInstance.GetMeta("jianghai_interior_liner", false).AsBool();
 
     private static bool ContainsAny(string value, params string[] fragments)
     {

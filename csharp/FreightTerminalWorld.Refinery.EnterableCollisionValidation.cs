@@ -13,6 +13,7 @@ public partial class FreightTerminalWorld
         out int facadeWallHits,
         out int sideWallHits,
         out int backWallHits,
+        out int linerSurfaceHits,
         out int wingWallHits,
         out int overhangClears,
         out string summary)
@@ -21,6 +22,7 @@ public partial class FreightTerminalWorld
         facadeWallHits = 0;
         sideWallHits = 0;
         backWallHits = 0;
+        linerSurfaceHits = 0;
         wingWallHits = 0;
         overhangClears = 0;
         summary = "ok";
@@ -233,11 +235,77 @@ public partial class FreightTerminalWorld
                 return false;
             }
             backWallHits++;
+
+            var interiorWidth = lintel.GetMeta("gameplay_interior_width", 0.0f).AsSingle();
+            var interiorDepth = lintel.GetMeta("gameplay_interior_depth", 0.0f).AsSingle();
+            if (interiorWidth < roomContract.DoorWidth + 0.4f || interiorDepth < 2.8f)
+            {
+                summary = $"liner_contract_invalid:{sourceName}";
+                return false;
+            }
+            foreach (var linerRole in new[] { "liner_left", "liner_right", "liner_back" })
+            {
+                var linerWall = sourceShapes.SingleOrDefault(shape =>
+                    shape.GetMeta("gameplay_proxy_role", string.Empty).AsString()
+                        == linerRole);
+                var probeDirection = linerRole == "liner_back" ? forward : tangent;
+                if (linerWall is null
+                    || !PhysicsRaycast.TryHit(
+                        space,
+                        linerWall.GlobalPosition + probeDirection * 0.55f,
+                        linerWall.GlobalPosition - probeDirection * 0.55f,
+                        exclusions,
+                        1,
+                        out var linerHit)
+                    || linerHit.Collider is not Node linerCollider
+                    || linerCollider.GetInstanceId() != expectedBodyId)
+                {
+                    summary = $"liner_open:{sourceName}:{linerRole}";
+                    return false;
+                }
+                var relative = linerWall.GlobalPosition - center;
+                var expectedTangent = linerRole switch
+                {
+                    "liner_left" => -interiorWidth * 0.5f,
+                    "liner_right" => interiorWidth * 0.5f,
+                    _ => 0.0f
+                };
+                var expectedDepth = linerRole == "liner_back"
+                    ? interiorDepth
+                    : interiorDepth * 0.5f;
+                if (Mathf.Abs(relative.Dot(tangent) - expectedTangent) > 0.02f
+                    || Mathf.Abs(-relative.Dot(forward) - expectedDepth) > 0.02f)
+                {
+                    summary = $"liner_alignment:{sourceName}:{linerRole}";
+                    return false;
+                }
+                linerSurfaceHits++;
+            }
+            var linerCeiling = sourceShapes.SingleOrDefault(shape =>
+                shape.GetMeta("gameplay_proxy_role", string.Empty).AsString()
+                    == "liner_ceiling");
+            if (linerCeiling is null
+                || !PhysicsRaycast.TryHit(
+                    space,
+                    linerCeiling.GlobalPosition + Vector3.Up * 0.55f,
+                    linerCeiling.GlobalPosition - Vector3.Up * 0.55f,
+                    exclusions,
+                    1,
+                    out var ceilingHit)
+                || ceilingHit.Collider is not Node ceilingCollider
+                || ceilingCollider.GetInstanceId() != expectedBodyId)
+            {
+                summary = $"liner_open:{sourceName}:liner_ceiling";
+                return false;
+            }
+            linerSurfaceHits++;
         }
         return doorClears == JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount
             && facadeWallHits == JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount * 10
             && sideWallHits == JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount * 2
             && backWallHits == JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount
+            && linerSurfaceHits
+                == JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount * 4
             && wingWallHits == JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount * 4
             && overhangClears == JianghaiGameplayCollisionContract.ExpectedEnterableSourceCount * 4;
     }
@@ -299,6 +367,16 @@ public partial class FreightTerminalWorld
                 owned: false) is not MeshInstance3D source)
         {
             summary = $"envelope_visual_missing:{sourceName}";
+            return false;
+        }
+        var roomWidth = source.GetMeta("jianghai_room_width_m", 0.0f).AsSingle();
+        var roomDepth = source.GetMeta("jianghai_room_depth_m", 0.0f).AsSingle();
+        if (roomWidth < contract.DoorWidth + 0.4f
+            || roomDepth < 2.8f
+            || !MetaApproximately(lintel, "gameplay_interior_width", roomWidth)
+            || !MetaApproximately(lintel, "gameplay_interior_depth", roomDepth))
+        {
+            summary = $"liner_visual_physics_drift:{sourceName}";
             return false;
         }
 

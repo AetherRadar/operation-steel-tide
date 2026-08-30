@@ -35,6 +35,8 @@ internal readonly record struct JianghaiEnterableRoomContract(
     float SideHalfWidth,
     float SideFrontInset,
     float SideRearInset,
+    float InteriorWidth,
+    float InteriorDepth,
     float DoorWidth,
     float DoorHeight);
 
@@ -49,10 +51,10 @@ internal static class JianghaiGameplayCollisionContract
 {
     public const string AuthoredDensityDistrictRole = "authored_density_building";
     public const string AuthoredDensityCollisionRole = "building_shell";
-    public const int ExpectedDensitySourceCount = 42;
-    public const int ExpectedSolidSourceCount = 59;
-    public const int ExpectedEnterableSourceCount = 6;
-    public const int EnterableShapesPerSource = 19;
+    public const int ExpectedDensitySourceCount = 50;
+    public const int ExpectedSolidSourceCount = 53;
+    public const int ExpectedEnterableSourceCount = 12;
+    public const int EnterableShapesPerSource = 23;
     public const int ExpectedAuthoredSourceCount =
         ExpectedDensitySourceCount
         + ExpectedSolidSourceCount
@@ -79,6 +81,10 @@ internal static class JianghaiGameplayCollisionContract
         "JianghaiDensity_EastInfill02",
         "JianghaiDensity_EastInfill03",
         "JianghaiDensity_EastInfill04",
+        "JianghaiDensity_EastInfill05",
+        "JianghaiDensity_EastInfill06",
+        "JianghaiDensity_EastInfill07",
+        "JianghaiDensity_EastInfill08",
         "JianghaiDensity_NorthWall01",
         "JianghaiDensity_NorthWall02",
         "JianghaiDensity_NorthWall03",
@@ -107,20 +113,29 @@ internal static class JianghaiGameplayCollisionContract
         "JianghaiDensity_WestInfill01",
         "JianghaiDensity_WestInfill02",
         "JianghaiDensity_WestInfill03",
-        "JianghaiDensity_WestInfill04"
+        "JianghaiDensity_WestInfill04",
+        "JianghaiDensity_WestInfill05",
+        "JianghaiDensity_WestInfill06",
+        "JianghaiDensity_WestInfill07",
+        "JianghaiDensity_WestInfill08"
     };
     private static readonly string[] EnterableSourceNameValues =
     {
+        "EastGateRow00",
         "EastPhotoHouse",
         "EastTeaHouse",
+        "NorthwestGateHouse",
+        "OuterEastMidResidence",
+        "OuterWestSquareResidence",
         "WeatheredRollerShop00",
         "WeatheredRollerShop01",
         "WeatheredRollerShop02",
-        "WeatheredRollerShop03"
+        "WeatheredRollerShop03",
+        "WestMarketResidence",
+        "WestMedicineRow01"
     };
     private static readonly string[] SolidSourceNameValues =
     {
-        "EastGateRow00",
         "EastGateRow02",
         "EastHarborResidence",
         "EastHardwareHouse",
@@ -153,10 +168,8 @@ internal static class JianghaiGameplayCollisionContract
         "JianghaiCleared_PawnshopWestHouse01",
         "JianghaiExpansion_PawnshopBackdrop",
         "NortheastGateHouse",
-        "NorthwestGateHouse",
         "OuterEastHarborResidence",
         "OuterEastMarketResidence",
-        "OuterEastMidResidence",
         "OuterEastNorthResidence",
         "OuterEastTeaResidence",
         "OuterNortheastResidence",
@@ -166,15 +179,12 @@ internal static class JianghaiGameplayCollisionContract
         "OuterWestMarketResidence",
         "OuterWestNorthResidence",
         "OuterWestSouthResidence",
-        "OuterWestSquareResidence",
         "WestClockHouse",
         "WestGateRow01",
         "WestGateRow02",
         "WestHarborResidence",
-        "WestMarketResidence",
         "WestMarketRow01",
         "WestMedicineHouse",
-        "WestMedicineRow01",
         "WestSquareRow01",
         "WestSquareRow02",
         "WestTeaWarehouse",
@@ -186,8 +196,7 @@ internal static class JianghaiGameplayCollisionContract
             "JianghaiCleared_FactoryWorkshopEast",
             "JianghaiCleared_FactoryWorkshopWest",
             "JianghaiCleared_MarketShop01",
-            "JianghaiCleared_MarketShop03",
-            "WestMedicineRow01"
+            "JianghaiCleared_MarketShop03"
         },
         StringComparer.Ordinal);
     private static readonly string[] AuthoredSourceNameValues = DensitySourceNameValues
@@ -260,23 +269,43 @@ internal static class JianghaiGameplayCollisionContract
             "WeatheredRollerShop00" => new(
                 0.77f, 9.84f, 4.55f, 3.69f, 2.80f,
                 1.444f, 4.792f, 1.85f, 4.20f,
-                5.023f, 1.934f, 4.299f, 1.58f, 2.48f),
+                5.023f, 1.934f, 4.299f, 7.20f, 4.25f, 1.58f, 2.48f),
             "WeatheredRollerShop01" => new(
                 0.80f, 10.14f, 4.72f, 3.80f, 2.80f,
                 1.507f, 5.000f, 1.90f, 4.40f,
-                5.242f, 2.022f, 4.487f, 1.58f, 2.48f),
+                5.242f, 2.022f, 4.487f, 7.20f, 4.42f, 1.58f, 2.48f),
             "WeatheredRollerShop02" or "WeatheredRollerShop03" => new(
                 0.78f, 9.92f, 4.62f, 3.75f, 2.80f,
                 1.475f, 4.896f, 1.90f, 4.30f,
-                5.132f, 1.980f, 4.395f, 1.58f, 2.48f),
+                5.132f, 1.980f, 4.395f, 7.20f, 4.32f, 1.58f, 2.48f),
             "EastPhotoHouse" => new(
                 1.29f, 12.70f, 7.47f, 4.61f, 4.00f,
                 2.376f, 7.886f, 2.70f, 6.20f,
-                7.447f, 3.186f, 7.076f, 1.58f, 2.48f),
+                7.447f, 3.186f, 7.076f, 7.20f, 6.40f, 1.58f, 2.48f),
+            "EastGateRow00" => new(
+                1.290f, 12.700f, 7.470f, 4.610f, 4.000f,
+                2.376f, 7.886f, 2.700f, 6.200f,
+                7.447f, 3.186f, 7.076f, 7.20f, 6.40f, 1.58f, 2.48f),
             "EastTeaHouse" => new(
                 1.32f, 13.11f, 7.67f, 4.68f, 4.00f,
                 2.422f, 8.041f, 2.70f, 6.35f,
-                7.593f, 3.247f, 7.217f, 1.58f, 2.48f),
+                7.593f, 3.247f, 7.217f, 7.20f, 6.40f, 1.58f, 2.48f),
+            "NorthwestGateHouse" => new(
+                1.366f, 13.447f, 7.909f, 4.881f, 4.235f,
+                2.516f, 8.350f, 2.859f, 6.565f,
+                7.885f, 3.373f, 7.492f, 7.20f, 6.40f, 1.58f, 2.48f),
+            "WestMedicineRow01" => new(
+                1.108f, 12.103f, 6.414f, 5.109f, 3.812f,
+                2.040f, 6.772f, 2.573f, 5.909f,
+                7.097f, 2.736f, 6.076f, 7.20f, 6.114f, 1.58f, 2.48f),
+            "WestMarketResidence" => new(
+                1.391f, 13.696f, 8.056f, 4.972f, 4.314f,
+                2.562f, 8.505f, 2.912f, 6.686f,
+                8.031f, 3.436f, 7.631f, 7.20f, 6.40f, 1.58f, 2.48f),
+            "OuterEastMidResidence" or "OuterWestSquareResidence" => new(
+                1.341f, 13.198f, 7.763f, 4.791f, 4.157f,
+                2.469f, 8.196f, 2.806f, 6.443f,
+                7.739f, 3.311f, 7.354f, 7.20f, 6.40f, 1.58f, 2.48f),
             _ => default
         };
         return room.CollisionDepth > 0.0f;
