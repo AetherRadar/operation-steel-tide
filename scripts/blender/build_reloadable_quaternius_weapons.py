@@ -58,7 +58,10 @@ ACTION_SURFACE_DISTANCE_TOLERANCE = 0.000001
 ACTION_SOCKET_ROUND_TRIP_TOLERANCE = 0.000002
 
 MAGAZINE_TRIANGLE_COUNT = 60
-BODY_TRIANGLE_COUNT = 1_314
+BODY_WITH_IRON_SIGHTS_TRIANGLE_COUNT = 1_314
+BODY_TRIANGLE_COUNT = 1_206
+FRONT_IRON_SIGHT_TRIANGLE_COUNT = 94
+REAR_IRON_SIGHT_TRIANGLE_COUNT = 14
 SOURCE_TRIANGLE_COUNT = 1_374
 ACTION_TRIANGLE_COUNT = 120
 SCENE_TRIANGLE_COUNT = 1_554
@@ -73,12 +76,24 @@ MAGAZINE_MATERIAL_TRIANGLES = {
     "DarkMetal": 22,
     "Black": 38,
 }
-BODY_MATERIAL_TRIANGLES = {
+BODY_WITH_IRON_SIGHTS_MATERIAL_TRIANGLES = {
     "DarkMetal": 670,
     "Metal": 372,
     "Black": 56,
     "Grey": 216,
 }
+BODY_MATERIAL_TRIANGLES = {
+    "DarkMetal": 562,
+    "Metal": 372,
+    "Black": 56,
+    "Grey": 216,
+}
+FRONT_IRON_SIGHT_MATERIAL_TRIANGLES = {"DarkMetal": FRONT_IRON_SIGHT_TRIANGLE_COUNT}
+REAR_IRON_SIGHT_MATERIAL_TRIANGLES = {"DarkMetal": REAR_IRON_SIGHT_TRIANGLE_COUNT}
+FRONT_IRON_SIGHT_MINIMUM = Vector((-0.037895, 0.223731, -0.741152))
+FRONT_IRON_SIGHT_MAXIMUM = Vector((0.037895, 0.267235, -0.680050))
+REAR_IRON_SIGHT_MINIMUM = Vector((-0.037895, 0.223731, -0.180685))
+REAR_IRON_SIGHT_MAXIMUM = Vector((0.037895, 0.242528, -0.119583))
 
 ROOT_NAME = "SteelTideReloadableMP5A5"
 SOCKET_NAMES = (
@@ -92,10 +107,10 @@ SOCKET_NAMES = (
 )
 
 # Filled with reviewed deterministic outputs after the first complete build.
-OUTPUT_GLB_SHA256 = "A21A1AF05BFDC91F307F7DD1EF431773A74B135B0CE5F8845354EC6029678101"
-OUTPUT_GLB_BYTES = 82_708
-OUTPUT_PREVIEW_SHA256 = "FD367AFB42BF7E91E3EBBD49006D99022C7484DE7B6AA928496509E78AF9E606"
-OUTPUT_PREVIEW_BYTES = 1_427_943
+OUTPUT_GLB_SHA256 = "55A33356F659CC9A6EC68FE3DE68A4B3D3C63DDAFCC45FE918DB1CC9FFBF1BDF"
+OUTPUT_GLB_BYTES = 84_528
+OUTPUT_PREVIEW_SHA256 = "BE4CF860018E8023E0AE6ED61F83B2030C8E4525FCB7785A03062641B038998C"
+OUTPUT_PREVIEW_BYTES = 1_428_041
 EXPECTED_PRIMARY_MINIMUM = Vector((-0.102000, -0.267235, -0.850000))
 EXPECTED_PRIMARY_MAXIMUM = Vector((0.046081, 0.267235, 0.320000))
 EXPECTED_SCENE_MINIMUM = Vector((-0.321852, -0.687235, -0.850000))
@@ -329,6 +344,45 @@ def welded_vertex_key(obj: bpy.types.Object, vertex_index: int) -> tuple[int, in
     return tuple(round(value * 100_000) for value in point)
 
 
+def welded_face_components(obj: bpy.types.Object) -> list[set[int]]:
+    key_faces: dict[tuple[int, int, int], set[int]] = {}
+    face_keys: dict[int, tuple[tuple[int, int, int], ...]] = {}
+    for polygon in obj.data.polygons:
+        keys = tuple(welded_vertex_key(obj, index) for index in polygon.vertices)
+        face_keys[polygon.index] = keys
+        for key in keys:
+            key_faces.setdefault(key, set()).add(polygon.index)
+
+    unseen = set(face_keys)
+    components: list[set[int]] = []
+    while unseen:
+        pending = [min(unseen)]
+        component: set[int] = set()
+        while pending:
+            face_index = pending.pop()
+            if face_index in component:
+                continue
+            component.add(face_index)
+            unseen.discard(face_index)
+            for key in face_keys[face_index]:
+                pending.extend(key_faces[key] - component)
+        components.append(component)
+    return components
+
+
+def welded_face_component_from_seeds(
+    obj: bpy.types.Object,
+    seeds: set[int],
+) -> set[int]:
+    matches = [component for component in welded_face_components(obj) if component & seeds]
+    if len(matches) != 1 or not seeds.issubset(matches[0]):
+        raise RuntimeError(
+            f"Expected one welded component containing {len(seeds)} seeds; "
+            f"found={len(matches)}"
+        )
+    return matches[0]
+
+
 def mp5a5_magazine_face_indices(obj: bpy.types.Object) -> set[int]:
     black_slot = next(
         index
@@ -348,24 +402,7 @@ def mp5a5_magazine_face_indices(obj: bpy.types.Object) -> set[int]:
             f"MP5A5 magazine seed selection drifted: {len(seeds)} != 38"
         )
 
-    key_faces: dict[tuple[int, int, int], set[int]] = {}
-    face_keys: dict[int, tuple[tuple[int, int, int], ...]] = {}
-    for polygon in obj.data.polygons:
-        keys = tuple(welded_vertex_key(obj, index) for index in polygon.vertices)
-        face_keys[polygon.index] = keys
-        for key in keys:
-            key_faces.setdefault(key, set()).add(polygon.index)
-
-    selected = set(seeds)
-    pending = list(sorted(seeds, reverse=True))
-    while pending:
-        face_index = pending.pop()
-        for key in face_keys[face_index]:
-            for neighbor in sorted(key_faces[key], reverse=True):
-                if neighbor not in selected:
-                    selected.add(neighbor)
-                    pending.append(neighbor)
-    return selected
+    return welded_face_component_from_seeds(obj, seeds)
 
 
 def material_triangle_counts(obj: bpy.types.Object) -> dict[str, int]:
@@ -418,7 +455,7 @@ def separate_magazine(
         )
     magazine = separated[0]
     if (
-        len(source.data.polygons) != BODY_TRIANGLE_COUNT
+        len(source.data.polygons) != BODY_WITH_IRON_SIGHTS_TRIANGLE_COUNT
         or len(magazine.data.polygons) != MAGAZINE_TRIANGLE_COUNT
     ):
         raise RuntimeError(
@@ -426,7 +463,7 @@ def separate_magazine(
             f"body={len(source.data.polygons)} "
             f"magazine={len(magazine.data.polygons)}"
         )
-    if material_triangle_counts(source) != BODY_MATERIAL_TRIANGLES:
+    if material_triangle_counts(source) != BODY_WITH_IRON_SIGHTS_MATERIAL_TRIANGLES:
         raise RuntimeError("MP5A5 body material triangle partition drifted.")
     if material_triangle_counts(magazine) != MAGAZINE_MATERIAL_TRIANGLES:
         raise RuntimeError("MP5A5 separated magazine materials drifted.")
@@ -435,6 +472,152 @@ def separate_magazine(
     magazine.name = "MagazineGeometry"
     magazine.data.name = "MagazineMesh"
     return source, magazine
+
+
+def component_godot_bounds(
+    obj: bpy.types.Object,
+    face_indices: set[int],
+) -> tuple[Vector, Vector]:
+    vertex_indices = {
+        vertex_index
+        for face_index in face_indices
+        for vertex_index in obj.data.polygons[face_index].vertices
+    }
+    return point_bounds(
+        [
+            blender_to_godot(obj.matrix_world @ obj.data.vertices[index].co)
+            for index in vertex_indices
+        ]
+    )
+
+
+def bounds_match(
+    actual: tuple[Vector, Vector],
+    expected: tuple[Vector, Vector],
+) -> bool:
+    return all(
+        (actual_bound - expected_bound).length <= BOUNDS_TOLERANCE
+        for actual_bound, expected_bound in zip(actual, expected)
+    )
+
+
+def require_iron_sight_component(
+    obj: bpy.types.Object,
+    label: str,
+    triangle_count: int,
+    expected_bounds: tuple[Vector, Vector],
+) -> set[int]:
+    matches = [
+        component
+        for component in welded_face_components(obj)
+        if len(component) == triangle_count
+        and bounds_match(component_godot_bounds(obj, component), expected_bounds)
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"Expected one MP5A5 {label} welded component; found={len(matches)}"
+        )
+    return matches[0]
+
+
+def separate_selected_faces(
+    source: bpy.types.Object,
+    face_indices: set[int],
+    name: str,
+    mesh_name: str,
+) -> bpy.types.Object:
+    bpy.ops.object.select_all(action="DESELECT")
+    source.select_set(True)
+    bpy.context.view_layer.objects.active = source
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="DESELECT")
+    bpy.ops.object.mode_set(mode="OBJECT")
+    for polygon in source.data.polygons:
+        polygon.select = polygon.index in face_indices
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.separate(type="SELECTED")
+    bpy.ops.object.mode_set(mode="OBJECT")
+    separated = [
+        obj
+        for obj in bpy.context.selected_objects
+        if obj.type == "MESH" and obj != source
+    ]
+    if len(separated) != 1:
+        raise RuntimeError(
+            f"Expected one separated MP5A5 {name} mesh; found={len(separated)}"
+        )
+    result = separated[0]
+    result.name = name
+    result.data.name = mesh_name
+    return result
+
+
+def separate_iron_sights(
+    body: bpy.types.Object,
+) -> tuple[bpy.types.Object, bpy.types.Object, bpy.types.Object]:
+    front_faces = require_iron_sight_component(
+        body,
+        "front sight",
+        FRONT_IRON_SIGHT_TRIANGLE_COUNT,
+        (FRONT_IRON_SIGHT_MINIMUM, FRONT_IRON_SIGHT_MAXIMUM),
+    )
+    rear_faces = require_iron_sight_component(
+        body,
+        "rear sight",
+        REAR_IRON_SIGHT_TRIANGLE_COUNT,
+        (REAR_IRON_SIGHT_MINIMUM, REAR_IRON_SIGHT_MAXIMUM),
+    )
+    if front_faces & rear_faces:
+        raise RuntimeError("MP5A5 front and rear sight components overlap.")
+
+    sights = separate_selected_faces(
+        body,
+        front_faces | rear_faces,
+        "IronSightGeometry",
+        "IronSightMesh",
+    )
+    front_faces = require_iron_sight_component(
+        sights,
+        "front sight",
+        FRONT_IRON_SIGHT_TRIANGLE_COUNT,
+        (FRONT_IRON_SIGHT_MINIMUM, FRONT_IRON_SIGHT_MAXIMUM),
+    )
+    front = separate_selected_faces(
+        sights,
+        front_faces,
+        "FrontIronGeometry",
+        "FrontIronSightMesh",
+    )
+    rear = sights
+    rear.name = "RearIronGeometry"
+    rear.data.name = "RearIronSightMesh"
+    body.name = "WeaponBodyGeometry"
+    body.data.name = "WeaponBodyMesh"
+
+    counts = (len(body.data.polygons), len(front.data.polygons), len(rear.data.polygons))
+    if counts != (
+        BODY_TRIANGLE_COUNT,
+        FRONT_IRON_SIGHT_TRIANGLE_COUNT,
+        REAR_IRON_SIGHT_TRIANGLE_COUNT,
+    ):
+        raise RuntimeError(f"Separated MP5A5 sight topology drifted: {counts}")
+    if material_triangle_counts(body) != BODY_MATERIAL_TRIANGLES:
+        raise RuntimeError("MP5A5 sight-free body material partition drifted.")
+    if material_triangle_counts(front) != FRONT_IRON_SIGHT_MATERIAL_TRIANGLES:
+        raise RuntimeError("MP5A5 front sight material partition drifted.")
+    if material_triangle_counts(rear) != REAR_IRON_SIGHT_MATERIAL_TRIANGLES:
+        raise RuntimeError("MP5A5 rear sight material partition drifted.")
+    require_bounds(
+        "MP5A5 separated front sight",
+        godot_mesh_bounds(body, (front,)),
+        (FRONT_IRON_SIGHT_MINIMUM, FRONT_IRON_SIGHT_MAXIMUM),
+    )
+    require_bounds(
+        "MP5A5 separated rear sight",
+        godot_mesh_bounds(body, (rear,)),
+        (REAR_IRON_SIGHT_MINIMUM, REAR_IRON_SIGHT_MAXIMUM),
+    )
+    return body, front, rear
 
 
 def canonical_transform(
@@ -788,6 +971,7 @@ def build_runtime_asset() -> tuple[bpy.types.Object, dict[str, Vector]]:
     transform = canonical_transform(source_minimum, source_maximum)
     for obj in (body, magazine_geometry):
         bake_object_transform(obj, transform)
+    body, front_iron_geometry, rear_iron_geometry = separate_iron_sights(body)
     configure_mp5a5_materials()
 
     root = bpy.data.objects.new(ROOT_NAME, None)
@@ -808,9 +992,29 @@ def build_runtime_asset() -> tuple[bpy.types.Object, dict[str, Vector]]:
     root["action_geometry_method"] = (
         "hand-shaped swept five-ring profile; no primitive or CSG"
     )
+    root["independent_iron_sights"] = True
+    root["iron_sight_source"] = "audited welded source components"
     root["blocked_source_platforms"] = "M24,AXMC,AWM,VSS,P226,M1911"
     bpy.context.collection.objects.link(root)
     body.parent = root
+    front_iron_sight = new_empty(
+        "FrontIronSight",
+        root,
+        Vector(),
+        "front_iron_sight_visibility",
+    )
+    front_iron_geometry.parent = front_iron_sight
+    front_iron_geometry["runtime_asset"] = True
+    front_iron_geometry["visibility_role"] = "front_iron_sight"
+    rear_iron_sight = new_empty(
+        "RearIronSight",
+        root,
+        Vector(),
+        "rear_iron_sight_visibility",
+    )
+    rear_iron_geometry.parent = rear_iron_sight
+    rear_iron_geometry["runtime_asset"] = True
+    rear_iron_geometry["visibility_role"] = "rear_iron_sight"
 
     magazine = new_empty(
         "Magazine",
@@ -878,11 +1082,13 @@ def build_runtime_asset() -> tuple[bpy.types.Object, dict[str, Vector]]:
 
     counts = (
         len(body.data.polygons),
+        len(front_iron_geometry.data.polygons),
+        len(rear_iron_geometry.data.polygons),
         len(magazine_geometry.data.polygons),
         len(spare_geometry.data.polygons),
         len(charging_geometry.data.polygons),
     )
-    if counts[0] + counts[1] != SOURCE_TRIANGLE_COUNT:
+    if sum(counts[:4]) != SOURCE_TRIANGLE_COUNT:
         raise RuntimeError("MP5A5 source topology was not conserved.")
     if sum(counts) != SCENE_TRIANGLE_COUNT:
         raise RuntimeError("MP5A5 scene triangle count is invalid.")
@@ -1013,6 +1219,10 @@ def validate_exported_asset(
     bpy.ops.import_scene.gltf(filepath=str(OUTPUT_GLB))
     root = require_unique_node(ROOT_NAME)
     body = require_unique_node("WeaponBodyGeometry")
+    front_iron_sight = require_unique_node("FrontIronSight")
+    front_iron_geometry = require_unique_node("FrontIronGeometry")
+    rear_iron_sight = require_unique_node("RearIronSight")
+    rear_iron_geometry = require_unique_node("RearIronGeometry")
     magazine = require_unique_node("Magazine")
     spare_magazine = require_unique_node("SpareMagazine")
     magazine_geometry = require_unique_node("MagazineGeometry")
@@ -1023,6 +1233,10 @@ def validate_exported_asset(
     expected_nodes = {
         ROOT_NAME,
         "WeaponBodyGeometry",
+        "FrontIronSight",
+        "FrontIronGeometry",
+        "RearIronSight",
+        "RearIronGeometry",
         "Magazine",
         "MagazineGeometry",
         "SpareMagazine",
@@ -1037,7 +1251,13 @@ def validate_exported_asset(
             "Exported MP5A5 node contract drifted: "
             f"{sorted(actual_nodes)} != {sorted(expected_nodes)}"
         )
-    if body.type != "MESH" or magazine_geometry.type != "MESH" or spare_geometry.type != "MESH":
+    if (
+        body.type != "MESH"
+        or front_iron_geometry.type != "MESH"
+        or rear_iron_geometry.type != "MESH"
+        or magazine_geometry.type != "MESH"
+        or spare_geometry.type != "MESH"
+    ):
         raise RuntimeError("Exported MP5A5 mechanism nodes are missing geometry.")
     if body.parent != root or magazine.parent != root or spare_magazine.parent != root:
         raise RuntimeError("Exported MP5A5 root hierarchy is invalid.")
@@ -1045,26 +1265,41 @@ def validate_exported_asset(
         raise RuntimeError("Exported MP5A5 magazine hierarchy is invalid.")
     if charging_handle.parent != root or charging_geometry.parent != charging_handle:
         raise RuntimeError("Exported MP5A5 action hierarchy is invalid.")
+    if (
+        front_iron_sight.parent != root
+        or front_iron_geometry.parent != front_iron_sight
+        or rear_iron_sight.parent != root
+        or rear_iron_geometry.parent != rear_iron_sight
+    ):
+        raise RuntimeError("Exported MP5A5 iron-sight hierarchy is invalid.")
     if magazine_geometry.data == spare_geometry.data:
         raise RuntimeError("Exported MP5A5 magazines do not use independent mesh data.")
 
     counts = (
         len(body.data.polygons),
+        len(front_iron_geometry.data.polygons),
+        len(rear_iron_geometry.data.polygons),
         len(magazine_geometry.data.polygons),
         len(spare_geometry.data.polygons),
         len(charging_geometry.data.polygons),
     )
     if counts != (
         BODY_TRIANGLE_COUNT,
+        FRONT_IRON_SIGHT_TRIANGLE_COUNT,
+        REAR_IRON_SIGHT_TRIANGLE_COUNT,
         MAGAZINE_TRIANGLE_COUNT,
         MAGAZINE_TRIANGLE_COUNT,
         ACTION_TRIANGLE_COUNT,
     ):
         raise RuntimeError(f"Exported MP5A5 topology drifted: {counts}")
-    if counts[0] + counts[1] != SOURCE_TRIANGLE_COUNT or sum(counts) != SCENE_TRIANGLE_COUNT:
+    if sum(counts[:4]) != SOURCE_TRIANGLE_COUNT or sum(counts) != SCENE_TRIANGLE_COUNT:
         raise RuntimeError("Exported MP5A5 triangle conservation failed.")
     if material_triangle_counts(body) != BODY_MATERIAL_TRIANGLES:
         raise RuntimeError("Exported MP5A5 body material partition drifted.")
+    if material_triangle_counts(front_iron_geometry) != FRONT_IRON_SIGHT_MATERIAL_TRIANGLES:
+        raise RuntimeError("Exported MP5A5 front sight material partition drifted.")
+    if material_triangle_counts(rear_iron_geometry) != REAR_IRON_SIGHT_MATERIAL_TRIANGLES:
+        raise RuntimeError("Exported MP5A5 rear sight material partition drifted.")
     for geometry in (magazine_geometry, spare_geometry):
         if material_triangle_counts(geometry) != MAGAZINE_MATERIAL_TRIANGLES:
             raise RuntimeError(
@@ -1140,10 +1375,35 @@ def validate_exported_asset(
     )
 
     primary_bounds = godot_mesh_bounds(
-        root, (body, magazine_geometry, charging_geometry)
+        root,
+        (
+            body,
+            front_iron_geometry,
+            rear_iron_geometry,
+            magazine_geometry,
+            charging_geometry,
+        ),
     )
     scene_bounds = godot_mesh_bounds(
-        root, (body, magazine_geometry, spare_geometry, charging_geometry)
+        root,
+        (
+            body,
+            front_iron_geometry,
+            rear_iron_geometry,
+            magazine_geometry,
+            spare_geometry,
+            charging_geometry,
+        ),
+    )
+    require_bounds(
+        "Exported MP5A5 front sight",
+        godot_mesh_bounds(root, (front_iron_geometry,)),
+        (FRONT_IRON_SIGHT_MINIMUM, FRONT_IRON_SIGHT_MAXIMUM),
+    )
+    require_bounds(
+        "Exported MP5A5 rear sight",
+        godot_mesh_bounds(root, (rear_iron_geometry,)),
+        (REAR_IRON_SIGHT_MINIMUM, REAR_IRON_SIGHT_MAXIMUM),
     )
     if EXPECTED_PRIMARY_MINIMUM is not None and EXPECTED_PRIMARY_MAXIMUM is not None:
         require_bounds(
@@ -1185,6 +1445,8 @@ def main() -> None:
         f"preview_sha256={sha256(PREVIEW_PATH)} "
         f"source_triangles={SOURCE_TRIANGLE_COUNT} "
         f"body_triangles={BODY_TRIANGLE_COUNT} "
+        f"front_iron_triangles={FRONT_IRON_SIGHT_TRIANGLE_COUNT} "
+        f"rear_iron_triangles={REAR_IRON_SIGHT_TRIANGLE_COUNT} "
         f"magazine_triangles={MAGAZINE_TRIANGLE_COUNT} "
         f"spare_triangles={MAGAZINE_TRIANGLE_COUNT} "
         f"action_triangles={ACTION_TRIANGLE_COUNT} "

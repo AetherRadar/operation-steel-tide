@@ -86,7 +86,8 @@ MATERIAL_PHYSICS = {
     "Highlight": (0.86, 0.23, "finished_magazine_and_hardware"),
 }
 OUTPUT_NODE_TRIANGLES = {
-    "WeaponBodyGeometry": 5_248,
+    "WeaponBodyGeometry": 4_579,
+    "FrontIronSight": 669,
     "StockGeometry": 668,
     "TriggerGeometry": 228,
     "SafetyGeometry": 540,
@@ -97,13 +98,13 @@ OUTPUT_NODE_TRIANGLES = {
     "ChargingHandleGeometry": 852,
 }
 EXPECTED_PRIMARY_MINIMUM = Vector((-0.063999, -0.299936, -1.260000))
-EXPECTED_PRIMARY_MAXIMUM = Vector((0.063999, 0.300235, 0.320000))
+EXPECTED_PRIMARY_MAXIMUM = Vector((0.063999, 0.300062, 0.320000))
 EXPECTED_SCENE_MINIMUM = Vector((-0.330012, -0.719936, -1.260000))
-EXPECTED_SCENE_MAXIMUM = Vector((0.063999, 0.300235, 0.320000))
-OUTPUT_GLB_SHA256 = "C8FDC9F7C780E27D4EA87A3D4B7C00FDF7CACE2902F6A5A765DC5B8AB992FEC0"
-OUTPUT_GLB_BYTES = 176_684
-OUTPUT_PREVIEW_SHA256 = "0F24C3CB0A7BF0B6A233308AC3033AE56A1A0419BCC04BD5F3E291CED0CD9E8E"
-OUTPUT_PREVIEW_BYTES = 1_492_750
+EXPECTED_SCENE_MAXIMUM = Vector((0.063999, 0.300062, 0.320000))
+OUTPUT_GLB_SHA256 = "13F03B7D9E6CD2C50A85B5FA5E3C803530AB8AC165A1CB70CB296AC0BB8188BC"
+OUTPUT_GLB_BYTES = 178_048
+OUTPUT_PREVIEW_SHA256 = "830158C4F22B38A6BD461957FCBCD2D1A2AB8B6F9015D4FA3A6CD70FFA6AE6A0"
+OUTPUT_PREVIEW_BYTES = 1_493_438
 
 SOCKET_NAMES = (
     "PrimaryGripSocket",
@@ -116,6 +117,7 @@ SOCKET_NAMES = (
 )
 GEOMETRY_NAMES = (
     "WeaponBodyGeometry",
+    "FrontIronSight",
     "StockGeometry",
     "TriggerGeometry",
     "SafetyGeometry",
@@ -124,6 +126,14 @@ GEOMETRY_NAMES = (
     "SpareMagazineGeometry",
     "BoltGeometry",
     "ChargingHandleGeometry",
+)
+
+FRONT_IRON_SIGHT_SOURCE_FACES = 112
+FRONT_IRON_SIGHT_MINIMUM = Vector(
+    (-0.0295619294, 1.0381450653, 0.1344571412)
+)
+FRONT_IRON_SIGHT_MAXIMUM = Vector(
+    (0.0127077205, 1.0825898647, 0.3003039956)
 )
 
 
@@ -298,6 +308,64 @@ def apply_surface_finish(obj: bpy.types.Object) -> None:
         obj.data.uv_layers.remove(obj.data.uv_layers[0])
     obj.select_set(False)
     obj.data.update()
+
+
+def separate_front_iron_sight(body: bpy.types.Object) -> bpy.types.Object:
+    """Split the source's welded flip-up front sight into hideable geometry."""
+    bpy.ops.object.select_all(action="DESELECT")
+    bpy.context.view_layer.objects.active = body
+    body.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="DESELECT")
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    selected_faces = []
+    for polygon in body.data.polygons:
+        points = [body.data.vertices[index].co for index in polygon.vertices]
+        polygon.select = all(
+            1.037 <= point.y <= 1.084 and point.z >= 0.134
+            for point in points
+        )
+        if polygon.select:
+            selected_faces.append(polygon)
+    if len(selected_faces) != FRONT_IRON_SIGHT_SOURCE_FACES:
+        raise RuntimeError(
+            "SCAR-L welded front-sight selection drifted: "
+            f"{len(selected_faces)} != {FRONT_IRON_SIGHT_SOURCE_FACES}"
+        )
+    selected_points = [
+        body.data.vertices[index].co
+        for index in {
+            vertex_index
+            for polygon in selected_faces
+            for vertex_index in polygon.vertices
+        }
+    ]
+    require_bounds(
+        "welded front sight",
+        point_bounds(selected_points),
+        (FRONT_IRON_SIGHT_MINIMUM, FRONT_IRON_SIGHT_MAXIMUM),
+    )
+
+    previous_objects = set(bpy.context.scene.objects)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.separate(type="SELECTED")
+    bpy.ops.object.mode_set(mode="OBJECT")
+    separated = [
+        obj
+        for obj in bpy.context.scene.objects
+        if obj not in previous_objects and obj.type == "MESH"
+    ]
+    if len(separated) != 1:
+        raise RuntimeError(
+            f"SCAR-L front-sight separation created {len(separated)} objects."
+        )
+    front_sight = separated[0]
+    front_sight.name = "FrontIronSight"
+    front_sight.data.name = "FrontIronSightMesh"
+    front_sight["source_node"] = "Base/front_flip_sight"
+    front_sight["mechanism_role"] = "hideable_front_iron_sight"
+    return front_sight
 
 
 def godot_to_blender(position: Vector) -> Vector:
@@ -475,6 +543,7 @@ def build_runtime_asset() -> tuple[bpy.types.Object, dict[str, Vector]]:
     )
     for obj in source.values():
         bake_object_transform(obj, transform)
+    front_iron_sight = separate_front_iron_sight(source["Base"])
     configure_materials()
 
     names = {
@@ -494,6 +563,10 @@ def build_runtime_asset() -> tuple[bpy.types.Object, dict[str, Vector]]:
         obj["source_node"] = source_name
         obj["dcc_surface_finish"] = "1.4mm two-segment bevel; weighted normals"
         apply_surface_finish(obj)
+    front_iron_sight["dcc_surface_finish"] = (
+        "1.4mm two-segment bevel; weighted normals"
+    )
+    apply_surface_finish(front_iron_sight)
 
     body = source["Base"]
     magazine_geometry = source["Mag"]
@@ -526,6 +599,7 @@ def build_runtime_asset() -> tuple[bpy.types.Object, dict[str, Vector]]:
 
     for name in ("Base", "Stock", "Trigger", "Safety", "IronSight"):
         source[name].parent = root
+    front_iron_sight.parent = root
 
     magazine = new_empty(
         "Magazine", root, sockets["MagazineWellSocket"], "primary_magazine_pivot"
@@ -718,7 +792,7 @@ def validate_exported_asset(
         raise RuntimeError("SCAR-L runtime root is not identity in metre space.")
 
     root_children = (
-        "WeaponBodyGeometry", "StockGeometry", "TriggerGeometry",
+        "WeaponBodyGeometry", "FrontIronSight", "StockGeometry", "TriggerGeometry",
         "SafetyGeometry", "IronSightGeometry",
     )
     if any(meshes[name].parent != root for name in root_children):

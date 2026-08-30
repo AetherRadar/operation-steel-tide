@@ -183,7 +183,7 @@ public partial class TacticalPlayer
 
     private void SetWeaponSlot(PlayerWeaponSlot slot, WeaponBuild? build, LootGrade grade)
     {
-        var clone = build?.Clone();
+        var clone = build is null ? null : WeaponCatalog.NormalizeBuild(build);
         var magazine = clone?.Stats().MagazineSize ?? 0;
         var loadedGrade = clone is null
             ? LootGrade.Common

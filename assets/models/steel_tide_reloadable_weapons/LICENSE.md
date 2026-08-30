@@ -8,7 +8,8 @@
 - Exact source license: CC0 1.0 Universal.
 - License deed: https://creativecommons.org/publicdomain/zero/1.0/
 - Tracked-source acquisition date: 2026-08-20.
-- DCC mechanism adaptation and review date: 2026-08-29.
+- DCC mechanism adaptation and review date: 2026-08-29; MP5A5 independent
+  iron-sight split revised and reviewed 2026-08-30.
 - Attribution required for the Quaternius source: No. Creator credit and source
   links are retained as provenance.
 
@@ -29,8 +30,11 @@ They are not Godot runtime primitives, CSG objects, or empty marker substitutes.
 The immutable source is `../quaternius_ultimate_guns/mp5a5.glb`, mapped from
 the pack file `Submachine Gun.glb` (`SubmachineGun_2`). The derivative preserves
 all 1,374 source triangles. A welded-topology flood separates the complete
-authored 60-triangle external magazine from the 1,314-triangle body; an
-independent 60-triangle visible copy supplies the spare.
+authored 60-triangle external magazine from the 1,314-triangle body. Two
+additional audited welded islands expose the 94-triangle front and 14-triangle
+rear mechanical sights beneath dedicated visibility nodes, leaving a
+1,206-triangle main body. An independent 60-triangle visible copy supplies the
+spare.
 
 The static source does not contain a separable charging control, so Operation
 Steel Tide hand-models a five-ring swept MP5 tubular handle. Its neck, angled
@@ -39,7 +43,11 @@ blued-metal scalar PBR. The delivered scene contains 1,554 triangles.
 
 ```text
 SteelTideReloadableMP5A5
-|- WeaponBodyGeometry                  [1,314 source triangles]
+|- WeaponBodyGeometry                  [1,206 source triangles]
+|- FrontIronSight
+|  `- FrontIronGeometry                  [94 source triangles]
+|- RearIronSight
+|  `- RearIronGeometry                   [14 source triangles]
 |- Magazine
 |  |- MagazineGeometry                    [60 source triangles]
 |  `- MagazineGripSocket
@@ -72,16 +80,18 @@ to the 120-triangle visible action surface is exactly `0` m.
 | File | Bytes | SHA-256 |
 | --- | ---: | --- |
 | Source `../quaternius_ultimate_guns/mp5a5.glb` | 70,976 | `69DF22D1AA8603D66366D20C46755CCA2A19E1CABE8C1DB1B72EDB491AE48699` |
-| Runtime `mp5a5_reloadable.glb` | 82,708 | `A21A1AF05BFDC91F307F7DD1EF431773A74B135B0CE5F8845354EC6029678101` |
-| Review `mp5a5_reloadable_preview.png` | 1,427,943 | `FD367AFB42BF7E91E3EBBD49006D99022C7484DE7B6AA928496509E78AF9E606` |
-| DCC source `../../../source_art/reloadable_weapons/mp5a5_reloadable.blend` | 686,261 | `DD30818D0303FA8D75D37C3ED82DCE4B77C4161C61AC0BC78B98CE7407CC5D95` |
+| Runtime `mp5a5_reloadable.glb` | 84,528 | `55A33356F659CC9A6EC68FE3DE68A4B3D3C63DDAFCC45FE918DB1CC9FFBF1BDF` |
+| Review `mp5a5_reloadable_preview.png` | 1,428,041 | `BE4CF860018E8023E0AE6ED61F83B2030C8E4525FCB7785A03062641B038998C` |
+| DCC source `../../../source_art/reloadable_weapons/mp5a5_reloadable.blend` | 699,430 | `C2974747AB626E168047066166DC0AAECBD6A05B29FA12C397AD5E247C810B31` |
 
 `../../../scripts/blender/build_reloadable_quaternius_weapons.py` verifies the
-source hash/topology/bounds, welded magazine island and material partition,
+source hash/topology/bounds, welded magazine island and material partition, the
+unique 94-/14-triangle front/rear sight islands and their exact bounds,
 source-triangle conservation, independent magazine data, visible action,
-hierarchy, metre scale, sockets, action-terminal region and triangle-surface
-distance, output bounds, hashes, and Blender glTF round trip. Its reviewed GLB
-and preview hashes are stable across two headless Blender
+visibility-node hierarchy, per-node materials/topology, metre scale, sockets,
+action-terminal region and triangle-surface distance, output bounds, hashes,
+and Blender glTF round trip. Its reviewed GLB and preview hashes are stable
+across two headless Blender
 4.5.10 LTS rebuilds. Blender may rewrite `.blend` container metadata when the
 editable source is saved, so the table records the exact delivered container.
 

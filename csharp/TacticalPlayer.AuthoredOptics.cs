@@ -11,11 +11,12 @@ public partial class TacticalPlayer
         WeaponPlatform platform,
         string? opticId)
         => (platform == WeaponPlatform.M4A1 && opticId == "optic_micro")
-            // VSS micro/holo attachments are rejected by WeaponCatalog. Treat
-            // any legacy or externally restored VSS optic state as integrated
-            // as a defensive fallback so its inseparable authored PSO scope can
-            // never be stacked with a second visible housing.
-            || (platform == WeaponPlatform.VSS && opticId is not null);
+            // Fixed-scope weapons reject micro/holo attachments in WeaponCatalog.
+            // Treat any legacy or externally restored optic state as integrated
+            // defensively so an inseparable authored scope can never be stacked
+            // with a second visible housing.
+            || (WeaponCatalog.HasFixedIntegratedScope(platform)
+                && opticId is not null);
 
     private void InitializeAuthoredOptics()
     {
@@ -83,18 +84,18 @@ public partial class TacticalPlayer
                 : !weaponOwnsAuthoredOptic
                     || _opticReticle.Position.DistanceTo(Vector3.Zero) <= 0.001f;
             var integratedPresentationValid = true;
-            if (EquippedWeapon.Platform == WeaponPlatform.VSS
+            if (WeaponCatalog.HasFixedIntegratedScope(EquippedWeapon.Platform)
                 && weaponOwnsAuthoredOptic)
             {
                 integratedPresentationValid = _authoredPlatformWeapons.TryGetValue(
-                        WeaponPlatform.VSS,
-                        out var vssVisual)
-                    && IsInstanceValid(vssVisual.Root)
-                    && vssVisual.IntegratedOpticPresentationValid
+                        EquippedWeapon.Platform,
+                        out var integratedVisual)
+                    && IsInstanceValid(integratedVisual.Root)
+                    && integratedVisual.IntegratedOpticPresentationValid
                     && _opticRoot.GlobalPosition.DistanceTo(
-                        vssVisual.OpticReticleAnchor.GlobalPosition) <= 0.001f
+                        integratedVisual.OpticReticleAnchor.GlobalPosition) <= 0.001f
                     && _opticReticle.GlobalPosition.DistanceTo(
-                        vssVisual.OpticReticleAnchor.GlobalPosition) <= 0.001f;
+                        integratedVisual.OpticReticleAnchor.GlobalPosition) <= 0.001f;
             }
             return legacyHidden
                 && _authoredOptics.PresentationMatches(opticId, externalExpected)

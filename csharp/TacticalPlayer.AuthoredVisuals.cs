@@ -99,7 +99,8 @@ public partial class TacticalPlayer
             return authoredVisibility
                 && proceduralOpticsHidden
                 && muzzleAligned
-                && opticAligned;
+                && opticAligned
+                && _authoredPrimaryWeapon.IntegratedM4OpticAxisValid;
         }
     }
     internal bool UsesAuthoredGsh18ForDiagnostics
@@ -1332,13 +1333,13 @@ public partial class TacticalPlayer
             _opticRoot.Position = mountInWeaponRoot
                 + Vector3.Up * AuthoredOpticRailContactOffset(opticId);
         }
-        if (EquippedWeapon.Platform == WeaponPlatform.VSS
+        if (WeaponCatalog.HasFixedIntegratedScope(EquippedWeapon.Platform)
             && hasVisibleOptic
-            && WeaponUsesIntegratedOptic(WeaponPlatform.VSS, opticId))
+            && WeaponUsesIntegratedOptic(EquippedWeapon.Platform, opticId))
         {
             // The marker is derived at load time from the rear clear-lens
-            // vertices of the authored VSS mesh, so runtime alignment cannot
-            // drift away from the actual scope aperture.
+            // vertices of the authored scope mesh, so runtime alignment cannot
+            // drift away from the actual visible aperture.
             _opticRoot.GlobalPosition = authoredWeapon.OpticReticleAnchor.GlobalPosition;
             _opticReticle.Position = Vector3.Zero;
         }

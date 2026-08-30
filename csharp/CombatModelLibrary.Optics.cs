@@ -17,12 +17,36 @@ internal sealed class AuthoredOpticsVisual
         MicroReticleAnchor = CombatModelLibrary.RequireNode(root, "MicroReticleAnchor");
         HoloReticleAnchor = CombatModelLibrary.RequireNode(root, "HoloReticleAnchor");
         ScopeReticleAnchor = CombatModelLibrary.RequireNode(root, "ScopeReticleAnchor");
+        MicroRearApertureAnchor = CombatModelLibrary.RequireNode(
+            Micro,
+            "MicroRearApertureAnchor");
+        MicroFrontApertureAnchor = CombatModelLibrary.RequireNode(
+            Micro,
+            "MicroFrontApertureAnchor");
+        HoloRearApertureAnchor = CombatModelLibrary.RequireNode(
+            Holo,
+            "HoloRearApertureAnchor");
+        HoloFrontApertureAnchor = CombatModelLibrary.RequireNode(
+            Holo,
+            "HoloFrontApertureAnchor");
+        ScopeRearApertureAnchor = CombatModelLibrary.RequireNode(
+            Scope,
+            "ScopeRearApertureAnchor");
+        ScopeFrontApertureAnchor = CombatModelLibrary.RequireNode(
+            Scope,
+            "ScopeFrontApertureAnchor");
         RequireDirectChild(Micro, MicroGeometry);
         RequireDirectChild(Micro, MicroReticleAnchor);
+        RequireDirectChild(Micro, MicroRearApertureAnchor);
+        RequireDirectChild(Micro, MicroFrontApertureAnchor);
         RequireDirectChild(Holo, HoloGeometry);
         RequireDirectChild(Holo, HoloReticleAnchor);
+        RequireDirectChild(Holo, HoloRearApertureAnchor);
+        RequireDirectChild(Holo, HoloFrontApertureAnchor);
         RequireDirectChild(Scope, ScopeGeometry);
         RequireDirectChild(Scope, ScopeReticleAnchor);
+        RequireDirectChild(Scope, ScopeRearApertureAnchor);
+        RequireDirectChild(Scope, ScopeFrontApertureAnchor);
         Configure(null, showExternalModel: false);
     }
 
@@ -36,7 +60,15 @@ internal sealed class AuthoredOpticsVisual
     public Node3D MicroReticleAnchor { get; }
     public Node3D HoloReticleAnchor { get; }
     public Node3D ScopeReticleAnchor { get; }
+    public Node3D MicroRearApertureAnchor { get; }
+    public Node3D MicroFrontApertureAnchor { get; }
+    public Node3D HoloRearApertureAnchor { get; }
+    public Node3D HoloFrontApertureAnchor { get; }
+    public Node3D ScopeRearApertureAnchor { get; }
+    public Node3D ScopeFrontApertureAnchor { get; }
     public Node3D? ActiveReticleAnchor { get; private set; }
+    public Node3D? ActiveRearApertureAnchor { get; private set; }
+    public Node3D? ActiveFrontApertureAnchor { get; private set; }
 
     public bool ActiveGeometryVisible
         => Micro.Visible
@@ -70,6 +102,20 @@ internal sealed class AuthoredOpticsVisual
                 : scope
                     ? ScopeReticleAnchor
                     : null;
+        ActiveRearApertureAnchor = micro
+            ? MicroRearApertureAnchor
+            : holo
+                ? HoloRearApertureAnchor
+                : scope
+                    ? ScopeRearApertureAnchor
+                    : null;
+        ActiveFrontApertureAnchor = micro
+            ? MicroFrontApertureAnchor
+            : holo
+                ? HoloFrontApertureAnchor
+                : scope
+                    ? ScopeFrontApertureAnchor
+                    : null;
         return knownOptic;
     }
 
@@ -98,6 +144,24 @@ internal sealed class AuthoredOpticsVisual
                         ? HoloReticleAnchor
                         : expectedScope
                             ? ScopeReticleAnchor
+                            : null)
+            && ReferenceEquals(
+                ActiveRearApertureAnchor,
+                expectedMicro
+                    ? MicroRearApertureAnchor
+                    : expectedHolo
+                        ? HoloRearApertureAnchor
+                        : expectedScope
+                            ? ScopeRearApertureAnchor
+                            : null)
+            && ReferenceEquals(
+                ActiveFrontApertureAnchor,
+                expectedMicro
+                    ? MicroFrontApertureAnchor
+                    : expectedHolo
+                        ? HoloFrontApertureAnchor
+                        : expectedScope
+                            ? ScopeFrontApertureAnchor
                             : null);
     }
 
@@ -161,6 +225,7 @@ internal sealed class AuthoredOpticsVisual
 internal readonly record struct AuthoredOpticsInspection(
     bool Loaded,
     bool RequiredNodes,
+    bool AxisAnchorsValid,
     int MeshCount,
     int MaterialCount,
     int VertexCount,
@@ -171,6 +236,7 @@ internal readonly record struct AuthoredOpticsInspection(
 {
     public bool Valid => Loaded
         && RequiredNodes
+        && AxisAnchorsValid
         && MeshCount == 3
         && MaterialCount == 6
         && VertexCount >= 2_300
@@ -192,12 +258,18 @@ internal static partial class CombatModelLibrary
         "MicroOptic",
         "MicroGeometry",
         "MicroReticleAnchor",
+        "MicroRearApertureAnchor",
+        "MicroFrontApertureAnchor",
         "HoloOptic",
         "HoloGeometry",
         "HoloReticleAnchor",
+        "HoloRearApertureAnchor",
+        "HoloFrontApertureAnchor",
         "ScopeOptic",
         "ScopeGeometry",
-        "ScopeReticleAnchor"
+        "ScopeReticleAnchor",
+        "ScopeRearApertureAnchor",
+        "ScopeFrontApertureAnchor"
     };
 
     public static AuthoredOpticsVisual InstantiateAuthoredOptics(bool firstPerson)
@@ -230,9 +302,25 @@ internal static partial class CombatModelLibrary
                 && ReferenceEquals(visual.MicroGeometry.GetParent(), visual.Micro)
                 && ReferenceEquals(visual.HoloGeometry.GetParent(), visual.Holo)
                 && ReferenceEquals(visual.ScopeGeometry.GetParent(), visual.Scope);
+            var axisAnchorsValid = ApertureAxisValid(
+                    visual.Micro,
+                    visual.MicroRearApertureAnchor,
+                    visual.MicroFrontApertureAnchor,
+                    visual.MicroReticleAnchor)
+                && ApertureAxisValid(
+                    visual.Holo,
+                    visual.HoloRearApertureAnchor,
+                    visual.HoloFrontApertureAnchor,
+                    visual.HoloReticleAnchor)
+                && ApertureAxisValid(
+                    visual.Scope,
+                    visual.ScopeRearApertureAnchor,
+                    visual.ScopeFrontApertureAnchor,
+                    visual.ScopeReticleAnchor);
             return new AuthoredOpticsInspection(
                 true,
                 requiredNodes,
+                axisAnchorsValid,
                 micro.MeshCount + holo.MeshCount + scope.MeshCount,
                 CountMaterials(visual.Root),
                 geometry.VertexCount,
@@ -249,5 +337,21 @@ internal static partial class CombatModelLibrary
         {
             visual?.Root.Free();
         }
+    }
+
+    private static bool ApertureAxisValid(
+        Node3D optic,
+        Node3D rear,
+        Node3D front,
+        Node3D reticle)
+    {
+        var axis = front.Position - rear.Position;
+        return ReferenceEquals(rear.GetParent(), optic)
+            && ReferenceEquals(front.GetParent(), optic)
+            && rear.Position.DistanceTo(reticle.Position) <= 0.001f
+            && axis.Length() >= 0.05f
+            && Mathf.Abs(axis.X) <= 0.001f
+            && Mathf.Abs(axis.Y) <= 0.001f
+            && axis.Z < -0.05f;
     }
 }

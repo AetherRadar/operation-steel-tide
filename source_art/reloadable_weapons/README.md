@@ -149,6 +149,11 @@ than duplicated here.
 | M1911 | `../../assets/models/quaternius_ultimate_guns/m1911.glb` | `m1911_reloadable.blend` | `../../assets/models/steel_tide_reloadable_weapons/m1911_reloadable.glb`; `../../assets/models/steel_tide_reloadable_weapons/m1911_reloadable_preview.png` | same supplemental builder |
 | GSh-18 | `../../assets/models/tastytony_gsh18/low-poly_gsh-18.glb` | `gsh18_reloadable.blend` | `../../assets/models/steel_tide_reloadable_weapons/gsh18_reloadable.glb`; `../../assets/models/steel_tide_reloadable_weapons/gsh18_reloadable_preview.png` | `../../scripts/blender/build_reloadable_gsh18.py` |
 
+The SCAR-L builder conserves the source topology while separating the 112
+original `Base` faces that form its welded flip-up front sight. The resulting
+`FrontIronSight` node and the source's independent `IronSightGeometry` node can
+be hidden together for optical sights and restored together for the bare rifle.
+
 ## Runtime mechanism contract
 
 The canonical supplemental and GSh-18 assets use identity roots in Godot
@@ -170,8 +175,11 @@ SteelTideReloadable<Platform>
 
 SCAR-L additionally moves its authored `BoltGeometry` with the authored
 charging handle and supplies primary/support/magwell/rail/muzzle surface
-sockets. MP5A5 supplies the same broader socket set. The AK-47 uses the direct
-authored contract documented above rather than this supplemental adapter path.
+sockets. MP5A5 supplies the same broader socket set and exposes its audited
+source front/rear sight islands below `FrontIronSight/FrontIronGeometry` and
+`RearIronSight/RearIronGeometry`, so an attached optic can hide the mechanical
+sights without hiding the weapon body. The AK-47 uses the direct authored
+contract documented above rather than this supplemental adapter path.
 Its installed and spare magazine nodes share identical local geometry and an
 identical DCC-authored palm contact, so the support hand stays on the real
 magazine surface through extraction, pouch handoff, insertion, and seating.
@@ -179,7 +187,7 @@ magazine surface through extraction, pouch handoff, insertion, and seating.
 | Platform | Source/body triangles | Installed loading geometry | Spare/loading geometry | Action geometry | Delivered scene triangles |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | SCAR-L | 8,585 retained/refined source-derived geometry before spare | 132 refined source-derived | 132 refined source-derived | 937 refined source-derived = 85 bolt + 852 handle | 8,717 |
-| MP5A5 | 1,374 source = 1,314 body + 60 magazine | 60 source | 60 source-derived | 120 project | 1,554 |
+| MP5A5 | 1,374 source = 1,206 body + 94 front sight + 14 rear sight + 60 magazine | 60 source | 60 source-derived | 120 project | 1,554 |
 | M24 | 1,382 source body | 460 project internal floorplate/box | 2,740 project, five cartridges | 216 project | 4,798 |
 | AXMC | 1,722 source body | 364 project | 364 project | 216 project | 2,666 |
 | AWM | 1,688 source body | 364 project | 364 project | 216 project | 2,632 |
@@ -203,9 +211,11 @@ SHA-256, named source object, source topology, expected node hierarchy, visible
 mechanism topology, independent spare data where applicable, target scale, and
 Blender glTF round trip all match. SCAR checks every retained source part,
 per-material topology, installed/staged bounds, and seven surface-derived
-sockets. MP5 checks its welded magazine island, material partition, output
-bounds, stable runtime/preview identity, and that its action-hand socket remains
-on the outer terminal ring rather than at the mechanism pivot. The supplemental
+sockets. MP5 checks its welded magazine island, unique 94-/14-triangle
+front/rear sight islands, exact sight bounds, visibility hierarchy, per-node
+material partitions, output bounds, stable runtime/preview identity, and that
+its action-hand socket remains on the outer terminal ring rather than at the
+mechanism pivot. The supplemental
 builder likewise derives the M24/AXMC/AWM/VSS action sockets from the real
 minimum-X terminal surface. Both builders lock the endpoint region and measure
 socket-to-triangle distance after GLB round trip; the reviewed maximum is

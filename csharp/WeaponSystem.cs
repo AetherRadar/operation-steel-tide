@@ -691,13 +691,58 @@ public static class WeaponCatalog
     public static WeaponDefinition Weapon(WeaponPlatform platform) => Weapons[platform];
     public static bool IsSidearm(WeaponPlatform platform)
         => Weapon(platform).CarryClass == WeaponCarryClass.Sidearm;
+    public static bool HasFixedIntegratedScope(WeaponPlatform platform)
+        => platform is WeaponPlatform.M24
+            or WeaponPlatform.AXMC
+            or WeaponPlatform.AWM
+            or WeaponPlatform.VSS;
+    public static bool IsMagnifiedOptic(string attachmentId)
+        => attachmentId is "optic_scope" or "optic_7x" or "optic_sniper";
     public static AttachmentDefinition Attachment(string id) => Attachments[id];
     public static bool CanEquipAttachment(WeaponPlatform platform, string attachmentId)
     {
         var attachment = Attachment(attachmentId);
-        return platform != WeaponPlatform.VSS
-            || attachment.Slot != AttachmentSlot.Optic
-            || attachment.Id is "optic_scope" or "optic_7x" or "optic_sniper";
+        if (attachment.Slot != AttachmentSlot.Optic)
+        {
+            return true;
+        }
+
+        // The precision rifles and VSS already own a finished, inseparable
+        // magnified scope. The attachment selects its gameplay magnification;
+        // it must never stack a second micro/holo housing over that scope.
+        return !HasFixedIntegratedScope(platform)
+            || IsMagnifiedOptic(attachment.Id);
+    }
+
+    public static WeaponBuild NormalizeBuild(WeaponBuild source)
+    {
+        var normalized = source.Clone();
+        if (!HasFixedIntegratedScope(normalized.Platform))
+        {
+            return normalized;
+        }
+
+        var hasCompatibleOptic = normalized.Attachments.TryGetValue(
+                AttachmentSlot.Optic,
+                out var opticId)
+            && IsMagnifiedOptic(opticId);
+        if (hasCompatibleOptic)
+        {
+            return normalized;
+        }
+
+        // Whole-weapon loot and restored loadouts bypass the individual
+        // attachment eligibility path. Preserve the inseparable authored scope
+        // and translate a missing or legacy micro/holo value to the platform's
+        // canonical magnification instead of carrying an impossible visual
+        // combination.
+        normalized.Attachments[AttachmentSlot.Optic] = normalized.Platform switch
+        {
+            WeaponPlatform.M24 => "optic_sniper",
+            WeaponPlatform.AXMC or WeaponPlatform.AWM => "optic_7x",
+            _ => "optic_scope"
+        };
+        return normalized;
     }
     public static IReadOnlyCollection<WeaponDefinition> AllWeapons => Weapons.Values;
     public static IReadOnlyCollection<AttachmentDefinition> AllAttachments => Attachments.Values;

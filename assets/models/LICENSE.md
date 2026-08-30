@@ -28,7 +28,7 @@ The main rifle uses nisu's textured source. The short foregrip comes from
 `scarl.glb`, the rounder suppressor from `mp5a5.glb`, and the open-aperture
 optic housing from `axmc.glb`; the normal muzzle remains selected nisu
 geometry. Exact source objects, runtime nodes, removed source-glass panes, and
-transform-only muzzle/reticle markers are recorded in
+transform-only muzzle/reticle/rear-aperture/front-aperture markers are recorded in
 `steel_tide_m4a1/LICENSE.md`. Both source collections, the editable composite,
 and the runtime model remain CC0 and are not relicensed as MIT. The
 project-authored adaptation script remains covered by the repository's root MIT
@@ -41,7 +41,8 @@ editable source is `../../source_art/combat_optics/steel_tide_optics.blend`, and
 its reproducible adaptation is `../../scripts/blender/build_authored_optics.py`.
 All three source components are CC0 1.0 Universal. Their exact source-object
 mapping, acquisition date, license, output hashes, removed source-glass panes,
-and physically open aperture checks are recorded in
+independently derived rear/front aperture-anchor coordinates, globally unique
+Godot-safe node names, and physically open aperture checks are recorded in
 `steel_tide_optics/LICENSE.md` and `../../source_art/combat_optics/README.md`.
 
 The active Steel Tide AK-47 is a Blender adaptation of taradavies' finished
@@ -70,6 +71,9 @@ those mechanisms, adds an independent spare magazine, a conservative 1.4 mm
 two-segment bevel, weighted normals, differentiated scalar PBR parameters, and
 identity-ready metre sockets derived from the replacement mesh's actual grip,
 handguard, magazine, receiver rail, muzzle, and authored charging-handle origin.
+The source `Base` mesh's authored flip-up front sight is separated into a
+hideable node so external optics can clear both original iron-sight assemblies;
+the complete source sight geometry remains visible on the bare rifle.
 Distributions must credit AdamKokrito, link the source and CC BY 3.0, and
 disclose the modifications.
 Runtime/editable outputs are `steel_tide_scarl/scarl_reloadable.glb` and
@@ -81,8 +85,11 @@ attribution, hashes, topology, hierarchy, bounds, and socket coordinates are in
 
 The mechanism-ready MP5A5 derives from Quaternius's CC0 Ultimate Guns Pack.
 Its complete authored 60-triangle magazine is separated by welded topology,
-duplicated as independent spare geometry, and conserved with the 1,314-triangle
-body. Because the static source welds its control into the receiver, the visible
+duplicated as independent spare geometry, and conserved with a 1,206-triangle
+main body plus independent 94-triangle front and 14-triangle rear sight nodes.
+The sight nodes let runtime optics hide the original mechanical sights without
+hiding the weapon body. Because the static source welds its control into the
+receiver, the visible
 120-triangle tubular charging handle is hand-shaped in Blender as a swept
 five-ring hard-surface mesh with weighted normals and scalar metal PBR; it is
 not a runtime primitive or CSG object. Its action-hand socket is derived from

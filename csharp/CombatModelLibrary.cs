@@ -20,10 +20,16 @@ internal sealed class AuthoredWeaponVisual
     private readonly Node3D? _legacyRearIronSightSecondary;
     private AuthoredOpticsVisual? _worldExternalOptics;
     private bool _expectsWorldExternalOptics;
+    private bool _worldExternalOpticsLoadAttempted;
     private readonly Vector3? _magazineGripInMagazine;
     private readonly Vector3? _actionGripInAction;
+    private readonly IntegratedScopeInspection _integratedOpticInspection;
+    private readonly bool _ironSightGeometryAuthoredVisible;
 
-    public AuthoredWeaponVisual(Node3D root, WeaponPlatform platform)
+    public AuthoredWeaponVisual(
+        Node3D root,
+        WeaponPlatform platform,
+        IntegratedScopeInspection? integratedOpticInspection = null)
     {
         Root = root;
         Platform = platform;
@@ -45,9 +51,17 @@ internal sealed class AuthoredWeaponVisual
             root,
             "M4A1Body_06_Sight_2");
         FrontIronSight = CombatModelLibrary.FindOptionalNode(root, "FrontIronSight");
+        IronSightGeometry = CombatModelLibrary.FindOptionalNode(root, "IronSightGeometry");
+        _ironSightGeometryAuthoredVisible = IronSightGeometry?.Visible == true;
         MuzzleDeviceTip = CombatModelLibrary.RequireNode(root, "MuzzleDeviceTip");
         SuppressorTip = CombatModelLibrary.RequireNode(root, "SuppressorTip");
         OpticReticleAnchor = CombatModelLibrary.RequireNode(root, "OpticReticleAnchor");
+        OpticRearApertureAnchor = CombatModelLibrary.FindOptionalNode(
+            root,
+            "OpticRearApertureAnchor");
+        OpticFrontApertureAnchor = CombatModelLibrary.FindOptionalNode(
+            root,
+            "OpticFrontApertureAnchor");
         OpticRailContact = CombatModelLibrary.FindOptionalNode(root, "OpticRailContact");
         EjectionPort = CombatModelLibrary.FindOptionalNode(root, "EjectionPort");
         if (CombatModelLibrary.FindOptionalNode(Magazine, "MagazineGripSocket")
@@ -94,6 +108,10 @@ internal sealed class AuthoredWeaponVisual
             SpareMagazine,
             ChargingHandle);
         _sourceMechanismRest = CanonicalSourceMechanismRest(platform);
+        _integratedOpticInspection = HasIntegratedScope
+            ? integratedOpticInspection
+                ?? CombatModelLibrary.InspectIntegratedScope(Root, OpticReticleAnchor)
+            : default;
     }
 
     public Node3D Root { get; }
@@ -112,38 +130,229 @@ internal sealed class AuthoredWeaponVisual
     public Node3D OpticMount { get; }
     public Node3D? RearIronSight { get; }
     public Node3D? FrontIronSight { get; }
+    public Node3D? IronSightGeometry { get; }
     public Node3D MuzzleDeviceTip { get; }
     public Node3D SuppressorTip { get; }
     public Node3D OpticReticleAnchor { get; }
+    public Node3D? OpticRearApertureAnchor { get; }
+    public Node3D? OpticFrontApertureAnchor { get; }
     public Node3D? OpticRailContact { get; }
     public Node3D? EjectionPort { get; }
     public Node3D ActiveMuzzleTip => Suppressor.Visible ? SuppressorTip : MuzzleDeviceTip;
     public bool HasVisibleMagazineMechanism
         => CombatModelLibrary.MeshesBelow(Magazine).Any(mesh => mesh.Mesh is not null)
             && CombatModelLibrary.MeshesBelow(SpareMagazine).Any(mesh => mesh.Mesh is not null);
-    public VssIntegratedScopeInspection IntegratedOpticInspection
-        => Platform == WeaponPlatform.VSS
-            ? CombatModelLibrary.InspectVssIntegratedScope(Root, OpticReticleAnchor)
-            : default;
+    public bool HasIntegratedScope => CombatModelLibrary.HasIntegratedScope(Platform);
+    public IntegratedScopeInspection IntegratedOpticInspection
+        => _integratedOpticInspection;
     public bool IntegratedOpticPresentationValid
-        => Platform != WeaponPlatform.VSS || IntegratedOpticInspection.Valid;
+        => !HasIntegratedScope || IntegratedOpticInspection.Valid;
+    public bool IntegratedM4OpticAxisValid
+    {
+        get
+        {
+            if (Platform != WeaponPlatform.M4A1
+                || !GodotObject.IsInstanceValid(OpticRearApertureAnchor)
+                || !GodotObject.IsInstanceValid(OpticFrontApertureAnchor))
+            {
+                return false;
+            }
 
-    public void AttachWorldExternalOptics(AuthoredOpticsVisual? optics)
+            var rear = CombatModelLibrary.TransformBelowAncestor(
+                OpticRearApertureAnchor!,
+                Root).Origin;
+            var front = CombatModelLibrary.TransformBelowAncestor(
+                OpticFrontApertureAnchor!,
+                Root).Origin;
+            var reticle = CombatModelLibrary.TransformBelowAncestor(
+                OpticReticleAnchor,
+                Root).Origin;
+            var axis = front - rear;
+            return rear.DistanceTo(reticle) <= 0.001f
+                && axis.Length() >= 0.05f
+                && Mathf.Abs(axis.X) <= 0.001f
+                && Mathf.Abs(axis.Y) <= 0.001f
+                && axis.Z < -0.05f;
+        }
+    }
+
+    public bool WorldOpticPresentationMatches(WeaponBuild build)
+    {
+        if (!_expectsWorldExternalOptics)
+        {
+            return false;
+        }
+
+        var hasOptic = build.Attachments.TryGetValue(AttachmentSlot.Optic, out var opticId);
+        var integrated = hasOptic
+            && (HasIntegratedScope
+                || Platform == WeaponPlatform.M4A1 && opticId == "optic_micro");
+        var externalExpected = hasOptic && !integrated;
+        var externalPresentationMatches = externalExpected
+            ? _worldExternalOptics is not null
+                && GodotObject.IsInstanceValid(_worldExternalOptics.Root)
+                && _worldExternalOptics.PresentationMatches(opticId, externalExpected: true)
+            : _worldExternalOptics is null
+                || !GodotObject.IsInstanceValid(_worldExternalOptics.Root)
+                || _worldExternalOptics.PresentationMatches(opticId, externalExpected: false);
+        var integratedPresentationMatches = !integrated
+            || HasIntegratedScope && IntegratedOpticPresentationValid
+            || Platform == WeaponPlatform.M4A1
+                && OpticMount.Visible
+                && IntegratedM4OpticAxisValid;
+        var hideIronSights = hasOptic && (integrated || externalExpected);
+        var externalClearanceMatches = WorldExternalOpticMountMatches(
+            opticId,
+            externalExpected);
+        var ironSightPresentationMatches = IronSightVisibilityMatches(!hideIronSights);
+        var valid = externalPresentationMatches
+            && integratedPresentationMatches
+            && externalClearanceMatches
+            && ironSightPresentationMatches;
+        if (!valid)
+        {
+            GD.Print(
+                $"WORLD_OPTIC_MISMATCH platform={Platform} optic={opticId ?? "none"} "
+                + $"external={externalPresentationMatches} integrated={integratedPresentationMatches} "
+                + $"clearance={externalClearanceMatches} irons={ironSightPresentationMatches}");
+        }
+        return valid;
+    }
+
+    private bool WorldExternalOpticMountMatches(
+        string? opticId,
+        bool externalExpected)
+    {
+        if (!externalExpected)
+        {
+            return true;
+        }
+
+        var hasHideableIronSights = GodotObject.IsInstanceValid(RearIronSight)
+            || GodotObject.IsInstanceValid(FrontIronSight)
+            || GodotObject.IsInstanceValid(IronSightGeometry)
+            || GodotObject.IsInstanceValid(_legacyRearIronSightPrimary)
+            || GodotObject.IsInstanceValid(_legacyRearIronSightSecondary);
+        if (!GodotObject.IsInstanceValid(OpticRailContact)
+            || _worldExternalOptics is null
+            || !GodotObject.IsInstanceValid(_worldExternalOptics.Root))
+        {
+            return false;
+        }
+
+        var expectedOffset = Vector3.Up
+            * CombatModelLibrary.AuthoredOpticRailContactOffset(opticId);
+        var mountContractMatches = ReferenceEquals(
+                _worldExternalOptics.Root.GetParent(),
+                OpticRailContact)
+            && _worldExternalOptics.Root.Position.DistanceTo(expectedOffset) <= 0.001f
+            && _worldExternalOptics.Root.Transform.Basis.IsEqualApprox(Basis.Identity);
+        if (!mountContractMatches)
+        {
+            return false;
+        }
+
+        if (hasHideableIronSights)
+        {
+            return true;
+        }
+
+        var weaponTop = float.NegativeInfinity;
+        var opticBottom = float.PositiveInfinity;
+        var toWeaponRoot = Root.GlobalTransform.AffineInverse();
+        foreach (var mesh in CombatModelLibrary.MeshesBelow(Root))
+        {
+            if (mesh.Mesh is null
+                || !mesh.IsVisibleInTree()
+                || IsNodeBelow(mesh, _worldExternalOptics.Root))
+            {
+                continue;
+            }
+
+            var bounds = mesh.GetAabb();
+            var meshToWeaponRoot = toWeaponRoot * mesh.GlobalTransform;
+            for (var endpoint = 0; endpoint < 8; endpoint++)
+            {
+                weaponTop = Mathf.Max(
+                    weaponTop,
+                    (meshToWeaponRoot * bounds.GetEndpoint(endpoint)).Y);
+            }
+        }
+        foreach (var mesh in CombatModelLibrary.MeshesBelow(_worldExternalOptics.Root))
+        {
+            if (mesh.Mesh is null || !mesh.IsVisibleInTree())
+            {
+                continue;
+            }
+
+            var bounds = mesh.GetAabb();
+            var meshToWeaponRoot = toWeaponRoot * mesh.GlobalTransform;
+            for (var endpoint = 0; endpoint < 8; endpoint++)
+            {
+                opticBottom = Mathf.Min(
+                    opticBottom,
+                    (meshToWeaponRoot * bounds.GetEndpoint(endpoint)).Y);
+            }
+        }
+        return float.IsFinite(weaponTop)
+            && float.IsFinite(opticBottom)
+            && opticBottom >= weaponTop - 0.001f;
+    }
+
+    private static bool IsNodeBelow(Node node, Node ancestor)
+    {
+        for (var current = node; current is not null; current = current.GetParent())
+        {
+            if (ReferenceEquals(current, ancestor))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void EnableWorldExternalOptics()
     {
         _expectsWorldExternalOptics = true;
-        if (optics is null)
+    }
+
+    private bool EnsureWorldExternalOptics()
+    {
+        if (_worldExternalOptics is not null
+            && GodotObject.IsInstanceValid(_worldExternalOptics.Root))
         {
-            return;
+            return true;
         }
+        if (_worldExternalOpticsLoadAttempted)
+        {
+            return false;
+        }
+        _worldExternalOpticsLoadAttempted = true;
+
         if (!GodotObject.IsInstanceValid(OpticRailContact))
         {
-            optics.Root.Free();
-            return;
+            GD.PushWarning(
+                $"Authored {Platform} world optics unavailable; missing OpticRailContact.");
+            return false;
         }
 
-        OpticRailContact!.AddChild(optics.Root);
-        optics.Root.Transform = Transform3D.Identity;
-        _worldExternalOptics = optics;
+        AuthoredOpticsVisual? optics = null;
+        try
+        {
+            optics = CombatModelLibrary.InstantiateAuthoredOptics(firstPerson: false);
+            OpticRailContact!.AddChild(optics.Root);
+            optics.Root.Transform = Transform3D.Identity;
+            _worldExternalOptics = optics;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            optics?.Root.Free();
+            GD.PushWarning(
+                $"Authored {Platform} world optics unavailable; retaining iron sights: "
+                + exception.Message);
+            return false;
+        }
     }
 
     public bool TryMagazineGripGlobalPosition(bool spare, out Vector3 position)
@@ -189,24 +398,29 @@ internal sealed class AuthoredWeaponVisual
         var hasOptic = build.Attachments.TryGetValue(
             AttachmentSlot.Optic,
             out var opticId);
+        var usesIntegratedOptic = hasOptic
+            && (CombatModelLibrary.HasIntegratedScope(Platform)
+                || Platform == WeaponPlatform.M4A1 && opticId == "optic_micro");
+        var showWorldExternalOptic = hasOptic && !usesIntegratedOptic;
+        if (_expectsWorldExternalOptics && showWorldExternalOptic)
+        {
+            EnsureWorldExternalOptics();
+        }
         var worldExternalOpticVisible = false;
         if (_worldExternalOptics is not null
             && GodotObject.IsInstanceValid(_worldExternalOptics.Root))
         {
             worldExternalOpticVisible = _worldExternalOptics.Configure(
                 opticId,
-                showExternalModel: hasOptic);
+                showExternalModel: showWorldExternalOptic);
             _worldExternalOptics.Root.Position = Vector3.Up
                 * CombatModelLibrary.AuthoredOpticRailContactOffset(opticId);
         }
-        var hasDedicatedIronVisibility = GodotObject.IsInstanceValid(RearIronSight)
-            && GodotObject.IsInstanceValid(FrontIronSight);
-        var usesIntegratedOptic = hasOptic
-            && Platform != WeaponPlatform.AK74
-            && (!hasDedicatedIronVisibility || opticId == "optic_micro");
         OpticMount.Visible = usesIntegratedOptic;
         var hideIronSights = hasOptic
-            && (!_expectsWorldExternalOptics || worldExternalOpticVisible);
+            && (!_expectsWorldExternalOptics
+                || worldExternalOpticVisible
+                || usesIntegratedOptic);
         // Preserve the authored iron sights for the bare rifle, but fold them out
         // of the optical sight picture. Both assemblies remain in the GLB and are
         // restored when the optic is removed.
@@ -220,6 +434,9 @@ internal sealed class AuthoredWeaponVisual
             CombatModelLibrary.SetOptionalVisibility(_legacyRearIronSightSecondary, !hideIronSights);
         }
         CombatModelLibrary.SetOptionalVisibility(FrontIronSight, !hideIronSights);
+        CombatModelLibrary.SetOptionalVisibility(
+            IronSightGeometry,
+            !hideIronSights && _ironSightGeometryAuthoredVisible);
     }
 
     public void SyncMechanisms(Node3D magazine, Node3D spareMagazine, Node3D chargingHandle)
@@ -277,6 +494,22 @@ internal sealed class AuthoredWeaponVisual
             magazine.Transform,
             spareMagazine.Transform,
             chargingHandle.Transform);
+
+    private bool IronSightVisibilityMatches(bool expectedVisible)
+    {
+        var rearMatches = GodotObject.IsInstanceValid(RearIronSight)
+            ? RearIronSight!.Visible == expectedVisible
+            : (!GodotObject.IsInstanceValid(_legacyRearIronSightPrimary)
+                    || _legacyRearIronSightPrimary!.Visible == expectedVisible)
+                && (!GodotObject.IsInstanceValid(_legacyRearIronSightSecondary)
+                    || _legacyRearIronSightSecondary!.Visible == expectedVisible);
+        return rearMatches
+            && (!GodotObject.IsInstanceValid(FrontIronSight)
+                || FrontIronSight!.Visible == expectedVisible)
+            && (!GodotObject.IsInstanceValid(IronSightGeometry)
+                || IronSightGeometry!.Visible
+                    == (expectedVisible && _ironSightGeometryAuthoredVisible));
+    }
 
     private static MechanismTransforms CanonicalSourceMechanismRest(
         WeaponPlatform platform)
@@ -805,7 +1038,8 @@ internal static partial class CombatModelLibrary
         "SteelTideM4A1", "Magazine", "SpareMagazine", "ChargingHandle",
         "Stock", "Foregrip", "MuzzleDevice", "Suppressor", "OpticMount",
         "RearIronSight", "FrontIronSight",
-        "MuzzleDeviceTip", "SuppressorTip", "OpticReticleAnchor"
+        "MuzzleDeviceTip", "SuppressorTip", "OpticReticleAnchor",
+        "OpticRearApertureAnchor", "OpticFrontApertureAnchor"
     };
 
     private static readonly string[] OperatorNodes =
@@ -855,6 +1089,17 @@ internal static partial class CombatModelLibrary
         }
         var root = InstantiateRequired(WeaponScenePath, WeaponNodes);
         root.Name = "AuthoredM4A1Visual";
+        if (FindOptionalNode(root, "OpticRailContact") is null)
+        {
+            var reticleInWeaponRoot = TransformBelowAncestor(
+                RequireNode(root, "OpticReticleAnchor"),
+                root).Origin;
+            AddMarker(
+                root,
+                "OpticRailContact",
+                reticleInWeaponRoot
+                    - Vector3.Up * AuthoredOpticRailContactOffset("optic_micro"));
+        }
         if (firstPerson)
         {
             foreach (var geometry in GeometryBelow(root))
@@ -866,6 +1111,7 @@ internal static partial class CombatModelLibrary
         if (!firstPerson)
         {
             visual.SpareMagazine.Visible = false;
+            visual.EnableWorldExternalOptics();
         }
         return visual;
     }
@@ -891,17 +1137,7 @@ internal static partial class CombatModelLibrary
         if (!firstPerson)
         {
             visual.SpareMagazine.Visible = false;
-            AuthoredOpticsVisual? worldOptics = null;
-            try
-            {
-                worldOptics = InstantiateAuthoredOptics(firstPerson: false);
-            }
-            catch (Exception exception)
-            {
-                GD.PushWarning(
-                    $"Authored AK-47 world optics unavailable; retaining iron sights: {exception.Message}");
-            }
-            visual.AttachWorldExternalOptics(worldOptics);
+            visual.EnableWorldExternalOptics();
         }
         return visual;
     }
@@ -961,9 +1197,17 @@ internal static partial class CombatModelLibrary
             source = InstantiateRequired(WeaponScenePathFor(platform), Array.Empty<string>());
         }
 
-        if (platform == WeaponPlatform.VSS)
+        if (HasIntegratedScope(platform))
         {
-            ConfigureVssIntegratedScopeGlass(source);
+            try
+            {
+                ConfigureIntegratedScopeGlass(source, platform);
+            }
+            catch
+            {
+                source.Free();
+                throw;
+            }
         }
 
         var sourceBounds = FindOptionalNode(source, "WeaponBodyGeometry") is { } weaponBody
@@ -1016,28 +1260,31 @@ internal static partial class CombatModelLibrary
         var opticMount = AddWeaponMarkers(
             root,
             targetLength,
+            platform,
             authoredMagazine,
             authoredSpareMagazine,
             authoredAction,
             source);
-        if (platform == WeaponPlatform.VSS)
+        IntegratedScopeInspection? verifiedIntegratedScope = null;
+        if (HasIntegratedScope(platform))
         {
-            var aperture = InspectVssIntegratedScope(root);
-            if (!aperture.GeometryValid)
+            var aperture = InspectIntegratedScope(root);
+            if (!aperture.GeometryValid || !aperture.OpticalAxisAligned)
             {
                 root.Free();
                 throw new InvalidOperationException(
-                    "Authored VSS scope rear aperture could not be derived from its clear lens geometry.");
+                    $"Authored {platform} scope front/rear apertures do not form a valid optical axis.");
             }
             opticMount.Position = aperture.RearApertureCenter;
             var reticleAnchor = RequireNode(root, "OpticReticleAnchor");
-            var verified = InspectVssIntegratedScope(root, reticleAnchor);
+            var verified = InspectIntegratedScope(root, reticleAnchor);
             if (!verified.Valid)
             {
                 root.Free();
                 throw new InvalidOperationException(
-                    "Authored VSS scope marker does not match its clear rear aperture.");
+                    $"Authored {platform} scope marker does not match its clear rear aperture.");
             }
+            verifiedIntegratedScope = verified;
         }
         if (firstPerson)
         {
@@ -1046,7 +1293,16 @@ internal static partial class CombatModelLibrary
                 geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
             }
         }
-        return new AuthoredWeaponVisual(root, platform);
+        var visual = new AuthoredWeaponVisual(
+            root,
+            platform,
+            verifiedIntegratedScope);
+        if (!firstPerson)
+        {
+            visual.SpareMagazine.Visible = false;
+            visual.EnableWorldExternalOptics();
+        }
+        return visual;
     }
 
     private static (Node3D? Magazine, Node3D? SpareMagazine) AttachReloadableMagazine(
@@ -1185,6 +1441,7 @@ internal static partial class CombatModelLibrary
     private static Node3D AddWeaponMarkers(
         Node3D root,
         float length,
+        WeaponPlatform platform,
         Node3D? authoredMagazine = null,
         Node3D? authoredSpareMagazine = null,
         Node3D? authoredAction = null,
@@ -1234,10 +1491,69 @@ internal static partial class CombatModelLibrary
             root,
             "OpticRailSocket",
             new Vector3(0.0f, 0.16f, -0.16f));
+        var rearIronSight = FindOptionalNode(root, "RearIronSight");
+        var frontIronSight = FindOptionalNode(root, "FrontIronSight");
+        var canHideAuthoredIronSights = FindOptionalNode(root, "IronSightGeometry") is not null
+            || rearIronSight is not null && frontIronSight is not null;
+        if (!HasIntegratedScope(platform)
+            && source is not null
+            && !canHideAuthoredIronSights)
+        {
+            // Several licensed pistol and legacy SMG meshes weld their mechanical
+            // sights into the main body. They cannot be hidden without modifying
+            // the source art, so derive a safe rail plane once when the visual is
+            // instantiated. This keeps every external housing above the welded
+            // silhouette and adds no per-frame bounds work.
+            var highestAuthoredPoint = HighestMeshPointBelow(root, root);
+            if (float.IsFinite(highestAuthoredPoint))
+            {
+                opticRailContactPosition.Y = Mathf.Max(
+                    opticRailContactPosition.Y,
+                    highestAuthoredPoint);
+            }
+        }
         var opticMount = AddMarker(root, "OpticMount", opticRailContactPosition);
         AddMarker(root, "OpticRailContact", opticRailContactPosition);
         AddMarker(opticMount, "OpticReticleAnchor", Vector3.Zero);
         return opticMount;
+    }
+
+    private static float HighestMeshPointBelow(Node3D geometryRoot, Node3D ancestor)
+    {
+        var highest = float.NegativeInfinity;
+        foreach (var mesh in MeshesBelow(geometryRoot))
+        {
+            if (mesh.Mesh is null || !IsVisibleBelowAncestor(mesh, ancestor))
+            {
+                continue;
+            }
+
+            var bounds = mesh.GetAabb();
+            var toAncestor = TransformBelowAncestor(mesh, ancestor);
+            for (var endpoint = 0; endpoint < 8; endpoint++)
+            {
+                highest = Mathf.Max(
+                    highest,
+                    (toAncestor * bounds.GetEndpoint(endpoint)).Y);
+            }
+        }
+        return highest;
+    }
+
+    private static bool IsVisibleBelowAncestor(Node3D node, Node3D ancestor)
+    {
+        for (Node? current = node; current is not null; current = current.GetParent())
+        {
+            if (current is Node3D spatial && !spatial.Visible)
+            {
+                return false;
+            }
+            if (ReferenceEquals(current, ancestor))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Vector3 SocketPositionOr(

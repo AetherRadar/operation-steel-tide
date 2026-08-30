@@ -68,6 +68,8 @@ public partial class FreightTerminalWorld
             ("--capture-optics-narrow", static world => world.CaptureOpticsFrames(narrow: true)),
             ("--capture-optics-ultrawide", static world => world.CaptureOpticsFrames(ultrawide: true)),
             ("--validate-ads-alignment", static world => world.ValidateAdsAlignment()),
+            ("--validate-ads-alignment-narrow", static world => world.ValidateAdsAlignment(narrow: true)),
+            ("--validate-ads-alignment-ultrawide", static world => world.ValidateAdsAlignment(ultrawide: true)),
             ("--validate-stance-armor", static world => world.ValidateStanceAndArmorFlow()),
             ("--capture-expanded-map", static world => world.CaptureExpandedMapFrame()),
             ("--capture-extraction", static world => world.CaptureExtractionFrame()),

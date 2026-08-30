@@ -19,19 +19,21 @@ The Blender adaptation normalizes the authored model to a 1.58 m Godot-space
 contract; removes only the source presentation camera, light, and unused UV
 channels; retains the real `Base`, `Stock`, `Mag`, `Trigger`, `Bolt`,
 `CharginHandle`, `Safety`, and `IronSight` meshes; welds coincident hard-surface
-vertices; applies a 1.4 mm two-segment bevel and weighted normals; tunes scalar
-metallic/roughness values; adds gameplay pivots/sockets; and creates an
-independent spare by duplicating the complete authored magazine mesh. No
-programmatic primitive or CSG geometry is presented as finished art.
+vertices; separates the source `Base` mesh's authored flip-up front sight into
+an independently hideable mesh without replacing its geometry; applies a 1.4
+mm two-segment bevel and weighted normals; tunes scalar metallic/roughness
+values; adds gameplay pivots/sockets; and creates an independent spare by
+duplicating the complete authored magazine mesh. No programmatic primitive or
+CSG geometry is presented as finished art.
 
 ## File identity
 
 | File | Bytes | SHA-256 |
 | --- | ---: | --- |
 | `../../../source_art/third_party/adamkokrito_scarl/adamkokrito_scarl.glb` | 114,000 | `B67738744962E20E1829008064153D7817D3B4532391D759582028DB225E3308` |
-| `scarl_reloadable.glb` | 176,684 | `C8FDC9F7C780E27D4EA87A3D4B7C00FDF7CACE2902F6A5A765DC5B8AB992FEC0` |
-| `scarl_reloadable_preview.png` | 1,492,750 | `0F24C3CB0A7BF0B6A233308AC3033AE56A1A0419BCC04BD5F3E291CED0CD9E8E` |
-| `../../../source_art/reloadable_weapons/scarl_reloadable.blend` | 1,091,832 | `C94017345E323A2D2613DCFAE6E9AE9BE55AAA9C3BB84E4EC3457A7EB527B7CA` |
+| `scarl_reloadable.glb` | 178,048 | `13F03B7D9E6CD2C50A85B5FA5E3C803530AB8AC165A1CB70CB296AC0BB8188BC` |
+| `scarl_reloadable_preview.png` | 1,493,438 | `830158C4F22B38A6BD461957FCBCD2D1A2AB8B6F9015D4FA3A6CD70FFA6AE6A0` |
+| `../../../source_art/reloadable_weapons/scarl_reloadable.blend` | 1,095,483 | `65FD4401527A4BBDD5B3F2627AD1B56B10A8A51CA96DAB5D9C93A88B8E447211` |
 
 The reproducible builder is
 `../../../scripts/blender/build_reloadable_scarl.py`. It verifies the exact
@@ -48,11 +50,14 @@ makes the exported buffer bit-for-bit reproducible across headless runs.
 The source's independent `Mag`, `Bolt`, and `CharginHandle` meshes remain real
 visible mechanisms. `ChargingHandle` moves the authored `BoltGeometry` and
 `ChargingHandleGeometry` together, while tactical reload can leave the pivot at
-its authored rest frame.
+its authored rest frame. `FrontIronSight` and `IronSightGeometry` retain the
+complete source sights for the bare rifle and are hidden together only while an
+external optic is visible, clearing the optical axis without deleting art.
 
 ```text
 SteelTideReloadableScarL                 [identity root; Godot metres]
-|- WeaponBodyGeometry                   [5,248 triangles]
+|- WeaponBodyGeometry                   [4,579 triangles]
+|- FrontIronSight                         [669 triangles]
 |- StockGeometry                          [668 triangles]
 |- TriggerGeometry                        [228 triangles]
 |- SafetyGeometry                         [540 triangles]
@@ -76,9 +81,9 @@ SteelTideReloadableScarL                 [identity root; Godot metres]
 All coordinates are root-local Godot metres: X lateral, Y up, positive Z to
 the stock, and negative Z to the muzzle. The installed asset bounds are
 `(-0.063999,-0.299936,-1.260000)` to
-`(0.063999,0.300235,0.320000)`, exactly 1.58 m stock-to-muzzle. The staged-spare
+`(0.063999,0.300062,0.320000)`, exactly 1.58 m stock-to-muzzle. The staged-spare
 scene bounds are `(-0.330012,-0.719936,-1.260000)` to
-`(0.063999,0.300235,0.320000)`. The scene contains 8,717 triangles, including
+`(0.063999,0.300062,0.320000)`. The scene contains 8,717 triangles, including
 the independent staged spare.
 
 The grip frames are derived from the authored pistol-grip and handguard

@@ -17,6 +17,7 @@ import json
 from math import pi
 from pathlib import Path
 import struct
+import zlib
 
 import bpy
 import bmesh
@@ -90,6 +91,20 @@ FOREGRIP_LOCAL_OFFSET = Vector((0.0, 0.0, 0.0435))
 SUPPRESSOR_LOCAL_OFFSET = Vector((0.0, 0.11, 0.0))
 OPTIC_LOCAL_OFFSET = Vector((0.0, 0.0, 0.013))
 
+APERTURE_PLANE_TOLERANCE = 1.0e-5
+APERTURE_AXIS_RESIDUAL_TOLERANCE = 1.0e-6
+APERTURE_ANCHOR_MATCH_TOLERANCE = 1.0e-7
+ROUND_TRIP_TRANSFORM_TOLERANCE = 1.0e-6
+MINIMUM_APERTURE_AXIS_LENGTH = 0.05
+
+# Filled with reviewed deterministic outputs after the first complete build.
+OUTPUT_GLB_SHA256 = "BC34336E1B28F3E7EB8E8E5730142BCB934284F7B136CF53BD6D06C6D3D9D609"
+OUTPUT_GLB_BYTES = 5_302_128
+OUTPUT_PREVIEW_SHA256 = "CD5E58921A5BEA944548878C721E704C75B62C5882D846CAE5AA629DE0FA3A9F"
+OUTPUT_PREVIEW_BYTES = 1_023_330
+OUTPUT_ADS_PREVIEW_SHA256 = "30E19D7CBB7AED14305DF5F83FB97E77F04024AFC884A67ED4D7058C613286E1"
+OUTPUT_ADS_PREVIEW_BYTES = 888_600
+
 ATTACHMENT_SOURCE_INFO = {
     "Foregrip": (
         "assets/models/quaternius_ultimate_guns/scarl.glb",
@@ -128,6 +143,56 @@ def clear_scene() -> None:
 def require_file(path: Path) -> None:
     if not path.is_file():
         raise FileNotFoundError(path)
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest().upper()
+
+
+def require_output_identity(
+    label: str,
+    path: Path,
+    expected_bytes: int,
+    expected_hash: str,
+) -> None:
+    actual_bytes = path.stat().st_size
+    actual_hash = sha256(path)
+    if expected_hash and (
+        actual_bytes != expected_bytes
+        or actual_hash != expected_hash
+    ):
+        raise RuntimeError(
+            f"{label} identity drifted: bytes={actual_bytes}/{expected_bytes} "
+            f"sha256={actual_hash}/{expected_hash}"
+        )
+
+
+def canonicalize_png_metadata(path: Path) -> None:
+    payload = path.read_bytes()
+    signature = b"\x89PNG\r\n\x1a\n"
+    if not payload.startswith(signature):
+        raise RuntimeError(f"Review render is not a PNG: {path}")
+    output = bytearray(signature)
+    offset = len(signature)
+    while offset + 12 <= len(payload):
+        chunk_length = struct.unpack_from(">I", payload, offset)[0]
+        chunk_end = offset + 12 + chunk_length
+        if chunk_end > len(payload):
+            raise RuntimeError(f"Truncated PNG chunk in {path}")
+        chunk_type = payload[offset + 4:offset + 8]
+        chunk_data = payload[offset + 8:offset + 8 + chunk_length]
+        expected_crc = struct.unpack_from(">I", payload, offset + 8 + chunk_length)[0]
+        actual_crc = zlib.crc32(chunk_type + chunk_data) & 0xFFFFFFFF
+        if actual_crc != expected_crc:
+            raise RuntimeError(f"Invalid PNG CRC in {path}: {chunk_type!r}")
+        if chunk_type not in {b"tEXt", b"tIME"}:
+            output.extend(payload[offset:chunk_end])
+        offset = chunk_end
+        if chunk_type == b"IEND":
+            break
+    if offset != len(payload):
+        raise RuntimeError(f"Invalid PNG chunk layout: {path}")
+    path.write_bytes(output)
 
 
 def empty(
@@ -498,68 +563,142 @@ def add_authored_tip_marker(
     return marker
 
 
-def authored_optic_reticle_location(
+def authored_optic_aperture_locations(
     geometry: bpy.types.Object,
     glass_material_index: int,
-) -> Vector:
+) -> tuple[Vector, Vector]:
     if geometry.type != "MESH":
-        raise RuntimeError("Cannot derive optic reticle anchor from non-mesh geometry.")
+        raise RuntimeError("Cannot derive optic apertures from non-mesh geometry.")
     bpy.context.view_layer.update()
-    glass_vertices = {
-        vertex_index
+    glass_polygons = [
+        polygon
         for polygon in geometry.data.polygons
         if polygon.material_index == glass_material_index
+    ]
+    glass_vertices = {
+        vertex_index
+        for polygon in glass_polygons
         for vertex_index in polygon.vertices
     }
-    if len(glass_vertices) < 3:
-        raise RuntimeError("Compact optic has no authored glass surface.")
-    glass_positions = [
-        geometry.matrix_local @ geometry.data.vertices[vertex_index].co
-        for vertex_index in glass_vertices
-    ]
-    eyepiece_y = min(position.y for position in glass_positions)
-    eyepiece_positions = [
-        position
-        for position in glass_positions
-        if abs(position.y - eyepiece_y) <= 1.0e-5
-    ]
-    if len(eyepiece_positions) < 3:
-        raise RuntimeError("Compact optic eyepiece glass is not a stable planar surface.")
-    minimum = Vector(
-        tuple(min(position[axis] for position in eyepiece_positions) for axis in range(3))
-    )
-    maximum = Vector(
-        tuple(max(position[axis] for position in eyepiece_positions) for axis in range(3))
-    )
-    return Vector(
-        (
-            (minimum.x + maximum.x) * 0.5,
-            eyepiece_y,
-            (minimum.z + maximum.z) * 0.5,
+    glass_triangles = sum(len(polygon.vertices) - 2 for polygon in glass_polygons)
+    if (len(glass_polygons), len(glass_vertices), glass_triangles) != (12, 16, 12):
+        raise RuntimeError(
+            "Unexpected compact optic source-glass topology while deriving anchors: "
+            f"faces={len(glass_polygons)}/12 "
+            f"vertices={len(glass_vertices)}/16 triangles={glass_triangles}/12"
         )
-    )
+    glass_positions = {
+        vertex_index: geometry.matrix_local @ geometry.data.vertices[vertex_index].co
+        for vertex_index in glass_vertices
+    }
+    rear_y = min(position.y for position in glass_positions.values())
+    front_y = max(position.y for position in glass_positions.values())
+    if front_y - rear_y <= MINIMUM_APERTURE_AXIS_LENGTH:
+        raise RuntimeError(
+            "Compact optic source aperture depth collapsed: "
+            f"rear={rear_y:.9f} front={front_y:.9f}"
+        )
+
+    plane_vertices = {
+        "rear": {
+            index
+            for index, position in glass_positions.items()
+            if abs(position.y - rear_y) <= APERTURE_PLANE_TOLERANCE
+        },
+        "front": {
+            index
+            for index, position in glass_positions.items()
+            if abs(position.y - front_y) <= APERTURE_PLANE_TOLERANCE
+        },
+    }
+    if (
+        plane_vertices["rear"] & plane_vertices["front"]
+        or plane_vertices["rear"] | plane_vertices["front"] != glass_vertices
+    ):
+        raise RuntimeError("Compact optic glass does not form two independent planes.")
+
+    centers: dict[str, Vector] = {}
+    for plane_name, axis_y in (("rear", rear_y), ("front", front_y)):
+        vertex_indices = plane_vertices[plane_name]
+        plane_polygons = [
+            polygon
+            for polygon in glass_polygons
+            if set(polygon.vertices).issubset(vertex_indices)
+        ]
+        plane_triangles = sum(
+            len(polygon.vertices) - 2
+            for polygon in plane_polygons
+        )
+        if (len(plane_polygons), len(vertex_indices), plane_triangles) != (6, 8, 6):
+            raise RuntimeError(
+                f"Unexpected compact optic {plane_name} pane topology: "
+                f"faces={len(plane_polygons)}/6 "
+                f"vertices={len(vertex_indices)}/8 triangles={plane_triangles}/6"
+            )
+        positions = [glass_positions[index] for index in vertex_indices]
+        minimum_x = min(position.x for position in positions)
+        maximum_x = max(position.x for position in positions)
+        minimum_z = min(position.z for position in positions)
+        maximum_z = max(position.z for position in positions)
+        centers[plane_name] = Vector(
+            (
+                (minimum_x + maximum_x) * 0.5,
+                axis_y,
+                (minimum_z + maximum_z) * 0.5,
+            )
+        )
+
+    optical_axis_residual = Vector(
+        (
+            centers["front"].x - centers["rear"].x,
+            centers["front"].z - centers["rear"].z,
+        )
+    ).length
+    if optical_axis_residual > APERTURE_AXIS_RESIDUAL_TOLERANCE:
+        raise RuntimeError(
+            "Compact optic source apertures are not coaxial: "
+            f"residual={optical_axis_residual:.9f}"
+        )
+    return centers["rear"], centers["front"]
 
 
-def add_optic_reticle_anchor(
+def add_optic_aperture_anchors(
     parent: bpy.types.Object,
     geometry: bpy.types.Object,
     glass_material_index: int,
-) -> bpy.types.Object:
+) -> tuple[bpy.types.Object, bpy.types.Object, bpy.types.Object]:
     if geometry.parent != parent:
         raise RuntimeError(
-            f"Cannot derive optic reticle anchor outside {parent.name}."
+            f"Cannot derive optic aperture anchors outside {parent.name}."
         )
-    authored_glass_center = authored_optic_reticle_location(
+    rear_center, front_center = authored_optic_aperture_locations(
         geometry,
         glass_material_index,
     )
-    marker = empty("OpticReticleAnchor", parent, authored_glass_center)
-    marker["runtime_asset"] = True
-    marker["derived_from_mesh"] = geometry.name
-    marker["derived_from_material"] = geometry.data.materials[glass_material_index].name
-    marker["derived_from_surface"] = "-Y source eyepiece glass before pane removal"
-    marker["authored_glass_center"] = list(authored_glass_center)
-    return marker
+    material_name = geometry.data.materials[glass_material_index].name
+
+    def add_marker(
+        name: str,
+        plane_name: str,
+        location: Vector,
+    ) -> bpy.types.Object:
+        marker = empty(name, parent, location)
+        marker["runtime_asset"] = True
+        marker["derived_from_mesh"] = geometry.name
+        marker["derived_from_material"] = material_name
+        marker["derived_from_removed_source_glass"] = True
+        marker["derived_from_source_plane"] = plane_name
+        marker["source_plane_vertex_count"] = 8
+        marker["source_plane_face_count"] = 6
+        marker["source_plane_triangle_count"] = 6
+        marker["authored_glass_center"] = list(location)
+        return marker
+
+    reticle = add_marker("OpticReticleAnchor", "rear", rear_center)
+    reticle["derived_from_surface"] = "rear source eyepiece glass before pane removal"
+    rear = add_marker("OpticRearApertureAnchor", "rear", rear_center)
+    front = add_marker("OpticFrontApertureAnchor", "front", front_center)
+    return reticle, rear, front
 
 
 def remove_authored_optic_glass(
@@ -614,9 +753,64 @@ def remove_authored_optic_glass(
     geometry["removed_source_glass_triangles"] = glass_triangles
 
 
+def validate_optic_aperture_anchors(phase: str) -> None:
+    optic_mount = bpy.data.objects["OpticMount"]
+    reticle = bpy.data.objects["OpticReticleAnchor"]
+    rear = bpy.data.objects["OpticRearApertureAnchor"]
+    front = bpy.data.objects["OpticFrontApertureAnchor"]
+    if any(marker.parent != optic_mount for marker in (reticle, rear, front)):
+        raise RuntimeError(
+            f"M4A1 optic aperture hierarchy drifted after {phase}."
+        )
+    if (
+        reticle.get("derived_from_source_plane") != "rear"
+        or rear.get("derived_from_source_plane") != "rear"
+        or front.get("derived_from_source_plane") != "front"
+        or not rear.get("derived_from_removed_source_glass")
+        or not front.get("derived_from_removed_source_glass")
+    ):
+        raise RuntimeError(
+            f"M4A1 optic aperture provenance drifted after {phase}."
+        )
+    for marker in (reticle, rear, front):
+        expected = Vector(marker["authored_glass_center"])
+        if (marker.location - expected).length > APERTURE_ANCHOR_MATCH_TOLERANCE:
+            raise RuntimeError(
+                f"{marker.name} left its authored glass center after {phase}: "
+                f"actual={tuple(marker.location)} expected={tuple(expected)}"
+            )
+
+    axis = front.location - rear.location
+    axis_length = axis.length
+    optical_axis_residual = Vector((axis.x, axis.z)).length
+    reticle_to_rear = (reticle.location - rear.location).length
+    if (
+        axis.y <= MINIMUM_APERTURE_AXIS_LENGTH
+        or axis_length <= MINIMUM_APERTURE_AXIS_LENGTH
+        or optical_axis_residual > APERTURE_AXIS_RESIDUAL_TOLERANCE
+        or reticle_to_rear > APERTURE_ANCHOR_MATCH_TOLERANCE
+    ):
+        raise RuntimeError(
+            f"M4A1 optic anchor contract drifted after {phase}: "
+            f"axis={tuple(axis)} length={axis_length:.9f} "
+            f"godot_xy_residual={optical_axis_residual:.9f} "
+            f"reticle_to_rear={reticle_to_rear:.9f}"
+        )
+    print(
+        "M4A1_OPTIC_ANCHORS "
+        f"phase={phase} rear={tuple(round(value, 9) for value in rear.location)} "
+        f"front={tuple(round(value, 9) for value in front.location)} "
+        f"axis_length={axis_length:.9f} "
+        f"godot_xy_residual={optical_axis_residual:.9f} "
+        f"reticle_to_rear={reticle_to_rear:.9f}"
+    )
+
+
 def validate_open_optic_aperture() -> None:
     geometry = bpy.data.objects["OpticMountGeometry"]
     reticle_anchor = bpy.data.objects["OpticReticleAnchor"]
+    rear_anchor = bpy.data.objects["OpticRearApertureAnchor"]
+    front_anchor = bpy.data.objects["OpticFrontApertureAnchor"]
     if geometry.parent != reticle_anchor.parent:
         raise RuntimeError("Optic geometry and reticle anchor no longer share a parent.")
     if any("Glass" in material.name for material in geometry.data.materials):
@@ -630,14 +824,14 @@ def validate_open_optic_aperture() -> None:
     ]
     polygons = [tuple(polygon.vertices) for polygon in geometry.data.polygons]
     aperture = BVHTree.FromPolygons(vertices, polygons, all_triangles=False)
-    center = reticle_anchor.location
-    bounds_min_y = min(position.y for position in vertices)
-    bounds_max_y = max(position.y for position in vertices)
-    ray_origin = Vector((center.x, bounds_min_y - 0.01, center.z))
+    axis = front_anchor.location - rear_anchor.location
+    axis_length = axis.length
+    direction = axis.normalized()
+    ray_origin = rear_anchor.location - direction * 0.01
     hit_location, _, _, _ = aperture.ray_cast(
         ray_origin,
-        Vector((0.0, 1.0, 0.0)),
-        bounds_max_y - bounds_min_y + 0.02,
+        direction,
+        axis_length + 0.02,
     )
     if hit_location is not None:
         raise RuntimeError(
@@ -647,7 +841,7 @@ def validate_open_optic_aperture() -> None:
     print(
         "M4A1_OPTIC_APERTURE "
         "glass_faces=0 removed_faces=12 removed_triangles=12 "
-        "centerline_clear=True"
+        f"centerline_clear=True axis_length={axis_length:.9f}"
     )
 
 
@@ -1197,7 +1391,11 @@ def build_runtime_asset() -> bpy.types.Object:
         "authored scope housing; source glass used for anchor then removed"
     )
     optic_geometry["source_license"] = "CC0-1.0"
-    optic_reticle_anchor = add_optic_reticle_anchor(
+    (
+        optic_reticle_anchor,
+        optic_rear_aperture_anchor,
+        optic_front_aperture_anchor,
+    ) = add_optic_aperture_anchors(
         optic_mount,
         optic_geometry,
         glass_material_index=2,
@@ -1218,6 +1416,8 @@ def build_runtime_asset() -> bpy.types.Object:
     muzzle_tip.name = "MuzzleDeviceTip"
     suppressor_tip.name = "SuppressorTip"
     optic_reticle_anchor.name = "OpticReticleAnchor"
+    optic_rear_aperture_anchor.name = "OpticRearApertureAnchor"
+    optic_front_aperture_anchor.name = "OpticFrontApertureAnchor"
     bpy.context.view_layer.update()
     return root
 
@@ -1252,8 +1452,13 @@ def validate_attachment_geometry() -> dict[str, tuple[int, int, int]]:
     return statistics
 
 
-def validate_authored_markers() -> None:
+def validate_authored_markers(phase: str) -> None:
     bpy.context.view_layer.update()
+    transform_tolerance = (
+        ROUND_TRIP_TRANSFORM_TOLERANCE
+        if phase == "glb_roundtrip"
+        else 1.0e-8
+    )
     for name, parent_name in (
         ("MuzzleDeviceTip", "MuzzleDevice"),
         ("SuppressorTip", "Suppressor"),
@@ -1261,10 +1466,12 @@ def validate_authored_markers() -> None:
         marker = bpy.data.objects[name]
         parent = bpy.data.objects[parent_name]
         if marker.parent != parent:
-            raise RuntimeError(f"{name} is not a direct child of {parent_name}.")
+            raise RuntimeError(
+                f"{name} is not a direct child of {parent_name} after {phase}."
+            )
         geometry = bpy.data.objects[marker["derived_from_mesh"]]
         expected_location = authored_tip_location(geometry)
-        if (marker.location - expected_location).length > 1.0e-8:
+        if (marker.location - expected_location).length > transform_tolerance:
             raise RuntimeError(
                 f"{name} no longer matches the authored +Y mesh bound: "
                 f"actual={tuple(marker.location)} expected={tuple(expected_location)}"
@@ -1275,27 +1482,12 @@ def validate_authored_markers() -> None:
             raise RuntimeError(f"{name} is not forward of its attachment origin.")
         print(
             "M4A1_AUTHORED_MARKER "
-            f"node={name} parent={parent_name} "
+            f"phase={phase} node={name} parent={parent_name} "
             f"local={tuple(round(value, 6) for value in marker.location)} "
             f"global={tuple(round(value, 6) for value in global_location)}"
         )
 
-    reticle_anchor = bpy.data.objects["OpticReticleAnchor"]
-    optic_mount = bpy.data.objects["OpticMount"]
-    if reticle_anchor.parent != optic_mount:
-        raise RuntimeError("OpticReticleAnchor is not a direct child of OpticMount.")
-    expected_reticle = Vector(reticle_anchor["authored_glass_center"])
-    if (reticle_anchor.location - expected_reticle).length > 1.0e-8:
-        raise RuntimeError(
-            "OpticReticleAnchor no longer matches the authored eyepiece glass center."
-        )
-    reticle_global = reticle_anchor.matrix_world.translation
-    print(
-        "M4A1_AUTHORED_MARKER "
-        "node=OpticReticleAnchor parent=OpticMount "
-        f"local={tuple(round(value, 6) for value in reticle_anchor.location)} "
-        f"global={tuple(round(value, 6) for value in reticle_global)}"
-    )
+    validate_optic_aperture_anchors(phase)
 
 
 def require_unique_node(name: str) -> bpy.types.Object:
@@ -1427,6 +1619,8 @@ def validate_glb_roundtrip() -> bpy.types.Object:
             f"triangles={triangle_count}/{EXPECTED_TRIANGLE_COUNT}"
         )
     validate_reload_sockets(root, "glb_roundtrip")
+    validate_authored_markers("glb_roundtrip")
+    validate_open_optic_aperture()
     root["reload_socket_roundtrip_verified"] = True
     return root
 
@@ -1486,10 +1680,77 @@ def validate_exported_optic_aperture() -> None:
             "Exported M4A1 optic has unexpected runtime surfaces: "
             f"materials={primitive_material_names}"
         )
+
+    nodes = document.get("nodes", [])
+
+    def require_node_index(name: str) -> int:
+        matches = [
+            index
+            for index, node in enumerate(nodes)
+            if node.get("name") == name
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"Exported M4A1 node {name!r} count drifted: {len(matches)}"
+            )
+        return matches[0]
+
+    optic_mount_index = require_node_index("OpticMount")
+    child_indices = set(nodes[optic_mount_index].get("children", []))
+    anchor_indices = {
+        name: require_node_index(name)
+        for name in (
+            "OpticReticleAnchor",
+            "OpticRearApertureAnchor",
+            "OpticFrontApertureAnchor",
+        )
+    }
+    if any(index not in child_indices for index in anchor_indices.values()):
+        raise RuntimeError(
+            "Exported M4A1 aperture anchors are not direct children of OpticMount."
+        )
+    rear_node = nodes[anchor_indices["OpticRearApertureAnchor"]]
+    front_node = nodes[anchor_indices["OpticFrontApertureAnchor"]]
+    reticle_node = nodes[anchor_indices["OpticReticleAnchor"]]
+    if (
+        rear_node.get("extras", {}).get("derived_from_source_plane") != "rear"
+        or front_node.get("extras", {}).get("derived_from_source_plane") != "front"
+    ):
+        raise RuntimeError("Exported M4A1 aperture provenance drifted.")
+
+    def node_translation(node: dict) -> Vector:
+        values = node.get("translation", (0.0, 0.0, 0.0))
+        if len(values) != 3:
+            raise RuntimeError(f"Invalid exported M4A1 node translation: {values}")
+        return Vector(values)
+
+    rear_translation = node_translation(rear_node)
+    front_translation = node_translation(front_node)
+    reticle_translation = node_translation(reticle_node)
+    axis = front_translation - rear_translation
+    axis_length = axis.length
+    godot_xy_residual = Vector((axis.x, axis.y)).length
+    forward_separation = rear_translation.z - front_translation.z
+    reticle_to_rear = (reticle_translation - rear_translation).length
+    if (
+        forward_separation <= MINIMUM_APERTURE_AXIS_LENGTH
+        or axis_length <= MINIMUM_APERTURE_AXIS_LENGTH
+        or godot_xy_residual > APERTURE_AXIS_RESIDUAL_TOLERANCE
+        or reticle_to_rear > APERTURE_ANCHOR_MATCH_TOLERANCE
+    ):
+        raise RuntimeError(
+            "Exported M4A1 aperture-axis contract drifted: "
+            f"axis={tuple(axis)} length={axis_length:.9f} "
+            f"godot_xy_residual={godot_xy_residual:.9f} "
+            f"reticle_to_rear={reticle_to_rear:.9f}"
+        )
     print(
         "M4A1_EXPORTED_OPTIC_APERTURE "
         "glass_materials=0 glass_primitives=0 "
-        f"runtime_materials={primitive_material_names}"
+        f"runtime_materials={primitive_material_names} "
+        f"axis_length={axis_length:.9f} "
+        f"godot_xy_residual={godot_xy_residual:.9f} "
+        f"reticle_to_rear={reticle_to_rear:.9f}"
     )
 
 
@@ -1590,6 +1851,8 @@ def add_preview_stage(root: bpy.types.Object) -> None:
     camera_data.lens = 58.0
     scene.render.filepath = str(ADS_PREVIEW_PATH)
     bpy.ops.render.render(write_still=True)
+    canonicalize_png_metadata(PREVIEW_PATH)
+    canonicalize_png_metadata(ADS_PREVIEW_PATH)
     set_hierarchy_render_visibility(rear_iron_sight, True)
     set_hierarchy_render_visibility(front_iron_sight, True)
     root.hide_render = False
@@ -1618,6 +1881,8 @@ def main() -> None:
         "MuzzleDeviceTip",
         "SuppressorTip",
         "OpticReticleAnchor",
+        "OpticRearApertureAnchor",
+        "OpticFrontApertureAnchor",
     }
     missing_nodes = required_nodes - {obj.name for obj in bpy.data.objects}
     if missing_nodes:
@@ -1661,7 +1926,7 @@ def main() -> None:
             f"meshes={mesh_statistics(front_iron_sight)[0]}"
         )
     validate_attachment_geometry()
-    validate_authored_markers()
+    validate_authored_markers("dcc_source")
     validate_reload_sockets(root, "dcc_source")
     validate_open_optic_aperture()
     mesh_count, vertex_count, triangle_count = mesh_statistics(root)
@@ -1682,16 +1947,36 @@ def main() -> None:
         )
     export_asset(root)
     validate_exported_optic_aperture()
+    require_output_identity(
+        "M4A1 runtime GLB",
+        OUTPUT_GLB,
+        OUTPUT_GLB_BYTES,
+        OUTPUT_GLB_SHA256,
+    )
     save_source()
     roundtrip_root = validate_glb_roundtrip()
     add_preview_stage(roundtrip_root)
+    require_output_identity(
+        "M4A1 review preview",
+        PREVIEW_PATH,
+        OUTPUT_PREVIEW_BYTES,
+        OUTPUT_PREVIEW_SHA256,
+    )
+    require_output_identity(
+        "M4A1 ADS preview",
+        ADS_PREVIEW_PATH,
+        OUTPUT_ADS_PREVIEW_BYTES,
+        OUTPUT_ADS_PREVIEW_SHA256,
+    )
     print(
         "NISU_M4A1_EXPORT "
         f"meshes={mesh_count} vertices={vertex_count} triangles={triangle_count} "
-        f"glb_sha256={hashlib.sha256(OUTPUT_GLB.read_bytes()).hexdigest()} "
-        f"blend_sha256={hashlib.sha256(OUTPUT_BLEND.read_bytes()).hexdigest()} "
-        f"preview_sha256={hashlib.sha256(PREVIEW_PATH.read_bytes()).hexdigest()} "
-        f"ads_preview_sha256={hashlib.sha256(ADS_PREVIEW_PATH.read_bytes()).hexdigest()} "
+        f"glb_bytes={OUTPUT_GLB.stat().st_size} glb_sha256={sha256(OUTPUT_GLB)} "
+        f"blend_bytes={OUTPUT_BLEND.stat().st_size} blend_sha256={sha256(OUTPUT_BLEND)} "
+        f"preview_bytes={PREVIEW_PATH.stat().st_size} "
+        f"preview_sha256={sha256(PREVIEW_PATH)} "
+        f"ads_preview_bytes={ADS_PREVIEW_PATH.stat().st_size} "
+        f"ads_preview_sha256={sha256(ADS_PREVIEW_PATH)} "
         f"glb={OUTPUT_GLB} blend={OUTPUT_BLEND} preview={PREVIEW_PATH} "
         f"ads_preview={ADS_PREVIEW_PATH}"
     )

@@ -35,14 +35,21 @@ The final visible attachment nodes contain authored geometry: a Quaternius
 SCAR-L component fitted as `Foregrip`, the nisu barrel muzzle split into
 `MuzzleDevice`, a Quaternius MP5A5 front assembly fitted as `Suppressor`, and a
 complete Quaternius AXMC scope housing and mount fitted as `OpticMount`.
-`MuzzleDeviceTip`, `SuppressorTip`, and `OpticReticleAnchor` are transform-only
-runtime markers derived from those component bounds. The build asserts every
+`MuzzleDeviceTip`, `SuppressorTip`, `OpticReticleAnchor`,
+`OpticRearApertureAnchor`, and `OpticFrontApertureAnchor` are transform-only
+runtime markers. The optic markers are direct children of `OpticMount`; its
+rear/front markers are derived independently from the two real source-glass
+plane centers, while the reticle is coincident with the rear endpoint. The
+build asserts every
 attachment mesh, the two meshes beneath `RearIronSight`, the front-tower mesh
 beneath `FrontIronSight`, marker parent, pre-export transform, and fixed source
-selection. The optic reticle anchor is derived from the original authored
-eyepiece pane before both glass panes are removed from the runtime mesh. The
-build asserts zero remaining glass faces and a collision-free centerline through
-the resulting open aperture. Godot's `--validate-combat-models` diagnostic
+selection. Each source-glass plane must contain exactly 8 vertices and
+6 faces/triangles before both planes are removed from the runtime mesh. Blender
+`+Y` maps to Godot `-Z`, making `OpticFrontApertureAnchor` the more-negative
+Godot local `Z` endpoint. The build asserts positive front/rear separation,
+sub-micrometre Godot XY residual, zero reticle-to-rear distance, zero remaining
+glass faces, and a collision-free ray along the true aperture axis. Godot's
+`--validate-combat-models` diagnostic
 validates the imported
 GLB hierarchy and runtime alignment. Gameplay stat variants deliberately share
 these finished authored slot visuals rather than enabling the hidden primitive

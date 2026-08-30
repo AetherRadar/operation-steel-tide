@@ -14,7 +14,11 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+import hashlib
+import json
 from pathlib import Path
+import struct
+import zlib
 
 import bpy
 import bmesh
@@ -39,6 +43,20 @@ SOURCE_URL = "https://poly.pizza/bundle/Ultimate-Guns-Pack-cpgUfI4t2F"
 SOURCE_CREATOR = "Quaternius"
 SOURCE_LICENSE = "CC0-1.0"
 
+APERTURE_PLANE_TOLERANCE = 1.0e-5
+APERTURE_AXIS_RESIDUAL_TOLERANCE = 0.0005
+ANCHOR_MATCH_TOLERANCE = 1.0e-7
+ROUND_TRIP_TOLERANCE = 1.0e-6
+MINIMUM_APERTURE_SEPARATION = 1.0e-4
+
+# Filled with reviewed deterministic outputs after the first complete build.
+OUTPUT_GLB_SHA256 = "F10CDBBA8ED896807EE5111EC4D5FF1256D94B6FA8EF3899783641D49472D010"
+OUTPUT_GLB_BYTES = 80_356
+OUTPUT_PREVIEW_SHA256 = "69CF3EE68D05F1F46A150857B120F32C5C22F8258F5D1562944D93CCFC490D6B"
+OUTPUT_PREVIEW_BYTES = 1_615_951
+OUTPUT_ADS_PREVIEW_SHA256 = "09801D4FE74A6DFB1444850D5995FAE12D9455DCFFD2DBC99D5D715EFD805287"
+OUTPUT_ADS_PREVIEW_BYTES = 1_419_648
+
 
 @dataclass(frozen=True)
 class OpticSpec:
@@ -56,6 +74,13 @@ class OpticSpec:
     cross_section_power: float
     housing_color: tuple[float, float, float, float]
     hardware_color: tuple[float, float, float, float]
+
+
+@dataclass(frozen=True)
+class AperturePlane:
+    source_axis_y: float
+    source_center: Vector
+    vertex_indices: tuple[int, ...]
 
 
 OPTICS = (
@@ -307,10 +332,22 @@ def oriented_position(source: bpy.types.Object, vertex_index: int) -> Vector:
     )
 
 
-def source_aperture_center(
+def bounding_center(positions: list[Vector]) -> Vector:
+    if not positions:
+        raise RuntimeError("Cannot derive a center from an empty position set.")
+    minimum = Vector(
+        tuple(min(position[axis] for position in positions) for axis in range(3))
+    )
+    maximum = Vector(
+        tuple(max(position[axis] for position in positions) for axis in range(3))
+    )
+    return (minimum + maximum) * 0.5
+
+
+def source_aperture_planes(
     source: bpy.types.Object,
     faces: set[int],
-) -> tuple[Vector, set[int]]:
+) -> tuple[AperturePlane, AperturePlane, set[int]]:
     glass_faces = {
         face_index
         for face_index in faces
@@ -329,20 +366,84 @@ def source_aperture_center(
             f"faces={len(glass_faces)}/12 vertices={len(glass_vertices)}/16 "
             f"triangles={glass_triangles}/12"
         )
-    positions = [oriented_position(source, index) for index in glass_vertices]
-    rear_y = min(position.y for position in positions)
-    rear_positions = [
-        position for position in positions if abs(position.y - rear_y) <= 1.0e-5
-    ]
-    if len(rear_positions) < 3:
-        raise RuntimeError(f"No stable rear aperture on {source.name}.")
-    minimum = Vector(
-        tuple(min(position[axis] for position in rear_positions) for axis in range(3))
+    oriented = {
+        index: oriented_position(source, index)
+        for index in glass_vertices
+    }
+    rear_y = min(position.y for position in oriented.values())
+    front_y = max(position.y for position in oriented.values())
+    if front_y - rear_y <= MINIMUM_APERTURE_SEPARATION:
+        raise RuntimeError(
+            f"Source aperture planes collapse on {source.name}: "
+            f"rear={rear_y:.9f} front={front_y:.9f}"
+        )
+    rear_vertices = tuple(
+        sorted(
+            index
+            for index, position in oriented.items()
+            if abs(position.y - rear_y) <= APERTURE_PLANE_TOLERANCE
+        )
     )
-    maximum = Vector(
-        tuple(max(position[axis] for position in rear_positions) for axis in range(3))
+    front_vertices = tuple(
+        sorted(
+            index
+            for index, position in oriented.items()
+            if abs(position.y - front_y) <= APERTURE_PLANE_TOLERANCE
+        )
     )
-    return (minimum + maximum) * 0.5, glass_faces
+    if (
+        len(rear_vertices) != 8
+        or len(front_vertices) != 8
+        or set(rear_vertices) & set(front_vertices)
+        or set(rear_vertices) | set(front_vertices) != glass_vertices
+    ):
+        raise RuntimeError(
+            f"Source glass does not form two independent aperture planes on {source.name}: "
+            f"rear_vertices={len(rear_vertices)} "
+            f"front_vertices={len(front_vertices)} total={len(glass_vertices)}"
+        )
+    for plane_name, vertex_indices in (
+        ("rear", rear_vertices),
+        ("front", front_vertices),
+    ):
+        plane_faces = [
+            source.data.polygons[index]
+            for index in glass_faces
+            if set(source.data.polygons[index].vertices).issubset(vertex_indices)
+        ]
+        plane_triangles = sum(len(polygon.vertices) - 2 for polygon in plane_faces)
+        plane_y = [oriented[index].y for index in vertex_indices]
+        if (
+            len(plane_faces) != 6
+            or plane_triangles != 6
+            or max(plane_y) - min(plane_y) > APERTURE_PLANE_TOLERANCE
+        ):
+            raise RuntimeError(
+                f"Unexpected {plane_name} glass plane topology on {source.name}: "
+                f"faces={len(plane_faces)}/6 triangles={plane_triangles}/6 "
+                f"axis_span={max(plane_y) - min(plane_y):.9f}"
+            )
+    rear = AperturePlane(
+        source_axis_y=rear_y,
+        source_center=bounding_center([oriented[index] for index in rear_vertices]),
+        vertex_indices=rear_vertices,
+    )
+    front = AperturePlane(
+        source_axis_y=front_y,
+        source_center=bounding_center([oriented[index] for index in front_vertices]),
+        vertex_indices=front_vertices,
+    )
+    return rear, front, glass_faces
+
+
+def deformed_aperture_center(
+    source: bpy.types.Object,
+    plane: AperturePlane,
+    deform,
+) -> Vector:
+    return bounding_center(
+        [deform(source.data.vertices[index].co) for index in plane.vertex_indices]
+    )
 
 
 def signed_power(value: float, exponent: float) -> float:
@@ -494,6 +595,110 @@ def mesh_statistics(root: bpy.types.Object) -> tuple[int, int, int]:
     )
 
 
+def add_aperture_anchor(
+    dcc_name: str,
+    runtime_name: str,
+    variant: bpy.types.Object,
+    geometry: bpy.types.Object,
+    spec: OpticSpec,
+    plane_name: str,
+    plane: AperturePlane,
+    location: Vector,
+) -> bpy.types.Object:
+    anchor = empty(dcc_name, variant, location)
+    anchor["runtime_asset"] = True
+    anchor["runtime_contract_name"] = runtime_name
+    anchor["derived_from_mesh"] = geometry.name
+    anchor["derived_from_removed_source_glass"] = True
+    anchor["derived_from_source_file"] = spec.source_filename
+    anchor["derived_from_source_object"] = spec.source_object
+    anchor["derived_from_source_material"] = "Glass"
+    anchor["derived_from_source_plane"] = plane_name
+    anchor["source_plane_axis_y"] = plane.source_axis_y
+    anchor["source_plane_center"] = list(plane.source_center)
+    anchor["source_plane_vertex_count"] = len(plane.vertex_indices)
+    anchor["authored_aperture_center"] = list(location)
+    return anchor
+
+
+def aperture_anchor_name(optic_name: str, plane_name: str) -> str:
+    if not optic_name.endswith("Optic") or plane_name not in {"Rear", "Front"}:
+        raise RuntimeError(
+            f"Cannot derive a stable aperture node from {optic_name}/{plane_name}."
+        )
+    return optic_name.removesuffix("Optic") + plane_name + "ApertureAnchor"
+
+
+def validate_aperture_anchor_pair(
+    variant: bpy.types.Object,
+    reticle_anchor: bpy.types.Object,
+    rear_anchor: bpy.types.Object,
+    front_anchor: bpy.types.Object,
+    phase: str,
+) -> None:
+    if any(
+        anchor.parent != variant
+        for anchor in (reticle_anchor, rear_anchor, front_anchor)
+    ):
+        raise RuntimeError(
+            f"{variant.name} aperture anchors are not direct children after {phase}."
+        )
+    expected_rear_name = aperture_anchor_name(variant.name, "Rear")
+    expected_front_name = aperture_anchor_name(variant.name, "Front")
+    if (
+        rear_anchor.name != expected_rear_name
+        or rear_anchor.get("runtime_contract_name") != expected_rear_name
+    ):
+        raise RuntimeError(f"{variant.name} rear aperture contract drifted after {phase}.")
+    if (
+        front_anchor.name != expected_front_name
+        or front_anchor.get("runtime_contract_name") != expected_front_name
+    ):
+        raise RuntimeError(f"{variant.name} front aperture contract drifted after {phase}.")
+    if (
+        rear_anchor.get("derived_from_source_plane") != "rear"
+        or front_anchor.get("derived_from_source_plane") != "front"
+        or not rear_anchor.get("derived_from_removed_source_glass")
+        or not front_anchor.get("derived_from_removed_source_glass")
+    ):
+        raise RuntimeError(
+            f"{variant.name} aperture provenance drifted after {phase}."
+        )
+
+    separation = front_anchor.location.y - rear_anchor.location.y
+    optical_axis_residual = Vector(
+        (
+            front_anchor.location.x - rear_anchor.location.x,
+            front_anchor.location.z - rear_anchor.location.z,
+        )
+    ).length
+    reticle_to_rear = (reticle_anchor.location - rear_anchor.location).length
+    if separation <= MINIMUM_APERTURE_SEPARATION:
+        raise RuntimeError(
+            f"{variant.name} aperture depth collapsed after {phase}: "
+            f"separation={separation:.9f}"
+        )
+    if optical_axis_residual > APERTURE_AXIS_RESIDUAL_TOLERANCE:
+        raise RuntimeError(
+            f"{variant.name} aperture optical axis drifted after {phase}: "
+            f"residual={optical_axis_residual:.9f}"
+        )
+    if reticle_to_rear > ANCHOR_MATCH_TOLERANCE:
+        raise RuntimeError(
+            f"{variant.name} reticle left the real rear aperture after {phase}: "
+            f"distance={reticle_to_rear:.9f}"
+        )
+    print(
+        "AUTHORED_OPTIC_ANCHORS "
+        f"phase={phase} variant={variant.name} "
+        f"rear={tuple(round(value, 9) for value in rear_anchor.location)} "
+        f"front={tuple(round(value, 9) for value in front_anchor.location)} "
+        f"separation={separation:.9f} "
+        f"godot_xy_residual={optical_axis_residual:.9f} "
+        f"reticle_to_rear={reticle_to_rear:.9f}"
+    )
+
+
 def validate_open_aperture(
     variant: bpy.types.Object,
     geometry: bpy.types.Object,
@@ -555,12 +760,25 @@ def build_runtime_asset() -> bpy.types.Object:
     root["adaptation_date"] = "2026-08-28"
     root["runtime_generated_primitives"] = 0
 
-    built: list[tuple[bpy.types.Object, bpy.types.Object, bpy.types.Object]] = []
+    built: list[
+        tuple[
+            bpy.types.Object,
+            bpy.types.Object,
+            bpy.types.Object,
+            bpy.types.Object,
+            bpy.types.Object,
+        ]
+    ] = []
     for spec in OPTICS:
         source = import_source(spec)
         faces = select_scope_component(source, spec)
-        aperture_center, glass_faces = source_aperture_center(source, faces)
-        deform = build_point_deformer(source, faces, spec, aperture_center)
+        rear_plane, front_plane, glass_faces = source_aperture_planes(source, faces)
+        deform = build_point_deformer(
+            source,
+            faces,
+            spec,
+            rear_plane.source_center,
+        )
         variant = empty(spec.node_name, root)
         variant["runtime_asset"] = True
         variant["optic_profile"] = spec.node_name.removesuffix("Optic").lower()
@@ -588,30 +806,49 @@ def build_runtime_asset() -> bpy.types.Object:
             housing,
             hardware,
         )
-        # build_point_deformer accepts source-local coordinates, whereas the
-        # aperture center above is already oriented world space.  Derive the
-        # stable marker from the transformed source eyepiece vertices instead.
-        glass_vertices = face_vertices(source, glass_faces)
-        rear_oriented_y = min(oriented_position(source, index).y for index in glass_vertices)
-        rear_vertices = [
-            index
-            for index in glass_vertices
-            if abs(oriented_position(source, index).y - rear_oriented_y) <= 1.0e-5
-        ]
-        reticle_positions = [deform(source.data.vertices[index].co) for index in rear_vertices]
-        reticle_average = sum(reticle_positions, Vector()) / len(reticle_positions)
-        # The source panes duplicate some rim vertices for split normals, so an
-        # arithmetic vertex average is not the exact optical center.  The
-        # aperture bounding center is intentionally normalized to X/Z zero.
-        reticle = Vector((0.0, reticle_average.y, 0.0))
+        rear_aperture = deformed_aperture_center(source, rear_plane, deform)
+        front_aperture = deformed_aperture_center(source, front_plane, deform)
         anchor_name = spec.node_name.replace("Optic", "ReticleAnchor")
-        anchor = empty(anchor_name, variant, reticle)
+        anchor = empty(anchor_name, variant, rear_aperture)
         anchor["runtime_asset"] = True
         anchor["derived_from_mesh"] = geometry.name
         anchor["derived_from_removed_source_glass"] = True
         anchor["derived_from_surface"] = "rear eyepiece center"
+        anchor["authored_aperture_center"] = list(rear_aperture)
+        rear_anchor_name = aperture_anchor_name(spec.node_name, "Rear")
+        front_anchor_name = aperture_anchor_name(spec.node_name, "Front")
+        rear_anchor = add_aperture_anchor(
+            rear_anchor_name,
+            rear_anchor_name,
+            variant,
+            geometry,
+            spec,
+            "rear",
+            rear_plane,
+            rear_aperture,
+        )
+        front_anchor = add_aperture_anchor(
+            front_anchor_name,
+            front_anchor_name,
+            variant,
+            geometry,
+            spec,
+            "front",
+            front_plane,
+            front_aperture,
+        )
+        variant["aperture_anchor_contract"] = (
+            f"{rear_anchor_name},{front_anchor_name}"
+        )
+        validate_aperture_anchor_pair(
+            variant,
+            anchor,
+            rear_anchor,
+            front_anchor,
+            "dcc_source",
+        )
         validate_open_aperture(variant, geometry, anchor)
-        built.append((variant, geometry, anchor))
+        built.append((variant, geometry, anchor, rear_anchor, front_anchor))
 
     remove_sources(root)
     if len(built) != 3:
@@ -623,7 +860,7 @@ def build_runtime_asset() -> bpy.types.Object:
             f"meshes={mesh_count}/3 vertices={vertex_count} triangles={triangle_count}/1200"
         )
     dimensions = []
-    for variant, geometry, _ in built:
+    for variant, geometry, _, _, _ in built:
         positions = [geometry.matrix_local @ vertex.co for vertex in geometry.data.vertices]
         minimum = Vector(
             tuple(min(position[axis] for position in positions) for axis in range(3))
@@ -641,6 +878,188 @@ def build_runtime_asset() -> bpy.types.Object:
     return root
 
 
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest().upper()
+
+
+def require_output_identity(
+    label: str,
+    path: Path,
+    expected_bytes: int,
+    expected_hash: str,
+) -> None:
+    actual_bytes = path.stat().st_size
+    actual_hash = sha256(path)
+    if expected_hash and (
+        actual_bytes != expected_bytes
+        or actual_hash != expected_hash
+    ):
+        raise RuntimeError(
+            f"{label} identity drifted: bytes={actual_bytes}/{expected_bytes} "
+            f"sha256={actual_hash}/{expected_hash}"
+        )
+
+
+def canonicalize_png_metadata(path: Path) -> None:
+    payload = path.read_bytes()
+    signature = b"\x89PNG\r\n\x1a\n"
+    if not payload.startswith(signature):
+        raise RuntimeError(f"Review render is not a PNG: {path}")
+    output = bytearray(signature)
+    offset = len(signature)
+    while offset + 12 <= len(payload):
+        chunk_length = struct.unpack_from(">I", payload, offset)[0]
+        chunk_end = offset + 12 + chunk_length
+        if chunk_end > len(payload):
+            raise RuntimeError(f"Truncated PNG chunk in {path}")
+        chunk_type = payload[offset + 4:offset + 8]
+        chunk_data = payload[offset + 8:offset + 8 + chunk_length]
+        expected_crc = struct.unpack_from(">I", payload, offset + 8 + chunk_length)[0]
+        actual_crc = zlib.crc32(chunk_type + chunk_data) & 0xFFFFFFFF
+        if actual_crc != expected_crc:
+            raise RuntimeError(f"Invalid PNG CRC in {path}: {chunk_type!r}")
+        if chunk_type not in {b"tEXt", b"tIME"}:
+            output.extend(payload[offset:chunk_end])
+        offset = chunk_end
+        if chunk_type == b"IEND":
+            break
+    if offset != len(payload):
+        raise RuntimeError(f"Invalid PNG chunk layout: {path}")
+    path.write_bytes(output)
+
+
+def read_glb_document(path: Path) -> tuple[dict, list[tuple[int, bytes]]]:
+    payload = path.read_bytes()
+    if len(payload) < 20:
+        raise RuntimeError(f"GLB is truncated: {path}")
+    magic, version, declared_length = struct.unpack_from("<4sII", payload, 0)
+    if magic != b"glTF" or version != 2 or declared_length != len(payload):
+        raise RuntimeError(
+            f"Invalid GLB header: magic={magic!r} version={version} "
+            f"length={declared_length}/{len(payload)}"
+        )
+    chunks: list[tuple[int, bytes]] = []
+    document = None
+    offset = 12
+    while offset + 8 <= len(payload):
+        chunk_length, chunk_type = struct.unpack_from("<II", payload, offset)
+        offset += 8
+        chunk = payload[offset:offset + chunk_length]
+        offset += chunk_length
+        chunks.append((chunk_type, chunk))
+        if chunk_type == 0x4E4F534A:
+            document = json.loads(chunk.rstrip(b"\x00\x20\t\r\n").decode("utf-8"))
+    if offset != len(payload) or document is None:
+        raise RuntimeError(f"Invalid GLB chunk layout: {path}")
+    return document, chunks
+
+
+def gltf_translation(node: dict) -> Vector:
+    values = node.get("translation", (0.0, 0.0, 0.0))
+    if len(values) != 3:
+        raise RuntimeError(f"Invalid glTF node translation: {values}")
+    return Vector(values)
+
+
+def blender_to_gltf_translation(position: Vector) -> Vector:
+    return Vector((position.x, position.z, -position.y))
+
+
+def validate_exported_aperture_contract(
+    expected_locations: dict[str, tuple[Vector, Vector]],
+) -> None:
+    document, _ = read_glb_document(OUTPUT_GLB)
+    nodes = document.get("nodes", [])
+    root_matches = [
+        index
+        for index, node in enumerate(nodes)
+        if node.get("name") == "SteelTideAuthoredOptics"
+    ]
+    if len(root_matches) != 1:
+        raise RuntimeError(
+            f"Exported authored optic root count drifted: {len(root_matches)}"
+        )
+    root_children = set(nodes[root_matches[0]].get("children", []))
+    for spec in OPTICS:
+        variant_matches = [
+            index
+            for index, node in enumerate(nodes)
+            if node.get("name") == spec.node_name
+        ]
+        if len(variant_matches) != 1 or variant_matches[0] not in root_children:
+            raise RuntimeError(
+                f"Exported {spec.node_name} is not a direct child of the runtime root."
+            )
+        variant = nodes[variant_matches[0]]
+        children = [nodes[index] for index in variant.get("children", [])]
+
+        def require_child(name: str) -> dict:
+            matches = [child for child in children if child.get("name") == name]
+            if len(matches) != 1:
+                raise RuntimeError(
+                    f"Exported {spec.node_name}/{name} count drifted: {len(matches)}"
+                )
+            return matches[0]
+
+        require_child(spec.geometry_name)
+        reticle = require_child(spec.node_name.replace("Optic", "ReticleAnchor"))
+        rear_name = aperture_anchor_name(spec.node_name, "Rear")
+        front_name = aperture_anchor_name(spec.node_name, "Front")
+        rear = require_child(rear_name)
+        front = require_child(front_name)
+        if (
+            rear.get("extras", {}).get("runtime_contract_name") != rear_name
+            or front.get("extras", {}).get("runtime_contract_name") != front_name
+        ):
+            raise RuntimeError(
+                f"Exported {spec.node_name} aperture names are not stable contracts."
+            )
+        if (
+            rear.get("extras", {}).get("derived_from_source_plane") != "rear"
+            or front.get("extras", {}).get("derived_from_source_plane") != "front"
+        ):
+            raise RuntimeError(
+                f"Exported {spec.node_name} aperture provenance drifted."
+            )
+        rear_translation = gltf_translation(rear)
+        front_translation = gltf_translation(front)
+        reticle_translation = gltf_translation(reticle)
+        expected_rear, expected_front = expected_locations[spec.node_name]
+        if (
+            rear_translation - blender_to_gltf_translation(expected_rear)
+        ).length > ANCHOR_MATCH_TOLERANCE or (
+            front_translation - blender_to_gltf_translation(expected_front)
+        ).length > ANCHOR_MATCH_TOLERANCE:
+            raise RuntimeError(
+                f"Exported {spec.node_name} aperture transforms drifted."
+            )
+        godot_xy_residual = Vector(
+            (
+                front_translation.x - rear_translation.x,
+                front_translation.y - rear_translation.y,
+            )
+        ).length
+        separation = rear_translation.z - front_translation.z
+        reticle_to_rear = (reticle_translation - rear_translation).length
+        if (
+            separation <= MINIMUM_APERTURE_SEPARATION
+            or godot_xy_residual > APERTURE_AXIS_RESIDUAL_TOLERANCE
+            or reticle_to_rear > ANCHOR_MATCH_TOLERANCE
+        ):
+            raise RuntimeError(
+                f"Exported {spec.node_name} optical contract drifted: "
+                f"separation={separation:.9f} "
+                f"godot_xy_residual={godot_xy_residual:.9f} "
+                f"reticle_to_rear={reticle_to_rear:.9f}"
+            )
+        print(
+            "AUTHORED_OPTIC_EXPORTED_ANCHORS "
+            f"variant={spec.node_name} separation={separation:.9f} "
+            f"godot_xy_residual={godot_xy_residual:.9f} "
+            f"reticle_to_rear={reticle_to_rear:.9f}"
+        )
+
+
 def export_asset(root: bpy.types.Object) -> None:
     OUTPUT_GLB.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
@@ -654,6 +1073,7 @@ def export_asset(root: bpy.types.Object) -> None:
         export_apply=False,
         export_yup=True,
         export_attributes=True,
+        export_extras=True,
         export_cameras=False,
         export_lights=False,
     )
@@ -663,6 +1083,66 @@ def save_source() -> None:
     OUTPUT_BLEND.parent.mkdir(parents=True, exist_ok=True)
     bpy.context.preferences.filepaths.save_version = 0
     bpy.ops.wm.save_as_mainfile(filepath=str(OUTPUT_BLEND))
+
+
+def validate_glb_roundtrip(
+    expected_locations: dict[str, tuple[Vector, Vector]],
+) -> bpy.types.Object:
+    clear_scene()
+    bpy.ops.import_scene.gltf(filepath=str(OUTPUT_GLB))
+    root = bpy.data.objects.get("SteelTideAuthoredOptics")
+    if root is None:
+        raise RuntimeError("Authored optic GLB round trip lost its runtime root.")
+    mesh_count, vertex_count, triangle_count = mesh_statistics(root)
+    if mesh_count != 3 or triangle_count != 1200 or vertex_count < 2200:
+        raise RuntimeError(
+            "Authored optic GLB round-trip topology drifted: "
+            f"meshes={mesh_count}/3 vertices={vertex_count} triangles={triangle_count}/1200"
+        )
+    for spec in OPTICS:
+        variant = bpy.data.objects.get(spec.node_name)
+        geometry = bpy.data.objects.get(spec.geometry_name)
+        reticle = bpy.data.objects.get(spec.node_name.replace("Optic", "ReticleAnchor"))
+        if variant is None or geometry is None or reticle is None:
+            raise RuntimeError(
+                f"Authored optic GLB round trip lost {spec.node_name} nodes."
+            )
+
+        def require_contract_child(contract_name: str) -> bpy.types.Object:
+            matches = [
+                child
+                for child in variant.children
+                if child.name == contract_name
+                and child.get("runtime_contract_name") == contract_name
+            ]
+            if len(matches) != 1:
+                raise RuntimeError(
+                    f"{spec.node_name}/{contract_name} round-trip count drifted: "
+                    f"{len(matches)}"
+                )
+            return matches[0]
+
+        rear = require_contract_child(aperture_anchor_name(spec.node_name, "Rear"))
+        front = require_contract_child(aperture_anchor_name(spec.node_name, "Front"))
+        expected_rear, expected_front = expected_locations[spec.node_name]
+        if (
+            rear.location - expected_rear
+        ).length > ROUND_TRIP_TOLERANCE or (
+            front.location - expected_front
+        ).length > ROUND_TRIP_TOLERANCE:
+            raise RuntimeError(
+                f"{spec.node_name} aperture anchors moved during GLB round trip: "
+                f"rear={tuple(rear.location)} front={tuple(front.location)}"
+            )
+        validate_aperture_anchor_pair(
+            variant,
+            reticle,
+            rear,
+            front,
+            "glb_roundtrip",
+        )
+        validate_open_aperture(variant, geometry, reticle)
+    return root
 
 
 def preview_material(
@@ -765,6 +1245,8 @@ def add_preview_stage() -> None:
     camera_data.lens = 60.0
     scene.render.filepath = str(ADS_PREVIEW_PATH)
     bpy.ops.render.render(write_still=True)
+    canonicalize_png_metadata(PREVIEW_PATH)
+    canonicalize_png_metadata(ADS_PREVIEW_PATH)
 
 
 def main() -> None:
@@ -785,6 +1267,11 @@ def main() -> None:
         "HoloReticleAnchor",
         "ScopeReticleAnchor",
     }
+    expected_nodes.update(
+        spec.node_name.replace("Optic", suffix)
+        for spec in OPTICS
+        for suffix in ("RearApertureAnchor", "FrontApertureAnchor")
+    )
     available_nodes = {obj.name for obj in (root, *root.children_recursive)}
     missing = expected_nodes - available_nodes
     if missing:
@@ -794,16 +1281,66 @@ def main() -> None:
         geometry = bpy.data.objects[spec.geometry_name]
         anchor_name = spec.node_name.replace("Optic", "ReticleAnchor")
         anchors = [child for child in variant.children if child.name == anchor_name]
-        if len(anchors) != 1 or geometry.parent != variant:
+        rear = bpy.data.objects[
+            spec.node_name.replace("Optic", "RearApertureAnchor")
+        ]
+        front = bpy.data.objects[
+            spec.node_name.replace("Optic", "FrontApertureAnchor")
+        ]
+        if (
+            len(anchors) != 1
+            or geometry.parent != variant
+            or rear.parent != variant
+            or front.parent != variant
+        ):
             raise RuntimeError(f"Incomplete runtime hierarchy for {spec.node_name}.")
 
     mesh_count, vertex_count, triangle_count = mesh_statistics(root)
+    expected_locations = {
+        spec.node_name: (
+            bpy.data.objects[
+                spec.node_name.replace("Optic", "RearApertureAnchor")
+            ].location.copy(),
+            bpy.data.objects[
+                spec.node_name.replace("Optic", "FrontApertureAnchor")
+            ].location.copy(),
+        )
+        for spec in OPTICS
+    }
     export_asset(root)
+    validate_exported_aperture_contract(expected_locations)
+    require_output_identity(
+        "Authored optics GLB",
+        OUTPUT_GLB,
+        OUTPUT_GLB_BYTES,
+        OUTPUT_GLB_SHA256,
+    )
     save_source()
+    validate_glb_roundtrip(expected_locations)
     add_preview_stage()
+    require_output_identity(
+        "Authored optics review preview",
+        PREVIEW_PATH,
+        OUTPUT_PREVIEW_BYTES,
+        OUTPUT_PREVIEW_SHA256,
+    )
+    require_output_identity(
+        "Authored optics ADS preview",
+        ADS_PREVIEW_PATH,
+        OUTPUT_ADS_PREVIEW_BYTES,
+        OUTPUT_ADS_PREVIEW_SHA256,
+    )
     print(
         "AUTHORED_OPTICS_EXPORT "
         f"meshes={mesh_count} vertices={vertex_count} triangles={triangle_count} "
+        f"glb_bytes={OUTPUT_GLB.stat().st_size} "
+        f"glb_sha256={sha256(OUTPUT_GLB)} "
+        f"blend_bytes={OUTPUT_BLEND.stat().st_size} "
+        f"blend_sha256={sha256(OUTPUT_BLEND)} "
+        f"preview_bytes={PREVIEW_PATH.stat().st_size} "
+        f"preview_sha256={sha256(PREVIEW_PATH)} "
+        f"ads_preview_bytes={ADS_PREVIEW_PATH.stat().st_size} "
+        f"ads_preview_sha256={sha256(ADS_PREVIEW_PATH)} "
         f"glb={OUTPUT_GLB} blend={OUTPUT_BLEND} preview={PREVIEW_PATH} "
         f"ads_preview={ADS_PREVIEW_PATH}"
     )

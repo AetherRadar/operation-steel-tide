@@ -24,15 +24,23 @@ The build produces:
 The exported root is `SteelTideAuthoredOptics`. It owns exactly three visible
 mesh variants:
 
-| Variant | Geometry | Reticle marker | Blender dimensions (W/L/H) |
-| --- | --- | --- | --- |
-| `MicroOptic` | `MicroGeometry` | `MicroReticleAnchor` | `0.112 / 0.108 / 0.120 m` |
-| `HoloOptic` | `HoloGeometry` | `HoloReticleAnchor` | `0.168 / 0.142 / 0.160 m` |
-| `ScopeOptic` | `ScopeGeometry` | `ScopeReticleAnchor` | `0.132 / 0.420 / 0.145 m` |
+| Variant | Geometry | Reticle marker | Rear/front aperture markers | Blender dimensions (W/L/H) |
+| --- | --- | --- | --- | --- |
+| `MicroOptic` | `MicroGeometry` | `MicroReticleAnchor` | `MicroRearApertureAnchor` / `MicroFrontApertureAnchor` | `0.112 / 0.108 / 0.120 m` |
+| `HoloOptic` | `HoloGeometry` | `HoloReticleAnchor` | `HoloRearApertureAnchor` / `HoloFrontApertureAnchor` | `0.168 / 0.142 / 0.160 m` |
+| `ScopeOptic` | `ScopeGeometry` | `ScopeReticleAnchor` | `ScopeRearApertureAnchor` / `ScopeFrontApertureAnchor` | `0.132 / 0.420 / 0.145 m` |
 
-All three variants are centered on the optical axis with their rail-contact
-geometry below the reticle. Blender `+Y` maps to Godot `-Z`, so the reticle
-markers import at local Godot positions `(0, 0, +depth)`.
+Every aperture marker is a direct child of its optic variant. The names are
+globally unique because Godot 4.6 globally uniquifies imported glTF node names,
+not merely sibling names. All three variants remain centered on the optical
+axis with their rail-contact geometry below the reticle. Blender `+Y` maps to
+Godot `-Z`; the `FrontApertureAnchor` endpoint is consequently the
+more-negative local Godot `Z` endpoint.
+
+The rear and front coordinates come independently from the bounding centers
+of the original rear and front source-glass planes after deformation. The
+reticle marker is deliberately coincident with the rear anchor; no aperture
+endpoint is copied from a reticle marker.
 
 ## Deterministic quality checks
 
@@ -44,14 +52,21 @@ The script fails before export unless all of the following remain true:
 - all three runtime nodes contain nonempty, source-derived mesh geometry;
 - the runtime hierarchy contains no generated primitive mesh;
 - exactly 12 source glass triangles are removed per optic;
+- those triangles resolve into exactly two independent 8-vertex,
+  6-face/6-triangle planes;
+- the six globally unique aperture anchors are direct variant children and
+  preserve their exact raw-GLB and Blender-round-trip names;
+- front/rear separation stays positive, Godot XY optical-axis residual stays
+  at or below 0.5 mm, and reticle-to-rear distance remains zero;
 - every centerline passes through the housing without a BVH hit;
 - the three silhouettes remain dimensionally distinct; and
 - the final total is three meshes, at least 2,200 vertices, and exactly 1,200
   triangles.
 
 Godot additionally requires the three geometry nodes, the three reticle anchor
-nodes, six material surfaces, and distinct micro/holo/scope bounds through
-`CombatModelLibrary.InspectAuthoredOptics()` and `--validate-combat-models`.
+nodes, the six unique aperture-anchor nodes, six material surfaces, and
+distinct micro/holo/scope bounds. A clean Godot 4.6.3 import-tree audit verifies
+that none of the unique anchor names receives a numeric suffix.
 
 Full creator, source URL, license, file mapping, and hashes are recorded in
 `assets/models/steel_tide_optics/LICENSE.md`.

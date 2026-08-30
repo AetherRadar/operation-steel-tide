@@ -313,6 +313,7 @@ public partial class FreightTerminalWorld
             + $"{authoredOptics.MaterialCount}/"
             + $"{authoredOptics.VertexCount}/"
             + $"{authoredOptics.TriangleCount} "
+            + $"authored_optic_axis={authoredOptics.AxisAnchorsValid} "
             + $"authored_optic_sizes={authoredOptics.MicroSize}/"
             + $"{authoredOptics.HoloSize}/"
             + $"{authoredOptics.ScopeSize} "

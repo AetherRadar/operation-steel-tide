@@ -1,12 +1,24 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
-    private async void ValidateAdsAlignment()
+    private async void ValidateAdsAlignment(bool narrow = false, bool ultrawide = false)
     {
+        if (narrow || ultrawide)
+        {
+            var window = GetWindow();
+            window.ContentScaleMode = Window.ContentScaleModeEnum.CanvasItems;
+            window.ContentScaleAspect = Window.ContentScaleAspectEnum.Ignore;
+            window.Size = ultrawide
+                ? new Vector2I(2048, 621)
+                : new Vector2I(985, 847);
+            await WaitFrames(4);
+        }
+
         DisableActorsForSurvivalDiagnostics();
         _player.UiLocked = false;
         _player.SetSearchPose(false);
@@ -44,8 +56,28 @@ public partial class FreightTerminalWorld
             WeaponPlatform Platform,
             string OpticId,
             TacticalPlayer.FirstPersonOpticClearanceInspection Inspection,
-            Vector2 ScreenOffset)>();
-        var stancesReady = true;
+            Vector2 ScreenOffset,
+            TacticalPlayer.OpticAxisProjectionInspection Axis)>();
+        var worldOpticSamples = new List<(
+            WeaponPlatform Platform,
+            string OpticId,
+            bool Valid)>();
+        var warmupReady = false;
+        for (var attempt = 0; attempt < 2 && !warmupReady; attempt++)
+        {
+            Input.ActionRelease("aim");
+            await WaitFrames(4);
+            Input.ActionPress("aim");
+            warmupReady = await WaitForAimSettlement();
+        }
+        Input.ActionRelease("aim");
+        await WaitFrames(12);
+
+        // A cold Mono/resource load can complete after the diagnostic starts and
+        // clear the first synthetic input state. Warm the real ADS path before
+        // recording inherited-pose samples so a clean checkout is deterministic,
+        // while still requiring the second attempt to exercise live input.
+        var stancesReady = warmupReady;
         var opticSamplesSettled = true;
 
         await MeasureAfterInheritedPose(
@@ -81,29 +113,38 @@ public partial class FreightTerminalWorld
 
         Input.ActionRelease("aim");
         await WaitFrames(10);
-        var vssAttachmentCompatibilitySamples = new List<(
+        var attachmentCompatibilitySamples = new List<(
+            WeaponPlatform Platform,
             string AttachmentId,
             bool Expected,
             bool Actual)>();
-        var vssAttachmentCompatibilityMatrix = new[]
+        var opticAttachments = WeaponCatalog.AllAttachments
+            .Where(attachment => attachment.Slot == AttachmentSlot.Optic)
+            .OrderBy(attachment => attachment.Id)
+            .ToArray();
+        var attachmentCompatibilityValid = true;
+        foreach (var weapon in WeaponCatalog.AllWeapons.OrderBy(weapon => weapon.Platform))
         {
-            (AttachmentId: "optic_micro", Expected: false),
-            (AttachmentId: "optic_holo", Expected: false),
-            (AttachmentId: "optic_scope", Expected: true),
-            (AttachmentId: "optic_7x", Expected: true),
-            (AttachmentId: "optic_sniper", Expected: true)
-        };
-        var vssAttachmentCompatibilityValid = true;
-        foreach (var sample in vssAttachmentCompatibilityMatrix)
-        {
-            var actual = WeaponCatalog.CanEquipAttachment(
-                WeaponPlatform.VSS,
-                sample.AttachmentId);
-            vssAttachmentCompatibilitySamples.Add((
-                sample.AttachmentId,
-                sample.Expected,
-                actual));
-            vssAttachmentCompatibilityValid &= actual == sample.Expected;
+            foreach (var attachment in opticAttachments)
+            {
+                var fixedScope = weapon.Platform is WeaponPlatform.M24
+                    or WeaponPlatform.AXMC
+                    or WeaponPlatform.AWM
+                    or WeaponPlatform.VSS;
+                var magnified = attachment.Id is "optic_scope"
+                    or "optic_7x"
+                    or "optic_sniper";
+                var expected = !fixedScope || magnified;
+                var actual = WeaponCatalog.CanEquipAttachment(
+                    weapon.Platform,
+                    attachment.Id);
+                attachmentCompatibilitySamples.Add((
+                    weapon.Platform,
+                    attachment.Id,
+                    expected,
+                    actual));
+                attachmentCompatibilityValid &= actual == expected;
+            }
         }
 
         var vssCompatibilityBuild = WeaponCatalog.Build(WeaponPlatform.VSS, 3);
@@ -133,25 +174,60 @@ public partial class FreightTerminalWorld
         var slotPathRejected = ReferenceEquals(slotResult, slotIncoming)
             && _player.EquippedWeapon.Attachments.GetValueOrDefault(AttachmentSlot.Optic) == "optic_scope"
             && _player.EquippedAttachmentGrade(AttachmentSlot.Optic) == vssOpticGradeBefore;
-        vssAttachmentCompatibilityValid &= directPathRejected && slotPathRejected;
+        var incompatibleWholeWeapon = WeaponCatalog.Build(WeaponPlatform.M24, 3);
+        incompatibleWholeWeapon.Attachments[AttachmentSlot.Optic] = "optic_micro";
+        _player.EquipFromLootToWeaponSlot(
+            new LootItem
+            {
+                Kind = LootItemKind.Weapon,
+                Weapon = incompatibleWholeWeapon,
+                Grade = LootGrade.Epic
+            },
+            PlayerWeaponSlot.Primary);
+        await WaitFrames(4);
+        var wholeWeaponPathNormalized = _player.EquippedWeapon.Platform == WeaponPlatform.M24
+            && _player.EquippedWeapon.Attachments.GetValueOrDefault(AttachmentSlot.Optic)
+                == "optic_sniper"
+            && _player.AuthoredOpticPresentationValidForDiagnostics
+            && !_player.HasVisibleAuthoredOpticGeometryForDiagnostics;
+        var missingOpticWholeWeapon = WeaponCatalog.Build(WeaponPlatform.AWM, 3);
+        missingOpticWholeWeapon.Attachments.Remove(AttachmentSlot.Optic);
+        _player.EquipFromLootToWeaponSlot(
+            new LootItem
+            {
+                Kind = LootItemKind.Weapon,
+                Weapon = missingOpticWholeWeapon,
+                Grade = LootGrade.Epic
+            },
+            PlayerWeaponSlot.Primary);
+        await WaitFrames(4);
+        var missingWholeWeaponPathNormalized = _player.EquippedWeapon.Platform
+                == WeaponPlatform.AWM
+            && _player.EquippedWeapon.Attachments.GetValueOrDefault(AttachmentSlot.Optic)
+                == "optic_7x"
+            && _player.AuthoredOpticPresentationValidForDiagnostics
+            && !_player.HasVisibleAuthoredOpticGeometryForDiagnostics;
+        attachmentCompatibilityValid &= directPathRejected
+            && slotPathRejected
+            && wholeWeaponPathNormalized
+            && missingWholeWeaponPathNormalized;
 
-        var opticClearanceMatrix = new[]
-        {
-            (Platform: WeaponPlatform.M4A1, OpticId: "optic_micro"),
-            (Platform: WeaponPlatform.M4A1, OpticId: "optic_holo"),
-            (Platform: WeaponPlatform.M4A1, OpticId: "optic_scope"),
-            (Platform: WeaponPlatform.AK74, OpticId: "optic_micro"),
-            (Platform: WeaponPlatform.AK74, OpticId: "optic_holo"),
-            (Platform: WeaponPlatform.AK74, OpticId: "optic_scope"),
-            (Platform: WeaponPlatform.ScarL, OpticId: "optic_micro"),
-            (Platform: WeaponPlatform.ScarL, OpticId: "optic_holo"),
-            (Platform: WeaponPlatform.ScarL, OpticId: "optic_scope"),
-            (Platform: WeaponPlatform.MP5A5, OpticId: "optic_micro"),
-            (Platform: WeaponPlatform.MP5A5, OpticId: "optic_holo"),
-            (Platform: WeaponPlatform.VSS, OpticId: "optic_scope")
-        };
+        var opticClearanceMatrix = WeaponCatalog.AllWeapons
+            .OrderBy(weapon => weapon.Platform)
+            .SelectMany(weapon => opticAttachments
+                .Where(attachment => WeaponCatalog.CanEquipAttachment(
+                    weapon.Platform,
+                    attachment.Id))
+                .Select(attachment => (
+                    Platform: weapon.Platform,
+                    OpticId: attachment.Id)))
+            .ToArray();
         foreach (var sample in opticClearanceMatrix)
         {
+            worldOpticSamples.Add((
+                sample.Platform,
+                sample.OpticId,
+                InspectWorldOpticPresentation(sample.Platform, sample.OpticId)));
             await MeasureOpticClearance(sample.Platform, sample.OpticId);
         }
 
@@ -168,11 +244,14 @@ public partial class FreightTerminalWorld
 
         const float screenTolerancePixels = 1.5f;
         const float yawToleranceRadians = 0.001f;
+        const float opticAxisToleranceRadians = 0.003f;
         const float opticMountMaximumGapMeters = 0.02f;
         const float opticMountMaximumIntersectionMeters = 0.03f;
         const float ak47OpticContactToleranceMeters = 0.003f;
         var opticClearanceValid = opticSamplesSettled
             && opticClearanceSamples.Count == opticClearanceMatrix.Length;
+        var worldOpticsValid = worldOpticSamples.Count == opticClearanceMatrix.Length
+            && worldOpticSamples.All(sample => sample.Valid);
         foreach (var sample in opticClearanceSamples)
         {
             var contactRequired = !sample.Inspection.IntegratedOptic;
@@ -188,6 +267,11 @@ public partial class FreightTerminalWorld
                 && sample.Inspection.AuthoredPresentationValid
                 && sample.Inspection.IntegratedApertureValid
                 && sample.Inspection.ReticleDiameter is > 0.0f and <= 0.007f
+                && sample.Axis.Available
+                && sample.Axis.ReticleToRearPixels <= screenTolerancePixels
+                && sample.Axis.RearToFrontPixels <= screenTolerancePixels
+                && sample.Axis.FrontToScreenCenterPixels <= screenTolerancePixels
+                && sample.Axis.AxisAngleRadians <= opticAxisToleranceRadians
                 && (!contactRequired
                     || (sample.Inspection.MountGap >= -maximumIntersection
                         && sample.Inspection.MountGap <= maximumGap))
@@ -198,12 +282,14 @@ public partial class FreightTerminalWorld
             && offsets.Count == 4
             && maxOffset <= screenTolerancePixels
             && maxYaw <= yawToleranceRadians
-            && vssAttachmentCompatibilityValid
+            && attachmentCompatibilityValid
+            && worldOpticsValid
             && opticClearanceValid;
 
         await WaitFrames(2);
-        SaveViewportImage("res://ads_alignment_validation.png");
-        GD.Print($"ADS_ALIGNMENT_CHECK valid={valid} samples={offsets.Count} stances={stancesReady} reload={reloadCompleted} max_offset_px={maxOffset:0.000} max_yaw_rad={maxYaw:0.000000} offsets={FormatOffsets(offsets)} vss_compatibility={vssAttachmentCompatibilityValid} vss_compatibility_samples={FormatAttachmentCompatibilitySamples(vssAttachmentCompatibilitySamples)} vss_rejection_paths=direct:{directPathRejected};slot:{slotPathRejected} optic_settled={opticSamplesSettled} optic_clearance={opticClearanceValid} optic_samples={FormatOpticClearanceSamples(opticClearanceSamples)}");
+        var layout = ultrawide ? "ultrawide" : narrow ? "narrow" : "standard";
+        SaveViewportImage($"res://ads_alignment_{layout}_validation.png");
+        GD.Print($"ADS_ALIGNMENT_CHECK valid={valid} layout={layout} samples={offsets.Count} stances={stancesReady} reload={reloadCompleted} max_offset_px={maxOffset:0.000} max_yaw_rad={maxYaw:0.000000} offsets={FormatOffsets(offsets)} attachment_compatibility={attachmentCompatibilityValid} attachment_compatibility_samples={FormatAttachmentCompatibilitySamples(attachmentCompatibilitySamples)} vss_rejection_paths=direct:{directPathRejected};slot:{slotPathRejected} whole_weapon_normalized={wholeWeaponPathNormalized} missing_whole_weapon_normalized={missingWholeWeaponPathNormalized} world_optics={worldOpticsValid} world_optic_samples={FormatWorldOpticSamples(worldOpticSamples)} optic_settled={opticSamplesSettled} optic_clearance={opticClearanceValid} optic_samples={FormatOpticClearanceSamples(opticClearanceSamples)}");
         GD.Print($"ADS_ALIGNMENT_PASS valid={valid}");
         Input.ActionRelease("aim");
         Input.ActionRelease("lean_left");
@@ -267,15 +353,30 @@ public partial class FreightTerminalWorld
             // inherited viewmodel transform before exercising the real ADS
             // transition so one platform's interpolated pose cannot poison the
             // next sample.
-            _player.SetAimingPoseForDiagnostics(false);
-            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-            Input.ActionPress("aim");
-            opticSamplesSettled &= await WaitForAimSettlement();
+            var sampleSettled = false;
+            for (var attempt = 0; attempt < 2 && !sampleSettled; attempt++)
+            {
+                _player.SetAimingPoseForDiagnostics(false);
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                Input.ActionPress("aim");
+                sampleSettled = await WaitForAimSettlement();
+                if (!sampleSettled)
+                {
+                    // Window focus changes and a late cold resource load can
+                    // clear synthetic input without exercising the ADS path.
+                    // Re-enter from a known hip pose once; the measured sample
+                    // still has to satisfy the original pixel/axis tolerances.
+                    Input.ActionRelease("aim");
+                    await WaitFrames(4);
+                }
+            }
+            opticSamplesSettled &= sampleSettled;
             opticClearanceSamples.Add((
                 platform,
                 opticId,
                 _player.InspectOpticClearanceForDiagnostics(),
-                _player.OpticScreenOffsetForDiagnostics()));
+                _player.OpticScreenOffsetForDiagnostics(),
+                _player.InspectOpticAxisProjectionForDiagnostics()));
             Input.ActionRelease("aim");
             for (var frame = 0; frame < 12; frame++)
             {
@@ -314,6 +415,36 @@ public partial class FreightTerminalWorld
         }
     }
 
+    private bool InspectWorldOpticPresentation(WeaponPlatform platform, string opticId)
+    {
+        AuthoredWeaponVisual? visual = null;
+        try
+        {
+            var build = WeaponCatalog.Build(platform, 3);
+            build.Attachments[AttachmentSlot.Optic] = opticId;
+            visual = CombatModelLibrary.InstantiateWeapon(platform, firstPerson: false);
+            visual.Root.ProcessMode = ProcessModeEnum.Disabled;
+            visual.Root.Position = new Vector3(0.0f, -100.0f, 0.0f);
+            AddChild(visual.Root);
+            visual.Configure(build);
+            return visual.WorldOpticPresentationMatches(build);
+        }
+        catch (System.Exception exception)
+        {
+            GD.PushWarning(
+                $"World optic diagnostic failed for {platform}/{opticId}: {exception.Message}");
+            return false;
+        }
+        finally
+        {
+            if (visual is not null && IsInstanceValid(visual.Root))
+            {
+                visual.Root.GetParent()?.RemoveChild(visual.Root);
+                visual.Root.Free();
+            }
+        }
+    }
+
     private static string FormatOffsets(IReadOnlyList<Vector2> offsets)
     {
         var formatted = new string[offsets.Count];
@@ -326,6 +457,7 @@ public partial class FreightTerminalWorld
 
     private static string FormatAttachmentCompatibilitySamples(
         IReadOnlyList<(
+            WeaponPlatform Platform,
             string AttachmentId,
             bool Expected,
             bool Actual)> samples)
@@ -334,17 +466,23 @@ public partial class FreightTerminalWorld
         for (var index = 0; index < samples.Count; index++)
         {
             var sample = samples[index];
-            formatted[index] = $"{sample.AttachmentId}:expected={sample.Expected};actual={sample.Actual}";
+            formatted[index] = $"{sample.Platform}/{sample.AttachmentId}:expected={sample.Expected};actual={sample.Actual}";
         }
         return string.Join(',', formatted);
     }
+
+    private static string FormatWorldOpticSamples(
+        IReadOnlyList<(WeaponPlatform Platform, string OpticId, bool Valid)> samples)
+        => string.Join(',', samples.Select(
+            sample => $"{sample.Platform}/{sample.OpticId}:{sample.Valid}"));
 
     private static string FormatOpticClearanceSamples(
         IReadOnlyList<(
             WeaponPlatform Platform,
             string OpticId,
             TacticalPlayer.FirstPersonOpticClearanceInspection Inspection,
-            Vector2 ScreenOffset)> samples)
+            Vector2 ScreenOffset,
+            TacticalPlayer.OpticAxisProjectionInspection Axis)> samples)
     {
         var formatted = new string[samples.Count];
         for (var index = 0; index < samples.Count; index++)
@@ -367,7 +505,12 @@ public partial class FreightTerminalWorld
                 + $"surface={sample.Inspection.MountSurfaceHeight:0.000};"
                 + $"bottom={sample.Inspection.OpticBottom:0.000};"
                 + $"gap={sample.Inspection.MountGap:0.000};"
-                + $"offset={sample.ScreenOffset.Length():0.000}";
+                + $"offset={sample.ScreenOffset.Length():0.000};"
+                + $"axis_available={sample.Axis.Available};"
+                + $"dot_rear_px={sample.Axis.ReticleToRearPixels:0.000};"
+                + $"rear_front_px={sample.Axis.RearToFrontPixels:0.000};"
+                + $"front_center_px={sample.Axis.FrontToScreenCenterPixels:0.000};"
+                + $"axis_angle_rad={sample.Axis.AxisAngleRadians:0.000000}";
         }
         return string.Join(',', formatted);
     }

@@ -77,6 +77,15 @@ public partial class TacticalPlayer
         // distance does not turn either sleeve opening into a full-screen shape.
         if (WeaponCatalog.IsSidearm(EquippedWeapon.Platform))
         {
+            if (IsInstanceValid(_opticRoot) && _opticRoot.Visible)
+            {
+                var sidearmOpticPosition = ActiveOpticPositionInWeaponRoot();
+                return new Vector3(
+                    -sidearmOpticPosition.X * _weaponRoot.Scale.X,
+                    -sidearmOpticPosition.Y * _weaponRoot.Scale.Y,
+                    -0.66f);
+            }
+
             var pistolSightHeight = EquippedWeapon.Platform switch
             {
                 WeaponPlatform.DesertEagle => 0.18f,
@@ -94,12 +103,25 @@ public partial class TacticalPlayer
                 -0.66f);
         }
         var opticPosition = IsInstanceValid(_opticRoot) && _opticRoot.Visible
-            ? _opticRoot.Position
+            ? ActiveOpticPositionInWeaponRoot()
             : new Vector3(0.0f, 0.205f, 0.0f);
         return new Vector3(
             -opticPosition.X * _weaponRoot.Scale.X,
             -opticPosition.Y * _weaponRoot.Scale.Y,
             -0.55f);
+    }
+
+    private Vector3 ActiveOpticPositionInWeaponRoot()
+    {
+        if (!IsInstanceValid(_opticReticle))
+        {
+            return _opticRoot.Position;
+        }
+
+        // Use the final gameplay dot rather than the mount origin as the ADS
+        // coordinate source. This absorbs authored parent transforms and any
+        // non-zero aperture marker offset without adding a per-frame search.
+        return _opticRoot.Transform * _opticReticle.Position;
     }
 
     private static float OpticMountHeight(WeaponPlatform platform, string? opticId)
@@ -111,6 +133,9 @@ public partial class TacticalPlayer
             (WeaponPlatform.MP5A5, "optic_micro") => 0.325f,
             (WeaponPlatform.MP5A5, "optic_holo") => 0.335f,
             (WeaponPlatform.MP5A5, _) => 0.355f,
+            (WeaponPlatform.M3A1, "optic_micro") => 0.170f,
+            (WeaponPlatform.M3A1, "optic_holo") => 0.192f,
+            (WeaponPlatform.M3A1, _) => 0.184f,
             (WeaponPlatform.M4A1, _) => M4A1OpticMountHeight(opticId),
             (WeaponPlatform.AWM, "optic_scope" or "optic_7x" or "optic_sniper") => 0.38f,
             (_, "optic_scope" or "optic_7x" or "optic_sniper") => 0.225f,
@@ -307,8 +332,9 @@ public partial class TacticalPlayer
 
     internal Vector2 OpticScreenOffsetForDiagnostics()
     {
-        var viewportCenter = _camera.GetViewport().GetVisibleRect().Size * 0.5f;
-        return _camera.UnprojectPosition(_opticReticle.GlobalPosition) - viewportCenter;
+        var screenScale = DiagnosticScreenScale(out var screenSize);
+        return _camera.UnprojectPosition(_opticReticle.GlobalPosition) * screenScale
+            - screenSize * 0.5f;
     }
 
     internal FirstPersonOpticClearanceInspection InspectOpticClearanceForDiagnostics()
@@ -319,35 +345,29 @@ public partial class TacticalPlayer
                 && IsInstanceValid(platformVisual.Root)
                     ? platformVisual
                     : null;
-        if (visual is null || !IsInstanceValid(_opticRoot) || !_opticRoot.Visible)
+        var weaponGeometryRoot = visual?.Root;
+        if (weaponGeometryRoot is null
+            && EquippedWeapon.Platform == WeaponPlatform.M3A1
+            && IsInstanceValid(_authoredFirstPersonSmg?.WeaponBody))
+        {
+            weaponGeometryRoot = _authoredFirstPersonSmg.WeaponBody;
+        }
+        if (weaponGeometryRoot is null
+            || !IsInstanceValid(_opticRoot)
+            || !_opticRoot.Visible)
         {
             return default;
         }
 
         var weaponTop = float.NegativeInfinity;
         var weaponRootInverse = _weaponRoot.GlobalTransform.AffineInverse();
-        foreach (var node in visual.Root.FindChildren(
-                     "*",
-                     nameof(MeshInstance3D),
-                     recursive: true,
-                     owned: false))
+        if (weaponGeometryRoot is MeshInstance3D rootMesh)
         {
-            if (node is not MeshInstance3D mesh
-                || mesh.Mesh is null
-                || !mesh.IsVisibleInTree()
-                || IsNodeBelow(mesh, visual.OpticMount))
-            {
-                continue;
-            }
-
-            var bounds = mesh.GetAabb();
-            var toWeaponRoot = weaponRootInverse * mesh.GlobalTransform;
-            for (var endpoint = 0; endpoint < 8; endpoint++)
-            {
-                weaponTop = Mathf.Max(
-                    weaponTop,
-                    (toWeaponRoot * bounds.GetEndpoint(endpoint)).Y);
-            }
+            AccumulateWeaponMesh(rootMesh);
+        }
+        foreach (var mesh in CombatModelLibrary.MeshesBelow(weaponGeometryRoot))
+        {
+            AccumulateWeaponMesh(mesh);
         }
 
         if (!float.IsFinite(weaponTop))
@@ -355,11 +375,10 @@ public partial class TacticalPlayer
             return default;
         }
 
-        var hasDedicatedIronSights = IsInstanceValid(visual.RearIronSight)
-            || IsInstanceValid(visual.FrontIronSight);
-        var ironSightsClear = !hasDedicatedIronSights
-            || (visual.RearIronSight is { Visible: false }
-                && visual.FrontIronSight is { Visible: false });
+        var hasDedicatedIronSights = visual is not null
+            && (IsInstanceValid(visual.RearIronSight)
+                || IsInstanceValid(visual.FrontIronSight)
+                || IsInstanceValid(visual.IronSightGeometry));
         var authoredPresentationValid = EquippedWeapon.Platform == WeaponPlatform.M4A1
             ? AuthoredM4AttachmentPresentationValidForDiagnostics
             : AuthoredOpticPresentationValidForDiagnostics;
@@ -370,25 +389,29 @@ public partial class TacticalPlayer
             EquippedWeapon.Platform,
             opticId);
         var integratedGeometryVisible = integratedOptic
-            && (EquippedWeapon.Platform == WeaponPlatform.VSS
-                ? visual.IntegratedOpticPresentationValid
+            && (WeaponCatalog.HasFixedIntegratedScope(EquippedWeapon.Platform)
+                ? visual?.IntegratedOpticPresentationValid == true
                 : EquippedWeapon.Platform == WeaponPlatform.M4A1
-                    && visual.OpticMount.Visible);
-        var vssAperture = EquippedWeapon.Platform == WeaponPlatform.VSS
-                && integratedOptic
-            ? visual.IntegratedOpticInspection
+                    && visual?.OpticMount.Visible == true);
+        var integratedAperture = WeaponCatalog.HasFixedIntegratedScope(
+                EquippedWeapon.Platform)
+            && integratedOptic
+            ? visual?.IntegratedOpticInspection ?? default
             : default;
-        var integratedApertureValid = EquippedWeapon.Platform != WeaponPlatform.VSS
-            || !integratedOptic
-            || vssAperture.Valid;
+        var integratedApertureValid = WeaponCatalog.HasFixedIntegratedScope(
+                EquippedWeapon.Platform)
+            ? !integratedOptic || integratedAperture.Valid
+            : EquippedWeapon.Platform != WeaponPlatform.M4A1
+                || !integratedOptic
+                || visual?.IntegratedM4OpticAxisValid == true;
         var mountSurfaceHeight = weaponTop;
-        if (EquippedWeapon.Platform == WeaponPlatform.M4A1)
+        if (EquippedWeapon.Platform == WeaponPlatform.M4A1 && visual is not null)
         {
             var integratedAnchor = weaponRootInverse
                 * visual.OpticReticleAnchor.GlobalPosition;
             mountSurfaceHeight = integratedAnchor.Y - MicroOpticRailContactOffset;
         }
-        else if (visual.OpticRailContact is { } opticRailContact
+        else if (visual?.OpticRailContact is { } opticRailContact
             && IsInstanceValid(opticRailContact))
         {
             mountSurfaceHeight = (weaponRootInverse
@@ -396,6 +419,16 @@ public partial class TacticalPlayer
         }
         var opticBottom = _opticRoot.Position.Y
             - AuthoredOpticRailContactOffset(opticId);
+        const float weldedIronSightClearanceTolerance = 0.001f;
+        var ironSightsClear = hasDedicatedIronSights
+            ? (!GodotObject.IsInstanceValid(visual!.RearIronSight)
+                    || visual.RearIronSight!.Visible == false)
+                && (!GodotObject.IsInstanceValid(visual.FrontIronSight)
+                    || visual.FrontIronSight!.Visible == false)
+                && (!GodotObject.IsInstanceValid(visual.IronSightGeometry)
+                    || visual.IronSightGeometry!.Visible == false)
+            : integratedOptic
+                || opticBottom >= weaponTop - weldedIronSightClearanceTolerance;
         return new FirstPersonOpticClearanceInspection(
             true,
             weaponTop,
@@ -413,15 +446,137 @@ public partial class TacticalPlayer
             reticleDiameter,
             integratedOptic,
             integratedApertureValid,
-            vssAperture.GlassSurfaceCount,
-            vssAperture.RearApertureSize,
-            EquippedWeapon.Platform != WeaponPlatform.VSS || !integratedOptic
+            integratedAperture.GlassSurfaceCount,
+            integratedAperture.RearApertureSize,
+            !WeaponCatalog.HasFixedIntegratedScope(EquippedWeapon.Platform)
+                || !integratedOptic
                 ? 0.0f
-                : vssAperture.Valid
-                ? (visual.Root.GlobalTransform.AffineInverse()
+                : integratedAperture.Valid
+                ? (visual!.Root.GlobalTransform.AffineInverse()
                     * visual.OpticReticleAnchor.GlobalPosition)
-                    .DistanceTo(vssAperture.RearApertureCenter)
+                    .DistanceTo(integratedAperture.RearApertureCenter)
                 : float.PositiveInfinity);
+
+        void AccumulateWeaponMesh(MeshInstance3D mesh)
+        {
+            if (mesh.Mesh is null
+                || !mesh.IsVisibleInTree()
+                || visual is not null && IsNodeBelow(mesh, visual.OpticMount))
+            {
+                return;
+            }
+
+            var bounds = mesh.GetAabb();
+            var toWeaponRoot = weaponRootInverse * mesh.GlobalTransform;
+            for (var endpoint = 0; endpoint < 8; endpoint++)
+            {
+                weaponTop = Mathf.Max(
+                    weaponTop,
+                    (toWeaponRoot * bounds.GetEndpoint(endpoint)).Y);
+            }
+        }
+    }
+
+    internal OpticAxisProjectionInspection InspectOpticAxisProjectionForDiagnostics()
+    {
+        if (!IsInstanceValid(_camera)
+            || !IsInstanceValid(_opticRoot)
+            || !IsInstanceValid(_opticReticle)
+            || !_opticRoot.Visible)
+        {
+            return default;
+        }
+
+        AuthoredWeaponVisual? visual = EquippedWeapon.Platform == WeaponPlatform.M4A1
+            ? IsInstanceValid(_authoredPrimaryWeapon?.Root) ? _authoredPrimaryWeapon : null
+            : _authoredPlatformWeapons.TryGetValue(EquippedWeapon.Platform, out var platformVisual)
+                && IsInstanceValid(platformVisual.Root)
+                    ? platformVisual
+                    : null;
+
+        EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Optic, out var opticId);
+        var integrated = WeaponUsesIntegratedOptic(EquippedWeapon.Platform, opticId);
+        var reticleWorld = _opticReticle.GlobalPosition;
+        Vector3 rearWorld;
+        Vector3 frontWorld;
+        if (integrated
+            && WeaponCatalog.HasFixedIntegratedScope(EquippedWeapon.Platform))
+        {
+            var aperture = visual?.IntegratedOpticInspection ?? default;
+            if (!aperture.Valid)
+            {
+                return default;
+            }
+
+            rearWorld = visual!.Root.GlobalTransform * aperture.RearApertureCenter;
+            frontWorld = visual.Root.GlobalTransform * aperture.FrontApertureCenter;
+        }
+        else if (integrated)
+        {
+            if (visual?.OpticRearApertureAnchor is not { } rearAnchor
+                || visual.OpticFrontApertureAnchor is not { } frontAnchor
+                || !IsInstanceValid(rearAnchor)
+                || !IsInstanceValid(frontAnchor))
+            {
+                return default;
+            }
+            rearWorld = rearAnchor.GlobalPosition;
+            frontWorld = frontAnchor.GlobalPosition;
+        }
+        else
+        {
+            if (_authoredOptics.ActiveRearApertureAnchor is not { } rearAnchor
+                || _authoredOptics.ActiveFrontApertureAnchor is not { } frontAnchor
+                || !IsInstanceValid(rearAnchor)
+                || !IsInstanceValid(frontAnchor))
+            {
+                return default;
+            }
+            rearWorld = rearAnchor.GlobalPosition;
+            frontWorld = frontAnchor.GlobalPosition;
+        }
+
+        var axis = frontWorld - rearWorld;
+        if (axis.LengthSquared() <= 0.000001f)
+        {
+            return default;
+        }
+
+        var screenScale = DiagnosticScreenScale(out var screenSize);
+        var viewportCenter = screenSize * 0.5f;
+        var reticleProjection = _camera.UnprojectPosition(reticleWorld) * screenScale;
+        var rearProjection = _camera.UnprojectPosition(rearWorld) * screenScale;
+        var frontProjection = _camera.UnprojectPosition(frontWorld) * screenScale;
+        var firingDirection = -_camera.GlobalBasis.Z.Normalized();
+        return new OpticAxisProjectionInspection(
+            true,
+            integrated,
+            reticleProjection,
+            rearProjection,
+            frontProjection,
+            viewportCenter,
+            reticleProjection.DistanceTo(rearProjection),
+            rearProjection.DistanceTo(frontProjection),
+            frontProjection.DistanceTo(viewportCenter),
+            axis.Normalized().AngleTo(firingDirection));
+    }
+
+    private Vector2 DiagnosticScreenScale(out Vector2 screenSize)
+    {
+        var logicalSize = _camera.GetViewport().GetVisibleRect().Size;
+        var windowSize = GetWindow().Size;
+        screenSize = new Vector2(windowSize.X, windowSize.Y);
+        if (logicalSize.X <= 0.0f
+            || logicalSize.Y <= 0.0f
+            || screenSize.X <= 0.0f
+            || screenSize.Y <= 0.0f)
+        {
+            screenSize = logicalSize;
+            return Vector2.One;
+        }
+        return new Vector2(
+            screenSize.X / logicalSize.X,
+            screenSize.Y / logicalSize.Y);
     }
 
     private static bool IsNodeBelow(Node node, Node ancestor)
@@ -453,6 +608,18 @@ public partial class TacticalPlayer
         int IntegratedGlassSurfaceCount,
         Vector2 IntegratedApertureSize,
         float IntegratedAnchorResidual);
+
+    internal readonly record struct OpticAxisProjectionInspection(
+        bool Available,
+        bool IntegratedOptic,
+        Vector2 ReticleProjection,
+        Vector2 RearApertureProjection,
+        Vector2 FrontApertureProjection,
+        Vector2 ViewportCenter,
+        float ReticleToRearPixels,
+        float RearToFrontPixels,
+        float FrontToScreenCenterPixels,
+        float AxisAngleRadians);
 }
 
 internal readonly record struct ViewmodelShotImpulseInspection(
