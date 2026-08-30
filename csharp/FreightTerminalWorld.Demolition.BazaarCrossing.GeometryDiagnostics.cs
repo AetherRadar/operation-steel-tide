@@ -112,6 +112,26 @@ public partial class FreightTerminalWorld
         return failed.Count == 0;
     }
 
+    private static bool BazaarDetachedFoyerCollisionRemoved(
+        DemolitionArenaLayout layout)
+        => !layout.CollisionBoxes.Any(box =>
+            box.Name.StartsWith("WallAttackFoyerWestSightBaffle", StringComparison.Ordinal)
+            || box.Name.StartsWith("WallAttackFoyerEastSightBaffle", StringComparison.Ordinal));
+
+    private static bool BazaarDetachedFoyerBafflesRemoved(
+        Node3D? dressingRoot,
+        DemolitionArenaLayout layout)
+    {
+        if (!BazaarDetachedFoyerCollisionRemoved(layout))
+        {
+            return false;
+        }
+        var model = dressingRoot?.GetNodeOrNull<Node3D>("BazaarCrossingAuthoredEnvironment");
+        return IsInstanceValid(model)
+            && model!.FindChild("Bazaar_Mid_WestSouthFrontageBaffle*", true, false) is null
+            && model.FindChild("Bazaar_Mid_EastSouthFrontageBaffle*", true, false) is null;
+    }
+
     private static IReadOnlyList<BazaarStairRun> BazaarStairRuns(
         DemolitionArenaLayout layout)
     {

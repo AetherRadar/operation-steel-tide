@@ -7,10 +7,10 @@ walls and roofs, arcades, doors, windows, cornices, columns, counters, three
 decks, six stairs, rails, stair vestibules, continuous wall storage and
 shopfront bands, rooftop monitors/ridges, and limited market dressing.
 
-The current runtime binary is 112,618,852 bytes with SHA-256
-`CA68AC570E2FAA9FF284FBB25909888BE4AC93F9C661106525A6204801C43164`.
+The current runtime binary is 115,387,624 bytes with SHA-256
+`483DC0D81DA7E9636E52B840B51899CC66E2689457FDFCF5FFE34342B3B9DB22`.
 Its packed DCC source has SHA-256
-`A4459F775CF846D0EDD98302E1750BFEB0CDED1C0FD8DA2DE422420F3DD7B720`,
+`4E262B94FC9E67F064BB7D6E1D80C4E5482A661C557A4D840A05A8CDBA3879C1`,
 and the immutable map-local source palette has SHA-256
 `1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9`.
 The runtime mesh streams are not Draco-compressed; this packaging choice does

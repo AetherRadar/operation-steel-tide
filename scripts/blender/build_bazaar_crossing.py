@@ -472,10 +472,8 @@ RUNTIME_ARCHITECTURE_AABBS = (
     ("AttackEast", 36.5, 48.5, 43.0, 13.0, 7.6),
     ("AttackWestEntryWing", -12.0, 48.25, 6.0, 13.5, 8.0),
     ("AttackEastEntryWing", 12.0, 48.25, 6.0, 13.5, 8.0),
-    ("WestLaneLink", -46.0, 39.25, 6.0, 5.5, 8.4),
-    ("EastLaneLink", 46.0, 39.25, 6.0, 5.5, 8.4),
-    ("MidWestSouthFrontageBaffle", -10.5, 36.5, 0.42, 5.0, 8.0),
-    ("MidEastSouthFrontageBaffle", 10.5, 36.5, 0.42, 5.0, 8.0),
+    ("WestLaneLink", -45.5, 39.25, 7.0, 5.5, 8.4),
+    ("EastLaneLink", 45.5, 39.25, 7.0, 5.5, 8.4),
     ("WestApproachFacadeReturn", -49.0, 4.0, 0.42, 16.0, 8.0),
     ("EastApproachFacadeReturn", 52.0, 3.0, 0.42, 18.0, 8.0),
     ("WestConnectorReturn", -20.0, -19.4, 0.42, 3.2, 8.0),
@@ -3350,8 +3348,8 @@ def build_map_v2(
         ("AttackEastFoundry", (45.0, 58.0, 42.0, 55.0), 7.6, ("quat_metal_window", "trey_window"), steel),
         ("AttackWestEntryWing", (-15.0, -9.0, 41.5, 55.0), 8.0, ("quat_curved_window", "trey_foundation"), concrete),
         ("AttackEastEntryWing", (9.0, 15.0, 41.5, 55.0), 8.0, ("quat_metal_window", "trey_foundation"), steel),
-        ("WestLaneLink", (-49.0, -43.0, 36.5, 42.0), 8.4, ("quat_window_trim", "trey_foundation"), warm),
-        ("EastLaneLink", (43.0, 49.0, 36.5, 42.0), 8.4, ("quat_metal_window", "trey_foundation"), steel),
+        ("WestLaneLink", (-49.0, -42.0, 36.5, 42.0), 8.4, ("quat_window_trim", "trey_foundation"), warm),
+        ("EastLaneLink", (42.0, 49.0, 36.5, 42.0), 8.4, ("quat_metal_window", "trey_foundation"), steel),
         ("SouthWestCaravan", (-58.0, -37.0, 12.0, 36.5), 6.8, ("quat_window_trim", "trey_foundation"), warm),
         ("SouthWestArchive", (-37.0, -16.0, 12.0, 36.5), 8.0, ("quat_curved_window",), concrete),
         ("SouthEastTextile", (16.0, 38.0, 12.0, 36.5), 7.2, ("quat_window_trim", "trey_foundation"), warm),
@@ -4606,82 +4604,10 @@ def build_map_v2(
             depth_scale=0.76,
         )
 
-    # Two thin two-storey shop-wall extensions mirror the final LOS baffles at
-    # the Mid south frontage.  Stacked Quaternius façades, Trey cornices/posts,
-    # and coloured sign piers articulate the 420 mm wall instead of exposing a
-    # featureless collision slab; the north tips remain clear for attack routes.
+    # Keep the attack foyer open between the three real building masses.  The
+    # previous west/east frontage baffles were detached at both ends, read as
+    # freestanding façade slices, and created four low-value blind corners.
     trim_depth = source_dimensions(templates["trey_roof_trim"]).y
-    for side_name, wall_x, sign_material in (
-        ("West", -10.5, sign_ochre),
-        ("East", 10.5, sign_teal),
-    ):
-        for tier_index, (bottom, height, key) in enumerate(
-            ((0.0, 4.0, "quat_window_trim"), (4.0, 4.0, "quat_metal_window"))
-        ):
-            module_depth = source_dimensions(templates[key]).y
-            wall_objects = make_module_run(
-                f"Bazaar_Mid_{side_name}SouthFrontageBaffle_Tier{tier_index:02d}",
-                (wall_x, 34.0),
-                (wall_x, 39.0),
-                bottom,
-                height,
-                (key,),
-                templates,
-                specs,
-                architecture,
-                root,
-                role="finished_cc0_full_height_shop_wall_extension",
-                nominal_cell=2.5,
-                depth_scale=0.42 / module_depth,
-            )
-            for wall_object in wall_objects:
-                wall_object["runtime_wall_thickness_m"] = 0.42
-                wall_object["runtime_wall_bounds_xz"] = f"{wall_x:.3f},34.000,{wall_x:.3f},39.000"
-        for trim_index, trim_bottom in enumerate((0.10, 3.86, 7.70)):
-            make_module_run(
-                f"Bazaar_Mid_{side_name}SouthFrontageBaffle_Trim{trim_index:02d}",
-                (wall_x, 34.0),
-                (wall_x, 39.0),
-                trim_bottom,
-                0.24,
-                ("trey_roof_trim",),
-                templates,
-                specs,
-                architecture,
-                root,
-                role="finished_cc0_shop_wall_cornice",
-                material=painted_steel,
-                nominal_cell=2.5,
-                depth_scale=0.42 / trim_depth,
-            )
-        create_authored_column_set(
-            f"Bazaar_Mid_{side_name}SouthFrontageBaffle_Piers",
-            tuple((wall_x, z, 0.0, 8.0) for z in (34.0, 36.5, 39.0)),
-            0.28,
-            templates,
-            specs,
-            roof_sand,
-            architecture,
-            root,
-            role="finished_cc0_shop_wall_sign_piers",
-        )
-        foundation_depth = source_dimensions(templates["trey_foundation"]).y
-        make_module_run(
-            f"Bazaar_Mid_{side_name}SouthFrontageBaffle_Sign",
-            (wall_x + (0.02 if wall_x < 0.0 else -0.02), 35.15),
-            (wall_x + (0.02 if wall_x < 0.0 else -0.02), 37.85),
-            2.62,
-            0.82,
-            ("trey_foundation",),
-            templates,
-            specs,
-            dressing,
-            root,
-            role="finished_cc0_wall_mounted_shop_sign",
-            material=sign_material,
-            nominal_cell=1.35,
-            depth_scale=0.42 / foundation_depth,
-        )
 
     def make_articulated_facade_return(
         prefix: str,
@@ -6668,10 +6594,6 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
         "BazaarBlock_EastServiceClosure_Roof",
         "Bazaar_A_Gallery_UpperPrivacyScreen_metal_window",
         "Bazaar_B_Balcony_UpperPrivacyScreen_metal_window",
-        "Bazaar_Mid_WestSouthFrontageBaffle_Tier00_window_trim",
-        "Bazaar_Mid_WestSouthFrontageBaffle_Tier01_metal_window",
-        "Bazaar_Mid_EastSouthFrontageBaffle_Tier00_window_trim",
-        "Bazaar_Mid_EastSouthFrontageBaffle_Tier01_metal_window",
         "Bazaar_Mid_WestConnectorReturn_Tier00_window_trim",
         "Bazaar_Mid_WestConnectorReturn_Tier01_metal_window",
         "Bazaar_Mid_EastConnectorReturn_Tier00_window_trim",
@@ -6711,6 +6633,19 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
     missing = sorted(required - names)
     if missing:
         raise RuntimeError(f"Missing required Bazaar V2 objects: {missing}")
+
+    detached_foyer_prefixes = (
+        "Bazaar_Mid_WestSouthFrontageBaffle",
+        "Bazaar_Mid_EastSouthFrontageBaffle",
+    )
+    detached_foyer_parts = sorted(
+        name for name in names if name.startswith(detached_foyer_prefixes)
+    )
+    if detached_foyer_parts:
+        raise RuntimeError(
+            "Detached attack-foyer baffles survived the rebuild: "
+            f"{detached_foyer_parts}"
+        )
 
     validated_meshes: set[bpy.types.Mesh] = set()
     for obj in mesh_objects:

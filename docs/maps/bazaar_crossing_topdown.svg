@@ -74,8 +74,8 @@
       <rect x="462" y="585" width="36" height="81"/>
       <rect x="60" y="408" width="252" height="147"/>
       <rect x="504" y="408" width="252" height="147"/>
-      <rect x="114" y="555" width="36" height="33"/>
-      <rect x="666" y="555" width="36" height="33"/>
+      <rect x="114" y="555" width="42" height="33"/>
+      <rect x="660" y="555" width="42" height="33"/>
       <rect x="24" y="312" width="24" height="96"/>
       <rect x="768" y="312" width="24" height="96"/>
     </g>
@@ -103,10 +103,8 @@
       <rect x="726" y="0" width="66" height="132"/>
     </g>
 
-    <!-- Exact full-height sight returns and L-baffles. -->
+    <!-- Connected full-height sight returns and L-baffles. -->
     <g class="baffle" fill="none">
-      <path d="M345 540V570"/>
-      <path d="M471 540V570"/>
       <path d="M114 312V408"/>
       <path d="M720 300V408"/>
       <path d="M288 210V229"/>
@@ -272,7 +270,7 @@
     <line x1="0" y1="179" x2="46" y2="179" stroke="#ffd35c" stroke-width="6"/>
     <text x="62" y="185" fill="#d8e0e1" font-size="15">Upper deck / stair (not a door)</text>
     <line x1="0" y1="215" x2="46" y2="215" class="baffle"/>
-    <text x="62" y="221" fill="#d8e0e1" font-size="15">Full-height sight baffle / return</text>
+    <text x="62" y="221" fill="#d8e0e1" font-size="15">Building-attached sight return</text>
 
     <text x="0" y="271" fill="#f4f0df" font-size="21" font-weight="700">THREE-LANE ROUTES</text>
     <line x1="0" y1="300" x2="48" y2="300" stroke="#ed8c3d" stroke-width="7" stroke-linecap="round"/>
@@ -290,7 +288,7 @@
       <text x="0" y="522">High-point violations</text><text x="315" y="522" text-anchor="end" fill="#7ee3a1">0</text>
       <text x="0" y="551">Longest continuous LOS</text><text x="315" y="551" text-anchor="end" fill="#7ee3a1">44.30 m</text>
       <text x="0" y="580">Maximum open diameter</text><text x="315" y="580" text-anchor="end" fill="#7ee3a1">17.0 m</text>
-      <text x="0" y="609">Indoor / semi-indoor</text><text x="315" y="609" text-anchor="end" fill="#7ee3a1">35.5%</text>
+      <text x="0" y="609">Indoor / semi-indoor</text><text x="315" y="609" text-anchor="end" fill="#7ee3a1">37.0%</text>
       <text x="0" y="638">Plant coverage (9 × 9 each)</text><text x="315" y="638" text-anchor="end" fill="#7ee3a1">1.000 / 1.000</text>
       <text x="0" y="667">Ground doors</text><text x="315" y="667" text-anchor="end" fill="#7ee3a1">10 / 10</text>
       <text x="0" y="696">Authored route checks</text><text x="315" y="696" text-anchor="end" fill="#7ee3a1">7 / 7</text>

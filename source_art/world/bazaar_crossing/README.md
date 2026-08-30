@@ -90,22 +90,22 @@ visual low points correspond to runtime route points at `y=0.2`.
 
 The V2 report records:
 
-- 1,547 -> 770 visible mesh draw nodes and 2,160 -> 1,061 material surfaces
+- 1,533 -> 761 visible mesh draw nodes and 2,130 -> 1,036 material surfaces
   after same-region, same-material, same-responsibility static consolidation;
-- 709 unique meshes in the final packed DCC scene;
+- 700 unique meshes in the final packed DCC scene;
 - 252,707 raw whitelisted-source triangles;
-- 873,789 unique and 1,172,379 delivered instance triangles, unchanged by
+- 870,605 unique and 1,169,195 delivered instance triangles, unchanged by
   draw-node consolidation and GLB round trip;
 - 49 DCC materials and 58 DCC textures;
 - 203.473 MiB estimated RGBA8 plus full-mip-chain texture memory;
-- 115,853,196-byte non-Draco GLB, SHA-256
-  `93E7A925061FFF93DCC25F72E5353C584ED9B062831E9C0BD6439F77B6009D96`;
-- 50,974,276-byte packed Blend, SHA-256
-  `7025690DA87D10E7CCCE4381A4EB05E0BEB6F7ABF7D989F63EF5301272B05615`;
+- 115,387,624-byte non-Draco GLB, SHA-256
+  `483DC0D81DA7E9636E52B840B51899CC66E2689457FDFCF5FFE34342B3B9DB22`;
+- 51,005,477-byte packed Blend, SHA-256
+  `4E262B94FC9E67F064BB7D6E1D80C4E5482A661C557A4D840A05A8CDBA3879C1`;
 - bounds X `[-68,68]`, Blender Y `[-56.2,56.2]`, Z `[-0.16,9.46]`;
-- four complete enterable interiors and 9,997.683 square metres of roofed
+- four complete enterable interiors and 10,057.703 square metres of roofed
   footprint;
-- 135 continuous storage parts, 108 continuous shopfront parts, 109 skyline
+- 140 continuous storage parts, 112 continuous shopfront parts, 109 skyline
   articulation parts, and four back-service gate parts;
 - exact required-object, bounds, and triangle preservation after GLB
   round-trip import;

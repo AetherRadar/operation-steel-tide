@@ -40,7 +40,7 @@ Both objectives stay at street level, but neither is an exposed pad. At least 75
 
 ### South approach: three immediate commitments
 
-Attackers leave `(0, 49)` through three separated gates rather than entering one common apron. The two full-height Entry Wings occupy `x = -15..-9` and `x = 9..15` through `z = 41.5..55`; lane-closure masses and foyer baffles lock the commitment after the first bend. West enters the merchant streets toward A, centre enters the Mid vestibule, and east enters the loading streets toward B. The west sight return at `x = -49, z = -4..12` and east return at `x = 52, z = -6..12`, plus the edge service closures, prevent either approach from reading straight into its site.
+Attackers leave `(0, 49)` through three separated gates rather than entering one common apron. The two full-height Entry Wings occupy `x = -15..-9` and `x = 9..15` through `z = 41.5..55`; continuous building masses and their corners establish the commitment after the first bend. West enters the merchant streets toward A, centre enters the Mid vestibule, and east enters the loading streets toward B. No freestanding full-height façade slice is permitted in this foyer: every tactical wall must connect to a building shell. The closed West/East Lane Link buildings extend inward to `x = -42 / 42`, respectively, capping the cross-foyer rifle lane without adding wall tips or blind pockets. The west sight return at `x = -49, z = -4..12` and east return at `x = 52, z = -6..12`, plus the edge service closures, prevent either approach from reading straight into its site.
 
 ### A: two-storey merchant court
 
@@ -106,13 +106,13 @@ The deterministic V2 diagnostics currently report:
 | Reachable high-point violations | `0` | `0` |
 | Longest continuous sightline | `≤ 45 m` | `44.30 m` |
 | Largest reachable open-space diameter | `≤ 18 m` | `17.0 m` |
-| Indoor or semi-indoor playable share | `35–45%` | `35.5%` |
+| Indoor or semi-indoor playable share | `35–45%` | `37.0%` |
 | Plant samples roofed or courtyard-bounded | `≥ 75%` per site | `1.000 / 1.000` (`9 × 9` per site) |
 | Intentional ground doors | `10` | `10 / 10` |
 | Authored route traversal checks | `7` | `7 / 7` |
 | Strategy target checks | `24` | `24 / 24` |
-| Worst defender route stretch | `≤ 1.40×` direct distance | `1.151×` |
+| Worst defender route stretch | `≤ 1.40×` direct distance | `1.153×` |
 
-The `35.5%` share is a multi-level playable-surface measurement: the exact union of ground-level roof footprints contributes `2,772 m²`, the ground playable floor plate contributes `8,354 m²`, and the three genuinely additional horizontal decks contribute `300 m²` to both numerator and denominator. Stair ramps connect those surfaces and are not double-counted as another floor plate.
+The `37.0%` share is a multi-level playable-surface measurement computed from the exact union of runtime roof footprints over the traversable ground plate, plus the three genuinely additional horizontal decks in both numerator and denominator. Stair ramps connect those surfaces and are not double-counted as another floor plate.
 
 The presentation gate is qualitative but mandatory: gameplay-critical collision must have `100%` matching readable art, and representative Godot captures must show coherent walls, roofs, doors, stairs, interiors, and cover at player-camera distance. Fifteen shadow-free warm practical lights illuminate the authored interior combat band at runtime. The 21-frame Godot capture set covers both sites, both interior rear rooms, the S-bend and north connector, both back-market legs, all three high grounds, all six stairs, and both spawns. Every player-distance interior frame must pass centre-80% image gates of mean luminance `≥ 0.16`, lower-quartile luminance `≥ 0.09`, and pixels below `0.075` luminance `≤ 15%`; non-overview frames additionally require an unobstructed physics ray to their projected target. These measurements and captures replace the previous weak criteria; mesh count, a centre-to-centre A/B ray, or route-length symmetry cannot by itself demonstrate a tactically dense map.

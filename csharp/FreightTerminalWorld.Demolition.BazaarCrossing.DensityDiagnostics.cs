@@ -20,6 +20,7 @@ public partial class FreightTerminalWorld
         bool InteriorContractReady,
         bool PlantZoneCoverageReady,
         bool GroundDoorContractReady,
+        int DetachedFullHeightBaffleCount,
         bool DefenderRoutesEfficient,
         float MaximumDefenderRouteStretch,
         string DefenderRouteProfile,
@@ -28,6 +29,11 @@ public partial class FreightTerminalWorld
     private BazaarDensityResult BazaarV2DensityReady(DemolitionArenaLayout layout)
     {
         var failures = new List<string>();
+        var detachedFullHeightBaffles = BazaarDetachedFullHeightBaffles(layout);
+        if (detachedFullHeightBaffles.Count > 0)
+        {
+            failures.Add($"detached-baffles-{string.Join(',', detachedFullHeightBaffles)}");
+        }
         var blockers = layout.CollisionBoxes
             .Where(BazaarIsFullHeightArchitecture)
             .ToArray();
@@ -133,6 +139,7 @@ public partial class FreightTerminalWorld
             interiorContractReady,
             plantZoneCoverageReady,
             groundDoorContractReady,
+            detachedFullHeightBaffles.Count,
             defenderRoutesEfficient,
             maximumDefenderRoute.Stretch,
             defenderRouteProfile,
@@ -482,6 +489,41 @@ public partial class FreightTerminalWorld
                 || box.Name.StartsWith("Wall", StringComparison.Ordinal)
                 || box.Name.StartsWith("Partition", StringComparison.Ordinal)
                 || box.Name.StartsWith("Column", StringComparison.Ordinal));
+
+    private static IReadOnlyList<string> BazaarDetachedFullHeightBaffles(
+        DemolitionArenaLayout layout)
+    {
+        const float attachmentTolerance = 0.12f;
+        var anchors = layout.CollisionBoxes.Where(box =>
+            BazaarIsFullHeightArchitecture(box)
+            && !box.Name.Contains("Baffle", StringComparison.Ordinal)).ToArray();
+        return layout.CollisionBoxes.Where(box =>
+                BazaarIsFullHeightArchitecture(box)
+                && box.Name.Contains("Baffle", StringComparison.Ordinal)
+                && !anchors.Any(anchor => BazaarFootprintsTouch(
+                    box,
+                    anchor,
+                    attachmentTolerance)))
+            .Select(box => box.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static bool BazaarFootprintsTouch(
+        DemolitionArenaBox left,
+        DemolitionArenaBox right,
+        float tolerance)
+    {
+        var xGap = Mathf.Max(
+            Mathf.Abs(left.Center.X - right.Center.X)
+                - (left.Size.X + right.Size.X) * 0.5f,
+            0.0f);
+        var zGap = Mathf.Max(
+            Mathf.Abs(left.Center.Z - right.Center.Z)
+                - (left.Size.Z + right.Size.Z) * 0.5f,
+            0.0f);
+        return new Vector2(xGap, zGap).Length() <= tolerance;
+    }
 
     private static bool BazaarPointInsideFootprint(
         Vector3 point,

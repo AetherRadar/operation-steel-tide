@@ -176,6 +176,7 @@ public partial class FreightTerminalWorld
                 + $"interiors={density.InteriorContractReady} "
                 + $"plants={density.PlantZoneCoverageReady} "
                 + $"doors={density.GroundDoorContractReady} "
+                + $"detached_baffles={density.DetachedFullHeightBaffleCount} "
                 + $"def_route={density.DefenderRoutesEfficient}:{density.MaximumDefenderRouteStretch:0.000}:"
                 + $"{density.DefenderRouteProfile} failures={density.Failures}";
             CleanupBazaarCrossingDiagnostic();
@@ -263,6 +264,9 @@ public partial class FreightTerminalWorld
         var authoredPath = "res://assets/models/bazaar_crossing/bazaar_crossing.glb";
         var authoredVisualFailures = "not-checked";
         var visibleMeshCount = 0;
+        var detachedFoyerBafflesRemoved = BazaarDetachedFoyerBafflesRemoved(
+            dressingRoot,
+            layout);
         var authoredVisualsReady = ResourceLoader.Exists(authoredPath)
             && authoredModelCount == 1
             && missingModelCount == 0
@@ -314,6 +318,7 @@ public partial class FreightTerminalWorld
             && postPatrolReady
             && aiDirectivesReady
             && playerStairsReady
+            && detachedFoyerBafflesRemoved
             && authoredVisualsReady
             && siblingNamesReady
             && runtimeReady
@@ -333,6 +338,7 @@ public partial class FreightTerminalWorld
             + $"plant_coverage={density.PlantZoneACoverage:0.000}/{density.PlantZoneBCoverage:0.000} "
             + $"interiors={density.InteriorContractReady} plants={density.PlantZoneCoverageReady} "
             + $"doors={density.GroundDoorContractReady} "
+            + $"detached_baffles={density.DetachedFullHeightBaffleCount} "
             + $"def_route={density.DefenderRoutesEfficient}:{density.MaximumDefenderRouteStretch:0.000}:"
             + $"{density.DefenderRouteProfile} failures={density.Failures} "
             + $"traversal={traversalReady}:decks3:ramps6 failures={traversalFailures} "
@@ -350,6 +356,7 @@ public partial class FreightTerminalWorld
             + $"post_patrol={postPatrolReady} "
             + $"ai_directives={aiDirectivesReady} result={aiTraversal.Summary} failures={aiDirectiveFailures} "
             + $"player_stairs={playerStairsReady}:{stairWalks.Count} failures={stairWalkFailures} "
+            + $"detached_foyer_baffles_removed={detachedFoyerBafflesRemoved} "
             + $"authored={authoredVisualsReady}:1/{missingModelCount} meshes={visibleMeshCount} failures={authoredVisualFailures} "
             + $"siblings={siblingNamesReady} sibling_failures={siblingFailures} "
             + $"runtime={runtimeReady} lifecycle={initiallyIsolated}/{deactivatedReady} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} sites={arena.Sites.Count}";
