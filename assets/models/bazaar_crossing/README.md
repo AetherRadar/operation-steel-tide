@@ -17,14 +17,14 @@ routes, and smooth traversal surfaces.
 
 Current verified export:
 
-- 111,873,332 bytes, SHA-256
-  `B49CA049ABC5FD4E776877C8BCAEB5DC06379E1040AA19E49479436646A163D1`;
-- 717 visible mesh nodes / 663 unique meshes / 992 DCC material surfaces,
-  reduced from 1,492 nodes / 2,113 surfaces without changing triangles;
-- 845,147 unique and 1,142,141 delivered instance triangles;
+- 107,168,608 bytes, SHA-256
+  `87BEFD14810E665DC6AE5E3C76551684DF1AABCF270FF208A2024B332C4F2BC7`;
+- 700 visible mesh nodes / 648 unique meshes / 935 DCC material surfaces,
+  reduced from 1,443 nodes / 1,950 surfaces without changing triangles;
+- 805,155 unique and 1,101,693 delivered instance triangles;
 - four complete enterable interiors: A Caravanserai, B Market Warehouse, Mid
   Indoor Connector, and Defender Back Market;
-- 37 coherent closed modular city blocks with complete wall returns, cornices,
+- 38 coherent closed modular city blocks with complete wall returns, cornices,
   and roofs; only four legacy whole-building facades remain as outer landmarks;
 - A `y=3.6`, B `y=3.4`, and Mid `y=3.2` interior decks;
 - six exact-endpoint, 3.2 m authored stairs, all at or below 18 degrees, with
@@ -33,8 +33,10 @@ Current verified export:
   A-to-B sightline while preserving Mid-to-site splits;
 - 58 DCC textures, each at most 1024 px, with a 203.473 MiB RGBA8 plus
   mip-chain estimate;
-- 140 continuous storage parts, 112 continuous shopfront parts, 109 roofline
-  articulation parts, and a four-part back-market service gate;
+- 135 continuous storage parts, 104 continuous shopfront parts, 110 roofline
+  articulation parts, and two attached back-market solid-mass walls;
+- exactly 28 independently preserved runtime-door portals, with no false
+  terminus/niche portal and a connected A-rear Segment02 wall;
 - Blender-authored bounds X `[-68,68]`, Y `[-56.2,56.2]`, Z `[-0.16,9.46]`;
 - all visible meshes material-backed, UV-complete, CC0-sourced,
   provenance-complete, and exact-triangle validated after GLB round trip;

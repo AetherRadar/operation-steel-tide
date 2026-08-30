@@ -285,34 +285,35 @@ before the deterministic build runs.
 
 Artifact and audit mapping:
 
-- Runtime output: `bazaar_crossing/bazaar_crossing.glb`, 111,873,332 bytes,
+- Runtime output: `bazaar_crossing/bazaar_crossing.glb`, 107,168,608 bytes,
   SHA-256
-  `B49CA049ABC5FD4E776877C8BCAEB5DC06379E1040AA19E49479436646A163D1`.
+  `87BEFD14810E665DC6AE5E3C76551684DF1AABCF270FF208A2024B332C4F2BC7`.
 - Immutable map-local source palette:
   `../../source_art/world/bazaar_crossing/bazaar_crossing_source_palette.blend`,
   SHA-256
   `1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9`.
 - Editable packed source:
-  `../../source_art/world/bazaar_crossing/bazaar_crossing.blend`, 50,400,552
+  `../../source_art/world/bazaar_crossing/bazaar_crossing.blend`, 49,534,883
   bytes, SHA-256
-  `551BB6258752F088C3D75DA0DFA84B9459AD1C4E38A5C1C36DFA056352354EE1`.
+  `867C5DC9A2E7D0A6D8856B93BAC22FD38C3DBADF5C1961F61B3C0FDBE08C0FF2`.
 - Reproducible build: `../../scripts/blender/build_bazaar_crossing.py`.
 - Rights and exact source-object mapping: `bazaar_crossing/LICENSE.md` and
   `../../source_art/world/bazaar_crossing/LICENSE.md`.
 - Deterministic report:
   `../../source_art/world/bazaar_crossing/bazaar_crossing_build_report.json`.
 
-The final V2 scene contains 717 exported visible mesh nodes, 663 unique meshes,
-992 material surfaces, 49 DCC materials, 58 DCC textures, 845,147 unique
-triangles, and 1,142,141 delivered instance triangles. The textures are capped
+The final V2 scene contains 700 exported visible mesh nodes, 648 unique meshes,
+935 material surfaces, 48 DCC materials, 58 DCC textures, 805,155 unique
+triangles, and 1,101,693 delivered instance triangles. The textures are capped
 at 1024 pixels and have an estimated 203.473 MiB RGBA8 plus full-mip-chain
-cost. Static consolidation reduced 1,492 draw nodes to 717 and 2,113 surfaces
-to 992 without changing either triangle count. The GLB is exported without
+cost. Static consolidation reduced 1,443 draw nodes to 700 and 1,950 surfaces
+to 935 without changing either triangle count. The GLB is exported without
 `KHR_draco_mesh_compression`; `EXT_texture_webp` is its only required
-extension. Its round trip retains all 717 visible meshes and the exact
-instance-triangle count while checking scene bounds, four complete enterable
-interiors, three deck heights, all six 3.2-meter stairs, UV/material coverage,
-explicit CC0 provenance, and absence of Hero Mountain, Coast Line, all CC BY,
+extension. Its round trip retains all 700 visible meshes, all 28 independently
+auditable runtime-door portals, and the exact instance-triangle count while
+checking scene bounds, four complete enterable interiors, three deck heights,
+all six 3.2-meter stairs, UV/material coverage, explicit CC0 provenance, and
+absence of false terminus/niche portals, Hero Mountain, Coast Line, all CC BY,
 paid, editorial, private-store, or unclear-license content. The complete
 Jianghai Old City runtime GLB is neither embedded nor referenced.
 

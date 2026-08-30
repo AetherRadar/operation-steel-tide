@@ -104,7 +104,7 @@ public partial class EnemyOperator
         {
             IsDead = false;
             CollisionLayer = 2;
-            CollisionMask = 1;
+            CollisionMask = 1 | BreakableGlassField.MovementCollisionLayer;
             if (IsInstanceValid(_bodyRoot))
             {
                 _bodyRoot.Position = Vector3.Zero;

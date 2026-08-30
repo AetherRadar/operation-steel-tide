@@ -18,14 +18,15 @@ retained as provenance.
 - map-local source palette SHA-256:
   `1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9`;
 - generated packed Blend SHA-256:
-  `551BB6258752F088C3D75DA0DFA84B9459AD1C4E38A5C1C36DFA056352354EE1`;
+  `867C5DC9A2E7D0A6D8856B93BAC22FD38C3DBADF5C1961F61B3C0FDBE08C0FF2`;
 - generated runtime GLB SHA-256:
-  `B49CA049ABC5FD4E776877C8BCAEB5DC06379E1040AA19E49479436646A163D1`.
+  `87BEFD14810E665DC6AE5E3C76551684DF1AABCF270FF208A2024B332C4F2BC7`.
 
-The packed artifacts were regenerated on 2026-08-30 after the three approach
-stairs were opened to full-height 5.2-metre facade gaps, the obsolete B
-service-return wall was removed, and the two detached attack-foyer façade
-baffles were replaced by connected lane-link buildings.
+The packed artifacts were regenerated on 2026-08-30 after solid A/B/Mid and
+back-market wall fills were restricted to unambiguous foundation modules, two
+false terminus shopfronts and one floating A-rear rack were removed, the three
+real A-rear portals were widened to 4.0 metres, and the A-rear Segment02 and two
+18-metre rear-market mass overlaps were connected visibly to their roofs.
 
 The GLB is exported without `KHR_draco_mesh_compression`; disabling a binary
 compression extension does not alter the source licenses or provenance.
@@ -46,10 +47,10 @@ Universal. Acquired: 2026-08-27.
 | `IndFoundationAStraightFull` | `.../Meshes/Foundation/IndFoundationAStraightFull.fbx` -> `BazaarSource_IndFoundationAStraightFull` | Thick walls, counters, partitions, rack posts, and stair foundations |
 | `IndRoofDarkGreyAngledFull` | `.../Meshes/Roofs/IndRoofDarkGreyAngledFull.fbx` -> `BazaarSource_IndRoofDarkGreyAngledFull` | Retained roof vocabulary |
 | `IndWallFull` | `.../Meshes/Walls/IndWallFull.fbx` -> `BazaarSource_IndWallFull` | Interior wall vocabulary |
-| `IndWallArchDouble` | `.../Meshes/Walls/IndWallArchDouble.fbx` -> `BazaarSource_IndWallArchDouble` | A courtyard, B loading, and back-market arcades; open portals |
+| `IndWallArchDouble` | `.../Meshes/Walls/IndWallArchDouble.fbx` -> `BazaarSource_IndWallArchDouble` | A courtyard and unobstructed back-market arcades; 28 runtime-aligned open portals |
 | `IndWallArchDoubleColumns` | `.../Meshes/Walls/IndWallArchDoubleColumns.fbx` -> `BazaarSource_IndWallArchDoubleColumns` | Arcade structural vocabulary |
 | `IndWallArchDoubleCapGrey` | `.../Meshes/Walls/IndWallArchDoubleCapGrey.fbx` -> `BazaarSource_IndWallArchDoubleCapGrey` | Arcade caps |
-| `IndDoorFrameSingle` | `.../Meshes/Doors/IndDoorFrameSingle.fbx` -> `BazaarSource_IndDoorFrameSingle` | Door and partition frames |
+| `IndDoorFrameSingle` | `.../Meshes/Doors/IndDoorFrameSingle.fbx` -> `BazaarSource_IndDoorFrameSingle` | Retained audited palette source; not used by current solid wall fills |
 | `IndRoofDarkGreyFull` | `.../Meshes/Roofs/IndRoofDarkGreyFull.fbx` -> `BazaarSource_IndRoofDarkGreyFull` | Closed-block, warehouse, stair-hall, and market roofs |
 | `IndFloorGreyFull` | `.../Meshes/Floors/IndFloorGreyFull.fbx` -> `BazaarSource_IndFloorGreyFull` | Solid floor/ceiling and continuous storage-shelf vocabulary |
 | `IndWindowBFull` | `.../Meshes/Windows/IndWindowBFull.fbx` -> `BazaarSource_IndWindowBFull` | Industrial facade and clerestory windows |
@@ -69,7 +70,7 @@ Universal. Acquired: 2026-08-19. Local license evidence:
 | Source module | Local source -> pinned object | Bazaar V2 use |
 |---|---|---|
 | `Brick_Plain_1` | `assets/models/quaternius_downtown_city/Brick_Plain_1.gltf` -> `BazaarSource_QuatBrickPlain` | Red-brick wall vocabulary |
-| `DoorFrame_Trim` | `assets/models/quaternius_downtown_city/DoorFrame_Trim.gltf` -> `BazaarSource_QuatDoorFrameTrim` | Detailed personnel doors and partition rhythm |
+| `DoorFrame_Trim` | `assets/models/quaternius_downtown_city/DoorFrame_Trim.gltf` -> `BazaarSource_QuatDoorFrameTrim` | Retained audited palette source; not used by current solid wall fills |
 | `Brick_Window_CurvedDouble` | `assets/models/quaternius_downtown_city/Brick_Window_CurvedDouble.gltf` -> `BazaarSource_QuatBrickWindowCurvedDouble` | Curved brick windows for Mid and varied closed blocks |
 | `Brick_Window_Trim` | `assets/models/quaternius_downtown_city/Brick_Window_Trim.gltf` -> `BazaarSource_QuatBrickWindowTrim` | A, Mid, back-market, boundary, shopfront-band, and closed-block facades |
 | `Floor_4x4` | `assets/models/quaternius_downtown_city/Floor_4x4.gltf` -> `BazaarSource_QuatFloor4x4` | Double-sided interior floors, ceilings, decks, roofs, and rooftop monitor caps |

@@ -98,6 +98,7 @@ public partial class FreightTerminalWorld
                 return;
             }
 
+            DetachDemolitionGlassNetwork();
             _demolitionArena.SetActive(false);
             _demolitionArena.Root.QueueFree();
             _demolitionArena = null;
@@ -353,6 +354,8 @@ public partial class FreightTerminalWorld
     private void PrepareDemolitionRoundRuntime(bool resolveOpponentBuy)
     {
         ClearDemolitionDevice();
+        _demolitionArena?.ResetRoundState();
+        SynchronizeDemolitionGlassRoundReset();
         ResetDemolitionSquad();
         if (resolveOpponentBuy)
         {

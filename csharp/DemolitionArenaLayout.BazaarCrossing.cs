@@ -163,97 +163,10 @@ public sealed partial class DemolitionArenaLayout
         AddBazaarSiteAWalls(boxes);
         AddBazaarSiteBWalls(boxes);
         AddBazaarMidWalls(boxes);
+        AddBazaarGlassPortalLintels(boxes);
         AddBazaarBackMarketCollision(boxes);
         AddBazaarGuardRailCollision(boxes);
         return boxes;
-    }
-
-    private void AddBazaarSiteAWalls(List<DemolitionArenaBox> boxes)
-    {
-        AddBazaarHorizontalWall(boxes, "WallA_South", -4.0f, -60.0f, -34.0f, 6.4f,
-            new BazaarOpening(-56.0f, 5.2f), new BazaarOpening(-47.0f, 3.4f));
-        AddBazaarHorizontalWall(boxes, "WallA_North", -31.0f, -60.0f, -34.0f, 6.4f,
-            new BazaarOpening(-52.0f, 3.2f), new BazaarOpening(-37.0f, 3.2f));
-        AddBazaarVerticalWall(boxes, "WallA_West", -60.0f, -31.0f, -4.0f, 6.4f,
-            new BazaarOpening(-12.0f, 3.2f));
-        AddBazaarVerticalWall(boxes, "WallA_East", -34.0f, -31.0f, -4.0f, 6.4f,
-            new BazaarOpening(-10.0f, 3.2f));
-        AddBazaarHorizontalWall(boxes, "PartitionA_Rear", -23.0f, -60.0f, -34.0f, 3.0f,
-            new BazaarOpening(-56.0f, 3.2f), new BazaarOpening(-46.0f, 3.2f),
-            new BazaarOpening(-38.0f, 3.2f));
-        AddBazaarVerticalWall(boxes, "PartitionA_Warehouse", -47.0f, -31.0f, -23.0f, 3.0f,
-            new BazaarOpening(-27.0f, 3.2f));
-        foreach (var x in new[] { -51.0f, -41.0f })
-        {
-            foreach (var z in new[] { -22.0f, -18.0f, -14.0f })
-            {
-                boxes.Add(BazaarCollisionBox($"ColumnA_Arcade_{x:0}_{z:0}",
-                    new(x, 1.5f, z), new(0.68f, 3.0f, 0.68f)));
-            }
-        }
-    }
-
-    private void AddBazaarSiteBWalls(List<DemolitionArenaBox> boxes)
-    {
-        AddBazaarHorizontalWall(boxes, "WallB_South", -6.0f, 34.0f, 60.0f, 6.5f,
-            new BazaarOpening(46.0f, 3.4f), new BazaarOpening(56.0f, 5.2f));
-        AddBazaarHorizontalWall(boxes, "WallB_North", -30.0f, 34.0f, 60.0f, 6.5f,
-            new BazaarOpening(40.0f, 3.2f), new BazaarOpening(55.0f, 3.2f));
-        AddBazaarVerticalWall(boxes, "WallB_West", 34.0f, -30.0f, -6.0f, 6.5f,
-            new BazaarOpening(-14.0f, 3.2f));
-        AddBazaarVerticalWall(boxes, "WallB_East", 60.0f, -30.0f, -6.0f, 6.5f,
-            new BazaarOpening(-12.0f, 3.2f));
-        AddBazaarVerticalWall(boxes, "PartitionB_Loading", 40.0f, -28.0f, -6.0f, 3.0f,
-            new BazaarOpening(-25.3f, 3.4f), new BazaarOpening(-14.4f, 3.2f));
-        AddBazaarVerticalWall(boxes, "PartitionB_Stockroom", 52.0f, -30.0f, -6.0f, 3.0f,
-            new BazaarOpening(-27.0f, 3.2f), new BazaarOpening(-23.4f, 3.2f),
-            new BazaarOpening(-12.4f, 3.2f));
-        foreach (var x in new[] { 39.0f, 45.0f, 51.0f, 57.0f })
-        {
-            foreach (var z in new[] { -25.5f, -17.5f, -9.5f })
-            {
-                boxes.Add(BazaarCollisionBox($"ColumnB_Warehouse_{x:0}_{z:0}",
-                    new(x, 3.125f, z), new(0.52f, 6.25f, 0.52f)));
-            }
-        }
-    }
-
-    private void AddBazaarMidWalls(List<DemolitionArenaBox> boxes)
-    {
-        AddBazaarHorizontalWall(boxes, "WallMidConnector_North", -24.0f, -9.0f, 9.0f, 6.2f,
-            new BazaarOpening(4.0f, 3.2f));
-        AddBazaarHorizontalWall(boxes, "WallMidConnector_South", -7.0f, -9.0f, 9.0f, 6.2f,
-            new BazaarOpening(-5.0f, 3.2f));
-        AddBazaarVerticalWall(boxes, "WallMidConnector_West", -9.0f, -24.0f, -7.0f, 6.2f,
-            new BazaarOpening(-18.0f, 3.2f));
-        AddBazaarVerticalWall(boxes, "WallMidConnector_East", 9.0f, -24.0f, -7.0f, 6.2f,
-            new BazaarOpening(-14.0f, 3.2f));
-        AddBazaarHorizontalWall(boxes, "PartitionMidConnector_WestBaffle", -16.7f,
-            -8.8f, 1.5f, 3.0f);
-        AddBazaarHorizontalWall(boxes, "PartitionMidConnector_EastBaffle", -12.7f,
-            -1.5f, 8.8f, 3.0f);
-
-        AddBazaarHorizontalWall(boxes, "WallMidTea_North", -8.0f, -9.0f, 3.0f, 6.2f,
-            new BazaarOpening(-5.0f, 3.2f));
-        AddBazaarHorizontalWall(boxes, "WallMidTea_South", 6.0f, -9.0f, 3.0f, 6.2f,
-            new BazaarOpening(-1.0f, 3.2f));
-        AddBazaarVerticalWall(boxes, "WallMidTea_West", -9.0f, -8.0f, 6.0f, 6.2f);
-        AddBazaarVerticalWall(boxes, "WallMidTea_East", 3.0f, -8.0f, 6.0f, 6.2f);
-
-        AddBazaarHorizontalWall(boxes, "WallMidProduce_North", 5.0f, -3.0f, 9.0f, 6.2f,
-            new BazaarOpening(0.0f, 3.2f));
-        AddBazaarHorizontalWall(boxes, "WallMidProduce_South", 20.0f, -3.0f, 9.0f, 6.2f,
-            new BazaarOpening(1.0f, 3.2f));
-        AddBazaarVerticalWall(boxes, "WallMidProduce_West", -3.0f, 5.0f, 20.0f, 6.2f);
-        AddBazaarVerticalWall(boxes, "WallMidProduce_East", 9.0f, 5.0f, 20.0f, 6.2f);
-
-        AddBazaarHorizontalWall(boxes, "WallMidCarpet_North", 19.0f, -9.0f, 3.0f, 6.2f,
-            new BazaarOpening(-6.0f, 5.2f), new BazaarOpening(0.0f, 3.2f));
-        AddBazaarHorizontalWall(boxes, "WallMidCarpet_South", 34.0f, -9.0f, 3.0f, 6.2f,
-            new BazaarOpening(-6.0f, 5.2f), new BazaarOpening(0.0f, 3.2f));
-        AddBazaarHorizontalWall(boxes, "WallMidCarpet_SouthReturn", 34.0f, 3.0f, 8.0f, 6.2f);
-        AddBazaarVerticalWall(boxes, "WallMidCarpet_West", -9.0f, 19.0f, 34.0f, 6.2f);
-        AddBazaarVerticalWall(boxes, "WallMidCarpet_East", 3.0f, 19.0f, 34.0f, 6.2f);
     }
 
     private void AddBazaarBackMarketCollision(List<DemolitionArenaBox> boxes)

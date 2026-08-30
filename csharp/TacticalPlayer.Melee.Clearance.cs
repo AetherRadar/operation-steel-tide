@@ -154,7 +154,7 @@ public partial class TacticalPlayer
                     from,
                     to,
                     exclude,
-                    uint.MaxValue,
+                    BreakableGlassField.SightCollisionMask,
                     out hit))
             {
                 return false;

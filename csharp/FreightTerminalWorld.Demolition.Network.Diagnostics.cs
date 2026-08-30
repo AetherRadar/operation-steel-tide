@@ -100,7 +100,7 @@ public partial class FreightTerminalWorld
                 (int)WeaponPlatform.M4A1,
                 1,
                 (int)WeaponPlatform.P226,
-                DemolitionMapCatalog.TideforgeId,
+                DemolitionMapCatalog.BazaarCrossingId,
                 (int)mode,
                 endpoint,
                 (int)team);
@@ -190,6 +190,87 @@ public partial class FreightTerminalWorld
         }
         var clientActor = DemolitionActorForDiagnostics(clientActorId);
         var targetActor = DemolitionActorForDiagnostics(clientShotTargetId);
+        var networkGlassField = _demolitionArena?.BazaarGlassFields
+            .FirstOrDefault(IsInstanceValid);
+        var glassAuthorityProtected = networkGlassField is not null
+            && networkGlassField.HasLocalShatterAuthority == host;
+        var glassGunSynchronized = false;
+        var glassMeleeSynchronized = false;
+        var glassMaskBefore = networkGlassField?.ShatteredPaneMask ?? 0u;
+        if (!host
+            && openingLive
+            && networkGlassField is not null
+            && networkGlassField.TryGetIntactPaneRay(
+                out var glassGunFrom,
+                out var glassGunTo,
+                out _))
+        {
+            var localMaskBefore = networkGlassField.ShatteredPaneMask;
+            var predictedImpact = BreakableGlassField.TryShatterAlongRay(
+                GetWorld3D(),
+                glassGunFrom,
+                glassGunTo,
+                30.0f,
+                glassGunFrom.DirectionTo(glassGunTo),
+                out _,
+                spawnEffects: false);
+            glassAuthorityProtected &= predictedImpact
+                && networkGlassField.ShatteredPaneMask == localMaskBefore;
+            var stand = glassGunFrom - Vector3.Up * 1.4f;
+            _player.GlobalPosition = stand;
+            await ToSignal(GetTree().CreateTimer(0.8, true), SceneTreeTimer.SignalName.Timeout);
+            _squadNetwork.RequestDemolitionGlassHit(
+                glassGunFrom,
+                glassGunTo,
+                30.0f,
+                melee: false);
+        }
+        var glassGunDeadline = Time.GetTicksMsec() + 3500;
+        while (networkGlassField is not null
+            && networkGlassField.ShatteredPaneMask == glassMaskBefore
+            && Time.GetTicksMsec() < glassGunDeadline)
+        {
+            await ToSignal(GetTree().CreateTimer(0.1, true), SceneTreeTimer.SignalName.Timeout);
+        }
+        glassGunSynchronized = networkGlassField is not null
+            && networkGlassField.ShatteredPaneMask != glassMaskBefore
+            && _demolitionBazaarGlassMask == networkGlassField.ShatteredPaneMask;
+
+        var maskAfterGun = networkGlassField?.ShatteredPaneMask ?? 0u;
+        if (!host
+            && glassGunSynchronized
+            && networkGlassField is not null
+            && networkGlassField.TryGetIntactPaneRay(
+                out var glassMeleeFrom,
+                out var glassMeleeTo,
+                out _))
+        {
+            _player.GlobalPosition = glassMeleeFrom - Vector3.Up * 1.4f;
+            await ToSignal(GetTree().CreateTimer(0.8, true), SceneTreeTimer.SignalName.Timeout);
+            _squadNetwork.RequestDemolitionGlassHit(
+                glassMeleeFrom,
+                glassMeleeTo,
+                18.0f,
+                melee: true);
+        }
+        var glassMeleeDeadline = Time.GetTicksMsec() + 3500;
+        while (networkGlassField is not null
+            && networkGlassField.ShatteredPaneMask == maskAfterGun
+            && Time.GetTicksMsec() < glassMeleeDeadline)
+        {
+            await ToSignal(GetTree().CreateTimer(0.1, true), SceneTreeTimer.SignalName.Timeout);
+        }
+        glassMeleeSynchronized = networkGlassField is not null
+            && networkGlassField.ShatteredPaneMask != maskAfterGun
+            && _demolitionBazaarGlassMask == networkGlassField.ShatteredPaneMask;
+        var staleGlassSnapshotProtected = MergeDemolitionGlassSnapshot(
+            _demolitionBazaarGlassMask,
+            0u,
+            roundChanged: false) == _demolitionBazaarGlassMask;
+        var nextRoundGlassSnapshotCanReset = MergeDemolitionGlassSnapshot(
+            _demolitionBazaarGlassMask,
+            0u,
+            roundChanged: true) == 0u;
         var clientAuthorityProtected = true;
         if (!host && targetActor is EnemyOperator targetProxy)
         {
@@ -397,6 +478,9 @@ public partial class FreightTerminalWorld
         var secondLive = _demolitionNetworkPhase == DemolitionNetworkPhase.Live
             && _demolitionMatch.CurrentRound >= 2
             && _demolitionRoundActive;
+        var glassRoundResetSynchronized = networkGlassField is not null
+            && networkGlassField.ShatteredPaneMask == 0u
+            && _demolitionBazaarGlassMask == 0u;
         var networkEliminationReset = clientTeam != DemolitionNetworkTeam.Alpha;
         if (clientTeam == DemolitionNetworkTeam.Alpha && secondLive)
         {
@@ -407,7 +491,8 @@ public partial class FreightTerminalWorld
                 && !restoredMate.ReviveUsed
                 && restoredMate.IsPhysicsProcessing()
                 && restoredMate.CollisionLayer == 4
-                && restoredMate.CollisionMask == 1
+                && restoredMate.CollisionMask
+                    == (1u | BreakableGlassField.MovementCollisionLayer)
                 && restoredMate.AreDemolitionCollisionShapesEnabledForDiagnostics;
         }
         var nextRoundFundsAdvanced = _demolitionPlayerEconomy.Funds
@@ -448,10 +533,16 @@ public partial class FreightTerminalWorld
             && medicAbilitySynchronized
             && networkEliminationSynchronized
             && networkEliminationReset
-            && objectiveSynchronized;
+            && objectiveSynchronized
+            && glassAuthorityProtected
+            && glassGunSynchronized
+            && glassMeleeSynchronized
+            && glassRoundResetSynchronized
+            && staleGlassSnapshotProtected
+            && nextRoundGlassSnapshotCanReset;
         if (!host)
         {
-            GD.Print($"DEMOLITION_NETWORK_CHECK mode=client requested_team={clientTeam} online={_squadNetwork.IsOnline} peers={_squadNetwork.ConnectedPeerCount} team={_demolitionLocalNetworkTeam} slot={_demolitionLocalNetworkSlot} humans={DemolitionNetworkHumanCount} friendly_humans={DemolitionNetworkFriendlyHumanCount} opponent_humans={DemolitionNetworkOpponentHumanCount} lobby_observed={lobbyObserved} assigned={assigned} deployed_together={deployedTogether} opening_buy={openingBuy} opening_live={openingLive} independent_funds={openingEconomyIndependent} intermission={intermissionObserved} second_buy={secondBuy} second_live={secondLive} next_round_funds={nextRoundFundsAdvanced} funds={_demolitionPlayerEconomy.Funds} remote_representation={remoteRepresentation} client_authority={clientAuthorityProtected} round_authority={clientRoundAuthorityProtected} damage={damageRelayed} medic_sync={medicAbilitySynchronized} eliminated_sync={networkEliminationSynchronized} eliminated_reset={networkEliminationReset} objective={objectiveSynchronized} score={_demolitionMatch.PlayerScore}:{_demolitionMatch.OpponentScore} phase={_demolitionNetworkPhase} round={_demolitionMatch.CurrentRound}");
+            GD.Print($"DEMOLITION_NETWORK_CHECK mode=client requested_team={clientTeam} online={_squadNetwork.IsOnline} peers={_squadNetwork.ConnectedPeerCount} team={_demolitionLocalNetworkTeam} slot={_demolitionLocalNetworkSlot} humans={DemolitionNetworkHumanCount} friendly_humans={DemolitionNetworkFriendlyHumanCount} opponent_humans={DemolitionNetworkOpponentHumanCount} lobby_observed={lobbyObserved} assigned={assigned} deployed_together={deployedTogether} opening_buy={openingBuy} opening_live={openingLive} independent_funds={openingEconomyIndependent} intermission={intermissionObserved} second_buy={secondBuy} second_live={secondLive} next_round_funds={nextRoundFundsAdvanced} funds={_demolitionPlayerEconomy.Funds} remote_representation={remoteRepresentation} client_authority={clientAuthorityProtected} round_authority={clientRoundAuthorityProtected} damage={damageRelayed} medic_sync={medicAbilitySynchronized} eliminated_sync={networkEliminationSynchronized} eliminated_reset={networkEliminationReset} objective={objectiveSynchronized} glass_authority={glassAuthorityProtected} glass_gun={glassGunSynchronized} glass_melee={glassMeleeSynchronized} glass_reset={glassRoundResetSynchronized} glass_stale_snapshot={staleGlassSnapshotProtected} glass_round_replace={nextRoundGlassSnapshotCanReset} glass_mask={_demolitionBazaarGlassMask} score={_demolitionMatch.PlayerScore}:{_demolitionMatch.OpponentScore} phase={_demolitionNetworkPhase} round={_demolitionMatch.CurrentRound}");
             GD.Print($"DEMOLITION_NETWORK_PASS valid={valid}");
             await ToSignal(GetTree().CreateTimer(0.5, true), SceneTreeTimer.SignalName.Timeout);
             GetTree().Quit(valid ? 0 : 2);
@@ -475,7 +566,7 @@ public partial class FreightTerminalWorld
             && DemolitionNetworkHumanCount == 1
             && aiReplacement;
         valid &= disconnectRecovered;
-        GD.Print($"DEMOLITION_NETWORK_CHECK mode=host requested_team={clientTeam} online={_squadNetwork.IsOnline} registered={_squadNetwork.RegisteredDemolitionPlayerCount} lobby_players={_hud.DemolitionNetworkLobbyPlayerCount} lobby_can_start={_hud.DemolitionNetworkLobbyCanStart} peers_before={(connectedBeforeDisconnect ? 1 : 0)} peers_after={_squadNetwork.ConnectedPeerCount} team={_demolitionLocalNetworkTeam} slot={_demolitionLocalNetworkSlot} humans={DemolitionNetworkHumanCount} lobby_observed={lobbyObserved} lobby_held={hostStillInLobby} assigned={assigned} deployed_together={deployedTogether} opening_buy={openingBuy} opening_live={openingLive} independent_funds={openingEconomyIndependent} intermission={intermissionObserved} second_buy={secondBuy} second_live={secondLive} next_round_funds={nextRoundFundsAdvanced} funds={_demolitionPlayerEconomy.Funds} remote_representation={remoteRepresentation} damage={damageRelayed} medic_sync={medicAbilitySynchronized} eliminated_sync={networkEliminationSynchronized} eliminated_reset={networkEliminationReset} objective={objectiveSynchronized} disconnect_recovered={disconnectRecovered} ai_replacement={aiReplacement} score={_demolitionMatch.PlayerScore}:{_demolitionMatch.OpponentScore} phase={_demolitionNetworkPhase} round={_demolitionMatch.CurrentRound} action_received={_demolitionNetworkActionReceivedForDiagnostics} action_applied={_demolitionNetworkActionAppliedForDiagnostics} action_distance={_demolitionNetworkActionDistanceForDiagnostics:0.00}");
+        GD.Print($"DEMOLITION_NETWORK_CHECK mode=host requested_team={clientTeam} online={_squadNetwork.IsOnline} registered={_squadNetwork.RegisteredDemolitionPlayerCount} lobby_players={_hud.DemolitionNetworkLobbyPlayerCount} lobby_can_start={_hud.DemolitionNetworkLobbyCanStart} peers_before={(connectedBeforeDisconnect ? 1 : 0)} peers_after={_squadNetwork.ConnectedPeerCount} team={_demolitionLocalNetworkTeam} slot={_demolitionLocalNetworkSlot} humans={DemolitionNetworkHumanCount} lobby_observed={lobbyObserved} lobby_held={hostStillInLobby} assigned={assigned} deployed_together={deployedTogether} opening_buy={openingBuy} opening_live={openingLive} independent_funds={openingEconomyIndependent} intermission={intermissionObserved} second_buy={secondBuy} second_live={secondLive} next_round_funds={nextRoundFundsAdvanced} funds={_demolitionPlayerEconomy.Funds} remote_representation={remoteRepresentation} damage={damageRelayed} medic_sync={medicAbilitySynchronized} eliminated_sync={networkEliminationSynchronized} eliminated_reset={networkEliminationReset} objective={objectiveSynchronized} glass_authority={glassAuthorityProtected} glass_gun={glassGunSynchronized} glass_melee={glassMeleeSynchronized} glass_reset={glassRoundResetSynchronized} glass_stale_snapshot={staleGlassSnapshotProtected} glass_round_replace={nextRoundGlassSnapshotCanReset} glass_mask={_demolitionBazaarGlassMask} disconnect_recovered={disconnectRecovered} ai_replacement={aiReplacement} score={_demolitionMatch.PlayerScore}:{_demolitionMatch.OpponentScore} phase={_demolitionNetworkPhase} round={_demolitionMatch.CurrentRound} action_received={_demolitionNetworkActionReceivedForDiagnostics} action_applied={_demolitionNetworkActionAppliedForDiagnostics} action_distance={_demolitionNetworkActionDistanceForDiagnostics:0.00}");
         GD.Print($"DEMOLITION_NETWORK_PASS valid={valid}");
         await ToSignal(GetTree().CreateTimer(0.5, true), SceneTreeTimer.SignalName.Timeout);
         GetTree().Quit(valid ? 0 : 2);

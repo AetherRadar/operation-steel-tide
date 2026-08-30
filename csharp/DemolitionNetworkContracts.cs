@@ -47,6 +47,18 @@ public readonly record struct DemolitionFundsNetworkState(
     int Round,
     int Funds);
 
+public readonly record struct DemolitionGlassHitNetworkRequest(
+    long PeerId,
+    Godot.Vector3 Origin,
+    Godot.Vector3 End,
+    float Damage,
+    bool Melee);
+
+public readonly record struct DemolitionGlassNetworkState(
+    uint ShatteredMask,
+    int EffectPaneIndex,
+    Godot.Vector3 EffectPosition);
+
 public readonly record struct DemolitionPlayerNetworkState(
     long PeerId,
     DemolitionNetworkTeam Team,
@@ -79,4 +91,5 @@ public readonly record struct DemolitionMatchNetworkState(
     int DevicePhase,
     int ActiveSite,
     int CarrierActorId,
-    Godot.Vector3 DevicePosition);
+    Godot.Vector3 DevicePosition,
+    uint BazaarGlassMask = 0u);

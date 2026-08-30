@@ -70,7 +70,14 @@ public sealed partial class DemolitionArenaBuilder
         {
             BuildTideglassAuthoredCollision(root);
         }
-        return new DemolitionArenaRuntime(layout, root, sites, _staticBodies, _visualPartCount);
+        var bazaarGlassFields = BuildBazaarCrossingGlass(root, layout);
+        return new DemolitionArenaRuntime(
+            layout,
+            root,
+            sites,
+            _staticBodies,
+            bazaarGlassFields,
+            _visualPartCount);
     }
 
     private Dictionary<string, StandardMaterial3D> BuildMaterials()

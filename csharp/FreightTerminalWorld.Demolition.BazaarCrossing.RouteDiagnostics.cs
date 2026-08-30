@@ -251,7 +251,7 @@ public partial class FreightTerminalWorld
         var squadBodyReady = mate.IsInsideTree()
             && mate.ProcessMode != ProcessModeEnum.Disabled
             && mate.CollisionLayer == 4
-            && mate.CollisionMask == 1;
+            && mate.CollisionMask == (1u | BreakableGlassField.MovementCollisionLayer);
         var squadStepsBefore = mate.BazaarRoutePhysicsStepsForDiagnostics;
         foreach (var stair in stairs)
         {
@@ -307,7 +307,7 @@ public partial class FreightTerminalWorld
         var enemyBodyReady = enemy.IsInsideTree()
             && enemy.ProcessMode != ProcessModeEnum.Disabled
             && enemy.CollisionLayer == 2
-            && enemy.CollisionMask == 1;
+            && enemy.CollisionMask == (1u | BreakableGlassField.MovementCollisionLayer);
         var enemyStepsBefore = enemy.BazaarRoutePhysicsStepsForDiagnostics;
         foreach (var stair in stairs)
         {

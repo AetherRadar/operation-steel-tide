@@ -28,6 +28,7 @@ import traceback
 import bmesh
 import bpy
 from mathutils import Matrix, Vector
+from mathutils.bvhtree import BVHTree
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -57,6 +58,39 @@ MAX_EXPORT_DRAW_NODES = 800
 TARGET_EXPORT_DRAW_NODES = 780
 MAX_TEXTURE_DIMENSION = 1024
 MAX_TEXTURE_MEMORY_MIB = 240.0
+
+EXPECTED_RUNTIME_DOOR_PORTAL_NAMES = frozenset(
+    {
+        "Bazaar_A_Caravanserai_South_Portal01",
+        "Bazaar_A_Caravanserai_West_Portal00",
+        "Bazaar_A_Caravanserai_East_Portal00",
+        "Bazaar_A_Caravanserai_North_Portal00",
+        "Bazaar_A_Caravanserai_North_Portal01",
+        "Bazaar_A_RearWarehouse_CenterPortal",
+        "Bazaar_A_RearWarehouse_Portal_-56.0",
+        "Bazaar_A_RearWarehouse_Portal_-38.0",
+        "Bazaar_B_MarketWarehouse_South_Portal00",
+        "Bazaar_B_MarketWarehouse_West_Portal00",
+        "Bazaar_B_MarketWarehouse_East_Portal00",
+        "Bazaar_B_MarketWarehouse_North_Portal00",
+        "Bazaar_B_MarketWarehouse_North_Portal01",
+        "Bazaar_B_Loading_Portal00",
+        "Bazaar_B_Loading_Portal01",
+        "Bazaar_B_Stockroom_Portal00",
+        "Bazaar_B_Stockroom_Portal01",
+        "Bazaar_B_Stockroom_Portal02",
+        "Bazaar_Mid_NorthConnector_South_Portal00",
+        "Bazaar_Mid_NorthConnector_North_Portal00",
+        "Bazaar_Mid_NorthConnector_West_Portal00",
+        "Bazaar_Mid_NorthConnector_East_Portal00",
+        "Bazaar_Mid_NorthTeaHall_South_Portal00",
+        "Bazaar_Mid_NorthTeaHall_North_Portal00",
+        "Bazaar_Mid_CenterProduceHall_South_Portal00",
+        "Bazaar_Mid_CenterProduceHall_North_Portal00",
+        "Bazaar_Mid_SouthCarpetHall_South_Portal01",
+        "Bazaar_Mid_SouthCarpetHall_North_Portal01",
+    }
+)
 
 CC0_LICENSE = "CC0 1.0 Universal"
 PROJECT_LICENSE = "Project-authored layout/build adaptation (MIT repository)"
@@ -3439,7 +3473,7 @@ def build_map_v2(
             "north": ((-52.0, 3.2), (-37.0, 3.2)),
         },
         6.4,
-        ("trey_foundation", "quat_door_frame"),
+        ("trey_foundation",),
         ("quat_window_trim", "trey_foundation"),
         templates,
         specs,
@@ -3557,7 +3591,7 @@ def build_map_v2(
         "Bazaar_A_RearWarehouse_Partition",
         (-60.0, -23.0),
         (-34.0, -23.0),
-        ((2.4, 5.6), (12.4, 15.6), (20.4, 23.6)),
+        ((2.0, 6.0), (12.0, 16.0), (20.0, 24.0)),
         0.0,
         3.0,
         ("trey_foundation",),
@@ -3568,11 +3602,25 @@ def build_map_v2(
         role="finished_cc0_A_warehouse_partition",
         material=warm,
     )
+    make_module_run(
+        "Bazaar_A_RearWarehouse_Section02_UpperConnection",
+        (-44.0, -23.0),
+        (-40.0, -23.0),
+        3.0,
+        3.3,
+        ("trey_foundation",),
+        templates,
+        specs,
+        architecture,
+        root,
+        role="finished_cc0_A_connected_warehouse_partition_wall",
+        material=warm,
+    )
     make_portal(
         "Bazaar_A_RearWarehouse_CenterPortal",
         (-46.0, 0.0, -23.0),
         0.0,
-        3.2,
+        4.0,
         templates,
         specs,
         architecture,
@@ -3635,7 +3683,7 @@ def build_map_v2(
             f"Bazaar_A_RearWarehouse_Portal_{portal_x:+05.1f}",
             (portal_x, 0.0, -23.0),
             0.0,
-            3.2,
+            4.0,
             templates,
             specs,
             architecture,
@@ -3663,7 +3711,7 @@ def build_map_v2(
         )
     create_authored_column_set(
         "Bazaar_A_RearWarehouse_Pilasters",
-        tuple((x, -22.78, 0.0, 3.14) for x in (-59.0, -52.0, -49.5, -42.5, -40.0, -35.0)),
+        tuple((x, -22.78, 0.0, 3.14) for x in (-59.0, -53.5, -48.5, -43.5, -40.5, -35.0)),
         0.28,
         templates,
         specs,
@@ -3689,7 +3737,7 @@ def build_map_v2(
     )
     for band_name, start, end, band_material in (
         ("RearShopWest", (-59.2, -22.70), (-52.1, -22.70), floor_sand),
-        ("RearShopEast", (-41.9, -22.70), (-34.8, -22.70), floor_slate),
+        ("RearShopEast", (-39.8, -22.70), (-34.8, -22.70), floor_slate),
     ):
         add_upper_shopfront_band(
             f"Bazaar_A_{band_name}",
@@ -3704,12 +3752,6 @@ def build_map_v2(
         (-54.1, -22.48),
         (-48.0, -22.48),
         dark_timber,
-    )
-    add_wall_storage_rack(
-        "Bazaar_A_RearDisplayEast",
-        (-44.1, -22.48),
-        (-40.0, -22.48),
-        roof_sand,
     )
     add_wall_storage_rack(
         "Bazaar_A_CourtyardSpiceRack",
@@ -3783,7 +3825,7 @@ def build_map_v2(
             "north": ((40.0, 3.2), (55.0, 3.2)),
         },
         6.5,
-        ("trey_foundation", "quat_metal_window"),
+        ("trey_foundation",),
         ("quat_metal_window", "trey_window"),
         templates,
         specs,
@@ -3843,12 +3885,16 @@ def build_map_v2(
         role="finished_cc0_enterable_B_roof",
         material=roof_slate,
     )
-    create_authored_column_set(
+    # Keep the warehouse grid legible without occupying the first Loading
+    # portal's approach volume.  The former column at (39.0, -25.5) sat only
+    # one metre behind that opening and physically blocked its centreline.
+    b_warehouse_column_grid = create_authored_column_set(
         "Bazaar_B_Warehouse_ColumnGrid",
         tuple(
             (x, z, 0.0, 6.25)
             for x in (39.0, 45.0, 51.0, 57.0)
             for z in (-25.5, -17.5, -9.5)
+            if (x, z) != (39.0, -25.5)
         ),
         0.52,
         templates,
@@ -3858,6 +3904,7 @@ def build_map_v2(
         root,
         role="finished_cc0_B_structural_column_grid",
     )
+    b_warehouse_column_grid["portal_clearance_exclusion_xz"] = "39.000,-25.500"
     make_segmented_wall(
         "Bazaar_B_LoadingBay_Partition",
         (40.0, -28.0),
@@ -3865,12 +3912,12 @@ def build_map_v2(
         ((1.0, 4.4), (12.0, 15.2)),
         0.0,
         3.0,
-        ("trey_arch",),
+        ("trey_foundation",),
         templates,
         specs,
         architecture,
         root,
-        role="finished_cc0_B_loading_arcade",
+        role="finished_cc0_B_loading_partition_wall",
         material=concrete,
     )
     make_segmented_wall(
@@ -3943,16 +3990,16 @@ def build_map_v2(
     # Make both runtime-aligned partitions explicit at player height.  Arched
     # frames mark every loading/stockroom opening; signs and wall shelves occupy
     # the high wall band instead of consuming the clean navigation floor.
-    for partition_name, portal_x, portal_centers in (
-        ("Loading", 40.0, (-25.3, -14.4)),
-        ("Stockroom", 52.0, (-27.0, -23.4, -12.4)),
+    for partition_name, portal_x, portal_specs in (
+        ("Loading", 40.0, ((-25.3, 3.4), (-14.4, 3.2))),
+        ("Stockroom", 52.0, ((-27.0, 3.2), (-23.4, 3.2), (-12.4, 3.2))),
     ):
-        for portal_index, portal_z in enumerate(portal_centers):
+        for portal_index, (portal_z, portal_width) in enumerate(portal_specs):
             make_portal(
                 f"Bazaar_B_{partition_name}_Portal{portal_index:02d}",
                 (portal_x, 0.0, portal_z),
                 90.0,
-                3.2,
+                portal_width,
                 templates,
                 specs,
                 architecture,
@@ -4250,7 +4297,7 @@ def build_map_v2(
         (1.5, -16.7),
         0.0,
         3.0,
-        ("trey_foundation", "quat_door_frame"),
+        ("trey_foundation",),
         templates,
         specs,
         architecture,
@@ -4263,7 +4310,7 @@ def build_map_v2(
         (8.8, -12.7),
         0.0,
         3.0,
-        ("trey_foundation", "quat_door_frame"),
+        ("trey_foundation",),
         templates,
         specs,
         architecture,
@@ -5281,23 +5328,57 @@ def build_map_v2(
         )
         xmin, xmax = x - sx * 0.5, x + sx * 0.5
         zmin, zmax = z - sz * 0.5, z + sz * 0.5
-        # Arcaded north wall and staggered south kiosks create a protected,
-        # non-linear retake route while retaining multiple 3.2 m doorways.
-        make_module_run(
-            f"Bazaar_Back_{hall_name}_NorthArcade",
-            (xmin, zmin),
-            (xmax, zmin),
-            0.0,
-            3.0,
-            ("trey_arch",),
-            templates,
-            specs,
-            architecture,
-            root,
-            role="finished_cc0_back_market_arcade",
-            material=warm,
-            nominal_cell=4.0,
+        # Only unobstructed north-wall spans read as arcades. The outer rear
+        # halls meet 18 m city-block masses at this line, so those overlaps use
+        # an attached floor-to-roof foundation wall instead of false arches.
+        north_wall_spans = (
+            (
+                "SolidMassWall",
+                xmin,
+                -35.0,
+                "foundation",
+            ),
+            ("Arcade", -35.0, xmax, "arcade"),
+        ) if hall_name == "WestRearMarket" else (
+            ("Arcade", xmin, 35.0, "arcade"),
+            ("SolidMassWall", 35.0, xmax, "foundation"),
+        ) if hall_name == "EastRearMarket" else (
+            ("Arcade", xmin, xmax, "arcade"),
         )
+        for span_name, span_min, span_max, visual_language in north_wall_spans:
+            if visual_language == "arcade":
+                make_module_run(
+                    f"Bazaar_Back_{hall_name}_North{span_name}",
+                    (span_min, zmin),
+                    (span_max, zmin),
+                    0.0,
+                    3.0,
+                    ("trey_arch",),
+                    templates,
+                    specs,
+                    architecture,
+                    root,
+                    role="finished_cc0_back_market_arcade",
+                    material=warm,
+                    nominal_cell=4.0,
+                )
+            else:
+                make_module_run(
+                    f"Bazaar_Back_{hall_name}_North{span_name}",
+                    (span_min, zmin + 0.20),
+                    (span_max, zmin + 0.20),
+                    0.0,
+                    4.15,
+                    ("trey_foundation",),
+                    templates,
+                    specs,
+                    architecture,
+                    root,
+                    role="finished_cc0_back_market_solid_mass_wall",
+                    material=concrete,
+                    nominal_cell=2.0,
+                    depth_scale=1.15,
+                )
         make_segmented_wall(
             f"Bazaar_Back_{hall_name}_SouthKiosks",
             (xmin, zmax),
@@ -5305,7 +5386,7 @@ def build_map_v2(
             ((sx * 0.33 - 1.6, sx * 0.33 + 1.6), (sx * 0.76 - 1.6, sx * 0.76 + 1.6)),
             0.0,
             3.0,
-            ("trey_foundation", "quat_window_trim"),
+            ("trey_foundation",),
             templates,
             specs,
             architecture,
@@ -5476,77 +5557,6 @@ def build_map_v2(
                 nominal_cell=3.0,
                 depth_scale=0.68,
             )
-
-    # False arched shop niches and framed signs resolve the long-hall end walls
-    # without claiming a new runtime doorway through the closed link masses.
-    for niche_name, niche_x, niche_z, sign_material in (
-        ("WestTerminus", -27.18, -38.0, sign_ochre),
-        ("EastTerminus", 27.18, -38.0, sign_teal),
-    ):
-        make_portal(
-            f"Bazaar_Back_{niche_name}_ArchedNiche",
-            (niche_x, 0.0, niche_z),
-            90.0,
-            3.2,
-            templates,
-            specs,
-            architecture,
-            root,
-            region="Defender_BackMarket",
-        )
-        sign_x = niche_x + (0.22 if niche_x < 0.0 else -0.22)
-        make_module_run(
-            f"Bazaar_Back_{niche_name}_UpperSign",
-            (sign_x, niche_z - 2.2),
-            (sign_x, niche_z + 2.2),
-            2.58,
-            0.72,
-            ("trey_foundation",),
-            templates,
-            specs,
-            dressing,
-            root,
-            role="finished_cc0_wall_mounted_shop_sign",
-            material=sign_material,
-            nominal_cell=2.2,
-            depth_scale=0.26,
-        )
-        gate_x = niche_x + (0.18 if niche_x < 0.0 else -0.18)
-        add_upper_shopfront_band(
-            f"Bazaar_Back_{niche_name}_ServiceGate",
-            (gate_x, niche_z - 3.55),
-            (gate_x, niche_z + 3.55),
-            floor_slate if niche_x < 0.0 else floor_terracotta,
-            bottom=3.02,
-            height=0.82,
-        )
-        create_authored_column_set(
-            f"Bazaar_Back_{niche_name}_ServiceGatePiers",
-            tuple((gate_x, z, 0.0, 4.02) for z in (niche_z - 3.5, niche_z, niche_z + 3.5)),
-            0.24,
-            templates,
-            specs,
-            roof_sand,
-            architecture,
-            root,
-            role="finished_cc0_back_market_service_gate_piers",
-        )
-        make_module_run(
-            f"Bazaar_Back_{niche_name}_ServiceGateCornice",
-            (gate_x, niche_z - 3.6),
-            (gate_x, niche_z + 3.6),
-            3.86,
-            0.22,
-            ("trey_roof_trim",),
-            templates,
-            specs,
-            architecture,
-            root,
-            role="finished_cc0_back_market_service_gate_cornice",
-            material=dark_timber,
-            nominal_cell=2.4,
-            depth_scale=0.70,
-        )
 
     # Full-height rear city blocks bound the back-market folds. Their southern
     # faces leave a deliberate 5-7 m transfer corridor; only the 14 m defender
@@ -5724,6 +5734,7 @@ def add_review_lighting(collection: bpy.types.Collection) -> None:
             (38.0, 3.2, -18.0),
             (46.0, 3.2, -18.0),
             (55.0, 3.2, -18.0),
+            (39.2, 2.8, -25.2),
             (53.6, 2.8, 6.2),
             (56.0, 3.0, 2.5),
             (58.4, 2.8, 5.4),
@@ -5779,6 +5790,9 @@ def render_previews(collection: bpy.types.Collection) -> None:
         ("09_mid_spawn_clearance.png", (-9.45, -43.8, 1.65), (-6.0, 1.8, 36.0), 32.0),
         ("10_mid_upper_connection.png", (-6.0, -28.2, 4.72), (-6.0, 4.15, 16.6), 32.0),
         ("11_a_rear_portals.png", (-47.0, 9.0, 1.65), (-47.0, 1.55, -23.4), 24.0),
+        ("12_a_rear_wall_connection.png", (-47.0, 14.0, 4.45), (-42.0, 4.15, -23.0), 36.0),
+        ("13_back_market_north_mass.png", (-29.0, 34.5, 1.72), (-43.0, 2.0, -42.0), 31.0),
+        ("14_b_loading_portal_clearance.png", (35.2, 23.5, 1.68), (42.0, 1.4, -25.3), 31.0),
     )
     preview_filter = {
         filename.strip()
@@ -5804,6 +5818,92 @@ def object_world_bounds(objects: list[bpy.types.Object]) -> tuple[Vector, Vector
     minimum = Vector(tuple(min(point[axis] for point in points) for axis in range(3)))
     maximum = Vector(tuple(max(point[axis] for point in points) for axis in range(3)))
     return minimum, maximum
+
+
+def validate_runtime_portal_column_clearance(
+    runtime_portals: list[bpy.types.Object],
+    mesh_objects: list[bpy.types.Object],
+) -> dict[str, int | bool]:
+    """Reject vertical authored structure inside any true door approach.
+
+    Door frames are deliberately excluded by role.  Each column/post/pier
+    mesh gets its own world-space BVH so a wall or arch hit cannot hide a
+    structural blocker behind it.  The 3.1 m deep sample volume covers a
+    player's immediate approach on both sides of every runtime portal.
+    """
+    vertical_role_tokens = ("column", "pilaster", "pier", "post")
+    vertical_objects = [
+        obj
+        for obj in mesh_objects
+        if any(
+            token in str(obj.get("bazaar_role", "")).lower()
+            for token in vertical_role_tokens
+        )
+    ]
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    vertical_bvhs: list[tuple[bpy.types.Object, BVHTree]] = []
+    for obj in vertical_objects:
+        evaluated = obj.evaluated_get(depsgraph)
+        mesh = evaluated.to_mesh()
+        try:
+            if not mesh.polygons:
+                continue
+            world_vertices = [evaluated.matrix_world @ vertex.co for vertex in mesh.vertices]
+            polygons = [tuple(polygon.vertices) for polygon in mesh.polygons]
+            bvh = BVHTree.FromPolygons(
+                world_vertices,
+                polygons,
+                all_triangles=all(len(polygon) == 3 for polygon in polygons),
+                epsilon=0.0001,
+            )
+            vertical_bvhs.append((obj, bvh))
+        finally:
+            evaluated.to_mesh_clear()
+
+    clearance_depth = 3.1
+    half_depth = clearance_depth * 0.5
+    blockers: set[str] = set()
+    up = Vector((0.0, 0.0, 1.0))
+    for portal in runtime_portals:
+        width = float(portal.get("clear_opening_width_m", 0.0))
+        sample_offset = min(0.65, width * 0.20)
+        basis = portal.matrix_world.to_3x3()
+        tangent = basis @ Vector((1.0, 0.0, 0.0))
+        normal = basis @ Vector((0.0, 1.0, 0.0))
+        tangent.z = 0.0
+        normal.z = 0.0
+        if tangent.length < 0.001 or normal.length < 0.001:
+            raise RuntimeError(f"Runtime portal has a degenerate basis: {portal.name}")
+        tangent.normalize()
+        normal.normalize()
+        center = portal.matrix_world.translation
+        for lateral in (-sample_offset, 0.0, sample_offset):
+            for height in (0.55, 1.35, 2.15):
+                sample_center = center + tangent * lateral + up * height
+                for side in (-1.0, 1.0):
+                    origin = sample_center + normal * (side * half_depth)
+                    direction = normal * -side
+                    for blocker, bvh in vertical_bvhs:
+                        location, _hit_normal, _face, distance = bvh.ray_cast(
+                            origin,
+                            direction,
+                            clearance_depth,
+                        )
+                        if location is not None and distance is not None:
+                            blockers.add(
+                                f"{portal.name}:{blocker.name}:"
+                                f"lateral={lateral:.2f}:height={height:.2f}"
+                            )
+    if blockers:
+        raise RuntimeError(
+            "Runtime door approach intersects authored column/post geometry: "
+            f"{sorted(blockers)}"
+        )
+    return {
+        "valid": True,
+        "portal_count": len(runtime_portals),
+        "vertical_blocker_mesh_count": len(vertical_bvhs),
+    }
 
 
 def triangulate_visible_meshes(root: bpy.types.Object) -> None:
@@ -6402,6 +6502,7 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
         "Bazaar_A_Gallery_Deck",
         "Bazaar_B_InteriorFloor",
         "Bazaar_B_WarehouseRoof",
+        "Bazaar_B_Warehouse_ColumnGrid",
         "Bazaar_B_Balcony_Deck",
         "Bazaar_Mid_Mezzanine_Deck",
         "Bazaar_Mid_NorthConnector_Roof",
@@ -6447,6 +6548,177 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
     missing = sorted(required - names)
     if missing:
         raise RuntimeError(f"Missing required Bazaar V2 objects: {missing}")
+
+    runtime_portals = [
+        obj
+        for obj in mesh_objects
+        if obj.get("bazaar_role") == "finished_cc0_runtime_door_portal"
+    ]
+    actual_runtime_portal_names = frozenset(obj.name for obj in runtime_portals)
+    if actual_runtime_portal_names != EXPECTED_RUNTIME_DOOR_PORTAL_NAMES:
+        raise RuntimeError(
+            "Runtime door-portal contract drifted: "
+            f"missing={sorted(EXPECTED_RUNTIME_DOOR_PORTAL_NAMES - actual_runtime_portal_names)} "
+            f"unexpected={sorted(actual_runtime_portal_names - EXPECTED_RUNTIME_DOOR_PORTAL_NAMES)}"
+        )
+    if len(runtime_portals) != 28:
+        raise RuntimeError(
+            f"Bazaar must contain exactly 28 true runtime door portals, found {len(runtime_portals)}"
+        )
+    misleading_portal_roles = sorted(
+        obj.name
+        for obj in mesh_objects
+        if any(
+            token in str(obj.get("bazaar_role", "")).lower()
+            for token in ("fake_door", "solid_door", "niche")
+        )
+    )
+    misleading_portal_names = sorted(
+        name
+        for name in names
+        if any(token in name.lower() for token in ("archedniche", "terminus"))
+    )
+    if misleading_portal_roles or misleading_portal_names:
+        raise RuntimeError(
+            "False door/niche art survived the portal cleanup: "
+            f"roles={misleading_portal_roles} names={misleading_portal_names}"
+        )
+
+    expected_special_portal_widths = {
+        "Bazaar_A_RearWarehouse_CenterPortal": 4.0,
+        "Bazaar_A_RearWarehouse_Portal_-56.0": 4.0,
+        "Bazaar_A_RearWarehouse_Portal_-38.0": 4.0,
+        "Bazaar_B_Loading_Portal00": 3.4,
+        "Bazaar_B_Loading_Portal01": 3.2,
+    }
+    for portal_name, expected_width in expected_special_portal_widths.items():
+        portal = bpy.data.objects[portal_name]
+        actual_width = float(portal.get("clear_opening_width_m", 0.0))
+        if abs(actual_width - expected_width) > 0.001:
+            raise RuntimeError(
+                f"Runtime portal width drifted for {portal_name}: "
+                f"{actual_width:.3f} != {expected_width:.3f}"
+            )
+    undersized_runtime_portals = sorted(
+        obj.name
+        for obj in runtime_portals
+        if float(obj.get("clear_opening_width_m", 0.0)) < 3.199
+    )
+    if undersized_runtime_portals:
+        raise RuntimeError(
+            f"Runtime door portals narrower than 3.2 m: {undersized_runtime_portals}"
+        )
+    b_column_grid = bpy.data.objects["Bazaar_B_Warehouse_ColumnGrid"]
+    if (
+        int(b_column_grid.get("authored_module_instances", 0)) != 11
+        or b_column_grid.get("portal_clearance_exclusion_xz") != "39.000,-25.500"
+    ):
+        raise RuntimeError(
+            "B warehouse column grid restored the Loading Portal00 blocker"
+        )
+    portal_column_clearance = validate_runtime_portal_column_clearance(
+        runtime_portals,
+        mesh_objects,
+    )
+
+    solid_visual_selectors = (
+        (
+            "A shell lower fills",
+            lambda obj: obj.name.startswith("Bazaar_A_Caravanserai_")
+            and "_Lower_Section" in obj.name,
+        ),
+        (
+            "B shell lower fills",
+            lambda obj: obj.name.startswith("Bazaar_B_MarketWarehouse_")
+            and "_Lower_Section" in obj.name,
+        ),
+        (
+            "Mid sight baffles",
+            lambda obj: obj.name.startswith("Bazaar_Mid_NorthConnector_")
+            and "Baffle" in obj.name,
+        ),
+        (
+            "A rear partition fills",
+            lambda obj: obj.name.startswith("Bazaar_A_RearWarehouse_Partition_Section"),
+        ),
+        (
+            "A rear upper connection",
+            lambda obj: obj.name.startswith(
+                "Bazaar_A_RearWarehouse_Section02_UpperConnection"
+            ),
+        ),
+        (
+            "B loading partition fills",
+            lambda obj: obj.name.startswith("Bazaar_B_LoadingBay_Partition_Section"),
+        ),
+        (
+            "back-market kiosk fills",
+            lambda obj: "_SouthKiosks_Section" in obj.name,
+        ),
+        (
+            "back-market mass walls",
+            lambda obj: obj.name.startswith("Bazaar_Back_")
+            and "NorthSolidMassWall" in obj.name,
+        ),
+    )
+    solid_visual_objects: list[bpy.types.Object] = []
+    for solid_group_name, selector in solid_visual_selectors:
+        matching_objects = [obj for obj in mesh_objects if selector(obj)]
+        if not matching_objects:
+            raise RuntimeError(f"Required solid visual group is missing: {solid_group_name}")
+        solid_visual_objects.extend(matching_objects)
+    misleading_solid_sources = sorted(
+        f"{obj.name}:{obj.get('source_object', '')}"
+        for obj in set(solid_visual_objects)
+        if any(
+            token in str(obj.get("source_object", "")).lower()
+            for token in ("door", "window", "arch")
+        )
+    )
+    if misleading_solid_sources:
+        raise RuntimeError(
+            "Solid wall fills still use passable door/window/arch source language: "
+            f"{misleading_solid_sources}"
+        )
+
+    rear_segment = bpy.data.objects[
+        "Bazaar_A_RearWarehouse_Partition_Section02_foundation"
+    ]
+    rear_segment_connection = bpy.data.objects[
+        "Bazaar_A_RearWarehouse_Section02_UpperConnection_foundation"
+    ]
+    expected_rear_segment_run = ("-44.000,-23.000", "-40.000,-23.000")
+    for segment_object in (rear_segment, rear_segment_connection):
+        actual_run = (
+            str(segment_object.get("godot_run_start_xz", "")),
+            str(segment_object.get("godot_run_end_xz", "")),
+        )
+        if actual_run != expected_rear_segment_run:
+            raise RuntimeError(
+                f"A rear Segment02 run drifted for {segment_object.name}: {actual_run}"
+            )
+    rear_segment_points = [
+        rear_segment.matrix_world @ Vector(corner) for corner in rear_segment.bound_box
+    ]
+    rear_connection_points = [
+        rear_segment_connection.matrix_world @ Vector(corner)
+        for corner in rear_segment_connection.bound_box
+    ]
+    rear_segment_top = max(point.z for point in rear_segment_points)
+    rear_connection_bottom = min(point.z for point in rear_connection_points)
+    rear_connection_top = max(point.z for point in rear_connection_points)
+    rear_connection_min_x = min(point.x for point in rear_connection_points)
+    if (
+        abs(rear_segment_top - rear_connection_bottom) > 0.02
+        or rear_connection_top < 6.28
+        or rear_connection_min_x < -45.0
+    ):
+        raise RuntimeError(
+            "A rear Segment02 is not visibly connected floor-to-roof or escaped "
+            f"its safe span: base_top={rear_segment_top:.3f} "
+            f"upper={rear_connection_bottom:.3f}..{rear_connection_top:.3f} "
+            f"min_x={rear_connection_min_x:.3f}"
+        )
 
     detached_foyer_prefixes = (
         "Bazaar_Mid_WestSouthFrontageBaffle",
@@ -6608,8 +6880,8 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
             )
             for obj in mesh_objects
         ),
-        "back_service_gate_parts": sum(
-            "back_market_service_gate" in str(obj.get("bazaar_role", ""))
+        "back_solid_mass_wall_parts": sum(
+            obj.get("bazaar_role") == "finished_cc0_back_market_solid_mass_wall"
             for obj in mesh_objects
         ),
     }
@@ -6624,7 +6896,7 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
         "continuous_storage_parts": 80,
         "continuous_shopfront_parts": 60,
         "skyline_articulation_parts": 45,
-        "back_service_gate_parts": 4,
+        "back_solid_mass_wall_parts": 2,
     }
     for polish_key, minimum in polish_minimums.items():
         if art_polish_counts[polish_key] < minimum:
@@ -6725,7 +6997,7 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
     depsgraph = bpy.context.evaluated_depsgraph_get()
     a_rear_visual_blockers: list[str] = []
     for portal_x in (-56.0, -46.0, -38.0):
-        for x_offset in (-0.8, 0.0, 0.8):
+        for x_offset in (-1.2, 0.0, 1.2):
             for height in (0.55, 1.35, 2.15):
                 ray_origin = godot_to_blender(portal_x + x_offset, height, -21.2)
                 hit, _location, _normal, _face, hit_object, _matrix = bpy.context.scene.ray_cast(
@@ -6949,6 +7221,10 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
         "art_polish_object_counts": art_polish_counts,
         "roofed_footprint_m2": round(roof_footprint_m2, 3),
         "legacy_outer_facade_count": len(legacy_facades),
+        "runtime_door_portal_count": len(runtime_portals),
+        "runtime_portal_column_clearance_gate": portal_column_clearance,
+        "solid_visual_language_gate": "foundation_only",
+        "a_rear_segment02_connected": True,
         "closed_modular_block_count": len(
             [obj for obj in mesh_objects if obj.get("bazaar_role") == "finished_cc0_closed_urban_block_roof"]
         ),
@@ -6994,6 +7270,7 @@ def optimize_static_draw_nodes_v2(
         "BazaarGroundAuthoredMesh",
         "Bazaar_A_Gallery_Deck",
         "Bazaar_B_Balcony_Deck",
+        "Bazaar_B_Warehouse_ColumnGrid",
         "Bazaar_Mid_Mezzanine_Deck",
         "Bazaar_B_WarehouseRoof",
         "Bazaar_Mid_NorthConnector_Roof",
@@ -7030,6 +7307,7 @@ def optimize_static_draw_nodes_v2(
             or any(obj.name.startswith(stair.name) for stair in STAIRS)
             or "deck" in role
             or "upper_privacy" in role
+            or role == "finished_cc0_runtime_door_portal"
             or obj.get("runtime_wall_thickness_m") is not None
             or obj.get("runtime_screen_thickness_m") is not None
             or obj.data.users != 1
@@ -7492,6 +7770,39 @@ def validate_round_trip_v2(expected: dict[str, object]) -> dict[str, object]:
     missing = sorted(required - names)
     if missing:
         raise RuntimeError(f"Round-trip missing Bazaar V2 objects: {missing}")
+    round_trip_runtime_portals = [
+        obj
+        for obj in meshes
+        if obj.get("bazaar_role") == "finished_cc0_runtime_door_portal"
+    ]
+    round_trip_runtime_portal_names = frozenset(
+        obj.name for obj in round_trip_runtime_portals
+    )
+    if round_trip_runtime_portal_names != EXPECTED_RUNTIME_DOOR_PORTAL_NAMES:
+        raise RuntimeError(
+            "Round-trip runtime door-portal contract drifted: "
+            f"missing={sorted(EXPECTED_RUNTIME_DOOR_PORTAL_NAMES - round_trip_runtime_portal_names)} "
+            f"unexpected={sorted(round_trip_runtime_portal_names - EXPECTED_RUNTIME_DOOR_PORTAL_NAMES)}"
+        )
+    if len(round_trip_runtime_portals) != 28:
+        raise RuntimeError(
+            "Round-trip must retain 28 independently auditable runtime door portals, "
+            f"found {len(round_trip_runtime_portals)}"
+        )
+    round_trip_column_grid = bpy.data.objects.get("Bazaar_B_Warehouse_ColumnGrid")
+    if (
+        round_trip_column_grid is None
+        or int(round_trip_column_grid.get("authored_module_instances", 0)) != 11
+        or round_trip_column_grid.get("portal_clearance_exclusion_xz")
+        != "39.000,-25.500"
+    ):
+        raise RuntimeError(
+            "Round-trip B warehouse column grid lost its Loading Portal00 exclusion"
+        )
+    round_trip_portal_column_clearance = validate_runtime_portal_column_clearance(
+        round_trip_runtime_portals,
+        meshes,
+    )
     if len(meshes) != int(expected["mesh_object_count"]):
         raise RuntimeError(
             f"Round-trip mesh count changed: expected {expected['mesh_object_count']}, "
@@ -7564,6 +7875,8 @@ def validate_round_trip_v2(expected: dict[str, object]) -> dict[str, object]:
         "instance_triangles": instance_triangles,
         "bounds_min": [round(value, 4) for value in minimum],
         "bounds_max": [round(value, 4) for value in maximum],
+        "runtime_door_portal_count": len(round_trip_runtime_portals),
+        "runtime_portal_column_clearance_gate": round_trip_portal_column_clearance,
         "v2_required_objects_preserved": True,
     }
 
@@ -7644,7 +7957,8 @@ def main() -> None:
     print(
         "BAZAAR_DCC_PASS valid=True cc0_only=True interiors=4 platforms=3 "
         "dense_v2=True architectural_cover=True site_pair_block=True "
-        "round_trip=True draco_absent=True"
+        "runtime_portals=28 false_doors_absent=True segment02_connected=True "
+        "portal_column_clearance=True round_trip=True draco_absent=True"
     )
 
 

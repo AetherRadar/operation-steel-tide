@@ -182,7 +182,7 @@ public partial class SquadMate
         SetPhysicsProcess(true);
         Visible = true;
         CollisionLayer = 4;
-        CollisionMask = 1;
+        CollisionMask = 1 | BreakableGlassField.MovementCollisionLayer;
         var children = GetChildren();
         using var childrenBacking = children.AsDisposable();
         foreach (var child in children)

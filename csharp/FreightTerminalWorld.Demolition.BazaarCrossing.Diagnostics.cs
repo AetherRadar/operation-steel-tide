@@ -192,6 +192,7 @@ public partial class FreightTerminalWorld
 
         var aRearPortalsReady = BazaarARearPortalsReady(
             layout, GetWorld3D(), out var aRearPortalFailures);
+        var portalGlass = await BazaarPortalGlassReady(arena, layout);
         var midMezzanineConnectionReady = BazaarMidMezzanineConnectionReady(
             layout, GetWorld3D(), out var midMezzanineConnectionFailures);
         var traversalReady = BazaarTraversalGeometryReady(layout, out var traversalFailures);
@@ -287,6 +288,11 @@ public partial class FreightTerminalWorld
         var runtimeReady = arena.Active
             && arena.Root.Visible
             && arena.Root.ProcessMode != ProcessModeEnum.Disabled
+            && arena.BazaarGlassFields.Count == 1
+            && arena.BazaarGlassFields.All(field => field.IsFieldActive
+                && Enumerable.Range(0, field.PaneCount).All(index =>
+                    field.IsPaneShattered(index)
+                    || !field.IsPaneMovementCollisionDisabled(index)))
             && arena.CollisionBodyCount >= layout.CollisionBoxes.Count + layout.TraversalBoxes.Count
             && arena.ActiveCollisionBodyCount == arena.CollisionBodyCount
             && arena.AllStaticBodiesUseWorldLayer()
@@ -302,6 +308,11 @@ public partial class FreightTerminalWorld
         var deactivatedReady = !arena.Active
             && !arena.Root.Visible
             && arena.Root.ProcessMode == ProcessModeEnum.Disabled
+            && arena.BazaarGlassFields.All(field => !field.IsFieldActive
+                && field.CollisionLayer == 0)
+            && arena.BazaarGlassFields.All(field =>
+                Enumerable.Range(0, field.PaneCount).All(
+                    field.IsPaneMovementCollisionDisabled))
             && arena.ActiveCollisionBodyCount == 0
             && arena.AllStaticBodiesUseWorldLayer();
 
@@ -318,6 +329,7 @@ public partial class FreightTerminalWorld
             && sightlinesReady
             && density.Ready
             && aRearPortalsReady
+            && portalGlass.Ready
             && midMezzanineConnectionReady
             && traversalReady
             && guardRails.Ready
@@ -354,6 +366,10 @@ public partial class FreightTerminalWorld
             + $"def_route={density.DefenderRoutesEfficient}:{density.MaximumDefenderRouteStretch:0.000}:"
             + $"{density.DefenderRouteProfile} failures={density.Failures} "
             + $"a_rear_portals={aRearPortalsReady} failures={aRearPortalFailures} "
+            + $"portal_glass={portalGlass.Ready}:{portalGlass.ShotClearedCount}/{portalGlass.PortalCount} "
+            + $"glass_actors={portalGlass.PlayerReady}/{portalGlass.SquadReady}/{portalGlass.EnemyReady} "
+            + $"glass_reset={portalGlass.ResetReady} glass_actor_result={portalGlass.ActorSummary} "
+            + $"glass_failures={portalGlass.Failures} "
             + $"mid_connection={midMezzanineConnectionReady} failures={midMezzanineConnectionFailures} "
             + $"traversal={traversalReady}:decks3:ramps6 failures={traversalFailures} "
             + $"guardrails={guardRails.Ready}:{guardRails.RailCount} "

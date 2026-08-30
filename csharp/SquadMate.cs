@@ -229,7 +229,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     {
         _rng.Randomize();
         CollisionLayer = 4;
-        CollisionMask = 1;
+        CollisionMask = 1 | BreakableGlassField.MovementCollisionLayer;
         FloorSnapLength = 0.35f;
         if (IsInstanceValid(Leader))
         {
@@ -547,6 +547,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
                 Velocity = doorVelocity;
                 ResetMovementProgress();
                 MoveAndSlide();
+                BreakableGlassField.TryShatterMovementBlockerFromCollisions(this);
                 AnimateRig(dt);
                 return;
             }
@@ -584,6 +585,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             ConsiderRoleAbility(hostile, _combatHasSight);
         }
         MoveAndSlide();
+        BreakableGlassField.TryShatterMovementBlockerFromCollisions(this);
         TryNavigationStepUp(
             navigationDirective.Kind == SquadTraversalKind.Step
                 || navigationDirective.SteppedDirect
@@ -762,7 +764,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
                 from,
                 to,
                 GetRid(),
-                uint.MaxValue,
+                BreakableGlassField.SightCollisionMask,
                 out var hit))
         {
             return false;

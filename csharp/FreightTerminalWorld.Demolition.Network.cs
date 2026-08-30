@@ -107,6 +107,7 @@ public partial class FreightTerminalWorld
         _demolitionNetworkActionAppliedForDiagnostics = false;
         _demolitionNetworkActionDistanceForDiagnostics = -1.0f;
         InitializeRemoteDemolitionEconomies();
+        ConfigureDemolitionGlassNetwork();
     }
 
     private void OnDemolitionNetworkAssignment(DemolitionNetworkTeam team, int slot)
@@ -382,7 +383,8 @@ public partial class FreightTerminalWorld
             (int)_demolitionDeviceLifecycle.Phase,
             _demolitionActiveSite,
             carrierActorId,
-            position);
+            position,
+            CaptureDemolitionBazaarGlassMask());
     }
 
     private int DemolitionActorIdForNode(Node3D? actor)
@@ -473,6 +475,9 @@ public partial class FreightTerminalWorld
             state,
             previousRound != state.CurrentRound,
             previousPhase != state.Phase);
+        ApplyDemolitionGlassSnapshot(
+            state.BazaarGlassMask,
+            previousRound != state.CurrentRound);
         if (state.Phase == DemolitionNetworkPhase.Intermission
             && previousPhase != DemolitionNetworkPhase.Intermission)
         {

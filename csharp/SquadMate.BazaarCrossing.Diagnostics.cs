@@ -27,6 +27,9 @@ public partial class SquadMate
             delta);
         MaintainStairNavigation(directive.Target, delta);
         MoveAndSlide();
+        BreakableGlassField.TryShatterMovementBlockerFromCollisions(
+            this,
+            spawnEffects: false);
         TryNavigationStepUp(
             directive.Kind == SquadTraversalKind.Step
                 || directive.SteppedDirect

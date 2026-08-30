@@ -60,7 +60,11 @@ public partial class FreightTerminalWorld
         var frameInstances = fields.Sum(field => field.FrameInstanceCount);
         var field = fields.FirstOrDefault(candidate =>
             candidate.PaneCount >= 2
-            && !candidate.Name.ToString().StartsWith("SkybridgeBreakableGlass", System.StringComparison.Ordinal));
+            && candidate.HasLocalShatterAuthority
+            && !candidate.WorldOcclusionRequired
+            && !candidate.Name.ToString().StartsWith(
+                "SkybridgeBreakableGlass",
+                System.StringComparison.Ordinal));
         var rayFrom = Vector3.Zero;
         var rayTo = Vector3.Zero;
         var paneIndex = -1;
@@ -74,8 +78,42 @@ public partial class FreightTerminalWorld
         var closeAudioPlaying = false;
         var skybridgeShot = false;
         var playerAudioPlaying = false;
+        var inactiveAuthoritativeApply = false;
+        var wallOcclusionProtected = false;
         if (rayReady && field is not null)
         {
+            var originalWorldOcclusionRequired = field.WorldOcclusionRequired;
+            field.SetWorldOcclusionRequired(true);
+            var blocker = new StaticBody3D
+            {
+                Name = "GlassOcclusionDiagnosticBlocker",
+                CollisionLayer = 1,
+                CollisionMask = 0
+            };
+            blocker.AddChild(new CollisionShape3D
+            {
+                Shape = new BoxShape3D { Size = new Vector3(0.32f, 1.2f, 0.32f) }
+            });
+            AddChild(blocker);
+            blocker.GlobalPosition = rayFrom.Lerp(rayTo, 0.32f);
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            wallOcclusionProtected = !BreakableGlassField.TryShatterAlongRay(
+                    GetWorld3D(),
+                    rayFrom,
+                    rayTo,
+                    30.0f,
+                    rayFrom.DirectionTo(rayTo),
+                    out _,
+                    false)
+                && !field.IsPaneShattered(paneIndex);
+            field.SetWorldOcclusionRequired(originalWorldOcclusionRequired);
+            // Detach immediately so the follow-up ray cannot still see a body that is
+            // only queued for deletion at the end of the current frame.
+            RemoveChild(blocker);
+            blocker.QueueFree();
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
             firstShotBlocked = BreakableGlassField.TryShatterAlongRay(
                 GetWorld3D(),
                 rayFrom,
@@ -128,6 +166,29 @@ public partial class FreightTerminalWorld
                     .OfType<AudioStreamPlayer>()
                     .Any(audio => audio.Playing && audio.Stream?.GetLength() >= 0.6);
             }
+            if (field.TryGetIntactPaneRay(out _, out _, out var inactivePaneIndex)
+                && inactivePaneIndex is >= 0 and < sizeof(uint) * 8)
+            {
+                var snapshot = field.CaptureStateForDiagnostics();
+                var eventCount = 0;
+                void CountUnexpectedApplyEvent(BreakableGlassField _, int __, uint ___)
+                    => eventCount++;
+                field.PaneShattered += CountUnexpectedApplyEvent;
+                field.SetFieldActive(false);
+                var appliedMask = field.ShatteredPaneMask | (1u << inactivePaneIndex);
+                var applied = field.ApplyShatteredPaneMask(appliedMask);
+                var inactiveStateStored = field.IsPaneShattered(inactivePaneIndex)
+                    && field.IsPaneCollisionDisabled(inactivePaneIndex)
+                    && field.CollisionLayer == 0;
+                field.SetFieldActive(true);
+                inactiveAuthoritativeApply = applied
+                    && inactiveStateStored
+                    && field.IsPaneShattered(inactivePaneIndex)
+                    && field.IsPaneCollisionDisabled(inactivePaneIndex)
+                    && eventCount == 0;
+                field.PaneShattered -= CountUnexpectedApplyEvent;
+                field.RestoreStateForDiagnostics(snapshot);
+            }
         }
 
         var skybridgeField = fields.FirstOrDefault(candidate =>
@@ -177,8 +238,10 @@ public partial class FreightTerminalWorld
             && panesDense
             && framesComplete
             && singleSurfaceVisuals
-            && residentialTracked;
-        GD.Print($"GLASS_CHECK valid={valid} fields={fields.Length} panes={paneCount} frames={frameInstances} single_surface={singleSurfaceVisuals} ray_ready={rayReady} first_shot_blocked={firstShotBlocked} collision_disabled={collisionDisabled} second_shot_clear={secondShotCleared} audio_triggered={audioTriggered} audio_playing={audioPlaying} close_audio={closeAudioPlaying} skybridge_ready={skybridgeReady} skybridge_crosshair={skybridgeCrosshair} skybridge_alignment={skybridgeAlignment:0.000} skybridge_fire={skybridgeFireAccepted} skybridge_shot={skybridgeShot} player_audio={playerAudioPlaying} batched={fieldsBatched} dense={panesDense} tracked={residentialTracked}");
+            && residentialTracked
+            && inactiveAuthoritativeApply
+            && wallOcclusionProtected;
+        GD.Print($"GLASS_CHECK valid={valid} fields={fields.Length} panes={paneCount} frames={frameInstances} single_surface={singleSurfaceVisuals} ray_ready={rayReady} occlusion={wallOcclusionProtected} first_shot_blocked={firstShotBlocked} collision_disabled={collisionDisabled} second_shot_clear={secondShotCleared} audio_triggered={audioTriggered} audio_playing={audioPlaying} close_audio={closeAudioPlaying} skybridge_ready={skybridgeReady} skybridge_crosshair={skybridgeCrosshair} skybridge_alignment={skybridgeAlignment:0.000} skybridge_fire={skybridgeFireAccepted} skybridge_shot={skybridgeShot} player_audio={playerAudioPlaying} inactive_apply={inactiveAuthoritativeApply} batched={fieldsBatched} dense={panesDense} tracked={residentialTracked}");
         GD.Print($"GLASS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

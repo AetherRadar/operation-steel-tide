@@ -66,6 +66,8 @@ public partial class FreightTerminalWorld
         _squadNetwork.DemolitionPurchaseRequested += OnDemolitionNetworkPurchaseRequested;
         _squadNetwork.DemolitionPurchaseResultReceived += OnDemolitionPurchaseResult;
         _squadNetwork.DemolitionFundsStateReceived += OnDemolitionFundsState;
+        _squadNetwork.DemolitionGlassHitRequested += OnDemolitionGlassHitRequested;
+        _squadNetwork.DemolitionGlassStateReceived += OnDemolitionGlassState;
         _squadNetwork.ExtractionLobbyMemberReceived += OnExtractionLobbyMember;
         _squadNetwork.ExtractionLobbyStateReceived += OnExtractionLobbyState;
         _squadNetwork.ExtractionAssignmentReceived += OnExtractionAssignment;
@@ -731,6 +733,7 @@ public partial class FreightTerminalWorld
 
     private void DetachSquadNetworkEvents()
     {
+        DetachDemolitionGlassNetwork();
         _deploymentLoadGeneration++;
         _jianghaiDeploymentLoadPending = false;
         if (IsInstanceValid(_hud))
@@ -761,6 +764,8 @@ public partial class FreightTerminalWorld
         _squadNetwork.DemolitionPurchaseRequested -= OnDemolitionNetworkPurchaseRequested;
         _squadNetwork.DemolitionPurchaseResultReceived -= OnDemolitionPurchaseResult;
         _squadNetwork.DemolitionFundsStateReceived -= OnDemolitionFundsState;
+        _squadNetwork.DemolitionGlassHitRequested -= OnDemolitionGlassHitRequested;
+        _squadNetwork.DemolitionGlassStateReceived -= OnDemolitionGlassState;
         _squadNetwork.ExtractionLobbyMemberReceived -= OnExtractionLobbyMember;
         _squadNetwork.ExtractionLobbyStateReceived -= OnExtractionLobbyState;
         _squadNetwork.ExtractionAssignmentReceived -= OnExtractionAssignment;

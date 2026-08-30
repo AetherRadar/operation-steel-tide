@@ -36,6 +36,8 @@ public partial class BreakableGlassField : Area3D
         public Vector3 Rotation;
         public Color Tint;
         public uint ShapeOwner;
+        public uint MovementShapeOwner;
+        public bool HasMovementShape;
         public bool Shattered;
     }
 
@@ -58,12 +60,16 @@ public partial class BreakableGlassField : Area3D
         Godot.Material glassMaterial,
         Godot.Material frameMaterial,
         Godot.Material? backingMaterial = null,
-        float visibilityRange = 105.0f)
+        float visibilityRange = 105.0f,
+        bool buildFrames = true,
+        bool blocksMovementUntilShattered = false)
     {
         _glassMaterial = glassMaterial;
         _frameMaterial = frameMaterial;
         _backingMaterial = backingMaterial;
         _visibilityRange = visibilityRange;
+        _buildFrames = buildFrames;
+        _blocksMovementUntilShattered = blocksMovementUntilShattered;
     }
 
     public int AddPane(Vector3 position, Vector3 size, Color tint, Vector3 rotation = default)
@@ -97,9 +103,14 @@ public partial class BreakableGlassField : Area3D
         InputRayPickable = false;
 
         BuildGlassVisuals();
-        BuildFrameVisuals();
+        if (_buildFrames)
+        {
+            BuildFrameVisuals();
+        }
         BuildBackingVisuals();
         BuildQueryShapes();
+        BuildMovementShapes();
+        ApplyFieldCollisionState();
         AddToGroup(GroupName);
     }
 
@@ -123,6 +134,7 @@ public partial class BreakableGlassField : Area3D
             Name = "IntactGlass",
             Multimesh = _glassMultiMesh,
             MaterialOverride = _glassMaterial,
+            PhysicsInterpolationMode = PhysicsInterpolationModeEnum.Off,
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
             VisibilityRangeEnd = _visibilityRange,
             VisibilityRangeEndMargin = 12.0f
@@ -286,8 +298,13 @@ public partial class BreakableGlassField : Area3D
             return false;
         }
         var owner = ShapeFindOwner(shapeIndex);
-        return _paneByShapeOwner.TryGetValue(owner, out var paneIndex)
-            && ShatterPane(paneIndex, hitPosition, hitNormal, shotDirection, spawnEffects);
+        if (!_paneByShapeOwner.TryGetValue(owner, out var paneIndex)
+            || IsPaneShattered(paneIndex))
+        {
+            return false;
+        }
+        return !_hasLocalShatterAuthority
+            || ShatterPane(paneIndex, hitPosition, hitNormal, shotDirection, spawnEffects);
     }
 
     private bool ShatterPane(
@@ -297,13 +314,73 @@ public partial class BreakableGlassField : Area3D
         Vector3 shotDirection,
         bool spawnEffects)
     {
-        if (paneIndex < 0 || paneIndex >= _panes.Count || _panes[paneIndex].Shattered)
+        if (!_committed
+            || !_fieldActive
+            || paneIndex < 0
+            || paneIndex >= _panes.Count
+            || _panes[paneIndex].Shattered)
+        {
+            return false;
+        }
+        var shatterMask = ShatterMaskForPane(paneIndex);
+        var changed = false;
+        _suppressPaneShatteredEvent = true;
+        try
+        {
+            for (var linkedIndex = 0; linkedIndex < _panes.Count; linkedIndex++)
+            {
+                if (linkedIndex >= sizeof(uint) * 8
+                    || (shatterMask & (1u << linkedIndex)) == 0u
+                    || _panes[linkedIndex].Shattered)
+                {
+                    continue;
+                }
+                var linkedPane = _panes[linkedIndex];
+                var linkedPosition = linkedIndex == paneIndex
+                    ? hitPosition
+                    : ToGlobal(linkedPane.Position);
+                changed |= ShatterSinglePane(
+                    linkedIndex,
+                    linkedPosition,
+                    hitNormal,
+                    shotDirection,
+                    spawnEffects && linkedIndex == paneIndex);
+            }
+        }
+        finally
+        {
+            _suppressPaneShatteredEvent = false;
+        }
+        if (changed)
+        {
+            // Linked partners are processed in index order, but the replicated impact
+            // belongs to the pane the attack actually touched.
+            LastShatterPosition = hitPosition;
+            NotifyPaneShattered(paneIndex);
+        }
+        return changed;
+    }
+
+    private bool ShatterSinglePane(
+        int paneIndex,
+        Vector3 hitPosition,
+        Vector3 hitNormal,
+        Vector3 shotDirection,
+        bool spawnEffects,
+        bool requireFieldActive = true)
+    {
+        if (!_committed
+            || requireFieldActive && !_fieldActive
+            || paneIndex < 0
+            || paneIndex >= _panes.Count
+            || _panes[paneIndex].Shattered)
         {
             return false;
         }
         var pane = _panes[paneIndex];
         pane.Shattered = true;
         ShapeOwnerSetDisabled(pane.ShapeOwner, true);
+        SetPaneMovementCollisionDisabled(pane, true);
         _glassMultiMesh?.SetInstanceTransform(
             paneIndex,
             new Transform3D(Basis.Identity.Scaled(Vector3.Zero), pane.Position));
@@ -369,6 +446,10 @@ public partial class BreakableGlassField : Area3D
     {
         var shattered = 0;
         effectsUsed = 0;
+        if (!_hasLocalShatterAuthority)
+        {
+            return 0;
+        }
         for (var index = 0; index < _panes.Count; index++)
         {
             var pane = _panes[index];
@@ -402,29 +483,45 @@ public partial class BreakableGlassField : Area3D
         bool spawnEffects = true)
     {
         hitPosition = to;
-        if (world is null)
-        {
-            return false;
-        }
-        if (!PhysicsRaycast.TryHit(
+        if (!TryFindIntactPaneAlongRay(
                 world,
                 from,
                 to,
-                GlassCollisionLayer,
-                out var hit,
-                collideWithAreas: true,
-                collideWithBodies: false)
-            || hit.Collider is not BreakableGlassField glass)
+                out var glass,
+                out var paneIndex,
+                out hitPosition,
+                out var hitNormal)
+            || glass is null)
         {
             return false;
         }
-        hitPosition = hit.Position;
-        return glass.TryShatterShape(
-            hit.Shape,
+        if (damage < MinimumShatterDamage)
+        {
+            return false;
+        }
+        if (glass._worldOcclusionRequired
+            && PhysicsRaycast.TryHit(
+                world,
+                from,
+                to,
+                SightCollisionMask,
+                out var nearerBody,
+                collideWithAreas: false,
+                collideWithBodies: true)
+            && from.DistanceTo(nearerBody.Position) + 0.003f
+                < from.DistanceTo(hitPosition))
+        {
+            return false;
+        }
+        if (!glass._hasLocalShatterAuthority)
+        {
+            return true;
+        }
+        return glass.ShatterPane(
+            paneIndex,
             hitPosition,
-            hit.Normal,
+            hitNormal,
             shotDirection,
-            damage,
             spawnEffects);
     }
 

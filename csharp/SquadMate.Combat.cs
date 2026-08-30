@@ -668,7 +668,7 @@ public partial class SquadMate
                 from,
                 to,
                 GetRid(),
-                uint.MaxValue,
+                BreakableGlassField.SightCollisionMask,
                 out var hit))
         {
             return false;

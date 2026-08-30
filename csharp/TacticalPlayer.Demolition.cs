@@ -33,7 +33,7 @@ public partial class TacticalPlayer
         ProcessMode = ProcessModeEnum.Inherit;
         SetPhysicsProcess(true);
         CollisionLayer = 1;
-        CollisionMask = 1 | 2;
+        CollisionMask = 1 | 2 | BreakableGlassField.MovementCollisionLayer;
         _collider.Disabled = false;
         _stance = PlayerStance.Standing;
         _isPlating = false;
@@ -79,7 +79,7 @@ public partial class TacticalPlayer
             ProcessMode = ProcessModeEnum.Inherit;
             SetPhysicsProcess(true);
             CollisionLayer = 1;
-            CollisionMask = 1 | 2;
+            CollisionMask = 1 | 2 | BreakableGlassField.MovementCollisionLayer;
             _collider.SetDeferred(CollisionShape3D.PropertyName.Disabled, false);
             UiLocked = false;
         }

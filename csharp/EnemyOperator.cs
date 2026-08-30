@@ -222,7 +222,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         CollisionLayer = 2;
         // Player/world collision remains bidirectional, while operators no longer solve
         // CharacterBody collisions against every other operator in a dense firefight.
-        CollisionMask = 1;
+        CollisionMask = 1 | BreakableGlassField.MovementCollisionLayer;
         FloorSnapLength = 0.35f;
         BuildLootInventory();
         BuildOperator();
@@ -784,6 +784,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
 
         MoveAndSlide();
+        BreakableGlassField.TryShatterMovementBlockerFromCollisions(this);
         TryPursuitNavigationStepUp();
         _stationaryMoveTimer = stationary
             ? 0.25f * (0.85f + _crowdSchedulePhase * 0.3f)
@@ -1069,7 +1070,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             // Revive dead diagnostics subjects so multi-phase validators can reuse them.
             IsDead = false;
             CollisionLayer = 2;
-            CollisionMask = 1;
+            CollisionMask = 1 | BreakableGlassField.MovementCollisionLayer;
             SetPhysicsProcess(true);
             ProcessMode = ProcessModeEnum.Inherit;
             if (IsInstanceValid(_bodyRoot))
@@ -1305,7 +1306,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
                 from,
                 to,
                 GetRid(),
-                uint.MaxValue,
+                BreakableGlassField.SightCollisionMask,
                 out var hit))
         {
             return false;

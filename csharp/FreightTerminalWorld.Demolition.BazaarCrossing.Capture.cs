@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
@@ -14,7 +15,8 @@ public partial class FreightTerminalWorld
         bool StrictTopdown = false,
         bool RequireReadableInterior = false,
         bool RequireClearTarget = true,
-        IReadOnlyList<Vector3>? RequiredClearTargets = null);
+        IReadOnlyList<Vector3>? RequiredClearTargets = null,
+        bool BreachARearGlass = false);
 
     private readonly record struct BazaarCaptureImageResult(
         bool Saved,
@@ -222,12 +224,33 @@ public partial class FreightTerminalWorld
                     new Vector3(-56.0f, eye, -24.2f),
                     new Vector3(-46.0f, eye, -24.2f),
                     new Vector3(-38.0f, eye, -24.2f)
-                })
+                }),
+            new BazaarCaptureFrame(
+                "res://bazaar_crossing_a_rear_glass_breached.png",
+                new Vector3(-46.0f, eye, -15.0f),
+                new Vector3(-46.0f, eye, -24.2f),
+                80.0f,
+                RequireReadableInterior: true,
+                RequiredClearTargets: new[]
+                {
+                    new Vector3(-56.0f, eye, -24.2f),
+                    new Vector3(-46.0f, eye, -24.2f),
+                    new Vector3(-38.0f, eye, -24.2f)
+                },
+                BreachARearGlass: true)
         };
 
         var validity = new Dictionary<string, bool>();
         foreach (var frame in frames)
         {
+            var glassStateReady = BazaarPrepareGlassCaptureState(
+                _demolitionArena,
+                frame.BreachARearGlass);
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            glassStateReady = glassStateReady
+                && BazaarARearGlassCapturePhysicsReady(
+                    _demolitionArena,
+                    frame.BreachARearGlass);
             camera.Fov = frame.Fov;
             camera.GlobalPosition = layout.Origin + frame.Position;
             camera.LookAt(
@@ -257,7 +280,8 @@ public partial class FreightTerminalWorld
             validity[frame.Path] = framingReady
                 && result.Saved
                 && readabilityReady
-                && clearTargetsReady;
+                && clearTargetsReady
+                && glassStateReady;
             GD.Print(
                 $"BAZAAR_CAPTURE_FRAME path={frame.Path} saved={result.Saved} framing={framingReady} "
                 + $"readable={readabilityReady} mean={result.MeanLuminance:0.000} "
@@ -265,6 +289,7 @@ public partial class FreightTerminalWorld
                 + $"dark075={result.VeryDarkSampleFraction:0.000} range={result.DynamicRange:0.000} "
                 + $"blocker={framingBlocker} clear_targets={clearTargetsReady} "
                 + $"clear_target_blockers={clearTargetBlockers} "
+                + $"glass_state={glassStateReady}:{frame.BreachARearGlass} "
                 + $"position={camera.GlobalPosition} target={target}");
         }
 
@@ -288,6 +313,72 @@ public partial class FreightTerminalWorld
         camera.QueueFree();
         await WaitFrames(3);
         GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private static bool BazaarPrepareGlassCaptureState(
+        DemolitionArenaRuntime arena,
+        bool breachARearGlass)
+    {
+        if (arena.BazaarGlassFields.Count != 1)
+        {
+            return false;
+        }
+        var field = arena.BazaarGlassFields[0];
+        field.ResetAllPanes();
+        if (!breachARearGlass)
+        {
+            return field.ShatteredCount == 0;
+        }
+
+        var breached = 0;
+        for (var index = 0; index < arena.Layout.BazaarGlassPortals.Count; index++)
+        {
+            var portal = arena.Layout.BazaarGlassPortals[index];
+            if (!portal.Name.StartsWith("Bazaar_A_RearWarehouse_", StringComparison.Ordinal))
+            {
+                continue;
+            }
+            breached += field.TryShatterPane(
+                index,
+                portal.WorldCenter,
+                portal.Normal,
+                portal.Normal,
+                spawnEffects: false)
+                ? 1
+                : 0;
+        }
+        return breached == 3
+            && field.ShatteredCount == 3;
+    }
+
+    private static bool BazaarARearGlassCapturePhysicsReady(
+        DemolitionArenaRuntime arena,
+        bool breached)
+    {
+        foreach (var portal in arena.Layout.BazaarGlassPortals.Where(portal =>
+            portal.Name.StartsWith("Bazaar_A_RearWarehouse_", StringComparison.Ordinal)))
+        {
+            var normal = new Vector3(portal.Normal.X, 0.0f, portal.Normal.Z).Normalized();
+            var from = portal.WorldCenter + normal * 0.35f;
+            var to = portal.WorldCenter - normal * 0.35f;
+            var queryBlocked = PhysicsRaycast.HasHit(
+                arena.Root.GetWorld3D(),
+                from,
+                to,
+                BreakableGlassField.GlassCollisionLayer,
+                collideWithAreas: true,
+                collideWithBodies: false);
+            var movementBlocked = PhysicsRaycast.HasHit(
+                arena.Root.GetWorld3D(),
+                from,
+                to,
+                BreakableGlassField.MovementCollisionLayer);
+            if (queryBlocked == breached || movementBlocked == breached)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static bool BazaarCaptureClearTargetsReady(

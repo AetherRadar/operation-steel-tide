@@ -7,8 +7,8 @@ materials, and packed textures used by this map. Its SHA-256 is
 Daily rebuilds never open the mutable Jianghai Old City Blend.
 
 `scripts/blender/build_bazaar_crossing.py` validates that palette, assembles
-finished CC0 modules into the dense arena, renders eight review views, saves the
-packed DCC source, exports a Godot-compatible non-Draco runtime GLB, imports
+finished CC0 modules into the dense arena, renders fourteen review views, saves
+the packed DCC source, exports a Godot-compatible non-Draco runtime GLB, imports
 the GLB again, and writes `bazaar_crossing_build_report.json`. It rejects every
 visible mesh whose source is not CC0 and parses the exported GLB JSON to reject
 `KHR_draco_mesh_compression` in required, used, or per-primitive extensions.
@@ -92,23 +92,25 @@ visual low points correspond to runtime route points at `y=0.2`.
 
 The V2 report records:
 
-- 1,492 -> 717 visible mesh draw nodes and 2,113 -> 992 material surfaces
+- 1,443 -> 700 visible mesh draw nodes and 1,950 -> 935 material surfaces
   after same-region, same-material, same-responsibility static consolidation;
-- 663 unique meshes in the final packed DCC scene;
+- 648 unique meshes in the final packed DCC scene;
 - 252,707 raw whitelisted-source triangles;
-- 845,147 unique and 1,142,141 delivered instance triangles, unchanged by
+- 805,155 unique and 1,101,693 delivered instance triangles, unchanged by
   draw-node consolidation and GLB round trip;
-- 49 DCC materials and 58 DCC textures;
+- 48 DCC materials and 58 DCC textures;
 - 203.473 MiB estimated RGBA8 plus full-mip-chain texture memory;
-- 111,873,332-byte non-Draco GLB, SHA-256
-  `B49CA049ABC5FD4E776877C8BCAEB5DC06379E1040AA19E49479436646A163D1`;
-- 50,400,552-byte packed Blend, SHA-256
-  `551BB6258752F088C3D75DA0DFA84B9459AD1C4E38A5C1C36DFA056352354EE1`;
+- 107,168,608-byte non-Draco GLB, SHA-256
+  `87BEFD14810E665DC6AE5E3C76551684DF1AABCF270FF208A2024B332C4F2BC7`;
+- 49,534,883-byte packed Blend, SHA-256
+  `867C5DC9A2E7D0A6D8856B93BAC22FD38C3DBADF5C1961F61B3C0FDBE08C0FF2`;
 - bounds X `[-68,68]`, Blender Y `[-56.2,56.2]`, Z `[-0.16,9.46]`;
-- four complete enterable interiors and 9,930.973 square metres of roofed
+- four complete enterable interiors and 9,925.573 square metres of roofed
   footprint;
-- 140 continuous storage parts, 112 continuous shopfront parts, 109 skyline
-  articulation parts, and four back-service gate parts;
+- 135 continuous storage parts, 104 continuous shopfront parts, 110 skyline
+  articulation parts, and two attached back-market solid-mass walls;
+- exactly 28 independently preserved runtime-door portal objects, with no fake
+  terminus/niche role and a floor-to-roof A-rear Segment02 connection;
 - exact required-object, bounds, and triangle preservation after GLB
   round-trip import;
 - no `KHR_draco_mesh_compression`; the only required GLB extension is

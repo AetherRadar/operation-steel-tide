@@ -284,7 +284,8 @@ public partial class TacticalPlayer
             uint.MaxValue,
             out var hit);
         var glassTraceEnd = hasHit ? hit.Position : to;
-        if (TryShatterVisibleMeleeGlass(
+        if (!glassBroken
+            && TryShatterVisibleMeleeGlass(
                 from,
                 glassTraceEnd,
                 definition.BaseDamage * 0.4f))
@@ -406,30 +407,47 @@ public partial class TacticalPlayer
 
     private bool TryShatterVisibleMeleeGlass(Vector3 from, Vector3 to, float damage)
     {
+        var bladeDirection = from.DirectionTo(to);
+        var glassQueryEnd = to + bladeDirection * 0.04f;
         if (!PhysicsRaycast.TryHit(
                 GetWorld3D(),
                 from,
-                to,
+                glassQueryEnd,
                 BreakableGlassField.GlassCollisionLayer,
                 out var glassHit,
                 collideWithAreas: true,
                 collideWithBodies: false)
-            || glassHit.Collider is not BreakableGlassField
-            || TryFindMeleeWorldBlocker(
+            || glassHit.Collider is not BreakableGlassField glass)
+        {
+            return false;
+        }
+        if (TryFindMeleeWorldBlocker(
                 _camera.GlobalPosition,
                 glassHit.Position,
-                out _))
+                out var blocker)
+            && !(blocker.Collider is StaticBody3D movementBody
+                && movementBody.GetParent() == glass
+                && blocker.Position.DistanceSquaredTo(glassHit.Position) <= 0.04f))
         {
             return false;
         }
         var direction = from.DirectionTo(glassHit.Position);
-        return BreakableGlassField.TryShatterAlongRay(
+        var impacted = BreakableGlassField.TryShatterAlongRay(
             GetWorld3D(),
             from,
-            glassHit.Position + direction * 0.02f,
+            glassHit.Position + direction * 0.04f,
             damage,
             direction,
             out _);
+        if (impacted)
+        {
+            Main?.OnLocalPlayerGlassImpact(
+                from,
+                glassHit.Position,
+                damage,
+                melee: true);
+        }
+        return impacted;
     }
 
     private bool ApplyMeleeDamage(

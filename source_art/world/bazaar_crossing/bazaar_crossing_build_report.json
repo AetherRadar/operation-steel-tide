@@ -5,26 +5,26 @@
   "source_blend_sha256": "1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9",
   "blend": {
     "path": "source_art/world/bazaar_crossing/bazaar_crossing.blend",
-    "bytes": 50400552,
-    "sha256": "551BB6258752F088C3D75DA0DFA84B9459AD1C4E38A5C1C36DFA056352354EE1"
+    "bytes": 49534883,
+    "sha256": "867C5DC9A2E7D0A6D8856B93BAC22FD38C3DBADF5C1961F61B3C0FDBE08C0FF2"
   },
   "glb": {
     "path": "assets/models/bazaar_crossing/bazaar_crossing.glb",
-    "bytes": 111873332,
-    "sha256": "B49CA049ABC5FD4E776877C8BCAEB5DC06379E1040AA19E49479436646A163D1"
+    "bytes": 107168608,
+    "sha256": "87BEFD14810E665DC6AE5E3C76551684DF1AABCF270FF208A2024B332C4F2BC7"
   },
   "scene": {
     "revision": "V2 dense enterable interiors",
-    "object_count": 752,
-    "mesh_object_count": 717,
-    "unique_mesh_count": 663,
-    "material_count": 49,
+    "object_count": 736,
+    "mesh_object_count": 700,
+    "unique_mesh_count": 648,
+    "material_count": 48,
     "texture_count": 58,
-    "draw_node_count": 717,
-    "surface_draw_count": 992,
+    "draw_node_count": 700,
+    "surface_draw_count": 935,
     "raw_source_triangles": 252707,
-    "unique_triangles": 845147,
-    "instance_triangles": 1142141,
+    "unique_triangles": 805155,
+    "instance_triangles": 1101693,
     "texture_memory_bytes_estimate_rgba8_mips": 213356866,
     "texture_memory_mib_estimate_rgba8_mips": 203.473,
     "blender_bounds_min": [
@@ -44,24 +44,32 @@
       "Defender_BackMarket",
       "Mid_IndoorConnector"
     ],
-    "architectural_cover_object_count": 727,
+    "architectural_cover_object_count": 690,
     "prop_cover_object_count": 2,
-    "architectural_cover_ratio": 0.9973,
+    "architectural_cover_ratio": 0.9971,
     "art_polish_object_counts": {
-      "shop_signs": 30,
-      "wall_shelves": 108,
+      "shop_signs": 28,
+      "wall_shelves": 105,
       "wall_awnings": 11,
       "roof_parapets": 112,
       "rooftop_lantern_parts": 60,
       "upper_privacy_screen_parts": 8,
       "stair_tread_nosing_assemblies": 6,
-      "continuous_storage_parts": 140,
-      "continuous_shopfront_parts": 112,
+      "continuous_storage_parts": 135,
+      "continuous_shopfront_parts": 104,
       "skyline_articulation_parts": 110,
-      "back_service_gate_parts": 4
+      "back_solid_mass_wall_parts": 2
     },
     "roofed_footprint_m2": 9925.573,
     "legacy_outer_facade_count": 4,
+    "runtime_door_portal_count": 28,
+    "runtime_portal_column_clearance_gate": {
+      "valid": true,
+      "portal_count": 28,
+      "vertical_blocker_mesh_count": 82
+    },
+    "solid_visual_language_gate": "foundation_only",
+    "a_rear_segment02_connected": true,
     "closed_modular_block_count": 38,
     "stairs": {
       "Bazaar_A_Gallery_South_Stair": {
@@ -108,7 +116,7 @@
     },
     "authored_module_contract": {
       "visible_mesh_origin_counts": {
-        "cc0": 717,
+        "cc0": 700,
         "project_authored": 0,
         "procedural": 0
       },
@@ -124,26 +132,26 @@
     "draw_node_optimization": {
       "strategy": "same collection, spatial region, authored responsibility, source provenance, and material signature",
       "spatial_bucket_m": 32.0,
-      "merged_group_count": 338,
-      "merged_source_node_count": 1113,
-      "pre_draw_nodes": 1492,
-      "post_draw_nodes": 717,
-      "pre_surface_draw_count": 2113,
-      "post_surface_draw_count": 992,
-      "pre_unique_triangles": 845147,
-      "post_unique_triangles": 845147,
-      "pre_instance_triangles": 1142141,
-      "post_instance_triangles": 1142141,
+      "merged_group_count": 326,
+      "merged_source_node_count": 1069,
+      "pre_draw_nodes": 1443,
+      "post_draw_nodes": 700,
+      "pre_surface_draw_count": 1950,
+      "post_surface_draw_count": 935,
+      "pre_unique_triangles": 805155,
+      "post_unique_triangles": 805155,
+      "pre_instance_triangles": 1101693,
+      "post_instance_triangles": 1101693,
       "triangle_and_bounds_preserved": true
     }
   },
   "round_trip": {
-    "object_count": 729,
-    "mesh_object_count": 717,
-    "unique_mesh_count": 663,
-    "material_count": 47,
+    "object_count": 712,
+    "mesh_object_count": 700,
+    "unique_mesh_count": 648,
+    "material_count": 46,
     "texture_count": 56,
-    "instance_triangles": 1142141,
+    "instance_triangles": 1101693,
     "bounds_min": [
       -68.0,
       -56.2,
@@ -154,6 +162,12 @@
       56.2,
       9.46
     ],
+    "runtime_door_portal_count": 28,
+    "runtime_portal_column_clearance_gate": {
+      "valid": true,
+      "portal_count": 28,
+      "vertical_blocker_mesh_count": 43
+    },
     "v2_required_objects_preserved": true
   },
   "glb_extension_gate": {
@@ -188,6 +202,9 @@
     "source_art/world/bazaar_crossing/previews/08_b_stair_vestibule.png",
     "source_art/world/bazaar_crossing/previews/09_mid_spawn_clearance.png",
     "source_art/world/bazaar_crossing/previews/10_mid_upper_connection.png",
-    "source_art/world/bazaar_crossing/previews/11_a_rear_portals.png"
+    "source_art/world/bazaar_crossing/previews/11_a_rear_portals.png",
+    "source_art/world/bazaar_crossing/previews/12_a_rear_wall_connection.png",
+    "source_art/world/bazaar_crossing/previews/13_back_market_north_mass.png",
+    "source_art/world/bazaar_crossing/previews/14_b_loading_portal_clearance.png"
   ]
 }

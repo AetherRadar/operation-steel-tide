@@ -46,7 +46,9 @@ public partial class SquadMate
         IsBodyBag = bodyBag;
         HasFireablePrimary = hasWeapon;
         CollisionLayer = bodyBag ? 0u : 4u;
-        CollisionMask = bodyBag ? 0u : 1u;
+        CollisionMask = bodyBag
+            ? 0u
+            : 1u | BreakableGlassField.MovementCollisionLayer;
         if (IsInstanceValid(_rig))
         {
             _rig.Visible = !bodyBag;

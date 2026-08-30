@@ -479,7 +479,8 @@ public partial class SquadNetwork
                 state.DevicePhase,
                 state.ActiveSite,
                 state.CarrierActorId,
-                state.DevicePosition);
+                state.DevicePosition,
+                state.BazaarGlassMask);
         }
     }
 
@@ -497,7 +498,8 @@ public partial class SquadNetwork
         int devicePhase,
         int activeSite,
         int carrierActorId,
-        Vector3 devicePosition)
+        Vector3 devicePosition,
+        uint bazaarGlassMask)
     {
         if (!Enum.IsDefined(typeof(DemolitionNetworkPhase), phase)
             || !Enum.IsDefined(typeof(DemolitionDevicePhase), devicePhase)
@@ -519,7 +521,8 @@ public partial class SquadNetwork
             devicePhase,
             activeSite,
             carrierActorId,
-            devicePosition));
+            devicePosition,
+            bazaarGlassMask));
     }
 
     public void RequestDemolitionAction(DemolitionNetworkAction action, int siteIndex)

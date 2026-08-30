@@ -191,7 +191,8 @@ public partial class FreightTerminalWorld
         var playerRestoredForNextRound = _player.IsPhysicsProcessing()
             && !_player.IsDead
             && _player.CollisionLayer == 1
-            && _player.CollisionMask == (1 | 2)
+            && _player.CollisionMask
+                == (1u | 2u | BreakableGlassField.MovementCollisionLayer)
             && !_player.DemolitionColliderDisabledForDiagnostics
             && _player.Velocity.LengthSquared() <= 0.0001f;
         var mateRestoredForNextRound = mate is not null
@@ -200,7 +201,8 @@ public partial class FreightTerminalWorld
             && !mate.ReviveUsed
             && !mate.HoldFireActive
             && mate.CollisionLayer == 4
-            && mate.CollisionMask == 1
+            && mate.CollisionMask
+                == (1u | BreakableGlassField.MovementCollisionLayer)
             && mate.AreDemolitionCollisionShapesEnabledForDiagnostics
             && mate.Velocity.LengthSquared() <= 0.0001f;
 

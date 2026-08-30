@@ -277,7 +277,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         _rng.Randomize();
         CollisionLayer = 1;
-        CollisionMask = 1 | 2;
+        CollisionMask = 1 | 2 | BreakableGlassField.MovementCollisionLayer;
         // Thin stair treads (~0.13 m rise); generous snap helps the capsule mount each step.
         FloorSnapLength = 0.95f;
         FloorMaxAngle = Mathf.DegToRad(64.0f);
@@ -426,7 +426,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
 
         GlobalPosition = worldExitPoint;
         CollisionLayer = 1;
-        CollisionMask = 1 | 2;
+        CollisionMask = 1 | 2 | BreakableGlassField.MovementCollisionLayer;
         _collider.Disabled = false;
         Velocity = Vector3.Zero;
         _head.Position = new Vector3(0.0f, 1.57f, 0.0f);
@@ -2061,15 +2061,21 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var from = _camera.GlobalPosition;
         var maximumRange = stats.EffectiveRange * 1.35f;
         var to = from + direction * maximumRange;
+        var glassDamage = stats.Damage * AmmoTiers.DamageMultiplier(CurrentAmmoGrade);
         var glassBlocked = BreakableGlassField.TryShatterAlongRay(
             GetWorld3D(),
             from,
             to,
-            stats.Damage * AmmoTiers.DamageMultiplier(CurrentAmmoGrade),
+            glassDamage,
             direction,
             out var glassHitPosition);
         if (glassBlocked)
         {
+            Main?.OnLocalPlayerGlassImpact(
+                from,
+                glassHitPosition,
+                glassDamage,
+                melee: false);
             PlayLocalGlassBreak();
         }
         var hit = default(PhysicsRaycastHit);

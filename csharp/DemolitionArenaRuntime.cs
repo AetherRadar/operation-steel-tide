@@ -7,11 +7,13 @@ namespace OperationSteelTide;
 public sealed class DemolitionArenaRuntime
 {
     private readonly List<StaticBody3D> _staticBodies;
+    private readonly IReadOnlyList<BreakableGlassField> _bazaarGlassFields;
 
     public DemolitionArenaLayout Layout { get; }
     public Node3D Root { get; }
     public IReadOnlyList<Node3D> Sites { get; }
     public IReadOnlyList<StaticBody3D> StaticBodies => _staticBodies;
+    public IReadOnlyList<BreakableGlassField> BazaarGlassFields => _bazaarGlassFields;
     public IReadOnlyList<Vector3> CoverPoints => Layout.CoverPoints;
     public bool Active { get; private set; }
     public int CollisionBodyCount => _staticBodies.Count;
@@ -23,12 +25,14 @@ public sealed class DemolitionArenaRuntime
         Node3D root,
         IReadOnlyList<Node3D> sites,
         List<StaticBody3D> staticBodies,
+        IReadOnlyList<BreakableGlassField> bazaarGlassFields,
         int visualPartCount)
     {
         Layout = layout;
         Root = root;
         Sites = sites;
         _staticBodies = staticBodies;
+        _bazaarGlassFields = bazaarGlassFields;
         VisualPartCount = visualPartCount;
         SetActive(false);
     }
@@ -43,7 +47,27 @@ public sealed class DemolitionArenaRuntime
         {
             _staticBodies[index].CollisionLayer = collisionLayer;
         }
+        for (var index = 0; index < _bazaarGlassFields.Count; index++)
+        {
+            var field = _bazaarGlassFields[index];
+            if (GodotObject.IsInstanceValid(field))
+            {
+                field.SetFieldActive(active);
+            }
+        }
         ActiveCollisionBodyCount = active ? _staticBodies.Count : 0;
+    }
+
+    public void ResetRoundState()
+    {
+        for (var index = 0; index < _bazaarGlassFields.Count; index++)
+        {
+            var field = _bazaarGlassFields[index];
+            if (GodotObject.IsInstanceValid(field))
+            {
+                field.ResetAllPanes();
+            }
+        }
     }
 
     public bool AllStaticBodiesUseWorldLayer()
