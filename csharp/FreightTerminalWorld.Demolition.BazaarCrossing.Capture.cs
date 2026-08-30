@@ -154,9 +154,9 @@ public partial class FreightTerminalWorld
                 RequireReadableInterior: true),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_a_gallery_south_stair.png",
-                new Vector3(-56.0f, eye, 3.5f),
-                new Vector3(-56.0f, 3.7f, -9.0f),
-                66.0f,
+                new Vector3(-52.8f, eye, 8.0f),
+                new Vector3(-56.0f, 2.9f, -4.0f),
+                72.0f,
                 RequireReadableInterior: true),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_a_gallery_rear_stair.png",
@@ -166,9 +166,9 @@ public partial class FreightTerminalWorld
                 RequireReadableInterior: true),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_mid_south_stair.png",
-                new Vector3(-6.0f, eye, 42.0f),
-                new Vector3(-6.0f, 3.3f, 31.0f),
-                66.0f,
+                new Vector3(-2.8f, eye, 47.0f),
+                new Vector3(-6.0f, 2.7f, 35.0f),
+                72.0f,
                 RequireReadableInterior: true),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_mid_north_stair.png",
@@ -178,9 +178,9 @@ public partial class FreightTerminalWorld
                 RequireReadableInterior: true),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_b_balcony_south_stair.png",
-                new Vector3(56.0f, eye, 3.0f),
-                new Vector3(56.0f, 3.5f, -9.0f),
-                66.0f,
+                new Vector3(52.8f, eye, 7.5f),
+                new Vector3(56.0f, 2.8f, -5.0f),
+                72.0f,
                 RequireReadableInterior: true),
             new BazaarCaptureFrame(
                 "res://bazaar_crossing_b_balcony_rear_stair.png",

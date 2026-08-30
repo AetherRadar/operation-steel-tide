@@ -18,13 +18,14 @@ retained as provenance.
 - map-local source palette SHA-256:
   `1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9`;
 - generated packed Blend SHA-256:
-  `4E262B94FC9E67F064BB7D6E1D80C4E5482A661C557A4D840A05A8CDBA3879C1`;
+  `A92B51DF62D4F6094E88ABD7091AE7DFD517679A11FC922CBEB50882836D36BB`;
 - generated runtime GLB SHA-256:
-  `483DC0D81DA7E9636E52B840B51899CC66E2689457FDFCF5FFE34342B3B9DB22`.
+  `1B6F6B588B26AE708BA132FE15EC2CD98BBF6D971FC369C4B5B08E71E346E6AD`.
 
-The packed artifacts were regenerated on 2026-08-30 after removing the two
-detached attack-foyer façade baffles and extending the connected lane-link
-buildings to preserve the verified sightline budget.
+The packed artifacts were regenerated on 2026-08-30 after the three approach
+stairs were opened to full-height 5.2-metre facade gaps, the obsolete B
+service-return wall was removed, and the two detached attack-foyer façade
+baffles were replaced by connected lane-link buildings.
 
 The GLB is exported without `KHR_draco_mesh_compression`; disabling a binary
 compression extension does not alter the source licenses or provenance.

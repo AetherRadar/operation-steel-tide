@@ -140,6 +140,8 @@ public partial class FreightTerminalWorld
         var serviceRouteReady = serviceGeometryReady
             && serviceLayoutClear
             && servicePhysicalClear;
+        var openApproachStairsReady = BazaarOpenApproachStairEntriesReady(
+            layout, out var openApproachStairFailures);
         var retakeChoicesReady = layout.SiteRotationPath.Count >= 10
             && layout.AuxiliaryPaths.Count == 4
             && layout.AuxiliaryPaths[0].All(point => Mathf.Abs(point.Y - layout.Origin.Y) <= 0.3f)
@@ -306,6 +308,7 @@ public partial class FreightTerminalWorld
             && routeTimingReady
             && groundRoutesReady
             && serviceRouteReady
+            && openApproachStairsReady
             && retakeChoicesReady
             && sightlinesReady
             && density.Ready
@@ -330,6 +333,7 @@ public partial class FreightTerminalWorld
             + $"ground_routes={groundRoutesReady}:7 failures={groundRouteFailures} retakes={retakeChoicesReady}:2 "
             + $"b_service={serviceRouteReady}:{serviceGeometryReady}:{serviceLayoutClear}:{servicePhysicalClear} "
             + $"service_failures={serviceGeometryFailures}:{serviceLayoutBlocker}:{servicePhysicalBlocker} "
+            + $"open_stair_entries={openApproachStairsReady} failures={openApproachStairFailures} "
             + $"sightlines={sightlinesReady} spawn_pair={spawnPairsBlocked} attack_sites={attackSpawnToSitesBlocked} "
             + $"defender_sites={defenderSpawnToSitesBlocked} site_pair={sitesMutuallyBlocked} "
             + $"density={density.Ready} site_visible={density.SiteVisiblePairs}/{density.SitePairCount} "

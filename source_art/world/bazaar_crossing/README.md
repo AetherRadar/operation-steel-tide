@@ -7,7 +7,7 @@ materials, and packed textures used by this map. Its SHA-256 is
 Daily rebuilds never open the mutable Jianghai Old City Blend.
 
 `scripts/blender/build_bazaar_crossing.py` validates that palette, assembles
-finished CC0 modules into the dense arena, renders six review views, saves the
+finished CC0 modules into the dense arena, renders eight review views, saves the
 packed DCC source, exports a Godot-compatible non-Draco runtime GLB, imports
 the GLB again, and writes `bazaar_crossing_build_report.json`. It rejects every
 visible mesh whose source is not CC0 and parses the exported GLB JSON to reject
@@ -81,8 +81,10 @@ as `(x, -z, y)`. The root remains at the origin with unit scale.
 | Mid South | `(-6,0,40.85)` -> `(-6,3.2,31)` | `3.2 m` / `17.9976 deg` |
 | Mid North | `(-6,0,7.15)` -> `(-6,3.2,17)` | `3.2 m` / `17.9976 deg` |
 
-The three approach-side flights occupy attached, roofed stair vestibules. Rear
-flights are inside their parent buildings. Inner rails leave landing gaps.
+The three approach-side flights use full-height 5.2-metre facade openings and
+unobstructed exterior forecourts; they have no side portal, front wall, arch,
+canopy post, or entry trim. Rear flights remain inside their parent buildings.
+Inner rails leave landing gaps.
 Godot owns collision, navigation, spawns, sites, and smooth route surfaces;
 visual low points correspond to runtime route points at `y=0.2`.
 
@@ -90,20 +92,20 @@ visual low points correspond to runtime route points at `y=0.2`.
 
 The V2 report records:
 
-- 1,533 -> 761 visible mesh draw nodes and 2,130 -> 1,036 material surfaces
+- 1,476 -> 713 visible mesh draw nodes and 2,085 -> 988 material surfaces
   after same-region, same-material, same-responsibility static consolidation;
-- 700 unique meshes in the final packed DCC scene;
+- 659 unique meshes in the final packed DCC scene;
 - 252,707 raw whitelisted-source triangles;
-- 870,605 unique and 1,169,195 delivered instance triangles, unchanged by
+- 843,171 unique and 1,140,165 delivered instance triangles, unchanged by
   draw-node consolidation and GLB round trip;
 - 49 DCC materials and 58 DCC textures;
 - 203.473 MiB estimated RGBA8 plus full-mip-chain texture memory;
-- 115,387,624-byte non-Draco GLB, SHA-256
-  `483DC0D81DA7E9636E52B840B51899CC66E2689457FDFCF5FFE34342B3B9DB22`;
-- 51,005,477-byte packed Blend, SHA-256
-  `4E262B94FC9E67F064BB7D6E1D80C4E5482A661C557A4D840A05A8CDBA3879C1`;
+- 111,564,672-byte non-Draco GLB, SHA-256
+  `1B6F6B588B26AE708BA132FE15EC2CD98BBF6D971FC369C4B5B08E71E346E6AD`;
+- 50,292,840-byte packed Blend, SHA-256
+  `A92B51DF62D4F6094E88ABD7091AE7DFD517679A11FC922CBEB50882836D36BB`;
 - bounds X `[-68,68]`, Blender Y `[-56.2,56.2]`, Z `[-0.16,9.46]`;
-- four complete enterable interiors and 10,057.703 square metres of roofed
+- four complete enterable interiors and 9,930.973 square metres of roofed
   footprint;
 - 140 continuous storage parts, 112 continuous shopfront parts, 109 skyline
   articulation parts, and four back-service gate parts;

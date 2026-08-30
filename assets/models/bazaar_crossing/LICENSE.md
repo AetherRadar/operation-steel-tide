@@ -4,13 +4,14 @@ Every visible mesh embedded in `bazaar_crossing.glb` is an arrangement,
 instance, or real DCC adaptation of a whitelisted finished CC0 1.0 Universal
 source. This includes the ground, interior floors/ceilings, complete building
 walls and roofs, arcades, doors, windows, cornices, columns, counters, three
-decks, six stairs, rails, stair vestibules, continuous wall storage and
-shopfront bands, rooftop monitors/ridges, and limited market dressing.
+decks, six stairs, rails, three open approach forecourts, continuous wall
+storage and shopfront bands, rooftop monitors/ridges, and limited market
+dressing.
 
-The current runtime binary is 115,387,624 bytes with SHA-256
-`483DC0D81DA7E9636E52B840B51899CC66E2689457FDFCF5FFE34342B3B9DB22`.
+The current runtime binary is 111,564,672 bytes with SHA-256
+`1B6F6B588B26AE708BA132FE15EC2CD98BBF6D971FC369C4B5B08E71E346E6AD`.
 Its packed DCC source has SHA-256
-`4E262B94FC9E67F064BB7D6E1D80C4E5482A661C557A4D840A05A8CDBA3879C1`,
+`A92B51DF62D4F6094E88ABD7091AE7DFD517679A11FC922CBEB50882836D36BB`,
 and the immutable map-local source palette has SHA-256
 `1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9`.
 The runtime mesh streams are not Draco-compressed; this packaging choice does

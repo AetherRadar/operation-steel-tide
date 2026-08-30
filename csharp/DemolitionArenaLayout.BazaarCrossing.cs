@@ -107,7 +107,7 @@ public sealed partial class DemolitionArenaLayout
             BazaarCollisionBox("MassWestServiceClosure", new(-62.0f, 4.0f, 4.0f), new(4.0f, 8.0f, 16.0f)),
             BazaarCollisionBox("MassEastServiceClosure", new(62.0f, 4.0f, 4.0f), new(4.0f, 8.0f, 16.0f)),
             BazaarCollisionBox("WallWestApproachSightReturn", new(-49.0f, 4.0f, 4.0f), new(0.42f, 8.0f, 16.0f)),
-            BazaarCollisionBox("WallEastServicePocketClosure", new(56.0f, 4.0f, 9.4f), new(8.0f, 8.0f, 0.42f)),
+            BazaarCollisionBox("WallEastServicePocketClosure", new(56.0f, 4.0f, 10.0f), new(8.0f, 8.0f, 0.42f)),
 
             // Offset gaps through these blocks are the earned Mid-to-site splits.
             BazaarCollisionBox("MassSeparationWestNorth", new(-19.25f, 3.9f, -26.0f), new(19.5f, 7.8f, 10.0f)),
@@ -158,14 +158,6 @@ public sealed partial class DemolitionArenaLayout
             BazaarCollisionBox("WallB_BalconyPrivacyScreen", new(53.0f, 4.95f, -16.75f), new(0.42f, 3.1f, 15.5f))
         };
 
-        AddBazaarVerticalWall(boxes, "WallEastApproachSightReturn", 52.0f, -6.0f, 12.0f, 8.0f,
-            new BazaarOpening(6.2f, 3.2f));
-        AddBazaarApproachStairVestibuleCollision(
-            boxes, "A", -56.0f, -4.0f, 2.1f, 6.3f, entryOnEast: true);
-        AddBazaarApproachStairVestibuleCollision(
-            boxes, "B", 56.0f, -6.0f, 1.5f, 6.4f, entryOnEast: false);
-        AddBazaarApproachStairVestibuleCollision(
-            boxes, "Mid", -6.0f, 34.0f, 40.85f, 6.1f, entryOnEast: true);
         AddBazaarSiteAWalls(boxes);
         AddBazaarSiteBWalls(boxes);
         AddBazaarMidWalls(boxes);
@@ -174,50 +166,10 @@ public sealed partial class DemolitionArenaLayout
         return boxes;
     }
 
-    private void AddBazaarApproachStairVestibuleCollision(
-        List<DemolitionArenaBox> boxes,
-        string name,
-        float centerX,
-        float buildingZ,
-        float stairBottomZ,
-        float roofHeight,
-        bool entryOnEast)
-    {
-        const float halfWidth = 1.8f;
-        const float entryWidth = 3.2f;
-        const float landingDepth = 4.3f;
-        var outerZ = stairBottomZ + landingDepth;
-        var entryCenterZ = stairBottomZ + 2.2f;
-        var westX = centerX - halfWidth;
-        var eastX = centerX + halfWidth;
-        var opening = new BazaarOpening(entryCenterZ, entryWidth);
-
-        if (entryOnEast)
-        {
-            AddBazaarVerticalWall(boxes, $"Wall{name}SouthStairVestibuleWest", westX,
-                buildingZ, outerZ, roofHeight);
-            AddBazaarVerticalWall(boxes, $"Wall{name}SouthStairVestibuleEast", eastX,
-                buildingZ, outerZ, roofHeight, opening);
-        }
-        else
-        {
-            AddBazaarVerticalWall(boxes, $"Wall{name}SouthStairVestibuleWest", westX,
-                buildingZ, outerZ, roofHeight, opening);
-            AddBazaarVerticalWall(boxes, $"Wall{name}SouthStairVestibuleEast", eastX,
-                buildingZ, outerZ, roofHeight);
-        }
-        AddBazaarHorizontalWall(boxes, $"Wall{name}SouthStairVestibuleOuter", outerZ,
-            westX, eastX, roofHeight);
-        boxes.Add(BazaarCollisionBox(
-            $"Roof{name}SouthStairVestibule",
-            new(centerX, roofHeight + 0.07f, (buildingZ + outerZ) * 0.5f),
-            new(halfWidth * 2.0f + 0.2f, 0.14f, outerZ - buildingZ)));
-    }
-
     private void AddBazaarSiteAWalls(List<DemolitionArenaBox> boxes)
     {
         AddBazaarHorizontalWall(boxes, "WallA_South", -4.0f, -60.0f, -34.0f, 6.4f,
-            new BazaarOpening(-56.0f, 3.2f), new BazaarOpening(-47.0f, 3.4f));
+            new BazaarOpening(-56.0f, 5.2f), new BazaarOpening(-47.0f, 3.4f));
         AddBazaarHorizontalWall(boxes, "WallA_North", -31.0f, -60.0f, -34.0f, 6.4f,
             new BazaarOpening(-52.0f, 3.2f), new BazaarOpening(-37.0f, 3.2f));
         AddBazaarVerticalWall(boxes, "WallA_West", -60.0f, -31.0f, -4.0f, 6.4f,
@@ -241,7 +193,7 @@ public sealed partial class DemolitionArenaLayout
     private void AddBazaarSiteBWalls(List<DemolitionArenaBox> boxes)
     {
         AddBazaarHorizontalWall(boxes, "WallB_South", -6.0f, 34.0f, 60.0f, 6.5f,
-            new BazaarOpening(46.0f, 3.4f), new BazaarOpening(56.0f, 3.2f));
+            new BazaarOpening(46.0f, 3.4f), new BazaarOpening(56.0f, 5.2f));
         AddBazaarHorizontalWall(boxes, "WallB_North", -30.0f, 34.0f, 60.0f, 6.5f,
             new BazaarOpening(40.0f, 3.2f), new BazaarOpening(55.0f, 3.2f));
         AddBazaarVerticalWall(boxes, "WallB_West", 34.0f, -30.0f, -6.0f, 6.5f,
@@ -295,7 +247,7 @@ public sealed partial class DemolitionArenaLayout
         AddBazaarHorizontalWall(boxes, "WallMidCarpet_North", 19.0f, -9.0f, 3.0f, 6.2f,
             new BazaarOpening(0.0f, 3.2f));
         AddBazaarHorizontalWall(boxes, "WallMidCarpet_South", 34.0f, -9.0f, 3.0f, 6.2f,
-            new BazaarOpening(-6.0f, 3.2f), new BazaarOpening(0.0f, 3.2f));
+            new BazaarOpening(-6.0f, 5.2f), new BazaarOpening(0.0f, 3.2f));
         AddBazaarHorizontalWall(boxes, "WallMidCarpet_SouthReturn", 34.0f, 3.0f, 8.0f, 6.2f);
         AddBazaarVerticalWall(boxes, "WallMidCarpet_West", -9.0f, 19.0f, 34.0f, 6.2f);
         AddBazaarVerticalWall(boxes, "WallMidCarpet_East", 3.0f, 19.0f, 34.0f, 6.2f);
@@ -544,7 +496,10 @@ public sealed partial class DemolitionArenaLayout
             && thresholds.Length == 6
             && thresholds.Count(threshold => threshold.StairTransition) == 1
             && thresholds.Count(threshold => !threshold.StairTransition) == 5
-            && thresholds.All(threshold => threshold.Width is >= 2.8f and <= 3.6f);
+            && thresholds.Where(threshold => !threshold.StairTransition)
+                .All(threshold => threshold.Width is >= 2.8f and <= 3.6f)
+            && thresholds.Where(threshold => threshold.StairTransition)
+                .All(threshold => threshold.Width is >= 5.0f and <= 5.4f);
     }
 
     private IReadOnlyList<float> BuildBazaarCrossingCriticalPassageWidths()

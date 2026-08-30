@@ -70,10 +70,8 @@ public partial class FreightTerminalWorld
         var boxes = layout.CollisionBoxes.ToDictionary(box => box.Name, StringComparer.Ordinal);
         var exactContracts = new[]
         {
-            (Name: "WallEastServicePocketClosure", Center: new Vector3(56.0f, 4.0f, 9.4f), Size: new Vector3(8.0f, 8.0f, 0.42f)),
-            (Name: "CoverB_ServiceCounter", Center: new Vector3(58.5f, 0.58f, 3.7f), Size: new Vector3(0.62f, 1.16f, 4.6f)),
-            (Name: "WallBSouthStairVestibuleOuter_Segment00", Center: new Vector3(56.0f, 3.2f, 5.8f), Size: new Vector3(3.6f, 6.4f, 0.42f)),
-            (Name: "RoofBSouthStairVestibule", Center: new Vector3(56.0f, 6.47f, -0.1f), Size: new Vector3(3.8f, 0.14f, 11.8f))
+            (Name: "WallEastServicePocketClosure", Center: new Vector3(56.0f, 4.0f, 10.0f), Size: new Vector3(8.0f, 8.0f, 0.42f)),
+            (Name: "CoverB_ServiceCounter", Center: new Vector3(58.5f, 0.58f, 3.7f), Size: new Vector3(0.62f, 1.16f, 4.6f))
         };
         foreach (var contract in exactContracts)
         {
@@ -90,22 +88,60 @@ public partial class FreightTerminalWorld
             }
         }
 
-        var eastReturnSegments = boxes.Values
+        var obsoleteReturnBoxes = boxes.Values
             .Where(box => box.Name.StartsWith(
-                "WallEastApproachSightReturn_Segment", StringComparison.Ordinal))
-            .OrderBy(box => box.Center.Z)
+                "WallEastApproachSightReturn", StringComparison.Ordinal))
+            .Select(box => box.Name)
             .ToArray();
-        var bVestibuleWestSegments = boxes.Values
-            .Where(box => box.Name.StartsWith(
-                "WallBSouthStairVestibuleWest_Segment", StringComparison.Ordinal))
-            .OrderBy(box => box.Center.Z)
-            .ToArray();
-        if (eastReturnSegments.Length != 2
-            || bVestibuleWestSegments.Length != 2
-            || eastReturnSegments.Any(box => !Mathf.IsEqualApprox(box.Size.X, 0.42f))
-            || bVestibuleWestSegments.Any(box => !Mathf.IsEqualApprox(box.Size.X, 0.42f)))
+        if (obsoleteReturnBoxes.Length > 0)
         {
-            failed.Add($"door-segments-{eastReturnSegments.Length}-{bVestibuleWestSegments.Length}");
+            failed.Add($"obsolete-return-{string.Join(',', obsoleteReturnBoxes)}");
+        }
+
+        failures = string.Join('|', failed);
+        return failed.Count == 0;
+    }
+
+    private static bool BazaarOpenApproachStairEntriesReady(
+        DemolitionArenaLayout layout,
+        out string failures)
+    {
+        var failed = new List<string>();
+        var obsoleteVestibuleBoxes = layout.CollisionBoxes
+            .Where(box => box.Name.Contains("SouthStairVestibule", StringComparison.Ordinal))
+            .Select(box => box.Name)
+            .ToArray();
+        if (obsoleteVestibuleBoxes.Length > 0)
+        {
+            failed.Add($"obsolete-{string.Join(',', obsoleteVestibuleBoxes)}");
+        }
+
+        var entries = new[]
+        {
+            (Name: "a", CenterX: -56.0f, WallZ: -4.0f, ApproachZ: 7.2f),
+            (Name: "b", CenterX: 56.0f, WallZ: -6.0f, ApproachZ: 6.8f),
+            (Name: "mid", CenterX: -6.0f, WallZ: 34.0f, ApproachZ: 46.2f)
+        };
+        const float clearHalfWidth = 2.2f;
+        foreach (var entry in entries)
+        {
+            var minimumZ = MathF.Min(entry.WallZ + 0.35f, entry.ApproachZ);
+            var maximumZ = MathF.Max(entry.WallZ + 0.35f, entry.ApproachZ);
+            var blockers = layout.CollisionBoxes.Where(box =>
+            {
+                var halfSize = box.Size * 0.5f;
+                var overlapsWidth = box.Center.X + halfSize.X > entry.CenterX - clearHalfWidth
+                    && box.Center.X - halfSize.X < entry.CenterX + clearHalfWidth;
+                var overlapsDepth = box.Center.Z + halfSize.Z > minimumZ
+                    && box.Center.Z - halfSize.Z < maximumZ;
+                var overlapsPlayerHeight = box.Center.Y + halfSize.Y > 0.2f
+                    && box.Center.Y - halfSize.Y < 2.6f;
+                return overlapsWidth && overlapsDepth && overlapsPlayerHeight;
+            }).Select(box => box.Name).ToArray();
+            if (blockers.Length > 0)
+            {
+                failed.Add($"{entry.Name}-{string.Join(',', blockers)}");
+            }
         }
 
         failures = string.Join('|', failed);
@@ -439,9 +475,9 @@ public partial class FreightTerminalWorld
             "Bazaar_A_InteriorFloor",
             "Bazaar_B_InteriorFloor",
             "Bazaar_B_ServicePassage_Floor",
-            "Bazaar_A_SouthStair_Floor",
-            "Bazaar_B_SouthStair_Floor",
-            "Bazaar_Mid_SouthStair_Floor",
+            "Bazaar_A_SouthStair_OpenForecourt",
+            "Bazaar_B_SouthStair_OpenForecourt",
+            "Bazaar_Mid_SouthStair_OpenForecourt",
             "Bazaar_B_WarehouseRoof",
             "Bazaar_Mid_NorthConnector_Roof",
             "Bazaar_Mid_NorthTeaHall_Roof",

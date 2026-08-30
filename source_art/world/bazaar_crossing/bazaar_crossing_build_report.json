@@ -5,26 +5,26 @@
   "source_blend_sha256": "1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9",
   "blend": {
     "path": "source_art/world/bazaar_crossing/bazaar_crossing.blend",
-    "bytes": 51005477,
-    "sha256": "4E262B94FC9E67F064BB7D6E1D80C4E5482A661C557A4D840A05A8CDBA3879C1"
+    "bytes": 50292840,
+    "sha256": "A92B51DF62D4F6094E88ABD7091AE7DFD517679A11FC922CBEB50882836D36BB"
   },
   "glb": {
     "path": "assets/models/bazaar_crossing/bazaar_crossing.glb",
-    "bytes": 115387624,
-    "sha256": "483DC0D81DA7E9636E52B840B51899CC66E2689457FDFCF5FFE34342B3B9DB22"
+    "bytes": 111564672,
+    "sha256": "1B6F6B588B26AE708BA132FE15EC2CD98BBF6D971FC369C4B5B08E71E346E6AD"
   },
   "scene": {
     "revision": "V2 dense enterable interiors",
-    "object_count": 794,
-    "mesh_object_count": 761,
-    "unique_mesh_count": 700,
+    "object_count": 746,
+    "mesh_object_count": 713,
+    "unique_mesh_count": 659,
     "material_count": 49,
     "texture_count": 58,
-    "draw_node_count": 761,
-    "surface_draw_count": 1036,
+    "draw_node_count": 713,
+    "surface_draw_count": 988,
     "raw_source_triangles": 252707,
-    "unique_triangles": 870605,
-    "instance_triangles": 1169195,
+    "unique_triangles": 843171,
+    "instance_triangles": 1140165,
     "texture_memory_bytes_estimate_rgba8_mips": 213356866,
     "texture_memory_mib_estimate_rgba8_mips": 203.473,
     "blender_bounds_min": [
@@ -44,11 +44,11 @@
       "Defender_BackMarket",
       "Mid_IndoorConnector"
     ],
-    "architectural_cover_object_count": 751,
+    "architectural_cover_object_count": 720,
     "prop_cover_object_count": 0,
     "architectural_cover_ratio": 1.0,
     "art_polish_object_counts": {
-      "shop_signs": 33,
+      "shop_signs": 30,
       "wall_shelves": 108,
       "wall_awnings": 11,
       "roof_parapets": 110,
@@ -60,7 +60,7 @@
       "skyline_articulation_parts": 109,
       "back_service_gate_parts": 4
     },
-    "roofed_footprint_m2": 10057.703,
+    "roofed_footprint_m2": 9930.973,
     "legacy_outer_facade_count": 4,
     "closed_modular_block_count": 37,
     "stairs": {
@@ -108,7 +108,7 @@
     },
     "authored_module_contract": {
       "visible_mesh_origin_counts": {
-        "cc0": 761,
+        "cc0": 713,
         "project_authored": 0,
         "procedural": 0
       },
@@ -124,26 +124,26 @@
     "draw_node_optimization": {
       "strategy": "same collection, spatial region, authored responsibility, source provenance, and material signature",
       "spatial_bucket_m": 32.0,
-      "merged_group_count": 336,
-      "merged_source_node_count": 1108,
-      "pre_draw_nodes": 1533,
-      "post_draw_nodes": 761,
-      "pre_surface_draw_count": 2130,
-      "post_surface_draw_count": 1036,
-      "pre_unique_triangles": 870605,
-      "post_unique_triangles": 870605,
-      "pre_instance_triangles": 1169195,
-      "post_instance_triangles": 1169195,
+      "merged_group_count": 332,
+      "merged_source_node_count": 1095,
+      "pre_draw_nodes": 1476,
+      "post_draw_nodes": 713,
+      "pre_surface_draw_count": 2085,
+      "post_surface_draw_count": 988,
+      "pre_unique_triangles": 843171,
+      "post_unique_triangles": 843171,
+      "pre_instance_triangles": 1140165,
+      "post_instance_triangles": 1140165,
       "triangle_and_bounds_preserved": true
     }
   },
   "round_trip": {
-    "object_count": 773,
-    "mesh_object_count": 761,
-    "unique_mesh_count": 700,
-    "material_count": 48,
+    "object_count": 725,
+    "mesh_object_count": 713,
+    "unique_mesh_count": 659,
+    "material_count": 47,
     "texture_count": 56,
-    "instance_triangles": 1169195,
+    "instance_triangles": 1140165,
     "bounds_min": [
       -68.0,
       -56.2,
