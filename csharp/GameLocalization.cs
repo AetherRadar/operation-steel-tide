@@ -135,7 +135,8 @@ public static class GameLocalization
         Chinese["door_blocked"] = "\u95e8\u88ab\u963b\u6321  //  \u8bf7\u79bb\u5f00\u5165\u53e3";
         Chinese["secondary_weapon"] = "\u526f\u6b66\u5668";
         Chinese["sidearm_weapon"] = "\u624b\u67aa";
-        Chinese["squad_ready"] = "\u5c0f\u961f\u5df2\u5c31\u7eea  //  F1 \u8ddf\u968f  F2 \u6212\u5907  F3 \u79fb\u52a8  H \u6280\u80fd";
+        Chinese["squad_ready"] = "\u5c0f\u961f\u5df2\u5c31\u7eea  //  F1-F5 \u6307\u6325 AI  //  H \u6280\u80fd";
+        Chinese["squad_ready_network"] = "\u5c0f\u961f\u5df2\u5c31\u7eea  //  \u961f\u4f0d\u8054\u673a\u4e2d  //  H \u6280\u80fd";
         Chinese["squad_create_room"] = "\u521b\u5efa\u623f\u95f4  //  {0}";
         Chinese["squad_join_room"] = "\u52a0\u5165\u623f\u95f4  //  {0}";
         Chinese["squad_lobby_start"] = "\u25b6  \u5f00\u59cb\u884c\u52a8  //  {0}/{1}";
@@ -190,6 +191,9 @@ public static class GameLocalization
         Chinese["spectating_teammate"] = "\u6b63\u5728\u89c2\u6218\u961f\u53cb";
         Chinese["spectating_teammate_named"] = "\u6b63\u5728\u89c2\u6218  //  {0}";
         Chinese["spectator_switch_hint"] = "\u9f20\u6807\u70b9\u51fb\u5207\u6362\u5b58\u6d3b\u961f\u53cb";
+        Chinese["spectator_ai_command_title"] = "\u5df2\u9635\u4ea1  //  AI \u6307\u6325\u6a21\u5f0f";
+        Chinese["spectator_ai_command_hint"] = "F1 \u96c6\u7ed3  F2 \u6212\u5907  F3 \u79fb\u52a8  F4 \u505c\u706b  F5 \u96c6\u706b";
+        Chinese["spectator_ai_command_toast"] = "AI \u6307\u6325\u5df2\u63a5\u7ba1  //  F1-F5 \u4ecd\u53ef\u4e0b\u4ee4";
         Chinese["weapon_m24"] = "M24 \u7cbe\u786e\u5c04\u624b\u6b65\u67aa";
         Chinese["weapon_p226"] = "P226 \u5236\u5f0f\u624b\u67aa";
         Chinese["weapon_m1911"] = "M1911 \u6218\u672f\u624b\u67aa";

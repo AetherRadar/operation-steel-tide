@@ -188,7 +188,6 @@ internal sealed class SurvivorExtractionService
 
     private void Rally(List<SquadMate> livingMates)
     {
-        _runtime.BeginRally();
         var orderChanged = false;
         for (var index = 0; index < livingMates.Count; index++)
         {
@@ -196,6 +195,13 @@ internal sealed class SurvivorExtractionService
             if (!_ralliedMateIds.Add(mate.GetInstanceId()))
             {
                 continue;
+            }
+            if (!orderChanged)
+            {
+                // Establish the automatic evacuation order once. The eliminated
+                // local player may subsequently override it through the survivor
+                // F1-F5 command UI without this service rewriting the order every frame.
+                _runtime.BeginRally();
             }
             _runtime.SetRallyDestination(
                 mate,

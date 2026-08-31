@@ -385,6 +385,7 @@ public partial class FreightTerminalWorld
     private void FinishExtractionMission()
     {
         _hud.SetExtractionCinematicVisible(false);
+        _hud.SetSquadCommandPresentation(false, false, suppressFooter: true);
         _player.IsDead = true;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         _missionDirector.CompleteMission(true, _kills, _headshots, _shotsFired, _shotsHit);

@@ -115,7 +115,9 @@ public partial class CombatHUD
         => _demolitionGameplayPresentation
         && IsInstanceValid(_squadOrderLabel)
         && !_squadOrderLabel.Visible
-        && System.Array.TrueForAll(_orderButtons, button => IsInstanceValid(button) && !button.Visible);
+        && System.Array.TrueForAll(_orderButtons, button => IsInstanceValid(button) && !button.Visible)
+        && IsInstanceValid(_fireStanceButton)
+        && !_fireStanceButton.Visible;
     public bool AreDemolitionLegacyTopLabelsHidden
         => _demolitionGameplayPresentation
         && IsInstanceValid(_objectiveLabel) && !_objectiveLabel.Visible
@@ -195,17 +197,7 @@ public partial class CombatHUD
             _classSkillRoot.Visible = true;
             RefreshFooterLayout();
         }
-        if (IsInstanceValid(_squadOrderLabel))
-        {
-            _squadOrderLabel.Visible = !active;
-        }
-        foreach (var button in _orderButtons)
-        {
-            if (IsInstanceValid(button))
-            {
-                button.Visible = !active;
-            }
-        }
+        RefreshSquadCommandPresentationVisibility();
         CanvasItem[] legacyTopLabels =
         {
             _objectiveLabel,

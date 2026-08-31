@@ -17,6 +17,25 @@ public partial class CombatHUD
         => IsInstanceValid(_squadRoomBrowser) && _squadRoomBrowser.UiReady;
     public int VisibleExtractionLanRoomCount
         => IsInstanceValid(_squadRoomBrowser) ? _squadRoomBrowser.VisibleRoomCount : 0;
+    internal bool IsAiSquadCommandPresentationVisibleForDiagnostics
+        => _squadSurvivorCommandMode
+            && _squadCommandPresentationAllowed
+            && IsInstanceValid(_squadOrderLabel)
+            && _squadOrderLabel.IsVisibleInTree()
+            && IsInstanceValid(_classSkillLabel)
+            && _classSkillLabel.IsVisibleInTree()
+            && IsInstanceValid(_classSkillBar)
+            && !_classSkillBar.Visible;
+    internal bool AreSquadCommandControlsVisibleForDiagnostics
+        => IsInstanceValid(_squadOrderLabel)
+            && _squadOrderLabel.IsVisibleInTree()
+            && Array.TrueForAll(_orderButtons, button => IsInstanceValid(button) && button.IsVisibleInTree())
+            && IsInstanceValid(_fireStanceButton)
+            && _fireStanceButton.IsVisibleInTree();
+    internal string SquadCommandHintForDiagnostics
+        => IsInstanceValid(_squadOrderLabel) ? _squadOrderLabel.Text : string.Empty;
+    internal string SquadCommandTitleForDiagnostics
+        => IsInstanceValid(_classSkillLabel) ? _classSkillLabel.Text : string.Empty;
     public SquadSessionMode SelectedSquadSessionMode => _selectedSessionMode;
     public OperatorRole SelectedOperatorRole => _selectedRole;
     internal int OperatorRoleCardCountForDiagnostics
@@ -109,6 +128,9 @@ public partial class CombatHUD
     private float _displayedCooldownMax = 1.0f;
     private bool _displayedSkillActive;
     private bool _displayedSkillAction;
+    private bool _squadCommandPresentationAllowed;
+    private bool _squadSurvivorCommandMode;
+    private bool _squadCommandFooterSuppressed;
     private bool _squadLobbyWaiting;
     private bool _squadLobbyHost;
     private bool _squadLobbyCanStart;
@@ -235,6 +257,7 @@ public partial class CombatHUD
         _fireStanceButton.AddThemeFontSizeOverride("font_size", 11);
         _fireStanceButton.Pressed += () => SquadFireStanceRequested?.Invoke();
         _classSkillRoot.AddChild(_fireStanceButton);
+        RefreshSquadCommandPresentationVisibility();
         BindFooterLayout(root);
     }
 
@@ -771,12 +794,73 @@ public partial class CombatHUD
         RefreshSquadOrderLabel();
     }
 
+    public void SetSquadCommandPresentation(
+        bool allowed,
+        bool survivorMode,
+        bool suppressFooter = false)
+    {
+        var footerWasSuppressed = _squadCommandFooterSuppressed;
+        _squadCommandPresentationAllowed = allowed;
+        _squadSurvivorCommandMode = allowed && survivorMode;
+        _squadCommandFooterSuppressed = suppressFooter;
+        if (IsInstanceValid(_classSkillRoot))
+        {
+            if (suppressFooter)
+            {
+                _classSkillRoot.Visible = false;
+            }
+            else if ((footerWasSuppressed || allowed && survivorMode)
+                && !_downedFooterSuppressed)
+            {
+                _classSkillRoot.Visible = true;
+            }
+        }
+        RefreshSquadCommandPresentationVisibility();
+        RefreshClassSkillText();
+        RefreshSquadOrderLabel();
+    }
+
+    private void RefreshSquadCommandPresentationVisibility()
+    {
+        var commandsVisible = !_squadCommandFooterSuppressed
+            && _squadCommandPresentationAllowed
+            && !_demolitionGameplayPresentation;
+        if (IsInstanceValid(_squadOrderLabel))
+        {
+            _squadOrderLabel.Visible = commandsVisible;
+        }
+        foreach (var button in _orderButtons)
+        {
+            if (IsInstanceValid(button))
+            {
+                button.Visible = commandsVisible;
+            }
+        }
+        if (IsInstanceValid(_fireStanceButton))
+        {
+            _fireStanceButton.Visible = commandsVisible;
+        }
+        if (IsInstanceValid(_classSkillBar))
+        {
+            _classSkillBar.Visible = !_squadSurvivorCommandMode;
+        }
+    }
+
     private void RefreshSquadOrderLabel()
     {
         if (!IsInstanceValid(_squadOrderLabel))
         {
             return;
         }
+        if (_squadSurvivorCommandMode)
+        {
+            _squadOrderLabel.AddThemeFontSizeOverride("font_size", 10);
+            _squadOrderLabel.Text = Text(
+                "spectator_ai_command_hint",
+                "F1 RALLY  F2 HOLD  F3 MOVE  F4 FIRE  F5 FOCUS");
+            return;
+        }
+        _squadOrderLabel.AddThemeFontSizeOverride("font_size", 12);
         var orderName = OperatorRoles.OrderName(_displayedOrder, _language);
         var stance = _displayedHoldFire
             ? GameLocalization.Get("squad_stance_hold_fire", _language, "HOLD FIRE")
@@ -790,6 +874,13 @@ public partial class CombatHUD
     {
         if (!IsInstanceValid(_classSkillLabel))
         {
+            return;
+        }
+        if (_squadSurvivorCommandMode)
+        {
+            var orderName = OperatorRoles.OrderName(_displayedOrder, _language);
+            _classSkillLabel.Text = $"{Text("spectator_ai_command_title", "ELIMINATED // AI COMMAND")}  //  {orderName}";
+            _classSkillLabel.AddThemeColorOverride("font_color", new Color(0.38f, 0.9f, 0.82f));
             return;
         }
         var name = OperatorRoles.SkillName(_displayedRole, _language);

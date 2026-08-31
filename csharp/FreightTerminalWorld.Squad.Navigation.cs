@@ -86,12 +86,14 @@ public partial class FreightTerminalWorld
     // without baking a second navigation mesh over the procedural level.
     private void UpdateSquadLeaderTrail()
     {
-        if (!IsInstanceValid(_player) || _player.IsInVehicle)
+        var followAnchor = ResolveSquadFollowAnchor();
+        if (!IsInstanceValid(followAnchor)
+            || ReferenceEquals(followAnchor, _player) && _player.IsInVehicle)
         {
             return;
         }
 
-        var position = _player.GlobalPosition;
+        var position = followAnchor.GlobalPosition;
         if (!_squadLeaderTrailInitialized)
         {
             ResetSquadLeaderTrail(position);
@@ -540,7 +542,9 @@ public partial class FreightTerminalWorld
         {
             return formationDestination;
         }
-        if (_player.IsInVehicle)
+        var followAnchor = ResolveSquadFollowAnchor();
+        if (!IsInstanceValid(followAnchor)
+            || ReferenceEquals(followAnchor, _player) && _player.IsInVehicle)
         {
             return formationDestination;
         }
@@ -549,9 +553,9 @@ public partial class FreightTerminalWorld
         // changing floors, or whenever that offset has no real support, route to the
         // leader's feet first. Formation spacing resumes after both operators share a
         // walkable height band.
-        return Mathf.Abs(mate.GlobalPosition.Y - _player.GlobalPosition.Y) > SquadNavSameBandHeight
+        return Mathf.Abs(mate.GlobalPosition.Y - followAnchor.GlobalPosition.Y) > SquadNavSameBandHeight
             || !IsSquadNavigationDestinationSupported(formationDestination, mate)
-                ? _player.GlobalPosition
+                ? followAnchor.GlobalPosition
                 : formationDestination;
     }
 

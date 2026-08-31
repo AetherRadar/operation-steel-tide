@@ -36,6 +36,19 @@ public enum SquadSessionMode
     Join
 }
 
+public static class SquadCommandRules
+{
+    public static bool CanExposeAiCommands(
+        bool demolitionMode,
+        bool networkMatch,
+        bool squadDeployed,
+        int locallyAuthoritativeAiCount)
+        => !demolitionMode
+            && !networkMatch
+            && squadDeployed
+            && locallyAuthoritativeAiCount > 0;
+}
+
 public interface ISquadCombatant
 {
     Node3D CombatNode { get; }

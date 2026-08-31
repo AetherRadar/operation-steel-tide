@@ -101,9 +101,12 @@ public partial class FreightTerminalWorld
         _hud.SetSquadOrder(_squadOrder);
         RefreshSquadHud();
         Input.MouseMode = Input.MouseModeEnum.Captured;
+        var aiCommandsAvailable = IsLocalAiSquadCommandSession;
         _hud.ShowLocalizedMessage(
-            "squad_ready",
-            "SQUAD READY  //  F1 FOLLOW  F2 HOLD  F3 MOVE  H SKILL",
+            aiCommandsAvailable ? "squad_ready" : "squad_ready_network",
+            aiCommandsAvailable
+                ? "SQUAD READY  //  F1-F5 AI COMMANDS  //  H SKILL"
+                : "SQUAD READY  //  TEAM LINK ACTIVE  //  H SKILL",
             OperatorRoles.Spec(role).Accent);
     }
 
@@ -122,8 +125,8 @@ public partial class FreightTerminalWorld
             RefreshSquadHud();
             Input.MouseMode = Input.MouseModeEnum.Captured;
             _hud.ShowLocalizedMessage(
-                "squad_ready",
-                "SQUAD READY  //  F1 FOLLOW  F2 HOLD  F3 MOVE  H SKILL",
+                "squad_ready_network",
+                "SQUAD READY  //  TEAM LINK ACTIVE  //  H SKILL",
                 OperatorRoles.Spec(_player.Role).Accent);
         }
     }

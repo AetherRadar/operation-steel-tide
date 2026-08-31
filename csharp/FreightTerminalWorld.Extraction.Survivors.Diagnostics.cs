@@ -10,9 +10,11 @@ public partial class FreightTerminalWorld
     {
         var cleanStart = false;
         var firstDown = false;
+        var firstDownAiCommandHidden = false;
         var firstRevived = false;
         var mateDown = false;
         var secondEliminated = false;
+        var secondEliminatedAiCommandVisible = false;
         var unsafePreparationBounded = false;
         var activePreparationGrace = false;
         var criticalRecoveryBeforeRescue = false;
@@ -21,12 +23,14 @@ public partial class FreightTerminalWorld
         var mateRevived = false;
         var medicSkippedKia = false;
         var takeoverStarted = false;
+        var manualAiCommandPreserved = false;
         var boardingReady = false;
         var unboardedValueExcluded = false;
         var boardedValueIncluded = false;
         var aiBoarded = false;
         var playerExcluded = false;
         var completed = false;
+        var resultAiCommandHidden = false;
         var failure = string.Empty;
 
         try
@@ -107,6 +111,8 @@ public partial class FreightTerminalWorld
                 && _player.IsDead
                 && _player.CanBeRevived
                 && _localPlayerDowned;
+            firstDownAiCommandHidden = !_hud.IsAiSquadCommandPresentationVisibleForDiagnostics
+                && !_hud.AreSquadCommandControlsVisibleForDiagnostics;
             firstRevived = _player.TryReceiveRevive(50.0f)
                 && !_player.IsDead
                 && _player.ReviveUsed;
@@ -127,6 +133,8 @@ public partial class FreightTerminalWorld
                 && _localPlayerEliminated
                 && !_localPlayerDowned
                 && !_missionEnded;
+            secondEliminatedAiCommandVisible = _hud.IsAiSquadCommandPresentationVisibleForDiagnostics
+                && _hud.AreSquadCommandControlsVisibleForDiagnostics;
 
             UpdateExtractionSequence(0.1f);
             var recoveryHeldExtraction = SurvivorExtractionTakeoverForDiagnostics
@@ -190,6 +198,10 @@ public partial class FreightTerminalWorld
                 && ready == 2
                 && total == 2
                 && _extractionAircraft.Phase == ExtractionAircraftPhase.Inbound;
+            var manualHoldAccepted = TryIssuePlayerSquadOrder(SquadOrder.Hold);
+            UpdateExtractionSequence(0.1f);
+            manualAiCommandPreserved = manualHoldAccepted
+                && new[] { medic, casualty }.All(mate => mate.Order == SquadOrder.Hold);
 
             _extractionAircraft.AdvanceForValidation(ExtractionAircraft.ArrivalDuration + 0.1f);
             UpdateExtractionSequence(0.1f);
@@ -216,6 +228,9 @@ public partial class FreightTerminalWorld
                 && _missionPhase == "COMPLETE"
                 && _hud.IsMissionResultVisible
                 && _extractionAircraft.DestinationReached;
+            resultAiCommandHidden = !_hud.IsAiSquadCommandPresentationVisibleForDiagnostics
+                && !_hud.AreSquadCommandControlsVisibleForDiagnostics
+                && !_hud.ClassSkillHudVisibleForDiagnostics;
         }
         catch (Exception exception)
         {
@@ -225,9 +240,11 @@ public partial class FreightTerminalWorld
 
         var valid = cleanStart
             && firstDown
+            && firstDownAiCommandHidden
             && firstRevived
             && mateDown
             && secondEliminated
+            && secondEliminatedAiCommandVisible
             && unsafePreparationBounded
             && activePreparationGrace
             && criticalRecoveryBeforeRescue
@@ -236,25 +253,30 @@ public partial class FreightTerminalWorld
             && mateRevived
             && medicSkippedKia
             && takeoverStarted
+            && manualAiCommandPreserved
             && boardingReady
             && unboardedValueExcluded
             && boardedValueIncluded
             && aiBoarded
             && playerExcluded
             && completed
+            && resultAiCommandHidden
             && string.IsNullOrEmpty(failure);
         GD.Print(
             $"EXTRACTION_SURVIVORS_CHECK valid={valid} clean={cleanStart} "
             + $"first_down={firstDown} first_revived={firstRevived} mate_down={mateDown} "
-            + $"second_eliminated={secondEliminated} unsafe_prep_bounded={unsafePreparationBounded} "
+            + $"first_down_ai_hint_hidden={firstDownAiCommandHidden} "
+            + $"second_eliminated={secondEliminated} second_down_ai_hint={secondEliminatedAiCommandVisible} "
+            + $"unsafe_prep_bounded={unsafePreparationBounded} "
             + $"active_prep_grace={activePreparationGrace} "
             + $"recovery_before_rescue={criticalRecoveryBeforeRescue} "
             + $"rescue_assigned={rescueAssigned} "
             + $"rescue_before_extract={rescueBeforeExtract} mate_revived={mateRevived} "
-            + $"medic_skipped_kia={medicSkippedKia} takeover={takeoverStarted} "
+            + $"medic_skipped_kia={medicSkippedKia} takeover={takeoverStarted} manual_command={manualAiCommandPreserved} "
             + $"boarding_ready={boardingReady} unboarded_value={unboardedValueExcluded} "
             + $"boarded_value={boardedValueIncluded} ai_boarded={aiBoarded} "
-            + $"player_excluded={playerExcluded} completed={completed} failure={failure}");
+            + $"player_excluded={playerExcluded} completed={completed} "
+            + $"result_ai_hint_hidden={resultAiCommandHidden} failure={failure}");
         GD.Print($"EXTRACTION_SURVIVORS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

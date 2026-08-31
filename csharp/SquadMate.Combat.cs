@@ -335,13 +335,20 @@ public partial class SquadMate
         {
             return _orderPosition;
         }
-        if (Leader.IsDead && _combatHasEngagementAnchor)
+        var followAnchor = Main.ResolveSquadFollowAnchor();
+        if (ReferenceEquals(followAnchor, Leader)
+            && Leader.IsDead
+            && _combatHasEngagementAnchor)
         {
             return _combatEngagementAnchor;
         }
-        return Leader.GlobalPosition
-            + Leader.GlobalBasis.X * formation.X
-            + Leader.GlobalBasis.Z * formation.Z;
+        if (ReferenceEquals(followAnchor, this))
+        {
+            return GlobalPosition;
+        }
+        return followAnchor.GlobalPosition
+            + followAnchor.GlobalBasis.X * formation.X
+            + followAnchor.GlobalBasis.Z * formation.Z;
     }
 
     private Vector3 ResolveTacticalDestination(
