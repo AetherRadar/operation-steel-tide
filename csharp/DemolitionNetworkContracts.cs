@@ -92,4 +92,6 @@ public readonly record struct DemolitionMatchNetworkState(
     int ActiveSite,
     int CarrierActorId,
     Godot.Vector3 DevicePosition,
+    int AlphaWeaponLoadout,
+    int BravoWeaponLoadout,
     uint BazaarGlassMask = 0u);

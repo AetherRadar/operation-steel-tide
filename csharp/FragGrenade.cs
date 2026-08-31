@@ -8,8 +8,11 @@ public partial class FragGrenade : RigidBody3D
     private const float GroundFuseDuration = 0.55f;
     private const float MaximumAirborneLifetime = 18.0f;
 
+    public const string ActiveGroupName = "active_frag_grenades";
+
     public Node? OwnerBody { get; set; }
     public FreightTerminalWorld? Main { get; set; }
+    public bool DamageEnabled { get; set; } = true;
     public bool HasTouchedGround { get; private set; }
     public bool FuseStarted => HasTouchedGround && _armed;
 
@@ -26,6 +29,7 @@ public partial class FragGrenade : RigidBody3D
         ContinuousCd = true;
         ContactMonitor = true;
         MaxContactsReported = 6;
+        AddToGroup(ActiveGroupName);
         if (OwnerBody is PhysicsBody3D owner && IsInstanceValid(owner))
         {
             AddCollisionExceptionWith(owner);
@@ -38,9 +42,9 @@ public partial class FragGrenade : RigidBody3D
         AddChild(GrenadeVisualFactory.CreateFragmentationGrenade(firstPerson: false));
     }
 
-    public void Arm(Vector3 direction)
+    public void Arm(Vector3 direction, float speed = 15.0f, float loft = 5.2f)
     {
-        LinearVelocity = direction.Normalized() * 15.0f + Vector3.Up * 5.2f;
+        LinearVelocity = direction.Normalized() * speed + Vector3.Up * loft;
         AngularVelocity = new Vector3(8.0f, 5.0f, 11.0f);
         _armed = true;
     }
@@ -66,7 +70,14 @@ public partial class FragGrenade : RigidBody3D
             return;
         }
         _armed = false;
-        Main?.Explode(GlobalPosition, 8.5f, 125.0f, OwnerBody ?? this, this);
+        if (DamageEnabled)
+        {
+            Main?.Explode(GlobalPosition, 8.5f, 125.0f, OwnerBody ?? this, this);
+        }
+        else
+        {
+            Main?.PresentReplicatedFragExplosion(GlobalPosition);
+        }
         QueueFree();
     }
 

@@ -210,4 +210,18 @@ public partial class SquadMate
         UpdateHealthVisual();
         UpdateLabel();
     }
+
+    public void ConfigureDemolitionRoundLoadout(WeaponBuild? build)
+    {
+        if (build is null)
+        {
+            ApplyColdStartUnarmed();
+            return;
+        }
+        EquipWeaponFromLoot(
+            build,
+            LootGrade.Common,
+            LootGrade.Common,
+            recoveredAmmoQuantity: 0);
+    }
 }

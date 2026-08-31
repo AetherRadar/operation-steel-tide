@@ -1417,7 +1417,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             _activeQuickSlot switch
             {
                 PlayerQuickSlot.FragmentationGrenade => GameLocalization.Get("grenade", Hud?.CurrentLanguage ?? "en", "FRAG GRENADE"),
-                PlayerQuickSlot.Utility => GameLocalization.Get("smoke_grenade", Hud?.CurrentLanguage ?? "en", "SMOKE GRENADE"),
+                PlayerQuickSlot.Utility => SelectedDemolitionUtility == DemolitionUtilityType.Smoke
+                    ? GameLocalization.Get("smoke_grenade", Hud?.CurrentLanguage ?? "en", "SMOKE GRENADE")
+                    : GameLocalization.Get("incendiary_grenade", Hud?.CurrentLanguage ?? "en", "INCENDIARY"),
                 PlayerQuickSlot.Melee => CurrentMeleeDefinition.DisplayName(Hud?.CurrentLanguage ?? "en"),
                 _ => EquippedWeapon.DisplayName(Hud?.CurrentLanguage ?? "en")
             },
@@ -2856,8 +2858,22 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             return false;
         }
+        var origin = _camera.GlobalPosition - _camera.GlobalBasis.Z * 0.7f;
+        var direction = -_camera.GlobalBasis.Z;
+        if (Main.IsDemolitionNetworkClient)
+        {
+            if (!Main.TryRequestLocalDemolitionUtilityThrow(
+                    DemolitionNetworkUtilityKind.Fragmentation,
+                    origin,
+                    direction))
+            {
+                return false;
+            }
+            OnThrowableConsumed();
+            return true;
+        }
         Grenades--;
-        Main.ThrowGrenade(_camera.GlobalPosition - _camera.GlobalBasis.Z * 0.7f, -_camera.GlobalBasis.Z, this);
+        Main.ThrowGrenade(origin, direction, this);
         Hud?.SetStats(Health, Armor, Stamina, Ammo, ReserveAmmo, Grenades);
         OnThrowableConsumed();
         return true;

@@ -12,6 +12,8 @@ public partial class CombatHUD
     private DemolitionTeamStatusView _demolitionTeamStatusView = null!;
     private bool _demolitionGameplayPresentation;
     private int _demolitionSmokeGrenades;
+    private int _demolitionIncendiaryGrenades;
+    private DemolitionUtilityType _demolitionSelectedUtility = DemolitionUtilityType.Smoke;
     private int _radioMessageDiagnosticSuppressionDepth;
 
     public bool IsDemolitionBuyVisible
@@ -166,14 +168,16 @@ public partial class CombatHUD
             primaryId,
             armorSelected,
             grenadeCount,
-            smokeGrenadeCount) =>
+            smokeGrenadeCount,
+            incendiaryGrenadeCount) =>
             EmitSignal(
                 SignalName.DemolitionPurchaseRequested,
                 sidearmId,
                 primaryId,
                 armorSelected,
                 grenadeCount,
-                smokeGrenadeCount);
+                smokeGrenadeCount,
+                incendiaryGrenadeCount);
     }
 
     public void SetDemolitionGameplayPresentation(bool active)
@@ -218,6 +222,17 @@ public partial class CombatHUD
     public void SetDemolitionSmokeGrenades(int count)
     {
         _demolitionSmokeGrenades = Mathf.Max(0, count);
+        RefreshQuickSlotBar();
+    }
+
+    public void SetDemolitionUtilities(
+        int smokeGrenades,
+        int incendiaryGrenades,
+        DemolitionUtilityType selectedUtility)
+    {
+        _demolitionSmokeGrenades = Mathf.Max(0, smokeGrenades);
+        _demolitionIncendiaryGrenades = Mathf.Max(0, incendiaryGrenades);
+        _demolitionSelectedUtility = selectedUtility;
         RefreshQuickSlotBar();
     }
 
@@ -336,6 +351,9 @@ public partial class CombatHUD
 
     public void SetDemolitionBuySmokeGrenadesForDiagnostics(int count)
         => _demolitionBuyView.SetSmokeGrenadesForDiagnostics(count);
+
+    public void SetDemolitionBuyIncendiaryGrenadesForDiagnostics(int count)
+        => _demolitionBuyView.SetIncendiaryGrenadesForDiagnostics(count);
 
     public void PressDemolitionBuyConfirmForDiagnostics()
         => _demolitionBuyView.PressConfirmForDiagnostics();

@@ -106,6 +106,7 @@ public partial class FreightTerminalWorld
         _demolitionNetworkActionReceivedForDiagnostics = false;
         _demolitionNetworkActionAppliedForDiagnostics = false;
         _demolitionNetworkActionDistanceForDiagnostics = -1.0f;
+        ResetDemolitionAuthoritativeWeaponLoadouts();
         InitializeRemoteDemolitionEconomies();
         ConfigureDemolitionGlassNetwork();
     }
@@ -172,6 +173,7 @@ public partial class FreightTerminalWorld
                 }
                 mate = SpawnSquadMate(state.Slot, state.Role, true, state.PeerId);
             }
+            ApplyRecordedRemoteDemolitionCarriedWeapon(state.PeerId, mate);
             var authoritativeHealth = _squadNetwork.IsHost ? mate.Health : state.Health;
             var authoritativeDead = _squadNetwork.IsHost
                 ? mate.IsDowned || mate.IsBodyBag
@@ -222,6 +224,7 @@ public partial class FreightTerminalWorld
             && IsInstanceValid(existing))
         {
             existing.ConfigureNetworkProxy(state.PeerId, state.Role, human: true);
+            ApplyRecordedRemoteDemolitionCarriedWeapon(state.PeerId, existing);
             return existing;
         }
         var actorId = DemolitionActorId(state.Team, state.Slot);
@@ -233,6 +236,7 @@ public partial class FreightTerminalWorld
         }
         opponent.ConfigureNetworkProxy(state.PeerId, state.Role, human: true);
         _remoteDemolitionOpponents[state.PeerId] = opponent;
+        ApplyRecordedRemoteDemolitionCarriedWeapon(state.PeerId, opponent);
         return opponent;
     }
 
@@ -248,7 +252,7 @@ public partial class FreightTerminalWorld
             spawns[spawnIndex],
             alerted: false,
             teamId: 0,
-            initialWeapon: _demolitionOpponentRoundWeapon,
+            initialWeapon: DemolitionOpponentRoundWeaponForSlot(spawnIndex),
             sentryMode: side == DemolitionTeam.Defenders,
             detectionRange: 52.0f);
         opponent.NetworkId = DemolitionActorId(team, spawnIndex);
@@ -278,13 +282,16 @@ public partial class FreightTerminalWorld
 
     private void OnDemolitionNetworkPeerLeft(long peerId)
     {
+        var departedPlayer = _demolitionNetworkPlayers.GetValueOrDefault(peerId);
         _demolitionNetworkPlayers.Remove(peerId);
         _demolitionBuyReadyPeers.Remove(peerId);
         _demolitionRemoteEconomies.Remove(peerId);
+        RemoveDemolitionRemotePurchasedWeapon(peerId);
         RemoveRemoteDemolitionOpponent(peerId);
         if (_demolitionMode)
         {
             EnsureAiSquadFill();
+            ApplyDemolitionDisconnectBotLoadout(departedPlayer);
         }
         if (_squadNetwork.IsHost && _demolitionBuyPhaseActive)
         {
@@ -384,6 +391,8 @@ public partial class FreightTerminalWorld
             _demolitionActiveSite,
             carrierActorId,
             position,
+            CaptureDemolitionTeamWeaponLoadout(DemolitionNetworkTeam.Alpha),
+            CaptureDemolitionTeamWeaponLoadout(DemolitionNetworkTeam.Bravo),
             CaptureDemolitionBazaarGlassMask());
     }
 
@@ -461,6 +470,10 @@ public partial class FreightTerminalWorld
             ? state.BravoFunds
             : state.AlphaFunds;
         _demolitionOpponentEconomy.ApplyNetworkFunds(opponentFunds);
+        var weaponLoadoutChanged = ApplyDemolitionAuthoritativeWeaponLoadouts(
+            state.CurrentRound,
+            state.AlphaWeaponLoadout,
+            state.BravoWeaponLoadout);
         _networkDevicePhase = (DemolitionDevicePhase)state.DevicePhase;
         _demolitionDevicePlanted = state.DevicePhase == (int)DemolitionDevicePhase.Planted;
         _demolitionActiveSite = state.ActiveSite;
@@ -475,6 +488,12 @@ public partial class FreightTerminalWorld
             state,
             previousRound != state.CurrentRound,
             previousPhase != state.Phase);
+        if (weaponLoadoutChanged)
+        {
+            // Actor snapshots can arrive before the match snapshot. Reconcile those
+            // already-created proxies with the host's explicit per-slot weapons.
+            RefreshDemolitionAuthoritativeWeaponLoadouts();
+        }
         ApplyDemolitionGlassSnapshot(
             state.BazaarGlassMask,
             previousRound != state.CurrentRound);
@@ -546,6 +565,10 @@ public partial class FreightTerminalWorld
                 UpdateDemolitionRoundHud();
                 break;
             case DemolitionNetworkPhase.Intermission:
+                if (phaseChanged)
+                {
+                    ClearDemolitionUtilityProjectiles();
+                }
                 _demolitionBuyPhaseActive = false;
                 _demolitionRoundActive = false;
                 _demolitionIntermissionRemaining = state.PhaseRemaining;
@@ -554,6 +577,10 @@ public partial class FreightTerminalWorld
                 UpdateDemolitionNetworkIntermissionHud();
                 break;
             case DemolitionNetworkPhase.Complete:
+                if (phaseChanged)
+                {
+                    ClearDemolitionUtilityProjectiles();
+                }
                 _demolitionBuyPhaseActive = false;
                 _demolitionRoundActive = false;
                 _demolitionIntermissionRemaining = 0.0f;

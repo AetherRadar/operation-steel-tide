@@ -41,7 +41,9 @@ public partial class FreightTerminalWorld
                 navigator,
                 destination,
                 budget,
-                SquadTraversalCapabilities.Walk | SquadTraversalCapabilities.Step,
+                SquadTraversalCapabilities.Walk
+                    | SquadTraversalCapabilities.Step
+                    | SquadTraversalCapabilities.Ladder,
                 out var planned,
                 out _)
             || planned.Length == 0)

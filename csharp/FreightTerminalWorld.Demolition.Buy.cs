@@ -14,7 +14,6 @@ public partial class FreightTerminalWorld
     private readonly Dictionary<long, DemolitionEconomy> _demolitionRemoteEconomies = new();
     private int _demolitionNetworkFundsRound;
     private WeaponBuild _demolitionOpponentRoundWeapon = WeaponCatalog.Build(WeaponPlatform.P226, 0);
-    private readonly List<SmokeGrenade> _activeSmokeGrenades = new();
 
     public bool IsDemolitionBuyPhaseActive => _demolitionBuyPhaseActive;
     public float DemolitionBuySecondsRemaining => _demolitionBuyRemaining;
@@ -67,6 +66,7 @@ public partial class FreightTerminalWorld
             {
                 ProcessLocalDemolitionPurchase(DemolitionPurchaseSelection.Empty);
             }
+            ApplyRemoteDemolitionBuyFallbacks();
             if (_demolitionBuyPhaseActive)
             {
                 BeginDemolitionLivePhase();
@@ -79,7 +79,8 @@ public partial class FreightTerminalWorld
         string primaryId,
         bool armorSelected,
         int grenadeCount,
-        int smokeGrenadeCount)
+        int smokeGrenadeCount,
+        int incendiaryGrenadeCount)
     {
         if (!_demolitionMode || !_demolitionBuyPhaseActive || _missionEnded
             || _demolitionLocalBuyReady || _demolitionPurchasePending)
@@ -92,7 +93,8 @@ public partial class FreightTerminalWorld
             primaryId,
             armorSelected,
             grenadeCount,
-            smokeGrenadeCount);
+            smokeGrenadeCount,
+            incendiaryGrenadeCount);
         if (IsDemolitionNetworkClient)
         {
             _demolitionPurchasePending = true;
@@ -108,6 +110,20 @@ public partial class FreightTerminalWorld
 
         ProcessLocalDemolitionPurchase(selection);
     }
+
+    private void OnDemolitionPurchaseRequested(
+        string sidearmId,
+        string primaryId,
+        bool armorSelected,
+        int grenadeCount,
+        int smokeGrenadeCount)
+        => OnDemolitionPurchaseRequested(
+            sidearmId,
+            primaryId,
+            armorSelected,
+            grenadeCount,
+            smokeGrenadeCount,
+            0);
 
     private void ProcessLocalDemolitionPurchase(DemolitionPurchaseSelection selection)
     {
@@ -130,7 +146,8 @@ public partial class FreightTerminalWorld
         _player.ApplyDemolitionRoundLoadout(
             loadout,
             quote.Selection.GrenadeCount,
-            quote.Selection.SmokeGrenadeCount);
+            quote.Selection.SmokeGrenadeCount,
+            quote.Selection.IncendiaryGrenadeCount);
         CompleteDemolitionBuyPhase(spent, quote.HasFirearm);
     }
 
@@ -186,6 +203,46 @@ public partial class FreightTerminalWorld
         BeginDemolitionLivePhase();
     }
 
+    private void ApplyRemoteDemolitionBuyFallbacks()
+    {
+        if (!_squadNetwork.IsHost
+            || !_squadNetwork.IsOnline
+            || !_squadNetwork.IsDemolitionSession)
+        {
+            return;
+        }
+        foreach (var member in _squadNetwork.DemolitionLobbyMembers())
+        {
+            if (member.Host || _demolitionBuyReadyPeers.Contains(member.PeerId))
+            {
+                continue;
+            }
+            var economy = RemoteDemolitionEconomy(member.PeerId);
+            var quote = DemolitionBuyCatalog.Quote(
+                DemolitionPurchaseSelection.Empty,
+                economy.Funds);
+            RecordDemolitionRemotePurchasedWeapon(member.PeerId, quote);
+            RecordDemolitionRemoteUtilityPurchase(
+                member.PeerId,
+                _demolitionMatch.CurrentRound,
+                quote);
+            _demolitionBuyReadyPeers.Add(member.PeerId);
+            _squadNetwork.SendDemolitionPurchaseResult(
+                member.PeerId,
+                new DemolitionPurchaseNetworkResult(
+                    _demolitionMatch.CurrentRound,
+                    true,
+                    quote.Selection,
+                    quote.TotalCost,
+                    economy.Funds));
+            _squadNetwork.SendDemolitionFundsState(
+                member.PeerId,
+                new DemolitionFundsNetworkState(
+                    _demolitionMatch.CurrentRound,
+                    economy.Funds));
+        }
+    }
+
     private void OnDemolitionNetworkPurchaseRequested(
         long peerId,
         int round,
@@ -213,6 +270,8 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        RecordDemolitionRemotePurchasedWeapon(peerId, quote);
+        RecordDemolitionRemoteUtilityPurchase(peerId, round, quote);
         _demolitionBuyReadyPeers.Add(peerId);
         TryBeginNetworkDemolitionLivePhase();
     }
@@ -248,7 +307,8 @@ public partial class FreightTerminalWorld
         _player.ApplyDemolitionRoundLoadout(
             loadout,
             quote.Selection.GrenadeCount,
-            quote.Selection.SmokeGrenadeCount);
+            quote.Selection.SmokeGrenadeCount,
+            quote.Selection.IncendiaryGrenadeCount);
         CompleteDemolitionBuyPhase(result.TotalCost, quote.HasFirearm);
     }
 
@@ -405,8 +465,11 @@ public partial class FreightTerminalWorld
     private void ResolveDemolitionOpponentBuy()
     {
         var funds = _demolitionOpponentEconomy.Funds;
-        var offer = funds >= 3600
-            ? DemolitionBuyCatalog.Primary(DemolitionBuyCatalog.ScarLId)
+        PlanDemolitionOpponentRoundWeapons(funds);
+        var offer = funds >= DemolitionBotLoadoutPlanner.SniperFundsThreshold
+            ? DemolitionBuyCatalog.Primary(DemolitionBuyCatalog.M24Id)
+            : funds >= 3600
+                ? DemolitionBuyCatalog.Primary(DemolitionBuyCatalog.ScarLId)
             : funds >= 3100
                 ? DemolitionBuyCatalog.Primary(DemolitionBuyCatalog.M4A1Id)
                 : funds >= 2900
@@ -429,46 +492,4 @@ public partial class FreightTerminalWorld
         _demolitionOpponentRoundWeapon = WeaponCatalog.Build(platform, 0);
     }
 
-    public void ThrowSmokeGrenade(Vector3 origin, Vector3 direction, Node source)
-        => ThrowSmokeGrenade(origin, direction, source, 14.0f, 5.0f);
-
-    public void ThrowSmokeGrenade(Vector3 origin, Vector3 direction, Node source, float speed, float loft)
-    {
-        var grenade = new SmokeGrenade
-        {
-            Position = origin,
-            OwnerBody = source
-        };
-        AddChild(grenade);
-        grenade.Arm(direction, speed, loft);
-    }
-
-    public bool IsLineObscuredBySmoke(Vector3 from, Vector3 to)
-    {
-        for (var index = _activeSmokeGrenades.Count - 1; index >= 0; index--)
-        {
-            var smoke = _activeSmokeGrenades[index];
-            if (!IsInstanceValid(smoke))
-            {
-                _activeSmokeGrenades.RemoveAt(index);
-                continue;
-            }
-            if (smoke.ObscuresSegment(from, to))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    internal void RegisterActiveSmokeGrenade(SmokeGrenade smoke)
-    {
-        if (!_activeSmokeGrenades.Contains(smoke))
-        {
-            _activeSmokeGrenades.Add(smoke);
-        }
-    }
-
-    internal void UnregisterActiveSmokeGrenade(SmokeGrenade smoke)
-        => _activeSmokeGrenades.Remove(smoke);
 }

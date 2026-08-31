@@ -42,7 +42,8 @@ public partial class TacticalPlayer
             case PlayerQuickSlot.FragmentationGrenade when Grenades > 0:
                 SelectThrowableSlot(slot, notify);
                 return true;
-            case PlayerQuickSlot.Utility when SmokeGrenades > 0:
+            case PlayerQuickSlot.Utility when SmokeGrenades > 0 || IncendiaryGrenades > 0:
+                SelectAvailableDemolitionUtility(cycle: _activeQuickSlot == PlayerQuickSlot.Utility);
                 SelectThrowableSlot(slot, notify);
                 return true;
             default:
@@ -73,8 +74,30 @@ public partial class TacticalPlayer
         }
         var message = slot == PlayerQuickSlot.FragmentationGrenade
             ? ("frag_grenade_ready", "FRAG GRENADE READY")
-            : ("utility_ready", "UTILITY ITEM READY");
+            : SelectedDemolitionUtility == DemolitionUtilityType.Smoke
+                ? ("smoke_grenade_ready", "SMOKE GRENADE READY  //  PRESS 6 TO SWITCH")
+                : ("incendiary_grenade_ready", "INCENDIARY READY  //  PRESS 6 TO SWITCH");
         Hud?.ShowLocalizedMessage(message.Item1, message.Item2, new Color(0.95f, 0.72f, 0.28f));
+    }
+
+    private void SelectAvailableDemolitionUtility(bool cycle)
+    {
+        if (cycle && SmokeGrenades > 0 && IncendiaryGrenades > 0)
+        {
+            SelectedDemolitionUtility = SelectedDemolitionUtility == DemolitionUtilityType.Smoke
+                ? DemolitionUtilityType.Incendiary
+                : DemolitionUtilityType.Smoke;
+        }
+        else if (SelectedDemolitionUtility == DemolitionUtilityType.Smoke && SmokeGrenades <= 0)
+        {
+            SelectedDemolitionUtility = DemolitionUtilityType.Incendiary;
+        }
+        else if (SelectedDemolitionUtility == DemolitionUtilityType.Incendiary
+            && IncendiaryGrenades <= 0)
+        {
+            SelectedDemolitionUtility = DemolitionUtilityType.Smoke;
+        }
+        RefreshDemolitionUtilityHud();
     }
 
     private void CancelReloadForQuickSlot()
@@ -121,7 +144,9 @@ public partial class TacticalPlayer
         return _activeQuickSlot switch
         {
             PlayerQuickSlot.FragmentationGrenade => ThrowGrenade(),
-            PlayerQuickSlot.Utility => ThrowSmokeGrenade(),
+            PlayerQuickSlot.Utility => SelectedDemolitionUtility == DemolitionUtilityType.Smoke
+                ? ThrowSmokeGrenade()
+                : ThrowIncendiaryGrenade(),
             _ => false
         };
     }

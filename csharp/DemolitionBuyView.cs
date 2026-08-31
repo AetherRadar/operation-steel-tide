@@ -14,7 +14,8 @@ public partial class DemolitionBuyView : ColorRect
         string primaryId,
         bool armorSelected,
         int grenadeCount,
-        int smokeGrenadeCount);
+        int smokeGrenadeCount,
+        int incendiaryGrenadeCount);
 
     private Label _title = null!;
     private Label _roundLabel = null!;
@@ -31,6 +32,7 @@ public partial class DemolitionBuyView : ColorRect
     private Label _projectedBalance = null!;
     private Label _grenadeCount = null!;
     private Label _smokeGrenadeCount = null!;
+    private Label _incendiaryGrenadeCount = null!;
     private Button _p226Button = null!;
     private Button _gsh18Button = null!;
     private Button _m1911Button = null!;
@@ -38,11 +40,14 @@ public partial class DemolitionBuyView : ColorRect
     private Button _ak74Button = null!;
     private Button _m4a1Button = null!;
     private Button _scarLButton = null!;
+    private Button _m24Button = null!;
     private CheckButton _armorButton = null!;
     private Button _grenadeDecrease = null!;
     private Button _grenadeIncrease = null!;
     private Button _smokeGrenadeDecrease = null!;
     private Button _smokeGrenadeIncrease = null!;
+    private Button _incendiaryGrenadeDecrease = null!;
+    private Button _incendiaryGrenadeIncrease = null!;
     private Button _clearButton = null!;
     private Button _confirmButton = null!;
     private DemolitionBuySnapshot _snapshot;
@@ -68,6 +73,7 @@ public partial class DemolitionBuyView : ColorRect
         DemolitionBuyCatalog.Ak74Id => !_ak74Button.Disabled,
         DemolitionBuyCatalog.M4A1Id => !_m4a1Button.Disabled,
         DemolitionBuyCatalog.ScarLId => !_scarLButton.Disabled,
+        DemolitionBuyCatalog.M24Id => !_m24Button.Disabled,
         _ => false
     };
     public bool UiReady
@@ -76,8 +82,10 @@ public partial class DemolitionBuyView : ColorRect
         && IsInstanceValid(_p226Button)
         && IsInstanceValid(_gsh18Button)
         && IsInstanceValid(_scarLButton)
+        && IsInstanceValid(_m24Button)
         && IsInstanceValid(_armorButton)
         && IsInstanceValid(_smokeGrenadeCount)
+        && IsInstanceValid(_incendiaryGrenadeCount)
         && IsInstanceValid(_confirmButton);
     public bool IntentSignalsConnected
         => HasConnections(SignalName.PurchaseRequested)
@@ -88,11 +96,14 @@ public partial class DemolitionBuyView : ColorRect
         && _ak74Button.HasConnections(BaseButton.SignalName.Pressed)
         && _m4a1Button.HasConnections(BaseButton.SignalName.Pressed)
         && _scarLButton.HasConnections(BaseButton.SignalName.Pressed)
+        && _m24Button.HasConnections(BaseButton.SignalName.Pressed)
         && _armorButton.HasConnections(BaseButton.SignalName.Toggled)
         && _grenadeDecrease.HasConnections(BaseButton.SignalName.Pressed)
         && _grenadeIncrease.HasConnections(BaseButton.SignalName.Pressed)
         && _smokeGrenadeDecrease.HasConnections(BaseButton.SignalName.Pressed)
         && _smokeGrenadeIncrease.HasConnections(BaseButton.SignalName.Pressed)
+        && _incendiaryGrenadeDecrease.HasConnections(BaseButton.SignalName.Pressed)
+        && _incendiaryGrenadeIncrease.HasConnections(BaseButton.SignalName.Pressed)
         && _clearButton.HasConnections(BaseButton.SignalName.Pressed)
         && _confirmButton.HasConnections(BaseButton.SignalName.Pressed);
 
@@ -140,6 +151,7 @@ public partial class DemolitionBuyView : ColorRect
         SetOfferText(_ak74Button, DemolitionBuyCatalog.Primaries[1]);
         SetOfferText(_m4a1Button, DemolitionBuyCatalog.Primaries[2]);
         SetOfferText(_scarLButton, DemolitionBuyCatalog.Primaries[3]);
+        SetOfferText(_m24Button, DemolitionBuyCatalog.Primaries[4]);
         Refresh();
     }
 
@@ -176,6 +188,12 @@ public partial class DemolitionBuyView : ColorRect
         Refresh();
     }
 
+    public void SetIncendiaryGrenadesForDiagnostics(int count)
+    {
+        _selection = _selection with { IncendiaryGrenadeCount = count };
+        Refresh();
+    }
+
     public void PressConfirmForDiagnostics() => EmitPurchaseIntent();
 
     public void SubmitTimeoutSelection()
@@ -209,6 +227,7 @@ public partial class DemolitionBuyView : ColorRect
         _ak74Button = offers.GetNode<Button>("AK74Button");
         _m4a1Button = offers.GetNode<Button>("M4A1Button");
         _scarLButton = offers.GetNode<Button>("ScarLButton");
+        _m24Button = offers.GetNode<Button>("M24Button");
         _armorButton = offers.GetNode<CheckButton>("ArmorButton");
         _grenadeDecrease = offers.GetNode<Button>("GrenadeDecrease");
         _grenadeIncrease = offers.GetNode<Button>("GrenadeIncrease");
@@ -216,6 +235,9 @@ public partial class DemolitionBuyView : ColorRect
         _smokeGrenadeDecrease = offers.GetNode<Button>("SmokeGrenadeDecrease");
         _smokeGrenadeIncrease = offers.GetNode<Button>("SmokeGrenadeIncrease");
         _smokeGrenadeCount = offers.GetNode<Label>("SmokeGrenadeCount");
+        _incendiaryGrenadeDecrease = offers.GetNode<Button>("IncendiaryGrenadeDecrease");
+        _incendiaryGrenadeIncrease = offers.GetNode<Button>("IncendiaryGrenadeIncrease");
+        _incendiaryGrenadeCount = offers.GetNode<Label>("IncendiaryGrenadeCount");
         var summaryPanel = panel.GetNode<Control>("SummaryPanel");
         _summaryTitle = summaryPanel.GetNode<Label>("SummaryTitle");
         _summary = summaryPanel.GetNode<Label>("Summary");
@@ -233,6 +255,7 @@ public partial class DemolitionBuyView : ColorRect
         _ak74Button.Pressed += () => SelectPrimary(DemolitionBuyCatalog.Ak74Id);
         _m4a1Button.Pressed += () => SelectPrimary(DemolitionBuyCatalog.M4A1Id);
         _scarLButton.Pressed += () => SelectPrimary(DemolitionBuyCatalog.ScarLId);
+        _m24Button.Pressed += () => SelectPrimary(DemolitionBuyCatalog.M24Id);
         _armorButton.Toggled += selected =>
         {
             _selection = _selection with { ArmorSelected = selected };
@@ -256,6 +279,22 @@ public partial class DemolitionBuyView : ColorRect
         _smokeGrenadeIncrease.Pressed += () =>
         {
             _selection = _selection with { SmokeGrenadeCount = _selection.SmokeGrenadeCount + 1 };
+            Refresh();
+        };
+        _incendiaryGrenadeDecrease.Pressed += () =>
+        {
+            _selection = _selection with
+            {
+                IncendiaryGrenadeCount = _selection.IncendiaryGrenadeCount - 1
+            };
+            Refresh();
+        };
+        _incendiaryGrenadeIncrease.Pressed += () =>
+        {
+            _selection = _selection with
+            {
+                IncendiaryGrenadeCount = _selection.IncendiaryGrenadeCount + 1
+            };
             Refresh();
         };
         _clearButton.Pressed += () =>
@@ -298,7 +337,8 @@ public partial class DemolitionBuyView : ColorRect
             _quote.Selection.PrimaryId,
             _quote.Selection.ArmorSelected,
             _quote.Selection.GrenadeCount,
-            _quote.Selection.SmokeGrenadeCount);
+            _quote.Selection.SmokeGrenadeCount,
+            _quote.Selection.IncendiaryGrenadeCount);
     }
 
     private void Refresh()
@@ -330,6 +370,7 @@ public partial class DemolitionBuyView : ColorRect
         _armorButton.SetPressedNoSignal(_selection.ArmorSelected);
         _grenadeCount.Text = $"{Text("grenade", "FRAG")}  x{_selection.GrenadeCount}  //  ${DemolitionBuyCatalog.GrenadePrice}";
         _smokeGrenadeCount.Text = $"{Text("smoke_grenade", "SMOKE")}  x{_selection.SmokeGrenadeCount}  //  ${DemolitionBuyCatalog.SmokeGrenadePrice}";
+        _incendiaryGrenadeCount.Text = $"{Text("incendiary_grenade", "INCENDIARY")}  x{_selection.IncendiaryGrenadeCount}  //  ${DemolitionBuyCatalog.IncendiaryGrenadePrice}";
         SetSelected(_p226Button, _selection.SidearmId == DemolitionBuyCatalog.P226Id);
         SetSelected(_gsh18Button, _selection.SidearmId == DemolitionBuyCatalog.Gsh18Id);
         SetSelected(_m1911Button, _selection.SidearmId == DemolitionBuyCatalog.M1911Id);
@@ -337,6 +378,7 @@ public partial class DemolitionBuyView : ColorRect
         SetSelected(_ak74Button, _selection.PrimaryId == DemolitionBuyCatalog.Ak74Id);
         SetSelected(_m4a1Button, _selection.PrimaryId == DemolitionBuyCatalog.M4A1Id);
         SetSelected(_scarLButton, _selection.PrimaryId == DemolitionBuyCatalog.ScarLId);
+        SetSelected(_m24Button, _selection.PrimaryId == DemolitionBuyCatalog.M24Id);
         _p226Button.Disabled = DemolitionBuyCatalog.Sidearms[0].Price > _snapshot.Funds;
         _gsh18Button.Disabled = DemolitionBuyCatalog.Sidearms[1].Price > _snapshot.Funds;
         _m1911Button.Disabled = DemolitionBuyCatalog.Sidearms[2].Price > _snapshot.Funds;
@@ -344,10 +386,13 @@ public partial class DemolitionBuyView : ColorRect
         _ak74Button.Disabled = DemolitionBuyCatalog.Primaries[1].Price > _snapshot.Funds;
         _m4a1Button.Disabled = DemolitionBuyCatalog.Primaries[2].Price > _snapshot.Funds;
         _scarLButton.Disabled = DemolitionBuyCatalog.Primaries[3].Price > _snapshot.Funds;
+        _m24Button.Disabled = DemolitionBuyCatalog.Primaries[4].Price > _snapshot.Funds;
         _grenadeDecrease.Disabled = _selection.GrenadeCount <= 0;
         _grenadeIncrease.Disabled = _selection.GrenadeCount >= DemolitionBuyCatalog.MaximumGrenades;
         _smokeGrenadeDecrease.Disabled = _selection.SmokeGrenadeCount <= 0;
         _smokeGrenadeIncrease.Disabled = _selection.SmokeGrenadeCount >= DemolitionBuyCatalog.MaximumSmokeGrenades;
+        _incendiaryGrenadeDecrease.Disabled = _selection.IncendiaryGrenadeCount <= 0;
+        _incendiaryGrenadeIncrease.Disabled = _selection.IncendiaryGrenadeCount >= DemolitionBuyCatalog.MaximumIncendiaryGrenades;
         _summary.Text = BuildSummary();
         _projectedBalance.Text = _quote.Affordable
             ? GameLocalization.Format(
@@ -385,6 +430,10 @@ public partial class DemolitionBuyView : ColorRect
         if (_selection.SmokeGrenadeCount > 0)
         {
             utilities.Add($"{Text("smoke_grenade", "SMOKE")}  x{_selection.SmokeGrenadeCount}");
+        }
+        if (_selection.IncendiaryGrenadeCount > 0)
+        {
+            utilities.Add($"{Text("incendiary_grenade", "INCENDIARY")}  x{_selection.IncendiaryGrenadeCount}");
         }
         var utility = utilities.Count > 0
             ? string.Join("\n", utilities)

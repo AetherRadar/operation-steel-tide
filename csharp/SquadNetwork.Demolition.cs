@@ -480,6 +480,8 @@ public partial class SquadNetwork
                 state.ActiveSite,
                 state.CarrierActorId,
                 state.DevicePosition,
+                state.AlphaWeaponLoadout,
+                state.BravoWeaponLoadout,
                 state.BazaarGlassMask);
         }
     }
@@ -499,11 +501,15 @@ public partial class SquadNetwork
         int activeSite,
         int carrierActorId,
         Vector3 devicePosition,
+        int alphaWeaponLoadout,
+        int bravoWeaponLoadout,
         uint bazaarGlassMask)
     {
         if (!Enum.IsDefined(typeof(DemolitionNetworkPhase), phase)
             || !Enum.IsDefined(typeof(DemolitionDevicePhase), devicePhase)
             || currentRound < 1 || alphaScore < 0 || bravoScore < 0
+            || !DemolitionBotLoadoutNetworkCodec.IsValid(alphaWeaponLoadout)
+            || !DemolitionBotLoadoutNetworkCodec.IsValid(bravoWeaponLoadout)
             || !float.IsFinite(phaseRemaining) || !IsFinite(devicePosition))
         {
             return;
@@ -522,6 +528,8 @@ public partial class SquadNetwork
             activeSite,
             carrierActorId,
             devicePosition,
+            alphaWeaponLoadout,
+            bravoWeaponLoadout,
             bazaarGlassMask));
     }
 
@@ -569,7 +577,8 @@ public partial class SquadNetwork
             selection.PrimaryId,
             selection.ArmorSelected,
             selection.GrenadeCount,
-            selection.SmokeGrenadeCount);
+            selection.SmokeGrenadeCount,
+            selection.IncendiaryGrenadeCount);
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -579,7 +588,8 @@ public partial class SquadNetwork
         string primaryId,
         bool armorSelected,
         int grenadeCount,
-        int smokeGrenadeCount)
+        int smokeGrenadeCount,
+        int incendiaryGrenadeCount)
     {
         var sender = Multiplayer.GetRemoteSenderId();
         if (!IsHost || !DemolitionMatchStarted || round < 1
@@ -595,7 +605,8 @@ public partial class SquadNetwork
                 primaryId,
                 armorSelected,
                 grenadeCount,
-                smokeGrenadeCount));
+                smokeGrenadeCount,
+                incendiaryGrenadeCount));
     }
 
     public void SendDemolitionPurchaseResult(
@@ -614,6 +625,7 @@ public partial class SquadNetwork
             result.Selection.ArmorSelected,
             result.Selection.GrenadeCount,
             result.Selection.SmokeGrenadeCount,
+            result.Selection.IncendiaryGrenadeCount,
             result.TotalCost,
             result.RemainingFunds);
     }
@@ -627,6 +639,7 @@ public partial class SquadNetwork
         bool armorSelected,
         int grenadeCount,
         int smokeGrenadeCount,
+        int incendiaryGrenadeCount,
         int totalCost,
         int remainingFunds)
     {
@@ -638,7 +651,8 @@ public partial class SquadNetwork
                 primaryId,
                 armorSelected,
                 grenadeCount,
-                smokeGrenadeCount),
+                smokeGrenadeCount,
+                incendiaryGrenadeCount),
             Mathf.Max(0, totalCost),
             Mathf.Clamp(remainingFunds, 0, DemolitionEconomy.MaximumFunds)));
     }

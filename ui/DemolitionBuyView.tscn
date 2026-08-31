@@ -285,7 +285,7 @@ text = "AK-47\n$2900"
 [node name="M4A1Button" type="Button" parent="Panel/Offers"]
 layout_mode = 0
 offset_top = 204.0
-offset_right = 314.0
+offset_right = 204.0
 offset_bottom = 264.0
 focus_mode = 0
 toggle_mode = true
@@ -301,7 +301,25 @@ text = "M4A1\n$3100"
 
 [node name="ScarLButton" type="Button" parent="Panel/Offers"]
 layout_mode = 0
-offset_left = 330.0
+offset_left = 220.0
+offset_top = 204.0
+offset_right = 424.0
+offset_bottom = 264.0
+focus_mode = 0
+toggle_mode = true
+theme_override_colors/font_color = Color(0.86, 0.93, 0.9, 1)
+theme_override_colors/font_disabled_color = Color(0.34, 0.4, 0.38, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/pressed = SubResource("Style_offer_pressed")
+theme_override_styles/hover_pressed = SubResource("Style_offer_pressed")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "SCAR-L\n$3600"
+
+[node name="M24Button" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_left = 440.0
 offset_top = 204.0
 offset_right = 644.0
 offset_bottom = 264.0
@@ -315,7 +333,7 @@ theme_override_styles/hover = SubResource("Style_offer_hover")
 theme_override_styles/pressed = SubResource("Style_offer_pressed")
 theme_override_styles/hover_pressed = SubResource("Style_offer_pressed")
 theme_override_styles/disabled = SubResource("Style_offer_disabled")
-text = "SCAR-L\n$3600"
+text = "M24 PRECISION RIFLE\n$4300"
 
 [node name="ProtectionTitle" type="Label" parent="Panel/Offers"]
 layout_mode = 0
@@ -348,9 +366,9 @@ text = "UTILITY"
 
 [node name="GrenadeDecrease" type="Button" parent="Panel/Offers"]
 layout_mode = 0
-offset_top = 374.0
+offset_top = 370.0
 offset_right = 48.0
-offset_bottom = 408.0
+offset_bottom = 398.0
 focus_mode = 0
 tooltip_text = "Remove grenade"
 theme_override_font_sizes/font_size = 18
@@ -362,9 +380,9 @@ text = "-"
 [node name="GrenadeCount" type="Label" parent="Panel/Offers"]
 layout_mode = 0
 offset_left = 62.0
-offset_top = 376.0
+offset_top = 370.0
 offset_right = 250.0
-offset_bottom = 406.0
+offset_bottom = 398.0
 theme_override_colors/font_color = Color(0.84, 0.91, 0.88, 1)
 theme_override_font_sizes/font_size = 13
 text = "FRAG  x0  //  $450"
@@ -373,9 +391,9 @@ vertical_alignment = 1
 [node name="GrenadeIncrease" type="Button" parent="Panel/Offers"]
 layout_mode = 0
 offset_left = 266.0
-offset_top = 374.0
+offset_top = 370.0
 offset_right = 314.0
-offset_bottom = 408.0
+offset_bottom = 398.0
 focus_mode = 0
 tooltip_text = "Add grenade"
 theme_override_font_sizes/font_size = 18
@@ -386,9 +404,9 @@ text = "+"
 
 [node name="SmokeGrenadeDecrease" type="Button" parent="Panel/Offers"]
 layout_mode = 0
-offset_top = 414.0
+offset_top = 402.0
 offset_right = 48.0
-offset_bottom = 448.0
+offset_bottom = 430.0
 focus_mode = 0
 tooltip_text = "Remove smoke grenade"
 theme_override_font_sizes/font_size = 18
@@ -400,9 +418,9 @@ text = "-"
 [node name="SmokeGrenadeCount" type="Label" parent="Panel/Offers"]
 layout_mode = 0
 offset_left = 62.0
-offset_top = 416.0
+offset_top = 402.0
 offset_right = 250.0
-offset_bottom = 446.0
+offset_bottom = 430.0
 theme_override_colors/font_color = Color(0.84, 0.91, 0.88, 1)
 theme_override_font_sizes/font_size = 13
 text = "SMOKE  x0  //  $300"
@@ -411,11 +429,49 @@ vertical_alignment = 1
 [node name="SmokeGrenadeIncrease" type="Button" parent="Panel/Offers"]
 layout_mode = 0
 offset_left = 266.0
-offset_top = 414.0
+offset_top = 402.0
 offset_right = 314.0
-offset_bottom = 448.0
+offset_bottom = 430.0
 focus_mode = 0
 tooltip_text = "Add smoke grenade"
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "+"
+
+[node name="IncendiaryGrenadeDecrease" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_top = 434.0
+offset_right = 48.0
+offset_bottom = 462.0
+focus_mode = 0
+tooltip_text = "Remove incendiary grenade"
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("Style_offer")
+theme_override_styles/hover = SubResource("Style_offer_hover")
+theme_override_styles/disabled = SubResource("Style_offer_disabled")
+text = "-"
+
+[node name="IncendiaryGrenadeCount" type="Label" parent="Panel/Offers"]
+layout_mode = 0
+offset_left = 62.0
+offset_top = 434.0
+offset_right = 250.0
+offset_bottom = 462.0
+theme_override_colors/font_color = Color(0.94, 0.72, 0.42, 1)
+theme_override_font_sizes/font_size = 13
+text = "INCENDIARY  x0  //  $500"
+vertical_alignment = 1
+
+[node name="IncendiaryGrenadeIncrease" type="Button" parent="Panel/Offers"]
+layout_mode = 0
+offset_left = 266.0
+offset_top = 434.0
+offset_right = 314.0
+offset_bottom = 462.0
+focus_mode = 0
+tooltip_text = "Add incendiary grenade"
 theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("Style_offer")
 theme_override_styles/hover = SubResource("Style_offer_hover")

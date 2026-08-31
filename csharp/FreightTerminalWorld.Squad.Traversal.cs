@@ -31,7 +31,8 @@ public partial class FreightTerminalWorld
         SquadTraversalKind kind,
         bool bidirectional,
         IReadOnlyList<Vector3> forwardPoints,
-        float costMultiplier = 1.0f)
+        float costMultiplier = 1.0f,
+        Vector3 actionOutward = default)
     {
         if (forwardPoints.Count < 2)
         {
@@ -49,9 +50,19 @@ public partial class FreightTerminalWorld
             }
         }
         var id = _squadTraversalLinks.Count;
-        var forwardDirectives = BuildSquadLinkDirectives(id, kind, points, forward: true);
+        var forwardDirectives = BuildSquadLinkDirectives(
+            id,
+            kind,
+            points,
+            forward: true,
+            actionOutward: actionOutward);
         var reverseDirectives = bidirectional
-            ? BuildSquadLinkDirectives(id, kind, points, forward: false)
+            ? BuildSquadLinkDirectives(
+                id,
+                kind,
+                points,
+                forward: false,
+                actionOutward: actionOutward)
             : Array.Empty<SquadNavigationDirective>();
         _squadTraversalLinks.Add(new SquadTraversalLink(
             id,
@@ -145,10 +156,28 @@ public partial class FreightTerminalWorld
         var nodes = new List<SquadPortalNode>();
         var nodeLookup = new Dictionary<(int X, int Z, int Bucket), int>();
         var graphEdges = new List<SquadNavigationGraphEdge>();
+        var ordinaryPortalNodes = new HashSet<int>();
+        var ladderPortalNodes = new HashSet<int>();
+        var ladderPortals = new List<SquadLadderPortal>();
         foreach (var link in _squadTraversalLinks)
         {
             var from = GetOrAddSquadPortalNode(link.ForwardPoints[0], nodes, nodeLookup);
             var to = GetOrAddSquadPortalNode(link.ForwardPoints[^1], nodes, nodeLookup);
+            if (link.Kind == SquadTraversalKind.Ladder)
+            {
+                ladderPortalNodes.Add(from);
+                ladderPortalNodes.Add(to);
+                ladderPortals.Add(new SquadLadderPortal(
+                    from,
+                    to,
+                    link.Bidirectional,
+                    link.ForwardDirectives[^1].ActionOutward));
+            }
+            else
+            {
+                ordinaryPortalNodes.Add(from);
+                ordinaryPortalNodes.Add(to);
+            }
             if (!SupportsSquadTraversal(capabilities, link.Kind))
             {
                 continue;
@@ -251,16 +280,65 @@ public partial class FreightTerminalWorld
         }
 
         var portalComponents = BuildSquadPortalComponentMap(portalNodeCount, graphEdges);
+        var terminalLadderComponents = BuildSquadTerminalLadderComponents(
+            portalComponents,
+            ordinaryPortalNodes,
+            ladderPortalNodes);
+        var startHasOrdinaryAttachment = authoredStartPortal >= 0
+            && !terminalLadderComponents.Contains(portalComponents[authoredStartPortal]);
+        var goalHasOrdinaryAttachment = authoredGoalPortal >= 0
+            && !terminalLadderComponents.Contains(portalComponents[authoredGoalPortal]);
+        var enabledLadderComponents = !SupportsSquadTraversal(
+                capabilities,
+                SquadTraversalKind.Ladder)
+            || startHasOrdinaryAttachment && goalHasOrdinaryAttachment
+                ? new HashSet<int>()
+                : SelectSquadLadderTerminalComponents(
+                    navigator.GlobalPosition,
+                    destination,
+                    nodes,
+                    portalComponents,
+                    terminalLadderComponents,
+                    ladderPortals);
+        AddSquadLadderTerminalEndpointConnectors(
+            navigator.GlobalPosition,
+            destination,
+            startNode,
+            goalNode,
+            nodes,
+            portalComponents,
+            terminalLadderComponents,
+            enabledLadderComponents,
+            ladderPortals,
+            graphEdges);
+        if (enabledLadderComponents.Count > 0)
+        {
+            var terminalRoute = SquadNavigationGraph.FindShortestPath(
+                nodes.Count,
+                startNode,
+                goalNode,
+                graphEdges,
+                out cost);
+            if (terminalRoute is { Length: > 0 })
+            {
+                directives = terminalRoute;
+                return true;
+            }
+        }
         var startComponents = FindSquadPortalEndpointComponents(
             navigator.GlobalPosition,
             portalNodeCount,
             nodes,
-            portalComponents);
+            portalComponents,
+            terminalLadderComponents,
+            enabledLadderComponents);
         var goalComponents = FindSquadPortalEndpointComponents(
             destination,
             portalNodeCount,
             nodes,
-            portalComponents);
+            portalComponents,
+            terminalLadderComponents,
+            enabledLadderComponents);
         var componentsReachableFromStart = BuildSquadPortalComponentReachability(
             portalNodeCount,
             graphEdges,
@@ -291,7 +369,9 @@ public partial class FreightTerminalWorld
                 graphEdges,
                 budget,
                 exclude,
-                componentsThatReachGoal);
+                componentsThatReachGoal,
+                terminalLadderComponents,
+                enabledLadderComponents);
             if (budget.IsExhausted)
             {
                 return false;
@@ -307,7 +387,9 @@ public partial class FreightTerminalWorld
                 graphEdges,
                 budget,
                 exclude,
-                componentsReachableFromStart);
+                componentsReachableFromStart,
+                terminalLadderComponents,
+                enabledLadderComponents);
             if (budget.IsExhausted)
             {
                 return false;
@@ -364,7 +446,9 @@ public partial class FreightTerminalWorld
         List<SquadNavigationGraphEdge> graphEdges,
         SquadNavSearchBudget budget,
         Godot.Collections.Array<Rid> exclude,
-        ISet<int>? eligibleComponents)
+        ISet<int>? eligibleComponents,
+        IReadOnlySet<int> terminalLadderComponents,
+        IReadOnlySet<int> enabledLadderComponents)
     {
         var bucket = SquadTraversalBucket(endpoint);
         var ranked = new PriorityQueue<
@@ -396,6 +480,8 @@ public partial class FreightTerminalWorld
             }
             var component = portalComponents[candidate.Node];
             if (attemptedComponents.Contains(component)
+                || terminalLadderComponents.Contains(component)
+                    && !enabledLadderComponents.Contains(component)
                 || eligibleComponents is not null && !eligibleComponents.Contains(component))
             {
                 continue;
@@ -462,15 +548,20 @@ public partial class FreightTerminalWorld
         Vector3 endpoint,
         int portalNodeCount,
         IReadOnlyList<SquadPortalNode> nodes,
-        IReadOnlyList<int> portalComponents)
+        IReadOnlyList<int> portalComponents,
+        IReadOnlySet<int> terminalLadderComponents,
+        IReadOnlySet<int> enabledLadderComponents)
     {
         var components = new HashSet<int>();
         var bucket = SquadTraversalBucket(endpoint);
         for (var node = 0; node < portalNodeCount; node++)
         {
-            if (nodes[node].Bucket == bucket)
+            var component = portalComponents[node];
+            if (nodes[node].Bucket == bucket
+                && (!terminalLadderComponents.Contains(component)
+                    || enabledLadderComponents.Contains(component)))
             {
-                components.Add(portalComponents[node]);
+                components.Add(component);
             }
         }
         return components;
@@ -553,7 +644,8 @@ public partial class FreightTerminalWorld
         int linkId,
         SquadTraversalKind linkKind,
         IReadOnlyList<Vector3> points,
-        bool forward)
+        bool forward,
+        Vector3 actionOutward)
     {
         var count = points.Count;
         var directedEdgeId = linkId * 2 + (forward ? 0 : 1);
@@ -561,14 +653,20 @@ public partial class FreightTerminalWorld
         for (var index = 0; index < count; index++)
         {
             var pointIndex = forward ? index : count - index - 1;
-            var kind = index == 0 && linkKind is SquadTraversalKind.Vault or SquadTraversalKind.Drop
+            var requiresWalkApproach = index == 0
+                && linkKind is (SquadTraversalKind.Vault
+                    or SquadTraversalKind.Drop
+                    or SquadTraversalKind.Ladder);
+            var kind = requiresWalkApproach
                 ? SquadTraversalKind.Walk
                 : linkKind;
             directives[index] = new SquadNavigationDirective(
                 points[pointIndex],
                 kind,
                 directedEdgeId,
-                true);
+                true,
+                ActionOrigin: points[forward ? 0 : count - 1],
+                ActionOutward: actionOutward);
         }
         return directives;
     }

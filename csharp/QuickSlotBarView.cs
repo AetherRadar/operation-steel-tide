@@ -28,7 +28,9 @@ public partial class QuickSlotBarView : Control
     private WeaponBuild? _sidearm;
     private string _knifeSkinId = KnifeSkinCatalog.DefaultId;
     private int _fragGrenades;
-    private int _utilityItems;
+    private int _smokeItems;
+    private int _incendiaryItems;
+    private DemolitionUtilityType _selectedUtility = DemolitionUtilityType.Smoke;
     private int _activeSlot;
     private bool _hasPrimary;
     private bool _configured;
@@ -112,7 +114,9 @@ public partial class QuickSlotBarView : Control
         WeaponBuild? sidearm,
         string knifeSkinId,
         int fragGrenades,
-        int utilityItems,
+        int smokeItems,
+        int incendiaryItems,
+        DemolitionUtilityType selectedUtility,
         int activeSlot)
     {
         _language = GameLocalization.IsChinese(language) ? "zh" : "en";
@@ -122,7 +126,9 @@ public partial class QuickSlotBarView : Control
         _sidearm = sidearm;
         _knifeSkinId = knifeSkinId;
         _fragGrenades = Math.Max(0, fragGrenades);
-        _utilityItems = Math.Max(0, utilityItems);
+        _smokeItems = Math.Max(0, smokeItems);
+        _incendiaryItems = Math.Max(0, incendiaryItems);
+        _selectedUtility = selectedUtility;
         _activeSlot = Math.Clamp(activeSlot, 0, _buttons.Length - 1);
         _configured = true;
         if (IsNodeReady())
@@ -172,10 +178,14 @@ public partial class QuickSlotBarView : Control
         _buttons[2].Visible = _sidearm is not null;
         _buttons[3].Visible = true;
         _buttons[4].Visible = _fragGrenades > 0;
-        _buttons[5].Visible = _utilityItems > 0;
+        _buttons[5].Visible = _smokeItems > 0 || _incendiaryItems > 0;
 
         _fragLabel.Text = $"{Text("grenade", "FRAG")}  x{_fragGrenades}";
-        _utilityLabel.Text = $"{Text("smoke_grenade", "SMOKE")}  x{_utilityItems}";
+        var smokeLabel = $"{Text("smoke_grenade", "SMOKE")} x{_smokeItems}";
+        var incendiaryLabel = $"{Text("incendiary_grenade", "FIRE")} x{_incendiaryItems}";
+        _utilityLabel.Text = _selectedUtility == DemolitionUtilityType.Smoke
+            ? $"[{smokeLabel}]  /  {incendiaryLabel}"
+            : $"{smokeLabel}  /  [{incendiaryLabel}]";
         _buttons[0].TooltipText = Text("select_primary", "SELECT PRIMARY WEAPON");
         _buttons[1].TooltipText = Text("select_secondary", "SELECT SECONDARY WEAPON");
         _buttons[2].TooltipText = Text("select_sidearm", "SELECT SIDEARM");

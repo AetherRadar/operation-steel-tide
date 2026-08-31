@@ -74,6 +74,14 @@ public sealed class DemolitionStrategyPlanner
     private const float AttackerUrgentThresholdSeconds = 35.0f;
     private const float AttackerPlantAndSettleSeconds = 5.4f;
     private const float AttackerEstimatedMoveSpeed = 5.1f;
+    internal const float PlantDurationSeconds = 3.4f;
+    internal const float PlantMoveSpeed = 5.1f;
+    internal const float PlantStoppingDistance = 2.15f;
+    internal const float PlantCommitBufferSeconds = 1.5f;
+    internal const float DefuseDurationSeconds = 7.0f;
+    internal const float DefuseMoveSpeed = 5.3f;
+    internal const float DefuseStoppingDistance = 2.15f;
+    internal const float DefuseCommitBufferSeconds = 1.25f;
 
     public DemolitionStrategyPlan Plan(
         DemolitionTeam team,
@@ -117,9 +125,53 @@ public sealed class DemolitionStrategyPlanner
                     lockCommittedSite);
         }
         return phase == DemolitionStrategyPhase.PostPlant && plantedSiteIndex >= 0
-            ? PlanDefenderRetake(available, plantedSiteIndex, siteCenters)
+            ? PlanDefenderRetake(available, plantedSiteIndex, siteCenters, remainingSeconds)
             : PlanDefenderOpening(available, knownOpponents, siteCenters);
     }
+
+    /// <summary>
+    /// Estimates the last safe start for a defuse without pathfinding. Runtime callers
+    /// pass the already known actor/site distance, keeping the per-frame decision O(1).
+    /// </summary>
+    internal static float EstimateDefuseCompletionSeconds(
+        float distanceToDevice,
+        float channelProgress)
+    {
+        var travelDistance = Math.Max(0.0f, distanceToDevice - DefuseStoppingDistance);
+        var travelSeconds = travelDistance / DefuseMoveSpeed;
+        var channelSeconds = (1.0f - Math.Clamp(channelProgress, 0.0f, 1.0f))
+            * DefuseDurationSeconds;
+        return travelSeconds + channelSeconds;
+    }
+
+    internal static bool RequiresUrgentDefuseCommit(
+        float secondsRemaining,
+        float distanceToDevice,
+        float channelProgress)
+        => secondsRemaining <= EstimateDefuseCompletionSeconds(
+                distanceToDevice,
+                channelProgress)
+            + DefuseCommitBufferSeconds;
+
+    internal static float EstimatePlantCompletionSeconds(
+        float distanceToSite,
+        float channelProgress)
+    {
+        var travelDistance = Math.Max(0.0f, distanceToSite - PlantStoppingDistance);
+        var travelSeconds = travelDistance / PlantMoveSpeed;
+        var channelSeconds = (1.0f - Math.Clamp(channelProgress, 0.0f, 1.0f))
+            * PlantDurationSeconds;
+        return travelSeconds + channelSeconds;
+    }
+
+    internal static bool RequiresUrgentPlantCommit(
+        float secondsRemaining,
+        float distanceToSite,
+        float channelProgress)
+        => secondsRemaining <= EstimatePlantCompletionSeconds(
+                distanceToSite,
+                channelProgress)
+            + PlantCommitBufferSeconds;
 
     /// <summary>
     /// Chooses an execute around the device runner rather than the team centroid. Actual
@@ -523,13 +575,20 @@ public sealed class DemolitionStrategyPlanner
     private static DemolitionStrategyPlan PlanDefenderRetake(
         List<DemolitionAgentSnapshot> members,
         int plantedSiteIndex,
-        IReadOnlyList<Vector2> siteCenters)
+        IReadOnlyList<Vector2> siteCenters,
+        float remainingSeconds)
     {
         var site = siteCenters[Math.Clamp(plantedSiteIndex, 0, siteCenters.Count - 1)];
         var siteX = site.X;
         var siteZ = site.Y;
+        var nearestDistance = members.Min(member => Math.Sqrt(DistanceSquared(member, siteX, siteZ)));
+        var urgent = RequiresUrgentDefuseCommit(
+            remainingSeconds,
+            (float)nearestDistance,
+            channelProgress: 0.0f);
         var defuser = members
-            .OrderBy(member => DistanceSquared(member, siteX, siteZ) + (1.0f - member.HealthRatio) * 90.0f)
+            .OrderBy(member => DistanceSquared(member, siteX, siteZ)
+                + (urgent ? 0.0f : (1.0f - member.HealthRatio) * 90.0f))
             .ThenBy(member => member.MemberId, StringComparer.Ordinal)
             .First();
         var remaining = members.Where(member => member.MemberId != defuser.MemberId).ToList();
@@ -542,7 +601,9 @@ public sealed class DemolitionStrategyPlanner
         {
             new(defuser.MemberId, DemolitionDuty.Defuse, plantedSiteIndex,
                 plantedSiteIndex == 0 ? "site_a" : "site_b",
-                $"closest viable defuser: health {defuser.HealthRatio:0.00}, distance {Math.Sqrt(DistanceSquared(defuser, siteX, siteZ)):0.0}")
+                urgent
+                    ? $"last-chance defuser: shortest travel {Math.Sqrt(DistanceSquared(defuser, siteX, siteZ)):0.0}"
+                    : $"closest viable defuser: health {defuser.HealthRatio:0.00}, distance {Math.Sqrt(DistanceSquared(defuser, siteX, siteZ)):0.0}")
         };
         if (!string.IsNullOrEmpty(cover.MemberId))
         {

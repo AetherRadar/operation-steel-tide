@@ -654,6 +654,11 @@ public partial class FreightTerminalWorld
             _demolitionSquadCombatBreakoffs.Remove(mate);
             return true;
         }
+        if (ShouldHardCommitDemolitionSquadObjective(mate))
+        {
+            _demolitionSquadCombatBreakoffs.Remove(mate);
+            return true;
+        }
         return !ShouldYieldDemolitionSquadToCombat(mate);
     }
 
@@ -690,6 +695,39 @@ public partial class FreightTerminalWorld
 
     internal bool TryGetDemolitionEscortTarget(SquadMate mate, out Node3D leader)
         => TryGetDemolitionEscortTarget(mate, out leader, out _);
+
+    private bool ShouldHardCommitDemolitionSquadObjective(SquadMate mate)
+    {
+        if (!_demolitionRoundActive
+            || mate != _demolitionSquadObjectiveMate
+            || mate.IsDowned
+            || mate.IsBodyBag)
+        {
+            return false;
+        }
+
+        var layout = DemolitionLayout();
+        var siteIndex = _demolitionDevicePlanted
+            ? _demolitionActiveSite
+            : _demolitionSquadObjectiveSite;
+        if (siteIndex < 0 || siteIndex >= layout.SitePositions.Count)
+        {
+            return false;
+        }
+        var distance = HorizontalDistance(mate.GlobalPosition, layout.SitePositions[siteIndex]);
+        return _demolitionDevicePlanted
+            ? DemolitionStrategyPlanner.RequiresUrgentDefuseCommit(
+                _demolitionRemaining,
+                distance,
+                _demolitionSquadDefuseProgress)
+            : DemolitionStrategyPlanner.RequiresUrgentPlantCommit(
+                _demolitionRemaining,
+                distance,
+                _demolitionSquadPlantProgress);
+    }
+
+    private static bool IsAutonomousDemolitionSquadMate(SquadMate mate)
+        => !mate.IsHumanProxy && !mate.IsNetworkProxy;
 
     private bool ShouldYieldDemolitionSquadToCombat(SquadMate mate)
     {
@@ -728,10 +766,20 @@ public partial class FreightTerminalWorld
             return true;
         }
         var carrier = ResolveDemolitionAttacker(_demolitionDeviceLifecycle.CarrierMemberId) as SquadMate;
+        if (_demolitionSquadObjectiveMate != carrier)
+        {
+            _demolitionSquadPlantProgress = 0.0f;
+        }
         _demolitionSquadObjectiveMate = carrier;
         if (carrier is null || carrier.IsDowned || carrier.IsBodyBag)
         {
             _demolitionSquadPlantProgress = 0.0f;
+            return true;
+        }
+        if (!IsAutonomousDemolitionSquadMate(carrier))
+        {
+            // Remote humans own movement and planting through their input/RPC stream.
+            // The world coordinator must track their ownership without driving them.
             return true;
         }
         var layout = DemolitionLayout();

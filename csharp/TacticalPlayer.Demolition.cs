@@ -5,6 +5,9 @@ namespace OperationSteelTide;
 public partial class TacticalPlayer
 {
     public int SmokeGrenades { get; private set; }
+    public int IncendiaryGrenades { get; private set; }
+    public DemolitionUtilityType SelectedDemolitionUtility { get; private set; }
+        = DemolitionUtilityType.Smoke;
     internal bool DemolitionColliderDisabledForDiagnostics => _collider.Disabled;
 
     public void ResetForDemolitionRound(
@@ -12,7 +15,8 @@ public partial class TacticalPlayer
         OperatorRole role,
         DeploymentLoadout loadout,
         int grenadeCount,
-        int smokeGrenadeCount)
+        int smokeGrenadeCount,
+        int incendiaryGrenadeCount = 0)
     {
         EjectFromVehicleIfAny();
         CancelLadderClimb(notify: false);
@@ -21,7 +25,11 @@ public partial class TacticalPlayer
         ResetFieldUseForRound();
         CancelReload();
         ConfigureRole(role);
-        ApplyDemolitionRoundLoadout(loadout, grenadeCount, smokeGrenadeCount);
+        ApplyDemolitionRoundLoadout(
+            loadout,
+            grenadeCount,
+            smokeGrenadeCount,
+            incendiaryGrenadeCount);
         GlobalPosition = spawn;
         Rotation = Vector3.Zero;
         Velocity = Vector3.Zero;
@@ -118,7 +126,8 @@ public partial class TacticalPlayer
     public void ApplyDemolitionRoundLoadout(
         DeploymentLoadout loadout,
         int grenadeCount,
-        int smokeGrenadeCount)
+        int smokeGrenadeCount,
+        int incendiaryGrenadeCount = 0)
     {
         Backpack.Clear();
         ApplyDeploymentLoadout(loadout, includeEmergencySupplies: false);
@@ -127,7 +136,14 @@ public partial class TacticalPlayer
             smokeGrenadeCount,
             0,
             DemolitionBuyCatalog.MaximumSmokeGrenades);
-        Hud?.SetDemolitionSmokeGrenades(SmokeGrenades);
+        IncendiaryGrenades = Mathf.Clamp(
+            incendiaryGrenadeCount,
+            0,
+            DemolitionBuyCatalog.MaximumIncendiaryGrenades);
+        SelectedDemolitionUtility = SmokeGrenades > 0
+            ? DemolitionUtilityType.Smoke
+            : DemolitionUtilityType.Incendiary;
+        RefreshDemolitionUtilityHud();
         PushHudStats();
     }
 
@@ -137,14 +153,109 @@ public partial class TacticalPlayer
         {
             return false;
         }
+        var origin = _camera.GlobalPosition - _camera.GlobalBasis.Z * 0.7f;
+        var direction = -_camera.GlobalBasis.Z;
+        if (Main.IsDemolitionNetworkClient)
+        {
+            if (!Main.TryRequestLocalDemolitionUtilityThrow(
+                    DemolitionNetworkUtilityKind.Smoke,
+                    origin,
+                    direction))
+            {
+                return false;
+            }
+            OnThrowableConsumed();
+            return true;
+        }
         SmokeGrenades--;
-        Main.ThrowSmokeGrenade(
-            _camera.GlobalPosition - _camera.GlobalBasis.Z * 0.7f,
-            -_camera.GlobalBasis.Z,
-            this);
-        Hud?.SetDemolitionSmokeGrenades(SmokeGrenades);
+        Main.ThrowSmokeGrenade(origin, direction, this);
+        if (SmokeGrenades <= 0 && IncendiaryGrenades > 0)
+        {
+            SelectedDemolitionUtility = DemolitionUtilityType.Incendiary;
+        }
+        RefreshDemolitionUtilityHud();
         PushHudStats();
         OnThrowableConsumed();
+        return true;
+    }
+
+    private bool ThrowIncendiaryGrenade()
+    {
+        if (IncendiaryGrenades <= 0
+            || _isReloading
+            || MedicalActionBlocksWeapon
+            || IsDead
+            || Main is null)
+        {
+            return false;
+        }
+        var origin = _camera.GlobalPosition - _camera.GlobalBasis.Z * 0.7f;
+        var direction = -_camera.GlobalBasis.Z;
+        if (Main.IsDemolitionNetworkClient)
+        {
+            if (!Main.TryRequestLocalDemolitionUtilityThrow(
+                    DemolitionNetworkUtilityKind.Incendiary,
+                    origin,
+                    direction))
+            {
+                return false;
+            }
+            OnThrowableConsumed();
+            return true;
+        }
+        IncendiaryGrenades--;
+        Main.ThrowIncendiaryGrenade(origin, direction, this);
+        if (IncendiaryGrenades <= 0 && SmokeGrenades > 0)
+        {
+            SelectedDemolitionUtility = DemolitionUtilityType.Smoke;
+        }
+        RefreshDemolitionUtilityHud();
+        PushHudStats();
+        OnThrowableConsumed();
+        return true;
+    }
+
+    private void RefreshDemolitionUtilityHud()
+        => Hud?.SetDemolitionUtilities(
+            SmokeGrenades,
+            IncendiaryGrenades,
+            SelectedDemolitionUtility);
+
+    internal int DemolitionUtilityCount(DemolitionNetworkUtilityKind kind)
+        => kind switch
+        {
+            DemolitionNetworkUtilityKind.Fragmentation => Grenades,
+            DemolitionNetworkUtilityKind.Smoke => SmokeGrenades,
+            DemolitionNetworkUtilityKind.Incendiary => IncendiaryGrenades,
+            _ => 0
+        };
+
+    internal bool TryConsumeDemolitionNetworkUtility(DemolitionNetworkUtilityKind kind)
+    {
+        switch (kind)
+        {
+            case DemolitionNetworkUtilityKind.Fragmentation when Grenades > 0:
+                Grenades--;
+                break;
+            case DemolitionNetworkUtilityKind.Smoke when SmokeGrenades > 0:
+                SmokeGrenades--;
+                if (SmokeGrenades <= 0 && IncendiaryGrenades > 0)
+                {
+                    SelectedDemolitionUtility = DemolitionUtilityType.Incendiary;
+                }
+                break;
+            case DemolitionNetworkUtilityKind.Incendiary when IncendiaryGrenades > 0:
+                IncendiaryGrenades--;
+                if (IncendiaryGrenades <= 0 && SmokeGrenades > 0)
+                {
+                    SelectedDemolitionUtility = DemolitionUtilityType.Smoke;
+                }
+                break;
+            default:
+                return false;
+        }
+        RefreshDemolitionUtilityHud();
+        PushHudStats();
         return true;
     }
 
@@ -166,5 +277,41 @@ public partial class TacticalPlayer
         CollisionMask = 0;
         _collider.Disabled = true;
         Hud?.HideDownedState();
+    }
+
+    internal LootItem? DetachDemolitionDropWeapon()
+    {
+        StoreActiveFirearmState();
+        PlayerWeaponSlot? dropSlot = HasActiveFirearm
+            ? _activeWeaponSlot
+            : HasFireablePrimary && WeaponBuildForSlot(PlayerWeaponSlot.Primary) is not null
+                ? PlayerWeaponSlot.Primary
+                : WeaponBuildForSlot(PlayerWeaponSlot.Secondary) is not null
+                    ? PlayerWeaponSlot.Secondary
+                    : WeaponBuildForSlot(PlayerWeaponSlot.Sidearm) is not null
+                        ? PlayerWeaponSlot.Sidearm
+                        : null;
+        if (dropSlot is not PlayerWeaponSlot slot
+            || WeaponBuildForSlot(slot) is not WeaponBuild weapon)
+        {
+            return null;
+        }
+        var grade = WeaponGradeForSlot(slot);
+        SetWeaponSlot(slot, null, grade);
+        if (slot == PlayerWeaponSlot.Primary)
+        {
+            HasFireablePrimary = false;
+        }
+        if (_activeWeaponSlot == slot)
+        {
+            ActivateWeaponSlot(PreferredFirearmOrMelee(), false, true, false);
+        }
+        return new LootItem
+        {
+            Kind = LootItemKind.Weapon,
+            Weapon = weapon.Clone(),
+            Grade = grade,
+            Quantity = 1
+        };
     }
 }

@@ -11,6 +11,12 @@ public enum DemolitionBuyCategory
     Utility
 }
 
+public enum DemolitionUtilityType
+{
+    Smoke,
+    Incendiary
+}
+
 public sealed record DemolitionBuyOffer(
     string Id,
     DemolitionBuyCategory Category,
@@ -25,9 +31,21 @@ public readonly record struct DemolitionPurchaseSelection(
     string PrimaryId,
     bool ArmorSelected,
     int GrenadeCount,
-    int SmokeGrenadeCount)
+    int SmokeGrenadeCount,
+    int IncendiaryGrenadeCount)
 {
-    public static DemolitionPurchaseSelection Empty => new(string.Empty, string.Empty, false, 0, 0);
+    public DemolitionPurchaseSelection(
+        string sidearmId,
+        string primaryId,
+        bool armorSelected,
+        int grenadeCount,
+        int smokeGrenadeCount)
+        : this(sidearmId, primaryId, armorSelected, grenadeCount, smokeGrenadeCount, 0)
+    {
+    }
+
+    public static DemolitionPurchaseSelection Empty
+        => new(string.Empty, string.Empty, false, 0, 0, 0);
 }
 
 public readonly record struct DemolitionPurchaseQuote(
@@ -64,11 +82,14 @@ public static class DemolitionBuyCatalog
     public const string Ak74Id = "ak74";
     public const string M4A1Id = "m4a1";
     public const string ScarLId = "scarl";
+    public const string M24Id = "m24";
     public const int ArmorPrice = 1000;
     public const int GrenadePrice = 450;
     public const int SmokeGrenadePrice = 300;
+    public const int IncendiaryGrenadePrice = 500;
     public const int MaximumGrenades = 2;
     public const int MaximumSmokeGrenades = 2;
+    public const int MaximumIncendiaryGrenades = 2;
 
     public static readonly IReadOnlyList<DemolitionBuyOffer> Sidearms = new[]
     {
@@ -89,7 +110,9 @@ public static class DemolitionBuyCatalog
         new DemolitionBuyOffer(M4A1Id, DemolitionBuyCategory.Primary, WeaponPlatform.M4A1,
             3100, 90, "demolition_buy_m4a1", "M4A1"),
         new DemolitionBuyOffer(ScarLId, DemolitionBuyCategory.Primary, WeaponPlatform.ScarL,
-            3600, 80, "demolition_buy_scarl", "SCAR-L")
+            3600, 80, "demolition_buy_scarl", "SCAR-L"),
+        new DemolitionBuyOffer(M24Id, DemolitionBuyCategory.Primary, WeaponPlatform.M24,
+            4300, 25, "weapon_m24", "M24 PRECISION RIFLE")
     };
 
     public static DemolitionPurchaseSelection Normalize(DemolitionPurchaseSelection selection)
@@ -101,7 +124,8 @@ public static class DemolitionBuyCatalog
             primary,
             selection.ArmorSelected,
             Math.Clamp(selection.GrenadeCount, 0, MaximumGrenades),
-            Math.Clamp(selection.SmokeGrenadeCount, 0, MaximumSmokeGrenades));
+            Math.Clamp(selection.SmokeGrenadeCount, 0, MaximumSmokeGrenades),
+            Math.Clamp(selection.IncendiaryGrenadeCount, 0, MaximumIncendiaryGrenades));
     }
 
     public static DemolitionPurchaseQuote Quote(DemolitionPurchaseSelection selection, int funds)
@@ -111,7 +135,8 @@ public static class DemolitionBuyCatalog
             + (Find(Primaries, normalized.PrimaryId)?.Price ?? 0)
             + (normalized.ArmorSelected ? ArmorPrice : 0)
             + normalized.GrenadeCount * GrenadePrice
-            + normalized.SmokeGrenadeCount * SmokeGrenadePrice;
+            + normalized.SmokeGrenadeCount * SmokeGrenadePrice
+            + normalized.IncendiaryGrenadeCount * IncendiaryGrenadePrice;
         var available = Math.Max(0, funds);
         return new DemolitionPurchaseQuote(
             normalized,

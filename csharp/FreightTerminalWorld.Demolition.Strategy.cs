@@ -96,7 +96,8 @@ public partial class FreightTerminalWorld
         ApplyDemolitionSquadPlan(playerPlan, layout);
 
         var opponentSnapshots = new List<DemolitionAgentSnapshot>();
-        foreach (var opponent in _demolitionOpponents.Where(IsInstanceValid))
+        foreach (var opponent in _demolitionOpponents.Where(opponent =>
+                     IsInstanceValid(opponent) && IsAutonomousDemolitionOpponent(opponent)))
         {
             var range = opponent.CarriedWeapon.Stats().EffectiveRange;
             var role = range >= 150.0f
@@ -317,7 +318,8 @@ public partial class FreightTerminalWorld
     private void ResolveAndApplyDemolitionObjectiveChannels(DemolitionStrategyPlan opponentPlan)
     {
         var opponents = _demolitionOpponents
-            .Where(IsInstanceValid)
+            .Where(opponent =>
+                IsInstanceValid(opponent) && IsAutonomousDemolitionOpponent(opponent))
             .ToList();
         var aliveMemberIds = opponents
             .Where(opponent => !opponent.IsDead)
@@ -575,13 +577,13 @@ public partial class FreightTerminalWorld
         }
         if (!IsInstanceValid(_demolitionSquadObjectiveMate)
             || _demolitionSquadObjectiveMate!.IsDowned
-            || _demolitionSquadObjectiveMate.IsBodyBag)
+            || _demolitionSquadObjectiveMate.IsBodyBag
+            || !IsAutonomousDemolitionSquadMate(_demolitionSquadObjectiveMate))
         {
             var site = layout.SitePositions[siteIndex];
-            _demolitionSquadObjectiveMate = _squadMates
-                .Where(mate => IsInstanceValid(mate) && !mate.IsDowned && !mate.IsBodyBag)
-                .OrderBy(mate => mate.GlobalPosition.DistanceSquaredTo(site))
-                .FirstOrDefault();
+            _demolitionSquadObjectiveMate = SelectAutonomousDemolitionSquadObjectiveMate(
+                _squadMates,
+                site);
             if (_demolitionSquadObjectiveMate is not null)
             {
                 _demolitionSquadAssignmentTargets.Remove(_demolitionSquadObjectiveMate);
@@ -609,9 +611,15 @@ public partial class FreightTerminalWorld
         {
             carrier.SetOrder(SquadOrder.Hold, carrier.GlobalPosition);
         }
-        if (carrier.IsRevivingFriendly || ShouldYieldDemolitionSquadToCombat(carrier))
+        var hardCommit = ShouldHardCommitDemolitionSquadObjective(carrier);
+        if (carrier.IsRevivingFriendly
+            || (!hardCommit && ShouldYieldDemolitionSquadToCombat(carrier)))
         {
             return;
+        }
+        if (hardCommit)
+        {
+            _demolitionSquadCombatBreakoffs.Remove(carrier);
         }
         var progress = !_demolitionDevicePlanted
             ? _demolitionSquadPlantProgress += delta / DemolitionPlantDuration
@@ -634,6 +642,20 @@ public partial class FreightTerminalWorld
                     siteName));
         }
     }
+
+    private static bool IsAutonomousDemolitionOpponent(EnemyOperator opponent)
+        => !opponent.IsHumanProxy && !opponent.IsNetworkProxy;
+
+    private static SquadMate? SelectAutonomousDemolitionSquadObjectiveMate(
+        IEnumerable<SquadMate> mates,
+        Vector3 site)
+        => mates
+            .Where(mate => IsInstanceValid(mate)
+                && !mate.IsDowned
+                && !mate.IsBodyBag
+                && IsAutonomousDemolitionSquadMate(mate))
+            .OrderBy(mate => mate.GlobalPosition.DistanceSquaredTo(site))
+            .FirstOrDefault();
 
     private static DemolitionAgentSnapshot Snapshot(
         string memberId,
@@ -690,7 +712,11 @@ public partial class FreightTerminalWorld
     /// <summary>
     /// Drives every demolition enemy: defenders defuse, attackers carry and plant.
     /// </summary>
-    public bool TryHandleDemolitionDefenderMovement(EnemyOperator opponent, float delta, Node3D? combatTarget)
+    public bool TryHandleDemolitionDefenderMovement(
+        EnemyOperator opponent,
+        float delta,
+        Node3D? combatTarget,
+        bool targetVisible)
     {
         var deviceObjectiveId = _demolitionDeviceLifecycle.IsGrounded
             ? _demolitionDeviceLifecycle.PickupRunnerMemberId
@@ -723,7 +749,10 @@ public partial class FreightTerminalWorld
                 "live demolition device objective");
         }
 
-        var targetDistance = ResolveDemolitionCombatTargetDistance(opponent, combatTarget);
+        var targetDistance = ResolveDemolitionCombatTargetDistance(
+            opponent,
+            combatTarget,
+            targetVisible);
         if (!UpdateDemolitionCombatArbitration(opponent, targetDistance))
         {
             return false;
@@ -838,9 +867,12 @@ public partial class FreightTerminalWorld
         opponent.ResetScriptedObjectiveNavigation();
     }
 
-    private float ResolveDemolitionCombatTargetDistance(EnemyOperator opponent, Node3D? target)
+    private float ResolveDemolitionCombatTargetDistance(
+        EnemyOperator opponent,
+        Node3D? target,
+        bool targetVisible)
     {
-        if (target is null || !IsInstanceValid(target))
+        if (!targetVisible || target is null || !IsInstanceValid(target))
         {
             return float.PositiveInfinity;
         }
@@ -860,12 +892,23 @@ public partial class FreightTerminalWorld
     /// </summary>
     private bool UpdateDemolitionCombatArbitration(EnemyOperator opponent, float targetDistance)
     {
+        if (ShouldHardCommitDemolitionPlant(opponent))
+        {
+            _demolitionCombatBreakoffs.Remove(opponent);
+            return true;
+        }
+        if (opponent == _demolitionDefuser && ShouldHardCommitDemolitionDefuse(opponent))
+        {
+            _demolitionCombatBreakoffs.Remove(opponent);
+            return true;
+        }
         var channeling = IsDemolitionOpponentChanneling(opponent);
         if (channeling && targetDistance >= DemolitionChannelGuardRange)
         {
             return true;
         }
-        // 更智能：载体/拆包者只在贴脸且有视线时才弃包/弃拆去刚枪，避免白房面墙罚站；普通队员保持24/30m
+        // Objective carriers yield only to a confirmed close threat; other members
+        // retain the wider engage/resume rings used by the regular combat layer.
         var isCarrierOrDefuser = opponent == _demolitionCarrier || opponent == _demolitionDefuser;
         var engageRange = isCarrierOrDefuser ? 14.0f : DemolitionCombatEngageRange;
         var resumeRange = isCarrierOrDefuser ? 18.0f : DemolitionCombatResumeRange;
@@ -886,7 +929,7 @@ public partial class FreightTerminalWorld
         return true;
     }
 
-    private bool IsDemolitionOpponentChanneling(EnemyOperator opponent)
+    internal bool IsDemolitionOpponentChanneling(EnemyOperator opponent)
         => (!_demolitionDevicePlanted
                 && opponent == _demolitionCarrier
                 && _demolitionEnemyPlantProgress > 0.0f)
@@ -944,7 +987,8 @@ public partial class FreightTerminalWorld
         {
             return false;
         }
-        if (targetDistance < DemolitionChannelGuardRange)
+        if (targetDistance < DemolitionChannelGuardRange
+            && !ShouldHardCommitDemolitionPlant(opponent))
         {
             // Threat inside the guard bubble: hand control to the combat layer. The
             // channel keeps its progress and resumes once the fight is won or lost.
@@ -954,15 +998,15 @@ public partial class FreightTerminalWorld
         var site = layout.SitePositions[Mathf.Clamp(_demolitionEnemyTargetSite, 0, layout.SitePositions.Count - 1)];
         var flatSite = new Vector3(site.X, opponent.GlobalPosition.Y, site.Z);
         var distance = opponent.GlobalPosition.DistanceTo(flatSite);
-        if (distance > 2.15f)
+        if (distance > DemolitionStrategyPlanner.PlantStoppingDistance)
         {
             return MoveDemolitionOpponentAlongRoute(
                 opponent,
                 site,
                 $"carrier_site_{_demolitionEnemyTargetSite}",
                 delta,
-                2.15f,
-                5.1f);
+                DemolitionStrategyPlanner.PlantStoppingDistance,
+                DemolitionStrategyPlanner.PlantMoveSpeed);
         }
 
         var velocity = opponent.Velocity;
@@ -977,9 +1021,34 @@ public partial class FreightTerminalWorld
         return true;
     }
 
+    private bool ShouldHardCommitDemolitionPlant(EnemyOperator opponent)
+    {
+        if (_demolitionDevicePlanted
+            || _demolitionDeviceLifecycle.IsGrounded
+            || _demolitionMatch.PlayerSide != DemolitionTeam.Defenders
+            || opponent != _demolitionCarrier
+            || _demolitionEnemyTargetSite < 0)
+        {
+            return false;
+        }
+        var layout = DemolitionLayout();
+        if (_demolitionEnemyTargetSite >= layout.SitePositions.Count)
+        {
+            return false;
+        }
+        var distance = HorizontalDistance(
+            opponent.GlobalPosition,
+            layout.SitePositions[_demolitionEnemyTargetSite]);
+        return DemolitionStrategyPlanner.RequiresUrgentPlantCommit(
+            _demolitionRemaining,
+            distance,
+            _demolitionEnemyPlantProgress);
+    }
+
     private bool TryHandleDemolitionDefuserMovement(EnemyOperator opponent, float delta, float targetDistance)
     {
-        if (targetDistance < DemolitionChannelGuardRange)
+        if (targetDistance < DemolitionChannelGuardRange
+            && !ShouldHardCommitDemolitionDefuse(opponent))
         {
             // Same guard rule as the carrier: drop to the combat layer, keep the progress.
             return false;
@@ -987,15 +1056,15 @@ public partial class FreightTerminalWorld
         var devicePosition = DemolitionLayout().SitePositions[_demolitionActiveSite];
         var flatDevice = new Vector3(devicePosition.X, opponent.GlobalPosition.Y, devicePosition.Z);
         var distance = opponent.GlobalPosition.DistanceTo(flatDevice);
-        if (distance > 2.15f)
+        if (distance > DemolitionStrategyPlanner.DefuseStoppingDistance)
         {
             return MoveDemolitionOpponentAlongRoute(
                 opponent,
                 devicePosition,
                 $"defuser_site_{_demolitionActiveSite}",
                 delta,
-                2.15f,
-                5.3f);
+                DemolitionStrategyPlanner.DefuseStoppingDistance,
+                DemolitionStrategyPlanner.DefuseMoveSpeed);
         }
 
         var velocity = opponent.Velocity;
@@ -1015,6 +1084,22 @@ public partial class FreightTerminalWorld
                     siteName));
         }
         return true;
+    }
+
+    private bool ShouldHardCommitDemolitionDefuse(EnemyOperator opponent)
+    {
+        if (!_demolitionDevicePlanted
+            || opponent != _demolitionDefuser
+            || _demolitionActiveSite < 0)
+        {
+            return false;
+        }
+        var devicePosition = DemolitionLayout().SitePositions[_demolitionActiveSite];
+        var distance = HorizontalDistance(opponent.GlobalPosition, devicePosition);
+        return DemolitionStrategyPlanner.RequiresUrgentDefuseCommit(
+            _demolitionRemaining,
+            distance,
+            _demolitionDefuseProgress);
     }
 
     private static bool MoveDemolitionOpponentToward(

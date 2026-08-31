@@ -60,6 +60,18 @@ public partial class EnemyOperator
         float speed,
         bool requireRoute)
     {
+        if (_pursuitLadderActive
+            && TryGetActivePursuitStaticDirective(out var ladderDirective)
+            && ladderDirective.Kind == SquadTraversalKind.Ladder)
+        {
+            if (!UpdatePursuitLadderTraversal(delta, ladderDirective))
+            {
+                InvalidateStaticPursuitRoute();
+                Velocity = Vector3.Zero;
+            }
+            return true;
+        }
+
         var routed = TryResolvePursuitNavigationDestination(
             target,
             fallback,
@@ -68,6 +80,19 @@ public partial class EnemyOperator
         if (requireRoute && !routed)
         {
             return false;
+        }
+
+        if (routed
+            && TryGetActivePursuitStaticDirective(out var staticDirective)
+            && staticDirective.Kind == SquadTraversalKind.Ladder)
+        {
+            _pursuitDoorWaitTimer = 0.0f;
+            if (!UpdatePursuitLadderTraversal(delta, staticDirective))
+            {
+                InvalidateStaticPursuitRoute();
+                Velocity = Vector3.Zero;
+            }
+            return true;
         }
 
         if (Main is not null
@@ -179,7 +204,16 @@ public partial class EnemyOperator
             return false;
         }
 
-        if (TryResolvePursuitTrailDestination(target, out var routedDestination))
+        var prefersStaticRoute = _pursuitLadderActive
+            || Mathf.Abs(fallback.Y - GlobalPosition.Y) > PursuitTrailAttachHeight;
+        if (prefersStaticRoute
+            && TryResolveStaticPursuitDestination(target, fallback, out var routedDestination))
+        {
+            destination = routedDestination;
+            precise = true;
+            return true;
+        }
+        if (TryResolvePursuitTrailDestination(target, out routedDestination))
         {
             destination = routedDestination;
             precise = true;
@@ -371,9 +405,13 @@ public partial class EnemyOperator
     {
         destination = default;
         var targetId = target.GetInstanceId();
+        var preservesActiveLadder = _pursuitLadderActive
+            && TryGetActivePursuitStaticDirective(out var activeDirective)
+            && activeDirective.Kind == SquadTraversalKind.Ladder;
         if (_pursuitStaticRoute.Length > 0
             && _pursuitStaticRouteTargetId == targetId
-            && _pursuitStaticRouteDestination.DistanceSquaredTo(fallback) <= 9.0f)
+            && (preservesActiveLadder
+                || _pursuitStaticRouteDestination.DistanceSquaredTo(fallback) <= 9.0f))
         {
             AdvanceStaticPursuitRoute();
             if (_pursuitStaticRouteCursor < _pursuitStaticRoute.Length)
@@ -423,6 +461,30 @@ public partial class EnemyOperator
             _pursuitStaticRouteCursor++;
             PursuitTrailWaypointAdvancesForDiagnostics++;
         }
+    }
+
+    private bool TryGetActivePursuitStaticDirective(out SquadNavigationDirective directive)
+    {
+        directive = default;
+        if (_pursuitStaticRouteCursor < 0
+            || _pursuitStaticRouteCursor >= _pursuitStaticRoute.Length)
+        {
+            return false;
+        }
+        directive = _pursuitStaticRoute[_pursuitStaticRouteCursor];
+        return true;
+    }
+
+    private void CompleteActivePursuitLadderDirective(int directedEdgeId)
+    {
+        if (!TryGetActivePursuitStaticDirective(out var directive)
+            || directive.Kind != SquadTraversalKind.Ladder
+            || directive.DirectedEdgeId != directedEdgeId)
+        {
+            return;
+        }
+        _pursuitStaticRouteCursor++;
+        PursuitTrailWaypointAdvancesForDiagnostics++;
     }
 
     private bool IsPursuitDirectiveReached(SquadNavigationDirective[] route, int cursor)
@@ -476,6 +538,7 @@ public partial class EnemyOperator
 
     private void InvalidateStaticPursuitRoute()
     {
+        CancelPursuitLadderTraversal();
         _pursuitStaticRoute = Array.Empty<SquadNavigationDirective>();
         _pursuitStaticRouteCursor = 0;
         _pursuitStaticRouteTargetId = 0;
@@ -498,5 +561,6 @@ public partial class EnemyOperator
         PursuitStaticPlansForDiagnostics = 0;
         PursuitRouteRecoveriesForDiagnostics = 0;
         PursuitNavigationStepUpsForDiagnostics = 0;
+        PursuitLadderTraversalsForDiagnostics = 0;
     }
 }

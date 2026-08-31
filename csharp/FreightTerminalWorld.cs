@@ -520,6 +520,14 @@ public partial class FreightTerminalWorld : Node3D
     }
 
     public void ThrowGrenade(Vector3 origin, Vector3 direction, Node source)
+        => ThrowGrenade(origin, direction, source, 15.0f, 5.2f);
+
+    public void ThrowGrenade(
+        Vector3 origin,
+        Vector3 direction,
+        Node source,
+        float speed,
+        float loft)
     {
         var grenade = new FragGrenade
         {
@@ -528,7 +536,14 @@ public partial class FreightTerminalWorld : Node3D
             Main = this
         };
         AddChild(grenade);
-        grenade.Arm(direction);
+        grenade.Arm(direction, speed, loft);
+        NotifyHostDemolitionUtilitySpawned(
+            DemolitionNetworkUtilityKind.Fragmentation,
+            origin,
+            direction,
+            source,
+            speed,
+            loft);
     }
 
     public void SpawnShell(Vector3 origin, Vector3 velocity)
@@ -542,6 +557,13 @@ public partial class FreightTerminalWorld : Node3D
     {
         var best = new Vector3(0, -1000, 0);
         var bestScore = float.PositiveInfinity;
+        if (_demolitionMode && _demolitionArena is not null)
+        {
+            // Demolition arenas are spatially isolated from extraction. Restricting
+            // this bounded scan avoids selecting a valid but unreachable remote point.
+            ConsiderCoverPoint(_demolitionArena.CoverPoints, origin, threat, ref best, ref bestScore);
+            return best;
+        }
         if (!IsBlackwaterRefineryMap)
         {
             ConsiderCoverPoint(_coverPoints, origin, threat, ref best, ref bestScore);
@@ -1653,6 +1675,7 @@ public partial class FreightTerminalWorld : Node3D
         var weaponItem = source.Loot[index];
         source.Loot.RemoveAt(index);
         RefreshGradedLootPickupPresentation(source);
+        RefreshDroppedWeaponPickupPresentation(source);
         if (source is EnemyOperator corpse)
         {
             corpse.MarkCarriedWeaponRemoved();
@@ -1660,6 +1683,7 @@ public partial class FreightTerminalWorld : Node3D
         source.OnSearched();
         PublishExtractionLootMutation(source);
         RetireEmptyGradedLootPickup(source);
+        RetireEmptyDroppedWeaponPickup(source);
         return operatorNode.EquipWeaponFromLoot(weaponItem.Weapon!);
     }
 
@@ -1702,10 +1726,12 @@ public partial class FreightTerminalWorld : Node3D
             enemy.MarkCarriedWeaponRemoved();
         }
         RefreshGradedLootPickupPresentation(source);
+        RefreshDroppedWeaponPickupPresentation(source);
         source.OnSearched();
         PublishExtractionLootMutation(source);
         RetireEmptyGradedLootPickup(source);
-        return _player.HasFireablePrimary;
+        RetireEmptyDroppedWeaponPickup(source);
+        return true;
     }
 
     /// <summary>Squad mate equip from loot source (cold-start re-arm).</summary>
@@ -1741,6 +1767,7 @@ public partial class FreightTerminalWorld : Node3D
             source.Loot.RemoveAt(ammoIndex);
         }
         RefreshGradedLootPickupPresentation(source);
+        RefreshDroppedWeaponPickupPresentation(source);
         if (source is EnemyOperator corpse)
         {
             corpse.MarkCarriedWeaponRemoved();
@@ -1748,6 +1775,7 @@ public partial class FreightTerminalWorld : Node3D
         source.OnSearched();
         PublishExtractionLootMutation(source);
         RetireEmptyGradedLootPickup(source);
+        RetireEmptyDroppedWeaponPickup(source);
         return mate.EquipWeaponFromLoot(
             weaponItem.Weapon!,
             ammoGrade,
@@ -1797,6 +1825,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             _hud.ShowKnockdown(enemy.OperatorCallsign(_languageSetting), mate.Callsign);
         }
+        SpawnDemolitionWeaponDrop(enemy);
         _lootSources.Add(enemy);
         if (IsExtractionNetworkMatch)
         {
@@ -1873,6 +1902,7 @@ public partial class FreightTerminalWorld : Node3D
         if (_demolitionMode)
         {
             _player.MarkEliminatedForDemolitionRound();
+            SpawnDemolitionWeaponDrop(_player);
             FinishDemolitionRound(
                 false,
                 GameLocalization.Get(
@@ -4147,7 +4177,13 @@ public partial class FreightTerminalWorld : Node3D
         await WaitFrames(4);
         Input.ActionRelease("weapon_cycle");
         var cycledToKnife = _player.KnifeEquipped;
-        await WaitFrames(5);
+        // The input gate advances on physics ticks, while WaitFrames observes render
+        // frames. High-refresh displays can otherwise issue the second synthetic wheel
+        // pulse before the production debounce has elapsed.
+        for (var physicsFrame = 0; physicsFrame < 10; physicsFrame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
         Input.ActionPress("weapon_cycle");
         await WaitFrames(4);
         Input.ActionRelease("weapon_cycle");

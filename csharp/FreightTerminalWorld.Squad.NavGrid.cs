@@ -596,7 +596,9 @@ public partial class FreightTerminalWorld
         int cursor)
     {
         var directive = directives[cursor];
-        if (directive.Kind is SquadTraversalKind.Vault or SquadTraversalKind.Drop)
+        if (directive.Kind is SquadTraversalKind.Vault
+            or SquadTraversalKind.Drop
+            or SquadTraversalKind.Ladder)
         {
             var actionHorizontal = new Vector2(
                 position.X - directive.Target.X,

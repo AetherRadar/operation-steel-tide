@@ -7,15 +7,20 @@ public partial class TacticalPlayer
     private Node3D _heldThrowableRoot = null!;
     private Node3D _heldFragVisual = null!;
     private Node3D _heldSmokeVisual = null!;
+    private Node3D _heldIncendiaryVisual = null!;
 
     internal bool HeldFragmentationGrenadeVisibleForDiagnostics
         => IsInstanceValid(_heldFragVisual) && _heldFragVisual.Visible;
     internal bool HeldSmokeGrenadeVisibleForDiagnostics
         => IsInstanceValid(_heldSmokeVisual) && _heldSmokeVisual.Visible;
+    internal bool HeldIncendiaryGrenadeVisibleForDiagnostics
+        => IsInstanceValid(_heldIncendiaryVisual) && _heldIncendiaryVisual.Visible;
     internal int HeldFragmentationGrenadeMeshCountForDiagnostics
         => CountMeshes(_heldFragVisual);
     internal int HeldSmokeGrenadeMeshCountForDiagnostics
         => CountMeshes(_heldSmokeVisual);
+    internal int HeldIncendiaryGrenadeMeshCountForDiagnostics
+        => CountMeshes(_heldIncendiaryVisual);
 
     private void BuildHeldThrowables()
     {
@@ -36,6 +41,10 @@ public partial class TacticalPlayer
         _heldSmokeVisual = GrenadeVisualFactory.CreateSmokeGrenade(firstPerson: true);
         _heldSmokeVisual.Name = "HeldSmokeGrenade";
         _heldThrowableRoot.AddChild(_heldSmokeVisual);
+
+        _heldIncendiaryVisual = GrenadeVisualFactory.CreateIncendiaryGrenade(firstPerson: true);
+        _heldIncendiaryVisual.Name = "HeldIncendiaryGrenade";
+        _heldThrowableRoot.AddChild(_heldIncendiaryVisual);
 
         var glove = new StandardMaterial3D
         {
@@ -73,10 +82,16 @@ public partial class TacticalPlayer
             && Grenades > 0;
         var smokeVisible = canShow
             && _activeQuickSlot == PlayerQuickSlot.Utility
+            && SelectedDemolitionUtility == DemolitionUtilityType.Smoke
             && SmokeGrenades > 0;
-        _heldThrowableRoot.Visible = fragVisible || smokeVisible;
+        var incendiaryVisible = canShow
+            && _activeQuickSlot == PlayerQuickSlot.Utility
+            && SelectedDemolitionUtility == DemolitionUtilityType.Incendiary
+            && IncendiaryGrenades > 0;
+        _heldThrowableRoot.Visible = fragVisible || smokeVisible || incendiaryVisible;
         _heldFragVisual.Visible = fragVisible;
         _heldSmokeVisual.Visible = smokeVisible;
+        _heldIncendiaryVisual.Visible = incendiaryVisible;
     }
 
     private static int CountMeshes(Node? root)

@@ -97,6 +97,45 @@ internal static class GrenadeVisualFactory
         return root;
     }
 
+    public static Node3D CreateIncendiaryGrenade(bool firstPerson)
+    {
+        var root = new Node3D { Name = "IncendiaryGrenadeVisual" };
+        var body = Material(new Color(0.18f, 0.07f, 0.035f), 0.38f, 0.48f);
+        var band = Material(new Color(1.0f, 0.28f, 0.035f), 0.12f, 0.56f);
+        band.EmissionEnabled = true;
+        band.Emission = new Color(1.0f, 0.12f, 0.015f);
+        band.EmissionEnergyMultiplier = firstPerson ? 1.3f : 0.75f;
+        var metal = Material(new Color(0.28f, 0.25f, 0.22f), 0.84f, 0.24f);
+
+        AddPart(root, new CapsuleMesh
+        {
+            Radius = 0.075f,
+            Height = 0.205f,
+            RadialSegments = 16,
+            Rings = 6
+        }, Vector3.Zero, Vector3.Zero, body, firstPerson);
+        for (var bandIndex = -1; bandIndex <= 1; bandIndex++)
+        {
+            AddPart(root, new CylinderMesh
+            {
+                TopRadius = 0.079f,
+                BottomRadius = 0.079f,
+                Height = 0.014f,
+                RadialSegments = 16
+            }, new Vector3(0, bandIndex * 0.052f, 0), Vector3.Zero, band, firstPerson);
+        }
+        AddPart(root, new CylinderMesh
+        {
+            TopRadius = 0.038f,
+            BottomRadius = 0.042f,
+            Height = 0.05f,
+            RadialSegments = 12
+        }, new Vector3(0, 0.126f, 0), Vector3.Zero, metal, firstPerson);
+        AddPart(root, new BoxMesh { Size = new Vector3(0.032f, 0.014f, 0.145f) },
+            new Vector3(0.02f, 0.159f, 0.04f), new Vector3(0.08f, 0, -0.12f), metal, firstPerson);
+        return root;
+    }
+
     private static void AddPart(
         Node3D root,
         PrimitiveMesh mesh,

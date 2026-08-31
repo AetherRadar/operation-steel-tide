@@ -27,6 +27,8 @@ public partial class SquadMate
     private Vector3 _navigationTraversalCross;
     private Vector3 _navigationTraversalLanding;
     private Vector3 _navigationTraversalDirection;
+    private AuthoredLadderTraversalPath _navigationLadderPath;
+    private bool _navigationLadderAscending;
     private int _navigationTraversalDirectedEdgeId = -1;
     private string _navigationTraversalBlocker = string.Empty;
 
@@ -60,10 +62,15 @@ public partial class SquadMate
             _navigationTraversalDuration,
             _navigationTraversalElapsed + Mathf.Max(0.0f, delta));
         var progress = NavigationTraversalProgress;
-        var checkpoints = new[] { NavigationTraversalFirstPhase, NavigationTraversalSecondPhase, progress };
         var fromProgress = previousProgress;
-        foreach (var checkpoint in checkpoints)
+        for (var checkpointIndex = 0; checkpointIndex < 3; checkpointIndex++)
         {
+            var checkpoint = checkpointIndex switch
+            {
+                0 => NavigationTraversalFirstPhase,
+                1 => NavigationTraversalSecondPhase,
+                _ => progress
+            };
             var toProgress = Mathf.Min(progress, checkpoint);
             if (toProgress <= fromProgress + 0.0001f)
             {
@@ -71,7 +78,9 @@ public partial class SquadMate
             }
             var target = EvaluateNavigationTraversal(toProgress);
             var motion = target - GlobalPosition;
-            var collision = !_navigationTraversalBypassesWindowBarrier
+            var bypassesWorldCollision = _navigationTraversalBypassesWindowBarrier
+                || _navigationTraversalKind == SquadTraversalKind.Ladder;
+            var collision = !bypassesWorldCollision
                 && motion.LengthSquared() > 0.000001f
                 ? MoveAndCollide(
                     motion,
@@ -80,7 +89,7 @@ public partial class SquadMate
                     recoveryAsCollision: false,
                     maxCollisions: 4)
                 : null;
-            if (_navigationTraversalBypassesWindowBarrier)
+            if (bypassesWorldCollision)
             {
                 GlobalPosition = target;
             }
@@ -110,6 +119,11 @@ public partial class SquadMate
     private Vector3 EvaluateNavigationTraversal(float progress)
     {
         progress = Mathf.Clamp(progress, 0.0f, 1.0f);
+        if (_navigationTraversalKind == SquadTraversalKind.Ladder)
+        {
+            var pathProgress = _navigationLadderAscending ? progress : 1.0f - progress;
+            return _navigationLadderPath.Evaluate(_navigationLadderPath.Length * pathProgress);
+        }
         if (progress <= NavigationTraversalFirstPhase)
         {
             var t = Mathf.SmoothStep(0.0f, 1.0f, progress / NavigationTraversalFirstPhase);
@@ -133,16 +147,74 @@ public partial class SquadMate
 
     private bool TryBeginNavigationTraversal(SquadNavigationDirective directive)
     {
-        if (_navigationTraversalActive || directive.Kind is not (SquadTraversalKind.Vault or SquadTraversalKind.Drop))
+        if (_navigationTraversalActive
+            || directive.Kind is not (SquadTraversalKind.Vault
+                or SquadTraversalKind.Drop
+                or SquadTraversalKind.Ladder))
         {
             return _navigationTraversalActive;
         }
+        if (directive.Kind == SquadTraversalKind.Ladder)
+        {
+            return TryBuildNavigationLadderPath(
+                    directive,
+                    out var ladderTraversal,
+                    out var ladderPath,
+                    out var ladderAscending)
+                && BeginNavigationTraversal(
+                    ladderTraversal,
+                    directive.DirectedEdgeId,
+                    ladderPath,
+                    ladderAscending);
+        }
+
         var direction = directive.Target - GlobalPosition;
         direction.Y = 0.0f;
         var planned = directive.Kind == SquadTraversalKind.Vault
             ? TryBuildNavigationVaultPath(direction, out var path)
             : TryBuildNavigationDropPath(direction, out path);
         return planned && BeginNavigationTraversal(path, directive.DirectedEdgeId);
+    }
+
+    private static bool TryBuildNavigationLadderPath(
+        SquadNavigationDirective directive,
+        out NavigationTraversalPath traversal,
+        out AuthoredLadderTraversalPath ladderPath,
+        out bool ascending)
+    {
+        traversal = default;
+        ladderPath = default;
+        ascending = directive.Target.Y > directive.ActionOrigin.Y;
+        var bottomFeet = ascending ? directive.ActionOrigin : directive.Target;
+        var topFeet = ascending ? directive.Target : directive.ActionOrigin;
+        if (!AuthoredLadderTraversalPath.TryCreate(
+                bottomFeet,
+                topFeet,
+                directive.ActionOutward,
+                out ladderPath))
+        {
+            return false;
+        }
+
+        var direction = directive.Target - directive.ActionOrigin;
+        direction.Y = 0.0f;
+        if (direction.LengthSquared() <= 0.01f)
+        {
+            direction = ascending ? -ladderPath.Outward : ladderPath.Outward;
+        }
+        else
+        {
+            direction = direction.Normalized();
+        }
+        traversal = new NavigationTraversalPath(
+            SquadTraversalKind.Ladder,
+            directive.ActionOrigin,
+            ladderPath.WallBottom,
+            ladderPath.WallTop,
+            directive.Target,
+            direction,
+            Mathf.Max(0.65f, ladderPath.Length / 2.65f));
+        return true;
     }
 
     private bool TryBeginTraversalRecovery(Vector3 direction)
@@ -402,7 +474,11 @@ public partial class SquadMate
         return true;
     }
 
-    private bool BeginNavigationTraversal(NavigationTraversalPath path, int directedEdgeId)
+    private bool BeginNavigationTraversal(
+        NavigationTraversalPath path,
+        int directedEdgeId,
+        AuthoredLadderTraversalPath ladderPath = default,
+        bool ladderAscending = false)
     {
         if (_navigationTraversalActive)
         {
@@ -414,6 +490,8 @@ public partial class SquadMate
         _navigationTraversalCross = path.Cross;
         _navigationTraversalLanding = path.Landing;
         _navigationTraversalDirection = path.Direction;
+        _navigationLadderPath = ladderPath;
+        _navigationLadderAscending = ladderAscending;
         _navigationTraversalDuration = path.Duration;
         _navigationTraversalElapsed = 0.0f;
         _navigationTraversalDirectedEdgeId = directedEdgeId;
@@ -434,6 +512,8 @@ public partial class SquadMate
             -0.1f,
             _navigationTraversalDirection.Z * 2.4f);
         _navigationTraversalDirectedEdgeId = -1;
+        _navigationLadderPath = default;
+        _navigationLadderAscending = false;
         _navigationTraversalBypassesWindowBarrier = false;
         ResetMovementProgress();
     }
@@ -449,6 +529,8 @@ public partial class SquadMate
             Main.ReportSquadTraversalFailure(this, _navigationTraversalDirectedEdgeId);
         }
         _navigationTraversalDirectedEdgeId = -1;
+        _navigationLadderPath = default;
+        _navigationLadderAscending = false;
         _navigationTraversalBypassesWindowBarrier = false;
         RequestNavigationRecovery(forceEscape: true);
     }
@@ -464,6 +546,8 @@ public partial class SquadMate
         _navigationTraversalActive = false;
         _navigationTraversalDirectedEdgeId = -1;
         _navigationTraversalBlocker = string.Empty;
+        _navigationLadderPath = default;
+        _navigationLadderAscending = false;
         _navigationTraversalBypassesWindowBarrier = false;
     }
 
@@ -477,4 +561,28 @@ public partial class SquadMate
 
     internal bool CanPlanNavigationDropForDiagnostics(Vector3 direction)
         => TryBuildNavigationDropPath(direction, out _);
+
+    internal bool BeginNavigationLadderForDiagnostics(
+        Vector3 bottomFeet,
+        Vector3 topFeet,
+        Vector3 outward,
+        bool startAtTop = false)
+        => TryBeginNavigationTraversal(new SquadNavigationDirective(
+            startAtTop ? bottomFeet : topFeet,
+            SquadTraversalKind.Ladder,
+            DirectedEdgeId: -1,
+            Required: true,
+            ActionOrigin: startAtTop ? topFeet : bottomFeet,
+            ActionOutward: outward));
+
+    internal bool AdvanceNavigationTraversalForDiagnostics(float delta)
+        => UpdateActiveNavigationTraversal(delta);
+
+    internal void ResetNavigationTraversalForDiagnostics()
+    {
+        CancelNavigationTraversal();
+        CompletedNavigationTraversalsForDiagnostics = 0;
+        RejectedNavigationTraversalsForDiagnostics = 0;
+        _lastCompletedTraversalKind = SquadTraversalKind.Walk;
+    }
 }

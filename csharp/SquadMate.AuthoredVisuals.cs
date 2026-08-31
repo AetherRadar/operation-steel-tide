@@ -8,6 +8,7 @@ public partial class SquadMate
     private AuthoredOperatorVisual _authoredOperatorVisual = null!;
     private AuthoredOperatorAnimator _authoredOperatorAnimator = null!;
     private float _authoredAimHoldRemaining;
+    private WeaponPlatform? _authoredCarriedWeaponPlatform;
 
     internal bool UsesAuthoredOperatorForDiagnostics
         => IsInstanceValid(_authoredOperatorVisual?.Root);
@@ -19,6 +20,9 @@ public partial class SquadMate
         => UsesAuthoredOperatorForDiagnostics
             ? _authoredOperatorAnimator.AnimationCount
             : 0;
+    internal bool AuthoredCarriedWeaponMatchesForDiagnostics
+        => UsesAuthoredOperatorForDiagnostics
+            && _authoredCarriedWeaponPlatform == CarriedWeapon.Platform;
 
     internal bool IsDemolitionRoundFrozenPoseForDiagnostics
         => new Vector2(Velocity.X, Velocity.Z).LengthSquared() <= 0.0001f
@@ -140,11 +144,12 @@ public partial class SquadMate
         {
             authoredOperator = CombatModelLibrary.InstantiateOperator(
                 OperatorRoles.Spec(Role).VisualId,
-                WeaponCatalog.Build(WeaponPlatform.M4A1, 0));
+                CarriedWeapon);
             _rig.AddChild(authoredOperator.Root);
             var authoredAnimator = new AuthoredOperatorAnimator(authoredOperator);
             _authoredOperatorVisual = authoredOperator;
             _authoredOperatorAnimator = authoredAnimator;
+            _authoredCarriedWeaponPlatform = CarriedWeapon.Platform;
         }
         catch (Exception exception)
         {
@@ -160,6 +165,46 @@ public partial class SquadMate
             {
                 mesh.QueueFree();
             }
+        }
+    }
+
+    private void RefreshAuthoredCarriedWeaponVisual()
+    {
+        if (!IsInsideTree() || !IsInstanceValid(_rig))
+        {
+            return;
+        }
+
+        AuthoredOperatorVisual? replacement = null;
+        try
+        {
+            replacement = CombatModelLibrary.InstantiateOperator(
+                OperatorRoles.Spec(Role).VisualId,
+                CarriedWeapon);
+            _rig.AddChild(replacement.Root);
+            replacement.SetTeamColor(OperatorRoles.Spec(Role).Accent);
+            replacement.SetWeaponVisible(HasFireablePrimary);
+            replacement.SetWeaponReadied(HasFireablePrimary && !IsDowned);
+            var replacementAnimator = new AuthoredOperatorAnimator(replacement);
+            replacementAnimator.SetRestingPose(HasFireablePrimary && !IsDowned);
+
+            var previousRoot = UsesAuthoredOperatorForDiagnostics
+                ? _authoredOperatorVisual.Root
+                : null;
+            _authoredOperatorVisual = replacement;
+            _authoredOperatorAnimator = replacementAnimator;
+            _authoredCarriedWeaponPlatform = CarriedWeapon.Platform;
+            if (IsInstanceValid(previousRoot))
+            {
+                previousRoot!.Free();
+            }
+        }
+        catch (Exception exception)
+        {
+            replacement?.Root.Free();
+            GD.PushWarning(
+                $"Authored {CarriedWeapon.Platform} squad weapon unavailable; retaining prior visual: "
+                + exception.Message);
         }
     }
 

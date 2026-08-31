@@ -93,6 +93,10 @@ public partial class FreightTerminalWorld
     {
         EnsureSquadInputActions();
         _squadNetwork = SquadNetworkRuntime.GetOrCreate(GetTree());
+        AttachDemolitionUtilityNetwork();
+        _squadNetwork.DemolitionWeaponPickupRequested += OnDemolitionWeaponPickupRequested;
+        _squadNetwork.DemolitionWeaponDropStateReceived += OnDemolitionWeaponDropState;
+        _squadNetwork.DemolitionWeaponPickupResultReceived += OnDemolitionWeaponPickupResult;
         _squadNetwork.RemoteStateReceived += OnRemoteSquadState;
         _squadNetwork.RemotePeerLeft += OnRemoteSquadPeerLeft;
         _squadNetwork.RemoteAbilityReceived += OnRemoteSquadAbility;
@@ -780,6 +784,7 @@ public partial class FreightTerminalWorld
     private void DetachSquadNetworkEvents()
     {
         DetachDemolitionGlassNetwork();
+        DetachDemolitionUtilityNetwork();
         _deploymentLoadGeneration++;
         _jianghaiDeploymentLoadPending = false;
         if (IsInstanceValid(_hud))
@@ -791,6 +796,9 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        _squadNetwork.DemolitionWeaponPickupRequested -= OnDemolitionWeaponPickupRequested;
+        _squadNetwork.DemolitionWeaponDropStateReceived -= OnDemolitionWeaponDropState;
+        _squadNetwork.DemolitionWeaponPickupResultReceived -= OnDemolitionWeaponPickupResult;
         _squadNetwork.RemoteStateReceived -= OnRemoteSquadState;
         _squadNetwork.RemotePeerLeft -= OnRemoteSquadPeerLeft;
         _squadNetwork.RemoteAbilityReceived -= OnRemoteSquadAbility;
@@ -2804,6 +2812,7 @@ public partial class FreightTerminalWorld
         if (_demolitionMode)
         {
             mate.EliminateForDemolitionRound();
+            SpawnDemolitionWeaponDrop(mate);
             _hud.ShowLocalizedMessage(
                 "demolition_teammate_eliminated",
                 $"{mate.Callsign} ELIMINATED  //  OUT FOR THIS ROUND",
@@ -2938,6 +2947,7 @@ public partial class FreightTerminalWorld
         if (_demolitionMode)
         {
             _player.MarkEliminatedForDemolitionRound();
+            SpawnDemolitionWeaponDrop(_player);
         }
         _player.EjectFromVehicleIfAny();
         if (_hud.IsLootVisible)
@@ -3009,6 +3019,10 @@ public partial class FreightTerminalWorld
         }
         if (_demolitionMode)
         {
+            _localPlayerDowned = false;
+            _localPlayerEliminated = true;
+            _player.MarkEliminatedForDemolitionRound();
+            SpawnDemolitionWeaponDrop(_player);
             FinishDemolitionRound(
                 false,
                 GameLocalization.Get(

@@ -951,6 +951,9 @@ public partial class FreightTerminalWorld
                     mate.DemolitionOrderPositionForDiagnostics,
                     TacticalState: mate.CaptureDemolitionTacticalStateForDiagnostics()));
         SmokeGrenade? diagnosticSmoke = null;
+        SquadMate? diagnosticHumanCarrier = null;
+        EnemyOperator? diagnosticHumanDefuser = null;
+        EnemyOperator? diagnosticAutonomousDefuser = null;
         _hud.BeginRadioMessageSuppressionForDiagnostics();
         try
         {
@@ -966,10 +969,10 @@ public partial class FreightTerminalWorld
             // A hostile inside the engage bubble makes the objective mover yield to the
             // full combat layer; past the resume ring it takes the objective back over.
             _player.GlobalPosition = probe.GlobalPosition + new Vector3(18.0f, 0.2f, 0.0f);
-            var yieldedToCombat = !TryHandleDemolitionDefenderMovement(probe, 0.05f, _player)
+            var yieldedToCombat = !TryHandleDemolitionDefenderMovement(probe, 0.05f, _player, targetVisible: true)
                 && _demolitionCombatBreakoffs.Contains(probe);
             _player.GlobalPosition = probe.GlobalPosition + new Vector3(34.0f, 0.2f, 0.0f);
-            var resumedObjective = TryHandleDemolitionDefenderMovement(probe, 0.05f, _player)
+            var resumedObjective = TryHandleDemolitionDefenderMovement(probe, 0.05f, _player, targetVisible: true)
                 && !_demolitionCombatBreakoffs.Contains(probe);
 
             // Smoke breaks stale close-range target arbitration. The objective controller
@@ -987,7 +990,7 @@ public partial class FreightTerminalWorld
             diagnosticSmoke._PhysicsProcess(0.4);
             var smokeBlocksTarget = IsLineObscuredBySmoke(smokeFrom, smokeTo);
             var smokeResumesObjective = smokeBlocksTarget
-                && TryHandleDemolitionDefenderMovement(probe, 0.05f, _player)
+                && TryHandleDemolitionDefenderMovement(probe, 0.05f, _player, targetVisible: true)
                 && !_demolitionCombatBreakoffs.Contains(probe);
             diagnosticSmoke.RemoveFromGroup(SmokeGrenade.ActiveGroupName);
             diagnosticSmoke.QueueFree();
@@ -998,8 +1001,208 @@ public partial class FreightTerminalWorld
             _demolitionCarrier = probe;
             _demolitionEnemyPlantProgress = 0.3f;
             _player.GlobalPosition = probe.GlobalPosition + new Vector3(18.0f, 0.2f, 0.0f);
-            var channelHoldsUnderFire = TryHandleDemolitionDefenderMovement(probe, 0.05f, _player)
+            var channelHoldsUnderFire = TryHandleDemolitionDefenderMovement(probe, 0.05f, _player, targetVisible: true)
                 && _demolitionEnemyPlantProgress >= 0.3f;
+            var urgentPlanterHardCommit = DemolitionStrategyPlanner.RequiresUrgentPlantCommit(
+                DemolitionStrategyPlanner.PlantDurationSeconds
+                    + DemolitionStrategyPlanner.PlantCommitBufferSeconds - 0.1f,
+                distanceToSite: 0.0f,
+                channelProgress: 0.0f);
+
+            // World-owned objective control must never drive a remote human proxy.
+            // The same autonomous filter is used by the relay selector, so an AI is
+            // chosen even when a human proxy is geometrically closer to the site.
+            var squadObjectiveProbe = _squadMates.FirstOrDefault(mate =>
+                IsInstanceValid(mate) && IsAutonomousDemolitionSquadMate(mate));
+            diagnosticHumanCarrier = new SquadMate();
+            diagnosticHumanCarrier.Configure(
+                this,
+                _player,
+                99,
+                OperatorRole.Assault,
+                "REMOTE_OBJECTIVE_PROBE",
+                humanProxy: true,
+                peerId: 9_999,
+                networkProxy: true);
+            _squadMates.Add(diagnosticHumanCarrier);
+            var relayRejectsHumanProxy = squadObjectiveProbe is not null
+                && ReferenceEquals(
+                    SelectAutonomousDemolitionSquadObjectiveMate(
+                        new[] { diagnosticHumanCarrier, squadObjectiveProbe },
+                        squadObjectiveProbe.GlobalPosition),
+                    squadObjectiveProbe);
+            _demolitionDeviceLifecycle.BeginGrounded();
+            var humanCarrierId = DemolitionMemberId(diagnosticHumanCarrier)!;
+            _demolitionDeviceLifecycle.AssignPickupRunner(humanCarrierId);
+            _demolitionDeviceLifecycle.TryPickup(humanCarrierId);
+            _demolitionDevicePlanted = false;
+            _demolitionSquadObjectiveMate = diagnosticHumanCarrier;
+            _demolitionSquadPlantProgress = 0.35f;
+            var humanProgressBefore = _demolitionSquadPlantProgress;
+            var humanCarrierHandled = TryUpdateDemolitionSquadDeviceObjective(1.0f);
+            var humanCarrierNotAutomated = humanCarrierHandled
+                && Mathf.IsEqualApprox(_demolitionSquadPlantProgress, humanProgressBefore)
+                && ReferenceEquals(_demolitionSquadObjectiveMate, diagnosticHumanCarrier);
+            _squadMates.Remove(diagnosticHumanCarrier);
+            diagnosticHumanCarrier.Free();
+            diagnosticHumanCarrier = null;
+            RestoreDemolitionDeviceRuntimeForDiagnostics(savedDeviceRuntime);
+
+            // A remote human may manually defuse, but must not occupy the AI planner's
+            // sole Defuse channel and prevent an autonomous teammate from committing.
+            diagnosticHumanDefuser = new EnemyOperator();
+            diagnosticHumanDefuser.ConfigureNetworkProxy(
+                9_998,
+                OperatorRole.Medic,
+                human: true);
+            diagnosticAutonomousDefuser = new EnemyOperator
+            {
+                Name = "AutonomousDefuserProbe"
+            };
+            var defuserSite = layout.SitePositions[0];
+            diagnosticHumanDefuser.Position = defuserSite;
+            diagnosticAutonomousDefuser.Position = defuserSite + Vector3.Right * 9.0f;
+            var autonomousDefenderSnapshots = new[]
+                {
+                    diagnosticHumanDefuser,
+                    diagnosticAutonomousDefuser
+                }
+                .Where(IsAutonomousDemolitionOpponent)
+                .Select(opponent => Snapshot(
+                    opponent.Name,
+                    DemolitionTeam.Defenders,
+                    OperatorRole.Medic,
+                    1.0f,
+                    100.0f,
+                    true,
+                    false,
+                    opponent.Position,
+                    layout.Origin))
+                .ToArray();
+            var autonomousDefuserPlan = _demolitionStrategyPlanner.Plan(
+                DemolitionTeam.Defenders,
+                DemolitionStrategyPhase.PostPlant,
+                autonomousDefenderSnapshots,
+                plantedSiteIndex: 0,
+                knownOpponents: System.Array.Empty<DemolitionAgentSnapshot>(),
+                strategySeed: _demolitionMatch.CurrentRound,
+                siteCenters: layout.LocalSiteCoordinates,
+                remainingSeconds: 8.0f);
+            var autonomousDefuserResolution = _demolitionObjectiveChannelCoordinator.Resolve(
+                autonomousDefuserPlan,
+                new[] { diagnosticAutonomousDefuser.Name.ToString() },
+                new DemolitionObjectiveChannelState(
+                    null,
+                    diagnosticHumanDefuser.Name.ToString(),
+                    0.0f,
+                    0.35f,
+                    -1,
+                    0));
+            var humanProxyDoesNotBlockAutonomousDefuser =
+                autonomousDefenderSnapshots.Length == 1
+                && autonomousDefuserPlan.Assignments.Any(assignment =>
+                    assignment.MemberId == diagnosticAutonomousDefuser.Name.ToString()
+                    && assignment.Duty == DemolitionDuty.Defuse)
+                && autonomousDefuserResolution.DefuserMemberId
+                    == diagnosticAutonomousDefuser.Name.ToString();
+            diagnosticHumanDefuser.Free();
+            diagnosticHumanDefuser = null;
+            diagnosticAutonomousDefuser.Free();
+            diagnosticAutonomousDefuser = null;
+
+            var squadUrgentPlantHardCommit = false;
+            var squadUrgentDefuseHardCommit = false;
+            if (squadObjectiveProbe is not null)
+            {
+                var objectiveSite = layout.SitePositions[0];
+                squadObjectiveProbe.GlobalPosition = objectiveSite + Vector3.Up * 0.2f;
+                _demolitionSquadObjectiveMate = squadObjectiveProbe;
+                _demolitionSquadObjectiveSite = 0;
+                _demolitionDevicePlanted = false;
+                _demolitionSquadPlantProgress = 0.25f;
+                _demolitionRemaining = DemolitionStrategyPlanner.EstimatePlantCompletionSeconds(
+                        distanceToSite: 0.0f,
+                        channelProgress: _demolitionSquadPlantProgress)
+                    + DemolitionStrategyPlanner.PlantCommitBufferSeconds - 0.1f;
+                squadUrgentPlantHardCommit = ShouldHardCommitDemolitionSquadObjective(
+                    squadObjectiveProbe);
+
+                _demolitionDevicePlanted = true;
+                _demolitionActiveSite = 0;
+                _demolitionSquadDefuseProgress = 0.25f;
+                _demolitionRemaining = DemolitionStrategyPlanner.EstimateDefuseCompletionSeconds(
+                        distanceToDevice: 0.0f,
+                        channelProgress: _demolitionSquadDefuseProgress)
+                    + DemolitionStrategyPlanner.DefuseCommitBufferSeconds - 0.1f;
+                squadUrgentDefuseHardCommit = ShouldHardCommitDemolitionSquadObjective(
+                    squadObjectiveProbe);
+            }
+            _demolitionDevicePlanted = savedDevicePlanted;
+            _demolitionActiveSite = savedActiveSite;
+            _demolitionSquadObjectiveMate = savedRelayMate;
+            _demolitionSquadObjectiveSite = savedRelaySite;
+            _demolitionSquadPlantProgress = savedSquadPlantProgress;
+            _demolitionSquadDefuseProgress = savedSquadDefuseProgress;
+            _demolitionRemaining = savedRemaining;
+
+            // Defuse arbitration distinguishes confirmed sight from a nearby actor
+            // behind geometry, then hard-commits when the fuse reaches last chance.
+            var defuseProbeTransform = probe.GlobalTransform;
+            var defuseProbeVelocity = probe.Velocity;
+            var defusePlayerTransform = _player.GlobalTransform;
+            var defuseAssignment = _demolitionOpponentAssignments[probe];
+            var defuseBreakoff = _demolitionCombatBreakoffs.Contains(probe);
+            _demolitionDevicePlanted = true;
+            _demolitionActiveSite = 0;
+            _demolitionDefuser = probe;
+            _demolitionDefuseProgress = 0.0f;
+            _demolitionOpponentAssignments[probe] = new DemolitionAssignment(
+                probe.Name,
+                DemolitionDuty.Defuse,
+                0,
+                "site_a",
+                "diagnostic urgent defuse");
+            probe.GlobalPosition = layout.SitePositions[0] + Vector3.Up * 0.2f;
+            probe.Velocity = Vector3.Zero;
+            _player.GlobalPosition = probe.GlobalPosition + new Vector3(6.0f, 0.0f, 0.0f);
+            _demolitionRemaining = 30.0f;
+            var visibleThreatYieldsDefuse = !TryHandleDemolitionDefenderMovement(
+                probe,
+                0.05f,
+                _player,
+                targetVisible: true);
+            var hiddenThreatCannotStopDefuse = TryHandleDemolitionDefenderMovement(
+                probe,
+                0.05f,
+                _player,
+                targetVisible: false);
+            _demolitionDefuseProgress = 0.0f;
+            _demolitionRemaining = DemolitionStrategyPlanner.EstimateDefuseCompletionSeconds(
+                    HorizontalDistance(probe.GlobalPosition, layout.SitePositions[0]),
+                    _demolitionDefuseProgress)
+                + DemolitionStrategyPlanner.DefuseCommitBufferSeconds - 0.1f;
+            var urgentDefuserHardCommits = TryHandleDemolitionDefenderMovement(
+                probe,
+                0.05f,
+                _player,
+                targetVisible: true);
+            probe.GlobalTransform = defuseProbeTransform;
+            probe.Velocity = defuseProbeVelocity;
+            _player.GlobalTransform = defusePlayerTransform;
+            _demolitionOpponentAssignments[probe] = defuseAssignment;
+            _demolitionDevicePlanted = false;
+            _demolitionActiveSite = savedActiveSite;
+            _demolitionDefuser = savedDefuser;
+            _demolitionDefuseProgress = savedDefuseProgress;
+            _demolitionRemaining = savedRemaining;
+            if (defuseBreakoff)
+            {
+                _demolitionCombatBreakoffs.Add(probe);
+            }
+            else
+            {
+                _demolitionCombatBreakoffs.Remove(probe);
+            }
 
             // Clock pressure: with the planned site unreachable in the remaining time,
             // the carrier commits to the closest site that still fits the clock.
@@ -2356,8 +2559,29 @@ public partial class FreightTerminalWorld
                 }
             }
 
+            var defuseArbitration = visibleThreatYieldsDefuse
+                && hiddenThreatCannotStopDefuse
+                && urgentDefuserHardCommits;
+            GD.Print(
+                $"DEMOLITION_OBJECTIVE_ARBITRATION_CHECK valid={defuseArbitration && urgentPlanterHardCommit && squadUrgentPlantHardCommit && squadUrgentDefuseHardCommit && humanCarrierNotAutomated && relayRejectsHumanProxy && humanProxyDoesNotBlockAutonomousDefuser} "
+                + $"urgent_plant={urgentPlanterHardCommit} "
+                + $"squad_urgent_plant={squadUrgentPlantHardCommit} "
+                + $"squad_urgent_defuse={squadUrgentDefuseHardCommit} "
+                + $"human_carrier_manual={humanCarrierNotAutomated} "
+                + $"relay_rejects_human={relayRejectsHumanProxy} "
+                + $"human_defuser_nonblocking={humanProxyDoesNotBlockAutonomousDefuser} "
+                + $"visible_yield={visibleThreatYieldsDefuse} "
+                + $"hidden_commit={hiddenThreatCannotStopDefuse} "
+                + $"urgent_commit={urgentDefuserHardCommits}");
             var valid = yieldedToCombat && resumedObjective && channelHoldsUnderFire
                 && smokeResumesObjective
+                && urgentPlanterHardCommit
+                && squadUrgentPlantHardCommit
+                && squadUrgentDefuseHardCommit
+                && humanCarrierNotAutomated
+                && relayRejectsHumanProxy
+                && humanProxyDoesNotBlockAutonomousDefuser
+                && defuseArbitration
                 && switchedUnderPressure && detourRoutesAroundWall && unreachableSafe && unreachableRetries
                 && teamAwareUnreachableSafe && softPenaltyDirectReachable
                 && routeRecovery && runtimeRoute && frontierFallback && frontierFallbackStable
@@ -2431,6 +2655,13 @@ public partial class FreightTerminalWorld
                 diagnosticSmoke.RemoveFromGroup(SmokeGrenade.ActiveGroupName);
                 diagnosticSmoke.QueueFree();
             }
+            if (diagnosticHumanCarrier is not null)
+            {
+                _squadMates.Remove(diagnosticHumanCarrier);
+                diagnosticHumanCarrier.Free();
+            }
+            diagnosticHumanDefuser?.Free();
+            diagnosticAutonomousDefuser?.Free();
             _player.GlobalTransform = savedPlayerTransform;
             _player.Velocity = savedPlayerVelocity;
             _demolitionRemaining = savedRemaining;
@@ -2876,7 +3107,7 @@ public partial class FreightTerminalWorld
         var pickupRouteUsed = false;
         while (_demolitionDeviceLifecycle.IsGrounded && pickupFrames < 240)
         {
-            _ = TryHandleDemolitionDefenderMovement(carrier, 0.05f, null);
+            _ = TryHandleDemolitionDefenderMovement(carrier, 0.05f, null, targetVisible: false);
             pickupRouteUsed |= _demolitionOpponentRoutes.TryGetValue(carrier, out var pickupCursor)
                 && pickupCursor.RouteKey == "device_pickup"
                 && pickupCursor.ReachesDestination;
@@ -2899,7 +3130,7 @@ public partial class FreightTerminalWorld
         var carrierRouteUsed = false;
         while (!_demolitionDevicePlanted && plantFrames < 600)
         {
-            _ = TryHandleDemolitionDefenderMovement(carrier, 0.05f, null);
+            _ = TryHandleDemolitionDefenderMovement(carrier, 0.05f, null, targetVisible: false);
             carrierRouteUsed |= _demolitionOpponentRoutes.TryGetValue(carrier, out var activeCarrierCursor)
                 && activeCarrierCursor.RouteKey.StartsWith("carrier_site_", System.StringComparison.Ordinal)
                 && activeCarrierCursor.ReachesDestination;

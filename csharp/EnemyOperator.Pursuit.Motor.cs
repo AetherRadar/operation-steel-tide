@@ -4,12 +4,119 @@ namespace OperationSteelTide;
 
 public partial class EnemyOperator
 {
+    private const float PursuitLadderSpeed = 2.65f;
+
     private readonly Godot.Collections.Array<Rid> _pursuitNavigationExclusions = new();
     private bool _pursuitNavigationMotorActive;
     private Vector3 _pursuitNavigationMotorDirection;
     private Vector3 _pursuitNavigationMotorDestination;
     private Vector3 _lastPursuitStairDirection;
     private int _pursuitRouteStallCount;
+    private bool _pursuitLadderActive;
+    private bool _pursuitLadderAscending;
+    private int _pursuitLadderDirectedEdgeId = -1;
+    private float _pursuitLadderElapsed;
+    private float _pursuitLadderDuration;
+    private AuthoredLadderTraversalPath _pursuitLadderPath;
+
+    internal bool IsPursuitLadderActiveForDiagnostics => _pursuitLadderActive;
+    internal int PursuitLadderTraversalsForDiagnostics { get; private set; }
+
+    private bool UpdatePursuitLadderTraversal(
+        float delta,
+        SquadNavigationDirective directive)
+    {
+        if (!_pursuitLadderActive
+            && !TryBeginPursuitLadderTraversal(directive))
+        {
+            return false;
+        }
+        if (_pursuitLadderDirectedEdgeId != directive.DirectedEdgeId)
+        {
+            CancelPursuitLadderTraversal();
+            return false;
+        }
+
+        _pursuitLadderElapsed = Mathf.Min(
+            _pursuitLadderDuration,
+            _pursuitLadderElapsed + Mathf.Max(0.0f, delta));
+        var progress = Mathf.Clamp(
+            _pursuitLadderElapsed / Mathf.Max(0.001f, _pursuitLadderDuration),
+            0.0f,
+            1.0f);
+        var pathProgress = _pursuitLadderAscending ? progress : 1.0f - progress;
+        GlobalPosition = _pursuitLadderPath.Evaluate(_pursuitLadderPath.Length * pathProgress);
+        Velocity = Vector3.Zero;
+        LookAt(GlobalPosition - _pursuitLadderPath.Outward, Vector3.Up);
+        _pursuitProgressOrigin = GlobalPosition;
+        _pursuitProgressTimer = 0.0f;
+        ResetPursuitNavigationMotorFrame();
+        if (progress < 0.9999f)
+        {
+            return true;
+        }
+
+        CompleteActivePursuitLadderDirective(_pursuitLadderDirectedEdgeId);
+        _pursuitLadderActive = false;
+        _pursuitLadderAscending = false;
+        _pursuitLadderDirectedEdgeId = -1;
+        _pursuitLadderElapsed = 0.0f;
+        _pursuitLadderDuration = 0.0f;
+        _pursuitLadderPath = default;
+        PursuitLadderTraversalsForDiagnostics++;
+        return true;
+    }
+
+    private bool TryBeginPursuitLadderTraversal(SquadNavigationDirective directive)
+    {
+        var ascending = directive.Target.Y > directive.ActionOrigin.Y;
+        var bottomFeet = ascending ? directive.ActionOrigin : directive.Target;
+        var topFeet = ascending ? directive.Target : directive.ActionOrigin;
+        if (!AuthoredLadderTraversalPath.TryCreate(
+                bottomFeet,
+                topFeet,
+                directive.ActionOutward,
+                out var path))
+        {
+            return false;
+        }
+
+        _pursuitLadderActive = true;
+        _pursuitLadderAscending = ascending;
+        _pursuitLadderDirectedEdgeId = directive.DirectedEdgeId;
+        _pursuitLadderElapsed = 0.0f;
+        _pursuitLadderDuration = Mathf.Max(0.65f, path.Length / PursuitLadderSpeed);
+        _pursuitLadderPath = path;
+        GlobalPosition = directive.ActionOrigin;
+        Velocity = Vector3.Zero;
+        return true;
+    }
+
+    private void CancelPursuitLadderTraversal()
+    {
+        _pursuitLadderActive = false;
+        _pursuitLadderAscending = false;
+        _pursuitLadderDirectedEdgeId = -1;
+        _pursuitLadderElapsed = 0.0f;
+        _pursuitLadderDuration = 0.0f;
+        _pursuitLadderPath = default;
+    }
+
+    internal bool AdvancePursuitLadderForDiagnostics(
+        float delta,
+        Vector3 bottomFeet,
+        Vector3 topFeet,
+        Vector3 outward,
+        bool startAtTop = false)
+        => UpdatePursuitLadderTraversal(
+            delta,
+            new SquadNavigationDirective(
+                startAtTop ? bottomFeet : topFeet,
+                SquadTraversalKind.Ladder,
+                DirectedEdgeId: -1,
+                Required: true,
+                ActionOrigin: startAtTop ? topFeet : bottomFeet,
+                ActionOutward: outward));
 
     private bool IsPursuitCorridorClear(Vector3 point)
     {

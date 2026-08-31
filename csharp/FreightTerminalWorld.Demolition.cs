@@ -6,9 +6,9 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
-    private const float DemolitionPlantDuration = 3.4f;
+    private const float DemolitionPlantDuration = DemolitionStrategyPlanner.PlantDurationSeconds;
     private const float DemolitionFuseDuration = 40.0f;
-    private const float DemolitionDefuseDuration = 7.0f;
+    private const float DemolitionDefuseDuration = DemolitionStrategyPlanner.DefuseDurationSeconds;
     private const float DemolitionRoundDuration = 100.0f;
     private const float DemolitionIntermissionDuration = 5.0f;
     private const float DemolitionStrategyRefreshDuration = 1.5f;
@@ -300,11 +300,12 @@ public partial class FreightTerminalWorld
         var count = Mathf.Min(DemolitionSquadSize, spawns.Count);
         for (var index = 0; index < count; index++)
         {
+            var opponentWeapon = DemolitionOpponentRoundWeaponForSlot(index);
             var opponent = SpawnEnemy(
                 spawns[index],
                 alerted: false,
                 teamId: 0,
-                initialWeapon: _demolitionOpponentRoundWeapon,
+                initialWeapon: opponentWeapon,
                 sentryMode: opponentSide == DemolitionTeam.Defenders,
                 detectionRange: 52.0f);
             opponent.Name = $"DemolitionOpponent_{index + 1:00}";
@@ -324,6 +325,9 @@ public partial class FreightTerminalWorld
     {
         foreach (var opponent in _demolitionOpponents)
         {
+            // Eliminated demolition bodies are temporary round loot sources. Keeping
+            // them registered after QueueFree leaves stale searches and source scans.
+            _lootSources.Remove(opponent);
             if (!IsInstanceValid(opponent))
             {
                 continue;
@@ -354,6 +358,10 @@ public partial class FreightTerminalWorld
     private void PrepareDemolitionRoundRuntime(bool resolveOpponentBuy)
     {
         ClearDemolitionDevice();
+        ClearDemolitionWeaponDrops();
+        ClearDemolitionUtilityProjectiles();
+        ResetDemolitionUtilityNetworkForRound();
+        CaptureDemolitionBotUtilityBudgetsForRound();
         _demolitionArena?.ResetRoundState();
         SynchronizeDemolitionGlassRoundReset();
         ResetDemolitionSquad();
@@ -442,6 +450,10 @@ public partial class FreightTerminalWorld
         {
             var spawnIndex = Mathf.Clamp(mate.SquadSlot, 0, spawns.Count - 1);
             mate.ResetForDemolitionRound(spawns[spawnIndex]);
+            mate.ConfigureDemolitionRoundLoadout(
+                DemolitionBotLoadoutPlanner.BuildForSlot(
+                    _demolitionPlayerEconomy.Funds,
+                    mate.SquadSlot));
             mate.LookAt(layout.Midpoint, Vector3.Up);
         }
         ResetSquadLeaderTrail(_player.GlobalPosition);
@@ -555,17 +567,69 @@ public partial class FreightTerminalWorld
 
     private void UpdateDemolitionInteraction(float delta)
     {
+        if (!Input.IsActionPressed(GameInputActions.Interact))
+        {
+            _interactReleaseRequired = false;
+        }
         if (!_demolitionRoundActive || _missionEnded)
         {
             _hud.SetInteraction(string.Empty, 0.0f, false);
             return;
         }
-        if (!_demolitionDevicePlanted)
+        if (IsDemolitionObjectiveInteractionAvailable())
         {
-            UpdateDemolitionPlantInteraction(delta);
+            if (!_demolitionDevicePlanted)
+            {
+                UpdateDemolitionPlantInteraction(delta);
+            }
+            else
+            {
+                UpdateDemolitionDefuseInteraction(delta);
+            }
             return;
         }
-        UpdateDemolitionDefuseInteraction(delta);
+
+        if (!_demolitionDevicePlanted)
+        {
+            _demolitionPlantProgress = Mathf.Max(0.0f, _demolitionPlantProgress - delta * 1.4f);
+        }
+        else
+        {
+            _demolitionPlayerDefuseProgress = Mathf.Max(
+                0.0f,
+                _demolitionPlayerDefuseProgress - delta * 1.4f);
+        }
+        if (TryUpdateDemolitionWeaponDropInteraction())
+        {
+            return;
+        }
+        _hud.SetInteraction(string.Empty, 0.0f, false);
+    }
+
+    private bool IsDemolitionObjectiveInteractionAvailable()
+    {
+        var layout = DemolitionLayout();
+        if (!_demolitionDevicePlanted)
+        {
+            if (LocalDemolitionSide != DemolitionTeam.Attackers
+                || !PlayerCarriesDemolitionDevice())
+            {
+                return false;
+            }
+            return layout.SitePositions.Any(sitePosition =>
+                HorizontalDistance(_player.GlobalPosition, sitePosition) < 3.25f
+                && Mathf.Abs(_player.GlobalPosition.Y - sitePosition.Y) < 2.8f);
+        }
+
+        if (LocalDemolitionSide != DemolitionTeam.Defenders
+            || _demolitionActiveSite < 0
+            || _demolitionActiveSite >= layout.SitePositions.Count)
+        {
+            return false;
+        }
+        var devicePosition = layout.SitePositions[_demolitionActiveSite];
+        return HorizontalDistance(_player.GlobalPosition, devicePosition) <= 3.25f
+            && Mathf.Abs(_player.GlobalPosition.Y - devicePosition.Y) <= 2.8f;
     }
 
     private void UpdateDemolitionPlantInteraction(float delta)
@@ -715,12 +779,14 @@ public partial class FreightTerminalWorld
         ResetDemolitionOpponentRoute(previousCarrier);
         _demolitionSquadObjectiveMate = null;
         _demolitionSquadPlantProgress = 0.0f;
+        // The planted site is shared objective information, but the planter's exact
+        // position is not. The refreshed retake plan wakes defenders without creating
+        // an omniscient pursuit that competes with the defuse route.
         foreach (var opponent in _demolitionOpponents)
         {
             if (IsInstanceValid(opponent) && !opponent.IsDead)
             {
                 opponent.SentryMode = false;
-                opponent.SetAlerted(_player.GlobalPosition);
             }
         }
         RefreshDemolitionStrategies(true);
@@ -765,6 +831,7 @@ public partial class FreightTerminalWorld
         }
 
         UpdateDemolitionDeviceLifecycle();
+        UpdateDemolitionUtilityAi(delta);
 
         var playerSide = _demolitionMatch.PlayerSide;
         var opponentsAlive = DemolitionOpponentCount;
@@ -914,6 +981,7 @@ public partial class FreightTerminalWorld
             return;
         }
         _demolitionRoundActive = false;
+        ClearDemolitionUtilityProjectiles();
         _player.EjectFromVehicleIfAny();
         SetDemolitionActorsFrozen(true);
 

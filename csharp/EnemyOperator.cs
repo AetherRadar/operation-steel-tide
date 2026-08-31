@@ -597,16 +597,6 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
         UpdatePursuitTimers(dt);
         UpdateCombatTarget(dt);
-        // A confirmed pursuit takes precedence over the scripted demolition
-        // objective route; otherwise an alerted defender can stand on its
-        // assignment while the hostile moves through a doorway or around a wall.
-        if (!IsPursuing
-            && Main?.TryHandleDemolitionDefenderMovement(this, dt, EngageTargetNode) == true)
-        {
-            MoveOperator(dt);
-            AnimateBody(dt);
-            return;
-        }
         UpdateDownedFinishLock(dt);
         UpdateWorldBossState(dt);
         var velocity = Velocity;
@@ -652,7 +642,16 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
         if (!hasEngageTarget)
         {
-            if (IsWorldBoss)
+            var followsDemolitionObjective = Main?.TryHandleDemolitionDefenderMovement(
+                this,
+                dt,
+                combatTarget: null,
+                targetVisible: false) == true;
+            if (followsDemolitionObjective)
+            {
+                _searchingLoot = false;
+            }
+            else if (IsWorldBoss)
             {
                 _searchingLoot = false;
                 UpdateWorldBossPatrol(dt);
@@ -735,6 +734,23 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             }
         }
 
+        // Demolition objective movement is decided after the cached visibility probe.
+        // Pursuit therefore cannot starve a plant/defuse route, while a genuinely
+        // visible close threat can still hand control to the full combat motor.
+        var followsVisibleDemolitionObjective = Main?.TryHandleDemolitionDefenderMovement(
+            this,
+            dt,
+            EngageTargetNode,
+            hasSight) == true;
+        if (followsVisibleDemolitionObjective)
+        {
+            _searchingLoot = false;
+            FireWhileFollowingDemolitionObjective(distance, hasSight);
+            MoveOperator(dt);
+            AnimateBody(dt);
+            return;
+        }
+
         if (Alerted && hasSight)
         {
             RefreshVisiblePursuitContact();
@@ -769,6 +785,29 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
         MoveOperator(dt);
         AnimateBody(dt);
+    }
+
+    /// <summary>
+    /// Returns fire without touching the velocity chosen by the demolition objective
+    /// motor. This deliberately reuses the normal weapon cadence, damage, and accuracy.
+    /// </summary>
+    private void FireWhileFollowingDemolitionObjective(float distance, bool hasSight)
+    {
+        if (!hasSight
+            || Main?.IsDemolitionOpponentChanneling(this) == true
+            || _fireTimer > 0.0f
+            || distance >= CurrentFireRange)
+        {
+            return;
+        }
+        if (_combatTarget is not null)
+        {
+            FireAtSquad(distance);
+        }
+        else if (_rawTarget is EnemyOperator rival && !rival.IsDead)
+        {
+            FireAtNode(rival, distance);
+        }
     }
 
     private void MoveOperator(float delta)
@@ -1171,6 +1210,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private void UpdateStance(float delta, float distance, bool hasSight)
     {
+        var isDemolitionCombatant = Main?.IsDemolitionMode == true;
         if (IsWorldBoss)
         {
             if (IsProne)
@@ -1181,7 +1221,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             _inCover = false;
             return;
         }
-        if (SentryMode)
+        if (SentryMode && !isDemolitionCombatant)
         {
             if (IsProne)
             {
@@ -1215,8 +1255,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         {
             SetProne(false);
         }
-        // Seek cover when mid-fight and a cover point is available.
-        if (IsRivalSquad && !_seekingCover && !_inCover && Main is not null && distance > 12.0f && _rng.Randf() < 0.55f)
+        // Demolition combatants share the existing low-frequency stance decision,
+        // but keep the ordinary NPC prone chance, accuracy, and movement tuning.
+        var coverSeekChance = IsRivalSquad ? 0.55f : isDemolitionCombatant ? 0.38f : 0.0f;
+        if (coverSeekChance > 0.0f
+            && !_seekingCover
+            && !_inCover
+            && Main is not null
+            && distance > 12.0f
+            && _rng.Randf() < coverSeekChance)
         {
             var cover = Main.FindCoverPoint(GlobalPosition, CurrentThreatPosition(hasSight));
             if (cover.Y > -500.0f && cover.DistanceTo(GlobalPosition) < 22.0f)
@@ -1447,7 +1494,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
         var combatPosition = CurrentTargetPosition();
         // Cover movement can run, but never fully suppress shooting once a target is locked.
-        var holdingCover = !SentryMode && UpdateCover(delta, combatPosition);
+        var holdingCover = (!SentryMode || Main?.IsDemolitionMode == true)
+            && UpdateCover(delta, combatPosition);
         var targetFlat = new Vector3(combatPosition.X, GlobalPosition.Y, combatPosition.Z);
         if (GlobalPosition.DistanceTo(targetFlat) > 0.1f)
         {
@@ -1683,7 +1731,13 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         var rangeFactor = Mathf.Clamp(stats.EffectiveRange / 150.0f, 0.7f, 1.25f);
         // Rivals are more accurate at medium range so multi-squad fights resolve.
         var baseAcc = IsWorldBoss ? 0.95f : IsRivalSquad ? 0.97f : 0.9f;
-        var accuracy = Mathf.Clamp((IsProne ? baseAcc + 0.02f : baseAcc) - distance * 0.005f / rangeFactor + AccuracyBonus, 0.55f, 0.98f);
+        // Demolition gains cover behavior, not extra aim. Preserve the ordinary
+        // extraction prone bonus while keeping demolition base accuracy unchanged.
+        var proneAccuracyBonus = IsProne && Main?.IsDemolitionMode != true ? 0.02f : 0.0f;
+        var accuracy = Mathf.Clamp(
+            baseAcc + proneAccuracyBonus - distance * 0.005f / rangeFactor + AccuracyBonus,
+            0.55f,
+            0.98f);
         var regionRoll = _rng.Randf();
         var hitRegion = IsProne
             ? HitRegion.Torso

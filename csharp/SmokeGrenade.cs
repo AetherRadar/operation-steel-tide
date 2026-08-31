@@ -19,10 +19,14 @@ public partial class SmokeGrenade : RigidBody3D
     public bool OwnerCollisionExcluded { get; private set; }
     public bool HasTouchedGround { get; private set; }
     public bool FuseStarted => HasTouchedGround && _armed;
-    public int CloudVisualCount => IsInstanceValid(_cloudRoot) ? _cloudRoot.GetChildCount() : 0;
+    public int CloudVisualCount
+        => IsInstanceValid(_cloudInstances) && _cloudInstances.Multimesh is not null
+            ? _cloudInstances.Multimesh.InstanceCount
+            : 0;
 
     private MeshInstance3D _casing = null!;
     private Node3D _cloudRoot = null!;
+    private MultiMeshInstance3D _cloudInstances = null!;
     private bool _armed;
     private bool _fading;
     private float _fuse;
@@ -164,13 +168,14 @@ public partial class SmokeGrenade : RigidBody3D
         _cloudRoot = new Node3D
         {
             Name = "SmokeCloud",
-            Position = Vector3.Up * 1.25f
+            Position = Vector3.Up * 1.25f,
+            Scale = Vector3.One * 0.12f
         };
         AddChild(_cloudRoot);
-        for (var index = 0; index < 24; index++)
-        {
-            AddSmokeLobe(index);
-        }
+        BuildSmokeInstances();
+        CreateTween().TweenProperty(_cloudRoot, "scale", Vector3.One, 0.9f)
+            .SetTrans(Tween.TransitionType.Back)
+            .SetEase(Tween.EaseType.Out);
     }
 
     private void BeginGroundFuse()
@@ -183,50 +188,51 @@ public partial class SmokeGrenade : RigidBody3D
         _fuse = GroundFuseDuration;
     }
 
-    private void AddSmokeLobe(int index)
+    private void BuildSmokeInstances()
     {
-        var angle = index * Mathf.Tau / 24.0f + (index % 3) * 0.21f;
-        var ring = index % 4;
-        var radial = 0.9f + ring * 0.95f;
-        var target = new Vector3(
-            Mathf.Cos(angle) * radial,
-            0.3f + (index % 5) * 0.48f,
-            Mathf.Sin(angle) * radial);
-        var alpha = 0.3f + (index % 4) * 0.045f;
         var material = new StandardMaterial3D
         {
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-            AlbedoColor = new Color(0.56f, 0.6f, 0.57f, alpha),
+            AlbedoColor = new Color(0.56f, 0.6f, 0.57f, 0.36f),
             Roughness = 1.0f
         };
-        var lobe = new MeshInstance3D
+        var multimesh = new MultiMesh
         {
-            Name = $"SmokeLobe_{index + 1:00}",
+            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+            InstanceCount = 24,
             Mesh = new SphereMesh
             {
                 Radius = 0.82f,
                 Height = 1.64f,
                 RadialSegments = 10,
                 Rings = 6
-            },
-            Position = Vector3.Up * 0.15f,
-            Scale = Vector3.One * 0.12f,
+            }
+        };
+        _cloudInstances = new MultiMeshInstance3D
+        {
+            Name = "SmokeLobesMultiMesh",
+            Multimesh = multimesh,
             MaterialOverride = material,
+            PhysicsInterpolationMode = PhysicsInterpolationModeEnum.Off,
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
         };
-        _cloudRoot.AddChild(lobe);
-        var scale = new Vector3(
-            1.7f + (index % 3) * 0.25f,
-            1.35f + (index % 4) * 0.18f,
-            1.7f + ((index + 1) % 3) * 0.25f);
-        var tween = CreateTween().SetParallel(true);
-        tween.TweenProperty(lobe, "position", target, 0.82f)
-            .SetTrans(Tween.TransitionType.Quad)
-            .SetEase(Tween.EaseType.Out);
-        tween.TweenProperty(lobe, "scale", scale, 0.9f)
-            .SetTrans(Tween.TransitionType.Back)
-            .SetEase(Tween.EaseType.Out);
+        for (var index = 0; index < multimesh.InstanceCount; index++)
+        {
+            var angle = index * Mathf.Tau / 24.0f + (index % 3) * 0.21f;
+            var ring = index % 4;
+            var radial = 0.9f + ring * 0.95f;
+            var position = new Vector3(
+                Mathf.Cos(angle) * radial,
+                0.3f + (index % 5) * 0.48f,
+                Mathf.Sin(angle) * radial);
+            var scale = new Vector3(
+                1.7f + (index % 3) * 0.25f,
+                1.35f + (index % 4) * 0.18f,
+                1.7f + ((index + 1) % 3) * 0.25f);
+            multimesh.SetInstanceTransform(index, new Transform3D(Basis.Identity.Scaled(scale), position));
+        }
+        _cloudRoot.AddChild(_cloudInstances);
     }
 
     private void FadeCloud()
@@ -235,15 +241,9 @@ public partial class SmokeGrenade : RigidBody3D
         {
             return;
         }
-        var children = _cloudRoot.GetChildren();
-        using var childrenBacking = children.AsDisposable();
-        foreach (var child in children)
+        if (IsInstanceValid(_cloudInstances))
         {
-            if (child is not MeshInstance3D lobe)
-            {
-                continue;
-            }
-            CreateTween().TweenProperty(lobe, "transparency", 1.0f, 1.5f);
+            CreateTween().TweenProperty(_cloudInstances, "transparency", 1.0f, 1.5f);
         }
     }
 }

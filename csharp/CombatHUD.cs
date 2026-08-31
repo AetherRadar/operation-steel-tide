@@ -41,7 +41,8 @@ public partial class CombatHUD : CanvasLayer
         string primaryId,
         bool armorSelected,
         int grenadeCount,
-        int smokeGrenadeCount);
+        int smokeGrenadeCount,
+        int incendiaryGrenadeCount);
     [Signal] public delegate void OperationsHomeRequestedEventHandler();
     [Signal] public delegate void DeploymentTimeOfDayChangedEventHandler(int timeOfDay);
 
@@ -1299,6 +1300,8 @@ public partial class CombatHUD : CanvasLayer
             _quickKnifeSkinId,
             _grenadeCount,
             _demolitionGameplayPresentation ? _demolitionSmokeGrenades : 0,
+            _demolitionGameplayPresentation ? _demolitionIncendiaryGrenades : 0,
+            _demolitionSelectedUtility,
             _activeWeaponSlot);
     }
 

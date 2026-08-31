@@ -103,6 +103,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         RefillMagazine();
         HasFireablePrimary = true;
         _carriedWeaponRecovered = true;
+        RefreshAuthoredCarriedWeaponVisual();
         if (IsInstanceValid(_weapon))
         {
             _weapon.Visible = true;
@@ -157,6 +158,20 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         _reloadTimer = 0.0f;
     }
 
+    private static bool RequiresSingleShotCadence(WeaponBuild build)
+    {
+        var definition = WeaponCatalog.Weapon(build.Platform);
+        return !definition.SupportsAutomatic || build.Stats().FireInterval >= 0.45f;
+    }
+
+    internal bool UsesSingleShotCadenceForDiagnostics
+        => RequiresSingleShotCadence(CarriedWeapon);
+
+    internal float MinimumFireCooldownForDiagnostics
+        => RequiresSingleShotCadence(CarriedWeapon)
+            ? CarriedWeapon.Stats().FireInterval
+            : 0.0f;
+
     internal void SetCarriedWeaponForDiagnostics(WeaponBuild build)
     {
         CarriedWeapon = build.Clone();
@@ -165,6 +180,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         _ammoGrade = LootGrade.Uncommon;
         ResetRecoveredAmmo();
         RefillMagazine();
+        RefreshAuthoredCarriedWeaponVisual();
     }
 
     private readonly RandomNumberGenerator _rng = new();
@@ -709,7 +725,12 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
         var spec = OperatorRoles.Spec(Role);
         var fireBoost = Role == OperatorRole.Assault && _overdriveTime > 0.0f ? 0.68f : 1.0f;
-        if (_burstShotsRemaining <= 0)
+        var singleShot = RequiresSingleShotCadence(CarriedWeapon);
+        if (singleShot)
+        {
+            _burstShotsRemaining = 1;
+        }
+        else if (_burstShotsRemaining <= 0)
         {
             _burstShotsRemaining = Role switch
             {
@@ -719,11 +740,28 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             };
         }
         _burstShotsRemaining--;
-        // Slow primaries (DMRs, snipers) stretch the burst rhythm without stalling it.
-        var cadenceScale = Mathf.Clamp(stats.FireInterval / 0.092f, 1.0f, 1.9f);
-        _weaponCooldown = (_burstShotsRemaining > 0
-            ? _rng.RandfRange(0.12f, 0.19f)
-            : _rng.RandfRange(0.42f, 0.72f)) * spec.FireIntervalMultiplier * fireBoost * cadenceScale;
+        if (singleShot)
+        {
+            // Bolt-actions and other non-automatic weapons fire exactly one round per
+            // decision. Role boosts may shorten their recovery, but never below the
+            // authored weapon interval.
+            _weaponCooldown = Mathf.Max(
+                stats.FireInterval,
+                stats.FireInterval
+                    * _rng.RandfRange(1.05f, 1.32f)
+                    * spec.FireIntervalMultiplier
+                    * fireBoost);
+        }
+        else
+        {
+            var cadenceScale = Mathf.Clamp(stats.FireInterval / 0.092f, 1.0f, 1.9f);
+            _weaponCooldown = (_burstShotsRemaining > 0
+                ? _rng.RandfRange(0.12f, 0.19f)
+                : _rng.RandfRange(0.42f, 0.72f))
+                * spec.FireIntervalMultiplier
+                * fireBoost
+                * cadenceScale;
+        }
         var targetVelocity = enemy.Velocity;
         targetVelocity.Y = 0.0f;
         var leadSeconds = Mathf.Clamp(distance / 180.0f, 0.04f, 0.22f);

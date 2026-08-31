@@ -48,14 +48,14 @@ public partial class FreightTerminalWorld
         AddRoofLadder("RadarPodRoof", "Radar spire", new Vector3(39.35f, 0.08f, 33.0f), new Vector3(37.35f, 14.68f, 33.0f), Vector3.Right, safety);
 
         // Expansion districts. Each enterable building has its own exterior route to the roof.
-        AddRoofLadder("CustomsWarehouseRoof", "Customs warehouse", new Vector3(-70.0f, 0.08f, -23.0f), new Vector3(-68.0f, 5.82f, -23.0f), Vector3.Left, safety);
-        AddRoofLadder("OpsAnnexRoof", "Operations annex", new Vector3(52.0f, 0.08f, -58.0f), new Vector3(52.0f, 10.22f, -56.0f), Vector3.Forward, safety);
-        AddRoofLadder("FuelLogisticsRoof", "Fuel logistics hall", new Vector3(72.0f, 0.08f, -118.0f), new Vector3(70.0f, 5.42f, -118.0f), Vector3.Right, safety);
-        AddRoofLadder("QuayStorageRoof", "Quay bonded storage", new Vector3(31.0f, 0.08f, -143.0f), new Vector3(29.0f, 5.02f, -143.0f), Vector3.Right, safety);
-        AddRoofLadder("DispatchOfficeRoof", "Rail dispatch office", new Vector3(-105.25f, 0.08f, -66.0f), new Vector3(-103.45f, 3.7f, -66.0f), Vector3.Left, safety);
+        AddRoofLadder("CustomsWarehouseRoof", "Customs warehouse", new Vector3(-70.0f, 0.08f, -23.0f), new Vector3(-68.0f, 6.82f, -23.0f), Vector3.Left, safety);
+        AddRoofLadder("OpsAnnexRoof", "Operations annex", new Vector3(52.0f, 0.08f, -58.0f), new Vector3(52.0f, 12.26f, -56.0f), Vector3.Forward, safety);
+        AddRoofLadder("FuelLogisticsRoof", "Fuel logistics hall", new Vector3(72.0f, 0.08f, -118.0f), new Vector3(70.0f, 6.43f, -118.0f), Vector3.Right, safety);
+        AddRoofLadder("QuayStorageRoof", "Quay bonded storage", new Vector3(31.0f, 0.08f, -143.0f), new Vector3(29.0f, 6.03f, -143.0f), Vector3.Right, safety);
+        AddRoofLadder("DispatchOfficeRoof", "Rail dispatch office", new Vector3(-86.75f, 0.08f, -66.0f), new Vector3(-88.55f, 3.7f, -66.0f), Vector3.Right, safety);
         AddRoofLadder("RailCanopyRoof", "Rail loading canopy", new Vector3(-40.0f, 0.08f, -101.0f), new Vector3(-38.2f, 4.42f, -101.0f), Vector3.Left, safety);
         AddRoofLadder("MaintenanceHangarRoof", "Maintenance hangar", new Vector3(8.55f, 0.08f, -100.0f), new Vector3(10.45f, 8.25f, -100.0f), Vector3.Left, safety);
-        AddRoofLadder("TankControlRoof", "Tank control shelter", new Vector3(105.0f, 0.08f, -118.0f), new Vector3(103.2f, 3.58f, -118.0f), Vector3.Right, safety);
+        AddRoofLadder("TankControlRoof", "Tank control shelter", new Vector3(105.0f, 0.08f, -118.0f), new Vector3(103.2f, 3.74f, -118.0f), Vector3.Right, safety);
         AddRoofLadder("SeawallShelterRoof", "Seawall shelter", new Vector3(49.45f, 0.08f, -146.0f), new Vector3(47.65f, 3.3f, -146.0f), Vector3.Right, safety);
         AddRoofLadder("ExtractionShelterRoof", "Extraction equipment shelter", new Vector3(-15.15f, 0.28f, -56.5f), new Vector3(-13.75f, 2.9f, -56.5f), Vector3.Left, safety);
 
@@ -156,6 +156,13 @@ public partial class FreightTerminalWorld
             outward,
             VerticalAccessKind.Ladder,
             visualRoot));
+        RegisterSquadTraversalLink(
+            $"roof_ladder:{id}",
+            SquadTraversalKind.Ladder,
+            bidirectional: true,
+            new[] { bottomFeet, topFeet },
+            costMultiplier: 1.65f,
+            actionOutward: outward);
     }
 
     private void AddStairRoute(string id, string building, Vector3 bottomFeet, Vector3 topFeet)
@@ -520,6 +527,8 @@ public partial class FreightTerminalWorld
             && climbedToRoof
             && climbedDown;
 
+        var aiLadder = RunAiLadderDiagnostics(representative);
+
         var expectedLadders = 26;
         var valid = _roofAccessRoot is not null
             && coverageReady
@@ -535,8 +544,9 @@ public partial class FreightTerminalWorld
             && startedLow
             && collisionActive
             && collisionRestored
-            && inputFlowReady;
-        GD.Print($"ROOF_ACCESS_CHECK valid={valid} routes={_roofAccessRoutes.Count} ladders={FunctionalLadderCount}/{expectedLadders} residential={_residentialRoofAccessCount}/{ResidentialTowerSpecs.Length} coverage={coverageReady} visuals={visualReady} instances={ladderGeometryCount} bottom_floor={bottomFloorReady} missing_bottom={string.Join(',', missingBottomFloors)} top_floor={topFloorReady} missing_top={string.Join(',', missingTopFloors)} landing_clear={landingClearanceReady} blocked={string.Join(',', blockedLandings)} path_clear={pathClearanceReady} path_blocked={string.Join(',', blockedPaths)} mounted={mounted} collision={collisionActive}/{collisionRestored} input_up={climbedWithInput} lateral_blocked={lateralBlocked} fire_blocked={fireBlocked} cancel={cancelledWithoutRemount} no_teleport={cancelledWithoutTeleport} reached_roof={climbedToRoof} mounted_top={mountedAtTop} reached_ground={climbedDown} down_active={_player.IsClimbingLadder} down_progress={downProgress:0.000} down_pos={downPosition.X:0.00},{downPosition.Y:0.00},{downPosition.Z:0.00} down_distance={downDistance:0.00}");
+            && inputFlowReady
+            && aiLadder.Valid;
+        GD.Print($"ROOF_ACCESS_CHECK valid={valid} routes={_roofAccessRoutes.Count} ladders={FunctionalLadderCount}/{expectedLadders} residential={_residentialRoofAccessCount}/{ResidentialTowerSpecs.Length} coverage={coverageReady} visuals={visualReady} instances={ladderGeometryCount} bottom_floor={bottomFloorReady} missing_bottom={string.Join(',', missingBottomFloors)} top_floor={topFloorReady} missing_top={string.Join(',', missingTopFloors)} landing_clear={landingClearanceReady} blocked={string.Join(',', blockedLandings)} path_clear={pathClearanceReady} path_blocked={string.Join(',', blockedPaths)} mounted={mounted} collision={collisionActive}/{collisionRestored} input_up={climbedWithInput} lateral_blocked={lateralBlocked} fire_blocked={fireBlocked} cancel={cancelledWithoutRemount} no_teleport={cancelledWithoutTeleport} reached_roof={climbedToRoof} mounted_top={mountedAtTop} reached_ground={climbedDown} down_active={_player.IsClimbingLadder} down_progress={downProgress:0.000} down_pos={downPosition.X:0.00},{downPosition.Y:0.00},{downPosition.Z:0.00} down_distance={downDistance:0.00} ai_links={aiLadder.AuthoredLinksReady}:{aiLadder.LinkCount} friendly_route={aiLadder.FriendlyRouteUp}/{aiLadder.FriendlyRouteDown} enemy_route={aiLadder.EnemyRouteUp}/{aiLadder.EnemyRouteDown} friendly_approach={aiLadder.FriendlyApproachUp}/{aiLadder.FriendlyApproachDown} enemy_approach={aiLadder.EnemyApproachUp}/{aiLadder.EnemyApproachDown} friendly_climb={aiLadder.FriendlyClimbedUp}/{aiLadder.FriendlyClimbedDown} enemy_climb={aiLadder.EnemyClimbedUp}/{aiLadder.EnemyClimbedDown}");
         GD.Print($"ROOF_ACCESS_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

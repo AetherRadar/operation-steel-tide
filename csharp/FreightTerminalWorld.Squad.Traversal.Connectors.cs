@@ -106,10 +106,16 @@ public partial class FreightTerminalWorld
         var nodes = new List<SquadPortalNode>();
         var nodeLookup = new Dictionary<(int X, int Z, int Bucket), int>();
         var authoredEdges = new List<SquadNavigationGraphEdge>();
+        var ordinaryPortalNodes = new HashSet<int>();
         foreach (var link in _squadTraversalLinks)
         {
             var from = GetOrAddSquadPortalNode(link.ForwardPoints[0], nodes, nodeLookup);
             var to = GetOrAddSquadPortalNode(link.ForwardPoints[^1], nodes, nodeLookup);
+            if (link.Kind != SquadTraversalKind.Ladder)
+            {
+                ordinaryPortalNodes.Add(from);
+                ordinaryPortalNodes.Add(to);
+            }
             authoredEdges.Add(new SquadNavigationGraphEdge(
                 from,
                 to,
@@ -125,7 +131,10 @@ public partial class FreightTerminalWorld
             }
         }
 
-        var warmState = BuildSquadPortalWalkWarmState(nodes, authoredEdges);
+        var warmState = BuildSquadPortalWalkWarmState(
+            nodes,
+            authoredEdges,
+            ordinaryPortalNodes);
         if (warmState.Components.Count <= 1)
         {
             _squadPortalWalkCorridorCacheReady = true;
@@ -165,7 +174,8 @@ public partial class FreightTerminalWorld
 
     private static SquadPortalWalkWarmState BuildSquadPortalWalkWarmState(
         List<SquadPortalNode> nodes,
-        List<SquadNavigationGraphEdge> graphEdges)
+        List<SquadNavigationGraphEdge> graphEdges,
+        IReadOnlySet<int> ordinaryPortalNodes)
     {
         var authoredParent = new int[nodes.Count];
         for (var node = 0; node < nodes.Count; node++)
@@ -181,11 +191,24 @@ public partial class FreightTerminalWorld
             }
         }
 
+        var ordinaryRoots = new HashSet<int>();
+        foreach (var node in ordinaryPortalNodes)
+        {
+            if (node >= 0 && node < nodes.Count)
+            {
+                ordinaryRoots.Add(FindSquadPortalComponent(authoredParent, node));
+            }
+        }
+
         var componentByRoot = new Dictionary<int, int>();
         var components = new List<List<int>>();
         for (var node = 0; node < nodes.Count; node++)
         {
             var root = FindSquadPortalComponent(authoredParent, node);
+            if (!ordinaryRoots.Contains(root))
+            {
+                continue;
+            }
             if (!componentByRoot.TryGetValue(root, out var component))
             {
                 component = components.Count;
