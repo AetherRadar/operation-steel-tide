@@ -1177,8 +1177,8 @@ diagnostic.
 | Texture `djmaesen_smg45/animated_reload_arms_Image_0.png` | 1,913,243 | `3BC291E07FA1E04DC5CEE727297D7051966A8D8AC39FCCE622BFB7DC408CB002` |
 | Texture `djmaesen_smg45/animated_reload_arms_Image_1.png` | 3,561,679 | `92CF1397C106CF721902A676985E82253CEC6E526DBD25510BD4E8B8685EEEA1` |
 | Texture `djmaesen_smg45/animated_reload_arms_Image_2.png` | 3,527,986 | `ADD5B1429F735916033AE45BD755B6A6DA70A9EBD047EED38F78C7D64A967F08` |
-| DCC source `../../source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend` | 28,356,557 | `2EF76C7FD395E6681473162F3FDEF35C2C10E6EF9F8C5AACE48C9D020C43A95B` |
-| Builder `../../scripts/blender/build_animated_reload_arms.py` | 63,519 | `DDEE2191373ED8E4395166CEA921A05EFA64C5753B618BAF5A0785E5138FF682` |
+| DCC source `../../source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend` | 28,356,557 | `D6CB5CE01B45FE2DD0956ACEDCE1724267FA3F0AB0BD01DEF71F9E9EB1E3A0E3` |
+| Builder `../../scripts/blender/build_animated_reload_arms.py` | 64,520 | `B63857A0927465B8007D4EC408746AAF47466D19F5697B2564DCD79FE768D10F` |
 
 The source and every derived arm mesh remain copyright DJMaesen and are not
 covered by the repository's MIT license. Full attribution, static adaptations,

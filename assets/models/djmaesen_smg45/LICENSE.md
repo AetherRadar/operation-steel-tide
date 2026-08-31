@@ -19,8 +19,8 @@ The runtime models in this directory are adapted from **fps animated smg** by
   sidecars)
 - Build scripts: `scripts/blender/build_djmaesen_smg45.py`,
   `scripts/blender/build_first_person_arms.py`, and
-  `scripts/blender/build_animated_reload_arms.py` (63,519 bytes, SHA-256
-  `DDEE2191373ED8E4395166CEA921A05EFA64C5753B618BAF5A0785E5138FF682`)
+  `scripts/blender/build_animated_reload_arms.py` (64,520 bytes, SHA-256
+  `B63857A0927465B8007D4EC408746AAF47466D19F5697B2564DCD79FE768D10F`)
 - Animated arms reproducible DCC source:
   `source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend`
 - Static pose variants generated: 2026-08-24
