@@ -22,8 +22,12 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
         SidearmForearmsMesh = CombatModelLibrary.RequireNode(
             root,
             "SidearmReloadForearmsMesh");
-        FullMesh.Visible = true;
-        SidearmForearmsMesh.Visible = false;
+        // Reload presentation is deliberately limited to the gloves and short
+        // cuffs. The complete sleeve mesh can cross the camera near plane when
+        // an authored reach is retargeted, producing the giant "tentacle" seen
+        // in first person.
+        FullMesh.Visible = false;
+        SidearmForearmsMesh.Visible = true;
         RightGripFrame = CombatModelLibrary.RequireNode(root, "RightGripFrame");
         SupportGripFrame = CombatModelLibrary.RequireNode(root, "SupportGripFrame");
         RightPalmFrame = CombatModelLibrary.RequireNode(root, "RightPalmFrame");
@@ -174,9 +178,9 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
 
     public void SetPresentationPlatform(WeaponPlatform platform)
     {
-        var sidearm = WeaponCatalog.IsSidearm(platform);
-        FullMesh.Visible = !sidearm;
-        SidearmForearmsMesh.Visible = sidearm;
+        _ = platform;
+        FullMesh.Visible = false;
+        SidearmForearmsMesh.Visible = true;
     }
 
     public void RetargetLeftPalm(
@@ -184,26 +188,29 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
         Vector3 targetGlobalPosition,
         float sidearmMagazineBlend = 1.0f)
     {
-        targetGlobalPosition = ReachableLeftPalmTarget(platform, targetGlobalPosition);
         EnsureContactPointsInitialized();
         var targetInSkeleton = Skeleton.GlobalTransform.AffineInverse()
             * targetGlobalPosition;
-        if (WeaponCatalog.IsSidearm(platform))
+        if (UsesSidearmForearms)
         {
-            // The sidearm presentation intentionally renders only the glove,
-            // short cuff, and forearm. Move that compact chain as one authored
-            // unit instead of solving an invisible shoulder/elbow IK chain;
-            // this preserves the clip's hand pose and removes elbow flips.
-            var sidearmContactInSkeleton = Skeleton.GlobalTransform.AffineInverse()
+            // Only the glove, short cuff, and forearm are rendered for every
+            // weapon. Move that compact chain as one authored unit instead of
+            // solving an invisible shoulder/elbow IK chain; this preserves the
+            // clip's hand pose and cannot stretch a sleeve across the viewport.
+            var compactContactInSkeleton = Skeleton.GlobalTransform.AffineInverse()
                 * LeftSupportAnchorGlobalPosition(
                     platform,
                     sidearmMagazineBlend);
-            var sidearmShoulder = Skeleton.GetBoneGlobalPose(LeftShoulderBone);
-            sidearmShoulder.Origin += targetInSkeleton - sidearmContactInSkeleton;
-            Skeleton.SetBoneGlobalPose(LeftShoulderBone, sidearmShoulder);
+            var compactShoulder = Skeleton.GetBoneGlobalPose(LeftShoulderBone);
+            compactShoulder.Origin += targetInSkeleton - compactContactInSkeleton;
+            Skeleton.SetBoneGlobalPose(LeftShoulderBone, compactShoulder);
             Skeleton.ForceUpdateBoneChildTransform(LeftShoulderBone);
             return;
         }
+
+        targetGlobalPosition = ReachableLeftPalmTarget(platform, targetGlobalPosition);
+        targetInSkeleton = Skeleton.GlobalTransform.AffineInverse()
+            * targetGlobalPosition;
 
         var shoulder = Skeleton.GetBoneGlobalPose(LeftShoulderBone);
         var elbow = Skeleton.GetBoneGlobalPose(LeftElbowBone);

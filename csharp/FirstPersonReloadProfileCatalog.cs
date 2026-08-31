@@ -226,11 +226,14 @@ internal static class FirstPersonReloadProfileCatalog
             FirstPersonReloadMechanism.PistolMagazine,
             clipStem,
             SharedMagazineHome,
-            new Vector3(-0.12f, -0.27f, -0.23f),
+            new Vector3(-0.08f, -0.46f, -0.27f),
             new Vector3(0.035f, 0.0f, 0.315f),
-            new Vector3(-0.08f, -0.15f, -0.28f),
-            new Vector3(-0.12f, -0.27f, -0.23f),
-            new Vector3(-0.08f, -0.16f, -0.27f),
+            // Pull the installed magazine visibly down out of the grip before
+            // it disappears. The old path moved upward first, so the new
+            // magazine appeared to brush an unchanged magazine in the pistol.
+            new Vector3(-0.02f, -0.36f, -0.29f),
+            new Vector3(-0.08f, -0.46f, -0.27f),
+            new Vector3(-0.02f, -0.34f, -0.29f),
             new Vector3(-0.19f, 0.0f, 0.0f),
             // Pistol magazines travel straight through the magwell. Keeping
             // one orientation across extract, pouch, and seat avoids the
