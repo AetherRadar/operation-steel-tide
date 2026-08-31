@@ -20,9 +20,8 @@ public partial class CombatHUD
 
     private void BuildPauseMenu(Control root)
     {
-        var scene = GD.Load<PackedScene>(PauseMenuViewScenePath)
-            ?? throw new System.InvalidOperationException($"Unable to load {PauseMenuViewScenePath}");
-        _pauseMenuView = scene.Instantiate<PauseMenuView>();
+        _pauseMenuView = HudPackedSceneCache.Instantiate<PauseMenuView>(
+            PauseMenuViewScenePath);
         root.AddChild(_pauseMenuView);
 
         _pauseMenuView.ResumeRequested += () => EmitSignal(SignalName.PauseRequested);

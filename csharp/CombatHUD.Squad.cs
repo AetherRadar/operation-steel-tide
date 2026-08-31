@@ -407,9 +407,8 @@ public partial class CombatHUD
         _squadAddress.AddThemeFontSizeOverride("font_size", 12);
         sessionBand.AddChild(_squadAddress);
 
-        var roomBrowserScene = GD.Load<PackedScene>(LanRoomBrowserView.ScenePath)
-            ?? throw new InvalidOperationException($"Unable to load {LanRoomBrowserView.ScenePath}");
-        _squadRoomBrowser = roomBrowserScene.Instantiate<LanRoomBrowserView>();
+        _squadRoomBrowser = HudPackedSceneCache.Instantiate<LanRoomBrowserView>(
+            LanRoomBrowserView.ScenePath);
         _squadRoomBrowser.Position = new Vector2(596, 36);
         _squadRoomBrowser.Size = new Vector2(64, 38);
         _squadRoomBrowser.SetContext(LanRoomKind.Extraction);

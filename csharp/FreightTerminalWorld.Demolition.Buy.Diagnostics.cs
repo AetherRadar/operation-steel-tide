@@ -43,7 +43,7 @@ public partial class FreightTerminalWorld
             && gsh18Loadout.SidearmReserveAmmo == 54;
 
         const string scenePath = "res://ui/DemolitionBuyView.tscn";
-        var packedScene = GD.Load<PackedScene>(scenePath);
+        var packedScene = HudPackedSceneCache.Load(scenePath);
         var probe = packedScene?.Instantiate<DemolitionBuyView>();
         var purchaseRequests = 0;
         var requestedSidearm = string.Empty;

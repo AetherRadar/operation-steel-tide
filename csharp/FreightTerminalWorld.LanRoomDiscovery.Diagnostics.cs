@@ -103,7 +103,7 @@ public partial class FreightTerminalWorld
             && _hud.SquadNetworkAddress == "127.0.0.1:30117"
             && _hud.SelectedDeploymentMapId == DeploymentMapCatalog.FreightTerminalId;
 
-        var packedBriefing = GD.Load<PackedScene>("res://ui/DemolitionBriefingView.tscn");
+        var packedBriefing = HudPackedSceneCache.Load("res://ui/DemolitionBriefingView.tscn");
         var briefing = packedBriefing?.Instantiate<DemolitionBriefingView>();
         var demolitionSelection = false;
         if (briefing is not null)

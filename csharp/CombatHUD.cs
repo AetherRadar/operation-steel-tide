@@ -410,9 +410,8 @@ public partial class CombatHUD : CanvasLayer
         _reserveLabel = Label("/ 150", 18, new Color(0.54f, 0.65f, 0.62f));
         _reserveLabel.Position = new Vector2(78, 23);
         weapon.AddChild(_reserveLabel);
-        var quickSlotScene = GD.Load<PackedScene>("res://ui/QuickSlotBarView.tscn")
-            ?? throw new InvalidOperationException("Unable to load res://ui/QuickSlotBarView.tscn");
-        _quickSlotBar = quickSlotScene.Instantiate<QuickSlotBarView>();
+        _quickSlotBar = HudPackedSceneCache.Instantiate<QuickSlotBarView>(
+            "res://ui/QuickSlotBarView.tscn");
         _quickSlotBar.Position = new Vector2(118, 7);
         _quickSlotBar.SlotRequested += slot => EmitSignal(SignalName.WeaponSlotRequested, slot);
         weapon.AddChild(_quickSlotBar);
@@ -701,9 +700,8 @@ public partial class CombatHUD : CanvasLayer
         panel.AddChild(_lootStats);
 
         BuildLootOperatorDisplay(panel);
-        var weaponRackScene = GD.Load<PackedScene>(LootWeaponRackView.ScenePath)
-            ?? throw new InvalidOperationException($"Missing scene: {LootWeaponRackView.ScenePath}");
-        _lootWeaponRack = weaponRackScene.Instantiate<LootWeaponRackView>();
+        _lootWeaponRack = HudPackedSceneCache.Instantiate<LootWeaponRackView>(
+            LootWeaponRackView.ScenePath);
         _lootWeaponRack.Position = new Vector2(1200, 174);
         _lootWeaponRack.Size = new Vector2(184, 296);
         _lootWeaponRack.Dropped += HandleLootDrop;

@@ -146,23 +146,18 @@ public partial class CombatHUD
     private void BuildDemolitionHud(Control root)
     {
         BuildDemolitionBuyHud(root);
-        var teamStatusScene = GD.Load<PackedScene>(DemolitionTeamStatusViewScenePath)
-            ?? throw new System.InvalidOperationException(
-                $"Unable to load {DemolitionTeamStatusViewScenePath}");
-        _demolitionTeamStatusView = teamStatusScene.Instantiate<DemolitionTeamStatusView>();
+        _demolitionTeamStatusView = HudPackedSceneCache.Instantiate<DemolitionTeamStatusView>(
+            DemolitionTeamStatusViewScenePath);
         root.AddChild(_demolitionTeamStatusView);
-        var scene = GD.Load<PackedScene>(DemolitionRoundResultViewScenePath)
-            ?? throw new System.InvalidOperationException(
-                $"Unable to load {DemolitionRoundResultViewScenePath}");
-        _demolitionRoundResultView = scene.Instantiate<DemolitionRoundResultView>();
+        _demolitionRoundResultView = HudPackedSceneCache.Instantiate<DemolitionRoundResultView>(
+            DemolitionRoundResultViewScenePath);
         root.AddChild(_demolitionRoundResultView);
     }
 
     private void BuildDemolitionBuyHud(Control root)
     {
-        var scene = GD.Load<PackedScene>(DemolitionBuyViewScenePath)
-            ?? throw new System.InvalidOperationException($"Unable to load {DemolitionBuyViewScenePath}");
-        _demolitionBuyView = scene.Instantiate<DemolitionBuyView>();
+        _demolitionBuyView = HudPackedSceneCache.Instantiate<DemolitionBuyView>(
+            DemolitionBuyViewScenePath);
         root.AddChild(_demolitionBuyView);
         _demolitionBuyView.PurchaseRequested += (
             sidearmId,

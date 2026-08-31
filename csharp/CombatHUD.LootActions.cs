@@ -26,8 +26,8 @@ public partial class CombatHUD
 
     private void BuildLootItemActionMenu()
     {
-        var scene = GD.Load<PackedScene>(LootItemActionMenuView.ScenePath);
-        _lootItemActionMenu = scene.Instantiate<LootItemActionMenuView>();
+        _lootItemActionMenu = HudPackedSceneCache.Instantiate<LootItemActionMenuView>(
+            LootItemActionMenuView.ScenePath);
         _lootItemActionMenu.Name = "LootItemActionMenu";
         _lootItemActionMenu.EquipRequested += itemId =>
             EmitSignal(SignalName.BackpackUseRequested, itemId);

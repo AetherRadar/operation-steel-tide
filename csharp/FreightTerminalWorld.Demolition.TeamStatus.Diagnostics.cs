@@ -10,7 +10,7 @@ public partial class FreightTerminalWorld
         await WaitFrames(3);
         var originalLanguage = _hud.CurrentLanguage;
         var snapshot = DemolitionTeamStatusDiagnosticSnapshot();
-        var packedScene = GD.Load<PackedScene>(DemolitionTeamStatusView.ScenePath);
+        var packedScene = HudPackedSceneCache.Load(DemolitionTeamStatusView.ScenePath);
         var probe = packedScene?.Instantiate<DemolitionTeamStatusView>();
         var sceneReady = false;
         var englishReady = false;

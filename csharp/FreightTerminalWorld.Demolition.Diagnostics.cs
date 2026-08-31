@@ -85,7 +85,7 @@ public partial class FreightTerminalWorld
             && !_demolitionMode;
 
         const string scenePath = "res://ui/DemolitionBriefingView.tscn";
-        var packedScene = GD.Load<PackedScene>(scenePath);
+        var packedScene = HudPackedSceneCache.Load(scenePath);
         var probe = packedScene?.Instantiate<DemolitionBriefingView>();
         var backRequests = 0;
         var deployRequests = 0;
@@ -219,12 +219,14 @@ public partial class FreightTerminalWorld
             && _squadDeployed
             && _demolitionArena?.Layout.MapId == DemolitionMapCatalog.BazaarCrossingId
             && _demolitionArena.Root.Name == "BazaarCrossingArena";
+        var hudSceneCacheReady = HudPackedSceneCache.IsCached(scenePath)
+            && HudPackedSceneCache.IsCached(LanRoomBrowserView.ScenePath);
         var valid = sceneReady && chineseReady && englishReady && mapPoolReady && tideglassCarousel
             && tideforgeCarousel && harborCarousel && lockedCarousel && carouselReturned && lockedMapRejected
             && bazaarCarousel
             && synchronizedWithoutDeployment && addressModes && networkLobbyState
-            && probeReady && backReady && bazaarDeploymentReady;
-        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} catalog_order={catalogOrderReady} map_pool={mapPoolReady} tideglass={tideglassCarousel} tideforge={tideforgeCarousel} harbor={harborCarousel} bazaar={bazaarCarousel} carousel_locked={lockedCarousel} carousel_return={carouselReturned} locked_rejected={lockedMapRejected} sync={synchronizedWithoutDeployment} address_modes={addressModes} network_lobby={networkLobbyState} probe={probeReady} back={backReady} bazaar_deployment={bazaarDeploymentReady}");
+            && probeReady && backReady && bazaarDeploymentReady && hudSceneCacheReady;
+        GD.Print($"DEMOLITION_BRIEFING_CHECK valid={valid} scene={sceneReady} packed={_hud.DemolitionBriefingUsesPackedScene} ui={_hud.DemolitionBriefingUiReady} signals={_hud.DemolitionBriefingIntentSignalsReady} chinese={chineseReady} english={englishReady} catalog_order={catalogOrderReady} map_pool={mapPoolReady} tideglass={tideglassCarousel} tideforge={tideforgeCarousel} harbor={harborCarousel} bazaar={bazaarCarousel} carousel_locked={lockedCarousel} carousel_return={carouselReturned} locked_rejected={lockedMapRejected} sync={synchronizedWithoutDeployment} address_modes={addressModes} network_lobby={networkLobbyState} probe={probeReady} hud_scene_cache={hudSceneCacheReady} back={backReady} bazaar_deployment={bazaarDeploymentReady}");
         GD.Print($"DEMOLITION_BRIEFING_PASS valid={valid}");
         GetTree().Paused = false;
         await WaitFrames(180);

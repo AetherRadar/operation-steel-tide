@@ -114,9 +114,7 @@ public partial class DemolitionTeamStatusView : Control
         _score = center.GetNode<Label>("Score");
         _timer = center.GetNode<Label>("Timer");
         _phase = center.GetNode<Label>("Phase");
-        _cardScene = GD.Load<PackedScene>(DemolitionTeamMemberCard.ScenePath)
-            ?? throw new System.InvalidOperationException(
-                $"Unable to load {DemolitionTeamMemberCard.ScenePath}");
+        _cardScene = HudPackedSceneCache.Load(DemolitionTeamMemberCard.ScenePath);
     }
 
     private void Refresh()

@@ -187,9 +187,8 @@ public partial class CombatHUD
 
     private void BuildOperationsOfficeMenu(Control root)
     {
-        var scene = GD.Load<PackedScene>(OperationsOfficeViewScenePath)
-            ?? throw new System.InvalidOperationException($"Unable to load {OperationsOfficeViewScenePath}");
-        _operationsOfficeRoot = scene.Instantiate<ColorRect>();
+        _operationsOfficeRoot = HudPackedSceneCache.Instantiate<ColorRect>(
+            OperationsOfficeViewScenePath);
         root.AddChild(_operationsOfficeRoot);
 
         var rail = _operationsOfficeRoot.GetNode<Control>("Rail");
@@ -218,9 +217,8 @@ public partial class CombatHUD
 
     private void BuildDemolitionBriefingView(Control root)
     {
-        var scene = GD.Load<PackedScene>(DemolitionBriefingViewScenePath)
-            ?? throw new System.InvalidOperationException($"Unable to load {DemolitionBriefingViewScenePath}");
-        _demolitionBriefingView = scene.Instantiate<DemolitionBriefingView>();
+        _demolitionBriefingView = HudPackedSceneCache.Instantiate<DemolitionBriefingView>(
+            DemolitionBriefingViewScenePath);
         root.AddChild(_demolitionBriefingView);
         _demolitionBriefingView.BackRequested += () => EmitSignal(SignalName.DemolitionBackRequested);
         _demolitionBriefingView.DeployRequested += (

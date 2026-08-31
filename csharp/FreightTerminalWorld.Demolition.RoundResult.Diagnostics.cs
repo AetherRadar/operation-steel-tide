@@ -9,7 +9,7 @@ public partial class FreightTerminalWorld
         await WaitFrames(3);
         const string scenePath = "res://ui/DemolitionRoundResultView.tscn";
         var originalLanguage = _hud.CurrentLanguage;
-        var packedScene = GD.Load<PackedScene>(scenePath);
+        var packedScene = HudPackedSceneCache.Load(scenePath);
         var probe = packedScene?.Instantiate<DemolitionRoundResultView>();
         var chineseVictory = false;
         var englishDefeat = false;
