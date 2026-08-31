@@ -276,7 +276,11 @@ public partial class FreightTerminalWorld
         const float thickness = 0.28f;
         const float height = 1.10f;
         const float lateralOffset = 1.66f;
-        var delta = highSurface - lowSurface;
+        const float lowClearance = 0.90f;
+        var fullDelta = highSurface - lowSurface;
+        var fullLength = fullDelta.Length();
+        var trimmedLowSurface = lowSurface + fullDelta / fullLength * lowClearance;
+        var delta = highSurface - trimmedLowSurface;
         var horizontalRun = new Vector2(delta.X, delta.Z).Length();
         var angle = Mathf.Atan2(delta.Y, horizontalRun);
         var length = delta.Length();
@@ -289,7 +293,7 @@ public partial class FreightTerminalWorld
             : new Vector3(thickness, height, length);
         var lateral = new Vector3(-delta.Z, 0.0f, delta.X).Normalized();
         var normal = Basis.FromEuler(rotation) * Vector3.Up;
-        var center = layout.Origin + (lowSurface + highSurface) * 0.5f
+        var center = layout.Origin + (trimmedLowSurface + highSurface) * 0.5f
             + normal * (height * 0.5f);
         rails.Add(new BazaarGuardRailExpectation(
             $"{namePrefix}Left",
@@ -321,9 +325,10 @@ public partial class FreightTerminalWorld
         }
         if (rail.StairRail)
         {
+            const float lowClearance = 0.90f;
             var railLength = Mathf.Max(rail.Size.X, rail.Size.Z);
             var traversalLength = Mathf.Max(traversal.Size.X, traversal.Size.Z);
-            return Mathf.Abs(railLength - traversalLength) <= tolerance
+            return Mathf.Abs(railLength + lowClearance - traversalLength) <= tolerance
                 && BazaarGuardRailVectorNear(rail.Rotation, traversal.Rotation, 0.002f);
         }
         var railBottom = rail.Center.Y - rail.Size.Y * 0.5f;

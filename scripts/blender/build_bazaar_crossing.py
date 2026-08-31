@@ -497,6 +497,7 @@ STAIRS = (
     StairSpec("Bazaar_Mid_Mezzanine_South_Stair", -6.0, 40.85, -6.0, 31.0, 3.2, 3.2, 18, 9.85 / 18.0, "Mid_Mezzanine"),
     StairSpec("Bazaar_Mid_Mezzanine_North_Stair", -6.0, 7.15, -6.0, 17.0, 3.2, 3.2, 18, 9.85 / 18.0, "Mid_Mezzanine"),
 )
+STAIR_RAIL_LOW_CLEARANCE = 0.90
 
 # Frozen invisible runtime-collision contract supplied by the Bazaar gameplay
 # builder.  The DCC scene places finished CC0 building masses or authored cover
@@ -1586,13 +1587,18 @@ def create_authored_stair_rails(
     up = Vector((0.0, 0.0, 1.0))
     slope_length = sqrt(run * run + spec.top_height * spec.top_height)
     tiles = max(2, int(round(run / 2.0)))
-    cell = slope_length / tiles
+    rail_length = slope_length - STAIR_RAIL_LOW_CLEARANCE
+    cell = rail_length / tiles
     bottom = godot_to_blender(spec.bottom_x, 0.0, spec.bottom_z)
     transforms: list[Matrix] = []
     rail_offset = spec.width * 0.5 + 0.06
     rail_levels = (0.48, 0.92)
     for side_sign in (-1.0, 1.0):
-        base = bottom + lateral * rail_offset * side_sign
+        base = (
+            bottom
+            + slope * STAIR_RAIL_LOW_CLEARANCE
+            + lateral * rail_offset * side_sign
+        )
         for rail_level in rail_levels:
             for index in range(tiles):
                 transforms.append(
@@ -1618,14 +1624,19 @@ def create_authored_stair_rails(
     )
     rails["stair_contract"] = spec.name
     rails["open_rail_rows"] = len(rail_levels)
+    rails["low_entry_clearance_m"] = STAIR_RAIL_LOW_CLEARANCE
 
     newel_positions: list[tuple[float, float, float, float]] = []
     post_segments = max(3, int(round(run / 2.7)))
+    entry_fraction = STAIR_RAIL_LOW_CLEARANCE / slope_length
     for side_sign in (-1.0, 1.0):
         side = rail_offset * side_sign
         px, pz = -uz, ux
         for post_index in range(post_segments + 1):
-            fraction = post_index / post_segments
+            fraction = (
+                entry_fraction
+                + (1.0 - entry_fraction) * post_index / post_segments
+            )
             step_height = spec.top_height * fraction
             newel_positions.append(
                 (
@@ -1648,6 +1659,7 @@ def create_authored_stair_rails(
     )
     newels["stair_contract"] = spec.name
     newels["post_segments"] = post_segments
+    newels["low_entry_clearance_m"] = STAIR_RAIL_LOW_CLEARANCE
     return rails, newels
 
 
@@ -6063,6 +6075,16 @@ def validate_authored_scene(root: bpy.types.Object) -> dict[str, object]:
             raise RuntimeError(f"Stair lacks authored Trey guardrails: {stair.name}")
         if newels is None or newels.get("stair_contract") != stair.name:
             raise RuntimeError(f"Stair lacks authored Trey landing newels: {stair.name}")
+        if (
+            abs(float(rails.get("low_entry_clearance_m", -1.0)) - STAIR_RAIL_LOW_CLEARANCE)
+            > 0.0001
+            or abs(
+                float(newels.get("low_entry_clearance_m", -1.0))
+                - STAIR_RAIL_LOW_CLEARANCE
+            )
+            > 0.0001
+        ):
+            raise RuntimeError(f"Stair low-entry rail clearance drifted: {stair.name}")
         expected_rail_modules = 2 * max(2, int(round(run / 2.0)))
         if (
             "IndRoofTrimBStraightFull" not in str(rails.get("source_asset", ""))
@@ -6417,6 +6439,11 @@ def validate_authored_scene(root: bpy.types.Object) -> dict[str, object]:
                     "guardrail_module_instances": int(
                         bpy.data.objects[f"{stair.name}_AuthoredTreyRails"][
                             "authored_module_instances"
+                        ]
+                    ),
+                    "low_entry_clearance_m": float(
+                        bpy.data.objects[f"{stair.name}_AuthoredTreyRails"][
+                            "low_entry_clearance_m"
                         ]
                     ),
                     "newel_source_object": "BazaarSource_IndColumnFree",
@@ -6932,6 +6959,18 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
             raise RuntimeError(f"Stair lacks authored guardrails: {stair.name}")
         if bpy.data.objects.get(f"{stair.name}_AuthoredTreyNewels") is None:
             raise RuntimeError(f"Stair lacks authored newels: {stair.name}")
+        rails = bpy.data.objects[f"{stair.name}_AuthoredTreyRails"]
+        newels = bpy.data.objects[f"{stair.name}_AuthoredTreyNewels"]
+        if (
+            abs(float(rails.get("low_entry_clearance_m", -1.0)) - STAIR_RAIL_LOW_CLEARANCE)
+            > 0.0001
+            or abs(
+                float(newels.get("low_entry_clearance_m", -1.0))
+                - STAIR_RAIL_LOW_CLEARANCE
+            )
+            > 0.0001
+        ):
+            raise RuntimeError(f"Stair low-entry rail clearance drifted: {stair.name}")
         nosings = bpy.data.objects.get(f"{stair.name}_AuthoredTreyTreadNosings")
         if nosings is None or int(nosings.get("tread_nosing_instances", 0)) != stair.steps:
             raise RuntimeError(f"Stair lacks one authored tread nosing per step: {stair.name}")
@@ -7236,6 +7275,11 @@ def validate_authored_scene_v2(root: bpy.types.Object) -> dict[str, object]:
                     float(bpy.data.objects[stair.name]["slope_degrees"]), 4
                 ),
                 "steps": int(bpy.data.objects[stair.name]["step_count"]),
+                "low_entry_rail_clearance_m": float(
+                    bpy.data.objects[f"{stair.name}_AuthoredTreyRails"][
+                        "low_entry_clearance_m"
+                    ]
+                ),
             }
             for stair in STAIRS
         },

@@ -18,15 +18,18 @@ retained as provenance.
 - map-local source palette SHA-256:
   `1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9`;
 - generated packed Blend SHA-256:
-  `867C5DC9A2E7D0A6D8856B93BAC22FD38C3DBADF5C1961F61B3C0FDBE08C0FF2`;
+  `0C5341729E1D6A4D6DFD80A74D52AD74E5787E68A236B208819710833934262B`;
 - generated runtime GLB SHA-256:
-  `87BEFD14810E665DC6AE5E3C76551684DF1AABCF270FF208A2024B332C4F2BC7`.
+  `B0AADFAD6610AB37A57E7D583044483E01E7402E86557CF573D9558A72862514`.
 
 The packed artifacts were regenerated on 2026-08-30 after solid A/B/Mid and
 back-market wall fills were restricted to unambiguous foundation modules, two
 false terminus shopfronts and one floating A-rear rack were removed, the three
 real A-rear portals were widened to 4.0 metres, and the A-rear Segment02 and two
 18-metre rear-market mass overlaps were connected visibly to their roofs.
+They were regenerated again on 2026-08-31 with each stair's guardrails and
+newels beginning 0.90 metres upslope so the low landing remains clear for
+player turns.
 
 The GLB is exported without `KHR_draco_mesh_compression`; disabling a binary
 compression extension does not alter the source licenses or provenance.

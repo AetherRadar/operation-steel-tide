@@ -18,6 +18,7 @@ public sealed partial class DemolitionArenaLayout
     private const float BazaarGuardRailThickness = 0.28f;
     private const float BazaarGuardRailHeight = 1.10f;
     private const float BazaarStairGuardRailOffset = 1.66f;
+    private const float BazaarStairGuardRailLowClearance = 0.90f;
 
     private readonly record struct BazaarOpening(float Center, float Width);
 
@@ -241,7 +242,11 @@ public sealed partial class DemolitionArenaLayout
         Vector3 lowSurface,
         Vector3 highSurface)
     {
-        var delta = highSurface - lowSurface;
+        var fullDelta = highSurface - lowSurface;
+        var fullLength = fullDelta.Length();
+        var trimmedLowSurface = lowSurface
+            + fullDelta / fullLength * BazaarStairGuardRailLowClearance;
+        var delta = highSurface - trimmedLowSurface;
         var horizontalRun = new Vector2(delta.X, delta.Z).Length();
         var angle = Mathf.Atan2(delta.Y, horizontalRun);
         var length = delta.Length();
@@ -254,7 +259,7 @@ public sealed partial class DemolitionArenaLayout
             : new Vector3(BazaarGuardRailThickness, BazaarGuardRailHeight, length);
         var lateral = new Vector3(-delta.Z, 0.0f, delta.X).Normalized();
         var surfaceNormal = Basis.FromEuler(rotation) * Vector3.Up;
-        var center = (lowSurface + highSurface) * 0.5f
+        var center = (trimmedLowSurface + highSurface) * 0.5f
             + surfaceNormal * (BazaarGuardRailHeight * 0.5f);
         boxes.Add(BazaarCollisionBox(
             $"{namePrefix}Left",

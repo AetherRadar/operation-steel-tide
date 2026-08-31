@@ -5,13 +5,13 @@
   "source_blend_sha256": "1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9",
   "blend": {
     "path": "source_art/world/bazaar_crossing/bazaar_crossing.blend",
-    "bytes": 49534883,
-    "sha256": "867C5DC9A2E7D0A6D8856B93BAC22FD38C3DBADF5C1961F61B3C0FDBE08C0FF2"
+    "bytes": 49534466,
+    "sha256": "0C5341729E1D6A4D6DFD80A74D52AD74E5787E68A236B208819710833934262B"
   },
   "glb": {
     "path": "assets/models/bazaar_crossing/bazaar_crossing.glb",
-    "bytes": 107168608,
-    "sha256": "87BEFD14810E665DC6AE5E3C76551684DF1AABCF270FF208A2024B332C4F2BC7"
+    "bytes": 107169064,
+    "sha256": "B0AADFAD6610AB37A57E7D583044483E01E7402E86557CF573D9558A72862514"
   },
   "scene": {
     "revision": "V2 dense enterable interiors",
@@ -76,37 +76,43 @@
         "width_m": 3.2,
         "run_m": 11.1,
         "slope_degrees": 17.9691,
-        "steps": 20
+        "steps": 20,
+        "low_entry_rail_clearance_m": 0.9
       },
       "Bazaar_A_Gallery_Rear_Stair": {
         "width_m": 3.2,
         "run_m": 11.100000000000001,
         "slope_degrees": 17.9691,
-        "steps": 20
+        "steps": 20,
+        "low_entry_rail_clearance_m": 0.9
       },
       "Bazaar_B_Balcony_South_Stair": {
         "width_m": 3.2,
         "run_m": 10.5,
         "slope_degrees": 17.9424,
-        "steps": 20
+        "steps": 20,
+        "low_entry_rail_clearance_m": 0.9
       },
       "Bazaar_B_Balcony_Rear_Stair": {
         "width_m": 3.2,
         "run_m": 10.5,
         "slope_degrees": 17.9424,
-        "steps": 20
+        "steps": 20,
+        "low_entry_rail_clearance_m": 0.9
       },
       "Bazaar_Mid_Mezzanine_South_Stair": {
         "width_m": 3.2,
         "run_m": 9.850000000000001,
         "slope_degrees": 17.9976,
-        "steps": 18
+        "steps": 18,
+        "low_entry_rail_clearance_m": 0.9
       },
       "Bazaar_Mid_Mezzanine_North_Stair": {
         "width_m": 3.2,
         "run_m": 9.85,
         "slope_degrees": 17.9976,
-        "steps": 18
+        "steps": 18,
+        "low_entry_rail_clearance_m": 0.9
       }
     },
     "platform_top_m": {

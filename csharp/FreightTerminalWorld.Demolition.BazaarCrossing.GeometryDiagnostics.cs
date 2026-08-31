@@ -460,6 +460,76 @@ public partial class FreightTerminalWorld
         return results;
     }
 
+    private async Task<(bool Ready, string Summary)> BazaarWalkPlayerThroughMidSouthLeftLanding(
+        DemolitionArenaLayout layout)
+    {
+        var start = layout.Origin + new Vector3(-7.0f, 3.4f, 30.8f);
+        var waypoints = new[]
+        {
+            layout.Origin + new Vector3(-7.0f, 0.2f, 41.35f),
+            layout.Origin + new Vector3(-8.75f, 0.2f, 41.35f),
+            layout.Origin + new Vector3(-8.75f, 0.2f, 43.2f)
+        };
+
+        Input.ActionRelease("move_forward");
+        Input.ActionRelease("sprint");
+        _player.ProcessMode = ProcessModeEnum.Inherit;
+        _player.UiLocked = false;
+        _player.RestoreMovementInput();
+        _player.SetStaminaForDiagnostics(100.0f);
+        _player.GlobalPosition = start;
+        _player.Velocity = Vector3.Zero;
+        await WaitFrames(6);
+
+        var settledStart = _player.GlobalPosition;
+        var reachedWaypoints = 0;
+        var totalFrames = 0;
+        Input.ActionPress("move_forward");
+        for (var waypointIndex = 0; waypointIndex < waypoints.Length; waypointIndex++)
+        {
+            var waypoint = waypoints[waypointIndex];
+            var reached = false;
+            for (var waypointFrames = 0; waypointFrames < 240; waypointFrames++)
+            {
+                totalFrames++;
+                _player.FaceWorldPointForDiagnostics(waypoint);
+                if (!_player.HasMovementIntent && waypointFrames > 2)
+                {
+                    _player.RestoreMovementInput();
+                    Input.ActionPress("move_forward");
+                }
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                var delta = waypoint - _player.GlobalPosition;
+                var horizontal = new Vector2(delta.X, delta.Z).Length();
+                var heightReached = _player.GlobalPosition.Y <= waypoint.Y + 0.55f;
+                if (horizontal < 0.38f && heightReached)
+                {
+                    reached = true;
+                    break;
+                }
+            }
+            if (!reached)
+            {
+                break;
+            }
+            reachedWaypoints++;
+        }
+        Input.ActionRelease("move_forward");
+        Input.ActionRelease("sprint");
+
+        var drop = settledStart.Y - _player.GlobalPosition.Y;
+        var exitDistance = new Vector2(
+            waypoints[^1].X - _player.GlobalPosition.X,
+            waypoints[^1].Z - _player.GlobalPosition.Z).Length();
+        var ready = reachedWaypoints == waypoints.Length
+            && drop >= 2.5f
+            && exitDistance < 0.5f;
+        return (
+            ready,
+            $"{ready}:{reachedWaypoints}/{waypoints.Length}:{totalFrames}:"
+                + $"drop{drop:0.00}:exit{exitDistance:0.00}");
+    }
+
     private async Task<(bool Ready, int Frames, float HeightDelta)> BazaarWalkPlayer(
         Vector3 start,
         Vector3 target,

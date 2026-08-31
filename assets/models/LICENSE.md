@@ -292,17 +292,17 @@ before the deterministic build runs.
 
 Artifact and audit mapping:
 
-- Runtime output: `bazaar_crossing/bazaar_crossing.glb`, 107,168,608 bytes,
+- Runtime output: `bazaar_crossing/bazaar_crossing.glb`, 107,169,064 bytes,
   SHA-256
-  `87BEFD14810E665DC6AE5E3C76551684DF1AABCF270FF208A2024B332C4F2BC7`.
+  `B0AADFAD6610AB37A57E7D583044483E01E7402E86557CF573D9558A72862514`.
 - Immutable map-local source palette:
   `../../source_art/world/bazaar_crossing/bazaar_crossing_source_palette.blend`,
   SHA-256
   `1E6C91C5AA1B7D798B5C603BB2CE40C89B5C3255A9047209EEAB109C9F4730F9`.
 - Editable packed source:
-  `../../source_art/world/bazaar_crossing/bazaar_crossing.blend`, 49,534,883
+  `../../source_art/world/bazaar_crossing/bazaar_crossing.blend`, 49,534,466
   bytes, SHA-256
-  `867C5DC9A2E7D0A6D8856B93BAC22FD38C3DBADF5C1961F61B3C0FDBE08C0FF2`.
+  `0C5341729E1D6A4D6DFD80A74D52AD74E5787E68A236B208819710833934262B`.
 - Reproducible build: `../../scripts/blender/build_bazaar_crossing.py`.
 - Rights and exact source-object mapping: `bazaar_crossing/LICENSE.md` and
   `../../source_art/world/bazaar_crossing/LICENSE.md`.

@@ -263,6 +263,7 @@ public partial class FreightTerminalWorld
         var stairWalkFailures = string.Join('|', stairWalks
             .Where(walk => !walk.Ready)
             .Select(walk => $"{walk.Name}:{walk.Ascended}:{walk.Descended}:{walk.AscendGain:0.00}:{walk.DescendLoss:0.00}"));
+        var playerLeftStairExit = await BazaarWalkPlayerThroughMidSouthLeftLanding(layout);
         var playerMidConnection = await BazaarWalkPlayerAcrossMidMezzanine(layout);
 
         var dressingRoot = arena.Root.GetNodeOrNull<Node3D>("DemolitionAuthoredDressing");
@@ -340,6 +341,7 @@ public partial class FreightTerminalWorld
             && postPatrolReady
             && aiDirectivesReady
             && playerStairsReady
+            && playerLeftStairExit.Ready
             && playerMidConnection.Ready
             && detachedFoyerBafflesRemoved
             && authoredVisualsReady
@@ -386,6 +388,7 @@ public partial class FreightTerminalWorld
             + $"post_patrol={postPatrolReady} "
             + $"ai_directives={aiDirectivesReady} result={aiTraversal.Summary} failures={aiDirectiveFailures} "
             + $"player_stairs={playerStairsReady}:{stairWalks.Count} failures={stairWalkFailures} "
+            + $"player_left_stair_exit={playerLeftStairExit.Summary} "
             + $"player_mid_connection={playerMidConnection.Ready}:{playerMidConnection.Summary} "
             + $"detached_foyer_baffles_removed={detachedFoyerBafflesRemoved} "
             + $"authored={authoredVisualsReady}:1/{missingModelCount} meshes={visibleMeshCount} failures={authoredVisualFailures} "

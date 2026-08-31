@@ -84,7 +84,10 @@ as `(x, -z, y)`. The root remains at the origin with unit scale.
 The three approach-side flights use full-height 5.2-metre facade openings and
 unobstructed exterior forecourts; they have no side portal, front wall, arch,
 canopy post, or entry trim. Rear flights remain inside their parent buildings.
-Inner rails leave landing gaps.
+Inner rails leave landing gaps. Every stair rail and its first newel begin
+`0.90 m` upslope from the visual low point, keeping the low landing clear for a
+player capsule to descend along either side and turn out without catching the
+rail end.
 Godot owns collision, navigation, spawns, sites, and smooth route surfaces;
 visual low points correspond to runtime route points at `y=0.2`.
 
@@ -100,10 +103,10 @@ The V2 report records:
   draw-node consolidation and GLB round trip;
 - 48 DCC materials and 58 DCC textures;
 - 203.473 MiB estimated RGBA8 plus full-mip-chain texture memory;
-- 107,168,608-byte non-Draco GLB, SHA-256
-  `87BEFD14810E665DC6AE5E3C76551684DF1AABCF270FF208A2024B332C4F2BC7`;
-- 49,534,883-byte packed Blend, SHA-256
-  `867C5DC9A2E7D0A6D8856B93BAC22FD38C3DBADF5C1961F61B3C0FDBE08C0FF2`;
+- 107,169,064-byte non-Draco GLB, SHA-256
+  `B0AADFAD6610AB37A57E7D583044483E01E7402E86557CF573D9558A72862514`;
+- 49,534,466-byte packed Blend, SHA-256
+  `0C5341729E1D6A4D6DFD80A74D52AD74E5787E68A236B208819710833934262B`;
 - bounds X `[-68,68]`, Blender Y `[-56.2,56.2]`, Z `[-0.16,9.46]`;
 - four complete enterable interiors and 9,925.573 square metres of roofed
   footprint;
