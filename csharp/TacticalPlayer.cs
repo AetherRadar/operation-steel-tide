@@ -577,7 +577,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             Name = "M4A1",
             Position = new Vector3(0.34f, -0.33f, -0.58f),
-            Scale = Vector3.One * 0.68f
+            Scale = Vector3.One * 0.68f,
+            // Camera-space weapon meshes and their skinned reload hands are
+            // already updated every rendered frame. Physics interpolation can
+            // otherwise render the glove from an older bone pose while the
+            // magazine and contact markers use the current one, producing a
+            // detached or flickering support hand.
+            PhysicsInterpolationMode = PhysicsInterpolationModeEnum.Off
         };
         _camera.AddChild(_weaponRoot);
         _proceduralWeaponVisual = new Node3D { Name = "ProceduralWeaponVisual" };

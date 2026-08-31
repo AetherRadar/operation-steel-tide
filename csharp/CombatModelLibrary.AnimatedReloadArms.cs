@@ -22,10 +22,10 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
         SidearmForearmsMesh = CombatModelLibrary.RequireNode(
             root,
             "SidearmReloadForearmsMesh");
-        // Reload presentation is deliberately limited to the gloves and short
-        // cuffs. The complete sleeve mesh can cross the camera near plane when
-        // an authored reach is retargeted, producing the giant "tentacle" seen
-        // in first person.
+        // Reload presentation uses the complete gloves and authored forearms,
+        // while omitting only the upper arms that can cross the camera near
+        // plane. Keeping the wrist-to-sleeve span visible avoids both a
+        // floating hand and the giant "tentacle" silhouette.
         FullMesh.Visible = false;
         SidearmForearmsMesh.Visible = true;
         RightGripFrame = CombatModelLibrary.RequireNode(root, "RightGripFrame");
@@ -110,9 +110,16 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
     {
         if (!WeaponCatalog.IsSidearm(platform))
         {
-            return LeftGripAnchorGlobalPosition;
+            // Place the visible palm itself on the long-gun target.  The DCC
+            // foregrip marker is offset from the palm and leaves a noticeable
+            // hand pop when the reload layer returns to the normal support
+            // grip at the final frame.
+            return LeftPalmCenterGlobalPosition;
         }
         EnsureContactPointsInitialized();
+        // This DCC marker sits on the lower glove surface.  Keep that surface
+        // on the magazine rather than burying the palm centre inside the
+        // magazine and firing hand.
         var contactInBone = _leftPalmContactInBone.Lerp(
             _leftSidearmMagazineAnchorInBone,
             Mathf.Clamp(sidearmMagazineBlend, 0.0f, 1.0f));
@@ -186,6 +193,7 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
     public void RetargetLeftPalm(
         WeaponPlatform platform,
         Vector3 targetGlobalPosition,
+        Vector3 desiredWristDirectionGlobal,
         float sidearmMagazineBlend = 1.0f)
     {
         EnsureContactPointsInitialized();
@@ -202,6 +210,35 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
                     platform,
                     sidearmMagazineBlend);
             var compactShoulder = Skeleton.GetBoneGlobalPose(LeftShoulderBone);
+            var compactWrist = Skeleton.GetBoneGlobalPose(LeftWristBone);
+            var compactPalmCenter = Skeleton.GlobalTransform.AffineInverse()
+                * LeftPalmCenterGlobalPosition;
+            var currentWristDirection = compactWrist.Origin
+                - compactPalmCenter;
+            var desiredWristDirection = Skeleton.GlobalTransform.Basis.Inverse()
+                * desiredWristDirectionGlobal;
+            if (currentWristDirection.LengthSquared() > 0.000001f
+                && desiredWristDirection.LengthSquared() > 0.000001f)
+            {
+                var wristSwing = new Quaternion(
+                    currentWristDirection.Normalized(),
+                    desiredWristDirection.Normalized());
+                var wristCorrection = WeaponCatalog.IsSidearm(platform)
+                    ? new Quaternion(
+                        desiredWristDirection.Normalized(),
+                        Mathf.DegToRad(-90.0f)) * wristSwing
+                    : wristSwing;
+                compactShoulder.Basis = (
+                    new Basis(wristCorrection) * compactShoulder.Basis)
+                    .Orthonormalized();
+                Skeleton.SetBoneGlobalPose(LeftShoulderBone, compactShoulder);
+                Skeleton.ForceUpdateBoneChildTransform(LeftShoulderBone);
+                compactContactInSkeleton = Skeleton.GlobalTransform.AffineInverse()
+                    * LeftSupportAnchorGlobalPosition(
+                        platform,
+                        sidearmMagazineBlend);
+                compactShoulder = Skeleton.GetBoneGlobalPose(LeftShoulderBone);
+            }
             compactShoulder.Origin += targetInSkeleton - compactContactInSkeleton;
             Skeleton.SetBoneGlobalPose(LeftShoulderBone, compactShoulder);
             Skeleton.ForceUpdateBoneChildTransform(LeftShoulderBone);

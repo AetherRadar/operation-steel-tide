@@ -47,7 +47,7 @@ public partial class TacticalPlayer
         _magazine.Rotation = profile.MagazineRotation;
         _spareMagazine.Visible = progress >= profile.ExtractEnd;
         _spareMagazine.Position = profile.ExtractedMagazine;
-        _spareMagazine.Rotation = profile.ExtractedRotation;
+        _spareMagazine.Rotation = profile.MagazineRotation;
         var sidearmSlideLockedOpen = WeaponCatalog.IsSidearm(profile.Platform)
             && _reloadStartedEmpty
             && progress < profile.ActionEnd;
@@ -81,9 +81,7 @@ public partial class TacticalPlayer
             _spareMagazine.Position = profile.ExtractedMagazine.Lerp(
                 profile.MagazineHome,
                 t);
-            _spareMagazine.Rotation = profile.ExtractedRotation.Lerp(
-                profile.MagazineRotation,
-                t);
+            _spareMagazine.Rotation = profile.MagazineRotation;
             _supportHand.Position = _spareMagazine.Position + profile.MagazineGripOffset;
             _supportHand.Rotation = profile.MagazineHandRotation;
             PlayPlatformReloadSound(1, progress, profile.InsertEnd + 0.035f, 1.04f);
@@ -232,19 +230,8 @@ public partial class TacticalPlayer
 
     private void ApplyMagazineExtraction(FirstPersonReloadProfile profile, float t)
     {
-        if (profile.Mechanism == FirstPersonReloadMechanism.RockAndLockMagazine)
-        {
-            var rock = SmoothStep(Mathf.Clamp(t * 1.8f, 0.0f, 1.0f));
-            var pull = SmoothStep(Mathf.Clamp((t - 0.25f) / 0.75f, 0.0f, 1.0f));
-            _magazine.Position = profile.MagazineHome.Lerp(profile.ExtractedMagazine, pull);
-            _magazine.Rotation = profile.MagazineRotation.Lerp(
-                profile.ExtractedRotation,
-                rock);
-            return;
-        }
-
         _magazine.Position = profile.MagazineHome.Lerp(profile.ExtractedMagazine, t);
-        _magazine.Rotation = profile.MagazineRotation.Lerp(profile.ExtractedRotation, t);
+        _magazine.Rotation = profile.MagazineRotation;
     }
 
     private void UpdateReloadAction(
@@ -338,10 +325,10 @@ public partial class TacticalPlayer
     {
         var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
         var emphasis = Mathf.Sin(progress * Mathf.Pi);
-        // Sidearms stay close to their normal ready pose. The magazine hand
-        // performs the exchange at the bottom of frame instead of lifting the
-        // complete weapon-and-arms rig into the centre of the screen.
-        return new Vector3(-0.025f, 0.045f, 0.045f) * emphasis;
+        // Lift the compact reload workspace enough to keep the authored cuff
+        // and forearm segment visible and connected to the bottom edge. Keep
+        // the depth change small so the hand does not balloon near the camera.
+        return new Vector3(-0.025f, 0.160f, 0.0f) * emphasis;
     }
 
     private Vector3 SidearmReloadViewRotation()
@@ -369,7 +356,9 @@ public partial class TacticalPlayer
             WeaponPlatform.AK74 or WeaponPlatform.MP5A5 => 0.050f,
             WeaponPlatform.M24 => 0.250f,
             WeaponPlatform.AXMC or WeaponPlatform.AWM => 0.100f,
-            WeaponPlatform.VSS => 0.080f,
+            // The long VSS magazine otherwise leaves the glove and magazine
+            // surface on the bottom readability line during extraction.
+            WeaponPlatform.VSS => 0.105f,
             _ => 0.0f
         };
         return Vector3.Up * (workspaceLift * emphasis + exchangeLift * exchange);

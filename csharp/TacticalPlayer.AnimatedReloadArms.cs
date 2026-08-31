@@ -155,9 +155,25 @@ public partial class TacticalPlayer
             EquippedWeapon.Platform,
             authoredEmptyReload,
             authoredArmProgress);
+        var supportTarget = ReloadSupportTargetGlobal();
+        // Bring the support wrist in from the lower-left of the magazine.  A
+        // lower-right exit overlaps the firing hand and pushes the cuff below
+        // frame, making a valid skinned glove appear missing.
+        var reloadProfile = FirstPersonReloadProfileCatalog.For(
+            EquippedWeapon.Platform);
+        var wristDirectionInWeaponRoot = WeaponCatalog.IsSidearm(
+                EquippedWeapon.Platform)
+            ? new Vector3(0.32f, -0.50f, -0.80f)
+            : new Vector3(0.30f, -0.67f, -0.68f);
+        var safeWristDirection = reloadProfile.Mechanism
+                == FirstPersonReloadMechanism.InternalMagazine
+            ? Vector3.Zero
+            : _weaponRoot.GlobalTransform.Basis.Orthonormalized()
+                * wristDirectionInWeaponRoot.Normalized();
         animatedReloadArms.RetargetLeftPalm(
             EquippedWeapon.Platform,
-            ReloadSupportTargetGlobal(),
+            supportTarget,
+            safeWristDirection,
             SidearmReloadMagazineAnchorBlend());
         return true;
     }
@@ -171,24 +187,11 @@ public partial class TacticalPlayer
         {
             return progress;
         }
-        if (progress < profile.ExtractEnd)
-        {
-            return progress;
-        }
-        if (progress < profile.SeatEnd)
-        {
-            // Hold one authored magazine-grip pose while the compact forearm
-            // follows the direct down-and-up target. This removes the old
-            // stow/acquire wrist turns that made the cuff appear to vanish.
-            return profile.ExtractEnd;
-        }
 
-        // Return through the same short reach instead of playing the unused
-        // pouch detour at high speed after the fresh magazine is seated.
-        return Mathf.Lerp(
-            profile.ExtractEnd,
-            0.0f,
-            SmoothSegment(progress, profile.SeatEnd, 1.0f));
+        // Keep one compact, camera-safe grip for the direct exchange. The
+        // target supplies all down-and-up motion; replaying the old pouch clip
+        // turns the wrist behind the near plane and leaves a floating hand.
+        return 0.0f;
     }
 
     private float SidearmReloadMagazineAnchorBlend()

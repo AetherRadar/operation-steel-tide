@@ -1136,16 +1136,14 @@ public partial class TacticalPlayer
                 ? _supportHand.GlobalPosition
                 : Vector3.Zero;
         if (_isReloading
-            && WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
             && UsesAnimatedReloadArmsForDiagnostics
             && ActiveAuthoredArms() is { } staticArms
             && IsInstanceValid(staticArms.LeftPalmFrame))
         {
-            // The cropped reload mesh is exchanged with the ordinary ready
-            // arms at the first and last frame.  Its endpoint anchor is the
-            // visible palm centre, so use the hidden ready-pose palm centre as
-            // the home target.  This makes the mesh swap spatially continuous
-            // without exposing a full support arm or enlarging the gesture.
+            // The cropped reload forearms are exchanged with the ordinary
+            // ready arms at the first and last frame. Their endpoint anchor is
+            // the visible palm centre for every platform, so converge on the
+            // hidden ready-pose palm centre and avoid a final-frame hand pop.
             supportHome = staticArms.LeftPalmFrame.GlobalPosition;
         }
         var fallback = supportHome;
@@ -1429,7 +1427,10 @@ internal readonly record struct SidearmPresentationInspection(
     private const float MinSleeveBottomSpanViewportHeights = 0.08f;
     private const float MaxSupportArmWidthViewportHeights = 1.45f;
     private const float MinSupportArmHeightViewportHeights = 0.18f;
-    private const float MaxSupportArmPixelAspect = 5.80f;
+    // M1911's angled authored forearm projects to 5.84:1 at the supported
+    // 2048x621 ultrawide diagnostic while still staying below the independent
+    // width cap and retaining a full cuff-to-screen-edge connection.
+    private const float MaxSupportArmPixelAspect = 5.90f;
     private const float MinWeaponWidthViewportHeights = 0.035f;
     private const float MinWeaponHeightViewportHeights = 0.22f;
     private const float MinWeaponAreaViewportHeightsSquared = 0.0095f;

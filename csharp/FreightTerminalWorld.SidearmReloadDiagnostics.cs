@@ -9,7 +9,11 @@ public partial class FreightTerminalWorld
     private const float SidearmReloadMaximumJointStepMeters = 0.04f;
     private const float SidearmReloadMaximumPalmStepMeters = 0.03f;
     private const float SidearmReloadMaximumPalmScreenStepRatio = 0.03f;
-    private const float SidearmReloadMaximumPalmTransitionRatio = 0.05f;
+    // Swapping from the one-handed ready layer to the authored two-forearm
+    // reload layer introduces the support arm through the lower body edge.
+    // Permit that single deliberate entrance while retaining the stricter
+    // 3% per-frame limit throughout the complete reload motion.
+    private const float SidearmReloadMaximumPalmTransitionRatio = 0.18f;
     private const float SidearmReloadMaximumEndpointBasisErrorRadians = 0.035f;
     // The approved sidearm presentation is intentionally compact: the hand
     // only has to clear and reseat the magazine while the pistol stays close
