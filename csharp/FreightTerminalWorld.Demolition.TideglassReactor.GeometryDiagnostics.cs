@@ -67,7 +67,10 @@ public partial class FreightTerminalWorld
         float EastGain,
         bool SiteOfficeReady,
         int SiteOfficeFrames,
-        float SiteOfficeGain)> TideglassWalkPlayerAcrossStairs(
+        float SiteOfficeGain,
+        bool SiteOfficeExitReady,
+        int SiteOfficeExitFrames,
+        float SiteOfficeExitDrop)> TideglassWalkPlayerAcrossStairs(
         DemolitionArenaLayout layout)
     {
         var west = await TideglassWalkPlayerAcrossStair(
@@ -86,8 +89,17 @@ public partial class FreightTerminalWorld
             minimumGain: 2.05f,
             horizontalTolerance: 0.85f,
             maximumFrames: 300);
+        var siteOfficeExit = siteOffice.Ready
+            ? await TideglassWalkPlayerDownStair(
+                layout,
+                new Vector3(30.7f, 0.22f, 46.1f),
+                maximumDestinationHeight: 0.75f,
+                minimumDrop: 1.75f,
+                horizontalTolerance: 0.9f,
+                maximumFrames: 300)
+            : (Ready: false, Frames: 0, Drop: 0.0f);
         return (
-            west.Ready && east.Ready && siteOffice.Ready,
+            west.Ready && east.Ready && siteOffice.Ready && siteOfficeExit.Ready,
             west.Ready,
             west.Frames,
             west.Gain,
@@ -96,7 +108,10 @@ public partial class FreightTerminalWorld
             east.Gain,
             siteOffice.Ready,
             siteOffice.Frames,
-            siteOffice.Gain);
+            siteOffice.Gain,
+            siteOfficeExit.Ready,
+            siteOfficeExit.Frames,
+            siteOfficeExit.Drop);
     }
 
     private async Task<(bool Ready, int Frames, float Gain)> TideglassWalkPlayerAcrossStair(
@@ -148,6 +163,90 @@ public partial class FreightTerminalWorld
             && gain >= minimumGain
             && _player.GlobalPosition.Y >= layout.Origin.Y + minimumDestinationHeight;
         return (ready, frames, gain);
+    }
+
+    private async Task<(bool Ready, int Frames, float Drop)> TideglassWalkPlayerDownStair(
+        DemolitionArenaLayout layout,
+        Vector3 targetPosition,
+        float maximumDestinationHeight,
+        float minimumDrop,
+        float horizontalTolerance,
+        int maximumFrames)
+    {
+        Input.ActionRelease("move_forward");
+        Input.ActionRelease("sprint");
+        _player.ProcessMode = ProcessModeEnum.Inherit;
+        _player.UiLocked = false;
+        _player.RestoreMovementInput();
+        _player.SetStaminaForDiagnostics(100.0f);
+        _player.Velocity = Vector3.Zero;
+        await WaitFrames(3);
+
+        var start = _player.GlobalPosition;
+        var target = layout.Origin + targetPosition;
+        var reached = false;
+        var frames = 0;
+        Input.ActionPress("move_forward");
+        for (; frames < maximumFrames; frames++)
+        {
+            _player.FaceWorldPointForDiagnostics(target);
+            if (!_player.HasMovementIntent && frames > 2)
+            {
+                _player.RestoreMovementInput();
+                Input.ActionPress("move_forward");
+            }
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            var delta = target - _player.GlobalPosition;
+            var horizontalDistance = new Vector2(delta.X, delta.Z).Length();
+            if (horizontalDistance < horizontalTolerance
+                && _player.GlobalPosition.Y <= layout.Origin.Y + maximumDestinationHeight)
+            {
+                reached = true;
+                break;
+            }
+        }
+        Input.ActionRelease("move_forward");
+        Input.ActionRelease("sprint");
+        var drop = start.Y - _player.GlobalPosition.Y;
+        var ready = reached
+            && drop >= minimumDrop
+            && _player.GlobalPosition.Y <= layout.Origin.Y + maximumDestinationHeight;
+        return (ready, frames, drop);
+    }
+
+    private static bool TideglassConstructionOfficeRoomsSealed(
+        World3D world,
+        DemolitionArenaLayout layout,
+        out string blockers)
+    {
+        var office = layout.Props.First(prop => prop.Name == "SightBlockConstructionSiteOffice");
+        var roomBlockers = new List<string>();
+        for (var pieceIndex = 0; pieceIndex < office.CollisionPieceCount; pieceIndex++)
+        {
+            TideglassPropPieceWorld(
+                office,
+                office.CollisionPieceAt(pieceIndex),
+                out var center,
+                out var basis,
+                out var half);
+            var verticalExtent = Mathf.Abs(basis.X.Y) * half.X
+                + Mathf.Abs(basis.Y.Y) * half.Y
+                + Mathf.Abs(basis.Z.Y) * half.Z;
+            var feet = new Vector3(center.X, center.Y - verticalExtent + 0.2f, center.Z);
+            var sealedRoom = !TideglassPhysicalRouteClear(
+                world,
+                new[] { feet, feet + Vector3.Right * 0.05f },
+                out var blocker);
+            roomBlockers.Add($"{pieceIndex + 1}:{blocker}");
+            if (!sealedRoom || blocker != office.Name)
+            {
+                blockers = string.Join('|', roomBlockers);
+                return false;
+            }
+        }
+
+        blockers = string.Join('|', roomBlockers);
+        return true;
     }
 
     private static bool TideglassPropsSeparated(
@@ -306,12 +405,23 @@ public partial class FreightTerminalWorld
             failure = "piece-metadata";
             return false;
         }
+        var expectedSupplementalPieces = prop.AddAnalyticalCollisionToAuthored
+            ? prop.CollisionPieceCount
+            : 0;
+        if (!body.HasMeta("supplemental_collision_piece_count")
+            || body.GetMeta("supplemental_collision_piece_count").AsInt32()
+                != expectedSupplementalPieces)
+        {
+            failure = "supplemental-metadata";
+            return false;
+        }
 
         if (prop.CollisionMode == DemolitionArenaPropCollisionMode.AuthoredConcave)
         {
-            if (collisions.Length != 1
-                || collisions[0].Name != "Collision"
-                || collisions[0].Shape is not ConcavePolygonShape3D concave)
+            var authoredCollision = collisions.SingleOrDefault(collision =>
+                collision.Name == "Collision");
+            if (collisions.Length != 1 + expectedSupplementalPieces
+                || authoredCollision?.Shape is not ConcavePolygonShape3D concave)
             {
                 failure = "authored-shape";
                 return false;
@@ -331,8 +441,8 @@ public partial class FreightTerminalWorld
             if (collisionFaces.Length < 3
                 || collisionFaces.Length != sourceFaceCount
                 || concave.BackfaceCollision != prop.AuthoredBackfaceCollision
-                || !collisions[0].Position.IsEqualApprox(Vector3.Zero)
-                || !collisions[0].Rotation.IsEqualApprox(Vector3.Zero))
+                || !authoredCollision.Position.IsEqualApprox(Vector3.Zero)
+                || !authoredCollision.Rotation.IsEqualApprox(Vector3.Zero))
             {
                 failure = "authored-geometry";
                 return false;
@@ -345,6 +455,20 @@ public partial class FreightTerminalWorld
             {
                 failure = "authored-metadata";
                 return false;
+            }
+            for (var pieceIndex = 0; pieceIndex < expectedSupplementalPieces; pieceIndex++)
+            {
+                var piece = prop.CollisionPieceAt(pieceIndex);
+                var collision = collisions.SingleOrDefault(candidate =>
+                    candidate.Name == $"SolidCollision_{pieceIndex + 1:00}");
+                if (collision?.Shape is not BoxShape3D box
+                    || !box.Size.IsEqualApprox(piece.Size * prop.Scale)
+                    || !collision.Position.IsEqualApprox(piece.Offset * prop.Scale)
+                    || !collision.Rotation.IsEqualApprox(piece.Rotation))
+                {
+                    failure = $"supplemental-box-{pieceIndex + 1}";
+                    return false;
+                }
             }
             return true;
         }

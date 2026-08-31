@@ -388,6 +388,10 @@ public partial class FreightTerminalWorld
                 constructionOfficeOpenRamp,
                 layout)
             && IsPointInsideDemolitionGeometry(constructionOfficeSolidWall, layout);
+        var constructionOfficeRoomsSealed = TideglassConstructionOfficeRoomsSealed(
+            GetWorld3D(),
+            layout,
+            out var constructionOfficeRoomBlockers);
         var stairTraversal = await TideglassWalkPlayerAcrossStairs(layout);
 
         var authoredNodes = GetTree().GetNodesInGroup("demolition_authored_model");
@@ -497,6 +501,7 @@ public partial class FreightTerminalWorld
             && upwardBlock.Ready
             && southHousePassageClear
             && deviceDropGeometryReady
+            && constructionOfficeRoomsSealed
             && stairTraversal.Ready
             && authoredDressingReady
             && runtimeReady;
@@ -525,9 +530,11 @@ public partial class FreightTerminalWorld
             + $"walkway_upward_block={upwardBlock.Ready}:{upwardBlock.SafeFraction:0.000}:{upwardBlock.Collider} "
             + $"south_house_passage={southHousePassageClear}:{southHousePassageBlocker} "
             + $"device_drop_geometry={deviceDropGeometryReady} "
+            + $"site_office_rooms_sealed={constructionOfficeRoomsSealed}:{constructionOfficeRoomBlockers} "
             + $"stair_walk={stairTraversal.Ready} west_stair={stairTraversal.WestReady}:{stairTraversal.WestFrames}:{stairTraversal.WestGain:0.00} "
             + $"east_stair={stairTraversal.EastReady}:{stairTraversal.EastFrames}:{stairTraversal.EastGain:0.00} "
             + $"site_office_stair={stairTraversal.SiteOfficeReady}:{stairTraversal.SiteOfficeFrames}:{stairTraversal.SiteOfficeGain:0.00} "
+            + $"site_office_exit={stairTraversal.SiteOfficeExitReady}:{stairTraversal.SiteOfficeExitFrames}:{stairTraversal.SiteOfficeExitDrop:0.00} "
             + $"runtime={runtimeReady} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} sites={arena.Sites.Count} "
             + $"authored={authoredDressingReady} authored_models={authoredModelCount} authored_nodes={authoredModels.Length} "
             + $"dressing_scenes={uniqueSceneCount} dressing_packs={dressingSourcePacks.Count} dressing_reuse={dressingSceneReuse} "

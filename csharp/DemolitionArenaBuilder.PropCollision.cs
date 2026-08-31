@@ -17,6 +17,12 @@ public sealed partial class DemolitionArenaBuilder
         {
             AddPropCollisionBoxes(body, definition);
         }
+        else if (definition.AddAnalyticalCollisionToAuthored)
+        {
+            // Keep authored traversal surfaces such as ramps while sealing thin, closed shells
+            // with stable volumes so a moving player cannot tunnel into a non-playable interior.
+            AddPropCollisionBoxes(body, definition, "SolidCollision");
+        }
 
         var effectiveMode = authoredCollision
             ? DemolitionArenaPropCollisionMode.AuthoredConcave
@@ -27,11 +33,17 @@ public sealed partial class DemolitionArenaBuilder
                 : definition.CollisionMode;
         body.SetMeta("prop_collision_mode", effectiveMode.ToString());
         body.SetMeta("analytical_collision_piece_count", definition.CollisionPieceCount);
+        body.SetMeta(
+            "supplemental_collision_piece_count",
+            authoredCollision && definition.AddAnalyticalCollisionToAuthored
+                ? definition.CollisionPieceCount
+                : 0);
     }
 
     private static void AddPropCollisionBoxes(
         StaticBody3D body,
-        DemolitionArenaProp definition)
+        DemolitionArenaProp definition,
+        string namePrefix = "Collision")
     {
         for (var index = 0; index < definition.CollisionPieceCount; index++)
         {
@@ -39,8 +51,8 @@ public sealed partial class DemolitionArenaBuilder
             body.AddChild(new CollisionShape3D
             {
                 Name = definition.CollisionPieceCount == 1
-                    ? "Collision"
-                    : $"Collision_{index + 1:00}",
+                    ? namePrefix
+                    : $"{namePrefix}_{index + 1:00}",
                 Position = piece.Offset * definition.Scale,
                 Rotation = piece.Rotation,
                 Shape = new BoxShape3D { Size = piece.Size * definition.Scale }

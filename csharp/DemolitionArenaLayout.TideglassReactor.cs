@@ -158,7 +158,7 @@ public sealed partial class DemolitionArenaLayout
             TideglassAuthoredProp("SouthwestWatchHouse", QuaterniusBuildingsRoot, "house1.glb", new(-25.9f, 0.02f, 34.2f), 180.0f, 4.2f, new(2.10f, 3.179f, 3.62f), new(0, 1.5895f, 0), DemolitionArenaPropCollisionMode.CompoundBoxes, TideglassWatchHouseCollision()),
             TideglassAuthoredProp("DefenderArchiveBlock", QuaterniusDowntownRoot, "Building_Medium_2_001.gltf", new(-42.0f, 0.02f, -14.7f), 0.0f, 1.0f, new(14.0f, 25.01f, 12.0f), new(0.0f, 12.5f, -6.0f), DemolitionArenaPropCollisionMode.FootprintBox),
             TideglassAuthoredProp("NorthFoundryTenement", QuaterniusDowntownRoot, "Building_Small_1.gltf", new(-17.5f, 0.02f, -31.2f), 0.0f, 1.0f, new(12.0f, 17.03f, 12.0f), new(-1.0f, 8.5f, -6.0f), DemolitionArenaPropCollisionMode.CompoundBoxes, TideglassFoundryTenementCollision()),
-            TideglassAuthoredProp("SightBlockConstructionSiteOffice", MajadroidConstructionRoot, "containers-office.glb", new(24.5f, 0.02f, 42.6f), 0.0f, 1.0f, new(11.45f, 5.76f, 8.11f), new(0, 2.88f, 0), DemolitionArenaPropCollisionMode.AuthoredConcave, TideglassConstructionOfficeAnalyticalCollision(), authoredBackfaceCollision: true),
+            TideglassAuthoredProp("SightBlockConstructionSiteOffice", MajadroidConstructionRoot, "containers-office.glb", new(24.5f, 0.02f, 42.6f), 0.0f, 1.0f, new(11.45f, 5.76f, 8.11f), new(0, 2.88f, 0), DemolitionArenaPropCollisionMode.AuthoredConcave, TideglassConstructionOfficeAnalyticalCollision(), authoredBackfaceCollision: true, addAnalyticalCollisionToAuthored: true),
             TideglassAuthoredProp("SightBlockReactorCargoContainers", MajadroidConstructionRoot, "containers-cargo.glb", new(52.0f, 0.02f, 5.0f), 90.0f, 0.82f, new(3.0f, 2.6f, 8.4f), new(0, 1.3f, 0), DemolitionArenaPropCollisionMode.AuthoredConcave, TideglassCargoContainersAnalyticalCollision(), authoredBackfaceCollision: true),
             TideglassAuthoredProp("ConstructionTruck", MajadroidConstructionRoot, "concrete-truck-red.glb", new(-63.5f, 0.02f, 32.0f), 90.0f, 1.05f, new(3.13f, 3.82f, 7.18f), new(0, 1.9075f, 0), DemolitionArenaPropCollisionMode.AuthoredConcave, TideglassConstructionTruckAnalyticalCollision(), authoredBackfaceCollision: true),
 
@@ -382,7 +382,8 @@ public sealed partial class DemolitionArenaLayout
         Vector3 collisionOffset,
         DemolitionArenaPropCollisionMode collisionMode = DemolitionArenaPropCollisionMode.BoundsBox,
         IReadOnlyList<DemolitionArenaPropCollisionBox>? collisionPieces = null,
-        bool authoredBackfaceCollision = false)
+        bool authoredBackfaceCollision = false,
+        bool addAnalyticalCollisionToAuthored = false)
     {
         return new DemolitionArenaProp(
             name,
@@ -394,7 +395,8 @@ public sealed partial class DemolitionArenaLayout
             collisionOffset,
             collisionMode,
             collisionPieces,
-            authoredBackfaceCollision);
+            authoredBackfaceCollision,
+            addAnalyticalCollisionToAuthored);
     }
 
     private Vector3 TideglassReactorStrategyTarget(string key) => key switch
