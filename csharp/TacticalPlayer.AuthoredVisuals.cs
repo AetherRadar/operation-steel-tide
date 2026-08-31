@@ -13,18 +13,21 @@ public partial class TacticalPlayer
     private const float AuthoredArmPresentationScale = 0.72f;
     private const float AuthoredSidearmArmPresentationScale = 0.64f;
     private const float AuthoredSidearmArmPitchRadians = 0.30f;
-    private const float AuthoredLargeSidearmArmPresentationScale = 0.50f;
-    private const float AuthoredLargeSidearmArmPitchRadians = 0.80f;
+    private const float AuthoredSidearmAdsArmPresentationScale = 0.54f;
+    private const float AuthoredSidearmAdsArmPitchRadians = 0.50f;
+    private const float AuthoredLargeSidearmArmPresentationScale = 0.58f;
+    private const float AuthoredLargeSidearmArmPitchRadians = 0.45f;
+    private const float AuthoredLargeSidearmAdsArmPresentationScale = 0.42f;
+    private const float AuthoredLargeSidearmAdsArmPitchRadians = 0.82f;
     private const float AnimatedScarReloadArmPresentationScale = 0.80f;
     private const float AnimatedAwmReloadArmPresentationScale = 0.75f;
-    // A single uniform sidearm fit keeps the DCC sleeve tails beyond the frame
-    // bottom while both palms remain on their physical weapon/magazine contacts.
-    // Scaling individual bones instead would distort the forearm and reintroduce
-    // the near-plane sleeve sheet seen in the original reload presentation.
-    private const float AnimatedSidearmReloadArmPresentationScale = 0.76f;
+    // Match the idle hand scale when the animated sidearm forearms take over.
+    // Only the articulated gloves, forearms, and short cuffs are rendered;
+    // the hidden shoulder chain still solves the real magazine contacts.
+    private const float AnimatedSidearmReloadArmPresentationScale = 0.64f;
     private const float AnimatedSidearmReloadArmPitchRadians = 0.30f;
-    private const float AnimatedLargeSidearmReloadArmPresentationScale = 0.76f;
-    private const float AnimatedLargeSidearmReloadArmPitchRadians = 0.30f;
+    private const float AnimatedLargeSidearmReloadArmPresentationScale = 0.58f;
+    private const float AnimatedLargeSidearmReloadArmPitchRadians = 0.45f;
     private const float SidearmBottomScreenBandStartRatio = 0.96f;
     private const float MaxAuthoredPalmSurfaceGap = 0.018f;
     internal const float MaxServicePistolSupportArmCorrection = 0.03f;
@@ -479,7 +482,9 @@ public partial class TacticalPlayer
             return default;
         }
 
-        var leftGrip = animatedArms?.LeftPalmContactGlobalPosition
+        var leftGrip = animatedArms?.LeftSupportAnchorGlobalPosition(
+                EquippedWeapon.Platform,
+                SidearmReloadMagazineAnchorBlend())
             ?? arms!.LeftGripFrame.GlobalPosition;
         var supportTarget = M4ReloadSupportTargetGlobal();
         var primaryMagazinePosition = _authoredPrimaryWeapon.Magazine.GlobalPosition;
@@ -501,7 +506,7 @@ public partial class TacticalPlayer
             ? weaponRootInverse * animatedArms.LeftPalmContactGlobalTransform
             : arms!.LeftArm.Transform;
         var sleeveWristLength = animatedArms is not null
-            ? animatedArms.LeftPalmContactGlobalPosition.DistanceTo(
+            ? animatedArms.LeftPalmCenterGlobalPosition.DistanceTo(
                 animatedArms.LeftWristGlobalPosition)
             : arms!.LeftPalmFrame.GlobalPosition.DistanceTo(
                 arms.LeftWristFrame.GlobalPosition);
@@ -1011,10 +1016,15 @@ public partial class TacticalPlayer
         var inheritedScale = Mathf.Max(0.0001f, _weaponRoot.Scale.X);
         var sidearm = WeaponCatalog.IsSidearm(EquippedWeapon.Platform);
         var largeSidearm = EquippedWeapon.Platform == WeaponPlatform.DesertEagle;
+        var sidearmAds = sidearm && _isAiming && !_isReloading;
         var presentationScale = largeSidearm
-            ? AuthoredLargeSidearmArmPresentationScale
+            ? sidearmAds
+                ? AuthoredLargeSidearmAdsArmPresentationScale
+                : AuthoredLargeSidearmArmPresentationScale
             : sidearm
-                ? AuthoredSidearmArmPresentationScale
+                ? sidearmAds
+                    ? AuthoredSidearmAdsArmPresentationScale
+                    : AuthoredSidearmArmPresentationScale
                 : AuthoredArmPresentationScale;
         arms.RightArm.Transform = Transform3D.Identity;
         arms.LeftArm.Transform = Transform3D.Identity;
@@ -1028,8 +1038,12 @@ public partial class TacticalPlayer
             // chest instead of projecting a straight arm across an ultrawide
             // viewport. Palm anchors remain rigidly attached to the weapon.
             var pitch = largeSidearm
-                ? AuthoredLargeSidearmArmPitchRadians
-                : AuthoredSidearmArmPitchRadians;
+                ? sidearmAds
+                    ? AuthoredLargeSidearmAdsArmPitchRadians
+                    : AuthoredLargeSidearmArmPitchRadians
+                : sidearmAds
+                    ? AuthoredSidearmAdsArmPitchRadians
+                    : AuthoredSidearmArmPitchRadians;
             presentationBasis = new Basis(Vector3.Right, pitch)
                 * presentationBasis;
         }
@@ -1100,7 +1114,9 @@ public partial class TacticalPlayer
         return _isReloading
             && UsesAnimatedReloadArmsForDiagnostics
             && animatedArms is not null
-                ? animatedArms.ReachableLeftPalmTarget(requestedTarget)
+                ? animatedArms.ReachableLeftPalmTarget(
+                    EquippedWeapon.Platform,
+                    requestedTarget)
                 : requestedTarget;
     }
 
@@ -1112,6 +1128,19 @@ public partial class TacticalPlayer
             : IsInstanceValid(_supportHand)
                 ? _supportHand.GlobalPosition
                 : Vector3.Zero;
+        if (_isReloading
+            && WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
+            && UsesAnimatedReloadArmsForDiagnostics
+            && ActiveAuthoredArms() is { } staticArms
+            && IsInstanceValid(staticArms.LeftPalmFrame))
+        {
+            // The cropped reload mesh is exchanged with the ordinary ready
+            // arms at the first and last frame.  Its endpoint anchor is the
+            // visible palm centre, so use the hidden ready-pose palm centre as
+            // the home target.  This makes the mesh swap spatially continuous
+            // without exposing a full support arm or enlarging the gesture.
+            supportHome = staticArms.LeftPalmFrame.GlobalPosition;
+        }
         var fallback = supportHome;
         if (!_isReloading
             || EquippedWeapon.Platform == WeaponPlatform.M3A1
@@ -1183,6 +1212,12 @@ public partial class TacticalPlayer
                 out var magazineContact)
                 ? magazineContact
                 : fallback;
+            if (WeaponCatalog.IsSidearm(EquippedWeapon.Platform))
+            {
+                return fromContact.Lerp(
+                    supportHome,
+                    SmoothSegment(progress, profile.SeatEnd, profile.ActionEnd));
+            }
             if (profile.UsesAction(_reloadStartedEmpty)
                 && weapon.TryActionGripGlobalPosition(out var actionContact))
             {
@@ -1201,7 +1236,8 @@ public partial class TacticalPlayer
                 SmoothSegment(progress, profile.SeatEnd, profile.ActionEnd));
         }
 
-        if (profile.UsesAction(_reloadStartedEmpty))
+        if (!WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
+            && profile.UsesAction(_reloadStartedEmpty))
         {
             if (weapon.TryActionGripGlobalPosition(out var actionContact))
             {
@@ -1424,6 +1460,9 @@ internal readonly record struct SidearmPresentationInspection(
             && LeftArm.HeightViewportHeights(ScreenSize.Y) >= MinSupportArmHeightViewportHeights
             && LeftArm.PixelAspect <= MaxSupportArmPixelAspect;
 
+    public bool SupportPresentationValid
+        => Aiming || SupportArmShapeValid;
+
     public bool WeaponReadable
         => Weapon.WidthViewportHeights(ScreenSize.Y) >= MinWeaponWidthViewportHeights
             && Weapon.HeightViewportHeights(ScreenSize.Y) >= MinWeaponHeightViewportHeights
@@ -1439,7 +1478,7 @@ internal readonly record struct SidearmPresentationInspection(
             && LeftArm.Available
             && Weapon.Available
             && SleevesReachBottom
-            && SupportArmShapeValid
+            && SupportPresentationValid
             && WeaponReadable;
 }
 

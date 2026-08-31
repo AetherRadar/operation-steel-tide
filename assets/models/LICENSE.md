@@ -1139,22 +1139,33 @@ animated smg** by **DJMaesen**:
 - Exact license: Creative Commons Attribution 4.0 International (CC BY 4.0),
   https://creativecommons.org/licenses/by/4.0/
 - Source acquisition date: 2026-08-21.
-- Animated reload-arm derivative generated 2026-08-29 and revised/reviewed
-  for IK continuity on 2026-08-30.
+- Animated reload-arm derivative generated 2026-08-29, revised/reviewed for IK
+  continuity on 2026-08-30, and static-matched for compact sidearm reload
+  endpoints on 2026-08-31.
 - Required attribution: **"fps animated smg" by DJMaesen, licensed under CC BY
   4.0.** Indicate that Operation Steel Tide removed the visible SMG, baked the
   authored frame-155 two-hand pose as the bind pose, and added platform-specific
   reload clips and contract markers.
 
-`animated_reload_arms.glb` retains one 13,700-triangle skinned arms mesh, one
-skin, the authored glove/sleeve materials and skin weights, three embedded PNG
-images, and 24 tactical/empty reload clips across twelve profiles. Both shoulder
-roots and the right palm-to-grip relation remain fixed; the left arm is the
-moving reload limb. The 2026-08-30 revision uses position-only arm IK plus a
-separate wrist-rotation constraint, normalizes adjacent baked quaternion signs,
-exports twelve platform elbow-pole markers, and applies deterministic per-frame
-bone/palm continuity gates before export. No project-authored replacement body
-geometry is introduced.
+`animated_reload_arms.glb` contract revision 5 retains one 13,700-triangle
+skinned full-arm mesh and adds one 9,306-triangle pistol crop containing the
+authored gloves and 16 cm short sleeve cuffs. Both meshes share the original
+armature/skin, materials, UVs, and skin weights. The GLB also retains three
+embedded PNG images and 24 tactical/empty reload clips across twelve profiles.
+Both shoulder roots and the right palm-to-grip relation remain fixed; the left
+arm is the moving reload limb. `LeftSidearmMagazineAnchorFrame` is attached to
+the actual evaluated glove surface for compact pistol magazine exchange. The
+2026-08-30 revision uses position-only arm IK plus a separate wrist-rotation
+constraint, normalizes adjacent baked quaternion signs, exports twelve platform
+elbow-pole markers, and applies deterministic per-frame bone/palm and glove
+surface-contact continuity gates before export. The 2026-08-31 follow-up keeps
+the same mesh and markers but hard-matches every pistol clip boundary to the
+exact static compact pose so the exchange stays small and the support arm does
+not jitter back into a full-arm silhouette. P226/M1911, GSh-18, and Desert
+Eagle use independently calibrated compact magazine-grip wrist poses; every
+pistol clip eases from the authored neutral wrist into that pose, holds it only
+through the exchange, then returns to neutral before the cropped mesh is hidden.
+No project-authored replacement body geometry is introduced.
 The builder emits three extracted texture sidecars but no dedicated studio
 preview PNG; visual review uses the in-engine reload captures and deterministic
 diagnostic.
@@ -1162,17 +1173,17 @@ diagnostic.
 | Animated reload-arm file | Bytes | SHA-256 |
 | --- | ---: | --- |
 | Original `../../source_art/third_party/djmaesen_fps_smg45/fps_animated_smg.glb` | 22,128,372 | `61F30D8980CE292869F97D98587A2736BAF719A19C0A32756838BD9EF2ADA83A` |
-| Runtime `djmaesen_smg45/animated_reload_arms.glb` | 9,834,140 | `2D7C2B1A224A2E047B45944DB684832B9E6749451DA7394EBBB589A02EE2C3E4` |
+| Runtime `djmaesen_smg45/animated_reload_arms.glb` | 10,248,084 | `C9BB50D36A7C3C286395B6808647AE8E49356D7A6380482057F4462E6C9311E3` |
 | Texture `djmaesen_smg45/animated_reload_arms_Image_0.png` | 1,913,243 | `3BC291E07FA1E04DC5CEE727297D7051966A8D8AC39FCCE622BFB7DC408CB002` |
 | Texture `djmaesen_smg45/animated_reload_arms_Image_1.png` | 3,561,679 | `92CF1397C106CF721902A676985E82253CEC6E526DBD25510BD4E8B8685EEEA1` |
 | Texture `djmaesen_smg45/animated_reload_arms_Image_2.png` | 3,527,986 | `ADD5B1429F735916033AE45BD755B6A6DA70A9EBD047EED38F78C7D64A967F08` |
-| DCC source `../../source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend` | 26,781,840 | `A873D206ABD988525EE6D0E50989E0E91C7DF1122BD72787B4064145FFABA580` |
+| DCC source `../../source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend` | 28,356,557 | `2EF76C7FD395E6681473162F3FDEF35C2C10E6EF9F8C5AACE48C9D020C43A95B` |
+| Builder `../../scripts/blender/build_animated_reload_arms.py` | 63,519 | `DDEE2191373ED8E4395166CEA921A05EFA64C5753B618BAF5A0785E5138FF682` |
 
 The source and every derived arm mesh remain copyright DJMaesen and are not
 covered by the repository's MIT license. Full attribution, static adaptations,
 and the reproducible Blender mapping are recorded in
-`djmaesen_smg45/LICENSE.md`; the animated builder is
-`../../scripts/blender/build_animated_reload_arms.py`.
+`djmaesen_smg45/LICENSE.md`.
 
 The standard free version of the Downtown City MegaKit is distributed by Quaternius under CC0 1.0 Universal:
 

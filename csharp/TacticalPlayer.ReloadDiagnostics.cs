@@ -18,9 +18,7 @@ public partial class TacticalPlayer
         var weapon = ActiveAuthoredReloadWeapon();
         var weaponRoot = ActiveAuthoredWeaponRootForDiagnostics;
         var staticArms = ActiveAuthoredArms();
-        var useAnimatedPose = _isReloading
-            || staticArms is null
-            || !IsInstanceValid(staticArms.Root);
+        var useAnimatedPose = UsesAnimatedReloadArmsForDiagnostics;
         var pose = FirstPersonArmPoseCatalog.For(platform);
         var clipName = FirstPersonReloadProfileCatalog.For(platform)
             .ClipName(_reloadStartedEmpty);
@@ -48,11 +46,28 @@ public partial class TacticalPlayer
         var rightPalm = palmContactsAvailable
             ? rootInverse * rightPalmGlobal
             : Vector3.Zero;
+        var rightWristGlobal = palmContactsAvailable
+            ? useAnimatedPose
+                ? arms!.RightWristGlobalPosition
+                : staticArms!.RightWristFrame.GlobalPosition
+            : Vector3.Zero;
         var leftPalmAvailable = palmContactsAvailable;
         var leftPalmGlobal = palmContactsAvailable
             ? useAnimatedPose
-                ? arms!.LeftPalmContactGlobalPosition
+                ? arms!.LeftSupportAnchorGlobalPosition(
+                    EquippedWeapon.Platform,
+                    SidearmReloadMagazineAnchorBlend())
+                : staticArms!.LeftGripFrame.GlobalPosition
+            : Vector3.Zero;
+        var visibleLeftPalmGlobal = palmContactsAvailable
+            ? useAnimatedPose
+                ? arms!.LeftPalmCenterGlobalPosition
                 : staticArms!.LeftPalmFrame.GlobalPosition
+            : Vector3.Zero;
+        var leftWristGlobal = palmContactsAvailable
+            ? useAnimatedPose
+                ? arms!.LeftWristGlobalPosition
+                : staticArms!.LeftWristFrame.GlobalPosition
             : Vector3.Zero;
         var leftPalm = palmContactsAvailable
             ? rootInverse * leftPalmGlobal
@@ -88,11 +103,17 @@ public partial class TacticalPlayer
             rightPalmAvailable,
             rightPalmGlobal,
             leftPalmAvailable,
-            leftPalmGlobal,
-            arms?.Mesh);
+            visibleLeftPalmGlobal,
+            useAnimatedPose ? arms?.Mesh : null);
         var screenContact = InspectReloadScreenContact(
-            leftPalmGlobal,
+            rightPalmGlobal,
+            rightPalmAvailable,
+            rightWristGlobal,
+            palmContactsAvailable,
+            visibleLeftPalmGlobal,
             leftPalmAvailable,
+            leftWristGlobal,
+            palmContactsAvailable,
             primaryMagazineGripGlobal,
             primaryMagazineGripAvailable,
             magazine,
@@ -102,14 +123,15 @@ public partial class TacticalPlayer
             actionGripGlobal,
             actionGripAvailable,
             action);
-        var visibleSupportPalm = !useAnimatedPose
-            && staticArms is not null
-            && IsInstanceValid(staticArms.LeftGripFrame)
-                ? rootInverse * staticArms.LeftGripFrame.GlobalPosition
-                : leftPalm;
+        var visibleSupportPalm = palmContactsAvailable
+            ? rootInverse * visibleLeftPalmGlobal
+            : Vector3.Zero;
         return new AllWeaponReloadInspection(
             platform,
-            arms is not null && IsInstanceValid(weaponRoot),
+            (useAnimatedPose
+                ? arms is not null && IsInstanceValid(arms.Root)
+                : staticArms is not null && IsInstanceValid(staticArms.Root))
+                && IsInstanceValid(weaponRoot),
             false,
             _isReloading,
             _reloadStartedEmpty,
@@ -275,8 +297,14 @@ public partial class TacticalPlayer
     }
 
     private ReloadScreenContactInspection InspectReloadScreenContact(
+        Vector3 rightPalmGlobal,
+        bool rightPalmAvailable,
+        Vector3 rightWristGlobal,
+        bool rightWristAvailable,
         Vector3 leftPalmGlobal,
         bool leftPalmAvailable,
+        Vector3 leftWristGlobal,
+        bool leftWristAvailable,
         Vector3 primaryMagazineGripGlobal,
         bool primaryMagazineGripAvailable,
         Node3D? primaryMagazine,
@@ -306,17 +334,32 @@ public partial class TacticalPlayer
         var screenScale = new Vector2(
             screenSize.X / logicalViewportSize.X,
             screenSize.Y / logicalViewportSize.Y);
+        var rightPalmBehind = !rightPalmAvailable
+            || _camera.IsPositionBehind(rightPalmGlobal);
+        var rightWristBehind = !rightWristAvailable
+            || _camera.IsPositionBehind(rightWristGlobal);
         var leftPalmBehind = !leftPalmAvailable
             || _camera.IsPositionBehind(leftPalmGlobal);
+        var leftWristBehind = !leftWristAvailable
+            || _camera.IsPositionBehind(leftWristGlobal);
         var primaryGripBehind = !primaryMagazineGripAvailable
             || _camera.IsPositionBehind(primaryMagazineGripGlobal);
         var spareGripBehind = !spareMagazineGripAvailable
             || _camera.IsPositionBehind(spareMagazineGripGlobal);
         var actionGripBehind = !actionGripAvailable
             || _camera.IsPositionBehind(actionGripGlobal);
+        var rightPalmScreen = rightPalmBehind
+            ? Vector2.Zero
+            : _camera.UnprojectPosition(rightPalmGlobal) * screenScale;
+        var rightWristScreen = rightWristBehind
+            ? Vector2.Zero
+            : _camera.UnprojectPosition(rightWristGlobal) * screenScale;
         var leftPalmScreen = leftPalmBehind
             ? Vector2.Zero
             : _camera.UnprojectPosition(leftPalmGlobal) * screenScale;
+        var leftWristScreen = leftWristBehind
+            ? Vector2.Zero
+            : _camera.UnprojectPosition(leftWristGlobal) * screenScale;
         var primaryGripScreen = primaryGripBehind
             ? Vector2.Zero
             : _camera.UnprojectPosition(primaryMagazineGripGlobal) * screenScale;
@@ -328,9 +371,18 @@ public partial class TacticalPlayer
             : _camera.UnprojectPosition(actionGripGlobal) * screenScale;
         return new ReloadScreenContactInspection(
             screenSize,
+            rightPalmAvailable,
+            rightPalmBehind,
+            rightPalmScreen,
+            rightWristAvailable,
+            rightWristBehind,
+            rightWristScreen,
             leftPalmAvailable,
             leftPalmBehind,
             leftPalmScreen,
+            leftWristAvailable,
+            leftWristBehind,
+            leftWristScreen,
             primaryMagazineGripAvailable,
             primaryGripBehind,
             primaryGripScreen,
@@ -477,9 +529,18 @@ internal readonly record struct AllWeaponReloadInspection(
 
 internal readonly record struct ReloadScreenContactInspection(
     Vector2 ScreenSize,
+    bool RightPalmAvailable,
+    bool RightPalmBehindCamera,
+    Vector2 RightPalmScreen,
+    bool RightWristAvailable,
+    bool RightWristBehindCamera,
+    Vector2 RightWristScreen,
     bool LeftPalmAvailable,
     bool LeftPalmBehindCamera,
     Vector2 LeftPalmScreen,
+    bool LeftWristAvailable,
+    bool LeftWristBehindCamera,
+    Vector2 LeftWristScreen,
     bool PrimaryMagazineGripAvailable,
     bool PrimaryMagazineGripBehindCamera,
     Vector2 PrimaryMagazineGripScreen,
@@ -494,7 +555,9 @@ internal readonly record struct ReloadScreenContactInspection(
     VisibleMeshScreenProjection ActionScreen)
 {
     private const float ReadableTopRatio = 0.20f;
-    private const float ReadableBottomRatio = 0.85f;
+    // A fully visible glove may place its authored palm centre a few pixels
+    // below the old 85% line while the magazine and sleeve remain on-screen.
+    private const float ReadableBottomRatio = 0.86f;
     private const float ReadableSideMarginRatio = 0.04f;
 
     public float LeftPalmYRatio
@@ -611,6 +674,7 @@ internal readonly record struct ReloadBodyContinuityInspection(
     bool LeftShoulderBehindCamera,
     VisibleMeshScreenProjection AnimatedMeshScreen,
     bool AnimatedMeshUsesSkeleton,
+    bool AnimatedMeshUsesForearmSkeleton,
     ReloadArmScreenChainInspection RightArm,
     ReloadArmScreenChainInspection LeftArm)
 {

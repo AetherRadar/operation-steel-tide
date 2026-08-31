@@ -2010,7 +2010,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         Main?.ReportGunshot(GlobalPosition, stats.SoundRadius);
         Main?.NotifyAircraftOperatorAttack(this, GlobalPosition, stats.SoundRadius);
         PlayLocalWeaponReport();
-        var shotImpact = Mathf.Sqrt(Mathf.Max(0.25f, stats.Recoil));
+        var presentationImpactScale = SoundLab.FirstPersonShotImpactScale(
+            EquippedWeapon.Platform);
+        var shotImpact = Mathf.Sqrt(Mathf.Max(0.25f, stats.Recoil))
+            * presentationImpactScale;
         var suppressedFlash = SoundLab.IsSuppressed(EquippedWeapon) ? 0.48f : 1.0f;
         _muzzleFlash.LightEnergy = Mathf.Lerp(
             9.5f,
@@ -2161,11 +2164,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         };
         var verticalRecoil = _rng.RandfRange(0.014f, 0.024f)
             * stats.Recoil
+            * presentationImpactScale
             * (_isAiming ? 0.58f : 1.0f)
             * stanceRecoil
             * RoleRecoilMultiplier;
         var horizontalRecoil = _rng.RandfRange(-0.021f, 0.021f)
             * stats.Recoil
+            * presentationImpactScale
             * stanceRecoil
             * RoleRecoilMultiplier;
         _recoilPitch -= verticalRecoil;

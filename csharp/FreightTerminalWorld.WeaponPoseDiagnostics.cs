@@ -342,10 +342,12 @@ public partial class FreightTerminalWorld
             string opticId)
         {
             Input.ActionRelease("aim");
+            Input.ActionRelease("lean_left");
+            Input.ActionRelease("lean_right");
             var build = WeaponCatalog.Build(platform, 3);
             build.Attachments[AttachmentSlot.Optic] = opticId;
             _player.GrantFireablePrimaryForDiagnostics(build);
-            for (var frame = 0; frame < 6; frame++)
+            for (var frame = 0; frame < 30; frame++)
             {
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             }
@@ -378,7 +380,7 @@ public partial class FreightTerminalWorld
                 _player.OpticScreenOffsetForDiagnostics(),
                 _player.InspectOpticAxisProjectionForDiagnostics()));
             Input.ActionRelease("aim");
-            for (var frame = 0; frame < 12; frame++)
+            for (var frame = 0; frame < 24; frame++)
             {
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             }

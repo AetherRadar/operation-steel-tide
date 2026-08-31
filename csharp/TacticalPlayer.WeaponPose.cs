@@ -13,7 +13,7 @@ public partial class TacticalPlayer
         0.30f,
         -0.29f,
         -0.66f);
-    private static readonly Vector3 SidearmHipWeaponPosition = new(0.38f, -0.24f, -0.62f);
+    private static readonly Vector3 SidearmHipWeaponPosition = new(0.38f, -0.18f, -0.55f);
     private static readonly Vector3 SearchWeaponStart = new(0.5f, -0.58f, -0.48f);
     private static readonly Vector3 SearchWeaponEnd = new(0.32f, -0.48f, -0.72f);
     private const float HipWeaponPitch = 0.018f;
@@ -39,10 +39,9 @@ public partial class TacticalPlayer
                 : HipWeaponPositionForCurrentPlatform();
         if (_isReloading)
         {
-            // The authored arm meshes include the complete forearm and capped
-            // upper sleeve. Keep their shoulder end at the camera-bottom mount
-            // throughout every reload; lifting the complete rig used to expose
-            // both sleeve caps as detached black circles in the centre of view.
+            // Sidearms use cropped animated forearms and remain close to their
+            // normal ready pose. Long guns keep their platform-specific working
+            // space offset for the larger magazine and action mechanisms.
             return WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
                 ? SidearmHipWeaponPosition + SidearmReloadViewPositionOffset()
                 : HipWeaponPosition + PlatformReloadViewPositionOffset();
@@ -88,19 +87,23 @@ public partial class TacticalPlayer
 
             var pistolSightHeight = EquippedWeapon.Platform switch
             {
-                WeaponPlatform.DesertEagle => 0.18f,
-                WeaponPlatform.GSh18 => 0.205f,
-                WeaponPlatform.P226 => 0.19f,
-                WeaponPlatform.M1911 => 0.22f,
-                _ => 0.20f
+                WeaponPlatform.DesertEagle => 0.17f,
+                WeaponPlatform.GSh18 => 0.195f,
+                WeaponPlatform.P226 => 0.182f,
+                WeaponPlatform.M1911 => 0.200f,
+                _ => 0.19f
             };
-            // Centre the compact sight picture and keep it only slightly farther
-            // forward than the hip mount. The previous -0.82 depth made the gun
-            // shrink as ADS started and exaggerated the apparent arm length.
+            var sidearmAdsX = EquippedWeapon.Platform == WeaponPlatform.DesertEagle
+                ? 0.085f
+                : 0.050f;
+            // Keep the pistol close to the screen and push it a touch farther
+            // right, so ADS reads like a tighter ready-up rather than a full
+            // arm extension. This also shortens the transition distance from
+            // the hip pose, which reduces visible sleeve sweep on ultrawide.
             return new Vector3(
-                0.035f,
+                sidearmAdsX,
                 -pistolSightHeight * _weaponRoot.Scale.Y + 0.025f,
-                -0.66f);
+                -0.54f);
         }
         var opticPosition = IsInstanceValid(_opticRoot) && _opticRoot.Visible
             ? ActiveOpticPositionInWeaponRoot()
@@ -244,13 +247,8 @@ public partial class TacticalPlayer
 
     private void ApplyViewmodelShotImpulse(float recoil, float stanceRecoil)
     {
-        var carryScale = EquippedWeapon.Platform switch
-        {
-            WeaponPlatform.MP5A5 or WeaponPlatform.P226 or WeaponPlatform.GSh18 => 0.9f,
-            WeaponPlatform.M24 or WeaponPlatform.AXMC or WeaponPlatform.AWM
-                or WeaponPlatform.DesertEagle => 1.08f,
-            _ => 1.0f
-        };
+        var carryScale = SoundLab.FirstPersonShotImpactScale(
+            EquippedWeapon.Platform);
         var aimScale = _isAiming ? 0.66f : 1.0f;
         var strength = Mathf.Sqrt(Mathf.Max(0.25f, recoil))
             * stanceRecoil

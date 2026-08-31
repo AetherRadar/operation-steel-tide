@@ -7,6 +7,8 @@ namespace OperationSteelTide;
 internal sealed class AuthoredAnimatedReloadArmsVisual
 {
     private Vector3 _leftPalmContactInBone;
+    private Vector3 _leftGripAnchorInBone;
+    private Vector3 _leftSidearmMagazineAnchorInBone;
     private Vector3 _rightPalmContactInBone;
     private readonly Dictionary<WeaponPlatform, Node3D> _leftElbowPoleFrames = new();
     private bool _contactPointsInitialized;
@@ -16,11 +18,22 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
         Root = root;
         Skeleton = CombatModelLibrary.RequireSkeleton(root);
         AnimationPlayer = CombatModelLibrary.RequireAnimationPlayer(root);
-        Mesh = CombatModelLibrary.RequireNode(root, "ReloadArmsMesh");
+        FullMesh = CombatModelLibrary.RequireNode(root, "ReloadArmsMesh");
+        SidearmForearmsMesh = CombatModelLibrary.RequireNode(
+            root,
+            "SidearmReloadForearmsMesh");
+        FullMesh.Visible = true;
+        SidearmForearmsMesh.Visible = false;
         RightGripFrame = CombatModelLibrary.RequireNode(root, "RightGripFrame");
         SupportGripFrame = CombatModelLibrary.RequireNode(root, "SupportGripFrame");
         RightPalmFrame = CombatModelLibrary.RequireNode(root, "RightPalmFrame");
         LeftPalmFrame = CombatModelLibrary.RequireNode(root, "LeftPalmFrame");
+        LeftGripAnchorFrame = CombatModelLibrary.RequireNode(
+            root,
+            "LeftGripAnchorFrame");
+        LeftSidearmMagazineAnchorFrame = CombatModelLibrary.RequireNode(
+            root,
+            "LeftSidearmMagazineAnchorFrame");
         RightWristFrame = CombatModelLibrary.RequireNode(root, "RightWristFrame");
         LeftWristFrame = CombatModelLibrary.RequireNode(root, "LeftWristFrame");
         RightShoulderFrame = CombatModelLibrary.RequireNode(root, "RightShoulderFrame");
@@ -47,11 +60,18 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
     public Node3D Root { get; }
     public Skeleton3D Skeleton { get; }
     public AnimationPlayer AnimationPlayer { get; }
-    public Node3D Mesh { get; }
+    public Node3D FullMesh { get; }
+    public Node3D SidearmForearmsMesh { get; }
+    public Node3D Mesh
+        => SidearmForearmsMesh.Visible ? SidearmForearmsMesh : FullMesh;
+    public bool UsesSidearmForearms
+        => SidearmForearmsMesh.Visible && !FullMesh.Visible;
     public Node3D RightGripFrame { get; }
     public Node3D SupportGripFrame { get; }
     public Node3D RightPalmFrame { get; }
     public Node3D LeftPalmFrame { get; }
+    public Node3D LeftGripAnchorFrame { get; }
+    public Node3D LeftSidearmMagazineAnchorFrame { get; }
     public Node3D RightWristFrame { get; }
     public Node3D LeftWristFrame { get; }
     public Node3D RightShoulderFrame { get; }
@@ -62,13 +82,39 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
     public int LeftPalmBone { get; }
     public int RightPalmBone { get; }
 
-    public Vector3 LeftPalmContactGlobalPosition
+    public Vector3 LeftPalmCenterGlobalPosition
     {
         get
         {
             EnsureContactPointsInitialized();
             return ContactPointGlobal(LeftPalmBone, _leftPalmContactInBone);
         }
+    }
+
+    public Vector3 LeftGripAnchorGlobalPosition
+    {
+        get
+        {
+            EnsureContactPointsInitialized();
+            return ContactPointGlobal(LeftPalmBone, _leftGripAnchorInBone);
+        }
+    }
+
+    public Vector3 LeftSupportAnchorGlobalPosition(
+        WeaponPlatform platform,
+        float sidearmMagazineBlend = 1.0f)
+    {
+        if (!WeaponCatalog.IsSidearm(platform))
+        {
+            return LeftGripAnchorGlobalPosition;
+        }
+        EnsureContactPointsInitialized();
+        var contactInBone = _leftPalmContactInBone.Lerp(
+            _leftSidearmMagazineAnchorInBone,
+            Mathf.Clamp(sidearmMagazineBlend, 0.0f, 1.0f));
+        return ContactPointGlobal(
+            LeftPalmBone,
+            contactInBone);
     }
 
     public Vector3 RightPalmContactGlobalPosition
@@ -81,7 +127,7 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
     }
 
     public Transform3D LeftPalmContactGlobalTransform
-        => ContactFrameGlobal(LeftPalmBone, LeftPalmContactGlobalPosition);
+        => ContactFrameGlobal(LeftPalmBone, LeftPalmCenterGlobalPosition);
 
     public Transform3D RightPalmContactGlobalTransform
         => ContactFrameGlobal(RightPalmBone, RightPalmContactGlobalPosition);
@@ -126,21 +172,46 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
         AnimationPlayer.Pause();
     }
 
+    public void SetPresentationPlatform(WeaponPlatform platform)
+    {
+        var sidearm = WeaponCatalog.IsSidearm(platform);
+        FullMesh.Visible = !sidearm;
+        SidearmForearmsMesh.Visible = sidearm;
+    }
+
     public void RetargetLeftPalm(
         WeaponPlatform platform,
-        Vector3 targetGlobalPosition)
+        Vector3 targetGlobalPosition,
+        float sidearmMagazineBlend = 1.0f)
     {
-        targetGlobalPosition = ReachableLeftPalmTarget(targetGlobalPosition);
+        targetGlobalPosition = ReachableLeftPalmTarget(platform, targetGlobalPosition);
         EnsureContactPointsInitialized();
         var targetInSkeleton = Skeleton.GlobalTransform.AffineInverse()
             * targetGlobalPosition;
+        if (WeaponCatalog.IsSidearm(platform))
+        {
+            // The sidearm presentation intentionally renders only the glove,
+            // short cuff, and forearm. Move that compact chain as one authored
+            // unit instead of solving an invisible shoulder/elbow IK chain;
+            // this preserves the clip's hand pose and removes elbow flips.
+            var sidearmContactInSkeleton = Skeleton.GlobalTransform.AffineInverse()
+                * LeftSupportAnchorGlobalPosition(
+                    platform,
+                    sidearmMagazineBlend);
+            var sidearmShoulder = Skeleton.GetBoneGlobalPose(LeftShoulderBone);
+            sidearmShoulder.Origin += targetInSkeleton - sidearmContactInSkeleton;
+            Skeleton.SetBoneGlobalPose(LeftShoulderBone, sidearmShoulder);
+            Skeleton.ForceUpdateBoneChildTransform(LeftShoulderBone);
+            return;
+        }
+
         var shoulder = Skeleton.GetBoneGlobalPose(LeftShoulderBone);
         var elbow = Skeleton.GetBoneGlobalPose(LeftElbowBone);
         var wrist = Skeleton.GetBoneGlobalPose(LeftWristBone);
         var originalElbowBasis = elbow.Basis;
         var originalWristBasis = wrist.Basis;
         var contactInSkeleton = Skeleton.GlobalTransform.AffineInverse()
-            * LeftPalmContactGlobalPosition;
+            * LeftGripAnchorGlobalPosition;
         var targetWrist = targetInSkeleton - (contactInSkeleton - wrist.Origin);
 
         var proximal = elbow.Origin - shoulder.Origin;
@@ -256,8 +327,15 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
             - armDirection * poleDirection.Dot(armDirection);
     }
 
-    public Vector3 ReachableLeftPalmTarget(Vector3 requestedGlobalPosition)
+    public Vector3 ReachableLeftPalmTarget(
+        WeaponPlatform platform,
+        Vector3 requestedGlobalPosition)
     {
+        if (WeaponCatalog.IsSidearm(platform))
+        {
+            return requestedGlobalPosition;
+        }
+
         EnsureContactPointsInitialized();
         var requestedInSkeleton = Skeleton.GlobalTransform.AffineInverse()
             * requestedGlobalPosition;
@@ -265,7 +343,7 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
         var elbow = Skeleton.GetBoneGlobalPose(LeftElbowBone);
         var wrist = Skeleton.GetBoneGlobalPose(LeftWristBone);
         var contactInSkeleton = Skeleton.GlobalTransform.AffineInverse()
-            * LeftPalmContactGlobalPosition;
+            * LeftGripAnchorGlobalPosition;
         var wristToContact = contactInSkeleton - wrist.Origin;
         var requestedWrist = requestedInSkeleton - wristToContact;
         var shoulderToWrist = requestedWrist - shoulder.Origin;
@@ -317,6 +395,12 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
 
         _leftPalmContactInBone = ContactPointInBone(
             LeftPalmFrame,
+            LeftPalmBone);
+        _leftGripAnchorInBone = ContactPointInBone(
+            LeftGripAnchorFrame,
+            LeftPalmBone);
+        _leftSidearmMagazineAnchorInBone = ContactPointInBone(
+            LeftSidearmMagazineAnchorFrame,
             LeftPalmBone);
         _rightPalmContactInBone = ContactPointInBone(
             RightPalmFrame,
@@ -381,8 +465,10 @@ internal static partial class CombatModelLibrary
     private static readonly string[] AnimatedReloadArmsNodes =
     {
         "WeaponRoot", "ReloadArmsSkeleton", "ReloadArmsMesh",
+        "SidearmReloadForearmsMesh",
         "RightGripFrame", "SupportGripFrame",
-        "LeftPalmFrame", "RightPalmFrame",
+        "LeftPalmFrame", "LeftGripAnchorFrame",
+        "LeftSidearmMagazineAnchorFrame", "RightPalmFrame",
         "LeftWristFrame", "RightWristFrame",
         "LeftShoulderFrame", "RightShoulderFrame",
         "m4a1_ElbowPoleFrame", "ak74_ElbowPoleFrame",

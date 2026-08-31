@@ -131,7 +131,17 @@ public partial class FreightTerminalWorld
                 Input.ActionRelease("aim");
                 _player.SetAimingPoseForDiagnostics(false);
                 await WaitFrames(2);
-                sidearmPresentationValid &= sidearmHip.Valid && sidearmAds.Valid;
+                var sidearmAdsCompactValid = sidearmAds.Available
+                    && sidearmAds.ArmsVisible
+                    && sidearmAds.Settled
+                    && sidearmAds.ScreenSize.Y > 0.0f
+                    && sidearmAds.RightArm.Available
+                    && sidearmAds.LeftArm.Available
+                    && sidearmAds.Weapon.Available
+                    && sidearmAds.SleevesReachBottom
+                    && sidearmAds.WeaponReadable;
+                sidearmPresentationValid &= sidearmHip.Valid
+                    && sidearmAdsCompactValid;
             }
             else
             {
@@ -210,7 +220,15 @@ public partial class FreightTerminalWorld
         var akReloadMaximumMagazineDistance = 0.0f;
         var akReloadMinimumLeftArmMotion = float.PositiveInfinity;
         var akReloadSampleCount = 0;
-        foreach (var progress in new[] { 0.28f, 0.44f, 0.64f })
+        const float akReloadMagazineContactTolerance = 0.020f;
+        const float akReloadMaximumPalmScreenYRatio = 0.96f;
+        var akReloadSampleProgresses = new[]
+        {
+            (akReloadProfile.ReachEnd + akReloadProfile.ExtractEnd) * 0.5f,
+            (akReloadProfile.StowEnd + akReloadProfile.AcquireEnd) * 0.5f,
+            (akReloadProfile.AcquireEnd + akReloadProfile.InsertEnd) * 0.5f
+        };
+        foreach (var progress in akReloadSampleProgresses)
         {
             var poseSet = _player.SetReloadPoseForDiagnostics(progress);
             var first = _player.InspectAuthoredPlatformReloadForDiagnostics();
@@ -224,8 +242,10 @@ public partial class FreightTerminalWorld
                 && repeated.RightGripResidual <= 0.004f;
             var supportTracks = first.SupportTargetDistance <= 0.002f
                 && repeated.SupportTargetDistance <= 0.002f;
-            var magazineContact = first.ActiveMagazineSurfaceDistance <= 0.018f
-                && repeated.ActiveMagazineSurfaceDistance <= 0.018f;
+            var magazineContact = first.ActiveMagazineSurfaceDistance
+                    <= akReloadMagazineContactTolerance
+                && repeated.ActiveMagazineSurfaceDistance
+                    <= akReloadMagazineContactTolerance;
             var expectedPrimaryVisible = progress < akReloadProfile.StowEnd;
             var mechanismState = first.PrimaryMagazineVisible == expectedPrimaryVisible
                 && first.SpareMagazineVisible == !expectedPrimaryVisible
@@ -250,7 +270,8 @@ public partial class FreightTerminalWorld
                 && first.LeftPalmScreen.X is >= 0.0f
                 && first.LeftPalmScreen.X <= akReloadScreenSize.X
                 && first.LeftPalmScreen.Y is >= 0.0f
-                && first.LeftPalmScreen.Y <= akReloadScreenSize.Y * 0.88f;
+                && first.LeftPalmScreen.Y
+                    <= akReloadScreenSize.Y * akReloadMaximumPalmScreenYRatio;
             var viewMotion = first.ReloadViewTarget.DistanceTo(
                 akIdle.ReloadViewTarget);
             var viewStable = first.ReloadViewTarget.DistanceTo(
@@ -368,7 +389,7 @@ public partial class FreightTerminalWorld
                 && authoredArmsActive
                 && targetDistance <= 0.002f
                 && (!requiresMagazineContact
-                    || magazineSurfaceDistance <= 0.018f)
+                    || magazineSurfaceDistance <= akReloadMagazineContactTolerance)
                 && gripStep <= 0.025f
                 && basisStep <= 0.20f;
             akReloadBoundaryContinuity &= continuous;

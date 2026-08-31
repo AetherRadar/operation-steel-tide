@@ -87,6 +87,7 @@ public static class SoundLab
         if (!WeaponShotCache.TryGetValue(key, out var stream))
         {
             stream = BuildWeaponShot(
+                platform,
                 WeaponShotRecipeFor(platform, suppressed),
                 distant,
                 nearField);
@@ -99,6 +100,17 @@ public static class SoundLab
         => build.Platform == WeaponPlatform.VSS
         || build.Attachments.TryGetValue(AttachmentSlot.Muzzle, out var muzzleId)
             && muzzleId == "muzzle_suppressor";
+
+    public static float FirstPersonShotImpactScale(WeaponPlatform platform)
+        => platform switch
+        {
+            WeaponPlatform.P226 or WeaponPlatform.GSh18 => 1.15f,
+            WeaponPlatform.M1911 => 1.20f,
+            WeaponPlatform.DesertEagle => 1.32f,
+            WeaponPlatform.M24 or WeaponPlatform.AXMC or WeaponPlatform.AWM
+                => 1.12f,
+            _ => 1.0f
+        };
 
     public static float WeaponShotVolumeDb(WeaponBuild build, bool distant = false)
     {
@@ -124,7 +136,15 @@ public static class SoundLab
     }
 
     public static float PlayerWeaponShotVolumeDb(WeaponBuild build)
-        => Mathf.Min(2.5f, WeaponShotVolumeDb(build) + 5.5f);
+    {
+        var impactScale = Mathf.Max(
+            1.0f,
+            FirstPersonShotImpactScale(build.Platform));
+        var impactBoostDb = 20.0f * Mathf.Log(impactScale) / Mathf.Log(10.0f);
+        return Mathf.Min(
+            2.5f,
+            WeaponShotVolumeDb(build) + 5.5f + impactBoostDb);
+    }
 
     public static int WeaponShotSignature(WeaponBuild build, bool distant = false)
         => WeaponShotSignature(WeaponShot(build, distant));
@@ -232,6 +252,7 @@ public static class SoundLab
     }
 
     private static AudioStreamWav BuildWeaponShot(
+        WeaponPlatform platform,
         WeaponShotRecipe recipe,
         bool distant,
         bool nearField)
@@ -275,7 +296,9 @@ public static class SoundLab
                     * 0.24f
                     * Mathf.Exp(-t * (recipe.PressureDecay * 0.78f))
                 : 0.0f;
-            var drive = nearField ? 1.34f : 1.28f;
+            var drive = nearField
+                ? platform == WeaponPlatform.DesertEagle ? 1.72f : 1.34f
+                : 1.28f;
             var sample = Mathf.Tanh(
                     (crack + pressure + tail + mechanical + sub + nearFieldBody) * drive)
                 * 0.94f;
@@ -286,7 +309,13 @@ public static class SoundLab
         {
             // Automatic fire overlaps several local voices. Preserve headroom in
             // the PCM while the near-field body layer and player gain carry weight.
-            var targetPeak = nearField ? 0.58f : 0.94f;
+            // The Desert Eagle keeps the full local gain and a denser pressure
+            // body, but leaves extra PCM headroom for its overlapping tail.
+            // This reads louder than a service pistol without clipping a rapid
+            // follow-up report.
+            var targetPeak = nearField
+                ? platform == WeaponPlatform.DesertEagle ? 0.46f : 0.58f
+                : 0.94f;
             var normalization = targetPeak / peak;
             for (var i = 0; i < samples.Length; i++)
             {

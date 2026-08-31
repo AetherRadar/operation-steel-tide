@@ -5,6 +5,17 @@ namespace OperationSteelTide;
 
 public partial class TacticalPlayer
 {
+    private static readonly string[] ReloadFullArmSkinBones =
+    {
+        "R_arm_024", "R_elbow_025", "R_wrist_026", "R_palm_039",
+        "L_arm_01", "L_elbow_02", "L_wrist_03", "L_palm_015"
+    };
+    private static readonly string[] ReloadForearmSkinBones =
+    {
+        "R_wrist_026", "R_palm_039",
+        "L_wrist_03", "L_palm_015"
+    };
+
     private float ReloadNearPlaneZ
         => -(_camera.Near + Mathf.Max(0.0001f, _camera.Near * 0.01f));
 
@@ -63,6 +74,7 @@ public partial class TacticalPlayer
                 logicalViewportSize,
                 screenSize),
             ReloadMeshUsesSkeleton(animatedMesh, skeleton),
+            ReloadMeshUsesForearmSkeleton(animatedMesh, skeleton),
             rightArm,
             leftArm);
     }
@@ -408,19 +420,42 @@ public partial class TacticalPlayer
     private static bool ReloadMeshUsesSkeleton(
         Node3D? root,
         Skeleton3D? skeleton)
+        => ReloadMeshUsesSkeleton(
+            root,
+            skeleton,
+            ReloadFullArmSkinBones);
+
+    private static bool ReloadMeshUsesForearmSkeleton(
+        Node3D? root,
+        Skeleton3D? skeleton)
+        => ReloadMeshUsesSkeleton(
+            root,
+            skeleton,
+            ReloadForearmSkinBones);
+
+    private static bool ReloadMeshUsesSkeleton(
+        Node3D? root,
+        Skeleton3D? skeleton,
+        IReadOnlyList<string> requiredBoneNames)
     {
         if (!IsInstanceValid(root) || !IsInstanceValid(skeleton))
         {
             return false;
         }
         if (root is MeshInstance3D rootMesh
-            && ReloadMeshUsesSkeleton(rootMesh, skeleton!))
+            && ReloadMeshUsesSkeleton(
+                rootMesh,
+                skeleton!,
+                requiredBoneNames))
         {
             return true;
         }
         foreach (var mesh in CombatModelLibrary.MeshesBelow(root!))
         {
-            if (ReloadMeshUsesSkeleton(mesh, skeleton!))
+            if (ReloadMeshUsesSkeleton(
+                    mesh,
+                    skeleton!,
+                    requiredBoneNames))
             {
                 return true;
             }
@@ -430,7 +465,8 @@ public partial class TacticalPlayer
 
     private static bool ReloadMeshUsesSkeleton(
         MeshInstance3D mesh,
-        Skeleton3D skeleton)
+        Skeleton3D skeleton,
+        IReadOnlyList<string> requiredBoneNames)
     {
         if (mesh.Mesh is null
             || mesh.Skin is null
@@ -440,11 +476,7 @@ public partial class TacticalPlayer
             return false;
         }
         var requiredBones = new HashSet<int>();
-        foreach (var boneName in new[]
-                 {
-                     "R_arm_024", "R_elbow_025", "R_wrist_026", "R_palm_039",
-                     "L_arm_01", "L_elbow_02", "L_wrist_03", "L_palm_015"
-                 })
+        foreach (var boneName in requiredBoneNames)
         {
             var bone = skeleton.FindBone(boneName);
             if (bone < 0)

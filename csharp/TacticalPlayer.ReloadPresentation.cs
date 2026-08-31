@@ -52,7 +52,11 @@ public partial class TacticalPlayer
         _spareMagazine.Visible = progress >= profile.StowEnd;
         _spareMagazine.Position = profile.SpareMagazineHome;
         _spareMagazine.Rotation = profile.StowedRotation;
-        _chargingHandle.Position = profile.ActionHome;
+        var sidearmSlideLockedOpen = WeaponCatalog.IsSidearm(profile.Platform)
+            && _reloadStartedEmpty
+            && progress < profile.ActionEnd;
+        _chargingHandle.Position = profile.ActionHome
+            + (sidearmSlideLockedOpen ? profile.ActionTravel : Vector3.Zero);
         _supportHand.Position = profile.SupportHome;
         _supportHand.Rotation = profile.SupportRotation;
 
@@ -115,9 +119,17 @@ public partial class TacticalPlayer
         }
         else
         {
-            var usesAction = profile.UsesAction(_reloadStartedEmpty);
-            var fromAction = usesAction ? profile.ActionGrip : wellGrip;
-            var fromRotation = usesAction
+            var sidearm = WeaponCatalog.IsSidearm(profile.Platform);
+            var usesAction = !sidearm
+                && profile.UsesAction(_reloadStartedEmpty);
+            var fromAction = sidearm
+                ? profile.SupportHome
+                : usesAction
+                    ? profile.ActionGrip
+                    : wellGrip;
+            var fromRotation = sidearm
+                ? profile.SupportRotation
+                : usesAction
                 ? profile.ActionHandRotation
                 : profile.MagazineHandRotation;
             var t = SmoothSegment(progress, profile.ActionEnd, 1.0f);
@@ -292,6 +304,27 @@ public partial class TacticalPlayer
     {
         _spareMagazine.Position = profile.MagazineHome;
         _spareMagazine.Rotation = profile.MagazineRotation;
+        if (WeaponCatalog.IsSidearm(profile.Platform))
+        {
+            // Keep pistol reloads compact: the support hand seats the magazine
+            // and immediately leaves the bottom of frame. On an empty reload,
+            // the real slide still cycles as a slide-release action; the hand
+            // does not cross the pistol and expose a full arm near the camera.
+            var t = SmoothSegment(progress, profile.SeatEnd, profile.ActionEnd);
+            _supportHand.Position = wellGrip.Lerp(profile.SupportHome, t);
+            _supportHand.Rotation = profile.MagazineHandRotation.Lerp(
+                profile.SupportRotation,
+                t);
+            if (profile.UsesAction(_reloadStartedEmpty))
+            {
+                var release = SmoothStep(t);
+                _chargingHandle.Position = profile.ActionHome
+                    + profile.ActionTravel * (1.0f - release);
+                PlayPlatformReloadSound(2, progress, profile.SeatEnd + 0.040f, 1.12f);
+            }
+            return;
+        }
+
         if (!profile.UsesAction(_reloadStartedEmpty))
         {
             var t = SmoothSegment(progress, profile.SeatEnd, profile.ActionEnd);
@@ -355,20 +388,10 @@ public partial class TacticalPlayer
     {
         var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
         var emphasis = Mathf.Sin(progress * Mathf.Pi);
-        var exchange = ReloadExchangeWorkspaceEnvelope(progress);
-        var extractionLift = EquippedWeapon.Platform == WeaponPlatform.DesertEagle
-            ? 0.170f
-            : 0.150f;
-        // Lift the pistol into the player's working space while the support
-        // hand exchanges magazines. A phase-shaped extraction lift keeps the
-        // removed magazine, feed lips, and gripping palm above the footer HUD;
-        // it fades before the slide/charging action so the pistol never floats
-        // in the centre of the view for the remainder of the reload.
-        // Move the rig slightly away from the near plane as it rises. Keeping
-        // the elbows in front of the camera is what prevents a large pistol
-        // pose from turning into isolated hands or clipped sleeve openings.
-        return new Vector3(-0.025f, 0.260f, -0.080f) * emphasis
-            + Vector3.Up * extractionLift * exchange;
+        // Sidearms stay close to their normal ready pose. The magazine hand
+        // performs the exchange at the bottom of frame instead of lifting the
+        // complete weapon-and-arms rig into the centre of the screen.
+        return new Vector3(-0.025f, 0.045f, 0.045f) * emphasis;
     }
 
     private Vector3 SidearmReloadViewRotation()
@@ -441,7 +464,9 @@ public partial class TacticalPlayer
         var pose = FirstPersonArmPoseCatalog.For(EquippedWeapon.Platform);
         var rightGrip = animatedArms?.RightGripFrame.GlobalPosition
             ?? arms!.RightGripFrame.GlobalPosition;
-        var leftGrip = animatedArms?.LeftPalmContactGlobalPosition
+        var leftGrip = animatedArms?.LeftSupportAnchorGlobalPosition(
+                EquippedWeapon.Platform,
+                SidearmReloadMagazineAnchorBlend())
             ?? arms!.LeftGripFrame.GlobalPosition;
         var supportTarget = ReloadSupportTargetGlobal();
         var primaryMagazine = weapon.Magazine.GlobalPosition;
@@ -454,7 +479,7 @@ public partial class TacticalPlayer
         var screenSize = new Vector2(windowSize.X, windowSize.Y);
         var rightPalmPosition = animatedArms?.RightPalmContactGlobalPosition
             ?? arms!.RightPalmFrame.GlobalPosition;
-        var leftPalmPosition = animatedArms?.LeftPalmContactGlobalPosition
+        var leftPalmPosition = animatedArms?.LeftPalmCenterGlobalPosition
             ?? arms!.LeftPalmFrame.GlobalPosition;
         var rightWristPosition = animatedArms?.RightWristGlobalPosition
             ?? arms!.RightWristFrame.GlobalPosition;
@@ -468,7 +493,7 @@ public partial class TacticalPlayer
             : arms!.LeftArm.Transform;
         var activeMagazineContact = InspectVisibleMeshSurface(
             activeMagazine,
-            leftPalmPosition);
+            leftGrip);
         var bodyContinuity = InspectReloadBodyContinuity(
             animatedArms?.Skeleton,
             rightPalmAvailable: true,

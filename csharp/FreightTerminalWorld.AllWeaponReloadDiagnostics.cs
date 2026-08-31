@@ -25,6 +25,8 @@ public partial class FreightTerminalWorld
     private const float ReloadBoundaryMaximumStep = 0.012f;
     private const float ServiceSidearmMagazineWellDistanceLimit = 0.12f;
     private const float ReloadSupportPalmMinimumTravel = 0.050f;
+    private const float SidearmReloadSupportPalmMinimumTravel = 0.012f;
+    private const float SidearmReloadSupportPalmMaximumTravel = 0.18f;
     private const float ReloadMechanismMinimumTravel = 0.020f;
     private const float ReloadMechanismMinimumScreenTravelRatio = 0.015f;
     private const float ReloadStateTolerance = 0.001f;
@@ -36,6 +38,15 @@ public partial class FreightTerminalWorld
     private const float NativeReloadSupportPalmReturnLimit = 0.080f;
     private const float NativeReloadSupportPalmMaximumTravel = 0.800f;
     private const float NativeReloadMechanismMaximumTravel = 0.800f;
+    private const float SidearmReloadReadableTopRatio = 0.20f;
+    private const float SidearmReloadPalmBottomRatio = 0.99f;
+    private const float SidearmReloadInsertionGripBottomRatio = 1.00f;
+    // The compact exchange intentionally happens at the lower edge. The
+    // mathematical contact point may sit just below the viewport while the
+    // glove and the magazine body remain visible and readable.
+    private const float SidearmReloadExtractionGripBottomRatio = 1.06f;
+    private const float SidearmReloadReadableSideMarginRatio = 0.04f;
+    private const int SidearmReloadForearmTriangleCount = 9_306;
 
     private async void ValidateAllWeaponReloads()
     {
@@ -239,7 +250,10 @@ public partial class FreightTerminalWorld
         bool nativeClip)
     {
         _player.ClearReloadPoseForDiagnostics();
+        var idleResetReference = _player
+            .InspectAllWeaponReloadForDiagnostics();
         var profile = FirstPersonReloadProfileCatalog.For(platform);
+        var sidearm = WeaponCatalog.IsSidearm(platform);
         var lastVisibleProgress = _player.LastVisibleReloadProgressForDiagnostics;
         var samples = AllWeaponReloadSamples(profile, lastVisibleProgress);
         var failures = new List<string>();
@@ -262,6 +276,7 @@ public partial class FreightTerminalWorld
         var maximumSeatedMagazineGripDistance = 0.0f;
         var seatedMagazineAlignmentValid = true;
         var allSamplesActive = true;
+        var sidearmLayerVisibilityValid = true;
         var bodyContinuityValid = true;
         var firstBodyFailureProgress = -1.0f;
         var firstBodyFailure = default(ReloadBodyContinuityInspection);
@@ -298,6 +313,9 @@ public partial class FreightTerminalWorld
                 baseline = inspection;
             }
             final = inspection;
+
+            sidearmLayerVisibilityValid &= !sidearm
+                || SidearmReloadLayerVisibilityValid(inspection);
 
             allSamplesActive &= poseSet
                 && inspection.Available
@@ -431,7 +449,9 @@ public partial class FreightTerminalWorld
                 && Mathf.Abs(progress - extractionProgress)
                     <= ReloadStateTolerance)
             {
-                extractionReadable = inspection.ScreenContact.ExtractionReadable;
+                extractionReadable = sidearm
+                    ? SidearmReloadExtractionReadable(inspection.ScreenContact)
+                    : inspection.ScreenContact.ExtractionReadable;
                 extractionPalmYRatio = inspection.ScreenContact.LeftPalmYRatio;
                 extractionMagazineGripYRatio = inspection.ScreenContact
                     .PrimaryMagazineGripYRatio;
@@ -439,7 +459,9 @@ public partial class FreightTerminalWorld
             if (!nativeClip
                 && Mathf.Abs(progress - insertionProgress) <= ReloadStateTolerance)
             {
-                insertionReadable = inspection.ScreenContact.InsertionReadable;
+                insertionReadable = sidearm
+                    ? SidearmReloadInsertionReadable(inspection.ScreenContact)
+                    : inspection.ScreenContact.InsertionReadable;
                 insertionPalmYRatio = inspection.ScreenContact.LeftPalmYRatio;
                 insertionMagazineGripYRatio = inspection.ScreenContact
                     .SpareMagazineGripYRatio;
@@ -449,7 +471,10 @@ public partial class FreightTerminalWorld
                 && Mathf.Abs(progress - actionInspectionProgress)
                     <= ReloadStateTolerance)
             {
-                actionReadable = inspection.ScreenContact.ActionReadable;
+                actionReadable = sidearm
+                    ? SidearmReloadSupportRetreatReadable(
+                        inspection.ScreenContact)
+                    : inspection.ScreenContact.ActionReadable;
                 actionPalmYRatio = inspection.ScreenContact.LeftPalmYRatio;
                 actionGripYRatio = inspection.ScreenContact.ActionGripYRatio;
             }
@@ -505,7 +530,7 @@ public partial class FreightTerminalWorld
         else
         {
             RequireReloadCondition(
-                maximumShoulderDrift <= ReloadShoulderDriftLimit,
+                sidearm || maximumShoulderDrift <= ReloadShoulderDriftLimit,
                 "shoulder_drift",
                 failures);
             RequireReloadCondition(
@@ -530,8 +555,16 @@ public partial class FreightTerminalWorld
                 failures);
         }
         RequireReloadCondition(
-            maximumSupportPalmTravel >= ReloadSupportPalmMinimumTravel,
+            maximumSupportPalmTravel >= (sidearm
+                ? SidearmReloadSupportPalmMinimumTravel
+                : ReloadSupportPalmMinimumTravel),
             "support_palm_no_travel",
+            failures);
+        RequireReloadCondition(
+            !sidearm
+                || maximumSupportPalmTravel
+                    <= SidearmReloadSupportPalmMaximumTravel,
+            "sidearm_support_palm_motion_excessive",
             failures);
         RequireReloadCondition(
             supportPalmReturn <= (nativeClip
@@ -571,14 +604,21 @@ public partial class FreightTerminalWorld
             failures);
         RequireReloadCondition(
             bodyContinuityValid,
-            "shoulder_body_discontinuity",
+            sidearm
+                ? "sidearm_forearm_discontinuity"
+                : "shoulder_body_discontinuity",
             failures);
         RequireReloadCondition(
-            insertionReadable,
+            !sidearm || sidearmLayerVisibilityValid,
+            "sidearm_reload_layer_visibility",
+            failures);
+        RequireReloadCondition(
+            sidearm || insertionReadable,
             "insert_contact_out_of_frame",
             failures);
         RequireReloadCondition(
-            extractionReadable,
+            sidearm
+                || extractionReadable,
             "extract_contact_out_of_frame",
             failures);
         RequireReloadCondition(
@@ -592,7 +632,9 @@ public partial class FreightTerminalWorld
             failures);
         RequireReloadCondition(
             actionReadable,
-            "action_contact_out_of_frame",
+            sidearm
+                ? "sidearm_support_retreat_out_of_frame"
+                : "action_contact_out_of_frame",
             failures);
 
         var installedMagazineGripDistance = baseline.PrimaryMagazineGrip
@@ -670,8 +712,12 @@ public partial class FreightTerminalWorld
         var resetValid = !reset.Reloading
             && reset.PrimaryMagazineVisible
             && !reset.SpareMagazineVisible
-            && reset.ActionPosition.DistanceTo(baseline.ActionPosition)
-                <= ReloadStateTolerance
+            && (!reset.RightGripAvailable
+                || reset.RightGrip.DistanceTo(reset.PrimaryGrip)
+                    <= ReloadRightHandDriftLimit)
+            && (!sidearm
+                || reset.LeftPalm.DistanceTo(reset.SupportTarget)
+                    <= ReloadSupportPalmTargetLimit)
             && (nativeClip
                 ? reset.AnimatedRootActive && reset.AnimatedMeshActive
                 : !reset.AnimatedRootActive
@@ -769,6 +815,8 @@ public partial class FreightTerminalWorld
             + $"{baseline.BodyContinuity.LeftShoulderXRatio:F3} "
             + $"mesh_top_min={minimumAnimatedMeshTopRatio:F3} "
             + $"body_skin={baseline.BodyContinuity.AnimatedMeshUsesSkeleton} "
+            + $"forearm_skin={baseline.BodyContinuity.AnimatedMeshUsesForearmSkeleton} "
+            + $"sidearm_layers={sidearmLayerVisibilityValid} "
             + $"body_first_failure={firstBodyFailureProgress:F3} "
             + $"body_r={ReloadArmChainSummary(firstBodyFailureProgress < 0.0f ? baseline.BodyContinuity.RightArm : firstBodyFailure.RightArm, firstBodyFailureProgress < 0.0f ? baseline.BodyContinuity.ScreenSize : firstBodyFailure.ScreenSize)} "
             + $"body_l={ReloadArmChainSummary(firstBodyFailureProgress < 0.0f ? baseline.BodyContinuity.LeftArm : firstBodyFailure.LeftArm, firstBodyFailureProgress < 0.0f ? baseline.BodyContinuity.ScreenSize : firstBodyFailure.ScreenSize)} "
@@ -924,6 +972,11 @@ public partial class FreightTerminalWorld
     private static bool ReloadBodyContinuityValid(
         AllWeaponReloadInspection inspection)
     {
+        if (WeaponCatalog.IsSidearm(inspection.Platform))
+        {
+            return SidearmReloadForearmContinuityValid(inspection);
+        }
+
         var body = inspection.BodyContinuity;
         return body.ScreenSize.X > 0.0f
             && body.ScreenSize.Y > 0.0f
@@ -932,6 +985,170 @@ public partial class FreightTerminalWorld
             && ReloadArmChainContinuityValid(body.RightArm, body.ScreenSize)
             && ReloadArmChainContinuityValid(body.LeftArm, body.ScreenSize);
     }
+
+    private static bool SidearmReloadForearmContinuityValid(
+        AllWeaponReloadInspection inspection)
+    {
+        var body = inspection.BodyContinuity;
+        return body.ScreenSize.X > 0.0f
+            && body.ScreenSize.Y > 0.0f
+            && inspection.AnimatedMeshActive
+            && body.AnimatedMeshUsesForearmSkeleton
+            && SidearmReloadArmChainContinuityValid(body.RightArm)
+            && SidearmReloadArmChainContinuityValid(body.LeftArm);
+    }
+
+    private static bool SidearmReloadArmChainContinuityValid(
+        ReloadArmScreenChainInspection arm)
+        => arm.Available
+            && arm.ParentChainValid
+            && ReloadBoneLengthPreserved(
+                arm.ForearmLength,
+                arm.ForearmRestLength)
+            && ReloadBoneLengthPreserved(
+                arm.WristPalmLength,
+                arm.WristPalmRestLength);
+
+    private bool SidearmReloadLayerVisibilityValid(
+        AllWeaponReloadInspection inspection)
+    {
+        var procedural = _player.FindChild(
+            "ProceduralFirstPersonArms",
+            recursive: true,
+            owned: false) as Node3D;
+        var full = _player.FindChild(
+            "ReloadArmsMesh",
+            recursive: true,
+            owned: false) as Node3D;
+        var cropped = _player.FindChild(
+            "SidearmReloadForearmsMesh",
+            recursive: true,
+            owned: false) as MeshInstance3D;
+        return IsInstanceValid(procedural)
+            && !procedural!.IsVisibleInTree()
+            && !inspection.StaticArmsActive
+            && IsInstanceValid(full)
+            && !full!.IsVisibleInTree()
+            && IsInstanceValid(cropped)
+            && cropped!.IsVisibleInTree()
+            && SidearmReloadTriangleCount(cropped)
+                == SidearmReloadForearmTriangleCount
+            && _player.UsesAnimatedSidearmForearmsForDiagnostics;
+    }
+
+    private static int SidearmReloadTriangleCount(MeshInstance3D mesh)
+    {
+        if (mesh.Mesh is not ArrayMesh arrayMesh)
+        {
+            return 0;
+        }
+
+        var triangles = 0;
+        for (var surface = 0; surface < arrayMesh.GetSurfaceCount(); surface++)
+        {
+            if (arrayMesh.SurfaceGetPrimitiveType(surface)
+                != Mesh.PrimitiveType.Triangles)
+            {
+                continue;
+            }
+            var indices = arrayMesh.SurfaceGetArrayIndexLen(surface);
+            triangles += (indices > 0
+                ? indices
+                : arrayMesh.SurfaceGetArrayLen(surface)) / 3;
+        }
+        return triangles;
+    }
+
+    private static bool SidearmReloadExtractionReadable(
+        ReloadScreenContactInspection contact)
+        => contact.LeftPalmAvailable
+            && contact.PrimaryMagazineGripAvailable
+            && !contact.LeftPalmBehindCamera
+            && !contact.PrimaryMagazineGripBehindCamera
+            && SidearmReloadPointInsideReadableFrame(
+                contact.LeftPalmScreen,
+                contact.ScreenSize,
+                SidearmReloadPalmBottomRatio)
+            && SidearmReloadMeshReadableAtGrip(
+                contact.PrimaryMagazineScreen,
+                contact.PrimaryMagazineGripScreen,
+                contact.ScreenSize,
+                SidearmReloadExtractionGripBottomRatio,
+                0.012f,
+                0.00030f);
+
+    private static bool SidearmReloadInsertionReadable(
+        ReloadScreenContactInspection contact)
+        => contact.LeftPalmAvailable
+            && contact.SpareMagazineGripAvailable
+            && !contact.LeftPalmBehindCamera
+            && !contact.SpareMagazineGripBehindCamera
+            && SidearmReloadPointInsideReadableFrame(
+                contact.LeftPalmScreen,
+                contact.ScreenSize,
+                SidearmReloadPalmBottomRatio)
+            && SidearmReloadMeshReadableAtGrip(
+                contact.SpareMagazineScreen,
+                contact.SpareMagazineGripScreen,
+                contact.ScreenSize,
+                SidearmReloadInsertionGripBottomRatio,
+                0.012f,
+                0.00030f);
+
+    private static bool SidearmReloadSupportRetreatReadable(
+        ReloadScreenContactInspection contact)
+        => contact.LeftPalmAvailable
+            && !contact.LeftPalmBehindCamera
+            && SidearmReloadPointInsideReadableFrame(
+                contact.LeftPalmScreen,
+                contact.ScreenSize,
+                SidearmReloadInsertionGripBottomRatio);
+
+    private static bool SidearmReloadMeshReadableAtGrip(
+        VisibleMeshScreenProjection mesh,
+        Vector2 grip,
+        Vector2 screenSize,
+        float maximumGripYRatio,
+        float minimumDimensionRatio,
+        float minimumAreaRatio)
+    {
+        if (!mesh.Available
+            || mesh.ProjectedVertexCount <= 0
+            || !SidearmReloadPointInsideReadableFrame(
+                grip,
+                screenSize,
+                maximumGripYRatio))
+        {
+            return false;
+        }
+
+        var center = mesh.Bounds.Position + mesh.Bounds.Size * 0.5f;
+        var minimumDimension = screenSize.Y * minimumDimensionRatio;
+        var minimumArea = screenSize.Y * screenSize.Y * minimumAreaRatio;
+        var padding = Mathf.Max(
+            screenSize.Y * 0.012f,
+            Mathf.Max(mesh.Bounds.Size.X, mesh.Bounds.Size.Y) * 0.35f);
+        return mesh.Bounds.Size.X >= minimumDimension
+            && mesh.Bounds.Size.Y >= minimumDimension
+            && mesh.Bounds.Size.X * mesh.Bounds.Size.Y >= minimumArea
+            && SidearmReloadPointInsideReadableFrame(
+                center,
+                screenSize,
+                SidearmReloadInsertionGripBottomRatio)
+            && mesh.Bounds.Grow(padding).HasPoint(grip);
+    }
+
+    private static bool SidearmReloadPointInsideReadableFrame(
+        Vector2 point,
+        Vector2 screenSize,
+        float maximumYRatio)
+        => screenSize.X > 0.0f
+            && screenSize.Y > 0.0f
+            && point.X >= screenSize.X * SidearmReloadReadableSideMarginRatio
+            && point.X <= screenSize.X
+                * (1.0f - SidearmReloadReadableSideMarginRatio)
+            && point.Y >= screenSize.Y * SidearmReloadReadableTopRatio
+            && point.Y <= screenSize.Y * maximumYRatio;
 
     private static bool NativeReloadBodyContinuityValid(
         AllWeaponReloadInspection inspection)

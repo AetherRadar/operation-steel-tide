@@ -15,6 +15,10 @@ public partial class FreightTerminalWorld
             (Platform: WeaponPlatform.M3A1, MinimumLocalVolumeDb: 1.0f),
             (Platform: WeaponPlatform.MP5A5, MinimumLocalVolumeDb: 0.5f),
             (Platform: WeaponPlatform.M4A1, MinimumLocalVolumeDb: 1.5f),
+            (Platform: WeaponPlatform.P226, MinimumLocalVolumeDb: 1.5f),
+            (Platform: WeaponPlatform.M1911, MinimumLocalVolumeDb: 2.5f),
+            (Platform: WeaponPlatform.GSh18, MinimumLocalVolumeDb: 1.5f),
+            (Platform: WeaponPlatform.DesertEagle, MinimumLocalVolumeDb: 1.0f),
             (Platform: WeaponPlatform.AWM, MinimumLocalVolumeDb: 2.5f),
             (Platform: WeaponPlatform.VSS, MinimumLocalVolumeDb: -4.5f)
         };
@@ -108,6 +112,9 @@ public partial class FreightTerminalWorld
             (Platform: WeaponPlatform.M4A1, MinimumKickback: 0.073f, MinimumCameraPitch: 0.012f),
             (Platform: WeaponPlatform.AK74, MinimumKickback: 0.081f, MinimumCameraPitch: 0.014f),
             (Platform: WeaponPlatform.P226, MinimumKickback: 0.055f, MinimumCameraPitch: 0.009f),
+            (Platform: WeaponPlatform.M1911, MinimumKickback: 0.065f, MinimumCameraPitch: 0.011f),
+            (Platform: WeaponPlatform.GSh18, MinimumKickback: 0.055f, MinimumCameraPitch: 0.009f),
+            (Platform: WeaponPlatform.DesertEagle, MinimumKickback: 0.090f, MinimumCameraPitch: 0.018f),
             (Platform: WeaponPlatform.AWM, MinimumKickback: 0.117f, MinimumCameraPitch: 0.033f)
         };
         var valid = true;
@@ -130,9 +137,12 @@ public partial class FreightTerminalWorld
                 && idleCrosshair.Available
                 && idleCrosshair.Offset.Length() <= 0.01f
                 && idleCrosshair.Scale.DistanceTo(Vector2.One) <= 0.01f;
+            var sidearmView = WeaponCatalog.IsSidearm(sample.Platform);
             var rightBiasedViewValid = idle.ViewPosition.X >= 0.295f
                 && idle.ViewPosition.X <= 0.39f
-                && idle.ViewPosition.Z is >= -0.70f and <= -0.59f
+                && (sidearmView
+                    ? idle.ViewPosition.Z is >= -0.59f and <= -0.52f
+                    : idle.ViewPosition.Z is >= -0.70f and <= -0.59f)
                 && idle.ViewRotation.Y >= 0.04f;
             var weaponImpulseValid = impact.Kickback >= sample.MinimumKickback
                 && impact.Pitch <= -0.018f
