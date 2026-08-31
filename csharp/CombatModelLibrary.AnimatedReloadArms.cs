@@ -338,7 +338,7 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
         WeaponPlatform platform,
         Vector3 requestedGlobalPosition)
     {
-        if (WeaponCatalog.IsSidearm(platform))
+        if (UsesSidearmForearms)
         {
             return requestedGlobalPosition;
         }

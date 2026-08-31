@@ -246,7 +246,7 @@ public partial class FreightTerminalWorld
                     <= akReloadMagazineContactTolerance
                 && repeated.ActiveMagazineSurfaceDistance
                     <= akReloadMagazineContactTolerance;
-            var expectedPrimaryVisible = progress < akReloadProfile.StowEnd;
+            var expectedPrimaryVisible = progress < akReloadProfile.ExtractEnd;
             var mechanismState = first.PrimaryMagazineVisible == expectedPrimaryVisible
                 && first.SpareMagazineVisible == !expectedPrimaryVisible
                 && first.SeparateMagazineNodes
@@ -586,9 +586,9 @@ public partial class FreightTerminalWorld
         foreach (var sample in new[]
         {
             (
-                Boundary: m4ReloadProfile.StowEnd,
-                Before: m4ReloadProfile.StowEnd - m4ReloadBoundaryEpsilon,
-                After: m4ReloadProfile.StowEnd + m4ReloadBoundaryEpsilon),
+                Boundary: m4ReloadProfile.ExtractEnd,
+                Before: m4ReloadProfile.ExtractEnd - m4ReloadBoundaryEpsilon,
+                After: m4ReloadProfile.ExtractEnd + m4ReloadBoundaryEpsilon),
             (
                 Boundary: m4ReloadProfile.SeatEnd,
                 Before: m4ReloadProfile.SeatEnd - m4ReloadBoundaryEpsilon,

@@ -178,7 +178,7 @@ public partial class FreightTerminalWorld
                     || SidearmReloadSupportRetreatReadable(
                         inspection.ScreenContact);
                 var sampleBodyContinuous = ReloadBodyContinuityValid(inspection);
-                var sampleLayersValid = SidearmReloadLayerVisibilityValid(inspection);
+                var sampleLayersValid = CompactReloadLayerVisibilityValid(inspection);
                 var sampleValid = set
                     && inspection.AnimatedRootActive
                     && inspection.AnimatedMeshActive

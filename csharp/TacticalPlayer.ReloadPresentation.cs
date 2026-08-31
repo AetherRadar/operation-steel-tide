@@ -34,10 +34,6 @@ public partial class TacticalPlayer
         var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
         var profile = FirstPersonReloadProfileCatalog.For(EquippedWeapon.Platform);
         var wellGrip = profile.MagazineHome + profile.MagazineGripOffset;
-        var extractedGrip = profile.ExtractedMagazine + profile.MagazineGripOffset;
-        var stowedGrip = profile.StowedMagazine + profile.MagazineGripOffset;
-        var spareGrip = profile.SpareMagazineHome + profile.MagazineGripOffset;
-        var readyGrip = profile.ReadyMagazine + profile.MagazineGripOffset;
 
         if (profile.Mechanism == FirstPersonReloadMechanism.InternalMagazine)
         {
@@ -46,12 +42,12 @@ public partial class TacticalPlayer
             return;
         }
 
-        _magazine.Visible = progress < profile.StowEnd;
+        _magazine.Visible = progress < profile.ExtractEnd;
         _magazine.Position = profile.MagazineHome;
         _magazine.Rotation = profile.MagazineRotation;
-        _spareMagazine.Visible = progress >= profile.StowEnd;
-        _spareMagazine.Position = profile.SpareMagazineHome;
-        _spareMagazine.Rotation = profile.StowedRotation;
+        _spareMagazine.Visible = progress >= profile.ExtractEnd;
+        _spareMagazine.Position = profile.ExtractedMagazine;
+        _spareMagazine.Rotation = profile.ExtractedRotation;
         var sidearmSlideLockedOpen = WeaponCatalog.IsSidearm(profile.Platform)
             && _reloadStartedEmpty
             && progress < profile.ActionEnd;
@@ -76,39 +72,18 @@ public partial class TacticalPlayer
             _supportHand.Rotation = profile.MagazineHandRotation;
             PlayPlatformReloadSound(0, progress, profile.ReachEnd + 0.08f, 0.91f);
         }
-        else if (progress < profile.StowEnd)
-        {
-            var t = SmoothSegment(progress, profile.ExtractEnd, profile.StowEnd);
-            _magazine.Position = profile.ExtractedMagazine.Lerp(profile.StowedMagazine, t);
-            _magazine.Rotation = profile.ExtractedRotation.Lerp(profile.StowedRotation, t);
-            _supportHand.Position = extractedGrip.Lerp(stowedGrip, t);
-            _supportHand.Rotation = profile.MagazineHandRotation;
-        }
-        else if (progress < profile.AcquireEnd)
-        {
-            // Keep the removed magazine at its pouch endpoint while the hand
-            // changes over to the spare. Resetting this hidden node to the
-            // magwell made the physical hand target jump at StowEnd.
-            _magazine.Position = profile.StowedMagazine;
-            _magazine.Rotation = profile.StowedRotation;
-            var t = SmoothSegment(progress, profile.StowEnd, profile.AcquireEnd);
-            _supportHand.Position = stowedGrip.Lerp(spareGrip, t);
-            _supportHand.Rotation = profile.MagazineHandRotation;
-        }
-        else if (progress < profile.InsertEnd)
-        {
-            var t = SmoothSegment(progress, profile.AcquireEnd, profile.InsertEnd);
-            _spareMagazine.Position = profile.SpareMagazineHome.Lerp(profile.ReadyMagazine, t);
-            _spareMagazine.Rotation = profile.StowedRotation.Lerp(
-                profile.ExtractedRotation,
-                t);
-            _supportHand.Position = spareGrip.Lerp(readyGrip, t);
-            _supportHand.Rotation = profile.MagazineHandRotation;
-        }
         else if (progress < profile.SeatEnd)
         {
-            var t = SmoothSegment(progress, profile.InsertEnd, profile.SeatEnd);
-            ApplyMagazineInsertion(profile, t);
+            // The old magazine changes to the fresh one at one shared point
+            // below the magwell. The left hand then reverses the same path and
+            // seats it directly; there is no pouch detour or cross-screen arc.
+            var t = SmoothSegment(progress, profile.ExtractEnd, profile.SeatEnd);
+            _spareMagazine.Position = profile.ExtractedMagazine.Lerp(
+                profile.MagazineHome,
+                t);
+            _spareMagazine.Rotation = profile.ExtractedRotation.Lerp(
+                profile.MagazineRotation,
+                t);
             _supportHand.Position = _spareMagazine.Position + profile.MagazineGripOffset;
             _supportHand.Rotation = profile.MagazineHandRotation;
             PlayPlatformReloadSound(1, progress, profile.InsertEnd + 0.035f, 1.04f);
@@ -270,31 +245,6 @@ public partial class TacticalPlayer
 
         _magazine.Position = profile.MagazineHome.Lerp(profile.ExtractedMagazine, t);
         _magazine.Rotation = profile.MagazineRotation.Lerp(profile.ExtractedRotation, t);
-    }
-
-    private void ApplyMagazineInsertion(FirstPersonReloadProfile profile, float t)
-    {
-        if (profile.Mechanism == FirstPersonReloadMechanism.RockAndLockMagazine)
-        {
-            var hook = SmoothStep(Mathf.Clamp(t / 0.62f, 0.0f, 1.0f));
-            var lockRotation = SmoothStep(Mathf.Clamp((t - 0.35f) / 0.65f, 0.0f, 1.0f));
-            _spareMagazine.Position = profile.ReadyMagazine.Lerp(profile.MagazineHome, hook);
-            _spareMagazine.Rotation = profile.ExtractedRotation.Lerp(
-                profile.MagazineRotation,
-                lockRotation);
-            return;
-        }
-
-        // A short final over-travel makes the magazine visibly seat instead of
-        // dissolving into the magwell at constant speed.
-        var seat = SmoothStep(Mathf.Clamp(t / 0.82f, 0.0f, 1.0f));
-        var impact = Mathf.Sin(Mathf.Clamp((t - 0.80f) / 0.20f, 0.0f, 1.0f) * Mathf.Pi)
-            * 0.008f;
-        _spareMagazine.Position = profile.ReadyMagazine.Lerp(profile.MagazineHome, seat)
-            + Vector3.Down * impact;
-        _spareMagazine.Rotation = profile.ExtractedRotation.Lerp(
-            profile.MagazineRotation,
-            seat);
     }
 
     private void UpdateReloadAction(

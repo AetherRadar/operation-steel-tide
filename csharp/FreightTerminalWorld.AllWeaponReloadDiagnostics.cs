@@ -276,7 +276,7 @@ public partial class FreightTerminalWorld
         var maximumSeatedMagazineGripDistance = 0.0f;
         var seatedMagazineAlignmentValid = true;
         var allSamplesActive = true;
-        var sidearmLayerVisibilityValid = true;
+        var compactLayerVisibilityValid = true;
         var bodyContinuityValid = true;
         var firstBodyFailureProgress = -1.0f;
         var firstBodyFailure = default(ReloadBodyContinuityInspection);
@@ -314,8 +314,8 @@ public partial class FreightTerminalWorld
             }
             final = inspection;
 
-            sidearmLayerVisibilityValid &= !sidearm
-                || SidearmReloadLayerVisibilityValid(inspection);
+            compactLayerVisibilityValid &= nativeClip
+                || CompactReloadLayerVisibilityValid(inspection);
 
             allSamplesActive &= poseSet
                 && inspection.Available
@@ -332,9 +332,12 @@ public partial class FreightTerminalWorld
             maximumShoulderDrift = Mathf.Max(
                 maximumShoulderDrift,
                 inspection.RightShoulder.DistanceTo(baseline.RightShoulder));
-            maximumShoulderDrift = Mathf.Max(
-                maximumShoulderDrift,
-                inspection.LeftShoulder.DistanceTo(baseline.LeftShoulder));
+            if (!inspection.BodyContinuity.AnimatedMeshUsesForearmSkeleton)
+            {
+                maximumShoulderDrift = Mathf.Max(
+                    maximumShoulderDrift,
+                    inspection.LeftShoulder.DistanceTo(baseline.LeftShoulder));
+            }
             if (inspection.RightGripAvailable)
             {
                 maximumRightGripResidual = Mathf.Max(
@@ -530,7 +533,7 @@ public partial class FreightTerminalWorld
         else
         {
             RequireReloadCondition(
-                sidearm || maximumShoulderDrift <= ReloadShoulderDriftLimit,
+                maximumShoulderDrift <= ReloadShoulderDriftLimit,
                 "shoulder_drift",
                 failures);
             RequireReloadCondition(
@@ -604,13 +607,13 @@ public partial class FreightTerminalWorld
             failures);
         RequireReloadCondition(
             bodyContinuityValid,
-            sidearm
-                ? "sidearm_forearm_discontinuity"
+            baseline.BodyContinuity.AnimatedMeshUsesForearmSkeleton
+                ? "compact_forearm_discontinuity"
                 : "shoulder_body_discontinuity",
             failures);
         RequireReloadCondition(
-            !sidearm || sidearmLayerVisibilityValid,
-            "sidearm_reload_layer_visibility",
+            nativeClip || compactLayerVisibilityValid,
+            "compact_reload_layer_visibility",
             failures);
         RequireReloadCondition(
             sidearm || insertionReadable,
@@ -818,7 +821,7 @@ public partial class FreightTerminalWorld
             + $"mesh_top_min={minimumAnimatedMeshTopRatio:F3} "
             + $"body_skin={baseline.BodyContinuity.AnimatedMeshUsesSkeleton} "
             + $"forearm_skin={baseline.BodyContinuity.AnimatedMeshUsesForearmSkeleton} "
-            + $"sidearm_layers={sidearmLayerVisibilityValid} "
+            + $"compact_layers={compactLayerVisibilityValid} "
             + $"body_first_failure={firstBodyFailureProgress:F3} "
             + $"body_r={ReloadArmChainSummary(firstBodyFailureProgress < 0.0f ? baseline.BodyContinuity.RightArm : firstBodyFailure.RightArm, firstBodyFailureProgress < 0.0f ? baseline.BodyContinuity.ScreenSize : firstBodyFailure.ScreenSize)} "
             + $"body_l={ReloadArmChainSummary(firstBodyFailureProgress < 0.0f ? baseline.BodyContinuity.LeftArm : firstBodyFailure.LeftArm, firstBodyFailureProgress < 0.0f ? baseline.BodyContinuity.ScreenSize : firstBodyFailure.ScreenSize)} "
@@ -974,9 +977,9 @@ public partial class FreightTerminalWorld
     private static bool ReloadBodyContinuityValid(
         AllWeaponReloadInspection inspection)
     {
-        if (WeaponCatalog.IsSidearm(inspection.Platform))
+        if (inspection.BodyContinuity.AnimatedMeshUsesForearmSkeleton)
         {
-            return SidearmReloadForearmContinuityValid(inspection);
+            return CompactReloadForearmContinuityValid(inspection);
         }
 
         var body = inspection.BodyContinuity;
@@ -988,7 +991,7 @@ public partial class FreightTerminalWorld
             && ReloadArmChainContinuityValid(body.LeftArm, body.ScreenSize);
     }
 
-    private static bool SidearmReloadForearmContinuityValid(
+    private static bool CompactReloadForearmContinuityValid(
         AllWeaponReloadInspection inspection)
     {
         var body = inspection.BodyContinuity;
@@ -996,11 +999,11 @@ public partial class FreightTerminalWorld
             && body.ScreenSize.Y > 0.0f
             && inspection.AnimatedMeshActive
             && body.AnimatedMeshUsesForearmSkeleton
-            && SidearmReloadArmChainContinuityValid(body.RightArm)
-            && SidearmReloadArmChainContinuityValid(body.LeftArm);
+            && CompactReloadArmChainContinuityValid(body.RightArm)
+            && CompactReloadArmChainContinuityValid(body.LeftArm);
     }
 
-    private static bool SidearmReloadArmChainContinuityValid(
+    private static bool CompactReloadArmChainContinuityValid(
         ReloadArmScreenChainInspection arm)
         => arm.Available
             && arm.ParentChainValid
@@ -1011,7 +1014,7 @@ public partial class FreightTerminalWorld
                 arm.WristPalmLength,
                 arm.WristPalmRestLength);
 
-    private bool SidearmReloadLayerVisibilityValid(
+    private bool CompactReloadLayerVisibilityValid(
         AllWeaponReloadInspection inspection)
     {
         var procedural = _player.FindChild(

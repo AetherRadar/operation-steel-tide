@@ -144,6 +144,7 @@ public partial class TacticalPlayer
         // gesture from sweeping the cropped support forearm across the pistol.
         var authoredEmptyReload = _reloadStartedEmpty
             && !WeaponCatalog.IsSidearm(EquippedWeapon.Platform);
+        var authoredArmProgress = DirectReloadArmProgress();
         animatedReloadArms!.SetPresentationPlatform(EquippedWeapon.Platform);
         animatedReloadArms.SetReloadProgress(
             EquippedWeapon.Platform,
@@ -153,12 +154,41 @@ public partial class TacticalPlayer
         animatedReloadArms!.SetReloadProgress(
             EquippedWeapon.Platform,
             authoredEmptyReload,
-            ReloadProgress);
+            authoredArmProgress);
         animatedReloadArms.RetargetLeftPalm(
             EquippedWeapon.Platform,
             ReloadSupportTargetGlobal(),
             SidearmReloadMagazineAnchorBlend());
         return true;
+    }
+
+    private float DirectReloadArmProgress()
+    {
+        var profile = FirstPersonReloadProfileCatalog.For(
+            EquippedWeapon.Platform);
+        var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
+        if (profile.Mechanism == FirstPersonReloadMechanism.InternalMagazine)
+        {
+            return progress;
+        }
+        if (progress < profile.ExtractEnd)
+        {
+            return progress;
+        }
+        if (progress < profile.SeatEnd)
+        {
+            // Hold one authored magazine-grip pose while the compact forearm
+            // follows the direct down-and-up target. This removes the old
+            // stow/acquire wrist turns that made the cuff appear to vanish.
+            return profile.ExtractEnd;
+        }
+
+        // Return through the same short reach instead of playing the unused
+        // pouch detour at high speed after the fresh magazine is seated.
+        return Mathf.Lerp(
+            profile.ExtractEnd,
+            0.0f,
+            SmoothSegment(progress, profile.SeatEnd, 1.0f));
     }
 
     private float SidearmReloadMagazineAnchorBlend()

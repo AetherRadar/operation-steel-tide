@@ -1181,28 +1181,11 @@ public partial class TacticalPlayer
                 : fallback;
         }
 
-        if (!internalMagazine && progress < profile.StowEnd)
+        if (!internalMagazine && progress < profile.ExtractEnd)
         {
             return weapon.TryMagazineGripGlobalPosition(false, out var contact)
                 ? contact
                 : fallback;
-        }
-
-        if (!internalMagazine && progress < profile.AcquireEnd)
-        {
-            var fromContactAvailable = weapon.TryMagazineGripGlobalPosition(
-                false,
-                out var fromContact);
-            var toContactAvailable = weapon.TryMagazineGripGlobalPosition(
-                true,
-                out var toContact);
-            if (fromContactAvailable && toContactAvailable)
-            {
-                return fromContact.Lerp(
-                    toContact,
-                    SmoothSegment(progress, profile.StowEnd, profile.AcquireEnd));
-            }
-            return fallback;
         }
 
         if (progress < profile.SeatEnd)
