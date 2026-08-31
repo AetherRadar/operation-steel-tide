@@ -712,6 +712,8 @@ public partial class FreightTerminalWorld
         var resetValid = !reset.Reloading
             && reset.PrimaryMagazineVisible
             && !reset.SpareMagazineVisible
+            && reset.ActionPosition.DistanceTo(idleResetReference.ActionPosition)
+                <= ReloadStateTolerance
             && (!reset.RightGripAvailable
                 || reset.RightGrip.DistanceTo(reset.PrimaryGrip)
                     <= ReloadRightHandDriftLimit)

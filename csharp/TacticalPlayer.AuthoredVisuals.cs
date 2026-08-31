@@ -1066,8 +1066,15 @@ public partial class TacticalPlayer
         {
             return;
         }
-        if (!_isReloading
-            || (EquippedWeapon.Platform != WeaponPlatform.M4A1
+        if (!_isReloading)
+        {
+            // ADS can change without rebuilding the authored weapon. Refresh the
+            // compact sidearm scale and pitch every presentation frame so the
+            // close camera pose never inherits the larger hip-fire arm fit.
+            AlignAuthoredArmsToWeapon();
+            return;
+        }
+        if ((EquippedWeapon.Platform != WeaponPlatform.M4A1
                 && !UsesPlatformReloadPresentation()
                 && !UsesSidearmReloadPresentation())
             || ActiveAuthoredArms() is not { } arms

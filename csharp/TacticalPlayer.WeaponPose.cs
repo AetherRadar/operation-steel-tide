@@ -136,9 +136,11 @@ public partial class TacticalPlayer
             (WeaponPlatform.MP5A5, "optic_micro") => 0.325f,
             (WeaponPlatform.MP5A5, "optic_holo") => 0.335f,
             (WeaponPlatform.MP5A5, _) => 0.355f,
-            (WeaponPlatform.M3A1, "optic_micro") => 0.170f,
-            (WeaponPlatform.M3A1, "optic_holo") => 0.192f,
-            (WeaponPlatform.M3A1, _) => 0.184f,
+            // Clear the SMG-45 receiver's welded sight ridge while keeping each
+            // authored optic's contact plane on the same compact mount line.
+            (WeaponPlatform.M3A1, "optic_micro") => 0.179f,
+            (WeaponPlatform.M3A1, "optic_holo") => 0.201f,
+            (WeaponPlatform.M3A1, _) => 0.193f,
             (WeaponPlatform.M4A1, _) => M4A1OpticMountHeight(opticId),
             (WeaponPlatform.AWM, "optic_scope" or "optic_7x" or "optic_sniper") => 0.38f,
             (_, "optic_scope" or "optic_7x" or "optic_sniper") => 0.225f,
