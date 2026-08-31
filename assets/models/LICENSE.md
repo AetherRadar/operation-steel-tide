@@ -971,6 +971,20 @@ The 3D House Construction Site - LowPoly CC0 art package is published by Majadro
 
 The source package credits Imphenzia for its color palette. The runtime conversion selects one office-container stack, one cargo-container stack, one concrete truck, and three distinct material props instead of bundling overlapping source variants. Attribution is not required under the package's CC0 dedication, but both creator credits are retained for provenance.
 
+The 2026-08-31 Tideglass traversal rebuild makes two DCC edits without changing
+their source license. `majadroid_construction_site/containers-office.glb` retains
+the Majadroid office-container mesh and adds a Blender-cut upper-floor doorway.
+`majadroid_construction_site/building.glb` retains the Majadroid tower structure,
+opens its service shaft, and combines it with 36 `IndStairsWideFull.fbx` flights
+and 36 logical landing assemblies made from `IndFloorGreyPlatformFull.fbx` from
+the Trey Ramm kit documented below. Both source palettes are embedded in the
+tower GLB; deterministic `building_ImphenziaPalette01-256-Gradient.png` and
+`building_PacificNorthwestGradientAtlas.png` copies are also retained because
+Godot's imported scene records those external texture-resource paths.
+`scripts/blender/build_tideglass_map_assets.py` records and verifies the source
+metadata, dimensions, mesh counts, reachable-storey count, GLB round trip, and
+deterministic output.
+
 ## Trey Ramm CC0 modular industrial models
 
 The Modular Industrial Kit is published by Trey Ramm, OpenGameArt user `minime453`, under CC0 1.0:
@@ -983,6 +997,14 @@ The Modular Industrial Kit is published by Trey Ramm, OpenGameArt user `minime45
 - License and creator evidence: `source_art/third_party/trey_modular_industrial/SOURCE_PAGE.html` and `ORIGINAL_README.txt`
 - Source atlas and preview: `source_art/third_party/trey_modular_industrial/PacificNorthwestGradientAtlas.png` and `ASSET_OVERVIEW.png`
 - Reproducible conversion: `scripts/blender/build_trey_modular_industrial.py`
+
+The additional Tideglass tower-stair composite is rebuilt by
+`scripts/blender/build_tideglass_map_assets.py` from
+`Meshes/Details/IndStairsWideFull.fbx`,
+`Meshes/Floors/IndFloorGreyPlatformFull.fbx`, and the original Pacific Northwest
+gradient atlas. The runtime mapping is
+`majadroid_construction_site/building.glb`; the DCC edit removes only the stair
+module's closed high-end cap where each authored landing continues.
 
 The runtime scenes combine selected authored modules from the source kit,
 including two distinct closed perimeter-gate compositions and nineteen closed

@@ -25,7 +25,7 @@ public sealed partial class DemolitionArenaLayout
             Box("EastPerimeter", new(67.5f, 1.5f, 0), new(1.0f, 3.0f, 112), "concrete_dark", visible: false),
 
             // The open construction tower keeps its sightlines: only its floor and visible column grid collide.
-            Box("ConstructionTowerFoundation", new(-55.0f, 0.2f, 22.0f), new(13.9f, 0.36f, 16.6f), "concrete", visible: false),
+            Box("ConstructionTowerFoundation", new(-55.0f, 0.06f, 22.0f), new(13.9f, 0.12f, 16.6f), "concrete", visible: false),
             Box("BrickFactoryShell", new(58.0f, 10.52f, -12.25f), new(12.5f, 21.0f, 15.5f), "rust", visible: false),
             Box("GatewayWestPillar", new(-2.575f, 2.02f, -31.5f), new(0.85f, 4.0f, 0.75f), "rust", visible: false),
             Box("GatewayEastPillar", new(2.575f, 2.02f, -31.5f), new(0.85f, 4.0f, 0.75f), "rust", visible: false)
@@ -81,6 +81,12 @@ public sealed partial class DemolitionArenaLayout
                 new(-53.84f, 0.63f, 31.65f),
                 new(6.87f, 1.26f, 12.35f),
                 "ground",
+                visible: false),
+            Box(
+                "ConstructionTowerNavigationFootprint",
+                new(-55.0f, 0.92f, 22.0f),
+                new(13.9f, 1.8f, 16.6f),
+                "warning",
                 visible: false)
         };
 
@@ -158,7 +164,7 @@ public sealed partial class DemolitionArenaLayout
             TideglassAuthoredProp("SouthwestWatchHouse", QuaterniusBuildingsRoot, "house1.glb", new(-25.9f, 0.02f, 34.2f), 180.0f, 4.2f, new(2.10f, 3.179f, 3.62f), new(0, 1.5895f, 0), DemolitionArenaPropCollisionMode.CompoundBoxes, TideglassWatchHouseCollision()),
             TideglassAuthoredProp("DefenderArchiveBlock", QuaterniusDowntownRoot, "Building_Medium_2_001.gltf", new(-42.0f, 0.02f, -14.7f), 0.0f, 1.0f, new(14.0f, 25.01f, 12.0f), new(0.0f, 12.5f, -6.0f), DemolitionArenaPropCollisionMode.FootprintBox),
             TideglassAuthoredProp("NorthFoundryTenement", QuaterniusDowntownRoot, "Building_Small_1.gltf", new(-17.5f, 0.02f, -31.2f), 0.0f, 1.0f, new(12.0f, 17.03f, 12.0f), new(-1.0f, 8.5f, -6.0f), DemolitionArenaPropCollisionMode.CompoundBoxes, TideglassFoundryTenementCollision()),
-            TideglassAuthoredProp("SightBlockConstructionSiteOffice", MajadroidConstructionRoot, "containers-office.glb", new(24.5f, 0.02f, 42.6f), 0.0f, 1.0f, new(11.45f, 5.76f, 8.11f), new(0, 2.88f, 0), DemolitionArenaPropCollisionMode.AuthoredConcave, TideglassConstructionOfficeAnalyticalCollision(), authoredBackfaceCollision: true, addAnalyticalCollisionToAuthored: true),
+            TideglassAuthoredProp("SightBlockConstructionSiteOffice", MajadroidConstructionRoot, "containers-office.glb", new(24.5f, 0.02f, 42.6f), 0.0f, 1.0f, new(11.45f, 5.76f, 8.11f), new(0, 2.88f, 0), DemolitionArenaPropCollisionMode.AuthoredConcave, TideglassConstructionOfficeAnalyticalCollision(), authoredBackfaceCollision: true, authoredSolidCollisionPieceCount: 2),
             TideglassAuthoredProp("SightBlockReactorCargoContainers", MajadroidConstructionRoot, "containers-cargo.glb", new(52.0f, 0.02f, 5.0f), 90.0f, 0.82f, new(3.0f, 2.6f, 8.4f), new(0, 1.3f, 0), DemolitionArenaPropCollisionMode.AuthoredConcave, TideglassCargoContainersAnalyticalCollision(), authoredBackfaceCollision: true),
             TideglassAuthoredProp("ConstructionTruck", MajadroidConstructionRoot, "concrete-truck-red.glb", new(-63.5f, 0.02f, 32.0f), 90.0f, 1.05f, new(3.13f, 3.82f, 7.18f), new(0, 1.9075f, 0), DemolitionArenaPropCollisionMode.AuthoredConcave, TideglassConstructionTruckAnalyticalCollision(), authoredBackfaceCollision: true),
 
@@ -250,7 +256,9 @@ public sealed partial class DemolitionArenaLayout
         => new[]
         {
             new DemolitionArenaPropCollisionBox(new(3.0f, 2.6f, 7.0f), new(-4.225f, 1.856f, -0.556f)),
-            new DemolitionArenaPropCollisionBox(new(7.0f, 2.6f, 3.0f), new(0.775f, 1.856f, 1.444f)),
+            // Stop the lower-room seal below the upper landing so the player capsule
+            // cannot catch its invisible top edge while crossing the authored doorway.
+            new DemolitionArenaPropCollisionBox(new(7.0f, 1.9f, 3.0f), new(0.775f, 1.506f, 1.444f)),
             new DemolitionArenaPropCollisionBox(new(7.0f, 2.6f, 3.0f), new(-2.225f, 4.456f, 1.444f))
         };
 
@@ -279,7 +287,15 @@ public sealed partial class DemolitionArenaLayout
     private static IReadOnlyList<DemolitionArenaPropCollisionBox> TideglassFoundryTenementCollision()
         => new[]
         {
-            new DemolitionArenaPropCollisionBox(new(12.0f, 17.03f, 12.0f), new(-1.0f, 8.5f, -6.0f)),
+            // The source facade has a real stair-served doorway at local X=0, +Z.
+            // Build a hollow perimeter around it instead of sealing the whole building.
+            new DemolitionArenaPropCollisionBox(new(12.0f, 17.03f, 0.50f), new(-1.0f, 8.5f, -11.75f)),
+            new DemolitionArenaPropCollisionBox(new(0.50f, 17.03f, 11.50f), new(-6.75f, 8.5f, -6.0f)),
+            new DemolitionArenaPropCollisionBox(new(0.50f, 17.03f, 11.50f), new(4.75f, 8.5f, -6.0f)),
+            new DemolitionArenaPropCollisionBox(new(5.95f, 17.03f, 0.50f), new(-4.025f, 8.5f, -0.25f)),
+            new DemolitionArenaPropCollisionBox(new(3.95f, 17.03f, 0.50f), new(3.025f, 8.5f, -0.25f)),
+            new DemolitionArenaPropCollisionBox(new(2.10f, 14.00f, 0.50f), new(0, 10.03f, -0.25f)),
+            new DemolitionArenaPropCollisionBox(new(11.50f, 0.20f, 11.25f), new(-1.0f, 0.90f, -6.12f)),
             new DemolitionArenaPropCollisionBox(new(2.0f, 1.00f, 0.40f), new(0, 0.50f, 0.20f)),
             new DemolitionArenaPropCollisionBox(new(2.0f, 0.80f, 0.40f), new(0, 0.40f, 0.60f)),
             new DemolitionArenaPropCollisionBox(new(2.0f, 0.60f, 0.40f), new(0, 0.30f, 1.00f)),
@@ -383,7 +399,7 @@ public sealed partial class DemolitionArenaLayout
         DemolitionArenaPropCollisionMode collisionMode = DemolitionArenaPropCollisionMode.BoundsBox,
         IReadOnlyList<DemolitionArenaPropCollisionBox>? collisionPieces = null,
         bool authoredBackfaceCollision = false,
-        bool addAnalyticalCollisionToAuthored = false)
+        int authoredSolidCollisionPieceCount = 0)
     {
         return new DemolitionArenaProp(
             name,
@@ -396,7 +412,7 @@ public sealed partial class DemolitionArenaLayout
             collisionMode,
             collisionPieces,
             authoredBackfaceCollision,
-            addAnalyticalCollisionToAuthored);
+            authoredSolidCollisionPieceCount);
     }
 
     private Vector3 TideglassReactorStrategyTarget(string key) => key switch

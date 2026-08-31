@@ -124,9 +124,14 @@ public partial class FreightTerminalWorld
                     return false;
                 }
                 var concave = (ConcavePolygonShape3D)shapes[index].Shape;
+                var requiresBackfaceCollision = landmarkName == "CivicElevatedWalkway"
+                    || landmarkName == "ConstructionBuilding"
+                    && !meshes[index].Name.ToString().Contains(
+                        "ConstructionTowerAuthoredStairs",
+                        StringComparison.Ordinal);
                 if (concave.GetFaces().Length < 3
                     || concave.GetFaces().Length != sourceFaces.Length
-                    || (landmarkName == "CivicElevatedWalkway" && !concave.BackfaceCollision)
+                    || concave.BackfaceCollision != requiresBackfaceCollision
                     || !shapes[index].GlobalBasis.Scale.IsEqualApprox(Vector3.One))
                 {
                     return false;
@@ -279,6 +284,46 @@ public partial class FreightTerminalWorld
 
         clearance = buildingMinimum.Z - craneMaximum.Z;
         return clearance >= 0.30f;
+    }
+
+    private static bool TideglassConstructionTowerStairsReady(
+        Node3D arenaRoot,
+        Node3D? dressingRoot,
+        out string report)
+    {
+        report = "missing";
+        var building = dressingRoot?.GetNodeOrNull<Node3D>("ConstructionBuilding");
+        var collision = arenaRoot.GetNodeOrNull<StaticBody3D>(
+            "ConstructionBuildingAuthoredCollision");
+        if (!IsInstanceValid(building) || !IsInstanceValid(collision))
+        {
+            return false;
+        }
+
+        var meshNodes = building.FindChildren("*", "MeshInstance3D", true, false);
+        using var meshNodesBacking = meshNodes.AsDisposable();
+        var stairMeshes = meshNodes
+            .OfType<MeshInstance3D>()
+            .Where(mesh => mesh.Name.ToString().Contains(
+                "ConstructionTowerAuthoredStairs",
+                StringComparison.Ordinal))
+            .ToArray();
+        var collisionNodes = collision!.FindChildren("*", "CollisionShape3D", true, false);
+        using var collisionNodesBacking = collisionNodes.AsDisposable();
+        var shapes = collisionNodes.OfType<CollisionShape3D>().ToArray();
+        var stairTriangles = stairMeshes.Length == 1 && stairMeshes[0].Mesh is not null
+            ? stairMeshes[0].Mesh!.GetFaces().Length / 3
+            : 0;
+        var collisionMatches = stairMeshes.Length == 1
+            && shapes.Any(shape => shape.Shape is ConcavePolygonShape3D concave
+                && concave.GetFaces().Length == stairMeshes[0].Mesh!.GetFaces().Length);
+        report = $"meshes={stairMeshes.Length}:triangles={stairTriangles}:"
+            + $"shapes={shapes.Length}:collision={collisionMatches}:"
+            + "expected_assembly=36flights:36landings:19storeys";
+        return stairMeshes.Length == 1
+            && stairTriangles >= 3500
+            && shapes.Length == 2
+            && collisionMatches;
     }
 
     private static bool TideglassTryGetFaceBounds(

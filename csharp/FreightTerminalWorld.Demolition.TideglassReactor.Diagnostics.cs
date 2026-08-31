@@ -142,6 +142,10 @@ public partial class FreightTerminalWorld
         var constructionLandmarkClearanceReady = TideglassConstructionLandmarkClearanceReady(
             dressingRoot,
             out var constructionLandmarkClearance);
+        var constructionTowerStairsReady = TideglassConstructionTowerStairsReady(
+            arena.Root,
+            dressingRoot,
+            out var constructionTowerStairReport);
         var authoredMeshCollisionReady = TideglassAuthoredMeshCollisionReady(arena.Root);
         var treyAssembliesReady = TideglassTreyAssembliesReady(
             arena.Root,
@@ -160,13 +164,17 @@ public partial class FreightTerminalWorld
         var broadConstructionShellsRemoved = layout.CollisionBoxes.All(box =>
             box.Name != "CraneBaseShell"
             && !box.Name.StartsWith("ConstructionSoilBank", StringComparison.Ordinal))
-            && layout.NavigationBoxes.Count == 13
+            && layout.NavigationBoxes.Count == 14
             && layout.NavigationBoxes[0].Name == "CraneNavigationFootprint"
             && (layout.NavigationBoxes[0].Center - layout.Origin).IsEqualApprox(
                 new Vector3(-42.174f, 0.92f, -10.174f))
             && layout.NavigationBoxes[0].Size.IsEqualApprox(new Vector3(6.3f, 1.8f, 6.3f))
             && layout.NavigationBoxes[1].Name == "ConstructionSouthHillNavigation"
-            && layout.NavigationBoxes[2].Name == "ConstructionNorthHillNavigation";
+            && layout.NavigationBoxes[2].Name == "ConstructionNorthHillNavigation"
+            && layout.NavigationBoxes[3].Name == "ConstructionTowerNavigationFootprint"
+            && (layout.NavigationBoxes[3].Center - layout.Origin).IsEqualApprox(
+                new Vector3(-55.0f, 0.92f, 22.0f))
+            && layout.NavigationBoxes[3].Size.IsEqualApprox(new Vector3(13.9f, 1.8f, 16.6f));
         var geometryReady = layout.CollisionBoxes.Count == 15
             && layout.Props.Count == 56
             && importedProps == layout.Props.Count
@@ -187,6 +195,7 @@ public partial class FreightTerminalWorld
             && gatewayCollisionReady
             && brickFactoryCollisionReady
             && constructionLandmarkClearanceReady
+            && constructionTowerStairsReady
             && authoredMeshCollisionReady
             && treyAssembliesReady
             && majadroidVariantsReady
@@ -392,7 +401,27 @@ public partial class FreightTerminalWorld
             GetWorld3D(),
             layout,
             out var constructionOfficeRoomBlockers);
-        var stairTraversal = await TideglassWalkPlayerAcrossStairs(layout);
+        var constructionOfficeDoorClear = TideglassFindConstructionOfficeDoor(
+            GetWorld3D(),
+            layout,
+            out var constructionOfficeDoorOutside,
+            out var constructionOfficeDoorInside,
+            out var constructionOfficeDoorReport);
+        var foundry = layout.Props.Single(prop => prop.Name == "NorthFoundryTenement");
+        var foundryDoorClear = TideglassPhysicalRouteClear(
+            GetWorld3D(),
+            new[]
+            {
+                foundry.Position + new Vector3(0, 1.03f, 0.35f),
+                foundry.Position + new Vector3(0, 1.03f, -2.50f),
+                foundry.Position + new Vector3(0, 1.03f, 0.35f)
+            },
+            out var foundryDoorBlocker);
+        var stairTraversal = await TideglassWalkPlayerAcrossStairs(
+            layout,
+            dressingRoot,
+            constructionOfficeDoorOutside,
+            constructionOfficeDoorInside);
 
         var authoredNodes = GetTree().GetNodesInGroup("demolition_authored_model");
         using var authoredNodesBacking = authoredNodes.AsDisposable();
@@ -502,6 +531,8 @@ public partial class FreightTerminalWorld
             && southHousePassageClear
             && deviceDropGeometryReady
             && constructionOfficeRoomsSealed
+            && constructionOfficeDoorClear
+            && foundryDoorClear
             && stairTraversal.Ready
             && authoredDressingReady
             && runtimeReady;
@@ -519,6 +550,7 @@ public partial class FreightTerminalWorld
             + $"road_surfaces={roadSurfacesReady} road_surface_failures={roadSurfaceFailures} tower_collision={towerCollisionReady} authored_mesh_collision={authoredMeshCollisionReady} "
             + $"walkway_collision={walkwayCollisionReady}:{walkwayCollisionFailure} gateway_collision={gatewayCollisionReady}:{gatewayCollisionFailure} brick_factory_collision={brickFactoryCollisionReady}:{brickFactoryCollisionFailure} "
             + $"construction_clearance={constructionLandmarkClearanceReady}:{constructionLandmarkClearance:0.000} "
+            + $"tower_stair_asset={constructionTowerStairsReady}:{constructionTowerStairReport} "
             + $"trey_assemblies={treyAssembliesReady}:{treyAssemblyFailures} majadroid_variants={majadroidVariantsReady}:{majadroidVariantFailures} broad_shell_free={broadConstructionShellsRemoved} orphan_cover_free={noOrphanCover} shells_mapped={collisionShellsMapped} authored_collision_only={authoredCollisionOnly} "
             + $"spawns_sites={spawnAndSiteReady} topology={topologyReady} sightlines={heuristicSightlinesBlocked}/{physicalSightlinesBlocked} "
             + $"spawn_sightlines={spawnSightlinesBlocked} spawn_sightline_failures={unblockedSpawnSightlines} site_sightline={siteRotationSightlineBlocked}:{siteSightlineBlocker} "
@@ -530,11 +562,16 @@ public partial class FreightTerminalWorld
             + $"walkway_upward_block={upwardBlock.Ready}:{upwardBlock.SafeFraction:0.000}:{upwardBlock.Collider} "
             + $"south_house_passage={southHousePassageClear}:{southHousePassageBlocker} "
             + $"device_drop_geometry={deviceDropGeometryReady} "
-            + $"site_office_rooms_sealed={constructionOfficeRoomsSealed}:{constructionOfficeRoomBlockers} "
+            + $"site_office_lower_rooms_sealed={constructionOfficeRoomsSealed}:{constructionOfficeRoomBlockers} "
+            + $"site_office_door_clear={constructionOfficeDoorClear}:{constructionOfficeDoorReport} "
+            + $"foundry_door_clear={foundryDoorClear}:{foundryDoorBlocker} "
             + $"stair_walk={stairTraversal.Ready} west_stair={stairTraversal.WestReady}:{stairTraversal.WestFrames}:{stairTraversal.WestGain:0.00} "
             + $"east_stair={stairTraversal.EastReady}:{stairTraversal.EastFrames}:{stairTraversal.EastGain:0.00} "
             + $"site_office_stair={stairTraversal.SiteOfficeReady}:{stairTraversal.SiteOfficeFrames}:{stairTraversal.SiteOfficeGain:0.00} "
+            + $"site_office_door={stairTraversal.SiteOfficeDoorReady}:{stairTraversal.SiteOfficeDoorFrames} "
             + $"site_office_exit={stairTraversal.SiteOfficeExitReady}:{stairTraversal.SiteOfficeExitFrames}:{stairTraversal.SiteOfficeExitDrop:0.00} "
+            + $"foundry_door_walk={stairTraversal.FoundryDoorReady}:{stairTraversal.FoundryDoorFrames} "
+            + $"tower_stair_walk={stairTraversal.TowerStairsReady}:{stairTraversal.TowerStairFrames}:{stairTraversal.TowerStairGain:0.00} "
             + $"runtime={runtimeReady} bodies={arena.CollisionBodyCount} visuals={arena.VisualPartCount} sites={arena.Sites.Count} "
             + $"authored={authoredDressingReady} authored_models={authoredModelCount} authored_nodes={authoredModels.Length} "
             + $"dressing_scenes={uniqueSceneCount} dressing_packs={dressingSourcePacks.Count} dressing_reuse={dressingSceneReuse} "

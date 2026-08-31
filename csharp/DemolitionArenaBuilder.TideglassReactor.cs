@@ -56,7 +56,11 @@ public sealed partial class DemolitionArenaBuilder
                 }
                 var shape = new ConcavePolygonShape3D
                 {
-                    BackfaceCollision = landmarkName == "CivicElevatedWalkway"
+                    BackfaceCollision = landmarkName is "CivicElevatedWalkway"
+                        || landmarkName == "ConstructionBuilding"
+                        && !mesh.Name.ToString().Contains(
+                            "ConstructionTowerAuthoredStairs",
+                            System.StringComparison.Ordinal)
                 };
                 shape.SetFaces(bakedFaces);
 

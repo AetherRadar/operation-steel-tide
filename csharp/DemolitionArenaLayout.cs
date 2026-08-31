@@ -37,7 +37,7 @@ public readonly record struct DemolitionArenaProp(
     DemolitionArenaPropCollisionMode CollisionMode = DemolitionArenaPropCollisionMode.BoundsBox,
     IReadOnlyList<DemolitionArenaPropCollisionBox>? CollisionPieces = null,
     bool AuthoredBackfaceCollision = false,
-    bool AddAnalyticalCollisionToAuthored = false)
+    int AuthoredSolidCollisionPieceCount = 0)
 {
     public int CollisionPieceCount => CollisionPieces is { Count: > 0 } pieces ? pieces.Count : 1;
 

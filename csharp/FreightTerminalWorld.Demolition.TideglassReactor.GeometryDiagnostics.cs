@@ -57,6 +57,43 @@ public partial class FreightTerminalWorld
         return true;
     }
 
+    private static bool TideglassFindConstructionOfficeDoor(
+        World3D world,
+        DemolitionArenaLayout layout,
+        out Vector3 outside,
+        out Vector3 inside,
+        out string report)
+    {
+        var attempts = 0;
+        var lastBlocker = "none";
+        for (var heightIndex = 0; heightIndex <= 5; heightIndex++)
+        {
+            var feetHeight = 2.74f + heightIndex * 0.06f;
+            for (var crossIndex = 0; crossIndex <= 18; crossIndex++)
+            {
+                var cross = 0.25f + crossIndex * 0.10f;
+                var candidateOutside = layout.Origin + new Vector3(26.28f, feetHeight, 42.6f + cross);
+                var candidateInside = layout.Origin + new Vector3(25.18f, feetHeight, 42.6f + cross);
+                attempts++;
+                if (!TideglassPhysicalRouteClear(
+                        world,
+                        new[] { candidateOutside, candidateInside, candidateOutside },
+                        out lastBlocker))
+                {
+                    continue;
+                }
+                outside = candidateOutside;
+                inside = candidateInside;
+                report = $"attempts={attempts}:height={feetHeight:0.00}:cross={cross:0.00}";
+                return true;
+            }
+        }
+        outside = Vector3.Zero;
+        inside = Vector3.Zero;
+        report = $"attempts={attempts}:blocker={lastBlocker}";
+        return false;
+    }
+
     private async Task<(
         bool Ready,
         bool WestReady,
@@ -68,10 +105,20 @@ public partial class FreightTerminalWorld
         bool SiteOfficeReady,
         int SiteOfficeFrames,
         float SiteOfficeGain,
+        bool SiteOfficeDoorReady,
+        int SiteOfficeDoorFrames,
         bool SiteOfficeExitReady,
         int SiteOfficeExitFrames,
-        float SiteOfficeExitDrop)> TideglassWalkPlayerAcrossStairs(
-        DemolitionArenaLayout layout)
+        float SiteOfficeExitDrop,
+        bool FoundryDoorReady,
+        int FoundryDoorFrames,
+        bool TowerStairsReady,
+        int TowerStairFrames,
+        float TowerStairGain)> TideglassWalkPlayerAcrossStairs(
+        DemolitionArenaLayout layout,
+        Node3D? dressingRoot,
+        Vector3 officeOutside,
+        Vector3 officeInside)
     {
         var west = await TideglassWalkPlayerAcrossStair(
             layout,
@@ -89,7 +136,20 @@ public partial class FreightTerminalWorld
             minimumGain: 2.05f,
             horizontalTolerance: 0.85f,
             maximumFrames: 300);
-        var siteOfficeExit = siteOffice.Ready
+        var siteOfficeDoor = siteOffice.Ready
+            ? await TideglassWalkPlayerWaypoints(
+                new[]
+                {
+                    layout.Origin + new Vector3(26.55f, 2.75f, 44.35f),
+                    officeOutside,
+                    officeInside,
+                    officeOutside,
+                    layout.Origin + new Vector3(26.8f, 2.75f, 46.1f)
+                },
+                horizontalTolerance: 0.58f,
+                maximumFramesPerWaypoint: 220)
+            : (Ready: false, Frames: 0, Gain: 0.0f);
+        var siteOfficeExit = siteOfficeDoor.Ready
             ? await TideglassWalkPlayerDownStair(
                 layout,
                 new Vector3(30.7f, 0.22f, 46.1f),
@@ -98,8 +158,55 @@ public partial class FreightTerminalWorld
                 horizontalTolerance: 0.9f,
                 maximumFrames: 300)
             : (Ready: false, Frames: 0, Drop: 0.0f);
+        var foundry = layout.Props.Single(prop => prop.Name == "NorthFoundryTenement");
+        var foundryDoor = await TideglassWalkPlayerRoute(
+            foundry.Position + new Vector3(0, 0.22f, 2.65f),
+            new[]
+            {
+                foundry.Position + new Vector3(0, 0.70f, 1.10f),
+                foundry.Position + new Vector3(0, 1.03f, 0.25f),
+                foundry.Position + new Vector3(0, 1.03f, -2.50f),
+                foundry.Position + new Vector3(0, 1.03f, 0.25f),
+                foundry.Position + new Vector3(0, 0.22f, 2.65f)
+            },
+            horizontalTolerance: 0.55f,
+            maximumFramesPerWaypoint: 220);
+        var constructionBuilding = dressingRoot?.GetNodeOrNull<Node3D>("ConstructionBuilding");
+        var towerStart = IsInstanceValid(constructionBuilding)
+            ? constructionBuilding!.ToGlobal(new Vector3(2.30f, 0.22f, 4.50f))
+            : Vector3.Zero;
+        var towerWaypoints = IsInstanceValid(constructionBuilding)
+            ? new[]
+            {
+                constructionBuilding!.ToGlobal(new Vector3(2.30f, 1.50f, 2.88f)),
+                constructionBuilding.ToGlobal(new Vector3(2.30f, 1.50f, 1.78f)),
+                constructionBuilding.ToGlobal(new Vector3(4.15f, 1.50f, 1.78f)),
+                constructionBuilding.ToGlobal(new Vector3(4.15f, 2.78f, 4.45f)),
+                constructionBuilding.ToGlobal(new Vector3(4.15f, 2.78f, 5.25f)),
+                constructionBuilding.ToGlobal(new Vector3(2.30f, 2.78f, 5.25f)),
+                constructionBuilding.ToGlobal(new Vector3(2.30f, 4.06f, 2.88f)),
+                constructionBuilding.ToGlobal(new Vector3(2.30f, 4.06f, 1.78f)),
+                constructionBuilding.ToGlobal(new Vector3(4.15f, 4.06f, 1.78f)),
+                constructionBuilding.ToGlobal(new Vector3(4.15f, 5.34f, 4.45f))
+            }
+            : Array.Empty<Vector3>();
+        var towerStairs = towerWaypoints.Length > 0
+            ? await TideglassWalkPlayerRoute(
+                towerStart,
+                towerWaypoints,
+                horizontalTolerance: 0.46f,
+                maximumFramesPerWaypoint: 260,
+                verticalTolerance: 0.28f)
+            : (Ready: false, Frames: 0, Gain: 0.0f);
+        var towerStairsReady = towerStairs.Ready && towerStairs.Gain >= 4.65f;
         return (
-            west.Ready && east.Ready && siteOffice.Ready && siteOfficeExit.Ready,
+            west.Ready
+                && east.Ready
+                && siteOffice.Ready
+                && siteOfficeDoor.Ready
+                && siteOfficeExit.Ready
+                && foundryDoor.Ready
+                && towerStairsReady,
             west.Ready,
             west.Frames,
             west.Gain,
@@ -109,9 +216,97 @@ public partial class FreightTerminalWorld
             siteOffice.Ready,
             siteOffice.Frames,
             siteOffice.Gain,
+            siteOfficeDoor.Ready,
+            siteOfficeDoor.Frames,
             siteOfficeExit.Ready,
             siteOfficeExit.Frames,
-            siteOfficeExit.Drop);
+            siteOfficeExit.Drop,
+            foundryDoor.Ready,
+            foundryDoor.Frames,
+            towerStairsReady,
+            towerStairs.Frames,
+            towerStairs.Gain);
+    }
+
+    private async Task<(bool Ready, int Frames, float Gain)> TideglassWalkPlayerRoute(
+        Vector3 start,
+        IReadOnlyList<Vector3> waypoints,
+        float horizontalTolerance,
+        int maximumFramesPerWaypoint,
+        float verticalTolerance = 0.72f)
+    {
+        Input.ActionRelease("move_forward");
+        Input.ActionRelease("sprint");
+        _player.ProcessMode = ProcessModeEnum.Inherit;
+        _player.UiLocked = false;
+        _player.RestoreMovementInput();
+        _player.SetStaminaForDiagnostics(100.0f);
+        _player.GlobalPosition = start;
+        _player.Velocity = Vector3.Zero;
+        await WaitFrames(8);
+        var settledStart = _player.GlobalPosition;
+        var traversal = await TideglassWalkPlayerWaypoints(
+            waypoints,
+            horizontalTolerance,
+            maximumFramesPerWaypoint,
+            verticalTolerance);
+        return (
+            traversal.Ready,
+            traversal.Frames,
+            _player.GlobalPosition.Y - settledStart.Y);
+    }
+
+    private async Task<(bool Ready, int Frames, float Gain)> TideglassWalkPlayerWaypoints(
+        IReadOnlyList<Vector3> waypoints,
+        float horizontalTolerance,
+        int maximumFramesPerWaypoint,
+        float verticalTolerance = 0.72f)
+    {
+        if (waypoints.Count == 0)
+        {
+            return (false, 0, 0.0f);
+        }
+        var startHeight = _player.GlobalPosition.Y;
+        var totalFrames = 0;
+        for (var waypointIndex = 0; waypointIndex < waypoints.Count; waypointIndex++)
+        {
+            var target = waypoints[waypointIndex];
+            var reached = false;
+            Input.ActionPress("move_forward");
+            for (var frame = 0; frame < maximumFramesPerWaypoint; frame++)
+            {
+                totalFrames++;
+                _player.FaceWorldPointForDiagnostics(target);
+                if (!_player.HasMovementIntent && frame > 2)
+                {
+                    _player.RestoreMovementInput();
+                    Input.ActionPress("move_forward");
+                }
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                var delta = target - _player.GlobalPosition;
+                if (new Vector2(delta.X, delta.Z).Length() < horizontalTolerance
+                    && Mathf.Abs(delta.Y) < verticalTolerance)
+                {
+                    reached = true;
+                    break;
+                }
+            }
+            Input.ActionRelease("move_forward");
+            if (!reached)
+            {
+                GD.Print(
+                    $"TIDEGLASS_WAYPOINT_FAIL index={waypointIndex + 1}/{waypoints.Count} "
+                    + $"target={target} player={_player.GlobalPosition} "
+                    + $"horizontal={new Vector2(
+                        target.X - _player.GlobalPosition.X,
+                        target.Z - _player.GlobalPosition.Z).Length():0.000} "
+                    + $"vertical={Mathf.Abs(target.Y - _player.GlobalPosition.Y):0.000}");
+                return (false, totalFrames, _player.GlobalPosition.Y - startHeight);
+            }
+        }
+        Input.ActionRelease("move_forward");
+        Input.ActionRelease("sprint");
+        return (true, totalFrames, _player.GlobalPosition.Y - startHeight);
     }
 
     private async Task<(bool Ready, int Frames, float Gain)> TideglassWalkPlayerAcrossStair(
@@ -221,7 +416,9 @@ public partial class FreightTerminalWorld
     {
         var office = layout.Props.First(prop => prop.Name == "SightBlockConstructionSiteOffice");
         var roomBlockers = new List<string>();
-        for (var pieceIndex = 0; pieceIndex < office.CollisionPieceCount; pieceIndex++)
+        for (var pieceIndex = 0;
+             pieceIndex < office.AuthoredSolidCollisionPieceCount;
+             pieceIndex++)
         {
             TideglassPropPieceWorld(
                 office,
@@ -246,7 +443,7 @@ public partial class FreightTerminalWorld
         }
 
         blockers = string.Join('|', roomBlockers);
-        return true;
+        return office.AuthoredSolidCollisionPieceCount == 2;
     }
 
     private static bool TideglassPropsSeparated(
@@ -405,9 +602,7 @@ public partial class FreightTerminalWorld
             failure = "piece-metadata";
             return false;
         }
-        var expectedSupplementalPieces = prop.AddAnalyticalCollisionToAuthored
-            ? prop.CollisionPieceCount
-            : 0;
+        var expectedSupplementalPieces = prop.AuthoredSolidCollisionPieceCount;
         if (!body.HasMeta("supplemental_collision_piece_count")
             || body.GetMeta("supplemental_collision_piece_count").AsInt32()
                 != expectedSupplementalPieces)
@@ -1133,8 +1328,8 @@ public partial class FreightTerminalWorld
     {
         var foundation = layout.CollisionBoxes.SingleOrDefault(box => box.Name == "ConstructionTowerFoundation");
         if (foundation.Name != "ConstructionTowerFoundation"
-            || (foundation.Center - layout.Origin).DistanceTo(new Vector3(-55.0f, 0.2f, 22.0f)) > 0.01f
-            || !foundation.Size.IsEqualApprox(new Vector3(13.9f, 0.36f, 16.6f)))
+            || (foundation.Center - layout.Origin).DistanceTo(new Vector3(-55.0f, 0.06f, 22.0f)) > 0.01f
+            || !foundation.Size.IsEqualApprox(new Vector3(13.9f, 0.12f, 16.6f)))
         {
             return false;
         }

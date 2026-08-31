@@ -12,10 +12,13 @@ glTF importer.
 from __future__ import annotations
 
 import argparse
+import math
+import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
@@ -24,6 +27,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_DIR = REPO_ROOT / "source_art" / "third_party" / "majadroid_construction_site"
 OUTPUT_DIR = REPO_ROOT / "assets" / "models" / "majadroid_construction_site"
 PALETTE_PATH = SOURCE_DIR / "ImphenziaPalette01-256-Gradient.png"
+TREY_SOURCE_DIR = REPO_ROOT / "source_art" / "third_party" / "trey_modular_industrial"
+TREY_PALETTE_PATH = TREY_SOURCE_DIR / "PacificNorthwestGradientAtlas.png"
+TREY_STAIR_PATH = TREY_SOURCE_DIR / "Meshes" / "Details" / "IndStairsWideFull.fbx"
+TREY_PLATFORM_PATH = (
+    TREY_SOURCE_DIR / "Meshes" / "Floors" / "IndFloorGreyPlatformFull.fbx"
+)
 
 
 @dataclass(frozen=True)
@@ -96,6 +105,9 @@ def require_sources() -> None:
     missing = [asset.source_name for asset in ASSETS if not (SOURCE_DIR / asset.source_name).is_file()]
     if not PALETTE_PATH.is_file():
         missing.append(PALETTE_PATH.name)
+    for path in (TREY_PALETTE_PATH, TREY_STAIR_PATH, TREY_PLATFORM_PATH):
+        if not path.is_file():
+            missing.append(str(path.relative_to(REPO_ROOT)))
     if missing:
         raise FileNotFoundError(f"Missing Majadroid source files: {', '.join(missing)}")
 
@@ -335,6 +347,393 @@ def normalize_asset(objects: list[bpy.types.Object], spec: AssetSpec) -> bpy.typ
     return root
 
 
+def open_office_platform_doorway(objects: list[bpy.types.Object], spec: AssetSpec) -> None:
+    if spec.slug != "containers-office":
+        return
+
+    meshes = [obj for obj in objects if obj.type == "MESH"]
+    if len(meshes) != 1:
+        raise RuntimeError(
+            f"containers-office doorway edit expects one mesh; found {len(meshes)}"
+        )
+
+    # The upper office door at the ramp landing is modeled as a closed leaf over a
+    # solid container wall. Cut the full player-sized opening in Blender so the
+    # rendered doorway and the authored concave collision share the same topology.
+    doorway_minimum = Vector((0.85, -2.10, 2.55))
+    doorway_maximum = Vector((1.65, -0.25, 5.05))
+    office = meshes[0]
+    inverse = office.matrix_world.inverted()
+    mesh = office.data
+    editable = bmesh.new()
+    editable.from_mesh(mesh)
+    editable.faces.ensure_lookup_table()
+    for axis, boundary in (
+        (Vector((0.0, 1.0, 0.0)), doorway_minimum.y),
+        (Vector((0.0, 1.0, 0.0)), doorway_maximum.y),
+        (Vector((0.0, 0.0, 1.0)), doorway_minimum.z),
+        (Vector((0.0, 0.0, 1.0)), doorway_maximum.z),
+    ):
+        world_point = Vector((0.0, 0.0, 0.0))
+        if axis.y != 0.0:
+            world_point.y = boundary
+        else:
+            world_point.z = boundary
+        bmesh.ops.bisect_plane(
+            editable,
+            geom=list(editable.verts) + list(editable.edges) + list(editable.faces),
+            dist=0.00001,
+            plane_co=inverse @ world_point,
+            plane_no=office.matrix_world.to_3x3().transposed() @ axis,
+            clear_inner=False,
+            clear_outer=False,
+        )
+
+    doorway_faces = []
+    for face in editable.faces:
+        world_center = office.matrix_world @ face.calc_center_median()
+        if (
+            doorway_minimum.x <= world_center.x <= doorway_maximum.x
+            and doorway_minimum.y < world_center.y < doorway_maximum.y
+            and doorway_minimum.z < world_center.z < doorway_maximum.z
+        ):
+            doorway_faces.append(face)
+    if len(doorway_faces) < 8:
+        editable.free()
+        raise RuntimeError(
+            f"Upper office doorway edit found too little wall geometry: {len(doorway_faces)} faces"
+        )
+    bmesh.ops.delete(editable, geom=doorway_faces, context="FACES")
+    loose_vertices = [vertex for vertex in editable.verts if not vertex.link_edges]
+    if loose_vertices:
+        bmesh.ops.delete(editable, geom=loose_vertices, context="VERTS")
+    editable.to_mesh(mesh)
+    editable.free()
+    mesh.update()
+    bpy.context.view_layer.update()
+
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    for vertical in (2.88, 3.72, 4.56):
+        hit, *_ = bpy.context.scene.ray_cast(
+            depsgraph,
+            Vector((1.82, -1.18, vertical)),
+            Vector((-1.0, 0.0, 0.0)),
+            distance=0.94,
+        )
+        if hit:
+            raise RuntimeError(
+                f"Upper office doorway remains blocked at vertical={vertical:.2f}"
+            )
+
+    floor_hit, *_ = bpy.context.scene.ray_cast(
+        depsgraph,
+        Vector((0.52, -1.18, 3.70)),
+        Vector((0.0, 0.0, -1.0)),
+        distance=1.20,
+    )
+    if not floor_hit:
+        raise RuntimeError("Upper office doorway edit removed the playable room floor")
+
+
+def cut_construction_tower_stairwell(
+    objects: list[bpy.types.Object],
+    spec: AssetSpec,
+) -> None:
+    if spec.slug != "building":
+        return
+
+    building_meshes = [
+        obj for obj in objects if obj.type == "MESH" and len(obj.data.polygons) > 100
+    ]
+    if len(building_meshes) != 1:
+        raise RuntimeError(
+            f"construction tower stairwell edit expects one structural mesh; "
+            f"found {len(building_meshes)}"
+        )
+
+    # The source tower already reserves a tiny repeated service opening but ships
+    # without vertical circulation. Widen that shaft through the upper slabs and
+    # column fragments in Blender before installing the authored switchback stairs.
+    # Start below the first landing.  The source tower carries low structural
+    # fragments through this corner as well as the repeated upper-floor slabs;
+    # leaving them in place blocks the first switchback even when every upper
+    # stairwell opening is clear.
+    shaft_minimum = Vector((1.45, -5.70, 0.10))
+    shaft_maximum = Vector((5.00, -1.30, 46.42))
+    tower = building_meshes[0]
+    inverse = tower.matrix_world.inverted()
+    editable = bmesh.new()
+    editable.from_mesh(tower.data)
+    for axis, boundary in (
+        (Vector((1.0, 0.0, 0.0)), shaft_minimum.x),
+        (Vector((1.0, 0.0, 0.0)), shaft_maximum.x),
+        (Vector((0.0, 1.0, 0.0)), shaft_minimum.y),
+        (Vector((0.0, 1.0, 0.0)), shaft_maximum.y),
+        (Vector((0.0, 0.0, 1.0)), shaft_minimum.z),
+        (Vector((0.0, 0.0, 1.0)), shaft_maximum.z),
+    ):
+        world_point = Vector((0.0, 0.0, 0.0))
+        if axis.x:
+            world_point.x = boundary
+        elif axis.y:
+            world_point.y = boundary
+        else:
+            world_point.z = boundary
+        bmesh.ops.bisect_plane(
+            editable,
+            geom=list(editable.verts) + list(editable.edges) + list(editable.faces),
+            dist=0.00001,
+            plane_co=inverse @ world_point,
+            plane_no=tower.matrix_world.to_3x3().transposed() @ axis,
+            clear_inner=False,
+            clear_outer=False,
+        )
+
+    removed_faces = []
+    for face in editable.faces:
+        center = tower.matrix_world @ face.calc_center_median()
+        if (
+            shaft_minimum.x < center.x < shaft_maximum.x
+            and shaft_minimum.y < center.y < shaft_maximum.y
+            and shaft_minimum.z < center.z < shaft_maximum.z
+        ):
+            removed_faces.append(face)
+    if len(removed_faces) < 150:
+        editable.free()
+        raise RuntimeError(
+            f"Construction tower stairwell removed too little structure: "
+            f"{len(removed_faces)} faces"
+        )
+    bmesh.ops.delete(editable, geom=removed_faces, context="FACES")
+    loose_vertices = [vertex for vertex in editable.verts if not vertex.link_edges]
+    if loose_vertices:
+        bmesh.ops.delete(editable, geom=loose_vertices, context="VERTS")
+    editable.to_mesh(tower.data)
+    editable.free()
+    tower.data.update()
+    bpy.context.view_layer.update()
+
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    for level in range(1, 19):
+        floor_height = 2.56 * level
+        for x, y in (
+            (3.25, -5.25),
+            (1.80, -4.50),
+            (3.25, -3.50),
+            (4.70, -2.50),
+            (3.25, -1.75),
+        ):
+            hit, *_ = bpy.context.scene.ray_cast(
+                depsgraph,
+                Vector((x, y, floor_height + 0.20)),
+                Vector((0.0, 0.0, -1.0)),
+                distance=0.48,
+            )
+            if hit:
+                raise RuntimeError(
+                    f"Construction tower stairwell remains blocked at level={level} "
+                    f"sample=({x:.2f},{y:.2f})"
+                )
+        floor_hit, *_ = bpy.context.scene.ray_cast(
+            depsgraph,
+            Vector((0.0, 0.0, floor_height + 0.20)),
+            Vector((0.0, 0.0, -1.0)),
+            distance=0.48,
+        )
+        if not floor_hit:
+            raise RuntimeError(
+                f"Construction tower stairwell edit damaged floor {level} outside the shaft"
+            )
+
+
+def load_trey_palette() -> bpy.types.Image:
+    image = bpy.data.images.get(TREY_PALETTE_PATH.name)
+    if image is None:
+        image = bpy.data.images.load(str(TREY_PALETTE_PATH), check_existing=True)
+    image.name = TREY_PALETTE_PATH.name
+    image.filepath = str(TREY_PALETTE_PATH)
+    image.colorspace_settings.name = "sRGB"
+    return image
+
+
+def import_trey_module(path: Path, expected_mesh: str) -> bpy.types.Object:
+    imported = import_fbx(path)
+    selected = [
+        obj for obj in imported if obj.type == "MESH" and expected_mesh in obj.name
+    ]
+    if len(selected) != 1:
+        raise RuntimeError(
+            f"Expected one {expected_mesh} mesh in {path.name}; found "
+            f"{[obj.name for obj in imported if obj.type == 'MESH']}"
+        )
+    module = selected[0]
+    for obj in imported:
+        if obj != module:
+            bpy.data.objects.remove(obj, do_unlink=True)
+    return module
+
+
+def open_trey_stair_exit(stair: bpy.types.Object) -> None:
+    """Remove the source module's full-height end cap before adjoining a landing."""
+    editable = bmesh.new()
+    editable.from_mesh(stair.data)
+    exit_faces = [
+        face
+        for face in editable.faces
+        if all(abs(vertex.co.y) < 0.005 for vertex in face.verts)
+    ]
+    if len(exit_faces) != 2:
+        editable.free()
+        raise RuntimeError(
+            f"Expected two Trey stair exit cap faces; found {len(exit_faces)}"
+        )
+    bmesh.ops.delete(editable, geom=exit_faces, context="FACES")
+    editable.to_mesh(stair.data)
+    editable.free()
+    stair.data.update()
+
+
+def configure_trey_material(objects: list[bpy.types.Object]) -> bpy.types.Material:
+    palette = load_trey_palette()
+    material = bpy.data.materials.new("TreyTowerStairPalette")
+    material.use_nodes = True
+    nodes = material.node_tree.nodes
+    links = material.node_tree.links
+    principled = nodes.get("Principled BSDF")
+    if principled is None:
+        principled = nodes.new("ShaderNodeBsdfPrincipled")
+        output = nodes.get("Material Output") or nodes.new("ShaderNodeOutputMaterial")
+        links.new(principled.outputs["BSDF"], output.inputs["Surface"])
+    texture = nodes.new("ShaderNodeTexImage")
+    texture.name = "TreyTowerStairPaletteTexture"
+    texture.image = palette
+    texture.interpolation = "Closest"
+    links.new(texture.outputs["Color"], principled.inputs["Base Color"])
+    principled.inputs["Roughness"].default_value = 0.68
+    for obj in objects:
+        obj.data.materials.clear()
+        obj.data.materials.append(material)
+        for polygon in obj.data.polygons:
+            polygon.material_index = 0
+    return material
+
+
+def add_construction_tower_stairs(
+    objects: list[bpy.types.Object],
+    spec: AssetSpec,
+    root: bpy.types.Object,
+) -> None:
+    if spec.slug != "building":
+        return
+
+    stair_source = import_trey_module(TREY_STAIR_PATH, "StairsWideFull")
+    platform_source = import_trey_module(TREY_PLATFORM_PATH, "FloorGreyPlatformFull")
+    # Trey closes the high end of this module with a vertical face. That face is
+    # useful for a standalone stair but becomes an invisible capsule blocker when
+    # a landing continues from the final tread, so open it in the authored mesh.
+    open_trey_stair_exit(stair_source)
+    configure_trey_material([stair_source, platform_source])
+    stair_parts: list[bpy.types.Object] = []
+
+    for storey in range(18):
+        base_height = 2.56 * storey
+        transforms = (
+            (
+                stair_source,
+                Matrix.Translation(Vector((2.30, -2.50, base_height)))
+                @ Matrix.Diagonal(Vector((0.75, 1.0, 0.64, 1.0))),
+                f"TowerStair_{storey + 1:02d}_A",
+            ),
+            (
+                stair_source,
+                Matrix.Translation(Vector((4.15, -4.50, base_height + 1.28)))
+                @ Matrix.Rotation(math.pi, 4, "Z")
+                @ Matrix.Diagonal(Vector((0.75, 1.0, 0.64, 1.0))),
+                f"TowerStair_{storey + 1:02d}_B",
+            ),
+            (
+                platform_source,
+                Matrix.Translation(Vector((3.225, -2.50, base_height + 1.24)))
+                @ Matrix.Diagonal(Vector((1.70, 0.35, 1.0, 1.0))),
+                f"TowerLanding_{storey + 1:02d}_Mid",
+            ),
+            (
+                platform_source,
+                Matrix.Translation(Vector((3.225, -1.75, base_height + 1.24)))
+                @ Matrix.Diagonal(Vector((1.70, 0.40, 1.0, 1.0))),
+                f"TowerLanding_{storey + 1:02d}_MidTurnApron",
+            ),
+            (
+                platform_source,
+                Matrix.Translation(Vector((3.225, -4.50, base_height + 2.52)))
+                @ Matrix.Diagonal(Vector((1.70, 0.35, 1.0, 1.0))),
+                f"TowerLanding_{storey + 1:02d}_Floor",
+            ),
+            (
+                platform_source,
+                Matrix.Translation(Vector((3.225, -5.25, base_height + 2.52)))
+                @ Matrix.Diagonal(Vector((1.70, 0.40, 1.0, 1.0))),
+                f"TowerLanding_{storey + 1:02d}_FloorTurnApron",
+            ),
+        )
+        for source, transform, name in transforms:
+            part = source.copy()
+            part.data = source.data
+            bpy.context.collection.objects.link(part)
+            part.name = name
+            part.matrix_world = transform @ source.matrix_world
+            stair_parts.append(part)
+
+    bpy.data.objects.remove(stair_source, do_unlink=True)
+    bpy.data.objects.remove(platform_source, do_unlink=True)
+    bpy.ops.object.select_all(action="DESELECT")
+    for part in stair_parts:
+        part.select_set(True)
+    bpy.context.view_layer.objects.active = stair_parts[0]
+    result = bpy.ops.object.join()
+    if "FINISHED" not in result:
+        raise RuntimeError(f"Blender could not join construction tower stairs: {result}")
+    stairs = stair_parts[0]
+    stairs.name = "ConstructionTowerAuthoredStairs"
+    stairs.data.name = "ConstructionTowerAuthoredStairsMesh"
+    world = stairs.matrix_world.copy()
+    stairs.parent = root
+    stairs.matrix_world = world
+    stairs["source_creator"] = "Trey Ramm / minime453"
+    stairs["source_asset"] = "Modular Industrial Pieces"
+    stairs["source_url"] = "https://opengameart.org/content/modular-industrial-kit"
+    stairs["license"] = "CC0-1.0"
+    stairs["authored_flights"] = 36
+    stairs["authored_landings"] = 36
+    stairs["reachable_storeys"] = 19
+    objects.append(stairs)
+    root["secondary_source_creator"] = "Trey Ramm / minime453"
+    root["secondary_source_asset"] = "Modular Industrial Pieces"
+    root["secondary_source_url"] = (
+        "https://opengameart.org/content/modular-industrial-kit"
+    )
+    root["secondary_source_license"] = "CC0-1.0"
+    root["authored_stair_flights"] = 36
+    root["authored_stair_landings"] = 36
+    root["reachable_storeys"] = 19
+    root["floor_spacing_m"] = 2.56
+    bpy.context.view_layer.update()
+
+    stair_minimum, stair_maximum = object_bounds(stairs)
+    expected_minimum = Vector((1.52, -5.65, 0.0))
+    expected_maximum = Vector((4.92, -1.35, 46.08))
+    if any(stair_minimum[index] > expected_minimum[index] + 0.08 for index in range(3)):
+        raise RuntimeError(
+            f"Construction tower stairs do not reach expected lower bounds: "
+            f"{tuple(stair_minimum)}"
+        )
+    if any(stair_maximum[index] < expected_maximum[index] - 0.08 for index in range(3)):
+        raise RuntimeError(
+            f"Construction tower stairs do not reach expected upper bounds: "
+            f"{tuple(stair_maximum)}"
+        )
+
+
 def validate_dimensions(objects: list[bpy.types.Object], spec: AssetSpec) -> Vector:
     minimum, maximum = mesh_bounds(objects)
     dimensions = maximum - minimum
@@ -381,10 +780,26 @@ def export_glb(root: bpy.types.Object, objects: list[bpy.types.Object], output_p
         raise RuntimeError(f"Blender could not export {output_path.name}: {result}")
 
 
+def write_godot_texture_sidecars(output_path: Path, spec: AssetSpec) -> None:
+    """Materialize deterministic copies referenced by Godot's GLB import cache."""
+    shutil.copyfile(
+        PALETTE_PATH,
+        output_path.with_name(f"{output_path.stem}_{PALETTE_PATH.name}"),
+    )
+    if spec.slug == "building":
+        shutil.copyfile(
+            TREY_PALETTE_PATH,
+            output_path.with_name(f"{output_path.stem}_{TREY_PALETTE_PATH.name}"),
+        )
+
+
 def verify_glb(output_path: Path, expected_dimensions: Vector) -> tuple[Vector, int]:
     clear_scene()
     configure_scene()
     before = set(bpy.data.objects)
+    # Blender's verification import materializes embedded images beside the GLB.
+    # Keep those stable sidecars: Godot records them as external texture resources
+    # while importing the scene, even though the source GLB also embeds each image.
     result = bpy.ops.import_scene.gltf(filepath=str(output_path))
     if "FINISHED" not in result:
         raise RuntimeError(f"Blender could not verify {output_path.name}: {result}")
@@ -424,10 +839,14 @@ def build_asset(spec: AssetSpec) -> None:
     palette = load_palette()
     warnings = ensure_palette_materials(objects, palette)
     root = normalize_asset(objects, spec)
+    open_office_platform_doorway(objects, spec)
+    cut_construction_tower_stairwell(objects, spec)
+    add_construction_tower_stairs(objects, spec, root)
     dimensions = validate_dimensions(objects, spec)
     mesh_count, triangle_count, material_count = mesh_statistics(objects)
     output_path = OUTPUT_DIR / spec.output_name
     export_glb(root, objects, output_path)
+    write_godot_texture_sidecars(output_path, spec)
     verified_dimensions, embedded_image_count = verify_glb(output_path, dimensions)
 
     raw_dimensions = raw_maximum - raw_minimum

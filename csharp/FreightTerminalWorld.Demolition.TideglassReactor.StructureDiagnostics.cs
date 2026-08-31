@@ -170,7 +170,9 @@ public partial class FreightTerminalWorld
             box => box.Name == "CivicWalkwayWestStairNavigation");
         var eastStairNavigation = layout.NavigationBoxes.SingleOrDefault(
             box => box.Name == "CivicWalkwayEastStairNavigation");
-        var navigationReady = layout.NavigationBoxes.Count == 13
+        var towerNavigation = layout.NavigationBoxes.SingleOrDefault(
+            box => box.Name == "ConstructionTowerNavigationFootprint");
+        var navigationReady = layout.NavigationBoxes.Count == 14
             && navigationPillars.Length == expectedPillars.Length
             && navigationPillars.Select((pillar, index) =>
                     (pillar.Center - layout.Origin).DistanceTo(expectedPillars[index]) <= tolerance
@@ -183,7 +185,11 @@ public partial class FreightTerminalWorld
             && eastStairNavigation.Name == "CivicWalkwayEastStairNavigation"
             && (eastStairNavigation.Center - layout.Origin).DistanceTo(
                 new Vector3(5.75f, 1.17f, 26.5f)) <= tolerance
-            && eastStairNavigation.Size.IsEqualApprox(new Vector3(2.3f, 2.3f, 2.3f));
+            && eastStairNavigation.Size.IsEqualApprox(new Vector3(2.3f, 2.3f, 2.3f))
+            && towerNavigation.Name == "ConstructionTowerNavigationFootprint"
+            && (towerNavigation.Center - layout.Origin).DistanceTo(
+                new Vector3(-55.0f, 0.92f, 22.0f)) <= tolerance
+            && towerNavigation.Size.IsEqualApprox(new Vector3(13.9f, 1.8f, 16.6f));
         if (!navigationReady)
         {
             failure = $"navigation={layout.NavigationBoxes.Count}:{navigationPillars.Length}";

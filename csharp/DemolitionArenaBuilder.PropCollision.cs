@@ -17,11 +17,15 @@ public sealed partial class DemolitionArenaBuilder
         {
             AddPropCollisionBoxes(body, definition);
         }
-        else if (definition.AddAnalyticalCollisionToAuthored)
+        else if (definition.AuthoredSolidCollisionPieceCount > 0)
         {
             // Keep authored traversal surfaces such as ramps while sealing thin, closed shells
             // with stable volumes so a moving player cannot tunnel into a non-playable interior.
-            AddPropCollisionBoxes(body, definition, "SolidCollision");
+            AddPropCollisionBoxes(
+                body,
+                definition,
+                "SolidCollision",
+                definition.AuthoredSolidCollisionPieceCount);
         }
 
         var effectiveMode = authoredCollision
@@ -35,22 +39,31 @@ public sealed partial class DemolitionArenaBuilder
         body.SetMeta("analytical_collision_piece_count", definition.CollisionPieceCount);
         body.SetMeta(
             "supplemental_collision_piece_count",
-            authoredCollision && definition.AddAnalyticalCollisionToAuthored
-                ? definition.CollisionPieceCount
+            authoredCollision
+                ? definition.AuthoredSolidCollisionPieceCount
                 : 0);
     }
 
     private static void AddPropCollisionBoxes(
         StaticBody3D body,
         DemolitionArenaProp definition,
-        string namePrefix = "Collision")
+        string namePrefix = "Collision",
+        int? pieceCount = null)
     {
-        for (var index = 0; index < definition.CollisionPieceCount; index++)
+        var count = pieceCount ?? definition.CollisionPieceCount;
+        if (count < 0 || count > definition.CollisionPieceCount)
+        {
+            throw new System.ArgumentOutOfRangeException(
+                nameof(pieceCount),
+                count,
+                "Supplemental collision pieces must be a prefix of the analytical definition.");
+        }
+        for (var index = 0; index < count; index++)
         {
             var piece = definition.CollisionPieceAt(index);
             body.AddChild(new CollisionShape3D
             {
-                Name = definition.CollisionPieceCount == 1
+                Name = namePrefix == "Collision" && count == 1
                     ? namePrefix
                     : $"{namePrefix}_{index + 1:00}",
                 Position = piece.Offset * definition.Scale,
