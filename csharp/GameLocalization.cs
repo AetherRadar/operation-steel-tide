@@ -463,6 +463,9 @@ public static class GameLocalization
         Chinese["extraction_hold"] = "\u7559\u5728\u64a4\u79bb\u533a\u5185  //  \u79bb\u5f00\u5c06\u91cd\u7f6e\u5012\u8ba1\u65f6";
         Chinese["extraction_squad"] = "\u5c0f\u961f\u5c31\u4f4d";
         Chinese["extraction_aborted"] = "\u64a4\u79bb\u4e2d\u65ad  //  \u8fd4\u56de\u7eff\u8272\u533a\u57df\u91cd\u65b0\u547c\u53eb";
+        Chinese["survivor_extraction_cold"] = "\u5e78\u5b58 AI \u6b63\u5728\u547c\u53eb\u7d27\u6025\u64a4\u79bb  //  \u575a\u5b88\u65f6\u95f4\u5ef6\u957f";
+        Chinese["survivor_extraction_inbound"] = "\u5e78\u5b58 AI \u6b63\u5728\u547c\u53eb\u64a4\u79bb  //  \u575a\u5b88\u7eff\u8272\u533a\u57df";
+        Chinese["survivor_extraction_rescue"] = "AI \u64a4\u79bb\u6682\u505c  //  \u6b63\u5728\u6551\u63f4\u961f\u53cb";
         Chinese["extraction_departing"] = "\u5c0f\u961f\u767b\u673a\u5b8c\u6bd5  //  \u6b63\u5728\u8fd4\u822a\u7279\u52e4\u5904";
         Chinese["extraction_arrived"] = "\u5df2\u62b5\u8fbe\u7279\u52e4\u5904  //  \u63a5\u9001\u673a\u5df2\u5b8c\u6210\u964d\u843d";
         Chinese["backpack_container"] = "\u80cc\u5305\u5bb9\u5668";

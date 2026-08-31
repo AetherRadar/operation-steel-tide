@@ -49,6 +49,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     public void ApplyColdStartUnarmed()
     {
         HasFireablePrimary = false;
+        _carriedWeaponRecovered = false;
+        ResetRecoveredAmmo();
         if (IsInstanceValid(_weapon))
         {
             _weapon.Visible = false;
@@ -64,7 +66,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     public void GrantFireablePrimaryForDiagnostics()
     {
         HasFireablePrimary = true;
+        _carriedWeaponRecovered = false;
+        _carriedWeaponGrade = LootGrade.Uncommon;
         _ammoGrade = LootGrade.Uncommon;
+        ResetRecoveredAmmo();
         RefillMagazine();
         if (IsInstanceValid(_weapon))
         {
@@ -73,8 +78,14 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         SetAuthoredWeaponVisible(true);
     }
 
+    internal int MagazineRemainingForDiagnostics => _magazineRemaining;
+
     /// <summary>Production path: equip a weapon taken from a world loot source.</summary>
-    public bool EquipWeaponFromLoot(WeaponBuild build, LootGrade ammoGrade = LootGrade.Uncommon)
+    public bool EquipWeaponFromLoot(
+        WeaponBuild build,
+        LootGrade ammoGrade = LootGrade.Uncommon,
+        LootGrade? weaponGrade = null,
+        int recoveredAmmoQuantity = 0)
     {
         if (build is null)
         {
@@ -83,9 +94,15 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         CarriedWeapon = build.Clone();
         _audioWeapon = build.Clone();
         RefreshShotAudio();
+        _carriedWeaponGrade = weaponGrade ?? ammoGrade;
         _ammoGrade = ammoGrade;
+        SetRecoveredAmmo(
+            WeaponCatalog.Weapon(build.Platform).Caliber,
+            ammoGrade,
+            recoveredAmmoQuantity);
         RefillMagazine();
         HasFireablePrimary = true;
+        _carriedWeaponRecovered = true;
         if (IsInstanceValid(_weapon))
         {
             _weapon.Visible = true;
@@ -143,7 +160,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     internal void SetCarriedWeaponForDiagnostics(WeaponBuild build)
     {
         CarriedWeapon = build.Clone();
+        _carriedWeaponRecovered = false;
+        _carriedWeaponGrade = LootGrade.Uncommon;
         _ammoGrade = LootGrade.Uncommon;
+        ResetRecoveredAmmo();
         RefillMagazine();
     }
 
@@ -219,6 +239,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         IsDowned = false;
         Order = SquadOrder.Follow;
         _orderPosition = Position;
+        InitializeSustainmentLoadout();
         if (IsInsideTree())
         {
             ApplyRoleVisuals();
@@ -250,6 +271,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
     public override void _ExitTree()
     {
+        ClearSustainmentLootTarget();
         _navigationProbeExclusions?.AsDisposable().Dispose();
         _navigationProbeExclusions = null;
     }
@@ -279,6 +301,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
 
         _reviveTarget = null;
+        ResetSustainmentForIncapacitation();
         CancelNavigationTraversal();
         Velocity = Vector3.Zero;
         CollisionLayer = 0;
@@ -350,6 +373,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         {
             return;
         }
+        CancelSustainmentAction(releaseLoot: true);
         ResetEmergencyGlassEgressPlan();
         _reviveTarget = target;
     }
@@ -412,6 +436,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         _skillCooldown = Mathf.Max(0.0f, _skillCooldown - dt);
         _overdriveTime = Mathf.Max(0.0f, _overdriveTime - dt);
         _decisionTimer = Mathf.Max(0.0f, _decisionTimer - dt);
+        UpdateSustainmentTimers(dt);
         UpdateCombatTacticalTimers(dt);
 
         if (IsNetworkProxy)
@@ -460,6 +485,13 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         _lootHuntCooldown = Mathf.Max(0.0f, _lootHuntCooldown - dt);
         var hostile = UpdateCombatTarget(dt);
         var patient = Role == OperatorRole.Medic ? Main.FindLowestFriendly(0.72f, true) : null;
+        if (UpdateSustainment(dt, hostile))
+        {
+            MoveAndSlide();
+            BreakableGlassField.TryShatterMovementBlockerFromCollisions(this);
+            AnimateRig(dt);
+            return;
+        }
         // Cold-start: hunt a weapon cache before combat when still unarmed.
         if (!HasFireablePrimary && Order != SquadOrder.Hold)
         {
@@ -478,6 +510,11 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             destination = patient.CombatNode.GlobalPosition;
             objectivePriority = hostile is null
                 || GlobalPosition.DistanceTo(hostile.GlobalPosition) > 14.0f;
+        }
+        if (TryGetSustainmentDestination(out var sustainmentDestination))
+        {
+            destination = sustainmentDestination;
+            objectivePriority = true;
         }
         if (Main.IsDemolitionMode
             && Main.TryGetDemolitionObjectiveDestination(this, out var demolitionObjectiveDestination))
@@ -699,6 +736,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         CombatShotsFired++;
         PlayShotAudio();
         Main.NotifyAircraftOperatorAttack(this, GlobalPosition, stats.SoundRadius);
+        var firedAmmoGrade = CommitFiredPrimaryRound();
+        Main.ReportGunshot(GlobalPosition, stats.SoundRadius);
         if (BreakableGlassField.TryShatterAlongRay(
             GetWorld3D(),
             shotOrigin,
@@ -708,7 +747,6 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             out var glassHitPosition))
         {
             Main.SpawnTracer(shotOrigin, glassHitPosition, new Color(0.34f, 0.78f, 1.0f));
-            Main.ReportGunshot(GlobalPosition, stats.SoundRadius);
             return;
         }
         // Wallbang gate on the real damage path.
@@ -731,24 +769,34 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         if (_rng.Randf() < accuracy)
         {
             enemy.TakeDamage(
-                stats.Damage * AmmoTiers.DamageMultiplier(_ammoGrade) * _rng.RandfRange(0.32f, 0.48f),
+                stats.Damage * AmmoTiers.DamageMultiplier(firedAmmoGrade) * _rng.RandfRange(0.32f, 0.48f),
                 hitPoint,
                 this,
-                AmmoTiers.ArmorPenetration(_ammoGrade));
+                AmmoTiers.ArmorPenetration(firedAmmoGrade));
         }
         else
         {
             hitPoint += new Vector3(_rng.RandfRange(-1.4f, 1.4f), _rng.RandfRange(-0.7f, 1.2f), _rng.RandfRange(-1.4f, 1.4f));
         }
+        Main.SpawnTracer(shotOrigin, hitPoint, new Color(0.34f, 0.78f, 1.0f));
+    }
+
+    private LootGrade CommitFiredPrimaryRound()
+    {
+        // Capture the grade before the final recovered round downgrades future
+        // baseline shots. Every path after CombatShotsFired, including glass and
+        // wall impacts, commits exactly one round through this shared method.
+        var firedAmmoGrade = _ammoGrade;
         _magazineRemaining--;
+        ConsumeRecoveredAmmoShot();
         if (_magazineRemaining <= 0)
         {
+            var spec = OperatorRoles.Spec(Role);
             var reloadBoost = Role == OperatorRole.Assault && _overdriveTime > 0.0f ? 0.78f : 1.0f;
             _reloadTimer = Mathf.Clamp(2.6f * spec.ReloadMultiplier * reloadBoost, 1.2f, 3.6f);
             _burstShotsRemaining = 0;
         }
-        Main.SpawnTracer(shotOrigin, hitPoint, new Color(0.34f, 0.78f, 1.0f));
-        Main.ReportGunshot(GlobalPosition, stats.SoundRadius);
+        return firedAmmoGrade;
     }
 
     private bool HasLineOfSight(EnemyOperator enemy)
@@ -1040,8 +1088,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             HitRegion.Limbs => 0.74f,
             _ => 1.0f
         };
+        RegisterSustainmentDamage();
         var healthBefore = Health;
-        Health = Mathf.Max(0.0f, Health - amount * multiplier);
+        var protectedDamage = ApplySustainmentProtection(region, amount * multiplier);
+        Health = Mathf.Max(0.0f, Health - protectedDamage);
         var appliedDamage = Mathf.Max(0.0f, healthBefore - Health);
         UpdateHealthVisual();
         if (Health > 0.0f)
@@ -1060,6 +1110,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
 
         IsDowned = true;
+        ResetSustainmentForIncapacitation();
         Velocity = Vector3.Zero;
         OnCombatIncapacitated();
         if (!UsesAuthoredOperatorForDiagnostics)

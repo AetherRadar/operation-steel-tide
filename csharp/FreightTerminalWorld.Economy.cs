@@ -99,7 +99,16 @@ public partial class FreightTerminalWorld
         }
 
         EnsureDeploymentBaseline();
-        var currentValue = CombatHUD.ComputeBackpackTotalValue(_player);
+        // A permanently eliminated player loses carried loot, while equipment
+        // actually brought out by living AI teammates still belongs to the squad.
+        // FinishExtractionMission marks a normally extracted player dead only to
+        // freeze post-mission input before this calculation runs. Permanent local
+        // elimination is the authoritative signal that their backpack was lost.
+        var playerEscaped = !_localPlayerEliminated;
+        var currentValue = playerEscaped
+            ? CombatHUD.ComputeBackpackTotalValue(_player)
+            : _deploymentBaselineValue;
+        currentValue += LivingSquadRecoveredSustainmentValue();
         var extractedValue = Math.Max(
             0,
             Mathf.RoundToInt((currentValue - _deploymentBaselineValue) * ObjectiveExtractionMultiplier()));

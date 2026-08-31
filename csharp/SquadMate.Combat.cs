@@ -46,6 +46,7 @@ public partial class SquadMate
     private bool _combatHasCoverPosition;
     private bool _combatHasEngagementAnchor;
     private bool _followFormationSettled;
+    private bool _longRangeFollowRecoveryRequested;
     private int _burstShotsRemaining;
     private int _combatNavigationStallCount;
 
@@ -83,6 +84,7 @@ public partial class SquadMate
         _combatHasSight = false;
         _combatHasEngagementAnchor = false;
         _followFormationSettled = false;
+        _longRangeFollowRecoveryRequested = false;
         _burstShotsRemaining = 0;
         _combatNavigationStallCount = 0;
         CombatShotsFired = 0;
@@ -103,6 +105,7 @@ public partial class SquadMate
         _combatClearanceReuseTimer = 0.0f;
         _combatClearanceDirection = Vector3.Zero;
         _followFormationSettled = false;
+        _longRangeFollowRecoveryRequested = false;
         _burstShotsRemaining = 0;
         _combatNavigationStallCount = 0;
         ResetMovementProgress();
@@ -394,14 +397,24 @@ public partial class SquadMate
         float delta)
     {
         var destination = anchorDestination;
+        var leaderDistance = GlobalPosition.DistanceTo(Leader.GlobalPosition);
+        if (Order != SquadOrder.Follow || Leader.IsDead || leaderDistance < 30.0f)
+        {
+            _longRangeFollowRecoveryRequested = false;
+        }
         if (Order == SquadOrder.Follow
             && !objectivePriority
             && hostile is null
             && !Leader.IsDead
-            && GlobalPosition.DistanceTo(Leader.GlobalPosition) > 42.0f)
+            && leaderDistance > 42.0f
+            && !_longRangeFollowRecoveryRequested)
         {
-            GlobalPosition = Leader.GlobalPosition + Vector3.Up * 0.35f;
-            ResetMovementProgress();
+            // A raw position snap can cross a closed door or place the capsule
+            // inside authored walls. Refresh the existing route and request a
+            // grounded local escape instead; the normal movement controller keeps
+            // collision authority for every metre of the catch-up.
+            _longRangeFollowRecoveryRequested = true;
+            Main.ReplanSquadNavigationAfterStall(this);
         }
 
         var flatDestination = FlattenToCurrentHeight(destination);

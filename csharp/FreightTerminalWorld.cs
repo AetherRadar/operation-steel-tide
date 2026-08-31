@@ -1727,7 +1727,8 @@ public partial class FreightTerminalWorld : Node3D
         var weaponItem = source.Loot[index];
         source.Loot.RemoveAt(index);
         // Adopt (and consume) a matching-caliber ammo stack so mate fire respects ammo grades.
-        var ammoGrade = weaponItem.Grade;
+        var ammoGrade = LootGrade.Common;
+        var recoveredAmmoQuantity = 0;
         var caliber = WeaponCatalog.Weapon(weaponItem.Weapon!.Platform).Caliber;
         var ammoIndex = source.Loot.FindIndex(item =>
             item.Kind == LootItemKind.Ammunition
@@ -1736,6 +1737,7 @@ public partial class FreightTerminalWorld : Node3D
         if (ammoIndex >= 0)
         {
             ammoGrade = source.Loot[ammoIndex].Grade;
+            recoveredAmmoQuantity = source.Loot[ammoIndex].Quantity;
             source.Loot.RemoveAt(ammoIndex);
         }
         RefreshGradedLootPickupPresentation(source);
@@ -1746,7 +1748,11 @@ public partial class FreightTerminalWorld : Node3D
         source.OnSearched();
         PublishExtractionLootMutation(source);
         RetireEmptyGradedLootPickup(source);
-        return mate.EquipWeaponFromLoot(weaponItem.Weapon!, ammoGrade);
+        return mate.EquipWeaponFromLoot(
+            weaponItem.Weapon!,
+            ammoGrade,
+            weaponItem.Grade,
+            recoveredAmmoQuantity);
     }
 
     private void SpawnExplosives()
@@ -1895,15 +1901,22 @@ public partial class FreightTerminalWorld : Node3D
     {
         var rows = new List<(string Team, int Value)>();
         // Player squad (player + living mates only).
-        var playerValue = CombatHUD.ComputeBackpackTotalValue(_player);
+        var playerValue = _localPlayerEliminated
+            ? 0
+            : CombatHUD.ComputeBackpackTotalValue(_player);
+        var extractionFinalized = _missionEnded || _extractionDeparturePlaying;
         foreach (var mate in _squadMates)
         {
-            if (!IsInstanceValid(mate) || mate.IsBodyBag || mate.IsDowned)
+            if (!IsInstanceValid(mate)
+                || mate.IsBodyBag
+                || mate.IsDowned
+                || extractionFinalized && !mate.IsExtractionPassenger)
             {
                 continue;
             }
-            // Living AI mates contribute a fixed kit residual; bags add nothing.
-            playerValue += 80;
+            // Living AI mates retain their baseline residual and any net upgrades
+            // recovered from corpse packages. Bags still add nothing.
+            playerValue += 80 + mate.RecoveredSustainmentValue;
         }
         rows.Add((GameLocalization.IsChinese(_languageSetting) ? "我方小队" : "PLAYER SQUAD", playerValue));
 

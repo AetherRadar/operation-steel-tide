@@ -38,7 +38,8 @@ public partial class FreightTerminalWorld
 
     private void TryBeginExtractionSequence(Node3D body)
     {
-        if (body != _player || _missionEnded || _demolitionMode || IsExtractionNetworkClient)
+        if (body != _player || _missionEnded || _demolitionMode || IsExtractionNetworkClient
+            || _localPlayerEliminated || _player.IsDead)
         {
             return;
         }
@@ -57,6 +58,10 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        if (IsSurvivorExtractionTakeoverActive)
+        {
+            return;
+        }
         _extractionPlayerInside = false;
         if (_extractionCountdownActive)
         {
@@ -72,6 +77,10 @@ public partial class FreightTerminalWorld
         }
         if (!IsInstanceValid(_player) || !_player.IsInsideTree()
             || !IsInstanceValid(_hud) || !_hud.IsInsideTree())
+        {
+            return;
+        }
+        if (TryUpdateSurvivorExtractionSequence(delta))
         {
             return;
         }
@@ -248,6 +257,10 @@ public partial class FreightTerminalWorld
 
     private (int Ready, int Total) CountExtractionSquad()
     {
+        if (IsSurvivorExtractionTakeoverActive)
+        {
+            return CountSurvivorExtractionSquad();
+        }
         var ready = 1;
         var total = 1;
         foreach (var mate in _squadMates)
@@ -340,6 +353,11 @@ public partial class FreightTerminalWorld
 
     private void BoardExtractionSquad()
     {
+        if (IsSurvivorExtractionTakeoverActive)
+        {
+            BoardSurvivorExtractionSquad();
+            return;
+        }
         _extractionBoardedSquadmates = 0;
         if (_extractionAircraft is null || !IsInstanceValid(_extractionAircraft))
         {
