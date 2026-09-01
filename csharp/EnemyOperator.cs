@@ -5,7 +5,7 @@ using Godot;
 namespace OperationSteelTide;
 
 [GlobalClass]
-public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLootSource
+public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLootSource, IFlashbangTarget
 {
     private static readonly Dictionary<Vector3, BoxMesh> SharedBoxMeshes = new();
     private static readonly Dictionary<Vector2, CapsuleMesh> SharedCapsuleMeshes = new();
@@ -224,6 +224,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         // CharacterBody collisions against every other operator in a dense firefight.
         CollisionMask = 1 | BreakableGlassField.MovementCollisionLayer;
         FloorSnapLength = 0.35f;
+        AddToGroup(FlashbangGrenade.TargetGroupName);
         BuildLootInventory();
         BuildOperator();
         if (IsWorldBoss)
@@ -609,6 +610,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         _repathTimer -= dt;
         _patrolTimer -= dt;
         _hitStun = Mathf.Max(0.0f, _hitStun - dt);
+        UpdateCombatMovementTimers(dt);
         _proneTimer = Mathf.Max(0.0f, _proneTimer - dt);
         if (IsProne && _proneTimer <= 0.0f)
         {
@@ -825,6 +827,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             return;
         }
 
+        if (TryHandlePendingAirborneAttackShot(distance, hasSight))
+        {
+            return;
+        }
+
         // Velocity remains owned by the objective motor, while aim remains owned by
         // the recently confirmed hostile. This prevents route LookAt from turning a
         // firing bot away and making it permanently fail its own view cone.
@@ -851,6 +858,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private void MoveOperator(float delta)
     {
+        PrepareCombatMovementBeforeMove(delta);
         _stationaryMoveTimer -= delta;
         var stationary = IsOnFloor()
             && Mathf.Abs(Velocity.X) < 0.02f
@@ -1175,6 +1183,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         _stanceDecisionTimer = 0.0f;
         _proneTimer = 0.0f;
         SetProne(false);
+        ResetCombatMovementState();
         Suspicion = 0.0f;
         Alerted = false;
         _combatTarget = null;
@@ -1196,8 +1205,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         Alerted = false;
         Suspicion = 0.0f;
         _searchingLoot = false;
+        SetProne(false);
+        SetCombatCrouched(false);
+        var leftCover = _seekingCover || _inCover;
         _seekingCover = false;
         _inCover = false;
+        if (leftCover)
+        {
+            UpdateAuthoredStanceCollider();
+        }
         _noContactTimer = 0.0f;
         _combatTarget = null;
         _rawTarget = null;
@@ -1276,6 +1292,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             _inCover = false;
             return;
         }
+        if (isDemolitionCombatant)
+        {
+            UpdateDemolitionCombatStance(distance, hasSight);
+            return;
+        }
         if (_stanceDecisionTimer > 0.0f)
         {
             return;
@@ -1297,9 +1318,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         {
             SetProne(false);
         }
-        // Demolition combatants share the existing low-frequency stance decision,
-        // but keep the ordinary NPC prone chance, accuracy, and movement tuning.
-        var coverSeekChance = IsRivalSquad ? 0.55f : isDemolitionCombatant ? 0.38f : 0.0f;
+        var coverSeekChance = IsRivalSquad ? 0.55f : 0.0f;
         if (coverSeekChance > 0.0f
             && !_seekingCover
             && !_inCover
@@ -1318,24 +1337,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     }
 
     public void SetProne(bool prone)
-    {
-        IsProne = prone;
-        if (prone)
-        {
-            var stopped = Velocity;
-            stopped.X = 0.0f;
-            stopped.Z = 0.0f;
-            Velocity = stopped;
-        }
-        UpdateAuthoredStanceCollider();
-        if (IsInstanceValid(_bodyRoot))
-        {
-            _bodyRoot.Position = Vector3.Zero;
-            _bodyRoot.Rotation = UsesAuthoredOperatorForDiagnostics
-                ? Vector3.Zero
-                : new Vector3(prone ? Mathf.Pi * 0.48f : 0.0f, 0.0f, 0.0f);
-        }
-    }
+        => _ = TrySetPronePosture(prone, StandingColliderHeight);
 
     public bool IsHostileTo(EnemyOperator other)
     {
@@ -1354,11 +1356,14 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
         if (_combatTarget is not null && IsAttackableCombatant(_combatTarget))
         {
-            return _combatTarget.HitPoint(IsProne ? HitRegion.Limbs : HitRegion.Torso);
+            return _combatTarget.HitPoint(HitRegion.Torso);
         }
         if (_rawTarget is not null && GodotObject.IsInstanceValid(_rawTarget))
         {
-            return _rawTarget.GlobalPosition + Vector3.Up * (IsProne ? 0.45f : 1.2f);
+            var targetHeight = _rawTarget is EnemyOperator rival
+                ? rival.CombatAimHeight
+                : 1.2f;
+            return _rawTarget.GlobalPosition + Vector3.Up * targetHeight;
         }
         return Player.HitPoint(HitRegion.Torso);
     }
@@ -1392,7 +1397,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         {
             return false;
         }
-        var from = GlobalPosition + Vector3.Up * (IsProne ? 0.55f : 1.55f);
+        if (FlashbangSuppressesVision)
+        {
+            return false;
+        }
+        var from = GlobalPosition + Vector3.Up * CombatEyeHeight;
         var to = CurrentTargetPoint();
         if (Main?.IsLineObscuredBySmoke(from, to) == true)
         {
@@ -1412,13 +1421,26 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         return collider == targetNode || collider is Node node && targetNode.IsAncestorOf(node);
     }
 
-    private Vector3 RawMuzzlePosition => IsInstanceValid(_muzzle)
-        ? _muzzle.GlobalPosition
-        : GlobalPosition + Vector3.Up * (IsProne ? 0.55f : 1.45f);
+    private Vector3 RawMuzzlePosition
+    {
+        get
+        {
+            if (!IsInstanceValid(_muzzle))
+            {
+                return GlobalPosition + Vector3.Up * CombatMuzzleHeight;
+            }
+            var muzzle = _muzzle.GlobalPosition;
+            if (IsProne || IsCrouched)
+            {
+                muzzle.Y = GlobalPosition.Y + CombatMuzzleHeight;
+            }
+            return muzzle;
+        }
+    }
 
     private Vector3 ResolveBallisticShotOrigin()
     {
-        var bodyOrigin = GlobalPosition + Vector3.Up * (IsProne ? 0.55f : 1.45f);
+        var bodyOrigin = GlobalPosition + Vector3.Up * CombatMuzzleHeight;
         return Ballistics.ResolveShotOrigin(GetWorld3D(), bodyOrigin, RawMuzzlePosition, GetRid());
     }
 
@@ -1438,14 +1460,19 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private bool WithinViewCone()
     {
+        if (FlashbangSuppressesVision)
+        {
+            return false;
+        }
         if (SentryMode)
         {
             return true;
         }
-        var eye = GlobalPosition + Vector3.Up * (IsProne ? 0.5f : 1.5f);
+        var eye = GlobalPosition + Vector3.Up * CombatEyeHeight;
         var target = CurrentTargetPoint();
         var direction = eye.DirectionTo(target);
-        return (-GlobalBasis.Z).Dot(direction) > 0.42f;
+        var threshold = Mathf.Lerp(0.42f, 0.72f, FlashbangIntensity / FlashVisionSuppressionThreshold);
+        return (-GlobalBasis.Z).Dot(direction) > threshold;
     }
 
     public void HearGunshot(Vector3 origin, float radius)
@@ -1487,6 +1514,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private void Engage(float delta, float distance, bool hasSight)
     {
+        if (TryHandlePendingAirborneAttackShot(distance, hasSight))
+        {
+            return;
+        }
+
         if (_hitStun > 0.0f)
         {
             // Repeated hits must not stunlock a back-turned operator forever. Damage
@@ -1616,7 +1648,9 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
         if (!holdingCover)
         {
-            var speed = SentryMode ? 0.0f : IsProne ? 1.1f : distance > 19.0f ? 5.2f : 2.4f;
+            var speed = SentryMode
+                ? 0.0f
+                : IsProne ? 1.1f : IsCrouched ? 1.85f : distance > 19.0f ? 5.2f : 2.4f;
             if (IsRivalSquad)
             {
                 speed *= 1.08f;
@@ -1633,7 +1667,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
         // Fire when we have a live engage target in range. Prefer LOS, but still allow
         // close-range pressure shots so squads do not soft-lock when LOS is noisy.
-        var canFire = distance < CurrentFireRange && _fireTimer <= 0.0f && (hasSight || distance < 18.0f);
+        var canFire = CanFireDuringFlashbang
+            && distance < CurrentFireRange
+            && _fireTimer <= 0.0f
+            && (hasSight || distance < 18.0f);
         if (canFire)
         {
             if (_combatTarget is not null)
@@ -1663,11 +1700,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private bool CanReturnFireAtRecentDamageThreat()
     {
-        if (!HasRecentDamageThreat || Main is null)
+        if (!HasRecentDamageThreat || Main is null || !CanFireDuringFlashbang)
         {
             return false;
         }
-        var from = GlobalPosition + Vector3.Up * (IsProne ? 0.55f : 1.45f);
+        var from = GlobalPosition + Vector3.Up * CombatMuzzleHeight;
         var to = ConfirmedCombatContactPosition + Vector3.Up * 1.05f;
         return Main.IsLineObscuredBySmoke(from, to);
     }
@@ -1676,10 +1713,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     {
         if (_seekingCover)
         {
-            if (IsProne)
-            {
-                SetProne(false);
-            }
+            _ = TryStandForCombatMovement(clearCoverState: false);
             var targetFlat = new Vector3(_coverTarget.X, GlobalPosition.Y, _coverTarget.Z);
             var direction = GlobalPosition.DirectionTo(targetFlat);
             if (GlobalPosition.DistanceTo(targetFlat) < 0.85f)
@@ -1808,6 +1842,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     {
         var target = AssignedCombatTargetNode();
         if (!HasFireablePrimary
+            || !CanFireDuringFlashbang
             || !CanReturnFireAtRecentDamageThreat()
             || target is null
             || !GodotObject.IsInstanceValid(target))
@@ -1818,11 +1853,12 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         BeginMuzzleFlash();
         var stats = CarriedWeapon.Stats();
         _fireTimer = _rng.RandfRange(stats.FireInterval * 3.6f, stats.FireInterval * 6.2f)
-            * (IsWorldBoss ? WorldBossFireCadenceMultiplier : 1.0f);
+            * (IsWorldBoss ? WorldBossFireCadenceMultiplier : 1.0f)
+            * FlashbangFireCadenceMultiplier;
         var accuracy = Mathf.Clamp(
             0.4f - distance * 0.007f + AccuracyBonus,
             0.14f,
-            0.42f);
+            0.42f) * FlashbangAccuracyMultiplier;
         var aimPoint = ConfirmedCombatContactPosition + Vector3.Up * 1.05f;
         var shotOrigin = ResolveBallisticShotOrigin();
         if (BreakableGlassField.TryShatterAlongRay(
@@ -1884,7 +1920,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private void FireAtSquad(float distance)
     {
-        if (!HasFireablePrimary)
+        if (!HasFireablePrimary || !CanFireDuringFlashbang)
         {
             return;
         }
@@ -1908,7 +1944,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         BeginMuzzleFlash();
         var stats = CarriedWeapon.Stats();
         _fireTimer = _rng.RandfRange(stats.FireInterval * 2.4f, stats.FireInterval * 4.8f)
-            * (IsWorldBoss ? WorldBossFireCadenceMultiplier : 1.0f);
+            * (IsWorldBoss ? WorldBossFireCadenceMultiplier : 1.0f)
+            * FlashbangFireCadenceMultiplier;
         var rangeFactor = Mathf.Clamp(stats.EffectiveRange / 150.0f, 0.7f, 1.25f);
         // Rivals are more accurate at medium range so multi-squad fights resolve.
         var baseAcc = IsWorldBoss ? 0.95f : IsRivalSquad ? 0.97f : 0.9f;
@@ -1918,7 +1955,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         var accuracy = Mathf.Clamp(
             baseAcc + proneAccuracyBonus - distance * 0.005f / rangeFactor + AccuracyBonus,
             0.55f,
-            0.98f);
+            0.98f) * FlashbangAccuracyMultiplier;
         var regionRoll = _rng.Randf();
         var hitRegion = IsProne
             ? HitRegion.Torso
@@ -1972,16 +2009,18 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private void FireAtNode(EnemyOperator rival, float distance)
     {
-        if (!HasFireablePrimary)
+        if (!HasFireablePrimary || !CanFireDuringFlashbang)
         {
             return;
         }
         BeginMuzzleFlash();
         var stats = CarriedWeapon.Stats();
         _fireTimer = _rng.RandfRange(stats.FireInterval * 3.2f, stats.FireInterval * 6.8f)
-            * (IsWorldBoss ? WorldBossFireCadenceMultiplier : 1.0f);
-        var accuracy = Mathf.Clamp(0.9f - distance * 0.008f + AccuracyBonus, 0.4f, 0.94f);
-        var aimPoint = rival.GlobalPosition + Vector3.Up * (rival.IsProne ? 0.45f : 1.2f);
+            * (IsWorldBoss ? WorldBossFireCadenceMultiplier : 1.0f)
+            * FlashbangFireCadenceMultiplier;
+        var accuracy = Mathf.Clamp(0.9f - distance * 0.008f + AccuracyBonus, 0.4f, 0.94f)
+            * FlashbangAccuracyMultiplier;
+        var aimPoint = rival.GlobalPosition + Vector3.Up * rival.CombatAimHeight;
         var shotOrigin = ResolveBallisticShotOrigin();
         if (BreakableGlassField.TryShatterAlongRay(
             GetWorld3D(),
@@ -2051,12 +2090,19 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
         if (UsesAuthoredOperatorForDiagnostics)
         {
-            AnimateAuthoredOperator(delta, speed);
+            // The authored set has no dedicated jump clip. Holding its armed aim pose
+            // in the air reads as an intentional jump shot and avoids sprinting in place.
+            var locomotionSpeed = IsOnFloor() ? speed : 0.0f;
+            AnimateAuthoredOperator(delta, locomotionSpeed);
             UpdateAuthoredStanceCollider();
             return;
         }
+        if (!IsOnFloor())
+        {
+            speed = 0.0f;
+        }
         _animationPhase += delta * (4.0f + speed * 1.7f);
-        var coverOffset = _inCover ? -0.38f : 0.0f;
+        var coverOffset = IsCrouched ? -0.38f : 0.0f;
         var position = _bodyRoot.Position;
         position.Y = Mathf.Lerp(
             position.Y,
@@ -2089,8 +2135,9 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
                 || Main?.IsDemolitionNetworkClient == true))
         {
             var proxyHitHeight = hitPosition.Y - GlobalPosition.Y;
-            LastHitWasHeadshot = proxyHitHeight > 1.48f;
-            LastHitWasArmored = proxyHitHeight > 0.66f;
+            var proxyRegion = ResolveIncomingHitRegion(proxyHitHeight);
+            LastHitWasHeadshot = proxyRegion == HitRegion.Head;
+            LastHitWasArmored = proxyRegion is HitRegion.Head or HitRegion.Torso;
             return false;
         }
         Alerted = true;
@@ -2100,10 +2147,9 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             Player = tacticalPlayer;
         }
         RegisterDamageThreat(attacker);
+        RegisterCombatPressure();
         var localHeight = hitPosition.Y - GlobalPosition.Y;
-        var region = localHeight > 1.48f
-            ? HitRegion.Head
-            : localHeight > 0.66f ? HitRegion.Torso : HitRegion.Limbs;
+        var region = ResolveIncomingHitRegion(localHeight);
         LastHitWasHeadshot = region == HitRegion.Head;
         var adjustedDamage = region switch
         {
@@ -2133,8 +2179,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         _mainMaterial.AlbedoColor = new Color(0.62f, 0.12f, 0.07f);
         CreateTween().TweenProperty(_mainMaterial, "albedo_color", original, 0.11f);
 
-        if (_health > 0.0f && !SentryMode && !_seekingCover && !_inCover && Main is not null
-            && (_health < 76.0f || _rng.Randf() < 0.4f))
+        var shouldSeekCover = Main?.IsDemolitionMode == true
+            ? _health < 62.0f
+            : _health < 76.0f || _rng.Randf() < 0.4f;
+        if (_health > 0.0f
+            && !SentryMode
+            && !_seekingCover
+            && !_inCover
+            && Main is not null
+            && shouldSeekCover)
         {
             var threatPosition = CurrentThreatPosition(hasSight: false);
             var candidate = Main.FindCoverPoint(GlobalPosition, threatPosition);
@@ -2173,6 +2226,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             return;
         }
         IsDead = true;
+        SetProne(false);
+        SetCombatCrouched(false);
         ShowCorpseLootBackpack();
         ClearPursuitMemory(clearTarget: true);
         CollisionLayer = 0;

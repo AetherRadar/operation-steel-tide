@@ -645,12 +645,14 @@ public static class GameLocalization
         Chinese["demolition_buy_no_utility"] = "\u672a\u8d2d\u4e70\u6295\u63b7\u7269";
         Chinese["smoke_grenade"] = "\u70df\u96fe\u5f39";
         Chinese["incendiary_grenade"] = "\u71c3\u70e7\u5f39";
+        Chinese["flashbang_grenade"] = "\u95ea\u5149\u5f39";
         Chinese["select_frag_grenade"] = "\u5207\u6362\u5230\u7834\u7247\u624b\u96f7";
         Chinese["select_utility"] = "\u5207\u6362\u5230\u5176\u4ed6\u9053\u5177";
         Chinese["frag_grenade_ready"] = "\u7834\u7247\u624b\u96f7\u5df2\u5c31\u7eea";
         Chinese["utility_ready"] = "\u9053\u5177\u5df2\u5c31\u7eea";
         Chinese["smoke_grenade_ready"] = "\u70df\u96fe\u5f39\u5df2\u5c31\u7eea";
         Chinese["incendiary_grenade_ready"] = "\u71c3\u70e7\u5f39\u5df2\u5c31\u7eea";
+        Chinese["flashbang_grenade_ready"] = "\u95ea\u5149\u5f39\u5df2\u5c31\u7eea";
         Chinese["quick_slot_empty"] = "\u69fd\u4f4d\u4e3a\u7a7a";
         Chinese["quick_throw"] = "\u6295\u63b7";
         Chinese["quick_deploy"] = "\u4f7f\u7528";

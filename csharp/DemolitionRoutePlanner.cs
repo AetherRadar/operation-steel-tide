@@ -15,7 +15,7 @@ public readonly record struct DemolitionRouteResult(
 /// objective movement. Automatic links stay on one walkable grade; only authored paths can
 /// bridge a full floor change.
 /// </summary>
-public sealed class DemolitionRoutePlanner
+public sealed partial class DemolitionRoutePlanner
 {
     private const float MaximumVisibilityEdge = 24.0f;
     private const float MaximumEndpointEdge = 34.0f;
@@ -96,10 +96,19 @@ public sealed class DemolitionRoutePlanner
     public DemolitionRouteResult Plan(
         Vector3 start,
         Vector3 destination,
-        DemolitionTeam? movingTeam = null)
+        DemolitionTeam? movingTeam = null,
+        DemolitionRouteIntent routeIntent = DemolitionRouteIntent.Balanced)
     {
+        if (movingTeam == DemolitionTeam.Defenders
+            && routeIntent != DemolitionRouteIntent.Balanced
+            && TryPlanAuthoredRetakeCorridor(start, destination, routeIntent, out var retakeRoute))
+        {
+            return retakeRoute;
+        }
+
         if (CanUseRouteSegment(start, destination)
-            && TacticalSegmentPenalty(start, destination, destination, movingTeam) <= 0.001f)
+            && TacticalSegmentPenalty(start, destination, start, destination, movingTeam, routeIntent)
+                <= 0.001f)
         {
             return new DemolitionRouteResult(
                 new[] { destination },
@@ -113,6 +122,7 @@ public sealed class DemolitionRoutePlanner
                 start,
                 destination,
                 attackSiteIndex,
+                routeIntent,
                 out var attackRoute))
         {
             return attackRoute;
@@ -146,7 +156,8 @@ public sealed class DemolitionRoutePlanner
             destinationIndex,
             start,
             destination,
-            movingTeam);
+            movingTeam,
+            routeIntent);
         if (search.Previous[destinationIndex] < 0)
         {
             var frontierIndex = FindClosestReachableFrontier(search.Distances, destination);
@@ -169,7 +180,8 @@ public sealed class DemolitionRoutePlanner
                 start,
                 frontierRoute,
                 destination,
-                movingTeam);
+                movingTeam,
+                routeIntent);
             return new DemolitionRouteResult(
                 safeRoute,
                 false,
@@ -177,7 +189,7 @@ public sealed class DemolitionRoutePlanner
         }
 
         var route = ReconstructRoute(search.Previous, startIndex, destinationIndex, start, destination);
-        var simplified = SimplifyRoute(start, route, destination, movingTeam);
+        var simplified = SimplifyRoute(start, route, destination, movingTeam, routeIntent);
         return new DemolitionRouteResult(simplified, true, RouteLength(start, simplified));
     }
 
@@ -200,6 +212,7 @@ public sealed class DemolitionRoutePlanner
         Vector3 start,
         Vector3 destination,
         int siteIndex,
+        DemolitionRouteIntent routeIntent,
         out DemolitionRouteResult route)
     {
         var authoredPath = siteIndex == 0
@@ -214,21 +227,15 @@ public sealed class DemolitionRoutePlanner
             {
                 continue;
             }
-            var tacticalCost = TacticalSegmentPenalty(
-                start,
-                waypoint,
-                destination,
-                DemolitionTeam.Attackers);
+            var tacticalCost = TacticalSegmentPenalty(start, waypoint, start, destination,
+                DemolitionTeam.Attackers, routeIntent);
             var previous = waypoint;
             for (var index = entry + 1;
                 index < authoredPath.Count && !float.IsPositiveInfinity(tacticalCost);
                 index++)
             {
-                tacticalCost += TacticalSegmentPenalty(
-                    previous,
-                    authoredPath[index],
-                    destination,
-                    DemolitionTeam.Attackers);
+                tacticalCost += TacticalSegmentPenalty(previous, authoredPath[index], start,
+                    destination, DemolitionTeam.Attackers, routeIntent);
                 previous = authoredPath[index];
             }
             if (float.IsPositiveInfinity(tacticalCost))
@@ -275,7 +282,8 @@ public sealed class DemolitionRoutePlanner
             start,
             lane,
             destination,
-            DemolitionTeam.Attackers);
+            DemolitionTeam.Attackers,
+            routeIntent);
         route = new DemolitionRouteResult(
             simplified,
             true,
@@ -369,7 +377,8 @@ public sealed class DemolitionRoutePlanner
         int destinationIndex,
         Vector3 start,
         Vector3 destination,
-        DemolitionTeam? movingTeam)
+        DemolitionTeam? movingTeam,
+        DemolitionRouteIntent routeIntent)
     {
         var distances = new float[edges.Length];
         var previous = new int[edges.Length];
@@ -411,7 +420,7 @@ public sealed class DemolitionRoutePlanner
                     start,
                     destination);
                 var candidateDistance = currentDistance + edge.Cost
-                    + TacticalSegmentPenalty(from, to, destination, movingTeam);
+                    + TacticalSegmentPenalty(from, to, start, destination, movingTeam, routeIntent);
                 if (candidateDistance + 0.001f >= distances[edge.To])
                 {
                     continue;
@@ -426,8 +435,10 @@ public sealed class DemolitionRoutePlanner
     private float TacticalSegmentPenalty(
         Vector3 from,
         Vector3 to,
+        Vector3 routeOrigin,
         Vector3 destination,
-        DemolitionTeam? movingTeam)
+        DemolitionTeam? movingTeam,
+        DemolitionRouteIntent routeIntent)
     {
         if (movingTeam is null)
         {
@@ -490,6 +501,13 @@ public sealed class DemolitionRoutePlanner
                 penalty += OpeningLaneReversePenalty
                     + Mathf.Abs(actualLateral) * 5.0f;
             }
+        }
+        if (movingTeam == DemolitionTeam.Defenders
+            && routeIntent != DemolitionRouteIntent.Balanced)
+        {
+            penalty += DemolitionRetakeCorridorPolicy.SegmentPenalty(
+                from, to, routeOrigin, destination, _layout.Midpoint,
+                ClosestSiteIndex(destination), routeIntent);
         }
         return penalty;
     }
@@ -607,7 +625,8 @@ public sealed class DemolitionRoutePlanner
         Vector3 start,
         IReadOnlyList<Vector3> route,
         Vector3 destination,
-        DemolitionTeam? movingTeam)
+        DemolitionTeam? movingTeam,
+        DemolitionRouteIntent routeIntent)
     {
         var simplified = new List<Vector3>();
         var anchor = start;
@@ -618,11 +637,8 @@ public sealed class DemolitionRoutePlanner
             for (var candidate = route.Count - 1; candidate > index; candidate--)
             {
                 if (CanUseRouteSegment(anchor, route[candidate])
-                    && TacticalSegmentPenalty(
-                        anchor,
-                        route[candidate],
-                        destination,
-                        movingTeam) <= 0.001f)
+                    && TacticalSegmentPenalty(anchor, route[candidate], start, destination,
+                        movingTeam, routeIntent) <= 0.001f)
                 {
                     furthest = candidate;
                     break;

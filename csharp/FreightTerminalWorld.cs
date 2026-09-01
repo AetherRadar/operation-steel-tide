@@ -876,7 +876,7 @@ public partial class FreightTerminalWorld : Node3D
         _hud.DemolitionModeRequested += OnDemolitionModeRequested;
         _hud.DemolitionBackRequested += OnDemolitionBackRequested;
         _hud.DemolitionDeploymentRequested += OnDemolitionDeploymentRequested;
-        _hud.DemolitionPurchaseRequested += OnDemolitionPurchaseRequested;
+        _hud.DemolitionPurchaseRequestedWithFlash += OnDemolitionPurchaseRequested;
         _hud.OperationsHomeRequested += OnOperationsHomeRequested;
 
         _player = new TacticalPlayer

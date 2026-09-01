@@ -97,14 +97,15 @@ public partial class FreightTerminalWorld
             var decision = DemolitionUtilityPlanner.Plan(BuildUtilityContext(
                 localTeam,
                 assignment,
-                mate.GlobalPosition,
+                mate,
                 objective,
                 contactPosition,
                 hasContact,
                 mate == _demolitionSquadObjectiveMate,
                 mate.HasDemolitionUtility(DemolitionAiUtilityKind.Fragmentation),
                 mate.HasDemolitionUtility(DemolitionAiUtilityKind.Smoke),
-                mate.HasDemolitionUtility(DemolitionAiUtilityKind.Incendiary)));
+                mate.HasDemolitionUtility(DemolitionAiUtilityKind.Incendiary),
+                mate.HasDemolitionUtility(DemolitionAiUtilityKind.Flashbang)));
             DemolitionAiUtilityDecisionsForDiagnostics++;
             if (decision.Kind == DemolitionAiUtilityKind.None
                 || !TryExecuteDemolitionUtility(
@@ -154,14 +155,15 @@ public partial class FreightTerminalWorld
             var decision = DemolitionUtilityPlanner.Plan(BuildUtilityContext(
                 opponentTeam,
                 assignment,
-                opponent.GlobalPosition,
+                opponent,
                 objective,
                 contactPosition,
                 hasContact,
                 objectiveChannelOwner,
                 opponent.HasDemolitionUtility(DemolitionAiUtilityKind.Fragmentation),
                 opponent.HasDemolitionUtility(DemolitionAiUtilityKind.Smoke),
-                opponent.HasDemolitionUtility(DemolitionAiUtilityKind.Incendiary)));
+                opponent.HasDemolitionUtility(DemolitionAiUtilityKind.Incendiary),
+                opponent.HasDemolitionUtility(DemolitionAiUtilityKind.Flashbang)));
             DemolitionAiUtilityDecisionsForDiagnostics++;
             if (decision.Kind == DemolitionAiUtilityKind.None
                 || !TryExecuteDemolitionUtility(
@@ -180,14 +182,15 @@ public partial class FreightTerminalWorld
     private DemolitionUtilityContext BuildUtilityContext(
         DemolitionTeam team,
         DemolitionAssignment assignment,
-        Vector3 actorPosition,
+        Node3D actor,
         Vector3 objective,
         Vector3 contactPosition,
         bool hasContact,
         bool objectiveChannelOwner,
         bool hasFragmentation,
         bool hasSmoke,
-        bool hasIncendiary)
+        bool hasIncendiary,
+        bool hasFlashbang)
     {
         var phase = _demolitionDevicePlanted
             ? DemolitionStrategyPhase.PostPlant
@@ -196,7 +199,7 @@ public partial class FreightTerminalWorld
             team,
             phase,
             assignment.Duty,
-            actorPosition,
+            actor.GlobalPosition,
             objective,
             contactPosition,
             hasContact,
@@ -209,7 +212,12 @@ public partial class FreightTerminalWorld
                 team,
                 hasContact ? contactPosition : objective,
                 IncendiaryGrenade.FireRadius + 1.25f),
-            _demolitionRemaining);
+            _demolitionRemaining,
+            hasFlashbang,
+            IsFlashbangFriendlySafe(
+                team,
+                actor,
+                hasContact ? contactPosition : objective));
     }
 
     private bool TryExecuteDemolitionUtility(
@@ -233,6 +241,9 @@ public partial class FreightTerminalWorld
                 break;
             case DemolitionAiUtilityKind.Incendiary:
                 ThrowIncendiaryGrenade(origin, direction, actor, 14.0f, loft);
+                break;
+            case DemolitionAiUtilityKind.Flashbang:
+                ThrowFlashbangGrenade(origin, direction, actor, 14.0f, loft);
                 break;
             default:
                 return false;
@@ -316,6 +327,74 @@ public partial class FreightTerminalWorld
         }
         return true;
     }
+
+    private bool IsFlashbangFriendlySafe(
+        DemolitionTeam team,
+        Node3D thrower,
+        Vector3 detonationPoint)
+    {
+        if (FlashbangWouldDisruptFriendly(thrower, detonationPoint))
+        {
+            return false;
+        }
+
+        if (team == LocalDemolitionSide)
+        {
+            if (IsInstanceValid(_player)
+                && _player != thrower
+                && !_player.IsDead
+                && FlashbangWouldDisruptFriendly(_player, detonationPoint))
+            {
+                return false;
+            }
+            foreach (var mate in _squadMates)
+            {
+                if (IsInstanceValid(mate)
+                    && mate != thrower
+                    && !mate.IsDowned
+                    && !mate.IsBodyBag
+                    && FlashbangWouldDisruptFriendly(mate, detonationPoint))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        foreach (var opponent in _demolitionOpponents)
+        {
+            if (IsInstanceValid(opponent)
+                && opponent != thrower
+                && !opponent.IsDead
+                && FlashbangWouldDisruptFriendly(opponent, detonationPoint))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool FlashbangWouldDisruptFriendly(Node3D friendly, Vector3 detonationPoint)
+    {
+        var viewOrigin = friendly is IFlashbangTarget target
+            ? target.FlashbangViewOrigin
+            : friendly.GlobalPosition + Vector3.Up * 1.45f;
+        var viewForward = friendly is IFlashbangTarget flashbangTarget
+            ? flashbangTarget.FlashbangViewForward
+            : -friendly.GlobalBasis.Z;
+        return !IsPredictedFlashbangExposureSafe(viewOrigin, viewForward, detonationPoint);
+    }
+
+    internal static bool IsPredictedFlashbangExposureSafe(
+        Vector3 viewOrigin,
+        Vector3 viewForward,
+        Vector3 detonationPoint)
+        => FlashbangExposureResolver.Resolve(
+                detonationPoint,
+                viewOrigin,
+                viewForward,
+                hasLineOfSight: true)
+            .Intensity < 0.16f;
 
     private Vector3 ResolveUtilityObjective(DemolitionAssignment assignment)
     {

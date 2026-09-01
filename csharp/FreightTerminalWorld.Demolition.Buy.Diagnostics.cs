@@ -35,6 +35,28 @@ public partial class FreightTerminalWorld
         var incendiaryQuote = DemolitionBuyCatalog.Quote(
             new DemolitionPurchaseSelection(string.Empty, string.Empty, false, 0, 0, 1),
             DemolitionBuyCatalog.IncendiaryGrenadePrice);
+        var flashbangQuote = DemolitionBuyCatalog.Quote(
+            new DemolitionPurchaseSelection(string.Empty, string.Empty, false, 0, 0, 0, 1),
+            DemolitionBuyCatalog.FlashbangGrenadePrice);
+        var flashbangClampQuote = DemolitionBuyCatalog.Quote(
+            new DemolitionPurchaseSelection(string.Empty, string.Empty, false, 0, 0, 0, 99),
+            DemolitionBuyCatalog.MaximumFlashbangGrenades
+                * DemolitionBuyCatalog.FlashbangGrenadePrice);
+        var legacyPurchasePayload = SquadNetwork.DecodeLegacyDemolitionPurchase(
+            DemolitionBuyCatalog.P226Id,
+            string.Empty,
+            false,
+            0,
+            0,
+            1);
+        var purchasePayloadV2 = SquadNetwork.DecodeDemolitionPurchaseV2(
+            DemolitionBuyCatalog.P226Id,
+            string.Empty,
+            false,
+            0,
+            0,
+            1,
+            1);
         var pistolLoadout = DemolitionBuyCatalog.BuildLoadout(pistolQuote);
         var gsh18Loadout = DemolitionBuyCatalog.BuildLoadout(gsh18Quote);
         var m24Loadout = DemolitionBuyCatalog.BuildLoadout(m24Quote);
@@ -60,17 +82,35 @@ public partial class FreightTerminalWorld
             && m24Loadout.ReserveAmmo == 25
             && incendiaryQuote.Affordable
             && incendiaryQuote.Selection.IncendiaryGrenadeCount == 1;
+        var flashBuyReady = flashbangQuote.Affordable
+            && flashbangQuote.TotalCost == DemolitionBuyCatalog.FlashbangGrenadePrice
+            && flashbangQuote.RemainingFunds == 0
+            && flashbangQuote.Selection.FlashbangGrenadeCount == 1
+            && flashbangClampQuote.Affordable
+            && flashbangClampQuote.Selection.FlashbangGrenadeCount
+                == DemolitionBuyCatalog.MaximumFlashbangGrenades
+            && flashbangClampQuote.TotalCost
+                == DemolitionBuyCatalog.MaximumFlashbangGrenades
+                    * DemolitionBuyCatalog.FlashbangGrenadePrice;
+        var flashPurchaseRpcReady = legacyPurchasePayload.FlashbangGrenadeCount == 0
+            && legacyPurchasePayload.IncendiaryGrenadeCount == 1
+            && !SquadNetwork.UsesDemolitionPurchaseV2(legacyPurchasePayload)
+            && purchasePayloadV2.FlashbangGrenadeCount == 1
+            && purchasePayloadV2.IncendiaryGrenadeCount == 1
+            && SquadNetwork.UsesDemolitionPurchaseV2(purchasePayloadV2);
 
         const string scenePath = "res://ui/DemolitionBuyView.tscn";
         var packedScene = HudPackedSceneCache.Load(scenePath);
         var probe = packedScene?.Instantiate<DemolitionBuyView>();
         var purchaseRequests = 0;
+        var purchaseRequestsWithFlash = 0;
         var requestedSidearm = string.Empty;
         var requestedPrimary = string.Empty;
         var requestedArmor = true;
         var requestedGrenades = -1;
         var requestedSmokeGrenades = -1;
         var requestedIncendiaryGrenades = -1;
+        var requestedFlashbangGrenades = -1;
         if (probe is not null)
         {
             probe.Visible = false;
@@ -91,18 +131,31 @@ public partial class FreightTerminalWorld
                 requestedSmokeGrenades = smokeGrenadeCount;
                 requestedIncendiaryGrenades = incendiaryGrenadeCount;
             };
+            probe.PurchaseRequestedWithFlash += (
+                sidearmId,
+                primaryId,
+                armorSelected,
+                grenadeCount,
+                smokeGrenadeCount,
+                incendiaryGrenadeCount,
+                flashbangGrenadeCount) =>
+            {
+                purchaseRequestsWithFlash++;
+                requestedFlashbangGrenades = flashbangGrenadeCount;
+            };
             probe.SetLanguage("zh");
             probe.BeginRound(new DemolitionBuySnapshot(
                 1,
                 0,
                 0,
                 DemolitionTeam.Attackers,
-                DemolitionEconomy.StartingFunds,
+                DemolitionEconomy.StartingFunds + 400,
                 DemolitionBuyDuration,
                 DemolitionBuyDuration,
                 false));
             probe.SelectSidearmForDiagnostics(DemolitionBuyCatalog.P226Id);
             probe.SetSmokeGrenadesForDiagnostics(1);
+            probe.SetFlashbangGrenadesForDiagnostics(1);
             probe.PressConfirmForDiagnostics();
         }
         var sceneReady = probe is not null
@@ -115,15 +168,19 @@ public partial class FreightTerminalWorld
             && !probe.IsPrimaryOfferEnabled(DemolitionBuyCatalog.Mp5Id)
             && !probe.IsPrimaryOfferEnabled(DemolitionBuyCatalog.M4A1Id)
             && !probe.IsPrimaryOfferEnabled(DemolitionBuyCatalog.M24Id)
-            && probe.CurrentQuote.TotalCost == 800
-            && probe.CurrentQuote.RemainingFunds == 0
+            && probe.CurrentQuote.TotalCost == 1150
+            && probe.CurrentQuote.RemainingFunds == 50
+            && probe.CurrentSelection.FlashbangGrenadeCount == 1
             && purchaseRequests == 1
+            && purchaseRequestsWithFlash == 1
             && requestedSidearm == DemolitionBuyCatalog.P226Id
             && string.IsNullOrEmpty(requestedPrimary)
             && !requestedArmor
             && requestedGrenades == 0
             && requestedSmokeGrenades == 1
-            && requestedIncendiaryGrenades == 0;
+            && requestedIncendiaryGrenades == 0
+            && requestedFlashbangGrenades == 1;
+        var sceneFlashCount = probe?.CurrentSelection.FlashbangGrenadeCount ?? -1;
         if (probe is not null)
         {
             probe.SelectPrimaryForDiagnostics(DemolitionBuyCatalog.M4A1Id);
@@ -201,14 +258,16 @@ public partial class FreightTerminalWorld
         await WaitFrames(3);
 
         var valid = domainReady
+            && flashBuyReady
+            && flashPurchaseRpcReady
             && sceneReady
             && unaffordableBlocked
             && hudReady
             && smokeReady
             && incendiaryReady
             && overlapDamageGuard;
-        GD.Print($"DEMOLITION_BUY_CHECK valid={valid} domain={domainReady} scene={sceneReady} signals={purchaseRequests} primary_locked={!openingPrimary.Affordable} pistol_cost={pistolQuote.TotalCost} pistol_balance={pistolQuote.RemainingFunds} gsh18_cost={gsh18Quote.TotalCost} gsh18_platform={gsh18Loadout.Sidearm?.Platform} m24={m24Loadout.Weapon?.Platform}:{m24Quote.TotalCost} smoke_cost={DemolitionBuyCatalog.SmokeGrenadePrice} smoke={smokeReady}:{SmokeGrenade.CloudRadius:0.0}m/{SmokeGrenade.VisualLobeCount}/{SmokeGrenade.VisualOpacity:0.00} incendiary={incendiaryReady}:{DemolitionBuyCatalog.IncendiaryGrenadePrice} overlap_guard={overlapDamageGuard} combo_blocked={unaffordableBlocked} hud={hudReady}");
-        GD.Print($"DEMOLITION_BUY_PASS valid={valid}");
+        GD.Print($"DEMOLITION_BUY_CHECK valid={valid} domain={domainReady} scene={sceneReady} signals={purchaseRequests}/{purchaseRequestsWithFlash} primary_locked={!openingPrimary.Affordable} pistol_cost={pistolQuote.TotalCost} pistol_balance={pistolQuote.RemainingFunds} gsh18_cost={gsh18Quote.TotalCost} gsh18_platform={gsh18Loadout.Sidearm?.Platform} m24={m24Loadout.Weapon?.Platform}:{m24Quote.TotalCost} smoke_cost={DemolitionBuyCatalog.SmokeGrenadePrice} smoke={smokeReady}:{SmokeGrenade.CloudRadius:0.0}m/{SmokeGrenade.VisualLobeCount}/{SmokeGrenade.VisualOpacity:0.00} incendiary={incendiaryReady}:{DemolitionBuyCatalog.IncendiaryGrenadePrice} overlap_guard={overlapDamageGuard} combo_blocked={unaffordableBlocked} hud={hudReady} flash_buy={flashBuyReady}:{flashbangQuote.TotalCost}/{flashbangQuote.Selection.FlashbangGrenadeCount} flash_ui={sceneReady}:{sceneFlashCount}/{requestedFlashbangGrenades} flash_rpc={flashPurchaseRpcReady}:{legacyPurchasePayload.FlashbangGrenadeCount}/{purchasePayloadV2.FlashbangGrenadeCount}");
+        GD.Print($"DEMOLITION_BUY_PASS valid={valid} flash_buy={flashBuyReady} flash_ui={sceneReady} flash_rpc={flashPurchaseRpcReady}");
         GetTree().Paused = false;
         await WaitFrames(30);
         GetTree().Quit(valid ? 0 : 2);
@@ -231,6 +290,7 @@ public partial class FreightTerminalWorld
         _hud.SetDemolitionBuyGrenadesForDiagnostics(1);
         _hud.SetDemolitionBuySmokeGrenadesForDiagnostics(1);
         _hud.SetDemolitionBuyIncendiaryGrenadesForDiagnostics(1);
+        _hud.SetDemolitionBuyFlashbangGrenadesForDiagnostics(1);
         await WaitFrames(18);
         SaveViewportImage("res://demolition_buy_validation.png");
         GD.Print("DEMOLITION_BUY_CAPTURE path=demolition_buy_validation.png");

@@ -293,17 +293,7 @@ public partial class EnemyOperator
 
     internal void PrepareForScriptedMovement()
     {
-        if (IsProne)
-        {
-            SetProne(false);
-        }
-        var leftCover = _seekingCover || _inCover;
-        _seekingCover = false;
-        _inCover = false;
-        if (leftCover)
-        {
-            UpdateAuthoredStanceCollider();
-        }
+        _ = TryStandForCombatMovement();
     }
 
     private Vector3 ApplyPursuitObstacleAvoidance(Vector3 direction)

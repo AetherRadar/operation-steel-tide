@@ -91,6 +91,7 @@ public partial class SquadNetwork
 
     private void ForgetDemolitionPeer(long peerId)
     {
+        _demolitionPurchaseV2Peers.Remove(peerId);
         if (!_demolitionAssignments.Remove(peerId))
         {
             return;
@@ -123,6 +124,7 @@ public partial class SquadNetwork
         DemolitionMatchStarted = false;
         _demolitionHostRole = OperatorRole.Assault;
         _demolitionAssignments.Clear();
+        _demolitionPurchaseV2Peers.Clear();
     }
 
     private List<long> RegisteredDemolitionPeerIds()

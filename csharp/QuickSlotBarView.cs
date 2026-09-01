@@ -30,6 +30,7 @@ public partial class QuickSlotBarView : Control
     private int _fragGrenades;
     private int _smokeItems;
     private int _incendiaryItems;
+    private int _flashbangItems;
     private DemolitionUtilityType _selectedUtility = DemolitionUtilityType.Smoke;
     private int _activeSlot;
     private bool _hasPrimary;
@@ -55,6 +56,30 @@ public partial class QuickSlotBarView : Control
 
     public int ActiveSlot => _activeSlot;
     internal int PresentationUpdateCountForDiagnostics => _presentationUpdateCount;
+    internal bool VisibleSlotsWithinViewportForDiagnostics
+    {
+        get
+        {
+            var viewportRect = GetViewport().GetVisibleRect();
+            const float tolerance = 0.5f;
+            foreach (var button in _buttons)
+            {
+                if (!IsInstanceValid(button) || !button.Visible)
+                {
+                    continue;
+                }
+                var rect = button.GetGlobalRect();
+                if (rect.Position.X < viewportRect.Position.X - tolerance
+                    || rect.Position.Y < viewportRect.Position.Y - tolerance
+                    || rect.End.X > viewportRect.End.X + tolerance
+                    || rect.End.Y > viewportRect.End.Y + tolerance)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
 
     internal void ResetPresentationUpdateCountForDiagnostics() => _presentationUpdateCount = 0;
 
@@ -118,6 +143,33 @@ public partial class QuickSlotBarView : Control
         int incendiaryItems,
         DemolitionUtilityType selectedUtility,
         int activeSlot)
+        => SetLoadout(
+            language,
+            primary,
+            hasPrimary,
+            secondary,
+            sidearm,
+            knifeSkinId,
+            fragGrenades,
+            smokeItems,
+            incendiaryItems,
+            0,
+            selectedUtility,
+            activeSlot);
+
+    public void SetLoadout(
+        string language,
+        WeaponBuild? primary,
+        bool hasPrimary,
+        WeaponBuild? secondary,
+        WeaponBuild? sidearm,
+        string knifeSkinId,
+        int fragGrenades,
+        int smokeItems,
+        int incendiaryItems,
+        int flashbangItems,
+        DemolitionUtilityType selectedUtility,
+        int activeSlot)
     {
         _language = GameLocalization.IsChinese(language) ? "zh" : "en";
         _primary = primary;
@@ -128,6 +180,7 @@ public partial class QuickSlotBarView : Control
         _fragGrenades = Math.Max(0, fragGrenades);
         _smokeItems = Math.Max(0, smokeItems);
         _incendiaryItems = Math.Max(0, incendiaryItems);
+        _flashbangItems = Math.Max(0, flashbangItems);
         _selectedUtility = selectedUtility;
         _activeSlot = Math.Clamp(activeSlot, 0, _buttons.Length - 1);
         _configured = true;
@@ -178,14 +231,20 @@ public partial class QuickSlotBarView : Control
         _buttons[2].Visible = _sidearm is not null;
         _buttons[3].Visible = true;
         _buttons[4].Visible = _fragGrenades > 0;
-        _buttons[5].Visible = _smokeItems > 0 || _incendiaryItems > 0;
+        _buttons[5].Visible = _smokeItems > 0 || _incendiaryItems > 0 || _flashbangItems > 0;
 
         _fragLabel.Text = $"{Text("grenade", "FRAG")}  x{_fragGrenades}";
         var smokeLabel = $"{Text("smoke_grenade", "SMOKE")} x{_smokeItems}";
         var incendiaryLabel = $"{Text("incendiary_grenade", "FIRE")} x{_incendiaryItems}";
-        _utilityLabel.Text = _selectedUtility == DemolitionUtilityType.Smoke
-            ? $"[{smokeLabel}]  /  {incendiaryLabel}"
-            : $"{smokeLabel}  /  [{incendiaryLabel}]";
+        var flashbangLabel = $"{Text("flashbang_grenade", "FLASH")} x{_flashbangItems}";
+        _utilityLabel.Text = _selectedUtility switch
+        {
+            DemolitionUtilityType.Smoke
+                => $"[{smokeLabel}]\n{incendiaryLabel}\n{flashbangLabel}",
+            DemolitionUtilityType.Incendiary
+                => $"{smokeLabel}\n[{incendiaryLabel}]\n{flashbangLabel}",
+            _ => $"{smokeLabel}\n{incendiaryLabel}\n[{flashbangLabel}]"
+        };
         _buttons[0].TooltipText = Text("select_primary", "SELECT PRIMARY WEAPON");
         _buttons[1].TooltipText = Text("select_secondary", "SELECT SECONDARY WEAPON");
         _buttons[2].TooltipText = Text("select_sidearm", "SELECT SIDEARM");

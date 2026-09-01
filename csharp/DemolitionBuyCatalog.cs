@@ -14,7 +14,8 @@ public enum DemolitionBuyCategory
 public enum DemolitionUtilityType
 {
     Smoke,
-    Incendiary
+    Incendiary,
+    Flashbang
 }
 
 public sealed record DemolitionBuyOffer(
@@ -32,20 +33,39 @@ public readonly record struct DemolitionPurchaseSelection(
     bool ArmorSelected,
     int GrenadeCount,
     int SmokeGrenadeCount,
-    int IncendiaryGrenadeCount)
+    int IncendiaryGrenadeCount,
+    int FlashbangGrenadeCount)
 {
     public DemolitionPurchaseSelection(
         string sidearmId,
         string primaryId,
         bool armorSelected,
         int grenadeCount,
+        int smokeGrenadeCount,
+        int incendiaryGrenadeCount)
+        : this(
+            sidearmId,
+            primaryId,
+            armorSelected,
+            grenadeCount,
+            smokeGrenadeCount,
+            incendiaryGrenadeCount,
+            0)
+    {
+    }
+
+    public DemolitionPurchaseSelection(
+        string sidearmId,
+        string primaryId,
+        bool armorSelected,
+        int grenadeCount,
         int smokeGrenadeCount)
-        : this(sidearmId, primaryId, armorSelected, grenadeCount, smokeGrenadeCount, 0)
+        : this(sidearmId, primaryId, armorSelected, grenadeCount, smokeGrenadeCount, 0, 0)
     {
     }
 
     public static DemolitionPurchaseSelection Empty
-        => new(string.Empty, string.Empty, false, 0, 0, 0);
+        => new(string.Empty, string.Empty, false, 0, 0, 0, 0);
 }
 
 public readonly record struct DemolitionPurchaseQuote(
@@ -87,9 +107,11 @@ public static class DemolitionBuyCatalog
     public const int GrenadePrice = 450;
     public const int SmokeGrenadePrice = 300;
     public const int IncendiaryGrenadePrice = 500;
+    public const int FlashbangGrenadePrice = 350;
     public const int MaximumGrenades = 2;
     public const int MaximumSmokeGrenades = 2;
     public const int MaximumIncendiaryGrenades = 2;
+    public const int MaximumFlashbangGrenades = 2;
 
     public static readonly IReadOnlyList<DemolitionBuyOffer> Sidearms = new[]
     {
@@ -125,7 +147,8 @@ public static class DemolitionBuyCatalog
             selection.ArmorSelected,
             Math.Clamp(selection.GrenadeCount, 0, MaximumGrenades),
             Math.Clamp(selection.SmokeGrenadeCount, 0, MaximumSmokeGrenades),
-            Math.Clamp(selection.IncendiaryGrenadeCount, 0, MaximumIncendiaryGrenades));
+            Math.Clamp(selection.IncendiaryGrenadeCount, 0, MaximumIncendiaryGrenades),
+            Math.Clamp(selection.FlashbangGrenadeCount, 0, MaximumFlashbangGrenades));
     }
 
     public static DemolitionPurchaseQuote Quote(DemolitionPurchaseSelection selection, int funds)
@@ -136,7 +159,8 @@ public static class DemolitionBuyCatalog
             + (normalized.ArmorSelected ? ArmorPrice : 0)
             + normalized.GrenadeCount * GrenadePrice
             + normalized.SmokeGrenadeCount * SmokeGrenadePrice
-            + normalized.IncendiaryGrenadeCount * IncendiaryGrenadePrice;
+            + normalized.IncendiaryGrenadeCount * IncendiaryGrenadePrice
+            + normalized.FlashbangGrenadeCount * FlashbangGrenadePrice;
         var available = Math.Max(0, funds);
         return new DemolitionPurchaseQuote(
             normalized,

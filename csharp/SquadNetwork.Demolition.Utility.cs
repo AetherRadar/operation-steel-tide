@@ -7,7 +7,8 @@ public enum DemolitionNetworkUtilityKind
 {
     Fragmentation,
     Smoke,
-    Incendiary
+    Incendiary,
+    Flashbang
 }
 
 public readonly record struct DemolitionUtilityThrowRequest(
@@ -29,6 +30,11 @@ public readonly record struct DemolitionUtilityThrowSpawn(
     Vector3 Direction,
     float Speed,
     float Loft);
+
+public readonly record struct DemolitionFlashbangDetonation(
+    int SpawnId,
+    int Round,
+    Vector3 Position);
 
 public static class DemolitionUtilityNetworkContract
 {
@@ -62,6 +68,12 @@ public static class DemolitionUtilityNetworkContract
         && float.IsFinite(spawn.Loft)
         && spawn.Loft is >= 2.0f and <= 9.0f;
 
+    public static bool IsFlashbangDetonationPayloadValid(
+        DemolitionFlashbangDetonation detonation)
+        => detonation.SpawnId >= 1
+        && detonation.Round >= 1
+        && IsFinite(detonation.Position);
+
     public static bool HostMayAuthorize(
         bool host,
         bool sessionActive,
@@ -92,6 +104,7 @@ public partial class SquadNetwork
 {
     public event Action<DemolitionUtilityThrowRequest>? DemolitionUtilityThrowRequested;
     public event Action<DemolitionUtilityThrowSpawn>? DemolitionUtilityThrowSpawnReceived;
+    public event Action<DemolitionFlashbangDetonation>? DemolitionFlashbangDetonationReceived;
     public event Action<int>? DemolitionUtilityThrowRejected;
 
     public bool RequestDemolitionUtilityThrow(
@@ -177,6 +190,28 @@ public partial class SquadNetwork
         RpcId(peerId, MethodName.ReceiveDemolitionUtilityThrowRejected, requestId);
     }
 
+    public void BroadcastDemolitionFlashbangDetonation(
+        DemolitionFlashbangDetonation detonation)
+    {
+        if (!IsOnline
+            || !IsHost
+            || !IsDemolitionSession
+            || !DemolitionMatchStarted
+            || !DemolitionUtilityNetworkContract.IsFlashbangDetonationPayloadValid(detonation))
+        {
+            return;
+        }
+        foreach (var peerId in RegisteredDemolitionPeerIds())
+        {
+            RpcId(
+                peerId,
+                MethodName.ReceiveDemolitionFlashbangDetonation,
+                detonation.SpawnId,
+                detonation.Round,
+                detonation.Position);
+        }
+    }
+
     [Rpc(
         MultiplayerApi.RpcMode.AnyPeer,
         TransferMode = DemolitionUtilityNetworkContract.TransferMode)]
@@ -257,5 +292,23 @@ public partial class SquadNetwork
         {
             DemolitionUtilityThrowRejected?.Invoke(requestId);
         }
+    }
+
+    [Rpc(
+        MultiplayerApi.RpcMode.Authority,
+        TransferMode = DemolitionUtilityNetworkContract.TransferMode)]
+    private void ReceiveDemolitionFlashbangDetonation(
+        int spawnId,
+        int round,
+        Vector3 position)
+    {
+        var detonation = new DemolitionFlashbangDetonation(spawnId, round, position);
+        if (!IsDemolitionSession
+            || !DemolitionMatchStarted
+            || !DemolitionUtilityNetworkContract.IsFlashbangDetonationPayloadValid(detonation))
+        {
+            return;
+        }
+        DemolitionFlashbangDetonationReceived?.Invoke(detonation);
     }
 }

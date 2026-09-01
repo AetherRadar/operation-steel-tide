@@ -68,4 +68,45 @@ public partial class EnemyOperator
         _scriptedObjectiveProgressOrigin = state.ProgressOrigin;
         _scriptedObjectiveProgressTimer = state.ProgressTimer;
     }
+
+    internal void SetCombatPostureForDiagnostics(EnemyCombatPosture posture)
+    {
+        _seekingCover = false;
+        _inCover = false;
+        switch (posture)
+        {
+            case EnemyCombatPosture.Prone:
+                SetProne(true);
+                _proneTimer = 1.0f;
+                break;
+            case EnemyCombatPosture.Crouched:
+                if (!TrySetPronePosture(false, CrouchedColliderHeight))
+                {
+                    return;
+                }
+                SetCombatCrouched(true);
+                _combatStanceHoldRemaining = 1.0f;
+                break;
+            default:
+                _ = TryStandForCombatMovement();
+                break;
+        }
+        UpdateAuthoredStanceCollider();
+    }
+
+    internal bool TryStandForDiagnostics()
+        => TryStandForCombatMovement();
+
+    internal bool TryStartCombatJumpAttackForDiagnostics(
+        EnemyCombatJumpContext context,
+        Vector3 direction)
+        => TryStartCombatJumpAttack(
+            context with { CooldownRemaining = _combatJumpCooldown },
+            direction);
+
+    internal void ApplyFlashbangMovementForDiagnostics(float delta)
+        => ApplyFlashbangMovement(Mathf.Max(0.0f, delta));
+
+    internal void AdvanceCombatMovementTimersForDiagnostics(float delta)
+        => UpdateCombatMovementTimers(Mathf.Max(0.0f, delta));
 }

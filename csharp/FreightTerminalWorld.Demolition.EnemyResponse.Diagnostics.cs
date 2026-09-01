@@ -15,7 +15,7 @@ public partial class FreightTerminalWorld
         await WaitFrames(5);
         if (_demolitionBuyPhaseActive)
         {
-            OnDemolitionPurchaseRequested(string.Empty, string.Empty, false, 0, 0, 0);
+            OnDemolitionPurchaseRequested(string.Empty, string.Empty, false, 0, 0, 0, 0);
         }
         await WaitFrames(5);
 
@@ -89,6 +89,213 @@ public partial class FreightTerminalWorld
         probe.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(WeaponPlatform.M4A1, 1));
         probe.ProcessMode = ProcessModeEnum.Disabled;
         await WaitFrames(3);
+
+        // Pure production planners make stance and jump prerequisites deterministic.
+        var coveredVisible = new EnemyCombatPostureContext(
+            EnemyCombatPosture.Standing, true, false, true, false, true,
+            18.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+        var pressuredMidrange = coveredVisible with
+        {
+            Pressured = true,
+            InCover = false,
+            Distance = 24.0f
+        };
+        var closeProne = pressuredMidrange with
+        {
+            Current = EnemyCombatPosture.Prone,
+            Distance = 4.0f,
+            HoldRemaining = 1.0f
+        };
+        var lostCrouch = coveredVisible with
+        {
+            Current = EnemyCombatPosture.Crouched,
+            HasSight = false,
+            InCover = false,
+            HoldRemaining = 1.0f
+        };
+        var coveredCrouch = EnemyOperator.PlanCombatPostureForDiagnostics(coveredVisible).Posture
+            == EnemyCombatPosture.Crouched;
+        var pressuredProne = EnemyOperator.PlanCombatPostureForDiagnostics(pressuredMidrange).Posture
+            == EnemyCombatPosture.Prone;
+        var conditionLossStands = EnemyOperator.PlanCombatPostureForDiagnostics(closeProne).Posture
+                == EnemyCombatPosture.Standing
+            && EnemyOperator.PlanCombatPostureForDiagnostics(lostCrouch).Posture
+                == EnemyCombatPosture.Standing;
+
+        probe.SetCombatPostureForDiagnostics(EnemyCombatPosture.Standing);
+        var standingDimensions = probe.CaptureCombatMovementForDiagnostics();
+        probe.SetCombatPostureForDiagnostics(EnemyCombatPosture.Crouched);
+        var crouchedDimensions = probe.CaptureCombatMovementForDiagnostics();
+        probe.SetCombatPostureForDiagnostics(EnemyCombatPosture.Prone);
+        var proneDimensions = probe.CaptureCombatMovementForDiagnostics();
+        probe.SetCombatPostureForDiagnostics(EnemyCombatPosture.Standing);
+        var stanceDimensionsReasonable = standingDimensions.ColliderHeight > crouchedDimensions.ColliderHeight
+            && crouchedDimensions.ColliderHeight > proneDimensions.ColliderHeight
+            && standingDimensions.EyeHeight > crouchedDimensions.EyeHeight
+            && crouchedDimensions.EyeHeight > proneDimensions.EyeHeight
+            && Mathf.IsEqualApprox(standingDimensions.ColliderHeight, 1.78f)
+            && Mathf.IsEqualApprox(crouchedDimensions.ColliderHeight, 1.22f)
+            && Mathf.IsEqualApprox(proneDimensions.ColliderHeight, 0.78f)
+            && Mathf.IsEqualApprox(standingDimensions.EyeHeight, 1.55f)
+            && Mathf.IsEqualApprox(crouchedDimensions.EyeHeight, 1.03f)
+            && Mathf.IsEqualApprox(proneDimensions.EyeHeight, 0.55f);
+
+        // A low ceiling overlaps only the volume required to expand beyond a crouch.
+        // Both crouch and prone must retain their collision shape until that obstruction
+        // is removed, including while weak flash movement continues at posture speed.
+        var lowCeiling = new CollisionShape3D
+        {
+            Name = "CombatPostureLowCeiling",
+            Position = new Vector3(0.0f, floorY - platformCenter.Y + 1.4f, 0.0f),
+            Shape = new BoxShape3D { Size = new Vector3(3.0f, 0.2f, 3.0f) }
+        };
+        platform.AddChild(lowCeiling);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        var flashSource = probePosition + Vector3.Left * 2.0f;
+
+        probe.SetCombatPostureForDiagnostics(EnemyCombatPosture.Crouched);
+        var crouchedStandBlocked = !probe.TryStandForDiagnostics()
+            && probe.CaptureCombatMovementForDiagnostics().Posture
+                == EnemyCombatPosture.Crouched;
+        probe.Velocity = Vector3.Right * 5.2f;
+        probe.ApplyFlashbang(new FlashbangExposure(flashSource, 0.32f, 0.45f, 2.0f, 1.0f));
+        probe.ApplyFlashbangMovementForDiagnostics(0.1f);
+        var weakCrouchFlashState = probe.CaptureCombatMovementForDiagnostics();
+        var weakCrouchFlashSpeed = HorizontalSpeed(probe.Velocity);
+        var weakCrouchFlashMovementBounded = weakCrouchFlashState.Posture
+                == EnemyCombatPosture.Crouched
+            && weakCrouchFlashSpeed is > 0.2f and <= 1.86f;
+        probe.AdvanceCombatMovementTimersForDiagnostics(1.0f);
+
+        probe.SetCombatPostureForDiagnostics(EnemyCombatPosture.Prone);
+        var proneStandBlocked = !probe.TryStandForDiagnostics()
+            && probe.CaptureCombatMovementForDiagnostics().Posture
+                == EnemyCombatPosture.Prone;
+        probe.Velocity = Vector3.Right * 5.2f;
+        probe.ApplyFlashbang(new FlashbangExposure(flashSource, 0.32f, 0.45f, 2.0f, 1.0f));
+        probe.ApplyFlashbangMovementForDiagnostics(0.1f);
+        var weakProneFlashState = probe.CaptureCombatMovementForDiagnostics();
+        var weakProneFlashSpeed = HorizontalSpeed(probe.Velocity);
+        var weakProneFlashMovementBounded = weakProneFlashState.Posture
+                == EnemyCombatPosture.Prone
+            && weakProneFlashSpeed is > 0.2f and <= 1.11f;
+        probe.AdvanceCombatMovementTimersForDiagnostics(1.0f);
+        var lowCeilingPreservesPosture = crouchedStandBlocked && proneStandBlocked;
+
+        lowCeiling.QueueFree();
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        var clearanceRemovalRestoresStanding = probe.TryStandForDiagnostics()
+            && probe.CaptureCombatMovementForDiagnostics().Posture
+                == EnemyCombatPosture.Standing;
+
+        probe.ResetTacticalStateForDiagnostics();
+        probe.GlobalPosition = probePosition;
+        probe.Velocity = Vector3.Zero;
+        probe.LookAt(
+            new Vector3(playerPosition.X, probePosition.Y, playerPosition.Z),
+            Vector3.Up);
+        probe.ConfigureCombatProbeForDiagnostics(
+            0x4A554D505F4149UL,
+            playerPosition,
+            bypassPlayerProtection: true,
+            suppressContactSharing: true);
+        probe.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(WeaponPlatform.M4A1, 1));
+        probe.ProcessMode = ProcessModeEnum.Disabled;
+        _ = probe.TakeDamage(0.1f, probe.GlobalPosition + Vector3.Up, _player);
+        probe.ArmWeaponForDiagnostics();
+
+        var readyJump = new EnemyCombatJumpContext(
+            true, true, true, true, true, false, true, 2.0f, 8.0f, 0.0f);
+        var jumpConditionsRequired = EnemyOperator.CanStartCombatJumpAttackForDiagnostics(readyJump)
+            && !EnemyOperator.CanStartCombatJumpAttackForDiagnostics(readyJump with { Pressured = false })
+            && !EnemyOperator.CanStartCombatJumpAttackForDiagnostics(readyJump with { HasSight = false })
+            && !EnemyOperator.CanStartCombatJumpAttackForDiagnostics(readyJump with { Distance = 4.49f })
+            && !EnemyOperator.CanStartCombatJumpAttackForDiagnostics(readyJump with { Distance = 10.01f })
+            && !EnemyOperator.CanStartCombatJumpAttackForDiagnostics(readyJump with { CooldownRemaining = 0.1f });
+        probe.Velocity = new Vector3(2.0f, 0.0f, 0.0f);
+        var invalidJumpStarted = probe.TryStartCombatJumpAttackForDiagnostics(
+            readyJump with { Pressured = false },
+            Vector3.Right);
+        var invalidJumpStaysGrounded = !invalidJumpStarted && Mathf.Abs(probe.Velocity.Y) <= 0.001f;
+        var validJumpStarted = probe.TryStartCombatJumpAttackForDiagnostics(readyJump, Vector3.Right);
+        var jumpState = probe.CaptureCombatMovementForDiagnostics();
+        var jumpImpulseY = probe.Velocity.Y;
+        var validJumpProducesImpulse = validJumpStarted
+            && jumpImpulseY > 4.0f
+            && jumpState.JumpCooldown > 3.0f
+            && jumpState.JumpAttacks == 1;
+        var airborneShotsBefore = probe.AttackShotsFired;
+        var airborneMarkersBefore = jumpState.AirborneAttackShots;
+        probe.ProcessMode = ProcessModeEnum.Inherit;
+        var airborneShotObserved = false;
+        var airborneAimingPoseObserved = false;
+        var airborneResponseFrames = 0;
+        const int maximumAirborneResponseFrames = 90;
+        while (airborneResponseFrames < maximumAirborneResponseFrames
+            && (!airborneShotObserved || !airborneAimingPoseObserved))
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            _player.SetHealthForDiagnostics(_player.MaxHealth);
+            var airborneState = probe.CaptureCombatMovementForDiagnostics();
+            airborneShotObserved = !probe.IsOnFloor()
+                && probe.AttackShotsFired > airborneShotsBefore
+                && airborneState.AirborneAttackShots > airborneMarkersBefore;
+            airborneAimingPoseObserved |= !probe.IsOnFloor()
+                && probe.AuthoredAnimationForDiagnostics == "aim_idle";
+            airborneResponseFrames++;
+        }
+        probe.ProcessMode = ProcessModeEnum.Disabled;
+        var airborneAnimation = probe.AuthoredAnimationForDiagnostics;
+        probe.Velocity = new Vector3(2.0f, 0.0f, 0.0f);
+        var cooldownJumpStarted = probe.TryStartCombatJumpAttackForDiagnostics(
+            readyJump,
+            Vector3.Right);
+        var jumpCooldownPreventsRepeat = !cooldownJumpStarted
+            && Mathf.Abs(probe.Velocity.Y) <= 0.001f;
+
+        probe.Velocity = Vector3.Zero;
+        probe.ApplyFlashbang(new FlashbangExposure(flashSource, 1.0f, 0.9f, 2.0f, 1.0f));
+        var strongFlashState = probe.CaptureCombatMovementForDiagnostics();
+        var strongFlashSuppressesCombat = strongFlashState.VisionSuppressed
+            && !strongFlashState.CanFire;
+        probe.AdvanceCombatMovementTimersForDiagnostics(0.4f);
+        var stackedFlashBeforeWeak = probe.CaptureCombatMovementForDiagnostics();
+        probe.ApplyFlashbang(new FlashbangExposure(flashSource, 0.24f, 0.1f, 2.0f, 1.0f));
+        var stackedFlashAfterWeak = probe.CaptureCombatMovementForDiagnostics();
+        var weakFlashCannotReduceStrongFlash = stackedFlashAfterWeak.FlashIntensity
+                >= stackedFlashBeforeWeak.FlashIntensity - 0.001f
+            && stackedFlashAfterWeak.FlashRemaining
+                >= stackedFlashBeforeWeak.FlashRemaining - 0.001f;
+        probe.ApplyFlashbang(new FlashbangExposure(flashSource, 0.95f, 0.1f, 2.0f, 1.0f));
+        var stackedFlashAfterStronger = probe.CaptureCombatMovementForDiagnostics();
+        var strongerFlashRaisesCurrentIntensity = stackedFlashAfterStronger.FlashIntensity >= 0.94f
+            && stackedFlashAfterStronger.FlashRemaining
+                >= stackedFlashAfterWeak.FlashRemaining - 0.001f;
+        probe.ApplyFlashbangMovementForDiagnostics(0.1f);
+        var flashEscapeDirection = (probePosition - flashSource).Normalized();
+        var flashKeepsEvading = HorizontalSpeed(probe.Velocity) > 0.2f
+            && probe.Velocity.Dot(flashEscapeDirection) > 0.2f;
+        probe.AdvanceCombatMovementTimersForDiagnostics(0.2f);
+        var fadingFlashState = probe.CaptureCombatMovementForDiagnostics();
+        var flashDecays = fadingFlashState.FlashIntensity > 0.0f
+            && fadingFlashState.FlashIntensity < stackedFlashAfterWeak.FlashIntensity;
+        probe.AdvanceCombatMovementTimersForDiagnostics(0.35f);
+        var recoveredFlashState = probe.CaptureCombatMovementForDiagnostics();
+        var flashRecovers = !recoveredFlashState.VisionSuppressed
+            && recoveredFlashState.CanFire
+            && recoveredFlashState.FlashIntensity <= 0.001f;
+
+        probe.ResetTacticalStateForDiagnostics();
+        probe.GlobalPosition = probePosition;
+        probe.Velocity = Vector3.Zero;
+        probe.LookAt(probePosition + Vector3.Forward, Vector3.Up);
+        probe.ConfigureCombatProbeForDiagnostics(
+            0x454E454D595F4149UL,
+            playerPosition,
+            bypassPlayerProtection: true,
+            suppressContactSharing: true);
+        probe.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(WeaponPlatform.M4A1, 1));
+        probe.ProcessMode = ProcessModeEnum.Disabled;
 
         _demolitionDevicePlanted = true;
         _demolitionActiveSite = 0;
@@ -391,6 +598,26 @@ public partial class FreightTerminalWorld
         responseSmoke.QueueFree();
 
         var valid = proneStopsMomentum
+            && coveredCrouch
+            && pressuredProne
+            && conditionLossStands
+            && stanceDimensionsReasonable
+            && jumpConditionsRequired
+            && invalidJumpStaysGrounded
+            && validJumpProducesImpulse
+            && airborneShotObserved
+            && airborneAimingPoseObserved
+            && jumpCooldownPreventsRepeat
+            && lowCeilingPreservesPosture
+            && clearanceRemovalRestoresStanding
+            && weakCrouchFlashMovementBounded
+            && weakProneFlashMovementBounded
+            && strongFlashSuppressesCombat
+            && weakFlashCannotReduceStrongFlash
+            && strongerFlashRaisesCurrentIntensity
+            && flashKeepsEvading
+            && flashDecays
+            && flashRecovers
             && objectiveForcesStanding
             && noObjectiveProneSlide
             && objectivePreservesLadder
@@ -423,7 +650,7 @@ public partial class FreightTerminalWorld
             && smokeMovesOutward
             && smokeTargetRetained;
 
-        GD.Print($"DEMOLITION_ENEMY_RESPONSE_CHECK valid={valid} prone_stop={proneStopsMomentum} objective_stand={objectiveForcesStanding} objective_no_slide={noObjectiveProneSlide} ladder_guard={objectivePreservesLadder} ladder_transform={ladderTransformPreserved} ladder_velocity={ladderVelocityPreserved} ladder_progress={ladderProgressPreserved} ladder_active={ladderActivePreserved} ladder_breakoff={ladderBreakoffPreserved} ladder_released={ladderReleased} hidden_continues={hiddenUnconfirmedContinues} initially_back={initiallyBackTurned} normal_interrupt={normalHitInterrupts} normal_damage={normalDamageRecorded} noise_isolated={noisePreservesConfirmedContact} urgent_interrupt={urgentHitInterrupts} urgent_damage={urgentDamageRecorded} response_prone={responseStartedProne} stood={stoodDuringResponse} faced={facedAttacker} fired={firedAtAttacker} shots={probe.AttackShotsFired - shotsBefore} prone_slide_frames={proneSlideFrames} response_frames={responseFrames}/{maximumResponseFrames} target={retainedTarget} los={clearLineOfSight} ballistic={clearBallisticPath} ray_hit={rayHit} accuracy_unchanged={accuracyUnchanged} weapon_unchanged={weaponUnchanged} smoke_inside={smokeContainsProbe} smoke_block={smokeBlocksSight} smoke_los_rejected={smokeLineOfSightRejected} smoke_ballistic={smokeBallisticPathOpen} smoke_threat={smokeThreatRecorded} smoke_delay={smokeReactionDelayCompressed} smoke_fired={smokeReturnFire} smoke_move={smokeKeepsMoving}:{smokeDisplacement:0.00} smoke_outward={smokeMovesOutward}:{smokeStartDistance:0.00}->{smokeEndDistance:0.00} smoke_target={smokeTargetRetained} smoke_frames={smokeResponseFrames}/{maximumSmokeResponseFrames} recent_timer={urgentContact.RecentDamageThreatTimer:0.00}");
+        GD.Print($"DEMOLITION_ENEMY_RESPONSE_CHECK valid={valid} posture_cover={coveredCrouch} posture_pressure={pressuredProne} posture_recover={conditionLossStands} dimensions={stanceDimensionsReasonable}:{standingDimensions.ColliderHeight:0.00}/{crouchedDimensions.ColliderHeight:0.00}/{proneDimensions.ColliderHeight:0.00} eyes={standingDimensions.EyeHeight:0.00}/{crouchedDimensions.EyeHeight:0.00}/{proneDimensions.EyeHeight:0.00} clearance_hold={lowCeilingPreservesPosture} clearance_release={clearanceRemovalRestoresStanding} jump_gates={jumpConditionsRequired} jump_invalid={invalidJumpStaysGrounded} jump_impulse={validJumpProducesImpulse}:{jumpImpulseY:0.00} jump_fired={airborneShotObserved}:{airborneResponseFrames}/{maximumAirborneResponseFrames} jump_pose={airborneAimingPoseObserved}:{airborneAnimation} jump_cooldown={jumpCooldownPreventsRepeat} weak_flash_crouch={weakCrouchFlashMovementBounded}:{weakCrouchFlashSpeed:0.00} weak_flash_prone={weakProneFlashMovementBounded}:{weakProneFlashSpeed:0.00} flash_suppressed={strongFlashSuppressesCombat} flash_stack={weakFlashCannotReduceStrongFlash}:{stackedFlashBeforeWeak.FlashIntensity:0.00}/{stackedFlashBeforeWeak.FlashRemaining:0.00}->{stackedFlashAfterWeak.FlashIntensity:0.00}/{stackedFlashAfterWeak.FlashRemaining:0.00}->{stackedFlashAfterStronger.FlashIntensity:0.00}/{stackedFlashAfterStronger.FlashRemaining:0.00}:{strongerFlashRaisesCurrentIntensity} flash_move={flashKeepsEvading} flash_decay={flashDecays}:{strongFlashState.FlashIntensity:0.00}->{fadingFlashState.FlashIntensity:0.00} flash_recover={flashRecovers} prone_stop={proneStopsMomentum} objective_stand={objectiveForcesStanding} objective_no_slide={noObjectiveProneSlide} ladder_guard={objectivePreservesLadder} ladder_transform={ladderTransformPreserved} ladder_velocity={ladderVelocityPreserved} ladder_progress={ladderProgressPreserved} ladder_active={ladderActivePreserved} ladder_breakoff={ladderBreakoffPreserved} ladder_released={ladderReleased} hidden_continues={hiddenUnconfirmedContinues} initially_back={initiallyBackTurned} normal_interrupt={normalHitInterrupts} normal_damage={normalDamageRecorded} noise_isolated={noisePreservesConfirmedContact} urgent_interrupt={urgentHitInterrupts} urgent_damage={urgentDamageRecorded} response_prone={responseStartedProne} stood={stoodDuringResponse} faced={facedAttacker} fired={firedAtAttacker} shots={probe.AttackShotsFired - shotsBefore} prone_slide_frames={proneSlideFrames} response_frames={responseFrames}/{maximumResponseFrames} target={retainedTarget} los={clearLineOfSight} ballistic={clearBallisticPath} ray_hit={rayHit} accuracy_unchanged={accuracyUnchanged} weapon_unchanged={weaponUnchanged} smoke_inside={smokeContainsProbe} smoke_block={smokeBlocksSight} smoke_los_rejected={smokeLineOfSightRejected} smoke_ballistic={smokeBallisticPathOpen} smoke_threat={smokeThreatRecorded} smoke_delay={smokeReactionDelayCompressed} smoke_fired={smokeReturnFire} smoke_move={smokeKeepsMoving}:{smokeDisplacement:0.00} smoke_outward={smokeMovesOutward}:{smokeStartDistance:0.00}->{smokeEndDistance:0.00} smoke_target={smokeTargetRetained} smoke_frames={smokeResponseFrames}/{maximumSmokeResponseFrames} recent_timer={urgentContact.RecentDamageThreatTimer:0.00}");
         GD.Print($"DEMOLITION_ENEMY_RESPONSE_PASS valid={valid}");
         platform.QueueFree();
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);

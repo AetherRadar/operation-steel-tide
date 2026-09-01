@@ -83,6 +83,69 @@ public partial class FreightTerminalWorld
             true,
             false,
             40.0f));
+        var safeFlash = DemolitionUtilityPlanner.Plan(Context(
+            DemolitionTeam.Attackers,
+            DemolitionStrategyPhase.Opening,
+            DemolitionDuty.Entry,
+            origin,
+            objective,
+            contact,
+            hasContact: true,
+            hasFrag: false,
+            hasSmoke: false,
+            hasIncendiary: false,
+            hasFlashbang: true));
+        var unsafeFlash = DemolitionUtilityPlanner.Plan(Context(
+            DemolitionTeam.Attackers,
+            DemolitionStrategyPhase.Opening,
+            DemolitionDuty.Entry,
+            origin,
+            objective,
+            contact,
+            hasContact: true,
+            hasFrag: false,
+            hasSmoke: false,
+            hasIncendiary: false,
+            hasFlashbang: true,
+            flashbangFriendlySafe: false));
+        var flashSource = new Vector3(0.0f, 0.0f, -4.0f);
+        var flashFacing = FlashbangExposureResolver.Resolve(
+            flashSource,
+            Vector3.Zero,
+            Vector3.Forward,
+            hasLineOfSight: true);
+        var flashAway = FlashbangExposureResolver.Resolve(
+            flashSource,
+            Vector3.Zero,
+            Vector3.Back,
+            hasLineOfSight: true);
+        var flashBlocked = FlashbangExposureResolver.Resolve(
+            flashSource,
+            Vector3.Zero,
+            Vector3.Forward,
+            hasLineOfSight: false);
+        var flashOutOfRange = FlashbangExposureResolver.Resolve(
+            Vector3.Forward * (FlashbangExposureResolver.MaximumRadius + 1.0f),
+            Vector3.Zero,
+            Vector3.Forward,
+            hasLineOfSight: true);
+        var flashResolverReady = flashFacing.Intensity >= 0.75f
+            && flashFacing.DurationSeconds > flashAway.DurationSeconds
+            && flashFacing.Intensity > flashAway.Intensity
+            && flashAway.Intensity > 0.01f
+            && flashFacing.FacingDot >= 0.99f
+            && flashAway.FacingDot <= -0.99f
+            && Mathf.IsZeroApprox(flashBlocked.Intensity)
+            && Mathf.IsZeroApprox(flashBlocked.DurationSeconds)
+            && Mathf.IsZeroApprox(flashOutOfRange.Intensity);
+        var flashThrowerSafetyReady = !IsPredictedFlashbangExposureSafe(
+                Vector3.Zero,
+                Vector3.Forward,
+                flashSource)
+            && IsPredictedFlashbangExposureSafe(
+                Vector3.Zero,
+                Vector3.Back,
+                flashSource);
 
         var requestContract = DemolitionUtilityNetworkContract.TransferMode
                 == MultiplayerPeer.TransferModeEnum.Reliable
@@ -116,6 +179,36 @@ public partial class FreightTerminalWorld
                 Vector3.Forward,
                 14.0f,
                 5.0f));
+        var flashNetworkContract = DemolitionUtilityNetworkContract.IsRequestPayloadValid(
+                3,
+                8,
+                (int)DemolitionNetworkUtilityKind.Flashbang,
+                origin,
+                Vector3.Forward)
+            && DemolitionUtilityNetworkContract.IsSpawnPayloadValid(
+                new DemolitionUtilityThrowSpawn(
+                    4,
+                    3,
+                    2,
+                    102,
+                    8,
+                    DemolitionNetworkUtilityKind.Flashbang,
+                    origin,
+                    Vector3.Forward,
+                    14.0f,
+                    5.0f));
+        var flashDetonationContract = DemolitionUtilityNetworkContract
+                .IsFlashbangDetonationPayloadValid(
+                    new DemolitionFlashbangDetonation(102, 3, new Vector3(1.0f, 2.0f, 3.0f)))
+            && !DemolitionUtilityNetworkContract.IsFlashbangDetonationPayloadValid(
+                new DemolitionFlashbangDetonation(0, 3, Vector3.Zero))
+            && !DemolitionUtilityNetworkContract.IsFlashbangDetonationPayloadValid(
+                new DemolitionFlashbangDetonation(102, 0, Vector3.Zero))
+            && !DemolitionUtilityNetworkContract.IsFlashbangDetonationPayloadValid(
+                new DemolitionFlashbangDetonation(
+                    102,
+                    3,
+                    new Vector3(float.NaN, 0.0f, 0.0f)));
         var authorityContract = DemolitionUtilityNetworkContract.HostMayAuthorize(
                 true,
                 true,
@@ -214,6 +307,21 @@ public partial class FreightTerminalWorld
         var smokeCap = _activeSmokeGrenades.Count == MaximumActiveSmokeGrenades
             && smokes[0].IsQueuedForDeletion();
 
+        var flashbangs = new List<FlashbangGrenade>();
+        for (var index = 0; index < 7; index++)
+        {
+            var grenade = new FlashbangGrenade
+            {
+                Name = $"FlashbangCapProbe_{index}",
+                Position = new Vector3(index * 0.2f, 46.0f, 0.0f),
+                OwnerBody = _player
+            };
+            AddChild(grenade);
+            flashbangs.Add(grenade);
+        }
+        var flashbangCap = ActiveFlashbangCountForDiagnostics == MaximumActiveFlashbangGrenades
+            && flashbangs[0].IsQueuedForDeletion();
+
         var tickProbe = new Node { Name = "IncendiaryDamageCadenceProbe" };
         AddChild(tickProbe);
         var overlapGuard = TryAcquireIncendiaryDamageTickForDiagnostics(tickProbe)
@@ -236,7 +344,8 @@ public partial class FreightTerminalWorld
         var roundCleanup = fragGrouped
             && frag.IsQueuedForDeletion()
             && smokes[4].IsQueuedForDeletion()
-            && incendiaries[4].IsQueuedForDeletion();
+            && incendiaries[4].IsQueuedForDeletion()
+            && flashbangs[6].IsQueuedForDeletion();
         var roundActiveBeforePostRoundProbe = _demolitionRoundActive;
         var playerHealthBeforePostRoundProbe = _player.Health;
         var damageTicksBeforePostRoundProbe = _incendiaryLastDamageTicksMsec.Count;
@@ -254,21 +363,70 @@ public partial class FreightTerminalWorld
             && _incendiaryLastDamageTicksMsec.Count == damageTicksBeforePostRoundProbe
             && DemolitionWeaponDropCountForDiagnostics == dropsBeforePostRoundProbe;
         var postRoundProjectilesCleared = _activeSmokeGrenades.Count == 0
-            && _activeIncendiaryGrenades.Count == 0;
+            && _activeIncendiaryGrenades.Count == 0
+            && ActiveFlashbangCountForDiagnostics == 0;
         _demolitionRoundActive = roundActiveBeforePostRoundProbe;
+        _hud.ClearFlashbangExposure();
+        if (!_player.IsInGroup(FlashbangGrenade.TargetGroupName))
+        {
+            _player.AddToGroup(FlashbangGrenade.TargetGroupName);
+        }
+        // Keep the end-to-end LOS probe well above every authored arena volume.
+        // Several maps have tall center structures whose collision can otherwise
+        // make this intentionally unobstructed ray depend on the selected arena.
+        _player.GlobalPosition = new Vector3(0.0f, 400.0f, 0.0f);
+        _player.Velocity = Vector3.Zero;
+        var replicatedFlashPosition = _player.FlashbangViewOrigin
+            + _player.FlashbangViewForward.Normalized() * 4.0f;
+        var replicatedFlash = new FlashbangGrenade
+        {
+            Name = "AuthoritativeFlashbangDetonationProbe",
+            Position = replicatedFlashPosition,
+            OwnerBody = this
+        };
+        replicatedFlash.ConfigureNetworkReplication(
+            9102,
+            Mathf.Max(1, _demolitionMatch.CurrentRound),
+            waitForAuthoritativeDetonation: true);
+        AddChild(replicatedFlash);
+        replicatedFlash.Arm(Vector3.Forward, speed: 0.0f, loft: 0.0f);
+        replicatedFlash._PhysicsProcess(2.0);
+        var flashWaitsForHost = replicatedFlash.WaitsForAuthoritativeDetonation
+            && !replicatedFlash.HasDetonated;
+        replicatedFlash.ApplyAuthoritativeDetonation(replicatedFlashPosition);
+        var flashPlayerGrouped = _player.IsInGroup(FlashbangGrenade.TargetGroupName);
+        var flashTargetAlpha = _hud.FlashbangOverlayAlphaForDiagnostics;
+        var flashTargetApplied = flashWaitsForHost
+            && replicatedFlash.HasDetonated
+            && replicatedFlash.GlobalPosition.DistanceTo(replicatedFlashPosition) <= 0.001f
+            && flashPlayerGrouped
+            && replicatedFlash.AppliedTargetCountForDiagnostics >= 1
+            && _hud.IsFlashbangOverlayVisible
+            && flashTargetAlpha >= 0.75f;
+        _hud.ClearFlashbangExposure();
+        replicatedFlash.QueueFree();
         var valid = executeSmoke.Kind == DemolitionAiUtilityKind.Smoke
             && retakeSmoke.Kind == DemolitionAiUtilityKind.Smoke
             && pushIncendiary.Kind == DemolitionAiUtilityKind.Incendiary
             && coverFrag.Kind == DemolitionAiUtilityKind.Fragmentation
             && channelHold.Kind == DemolitionAiUtilityKind.None
             && unsafeFire.Kind == DemolitionAiUtilityKind.None
+            && safeFlash.Kind == DemolitionAiUtilityKind.Flashbang
+            && unsafeFlash.Kind == DemolitionAiUtilityKind.None
+            && flashResolverReady
+            && flashThrowerSafetyReady
             && incendiaryCap
             && smokeCap
+            && flashbangCap
             && overlapGuard
             && lowFrequency
             && fireTuning
             && requestContract
             && spawnContract
+            && flashNetworkContract
+            && flashDetonationContract
+            && flashWaitsForHost
+            && flashTargetApplied
             && authorityContract
             && requestHighWaterRoundScoped
             && budgetContract
@@ -284,8 +442,15 @@ public partial class FreightTerminalWorld
             + $"network={requestContract}/{spawnContract}/{authorityContract} "
             + $"round_scoped_request={requestHighWaterRoundScoped} "
             + $"budget={budgetContract} cleanup={roundCleanup} "
-            + $"post_round={postRoundProjectilesCleared}/{postRoundDamageBlocked}");
-        GD.Print($"DEMOLITION_UTILITY_PASS valid={valid}");
+            + $"post_round={postRoundProjectilesCleared}/{postRoundDamageBlocked} "
+            + $"flash_plan={safeFlash.Kind}/{unsafeFlash.Kind} "
+            + $"flash_resolver={flashResolverReady}:{flashFacing.Intensity:0.00}/{flashAway.Intensity:0.00}/{flashBlocked.Intensity:0.00} "
+            + $"flash_thrower_safe={flashThrowerSafetyReady} "
+            + $"flash_network={flashNetworkContract}/{flashDetonationContract}/{flashWaitsForHost} "
+            + $"flash_target={flashTargetApplied}:{flashPlayerGrouped}/{replicatedFlash.EligibleTargetCountForDiagnostics}/{replicatedFlash.AppliedTargetCountForDiagnostics}/{flashTargetAlpha:0.00} "
+            + $"flash_cap={flashbangCap}:{MaximumActiveFlashbangGrenades} "
+            + $"flash_cleanup={roundCleanup && postRoundProjectilesCleared}");
+        GD.Print($"DEMOLITION_UTILITY_PASS valid={valid} flash_resolver={flashResolverReady} flash_thrower_safe={flashThrowerSafetyReady} flash_plan={safeFlash.Kind}/{unsafeFlash.Kind} flash_network={flashNetworkContract}/{flashDetonationContract}/{flashWaitsForHost} flash_target={flashTargetApplied} flash_cap={flashbangCap} flash_cleanup={roundCleanup && postRoundProjectilesCleared}");
         tickProbe.QueueFree();
         GetTree().Paused = false;
         await WaitFrames(3);
@@ -303,7 +468,9 @@ public partial class FreightTerminalWorld
         bool hasFrag,
         bool hasSmoke,
         bool hasIncendiary,
-        bool channeling = false)
+        bool channeling = false,
+        bool hasFlashbang = false,
+        bool flashbangFriendlySafe = true)
         => new(
             team,
             phase,
@@ -318,5 +485,7 @@ public partial class FreightTerminalWorld
             hasIncendiary,
             true,
             true,
-            40.0f);
+            40.0f,
+            hasFlashbang,
+            flashbangFriendlySafe);
 }

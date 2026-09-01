@@ -784,8 +784,18 @@ public partial class FreightTerminalWorld
             assignment.TargetKey,
             delta,
             2.0f,
-            assignment.Duty is DemolitionDuty.Retake or DemolitionDuty.Flank ? 5.8f : 4.8f);
+            assignment.Duty is DemolitionDuty.Retake or DemolitionDuty.Flank ? 5.8f : 4.8f,
+            ResolveDemolitionRouteIntent(assignment));
     }
+
+    private static DemolitionRouteIntent ResolveDemolitionRouteIntent(
+        DemolitionAssignment assignment)
+        => assignment.Duty switch
+        {
+            DemolitionDuty.Defuse => DemolitionRouteIntent.DirectRetake,
+            DemolitionDuty.CoverDefuser or DemolitionDuty.Flank => DemolitionRouteIntent.WideFlank,
+            _ => assignment.RouteIntent
+        };
 
     private bool MoveDemolitionOpponentAlongRoute(
         EnemyOperator opponent,
@@ -793,7 +803,8 @@ public partial class FreightTerminalWorld
         string routeKey,
         float delta,
         float stoppingDistance,
-        float speed)
+        float speed,
+        DemolitionRouteIntent routeIntent = DemolitionRouteIntent.Balanced)
     {
         var planner = _demolitionRoutePlanner ??= new DemolitionRoutePlanner(DemolitionLayout());
         if (!_demolitionOpponentRoutes.TryGetValue(opponent, out var cursor))
@@ -810,6 +821,7 @@ public partial class FreightTerminalWorld
                 planner,
                 routeKey,
                 destination,
+                routeIntent,
                 countAsReplan: false);
         }
 
@@ -833,6 +845,7 @@ public partial class FreightTerminalWorld
                     planner,
                     routeKey,
                     destination,
+                    routeIntent,
                     countAsReplan: true);
             }
             return true;
@@ -853,6 +866,7 @@ public partial class FreightTerminalWorld
                 planner,
                 routeKey,
                 destination,
+                routeIntent,
                 countAsReplan: true);
         }
         return true;
@@ -864,12 +878,14 @@ public partial class FreightTerminalWorld
         DemolitionRoutePlanner planner,
         string routeKey,
         Vector3 destination,
+        DemolitionRouteIntent routeIntent,
         bool countAsReplan)
     {
         var route = planner.Plan(
             opponent.GlobalPosition,
             destination,
-            DemolitionOtherSide(_demolitionMatch.PlayerSide));
+            DemolitionOtherSide(_demolitionMatch.PlayerSide),
+            routeIntent);
         cursor.Reset(routeKey, opponent.GlobalPosition, destination, route, countAsReplan);
         opponent.ResetScriptedObjectiveNavigation();
     }

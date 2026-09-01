@@ -17,6 +17,15 @@ public partial class DemolitionBuyView : ColorRect
         int smokeGrenadeCount,
         int incendiaryGrenadeCount);
 
+    [Signal] public delegate void PurchaseRequestedWithFlashEventHandler(
+        string sidearmId,
+        string primaryId,
+        bool armorSelected,
+        int grenadeCount,
+        int smokeGrenadeCount,
+        int incendiaryGrenadeCount,
+        int flashbangGrenadeCount);
+
     private Label _title = null!;
     private Label _roundLabel = null!;
     private Label _sideLabel = null!;
@@ -33,6 +42,7 @@ public partial class DemolitionBuyView : ColorRect
     private Label _grenadeCount = null!;
     private Label _smokeGrenadeCount = null!;
     private Label _incendiaryGrenadeCount = null!;
+    private Label _flashbangGrenadeCount = null!;
     private Button _p226Button = null!;
     private Button _gsh18Button = null!;
     private Button _m1911Button = null!;
@@ -48,6 +58,8 @@ public partial class DemolitionBuyView : ColorRect
     private Button _smokeGrenadeIncrease = null!;
     private Button _incendiaryGrenadeDecrease = null!;
     private Button _incendiaryGrenadeIncrease = null!;
+    private Button _flashbangGrenadeDecrease = null!;
+    private Button _flashbangGrenadeIncrease = null!;
     private Button _clearButton = null!;
     private Button _confirmButton = null!;
     private DemolitionBuySnapshot _snapshot;
@@ -86,9 +98,11 @@ public partial class DemolitionBuyView : ColorRect
         && IsInstanceValid(_armorButton)
         && IsInstanceValid(_smokeGrenadeCount)
         && IsInstanceValid(_incendiaryGrenadeCount)
+        && IsInstanceValid(_flashbangGrenadeCount)
         && IsInstanceValid(_confirmButton);
     public bool IntentSignalsConnected
         => HasConnections(SignalName.PurchaseRequested)
+        && HasConnections(SignalName.PurchaseRequestedWithFlash)
         && _p226Button.HasConnections(BaseButton.SignalName.Pressed)
         && _gsh18Button.HasConnections(BaseButton.SignalName.Pressed)
         && _m1911Button.HasConnections(BaseButton.SignalName.Pressed)
@@ -104,6 +118,8 @@ public partial class DemolitionBuyView : ColorRect
         && _smokeGrenadeIncrease.HasConnections(BaseButton.SignalName.Pressed)
         && _incendiaryGrenadeDecrease.HasConnections(BaseButton.SignalName.Pressed)
         && _incendiaryGrenadeIncrease.HasConnections(BaseButton.SignalName.Pressed)
+        && _flashbangGrenadeDecrease.HasConnections(BaseButton.SignalName.Pressed)
+        && _flashbangGrenadeIncrease.HasConnections(BaseButton.SignalName.Pressed)
         && _clearButton.HasConnections(BaseButton.SignalName.Pressed)
         && _confirmButton.HasConnections(BaseButton.SignalName.Pressed);
 
@@ -194,6 +210,12 @@ public partial class DemolitionBuyView : ColorRect
         Refresh();
     }
 
+    public void SetFlashbangGrenadesForDiagnostics(int count)
+    {
+        _selection = _selection with { FlashbangGrenadeCount = count };
+        Refresh();
+    }
+
     public void PressConfirmForDiagnostics() => EmitPurchaseIntent();
 
     public void SubmitTimeoutSelection()
@@ -238,6 +260,9 @@ public partial class DemolitionBuyView : ColorRect
         _incendiaryGrenadeDecrease = offers.GetNode<Button>("IncendiaryGrenadeDecrease");
         _incendiaryGrenadeIncrease = offers.GetNode<Button>("IncendiaryGrenadeIncrease");
         _incendiaryGrenadeCount = offers.GetNode<Label>("IncendiaryGrenadeCount");
+        _flashbangGrenadeDecrease = offers.GetNode<Button>("FlashbangGrenadeDecrease");
+        _flashbangGrenadeIncrease = offers.GetNode<Button>("FlashbangGrenadeIncrease");
+        _flashbangGrenadeCount = offers.GetNode<Label>("FlashbangGrenadeCount");
         var summaryPanel = panel.GetNode<Control>("SummaryPanel");
         _summaryTitle = summaryPanel.GetNode<Label>("SummaryTitle");
         _summary = summaryPanel.GetNode<Label>("Summary");
@@ -297,6 +322,22 @@ public partial class DemolitionBuyView : ColorRect
             };
             Refresh();
         };
+        _flashbangGrenadeDecrease.Pressed += () =>
+        {
+            _selection = _selection with
+            {
+                FlashbangGrenadeCount = _selection.FlashbangGrenadeCount - 1
+            };
+            Refresh();
+        };
+        _flashbangGrenadeIncrease.Pressed += () =>
+        {
+            _selection = _selection with
+            {
+                FlashbangGrenadeCount = _selection.FlashbangGrenadeCount + 1
+            };
+            Refresh();
+        };
         _clearButton.Pressed += () =>
         {
             _selection = DemolitionPurchaseSelection.Empty;
@@ -339,6 +380,15 @@ public partial class DemolitionBuyView : ColorRect
             _quote.Selection.GrenadeCount,
             _quote.Selection.SmokeGrenadeCount,
             _quote.Selection.IncendiaryGrenadeCount);
+        EmitSignal(
+            SignalName.PurchaseRequestedWithFlash,
+            _quote.Selection.SidearmId,
+            _quote.Selection.PrimaryId,
+            _quote.Selection.ArmorSelected,
+            _quote.Selection.GrenadeCount,
+            _quote.Selection.SmokeGrenadeCount,
+            _quote.Selection.IncendiaryGrenadeCount,
+            _quote.Selection.FlashbangGrenadeCount);
     }
 
     private void Refresh()
@@ -371,6 +421,7 @@ public partial class DemolitionBuyView : ColorRect
         _grenadeCount.Text = $"{Text("grenade", "FRAG")}  x{_selection.GrenadeCount}  //  ${DemolitionBuyCatalog.GrenadePrice}";
         _smokeGrenadeCount.Text = $"{Text("smoke_grenade", "SMOKE")}  x{_selection.SmokeGrenadeCount}  //  ${DemolitionBuyCatalog.SmokeGrenadePrice}";
         _incendiaryGrenadeCount.Text = $"{Text("incendiary_grenade", "INCENDIARY")}  x{_selection.IncendiaryGrenadeCount}  //  ${DemolitionBuyCatalog.IncendiaryGrenadePrice}";
+        _flashbangGrenadeCount.Text = $"{Text("flashbang_grenade", "FLASHBANG")}  x{_selection.FlashbangGrenadeCount}  //  ${DemolitionBuyCatalog.FlashbangGrenadePrice}";
         SetSelected(_p226Button, _selection.SidearmId == DemolitionBuyCatalog.P226Id);
         SetSelected(_gsh18Button, _selection.SidearmId == DemolitionBuyCatalog.Gsh18Id);
         SetSelected(_m1911Button, _selection.SidearmId == DemolitionBuyCatalog.M1911Id);
@@ -393,6 +444,8 @@ public partial class DemolitionBuyView : ColorRect
         _smokeGrenadeIncrease.Disabled = _selection.SmokeGrenadeCount >= DemolitionBuyCatalog.MaximumSmokeGrenades;
         _incendiaryGrenadeDecrease.Disabled = _selection.IncendiaryGrenadeCount <= 0;
         _incendiaryGrenadeIncrease.Disabled = _selection.IncendiaryGrenadeCount >= DemolitionBuyCatalog.MaximumIncendiaryGrenades;
+        _flashbangGrenadeDecrease.Disabled = _selection.FlashbangGrenadeCount <= 0;
+        _flashbangGrenadeIncrease.Disabled = _selection.FlashbangGrenadeCount >= DemolitionBuyCatalog.MaximumFlashbangGrenades;
         _summary.Text = BuildSummary();
         _projectedBalance.Text = _quote.Affordable
             ? GameLocalization.Format(
@@ -434,6 +487,10 @@ public partial class DemolitionBuyView : ColorRect
         if (_selection.IncendiaryGrenadeCount > 0)
         {
             utilities.Add($"{Text("incendiary_grenade", "INCENDIARY")}  x{_selection.IncendiaryGrenadeCount}");
+        }
+        if (_selection.FlashbangGrenadeCount > 0)
+        {
+            utilities.Add($"{Text("flashbang_grenade", "FLASHBANG")}  x{_selection.FlashbangGrenadeCount}");
         }
         var utility = utilities.Count > 0
             ? string.Join("\n", utilities)

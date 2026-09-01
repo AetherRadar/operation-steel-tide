@@ -29,6 +29,7 @@ public partial class SquadNetwork
 
     private readonly Dictionary<long, (DemolitionNetworkTeam Team, int Slot, OperatorRole Role)>
         _demolitionAssignments = new();
+    private readonly HashSet<long> _demolitionPurchaseV2Peers = new();
     private OperatorRole _demolitionHostRole = OperatorRole.Assault;
 
     public void ConfigureDemolitionSession(string mapId, DemolitionNetworkTeam requestedTeam)
@@ -571,14 +572,27 @@ public partial class SquadNetwork
             DemolitionPurchaseRequested?.Invoke(1, round, selection);
             return;
         }
-        RpcId(1, MethodName.SubmitDemolitionPurchase,
+        if (!UsesDemolitionPurchaseV2(selection))
+        {
+            RpcId(1, MethodName.SubmitDemolitionPurchase,
+                round,
+                selection.SidearmId,
+                selection.PrimaryId,
+                selection.ArmorSelected,
+                selection.GrenadeCount,
+                selection.SmokeGrenadeCount,
+                selection.IncendiaryGrenadeCount);
+            return;
+        }
+        RpcId(1, MethodName.SubmitDemolitionPurchaseV2,
             round,
             selection.SidearmId,
             selection.PrimaryId,
             selection.ArmorSelected,
             selection.GrenadeCount,
             selection.SmokeGrenadeCount,
-            selection.IncendiaryGrenadeCount);
+            selection.IncendiaryGrenadeCount,
+            selection.FlashbangGrenadeCount);
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -597,16 +611,48 @@ public partial class SquadNetwork
         {
             return;
         }
+        _demolitionPurchaseV2Peers.Remove(sender);
         DemolitionPurchaseRequested?.Invoke(
             sender,
             round,
-            new DemolitionPurchaseSelection(
+            DecodeLegacyDemolitionPurchase(
                 sidearmId,
                 primaryId,
                 armorSelected,
                 grenadeCount,
                 smokeGrenadeCount,
                 incendiaryGrenadeCount));
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void SubmitDemolitionPurchaseV2(
+        int round,
+        string sidearmId,
+        string primaryId,
+        bool armorSelected,
+        int grenadeCount,
+        int smokeGrenadeCount,
+        int incendiaryGrenadeCount,
+        int flashbangGrenadeCount)
+    {
+        var sender = Multiplayer.GetRemoteSenderId();
+        if (!IsHost || !DemolitionMatchStarted || round < 1
+            || !_demolitionAssignments.ContainsKey(sender))
+        {
+            return;
+        }
+        _demolitionPurchaseV2Peers.Add(sender);
+        DemolitionPurchaseRequested?.Invoke(
+            sender,
+            round,
+            DecodeDemolitionPurchaseV2(
+                sidearmId,
+                primaryId,
+                armorSelected,
+                grenadeCount,
+                smokeGrenadeCount,
+                incendiaryGrenadeCount,
+                flashbangGrenadeCount));
     }
 
     public void SendDemolitionPurchaseResult(
@@ -617,7 +663,22 @@ public partial class SquadNetwork
         {
             return;
         }
-        RpcId(peerId, MethodName.ReceiveDemolitionPurchaseResult,
+        if (!_demolitionPurchaseV2Peers.Contains(peerId))
+        {
+            RpcId(peerId, MethodName.ReceiveDemolitionPurchaseResult,
+                result.Round,
+                result.Approved,
+                result.Selection.SidearmId,
+                result.Selection.PrimaryId,
+                result.Selection.ArmorSelected,
+                result.Selection.GrenadeCount,
+                result.Selection.SmokeGrenadeCount,
+                result.Selection.IncendiaryGrenadeCount,
+                result.TotalCost,
+                result.RemainingFunds);
+            return;
+        }
+        RpcId(peerId, MethodName.ReceiveDemolitionPurchaseResultV2,
             result.Round,
             result.Approved,
             result.Selection.SidearmId,
@@ -626,6 +687,7 @@ public partial class SquadNetwork
             result.Selection.GrenadeCount,
             result.Selection.SmokeGrenadeCount,
             result.Selection.IncendiaryGrenadeCount,
+            result.Selection.FlashbangGrenadeCount,
             result.TotalCost,
             result.RemainingFunds);
     }
@@ -646,7 +708,7 @@ public partial class SquadNetwork
         DemolitionPurchaseResultReceived?.Invoke(new DemolitionPurchaseNetworkResult(
             round,
             approved,
-            new DemolitionPurchaseSelection(
+            DecodeLegacyDemolitionPurchase(
                 sidearmId,
                 primaryId,
                 armorSelected,
@@ -656,6 +718,70 @@ public partial class SquadNetwork
             Mathf.Max(0, totalCost),
             Mathf.Clamp(remainingFunds, 0, DemolitionEconomy.MaximumFunds)));
     }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void ReceiveDemolitionPurchaseResultV2(
+        int round,
+        bool approved,
+        string sidearmId,
+        string primaryId,
+        bool armorSelected,
+        int grenadeCount,
+        int smokeGrenadeCount,
+        int incendiaryGrenadeCount,
+        int flashbangGrenadeCount,
+        int totalCost,
+        int remainingFunds)
+    {
+        DemolitionPurchaseResultReceived?.Invoke(new DemolitionPurchaseNetworkResult(
+            round,
+            approved,
+            DecodeDemolitionPurchaseV2(
+                sidearmId,
+                primaryId,
+                armorSelected,
+                grenadeCount,
+                smokeGrenadeCount,
+                incendiaryGrenadeCount,
+                flashbangGrenadeCount),
+            Mathf.Max(0, totalCost),
+            Mathf.Clamp(remainingFunds, 0, DemolitionEconomy.MaximumFunds)));
+    }
+
+    internal static DemolitionPurchaseSelection DecodeLegacyDemolitionPurchase(
+        string sidearmId,
+        string primaryId,
+        bool armorSelected,
+        int grenadeCount,
+        int smokeGrenadeCount,
+        int incendiaryGrenadeCount)
+        => new(
+            sidearmId,
+            primaryId,
+            armorSelected,
+            grenadeCount,
+            smokeGrenadeCount,
+            incendiaryGrenadeCount);
+
+    internal static bool UsesDemolitionPurchaseV2(DemolitionPurchaseSelection selection)
+        => selection.FlashbangGrenadeCount > 0;
+
+    internal static DemolitionPurchaseSelection DecodeDemolitionPurchaseV2(
+        string sidearmId,
+        string primaryId,
+        bool armorSelected,
+        int grenadeCount,
+        int smokeGrenadeCount,
+        int incendiaryGrenadeCount,
+        int flashbangGrenadeCount)
+        => new(
+            sidearmId,
+            primaryId,
+            armorSelected,
+            grenadeCount,
+            smokeGrenadeCount,
+            incendiaryGrenadeCount,
+            flashbangGrenadeCount);
 
     public void SendDemolitionFundsState(long peerId, DemolitionFundsNetworkState state)
     {

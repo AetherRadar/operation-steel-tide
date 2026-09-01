@@ -35,6 +35,14 @@ public enum DemolitionDuty
     Lurk
 }
 
+public enum DemolitionRouteIntent
+{
+    Balanced,
+    DirectRetake,
+    WideFlank,
+    RearApproach
+}
+
 public readonly record struct DemolitionAgentSnapshot(
     string MemberId,
     DemolitionTeam Team,
@@ -51,7 +59,8 @@ public readonly record struct DemolitionAssignment(
     DemolitionDuty Duty,
     int SiteIndex,
     string TargetKey,
-    string Reason);
+    string Reason,
+    DemolitionRouteIntent RouteIntent = DemolitionRouteIntent.Balanced);
 
 public sealed record DemolitionStrategyPlan(
     DemolitionTeam Team,
@@ -603,7 +612,8 @@ public sealed class DemolitionStrategyPlanner
                 plantedSiteIndex == 0 ? "site_a" : "site_b",
                 urgent
                     ? $"last-chance defuser: shortest travel {Math.Sqrt(DistanceSquared(defuser, siteX, siteZ)):0.0}"
-                    : $"closest viable defuser: health {defuser.HealthRatio:0.00}, distance {Math.Sqrt(DistanceSquared(defuser, siteX, siteZ)):0.0}")
+                    : $"closest viable defuser: health {defuser.HealthRatio:0.00}, distance {Math.Sqrt(DistanceSquared(defuser, siteX, siteZ)):0.0}",
+                DemolitionRouteIntent.DirectRetake)
         };
         if (!string.IsNullOrEmpty(cover.MemberId))
         {
@@ -612,24 +622,59 @@ public sealed class DemolitionStrategyPlanner
                 DemolitionDuty.CoverDefuser,
                 plantedSiteIndex,
                 plantedSiteIndex == 0 ? "retake_cover_a" : "retake_cover_b",
-                $"best cover weapon: range {cover.WeaponRange:0}, health {cover.HealthRatio:0.00}"));
+                $"wide overwatch: range {cover.WeaponRange:0}, health {cover.HealthRatio:0.00}",
+                DemolitionRouteIntent.WideFlank));
         }
 
         var retakers = remaining.Where(member => member.MemberId != cover.MemberId).ToList();
-        for (var index = 0; index < retakers.Count; index++)
+        if (retakers.Count > 0)
         {
-            var member = retakers[index];
-            var flank = index % 3 == 2 && member.HealthRatio >= 0.5f;
+            var direct = retakers
+                .OrderBy(member => DistanceSquared(member, siteX, siteZ))
+                .ThenByDescending(member => member.HealthRatio)
+                .ThenBy(member => member.MemberId, StringComparer.Ordinal)
+                .First();
+            retakers.RemoveAll(member => member.MemberId == direct.MemberId);
+            assignments.Add(new DemolitionAssignment(
+                direct.MemberId,
+                DemolitionDuty.Retake,
+                plantedSiteIndex,
+                plantedSiteIndex == 0 ? "retake_entry_a" : "retake_entry_b",
+                $"direct retake pressure: distance {Math.Sqrt(DistanceSquared(direct, siteX, siteZ)):0.0}",
+                DemolitionRouteIntent.DirectRetake));
+        }
+        if (retakers.Count > 0)
+        {
+            var flanker = retakers
+                .OrderByDescending(member => member.HealthRatio)
+                .ThenByDescending(member => member.WeaponRange)
+                .ThenBy(member => member.MemberId, StringComparer.Ordinal)
+                .First();
+            retakers.RemoveAll(member => member.MemberId == flanker.MemberId);
+            assignments.Add(new DemolitionAssignment(
+                flanker.MemberId,
+                DemolitionDuty.Flank,
+                plantedSiteIndex,
+                plantedSiteIndex == 0 ? "retake_flank_a" : "retake_flank_b",
+                $"wide flank: health {flanker.HealthRatio:0.00}, range {flanker.WeaponRange:0}",
+                DemolitionRouteIntent.WideFlank));
+        }
+        foreach (var member in retakers)
+        {
+            var routeIntent = urgent
+                ? DemolitionRouteIntent.DirectRetake
+                : DemolitionRouteIntent.RearApproach;
             assignments.Add(new DemolitionAssignment(
                 member.MemberId,
-                flank ? DemolitionDuty.Flank : DemolitionDuty.Retake,
+                DemolitionDuty.Retake,
                 plantedSiteIndex,
-                flank
-                    ? plantedSiteIndex == 0 ? "retake_flank_a" : "retake_flank_b"
-                    : plantedSiteIndex == 0 ? "retake_entry_a" : "retake_entry_b",
-                flank
-                    ? $"healthy flanker at {member.HealthRatio:0.00}"
-                    : $"retake pressure with range {member.WeaponRange:0}"));
+                urgent
+                    ? (plantedSiteIndex == 0 ? "retake_entry_a" : "retake_entry_b")
+                    : (plantedSiteIndex == 0 ? "retake_rear_a" : "retake_rear_b"),
+                urgent
+                    ? $"last-chance direct pressure: distance {Math.Sqrt(DistanceSquared(member, siteX, siteZ)):0.0}"
+                    : $"rear approach: health {member.HealthRatio:0.00}, range {member.WeaponRange:0}",
+                routeIntent));
         }
 
         var siteName = plantedSiteIndex == 0 ? "A" : "B";
@@ -639,7 +684,9 @@ public sealed class DemolitionStrategyPlanner
             plantedSiteIndex,
             DemolitionOpeningPattern.FullExecute,
             assignments,
-            $"RETAKE {siteName}  //  COVER DEFUSER  //  FLANK LATE");
+            urgent
+                ? $"RETAKE {siteName}  //  LAST-CHANCE DIRECT PRESSURE"
+                : $"RETAKE {siteName}  //  COVER DEFUSER  //  FLANK LATE");
     }
 
     private static float EntryScore(DemolitionAgentSnapshot member)

@@ -12,6 +12,7 @@ public partial class FreightTerminalWorld
     private readonly Dictionary<int, DemolitionNetworkUtilityKind>
         _pendingLocalDemolitionUtilityThrows = new();
     private readonly HashSet<int> _receivedDemolitionUtilitySpawnIds = new();
+    private readonly Dictionary<int, FlashbangGrenade> _replicatedFlashbangsBySpawnId = new();
     private bool _demolitionUtilityNetworkAttached;
     private bool _suppressDemolitionUtilityReplication;
     private int _nextLocalDemolitionUtilityRequestId;
@@ -30,6 +31,7 @@ public partial class FreightTerminalWorld
         }
         _squadNetwork.DemolitionUtilityThrowRequested += OnDemolitionUtilityThrowRequested;
         _squadNetwork.DemolitionUtilityThrowSpawnReceived += OnDemolitionUtilityThrowSpawnReceived;
+        _squadNetwork.DemolitionFlashbangDetonationReceived += OnDemolitionFlashbangDetonationReceived;
         _squadNetwork.DemolitionUtilityThrowRejected += OnDemolitionUtilityThrowRejected;
         _demolitionUtilityNetworkAttached = true;
     }
@@ -43,6 +45,7 @@ public partial class FreightTerminalWorld
         }
         _squadNetwork.DemolitionUtilityThrowRequested -= OnDemolitionUtilityThrowRequested;
         _squadNetwork.DemolitionUtilityThrowSpawnReceived -= OnDemolitionUtilityThrowSpawnReceived;
+        _squadNetwork.DemolitionFlashbangDetonationReceived -= OnDemolitionFlashbangDetonationReceived;
         _squadNetwork.DemolitionUtilityThrowRejected -= OnDemolitionUtilityThrowRejected;
         _demolitionUtilityNetworkAttached = false;
     }
@@ -59,6 +62,7 @@ public partial class FreightTerminalWorld
         _demolitionRemoteUtilityRequestIds.Clear();
         _pendingLocalDemolitionUtilityThrows.Clear();
         _receivedDemolitionUtilitySpawnIds.Clear();
+        _replicatedFlashbangsBySpawnId.Clear();
         _nextLocalDemolitionUtilityRequestId = 0;
         _nextDemolitionUtilitySpawnId = 0;
     }
@@ -85,7 +89,8 @@ public partial class FreightTerminalWorld
         return new DemolitionBotUtilityInventory(
             selection.GrenadeCount,
             selection.SmokeGrenadeCount,
-            selection.IncendiaryGrenadeCount);
+            selection.IncendiaryGrenadeCount,
+            selection.FlashbangGrenadeCount);
     }
 
     internal bool TryRequestLocalDemolitionUtilityThrow(
@@ -235,7 +240,23 @@ public partial class FreightTerminalWorld
     private void OnDemolitionUtilityThrowRejected(int requestId)
         => _pendingLocalDemolitionUtilityThrows.Remove(requestId);
 
-    private void NotifyHostDemolitionUtilitySpawned(
+    private void OnDemolitionFlashbangDetonationReceived(
+        DemolitionFlashbangDetonation detonation)
+    {
+        if (!IsDemolitionNetworkClient
+            || detonation.Round != _demolitionMatch.CurrentRound
+            || !_receivedDemolitionUtilitySpawnIds.Contains(detonation.SpawnId)
+            || !_replicatedFlashbangsBySpawnId.Remove(
+                detonation.SpawnId,
+                out var grenade)
+            || !IsInstanceValid(grenade))
+        {
+            return;
+        }
+        grenade.ApplyAuthoritativeDetonation(detonation.Position);
+    }
+
+    private DemolitionUtilityThrowSpawn? NotifyHostDemolitionUtilitySpawned(
         DemolitionNetworkUtilityKind kind,
         Vector3 origin,
         Vector3 direction,
@@ -250,12 +271,12 @@ public partial class FreightTerminalWorld
             || !_squadNetwork.IsHost
             || source is not Node3D actor)
         {
-            return;
+            return null;
         }
         var actorId = DemolitionActorIdForNode(actor);
         if (actorId < DemolitionAlphaActorBase)
         {
-            return;
+            return null;
         }
         var sourcePeerId = actor switch
         {
@@ -275,6 +296,7 @@ public partial class FreightTerminalWorld
             speed,
             loft);
         _squadNetwork.BroadcastDemolitionUtilityThrow(spawn);
+        return spawn;
     }
 
     private void SpawnDemolitionUtilityProjectile(
@@ -315,6 +337,16 @@ public partial class FreightTerminalWorld
                     };
                     AddChild(incendiary);
                     incendiary.Arm(spawn.Direction, spawn.Speed, spawn.Loft);
+                    break;
+                case DemolitionNetworkUtilityKind.Flashbang:
+                    var flashbang = SpawnReplicatedFlashbangGrenade(
+                        spawn,
+                        owner,
+                        waitForAuthoritativeDetonation: !authoritativeDamage);
+                    if (!authoritativeDamage)
+                    {
+                        _replicatedFlashbangsBySpawnId[spawn.SpawnId] = flashbang;
+                    }
                     break;
             }
         }
@@ -387,6 +419,7 @@ public partial class FreightTerminalWorld
             DemolitionNetworkUtilityKind.Fragmentation => inventory.FragmentationGrenades,
             DemolitionNetworkUtilityKind.Smoke => inventory.SmokeGrenades,
             DemolitionNetworkUtilityKind.Incendiary => inventory.IncendiaryGrenades,
+            DemolitionNetworkUtilityKind.Flashbang => inventory.FlashbangGrenades,
             _ => 0
         };
 
@@ -406,6 +439,10 @@ public partial class FreightTerminalWorld
             DemolitionNetworkUtilityKind.Incendiary => inventory with
             {
                 IncendiaryGrenades = Mathf.Max(0, inventory.IncendiaryGrenades - 1)
+            },
+            DemolitionNetworkUtilityKind.Flashbang => inventory with
+            {
+                FlashbangGrenades = Mathf.Max(0, inventory.FlashbangGrenades - 1)
             },
             _ => inventory
         };

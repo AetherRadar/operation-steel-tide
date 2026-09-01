@@ -162,8 +162,11 @@ public partial class FreightTerminalWorld
         QueueFreeDemolitionUtilityGroup(FragGrenade.ActiveGroupName);
         QueueFreeDemolitionUtilityGroup(SmokeGrenade.ActiveGroupName);
         QueueFreeDemolitionUtilityGroup(IncendiaryGrenade.ActiveGroupName);
+        QueueFreeDemolitionUtilityGroup(FlashbangGrenade.ActiveGroupName);
         _activeSmokeGrenades.Clear();
         _activeIncendiaryGrenades.Clear();
+        _activeFlashbangGrenades.Clear();
+        _replicatedFlashbangsBySpawnId.Clear();
         _incendiaryLastDamageTicksMsec.Clear();
     }
 

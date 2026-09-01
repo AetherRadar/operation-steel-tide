@@ -175,6 +175,8 @@ public sealed partial class DemolitionArenaLayout
         "retake_cover_b" => World(new Vector3(48.0f, 0.2f, 25.0f)),
         "retake_flank_a" => World(new Vector3(-50.0f, 0.2f, -13.0f)),
         "retake_flank_b" => World(new Vector3(50.0f, 0.2f, 14.0f)),
+        "retake_rear_a" => World(new Vector3(-48.0f, 0.2f, -13.0f)),
+        "retake_rear_b" => World(new Vector3(48.0f, 0.2f, 13.0f)),
         "postplant_guard_a" => World(new Vector3(-39.0f, 0.2f, -19.0f)),
         "postplant_guard_b" => World(new Vector3(39.0f, 0.2f, 19.0f)),
         "postplant_crossfire_a" => World(new Vector3(-34.0f, 0.2f, -25.0f)),

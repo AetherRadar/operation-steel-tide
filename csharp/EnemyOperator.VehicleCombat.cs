@@ -59,7 +59,10 @@ public partial class EnemyOperator
 
     private void FireAtOccupiedVehicle(DriveableVehicle vehicle, float distance)
     {
-        if (!HasFireablePrimary || vehicle.IsDestroyed || !vehicle.HasDriver)
+        if (!HasFireablePrimary
+            || !CanFireDuringFlashbang
+            || vehicle.IsDestroyed
+            || !vehicle.HasDriver)
         {
             return;
         }
@@ -67,13 +70,14 @@ public partial class EnemyOperator
         BeginMuzzleFlash();
         var stats = CarriedWeapon.Stats();
         _fireTimer = _rng.RandfRange(stats.FireInterval * 1.8f, stats.FireInterval * 3.6f)
-            * (IsWorldBoss ? WorldBossFireCadenceMultiplier : 1.0f);
+            * (IsWorldBoss ? WorldBossFireCadenceMultiplier : 1.0f)
+            * FlashbangFireCadenceMultiplier;
         var rangeFactor = Mathf.Clamp(stats.EffectiveRange / 150.0f, 0.7f, 1.25f);
         var baseAccuracy = IsWorldBoss ? 0.96f : IsRivalSquad ? 0.94f : 0.88f;
         var accuracy = Mathf.Clamp(
             (IsProne ? baseAccuracy + 0.02f : baseAccuracy) - distance * 0.004f / rangeFactor,
             0.58f,
-            0.97f);
+            0.97f) * FlashbangAccuracyMultiplier;
         var aimPoint = vehicle.HostileAimPoint(GlobalPosition);
         var shotOrigin = ResolveBallisticShotOrigin();
         if (BreakableGlassField.TryShatterAlongRay(

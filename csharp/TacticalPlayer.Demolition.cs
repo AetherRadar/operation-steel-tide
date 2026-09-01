@@ -6,6 +6,7 @@ public partial class TacticalPlayer
 {
     public int SmokeGrenades { get; private set; }
     public int IncendiaryGrenades { get; private set; }
+    public int FlashbangGrenades { get; private set; }
     public DemolitionUtilityType SelectedDemolitionUtility { get; private set; }
         = DemolitionUtilityType.Smoke;
     internal bool DemolitionColliderDisabledForDiagnostics => _collider.Disabled;
@@ -16,8 +17,13 @@ public partial class TacticalPlayer
         DeploymentLoadout loadout,
         int grenadeCount,
         int smokeGrenadeCount,
-        int incendiaryGrenadeCount = 0)
+        int incendiaryGrenadeCount = 0,
+        int flashbangGrenadeCount = 0)
     {
+        if (!IsInGroup(FlashbangGrenade.TargetGroupName))
+        {
+            AddToGroup(FlashbangGrenade.TargetGroupName);
+        }
         EjectFromVehicleIfAny();
         CancelLadderClimb(notify: false);
         CancelLowObstacleVault("demolition_round_reset");
@@ -29,7 +35,8 @@ public partial class TacticalPlayer
             loadout,
             grenadeCount,
             smokeGrenadeCount,
-            incendiaryGrenadeCount);
+            incendiaryGrenadeCount,
+            flashbangGrenadeCount);
         GlobalPosition = spawn;
         Rotation = Vector3.Zero;
         Velocity = Vector3.Zero;
@@ -61,6 +68,7 @@ public partial class TacticalPlayer
         DisarmFireInput();
         RestoreMovementInput();
         Hud?.HideDownedState();
+        Hud?.ClearFlashbangExposure();
         PushHudStats();
     }
 
@@ -127,7 +135,8 @@ public partial class TacticalPlayer
         DeploymentLoadout loadout,
         int grenadeCount,
         int smokeGrenadeCount,
-        int incendiaryGrenadeCount = 0)
+        int incendiaryGrenadeCount = 0,
+        int flashbangGrenadeCount = 0)
     {
         Backpack.Clear();
         ApplyDeploymentLoadout(loadout, includeEmergencySupplies: false);
@@ -140,9 +149,11 @@ public partial class TacticalPlayer
             incendiaryGrenadeCount,
             0,
             DemolitionBuyCatalog.MaximumIncendiaryGrenades);
-        SelectedDemolitionUtility = SmokeGrenades > 0
-            ? DemolitionUtilityType.Smoke
-            : DemolitionUtilityType.Incendiary;
+        FlashbangGrenades = Mathf.Clamp(
+            flashbangGrenadeCount,
+            0,
+            DemolitionBuyCatalog.MaximumFlashbangGrenades);
+        SelectedDemolitionUtility = FirstAvailableDemolitionUtility();
         RefreshDemolitionUtilityHud();
         PushHudStats();
     }
@@ -171,10 +182,7 @@ public partial class TacticalPlayer
         }
         SmokeGrenades--;
         Main.ThrowSmokeGrenade(origin, direction, this);
-        if (SmokeGrenades <= 0 && IncendiaryGrenades > 0)
-        {
-            SelectedDemolitionUtility = DemolitionUtilityType.Incendiary;
-        }
+        EnsureSelectedDemolitionUtilityAvailable();
         RefreshDemolitionUtilityHud();
         PushHudStats();
         OnThrowableConsumed();
@@ -209,10 +217,42 @@ public partial class TacticalPlayer
         }
         IncendiaryGrenades--;
         Main.ThrowIncendiaryGrenade(origin, direction, this);
-        if (IncendiaryGrenades <= 0 && SmokeGrenades > 0)
+        EnsureSelectedDemolitionUtilityAvailable();
+        RefreshDemolitionUtilityHud();
+        PushHudStats();
+        OnThrowableConsumed();
+        return true;
+    }
+
+    private bool ThrowFlashbangGrenade()
+    {
+        if (FlashbangGrenades <= 0
+            || _isReloading
+            || MedicalActionBlocksWeapon
+            || IsDead
+            || Main is null)
         {
-            SelectedDemolitionUtility = DemolitionUtilityType.Smoke;
+            return false;
         }
+        var authoritativeView = CaptureAuthoritativeViewTransform();
+        var origin = authoritativeView.Origin
+            - authoritativeView.Basis.Z * 0.7f;
+        var direction = -authoritativeView.Basis.Z;
+        if (Main.IsDemolitionNetworkClient)
+        {
+            if (!Main.TryRequestLocalDemolitionUtilityThrow(
+                    DemolitionNetworkUtilityKind.Flashbang,
+                    origin,
+                    direction))
+            {
+                return false;
+            }
+            OnThrowableConsumed();
+            return true;
+        }
+        FlashbangGrenades--;
+        Main.ThrowFlashbangGrenade(origin, direction, this);
+        EnsureSelectedDemolitionUtilityAvailable();
         RefreshDemolitionUtilityHud();
         PushHudStats();
         OnThrowableConsumed();
@@ -223,6 +263,7 @@ public partial class TacticalPlayer
         => Hud?.SetDemolitionUtilities(
             SmokeGrenades,
             IncendiaryGrenades,
+            FlashbangGrenades,
             SelectedDemolitionUtility);
 
     internal int DemolitionUtilityCount(DemolitionNetworkUtilityKind kind)
@@ -231,6 +272,7 @@ public partial class TacticalPlayer
             DemolitionNetworkUtilityKind.Fragmentation => Grenades,
             DemolitionNetworkUtilityKind.Smoke => SmokeGrenades,
             DemolitionNetworkUtilityKind.Incendiary => IncendiaryGrenades,
+            DemolitionNetworkUtilityKind.Flashbang => FlashbangGrenades,
             _ => 0
         };
 
@@ -243,24 +285,52 @@ public partial class TacticalPlayer
                 break;
             case DemolitionNetworkUtilityKind.Smoke when SmokeGrenades > 0:
                 SmokeGrenades--;
-                if (SmokeGrenades <= 0 && IncendiaryGrenades > 0)
-                {
-                    SelectedDemolitionUtility = DemolitionUtilityType.Incendiary;
-                }
                 break;
             case DemolitionNetworkUtilityKind.Incendiary when IncendiaryGrenades > 0:
                 IncendiaryGrenades--;
-                if (IncendiaryGrenades <= 0 && SmokeGrenades > 0)
-                {
-                    SelectedDemolitionUtility = DemolitionUtilityType.Smoke;
-                }
+                break;
+            case DemolitionNetworkUtilityKind.Flashbang when FlashbangGrenades > 0:
+                FlashbangGrenades--;
                 break;
             default:
                 return false;
         }
+        EnsureSelectedDemolitionUtilityAvailable();
         RefreshDemolitionUtilityHud();
         PushHudStats();
         return true;
+    }
+
+    private DemolitionUtilityType FirstAvailableDemolitionUtility()
+    {
+        if (SmokeGrenades > 0)
+        {
+            return DemolitionUtilityType.Smoke;
+        }
+        if (IncendiaryGrenades > 0)
+        {
+            return DemolitionUtilityType.Incendiary;
+        }
+        return FlashbangGrenades > 0
+            ? DemolitionUtilityType.Flashbang
+            : DemolitionUtilityType.Incendiary;
+    }
+
+    private bool HasDemolitionUtility(DemolitionUtilityType kind)
+        => kind switch
+        {
+            DemolitionUtilityType.Smoke => SmokeGrenades > 0,
+            DemolitionUtilityType.Incendiary => IncendiaryGrenades > 0,
+            DemolitionUtilityType.Flashbang => FlashbangGrenades > 0,
+            _ => false
+        };
+
+    private void EnsureSelectedDemolitionUtilityAvailable()
+    {
+        if (!HasDemolitionUtility(SelectedDemolitionUtility))
+        {
+            SelectedDemolitionUtility = FirstAvailableDemolitionUtility();
+        }
     }
 
     internal void MarkEliminatedForDemolitionRound()

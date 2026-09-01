@@ -80,7 +80,8 @@ public partial class FreightTerminalWorld
         bool armorSelected,
         int grenadeCount,
         int smokeGrenadeCount,
-        int incendiaryGrenadeCount)
+        int incendiaryGrenadeCount,
+        int flashbangGrenadeCount)
     {
         if (!_demolitionMode || !_demolitionBuyPhaseActive || _missionEnded
             || _demolitionLocalBuyReady || _demolitionPurchasePending)
@@ -94,7 +95,8 @@ public partial class FreightTerminalWorld
             armorSelected,
             grenadeCount,
             smokeGrenadeCount,
-            incendiaryGrenadeCount);
+            incendiaryGrenadeCount,
+            flashbangGrenadeCount);
         if (IsDemolitionNetworkClient)
         {
             _demolitionPurchasePending = true;
@@ -123,6 +125,7 @@ public partial class FreightTerminalWorld
             armorSelected,
             grenadeCount,
             smokeGrenadeCount,
+            0,
             0);
 
     private void ProcessLocalDemolitionPurchase(DemolitionPurchaseSelection selection)
@@ -147,7 +150,8 @@ public partial class FreightTerminalWorld
             loadout,
             quote.Selection.GrenadeCount,
             quote.Selection.SmokeGrenadeCount,
-            quote.Selection.IncendiaryGrenadeCount);
+            quote.Selection.IncendiaryGrenadeCount,
+            quote.Selection.FlashbangGrenadeCount);
         CompleteDemolitionBuyPhase(spent, quote.HasFirearm);
     }
 
@@ -308,7 +312,8 @@ public partial class FreightTerminalWorld
             loadout,
             quote.Selection.GrenadeCount,
             quote.Selection.SmokeGrenadeCount,
-            quote.Selection.IncendiaryGrenadeCount);
+            quote.Selection.IncendiaryGrenadeCount,
+            quote.Selection.FlashbangGrenadeCount);
         CompleteDemolitionBuyPhase(result.TotalCost, quote.HasFirearm);
     }
 

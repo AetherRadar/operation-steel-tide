@@ -78,6 +78,13 @@ public partial class EnemyOperator
             return;
         }
 
+        _ = TryStandForCombatMovement();
+        _combatStanceHoldRemaining = 0.0f;
+        _combatStanceCooldown = 0.0f;
+        _combatPressureRemaining = 0.0f;
+        _combatCoverSearchCooldown = 0.0f;
+        ClearAirborneCombatForRoundFreeze();
+        ResetFlashbangState();
         _authoredAimHoldRemaining = 0.0f;
         if (UsesAuthoredOperatorForDiagnostics)
         {
@@ -104,11 +111,13 @@ public partial class EnemyOperator
         _authoredOperatorVisual.SetWeaponReadied(weaponReadied);
         _authoredOperatorAnimator.Update(
             delta,
-            speed,
+            IsCombatAirborneAttack ? 0.0f : speed,
             weaponReadied,
             IsProne,
-            _inCover && !IsProne,
-            visibleTargetInRange || _authoredAimHoldRemaining > 0.0f,
+            IsCrouched,
+            visibleTargetInRange
+                || _authoredAimHoldRemaining > 0.0f
+                || IsCombatAirborneAttack,
             downed: false,
             reviving: false,
             IsDead);
@@ -175,8 +184,7 @@ public partial class EnemyOperator
         {
             return;
         }
-        var crouched = _inCover && !IsProne && !IsDead;
-        var height = IsProne || IsDead ? 0.78f : crouched ? 1.22f : 1.78f;
+        var height = CombatColliderHeight;
         capsule.Height = height;
         _collider.Position = new Vector3(0.0f, height * 0.5f, 0.0f);
     }

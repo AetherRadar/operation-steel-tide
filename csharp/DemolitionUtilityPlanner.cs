@@ -7,7 +7,8 @@ public enum DemolitionAiUtilityKind
     None,
     Fragmentation,
     Smoke,
-    Incendiary
+    Incendiary,
+    Flashbang
 }
 
 public readonly record struct DemolitionUtilityContext(
@@ -24,7 +25,9 @@ public readonly record struct DemolitionUtilityContext(
     bool HasIncendiary,
     bool FragmentationFriendlySafe,
     bool IncendiaryFriendlySafe,
-    float RemainingSeconds);
+    float RemainingSeconds,
+    bool HasFlashbang = false,
+    bool FlashbangFriendlySafe = true);
 
 public readonly record struct DemolitionUtilityDecision(
     DemolitionAiUtilityKind Kind,
@@ -130,6 +133,25 @@ public static class DemolitionUtilityPlanner
                 DemolitionAiUtilityKind.Fragmentation,
                 Grounded(context.ContactPosition),
                 "fragmentation grenade pressures confirmed cover");
+        }
+
+        if (context.HasVisibleContact
+            && context.HasFlashbang
+            && context.FlashbangFriendlySafe
+            && contactDistance is >= 5.0f and <= 24.0f
+            && context.Duty is DemolitionDuty.Entry
+                or DemolitionDuty.Retake
+                or DemolitionDuty.Defuse
+                or DemolitionDuty.CoverDefuser
+                or DemolitionDuty.Recon
+                or DemolitionDuty.Flank)
+        {
+            return new DemolitionUtilityDecision(
+                DemolitionAiUtilityKind.Flashbang,
+                context.ContactPosition,
+                attacking
+                    ? "flashbang opens the confirmed entry"
+                    : "flashbang disrupts the confirmed attacker");
         }
 
         if (context.HasVisibleContact

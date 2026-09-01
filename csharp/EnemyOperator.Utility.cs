@@ -8,12 +8,14 @@ public partial class EnemyOperator
     private int _demolitionFragGrenades;
     private int _demolitionSmokeGrenades;
     private int _demolitionIncendiaryGrenades;
+    private int _demolitionFlashbangGrenades;
 
     internal Vector3 DemolitionUtilityThrowOrigin
         => RawMuzzlePosition;
     internal int DemolitionFragGrenadesForDiagnostics => _demolitionFragGrenades;
     internal int DemolitionSmokeGrenadesForDiagnostics => _demolitionSmokeGrenades;
     internal int DemolitionIncendiaryGrenadesForDiagnostics => _demolitionIncendiaryGrenades;
+    internal int DemolitionFlashbangGrenadesForDiagnostics => _demolitionFlashbangGrenades;
 
     internal void EnsureDemolitionUtilityInventory(
         int round,
@@ -34,6 +36,7 @@ public partial class EnemyOperator
         _demolitionFragGrenades = inventory.FragmentationGrenades;
         _demolitionSmokeGrenades = inventory.SmokeGrenades;
         _demolitionIncendiaryGrenades = inventory.IncendiaryGrenades;
+        _demolitionFlashbangGrenades = inventory.FlashbangGrenades;
     }
 
     internal bool HasDemolitionUtility(DemolitionAiUtilityKind kind)
@@ -42,6 +45,7 @@ public partial class EnemyOperator
             DemolitionAiUtilityKind.Fragmentation => _demolitionFragGrenades > 0,
             DemolitionAiUtilityKind.Smoke => _demolitionSmokeGrenades > 0,
             DemolitionAiUtilityKind.Incendiary => _demolitionIncendiaryGrenades > 0,
+            DemolitionAiUtilityKind.Flashbang => _demolitionFlashbangGrenades > 0,
             _ => false
         };
 
@@ -75,6 +79,9 @@ public partial class EnemyOperator
                 break;
             case DemolitionAiUtilityKind.Incendiary:
                 _demolitionIncendiaryGrenades--;
+                break;
+            case DemolitionAiUtilityKind.Flashbang:
+                _demolitionFlashbangGrenades--;
                 break;
         }
         _fireTimer = Mathf.Max(_fireTimer, 0.8f);

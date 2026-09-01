@@ -8,6 +8,7 @@ public partial class TacticalPlayer
     private Node3D _heldFragVisual = null!;
     private Node3D _heldSmokeVisual = null!;
     private Node3D _heldIncendiaryVisual = null!;
+    private Node3D _heldFlashbangVisual = null!;
 
     internal bool HeldFragmentationGrenadeVisibleForDiagnostics
         => IsInstanceValid(_heldFragVisual) && _heldFragVisual.Visible;
@@ -15,12 +16,16 @@ public partial class TacticalPlayer
         => IsInstanceValid(_heldSmokeVisual) && _heldSmokeVisual.Visible;
     internal bool HeldIncendiaryGrenadeVisibleForDiagnostics
         => IsInstanceValid(_heldIncendiaryVisual) && _heldIncendiaryVisual.Visible;
+    internal bool HeldFlashbangGrenadeVisibleForDiagnostics
+        => IsInstanceValid(_heldFlashbangVisual) && _heldFlashbangVisual.Visible;
     internal int HeldFragmentationGrenadeMeshCountForDiagnostics
         => CountMeshes(_heldFragVisual);
     internal int HeldSmokeGrenadeMeshCountForDiagnostics
         => CountMeshes(_heldSmokeVisual);
     internal int HeldIncendiaryGrenadeMeshCountForDiagnostics
         => CountMeshes(_heldIncendiaryVisual);
+    internal int HeldFlashbangGrenadeMeshCountForDiagnostics
+        => CountMeshes(_heldFlashbangVisual);
 
     private void BuildHeldThrowables()
     {
@@ -45,6 +50,12 @@ public partial class TacticalPlayer
         _heldIncendiaryVisual = GrenadeVisualFactory.CreateIncendiaryGrenade(firstPerson: true);
         _heldIncendiaryVisual.Name = "HeldIncendiaryGrenade";
         _heldThrowableRoot.AddChild(_heldIncendiaryVisual);
+
+        // Reuse the shipped throwable presentation instead of introducing new
+        // programmer-art geometry for the flashbang casing.
+        _heldFlashbangVisual = GrenadeVisualFactory.CreateSmokeGrenade(firstPerson: true);
+        _heldFlashbangVisual.Name = "HeldFlashbangGrenade";
+        _heldThrowableRoot.AddChild(_heldFlashbangVisual);
 
         var glove = new StandardMaterial3D
         {
@@ -88,10 +99,15 @@ public partial class TacticalPlayer
             && _activeQuickSlot == PlayerQuickSlot.Utility
             && SelectedDemolitionUtility == DemolitionUtilityType.Incendiary
             && IncendiaryGrenades > 0;
-        _heldThrowableRoot.Visible = fragVisible || smokeVisible || incendiaryVisible;
+        var flashbangVisible = canShow
+            && _activeQuickSlot == PlayerQuickSlot.Utility
+            && SelectedDemolitionUtility == DemolitionUtilityType.Flashbang
+            && FlashbangGrenades > 0;
+        _heldThrowableRoot.Visible = fragVisible || smokeVisible || incendiaryVisible || flashbangVisible;
         _heldFragVisual.Visible = fragVisible;
         _heldSmokeVisual.Visible = smokeVisible;
         _heldIncendiaryVisual.Visible = incendiaryVisible;
+        _heldFlashbangVisual.Visible = flashbangVisible;
     }
 
     private static int CountMeshes(Node? root)

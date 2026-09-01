@@ -13,6 +13,7 @@ public partial class CombatHUD
     private bool _demolitionGameplayPresentation;
     private int _demolitionSmokeGrenades;
     private int _demolitionIncendiaryGrenades;
+    private int _demolitionFlashbangGrenades;
     private DemolitionUtilityType _demolitionSelectedUtility = DemolitionUtilityType.Smoke;
     private int _radioMessageDiagnosticSuppressionDepth;
 
@@ -138,6 +139,9 @@ public partial class CombatHUD
         && _quickSlotBar.SceneFilePath == "res://ui/QuickSlotBarView.tscn";
     public bool QuickSlotIntentSignalsReady
         => IsInstanceValid(_quickSlotBar) && _quickSlotBar.IntentSignalsConnected;
+    internal bool QuickSlotsWithinViewportForDiagnostics
+        => IsInstanceValid(_quickSlotBar)
+        && _quickSlotBar.VisibleSlotsWithinViewportForDiagnostics;
     public int VisibleQuickSlotCount
         => IsInstanceValid(_quickSlotBar) ? _quickSlotBar.VisibleSlotCount : 0;
     public int ActiveQuickSlot
@@ -178,6 +182,23 @@ public partial class CombatHUD
                 grenadeCount,
                 smokeGrenadeCount,
                 incendiaryGrenadeCount);
+        _demolitionBuyView.PurchaseRequestedWithFlash += (
+            sidearmId,
+            primaryId,
+            armorSelected,
+            grenadeCount,
+            smokeGrenadeCount,
+            incendiaryGrenadeCount,
+            flashbangGrenadeCount) =>
+            EmitSignal(
+                SignalName.DemolitionPurchaseRequestedWithFlash,
+                sidearmId,
+                primaryId,
+                armorSelected,
+                grenadeCount,
+                smokeGrenadeCount,
+                incendiaryGrenadeCount,
+                flashbangGrenadeCount);
     }
 
     public void SetDemolitionGameplayPresentation(bool active)
@@ -229,9 +250,21 @@ public partial class CombatHUD
         int smokeGrenades,
         int incendiaryGrenades,
         DemolitionUtilityType selectedUtility)
+        => SetDemolitionUtilities(
+            smokeGrenades,
+            incendiaryGrenades,
+            0,
+            selectedUtility);
+
+    public void SetDemolitionUtilities(
+        int smokeGrenades,
+        int incendiaryGrenades,
+        int flashbangGrenades,
+        DemolitionUtilityType selectedUtility)
     {
         _demolitionSmokeGrenades = Mathf.Max(0, smokeGrenades);
         _demolitionIncendiaryGrenades = Mathf.Max(0, incendiaryGrenades);
+        _demolitionFlashbangGrenades = Mathf.Max(0, flashbangGrenades);
         _demolitionSelectedUtility = selectedUtility;
         RefreshQuickSlotBar();
     }
@@ -354,6 +387,9 @@ public partial class CombatHUD
 
     public void SetDemolitionBuyIncendiaryGrenadesForDiagnostics(int count)
         => _demolitionBuyView.SetIncendiaryGrenadesForDiagnostics(count);
+
+    public void SetDemolitionBuyFlashbangGrenadesForDiagnostics(int count)
+        => _demolitionBuyView.SetFlashbangGrenadesForDiagnostics(count);
 
     public void PressDemolitionBuyConfirmForDiagnostics()
         => _demolitionBuyView.PressConfirmForDiagnostics();

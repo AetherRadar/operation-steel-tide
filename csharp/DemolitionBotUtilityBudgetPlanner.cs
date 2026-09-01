@@ -5,14 +5,24 @@ namespace OperationSteelTide;
 public readonly record struct DemolitionBotUtilityInventory(
     int FragmentationGrenades,
     int SmokeGrenades,
-    int IncendiaryGrenades)
+    int IncendiaryGrenades,
+    int FlashbangGrenades)
 {
-    public static DemolitionBotUtilityInventory Empty => new(0, 0, 0);
+    public DemolitionBotUtilityInventory(
+        int fragmentationGrenades,
+        int smokeGrenades,
+        int incendiaryGrenades)
+        : this(fragmentationGrenades, smokeGrenades, incendiaryGrenades, 0)
+    {
+    }
+
+    public static DemolitionBotUtilityInventory Empty => new(0, 0, 0, 0);
 
     public int TotalCost
         => FragmentationGrenades * DemolitionBuyCatalog.GrenadePrice
         + SmokeGrenades * DemolitionBuyCatalog.SmokeGrenadePrice
-        + IncendiaryGrenades * DemolitionBuyCatalog.IncendiaryGrenadePrice;
+        + IncendiaryGrenades * DemolitionBuyCatalog.IncendiaryGrenadePrice
+        + FlashbangGrenades * DemolitionBuyCatalog.FlashbangGrenadePrice;
 }
 
 /// <summary>
@@ -33,7 +43,11 @@ public static class DemolitionBotUtilityBudgetPlanner
             return DemolitionBotUtilityInventory.Empty;
         }
 
-        var preferred = Math.Abs((slot + Math.Max(1, round)) % 3);
+        // Preserve the established opening-round smoke contract while introducing
+        // flashbangs into the later-round per-slot rotation.
+        var preferred = round <= 1
+            ? 0
+            : Math.Abs((slot + Math.Max(1, round)) % 4);
         if (preferred == 1 && remaining >= DemolitionBuyCatalog.IncendiaryGrenadePrice)
         {
             return new DemolitionBotUtilityInventory(0, 0, 1);
@@ -41,6 +55,10 @@ public static class DemolitionBotUtilityBudgetPlanner
         if (preferred == 2 && remaining >= DemolitionBuyCatalog.GrenadePrice)
         {
             return new DemolitionBotUtilityInventory(1, 0, 0);
+        }
+        if (preferred == 3 && remaining >= DemolitionBuyCatalog.FlashbangGrenadePrice)
+        {
+            return new DemolitionBotUtilityInventory(0, 0, 0, 1);
         }
         return new DemolitionBotUtilityInventory(0, 1, 0);
     }

@@ -43,6 +43,14 @@ public partial class CombatHUD : CanvasLayer
         int grenadeCount,
         int smokeGrenadeCount,
         int incendiaryGrenadeCount);
+    [Signal] public delegate void DemolitionPurchaseRequestedWithFlashEventHandler(
+        string sidearmId,
+        string primaryId,
+        bool armorSelected,
+        int grenadeCount,
+        int smokeGrenadeCount,
+        int incendiaryGrenadeCount,
+        int flashbangGrenadeCount);
     [Signal] public delegate void OperationsHomeRequestedEventHandler();
     [Signal] public delegate void DeploymentTimeOfDayChangedEventHandler(int timeOfDay);
 
@@ -558,6 +566,7 @@ public partial class CombatHUD : CanvasLayer
         BuildSquadHud(canvasRoot);
         BuildOperationsOfficeHud(canvasRoot);
         BuildDemolitionHud(canvasRoot);
+        BuildFlashbangOverlay(canvasRoot);
         root.MoveChild(_lootOverlay, root.GetChildCount() - 1);
     }
 
@@ -1301,6 +1310,7 @@ public partial class CombatHUD : CanvasLayer
             _grenadeCount,
             _demolitionGameplayPresentation ? _demolitionSmokeGrenades : 0,
             _demolitionGameplayPresentation ? _demolitionIncendiaryGrenades : 0,
+            _demolitionGameplayPresentation ? _demolitionFlashbangGrenades : 0,
             _demolitionSelectedUtility,
             _activeWeaponSlot);
     }

@@ -43,10 +43,10 @@ corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 
 [node name="QuickSlotBarView" type="Control"]
-custom_minimum_size = Vector2(718, 50)
+custom_minimum_size = Vector2(620, 50)
 layout_mode = 3
 anchors_preset = 0
-offset_right = 718.0
+offset_right = 620.0
 offset_bottom = 50.0
 mouse_filter = 1
 script = ExtResource("1_quick")
@@ -62,7 +62,7 @@ theme_override_constants/separation = 4
 
 [node name="Primary" type="Button" parent="Slots"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(164, 50)
+custom_minimum_size = Vector2(124, 50)
 layout_mode = 2
 focus_mode = 0
 mouse_default_cursor_shape = 2
@@ -89,14 +89,14 @@ unique_name_in_owner = true
 layout_mode = 0
 offset_left = 25.0
 offset_top = 3.0
-offset_right = 158.0
+offset_right = 118.0
 offset_bottom = 47.0
 mouse_filter = 2
 script = ExtResource("2_preview")
 
 [node name="Secondary" type="Button" parent="Slots"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(112, 50)
+custom_minimum_size = Vector2(92, 50)
 layout_mode = 2
 focus_mode = 0
 mouse_default_cursor_shape = 2
@@ -123,14 +123,14 @@ unique_name_in_owner = true
 layout_mode = 0
 offset_left = 24.0
 offset_top = 3.0
-offset_right = 106.0
+offset_right = 86.0
 offset_bottom = 47.0
 mouse_filter = 2
 script = ExtResource("2_preview")
 
 [node name="Sidearm" type="Button" parent="Slots"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(112, 50)
+custom_minimum_size = Vector2(92, 50)
 layout_mode = 2
 focus_mode = 0
 mouse_default_cursor_shape = 2
@@ -157,14 +157,14 @@ unique_name_in_owner = true
 layout_mode = 0
 offset_left = 24.0
 offset_top = 3.0
-offset_right = 106.0
+offset_right = 86.0
 offset_bottom = 47.0
 mouse_filter = 2
 script = ExtResource("2_preview")
 
 [node name="Melee" type="Button" parent="Slots"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(82, 50)
+custom_minimum_size = Vector2(68, 50)
 layout_mode = 2
 focus_mode = 0
 mouse_default_cursor_shape = 2
@@ -191,14 +191,14 @@ unique_name_in_owner = true
 layout_mode = 0
 offset_left = 23.0
 offset_top = 3.0
-offset_right = 77.0
+offset_right = 63.0
 offset_bottom = 47.0
 mouse_filter = 2
 script = ExtResource("2_preview")
 
 [node name="Fragmentation" type="Button" parent="Slots"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(112, 50)
+custom_minimum_size = Vector2(100, 50)
 layout_mode = 2
 focus_mode = 0
 mouse_default_cursor_shape = 2
@@ -225,7 +225,7 @@ unique_name_in_owner = true
 layout_mode = 0
 offset_left = 27.0
 offset_top = 5.0
-offset_right = 106.0
+offset_right = 94.0
 offset_bottom = 45.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.9, 0.86, 0.7, 1)
@@ -236,7 +236,7 @@ vertical_alignment = 1
 
 [node name="Utility" type="Button" parent="Slots"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(116, 50)
+custom_minimum_size = Vector2(124, 50)
 layout_mode = 2
 focus_mode = 0
 mouse_default_cursor_shape = 2
@@ -262,12 +262,12 @@ vertical_alignment = 1
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 27.0
-offset_top = 5.0
-offset_right = 110.0
-offset_bottom = 45.0
+offset_top = 2.0
+offset_right = 118.0
+offset_bottom = 48.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.72, 0.86, 0.84, 1)
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 8
 text = "SMOKE  x1"
 horizontal_alignment = 1
 vertical_alignment = 1
