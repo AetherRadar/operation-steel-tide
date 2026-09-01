@@ -330,6 +330,7 @@ public partial class EnemyOperator
         _combatCoverSearchCooldown = 0.0f;
         ResetAirborneCombatState();
         ResetFlashbangState();
+        ResetIncendiaryAvoidance();
         _combatCrouchTransitions = 0;
         _combatProneTransitions = 0;
         UpdateAuthoredStanceCollider();

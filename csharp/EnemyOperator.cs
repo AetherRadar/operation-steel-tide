@@ -858,7 +858,18 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     private void MoveOperator(float delta)
     {
-        PrepareCombatMovementBeforeMove(delta);
+        var escapingIncendiaryFire = ApplyIncendiaryAvoidance(delta);
+        if (escapingIncendiaryFire)
+        {
+            // Pursuit may have prepared a route step before hazard movement took
+            // ownership of velocity. Discard that frame so it cannot lift the
+            // operator back along the stale route after escaping the fire.
+            ResetPursuitNavigationMotorFrame();
+        }
+        else
+        {
+            PrepareCombatMovementBeforeMove(delta);
+        }
         _stationaryMoveTimer -= delta;
         var stationary = IsOnFloor()
             && Mathf.Abs(Velocity.X) < 0.02f
@@ -871,7 +882,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
         MoveAndSlide();
         BreakableGlassField.TryShatterMovementBlockerFromCollisions(this);
-        TryPursuitNavigationStepUp();
+        if (!escapingIncendiaryFire)
+        {
+            TryPursuitNavigationStepUp();
+        }
         _stationaryMoveTimer = stationary
             ? 0.25f * (0.85f + _crowdSchedulePhase * 0.3f)
             : 0.0f;
@@ -2230,6 +2244,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         SetCombatCrouched(false);
         ShowCorpseLootBackpack();
         ClearPursuitMemory(clearTarget: true);
+        ResetIncendiaryAvoidance();
         CollisionLayer = 0;
         CollisionMask = 0;
         Velocity = Vector3.Zero;

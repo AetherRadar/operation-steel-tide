@@ -144,6 +144,7 @@ public partial class SquadMate
             return;
         }
         ReviveUsed = true;
+        ResetIncendiaryAvoidance();
         SetDemolitionEliminatedPose();
         SetPhysicsProcess(false);
         CollisionLayer = 0;
@@ -172,6 +173,7 @@ public partial class SquadMate
         ReviveUsed = false;
         IsExtractionPassenger = false;
         _remoteDown = false;
+        ResetIncendiaryAvoidance();
         _reviveTarget = null;
         _revivePoseBlend = 0.0f;
         _skillActionTime = 0.0f;

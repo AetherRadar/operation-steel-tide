@@ -318,6 +318,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
         _reviveTarget = null;
         ResetSustainmentForIncapacitation();
+        ResetIncendiaryAvoidance();
         CancelNavigationTraversal();
         Velocity = Vector3.Zero;
         CollisionLayer = 0;
@@ -488,6 +489,13 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             }
             AnimateRig(dt);
             UpdateLabel();
+            return;
+        }
+
+        if (TryUpdateIncendiaryAvoidance(dt))
+        {
+            UpdateSkillAction(dt);
+            AnimateRig(dt);
             return;
         }
 
@@ -1185,6 +1193,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         ReviveUsed = true;
         IsDowned = false;
         Health = Mathf.Clamp(healAmount, 1.0f, MaxHealth);
+        ResetIncendiaryAvoidance();
         CommitAuthoritativeRemoteCombatState();
         ResetMovementProgress();
         _rig.Rotation = Vector3.Zero;
@@ -1226,6 +1235,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         IsDowned = true;
         ReviveUsed = true;
         Health = 0.0f;
+        ResetIncendiaryAvoidance();
         CommitAuthoritativeRemoteCombatState();
         Velocity = Vector3.Zero;
         CollisionLayer = 0;

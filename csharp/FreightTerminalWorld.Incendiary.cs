@@ -7,6 +7,11 @@ public partial class FreightTerminalWorld
 {
     private const int MaximumActiveIncendiaryGrenades = 4;
     private const ulong IncendiaryDamageCooldownMsec = 350;
+    private const float IncendiaryAiAvoidanceMargin = 0.8f;
+    private const float IncendiaryAiMaximumVerticalSeparation = 1.75f;
+    private const float IncendiaryAiEscapeNearLookAhead = 1.25f;
+    private const float IncendiaryAiEscapeFarLookAhead = 2.75f;
+    private const int IncendiaryAiEscapeCandidateCount = 16;
     private readonly List<IncendiaryGrenade> _activeIncendiaryGrenades = new();
     private readonly Dictionary<ulong, ulong> _incendiaryLastDamageTicksMsec = new();
 
@@ -65,6 +70,148 @@ public partial class FreightTerminalWorld
 
     internal void UnregisterActiveIncendiaryGrenade(IncendiaryGrenade grenade)
         => _activeIncendiaryGrenades.Remove(grenade);
+
+    /// <summary>
+    /// Resolves an allocation-free horizontal escape heading for AI standing in, or
+    /// immediately beside, one or more active fire fields. Candidate scoring looks
+    /// ahead at two distances so escaping one incendiary cannot blindly steer an
+    /// operator into another overlapping field.
+    /// </summary>
+    internal bool TryGetIncendiaryEscapeDirection(
+        Vector3 point,
+        Vector3 fallbackDirection,
+        out Vector3 direction)
+    {
+        var threatened = false;
+        var weightedEscape = Vector3.Zero;
+        for (var index = _activeIncendiaryGrenades.Count - 1; index >= 0; index--)
+        {
+            var incendiary = _activeIncendiaryGrenades[index];
+            if (!IsInstanceValid(incendiary))
+            {
+                _activeIncendiaryGrenades.RemoveAt(index);
+                continue;
+            }
+            if (!incendiary.IsBurning || incendiary.RemainingDuration <= 0.0f)
+            {
+                continue;
+            }
+
+            var offset = point - incendiary.GlobalPosition;
+            if (Mathf.Abs(offset.Y) > IncendiaryAiMaximumVerticalSeparation)
+            {
+                continue;
+            }
+            offset.Y = 0.0f;
+            var distance = offset.Length();
+            var avoidanceRadius = IncendiaryGrenade.FireRadius + IncendiaryAiAvoidanceMargin;
+            if (distance > avoidanceRadius)
+            {
+                continue;
+            }
+            threatened = true;
+            if (offset.LengthSquared() > 0.001f)
+            {
+                var depth = 1.0f + Mathf.Clamp(
+                    1.0f - distance / avoidanceRadius,
+                    0.0f,
+                    1.0f) * 2.0f;
+                weightedEscape += offset.Normalized() * depth;
+            }
+        }
+
+        if (!threatened)
+        {
+            direction = Vector3.Zero;
+            return false;
+        }
+
+        fallbackDirection.Y = 0.0f;
+        var fallback = fallbackDirection.LengthSquared() > 0.001f
+            ? fallbackDirection.Normalized()
+            : Vector3.Forward;
+        var bestDirection = weightedEscape.LengthSquared() > 0.001f
+            ? weightedEscape.Normalized()
+            : fallback;
+        var bestScore = ScoreIncendiaryEscapeDirection(point, bestDirection, fallback);
+        for (var candidateIndex = 0;
+             candidateIndex < IncendiaryAiEscapeCandidateCount;
+             candidateIndex++)
+        {
+            var angle = Mathf.Tau * candidateIndex / IncendiaryAiEscapeCandidateCount;
+            var candidate = new Vector3(Mathf.Cos(angle), 0.0f, Mathf.Sin(angle));
+            var score = ScoreIncendiaryEscapeDirection(point, candidate, fallback);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestDirection = candidate;
+            }
+        }
+
+        direction = bestDirection;
+        return true;
+    }
+
+    private float ScoreIncendiaryEscapeDirection(
+        Vector3 point,
+        Vector3 candidate,
+        Vector3 fallback)
+    {
+        var nearPoint = point + candidate * IncendiaryAiEscapeNearLookAhead;
+        var farPoint = point + candidate * IncendiaryAiEscapeFarLookAhead;
+        var minimumClearance = float.PositiveInfinity;
+        var weightedProgress = 0.0f;
+        var activeFields = 0;
+        foreach (var incendiary in _activeIncendiaryGrenades)
+        {
+            if (!IsInstanceValid(incendiary)
+                || !incendiary.IsBurning
+                || incendiary.RemainingDuration <= 0.0f)
+            {
+                continue;
+            }
+
+            var center = incendiary.GlobalPosition;
+            if (Mathf.Abs(point.Y - center.Y) > IncendiaryAiMaximumVerticalSeparation)
+            {
+                continue;
+            }
+            var currentDistance = IncendiaryAiHorizontalDistance(point, center);
+            if (currentDistance
+                > IncendiaryGrenade.FireRadius
+                    + IncendiaryAiAvoidanceMargin
+                    + IncendiaryAiEscapeFarLookAhead)
+            {
+                continue;
+            }
+
+            activeFields++;
+            var nearDistance = IncendiaryAiHorizontalDistance(nearPoint, center);
+            var farDistance = IncendiaryAiHorizontalDistance(farPoint, center);
+            var futureDistance = Mathf.Min(nearDistance, farDistance);
+            var clearance = futureDistance
+                - (IncendiaryGrenade.FireRadius + IncendiaryAiAvoidanceMargin);
+            minimumClearance = Mathf.Min(minimumClearance, clearance);
+            var importance = 1.0f + Mathf.Clamp(
+                1.0f - currentDistance / (IncendiaryGrenade.FireRadius * 2.0f),
+                0.0f,
+                1.0f) * 2.0f;
+            weightedProgress += (farDistance - currentDistance) * importance;
+            if (nearDistance < IncendiaryGrenade.FireRadius)
+            {
+                weightedProgress -= (IncendiaryGrenade.FireRadius - nearDistance) * 18.0f;
+            }
+        }
+
+        return activeFields == 0
+            ? 0.0f
+            : minimumClearance * 4.0f
+                + weightedProgress
+                + candidate.Dot(fallback) * 0.2f;
+    }
+
+    private static float IncendiaryAiHorizontalDistance(Vector3 first, Vector3 second)
+        => new Vector2(first.X - second.X, first.Z - second.Z).Length();
 
     internal void ApplyIncendiaryDamageTick(
         Vector3 position,

@@ -890,6 +890,7 @@ public partial class SquadMate
 
     private void OnCombatIncapacitated()
     {
+        ResetIncendiaryAvoidance();
         ClearCombatTarget();
         _combatThreat = null;
         _combatNavigationStallCount = 0;
@@ -939,6 +940,7 @@ public partial class SquadMate
         _combatTargetScanTimer = 0.0f;
         _combatSightTimer = 0.0f;
         _combatMemoryRemaining = 0.0f;
+        ResetIncendiaryAvoidance();
         ClearCombatTarget();
         ResetMovementProgress();
         if (IsInstanceValid(Main))
