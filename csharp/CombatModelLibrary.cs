@@ -1710,11 +1710,14 @@ internal static partial class CombatModelLibrary
             throw new InvalidOperationException("GSh-18 model has no usable geometry bounds.");
         }
 
-        var targetLength = firstPerson ? Gsh18FirstPersonLength : Gsh18PreviewLength;
         // The reloadable DCC asset already uses the shared metre-space weapon
-        // contract: X is lateral, Y is up, and the muzzle points toward -Z.
-        // Keep its authored first-person origin and only enlarge world previews.
-        var scale = targetLength / sourceBounds.Size.Z;
+        // contract at the authored first-person size: X is lateral, Y is up,
+        // and the muzzle points toward -Z. Do not normalize that viewmodel from
+        // only the body bounds; doing so enlarges the weapon while its hand-fit
+        // anchors remain in the original metre-space frame.
+        var scale = firstPerson
+            ? 1.0f
+            : Gsh18PreviewLength / Gsh18FirstPersonLength;
         var wrapper = new Node3D
         {
             Name = "AuthoredGsh18Visual",

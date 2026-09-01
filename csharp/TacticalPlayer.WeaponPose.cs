@@ -95,13 +95,13 @@ public partial class TacticalPlayer
                 WeaponPlatform.M1911 => 0.200f,
                 _ => 0.19f
             };
-            var sidearmAdsX = EquippedWeapon.Platform == WeaponPlatform.DesertEagle
-                ? 0.085f
-                : 0.050f;
-            // Keep the pistol close to the screen and push it a touch farther
-            // right, so ADS reads like a tighter ready-up rather than a full
-            // arm extension. This also shortens the transition distance from
-            // the hip pose, which reduces visible sleeve sweep on ultrawide.
+            // Centre the physical barrel axis rather than carrying the hip-fire
+            // right bias into ADS. The GSh muzzle socket sits 5.04 mm right of
+            // its authored origin, so absorb that offset through WeaponRoot's
+            // inherited 0.68 presentation scale.
+            var sidearmAdsX = EquippedWeapon.Platform == WeaponPlatform.GSh18
+                ? -0.00343f
+                : 0.0f;
             return new Vector3(
                 sidearmAdsX,
                 -pistolSightHeight * _weaponRoot.Scale.Y + 0.025f,

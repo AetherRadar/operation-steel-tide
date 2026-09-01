@@ -13,8 +13,8 @@ public partial class TacticalPlayer
     private const float AuthoredArmPresentationScale = 0.72f;
     private const float AuthoredSidearmArmPresentationScale = 0.64f;
     private const float AuthoredSidearmArmPitchRadians = 0.30f;
-    private const float AuthoredSidearmAdsArmPresentationScale = 0.54f;
-    private const float AuthoredSidearmAdsArmPitchRadians = 0.50f;
+    private const float AuthoredSidearmAdsArmPresentationScale = 0.64f;
+    private const float AuthoredSidearmAdsArmPitchRadians = 0.30f;
     private const float AuthoredLargeSidearmArmPresentationScale = 0.58f;
     private const float AuthoredLargeSidearmArmPitchRadians = 0.45f;
     private const float AuthoredLargeSidearmAdsArmPresentationScale = 0.42f;
