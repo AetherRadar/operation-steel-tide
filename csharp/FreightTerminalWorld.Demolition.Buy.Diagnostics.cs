@@ -163,12 +163,16 @@ public partial class FreightTerminalWorld
         smoke.BeginGroundFuseForDiagnostics();
         smoke._PhysicsProcess(2.0);
         var smokeCenter = smoke.GlobalPosition + Vector3.Up * 1.45f;
+        var smokeInnerEdge = smokeCenter + Vector3.Forward * (SmokeGrenade.CloudRadius - 0.1f);
+        var smokeOuterEdge = smokeCenter + Vector3.Forward * (SmokeGrenade.CloudRadius + 0.2f);
         var smokeReady = smoke.IsDeployed
             && smoke.RemainingDuration > 12.0f
-            && smoke.CloudVisualCount == 24
+            && smoke.CloudVisualCount == SmokeGrenade.VisualLobeCount
             && smoke.IsInGroup(SmokeGrenade.ActiveGroupName)
             && smoke.OwnerCollisionExcluded
             && IsLineObscuredBySmoke(smokeCenter + Vector3.Left * 8.0f, smokeCenter + Vector3.Right * 8.0f)
+            && IsLineObscuredBySmoke(smokeInnerEdge + Vector3.Left, smokeInnerEdge + Vector3.Right)
+            && !IsLineObscuredBySmoke(smokeOuterEdge + Vector3.Left, smokeOuterEdge + Vector3.Right)
             && !IsLineObscuredBySmoke(smokeCenter + Vector3.Forward * 12.0f, smokeCenter + Vector3.Forward * 18.0f);
         smoke.QueueFree();
 
@@ -203,7 +207,7 @@ public partial class FreightTerminalWorld
             && smokeReady
             && incendiaryReady
             && overlapDamageGuard;
-        GD.Print($"DEMOLITION_BUY_CHECK valid={valid} domain={domainReady} scene={sceneReady} signals={purchaseRequests} primary_locked={!openingPrimary.Affordable} pistol_cost={pistolQuote.TotalCost} pistol_balance={pistolQuote.RemainingFunds} gsh18_cost={gsh18Quote.TotalCost} gsh18_platform={gsh18Loadout.Sidearm?.Platform} m24={m24Loadout.Weapon?.Platform}:{m24Quote.TotalCost} smoke_cost={DemolitionBuyCatalog.SmokeGrenadePrice} smoke={smokeReady} incendiary={incendiaryReady}:{DemolitionBuyCatalog.IncendiaryGrenadePrice} overlap_guard={overlapDamageGuard} combo_blocked={unaffordableBlocked} hud={hudReady}");
+        GD.Print($"DEMOLITION_BUY_CHECK valid={valid} domain={domainReady} scene={sceneReady} signals={purchaseRequests} primary_locked={!openingPrimary.Affordable} pistol_cost={pistolQuote.TotalCost} pistol_balance={pistolQuote.RemainingFunds} gsh18_cost={gsh18Quote.TotalCost} gsh18_platform={gsh18Loadout.Sidearm?.Platform} m24={m24Loadout.Weapon?.Platform}:{m24Quote.TotalCost} smoke_cost={DemolitionBuyCatalog.SmokeGrenadePrice} smoke={smokeReady}:{SmokeGrenade.CloudRadius:0.0}m/{SmokeGrenade.VisualLobeCount}/{SmokeGrenade.VisualOpacity:0.00} incendiary={incendiaryReady}:{DemolitionBuyCatalog.IncendiaryGrenadePrice} overlap_guard={overlapDamageGuard} combo_blocked={unaffordableBlocked} hud={hudReady}");
         GD.Print($"DEMOLITION_BUY_PASS valid={valid}");
         GetTree().Paused = false;
         await WaitFrames(30);

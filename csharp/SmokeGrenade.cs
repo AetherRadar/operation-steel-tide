@@ -9,9 +9,11 @@ public partial class SmokeGrenade : RigidBody3D
     private const float MaximumAirborneLifetime = 18.0f;
 
     public const string ActiveGroupName = "active_smoke_grenades";
-    public const float CloudRadius = 5.6f;
+    public const float CloudRadius = 7.4f;
     public const float CloudDuration = 13.0f;
-    public const float VisualCoverageRadius = 5.55f;
+    public const float VisualCoverageRadius = 7.4f;
+    public const int VisualLobeCount = 40;
+    public const float VisualOpacity = 0.46f;
 
     public Node? OwnerBody { get; set; }
     public bool IsDeployed { get; private set; }
@@ -194,17 +196,17 @@ public partial class SmokeGrenade : RigidBody3D
         {
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-            AlbedoColor = new Color(0.56f, 0.6f, 0.57f, 0.36f),
+            AlbedoColor = new Color(0.56f, 0.6f, 0.57f, VisualOpacity),
             Roughness = 1.0f
         };
         var multimesh = new MultiMesh
         {
             TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
-            InstanceCount = 24,
+            InstanceCount = VisualLobeCount,
             Mesh = new SphereMesh
             {
-                Radius = 0.82f,
-                Height = 1.64f,
+                Radius = 0.88f,
+                Height = 1.76f,
                 RadialSegments = 10,
                 Rings = 6
             }
@@ -219,12 +221,12 @@ public partial class SmokeGrenade : RigidBody3D
         };
         for (var index = 0; index < multimesh.InstanceCount; index++)
         {
-            var angle = index * Mathf.Tau / 24.0f + (index % 3) * 0.21f;
+            var angle = index * Mathf.Tau / VisualLobeCount + (index % 2) * 0.16f;
             var ring = index % 4;
-            var radial = 0.9f + ring * 0.95f;
+            var radial = 0.9f + ring * 1.5f;
             var position = new Vector3(
                 Mathf.Cos(angle) * radial,
-                0.3f + (index % 5) * 0.48f,
+                0.25f + (index % 5) * 0.45f,
                 Mathf.Sin(angle) * radial);
             var scale = new Vector3(
                 1.7f + (index % 3) * 0.25f,

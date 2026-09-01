@@ -305,7 +305,11 @@ public partial class FreightTerminalWorld
             && _player.CollisionMask == 0
             && _player.DemolitionColliderDisabledForDiagnostics;
 
-        var smokePresentationAligned = Mathf.Abs(SmokeGrenade.CloudRadius - SmokeGrenade.VisualCoverageRadius) <= 0.1f;
+        var smokePresentationAligned = Mathf.Abs(
+                SmokeGrenade.CloudRadius - SmokeGrenade.VisualCoverageRadius) <= 0.1f
+            && SmokeGrenade.CloudRadius >= 7.3f
+            && SmokeGrenade.VisualLobeCount >= 40
+            && SmokeGrenade.VisualOpacity >= 0.44f;
         _hud.ShowOperationsOffice();
         var presentationRestored = !_hud.IsDemolitionSquadRosterHidden
             && !_hud.IsDemolitionSkillHudVisible
@@ -330,7 +334,7 @@ public partial class FreightTerminalWorld
             && noAllyPlayerEliminated
             && smokePresentationAligned
             && presentationRestored;
-        GD.Print($"DEMOLITION_RULES_CHECK valid={valid} roster_hidden={rosterHidden} skill_hud={skillHudVisible} orders_hidden={ordersHidden} utility={utilityHudVisible} footer_separated={demolitionFooterSeparated} recon_range={DemolitionReconScanRange:0.0} recon_boundary={reconBoundary} inputs={roleRules} elimination_rules={eliminationRules} device_lifecycle={deviceLifecycleValid} spectator_localized={spectatorLocalized} eliminated_device_localized={eliminatedDeviceSpectatorLocalized} player_eliminated={playerEliminated} player_frozen={playerFrozenAfterElimination} player_collision={playerEliminationCollision} player_collider_disabled={playerColliderDisabled} player_reset={playerRestoredForNextRound} mate_running_before_elimination={mateWasRunningBeforeElimination} mate_eliminated={mateEliminated} mate_frozen={mateFrozenAfterElimination} mate_collision={mateEliminationCollision} mate_shapes_disabled={mateCollisionShapesDisabled} mate_reset={mateRestoredForNextRound} planted_wipe_continues={plantedWipeDeviceContinues} fire_stance_reset={demolitionFireStanceReset} no_ally_eliminated={noAllyPlayerEliminated} no_ally_mates={noAllyMatesEliminated} smoke_aligned={smokePresentationAligned} presentation_restored={presentationRestored} round_active={_demolitionRoundActive}");
+        GD.Print($"DEMOLITION_RULES_CHECK valid={valid} roster_hidden={rosterHidden} skill_hud={skillHudVisible} orders_hidden={ordersHidden} utility={utilityHudVisible} footer_separated={demolitionFooterSeparated} recon_range={DemolitionReconScanRange:0.0} recon_boundary={reconBoundary} inputs={roleRules} elimination_rules={eliminationRules} device_lifecycle={deviceLifecycleValid} spectator_localized={spectatorLocalized} eliminated_device_localized={eliminatedDeviceSpectatorLocalized} player_eliminated={playerEliminated} player_frozen={playerFrozenAfterElimination} player_collision={playerEliminationCollision} player_collider_disabled={playerColliderDisabled} player_reset={playerRestoredForNextRound} mate_running_before_elimination={mateWasRunningBeforeElimination} mate_eliminated={mateEliminated} mate_frozen={mateFrozenAfterElimination} mate_collision={mateEliminationCollision} mate_shapes_disabled={mateCollisionShapesDisabled} mate_reset={mateRestoredForNextRound} planted_wipe_continues={plantedWipeDeviceContinues} fire_stance_reset={demolitionFireStanceReset} no_ally_eliminated={noAllyPlayerEliminated} no_ally_mates={noAllyMatesEliminated} smoke_aligned={smokePresentationAligned}:{SmokeGrenade.CloudRadius:0.0}m/{SmokeGrenade.VisualLobeCount}/{SmokeGrenade.VisualOpacity:0.00} presentation_restored={presentationRestored} round_active={_demolitionRoundActive}");
         GD.Print($"DEMOLITION_RULES_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
