@@ -701,7 +701,6 @@ public partial class TacticalPlayer
         if (EquippedWeapon.Platform != WeaponPlatform.M3A1)
         {
             EnsureAuthoredArmsForPlatform();
-            EnsureAuthoredAnimatedReloadArms();
         }
         if (useAuthoredGsh18)
         {
@@ -1083,30 +1082,15 @@ public partial class TacticalPlayer
             return;
         }
 
-        // Start from the authored two-hand hold every frame so fixed diagnostic
-        // samples and normal playback produce the same pose. Swing the complete
-        // arm around its authored node pivot before applying the small reach
-        // correction that puts the visible grip marker on the magazine handoff.
-        // Because the sleeve, hand, wrist and markers share LeftArm as their
-        // parent, this keeps the authored sleeve continuous throughout the move.
+        // Start from the authored two-hand hold every frame, then translate the
+        // complete support arm until its real grip marker meets the live prop.
+        // Do not swing the whole sleeve around its root: that can turn the cuff
+        // upright in front of the camera and overlap the firing arm.
         AlignAuthoredArmsToWeapon();
-        var restTransform = arms.LeftArm.Transform;
-        var restGripInArms = arms.MarkerTransformInRoot(arms.LeftGripFrame).Origin;
         var targetInArms = arms.Root.GlobalTransform.AffineInverse()
             * ReloadSupportTargetGlobal();
-        var restReach = restGripInArms - restTransform.Origin;
-        var targetReach = targetInArms - restTransform.Origin;
-        if (restReach.LengthSquared() > 0.000001f
-            && targetReach.LengthSquared() > 0.000001f)
-        {
-            var pivotSwing = new Quaternion(restReach.Normalized(), targetReach.Normalized());
-            arms.LeftArm.Transform = new Transform3D(
-                new Basis(pivotSwing) * restTransform.Basis,
-                restTransform.Origin);
-        }
-
-        var rotatedGripInArms = arms.MarkerTransformInRoot(arms.LeftGripFrame).Origin;
-        arms.LeftArm.Position += targetInArms - rotatedGripInArms;
+        var gripInArms = arms.MarkerTransformInRoot(arms.LeftGripFrame).Origin;
+        arms.LeftArm.Position += targetInArms - gripInArms;
     }
 
     private Vector3 M4ReloadSupportTargetGlobal()

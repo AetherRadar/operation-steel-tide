@@ -103,6 +103,20 @@ public partial class TacticalPlayer
 
     private bool UpdateAnimatedReloadArmsPresentation()
     {
+        // Reloads use the same split authored arms as the ready pose: the right
+        // arm remains on the firing grip and the left arm alone follows the
+        // live magazine/action contact.  Never expose the independent skinned
+        // reload rig, which can add a second pair of limbs and a second motion
+        // path in front of the weapon.
+        if (IsInstanceValid(_authoredAnimatedReloadArms?.Root))
+        {
+            _authoredAnimatedReloadArms.Root.Visible = false;
+        }
+        return false;
+    }
+
+    private bool UpdateLegacyAnimatedReloadArmsPresentation()
+    {
         var animatedReloadArms = _authoredAnimatedReloadArms;
         var sidearmReload = _isReloading
             && WeaponCatalog.IsSidearm(EquippedWeapon.Platform);

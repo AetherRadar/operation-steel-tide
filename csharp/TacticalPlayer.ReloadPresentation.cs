@@ -51,7 +51,9 @@ public partial class TacticalPlayer
         _magazine.Visible = progress < profile.StowEnd;
         _magazine.Position = profile.MagazineHome;
         _magazine.Rotation = profile.MagazineRotation;
-        _spareMagazine.Visible = progress >= profile.StowEnd;
+        // Hide both magazines during the pouch hand-off.  The replacement
+        // becomes visible only once the support hand has actually acquired it.
+        _spareMagazine.Visible = progress >= profile.AcquireEnd;
         _spareMagazine.Position = profile.SpareMagazineHome;
         _spareMagazine.Rotation = profile.StowedRotation;
         var sidearmSlideLockedOpen = sidearm
