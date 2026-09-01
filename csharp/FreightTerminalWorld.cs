@@ -3291,29 +3291,6 @@ public partial class FreightTerminalWorld : Node3D
         GetTree().Quit(valid ? 0 : 2);
     }
 
-    private async void CaptureReloadFrame()
-    {
-        SetCaptureLanguage("en");
-        _player.GrantFireablePrimaryForDiagnostics();
-        foreach (var enemy in _enemies)
-        {
-            enemy.ProcessMode = ProcessModeEnum.Disabled;
-        }
-        _player.Fire();
-        await WaitFrames(8);
-        Input.ActionPress("reload");
-        await WaitFrames(2);
-        Input.ActionRelease("reload");
-        var deadline = Time.GetTicksMsec() + 2500;
-        while (_player.ReloadProgress < 0.63f && Time.GetTicksMsec() < deadline)
-        {
-            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-        }
-        SaveViewportImage("res://reload_validation.png");
-        GD.Print($"RELOAD_CHECK active={_player.IsReloading} progress={_player.ReloadProgress:0.00} ammo={_player.Ammo}");
-        GetTree().Quit();
-    }
-
     private async void CaptureOperatorFrame()
     {
         SetCaptureLanguage("en");

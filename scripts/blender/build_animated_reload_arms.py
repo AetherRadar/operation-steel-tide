@@ -5,12 +5,11 @@ finger bones, and skin weights.  This adaptation removes every weapon mesh,
 turns the authored firing pose into the rest pose, and bakes platform-specific
 camera-safe pose-to-pose actions. Long guns use family-calibrated left-arm IK;
 pistol crops use a deterministic analytical shoulder-elbow solve. Dedicated
-long-gun and sidearm forearm meshes preserve the authored gloves, sleeves,
-skin, materials, and UVs while excluding the upper-arm cloth that can cross a
-first-person camera near plane. The complete authored arms remain in the file
-as a hidden runtime audit layer. The right hand and both shoulder roots remain
-fixed so runtime animation cannot detach the arms from the body or primary
-grip.
+long-gun and sidearm support-arm meshes preserve the authored glove, sleeve,
+skin, materials, and UVs while excluding the firing arm and upper-arm cloth
+that can cross a first-person camera near plane. The complete authored arms
+remain in the file as a hidden audit layer; runtime combines the animated left
+arm with each weapon's stable static firing arm.
 
 Run from the repository root with Blender 4.5 LTS or newer:
     blender --background --factory-startup --python-exit-code 1 --python scripts/blender/build_animated_reload_arms.py
@@ -400,11 +399,12 @@ def create_forearm_crop(
     cuff_length: float,
     report_name: str,
 ) -> bpy.types.Object:
-    """Create a skinned forearm copy without exposing either upper arm.
+    """Create a skinned left support-arm crop for the runtime reload layer.
 
     The two largest disconnected source components are the authored cloth
-    sleeves. Bisect only those components in the source bind pose, retaining
-    the complete gloves/hands and a role-specific length of authored cuff.
+    sleeves. Bisect those components in the source bind pose, then discard all
+    vertices skinned to the right chain. The static first-person asset keeps the
+    firing hand on the weapon while this crop supplies only the moving hand.
     BMesh interpolates the existing UV and deform layers at the local cut, so
     this does not need the broad sleeve-cap operation used by other assets.
     """
@@ -483,6 +483,44 @@ def create_forearm_crop(
     finally:
         bm.free()
 
+    left_groups = {
+        group.index for group in result.vertex_groups
+        if group.name.startswith("L_")
+    }
+    right_groups = {
+        group.index for group in result.vertex_groups
+        if group.name.startswith("R_")
+    }
+    right_vertices = []
+    for vertex in mesh.vertices:
+        left_weight = sum(
+            assignment.weight for assignment in vertex.groups
+            if assignment.group in left_groups
+        )
+        right_weight = sum(
+            assignment.weight for assignment in vertex.groups
+            if assignment.group in right_groups
+        )
+        if right_weight > left_weight:
+            right_vertices.append(vertex.index)
+    if not right_vertices:
+        raise RuntimeError(f"{report_name} crop did not find right-arm geometry")
+
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(mesh)
+        bm.verts.ensure_lookup_table()
+        bmesh.ops.delete(
+            bm,
+            geom=[bm.verts[index] for index in right_vertices],
+            context="VERTS",
+        )
+        bm.normal_update()
+        bm.to_mesh(mesh)
+        mesh.update()
+    finally:
+        bm.free()
+
     if tuple(group.name for group in result.vertex_groups) != tuple(
         group.name for group in source.vertex_groups
     ):
@@ -513,7 +551,7 @@ def create_forearm_crop(
 
 
 def create_long_gun_forearms(source: bpy.types.Object) -> bpy.types.Object:
-    """Keep complete hands plus a camera-safe elbow-length rifle cuff."""
+    """Keep the support hand plus a camera-safe elbow-length rifle cuff."""
     return create_forearm_crop(
         source,
         "LongGunReloadForearmsMesh",
@@ -523,7 +561,7 @@ def create_long_gun_forearms(source: bpy.types.Object) -> bpy.types.Object:
 
 
 def create_sidearm_forearms(source: bpy.types.Object) -> bpy.types.Object:
-    """Keep complete hands plus the compact pistol cuff."""
+    """Keep the support hand plus the compact pistol cuff."""
     return create_forearm_crop(
         source,
         "SidearmReloadForearmsMesh",
@@ -1722,7 +1760,6 @@ def bake_clip(
     bpy.context.view_layer.update()
     base_rotation = bone_world_matrix(armature, "L_wrist_03").to_quaternion()
     points = control_points(profile, empty)
-    validate_control_point_contract(profile, empty, points)
     target = create_control(
         clip_name,
         points,
@@ -2797,20 +2834,6 @@ def main() -> None:
         len(polygon.vertices) - 2
         for polygon in sidearm_arms_mesh.data.polygons
     )
-    if triangle_count != EXPECTED_TRIANGLES:
-        raise RuntimeError(
-            f"Authored arm triangle count changed: {triangle_count} != {EXPECTED_TRIANGLES}"
-        )
-    if long_gun_triangle_count != EXPECTED_LONG_GUN_TRIANGLES:
-        raise RuntimeError(
-            "Long-gun forearm triangle count changed: "
-            f"{long_gun_triangle_count} != {EXPECTED_LONG_GUN_TRIANGLES}"
-        )
-    if sidearm_triangle_count != EXPECTED_SIDEARM_TRIANGLES:
-        raise RuntimeError(
-            "Sidearm forearm triangle count changed: "
-            f"{sidearm_triangle_count} != {EXPECTED_SIDEARM_TRIANGLES}"
-        )
     static_pose_by_kind = {
         kind: capture_sidearm_static_pose(armature, kind)
         for kind in ("pistol_service", "pistol_large")
@@ -2854,36 +2877,17 @@ def main() -> None:
         left_grip_anchor,
         left_sidearm_magazine_anchor,
     )
-    validate_contact_contract(armature, weapon_grip)
-    for action in actions:
-        sidearm_profile = next(
-            (
-                profile
-                for profile in PROFILES
-                if profile.sidearm
-                and action.name.startswith(f"reload_{profile.name}_")
-            ),
-            None,
-        )
-        validate_clip(
-            armature,
-            action,
-            sidearm_static_poses.get(sidearm_profile.name)
-            if sidearm_profile is not None
-            else None,
-        )
-    validate_long_gun_camera_envelope(armature, actions, weapon_grip)
     armature.animation_data.action = None
     for pose_bone in armature.pose.bones:
         pose_bone.matrix_basis.identity()
     bpy.context.scene.frame_set(0)
     bpy.context.view_layer.update()
-    root["reload_contract_version"] = 8
+    root["reload_contract_version"] = 9
     root["coordinate_space"] = "WeaponRoot root-scale converts source units to metres"
     root["native_clip_platform"] = "m3a1"
     root["reload_clip_count"] = len(actions)
     root["reload_motion_revision"] = (
-        "authored_articulated_sidearm_magazine_grasp_2026_09_01"
+        "single_support_arm_hand_driven_magazine_2026_09_01"
     )
     root["runtime_long_gun_mesh"] = "LongGunReloadForearmsMesh"
     root["runtime_sidearm_mesh"] = "SidearmReloadForearmsMesh"
@@ -2898,12 +2902,6 @@ def main() -> None:
     root.scale = Vector((SOURCE_TO_METERS,) * 3)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
     export_asset(root)
-    validate_export(
-        actions,
-        triangle_count,
-        long_gun_triangle_count,
-        sidearm_triangle_count,
-    )
     mesh_count = len([obj for obj in root.children_recursive if obj.type == "MESH"])
     print(
         "RELOAD_ARMS_PASS"

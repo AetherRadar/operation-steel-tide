@@ -11,7 +11,6 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
     private Vector3 _leftSidearmMagazineAnchorInBone;
     private Vector3 _rightPalmContactInBone;
     private readonly Dictionary<WeaponPlatform, Node3D> _leftElbowPoleFrames = new();
-    private readonly int[][] _leftDigitChains;
     private bool _contactPointsInitialized;
     private Vector3 _presentedLeftSupportTargetGlobalPosition;
     private string _presentedClipName = string.Empty;
@@ -57,39 +56,6 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
         LeftElbowBone = Skeleton.FindBone("L_elbow_02");
         LeftWristBone = Skeleton.FindBone("L_wrist_03");
         LeftPalmBone = Skeleton.FindBone("L_palm_015");
-        _leftDigitChains = new[]
-        {
-            new[]
-            {
-                Skeleton.FindBone("L_thumb1_04"),
-                Skeleton.FindBone("L_thumb2_05"),
-                Skeleton.FindBone("L_thumb3_00")
-            },
-            new[]
-            {
-                Skeleton.FindBone("L_point1_07"),
-                Skeleton.FindBone("L_point2_08"),
-                Skeleton.FindBone("L_point3_09")
-            },
-            new[]
-            {
-                Skeleton.FindBone("L_middle1_011"),
-                Skeleton.FindBone("L_middle2_012"),
-                Skeleton.FindBone("L_middle3_013")
-            },
-            new[]
-            {
-                Skeleton.FindBone("L_ring1_016"),
-                Skeleton.FindBone("L_ring2_017"),
-                Skeleton.FindBone("L_ring3_018")
-            },
-            new[]
-            {
-                Skeleton.FindBone("L_pink1_020"),
-                Skeleton.FindBone("L_pink2_021"),
-                Skeleton.FindBone("L_pink3_022")
-            }
-        };
         RightPalmBone = Skeleton.FindBone("R_palm_039");
         foreach (var platform in Enum.GetValues<WeaponPlatform>())
         {
@@ -193,32 +159,13 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
     public Vector3 LeftWristGlobalPosition
         => BoneFrameGlobal(LeftWristBone).Origin;
 
-    public float MinimumLeftDigitCurlRadians
-    {
-        get
-        {
-            var minimum = float.PositiveInfinity;
-            foreach (var chain in _leftDigitChains)
-            {
-                var curl = 0.0f;
-                foreach (var bone in chain)
-                {
-                    curl += Quaternion.Identity.AngleTo(
-                        Skeleton.GetBonePoseRotation(bone));
-                }
-                minimum = Mathf.Min(minimum, curl);
-            }
-            return minimum;
-        }
-    }
-
     public Vector3 RightWristGlobalPosition
         => BoneFrameGlobal(Skeleton.FindBone("R_wrist_026")).Origin;
 
     public Vector3 PresentedLeftSupportTargetGlobalPosition
         => _presentedLeftSupportTargetGlobalPosition;
 
-    public void AcceptAuthoredSidearmPose()
+    public void AcceptAuthoredPose()
         => _presentedLeftSupportTargetGlobalPosition =
             LeftPalmCenterGlobalPosition;
 
@@ -310,7 +257,7 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
             * targetGlobalPosition;
         if (UsesSidearmForearms)
         {
-            AcceptAuthoredSidearmPose();
+            AcceptAuthoredPose();
             return;
         }
 

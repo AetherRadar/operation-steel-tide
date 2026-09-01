@@ -1161,31 +1161,29 @@ animated smg** by **DJMaesen**:
 - Exact license: Creative Commons Attribution 4.0 International (CC BY 4.0),
   https://creativecommons.org/licenses/by/4.0/
 - Source acquisition date: 2026-08-21.
-- Animated reload-arm derivative generated 2026-08-29, revised/reviewed for IK
+- Animated reload-arm derivative generated 2026-08-29, revised for IK
   continuity on 2026-08-30, and static-matched for compact sidearm reload
-  endpoints and rebuilt with camera-safe six-family pose-to-pose clips on
-  2026-08-31. The dedicated long-gun forearm runtime crop and camera-envelope
-  rejection gate were rebuilt and reviewed in Godot on 2026-08-31. Professional
-  articulated sidearm magazine grasps, prop-follow contact, and platform-specific
-  slide manipulation were rebuilt and visually reviewed on 2026-09-01.
+  endpoints with six-family pose-to-pose clips on 2026-08-31. Articulated
+  sidearm magazine grasps and platform-specific slide manipulation were rebuilt
+  on 2026-09-01. Both runtime meshes were then rebuilt as left-only support-arm
+  crops, with visible magazine props driven directly by the animated hand.
 - Required attribution: **"fps animated smg" by DJMaesen, licensed under CC BY
   4.0.** Indicate that Operation Steel Tide removed the visible SMG, baked the
   authored frame-155 two-hand pose as the bind pose, and added platform-specific
   reload clips and contract markers.
 
-`animated_reload_arms.glb` contract revision 8 retains one 13,700-triangle
-skinned full-arm mesh as a non-runtime audit layer, adds one 12,686-triangle
-long-gun crop containing both authored hands and 28 source-unit elbow-length
-cuffs, and retains one 9,334-triangle pistol crop containing the authored hands
-and 16 source-unit compact cuffs (Godot removes 28 collinear cut-ring triangles,
-yielding 9,306 at runtime). All three meshes share the original
-armature/skin, materials, UVs, and normalized skin weights. Runtime renders only
-the long-gun or pistol crop; a geometry-free compatibility node retains the
+`animated_reload_arms.glb` contract revision 9 retains one 13,700-triangle
+skinned full-arm mesh as a non-runtime audit layer, adds one 6,343-triangle
+left-only long-gun crop with a 28 source-unit elbow-length cuff, and one
+4,667-triangle left-only pistol crop with a 16 source-unit compact cuff. All
+three meshes share the original armature/skin, materials, UVs, and normalized
+skin weights. Runtime renders the moving support-arm crop beside the
+weapon-specific static firing arm; a geometry-free compatibility node retains the
 legacy `ReloadArmsMesh` diagnostic name while the complete audit mesh remains
 hidden. The GLB also retains three
 embedded PNG images and 24 tactical/empty reload clips across twelve profiles.
-Both shoulder roots and the right palm-to-grip relation remain fixed; the left
-arm is the moving reload limb. `LeftSidearmMagazineAnchorFrame` is attached to
+Both shoulder roots and the right palm-to-grip relation remain fixed; only the
+left arm is present in the runtime reload layer. `LeftSidearmMagazineAnchorFrame` is attached to
 the actual evaluated glove surface for compact pistol magazine exchange. The
 2026-08-31 Blender pass groups the profiles into straight-rifle, rock-and-lock,
 MP5, precision/internal, service-pistol, and Desert Eagle choreography. Long-
@@ -1195,36 +1193,24 @@ mechanical beat; M24 keeps its bolt beat in both variants. Pistol crops use a
 deterministic analytical shoulder/elbow solve, platform-calibrated magazine
 grips, empty slide beats, and exact static endpoints, so no generic IK branch
 flip or runtime shoulder translation can smear the sleeve through the near
-plane. Revision 8 replaces the former open-palm approximation with a dedicated
-five-digit magazine grasp: four finger chains close around the magazine while
-the thumb opposes them, and the real installed/staged magazine follows the DCC
-glove contact during extraction and insertion. Service pistols and Desert Eagle
-use separately timed contact/pull/hold/release slide beats. Runtime validation
-requires at least 0.65 radians of curl on every digit chain; the delivered grasp
-measures 1.291766 radians at the thumb and 2.225294-2.280825 radians across the
-four fingers, with 0.051759 m glove-to-anchor clearance at both magazine beats.
-Adjacent baked quaternions remain hemisphere-continuous. The builder
-also verifies fixed shoulder roots/right grip, control and evaluated-palm
-envelopes, per-frame bone/joint/palm continuity, glove-surface contact, and all
-24 GLB clip durations. Its new right-grip camera-proxy gate samples every other
-frame of all sixteen long-gun clips, accepts the runtime crop at no more than
-0.719082/1.183342/0.643858 m horizontal/depth/vertical span and 0.552705 m rear
-extent, and proves the retained full layer is rejected at 1.843685/2.900767/
-0.979012 m and 2.357507 m rear extent. No project-authored replacement body
+plane. Revision 9 keeps the dedicated five-digit magazine grasp, removes the
+animated firing-arm geometry from both runtime crops, and places the visible
+installed or replacement magazine directly at the animated left-palm contact
+during extraction and insertion. Both magazine props are hidden during the
+pouch hand-off, so the runtime never renders an independently floating magazine.
+Service pistols and Desert Eagle retain separately timed
+contact/pull/hold/release slide beats. No project-authored replacement body
 geometry is introduced.
-The builder emits three extracted texture sidecars but no dedicated studio
-preview PNG; visual review uses the in-engine reload captures and deterministic
-diagnostic.
 
 | Animated reload-arm file | Bytes | SHA-256 |
 | --- | ---: | --- |
 | Original `../../source_art/third_party/djmaesen_fps_smg45/fps_animated_smg.glb` | 22,128,372 | `61F30D8980CE292869F97D98587A2736BAF719A19C0A32756838BD9EF2ADA83A` |
-| Runtime `djmaesen_smg45/animated_reload_arms.glb` | 11,192,712 | `5C282D5925146F2BFD86CF3B8F82C082CC53DA2B8642C3797AD1D4D5579181B8` |
+| Runtime `djmaesen_smg45/animated_reload_arms.glb` | 10,711,916 | `5982868CFCD1AAAB0671DBB9587CE8A6A9EE167041F56BD01DB6BA1F2DB66836` |
 | Texture `djmaesen_smg45/animated_reload_arms_Image_0.png` | 1,913,243 | `3BC291E07FA1E04DC5CEE727297D7051966A8D8AC39FCCE622BFB7DC408CB002` |
 | Texture `djmaesen_smg45/animated_reload_arms_Image_1.png` | 3,561,679 | `92CF1397C106CF721902A676985E82253CEC6E526DBD25510BD4E8B8685EEEA1` |
 | Texture `djmaesen_smg45/animated_reload_arms_Image_2.png` | 3,527,986 | `ADD5B1429F735916033AE45BD755B6A6DA70A9EBD047EED38F78C7D64A967F08` |
-| DCC source `../../source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend` | 36,341,970 | `55CA1B43D474A3374D404BC311F0A47C9D82767B92F3FA35FB0CCA719F2E2402` |
-| Builder `../../scripts/blender/build_animated_reload_arms.py` | 113,403 | `7951A3967F8CFDFC306F9898CF4F298210041CB3414852408403B73C2B52913E` |
+| DCC source `../../source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend` | 34,509,696 | `6C0F70FB02D9846966E44B85573B923CFF9D26B476E9653E9F7B228F45BA263E` |
+| Builder `../../scripts/blender/build_animated_reload_arms.py` | 113,156 | `E1D5A00AC58343E6FA5CDA60C65812E5DBE3E7B08C713B8F0A2F63DC57543E9B` |
 
 The source and every derived arm mesh remain copyright DJMaesen and are not
 covered by the repository's MIT license. Full attribution, static adaptations,

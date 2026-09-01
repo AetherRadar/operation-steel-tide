@@ -130,11 +130,6 @@ public partial class TacticalPlayer
         var supportTargetGlobal = useAnimatedPose && arms is not null
             ? arms.PresentedLeftSupportTargetGlobalPosition
             : ReloadSupportTargetGlobal();
-        var sidearmMinimumDigitCurl = useAnimatedPose
-            && WeaponCatalog.IsSidearm(platform)
-            && arms is not null
-                ? arms.MinimumLeftDigitCurlRadians
-                : 0.0f;
         return new AllWeaponReloadInspection(
             platform,
             (useAnimatedPose
@@ -199,8 +194,7 @@ public partial class TacticalPlayer
             bodyContinuity,
             rootInverse * supportTargetGlobal,
             screenContact,
-            visibleSupportPalm,
-            sidearmMinimumDigitCurl);
+            visibleSupportPalm);
     }
 
     internal void CancelReloadForDiagnostics()
@@ -303,8 +297,7 @@ public partial class TacticalPlayer
             bodyContinuity,
             Vector3.Zero,
             default,
-            leftPalm,
-            default);
+            leftPalm);
     }
 
     private ReloadScreenContactInspection InspectReloadScreenContact(
@@ -536,8 +529,7 @@ internal readonly record struct AllWeaponReloadInspection(
     ReloadBodyContinuityInspection BodyContinuity,
     Vector3 SupportTarget,
     ReloadScreenContactInspection ScreenContact,
-    Vector3 VisibleSupportPalm,
-    float SidearmMinimumDigitCurlRadians);
+    Vector3 VisibleSupportPalm);
 
 internal readonly record struct ReloadScreenContactInspection(
     Vector2 ScreenSize,

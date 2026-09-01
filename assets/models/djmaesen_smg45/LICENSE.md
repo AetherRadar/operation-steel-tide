@@ -19,8 +19,8 @@ The runtime models in this directory are adapted from **fps animated smg** by
   sidecars)
 - Build scripts: `scripts/blender/build_djmaesen_smg45.py`,
   `scripts/blender/build_first_person_arms.py`, and
-  `scripts/blender/build_animated_reload_arms.py` (113,403 bytes, SHA-256
-  `7951A3967F8CFDFC306F9898CF4F298210041CB3414852408403B73C2B52913E`)
+  `scripts/blender/build_animated_reload_arms.py` (113,156 bytes, SHA-256
+  `E1D5A00AC58343E6FA5CDA60C65812E5DBE3E7B08C713B8F0A2F63DC57543E9B`)
 - Animated arms reproducible DCC source:
   `source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend`
 - Static pose variants generated: 2026-08-24
@@ -31,6 +31,9 @@ The runtime models in this directory are adapted from **fps animated smg** by
 - Dedicated long-gun forearm crop and runtime layer rebuilt: 2026-08-31
 - Articulated magazine grasp, real-prop contact following, and professional
   platform-specific slide manipulation rebuilt/reviewed: 2026-09-01
+- Runtime reload layers rebuilt as left-support-arm-only crops, with the static
+  firing arm retained and visible magazines driven directly by the support-hand
+  contact: 2026-09-01
 - Animated first-person sleeve fit and upper-arm volume revised: 2026-08-28
 - Service-pistol support-arm pose revised in Blender: 2026-08-28
 - First-person weapon uniformly enlarged around the authored two-hand grip center: 2026-08-28
@@ -64,23 +67,23 @@ pulling the complete limb toward the camera. This revision changes only the
 evaluated skeletal pose and marker placement; it does not add source geometry.
 `animated_reload_arms.glb` is an arms-only skinned derivative that removes the
 visible SMG while retaining the authored glove/sleeve materials, finger bones,
-skin weights, and 13,700-triangle full-arm topology. Contract revision 8 keeps
+skin weights, and 13,700-triangle full-arm topology. Contract revision 9 keeps
 that complete topology as the non-runtime `FullReloadArmsAuditMesh`, adds a
-12,686-triangle `LongGunReloadForearmsMesh` with both authored hands and 28
-source-unit (0.42 m) elbow-length cuffs, and retains the 9,334-triangle
-`SidearmReloadForearmsMesh` with 16 source-unit (0.24 m) compact cuffs (9,306
-triangles after Godot removes 28 collinear cut-ring faces). All
+6,343-triangle left-only `LongGunReloadForearmsMesh` with a 28 source-unit
+(0.42 m) elbow-length cuff, and a 4,667-triangle left-only
+`SidearmReloadForearmsMesh` with a 16 source-unit (0.24 m) compact cuff. All
 three meshes share the original skin and armature, materials, UVs, and normalized
-weights. Runtime selects the long-gun crop for rifles/SMGs and the shorter crop
-for pistols; the full audit mesh is always hidden. A geometry-free
+weights. Runtime combines the selected animated support-arm crop with the
+weapon-specific static firing arm; the full audit mesh is always hidden. A geometry-free
 `ReloadArmsMesh` compatibility layer preserves the existing runtime diagnostic
 name without rendering the formerly intrusive upper-arm cloth. The authored frame-155
 two-hand surface is baked as the new bind pose, and 24 named tactical/empty
 reload clips cover M4A1, AK74, SCAR-L, MP5A5, M24, AXMC, AWM, VSS, P226,
 M1911, GSh-18, and Desert Eagle. Its palm markers use evaluated glove contact
 centers, while
-`RightGripFrame` preserves the source SMG's real primary-grip transform. No
-procedural replacement geometry is introduced. The 2026-08-30 DCC revision
+`RightGripFrame` preserves the source SMG's real primary-grip transform and is
+used only to mount the left-arm layer. No procedural replacement geometry is
+introduced. The 2026-08-30 DCC revision
 solves left-hand position separately from wrist rotation, makes every baked
 quaternion track hemisphere-continuous before glTF export, and exports one
 platform-specific elbow-pole marker per profile. The 2026-08-31 follow-up then
@@ -102,17 +105,14 @@ and the static-to-skinned visibility-boundary flip.
 
 The 2026-09-01 revision replaces the former open-palm approximation with a
 purpose-authored `magazine_grasp` pose. The thumb opposes four independently
-curled finger chains around the real magazine, and runtime moves the installed
-or staged magazine to the DCC glove contact instead of moving the arm toward a
-detached prop. Every extraction/insertion key is rejected unless all five digit
-chains exceed 0.65 radians and the glove-anchor clearance stays between 45 and
-60 mm. The delivered clips measure 1.291766 radians at the thumb,
-2.225294-2.280825 radians across the fingers, and 51.759 mm clearance. Service
-pistols and Desert Eagle retain distinct magazine paths and now use distinct
-slide contact/pull/hold/release timing; the support hand releases while the
-slide returns under spring force. Runtime sidearm wrist correction and hidden
-shoulder translation were removed, leaving the exported Blender performance as
-the only arm motion.
+curled finger chains around the real magazine. Contract revision 9 removes the
+animated firing-arm geometry from both runtime crops and keeps the stable static
+right arm on the weapon. During extraction and insertion, the installed or
+replacement magazine is placed directly at the animated left-palm contact; both
+magazines are hidden during the pouch hand-off, so no independent free-floating
+prop path is rendered. Service pistols and Desert Eagle retain distinct slide
+contact/pull/hold/release timing, with the support hand releasing while the slide
+returns under spring force.
 
 The revision groups the twelve profiles into six readable choreography sets:
 straight rifle (M4A1/SCAR-L), rock-and-lock (AK74/VSS), MP5, precision/internal

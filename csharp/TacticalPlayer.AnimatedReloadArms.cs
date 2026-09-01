@@ -118,7 +118,12 @@ public partial class TacticalPlayer
         if (staticArms is not null
             && IsInstanceValid(staticArms.Root))
         {
-            staticArms.Root.Visible = !active;
+            // The firing hand stays on the weapon's stable authored pose.  The
+            // reload layer owns only the support arm, so two complete arm rigs
+            // can never cross or stack in front of the camera.
+            staticArms.Root.Visible = true;
+            staticArms.RightArm.Visible = true;
+            staticArms.LeftArm.Visible = !active;
         }
         if (active && IsInstanceValid(_proceduralFirstPersonArms))
         {
@@ -156,26 +161,17 @@ public partial class TacticalPlayer
             EquippedWeapon.Platform,
             authoredEmptyReload,
             authoredArmProgress);
-        if (sidearmReload)
-        {
-            animatedReloadArms.AcceptAuthoredSidearmPose();
-            AlignSidearmReloadMagazineToAuthoredHand(
-                animatedReloadArms,
-                authoredArmProgress);
-        }
-        else
-        {
-            // Long guns retain live prop contact IK. Sidearms deliberately do
-            // not enter this path: their DCC clip owns the complete shoulder,
-            // wrist and articulated-finger performance.
-            animatedReloadArms.RetargetLeftPalm(
-                EquippedWeapon.Platform,
-                RawReloadSupportTargetGlobal());
-        }
+        // The DCC clip owns the complete left-arm performance.  Moving the
+        // rigid magazine to that hand is considerably more robust than making
+        // the skinned arm chase a second procedural trajectory.
+        animatedReloadArms.AcceptAuthoredPose();
+        AlignReloadMagazineToAuthoredHand(
+            animatedReloadArms,
+            authoredArmProgress);
         return true;
     }
 
-    private void AlignSidearmReloadMagazineToAuthoredHand(
+    private void AlignReloadMagazineToAuthoredHand(
         AuthoredAnimatedReloadArmsVisual animatedReloadArms,
         float progress)
     {
@@ -187,22 +183,42 @@ public partial class TacticalPlayer
 
         var profile = FirstPersonReloadProfileCatalog.For(
             EquippedWeapon.Platform);
-        var handContact =
-            animatedReloadArms.LeftSidearmMagazineAnchorGlobalPosition;
-        if (progress >= profile.ReachEnd && progress < profile.StowEnd)
+        if (profile.Mechanism == FirstPersonReloadMechanism.InternalMagazine)
         {
-            weapon.AlignMagazineGripToGlobalPosition(
-                spare: false,
-                handContact);
             return;
         }
 
-        if (progress >= profile.AcquireEnd && progress < profile.SeatEnd)
+        var carryingRemoved = progress >= profile.ReachEnd
+            && progress < profile.StowEnd;
+        var carryingReplacement = progress >= profile.AcquireEnd
+            && progress < profile.SeatEnd;
+
+        // There is deliberately no visible prop during the pouch hand-off.
+        // A magazine is rendered only while installed or while physically held
+        // by the support hand; it never follows an independent floating path.
+        if (progress >= profile.ReachEnd && progress < profile.AcquireEnd)
         {
-            weapon.AlignMagazineGripToGlobalPosition(
-                spare: true,
-                handContact);
+            weapon.Magazine.Visible = carryingRemoved;
+            weapon.SpareMagazine.Visible = false;
         }
+        else if (carryingReplacement)
+        {
+            weapon.Magazine.Visible = false;
+            weapon.SpareMagazine.Visible = true;
+        }
+
+        if (!carryingRemoved && !carryingReplacement)
+        {
+            return;
+        }
+
+        var sidearm = WeaponCatalog.IsSidearm(EquippedWeapon.Platform);
+        var handContact = sidearm
+            ? animatedReloadArms.LeftPalmCenterGlobalPosition
+            : animatedReloadArms.LeftGripAnchorGlobalPosition;
+        weapon.AlignMagazineGripToGlobalPosition(
+            spare: carryingReplacement,
+            handContact);
     }
 
     private float DirectReloadArmProgress()
@@ -212,31 +228,6 @@ public partial class TacticalPlayer
         // seating and action cadence; holding frame zero turns every reload
         // into the same floating-hand pose.
         return Mathf.Clamp(PresentationReloadProgress, 0.0f, 1.0f);
-    }
-
-    private float SidearmReloadMagazineAnchorBlend()
-    {
-        if (!_isReloading
-            || !WeaponCatalog.IsSidearm(EquippedWeapon.Platform))
-        {
-            return 0.0f;
-        }
-
-        var profile = FirstPersonReloadProfileCatalog.For(
-            EquippedWeapon.Platform);
-        var progress = Mathf.Clamp(PresentationReloadProgress, 0.0f, 1.0f);
-        if (progress < profile.ReachEnd)
-        {
-            return SmoothSegment(progress, 0.0f, profile.ReachEnd);
-        }
-        if (progress < profile.InsertEnd)
-        {
-            return 1.0f;
-        }
-        return 1.0f - SmoothSegment(
-            progress,
-            profile.InsertEnd,
-            1.0f);
     }
 
     private float SidearmReloadActionContactBlend()
