@@ -308,8 +308,8 @@ public partial class FreightTerminalWorld
         var smokePresentationAligned = Mathf.Abs(
                 SmokeGrenade.CloudRadius - SmokeGrenade.VisualCoverageRadius) <= 0.1f
             && SmokeGrenade.CloudRadius >= 7.3f
-            && SmokeGrenade.VisualLobeCount >= 40
-            && SmokeGrenade.VisualOpacity >= 0.44f;
+            && SmokeGrenade.VisualLobeCount >= 48
+            && SmokeGrenade.VisualOpacity >= 0.60f;
         _hud.ShowOperationsOffice();
         var presentationRestored = !_hud.IsDemolitionSquadRosterHidden
             && !_hud.IsDemolitionSkillHudVisible

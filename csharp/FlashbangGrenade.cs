@@ -25,8 +25,11 @@ public interface IFlashbangTarget
 public static class FlashbangExposureResolver
 {
     public const float MaximumRadius = 20.0f;
-    public const float FullEffectRadius = 2.5f;
-    public const float MaximumDuration = 4.25f;
+    public const float FullEffectRadius = 4.0f;
+    public const float MaximumDuration = 5.5f;
+    public const float MinimumDuration = 0.35f;
+    public const float RearFacingIntensityFloor = 0.18f;
+    public const float CloseExposureIntensityFloor = 0.72f;
 
     public static FlashbangExposure Resolve(
         Vector3 sourcePosition,
@@ -53,17 +56,19 @@ public static class FlashbangExposureResolver
         var distanceFactor = 1.0f - Mathf.SmoothStep(0.0f, 1.0f, distanceBlend);
         var facingBlend = Mathf.Clamp((facingDot + 0.72f) / 1.07f, 0.0f, 1.0f);
         var facingFactor = Mathf.Lerp(
-            0.12f,
+            RearFacingIntensityFloor,
             1.0f,
             Mathf.SmoothStep(0.0f, 1.0f, facingBlend));
-        var proximityFloor = distance <= FullEffectRadius ? 0.55f : 0.0f;
+        var proximityFloor = distance <= FullEffectRadius
+            ? CloseExposureIntensityFloor
+            : 0.0f;
         var intensity = Mathf.Clamp(
             Mathf.Max(proximityFloor, distanceFactor * facingFactor),
             0.0f,
             1.0f);
         var duration = intensity <= 0.01f
             ? 0.0f
-            : Mathf.Lerp(0.22f, MaximumDuration, intensity);
+            : Mathf.Lerp(MinimumDuration, MaximumDuration, intensity);
         return new FlashbangExposure(
             sourcePosition,
             intensity,
@@ -233,12 +238,12 @@ public partial class FlashbangGrenade : RigidBody3D
         {
             Name = "FlashBurst",
             LightColor = new Color(0.95f, 0.98f, 1.0f),
-            LightEnergy = 12.0f,
-            OmniRange = 16.0f,
+            LightEnergy = 18.0f,
+            OmniRange = 20.0f,
             ShadowEnabled = false
         };
         AddChild(flash);
-        CreateTween().TweenProperty(flash, "light_energy", 0.0f, 0.18f);
+        CreateTween().TweenProperty(flash, "light_energy", 0.0f, 0.22f);
     }
 
     private void ApplyExposureToTargets()

@@ -13,8 +13,8 @@ public partial class SmokeGrenade : RigidBody3D
     public const float CloudRadius = 7.4f;
     public const float CloudDuration = 13.0f;
     public const float VisualCoverageRadius = 7.4f;
-    public const int VisualLobeCount = 40;
-    public const float VisualOpacity = 0.46f;
+    public const int VisualLobeCount = 48;
+    public const float VisualOpacity = 0.62f;
 
     public Node? OwnerBody { get; set; }
     public bool IsDeployed { get; private set; }

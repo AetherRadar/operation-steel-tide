@@ -59,7 +59,7 @@ public partial class FreightTerminalWorld
             1.0f));
         await WaitFrames(1);
         var flashOverlayApplied = _hud.IsFlashbangOverlayVisible
-            && _hud.FlashbangOverlayAlphaForDiagnostics >= 0.75f;
+            && _hud.FlashbangOverlayAlphaForDiagnostics >= 0.99f;
         var flashAlphaBeforeStack = _hud.FlashbangOverlayAlphaForDiagnostics;
         var flashRemainingBeforeStack = _hud.FlashbangOverlayRemainingForDiagnostics;
         _player.ApplyFlashbang(new FlashbangExposure(

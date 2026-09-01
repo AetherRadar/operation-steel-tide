@@ -129,23 +129,29 @@ public partial class FreightTerminalWorld
             Vector3.Zero,
             Vector3.Forward,
             hasLineOfSight: true);
-        var flashResolverReady = flashFacing.Intensity >= 0.75f
+        var flashResolverReady = flashFacing.Intensity >= 0.99f
+            && flashFacing.DurationSeconds >= 5.4f
             && flashFacing.DurationSeconds > flashAway.DurationSeconds
             && flashFacing.Intensity > flashAway.Intensity
-            && flashAway.Intensity > 0.01f
+            && flashAway.Intensity >= 0.70f
+            && flashAway.DurationSeconds >= 4.0f
             && flashFacing.FacingDot >= 0.99f
             && flashAway.FacingDot <= -0.99f
+            && FlashbangExposureResolver.FullEffectRadius >= 4.0f
+            && FlashbangExposureResolver.MaximumDuration >= 5.4f
+            && FlashbangOverlayView.ResolveScreenAlpha(0.82f) >= 0.99f
             && Mathf.IsZeroApprox(flashBlocked.Intensity)
             && Mathf.IsZeroApprox(flashBlocked.DurationSeconds)
             && Mathf.IsZeroApprox(flashOutOfRange.Intensity);
+        var flashThrowerSafetySource = Vector3.Forward * 9.0f;
         var flashThrowerSafetyReady = !IsPredictedFlashbangExposureSafe(
                 Vector3.Zero,
                 Vector3.Forward,
-                flashSource)
+                flashThrowerSafetySource)
             && IsPredictedFlashbangExposureSafe(
                 Vector3.Zero,
                 Vector3.Back,
-                flashSource);
+                flashThrowerSafetySource);
 
         var requestContract = DemolitionUtilityNetworkContract.TransferMode
                 == MultiplayerPeer.TransferModeEnum.Reliable
@@ -402,7 +408,7 @@ public partial class FreightTerminalWorld
             && flashPlayerGrouped
             && replicatedFlash.AppliedTargetCountForDiagnostics >= 1
             && _hud.IsFlashbangOverlayVisible
-            && flashTargetAlpha >= 0.75f;
+            && flashTargetAlpha >= 0.99f;
         _hud.ClearFlashbangExposure();
         replicatedFlash.QueueFree();
         var valid = executeSmoke.Kind == DemolitionAiUtilityKind.Smoke
@@ -444,7 +450,7 @@ public partial class FreightTerminalWorld
             + $"budget={budgetContract} cleanup={roundCleanup} "
             + $"post_round={postRoundProjectilesCleared}/{postRoundDamageBlocked} "
             + $"flash_plan={safeFlash.Kind}/{unsafeFlash.Kind} "
-            + $"flash_resolver={flashResolverReady}:{flashFacing.Intensity:0.00}/{flashAway.Intensity:0.00}/{flashBlocked.Intensity:0.00} "
+            + $"flash_resolver={flashResolverReady}:{flashFacing.Intensity:0.00}/{flashFacing.DurationSeconds:0.00}s/{flashAway.Intensity:0.00}/{flashAway.DurationSeconds:0.00}s/{flashBlocked.Intensity:0.00} "
             + $"flash_thrower_safe={flashThrowerSafetyReady} "
             + $"flash_network={flashNetworkContract}/{flashDetonationContract}/{flashWaitsForHost} "
             + $"flash_target={flashTargetApplied}:{flashPlayerGrouped}/{replicatedFlash.EligibleTargetCountForDiagnostics}/{replicatedFlash.AppliedTargetCountForDiagnostics}/{flashTargetAlpha:0.00} "

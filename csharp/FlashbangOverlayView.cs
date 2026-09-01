@@ -5,6 +5,10 @@ namespace OperationSteelTide;
 [GlobalClass]
 public partial class FlashbangOverlayView : Control
 {
+    internal const float ScreenOpacityScale = 1.12f;
+    internal const float ScreenOpacityBias = 0.12f;
+    internal const float MaximumPeakHoldSeconds = 0.32f;
+
     private ColorRect _wash = null!;
     private Tween? _fadeTween;
     private ulong _exposureEndsAtMsec;
@@ -40,7 +44,7 @@ public partial class FlashbangOverlayView : Control
         var now = Time.GetTicksMsec();
         var requestedEnd = now + (ulong)Mathf.CeilToInt(durationSeconds * 1000.0f);
         var mergedEnd = System.Math.Max(_exposureEndsAtMsec, requestedEnd);
-        var mergedAlpha = Mathf.Max(DisplayedAlpha, Mathf.Clamp(intensity, 0.0f, 1.0f));
+        var mergedAlpha = Mathf.Max(DisplayedAlpha, ResolveScreenAlpha(intensity));
         var mergedDuration = Mathf.Max(0.04f, (mergedEnd - now) / 1000.0f);
 
         _fadeTween?.Kill();
@@ -54,7 +58,7 @@ public partial class FlashbangOverlayView : Control
             1.0f,
             mergedAlpha);
 
-        var holdSeconds = Mathf.Min(0.18f, mergedDuration * 0.12f);
+        var holdSeconds = Mathf.Min(MaximumPeakHoldSeconds, mergedDuration * 0.16f);
         _fadeTween = CreateTween();
         _fadeTween.TweenInterval(holdSeconds);
         _fadeTween.TweenProperty(
@@ -66,6 +70,12 @@ public partial class FlashbangOverlayView : Control
             .SetEase(Tween.EaseType.In);
         _fadeTween.TweenCallback(Callable.From(FinishExposure));
     }
+
+    internal static float ResolveScreenAlpha(float intensity)
+        => Mathf.Clamp(
+            intensity * ScreenOpacityScale + ScreenOpacityBias,
+            0.0f,
+            1.0f);
 
     public void ClearExposure()
     {
