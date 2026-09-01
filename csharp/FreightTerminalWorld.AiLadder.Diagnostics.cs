@@ -20,7 +20,11 @@ public partial class FreightTerminalWorld
         bool FriendlyClimbedUp,
         bool FriendlyClimbedDown,
         bool EnemyClimbedUp,
-        bool EnemyClimbedDown)
+        bool EnemyClimbedDown,
+        bool EnemyStoodUp,
+        bool EnemyStoodDown,
+        bool EnemyReleasedUp,
+        bool EnemyReleasedDown)
     {
         public bool Valid => AuthoredLinksReady
             && FriendlyRouteUp
@@ -34,7 +38,11 @@ public partial class FreightTerminalWorld
             && FriendlyClimbedUp
             && FriendlyClimbedDown
             && EnemyClimbedUp
-            && EnemyClimbedDown;
+            && EnemyClimbedDown
+            && EnemyStoodUp
+            && EnemyStoodDown
+            && EnemyReleasedUp
+            && EnemyReleasedDown;
     }
 
     private async void ValidateAiLadders()
@@ -53,7 +61,9 @@ public partial class FreightTerminalWorld
             + $"friendly_approach={result.FriendlyApproachUp}/{result.FriendlyApproachDown} "
             + $"enemy_approach={result.EnemyApproachUp}/{result.EnemyApproachDown} "
             + $"friendly_climb={result.FriendlyClimbedUp}/{result.FriendlyClimbedDown} "
-            + $"enemy_climb={result.EnemyClimbedUp}/{result.EnemyClimbedDown}");
+            + $"enemy_climb={result.EnemyClimbedUp}/{result.EnemyClimbedDown} "
+            + $"enemy_standing={result.EnemyStoodUp}/{result.EnemyStoodDown} "
+            + $"enemy_released={result.EnemyReleasedUp}/{result.EnemyReleasedDown}");
         GD.Print($"AI_LADDER_PASS valid={result.Valid}");
         QuitDiagnosticAfterSceneCleanup(result.Valid ? 0 : 2);
     }
@@ -87,6 +97,10 @@ public partial class FreightTerminalWorld
         var friendlyClimbedDown = false;
         var enemyClimbedUp = false;
         var enemyClimbedDown = false;
+        var enemyStoodUp = false;
+        var enemyStoodDown = false;
+        var enemyReleasedUp = false;
+        var enemyReleasedDown = false;
         var mate = _squadMates.FirstOrDefault(candidate => IsInstanceValid(candidate));
         var enemy = _enemies.FirstOrDefault(candidate => IsInstanceValid(candidate));
         _player.ProcessMode = ProcessModeEnum.Disabled;
@@ -224,34 +238,62 @@ public partial class FreightTerminalWorld
 
             enemy.GlobalPosition = representative.BottomFeet;
             enemy.Velocity = Vector3.Zero;
+            enemy.SetProne(true);
+            var enemyUpStartedProne = enemy.IsProne;
+            var enemyUpPostureClean = enemyUpStartedProne;
+            var enemyUpTraversalSeen = false;
             var enemyTraversalCount = enemy.PursuitLadderTraversalsForDiagnostics;
             for (var frame = 0;
                  frame < 480
                     && enemy.PursuitLadderTraversalsForDiagnostics == enemyTraversalCount;
                  frame++)
             {
-                enemy.AdvancePursuitLadderForDiagnostics(
+                var advanced = enemy.AdvancePursuitLadderForDiagnostics(
                     1.0f / 60.0f,
                     representative.BottomFeet,
                     representative.TopFeet,
                     representative.Outward);
+                if (advanced)
+                {
+                    enemyUpPostureClean &= !enemy.IsProne;
+                    enemyUpTraversalSeen |= enemy.IsPursuitLadderActiveForDiagnostics;
+                }
             }
+            enemyStoodUp = enemyUpStartedProne
+                && enemyUpTraversalSeen
+                && enemyUpPostureClean;
+            enemyReleasedUp = enemyUpTraversalSeen
+                && !enemy.IsPursuitLadderActiveForDiagnostics;
             enemyClimbedUp = enemy.PursuitLadderTraversalsForDiagnostics > enemyTraversalCount
                 && enemy.GlobalPosition.DistanceTo(representative.TopFeet) <= 0.05f;
 
+            enemy.SetProne(true);
+            var enemyDownStartedProne = enemy.IsProne;
+            var enemyDownPostureClean = enemyDownStartedProne;
+            var enemyDownTraversalSeen = false;
             enemyTraversalCount = enemy.PursuitLadderTraversalsForDiagnostics;
             for (var frame = 0;
                  frame < 480
                     && enemy.PursuitLadderTraversalsForDiagnostics == enemyTraversalCount;
                  frame++)
             {
-                enemy.AdvancePursuitLadderForDiagnostics(
+                var advanced = enemy.AdvancePursuitLadderForDiagnostics(
                     1.0f / 60.0f,
                     representative.BottomFeet,
                     representative.TopFeet,
                     representative.Outward,
                     startAtTop: true);
+                if (advanced)
+                {
+                    enemyDownPostureClean &= !enemy.IsProne;
+                    enemyDownTraversalSeen |= enemy.IsPursuitLadderActiveForDiagnostics;
+                }
             }
+            enemyStoodDown = enemyDownStartedProne
+                && enemyDownTraversalSeen
+                && enemyDownPostureClean;
+            enemyReleasedDown = enemyDownTraversalSeen
+                && !enemy.IsPursuitLadderActiveForDiagnostics;
             enemyClimbedDown = enemy.PursuitLadderTraversalsForDiagnostics > enemyTraversalCount
                 && enemy.GlobalPosition.DistanceTo(representative.BottomFeet) <= 0.05f;
 
@@ -273,6 +315,10 @@ public partial class FreightTerminalWorld
             friendlyClimbedUp,
             friendlyClimbedDown,
             enemyClimbedUp,
-            enemyClimbedDown);
+            enemyClimbedDown,
+            enemyStoodUp,
+            enemyStoodDown,
+            enemyReleasedUp,
+            enemyReleasedDown);
     }
 }

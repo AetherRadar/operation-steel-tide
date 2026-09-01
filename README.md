@@ -240,6 +240,7 @@ Go 后端提供三个任务定义、目标文本、侦测规则、增援阈值�
 Godot_console.exe --path . -- --capture-deployment
 Godot_console.exe --path . -- --validate-pause-ui
 Godot_console.exe --path . -- --validate-demolition
+Godot_console.exe --path . -- --validate-demolition-enemy-response
 Godot_console.exe --path . -- --validate-demolition-utility
 Godot_console.exe --path . -- --validate-demolition-weapons
 Godot_console.exe --path . -- --validate-ai-ladders
@@ -327,6 +328,8 @@ Godot_console.exe --headless --path . -- --validate-extraction-network-client
 `--validate-refinery-map` 通过旧地图 ID 启动江海旧城，并验证正式模型布置、CC0 来源覆盖、场景缓存、质量等级、仅使用盒体的碰撞代理、独立区域、高价值战利品区、车辆路线、屋顶小队通行、战利品/驻军/小地图集成，以及严格渲染预算。`--capture-refinery-map` 保留兼容命令和旧输出名，同时保存俯视构图、玩家高度道路、两个高价值院落和屋顶路线。`--capture-promotion` 使用固定布置与机位，在 `docs/media` 下重复生成 1600 x 900 无 HUD 主视觉、小队推进和市集天桥图片，并输出 1280 x 640 社交封面。`--capture-readme-zh` 则以中文 HUD 确定性生成首页所用的小队、战术态势、交火、背包和爆破买装五张实机图。
 
 `--validate-pause-ui` 验证正式制作的暂停场景、必需控件绑定、不产生信号反馈的设置同步、中英文标签、暂停可见状态和鼠标释放，以及现有继续游戏事件路径。
+
+`--validate-demolition-enemy-response` 通过真实受击、视锥、物理和开火链路，检查背向且趴下的拆除者受击后中断普通/紧急拆除、站起、转身并还火，同时保证不变更准度与武器。
 
 `--validate-demolition` 验证行动办公室入口、职业和地图选择、实战前冻结的购买阶段、准确的首回合手枪消费、仅持副武器射击、空防护/战术道具状态、彼此隔离的经济和撤离系统、5v5 小队补齐、敌方购买、开局和下包后的 AI 职责、安放、AI 实体拆除，以及战术 AI 层（带滞后的战斗优先仲裁、感知烟雾的目标丢失、安全前沿重试、携弹者/拆除者路线恢复、最后时限硬提交、时间压力下的目标点切换和小队岗位锚定）、回合奖励、回合计分/重置、第 13 回合中场换边后敌方携弹者安放与玩家拆除、MR12/13 胜/净胜两回合加时规则和经济奖励表。`--validate-demolition-utility` 检查情境道具选择、友军安全、目标频道保护、主机权威、活动数量上限、重叠火区节流和低频团队冷却；`--validate-demolition-weapons` 检查 AI 购买阶梯、单狙限制、正式掉枪模型、尸体去重、近距离交换和联机状态契约。`--validate-ai-ladders` 则分别验证友军和敌人的梯子上下路线与实际运动。`--validate-demolition-rules` 验证爆破模式专用 HUD、侦察边界、战术道具绑定、淘汰后的碰撞状态和本地化观战流程。`--validate-demolition-arena` 检查 Tideforge 激活、108 米出生点间距、约 80 至 90 米的 A/B 进攻路线、约 113 米的转点路线、平衡的抵达时间、可供胶囊体通行的路线、被遮挡的出生点视线、77 米目标点间距、目标点布置、本地化小地图标记和空间隔离。`--validate-harbor-locks` 检查第四张可选地图、所有导入的 CC0 工业模型实例、本地化、碰撞生命周期，以及通往两个目标点的确定性路线；`--capture-harbor-locks` 渲染战术总览。`--validate-tideglass-density` 独立强制第二张地图保持 136 米 x 112 米、仅有两个相距至少 80 米的爆能器点、41 栋跨五区分布的主要建筑（含 30 栋扩建建筑）、52 个带碰撞的正式道具、78 条正式模型引用与 70 条去重场景路径、八套 CC0 来源、最长 58.00 米水平视线、最大 21.78 米开放空间直径、三路零重叠、六条实体路线、无孤立可见隔板、全部掩体/策略点可达，以及双方出生点、爆点与两点之间的实体视线遮挡；`--validate-tideglass-reactor` 进一步检查 26 条装饰模型引用和 52 条带碰撞正式道具引用、完整建筑模型的受控复用、实心材质不透明且仅允许语义玻璃/窗户透明、紧贴模型的碰撞、已烘焙缩放的正式地表与地标三角碰撞、封闭的模块化建筑结构、可见边界闸门与碰撞对齐、高架步道两侧楼梯的精确正式三角碰撞与玩家实际通行、真实物理出生点视线遮挡、畅通的掩体点与策略点，以及经布局和运行时物理双重验证的六条路线；`--capture-tideglass-reactor` 渲染总览和玩家高度视图，覆盖双点、三路、双方出生、主要建筑、高架步道、拱门和两座边界闸门。`--validate-bazaar-density` 独立强制 A/B 多点互视、高位穿透、最长视线、开放空间直径、室内占比、爆点覆盖、真实墙洞以及全防守出生点绕行效率门槛；`--validate-bazaar-crossing` 进一步验证七条地面路线、六条双向楼梯、24 个战术位、双方 AI 实际上下楼、正式 GLB 材质/UV/碰撞对齐和运行时生命周期；`--capture-bazaar-crossing` 输出严格俯视图、斜俯视图、两座完整室内爆点、S 形 Mid、后市场、高台、六座楼梯与双方出生视角。`--validate-demolition-briefing` 验证场景加载、必需绑定、中英文同步、十二项轮播中四张可玩地图、锁定地图拒绝、无需部署即可完成的职业/地图选择，以及返回/部署意图信号。`--validate-demolition-buy` 验证纯价格规则、首回合主武器锁定、P226、M24、烟雾弹和燃烧弹价格、不可负担选择拦截、正式场景绑定、中英文同步、实时 HUD 状态和购买意图载荷。
 

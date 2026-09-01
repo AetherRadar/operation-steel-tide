@@ -9,6 +9,11 @@ internal readonly record struct PursuitContactDiagnosticState(
     Vector3 LastKnownTargetPosition,
     float PursuitTimer,
     float LostSightTimer,
+    ulong ConfirmedPursuitTargetId,
+    Vector3 ConfirmedCombatContactPosition,
+    float ConfirmedCombatContactTimer,
+    ulong RecentDamageThreatTargetId,
+    float RecentDamageThreatTimer,
     Vector3 PursuitProgressOrigin,
     float PursuitProgressTimer,
     bool Alerted,
@@ -66,6 +71,11 @@ public partial class EnemyOperator
             _lastKnownTargetPosition,
             _pursuitTimer,
             _lostSightTimer,
+            _confirmedPursuitTargetId,
+            _confirmedCombatContactPosition,
+            _confirmedCombatContactTimer,
+            _recentDamageThreatTargetId,
+            _recentDamageThreatTimer,
             _pursuitProgressOrigin,
             _pursuitProgressTimer,
             Alerted,
@@ -76,4 +86,7 @@ public partial class EnemyOperator
 
     internal bool MatchesPursuitContactStateForDiagnostics(PursuitContactDiagnosticState state)
         => CapturePursuitContactStateForDiagnostics() == state;
+
+    internal void AdvancePursuitTimersForDiagnostics(float delta)
+        => UpdatePursuitTimers(Mathf.Max(0.0f, delta));
 }

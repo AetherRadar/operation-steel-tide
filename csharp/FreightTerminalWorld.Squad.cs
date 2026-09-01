@@ -169,6 +169,7 @@ public partial class FreightTerminalWorld
         var operationsOfficeCommand = Array.Exists(args, value =>
             value == "--validate-operations-office"
             || value == "--validate-demolition"
+            || value == "--validate-demolition-enemy-response"
             || value == "--validate-demolition-rules"
             || value == "--validate-demolition-arena"
             || value == "--validate-tideglass-reactor"

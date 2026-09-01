@@ -5098,8 +5098,34 @@ public partial class FreightTerminalWorld : Node3D
         var engagedPlayer = rivalA.EngageTargetNode == _player || firedAtPlayer;
 
         // --- 3) Stance/cover from AI tick near cover points ---
-        rivalA.ResetTacticalStateForDiagnostics();
-        rivalA.GrantFireablePrimaryForDiagnostics();
+        // Isolate this phase from the still-running NPC and other rivals. Their target
+        // scoring and gunfire previously made this diagnostic alternate between pass
+        // and fail even though the production stance behavior had not changed.
+        foreach (var other in _enemies)
+        {
+            if (!IsInstanceValid(other) || ReferenceEquals(other, rivalA))
+            {
+                continue;
+            }
+            other.Velocity = Vector3.Zero;
+            other.GlobalPosition = new Vector3(
+                190.0f + other.NetworkId * 0.25f,
+                0.2f,
+                190.0f);
+            other.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        foreach (var mate in _squadMates)
+        {
+            if (!IsInstanceValid(mate))
+            {
+                continue;
+            }
+            mate.Velocity = Vector3.Zero;
+            mate.GlobalPosition = new Vector3(220.0f, 0.2f, 220.0f);
+            mate.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        InvalidateCombatTargetIndex();
+
         _player.SetHealthForDiagnostics(_player.MaxHealth);
         _player.IsDead = false;
         _player.ProcessMode = ProcessModeEnum.Inherit;
@@ -5107,13 +5133,24 @@ public partial class FreightTerminalWorld : Node3D
         var coverReference = new Vector3(5.0f, 0.25f, 25.0f);
         var coverSpot = _coverPoints.OrderBy(p => p.DistanceTo(coverReference)).First();
         rivalA.GlobalPosition = coverSpot + new Vector3(0.8f, 0.15f, 0.8f);
+        rivalA.Velocity = Vector3.Zero;
         _player.GlobalPosition = rivalA.GlobalPosition + new Vector3(0.0f, 0.15f, 18.0f);
-        rivalA.SetAlerted(_player.GlobalPosition);
+        _player.Velocity = Vector3.Zero;
+        rivalA.SentryMode = false;
+        rivalA.ConfigureCombatProbeForDiagnostics(
+            0x5354_414E_4345UL,
+            _player.GlobalPosition,
+            bypassPlayerProtection: true,
+            suppressContactSharing: false);
+        rivalA.GrantFireablePrimaryForDiagnostics();
+        rivalA.LookAt(_player.GlobalPosition, Vector3.Up);
+        rivalA.ArmWeaponForDiagnostics();
         var sawProneOrCover = false;
+        var stanceTargetedPlayer = false;
         for (var i = 0; i < 160; i++)
         {
-            rivalA.ArmWeaponForDiagnostics();
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            stanceTargetedPlayer |= ReferenceEquals(rivalA.EngageTargetNode, _player);
             if (rivalA.IsProne || rivalA.UsesCover)
             {
                 sawProneOrCover = true;
@@ -5308,11 +5345,11 @@ public partial class FreightTerminalWorld : Node3D
 
         var valid = vsEnemyTarget && vsEnemyShots && vsEnemyDamage
             && playerShotPathClear && firedAtPlayer && playerHurtByFire && engagedPlayer
-            && sawProneOrCover
+            && sawProneOrCover && stanceTargetedPlayer
             && lootStarted && leftLootForCombat && npcTargetedOp
             && pursuitPairReady && pursuitRetained && pursuitAdvanced
             && memoryStayedFrozen && squadContactShared && damageThreatLocked && wallFlanked;
-        GD.Print($"EXTRACTION_AI_CHECK valid={valid} vs_enemy_target={vsEnemyTarget} vs_enemy_shots={vsEnemyShots} vs_enemy_dmg={vsEnemyDamage} player_path_clear={playerShotPathClear} fire_player={firedAtPlayer} player_hurt={playerHurtByFire} engaged_player={engagedPlayer} prone_or_cover={sawProneOrCover} loot_start={lootStarted} loot_via_physics=True loot_to_combat={leftLootForCombat} npc_target_op={npcTargetedOp} pursuit_pair={pursuitPairReady} pursuit_retained={pursuitRetained} pursuit_advanced={pursuitAdvanced} memory_frozen={memoryStayedFrozen} squad_shared={squadContactShared} damage_threat={damageThreatLocked} wall_flanked={wallFlanked}");
+        GD.Print($"EXTRACTION_AI_CHECK valid={valid} vs_enemy_target={vsEnemyTarget} vs_enemy_shots={vsEnemyShots} vs_enemy_dmg={vsEnemyDamage} player_path_clear={playerShotPathClear} fire_player={firedAtPlayer} player_hurt={playerHurtByFire} engaged_player={engagedPlayer} prone_or_cover={sawProneOrCover} stance_target={stanceTargetedPlayer} loot_start={lootStarted} loot_via_physics=True loot_to_combat={leftLootForCombat} npc_target_op={npcTargetedOp} pursuit_pair={pursuitPairReady} pursuit_retained={pursuitRetained} pursuit_advanced={pursuitAdvanced} memory_frozen={memoryStayedFrozen} squad_shared={squadContactShared} damage_threat={damageThreatLocked} wall_flanked={wallFlanked}");
         GD.Print($"EXTRACTION_AI_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

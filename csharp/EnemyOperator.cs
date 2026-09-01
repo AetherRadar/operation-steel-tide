@@ -610,6 +610,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         _patrolTimer -= dt;
         _hitStun = Mathf.Max(0.0f, _hitStun - dt);
         _proneTimer = Mathf.Max(0.0f, _proneTimer - dt);
+        if (IsProne && _proneTimer <= 0.0f)
+        {
+            SetProne(false);
+        }
         _stanceDecisionTimer -= dt;
         _lootSearchTimer -= dt;
 
@@ -734,6 +738,14 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             }
         }
 
+        // Record confirmed sight before demolition arbitration. Objective runners may
+        // keep moving at long range, but they must not erase the contact by turning
+        // toward a route waypoint and failing their own view-cone check next frame.
+        if (Alerted && hasSight)
+        {
+            RefreshVisiblePursuitContact();
+        }
+
         // Demolition objective movement is decided after the cached visibility probe.
         // Pursuit therefore cannot starve a plant/defuse route, while a genuinely
         // visible close threat can still hand control to the full combat motor.
@@ -751,11 +763,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             return;
         }
 
-        if (Alerted && hasSight)
-        {
-            RefreshVisiblePursuitContact();
-        }
-        else if (Alerted && !IsPursuing)
+        if (Alerted && !hasSight && !IsPursuing)
         {
             BeginPursuitFromCurrentTarget(shareContact: true);
         }
@@ -793,8 +801,20 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     /// </summary>
     private void FireWhileFollowingDemolitionObjective(float distance, bool hasSight)
     {
+        if (Main?.IsDemolitionOpponentChanneling(this) == true)
+        {
+            return;
+        }
+
+        // Velocity remains owned by the objective motor, while aim remains owned by
+        // the recently confirmed hostile. This prevents route LookAt from turning a
+        // firing bot away and making it permanently fail its own view cone.
+        if (HasFreshConfirmedCombatContact)
+        {
+            FaceCombatContact(hasSight);
+        }
+
         if (!hasSight
-            || Main?.IsDemolitionOpponentChanneling(this) == true
             || _fireTimer > 0.0f
             || distance >= CurrentFireRange)
         {
@@ -1233,16 +1253,13 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
         if (_stanceDecisionTimer > 0.0f)
         {
-            if (IsProne && _proneTimer <= 0.0f)
-            {
-                SetProne(false);
-            }
             return;
         }
         _stanceDecisionTimer = _rng.RandfRange(0.9f, 1.8f);
         // Rivals prone more aggressively to break headshot lines; NPCs less so.
         var proneChance = IsRivalSquad ? 0.72f : 0.28f;
-        var wantProne = (hasSight || distance < 28.0f)
+        var wantProne = !_seekingCover
+            && (hasSight || distance < 28.0f)
             && distance > 9.0f
             && distance < 40.0f
             && (_inCover || _rng.Randf() < proneChance);
@@ -1261,6 +1278,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         if (coverSeekChance > 0.0f
             && !_seekingCover
             && !_inCover
+            && !IsProne
             && Main is not null
             && distance > 12.0f
             && _rng.Randf() < coverSeekChance)
@@ -1277,6 +1295,13 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     public void SetProne(bool prone)
     {
         IsProne = prone;
+        if (prone)
+        {
+            var stopped = Velocity;
+            stopped.X = 0.0f;
+            stopped.Z = 0.0f;
+            Velocity = stopped;
+        }
         UpdateAuthoredStanceCollider();
         if (IsInstanceValid(_bodyRoot))
         {
@@ -1439,6 +1464,13 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     {
         if (_hitStun > 0.0f)
         {
+            // Repeated hits must not stunlock a back-turned operator forever. Damage
+            // memory supplies the attacker's last confirmed direction even before the
+            // normal view cone can establish line of sight.
+            if (HasRecentDamageThreat || hasSight)
+            {
+                FaceCombatContact(hasSight);
+            }
             var stunnedVelocity = Velocity;
             stunnedVelocity.X = Mathf.MoveToward(stunnedVelocity.X, 0.0f, delta * 18.0f);
             stunnedVelocity.Z = Mathf.MoveToward(stunnedVelocity.Z, 0.0f, delta * 18.0f);
@@ -1573,10 +1605,28 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
     }
 
+    private void FaceCombatContact(bool hasSight)
+    {
+        var contact = hasSight
+            ? CurrentTargetPosition()
+            : HasFreshConfirmedCombatContact
+                ? ConfirmedCombatContactPosition
+                : LastKnownTargetPosition;
+        var contactFlat = new Vector3(contact.X, GlobalPosition.Y, contact.Z);
+        if (GlobalPosition.DistanceSquaredTo(contactFlat) > 0.01f)
+        {
+            LookAt(contactFlat, Vector3.Up);
+        }
+    }
+
     private bool UpdateCover(float delta, Vector3 combatPosition)
     {
         if (_seekingCover)
         {
+            if (IsProne)
+            {
+                SetProne(false);
+            }
             var targetFlat = new Vector3(_coverTarget.X, GlobalPosition.Y, _coverTarget.Z);
             var direction = GlobalPosition.DirectionTo(targetFlat);
             if (GlobalPosition.DistanceTo(targetFlat) < 0.85f)

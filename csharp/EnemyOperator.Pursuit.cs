@@ -7,17 +7,37 @@ public partial class EnemyOperator
     private const float RivalPursuitSeconds = 18.0f;
     private const float GarrisonPursuitSeconds = 13.0f;
     private const float SharedPursuitSeconds = 10.0f;
+    private const float ConfirmedContactObjectiveBreakoffSeconds = 3.5f;
+    private const float DirectDamageReactionSeconds = 2.6f;
     private const float SquadContactShareRange = 52.0f;
 
     public bool IsPursuing => !IsDead && _hasLastKnownTarget && _pursuitTimer > 0.0f;
     public Vector3 LastKnownTargetPosition => _lastKnownTargetPosition;
     public float PursuitSecondsRemaining => Mathf.Max(0.0f, _pursuitTimer);
     public int SquadContactsReceived { get; private set; }
+    internal bool HasFreshConfirmedCombatContact
+        => IsPursuing
+            && _confirmedCombatContactTimer > 0.0f
+            && CurrentTargetMatches(_confirmedPursuitTargetId);
+    internal Vector3 ConfirmedCombatContactPosition
+        => _confirmedCombatContactPosition;
+    internal bool HasRecentDamageThreat
+        => _recentDamageThreatTimer > 0.0f
+            && CurrentTargetMatches(_recentDamageThreatTargetId);
+    internal float ConfirmedCombatContactSecondsForDiagnostics
+        => Mathf.Max(0.0f, _confirmedCombatContactTimer);
+    internal float RecentDamageThreatSecondsForDiagnostics
+        => Mathf.Max(0.0f, _recentDamageThreatTimer);
 
     private bool _hasLastKnownTarget;
     private Vector3 _lastKnownTargetPosition;
     private float _pursuitTimer;
     private float _lostSightTimer;
+    private ulong _confirmedPursuitTargetId;
+    private Vector3 _confirmedCombatContactPosition;
+    private float _confirmedCombatContactTimer;
+    private ulong _recentDamageThreatTargetId;
+    private float _recentDamageThreatTimer;
     private float _squadShareCooldown;
     private float _avoidanceHoldTimer;
     private float _avoidanceSide = 1.0f;
@@ -40,6 +60,8 @@ public partial class EnemyOperator
     {
         _squadShareCooldown = Mathf.Max(0.0f, _squadShareCooldown - delta);
         _avoidanceHoldTimer = Mathf.Max(0.0f, _avoidanceHoldTimer - delta);
+        _confirmedCombatContactTimer = Mathf.Max(0.0f, _confirmedCombatContactTimer - delta);
+        _recentDamageThreatTimer = Mathf.Max(0.0f, _recentDamageThreatTimer - delta);
         if (!_hasLastKnownTarget)
         {
             return;
@@ -137,6 +159,7 @@ public partial class EnemyOperator
         AssignCombatTarget(target);
         ConfirmPursuitNavigationContact(target);
         RememberInvestigationPoint(position, seconds);
+        RecordConfirmedCombatContact(target, position);
         Alerted = true;
         Suspicion = 100.0f;
         _searchingLoot = false;
@@ -172,6 +195,7 @@ public partial class EnemyOperator
         AssignCombatTarget(target);
         ConfirmPursuitNavigationContact(target);
         RememberInvestigationPoint(position, SharedPursuitSeconds);
+        RecordConfirmedCombatContact(target, position);
         Alerted = true;
         Suspicion = 100.0f;
         _searchingLoot = false;
@@ -184,6 +208,24 @@ public partial class EnemyOperator
             return;
         }
         RememberPursuitContact(target, target.GlobalPosition, CurrentPursuitDuration, shareContact: true);
+        _recentDamageThreatTargetId = target.GetInstanceId();
+        _recentDamageThreatTimer = DirectDamageReactionSeconds;
+    }
+
+    private void RecordConfirmedCombatContact(Node3D target, Vector3 position)
+    {
+        _confirmedPursuitTargetId = target.GetInstanceId();
+        _confirmedCombatContactPosition = position;
+        _confirmedCombatContactTimer = ConfirmedContactObjectiveBreakoffSeconds;
+    }
+
+    private bool CurrentTargetMatches(ulong targetId)
+    {
+        var target = AssignedCombatTargetNode();
+        return targetId != 0UL
+            && target is not null
+            && GodotObject.IsInstanceValid(target)
+            && target.GetInstanceId() == targetId;
     }
 
     private Vector3 CurrentPursuitDestination()
@@ -228,12 +270,7 @@ public partial class EnemyOperator
             HoldSentryPosition(delta);
             return;
         }
-        if (IsProne)
-        {
-            SetProne(false);
-        }
-        _seekingCover = false;
-        _inCover = false;
+        PrepareForScriptedMovement();
         _searchingLoot = false;
 
         var target = AssignedCombatTargetNode();
@@ -249,6 +286,21 @@ public partial class EnemyOperator
             CurrentPursuitDestination(),
             speed,
             requireRoute: false);
+    }
+
+    internal void PrepareForScriptedMovement()
+    {
+        if (IsProne)
+        {
+            SetProne(false);
+        }
+        var leftCover = _seekingCover || _inCover;
+        _seekingCover = false;
+        _inCover = false;
+        if (leftCover)
+        {
+            UpdateAuthoredStanceCollider();
+        }
     }
 
     private Vector3 ApplyPursuitObstacleAvoidance(Vector3 direction)
@@ -423,6 +475,11 @@ public partial class EnemyOperator
         _hasLastKnownTarget = false;
         _pursuitTimer = 0.0f;
         _lostSightTimer = 0.0f;
+        _confirmedPursuitTargetId = 0UL;
+        _confirmedCombatContactPosition = Vector3.Zero;
+        _confirmedCombatContactTimer = 0.0f;
+        _recentDamageThreatTargetId = 0UL;
+        _recentDamageThreatTimer = 0.0f;
         _avoidanceHoldTimer = 0.0f;
         _pursuitProgressOrigin = GlobalPosition;
         _pursuitProgressTimer = 0.0f;

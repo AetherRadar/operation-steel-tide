@@ -749,6 +749,13 @@ public partial class FreightTerminalWorld
                 "live demolition device objective");
         }
 
+        // Ladder traversal exclusively owns the transform until it reaches the far
+        // endpoint. Objective arbitration resumes on the following physics tick.
+        if (opponent.IsPursuitLadderActive)
+        {
+            return false;
+        }
+
         var targetDistance = ResolveDemolitionCombatTargetDistance(
             opponent,
             combatTarget,
@@ -872,26 +879,39 @@ public partial class FreightTerminalWorld
         Node3D? target,
         bool targetVisible)
     {
-        if (!targetVisible || target is null || !IsInstanceValid(target))
+        if (target is null
+            || !IsInstanceValid(target)
+            || (!targetVisible && !opponent.HasFreshConfirmedCombatContact))
         {
             return float.PositiveInfinity;
         }
+        var targetPosition = targetVisible
+            ? target.GlobalPosition
+            : opponent.ConfirmedCombatContactPosition;
         var from = opponent.GlobalPosition + Vector3.Up * 1.45f;
-        var to = target.GlobalPosition + Vector3.Up;
-        return IsLineObscuredBySmoke(from, to)
+        var to = targetPosition + Vector3.Up;
+        return !opponent.HasRecentDamageThreat && IsLineObscuredBySmoke(from, to)
             ? float.PositiveInfinity
-            : opponent.GlobalPosition.DistanceTo(target.GlobalPosition);
+            : opponent.GlobalPosition.DistanceTo(targetPosition);
     }
 
     /// <summary>
     /// Combat-first arbitration, the core of any competent bot: objective movement yields
     /// to the full combat layer while a hostile is inside the engage bubble, and resumes
-    /// with hysteresis once the threat leaves it. A carrier or defuser mid-channel holds
-    /// the channel under fire from beyond the guard range, trading damage for the
-    /// objective like a planted-round defuser in Counter-Strike.
+    /// with hysteresis once the threat leaves it. A carrier or defuser may hold the
+    /// channel against a distant observed threat, but a direct hit always interrupts
+    /// the objective and hands control back to ordinary combat.
     /// </summary>
     private bool UpdateDemolitionCombatArbitration(EnemyOperator opponent, float targetDistance)
     {
+        // A direct hit is stronger evidence than a view-cone check and immediately
+        // interrupts plant/defuse. Repeated hits refresh the short reaction window;
+        // cadence and accuracy remain owned by the ordinary combat layer.
+        if (opponent.HasRecentDamageThreat && !float.IsPositiveInfinity(targetDistance))
+        {
+            _demolitionCombatBreakoffs.Add(opponent);
+            return false;
+        }
         if (ShouldHardCommitDemolitionPlant(opponent))
         {
             _demolitionCombatBreakoffs.Remove(opponent);
@@ -1009,6 +1029,7 @@ public partial class FreightTerminalWorld
                 DemolitionStrategyPlanner.PlantMoveSpeed);
         }
 
+        opponent.PrepareForScriptedMovement();
         var velocity = opponent.Velocity;
         velocity.X = Mathf.MoveToward(velocity.X, 0.0f, delta * 18.0f);
         velocity.Z = Mathf.MoveToward(velocity.Z, 0.0f, delta * 18.0f);
@@ -1067,6 +1088,7 @@ public partial class FreightTerminalWorld
                 DemolitionStrategyPlanner.DefuseMoveSpeed);
         }
 
+        opponent.PrepareForScriptedMovement();
         var velocity = opponent.Velocity;
         velocity.X = Mathf.MoveToward(velocity.X, 0.0f, delta * 18.0f);
         velocity.Z = Mathf.MoveToward(velocity.Z, 0.0f, delta * 18.0f);
@@ -1109,6 +1131,7 @@ public partial class FreightTerminalWorld
         float stoppingDistance,
         float speed)
     {
+        opponent.PrepareForScriptedMovement();
         target.Y = opponent.GlobalPosition.Y;
         var distance = HorizontalDistance(opponent.GlobalPosition, target);
         var velocity = opponent.Velocity;
@@ -1136,6 +1159,7 @@ public partial class FreightTerminalWorld
 
     private static void StopDemolitionOpponent(EnemyOperator opponent)
     {
+        opponent.PrepareForScriptedMovement();
         var velocity = opponent.Velocity;
         velocity.X = 0.0f;
         velocity.Z = 0.0f;

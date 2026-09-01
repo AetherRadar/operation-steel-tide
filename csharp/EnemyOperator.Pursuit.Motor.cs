@@ -19,7 +19,8 @@ public partial class EnemyOperator
     private float _pursuitLadderDuration;
     private AuthoredLadderTraversalPath _pursuitLadderPath;
 
-    internal bool IsPursuitLadderActiveForDiagnostics => _pursuitLadderActive;
+    internal bool IsPursuitLadderActive => _pursuitLadderActive;
+    internal bool IsPursuitLadderActiveForDiagnostics => IsPursuitLadderActive;
     internal int PursuitLadderTraversalsForDiagnostics { get; private set; }
 
     private bool UpdatePursuitLadderTraversal(
@@ -31,6 +32,7 @@ public partial class EnemyOperator
         {
             return false;
         }
+        PrepareForScriptedMovement();
         if (_pursuitLadderDirectedEdgeId != directive.DirectedEdgeId)
         {
             CancelPursuitLadderTraversal();
