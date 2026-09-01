@@ -466,7 +466,12 @@ public partial class FreightTerminalWorld
         var cachedInstances = new System.Collections.Generic.Dictionary<WeaponPlatform, ulong>();
         foreach (var platform in Enum.GetValues<WeaponPlatform>())
         {
-            _player.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(platform, 0));
+            var firstPersonBuild = WeaponCatalog.Build(platform, 0);
+            if (platform == WeaponPlatform.M3A1)
+            {
+                firstPersonBuild.Attachments[AttachmentSlot.Optic] = "optic_holo";
+            }
+            _player.GrantFireablePrimaryForDiagnostics(firstPersonBuild);
             await WaitFrames(8);
             var path = $"res://first_person_{platform.ToString().ToLowerInvariant()}_validation.png";
             var absolutePath = ProjectSettings.GlobalizePath(path);
@@ -498,6 +503,7 @@ public partial class FreightTerminalWorld
             }
             if (platform == WeaponPlatform.M3A1)
             {
+                var readyOptic = _player.InspectSmgOpticAttachmentForDiagnostics();
                 var reloadPath = "res://first_person_m3a1_reload_validation.png";
                 var reloadAbsolutePath = ProjectSettings.GlobalizePath(reloadPath);
                 if (System.IO.File.Exists(reloadAbsolutePath))
@@ -506,10 +512,44 @@ public partial class FreightTerminalWorld
                 }
                 var reloadPose = _player.SetReloadPoseForDiagnostics(0.46f);
                 await WaitFrames(2);
+                var reloadOptic = _player.InspectSmgOpticAttachmentForDiagnostics();
+                var relativePositionError = readyOptic.OpticTransformInWeaponBody.Origin
+                    .DistanceTo(reloadOptic.OpticTransformInWeaponBody.Origin);
+                var relativeRotationError = readyOptic.OpticTransformInWeaponBody.Basis
+                    .Orthonormalized()
+                    .GetRotationQuaternion()
+                    .AngleTo(reloadOptic.OpticTransformInWeaponBody.Basis
+                        .Orthonormalized()
+                        .GetRotationQuaternion());
+                var weaponPositionTravel = readyOptic.WeaponBodyGlobalTransform.Origin
+                    .DistanceTo(reloadOptic.WeaponBodyGlobalTransform.Origin);
+                var weaponRotationTravel = readyOptic.WeaponBodyGlobalTransform.Basis
+                    .Orthonormalized()
+                    .GetRotationQuaternion()
+                    .AngleTo(reloadOptic.WeaponBodyGlobalTransform.Basis
+                        .Orthonormalized()
+                        .GetRotationQuaternion());
+                var smgOpticFollowsReload = readyOptic.Available
+                    && reloadOptic.Available
+                    && readyOptic.MountedToWeaponBody
+                    && reloadOptic.MountedToWeaponBody
+                    && relativePositionError <= 0.0001f
+                    && relativeRotationError <= 0.0001f
+                    && (weaponPositionTravel >= 0.005f || weaponRotationTravel >= 0.01f);
                 SaveViewportImage(reloadPath);
                 captures[platform] &= reloadPose
+                    && smgOpticFollowsReload
                     && System.IO.File.Exists(reloadAbsolutePath)
                     && new System.IO.FileInfo(reloadAbsolutePath).Length > 0;
+                GD.Print(
+                    $"SMG_OPTIC_RELOAD_CHECK valid={smgOpticFollowsReload} "
+                    + $"ready_parent={readyOptic.MountedToWeaponBody} "
+                    + $"reload_parent={reloadOptic.MountedToWeaponBody} "
+                    + $"relative_position_error={relativePositionError:0.000000} "
+                    + $"relative_rotation_error={relativeRotationError:0.000000} "
+                    + $"weapon_position_travel={weaponPositionTravel:0.000000} "
+                    + $"weapon_rotation_travel={weaponRotationTravel:0.000000}");
+                GD.Print($"SMG_OPTIC_RELOAD_PASS valid={smgOpticFollowsReload}");
                 _player.ClearReloadPoseForDiagnostics();
             }
             var instanceId = _player.AuthoredWeaponInstanceIdForDiagnostics(platform);

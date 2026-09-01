@@ -120,13 +120,15 @@ public partial class TacticalPlayer
     {
         if (!IsInstanceValid(_opticReticle))
         {
-            return _opticRoot.Position;
+            return _weaponRoot.GlobalTransform.AffineInverse()
+                * _opticRoot.GlobalPosition;
         }
 
         // Use the final gameplay dot rather than the mount origin as the ADS
         // coordinate source. This absorbs authored parent transforms and any
         // non-zero aperture marker offset without adding a per-frame search.
-        return _opticRoot.Transform * _opticReticle.Position;
+        return _weaponRoot.GlobalTransform.AffineInverse()
+            * _opticReticle.GlobalPosition;
     }
 
     private static float OpticMountHeight(WeaponPlatform platform, string? opticId)
@@ -384,6 +386,10 @@ public partial class TacticalPlayer
         }
         foreach (var mesh in CombatModelLibrary.MeshesBelow(weaponGeometryRoot))
         {
+            if (ReferenceEquals(mesh, _opticRoot) || _opticRoot.IsAncestorOf(mesh))
+            {
+                continue;
+            }
             AccumulateWeaponMesh(mesh);
         }
 
@@ -434,7 +440,8 @@ public partial class TacticalPlayer
             mountSurfaceHeight = (weaponRootInverse
                 * opticRailContact.GlobalPosition).Y;
         }
-        var opticBottom = _opticRoot.Position.Y
+        var opticPositionInWeaponRoot = weaponRootInverse * _opticRoot.GlobalPosition;
+        var opticBottom = opticPositionInWeaponRoot.Y
             - AuthoredOpticRailContactOffset(opticId);
         const float weldedIronSightClearanceTolerance = 0.001f;
         var ironSightsClear = hasDedicatedIronSights
@@ -449,8 +456,8 @@ public partial class TacticalPlayer
         return new FirstPersonOpticClearanceInspection(
             true,
             weaponTop,
-            _opticRoot.Position.Y,
-            _opticRoot.Position.Y - weaponTop,
+            opticPositionInWeaponRoot.Y,
+            opticPositionInWeaponRoot.Y - weaponTop,
             mountSurfaceHeight,
             opticBottom,
             opticBottom - mountSurfaceHeight,

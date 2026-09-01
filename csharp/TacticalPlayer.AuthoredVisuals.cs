@@ -41,6 +41,8 @@ public partial class TacticalPlayer
     private AuthoredFirstPersonArmsVisual _authoredRifleArms = null!;
     private AuthoredFirstPersonArmsVisual _authoredPistolServiceArms = null!;
     private AuthoredFirstPersonArmsVisual _authoredPistolLargeArms = null!;
+    private Transform3D _authoredSmgWeaponBodyReadyTransformInWeaponRoot = Transform3D.Identity;
+    private bool _authoredSmgWeaponBodyReadyTransformCaptured;
     private bool _rifleArmsLoadAttempted;
     private bool _pistolServiceArmsLoadAttempted;
     private bool _pistolLargeArmsLoadAttempted;
@@ -212,6 +214,27 @@ public partial class TacticalPlayer
                 : null;
 
     internal Transform3D WeaponRootGlobalTransformForDiagnostics => _weaponRoot.GlobalTransform;
+
+    internal SmgOpticAttachmentInspection InspectSmgOpticAttachmentForDiagnostics()
+    {
+        if (EquippedWeapon.Platform != WeaponPlatform.M3A1
+            || !IsInstanceValid(_authoredFirstPersonSmg?.WeaponBody)
+            || !IsInstanceValid(_opticRoot))
+        {
+            return default;
+        }
+
+        var weaponBody = _authoredFirstPersonSmg.WeaponBody;
+        var mountedToWeaponBody = ReferenceEquals(_opticRoot.GetParent(), weaponBody);
+        return new SmgOpticAttachmentInspection(
+            true,
+            mountedToWeaponBody,
+            mountedToWeaponBody
+                ? _opticRoot.Transform
+                : weaponBody.GlobalTransform.AffineInverse() * _opticRoot.GlobalTransform,
+            weaponBody.GlobalTransform,
+            _opticRoot.GlobalTransform);
+    }
 
     internal SidearmPresentationInspection InspectSidearmPresentationForDiagnostics()
     {
@@ -738,6 +761,12 @@ public partial class TacticalPlayer
             {
                 _authoredFirstPersonSmg.SyncMechanisms();
                 _authoredFirstPersonSmg.SetReloadProgress(_isReloading ? PresentationReloadProgress : 0.0f);
+                PrepareOpticParentForCurrentWeapon();
+                EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Optic, out var opticId);
+                SetOpticReadyTransformInWeaponRoot(new Vector3(
+                    0.0f,
+                    OpticMountHeight(EquippedWeapon.Platform, opticId),
+                    -0.25f));
             }
         }
         else
@@ -875,11 +904,57 @@ public partial class TacticalPlayer
             _weaponRoot.AddChild(authoredSmg.Root);
             _authoredFirstPersonSmg = authoredSmg;
             _authoredFirstPersonSmg.SetReloadProgress(0.0f);
+            _authoredSmgWeaponBodyReadyTransformInWeaponRoot =
+                _weaponRoot.GlobalTransform.AffineInverse()
+                * _authoredFirstPersonSmg.WeaponBody.GlobalTransform;
+            _authoredSmgWeaponBodyReadyTransformCaptured = true;
         }
         catch (Exception exception)
         {
             GD.PushError($"Required authored SMG-45 first-person model unavailable: {exception.Message}");
         }
+    }
+
+    private void PrepareOpticParentForCurrentWeapon()
+    {
+        if (!IsInstanceValid(_opticRoot) || !IsInstanceValid(_weaponRoot))
+        {
+            return;
+        }
+
+        Node3D desiredParent = _weaponRoot;
+        if (EquippedWeapon.Platform == WeaponPlatform.M3A1
+            && IsInstanceValid(_authoredFirstPersonSmg?.WeaponBody))
+        {
+            desiredParent = _authoredFirstPersonSmg.WeaponBody;
+        }
+        if (!ReferenceEquals(_opticRoot.GetParent(), desiredParent))
+        {
+            _opticRoot.Reparent(desiredParent, keepGlobalTransform: true);
+        }
+    }
+
+    private void SetOpticReadyTransformInWeaponRoot(Vector3 position)
+    {
+        var readyTransformInWeaponRoot = new Transform3D(Basis.Identity, position);
+        if (EquippedWeapon.Platform == WeaponPlatform.M3A1
+            && _authoredSmgWeaponBodyReadyTransformCaptured
+            && IsInstanceValid(_authoredFirstPersonSmg?.WeaponBody)
+            && ReferenceEquals(_opticRoot.GetParent(), _authoredFirstPersonSmg.WeaponBody))
+        {
+            _opticRoot.Transform = _authoredSmgWeaponBodyReadyTransformInWeaponRoot
+                .AffineInverse()
+                * readyTransformInWeaponRoot;
+            return;
+        }
+
+        if (ReferenceEquals(_opticRoot.GetParent(), _weaponRoot))
+        {
+            _opticRoot.Transform = readyTransformInWeaponRoot;
+            return;
+        }
+
+        _opticRoot.GlobalTransform = _weaponRoot.GlobalTransform * readyTransformInWeaponRoot;
     }
 
     private void EnsureAuthoredPlatformWeapon(WeaponPlatform platform)
@@ -1539,3 +1614,10 @@ internal readonly record struct AuthoredM4ReloadArmInspection(
     float ActiveMagazineDistance,
     float SleeveWristLength,
     Transform3D LeftArmTransform);
+
+internal readonly record struct SmgOpticAttachmentInspection(
+    bool Available,
+    bool MountedToWeaponBody,
+    Transform3D OpticTransformInWeaponBody,
+    Transform3D WeaponBodyGlobalTransform,
+    Transform3D OpticGlobalTransform);

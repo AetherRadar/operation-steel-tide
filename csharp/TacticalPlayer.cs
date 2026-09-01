@@ -1145,15 +1145,15 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var opticScale = EquippedWeapon.Attachments.TryGetValue(AttachmentSlot.Optic, out var opticId)
             ? WeaponCatalog.Attachment(opticId).VisualScale
             : 0.0f;
+        PrepareOpticParentForCurrentWeapon();
         _opticRoot.Visible = opticScale > 0.0f;
-        _opticRoot.Scale = Vector3.One;
         var usesIntegratedWeaponOptic = WeaponUsesIntegratedOptic(
             EquippedWeapon.Platform,
             opticId);
-        _opticRoot.Position = new Vector3(
+        SetOpticReadyTransformInWeaponRoot(new Vector3(
             0,
             OpticMountHeight(EquippedWeapon.Platform, opticId),
-            -0.25f);
+            -0.25f));
         // Finished DCC assets own every visible sight housing. The retained
         // legacy nodes are invisible compatibility scaffolding only.
         _reflexSightModel.Visible = false;
