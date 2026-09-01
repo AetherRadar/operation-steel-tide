@@ -318,6 +318,78 @@ public partial class FreightTerminalWorld
         }
         var accuracyUnchanged = Mathf.IsEqualApprox(probe.AccuracyBonus, accuracyBefore);
         var weaponUnchanged = WeaponSignature(probe.CarriedWeapon) == weaponBefore;
+
+        // A smoke-covered operator must not become a stationary target. Direct damage
+        // gives it one short suppression window while the movement motor drives it away
+        // from the cloud center. Shot count is deterministic; hit chance intentionally is not.
+        probe.GlobalPosition = probePosition;
+        probe.Velocity = Vector3.Zero;
+        probe.LookAt(probePosition + Vector3.Forward, Vector3.Up);
+        probe.ConfigureCombatProbeForDiagnostics(
+            0x534D4F4B455F4149UL,
+            playerPosition,
+            bypassPlayerProtection: true,
+            suppressContactSharing: true);
+        probe.GrantFireablePrimaryForDiagnostics(WeaponCatalog.Build(WeaponPlatform.M4A1, 1));
+        probe.ProcessMode = ProcessModeEnum.Disabled;
+        var responseSmoke = new SmokeGrenade
+        {
+            Name = "EnemyResponseSmoke",
+            Position = probePosition
+        };
+        AddChild(responseSmoke);
+        responseSmoke.Arm(Vector3.Forward);
+        responseSmoke.BeginGroundFuseForDiagnostics();
+        responseSmoke._PhysicsProcess(0.4f);
+        var smokeProbePoint = probePosition + Vector3.Up * 0.9f;
+        var smokeContainsProbe = responseSmoke.ContainsPoint(smokeProbePoint);
+        var smokeBlocksSight = IsLineObscuredBySmoke(
+            probePosition + Vector3.Up * 1.45f,
+            playerPosition + Vector3.Up * 1.05f);
+        probe.SetFireTimerForDiagnostics(4.2f);
+        _ = probe.TakeDamage(0.1f, probe.GlobalPosition + Vector3.Up, _player);
+        var smokeThreatRecorded = probe.HasRecentDamageThreat;
+        var smokeReactionDelayCompressed = probe.FireTimerForDiagnostics <= 0.35f;
+        var smokeLineOfSightRejected = !probe.HasCurrentTargetLineOfSightForDiagnostics();
+        var smokeBallisticPathOpen = Ballistics.HasClearShot(
+            GetWorld3D(),
+            probe.ResolvedShotOriginForDiagnostics,
+            _player.HitPoint(HitRegion.Torso),
+            _player,
+            probe.GetRid());
+        var smokeStart = probe.GlobalPosition;
+        var smokeStartDistance = HorizontalDistance(smokeStart, responseSmoke.CloudCenter);
+        var smokeShotsBefore = probe.AttackShotsFired;
+        probe.ProcessMode = ProcessModeEnum.Inherit;
+        var smokeResponseFrames = 0;
+        const int maximumSmokeResponseFrames = 180;
+        while (smokeResponseFrames < maximumSmokeResponseFrames)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            _player.SetHealthForDiagnostics(_player.MaxHealth);
+            var displacement = HorizontalDistance(smokeStart, probe.GlobalPosition);
+            var cloudDistance = HorizontalDistance(
+                probe.GlobalPosition,
+                responseSmoke.CloudCenter);
+            if (probe.AttackShotsFired > smokeShotsBefore
+                && displacement > 0.75f
+                && cloudDistance > smokeStartDistance + 0.75f)
+            {
+                break;
+            }
+            smokeResponseFrames++;
+        }
+        probe.ProcessMode = ProcessModeEnum.Disabled;
+        var smokeDisplacement = HorizontalDistance(smokeStart, probe.GlobalPosition);
+        var smokeEndDistance = HorizontalDistance(probe.GlobalPosition, responseSmoke.CloudCenter);
+        var smokeReturnFire = probe.AttackShotsFired > smokeShotsBefore;
+        var smokeKeepsMoving = smokeDisplacement > 0.75f;
+        var smokeMovesOutward = smokeEndDistance > smokeStartDistance + 0.75f;
+        var smokeTargetRetained = ReferenceEquals(probe.EngageTargetNode, _player);
+        UnregisterActiveSmokeGrenade(responseSmoke);
+        responseSmoke.RemoveFromGroup(SmokeGrenade.ActiveGroupName);
+        responseSmoke.QueueFree();
+
         var valid = proneStopsMomentum
             && objectiveForcesStanding
             && noObjectiveProneSlide
@@ -339,9 +411,19 @@ public partial class FreightTerminalWorld
             && clearLineOfSight
             && clearBallisticPath
             && accuracyUnchanged
-            && weaponUnchanged;
+            && weaponUnchanged
+            && smokeContainsProbe
+            && smokeBlocksSight
+            && smokeThreatRecorded
+            && smokeReactionDelayCompressed
+            && smokeLineOfSightRejected
+            && smokeBallisticPathOpen
+            && smokeReturnFire
+            && smokeKeepsMoving
+            && smokeMovesOutward
+            && smokeTargetRetained;
 
-        GD.Print($"DEMOLITION_ENEMY_RESPONSE_CHECK valid={valid} prone_stop={proneStopsMomentum} objective_stand={objectiveForcesStanding} objective_no_slide={noObjectiveProneSlide} ladder_guard={objectivePreservesLadder} ladder_transform={ladderTransformPreserved} ladder_velocity={ladderVelocityPreserved} ladder_progress={ladderProgressPreserved} ladder_active={ladderActivePreserved} ladder_breakoff={ladderBreakoffPreserved} ladder_released={ladderReleased} hidden_continues={hiddenUnconfirmedContinues} initially_back={initiallyBackTurned} normal_interrupt={normalHitInterrupts} normal_damage={normalDamageRecorded} noise_isolated={noisePreservesConfirmedContact} urgent_interrupt={urgentHitInterrupts} urgent_damage={urgentDamageRecorded} response_prone={responseStartedProne} stood={stoodDuringResponse} faced={facedAttacker} fired={firedAtAttacker} shots={probe.AttackShotsFired - shotsBefore} prone_slide_frames={proneSlideFrames} response_frames={responseFrames}/{maximumResponseFrames} target={retainedTarget} los={clearLineOfSight} ballistic={clearBallisticPath} ray_hit={rayHit} accuracy_unchanged={accuracyUnchanged} weapon_unchanged={weaponUnchanged} recent_timer={urgentContact.RecentDamageThreatTimer:0.00}");
+        GD.Print($"DEMOLITION_ENEMY_RESPONSE_CHECK valid={valid} prone_stop={proneStopsMomentum} objective_stand={objectiveForcesStanding} objective_no_slide={noObjectiveProneSlide} ladder_guard={objectivePreservesLadder} ladder_transform={ladderTransformPreserved} ladder_velocity={ladderVelocityPreserved} ladder_progress={ladderProgressPreserved} ladder_active={ladderActivePreserved} ladder_breakoff={ladderBreakoffPreserved} ladder_released={ladderReleased} hidden_continues={hiddenUnconfirmedContinues} initially_back={initiallyBackTurned} normal_interrupt={normalHitInterrupts} normal_damage={normalDamageRecorded} noise_isolated={noisePreservesConfirmedContact} urgent_interrupt={urgentHitInterrupts} urgent_damage={urgentDamageRecorded} response_prone={responseStartedProne} stood={stoodDuringResponse} faced={facedAttacker} fired={firedAtAttacker} shots={probe.AttackShotsFired - shotsBefore} prone_slide_frames={proneSlideFrames} response_frames={responseFrames}/{maximumResponseFrames} target={retainedTarget} los={clearLineOfSight} ballistic={clearBallisticPath} ray_hit={rayHit} accuracy_unchanged={accuracyUnchanged} weapon_unchanged={weaponUnchanged} smoke_inside={smokeContainsProbe} smoke_block={smokeBlocksSight} smoke_los_rejected={smokeLineOfSightRejected} smoke_ballistic={smokeBallisticPathOpen} smoke_threat={smokeThreatRecorded} smoke_delay={smokeReactionDelayCompressed} smoke_fired={smokeReturnFire} smoke_move={smokeKeepsMoving}:{smokeDisplacement:0.00} smoke_outward={smokeMovesOutward}:{smokeStartDistance:0.00}->{smokeEndDistance:0.00} smoke_target={smokeTargetRetained} smoke_frames={smokeResponseFrames}/{maximumSmokeResponseFrames} recent_timer={urgentContact.RecentDamageThreatTimer:0.00}");
         GD.Print($"DEMOLITION_ENEMY_RESPONSE_PASS valid={valid}");
         platform.QueueFree();
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);

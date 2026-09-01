@@ -52,6 +52,41 @@ public partial class FreightTerminalWorld
         return false;
     }
 
+    internal bool TryGetSmokeEscapeDirection(
+        Vector3 point,
+        Vector3 fallbackDirection,
+        out Vector3 direction)
+    {
+        var escape = Vector3.Zero;
+        var isInsideSmoke = false;
+        for (var index = _activeSmokeGrenades.Count - 1; index >= 0; index--)
+        {
+            var smoke = _activeSmokeGrenades[index];
+            if (!IsInstanceValid(smoke))
+            {
+                _activeSmokeGrenades.RemoveAt(index);
+                continue;
+            }
+            if (!smoke.TryGetEscapeContribution(point, out var contribution, out var weight))
+            {
+                continue;
+            }
+            isInsideSmoke = true;
+            escape += contribution * weight;
+        }
+
+        escape.Y = 0.0f;
+        fallbackDirection.Y = 0.0f;
+        if (escape.LengthSquared() <= 0.001f)
+        {
+            escape = fallbackDirection.LengthSquared() > 0.001f
+                ? fallbackDirection.Normalized()
+                : Vector3.Forward;
+        }
+        direction = escape.Normalized();
+        return isInsideSmoke;
+    }
+
     internal void RegisterActiveSmokeGrenade(SmokeGrenade smoke)
     {
         if (_activeSmokeGrenades.Contains(smoke))

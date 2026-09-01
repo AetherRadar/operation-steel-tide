@@ -9,6 +9,7 @@ public partial class IncendiaryGrenade : RigidBody3D
     private const float MaximumAirborneLifetime = 18.0f;
     private const float DamageInterval = 0.4f;
     private const float DamagePerTick = 6.0f;
+    private const float MinimumGroundNormalDot = 0.82f;
     private const float FireSurfaceOffset = 0.02f;
     private const float FireDecalProjectionDepth = 0.55f;
     private const int FireDecalTextureSize = 64;
@@ -31,7 +32,9 @@ public partial class IncendiaryGrenade : RigidBody3D
             && GlobalBasis.IsEqualApprox(Basis.Identity)
             && GlobalPosition.IsEqualApprox(
                 _fireSurfacePosition + _fireSurfaceNormal * FireSurfaceOffset)
-            && _fireGroundDecal.GlobalBasis.Y.Dot(_fireSurfaceNormal) >= 0.999f;
+            && _fireGroundDecal.GlobalBasis.Y.Dot(_fireSurfaceNormal) >= 0.999f
+            && IsInstanceValid(_fireParticles)
+            && _fireParticles.GlobalBasis.Y.Dot(_fireSurfaceNormal) >= 0.999f;
     internal float FireParticleCoverageRadiusForDiagnostics
         => IsInstanceValid(_fireParticles)
             && _fireParticles.ProcessMaterial is ParticleProcessMaterial particles
@@ -48,6 +51,9 @@ public partial class IncendiaryGrenade : RigidBody3D
     private float _damageTimer;
     private Vector3 _fireSurfacePosition;
     private Vector3 _fireSurfaceNormal = Vector3.Up;
+    private Vector3 _fireSurfaceLocalPosition;
+    private Vector3 _fireSurfaceLocalNormal = Vector3.Up;
+    private StaticBody3D? _fireSurfaceBody;
     private FreightTerminalWorld? _registeredWorld;
 
     public override void _Ready()
@@ -113,8 +119,19 @@ public partial class IncendiaryGrenade : RigidBody3D
             _fuse -= step;
             if (_fuse <= 0.0f)
             {
+                if (!TryRefreshFireSurfaceAnchor())
+                {
+                    QueueFree();
+                    return;
+                }
                 Ignite();
             }
+            return;
+        }
+
+        if (!TryRefreshFireSurfaceAnchor())
+        {
+            QueueFree();
             return;
         }
 
@@ -144,21 +161,52 @@ public partial class IncendiaryGrenade : RigidBody3D
         }
         for (var contact = 0; contact < state.GetContactCount(); contact++)
         {
-            var normal = (GlobalBasis * state.GetContactLocalNormal(contact)).Normalized();
-            if (normal.Dot(Vector3.Up) >= 0.35f && state.LinearVelocity.Y <= 3.0f)
+            var normal = state.GetContactLocalNormal(contact).Normalized();
+            if (TryBeginGroundFuse(
+                    state.GetContactColliderObject(contact),
+                    state.GetContactColliderPosition(contact),
+                    normal,
+                    state.LinearVelocity.Y))
             {
-                BeginGroundFuse(state.GetContactColliderPosition(contact), normal);
                 return;
             }
         }
     }
+
+    internal bool TryBeginGroundFuseForDiagnostics(
+        GodotObject collider,
+        Vector3 surfacePosition,
+        Vector3 surfaceNormal,
+        float verticalVelocity)
+        => TryBeginGroundFuse(collider, surfacePosition, surfaceNormal, verticalVelocity);
 
     internal void BeginGroundFuseForDiagnostics(
         Vector3 surfacePosition,
         Vector3 surfaceNormal)
         => BeginGroundFuse(surfacePosition, surfaceNormal);
 
-    private void BeginGroundFuse(Vector3 surfacePosition, Vector3 surfaceNormal)
+    private bool TryBeginGroundFuse(
+        GodotObject? collider,
+        Vector3 surfacePosition,
+        Vector3 surfaceNormal,
+        float verticalVelocity)
+    {
+        if (collider is not StaticBody3D surfaceBody
+            || surfaceBody.GetType() != typeof(StaticBody3D)
+            || surfaceNormal.LengthSquared() <= 0.001f
+            || surfaceNormal.Normalized().Dot(Vector3.Up) < MinimumGroundNormalDot
+            || verticalVelocity > 3.0f)
+        {
+            return false;
+        }
+        BeginGroundFuse(surfacePosition, surfaceNormal, surfaceBody);
+        return HasTouchedGround;
+    }
+
+    private void BeginGroundFuse(
+        Vector3 surfacePosition,
+        Vector3 surfaceNormal,
+        StaticBody3D? surfaceBody = null)
     {
         if (!_armed || HasTouchedGround || IsBurning)
         {
@@ -169,6 +217,13 @@ public partial class IncendiaryGrenade : RigidBody3D
         _fireSurfaceNormal = surfaceNormal.LengthSquared() > 0.001f
             ? surfaceNormal.Normalized()
             : Vector3.Up;
+        _fireSurfaceBody = surfaceBody;
+        if (surfaceBody is not null)
+        {
+            _fireSurfaceLocalPosition = surfaceBody.ToLocal(_fireSurfacePosition);
+            _fireSurfaceLocalNormal = (surfaceBody.GlobalBasis.Inverse() * _fireSurfaceNormal)
+                .Normalized();
+        }
         _hasFireSurface = true;
         _fuse = GroundFuseDuration;
         LinearVelocity = Vector3.Zero;
@@ -192,14 +247,58 @@ public partial class IncendiaryGrenade : RigidBody3D
         _casing.Visible = false;
         if (!_hasFireSurface)
         {
-            _fireSurfacePosition = GlobalPosition;
-            _fireSurfaceNormal = Vector3.Up;
+            QueueFree();
+            return;
         }
+        ApplyFireSurfaceTransform();
+        BuildFirePresentation();
+    }
+
+    private bool TryRefreshFireSurfaceAnchor()
+    {
+        if (!_hasFireSurface)
+        {
+            return false;
+        }
+        if (_fireSurfaceBody is null)
+        {
+            return true;
+        }
+        if (!IsInstanceValid(_fireSurfaceBody))
+        {
+            return false;
+        }
+        _fireSurfacePosition = _fireSurfaceBody.ToGlobal(_fireSurfaceLocalPosition);
+        _fireSurfaceNormal = (_fireSurfaceBody.GlobalBasis * _fireSurfaceLocalNormal)
+            .Normalized();
+        if (IsBurning)
+        {
+            ApplyFireSurfaceTransform();
+            if (IsInstanceValid(_fireParticles))
+            {
+                _fireParticles.Transform = new Transform3D(
+                    SurfaceAlignedBasis(_fireSurfaceNormal),
+                    Vector3.Zero);
+            }
+            if (IsInstanceValid(_fireGroundDecal))
+            {
+                _fireGroundDecal.Transform = FireGroundDecalTransform();
+            }
+        }
+        return true;
+    }
+
+    private void ApplyFireSurfaceTransform()
+    {
         GlobalTransform = new Transform3D(
             Basis.Identity,
             _fireSurfacePosition + _fireSurfaceNormal * FireSurfaceOffset);
-        BuildFirePresentation();
     }
+
+    private Transform3D FireGroundDecalTransform()
+        => new(
+            SurfaceAlignedBasis(_fireSurfaceNormal),
+            _fireSurfaceNormal * (FireDecalProjectionDepth * 0.24f));
 
     private void BuildFirePresentation()
     {
@@ -219,6 +318,9 @@ public partial class IncendiaryGrenade : RigidBody3D
         _fireParticles = new GpuParticles3D
         {
             Name = "SharedFireParticles",
+            Transform = new Transform3D(
+                SurfaceAlignedBasis(_fireSurfaceNormal),
+                Vector3.Zero),
             Amount = 96,
             Lifetime = 0.72f,
             Randomness = 0.45f,
@@ -256,9 +358,7 @@ public partial class IncendiaryGrenade : RigidBody3D
         _fireGroundDecal = new Decal
         {
             Name = "FireGroundGlow",
-            Transform = new Transform3D(
-                SurfaceAlignedBasis(_fireSurfaceNormal),
-                _fireSurfaceNormal * (FireDecalProjectionDepth * 0.24f)),
+            Transform = FireGroundDecalTransform(),
             Size = new Vector3(
                 FireRadius * 1.8f,
                 FireDecalProjectionDepth,

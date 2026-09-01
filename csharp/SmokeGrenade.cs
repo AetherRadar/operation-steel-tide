@@ -7,6 +7,7 @@ public partial class SmokeGrenade : RigidBody3D
 {
     private const float GroundFuseDuration = 0.35f;
     private const float MaximumAirborneLifetime = 18.0f;
+    private const float CloudVerticalHalfHeight = 3.2f;
 
     public const string ActiveGroupName = "active_smoke_grenades";
     public const float CloudRadius = 7.4f;
@@ -21,6 +22,7 @@ public partial class SmokeGrenade : RigidBody3D
     public bool OwnerCollisionExcluded { get; private set; }
     public bool HasTouchedGround { get; private set; }
     public bool FuseStarted => HasTouchedGround && _armed;
+    internal Vector3 CloudCenter => GlobalPosition + Vector3.Up * 1.45f;
     public int CloudVisualCount
         => IsInstanceValid(_cloudInstances) && _cloudInstances.Multimesh is not null
             ? _cloudInstances.Multimesh.InstanceCount
@@ -147,10 +149,41 @@ public partial class SmokeGrenade : RigidBody3D
         {
             return false;
         }
-        var center = GlobalPosition + Vector3.Up * 1.45f;
+        var center = CloudCenter;
         var factor = Mathf.Clamp((center - from).Dot(segment) / lengthSquared, 0.0f, 1.0f);
         var closest = from + segment * factor;
         return closest.DistanceSquaredTo(center) <= CloudRadius * CloudRadius;
+    }
+
+    public bool ContainsPoint(Vector3 point)
+    {
+        if (!IsDeployed || RemainingDuration <= 0.0f)
+        {
+            return false;
+        }
+        var offset = point - CloudCenter;
+        var horizontalDistanceSquared = offset.X * offset.X + offset.Z * offset.Z;
+        return Mathf.Abs(offset.Y) <= CloudVerticalHalfHeight
+            && horizontalDistanceSquared <= CloudRadius * CloudRadius;
+    }
+
+    internal bool TryGetEscapeContribution(
+        Vector3 point,
+        out Vector3 direction,
+        out float weight)
+    {
+        if (!ContainsPoint(point))
+        {
+            direction = Vector3.Zero;
+            weight = 0.0f;
+            return false;
+        }
+        var offset = point - CloudCenter;
+        offset.Y = 0.0f;
+        var distance = offset.Length();
+        direction = distance > 0.01f ? offset / distance : Vector3.Zero;
+        weight = 1.0f + Mathf.Clamp(1.0f - distance / CloudRadius, 0.0f, 1.0f);
+        return true;
     }
 
     private void DeploySmoke()

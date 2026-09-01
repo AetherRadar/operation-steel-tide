@@ -629,6 +629,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
 
         var hasEngageTarget = EngageTargetNode is not null;
+        var smokeEscapeFallback = hasEngageTarget
+            ? GlobalPosition - CurrentTargetPosition()
+            : -GlobalBasis.Z;
+        var smokeEscapeDirection = Vector3.Zero;
+        var isInsideSmoke = Main is not null
+            && Main.TryGetSmokeEscapeDirection(
+                GlobalPosition + Vector3.Up * 0.9f,
+                smokeEscapeFallback,
+                out smokeEscapeDirection);
         if (hasEngageTarget)
         {
             _noContactTimer = 0.0f;
@@ -646,7 +655,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
         if (!hasEngageTarget)
         {
-            var followsDemolitionObjective = Main?.TryHandleDemolitionDefenderMovement(
+            var followsDemolitionObjective = !isInsideSmoke
+                && Main?.TryHandleDemolitionDefenderMovement(
                 this,
                 dt,
                 combatTarget: null,
@@ -689,6 +699,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
                 {
                     Patrol(dt);
                 }
+            }
+            if (isInsideSmoke)
+            {
+                ApplySmokeEvasion(dt, smokeEscapeDirection);
             }
             MoveOperator(dt);
             AnimateBody(dt);
@@ -749,7 +763,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         // Demolition objective movement is decided after the cached visibility probe.
         // Pursuit therefore cannot starve a plant/defuse route, while a genuinely
         // visible close threat can still hand control to the full combat motor.
-        var followsVisibleDemolitionObjective = Main?.TryHandleDemolitionDefenderMovement(
+        var followsVisibleDemolitionObjective = !isInsideSmoke
+            && Main?.TryHandleDemolitionDefenderMovement(
             this,
             dt,
             EngageTargetNode,
@@ -790,6 +805,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         else
         {
             Patrol(dt);
+        }
+        if (isInsideSmoke)
+        {
+            ApplySmokeEvasion(dt, smokeEscapeDirection);
         }
         MoveOperator(dt);
         AnimateBody(dt);
@@ -923,6 +942,12 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private void AcquireCombatTarget()
     {
         var previousTarget = AssignedCombatTargetNode();
+        // A direct hit wins the normal proximity rescore for the brief reaction window.
+        // This keeps the recorded attacker and blind-fire contact coherent inside smoke.
+        if (HasRecentDamageThreat && IsValidHostileTarget(previousTarget))
+        {
+            return;
+        }
         var retainPrevious = CanRetainPursuitTarget(previousTarget);
         _combatTarget = null;
         _rawTarget = null;
@@ -1476,9 +1501,16 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             stunnedVelocity.Z = Mathf.MoveToward(stunnedVelocity.Z, 0.0f, delta * 18.0f);
             Velocity = stunnedVelocity;
             // Still allow return fire while stunned at reduced cadence.
-            if (_fireTimer <= 0.0f && distance < CurrentFireRange && hasSight)
+            var canReturnFireThroughSmoke = CanReturnFireAtRecentDamageThreat();
+            if (_fireTimer <= 0.0f
+                && distance < CurrentFireRange
+                && (hasSight || canReturnFireThroughSmoke))
             {
-                if (_combatTarget is not null)
+                if (!hasSight)
+                {
+                    FireAtRecentDamageThreat(distance);
+                }
+                else if (_combatTarget is not null)
                 {
                     FireAtSquad(distance);
                 }
@@ -1493,6 +1525,16 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         if (!hasSight)
         {
             UpdateLostContactMovement(delta);
+            if (HasRecentDamageThreat)
+            {
+                FaceCombatContact(hasSight: false);
+            }
+            if (CanReturnFireAtRecentDamageThreat()
+                && _fireTimer <= 0.0f
+                && distance < CurrentFireRange)
+            {
+                FireAtRecentDamageThreat(distance);
+            }
             return;
         }
 
@@ -1617,6 +1659,17 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         {
             LookAt(contactFlat, Vector3.Up);
         }
+    }
+
+    private bool CanReturnFireAtRecentDamageThreat()
+    {
+        if (!HasRecentDamageThreat || Main is null)
+        {
+            return false;
+        }
+        var from = GlobalPosition + Vector3.Up * (IsProne ? 0.55f : 1.45f);
+        var to = ConfirmedCombatContactPosition + Vector3.Up * 1.05f;
+        return Main.IsLineObscuredBySmoke(from, to);
     }
 
     private bool UpdateCover(float delta, Vector3 combatPosition)
@@ -1749,6 +1802,84 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             0.0f,
             _rng.RandfRange(-4.0f, 4.0f));
         _patrolTimer = _rng.RandfRange(4.0f, 8.0f);
+    }
+
+    private void FireAtRecentDamageThreat(float distance)
+    {
+        var target = AssignedCombatTargetNode();
+        if (!HasFireablePrimary
+            || !CanReturnFireAtRecentDamageThreat()
+            || target is null
+            || !GodotObject.IsInstanceValid(target))
+        {
+            return;
+        }
+
+        BeginMuzzleFlash();
+        var stats = CarriedWeapon.Stats();
+        _fireTimer = _rng.RandfRange(stats.FireInterval * 3.6f, stats.FireInterval * 6.2f)
+            * (IsWorldBoss ? WorldBossFireCadenceMultiplier : 1.0f);
+        var accuracy = Mathf.Clamp(
+            0.4f - distance * 0.007f + AccuracyBonus,
+            0.14f,
+            0.42f);
+        var aimPoint = ConfirmedCombatContactPosition + Vector3.Up * 1.05f;
+        var shotOrigin = ResolveBallisticShotOrigin();
+        if (BreakableGlassField.TryShatterAlongRay(
+            GetWorld3D(),
+            shotOrigin,
+            aimPoint,
+            stats.Damage * 0.3f,
+            shotOrigin.DirectionTo(aimPoint),
+            out var glassHitPosition))
+        {
+            Main?.SpawnTracer(shotOrigin, glassHitPosition, CurrentTracerColor);
+            return;
+        }
+
+        var clear = Ballistics.HasClearShot(
+            GetWorld3D(),
+            shotOrigin,
+            aimPoint,
+            target,
+            GetRid());
+        var targetRemainsNearContact = target.GlobalPosition.DistanceSquaredTo(
+            ConfirmedCombatContactPosition) <= 1.75f * 1.75f;
+        if (clear && targetRemainsNearContact && _rng.Randf() < accuracy)
+        {
+            if (_combatTarget is { CombatDowned: false } combatTarget)
+            {
+                combatTarget.TakeCombatDamage(
+                    stats.Damage * _rng.RandfRange(0.24f, 0.38f),
+                    aimPoint,
+                    this);
+            }
+            else if (target is EnemyOperator rival && !rival.IsDead)
+            {
+                rival.TakeDamage(
+                    stats.Damage * _rng.RandfRange(0.22f, 0.34f),
+                    aimPoint,
+                    this);
+            }
+        }
+        else if (!clear)
+        {
+            if (PhysicsRaycast.TryHit(
+                GetWorld3D(),
+                shotOrigin,
+                aimPoint,
+                GetRid(),
+                uint.MaxValue,
+                out var hit))
+            {
+                aimPoint = hit.Position;
+            }
+        }
+        else
+        {
+            aimPoint += Scatter() * 1.4f;
+        }
+        Main?.SpawnTracer(shotOrigin, aimPoint, CurrentTracerColor);
     }
 
     private void FireAtSquad(float distance)

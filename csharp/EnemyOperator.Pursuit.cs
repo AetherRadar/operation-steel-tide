@@ -9,6 +9,7 @@ public partial class EnemyOperator
     private const float SharedPursuitSeconds = 10.0f;
     private const float ConfirmedContactObjectiveBreakoffSeconds = 3.5f;
     private const float DirectDamageReactionSeconds = 2.6f;
+    private const float DirectDamageMaximumReturnFireDelay = 0.35f;
     private const float SquadContactShareRange = 52.0f;
 
     public bool IsPursuing => !IsDead && _hasLastKnownTarget && _pursuitTimer > 0.0f;
@@ -187,7 +188,8 @@ public partial class EnemyOperator
             return;
         }
         var current = AssignedCombatTargetNode();
-        if (IsPursuing && _lostSightTimer < 0.4f && current != target)
+        if (current != target
+            && (HasRecentDamageThreat || IsPursuing && _lostSightTimer < 0.4f))
         {
             return;
         }
@@ -210,6 +212,7 @@ public partial class EnemyOperator
         RememberPursuitContact(target, target.GlobalPosition, CurrentPursuitDuration, shareContact: true);
         _recentDamageThreatTargetId = target.GetInstanceId();
         _recentDamageThreatTimer = DirectDamageReactionSeconds;
+        _fireTimer = Mathf.Min(_fireTimer, DirectDamageMaximumReturnFireDelay);
     }
 
     private void RecordConfirmedCombatContact(Node3D target, Vector3 position)
@@ -335,6 +338,24 @@ public partial class EnemyOperator
             side = -side;
         }
         return (direction * 0.28f + side).Normalized();
+    }
+
+    private void ApplySmokeEvasion(float delta, Vector3 escapeDirection)
+    {
+        PrepareForScriptedMovement();
+        escapeDirection.Y = 0.0f;
+        if (escapeDirection.LengthSquared() <= 0.001f)
+        {
+            escapeDirection = -GlobalBasis.Z;
+            escapeDirection.Y = 0.0f;
+        }
+        escapeDirection = ApplyPursuitObstacleAvoidance(escapeDirection.Normalized());
+        var speed = IsWorldBoss ? 6.8f * WorldBossMoveMultiplier : 6.4f;
+        var velocity = Velocity;
+        velocity.X = Mathf.MoveToward(velocity.X, escapeDirection.X * speed, delta * 18.0f);
+        velocity.Z = Mathf.MoveToward(velocity.Z, escapeDirection.Z * speed, delta * 18.0f);
+        Velocity = velocity;
+        _stationaryMoveTimer = 0.0f;
     }
 
     internal void ResetScriptedObjectiveNavigation()

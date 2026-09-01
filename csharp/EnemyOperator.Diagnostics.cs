@@ -29,6 +29,7 @@ public partial class EnemyOperator
     internal int TargetCandidateEvaluationCountForDiagnostics { get; private set; }
     internal int LineOfSightProbeCountForDiagnostics { get; private set; }
     internal int ContactShareRequestCountForDiagnostics { get; private set; }
+    internal float FireTimerForDiagnostics => _fireTimer;
 
     internal void ResetCrowdPerformanceCountersForDiagnostics()
     {
@@ -89,4 +90,7 @@ public partial class EnemyOperator
 
     internal void AdvancePursuitTimersForDiagnostics(float delta)
         => UpdatePursuitTimers(Mathf.Max(0.0f, delta));
+
+    internal void SetFireTimerForDiagnostics(float seconds)
+        => _fireTimer = Mathf.Max(0.0f, seconds);
 }

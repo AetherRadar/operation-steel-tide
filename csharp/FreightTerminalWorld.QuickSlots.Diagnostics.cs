@@ -162,31 +162,97 @@ public partial class FreightTerminalWorld
         smokeProbe._PhysicsProcess(0.4);
         var smokeGroundDeployed = smokeProbe.HasTouchedGround && smokeProbe.IsDeployed;
 
+        var incendiarySurface = new Vector3(4.0f, 80.0f, 0.0f);
+        var incendiaryGroundContact = new StaticBody3D
+        {
+            Name = "IncendiaryStaticGroundContact",
+            Position = incendiarySurface,
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        AddChild(incendiaryGroundContact);
+        incendiaryGroundContact.AddChild(new CollisionShape3D
+        {
+            Shape = new BoxShape3D { Size = new Vector3(8.0f, 0.2f, 8.0f) }
+        });
+        var incendiaryCharacterContact = new CharacterBody3D
+        {
+            Name = "IncendiaryCharacterContact",
+            Position = incendiarySurface + Vector3.Up * 0.8f,
+            CollisionLayer = 2,
+            CollisionMask = 0
+        };
+        AddChild(incendiaryCharacterContact);
+        incendiaryCharacterContact.AddChild(new CollisionShape3D
+        {
+            Shape = new BoxShape3D { Size = new Vector3(4.0f, 1.2f, 4.0f) }
+        });
         var incendiaryProbe = new IncendiaryGrenade
         {
-            Position = new Vector3(4, 40, 0),
+            Name = "IncendiaryPhysicsProbe",
+            Position = incendiarySurface + Vector3.Up * 3.0f,
             Basis = Basis.FromEuler(new Vector3(0.72f, 0.41f, -0.63f)),
             DamageEnabled = false
         };
         AddChild(incendiaryProbe);
-        incendiaryProbe.Arm(Vector3.Forward);
-        incendiaryProbe._PhysicsProcess(4.0);
+        incendiaryProbe.Arm(Vector3.Forward, speed: 0.0f, loft: 0.0f);
+        incendiaryProbe.AngularVelocity = Vector3.Zero;
+        var incendiaryWallContactRejected = !incendiaryProbe.TryBeginGroundFuseForDiagnostics(
+                incendiaryGroundContact,
+                incendiarySurface + Vector3.Up * 0.1f,
+                Vector3.Right,
+                -1.0f)
+            && !incendiaryProbe.HasTouchedGround;
+        for (var frame = 0; frame < 8; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
         var incendiaryAirborneSafe = !incendiaryProbe.HasTouchedGround
             && !incendiaryProbe.FuseStarted
             && !incendiaryProbe.IsBurning;
-        var incendiarySurface = new Vector3(4.15f, 39.72f, -0.08f);
-        var incendiarySurfaceNormal = new Vector3(0.12f, 0.98f, -0.05f).Normalized();
-        incendiaryProbe.BeginGroundFuseForDiagnostics(
-            incendiarySurface,
-            incendiarySurfaceNormal);
-        incendiaryProbe._PhysicsProcess(0.5);
+        for (var frame = 0; frame < 72; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        var incendiaryDynamicContactRejected = !incendiaryProbe.HasTouchedGround
+            && !incendiaryProbe.FuseStarted
+            && !incendiaryProbe.IsBurning;
+        incendiaryCharacterContact.Position += Vector3.Right * 8.0f;
+        incendiaryProbe.Sleeping = false;
+        for (var frame = 0; frame < 180 && !incendiaryProbe.IsBurning; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        var incendiaryGroundRayHit = PhysicsRaycast.TryHit(
+                GetWorld3D(),
+                incendiaryProbe.GlobalPosition + Vector3.Up * 0.35f,
+                incendiaryProbe.GlobalPosition + Vector3.Down * 0.45f,
+                incendiaryProbe.GetRid(),
+                1,
+                out var incendiaryGroundHit);
+        var incendiaryGroundColliderMatched = incendiaryGroundRayHit
+            && incendiaryGroundHit.Collider is not null
+            && incendiaryGroundHit.Collider.GetInstanceId()
+                == incendiaryGroundContact.GetInstanceId();
+        var incendiaryGroundAnchorError = incendiaryGroundRayHit
+            ? incendiaryProbe.GlobalPosition.DistanceTo(
+                incendiaryGroundHit.Position
+                    + incendiaryGroundHit.Normal * 0.02f)
+            : float.PositiveInfinity;
+        var incendiaryGroundRayAligned = incendiaryGroundColliderMatched
+            && incendiaryGroundHit.Normal.Dot(Vector3.Up) >= 0.999f
+            && incendiaryGroundAnchorError <= 0.055f;
         var incendiaryGroundIgnited = incendiaryProbe.HasTouchedGround
             && incendiaryProbe.IsBurning
+            && incendiaryGroundRayAligned
             && incendiaryProbe.ParticleEmitterCount == 1
             && incendiaryProbe.FirePresentationGroundedForDiagnostics
             && Mathf.IsEqualApprox(
                 incendiaryProbe.FireParticleCoverageRadiusForDiagnostics,
                 IncendiaryGrenade.FireRadius * 0.82f);
+        GD.Print($"INCENDIARY_PHYSICS_CHECK burning={incendiaryProbe.IsBurning} touched={incendiaryProbe.HasTouchedGround} ray={incendiaryGroundRayHit} collider={incendiaryGroundColliderMatched} normal={incendiaryGroundHit.Normal.Dot(Vector3.Up):0.000} anchor_error={incendiaryGroundAnchorError:0.000} presentation={incendiaryProbe.FirePresentationGroundedForDiagnostics} emitters={incendiaryProbe.ParticleEmitterCount}");
+        incendiaryCharacterContact.QueueFree();
+        incendiaryGroundContact.QueueFree();
         incendiaryProbe.QueueFree();
 
         _player.EquipFromLoot(new LootItem
@@ -260,10 +326,21 @@ public partial class FreightTerminalWorld
 
         var previousCamera = GetViewport().GetCamera3D();
         var captureSurface = new Vector3(0.0f, 120.0f, 0.0f);
+        var captureGroundContact = new StaticBody3D
+        {
+            Name = "IncendiaryCaptureGroundContact",
+            Position = captureSurface + Vector3.Down * 0.06f,
+            CollisionLayer = 1,
+            CollisionMask = 0
+        };
+        AddChild(captureGroundContact);
+        captureGroundContact.AddChild(new CollisionShape3D
+        {
+            Shape = new BoxShape3D { Size = new Vector3(12.0f, 0.12f, 12.0f) }
+        });
         var captureFloor = new MeshInstance3D
         {
             Name = "IncendiaryCaptureFloor",
-            Position = captureSurface + Vector3.Down * 0.08f,
             Mesh = new BoxMesh { Size = new Vector3(12.0f, 0.12f, 12.0f) },
             MaterialOverride = new StandardMaterial3D
             {
@@ -272,7 +349,7 @@ public partial class FreightTerminalWorld
             },
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
         };
-        AddChild(captureFloor);
+        captureGroundContact.AddChild(captureFloor);
         var captureCamera = new Camera3D
         {
             Name = "IncendiaryCaptureCamera",
@@ -285,13 +362,18 @@ public partial class FreightTerminalWorld
         var incendiaryCapture = new IncendiaryGrenade
         {
             Name = "IncendiaryGroundCapture",
-            Position = captureSurface + Vector3.Up * 0.5f,
+            Position = captureSurface + Vector3.Up * 1.4f,
             DamageEnabled = false
         };
         AddChild(incendiaryCapture);
-        incendiaryCapture.Arm(Vector3.Forward);
-        incendiaryCapture.BeginGroundFuseForDiagnostics(captureSurface, Vector3.Up);
-        incendiaryCapture._PhysicsProcess(0.5f);
+        incendiaryCapture.Arm(Vector3.Forward, speed: 0.0f, loft: 0.0f);
+        incendiaryCapture.AngularVelocity = Vector3.Zero;
+        for (var frame = 0; frame < 150 && !incendiaryCapture.IsBurning; frame++)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        var incendiaryCaptureGrounded = incendiaryCapture.IsBurning
+            && incendiaryCapture.FirePresentationGroundedForDiagnostics;
         await WaitFrames(36);
         SaveViewportImage("res://incendiary_ground_validation.png");
         if (IsInstanceValid(previousCamera))
@@ -299,7 +381,7 @@ public partial class FreightTerminalWorld
             previousCamera.Current = true;
         }
         captureCamera.QueueFree();
-        captureFloor.QueueFree();
+        captureGroundContact.QueueFree();
         incendiaryCapture.QueueFree();
 
         var valid = sceneReady
@@ -323,7 +405,10 @@ public partial class FreightTerminalWorld
             && smokeAirborneSafe
             && smokeGroundDeployed
             && incendiaryAirborneSafe
+            && incendiaryDynamicContactRejected
+            && incendiaryWallContactRejected
             && incendiaryGroundIgnited
+            && incendiaryCaptureGrounded
             && desertEagleReady
             && emptyBlocked
             && rackReady
@@ -332,7 +417,7 @@ public partial class FreightTerminalWorld
             && rackDetailIntent
             && rackValueReady
             && redeployClearsSecondary;
-        GD.Print($"QUICK_SLOTS_CHECK valid={valid} scene={sceneReady} inputs={inputReady} weapon_slots={weaponSlotsReady} unique_models={uniqueLongGunModels} initial={initialVisibility} gsh18={gsh18Ready} frag_selected={fragSelected} frag_consumed={fragConsumed} localized={localized} utility_selected={utilitySelected} utility_cycle={incendiaryCycled && smokeCycledBack} smoke_consumed={smokeConsumed} incendiary_selected={incendiarySelected} incendiary_consumed={incendiaryConsumed} frag_air_safe={fragAirborneSafe} frag_ground={fragGroundDetonated} smoke_air_safe={smokeAirborneSafe} smoke_ground={smokeGroundDeployed} incendiary_air_safe={incendiaryAirborneSafe} incendiary_ground={incendiaryGroundIgnited} deagle={desertEagleReady} empty_blocked={emptyBlocked} rack={rackReady} rack_zh={rackChinese} rack_en={rackEnglish} rack_detail={rackDetailIntent} rack_value={rackValueReady}/{rackValue} redeploy_clear={redeployClearsSecondary} visible={_hud.VisibleQuickSlotCount} active={_player.ActiveQuickSlot}");
+        GD.Print($"QUICK_SLOTS_CHECK valid={valid} scene={sceneReady} inputs={inputReady} weapon_slots={weaponSlotsReady} unique_models={uniqueLongGunModels} initial={initialVisibility} gsh18={gsh18Ready} frag_selected={fragSelected} frag_consumed={fragConsumed} localized={localized} utility_selected={utilitySelected} utility_cycle={incendiaryCycled && smokeCycledBack} smoke_consumed={smokeConsumed} incendiary_selected={incendiarySelected} incendiary_consumed={incendiaryConsumed} frag_air_safe={fragAirborneSafe} frag_ground={fragGroundDetonated} smoke_air_safe={smokeAirborneSafe} smoke_ground={smokeGroundDeployed} incendiary_air_safe={incendiaryAirborneSafe} incendiary_dynamic_reject={incendiaryDynamicContactRejected} incendiary_wall_reject={incendiaryWallContactRejected} incendiary_ground={incendiaryGroundIgnited} incendiary_capture={incendiaryCaptureGrounded} deagle={desertEagleReady} empty_blocked={emptyBlocked} rack={rackReady} rack_zh={rackChinese} rack_en={rackEnglish} rack_detail={rackDetailIntent} rack_value={rackValueReady}/{rackValue} redeploy_clear={redeployClearsSecondary} visible={_hud.VisibleQuickSlotCount} active={_player.ActiveQuickSlot}");
         GD.Print($"QUICK_SLOTS_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }
