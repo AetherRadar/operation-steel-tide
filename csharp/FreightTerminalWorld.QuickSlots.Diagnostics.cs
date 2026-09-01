@@ -162,18 +162,32 @@ public partial class FreightTerminalWorld
         smokeProbe._PhysicsProcess(0.4);
         var smokeGroundDeployed = smokeProbe.HasTouchedGround && smokeProbe.IsDeployed;
 
-        var incendiaryProbe = new IncendiaryGrenade { Position = new Vector3(4, 40, 0) };
+        var incendiaryProbe = new IncendiaryGrenade
+        {
+            Position = new Vector3(4, 40, 0),
+            Basis = Basis.FromEuler(new Vector3(0.72f, 0.41f, -0.63f)),
+            DamageEnabled = false
+        };
         AddChild(incendiaryProbe);
         incendiaryProbe.Arm(Vector3.Forward);
         incendiaryProbe._PhysicsProcess(4.0);
         var incendiaryAirborneSafe = !incendiaryProbe.HasTouchedGround
             && !incendiaryProbe.FuseStarted
             && !incendiaryProbe.IsBurning;
-        incendiaryProbe.BeginGroundFuseForDiagnostics();
+        var incendiarySurface = new Vector3(4.15f, 39.72f, -0.08f);
+        var incendiarySurfaceNormal = new Vector3(0.12f, 0.98f, -0.05f).Normalized();
+        incendiaryProbe.BeginGroundFuseForDiagnostics(
+            incendiarySurface,
+            incendiarySurfaceNormal);
         incendiaryProbe._PhysicsProcess(0.5);
         var incendiaryGroundIgnited = incendiaryProbe.HasTouchedGround
             && incendiaryProbe.IsBurning
-            && incendiaryProbe.ParticleEmitterCount == 1;
+            && incendiaryProbe.ParticleEmitterCount == 1
+            && incendiaryProbe.FirePresentationGroundedForDiagnostics
+            && Mathf.IsEqualApprox(
+                incendiaryProbe.FireParticleCoverageRadiusForDiagnostics,
+                IncendiaryGrenade.FireRadius * 0.82f);
+        incendiaryProbe.QueueFree();
 
         _player.EquipFromLoot(new LootItem
         {
@@ -243,6 +257,50 @@ public partial class FreightTerminalWorld
             && !_player.HasSecondaryWeapon
             && _player.SidearmWeaponPlatform == WeaponPlatform.P226
             && _player.ActiveWeaponSlot == PlayerWeaponSlot.Primary;
+
+        var previousCamera = GetViewport().GetCamera3D();
+        var captureSurface = new Vector3(0.0f, 120.0f, 0.0f);
+        var captureFloor = new MeshInstance3D
+        {
+            Name = "IncendiaryCaptureFloor",
+            Position = captureSurface + Vector3.Down * 0.08f,
+            Mesh = new BoxMesh { Size = new Vector3(12.0f, 0.12f, 12.0f) },
+            MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = new Color(0.075f, 0.085f, 0.095f),
+                Roughness = 0.88f
+            },
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
+        };
+        AddChild(captureFloor);
+        var captureCamera = new Camera3D
+        {
+            Name = "IncendiaryCaptureCamera",
+            Position = captureSurface + new Vector3(6.4f, 4.1f, 6.8f),
+            Fov = 54.0f,
+            Current = true
+        };
+        AddChild(captureCamera);
+        captureCamera.LookAt(captureSurface + Vector3.Up * 0.35f);
+        var incendiaryCapture = new IncendiaryGrenade
+        {
+            Name = "IncendiaryGroundCapture",
+            Position = captureSurface + Vector3.Up * 0.5f,
+            DamageEnabled = false
+        };
+        AddChild(incendiaryCapture);
+        incendiaryCapture.Arm(Vector3.Forward);
+        incendiaryCapture.BeginGroundFuseForDiagnostics(captureSurface, Vector3.Up);
+        incendiaryCapture._PhysicsProcess(0.5f);
+        await WaitFrames(36);
+        SaveViewportImage("res://incendiary_ground_validation.png");
+        if (IsInstanceValid(previousCamera))
+        {
+            previousCamera.Current = true;
+        }
+        captureCamera.QueueFree();
+        captureFloor.QueueFree();
+        incendiaryCapture.QueueFree();
 
         var valid = sceneReady
             && inputReady

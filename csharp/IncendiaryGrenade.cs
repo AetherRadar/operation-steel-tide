@@ -9,6 +9,9 @@ public partial class IncendiaryGrenade : RigidBody3D
     private const float MaximumAirborneLifetime = 18.0f;
     private const float DamageInterval = 0.4f;
     private const float DamagePerTick = 6.0f;
+    private const float FireSurfaceOffset = 0.02f;
+    private const float FireDecalProjectionDepth = 0.55f;
+    private const int FireDecalTextureSize = 64;
 
     public const string ActiveGroupName = "active_incendiary_grenades";
     public const float FireRadius = 4.0f;
@@ -22,13 +25,29 @@ public partial class IncendiaryGrenade : RigidBody3D
     public bool FuseStarted => HasTouchedGround && _armed;
     public int ParticleEmitterCount
         => IsInstanceValid(_fireParticles) ? 1 : 0;
+    internal bool FirePresentationGroundedForDiagnostics
+        => IsBurning
+            && IsInstanceValid(_fireGroundDecal)
+            && GlobalBasis.IsEqualApprox(Basis.Identity)
+            && GlobalPosition.IsEqualApprox(
+                _fireSurfacePosition + _fireSurfaceNormal * FireSurfaceOffset)
+            && _fireGroundDecal.GlobalBasis.Y.Dot(_fireSurfaceNormal) >= 0.999f;
+    internal float FireParticleCoverageRadiusForDiagnostics
+        => IsInstanceValid(_fireParticles)
+            && _fireParticles.ProcessMaterial is ParticleProcessMaterial particles
+                ? particles.EmissionRingRadius
+                : 0.0f;
 
     private MeshInstance3D _casing = null!;
     private GpuParticles3D _fireParticles = null!;
+    private Decal _fireGroundDecal = null!;
     private bool _armed;
+    private bool _hasFireSurface;
     private float _fuse;
     private float _airborneLifetime;
     private float _damageTimer;
+    private Vector3 _fireSurfacePosition;
+    private Vector3 _fireSurfaceNormal = Vector3.Up;
     private FreightTerminalWorld? _registeredWorld;
 
     public override void _Ready()
@@ -128,22 +147,33 @@ public partial class IncendiaryGrenade : RigidBody3D
             var normal = (GlobalBasis * state.GetContactLocalNormal(contact)).Normalized();
             if (normal.Dot(Vector3.Up) >= 0.35f && state.LinearVelocity.Y <= 3.0f)
             {
-                BeginGroundFuse();
+                BeginGroundFuse(state.GetContactColliderPosition(contact), normal);
                 return;
             }
         }
     }
 
-    internal void BeginGroundFuseForDiagnostics() => BeginGroundFuse();
+    internal void BeginGroundFuseForDiagnostics(
+        Vector3 surfacePosition,
+        Vector3 surfaceNormal)
+        => BeginGroundFuse(surfacePosition, surfaceNormal);
 
-    private void BeginGroundFuse()
+    private void BeginGroundFuse(Vector3 surfacePosition, Vector3 surfaceNormal)
     {
         if (!_armed || HasTouchedGround || IsBurning)
         {
             return;
         }
         HasTouchedGround = true;
+        _fireSurfacePosition = surfacePosition;
+        _fireSurfaceNormal = surfaceNormal.LengthSquared() > 0.001f
+            ? surfaceNormal.Normalized()
+            : Vector3.Up;
+        _hasFireSurface = true;
         _fuse = GroundFuseDuration;
+        LinearVelocity = Vector3.Zero;
+        AngularVelocity = Vector3.Zero;
+        Freeze = true;
     }
 
     private void Ignite()
@@ -160,25 +190,36 @@ public partial class IncendiaryGrenade : RigidBody3D
         CollisionLayer = 0;
         CollisionMask = 0;
         _casing.Visible = false;
+        if (!_hasFireSurface)
+        {
+            _fireSurfacePosition = GlobalPosition;
+            _fireSurfaceNormal = Vector3.Up;
+        }
+        GlobalTransform = new Transform3D(
+            Basis.Identity,
+            _fireSurfacePosition + _fireSurfaceNormal * FireSurfaceOffset);
         BuildFirePresentation();
     }
 
     private void BuildFirePresentation()
     {
+        var fireTexture = BuildFireParticleTexture();
         var fireMaterial = new StandardMaterial3D
         {
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
             BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
-            AlbedoColor = new Color(1.0f, 0.22f, 0.025f, 0.86f),
+            AlbedoColor = Colors.White,
+            AlbedoTexture = fireTexture,
             EmissionEnabled = true,
             Emission = new Color(1.0f, 0.08f, 0.01f),
+            EmissionTexture = fireTexture,
             EmissionEnergyMultiplier = 3.2f
         };
         _fireParticles = new GpuParticles3D
         {
             Name = "SharedFireParticles",
-            Amount = 56,
+            Amount = 96,
             Lifetime = 0.72f,
             Randomness = 0.45f,
             Explosiveness = 0.12f,
@@ -196,8 +237,14 @@ public partial class IncendiaryGrenade : RigidBody3D
                 Gravity = new Vector3(0.0f, 0.65f, 0.0f),
                 ScaleMin = 0.55f,
                 ScaleMax = 1.35f,
-                Color = new Color(1.0f, 0.38f, 0.04f, 0.9f)
+                Color = Colors.White,
+                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Ring,
+                EmissionRingAxis = Vector3.Up,
+                EmissionRingHeight = 0.04f,
+                EmissionRingInnerRadius = 0.08f,
+                EmissionRingRadius = FireRadius * 0.82f
             },
+            LocalCoords = false,
             Emitting = true,
             VisibilityAabb = new Aabb(
                 new Vector3(-FireRadius, -0.2f, -FireRadius),
@@ -205,27 +252,138 @@ public partial class IncendiaryGrenade : RigidBody3D
         };
         AddChild(_fireParticles);
 
-        AddChild(new MeshInstance3D
+        var groundTexture = BuildFireGroundTexture();
+        _fireGroundDecal = new Decal
         {
             Name = "FireGroundGlow",
-            Mesh = new CylinderMesh
-            {
-                TopRadius = FireRadius * 0.78f,
-                BottomRadius = FireRadius * 0.9f,
-                Height = 0.025f,
-                RadialSegments = 28
-            },
-            Position = Vector3.Up * 0.035f,
-            MaterialOverride = new StandardMaterial3D
-            {
-                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-                AlbedoColor = new Color(1.0f, 0.12f, 0.015f, 0.2f),
-                EmissionEnabled = true,
-                Emission = new Color(1.0f, 0.06f, 0.005f),
-                EmissionEnergyMultiplier = 1.8f
-            },
-            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
+            Transform = new Transform3D(
+                SurfaceAlignedBasis(_fireSurfaceNormal),
+                _fireSurfaceNormal * (FireDecalProjectionDepth * 0.24f)),
+            Size = new Vector3(
+                FireRadius * 1.8f,
+                FireDecalProjectionDepth,
+                FireRadius * 1.8f),
+            TextureAlbedo = groundTexture,
+            AlbedoMix = 0.24f,
+            Modulate = new Color(1.0f, 0.38f, 0.12f, 0.52f),
+            UpperFade = 0.18f,
+            LowerFade = 0.18f
+        };
+        AddChild(_fireGroundDecal);
+
+        AddChild(new OmniLight3D
+        {
+            Name = "FireLight",
+            Position = Vector3.Up * 0.42f,
+            LightColor = new Color(1.0f, 0.22f, 0.035f),
+            LightEnergy = 0.85f,
+            OmniRange = FireRadius * 1.3f,
+            ShadowEnabled = false
         });
+    }
+
+    private static ImageTexture BuildFireParticleTexture()
+    {
+        const int width = 48;
+        const int height = 96;
+        var image = Image.CreateEmpty(width, height, false, Image.Format.Rgba8);
+        for (var y = 0; y < height; y++)
+        {
+            var flameHeight = 1.0f - y / (height - 1.0f);
+            var verticalFade = Mathf.Clamp(flameHeight / 0.08f, 0.0f, 1.0f)
+                * Mathf.Clamp((1.0f - flameHeight) / 0.08f, 0.0f, 1.0f);
+            var halfWidth = Mathf.Lerp(0.48f, 0.045f, Mathf.Pow(flameHeight, 0.68f));
+            var wave = Mathf.Sin(flameHeight * 12.4f) * 0.055f * flameHeight;
+            for (var x = 0; x < width; x++)
+            {
+                var horizontal = (x / (width - 1.0f) * 2.0f - 1.0f) - wave;
+                var horizontalFade = Mathf.Clamp(
+                    (halfWidth - Mathf.Abs(horizontal)) / 0.11f,
+                    0.0f,
+                    1.0f);
+                var flicker = 0.76f
+                    + 0.16f * Mathf.Sin(x * 0.61f + y * 0.29f)
+                    + 0.08f * Mathf.Sin(x * 0.17f - y * 0.73f);
+                var alpha = verticalFade
+                    * horizontalFade
+                    * Mathf.Clamp(flicker, 0.42f, 1.0f);
+                var color = new Color(1.0f, 0.78f, 0.12f, alpha)
+                    .Lerp(new Color(1.0f, 0.08f, 0.005f, alpha), flameHeight);
+                image.SetPixel(x, y, color);
+            }
+        }
+        return ImageTexture.CreateFromImage(image);
+    }
+
+    private static ImageTexture BuildFireGroundTexture()
+    {
+        var image = Image.CreateEmpty(
+            FireDecalTextureSize,
+            FireDecalTextureSize,
+            false,
+            Image.Format.Rgba8);
+        for (var y = 0; y < FireDecalTextureSize; y++)
+        {
+            for (var x = 0; x < FireDecalTextureSize; x++)
+            {
+                var offset = new Vector2(
+                    (x + 0.5f) / FireDecalTextureSize * 2.0f - 1.0f,
+                    (y + 0.5f) / FireDecalTextureSize * 2.0f - 1.0f);
+                var radius = offset.Length();
+                var edge = Mathf.Clamp((1.0f - radius) / 0.16f, 0.0f, 1.0f);
+                var breakup = ValueNoise(x, y, 9.0f, 17) * 0.62f
+                    + ValueNoise(x + 13, y - 19, 4.5f, 41) * 0.38f;
+                var patches = Mathf.Clamp((breakup - 0.34f) / 0.36f, 0.0f, 1.0f);
+                var alpha = edge * patches * 0.36f;
+                image.SetPixel(x, y, new Color(1.0f, 0.11f, 0.01f, alpha));
+            }
+        }
+        return ImageTexture.CreateFromImage(image);
+    }
+
+    private static float ValueNoise(float x, float y, float scale, int seed)
+    {
+        var sampleX = x / scale;
+        var sampleY = y / scale;
+        var x0 = (int)Mathf.Floor(sampleX);
+        var y0 = (int)Mathf.Floor(sampleY);
+        var blendX = sampleX - x0;
+        var blendY = sampleY - y0;
+        blendX *= blendX * (3.0f - 2.0f * blendX);
+        blendY *= blendY * (3.0f - 2.0f * blendY);
+        var top = Mathf.Lerp(
+            HashNoise(x0, y0, seed),
+            HashNoise(x0 + 1, y0, seed),
+            blendX);
+        var bottom = Mathf.Lerp(
+            HashNoise(x0, y0 + 1, seed),
+            HashNoise(x0 + 1, y0 + 1, seed),
+            blendX);
+        return Mathf.Lerp(top, bottom, blendY);
+    }
+
+    private static float HashNoise(int x, int y, int seed)
+    {
+        unchecked
+        {
+            var hash = (uint)(x * 374761393 + y * 668265263 + seed * 362437);
+            hash = (hash ^ (hash >> 13)) * 1274126177u;
+            return (hash & 0xffffu) / 65535.0f;
+        }
+    }
+
+    private static Basis SurfaceAlignedBasis(Vector3 surfaceNormal)
+    {
+        var up = surfaceNormal.LengthSquared() > 0.001f
+            ? surfaceNormal.Normalized()
+            : Vector3.Up;
+        var z = Vector3.Back - up * up.Dot(Vector3.Back);
+        if (z.LengthSquared() <= 0.001f)
+        {
+            z = Vector3.Right - up * up.Dot(Vector3.Right);
+        }
+        z = z.Normalized();
+        var x = up.Cross(z).Normalized();
+        return new Basis(x, up, z);
     }
 }

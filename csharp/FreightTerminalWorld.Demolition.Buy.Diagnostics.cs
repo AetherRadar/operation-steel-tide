@@ -183,7 +183,7 @@ public partial class FreightTerminalWorld
         };
         AddChild(incendiary);
         incendiary.Arm(Vector3.Forward);
-        incendiary.BeginGroundFuseForDiagnostics();
+        incendiary.BeginGroundFuseForDiagnostics(Vector3.Zero, Vector3.Up);
         incendiary._PhysicsProcess(0.5);
         var incendiaryReady = incendiary.IsBurning
             && incendiary.RemainingDuration >= 7.0f
