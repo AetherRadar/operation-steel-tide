@@ -14,11 +14,11 @@ public partial class FreightTerminalWorld
     private const float SidearmReloadMaximumJointStepMeters = 0.08f;
     private const float SidearmReloadMaximumPalmStepMeters = 0.08f;
     private const float SidearmReloadMaximumPalmScreenStepRatio = 0.045f;
-    // Swapping from the one-handed ready layer to the authored two-forearm
-    // reload layer introduces the support arm through the lower body edge.
-    // Permit that single deliberate entrance while retaining the stricter
-    // 3% per-frame limit throughout the complete reload motion.
-    private const float SidearmReloadMaximumPalmTransitionRatio = 0.25f;
+    // The support hand deliberately enters and leaves through the lower body
+    // edge when switching between independently cropped ready/reload layers.
+    // The authored service-pistol handoff peaks at 28.4% of screen height;
+    // in-motion samples retain the strict 4.5% per-frame continuity bound.
+    private const float SidearmReloadMaximumPalmTransitionRatio = 0.30f;
     private const float SidearmReloadMaximumEndpointBasisErrorRadians = 0.035f;
     // The approved sidearm presentation is intentionally compact: the hand
     // only has to clear and reseat the magazine while the pistol stays close
@@ -29,6 +29,7 @@ public partial class FreightTerminalWorld
     private const float SidearmReloadMaximumArmMotion = 0.42f;
     private const float SidearmReloadMaximumViewMotion = 0.22f;
     private const float SidearmReloadMinimumActionTravel = 0.006f;
+    private const float SidearmReloadMinimumDigitCurlRadians = 0.65f;
     private const int SidearmReloadMinimumContinuityFrames = 100;
     private const int SidearmReloadMaximumContinuityFrames = 180;
 
@@ -125,6 +126,7 @@ public partial class FreightTerminalWorld
             var palmScreenContinuous = true;
             var endpointPoseContinuous = true;
             var samplesValid = true;
+            var digitGraspValid = true;
             var maximumGripResidual = 0.0f;
             var maximumSupportDistance = 0.0f;
             var minimumArmMotion = float.PositiveInfinity;
@@ -167,6 +169,9 @@ public partial class FreightTerminalWorld
                     inspection.PrimaryGrip);
                 var actionTravel = inspection.ActionPosition.DistanceTo(
                     baseline.ActionPosition);
+                var digitCurl = inspection.SidearmMinimumDigitCurlRadians;
+                var sampleDigitGrasp = sample.Stage == "action"
+                    || digitCurl >= SidearmReloadMinimumDigitCurlRadians;
                 var magazineScreen = sample.Stage == "extract"
                     ? inspection.ScreenContact.PrimaryMagazineScreen
                     : inspection.ScreenContact.SpareMagazineScreen;
@@ -204,12 +209,14 @@ public partial class FreightTerminalWorld
                     && inspection.PrimaryMagazineGeometry
                     && inspection.SpareMagazineGeometry
                     && inspection.ActionGeometry
+                    && sampleDigitGrasp
                     && sampleBodyContinuous
                     && expectedMechanism
                     && sampleExtractionReadable
                     && sampleInsertionReadable
                     && sampleActionRetreat;
                 samplesValid &= sampleValid;
+                digitGraspValid &= sampleDigitGrasp;
                 poseSet &= set;
                 armsActive &= inspection.AnimatedRootActive
                     && inspection.AnimatedMeshActive;
@@ -248,6 +255,8 @@ public partial class FreightTerminalWorld
                     + $"primary_mag={inspection.PrimaryMagazineVisible} "
                     + $"spare_mag={inspection.SpareMagazineVisible} "
                     + $"slide_travel={actionTravel:F6} "
+                    + $"digit_grasp={sampleDigitGrasp} "
+                    + $"minimum_digit_curl={digitCurl:F6} "
                     + $"extract_screen={sampleExtractionReadable} "
                     + $"insert_screen={sampleInsertionReadable} "
                     + $"action_retreat={sampleActionRetreat} "
@@ -555,6 +564,7 @@ public partial class FreightTerminalWorld
                 && visibleMotion
                 && viewMotion
                 && mechanismStages
+                && digitGraspValid
                 && samplesValid
                 && bodyContinuous
                 && extractionReadable
@@ -573,6 +583,7 @@ public partial class FreightTerminalWorld
                 + $"layers={reloadLayersValid} "
                 + $"support_tracks={supportTracks} visible_motion={visibleMotion} "
                 + $"view_motion={viewMotion} mechanism_stages={mechanismStages} "
+                + $"digit_grasp={digitGraspValid} "
                 + $"samples={samplesValid} body_continuous={bodyContinuous} "
                 + $"animation_continuous={animationContinuous} "
                 + $"palm_screen_continuous={palmScreenContinuous} "

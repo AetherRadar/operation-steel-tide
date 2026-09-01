@@ -122,7 +122,12 @@ internal static class FirstPersonReloadProfileCatalog
             WeaponPlatform.P226 => Sidearm(platform, "p226"),
             WeaponPlatform.M1911 => Sidearm(platform, "m1911"),
             WeaponPlatform.GSh18 => Sidearm(platform, "gsh18"),
-            WeaponPlatform.DesertEagle => Sidearm(platform, "desert_eagle"),
+            WeaponPlatform.DesertEagle => Sidearm(
+                platform,
+                "desert_eagle",
+                reachEnd: 0.23f,
+                seatEnd: 0.75f,
+                actionEnd: 0.922f),
             WeaponPlatform.M3A1 => Rifle(
                 platform,
                 "m3a1",
@@ -222,7 +227,10 @@ internal static class FirstPersonReloadProfileCatalog
 
     private static FirstPersonReloadProfile Sidearm(
         WeaponPlatform platform,
-        string clipStem)
+        string clipStem,
+        float reachEnd = 0.18f,
+        float seatEnd = 0.78f,
+        float actionEnd = 0.985f)
         => new(
             platform,
             FirstPersonReloadMechanism.PistolMagazine,
@@ -249,12 +257,12 @@ internal static class FirstPersonReloadProfileCatalog
             new Vector3(0.16f, -0.04f, 0.18f),
             new Vector3(0.52f, 0.10f, 0.32f),
             new Vector3(0.30f, -0.14f, 0.08f),
-            0.13f,
+            reachEnd,
             0.31f,
             0.43f,
             0.54f,
             0.71f,
-            0.78f,
-            0.91f,
+            seatEnd,
+            actionEnd,
             false);
 }

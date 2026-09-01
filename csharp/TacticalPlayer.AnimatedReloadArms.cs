@@ -156,18 +156,53 @@ public partial class TacticalPlayer
             EquippedWeapon.Platform,
             authoredEmptyReload,
             authoredArmProgress);
-        var supportTarget = RawReloadSupportTargetGlobal();
-        var sidearmMagazineBlend = SidearmReloadMagazineAnchorBlend();
-        var sidearmActionBlend = SidearmReloadActionContactBlend();
-        // Preserve the DCC motion while resolving its visible glove contact to
-        // the live magazine, action, or ready-pose marker. The shared two-bone
-        // solve keeps both segment lengths and the authored shoulder origin.
-        animatedReloadArms.RetargetLeftPalm(
-            EquippedWeapon.Platform,
-            supportTarget,
-            sidearmMagazineBlend,
-            sidearmActionBlend);
+        if (sidearmReload)
+        {
+            animatedReloadArms.AcceptAuthoredSidearmPose();
+            AlignSidearmReloadMagazineToAuthoredHand(
+                animatedReloadArms,
+                authoredArmProgress);
+        }
+        else
+        {
+            // Long guns retain live prop contact IK. Sidearms deliberately do
+            // not enter this path: their DCC clip owns the complete shoulder,
+            // wrist and articulated-finger performance.
+            animatedReloadArms.RetargetLeftPalm(
+                EquippedWeapon.Platform,
+                RawReloadSupportTargetGlobal());
+        }
         return true;
+    }
+
+    private void AlignSidearmReloadMagazineToAuthoredHand(
+        AuthoredAnimatedReloadArmsVisual animatedReloadArms,
+        float progress)
+    {
+        var weapon = ActiveAuthoredReloadWeapon();
+        if (weapon is null || !IsInstanceValid(weapon.Root))
+        {
+            return;
+        }
+
+        var profile = FirstPersonReloadProfileCatalog.For(
+            EquippedWeapon.Platform);
+        var handContact =
+            animatedReloadArms.LeftSidearmMagazineAnchorGlobalPosition;
+        if (progress >= profile.ReachEnd && progress < profile.StowEnd)
+        {
+            weapon.AlignMagazineGripToGlobalPosition(
+                spare: false,
+                handContact);
+            return;
+        }
+
+        if (progress >= profile.AcquireEnd && progress < profile.SeatEnd)
+        {
+            weapon.AlignMagazineGripToGlobalPosition(
+                spare: true,
+                handContact);
+        }
     }
 
     private float DirectReloadArmProgress()

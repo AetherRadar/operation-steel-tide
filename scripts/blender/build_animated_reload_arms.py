@@ -62,6 +62,15 @@ EXPECTED_SIDEARM_TRIANGLES = 9_334
 LONG_GUN_FOREARM_CUFF_LENGTH = 40.0
 SIDEARM_FOREARM_CUFF_LENGTH = 16.0
 LEFT_CHAIN = ("L_arm_01", "L_elbow_02", "L_wrist_03")
+LEFT_HAND_BONES = (
+    "L_thumb1_04", "L_thumb2_05", "L_thumb3_00",
+    "L_point1_07", "L_point2_08", "L_point3_09",
+    "L_middle1_011", "L_middle2_012", "L_middle3_013",
+    "L_palm_015",
+    "L_ring1_016", "L_ring2_017", "L_ring3_018",
+    "L_pink1_020", "L_pink2_021", "L_pink3_022",
+)
+LEFT_ANIMATED_BONES = LEFT_CHAIN + LEFT_HAND_BONES
 RIGHT_PALM = "R_palm_039"
 LEFT_PALM = "L_palm_015"
 LEFT_SHOULDER = "L_arm_01"
@@ -83,6 +92,9 @@ MAX_GRIP_CONTACT_METERS = 0.035
 MIN_SUPPORT_ANCHOR_OFFSET_METERS = 0.050
 MAX_SUPPORT_ANCHOR_OFFSET_METERS = 0.075
 MAX_SIDEARM_ANCHOR_SURFACE_ERROR_METERS = 0.0051
+MIN_SIDEARM_GRASP_CLEARANCE_METERS = 0.045
+MAX_SIDEARM_GRASP_CLEARANCE_METERS = 0.060
+MIN_SIDEARM_DIGIT_CURL_RADIANS = 0.65
 MIN_SIDEARM_ANCHOR_BELOW_PALM_METERS = 0.060
 MAX_SIDEARM_ANCHOR_BELOW_PALM_METERS = 0.063
 MIN_SIDEARM_ANCHOR_LATERAL_METERS = -0.041
@@ -114,14 +126,22 @@ SIDEARM_ACTION_WRIST_POSES = {
     "p226": (-12.0, -5.0, 10.0),
     "m1911": (-13.0, -6.0, 9.0),
     "gsh18": (-7.0, -3.0, 12.0),
-    "desert_eagle": (-18.0, -8.0, 3.0),
+    "desert_eagle": (-14.0, 8.0, 12.0),
 }
 SIDEARM_IK_BLEND_IN_START = 0.02
-SIDEARM_IK_BLEND_IN_END = 0.12
-SIDEARM_TACTICAL_BLEND_OUT_START = 0.86
-SIDEARM_EMPTY_BLEND_OUT_START = 0.915
+SIDEARM_IK_BLEND_IN_END = 0.18
+SIDEARM_DESERT_EAGLE_BLEND_IN_END = 0.23
+SIDEARM_TACTICAL_BLEND_OUT_START = 0.82
+SIDEARM_EMPTY_BLEND_OUT_START = 0.890
 SIDEARM_ENDPOINT_MAX_BASIS_ERROR_RADIANS = 0.01
 SIDEARM_ENDPOINT_MAX_POSITION_ERROR_METERS = 0.003
+SIDEARM_HAND_SOURCE_FRAMES = {
+    "ready": SOURCE_IDLE_FRAME,
+    "open": 40,
+    "pinch": 20,
+    "wrap": 0,
+    "rack": 120,
+}
 MAX_LONG_GUN_CAMERA_HORIZONTAL_SPAN_METERS = 1.20
 # Depth span includes the cuff extending away from the lens as well as toward
 # it.  The explicit rear-extent gate below is the near-plane safety bound; this
@@ -161,6 +181,13 @@ class SidearmStaticPose:
 
     local_basis: dict[str, Matrix]
     global_pose: dict[str, Matrix]
+
+
+@dataclass(frozen=True)
+class SidearmHandPoseLibrary:
+    """Source-authored finger poses stored relative to their parent bones."""
+
+    relative_pose: dict[str, dict[str, Matrix]]
 
 
 # Coordinates are source-rig units in WeaponRoot space.  The exported root
@@ -213,8 +240,8 @@ PROFILES = (
                   (-2.0, -3.0, -2.0), (0.0, -6.0, 7.0),
                   (40.0, 18.0, -23.0), True),
     ReloadProfile("desert_eagle", "desert_eagle", (-7.0, -10.5, 1.0),
-                  (-4.0, -3.0, -6.0), (-2.0, -1.0, -12.0),
-                  (-4.0, -3.0, -2.0), (-3.5, -8.5, 5.5),
+                  (-4.0, -3.0, -6.0), (-3.75, -1.75, -9.0),
+                  (-4.0, -3.0, -2.0), (-3.5, -11.5, 5.5),
                   (41.0, 16.0, -25.0), True),
 )
 
@@ -505,6 +532,66 @@ def create_sidearm_forearms(source: bpy.types.Object) -> bpy.types.Object:
     )
 
 
+def capture_sidearm_hand_pose_library(
+    armature: bpy.types.Object,
+) -> SidearmHandPoseLibrary:
+    """Retain the source animator's real open, pinch, wrap, and rack hand poses.
+
+    Storing each finger transform relative to its animated parent makes the
+    hand performance independent of the source SMG arm motion.  The poses can
+    then be placed on the newly solved pistol wrist without approximating a
+    grasp from Euler guesses or leaving the original firing hand frozen.
+    """
+    scene = bpy.context.scene
+    original_frame = scene.frame_current
+    relative_pose: dict[str, dict[str, Matrix]] = {}
+    for pose_name, frame in SIDEARM_HAND_SOURCE_FRAMES.items():
+        scene.frame_set(frame)
+        bpy.context.view_layer.update()
+        relative_pose[pose_name] = {
+            bone_name: (
+                armature.pose.bones[bone_name].parent.matrix.inverted()
+                @ armature.pose.bones[bone_name].matrix
+            )
+            for bone_name in LEFT_HAND_BONES
+        }
+    magazine_grasp = {
+        bone_name: matrix.copy()
+        for bone_name, matrix in relative_pose["wrap"].items()
+    }
+    finger_chains = (
+        ("L_point1_07", "L_point2_08", "L_point3_09"),
+        ("L_middle1_011", "L_middle2_012", "L_middle3_013"),
+        ("L_ring1_016", "L_ring2_017", "L_ring3_018"),
+        ("L_pink1_020", "L_pink2_021", "L_pink3_022"),
+    )
+    for chain in finger_chains:
+        for bone_name, degrees in zip(chain, (-50.0, -45.0, -32.5)):
+            magazine_grasp[bone_name] = (
+                magazine_grasp[bone_name]
+                @ Matrix.Rotation(math.radians(degrees), 4, "X")
+            )
+    for bone_name, degrees in zip(
+        ("L_thumb1_04", "L_thumb2_05", "L_thumb3_00"),
+        (-25.0, -22.5, -16.25),
+    ):
+        magazine_grasp[bone_name] = (
+            magazine_grasp[bone_name]
+            @ Matrix.Rotation(math.radians(degrees), 4, "Z")
+        )
+    relative_pose["magazine_grasp"] = magazine_grasp
+    scene.frame_set(original_frame)
+    bpy.context.view_layer.update()
+    print(
+        "SIDEARM_HAND_POSE_LIBRARY"
+        f" poses={len(relative_pose)}"
+        f" bones={len(LEFT_HAND_BONES)}"
+        f" source_frames={','.join(str(value) for value in SIDEARM_HAND_SOURCE_FRAMES.values())}"
+        " valid=True"
+    )
+    return SidearmHandPoseLibrary(relative_pose)
+
+
 def import_and_prepare_source() -> tuple[
     bpy.types.Object,
     bpy.types.Object,
@@ -513,6 +600,7 @@ def import_and_prepare_source() -> tuple[
     Matrix,
     Matrix,
     Matrix,
+    SidearmHandPoseLibrary,
 ]:
     clear_scene()
     bpy.ops.import_scene.gltf(filepath=str(SOURCE_GLB))
@@ -522,6 +610,9 @@ def import_and_prepare_source() -> tuple[
     bpy.context.view_layer.update()
     armature = bpy.data.objects["Object_4"]
     arms_mesh = bpy.data.objects["Object_7"]
+    sidearm_hand_poses = capture_sidearm_hand_pose_library(armature)
+    scene.frame_set(SOURCE_IDLE_FRAME)
+    bpy.context.view_layer.update()
     refine_authored_sleeves()
     # Crop the runtime layers from the authored sleeve before the audit-only
     # shoulder extension is added.  Cropping the extended mesh retained a
@@ -658,6 +749,7 @@ def import_and_prepare_source() -> tuple[
         left_contact,
         left_grip_anchor,
         left_sidearm_magazine_anchor,
+        sidearm_hand_poses,
     )
 
 
@@ -858,13 +950,22 @@ def mechanical_control_points(
         )
     elif profile.family in {"service_pistol", "desert_eagle"}:
         contact = action
-        peak = action + Vector((0.0, 4.5, 0.0))
-        release = action
+        slide_travel = 2.56 if profile.family == "desert_eagle" else 4.1
+        peak = action + Vector((0.0, slide_travel, 0.0))
+        # The support hand opens at full rearward travel; the recoil spring
+        # sends the slide forward without dragging the hand along with it.
+        release = peak
         rotations = (
             Vector(SIDEARM_ACTION_WRIST_POSES[profile.name]),
             Vector(SIDEARM_ACTION_WRIST_POSES[profile.name])
             + Vector((-3.0, -7.0, -3.0)),
-            Vector(SIDEARM_ACTION_WRIST_POSES[profile.name]),
+            Vector(SIDEARM_ACTION_WRIST_POSES[profile.name])
+            + Vector((-3.0, -7.0, -3.0)),
+        )
+        fractions = (
+            (0.859375, 0.890625, 0.906250, 0.921875)
+            if profile.family == "desert_eagle"
+            else (0.906250, 0.921875, 0.937500, 0.984375)
         )
     elif profile.family in {"precision", "internal_precision"}:
         contact = action
@@ -884,11 +985,13 @@ def mechanical_control_points(
             Vector((4.0, -20.0, -8.0)),
             Vector((8.0, -10.0, -3.0)),
         )
+    if profile.family not in {"service_pistol", "desert_eagle"}:
+        fractions = (0.840, 0.870, 0.895, 0.915)
     return [
-        control_point(0.840, contact, rotations[0], "action_contact"),
-        control_point(0.870, peak, rotations[1], "action_peak"),
-        control_point(0.895, peak, rotations[1], "action_peak_hold"),
-        control_point(0.915, release, rotations[2], "action_release"),
+        control_point(fractions[0], contact, rotations[0], "action_contact"),
+        control_point(fractions[1], peak, rotations[1], "action_peak"),
+        control_point(fractions[2], peak, rotations[1], "action_peak_hold"),
+        control_point(fractions[3], release, rotations[2], "action_release"),
     ]
 
 
@@ -922,77 +1025,146 @@ def sidearm_control_points(
 ) -> list[ReloadControlPoint]:
     """Build a compact pistol exchange on the cropped authored forearms.
 
-    Position-only IK now performs the short magazine and slide path in Blender;
-    runtime selects the platform clip but does not pull the hidden upper sleeve
-    toward a second target.  Constraint influence is zero at both boundaries,
-    preserving the exact static service/large-pistol pose across visibility
-    changes. Empty clips add an overhand slide beat after the magazine seats.
+    Each location is the physical palm contact point, not the wrist origin.
+    The bake solves the wrist from that surface point and layers the source
+    animator's finger performance onto it. Runtime therefore plays a complete
+    grasp rather than translating the hidden shoulder until a frozen fist is
+    near the prop. Empty clips add an authored overhand slide beat after seat.
     """
-    support_anchor = Vector(profile.support)
     magazine_anchor = Vector(profile.magazine)
     old_clear = magazine_anchor + Vector((0.0, 1.0, -4.0))
     exchange = Vector(profile.exchange)
     insert = Vector(profile.insert)
     approach = insert + Vector((1.0, 2.0, -4.0))
-    seated = insert + Vector((0.0, -0.5, 1.5))
+    seated = magazine_anchor
     try:
         wrist_pose = Vector(SIDEARM_MAGAZINE_WRIST_POSES[profile.name])
     except KeyError as error:
         raise RuntimeError(
             f"Missing sidearm magazine wrist pose: {profile.name}"
         ) from error
+    reach_end = sidearm_reach_end(profile)
+    seat_fraction = 0.750 if profile.name == "desert_eagle" else 0.780
+    seat_hold_fraction = (
+        0.765625 if profile.name == "desert_eagle" else 0.795
+    )
     points = [
-        control_point(0.000, support_anchor, Vector()),
-        control_point(0.040, support_anchor, Vector()),
-        control_point(0.240, magazine_anchor, wrist_pose),
+        control_point(0.000, magazine_anchor, Vector()),
+        control_point(0.040, magazine_anchor, Vector()),
+        control_point(reach_end, magazine_anchor, wrist_pose, "old_mag_grip"),
         control_point(0.310, old_clear, wrist_pose + Vector((3.0, 1.0, 3.0)),
                       "old_mag_out"),
-        control_point(0.360, old_clear, wrist_pose + Vector((3.0, 1.0, 3.0)),
+        control_point(0.340, old_clear, wrist_pose + Vector((3.0, 1.0, 3.0)),
                       "old_mag_out_hold"),
-        control_point(0.440, exchange, wrist_pose + Vector((2.0, 0.0, 2.0))),
-        control_point(0.550, approach + Vector((2.0, 1.0, -2.0)), wrist_pose,
+        control_point(0.430, exchange, wrist_pose + Vector((2.0, 0.0, 2.0))),
+        control_point(0.540, exchange, wrist_pose + Vector((2.0, 0.0, 2.0)),
                       "fresh_mag_ready"),
-        control_point(0.640, approach, wrist_pose),
-        control_point(0.680, insert, wrist_pose, "new_mag_insert"),
-        control_point(0.710, seated, wrist_pose - Vector((4.0, 1.0, 3.0)),
+        control_point(0.630, approach, wrist_pose),
+        control_point(0.710, insert, wrist_pose, "new_mag_insert"),
+        control_point(seat_fraction, seated,
+                      wrist_pose - Vector((4.0, 1.0, 3.0)),
                       "new_mag_seat"),
-        control_point(0.750, seated, wrist_pose - Vector((4.0, 1.0, 3.0)),
+        control_point(seat_hold_fraction, seated,
+                      wrist_pose - Vector((4.0, 1.0, 3.0)),
                       "new_mag_seat_hold"),
     ]
     if empty:
         mechanical = mechanical_control_points(profile)
         contact = mechanical[0]
         seated_rotation = wrist_pose - Vector((4.0, 1.0, 3.0))
-        points.extend(
-            (
+        if profile.name == "desert_eagle":
+            approach_samples = (
                 control_point(
-                    0.775,
-                    seated.lerp(contact.location, 0.20),
-                    seated_rotation.lerp(contact.rotation_degrees, 0.20),
+                    0.781250,
+                    seated.lerp(contact.location, 1.0 / 6.0),
+                    seated_rotation.lerp(
+                        contact.rotation_degrees,
+                        1.0 / 6.0,
+                    ),
                     "action_approach_early",
                 ),
                 control_point(
-                    0.795,
-                    seated.lerp(contact.location, 0.45),
-                    seated_rotation.lerp(contact.rotation_degrees, 0.45),
+                    0.796875,
+                    seated.lerp(contact.location, 2.0 / 6.0),
+                    seated_rotation.lerp(
+                        contact.rotation_degrees,
+                        2.0 / 6.0,
+                    ),
                     "action_approach_middle",
                 ),
                 control_point(
-                    0.815,
-                    seated.lerp(contact.location, 0.70),
-                    seated_rotation.lerp(contact.rotation_degrees, 0.70),
+                    0.812500,
+                    seated.lerp(contact.location, 3.0 / 6.0),
+                    seated_rotation.lerp(
+                        contact.rotation_degrees,
+                        3.0 / 6.0,
+                    ),
                     "action_approach_late",
                 ),
+                control_point(
+                    0.828125,
+                    seated.lerp(contact.location, 4.0 / 6.0),
+                    seated_rotation.lerp(
+                        contact.rotation_degrees,
+                        4.0 / 6.0,
+                    ),
+                    "action_approach_contact",
+                ),
+                control_point(
+                    0.843750,
+                    seated.lerp(contact.location, 5.0 / 6.0),
+                    seated_rotation.lerp(
+                        contact.rotation_degrees,
+                        5.0 / 6.0,
+                    ),
+                ),
             )
-        )
+        else:
+            approach_samples = (
+                control_point(
+                    0.812500,
+                    seated.lerp(contact.location, 0.14),
+                    seated_rotation.lerp(contact.rotation_degrees, 0.14),
+                    "action_approach_early",
+                ),
+                control_point(
+                    0.828125,
+                    seated.lerp(contact.location, 0.29),
+                    seated_rotation.lerp(contact.rotation_degrees, 0.29),
+                    "action_approach_middle",
+                ),
+                control_point(
+                    0.843750,
+                    seated.lerp(contact.location, 0.43),
+                    seated_rotation.lerp(contact.rotation_degrees, 0.43),
+                    "action_approach_late",
+                ),
+                control_point(
+                    0.859375,
+                    seated.lerp(contact.location, 0.57),
+                    seated_rotation.lerp(contact.rotation_degrees, 0.57),
+                    "action_approach_contact",
+                ),
+                control_point(
+                    0.875000,
+                    seated.lerp(contact.location, 0.71),
+                    seated_rotation.lerp(contact.rotation_degrees, 0.71),
+                ),
+                control_point(
+                    0.890625,
+                    seated.lerp(contact.location, 0.86),
+                    seated_rotation.lerp(contact.rotation_degrees, 0.86),
+                ),
+            )
+        points.extend(approach_samples)
         points.extend(mechanical)
-        append_camera_safe_return(points, support_anchor, sidearm=True)
+        append_camera_safe_return(points, magazine_anchor, sidearm=True)
     else:
         points.append(
             control_point(0.860, seated,
                           wrist_pose - Vector((4.0, 1.0, 3.0)))
         )
-        points.append(control_point(1.000, support_anchor, Vector()))
+        points.append(control_point(1.000, magazine_anchor, Vector()))
     return points
 
 
@@ -1150,6 +1322,7 @@ def create_control(
     points: list[ReloadControlPoint],
     base_rotation: Quaternion,
     end_frame: int,
+    linear: bool = False,
 ) -> bpy.types.Object:
     target = bpy.data.objects.new(f"{name}_IKTarget", None)
     target.empty_display_type = "SPHERE"
@@ -1168,7 +1341,12 @@ def create_control(
         target.rotation_quaternion = base_rotation @ delta.to_quaternion()
         target.keyframe_insert("location", frame=frame)
         target.keyframe_insert("rotation_quaternion", frame=frame)
-    eased_keyframes(target)
+    if linear:
+        for curve in target.animation_data.action.fcurves:
+            for key in curve.keyframe_points:
+                key.interpolation = "LINEAR"
+    else:
+        eased_keyframes(target)
     return target
 
 
@@ -1177,24 +1355,136 @@ def smooth_step(value: float) -> float:
     return value * value * (3.0 - 2.0 * value)
 
 
-def sidearm_pose_influence(fraction: float, empty: bool) -> float:
+def sidearm_reach_end(profile: ReloadProfile) -> float:
+    """Give the physically larger Desert Eagle a longer grasp approach."""
+    if profile.name == "desert_eagle":
+        return SIDEARM_DESERT_EAGLE_BLEND_IN_END
+    return SIDEARM_IK_BLEND_IN_END
+
+
+def sidearm_pose_influence(
+    fraction: float,
+    empty: bool,
+    reach_end: float = SIDEARM_IK_BLEND_IN_END,
+    profile_name: str = "",
+) -> float:
     blend_out_start = (
-        SIDEARM_EMPTY_BLEND_OUT_START
+        0.890625
+        if empty and profile_name == "desert_eagle"
+        else SIDEARM_EMPTY_BLEND_OUT_START
         if empty
         else SIDEARM_TACTICAL_BLEND_OUT_START
     )
     if fraction <= SIDEARM_IK_BLEND_IN_START:
         return 0.0
-    if fraction < SIDEARM_IK_BLEND_IN_END:
+    if fraction < reach_end:
         return smooth_step(
             (fraction - SIDEARM_IK_BLEND_IN_START)
-            / (SIDEARM_IK_BLEND_IN_END - SIDEARM_IK_BLEND_IN_START)
+            / (reach_end - SIDEARM_IK_BLEND_IN_START)
         )
     if fraction <= blend_out_start:
         return 1.0
-    return 1.0 - smooth_step(
+    return_amount = (
         (fraction - blend_out_start) / (1.0 - blend_out_start)
     )
+    # A linear authored return avoids the 1.5x mid-curve velocity spike of a
+    # cubic smooth step. That spike was visible on the large Desert Eagle as
+    # a late wrist snap even though both endpoints were correctly posed.
+    return 1.0 - max(0.0, min(1.0, return_amount))
+
+
+def sidearm_hand_pose_keys(
+    empty: bool,
+    reach_end: float = SIDEARM_IK_BLEND_IN_END,
+    profile_name: str = "",
+) -> tuple[tuple[float, str], ...]:
+    """Stage a professional release, regrip, seat, and slide manipulation."""
+    seat_hold = 0.765625 if profile_name == "desert_eagle" else 0.795
+    magazine_exchange = (
+        (0.000, "ready"),
+        (0.045, "open"),
+        (reach_end - 0.050, "pinch"),
+        (reach_end, "magazine_grasp"),
+        (0.410, "magazine_grasp"),
+        (0.455, "open"),
+        (0.500, "open"),
+        (0.520, "pinch"),
+        (0.540, "magazine_grasp"),
+        (seat_hold, "magazine_grasp"),
+    )
+    if empty:
+        if profile_name == "desert_eagle":
+            return magazine_exchange + (
+                (0.770, "open"),
+                (0.855, "rack"),
+                (0.906250, "rack"),
+                (0.921875, "open"),
+                (1.000, "ready"),
+            )
+        return magazine_exchange + (
+            (0.805, "open"),
+            (0.900, "rack"),
+            (0.9375, "rack"),
+            (0.984375, "open"),
+            (1.000, "ready"),
+        )
+    return magazine_exchange + (
+        (0.820, "open"),
+        (1.000, "ready"),
+    )
+
+
+def interpolated_matrix(left: Matrix, right: Matrix, amount: float) -> Matrix:
+    left_location, left_rotation, left_scale = left.decompose()
+    right_location, right_rotation, right_scale = right.decompose()
+    eased = smooth_step(amount)
+    return Matrix.LocRotScale(
+        left_location.lerp(right_location, eased),
+        left_rotation.slerp(right_rotation, eased),
+        left_scale.lerp(right_scale, eased),
+    )
+
+
+def sidearm_hand_relative_pose(
+    library: SidearmHandPoseLibrary,
+    fraction: float,
+    empty: bool,
+    reach_end: float = SIDEARM_IK_BLEND_IN_END,
+    profile_name: str = "",
+) -> dict[str, Matrix]:
+    keys = sidearm_hand_pose_keys(empty, reach_end, profile_name)
+    left_fraction, left_name = keys[0]
+    right_fraction, right_name = keys[-1]
+    for left, right in zip(keys, keys[1:]):
+        if fraction <= right[0]:
+            left_fraction, left_name = left
+            right_fraction, right_name = right
+            break
+    span = max(0.000001, right_fraction - left_fraction)
+    amount = max(0.0, min(1.0, (fraction - left_fraction) / span))
+    return {
+        bone_name: interpolated_matrix(
+            library.relative_pose[
+                "ready" if bone_name == LEFT_PALM else left_name
+            ][bone_name],
+            library.relative_pose[
+                "ready" if bone_name == LEFT_PALM else right_name
+            ][bone_name],
+            amount,
+        )
+        for bone_name in LEFT_HAND_BONES
+    }
+
+
+def apply_sidearm_hand_pose(
+    armature: bpy.types.Object,
+    relative_pose: dict[str, Matrix],
+) -> None:
+    # LEFT_HAND_BONES is parent-first, including L_palm before ring and pinky.
+    for bone_name in LEFT_HAND_BONES:
+        pose_bone = armature.pose.bones[bone_name]
+        pose_bone.matrix = pose_bone.parent.matrix @ relative_pose[bone_name]
+        bpy.context.view_layer.update()
 
 
 def pose_matrix(
@@ -1286,11 +1576,13 @@ def bake_sidearm_clip(
     profile: ReloadProfile,
     empty: bool,
     static_pose: SidearmStaticPose,
+    hand_pose_library: SidearmHandPoseLibrary,
+    magazine_anchor_in_palm: Matrix,
     target: bpy.types.Object,
     end_frame: int,
     clip_name: str,
 ) -> bpy.types.Action:
-    """Bake deterministic pose-to-pose pistol motion from an analytical solve."""
+    """Bake an articulated pistol reload with palm-driven prop contact."""
     action = bpy.data.actions.new(clip_name)
     action.use_fake_user = True
     armature.animation_data_create()
@@ -1300,21 +1592,55 @@ def bake_sidearm_clip(
     static_wrist_location = static_wrist.translation
     static_wrist_rotation = static_wrist.to_quaternion()
     pole_location = Vector(profile.pole)
+    apply_sidearm_static_pose(armature, static_pose)
+    apply_sidearm_hand_pose(
+        armature,
+        hand_pose_library.relative_pose["ready"],
+    )
+    static_anchor_location = (
+        bone_world_matrix(armature, LEFT_PALM)
+        @ magazine_anchor_in_palm
+    ).translation
     for pose_bone in armature.pose.bones:
-        if pose_bone.name in LEFT_CHAIN:
+        if pose_bone.name in LEFT_ANIMATED_BONES:
             pose_bone.rotation_mode = "QUATERNION"
     for frame in range(0, end_frame + 1):
         scene.frame_set(frame)
         bpy.context.view_layer.update()
         target_location = target.location.copy()
         target_rotation = target.rotation_quaternion.copy()
-        influence = sidearm_pose_influence(frame / end_frame, empty)
-        solved_location = static_wrist_location.lerp(target_location, influence)
+        fraction = frame / end_frame
+        reach_end = sidearm_reach_end(profile)
+        influence = sidearm_pose_influence(
+            fraction,
+            empty,
+            reach_end,
+            profile.name,
+        )
+        desired_contact = static_anchor_location.lerp(
+            target_location,
+            influence,
+        )
         solved_rotation = static_wrist_rotation.slerp(
             target_rotation,
             influence,
         )
+        hand_pose = sidearm_hand_relative_pose(
+            hand_pose_library,
+            fraction,
+            empty,
+            reach_end,
+            profile.name,
+        )
         apply_sidearm_static_pose(armature, static_pose)
+        apply_sidearm_hand_pose(armature, hand_pose)
+        posed_anchor = (
+            bone_world_matrix(armature, LEFT_PALM)
+            @ magazine_anchor_in_palm
+        ).translation
+        static_offset = posed_anchor - static_wrist_location
+        rotation_delta = solved_rotation @ static_wrist_rotation.inverted()
+        solved_location = desired_contact - rotation_delta @ static_offset
         solved = analytical_sidearm_pose(
             static_pose,
             solved_location,
@@ -1324,7 +1650,24 @@ def bake_sidearm_clip(
         for bone_name in LEFT_CHAIN:
             armature.pose.bones[bone_name].matrix = solved[bone_name]
             bpy.context.view_layer.update()
-        for bone_name in LEFT_CHAIN:
+        apply_sidearm_hand_pose(armature, hand_pose)
+        actual_contact = (
+            bone_world_matrix(armature, LEFT_PALM)
+            @ magazine_anchor_in_palm
+        ).translation
+        contact_correction = desired_contact - actual_contact
+        if contact_correction.length > 0.000001:
+            solved = analytical_sidearm_pose(
+                static_pose,
+                solved_location + contact_correction,
+                solved_rotation,
+                pole_location,
+            )
+            for bone_name in LEFT_CHAIN:
+                armature.pose.bones[bone_name].matrix = solved[bone_name]
+                bpy.context.view_layer.update()
+            apply_sidearm_hand_pose(armature, hand_pose)
+        for bone_name in LEFT_ANIMATED_BONES:
             pose_bone = armature.pose.bones[bone_name]
             pose_bone.keyframe_insert("location", frame=frame, group=bone_name)
             pose_bone.keyframe_insert(
@@ -1350,6 +1693,8 @@ def bake_clip(
     profile: ReloadProfile,
     empty: bool,
     sidearm_static_pose: SidearmStaticPose | None = None,
+    sidearm_hand_poses: SidearmHandPoseLibrary | None = None,
+    sidearm_magazine_anchor_in_palm: Matrix | None = None,
 ) -> bpy.types.Action:
     suffix = "empty" if empty else "tactical"
     clip_name = f"reload_{profile.name}_{suffix}"
@@ -1368,6 +1713,10 @@ def bake_clip(
             raise RuntimeError(
                 f"Missing static sidearm endpoint pose for {profile.name}"
             )
+        if sidearm_hand_poses is None or sidearm_magazine_anchor_in_palm is None:
+            raise RuntimeError(
+                f"Missing articulated hand contract for {profile.name}"
+            )
         apply_sidearm_static_pose(armature, sidearm_static_pose)
     scene.frame_set(0)
     bpy.context.view_layer.update()
@@ -1379,6 +1728,7 @@ def bake_clip(
         points,
         base_rotation,
         end_frame,
+        linear=profile.sidearm,
     )
     if profile.sidearm:
         return bake_sidearm_clip(
@@ -1386,6 +1736,8 @@ def bake_clip(
             profile,
             empty,
             sidearm_static_pose,
+            sidearm_hand_poses,
+            sidearm_magazine_anchor_in_palm,
             target,
             end_frame,
             clip_name,
@@ -1465,7 +1817,16 @@ def make_baked_quaternions_continuous(action: bpy.types.Action) -> None:
     opposite signs. Normalizing every left-chain track before export prevents
     a visually identical 30 Hz bake from twitching between its keyframes.
     """
-    for bone_name in LEFT_CHAIN:
+    animated_bones = (
+        LEFT_ANIMATED_BONES
+        if any(
+            curve.data_path
+                == f'pose.bones["{LEFT_HAND_BONES[0]}"].rotation_quaternion'
+            for curve in action.fcurves
+        )
+        else LEFT_CHAIN
+    )
+    for bone_name in animated_bones:
         data_path = f'pose.bones["{bone_name}"].rotation_quaternion'
         curves = [
             next(
@@ -1717,7 +2078,23 @@ def validate_sidearm_magazine_anchor_keyframes(
         points_by_beat["new_mag_seat"].fraction,
     )
     mesh = bpy.data.objects["FullReloadArmsAuditMesh"]
-    maximum_error = 0.0
+    digit_chains = (
+        ("L_thumb1_04", "L_thumb2_05", "L_thumb3_00"),
+        ("L_point1_07", "L_point2_08", "L_point3_09"),
+        ("L_middle1_011", "L_middle2_012", "L_middle3_013"),
+        ("L_ring1_016", "L_ring2_017", "L_ring3_018"),
+        ("L_pink1_020", "L_pink2_021", "L_pink3_022"),
+    )
+    bpy.context.scene.frame_set(0)
+    bpy.context.view_layer.update()
+    ready_relative = {
+        bone_name: (
+            armature.pose.bones[bone_name].parent.matrix.inverted()
+            @ armature.pose.bones[bone_name].matrix
+        )
+        for chain in digit_chains
+        for bone_name in chain
+    }
     for stage, fraction in zip(("extract", "insert"), fractions):
         frame = round(fraction * end)
         bpy.context.scene.frame_set(frame)
@@ -1734,8 +2111,24 @@ def validate_sidearm_magazine_anchor_keyframes(
             raise RuntimeError(
                 f"Could not resolve animated glove surface for {action.name}"
             )
-        surface_error = distance * SOURCE_TO_METERS
-        maximum_error = max(maximum_error, surface_error)
+        grasp_clearance = distance * SOURCE_TO_METERS
+        digit_curls = tuple(
+            sum(
+                shortest_rotation_error(
+                    ready_relative[bone_name],
+                    armature.pose.bones[bone_name].parent.matrix.inverted()
+                    @ armature.pose.bones[bone_name].matrix,
+                )
+                for bone_name in chain
+            )
+            for chain in digit_chains
+        )
+        stage_valid = (
+            MIN_SIDEARM_GRASP_CLEARANCE_METERS
+            <= grasp_clearance
+            <= MAX_SIDEARM_GRASP_CLEARANCE_METERS
+            and min(digit_curls) >= MIN_SIDEARM_DIGIT_CURL_RADIANS
+        )
         print(
             "SIDEARM_MAGAZINE_ANCHOR_KEY"
             f" clip={action.name}"
@@ -1743,13 +2136,15 @@ def validate_sidearm_magazine_anchor_keyframes(
             f" stage={stage}"
             f" frame={frame}"
             f" face={face_index}"
-            f" surface_error={surface_error:.9f}"
-            f" valid={surface_error <= MAX_SIDEARM_ANCHOR_SURFACE_ERROR_METERS}"
+            f" grasp_clearance={grasp_clearance:.9f}"
+            f" digit_curls={'/'.join(f'{value:.6f}' for value in digit_curls)}"
+            f" valid={stage_valid}"
         )
-    if maximum_error > MAX_SIDEARM_ANCHOR_SURFACE_ERROR_METERS:
-        raise RuntimeError(
-            f"Sidearm magazine anchor left the glove surface: {action.name}"
-        )
+        if not stage_valid:
+            raise RuntimeError(
+                "Sidearm magazine grasp lost enclosure or finger curl: "
+                f"{action.name}"
+            )
 
 
 def reload_profile_for_action(
@@ -2388,6 +2783,7 @@ def main() -> None:
         left_contact,
         left_grip_anchor,
         left_sidearm_magazine_anchor,
+        sidearm_hand_poses,
     ) = import_and_prepare_source()
     arms_mesh = bpy.data.objects["FullReloadArmsAuditMesh"]
     triangle_count = sum(len(polygon.vertices) - 2 for polygon in arms_mesh.data.polygons)
@@ -2428,12 +2824,18 @@ def main() -> None:
         for profile in PROFILES
         if profile.sidearm
     }
+    sidearm_magazine_anchor_in_palm = (
+        bone_world_matrix(armature, LEFT_PALM).inverted()
+        @ left_sidearm_magazine_anchor
+    )
     actions = [
         bake_clip(
             armature,
             profile,
             empty,
             sidearm_static_poses.get(profile.name),
+            sidearm_hand_poses if profile.sidearm else None,
+            sidearm_magazine_anchor_in_palm if profile.sidearm else None,
         )
         for profile in PROFILES
         for empty in (False, True)
@@ -2476,12 +2878,12 @@ def main() -> None:
         pose_bone.matrix_basis.identity()
     bpy.context.scene.frame_set(0)
     bpy.context.view_layer.update()
-    root["reload_contract_version"] = 7
+    root["reload_contract_version"] = 8
     root["coordinate_space"] = "WeaponRoot root-scale converts source units to metres"
     root["native_clip_platform"] = "m3a1"
     root["reload_clip_count"] = len(actions)
     root["reload_motion_revision"] = (
-        "authored_cuff_pose_to_pose_contact_2026_08_31"
+        "authored_articulated_sidearm_magazine_grasp_2026_09_01"
     )
     root["runtime_long_gun_mesh"] = "LongGunReloadForearmsMesh"
     root["runtime_sidearm_mesh"] = "SidearmReloadForearmsMesh"

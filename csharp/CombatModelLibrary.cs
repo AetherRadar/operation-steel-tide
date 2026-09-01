@@ -375,6 +375,29 @@ internal sealed class AuthoredWeaponVisual
         return true;
     }
 
+    public bool AlignMagazineGripToGlobalPosition(
+        bool spare,
+        Vector3 targetGlobalPosition)
+    {
+        if (!TryMagazineGripGlobalPosition(spare, out var currentGrip))
+        {
+            return false;
+        }
+
+        var magazine = spare ? SpareMagazine : Magazine;
+        if (!GodotObject.IsInstanceValid(magazine))
+        {
+            return false;
+        }
+
+        // The sidearm reload clip owns the hand and finger performance. Move
+        // the rigid DCC-authored magazine by the remaining contact delta after
+        // its normal mechanism phase has been synchronized; never deform or
+        // translate the skinned arm to chase the prop.
+        magazine.GlobalPosition += targetGlobalPosition - currentGrip;
+        return true;
+    }
+
     public bool TryActionGripGlobalPosition(out Vector3 position)
     {
         if (_actionGripInAction is not { } localContact)

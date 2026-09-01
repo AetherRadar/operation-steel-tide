@@ -15,15 +15,21 @@ blender --background --factory-startup --python-exit-code 1 --python scripts/ble
 ```
 
 The second command rebuilds `animated_reload_arms.blend` and the contract-
-revision-7 runtime GLB with 24 tactical/empty clips. Its 2026-08-31 pose-to-
+revision-8 runtime GLB with 24 tactical/empty clips. Its 2026-08-31 pose-to-
 pose pass groups the twelve platforms into straight-rifle, rock-and-lock, MP5,
 precision/internal, service-pistol, and Desert Eagle choreography. Long guns
 use short camera-safe magazine paths instead of the retired waist-pouch arc;
 cropped pistol forearms use a deterministic analytical shoulder/elbow solve so
 the right hand stays fixed and empty reloads retain a readable slide beat.
-Long guns render a dedicated 9,914-triangle crop with 28 source-unit cuffs;
+Long guns render a dedicated 12,686-triangle crop with 28 source-unit cuffs;
 the complete 13,700-triangle arms remain a hidden audit layer and pistols keep
-their 9,306-triangle compact crop. The builder samples the long-gun crop in a
+their 9,334-triangle compact crop (9,306 after Godot import removes collinear
+cut-ring faces). The 2026-09-01 sidearm pass adds a five-digit magazine grasp,
+moves the real installed/staged magazine with that authored glove contact,
+removes runtime wrist/shoulder pose correction, and gives service pistols and
+Desert Eagle separate professional slide beats. Extraction and insertion must
+retain 45-60 mm glove-anchor clearance and at least 0.65 radians of curl on
+every digit chain. The builder samples the long-gun crop in a
 right-grip camera proxy and proves the full audit layer fails that envelope,
 then rejects missing beat holds, out-of-envelope controls, discontinuous bones
 or palms, endpoint mismatch, and GLB clip-duration drift before export.

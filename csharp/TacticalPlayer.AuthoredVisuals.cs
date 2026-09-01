@@ -482,8 +482,7 @@ public partial class TacticalPlayer
         }
 
         var leftGrip = animatedArms?.LeftSupportAnchorGlobalPosition(
-                EquippedWeapon.Platform,
-                SidearmReloadMagazineAnchorBlend())
+                EquippedWeapon.Platform)
             ?? arms!.LeftGripFrame.GlobalPosition;
         var supportTarget = M4ReloadSupportTargetGlobal();
         var primaryMagazinePosition = _authoredPrimaryWeapon.Magazine.GlobalPosition;
@@ -1124,18 +1123,14 @@ public partial class TacticalPlayer
             return requestedTarget;
         }
 
-        var sidearmMagazineBlend = SidearmReloadMagazineAnchorBlend();
         if (WeaponCatalog.IsSidearm(EquippedWeapon.Platform))
         {
-            return animatedArms.SidearmSupportTargetGlobalPosition(
-                requestedTarget,
-                sidearmMagazineBlend,
-                SidearmReloadActionContactBlend());
+            return animatedArms.LeftSupportAnchorGlobalPosition(
+                EquippedWeapon.Platform);
         }
         return animatedArms.ReachableLeftPalmTarget(
             EquippedWeapon.Platform,
-            requestedTarget,
-            sidearmMagazineBlend);
+            requestedTarget);
     }
 
     private Vector3 RawReloadSupportTargetGlobal()

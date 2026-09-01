@@ -88,9 +88,7 @@ public partial class TacticalPlayer
         var rightGrip = animatedArms?.RightGripFrame.GlobalPosition
             ?? arms!.RightGripFrame.GlobalPosition;
         var leftGrip = animatedArms?.LeftSupportAnchorGlobalPosition(
-                EquippedWeapon.Platform,
-                SidearmReloadMagazineAnchorBlend(),
-                SidearmReloadActionContactBlend())
+                EquippedWeapon.Platform)
             ?? arms!.LeftGripFrame.GlobalPosition;
         var supportTarget = animatedArms
             ?.PresentedLeftSupportTargetGlobalPosition
@@ -107,7 +105,7 @@ public partial class TacticalPlayer
             ?? arms!.RightPalmFrame.GlobalPosition;
         var leftPalmPosition = animatedArms is not null
             && WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
-                ? animatedArms.LeftWristGlobalPosition
+                ? animatedArms.LeftPalmCenterGlobalPosition
                 : animatedArms?.LeftPalmCenterGlobalPosition
                     ?? arms!.LeftPalmFrame.GlobalPosition;
         var rightWristPosition = animatedArms?.RightWristGlobalPosition
