@@ -153,8 +153,10 @@ public partial class TacticalPlayer
         {
             return false;
         }
-        var origin = _camera.GlobalPosition - _camera.GlobalBasis.Z * 0.7f;
-        var direction = -_camera.GlobalBasis.Z;
+        var authoritativeView = CaptureAuthoritativeViewTransform();
+        var origin = authoritativeView.Origin
+            - authoritativeView.Basis.Z * 0.7f;
+        var direction = -authoritativeView.Basis.Z;
         if (Main.IsDemolitionNetworkClient)
         {
             if (!Main.TryRequestLocalDemolitionUtilityThrow(
@@ -189,8 +191,10 @@ public partial class TacticalPlayer
         {
             return false;
         }
-        var origin = _camera.GlobalPosition - _camera.GlobalBasis.Z * 0.7f;
-        var direction = -_camera.GlobalBasis.Z;
+        var authoritativeView = CaptureAuthoritativeViewTransform();
+        var origin = authoritativeView.Origin
+            - authoritativeView.Basis.Z * 0.7f;
+        var direction = -authoritativeView.Basis.Z;
         if (Main.IsDemolitionNetworkClient)
         {
             if (!Main.TryRequestLocalDemolitionUtilityThrow(

@@ -6,6 +6,7 @@ internal enum FirstPersonReloadMechanism
 {
     StraightMagazine,
     RockAndLockMagazine,
+    HkSlapMagazine,
     PistolMagazine,
     PrecisionMagazine,
     InternalMagazine
@@ -95,7 +96,8 @@ internal static class FirstPersonReloadProfileCatalog
                 new Vector3(-0.22f, -0.55f, -0.30f),
                 new Vector3(-0.11f, -0.32f, -0.32f),
                 new Vector3(-0.080f, 0.035f, -0.280f),
-                new Vector3(0.0f, 0.0f, 0.105f)),
+                new Vector3(0.0f, 0.0f, 0.105f),
+                FirstPersonReloadMechanism.HkSlapMagazine),
             WeaponPlatform.VSS => Rifle(
                 platform,
                 "vss",

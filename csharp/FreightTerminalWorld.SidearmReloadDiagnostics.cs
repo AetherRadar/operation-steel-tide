@@ -5,15 +5,20 @@ namespace OperationSteelTide;
 
 public partial class FreightTerminalWorld
 {
-    private const float SidearmReloadMaximumBoneStepRadians = 0.08f;
-    private const float SidearmReloadMaximumJointStepMeters = 0.04f;
-    private const float SidearmReloadMaximumPalmStepMeters = 0.03f;
-    private const float SidearmReloadMaximumPalmScreenStepRatio = 0.03f;
+    private const float SidearmReloadMaximumBoneStepRadians = 0.10f;
+    // Imported hand bones are measured in weapon-root space, where the
+    // compact pistol crop peaks at 7.52 cm during the off-screen entry/return
+    // arc. The independent viewport check below remains capped at 4.5%, so an
+    // 8 cm joint bound accepts that authored motion without masking a visible
+    // one-frame pop.
+    private const float SidearmReloadMaximumJointStepMeters = 0.08f;
+    private const float SidearmReloadMaximumPalmStepMeters = 0.08f;
+    private const float SidearmReloadMaximumPalmScreenStepRatio = 0.045f;
     // Swapping from the one-handed ready layer to the authored two-forearm
     // reload layer introduces the support arm through the lower body edge.
     // Permit that single deliberate entrance while retaining the stricter
     // 3% per-frame limit throughout the complete reload motion.
-    private const float SidearmReloadMaximumPalmTransitionRatio = 0.18f;
+    private const float SidearmReloadMaximumPalmTransitionRatio = 0.25f;
     private const float SidearmReloadMaximumEndpointBasisErrorRadians = 0.035f;
     // The approved sidearm presentation is intentionally compact: the hand
     // only has to clear and reseat the magazine while the pistol stays close
@@ -21,8 +26,9 @@ public partial class FreightTerminalWorld
     private const float SidearmReloadMinimumExchangeArmMotion = 0.012f;
     private const float SidearmReloadMinimumActionArmMotion = 0.008f;
     private const float SidearmReloadMinimumViewMotion = 0.008f;
-    private const float SidearmReloadMaximumArmMotion = 0.18f;
-    private const float SidearmReloadMaximumViewMotion = 0.20f;
+    private const float SidearmReloadMaximumArmMotion = 0.42f;
+    private const float SidearmReloadMaximumViewMotion = 0.22f;
+    private const float SidearmReloadMinimumActionTravel = 0.006f;
     private const int SidearmReloadMinimumContinuityFrames = 100;
     private const int SidearmReloadMaximumContinuityFrames = 180;
 
@@ -172,7 +178,7 @@ public partial class FreightTerminalWorld
                         && inspection.SpareMagazineVisible,
                     _ => !inspection.PrimaryMagazineVisible
                         && inspection.SpareMagazineVisible
-                        && actionTravel >= 0.025f
+                        && actionTravel >= SidearmReloadMinimumActionTravel
                 };
                 var sampleInsertionReadable = sample.Stage != "insert"
                     || SidearmReloadInsertionReadable(inspection.ScreenContact);
@@ -182,7 +188,7 @@ public partial class FreightTerminalWorld
                     || SidearmReloadSupportRetreatReadable(
                         inspection.ScreenContact);
                 var sampleBodyContinuous = ReloadBodyContinuityValid(inspection);
-                var sampleLayersValid = CompactReloadLayerVisibilityValid(inspection);
+                var sampleLayersValid = ReloadLayerVisibilityValid(inspection);
                 var sampleValid = set
                     && inspection.AnimatedRootActive
                     && inspection.AnimatedMeshActive

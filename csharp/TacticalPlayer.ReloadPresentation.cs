@@ -31,9 +31,15 @@ public partial class TacticalPlayer
             return;
         }
 
-        var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
+        var progress = Mathf.Clamp(PresentationReloadProgress, 0.0f, 1.0f);
         var profile = FirstPersonReloadProfileCatalog.For(EquippedWeapon.Platform);
+        var sidearm = WeaponCatalog.IsSidearm(profile.Platform);
+        UpdateProfiledReloadSounds(profile, progress);
         var wellGrip = profile.MagazineHome + profile.MagazineGripOffset;
+        var extractedGrip = profile.ExtractedMagazine + profile.MagazineGripOffset;
+        var stowedGrip = profile.StowedMagazine + profile.MagazineGripOffset;
+        var spareGrip = profile.SpareMagazineHome + profile.MagazineGripOffset;
+        var readyGrip = profile.ReadyMagazine + profile.MagazineGripOffset;
 
         if (profile.Mechanism == FirstPersonReloadMechanism.InternalMagazine)
         {
@@ -42,17 +48,28 @@ public partial class TacticalPlayer
             return;
         }
 
-        _magazine.Visible = progress < profile.ExtractEnd;
+        _magazine.Visible = progress < profile.StowEnd;
         _magazine.Position = profile.MagazineHome;
         _magazine.Rotation = profile.MagazineRotation;
-        _spareMagazine.Visible = progress >= profile.ExtractEnd;
-        _spareMagazine.Position = profile.ExtractedMagazine;
-        _spareMagazine.Rotation = profile.MagazineRotation;
-        var sidearmSlideLockedOpen = WeaponCatalog.IsSidearm(profile.Platform)
+        _spareMagazine.Visible = progress >= profile.StowEnd;
+        _spareMagazine.Position = profile.SpareMagazineHome;
+        _spareMagazine.Rotation = profile.StowedRotation;
+        var sidearmSlideLockedOpen = sidearm
             && _reloadStartedEmpty
             && progress < profile.ActionEnd;
+        var hkEmptyReload = profile.Mechanism
+                == FirstPersonReloadMechanism.HkSlapMagazine
+            && _reloadStartedEmpty;
+        var hkLock = hkEmptyReload && progress < profile.ActionEnd
+            ? SmoothSegment(
+                progress,
+                0.0f,
+                Mathf.Max(0.001f, profile.ReachEnd * 0.78f))
+            : 0.0f;
         _chargingHandle.Position = profile.ActionHome
-            + (sidearmSlideLockedOpen ? profile.ActionTravel : Vector3.Zero);
+            + (sidearmSlideLockedOpen
+                ? profile.ActionTravel
+                : profile.ActionTravel * hkLock);
         _supportHand.Position = profile.SupportHome;
         _supportHand.Rotation = profile.SupportRotation;
 
@@ -70,41 +87,68 @@ public partial class TacticalPlayer
             ApplyMagazineExtraction(profile, t);
             _supportHand.Position = _magazine.Position + profile.MagazineGripOffset;
             _supportHand.Rotation = profile.MagazineHandRotation;
-            PlayPlatformReloadSound(0, progress, profile.ReachEnd + 0.08f, 0.91f);
+        }
+        else if (progress < profile.StowEnd)
+        {
+            var t = SmoothSegment(progress, profile.ExtractEnd, profile.StowEnd);
+            _magazine.Position = profile.ExtractedMagazine.Lerp(
+                profile.StowedMagazine,
+                t);
+            _magazine.Rotation = profile.ExtractedRotation.Lerp(
+                profile.StowedRotation,
+                t);
+            _supportHand.Position = extractedGrip.Lerp(stowedGrip, t);
+            _supportHand.Rotation = profile.MagazineHandRotation;
+        }
+        else if (progress < profile.AcquireEnd)
+        {
+            // The removed magazine remains at its pouch endpoint while the
+            // hand changes over to the spare. Moving this hidden node back to
+            // the magwell creates a visible one-frame target jump.
+            _magazine.Position = profile.StowedMagazine;
+            _magazine.Rotation = profile.StowedRotation;
+            var t = SmoothSegment(progress, profile.StowEnd, profile.AcquireEnd);
+            _supportHand.Position = stowedGrip.Lerp(spareGrip, t);
+            _supportHand.Rotation = profile.MagazineHandRotation;
+        }
+        else if (progress < profile.InsertEnd)
+        {
+            var t = SmoothSegment(progress, profile.AcquireEnd, profile.InsertEnd);
+            _spareMagazine.Position = profile.SpareMagazineHome.Lerp(
+                profile.ReadyMagazine,
+                t);
+            _spareMagazine.Rotation = profile.StowedRotation.Lerp(
+                profile.ExtractedRotation,
+                t);
+            _supportHand.Position = spareGrip.Lerp(readyGrip, t);
+            _supportHand.Rotation = profile.MagazineHandRotation;
         }
         else if (progress < profile.SeatEnd)
         {
-            // The old magazine changes to the fresh one at one shared point
-            // below the magwell. The left hand then reverses the same path and
-            // seats it directly; there is no pouch detour or cross-screen arc.
-            var t = SmoothSegment(progress, profile.ExtractEnd, profile.SeatEnd);
-            _spareMagazine.Position = profile.ExtractedMagazine.Lerp(
-                profile.MagazineHome,
-                t);
-            _spareMagazine.Rotation = profile.MagazineRotation;
-            _supportHand.Position = _spareMagazine.Position + profile.MagazineGripOffset;
+            var t = SmoothSegment(progress, profile.InsertEnd, profile.SeatEnd);
+            ApplyMagazineInsertion(profile, t);
+            _supportHand.Position = _spareMagazine.Position
+                + profile.MagazineGripOffset;
             _supportHand.Rotation = profile.MagazineHandRotation;
-            PlayPlatformReloadSound(1, progress, profile.InsertEnd + 0.035f, 1.04f);
         }
-        else if (progress < profile.ActionEnd)
+        else if (progress < profile.ActionEnd || sidearm)
         {
             UpdateReloadAction(profile, progress, wellGrip);
         }
         else
         {
-            var sidearm = WeaponCatalog.IsSidearm(profile.Platform);
             var usesAction = !sidearm
                 && profile.UsesAction(_reloadStartedEmpty);
-            var fromAction = sidearm
+            var returnedDuringAction = sidearm
+                || !usesAction
+                || profile.Mechanism
+                    == FirstPersonReloadMechanism.HkSlapMagazine;
+            var fromAction = returnedDuringAction
                 ? profile.SupportHome
-                : usesAction
-                    ? profile.ActionGrip
-                    : wellGrip;
-            var fromRotation = sidearm
+                : profile.ActionGrip;
+            var fromRotation = returnedDuringAction
                 ? profile.SupportRotation
-                : usesAction
-                ? profile.ActionHandRotation
-                : profile.MagazineHandRotation;
+                : profile.ActionHandRotation;
             var t = SmoothSegment(progress, profile.ActionEnd, 1.0f);
             _spareMagazine.Position = profile.MagazineHome;
             _spareMagazine.Rotation = profile.MagazineRotation;
@@ -157,7 +201,6 @@ public partial class TacticalPlayer
                 t);
             _supportHand.Position = pouchGrip.Lerp(stagedGrip, t);
             _supportHand.Rotation = profile.MagazineHandRotation;
-            PlayPlatformReloadSound(0, progress, profile.ReachEnd + 0.06f, 0.96f);
         }
         else if (progress < profile.StowEnd)
         {
@@ -200,7 +243,6 @@ public partial class TacticalPlayer
             _supportHand.Position = _spareMagazine.Position
                 + profile.MagazineGripOffset;
             _supportHand.Rotation = profile.MagazineHandRotation;
-            PlayPlatformReloadSound(1, progress, profile.InsertEnd + 0.025f, 1.08f);
         }
         else if (progress < profile.ActionEnd)
         {
@@ -230,8 +272,62 @@ public partial class TacticalPlayer
 
     private void ApplyMagazineExtraction(FirstPersonReloadProfile profile, float t)
     {
-        _magazine.Position = profile.MagazineHome.Lerp(profile.ExtractedMagazine, t);
-        _magazine.Rotation = profile.MagazineRotation;
+        if (profile.Mechanism == FirstPersonReloadMechanism.RockAndLockMagazine)
+        {
+            // AK/VSS magazines must first rock their rear lug clear, then pull
+            // away. A straight vertical lerp reads like an AR-style magwell.
+            var rock = SmoothStep(Mathf.Clamp(t * 1.8f, 0.0f, 1.0f));
+            var pull = SmoothStep(Mathf.Clamp((t - 0.42f) / 0.58f, 0.0f, 1.0f));
+            _magazine.Position = profile.MagazineHome.Lerp(
+                profile.ExtractedMagazine,
+                pull);
+            _magazine.Rotation = profile.MagazineRotation.Lerp(
+                profile.ExtractedRotation,
+                rock);
+            return;
+        }
+
+        _magazine.Position = profile.MagazineHome.Lerp(
+            profile.ExtractedMagazine,
+            t);
+        _magazine.Rotation = profile.MagazineRotation.Lerp(
+            profile.ExtractedRotation,
+            t);
+    }
+
+    private void ApplyMagazineInsertion(FirstPersonReloadProfile profile, float t)
+    {
+        if (profile.Mechanism == FirstPersonReloadMechanism.RockAndLockMagazine)
+        {
+            // Hook the front lug before rotating the magazine home. Separating
+            // those two beats restores the recognisable AK/VSS lock-in motion.
+            var hook = SmoothStep(Mathf.Clamp(t / 0.48f, 0.0f, 1.0f));
+            var lockRotation = SmoothStep(Mathf.Clamp(
+                (t - 0.35f) / 0.65f,
+                0.0f,
+                1.0f));
+            _spareMagazine.Position = profile.ReadyMagazine.Lerp(
+                profile.MagazineHome,
+                hook);
+            _spareMagazine.Rotation = profile.ExtractedRotation.Lerp(
+                profile.MagazineRotation,
+                lockRotation);
+            return;
+        }
+
+        // A short final over-travel gives straight magazines a distinct seat
+        // impact without borrowing the rock-and-lock rotation.
+        var seat = SmoothStep(Mathf.Clamp(t / 0.82f, 0.0f, 1.0f));
+        var impact = Mathf.Sin(
+                Mathf.Clamp((t - 0.80f) / 0.20f, 0.0f, 1.0f) * Mathf.Pi)
+            * 0.008f;
+        _spareMagazine.Position = profile.ReadyMagazine.Lerp(
+                profile.MagazineHome,
+                seat)
+            + Vector3.Down * impact;
+        _spareMagazine.Rotation = profile.ExtractedRotation.Lerp(
+            profile.MagazineRotation,
+            seat);
     }
 
     private void UpdateReloadAction(
@@ -243,22 +339,51 @@ public partial class TacticalPlayer
         _spareMagazine.Rotation = profile.MagazineRotation;
         if (WeaponCatalog.IsSidearm(profile.Platform))
         {
-            // Keep pistol reloads compact: the support hand seats the magazine
-            // and immediately leaves the bottom of frame. On an empty reload,
-            // the real slide still cycles as a slide-release action; the hand
-            // does not cross the pistol and expose a full arm near the camera.
-            var t = SmoothSegment(progress, profile.SeatEnd, profile.ActionEnd);
-            _supportHand.Position = wellGrip.Lerp(profile.SupportHome, t);
-            _supportHand.Rotation = profile.MagazineHandRotation.Lerp(
-                profile.SupportRotation,
-                t);
-            if (profile.UsesAction(_reloadStartedEmpty))
+            var sidearmActionProgress = Mathf.InverseLerp(
+                profile.SeatEnd,
+                profile.ActionEnd,
+                progress);
+            if (!profile.UsesAction(_reloadStartedEmpty))
             {
-                var release = SmoothStep(t);
-                _chargingHandle.Position = profile.ActionHome
-                    + profile.ActionTravel * (1.0f - release);
-                PlayPlatformReloadSound(2, progress, profile.SeatEnd + 0.040f, 1.12f);
+                var retreat = SmoothSegment(
+                    progress,
+                    profile.SeatEnd,
+                    1.0f);
+                _supportHand.Position = wellGrip.Lerp(
+                    profile.SupportHome,
+                    retreat);
+                _supportHand.Rotation = profile.MagazineHandRotation.Lerp(
+                    profile.SupportRotation,
+                    retreat);
+                return;
             }
+
+            // Empty pistol reloads now show the support hand making a short,
+            // readable slide contact instead of cycling the mechanism under a
+            // floating fist. The compact crop permits this CS-style beat
+            // without exposing an upper sleeve at the camera near plane.
+            var reachSlide = SidearmReloadActionReachBlend(
+                profile,
+                progress);
+            var retreatSlide = SidearmReloadReturnBlend(
+                profile,
+                progress);
+            var atSlide = wellGrip.Lerp(profile.ActionGrip, reachSlide);
+            var atSlideRotation = profile.MagazineHandRotation.Lerp(
+                profile.ActionHandRotation,
+                reachSlide);
+            _supportHand.Position = atSlide.Lerp(
+                profile.SupportHome,
+                retreatSlide);
+            _supportHand.Rotation = atSlideRotation.Lerp(
+                profile.SupportRotation,
+                retreatSlide);
+            var release = SmoothStep(Mathf.Clamp(
+                (sidearmActionProgress - 0.46f) / 0.20f,
+                0.0f,
+                1.0f));
+            _chargingHandle.Position = profile.ActionHome
+                + profile.ActionTravel * (1.0f - release);
             return;
         }
 
@@ -273,6 +398,37 @@ public partial class TacticalPlayer
         }
 
         var actionProgress = Mathf.InverseLerp(profile.SeatEnd, profile.ActionEnd, progress);
+        if (profile.Mechanism == FirstPersonReloadMechanism.HkSlapMagazine)
+        {
+            // The MP5 action is not an AR-style pull-and-return. Its handle is
+            // already locked back during the exchange; the hand reaches the
+            // cocking support, holds for a readable beat, then slaps it down
+            // and retreats as the bolt runs home.
+            var reachHandle = SmoothStep(Mathf.Clamp(
+                actionProgress / 0.30f,
+                0.0f,
+                1.0f));
+            var slapRelease = SmoothStep(Mathf.Clamp(
+                (actionProgress - 0.46f) / 0.18f,
+                0.0f,
+                1.0f));
+            var retreat = SmoothStep(Mathf.Clamp(
+                (actionProgress - 0.62f) / 0.38f,
+                0.0f,
+                1.0f));
+            var atHandle = wellGrip.Lerp(profile.ActionGrip, reachHandle);
+            var atHandleRotation = profile.MagazineHandRotation.Lerp(
+                profile.ActionHandRotation,
+                reachHandle);
+            _supportHand.Position = atHandle.Lerp(profile.SupportHome, retreat);
+            _supportHand.Rotation = atHandleRotation.Lerp(
+                profile.SupportRotation,
+                retreat);
+            _chargingHandle.Position = profile.ActionHome
+                + profile.ActionTravel * (1.0f - slapRelease);
+            return;
+        }
+
         var reach = SmoothStep(Mathf.Clamp(actionProgress / 0.36f, 0.0f, 1.0f));
         var cycle = Mathf.Clamp((actionProgress - 0.34f) / 0.66f, 0.0f, 1.0f);
         var travel = Mathf.Sin(cycle * Mathf.Pi);
@@ -281,7 +437,6 @@ public partial class TacticalPlayer
             profile.ActionHandRotation,
             reach);
         _chargingHandle.Position = profile.ActionHome + profile.ActionTravel * travel;
-        PlayPlatformReloadSound(2, progress, profile.SeatEnd + 0.065f, 1.10f);
     }
 
     private void ResetProfiledReloadRig()
@@ -299,13 +454,56 @@ public partial class TacticalPlayer
         _reloadStartedEmpty = false;
     }
 
+    private void UpdateProfiledReloadSounds(
+        FirstPersonReloadProfile profile,
+        float progress)
+    {
+        var internalMagazine = profile.Mechanism
+            == FirstPersonReloadMechanism.InternalMagazine;
+        PlayPlatformReloadSound(
+            0,
+            progress,
+            profile.ReachEnd + (internalMagazine ? 0.060f : 0.080f),
+            internalMagazine ? 0.96f : 0.91f);
+        PlayPlatformReloadSound(
+            1,
+            progress,
+            profile.InsertEnd + (internalMagazine ? 0.025f : 0.035f),
+            internalMagazine ? 1.08f : 1.04f);
+
+        if (!profile.UsesAction(_reloadStartedEmpty))
+        {
+            return;
+        }
+
+        var actionThreshold = profile.Mechanism switch
+        {
+            FirstPersonReloadMechanism.PistolMagazine
+                => profile.SeatEnd + 0.040f,
+            FirstPersonReloadMechanism.HkSlapMagazine
+                => Mathf.Lerp(profile.SeatEnd, profile.ActionEnd, 0.50f),
+            _ => profile.SeatEnd + 0.065f
+        };
+        var actionPitch = profile.Mechanism switch
+        {
+            FirstPersonReloadMechanism.PistolMagazine => 1.12f,
+            FirstPersonReloadMechanism.HkSlapMagazine => 1.16f,
+            _ => 1.10f
+        };
+        PlayPlatformReloadSound(2, progress, actionThreshold, actionPitch);
+    }
+
     private void PlayPlatformReloadSound(
         int stage,
         float progress,
         float threshold,
         float pitch)
     {
-        if (_reloadSoundStage != stage || progress <= threshold)
+        // A long render frame can cross an entire pose phase. The ordered
+        // scheduler above normally advances every due milestone, while this
+        // comparison also lets the newest due cue recover if an earlier stage
+        // was absent from restored state instead of permanently muting reloads.
+        if (_reloadSoundStage > stage || progress <= threshold)
         {
             return;
         }
@@ -321,255 +519,23 @@ public partial class TacticalPlayer
     private static float SmoothSegment(float value, float start, float end)
         => SmoothStep(Mathf.InverseLerp(start, end, value));
 
-    private Vector3 SidearmReloadViewPositionOffset()
-    {
-        var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
-        var emphasis = Mathf.Sin(progress * Mathf.Pi);
-        // Lift the compact reload workspace enough to keep the authored cuff
-        // and forearm segment visible and connected to the bottom edge. Keep
-        // the depth change small so the hand does not balloon near the camera.
-        return new Vector3(-0.025f, 0.160f, 0.0f) * emphasis;
-    }
+    private static float SidearmReloadActionPeak(
+        FirstPersonReloadProfile profile)
+        => Mathf.Lerp(profile.SeatEnd, profile.ActionEnd, 0.50f);
 
-    private Vector3 SidearmReloadViewRotation()
-    {
-        var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
-        var emphasis = Mathf.Sin(progress * Mathf.Pi);
-        return new Vector3(-0.055f, 0.025f, -0.075f) * emphasis;
-    }
-
-    private Vector3 PlatformReloadViewPositionOffset()
-    {
-        var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
-        var emphasis = Mathf.Sin(progress * Mathf.Pi);
-        var exchange = ReloadExchangeWorkspaceEnvelope(progress);
-        var workspaceLift = EquippedWeapon.Platform switch
-        {
-            WeaponPlatform.M4A1 => 0.130f,
-            WeaponPlatform.AXMC or WeaponPlatform.AWM => 0.040f,
-            WeaponPlatform.VSS => 0.025f,
-            _ => 0.0f
-        };
-        var exchangeLift = EquippedWeapon.Platform switch
-        {
-            WeaponPlatform.M4A1 => 0.130f,
-            WeaponPlatform.AK74 or WeaponPlatform.MP5A5 => 0.050f,
-            WeaponPlatform.M24 => 0.250f,
-            WeaponPlatform.AXMC or WeaponPlatform.AWM => 0.100f,
-            // The long VSS magazine otherwise leaves the glove and magazine
-            // surface on the bottom readability line during extraction.
-            WeaponPlatform.VSS => 0.105f,
-            _ => 0.0f
-        };
-        return Vector3.Up * (workspaceLift * emphasis + exchangeLift * exchange);
-    }
-
-    private float ReloadExchangeWorkspaceEnvelope(float progress)
-    {
-        var profile = FirstPersonReloadProfileCatalog.For(
-            EquippedWeapon.Platform);
-        var enter = SmoothSegment(
+    private static float SidearmReloadActionReachBlend(
+        FirstPersonReloadProfile profile,
+        float progress)
+        => SmoothSegment(
             progress,
-            Mathf.Max(0.0f, profile.ReachEnd - 0.08f),
-            profile.ReachEnd);
-        var sidearm = WeaponCatalog.IsSidearm(EquippedWeapon.Platform);
-        var leave = 1.0f - SmoothSegment(
+            profile.InsertEnd,
+            SidearmReloadActionPeak(profile));
+
+    private static float SidearmReloadReturnBlend(
+        FirstPersonReloadProfile profile,
+        float progress)
+        => SmoothSegment(
             progress,
-            sidearm ? profile.ExtractEnd : profile.InsertEnd,
-            sidearm ? profile.AcquireEnd : profile.SeatEnd);
-        return enter * leave;
-    }
-
-    internal void SetReloadVariantForDiagnostics(bool emptyReload)
-        => _reloadStartedEmpty = emptyReload;
-
-    internal AuthoredPlatformReloadInspection InspectAuthoredPlatformReloadForDiagnostics()
-    {
-        var arms = ActiveAuthoredArms();
-        var animatedArms = UsesAnimatedReloadArmsForDiagnostics
-            ? AnimatedReloadArmsForDiagnostics
-            : null;
-        var weapon = ActiveAuthoredReloadWeapon();
-        if ((!UsesPlatformReloadPresentation() && !UsesSidearmReloadPresentation())
-            || (animatedArms is null
-                && (arms is null || !IsInstanceValid(arms.Root)))
-            || weapon is null
-            || !IsInstanceValid(weapon.Root))
-        {
-            return default;
-        }
-
-        var weaponRootInverse = _weaponRoot.GlobalTransform.AffineInverse();
-        var pose = FirstPersonArmPoseCatalog.For(EquippedWeapon.Platform);
-        var rightGrip = animatedArms?.RightGripFrame.GlobalPosition
-            ?? arms!.RightGripFrame.GlobalPosition;
-        var leftGrip = animatedArms?.LeftSupportAnchorGlobalPosition(
-                EquippedWeapon.Platform,
-                SidearmReloadMagazineAnchorBlend())
-            ?? arms!.LeftGripFrame.GlobalPosition;
-        var supportTarget = ReloadSupportTargetGlobal();
-        var primaryMagazine = weapon.Magazine.GlobalPosition;
-        var spareMagazine = weapon.SpareMagazine.GlobalPosition;
-        var activeMagazine = weapon.SpareMagazine.Visible
-            ? weapon.SpareMagazine
-            : weapon.Magazine;
-        var logicalViewportSize = _camera.GetViewport().GetVisibleRect().Size;
-        var windowSize = GetWindow().Size;
-        var screenSize = new Vector2(windowSize.X, windowSize.Y);
-        var rightPalmPosition = animatedArms?.RightPalmContactGlobalPosition
-            ?? arms!.RightPalmFrame.GlobalPosition;
-        var leftPalmPosition = animatedArms?.LeftPalmCenterGlobalPosition
-            ?? arms!.LeftPalmFrame.GlobalPosition;
-        var rightWristPosition = animatedArms?.RightWristGlobalPosition
-            ?? arms!.RightWristFrame.GlobalPosition;
-        var leftWristPosition = animatedArms?.LeftWristGlobalPosition
-            ?? arms!.LeftWristFrame.GlobalPosition;
-        var rightArmTransform = animatedArms is not null
-            ? weaponRootInverse * animatedArms.RightPalmContactGlobalTransform
-            : arms!.RightArm.Transform;
-        var leftArmTransform = animatedArms is not null
-            ? weaponRootInverse * animatedArms.LeftPalmContactGlobalTransform
-            : arms!.LeftArm.Transform;
-        var activeMagazineContact = InspectVisibleMeshSurface(
-            activeMagazine,
-            leftGrip);
-        var bodyContinuity = InspectReloadBodyContinuity(
-            animatedArms?.Skeleton,
-            rightPalmAvailable: true,
-            rightPalmPosition,
-            leftPalmAvailable: true,
-            leftPalmPosition,
-            animatedArms?.Mesh);
-        var leftPalmViewport = _camera.UnprojectPosition(leftPalmPosition);
-        var leftPalmScreen = new Vector2(
-            leftPalmViewport.X * screenSize.X / logicalViewportSize.X,
-            leftPalmViewport.Y * screenSize.Y / logicalViewportSize.Y);
-        return new AuthoredPlatformReloadInspection(
-            animatedArms is not null
-                ? animatedArms.Root.IsVisibleInTree()
-                    && animatedArms.Mesh.IsVisibleInTree()
-                : arms!.Root.IsVisibleInTree()
-                    && arms.RightArm.IsVisibleInTree()
-                    && arms.LeftArm.IsVisibleInTree()
-                    && UsesAuthoredHandRigForDiagnostics,
-            weapon.Magazine.Visible,
-            weapon.SpareMagazine.Visible,
-            weapon.Magazine.GetInstanceId() != weapon.SpareMagazine.GetInstanceId(),
-            weapon.HasVisibleMagazineMechanism,
-            rightGrip,
-            leftGrip,
-            supportTarget,
-            leftPalmScreen,
-            primaryMagazine,
-            spareMagazine,
-            (weaponRootInverse * rightGrip).DistanceTo(pose.PrimaryGrip),
-            leftGrip.DistanceTo(supportTarget),
-            activeMagazineContact.Distance,
-            leftPalmPosition.DistanceTo(leftWristPosition),
-            rightPalmPosition.DistanceTo(rightWristPosition),
-            rightArmTransform,
-            leftArmTransform,
-            WeaponViewPositionTarget(),
-            WeaponViewRotationTarget(),
-            bodyContinuity);
-    }
-
-    private AuthoredWeaponVisual? ActiveAuthoredReloadWeapon()
-    {
-        if (EquippedWeapon.Platform == WeaponPlatform.M4A1
-            && IsInstanceValid(_authoredPrimaryWeapon?.Root))
-        {
-            return _authoredPrimaryWeapon;
-        }
-        return _authoredPlatformWeapons.TryGetValue(EquippedWeapon.Platform, out var weapon)
-            && IsInstanceValid(weapon.Root)
-                ? weapon
-                : null;
-    }
-
-    internal SidearmReloadInspection InspectSidearmReloadForDiagnostics()
-    {
-        var arms = ActiveAuthoredArms();
-        if (!UsesSidearmReloadPresentation()
-            || arms is null
-            || !IsInstanceValid(arms.Root)
-            || !IsInstanceValid(ActiveAuthoredWeaponRootForDiagnostics))
-        {
-            return default;
-        }
-
-        var weaponRootInverse = _weaponRoot.GlobalTransform.AffineInverse();
-        var pose = FirstPersonArmPoseCatalog.For(EquippedWeapon.Platform);
-        var rightGrip = arms.RightGripFrame.GlobalPosition;
-        var leftGrip = arms.LeftGripFrame.GlobalPosition;
-        var supportTarget = ReloadSupportTargetGlobal();
-        return new SidearmReloadInspection(
-            arms.Root.IsVisibleInTree()
-                && arms.RightArm.IsVisibleInTree()
-                && arms.LeftArm.IsVisibleInTree()
-                && UsesAuthoredHandRigForDiagnostics,
-            _isReloading,
-            ReloadProgress,
-            (weaponRootInverse * rightGrip).DistanceTo(pose.PrimaryGrip),
-            leftGrip.DistanceTo(supportTarget),
-            rightGrip,
-            leftGrip,
-            supportTarget,
-            arms.RightArm.Transform,
-            arms.LeftArm.Transform,
-            _magazine.Visible,
-            _spareMagazine.Visible,
-            _chargingHandle.Position.DistanceTo(PlatformChargingHandleHome),
-            WeaponViewPositionTarget(),
-            WeaponViewRotationTarget());
-    }
+            SidearmReloadActionPeak(profile),
+            1.0f);
 }
-
-internal readonly record struct AuthoredPlatformReloadInspection(
-    bool AuthoredArmsActive,
-    bool PrimaryMagazineVisible,
-    bool SpareMagazineVisible,
-    bool SeparateMagazineNodes,
-    bool VisibleMagazineMechanism,
-    Vector3 RightGrip,
-    Vector3 LeftGrip,
-    Vector3 SupportTarget,
-    Vector2 LeftPalmScreen,
-    Vector3 PrimaryMagazinePosition,
-    Vector3 SpareMagazinePosition,
-    float RightGripResidual,
-    float SupportTargetDistance,
-    float ActiveMagazineSurfaceDistance,
-    float LeftSleeveWristLength,
-    float RightSleeveWristLength,
-    Transform3D RightArmTransform,
-    Transform3D LeftArmTransform,
-    Vector3 ReloadViewTarget,
-    Vector3 ReloadRotationTarget,
-    ReloadBodyContinuityInspection BodyContinuity)
-{
-    public bool SleevesReachFrameBottom
-        // Animated arms are a single skinned mesh. Projecting its undeformed
-        // source vertices produces a tiny, stale AABB unrelated to the visible
-        // sleeves. The posed bone chains instead prove that both weighted arms
-        // remain connected through a viewport body edge.
-        => BodyContinuity.RightArm.BodyEdgeConnected
-            && BodyContinuity.LeftArm.BodyEdgeConnected;
-}
-
-internal readonly record struct SidearmReloadInspection(
-    bool AuthoredArmsActive,
-    bool Reloading,
-    float Progress,
-    float RightGripResidual,
-    float SupportTargetDistance,
-    Vector3 RightGrip,
-    Vector3 LeftGrip,
-    Vector3 SupportTarget,
-    Transform3D RightArmTransform,
-    Transform3D LeftArmTransform,
-    bool PrimaryMagazineVisible,
-    bool SpareMagazineVisible,
-    float SlideTravel,
-    Vector3 ReloadViewTarget,
-    Vector3 ReloadRotationTarget);

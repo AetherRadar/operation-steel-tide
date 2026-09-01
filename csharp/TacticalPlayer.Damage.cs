@@ -124,9 +124,17 @@ public partial class TacticalPlayer
 
     private void UpdateDamageKick(float delta)
     {
-        _damageKickPitch = Mathf.Lerp(_damageKickPitch, 0.0f, delta * 9.5f);
-        _damageKickRoll = Mathf.Lerp(_damageKickRoll, 0.0f, delta * 11.0f);
-        _damageKickOffset = _damageKickOffset.Lerp(Vector3.Zero, delta * 12.0f);
+        _damageKickPitch = Mathf.Lerp(
+            _damageKickPitch,
+            0.0f,
+            SmoothFactor(9.5f, delta));
+        _damageKickRoll = Mathf.Lerp(
+            _damageKickRoll,
+            0.0f,
+            SmoothFactor(11.0f, delta));
+        _damageKickOffset = _damageKickOffset.Lerp(
+            Vector3.Zero,
+            SmoothFactor(12.0f, delta));
     }
 
     internal float IncomingDamageAngleForDiagnostics(Node? attacker, Vector3 hitPosition = default)

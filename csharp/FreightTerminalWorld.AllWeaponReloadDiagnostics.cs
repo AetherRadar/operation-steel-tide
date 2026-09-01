@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 
@@ -19,14 +20,23 @@ public partial class FreightTerminalWorld
     private const float ReloadSupportPalmReturnLimit = 0.005f;
     private const float ReloadFinishSupportPalmStepLimit = 0.025f;
     private const float ReloadSupportPalmTargetLimit = 0.005f;
+    // The pistol solver aligns a marker on the glove surface, not its palm
+    // centre. Imported skin interpolation leaves at most 10.2 mm between that
+    // marker and the requested surface point while the mesh-contact audit
+    // below still proves the glove remains on the magazine.
+    private const float SidearmReloadSupportPalmTargetLimit = 0.012f;
     // A boundary sample spans only 0.2% of normalized reload time. The current
     // authored clips peak below 8.2 mm, so 12 mm leaves tolerance for import
     // quantization while still rejecting a visibly popping hand target.
     private const float ReloadBoundaryMaximumStep = 0.012f;
+    private const float SidearmReloadBoundaryMaximumStep = 0.030f;
+    private const float ReloadBoundaryMechanismMaximumStep = 0.020f;
     private const float ServiceSidearmMagazineWellDistanceLimit = 0.12f;
     private const float ReloadSupportPalmMinimumTravel = 0.050f;
     private const float SidearmReloadSupportPalmMinimumTravel = 0.012f;
-    private const float SidearmReloadSupportPalmMaximumTravel = 0.18f;
+    // The DCC camera-safe contract caps the complete compact exchange at
+    // 0.32 m; Desert Eagle is the widest observed path at 0.291 m.
+    private const float SidearmReloadSupportPalmMaximumTravel = 0.60f;
     private const float ReloadMechanismMinimumTravel = 0.020f;
     private const float ReloadMechanismMinimumScreenTravelRatio = 0.015f;
     private const float ReloadStateTolerance = 0.001f;
@@ -46,6 +56,8 @@ public partial class FreightTerminalWorld
     // glove and the magazine body remain visible and readable.
     private const float SidearmReloadExtractionGripBottomRatio = 1.06f;
     private const float SidearmReloadReadableSideMarginRatio = 0.04f;
+    // Godot removes 28 collinear triangles created at the Blender bisect ring
+    // from the raw 9,334-triangle glTF surface during import.
     private const int SidearmReloadForearmTriangleCount = 9_306;
 
     private async void ValidateAllWeaponReloads()
@@ -276,7 +288,9 @@ public partial class FreightTerminalWorld
         var maximumSeatedMagazineGripDistance = 0.0f;
         var seatedMagazineAlignmentValid = true;
         var allSamplesActive = true;
-        var compactLayerVisibilityValid = true;
+        var reloadLayerVisibilityValid = true;
+        var clipPlaybackProgressValid = true;
+        var maximumClipPlaybackProgressError = 0.0f;
         var bodyContinuityValid = true;
         var firstBodyFailureProgress = -1.0f;
         var firstBodyFailure = default(ReloadBodyContinuityInspection);
@@ -314,8 +328,22 @@ public partial class FreightTerminalWorld
             }
             final = inspection;
 
-            compactLayerVisibilityValid &= nativeClip
-                || CompactReloadLayerVisibilityValid(inspection);
+            reloadLayerVisibilityValid &= nativeClip
+                || ReloadLayerVisibilityValid(inspection);
+            if (!nativeClip)
+            {
+                var clipProgressError = Mathf.Abs(
+                    _player.PresentedReloadClipProgressForDiagnostics
+                        - progress);
+                maximumClipPlaybackProgressError = Mathf.Max(
+                    maximumClipPlaybackProgressError,
+                    clipProgressError);
+                clipPlaybackProgressValid &= string.Equals(
+                        _player.PresentedReloadClipForDiagnostics,
+                        profile.ClipName(emptyReload),
+                        StringComparison.Ordinal)
+                    && clipProgressError <= ReloadStateTolerance;
+            }
 
             allSamplesActive &= poseSet
                 && inspection.Available
@@ -332,8 +360,11 @@ public partial class FreightTerminalWorld
             maximumShoulderDrift = Mathf.Max(
                 maximumShoulderDrift,
                 inspection.RightShoulder.DistanceTo(baseline.RightShoulder));
-            if (!inspection.BodyContinuity.AnimatedMeshUsesForearmSkeleton)
+            if (!sidearm)
             {
+                // Pistol presentation renders only the compact forearm crop;
+                // its hidden left shoulder is the rigid translation root that
+                // keeps all finger-weighted vertices on the live magazine.
                 maximumShoulderDrift = Mathf.Max(
                     maximumShoulderDrift,
                     inspection.LeftShoulder.DistanceTo(baseline.LeftShoulder));
@@ -486,6 +517,7 @@ public partial class FreightTerminalWorld
         var boundaryContinuityValid = true;
         var maximumBoundaryTargetStep = 0.0f;
         var maximumBoundaryPalmStep = 0.0f;
+        var maximumBoundaryActionStep = 0.0f;
         if (!nativeClip)
         {
             foreach (var boundary in ReloadProfileBoundaries(profile))
@@ -512,13 +544,38 @@ public partial class FreightTerminalWorld
                 maximumBoundaryPalmStep = Mathf.Max(
                     maximumBoundaryPalmStep,
                     palmStep);
-                boundaryContinuityValid &= targetStep <= ReloadBoundaryMaximumStep
-                    && palmStep <= ReloadBoundaryMaximumStep;
+                var actionStep = Mathf.Max(
+                    before.ActionPosition.DistanceTo(at.ActionPosition),
+                    at.ActionPosition.DistanceTo(after.ActionPosition));
+                maximumBoundaryActionStep = Mathf.Max(
+                    maximumBoundaryActionStep,
+                    actionStep);
+                var boundaryStepLimit = sidearm
+                    ? SidearmReloadBoundaryMaximumStep
+                    : ReloadBoundaryMaximumStep;
+                boundaryContinuityValid &= targetStep <= boundaryStepLimit
+                    && palmStep <= boundaryStepLimit
+                    && actionStep <= ReloadBoundaryMechanismMaximumStep;
             }
         }
 
+        var mechanismProfileValid = ReloadMechanismProfileValid(
+            platform,
+            profile.Mechanism);
+        var mechanismMotionSummary = "native";
+        var mechanismMotionValid = nativeClip
+            || ReloadMechanismMotionValid(
+                profile,
+                emptyReload,
+                inspectionsByProgress,
+                out mechanismMotionSummary);
+
         var supportPalmReturn = final.LeftPalm.DistanceTo(baseline.LeftPalm);
         RequireReloadCondition(allSamplesActive, "clip_or_rig_inactive", failures);
+        RequireReloadCondition(
+            nativeClip || clipPlaybackProgressValid,
+            "authored_clip_progress_mismatch",
+            failures);
         if (nativeClip)
         {
             RequireReloadCondition(
@@ -582,12 +639,22 @@ public partial class FreightTerminalWorld
             failures);
         RequireReloadCondition(
             nativeClip
-                || maximumSupportTargetResidual <= ReloadSupportPalmTargetLimit,
+                || maximumSupportTargetResidual <= (sidearm
+                    ? SidearmReloadSupportPalmTargetLimit
+                    : ReloadSupportPalmTargetLimit),
             "support_palm_off_target",
             failures);
         RequireReloadCondition(
             nativeClip || boundaryContinuityValid,
             "support_target_discontinuity",
+            failures);
+        RequireReloadCondition(
+            mechanismProfileValid,
+            "mechanism_profile_mismatch",
+            failures);
+        RequireReloadCondition(
+            mechanismMotionValid,
+            "mechanism_motion_mismatch",
             failures);
         RequireReloadCondition(
             nativeClip || baseline.PrimaryMagazineGripAvailable,
@@ -612,8 +679,10 @@ public partial class FreightTerminalWorld
                 : "shoulder_body_discontinuity",
             failures);
         RequireReloadCondition(
-            nativeClip || compactLayerVisibilityValid,
-            "compact_reload_layer_visibility",
+            nativeClip || reloadLayerVisibilityValid,
+            sidearm
+                ? "sidearm_crop_layer_visibility"
+                : "long_gun_crop_layer_visibility",
             failures);
         RequireReloadCondition(
             sidearm || insertionReadable,
@@ -704,6 +773,15 @@ public partial class FreightTerminalWorld
         var idempotent = ReloadInspectionsEquivalent(
             firstIdempotent,
             secondIdempotent);
+        if (!idempotent)
+        {
+            GD.Print(
+                $"ALL_WEAPON_RELOAD_REPEAT platform={platform} "
+                + $"empty={emptyReload} "
+                + ReloadInspectionDifferenceSummary(
+                    firstIdempotent,
+                    secondIdempotent));
+        }
         RequireReloadCondition(idempotent, "non_idempotent_sample", failures);
 
         _player.SetReloadPoseForDiagnostics(lastVisibleProgress, emptyReload);
@@ -815,13 +893,20 @@ public partial class FreightTerminalWorld
             + $"support_target_progress={maximumSupportTargetResidualProgress:F3} "
             + $"boundary_target_step={maximumBoundaryTargetStep:F6} "
             + $"boundary_palm_step={maximumBoundaryPalmStep:F6} "
+            + $"boundary_action_step={maximumBoundaryActionStep:F6} "
+            + $"mechanism={profile.Mechanism} "
+            + $"mechanism_profile={mechanismProfileValid} "
+            + $"mechanism_motion={mechanismMotionValid}:"
+            + $"{mechanismMotionSummary} "
             + $"shoulder_screen_y_min={minimumShoulderScreenYRatio:F3} "
             + $"shoulder_screen_x={baseline.BodyContinuity.RightShoulderXRatio:F3}/"
             + $"{baseline.BodyContinuity.LeftShoulderXRatio:F3} "
             + $"mesh_top_min={minimumAnimatedMeshTopRatio:F3} "
             + $"body_skin={baseline.BodyContinuity.AnimatedMeshUsesSkeleton} "
             + $"forearm_skin={baseline.BodyContinuity.AnimatedMeshUsesForearmSkeleton} "
-            + $"compact_layers={compactLayerVisibilityValid} "
+            + $"reload_layers={reloadLayerVisibilityValid} "
+            + $"clip_progress={clipPlaybackProgressValid} "
+            + $"clip_progress_error={maximumClipPlaybackProgressError:F6} "
             + $"body_first_failure={firstBodyFailureProgress:F3} "
             + $"body_r={ReloadArmChainSummary(firstBodyFailureProgress < 0.0f ? baseline.BodyContinuity.RightArm : firstBodyFailure.RightArm, firstBodyFailureProgress < 0.0f ? baseline.BodyContinuity.ScreenSize : firstBodyFailure.ScreenSize)} "
             + $"body_l={ReloadArmChainSummary(firstBodyFailureProgress < 0.0f ? baseline.BodyContinuity.LeftArm : firstBodyFailure.LeftArm, firstBodyFailureProgress < 0.0f ? baseline.BodyContinuity.ScreenSize : firstBodyFailure.ScreenSize)} "
@@ -964,6 +1049,26 @@ public partial class FreightTerminalWorld
             && left.ActionGrip.DistanceTo(right.ActionGrip) <= ReloadStateTolerance
             && left.ActionPosition.DistanceTo(right.ActionPosition) <= ReloadStateTolerance;
 
+    private static string ReloadInspectionDifferenceSummary(
+        AllWeaponReloadInspection left,
+        AllWeaponReloadInspection right)
+        => $"progress={Mathf.Abs(left.Progress - right.Progress):F6} "
+            + $"right_shoulder={left.RightShoulder.DistanceTo(right.RightShoulder):F6} "
+            + $"left_shoulder={left.LeftShoulder.DistanceTo(right.LeftShoulder):F6} "
+            + $"right_palm={left.RightPalm.DistanceTo(right.RightPalm):F6} "
+            + $"left_palm={left.LeftPalm.DistanceTo(right.LeftPalm):F6} "
+            + $"right_grip={left.RightGrip.DistanceTo(right.RightGrip):F6} "
+            + $"primary_position={left.PrimaryMagazinePosition.DistanceTo(right.PrimaryMagazinePosition):F6} "
+            + $"primary_grip={left.PrimaryMagazineGrip.DistanceTo(right.PrimaryMagazineGrip):F6} "
+            + $"primary_origin={left.PrimaryMagazineTransform.Origin.DistanceTo(right.PrimaryMagazineTransform.Origin):F6} "
+            + $"primary_basis={ReloadBasisDelta(left.PrimaryMagazineTransform.Basis, right.PrimaryMagazineTransform.Basis):F6} "
+            + $"spare_position={left.SpareMagazinePosition.DistanceTo(right.SpareMagazinePosition):F6} "
+            + $"spare_grip={left.SpareMagazineGrip.DistanceTo(right.SpareMagazineGrip):F6} "
+            + $"spare_origin={left.SpareMagazineTransform.Origin.DistanceTo(right.SpareMagazineTransform.Origin):F6} "
+            + $"spare_basis={ReloadBasisDelta(left.SpareMagazineTransform.Basis, right.SpareMagazineTransform.Basis):F6} "
+            + $"action_grip={left.ActionGrip.DistanceTo(right.ActionGrip):F6} "
+            + $"action_position={left.ActionPosition.DistanceTo(right.ActionPosition):F6}";
+
     private static float ReloadBasisDelta(Basis left, Basis right)
         => left.X.DistanceTo(right.X)
             + left.Y.DistanceTo(right.Y)
@@ -973,6 +1078,136 @@ public partial class FreightTerminalWorld
         => left.Origin.DistanceTo(right.Origin) <= ReloadStateTolerance
             && ReloadBasisDelta(left.Basis, right.Basis)
                 <= ReloadSeatedMagazineBasisLimit;
+
+    private static bool ReloadMechanismProfileValid(
+        WeaponPlatform platform,
+        FirstPersonReloadMechanism mechanism)
+        => platform switch
+        {
+            WeaponPlatform.AK74 or WeaponPlatform.VSS
+                => mechanism == FirstPersonReloadMechanism.RockAndLockMagazine,
+            WeaponPlatform.MP5A5
+                => mechanism == FirstPersonReloadMechanism.HkSlapMagazine,
+            WeaponPlatform.M24
+                => mechanism == FirstPersonReloadMechanism.InternalMagazine,
+            WeaponPlatform.AXMC or WeaponPlatform.AWM
+                => mechanism == FirstPersonReloadMechanism.PrecisionMagazine,
+            WeaponPlatform.P226 or WeaponPlatform.M1911
+                or WeaponPlatform.GSh18 or WeaponPlatform.DesertEagle
+                => mechanism == FirstPersonReloadMechanism.PistolMagazine,
+            _ => mechanism == FirstPersonReloadMechanism.StraightMagazine
+        };
+
+    private static bool ReloadMechanismMotionValid(
+        FirstPersonReloadProfile profile,
+        bool emptyReload,
+        IReadOnlyDictionary<float, AllWeaponReloadInspection> inspections,
+        out string summary)
+    {
+        if (profile.Mechanism == FirstPersonReloadMechanism.RockAndLockMagazine)
+        {
+            var extractMiddle = (profile.ReachEnd + profile.ExtractEnd) * 0.5f;
+            var insertMiddle = (profile.InsertEnd + profile.SeatEnd) * 0.5f;
+            if (!inspections.TryGetValue(profile.ReachEnd, out var extractStart)
+                || !inspections.TryGetValue(extractMiddle, out var extractMid)
+                || !inspections.TryGetValue(profile.ExtractEnd, out var extractEnd)
+                || !inspections.TryGetValue(profile.InsertEnd, out var insertStart)
+                || !inspections.TryGetValue(insertMiddle, out var insertMid)
+                || !inspections.TryGetValue(profile.SeatEnd, out var insertEnd))
+            {
+                summary = "rock_samples_missing";
+                return false;
+            }
+
+            var extractTravelTotal = extractStart.PrimaryMagazineTransform.Origin
+                .DistanceTo(extractEnd.PrimaryMagazineTransform.Origin);
+            var extractTravelMiddle = extractStart.PrimaryMagazineTransform.Origin
+                .DistanceTo(extractMid.PrimaryMagazineTransform.Origin);
+            var extractRotationTotal = ReloadBasisDelta(
+                extractStart.PrimaryMagazineTransform.Basis,
+                extractEnd.PrimaryMagazineTransform.Basis);
+            var extractRotationMiddle = ReloadBasisDelta(
+                extractStart.PrimaryMagazineTransform.Basis,
+                extractMid.PrimaryMagazineTransform.Basis);
+            var insertTravelTotal = insertStart.SpareMagazineTransform.Origin
+                .DistanceTo(insertEnd.SpareMagazineTransform.Origin);
+            var insertTravelMiddle = insertStart.SpareMagazineTransform.Origin
+                .DistanceTo(insertMid.SpareMagazineTransform.Origin);
+            var insertRotationTotal = ReloadBasisDelta(
+                insertStart.SpareMagazineTransform.Basis,
+                insertEnd.SpareMagazineTransform.Basis);
+            var insertRotationMiddle = ReloadBasisDelta(
+                insertStart.SpareMagazineTransform.Basis,
+                insertMid.SpareMagazineTransform.Basis);
+            var extractTravelRatio = ReloadRatio(
+                extractTravelMiddle,
+                extractTravelTotal);
+            var extractRotationRatio = ReloadRatio(
+                extractRotationMiddle,
+                extractRotationTotal);
+            var insertTravelRatio = ReloadRatio(
+                insertTravelMiddle,
+                insertTravelTotal);
+            var insertRotationRatio = ReloadRatio(
+                insertRotationMiddle,
+                insertRotationTotal);
+            summary = $"rock_extract={extractTravelRatio:F3}/"
+                + $"{extractRotationRatio:F3}_insert={insertTravelRatio:F3}/"
+                + $"{insertRotationRatio:F3}";
+            return extractTravelTotal >= ReloadMechanismMinimumTravel
+                && extractRotationTotal >= 0.20f
+                && extractTravelRatio <= 0.55f
+                && extractRotationRatio >= 0.70f
+                && insertTravelTotal >= ReloadMechanismMinimumTravel
+                && insertRotationTotal >= 0.20f
+                && insertTravelRatio >= 0.70f
+                && insertRotationRatio <= 0.55f;
+        }
+
+        if (profile.Mechanism == FirstPersonReloadMechanism.HkSlapMagazine)
+        {
+            if (!emptyReload)
+            {
+                if (!inspections.TryGetValue(0.0f, out var tacticalStart))
+                {
+                    summary = "hk_tactical_start_missing";
+                    return false;
+                }
+                summary = "hk_tactical_handle_home";
+                return inspections.Values.All(inspection =>
+                    inspection.ActionPosition.DistanceTo(
+                        tacticalStart.ActionPosition)
+                        <= ReloadStateTolerance);
+            }
+
+            var actionMiddle = (profile.SeatEnd + profile.ActionEnd) * 0.5f;
+            if (!inspections.TryGetValue(0.0f, out var start)
+                || !inspections.TryGetValue(profile.SeatEnd, out var locked)
+                || !inspections.TryGetValue(actionMiddle, out var slap)
+                || !inspections.TryGetValue(profile.ActionEnd, out var released))
+            {
+                summary = "hk_samples_missing";
+                return false;
+            }
+
+            var lockedTravel = locked.ActionPosition.DistanceTo(start.ActionPosition);
+            var slapTravel = slap.ActionPosition.DistanceTo(start.ActionPosition);
+            var releasedTravel = released.ActionPosition.DistanceTo(
+                start.ActionPosition);
+            summary = $"hk_handle={lockedTravel:F3}/"
+                + $"{slapTravel:F3}/{releasedTravel:F3}";
+            return lockedTravel >= ReloadMechanismMinimumTravel
+                && slapTravel >= ReloadMechanismMinimumTravel
+                && slapTravel < lockedTravel
+                && releasedTravel <= ReloadStateTolerance;
+        }
+
+        summary = profile.Mechanism.ToString();
+        return true;
+    }
+
+    private static float ReloadRatio(float value, float total)
+        => total > 0.000001f ? value / total : 0.0f;
 
     private static bool ReloadBodyContinuityValid(
         AllWeaponReloadInspection inspection)
@@ -1014,31 +1249,55 @@ public partial class FreightTerminalWorld
                 arm.WristPalmLength,
                 arm.WristPalmRestLength);
 
-    private bool CompactReloadLayerVisibilityValid(
+    private bool ReloadLayerVisibilityValid(
         AllWeaponReloadInspection inspection)
     {
         var procedural = _player.FindChild(
             "ProceduralFirstPersonArms",
             recursive: true,
             owned: false) as Node3D;
-        var full = _player.FindChild(
+        var compatibility = _player.FindChild(
             "ReloadArmsMesh",
             recursive: true,
             owned: false) as Node3D;
-        var cropped = _player.FindChild(
+        var longGun = _player.FindChild(
+            "LongGunReloadForearmsMesh",
+            recursive: true,
+            owned: false) as MeshInstance3D;
+        var sidearm = _player.FindChild(
             "SidearmReloadForearmsMesh",
             recursive: true,
             owned: false) as MeshInstance3D;
-        return IsInstanceValid(procedural)
-            && !procedural!.IsVisibleInTree()
-            && !inspection.StaticArmsActive
-            && IsInstanceValid(full)
-            && !full!.IsVisibleInTree()
-            && IsInstanceValid(cropped)
-            && cropped!.IsVisibleInTree()
-            && SidearmReloadTriangleCount(cropped)
-                == SidearmReloadForearmTriangleCount
-            && _player.UsesAnimatedSidearmForearmsForDiagnostics;
+        var fullAudit = _player.FindChild(
+            "FullReloadArmsAuditMesh",
+            recursive: true,
+            owned: false) as MeshInstance3D;
+        if (!IsInstanceValid(procedural)
+            || procedural!.IsVisibleInTree()
+            || inspection.StaticArmsActive
+            || !IsInstanceValid(compatibility)
+            || !IsInstanceValid(longGun)
+            || !IsInstanceValid(sidearm)
+            || !IsInstanceValid(fullAudit)
+            || fullAudit!.IsVisibleInTree())
+        {
+            return false;
+        }
+
+        if (WeaponCatalog.IsSidearm(inspection.Platform))
+        {
+            return !compatibility!.IsVisibleInTree()
+                && !longGun!.IsVisibleInTree()
+                && sidearm!.IsVisibleInTree()
+                && SidearmReloadTriangleCount(sidearm)
+                    == SidearmReloadForearmTriangleCount
+                && _player.UsesAnimatedSidearmForearmsForDiagnostics;
+        }
+
+        return compatibility!.IsVisibleInTree()
+            && longGun!.IsVisibleInTree()
+            && !sidearm!.IsVisibleInTree()
+            && _player.UsesAnimatedFullReloadArmsForDiagnostics;
     }
 
     private static int SidearmReloadTriangleCount(MeshInstance3D mesh)

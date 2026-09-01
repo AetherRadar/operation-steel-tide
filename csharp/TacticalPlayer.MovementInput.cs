@@ -391,7 +391,9 @@ public partial class TacticalPlayer
             shoulderShift * 0.016f,
             -lift * 0.055f,
             lift * 0.026f) + _damageKickOffset;
-        _camera.Position = _camera.Position.Lerp(cameraTarget, SmoothFactor(15.0f, delta));
+        _cameraLocalOffset = _cameraLocalOffset.Lerp(
+            cameraTarget,
+            SmoothFactor(15.0f, delta));
         _camera.Fov = Mathf.Lerp(_camera.Fov, 75.0f, SmoothFactor(9.0f, delta));
 
         _opticReticle.Visible = false;

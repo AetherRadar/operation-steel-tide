@@ -19,14 +19,16 @@ The runtime models in this directory are adapted from **fps animated smg** by
   sidecars)
 - Build scripts: `scripts/blender/build_djmaesen_smg45.py`,
   `scripts/blender/build_first_person_arms.py`, and
-  `scripts/blender/build_animated_reload_arms.py` (64,520 bytes, SHA-256
-  `B63857A0927465B8007D4EC408746AAF47466D19F5697B2564DCD79FE768D10F`)
+  `scripts/blender/build_animated_reload_arms.py` (98,273 bytes, SHA-256
+  `40DF75DD1B850424CBE625C132C04A4BD64D2D850EE1A38C76A05CE0B41F11DD`)
 - Animated arms reproducible DCC source:
   `source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend`
 - Static pose variants generated: 2026-08-24
 - Animated reload-arm derivative generated: 2026-08-29
 - Animated left-arm IK continuity and elbow-pole revision: 2026-08-30
 - Static-matched compact sidearm reload endpoints generated: 2026-08-31
+- Camera-safe six-family pose-to-pose reload clips rebuilt: 2026-08-31
+- Dedicated long-gun forearm crop and runtime layer rebuilt: 2026-08-31
 - Animated first-person sleeve fit and upper-arm volume revised: 2026-08-28
 - Service-pistol support-arm pose revised in Blender: 2026-08-28
 - First-person weapon uniformly enlarged around the authored two-hand grip center: 2026-08-28
@@ -60,10 +62,16 @@ pulling the complete limb toward the camera. This revision changes only the
 evaluated skeletal pose and marker placement; it does not add source geometry.
 `animated_reload_arms.glb` is an arms-only skinned derivative that removes the
 visible SMG while retaining the authored glove/sleeve materials, finger bones,
-skin weights, and 13,700-triangle full-arm topology. It also contains a
-9,306-triangle `SidearmReloadForearmsMesh` made by cropping both authored
-sleeves to glove-length cuffs, so pistol reloads do not expose distorted full
-arms; both meshes share the original skin and armature. The authored frame-155
+skin weights, and 13,700-triangle full-arm topology. Contract revision 7 keeps
+that complete topology as the non-runtime `FullReloadArmsAuditMesh`, adds a
+9,914-triangle `LongGunReloadForearmsMesh` with both authored hands and 28
+source-unit (0.42 m) elbow-length cuffs, and retains the 9,306-triangle
+`SidearmReloadForearmsMesh` with 16 source-unit (0.24 m) compact cuffs. All
+three meshes share the original skin and armature, materials, UVs, and normalized
+weights. Runtime selects the long-gun crop for rifles/SMGs and the shorter crop
+for pistols; the full audit mesh is always hidden. A geometry-free
+`ReloadArmsMesh` compatibility layer preserves the existing runtime diagnostic
+name without rendering the formerly intrusive upper-arm cloth. The authored frame-155
 two-hand surface is baked as the new bind pose, and 24 named tactical/empty
 reload clips cover M4A1, AK74, SCAR-L, MP5A5, M24, AXMC, AWM, VSS, P226,
 M1911, GSh-18, and Desert Eagle. Its palm markers use evaluated glove contact
@@ -75,24 +83,36 @@ quaternion track hemisphere-continuous before glTF export, and exports one
 platform-specific elbow-pole marker per profile. The 2026-08-31 follow-up then
 hard-matches every pistol clip boundary back to the exact `pistol_service` or
 `pistol_large` static pose so the exchange stays compact and the support arm
-does not jitter back into a full-arm silhouette. Contract revision 5 places
+does not jitter back into a full-arm silhouette. Contract revision 7 places
 `LeftSidearmMagazineAnchorFrame` on an actual glove-side triangle selected by
 BVH at the camera-calibrated signed offsets of -39.7 mm lateral, -11.8 mm
 forward, and 61.3 mm below the evaluated palm center. Aligning this point with
 the magazine uses a compact platform-calibrated wrist pose: -10/25/42 degrees
 for P226 and M1911, 0/5/42 degrees for GSh-18, and -9/28/30 degrees for Desert
 Eagle. Tactical and empty pistol clips reuse the exact `pistol_service` or
-`pistol_large` static DCC pose at normalized time 0.00 and 1.00. Because runtime
-already translates the cropped chain onto the real magazine, the DCC clip keeps
-position IK disabled and eases only the compact wrist grip in by 0.15, holds it
-through 0.82, then eases it out. This avoids a duplicate shoulder/elbow sweep
-and removes the static-to-skinned visibility-boundary flip. The builder verifies
-that every LEFT_CHAIN endpoint stays within 0.01 radians and 3 mm of its matching
-static pistol pose, and that the magazine marker remains on the skinned glove at
-the extract and insert grip frames of every P226, M1911, GSh-18, and Desert Eagle
-clip. It also rejects any clip whose left shoulder, elbow, or wrist rotation,
-joint translation, palm translation, or total hand travel exceeds the compact
-sidearm continuity limits; these changes preserve the same mesh, materials,
-skin, and arm hierarchy.
+`pistol_large` static DCC pose at normalized time 0.00 and 1.00. Their cropped
+forearms now use a deterministic analytical shoulder/elbow solve in Blender,
+with a compact position-and-wrist path for the magazine and an overhand slide
+beat on empty reloads; runtime selects and samples the baked clip without adding
+a second shoulder translation. This removes the former generic-IK branch flip
+and the static-to-skinned visibility-boundary flip.
+
+The revision groups the twelve profiles into six readable choreography sets:
+straight rifle (M4A1/SCAR-L), rock-and-lock (AK74/VSS), MP5, precision/internal
+(M24/AXMC/AWM), service pistol (P226/M1911/GSh-18), and Desert Eagle. Long guns
+use direct exchange poses instead of the retired waist-pouch arc, with explicit
+old-magazine-out and new-magazine-seat holds. Empty clips add a mechanical
+contact/pull/hold/release beat, while M24 retains its bolt beat in both tactical
+and empty clips. The builder verifies zero hold drift, a 0.65 m control envelope
+for long guns and 0.32 m for pistol crops, fixed shoulder roots and right grip,
+hemisphere-continuous quaternions, 45 mm maximum pistol joint/palm step, exact
+pistol endpoints within 0.01 radians and 3 mm, glove-surface marker contact, and
+all 24 exported clip durations. It additionally samples every other frame of
+all sixteen long-gun clips in the right-grip camera proxy: delivered spans peak
+at 0.719082 m horizontal, 1.183342 m depth, 0.643858 m vertical, and 0.552705 m
+rear extent. The retained full-arm layer is deliberately rejected by the same
+gate at 1.843685/2.900767/0.979012 m with 2.357507 m rear extent, so the prior
+near-plane giant-sleeve failure cannot satisfy the build contract. These changes
+preserve the authored materials, skin, and arm hierarchy.
 The original model and all derived geometry remain copyright DJMaesen and are not
 covered by the repository's MIT license.

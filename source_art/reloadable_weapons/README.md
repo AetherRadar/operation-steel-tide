@@ -248,12 +248,23 @@ DJMaesen's **fps animated smg**, acquired 2026-08-21 from
 `https://sketchfab.com/3d-models/fps-animated-smg-ea3dad7478624495a5a46f40127b0579`
 under CC BY 4.0 and generated for this reload set on 2026-08-29.
 
-The GLB retains one 13,700-triangle skinned authored arms mesh, one skin, the
-three embedded source texture images (also extracted as runtime sidecars), and
-24 named tactical/empty clips across twelve weapon profiles. The baked clips
-keep both shoulder roots and the right palm/grip relation fixed while the left
-arm travels to the visible mechanism and returns. Exact attribution and source
-mapping are in `../../assets/models/djmaesen_smg45/LICENSE.md`; exact delivered
-hashes are summarized in `../../assets/models/LICENSE.md`. This builder does
-not emit a dedicated studio preview PNG; visual review is performed through the
-in-engine reload captures and deterministic diagnostic.
+Contract revision 7 retains the 13,700-triangle full-arm mesh as a hidden audit
+layer, adds 9,914-triangle cropped long-gun forearms, and retains the 9,306-
+triangle cropped pistol forearms. All three share one skin, three embedded
+source textures, and 24 named tactical/empty clips. The 2026-08-31 Blender pass uses
+six choreography groups: straight rifle (M4A1/SCAR-L), rock-and-lock
+(AK74/VSS), MP5, precision/internal (M24/AXMC/AWM), service pistol
+(P226/M1911/GSh-18), and Desert Eagle. Long-gun clips replace the old waist-
+pouch sweep with direct exchange poses and explicit old-magazine-out and new-
+magazine-seat holds. Empty clips add a contact/pull/hold/release mechanical
+beat; M24 retains that bolt beat for both variants. Pistol crops use a stable
+analytical shoulder/elbow solve with exact static endpoints rather than a
+runtime chain translation. Both shoulder roots and the right palm/grip
+relation remain fixed throughout. Runtime renders the long-gun or pistol crop,
+never the complete upper-arm audit layer. A grip-space camera envelope samples
+all sixteen long-gun clips and explicitly rejects the former full-sleeve
+presentation that crossed the Godot near plane. Exact attribution and source mapping are in
+`../../assets/models/djmaesen_smg45/LICENSE.md`; exact delivered hashes are
+summarized in `../../assets/models/LICENSE.md`. This builder does not emit a
+dedicated studio preview PNG; visual review is performed through the in-engine
+reload captures and deterministic diagnostic.

@@ -529,7 +529,18 @@ internal sealed class AuthoredWeaponVisual
         Transform3D sourceTransform,
         Transform3D sourceRest,
         Transform3D authoredRest)
-        => sourceTransform * sourceRest.AffineInverse() * authoredRest;
+    {
+        // Position and orientation are independent root-space mechanism
+        // deltas. Multiplying the complete transforms rotates the authored
+        // rest origin around the canonical source pivot, so an AK magazine
+        // appears to translate merely because it is rocking in place.
+        var orientationDelta = sourceTransform.Basis
+            * sourceRest.Basis.Inverse();
+        var positionDelta = sourceTransform.Origin - sourceRest.Origin;
+        return new Transform3D(
+            orientationDelta * authoredRest.Basis,
+            authoredRest.Origin + positionDelta);
+    }
 
     private readonly record struct MechanismTransforms(
         Transform3D Magazine,

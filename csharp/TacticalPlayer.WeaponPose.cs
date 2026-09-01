@@ -29,6 +29,8 @@ public partial class TacticalPlayer
     private float _viewmodelKickPitch;
     private float _viewmodelKickRoll;
     private float _viewmodelKickSide;
+    private Vector3 _pendingViewmodelPositionImpulse;
+    private Vector3 _pendingViewmodelRotationImpulse;
 
     private Vector3 WeaponViewPositionTarget()
     {
@@ -206,20 +208,32 @@ public partial class TacticalPlayer
         _weaponRoot.Rotation = weaponRotation.Lerp(
             WeaponViewRotationTarget(),
             SmoothFactor(9.0f, delta));
+        if (!_pendingViewmodelPositionImpulse.IsZeroApprox())
+        {
+            _weaponRoot.Position += _pendingViewmodelPositionImpulse;
+            _pendingViewmodelPositionImpulse = Vector3.Zero;
+        }
+        if (!_pendingViewmodelRotationImpulse.IsZeroApprox())
+        {
+            _weaponRoot.Rotation += _pendingViewmodelRotationImpulse;
+            _pendingViewmodelRotationImpulse = Vector3.Zero;
+        }
     }
 
     private void UpdateHeldWeaponPresentation(float delta)
     {
         UpdateWeaponViewPose(delta, EquippedWeapon.Stats().Handling);
         ApplyProceduralHandPose();
-        UpdateReloadAnimation();
         SyncAuthoredPrimaryWeapon();
         UpdateAuthoredM4ReloadSupportArm();
     }
 
     internal void AdvanceVehicleReloadPresentationForDiagnostics(float delta)
     {
+        _reloadPresentationPinnedForDiagnostics = false;
         UpdateReloadTimer(delta);
+        AdvanceReloadPresentationForDiagnostics();
+        FlushReloadRigReset();
         UpdateHeldWeaponPresentation(delta);
     }
 
@@ -266,14 +280,15 @@ public partial class TacticalPlayer
         _viewmodelKickSide = Mathf.Clamp(_viewmodelKickSide + side, -0.065f, 0.065f);
         _viewmodelKickRoll = Mathf.Clamp(_viewmodelKickRoll + roll, -0.09f, 0.09f);
 
-        // Apply most of the first-frame impulse immediately. The tracked values
-        // above hold the pose briefly and then return independently from camera
-        // recoil, so the firearm reads as a physical object reacting in the hands.
-        _weaponRoot.Position += new Vector3(
+        // Queue most of the first-frame impulse for the next rendered frame.
+        // The tracked values above hold the pose briefly and then return
+        // independently from camera recoil, so the firearm reads as a physical
+        // object reacting in the hands without a physics-only transform write.
+        _pendingViewmodelPositionImpulse += new Vector3(
             side * 0.16f,
             -kickback * 0.05f,
             kickback * 0.74f);
-        _weaponRoot.Rotation += new Vector3(
+        _pendingViewmodelRotationImpulse += new Vector3(
             -pitch * 0.72f,
             0.0f,
             roll * 0.58f);
@@ -285,6 +300,8 @@ public partial class TacticalPlayer
         _viewmodelKickPitch = 0.0f;
         _viewmodelKickRoll = 0.0f;
         _viewmodelKickSide = 0.0f;
+        _pendingViewmodelPositionImpulse = Vector3.Zero;
+        _pendingViewmodelRotationImpulse = Vector3.Zero;
     }
 
     internal ViewmodelShotImpulseInspection InspectViewmodelShotImpulseForDiagnostics()

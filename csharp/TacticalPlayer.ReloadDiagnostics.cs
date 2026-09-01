@@ -56,12 +56,15 @@ public partial class TacticalPlayer
             ? useAnimatedPose
                 ? arms!.LeftSupportAnchorGlobalPosition(
                     EquippedWeapon.Platform,
-                    SidearmReloadMagazineAnchorBlend())
+                    SidearmReloadMagazineAnchorBlend(),
+                    SidearmReloadActionContactBlend())
                 : staticArms!.LeftGripFrame.GlobalPosition
             : Vector3.Zero;
         var visibleLeftPalmGlobal = palmContactsAvailable
             ? useAnimatedPose
-                ? arms!.LeftPalmCenterGlobalPosition
+                ? WeaponCatalog.IsSidearm(platform)
+                    ? leftPalmGlobal
+                    : arms!.LeftPalmCenterGlobalPosition
                 : staticArms!.LeftPalmFrame.GlobalPosition
             : Vector3.Zero;
         var leftWristGlobal = palmContactsAvailable
@@ -126,6 +129,9 @@ public partial class TacticalPlayer
         var visibleSupportPalm = palmContactsAvailable
             ? rootInverse * visibleLeftPalmGlobal
             : Vector3.Zero;
+        var supportTargetGlobal = useAnimatedPose && arms is not null
+            ? arms.PresentedLeftSupportTargetGlobalPosition
+            : ReloadSupportTargetGlobal();
         return new AllWeaponReloadInspection(
             platform,
             (useAnimatedPose
@@ -188,7 +194,7 @@ public partial class TacticalPlayer
             HasRenderableReloadGeometry(action),
             0.0f,
             bodyContinuity,
-            rootInverse * ReloadSupportTargetGlobal(),
+            rootInverse * supportTargetGlobal,
             screenContact,
             visibleSupportPalm);
     }

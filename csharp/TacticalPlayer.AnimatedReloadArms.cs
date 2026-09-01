@@ -23,6 +23,16 @@ public partial class TacticalPlayer
         => UsesAnimatedReloadArmsForDiagnostics
             && _authoredAnimatedReloadArms.UsesSidearmForearms;
 
+    internal bool UsesAnimatedFullReloadArmsForDiagnostics
+        => UsesAnimatedReloadArmsForDiagnostics
+            && _authoredAnimatedReloadArms.UsesFullArms;
+
+    internal string PresentedReloadClipForDiagnostics
+        => AnimatedReloadArmsForDiagnostics?.PresentedClipName ?? string.Empty;
+
+    internal float PresentedReloadClipProgressForDiagnostics
+        => AnimatedReloadArmsForDiagnostics?.PresentedClipProgress ?? 0.0f;
+
     internal AnimatedReloadLeftArmPoseInspection
         InspectAnimatedReloadLeftArmPoseForDiagnostics()
     {
@@ -138,60 +148,35 @@ public partial class TacticalPlayer
             return false;
         }
 
-        // Empty sidearm reloads reuse the compact tactical hand choreography.
-        // The runtime slide-release pulse below still cycles the real slide;
-        // avoiding the authored empty clip prevents its old cross-gun rack
-        // gesture from sweeping the cropped support forearm across the pistol.
-        var authoredEmptyReload = _reloadStartedEmpty
-            && !WeaponCatalog.IsSidearm(EquippedWeapon.Platform);
+        var authoredEmptyReload = _reloadStartedEmpty;
         var authoredArmProgress = DirectReloadArmProgress();
         animatedReloadArms!.SetPresentationPlatform(EquippedWeapon.Platform);
-        animatedReloadArms.SetReloadProgress(
-            EquippedWeapon.Platform,
-            authoredEmptyReload,
-            0.0f);
         AlignAnimatedReloadArmsToWeapon(animatedReloadArms);
         animatedReloadArms!.SetReloadProgress(
             EquippedWeapon.Platform,
             authoredEmptyReload,
             authoredArmProgress);
-        var supportTarget = ReloadSupportTargetGlobal();
-        // Bring the support wrist in from the lower-left of the magazine.  A
-        // lower-right exit overlaps the firing hand and pushes the cuff below
-        // frame, making a valid skinned glove appear missing.
-        var reloadProfile = FirstPersonReloadProfileCatalog.For(
-            EquippedWeapon.Platform);
-        var wristDirectionInWeaponRoot = WeaponCatalog.IsSidearm(
-                EquippedWeapon.Platform)
-            ? new Vector3(0.32f, -0.50f, -0.80f)
-            : new Vector3(0.30f, -0.67f, -0.68f);
-        var safeWristDirection = reloadProfile.Mechanism
-                == FirstPersonReloadMechanism.InternalMagazine
-            ? Vector3.Zero
-            : _weaponRoot.GlobalTransform.Basis.Orthonormalized()
-                * wristDirectionInWeaponRoot.Normalized();
+        var supportTarget = RawReloadSupportTargetGlobal();
+        var sidearmMagazineBlend = SidearmReloadMagazineAnchorBlend();
+        var sidearmActionBlend = SidearmReloadActionContactBlend();
+        // Preserve the DCC motion while resolving its visible glove contact to
+        // the live magazine, action, or ready-pose marker. The shared two-bone
+        // solve keeps both segment lengths and the authored shoulder origin.
         animatedReloadArms.RetargetLeftPalm(
             EquippedWeapon.Platform,
             supportTarget,
-            safeWristDirection,
-            SidearmReloadMagazineAnchorBlend());
+            sidearmMagazineBlend,
+            sidearmActionBlend);
         return true;
     }
 
     private float DirectReloadArmProgress()
     {
-        var profile = FirstPersonReloadProfileCatalog.For(
-            EquippedWeapon.Platform);
-        var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
-        if (profile.Mechanism == FirstPersonReloadMechanism.InternalMagazine)
-        {
-            return progress;
-        }
-
-        // Keep one compact, camera-safe grip for the direct exchange. The
-        // target supplies all down-and-up motion; replaying the old pouch clip
-        // turns the wrist behind the near plane and leaves a floating hand.
-        return 0.0f;
+        // The DCC clips are authored per platform and variant. Sampling their
+        // real presentation clock is what preserves the reach, exchange,
+        // seating and action cadence; holding frame zero turns every reload
+        // into the same floating-hand pose.
+        return Mathf.Clamp(PresentationReloadProgress, 0.0f, 1.0f);
     }
 
     private float SidearmReloadMagazineAnchorBlend()
@@ -204,23 +189,41 @@ public partial class TacticalPlayer
 
         var profile = FirstPersonReloadProfileCatalog.For(
             EquippedWeapon.Platform);
-        var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
+        var progress = Mathf.Clamp(PresentationReloadProgress, 0.0f, 1.0f);
         if (progress < profile.ReachEnd)
         {
             return SmoothSegment(progress, 0.0f, profile.ReachEnd);
         }
-        if (progress < profile.SeatEnd)
+        if (progress < profile.InsertEnd)
         {
             return 1.0f;
         }
-        if (progress < profile.ActionEnd)
+        return 1.0f - SmoothSegment(
+            progress,
+            profile.InsertEnd,
+            1.0f);
+    }
+
+    private float SidearmReloadActionContactBlend()
+    {
+        if (!_isReloading
+            || !_reloadStartedEmpty
+            || !WeaponCatalog.IsSidearm(EquippedWeapon.Platform))
         {
-            return 1.0f - SmoothSegment(
-                progress,
-                profile.SeatEnd,
-                profile.ActionEnd);
+            return 0.0f;
         }
-        return 0.0f;
+
+        var profile = FirstPersonReloadProfileCatalog.For(
+            EquippedWeapon.Platform);
+        var progress = Mathf.Clamp(PresentationReloadProgress, 0.0f, 1.0f);
+        if (progress < profile.InsertEnd)
+        {
+            return 0.0f;
+        }
+
+        var reach = SidearmReloadActionReachBlend(profile, progress);
+        var retreat = SidearmReloadReturnBlend(profile, progress);
+        return reach * (1.0f - retreat);
     }
 
     private void AlignAnimatedReloadArmsToWeapon(

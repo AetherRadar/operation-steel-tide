@@ -293,6 +293,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         BuildMedicalDevices();
         ApplyWeaponBuildVisuals();
         ConfigureRole(Role);
+        InitializeFirstPersonTransformClock();
         Input.MouseMode = Input.MouseModeEnum.Captured;
         DisarmFireInput();
         DisarmMovementInput();
@@ -343,13 +344,22 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             _head.Rotation = Vector3.Zero;
         }
+        _cameraLocalBasis = Basis.Identity;
+        RefreshPhysicsAimTransform();
+        ResetFirstPersonTransformInterpolation();
     }
 
     public void AimCameraAtWorldPointForDiagnostics(Vector3 worldPoint)
     {
         if (IsInstanceValid(_camera) && _camera.GlobalPosition.DistanceSquaredTo(worldPoint) > 0.0001f)
         {
-            _camera.LookAt(worldPoint, Vector3.Up);
+            PresentManualFirstPersonTransform(1.0f);
+            var cameraGlobal = _camera.GlobalTransform.LookingAt(worldPoint, Vector3.Up);
+            var body = GlobalTransform;
+            var headAnchor = body * _head.Transform;
+            _cameraLocalBasis = headAnchor.Basis.Inverse() * cameraGlobal.Basis;
+            RefreshPhysicsAimTransform();
+            _camera.GlobalTransform = cameraGlobal;
         }
     }
 
@@ -402,6 +412,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             _knifeRoot.Visible = false;
         }
+        ResetFirstPersonTransformInterpolation();
         Hud?.ShowLocalizedMessage("vehicle_entered", "VEHICLE  //  ENGAGED", new Color(0.55f, 0.92f, 0.68f));
     }
 
@@ -443,6 +454,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             RestoreMovementInput();
         }
+        ResetFirstPersonTransformInterpolation();
         if (!forced && !IsDead)
         {
             Hud?.ShowLocalizedMessage("vehicle_exited", "VEHICLE  //  DISMOUNTED", new Color(0.7f, 0.82f, 0.78f));
@@ -478,14 +490,27 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         };
         AddChild(_collider);
 
-        _head = new Node3D { Name = "Head", Position = new Vector3(0.0f, 1.57f, 0.0f) };
+        _head = new Node3D
+        {
+            Name = "Head",
+            Position = new Vector3(0.0f, 1.57f, 0.0f),
+            // Camera and first-person descendants are presented manually in
+            // _Process. Automatic transform interpolation on this branch would
+            // blend a second time and warns when the camera moves at render Hz.
+            PhysicsInterpolationMode = PhysicsInterpolationModeEnum.Off
+        };
         AddChild(_head);
         _camera = new Camera3D
         {
             Name = "CombatCamera",
             Current = true,
             Fov = 76.0f,
-            Near = 0.04f
+            Near = 0.04f,
+            // A top-level camera is independent from the 60 Hz CharacterBody3D
+            // parent. Its global transform is composed explicitly each rendered
+            // frame from our private physics samples and immediate mouse look.
+            TopLevel = true,
+            PhysicsInterpolationMode = PhysicsInterpolationModeEnum.Off
         };
         _head.AddChild(_camera);
     }
@@ -1181,11 +1206,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             // Yaw is owned by the vehicle body while driving; only pitch the cabin view.
             _pitch = Mathf.Clamp(_pitch - motion.Relative.Y * MouseSensitivity, -0.55f, 0.42f);
+            RefreshPhysicsAimTransform();
             return;
         }
         if (_isClimbingLadder)
         {
             _pitch = Mathf.Clamp(_pitch - motion.Relative.Y * MouseSensitivity, -0.55f, 0.42f);
+            RefreshPhysicsAimTransform();
             return;
         }
         if (_isVaulting)
@@ -1193,6 +1220,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             // Keep the body aligned with the authored vault arc while preserving a
             // small first-person look range during the movement lock.
             _pitch = Mathf.Clamp(_pitch - motion.Relative.Y * MouseSensitivity, -0.7f, 0.58f);
+            RefreshPhysicsAimTransform();
             return;
         }
 
@@ -1200,9 +1228,18 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         rotation.Y -= motion.Relative.X * MouseSensitivity;
         Rotation = rotation;
         _pitch = Mathf.Clamp(_pitch - motion.Relative.Y * MouseSensitivity, -1.38f, 1.38f);
+        RefreshPhysicsAimTransform();
     }
 
     public override void _PhysicsProcess(double delta)
+    {
+        var dt = (float)delta;
+        BeginFirstPersonPhysicsStep();
+        RunAuthoritativePhysicsStep(delta);
+        CompleteFirstPersonPhysicsStep(dt);
+    }
+
+    private void RunAuthoritativePhysicsStep(double delta)
     {
         RecordCombatMovementTrail();
         var dt = (float)delta;
@@ -1220,7 +1257,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             CloseMedicalWheelWithoutUse();
             CancelFieldUse(false);
             CancelReload();
-            UpdateHeldWeaponPresentation(dt);
             UpdateDownedCrawl(dt);
             return;
         }
@@ -1235,7 +1271,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             UpdateLadderClimb(dt);
             if (_isClimbingLadder)
             {
-                UpdateCameraAndWeapon(dt);
                 PushHudStats();
             }
             return;
@@ -1247,7 +1282,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         if (_isVaulting)
         {
             UpdateVaultMovement(dt);
-            UpdateCameraAndWeapon(dt);
             PushHudStats();
             Hud?.SetAiming(false);
             return;
@@ -1261,7 +1295,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             Velocity = Vector3.Zero;
             _isAiming = false;
-            UpdateHeldWeaponPresentation(dt);
             Hud?.SetAiming(false);
             return;
         }
@@ -1273,7 +1306,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
 
         _fireCooldown = Mathf.Max(0.0f, _fireCooldown - dt);
-        _knifeTime = Mathf.Max(0.0f, _knifeTime - dt);
         if (!_fireInputArmed)
         {
             if (Input.IsActionPressed(GameInputActions.Fire))
@@ -1403,7 +1435,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         }
 
         MovePlayer(dt);
-        UpdateCameraAndWeapon(dt);
         var fieldSupplies = PushHudStats();
         Hud?.SetEquipment(
             fieldSupplies.ArmorPlates,
@@ -1455,21 +1486,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         // Keep the rider seated; look pitch only. The cab gunner keeps the firearm up.
         Position = Vector3.Zero;
         Rotation = Vector3.Zero;
-        var headPosition = _head.Position;
-        headPosition.Y = Mathf.Lerp(headPosition.Y, 0.52f, delta * 12.0f);
-        headPosition.Z = Mathf.Lerp(headPosition.Z, 0.05f, delta * 12.0f);
-        _head.Position = headPosition;
-        _head.Rotation = new Vector3(_pitch, 0.0f, 0.0f);
-        if (IsInstanceValid(_weaponRoot))
-        {
-            _weaponRoot.Visible = IsFirearmQuickSlotSelected;
-        }
-        if (IsInstanceValid(_knifeRoot))
-        {
-            _knifeRoot.Visible = false;
-        }
-        UpdateHeldThrowableVisual();
-
         UpdateReloadTimer(delta);
         if (IsFirearmQuickSlotSelected
             && !RoleActionBlocksWeapon
@@ -1477,8 +1493,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             StartReload();
         }
-        UpdateHeldWeaponPresentation(delta);
-
         if (!_fireInputArmed)
         {
             if (Input.IsActionPressed(GameInputActions.Fire))
@@ -1502,14 +1516,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             && !MedicalActionBlocksWeapon)
         {
             Fire();
-        }
-
-        // Light cabin camera sway from vehicle speed (no full weapon bob).
-        if (IsInstanceValid(_camera))
-        {
-            var sway = Mathf.Sin(Time.GetTicksMsec() * 0.008f) * 0.004f;
-            _camera.Position = new Vector3(sway, 0.0f, 0.0f);
-            _camera.Fov = Mathf.Lerp(_camera.Fov, 72.0f, delta * 8.0f);
         }
 
         PushHudStats();
@@ -1551,11 +1557,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         // Soft prone crawl: slow drag while waiting for a teammate revive.
         _stance = PlayerStance.Prone;
-        var targetHeadY = 0.42f;
         var targetColliderHeight = 0.72f;
-        var headPosition = _head.Position;
-        headPosition.Y = Mathf.Lerp(headPosition.Y, targetHeadY, delta * 10.0f);
-        _head.Position = headPosition;
         if (_collider.Shape is CapsuleShape3D capsule)
         {
             capsule.Height = Mathf.Lerp(capsule.Height, targetColliderHeight, delta * 10.0f);
@@ -1595,10 +1597,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _isAiming = false;
         Hud?.SetAiming(false);
         PushHudStats();
-        if (IsInstanceValid(_camera))
-        {
-            _camera.Fov = Mathf.Lerp(_camera.Fov, 68.0f, delta * 6.0f);
-        }
     }
 
     /// <summary>
@@ -1933,7 +1931,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             0.0f) * bobStrength;
         _smoothedBobOffset = _smoothedBobOffset.Lerp(targetBobOffset, SmoothFactor(walking ? 14.0f : 18.0f, delta));
         _stairViewOffsetY = Mathf.MoveToward(_stairViewOffsetY, 0.0f, delta * 1.7f);
-        _camera.Position = _smoothedBobOffset
+        _cameraLocalOffset = _smoothedBobOffset
             + Vector3.Up * _stairViewOffsetY
             + new Vector3(_leanValue * 0.17f, _slideTime > 0.0f ? -0.08f : 0.0f, 0.0f)
             + _damageKickOffset;
@@ -1950,11 +1948,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             && !RoleActionBlocksWeapon
             && !MedicalActionBlocksWeapon;
         UpdateHeldThrowableVisual();
-        UpdateKnifeAnimation(delta);
+        UpdateKnifeRenderPresentation();
         UpdateWeaponViewPose(delta, handling);
         ApplyProceduralHandPose();
         _opticReticle.Visible = _isAiming && IsFirearmQuickSlotSelected;
-        UpdateReloadAnimation();
         SyncAuthoredPrimaryWeapon();
         UpdateAuthoredM4ReloadSupportArm();
     }
@@ -2049,7 +2046,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             flashDuration + 0.018f);
         flashTween.TweenCallback(Callable.From(() => _muzzleBloom.Visible = false));
 
-        var shellVelocity = _camera.GlobalBasis.X * 3.0f + Vector3.Up * 1.25f - _camera.GlobalBasis.Z * 0.45f;
+        var authoritativeView = CaptureAuthoritativeViewTransform();
+        var shellVelocity = authoritativeView.Basis.X * 3.0f
+            + Vector3.Up * 1.25f
+            - authoritativeView.Basis.Z * 0.45f;
         Main?.SpawnShell(_ejectMarker.GlobalPosition, shellVelocity);
 
         // Sprint or vehicle motion degrades accuracy instead of blocking the trigger.
@@ -2064,12 +2064,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             _ => 1.0f
         };
         var spread = ((_isAiming ? 0.0015f : 0.0065f) + movingPenalty * 0.009f) * stanceAccuracy;
-        var direction = -_camera.GlobalBasis.Z;
-        direction += _camera.GlobalBasis.X * _rng.RandfRange(-spread, spread);
-        direction += _camera.GlobalBasis.Y * _rng.RandfRange(-spread, spread);
+        var direction = -authoritativeView.Basis.Z;
+        direction += authoritativeView.Basis.X * _rng.RandfRange(-spread, spread);
+        direction += authoritativeView.Basis.Y * _rng.RandfRange(-spread, spread);
         direction = direction.Normalized();
 
-        var from = _camera.GlobalPosition;
+        var from = authoritativeView.Origin;
         var maximumRange = stats.EffectiveRange * 1.35f;
         var to = from + direction * maximumRange;
         var glassDamage = stats.Damage * AmmoTiers.DamageMultiplier(CurrentAmmoGrade);
@@ -2210,6 +2210,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _activeReloadDuration = ReloadDuration * RoleReloadMultiplier;
         _reloadTime = _activeReloadDuration;
         _reloadSoundStage = 0;
+        BeginReloadPresentationClock();
     }
 
     private void FinishReload()
@@ -2224,114 +2225,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         ConsumeAmmoReserve(CurrentAmmoCaliber, grade, amount);
         _loadedAmmoGrade = grade;
         _isReloading = false;
-        ResetReloadRig();
+        QueueReloadPresentationReset();
         Hud?.SetAmmoTier(CurrentAmmoGrade);
-    }
-
-    private void UpdateReloadAnimation()
-    {
-        if (!_isReloading || EquippedWeapon.Platform == WeaponPlatform.M3A1)
-        {
-            return;
-        }
-        UpdateProfiledReloadAnimation();
-    }
-
-    private void UpdateM4ReloadAnimation()
-    {
-        var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
-        var magazineHome = new Vector3(0, -0.2f, -0.31f);
-        var magazineRotation = new Vector3(-0.19f, 0, 0);
-        var handHome = new Vector3(-0.03f, -0.2f, -0.58f);
-        var handAtWell = magazineHome + M4ReloadMagazineGripOffset;
-        var droppedMagazine = new Vector3(-0.1f, -0.43f, -0.38f);
-        var sparePickup = new Vector3(-0.2f, -0.42f, -0.42f);
-        var spareReady = new Vector3(-0.14f, -0.32f, -0.36f);
-        var removedMagazineGrip = droppedMagazine + M4ReloadMagazineGripOffset;
-
-        // Establish the complete mechanism state on every update. Besides
-        // making fixed-progress diagnostics deterministic, this avoids a
-        // one-frame stale magazine when a reload pose is restored or sampled.
-        _magazine.Visible = progress < 0.43f || progress >= 0.78f;
-        _magazine.Position = progress is >= 0.43f and < 0.78f
-            ? droppedMagazine
-            : magazineHome;
-        _magazine.Rotation = progress is >= 0.43f and < 0.78f
-            ? new Vector3(0.62f, 0.08f, 0.36f)
-            : magazineRotation;
-        _spareMagazine.Visible = progress is >= 0.43f and < 0.78f;
-        _spareMagazine.Position = progress >= 0.78f
-            ? magazineHome
-            : new Vector3(-0.3f, -0.62f, -0.18f);
-        _spareMagazine.Rotation = progress >= 0.78f
-            ? magazineRotation
-            : new Vector3(0.35f, 0, 0.35f);
-        _chargingHandle.Position = new Vector3(0.075f, 0.085f, -0.05f);
-        _supportHand.Position = handHome;
-        _supportHand.Rotation = new Vector3(0.2f, 0, 0.05f);
-
-        if (progress < 0.18f)
-        {
-            var t = SmoothStep(progress / 0.18f);
-            _supportHand.Position = handHome.Lerp(handAtWell, t);
-            _supportHand.Rotation = new Vector3(0.2f, 0, 0.05f)
-                .Lerp(new Vector3(0.42f, 0.08f, 0.22f), t);
-        }
-        else if (progress < 0.43f)
-        {
-            var t = SmoothStep((progress - 0.18f) / 0.25f);
-            _magazine.Position = magazineHome.Lerp(droppedMagazine, t);
-            _magazine.Rotation = magazineRotation.Lerp(new Vector3(0.62f, 0.08f, 0.36f), t);
-            _supportHand.Position = _magazine.Position + M4ReloadMagazineGripOffset;
-            _supportHand.Rotation = new Vector3(0.42f, 0.08f, 0.22f);
-            if (_reloadSoundStage == 0 && progress > 0.3f)
-            {
-                _reloadSoundStage = 1;
-                _reloadAudio.PitchScale = 0.9f;
-                _reloadAudio.Play();
-            }
-        }
-        else if (progress < 0.55f)
-        {
-            var t = SmoothStep((progress - 0.43f) / 0.12f);
-            _spareMagazine.Position = sparePickup.Lerp(spareReady, t);
-            var spareMagazineGrip = _spareMagazine.Position + M4ReloadMagazineGripOffset;
-            _supportHand.Position = removedMagazineGrip.Lerp(spareMagazineGrip, t);
-            _supportHand.Rotation = new Vector3(0.42f, 0.08f, 0.22f);
-        }
-        else if (progress < 0.78f)
-        {
-            var t = SmoothStep((progress - 0.55f) / 0.23f);
-            _spareMagazine.Position = spareReady.Lerp(magazineHome, t);
-            _spareMagazine.Rotation = new Vector3(0.35f, 0, 0.35f).Lerp(magazineRotation, t);
-            _supportHand.Position = _spareMagazine.Position + M4ReloadMagazineGripOffset;
-            _supportHand.Rotation = new Vector3(0.42f, 0.08f, 0.22f);
-        }
-        else if (progress < 0.9f)
-        {
-            var t = SmoothStep((progress - 0.78f) / 0.12f);
-            var handleGrip = new Vector3(0.0f, 0.02f, -0.02f);
-            _supportHand.Position = handAtWell.Lerp(handleGrip, t);
-            _supportHand.Rotation = new Vector3(0.42f, 0.08f, 0.22f);
-            _chargingHandle.Position = new Vector3(0.075f, 0.085f, -0.05f).Lerp(new Vector3(0.075f, 0.085f, 0.08f), t);
-            if (_reloadSoundStage == 1)
-            {
-                _reloadSoundStage = 2;
-                _reloadAudio.PitchScale = 1.08f;
-                _reloadAudio.Play();
-            }
-        }
-        else
-        {
-            var t = SmoothStep((progress - 0.9f) / 0.1f);
-            _chargingHandle.Position = new Vector3(0.075f, 0.085f, 0.08f).Lerp(new Vector3(0.075f, 0.085f, -0.05f), t);
-            _supportHand.Position = new Vector3(0.0f, 0.02f, -0.02f).Lerp(handHome, t);
-            _supportHand.Rotation = new Vector3(0.42f, 0.08f, 0.22f)
-                .Lerp(new Vector3(0.2f, 0, 0.05f), t);
-        }
-
-        _supportForearm.Position = _supportHand.Position + new Vector3(-0.09f, -0.24f, 0.1f);
-        _supportForearm.Rotation = new Vector3(0.22f, 0.05f, -0.28f);
     }
 
     private void ResetReloadRig()
@@ -2354,8 +2249,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _activeReloadDuration = ReloadDuration * RoleReloadMultiplier;
         _reloadTime = _activeReloadDuration
             * (1.0f - Mathf.Clamp(progress, 0.0f, 1.0f));
+        PinReloadPresentationForDiagnostics(progress);
         ApplyProceduralHandPose();
-        UpdateReloadAnimation();
         SyncAuthoredPrimaryWeapon();
         UpdateAuthoredM4ReloadSupportArm();
         return true;
@@ -2365,7 +2260,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     {
         _isReloading = false;
         _reloadTime = 0.0f;
-        ResetReloadRig();
+        QueueReloadPresentationReset();
+        FlushReloadRigReset();
     }
 
     private static float SmoothStep(float value)
@@ -2858,8 +2754,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             return false;
         }
-        var origin = _camera.GlobalPosition - _camera.GlobalBasis.Z * 0.7f;
-        var direction = -_camera.GlobalBasis.Z;
+        var authoritativeView = CaptureAuthoritativeViewTransform();
+        var origin = authoritativeView.Origin
+            - authoritativeView.Basis.Z * 0.7f;
+        var direction = -authoritativeView.Basis.Z;
         if (Main.IsDemolitionNetworkClient)
         {
             if (!Main.TryRequestLocalDemolitionUtilityThrow(

@@ -175,11 +175,17 @@ public partial class TacticalPlayer
             return;
         }
 
+        var resetImmediately = _reloadPresentationPinnedForDiagnostics
+            || !IsProcessing();
         _isReloading = false;
         _reloadTime = 0.0f;
         _activeReloadDuration = 0.0f;
         _reloadSoundStage = 0;
-        ResetReloadRig();
+        QueueReloadPresentationReset();
+        if (resetImmediately)
+        {
+            FlushReloadRigReset();
+        }
     }
 
     private void UpdateReloadTimer(float delta)
@@ -188,12 +194,19 @@ public partial class TacticalPlayer
         {
             return;
         }
+        if (_reloadPresentationPinnedForDiagnostics)
+        {
+            return;
+        }
 
+        var previousProgress = ReloadProgress;
         _reloadTime -= delta;
         if (_reloadTime <= 0.0f)
         {
             FinishReload();
+            return;
         }
+        CaptureReloadPhysicsStep(previousProgress);
     }
 
     internal bool SetReloadPoseForDiagnostics(float progress, bool emptyReload = false)
@@ -213,6 +226,7 @@ public partial class TacticalPlayer
         _weaponRoot.Position = WeaponViewPositionTarget();
         _weaponRoot.Rotation = WeaponViewRotationTarget();
         _isReloading = true;
+        PinReloadPresentationForDiagnostics(0.0f);
 
         // The auditors disable player processing to keep every mechanism
         // sample deterministic. Recreate the complete runtime viewmodel path
@@ -232,10 +246,15 @@ public partial class TacticalPlayer
             var step = Mathf.Min(simulationStep, targetElapsed - elapsed);
             elapsed += step;
             _reloadTime = _activeReloadDuration - elapsed;
+            PinReloadPresentationForDiagnostics(
+                _activeReloadDuration > 0.0f
+                    ? elapsed / _activeReloadDuration
+                    : normalizedProgress);
             UpdateWeaponViewPose(step, handling);
         }
         _reloadTime = _activeReloadDuration * (1.0f - normalizedProgress);
-        UpdateReloadAnimation();
+        PinReloadPresentationForDiagnostics(normalizedProgress);
+        ApplyProceduralHandPose();
         SyncAuthoredPrimaryWeapon();
         UpdateAuthoredM4ReloadSupportArm();
         return true;
@@ -246,7 +265,8 @@ public partial class TacticalPlayer
         _isReloading = false;
         _reloadTime = 0.0f;
         _activeReloadDuration = 0.0f;
-        ResetReloadRig();
+        QueueReloadPresentationReset();
+        FlushReloadRigReset();
         UpdateWeaponViewPose(1.0f / 60.0f, EquippedWeapon.Stats().Handling);
         ApplyProceduralHandPose();
         SyncAuthoredPrimaryWeapon();

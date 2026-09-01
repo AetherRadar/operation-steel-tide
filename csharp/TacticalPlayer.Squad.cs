@@ -145,7 +145,11 @@ public partial class TacticalPlayer
 
         if (broadcast)
         {
-            Main?.OnLocalRoleAbility(Role, _camera.GlobalPosition, -_camera.GlobalBasis.Z);
+            var authoritativeView = CaptureAuthoritativeViewTransform();
+            Main?.OnLocalRoleAbility(
+                Role,
+                authoritativeView.Origin,
+                -authoritativeView.Basis.Z);
         }
         return true;
     }
@@ -167,11 +171,15 @@ public partial class TacticalPlayer
                 _roleEffectApplied = true;
                 if (Role == OperatorRole.Medic)
                 {
-                    var nozzle = _camera.GlobalPosition
-                        + _camera.GlobalBasis.X * 0.28f
-                        - _camera.GlobalBasis.Y * 0.2f
-                        - _camera.GlobalBasis.Z * 0.58f;
-                    Main?.ApplyMedicSpray(this, nozzle, -_camera.GlobalBasis.Z);
+                    var authoritativeView = CaptureAuthoritativeViewTransform();
+                    var nozzle = authoritativeView.Origin
+                        + authoritativeView.Basis.X * 0.28f
+                        - authoritativeView.Basis.Y * 0.2f
+                        - authoritativeView.Basis.Z * 0.58f;
+                    Main?.ApplyMedicSpray(
+                        this,
+                        nozzle,
+                        -authoritativeView.Basis.Z);
                 }
                 else if (Role == OperatorRole.Recon)
                 {
@@ -326,8 +334,9 @@ public partial class TacticalPlayer
 
     public Vector3 GetAimPoint(float maximumDistance = 55.0f)
     {
-        var from = _camera.GlobalPosition;
-        var to = from - _camera.GlobalBasis.Z * maximumDistance;
+        var authoritativeView = CaptureAuthoritativeViewTransform();
+        var from = authoritativeView.Origin;
+        var to = from - authoritativeView.Basis.Z * maximumDistance;
         return PhysicsRaycast.TryHit(GetWorld3D(), from, to, GetRid(), 1 | 2, out var hit)
             ? hit.Position
             : to;

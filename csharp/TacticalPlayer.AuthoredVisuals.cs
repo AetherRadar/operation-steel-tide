@@ -32,7 +32,6 @@ public partial class TacticalPlayer
     private const float MaxAuthoredPalmSurfaceGap = 0.018f;
     internal const float MaxServicePistolSupportArmCorrection = 0.03f;
     private static readonly Vector3 AuthoredSmgCameraPosition = new(0.34f, -0.45f, -0.72f);
-    private static readonly Vector3 M4ReloadMagazineGripOffset = new(-0.06f, 0.08f, -0.02f);
 
     private Node3D _proceduralWeaponVisual = null!;
     private Node3D _proceduralFirstPersonArms = null!;
@@ -740,7 +739,7 @@ public partial class TacticalPlayer
             if (useAuthoredSmg)
             {
                 _authoredFirstPersonSmg.SyncMechanisms();
-                _authoredFirstPersonSmg.SetReloadProgress(_isReloading ? ReloadProgress : 0.0f);
+                _authoredFirstPersonSmg.SetReloadProgress(_isReloading ? PresentationReloadProgress : 0.0f);
             }
         }
         else
@@ -1118,13 +1117,25 @@ public partial class TacticalPlayer
     {
         var requestedTarget = RawReloadSupportTargetGlobal();
         var animatedArms = AnimatedReloadArmsForDiagnostics;
-        return _isReloading
-            && UsesAnimatedReloadArmsForDiagnostics
-            && animatedArms is not null
-                ? animatedArms.ReachableLeftPalmTarget(
-                    EquippedWeapon.Platform,
-                    requestedTarget)
-                : requestedTarget;
+        if (!_isReloading
+            || !UsesAnimatedReloadArmsForDiagnostics
+            || animatedArms is null)
+        {
+            return requestedTarget;
+        }
+
+        var sidearmMagazineBlend = SidearmReloadMagazineAnchorBlend();
+        if (WeaponCatalog.IsSidearm(EquippedWeapon.Platform))
+        {
+            return animatedArms.SidearmSupportTargetGlobalPosition(
+                requestedTarget,
+                sidearmMagazineBlend,
+                SidearmReloadActionContactBlend());
+        }
+        return animatedArms.ReachableLeftPalmTarget(
+            EquippedWeapon.Platform,
+            requestedTarget,
+            sidearmMagazineBlend);
     }
 
     private Vector3 RawReloadSupportTargetGlobal()
@@ -1156,7 +1167,7 @@ public partial class TacticalPlayer
         }
 
         var profile = FirstPersonReloadProfileCatalog.For(EquippedWeapon.Platform);
-        var progress = Mathf.Clamp(ReloadProgress, 0.0f, 1.0f);
+        var progress = Mathf.Clamp(PresentationReloadProgress, 0.0f, 1.0f);
         var internalMagazine = profile.Mechanism
             == FirstPersonReloadMechanism.InternalMagazine;
 
@@ -1179,18 +1190,69 @@ public partial class TacticalPlayer
                 : fallback;
         }
 
-        if (!internalMagazine && progress < profile.ExtractEnd)
+        if (!internalMagazine && progress < profile.StowEnd)
         {
             return weapon.TryMagazineGripGlobalPosition(false, out var contact)
                 ? contact
                 : fallback;
         }
 
-        if (progress < profile.SeatEnd)
+        if (!internalMagazine && progress < profile.AcquireEnd)
+        {
+            var oldContactAvailable = weapon.TryMagazineGripGlobalPosition(
+                false,
+                out var oldContact);
+            var spareContactAvailable = weapon.TryMagazineGripGlobalPosition(
+                true,
+                out var spareContact);
+            if (oldContactAvailable && spareContactAvailable)
+            {
+                return oldContact.Lerp(
+                    spareContact,
+                    SmoothSegment(
+                        progress,
+                        profile.StowEnd,
+                        profile.AcquireEnd));
+            }
+            return spareContactAvailable
+                ? spareContact
+                : oldContactAvailable ? oldContact : fallback;
+        }
+
+        var sidearmActionTransition = WeaponCatalog.IsSidearm(
+                EquippedWeapon.Platform)
+            && profile.UsesAction(_reloadStartedEmpty)
+            && progress >= profile.InsertEnd;
+        if (progress < profile.SeatEnd && !sidearmActionTransition)
         {
             return weapon.TryMagazineGripGlobalPosition(true, out var contact)
                 ? contact
                 : fallback;
+        }
+
+        if (WeaponCatalog.IsSidearm(EquippedWeapon.Platform))
+        {
+            var fromContact = weapon.TryMagazineGripGlobalPosition(
+                true,
+                out var magazineContact)
+                ? magazineContact
+                : fallback;
+            if (profile.UsesAction(_reloadStartedEmpty)
+                && weapon.TryActionGripGlobalPosition(
+                    out var sidearmActionContact))
+            {
+                var reachSlide = SidearmReloadActionReachBlend(
+                    profile,
+                    progress);
+                var retreatSlide = SidearmReloadReturnBlend(
+                    profile,
+                    progress);
+                return fromContact.Lerp(sidearmActionContact, reachSlide)
+                    .Lerp(supportHome, retreatSlide);
+            }
+            return fromContact.Lerp(
+                supportHome,
+                SmoothSegment(progress, profile.SeatEnd, 1.0f));
         }
 
         if (progress < profile.ActionEnd)
@@ -1200,12 +1262,6 @@ public partial class TacticalPlayer
                 out var magazineContact)
                 ? magazineContact
                 : fallback;
-            if (WeaponCatalog.IsSidearm(EquippedWeapon.Platform))
-            {
-                return fromContact.Lerp(
-                    supportHome,
-                    SmoothSegment(progress, profile.SeatEnd, profile.ActionEnd));
-            }
             if (profile.UsesAction(_reloadStartedEmpty)
                 && weapon.TryActionGripGlobalPosition(out var actionContact))
             {
@@ -1213,6 +1269,20 @@ public partial class TacticalPlayer
                     profile.SeatEnd,
                     profile.ActionEnd,
                     progress);
+                if (profile.Mechanism
+                    == FirstPersonReloadMechanism.HkSlapMagazine)
+                {
+                    var reachHandle = SmoothStep(Mathf.Clamp(
+                        actionProgress / 0.30f,
+                        0.0f,
+                        1.0f));
+                    var retreat = SmoothStep(Mathf.Clamp(
+                        (actionProgress - 0.62f) / 0.38f,
+                        0.0f,
+                        1.0f));
+                    return fromContact.Lerp(actionContact, reachHandle)
+                        .Lerp(supportHome, retreat);
+                }
                 var reach = SmoothStep(Mathf.Clamp(
                     actionProgress / 0.36f,
                     0.0f,
@@ -1225,6 +1295,8 @@ public partial class TacticalPlayer
         }
 
         if (!WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
+            && profile.Mechanism
+                != FirstPersonReloadMechanism.HkSlapMagazine
             && profile.UsesAction(_reloadStartedEmpty))
         {
             if (weapon.TryActionGripGlobalPosition(out var actionContact))
@@ -1306,7 +1378,7 @@ public partial class TacticalPlayer
             && IsInstanceValid(_authoredFirstPersonSmg?.Root))
         {
             _authoredFirstPersonSmg.SyncMechanisms();
-            _authoredFirstPersonSmg.SetReloadProgress(_isReloading ? ReloadProgress : 0.0f);
+            _authoredFirstPersonSmg.SetReloadProgress(_isReloading ? PresentationReloadProgress : 0.0f);
             _muzzle.GlobalTransform = _authoredFirstPersonSmg.Muzzle.GlobalTransform;
         }
         SyncAuthoredPlatformWeapon();

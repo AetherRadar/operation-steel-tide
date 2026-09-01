@@ -471,7 +471,7 @@ public partial class TacticalPlayer
         var cycle = Mathf.Sin(_ladderAnimationTime);
         var reach = cycle * 0.15f * Mathf.Lerp(0.25f, 1.0f, _ladderMotionAmount);
         _head.Rotation = new Vector3(_pitch, 0.0f, cycle * 0.006f * _ladderMotionAmount);
-        _camera.Position = new Vector3(
+        _cameraLocalOffset = new Vector3(
             cycle * 0.012f * _ladderMotionAmount,
             Mathf.Abs(cycle) * 0.014f * _ladderMotionAmount,
             0.0f);

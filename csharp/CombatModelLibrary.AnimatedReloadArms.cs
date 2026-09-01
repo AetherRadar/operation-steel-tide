@@ -6,28 +6,44 @@ namespace OperationSteelTide;
 
 internal sealed class AuthoredAnimatedReloadArmsVisual
 {
+    private static readonly Vector3 SidearmWristScreenOffset = new(
+        -0.030f,
+        -0.035f,
+        0.0f);
+    private const float SidearmWristDepthRetreat = 0.18f;
+    private const float SidearmMaximumWristCorrectionRadians = 0.16f;
     private Vector3 _leftPalmContactInBone;
     private Vector3 _leftGripAnchorInBone;
     private Vector3 _leftSidearmMagazineAnchorInBone;
     private Vector3 _rightPalmContactInBone;
     private readonly Dictionary<WeaponPlatform, Node3D> _leftElbowPoleFrames = new();
     private bool _contactPointsInitialized;
+    private Vector3 _presentedLeftSupportTargetGlobalPosition;
+    private string _presentedClipName = string.Empty;
+    private float _presentedClipProgress;
 
     public AuthoredAnimatedReloadArmsVisual(Node3D root)
     {
         Root = root;
         Skeleton = CombatModelLibrary.RequireSkeleton(root);
         AnimationPlayer = CombatModelLibrary.RequireAnimationPlayer(root);
+        // ReloadArmsMesh is a visibility-only compatibility layer retained for
+        // existing diagnostics. Runtime geometry is always one of the two
+        // authored forearm crops below; the complete arms are audit-only.
         FullMesh = CombatModelLibrary.RequireNode(root, "ReloadArmsMesh");
+        LongGunForearmsMesh = CombatModelLibrary.RequireNode(
+            root,
+            "LongGunReloadForearmsMesh");
         SidearmForearmsMesh = CombatModelLibrary.RequireNode(
             root,
             "SidearmReloadForearmsMesh");
-        // Reload presentation uses the complete gloves and authored forearms,
-        // while omitting only the upper arms that can cross the camera near
-        // plane. Keeping the wrist-to-sleeve span visible avoids both a
-        // floating hand and the giant "tentacle" silhouette.
-        FullMesh.Visible = false;
-        SidearmForearmsMesh.Visible = true;
+        FullAuditMesh = CombatModelLibrary.RequireNode(
+            root,
+            "FullReloadArmsAuditMesh");
+        FullMesh.Visible = true;
+        LongGunForearmsMesh.Visible = true;
+        SidearmForearmsMesh.Visible = false;
+        FullAuditMesh.Visible = false;
         RightGripFrame = CombatModelLibrary.RequireNode(root, "RightGripFrame");
         SupportGripFrame = CombatModelLibrary.RequireNode(root, "SupportGripFrame");
         RightPalmFrame = CombatModelLibrary.RequireNode(root, "RightPalmFrame");
@@ -64,12 +80,31 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
     public Node3D Root { get; }
     public Skeleton3D Skeleton { get; }
     public AnimationPlayer AnimationPlayer { get; }
+    /// <summary>Compatibility visibility layer; it contains no geometry.</summary>
     public Node3D FullMesh { get; }
+    public Node3D LongGunForearmsMesh { get; }
     public Node3D SidearmForearmsMesh { get; }
+    public Node3D FullAuditMesh { get; }
     public Node3D Mesh
-        => SidearmForearmsMesh.Visible ? SidearmForearmsMesh : FullMesh;
+        => SidearmForearmsMesh.Visible
+            ? SidearmForearmsMesh
+            : LongGunForearmsMesh;
     public bool UsesSidearmForearms
-        => SidearmForearmsMesh.Visible && !FullMesh.Visible;
+        => SidearmForearmsMesh.Visible
+            && !LongGunForearmsMesh.Visible
+            && !FullAuditMesh.Visible;
+    public bool UsesLongGunForearms
+        => LongGunForearmsMesh.Visible
+            && !SidearmForearmsMesh.Visible
+            && !FullAuditMesh.Visible;
+    // Compatibility name consumed by the existing TacticalPlayer diagnostic
+    // surface. It now means the non-sidearm authored reload presentation, not
+    // that the complete upper-arm audit mesh is rendered.
+    public bool UsesFullArms
+        => UsesLongGunForearms && FullMesh.Visible;
+    public string PresentedClipName
+        => _presentedClipName;
+    public float PresentedClipProgress => _presentedClipProgress;
     public Node3D RightGripFrame { get; }
     public Node3D SupportGripFrame { get; }
     public Node3D RightPalmFrame { get; }
@@ -106,7 +141,8 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
 
     public Vector3 LeftSupportAnchorGlobalPosition(
         WeaponPlatform platform,
-        float sidearmMagazineBlend = 1.0f)
+        float sidearmMagazineBlend = 1.0f,
+        float sidearmActionBlend = 0.0f)
     {
         if (!WeaponCatalog.IsSidearm(platform))
         {
@@ -117,15 +153,40 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
             return LeftPalmCenterGlobalPosition;
         }
         EnsureContactPointsInitialized();
-        // This DCC marker sits on the lower glove surface.  Keep that surface
-        // on the magazine rather than burying the palm centre inside the
-        // magazine and firing hand.
-        var contactInBone = _leftPalmContactInBone.Lerp(
-            _leftSidearmMagazineAnchorInBone,
-            Mathf.Clamp(sidearmMagazineBlend, 0.0f, 1.0f));
-        return ContactPointGlobal(
-            LeftPalmBone,
-            contactInBone);
+        // The imported glove is visually centred on the wrist weights; its
+        // palm child marker can move onto the prop while the rendered fist
+        // remains several centimetres away. During contact the control point
+        // therefore becomes the visible wrist. At both clip boundaries it is
+        // still the authored palm marker, preserving the exact ready-pose
+        // handoff to the ordinary first-person arms.
+        var palmAnchor = SidearmPalmAnchorGlobalPosition(
+            sidearmMagazineBlend);
+        var visibleContactBlend = Mathf.Max(
+            Mathf.Clamp(sidearmMagazineBlend, 0.0f, 1.0f),
+            Mathf.Clamp(sidearmActionBlend, 0.0f, 1.0f));
+        return palmAnchor.Lerp(
+            LeftWristGlobalPosition,
+            visibleContactBlend);
+    }
+
+    public Vector3 SidearmSupportTargetGlobalPosition(
+        Vector3 propTargetGlobalPosition,
+        float sidearmMagazineBlend,
+        float sidearmActionBlend)
+    {
+        var visibleContactBlend = Mathf.Max(
+            Mathf.Clamp(sidearmMagazineBlend, 0.0f, 1.0f),
+            Mathf.Clamp(sidearmActionBlend, 0.0f, 1.0f));
+        if (visibleContactBlend <= 0.0f)
+        {
+            return propTargetGlobalPosition;
+        }
+
+        var desiredWrist = SidearmDesiredWristGlobalPosition(
+            propTargetGlobalPosition);
+        return propTargetGlobalPosition.Lerp(
+            desiredWrist,
+            visibleContactBlend);
     }
 
     public Vector3 RightPalmContactGlobalPosition
@@ -148,6 +209,9 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
 
     public Vector3 RightWristGlobalPosition
         => BoneFrameGlobal(Skeleton.FindBone("R_wrist_026")).Origin;
+
+    public Vector3 PresentedLeftSupportTargetGlobalPosition
+        => _presentedLeftSupportTargetGlobalPosition;
 
     public Transform3D MarkerTransformInRoot(Node3D marker)
         => Root.GlobalTransform.AffineInverse() * marker.GlobalTransform;
@@ -175,88 +239,158 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
             throw new InvalidOperationException($"Animated reload arms are missing clip '{clip}'.");
         }
 
-        AnimationPlayer.Play(clip, 0.0);
+        if (!string.Equals(
+                AnimationPlayer.CurrentAnimation.ToString(),
+                clip,
+                StringComparison.Ordinal))
+        {
+            AnimationPlayer.Play(clip, 0.0);
+        }
+        // Runtime contact retargeting writes global poses on the left chain.
+        // Clear those edits before sampling the authored clip so presenting
+        // the same normalized time twice is deterministic instead of applying
+        // the previous frame's shoulder translation a second time.
+        Skeleton.ResetBonePose(LeftShoulderBone);
+        Skeleton.ResetBonePose(LeftElbowBone);
+        Skeleton.ResetBonePose(LeftWristBone);
+        Skeleton.ResetBonePose(LeftPalmBone);
+        Skeleton.ForceUpdateBoneChildTransform(LeftShoulderBone);
+        var normalizedProgress = Mathf.Clamp(progress, 0.0f, 1.0f);
+        var clipDuration = AnimationPlayer.GetAnimation(clip).Length;
+        if (string.Equals(
+                _presentedClipName,
+                clip,
+                StringComparison.Ordinal)
+            && Mathf.IsEqualApprox(
+                _presentedClipProgress,
+                normalizedProgress))
+        {
+            // AnimationPlayer may elide a seek to its current timestamp. Move
+            // through frame zero so the next seek reapplies every authored
+            // track after the manual contact pose was cleared.
+            AnimationPlayer.Seek(0.0, update: true, updateOnly: false);
+        }
         AnimationPlayer.Seek(
-            AnimationPlayer.GetAnimation(clip).Length
-                * Mathf.Clamp(progress, 0.0f, 1.0f),
-            update: true);
+            clipDuration * normalizedProgress,
+            update: true,
+            updateOnly: false);
+        Skeleton.ForceUpdateBoneChildTransform(LeftShoulderBone);
         AnimationPlayer.Pause();
+        _presentedClipName = clip;
+        _presentedClipProgress = normalizedProgress;
     }
 
     public void SetPresentationPlatform(WeaponPlatform platform)
     {
-        _ = platform;
-        FullMesh.Visible = false;
-        SidearmForearmsMesh.Visible = true;
+        var sidearm = WeaponCatalog.IsSidearm(platform);
+        FullMesh.Visible = !sidearm;
+        LongGunForearmsMesh.Visible = !sidearm;
+        SidearmForearmsMesh.Visible = sidearm;
+        FullAuditMesh.Visible = false;
     }
 
     public void RetargetLeftPalm(
         WeaponPlatform platform,
         Vector3 targetGlobalPosition,
-        Vector3 desiredWristDirectionGlobal,
-        float sidearmMagazineBlend = 1.0f)
+        float sidearmMagazineBlend = 0.0f,
+        float sidearmActionBlend = 0.0f)
     {
         EnsureContactPointsInitialized();
+        targetGlobalPosition = ReachableLeftPalmTarget(
+            platform,
+            targetGlobalPosition,
+            sidearmMagazineBlend);
         var targetInSkeleton = Skeleton.GlobalTransform.AffineInverse()
             * targetGlobalPosition;
         if (UsesSidearmForearms)
         {
-            // Only the glove, short cuff, and forearm are rendered for every
-            // weapon. Move that compact chain as one authored unit instead of
-            // solving an invisible shoulder/elbow IK chain; this preserves the
-            // clip's hand pose and cannot stretch a sleeve across the viewport.
-            var compactContactInSkeleton = Skeleton.GlobalTransform.AffineInverse()
+            var targetControlGlobal = SidearmSupportTargetGlobalPosition(
+                targetGlobalPosition,
+                sidearmMagazineBlend,
+                sidearmActionBlend);
+            _presentedLeftSupportTargetGlobalPosition = targetControlGlobal;
+            // Keep the DCC finger pose, but turn the wrist just enough for the
+            // compact cuff to enter from below-left instead of pointing into
+            // the camera near plane. Fade this correction with the magazine
+            // contact marker so both visibility endpoints remain the exact
+            // authored static pose.
+            var compactWrist = Skeleton.GetBoneGlobalPose(LeftWristBone);
+            var authoredContactInSkeleton = Skeleton.GlobalTransform
+                .AffineInverse()
+                * SidearmPalmAnchorGlobalPosition(sidearmMagazineBlend);
+            var authoredWristToContact = authoredContactInSkeleton
+                - compactWrist.Origin;
+            if (authoredWristToContact.LengthSquared() > 0.000001f)
+            {
+                var sidearmDesiredWrist = SidearmDesiredWristGlobalPosition(
+                    targetGlobalPosition);
+                var desiredWristToContact = Skeleton.GlobalTransform
+                    .Basis.Inverse()
+                    * (targetGlobalPosition - sidearmDesiredWrist);
+                if (desiredWristToContact.LengthSquared() > 0.000001f)
+                {
+                    var fullSwing = new Quaternion(
+                        authoredWristToContact.Normalized(),
+                        desiredWristToContact.Normalized());
+                    var fullSwingAngle = Quaternion.Identity.AngleTo(
+                        fullSwing);
+                    var limitedSwing = Quaternion.Identity.Slerp(
+                        fullSwing,
+                        fullSwingAngle <= SidearmMaximumWristCorrectionRadians
+                            ? 1.0f
+                            : SidearmMaximumWristCorrectionRadians
+                                / fullSwingAngle);
+                    var blendedSwing = Quaternion.Identity.Slerp(
+                        limitedSwing,
+                        Mathf.Max(
+                            Mathf.Clamp(sidearmMagazineBlend, 0.0f, 1.0f),
+                            Mathf.Clamp(sidearmActionBlend, 0.0f, 1.0f)));
+                    compactWrist.Basis = (
+                        new Basis(blendedSwing) * compactWrist.Basis)
+                        .Orthonormalized();
+                    Skeleton.SetBoneGlobalPose(LeftWristBone, compactWrist);
+                    Skeleton.ForceUpdateBoneChildTransform(LeftWristBone);
+                }
+            }
+
+            // Translate the complete hidden-root chain by the remaining
+            // contact residual so finger-weighted vertices and the short cuff
+            // follow the live magazine together without stretching.
+            var currentControlInSkeleton = Skeleton.GlobalTransform
+                .AffineInverse()
                 * LeftSupportAnchorGlobalPosition(
                     platform,
-                    sidearmMagazineBlend);
+                    sidearmMagazineBlend,
+                    sidearmActionBlend);
+            var targetControlInSkeleton = Skeleton.GlobalTransform
+                .AffineInverse()
+                * targetControlGlobal;
             var compactShoulder = Skeleton.GetBoneGlobalPose(LeftShoulderBone);
-            var compactWrist = Skeleton.GetBoneGlobalPose(LeftWristBone);
-            var compactPalmCenter = Skeleton.GlobalTransform.AffineInverse()
-                * LeftPalmCenterGlobalPosition;
-            var currentWristDirection = compactWrist.Origin
-                - compactPalmCenter;
-            var desiredWristDirection = Skeleton.GlobalTransform.Basis.Inverse()
-                * desiredWristDirectionGlobal;
-            if (currentWristDirection.LengthSquared() > 0.000001f
-                && desiredWristDirection.LengthSquared() > 0.000001f)
-            {
-                var wristSwing = new Quaternion(
-                    currentWristDirection.Normalized(),
-                    desiredWristDirection.Normalized());
-                var wristCorrection = WeaponCatalog.IsSidearm(platform)
-                    ? new Quaternion(
-                        desiredWristDirection.Normalized(),
-                        Mathf.DegToRad(-90.0f)) * wristSwing
-                    : wristSwing;
-                compactShoulder.Basis = (
-                    new Basis(wristCorrection) * compactShoulder.Basis)
-                    .Orthonormalized();
-                Skeleton.SetBoneGlobalPose(LeftShoulderBone, compactShoulder);
-                Skeleton.ForceUpdateBoneChildTransform(LeftShoulderBone);
-                compactContactInSkeleton = Skeleton.GlobalTransform.AffineInverse()
-                    * LeftSupportAnchorGlobalPosition(
-                        platform,
-                        sidearmMagazineBlend);
-                compactShoulder = Skeleton.GetBoneGlobalPose(LeftShoulderBone);
-            }
-            compactShoulder.Origin += targetInSkeleton - compactContactInSkeleton;
+            compactShoulder.Origin += targetControlInSkeleton
+                - currentControlInSkeleton;
             Skeleton.SetBoneGlobalPose(LeftShoulderBone, compactShoulder);
             Skeleton.ForceUpdateBoneChildTransform(LeftShoulderBone);
             return;
         }
 
-        targetGlobalPosition = ReachableLeftPalmTarget(platform, targetGlobalPosition);
-        targetInSkeleton = Skeleton.GlobalTransform.AffineInverse()
-            * targetGlobalPosition;
+        _presentedLeftSupportTargetGlobalPosition = targetGlobalPosition;
 
         var shoulder = Skeleton.GetBoneGlobalPose(LeftShoulderBone);
         var elbow = Skeleton.GetBoneGlobalPose(LeftElbowBone);
         var wrist = Skeleton.GetBoneGlobalPose(LeftWristBone);
         var originalElbowBasis = elbow.Basis;
         var originalWristBasis = wrist.Basis;
+        // Long-gun targets use the palm centre. Sidearms blend toward a marker
+        // on the lower glove surface while holding a magazine, then back to the
+        // palm centre for the ready-pose handoff. Solving that actual contact
+        // marker keeps the glove on the prop without translating the hidden
+        // shoulder or stretching either articulated segment.
         var contactInSkeleton = Skeleton.GlobalTransform.AffineInverse()
-            * LeftGripAnchorGlobalPosition;
-        var targetWrist = targetInSkeleton - (contactInSkeleton - wrist.Origin);
+            * LeftSupportAnchorGlobalPosition(
+                platform,
+                sidearmMagazineBlend);
+        var wristToContact = contactInSkeleton - wrist.Origin;
+        var targetWrist = targetInSkeleton - wristToContact;
 
         var proximal = elbow.Origin - shoulder.Origin;
         var distal = wrist.Origin - elbow.Origin;
@@ -373,10 +507,13 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
 
     public Vector3 ReachableLeftPalmTarget(
         WeaponPlatform platform,
-        Vector3 requestedGlobalPosition)
+        Vector3 requestedGlobalPosition,
+        float sidearmMagazineBlend = 0.0f)
     {
         if (UsesSidearmForearms)
         {
+            // The upper chain is hidden for pistol reloads and translates as
+            // one authored unit, so it does not need a two-bone reach clamp.
             return requestedGlobalPosition;
         }
 
@@ -387,7 +524,9 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
         var elbow = Skeleton.GetBoneGlobalPose(LeftElbowBone);
         var wrist = Skeleton.GetBoneGlobalPose(LeftWristBone);
         var contactInSkeleton = Skeleton.GlobalTransform.AffineInverse()
-            * LeftGripAnchorGlobalPosition;
+            * LeftSupportAnchorGlobalPosition(
+                platform,
+                sidearmMagazineBlend);
         var wristToContact = contactInSkeleton - wrist.Origin;
         var requestedWrist = requestedInSkeleton - wristToContact;
         var shoulderToWrist = requestedWrist - shoulder.Origin;
@@ -456,6 +595,60 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
         => Skeleton.GlobalTransform
             * (Skeleton.GetBoneGlobalPose(bone) * pointInBone);
 
+    private Vector3 SidearmPalmAnchorGlobalPosition(float magazineBlend)
+    {
+        var contactInBone = _leftPalmContactInBone.Lerp(
+            _leftSidearmMagazineAnchorInBone,
+            Mathf.Clamp(magazineBlend, 0.0f, 1.0f));
+        return ContactPointGlobal(LeftPalmBone, contactInBone);
+    }
+
+    private Vector3 SidearmDesiredWristGlobalPosition(
+        Vector3 propTargetGlobalPosition)
+    {
+        var camera = FirstPersonCameraAncestor();
+        if (camera is null || !GodotObject.IsInstanceValid(camera))
+        {
+            return propTargetGlobalPosition;
+        }
+
+        var cameraInverse = camera.GlobalTransform.AffineInverse();
+        var targetInCamera = cameraInverse * propTargetGlobalPosition;
+        if (Mathf.Abs(targetInCamera.Z) <= 0.0001f)
+        {
+            return propTargetGlobalPosition;
+        }
+
+        // Match the prop's screen ray at a fixed depth behind the contact.
+        // Deriving that depth from the already-retargeted wrist makes the
+        // whole hidden shoulder chain retreat again every presentation frame.
+        // The fixed prop-relative depth is deterministic and still keeps the
+        // glove away from the near plane. A small camera-plane offset leaves
+        // the wrist below-left while the fingers overlap the magazine or slide.
+        var desiredWristDepth = targetInCamera.Z - SidearmWristDepthRetreat;
+        var depthScale = desiredWristDepth / targetInCamera.Z;
+        var targetAtWristDepth = new Vector3(
+            targetInCamera.X * depthScale,
+            targetInCamera.Y * depthScale,
+            desiredWristDepth);
+        return camera.GlobalTransform
+            * (targetAtWristDepth + SidearmWristScreenOffset);
+    }
+
+    private Camera3D? FirstPersonCameraAncestor()
+    {
+        for (Node? ancestor = Root.GetParent();
+             ancestor is not null;
+             ancestor = ancestor.GetParent())
+        {
+            if (ancestor is Camera3D camera)
+            {
+                return camera;
+            }
+        }
+        return null;
+    }
+
     private Transform3D ContactFrameGlobal(int bone, Vector3 contactGlobalPosition)
     {
         var boneFrame = BoneFrameGlobal(bone);
@@ -498,41 +691,5 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
                     $"Animated reload arms contract is missing bone '{bone}'.");
             }
         }
-    }
-}
-
-internal static partial class CombatModelLibrary
-{
-    internal const string AnimatedReloadArmsScenePath =
-        "res://assets/models/djmaesen_smg45/animated_reload_arms.glb";
-
-    private static readonly string[] AnimatedReloadArmsNodes =
-    {
-        "WeaponRoot", "ReloadArmsSkeleton", "ReloadArmsMesh",
-        "SidearmReloadForearmsMesh",
-        "RightGripFrame", "SupportGripFrame",
-        "LeftPalmFrame", "LeftGripAnchorFrame",
-        "LeftSidearmMagazineAnchorFrame", "RightPalmFrame",
-        "LeftWristFrame", "RightWristFrame",
-        "LeftShoulderFrame", "RightShoulderFrame",
-        "m4a1_ElbowPoleFrame", "ak74_ElbowPoleFrame",
-        "scarl_ElbowPoleFrame", "mp5a5_ElbowPoleFrame",
-        "m24_ElbowPoleFrame", "axmc_ElbowPoleFrame",
-        "awm_ElbowPoleFrame", "vss_ElbowPoleFrame",
-        "p226_ElbowPoleFrame", "m1911_ElbowPoleFrame",
-        "gsh18_ElbowPoleFrame", "desert_eagle_ElbowPoleFrame"
-    };
-
-    public static AuthoredAnimatedReloadArmsVisual InstantiateAnimatedReloadArms()
-    {
-        var root = InstantiateRequired(
-            AnimatedReloadArmsScenePath,
-            AnimatedReloadArmsNodes);
-        root.Name = "AuthoredAnimatedReloadArmsVisual";
-        foreach (var geometry in GeometryBelow(root))
-        {
-            geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
-        }
-        return new AuthoredAnimatedReloadArmsVisual(root);
     }
 }

@@ -3,7 +3,12 @@
 The CC BY 4.0 source supplies production glove/sleeve geometry, materials,
 finger bones, and skin weights.  This adaptation removes every weapon mesh,
 turns the authored firing pose into the rest pose, and bakes platform-specific
-left-arm IK into named actions.  The right hand and both shoulder roots remain
+camera-safe pose-to-pose actions. Long guns use family-calibrated left-arm IK;
+pistol crops use a deterministic analytical shoulder-elbow solve. Dedicated
+long-gun and sidearm forearm meshes preserve the authored gloves, sleeves,
+skin, materials, and UVs while excluding the upper-arm cloth that can cross a
+first-person camera near plane. The complete authored arms remain in the file
+as a hidden runtime audit layer. The right hand and both shoulder roots remain
 fixed so runtime animation cannot detach the arms from the body or primary
 grip.
 
@@ -49,8 +54,12 @@ OUTPUT_GLB = (
 SOURCE_IDLE_FRAME = 155
 SOURCE_TO_METERS = 0.015
 FPS = 30
+TACTICAL_DURATION_SECONDS = 1.80
+EMPTY_DURATION_SECONDS = 2.15
 EXPECTED_TRIANGLES = 13_700
-EXPECTED_SIDEARM_TRIANGLES = 9_306
+EXPECTED_LONG_GUN_TRIANGLES = 12_686
+EXPECTED_SIDEARM_TRIANGLES = 9_334
+LONG_GUN_FOREARM_CUFF_LENGTH = 40.0
 SIDEARM_FOREARM_CUFF_LENGTH = 16.0
 LEFT_CHAIN = ("L_arm_01", "L_elbow_02", "L_wrist_03")
 RIGHT_PALM = "R_palm_039"
@@ -60,9 +69,13 @@ RIGHT_SHOULDER = "R_arm_024"
 MAX_FIXED_DRIFT_METERS = 0.00025
 MAX_FIXED_ROTATION_RADIANS = 0.001
 MAX_BIND_SURFACE_ERROR_METERS = 0.00001
-MIN_HAND_TRAVEL_METERS = 0.45
-MAX_HAND_TRAVEL_METERS = 3.50
+MIN_HAND_TRAVEL_METERS = 0.25
+MAX_HAND_TRAVEL_METERS = 2.50
 MAX_RETURN_ERROR_METERS = 0.025
+MAX_CONTROL_EXCURSION_METERS = 0.65
+MAX_CAMERA_SAFE_EXCURSION_METERS = 0.85
+MAX_POSE_HOLD_DRIFT_METERS = 0.025
+MIN_MECHANICAL_BEAT_METERS = 0.030
 MIN_PALM_OFFSET_METERS = 0.075
 MAX_PALM_OFFSET_METERS = 0.115
 MIN_GRIP_CONTACT_METERS = 0.015
@@ -84,33 +97,62 @@ SIDEARM_ANCHOR_TARGET_FORWARD_METERS = -0.0118
 SIDEARM_ANCHOR_TARGET_BELOW_METERS = 0.0613
 MAX_LEFT_BONE_STEP_RADIANS = 0.55
 MAX_LEFT_PALM_STEP_METERS = 0.25
-SIDEARM_MAX_LEFT_BONE_STEP_RADIANS = 0.17
-SIDEARM_MAX_LEFT_JOINT_STEP_METERS = 0.030
-SIDEARM_MAX_LEFT_PALM_STEP_METERS = 0.030
-SIDEARM_MIN_HAND_TRAVEL_METERS = 0.012
-SIDEARM_MAX_HAND_TRAVEL_METERS = 0.15
+SIDEARM_MAX_LEFT_BONE_STEP_RADIANS = 0.24
+SIDEARM_MAX_LEFT_JOINT_STEP_METERS = 0.045
+SIDEARM_MAX_LEFT_PALM_STEP_METERS = 0.045
+SIDEARM_MIN_HAND_TRAVEL_METERS = 0.10
+SIDEARM_MAX_HAND_TRAVEL_METERS = 1.10
+SIDEARM_MAX_CONTROL_EXCURSION_METERS = 0.32
+SIDEARM_MAX_CAMERA_SAFE_EXCURSION_METERS = 0.45
 SIDEARM_MAGAZINE_WRIST_POSES = {
     "p226": (-10.0, 25.0, 42.0),
     "m1911": (-10.0, 25.0, 42.0),
     "gsh18": (0.0, 5.0, 42.0),
     "desert_eagle": (-9.0, 28.0, 30.0),
 }
-SIDEARM_MAGAZINE_POSE_START = 0.15
-SIDEARM_MAGAZINE_POSE_END = 0.82
+SIDEARM_ACTION_WRIST_POSES = {
+    "p226": (-12.0, -5.0, 10.0),
+    "m1911": (-13.0, -6.0, 9.0),
+    "gsh18": (-7.0, -3.0, 12.0),
+    "desert_eagle": (-18.0, -8.0, 3.0),
+}
+SIDEARM_IK_BLEND_IN_START = 0.02
+SIDEARM_IK_BLEND_IN_END = 0.12
+SIDEARM_TACTICAL_BLEND_OUT_START = 0.86
+SIDEARM_EMPTY_BLEND_OUT_START = 0.915
 SIDEARM_ENDPOINT_MAX_BASIS_ERROR_RADIANS = 0.01
 SIDEARM_ENDPOINT_MAX_POSITION_ERROR_METERS = 0.003
+MAX_LONG_GUN_CAMERA_HORIZONTAL_SPAN_METERS = 1.20
+# Depth span includes the cuff extending away from the lens as well as toward
+# it.  The explicit rear-extent gate below is the near-plane safety bound; this
+# wider total span admits a natural 40-unit elbow cuff while still rejecting
+# the 2.90 m full-arm audit silhouette by a large margin.
+MAX_LONG_GUN_CAMERA_DEPTH_SPAN_METERS = 1.40
+MAX_LONG_GUN_CAMERA_VERTICAL_SPAN_METERS = 1.05
+MAX_LONG_GUN_CAMERA_REAR_EXTENT_METERS = 0.75
+CAMERA_ENVELOPE_FRAME_STEP = 2
 
 
 @dataclass(frozen=True)
 class ReloadProfile:
     name: str
+    family: str
     support: tuple[float, float, float]
     magazine: tuple[float, float, float]
-    pocket: tuple[float, float, float]
+    exchange: tuple[float, float, float]
     insert: tuple[float, float, float]
     action: tuple[float, float, float]
     pole: tuple[float, float, float]
     sidearm: bool = False
+    tactical_action: bool = False
+
+
+@dataclass(frozen=True)
+class ReloadControlPoint:
+    fraction: float
+    location: Vector
+    rotation_degrees: Vector
+    beat: str = ""
 
 
 @dataclass(frozen=True)
@@ -126,30 +168,54 @@ class SidearmStaticPose:
 # Each entry is intentionally platform-specific rather than a shared family
 # guess so a runtime adapter can select a stable, named clip per weapon.
 PROFILES = (
-    ReloadProfile("m4a1", (5.4, -31.0, 3.2), (4.0, -10.0, -9.0),
-                  (31.0, 3.0, -26.0), (3.0, -11.0, -4.0), (2.0, -4.0, 10.0), (48.0, 1.0, -27.0)),
-    ReloadProfile("ak74", (5.4, -31.0, 3.2), (7.0, -13.0, -12.0),
-                  (32.0, 2.0, -28.0), (8.0, -13.0, -5.0), (13.0, -10.0, 8.0), (50.0, -1.0, -28.0)),
-    ReloadProfile("scarl", (5.4, -31.0, 3.2), (4.0, -11.0, -10.0),
-                  (31.0, 2.0, -27.0), (4.0, -12.0, -4.0), (12.0, -14.0, 9.0), (48.0, 0.0, -27.0)),
-    ReloadProfile("mp5a5", (5.4, -28.0, 3.5), (3.0, -10.0, -12.0),
-                  (30.0, 4.0, -27.0), (3.0, -10.0, -5.0), (12.0, -19.0, 11.0), (47.0, 2.0, -27.0)),
-    ReloadProfile("m24", (5.0, -39.0, 3.0), (4.0, -9.0, -10.0),
-                  (32.0, 4.0, -28.0), (4.0, -10.0, -4.0), (9.0, -4.0, 10.0), (50.0, 0.0, -29.0)),
-    ReloadProfile("axmc", (5.0, -40.0, 3.0), (4.0, -10.0, -11.0),
-                  (33.0, 3.0, -29.0), (4.0, -11.0, -4.0), (10.0, -5.0, 11.0), (51.0, 0.0, -29.0)),
-    ReloadProfile("awm", (5.0, -42.0, 3.0), (5.0, -10.0, -12.0),
-                  (34.0, 3.0, -30.0), (5.0, -11.0, -5.0), (10.0, -5.0, 11.0), (52.0, -1.0, -30.0)),
-    ReloadProfile("vss", (5.0, -35.0, 3.0), (5.0, -12.0, -11.0),
-                  (31.0, 3.0, -28.0), (5.0, -12.0, -4.0), (12.0, -11.0, 9.0), (49.0, 0.0, -28.0)),
-    ReloadProfile("p226", (3.0, 0.0, 5.0), (-2.0, -2.0, -5.0),
-                  (29.0, 12.0, -27.0), (-2.0, -2.0, -2.0), (1.0, -8.0, 10.0), (40.0, 18.0, -23.0), True),
-    ReloadProfile("m1911", (3.0, 0.0, 5.0), (-3.0, -2.0, -5.0),
-                  (29.0, 12.0, -27.0), (-3.0, -2.0, -2.0), (1.0, -9.0, 10.0), (40.0, 18.0, -23.0), True),
-    ReloadProfile("gsh18", (3.0, 0.0, 5.0), (-2.0, -3.0, -5.0),
-                  (29.0, 12.0, -27.0), (-2.0, -3.0, -2.0), (1.0, -9.0, 10.0), (40.0, 18.0, -23.0), True),
-    ReloadProfile("desert_eagle", (-7.0, -10.5, 1.0), (-4.0, -3.0, -6.0),
-                  (30.0, 11.0, -29.0), (-4.0, -3.0, -2.0), (0.0, -10.0, 11.0), (41.0, 16.0, -25.0), True),
+    ReloadProfile("m4a1", "straight_rifle", (5.4, -31.0, 3.2),
+                  (4.0, -10.0, -9.0), (13.0, -4.0, -20.0),
+                  (3.0, -11.0, -4.0), (2.0, -4.0, 10.0),
+                  (48.0, 1.0, -27.0)),
+    ReloadProfile("ak74", "rock_and_lock", (5.4, -31.0, 3.2),
+                  (7.0, -13.0, -12.0), (15.0, -5.0, -22.0),
+                  (8.0, -13.0, -5.0), (13.0, -10.0, 8.0),
+                  (50.0, -1.0, -28.0)),
+    ReloadProfile("scarl", "straight_rifle", (5.4, -31.0, 3.2),
+                  (4.0, -11.0, -10.0), (13.0, -4.0, -21.0),
+                  (4.0, -12.0, -4.0), (12.0, -14.0, 9.0),
+                  (48.0, 0.0, -27.0)),
+    ReloadProfile("mp5a5", "mp5", (5.4, -28.0, 3.5),
+                  (3.0, -10.0, -12.0), (12.0, -4.0, -21.0),
+                  (3.0, -10.0, -5.0), (12.0, -19.0, 11.0),
+                  (47.0, 2.0, -27.0)),
+    ReloadProfile("m24", "internal_precision", (5.0, -39.0, 3.0),
+                  (4.0, -9.0, -10.0), (12.0, -7.0, -19.0),
+                  (4.0, -10.0, -4.0), (9.0, -4.0, 10.0),
+                  (50.0, 0.0, -29.0), tactical_action=True),
+    ReloadProfile("axmc", "precision", (5.0, -40.0, 3.0),
+                  (4.0, -10.0, -11.0), (13.0, -8.0, -21.0),
+                  (4.0, -11.0, -4.0), (10.0, -5.0, 11.0),
+                  (51.0, 0.0, -29.0)),
+    ReloadProfile("awm", "precision", (5.0, -42.0, 3.0),
+                  (5.0, -10.0, -12.0), (14.0, -9.0, -22.0),
+                  (5.0, -11.0, -5.0), (10.0, -5.0, 11.0),
+                  (52.0, -1.0, -30.0)),
+    ReloadProfile("vss", "rock_and_lock", (5.0, -35.0, 3.0),
+                  (5.0, -12.0, -11.0), (14.0, -5.0, -21.0),
+                  (5.0, -12.0, -4.0), (12.0, -11.0, 9.0),
+                  (49.0, 0.0, -28.0)),
+    ReloadProfile("p226", "service_pistol", (3.0, 0.0, 5.0),
+                  (-2.0, -2.0, -5.0), (0.0, 0.0, -11.0),
+                  (-2.0, -2.0, -2.0), (0.0, -6.0, 7.0),
+                  (40.0, 18.0, -23.0), True),
+    ReloadProfile("m1911", "service_pistol", (3.0, 0.0, 5.0),
+                  (-3.0, -2.0, -5.0), (-1.0, 0.0, -11.0),
+                  (-3.0, -2.0, -2.0), (0.0, -6.0, 7.0),
+                  (40.0, 18.0, -23.0), True),
+    ReloadProfile("gsh18", "service_pistol", (3.0, 0.0, 5.0),
+                  (-2.0, -3.0, -5.0), (0.0, -1.0, -11.0),
+                  (-2.0, -3.0, -2.0), (0.0, -6.0, 7.0),
+                  (40.0, 18.0, -23.0), True),
+    ReloadProfile("desert_eagle", "desert_eagle", (-7.0, -10.5, 1.0),
+                  (-4.0, -3.0, -6.0), (-2.0, -1.0, -12.0),
+                  (-4.0, -3.0, -2.0), (-3.5, -8.5, 5.5),
+                  (41.0, 16.0, -25.0), True),
 )
 
 
@@ -301,19 +367,24 @@ def sidearm_magazine_anchor_frame(
     return anchor
 
 
-def create_sidearm_forearms(source: bpy.types.Object) -> bpy.types.Object:
-    """Create a skinned forearm-only copy without exposing either upper arm.
+def create_forearm_crop(
+    source: bpy.types.Object,
+    object_name: str,
+    cuff_length: float,
+    report_name: str,
+) -> bpy.types.Object:
+    """Create a skinned forearm copy without exposing either upper arm.
 
     The two largest disconnected source components are the authored cloth
-    sleeves.  Bisect only those components in the source bind pose, retaining
-    the complete gloves/hands and only a very short protective cuff.
+    sleeves. Bisect only those components in the source bind pose, retaining
+    the complete gloves/hands and a role-specific length of authored cuff.
     BMesh interpolates the existing UV and deform layers at the local cut, so
     this does not need the broad sleeve-cap operation used by other assets.
     """
     result = source.copy()
     result.data = source.data.copy()
-    result.name = "SidearmReloadForearmsMesh"
-    result.data.name = "SidearmReloadForearmsMeshData"
+    result.name = object_name
+    result.data.name = f"{object_name}Data"
     source.users_collection[0].objects.link(result)
 
     mesh = result.data
@@ -356,7 +427,7 @@ def create_sidearm_forearms(source: bpy.types.Object) -> bpy.types.Object:
         cut_reports = []
         for component in sleeve_components:
             minimum_y = min(vertex.co.y for vertex in component)
-            cut_y = minimum_y + SIDEARM_FOREARM_CUFF_LENGTH
+            cut_y = minimum_y + cuff_length
             component_edges = {
                 edge for vertex in component for edge in vertex.link_edges
             }
@@ -388,22 +459,23 @@ def create_sidearm_forearms(source: bpy.types.Object) -> bpy.types.Object:
     if tuple(group.name for group in result.vertex_groups) != tuple(
         group.name for group in source.vertex_groups
     ):
-        raise RuntimeError("Sidearm forearm crop lost authored skin groups")
+        raise RuntimeError(f"{report_name} crop lost authored skin groups")
     if tuple(layer.name for layer in mesh.uv_layers) != tuple(
         layer.name for layer in source.data.uv_layers
     ):
-        raise RuntimeError("Sidearm forearm crop lost authored UV layers")
+        raise RuntimeError(f"{report_name} crop lost authored UV layers")
     if tuple(mesh.materials) != tuple(source.data.materials):
-        raise RuntimeError("Sidearm forearm crop lost authored materials")
+        raise RuntimeError(f"{report_name} crop lost authored materials")
     weight_sums = [
         sum(group.weight for group in vertex.groups) for vertex in mesh.vertices
     ]
     if not weight_sums or min(weight_sums) < 0.999 or max(weight_sums) > 1.001:
-        raise RuntimeError("Sidearm forearm crop produced invalid skin weights")
+        raise RuntimeError(f"{report_name} crop produced invalid skin weights")
     print(
-        "SIDEARM_FOREARM_CROP"
+        f"{report_name}_CROP"
         f" vertices={len(mesh.vertices)}"
         f" triangles={sum(len(polygon.vertices) - 2 for polygon in mesh.polygons)}"
+        f" cuff_length={cuff_length:.3f}"
         f" cut_y={'/'.join(f'{cut_y:.6f}' for cut_y, _ in cut_reports)}"
         f" cut_elements={'/'.join(str(count) for _, count in cut_reports)}"
         f" uv_layers={len(mesh.uv_layers)}"
@@ -411,6 +483,26 @@ def create_sidearm_forearms(source: bpy.types.Object) -> bpy.types.Object:
         f" valid=True"
     )
     return result
+
+
+def create_long_gun_forearms(source: bpy.types.Object) -> bpy.types.Object:
+    """Keep complete hands plus a camera-safe elbow-length rifle cuff."""
+    return create_forearm_crop(
+        source,
+        "LongGunReloadForearmsMesh",
+        LONG_GUN_FOREARM_CUFF_LENGTH,
+        "LONG_GUN_FOREARM",
+    )
+
+
+def create_sidearm_forearms(source: bpy.types.Object) -> bpy.types.Object:
+    """Keep complete hands plus the compact pistol cuff."""
+    return create_forearm_crop(
+        source,
+        "SidearmReloadForearmsMesh",
+        SIDEARM_FOREARM_CUFF_LENGTH,
+        "SIDEARM_FOREARM",
+    )
 
 
 def import_and_prepare_source() -> tuple[
@@ -431,8 +523,13 @@ def import_and_prepare_source() -> tuple[
     armature = bpy.data.objects["Object_4"]
     arms_mesh = bpy.data.objects["Object_7"]
     refine_authored_sleeves()
-    extend_authored_sleeves()
+    # Crop the runtime layers from the authored sleeve before the audit-only
+    # shoulder extension is added.  Cropping the extended mesh retained a
+    # straight, oversized tube at the cut and made the MP5/AK support forearm
+    # look detached whenever the wrist crossed the lower viewport edge.
+    long_gun_arms_mesh = create_long_gun_forearms(arms_mesh)
     sidearm_arms_mesh = create_sidearm_forearms(arms_mesh)
+    extend_authored_sleeves()
     bpy.context.view_layer.update()
     components = evaluated_component_centers(arms_mesh)
     right_palm = bone_world_matrix(armature, RIGHT_PALM)
@@ -455,6 +552,7 @@ def import_and_prepare_source() -> tuple[
         left_contact,
     )
     bind_vertices = evaluated_vertices(arms_mesh)
+    long_gun_bind_vertices = evaluated_vertices(long_gun_arms_mesh)
     sidearm_bind_vertices = evaluated_vertices(sidearm_arms_mesh)
 
     # Make the authored two-hand firing pose the new bind/rest pose.  This
@@ -472,6 +570,12 @@ def import_and_prepare_source() -> tuple[
     for vertex, position in zip(arms_mesh.data.vertices, bind_vertices):
         vertex.co = position
     arms_mesh.data.update()
+    for vertex, position in zip(
+        long_gun_arms_mesh.data.vertices,
+        long_gun_bind_vertices,
+    ):
+        vertex.co = position
+    long_gun_arms_mesh.data.update()
     for vertex, position in zip(
         sidearm_arms_mesh.data.vertices,
         sidearm_bind_vertices,
@@ -508,16 +612,36 @@ def import_and_prepare_source() -> tuple[
     bpy.context.collection.objects.link(root)
     armature.name = "ReloadArmsSkeleton"
     armature.data.name = "ReloadArmsSkeletonData"
-    arms_mesh.name = "ReloadArmsMesh"
-    arms_mesh.data.name = "ReloadArmsMeshData"
+    arms_mesh.name = "FullReloadArmsAuditMesh"
+    arms_mesh.data.name = "FullReloadArmsAuditMeshData"
     armature.parent = root
     armature.matrix_parent_inverse.identity()
     armature.matrix_basis.identity()
-    retained = {root, armature, arms_mesh, sidearm_arms_mesh}
+    compatibility_layer = bpy.data.objects.new("ReloadArmsMesh", None)
+    compatibility_layer.empty_display_type = "PLAIN_AXES"
+    compatibility_layer.empty_display_size = 1.0
+    bpy.context.collection.objects.link(compatibility_layer)
+    compatibility_layer.parent = root
+    compatibility_layer.matrix_parent_inverse.identity()
+    compatibility_layer.matrix_basis.identity()
+    compatibility_layer["presentation_role"] = (
+        "long_gun_forearms_compatibility_layer"
+    )
+    arms_mesh["presentation_role"] = "full_arms_non_runtime_audit"
+    long_gun_arms_mesh["presentation_role"] = "long_gun_forearms_runtime"
+    sidearm_arms_mesh["presentation_role"] = "sidearm_forearms_runtime"
+    retained = {
+        root,
+        armature,
+        arms_mesh,
+        long_gun_arms_mesh,
+        sidearm_arms_mesh,
+        compatibility_layer,
+    }
     for obj in list(bpy.context.scene.objects):
         if obj not in retained:
             bpy.data.objects.remove(obj, do_unlink=True)
-    for visible_mesh in (arms_mesh, sidearm_arms_mesh):
+    for visible_mesh in (arms_mesh, long_gun_arms_mesh, sidearm_arms_mesh):
         if visible_mesh.parent is not armature:
             raise RuntimeError(
                 f"{visible_mesh.name} lost its authored armature parent"
@@ -647,112 +771,383 @@ def apply_sidearm_static_pose(
     bpy.context.view_layer.update()
 
 
-def keyframe_sidearm_magazine_influence(
-    constraint: bpy.types.Constraint,
-    end_frame: int,
-) -> None:
-    for fraction, influence in (
-        (0.0, 0.0),
-        (SIDEARM_MAGAZINE_POSE_START, 1.0),
-        (SIDEARM_MAGAZINE_POSE_END, 1.0),
-        (1.0, 0.0),
-    ):
-        constraint.influence = influence
-        constraint.keyframe_insert(
-            data_path="influence",
-            frame=round(fraction * end_frame),
-        )
-
-
-def ease_constraint_keyframes(action: bpy.types.Action) -> None:
-    for curve in action.fcurves:
-        if ".constraints[" not in curve.data_path:
-            continue
-        for key in curve.keyframe_points:
-            key.interpolation = "BEZIER"
-            key.handle_left_type = "AUTO_CLAMPED"
-            key.handle_right_type = "AUTO_CLAMPED"
-
-
 def remove_baked_constraint_curves(action: bpy.types.Action) -> None:
     for curve in list(action.fcurves):
         if ".constraints[" in curve.data_path:
             action.fcurves.remove(curve)
 
 
+def control_point(
+    fraction: float,
+    location: Vector,
+    rotation_degrees: Vector | tuple[float, float, float],
+    beat: str = "",
+) -> ReloadControlPoint:
+    return ReloadControlPoint(
+        fraction,
+        location.copy(),
+        Vector(rotation_degrees),
+        beat,
+    )
+
+
+def magazine_pose_degrees(profile: ReloadProfile) -> tuple[Vector, ...]:
+    """Return family-specific wrist poses for extraction through seating."""
+    if profile.family == "rock_and_lock":
+        return tuple(
+            Vector(value)
+            for value in (
+                (36.0, -8.0, 22.0),
+                (45.0, -10.0, 34.0),
+                (42.0, -8.0, 30.0),
+                (38.0, -6.0, 25.0),
+                (32.0, -4.0, 18.0),
+                (20.0, -2.0, 10.0),
+            )
+        )
+    if profile.family == "mp5":
+        return tuple(
+            Vector(value)
+            for value in (
+                (30.0, 0.0, 10.0),
+                (35.0, 2.0, 16.0),
+                (34.0, 2.0, 15.0),
+                (30.0, 1.0, 11.0),
+                (25.0, 0.0, 8.0),
+                (18.0, -1.0, 5.0),
+            )
+        )
+    if profile.family in {"precision", "internal_precision"}:
+        return tuple(
+            Vector(value)
+            for value in (
+                (25.0, 0.0, 7.0),
+                (31.0, 2.0, 12.0),
+                (30.0, 2.0, 12.0),
+                (27.0, 1.0, 9.0),
+                (22.0, 0.0, 6.0),
+                (16.0, -1.0, 4.0),
+            )
+        )
+    return tuple(
+        Vector(value)
+        for value in (
+            (28.0, 1.0, 8.0),
+            (34.0, 2.0, 13.0),
+            (33.0, 2.0, 13.0),
+            (29.0, 1.0, 10.0),
+            (24.0, 0.0, 7.0),
+            (18.0, -1.0, 5.0),
+        )
+    )
+
+
+def mechanical_control_points(
+    profile: ReloadProfile,
+) -> list[ReloadControlPoint]:
+    """Author a visible contact-pull-hold-release mechanical beat."""
+    action = Vector(profile.action)
+    if profile.family == "mp5":
+        contact = action + Vector((-1.0, 1.0, -1.0))
+        peak = action + Vector((0.0, 6.0, 0.0))
+        release = action + Vector((-2.0, -2.0, 3.0))
+        rotations = (
+            Vector((-10.0, -18.0, -18.0)),
+            Vector((-16.0, -28.0, -24.0)),
+            Vector((-20.0, -20.0, -16.0)),
+        )
+    elif profile.family in {"service_pistol", "desert_eagle"}:
+        contact = action
+        peak = action + Vector((0.0, 4.5, 0.0))
+        release = action
+        rotations = (
+            Vector(SIDEARM_ACTION_WRIST_POSES[profile.name]),
+            Vector(SIDEARM_ACTION_WRIST_POSES[profile.name])
+            + Vector((-3.0, -7.0, -3.0)),
+            Vector(SIDEARM_ACTION_WRIST_POSES[profile.name]),
+        )
+    elif profile.family in {"precision", "internal_precision"}:
+        contact = action
+        peak = action + Vector((0.0, 4.5, 0.0))
+        release = action
+        rotations = (
+            Vector((7.0, -12.0, -4.0)),
+            Vector((3.0, -22.0, -8.0)),
+            Vector((7.0, -12.0, -4.0)),
+        )
+    else:
+        contact = action
+        peak = action + Vector((0.0, 5.5, 0.0))
+        release = action
+        rotations = (
+            Vector((8.0, -10.0, -3.0)),
+            Vector((4.0, -20.0, -8.0)),
+            Vector((8.0, -10.0, -3.0)),
+        )
+    return [
+        control_point(0.840, contact, rotations[0], "action_contact"),
+        control_point(0.870, peak, rotations[1], "action_peak"),
+        control_point(0.895, peak, rotations[1], "action_peak_hold"),
+        control_point(0.915, release, rotations[2], "action_release"),
+    ]
+
+
+def append_camera_safe_return(
+    points: list[ReloadControlPoint],
+    support: Vector,
+    sidearm: bool = False,
+) -> None:
+    """Split the action-to-support return so no sleeve crosses in one frame."""
+    release = points[-1]
+    if sidearm:
+        # The analytical solver already fades its effective target back to the
+        # exact static wrist. One uncluttered Bezier return avoids multiplying
+        # that fade by a stepped intermediate control and keeps the crop calm.
+        points.append(control_point(1.000, support, Vector()))
+        return
+    points.append(
+        control_point(
+            0.955,
+            release.location.lerp(support, 0.52),
+            release.rotation_degrees.lerp(Vector(), 0.52),
+            "return_clear",
+        )
+    )
+    points.append(control_point(1.000, support, Vector()))
+
+
 def sidearm_control_points(
     profile: ReloadProfile,
-) -> list[tuple[float, Vector, Vector]]:
-    """Keep pistol hand articulation compact while runtime moves the magazine.
+    empty: bool,
+) -> list[ReloadControlPoint]:
+    """Build a compact pistol exchange on the cropped authored forearms.
 
-    The runtime aligns the authored glove-surface marker to the real magazine
-    every frame.  A long DCC pouch excursion therefore adds no useful contact;
-    it only drives the hidden shoulder/elbow chain through a near-singularity.
-    The wrist constraint influence eases from the exact static ready pose into
-    a platform-specific magazine grip, holds that pose through extraction and
-    insertion, and eases back before the sidearm mesh is hidden. Tactical and
-    empty clips share the compact articulation because the runtime performs the
-    empty slide-release separately.
+    Position-only IK now performs the short magazine and slide path in Blender;
+    runtime selects the platform clip but does not pull the hidden upper sleeve
+    toward a second target.  Constraint influence is zero at both boundaries,
+    preserving the exact static service/large-pistol pose across visibility
+    changes. Empty clips add an overhand slide beat after the magazine seats.
     """
     support_anchor = Vector(profile.support)
     magazine_anchor = Vector(profile.magazine)
+    old_clear = magazine_anchor + Vector((0.0, 1.0, -4.0))
+    exchange = Vector(profile.exchange)
+    insert = Vector(profile.insert)
+    approach = insert + Vector((1.0, 2.0, -4.0))
+    seated = insert + Vector((0.0, -0.5, 1.5))
     try:
         wrist_pose = Vector(SIDEARM_MAGAZINE_WRIST_POSES[profile.name])
     except KeyError as error:
         raise RuntimeError(
             f"Missing sidearm magazine wrist pose: {profile.name}"
         ) from error
-    return [
-        (0.00, support_anchor, wrist_pose),
-        (SIDEARM_MAGAZINE_POSE_START, magazine_anchor, wrist_pose),
-        (SIDEARM_MAGAZINE_POSE_END, magazine_anchor, wrist_pose),
-        (1.00, support_anchor, wrist_pose),
+    points = [
+        control_point(0.000, support_anchor, Vector()),
+        control_point(0.040, support_anchor, Vector()),
+        control_point(0.240, magazine_anchor, wrist_pose),
+        control_point(0.310, old_clear, wrist_pose + Vector((3.0, 1.0, 3.0)),
+                      "old_mag_out"),
+        control_point(0.360, old_clear, wrist_pose + Vector((3.0, 1.0, 3.0)),
+                      "old_mag_out_hold"),
+        control_point(0.440, exchange, wrist_pose + Vector((2.0, 0.0, 2.0))),
+        control_point(0.550, approach + Vector((2.0, 1.0, -2.0)), wrist_pose,
+                      "fresh_mag_ready"),
+        control_point(0.640, approach, wrist_pose),
+        control_point(0.680, insert, wrist_pose, "new_mag_insert"),
+        control_point(0.710, seated, wrist_pose - Vector((4.0, 1.0, 3.0)),
+                      "new_mag_seat"),
+        control_point(0.750, seated, wrist_pose - Vector((4.0, 1.0, 3.0)),
+                      "new_mag_seat_hold"),
     ]
+    if empty:
+        mechanical = mechanical_control_points(profile)
+        contact = mechanical[0]
+        seated_rotation = wrist_pose - Vector((4.0, 1.0, 3.0))
+        points.extend(
+            (
+                control_point(
+                    0.775,
+                    seated.lerp(contact.location, 0.20),
+                    seated_rotation.lerp(contact.rotation_degrees, 0.20),
+                    "action_approach_early",
+                ),
+                control_point(
+                    0.795,
+                    seated.lerp(contact.location, 0.45),
+                    seated_rotation.lerp(contact.rotation_degrees, 0.45),
+                    "action_approach_middle",
+                ),
+                control_point(
+                    0.815,
+                    seated.lerp(contact.location, 0.70),
+                    seated_rotation.lerp(contact.rotation_degrees, 0.70),
+                    "action_approach_late",
+                ),
+            )
+        )
+        points.extend(mechanical)
+        append_camera_safe_return(points, support_anchor, sidearm=True)
+    else:
+        points.append(
+            control_point(0.860, seated,
+                          wrist_pose - Vector((4.0, 1.0, 3.0)))
+        )
+        points.append(control_point(1.000, support_anchor, Vector()))
+    return points
 
 
-def control_points(profile: ReloadProfile, empty: bool) -> list[tuple[float, Vector, Vector]]:
-    if profile.sidearm:
-        return sidearm_control_points(profile)
+def box_magazine_control_points(
+    profile: ReloadProfile,
+    empty: bool,
+) -> list[ReloadControlPoint]:
     support = Vector(profile.support)
     magazine = Vector(profile.magazine)
-    pocket = Vector(profile.pocket)
+    exchange = Vector(profile.exchange)
     insert = Vector(profile.insert)
-    action = Vector(profile.action)
-    old_lower = magazine.lerp(pocket, 0.48) + Vector((0.0, 0.0, -7.0))
-    fresh = pocket + Vector((-2.0, -2.0, 5.0))
-    approach = insert + Vector((0.0, 4.0, -8.0))
-    if not empty:
-        return [
-            (0.00, support, Vector()),
-            (0.15, magazine, Vector((28.0, 1.0, 8.0))),
-            (0.28, old_lower, Vector((34.0, 2.0, 13.0))),
-            (0.40, pocket, Vector((38.0, 2.0, 16.0))),
-            (0.51, fresh, Vector((36.0, 2.0, 15.0))),
-            (0.66, approach, Vector((29.0, 1.0, 10.0))),
-            (0.77, insert, Vector((25.0, 1.0, 8.0))),
-            (0.84, insert + Vector((0.0, -1.0, 4.0)), Vector((20.0, 0.0, 6.0))),
-            (1.00, support, Vector()),
-        ]
-    action_pull = action + Vector((0.0, 7.0, 0.0))
-    return [
-        (0.00, support, Vector()),
-        (0.13, magazine, Vector((28.0, 1.0, 8.0))),
-        (0.25, old_lower, Vector((34.0, 2.0, 13.0))),
-        (0.36, pocket, Vector((38.0, 2.0, 16.0))),
-        (0.46, fresh, Vector((36.0, 2.0, 15.0))),
-        (0.59, approach, Vector((29.0, 1.0, 10.0))),
-        (0.68, insert, Vector((25.0, 1.0, 8.0))),
-        (0.74, insert + Vector((0.0, -1.0, 4.0)), Vector((20.0, 0.0, 6.0))),
-        (0.82, action, Vector((8.0, -10.0, -3.0))),
-        (0.89, action_pull, Vector((6.0, -14.0, -5.0))),
-        (0.94, action, Vector((8.0, -10.0, -3.0))),
-        (1.00, support, Vector()),
+    if profile.family == "rock_and_lock":
+        old_clear = magazine + Vector((7.0, 3.0, -3.0))
+        fresh_ready = insert + Vector((7.0, 4.0, -7.0))
+        approach = insert + Vector((3.0, 3.0, -4.0))
+    elif profile.family == "mp5":
+        old_clear = magazine + Vector((4.0, 2.0, -8.0))
+        fresh_ready = insert + Vector((6.0, 4.0, -8.0))
+        approach = insert + Vector((2.0, 3.0, -5.0))
+    else:
+        old_clear = magazine + Vector((4.0, 2.0, -8.0))
+        fresh_ready = insert + Vector((6.0, 4.0, -8.0))
+        approach = insert + Vector((2.0, 3.0, -5.0))
+    seated = insert + Vector((0.0, -1.0, 3.0))
+    magazine_pose, old_pose, exchange_pose, ready_pose, insert_pose, seat_pose = (
+        magazine_pose_degrees(profile)
+    )
+    points = [
+        control_point(0.000, support, Vector()),
+        control_point(0.120, magazine, magazine_pose),
+        control_point(0.270, old_clear, old_pose, "old_mag_out"),
+        control_point(0.320, old_clear, old_pose, "old_mag_out_hold"),
+        control_point(0.420, exchange, exchange_pose),
+        control_point(0.530, fresh_ready, ready_pose, "fresh_mag_ready"),
+        control_point(0.680, approach, ready_pose),
+        control_point(0.730, insert, insert_pose, "new_mag_insert"),
+        control_point(0.750, seated, seat_pose, "new_mag_seat"),
+        control_point(0.790, seated, seat_pose, "new_mag_seat_hold"),
     ]
+    if empty or profile.tactical_action:
+        points.extend(mechanical_control_points(profile))
+        append_camera_safe_return(points, support)
+    else:
+        points.append(control_point(0.860, seated, seat_pose))
+        points.append(control_point(1.000, support, Vector()))
+    return points
+
+
+def internal_magazine_control_points(
+    profile: ReloadProfile,
+) -> list[ReloadControlPoint]:
+    """Feed the M24 from a compact cartridge path instead of a box-mag arc."""
+    support = Vector(profile.support)
+    reserve = Vector(profile.exchange)
+    port = Vector(profile.magazine)
+    insert = Vector(profile.insert)
+    staged_round = port + Vector((6.0, 4.0, -6.0))
+    approach = insert + Vector((3.0, 3.0, -4.0))
+    seated = insert + Vector((0.0, -1.0, 2.5))
+    magazine_pose, acquire_pose, ready_pose, _, insert_pose, seat_pose = (
+        magazine_pose_degrees(profile)
+    )
+    points = [
+        control_point(0.000, support, Vector()),
+        control_point(0.120, reserve, acquire_pose, "ammunition_acquired"),
+        control_point(0.280, reserve, acquire_pose,
+                      "ammunition_acquired_hold"),
+        control_point(0.420, staged_round, ready_pose, "fresh_round_ready"),
+        control_point(0.560, port, magazine_pose),
+        control_point(0.680, approach, ready_pose),
+        control_point(0.730, insert, insert_pose, "new_round_insert"),
+        control_point(0.750, seated, seat_pose, "new_round_seat"),
+        control_point(0.790, seated, seat_pose, "new_round_seat_hold"),
+    ]
+    points.extend(mechanical_control_points(profile))
+    append_camera_safe_return(points, support)
+    return points
+
+
+def control_points(
+    profile: ReloadProfile,
+    empty: bool,
+) -> list[ReloadControlPoint]:
+    if profile.sidearm:
+        return sidearm_control_points(profile, empty)
+    if profile.family == "internal_precision":
+        return internal_magazine_control_points(profile)
+    return box_magazine_control_points(profile, empty)
+
+
+def validate_control_point_contract(
+    profile: ReloadProfile,
+    empty: bool,
+    points: list[ReloadControlPoint],
+) -> None:
+    fractions = [point.fraction for point in points]
+    if (
+        not fractions
+        or fractions[0] != 0.0
+        or fractions[-1] != 1.0
+        or any(right <= left for left, right in zip(fractions, fractions[1:]))
+    ):
+        raise RuntimeError(
+            f"Reload control times are not strictly ordered: {profile.name}"
+        )
+    labels = {point.beat for point in points if point.beat}
+    if profile.family == "internal_precision":
+        required = {
+            "ammunition_acquired", "ammunition_acquired_hold",
+            "new_round_seat", "new_round_seat_hold",
+        }
+    else:
+        required = {
+            "old_mag_out", "old_mag_out_hold",
+            "new_mag_seat", "new_mag_seat_hold",
+        }
+    if empty or profile.tactical_action:
+        required |= {
+            "action_contact", "action_peak", "action_peak_hold",
+            "action_release",
+        }
+    missing = required - labels
+    if missing:
+        raise RuntimeError(
+            f"Reload control beats missing for {profile.name}: {sorted(missing)}"
+        )
+    support = points[0].location
+    maximum_excursion = max(
+        (point.location - support).length for point in points
+    ) * SOURCE_TO_METERS
+    excursion_limit = (
+        SIDEARM_MAX_CONTROL_EXCURSION_METERS
+        if profile.sidearm
+        else MAX_CONTROL_EXCURSION_METERS
+    )
+    valid = maximum_excursion <= excursion_limit
+    print(
+        "RELOAD_CONTROL_CHECK"
+        f" profile={profile.name}"
+        f" family={profile.family}"
+        f" variant={'empty' if empty else 'tactical'}"
+        f" keys={len(points)}"
+        f" max_excursion={maximum_excursion:.4f}"
+        f" limit={excursion_limit:.4f}"
+        f" valid={valid}"
+    )
+    if not valid:
+        raise RuntimeError(
+            f"Reload control path leaves camera-safe envelope: {profile.name}"
+        )
 
 
 def create_control(
     name: str,
-    points: list[tuple[float, Vector, Vector]],
+    points: list[ReloadControlPoint],
     base_rotation: Quaternion,
     end_frame: int,
 ) -> bpy.types.Object:
@@ -763,15 +1158,191 @@ def create_control(
     target.rotation_mode = "QUATERNION"
     target.animation_data_create()
     target.animation_data.action = bpy.data.actions.new(f"{name}_controls")
-    for fraction, location, rotation_degrees in points:
-        frame = round(fraction * end_frame)
-        target.location = location
-        delta = Euler(tuple(math.radians(value) for value in rotation_degrees), "XYZ")
+    for point in points:
+        frame = round(point.fraction * end_frame)
+        target.location = point.location
+        delta = Euler(
+            tuple(math.radians(value) for value in point.rotation_degrees),
+            "XYZ",
+        )
         target.rotation_quaternion = base_rotation @ delta.to_quaternion()
         target.keyframe_insert("location", frame=frame)
         target.keyframe_insert("rotation_quaternion", frame=frame)
     eased_keyframes(target)
     return target
+
+
+def smooth_step(value: float) -> float:
+    value = max(0.0, min(1.0, value))
+    return value * value * (3.0 - 2.0 * value)
+
+
+def sidearm_pose_influence(fraction: float, empty: bool) -> float:
+    blend_out_start = (
+        SIDEARM_EMPTY_BLEND_OUT_START
+        if empty
+        else SIDEARM_TACTICAL_BLEND_OUT_START
+    )
+    if fraction <= SIDEARM_IK_BLEND_IN_START:
+        return 0.0
+    if fraction < SIDEARM_IK_BLEND_IN_END:
+        return smooth_step(
+            (fraction - SIDEARM_IK_BLEND_IN_START)
+            / (SIDEARM_IK_BLEND_IN_END - SIDEARM_IK_BLEND_IN_START)
+        )
+    if fraction <= blend_out_start:
+        return 1.0
+    return 1.0 - smooth_step(
+        (fraction - blend_out_start) / (1.0 - blend_out_start)
+    )
+
+
+def pose_matrix(
+    location: Vector,
+    rotation: Quaternion,
+) -> Matrix:
+    return Matrix.LocRotScale(location, rotation, Vector((1.0, 1.0, 1.0)))
+
+
+def swing_pose_matrix(
+    source: Matrix,
+    source_direction: Vector,
+    target_direction: Vector,
+    location: Vector,
+) -> Matrix:
+    swing = source_direction.normalized().rotation_difference(
+        target_direction.normalized()
+    )
+    rotation = swing @ source.to_quaternion()
+    rotation.normalize()
+    return pose_matrix(location, rotation)
+
+
+def analytical_sidearm_pose(
+    static_pose: SidearmStaticPose,
+    target_location: Vector,
+    target_rotation: Quaternion,
+    pole_location: Vector,
+) -> dict[str, Matrix]:
+    """Solve a stable shoulder-elbow-wrist pose without an IK branch flip."""
+    shoulder_pose = static_pose.global_pose[LEFT_CHAIN[0]]
+    elbow_pose = static_pose.global_pose[LEFT_CHAIN[1]]
+    wrist_pose = static_pose.global_pose[LEFT_CHAIN[2]]
+    shoulder = shoulder_pose.translation
+    static_elbow = elbow_pose.translation
+    static_wrist = wrist_pose.translation
+    upper_direction = static_elbow - shoulder
+    forearm_direction = static_wrist - static_elbow
+    upper_length = upper_direction.length
+    forearm_length = forearm_direction.length
+    shoulder_to_target = target_location - shoulder
+    requested_distance = shoulder_to_target.length
+    if requested_distance <= 0.000001:
+        raise RuntimeError("Sidearm analytical target collapsed onto shoulder")
+    direction = shoulder_to_target / requested_distance
+    minimum_distance = abs(upper_length - forearm_length) + 0.001
+    maximum_distance = upper_length + forearm_length - 0.001
+    solved_distance = max(
+        minimum_distance,
+        min(maximum_distance, requested_distance),
+    )
+    solved_wrist = shoulder + direction * solved_distance
+    bend = static_elbow - shoulder
+    bend -= direction * bend.dot(direction)
+    if bend.length <= 0.0001:
+        bend = pole_location - shoulder
+        bend -= direction * bend.dot(direction)
+    if bend.length <= 0.0001:
+        raise RuntimeError("Sidearm analytical bend plane is degenerate")
+    bend.normalize()
+    along = (
+        upper_length * upper_length
+        - forearm_length * forearm_length
+        + solved_distance * solved_distance
+    ) / (2.0 * solved_distance)
+    height = math.sqrt(max(0.0, upper_length * upper_length - along * along))
+    solved_elbow = shoulder + direction * along + bend * height
+    solved_upper_direction = solved_elbow - shoulder
+    solved_forearm_direction = solved_wrist - solved_elbow
+    return {
+        LEFT_CHAIN[0]: swing_pose_matrix(
+            shoulder_pose,
+            upper_direction,
+            solved_upper_direction,
+            shoulder,
+        ),
+        LEFT_CHAIN[1]: swing_pose_matrix(
+            elbow_pose,
+            forearm_direction,
+            solved_forearm_direction,
+            solved_elbow,
+        ),
+        LEFT_CHAIN[2]: pose_matrix(solved_wrist, target_rotation),
+    }
+
+
+def bake_sidearm_clip(
+    armature: bpy.types.Object,
+    profile: ReloadProfile,
+    empty: bool,
+    static_pose: SidearmStaticPose,
+    target: bpy.types.Object,
+    end_frame: int,
+    clip_name: str,
+) -> bpy.types.Action:
+    """Bake deterministic pose-to-pose pistol motion from an analytical solve."""
+    action = bpy.data.actions.new(clip_name)
+    action.use_fake_user = True
+    armature.animation_data_create()
+    armature.animation_data.action = action
+    scene = bpy.context.scene
+    static_wrist = static_pose.global_pose[LEFT_CHAIN[2]]
+    static_wrist_location = static_wrist.translation
+    static_wrist_rotation = static_wrist.to_quaternion()
+    pole_location = Vector(profile.pole)
+    for pose_bone in armature.pose.bones:
+        if pose_bone.name in LEFT_CHAIN:
+            pose_bone.rotation_mode = "QUATERNION"
+    for frame in range(0, end_frame + 1):
+        scene.frame_set(frame)
+        bpy.context.view_layer.update()
+        target_location = target.location.copy()
+        target_rotation = target.rotation_quaternion.copy()
+        influence = sidearm_pose_influence(frame / end_frame, empty)
+        solved_location = static_wrist_location.lerp(target_location, influence)
+        solved_rotation = static_wrist_rotation.slerp(
+            target_rotation,
+            influence,
+        )
+        apply_sidearm_static_pose(armature, static_pose)
+        solved = analytical_sidearm_pose(
+            static_pose,
+            solved_location,
+            solved_rotation,
+            pole_location,
+        )
+        for bone_name in LEFT_CHAIN:
+            armature.pose.bones[bone_name].matrix = solved[bone_name]
+            bpy.context.view_layer.update()
+        for bone_name in LEFT_CHAIN:
+            pose_bone = armature.pose.bones[bone_name]
+            pose_bone.keyframe_insert("location", frame=frame, group=bone_name)
+            pose_bone.keyframe_insert(
+                "rotation_quaternion",
+                frame=frame,
+                group=bone_name,
+            )
+            pose_bone.keyframe_insert("scale", frame=frame, group=bone_name)
+    for curve in action.fcurves:
+        for key in curve.keyframe_points:
+            key.interpolation = "LINEAR"
+    make_baked_quaternions_continuous(action)
+    armature.animation_data.action = None
+    control_action = target.animation_data.action
+    target.animation_data_clear()
+    bpy.data.actions.remove(control_action)
+    bpy.data.objects.remove(target, do_unlink=True)
+    return action
 
 
 def bake_clip(
@@ -782,7 +1353,11 @@ def bake_clip(
 ) -> bpy.types.Action:
     suffix = "empty" if empty else "tactical"
     clip_name = f"reload_{profile.name}_{suffix}"
-    duration = 2.15 if empty else 1.80
+    duration = (
+        EMPTY_DURATION_SECONDS
+        if empty
+        else TACTICAL_DURATION_SECONDS
+    )
     end_frame = round(duration * FPS)
     scene = bpy.context.scene
     scene.frame_start = 0
@@ -797,12 +1372,24 @@ def bake_clip(
     scene.frame_set(0)
     bpy.context.view_layer.update()
     base_rotation = bone_world_matrix(armature, "L_wrist_03").to_quaternion()
+    points = control_points(profile, empty)
+    validate_control_point_contract(profile, empty, points)
     target = create_control(
         clip_name,
-        control_points(profile, empty),
+        points,
         base_rotation,
         end_frame,
     )
+    if profile.sidearm:
+        return bake_sidearm_clip(
+            armature,
+            profile,
+            empty,
+            sidearm_static_pose,
+            target,
+            end_frame,
+            clip_name,
+        )
     pole = bpy.data.objects.new(f"{clip_name}_ElbowPole", None)
     pole.empty_display_type = "CUBE"
     pole.empty_display_size = 2.0
@@ -834,18 +1421,6 @@ def bake_clip(
     wrist_rotation.target_space = "WORLD"
     wrist_rotation.owner_space = "WORLD"
     wrist_rotation.mix_mode = "REPLACE"
-    if profile.sidearm:
-        # The static service/large-pistol pose remains the unconstrained base.
-        # Runtime translates the cropped hand chain to the real magazine, so a
-        # second positional IK solve here only creates a large shoulder/elbow
-        # sweep. Keep that solve disabled and fade only the authored magazine
-        # wrist grip in and out; frame zero and the final frame then remain
-        # byte-for-byte evaluations of the ready-pose chain.
-        ik.influence = 0.0
-        keyframe_sidearm_magazine_influence(wrist_rotation, end_frame)
-        ease_constraint_keyframes(action)
-        scene.frame_set(0)
-        bpy.context.view_layer.update()
     bpy.context.view_layer.objects.active = armature
     bpy.ops.object.select_all(action="DESELECT")
     armature.select_set(True)
@@ -1012,7 +1587,7 @@ def validate_contact_contract(
     armature: bpy.types.Object,
     weapon_grip: Matrix,
 ) -> None:
-    mesh = bpy.data.objects["ReloadArmsMesh"]
+    mesh = bpy.data.objects["FullReloadArmsAuditMesh"]
     components = evaluated_component_centers(mesh)
     right_bone = bone_world_matrix(armature, RIGHT_PALM)
     left_bone = bone_world_matrix(armature, LEFT_PALM)
@@ -1119,27 +1694,29 @@ def validate_sidearm_magazine_anchor_keyframes(
     armature: bpy.types.Object,
     action: bpy.types.Action,
 ) -> None:
-    platform = next(
+    profile = next(
         (
-            profile.name
+            profile
             for profile in PROFILES
             if profile.sidearm
             and action.name.startswith(f"reload_{profile.name}_")
         ),
         None,
     )
-    if platform is None:
+    if profile is None:
         return
     _, end = (round(value) for value in action.frame_range)
-    # Inspect the authored magazine grip only after its compact wrist blend is
-    # fully established. Empty sidearm clips are retained as an asset contract,
-    # although runtime deliberately reuses the tactical hand choreography.
+    empty = action.name.endswith("_empty")
+    points_by_beat = {
+        point.beat: point
+        for point in sidearm_control_points(profile, empty)
+        if point.beat
+    }
     fractions = (
-        (SIDEARM_MAGAZINE_POSE_START, 0.68)
-        if action.name.endswith("_empty")
-        else (SIDEARM_MAGAZINE_POSE_START, 0.77)
+        points_by_beat["old_mag_out"].fraction,
+        points_by_beat["new_mag_seat"].fraction,
     )
-    mesh = bpy.data.objects["ReloadArmsMesh"]
+    mesh = bpy.data.objects["FullReloadArmsAuditMesh"]
     maximum_error = 0.0
     for stage, fraction in zip(("extract", "insert"), fractions):
         frame = round(fraction * end)
@@ -1162,7 +1739,7 @@ def validate_sidearm_magazine_anchor_keyframes(
         print(
             "SIDEARM_MAGAZINE_ANCHOR_KEY"
             f" clip={action.name}"
-            f" platform={platform}"
+            f" platform={profile.name}"
             f" stage={stage}"
             f" frame={frame}"
             f" face={face_index}"
@@ -1173,6 +1750,100 @@ def validate_sidearm_magazine_anchor_keyframes(
         raise RuntimeError(
             f"Sidearm magazine anchor left the glove surface: {action.name}"
         )
+
+
+def reload_profile_for_action(
+    action: bpy.types.Action,
+) -> tuple[ReloadProfile, bool]:
+    for profile in PROFILES:
+        for empty in (False, True):
+            suffix = "empty" if empty else "tactical"
+            if action.name == f"reload_{profile.name}_{suffix}":
+                return profile, empty
+    raise RuntimeError(f"No reload profile owns clip {action.name}")
+
+
+def validate_pose_beats(
+    action: bpy.types.Action,
+    left_positions: list[Vector],
+) -> tuple[bool, float, float, float, float, str]:
+    """Measure authored holds, mechanical travel, and camera-safe excursion."""
+    profile, empty = reload_profile_for_action(action)
+    points = control_points(profile, empty)
+    by_beat = {
+        point.beat: point
+        for point in points
+        if point.beat
+    }
+    _, end = (round(value) for value in action.frame_range)
+
+    def position_at(beat: str) -> Vector:
+        frame = round(by_beat[beat].fraction * end)
+        return left_positions[frame]
+
+    if profile.family == "internal_precision":
+        exchange_hold = (
+            position_at("ammunition_acquired_hold")
+            - position_at("ammunition_acquired")
+        ).length * SOURCE_TO_METERS
+        seat_hold = (
+            position_at("new_round_seat_hold")
+            - position_at("new_round_seat")
+        ).length * SOURCE_TO_METERS
+    else:
+        exchange_hold = (
+            position_at("old_mag_out_hold")
+            - position_at("old_mag_out")
+        ).length * SOURCE_TO_METERS
+        seat_hold = (
+            position_at("new_mag_seat_hold")
+            - position_at("new_mag_seat")
+        ).length * SOURCE_TO_METERS
+    uses_mechanical_beat = empty or profile.tactical_action
+    mechanical_travel = (
+        (
+            position_at("action_peak")
+            - position_at("action_contact")
+        ).length * SOURCE_TO_METERS
+        if uses_mechanical_beat
+        else 0.0
+    )
+    maximum_excursion = max(
+        (position - left_positions[0]).length
+        for position in left_positions
+    ) * SOURCE_TO_METERS
+    excursion_limit = (
+        SIDEARM_MAX_CAMERA_SAFE_EXCURSION_METERS
+        if profile.sidearm
+        else MAX_CAMERA_SAFE_EXCURSION_METERS
+    )
+    valid = (
+        exchange_hold <= MAX_POSE_HOLD_DRIFT_METERS
+        and seat_hold <= MAX_POSE_HOLD_DRIFT_METERS
+        and (
+            not uses_mechanical_beat
+            or mechanical_travel >= MIN_MECHANICAL_BEAT_METERS
+        )
+        and maximum_excursion <= excursion_limit
+    )
+    print(
+        "RELOAD_BEAT_CHECK"
+        f" clip={action.name}"
+        f" family={profile.family}"
+        f" exchange_hold={exchange_hold:.6f}"
+        f" seat_hold={seat_hold:.6f}"
+        f" mechanical_travel={mechanical_travel:.6f}"
+        f" max_excursion={maximum_excursion:.6f}"
+        f" valid={valid}"
+    )
+    return (
+        valid,
+        exchange_hold,
+        seat_hold,
+        mechanical_travel,
+        maximum_excursion,
+        profile.family,
+    )
 
 
 def validate_sidearm_endpoint_pose(
@@ -1276,32 +1947,54 @@ def validate_clip(
         (right - left).length for left, right in zip(left_positions, left_positions[1:])
     ) * SOURCE_TO_METERS
     return_error = (left_positions[-1] - left_positions[0]).length * SOURCE_TO_METERS
-    maximum_left_palm_step = max(
+    left_palm_steps = [
         (right - left).length
         for left, right in zip(left_positions, left_positions[1:])
-    ) * SOURCE_TO_METERS
-    maximum_left_bone_steps = [
-        max(
+    ]
+    maximum_left_palm_step = max(left_palm_steps) * SOURCE_TO_METERS
+    maximum_left_palm_step_frame = (
+        left_palm_steps.index(max(left_palm_steps)) + start + 1
+    )
+    left_bone_step_samples = [
+        [
             shortest_rotation_error(left[index], right[index])
             for left, right in zip(left_chain_frames, left_chain_frames[1:])
-        )
+        ]
         for index in range(len(LEFT_CHAIN))
     ]
-    maximum_left_joint_position_steps = [
-        max(
+    maximum_left_bone_steps = [max(samples) for samples in left_bone_step_samples]
+    maximum_left_bone_step_frames = [
+        samples.index(max(samples)) + start + 1
+        for samples in left_bone_step_samples
+    ]
+    left_joint_step_samples = [
+        [
             (
                 right[index].translation
                 - left[index].translation
             ).length
             for left, right in zip(left_chain_frames, left_chain_frames[1:])
-        ) * SOURCE_TO_METERS
+        ]
         for index in (1, 2)
     ]
-    sidearm = any(
-        profile.sidearm
-        and action.name.startswith(f"reload_{profile.name}_")
-        for profile in PROFILES
-    )
+    maximum_left_joint_position_steps = [
+        max(samples) * SOURCE_TO_METERS
+        for samples in left_joint_step_samples
+    ]
+    maximum_left_joint_step_frames = [
+        samples.index(max(samples)) + start + 1
+        for samples in left_joint_step_samples
+    ]
+    profile, empty = reload_profile_for_action(action)
+    sidearm = profile.sidearm
+    (
+        pose_beats_valid,
+        exchange_hold,
+        seat_hold,
+        mechanical_travel,
+        maximum_excursion,
+        family,
+    ) = validate_pose_beats(action, left_positions)
     minimum_hand_travel = (
         SIDEARM_MIN_HAND_TRAVEL_METERS
         if sidearm
@@ -1323,6 +2016,13 @@ def validate_clip(
         else MAX_LEFT_BONE_STEP_RADIANS
     )
     duration = (end - start) / FPS
+    expected_duration = round(
+        (
+            EMPTY_DURATION_SECONDS
+            if empty
+            else TACTICAL_DURATION_SECONDS
+        ) * FPS
+    ) / FPS
     valid = (
         shoulder_drift <= MAX_FIXED_DRIFT_METERS
         and right_palm_drift <= MAX_FIXED_DRIFT_METERS
@@ -1338,11 +2038,13 @@ def validate_clip(
             or max(maximum_left_joint_position_steps)
                 <= SIDEARM_MAX_LEFT_JOINT_STEP_METERS
         )
-        and 1.70 <= duration <= 2.20
+        and abs(duration - expected_duration) <= 0.000001
+        and pose_beats_valid
     )
     print(
         "RELOAD_CLIP"
         f" clip={action.name}"
+        f" family={family}"
         f" duration={duration:.3f}"
         f" shoulder_root_max={shoulder_drift:.6f}"
         f" right_palm_max={right_palm_drift:.6f}"
@@ -1352,14 +2054,146 @@ def validate_clip(
         f" left_palm_travel={left_travel:.4f}"
         f" return_error={return_error:.6f}"
         f" left_palm_step={maximum_left_palm_step:.6f}"
+        f" left_palm_step_frame={maximum_left_palm_step_frame}"
         f" left_bone_steps={'/'.join(f'{value:.6f}' for value in maximum_left_bone_steps)}"
+        f" left_bone_step_frames={'/'.join(str(value) for value in maximum_left_bone_step_frames)}"
         f" left_joint_steps={'/'.join(f'{value:.6f}' for value in maximum_left_joint_position_steps)}"
+        f" left_joint_step_frames={'/'.join(str(value) for value in maximum_left_joint_step_frames)}"
+        f" exchange_hold={exchange_hold:.6f}"
+        f" seat_hold={seat_hold:.6f}"
+        f" mechanical_travel={mechanical_travel:.6f}"
+        f" max_excursion={maximum_excursion:.6f}"
         f" sidearm={sidearm}"
         f" valid={valid}"
     )
     if not valid:
         raise RuntimeError(f"Reload clip validation failed: {action.name}")
     validate_sidearm_magazine_anchor_keyframes(armature, action)
+
+
+def evaluated_grip_space_bounds(
+    mesh_object: bpy.types.Object,
+    grip_inverse: Matrix,
+) -> tuple[Vector, Vector]:
+    """Return evaluated mesh bounds in the right-grip camera proxy frame."""
+    evaluated = mesh_object.evaluated_get(
+        bpy.context.evaluated_depsgraph_get()
+    )
+    mesh = evaluated.to_mesh()
+    try:
+        points = [
+            grip_inverse @ (evaluated.matrix_world @ vertex.co)
+            for vertex in mesh.vertices
+        ]
+    finally:
+        evaluated.to_mesh_clear()
+    if not points:
+        raise RuntimeError(f"Camera envelope mesh is empty: {mesh_object.name}")
+    minimum = Vector(
+        tuple(min(point[axis] for point in points) for axis in range(3))
+    ) * SOURCE_TO_METERS
+    maximum = Vector(
+        tuple(max(point[axis] for point in points) for axis in range(3))
+    ) * SOURCE_TO_METERS
+    return minimum, maximum
+
+
+def camera_envelope_valid(minimum: Vector, maximum: Vector) -> bool:
+    span = maximum - minimum
+    return (
+        span.x <= MAX_LONG_GUN_CAMERA_HORIZONTAL_SPAN_METERS
+        and span.y <= MAX_LONG_GUN_CAMERA_DEPTH_SPAN_METERS
+        and span.z <= MAX_LONG_GUN_CAMERA_VERTICAL_SPAN_METERS
+        and maximum.y <= MAX_LONG_GUN_CAMERA_REAR_EXTENT_METERS
+    )
+
+
+def validate_long_gun_camera_envelope(
+    armature: bpy.types.Object,
+    actions: list[bpy.types.Action],
+    weapon_grip: Matrix,
+) -> None:
+    """Reject the full-sleeve near-plane failure seen in Godot captures.
+
+    The source weapon grip is the stable camera proxy used by the runtime
+    mount. Every evaluated long-gun frame must keep the cropped silhouette in
+    a bounded grip-space volume. The retained full-arm audit layer must fail
+    the same envelope, proving this gate distinguishes the former giant-sleeve
+    presentation instead of merely restating the clip/bone checks.
+    """
+    long_gun_mesh = bpy.data.objects["LongGunReloadForearmsMesh"]
+    full_audit_mesh = bpy.data.objects["FullReloadArmsAuditMesh"]
+    grip_inverse = weapon_grip.inverted()
+    long_actions = [
+        action
+        for action in actions
+        if not reload_profile_for_action(action)[0].sidearm
+    ]
+    all_valid = True
+    for action in long_actions:
+        armature.animation_data.action = action
+        start, end = (round(value) for value in action.frame_range)
+        frames = list(range(start, end + 1, CAMERA_ENVELOPE_FRAME_STEP))
+        if frames[-1] != end:
+            frames.append(end)
+        worst_span = Vector((0.0, 0.0, 0.0))
+        maximum_rear = -math.inf
+        action_valid = True
+        for frame in frames:
+            bpy.context.scene.frame_set(frame)
+            bpy.context.view_layer.update()
+            minimum, maximum = evaluated_grip_space_bounds(
+                long_gun_mesh,
+                grip_inverse,
+            )
+            span = maximum - minimum
+            worst_span.x = max(worst_span.x, span.x)
+            worst_span.y = max(worst_span.y, span.y)
+            worst_span.z = max(worst_span.z, span.z)
+            maximum_rear = max(maximum_rear, maximum.y)
+            action_valid = action_valid and camera_envelope_valid(
+                minimum,
+                maximum,
+            )
+        all_valid = all_valid and action_valid
+        print(
+            "LONG_GUN_CAMERA_ENVELOPE"
+            f" clip={action.name}"
+            f" samples={len(frames)}"
+            f" horizontal_span={worst_span.x:.6f}"
+            f" depth_span={worst_span.y:.6f}"
+            f" vertical_span={worst_span.z:.6f}"
+            f" rear_extent={maximum_rear:.6f}"
+            f" valid={action_valid}"
+        )
+
+    reference_action = next(
+        action for action in long_actions if action.name == "reload_m4a1_empty"
+    )
+    armature.animation_data.action = reference_action
+    bpy.context.scene.frame_set(round(reference_action.frame_range[0]))
+    bpy.context.view_layer.update()
+    audit_minimum, audit_maximum = evaluated_grip_space_bounds(
+        full_audit_mesh,
+        grip_inverse,
+    )
+    audit_span = audit_maximum - audit_minimum
+    full_rejected = not camera_envelope_valid(audit_minimum, audit_maximum)
+    print(
+        "FULL_ARM_CAMERA_REJECTION"
+        f" clip={reference_action.name}"
+        f" horizontal_span={audit_span.x:.6f}"
+        f" depth_span={audit_span.y:.6f}"
+        f" vertical_span={audit_span.z:.6f}"
+        f" rear_extent={audit_maximum.y:.6f}"
+        f" rejected={full_rejected}"
+    )
+    armature.animation_data.action = None
+    reset_armature_pose(armature)
+    bpy.context.scene.frame_set(0)
+    bpy.context.view_layer.update()
+    if not all_valid or not full_rejected:
+        raise RuntimeError("Long-gun camera silhouette envelope is invalid")
 
 
 def export_asset(root: bpy.types.Object) -> None:
@@ -1389,6 +2223,7 @@ def export_asset(root: bpy.types.Object) -> None:
 def validate_export(
     actions: list[bpy.types.Action],
     expected_full_triangles: int,
+    expected_long_gun_triangles: int,
     expected_sidearm_triangles: int,
 ) -> None:
     with OUTPUT_GLB.open("rb") as stream:
@@ -1406,6 +2241,38 @@ def validate_export(
         sidecar.write_bytes(binary[offset:offset + view["byteLength"]])
     expected_clips = {action.name for action in actions}
     actual_clips = {item["name"] for item in document.get("animations", [])}
+    expected_durations = {
+        action.name: (
+            round(action.frame_range[1]) - round(action.frame_range[0])
+        ) / FPS
+        for action in actions
+    }
+    duration_contract = actual_clips == expected_clips
+    for animation in sorted(
+        document.get("animations", []),
+        key=lambda item: item["name"],
+    ):
+        ranges = [
+            document["accessors"][sampler["input"]]
+            for sampler in animation.get("samplers", [])
+        ]
+        duration = (
+            max(accessor["max"][0] for accessor in ranges)
+            - min(accessor["min"][0] for accessor in ranges)
+            if ranges
+            else -1.0
+        )
+        expected_duration = expected_durations.get(animation["name"], -2.0)
+        clip_duration_valid = abs(duration - expected_duration) <= 0.0001
+        duration_contract = duration_contract and clip_duration_valid
+        print(
+            "RELOAD_GLB_CLIP"
+            f" clip={animation['name']}"
+            f" duration={duration:.3f}"
+            f" expected={expected_duration:.3f}"
+            f" valid={clip_duration_valid}"
+        )
+
     def mesh_triangles(mesh_index: int) -> int:
         return sum(
             document["accessors"][primitive["indices"]]["count"] // 3
@@ -1416,7 +2283,9 @@ def validate_export(
     nodes_by_name = {
         node.get("name", ""): node for node in document.get("nodes", [])
     }
-    full_node = nodes_by_name.get("ReloadArmsMesh", {})
+    compatibility_node = nodes_by_name.get("ReloadArmsMesh", {})
+    full_node = nodes_by_name.get("FullReloadArmsAuditMesh", {})
+    long_gun_node = nodes_by_name.get("LongGunReloadForearmsMesh", {})
     sidearm_node = nodes_by_name.get("SidearmReloadForearmsMesh", {})
     exported_full_triangles = (
         mesh_triangles(full_node["mesh"]) if "mesh" in full_node else -1
@@ -1424,9 +2293,16 @@ def validate_export(
     exported_sidearm_triangles = (
         mesh_triangles(sidearm_node["mesh"]) if "mesh" in sidearm_node else -1
     )
+    exported_long_gun_triangles = (
+        mesh_triangles(long_gun_node["mesh"])
+        if "mesh" in long_gun_node
+        else -1
+    )
     skinned_mesh_contract = (
         "skin" in full_node
+        and "skin" in long_gun_node
         and "skin" in sidearm_node
+        and full_node["skin"] == long_gun_node["skin"]
         and full_node["skin"] == sidearm_node["skin"]
         and all(
             {
@@ -1438,14 +2314,27 @@ def validate_export(
             }
             <= set(primitive.get("attributes", {}))
             and "material" in primitive
-            for node in (full_node, sidearm_node)
+            for node in (full_node, long_gun_node, sidearm_node)
             if "mesh" in node
             for primitive in document["meshes"][node["mesh"]].get("primitives", [])
         )
     )
+    presentation_roles = {
+        compatibility_node.get("extras", {}).get("presentation_role"),
+        full_node.get("extras", {}).get("presentation_role"),
+        long_gun_node.get("extras", {}).get("presentation_role"),
+        sidearm_node.get("extras", {}).get("presentation_role"),
+    }
+    presentation_role_contract = presentation_roles == {
+        "long_gun_forearms_compatibility_layer",
+        "full_arms_non_runtime_audit",
+        "long_gun_forearms_runtime",
+        "sidearm_forearms_runtime",
+    }
     node_names = {node.get("name", "") for node in document.get("nodes", [])}
     expected_nodes = {
         "WeaponRoot", "ReloadArmsSkeleton", "ReloadArmsMesh",
+        "FullReloadArmsAuditMesh", "LongGunReloadForearmsMesh",
         "SidearmReloadForearmsMesh",
         "LeftPalmFrame", "LeftGripAnchorFrame",
         "LeftSidearmMagazineAnchorFrame", "RightPalmFrame",
@@ -1456,12 +2345,16 @@ def validate_export(
     valid = (
         magic == b"glTF" and version == 2 and chunk_type == 0x4E4F534A
         and binary_type == 0x004E4942 and embedded_images
-        and len(document.get("meshes", [])) == 2
+        and len(document.get("meshes", [])) == 3
         and len(document.get("skins", [])) == 1
         and exported_full_triangles == expected_full_triangles
+        and exported_long_gun_triangles == expected_long_gun_triangles
         and exported_sidearm_triangles == expected_sidearm_triangles
         and skinned_mesh_contract
+        and presentation_role_contract
+        and "mesh" not in compatibility_node
         and actual_clips == expected_clips
+        and duration_contract
         and expected_nodes <= node_names
     )
     print(
@@ -1469,9 +2362,12 @@ def validate_export(
         f" meshes={len(document.get('meshes', []))}"
         f" skins={len(document.get('skins', []))}"
         f" full_triangles={exported_full_triangles}"
+        f" long_gun_triangles={exported_long_gun_triangles}"
         f" sidearm_triangles={exported_sidearm_triangles}"
         f" shared_skin={skinned_mesh_contract}"
+        f" presentation_roles={presentation_role_contract}"
         f" clips={len(actual_clips)}"
+        f" clip_durations={duration_contract}"
         f" images={len(images)}"
         f" nodes={len(node_names)}"
         f" valid={valid}"
@@ -1493,8 +2389,13 @@ def main() -> None:
         left_grip_anchor,
         left_sidearm_magazine_anchor,
     ) = import_and_prepare_source()
-    arms_mesh = bpy.data.objects["ReloadArmsMesh"]
+    arms_mesh = bpy.data.objects["FullReloadArmsAuditMesh"]
     triangle_count = sum(len(polygon.vertices) - 2 for polygon in arms_mesh.data.polygons)
+    long_gun_arms_mesh = bpy.data.objects["LongGunReloadForearmsMesh"]
+    long_gun_triangle_count = sum(
+        len(polygon.vertices) - 2
+        for polygon in long_gun_arms_mesh.data.polygons
+    )
     sidearm_arms_mesh = bpy.data.objects["SidearmReloadForearmsMesh"]
     sidearm_triangle_count = sum(
         len(polygon.vertices) - 2
@@ -1503,6 +2404,11 @@ def main() -> None:
     if triangle_count != EXPECTED_TRIANGLES:
         raise RuntimeError(
             f"Authored arm triangle count changed: {triangle_count} != {EXPECTED_TRIANGLES}"
+        )
+    if long_gun_triangle_count != EXPECTED_LONG_GUN_TRIANGLES:
+        raise RuntimeError(
+            "Long-gun forearm triangle count changed: "
+            f"{long_gun_triangle_count} != {EXPECTED_LONG_GUN_TRIANGLES}"
         )
     if sidearm_triangle_count != EXPECTED_SIDEARM_TRIANGLES:
         raise RuntimeError(
@@ -1564,30 +2470,50 @@ def main() -> None:
             if sidearm_profile is not None
             else None,
         )
+    validate_long_gun_camera_envelope(armature, actions, weapon_grip)
     armature.animation_data.action = None
     for pose_bone in armature.pose.bones:
         pose_bone.matrix_basis.identity()
     bpy.context.scene.frame_set(0)
     bpy.context.view_layer.update()
-    root["reload_contract_version"] = 5
+    root["reload_contract_version"] = 7
     root["coordinate_space"] = "WeaponRoot root-scale converts source units to metres"
     root["native_clip_platform"] = "m3a1"
     root["reload_clip_count"] = len(actions)
+    root["reload_motion_revision"] = (
+        "authored_cuff_pose_to_pose_contact_2026_08_31"
+    )
+    root["runtime_long_gun_mesh"] = "LongGunReloadForearmsMesh"
+    root["runtime_sidearm_mesh"] = "SidearmReloadForearmsMesh"
+    root["non_runtime_audit_mesh"] = "FullReloadArmsAuditMesh"
+    root["reload_family_count"] = 6
+    root["reload_families"] = ",".join(
+        (
+            "straight_rifle", "rock_and_lock", "mp5",
+            "precision_and_internal", "service_pistol", "desert_eagle",
+        )
+    )
     root.scale = Vector((SOURCE_TO_METERS,) * 3)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
     export_asset(root)
-    validate_export(actions, triangle_count, sidearm_triangle_count)
+    validate_export(
+        actions,
+        triangle_count,
+        long_gun_triangle_count,
+        sidearm_triangle_count,
+    )
     mesh_count = len([obj for obj in root.children_recursive if obj.type == "MESH"])
     print(
         "RELOAD_ARMS_PASS"
         f" clips={len(actions)}"
         f" meshes={mesh_count}"
         f" full_triangles={triangle_count}"
+        f" long_gun_triangles={long_gun_triangle_count}"
         f" sidearm_triangles={sidearm_triangle_count}"
         f" glb={OUTPUT_GLB}"
         f" blend={SOURCE_BLEND}"
     )
-    if mesh_count != 2:
+    if mesh_count != 3:
         raise RuntimeError("Arms-only export contains unexpected visible meshes")
 
 

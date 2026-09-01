@@ -1163,31 +1163,44 @@ animated smg** by **DJMaesen**:
 - Source acquisition date: 2026-08-21.
 - Animated reload-arm derivative generated 2026-08-29, revised/reviewed for IK
   continuity on 2026-08-30, and static-matched for compact sidearm reload
-  endpoints on 2026-08-31.
+  endpoints and rebuilt with camera-safe six-family pose-to-pose clips on
+  2026-08-31. The dedicated long-gun forearm runtime crop and camera-envelope
+  rejection gate were rebuilt and reviewed in Godot on 2026-08-31.
 - Required attribution: **"fps animated smg" by DJMaesen, licensed under CC BY
   4.0.** Indicate that Operation Steel Tide removed the visible SMG, baked the
   authored frame-155 two-hand pose as the bind pose, and added platform-specific
   reload clips and contract markers.
 
-`animated_reload_arms.glb` contract revision 5 retains one 13,700-triangle
-skinned full-arm mesh and adds one 9,306-triangle pistol crop containing the
-authored gloves and 16 cm short sleeve cuffs. Both meshes share the original
-armature/skin, materials, UVs, and skin weights. The GLB also retains three
+`animated_reload_arms.glb` contract revision 7 retains one 13,700-triangle
+skinned full-arm mesh as a non-runtime audit layer, adds one 9,914-triangle
+long-gun crop containing both authored hands and 28 source-unit elbow-length
+cuffs, and retains one 9,306-triangle pistol crop containing the authored hands
+and 16 source-unit compact cuffs. All three meshes share the original
+armature/skin, materials, UVs, and normalized skin weights. Runtime renders only
+the long-gun or pistol crop; a geometry-free compatibility node retains the
+legacy `ReloadArmsMesh` diagnostic name while the complete audit mesh remains
+hidden. The GLB also retains three
 embedded PNG images and 24 tactical/empty reload clips across twelve profiles.
 Both shoulder roots and the right palm-to-grip relation remain fixed; the left
 arm is the moving reload limb. `LeftSidearmMagazineAnchorFrame` is attached to
 the actual evaluated glove surface for compact pistol magazine exchange. The
-2026-08-30 revision uses position-only arm IK plus a separate wrist-rotation
-constraint, normalizes adjacent baked quaternion signs, exports twelve platform
-elbow-pole markers, and applies deterministic per-frame bone/palm and glove
-surface-contact continuity gates before export. The 2026-08-31 follow-up keeps
-the same mesh and markers but hard-matches every pistol clip boundary to the
-exact static compact pose so the exchange stays small and the support arm does
-not jitter back into a full-arm silhouette. P226/M1911, GSh-18, and Desert
-Eagle use independently calibrated compact magazine-grip wrist poses; every
-pistol clip eases from the authored neutral wrist into that pose, holds it only
-through the exchange, then returns to neutral before the cropped mesh is hidden.
-No project-authored replacement body geometry is introduced.
+2026-08-31 Blender pass groups the profiles into straight-rifle, rock-and-lock,
+MP5, precision/internal, service-pistol, and Desert Eagle choreography. Long-
+gun clips replace the former waist-pouch sweep with a short direct exchange,
+zero-drift old-magazine-out and new-magazine-seat holds, and a clear empty
+mechanical beat; M24 keeps its bolt beat in both variants. Pistol crops use a
+deterministic analytical shoulder/elbow solve, platform-calibrated magazine
+grips, empty slide beats, and exact static endpoints, so no generic IK branch
+flip or runtime shoulder translation can smear the sleeve through the near
+plane. Adjacent baked quaternions remain hemisphere-continuous. The builder
+also verifies fixed shoulder roots/right grip, control and evaluated-palm
+envelopes, per-frame bone/joint/palm continuity, glove-surface contact, and all
+24 GLB clip durations. Its new right-grip camera-proxy gate samples every other
+frame of all sixteen long-gun clips, accepts the runtime crop at no more than
+0.719082/1.183342/0.643858 m horizontal/depth/vertical span and 0.552705 m rear
+extent, and proves the retained full layer is rejected at 1.843685/2.900767/
+0.979012 m and 2.357507 m rear extent. No project-authored replacement body
+geometry is introduced.
 The builder emits three extracted texture sidecars but no dedicated studio
 preview PNG; visual review uses the in-engine reload captures and deterministic
 diagnostic.
@@ -1195,12 +1208,12 @@ diagnostic.
 | Animated reload-arm file | Bytes | SHA-256 |
 | --- | ---: | --- |
 | Original `../../source_art/third_party/djmaesen_fps_smg45/fps_animated_smg.glb` | 22,128,372 | `61F30D8980CE292869F97D98587A2736BAF719A19C0A32756838BD9EF2ADA83A` |
-| Runtime `djmaesen_smg45/animated_reload_arms.glb` | 10,248,084 | `C9BB50D36A7C3C286395B6808647AE8E49356D7A6380482057F4462E6C9311E3` |
+| Runtime `djmaesen_smg45/animated_reload_arms.glb` | 10,800,200 | `29652B9C38F3620B2AAC01D7E23C5F2F5BEB83CF84ACF75CE83005B1EB103C6F` |
 | Texture `djmaesen_smg45/animated_reload_arms_Image_0.png` | 1,913,243 | `3BC291E07FA1E04DC5CEE727297D7051966A8D8AC39FCCE622BFB7DC408CB002` |
 | Texture `djmaesen_smg45/animated_reload_arms_Image_1.png` | 3,561,679 | `92CF1397C106CF721902A676985E82253CEC6E526DBD25510BD4E8B8685EEEA1` |
 | Texture `djmaesen_smg45/animated_reload_arms_Image_2.png` | 3,527,986 | `ADD5B1429F735916033AE45BD755B6A6DA70A9EBD047EED38F78C7D64A967F08` |
-| DCC source `../../source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend` | 28,356,557 | `D6CB5CE01B45FE2DD0956ACEDCE1724267FA3F0AB0BD01DEF71F9E9EB1E3A0E3` |
-| Builder `../../scripts/blender/build_animated_reload_arms.py` | 64,520 | `B63857A0927465B8007D4EC408746AAF47466D19F5697B2564DCD79FE768D10F` |
+| DCC source `../../source_art/third_party/djmaesen_fps_smg45/animated_reload_arms.blend` | 30,485,177 | `4BAEE139969EA5E33B686AE13B3AB23214A1BACB1D9F99329B6A901F1796ECF5` |
+| Builder `../../scripts/blender/build_animated_reload_arms.py` | 98,273 | `40DF75DD1B850424CBE625C132C04A4BD64D2D850EE1A38C76A05CE0B41F11DD` |
 
 The source and every derived arm mesh remain copyright DJMaesen and are not
 covered by the repository's MIT license. Full attribution, static adaptations,
