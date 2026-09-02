@@ -393,6 +393,11 @@ public partial class FreightTerminalWorld
         _hud.SetEnemyCount(state.EnemiesRemaining);
         RefreshLocalizedObjective();
         ApplyNetworkObjectiveVisuals(state.ObjectiveStage);
+        // MAP 03 owns authored pressure doors, extraction state, and reactive
+        // lighting outside the generic terminal visuals.  Keep network clients
+        // on the same power stage as the host as soon as the mission snapshot
+        // arrives; the helper is a no-op for every other map.
+        ApplyOrbitalComplexRuntimeObjectiveStage(state.ObjectiveStage);
         if (state.ExtractionActive)
         {
             _extractionCountdownActive = true;

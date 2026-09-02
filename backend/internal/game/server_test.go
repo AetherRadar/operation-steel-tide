@@ -75,6 +75,60 @@ func TestMissionsExposeInfiltrationRules(t *testing.T) {
 	}
 }
 
+func TestMissionsExposeFalltideRecoveryArray(t *testing.T) {
+	_, server := testServer(t)
+	response, err := http.Get(server.URL + "/api/v1/missions")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	var payload struct {
+		Missions []Mission `json:"missions"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+
+	var falltide *Mission
+	for index := range payload.Missions {
+		if payload.Missions[index].ID == "falltide-recovery-array" {
+			falltide = &payload.Missions[index]
+			break
+		}
+	}
+	if falltide == nil {
+		t.Fatal("falltide mission is missing")
+	}
+	if falltide.SpawnProtectionSeconds != 12 || falltide.BaseDetectionRange != 39 || falltide.ReinforcementThreshold != 62 {
+		t.Fatalf("falltide infiltration rules changed: %+v", *falltide)
+	}
+	wantObjectives := []string{"STABILIZE THE STORM-GRID BREAKERS", "AUTHORIZE THE QUARANTINE RELEASE"}
+	wantObjectiveIDs := []string{"reroute_breaker_bus", "purge_quarantine_archive"}
+	wantObjectiveKeys := []string{"falltide_objective_breakers", "falltide_objective_quarantine"}
+	if len(falltide.Objectives) != len(wantObjectives) {
+		t.Fatalf("falltide objectives = %v, want %v", falltide.Objectives, wantObjectives)
+	}
+	for index, objective := range wantObjectives {
+		if falltide.Objectives[index] != objective {
+			t.Fatalf("falltide objective %d = %q, want %q", index, falltide.Objectives[index], objective)
+		}
+	}
+	if len(falltide.ObjectiveIDs) != len(wantObjectiveIDs) {
+		t.Fatalf("falltide objective IDs = %v, want %v", falltide.ObjectiveIDs, wantObjectiveIDs)
+	}
+	if len(falltide.ObjectiveLocalizationKeys) != len(wantObjectiveKeys) {
+		t.Fatalf("falltide objective localization keys = %v, want %v", falltide.ObjectiveLocalizationKeys, wantObjectiveKeys)
+	}
+	for index := range wantObjectiveIDs {
+		if falltide.ObjectiveIDs[index] != wantObjectiveIDs[index] {
+			t.Fatalf("falltide objective ID %d = %q, want %q", index, falltide.ObjectiveIDs[index], wantObjectiveIDs[index])
+		}
+		if falltide.ObjectiveLocalizationKeys[index] != wantObjectiveKeys[index] {
+			t.Fatalf("falltide objective localization key %d = %q, want %q", index, falltide.ObjectiveLocalizationKeys[index], wantObjectiveKeys[index])
+		}
+	}
+}
+
 func TestSessionCompletionUpdatesProfile(t *testing.T) {
 	_, server := testServer(t)
 	startBody := bytes.NewBufferString(`{"playerId":"local-operator","missionId":"steel-tide-terminal","difficulty":"normal"}`)

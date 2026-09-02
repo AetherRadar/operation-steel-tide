@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Godot;
 
@@ -10,9 +11,11 @@ public partial class FreightTerminalWorld
     private const float PartialExtractionSeconds = 15.0f;
     private const float ColdExtractionSeconds = 18.0f;
     private const float ExtractionZoneRadius = 7.0f;
+    private static readonly OrbitalComplexExtractionStrategy OrbitalComplexExtraction = new();
     private ExtractionAircraft? _extractionAircraft;
     private bool _extractionCountdownActive;
     private bool _extractionPlayerInside;
+    private bool _orbitalExtractionLockedPromptShownWhileInside;
     private bool _extractionDeparturePlaying;
     private bool _extractionMissionSucceeded;
     private bool _skipExtractionCinematicForValidation;
@@ -26,8 +29,20 @@ public partial class FreightTerminalWorld
     public int ExtractionBoardedSquadmateCount => _extractionBoardedSquadmates;
     public bool IsExtractionAtOperationsOffice => _extractionAircraft?.DestinationReached == true;
 
+    private bool UsesOrbitalComplexTideGateExtraction
+        => string.Equals(
+            _activeRuntimeMapId,
+            DeploymentMapCatalog.OrbitalComplexId,
+            StringComparison.OrdinalIgnoreCase);
+
     private void BuildExtractionAircraft()
     {
+        if (UsesOrbitalComplexTideGateExtraction)
+        {
+            _extractionAircraft = null;
+            return;
+        }
+
         _extractionAircraft = new ExtractionAircraft
         {
             Name = "FriendlyExtractionTiltRotor",
@@ -54,6 +69,7 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        _orbitalExtractionLockedPromptShownWhileInside = false;
         if (IsExtractionNetworkClient)
         {
             return;
@@ -86,6 +102,10 @@ public partial class FreightTerminalWorld
         }
 
         _extractionPlayerInside = IsPlayerInsideExtractionZone();
+        if (!_extractionPlayerInside)
+        {
+            _orbitalExtractionLockedPromptShownWhileInside = false;
+        }
         if (_missionEnded || _extractionDeparturePlaying)
         {
             return;
@@ -108,7 +128,7 @@ public partial class FreightTerminalWorld
         RallySquadToExtraction();
         _extractionRemaining = Mathf.Max(0.0f, _extractionRemaining - delta);
         UpdateExtractionHud();
-        if (_extractionRemaining <= 0.0f && _extractionAircraft?.BoardingReady == true)
+        if (_extractionRemaining <= 0.0f && IsActiveExtractionTransportReady())
         {
             CompleteExtractionSequence();
         }
@@ -128,11 +148,14 @@ public partial class FreightTerminalWorld
                 && IsInsideExtractionZone(mate.GlobalPosition));
     }
 
-    private static bool IsInsideExtractionZone(Vector3 position)
+    private bool IsInsideExtractionZone(Vector3 position)
     {
         var offset = position - ExtractionPoint;
         var horizontalSquared = offset.X * offset.X + offset.Z * offset.Z;
-        return horizontalSquared <= ExtractionZoneRadius * ExtractionZoneRadius
+        var radius = UsesOrbitalComplexTideGateExtraction
+            ? OrbitalComplexRuntimeExtractionRadius
+            : ExtractionZoneRadius;
+        return horizontalSquared <= radius * radius
             && offset.Y >= -1.5f
             && offset.Y <= 4.2f;
     }
@@ -157,7 +180,30 @@ public partial class FreightTerminalWorld
     }
 
     private float CurrentExtractionCountdownDuration()
-        => ExtractionCountdownForRemainingObjectives(_objectiveTerminals.Count, _objectiveStage);
+        => UsesOrbitalComplexTideGateExtraction
+            ? OrbitalComplexExtraction.CountdownSeconds(_objectiveStage)
+            : ExtractionCountdownForRemainingObjectives(_objectiveTerminals.Count, _objectiveStage);
+
+    private bool IsActiveExtractionTransportReady()
+        => UsesOrbitalComplexTideGateExtraction
+            ? OrbitalComplexExtraction.TransportReady(_objectiveStage)
+            : _extractionAircraft?.BoardingReady == true;
+
+    private void BeginActiveExtractionTransport()
+    {
+        if (!UsesOrbitalComplexTideGateExtraction)
+        {
+            _extractionAircraft?.BeginInbound();
+        }
+    }
+
+    private void AbortActiveExtractionTransport()
+    {
+        if (!UsesOrbitalComplexTideGateExtraction)
+        {
+            _extractionAircraft?.AbortPickup();
+        }
+    }
 
     private bool ObjectivesIncompleteForExtraction()
         => _objectiveTerminals.Count > 0
@@ -170,15 +216,26 @@ public partial class FreightTerminalWorld
             return;
         }
 
+        if (UsesOrbitalComplexTideGateExtraction
+            && !OrbitalComplexExtraction.CanExtract(_objectiveStage))
+        {
+            ShowOrbitalExtractionLockedPrompt();
+            return;
+        }
+
         _extractionCountdownActive = true;
         _extractionRemaining = CurrentExtractionCountdownDuration();
         _missionDirector.ExitDeploymentZone();
         _preExtractionSquadOrder = _squadOrder;
         _preExtractionSquadMovePoint = _squadMovePoint;
-        _extractionAircraft?.BeginInbound();
+        BeginActiveExtractionTransport();
         RallySquadToExtraction();
         UpdateExtractionHud();
-        if (ObjectivesIncompleteForExtraction())
+        if (UsesOrbitalComplexTideGateExtraction)
+        {
+            ShowOrbitalExtractionPowerMessage();
+        }
+        else if (ObjectivesIncompleteForExtraction())
         {
             _hud.ShowLocalizedMessage(
                 "extraction_cold",
@@ -194,12 +251,39 @@ public partial class FreightTerminalWorld
         }
     }
 
+    private void ShowOrbitalExtractionLockedPrompt()
+    {
+        if (_orbitalExtractionLockedPromptShownWhileInside)
+        {
+            return;
+        }
+
+        _orbitalExtractionLockedPromptShownWhileInside = true;
+        _hud.ShowLocalizedMessage(
+            OrbitalComplexExtraction.StatusLocalizationKey(_objectiveStage),
+            "TIDE GATE OFFLINE  //  RESTORE EMERGENCY POWER",
+            new Color(1.0f, 0.48f, 0.22f));
+    }
+
+    private void ShowOrbitalExtractionPowerMessage()
+    {
+        var fullPower = _objectiveStage >= 2;
+        _hud.ShowLocalizedMessage(
+            OrbitalComplexExtraction.StatusLocalizationKey(_objectiveStage),
+            fullPower
+                ? "FULL POWER  //  TIDE GATE EXPRESS CYCLE  //  HOLD 9 SECONDS"
+                : "EMERGENCY POWER  //  TIDE GATE CYCLING  //  HOLD 18 SECONDS",
+            fullPower
+                ? new Color(0.3f, 1.0f, 0.66f)
+                : new Color(0.35f, 0.8f, 1.0f));
+    }
+
     private void CancelExtractionCountdown()
     {
         _extractionCountdownActive = false;
         _extractionRemaining = CurrentExtractionCountdownDuration();
         _hud.HideExtractionCountdown();
-        _extractionAircraft?.AbortPickup();
+        AbortActiveExtractionTransport();
         RestoreSquadOrderAfterExtractionAbort();
         _hud.ShowLocalizedMessage(
             "extraction_aborted",
@@ -250,7 +334,7 @@ public partial class FreightTerminalWorld
         _hud.SetExtractionCountdown(
             _extractionRemaining,
             CurrentExtractionCountdownDuration(),
-            _extractionAircraft?.BoardingReady == true,
+            IsActiveExtractionTransportReady(),
             ready,
             total);
     }
@@ -436,6 +520,22 @@ public partial class FreightTerminalWorld
         var objectiveScaled = coldDuration > ExtractionCountdownDuration
             && priorityDuration < ExtractionCountdownDuration
             && priorityDuration < coldDuration;
+        var orbitalRulesReady = !OrbitalComplexExtraction.CanExtract(0)
+            && Mathf.IsZeroApprox(OrbitalComplexExtraction.CountdownSeconds(0))
+            && !OrbitalComplexExtraction.TransportReady(0)
+            && OrbitalComplexExtraction.StatusLocalizationKey(0) == "falltide_extract_locked"
+            && OrbitalComplexExtraction.CanExtract(1)
+            && Mathf.IsEqualApprox(
+                OrbitalComplexExtraction.CountdownSeconds(1),
+                OrbitalComplexExtractionStrategy.EmergencyPowerCountdownSeconds)
+            && OrbitalComplexExtraction.TransportReady(1)
+            && OrbitalComplexExtraction.StatusLocalizationKey(1) == "falltide_extract_emergency"
+            && OrbitalComplexExtraction.CanExtract(2)
+            && Mathf.IsEqualApprox(
+                OrbitalComplexExtraction.CountdownSeconds(2),
+                OrbitalComplexExtractionStrategy.FullPowerCountdownSeconds)
+            && OrbitalComplexExtraction.TransportReady(2)
+            && OrbitalComplexExtraction.StatusLocalizationKey(2) == "falltide_extract_full";
         _missionDirector.ExitDeploymentZone();
         _missionDirector.RaiseConfirmedAlarm();
         _player.GlobalPosition = ExtractionPoint + new Vector3(0, 0.12f, 1.0f);
@@ -513,8 +613,8 @@ public partial class FreightTerminalWorld
             && combatPhasePreserved && leaveReset && aircraftArrived && boardingShown
             && departureStarted && resultDelayed && playerSeated && squadSeated
             && cameraFollowing && cinematicHud && aircraftFacesTravel && destinationReached && completed
-            && objectiveScaled;
-        GD.Print($"EXTRACTION_SEQUENCE_CHECK valid={valid} objective_free={entryStartedImmediately} objective_scaled={objectiveScaled} cold_duration={coldDuration:0.0} priority_duration={priorityDuration:0.0} combat_phase_preserved={combatPhasePreserved} countdown={countdownStarted} inbound={aircraftInbound} authored_visual={authoredVisual} leave_reset={leaveReset} aircraft_arrived={aircraftArrived} boarding={boardingShown} departure={departureStarted} result_delayed={resultDelayed} player_seated={playerSeated} squad_seated={squadSeated} boarded={_extractionBoardedSquadmates}/{expectedBoardedMates} camera={cameraFollowing} cinematic_hud={cinematicHud} faces_travel={aircraftFacesTravel} destination={destinationReached} completed={completed} duration={coldDuration:0.0} transfer={ExtractionAircraft.TransferDuration:0.0}");
+            && objectiveScaled && orbitalRulesReady;
+        GD.Print($"EXTRACTION_SEQUENCE_CHECK valid={valid} objective_free={entryStartedImmediately} objective_scaled={objectiveScaled} orbital_rules={orbitalRulesReady} cold_duration={coldDuration:0.0} priority_duration={priorityDuration:0.0} combat_phase_preserved={combatPhasePreserved} countdown={countdownStarted} inbound={aircraftInbound} authored_visual={authoredVisual} leave_reset={leaveReset} aircraft_arrived={aircraftArrived} boarding={boardingShown} departure={departureStarted} result_delayed={resultDelayed} player_seated={playerSeated} squad_seated={squadSeated} boarded={_extractionBoardedSquadmates}/{expectedBoardedMates} camera={cameraFollowing} cinematic_hud={cinematicHud} faces_travel={aircraftFacesTravel} destination={destinationReached} completed={completed} duration={coldDuration:0.0} transfer={ExtractionAircraft.TransferDuration:0.0}");
         GD.Print($"EXTRACTION_SEQUENCE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

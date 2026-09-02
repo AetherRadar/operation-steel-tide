@@ -7,6 +7,11 @@ public partial class FreightTerminalWorld
 {
     private void ConfigureTacticalMinimap()
     {
+        if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            ConfigureOrbitalComplexRuntimeMinimap();
+            return;
+        }
         if (IsBlackwaterRefineryMap)
         {
             ConfigureRefineryMinimap();

@@ -6,6 +6,11 @@ public partial class FreightTerminalWorld
 {
     private void SpawnCivilianValuableLoot()
     {
+        if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            SpawnOrbitalComplexRuntimeValuables();
+            return;
+        }
         if (IsBlackwaterRefineryMap)
         {
             SpawnRefineryValuableLoot();

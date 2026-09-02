@@ -324,6 +324,65 @@ absence of false terminus/niche portals, Hero Mountain, Coast Line, all CC BY,
 paid, editorial, private-store, or unclear-license content. The complete
 Jianghai Old City runtime GLB is neither embedded nor referenced.
 
+## FALLTIDE RECOVERY ARRAY // SUBLEVEL 09 underground MAP03 composite
+
+`FALLTIDE RECOVERY ARRAY // SUBLEVEL 09` (`map_id=orbital_complex`) is an
+original Blender 4.5 DCC composition for the third extraction map. The layout,
+transform table, pressure-shell hardscape, route markings, metadata, animation
+pivots, and build workflow are project-authored and covered by the root MIT
+license (subject to the AI-assistance disclosure in
+`../../docs/CONTENT_PROVENANCE.md`). The shell is authored in Blender and
+exported as ordinary mesh geometry; it is not a Godot CSG or runtime box
+construction. Visible industrial halls, offices, gates, and hero objects are
+instances or adaptations of finished sources listed below rather than
+programmer-art stand-ins.
+
+### Source and mapping record
+
+| Source / creator | Official source and exact license | Acquisition | Repository-local mapping and MAP03 use |
+| --- | --- | --- | --- |
+| NASA/Ames Research Center, **70 Meter Dish** | [NASA 3D resource](https://science.nasa.gov/3d-resources/70-meter-dish/); NASA Images and Media Usage Guidelines / U.S. Government work (not MIT or CC0) | Raw source acquired 2026-09-01; SHA-256 `36FF56A7A2BFD1C278F6F4774D32128D5931F2C22FE58241D00EE7D1815634BB` | `../../source_art/third_party/nasa_3d/nasa_70_meter_dish.glb` -> `TelemetryDishStaticBase_*` and `TelemetryDishMovingAssembly_*` below `DishYaw` -> `DishPitch`; scaled, de-branded, weathered, and suspended as the reactor-hall telemetry landmark |
+| NASA, **Orion Capsule (no fbc)** | [NASA 3D resource](https://science.nasa.gov/3d-resources/orion-capsule/); NASA Images and Media Usage Guidelines / U.S. Government work (not MIT or CC0) | Raw source acquired 2026-09-01; SHA-256 `ABC4C69C27AFA55C4A06BC9972B8872979F1473FB26E15224FB0F77F1CD81DC7` | `../../source_art/third_party/nasa_3d/nasa_orion_capsule_no_fbc.stl` -> `RecoveredCapsule_Fictional` in `District_LaunchSilo`; scaled, recolored, scorched, and impact-posed as an unnamed fictional recovered article |
+| Trey Ramm (`minime453`), **Modular Industrial Pieces** | [OpenGameArt source page](https://opengameart.org/content/modular-industrial-kit); CC0 1.0 Universal (`https://creativecommons.org/publicdomain/zero/1.0/`) | Selected source package acquired 2026-08-27 | `trey_modular_industrial/{reactor-annex,turbine-workshop,switchgear-hall,transformer-works,boiler-workshop,pump-house,glassworks-office,cooling-service-hall,control-room,maintenance-depot,foundry-warehouse,crew-canteen,elevated-walkway,arch-gateway,east-security-gate,west-service-gate}.glb` -> Breaker Yard, Quarantine Archive, Reactor Hall, Launch Silo, Coolant Tunnels, Tide Gate, and Intake districts; source-derived meshes/materials remain CC0 |
+| Majadroid / Maik Hoffmann, **3D House Construction Site - LowPoly** | [OpenGameArt source page](https://opengameart.org/content/3d-house-construction-site-lowpoly-cc0); CC0 1.0 (`https://creativecommons.org/publicdomain/zero/1.0/`) | Selected source package acquired 2026-08-27 | `majadroid_construction_site/{containers-office,containers-cargo}.glb` -> intake customs and coolant-pipe stores; the package's crane and construction-materials variants are not embedded in the current underground GLB; source-derived meshes/materials remain CC0 and the package's Imphenzia palette credit is retained |
+| Trey Ramm (`minime453`) and Kenney, **Operations Office** composition | Trey source [Modular Industrial Kit](https://opengameart.org/content/modular-industrial-kit) and Kenney [Furniture Kit 2.0](https://kenney.nl/assets/furniture-kit); both CC0 1.0 | Trey acquired 2026-08-27; Kenney acquired 2026-08-26 | `operations_office/operations_office_set.glb` -> `ArchiveCommandHall`; transitive source mapping is retained in `operations_office/README.md`; source-derived geometry/materials remain CC0 |
+| eye-candy.xyz, Charlotte Baglioni and Dario Barresi, and Amal Kumar, **Concrete Floor / Asphalt 03 / Rusty Painted Metal** | [Concrete Floor](https://polyhaven.com/a/concrete_floor), [Asphalt 03](https://polyhaven.com/a/asphalt_03), and [Rusty Painted Metal](https://polyhaven.com/a/rusty_painted_metal); each CC0 1.0 Universal | Acquired 2026-08-06 | `../../assets/textures/{concrete_floor,asphalt_03,rusty_painted_metal}_{diff,normal,rough}_1k.*` -> packed PBR materials `WetConcrete`, `RoadAsphalt`, and `OxidizedRedSteel`; exact map hashes are emitted in `source_art/world/orbital_complex/build_report.json` and the textures are embedded in the runtime GLB |
+
+NASA source-derived content is not relicensed under MIT. The project uses no
+NASA insignia, mission mark, logotype, seal, employee likeness, or source
+branding and makes no claim of NASA review, sponsorship, or endorsement. The
+NASA usage interpretation, immutable raw-file hashes, and evidence snapshot
+are in `../../source_art/third_party/nasa_3d/{README.md,LICENSE_EVIDENCE.md}`.
+
+### Reproducible output and indoor QA contract
+
+- Authoritative DCC source:
+  `../../source_art/world/orbital_complex/orbital_complex.blend` (15,521,550
+  bytes; SHA-256 `E288F6743444A27ADA414254DC06685EF223D36DE53EBFEDA959D306D3EB4EF2`).
+- Reproducible builder:
+  `../../scripts/blender/build_orbital_complex_underground.py`; it executes the
+  shared provenance/import/export helpers from `build_orbital_complex.py` and
+  must be run with Blender 4.5+.
+- Runtime output: `orbital_complex/orbital_complex.glb` (19,472,480 bytes;
+  SHA-256 `5031189E36A803B6EEBC1A91E6F0CB7AA23A14F23586AD9585A72D4B981F2E30`).
+  The binary is self-contained: 343 glTF nodes, 240 mesh resources, 242
+  primitives, 42 materials, 11 embedded images, and no external buffer or
+  image URI.
+- The exported root is `FalltideRecoveryArray` with `map_id=orbital_complex`,
+  340 x 320 m horizontal bounds, Godot center `(0,0,-60)`, and vertical
+  envelope `Y=-34..24`. `BunkerCeiling` and `BunkerPerimeterWalls` are
+  required for the enclosed-room contract; `ReactorPitFloor`, the service
+  deck, and the upper ring provide three readable vertical layers.
+- Every build must pass the deterministic Blender scene audit and GLB
+  round-trip audit (`valid`, `authored_major_geometry`, `roundtrip_import`,
+  `embedded_runtime_asset`, `interior_enclosed`, and `vertical_layers=3`),
+  preserve unique interactive nodes (`DishYaw`, `DishPitch`, gates, alarm and
+  power groups), preserve all named POI/spawn/extraction anchors, and render
+  the seven representative previews under
+  `../../source_art/world/orbital_complex/previews/`.
+- Gameplay collision/navigation remains in Godot; the visible shell and
+  imported authored modules are not silently replaced with runtime primitives.
+
 ## Poly Haven CC0 models
 
 The following two [Poly Haven](https://polyhaven.com/) models adapted into

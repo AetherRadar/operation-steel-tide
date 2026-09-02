@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace OperationSteelTide;
 
@@ -16,6 +17,7 @@ public static class DeploymentMapCatalog
 {
     public const string FreightTerminalId = "freight_terminal";
     public const string BlackwaterRefineryId = "blackwater_refinery";
+    public const string OrbitalComplexId = "orbital_complex";
 
     public static readonly IReadOnlyList<DeploymentMapOffer> Maps = new[]
     {
@@ -36,36 +38,35 @@ public static class DeploymentMapCatalog
             "GUANGCHANG PAWNSHOP  //  RED STAR ELECTRONICS",
             true),
         new DeploymentMapOffer(
-            "orbital_complex",
+            OrbitalComplexId,
             "MAP 03",
             "map_orbital_complex",
-            "ORBITAL COMPLEX",
+            "FALLTIDE RECOVERY ARRAY",
             "map_orbital_complex_subtitle",
-            "GLASS SKYBRIDGE DISTRICT  //  LOCKED",
-            false)
+            "STORM-BARRIER QUARANTINE COMPLEX",
+            true)
     };
 
-    public static DeploymentMapOffer Resolve(string id)
+    public static bool TryResolve(
+        string? id,
+        [NotNullWhen(true)] out DeploymentMapOffer? map)
     {
-        foreach (var map in Maps)
+        foreach (var candidate in Maps)
         {
-            if (string.Equals(map.Id, id, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(candidate.Id, id, StringComparison.OrdinalIgnoreCase))
             {
-                return map;
+                map = candidate;
+                return true;
             }
         }
-        return Maps[0];
-    }
 
-    public static bool IsAvailable(string id)
-    {
-        foreach (var map in Maps)
-        {
-            if (string.Equals(map.Id, id, StringComparison.OrdinalIgnoreCase))
-            {
-                return map.Available;
-            }
-        }
+        map = null;
         return false;
     }
+
+    public static DeploymentMapOffer Resolve(string id)
+        => TryResolve(id, out var map) ? map : Maps[0];
+
+    public static bool IsAvailable(string id)
+        => TryResolve(id, out var map) && map.Available;
 }

@@ -16,7 +16,11 @@ public partial class FreightTerminalWorld : Node3D
     private string _activeRuntimeMapId = DeploymentMapCatalog.FreightTerminalId;
     /// <summary>Player deploy pad chosen from edge set each match (not a fixed center apron).</summary>
     private Vector3 DeploymentPoint = new(0, 0.2f, 42.0f);
-    private static readonly Vector3 ExtractionPoint = new(0.0f, 0.08f, -60.0f);
+    private static readonly Vector3 FreightTerminalExtractionPoint = new(0.0f, 0.08f, -60.0f);
+    private Vector3 ExtractionPoint
+        => IsOrbitalComplexRuntimeMapSelected
+            ? OrbitalComplexRuntimeExtractionPoint
+            : FreightTerminalExtractionPoint;
 
     private TacticalPlayer _player = null!;
     internal TacticalPlayer LocalPlayerRef => _player;
@@ -271,6 +275,7 @@ public partial class FreightTerminalWorld : Node3D
         UpdateDemolitionNetwork((float)delta);
         UpdateExtractionNetwork((float)delta);
         UpdateWorldBossTracking();
+        UpdateOrbitalComplexRuntimePresentation((float)delta);
         if (IsInstanceValid(_extractionMarker))
         {
             _extractionMarker.RotateY((float)delta * 0.35f);
@@ -340,6 +345,10 @@ public partial class FreightTerminalWorld : Node3D
     private void InitMissionDirector()
     {
         _missionDirector = new MissionDirector { Name = "MissionDirector" };
+        if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            ConfigureOrbitalComplexRuntimeMission();
+        }
         _missionDirector.MissionLoaded += OnMissionLoaded;
         _missionDirector.PhaseChanged += OnPhaseChanged;
         _missionDirector.Gunshot += OnDirectorGunshot;
@@ -428,6 +437,15 @@ public partial class FreightTerminalWorld : Node3D
                 "extraction_unlocked",
                 "PRIORITY EXTRACTION  //  ALL OBJECTIVES COMPLETE  //  FAST LANE AUTHORIZED",
                 new Color(0.3f, 1.0f, 0.68f));
+        }
+        ApplyOrbitalComplexRuntimeObjectiveStage(index);
+        if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            SpawnOrbitalComplexRuntimeQrf(index);
+            if (index >= OrbitalComplexPowerRules.MaximumObjectiveStage)
+            {
+                SpawnOrbitalComplexRuntimeWorldBoss();
+            }
         }
     }
 
@@ -562,6 +580,15 @@ public partial class FreightTerminalWorld : Node3D
             // Demolition arenas are spatially isolated from extraction. Restricting
             // this bounded scan avoids selecting a valid but unreachable remote point.
             ConsiderCoverPoint(_demolitionArena.CoverPoints, origin, threat, ref best, ref bestScore);
+            return best;
+        }
+        if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            // Falltide is authored below the shared outdoor origin.  The legacy
+            // freight cover list is mostly at Y=0 and would let AI select a
+            // visually unreachable point on the wrong height band, so only use
+            // the map's registered service-deck, dry-dock, and catwalk points.
+            ConsiderCoverPoint(_registeredCoverPoints, origin, threat, ref best, ref bestScore);
             return best;
         }
         if (!IsBlackwaterRefineryMap)
@@ -835,7 +862,11 @@ public partial class FreightTerminalWorld : Node3D
 
     private void BuildHudAndPlayer()
     {
-        if (IsBlackwaterRefineryMap)
+        if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            ConfigureOrbitalComplexRuntimeSpawnSelection();
+        }
+        else if (IsBlackwaterRefineryMap)
         {
             DeploymentPoint = JianghaiExtractionSpawnLayout.PlayerPad;
             _assignedHostilePads = new List<Vector3>(JianghaiExtractionSpawnLayout.HostilePads);
@@ -850,6 +881,7 @@ public partial class FreightTerminalWorld : Node3D
 
         _hud = new CombatHUD { Name = "CombatHUD" };
         AddChild(_hud);
+        _hud.SetExtractionUsesTideGate(IsOrbitalComplexRuntimeMapSelected);
         _hud.SetDeploymentMapSelection(_activeRuntimeMapId);
         _hud.SetOperatorProfile(_operatorProfileStore.Profile);
         _hud.PauseRequested += TogglePause;
@@ -885,7 +917,9 @@ public partial class FreightTerminalWorld : Node3D
             Main = this,
             Hud = _hud,
             Position = DeploymentPoint,
-            Rotation = IsBlackwaterRefineryMap
+            Rotation = IsOrbitalComplexRuntimeMapSelected
+                ? new Vector3(0.0f, OrbitalComplexRuntimePlayerYaw, 0.0f)
+                : IsBlackwaterRefineryMap
                 ? new Vector3(0.0f, JianghaiExtractionSpawnLayout.PlayerYaw, 0.0f)
                 : Vector3.Zero,
             MouseSensitivity = 0.00165f * _sensitivitySetting
@@ -919,6 +953,11 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SpawnLootCases()
     {
+        if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            SpawnOrbitalComplexRuntimeWeaponCases();
+            return;
+        }
         if (IsBlackwaterRefineryMap)
         {
             SpawnRefineryWeaponCases();
@@ -1103,6 +1142,11 @@ public partial class FreightTerminalWorld : Node3D
     private void SpawnBuildingGradedLoot()
     {
         _buildingLootPickupCount = 0;
+        if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            SpawnOrbitalComplexRuntimeGradedLoot();
+            return;
+        }
         if (IsBlackwaterRefineryMap)
         {
             SpawnRefineryGradedLoot();
@@ -1292,6 +1336,11 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SpawnEnemies()
     {
+        if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            SpawnOrbitalComplexRuntimeEnemies();
+            return;
+        }
         // Map garrison NPCs (TeamId 0) — prefer hunting rival squads, loot when idle.
         IReadOnlyList<Vector3> positions = IsBlackwaterRefineryMap
             ? RefineryLayout.GarrisonSpawns
@@ -1347,6 +1396,11 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SpawnHostileOperatorSquads()
     {
+        if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            SpawnOrbitalComplexRuntimeHostileSquads();
+            return;
+        }
         // Pads assigned in BuildHudAndPlayer (player edge pad + farthest remaining).
         var chosen = _assignedHostilePads;
         if (chosen is null || chosen.Count == 0)
@@ -1785,6 +1839,11 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SpawnExplosives()
     {
+        if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            SpawnOrbitalComplexRuntimeExplosives();
+            return;
+        }
         foreach (var position in new[]
         {
             new Vector3(-6, 0, 18), new Vector3(-20, 0, -6), new Vector3(17, 0, -18),
@@ -2057,6 +2116,26 @@ public partial class FreightTerminalWorld : Node3D
             return;
         }
 
+        // Falltide's upper calibration ring has one authored telemetry console.
+        // Resolve it before loot/vehicle prompts so the map-specific scan action
+        // remains a deliberate interaction rather than an accidental pickup.
+        if (IsOrbitalComplexRuntimeMapSelected
+            && UpdateOrbitalComplexTelemetryInteraction(delta))
+        {
+            _interactionProgress = 0.0f;
+            return;
+        }
+
+        // The Undertow sump is an optional lower-dock pressure system.  It gets
+        // the same interaction priority as the telemetry console so a nearby
+        // loot pickup cannot steal the deliberate hold-to-purge action.
+        if (IsOrbitalComplexRuntimeMapSelected
+            && UpdateOrbitalComplexUndertowInteraction(delta))
+        {
+            _interactionProgress = 0.0f;
+            return;
+        }
+
         DriveableVehicle? nearestVehicle = null;
         var nearestVehicleDistance = 3.4f;
         for (var i = _vehicles.Count - 1; i >= 0; i--)
@@ -2166,6 +2245,11 @@ public partial class FreightTerminalWorld : Node3D
         }
         _lootSearchTarget = null;
         _player.SetSearchPose(false);
+        if (UpdateOrbitalComplexBleedValveInteraction(delta))
+        {
+            _interactionProgress = 0.0f;
+            return;
+        }
         UpdateObjectiveInteraction(delta);
     }
 
@@ -2593,9 +2677,11 @@ public partial class FreightTerminalWorld : Node3D
             _hud.SetInteraction(string.Empty, 0.0f, false);
             return;
         }
-        var action = _objectiveStage == 0
-            ? GameLocalization.Get("disable_relay", _languageSetting, "DISABLE RELAY")
-            : GameLocalization.Get("download_manifest", _languageSetting, "DOWNLOAD MANIFEST");
+        var action = IsOrbitalComplexRuntimeMapSelected
+            ? OrbitalComplexObjectiveInteractionLabel(_objectiveStage)
+            : _objectiveStage == 0
+                ? GameLocalization.Get("disable_relay", _languageSetting, "DISABLE RELAY")
+                : GameLocalization.Get("download_manifest", _languageSetting, "DOWNLOAD MANIFEST");
         _interactionProgress = Input.IsActionPressed(GameInputActions.Interact) && !_interactReleaseRequired
             ? Mathf.Min(1.0f, _interactionProgress + delta / 1.8f)
             : Mathf.Max(0.0f, _interactionProgress - delta * 1.6f);
@@ -2618,16 +2704,37 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
-        var screen = _objectiveScreens[_objectiveStage];
+        var completedObjectiveStage = _objectiveStage;
+        var screen = _objectiveScreens[completedObjectiveStage];
         screen.AlbedoColor = new Color(0.1f, 0.9f, 0.58f);
         screen.Emission = new Color(0.04f, 0.95f, 0.5f);
-        _jianghaiOldCitySceneLoader.SetTerminalCompleted(_objectiveStage);
-        _objectiveLights[_objectiveStage].LightColor = new Color(0.06f, 1.0f, 0.5f);
-        if (_objectiveStage == 0 && !_reinforcementsDeployed && !_reinforcementPending)
+        _jianghaiOldCitySceneLoader.SetTerminalCompleted(completedObjectiveStage);
+        _objectiveLights[completedObjectiveStage].LightColor = new Color(0.06f, 1.0f, 0.5f);
+        var isOrbitalBreaker = IsOrbitalComplexBreakerObjective(completedObjectiveStage);
+        var shouldDelayResponse = IsOrbitalComplexRuntimeMapSelected
+            ? isOrbitalBreaker
+            : completedObjectiveStage == 0;
+        if (shouldDelayResponse && !_reinforcementsDeployed && !_reinforcementPending)
         {
             _reinforcementThreshold = Mathf.Min(95, _reinforcementThreshold + 20);
             _threatLevel = Mathf.Max(0.0f, _threatLevel - 15.0f);
-            _hud.ShowLocalizedMessage("relay_offline", "RELAY OFFLINE  //  RESPONSE DELAYED", new Color(0.35f, 0.92f, 0.72f));
+            if (IsOrbitalComplexRuntimeMapSelected)
+            {
+                ShowOrbitalComplexObjectiveCompletion(completedObjectiveStage);
+            }
+            else
+            {
+                _hud.ShowLocalizedMessage(
+                    "relay_offline",
+                    "RELAY OFFLINE  //  RESPONSE DELAYED",
+                    new Color(0.35f, 0.92f, 0.72f));
+            }
+        }
+        else if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            // Archive completion still needs its own acknowledgement, and a breaker
+            // completion must remain visible if QRF state already changed asynchronously.
+            ShowOrbitalComplexObjectiveCompletion(completedObjectiveStage);
         }
         _interactionProgress = 0.0f;
         _missionDirector.AdvanceObjective();

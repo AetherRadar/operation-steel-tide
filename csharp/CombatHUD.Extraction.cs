@@ -13,12 +13,20 @@ public partial class CombatHUD
     private float _extractionRemaining;
     private float _extractionTotal = 12.0f;
     private bool _extractionAircraftReady;
+    private bool _extractionUsesTideGate;
     private int _extractionSquadReady = 1;
     private int _extractionSquadTotal = 1;
 
     public bool IsExtractionCountdownVisible => IsInstanceValid(_extractionRoot) && _extractionRoot.Visible;
     public float ExtractionCountdownSeconds => _extractionRemaining;
     public bool ExtractionAircraftReady => _extractionAircraftReady;
+    public bool ExtractionUsesTideGate => _extractionUsesTideGate;
+
+    public void SetExtractionUsesTideGate(bool enabled)
+    {
+        _extractionUsesTideGate = enabled;
+        RefreshExtractionLanguage();
+    }
 
     private void BuildExtractionHud(Control root)
     {
@@ -132,12 +140,18 @@ public partial class CombatHUD
             return;
         }
 
-        _extractionTitle.Text = _extractionAircraftReady
-            ? Text("extraction_boarding", "RESCUE AIRCRAFT ON PAD  //  BOARDING")
-            : Text("extraction_inbound", "FRIENDLY TILT-ROTOR INBOUND");
-        _extractionHint.Text = Text(
-            "extraction_hold",
-            "STAY INSIDE THE EXTRACTION ZONE  //  LEAVING RESETS THE TIMER");
+        _extractionTitle.Text = _extractionUsesTideGate
+            ? Text("falltide_extract_cycle", "TIDE GATE RECOVERY CYCLE ACTIVE")
+            : _extractionAircraftReady
+                ? Text("extraction_boarding", "RESCUE AIRCRAFT ON PAD  //  BOARDING")
+                : Text("extraction_inbound", "FRIENDLY TILT-ROTOR INBOUND");
+        _extractionHint.Text = _extractionUsesTideGate
+            ? Text(
+                "falltide_extract_hold",
+                "HOLD THE RECOVERY RAIL  //  LEAVING RESETS THE CYCLE")
+            : Text(
+                "extraction_hold",
+                "STAY INSIDE THE EXTRACTION ZONE  //  LEAVING RESETS THE TIMER");
         _extractionSquad.Text = $"{Text("extraction_squad", "SQUAD READY")}  {_extractionSquadReady}/{_extractionSquadTotal}";
         _extractionTimer.Text = $"00:{Mathf.CeilToInt(_extractionRemaining):00}";
         var urgent = _extractionRemaining <= 3.0f;

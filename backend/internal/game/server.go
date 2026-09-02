@@ -80,6 +80,17 @@ func defaultMissions() []Mission {
 			EnemyCount: 11, SpawnProtectionSeconds: 10, BaseDetectionRange: 38,
 			ReinforcementThreshold: 55, RewardCredits: 2700, RewardXP: 1450,
 		},
+		{
+			ID: "falltide-recovery-array", Name: "Operation Falltide", Map: "Falltide Recovery Array",
+			Briefing: "Cross the storm barrier, restore the isolated breaker grid, and authorize quarantine release before the array overloads.",
+			// Objective order is the canonical contract. The client may project this list into
+			// the deterministic shared-world order selected by the extraction world seed.
+			Objectives:                []string{"STABILIZE THE STORM-GRID BREAKERS", "AUTHORIZE THE QUARANTINE RELEASE"},
+			ObjectiveIDs:              []string{"reroute_breaker_bus", "purge_quarantine_archive"},
+			ObjectiveLocalizationKeys: []string{"falltide_objective_breakers", "falltide_objective_quarantine"},
+			EnemyCount:                24, SpawnProtectionSeconds: 12, BaseDetectionRange: 39,
+			ReinforcementThreshold: 62, RewardCredits: 3600, RewardXP: 1900,
+		},
 	}
 }
 

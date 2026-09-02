@@ -61,6 +61,15 @@ public sealed record OrbitalComplexValidationSnapshot(
 public static class OrbitalComplexLayoutValidator
 {
     private const float Epsilon = 0.01f;
+    // Boundary and roof collision intentionally sit half a metre outside the
+    // gameplay envelope so they seal the shell instead of leaving a numerical
+    // seam at the declared edge.  Keep that allowance explicit and small.
+    private const float CollisionEnvelopeMargin = 1.0f;
+    // CharacterBody3D roots are feet-level.  Keep encounter roots just above
+    // their authored floor, with enough tolerance for export rounding but not
+    // enough to permit a visibly buried spawn.
+    private const float FloorAlignmentTolerance = 0.08f;
+    private const float FloorTopTolerance = 0.04f;
 
     public static OrbitalComplexValidationSnapshot Validate(OrbitalComplexMapLayout layout)
     {
@@ -70,16 +79,24 @@ public static class OrbitalComplexLayoutValidator
         AddFailure(failures, boundsValid, "bounds");
         var uniqueIdsValid = ValidateUniqueIds(layout);
         AddFailure(failures, uniqueIdsValid, "duplicate_ids");
+        var spawnFloorAlignmentValid = ValidateSpawnFloorAlignment(layout);
+        AddFailure(failures, spawnFloorAlignmentValid, "spawn_floor_alignment");
         var minimumSpawnDistance = MinimumDistance(
             layout.PlayerSpawnPads.Select(pad => pad.Position),
             layout.RivalSpawnPads.Select(pad => pad.Position));
         var spawnSeparationValid = layout.PlayerSpawnPads.Count == 4
             && layout.RivalSpawnPads.Count >= 4
             && minimumSpawnDistance >= 100.0f
-            && MaximumPairDistance(layout.PlayerSpawnPads.Select(pad => pad.Position)) <= 16.0f;
+            && MaximumPairDistance(layout.PlayerSpawnPads.Select(pad => pad.Position)) <= 16.0f
+            && spawnFloorAlignmentValid;
         AddFailure(failures, spawnSeparationValid, "spawn_separation");
-        var minimumExtractionDistance = layout.PlayerSpawnPads
-            .Min(pad => HorizontalDistance(pad.Position, layout.Extraction.Position));
+        // Do not let a malformed/partial layout crash diagnostics while taking
+        // the minimum.  The count check below still reports the contract as
+        // invalid when no player pads are present.
+        var minimumExtractionDistance = layout.PlayerSpawnPads.Count == 0
+            ? 0.0f
+            : layout.PlayerSpawnPads
+                .Min(pad => HorizontalDistance(pad.Position, layout.Extraction.Position));
         var extractionDistanceValid = layout.Extraction.Radius is >= 6.0f and <= 12.0f
             && minimumExtractionDistance >= 250.0f;
         AddFailure(failures, extractionDistanceValid, "extraction_distance");
@@ -97,7 +114,9 @@ public static class OrbitalComplexLayoutValidator
         AddFailure(failures, routeCoverageValid, "route_coverage");
         var verticalityValid = ValidateVerticality(layout);
         AddFailure(failures, verticalityValid, "verticality");
-        var collisionValid = ValidateCollision(layout);
+        var collisionFloorAlignmentValid = ValidateCollisionFloorAlignment(layout);
+        AddFailure(failures, collisionFloorAlignmentValid, "collision_floor_alignment");
+        var collisionValid = ValidateCollision(layout) && collisionFloorAlignmentValid;
         AddFailure(failures, collisionValid, "collision");
         var powerStagesValid = ValidatePowerStages(layout);
         AddFailure(failures, powerStagesValid, "power_stages");
@@ -170,6 +189,7 @@ public static class OrbitalComplexLayoutValidator
             yield return ramp.LowApproach;
             yield return ramp.HighApproach;
         }
+        foreach (var gate in layout.PowerGates) yield return gate.Position;
     }
 
     private static bool Inside(OrbitalComplexMapBounds bounds, Vector3 point)
@@ -189,9 +209,12 @@ public static class OrbitalComplexLayoutValidator
             && Unique(layout.RivalSpawnPads.Select(item => item.Id))
             && Unique(layout.PatrolRoutes.Select(item => item.Id))
             && Unique(layout.Objectives.Select(item => item.Id))
-            && Unique(layout.WeaponCases.Select(item => item.Id))
-            && Unique(layout.GradedLoot.Select(item => item.Id))
-            && Unique(layout.Valuables.Select(item => item.Id))
+            // Loot ids are serialized into the shared extraction payload.  They
+            // therefore need to be unique across categories, not only within a
+            // single placement list.
+            && Unique(layout.WeaponCases.Select(item => item.Id)
+                .Concat(layout.GradedLoot.Select(item => item.Id))
+                .Concat(layout.Valuables.Select(item => item.Id)))
             && Unique(layout.Explosives.Select(item => item.Id))
             && Unique(layout.MinimapLandmarks.Select(item => item.Id))
             && Unique(layout.RouteProbes.Select(item => item.Id))
@@ -218,10 +241,18 @@ public static class OrbitalComplexLayoutValidator
         {
             return false;
         }
+        var objectiveTextReady = layout.Objectives.All(objective =>
+            !string.IsNullOrWhiteSpace(objective.Id)
+            && !string.IsNullOrWhiteSpace(objective.EnglishName)
+            && !string.IsNullOrWhiteSpace(objective.ChineseName)
+            && !string.IsNullOrWhiteSpace(objective.District)
+            && !string.IsNullOrWhiteSpace(objective.CompletionSignal)
+            && !string.IsNullOrWhiteSpace(objective.LocalizationKey));
         var expectedFirst = (layout.SharedWorldSeed & 1UL) == 0UL
             ? "reroute_breaker_bus"
             : "purge_quarantine_archive";
-        return layout.Objectives[0].Id == expectedFirst
+        return objectiveTextReady
+            && layout.Objectives[0].Id == expectedFirst
             && layout.Objectives[0].Id != layout.Objectives[1].Id
             && layout.Objectives[0].Position.DistanceTo(layout.Objectives[1].Position) >= 150.0f;
     }
@@ -303,6 +334,119 @@ public static class OrbitalComplexLayoutValidator
             && layout.Ramps.Any(ramp => ramp.LowApproach.Y < lowerLayerThreshold);
     }
 
+    private static bool ValidateSpawnFloorAlignment(OrbitalComplexMapLayout layout)
+    {
+        if (!TryGetFloorTop(layout, "service_deck", out var serviceTop)
+            || !TryGetFloorTop(layout, "dry_dock", out var dryDockTop)
+            || !TryGetFloorTop(layout, "catwalk_deck", out var catwalkTop))
+        {
+            return false;
+        }
+
+        var padsReady = layout.PlayerSpawnPads.All(pad =>
+                FeetOnFloor(pad.Position, FloorTopForLayer(
+                    pad.Layer, serviceTop, dryDockTop, catwalkTop)))
+            && layout.RivalSpawnPads.All(pad =>
+                FeetOnFloor(pad.Position, FloorTopForLayer(
+                    pad.Layer, serviceTop, dryDockTop, catwalkTop)));
+        var garrisonReady = layout.GarrisonSpawns.All(point =>
+            FeetOnNearestFloor(point, serviceTop, dryDockTop, catwalkTop));
+        var qrfReady = layout.QrfSpawns.All(point =>
+            FeetOnNearestFloor(point, serviceTop, dryDockTop, catwalkTop));
+        var patrolReady = layout.PatrolRoutes.All(route =>
+        {
+            var floorTop = FloorTopForLayer(
+                route.Layer, serviceTop, dryDockTop, catwalkTop);
+            return route.Waypoints.All(point => FeetOnFloor(point, floorTop));
+        });
+        return padsReady && garrisonReady && qrfReady && patrolReady;
+    }
+
+    private static bool ValidateCollisionFloorAlignment(OrbitalComplexMapLayout layout)
+    {
+        if (!TryGetFloorTop(layout, "service_deck", out var serviceTop)
+            || !TryGetFloorTop(layout, "dry_dock", out var dryDockTop)
+            || !TryGetFloorTop(layout, "catwalk_deck", out var catwalkTop))
+        {
+            return false;
+        }
+
+        var serviceDecks = layout.CollisionBoxes.Count(box =>
+            string.Equals(box.Purpose, "service_deck", StringComparison.OrdinalIgnoreCase));
+        var dryDockDecks = layout.CollisionBoxes.Count(box =>
+            string.Equals(box.Purpose, "dry_dock", StringComparison.OrdinalIgnoreCase));
+        var catwalkDecks = layout.CollisionBoxes.Count(box =>
+            string.Equals(box.Purpose, "catwalk_deck", StringComparison.OrdinalIgnoreCase));
+        return serviceDecks >= 4
+            && dryDockDecks >= 1
+            && catwalkDecks >= 3
+            && Mathf.Abs(serviceTop - (-15.8f)) <= FloorTopTolerance
+            && Mathf.Abs(dryDockTop - (-32.8f)) <= FloorTopTolerance
+            && Mathf.Abs(catwalkTop - (-2.375f)) <= FloorTopTolerance;
+    }
+
+    private static bool TryGetFloorTop(
+        OrbitalComplexMapLayout layout,
+        string purpose,
+        out float floorTop)
+    {
+        var floors = layout.CollisionBoxes
+            .Where(box => string.Equals(
+                box.Purpose, purpose, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (floors.Length == 0
+            || floors.Any(box => !Positive(box.Size)
+                || !IsAxisAligned(box.RotationRadians)
+                || !Finite(box.Position)))
+        {
+            floorTop = 0.0f;
+            return false;
+        }
+
+        floorTop = floors[0].Position.Y + floors[0].Size.Y * 0.5f;
+        var expectedTop = floorTop;
+        return float.IsFinite(expectedTop)
+            && floors.All(box => Mathf.Abs(
+                box.Position.Y + box.Size.Y * 0.5f - expectedTop) <= FloorTopTolerance);
+    }
+
+    private static float FloorTopForLayer(
+        OrbitalComplexVerticalLayer layer,
+        float serviceTop,
+        float dryDockTop,
+        float catwalkTop)
+        => layer switch
+        {
+            OrbitalComplexVerticalLayer.DryDock => dryDockTop,
+            OrbitalComplexVerticalLayer.Catwalk => catwalkTop,
+            _ => serviceTop
+        };
+
+    private static bool FeetOnNearestFloor(
+        Vector3 point,
+        float serviceTop,
+        float dryDockTop,
+        float catwalkTop)
+    {
+        var nearestFloor = serviceTop;
+        var nearestDistance = Mathf.Abs(point.Y - serviceTop);
+        var dryDockDistance = Mathf.Abs(point.Y - dryDockTop);
+        if (dryDockDistance < nearestDistance)
+        {
+            nearestFloor = dryDockTop;
+            nearestDistance = dryDockDistance;
+        }
+        if (Mathf.Abs(point.Y - catwalkTop) < nearestDistance)
+        {
+            nearestFloor = catwalkTop;
+        }
+        return FeetOnFloor(point, nearestFloor);
+    }
+
+    private static bool FeetOnFloor(Vector3 point, float floorTop)
+        => point.Y >= floorTop - FloorAlignmentTolerance
+            && point.Y <= floorTop + 0.60f;
+
     private static bool ValidateCollision(OrbitalComplexMapLayout layout)
     {
         var primitiveCollisionValid = layout.CollisionBoxes.Count >= 20
@@ -312,6 +456,12 @@ public static class OrbitalComplexLayoutValidator
             && layout.CollisionBoxes.Count(box => box.Purpose == "boundary") == 4
             && layout.CollisionBoxes.Any(box => box.Purpose == "dry_dock")
             && layout.CollisionBoxes.Count(box => box.Purpose == "catwalk_deck") >= 3;
+        var collisionEnvelopeValid = layout.CollisionBoxes.All(box =>
+                VolumeInside(layout.Bounds, box.Position, box.Size, box.RotationRadians))
+            && layout.Ramps.All(ramp =>
+                VolumeInside(layout.Bounds, ramp.Position, ramp.Size, ramp.RotationRadians))
+            && layout.PowerGates.All(gate =>
+                VolumeInside(layout.Bounds, gate.Position, gate.Size, gate.RotationRadians));
 
         // The bunker is enclosed on every side.  A short wall can pass a simple
         // count check while still allowing a player, vehicle, or grenade to leak
@@ -346,10 +496,53 @@ public static class OrbitalComplexLayoutValidator
                 && IntersectsRoofPlane(box, bounds.MaximumY));
 
         return primitiveCollisionValid
+            && collisionEnvelopeValid
             && fullHeightBoundaries
             && perimeterCoverage
             && ceilingCollision;
     }
+
+    private static bool VolumeInside(
+        OrbitalComplexMapBounds bounds,
+        Vector3 position,
+        Vector3 size,
+        Vector3 rotation)
+    {
+        if (!Positive(size)
+            || !Finite(position)
+            || !Finite(rotation))
+        {
+            return false;
+        }
+
+        // Convert the oriented box to a conservative world-space AABB.  This
+        // catches collision volumes accidentally exported outside the shell
+        // while accepting the deliberate one-metre boundary/roof overhang.
+        var half = size * 0.5f;
+        var basis = Basis.FromEuler(rotation);
+        var extent = new Vector3(
+            Mathf.Abs(basis.X.X) * half.X
+                + Mathf.Abs(basis.Y.X) * half.Y
+                + Mathf.Abs(basis.Z.X) * half.Z,
+            Mathf.Abs(basis.X.Y) * half.X
+                + Mathf.Abs(basis.Y.Y) * half.Y
+                + Mathf.Abs(basis.Z.Y) * half.Z,
+            Mathf.Abs(basis.X.Z) * half.X
+                + Mathf.Abs(basis.Y.Z) * half.Y
+                + Mathf.Abs(basis.Z.Z) * half.Z);
+        var horizontal = bounds.Horizontal;
+        return position.X - extent.X >= horizontal.Position.X - CollisionEnvelopeMargin
+            && position.X + extent.X <= horizontal.End.X + CollisionEnvelopeMargin
+            && position.Z - extent.Z >= horizontal.Position.Y - CollisionEnvelopeMargin
+            && position.Z + extent.Z <= horizontal.End.Y + CollisionEnvelopeMargin
+            && position.Y - extent.Y >= bounds.MinimumY - CollisionEnvelopeMargin
+            && position.Y + extent.Y <= bounds.MaximumY + CollisionEnvelopeMargin;
+    }
+
+    private static bool Finite(Vector3 value)
+        => float.IsFinite(value.X)
+            && float.IsFinite(value.Y)
+            && float.IsFinite(value.Z);
 
     private static bool IsAxisAligned(Vector3 rotation)
         => Mathf.IsZeroApprox(rotation.X)

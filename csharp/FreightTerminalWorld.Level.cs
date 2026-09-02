@@ -272,6 +272,7 @@ public partial class FreightTerminalWorld
                 ApplyNightVisionOverride();
             }
         }
+        ApplyOrbitalComplexRuntimeAtmosphere(timeOfDay);
     }
 
     public void SetNightVisionActive(bool active)
@@ -547,6 +548,10 @@ void sky() {
     {
         ResetSquadTraversalLinks();
         _refineryDoors.Clear();
+        if (TryBuildOrbitalComplexRuntimeLevel())
+        {
+            return;
+        }
         if (IsBlackwaterRefineryMap)
         {
             BuildBlackwaterRefineryLevel();

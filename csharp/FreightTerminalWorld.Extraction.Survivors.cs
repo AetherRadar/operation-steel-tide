@@ -42,7 +42,7 @@ public partial class FreightTerminalWorld : ISurvivorExtractionRuntime
     bool ISurvivorExtractionRuntime.CountdownActive => _extractionCountdownActive;
     float ISurvivorExtractionRuntime.CountdownRemaining => _extractionRemaining;
     bool ISurvivorExtractionRuntime.AircraftBoardingReady
-        => _extractionAircraft?.BoardingReady == true;
+        => IsActiveExtractionTransportReady();
     int ISurvivorExtractionRuntime.PassengerSeatCount
         => _extractionAircraft is not null && IsInstanceValid(_extractionAircraft)
             ? _extractionAircraft.PassengerSeatCount
@@ -63,7 +63,7 @@ public partial class FreightTerminalWorld : ISurvivorExtractionRuntime
         _extractionCountdownActive = false;
         _extractionRemaining = CurrentExtractionCountdownDuration();
         _hud.HideExtractionCountdown();
-        _extractionAircraft?.AbortPickup();
+        AbortActiveExtractionTransport();
     }
 
     void ISurvivorExtractionRuntime.PauseCountdownForRescue()
@@ -75,7 +75,7 @@ public partial class FreightTerminalWorld : ISurvivorExtractionRuntime
         _extractionCountdownActive = false;
         _extractionRemaining = CurrentExtractionCountdownDuration();
         _hud.HideExtractionCountdown();
-        _extractionAircraft?.AbortPickup();
+        AbortActiveExtractionTransport();
         _hud.ShowLocalizedMessage(
             "survivor_extraction_rescue",
             "AI EXTRACTION PAUSED  //  RESCUING SQUADMATE",
@@ -88,11 +88,26 @@ public partial class FreightTerminalWorld : ISurvivorExtractionRuntime
         {
             return;
         }
+        if (UsesOrbitalComplexTideGateExtraction
+            && !OrbitalComplexExtraction.CanExtract(_objectiveStage))
+        {
+            return;
+        }
         _extractionCountdownActive = true;
         _extractionRemaining = CurrentExtractionCountdownDuration();
         _missionDirector.ExitDeploymentZone();
-        _extractionAircraft?.BeginInbound();
+        BeginActiveExtractionTransport();
         UpdateExtractionHud();
+        if (UsesOrbitalComplexTideGateExtraction)
+        {
+            _hud.ShowLocalizedMessage(
+                OrbitalComplexExtraction.StatusLocalizationKey(_objectiveStage),
+                _objectiveStage >= 2
+                    ? "AI SURVIVORS CYCLING THE TIDE GATE  //  EXPRESS HOLD"
+                    : "AI SURVIVORS CYCLING THE TIDE GATE  //  EMERGENCY HOLD",
+                new Color(0.35f, 0.88f, 0.78f));
+            return;
+        }
         _hud.ShowLocalizedMessage(
             ObjectivesIncompleteForExtraction()
                 ? "survivor_extraction_cold"

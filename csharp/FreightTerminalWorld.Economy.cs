@@ -340,11 +340,14 @@ public partial class FreightTerminalWorld
         var threatElevatedAccepted = _hud.SelectedDeploymentThreatLevel == DeploymentThreatLevel.Elevated;
         _hud.SetDeploymentThreatForDiagnostics(DeploymentThreatLevel.Maximum);
         var threatMaximumStillAccepted = _hud.SelectedDeploymentThreatLevel == DeploymentThreatLevel.Maximum;
-        _hud.ApplyDeploymentMapForDiagnostics("orbital_complex");
-        var lockedMapRejected = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.BlackwaterRefineryId;
+        _hud.ApplyDeploymentMapForDiagnostics(DeploymentMapCatalog.OrbitalComplexId);
+        var orbitalMapAccepted = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.OrbitalComplexId
+            && _hud.DeploymentMapAvailable;
+        _hud.ApplyDeploymentMapForDiagnostics("unknown_extraction_map");
+        var unknownMapRejected = _hud.SelectedDeploymentMapId == DeploymentMapCatalog.OrbitalComplexId;
         var valid = uiReady && presetCount && weaponCount && armorCount && ammoPackCount && presetSelected
             && loadoutSelected && cost && projectedBalance && quantityPricing && gradePricing
-            && mapCatalog && refineryMapAcceptedAtLevelOne && lockedMapRejected
+            && mapCatalog && refineryMapAcceptedAtLevelOne && orbitalMapAccepted && unknownMapRejected
             && rankRestrictionsDisabled && rankRestrictionLocalization && rankGatesOpenFresh
             && threatDefault && threatMaximumAccepted
             && threatElevatedAccepted && threatMaximumStillAccepted
@@ -353,7 +356,7 @@ public partial class FreightTerminalWorld
             && weakStarter && starterUpgradesPriced && starterEquipped
             && starterWeaponGrade && selectedWeaponGrade;
 
-        GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} weapon_count={DeploymentCatalog.Weapons.Count} armor_count={DeploymentCatalog.Armor.Count} ammo_pack_count={_hud.DeploymentAmmoPackCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} quantity={selection.AmmoQuantity} quantity_pricing={quantityPricing} grade_pricing={gradePricing} weapon_grades={starterWeaponGrade}/{selectedWeaponGrade} map_count={_hud.DeploymentMapCount} selected_map={_hud.SelectedDeploymentMapId} map_available={_hud.DeploymentMapAvailable} rank_restrictions_off={rankRestrictionsDisabled} rank_localization={rankRestrictionLocalization} rank_gates_open={rankGatesOpenFresh} refinery_level_one={refineryMapAcceptedAtLevelOne} locked_map_rejected={lockedMapRejected} rank_level={_hud.DeploymentRankLevel} threat_default={threatDefault} threat_max={threatMaximumAccepted}/{threatMaximumStillAccepted} threat_elevated={threatElevatedAccepted} time_default={timeDefault} time_cycled={timeCycled} starter_preset={starterPresetSelected} starter_free={freeStarter} starter_weak={weakStarter} starter_upgrades_priced={starterUpgradesPriced} starter_equipped={starterEquipped} starter_damage={starterLoadout.Weapon?.Stats().Damage:0} starter_armor={starterArmor.Protection * 100.0f:0} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
+        GD.Print($"DEPLOYMENT_UI_CHECK valid={valid} ui_ready={uiReady} preset_count={_hud.DeploymentPresetCount} weapon_count={DeploymentCatalog.Weapons.Count} armor_count={DeploymentCatalog.Armor.Count} ammo_pack_count={_hud.DeploymentAmmoPackCount} preset_selected={presetSelected} loadout_selected={loadoutSelected} quantity={selection.AmmoQuantity} quantity_pricing={quantityPricing} grade_pricing={gradePricing} weapon_grades={starterWeaponGrade}/{selectedWeaponGrade} map_count={_hud.DeploymentMapCount} selected_map={_hud.SelectedDeploymentMapId} map_available={_hud.DeploymentMapAvailable} rank_restrictions_off={rankRestrictionsDisabled} rank_localization={rankRestrictionLocalization} rank_gates_open={rankGatesOpenFresh} refinery_level_one={refineryMapAcceptedAtLevelOne} orbital_accepted={orbitalMapAccepted} unknown_rejected={unknownMapRejected} rank_level={_hud.DeploymentRankLevel} threat_default={threatDefault} threat_max={threatMaximumAccepted}/{threatMaximumStillAccepted} threat_elevated={threatElevatedAccepted} time_default={timeDefault} time_cycled={timeCycled} starter_preset={starterPresetSelected} starter_free={freeStarter} starter_weak={weakStarter} starter_upgrades_priced={starterUpgradesPriced} starter_equipped={starterEquipped} starter_damage={starterLoadout.Weapon?.Stats().Damage:0} starter_armor={starterArmor.Protection * 100.0f:0} cost={_hud.DeploymentSelectedCost} projected_balance={_hud.DeploymentProjectedBalance}");
         GD.Print($"DEPLOYMENT_UI_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }

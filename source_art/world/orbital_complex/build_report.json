@@ -1,0 +1,604 @@
+{
+  "asset": "FALLTIDE RECOVERY ARRAY // SUBLEVEL 09",
+  "map_id": "orbital_complex",
+  "generated_on": "2026-09-02",
+  "blender_version": "4.5.10 LTS",
+  "coordinate_contract": {
+    "blender": "meters, Z-up",
+    "gltf": "meters, Y-up",
+    "godot_mapping": "X = Blender X, Y = Blender Z, Z = -Blender Y",
+    "map_bounds_m": [
+      340.0,
+      320.0
+    ],
+    "map_center_godot": [
+      0.0,
+      0.0,
+      -60.0
+    ],
+    "vertical_envelope_godot_y": [
+      -34.0,
+      24.0
+    ],
+    "interior": true
+  },
+  "scene_audit": {
+    "minimum_blender": [
+      -170.0,
+      -100.00002,
+      -34.0
+    ],
+    "maximum_blender": [
+      170.0,
+      220.00002,
+      24.0
+    ],
+    "dimensions_blender": [
+      340.0,
+      320.00003,
+      58.0
+    ],
+    "center_blender": [
+      0.0,
+      60.0,
+      -5.0
+    ],
+    "map_dimensions_godot_xz": [
+      340.0,
+      320.00003
+    ],
+    "map_center_godot": [
+      0.0,
+      0.0,
+      -60.0
+    ],
+    "duplicate_node_names": [],
+    "empty_material_meshes": [],
+    "interactive_nodes": [
+      "AlarmLight_Archive",
+      "AlarmLight_Breaker",
+      "AlarmLight_Central",
+      "AlarmLight_TideGate",
+      "DishPitch",
+      "DishYaw",
+      "PowerZone_Blackout",
+      "PowerZone_Powered",
+      "TideGateLeft",
+      "TideGateRight",
+      "UpperBypassBarrier",
+      "VaultDoorLeft",
+      "VaultDoorRight"
+    ],
+    "gameplay_anchors": [
+      "Extraction_MaintenanceSkiff",
+      "Extraction_TideGate",
+      "POI_BreakerYard",
+      "POI_CapsuleDrydock",
+      "POI_IntakeCauseway",
+      "POI_QuarantineArchive",
+      "POI_TelemetryDish",
+      "POI_TideGate",
+      "Spawn_EastService",
+      "Spawn_SouthEast",
+      "Spawn_SouthWest",
+      "Spawn_WestService"
+    ],
+    "dish_motion_partition": {
+      "static_base_nodes": [
+        "TelemetryDishStaticBase_01"
+      ],
+      "moving_assembly_nodes": [
+        "TelemetryDishMovingAssembly_01"
+      ]
+    }
+  },
+  "statistics_before_export": {
+    "mesh_nodes": 256,
+    "unique_meshes": 241,
+    "unique_triangles": 184766,
+    "instance_triangles": 216556,
+    "materials": 182,
+    "images": 35,
+    "estimated_texture_memory_bytes": 138936320
+  },
+  "roundtrip_audit": {
+    "scene": {
+      "minimum_blender": [
+        -170.0,
+        -100.00002,
+        -34.0
+      ],
+      "maximum_blender": [
+        170.0,
+        220.00002,
+        24.0
+      ],
+      "dimensions_blender": [
+        340.0,
+        320.00003,
+        58.0
+      ],
+      "center_blender": [
+        0.0,
+        60.0,
+        -5.0
+      ],
+      "map_dimensions_godot_xz": [
+        340.0,
+        320.00003
+      ],
+      "map_center_godot": [
+        0.0,
+        0.0,
+        -60.0
+      ],
+      "duplicate_node_names": [],
+      "empty_material_meshes": [],
+      "interactive_nodes": [
+        "AlarmLight_Archive",
+        "AlarmLight_Breaker",
+        "AlarmLight_Central",
+        "AlarmLight_TideGate",
+        "DishPitch",
+        "DishYaw",
+        "PowerZone_Blackout",
+        "PowerZone_Powered",
+        "TideGateLeft",
+        "TideGateRight",
+        "UpperBypassBarrier",
+        "VaultDoorLeft",
+        "VaultDoorRight"
+      ],
+      "gameplay_anchors": [
+        "Extraction_MaintenanceSkiff",
+        "Extraction_TideGate",
+        "POI_BreakerYard",
+        "POI_CapsuleDrydock",
+        "POI_IntakeCauseway",
+        "POI_QuarantineArchive",
+        "POI_TelemetryDish",
+        "POI_TideGate",
+        "Spawn_EastService",
+        "Spawn_SouthEast",
+        "Spawn_SouthWest",
+        "Spawn_WestService"
+      ],
+      "dish_motion_partition": {
+        "static_base_nodes": [
+          "TelemetryDishStaticBase_01"
+        ],
+        "moving_assembly_nodes": [
+          "TelemetryDishMovingAssembly_01"
+        ]
+      }
+    },
+    "statistics": {
+      "mesh_nodes": 255,
+      "unique_meshes": 240,
+      "unique_triangles": 184766,
+      "instance_triangles": 216556,
+      "materials": 42,
+      "images": 11,
+      "estimated_texture_memory_bytes": 42205184
+    }
+  },
+  "gltf_document": {
+    "gltf_nodes": 343,
+    "gltf_meshes": 240,
+    "gltf_primitives": 242,
+    "gltf_materials": 42,
+    "gltf_images": 11
+  },
+  "files": {
+    "blend": {
+      "path": "source_art/world/orbital_complex/orbital_complex.blend",
+      "bytes": 15521550,
+      "sha256": "E288F6743444A27ADA414254DC06685EF223D36DE53EBFEDA959D306D3EB4EF2"
+    },
+    "glb": {
+      "path": "assets/models/orbital_complex/orbital_complex.glb",
+      "bytes": 19472480,
+      "sha256": "5031189E36A803B6EEBC1A91E6F0CB7AA23A14F23586AD9585A72D4B981F2E30",
+      "embedded": true
+    }
+  },
+  "sources": [
+    {
+      "key": "operations_office",
+      "local_path": "assets/models/operations_office/operations_office_set.glb",
+      "creator": "Trey Ramm / minime453 and Kenney",
+      "title": "Special Operations authored command hall",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "3D91DF3C59651890C725A3A8301ACEC4E67EA3917DBCABAFA30EEB7812708C59"
+    },
+    {
+      "key": "dish",
+      "local_path": "source_art/third_party/nasa_3d/nasa_70_meter_dish.glb",
+      "creator": "NASA",
+      "title": "70 Meter Dish",
+      "source_url": "https://science.nasa.gov/3d-resources/70-meter-dish/",
+      "license": "NASA media usage guidelines; U.S. Government work",
+      "acquired": "2026-09-01",
+      "sha256": "36FF56A7A2BFD1C278F6F4774D32128D5931F2C22FE58241D00EE7D1815634BB"
+    },
+    {
+      "key": "capsule",
+      "local_path": "source_art/third_party/nasa_3d/nasa_orion_capsule_no_fbc.stl",
+      "creator": "NASA",
+      "title": "Orion Capsule source mesh",
+      "source_url": "https://science.nasa.gov/3d-resources/orion-capsule/",
+      "license": "NASA media usage guidelines; U.S. Government work",
+      "acquired": "2026-09-01",
+      "sha256": "ABC4C69C27AFA55C4A06BC9972B8872979F1473FB26E15224FB0F77F1CD81DC7"
+    },
+    {
+      "key": "reactor_annex",
+      "local_path": "assets/models/trey_modular_industrial/reactor-annex.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "51687DA6FADDB6A1E9E66DED920745FE25829B5FC542B33BAF60C465FCBDBE99"
+    },
+    {
+      "key": "turbine_workshop",
+      "local_path": "assets/models/trey_modular_industrial/turbine-workshop.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "6B74C277967F376E9833F01EBACE2E940147DD203F1C4BEFF35AA6AB6A1F4FFB"
+    },
+    {
+      "key": "switchgear_hall",
+      "local_path": "assets/models/trey_modular_industrial/switchgear-hall.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "673CE57EEE18D822666B0BF0FF378BFE230BECFA8D07E66851DB324EE08BD09F"
+    },
+    {
+      "key": "boiler_workshop",
+      "local_path": "assets/models/trey_modular_industrial/boiler-workshop.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "5D9CB882ED3E0CD590BFF06255869F5A744467BA3C870FE10293B37A8C85183B"
+    },
+    {
+      "key": "pump_house",
+      "local_path": "assets/models/trey_modular_industrial/pump-house.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "2E2E109221315CB2E9ABC240D840EDA79C7C6260B430EFAA936F3B1FBDFCEAA8"
+    },
+    {
+      "key": "transformer_works",
+      "local_path": "assets/models/trey_modular_industrial/transformer-works.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "A27D02F90CA903A4C64F2445DA72DCDFC0884DBBB6273FEF8A66FC59E022EE93"
+    },
+    {
+      "key": "glassworks_office",
+      "local_path": "assets/models/trey_modular_industrial/glassworks-office.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "484729E304094E7D6B7D7AB6C620A3A8C9AC08333555697828EC6B1E80BA39E3"
+    },
+    {
+      "key": "cooling_hall",
+      "local_path": "assets/models/trey_modular_industrial/cooling-service-hall.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "BCC3E72A8BF088AED9FF026C82AE5719095E1A167647DA2F7A3A33359BC4EDE6"
+    },
+    {
+      "key": "control_room",
+      "local_path": "assets/models/trey_modular_industrial/control-room.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "5106C8590330ECC18204F5E5261F8CF67443568644EAC116D2616FAF71C0C0FA"
+    },
+    {
+      "key": "maintenance_depot",
+      "local_path": "assets/models/trey_modular_industrial/maintenance-depot.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "76302E049BA585DEBA43086A68FAE871FAB5AB231FBBAFBCB551F1266535DC63"
+    },
+    {
+      "key": "foundry_warehouse",
+      "local_path": "assets/models/trey_modular_industrial/foundry-warehouse.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "EC2196B2B95D1F643DC25ACD66CFDF530F387E87A9D2DD4AF908001BBDEB2916"
+    },
+    {
+      "key": "crew_canteen",
+      "local_path": "assets/models/trey_modular_industrial/crew-canteen.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "F7079FC40C60824B0206C2BE97ADCB5CB883B2AD4ADDFE8F67BFC1D1AA1B1C49"
+    },
+    {
+      "key": "elevated_walkway",
+      "local_path": "assets/models/trey_modular_industrial/elevated-walkway.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "790F9C95D0C4EAC333F917C31F5986E349B8044E5081857A5683FEAAE05818C2"
+    },
+    {
+      "key": "east_gate",
+      "local_path": "assets/models/trey_modular_industrial/east-security-gate.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "E4B763F4EB8B022886BA3A47C0211DBDD5CDE1751B7E3A4086E21EF36C144CAD"
+    },
+    {
+      "key": "west_gate",
+      "local_path": "assets/models/trey_modular_industrial/west-service-gate.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "7D78A1B6C32AD791388931DA4AA28938BB585B072302C3947C421B8D971461EE"
+    },
+    {
+      "key": "arch_gateway",
+      "local_path": "assets/models/trey_modular_industrial/arch-gateway.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "ABD4D131100A45AA38B451779ABB7574ED0A5C553FDA6C3E49890622840AE89E"
+    },
+    {
+      "key": "container_office",
+      "local_path": "assets/models/majadroid_construction_site/containers-office.glb",
+      "creator": "Majadroid",
+      "title": "Construction Site Assets",
+      "source_url": "https://opengameart.org/content/3d-house-construction-site-lowpoly-cc0",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "27FEB7DE1B52EE9830AAEA6068DECAE10AB2134EBF39E8148029898290392690"
+    },
+    {
+      "key": "cargo_containers",
+      "local_path": "assets/models/majadroid_construction_site/containers-cargo.glb",
+      "creator": "Majadroid",
+      "title": "Construction Site Assets",
+      "source_url": "https://opengameart.org/content/3d-house-construction-site-lowpoly-cc0",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "7E74A87C0D3A8112FF629026022283E70661C9560237BFF943AF15C53E8E44A5"
+    },
+    {
+      "key": "compressor_house",
+      "local_path": "assets/models/trey_modular_industrial/compressor-house.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "3BA6206AAE522FEDA537DC6C7410BA4D6680F4BE2E557838DDAF75EA871DF121"
+    },
+    {
+      "key": "sawtooth_service_hall",
+      "local_path": "assets/models/trey_modular_industrial/sawtooth-service-hall.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "6A3F323240CA92D2A1BC2F4B4FB90EB97162C328E6DA5BAB9257AD13FED3738F"
+    },
+    {
+      "key": "loading_bay",
+      "local_path": "assets/models/trey_modular_industrial/loading-bay.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "77A25CAD7F8533C62C8DDBDA3EC4CD657349AA510D9EDFDDFC6CC0D5FEC7A5BE"
+    },
+    {
+      "key": "inspection_office",
+      "local_path": "assets/models/trey_modular_industrial/inspection-office.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "8AA2C47F558DAA0CE20C7407EA40D9A353537BC9FEB1A5C3ED26B4C58E6889D2"
+    },
+    {
+      "key": "shift_office",
+      "local_path": "assets/models/trey_modular_industrial/shift-office.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "86B4FC5FBC1564EF9E677494D6BF0417529E7D3102083C80C516B7867D1D46B7"
+    },
+    {
+      "key": "utility_office",
+      "local_path": "assets/models/trey_modular_industrial/utility-office.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "D296E602DF5732CED766B847F19E0B4C3DD5DEBBB5EA5EC0951F9C195BE905E2"
+    },
+    {
+      "key": "window_hall",
+      "local_path": "assets/models/trey_modular_industrial/window-hall.glb",
+      "creator": "Trey Ramm / minime453",
+      "title": "Modular Industrial Pieces authored composition",
+      "source_url": "https://opengameart.org/content/modular-industrial-kit",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-27",
+      "sha256": "7F844F9F73B908FFF8B4A48A9501C891D057366DB830D39C0BE4825013EF6B82"
+    }
+  ],
+  "surface_sources": [
+    {
+      "key": "concrete_floor",
+      "creator": "eye-candy.xyz",
+      "source_url": "https://polyhaven.com/a/concrete_floor",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-06",
+      "maps": {
+        "base_color": {
+          "local_path": "assets/textures/concrete_floor_diff_1k.jpg",
+          "sha256": "5E06D0FB226F671470F59BF7798954B6965C9ED56DD45084DFD012E15737E444"
+        },
+        "normal": {
+          "local_path": "assets/textures/concrete_floor_normal_1k.jpg",
+          "sha256": "5A403C176361193B785198AB363D3DC3755773CA5B023F19E05874E50CAEA302"
+        },
+        "roughness": {
+          "local_path": "assets/textures/concrete_floor_rough_1k.jpg",
+          "sha256": "342110E685C07AF2C56194662A796B2AB4F2A4D992A9745B8FC55943414FAEAD"
+        }
+      }
+    },
+    {
+      "key": "asphalt_03",
+      "creator": "Charlotte Baglioni and Dario Barresi",
+      "source_url": "https://polyhaven.com/a/asphalt_03",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-06",
+      "maps": {
+        "base_color": {
+          "local_path": "assets/textures/asphalt_03_diff_1k.jpg",
+          "sha256": "95AD02E2631C41CF9FDD6A37596CF75ADB4FB8A8B6880567CC78ED1C41DC5681"
+        },
+        "normal": {
+          "local_path": "assets/textures/asphalt_03_normal_1k.jpg",
+          "sha256": "978DE8349CE2E9989325099A6FD1F5EA6B2826528E1264606A5C51296B1E2888"
+        },
+        "roughness": {
+          "local_path": "assets/textures/asphalt_03_rough_1k.jpg",
+          "sha256": "069B6EA342AAAD04FD1582F59C16FBBE5C7A6F0F3A87BC9D57648ED53336FB3A"
+        }
+      }
+    },
+    {
+      "key": "rusty_painted_metal",
+      "creator": "Amal Kumar",
+      "source_url": "https://polyhaven.com/a/rusty_painted_metal",
+      "license": "CC0-1.0",
+      "acquired": "2026-08-06",
+      "maps": {
+        "base_color": {
+          "local_path": "assets/textures/rusty_painted_metal_diff_1k.jpg",
+          "sha256": "B086937B45C3628116A838363364A29BD3C5D2542CFF906EC1D92D681EE80E15"
+        },
+        "normal": {
+          "local_path": "assets/textures/rusty_painted_metal_normal_1k.jpg",
+          "sha256": "F3372E2F60517DF2D0E02C1472EB24071D95182D771C30B7ECD8E1B5142768BB"
+        },
+        "roughness": {
+          "local_path": "assets/textures/rusty_painted_metal_rough_1k.jpg",
+          "sha256": "2D1C355C793C5886EF9DCECFC06DA354E30218A84A9FE28DE37741D2F2ED5AAA"
+        }
+      }
+    }
+  ],
+  "previews": [
+    {
+      "file": "previews/overview_top.png",
+      "description": "Cutaway overview of enclosed multi-level bunker"
+    },
+    {
+      "file": "previews/south_player_height.png",
+      "description": "Player-scale intake pressure hall"
+    },
+    {
+      "file": "previews/central_landmark.png",
+      "description": "Reactor pit, suspended telemetry dish, and Cathode Well"
+    },
+    {
+      "file": "previews/north_tide_gate_powered.png",
+      "description": "Launch silo and powered recovery gate"
+    },
+    {
+      "file": "previews/undertow_sump.png",
+      "description": "Undertow Sump blackwater lift station and clear maintenance console bay"
+    },
+    {
+      "file": "previews/cathode_well.png",
+      "description": "Cathode Well coolant cathedral and north-south bridge"
+    },
+    {
+      "file": "previews/data_ossuary.png",
+      "description": "Data Ossuary quarantine memory aisle and archive spires"
+    }
+  ],
+  "authored_changes": [
+    "Replaced open-air barrier with an enclosed 340 x 320 m subterranean recovery bunker",
+    "Authored a real lower reactor pit at Godot Y -34, service deck at -16, and upper catwalk ring at -3",
+    "Recomposed CC0 industrial halls into breaker, quarantine, coolant, launch-silo, and intake districts",
+    "Suspended a scaled NASA dish inside the reactor hall and placed the fictional return capsule in a deep launch bay",
+    "Added pressure bulkheads, route bends, cross-level bridges, animated gate pivots, alarm groups, and power-state guidance",
+    "Added the Cathode Well coolant cathedral: tapered pressure ribs, concentric service rings, a suspended coolant bundle, and a north-south maintenance bridge",
+    "Added the Data Ossuary quarantine memory aisle: twelve faceted archive spires, cyan seams, suspended halos, and three authored arch frames",
+    "Reused seven previously uninstanced closed-shell Trey CC0 buildings to frame the new landmarks without runtime box-built architecture",
+    "Added the UNDERTOW SUMP Blackwater Lift 03: teardrop intake mouth, paired DCC volutes, double siphon arch, tidal sight glass, and a preserved maintenance-console apron"
+  ],
+  "validation": {
+    "valid": true,
+    "authored_major_geometry": true,
+    "roundtrip_import": true,
+    "embedded_runtime_asset": true,
+    "empty_material_meshes": 0,
+    "duplicate_node_names": 0,
+    "interactive_nodes_present": true,
+    "interior_enclosed": true,
+    "vertical_layers": 3
+  }
+}

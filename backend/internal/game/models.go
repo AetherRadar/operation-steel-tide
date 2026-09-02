@@ -3,17 +3,19 @@ package game
 import "time"
 
 type Mission struct {
-	ID                     string   `json:"id"`
-	Name                   string   `json:"name"`
-	Map                    string   `json:"map"`
-	Briefing               string   `json:"briefing"`
-	Objectives             []string `json:"objectives"`
-	EnemyCount             int      `json:"enemyCount"`
-	SpawnProtectionSeconds int      `json:"spawnProtectionSeconds"`
-	BaseDetectionRange     int      `json:"baseDetectionRange"`
-	ReinforcementThreshold int      `json:"reinforcementThreshold"`
-	RewardCredits          int      `json:"rewardCredits"`
-	RewardXP               int      `json:"rewardXp"`
+	ID                        string   `json:"id"`
+	Name                      string   `json:"name"`
+	Map                       string   `json:"map"`
+	Briefing                  string   `json:"briefing"`
+	Objectives                []string `json:"objectives"`
+	ObjectiveIDs              []string `json:"objectiveIds,omitempty"`
+	ObjectiveLocalizationKeys []string `json:"objectiveLocalizationKeys,omitempty"`
+	EnemyCount                int      `json:"enemyCount"`
+	SpawnProtectionSeconds    int      `json:"spawnProtectionSeconds"`
+	BaseDetectionRange        int      `json:"baseDetectionRange"`
+	ReinforcementThreshold    int      `json:"reinforcementThreshold"`
+	RewardCredits             int      `json:"rewardCredits"`
+	RewardXP                  int      `json:"rewardXp"`
 }
 
 type Profile struct {

@@ -137,7 +137,16 @@ public static class OperatorReputation
     };
 
     public static int RequiredLevelForMap(string mapId)
-        => mapId == DeploymentMapCatalog.BlackwaterRefineryId ? 2 : 1;
+    {
+        if (string.Equals(mapId, DeploymentMapCatalog.OrbitalComplexId, StringComparison.OrdinalIgnoreCase))
+        {
+            return 3;
+        }
+
+        return string.Equals(mapId, DeploymentMapCatalog.BlackwaterRefineryId, StringComparison.OrdinalIgnoreCase)
+            ? 2
+            : 1;
+    }
 
     public static int RequiredLevelForPreset(DeploymentPresetOffer preset)
     {

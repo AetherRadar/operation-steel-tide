@@ -199,6 +199,12 @@ public sealed class MissionPayload
     [JsonPropertyName("objectives")]
     public List<string> Objectives { get; set; } = new();
 
+    [JsonPropertyName("objectiveIds")]
+    public List<string> ObjectiveIds { get; set; } = new();
+
+    [JsonPropertyName("objectiveLocalizationKeys")]
+    public List<string> ObjectiveLocalizationKeys { get; set; } = new();
+
     [JsonPropertyName("enemyCount")]
     public int EnemyCount { get; set; } = 9;
 

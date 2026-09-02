@@ -384,7 +384,7 @@ public partial class FreightTerminalWorld
         _districtRouteSupportCount++;
     }
 
-    private static bool IsDistrictRouteSupportPositionClear(Vector3 position)
+    private bool IsDistrictRouteSupportPositionClear(Vector3 position)
     {
         var extractOffset = new Vector2(position.X - ExtractionPoint.X, position.Z - ExtractionPoint.Z);
         if (extractOffset.LengthSquared() < 19.0f * 19.0f)

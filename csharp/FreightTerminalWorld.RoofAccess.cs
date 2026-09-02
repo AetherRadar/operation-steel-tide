@@ -316,11 +316,13 @@ public partial class FreightTerminalWorld
 
         _lootSearchTarget = null;
         _player.SetSearchPose(false);
-        var verb = GameLocalization.Get(
-            startAtTop ? "climb_down" : "climb_up",
-            _languageSetting,
-            startAtTop ? "CLIMB DOWN" : "CLIMB TO ROOF");
-        _hud.SetInteraction($"{verb}  //  {nearest.Building}", -1.0f, true);
+        var action = IsOrbitalComplexRuntimeMapSelected
+            ? OrbitalComplexAccessInteractionLabel(nearest, startAtTop)
+            : $"{GameLocalization.Get(
+                    startAtTop ? "climb_down" : "climb_up",
+                    _languageSetting,
+                    startAtTop ? "CLIMB DOWN" : "CLIMB TO ROOF")}  //  {nearest.Building}";
+        _hud.SetInteraction(action, -1.0f, true);
         if (!_interactReleaseRequired && Input.IsActionJustPressed(GameInputActions.Interact))
         {
             _interactReleaseRequired = true;

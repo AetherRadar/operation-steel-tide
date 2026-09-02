@@ -8,6 +8,15 @@ namespace OperationSteelTide;
 [GlobalClass]
 public partial class MissionDirector : Node
 {
+    public const string DefaultBackendMissionId = "steel-tide-terminal";
+    public const string FalltideBackendMissionId = "falltide-recovery-array";
+
+    private static readonly string[] DefaultOfflineObjectives =
+    {
+        "DISABLE THE COMMUNICATIONS RELAY",
+        "RECOVER THE SHIPPING MANIFEST"
+    };
+
     [Signal]
     public delegate void MissionLoadedEventHandler(
         int spawnProtectionSeconds,
@@ -36,19 +45,80 @@ public partial class MissionDirector : Node
     private int _lastReportedSecond = -1;
     private double _missionStartedAt;
     private bool _resultSubmitted;
-    private List<string> _objectives = new()
-    {
-        "DISABLE THE COMMUNICATIONS RELAY",
-        "RECOVER THE SHIPPING MANIFEST"
-    };
+    private bool _configurationLocked;
+    private string _backendMissionId = DefaultBackendMissionId;
+    private List<string> _objectives = new(DefaultOfflineObjectives);
+    private List<string> _objectiveIds = new();
+    private List<string> _objectiveLocalizationKeys = new();
+    private bool _backendObjectiveContractValid = true;
     private int _objectiveIndex;
 
     public int SpawnProtectionSeconds { get; private set; } = 12;
     public float DetectionRange { get; private set; } = 34.0f;
     public int ReinforcementThreshold { get; private set; } = 70;
+    public string BackendMissionId => _backendMissionId;
+    public IReadOnlyList<string> Objectives => _objectives;
+    public IReadOnlyList<string> ObjectiveIds => _objectiveIds;
+    public IReadOnlyList<string> ObjectiveLocalizationKeys => _objectiveLocalizationKeys;
+    public bool BackendObjectiveContractValid => _backendObjectiveContractValid;
+    public bool IsOnline => _online;
+
+    /// <summary>
+    /// Selects the backend mission and the ordered objectives used when the backend is unavailable.
+    /// Configure the director before adding it to the scene tree; inputs are copied for isolation.
+    /// </summary>
+    public void ConfigureMission(
+        string backendMissionId,
+        IReadOnlyList<string> offlineObjectives,
+        IReadOnlyList<string>? offlineObjectiveIds = null,
+        IReadOnlyList<string>? offlineObjectiveLocalizationKeys = null)
+    {
+        if (_configurationLocked || IsInsideTree())
+        {
+            throw new InvalidOperationException(
+                "MissionDirector must be configured before it enters the scene tree.");
+        }
+        if (string.IsNullOrWhiteSpace(backendMissionId))
+        {
+            throw new ArgumentException("Backend mission ID is required.", nameof(backendMissionId));
+        }
+        ArgumentNullException.ThrowIfNull(offlineObjectives);
+
+        var objectives = CopyNonEmptyObjectives(offlineObjectives);
+        if (objectives.Count == 0)
+        {
+            throw new ArgumentException("At least one offline objective is required.", nameof(offlineObjectives));
+        }
+
+        var objectiveIds = offlineObjectiveIds is null
+            ? new List<string>()
+            : CopyNonEmptyObjectives(offlineObjectiveIds);
+        if (objectiveIds.Count > 0 && objectiveIds.Count != objectives.Count)
+        {
+            throw new ArgumentException(
+                "Offline objective IDs must match the objective count.",
+                nameof(offlineObjectiveIds));
+        }
+        var localizationKeys = offlineObjectiveLocalizationKeys is null
+            ? new List<string>()
+            : CopyNonEmptyObjectives(offlineObjectiveLocalizationKeys);
+        if (localizationKeys.Count > 0 && localizationKeys.Count != objectives.Count)
+        {
+            throw new ArgumentException(
+                "Offline objective localization keys must match the objective count.",
+                nameof(offlineObjectiveLocalizationKeys));
+        }
+
+        _backendMissionId = backendMissionId.Trim();
+        _objectives = objectives;
+        _objectiveIds = objectiveIds;
+        _objectiveLocalizationKeys = localizationKeys;
+        _backendObjectiveContractValid = true;
+    }
 
     public override void _Ready()
     {
+        _configurationLocked = true;
         ProcessMode = ProcessModeEnum.Always;
         _missionStartedAt = Time.GetTicksMsec() / 1000.0;
         _backend = new BackendClient();
@@ -175,7 +245,7 @@ public partial class MissionDirector : Node
         StartPayload? payload = null;
         try
         {
-            payload = await _backend!.StartSessionAsync("local-operator", "steel-tide-terminal");
+            payload = await _backend!.StartSessionAsync("local-operator", _backendMissionId);
         }
         catch (Exception exception)
         {
@@ -184,14 +254,60 @@ public partial class MissionDirector : Node
 
         if (payload is not null)
         {
+            // JSON clients are allowed to omit optional objects/arrays. Keep a
+            // malformed-but-successful response from taking the mission loop
+            // down; the locally configured map contract remains authoritative.
+            var session = payload.Session ?? new SessionPayload();
+            var mission = payload.Mission ?? new MissionPayload();
             _online = true;
-            _sessionId = payload.Session.Id;
-            SpawnProtectionSeconds = Math.Max(8, payload.Mission.SpawnProtectionSeconds);
-            DetectionRange = Math.Clamp(payload.Mission.BaseDetectionRange, 20, 45);
-            ReinforcementThreshold = Math.Clamp(payload.Mission.ReinforcementThreshold, 40, 95);
-            if (payload.Mission.Objectives.Count > 0)
+            _sessionId = session.Id ?? string.Empty;
+            SpawnProtectionSeconds = Math.Max(8, mission.SpawnProtectionSeconds);
+            DetectionRange = Math.Clamp(mission.BaseDetectionRange, 20, 45);
+            ReinforcementThreshold = Math.Clamp(mission.ReinforcementThreshold, 40, 95);
+            var onlineObjectives = CopyNonEmptyObjectives(
+                mission.Objectives ?? new List<string>());
+            var onlineObjectiveIds = CopyNonEmptyObjectives(
+                mission.ObjectiveIds ?? new List<string>());
+            var onlineLocalizationKeys = CopyNonEmptyObjectives(
+                mission.ObjectiveLocalizationKeys ?? new List<string>());
+            if (string.Equals(
+                    _backendMissionId,
+                    FalltideBackendMissionId,
+                    StringComparison.OrdinalIgnoreCase))
             {
-                _objectives = payload.Mission.Objectives;
+                // Falltide's world seed chooses which district is first. Keep the locally
+                // configured seeded order and validate the backend's canonical ID/text/key
+                // contract instead of replacing it with the backend's fixed canonical order.
+                _backendObjectiveContractValid = ValidateFalltideObjectiveContract(
+                    mission,
+                    onlineObjectives,
+                    onlineObjectiveIds,
+                    onlineLocalizationKeys);
+                if (_objectiveIds.Count == 0 && onlineObjectiveIds.Count == _objectives.Count)
+                {
+                    _objectiveIds = onlineObjectiveIds;
+                }
+                if (_objectiveLocalizationKeys.Count == 0
+                    && onlineLocalizationKeys.Count == _objectives.Count)
+                {
+                    _objectiveLocalizationKeys = onlineLocalizationKeys;
+                }
+                if (_objectives.Count == 0 && onlineObjectives.Count > 0)
+                {
+                    _objectives = onlineObjectives;
+                }
+            }
+            else if (onlineObjectives.Count > 0)
+            {
+                _objectives = onlineObjectives;
+                if (onlineObjectiveIds.Count == onlineObjectives.Count)
+                {
+                    _objectiveIds = onlineObjectiveIds;
+                }
+                if (onlineLocalizationKeys.Count == onlineObjectives.Count)
+                {
+                    _objectiveLocalizationKeys = onlineLocalizationKeys;
+                }
             }
             EmitSignal(SignalName.BackendStatus, true, "ONLINE");
         }
@@ -228,5 +344,110 @@ public partial class MissionDirector : Node
         }
         _phase = phase;
         EmitSignal(SignalName.PhaseChanged, _phase, _deploymentRemaining, _online);
+    }
+
+    private static List<string> CopyNonEmptyObjectives(IReadOnlyList<string> objectives)
+    {
+        var copy = new List<string>(objectives.Count);
+        foreach (var objective in objectives)
+        {
+            if (!string.IsNullOrWhiteSpace(objective))
+            {
+                copy.Add(objective.Trim());
+            }
+        }
+        return copy;
+    }
+
+    private static bool ValidateFalltideObjectiveContract(
+        MissionPayload mission,
+        IReadOnlyList<string> objectives,
+        IReadOnlyList<string> objectiveIds,
+        IReadOnlyList<string> localizationKeys)
+    {
+        if (!string.Equals(
+                mission.Id,
+                FalltideBackendMissionId,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var expectedIds = new[]
+        {
+            OrbitalComplexMapDefinition.BreakerObjectiveId,
+            OrbitalComplexMapDefinition.QuarantineObjectiveId
+        };
+        var expectedObjectives = new[]
+        {
+            OrbitalComplexMapDefinition.BreakerObjectiveEnglishName,
+            OrbitalComplexMapDefinition.QuarantineObjectiveEnglishName
+        };
+        var expectedKeys = new[]
+        {
+            OrbitalComplexMapDefinition.BreakerObjectiveLocalizationKey,
+            OrbitalComplexMapDefinition.QuarantineObjectiveLocalizationKey
+        };
+        if (objectives.Count != expectedObjectives.Length)
+        {
+            return false;
+        }
+
+        // A pre-ID backend remains compatible as long as it serves the canonical text
+        // sequence. Newer backends must also provide a paired ID and localization key.
+        if (objectiveIds.Count == 0 && localizationKeys.Count == 0)
+        {
+            return SequenceEqual(objectives, expectedObjectives);
+        }
+        if (objectiveIds.Count != expectedIds.Length
+            || (localizationKeys.Count != 0
+                && localizationKeys.Count != expectedKeys.Length))
+        {
+            return false;
+        }
+        for (var index = 0; index < expectedIds.Length; index++)
+        {
+            var payloadIndex = IndexOf(objectiveIds, expectedIds[index]);
+            if (payloadIndex < 0 || objectives[payloadIndex] != expectedObjectives[index])
+            {
+                return false;
+            }
+            if (localizationKeys.Count > 0
+                && localizationKeys[payloadIndex] != expectedKeys[index])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool SequenceEqual(
+        IReadOnlyList<string> left,
+        IReadOnlyList<string> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+        for (var index = 0; index < left.Count; index++)
+        {
+            if (!string.Equals(left[index], right[index], StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int IndexOf(IReadOnlyList<string> values, string expected)
+    {
+        for (var index = 0; index < values.Count; index++)
+        {
+            if (string.Equals(values[index], expected, StringComparison.Ordinal))
+            {
+                return index;
+            }
+        }
+        return -1;
     }
 }

@@ -17,7 +17,9 @@ public partial class FreightTerminalWorld
     {
         _industrialInteriorCaches.Clear();
         _industrialInteriorGuards.Clear();
-        if (IsBlackwaterRefineryMap || _industrialInteriors is null)
+        if (IsBlackwaterRefineryMap
+            || IsOrbitalComplexRuntimeMapSelected
+            || _industrialInteriors is null)
         {
             return;
         }

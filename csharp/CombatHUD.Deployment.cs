@@ -598,7 +598,10 @@ public partial class CombatHUD
 
     private void SelectDeploymentMap(string id)
     {
-        var map = DeploymentMapCatalog.Resolve(id);
+        if (!DeploymentMapCatalog.TryResolve(id, out var map))
+        {
+            return;
+        }
         if (!IsMapSelectable(map.Id))
         {
             return;

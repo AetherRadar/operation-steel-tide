@@ -34,7 +34,6 @@ public partial class FreightTerminalWorld
     private bool _orbitalComplexRuntimeEnemiesSpawned;
     private bool _orbitalComplexRuntimeHostilesSpawned;
     private int _orbitalComplexRuntimeTraversalLinkCount;
-    private int _orbitalComplexRuntimeCoverPointCount;
     private int _orbitalComplexRuntimeQrfStage;
     private readonly List<OmniLight3D> _orbitalComplexRuntimeLights = new();
     private bool _orbitalComplexRuntimeLightingBuilt;
@@ -148,6 +147,7 @@ public partial class FreightTerminalWorld
         }
         _orbitalComplexRuntimeBuild = null;
         _orbitalComplexRuntimeReady = false;
+        var coreBuildSucceeded = false;
         try
         {
             _orbitalComplexRuntimeBuild = _orbitalComplexRuntimeAssembler.Build(
@@ -155,13 +155,19 @@ public partial class FreightTerminalWorld
                 layout,
                 _objectiveStage,
                 layout.SharedWorldSeed);
-            _orbitalComplexRuntimeReady = true;
             _levelRoot.SetMeta("authored_scene_path", OrbitalComplexWorldAssembler.DefaultScenePath);
             _levelRoot.SetMeta("authored_scene_group", OrbitalComplexWorldAssembler.AuthoredSceneGroup);
             BuildOrbitalComplexRuntimeLighting();
+            BuildOrbitalComplexRuntimeAccess();
+            BuildOrbitalComplexRuntimePresentationFX();
+            // A diagnostic fallback may continue after a failed data-contract
+            // validation, but that shell is not a ready runtime even if assembly
+            // itself happened to succeed.
+            coreBuildSucceeded = validation.Valid;
         }
         catch (Exception exception) when (_diagnosticSceneLoadFallbackAllowed)
         {
+            _orbitalComplexRuntimeReady = false;
             _orbitalComplexRuntimeLoadError = string.IsNullOrEmpty(
                 _orbitalComplexRuntimeLoadError)
                 ? exception.Message
@@ -169,10 +175,31 @@ public partial class FreightTerminalWorld
             GD.PrintErr($"ORBITAL_AUTHORED_SCENE_ERROR {_orbitalComplexRuntimeLoadError}");
         }
 
-        BuildOrbitalComplexRuntimeObjectiveTerminals(layout);
-        BuildOrbitalComplexRuntimeExtraction(layout);
-        RegisterOrbitalComplexRuntimeTraversal(layout);
-        ApplyOrbitalComplexRuntimeObjectiveStage(_objectiveStage);
+        // The optional helper builders use OrbitalComplexRuntimeSceneReady as their
+        // prerequisite.  Expose the successfully assembled core only while this
+        // synchronous helper phase runs; the final assignment below remains the
+        // authoritative all-helpers-complete result.
+        _orbitalComplexRuntimeReady = coreBuildSucceeded;
+        try
+        {
+            BuildOrbitalComplexRuntimeObjectiveTerminals(layout);
+            BuildOrbitalComplexRuntimeExtraction(layout);
+            BuildOrbitalComplexRuntimeBleedValve(layout);
+            BuildOrbitalComplexRuntimeUndertowSump(layout);
+            BuildOrbitalComplexTacticalSignals();
+            RegisterOrbitalComplexRuntimeTraversal(layout);
+            ApplyOrbitalComplexRuntimeObjectiveStage(_objectiveStage);
+            _orbitalComplexRuntimeReady = coreBuildSucceeded;
+        }
+        catch (Exception exception) when (_diagnosticSceneLoadFallbackAllowed)
+        {
+            _orbitalComplexRuntimeReady = false;
+            _orbitalComplexRuntimeLoadError = string.IsNullOrEmpty(
+                _orbitalComplexRuntimeLoadError)
+                ? exception.Message
+                : $"{_orbitalComplexRuntimeLoadError};{exception.Message}";
+            GD.PrintErr($"ORBITAL_RUNTIME_HELPER_ERROR {_orbitalComplexRuntimeLoadError}");
+        }
         return true;
     }
 
@@ -335,7 +362,7 @@ public partial class FreightTerminalWorld
     private void RegisterOrbitalComplexRuntimeTraversal(OrbitalComplexMapLayout layout)
     {
         _orbitalComplexRuntimeTraversalLinkCount = 0;
-        _orbitalComplexRuntimeCoverPointCount = 0;
+        var coverPointCount = 0;
         foreach (var route in layout.PatrolRoutes)
         {
             var kind = route.Layer == OrbitalComplexVerticalLayer.Catwalk
@@ -377,8 +404,9 @@ public partial class FreightTerminalWorld
             // Unlike RegisterCoverPoint, preserve the authored vertical layer.  This list is
             // consumed by FindCoverPoint and therefore supports dry-dock/catwalk cover too.
             _registeredCoverPoints.Add(point);
-            _orbitalComplexRuntimeCoverPointCount++;
+            coverPointCount++;
         }
+        _levelRoot.SetMeta("falltide_runtime_cover_point_count", coverPointCount);
     }
 
     private static bool InsideOrbitalComplexRuntimeBounds(
@@ -460,9 +488,114 @@ public partial class FreightTerminalWorld
         var objectives = OrbitalComplexRuntimeLayout.Objectives
             .Select(objective => objective.EnglishName)
             .ToArray();
+        var objectiveIds = OrbitalComplexRuntimeLayout.Objectives
+            .Select(objective => objective.Id)
+            .ToArray();
+        var objectiveLocalizationKeys = OrbitalComplexRuntimeLayout.Objectives
+            .Select(objective => objective.LocalizationKey)
+            .ToArray();
         _missionDirector.ConfigureMission(
             MissionDirector.FalltideBackendMissionId,
-            objectives);
+            objectives,
+            objectiveIds,
+            objectiveLocalizationKeys);
+    }
+
+    /// <summary>Returns the interaction prompt for the objective selected by the shared seed.</summary>
+    private string OrbitalComplexObjectiveInteractionLabel(int objectiveStage)
+    {
+        if (!IsOrbitalComplexRuntimeMapSelected
+            || objectiveStage < 0
+            || objectiveStage >= OrbitalComplexRuntimeLayout.Objectives.Count)
+        {
+            return string.Empty;
+        }
+
+        var objective = OrbitalComplexRuntimeLayout.Objectives[objectiveStage];
+        if (IsOrbitalComplexBreakerObjective(objective))
+        {
+            return GameLocalization.Get(
+                "stabilize_breakers",
+                _languageSetting,
+                "STABILIZE STORM-GRID BREAKERS");
+        }
+        if (IsOrbitalComplexArchiveObjective(objective))
+        {
+            return GameLocalization.Get(
+                "authorize_quarantine",
+                _languageSetting,
+                "AUTHORIZE QUARANTINE RELEASE");
+        }
+        return GameLocalization.Objective(objective.EnglishName, _languageSetting);
+    }
+
+    private bool IsOrbitalComplexBreakerObjective(int objectiveStage)
+    {
+        if (!IsOrbitalComplexRuntimeMapSelected
+            || objectiveStage < 0
+            || objectiveStage >= OrbitalComplexRuntimeLayout.Objectives.Count)
+        {
+            return false;
+        }
+
+        return IsOrbitalComplexBreakerObjective(
+            OrbitalComplexRuntimeLayout.Objectives[objectiveStage]);
+    }
+
+    private static bool IsOrbitalComplexBreakerObjective(
+        OrbitalComplexObjectiveDefinition objective)
+        => objective.Id == OrbitalComplexMapDefinition.BreakerObjectiveId
+            || string.Equals(
+                objective.CompletionSignal,
+                "falltide_breaker_bus_rerouted",
+                StringComparison.Ordinal);
+
+    private static bool IsOrbitalComplexArchiveObjective(
+        OrbitalComplexObjectiveDefinition objective)
+        => objective.Id == OrbitalComplexMapDefinition.QuarantineObjectiveId
+            || string.Equals(
+                objective.CompletionSignal,
+                "falltide_archive_purged",
+                StringComparison.Ordinal);
+
+    private bool IsOrbitalComplexArchiveObjective(int objectiveStage)
+    {
+        if (!IsOrbitalComplexRuntimeMapSelected
+            || objectiveStage < 0
+            || objectiveStage >= OrbitalComplexRuntimeLayout.Objectives.Count)
+        {
+            return false;
+        }
+
+        return IsOrbitalComplexArchiveObjective(
+            OrbitalComplexRuntimeLayout.Objectives[objectiveStage]);
+    }
+
+    private void ShowOrbitalComplexObjectiveCompletion(int objectiveStage)
+    {
+        if (!IsOrbitalComplexRuntimeMapSelected
+            || objectiveStage < 0
+            || objectiveStage >= OrbitalComplexRuntimeLayout.Objectives.Count
+            || !IsInstanceValid(_hud))
+        {
+            return;
+        }
+
+        var objective = OrbitalComplexRuntimeLayout.Objectives[objectiveStage];
+        if (IsOrbitalComplexBreakerObjective(objective))
+        {
+            _hud.ShowLocalizedMessage(
+                "falltide_breakers_stabilized",
+                "STORM-GRID BREAKERS STABILIZED  //  RESPONSE DELAYED",
+                new Color(0.35f, 0.92f, 0.72f));
+        }
+        else if (IsOrbitalComplexArchiveObjective(objective))
+        {
+            _hud.ShowLocalizedMessage(
+                "falltide_quarantine_authorized",
+                "QUARANTINE RELEASE AUTHORIZED  //  ARCHIVE ACCESS GRANTED",
+                new Color(0.42f, 0.78f, 1.0f));
+        }
     }
 
     private void ApplyOrbitalComplexRuntimeObjectiveStage(int stage)
@@ -509,11 +642,17 @@ public partial class FreightTerminalWorld
             ? new Color(0.004f, 0.008f, 0.012f)
             : new Color(0.012f, 0.022f, 0.03f);
         _environmentRef.AmbientLightSource = Godot.Environment.AmbientSource.Color;
-        _environmentRef.AmbientLightColor = new Color(0.24f, 0.34f, 0.4f);
-        _environmentRef.AmbientLightEnergy = Mathf.Clamp(style.AmbientEnergy * 0.56f, 0.08f, 0.42f);
+        _environmentRef.AmbientLightColor = new Color(0.30f, 0.43f, 0.52f);
+        // This is an enclosed facility, so the authored shell cannot receive the
+        // outdoor sky radiance that the other maps use.  Keep the blackout mood in
+        // the local fixtures and alarm colours, but retain enough neutral fill to
+        // read walls, cover, and player silhouettes at gameplay distance.
+        _environmentRef.AmbientLightEnergy = Mathf.Clamp(style.AmbientEnergy * 0.92f, 0.36f, 0.78f);
+        _environmentRef.TonemapMode = Godot.Environment.ToneMapper.Aces;
+        _environmentRef.TonemapExposure = Mathf.Clamp(style.Exposure + 0.22f, 0.96f, 1.34f);
         _environmentRef.FogEnabled = true;
         _environmentRef.FogLightColor = new Color(0.08f, 0.18f, 0.23f);
-        _environmentRef.FogLightEnergy = 0.22f;
+        _environmentRef.FogLightEnergy = 0.34f;
         _environmentRef.FogDensity = timeOfDay == DeploymentTimeOfDay.Night
             ? 0.0044f
             : 0.0032f;
@@ -534,14 +673,18 @@ public partial class FreightTerminalWorld
         // height and let the power-state presentation have a real light source.
         var fixtures = new[]
         {
-            ("Intake", new Vector3(0, -8.0f, 72), new Color(0.08f, 0.42f, 0.78f), 4.2f, 30.0f),
-            ("Breaker", new Vector3(-100, -8.0f, -6), new Color(1.0f, 0.35f, 0.08f), 3.4f, 26.0f),
-            ("Archive", new Vector3(100, -8.0f, -6), new Color(0.30f, 0.36f, 1.0f), 3.4f, 26.0f),
-            ("Reactor", new Vector3(0, -10.0f, -34), new Color(1.0f, 0.12f, 0.035f), 5.0f, 38.0f),
-            ("Drydock", new Vector3(0, -30.0f, -34), new Color(0.08f, 0.54f, 0.88f), 4.6f, 24.0f),
-            ("TideGate", new Vector3(0, -8.0f, -194), new Color(0.08f, 0.95f, 0.66f), 4.8f, 28.0f),
-            ("CatwalkWest", new Vector3(-68, -0.5f, -34), new Color(0.10f, 0.48f, 0.92f), 2.4f, 20.0f),
-            ("CatwalkEast", new Vector3(68, -0.5f, -34), new Color(0.10f, 0.48f, 0.92f), 2.4f, 20.0f)
+            ("Intake", new Vector3(0, -8.0f, 72), new Color(0.08f, 0.42f, 0.78f), 8.0f, 42.0f),
+            ("Breaker", new Vector3(-100, -8.0f, -6), new Color(1.0f, 0.35f, 0.08f), 7.0f, 36.0f),
+            ("Archive", new Vector3(100, -8.0f, -6), new Color(0.30f, 0.36f, 1.0f), 7.0f, 36.0f),
+            ("Reactor", new Vector3(0, -10.0f, -34), new Color(1.0f, 0.12f, 0.035f), 10.0f, 48.0f),
+            ("Drydock", new Vector3(0, -30.0f, -34), new Color(0.08f, 0.54f, 0.88f), 8.0f, 32.0f),
+            ("Vault", new Vector3(0, -8.0f, -52), new Color(0.44f, 0.24f, 1.0f), 6.0f, 28.0f),
+            ("TideGate", new Vector3(0, -8.0f, -194), new Color(0.08f, 0.95f, 0.66f), 9.0f, 40.0f),
+            ("WestService", new Vector3(-148, -8.0f, -92), new Color(0.08f, 0.42f, 0.78f), 6.0f, 34.0f),
+            ("EastService", new Vector3(148, -8.0f, -92), new Color(0.30f, 0.36f, 1.0f), 6.0f, 34.0f),
+            ("LaunchSilo", new Vector3(0, -8.0f, -184), new Color(0.08f, 0.65f, 0.92f), 8.0f, 34.0f),
+            ("CatwalkWest", new Vector3(-68, -0.5f, -34), new Color(0.10f, 0.48f, 0.92f), 5.0f, 28.0f),
+            ("CatwalkEast", new Vector3(68, -0.5f, -34), new Color(0.10f, 0.48f, 0.92f), 5.0f, 28.0f)
         };
         foreach (var fixture in fixtures)
         {
@@ -572,6 +715,10 @@ public partial class FreightTerminalWorld
         }
 
         _orbitalComplexRuntimePresentationTime += Mathf.Max(0.0f, delta);
+        UpdateOrbitalComplexBleedValvePresentation(delta);
+        UpdateOrbitalComplexUndertowPresentation(delta);
+        UpdateOrbitalComplexRuntimePresentationFX(delta);
+        UpdateOrbitalComplexTacticalSignals(delta);
         var power = build.PowerState;
         if (build.PresentationNodes.TryGetValue("DishYaw", out var dish))
         {
@@ -613,7 +760,7 @@ public partial class FreightTerminalWorld
             visual.Rotation = visual.Rotation.Lerp(targetRotation, Mathf.Clamp(delta * 5.0f, 0.0f, 1.0f));
         }
 
-        var energyScale = power.Mode == OrbitalComplexPowerMode.Blackout ? 0.28f
+        var energyScale = power.Mode == OrbitalComplexPowerMode.Blackout ? 0.42f
             : power.Mode == OrbitalComplexPowerMode.EmergencyPower ? 0.72f : 1.0f;
         var flicker = 0.94f + Mathf.Sin(_orbitalComplexRuntimePresentationTime * 7.0f) * 0.06f;
         foreach (var light in _orbitalComplexRuntimeLights)

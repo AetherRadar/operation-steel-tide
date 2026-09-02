@@ -48,6 +48,19 @@ public static class DeploymentMapRuntime
             SelectMap(DeploymentMapCatalog.BlackwaterRefineryId);
         }
 
+        if (Array.Exists(args, value =>
+                value is "--validate-orbital-map"
+                    or "--validate-orbital-collision"
+                    or "--validate-orbital-gameplay"
+                    or "--validate-orbital-spawns"
+                    or "--validate-orbital-loading"
+                    or "--validate-orbital-atmosphere"
+                    or "--validate-orbital-integration"
+                    or "--capture-orbital-map"))
+        {
+            SelectMap(DeploymentMapCatalog.OrbitalComplexId);
+        }
+
         return _selectedMapId;
     }
 
@@ -84,7 +97,8 @@ public static class DeploymentMapRuntime
 
     private static void SelectMap(string mapId)
     {
-        var map = DeploymentMapCatalog.Resolve(mapId);
-        _selectedMapId = map.Available ? map.Id : DeploymentMapCatalog.FreightTerminalId;
+        _selectedMapId = DeploymentMapCatalog.TryResolve(mapId, out var map) && map.Available
+            ? map.Id
+            : DeploymentMapCatalog.FreightTerminalId;
     }
 }

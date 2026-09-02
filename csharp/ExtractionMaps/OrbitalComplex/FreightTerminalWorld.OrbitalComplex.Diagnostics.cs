@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
@@ -241,6 +242,293 @@ public partial class FreightTerminalWorld
         return count;
     }
 
+    /// <summary>
+    /// Exercises the MAP 03 seams that the focused layout diagnostics cannot observe:
+    /// deployment selection/HUD, mission objective contract, authored spawn hand-off, and
+    /// tide-gate extraction presentation. All checks use the deterministic startup seed.
+    /// </summary>
+    private async void ValidateOrbitalComplexIntegration()
+    {
+        await WaitFrames(8);
+        var valid = false;
+        var failure = string.Empty;
+        var selected = false;
+        var missionReady = false;
+        var objectiveIdsReady = false;
+        var objectiveTextReady = false;
+        var objectiveLocalizationReady = false;
+        var hudReady = false;
+        var mapSelectionReady = false;
+        var tideGateHudReady = false;
+        var minimapReady = false;
+        var extractionReady = false;
+        var extractionHudReady = false;
+        var stageReady = false;
+        var weaponCases = 0;
+        var gradedLoot = 0;
+        var hostileSquads = 0;
+        var enemies = 0;
+        var explosives = 0;
+        var gateStage0Ready = false;
+        var gateStage1Ready = false;
+        var gateStage2Ready = false;
+        var markerStage2Ready = false;
+        var runtimeReady = false;
+        var authoredRootValid = false;
+        var gameplayRootValid = false;
+
+        try
+        {
+            selected = IsOrbitalComplexRuntimeMapSelected;
+            if (!selected)
+            {
+                throw new InvalidOperationException("map_not_selected");
+            }
+
+            var layout = OrbitalComplexRuntimeLayout;
+            var layoutSnapshot = CaptureOrbitalComplexDiagnosticSnapshot();
+            runtimeReady = _orbitalComplexRuntimeReady;
+            authoredRootValid = _orbitalComplexRuntimeBuild is not null
+                && IsInstanceValid(_orbitalComplexRuntimeBuild.AuthoredArtRoot)
+                && _orbitalComplexRuntimeBuild.AuthoredArtRoot.IsInsideTree();
+            gameplayRootValid = _orbitalComplexRuntimeBuild is not null
+                && IsInstanceValid(_orbitalComplexRuntimeBuild.GameplayRoot)
+                && _orbitalComplexRuntimeBuild.GameplayRoot.IsInsideTree();
+            var expectedIds = layout.Objectives.Select(objective => objective.Id).ToArray();
+            var expectedTexts = layout.Objectives.Select(objective => objective.EnglishName).ToArray();
+            var expectedKeys = layout.Objectives
+                .Select(objective => objective.LocalizationKey)
+                .ToArray();
+
+            missionReady = IsInstanceValid(_missionDirector)
+                && _missionDirector.BackendMissionId == MissionDirector.FalltideBackendMissionId
+                && _missionDirector.BackendObjectiveContractValid;
+            objectiveIdsReady = missionReady
+                && OrbitalSequenceEqual(_missionDirector.ObjectiveIds, expectedIds);
+            objectiveTextReady = missionReady
+                && OrbitalSequenceEqual(_missionDirector.Objectives, expectedTexts);
+            objectiveLocalizationReady = expectedKeys.Length == expectedTexts.Length
+                && expectedKeys.All(key => !string.IsNullOrWhiteSpace(key))
+                && layout.Objectives.All(objective =>
+                    GameLocalization.Get(
+                        objective.LocalizationKey,
+                        "zh",
+                        objective.EnglishName) == objective.ChineseName
+                    && GameLocalization.Objective(
+                        objective.EnglishName,
+                        "zh") == objective.ChineseName)
+                && OrbitalSequenceEqual(
+                    _missionDirector.ObjectiveLocalizationKeys,
+                    expectedKeys);
+
+            hudReady = IsInstanceValid(_hud) && _hud.DeploymentUiReady;
+            if (hudReady)
+            {
+                _hud.SetDeploymentMapSelection(DeploymentMapCatalog.OrbitalComplexId);
+            }
+            mapSelectionReady = hudReady
+                && _hud.SelectedDeploymentMapId == DeploymentMapCatalog.OrbitalComplexId
+                && _hud.DeploymentMapCount == DeploymentMapCatalog.Maps.Count
+                && _hud.DeploymentMapAvailable;
+            tideGateHudReady = hudReady && _hud.ExtractionUsesTideGate;
+            minimapReady = hudReady
+                && _hud.MinimapLandmarkCount == layout.MinimapLandmarks.Count + 2;
+
+            var extractionShape = IsInstanceValid(_extractionArea)
+                ? _extractionArea.GetChildren().OfType<CollisionShape3D>().FirstOrDefault()
+                : null;
+            extractionReady = IsInstanceValid(_extractionArea)
+                && IsInstanceValid(_extractionMarker)
+                && IsInstanceValid(_orbitalComplexRuntimeExtractionSite)
+                && extractionShape?.Shape is CylinderShape3D cylinder
+                && Mathf.IsEqualApprox(cylinder.Radius, layout.Extraction.Radius)
+                && Mathf.IsEqualApprox(
+                    _orbitalComplexRuntimeExtractionSite!.GlobalPosition.DistanceTo(
+                        layout.Extraction.Position),
+                    0.0f);
+
+            weaponCases = _lootSources.OfType<WeaponCase>()
+                .Count(source => source.HasMeta("falltide_loot_id"));
+            gradedLoot = _lootSources.OfType<GradedLootPickup>()
+                .Count(source => source.HasMeta("falltide_loot_id"));
+            hostileSquads = _hostileSquads.Count(squad =>
+                squad.Members.Count == ExtractionSpawnPads.SquadSize
+                && squad.Members.All(IsInstanceValid));
+            enemies = _enemies.Count(IsInstanceValid);
+            explosives = _barrels.Count(barrel =>
+                IsInstanceValid(barrel) && barrel.HasMeta("falltide_chain_group"));
+            var contentReady = _orbitalComplexRuntimeWeaponCasesSpawned
+                && _orbitalComplexRuntimeGradedLootSpawned
+                && _orbitalComplexRuntimeValuablesSpawned
+                && _orbitalComplexRuntimeExplosivesSpawned
+                && weaponCases == layout.WeaponCases.Count
+                && gradedLoot == layout.GradedLoot.Count + layout.Valuables.Count
+                && explosives == layout.Explosives.Count;
+            var encountersReady = _orbitalComplexRuntimeEnemiesSpawned
+                && _orbitalComplexRuntimeHostilesSpawned
+                && hostileSquads == layout.RivalSpawnPads.Count
+                && enemies >= layout.GarrisonSpawns.Count
+                    + layout.RivalSpawnPads.Count * ExtractionSpawnPads.SquadSize;
+
+            extractionHudReady = false;
+            if (hudReady)
+            {
+                _hud.SetExtractionCountdown(
+                    OrbitalComplexExtractionStrategy.EmergencyPowerCountdownSeconds,
+                    OrbitalComplexExtractionStrategy.EmergencyPowerCountdownSeconds,
+                    OrbitalComplexExtraction.TransportReady(1),
+                    3,
+                    3);
+                var emergencyHud = _hud.IsExtractionCountdownVisible
+                    && _hud.ExtractionAircraftReady
+                    && Mathf.IsEqualApprox(
+                        _hud.ExtractionCountdownSeconds,
+                        OrbitalComplexExtractionStrategy.EmergencyPowerCountdownSeconds);
+                _hud.SetExtractionCountdown(
+                    OrbitalComplexExtractionStrategy.FullPowerCountdownSeconds,
+                    OrbitalComplexExtractionStrategy.FullPowerCountdownSeconds,
+                    OrbitalComplexExtraction.TransportReady(2),
+                    3,
+                    3);
+                var fullHud = _hud.IsExtractionCountdownVisible
+                    && _hud.ExtractionAircraftReady
+                    && Mathf.IsEqualApprox(
+                        _hud.ExtractionCountdownSeconds,
+                        OrbitalComplexExtractionStrategy.FullPowerCountdownSeconds);
+                extractionHudReady = emergencyHud && fullHud;
+                _hud.HideExtractionCountdown();
+            }
+
+            var originalStage = _objectiveStage;
+            OrbitalComplexGateRuntime? tideGate = null;
+            OrbitalComplexGateRuntime? vaultGate = null;
+            var gateLookupReady = false;
+            if (_orbitalComplexRuntimeBuild is not null
+                && _orbitalComplexRuntimeBuild.Gates.TryGetValue(
+                    "north_tide_gate",
+                    out var tideGateValue)
+                && _orbitalComplexRuntimeBuild.Gates.TryGetValue(
+                    "stormglass_vault",
+                    out var vaultGateValue))
+            {
+                gateLookupReady = true;
+                tideGate = tideGateValue;
+                vaultGate = vaultGateValue;
+            }
+            ApplyOrbitalComplexRuntimeObjectiveStage(0);
+            var zero = _orbitalComplexRuntimeBuild?.PowerState;
+            var stage0TideOpen = tideGate?.IsOpen == true;
+            var stage0VaultOpen = vaultGate?.IsOpen == true;
+            ApplyOrbitalComplexRuntimeObjectiveStage(1);
+            var one = _orbitalComplexRuntimeBuild?.PowerState;
+            var stage1TideOpen = tideGate?.IsOpen == true;
+            var stage1VaultOpen = vaultGate?.IsOpen == true;
+            ApplyOrbitalComplexRuntimeObjectiveStage(2);
+            var two = _orbitalComplexRuntimeBuild?.PowerState;
+            var stage2TideOpen = tideGate?.IsOpen == true;
+            var stage2VaultOpen = vaultGate?.IsOpen == true;
+            gateStage0Ready = gateLookupReady
+                && zero is not null
+                && !zero.ExtractionEnabled
+                && !stage0TideOpen
+                && !stage0VaultOpen;
+            gateStage1Ready = gateLookupReady
+                && one is not null
+                && one.ExtractionEnabled
+                && stage1TideOpen
+                && !stage1VaultOpen;
+            gateStage2Ready = gateLookupReady
+                && two is not null
+                && two.ExtractionEnabled
+                && stage2TideOpen
+                && stage2VaultOpen;
+            markerStage2Ready = IsInstanceValid(_extractionMarker)
+                && _extractionMarker.GetMeta("falltide_extraction_enabled", false).AsBool();
+            var gatesReady = gateStage0Ready
+                && gateStage1Ready
+                && gateStage2Ready
+                && markerStage2Ready;
+            ApplyOrbitalComplexRuntimeObjectiveStage(originalStage);
+            stageReady = gatesReady
+                && !OrbitalComplexExtraction.CanExtract(0)
+                && OrbitalComplexExtraction.CanExtract(1)
+                && OrbitalComplexExtraction.CanExtract(2)
+                && Mathf.IsEqualApprox(
+                    OrbitalComplexExtraction.CountdownSeconds(1),
+                    OrbitalComplexExtractionStrategy.EmergencyPowerCountdownSeconds)
+                && Mathf.IsEqualApprox(
+                    OrbitalComplexExtraction.CountdownSeconds(2),
+                    OrbitalComplexExtractionStrategy.FullPowerCountdownSeconds)
+                && OrbitalComplexExtraction.StatusLocalizationKey(0)
+                    == "falltide_extract_locked"
+                && OrbitalComplexExtraction.StatusLocalizationKey(1)
+                    == "falltide_extract_emergency"
+                && OrbitalComplexExtraction.StatusLocalizationKey(2)
+                    == "falltide_extract_full";
+
+            valid = layoutSnapshot.LayoutValid
+                && layoutSnapshot.SceneReady
+                && layoutSnapshot.CollisionReady
+                && layoutSnapshot.RoutesReady
+                && layoutSnapshot.SpawnsReady
+                && layoutSnapshot.LoadingReady
+                && selected
+                && missionReady
+                && objectiveIdsReady
+                && objectiveTextReady
+                && objectiveLocalizationReady
+                && hudReady
+                && mapSelectionReady
+                && tideGateHudReady
+                && minimapReady
+                && extractionReady
+                && extractionHudReady
+                && contentReady
+                && encountersReady
+                && stageReady;
+        }
+        catch (Exception exception)
+        {
+            failure = exception.GetType().Name + ":" + exception.Message;
+            GD.PushError($"ORBITAL_INTEGRATION_EXCEPTION {DiagnosticToken(failure)}");
+        }
+
+        GD.Print(
+            $"ORBITAL_INTEGRATION_CHECK valid={valid} selected={selected} "
+            + $"mission={missionReady} objective_ids={objectiveIdsReady} "
+            + $"objective_text={objectiveTextReady} localization={objectiveLocalizationReady} "
+            + $"hud={hudReady} map_selection={mapSelectionReady} minimap={minimapReady} "
+            + $"tide_gate_hud={tideGateHudReady} "
+            + $"extraction={extractionReady} extraction_hud={extractionHudReady} "
+            + $"stage={stageReady} gate0={gateStage0Ready} gate1={gateStage1Ready} "
+            + $"gate2={gateStage2Ready} marker2={markerStage2Ready} "
+            + $"runtime_ready={runtimeReady} authored_root={authoredRootValid} "
+            + $"gameplay_root={gameplayRootValid} "
+            + $"weapon_cases={weaponCases} graded_loot={gradedLoot} "
+            + $"hostile_squads={hostileSquads} enemies={enemies} explosives={explosives} "
+            + $"failure={DiagnosticToken(failure)}");
+        GD.Print($"ORBITAL_INTEGRATION_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private static bool OrbitalSequenceEqual(
+        IReadOnlyList<string> left,
+        IReadOnlyList<string> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+        for (var index = 0; index < left.Count; index++)
+        {
+            if (!string.Equals(left[index], right[index], StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static string DiagnosticToken(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -271,24 +559,44 @@ public partial class FreightTerminalWorld
             _player.ProcessMode = ProcessModeEnum.Disabled;
         }
 
-        var layout = OrbitalComplexRuntimeLayout;
-        var target = layout.MinimapLandmarks
-            .FirstOrDefault(landmark => landmark.Id is "stormglass" or "reactor")
-            .Position;
-        if (target == Vector3.Zero)
+        // Capture the signature space in its powered state so the authored dish,
+        // reactor pit, and cross-level shell are all legible in the review image.
+        // This branch is only reachable through --capture-orbital-map and does not
+        // alter a normal deployment's blackout progression.
+        ApplyOrbitalComplexRuntimeObjectiveStage(2);
+        if (IsInstanceValid(_environmentRef))
         {
-            target = layout.Bounds.Center;
+            _environmentRef.AmbientLightEnergy = Mathf.Max(
+                _environmentRef.AmbientLightEnergy,
+                0.72f);
+            _environmentRef.TonemapExposure = Mathf.Max(
+                _environmentRef.TonemapExposure,
+                1.24f);
+            _environmentRef.FogDensity = 0.0018f;
+            _environmentRef.FogLightEnergy = 0.46f;
         }
+
+        var target = OrbitalComplexMapDefinition.StormglassArrayCenter + new Vector3(0.0f, 6.0f, 0.0f);
+        var captureFill = new OmniLight3D
+        {
+            Name = "OrbitalComplexCaptureFill",
+            GlobalPosition = target + new Vector3(12.0f, 18.0f, 18.0f),
+            LightColor = new Color(0.42f, 0.72f, 1.0f),
+            LightEnergy = 11.0f,
+            OmniRange = 82.0f,
+            ShadowEnabled = false
+        };
+        AddChild(captureFill);
         var camera = new Camera3D
         {
             Name = "OrbitalComplexCaptureCamera",
-            Fov = 62.0f,
+            Fov = 58.0f,
             Near = 0.05f,
             Far = 700.0f
         };
         AddChild(camera);
-        camera.GlobalPosition = target + new Vector3(24.0f, 14.0f, 28.0f);
-        camera.LookAt(target + Vector3.Up * 1.4f, Vector3.Up);
+        camera.GlobalPosition = target + new Vector3(38.0f, 16.0f, 42.0f);
+        camera.LookAt(target, Vector3.Up);
         camera.MakeCurrent();
         await WaitFrames(12);
         SaveViewportImage("res://orbital_complex_map_validation.png");

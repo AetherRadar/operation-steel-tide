@@ -31,6 +31,12 @@ public partial class FreightTerminalWorld
 
     private void SpawnWorldBoss()
     {
+        if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            // The Tide Hunter enters only after the second power objective;
+            // this keeps the opening intake route readable and deterministic.
+            return;
+        }
         var patrolRoute = ActiveWorldBossPatrolRoute;
         var networkId = _nextEnemyNetworkId++;
         var boss = new EnemyOperator
