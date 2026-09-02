@@ -318,7 +318,16 @@ public static class SoundLab
             // This reads louder than a service pistol without clipping a rapid
             // follow-up report.
             var targetPeak = nearField
-                ? platform == WeaponPlatform.DesertEagle ? 0.46f : 0.58f
+                ? platform switch
+                {
+                    // These two fast rifles can overlap four or five local
+                    // voices during automatic fire. Keep their individual
+                    // PCM reports below the aggregate clipping threshold.
+                    WeaponPlatform.AK74 => 0.52f,
+                    WeaponPlatform.ScarL => 0.42f,
+                    WeaponPlatform.DesertEagle => 0.46f,
+                    _ => 0.58f
+                }
                 : 0.94f;
             var normalization = targetPeak / peak;
             for (var i = 0; i < samples.Length; i++)

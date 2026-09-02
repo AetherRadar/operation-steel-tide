@@ -12,20 +12,28 @@ public partial class FreightTerminalWorld
 
         var platforms = new[]
         {
-            (Platform: WeaponPlatform.M3A1, MinimumLocalVolumeDb: 1.0f),
-            (Platform: WeaponPlatform.MP5A5, MinimumLocalVolumeDb: 0.5f),
             (Platform: WeaponPlatform.M4A1, MinimumLocalVolumeDb: 1.5f),
+            (Platform: WeaponPlatform.AK74, MinimumLocalVolumeDb: 2.0f),
+            (Platform: WeaponPlatform.ScarL, MinimumLocalVolumeDb: 2.0f),
+            (Platform: WeaponPlatform.M24, MinimumLocalVolumeDb: 2.5f),
+            (Platform: WeaponPlatform.MP5A5, MinimumLocalVolumeDb: 0.5f),
+            (Platform: WeaponPlatform.M3A1, MinimumLocalVolumeDb: 1.0f),
+            (Platform: WeaponPlatform.AXMC, MinimumLocalVolumeDb: 2.5f),
             (Platform: WeaponPlatform.P226, MinimumLocalVolumeDb: 1.5f),
             (Platform: WeaponPlatform.M1911, MinimumLocalVolumeDb: 2.5f),
-            (Platform: WeaponPlatform.GSh18, MinimumLocalVolumeDb: 1.5f),
-            (Platform: WeaponPlatform.DesertEagle, MinimumLocalVolumeDb: 1.0f),
             (Platform: WeaponPlatform.AWM, MinimumLocalVolumeDb: 2.5f),
-            (Platform: WeaponPlatform.VSS, MinimumLocalVolumeDb: -4.5f)
+            (Platform: WeaponPlatform.VSS, MinimumLocalVolumeDb: -4.5f),
+            (Platform: WeaponPlatform.DesertEagle, MinimumLocalVolumeDb: 1.0f),
+            (Platform: WeaponPlatform.GSh18, MinimumLocalVolumeDb: 1.5f)
         };
         var signatures = new HashSet<int>();
+        var worldSignatures = new HashSet<int>();
+        var enemySignatures = new HashSet<int>();
         var streamCount = 0;
         var levelsReady = true;
         var nearFieldDistinct = true;
+        var worldDistinct = true;
+        var enemyDistinct = true;
         var headroomReady = true;
         var reports = new List<string>(platforms.Length);
         var smgFired = false;
@@ -40,6 +48,7 @@ public partial class FreightTerminalWorld
             var ready = _player.PlayerWeaponAudioReadyForDiagnostics;
             var signature = _player.PlayerWeaponAudioSignatureForDiagnostics;
             var worldSignature = SoundLab.WeaponShotSignature(build);
+            var enemySignature = SoundLab.WeaponShotSignature(build, distant: true);
             var volume = _player.PlayerWeaponAudioVolumeDbForDiagnostics;
             var singlePeak = SoundLab.PlayerWeaponShotEffectivePeak(build);
             var burstPeak = SoundLab.PlayerWeaponShotBurstPeak(
@@ -53,7 +62,17 @@ public partial class FreightTerminalWorld
             {
                 signatures.Add(signature);
             }
+            if (worldSignature != 0)
+            {
+                worldSignatures.Add(worldSignature);
+            }
+            if (enemySignature != 0)
+            {
+                enemySignatures.Add(enemySignature);
+            }
             nearFieldDistinct &= signature != 0 && signature != worldSignature;
+            worldDistinct &= worldSignature != 0 && worldSignature != enemySignature;
+            enemyDistinct &= enemySignature != 0;
             headroomReady &= singlePeak is >= 0.30f and <= 0.90f
                 && burstPeak <= 0.98f;
             if (platform == WeaponPlatform.M3A1)
@@ -79,8 +98,12 @@ public partial class FreightTerminalWorld
         var valid = localPlayback
             && streamCount == platforms.Length
             && signatures.Count == platforms.Length
+            && worldSignatures.Count == platforms.Length
+            && enemySignatures.Count == platforms.Length
             && levelsReady
             && nearFieldDistinct
+            && worldDistinct
+            && enemyDistinct
             && headroomReady
             && smgFired
             && smgPlaying;
@@ -88,7 +111,10 @@ public partial class FreightTerminalWorld
             $"WEAPON_AUDIO_CHECK valid={valid} local={localPlayback} "
             + $"streams={streamCount}/{platforms.Length} "
             + $"signatures={signatures.Count}/{platforms.Length} levels={levelsReady} "
-            + $"near_field_distinct={nearFieldDistinct} "
+            + $"world_signatures={worldSignatures.Count}/{platforms.Length} "
+            + $"enemy_signatures={enemySignatures.Count}/{platforms.Length} "
+            + $"near_field_distinct={nearFieldDistinct} world_vs_enemy_distinct={worldDistinct} "
+            + $"enemy_distinct={enemyDistinct} "
             + $"headroom={headroomReady} "
             + $"smg_fired={smgFired} smg_playing={smgPlaying} "
             + $"smg_tail_playing={smgTailPlaying} "
