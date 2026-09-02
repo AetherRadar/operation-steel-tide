@@ -788,6 +788,38 @@ public static class WeaponCatalog
             build.Attachments[AttachmentSlot.Magazine] = "mag_standard";
             return build;
         }
+        if (platform == WeaponPlatform.AK74)
+        {
+            // The authored AK already carries its production front/rear iron
+            // sights. Keep the entry-level rifle visually unmistakable instead
+            // of placing the shared circular micro optic on its dust cover;
+            // higher tiers still earn the holo/scope progression normally.
+            build.Attachments[AttachmentSlot.Barrel] = tier >= 2
+                ? "barrel_marksman"
+                : tier == 0 ? "barrel_cqb" : "barrel_standard";
+            if (tier >= 1)
+            {
+                build.Attachments[AttachmentSlot.Optic] = tier >= 2
+                    ? "optic_scope"
+                    : "optic_holo";
+            }
+            build.Attachments[AttachmentSlot.Grip] = tier >= 1
+                ? "grip_vertical"
+                : "grip_angled";
+            build.Attachments[AttachmentSlot.Stock] = tier >= 2
+                ? "stock_precision"
+                : "stock_light";
+            build.Attachments[AttachmentSlot.Magazine] = tier >= 2
+                ? "mag_extended"
+                : "mag_standard";
+            if (tier >= 1)
+            {
+                build.Attachments[AttachmentSlot.Muzzle] = tier == 1
+                    ? "muzzle_brake"
+                    : "muzzle_suppressor";
+            }
+            return build;
+        }
         if (platform == WeaponPlatform.M24)
         {
             build.Attachments[AttachmentSlot.Barrel] = "barrel_marksman";

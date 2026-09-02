@@ -78,7 +78,10 @@ internal static class FirstPersonArmPoseCatalog
     private static readonly FirstPersonArmPoseDefinition AkRifle = new(
         FirstPersonArmPoseKind.Rifle,
         new Vector3(0.0f, -0.07310f, -0.12176f),
-        new Vector3(-0.00120f, 0.01912f, -0.58830f));
+        // The authored AK mesh is uniformly compacted around the firing grip
+        // (0.89 presentation factor). Keep the support palm on the shortened
+        // handguard rather than leaving it at the former long-rifle anchor.
+        new Vector3(-0.00107f, 0.00898f, -0.53758f));
 
     private static readonly FirstPersonArmPoseDefinition ScarRifle = new(
         FirstPersonArmPoseKind.Rifle,

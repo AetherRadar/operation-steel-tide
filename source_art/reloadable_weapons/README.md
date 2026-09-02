@@ -27,6 +27,17 @@ The project-authored textures, mechanism meshes, and builders are covered by
 the root MIT license; retained third-party art and combined outputs keep the
 source-license mapping above.
 
+The AK adaptation keeps the original fixed-stock/curved-magazine proportions,
+then applies a uniform `0.89` presentation pass around the firing-hand grip.
+The resulting FP and world exports measure about `1.40 m` overall; this avoids
+the former oversized `1.58 m` viewmodel while keeping the trigger hand, support
+hand, and reload sockets on the same authored surfaces.
+The runtime leaves the AK's authored iron sights exposed at tier 0; the shared
+external holo and magnified optics begin at higher tiers so the base silhouette
+is not obscured by a generic circular sight. Bare-iron ADS uses the authored
+rear-aperture line at `0.075 m` in the weapon-root frame rather than the
+shared M4 fallback height.
+
 ## Rebuild
 
 Run Blender 4.5 LTS or newer from the repository root:

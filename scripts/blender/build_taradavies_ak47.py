@@ -63,15 +63,44 @@ SOURCE_TRIANGLE_COUNT = 22_394
 SOURCE_MIN_X = -4.76798916
 SOURCE_MAX_X = 4.77696609
 
-# The source is +X muzzle.  Normalize it into the project's Blender weapon
-# convention: +Y muzzle, +Z up, 1.58 m overall length, stock at -0.32 m and
-# muzzle at +1.26 m.  The glTF exporter maps that to Godot -Z forward/+Y up.
+# The source is +X muzzle. Normalize it into the project's Blender weapon
+# convention: +Y muzzle, +Z up. The source topology is retained, but the first-
+# person presentation is compacted to a 1.40 m overall length around the
+# firing-hand grip. That keeps the fixed-stock AK silhouette authentic beside
+# the M4/SCAR viewmodels without squeezing one axis. The glTF exporter maps
+# that frame to Godot -Z forward/+Y up.
 SOURCE_SCALE = 0.1648085108
-NORMALIZATION = (
+# This is the Godot-ready primary grip converted back to the authored Blender
+# frame (x lateral, y muzzleward, z up). Scaling around it leaves the trigger
+# hand contact fixed while every authored marker and mesh follows the same
+# uniform presentation transform.
+AK_PRESENTATION_SCALE = 0.89
+AK_PRIMARY_GRIP_PIVOT = Vector((0.0, 0.12176, -0.07310))
+_SOURCE_NORMALIZATION = (
     Matrix.Translation((0.0, 0.4727153319, -0.1323747021))
     @ Matrix.Rotation(pi * 0.5, 4, "Z")
     @ Matrix.Scale(SOURCE_SCALE, 4)
 )
+NORMALIZATION = (
+    Matrix.Translation(AK_PRIMARY_GRIP_PIVOT)
+    @ Matrix.Scale(AK_PRESENTATION_SCALE, 4)
+    @ Matrix.Translation(-AK_PRIMARY_GRIP_PIVOT)
+    @ _SOURCE_NORMALIZATION
+)
+
+
+def scale_presentation_point(point: Vector) -> Vector:
+    """Scale a normalized Blender-frame point around the firing-hand grip."""
+
+    return AK_PRIMARY_GRIP_PIVOT + (
+        point - AK_PRIMARY_GRIP_PIVOT
+    ) * AK_PRESENTATION_SCALE
+
+
+def scale_local_marker(point: Vector) -> Vector:
+    """Scale a marker expressed in its authored parent-local frame."""
+
+    return point * AK_PRESENTATION_SCALE
 
 MAGAZINE_SOURCE = "Cube.006"
 CHARGING_HANDLE_SOURCES = ("weapon.001", "Plane.001")
@@ -88,21 +117,21 @@ FRONT_IRON_MIN_SOURCE_X = 3.55
 FRONT_IRON_MIN_SOURCE_Z = 1.02
 FRONT_IRON_SOURCE_POLYGONS = 498
 
-MAGAZINE_PIVOT = Vector((0.0, 0.4311, 0.0068))
-SPARE_MAGAZINE_PIVOT = Vector((-0.30, 0.18, -0.62))
+MAGAZINE_PIVOT = scale_presentation_point(Vector((0.0, 0.4311, 0.0068)))
+SPARE_MAGAZINE_PIVOT = scale_presentation_point(Vector((-0.30, 0.18, -0.62)))
 # Invisible hand-target markers preserve the magazine's physically correct
 # rock-in pivot while giving the first-person rig explicit DCC-authored grips.
 # Blender +Y/+Z export to Godot -Z/+Y respectively.
-MAGAZINE_GRIP = Vector((-0.0055, 0.0148, -0.1244))
+MAGAZINE_GRIP = scale_local_marker(Vector((-0.0055, 0.0148, -0.1244)))
 # Both magazine nodes share the same authored geometry in their local frame,
 # so their palm contact must also be identical. A pouch-space coordinate here
 # makes the hand miss the spare magazine and leaves the contact misaligned
 # after that magazine is seated in the rifle.
 SPARE_MAGAZINE_GRIP = MAGAZINE_GRIP.copy()
-CHARGING_HANDLE_PIVOT = Vector((0.0370, 0.5307, 0.0437))
-MUZZLE_TIP = Vector((0.0, 1.260, 0.015))
-SUPPRESSOR_TIP = Vector((0.0, 1.395, 0.015))
-EJECTION_PORT = Vector((0.052, 0.485, 0.045))
+CHARGING_HANDLE_PIVOT = scale_presentation_point(Vector((0.0370, 0.5307, 0.0437)))
+MUZZLE_TIP = scale_presentation_point(Vector((0.0, 1.260, 0.015)))
+SUPPRESSOR_TIP = scale_presentation_point(Vector((0.0, 1.395, 0.015)))
+EJECTION_PORT = scale_presentation_point(Vector((0.052, 0.485, 0.045)))
 
 RUNTIME_NODE_PARENTS = {
     "SteelTideAK47": None,

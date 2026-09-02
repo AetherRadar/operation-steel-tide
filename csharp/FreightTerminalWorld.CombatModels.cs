@@ -178,6 +178,9 @@ public partial class FreightTerminalWorld
         var firstPersonSmg = CombatModelLibrary.InspectFirstPersonSmg45();
         var firstPersonSmgReload = CombatModelLibrary.InspectFirstPersonSmg45Reload();
         var ak47ModelQuality = InspectAk47ModelQuality();
+        var akDefaultBuild = WeaponCatalog.Build(WeaponPlatform.AK74, 0);
+        var akDefaultBareIron = !akDefaultBuild.Attachments.ContainsKey(
+            AttachmentSlot.Optic);
         var weaponGeometry = IsValidPlatformWeapon(WeaponPlatform.M4A1, weapon)
             && weapon.Size.X is >= 0.15f and <= 0.8f
             && weapon.Size.Y is >= 0.25f and <= 1.15f
@@ -260,6 +263,7 @@ public partial class FreightTerminalWorld
             && firstPersonSmgGeometry
             && firstPersonSmgReloadGeometry
             && ak47ModelQuality.Valid
+            && akDefaultBareIron
             && playerAuthored
             && playerAuthoredAttachments
             && squadAuthored
@@ -303,6 +307,7 @@ public partial class FreightTerminalWorld
             + $"smg45_arm_bounds={firstPersonSmgReload.ArmBoundsSize} "
             + $"smg45_weapon_bounds={firstPersonSmgReload.WeaponBoundsSize} "
             + $"ak47_model={FormatAk47ModelQuality(ak47ModelQuality)} "
+            + $"ak_default_bare_iron={akDefaultBareIron} "
             + $"platforms={string.Join(',', platformInspections.Select(pair => $"{pair.Key}:{FormatWeaponInspection(pair.Value, platformGeometry[pair.Key])}"))} "
             + $"m4_attachment_configuration={m4AttachmentConfiguration.Valid}/"
             + $"{m4AttachmentConfiguration.BareValid}/"

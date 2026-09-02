@@ -28,11 +28,15 @@ The adapted firearm geometry retains the source CC0 dedication.
 ## DCC adaptation and runtime contract
 
 The reproducible Blender 4.5 build rotates and normalizes the authored source
-to the project's weapon frame, rebuilds six PBR materials, and delivers
-separate first-person and world-detail exports. It separates the existing
-authored magazine, charging handle, front sight, and rear sight into real
-mechanism nodes. A compact optic bridge is refitted from the source model's own
+to the project's weapon frame, applies a uniform `0.89` presentation scale
+around the firing-hand grip, rebuilds six PBR materials, and delivers separate
+first-person and world-detail exports. It separates the existing authored
+magazine, charging handle, front sight, and rear sight into real mechanism
+nodes. A compact optic bridge is refitted from the source model's own
 rear-sight-base geometry; no primitive, CSG, or programmer-art rail is used.
+Both delivered variants are approximately `1.40 m` long; the scale is baked
+into the DCC geometry and marker coordinates, so no runtime axis stretch is
+required.
 
 Both GLBs expose the same named hierarchy, including `Magazine`,
 `SpareMagazine`, `ChargingHandle`, `RearIronSight`, `FrontIronSight`,
@@ -56,15 +60,15 @@ micro, holographic, and magnified optics to enforce a +/-3 mm contact gate.
 | File | Bytes | SHA-256 |
 | --- | ---: | --- |
 | Raw source `source_art/third_party/taradavies_ak47/ak47_taradavies.blend` | 2,044,772 | `F3E4D7708EEB95DBEBE9E240C868148C4F03BEDA363FB904141861FFC8EC1392` |
-| First-person `ak47_reloadable_fp.glb` | 2,263,784 | `99DC2034324C6DF1DB72EAF0163B0D431073817EB1BBF5D715C8600E8E75117C` |
-| World `ak47_reloadable_world.glb` | 705,676 | `DED072F5627D3FAEFC4A6E6948CDEA9E36091609A623667F4A326404B806B9DB` |
-| Editable `source_art/reloadable_weapons/ak47_reloadable.blend` | 5,647,790 | `9FEEF0E48E568D0AF627001A659342A12106A1A3F76247CB71C27AB0BD840757` |
-| Studio preview `ak47_studio_preview.png` | 1,020,160 | `5D565FC8030DF4C1F100453A4C4F9FF5C80BDFFE1F02C7B5494C4795F717F1CD` |
+| First-person `ak47_reloadable_fp.glb` | 2,263,780 | `15FB4C3324375DFF12BB2F97C0250EE48366FC764E279C01723883C6B8F51CD4` |
+| World `ak47_reloadable_world.glb` | 705,676 | `DB30E9740857A6A922AA1945D122C2DBA44C7A7AFCCB9D2E5DD3DE0B91389C18` |
+| Editable `source_art/reloadable_weapons/ak47_reloadable.blend` | 5,647,790 | `D3ACDFB1DD236CE39A10FD8A31F8048F3ACE1DC7515044135ABBF71B500BC7C8` |
+| Studio preview `ak47_studio_preview.png` | 959,029 | `DF8F71FEDCA26675AEB0DBC6CD3FFE5B7726F8D7FB0BDD43B680D7DC808300EE` |
 | Wood base color `source_art/reloadable_weapons/textures/ak47_laminated_wood_base_color.png` | 74,429 | `A42DC092BF14F8FA7F4FA2BE77E7BB1D9B9AAA286735D8262B65AB8516847F81` |
 | Wood roughness `source_art/reloadable_weapons/textures/ak47_laminated_wood_roughness.png` | 73,115 | `2CF47336790B4E6599AD98B1D309927CF4FDBC8E6FECCA6D66C7C36EB75DA852` |
 | Godot-extracted FP/world base-color copies (each) | 74,429 | `A42DC092BF14F8FA7F4FA2BE77E7BB1D9B9AAA286735D8262B65AB8516847F81` |
 | Godot-extracted FP/world roughness copies (each) | 66,424 | `E53F73BEF4C58464852C2A5110FBF61AB6C22E5698C2ACCE4A50FFC1AF1D687A` |
-| Build script `scripts/blender/build_taradavies_ak47.py` | 41,469 | `88A74BF36393595211B1390694A6145403A1A7ECCBD5857344EE6120192D3B5B` |
+| Build script `scripts/blender/build_taradavies_ak47.py` | 42,819 | `EF4842C76108167F0BFA4B7691077581FA819968577674B9912607C77D7F699B` |
 
 The official-page metadata, raw-source mapping, excluded dependencies, and
 source hash are preserved in

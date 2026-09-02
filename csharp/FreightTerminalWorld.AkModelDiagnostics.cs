@@ -45,7 +45,10 @@ internal readonly record struct Ak47ModelVariantInspection(
         && Mathf.Abs(RailContactGap) <= 0.003f
         && Size.X is >= 0.06f and <= 0.25f
         && Size.Y is >= 0.3f and <= 0.9f
-        && Size.Z is >= 1.4f and <= 1.75f;
+        // The AK is intentionally compacted around its firing grip to a
+        // 1.40 m authored presentation length. Keep a small tolerance for
+        // exporter round-off while rejecting the former 1.58 m regression.
+        && Size.Z is >= 1.34f and <= 1.46f;
 }
 
 internal readonly record struct Ak47ModelQualityInspection(

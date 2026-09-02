@@ -22,6 +22,10 @@ public partial class TacticalPlayer
     private const float MicroOpticRailContactOffset = 0.070f;
     private const float HoloOpticRailContactOffset = 0.092f;
     private const float ScopeOpticRailContactOffset = 0.084f;
+    // The AK's authored rear aperture sits lower than the shared M4-style
+    // fallback sight line. Keep bare-iron ADS on the actual sight axis after
+    // the DCC presentation compaction instead of lifting the rifle by 130 mm.
+    private const float Ak74IronSightHeight = 0.075f;
     private const float M4A1IntegratedMicroOpticHeight = 0.167f;
     private const float M4A1RailContactHeight =
         M4A1IntegratedMicroOpticHeight - MicroOpticRailContactOffset;
@@ -109,7 +113,12 @@ public partial class TacticalPlayer
         }
         var opticPosition = IsInstanceValid(_opticRoot) && _opticRoot.Visible
             ? ActiveOpticPositionInWeaponRoot()
-            : new Vector3(0.0f, 0.205f, 0.0f);
+            : new Vector3(
+                0.0f,
+                EquippedWeapon.Platform == WeaponPlatform.AK74
+                    ? Ak74IronSightHeight
+                    : 0.205f,
+                0.0f);
         return new Vector3(
             -opticPosition.X * _weaponRoot.Scale.X,
             -opticPosition.Y * _weaponRoot.Scale.Y,
