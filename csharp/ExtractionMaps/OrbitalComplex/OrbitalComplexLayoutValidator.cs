@@ -329,6 +329,11 @@ public static class OrbitalComplexLayoutValidator
                 IsAxisAligned(box.RotationRadians)
                 && CoversVerticalBounds(box, bounds)
                 && IsBoundaryEdge(box, bounds));
+        var perimeterCoverage = fullHeightBoundaries
+            && boundaries.Any(box => CoversNorthEdge(box, bounds))
+            && boundaries.Any(box => CoversSouthEdge(box, bounds))
+            && boundaries.Any(box => CoversWestEdge(box, bounds))
+            && boundaries.Any(box => CoversEastEdge(box, bounds));
 
         // BunkerCeiling is visible authored geometry, but gameplay must also have
         // an invisible roof shape.  Accept one full-footprint roof or a future
@@ -340,7 +345,10 @@ public static class OrbitalComplexLayoutValidator
                 && CoversHorizontalBounds(box, bounds)
                 && IntersectsRoofPlane(box, bounds.MaximumY));
 
-        return primitiveCollisionValid && fullHeightBoundaries && ceilingCollision;
+        return primitiveCollisionValid
+            && fullHeightBoundaries
+            && perimeterCoverage
+            && ceilingCollision;
     }
 
     private static bool IsAxisAligned(Vector3 rotation)
@@ -361,22 +369,62 @@ public static class OrbitalComplexLayoutValidator
         OrbitalComplexCollisionBox box,
         OrbitalComplexMapBounds bounds)
     {
+        return CoversNorthEdge(box, bounds)
+            || CoversSouthEdge(box, bounds)
+            || CoversWestEdge(box, bounds)
+            || CoversEastEdge(box, bounds);
+    }
+
+    private static bool CoversNorthEdge(
+        OrbitalComplexCollisionBox box,
+        OrbitalComplexMapBounds bounds)
+    {
         var halfWidth = box.Size.X * 0.5f;
-        var halfDepth = box.Size.Z * 0.5f;
         var horizontal = bounds.Horizontal;
-        var northSouth = box.Size.X >= horizontal.Size.X - 2.0f
+        return box.Size.X >= horizontal.Size.X - 2.0f
             && box.Size.Z <= 4.0f
-            && (Mathf.Abs(box.Position.Z - horizontal.Position.Y) <= 2.0f
-                || Mathf.Abs(box.Position.Z - horizontal.End.Y) <= 2.0f)
+            && Mathf.Abs(box.Position.Z - horizontal.Position.Y) <= 2.0f
             && box.Position.X - halfWidth <= horizontal.Position.X + Epsilon
             && box.Position.X + halfWidth >= horizontal.End.X - Epsilon;
-        var westEast = box.Size.Z >= horizontal.Size.Y - 2.0f
+    }
+
+    private static bool CoversSouthEdge(
+        OrbitalComplexCollisionBox box,
+        OrbitalComplexMapBounds bounds)
+    {
+        var halfWidth = box.Size.X * 0.5f;
+        var horizontal = bounds.Horizontal;
+        return box.Size.X >= horizontal.Size.X - 2.0f
+            && box.Size.Z <= 4.0f
+            && Mathf.Abs(box.Position.Z - horizontal.End.Y) <= 2.0f
+            && box.Position.X - halfWidth <= horizontal.Position.X + Epsilon
+            && box.Position.X + halfWidth >= horizontal.End.X - Epsilon;
+    }
+
+    private static bool CoversWestEdge(
+        OrbitalComplexCollisionBox box,
+        OrbitalComplexMapBounds bounds)
+    {
+        var halfDepth = box.Size.Z * 0.5f;
+        var horizontal = bounds.Horizontal;
+        return box.Size.Z >= horizontal.Size.Y - 2.0f
             && box.Size.X <= 4.0f
-            && (Mathf.Abs(box.Position.X - horizontal.Position.X) <= 2.0f
-                || Mathf.Abs(box.Position.X - horizontal.End.X) <= 2.0f)
+            && Mathf.Abs(box.Position.X - horizontal.Position.X) <= 2.0f
             && box.Position.Z - halfDepth <= horizontal.Position.Y + Epsilon
             && box.Position.Z + halfDepth >= horizontal.End.Y - Epsilon;
-        return northSouth || westEast;
+    }
+
+    private static bool CoversEastEdge(
+        OrbitalComplexCollisionBox box,
+        OrbitalComplexMapBounds bounds)
+    {
+        var halfDepth = box.Size.Z * 0.5f;
+        var horizontal = bounds.Horizontal;
+        return box.Size.Z >= horizontal.Size.Y - 2.0f
+            && box.Size.X <= 4.0f
+            && Mathf.Abs(box.Position.X - horizontal.End.X) <= 2.0f
+            && box.Position.Z - halfDepth <= horizontal.Position.Y + Epsilon
+            && box.Position.Z + halfDepth >= horizontal.End.Y - Epsilon;
     }
 
     private static bool CoversHorizontalBounds(
