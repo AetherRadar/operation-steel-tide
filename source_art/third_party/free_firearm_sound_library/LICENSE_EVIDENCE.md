@@ -8,10 +8,11 @@
 - Acquisition date: **2026-09-02**
 - Attribution required: No. Creator and source are retained here as courtesy and audit evidence.
 
-The OpenGameArt page identifies the library as field recordings made for real
-firearms and explicitly lists the CC0 license. Its linked prepared master sheet
-identifies the AK-47 recordings as 7.62×39 mm, with separate near-distance and
-mid-distance takes:
+The OpenGameArt page identifies this as an open firearm-sound library and
+explicitly lists the CC0 license. The public [mirror's catalog](https://github.com/petroulacl/fps-asset-kit)
+describes the same collection as high-quality field recordings from real
+firearms. Its prepared master sheet identifies the AK-47 recordings as 7.62×39
+mm, with separate near-distance and mid-distance takes:
 
 The raw bytes were retrieved from the public GitHub mirror listed below because
 the original download links on the OpenGameArt page are archived MediaFire
