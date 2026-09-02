@@ -11,10 +11,13 @@ public partial class FreightTerminalWorld
         var cleanStart = false;
         var firstDown = false;
         var firstDownAiCommandHidden = false;
+        var firstDownCommandsCancelled = false;
         var firstRevived = false;
         var mateDown = false;
         var secondEliminated = false;
         var secondEliminatedAiCommandVisible = false;
+        var secondDownRuleCoverage = false;
+        var mixedRosterPrepared = false;
         var unsafePreparationBounded = false;
         var activePreparationGrace = false;
         var criticalRecoveryBeforeRescue = false;
@@ -112,10 +115,36 @@ public partial class FreightTerminalWorld
                 && _player.CanBeRevived
                 && _localPlayerDowned;
             firstDownAiCommandHidden = !_hud.IsAiSquadCommandPresentationVisibleForDiagnostics
-                && !_hud.AreSquadCommandControlsVisibleForDiagnostics;
+                && !_hud.AreSquadCommandControlsVisibleForDiagnostics
+                && _hud.DownedFooterSuppressedForDiagnostics;
+            firstDownCommandsCancelled = _squadOrder == SquadOrder.Follow
+                && !_squadHoldFire
+                && new[] { medic, casualty }.All(mate =>
+                    mate.Order == SquadOrder.Follow && !mate.HoldFireActive);
             firstRevived = _player.TryReceiveRevive(50.0f)
                 && !_player.IsDead
                 && _player.ReviveUsed;
+
+            secondDownRuleCoverage = SquadReviveRules.ShouldFailExtractionOnSecondDown(
+                    demolitionMode: false,
+                    extractionNetworkClient: false,
+                    playerReviveUsed: true,
+                    allAiSquad: true)
+                && !SquadReviveRules.ShouldFailExtractionOnSecondDown(false, false, true, false)
+                && !SquadReviveRules.ShouldFailExtractionOnSecondDown(true, false, true, true)
+                && !SquadReviveRules.ShouldFailExtractionOnSecondDown(false, true, true, true)
+                && !SquadReviveRules.ShouldFailExtractionOnSecondDown(false, false, false, true);
+            var diagnosticHumanProxy = SpawnSquadMate(
+                99,
+                OperatorRole.Assault,
+                human: true,
+                peerId: 900002,
+                networkProxy: true);
+            diagnosticHumanProxy.ProcessMode = ProcessModeEnum.Disabled;
+            diagnosticHumanProxy.GlobalPosition = new Vector3(900.0f, 0.12f, 900.0f);
+            mixedRosterPrepared = diagnosticHumanProxy.IsHumanProxy
+                && diagnosticHumanProxy.IsNetworkProxy
+                && !IsAllAiSquadSession;
 
             mateDown = casualty.TakeCombatDamage(
                     999.0f,
@@ -241,10 +270,13 @@ public partial class FreightTerminalWorld
         var valid = cleanStart
             && firstDown
             && firstDownAiCommandHidden
+            && firstDownCommandsCancelled
             && firstRevived
             && mateDown
             && secondEliminated
             && secondEliminatedAiCommandVisible
+            && secondDownRuleCoverage
+            && mixedRosterPrepared
             && unsafePreparationBounded
             && activePreparationGrace
             && criticalRecoveryBeforeRescue
@@ -266,7 +298,9 @@ public partial class FreightTerminalWorld
             $"EXTRACTION_SURVIVORS_CHECK valid={valid} clean={cleanStart} "
             + $"first_down={firstDown} first_revived={firstRevived} mate_down={mateDown} "
             + $"first_down_ai_hint_hidden={firstDownAiCommandHidden} "
+            + $"first_down_commands_cancelled={firstDownCommandsCancelled} "
             + $"second_eliminated={secondEliminated} second_down_ai_hint={secondEliminatedAiCommandVisible} "
+            + $"second_down_rule={secondDownRuleCoverage} mixed_roster={mixedRosterPrepared} "
             + $"unsafe_prep_bounded={unsafePreparationBounded} "
             + $"active_prep_grace={activePreparationGrace} "
             + $"recovery_before_rescue={criticalRecoveryBeforeRescue} "

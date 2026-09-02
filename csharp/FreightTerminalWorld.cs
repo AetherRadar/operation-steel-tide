@@ -1954,6 +1954,11 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
+        if (ShouldFailLocalPlayerOnSecondDown())
+        {
+            FailSquadMission();
+            return;
+        }
         if (TryBeginLocalPlayerElimination())
         {
             return;
@@ -1972,7 +1977,11 @@ public partial class FreightTerminalWorld : Node3D
         }
         _missionEnded = true;
         LockLootForMissionTransition(Input.MouseModeEnum.Visible);
+        _player.UiLocked = true;
+        _player.DisarmFireInput();
+        _player.DisarmMovementInput();
         _hud.HideDownedState();
+        _hud.SetSquadCommandPresentation(false, false, suppressFooter: true);
         _missionDirector.CompleteMission(false, _kills, _headshots, _shotsFired, _shotsHit);
         _hud.ShowResult(false);
     }

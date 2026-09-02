@@ -1538,6 +1538,10 @@ public partial class CombatHUD : CanvasLayer
 
     public void ShowDownedState(float reviveWindowSeconds = 15.0f)
     {
+        // A downed leader has no command authority while the AI rescue state
+        // machine takes over. Clear the presentation as well as hiding the
+        // footer so stale F1-F5 controls cannot remain on screen.
+        SetSquadCommandPresentation(false, false);
         SetDownedFooterSuppressed(true);
         _downedBanner.Visible = true;
         UpdateDownedState(reviveWindowSeconds);

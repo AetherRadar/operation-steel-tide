@@ -392,6 +392,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
         CancelSustainmentAction(releaseLoot: true);
         ResetEmergencyGlassEgressPlan();
+        // Rescue is an autonomous override: stale Hold/Move orders and cached
+        // routes must not keep the selected medic from reaching the casualty.
+        SetOrder(SquadOrder.Follow, GlobalPosition);
+        Main?.ClearSquadNavigation(this);
         _reviveTarget = target;
     }
 

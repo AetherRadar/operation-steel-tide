@@ -278,17 +278,20 @@ public partial class FreightTerminalWorld
                 : new Color(0.35f, 0.8f, 1.0f));
     }
 
-    private void CancelExtractionCountdown()
+    private void CancelExtractionCountdown(bool announce = true)
     {
         _extractionCountdownActive = false;
         _extractionRemaining = CurrentExtractionCountdownDuration();
         _hud.HideExtractionCountdown();
         AbortActiveExtractionTransport();
         RestoreSquadOrderAfterExtractionAbort();
-        _hud.ShowLocalizedMessage(
-            "extraction_aborted",
-            "EXTRACTION ABORTED  //  RETURN TO THE GREEN ZONE TO CALL AGAIN",
-            new Color(1.0f, 0.56f, 0.22f));
+        if (announce)
+        {
+            _hud.ShowLocalizedMessage(
+                "extraction_aborted",
+                "EXTRACTION ABORTED  //  RETURN TO THE GREEN ZONE TO CALL AGAIN",
+                new Color(1.0f, 0.56f, 0.22f));
+        }
     }
 
     private void RallySquadToExtraction()

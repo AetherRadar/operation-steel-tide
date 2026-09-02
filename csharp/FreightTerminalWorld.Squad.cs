@@ -50,6 +50,29 @@ public partial class FreightTerminalWorld
             _squadDeployed,
             _squadMates.Count(IsLocalAiMate));
 
+    private bool IsAllAiSquadSession
+    {
+        get
+        {
+            if (!_squadDeployed)
+            {
+                return false;
+            }
+            return _squadMates
+                .Where(mate => GodotObject.IsInstanceValid(mate))
+                .All(mate => !mate.IsHumanProxy);
+        }
+    }
+
+    private bool ShouldFailLocalPlayerOnSecondDown()
+        => IsInstanceValid(_player)
+            && _player.IsDead
+            && SquadReviveRules.ShouldFailExtractionOnSecondDown(
+                _demolitionMode,
+                IsExtractionNetworkClient,
+                _player.ReviveUsed,
+                IsAllAiSquadSession);
+
     private bool CanEliminatedPlayerCommandLocalAi
         => IsLocalAiSquadCommandSession
             && _localPlayerEliminated
@@ -60,6 +83,7 @@ public partial class FreightTerminalWorld
     private bool CanLocalPlayerIssueAiSquadCommands
         => !_missionEnded
             && IsLocalAiSquadCommandSession
+            && !_localPlayerDowned
             && (!_player.IsDead && !_player.UiLocked
                 || CanEliminatedPlayerCommandLocalAi);
 
@@ -2901,6 +2925,38 @@ public partial class FreightTerminalWorld
         shell.Launch(from, to, damage, blastRadius);
     }
 
+    /// <summary>
+    /// A downed leader no longer owns the squad order state. Clear every stale
+    /// player-issued directive and let the normal AI rescue state machine choose
+    /// the nearest capable rescuer.
+    /// </summary>
+    private void ApplyAutonomousRescueSquadState()
+    {
+        _squadOrder = SquadOrder.Follow;
+        _squadMovePoint = _player.GlobalPosition;
+        _squadHoldFire = false;
+        ClearSquadFocusTarget();
+        if (IsInstanceValid(_squadMoveMarker))
+        {
+            _squadMoveMarker!.QueueFree();
+        }
+        _squadMoveMarker = null;
+        ClearLeaderReviveAi();
+        foreach (var mate in _squadMates)
+        {
+            if (!IsLocalAiMate(mate))
+            {
+                continue;
+            }
+            mate.SetHoldFire(false);
+            mate.SetOrder(SquadOrder.Follow, mate.GlobalPosition);
+            ClearSquadNavigation(mate);
+        }
+        _hud.SetSquadOrder(SquadOrder.Follow);
+        _hud.SetSquadFireStance(false);
+        _hud.SetSquadCommandPresentation(false, false);
+    }
+
     private bool HandleLocalPlayerDowned()
     {
         if (_demolitionMode)
@@ -2908,7 +2964,10 @@ public partial class FreightTerminalWorld
             return false;
         }
         _player.EjectFromVehicleIfAny();
-        var livingMate = _squadMates.Any(mate => IsInstanceValid(mate) && !mate.IsDowned);
+        var livingMate = _squadMates.Any(mate => IsInstanceValid(mate)
+            && !mate.IsDowned
+            && !mate.IsBodyBag
+            && !mate.IsExtractionPassenger);
         // Second life already used, or nobody left to revive → hard fail path.
         if (_player.ReviveUsed || !_squadDeployed || !livingMate)
         {
@@ -2921,6 +2980,11 @@ public partial class FreightTerminalWorld
         ResetAiReviveAbandonment(_player);
         _localPlayerDowned = true;
         _localPlayerDownedTimer = 0.0f;
+        if (_extractionCountdownActive)
+        {
+            CancelExtractionCountdown(announce: false);
+        }
+        ApplyAutonomousRescueSquadState();
         _player.UiLocked = true;
         _player.DisarmFireInput();
         _player.DisarmMovementInput();
@@ -2932,6 +2996,11 @@ public partial class FreightTerminalWorld
 
     private bool TryBeginLocalPlayerElimination()
     {
+        if (ShouldFailLocalPlayerOnSecondDown())
+        {
+            FailSquadMission();
+            return true;
+        }
         var spectatorTarget = FindLivingSpectatorTarget();
         if (_missionEnded
             || !_squadDeployed
@@ -3037,7 +3106,19 @@ public partial class FreightTerminalWorld
         _localPlayerDowned = false;
         _localPlayerEliminated = false;
         ClearLeaderReviveAi();
+        _squadOrder = SquadOrder.Follow;
+        _squadMovePoint = _player.GlobalPosition;
+        _squadHoldFire = false;
+        ClearSquadFocusTarget();
+        if (IsInstanceValid(_squadMoveMarker))
+        {
+            _squadMoveMarker!.QueueFree();
+        }
+        _squadMoveMarker = null;
         _player.EjectFromVehicleIfAny();
+        _player.UiLocked = true;
+        _player.DisarmFireInput();
+        _player.DisarmMovementInput();
         _hud.HideDownedState();
         _hud.SetSquadCommandPresentation(false, false, suppressFooter: true);
         Input.MouseMode = Input.MouseModeEnum.Visible;
@@ -3871,6 +3952,13 @@ public partial class FreightTerminalWorld
         var eliminatedFireToggleAccepted = false;
         var eliminatedFocusAccepted = false;
         var eliminatedHintLocalized = false;
+        var firstDownCommandsCancelled = false;
+        var allAiSecondDownFailed = false;
+        var secondDownRuleAllAi = SquadReviveRules.ShouldFailExtractionOnSecondDown(
+            demolitionMode: false,
+            extractionNetworkClient: false,
+            playerReviveUsed: true,
+            allAiSquad: true);
         var interactionProbe = new ResidentialSupplyCache { Name = "SquadInteractionProbe" };
         interactionProbe.Configure(
             ResidentialCacheKind.FamilyStash,
@@ -3946,7 +4034,8 @@ public partial class FreightTerminalWorld
                 && ReferenceEquals(_spectatedMate, reviverMate);
             downedBannerVisible = _hud.IsDownedBannerVisible;
             firstDownAiCommandHintHidden = !_hud.IsAiSquadCommandPresentationVisibleForDiagnostics
-                && !_hud.AreSquadCommandControlsVisibleForDiagnostics;
+                && !_hud.AreSquadCommandControlsVisibleForDiagnostics
+                && _hud.DownedFooterSuppressedForDiagnostics;
             var downedHoldPosition = _player.GlobalPosition;
             var downedWasLocked = _player.UiLocked;
             Input.ActionPress("move_forward");
@@ -4020,6 +4109,7 @@ public partial class FreightTerminalWorld
         var gridPathLifecycleOk = false;
         var gridReviverAssigned = false;
         var gridEmergencyPathReady = false;
+        var gridPathClearedByAutonomousRescue = false;
         if (gridMate is not null)
         {
             var gridMaze = BuildSquadRescueMazeForDiagnostics(
@@ -4083,13 +4173,11 @@ public partial class FreightTerminalWorld
             };
             _squadGridPaths[gridMate.GetInstanceId()] = gridFollowPath;
             var gridFirstWaypoint = gridFollowPath.Directives[0];
-            var gridFollowDirectives = gridFollowPath.Directives;
-            var gridFollowCursor = gridFollowPath.Cursor;
             gridPathLifecycleOk = gridPathCreated
                 && gridPathCleared
                 && gridFollowPath.Directives.Length > 0
-                && gridFollowCursor >= 0
-                && gridFollowCursor < gridFollowPath.Directives.Length;
+                && gridFollowPath.Cursor >= 0
+                && gridFollowPath.Cursor < gridFollowPath.Directives.Length;
             gridDetourReady = gridDirectBlocked
                 && gridFirstWaypoint.Target.DistanceTo(gridPlayerPosition) > 3.0f
                 && gridFirstWaypoint.Target.X > gridReviverPosition.X + 2.0f
@@ -4106,19 +4194,8 @@ public partial class FreightTerminalWorld
             UpdateSquadReviveAi(1.0f / 60.0f);
             gridReviverAssigned = ReferenceEquals(_leaderReviver, gridMate)
                 && gridMate.IsRevivingLeader;
-            gridEmergencyPathReady = _squadGridPaths.TryGetValue(
-                    gridMate.GetInstanceId(),
-                    out var emergencyGridPath)
-                && gridFollowPath is not null
-                && ReferenceEquals(gridFollowPath, emergencyGridPath)
-                && ReferenceEquals(gridFollowDirectives, emergencyGridPath.Directives)
-                && emergencyGridPath.Cursor == gridFollowCursor
-                && emergencyGridPath.Emergency
-                && emergencyGridPath.Destination.DistanceSquaredTo(gridPlayerPosition) <= 0.0001f
-                && emergencyGridPath.NextPlanMilliseconds == 0
-                && emergencyGridPath.FailedPlanAttempts == 0
-                && LeaderRescueUsedGridForDiagnostics
-                && LeaderRescueGridPlansForDiagnostics == 0;
+            gridPathClearedByAutonomousRescue = !_squadGridPaths.ContainsKey(
+                gridMate.GetInstanceId());
             _ = ResolveSquadNavigationDestination(
                 gridMate,
                 gridPlayerPosition,
@@ -4133,6 +4210,9 @@ public partial class FreightTerminalWorld
                 && !_player.IsDead
                 && _player.ReviveUsed
                 && !_localPlayerDowned;
+            gridEmergencyPathReady = gridReviverAssigned
+                && gridPathClearedByAutonomousRescue
+                && gridRescueUsedGrid;
             gridDetourOk = gridDetourReady
                 && gridPathLifecycleOk
                 && gridReviverAssigned
@@ -4248,6 +4328,14 @@ public partial class FreightTerminalWorld
         GD.Print($"SQUAD_RECOVERY pinch={recoveryPinchOk} ray_clear={recoveryRayClear} assigned={recoveryAssigned} completed={recoveryCompleted} recoveries={recoveryCount} lateral={recoveryLateral:0.00} grid_assigned={gridReviverAssigned} grid_emergency={gridEmergencyPathReady}");
         gridDetourOk &= recoveryPinchOk;
 
+        // A downed leader relinquishes stale player orders immediately. Seed a
+        // visible Hold + hold-fire state so the validator proves the reset path.
+        if (_squadHoldFire)
+        {
+            ToggleSquadFireStance();
+        }
+        IssueSquadOrder(SquadOrder.Hold);
+        ToggleSquadFireStance();
         _player.SetHealthForDiagnostics(10.0f);
         _player.SetReviveUsedForDiagnostics(false);
         _player.TakeDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
@@ -4256,11 +4344,37 @@ public partial class FreightTerminalWorld
             _player.TakeCombatDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
         }
         var playerDowned = _player.IsDead && _player.CanBeRevived;
+        var localAiAfterDown = _squadMates.Where(IsLocalAiMate).ToArray();
+        firstDownCommandsCancelled = playerDowned
+            && _squadOrder == SquadOrder.Follow
+            && !_squadHoldFire
+            && localAiAfterDown.All(mate => mate.Order == SquadOrder.Follow && !mate.HoldFireActive)
+            && !CanLocalPlayerIssueAiSquadCommands
+            && !_hud.IsAiSquadCommandPresentationVisibleForDiagnostics
+            && !_hud.AreSquadCommandControlsVisibleForDiagnostics
+            && _hud.DownedFooterSuppressedForDiagnostics;
         var playerFirstRevive = _player.TryReceiveRevive(50.0f);
         var playerUp = !_player.IsDead && playerFirstRevive && _player.ReviveUsed;
-        _player.TakeCombatDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
+        // Keep a mixed-human roster for the legacy spectator command path. The
+        // production all-AI second-down path is verified after this block.
+        SquadMate? diagnosticHumanProxy = null;
+        if (playerUp)
+        {
+            diagnosticHumanProxy = SpawnSquadMate(
+                99,
+                OperatorRole.Assault,
+                human: true,
+                peerId: 900001,
+                networkProxy: true);
+            diagnosticHumanProxy.ProcessMode = ProcessModeEnum.Disabled;
+            diagnosticHumanProxy.GlobalPosition = new Vector3(900.0f, 0.12f, 900.0f);
+        }
+        _player.IsDead = true;
         var playerSecondBlocked = _player.IsDead && !_player.CanBeRevived && !_player.TryReceiveRevive(50.0f) && _player.ReviveUsed;
-        var secondDeathSpectate = _localPlayerEliminated && IsSquadMateViewCurrent && !_missionEnded;
+        var secondDeathSpectate = TryBeginLocalPlayerElimination()
+            && _localPlayerEliminated
+            && IsSquadMateViewCurrent
+            && !_missionEnded;
         secondDeathAiCommandHintVisible = CanEliminatedPlayerCommandLocalAi
             && _hud.IsAiSquadCommandPresentationVisibleForDiagnostics
             && _hud.AreSquadCommandControlsVisibleForDiagnostics;
@@ -4345,8 +4459,32 @@ public partial class FreightTerminalWorld
         var finishedSpectateOk = finishDowned && finishAccepted
             && finishedPlayerSpectate;
 
+        if (diagnosticHumanProxy is not null && IsInstanceValid(diagnosticHumanProxy))
+        {
+            ClearDemolitionSquadMateState(diagnosticHumanProxy);
+            _squadMates.Remove(diagnosticHumanProxy);
+            diagnosticHumanProxy.QueueFree();
+        }
+        // With the synthetic human proxy removed, the same second down must
+        // now end an all-AI extraction instead of opening the spectator UI.
+        _player.SetHealthForDiagnostics(10.0f);
+        _player.SetReviveUsedForDiagnostics(true);
+        OnLocalPlayerRevived();
+        var allAiSecondDownDamage = _player.TakeCombatDamage(
+            999.0f,
+            _player.HitPoint(HitRegion.Torso),
+            this);
+        allAiSecondDownFailed = allAiSecondDownDamage
+            && _missionEnded
+            && !_localPlayerDowned
+            && !_localPlayerEliminated
+            && _hud.IsMissionResultVisible
+            && !_hud.IsAiSquadCommandPresentationVisibleForDiagnostics
+            && !_hud.AreSquadCommandControlsVisibleForDiagnostics;
+
         var reviveOk = mateDowned && firstRevive && mateUp && bodyBagOk && secondReviveBlocked
-            && playerDowned && playerFirstRevive && playerUp && playerSecondBlocked && secondDeathSpectate;
+            && playerDowned && playerFirstRevive && playerUp && playerSecondBlocked && secondDeathSpectate
+            && allAiSecondDownFailed;
         var unreachableTimeoutOk = wallChannelBlocked
             && unreachableAbandoned
             && unreachableGridUsed
@@ -4361,7 +4499,7 @@ public partial class FreightTerminalWorld
         var downedInteractionOk = downedLootBlocked && downedBackpackBlocked && interruptedClimbLocked;
         var eliminatedInteractionOk = eliminatedLootBlocked && eliminatedBackpackBlocked;
         interactionProbe.QueueFree();
-        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} stair_climbed={squadStairClimbed} stair_gain={squadStairGain:0.00} stair_steps={squadStairStepUps} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} combat_ai={combatAiOk} wall_blocked={combatWallBlocked} target_lock={combatTargetLocked} flanked={combatFlanked} sight_recovered={combatSightRecovered} fired={combatFired} damaged={combatDamaged} faced_move={combatFacedMovement} close_retreat={closeRangeRetreat} close_strafe={closeRangeStrafe} weapon_damage={weaponDamageScales} weapon_damage_values={defaultWeaponDamage:0.0}/{marksmanWeaponDamage:0.0} hold_fire={holdFireBlocked} fire_resumed={holdFireResumed} focus_adopted={focusAdopted} smoke={squadSmokeThrown && squadSmokeChargeSpent && squadSmokeDeployed} revive_once={reviveOk} ai_mate_revive={aiMateRescueOk} far_rescue_blocked={farRescueBlocked} far_cost={farNavigationCost:0.0} revive_select_usec={farSelectionMicroseconds} revive_select_budget={AiReviveSelectionMaximumMicroseconds} critical_rescue_blocked={criticalRescueBlocked} critical_health={criticalReviverHealth:0.00} mate_enemy_contact={mateRescueEnemyDetected} mate_rescue_assigned={mateRescueAssigned} mate_rescue_motion={mateRescueMinDistance < mateRescueStartDistance - 2.0f} mate_reviver_health={mateReviver.Health / mateReviver.MaxHealth:0.00} eliminated_mate_rescue={mateRescueAfterElimination} reverse_trail_rescue={reverseTrailRescue} reverse_wall={reverseTrailDirectBlocked} reverse_cost={reverseTrailCost:0.0} wall_channel_blocked={wallChannelBlocked} unreachable_abandoned={unreachableAbandoned} abandon_seconds={unreachableElapsed:0.0} abandon_grid_used={unreachableGridUsed} abandon_grid_plans={unreachableGridPlans} bleed_resumed={bleedResumedAfterAbandon} abandon_clear_revive={abandonmentClearedOnRevive} abandon_clear_down={abandonmentClearedOnDown} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} rescue_path={rescuePathOk} grid_rescue={gridDetourOk} grid_detour={gridDetourReady} grid_lifecycle={gridPathLifecycleOk} grid_used={gridRescueUsedGrid} grid_completed={gridRescueCompleted} rescue_wall={rescueDirectBlocked} follow_detour={followDetourReady} rescue_trail={rescueTrailUsed} rescue_advances={rescueWaypointAdvances} rescue_replans={rescueReplans} spectator_rmb={spectatorCycle.RightMouseBound} spectator_cycle={spectatorCycle.Advanced} spectator_eliminated_click={spectatorCycle.EliminatedMouseClick} spectator_skip_downed={spectatorCycle.SkippedDowned} spectator_wrap={spectatorCycle.Wrapped} spectator_localized={spectatorCycle.Localized} first_down_spectate={squadMateViewOnDown} downed_input_locked={downedInputLocked} downed_loot_blocked={downedLootBlocked} downed_backpack_blocked={downedBackpackBlocked} climb_interrupt_locked={interruptedClimbLocked} eliminated_loot_blocked={eliminatedLootBlocked} eliminated_backpack_blocked={eliminatedBackpackBlocked} spectator_tracks={spectatorTracksMate} spectator_outside={spectatorOutsideMate} spectator_third_person={spectatorThirdPerson} spectator_wall_avoided={spectatorWallAvoided} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} ai_command_local_only={aiCommandLocalOnly} ai_command_alive_hidden={aliveAiCommandHintHidden} ai_command_first_down_hidden={firstDownAiCommandHintHidden} ai_command_second_down_visible={secondDeathAiCommandHintVisible} ai_command_orders={eliminatedOrdersAccepted} ai_command_move_camera={eliminatedMoveUsesSpectatorView} ai_command_follow_ai={eliminatedFollowUsesAiLeader} ai_command_fire={eliminatedFireToggleAccepted} ai_command_focus={eliminatedFocusAccepted} ai_command_localized={eliminatedHintLocalized} finished_spectate={finishedSpectateOk} immediate_view={finishedPlayerSpectate} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}/{(long)Key.F4}/{(long)Key.F5}/{(long)Key.F6}");
+        GD.Print($"SQUAD_CHECK members={ActiveSquadCount} ai={AiSquadCount} role_fill={roleFillOk} ai_roles={string.Join("+", aiRoles)} default_follow={defaultFollow} follow_motion={followMotion} stair_climbed={squadStairClimbed} stair_gain={squadStairGain:0.00} stair_steps={squadStairStepUps} ai_cooldown={aiCooldownEnforced} ai_cooldown_seconds={cooldownMate.SkillCooldownDuration:0} medic_self={medicSelf} recon={scanned} assault_speed={assaultSpeed:0.00} assault_fire={assaultFire:0.00} orders={hold && move && follow} combat_ai={combatAiOk} wall_blocked={combatWallBlocked} target_lock={combatTargetLocked} flanked={combatFlanked} sight_recovered={combatSightRecovered} fired={combatFired} damaged={combatDamaged} faced_move={combatFacedMovement} close_retreat={closeRangeRetreat} close_strafe={closeRangeStrafe} weapon_damage={weaponDamageScales} weapon_damage_values={defaultWeaponDamage:0.0}/{marksmanWeaponDamage:0.0} hold_fire={holdFireBlocked} fire_resumed={holdFireResumed} focus_adopted={focusAdopted} smoke={squadSmokeThrown && squadSmokeChargeSpent && squadSmokeDeployed} revive_once={reviveOk} ai_mate_revive={aiMateRescueOk} far_rescue_blocked={farRescueBlocked} far_cost={farNavigationCost:0.0} revive_select_usec={farSelectionMicroseconds} revive_select_budget={AiReviveSelectionMaximumMicroseconds} critical_rescue_blocked={criticalRescueBlocked} critical_health={criticalReviverHealth:0.00} mate_enemy_contact={mateRescueEnemyDetected} mate_rescue_assigned={mateRescueAssigned} mate_rescue_motion={mateRescueMinDistance < mateRescueStartDistance - 2.0f} mate_reviver_health={mateReviver.Health / mateReviver.MaxHealth:0.00} eliminated_mate_rescue={mateRescueAfterElimination} reverse_trail_rescue={reverseTrailRescue} reverse_wall={reverseTrailDirectBlocked} reverse_cost={reverseTrailCost:0.0} wall_channel_blocked={wallChannelBlocked} unreachable_abandoned={unreachableAbandoned} abandon_seconds={unreachableElapsed:0.0} abandon_grid_used={unreachableGridUsed} abandon_grid_plans={unreachableGridPlans} bleed_resumed={bleedResumedAfterAbandon} abandon_clear_revive={abandonmentClearedOnRevive} abandon_clear_down={abandonmentClearedOnDown} ai_finish={aiFinishOk} finish_target={finishTargetAcquired} finish_lock={finishLockHeld} finish_shot={finishShotFired} finish_kia={finishConverted} ai_leader_revive={aiReviveOk} rescue_path={rescuePathOk} grid_rescue={gridDetourOk} grid_detour={gridDetourReady} grid_lifecycle={gridPathLifecycleOk} grid_used={gridRescueUsedGrid} grid_completed={gridRescueCompleted} rescue_wall={rescueDirectBlocked} follow_detour={followDetourReady} rescue_trail={rescueTrailUsed} rescue_advances={rescueWaypointAdvances} rescue_replans={rescueReplans} spectator_rmb={spectatorCycle.RightMouseBound} spectator_cycle={spectatorCycle.Advanced} spectator_eliminated_click={spectatorCycle.EliminatedMouseClick} spectator_skip_downed={spectatorCycle.SkippedDowned} spectator_wrap={spectatorCycle.Wrapped} spectator_localized={spectatorCycle.Localized} first_down_spectate={squadMateViewOnDown} downed_input_locked={downedInputLocked} downed_loot_blocked={downedLootBlocked} downed_backpack_blocked={downedBackpackBlocked} climb_interrupt_locked={interruptedClimbLocked} eliminated_loot_blocked={eliminatedLootBlocked} eliminated_backpack_blocked={eliminatedBackpackBlocked} spectator_tracks={spectatorTracksMate} spectator_outside={spectatorOutsideMate} spectator_third_person={spectatorThirdPerson} spectator_wall_avoided={spectatorWallAvoided} downed_banner={downedBannerVisible} player_view_after_revive={playerViewAfterRevive} second_death_spectate={secondDeathSpectate} all_ai_second_down_rule={secondDownRuleAllAi} all_ai_second_down_failed={allAiSecondDownFailed} first_down_commands_cancelled={firstDownCommandsCancelled} ai_command_local_only={aiCommandLocalOnly} ai_command_alive_hidden={aliveAiCommandHintHidden} ai_command_first_down_hidden={firstDownAiCommandHintHidden} ai_command_second_down_visible={secondDeathAiCommandHintVisible} ai_command_orders={eliminatedOrdersAccepted} ai_command_move_camera={eliminatedMoveUsesSpectatorView} ai_command_follow_ai={eliminatedFollowUsesAiLeader} ai_command_fire={eliminatedFireToggleAccepted} ai_command_focus={eliminatedFocusAccepted} ai_command_localized={eliminatedHintLocalized} finished_spectate={finishedSpectateOk} immediate_view={finishedPlayerSpectate} body_bag={bodyBagOk} prone_hold={mateCrawled} hud={!_hud.IsSquadLobbyVisible} keys={(long)Key.H}/{(long)Key.F1}/{(long)Key.F2}/{(long)Key.F3}/{(long)Key.F4}/{(long)Key.F5}/{(long)Key.F6}");
         var valid = ActiveSquadCount >= 2 && roleFillOk && combatAiOk
             && weaponDamageScales && holdFireBlocked && holdFireResumed && focusAdopted
             && squadSmokeThrown && squadSmokeChargeSpent && squadSmokeDeployed
@@ -4374,7 +4512,9 @@ public partial class FreightTerminalWorld
             && secondDeathAiCommandHintVisible && eliminatedOrdersAccepted
             && eliminatedMoveUsesSpectatorView && eliminatedFollowUsesAiLeader
             && eliminatedFireToggleAccepted && eliminatedFocusAccepted
-            && eliminatedHintLocalized && finishedSpectateOk;
+            && eliminatedHintLocalized && finishedSpectateOk
+            && secondDownRuleAllAi && allAiSecondDownFailed
+            && firstDownCommandsCancelled;
         GD.Print($"SQUAD_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
