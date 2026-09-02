@@ -1129,13 +1129,38 @@ public partial class FreightTerminalWorld
         };
         var visual = new MeshInstance3D { Mesh = SharedBoxMesh(size), MaterialOverride = material };
         body.AddChild(visual);
-        body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } });
+        var collisionShape = new BoxShape3D { Size = size };
+        if (KeepExpansionCollisionNode(name))
+        {
+            // A few compatibility diagnostics and traversal probes inspect a
+            // collision child by name. Keep those nodes discoverable while the
+            // high-volume map boxes use shape owners below.
+            body.AddChild(new CollisionShape3D { Shape = collisionShape });
+        }
+        else
+        {
+            // Shape owners retain the same broad-phase geometry without creating
+            // a CollisionShape3D node for every decorative/floor box. This is a
+            // substantial reduction in residential map node traversal overhead.
+            var shapeOwner = body.CreateShapeOwner(body);
+            body.ShapeOwnerSetTransform(shapeOwner, Transform3D.Identity);
+            body.ShapeOwnerAddShape(shapeOwner, collisionShape);
+        }
         parent.AddChild(body);
         if (IsDistanceCulledBox(name))
         {
             RegisterMapDetailVisual(visual);
         }
         return body;
+    }
+
+    private static bool KeepExpansionCollisionNode(string name)
+    {
+        return name.StartsWith("District", System.StringComparison.Ordinal)
+            || name.Equals("SouthResidentialBoulevard", System.StringComparison.Ordinal)
+            || name.StartsWith("ResidentialFloorSlab", System.StringComparison.Ordinal)
+            || name.Equals("ResidentialLobbyFloor", System.StringComparison.Ordinal)
+            || name.Contains("Collision", System.StringComparison.Ordinal);
     }
 
     private StaticBody3D ExpansionCylinder(

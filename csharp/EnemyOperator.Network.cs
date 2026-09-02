@@ -61,6 +61,7 @@ public partial class EnemyOperator
         if (System.Enum.IsDefined(typeof(WeaponPlatform), state.WeaponPlatform))
         {
             CarriedWeapon = WeaponCatalog.Build((WeaponPlatform)state.WeaponPlatform, 0);
+            RefreshShotAudio();
         }
         HasFireablePrimary = flags.HasFlag(ExtractionEnemyNetworkFlags.HasWeapon);
         if (IsInstanceValid(_carriedWeaponRoot))

@@ -162,9 +162,12 @@ public partial class EnemyOperator
         };
         AddChild(_worldBossLabel);
 
-        _shotAudio.Stream = SoundLab.Gunshot();
-        _shotAudio.VolumeDb = -1.5f;
+        RefreshShotAudio();
+        // The boss keeps a louder presentation, but still uses its configured
+        // AXMC report rather than silently reverting to the M4 fallback.
+        _shotAudio.VolumeDb += 3.5f;
         _shotAudio.MaxDistance = 185.0f;
+        _shotAudio.UnitSize = 16.0f;
         RefreshWorldBossPhaseVisuals(notify: false);
     }
 

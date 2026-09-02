@@ -57,6 +57,17 @@ public partial class FreightTerminalWorld
         => IsInstanceValid(_player)
             && position.DistanceSquaredTo(_player.GlobalPosition) > 72.0f * 72.0f;
 
+    /// <summary>
+    /// Distant extraction operators can advance their non-combat tactical motor at
+    /// 10 Hz.  Diagnostics and the compact demolition arena stay full-rate so their
+    /// timing assertions and close-quarters response remain deterministic.
+    /// </summary>
+    internal bool ShouldUseReducedEnemySimulation(Vector3 position)
+        => !_diagnosticSceneLoadFallbackAllowed
+            && !IsDemolitionMode
+            && IsInstanceValid(_player)
+            && position.DistanceSquaredTo(_player.GlobalPosition) > 96.0f * 96.0f;
+
     internal void RelayOperatorContact(
         EnemyOperator source,
         Node3D target,

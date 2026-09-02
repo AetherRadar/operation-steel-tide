@@ -58,6 +58,10 @@ public static class SoundLab
     public static AudioStreamWav EnemyShot()
         => WeaponShot(WeaponPlatform.M4A1, suppressed: false, distant: true);
 
+    /// <summary>Platform-aware distant report for AI operators.</summary>
+    public static AudioStreamWav EnemyShot(WeaponBuild build)
+        => WeaponShot(build, distant: true);
+
     public static AudioStreamWav WeaponShot(WeaponBuild build, bool distant = false)
     {
         var suppressed = IsSuppressed(build);

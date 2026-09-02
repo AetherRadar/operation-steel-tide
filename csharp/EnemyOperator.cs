@@ -92,6 +92,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     {
         HasFireablePrimary = true;
         CarriedWeapon = (build ?? WeaponCatalog.Build(WeaponPlatform.M4A1, 0)).Clone();
+        RefreshShotAudio();
         if (IsInstanceValid(_carriedWeaponRoot))
         {
             _carriedWeaponRoot.Visible = true;
@@ -113,6 +114,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
         CarriedWeapon = build.Clone();
         HasFireablePrimary = true;
+        RefreshShotAudio();
         if (IsInstanceValid(_carriedWeaponRoot))
         {
             _carriedWeaponRoot.Visible = true;
@@ -534,9 +536,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         _carriedWeaponRoot.AddChild(_muzzle);
         _shotAudio = new AudioStreamPlayer3D
         {
-            Stream = SoundLab.EnemyShot(),
-            VolumeDb = -8.0f,
-            MaxDistance = 90.0f
+            Stream = SoundLab.EnemyShot(CarriedWeapon),
+            VolumeDb = SoundLab.WeaponShotVolumeDb(CarriedWeapon, distant: true),
+            MaxDistance = Mathf.Max(90.0f, CarriedWeapon.Stats().SoundRadius * 1.9f),
+            UnitSize = 12.0f
         };
         _muzzle.AddChild(_shotAudio);
         _muzzleLight = new OmniLight3D
@@ -588,13 +591,17 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     public override void _PhysicsProcess(double delta)
     {
-        RecordCombatMovementTrail();
-        var dt = (float)delta;
         ResetPursuitNavigationMotorFrame();
         if (IsDead || !GodotObject.IsInstanceValid(Player))
         {
             return;
         }
+
+        if (!TryGetSimulationDelta((float)delta, out var dt))
+        {
+            return;
+        }
+        RecordCombatMovementTrail();
 
         UpdatePursuitTimers(dt);
         UpdateCombatTarget(dt);

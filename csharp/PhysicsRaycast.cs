@@ -27,6 +27,9 @@ internal static class PhysicsRaycast
     [System.ThreadStatic]
     private static Godot.Collections.Array<Rid>? _threadSingleExclude;
 
+    [System.ThreadStatic]
+    private static Godot.Collections.Array<Rid>? _threadDoubleExclude;
+
     public static bool HasHit(
         World3D world,
         Vector3 from,
@@ -58,6 +61,30 @@ internal static class PhysicsRaycast
         exclude.Add(excludeRid);
         return HasHit(
             space,
+            from,
+            to,
+            exclude,
+            collisionMask,
+            collideWithAreas,
+            collideWithBodies);
+    }
+
+    public static bool HasHit(
+        World3D world,
+        Vector3 from,
+        Vector3 to,
+        Rid firstExcludeRid,
+        Rid secondExcludeRid,
+        uint collisionMask,
+        bool collideWithAreas = false,
+        bool collideWithBodies = true)
+    {
+        var exclude = _threadDoubleExclude ??= new Godot.Collections.Array<Rid>();
+        exclude.Clear();
+        exclude.Add(firstExcludeRid);
+        exclude.Add(secondExcludeRid);
+        return HasHit(
+            world.DirectSpaceState,
             from,
             to,
             exclude,

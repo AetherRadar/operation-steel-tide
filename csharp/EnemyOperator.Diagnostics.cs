@@ -37,6 +37,7 @@ public partial class EnemyOperator
         TargetCandidateEvaluationCountForDiagnostics = 0;
         LineOfSightProbeCountForDiagnostics = 0;
         ContactShareRequestCountForDiagnostics = 0;
+        ResetReducedSimulationCountersForDiagnostics();
     }
 
     /// <summary>
