@@ -5,6 +5,8 @@ namespace OperationSteelTide;
 
 public static class GameLocalization
 {
+    public const string DefaultLanguage = "zh";
+
     private static readonly Dictionary<string, string> Chinese = new()
     {
         ["operation"] = "钢铁潮汐行动",

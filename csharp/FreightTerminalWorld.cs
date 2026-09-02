@@ -150,7 +150,7 @@ public partial class FreightTerminalWorld : Node3D
     private float _sensitivitySetting = 1.0f;
     private int _qualitySetting = 2;
     private bool _fullscreenSetting;
-    private string _languageSetting = "en";
+    private string _languageSetting = GameLocalization.DefaultLanguage;
 
     public override void _Ready()
     {
@@ -2890,7 +2890,10 @@ public partial class FreightTerminalWorld : Node3D
             _sensitivitySetting = (float)config.GetValue("controls", "sensitivity", 1.0f).AsDouble();
             _qualitySetting = (int)config.GetValue("graphics", "quality", 2).AsInt32();
             _fullscreenSetting = config.GetValue("graphics", "fullscreen", false).AsBool();
-            _languageSetting = config.GetValue("interface", "language", "en").AsString();
+            _languageSetting = config.GetValue(
+                "interface",
+                "language",
+                GameLocalization.DefaultLanguage).AsString();
         }
         if (_fullscreenSetting)
         {
