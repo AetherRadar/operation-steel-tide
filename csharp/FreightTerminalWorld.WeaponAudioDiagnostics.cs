@@ -39,6 +39,7 @@ public partial class FreightTerminalWorld
         var smgFired = false;
         var smgPlaying = false;
         var smgTailPlaying = false;
+        var recordedAk74Ready = false;
         foreach (var sample in platforms)
         {
             var platform = sample.Platform;
@@ -87,6 +88,22 @@ public partial class FreightTerminalWorld
                 await WaitFrames(2);
                 smgTailPlaying = _player.PlayerWeaponAudioPlayingForDiagnostics;
             }
+            if (platform == WeaponPlatform.AK74)
+            {
+                recordedAk74Ready =
+                    SoundLab.RecordedWeaponShotReadyForDiagnostics(
+                        platform,
+                        distant: false,
+                        nearField: true)
+                    && SoundLab.RecordedWeaponShotReadyForDiagnostics(
+                        platform,
+                        distant: false,
+                        nearField: false)
+                    && SoundLab.RecordedWeaponShotReadyForDiagnostics(
+                        platform,
+                        distant: true,
+                        nearField: false);
+            }
             reports.Add(
                 $"{platform}:{ready}:{volume:0.0}:"
                 + $"minimum={sample.MinimumLocalVolumeDb:0.0}:"
@@ -106,7 +123,8 @@ public partial class FreightTerminalWorld
             && enemyDistinct
             && headroomReady
             && smgFired
-            && smgPlaying;
+            && smgPlaying
+            && recordedAk74Ready;
         GD.Print(
             $"WEAPON_AUDIO_CHECK valid={valid} local={localPlayback} "
             + $"streams={streamCount}/{platforms.Length} "
@@ -118,6 +136,7 @@ public partial class FreightTerminalWorld
             + $"headroom={headroomReady} "
             + $"smg_fired={smgFired} smg_playing={smgPlaying} "
             + $"smg_tail_playing={smgTailPlaying} "
+            + $"recorded_ak74={recordedAk74Ready} "
             + $"reports={string.Join(',', reports)}");
         GD.Print($"WEAPON_AUDIO_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);

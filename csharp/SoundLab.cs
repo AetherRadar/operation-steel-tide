@@ -3,7 +3,7 @@ using Godot;
 
 namespace OperationSteelTide;
 
-public static class SoundLab
+public static partial class SoundLab
 {
     private readonly record struct WeaponShotRecipe(
         float Duration,
@@ -90,11 +90,18 @@ public static class SoundLab
         var key = (platform, suppressed, distant, nearField);
         if (!WeaponShotCache.TryGetValue(key, out var stream))
         {
-            stream = BuildWeaponShot(
-                platform,
-                WeaponShotRecipeFor(platform, suppressed),
-                distant,
-                nearField);
+            stream = TryLoadRecordedWeaponShot(
+                    platform,
+                    suppressed,
+                    distant,
+                    nearField,
+                    out var recorded)
+                ? recorded
+                : BuildWeaponShot(
+                    platform,
+                    WeaponShotRecipeFor(platform, suppressed),
+                    distant,
+                    nearField);
             WeaponShotCache[key] = stream;
         }
         return stream;

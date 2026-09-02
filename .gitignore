@@ -26,6 +26,7 @@
 /build/
 /dist/
 __pycache__/
+/.cache/free_firearm_sound_library/
 
 /*_validation.png
 /*_frame.png
