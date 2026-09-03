@@ -25,6 +25,7 @@
 /steel-tide-server.exe*
 /build/
 /dist/
+/android/
 __pycache__/
 /.cache/free_firearm_sound_library/
 

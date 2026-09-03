@@ -81,6 +81,16 @@
 
 通用应用同时包含 Intel 与 Apple Silicon 代码以及所需运行时文件。可选本地服务未运行时，游戏使用内置离线任务与进度后备流程。当前应用尚未签名或公证，因此 macOS 首次启动时可能要求用户明确批准。
 
+### Android（实验性）
+
+项目已提供 ARM64、API 35 的 Gradle Android 导出预设。安装 Godot 4.6.3 Mono 的 Android 导出模板，并准备 Android SDK Platform 36、Build Tools 36.1.0、Platform-Tools、CMake 与 NDK 后，可在 Windows PowerShell 中运行：
+
+```powershell
+pwsh -File scripts/package-android.ps1 -Mode Debug
+```
+
+脚本会在本机 Godot keystore 目录生成 debug 密钥，输出 `dist/OperationSteelTide-1.4.0-android-arm64-debug.apk` 及其 SHA-256 校验文件。release 构建需要先设置 `GODOT_ANDROID_KEYSTORE_RELEASE_PATH`、`GODOT_ANDROID_KEYSTORE_RELEASE_USER` 和 `GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD`，再将 `-Mode` 改为 `Release`；正式发布到 Google Play 仍需单独配置 release keystore 与 AAB 流程。
+
 通过互联网联机但不想配置路由器端口转发时，主机玩家可以运行 [playit.gg](https://playit.gg/) UDP 隧道，将其指向 `127.0.0.1:28960`；只有主机需要安装客户端。其他玩家在 `JOIN GAME` 中输入完整的公网端点，例如 `example.gl.at.ply.gg:41237`。准确配置步骤、当前服务限制和专用网络替代方案请参阅 [ONLINE_PLAY.md](ONLINE_PLAY.md)。
 
 ## 从源码运行
