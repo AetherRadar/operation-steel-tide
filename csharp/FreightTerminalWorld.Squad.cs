@@ -4451,12 +4451,29 @@ public partial class FreightTerminalWorld
         _player.SetReviveUsedForDiagnostics(false);
         OnLocalPlayerRevived();
         _player.TakeDamage(999.0f, _player.HitPoint(HitRegion.Torso), this);
-        var finishDowned = _player.IsDead && _localPlayerDowned && _player.CanBeRevived;
+        var firstFinishDowned = _player.IsDead && _localPlayerDowned && _player.CanBeRevived;
+        var firstFinishRejected = !_player.TryFinishDowned(this)
+            && _player.IsDead
+            && _localPlayerDowned
+            && !_localPlayerEliminated
+            && _player.CanBeRevived;
+        var firstFinishReviveAccepted = _player.TryReceiveRevive(50.0f);
+        _player.IsDead = true;
+        _localPlayerDowned = true;
+        _localPlayerEliminated = false;
+        var secondFinishDowned = _player.IsDead
+            && _localPlayerDowned
+            && !_player.CanBeRevived
+            && _player.ReviveUsed;
         var finishAccepted = _player.TryFinishDowned(this);
         var finishedPlayerSpectate = IsSquadMateViewCurrent
             && _localPlayerEliminated
             && !_missionEnded;
-        var finishedSpectateOk = finishDowned && finishAccepted
+        var finishedSpectateOk = firstFinishDowned
+            && firstFinishRejected
+            && firstFinishReviveAccepted
+            && secondFinishDowned
+            && finishAccepted
             && finishedPlayerSpectate;
 
         if (diagnosticHumanProxy is not null && IsInstanceValid(diagnosticHumanProxy))

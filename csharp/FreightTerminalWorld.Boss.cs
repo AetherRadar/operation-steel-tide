@@ -70,6 +70,10 @@ public partial class FreightTerminalWorld
 
     private void UpdateWorldBossTracking()
     {
+        if (_hud is null)
+        {
+            return;
+        }
         if (_demolitionMode)
         {
             _hud.SetMinimapWorldBoss(Vector3.Zero, false);

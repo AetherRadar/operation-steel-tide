@@ -384,11 +384,10 @@ public partial class TacticalPlayer
 
     public bool TryFinishDowned(Node? attacker = null)
     {
-        if (!CanBeRevived)
+        if (!IsDead || !ReviveUsed)
         {
             return false;
         }
-        ReviveUsed = true;
         Main?.OnLocalPlayerFinishedByHostile();
         return true;
     }

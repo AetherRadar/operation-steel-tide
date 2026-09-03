@@ -269,6 +269,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
+        if (_player is null || _hud is null)
+        {
+            return;
+        }
         UpdateSquad((float)delta);
         UpdateExtractionSequence((float)delta);
         UpdateDemolitionRound((float)delta);
@@ -396,7 +400,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OnPhaseChanged(string phase, float remaining, bool online)
     {
-        if (_demolitionMode || IsExtractionNetworkClient)
+        if (_demolitionMode || IsExtractionNetworkClient || _hud is null)
         {
             return;
         }
