@@ -72,7 +72,7 @@ public partial class FreightTerminalWorld
                 >= flashAlphaBeforeStack - 0.001f
             && _hud.FlashbangOverlayRemainingForDiagnostics
                 >= flashRemainingBeforeStack - 0.01f;
-        await WaitFrames(30);
+        await WaitFrames(36);
         var flashOverlayRecovered = !_hud.IsFlashbangOverlayVisible
             && Mathf.IsZeroApprox(_hud.FlashbangOverlayAlphaForDiagnostics);
         var inputReady = HasQuickSlotKey("weapon_primary", (Key)49)
@@ -94,6 +94,21 @@ public partial class FreightTerminalWorld
         var initialVisibility = Enumerable.Range(0, 6).All(_hud.IsQuickSlotVisible)
             && _hud.VisibleQuickSlotCount == 6;
         var quickSlotsWithinViewport = _hud.QuickSlotsWithinViewportForDiagnostics;
+        _player.SelectQuickSlot(PlayerQuickSlot.Primary, false);
+        _player.ResetWeaponCycleInputForDiagnostics();
+        var cycleDebounce = _player.WeaponCycleDebounceSecondsForDiagnostics + 0.01f;
+        var cycleToSecondary = _player.TryCycleWeaponFromInputForDiagnostics(false, cycleDebounce)
+            && _player.ActiveQuickSlot == PlayerQuickSlot.Secondary;
+        var cycleToSidearm = _player.TryCycleWeaponFromInputForDiagnostics(false, cycleDebounce)
+            && _player.ActiveQuickSlot == PlayerQuickSlot.Sidearm;
+        var cycleToMelee = _player.TryCycleWeaponFromInputForDiagnostics(false, cycleDebounce)
+            && _player.ActiveQuickSlot == PlayerQuickSlot.Melee;
+        var cycleToFrag = _player.TryCycleWeaponFromInputForDiagnostics(false, cycleDebounce)
+            && _player.ActiveQuickSlot == PlayerQuickSlot.FragmentationGrenade;
+        var cycleToUtility = _player.TryCycleWeaponFromInputForDiagnostics(false, cycleDebounce)
+            && _player.ActiveQuickSlot == PlayerQuickSlot.Utility;
+        var cycleBackToPrimary = _player.TryCycleWeaponFromInputForDiagnostics(false, cycleDebounce)
+            && _player.ActiveQuickSlot == PlayerQuickSlot.Primary;
 
         var gsh18Selected = _player.SelectQuickSlot(PlayerQuickSlot.Sidearm, false);
         await WaitFrames(2);
@@ -453,6 +468,12 @@ public partial class FreightTerminalWorld
             && uniqueLongGunModels
             && initialVisibility
             && quickSlotsWithinViewport
+            && cycleToSecondary
+            && cycleToSidearm
+            && cycleToMelee
+            && cycleToFrag
+            && cycleToUtility
+            && cycleBackToPrimary
             && gsh18Ready
             && gsh18Aiming
             && fragSelected
@@ -485,8 +506,8 @@ public partial class FreightTerminalWorld
             && rackDetailIntent
             && rackValueReady
             && redeployClearsSecondary;
-        GD.Print($"QUICK_SLOTS_CHECK valid={valid} scene={sceneReady} inputs={inputReady} weapon_slots={weaponSlotsReady} unique_models={uniqueLongGunModels} initial={initialVisibility} slot_bounds={quickSlotsWithinViewport} gsh18={gsh18Ready} frag_selected={fragSelected} frag_consumed={fragConsumed} localized={localized} utility_selected={utilitySelected} utility_cycle={incendiaryCycled && flashbangCycled && smokeCycledBack} smoke_consumed={smokeConsumed} incendiary_selected={incendiarySelected} incendiary_consumed={incendiaryConsumed} frag_air_safe={fragAirborneSafe} frag_ground={fragGroundDetonated} smoke_air_safe={smokeAirborneSafe} smoke_ground={smokeGroundDeployed} incendiary_air_safe={incendiaryAirborneSafe} incendiary_dynamic_reject={incendiaryDynamicContactRejected} incendiary_wall_reject={incendiaryWallContactRejected} incendiary_ground={incendiaryGroundIgnited} incendiary_capture={incendiaryCaptureGrounded} deagle={desertEagleReady} empty_blocked={emptyBlocked} rack={rackReady} rack_zh={rackChinese} rack_en={rackEnglish} rack_detail={rackDetailIntent} rack_value={rackValueReady}/{rackValue} redeploy_clear={redeployClearsSecondary} flash_scene={flashOverlaySceneReady} flash_localized={flashbangLocalized} flash_cycle={flashbangCycled} flash_selected={flashbangSelected} flash_consumed={flashbangConsumed} flash_overlay={flashOverlayApplied}/{flashOverlayStacksMonotonically}/{flashOverlayRecovered} visible={_hud.VisibleQuickSlotCount} active={_player.ActiveQuickSlot}");
-        GD.Print($"QUICK_SLOTS_PASS valid={valid} slot_bounds={quickSlotsWithinViewport} flash_scene={flashOverlaySceneReady} flash_localized={flashbangLocalized} flash_cycle={flashbangCycled} flash_selected={flashbangSelected} flash_consumed={flashbangConsumed} flash_overlay={flashOverlayApplied}/{flashOverlayStacksMonotonically}/{flashOverlayRecovered}");
+        GD.Print($"QUICK_SLOTS_CHECK valid={valid} scene={sceneReady} inputs={inputReady} weapon_slots={weaponSlotsReady} unique_models={uniqueLongGunModels} initial={initialVisibility} slot_bounds={quickSlotsWithinViewport} cycle={cycleToSecondary && cycleToSidearm && cycleToMelee && cycleToFrag && cycleToUtility && cycleBackToPrimary} cycle_steps={cycleToSecondary}/{cycleToSidearm}/{cycleToMelee}/{cycleToFrag}/{cycleToUtility}/{cycleBackToPrimary} gsh18={gsh18Ready} frag_selected={fragSelected} frag_consumed={fragConsumed} localized={localized} utility_selected={utilitySelected} utility_cycle={incendiaryCycled && flashbangCycled && smokeCycledBack} smoke_consumed={smokeConsumed} incendiary_selected={incendiarySelected} incendiary_consumed={incendiaryConsumed} frag_air_safe={fragAirborneSafe} frag_ground={fragGroundDetonated} smoke_air_safe={smokeAirborneSafe} smoke_ground={smokeGroundDeployed} incendiary_air_safe={incendiaryAirborneSafe} incendiary_dynamic_reject={incendiaryDynamicContactRejected} incendiary_wall_reject={incendiaryWallContactRejected} incendiary_ground={incendiaryGroundIgnited} incendiary_capture={incendiaryCaptureGrounded} deagle={desertEagleReady} empty_blocked={emptyBlocked} rack={rackReady} rack_zh={rackChinese} rack_en={rackEnglish} rack_detail={rackDetailIntent} rack_value={rackValueReady}/{rackValue} redeploy_clear={redeployClearsSecondary} flash_scene={flashOverlaySceneReady} flash_localized={flashbangLocalized} flash_cycle={flashbangCycled} flash_selected={flashbangSelected} flash_consumed={flashbangConsumed} flash_overlay={flashOverlayApplied}/{flashOverlayStacksMonotonically}/{flashOverlayRecovered} visible={_hud.VisibleQuickSlotCount} active={_player.ActiveQuickSlot}");
+        GD.Print($"QUICK_SLOTS_PASS valid={valid} slot_bounds={quickSlotsWithinViewport} cycle={cycleToSecondary && cycleToSidearm && cycleToMelee && cycleToFrag && cycleToUtility && cycleBackToPrimary} flash_scene={flashOverlaySceneReady} flash_localized={flashbangLocalized} flash_cycle={flashbangCycled} flash_selected={flashbangSelected} flash_consumed={flashbangConsumed} flash_overlay={flashOverlayApplied}/{flashOverlayStacksMonotonically}/{flashOverlayRecovered}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
     }
 

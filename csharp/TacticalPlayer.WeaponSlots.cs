@@ -328,22 +328,16 @@ public partial class TacticalPlayer
 
     private void CycleWeaponSlots()
     {
-        if (IsThrowableQuickSlotSelected)
+        const int quickSlotCount = (int)PlayerQuickSlot.Utility + 1;
+        var start = (int)_activeQuickSlot;
+        for (var offset = 1; offset <= quickSlotCount; offset++)
         {
-            ReturnFromThrowableSlot();
-            return;
+            var candidate = (PlayerQuickSlot)((start + offset) % quickSlotCount);
+            if (SelectQuickSlot(candidate, true))
+            {
+                return;
+            }
         }
-        var next = _activeWeaponSlot switch
-        {
-            PlayerWeaponSlot.Primary when HasSecondaryWeapon => PlayerWeaponSlot.Secondary,
-            PlayerWeaponSlot.Primary when HasSidearmWeapon => PlayerWeaponSlot.Sidearm,
-            PlayerWeaponSlot.Primary => PlayerWeaponSlot.Melee,
-            PlayerWeaponSlot.Secondary when HasSidearmWeapon => PlayerWeaponSlot.Sidearm,
-            PlayerWeaponSlot.Secondary => PlayerWeaponSlot.Melee,
-            PlayerWeaponSlot.Sidearm => PlayerWeaponSlot.Melee,
-            _ => PreferredFirearmOrMelee()
-        };
-        ActivateWeaponSlot(next, true);
     }
 
     private PlayerWeaponSlot PreferredFirearmOrMelee()
