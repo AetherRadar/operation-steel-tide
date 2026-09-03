@@ -1,4 +1,4 @@
-OPERATION STEEL TIDE 1.4.1 - WINDOWS X64
+OPERATION STEEL TIDE 1.4.2 - WINDOWS X64
 
 Run PLAY.bat. Godot, .NET, and Go do not need to be installed.
 
