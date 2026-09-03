@@ -27,18 +27,19 @@ SOURCE_IDLE_FRAME = 155
 SOURCE_RELOAD_START_FRAME = 0
 SOURCE_RELOAD_END_FRAME = 64
 SOURCE_TO_METERS = 0.015
-SLEEVE_WRIST_RADIAL_SCALE = 0.80
-SLEEVE_FOREARM_RADIAL_SCALE = 0.90
+SLEEVE_WRIST_RADIAL_SCALE = 1.24
+SLEEVE_FOREARM_RADIAL_SCALE = 1.36
 SLEEVE_WRIST_RADIAL_BLEND_LENGTH = 18.0
 SLEEVE_WRIST_OVERLAP = 1.2
 SLEEVE_WRIST_BLEND_LENGTH = 6.0
 SLEEVE_SHOULDER_BLEND_LENGTH = 26.0
 SLEEVE_SHOULDER_PLATEAU_LENGTH = 18.0
 SLEEVE_SHOULDER_EXTENSION = 104.0
-SLEEVE_SHOULDER_DROP = 18.0
-SLEEVE_SHOULDER_RADIAL_SCALE = 1.22
+SLEEVE_SHOULDER_DROP = 10.0
+SLEEVE_SHOULDER_RADIAL_SCALE = 1.30
 FIRST_PERSON_WEAPON_SCALE = 1.08
 FIRST_PERSON_MUZZLE_SOURCE = Vector((0.0, -49.60, 4.93))
+MAX_SAFE_CAP_SPAN = 8.0
 FIELD_ROTATION = Matrix.Rotation(math.radians(90.0), 4, "Z")
 WEAPON_MESH_NAMES = (
     "base_smg45_0",
@@ -237,7 +238,13 @@ def _boundary_edges(mesh: bpy.types.Mesh, component: set[int]) -> list[tuple[int
 
 
 def _boundary_loops(edges: list[tuple[int, int]]) -> list[list[int]]:
-    """Group boundary edges into ordered loops (open chains are returned too)."""
+    """Group closed boundary edges into ordered loops.
+
+    The source sleeve mesh has a longitudinal seam, so its boundary graph is
+    one open chain that walks around both end cuts. Treating that chain as a
+    single polygon creates a large sheet across the arm. Only genuinely
+    closed rings are safe to fill here.
+    """
     adjacency: dict[int, list[int]] = {}
     for left, right in edges:
         adjacency.setdefault(left, []).append(right)
@@ -251,6 +258,7 @@ def _boundary_loops(edges: list[tuple[int, int]]) -> list[list[int]]:
             if edge_key in visited_edges:
                 continue
             ordered = [start, neighbor]
+            closed = False
             visited_edges.add(edge_key)
             previous, current = start, neighbor
             while True:
@@ -267,9 +275,10 @@ def _boundary_loops(edges: list[tuple[int, int]]) -> list[list[int]]:
                 ordered.append(next_vertex)
                 if next_vertex == start:
                     ordered.pop()
+                    closed = True
                     break
                 previous, current = current, next_vertex
-            if len(ordered) >= 3:
+            if closed and len(ordered) >= 3:
                 loops.append(ordered)
     return loops
 
@@ -285,6 +294,15 @@ def _cap_boundary_loops(mesh: bpy.types.Mesh, component: set[int]) -> None:
         bm.verts.ensure_lookup_table()
         new_faces = []
         for order in loops:
+            # DJMaesen's sleeve is a thin strip with a longitudinal seam. Its
+            # boundary is technically a closed cycle, but it walks from the
+            # cuff around the seam to the shoulder and back. Filling that
+            # cycle would create a giant, camera-facing sheet. A real end cap
+            # is a compact ring; reject any boundary with a large source-space
+            # Y span and leave the authored seam open instead.
+            points = [mesh.vertices[index].co for index in order]
+            if max(point.y for point in points) - min(point.y for point in points) > MAX_SAFE_CAP_SPAN:
+                continue
             vertices = [bm.verts[index] for index in order]
             try:
                 face = bm.faces.new(vertices)
@@ -306,7 +324,7 @@ def _cap_boundary_loops(mesh: bpy.types.Mesh, component: set[int]) -> None:
 
 
 def cap_authored_sleeves() -> None:
-    """Seal every boundary loop on the authored arms so the first-person model stays watertight."""
+    """Cap only closed rings, preserving the authored sleeve seam."""
     arms = bpy.data.objects["Object_7"]
     mesh = arms.data
     adjacency: dict[int, set[int]] = {index: set() for index in range(len(mesh.vertices))}
