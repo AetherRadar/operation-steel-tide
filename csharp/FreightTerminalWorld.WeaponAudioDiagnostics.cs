@@ -40,6 +40,8 @@ public partial class FreightTerminalWorld
         var smgPlaying = false;
         var smgTailPlaying = false;
         var recordedAk74Ready = false;
+        var recordedPlatforms = 0;
+        var recordedAllReady = true;
         foreach (var sample in platforms)
         {
             var platform = sample.Platform;
@@ -47,6 +49,21 @@ public partial class FreightTerminalWorld
             _player.GrantFireablePrimaryForDiagnostics(build);
             await WaitFrames(2);
             var ready = _player.PlayerWeaponAudioReadyForDiagnostics;
+            var recorded =
+                SoundLab.RecordedWeaponShotReadyForDiagnostics(
+                    platform,
+                    distant: false,
+                    nearField: true)
+                && SoundLab.RecordedWeaponShotReadyForDiagnostics(
+                    platform,
+                    distant: false,
+                    nearField: false)
+                && SoundLab.RecordedWeaponShotReadyForDiagnostics(
+                    platform,
+                    distant: true,
+                    nearField: false);
+            recordedPlatforms += recorded ? 1 : 0;
+            recordedAllReady &= recorded;
             var signature = _player.PlayerWeaponAudioSignatureForDiagnostics;
             var worldSignature = SoundLab.WeaponShotSignature(build);
             var enemySignature = SoundLab.WeaponShotSignature(build, distant: true);
@@ -108,7 +125,7 @@ public partial class FreightTerminalWorld
                 $"{platform}:{ready}:{volume:0.0}:"
                 + $"minimum={sample.MinimumLocalVolumeDb:0.0}:"
                 + $"single_peak={singlePeak:F3}:burst_peak={burstPeak:F3}:"
-                + $"local={signature}:world={worldSignature}");
+                + $"local={signature}:world={worldSignature}:recorded={recorded}");
         }
 
         var localPlayback = _player.PlayerWeaponAudioIsLocalForDiagnostics;
@@ -124,7 +141,8 @@ public partial class FreightTerminalWorld
             && headroomReady
             && smgFired
             && smgPlaying
-            && recordedAk74Ready;
+            && recordedAk74Ready
+            && recordedAllReady;
         GD.Print(
             $"WEAPON_AUDIO_CHECK valid={valid} local={localPlayback} "
             + $"streams={streamCount}/{platforms.Length} "
@@ -137,6 +155,7 @@ public partial class FreightTerminalWorld
             + $"smg_fired={smgFired} smg_playing={smgPlaying} "
             + $"smg_tail_playing={smgTailPlaying} "
             + $"recorded_ak74={recordedAk74Ready} "
+            + $"recorded_platforms={recordedPlatforms}/{platforms.Length} "
             + $"reports={string.Join(',', reports)}");
         GD.Print($"WEAPON_AUDIO_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
