@@ -196,6 +196,7 @@ public partial class CombatHUD
     {
         BuildOperationsOfficeMenu(root);
         BuildDemolitionBriefingView(root);
+        EnsureTrainingRangeSetupView();
         BuildResultOfficeAction();
     }
 
@@ -273,6 +274,7 @@ public partial class CombatHUD
 
     public void ShowOperationsOffice(string status = "FIELD TEAM STANDING BY  //  HELIPAD CLEAR")
     {
+        SetTrainingRangeGameplayInputEnabled(false);
         HideDemolitionBuy();
         SetDemolitionGameplayPresentation(false);
         _squadLobby.Visible = false;
@@ -291,6 +293,7 @@ public partial class CombatHUD
 
     public void ShowDemolitionBriefing()
     {
+        SetTrainingRangeGameplayInputEnabled(false);
         HideDemolitionBuy();
         _squadLobby.Visible = false;
         _operationsOfficeRoot.Visible = false;
@@ -319,6 +322,7 @@ public partial class CombatHUD
 
     public void ShowTrainingRangeGameplay(string status)
     {
+        SetTrainingRangeGameplayInputEnabled(true);
         HideOperationsMenus();
         _squadLobby.Visible = false;
         _gameplayHudRoot.Visible = true;
@@ -331,6 +335,8 @@ public partial class CombatHUD
 
     public void HideTrainingRangeGameplay()
     {
+        SetTrainingRangeGameplayInputEnabled(false);
+        HideTrainingRangeSetup();
         _operationBanner.Visible = false;
     }
 

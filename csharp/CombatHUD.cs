@@ -1248,6 +1248,7 @@ public partial class CombatHUD : CanvasLayer
         RefreshMedicalLanguage();
         RefreshTacticalLanguage();
         RefreshExtractionLanguage();
+        RefreshTrainingRangeSetupLanguage();
         RefreshLootOverlay();
         if (IsWeaponDetailVisible && _detailedWeapon is not null)
         {
