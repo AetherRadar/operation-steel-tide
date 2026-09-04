@@ -225,7 +225,8 @@ public sealed class TrainingRangeArenaBuilder
             "LIVE FIRE  //  BACKSTOP",
             new Color(1.0f, 0.55f, 0.24f),
             noDepthTest: true,
-            fontSize: 64);
+            fontSize: 72,
+            pixelSize: 0.015f);
         AddLabel(
             root,
             "RangeTargetHeader",
@@ -233,7 +234,8 @@ public sealed class TrainingRangeArenaBuilder
             "TARGET WALL  //  LANES 01-06",
             new Color(0.78f, 0.86f, 0.82f),
             noDepthTest: true,
-            fontSize: 64);
+            fontSize: 72,
+            pixelSize: 0.015f);
     }
 
     private void BuildTrainingStations(Node3D root)
@@ -502,7 +504,8 @@ public sealed class TrainingRangeArenaBuilder
         string text,
         Color color,
         bool noDepthTest = false,
-        int fontSize = 42)
+        int fontSize = 42,
+        float pixelSize = 0.005f)
     {
         root.AddChild(new Label3D
         {
@@ -510,6 +513,7 @@ public sealed class TrainingRangeArenaBuilder
             Position = position,
             Text = text,
             FontSize = fontSize,
+            PixelSize = pixelSize,
             Modulate = color,
             OutlineSize = 8,
             NoDepthTest = noDepthTest
