@@ -23,6 +23,8 @@ public partial class TacticalMinimap : Control
     private readonly Vector2[] _playerArrow = new Vector2[4];
     private readonly Vector2[] _playerArrowOutline = new Vector2[5];
     private Rect2 _worldBounds = new(-170.0f, -220.0f, 340.0f, 320.0f);
+    private string _titleLocalizationKey = "minimap_title";
+    private string _titleEnglishName = "TACTICAL MAP";
     private Vector3 _playerPosition;
     private float _headingDegrees;
     private string _language = "en";
@@ -52,6 +54,22 @@ public partial class TacticalMinimap : Control
         _landmarks.Clear();
         _landmarks.AddRange(landmarks);
         RefreshLocalizedLandmarkLabels();
+        QueueImmediateRedraw();
+    }
+
+    /// <summary>
+    /// Changes the small map's heading without changing the map rendering contract.
+    /// Dedicated venues use this to avoid presenting an extraction-map label while
+    /// the player is in a separate training scene.
+    /// </summary>
+    public void SetTitle(string localizationKey, string englishName)
+    {
+        _titleLocalizationKey = string.IsNullOrWhiteSpace(localizationKey)
+            ? "minimap_title"
+            : localizationKey;
+        _titleEnglishName = string.IsNullOrWhiteSpace(englishName)
+            ? "TACTICAL MAP"
+            : englishName;
         QueueImmediateRedraw();
     }
 
@@ -113,7 +131,7 @@ public partial class TacticalMinimap : Control
         DrawString(
             ThemeDB.FallbackFont,
             new Vector2(13, 18),
-            GameLocalization.Get("minimap_title", _language, "TACTICAL MAP"),
+            GameLocalization.Get(_titleLocalizationKey, _language, _titleEnglishName),
             HorizontalAlignment.Left,
             -1,
             12,

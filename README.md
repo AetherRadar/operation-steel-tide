@@ -2,7 +2,7 @@
 
 简体中文 | [English](README.en.md)
 
-**一款使用 Godot 4.6 与 C# 开发的开源战术 FPS。你可以带领三人小队进入港区，完成目标、搜刮并活着撤离；也可以进入独立的 5v5 爆破对局，购买装备、安放/拆除炸弹，先赢 13 回合。**
+**一款使用 Godot 4.6 与 C# 开发的开源战术 FPS。你可以带领三人小队进入港区完成目标并撤离，进入独立的 5v5 爆破对局安放/拆除炸弹，也可以进入独立靶场选择目标、武器和弹药后射击。**
 
 ![江海旧城中的 Operation Steel Tide 项目封面图](docs/media/cover.png)
 
@@ -23,20 +23,23 @@
 | --- | --- | --- |
 | **撤离行动** | `QUICK EXTRACTION`：选职业和配装 → 带 AI 队友潜入 → 关闭通信中继、下载货运清单 → 搜刮 → 到绿色撤离区登机 | 活着登机；只保存高于部署基准的战利品 |
 | **5v5 爆破** | `DEMOLITION`：购买装备 → 进攻方安放炸弹或防守方拆除 → 用烟雾、掩体和队伍职责赢下回合 | 先赢 13 回合；中场换边，平局加时 |
-| **靶场** | `TRAINING RANGE`：进入练习场 → 鼠标滚轮切换全枪械 → 无限弹药 → 持续射击人形 Bot | 没有战绩压力；Bot 被击倒后自动重生 |
+| **靶场** | `TRAINING RANGE`：进入独立场地 → 选 Bot 类型和数量 → 选武器 → 选弹种与等级 → 进入射击 | 无限弹药；Bot 被击倒后自动复活 |
 
-撤离行动：**进去拿更多，出来才算赚。**  爆破模式：**每回合购买、安放或拆除，先赢 13 回合。**  靶场：**换枪、开火、反复打 Bot。**
+撤离行动：**进去拿更多，出来才算赚。**  爆破模式：**每回合购买、安放或拆除，先赢 13 回合。**  靶场：**选目标、选枪、选弹，进入射击。**
 
 ### 三种模式，一眼分清
 
 <table>
 <tr>
-<td width="50%"><a href="docs/media/gameplay-extraction-zh.png"><img src="docs/media/gameplay-extraction-zh.png" alt="撤离行动抵达撤离点并登机"></a><br><strong>撤离行动</strong><br>完成目标后进入绿色撤离区，和队友一起在倒计时结束前登机。</td>
-<td width="50%"><a href="docs/media/gameplay-demolition-spawn-zh.png"><img src="docs/media/gameplay-demolition-spawn-zh.png" alt="5v5 爆破出生点实机画面"></a><br><strong>5v5 爆破</strong><br>出生后看比分、小地图和回合计时，向安放点推进并赢下回合。</td>
+<td width="33%"><a href="docs/media/gameplay-extraction-zh.png"><img src="docs/media/gameplay-extraction-zh.png" alt="撤离行动抵达撤离点并登机"></a><br><strong>撤离行动</strong><br>完成目标，带战利品进入绿色撤离区并登机。</td>
+<td width="33%"><a href="docs/media/gameplay-demolition-spawn-zh.png"><img src="docs/media/gameplay-demolition-spawn-zh.png" alt="5v5 爆破出生点实机画面"></a><br><strong>5v5 爆破</strong><br>出生后安放或拆除炸弹，赢下回合。</td>
+<td width="34%"><a href="docs/media/gameplay-training-range-zh.png"><img src="docs/media/gameplay-training-range-zh.png" alt="独立靶场出生点与人形 Bot 实机画面"></a><br><strong>靶场</strong><br>独立场地选择目标、枪械、弹种，持续射击；Bot 自动复活。</td>
 </tr>
 </table>
 
-**靶场**不进入任务流程：选中后直接出生，滚轮切换全枪械，弹药自动补满，人形 Bot 被击倒后持续重生。
+![靶场配置面板](docs/media/gameplay-training-range-setup-zh.png)
+
+**靶场配置面板。** 进入前先选 Bot 类型和数量、武器、弹种与等级；进入场地后靠近对应工作台按 `F` 可重新配置。
 
 图片来自当前 Godot 运行版本，点击图片查看原图。
 
@@ -46,7 +49,7 @@
 2. 撤离行动：选职业，AI 补齐三人小队，按小地图找到两个任务终端。
 3. 按住 `F` 完成目标，搜刮武器和物资。
 4. 目标完成后跟随绿色信标，在倒计时结束前登机。
-5. 靶场：进入后直接拿到全枪械和无限弹药；鼠标滚轮切枪，击倒的人形 Bot 会自动重生。
+5. 靶场：选择 Bot 类型/数量、武器、弹种和等级，进入独立场地；鼠标滚轮切枪，靠近三个工作台按 `F` 重配，击倒的 Bot 自动复活。
 
 基础操作：`WASD` 移动、鼠标射击、`F` 搜刮/互动、`Tab` 背包。完整键位见[操作方式](#操作方式)。
 
@@ -94,7 +97,11 @@
 
 **5v5 爆破。** 出生即进入回合，顶部比分、小地图、阵营和回合计时说明目标；[购买阶段画面](docs/media/gameplay-demolition-zh.webp)另行展示装备决策。
 
-四张常规界面截图可通过 `--capture-readme-zh` 确定性重拍；撤离点画面使用 `--capture-extraction`，爆破出生画面使用 `--capture-demolition-spawn`。无 HUD 的开发机位仍可查看：[小队街道](docs/media/squad.webp)、[市集天桥](docs/media/city.webp)与[庙宇入口](docs/media/hero.webp)。
+![独立靶场出生点与人形 Bot](docs/media/gameplay-training-range-zh.png)
+
+**靶场。** 独立场地出生后直接射击人形 Bot；靶场地图标出枪械、弹药和 Bot 工作台，配置面板可选择 Bot、武器、弹种和等级。
+
+常规界面截图可通过 `--capture-readme-zh` 确定性重拍；撤离点画面使用 `--capture-extraction`，爆破出生画面使用 `--capture-demolition-spawn`，靶场画面使用 `--capture-training-range`，配置面板使用 `--capture-training-range-setup`。无 HUD 的开发机位仍可查看：[小队街道](docs/media/squad.webp)、[市集天桥](docs/media/city.webp)与[庙宇入口](docs/media/hero.webp)。
 
 > **开发说明：** 这是一个使用 AI 辅助开发的个人原型。AI 工具参与了部分实现和文档工作；仓库所有者仍对设计决策、集成、调试和验证负责。本项目不声称自身是一套可直接用于生产环境的架构范例。当前边界、重构规则和已发布内容的已知来源，请参阅 [ARCHITECTURE.md](ARCHITECTURE.md)、[工程规范](docs/ENGINEERING_STANDARDS.md)和[内容来源记录](docs/CONTENT_PROVENANCE.md)。
 

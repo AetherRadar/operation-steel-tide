@@ -1149,6 +1149,40 @@ The project-authored scene composition and rebuild script are covered by the
 repository's root MIT license, subject to the AI-assistance disclosure in
 `docs/CONTENT_PROVENANCE.md`.
 
+### Dedicated Training Range composition
+
+The standalone live-fire range added on 2026-09-04 is a runtime composition of
+already licensed assets; no new raw third-party package is introduced by the
+range feature. The source collections and exact licenses are:
+
+- Trey Ramm (`minime453`), Modular Industrial Kit —
+  https://opengameart.org/content/modular-industrial-kit — CC0 1.0 Universal;
+  acquired 2026-08-27. Runtime modules:
+  `trey_modular_industrial/{loading-bay,foundry-warehouse,utility-office,control-room,arch-gateway}.glb`.
+- Quaternius, Downtown City MegaKit —
+  https://quaternius.com/packs/downtowncitymegakit.html — CC0 1.0 Universal;
+  acquired 2026-08-19. Runtime road surface:
+  `quaternius_downtown_city/Street_Asphalt_9x9.gltf`.
+- Kenney, Furniture Kit 2.0 and City Kit Roads —
+  https://kenney.nl/assets/furniture-kit and
+  https://kenney.nl/assets/city-kit-roads — CC0 1.0 Universal; acquired
+  2026-08-26 and 2026-08-27. Runtime station props:
+  `kenney_furniture_kit/{desk,computerScreen,table,cardboardBoxClosed,sideTableDrawers}.glb`;
+  lane barriers and warning markers:
+  `kenney_city_kit_roads/{construction-barrier,road-sign-warning,construction-light}.glb`.
+- Amal Kumar, Concrete Road Barrier on Poly Haven —
+  https://polyhaven.com/a/concrete_road_barrier — CC0 1.0 Universal;
+  acquired 2026-08-06. Runtime target-wall segments:
+  `concrete_road_barrier/concrete_road_barrier.gltf` and its tracked PBR textures.
+
+The project-authored composition and interaction scaffolding live in
+`csharp/TrainingRangeArenaBuilder.cs`, `csharp/TrainingRangeArenaRuntime.cs`,
+and `csharp/FreightTerminalWorld.TrainingRange*.cs`. Primitive boxes in that
+builder are collision-only and are not presented as visible art. The runtime
+root is `TrainingRangeArena`; all source-derived meshes retain their original
+CC0 terms and creator credits above. The corresponding provenance row is in
+`docs/CONTENT_PROVENANCE.md`.
+
 ## Quaternius CC0 Buildings Pack models
 
 The Buildings Pack is published by Quaternius under CC0 1.0 Universal:

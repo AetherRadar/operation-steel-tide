@@ -142,7 +142,7 @@ public partial class FreightTerminalWorld
     private void OnTrainingRangeRequested()
     {
         ActivateBattlefieldFromOperationsOffice();
-        EnterTrainingRange();
+        BeginTrainingRangeSetup();
     }
 
     private void OnDemolitionBackRequested()

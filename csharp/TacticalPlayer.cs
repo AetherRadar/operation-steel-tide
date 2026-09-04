@@ -2072,7 +2072,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var from = authoritativeView.Origin;
         var maximumRange = stats.EffectiveRange * 1.35f;
         var to = from + direction * maximumRange;
-        var glassDamage = stats.Damage * AmmoTiers.DamageMultiplier(CurrentAmmoGrade);
+        var rangeAmmoDamage = TrainingRangeAmmoDamageMultiplier;
+        var rangeAmmoPenetration = Mathf.Max(
+            0.0f,
+            AmmoTiers.ArmorPenetration(CurrentAmmoGrade)
+                + TrainingRangeAmmoPenetrationBonus);
+        var glassDamage = stats.Damage
+            * AmmoTiers.DamageMultiplier(CurrentAmmoGrade)
+            * rangeAmmoDamage;
         var glassBlocked = BreakableGlassField.TryShatterAlongRay(
             GetWorld3D(),
             from,
@@ -2116,12 +2123,13 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 networkDamage = stats.Damage
                     * falloff
                     * _rng.RandfRange(0.94f, 1.06f)
-                    * AmmoTiers.DamageMultiplier(CurrentAmmoGrade);
+                    * AmmoTiers.DamageMultiplier(CurrentAmmoGrade)
+                    * rangeAmmoDamage;
                 killed = enemy.TakeDamage(
                     networkDamage,
                     end,
                     this,
-                    AmmoTiers.ArmorPenetration(CurrentAmmoGrade));
+                    rangeAmmoPenetration);
                 headshot = enemy.LastHitWasHeadshot;
                 EmitSignal(SignalName.HitConfirmed, killed, headshot, enemy.LastHitWasArmored);
             }
@@ -2161,7 +2169,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             Main?.SpawnImpact(end, hit.Normal);
         }
 
-        Main?.SpawnTracer(_muzzle.GlobalPosition, end, new Color(1.0f, 0.67f, 0.24f));
+        Main?.SpawnTracer(
+            _muzzle.GlobalPosition,
+            end,
+            TrainingRangeTracerRounds
+                ? new Color(0.32f, 0.9f, 1.0f)
+                : new Color(1.0f, 0.67f, 0.24f));
         Main?.OnLocalPlayerShot(_muzzle.GlobalPosition, end, networkEnemyId, networkDamage);
         Main?.RecordShot(damagedTarget, headshot);
         var stanceRecoil = _stance switch

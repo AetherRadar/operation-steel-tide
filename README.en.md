@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | English
 
-**An open-source tactical FPS built with Godot 4.6 and C#. Lead a three-operator squad into the harbor, complete objectives, loot, and extract alive—or enter a separate 5v5 demolition match, buy gear, plant/defuse, and win 13 rounds.**
+**An open-source tactical FPS built with Godot 4.6 and C#. Lead a three-operator squad into the harbor, complete objectives, and extract alive; enter a separate 5v5 demolition match to plant/defuse; or enter a standalone range to choose targets, weapons, and ammunition and start firing.**
 
 ![Operation Steel Tide key art in Jianghai Old City](docs/media/cover.png)
 
@@ -23,26 +23,33 @@
 | --- | --- | --- |
 | **Extraction** | `QUICK EXTRACTION`: pick a role and loadout → infiltrate with AI squadmates → disable the relay and download the manifest → loot → reach the green extraction zone | Board alive; only value above your deployment baseline is saved |
 | **5v5 Demolition** | `DEMOLITION`: buy gear → attack or defend → plant or defuse with smoke, cover, and team roles | First to 13 rounds; sides swap at halftime and ties go to overtime |
+| **Training Range** | `TRAINING RANGE`: enter a separate venue → choose bot behavior/count → choose a weapon → choose ammunition type/grade → start firing | Infinite ammunition; knocked-down bots revive automatically |
 
-Extraction: **go in for more, get out to profit.** Demolition: **buy, plant or defuse, and win 13 rounds.** Maps, money, and progression are separate.
+Extraction: **go in for more, get out to profit.** Demolition: **buy, plant or defuse, and win 13 rounds.** Training range: **choose a target, gun, and round, then fire.** Maps, money, and progression are separate.
 
-### Two modes, shown clearly
+### Three modes, shown clearly
 
 <table>
 <tr>
-<td width="50%"><a href="docs/media/gameplay-extraction-zh.png"><img src="docs/media/gameplay-extraction-zh.png" alt="Extraction gameplay at the rescue zone"></a><br><strong>Extraction</strong><br>Complete the objectives, enter the green zone, and board the rescue aircraft before the timer expires.</td>
-<td width="50%"><a href="docs/media/gameplay-demolition-spawn-zh.png"><img src="docs/media/gameplay-demolition-spawn-zh.png" alt="5v5 demolition gameplay from the spawn point"></a><br><strong>5v5 Demolition</strong><br>Spawn into the round, read the score/minimap/timer, and push toward a plant site.</td>
+<td width="33%"><a href="docs/media/gameplay-extraction-zh.png"><img src="docs/media/gameplay-extraction-zh.png" alt="Extraction gameplay at the rescue zone"></a><br><strong>Extraction</strong><br>Complete objectives, carry loot into the green zone, and board.</td>
+<td width="33%"><a href="docs/media/gameplay-demolition-spawn-zh.png"><img src="docs/media/gameplay-demolition-spawn-zh.png" alt="5v5 demolition gameplay from the spawn point"></a><br><strong>5v5 Demolition</strong><br>Plant or defuse the bomb and win the round.</td>
+<td width="34%"><a href="docs/media/gameplay-training-range-zh.png"><img src="docs/media/gameplay-training-range-zh.png" alt="Standalone training range with humanoid bots"></a><br><strong>Training Range</strong><br>Choose bots, weapons, and ammunition, then keep firing as targets revive.</td>
 </tr>
 </table>
 
-Both images are direct captures from the current Godot build; click either image to open the full-resolution file.
+![Training range configuration panel](docs/media/gameplay-training-range-setup-zh.png)
+
+**Training range setup.** Choose bot behavior/count, weapon, ammunition type, and grade before entering; use `F` at the matching bench to reconfigure inside the venue.
+
+The images are direct captures from the current Godot build; click any image to open the full-resolution file.
 
 ## Start in 30 seconds
 
-1. Launch the game and click **QUICK EXTRACTION** or **DEMOLITION**.
+1. Launch the game and click **QUICK EXTRACTION**, **DEMOLITION**, or **TRAINING RANGE**.
 2. In Extraction, choose a role, let AI fill the squad, and follow the minimap to both terminals.
 3. Hold `F` to complete objectives and loot weapons or supplies.
 4. Follow the green beacon and board before the extraction timer expires.
+5. In Training Range, choose bots, a weapon, and ammunition; use the three `F` benches to reconfigure and keep shooting while targets revive.
 
 Basic controls: `WASD` move, left mouse fire, `F` loot/interact, and `Tab` backpack. See [Controls](#controls).
 
@@ -90,7 +97,11 @@ The following images are generated directly by Godot from the current Jianghai O
 
 **5v5 demolition.** The spawn view shows the live score, minimap, teams, and round timer; the [round-buy capture](docs/media/gameplay-demolition-zh.webp) shows the equipment decision before the fight.
 
-The four standard interface captures can be reproduced with `--capture-readme-zh`; the extraction-point frame uses `--capture-extraction`, and the demolition spawn frame uses `--capture-demolition-spawn`. HUD-free development angles remain available for the [squad street](docs/media/squad.webp), [market footbridge](docs/media/city.webp), and [temple approach](docs/media/hero.webp).
+![Standalone training range with humanoid bots](docs/media/gameplay-training-range-zh.png)
+
+**Training Range.** Spawn into a separate live-fire venue with target lanes, a compact range map, weapon/ammunition/bot benches, and automatic bot revival.
+
+The standard interface captures can be reproduced with `--capture-readme-zh`; the extraction-point frame uses `--capture-extraction`, the demolition spawn frame uses `--capture-demolition-spawn`, and the training-range frame uses `--capture-training-range` (configuration panel: `--capture-training-range-setup`). HUD-free development angles remain available for the [squad street](docs/media/squad.webp), [market footbridge](docs/media/city.webp), and [temple approach](docs/media/hero.webp).
 
 > **Development disclosure:** This is an AI-assisted solo prototype. AI tools were used for portions of implementation and documentation; the repository owner remains responsible for design decisions, integration, debugging, and validation. It is not presented as a production-ready architecture reference. See [ARCHITECTURE.md](ARCHITECTURE.md), [Engineering Standards](docs/ENGINEERING_STANDARDS.md), and [Content Provenance](docs/CONTENT_PROVENANCE.md) for the current boundaries, refactor rules, and known origin of shipped content.
 

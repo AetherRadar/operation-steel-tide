@@ -45,6 +45,8 @@ public partial class FreightTerminalWorld
             ("--validate-extraction-network-host", static world => world.ValidateExtractionNetworkSession(host: true)),
             ("--validate-extraction-network-client", static world => world.ValidateExtractionNetworkSession(host: false)),
             ("--capture-operations-office", static world => world.CaptureOperationsOffice()),
+            ("--capture-training-range-setup", static world => world.CaptureTrainingRangeSetup(deployed: false)),
+            ("--capture-training-range", static world => world.CaptureTrainingRangeSetup(deployed: true)),
             ("--capture-demolition-briefing", static world => world.CaptureDemolitionBriefing()),
             ("--capture-demolition-buy", static world => world.CaptureDemolitionBuy()),
             ("--capture-demolition-weapon-drop", static world => world.CaptureDemolitionWeaponDrop()),

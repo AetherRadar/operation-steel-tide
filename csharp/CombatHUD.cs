@@ -229,7 +229,11 @@ public partial class CombatHUD : CanvasLayer
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (IsSquadLobbyVisible || IsOperationsOfficeVisible || IsDemolitionBriefingVisible || IsDemolitionBuyVisible)
+        if (IsSquadLobbyVisible
+            || IsOperationsOfficeVisible
+            || IsDemolitionBriefingVisible
+            || IsDemolitionBuyVisible
+            || IsTrainingRangeSetupVisible)
         {
             return;
         }
@@ -1341,6 +1345,17 @@ public partial class CombatHUD : CanvasLayer
         {
             _enemiesLabel.AddThemeColorOverride("font_color", new Color(0.32f, 0.92f, 0.7f));
         }
+    }
+
+    /// <summary>Use range terminology for human targets instead of mission hostiles.</summary>
+    public void SetTrainingRangeTargetCount(int count)
+    {
+        _enemiesLabel.Text = $"{Text("training_targets", "TARGETS")}  {count:00}";
+        _enemiesLabel.AddThemeColorOverride(
+            "font_color",
+            count == 0
+                ? new Color(0.32f, 0.92f, 0.7f)
+                : new Color(0.72f, 0.9f, 0.84f));
     }
 
     public void SetObjective(string value) => _objectiveLabel.Text = value;

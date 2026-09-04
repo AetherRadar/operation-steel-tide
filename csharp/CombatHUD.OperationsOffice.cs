@@ -326,8 +326,7 @@ public partial class CombatHUD
         HideOperationsMenus();
         _squadLobby.Visible = false;
         _gameplayHudRoot.Visible = true;
-        _classSkillRoot.Visible = true;
-        _squadRoster.Visible = false;
+        KeepTrainingRangeOverlaysHidden();
         _operationBanner.Text = status;
         _operationBanner.Modulate = Colors.White;
         _operationBanner.Visible = true;
@@ -338,6 +337,43 @@ public partial class CombatHUD
         SetTrainingRangeGameplayInputEnabled(false);
         HideTrainingRangeSetup();
         _operationBanner.Visible = false;
+        if (IsInstanceValid(_medicalStatusRoot))
+        {
+            _medicalStatusRoot.Visible = true;
+        }
+        if (IsInstanceValid(_backpackHotkeyButton))
+        {
+            _backpackHotkeyButton.Visible = true;
+        }
+    }
+
+    /// <summary>
+    /// Extraction and squad refreshes can run while the standalone range is active.
+    /// Keep their mission-only overlays out of the live-fire presentation every
+    /// frame so a stale squad roster or extraction countdown cannot reappear.
+    /// </summary>
+    public void KeepTrainingRangeOverlaysHidden()
+    {
+        if (IsInstanceValid(_squadRoster))
+        {
+            _squadRoster.Visible = false;
+        }
+        if (IsInstanceValid(_extractionRoot))
+        {
+            _extractionRoot.Visible = false;
+        }
+        if (IsInstanceValid(_classSkillRoot))
+        {
+            _classSkillRoot.Visible = false;
+        }
+        if (IsInstanceValid(_medicalStatusRoot))
+        {
+            _medicalStatusRoot.Visible = false;
+        }
+        if (IsInstanceValid(_backpackHotkeyButton))
+        {
+            _backpackHotkeyButton.Visible = false;
+        }
     }
 
     public void SetExtractionCinematicVisible(bool active)

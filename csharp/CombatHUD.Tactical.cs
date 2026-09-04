@@ -50,6 +50,11 @@ public partial class CombatHUD
         _minimap.Configure(worldBounds, landmarks);
     }
 
+    public void SetMinimapTitle(string localizationKey, string englishName)
+    {
+        _minimap.SetTitle(localizationKey, englishName);
+    }
+
     public void SetMinimapPlayer(Vector3 position, float headingDegrees)
     {
         _minimap.SetPlayerState(position, headingDegrees);

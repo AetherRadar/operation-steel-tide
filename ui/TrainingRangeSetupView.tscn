@@ -441,7 +441,7 @@ offset_left = 36.0
 offset_top = 614.0
 offset_right = 300.0
 offset_bottom = 660.0
-focus_neighbor_right = NodePath("../DeployButton")
+focus_neighbor_right = NodePath("../ExitButton")
 focus_mode = 2
 theme_override_colors/font_color = Color(0.75, 0.86, 0.83, 1)
 theme_override_colors/font_hover_color = Color(0.52, 1, 0.82, 1)
@@ -452,13 +452,32 @@ theme_override_styles/pressed = SubResource("Style_back_hover")
 theme_override_styles/focus = SubResource("Style_back_hover")
 text = "BACK"
 
+[node name="ExitButton" type="Button" parent="Panel"]
+visible = false
+layout_mode = 0
+offset_left = 366.0
+offset_top = 614.0
+offset_right = 674.0
+offset_bottom = 660.0
+focus_neighbor_left = NodePath("../BackButton")
+focus_neighbor_right = NodePath("../DeployButton")
+focus_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.72, 0.62, 1)
+theme_override_colors/font_hover_color = Color(1, 0.82, 0.68, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("Style_back")
+theme_override_styles/hover = SubResource("Style_back_hover")
+theme_override_styles/pressed = SubResource("Style_back_hover")
+theme_override_styles/focus = SubResource("Style_back_hover")
+text = "RETURN TO OPERATIONS"
+
 [node name="DeployButton" type="Button" parent="Panel"]
 layout_mode = 0
 offset_left = 700.0
 offset_top = 614.0
 offset_right = 1004.0
 offset_bottom = 660.0
-focus_neighbor_left = NodePath("../BackButton")
+focus_neighbor_left = NodePath("../ExitButton")
 focus_mode = 2
 theme_override_colors/font_color = Color(0.01, 0.08, 0.07, 1)
 theme_override_colors/font_hover_color = Color(0, 0.12, 0.09, 1)

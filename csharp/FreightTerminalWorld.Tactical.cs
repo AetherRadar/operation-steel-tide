@@ -7,6 +7,7 @@ public partial class FreightTerminalWorld
 {
     private void ConfigureTacticalMinimap()
     {
+        _hud.SetMinimapTitle("minimap_title", "TACTICAL MAP");
         if (IsOrbitalComplexRuntimeMapSelected)
         {
             ConfigureOrbitalComplexRuntimeMinimap();
@@ -42,6 +43,7 @@ public partial class FreightTerminalWorld
         {
             return;
         }
+        _hud.SetMinimapTitle("minimap_title", "TACTICAL MAP");
         var landmarks = new List<TacticalMapLandmark>();
         foreach (var marker in _demolitionArena.Layout.Markers)
         {

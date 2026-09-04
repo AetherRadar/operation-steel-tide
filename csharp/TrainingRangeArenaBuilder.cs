@@ -114,37 +114,37 @@ public sealed class TrainingRangeArenaBuilder
             root,
             "RangeLoadingBay",
             $"{TreyIndustrialRoot}/loading-bay.glb",
-            new(-35.0f, 0.0f, -33.0f),
+            new(-42.0f, 0.0f, -39.0f),
             new(0.0f, Mathf.Pi, 0.0f),
             Vector3.One * 2.65f);
-        AddCollisionBox(root, "RangeLoadingBayCollision", new(-35.0f, 2.5f, -33.0f), new(22.0f, 5.0f, 18.0f));
+        AddCollisionBox(root, "RangeLoadingBayCollision", new(-42.0f, 2.5f, -39.0f), new(18.0f, 5.0f, 16.0f));
 
         AddAuthoredModel(
             root,
             "RangeFoundryWarehouse",
             $"{TreyIndustrialRoot}/foundry-warehouse.glb",
-            new(34.0f, 0.0f, -33.0f),
+            new(42.0f, 0.0f, -39.0f),
             Vector3.Zero,
             Vector3.One * 2.55f);
-        AddCollisionBox(root, "RangeFoundryWarehouseCollision", new(34.0f, 2.5f, -33.0f), new(31.0f, 5.0f, 23.0f));
+        AddCollisionBox(root, "RangeFoundryWarehouseCollision", new(42.0f, 2.5f, -39.0f), new(24.0f, 5.0f, 18.0f));
 
         AddAuthoredModel(
             root,
             "RangeUtilityOffice",
             $"{TreyIndustrialRoot}/utility-office.glb",
-            new(-35.0f, 0.0f, 24.0f),
+            new(-42.0f, 0.0f, 22.0f),
             new(0.0f, Mathf.Pi * 0.5f, 0.0f),
             Vector3.One * 2.7f);
-        AddCollisionBox(root, "RangeUtilityOfficeCollision", new(-35.0f, 2.2f, 24.0f), new(18.0f, 4.4f, 17.0f));
+        AddCollisionBox(root, "RangeUtilityOfficeCollision", new(-42.0f, 2.2f, 22.0f), new(16.0f, 4.4f, 15.0f));
 
         AddAuthoredModel(
             root,
             "RangeControlRoom",
             $"{TreyIndustrialRoot}/control-room.glb",
-            new(34.0f, 0.0f, 24.0f),
+            new(42.0f, 0.0f, 22.0f),
             new(0.0f, -Mathf.Pi * 0.5f, 0.0f),
             Vector3.One * 2.25f);
-        AddCollisionBox(root, "RangeControlRoomCollision", new(34.0f, 3.0f, 24.0f), new(20.0f, 6.0f, 20.0f));
+        AddCollisionBox(root, "RangeControlRoomCollision", new(42.0f, 3.0f, 22.0f), new(17.0f, 6.0f, 17.0f));
 
         AddAuthoredModel(
             root,
@@ -202,7 +202,7 @@ public sealed class TrainingRangeArenaBuilder
                 root,
                 $"RangeBackstopBarrier_{index + 1:00}",
                 $"{PolyHavenBarrierRoot}/concrete_road_barrier.gltf",
-                new(segmentX[index], 0.0f, -44.0f),
+                new(segmentX[index], 0.0f, -35.0f),
                 new(0.0f, Mathf.Pi, 0.0f),
                 // Stretch vertically into a readable impact wall while preserving the
                 // barrier's authored width/depth proportions.
@@ -214,14 +214,14 @@ public sealed class TrainingRangeArenaBuilder
         AddCollisionBox(
             root,
             "RangeBackstopCollision",
-            new(0.0f, 3.2f, -44.0f),
+            new(0.0f, 3.2f, -35.0f),
             new(98.0f, 6.4f, 1.4f));
         AddLabel(
             root,
             "RangeBackstopLabel",
             // Place the sign just in front of the backstop plane so it remains legible
             // between the target silhouettes from the fixed spawn camera.
-            new(0.0f, 4.8f, -27.5f),
+            new(0.0f, 4.8f, -27.0f),
             "LIVE FIRE  //  BACKSTOP",
             new Color(1.0f, 0.55f, 0.24f),
             noDepthTest: true,
@@ -230,7 +230,7 @@ public sealed class TrainingRangeArenaBuilder
         AddLabel(
             root,
             "RangeTargetHeader",
-            new(0.0f, 6.1f, -27.2f),
+            new(0.0f, 6.1f, -26.7f),
             "TARGET WALL  //  LANES 01-06",
             new Color(0.78f, 0.86f, 0.82f),
             noDepthTest: true,
@@ -298,7 +298,7 @@ public sealed class TrainingRangeArenaBuilder
         AddLabel(root, "RangeTitle", new(0.0f, 6.0f, 42.0f), "TRAINING RANGE  //  LIVE FIRE", new Color(0.42f, 0.9f, 1.0f));
         AddLabel(root, "RangeRule", new(0.0f, 4.8f, 38.0f), "SELECT  →  LOAD  →  FIRE  →  RESET", new Color(0.92f, 0.94f, 0.84f));
 
-        var laneZ = new[] { 28.0f, 16.0f, 4.0f, -8.0f, -20.0f, -32.0f };
+        var laneZ = new[] { 24.0f, 14.0f, 4.0f, -6.0f, -16.0f, -26.0f };
         for (var index = 0; index < laneZ.Length; index++)
         {
             AddLabel(
@@ -363,7 +363,7 @@ public sealed class TrainingRangeArenaBuilder
         // Four targets per lane and six depth lanes provide all setup presets
         // (3/6/12/24) without changing the range footprint.
         var columns = new[] { -18.0f, -6.0f, 6.0f, 18.0f };
-        var rows = new[] { 28.0f, 16.0f, 4.0f, -8.0f, -20.0f, -32.0f };
+        var rows = new[] { 24.0f, 14.0f, 4.0f, -6.0f, -16.0f, -26.0f };
         var local = new List<Vector3>(columns.Length * rows.Length);
         foreach (var z in rows)
         {
@@ -429,6 +429,7 @@ public sealed class TrainingRangeArenaBuilder
         model.Rotation = rotation;
         model.Scale = scale;
         model.ProcessMode = Node.ProcessModeEnum.Disabled;
+        RemoveExportPlaceholders(model);
         model.SetMeta("training_range_authored_asset", path);
         model.AddToGroup("training_range_authored_model");
         if (path.EndsWith("/road-square.glb", StringComparison.Ordinal)
@@ -436,9 +437,53 @@ public sealed class TrainingRangeArenaBuilder
         {
             ApplyRangeRoadMaterial(model);
         }
+        else if (name.Contains("Screen", StringComparison.Ordinal))
+        {
+            ApplyRangePropFinish(model, new Color(0.18f, 0.34f, 0.31f), screen: true);
+        }
+        else if (name.Contains("WeaponSelection", StringComparison.Ordinal))
+        {
+            ApplyRangePropFinish(model, new Color(0.24f, 0.32f, 0.34f));
+        }
+        else if (name.Contains("Ammunition", StringComparison.Ordinal))
+        {
+            ApplyRangePropFinish(model, new Color(0.42f, 0.32f, 0.19f));
+        }
+        else if (name.Contains("BotControl", StringComparison.Ordinal))
+        {
+            ApplyRangePropFinish(model, new Color(0.22f, 0.36f, 0.28f));
+        }
         root.AddChild(model);
         _authoredModels.Add(model);
         return model;
+    }
+
+    /// <summary>
+    /// The source packages were exported from Blender scenes that retain the default
+    /// Cube/Camera/Light objects alongside the authored mesh.  Those helpers are not
+    /// part of the asset and, when instanced at range stations, read as bright white
+    /// boxes in the player's first-person view.  Remove only those unambiguous export
+    /// leftovers; the authored meshes and their materials remain untouched.
+    /// </summary>
+    private static void RemoveExportPlaceholders(Node root)
+    {
+        var children = root.GetChildren();
+        foreach (Node child in children)
+        {
+            var isDefaultMesh = child is MeshInstance3D
+                && string.Equals(child.Name, "Cube", StringComparison.Ordinal);
+            var isDefaultCamera = child is Camera3D
+                && string.Equals(child.Name, "Camera", StringComparison.Ordinal);
+            var isDefaultLight = child is Light3D
+                && string.Equals(child.Name, "Light", StringComparison.Ordinal);
+            if (isDefaultMesh || isDefaultCamera || isDefaultLight)
+            {
+                root.RemoveChild(child);
+                child.Free();
+                continue;
+            }
+            RemoveExportPlaceholders(child);
+        }
     }
 
     /// <summary>
@@ -476,6 +521,44 @@ public sealed class TrainingRangeArenaBuilder
         foreach (var child in node.GetChildren())
         {
             ApplyMaterialRecursive(child, material);
+        }
+    }
+
+    /// <summary>
+    /// Kenney's furniture materials are intentionally bright and read as display
+    /// pieces under the range's sun.  Preserve their authored textures while applying
+    /// a restrained station tint so the three interaction benches read as equipment,
+    /// ammunition, and control consoles instead of unlit white boxes.
+    /// </summary>
+    private static void ApplyRangePropFinish(Node node, Color tint, bool screen = false)
+    {
+        if (node is MeshInstance3D mesh && mesh.Mesh is { } sourceMesh)
+        {
+            for (var surface = 0; surface < sourceMesh.GetSurfaceCount(); surface++)
+            {
+                if (mesh.GetActiveMaterial(surface) is not BaseMaterial3D source
+                    || source.Duplicate(true) is not BaseMaterial3D finish)
+                {
+                    continue;
+                }
+                finish.AlbedoColor = new Color(
+                    source.AlbedoColor.R * tint.R,
+                    source.AlbedoColor.G * tint.G,
+                    source.AlbedoColor.B * tint.B,
+                    source.AlbedoColor.A);
+                finish.Roughness = Mathf.Max(source.Roughness, 0.68f);
+                if (screen)
+                {
+                    finish.EmissionEnabled = true;
+                    finish.Emission = new Color(tint.R * 0.45f, tint.G * 1.25f, tint.B * 1.05f);
+                    finish.EmissionEnergyMultiplier = 0.55f;
+                }
+                mesh.SetSurfaceOverrideMaterial(surface, finish);
+            }
+        }
+        foreach (Node child in node.GetChildren())
+        {
+            ApplyRangePropFinish(child, tint, screen);
         }
     }
 

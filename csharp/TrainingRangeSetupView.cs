@@ -14,6 +14,7 @@ namespace OperationSteelTide;
 public partial class TrainingRangeSetupView : ColorRect
 {
     [Signal] public delegate void BackRequestedEventHandler();
+    [Signal] public delegate void ExitRequestedEventHandler();
     [Signal] public delegate void DeployRequestedEventHandler(
         int botType,
         int botCount,
@@ -61,6 +62,7 @@ public partial class TrainingRangeSetupView : ColorRect
     private Label _summary = null!;
     private Label _hint = null!;
     private Button _backButton = null!;
+    private Button _exitButton = null!;
     private Button _deployButton = null!;
     private string _language = "en";
     private bool _inGameplay;
@@ -96,6 +98,7 @@ public partial class TrainingRangeSetupView : ColorRect
         && IsInstanceValid(_ammoLevelSelect)
         && IsInstanceValid(_summary)
         && IsInstanceValid(_backButton)
+        && IsInstanceValid(_exitButton)
         && IsInstanceValid(_deployButton);
     public bool IntentSignalsConnected
         => HasConnections(SignalName.BackRequested)
@@ -106,6 +109,7 @@ public partial class TrainingRangeSetupView : ColorRect
         && _ammoTypeSelect.HasConnections(OptionButton.SignalName.ItemSelected)
         && _ammoLevelSelect.HasConnections(OptionButton.SignalName.ItemSelected)
         && _backButton.HasConnections(BaseButton.SignalName.Pressed)
+        && _exitButton.HasConnections(BaseButton.SignalName.Pressed)
         && _deployButton.HasConnections(BaseButton.SignalName.Pressed);
     public bool SelectionContractReady
         => UiReady
@@ -149,7 +153,7 @@ public partial class TrainingRangeSetupView : ColorRect
             "training_setup_bot_hint",
             "EACH TARGET RETURNS AFTER A KNOCKDOWN.");
         _weaponCaption.Text = Text("training_setup_weapon_caption", "WEAPON BENCH");
-        _weaponSelectCaption.Text = Text("training_setup_weapon", "PRIMARY WEAPON");
+        _weaponSelectCaption.Text = Text("training_setup_weapon", "WEAPON");
         _weaponHint.Text = Text(
             "training_setup_weapon_hint",
             "ALL 13 AUTHORED WEAPONS ARE AVAILABLE.\nUSE THE BENCH AGAIN IN THE LANE.");
@@ -160,13 +164,15 @@ public partial class TrainingRangeSetupView : ColorRect
             "training_setup_ammo_hint",
             "AMMO AND UTILITY REFILL AUTOMATICALLY.");
         _backButton.Text = Text("training_setup_back", "BACK");
+        _exitButton.Text = Text("training_setup_exit", "RETURN TO OPERATIONS");
+        _exitButton.Visible = _inGameplay;
         _deployButton.Text = _inGameplay
             ? Text("training_setup_apply", "APPLY AND RESUME")
             : Text("training_setup_deploy", "ENTER LIVE-FIRE LANE");
         _hint.Text = _inGameplay
             ? Text(
                 "training_setup_live_hint",
-                "F3  CLOSE PANEL AND RESUME  //  CHANGES APPLY TO THE NEXT RESET")
+                "CHOOSE APPLY OR BACK TO CLOSE  //  CHANGES APPLY NOW")
             : Text(
                 "training_setup_hint",
                 "F3  OPEN THIS PANEL IN THE LANE  //  EVERY KNOCKDOWN STARTS A RESPAWN TIMER");
@@ -184,6 +190,13 @@ public partial class TrainingRangeSetupView : ColorRect
         _inGameplay = inGameplay;
         if (UiReady)
         {
+            // The exit button is hidden before the first deploy. Keep keyboard and
+            // controller focus on the visible actions in that state; once a player
+            // is in the range, include the explicit return-to-operations action.
+            _backButton.FocusNeighborRight = new NodePath(
+                inGameplay ? "../ExitButton" : "../DeployButton");
+            _deployButton.FocusNeighborLeft = new NodePath(
+                inGameplay ? "../ExitButton" : "../BackButton");
             SetLanguage(_language);
         }
     }
@@ -320,6 +333,7 @@ public partial class TrainingRangeSetupView : ColorRect
         _summary = panel.GetNode<Label>("Summary");
         _hint = panel.GetNode<Label>("Hint");
         _backButton = panel.GetNode<Button>("BackButton");
+        _exitButton = panel.GetNode<Button>("ExitButton");
         _deployButton = panel.GetNode<Button>("DeployButton");
     }
 
@@ -363,6 +377,7 @@ public partial class TrainingRangeSetupView : ColorRect
         _ammoTypeSelect.ItemSelected += _ => RefreshSummary();
         _ammoLevelSelect.ItemSelected += _ => RefreshSummary();
         _backButton.Pressed += () => EmitSignal(SignalName.BackRequested);
+        _exitButton.Pressed += () => EmitSignal(SignalName.ExitRequested);
         _deployButton.Pressed += () => EmitSignal(
             SignalName.DeployRequested,
             SelectedBotType,

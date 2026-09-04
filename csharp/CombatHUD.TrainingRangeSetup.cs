@@ -13,6 +13,7 @@ public partial class CombatHUD
         int ammoType,
         int ammoLevel);
     [Signal] public delegate void TrainingRangeSetupBackRequestedEventHandler();
+    [Signal] public delegate void TrainingRangeExitRequestedEventHandler();
     [Signal] public delegate void TrainingRangeSetupOpenedEventHandler(bool fromGameplay);
     [Signal] public delegate void TrainingRangeSetupClosedEventHandler(bool applied);
 
@@ -37,7 +38,8 @@ public partial class CombatHUD
         => IsInstanceValid(_trainingRangeSetupView)
         && _trainingRangeSetupView.IntentSignalsConnected
         && HasConnections(SignalName.TrainingRangeDeployRequested)
-        && HasConnections(SignalName.TrainingRangeSetupBackRequested);
+        && HasConnections(SignalName.TrainingRangeSetupBackRequested)
+        && HasConnections(SignalName.TrainingRangeExitRequested);
     public bool TrainingRangeSetupOpenedFromGameplay
         => _trainingRangeSetupOpen
         && IsInstanceValid(_trainingRangeSetupView)
@@ -143,6 +145,10 @@ public partial class CombatHUD
         var wasVisible = _trainingRangeSetupView.Visible;
         _trainingRangeSetupView.Visible = false;
         _trainingRangeSetupOpen = false;
+        // A station context only belongs to the panel instance opened from that
+        // bench.  Clear it on close so the next F3 global panel starts at the full
+        // range configuration instead of inheriting a stale station heading/focus.
+        _trainingRangeSetupView.SetStationContext(-1);
         if (wasVisible)
         {
             EmitSignal(SignalName.TrainingRangeSetupClosed, applied);
@@ -225,6 +231,7 @@ public partial class CombatHUD
             TrainingRangeSetupViewScenePath);
         AddChild(_trainingRangeSetupView);
         _trainingRangeSetupView.BackRequested += HandleTrainingRangeSetupBack;
+        _trainingRangeSetupView.ExitRequested += HandleTrainingRangeSetupExit;
         _trainingRangeSetupView.DeployRequested += HandleTrainingRangeSetupDeploy;
         // The pause menu emits this signal before the world applies the setting;
         // mirroring it here keeps a hidden setup panel localized after a language swap.
@@ -267,16 +274,20 @@ public partial class CombatHUD
             ammoLevel);
     }
 
+    private void HandleTrainingRangeSetupExit()
+    {
+        HideTrainingRangeSetup(applied: false);
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+        EmitSignal(SignalName.TrainingRangeExitRequested);
+    }
+
     private void RestoreTrainingRangeGameplayHud()
     {
         if (IsInstanceValid(_gameplayHudRoot))
         {
             _gameplayHudRoot.Visible = true;
         }
-        if (IsInstanceValid(_classSkillRoot))
-        {
-            _classSkillRoot.Visible = true;
-        }
+        KeepTrainingRangeOverlaysHidden();
     }
 
 }

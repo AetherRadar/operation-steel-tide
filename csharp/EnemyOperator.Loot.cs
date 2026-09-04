@@ -60,6 +60,22 @@ public partial class EnemyOperator
         _corpseLootBackpack.Open();
     }
 
+    /// <summary>
+    /// Dedicated live-fire targets are not loot sources.  Die() builds the normal
+    /// corpse pack before emitting Eliminated, so the range controller explicitly
+    /// removes that visual during the short knockdown/reset window.
+    /// </summary>
+    public void HideCorpseLootBackpackForTrainingRange()
+    {
+        if (!IsInstanceValid(_corpseLootBackpack))
+        {
+            return;
+        }
+        _corpseLootBackpack.Visible = false;
+        _corpseLootBackpack.QueueFree();
+        _corpseLootBackpack = null!;
+    }
+
     private void ResetCorpseLootBackpackForDiagnostics()
     {
         if (IsInstanceValid(_corpseLootBackpack))

@@ -53,7 +53,83 @@ public partial class FreightTerminalWorld
             _aircraft.SetPhysicsProcess(false);
         }
         arena.SetActive(true);
+        LocalizeTrainingRangeArenaLabels(arena);
         return arena;
+    }
+
+    private void LocalizeTrainingRangeArenaLabels(TrainingRangeArenaRuntime arena)
+    {
+        SetTrainingRangeLabel(
+            arena,
+            "WeaponStationLabel",
+            GameLocalization.Get("training_station_weapon", _languageSetting, "ARMORY  //  WEAPON SELECT"));
+        SetTrainingRangeLabel(
+            arena,
+            "AmmoStationLabel",
+            GameLocalization.Get("training_station_ammo", _languageSetting, "AMMO BENCH  //  ROUND SELECT"));
+        SetTrainingRangeLabel(
+            arena,
+            "BotStationLabel",
+            GameLocalization.Get("training_station_bot", _languageSetting, "BOT CONTROL  //  SET TARGETS"));
+        SetTrainingRangeLabel(
+            arena,
+            "RangeTitle",
+            GameLocalization.Get("training_range_status", _languageSetting, "TRAINING RANGE  //  LIVE FIRE"));
+        SetTrainingRangeLabel(
+            arena,
+            "RangeRule",
+            GameLocalization.Get(
+                "training_range_rule",
+                _languageSetting,
+                "SELECT  →  LOAD  →  FIRE  →  RESET"));
+        SetTrainingRangeLabel(
+            arena,
+            "RangeSpawnInstruction",
+            GameLocalization.Get(
+                "training_range_spawn_instruction",
+                _languageSetting,
+                "F  LOADOUT  //  FIRE LANES AHEAD"));
+        SetTrainingRangeLabel(
+            arena,
+            "RangeFireLineLabel",
+            GameLocalization.Get("training_range_fire_line", _languageSetting, "FIRE LINE"));
+        SetTrainingRangeLabel(
+            arena,
+            "RangeBackstopLabel",
+            GameLocalization.Get(
+                "training_range_backstop",
+                _languageSetting,
+                "LIVE FIRE  //  BACKSTOP"));
+        SetTrainingRangeLabel(
+            arena,
+            "RangeTargetHeader",
+            GameLocalization.Get(
+                "training_range_target_header",
+                _languageSetting,
+                "TARGET WALL  //  LANES 01-06"));
+        for (var index = 1; index <= 6; index++)
+        {
+            SetTrainingRangeLabel(
+                arena,
+                $"LaneLabel_{index:00}",
+                GameLocalization.Format(
+                    "training_range_lane_label",
+                    _languageSetting,
+                    $"LANE {index:00}  //  BOT TARGET",
+                    index));
+        }
+    }
+
+    private static void SetTrainingRangeLabel(
+        TrainingRangeArenaRuntime arena,
+        string nodeName,
+        string text)
+    {
+        var label = arena.Root.GetNodeOrNull<Label3D>(nodeName);
+        if (label is not null)
+        {
+            label.Text = text;
+        }
     }
 
     /// <summary>Deactivate the dedicated root and restore the production map root.</summary>
@@ -68,6 +144,10 @@ public partial class FreightTerminalWorld
         {
             _levelRoot.Visible = true;
             _levelRoot.ProcessMode = Node.ProcessModeEnum.Inherit;
+        }
+        if (IsInstanceValid(_player) && IsInstanceValid(_hud))
+        {
+            ConfigureTacticalMinimap();
         }
     }
 

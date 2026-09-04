@@ -687,6 +687,14 @@ public partial class CombatHUD
         _gameplayHudRoot.Visible = true;
         _classSkillRoot.Visible = true;
         _squadRoster.Visible = true;
+        if (IsInstanceValid(_medicalStatusRoot))
+        {
+            _medicalStatusRoot.Visible = true;
+        }
+        if (IsInstanceValid(_backpackHotkeyButton))
+        {
+            _backpackHotkeyButton.Visible = true;
+        }
     }
 
     public void SetSquadStatus(string status)

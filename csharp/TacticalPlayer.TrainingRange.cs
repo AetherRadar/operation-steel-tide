@@ -22,6 +22,7 @@ public partial class TacticalPlayer
     };
 
     private int _trainingRangeWeaponIndex;
+    private LootGrade _trainingRangeAmmoGrade = LootGrade.Legendary;
 
     public int TrainingRangeWeaponCount => TrainingRangeWeapons.Length;
     public int TrainingRangeWeaponIndex => _trainingRangeWeaponIndex;
@@ -58,6 +59,18 @@ public partial class TacticalPlayer
         _isPlating = false;
         _plateTime = 0.0f;
         _isAiming = false;
+        // A range deploy is a fresh first-person spawn.  Clear any pitch/head pose or
+        // camera basis left by a prior vehicle, downed state, or mission capture so the
+        // player faces the firing lanes instead of the floor/sky.
+        // The range spawn faces the target wall; a small downward bias keeps the
+        // firing line and first target row in view instead of wasting the top half
+        // of the first-person capture on sky.
+        _pitch = -0.08f;
+        _head.Position = new Vector3(0.0f, 1.57f, 0.0f);
+        _head.Rotation = Vector3.Zero;
+        _cameraLocalBasis = Basis.Identity;
+        _cameraLocalOffset = Vector3.Zero;
+        ResetFirstPersonTransformInterpolation();
         _slideTime = 0.0f;
         CancelMeleeAction();
         ResetReloadRig();
@@ -82,6 +95,11 @@ public partial class TacticalPlayer
         }
         _trainingRangeWeaponIndex = (_trainingRangeWeaponIndex + 1) % TrainingRangeWeapons.Length;
         InstallTrainingRangeWeapon(TrainingRangeWeapons[_trainingRangeWeaponIndex], notify: true);
+        // Installing a new weapon restores the production slot's last/default
+        // ammo grade.  Reapply the range selector after every cycle so AP/HP/
+        // tracer and its T-level remain active immediately, without requiring a
+        // manual reload first.
+        ApplyTrainingRangeAmmoProfile(_trainingRangeAmmoType, _trainingRangeAmmoLevel);
     }
 
     public void RefillTrainingRangeAmmo()
@@ -89,7 +107,7 @@ public partial class TacticalPlayer
         if (IsFirearmQuickSlotSelected && !_knifeEquipped)
         {
             Ammo = EquippedWeapon.Stats().MagazineSize;
-            SetAmmoReserve(CurrentAmmoCaliber, LootGrade.Legendary, 9999);
+            SetAmmoReserve(CurrentAmmoCaliber, _trainingRangeAmmoGrade, 9999);
         }
         Grenades = 99;
         SmokeGrenades = 99;

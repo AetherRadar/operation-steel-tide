@@ -45,6 +45,7 @@ public partial class DemolitionTeamStatusView : Control
     private Label _score = null!;
     private Label _timer = null!;
     private Label _phase = null!;
+    private Label _objective = null!;
     private PackedScene _cardScene = null!;
     private readonly List<DemolitionTeamMemberCard> _friendlyCards = new();
     private readonly List<DemolitionTeamMemberCard> _enemyCards = new();
@@ -58,6 +59,7 @@ public partial class DemolitionTeamStatusView : Control
         && IsInstanceValid(_score)
         && IsInstanceValid(_timer)
         && IsInstanceValid(_phase)
+        && IsInstanceValid(_objective)
         && IsInstanceValid(_cardScene);
     public int FriendlyCount => _friendlyCards.Count;
     public int EnemyCount => _enemyCards.Count;
@@ -67,6 +69,7 @@ public partial class DemolitionTeamStatusView : Control
     public string ScoreText => IsInstanceValid(_score) ? _score.Text : string.Empty;
     public string TimerText => IsInstanceValid(_timer) ? _timer.Text : string.Empty;
     public string PhaseText => IsInstanceValid(_phase) ? _phase.Text : string.Empty;
+    public string ObjectiveText => IsInstanceValid(_objective) ? _objective.Text : string.Empty;
 
     public override void _Ready()
     {
@@ -114,6 +117,7 @@ public partial class DemolitionTeamStatusView : Control
         _score = center.GetNode<Label>("Score");
         _timer = center.GetNode<Label>("Timer");
         _phase = center.GetNode<Label>("Phase");
+        _objective = center.GetNode<Label>("Objective");
         _cardScene = HudPackedSceneCache.Load(DemolitionTeamMemberCard.ScenePath);
     }
 
@@ -136,6 +140,7 @@ public partial class DemolitionTeamStatusView : Control
         _score.Text = $"{snapshot.FriendlyScore}  :  {snapshot.EnemyScore}";
         _timer.Text = FormatTime(snapshot.SecondsRemaining);
         _phase.Text = PhaseTextFor(snapshot);
+        _objective.Text = ObjectiveTextFor(snapshot);
         _timer.AddThemeColorOverride(
             "font_color",
             snapshot.Phase == DemolitionTeamStatusPhase.DeviceActive
@@ -236,6 +241,43 @@ public partial class DemolitionTeamStatusView : Control
                 : "demolition_buy_defend",
             _language,
             snapshot.PlayerSide == DemolitionTeam.Attackers ? "ATTACK" : "DEFEND");
+    }
+
+    private string ObjectiveTextFor(DemolitionTeamStatusSnapshot snapshot)
+    {
+        if (snapshot.Phase == DemolitionTeamStatusPhase.DeviceActive)
+        {
+            return GameLocalization.Get(
+                snapshot.PlayerSide == DemolitionTeam.Attackers
+                    ? "demolition_team_attack_device_active"
+                    : "demolition_team_defend_device_active",
+                _language,
+                snapshot.PlayerSide == DemolitionTeam.Attackers
+                    ? "DEFEND THE DEVICE"
+                    : "REACH THE DEVICE  //  DEFUSE");
+        }
+        if (snapshot.Phase == DemolitionTeamStatusPhase.Buy)
+        {
+            return GameLocalization.Get(
+                "demolition_team_buy_objective",
+                _language,
+                "BUY WEAPONS  //  START ROUND");
+        }
+        if (snapshot.Phase == DemolitionTeamStatusPhase.Intermission)
+        {
+            return GameLocalization.Get(
+                "demolition_team_intermission_objective",
+                _language,
+                "ROUND COMPLETE");
+        }
+        return GameLocalization.Get(
+            snapshot.PlayerSide == DemolitionTeam.Attackers
+                ? "demolition_team_attack_objective"
+                : "demolition_team_defend_objective",
+            _language,
+            snapshot.PlayerSide == DemolitionTeam.Attackers
+                ? "PLANT AT A OR B"
+                : "HOLD A OR B");
     }
 
     private static string FormatTime(float secondsRemaining)

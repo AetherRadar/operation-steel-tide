@@ -273,15 +273,16 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
+        if (_trainingRangeActive)
+        {
+            UpdateTrainingRange((float)delta);
+            UpdateTrainingRangeInteraction((float)delta);
+            return;
+        }
         UpdateSquad((float)delta);
         UpdateExtractionSequence((float)delta);
         UpdateDemolitionRound((float)delta);
         UpdateDemolitionNetwork((float)delta);
-        if (_trainingRangeActive)
-        {
-            UpdateTrainingRange((float)delta);
-            return;
-        }
         UpdateExtractionNetwork((float)delta);
         UpdateWorldBossTracking();
         UpdateOrbitalComplexRuntimePresentation((float)delta);
@@ -916,6 +917,10 @@ public partial class FreightTerminalWorld : Node3D
         _hud.OperationsQuickStartRequested += OnOperationsQuickStartRequested;
         _hud.DemolitionModeRequested += OnDemolitionModeRequested;
         _hud.TrainingRangeRequested += OnTrainingRangeRequested;
+        _hud.TrainingRangeDeployRequested += OnTrainingRangeDeployRequested;
+        _hud.TrainingRangeSetupOpened += OnTrainingRangeSetupOpened;
+        _hud.TrainingRangeSetupBackRequested += OnTrainingRangeSetupBackRequested;
+        _hud.TrainingRangeExitRequested += OnTrainingRangeExitRequested;
         _hud.DemolitionBackRequested += OnDemolitionBackRequested;
         _hud.DemolitionDeploymentRequested += OnDemolitionDeploymentRequested;
         _hud.DemolitionPurchaseRequestedWithFlash += OnDemolitionPurchaseRequested;
@@ -1966,7 +1971,13 @@ public partial class FreightTerminalWorld : Node3D
         _player.EjectFromVehicleIfAny();
         if (_trainingRangeActive)
         {
-            _player.PrepareTrainingRangeLoadout(_trainingRangeOrigin);
+            var rangeSpawn = _trainingRangeArena is not null
+                && GodotObject.IsInstanceValid(_trainingRangeArena.Root)
+                ? _trainingRangeArena.PlayerSpawn
+                : _trainingRangeOrigin + new Vector3(0.0f, 0.24f, 38.0f);
+            _player.PrepareTrainingRangeLoadout(rangeSpawn);
+            _player.SelectTrainingRangeWeapon(_trainingRangeWeaponIndex);
+            _player.ApplyTrainingRangeAmmoProfile(_trainingRangeAmmoType, _trainingRangeAmmoLevel);
             _hud.ShowLocalizedMessage(
                 "training_range_ready",
                 "TRAINING RANGE READY  //  RESPAWNED",
@@ -2992,9 +3003,25 @@ public partial class FreightTerminalWorld : Node3D
     {
         _languageSetting = GameLocalization.IsChinese(language) ? "zh" : "en";
         _hud.SetLanguage(_languageSetting);
-        _hud.SetEnemyCount(_enemiesRemaining);
+        if (_trainingRangeActive)
+        {
+            _hud.SetTrainingRangeTargetCount(_enemiesRemaining);
+        }
+        else
+        {
+            _hud.SetEnemyCount(_enemiesRemaining);
+        }
         _hud.SetMissionPhase(_missionPhase, _missionRemaining, _missionOnline);
-        RefreshLocalizedObjective();
+        if (_trainingRangeActive && _trainingRangeArena is not null)
+        {
+            LocalizeTrainingRangeArenaLabels(_trainingRangeArena);
+            ConfigureTrainingRangeMinimap(_trainingRangeArena);
+            _hud.SetObjective(BuildTrainingRangeObjective());
+        }
+        else
+        {
+            RefreshLocalizedObjective();
+        }
         RefreshLootView();
         RefreshResidentialLocalization();
         foreach (var drop in _aircraftSupplyDrops)
@@ -6512,7 +6539,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private async void CaptureExtractionFrame()
     {
-        SetCaptureLanguage("en");
+        SetCaptureLanguage("zh");
         _player.GrantFireablePrimaryForDiagnostics();
         foreach (var enemy in _enemies)
         {

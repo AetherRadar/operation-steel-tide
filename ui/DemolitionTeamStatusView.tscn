@@ -69,7 +69,7 @@ theme_override_constants/separation = 5
 alignment = 2
 
 [node name="Center" type="PanelContainer" parent="Band/Margin/Layout"]
-custom_minimum_size = Vector2(184, 97)
+custom_minimum_size = Vector2(208, 97)
 layout_mode = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleCenter")
@@ -115,6 +115,19 @@ theme_override_colors/font_color = Color(1, 0.68, 0.18, 1)
 theme_override_font_sizes/font_size = 9
 text = "ATTACK"
 horizontal_alignment = 1
+
+[node name="Objective" type="Label" parent="Band/Margin/Layout/Center/CenterStack"]
+custom_minimum_size = Vector2(0, 17)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.78, 0.24, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 12
+text = "PLANT AT A OR B"
+horizontal_alignment = 1
+vertical_alignment = 1
+clip_text = true
 
 [node name="Enemy" type="HBoxContainer" parent="Band/Margin/Layout"]
 custom_minimum_size = Vector2(500, 97)
