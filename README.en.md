@@ -19,14 +19,12 @@
 
 ## What are you actually doing?
 
-This is not a menu of unexplained modes. Choose the objective you want:
+| Mode | Core loop | Win condition |
+| --- | --- | --- |
+| **Extraction** | `QUICK EXTRACTION`: pick a role and loadout → infiltrate with AI squadmates → disable the relay and download the manifest → loot → reach the green extraction zone | Board alive; only value above your deployment baseline is saved |
+| **5v5 Demolition** | `DEMOLITION`: buy gear → attack or defend → plant or defuse with smoke, cover, and team roles | First to 13 rounds; sides swap at halftime and ties go to overtime |
 
-| If you want to… | Choose | What you do in a match | How you win |
-| --- | --- | --- | --- |
-| **Bring loot home** | `QUICK EXTRACTION` / **Extraction** | Pick a role and loadout → infiltrate with AI squadmates → disable the relay and download the manifest → loot weapons and supplies → hold the green extraction zone | Board alive; only value above your deployment baseline is banked |
-| **Fight round by round** | `DEMOLITION` / **5v5 Demolition** | Buy gear → attack or defend the bomb sites → plant or defuse with smoke, cover, and role-based team play | First to 13 rounds; sides swap at halftime and ties go to overtime |
-
-Extraction is **“go in for more, get out to profit.”** Demolition is **“spend each round to win the plant/defuse decision.”** The two modes keep separate maps, money, and progression.
+Extraction: **go in for more, get out to profit.** Demolition: **buy, plant or defuse, and win 13 rounds.** Maps, money, and progression are separate.
 
 ### Two modes, shown clearly
 
@@ -41,14 +39,14 @@ Both images are direct captures from the current Godot build; click either image
 
 ## Start in 30 seconds
 
-1. Download and launch the game, then click **QUICK EXTRACTION** (or **DEMOLITION** for competitive rounds).
-2. In Extraction, choose one role and let AI fill the three-operator squad; use the minimap to find the first terminal.
-3. Hold `F` at both terminals. Loot what you can, but you do not need to clear the whole map.
-4. Once both objectives are complete, follow the green beacon and board before the timer expires.
+1. Launch the game and click **QUICK EXTRACTION** or **DEMOLITION**.
+2. In Extraction, choose a role, let AI fill the squad, and follow the minimap to both terminals.
+3. Hold `F` to complete objectives and loot weapons or supplies.
+4. Follow the green beacon and board before the extraction timer expires.
 
-For a first run, remember four inputs: `WASD` move, left mouse fire, `F` loot/interact, and `Tab` backpack. The full keybind list is in [Controls](#controls).
+Basic controls: `WASD` move, left mouse fire, `F` loot/interact, and `Tab` backpack. See [Controls](#controls).
 
-> **Gameplay links:** this repository does not currently ship an external video, so it does not pretend that a placeholder is a trailer. Use the [direct in-engine captures](#current-chinese-gameplay-captures), [latest playable release](https://github.com/AetherRadar/operation-steel-tide/releases/latest), and [full controls](#controls) to see the current build rather than concept art.
+Links: [gameplay captures](#current-chinese-gameplay-captures) · [latest playable release](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [full controls](#controls)
 
 ## What Makes It Different
 
