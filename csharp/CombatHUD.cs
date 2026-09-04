@@ -1366,7 +1366,9 @@ public partial class CombatHUD : CanvasLayer
     public void SetMissionPhase(string phase, float remaining, bool online)
     {
         var network = online ? Text("online", "ONLINE") : Text("local", "LOCAL");
-        var phaseText = GameLocalization.Phase(phase, _language);
+        var phaseText = phase == "TRAINING_RANGE"
+            ? GameLocalization.Get("training_range", _language, "TRAINING RANGE")
+            : GameLocalization.Phase(phase, _language);
         if (phase == "DEPLOYMENT")
         {
             var countdown = remaining > 0.0f ? Mathf.CeilToInt(remaining).ToString("00") : Text("ready", "READY");
