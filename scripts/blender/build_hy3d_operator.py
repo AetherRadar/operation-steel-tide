@@ -149,7 +149,7 @@ def main() -> None:
     cfg = parse_args(); source_path=os.path.abspath(cfg.source); rigged_path=os.path.abspath(cfg.rigged); output_path=os.path.abspath(cfg.output)
     if output_path in {source_path, rigged_path}: raise SystemExit("output must be separate from inputs")
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    source_objects=import_asset(source_path); source=armature(source_objects); actions=source_actions(source)
+    source_objects=import_asset(source_path); source_names=[obj.name for obj in source_objects]; source=armature(source_objects); actions=source_actions(source)
     target_objects=import_asset(rigged_path); target=armature(target_objects); mesh=visual_mesh(target_objects)
     bpy.ops.object.select_all(action="DESELECT"); target.select_set(True); mesh.select_set(True); bpy.context.view_layer.objects.active=target; bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     corrections=rest_corrections(source,target); generated=[bake_action(source,target,action,corrections) for action in actions]
@@ -163,7 +163,6 @@ def main() -> None:
     root["steel_tide_asset_role"]="realistic_hy3d_operator"; root["mesh_source"]="Tencent HY-3D-3.1 + HY-3D-Rigging"; root["animation_source"]="Quaternius Universal Animation Library (CC0), rest-frame retarget"; root["triangle_count"]=triangles; root["animation_count"]=len(generated)
     # Removing a parent can unlink its imported children, so resolve each
     # name again instead of dereferencing stale StructRNA handles.
-    source_names = [obj.name for obj in source_objects]
     for source_name in source_names:
         live = bpy.data.objects.get(source_name)
         if live is not None:
