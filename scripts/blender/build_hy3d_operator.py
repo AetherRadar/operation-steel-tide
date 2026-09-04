@@ -131,7 +131,10 @@ def reduce_mesh(mesh: bpy.types.Object, budget: int) -> int:
 
 
 def add_contract_nodes(target: bpy.types.Object, mesh: bpy.types.Object) -> tuple[bpy.types.Object, list[bpy.types.Object]]:
-    for obj in list(bpy.context.scene.objects):
+    # Iterate the datablock, not only the active scene collection: imported
+    # glTF markers such as Quaternius' Icosphere can remain linked through a
+    # nested collection and must not ship as visible gameplay geometry.
+    for obj in list(bpy.data.objects):
         if obj.type == "MESH" and obj != mesh:
             bpy.data.objects.remove(obj, do_unlink=True)
     target.name = "QuaterniusOperatorRig"; target.data.name = "QuaterniusOperatorRig"; mesh.name = "OperatorBody"
