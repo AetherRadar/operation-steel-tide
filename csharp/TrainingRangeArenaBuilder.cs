@@ -16,6 +16,8 @@ public sealed class TrainingRangeArenaBuilder
     private const string MajadroidRoot = "res://assets/models/majadroid_construction_site";
     private const string TreyIndustrialRoot = "res://assets/models/trey_modular_industrial";
     private const string RoadsRoot = "res://assets/models/kenney_city_kit_roads";
+    private const string DowntownRoot = "res://assets/models/quaternius_downtown_city";
+    private const string PolyHavenBarrierRoot = "res://assets/models/concrete_road_barrier";
     private const string FurnitureRoot = "res://assets/models/kenney_furniture_kit";
 
     /// <summary>
@@ -28,6 +30,7 @@ public sealed class TrainingRangeArenaBuilder
     private readonly Dictionary<string, PackedScene> _sceneCache = new(StringComparer.Ordinal);
     private readonly List<StaticBody3D> _collisionBodies = new();
     private readonly List<Node3D> _authoredModels = new();
+    private StandardMaterial3D? _rangeRoadMaterial;
     private bool _built;
 
     public TrainingRangeArenaRuntime Build(Node parent, Vector3? origin = null)
@@ -78,17 +81,21 @@ public sealed class TrainingRangeArenaBuilder
 
     private void BuildGroundAndBoundary(Node3D root)
     {
-        // The authored road slab supplies the readable range surface.  The box below
-        // is invisible collision only and keeps a player from falling through its mesh.
+        // The downtown kit's authored asphalt module is a neutral, PBR street
+        // surface with real normal/roughness maps.  Its 9 m square is scaled once
+        // to cover the complete 99 m yard; unlike the construction-site palette
+        // atlas it cannot turn the entire first-person view into a flat orange card.
+        // The model's source bounds run from -9..0 on X/Z, hence the positive offset
+        // centers it over the arena origin.
         AddAuthoredModel(
             root,
-            "RangeRoadSurface",
-            $"{MajadroidRoot}/road.glb",
+            "RangeAsphaltSurface",
+            $"{DowntownRoot}/Street_Asphalt_9x9.gltf",
+            new Vector3(49.5f, 0.16f, 49.5f),
             Vector3.Zero,
-            Vector3.Zero,
-            // The source road is 0.2 m thick; flatten its Y scale so the authored
-            // surface sits flush with the gameplay ground at y≈0.
-            new Vector3(0.72f, 0.08f, 0.72f));
+            new Vector3(11.0f, 1.0f, 11.0f));
+        // The box below is invisible collision only and keeps a player from falling
+        // through the authored mesh.
         AddCollisionBox(root, "RangeGroundCollision", new(0.0f, -0.52f, 0.0f), new(99.0f, 1.0f, 99.0f));
 
         // Four low perimeter walls define the self-contained yard.  They are collision
@@ -147,9 +154,11 @@ public sealed class TrainingRangeArenaBuilder
             Vector3.Zero,
             Vector3.One * 1.35f);
 
-        // A backstop and side fencing make the range read as a dedicated facility from
-        // the spawn camera.  Fence panels are visual assets; boundary collision remains
-        // the invisible boxes created above.
+        BuildRangeBackstop(root);
+
+        // A backstop and side barriers make the range read as a dedicated facility from
+        // the spawn camera. These are authored road barriers; boundary collision
+        // remains the invisible boxes created above.
         var fencePositions = new[]
         {
             (new Vector3(-43.0f, 0.0f, -47.0f), 0.0f),
@@ -171,11 +180,60 @@ public sealed class TrainingRangeArenaBuilder
             AddAuthoredModel(
                 root,
                 $"RangeFence_{++fenceIndex:00}",
-                $"{MajadroidRoot}/fence.glb",
+                $"{RoadsRoot}/construction-barrier.glb",
                 position,
                 new(0.0f, Mathf.DegToRad(yawDegrees), 0.0f),
-                Vector3.One * 1.15f);
+                Vector3.One * 12.0f);
         }
+    }
+
+    /// <summary>
+    /// Build a visible, authored impact wall at the end of the firing lanes. The
+    /// concrete barriers are CC0 Poly Haven geometry; the companion collision box is
+    /// invisible gameplay scaffolding so projectiles and operators cannot leak through
+    /// the seam between adjacent meshes.
+    /// </summary>
+    private void BuildRangeBackstop(Node3D root)
+    {
+        var segmentX = new[] { -45.0f, -30.0f, -15.0f, 0.0f, 15.0f, 30.0f, 45.0f };
+        for (var index = 0; index < segmentX.Length; index++)
+        {
+            AddAuthoredModel(
+                root,
+                $"RangeBackstopBarrier_{index + 1:00}",
+                $"{PolyHavenBarrierRoot}/concrete_road_barrier.gltf",
+                new(segmentX[index], 0.0f, -44.0f),
+                new(0.0f, Mathf.Pi, 0.0f),
+                // Stretch vertically into a readable impact wall while preserving the
+                // barrier's authored width/depth proportions.
+                new(9.4f, 6.5f, 8.0f));
+        }
+
+        // Keep a small service gap below the sign while still sealing the whole lane
+        // width for physics and projectile raycasts.
+        AddCollisionBox(
+            root,
+            "RangeBackstopCollision",
+            new(0.0f, 3.2f, -44.0f),
+            new(98.0f, 6.4f, 1.4f));
+        AddLabel(
+            root,
+            "RangeBackstopLabel",
+            // Place the sign just in front of the backstop plane so it remains legible
+            // between the target silhouettes from the fixed spawn camera.
+            new(0.0f, 4.8f, -27.5f),
+            "LIVE FIRE  //  BACKSTOP",
+            new Color(1.0f, 0.55f, 0.24f),
+            noDepthTest: true,
+            fontSize: 64);
+        AddLabel(
+            root,
+            "RangeTargetHeader",
+            new(0.0f, 6.1f, -27.2f),
+            "TARGET WALL  //  LANES 01-06",
+            new Color(0.78f, 0.86f, 0.82f),
+            noDepthTest: true,
+            fontSize: 64);
     }
 
     private void BuildTrainingStations(Node3D root)
@@ -186,14 +244,14 @@ public sealed class TrainingRangeArenaBuilder
             root,
             "WeaponSelectionBench",
             $"{FurnitureRoot}/desk.glb",
-            new(-27.0f, 0.0f, 34.0f),
+            new(-8.0f, 0.0f, 31.0f),
             new(0.0f, Mathf.Pi, 0.0f),
             Vector3.One * 1.25f);
         AddAuthoredModel(
             root,
             "WeaponSelectionScreen",
             $"{FurnitureRoot}/computerScreen.glb",
-            new(-27.0f, 1.0f, 34.0f),
+            new(-8.0f, 1.0f, 31.0f),
             Vector3.Zero,
             Vector3.One * 1.15f);
 
@@ -201,14 +259,14 @@ public sealed class TrainingRangeArenaBuilder
             root,
             "AmmunitionBench",
             $"{FurnitureRoot}/table.glb",
-            new(-12.0f, 0.0f, 34.0f),
+            new(0.0f, 0.0f, 31.0f),
             Vector3.Zero,
             Vector3.One * 1.2f);
         AddAuthoredModel(
             root,
             "AmmunitionCrate",
             $"{FurnitureRoot}/cardboardBoxClosed.glb",
-            new(-12.0f, 0.85f, 34.0f),
+            new(0.0f, 0.85f, 31.0f),
             new(0.0f, 0.28f, 0.0f),
             Vector3.One * 1.1f);
 
@@ -216,20 +274,21 @@ public sealed class TrainingRangeArenaBuilder
             root,
             "BotControlBench",
             $"{FurnitureRoot}/sideTableDrawers.glb",
-            new(15.0f, 0.0f, 34.0f),
+            new(8.0f, 0.0f, 31.0f),
             new(0.0f, Mathf.Pi, 0.0f),
             Vector3.One * 1.15f);
         AddAuthoredModel(
             root,
             "BotControlScreen",
             $"{FurnitureRoot}/computerScreen.glb",
-            new(15.0f, 0.92f, 34.0f),
+            new(8.0f, 0.92f, 31.0f),
             Vector3.Zero,
             Vector3.One * 1.08f);
 
-        AddLabel(root, "WeaponStationLabel", new(-27.0f, 2.6f, 34.0f), "ARMORY  //  WEAPON SELECT", new Color(0.34f, 0.86f, 1.0f));
-        AddLabel(root, "AmmoStationLabel", new(-12.0f, 2.6f, 34.0f), "AMMO BENCH  //  CALIBER", new Color(1.0f, 0.72f, 0.24f));
-        AddLabel(root, "BotStationLabel", new(15.0f, 2.6f, 34.0f), "BOT CONTROL  //  RESET", new Color(0.48f, 1.0f, 0.63f));
+        AddLabel(root, "WeaponStationLabel", new(-8.0f, 2.6f, 31.0f), "ARMORY  //  WEAPON SELECT", new Color(0.34f, 0.86f, 1.0f));
+        AddLabel(root, "AmmoStationLabel", new(0.0f, 2.6f, 31.0f), "AMMO BENCH  //  CALIBER", new Color(1.0f, 0.72f, 0.24f));
+        AddLabel(root, "BotStationLabel", new(8.0f, 2.6f, 31.0f), "BOT CONTROL  //  RESET", new Color(0.48f, 1.0f, 0.63f));
+        AddLabel(root, "RangeSpawnInstruction", new(0.0f, 4.1f, 36.8f), "F  LOADOUT   //   FIRE LANES AHEAD", new Color(0.86f, 0.92f, 0.82f));
     }
 
     private void BuildLaneGuidance(Node3D root)
@@ -237,7 +296,7 @@ public sealed class TrainingRangeArenaBuilder
         AddLabel(root, "RangeTitle", new(0.0f, 6.0f, 42.0f), "TRAINING RANGE  //  LIVE FIRE", new Color(0.42f, 0.9f, 1.0f));
         AddLabel(root, "RangeRule", new(0.0f, 4.8f, 38.0f), "SELECT  →  LOAD  →  FIRE  →  RESET", new Color(0.92f, 0.94f, 0.84f));
 
-        var laneZ = new[] { 24.0f, 14.0f, 2.0f, -10.0f, -24.0f, -38.0f };
+        var laneZ = new[] { 28.0f, 16.0f, 4.0f, -8.0f, -20.0f, -32.0f };
         for (var index = 0; index < laneZ.Length; index++)
         {
             AddLabel(
@@ -246,16 +305,40 @@ public sealed class TrainingRangeArenaBuilder
                 new(-17.0f, 2.8f, laneZ[index]),
                 $"LANE {index + 1:00}  //  BOT TARGET",
                 new Color(0.74f, 0.8f, 0.78f));
+
+            // Authored warning markers make each firing lane readable from the spawn
+            // line even before a target has been selected.
+            AddAuthoredModel(
+                root,
+                $"LaneWarningSign_{index + 1:00}",
+                $"{RoadsRoot}/road-sign-warning.glb",
+                new(-23.0f, 0.02f, laneZ[index]),
+                new(0.0f, Mathf.Pi * 0.5f, 0.0f),
+                Vector3.One * 1.15f);
+            AddAuthoredModel(
+                root,
+                $"LaneLight_{index + 1:00}",
+                $"{RoadsRoot}/construction-light.glb",
+                new(23.0f, 0.02f, laneZ[index]),
+                Vector3.Zero,
+                Vector3.One * 1.1f);
         }
+
+        AddLabel(
+            root,
+            "RangeFireLineLabel",
+            new(0.0f, 1.45f, 31.7f),
+            "FIRE LINE",
+            new Color(1.0f, 0.84f, 0.36f));
     }
 
     private static void BuildRangeLighting(Node3D root)
     {
         var lights = new[]
         {
-            (new Vector3(-27.0f, 3.2f, 34.0f), new Color(0.18f, 0.68f, 1.0f)),
-            (new Vector3(-12.0f, 3.0f, 34.0f), new Color(1.0f, 0.46f, 0.16f)),
-            (new Vector3(15.0f, 3.0f, 34.0f), new Color(0.20f, 1.0f, 0.50f)),
+            (new Vector3(-8.0f, 3.2f, 31.0f), new Color(0.18f, 0.68f, 1.0f)),
+            (new Vector3(0.0f, 3.0f, 31.0f), new Color(1.0f, 0.46f, 0.16f)),
+            (new Vector3(8.0f, 3.0f, 31.0f), new Color(0.20f, 1.0f, 0.50f)),
             (new Vector3(0.0f, 6.0f, -42.0f), new Color(0.28f, 0.66f, 1.0f))
         };
         var index = 0;
@@ -275,18 +358,18 @@ public sealed class TrainingRangeArenaBuilder
 
     private static IReadOnlyList<TrainingRangeBotProfile> BuildBotProfiles(Vector3 origin)
     {
-        var local = new[]
+        // Four targets per lane and six depth lanes provide all setup presets
+        // (3/6/12/24) without changing the range footprint.
+        var columns = new[] { -18.0f, -6.0f, 6.0f, 18.0f };
+        var rows = new[] { 28.0f, 16.0f, 4.0f, -8.0f, -20.0f, -32.0f };
+        var local = new List<Vector3>(columns.Length * rows.Length);
+        foreach (var z in rows)
         {
-            new Vector3(0.0f, 0.24f, 24.0f),
-            new Vector3(-8.0f, 0.24f, 14.0f),
-            new Vector3(8.0f, 0.24f, 14.0f),
-            new Vector3(-12.0f, 0.24f, 2.0f),
-            new Vector3(12.0f, 0.24f, 2.0f),
-            new Vector3(0.0f, 0.24f, -10.0f),
-            new Vector3(-8.0f, 0.24f, -24.0f),
-            new Vector3(8.0f, 0.24f, -24.0f),
-            new Vector3(0.0f, 0.24f, -38.0f)
-        };
+            foreach (var x in columns)
+            {
+                local.Add(new Vector3(x, 0.24f, z));
+            }
+        }
         var visuals = new[]
         {
             OperatorVisualId.Garrison,
@@ -296,8 +379,8 @@ public sealed class TrainingRangeArenaBuilder
             OperatorVisualId.Jackal,
             OperatorVisualId.Viper
         };
-        var result = new List<TrainingRangeBotProfile>(local.Length);
-        for (var index = 0; index < local.Length; index++)
+        var result = new List<TrainingRangeBotProfile>(local.Count);
+        for (var index = 0; index < local.Count; index++)
         {
             result.Add(new TrainingRangeBotProfile(
                 index,
@@ -311,9 +394,9 @@ public sealed class TrainingRangeArenaBuilder
     private static IReadOnlyList<TrainingRangeStation> BuildStations(Vector3 origin)
         => new[]
         {
-            new TrainingRangeStation("armory", TrainingRangeStationKind.Weapon, origin + new Vector3(-27.0f, 0.0f, 34.0f), 2.8f, "ARMORY  //  WEAPON SELECT"),
-            new TrainingRangeStation("ammo", TrainingRangeStationKind.Ammunition, origin + new Vector3(-12.0f, 0.0f, 34.0f), 2.6f, "AMMO BENCH  //  CALIBER"),
-            new TrainingRangeStation("bot_control", TrainingRangeStationKind.BotControl, origin + new Vector3(15.0f, 0.0f, 34.0f), 2.8f, "BOT CONTROL  //  RESET")
+            new TrainingRangeStation("armory", TrainingRangeStationKind.Weapon, origin + new Vector3(-8.0f, 0.0f, 31.0f), 2.8f, "ARMORY  //  WEAPON SELECT"),
+            new TrainingRangeStation("ammo", TrainingRangeStationKind.Ammunition, origin + new Vector3(0.0f, 0.0f, 31.0f), 2.6f, "AMMO BENCH  //  CALIBER"),
+            new TrainingRangeStation("bot_control", TrainingRangeStationKind.BotControl, origin + new Vector3(8.0f, 0.0f, 31.0f), 2.8f, "BOT CONTROL  //  RESET")
         };
 
     private Node3D? AddAuthoredModel(
@@ -346,9 +429,52 @@ public sealed class TrainingRangeArenaBuilder
         model.ProcessMode = Node.ProcessModeEnum.Disabled;
         model.SetMeta("training_range_authored_asset", path);
         model.AddToGroup("training_range_authored_model");
+        if (path.EndsWith("/road-square.glb", StringComparison.Ordinal)
+            || path.EndsWith("/Street_Asphalt_9x9.gltf", StringComparison.Ordinal))
+        {
+            ApplyRangeRoadMaterial(model);
+        }
         root.AddChild(model);
         _authoredModels.Add(model);
         return model;
+    }
+
+    /// <summary>
+    /// The Kenney road mesh is authored geometry, but its shared palette atlas is an
+    /// art-reference gradient (the road UVs intentionally sample a saturated orange
+    /// swatch).  Keep the mesh and its raised markings while using the repository's
+    /// licensed PBR asphalt for a readable firing-lane floor.
+    /// </summary>
+    private void ApplyRangeRoadMaterial(Node3D model)
+    {
+        _rangeRoadMaterial ??= new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.22f, 0.24f, 0.25f),
+            AlbedoTexture = GD.Load<Texture2D>("res://assets/textures/asphalt_03_diff_1k.jpg"),
+            NormalEnabled = true,
+            NormalTexture = GD.Load<Texture2D>("res://assets/textures/asphalt_03_normal_1k.jpg"),
+            NormalScale = 0.72f,
+            Roughness = 0.88f,
+            RoughnessTexture = GD.Load<Texture2D>("res://assets/textures/asphalt_03_rough_1k.jpg"),
+            Metallic = 0.04f,
+            Uv1Triplanar = true,
+            Uv1WorldTriplanar = true,
+            Uv1Scale = Vector3.One * 0.16f,
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic
+        };
+        ApplyMaterialRecursive(model, _rangeRoadMaterial);
+    }
+
+    private static void ApplyMaterialRecursive(Node node, Material material)
+    {
+        if (node is MeshInstance3D mesh)
+        {
+            mesh.MaterialOverride = material;
+        }
+        foreach (var child in node.GetChildren())
+        {
+            ApplyMaterialRecursive(child, material);
+        }
     }
 
     private void AddCollisionBox(Node3D root, string name, Vector3 position, Vector3 size)
@@ -369,17 +495,24 @@ public sealed class TrainingRangeArenaBuilder
         _collisionBodies.Add(body);
     }
 
-    private static void AddLabel(Node3D root, string name, Vector3 position, string text, Color color)
+    private static void AddLabel(
+        Node3D root,
+        string name,
+        Vector3 position,
+        string text,
+        Color color,
+        bool noDepthTest = false,
+        int fontSize = 42)
     {
         root.AddChild(new Label3D
         {
             Name = name,
             Position = position,
             Text = text,
-            FontSize = 42,
+            FontSize = fontSize,
             Modulate = color,
             OutlineSize = 8,
-            NoDepthTest = false
+            NoDepthTest = noDepthTest
         });
     }
 }
