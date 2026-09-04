@@ -149,12 +149,12 @@ public partial class CombatHUD
         && _quickStartTitle.Text == Text("operations_quick_title", "QUICK EXTRACTION")
         && _quickStartDetail.Text == Text(
             "operations_quick_detail",
-            "ENTER LOADOUT  //  SQUAD UP  //  LOOT AND EXTRACT")
+            "ROLE  →  OBJECTIVES  →  LOOT  →  EXTRACT")
         && _demolitionEntryIndex.Text == Text("operations_demolition_index", "02  //  DEMOLITION")
         && _demolitionEntryTitle.Text == Text("operations_demolition_title", "DEMOLITION")
         && _demolitionEntryDetail.Text == Text(
             "operations_demolition_detail",
-            "5 V 5  //  FIRST TO 13  //  12-MAP POOL")
+            "BUY  →  PLANT / DEFUSE  →  WIN 13 ROUNDS")
         && _operationsStatus.Text == Text(
             "operations_status_ready",
             "FIELD TEAM STANDING BY  //  HELIPAD CLEAR")
@@ -449,10 +449,10 @@ public partial class CombatHUD
         _operationsOfficeSubtitle.Text = Text("operations_subtitle", "OPERATION STEEL TIDE");
         _quickStartIndex.Text = Text("operations_quick_index", "01  //  EXTRACTION");
         _quickStartTitle.Text = Text("operations_quick_title", "QUICK EXTRACTION");
-        _quickStartDetail.Text = Text("operations_quick_detail", "ENTER LOADOUT  //  SQUAD UP  //  LOOT AND EXTRACT");
+        _quickStartDetail.Text = Text("operations_quick_detail", "ROLE  →  OBJECTIVES  →  LOOT  →  EXTRACT");
         _demolitionEntryIndex.Text = Text("operations_demolition_index", "02  //  DEMOLITION");
         _demolitionEntryTitle.Text = Text("operations_demolition_title", "DEMOLITION");
-        _demolitionEntryDetail.Text = Text("operations_demolition_detail", "5 V 5  //  FIRST TO 13  //  12-MAP POOL");
+        _demolitionEntryDetail.Text = Text("operations_demolition_detail", "BUY  →  PLANT / DEFUSE  →  WIN 13 ROUNDS");
         _operationsQuitButton.Text = Text("operations_exit", "EXIT TO DESKTOP");
         _operationsStatus.Text = Text(
             "operations_status_ready",

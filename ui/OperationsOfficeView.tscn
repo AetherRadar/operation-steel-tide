@@ -281,7 +281,7 @@ theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.86)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
 theme_override_font_sizes/font_size = 13
-text = "ENTER LOADOUT  //  SQUAD UP  //  EXTRACT"
+text = "ROLE  →  OBJECTIVES  →  LOOT  →  EXTRACT"
 
 [node name="QuickArrow" type="Label" parent="Rail/QuickStartButton"]
 layout_mode = 0
@@ -358,7 +358,7 @@ theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.86)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
 theme_override_font_sizes/font_size = 13
-text = "5 V 5  //  FIRST TO 13  //  12-MAP POOL"
+text = "BUY  →  PLANT / DEFUSE  →  WIN 13 ROUNDS"
 
 [node name="DemolitionArrow" type="Label" parent="Rail/DemolitionModeButton"]
 layout_mode = 0
