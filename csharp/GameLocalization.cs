@@ -639,6 +639,16 @@ public static class GameLocalization
         Chinese["training_setup_station_weapon"] = "\u67aa\u68b0\u5de5\u4f4d  //  \u9009\u62e9\u6b66\u5668";
         Chinese["training_setup_station_ammo"] = "\u5f39\u836f\u5b9e\u9a8c\u5ba4  //  \u9009\u62e9\u5f39\u79cd";
         Chinese["training_setup_station_bot"] = "Bot \u63a7\u5236  //  \u8bbe\u7f6e\u76ee\u6807";
+        Chinese["training_bot_static"] = "\u56fa\u5b9a\u9776";
+        Chinese["training_bot_patrol"] = "\u5de1\u903b Bot";
+        Chinese["training_bot_reactive"] = "\u53cd\u5e94 Bot";
+        Chinese["training_ammo_fmj"] = "\u5168\u88ab\u7532\u5f39";
+        Chinese["training_ammo_ap"] = "\u7a7f\u7532\u5f39";
+        Chinese["training_ammo_hp"] = "\u7a7a\u5c16\u5f39";
+        Chinese["training_ammo_tracer"] = "\u66f3\u5149\u5f39";
+        Chinese["training_station_weapon"] = "\u67aa\u68b0\u5de5\u4f4d  //  \u9009\u62e9\u6b66\u5668";
+        Chinese["training_station_ammo"] = "\u5f39\u836f\u5b9e\u9a8c\u5ba4  //  \u9009\u62e9\u5f39\u79cd";
+        Chinese["training_station_bot"] = "Bot \u63a7\u5236  //  \u8bbe\u7f6e\u76ee\u6807";
         Chinese["operations_status_ready"] = "\u5916\u52e4\u5c0f\u961f\u5f85\u547d  //  \u505c\u673a\u576a\u5df2\u51c0\u7a7a";
         Chinese["operations_quick_status"] = "\u672c\u5730\u5c0f\u961f  //  3 \u4eba\u7f16\u5236  //  \u4f60\u9009\u804c\u4e1a\uff0cAI \u8865\u9f50\u5176\u4f59";
         Chinese["operations_back"] = "\u8fd4\u56de\u7279\u52e4\u5904";
