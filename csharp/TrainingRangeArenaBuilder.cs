@@ -28,9 +28,15 @@ public sealed class TrainingRangeArenaBuilder
     private readonly Dictionary<string, PackedScene> _sceneCache = new(StringComparer.Ordinal);
     private readonly List<StaticBody3D> _collisionBodies = new();
     private readonly List<Node3D> _authoredModels = new();
+    private bool _built;
 
     public TrainingRangeArenaRuntime Build(Node parent, Vector3? origin = null)
     {
+        if (_built)
+        {
+            throw new InvalidOperationException("A TrainingRangeArenaBuilder instance can build only one runtime arena.");
+        }
+        _built = true;
         _collisionBodies.Clear();
         _authoredModels.Clear();
 
