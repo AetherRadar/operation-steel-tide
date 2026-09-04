@@ -13,6 +13,7 @@ public partial class FreightTerminalWorld
             ("--validate-launch-isolation", static world => world.ValidateLaunchIsolation()),
             ("--validate-backend-client", static world => world.ValidateBackendClient()),
             ("--validate-operations-office", static world => world.ValidateOperationsOffice()),
+            ("--validate-training-range", static world => world.ValidateTrainingRange()),
             ("--validate-pause-ui", static world => world.ValidatePauseUi()),
             ("--validate-hud-resource-lifecycle", static world => world.ValidateHudResourceLifecycle()),
             ("--validate-demolition", static world => world.ValidateDemolitionMode()),

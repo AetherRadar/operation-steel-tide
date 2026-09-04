@@ -328,6 +328,11 @@ public partial class TacticalPlayer
 
     private void CycleWeaponSlots()
     {
+        if (Main?.IsTrainingRangeActive == true)
+        {
+            CycleTrainingRangeWeapon();
+            return;
+        }
         const int quickSlotCount = (int)PlayerQuickSlot.Utility + 1;
         var start = (int)_activeQuickSlot;
         for (var offset = 1; offset <= quickSlotCount; offset++)

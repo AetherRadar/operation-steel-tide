@@ -192,6 +192,7 @@ public partial class FreightTerminalWorld
                 or "--validate-demolition-network-roster-bravo-client");
         var operationsOfficeCommand = Array.Exists(args, value =>
             value == "--validate-operations-office"
+            || value == "--validate-training-range"
             || value == "--validate-demolition"
             || value == "--validate-demolition-enemy-response"
             || value == "--validate-demolition-rules"

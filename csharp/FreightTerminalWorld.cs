@@ -277,6 +277,11 @@ public partial class FreightTerminalWorld : Node3D
         UpdateExtractionSequence((float)delta);
         UpdateDemolitionRound((float)delta);
         UpdateDemolitionNetwork((float)delta);
+        if (_trainingRangeActive)
+        {
+            UpdateTrainingRange((float)delta);
+            return;
+        }
         UpdateExtractionNetwork((float)delta);
         UpdateWorldBossTracking();
         UpdateOrbitalComplexRuntimePresentation((float)delta);
@@ -910,6 +915,7 @@ public partial class FreightTerminalWorld : Node3D
         _hud.InventoryToggleRequested += OnInventoryToggleRequested;
         _hud.OperationsQuickStartRequested += OnOperationsQuickStartRequested;
         _hud.DemolitionModeRequested += OnDemolitionModeRequested;
+        _hud.TrainingRangeRequested += OnTrainingRangeRequested;
         _hud.DemolitionBackRequested += OnDemolitionBackRequested;
         _hud.DemolitionDeploymentRequested += OnDemolitionDeploymentRequested;
         _hud.DemolitionPurchaseRequestedWithFlash += OnDemolitionPurchaseRequested;
@@ -1865,6 +1871,10 @@ public partial class FreightTerminalWorld : Node3D
 
     private void OnEnemyEliminated(EnemyOperator enemy)
     {
+        if (HandleTrainingRangeBotEliminated(enemy))
+        {
+            return;
+        }
         if (_applyingExtractionNetworkState)
         {
             if (!_lootSources.Contains(enemy))
@@ -1954,6 +1964,15 @@ public partial class FreightTerminalWorld : Node3D
     private void OnPlayerDied()
     {
         _player.EjectFromVehicleIfAny();
+        if (_trainingRangeActive)
+        {
+            _player.PrepareTrainingRangeLoadout(_trainingRangeOrigin);
+            _hud.ShowLocalizedMessage(
+                "training_range_ready",
+                "TRAINING RANGE READY  //  RESPAWNED",
+                new Color(0.42f, 0.82f, 1.0f));
+            return;
+        }
         if (HandleLocalPlayerDowned())
         {
             return;

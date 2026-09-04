@@ -21,8 +21,12 @@ public partial class CombatHUD
     private Label _demolitionEntryIndex = null!;
     private Label _demolitionEntryTitle = null!;
     private Label _demolitionEntryDetail = null!;
+    private Label _trainingRangeIndex = null!;
+    private Label _trainingRangeTitle = null!;
+    private Label _trainingRangeDetail = null!;
     private Button _quickStartButton = null!;
     private Button _demolitionModeButton = null!;
+    private Button _trainingRangeButton = null!;
     private Button _operationsQuitButton = null!;
     private Button _resultOfficeButton = null!;
     private OperationsOfficeFocus _operationsOfficeHoverFocus;
@@ -44,15 +48,18 @@ public partial class CombatHUD
     public bool OperationsOfficeUiReady
         => IsInstanceValid(_quickStartButton)
         && IsInstanceValid(_demolitionModeButton)
+        && IsInstanceValid(_trainingRangeButton)
         && IsInstanceValid(_operationsCredits)
         && IsInstanceValid(_resultOfficeButton)
         && _quickStartButton.FocusMode == Control.FocusModeEnum.All
-        && _demolitionModeButton.FocusMode == Control.FocusModeEnum.All;
+        && _demolitionModeButton.FocusMode == Control.FocusModeEnum.All
+        && _trainingRangeButton.FocusMode == Control.FocusModeEnum.All;
     public bool OperationsOfficeUsesPackedScene
         => IsInstanceValid(_operationsOfficeRoot)
         && _operationsOfficeRoot.SceneFilePath == OperationsOfficeViewScenePath
         && _operationsOfficeRoot.GetNodeOrNull<Control>("Rail/QuickStartButton/QuickStartTitle") is not null
-        && _operationsOfficeRoot.GetNodeOrNull<Control>("Rail/DemolitionModeButton/DemolitionEntryTitle") is not null;
+        && _operationsOfficeRoot.GetNodeOrNull<Control>("Rail/DemolitionModeButton/DemolitionEntryTitle") is not null
+        && _operationsOfficeRoot.GetNodeOrNull<Control>("Rail/TrainingRangeButton/TrainingRangeTitle") is not null;
     public bool DemolitionBriefingUiReady
         => IsInstanceValid(_demolitionBriefingView) && _demolitionBriefingView.UiReady;
     public bool DemolitionBriefingUsesPackedScene
@@ -155,6 +162,11 @@ public partial class CombatHUD
         && _demolitionEntryDetail.Text == Text(
             "operations_demolition_detail",
             "BUY  →  PLANT / DEFUSE  →  WIN 13 ROUNDS")
+        && _trainingRangeIndex.Text == Text("operations_training_index", "03  //  TRAINING RANGE")
+        && _trainingRangeTitle.Text == Text("operations_training_title", "TRAINING RANGE")
+        && _trainingRangeDetail.Text == Text(
+            "operations_training_detail",
+            "ALL GUNS  →  INFINITE AMMO  →  LIVE BOTS")
         && _operationsStatus.Text == Text(
             "operations_status_ready",
             "FIELD TEAM STANDING BY  //  HELIPAD CLEAR")
@@ -172,6 +184,8 @@ public partial class CombatHUD
         && _demolitionModeButton.Text == _demolitionEntryTitle.Text
         && _quickStartButton.TooltipText == _quickStartTitle.Text
         && _demolitionModeButton.TooltipText == _demolitionEntryTitle.Text
+        && _trainingRangeButton.Text == _trainingRangeTitle.Text
+        && _trainingRangeButton.TooltipText == _trainingRangeTitle.Text
         && DemolitionBriefingLanguageReady
         && (!GameLocalization.IsChinese(_language)
             || (_operationsOfficeTitle.Text != "OPERATIONS OFFICE"
@@ -205,14 +219,20 @@ public partial class CombatHUD
         _demolitionEntryIndex = _demolitionModeButton.GetNode<Label>("DemolitionEntryIndex");
         _demolitionEntryTitle = _demolitionModeButton.GetNode<Label>("DemolitionEntryTitle");
         _demolitionEntryDetail = _demolitionModeButton.GetNode<Label>("DemolitionEntryDetail");
+        _trainingRangeButton = rail.GetNode<Button>("TrainingRangeButton");
+        _trainingRangeIndex = _trainingRangeButton.GetNode<Label>("TrainingRangeIndex");
+        _trainingRangeTitle = _trainingRangeButton.GetNode<Label>("TrainingRangeTitle");
+        _trainingRangeDetail = _trainingRangeButton.GetNode<Label>("TrainingRangeDetail");
         _operationsStatus = rail.GetNode<Label>("OperationsStatus");
         _operationsQuitButton = rail.GetNode<Button>("OperationsQuitButton");
 
         _quickStartButton.Pressed += () => EmitSignal(SignalName.OperationsQuickStartRequested);
         _demolitionModeButton.Pressed += () => EmitSignal(SignalName.DemolitionModeRequested);
+        _trainingRangeButton.Pressed += () => EmitSignal(SignalName.TrainingRangeRequested);
         _operationsQuitButton.Pressed += () => EmitSignal(SignalName.QuitRequested);
         BindOperationsFocus(_quickStartButton, OperationsOfficeFocus.QuickExtraction);
         BindOperationsFocus(_demolitionModeButton, OperationsOfficeFocus.Demolition);
+        BindOperationsFocus(_trainingRangeButton, OperationsOfficeFocus.Neutral);
     }
 
     private void BuildDemolitionBriefingView(Control root)
@@ -297,6 +317,23 @@ public partial class CombatHUD
         HideDemolitionBuy();
     }
 
+    public void ShowTrainingRangeGameplay(string status)
+    {
+        HideOperationsMenus();
+        _squadLobby.Visible = false;
+        _gameplayHudRoot.Visible = true;
+        _classSkillRoot.Visible = true;
+        _squadRoster.Visible = false;
+        _operationBanner.Text = status;
+        _operationBanner.Modulate = Colors.White;
+        _operationBanner.Visible = true;
+    }
+
+    public void HideTrainingRangeGameplay()
+    {
+        _operationBanner.Visible = false;
+    }
+
     public void SetExtractionCinematicVisible(bool active)
     {
         _gameplayHudRoot.Visible = !active;
@@ -309,6 +346,9 @@ public partial class CombatHUD
 
     public void PressDemolitionModeForDiagnostics()
         => PressButtonForDiagnostics(_demolitionModeButton);
+
+    public void PressTrainingRangeForDiagnostics()
+        => PressButtonForDiagnostics(_trainingRangeButton);
 
     public void FocusOperationsModeForDiagnostics(OperationsOfficeFocus focus)
     {
@@ -453,6 +493,9 @@ public partial class CombatHUD
         _demolitionEntryIndex.Text = Text("operations_demolition_index", "02  //  DEMOLITION");
         _demolitionEntryTitle.Text = Text("operations_demolition_title", "DEMOLITION");
         _demolitionEntryDetail.Text = Text("operations_demolition_detail", "BUY  →  PLANT / DEFUSE  →  WIN 13 ROUNDS");
+        _trainingRangeIndex.Text = Text("operations_training_index", "03  //  TRAINING RANGE");
+        _trainingRangeTitle.Text = Text("operations_training_title", "TRAINING RANGE");
+        _trainingRangeDetail.Text = Text("operations_training_detail", "ALL GUNS  →  INFINITE AMMO  →  LIVE BOTS");
         _operationsQuitButton.Text = Text("operations_exit", "EXIT TO DESKTOP");
         _operationsStatus.Text = Text(
             "operations_status_ready",
@@ -461,6 +504,8 @@ public partial class CombatHUD
         _demolitionModeButton.Text = _demolitionEntryTitle.Text;
         _quickStartButton.TooltipText = _quickStartTitle.Text;
         _demolitionModeButton.TooltipText = _demolitionEntryTitle.Text;
+        _trainingRangeButton.Text = _trainingRangeTitle.Text;
+        _trainingRangeButton.TooltipText = _trainingRangeTitle.Text;
         _demolitionBriefingView.SetLanguage(_language);
         _resultOfficeButton.Text = Text("operations_return", "RETURN TO OPERATIONS OFFICE");
         RefreshOperationsOfficeProfile();

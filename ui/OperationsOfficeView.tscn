@@ -302,7 +302,7 @@ offset_top = 436.0
 offset_right = 450.0
 offset_bottom = 552.0
 focus_neighbor_top = NodePath("../QuickStartButton")
-focus_neighbor_bottom = NodePath("../OperationsQuitButton")
+focus_neighbor_bottom = NodePath("../TrainingRangeButton")
 focus_mode = 2
 theme_override_colors/font_color = Color(0, 0, 0, 0)
 theme_override_colors/font_hover_color = Color(0, 0, 0, 0)
@@ -372,30 +372,107 @@ theme_override_font_sizes/font_size = 22
 text = ">"
 horizontal_alignment = 1
 
+[node name="TrainingRangeButton" type="Button" parent="Rail"]
+layout_mode = 0
+offset_left = 28.0
+offset_top = 572.0
+offset_right = 450.0
+offset_bottom = 688.0
+focus_neighbor_top = NodePath("../DemolitionModeButton")
+focus_neighbor_bottom = NodePath("../OperationsQuitButton")
+focus_mode = 2
+theme_override_colors/font_color = Color(0, 0, 0, 0)
+theme_override_colors/font_hover_color = Color(0, 0, 0, 0)
+theme_override_colors/font_pressed_color = Color(0, 0, 0, 0)
+theme_override_colors/font_focus_color = Color(0, 0, 0, 0)
+theme_override_font_sizes/font_size = 1
+theme_override_styles/normal = SubResource("StyleBox_mode_normal")
+theme_override_styles/hover = SubResource("StyleBox_quick_hover")
+theme_override_styles/pressed = SubResource("StyleBox_quick_pressed")
+theme_override_styles/focus = SubResource("StyleBox_quick_hover")
+
+[node name="TrainingRangeAccent" type="ColorRect" parent="Rail/TrainingRangeButton"]
+layout_mode = 0
+offset_right = 4.0
+offset_bottom = 116.0
+mouse_filter = 2
+color = Color(0.24, 0.7, 1, 1)
+
+[node name="TrainingRangeIndex" type="Label" parent="Rail/TrainingRangeButton"]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 13.0
+offset_right = 360.0
+offset_bottom = 31.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.34, 0.72, 0.96, 1)
+theme_override_font_sizes/font_size = 13
+text = "03  //  TRAINING RANGE"
+
+[node name="TrainingRangeTitle" type="Label" parent="Rail/TrainingRangeButton"]
+layout_mode = 0
+offset_left = 21.0
+offset_top = 38.0
+offset_right = 352.0
+offset_bottom = 67.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.72, 0.9, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 22
+text = "TRAINING RANGE"
+
+[node name="TrainingRangeDetail" type="Label" parent="Rail/TrainingRangeButton"]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 78.0
+offset_right = 366.0
+offset_bottom = 99.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.48, 0.7, 0.82, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.86)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 13
+text = "ALL GUNS  →  INFINITE AMMO  →  LIVE BOTS"
+
+[node name="TrainingRangeArrow" type="Label" parent="Rail/TrainingRangeButton"]
+layout_mode = 0
+offset_left = 382.0
+offset_top = 43.0
+offset_right = 405.0
+offset_bottom = 73.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.4, 0.78, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = ">"
+horizontal_alignment = 1
+
 [node name="StatusDivider" type="ColorRect" parent="Rail"]
 layout_mode = 0
 offset_left = 40.0
-offset_top = 600.0
+offset_top = 736.0
 offset_right = 440.0
-offset_bottom = 601.0
+offset_bottom = 737.0
 mouse_filter = 2
 color = Color(0.17, 0.32, 0.28, 0.82)
 
 [node name="StatusPulse" type="ColorRect" parent="Rail"]
 layout_mode = 0
 offset_left = 40.0
-offset_top = 632.0
+offset_top = 768.0
 offset_right = 47.0
-offset_bottom = 639.0
+offset_bottom = 775.0
 mouse_filter = 2
 color = Color(0.24, 0.9, 0.64, 1)
 
 [node name="OperationsStatus" type="Label" parent="Rail"]
 layout_mode = 0
 offset_left = 60.0
-offset_top = 622.0
+offset_top = 758.0
 offset_right = 432.0
-offset_bottom = 678.0
+offset_bottom = 814.0
 theme_override_colors/font_color = Color(0.48, 0.86, 0.7, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
 theme_override_constants/shadow_offset_x = 2

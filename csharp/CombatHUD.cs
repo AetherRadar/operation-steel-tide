@@ -25,6 +25,7 @@ public partial class CombatHUD : CanvasLayer
     [Signal] public delegate void InventoryToggleRequestedEventHandler();
     [Signal] public delegate void OperationsQuickStartRequestedEventHandler();
     [Signal] public delegate void DemolitionModeRequestedEventHandler();
+    [Signal] public delegate void TrainingRangeRequestedEventHandler();
     [Signal] public delegate void OperationsBackdropFocusChangedEventHandler(int focus);
     [Signal] public delegate void DemolitionDeploymentRequestedEventHandler(
         int role,

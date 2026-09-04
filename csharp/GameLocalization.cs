@@ -592,6 +592,12 @@ public static class GameLocalization
         Chinese["operations_demolition_title"] = "\u7206\u7834\u6a21\u5f0f";
         Chinese["operations_demolition_index"] = "02  //  \u7206\u7834\u884c\u52a8";
         Chinese["operations_demolition_detail"] = "\u8d2d\u4e70  \u2192  \u5b89\u653e / \u62c6\u9664  \u2192  \u5148\u8d62 13 \u5c40";
+        Chinese["operations_training_index"] = "03  //  \u9776\u573a";
+        Chinese["operations_training_title"] = "\u9776\u573a";
+        Chinese["operations_training_detail"] = "\u5168\u67aa\u68b0  \u2192  \u65e0\u9650\u5f39\u836f  \u2192  \u4eba\u5f62 Bot";
+        Chinese["training_range"] = "\u9776\u573a";
+        Chinese["training_range_status"] = "\u9776\u573a  //  \u5b9e\u5f39\u6d4b\u8bd5";
+        Chinese["training_range_ready"] = "\u9776\u573a\u5df2\u5c31\u7eea  //  \u9f20\u6807\u6eda\u8f6e\u5207\u6362\u67aa\u68b0  //  \u5f39\u836f\u65e0\u9650  //  Bot \u51fb\u5012\u540e\u81ea\u52a8\u91cd\u751f";
         Chinese["operations_status_ready"] = "\u5916\u52e4\u5c0f\u961f\u5f85\u547d  //  \u505c\u673a\u576a\u5df2\u51c0\u7a7a";
         Chinese["operations_quick_status"] = "\u672c\u5730\u5c0f\u961f  //  3 \u4eba\u7f16\u5236  //  \u4f60\u9009\u804c\u4e1a\uff0cAI \u8865\u9f50\u5176\u4f59";
         Chinese["operations_back"] = "\u8fd4\u56de\u7279\u52e4\u5904";

@@ -79,6 +79,10 @@ public partial class FreightTerminalWorld
         {
             OnDemolitionModeRequested();
         }
+        else if (Array.Exists(args, value => value == "--validate-training-range"))
+        {
+            OnTrainingRangeRequested();
+        }
     }
 
     private void EnterOperationsOffice()
@@ -133,6 +137,12 @@ public partial class FreightTerminalWorld
         _operationsOfficeBackdrop.SetPresentationActive(false);
         _squadNetwork.StartLanRoomBrowsing();
         _hud.ShowDemolitionBriefing();
+    }
+
+    private void OnTrainingRangeRequested()
+    {
+        ActivateBattlefieldFromOperationsOffice();
+        EnterTrainingRange();
     }
 
     private void OnDemolitionBackRequested()
