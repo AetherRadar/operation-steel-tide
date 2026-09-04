@@ -163,8 +163,9 @@ def main() -> None:
     root["steel_tide_asset_role"]="realistic_hy3d_operator"; root["mesh_source"]="Tencent HY-3D-3.1 + HY-3D-Rigging"; root["animation_source"]="Quaternius Universal Animation Library (CC0), rest-frame retarget"; root["triangle_count"]=triangles; root["animation_count"]=len(generated)
     # Removing a parent can unlink its imported children, so resolve each
     # name again instead of dereferencing stale StructRNA handles.
-    for source_object in source_objects:
-        live = bpy.data.objects.get(source_object.name)
+    source_names = [obj.name for obj in source_objects]
+    for source_name in source_names:
+        live = bpy.data.objects.get(source_name)
         if live is not None:
             bpy.data.objects.remove(live, do_unlink=True)
     bpy.ops.object.select_all(action="DESELECT"); root.select_set(True); target.select_set(True); mesh.select_set(True); [obj.select_set(True) for obj in sockets]; bpy.context.view_layer.objects.active=root
