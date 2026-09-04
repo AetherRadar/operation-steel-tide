@@ -1,4 +1,4 @@
-"""Prepare the tracked AK-47 field recordings used by the AK74 runtime audio.
+"""Prepare tracked field recordings used by the runtime weapon audio.
 
 The upstream files are intentionally not downloaded at runtime.  This script
 is a reproducible offline/online preparation step: it downloads the CC0 source,
@@ -130,6 +130,12 @@ def main() -> None:
     parser.add_argument("--source-dir", type=Path, default=DEFAULT_SOURCE_DIR)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument(
+        "--all-output-dir",
+        type=Path,
+        default=Path("assets/audio/weapons"),
+        help="root directory for the per-platform outputs emitted by --all",
+    )
+    parser.add_argument(
         "--all",
         action="store_true",
         help="also prepare the recorded takes for every runtime weapon platform",
@@ -178,7 +184,7 @@ def main() -> None:
             if not source.exists():
                 download(source_base + folder_url + "/" + filename, source)
 
-        output_dir = Path("assets/audio/weapons") / platform_id
+        output_dir = args.all_output_dir / platform_id
         profile_outputs = {
             f"{platform_id}_player_near.wav": convert(
                 near_source,
