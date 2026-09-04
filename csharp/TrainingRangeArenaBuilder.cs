@@ -86,7 +86,9 @@ public sealed class TrainingRangeArenaBuilder
             $"{MajadroidRoot}/road.glb",
             Vector3.Zero,
             Vector3.Zero,
-            new Vector3(0.72f, 1.0f, 0.72f));
+            // The source road is 0.2 m thick; flatten its Y scale so the authored
+            // surface sits flush with the gameplay ground at y≈0.
+            new Vector3(0.72f, 0.08f, 0.72f));
         AddCollisionBox(root, "RangeGroundCollision", new(0.0f, -0.52f, 0.0f), new(99.0f, 1.0f, 99.0f));
 
         // Four low perimeter walls define the self-contained yard.  They are collision
