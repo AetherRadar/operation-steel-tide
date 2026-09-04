@@ -2,13 +2,13 @@
 
 简体中文 | [English](README.en.md)
 
-**一款使用 Godot 4.6 与 C# 开发的开源战术撤离 FPS：指挥三人干员小队，带走成功撤离的装备，或进入独立的 5v5 爆破对局。**
+**一款使用 Godot 4.6 与 C# 开发的开源战术 FPS。你可以带领三人小队进入港区，完成目标、搜刮并活着撤离；也可以进入独立的 5v5 爆破对局，购买装备、安放/拆除炸弹，先赢 13 回合。**
 
 ![江海旧城中的 Operation Steel Tide 项目封面图](docs/media/cover.png)
 
 *基于江海旧城制作的 AI 辅助项目封面图；当前版本的中文实机画面见下方画廊。*
 
-[下载 Windows 版本](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [下载 macOS 版本](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [查看项目画廊](#项目画廊) · [查看小队 AI 源码](csharp/FreightTerminalWorld.Squad.cs) · [阅读架构说明](ARCHITECTURE.md)
+[下载 Windows 版本](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [下载 macOS 版本](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [看实机画面](#当前中文实机画面) · [30 秒开始](#30-秒开始) · [查看完整操作](#操作方式)
 
 [![Godot 4.6](https://img.shields.io/badge/Godot-4.6-478CBF?logo=godot-engine&logoColor=white)](https://godotengine.org/)
 [![.NET 8](https://img.shields.io/badge/.NET-8-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
@@ -16,6 +16,39 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-42e7c1.svg)](LICENSE)
 
 > **一分钟内开始游戏：** 下载最新的 Windows x64 或 macOS 通用 ZIP。完整解压后，在 Windows 运行 `PLAY.bat`，或在 macOS 打开 `Operation Steel Tide.app`；两种版本都不要求预装 Godot 或 .NET。
+
+## 你要做什么
+
+这不是“在菜单里选一个看不懂的模式”。先按你想玩的目标选择：
+
+| 想玩什么 | 选择 | 一局里真正要做的事 | 怎么算赢 |
+| --- | --- | --- | --- |
+| **带战利品回家** | `QUICK EXTRACTION` / **撤离行动** | 选职业和配装 → 带 AI 队友潜入 → 关闭通信中继、下载货运清单 → 搜刮武器和物资 → 到绿色撤离区读条登机 | 活着登机；只有高于部署基准的战利品会存入档案 |
+| **一回合一回合对枪** | `DEMOLITION` / **5v5 爆破** | 购买阶段买枪和投掷物 → 进攻方安放炸弹或防守方拆除 → 用烟雾、掩体和队伍职责赢下回合 | 先赢 13 回合；中场换边，平局进入加时 |
+
+撤离行动的核心是 **“进去拿更多，出来才算赚”**；爆破模式的核心是 **“每回合花钱做一次安放/拆除决策”**。两套模式的地图、资金和进度彼此独立。
+
+### 两种模式，一眼分清
+
+<table>
+<tr>
+<td width="50%"><a href="docs/media/gameplay-tactical-zh.webp"><img src="docs/media/gameplay-tactical-zh.webp" alt="撤离行动实机画面"></a><br><strong>撤离行动</strong><br>看小地图找终端，完成目标后带着战利品到绿色区域登机。</td>
+<td width="50%"><a href="docs/media/gameplay-demolition-zh.webp"><img src="docs/media/gameplay-demolition-zh.webp" alt="5v5 爆破模式实机画面"></a><br><strong>5v5 爆破</strong><br>每回合先买装备，再围绕安放点进攻或防守，先赢 13 回合。</td>
+</tr>
+</table>
+
+图片均来自当前 Godot 运行版本；点击图片可单独查看原图。
+
+## 30 秒开始
+
+1. 下载并启动游戏，点击 **QUICK EXTRACTION**（想玩竞技回合则点 **DEMOLITION**）。
+2. 撤离行动：选择一个职业，接受 AI 自动补齐的三人小队，进入地图后跟着小地图先找任务终端。
+3. 按住 `F` 完成两个终端目标；看到高价值物资就搜刮，但不要为了击杀清空整张地图。
+4. 两个目标完成后，跟随绿色信标到海堤撤离区，在倒计时结束前和队友一起登机。
+
+第一次游玩只需要记住四个键：`WASD` 移动、鼠标射击、`F` 搜刮/互动、`Tab` 查看背包。完整键位见[操作方式](#操作方式)。
+
+> **实机演示与下载入口：** 仓库当前没有外部视频文件，因此不放虚假的“视频链接”。你可以直接查看[当前中文实机画面](#当前中文实机画面)、[下载最新发行版](https://github.com/AetherRadar/operation-steel-tide/releases/latest)，或打开[完整操作与任务流程](#操作方式)；这些内容对应当前可运行版本，而不是概念图。
 
 ## 玩法亮点
 

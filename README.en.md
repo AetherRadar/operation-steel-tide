@@ -2,13 +2,13 @@
 
 [简体中文](README.md) | English
 
-**An open-source tactical extraction FPS built with Godot 4.6 and C#: command a three-operator squad, keep the gear you extract, or enter a separate 5v5 demolition match.**
+**An open-source tactical FPS built with Godot 4.6 and C#. Lead a three-operator squad into the harbor, complete objectives, loot, and extract alive—or enter a separate 5v5 demolition match, buy gear, plant/defuse, and win 13 rounds.**
 
 ![Operation Steel Tide key art in Jianghai Old City](docs/media/cover.png)
 
 *AI-assisted project key art based on Jianghai Old City; direct captures from the current build are shown below.*
 
-[Download for Windows](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [Download for macOS](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [View the presentation gallery](#presentation-gallery) · [Explore the squad AI](csharp/FreightTerminalWorld.Squad.cs) · [Read the architecture notes](ARCHITECTURE.md)
+[Download for Windows](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [Download for macOS](https://github.com/AetherRadar/operation-steel-tide/releases/latest) · [See gameplay captures](#current-chinese-gameplay-captures) · [Start in 30 seconds](#start-in-30-seconds) · [Read the controls](#controls)
 
 [![Godot 4.6](https://img.shields.io/badge/Godot-4.6-478CBF?logo=godot-engine&logoColor=white)](https://godotengine.org/)
 [![.NET 8](https://img.shields.io/badge/.NET-8-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
@@ -16,6 +16,39 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-42e7c1.svg)](LICENSE)
 
 > **Play in under a minute:** download the latest Windows x64 or macOS universal ZIP. Extract it, then run `PLAY.bat` on Windows or open `Operation Steel Tide.app` on macOS. Neither build requires Godot or .NET to be installed.
+
+## What are you actually doing?
+
+This is not a menu of unexplained modes. Choose the objective you want:
+
+| If you want to… | Choose | What you do in a match | How you win |
+| --- | --- | --- | --- |
+| **Bring loot home** | `QUICK EXTRACTION` / **Extraction** | Pick a role and loadout → infiltrate with AI squadmates → disable the relay and download the manifest → loot weapons and supplies → hold the green extraction zone | Board alive; only value above your deployment baseline is banked |
+| **Fight round by round** | `DEMOLITION` / **5v5 Demolition** | Buy gear → attack or defend the bomb sites → plant or defuse with smoke, cover, and role-based team play | First to 13 rounds; sides swap at halftime and ties go to overtime |
+
+Extraction is **“go in for more, get out to profit.”** Demolition is **“spend each round to win the plant/defuse decision.”** The two modes keep separate maps, money, and progression.
+
+### Two modes, shown clearly
+
+<table>
+<tr>
+<td width="50%"><a href="docs/media/gameplay-tactical-zh.webp"><img src="docs/media/gameplay-tactical-zh.webp" alt="Extraction gameplay capture"></a><br><strong>Extraction</strong><br>Follow the minimap to terminals, complete objectives, then reach the green zone with your loot.</td>
+<td width="50%"><a href="docs/media/gameplay-demolition-zh.webp"><img src="docs/media/gameplay-demolition-zh.webp" alt="5v5 demolition gameplay capture"></a><br><strong>5v5 Demolition</strong><br>Buy each round, then attack or defend the plant sites until one team wins 13 rounds.</td>
+</tr>
+</table>
+
+Both images are direct captures from the current Godot build; click either image to open the full-resolution file.
+
+## Start in 30 seconds
+
+1. Download and launch the game, then click **QUICK EXTRACTION** (or **DEMOLITION** for competitive rounds).
+2. In Extraction, choose one role and let AI fill the three-operator squad; use the minimap to find the first terminal.
+3. Hold `F` at both terminals. Loot what you can, but you do not need to clear the whole map.
+4. Once both objectives are complete, follow the green beacon and board before the timer expires.
+
+For a first run, remember four inputs: `WASD` move, left mouse fire, `F` loot/interact, and `Tab` backpack. The full keybind list is in [Controls](#controls).
+
+> **Gameplay links:** this repository does not currently ship an external video, so it does not pretend that a placeholder is a trailer. Use the [direct in-engine captures](#current-chinese-gameplay-captures), [latest playable release](https://github.com/AetherRadar/operation-steel-tide/releases/latest), and [full controls](#controls) to see the current build rather than concept art.
 
 ## What Makes It Different
 
