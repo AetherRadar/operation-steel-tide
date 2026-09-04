@@ -30,8 +30,8 @@
 
 <table>
 <tr>
-<td width="50%"><a href="docs/media/gameplay-tactical-zh.webp"><img src="docs/media/gameplay-tactical-zh.webp" alt="撤离行动实机画面"></a><br><strong>撤离行动</strong><br>看小地图找终端，完成目标后带着战利品到绿色区域登机。</td>
-<td width="50%"><a href="docs/media/gameplay-demolition-zh.webp"><img src="docs/media/gameplay-demolition-zh.webp" alt="5v5 爆破模式实机画面"></a><br><strong>5v5 爆破</strong><br>每回合先买装备，再围绕安放点进攻或防守，先赢 13 回合。</td>
+<td width="50%"><a href="docs/media/gameplay-extraction-zh.png"><img src="docs/media/gameplay-extraction-zh.png" alt="撤离行动抵达撤离点并登机"></a><br><strong>撤离行动</strong><br>完成目标后进入绿色撤离区，和队友一起在倒计时结束前登机。</td>
+<td width="50%"><a href="docs/media/gameplay-demolition-spawn-zh.png"><img src="docs/media/gameplay-demolition-spawn-zh.png" alt="5v5 爆破出生点实机画面"></a><br><strong>5v5 爆破</strong><br>出生后看比分、小地图和回合计时，向安放点推进并赢下回合。</td>
 </tr>
 </table>
 
@@ -86,11 +86,11 @@
 
 **搜刮与配装。** 个人背包展示武器、弹药品级、医疗物资、护甲、背包和高价值物品，并与当前人物装备实时比较。
 
-![中文 5v5 爆破模式回合买装界面](docs/media/gameplay-demolition-zh.webp)
+![中文 5v5 爆破出生点实机画面](docs/media/gameplay-demolition-spawn-zh.png)
 
-**5v5 爆破。** 独立 MR12 模式包含阵营、比分、资金、武器、防护与投掷物购买决策。
+**5v5 爆破。** 出生即进入回合，顶部比分、小地图、阵营和回合计时说明目标；[购买阶段画面](docs/media/gameplay-demolition-zh.webp)另行展示装备决策。
 
-这五张截图可通过 `--capture-readme-zh` 确定性重拍。无 HUD 的开发机位仍可查看：[小队街道](docs/media/squad.webp)、[市集天桥](docs/media/city.webp)与[庙宇入口](docs/media/hero.webp)。
+四张常规界面截图可通过 `--capture-readme-zh` 确定性重拍；撤离点画面使用 `--capture-extraction`，爆破出生画面使用 `--capture-demolition-spawn`。无 HUD 的开发机位仍可查看：[小队街道](docs/media/squad.webp)、[市集天桥](docs/media/city.webp)与[庙宇入口](docs/media/hero.webp)。
 
 > **开发说明：** 这是一个使用 AI 辅助开发的个人原型。AI 工具参与了部分实现和文档工作；仓库所有者仍对设计决策、集成、调试和验证负责。本项目不声称自身是一套可直接用于生产环境的架构范例。当前边界、重构规则和已发布内容的已知来源，请参阅 [ARCHITECTURE.md](ARCHITECTURE.md)、[工程规范](docs/ENGINEERING_STANDARDS.md)和[内容来源记录](docs/CONTENT_PROVENANCE.md)。
 
@@ -288,6 +288,7 @@ Godot_console.exe --path . -- --validate-ai-ladders
 Godot_console.exe --path . -- --validate-demolition-rules
 Godot_console.exe --path . -- --validate-demolition-arena
 Godot_console.exe --path . -- --capture-demolition-weapon-drop
+Godot_console.exe --path . -- --capture-demolition-spawn
 Godot_console.exe --path . -- --validate-harbor-locks
 Godot_console.exe --path . -- --capture-harbor-locks
 Godot_console.exe --path . -- --validate-tideglass-reactor

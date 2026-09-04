@@ -218,6 +218,7 @@ public partial class FreightTerminalWorld
             || value == "--capture-demolition-buy"
             || value == "--capture-demolition-round-result"
             || value == "--capture-demolition-device-status"
+            || value == "--capture-demolition-spawn"
             || value == "--capture-demolition-arena"
             || value == "--capture-tideglass-reactor"
             || value == "--capture-bazaar-crossing");

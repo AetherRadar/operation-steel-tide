@@ -49,6 +49,7 @@ public partial class FreightTerminalWorld
             ("--capture-demolition-weapon-drop", static world => world.CaptureDemolitionWeaponDrop()),
             ("--capture-demolition-round-result", static world => world.CaptureDemolitionRoundResult()),
             ("--capture-demolition-device-status", static world => world.CaptureDemolitionDeviceStatus()),
+            ("--capture-demolition-spawn", static world => world.CaptureDemolitionSpawn()),
             ("--capture-demolition-arena", static world => world.CaptureDemolitionArena()),
             ("--capture-harbor-locks", static world => world.CaptureHarborLocks()),
             ("--capture-tideglass-reactor", static world => world.CaptureTideglassReactor()),

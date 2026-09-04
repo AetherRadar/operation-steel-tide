@@ -30,8 +30,8 @@ Extraction: **go in for more, get out to profit.** Demolition: **buy, plant or d
 
 <table>
 <tr>
-<td width="50%"><a href="docs/media/gameplay-tactical-zh.webp"><img src="docs/media/gameplay-tactical-zh.webp" alt="Extraction gameplay capture"></a><br><strong>Extraction</strong><br>Follow the minimap to terminals, complete objectives, then reach the green zone with your loot.</td>
-<td width="50%"><a href="docs/media/gameplay-demolition-zh.webp"><img src="docs/media/gameplay-demolition-zh.webp" alt="5v5 demolition gameplay capture"></a><br><strong>5v5 Demolition</strong><br>Buy each round, then attack or defend the plant sites until one team wins 13 rounds.</td>
+<td width="50%"><a href="docs/media/gameplay-extraction-zh.png"><img src="docs/media/gameplay-extraction-zh.png" alt="Extraction gameplay at the rescue zone"></a><br><strong>Extraction</strong><br>Complete the objectives, enter the green zone, and board the rescue aircraft before the timer expires.</td>
+<td width="50%"><a href="docs/media/gameplay-demolition-spawn-zh.png"><img src="docs/media/gameplay-demolition-spawn-zh.png" alt="5v5 demolition gameplay from the spawn point"></a><br><strong>5v5 Demolition</strong><br>Spawn into the round, read the score/minimap/timer, and push toward a plant site.</td>
 </tr>
 </table>
 
@@ -86,11 +86,11 @@ The following images are generated directly by Godot from the current Jianghai O
 
 **Loot and loadouts.** The personal backpack compares weapons, ammunition grades, medical supplies, armor, packs, and valuables against the current operator.
 
-![Chinese round-buy interface for the 5v5 demolition mode](docs/media/gameplay-demolition-zh.webp)
+![Chinese 5v5 demolition gameplay from the spawn point](docs/media/gameplay-demolition-spawn-zh.png)
 
-**5v5 demolition.** The separate MR12 mode exposes team, score, funds, weapons, protection, and grenade purchases before the round.
+**5v5 demolition.** The spawn view shows the live score, minimap, teams, and round timer; the [round-buy capture](docs/media/gameplay-demolition-zh.webp) shows the equipment decision before the fight.
 
-All five screenshots can be reproduced deterministically with `--capture-readme-zh`. HUD-free development angles remain available for the [squad street](docs/media/squad.webp), [market footbridge](docs/media/city.webp), and [temple approach](docs/media/hero.webp).
+The four standard interface captures can be reproduced with `--capture-readme-zh`; the extraction-point frame uses `--capture-extraction`, and the demolition spawn frame uses `--capture-demolition-spawn`. HUD-free development angles remain available for the [squad street](docs/media/squad.webp), [market footbridge](docs/media/city.webp), and [temple approach](docs/media/hero.webp).
 
 > **Development disclosure:** This is an AI-assisted solo prototype. AI tools were used for portions of implementation and documentation; the repository owner remains responsible for design decisions, integration, debugging, and validation. It is not presented as a production-ready architecture reference. See [ARCHITECTURE.md](ARCHITECTURE.md), [Engineering Standards](docs/ENGINEERING_STANDARDS.md), and [Content Provenance](docs/CONTENT_PROVENANCE.md) for the current boundaries, refactor rules, and known origin of shipped content.
 
@@ -276,6 +276,7 @@ Godot_console.exe --path . -- --validate-pause-ui
 Godot_console.exe --path . -- --validate-demolition
 Godot_console.exe --path . -- --validate-demolition-rules
 Godot_console.exe --path . -- --validate-demolition-arena
+Godot_console.exe --path . -- --capture-demolition-spawn
 Godot_console.exe --path . -- --validate-harbor-locks
 Godot_console.exe --path . -- --capture-harbor-locks
 Godot_console.exe --path . -- --validate-tideglass-reactor

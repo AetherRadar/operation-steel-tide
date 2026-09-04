@@ -179,4 +179,53 @@ public partial class FreightTerminalWorld
             + carrier.Callsign);
         GetTree().Quit();
     }
+
+    private async void CaptureDemolitionSpawn()
+    {
+        await WaitFrames(5);
+        _hud.PressDemolitionModeForDiagnostics();
+        _hud.PressDemolitionRoleForDiagnostics(OperatorRole.Assault);
+        _hud.PressDemolitionMapForDiagnostics(DemolitionMapCatalog.BazaarCrossingId);
+        _hud.PressDemolitionDeployForDiagnostics();
+        await WaitFrames(5);
+        if (_demolitionBuyPhaseActive)
+        {
+            // Keep the first-round purchase affordable and show the real live HUD,
+            // rather than staging a buy-screen or a close-up device portrait.
+            _hud.SelectDemolitionBuySidearmForDiagnostics(DemolitionBuyCatalog.P226Id);
+            _hud.PressDemolitionBuyConfirmForDiagnostics();
+        }
+        await WaitFrames(5);
+
+        var layout = DemolitionLayout();
+        _player.GlobalPosition = layout.AttackSpawn + Vector3.Up * 0.2f;
+        _player.FaceWorldPointForDiagnostics(layout.Midpoint);
+        _player.SetViewPitchForDiagnostics(0.0f);
+        SetDemolitionActorsFrozen(true);
+        foreach (var mate in _squadMates.Where(IsInstanceValid))
+        {
+            mate.Visible = false;
+        }
+        foreach (var opponent in _demolitionOpponents.Where(IsInstanceValid))
+        {
+            opponent.Visible = false;
+        }
+
+        // Re-enable only the local player so its normal first-person camera and
+        // pistol presentation are visible at the attack spawn.
+        _player.ProcessMode = ProcessModeEnum.Inherit;
+        _player.UiLocked = false;
+        _player.DisarmFireInput();
+        _player.DisarmMovementInput();
+        _player.FaceWorldPointForDiagnostics(layout.Midpoint);
+        _player.AimCameraAtWorldPointForDiagnostics(layout.Midpoint + Vector3.Up * 1.0f);
+        _hud.SetLanguage("zh");
+        _hud.SetDemolitionGameplayPresentation(true);
+        UpdateDemolitionTeamStatusHud();
+        _player.GetNodeOrNull<Camera3D>("Head/CombatCamera")?.MakeCurrent();
+        await WaitFrames(18);
+        SaveViewportImage("res://demolition_spawn_validation.png");
+        GD.Print("DEMOLITION_SPAWN_CAPTURE valid=True path=demolition_spawn_validation.png");
+        GetTree().Quit();
+    }
 }
