@@ -189,7 +189,32 @@ public partial class FreightTerminalWorld
                 && TrainingRangeKills == 2;
         }
 
-        // Open and close the same panel through a station context.  This is the
+        // Change every live range slot once, then apply a different station payload.
+        // This is the regression that previously reset the weapon to its default
+        // build: F opened the panel correctly, but APPLY called SelectWeapon and
+        // rebuilt the same platform from scratch.  Keep a complete snapshot so the
+        // check covers optic, barrel, muzzle, grip, stock, and magazine together.
+        var attachmentEditApplied = false;
+        foreach (var slot in new[]
+        {
+            AttachmentSlot.Optic,
+            AttachmentSlot.Barrel,
+            AttachmentSlot.Muzzle,
+            AttachmentSlot.Grip,
+            AttachmentSlot.Stock,
+            AttachmentSlot.Magazine
+        })
+        {
+            attachmentEditApplied |= _player.CycleTrainingRangeAttachment(slot);
+        }
+        var buildBeforeStationApply = _player.EquippedWeapon.Clone();
+        // Re-applying the panel payload rebuilds target nodes, so retain the
+        // diagnostic position before that operation can dispose the old object.
+        var fireTargetPositionForLog = IsInstanceValid(fireTarget)
+            ? fireTarget!.GlobalPosition
+            : Vector3.Zero;
+
+        // Open and use the same panel through a station context.  This is the
         // interaction contract used by F in the actual arena, without synthesizing a
         // keyboard event in a headless validator.
         _hud.ShowTrainingRangeStation((int)TrainingRangeStationKind.Weapon, "ARMORY");
@@ -198,13 +223,36 @@ public partial class FreightTerminalWorld
             && _hud.TrainingRangeSetupOpenedFromGameplay
             && _hud.TrainingRangeSetupStationContext == (int)TrainingRangeStationKind.Weapon
             && GetTree().Paused;
-        _hud.PressTrainingRangeSetupBackForDiagnostics();
-        await WaitFrames(2);
+        // Keep the weapon selection unchanged, but alter ammo and target count so
+        // APPLY has real work to do while the active platform remains AWM.
+        _hud.SelectTrainingRangeBotCountForDiagnostics(6);
+        _hud.SelectTrainingRangeAmmoForDiagnostics(2, 1);
+        _hud.PressTrainingRangeSetupDeployForDiagnostics();
+        await WaitFrames(6);
+        var buildAfterStationApply = _player.EquippedWeapon.Clone();
+        var stationAttachmentPreserved =
+            attachmentEditApplied
+            && _trainingRangeActive
+            && _player.TrainingRangeWeaponPlatform == buildBeforeStationApply.Platform
+            && WeaponBuildsMatch(buildBeforeStationApply, buildAfterStationApply)
+            && _trainingRangeBotCount == 6
+            && _trainingRangeAmmoType == 2
+            && _trainingRangeAmmoLevel == 1;
         var stationResume = !_hud.IsTrainingRangeSetupVisible
             && _trainingRangeActive
             && !GetTree().Paused
             && _hud.IsGameplayHudVisible
             && _hud.TrainingRangeSetupStationContext == -1;
+
+        // A platform change intentionally discards the prior platform's parts and
+        // installs the selected platform's clean range baseline.  This keeps the
+        // persistence rule narrow: re-applying AWM preserves AWM, while selecting
+        // M4A1 starts from its own documented build.
+        var baselineM4 = WeaponCatalog.BuildTrainingRangeDefault(WeaponPlatform.M4A1);
+        _player.SelectTrainingRangeWeapon(0);
+        var platformSwitchReset = _player.TrainingRangeWeaponPlatform == WeaponPlatform.M4A1
+            && WeaponBuildsMatch(baselineM4, _player.EquippedWeapon)
+            && _player.TrainingRangeWeaponIndex == 0;
 
         var valid = setupReady
             && arenaReady
@@ -223,10 +271,31 @@ public partial class FreightTerminalWorld
             && repeatFireDowned
             && repeatRevived
             && stationPanel
+            && stationAttachmentPreserved
+            && platformSwitchReset
             && stationResume;
-        GD.Print($"TRAINING_RANGE_CHECK valid={valid} setup={setupReady} arena={arenaReady} selection={selectionReady} started={started} stations={stationsReady} infinite_ammo={infiniteAmmo} weapon_cycle={weaponCycle} live_fire_shot={liveFireShot} live_fire_hit={liveFireHit} live_fire_downed={liveFireDowned} live_fire_target_id={liveFireTargetId} live_fire_probe={liveFireProbeCollider} live_fire_probe_distance={liveFireProbeDistance:0.00} live_fire_probe_position={liveFireProbePosition} live_fire_camera={liveFireCameraPosition} live_fire_forward={liveFireCameraForward} fire_target_position={fireTarget?.GlobalPosition ?? Vector3.Zero} target_hit={targetHit} downed={downed} respawned={respawned} revive_frames={reviveFrames} repeat_fire_shot={repeatFireShot} repeat_fire_hit={repeatFireHit} repeat_fire_downed={repeatFireDowned} repeat_revived={repeatRevived} repeat_revive_frames={repeatReviveFrames} station_panel={stationPanel} station_resume={stationResume} target_id={targetId} bots={TrainingRangeBotCount} kills={TrainingRangeKills}");
+        GD.Print($"TRAINING_RANGE_CHECK valid={valid} setup={setupReady} arena={arenaReady} selection={selectionReady} started={started} stations={stationsReady} infinite_ammo={infiniteAmmo} weapon_cycle={weaponCycle} live_fire_shot={liveFireShot} live_fire_hit={liveFireHit} live_fire_downed={liveFireDowned} live_fire_target_id={liveFireTargetId} live_fire_probe={liveFireProbeCollider} live_fire_probe_distance={liveFireProbeDistance:0.00} live_fire_probe_position={liveFireProbePosition} live_fire_camera={liveFireCameraPosition} live_fire_forward={liveFireCameraForward} fire_target_position={fireTargetPositionForLog} target_hit={targetHit} downed={downed} respawned={respawned} revive_frames={reviveFrames} repeat_fire_shot={repeatFireShot} repeat_fire_hit={repeatFireHit} repeat_fire_downed={repeatFireDowned} repeat_revived={repeatRevived} repeat_revive_frames={repeatReviveFrames} station_panel={stationPanel} station_attachment_edit={attachmentEditApplied} station_attachment_preserved={stationAttachmentPreserved} platform_switch_reset={platformSwitchReset} station_resume={stationResume} target_id={targetId} bots={TrainingRangeBotCount} kills={TrainingRangeKills}");
         GD.Print($"TRAINING_RANGE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
+    }
+
+    private static bool WeaponBuildsMatch(WeaponBuild left, WeaponBuild right)
+    {
+        if (left.Platform != right.Platform || left.Attachments.Count != right.Attachments.Count)
+        {
+            return false;
+        }
+
+        foreach (var pair in left.Attachments)
+        {
+            if (!right.Attachments.TryGetValue(pair.Key, out var rightId)
+                || !string.Equals(pair.Value, rightId, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private async void CaptureTrainingRangeSetup(bool deployed)

@@ -131,7 +131,7 @@ public partial class EnemyOperator
     /// downed clip here; the target remains visible and non-collidable until the
     /// range controller calls <see cref="ReviveForTrainingRange"/>.
     /// </summary>
-    public void SetTrainingRangeDownedPose()
+    public void SetTrainingRangeDownedPose(float delta = 1.0f / 60.0f)
     {
         if (!GodotObject.IsInstanceValid(this) || !UsesAuthoredOperatorForDiagnostics)
         {
@@ -140,7 +140,7 @@ public partial class EnemyOperator
         _deathTween?.Kill();
         _deathTween = null;
         _authoredOperatorAnimator.Update(
-            0.0f,
+            Mathf.Clamp(delta, 0.0f, 0.1f),
             0.0f,
             weaponReadied: false,
             prone: false,

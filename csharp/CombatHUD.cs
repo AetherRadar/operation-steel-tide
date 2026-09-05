@@ -440,6 +440,7 @@ public partial class CombatHUD : CanvasLayer
         _weaponModeLabel.ClipText = true;
         weapon.AddChild(_weaponModeLabel);
         BuildAmmoTierHud(weapon);
+        BuildTrainingRangeAttachmentHud(weapon);
 
         // Bottom-right backpack control: open inventory + live total value.
         _backpackHotkeyButton = Button(
@@ -1422,6 +1423,7 @@ public partial class CombatHUD : CanvasLayer
         RefreshTacticalLanguage();
         RefreshExtractionLanguage();
         RefreshTrainingRangeSetupLanguage();
+        RefreshTrainingRangeAttachmentReadoutLanguage();
         RefreshLootOverlay();
         if (IsWeaponDetailVisible && _detailedWeapon is not null)
         {

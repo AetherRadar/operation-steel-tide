@@ -95,6 +95,7 @@ public partial class TacticalPlayer
             return;
         }
         _trainingRangeWeaponIndex = (_trainingRangeWeaponIndex + 1) % TrainingRangeWeapons.Length;
+        Main?.SyncTrainingRangeWeaponIndex(_trainingRangeWeaponIndex);
         InstallTrainingRangeWeapon(TrainingRangeWeapons[_trainingRangeWeaponIndex], notify: true);
         // Installing a new weapon restores the production slot's last/default
         // ammo grade.  Reapply the range selector after every cycle so AP/HP/
@@ -122,9 +123,20 @@ public partial class TacticalPlayer
         PushHudStats();
     }
 
-    private void InstallTrainingRangeWeapon(WeaponPlatform platform, bool notify)
+    private void InstallTrainingRangeWeapon(
+        WeaponPlatform platform,
+        bool notify,
+        WeaponBuild? preservedBuild = null)
     {
-        var build = WeaponCatalog.BuildTrainingRangeDefault(platform);
+        // A range station can re-apply its payload while the player is already
+        // holding this platform. Keep the live build in that case so changing
+        // bot count/ammo does not silently undo Y/U/I/O/P/L attachment choices.
+        // A different platform deliberately falls back to the clean range
+        // baseline (AK-47 therefore returns to its iron-sight default).
+        var build = preservedBuild is not null
+            && preservedBuild.Platform == platform
+            ? WeaponCatalog.NormalizeBuild(preservedBuild)
+            : WeaponCatalog.BuildTrainingRangeDefault(platform);
         if (WeaponCatalog.IsSidearm(platform))
         {
             InstallSidearmWeapon(build, LootGrade.Legendary);

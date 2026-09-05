@@ -46,6 +46,18 @@ public partial class FreightTerminalWorld
     {
         _trainingRangeSetupFromGameplay = fromGameplay;
         _trainingRangeSetupAwaitingDeploy = !fromGameplay;
+        if (fromGameplay && _trainingRangeActive)
+        {
+            // Reopening the station panel starts from the payload currently in
+            // the range.  This keeps an in-hand weapon and its edited build when
+            // the player changes only bot count or ammunition.
+            _hud.SetTrainingRangeSetupSelections(
+                _trainingRangeBotType,
+                _trainingRangeBotCount,
+                _trainingRangeWeaponIndex,
+                _trainingRangeAmmoType,
+                _trainingRangeAmmoLevel);
+        }
         _player.UiLocked = true;
         _player.DisarmFireInput();
         _player.DisarmMovementInput();

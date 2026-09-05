@@ -399,7 +399,7 @@ public sealed class LootItem
             LootItemKind.Valuable => $"{ValuableItems.DisplayName(ValuableKind, language)} x{Quantity}",
             _ => GameLocalization.IsChinese(language) ? "物品" : "Item"
         };
-        return GameLocalization.IsChinese(language) ? $"[{gradeTag}] {core}" : $"[{gradeTag}] {core}";
+        return $"[{gradeTag}] {core}";
     }
 
     public string Detail(string language)
@@ -565,6 +565,8 @@ public static class EquipmentCatalog
     };
 
     public static EquipmentDefinition Definition(string id) => Definitions[id];
+    public static bool TryDefinition(string id, out EquipmentDefinition definition)
+        => Definitions.TryGetValue(id, out definition!);
 
     public static EquipmentItem Create(string id)
     {
@@ -694,6 +696,8 @@ public static class WeaponCatalog
     };
 
     public static WeaponDefinition Weapon(WeaponPlatform platform) => Weapons[platform];
+    public static bool TryWeapon(WeaponPlatform platform, out WeaponDefinition definition)
+        => Weapons.TryGetValue(platform, out definition!);
     public static bool IsSidearm(WeaponPlatform platform)
         => Weapon(platform).CarryClass == WeaponCarryClass.Sidearm;
     public static bool HasFixedIntegratedScope(WeaponPlatform platform)
@@ -704,6 +708,8 @@ public static class WeaponCatalog
     public static bool IsMagnifiedOptic(string attachmentId)
         => attachmentId is "optic_scope" or "optic_7x" or "optic_sniper";
     public static AttachmentDefinition Attachment(string id) => Attachments[id];
+    public static bool TryAttachment(string id, out AttachmentDefinition definition)
+        => Attachments.TryGetValue(id, out definition!);
     public static bool CanEquipAttachment(WeaponPlatform platform, string attachmentId)
     {
         var attachment = Attachment(attachmentId);

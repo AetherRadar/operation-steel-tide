@@ -38,9 +38,63 @@ public partial class TacticalPlayer
     /// <summary>Apply a setup-panel weapon selection without touching mission inventory.</summary>
     public void SelectTrainingRangeWeapon(int index)
     {
-        _trainingRangeWeaponIndex = Mathf.Clamp(index, 0, TrainingRangeWeapons.Length - 1);
-        InstallTrainingRangeWeapon(TrainingRangeWeapons[_trainingRangeWeaponIndex], notify: true);
+        var selectedIndex = Mathf.Clamp(index, 0, TrainingRangeWeapons.Length - 1);
+        var selectedPlatform = TrainingRangeWeapons[selectedIndex];
+        var preservedBuild = CaptureTrainingRangeBuildForReapply(selectedPlatform);
+        _trainingRangeWeaponIndex = selectedIndex;
+        Main?.SyncTrainingRangeWeaponIndex(_trainingRangeWeaponIndex);
+        InstallTrainingRangeWeapon(
+            selectedPlatform,
+            notify: true,
+            preservedBuild: preservedBuild);
         ApplyTrainingRangeAmmoProfile(_trainingRangeAmmoType, _trainingRangeAmmoLevel);
+    }
+
+    /// <summary>
+    /// Captures the currently equipped range build only for an in-range
+    /// re-application of the same platform. Selection of another platform must
+    /// start from that weapon's documented training baseline instead of carrying
+    /// an optic or furniture across to an unrelated receiver.
+    /// </summary>
+    private WeaponBuild? CaptureTrainingRangeBuildForReapply(WeaponPlatform platform)
+    {
+        if (Main?.IsTrainingRangeActive != true)
+        {
+            return null;
+        }
+
+        // Normally the selected range firearm is the active slot.  Read that
+        // live object first so an attachment changed immediately before F is
+        // captured even if the slot's cached snapshot has not been touched by
+        // another action yet.
+        if (!_knifeEquipped
+            && IsFirearmQuickSlotSelected
+            && HasActiveFirearm
+            && EquippedWeapon.Platform == platform)
+        {
+            return EquippedWeapon.Clone();
+        }
+
+        // The player can open the panel while a grenade, knife, or another
+        // quick-slot item is selected.  In that case EquippedWeapon is only a
+        // stale view; inspect the persisted weapon slots so the range still
+        // preserves the build that belongs to this platform.  Each public
+        // snapshot is already cloned, so the caller can safely normalize it.
+        var storedBuilds = new[]
+        {
+            PrimaryWeaponBuild,
+            SecondaryWeaponBuild,
+            SidearmWeaponBuild
+        };
+        foreach (var storedBuild in storedBuilds)
+        {
+            if (storedBuild?.Platform == platform)
+            {
+                return storedBuild;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

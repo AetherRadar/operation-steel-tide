@@ -996,38 +996,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             : null;
         var barrelScale = barrelPart?.VisualScale ?? 1.0f;
         var barrelLength = definition.BarrelLength * barrelScale;
-        var receiverColor = EquippedWeapon.Platform switch
-        {
-            WeaponPlatform.AK74 => new Color(0.12f, 0.105f, 0.075f),
-            WeaponPlatform.ScarL => new Color(0.34f, 0.29f, 0.2f),
-            WeaponPlatform.M24 => new Color(0.16f, 0.19f, 0.17f),
-            WeaponPlatform.AXMC => new Color(0.035f, 0.14f, 0.15f),
-            WeaponPlatform.MP5A5 => new Color(0.025f, 0.032f, 0.03f),
-            WeaponPlatform.M3A1 => new Color(0.17f, 0.2f, 0.185f),
-            WeaponPlatform.P226 => new Color(0.055f, 0.06f, 0.065f),
-            WeaponPlatform.M1911 => new Color(0.16f, 0.15f, 0.13f),
-            WeaponPlatform.AWM => new Color(0.2f, 0.22f, 0.21f),
-            WeaponPlatform.VSS => new Color(0.075f, 0.1f, 0.075f),
-            WeaponPlatform.DesertEagle => new Color(0.42f, 0.44f, 0.41f),
-            WeaponPlatform.GSh18 => new Color(0.045f, 0.052f, 0.05f),
-            _ => new Color(0.045f, 0.052f, 0.05f)
-        };
-        var furnitureColor = EquippedWeapon.Platform switch
-        {
-            WeaponPlatform.AK74 => new Color(0.24f, 0.12f, 0.055f),
-            WeaponPlatform.ScarL => new Color(0.29f, 0.255f, 0.18f),
-            WeaponPlatform.M24 => new Color(0.18f, 0.24f, 0.16f),
-            WeaponPlatform.AXMC => new Color(0.08f, 0.29f, 0.28f),
-            WeaponPlatform.MP5A5 => new Color(0.055f, 0.065f, 0.06f),
-            WeaponPlatform.M3A1 => new Color(0.105f, 0.12f, 0.11f),
-            WeaponPlatform.P226 => new Color(0.075f, 0.08f, 0.085f),
-            WeaponPlatform.M1911 => new Color(0.22f, 0.12f, 0.065f),
-            WeaponPlatform.AWM => new Color(0.15f, 0.18f, 0.16f),
-            WeaponPlatform.VSS => new Color(0.16f, 0.24f, 0.14f),
-            WeaponPlatform.DesertEagle => new Color(0.07f, 0.075f, 0.07f),
-            WeaponPlatform.GSh18 => new Color(0.07f, 0.075f, 0.072f),
-            _ => new Color(0.18f, 0.17f, 0.13f)
-        };
+        var palette = WeaponPlatformVisualConfig.For(EquippedWeapon.Platform);
+        var receiverColor = palette.ReceiverColor;
+        var furnitureColor = palette.FurnitureColor;
         var receiverMaterial = TacticalSurfaceLibrary.WeaponFinish(receiverColor, 0.52f, 0.46f);
         var furnitureMaterial = TacticalSurfaceLibrary.WeaponFinish(furnitureColor, 0.12f, 0.68f, 5.5f);
 
@@ -1466,6 +1437,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             SecondaryWeaponForHud,
             SidearmWeaponForHud,
             (int)ActiveQuickSlot);
+        Hud?.SetTrainingRangeAttachmentReadout(
+            Main?.IsTrainingRangeActive == true && IsFirearmQuickSlotSelected,
+            IsFirearmQuickSlotSelected ? EquippedWeapon : null);
         Hud?.SetAiming(_isAiming);
         var heading = Mathf.RadToDeg(Rotation.Y) * -1.0f;
         Hud?.SetHeading(heading);

@@ -463,16 +463,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             ? WeaponCatalog.Attachment(carriedBarrelId).VisualScale
             : 1.0f;
         var carriedBarrelLength = carriedDefinition.BarrelLength * barrelScale;
-        var gunColor = CarriedWeapon.Platform switch
-        {
-            WeaponPlatform.AK74 => new Color(0.15f, 0.09f, 0.045f),
-            WeaponPlatform.ScarL => new Color(0.3f, 0.25f, 0.17f),
-            WeaponPlatform.M24 => new Color(0.16f, 0.21f, 0.13f),
-            WeaponPlatform.AXMC => new Color(0.035f, 0.23f, 0.22f),
-            WeaponPlatform.MP5A5 => new Color(0.035f, 0.045f, 0.043f),
-            WeaponPlatform.M3A1 => new Color(0.18f, 0.21f, 0.19f),
-            _ => new Color(0.018f, 0.023f, 0.022f)
-        };
+        var gunColor = WeaponPlatformVisualConfig.ThirdPersonGunColor(CarriedWeapon.Platform);
         var gun = TacticalSurfaceLibrary.WeaponFinish(gunColor, 0.88f, 0.25f);
         var lens = Material(new Color(0.025f, 0.16f, 0.15f), 0.62f, 0.08f);
 

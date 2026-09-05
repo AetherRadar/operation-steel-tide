@@ -43,6 +43,25 @@ public partial class FreightTerminalWorld
     public int TrainingRangeConfiguredAmmoType => _trainingRangeAmmoType;
     public int TrainingRangeConfiguredAmmoLevel => _trainingRangeAmmoLevel;
 
+    /// <summary>
+    /// Keeps the world payload in step with the live weapon-cycle control.  The
+    /// player owns the Q/weapon-cycle index while a station panel owns the
+    /// persisted configuration; synchronizing here prevents F3 from reopening
+    /// with the previous platform after a live cycle.
+    /// </summary>
+    internal void SyncTrainingRangeWeaponIndex(int index)
+    {
+        if (!_trainingRangeActive || !IsInstanceValid(_player))
+        {
+            return;
+        }
+
+        _trainingRangeWeaponIndex = Mathf.Clamp(
+            index,
+            0,
+            Mathf.Max(0, _player.TrainingRangeWeaponCount - 1));
+    }
+
     /// <summary>Apply the setup panel selection; if already in the range, rebuild targets immediately.</summary>
     public void ConfigureTrainingRange(
         int botType,
@@ -399,7 +418,7 @@ public partial class FreightTerminalWorld
                 // scheduled.  Re-assert the range-specific downed pose every frame
                 // so the target stays visibly knocked down until the reset timer
                 // expires, rather than briefly showing a mission corpse animation.
-                bot.SetTrainingRangeDownedPose();
+                bot.SetTrainingRangeDownedPose(delta);
                 if (!slot.RespawnPending)
                 {
                     slot.RespawnPending = true;
