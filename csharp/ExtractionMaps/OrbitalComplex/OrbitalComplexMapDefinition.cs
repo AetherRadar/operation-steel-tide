@@ -300,6 +300,13 @@ public static class OrbitalComplexMapDefinition
         Box("catwalk_north", new(0, -2.6f, -88), new(116, 0.45f, 3.6f), Vector3.Zero, "catwalk_deck"),
         Box("catwalk_west_spine", new(-94, -2.6f, -116), new(3.6f, 0.45f, 56), Vector3.Zero, "catwalk_deck"),
         Box("catwalk_east_spine", new(94, -2.6f, -116), new(3.6f, 0.45f, 56), Vector3.Zero, "catwalk_deck"),
+        // Multi-level detention galleries inside the open Stormglass atrium.
+        // They are deliberately offset outside the reactor ring so the lower
+        // yard remains a continuous combat loop.
+        Box("detention_gallery_west_mid", new(-103, -4.45f, -31), new(6.2f, 0.45f, 146), Vector3.Zero, "detention_gallery"),
+        Box("detention_gallery_east_mid", new(103, -4.45f, -31), new(6.2f, 0.45f, 146), Vector3.Zero, "detention_gallery"),
+        Box("detention_gallery_west_upper", new(-103, 6.65f, -31), new(6.2f, 0.45f, 146), Vector3.Zero, "detention_gallery"),
+        Box("detention_gallery_east_upper", new(103, 6.65f, -31), new(6.2f, 0.45f, 146), Vector3.Zero, "detention_gallery"),
         // The bunker shell is rendered by the authored GLB.  These hidden
         // gameplay volumes deliberately span the complete declared vertical
         // envelope so a player cannot climb above the roof or fall below the
@@ -308,7 +315,18 @@ public static class OrbitalComplexMapDefinition
         Box("south_boundary", new(0, -5.0f, 100), new(340, 60, 1), Vector3.Zero, "boundary"),
         Box("west_boundary", new(-170, -5.0f, -60), new(1, 60, 320), Vector3.Zero, "boundary"),
         Box("east_boundary", new(170, -5.0f, -60), new(1, 60, 320), Vector3.Zero, "boundary"),
-        Box("bunker_ceiling", new(0, 24.5f, -60), new(340, 1, 320), Vector3.Zero, "ceiling"),
+        // The bunker roof is intentionally split around three open courts:
+        // south intake, the Stormglass atrium, and the north recovery apron.
+        // Keeping these as separate volumes mirrors the authored DCC roof
+        // panels and gives the map a real indoor/outdoor cadence.
+        Box("bunker_ceiling_south_west", new(-132.5f, 24.5f, 85), new(75, 1, 32), Vector3.Zero, "ceiling"),
+        Box("bunker_ceiling_south_east", new(132.5f, 24.5f, 85), new(75, 1, 32), Vector3.Zero, "ceiling"),
+        Box("bunker_ceiling_transition", new(0, 24.5f, 59), new(340, 1, 18), Vector3.Zero, "ceiling"),
+        Box("bunker_ceiling_atrium_west", new(-141, 24.5f, -31), new(58, 1, 162), Vector3.Zero, "ceiling"),
+        Box("bunker_ceiling_atrium_east", new(141, 24.5f, -31), new(58, 1, 162), Vector3.Zero, "ceiling"),
+        Box("bunker_ceiling_mid_north", new(0, 24.5f, -151), new(340, 1, 78), Vector3.Zero, "ceiling"),
+        Box("bunker_ceiling_north_west", new(-145, 24.5f, -205), new(50, 1, 30), Vector3.Zero, "ceiling"),
+        Box("bunker_ceiling_north_east", new(145, 24.5f, -205), new(50, 1, 30), Vector3.Zero, "ceiling"),
         Box("reactor_pit_west_rim", new(-29, -17.5f, -34), new(4, 3.4f, 66), Vector3.Zero, "pit_rim"),
         Box("reactor_pit_east_rim", new(29, -17.5f, -34), new(4, 3.4f, 66), Vector3.Zero, "pit_rim")
     };

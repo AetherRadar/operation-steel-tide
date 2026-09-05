@@ -493,14 +493,23 @@ public static class OrbitalComplexLayoutValidator
             && boundaries.Any(box => CoversEastEdge(box, bounds));
 
         // BunkerCeiling is visible authored geometry, but gameplay must also have
-        // an invisible roof shape.  Accept one full-footprint roof or a future
-        // tiled equivalent that is represented by a single contract box.
-        var ceilingCollision = layout.CollisionBoxes
+        // invisible roof shapes.  The authored map deliberately leaves three
+        // open courts, so accept either a legacy full-footprint roof or a tiled
+        // equivalent: every roof tile must sit on the roof plane, stay in the
+        // envelope, and the union must cover both west and east perimeter bands.
+        var ceilingTiles = layout.CollisionBoxes
             .Where(IsCeilingCollision)
-            .Any(box => IsAxisAligned(box.RotationRadians)
+            .Where(box => IsAxisAligned(box.RotationRadians)
                 && box.Size.Y >= 0.5f
-                && CoversHorizontalBounds(box, bounds)
-                && IntersectsRoofPlane(box, bounds.MaximumY));
+                && IntersectsRoofPlane(box, bounds.MaximumY))
+            .ToArray();
+        var ceilingCollision = ceilingTiles.Any(box => CoversHorizontalBounds(box, bounds))
+            || (ceilingTiles.Length >= 3
+                && ceilingTiles.All(box => VolumeInside(bounds, box.Position, box.Size, box.RotationRadians))
+                && ceilingTiles.Any(box => box.Position.X - box.Size.X * 0.5f
+                    <= bounds.Horizontal.Position.X + Epsilon)
+                && ceilingTiles.Any(box => box.Position.X + box.Size.X * 0.5f
+                    >= bounds.Horizontal.End.X - Epsilon));
 
         return primitiveCollisionValid
             && collisionEnvelopeValid

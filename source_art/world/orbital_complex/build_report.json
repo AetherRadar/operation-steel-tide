@@ -93,10 +93,10 @@
     }
   },
   "statistics_before_export": {
-    "mesh_nodes": 347,
-    "unique_meshes": 310,
-    "unique_triangles": 199492,
-    "instance_triangles": 305892,
+    "mesh_nodes": 370,
+    "unique_meshes": 333,
+    "unique_triangles": 200632,
+    "instance_triangles": 307032,
     "materials": 182,
     "images": 35,
     "estimated_texture_memory_bytes": 138936320
@@ -173,32 +173,32 @@
       }
     },
     "statistics": {
-      "mesh_nodes": 346,
-      "unique_meshes": 309,
-      "unique_triangles": 199492,
-      "instance_triangles": 305892,
+      "mesh_nodes": 369,
+      "unique_meshes": 332,
+      "unique_triangles": 200632,
+      "instance_triangles": 307032,
       "materials": 42,
       "images": 11,
       "estimated_texture_memory_bytes": 42205184
     }
   },
   "gltf_document": {
-    "gltf_nodes": 465,
-    "gltf_meshes": 309,
-    "gltf_primitives": 311,
+    "gltf_nodes": 488,
+    "gltf_meshes": 332,
+    "gltf_primitives": 334,
     "gltf_materials": 42,
     "gltf_images": 11
   },
   "files": {
     "blend": {
       "path": "source_art/world/orbital_complex/orbital_complex.blend",
-      "bytes": 15613918,
-      "sha256": "2E719250DBD33D00CE369A62BBDB0CD65A951F0486BB93FD01ECF578C275AE24"
+      "bytes": 15640981,
+      "sha256": "B23E247853546156FA37BC72D50EABB02773F039FF75EDEBB0CF7F9084FDEE77"
     },
     "glb": {
       "path": "assets/models/orbital_complex/orbital_complex.glb",
-      "bytes": 19901844,
-      "sha256": "D19067BDB15B75E02EE4731BA530A9E2BAE15B61963A7AE2F4507A542EE4F33F",
+      "bytes": 19997864,
+      "sha256": "2DBEBF74C662624F293072A00E5629332F3B2E0148A2F72486A62466FAEE1CF4",
       "embedded": true
     }
   },

@@ -442,10 +442,33 @@ def build_hardscape_underground(groups, materials):
     _ribbon("ReactorPitWestBridge", [(-31.0, 16.0), (-31.0, 52.0)], 5.0, -3.0, -2.4, black, groups["District_ReactorHall"])
     _ribbon("ReactorPitEastBridge", [(31.0, 52.0), (31.0, 16.0)], 5.0, -3.0, -2.4, black, groups["District_ReactorHall"])
 
-    # Full-height shell: roof, pressure walls, and a secondary inner bulkhead
-    # leave no accidental skybox openings when the camera looks upward.
+    # Full-height shell with deliberate open-air courts.  The previous pass
+    # sealed the entire bunker with one roof slab, which made every district
+    # feel like the same indoor warehouse.  Split the roof around three
+    # pressure courtyards: the south intake yard, the Stormglass atrium, and
+    # the north recovery apron.  Their structural lips remain enclosed and
+    # readable, but the sky/ceiling contrast now gives the player a real
+    # in/out rhythm.
     shell_outline = [(-170.0, -100.0), (170.0, -100.0), (170.0, 220.0), (-170.0, 220.0), (-170.0, -100.0)]
-    panel("BunkerCeiling", shell_outline[:-1], 22.0, 24.0, ceiling, static, "DCC-authored pressure-ceiling hardscape")
+    for name, points in (
+        ("BunkerCeiling_SouthWest", [(-170.0, -100.0), (-95.0, -100.0), (-95.0, -68.0), (-170.0, -68.0)]),
+        ("BunkerCeiling_SouthEast", [(95.0, -100.0), (170.0, -100.0), (170.0, -68.0), (95.0, -68.0)]),
+        ("BunkerCeiling_Transition", [(-170.0, -68.0), (170.0, -68.0), (170.0, -50.0), (-170.0, -50.0)]),
+        ("BunkerCeiling_AtriumWest", [(-170.0, -50.0), (-112.0, -50.0), (-112.0, 112.0), (-170.0, 112.0)]),
+        ("BunkerCeiling_AtriumEast", [(112.0, -50.0), (170.0, -50.0), (170.0, 112.0), (112.0, 112.0)]),
+        ("BunkerCeiling_MidNorth", [(-170.0, 112.0), (170.0, 112.0), (170.0, 190.0), (-170.0, 190.0)]),
+        ("BunkerCeiling_NorthWest", [(-170.0, 190.0), (-120.0, 190.0), (-120.0, 220.0), (-170.0, 220.0)]),
+        ("BunkerCeiling_NorthEast", [(120.0, 190.0), (170.0, 190.0), (170.0, 220.0), (120.0, 220.0)]),
+    ):
+        panel(name, points, 22.0, 24.0, ceiling, static, "DCC-authored pressure-ceiling hardscape")
+    # Raised atrium galleries make the open court a true composite prison
+    # volume: floor yard, mid-level patrol ring, and upper transfer gallery.
+    for level, (bottom, top) in enumerate(((-5.3, -4.45), (5.8, 6.65)), start=1):
+        _ribbon(f"DetentionGalleryWest_L{level}", [(-103.0, -42.0), (-103.0, 104.0)], 6.2, bottom, top, black, groups["District_ReactorHall"])
+        _ribbon(f"DetentionGalleryEast_L{level}", [(103.0, -42.0), (103.0, 104.0)], 6.2, bottom, top, black, groups["District_ReactorHall"])
+        for index, y in enumerate((-12.0, 34.0, 80.0), start=1):
+            _ribbon(f"DetentionGalleryBridge_L{level}_{index}", [(-100.0, y), (-72.0, y)], 4.6, bottom, top, black, groups["District_ReactorHall"])
+            _ribbon(f"DetentionGalleryBridge_R_L{level}_{index}", [(72.0, y), (100.0, y)], 4.6, bottom, top, black, groups["District_ReactorHall"])
     _ribbon("BunkerPerimeterWalls", shell_outline, 3.0, -16.0, 22.0, black, static)
     _ribbon("SouthPressureBulkhead", [(-150.0, -40.0), (-44.0, -40.0)], 2.3, -16.0, 22.0, black, groups["District_IntakeCauseway"])
     # The intake used to be one uninterrupted 190 m sightline from the south
