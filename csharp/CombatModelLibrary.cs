@@ -1191,11 +1191,13 @@ internal sealed class AuthoredOperatorVisual
         // as the rifle, so preserve the solved wrist position while matching
         // the weapon's grip basis. This makes the palm wrap the pistol grip
         // instead of presenting the back of the hand above the receiver.
+#pragma warning disable CS0618
         _skeleton.SetBoneGlobalPoseOverride(
             _rightHandBone,
             new Transform3D(weaponBasis, hand.Origin),
             1.0f,
             persistent: true);
+#pragma warning restore CS0618
         _skeleton.ForceUpdateBoneChildTransform(_rightHandBone);
         if (_weapon.Root.GetParent() is BoneAttachment3D attachment)
         {
