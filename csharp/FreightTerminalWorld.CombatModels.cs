@@ -139,7 +139,7 @@ public partial class FreightTerminalWorld
             transitionsValid = transitions.SequenceEqual(unarmedUprightExpected);
         }
         var readyDistinct = readyIdleFit.WeaponOrigin.Y <= rifleFit.WeaponOrigin.Y - 0.18f;
-        var readyCrossBody = Mathf.Abs(readyIdleFit.MuzzleOffset.X) >= 0.16f
+        var readyForwardAligned = Mathf.Abs(readyIdleFit.MuzzleOffset.X) <= 0.16f
             && readyIdleFit.MuzzleOffset.Z <= -0.38f;
         var valid = count == 25
             && sockets
@@ -147,7 +147,7 @@ public partial class FreightTerminalWorld
             && rifleFit.Valid
             && movementRifleFitValid
             && readyDistinct
-            && readyCrossBody;
+            && readyForwardAligned;
         GD.Print(
             $"OPERATOR_ANIMATIONS_CHECK count={count} sockets={sockets} "
             + $"weapon_socket={weaponSocketPosition} back_socket={backWeaponSocketPosition} "
@@ -156,7 +156,7 @@ public partial class FreightTerminalWorld
             + $"support_offset={rifleFit.SupportHandOffset} "
             + $"hand_separation={rifleFit.HandSeparation:F3} "
             + $"ready_distinct={readyDistinct} ready_weapon={readyIdleFit.WeaponOrigin} "
-            + $"ready_cross_body={readyCrossBody} aim_weapon={rifleFit.WeaponOrigin} "
+            + $"ready_forward_aligned={readyForwardAligned} aim_weapon={rifleFit.WeaponOrigin} "
             + $"ready_muzzle={readyIdleFit.MuzzleOffset} "
             + $"movement_rifle_fit={string.Join(',', movementRifleFits)} "
             + $"muzzle_offset={rifleFit.MuzzleOffset} stock_offset={rifleFit.StockOffset} "

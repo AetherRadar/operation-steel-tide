@@ -635,6 +635,7 @@ internal sealed class AuthoredOperatorVisual
             _ => new Quaternion(0.7124552f, 0.126017f, -0.6895026f, -0.0333694f)
         };
     private readonly Skeleton3D _skeleton;
+    private readonly int _spineBone;
     private readonly int _rightShoulderBone;
     private readonly int _rightElbowBone;
     private readonly int _rightHandBone;
@@ -653,6 +654,7 @@ internal sealed class AuthoredOperatorVisual
         VisualId = visualId;
         AnimationPlayer = CombatModelLibrary.RequireAnimationPlayer(root);
         _skeleton = CombatModelLibrary.RequireSkeleton(root);
+        _spineBone = ResolveBoneIndex(_skeleton, "mixamorig:Spine");
         _rightShoulderBone = ResolveBoneIndex(_skeleton, "mixamorig:RightArm");
         _rightElbowBone = ResolveBoneIndex(_skeleton, "mixamorig:RightForeArm");
         _rightHandBone = ResolveBoneIndex(_skeleton, "mixamorig:RightHand");
@@ -766,6 +768,7 @@ internal sealed class AuthoredOperatorVisual
             LeftWristBelowHead: headBase.Y - leftWrist.Y,
             StockToRightShoulderDistance: stock.DistanceTo(rightShoulder),
             HeadToWeaponLineClearance: DistanceToSegment(headBase, stock, muzzle),
+            ChestToWeaponLineClearance: DistanceToSegment(chest, stock, muzzle),
             PrimaryHandToWeaponDistance: rightWrist.DistanceTo(weapon.Root.GlobalPosition),
             SupportHandToForegripDistance: leftWrist.DistanceTo(weapon.Foregrip.GlobalPosition),
             SupportHandOffset: weapon.Foregrip.GlobalPosition - leftWrist,
@@ -988,7 +991,6 @@ internal sealed class AuthoredOperatorVisual
         if (!_weaponReadied
             || _weapon is null
             || !GodotObject.IsInstanceValid(_weapon.Root)
-            || !CombatModelLibrary.UsesHy3dOperator(VisualId)
             || (!string.IsNullOrEmpty(animation) && !IsTwoHandedReadyAnimation()))
         {
             return;
@@ -998,7 +1000,57 @@ internal sealed class AuthoredOperatorVisual
         _skeleton.ClearBonesGlobalPoseOverride();
         _skeleton.ForceUpdateAllBoneTransforms();
 #pragma warning restore CS0618
-        ApplyWeaponSocketTransform(readied: true, dynamicHy3d: true);
+        ApplyCarryTorsoCorrection(animation);
+        var dynamicCarry = !WeaponCatalog.IsSidearm(_weapon.Platform);
+        var dynamicHy3d = CombatModelLibrary.UsesHy3dOperator(VisualId);
+        ApplyWeaponSocketTransform(readied: true, dynamicCarry: dynamicCarry);
+        if (!dynamicHy3d && dynamicCarry)
+        {
+            // The default Bamen operator has authored rifle-ready clips, but
+            // their left wrist is not constrained to the imported foregrip
+            // marker.  Solve that short chain after the socket follows the
+            // right hand so close third-person views show an actual two-hand
+            // grip instead of a fist hovering over the receiver.
+            RetargetHy3dLeftArm(_weapon.Foregrip.GlobalPosition);
+        }
+    }
+
+    private void ApplyCarryTorsoCorrection(string animation)
+    {
+#pragma warning disable CS0618
+        if (_spineBone < 0 || !animation.Contains("_", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var correctionDegrees = animation switch
+        {
+            "ready_sprint" or "aim_sprint" => 7.0f,
+            "ready_run" or "aim_run" => 4.5f,
+            "ready_walk" or "aim_walk" => 2.5f,
+            _ => 0.0f
+        };
+        if (correctionDegrees <= 0.0f)
+        {
+            return;
+        }
+
+        // The locomotion clips intentionally lean into a sprint, but the
+        // source lean is exaggerated at close third-person distances. Lift
+        // only the upper-body chain; the legs keep their authored stride and
+        // the weapon/hand solve below follows the corrected shoulders.
+        var spine = _skeleton.GetBoneGlobalPoseNoOverride(_spineBone);
+        var actorBasis = Root.GlobalTransform.Basis.Orthonormalized();
+        var correction = new Quaternion(actorBasis * Vector3.Right, Mathf.DegToRad(correctionDegrees));
+        _skeleton.SetBoneGlobalPoseOverride(
+            _spineBone,
+            new Transform3D(
+                (new Basis(correction) * spine.Basis).Orthonormalized(),
+                spine.Origin),
+            1.0f,
+            persistent: true);
+        _skeleton.ForceUpdateBoneChildTransform(_spineBone);
+#pragma warning restore CS0618
     }
 
     private bool IsTwoHandedReadyAnimation()
@@ -1008,7 +1060,7 @@ internal sealed class AuthoredOperatorVisual
             || animation.StartsWith("aim_", StringComparison.Ordinal);
     }
 
-    private void ApplyWeaponSocketTransform(bool readied, bool dynamicHy3d = false)
+    private void ApplyWeaponSocketTransform(bool readied, bool dynamicCarry = false)
     {
         if (_weapon is null)
         {
@@ -1021,7 +1073,7 @@ internal sealed class AuthoredOperatorVisual
         }
         _weapon.Root.Position = Vector3.Zero;
         var isHy3d = readied && CombatModelLibrary.UsesHy3dOperator(VisualId);
-        if (dynamicHy3d && isHy3d)
+        if (dynamicCarry && isHy3d)
         {
             // First put the trigger hand on a stable actor-frame target. The
             // imported HY-3D clips have a different upper-body rest axis, so
@@ -1038,6 +1090,15 @@ internal sealed class AuthoredOperatorVisual
                         : FemaleReadiedWeaponRotation
                     : ReadiedWeaponRotation
                 : Quaternion.Identity;
+        }
+        if (readied && dynamicCarry && socket is BoneAttachment3D dynamicAttachment)
+        {
+            // AnimationPlayer.Seek/Advance updates the skeleton immediately,
+            // while BoneAttachment3D normally refreshes on the next scene
+            // notification.  Refresh the hand attachment in the same tick so
+            // the rifle never lags behind the trigger wrist during run/sprint
+            // transitions.
+            dynamicAttachment.OnSkeletonUpdate();
         }
         var socketRelativeToRoot = TransformRelativeToAncestor(socket, Root);
         var inheritedScale = Mathf.Max(0.0001f, socketRelativeToRoot.Basis.Scale.X);
@@ -1072,14 +1133,17 @@ internal sealed class AuthoredOperatorVisual
             var rightHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_rightHandBone);
             _weapon.Root.Position = socket.GlobalTransform.AffineInverse() * rightHand.Origin;
         }
-        if (dynamicHy3d && isHy3d)
+        if (dynamicCarry)
         {
-            ApplyHy3dSocketBasis();
-            RetargetHy3dLeftArm(_weapon.Foregrip.GlobalPosition);
+            ApplyCarrySocketBasis();
+            if (isHy3d)
+            {
+                RetargetHy3dLeftArm(_weapon.Foregrip.GlobalPosition);
+            }
         }
     }
 
-    private void ApplyHy3dSocketBasis()
+    private void ApplyCarrySocketBasis()
     {
         var actorBasis = Root.GlobalTransform.Basis.Orthonormalized();
         // The M4A1 markers use the project frame (-Z down-range). Compensate
@@ -1087,11 +1151,10 @@ internal sealed class AuthoredOperatorVisual
         // quaternion.  A BoneAttachment can carry a non-orthogonal FBX hand
         // roll, so assigning the final global basis avoids leaking that roll
         // into the muzzle elevation on aim clips.
-        // Bias the rifle a few degrees across the chest.  This is the same
-        // ergonomic cant used by the source tactical clips: it brings the
-        // foregrip into the opposite arm's natural reach without moving the
-        // trigger hand, while keeping muzzle lateral error inside the combat
-        // model envelope.
+        // Bias the rifle a few degrees across the chest. This small ergonomic
+        // cant brings the foregrip into the opposite arm's natural reach
+        // without moving the trigger hand, while keeping muzzle lateral error
+        // inside the combat model envelope for both authored rigs.
         var carryBasis = (actorBasis * new Basis(Vector3.Up, Mathf.DegToRad(12.0f)))
             .Orthonormalized();
         var global = _weapon!.Root.GlobalTransform;
@@ -1462,6 +1525,7 @@ internal readonly record struct OperatorCarryInspection(
     float LeftWristBelowHead,
     float StockToRightShoulderDistance,
     float HeadToWeaponLineClearance,
+    float ChestToWeaponLineClearance,
     float PrimaryHandToWeaponDistance,
     float SupportHandToForegripDistance,
     Vector3 SupportHandOffset,

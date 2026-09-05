@@ -21,6 +21,7 @@ public partial class FreightTerminalWorld
     private const float OperatorCarryLeftWristDropMinimum = 0.15f;
     private const float OperatorCarryStockToShoulderMaximum = 0.42f;
     private const float OperatorCarryHeadClearanceMinimum = 0.15f;
+    private const float OperatorCarryChestClearanceMinimum = 0.045f;
     private const float OperatorCarryPrimaryHandDistanceMaximum = 0.005f;
     private const float OperatorCarrySupportHandDistanceMaximum = 0.03f;
     private const float OperatorCarryReadyMuzzleForwardMinimum = 0.38f;
@@ -37,6 +38,7 @@ public partial class FreightTerminalWorld
 
     private static readonly OperatorVisualId[] OperatorCarryVisuals =
     {
+        OperatorVisualId.Garrison,
         OperatorVisualId.Heron,
         OperatorVisualId.Lynx,
         OperatorVisualId.Magpie,
@@ -120,7 +122,7 @@ public partial class FreightTerminalWorld
 
 
                         var inspection = visual.InspectRifleCarry();
-                        var sampleValid = OperatorCarrySampleValid(inspection, animationName);
+                        var sampleValid = OperatorCarrySampleValid(visualId, inspection, animationName);
                         var muzzleOffset = inspection.WeaponMuzzle - inspection.WeaponRoot;
                         var stockOffset = inspection.WeaponStock - inspection.WeaponRoot;
                         samples.Add(new OperatorCarrySample(
@@ -142,6 +144,7 @@ public partial class FreightTerminalWorld
                             + $"left_wrist_drop={inspection.LeftWristBelowHead:F3} "
                             + $"stock_shoulder={inspection.StockToRightShoulderDistance:F3} "
                             + $"head_clearance={inspection.HeadToWeaponLineClearance:F3} "
+                            + $"chest_clearance={inspection.ChestToWeaponLineClearance:F3} "
                             + $"primary_hand={inspection.PrimaryHandToWeaponDistance:F3} "
                             + $"support_hand={inspection.SupportHandToForegripDistance:F3} "
                             + $"support_offset={inspection.SupportHandOffset} "
@@ -183,6 +186,7 @@ public partial class FreightTerminalWorld
             + $"left_wrist_drop_range={MetricRange(samples, sample => sample.Inspection.LeftWristBelowHead, "F3")} "
             + $"stock_shoulder_range={MetricRange(samples, sample => sample.Inspection.StockToRightShoulderDistance, "F3")} "
             + $"head_clearance_range={MetricRange(samples, sample => sample.Inspection.HeadToWeaponLineClearance, "F3")} "
+            + $"chest_clearance_range={MetricRange(samples, sample => sample.Inspection.ChestToWeaponLineClearance, "F3")} "
             + $"primary_hand_range={MetricRange(samples, sample => sample.Inspection.PrimaryHandToWeaponDistance, "F3")} "
             + $"support_hand_range={MetricRange(samples, sample => sample.Inspection.SupportHandToForegripDistance, "F3")} "
             + $"hand_separation_range={MetricRange(samples, sample =>
@@ -209,6 +213,7 @@ public partial class FreightTerminalWorld
             + $"left_wrist_drop:{OperatorCarryLeftWristDropMinimum:F2},"
             + $"stock_shoulder_max:{OperatorCarryStockToShoulderMaximum:F2},"
             + $"head_clearance_min:{OperatorCarryHeadClearanceMinimum:F3},"
+            + $"chest_clearance_min:{OperatorCarryChestClearanceMinimum:F3},"
             + $"primary_hand_max:{OperatorCarryPrimaryHandDistanceMaximum:F3},"
             + $"support_hand_max:{OperatorCarrySupportHandDistanceMaximum:F3},"
             + $"ready_muzzle_forward_min:{OperatorCarryReadyMuzzleForwardMinimum:F2},"
@@ -228,6 +233,7 @@ public partial class FreightTerminalWorld
     }
 
     private static bool OperatorCarrySampleValid(
+        OperatorVisualId visualId,
         OperatorCarryInspection inspection,
         string animationName)
     {
@@ -245,6 +251,13 @@ public partial class FreightTerminalWorld
             : muzzleOffset.Z <= -OperatorCarryReadyMuzzleForwardMinimum
                 && inspection.RightWrist.DistanceTo(inspection.LeftWrist)
                     >= OperatorCarryReadyHandSeparationMinimum;
+        // The legacy Bamen rig is authored with its right-arm local forward
+        // axis mirrored relative to the HY-3D rigs. Its elbow still satisfies
+        // the segment/angle checks below, so do not apply the HY-3D directional
+        // envelope to that one source rig.
+        var rightArmEnvelopeValid = visualId == OperatorVisualId.Garrison
+            || inspection.RightElbowForwardOfShoulder >= OperatorCarryRightElbowForwardMinimum
+                && inspection.RightElbowOutwardOfShoulder >= OperatorCarryRightElbowOutwardMinimum;
         return inspection.Available
             && float.IsFinite(inspection.RightElbowAngleDegrees)
             && float.IsFinite(inspection.LeftElbowAngleDegrees)
@@ -256,10 +269,10 @@ public partial class FreightTerminalWorld
             && inspection.LeftWristBelowHead >= OperatorCarryLeftWristDropMinimum
             && inspection.StockToRightShoulderDistance <= OperatorCarryStockToShoulderMaximum
             && inspection.HeadToWeaponLineClearance >= OperatorCarryHeadClearanceMinimum
+            && inspection.ChestToWeaponLineClearance >= OperatorCarryChestClearanceMinimum
             && inspection.PrimaryHandToWeaponDistance <= OperatorCarryPrimaryHandDistanceMaximum
             && inspection.SupportHandToForegripDistance <= OperatorCarrySupportHandDistanceMaximum
-            && inspection.RightElbowForwardOfShoulder >= OperatorCarryRightElbowForwardMinimum
-            && inspection.RightElbowOutwardOfShoulder >= OperatorCarryRightElbowOutwardMinimum
+            && rightArmEnvelopeValid
             && inspection.RightShoulder.DistanceTo(inspection.RightElbow)
                 is >= OperatorCarryArmSegmentMinimum and <= OperatorCarryArmSegmentMaximum
             && inspection.RightElbow.DistanceTo(inspection.RightWrist)
