@@ -23,7 +23,9 @@ public partial class FreightTerminalWorld
     private const float OperatorCarryHeadClearanceMinimum = 0.15f;
     private const float OperatorCarryChestClearanceMinimum = 0.045f;
     private const float OperatorCarryPrimaryHandDistanceMaximum = 0.005f;
-    private const float OperatorCarrySupportHandDistanceMaximum = 0.03f;
+    // The support palm is intentionally a few centimetres under the rail so
+    // the fingers wrap the handguard instead of sitting on top of it.
+    private const float OperatorCarrySupportHandDistanceMaximum = 0.08f;
     private const float OperatorCarryReadyMuzzleForwardMinimum = 0.38f;
     private const float OperatorCarryAimMuzzleForwardMinimum = 0.44f;
     private const float OperatorCarryAimMuzzleLateralMaximum = 0.16f;
@@ -254,7 +256,7 @@ public partial class FreightTerminalWorld
                 : visualId == OperatorVisualId.Garrison
                     ? 0.05f
                     : OperatorCarryLeftWristDropMinimum;
-        var leftElbowMaximum = locomotion ? 180.0f : OperatorCarryLeftElbowMaximum;
+        var leftElbowMaximum = locomotion || sprinting ? 180.0f : OperatorCarryLeftElbowMaximum;
         var readyHandSeparationMinimum = locomotion
             ? 0.20f
             : 0.20f;
@@ -262,9 +264,7 @@ public partial class FreightTerminalWorld
         // centimetres short at the extreme of its stride. Keep the strict
         // grip gate for idle/sprint poses and allow that bounded walk/run
         // tolerance while the hand remains visibly on the handguard.
-        var supportHandDistanceMaximum = locomotion
-            ? 0.06f
-            : OperatorCarrySupportHandDistanceMaximum;
+        var supportHandDistanceMaximum = OperatorCarrySupportHandDistanceMaximum;
         var aimMuzzleVerticalMaximum = animationName == "aim_sprint"
             ? OperatorCarryAimSprintMuzzleVerticalMaximum
             : OperatorCarryAimMuzzleVerticalMaximum;

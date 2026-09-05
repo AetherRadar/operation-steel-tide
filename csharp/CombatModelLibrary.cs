@@ -612,6 +612,8 @@ internal sealed class AuthoredPreviewOperatorVisual
 
 internal sealed class AuthoredOperatorVisual
 {
+    private const float Hy3dSupportPalmContactOffset = 0.050f;
+    private const float Hy3dSupportHandVerticalOffset = -0.045f;
     private const float FieldWeaponScale = 0.42f;
     private static readonly Quaternion ReadiedWeaponRotation = new(
         -0.9934235f,
@@ -664,6 +666,14 @@ internal sealed class AuthoredOperatorVisual
         _leftElbowBone = ResolveBoneIndex(_skeleton, "mixamorig:LeftForeArm");
         _leftWristBone = ResolveBoneIndex(_skeleton, "mixamorig:LeftHand");
         WeaponSocket = CreateBoneAttachment(_skeleton, "RuntimeWeaponSocket", "mixamorig:RightHand");
+        if (CombatModelLibrary.UsesHy3dOperator(visualId)
+            && CombatModelLibrary.FindOptionalNode(root, "WeaponSocket") is { } authoredWeaponSocket)
+        {
+            // Tencent's authored socket is placed at the palm/finger contact,
+            // not at the wrist-bone origin. Copy its local offset onto the
+            // runtime BoneAttachment so the rifle grip lands in the hand.
+            WeaponSocket.Position = authoredWeaponSocket.Position;
+        }
         BackWeaponSocket = CreateBoneAttachment(_skeleton, "RuntimeBackWeaponSocket", "mixamorig:Spine2");
         HeadSocket = CombatModelLibrary.RequireNode(root, "HeadSocket");
         VestSocket = CombatModelLibrary.RequireNode(root, "VestSocket");
@@ -700,9 +710,11 @@ internal sealed class AuthoredOperatorVisual
         var leftHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_leftWristBone);
         var weaponOrigin = weapon.Root.GlobalPosition;
         var primaryGripPosition = weapon.PrimaryGrip?.GlobalPosition ?? weaponOrigin;
-        var primaryHandOffset = primaryGripPosition - rightHand.Origin;
+        var primaryHandContact = PrimaryHandContactWorld(rightHand.Origin);
+        var supportHandContact = SupportHandContactWorld(leftHand.Origin);
+        var primaryHandOffset = primaryGripPosition - primaryHandContact;
         var primaryHandDistance = primaryHandOffset.Length();
-        var supportHandOffset = weapon.Foregrip.GlobalPosition - leftHand.Origin;
+        var supportHandOffset = weapon.Foregrip.GlobalPosition - supportHandContact;
         var supportHandDistance = supportHandOffset.Length();
         var supportHandTargetOffset = leftHand.Origin - rightHand.Origin;
         var handSeparation = supportHandTargetOffset.Length();
@@ -772,10 +784,11 @@ internal sealed class AuthoredOperatorVisual
             StockToRightShoulderDistance: stock.DistanceTo(rightShoulder),
             HeadToWeaponLineClearance: DistanceToSegment(headBase, stock, muzzle),
             ChestToWeaponLineClearance: DistanceToSegment(chest, stock, muzzle),
-            PrimaryHandToWeaponDistance: rightWrist.DistanceTo(
+            PrimaryHandToWeaponDistance: PrimaryHandContactWorld(rightWrist).DistanceTo(
                 weapon.PrimaryGrip?.GlobalPosition ?? weapon.Root.GlobalPosition),
-            SupportHandToForegripDistance: leftWrist.DistanceTo(weapon.Foregrip.GlobalPosition),
-            SupportHandOffset: weapon.Foregrip.GlobalPosition - leftWrist,
+            SupportHandToForegripDistance: SupportHandContactWorld(leftWrist).DistanceTo(
+                weapon.Foregrip.GlobalPosition),
+            SupportHandOffset: weapon.Foregrip.GlobalPosition - SupportHandContactWorld(leftWrist),
             weapon.Root.GlobalPosition,
             stock,
             muzzle,
@@ -790,6 +803,35 @@ internal sealed class AuthoredOperatorVisual
     {
         var index = ResolveBoneIndex(_skeleton, boneName);
         return (_skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(index)).Origin;
+    }
+
+    private Vector3 PrimaryHandContactWorld(Vector3 wristOrigin)
+    {
+        if (CombatModelLibrary.UsesHy3dOperator(VisualId)
+            && GodotObject.IsInstanceValid(WeaponSocket)
+            && WeaponSocket.IsInsideTree())
+        {
+            return WeaponSocket.GlobalPosition;
+        }
+
+        return wristOrigin;
+    }
+
+    private Vector3 SupportHandContactWorld(Vector3 wristOrigin)
+    {
+        if (!CombatModelLibrary.UsesHy3dOperator(VisualId))
+        {
+            return wristOrigin;
+        }
+
+        var elbow = BoneWorldPosition("mixamorig:LeftForeArm");
+        var palmDirection = wristOrigin - elbow;
+        if (palmDirection.LengthSquared() <= 0.000001f)
+        {
+            return wristOrigin;
+        }
+
+        return wristOrigin + palmDirection.Normalized() * Hy3dSupportPalmContactOffset;
     }
 
     private static float JointAngleDegrees(Vector3 proximal, Vector3 joint, Vector3 distal)
@@ -1153,6 +1195,7 @@ internal sealed class AuthoredOperatorVisual
             if (isHy3d)
             {
                 RetargetHy3dLeftArm(_weapon.Foregrip.GlobalPosition);
+                AlignSupportHandBasisToWeapon();
             }
         }
     }
@@ -1167,13 +1210,14 @@ internal sealed class AuthoredOperatorVisual
         }
 
         var rightHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_rightHandBone);
+        var handContact = PrimaryHandContactWorld(rightHand.Origin);
         var rootGlobal = _weapon.Root.GlobalTransform;
         var gripOffset = grip.GlobalPosition - rootGlobal.Origin;
         // The rifle root is attached to the wrist for animation follow. Keep
         // that relationship, but bake the authored primary-grip marker into
         // the local offset so the palm lands on the pistol grip rather than
         // hovering over the receiver.
-        rootGlobal.Origin = rightHand.Origin - gripOffset;
+        rootGlobal.Origin = handContact - gripOffset;
         _weapon.Root.GlobalTransform = rootGlobal;
 
     }
@@ -1205,6 +1249,28 @@ internal sealed class AuthoredOperatorVisual
         }
         ApplyCarrySocketBasis();
         AlignWeaponGripToPrimaryHand();
+    }
+
+    private void AlignSupportHandBasisToWeapon()
+    {
+        if (_weapon is null || _leftWristBone < 0)
+        {
+            return;
+        }
+
+        var hand = _skeleton.GetBoneGlobalPose(_leftWristBone);
+        var weaponBasis = _weapon.Root.GlobalTransform.Basis.Orthonormalized();
+        // The support palm is on the underside of the handguard. Use the
+        // authored rifle frame for its roll as well as its position so the
+        // fingers wrap the foregrip instead of floating above the top rail.
+#pragma warning disable CS0618
+        _skeleton.SetBoneGlobalPoseOverride(
+            _leftWristBone,
+            new Transform3D(weaponBasis, hand.Origin),
+            1.0f,
+            persistent: true);
+#pragma warning restore CS0618
+        _skeleton.ForceUpdateBoneChildTransform(_leftWristBone);
     }
 
     private void ApplyCarrySocketBasis()
@@ -1414,6 +1480,14 @@ internal sealed class AuthoredOperatorVisual
         var shoulder = BoneWorldPosition("mixamorig:LeftArm");
         var elbow = BoneWorldPosition("mixamorig:LeftForeArm");
         var wrist = BoneWorldPosition("mixamorig:LeftHand");
+        var palmDirection = (targetGlobalPosition - elbow).Normalized();
+        if (CombatModelLibrary.UsesHy3dOperator(VisualId)
+            && palmDirection.LengthSquared() > 0.000001f)
+        {
+            targetGlobalPosition -= palmDirection * Hy3dSupportPalmContactOffset;
+            targetGlobalPosition += Root.GlobalTransform.Basis.Orthonormalized()
+                * new Vector3(0.0f, Hy3dSupportHandVerticalOffset, 0.0f);
+        }
         var upperLength = shoulder.DistanceTo(elbow);
         var lowerLength = elbow.DistanceTo(wrist);
         var targetDistance = shoulder.DistanceTo(targetGlobalPosition);
@@ -1746,7 +1820,10 @@ internal static partial class CombatModelLibrary
             // Match the authored first-person rifle anchor: the contact point
             // is just below and slightly behind the receiver, at the centre of
             // the pistol grip rather than on the magazine well.
-            AddMarker(root, "PrimaryGrip", new Vector3(0.0f, -0.20f, 0.0f));
+            // Godot's imported frame is +Y up and -Z down-range. The pistol
+            // grip is below and behind the receiver, at the authored mesh's
+            // actual grip centre rather than at the receiver origin.
+            AddMarker(root, "PrimaryGrip", new Vector3(0.0f, -0.25f, 0.22f));
         }
         if (FindOptionalNode(root, "OpticRailContact") is null)
         {
