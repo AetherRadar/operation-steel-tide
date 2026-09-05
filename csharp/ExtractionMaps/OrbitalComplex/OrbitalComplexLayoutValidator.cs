@@ -84,10 +84,17 @@ public static class OrbitalComplexLayoutValidator
         var minimumSpawnDistance = MinimumDistance(
             layout.PlayerSpawnPads.Select(pad => pad.Position),
             layout.RivalSpawnPads.Select(pad => pad.Position));
+        var minimumOpeningDistance = MinimumDistance(
+            layout.PlayerSpawnPads.Select(pad => pad.Position),
+            layout.GarrisonSpawns);
         var spawnSeparationValid = layout.PlayerSpawnPads.Count == 4
             && layout.RivalSpawnPads.Count >= 4
             && minimumSpawnDistance >= 100.0f
             && MaximumPairDistance(layout.PlayerSpawnPads.Select(pad => pad.Position)) <= 16.0f
+            // The first garrison must be outside the normal 34 m contact
+            // bubble.  This leaves the deployment pocket useful for looting
+            // and route selection after the 12 s protection expires.
+            && minimumOpeningDistance >= 40.0f
             && spawnFloorAlignmentValid;
         AddFailure(failures, spawnSeparationValid, "spawn_separation");
         // Do not let a malformed/partial layout crash diagnostics while taking

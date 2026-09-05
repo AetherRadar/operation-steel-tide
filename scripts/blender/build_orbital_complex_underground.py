@@ -446,6 +446,16 @@ def build_hardscape_underground(groups, materials):
     panel("BunkerCeiling", shell_outline[:-1], 22.0, 24.0, ceiling, static, "DCC-authored pressure-ceiling hardscape")
     _ribbon("BunkerPerimeterWalls", shell_outline, 3.0, -16.0, 22.0, black, static)
     _ribbon("SouthPressureBulkhead", [(-150.0, -40.0), (-44.0, -40.0)], 2.3, -16.0, 22.0, black, groups["District_IntakeCauseway"])
+    # The intake used to be one uninterrupted 190 m sightline from the south
+    # deployment pocket to the reactor.  These authored-looking pressure
+    # partitions create a three-lane vestibule: a central service aisle and
+    # two side aisles around the first loot rooms.  The gaps are deliberately
+    # generous enough for the route probes and vehicles, while every player
+    # height view now gets a hard break roughly every 18–24 m.
+    _ribbon("IntakeVestibuleWestWall", [(-16.0, -88.0), (-16.0, -58.0)], 2.1, -16.0, 8.5, black, groups["District_IntakeCauseway"])
+    _ribbon("IntakeVestibuleEastWall", [(16.0, -88.0), (16.0, -58.0)], 2.1, -16.0, 8.5, black, groups["District_IntakeCauseway"])
+    _ribbon("IntakeVestibuleWestReturn", [(-16.0, -58.0), (-4.0, -58.0)], 2.1, -16.0, 8.5, black, groups["District_IntakeCauseway"])
+    _ribbon("IntakeVestibuleEastReturn", [(16.0, -58.0), (4.0, -58.0)], 2.1, -16.0, 8.5, black, groups["District_IntakeCauseway"])
     _ribbon("WestPowerBulkhead", [(-43.0, -86.0), (-43.0, 9.0), (-43.0, 74.0), (-43.0, 198.0)], 2.2, -16.0, 22.0, black, groups["District_BreakerYard"])
     _ribbon("EastQuarantineBulkhead", [(43.0, -86.0), (43.0, 9.0), (43.0, 74.0), (43.0, 198.0)], 2.2, -16.0, 22.0, black, groups["District_QuarantineArchive"])
     _ribbon("NorthSiloBulkhead", [(-118.0, 126.0), (-44.0, 126.0), (44.0, 126.0), (118.0, 126.0)], 2.0, -16.0, 22.0, black, groups["District_LaunchSilo"])
@@ -1014,6 +1024,29 @@ def authored_placements_underground():
         Placement("inspection_office", "OssuaryInspectionLock", "District_DataOssuary", (153.0, 111.0, -15.5), -90.0, (1.30, 1.30, 1.25)),
         Placement("shift_office", "OssuaryShiftLock", "District_DataOssuary", (153.0, 141.0, -15.5), -90.0, (1.34, 1.34, 1.28)),
         Placement("window_hall", "OssuaryWindowGallery", "District_DataOssuary", (130.0, 166.0, -15.5), 180.0, (1.42, 1.42, 1.30)),
+
+        # Intake deployment vestibule.  These reuse the licensed industrial
+        # kit modules as finished sightline breaks instead of adding another
+        # row of programmer-art boxes.  The central 12 m aisle remains open;
+        # the side buildings form two short flank routes into the bunker.
+        Placement("maintenance_depot", "IntakeVestMaintenanceWest", "District_IntakeCauseway", (-62.0, -74.0, -15.5), 90.0, (1.65, 1.65, 1.3)),
+        Placement("maintenance_depot", "IntakeVestMaintenanceEast", "District_IntakeCauseway", (62.0, -74.0, -15.5), -90.0, (1.65, 1.65, 1.3)),
+        Placement("arch_gateway", "IntakeVestGateWest", "District_IntakeCauseway", (-26.0, -78.0, -15.5), 90.0, (1.25, 1.25, 1.45)),
+        Placement("arch_gateway", "IntakeVestGateEast", "District_IntakeCauseway", (26.0, -78.0, -15.5), -90.0, (1.25, 1.25, 1.45)),
+        Placement("container_office", "IntakeVestControlWest", "District_IntakeCauseway", (-86.0, -48.0, -15.5), 12.0, (1.35, 1.35, 1.25)),
+        Placement("container_office", "IntakeVestControlEast", "District_IntakeCauseway", (86.0, -48.0, -15.5), -12.0, (1.35, 1.35, 1.25)),
+        Placement("cargo_containers", "IntakeVestCargoWest", "District_IntakeCauseway", (-92.0, -28.0, -15.5), 18.0, (1.5, 1.5, 1.5)),
+        Placement("cargo_containers", "IntakeVestCargoEast", "District_IntakeCauseway", (92.0, -28.0, -15.5), -18.0, (1.5, 1.5, 1.5)),
+        Placement("pump_house", "IntakeVestLiftWest", "District_IntakeCauseway", (-68.0, -12.0, -15.5), 72.0, (1.55, 1.55, 1.35)),
+        Placement("pump_house", "IntakeVestLiftEast", "District_IntakeCauseway", (68.0, -12.0, -15.5), -72.0, (1.55, 1.55, 1.35)),
+
+        # Two intermediate service clusters keep the west/east approach from
+        # reading as an empty 100 m apron.  They sit outside the 9 m marked
+        # lanes and give the objective districts distinct silhouettes.
+        Placement("boiler_workshop", "BreakerApproachHall", "District_BreakerYard", (-92.0, -50.0, -15.5), 20.0, (1.65, 1.65, 1.4)),
+        Placement("reactor_annex", "BreakerApproachAnnex", "District_BreakerYard", (-64.0, -4.0, -15.5), 8.0, (1.5, 1.5, 1.3)),
+        Placement("glassworks_office", "ArchiveApproachLab", "District_QuarantineArchive", (92.0, -50.0, -15.5), -20.0, (1.55, 1.55, 1.35)),
+        Placement("reactor_annex", "ArchiveApproachAnnex", "District_QuarantineArchive", (64.0, -4.0, -15.5), -8.0, (1.5, 1.5, 1.3)),
     ]
 
 

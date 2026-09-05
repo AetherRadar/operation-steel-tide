@@ -1,7 +1,7 @@
 {
   "asset": "FALLTIDE RECOVERY ARRAY // SUBLEVEL 09",
   "map_id": "orbital_complex",
-  "generated_on": "2026-09-02",
+  "generated_on": "2026-09-05",
   "blender_version": "4.5.10 LTS",
   "coordinate_contract": {
     "blender": "meters, Z-up",
@@ -93,10 +93,10 @@
     }
   },
   "statistics_before_export": {
-    "mesh_nodes": 256,
-    "unique_meshes": 241,
-    "unique_triangles": 184766,
-    "instance_triangles": 216556,
+    "mesh_nodes": 274,
+    "unique_meshes": 245,
+    "unique_triangles": 184862,
+    "instance_triangles": 250658,
     "materials": 182,
     "images": 35,
     "estimated_texture_memory_bytes": 138936320
@@ -173,32 +173,32 @@
       }
     },
     "statistics": {
-      "mesh_nodes": 255,
-      "unique_meshes": 240,
-      "unique_triangles": 184766,
-      "instance_triangles": 216556,
+      "mesh_nodes": 273,
+      "unique_meshes": 244,
+      "unique_triangles": 184862,
+      "instance_triangles": 250658,
       "materials": 42,
       "images": 11,
       "estimated_texture_memory_bytes": 42205184
     }
   },
   "gltf_document": {
-    "gltf_nodes": 343,
-    "gltf_meshes": 240,
-    "gltf_primitives": 242,
+    "gltf_nodes": 375,
+    "gltf_meshes": 244,
+    "gltf_primitives": 246,
     "gltf_materials": 42,
     "gltf_images": 11
   },
   "files": {
     "blend": {
       "path": "source_art/world/orbital_complex/orbital_complex.blend",
-      "bytes": 15521550,
-      "sha256": "E288F6743444A27ADA414254DC06685EF223D36DE53EBFEDA959D306D3EB4EF2"
+      "bytes": 15530384,
+      "sha256": "76F396429FD39D86A4716FF03FC13B7070B0BC559DE8729E81B0544FB2F61720"
     },
     "glb": {
       "path": "assets/models/orbital_complex/orbital_complex.glb",
-      "bytes": 19472480,
-      "sha256": "5031189E36A803B6EEBC1A91E6F0CB7AA23A14F23586AD9585A72D4B981F2E30",
+      "bytes": 19495640,
+      "sha256": "67A98AD2B33EDE20A788D9D724C2C3E8BAAE301445320A319BE6612CE23CE8DE",
       "embedded": true
     }
   },

@@ -76,14 +76,23 @@ public static class OrbitalComplexMapDefinition
 
     private static IReadOnlyList<OrbitalComplexSpawnPad> PlayerSpawnPads() => new[]
     {
-        PlayerPad("intake_alpha", new Vector3(-4.5f, -15.42f, 84.0f)),
-        PlayerPad("intake_bravo", new Vector3(4.5f, -15.42f, 84.0f)),
-        PlayerPad("intake_charlie", new Vector3(-4.5f, -15.42f, 78.0f)),
-        PlayerPad("intake_delta", new Vector3(4.5f, -15.42f, 78.0f))
+        // Keep the whole squad in the north intake pocket.  The old 78–84 m
+        // pads put operators inside the first garrison's 34 m acquisition
+        // bubble as soon as deployment protection ended.  Moving the pocket
+        // ten metres up the intake spine preserves the compact squad layout
+        // while giving players a quiet first loot decision and a covered route
+        // toward either objective district.
+        PlayerPad("intake_alpha", new Vector3(-4.5f, -15.42f, 94.0f)),
+        PlayerPad("intake_bravo", new Vector3(4.5f, -15.42f, 94.0f)),
+        PlayerPad("intake_charlie", new Vector3(-4.5f, -15.42f, 88.0f)),
+        PlayerPad("intake_delta", new Vector3(4.5f, -15.42f, 88.0f))
     };
 
     private static OrbitalComplexSpawnPad PlayerPad(string id, Vector3 position)
-        => new(id, position, new Vector3(0.0f, -15.42f, 38.0f),
+        // Face the sealed south intake bay on deployment.  The former target
+        // pointed straight down the 60 m intake spine toward the first
+        // garrison, making the opening read as an immediate firing lane.
+        => new(id, position, new Vector3(0.0f, -15.42f, 104.0f),
             OrbitalComplexVerticalLayer.ServiceDeck);
 
     private static IReadOnlyList<OrbitalComplexSpawnPad> RivalSpawnPads() => new[]
@@ -103,8 +112,11 @@ public static class OrbitalComplexMapDefinition
         new(-122, -15.42f, -2), new(-112, -15.42f, -22), new(-91, -15.42f, -25),
         new(-80, -15.42f, 10), new(122, -15.42f, -2), new(112, -15.42f, -24),
         new(91, -15.42f, -27), new(80, -15.42f, 11),
-        new(-28, -15.42f, 62), new(28, -15.42f, 62), new(-27, -15.42f, 30),
-        new(27, -15.42f, 30), new(-31, -15.42f, -16), new(31, -15.42f, -16),
+        // Hold the intake garrison one room deeper than the deployment
+        // pocket.  This creates a readable first contact (the side aisles at
+        // roughly 50 m) instead of an immediate spawn-door firefight.
+        new(-28, -15.42f, 44), new(28, -15.42f, 44), new(-27, -15.42f, 24),
+        new(27, -15.42f, 24), new(-31, -15.42f, -16), new(31, -15.42f, -16),
         new(-24, -15.42f, -54), new(24, -15.42f, -54),
         new(-18, -32.35f, -20), new(18, -32.35f, -20),
         new(-18, -32.35f, -48), new(18, -32.35f, -48),
@@ -132,7 +144,10 @@ public static class OrbitalComplexMapDefinition
             new(128, -15.35f, 12), new(78, -15.35f, 12),
             new(78, -15.35f, -30), new(128, -15.35f, -30)),
         Route("intake_spine", OrbitalComplexVerticalLayer.ServiceDeck,
-            new(-30, -15.35f, 88), new(30, -15.35f, 88),
+            // Keep patrol traffic out of the sealed deployment pocket.  The
+            // former z=88 waypoints let intake garrison path directly into
+            // the player spawn before the first cover decision.
+            new(-30, -15.35f, 62), new(30, -15.35f, 62),
             new(30, -15.35f, 22), new(-30, -15.35f, 22)),
         Route("reactor_ring", OrbitalComplexVerticalLayer.ServiceDeck,
             new(-32, -15.35f, -18), new(0, -15.35f, -6),
