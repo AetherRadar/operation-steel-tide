@@ -32,6 +32,7 @@ public partial class FreightTerminalWorld
             _trainingRangeWeaponIndex,
             _trainingRangeAmmoType,
             _trainingRangeAmmoLevel);
+        _hud.SetTrainingRangeAttachmentSelections(_player.TrainingRangeCurrentAttachmentIds);
         _hud.ShowTrainingRangeSetup(
             GameLocalization.Get(
                 "training_setup_status_ready",
@@ -57,6 +58,7 @@ public partial class FreightTerminalWorld
                 _trainingRangeWeaponIndex,
                 _trainingRangeAmmoType,
                 _trainingRangeAmmoLevel);
+            _hud.SetTrainingRangeAttachmentSelections(_player.TrainingRangeCurrentAttachmentIds);
         }
         _player.UiLocked = true;
         _player.DisarmFireInput();
@@ -83,6 +85,7 @@ public partial class FreightTerminalWorld
                     _trainingRangeWeaponIndex,
                     _trainingRangeAmmoType,
                     _trainingRangeAmmoLevel);
+                _hud.SetTrainingRangeAttachmentSelections(_player.TrainingRangeCurrentAttachmentIds);
             }
             ResumeTrainingRangeGameplay();
             return;
@@ -121,6 +124,7 @@ public partial class FreightTerminalWorld
         int ammoType,
         int ammoLevel)
     {
+        _trainingRangePendingAttachmentIds = _hud.SelectedTrainingRangeAttachmentIds;
         var wasActive = _trainingRangeActive;
         _trainingRangeSetupFromGameplay = false;
         _trainingRangeSetupAwaitingDeploy = false;

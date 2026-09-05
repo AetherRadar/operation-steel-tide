@@ -1,0 +1,92 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://csharp/TrainingRangeArmoryPartCard.cs" id="1_card"]
+
+[sub_resource type="StyleBoxFlat" id="Style_card"]
+bg_color = Color(0.016, 0.045, 0.047, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.13, 0.31, 0.31, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="Style_card_hover"]
+bg_color = Color(0.045, 0.13, 0.13, 1)
+border_width_left = 2
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.29, 0.88, 0.72, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="Style_card_pressed"]
+bg_color = Color(0.07, 0.25, 0.21, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.42, 1, 0.8, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[node name="TrainingRangeArmoryPartCard" type="Button"]
+custom_minimum_size = Vector2(0, 72)
+offset_right = 390.0
+offset_bottom = 72.0
+focus_mode = 2
+toggle_mode = true
+theme_override_colors/font_color = Color(0.88, 0.98, 0.94, 1)
+theme_override_colors/font_hover_color = Color(0.96, 1, 0.98, 1)
+theme_override_colors/font_pressed_color = Color(0.96, 1, 0.98, 1)
+theme_override_styles/normal = SubResource("Style_card")
+theme_override_styles/hover = SubResource("Style_card_hover")
+theme_override_styles/pressed = SubResource("Style_card_pressed")
+theme_override_styles/focus = SubResource("Style_card_hover")
+script = ExtResource("1_card")
+
+[node name="Accent" type="ColorRect" parent="."]
+layout_mode = 0
+offset_right = 4.0
+offset_bottom = 72.0
+mouse_filter = 2
+color = Color(0.14, 0.38, 0.37, 1)
+
+[node name="Content" type="VBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 15.0
+offset_top = 8.0
+offset_right = -12.0
+offset_bottom = -7.0
+mouse_filter = 2
+theme_override_constants/separation = 1
+
+[node name="Name" type="Label" parent="Content"]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.89, 0.98, 0.94, 1)
+theme_override_font_sizes/font_size = 13
+text = "Attachment"
+
+[node name="Effect" type="Label" parent="Content"]
+custom_minimum_size = Vector2(0, 21)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.53, 0.74, 0.69, 1)
+theme_override_font_sizes/font_size = 10
+text = "STANDARD SPEC"
+clip_text = true
+
+[node name="Badge" type="Label" parent="Content"]
+custom_minimum_size = Vector2(0, 17)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 1, 0.76, 1)
+theme_override_font_sizes/font_size = 10
+text = "INSTALLED"

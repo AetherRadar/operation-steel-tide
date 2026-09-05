@@ -33,6 +33,7 @@ public partial class FreightTerminalWorld
     private float _trainingRangeRespawnDelaySeconds = 1.0f;
     private bool _trainingRangeDecreaseHeld;
     private bool _trainingRangeIncreaseHeld;
+    private string?[] _trainingRangePendingAttachmentIds = new string?[6];
 
     private static readonly int[] TrainingRangeBotCountOptions = { 3, 6, 12, 24 };
     private const float TrainingRangeRespawnDelaySeconds = 1.0f;
@@ -181,6 +182,7 @@ public partial class FreightTerminalWorld
         ConfigureTrainingRangeMinimap(arena);
         _player.PrepareTrainingRangeLoadout(arena.PlayerSpawn);
         _player.SelectTrainingRangeWeapon(_trainingRangeWeaponIndex);
+        _player.ApplyTrainingRangeAttachmentPreset(_trainingRangePendingAttachmentIds);
         _player.ApplyTrainingRangeAmmoProfile(_trainingRangeAmmoType, _trainingRangeAmmoLevel);
         RebuildTrainingRangeBots(arena);
 
@@ -252,6 +254,7 @@ public partial class FreightTerminalWorld
     {
         var arena = EnsureTrainingRangeArena();
         _player.SelectTrainingRangeWeapon(_trainingRangeWeaponIndex);
+        _player.ApplyTrainingRangeAttachmentPreset(_trainingRangePendingAttachmentIds);
         _player.ApplyTrainingRangeAmmoProfile(_trainingRangeAmmoType, _trainingRangeAmmoLevel);
         RebuildTrainingRangeBots(arena);
         _hud.SetTrainingRangeTargetCount(TrainingRangeBotCount);
@@ -555,9 +558,12 @@ public partial class FreightTerminalWorld
                 enemy.OperatorCallsign(_languageSetting),
                 GameLocalization.Get("you", _languageSetting, "YOU"));
         }
-        // Keep the defeated node in the lane.  Its collision is already disabled by
+        // Keep the defeated node in the lane. Its collision is already disabled by
         // EnemyOperator.Die; the visible authored downed pose makes the reset timer
         // readable instead of hiding the target and spawning an unrelated replacement.
+        // Schedule the same configured reset delay used by the normal update path.
+        // Setting this to zero made a rapid diagnostic burst kill/revive the same
+        // target several times and made the first downed state frame-rate dependent.
         slot.RespawnTimer = Mathf.Max(
             _trainingRangeRespawnDelaySeconds,
             slot.Profile.RespawnDelaySeconds);
@@ -576,6 +582,10 @@ public partial class FreightTerminalWorld
         enemy.CollisionLayer = 0;
         enemy.CollisionMask = 0;
         enemy.HideCorpseLootBackpackForTrainingRange();
+        // Die() emits Eliminated synchronously and otherwise starts the normal
+        // terminal death tween immediately after this callback returns.  Mark
+        // the target as a reusable range dummy before that happens.
+        enemy.SuppressDeathAnimationForTrainingRange();
         enemy.SetTrainingRangeDownedPose();
         InvalidateCombatTargetIndex();
         return true;

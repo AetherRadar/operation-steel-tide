@@ -6,6 +6,23 @@ namespace OperationSteelTide;
 public partial class EnemyOperator
 {
     /// <summary>
+    /// Convert the synchronous elimination callback into the range target's
+    /// reusable downed state.  Must be called from the Eliminated signal handler
+    /// before EnemyOperator.Die() resumes and creates its normal death tween.
+    /// </summary>
+    internal void SuppressDeathAnimationForTrainingRange()
+    {
+        _suppressDeathAnimationForTrainingRange = true;
+        _deathTween?.Kill();
+        _deathTween = null;
+        if (IsInstanceValid(_bodyRoot))
+        {
+            _bodyRoot.Position = Vector3.Zero;
+            _bodyRoot.Rotation = Vector3.Zero;
+        }
+    }
+
+    /// <summary>
     /// Prepare a range target's presentation after the actor has been built.
     ///
     /// The live-fire venue intentionally keeps targets visually simple: the base
@@ -118,6 +135,11 @@ public partial class EnemyOperator
         CollisionMask = 1 | BreakableGlassField.MovementCollisionLayer;
         SetAuthoredCombatPoseForDiagnostics();
         PrepareTrainingRangeVisualForDiagnostics();
+        if (IsInstanceValid(_bodyRoot))
+        {
+            _bodyRoot.Position = Vector3.Zero;
+            _bodyRoot.Rotation = Vector3.Zero;
+        }
         // Pause only the AI tick.  Keeping the CharacterBody3D inherited avoids
         // briefly unregistering its hit collider before the range controller
         // resumes the target in the same frame.
@@ -139,8 +161,12 @@ public partial class EnemyOperator
         }
         _deathTween?.Kill();
         _deathTween = null;
+        // Select the authored downed pose without advancing it every frame.  The
+        // previous implementation replayed the clip continuously while the target
+        // was waiting to reset, accumulating root rotation and producing the tilted
+        // / upside-down bodies visible in the range.
         _authoredOperatorAnimator.Update(
-            Mathf.Clamp(delta, 0.0f, 0.1f),
+            0.0f,
             0.0f,
             weaponReadied: false,
             prone: false,
@@ -154,7 +180,16 @@ public partial class EnemyOperator
         // The animator applies the matching root-height correction; this explicit
         // call is intentionally idempotent because the range controller invokes it
         // every frame during the short reset window.
-        _authoredOperatorVisual.Root.Position = Vector3.Down * 0.46f;
+        // The authored downed clip is already grounded in model space.  Applying a
+        // fixed offset here made some operators float while others sank into the
+        // lane; keep the visual root at the actor's measured floor origin.
+        _authoredOperatorVisual.Root.Position = Vector3.Zero;
+        _authoredOperatorVisual.Root.Rotation = Vector3.Zero;
+        if (IsInstanceValid(_bodyRoot))
+        {
+            _bodyRoot.Position = Vector3.Zero;
+            _bodyRoot.Rotation = Vector3.Zero;
+        }
     }
 
     /// <summary>Move a target while leaving its AI disabled and its hit collider active.</summary>

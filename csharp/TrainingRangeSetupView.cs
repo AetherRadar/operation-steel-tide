@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace OperationSteelTide;
@@ -59,6 +60,12 @@ public partial class TrainingRangeSetupView : ColorRect
     private OptionButton _weaponSelect = null!;
     private OptionButton _ammoTypeSelect = null!;
     private OptionButton _ammoLevelSelect = null!;
+    private readonly OptionButton[] _attachmentSelects = new OptionButton[6];
+    private readonly AttachmentSlot[] _attachmentSlots =
+    {
+        AttachmentSlot.Optic, AttachmentSlot.Barrel, AttachmentSlot.Muzzle,
+        AttachmentSlot.Grip, AttachmentSlot.Stock, AttachmentSlot.Magazine
+    };
     private Label _summary = null!;
     private Label _hint = null!;
     private Button _backButton = null!;
@@ -96,6 +103,7 @@ public partial class TrainingRangeSetupView : ColorRect
         && IsInstanceValid(_weaponSelect)
         && IsInstanceValid(_ammoTypeSelect)
         && IsInstanceValid(_ammoLevelSelect)
+        && Array.TrueForAll(_attachmentSelects, b => GodotObject.IsInstanceValid(b))
         && IsInstanceValid(_summary)
         && IsInstanceValid(_backButton)
         && IsInstanceValid(_exitButton)
@@ -108,6 +116,7 @@ public partial class TrainingRangeSetupView : ColorRect
         && _weaponSelect.HasConnections(OptionButton.SignalName.ItemSelected)
         && _ammoTypeSelect.HasConnections(OptionButton.SignalName.ItemSelected)
         && _ammoLevelSelect.HasConnections(OptionButton.SignalName.ItemSelected)
+        && Array.TrueForAll(_attachmentSelects, b => b.HasConnections(OptionButton.SignalName.ItemSelected))
         && _backButton.HasConnections(BaseButton.SignalName.Pressed)
         && _exitButton.HasConnections(BaseButton.SignalName.Pressed)
         && _deployButton.HasConnections(BaseButton.SignalName.Pressed);
@@ -118,6 +127,20 @@ public partial class TrainingRangeSetupView : ColorRect
         && _weaponSelect.ItemCount == RangeWeapons.Length
         && _ammoTypeSelect.ItemCount == 4
         && _ammoLevelSelect.ItemCount == 4;
+
+    public string?[] SelectedAttachmentIds
+    {
+        get
+        {
+            var values = new string?[6];
+            for (var i = 0; i < values.Length; i++)
+            {
+                var id = _attachmentSelects[i].GetItemMetadata(_attachmentSelects[i].Selected).AsString();
+                values[i] = id.Length == 0 ? null : id;
+            }
+            return values;
+        }
+    }
 
     public override void _Ready()
     {
@@ -263,6 +286,24 @@ public partial class TrainingRangeSetupView : ColorRect
         RefreshSummary();
     }
 
+    public void SetAttachmentSelections(IReadOnlyList<string?> ids)
+    {
+        if (!UiReady || ids is null) return;
+        for (var i = 0; i < _attachmentSelects.Length && i < ids.Count; i++)
+        {
+            var wanted = ids[i] ?? string.Empty;
+            for (var j = 0; j < _attachmentSelects[i].ItemCount; j++)
+            {
+                if (_attachmentSelects[i].GetItemMetadata(j).AsString() == wanted)
+                {
+                    _attachmentSelects[i].Select(j);
+                    break;
+                }
+            }
+        }
+        RefreshSummary();
+    }
+
     public void SelectBotTypeForDiagnostics(int value)
         => _botTypeSelect.Select(Mathf.Clamp(value, 0, 2));
 
@@ -329,6 +370,12 @@ public partial class TrainingRangeSetupView : ColorRect
         _ammoHint = ammoPanel.GetNode<Label>("AmmoHint");
         _ammoTypeSelect = ammoPanel.GetNode<OptionButton>("AmmoTypeSelect");
         _ammoLevelSelect = ammoPanel.GetNode<OptionButton>("AmmoLevelSelect");
+        var attachmentPanel = panel.GetNode<Control>("AttachmentPanel");
+        for (var i = 0; i < _attachmentSelects.Length; i++)
+        {
+            _attachmentSelects[i] = attachmentPanel.GetNode<OptionButton>(
+                _attachmentSlots[i].ToString() + "Select");
+        }
 
         _summary = panel.GetNode<Label>("Summary");
         _hint = panel.GetNode<Label>("Hint");
@@ -355,6 +402,7 @@ public partial class TrainingRangeSetupView : ColorRect
             _weaponSelect.AddItem(WeaponCatalog.Weapon(platform).Name);
         }
         _weaponSelect.Select(0);
+        RefreshAttachmentOptions();
 
         _ammoTypeSelect.AddItem("FULL METAL JACKET");
         _ammoTypeSelect.AddItem("ARMOR PIERCING");
@@ -374,6 +422,9 @@ public partial class TrainingRangeSetupView : ColorRect
         _botTypeSelect.ItemSelected += _ => RefreshSummary();
         _botCountSelect.ItemSelected += _ => RefreshSummary();
         _weaponSelect.ItemSelected += _ => RefreshSummary();
+        _weaponSelect.ItemSelected += _ => RefreshAttachmentOptions();
+        foreach (var select in _attachmentSelects)
+            select.ItemSelected += _ => RefreshSummary();
         _ammoTypeSelect.ItemSelected += _ => RefreshSummary();
         _ammoLevelSelect.ItemSelected += _ => RefreshSummary();
         _backButton.Pressed += () => EmitSignal(SignalName.BackRequested);
@@ -423,6 +474,51 @@ public partial class TrainingRangeSetupView : ColorRect
                 index,
                 DisplayWeaponName(RangeWeapons[index]));
         }
+    }
+
+    private void RefreshAttachmentOptions()
+    {
+        if (!IsInstanceValid(_weaponSelect)) return;
+        var platform = RangeWeapons[Mathf.Clamp(_weaponSelect.Selected, 0, RangeWeapons.Length - 1)];
+        for (var i = 0; i < _attachmentSelects.Length; i++)
+        {
+            var select = _attachmentSelects[i];
+            var previous = select.Selected >= 0 && select.Selected < select.ItemCount
+                ? select.GetItemMetadata(select.Selected).AsString() : string.Empty;
+            select.Clear();
+            foreach (var id in AttachmentCandidates(platform, _attachmentSlots[i]))
+            {
+                var label = id.Length == 0 ? (_attachmentSlots[i] == AttachmentSlot.Optic ? "IRON SIGHTS // NONE" : "NONE / REMOVE") : WeaponCatalog.Attachment(id).Name;
+                select.AddItem(label);
+                select.SetItemMetadata(select.ItemCount - 1, id);
+            }
+            var restored = -1;
+            for (var j = 0; j < select.ItemCount; j++) if (select.GetItemMetadata(j).AsString() == previous) restored = j;
+            select.Select(restored >= 0 ? restored : 0);
+        }
+    }
+
+    private static IEnumerable<string> AttachmentCandidates(WeaponPlatform platform, AttachmentSlot slot)
+    {
+        if (slot == AttachmentSlot.Optic && WeaponCatalog.HasFixedIntegratedScope(platform))
+        {
+            yield return "optic_scope";
+            yield return "optic_7x";
+            yield return "optic_sniper";
+            yield break;
+        }
+        var ids = slot switch
+        {
+            AttachmentSlot.Optic => new[] { "", "optic_micro", "optic_holo", "optic_scope" },
+            AttachmentSlot.Barrel => WeaponCatalog.IsSidearm(platform) ? new[] { "barrel_standard" } : new[] { "barrel_cqb", "barrel_standard", "barrel_marksman" },
+            AttachmentSlot.Muzzle => new[] { "", "muzzle_brake", "muzzle_suppressor" },
+            AttachmentSlot.Grip => WeaponCatalog.IsSidearm(platform) ? new[] { "" } : new[] { "", "grip_angled", "grip_vertical" },
+            AttachmentSlot.Stock => WeaponCatalog.IsSidearm(platform) ? new[] { "" } : new[] { "", "stock_light", "stock_precision" },
+            AttachmentSlot.Magazine => new[] { "mag_standard", "mag_extended" },
+            _ => Array.Empty<string>()
+        };
+        foreach (var id in ids)
+            if (id.Length == 0 || WeaponCatalog.CanEquipAttachment(platform, id)) yield return id;
     }
 
     private void SetAmmoText(bool chinese)

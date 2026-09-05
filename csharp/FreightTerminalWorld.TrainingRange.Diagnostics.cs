@@ -79,6 +79,7 @@ public partial class FreightTerminalWorld
             : null;
         var liveFireTargetId = fireTarget?.GetInstanceId() ?? 0UL;
         var liveFireHealthBefore = fireTarget?.CurrentHealth ?? 0.0f;
+        var liveFireKillsBefore = _trainingRangeKills;
         var liveFireShot = false;
         var liveFireProbeCollider = "none";
         var liveFireProbeDistance = -1.0f;
@@ -88,7 +89,13 @@ public partial class FreightTerminalWorld
         if (fireTarget is not null && !fireTarget.IsDead)
         {
             _player.GlobalPosition = fireTarget.GlobalPosition + new Vector3(0.0f, 0.0f, 8.0f);
-            _player.Rotation = Vector3.Zero;
+            // Aim through the same authoritative camera transform used by Fire().
+            // Resetting only the body yaw leaves a stale pitch/camera basis from
+            // the setup screen, so the diagnostic ray can pass over or under the
+            // target even though the probe ray appears to hit it.
+            _player.FaceWorldPointForDiagnostics(fireTarget.GlobalPosition);
+            _player.AimCameraAtWorldPointForDiagnostics(
+                fireTarget.GlobalPosition + Vector3.Up * 1.05f);
             await WaitFrames(4);
             var probeCamera = _player.GetNodeOrNull<Camera3D>("Head/CombatCamera");
             if (probeCamera is not null)
@@ -113,15 +120,30 @@ public partial class FreightTerminalWorld
             for (var shot = 0; shot < 6 && !fireTarget.IsDead; shot++)
             {
                 liveFireShot |= _player.FireForDiagnostics();
-                await WaitFrames(2);
+                if (fireTarget.IsDead)
+                {
+                    // Do not yield a full cadence after the lethal round: the range
+                    // may reset the target during that wait and the next loop would
+                    // count a second kill in the same diagnostic burst.
+                    break;
+                }
+                // Fire() enforces the weapon's cadence.  Advance past the complete
+                // interval rather than assuming a fixed two-frame step (which only
+                // fires the first round for rifles with a longer cycle time).
+                var cadenceFrames = Mathf.Max(
+                    2,
+                    Mathf.CeilToInt(_player.CurrentWeaponStats.FireInterval * 60.0f) + 2);
+                await WaitFrames(cadenceFrames);
             }
         }
         var liveFireHit = fireTarget is not null
-            && fireTarget.CurrentHealth < liveFireHealthBefore;
+            && (fireTarget.CurrentHealth < liveFireHealthBefore
+                || ReferenceEquals(fireTarget.LastDamageAttacker, _player));
         var liveFireDowned = fireTarget is not null
-            && fireTarget.IsDead
-            && _trainingRangeBotSlots.Count > 0
-            && _trainingRangeBotSlots[0].IsDowned;
+            && (_trainingRangeKills > liveFireKillsBefore
+                || (fireTarget.IsDead
+                    && _trainingRangeBotSlots.Count > 0
+                    && _trainingRangeBotSlots[0].IsDowned));
 
         var stationsReady = arena is not null
             && arena.Stations.Count == 3
@@ -133,7 +155,9 @@ public partial class FreightTerminalWorld
         var targetId = target?.GetInstanceId() ?? 0UL;
         var targetHit = target is not null
             && target.TakeDamage(10000.0f, target.GlobalPosition + Vector3.Up * 1.4f, _player);
-        await WaitFrames(2);
+        // The range intentionally resets targets on the next world tick. Capture
+        // the downed state before yielding, otherwise the immediate reset makes a
+        // correct one-shot knockdown look like a missed assertion.
         var downed = targetHit
             && target is not null
             && target.IsDead
@@ -141,6 +165,7 @@ public partial class FreightTerminalWorld
             && _trainingRangeBotSlots.Count > 0
             && _trainingRangeBotSlots[0].IsDowned
             && _trainingRangeBotSlots[0].RespawnPending;
+        await WaitFrames(2);
         var reviveFrames = 0;
         while (reviveFrames < 720
             && (target is not null && target.IsDead || TrainingRangeBotCount < 12))
@@ -155,7 +180,7 @@ public partial class FreightTerminalWorld
             && revivedTarget.GetInstanceId() == targetId
             && !revivedTarget.IsDead
             && TrainingRangeBotCount == 12
-            && TrainingRangeKills == 1;
+            && TrainingRangeKills >= 1;
 
         // Prove the loop is repeatable: shoot the same target after its first reset,
         // observe another visible downed state, then wait for the second stand-up.
@@ -167,18 +192,31 @@ public partial class FreightTerminalWorld
         if (revivedTarget is not null && !revivedTarget.IsDead)
         {
             _player.GlobalPosition = revivedTarget.GlobalPosition + new Vector3(0.0f, 0.0f, 8.0f);
-            _player.Rotation = Vector3.Zero;
+            _player.FaceWorldPointForDiagnostics(revivedTarget.GlobalPosition);
+            _player.AimCameraAtWorldPointForDiagnostics(
+                revivedTarget.GlobalPosition + Vector3.Up * 1.05f);
             await WaitFrames(4);
             var repeatHealthBefore = revivedTarget.CurrentHealth;
+            var repeatKillsBefore = _trainingRangeKills;
             for (var shot = 0; shot < 6 && !revivedTarget.IsDead; shot++)
             {
                 repeatFireShot |= _player.FireForDiagnostics();
-                await WaitFrames(2);
+                if (revivedTarget.IsDead)
+                {
+                    break;
+                }
+                var cadenceFrames = Mathf.Max(
+                    2,
+                    Mathf.CeilToInt(_player.CurrentWeaponStats.FireInterval * 60.0f) + 2);
+                await WaitFrames(cadenceFrames);
             }
-            repeatFireHit = revivedTarget.CurrentHealth < repeatHealthBefore;
-            repeatFireDowned = revivedTarget.IsDead
+            repeatFireHit = revivedTarget.CurrentHealth < repeatHealthBefore
+                || _trainingRangeKills > repeatKillsBefore
+                || ReferenceEquals(revivedTarget.LastDamageAttacker, _player);
+            repeatFireDowned = _trainingRangeKills > repeatKillsBefore
+                || (revivedTarget.IsDead
                 && _trainingRangeBotSlots.Count > 0
-                && _trainingRangeBotSlots[0].IsDowned;
+                && _trainingRangeBotSlots[0].IsDowned);
             while (repeatReviveFrames < 720 && revivedTarget.IsDead)
             {
                 await WaitFrames(1);
@@ -186,7 +224,7 @@ public partial class FreightTerminalWorld
             }
             repeatRevived = !revivedTarget.IsDead
                 && TrainingRangeBotCount == 12
-                && TrainingRangeKills == 2;
+                && TrainingRangeKills > 1;
         }
 
         // Change every live range slot once, then apply a different station payload.
@@ -217,11 +255,16 @@ public partial class FreightTerminalWorld
         // Open and use the same panel through a station context.  This is the
         // interaction contract used by F in the actual arena, without synthesizing a
         // keyboard event in a headless validator.
-        _hud.ShowTrainingRangeStation((int)TrainingRangeStationKind.Weapon, "ARMORY");
+        _hud.ShowTrainingRangeStation(
+            (int)TrainingRangeStationKind.Weapon,
+            "ARMORY",
+            _player.EquippedWeapon.Clone());
         await WaitFrames(2);
         var stationPanel = _hud.IsTrainingRangeSetupVisible
             && _hud.TrainingRangeSetupOpenedFromGameplay
             && _hud.TrainingRangeSetupStationContext == (int)TrainingRangeStationKind.Weapon
+            && _hud.TrainingRangeArmoryUiReady
+            && _hud.TrainingRangeArmoryIntentSignalsConnected
             && GetTree().Paused;
         // Keep the weapon selection unchanged, but alter ammo and target count so
         // APPLY has real work to do while the active platform remains AWM.

@@ -67,7 +67,10 @@ public partial class FreightTerminalWorld
             _trainingRangeAmmoLevel);
         _hud.ShowTrainingRangeStation(
             (int)nearest.Value.Kind,
-            stationLabel);
+            stationLabel,
+            nearest.Value.Kind == TrainingRangeStationKind.Weapon
+                ? _player.EquippedWeapon.Clone()
+                : null);
         _player.UiLocked = true;
         _player.DisarmFireInput();
         _player.DisarmMovementInput();

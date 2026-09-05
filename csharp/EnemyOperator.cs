@@ -156,6 +156,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private float _crowdSchedulePhase;
     private float _stationaryMoveTimer;
     private Tween? _deathTween;
+    // Training-range targets use a reusable downed/reset loop instead of the
+    // normal terminal death tween.  The Eliminated signal is synchronous, so
+    // the range controller marks this before Die() resumes after EmitSignal.
+    private bool _suppressDeathAnimationForTrainingRange;
     /// <summary>How long without in-range contact before map NPCs start looting.</summary>
     private const float NpcLootIdleSeconds = 3.5f;
     /// <summary>Beyond this distance a living hostile is ignored for engagement (still exists on map).</summary>
@@ -1171,6 +1175,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     {
         _deathTween?.Kill();
         _deathTween = null;
+        _suppressDeathAnimationForTrainingRange = false;
         SetPhysicsProcess(true);
         ResetCorpseLootBackpackForDiagnostics();
         if (IsDead)
@@ -2251,6 +2256,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         CollisionMask = 0;
         Velocity = Vector3.Zero;
         EmitSignal(SignalName.Eliminated, this);
+        // A training-range listener may have converted this elimination into a
+        // short reusable downed pose.  Do not start the mission death animation
+        // after the listener returns; it would overwrite the downed clip and its
+        // tween would keep the operator tilted until another hit wakes it up.
+        if (_suppressDeathAnimationForTrainingRange)
+        {
+            _deathTween = null;
+            return;
+        }
         if (UsesTideHunterMonsterForDiagnostics)
         {
             if (IsInstanceValid(_worldBossChargeRing))

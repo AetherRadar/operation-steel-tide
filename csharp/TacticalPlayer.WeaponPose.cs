@@ -143,6 +143,10 @@ public partial class TacticalPlayer
     private static float OpticMountHeight(WeaponPlatform platform, string? opticId)
         => (platform, opticId) switch
         {
+            // The P226 rail sits low on the slide.  The generic pistol height
+            // leaves the authored micro optic visibly floating above the receiver.
+            (WeaponPlatform.P226, "optic_micro" or "optic_holo") => 0.105f,
+            (WeaponPlatform.P226, _) => 0.115f,
             (WeaponPlatform.ScarL, "optic_micro") => 0.33f,
             (WeaponPlatform.ScarL, "optic_holo") => 0.34f,
             (WeaponPlatform.ScarL, _) => 0.36f,

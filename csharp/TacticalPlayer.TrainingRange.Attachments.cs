@@ -11,6 +11,16 @@ namespace OperationSteelTide;
 /// </summary>
 public partial class TacticalPlayer
 {
+    /// <summary>Apply the six-slot gunsmith preset selected at the range station.</summary>
+    public void ApplyTrainingRangeAttachmentPreset(IReadOnlyList<string?> ids)
+    {
+        if (Main?.IsTrainingRangeActive != true || ids is null || !IsFirearmQuickSlotSelected)
+            return;
+        var slots = new[] { AttachmentSlot.Optic, AttachmentSlot.Barrel, AttachmentSlot.Muzzle,
+            AttachmentSlot.Grip, AttachmentSlot.Stock, AttachmentSlot.Magazine };
+        for (var i = 0; i < slots.Length && i < ids.Count; i++)
+            SetTrainingRangeAttachment(slots[i], ids[i], notify: false);
+    }
     private static readonly string?[] TrainingRangeBareOptics =
         { null, "optic_micro", "optic_holo", "optic_scope" };
     private static readonly string?[] TrainingRangeSidearmOptics =
@@ -48,6 +58,19 @@ public partial class TacticalPlayer
     /// </summary>
     public string TrainingRangeCurrentAttachmentId(AttachmentSlot slot)
         => EquippedWeapon.Attachments.TryGetValue(slot, out var id) ? id : string.Empty;
+
+    public string?[] TrainingRangeCurrentAttachmentIds
+    {
+        get
+        {
+            var slots = new[] { AttachmentSlot.Optic, AttachmentSlot.Barrel, AttachmentSlot.Muzzle,
+                AttachmentSlot.Grip, AttachmentSlot.Stock, AttachmentSlot.Magazine };
+            var values = new string?[slots.Length];
+            for (var i = 0; i < slots.Length; i++)
+                values[i] = TrainingRangeCurrentAttachmentId(slots[i]) is { Length: > 0 } id ? id : null;
+            return values;
+        }
+    }
 
     /// <summary>
     /// Candidate ids shown by the range's attachment controls.  A null entry is

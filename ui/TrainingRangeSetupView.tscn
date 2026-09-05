@@ -129,9 +129,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -520.0
-offset_top = -350.0
+offset_top = -450.0
 offset_right = 520.0
-offset_bottom = 350.0
+offset_bottom = 450.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("Style_panel")
@@ -140,7 +140,7 @@ theme_override_styles/panel = SubResource("Style_panel")
 layout_mode = 0
 offset_left = 0.0
 offset_right = 5.0
-offset_bottom = 700.0
+offset_bottom = 880.0
 mouse_filter = 2
 color = Color(0.25, 0.92, 0.76, 1)
 
@@ -404,21 +404,182 @@ theme_override_font_sizes/font_size = 11
 text = "AMMO AND UTILITY REFILL AUTOMATICALLY."
 autowrap_mode = 2
 
+[node name="AttachmentPanel" type="Panel" parent="Panel"]
+layout_mode = 0
+offset_left = 32.0
+offset_top = 500.0
+offset_right = 1008.0
+offset_bottom = 680.0
+mouse_filter = 1
+theme_override_styles/panel = SubResource("Style_section")
+
+[node name="Caption" type="Label" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 12.0
+offset_right = 940.0
+offset_bottom = 34.0
+theme_override_colors/font_color = Color(0.45, 0.79, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "GUNSMITH // ATTACHMENTS"
+
+[node name="Hint" type="Label" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 250.0
+offset_top = 12.0
+offset_right = 940.0
+offset_bottom = 34.0
+theme_override_colors/font_color = Color(0.4, 0.58, 0.56, 1)
+theme_override_font_sizes/font_size = 11
+text = "SELECT A SLOT TO PREVIEW THE INSTALLED PART"
+
+[node name="OpticCaption" type="Label" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 48.0
+offset_right = 125.0
+offset_bottom = 67.0
+theme_override_font_sizes/font_size = 11
+text = "OPTIC"
+
+[node name="OpticSelect" type="OptionButton" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 105.0
+offset_top = 42.0
+offset_right = 305.0
+offset_bottom = 76.0
+focus_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("Style_option")
+theme_override_styles/hover = SubResource("Style_option_hover")
+theme_override_styles/pressed = SubResource("Style_option_hover")
+theme_override_styles/focus = SubResource("Style_option_hover")
+
+[node name="BarrelCaption" type="Label" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 330.0
+offset_top = 48.0
+offset_right = 430.0
+offset_bottom = 67.0
+theme_override_font_sizes/font_size = 11
+text = "BARREL"
+
+[node name="BarrelSelect" type="OptionButton" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 417.0
+offset_top = 42.0
+offset_right = 617.0
+offset_bottom = 76.0
+focus_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("Style_option")
+theme_override_styles/hover = SubResource("Style_option_hover")
+theme_override_styles/pressed = SubResource("Style_option_hover")
+theme_override_styles/focus = SubResource("Style_option_hover")
+
+[node name="MuzzleCaption" type="Label" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 642.0
+offset_top = 48.0
+offset_right = 740.0
+offset_bottom = 67.0
+theme_override_font_sizes/font_size = 11
+text = "MUZZLE"
+
+[node name="MuzzleSelect" type="OptionButton" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 727.0
+offset_top = 42.0
+offset_right = 958.0
+offset_bottom = 76.0
+focus_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("Style_option")
+theme_override_styles/hover = SubResource("Style_option_hover")
+theme_override_styles/pressed = SubResource("Style_option_hover")
+theme_override_styles/focus = SubResource("Style_option_hover")
+
+[node name="GripCaption" type="Label" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 96.0
+offset_right = 125.0
+offset_bottom = 115.0
+theme_override_font_sizes/font_size = 11
+text = "GRIP"
+
+[node name="GripSelect" type="OptionButton" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 105.0
+offset_top = 90.0
+offset_right = 305.0
+offset_bottom = 124.0
+focus_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("Style_option")
+theme_override_styles/hover = SubResource("Style_option_hover")
+theme_override_styles/pressed = SubResource("Style_option_hover")
+theme_override_styles/focus = SubResource("Style_option_hover")
+
+[node name="StockCaption" type="Label" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 330.0
+offset_top = 96.0
+offset_right = 430.0
+offset_bottom = 115.0
+theme_override_font_sizes/font_size = 11
+text = "STOCK"
+
+[node name="StockSelect" type="OptionButton" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 417.0
+offset_top = 90.0
+offset_right = 617.0
+offset_bottom = 124.0
+focus_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("Style_option")
+theme_override_styles/hover = SubResource("Style_option_hover")
+theme_override_styles/pressed = SubResource("Style_option_hover")
+theme_override_styles/focus = SubResource("Style_option_hover")
+
+[node name="MagazineCaption" type="Label" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 642.0
+offset_top = 96.0
+offset_right = 740.0
+offset_bottom = 115.0
+theme_override_font_sizes/font_size = 11
+text = "MAGAZINE"
+
+[node name="MagazineSelect" type="OptionButton" parent="Panel/AttachmentPanel"]
+layout_mode = 0
+offset_left = 727.0
+offset_top = 90.0
+offset_right = 958.0
+offset_bottom = 124.0
+focus_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("Style_option")
+theme_override_styles/hover = SubResource("Style_option_hover")
+theme_override_styles/pressed = SubResource("Style_option_hover")
+theme_override_styles/focus = SubResource("Style_option_hover")
+
 [node name="SummaryRule" type="ColorRect" parent="Panel"]
 layout_mode = 0
 offset_left = 34.0
-offset_top = 503.0
+offset_top = 700.0
 offset_right = 1006.0
-offset_bottom = 504.0
+offset_bottom = 701.0
 mouse_filter = 2
 color = Color(0.16, 0.35, 0.34, 0.9)
 
 [node name="Summary" type="Label" parent="Panel"]
 layout_mode = 0
 offset_left = 36.0
-offset_top = 520.0
+offset_top = 718.0
 offset_right = 1000.0
-offset_bottom = 552.0
+offset_bottom = 750.0
 theme_override_colors/font_color = Color(0.86, 0.96, 0.91, 1)
 theme_override_font_sizes/font_size = 15
 text = "TARGETS  6   //   M4A1   //   FMJ   //   T3"
@@ -427,9 +588,9 @@ horizontal_alignment = 1
 [node name="Hint" type="Label" parent="Panel"]
 layout_mode = 0
 offset_left = 36.0
-offset_top = 561.0
+offset_top = 754.0
 offset_right = 1000.0
-offset_bottom = 587.0
+offset_bottom = 780.0
 theme_override_colors/font_color = Color(0.43, 0.65, 0.6, 1)
 theme_override_font_sizes/font_size = 11
 text = "F3  OPEN THIS PANEL IN THE LANE  //  EVERY KNOCKDOWN STARTS A RESPAWN TIMER"
@@ -438,9 +599,9 @@ horizontal_alignment = 1
 [node name="BackButton" type="Button" parent="Panel"]
 layout_mode = 0
 offset_left = 36.0
-offset_top = 614.0
+offset_top = 796.0
 offset_right = 300.0
-offset_bottom = 660.0
+offset_bottom = 842.0
 focus_neighbor_right = NodePath("../ExitButton")
 focus_mode = 2
 theme_override_colors/font_color = Color(0.75, 0.86, 0.83, 1)
@@ -456,9 +617,9 @@ text = "BACK"
 visible = false
 layout_mode = 0
 offset_left = 366.0
-offset_top = 614.0
+offset_top = 796.0
 offset_right = 674.0
-offset_bottom = 660.0
+offset_bottom = 842.0
 focus_neighbor_left = NodePath("../BackButton")
 focus_neighbor_right = NodePath("../DeployButton")
 focus_mode = 2
@@ -474,9 +635,9 @@ text = "RETURN TO OPERATIONS"
 [node name="DeployButton" type="Button" parent="Panel"]
 layout_mode = 0
 offset_left = 700.0
-offset_top = 614.0
+offset_top = 796.0
 offset_right = 1004.0
-offset_bottom = 660.0
+offset_bottom = 842.0
 focus_neighbor_left = NodePath("../ExitButton")
 focus_mode = 2
 theme_override_colors/font_color = Color(0.01, 0.08, 0.07, 1)
