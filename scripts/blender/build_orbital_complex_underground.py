@@ -419,6 +419,8 @@ def build_hardscape_underground(groups, materials):
     lane = _material(materials, "LaneMarking")
     cyan = _material(materials, "CyanEmission")
     orange = _material(materials, "SafetyOrange")
+    red = _material(materials, "OxidizedRedSteel")
+    white = _material(materials, "FadedAerospaceWhite")
 
     # Four floor leaves deliberately surround the open reactor shaft.  This
     # gives the player a real lower level instead of a decal pretending to be a
@@ -525,6 +527,25 @@ def build_hardscape_underground(groups, materials):
     _surface("PoweredNorthStrip", [(0.0, 110.0), (0.0, 200.0)], 0.34, -15.54, cyan, groups["PowerZone_Powered"], "powered_guidance_strip")
     _surface("ReactorHazardArc", [(-31.0, 14.0), (-42.0, 42.0), (-31.0, 70.0)], 0.55, -15.48, orange, groups["District_ReactorHall"], "hazard_marking")
 
+    # North of the reactor, turn the recovery route into a recognizable
+    # orbital airlock procession: three oversized pressure frames in sequence
+    # before the tide gate.  This is the map's second authored signature and
+    # gives the launch-silo district a readable purpose from the central ring.
+    for index, (y, radius, material) in enumerate(
+        ((142.0, 28.0, red), (170.0, 34.0, white), (198.0, 28.0, orange)),
+        start=1,
+    ):
+        _arch_pipe(
+            f"LaunchAirlockFrame_{index:02d}", (0.0, y), radius,
+            -15.0, 13.5, material, groups["District_LaunchSilo"],
+            tube_radius=0.56 if index == 2 else 0.42, segments=28,
+        )
+        _surface(
+            f"LaunchAirlockThreshold_{index:02d}",
+            [(-radius * 0.72, y), (radius * 0.72, y)], 0.38,
+            -15.34, cyan, groups["PowerZone_Powered"], "airlock_threshold",
+        )
+
     build_hero_landmarks_underground(groups, materials)
     build_undertow_sump_underground(groups, materials)
 
@@ -558,6 +579,109 @@ def build_hero_landmarks_underground(groups, materials):
     cyan = _material(materials, "CyanEmission")
     cyan_ceramic = _material(materials, "CeramicCyan")
     orange = _material(materials, "SafetyOrange")
+
+    # ------------------------------------------------------------------
+    # ORIGINAL DETENTION HALO
+    # ------------------------------------------------------------------
+    # The reactor used to read as a lone exhibition dish in an empty hall.
+    # Give the map its own identity: an orbital detention halo built around
+    # the reactor, with observation ribs, radial security portals, and a
+    # suspended service tier.  This is a single authored motif, not a loose
+    # collage of unrelated buildings; the industrial modules below become
+    # functional wings attached to this ring.
+    halo = groups["District_ReactorHall"]
+    halo_powered = create_empty("DetentionHaloPowered", groups["PowerZone_Powered"])
+    halo_powered["landmark_role"] = "detention halo stage-gated lighting"
+    halo_center = (0.0, 34.0)
+    _loop_pipe("DetentionHaloOuterRail", halo_center, 78.0, -14.72, red, halo,
+               tube_radius=0.48, segments=72, phase=math.radians(2.5))
+    _loop_pipe("DetentionHaloUpperRail", halo_center, 72.0, 8.5, white, halo,
+               tube_radius=0.34, segments=72, phase=math.radians(2.5))
+    _loop_pipe("DetentionHaloPoweredSeal", halo_center, 69.5, -14.35, cyan, halo_powered,
+               tube_radius=0.22, segments=72, phase=math.radians(2.5))
+    # Twelve vertical ribs read like cell-front bars from the floor and like
+    # a real orbital pressure cage from the catwalk.  They are spaced widely
+    # enough to preserve the existing ring routes and pit sightlines.
+    for index in range(12):
+        angle = math.tau * index / 12.0 + math.radians(15.0)
+        radius = 70.0
+        x = halo_center[0] + radius * math.cos(angle)
+        y = halo_center[1] + radius * math.sin(angle)
+        _pipe(
+            f"DetentionHaloRib_{index + 1:02d}",
+            [(x, y, -14.7),
+             (halo_center[0] + 67.8 * math.cos(angle), halo_center[1] + 67.8 * math.sin(angle), -5.0),
+             (halo_center[0] + 63.8 * math.cos(angle), halo_center[1] + 63.8 * math.sin(angle), 8.2)],
+            0.28 if index % 3 else 0.36,
+            red if index % 2 else white,
+            halo,
+        )
+    # Four radial security portals establish the ring's cardinal entrances;
+    # each is a distinct threshold into the attached service wing.
+    for index, angle in enumerate((0.0, math.pi * 0.5, math.pi, math.pi * 1.5), start=1):
+        portal_center = (
+            halo_center[0] + 77.0 * math.cos(angle),
+            halo_center[1] + 77.0 * math.sin(angle),
+        )
+        _arch_pipe(
+            f"DetentionHaloPortal_{index:02d}", portal_center, 6.5,
+            -14.6, 10.5, orange if index in (1, 3) else white, halo,
+            tube_radius=0.42, segments=24, phase=angle,
+        )
+    # Eight compact cell banks sit outside the halo.  Their trapezoid shells
+    # and repeated observation slits create the unmistakable prison rhythm
+    # from the floor while preserving a continuous service lane between the
+    # ring and the outer wall.  The geometry is authored here as one coherent
+    # orbital-security language, rather than as unrelated prefabs.
+    for index in range(8):
+        angle = math.tau * index / 8.0 + math.radians(22.5)
+        radial = (math.cos(angle), math.sin(angle))
+        tangent = (-radial[1], radial[0])
+        center_radius = 91.0
+        cx = halo_center[0] + radial[0] * center_radius
+        cy = halo_center[1] + radial[1] * center_radius
+        corners = []
+        for radial_offset, tangent_offset in ((-7.0, -6.0), (7.0, -6.0),
+                                               (7.0, 6.0), (-7.0, 6.0)):
+            corners.append((
+                cx + radial[0] * radial_offset + tangent[0] * tangent_offset,
+                cy + radial[1] * radial_offset + tangent[1] * tangent_offset,
+            ))
+        cell_material = white if index % 2 else black
+        cell_root = create_empty(f"DetentionCellBank_{index + 1:02d}", halo)
+        cell_root["collision_role"] = "architecture_shell"
+        cell_root["landmark_role"] = "detention cell bank"
+        panel(
+            f"DetentionCellBank_{index + 1:02d}", corners, -15.72, -4.4,
+            cell_material, cell_root, "Original DCC-modeled orbital detention cell bank",
+        )
+        # Three inset observation slits and a cyan threshold line make each
+        # bank read as occupied architecture instead of a blank block.
+        for slit_index in range(3):
+            tangent_offset = -3.6 + slit_index * 3.6
+            x = cx + radial[0] * -7.08 + tangent[0] * tangent_offset
+            y = cy + radial[1] * -7.08 + tangent[1] * tangent_offset
+            _pipe(
+                f"DetentionCellSlit_{index + 1:02d}_{slit_index + 1:02d}",
+                [(x, y, -10.2), (x, y, -5.0)], 0.12, cyan, cell_root,
+            )
+        threshold = [
+            (cx + radial[0] * -7.2 + tangent[0] * -5.2,
+             cy + radial[1] * -7.2 + tangent[1] * -5.2),
+            (cx + radial[0] * -7.2 + tangent[0] * 5.2,
+             cy + radial[1] * -7.2 + tangent[1] * 5.2),
+        ]
+        _pipe(
+            f"DetentionCellThreshold_{index + 1:02d}",
+            [(threshold[0][0], threshold[0][1], -14.9),
+             (threshold[1][0], threshold[1][1], -14.9)],
+            0.18, orange if index % 2 else cyan, halo_powered,
+        )
+    halo["landmark_id"] = "detention_halo"
+    halo["display_name"] = "STORMGLASS DETENTION HALO"
+    halo["gameplay_role"] = "central security rotunda linking reactor, intake, and objective wings"
+    halo["art_direction"] = "orbital pressure cage, radial portals, suspended observation tier"
+    halo["collision_role"] = "minor_prop"
 
     # ------------------------------------------------------------------
     # CATHODE WELL / COOLANT CATHEDRAL
@@ -1047,6 +1171,19 @@ def authored_placements_underground():
         Placement("reactor_annex", "BreakerApproachAnnex", "District_BreakerYard", (-64.0, -4.0, -15.5), 8.0, (1.5, 1.5, 1.3)),
         Placement("glassworks_office", "ArchiveApproachLab", "District_QuarantineArchive", (92.0, -50.0, -15.5), -20.0, (1.55, 1.55, 1.35)),
         Placement("reactor_annex", "ArchiveApproachAnnex", "District_QuarantineArchive", (64.0, -4.0, -15.5), -8.0, (1.5, 1.5, 1.3)),
+
+        # Stormglass Detention Halo wings.  These four buildings are aligned
+        # to the ring portals so the reactor is no longer an isolated hero
+        # prop: west/east are observation and medical control, north is the
+        # command block, and south is the controlled mess/processing wing.
+        Placement("control_room", "HaloObservationWest", "District_ReactorHall", (-78.0, 34.0, -15.5), 90.0, (1.55, 1.55, 1.4)),
+        Placement("control_room", "HaloObservationEast", "District_ReactorHall", (78.0, 34.0, -15.5), -90.0, (1.55, 1.55, 1.4)),
+        Placement("operations_office", "HaloCommandNorth", "District_ReactorHall", (0.0, 112.0, -15.5), 180.0, (1.25, 1.25, 1.25)),
+        Placement("crew_canteen", "HaloProcessingSouth", "District_ReactorHall", (0.0, -44.0, -15.5), 0.0, (1.45, 1.45, 1.3)),
+        Placement("elevated_walkway", "HaloTierWest", "District_ReactorHall", (-67.0, 34.0, -2.4), 90.0, (1.05, 1.05, 1.0)),
+        Placement("elevated_walkway", "HaloTierEast", "District_ReactorHall", (67.0, 34.0, -2.4), -90.0, (1.05, 1.05, 1.0)),
+        Placement("elevated_walkway", "HaloTierNorth", "District_ReactorHall", (0.0, 101.0, -2.4), 0.0, (1.0, 1.0, 1.0)),
+        Placement("elevated_walkway", "HaloTierSouth", "District_ReactorHall", (0.0, -33.0, -2.4), 180.0, (1.0, 1.0, 1.0)),
     ]
 
 
@@ -1304,7 +1441,17 @@ def render_previews_underground(groups):
         camera.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
         scene.camera = camera
         scene.render.filepath = str(PREVIEW_DIR / filename)
-        bpy.ops.render.render(write_still=True)
+        try:
+            bpy.ops.render.render(write_still=True)
+        except RuntimeError as error:
+            # Windows can briefly hold a PNG opened by the visual review
+            # panel.  Preserve the last good capture and keep building the
+            # authoritative BLEND/GLB; a locked preview must not invalidate
+            # the playable map export.
+            if (PREVIEW_DIR / filename).is_file():
+                print(f"ORBITAL_COMPLEX_PREVIEW_RETAINED file={filename} error={error}")
+            else:
+                raise
         if not (PREVIEW_DIR / filename).is_file():
             raise RuntimeError(f"Preview render missing: {filename}")
         preview_records.append({"file": f"previews/{filename}", "description": description, "camera_blender": list(location), "target_blender": list(target)})
