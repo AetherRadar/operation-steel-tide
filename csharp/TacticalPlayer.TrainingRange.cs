@@ -85,6 +85,7 @@ public partial class TacticalPlayer
         DisarmFireInput();
         RestoreMovementInput();
         RefillTrainingRangeAmmo();
+        ShowTrainingRangeAttachmentControls();
     }
 
     public void CycleTrainingRangeWeapon()
@@ -106,7 +107,12 @@ public partial class TacticalPlayer
     {
         if (IsFirearmQuickSlotSelected && !_knifeEquipped)
         {
-            Ammo = EquippedWeapon.Stats().MagazineSize;
+            // Keep the reserve infinite without overwriting the live magazine.
+            // The old per-frame assignment made R appear broken: every shot was
+            // immediately restored before the reload state could be observed.
+            // InstallTrainingRangeWeapon/ApplyTrainingRangeAmmoProfile still
+            // fill a fresh weapon once; from then on normal reload timing owns
+            // the magazine exactly as it does in a mission.
             SetAmmoReserve(CurrentAmmoCaliber, _trainingRangeAmmoGrade, 9999);
         }
         Grenades = 99;
@@ -118,7 +124,7 @@ public partial class TacticalPlayer
 
     private void InstallTrainingRangeWeapon(WeaponPlatform platform, bool notify)
     {
-        var build = WeaponCatalog.Build(platform, 3);
+        var build = WeaponCatalog.BuildTrainingRangeDefault(platform);
         if (WeaponCatalog.IsSidearm(platform))
         {
             InstallSidearmWeapon(build, LootGrade.Legendary);

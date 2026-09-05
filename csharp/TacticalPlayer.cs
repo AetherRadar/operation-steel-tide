@@ -291,6 +291,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         BuildLadderViewModel();
         BuildRoleDevices();
         BuildMedicalDevices();
+        EnsureTrainingRangeAttachmentInput();
         ApplyWeaponBuildVisuals();
         ConfigureRole(Role);
         InitializeFirstPersonTransformClock();
@@ -1349,6 +1350,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             CycleWeaponSlots();
         }
+
+        HandleTrainingRangeAttachmentCycleInput();
 
         if (Input.IsActionJustPressed(GameInputActions.ToggleFireMode)
             && IsFirearmQuickSlotSelected

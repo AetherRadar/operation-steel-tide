@@ -33,6 +33,12 @@ internal static class GameInputActions
     public static readonly StringName UseClassSkill = "use_class_skill";
     public static readonly StringName UsePlate = "use_plate";
     public static readonly StringName WeaponCycle = "weapon_cycle";
+    public static readonly StringName WeaponAttachmentCycle = "weapon_attachment_cycle";
+    public static readonly StringName WeaponAttachmentCycleBarrel = "weapon_attachment_cycle_barrel";
+    public static readonly StringName WeaponAttachmentCycleMuzzle = "weapon_attachment_cycle_muzzle";
+    public static readonly StringName WeaponAttachmentCycleGrip = "weapon_attachment_cycle_grip";
+    public static readonly StringName WeaponAttachmentCycleStock = "weapon_attachment_cycle_stock";
+    public static readonly StringName WeaponAttachmentCycleMagazine = "weapon_attachment_cycle_magazine";
     public static readonly StringName WeaponGrenade = "weapon_grenade";
     public static readonly StringName WeaponMelee = "weapon_melee";
     public static readonly StringName WeaponPrimary = "weapon_primary";

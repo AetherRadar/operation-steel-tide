@@ -892,6 +892,15 @@ public static class WeaponCatalog
         return build;
     }
 
+    /// <summary>
+    /// Baseline build used when entering the live-fire range.  The range starts
+    /// with a clean, readable sight picture so the player can evaluate the
+    /// weapon before deliberately cycling an optic with the Y key.  Precision
+    /// platforms still receive their authored magnified optic through Build().
+    /// </summary>
+    public static WeaponBuild BuildTrainingRangeDefault(WeaponPlatform platform)
+        => Build(platform, platform == WeaponPlatform.AK74 ? 0 : 1);
+
     public static string SlotChinese(AttachmentSlot slot) => slot switch
     {
         AttachmentSlot.Optic => "瞄具",
