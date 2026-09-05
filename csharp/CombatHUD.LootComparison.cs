@@ -250,6 +250,7 @@ public partial class CombatHUD
         var resized = 0;
         foreach (var preview in LootSourceModelPreviewsForDiagnostics())
         {
+            preview.Size += new Vector2(3.0f, 2.0f);
             preview.CustomMinimumSize += new Vector2(3.0f, 2.0f);
             resized++;
         }

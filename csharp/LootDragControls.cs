@@ -414,15 +414,24 @@ public partial class LootDragCard : PanelContainer
         };
         ModelPreviewForDiagnostics = preview;
         preview.Configure(InventoryPreviewKind.Rifle, weapon: weapon);
-        box.AddChild(preview);
-        var generatedIcon = new LootItemIconControl
+        preview.Position = Vector2.Zero;
+        preview.Size = new Vector2(220, 72);
+        var visual = new Control
         {
             CustomMinimumSize = new Vector2(220, 72),
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             MouseFilter = MouseFilterEnum.Ignore
         };
+        visual.AddChild(preview);
+        var generatedIcon = new LootItemIconControl
+        {
+            Position = Vector2.Zero,
+            Size = new Vector2(220, 72),
+            MouseFilter = MouseFilterEnum.Ignore
+        };
         generatedIcon.Configure(LootItemKind.Weapon, null, accent, generatedIconKey);
-        box.AddChild(generatedIcon);
+        visual.AddChild(generatedIcon);
+        box.AddChild(visual);
         var detailLabel = new Label
         {
             Text = detail,
