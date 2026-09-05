@@ -21,9 +21,9 @@ public partial class SquadMate
         Enum.GetValues<LootGrade>().Length];
     private readonly int[] _armorPlateSupplies = new int[Enum.GetValues<LootGrade>().Length];
     private readonly int[] _recoveredArmorPlateSupplies = new int[Enum.GetValues<LootGrade>().Length];
-    private EquipmentItem _equippedHelmet = EquipmentCatalog.Create("helmet_patrol");
-    private EquipmentItem _equippedBodyArmor = EquipmentCatalog.Create("armor_patrol");
-    private EquipmentItem _equippedBackpack = EquipmentCatalog.Create("pack_sling");
+    private EquipmentItem _equippedHelmet = EquipmentCatalog.Create("helmet_none");
+    private EquipmentItem _equippedBodyArmor = EquipmentCatalog.Create("armor_none");
+    private EquipmentItem _equippedBackpack = EquipmentCatalog.Create("pack_none");
     private LootGrade _equippedHelmetGrade = LootGrade.Uncommon;
     private LootGrade _equippedBodyArmorGrade = LootGrade.Uncommon;
     private LootGrade _equippedBackpackGrade = LootGrade.Uncommon;
@@ -76,9 +76,9 @@ public partial class SquadMate
 
     private void InitializeSustainmentLoadout()
     {
-        _equippedHelmet = EquipmentCatalog.Create("helmet_patrol");
-        _equippedBodyArmor = EquipmentCatalog.Create("armor_patrol");
-        _equippedBackpack = EquipmentCatalog.Create("pack_sling");
+        _equippedHelmet = EquipmentCatalog.Create("helmet_none");
+        _equippedBodyArmor = EquipmentCatalog.Create("armor_none");
+        _equippedBackpack = EquipmentCatalog.Create("pack_none");
         _equippedHelmetGrade = LootGrade.Uncommon;
         _equippedBodyArmorGrade = LootGrade.Uncommon;
         _equippedBackpackGrade = LootGrade.Uncommon;

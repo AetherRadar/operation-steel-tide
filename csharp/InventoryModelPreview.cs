@@ -22,6 +22,11 @@ public partial class InventoryModelPreview : SubViewportContainer
     private string _knifeSkinId = KnifeSkinCatalog.DefaultId;
     private OperatorRole _operatorRole = OperatorRole.Assault;
     private bool _staticLoadoutOperator;
+    private EquipmentItem? _helmet;
+    private EquipmentItem? _bodyArmor;
+    private EquipmentItem? _backpack;
+    private float _operatorMotionTime;
+    private Vector3 _operatorBaseRotation;
     private SubViewport? _viewport;
     private Node3D? _modelRoot;
     private Camera3D? _camera;
@@ -56,6 +61,9 @@ public partial class InventoryModelPreview : SubViewportContainer
         _weapon = weapon?.Clone();
         _knifeSkinId = knifeSkinId;
         _operatorRole = role;
+        _helmet = helmet?.Clone();
+        _bodyArmor = bodyArmor?.Clone();
+        _backpack = backpack?.Clone();
         _staticLoadoutOperator = staticLoadoutOperator;
         if (IsInsideTree())
         {
@@ -126,6 +134,22 @@ public partial class InventoryModelPreview : SubViewportContainer
         Resized += HandlePreviewResized;
         VisibilityChanged += HandlePreviewVisibilityChanged;
         RebuildModel();
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_kind != InventoryPreviewKind.Operator || !IsInstanceValid(_modelRoot))
+        {
+            return;
+        }
+
+        // Keep the authored paper-doll alive with a restrained look-around motion.
+        // The operator animation itself is intentionally frozen for a stable loadout
+        // shot; this adds head/body presence without affecting equipment alignment.
+        _operatorMotionTime += (float)delta;
+        var yaw = Mathf.Sin(_operatorMotionTime * 1.15f) * 0.035f;
+        var pitch = Mathf.Sin(_operatorMotionTime * 0.83f + 0.7f) * 0.012f;
+        _modelRoot!.Rotation = _operatorBaseRotation + new Vector3(pitch, yaw, 0.0f);
     }
 
     public override void _ExitTree()
@@ -241,6 +265,8 @@ public partial class InventoryModelPreview : SubViewportContainer
                 _modelRoot.RotationDegrees = _staticLoadoutOperator
                     ? new Vector3(0, 168, 0)
                     : new Vector3(0, -9, 0);
+                _operatorBaseRotation = _modelRoot.Rotation;
+                _operatorMotionTime = 0.0f;
                 break;
         }
         RequestRender();
@@ -306,7 +332,10 @@ public partial class InventoryModelPreview : SubViewportContainer
             root,
             OperatorRoles.Spec(_operatorRole).VisualId,
             _weapon,
-            staticLoadout: _staticLoadoutOperator);
+            staticLoadout: _staticLoadoutOperator,
+            helmet: _helmet,
+            bodyArmor: _bodyArmor,
+            backpack: _backpack);
     }
 
     private void BuildRifle(Node3D root)
@@ -500,6 +529,10 @@ public partial class InventoryModelPreview : SubViewportContainer
 
     private void BuildHelmet(Node3D root)
     {
+        if (_equipment is null || _equipment.DefinitionId.EndsWith("_none", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
         var heavy = _equipment?.DefinitionId == "helmet_heavy";
         var patrol = _equipment?.DefinitionId == "helmet_patrol";
         var nvg = _equipment?.DefinitionId == "helmet_nvg";
@@ -543,6 +576,10 @@ public partial class InventoryModelPreview : SubViewportContainer
 
     private void BuildBodyArmor(Node3D root)
     {
+        if (_equipment is null || _equipment.DefinitionId.EndsWith("_none", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
         if (TryBuildAuthoredArmorCarrier(root))
         {
             return;
@@ -581,6 +618,10 @@ public partial class InventoryModelPreview : SubViewportContainer
 
     private void BuildBackpack(Node3D root)
     {
+        if (_equipment is null || _equipment.DefinitionId.EndsWith("_none", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
         if (TryBuildAuthoredBackpack(root))
         {
             return;

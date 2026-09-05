@@ -144,7 +144,11 @@ public partial class SquadMate
         {
             authoredOperator = CombatModelLibrary.InstantiateOperator(
                 OperatorRoles.Spec(Role).VisualId,
-                CarriedWeapon);
+                weaponBuild: HasFireablePrimary ? CarriedWeapon : null,
+                attachDefaultWeapon: false,
+                helmet: EquippedHelmet,
+                bodyArmor: EquippedBodyArmor,
+                backpack: EquippedBackpack);
             _rig.AddChild(authoredOperator.Root);
             var authoredAnimator = new AuthoredOperatorAnimator(authoredOperator);
             _authoredOperatorVisual = authoredOperator;
@@ -180,7 +184,11 @@ public partial class SquadMate
         {
             replacement = CombatModelLibrary.InstantiateOperator(
                 OperatorRoles.Spec(Role).VisualId,
-                CarriedWeapon);
+                weaponBuild: HasFireablePrimary ? CarriedWeapon : null,
+                attachDefaultWeapon: false,
+                helmet: EquippedHelmet,
+                bodyArmor: EquippedBodyArmor,
+                backpack: EquippedBackpack);
             _rig.AddChild(replacement.Root);
             replacement.SetTeamColor(OperatorRoles.Spec(Role).Accent);
             replacement.SetWeaponVisible(HasFireablePrimary);

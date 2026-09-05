@@ -132,7 +132,13 @@ public partial class EnemyOperator
         AuthoredOperatorVisual? authoredOperator = null;
         try
         {
-            authoredOperator = CombatModelLibrary.InstantiateOperator(OperatorVisual, CarriedWeapon);
+            authoredOperator = CombatModelLibrary.InstantiateOperator(
+                OperatorVisual,
+                weaponBuild: HasFireablePrimary ? CarriedWeapon : null,
+                attachDefaultWeapon: false,
+                helmet: EquippedHelmet,
+                bodyArmor: EquippedBodyArmor,
+                backpack: EquippedBackpack);
             _bodyRoot.AddChild(authoredOperator.Root);
             var authoredAnimator = new AuthoredOperatorAnimator(authoredOperator);
             _authoredOperatorVisual = authoredOperator;

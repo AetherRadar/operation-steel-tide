@@ -43,9 +43,9 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private const int MaxArmorPlates = 3;
 
     public float Health { get; private set; } = 100.0f;
-    public EquipmentItem EquippedHelmet { get; private set; } = EquipmentCatalog.Create("helmet_light");
-    public EquipmentItem EquippedBodyArmor { get; private set; } = EquipmentCatalog.Create("armor_carrier");
-    public EquipmentItem EquippedBackpack { get; private set; } = EquipmentCatalog.Create("pack_assault");
+    public EquipmentItem EquippedHelmet { get; private set; } = EquipmentCatalog.Create("helmet_none");
+    public EquipmentItem EquippedBodyArmor { get; private set; } = EquipmentCatalog.Create("armor_none");
+    public EquipmentItem EquippedBackpack { get; private set; } = EquipmentCatalog.Create("pack_none");
     public LootGrade EquippedHelmetGrade { get; private set; } = LootGrade.Uncommon;
     public LootGrade EquippedBodyArmorGrade { get; private set; } = LootGrade.Rare;
     public LootGrade EquippedBackpackGrade { get; private set; } = LootGrade.Uncommon;
@@ -2599,6 +2599,58 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 };
         }
         return item;
+    }
+
+    /// <summary>Detaches an equipped gear item and returns it to the backpack.</summary>
+    public bool UnequipEquipment(EquipmentSlot slot)
+    {
+        var current = slot switch
+        {
+            EquipmentSlot.Helmet => EquippedHelmet,
+            EquipmentSlot.BodyArmor => EquippedBodyArmor,
+            EquipmentSlot.Backpack => EquippedBackpack,
+            _ => null
+        };
+        if (current is null || current.DefinitionId.EndsWith("_none", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        // Removing a backpack can reduce capacity; refuse the action rather than
+        // silently deleting the detached item when the inventory is full.
+        var capacityAfterRemoval = BackpackCapacity
+            - (slot == EquipmentSlot.Backpack ? current.Definition.CapacityBonus : 0);
+        if (Backpack.Count + 1 > capacityAfterRemoval)
+        {
+            Hud?.ShowLocalizedMessage("backpack_full", "BACKPACK FULL", new Color(1.0f, 0.48f, 0.28f));
+            return false;
+        }
+        Backpack.Add(new LootItem
+        {
+            Kind = LootItemKind.Equipment,
+            Equipment = current.Clone(),
+            Grade = EquippedEquipmentGrade(slot)
+        });
+        switch (slot)
+        {
+            case EquipmentSlot.Helmet:
+                EquippedHelmet = EquipmentCatalog.Create("helmet_none");
+                EquippedHelmetGrade = LootGrade.Common;
+                _nvgOn = false;
+                Main?.SetNightVisionActive(false);
+                Hud?.SetNightVisionActive(false);
+                break;
+            case EquipmentSlot.BodyArmor:
+                EquippedBodyArmor = EquipmentCatalog.Create("armor_none");
+                EquippedBodyArmorGrade = LootGrade.Common;
+                break;
+            case EquipmentSlot.Backpack:
+                EquippedBackpack = EquipmentCatalog.Create("pack_none");
+                EquippedBackpackGrade = LootGrade.Common;
+                break;
+        }
+        Hud?.ShowLocalizedMessage("equipment_removed", "EQUIPMENT REMOVED", new Color(0.55f, 0.75f, 0.9f));
+        Hud?.SetBackpackValuePlayer(this);
+        return true;
     }
 
     private void ShowIncompatibleAttachmentMessage()

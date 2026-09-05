@@ -172,6 +172,13 @@ public partial class SquadMate
                 _equippedBackpackRecovered = true;
                 break;
         }
+        if (UsesAuthoredOperatorForDiagnostics)
+        {
+            _authoredOperatorVisual.SetEquipment(
+                _equippedHelmet,
+                _equippedBodyArmor,
+                _equippedBackpack);
+        }
         return true;
     }
 

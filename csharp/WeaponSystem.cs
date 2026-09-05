@@ -503,6 +503,11 @@ public static class EquipmentCatalog
             Id = "armor_none", Name = "No body armor", ChineseName = "No body armor",
             Slot = EquipmentSlot.BodyArmor, Protection = 0.0f, MaxDurability = 0.0f
         },
+        ["pack_none"] = new EquipmentDefinition
+        {
+            Id = "pack_none", Name = "No backpack", ChineseName = "无背包",
+            Slot = EquipmentSlot.Backpack, Protection = 0.0f, MaxDurability = 0.0f, CapacityBonus = 0
+        },
         ["helmet_patrol"] = new EquipmentDefinition
         {
             Id = "helmet_patrol", Name = "Patrol protection cap", ChineseName = "Patrol protection cap",

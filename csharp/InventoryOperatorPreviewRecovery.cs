@@ -16,7 +16,10 @@ internal static class InventoryOperatorPreviewRecovery
         Node3D root,
         OperatorVisualId requestedVisual,
         WeaponBuild? weaponBuild = null,
-        bool staticLoadout = false)
+        bool staticLoadout = false,
+        EquipmentItem? helmet = null,
+        EquipmentItem? bodyArmor = null,
+        EquipmentItem? backpack = null)
         => TryBuild(
             root,
             requestedVisual,
@@ -24,7 +27,7 @@ internal static class InventoryOperatorPreviewRecovery
             {
                 if (!staticLoadout)
                 {
-                    return CombatModelLibrary.InstantiatePreviewOperator(visualId, weaponBuild).Root;
+                return CombatModelLibrary.InstantiatePreviewOperator(visualId, weaponBuild, helmet, bodyArmor, backpack).Root;
                 }
 
                 // The backpack paper doll is a product shot, not a live actor.
@@ -32,8 +35,11 @@ internal static class InventoryOperatorPreviewRecovery
                 // before it enters the viewport.
                 var visual = CombatModelLibrary.InstantiateOperator(
                     visualId,
-                    weaponBuild,
-                    attachDefaultWeapon: weaponBuild is not null);
+                    weaponBuild: weaponBuild,
+                    attachDefaultWeapon: weaponBuild is not null,
+                    helmet: helmet,
+                    bodyArmor: bodyArmor,
+                    backpack: backpack);
                 visual.AnimationPlayer.Stop();
                 if (visual.AnimationPlayer.HasAnimation("idle"))
                 {

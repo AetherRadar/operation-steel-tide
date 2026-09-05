@@ -877,7 +877,34 @@ public partial class CombatHUD : CanvasLayer
         content.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         content.MouseFilter = Control.MouseFilterEnum.Ignore;
         row.AddChild(content);
+        var removeButton = new Button
+        {
+            Text = "REMOVE",
+            CustomMinimumSize = new Vector2(54, 28),
+            TooltipText = "Unequip this item",
+            FocusMode = Control.FocusModeEnum.None
+        };
+        var equipmentSlot = target switch
+        {
+            LootDropTarget.Helmet => EquipmentSlot.Helmet,
+            LootDropTarget.BodyArmor => EquipmentSlot.BodyArmor,
+            _ => EquipmentSlot.Backpack
+        };
+        removeButton.Pressed += () => HandleUnequipEquipment(equipmentSlot);
+        row.AddChild(removeButton);
         return zone;
+    }
+
+    private void HandleUnequipEquipment(EquipmentSlot slot)
+    {
+        if (_shownPlayer is null)
+        {
+            return;
+        }
+        if (_shownPlayer.UnequipEquipment(slot))
+        {
+            RefreshLootOverlay();
+        }
     }
 
     private void BuildWeaponDetailOverlay()
@@ -1099,9 +1126,9 @@ public partial class CombatHUD : CanvasLayer
         {
             _lootStats.Text = Text("comparison_no_primary", "NO PRIMARY WEAPON EQUIPPED");
         }
-        _helmetSlotLabel.Text = _shownPlayer.EquippedHelmet.DisplayName(_language) + "\n" + _shownPlayer.EquippedHelmet.Detail(_language);
-        _armorSlotLabel.Text = _shownPlayer.EquippedBodyArmor.DisplayName(_language) + "\n" + _shownPlayer.EquippedBodyArmor.Detail(_language);
-        _packSlotLabel.Text = _shownPlayer.EquippedBackpack.DisplayName(_language) + "\n" + _shownPlayer.EquippedBackpack.Detail(_language);
+        _helmetSlotLabel.Text = EquipmentSlotText(_shownPlayer.EquippedHelmet, EquipmentSlot.Helmet);
+        _armorSlotLabel.Text = EquipmentSlotText(_shownPlayer.EquippedBodyArmor, EquipmentSlot.BodyArmor);
+        _packSlotLabel.Text = EquipmentSlotText(_shownPlayer.EquippedBackpack, EquipmentSlot.Backpack);
         _helmetPreview.Configure(InventoryPreviewKind.Helmet, _shownPlayer.EquippedHelmet);
         _armorPreview.Configure(InventoryPreviewKind.BodyArmor, _shownPlayer.EquippedBodyArmor);
         _packPreview.Configure(InventoryPreviewKind.Backpack, _shownPlayer.EquippedBackpack);
@@ -1161,6 +1188,20 @@ public partial class CombatHUD : CanvasLayer
             : $"BACKPACK VALUE  {totalValue}  //  GUNS + GEAR + AMMO";
         UpdateBackpackHotkey(_shownPlayer);
         UpdateLootToolbarPresentation();
+    }
+
+    private string EquipmentSlotText(EquipmentItem item, EquipmentSlot slot)
+    {
+        if (item.DefinitionId.EndsWith("_none", StringComparison.OrdinalIgnoreCase))
+        {
+            return slot switch
+            {
+                EquipmentSlot.Helmet => Text("empty_helmet", "EMPTY\nNO HELMET"),
+                EquipmentSlot.BodyArmor => Text("empty_body_armor", "EMPTY\nNO BODY ARMOR"),
+                _ => Text("empty_backpack", "EMPTY\nNO BACKPACK")
+            };
+        }
+        return item.DisplayName(_language) + "\n" + item.Detail(_language);
     }
 
     public void UpdateBackpackHotkey(TacticalPlayer? player)

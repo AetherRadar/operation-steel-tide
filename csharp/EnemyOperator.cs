@@ -46,9 +46,9 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     public WeaponBuild CarriedWeapon { get; private set; } = WeaponCatalog.Build(WeaponPlatform.M4A1, 0);
     /// <summary>False for rival cold-start operators until they loot a firearm. Map NPCs stay armed.</summary>
     public bool HasFireablePrimary { get; private set; } = true;
-    public EquipmentItem EquippedHelmet { get; private set; } = EquipmentCatalog.Create("helmet_light");
-    public EquipmentItem EquippedBodyArmor { get; private set; } = EquipmentCatalog.Create("armor_carrier");
-    public EquipmentItem EquippedBackpack { get; private set; } = EquipmentCatalog.Create("pack_assault");
+    public EquipmentItem EquippedHelmet { get; private set; } = EquipmentCatalog.Create("helmet_none");
+    public EquipmentItem EquippedBodyArmor { get; private set; } = EquipmentCatalog.Create("armor_none");
+    public EquipmentItem EquippedBackpack { get; private set; } = EquipmentCatalog.Create("pack_none");
     public bool LastHitWasHeadshot { get; private set; }
     public bool LastHitWasArmored { get; private set; }
     public Node? LastDamageAttacker { get; private set; }

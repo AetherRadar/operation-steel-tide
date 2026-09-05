@@ -643,6 +643,9 @@ internal sealed class AuthoredOperatorVisual
     private readonly int _leftWristBone;
     private AuthoredWeaponVisual? _weapon;
     private bool _weaponReadied;
+    private Node3D? _helmetVisual;
+    private Node3D? _bodyArmorVisual;
+    private Node3D? _backpackVisual;
 
     public AuthoredOperatorVisual(Node3D root, OperatorVisualId visualId = OperatorVisualId.Garrison)
     {
@@ -814,6 +817,102 @@ internal sealed class AuthoredOperatorVisual
         weapon.Configure(build);
         BackWeaponSocket.AddChild(weapon.Root);
         ApplyWeaponSocketTransform(readied: false);
+    }
+
+    /// <summary>Replaces the three optional world/paper-doll gear overlays.</summary>
+    public void SetEquipment(
+        EquipmentItem? helmet,
+        EquipmentItem? bodyArmor,
+        EquipmentItem? backpack)
+    {
+        ReplaceEquipmentVisual(ref _helmetVisual, HeadSocket, helmet, EquipmentSlot.Helmet);
+        ReplaceEquipmentVisual(ref _bodyArmorVisual, VestSocket, bodyArmor, EquipmentSlot.BodyArmor);
+        ReplaceEquipmentVisual(ref _backpackVisual, BackpackSocket, backpack, EquipmentSlot.Backpack);
+    }
+
+    private static void ReplaceEquipmentVisual(
+        ref Node3D? current,
+        Node3D socket,
+        EquipmentItem? equipment,
+        EquipmentSlot slot)
+    {
+        if (GodotObject.IsInstanceValid(current))
+        {
+            current!.QueueFree();
+        }
+        current = null;
+        if (equipment is null || equipment.DefinitionId.EndsWith("_none", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var root = new Node3D { Name = $"Equipped{slot}Visual" };
+        socket.AddChild(root);
+        if (TryAttachAuthoredEquipment(root, slot))
+        {
+            current = root;
+            return;
+        }
+        root.QueueFree();
+    }
+
+    private static bool TryAttachAuthoredEquipment(Node3D root, EquipmentSlot slot)
+    {
+        var sourceNodeName = slot switch
+        {
+            EquipmentSlot.Helmet => "Helmet",
+            EquipmentSlot.BodyArmor => "Vest",
+            EquipmentSlot.Backpack => "Backpack",
+            _ => string.Empty
+        };
+        if (string.IsNullOrEmpty(sourceNodeName))
+        {
+            return false;
+        }
+        Node3D? sourceRoot = null;
+        try
+        {
+            var scene = GD.Load<PackedScene>("res://assets/models/steel_tide_operator/steel_tide_operator.glb")
+                ?? throw new InvalidOperationException("Authored equipment scene could not load.");
+            sourceRoot = scene.Instantiate<Node3D>();
+            var source = CombatModelLibrary.FindOptionalNode(sourceRoot, sourceNodeName)
+                ?? throw new InvalidOperationException($"Authored equipment scene is missing {sourceNodeName}.");
+            var copy = source.Duplicate() as Node3D
+                ?? throw new InvalidOperationException($"{sourceNodeName} could not be duplicated.");
+            var bounds = CombatModelLibrary.ComputeBounds(copy);
+            if (bounds.MeshCount == 0 || bounds.Size.Y <= 0.01f)
+            {
+                copy.Free();
+                throw new InvalidOperationException($"{sourceNodeName} has no usable bounds.");
+            }
+            copy.Position -= bounds.Center;
+            var targetHeight = slot switch
+            {
+                EquipmentSlot.Helmet => 0.48f,
+                EquipmentSlot.BodyArmor => 0.86f,
+                EquipmentSlot.Backpack => 1.12f,
+                _ => bounds.Size.Y
+            };
+            copy.Scale = Vector3.One * (targetHeight / bounds.Size.Y);
+            copy.Position = slot switch
+            {
+                EquipmentSlot.Helmet => new Vector3(0, 0.10f, 0),
+                EquipmentSlot.BodyArmor => new Vector3(0, -0.02f, 0),
+                EquipmentSlot.Backpack => new Vector3(0, 0.0f, 0.08f),
+                _ => Vector3.Zero
+            };
+            root.AddChild(copy);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            GD.PushWarning($"Authored {slot} overlay unavailable; using fallback: {exception.Message}");
+            return false;
+        }
+        finally
+        {
+            sourceRoot?.Free();
+        }
     }
 
     public void SetWeaponVisible(bool visible)
@@ -1495,7 +1594,10 @@ internal static partial class CombatModelLibrary
     public static AuthoredOperatorVisual InstantiateOperator(
         OperatorVisualId visualId,
         WeaponBuild? weaponBuild = null,
-        bool attachDefaultWeapon = true)
+        bool attachDefaultWeapon = true,
+        EquipmentItem? helmet = null,
+        EquipmentItem? bodyArmor = null,
+        EquipmentItem? backpack = null)
     {
         var asset = OperatorVisualAsset(visualId);
         var source = InstantiateRequired(
@@ -1518,6 +1620,7 @@ internal static partial class CombatModelLibrary
         sourcePresentation.AddChild(source);
         wrapper.AddChild(sourcePresentation);
         var visual = new AuthoredOperatorVisual(wrapper, visualId);
+        visual.SetEquipment(helmet, bodyArmor, backpack);
         if (weaponBuild is not null || attachDefaultWeapon)
         {
             var carriedBuild = weaponBuild ?? WeaponCatalog.Build(WeaponPlatform.M4A1, 0);
@@ -1927,17 +2030,23 @@ internal static partial class CombatModelLibrary
 
     public static AuthoredPreviewOperatorVisual InstantiatePreviewOperator(
         OperatorVisualId visualId,
-        WeaponBuild? weaponBuild = null)
-        => InstantiatePreviewOperator(visualId, weaponBuild, buildObserver: null);
+        WeaponBuild? weaponBuild = null,
+        EquipmentItem? helmet = null,
+        EquipmentItem? bodyArmor = null,
+        EquipmentItem? backpack = null)
+        => InstantiatePreviewOperator(visualId, weaponBuild, helmet, bodyArmor, backpack, buildObserver: null);
 
     private static AuthoredPreviewOperatorVisual InstantiatePreviewOperator(
         OperatorVisualId visualId,
         Action<PreviewOperatorBuildStage, Node3D, Node3D?> buildObserver)
-        => InstantiatePreviewOperator(visualId, weaponBuild: null, buildObserver: buildObserver);
+        => InstantiatePreviewOperator(visualId, weaponBuild: null, helmet: null, bodyArmor: null, backpack: null, buildObserver: buildObserver);
 
     private static AuthoredPreviewOperatorVisual InstantiatePreviewOperator(
         OperatorVisualId visualId,
         WeaponBuild? weaponBuild,
+        EquipmentItem? helmet,
+        EquipmentItem? bodyArmor,
+        EquipmentItem? backpack,
         Action<PreviewOperatorBuildStage, Node3D, Node3D?>? buildObserver)
     {
         Node3D? source = null;
@@ -1975,6 +2084,8 @@ internal static partial class CombatModelLibrary
                     previewVisual.SetWeaponReadied(false);
                     pendingWeapon = null;
                 }
+                var equipmentVisual = new AuthoredOperatorVisual(source, visualId);
+                equipmentVisual.SetEquipment(helmet, bodyArmor, backpack);
             }
 
             wrapper = new Node3D();
