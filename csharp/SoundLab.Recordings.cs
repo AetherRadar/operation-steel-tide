@@ -52,6 +52,17 @@ public static partial class SoundLab
             nearField: nearField,
             out _);
 
+    internal static float RecordedWeaponLeadingSilenceSecondsForDiagnostics(
+        WeaponPlatform platform)
+        => TryLoadRecordedWeaponShot(
+            platform,
+            suppressed: false,
+            distant: false,
+            nearField: true,
+            out var stream)
+            ? LeadingSilenceSeconds(stream)
+            : float.PositiveInfinity;
+
     private static bool TryLoadRecordedWeaponShot(
         WeaponPlatform platform,
         bool suppressed,
@@ -185,6 +196,7 @@ public static partial class SoundLab
             // optional ADPCM import setting from changing the licensed take.
             var pcm = new byte[dataLength];
             Array.Copy(bytes, dataOffset, pcm, 0, dataLength);
+            pcm = TrimLeadingSilence(pcm, channels, mixRate);
             return new AudioStreamWav
             {
                 Format = AudioStreamWav.FormatEnum.Format16Bits,
@@ -197,6 +209,102 @@ public static partial class SoundLab
         {
             file.Close();
         }
+    }
+
+    /// <summary>
+    /// Field recordings often contain a long pre-roll before the muzzle report.
+    /// Keeping that pre-roll makes a local shot sound late enough to line up with
+    /// a distant impact, especially for pistols. Preserve a tiny two-millisecond
+    /// lead-in for a clean waveform while removing the unusable silence.
+    /// </summary>
+    private static byte[] TrimLeadingSilence(byte[] data, ushort channels, int mixRate)
+    {
+        var frameBytes = channels * 2;
+        var frameCount = data.Length / frameBytes;
+        var audibleFrame = -1;
+        const int threshold = 320;
+        for (var frame = 0; frame < frameCount; frame++)
+        {
+            var peak = 0;
+            var frameOffset = frame * frameBytes;
+            for (var channel = 0; channel < channels; channel++)
+            {
+                var offset = frameOffset + channel * 2;
+                var sample = Math.Abs((short)(data[offset] | data[offset + 1] << 8));
+                peak = Math.Max(peak, sample);
+            }
+            if (peak < threshold)
+            {
+                continue;
+            }
+
+            var sustained = true;
+            for (var lookahead = 1; lookahead <= 2 && frame + lookahead < frameCount; lookahead++)
+            {
+                var nextOffset = (frame + lookahead) * frameBytes;
+                var nextPeak = 0;
+                for (var channel = 0; channel < channels; channel++)
+                {
+                    var offset = nextOffset + channel * 2;
+                    nextPeak = Math.Max(
+                        nextPeak,
+                        Math.Abs((short)(data[offset] | data[offset + 1] << 8)));
+                }
+                if (nextPeak < threshold / 2)
+                {
+                    sustained = false;
+                    break;
+                }
+            }
+            if (sustained)
+            {
+                audibleFrame = frame;
+                break;
+            }
+        }
+
+        if (audibleFrame <= 0)
+        {
+            return data;
+        }
+        var prerollFrames = Math.Min(audibleFrame, Math.Max(1, mixRate / 500));
+        var start = (audibleFrame - prerollFrames) * frameBytes;
+        var trimmed = new byte[data.Length - start];
+        Array.Copy(data, start, trimmed, 0, trimmed.Length);
+        // Keep very short takes above the diagnostic/import floor after trimming.
+        // The tail is intentionally silent; the audible report still begins at
+        // sample zero and the extra room prevents the voice from being rejected.
+        const int minimumVoiceBytes = 16000;
+        if (trimmed.Length < minimumVoiceBytes)
+        {
+            Array.Resize(ref trimmed, minimumVoiceBytes);
+        }
+        return trimmed;
+    }
+
+    private static float LeadingSilenceSeconds(AudioStreamWav stream)
+    {
+        var channels = stream.Stereo ? 2 : 1;
+        var frameBytes = channels * 2;
+        var frameCount = stream.Data.Length / frameBytes;
+        const int threshold = 320;
+        for (var frame = 0; frame < frameCount; frame++)
+        {
+            var offset = frame * frameBytes;
+            var peak = 0;
+            for (var channel = 0; channel < channels; channel++)
+            {
+                var sampleOffset = offset + channel * 2;
+                peak = Math.Max(
+                    peak,
+                    Math.Abs((short)(stream.Data[sampleOffset] | stream.Data[sampleOffset + 1] << 8)));
+            }
+            if (peak >= threshold)
+            {
+                return frame / (float)Math.Max(1, stream.MixRate);
+            }
+        }
+        return (float)stream.GetLength();
     }
 
     private static string ReadFourCc(byte[] bytes, int offset)

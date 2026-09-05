@@ -42,6 +42,7 @@ public partial class FreightTerminalWorld
         var recordedAk74Ready = false;
         var recordedPlatforms = 0;
         var recordedAllReady = true;
+        var recordedLeadReady = true;
         foreach (var sample in platforms)
         {
             var platform = sample.Platform;
@@ -62,6 +63,8 @@ public partial class FreightTerminalWorld
                     platform,
                     distant: true,
                     nearField: false);
+            var leadingSilence = SoundLab.RecordedWeaponLeadingSilenceSecondsForDiagnostics(platform);
+            recordedLeadReady &= leadingSilence <= 0.02f;
             recordedPlatforms += recorded ? 1 : 0;
             recordedAllReady &= recorded;
             var signature = _player.PlayerWeaponAudioSignatureForDiagnostics;
@@ -125,7 +128,7 @@ public partial class FreightTerminalWorld
                 $"{platform}:{ready}:{volume:0.0}:"
                 + $"minimum={sample.MinimumLocalVolumeDb:0.0}:"
                 + $"single_peak={singlePeak:F3}:burst_peak={burstPeak:F3}:"
-                + $"local={signature}:world={worldSignature}:recorded={recorded}");
+                + $"local={signature}:world={worldSignature}:recorded={recorded}:lead={leadingSilence:0.000}");
         }
 
         var localPlayback = _player.PlayerWeaponAudioIsLocalForDiagnostics;
@@ -142,7 +145,8 @@ public partial class FreightTerminalWorld
             && smgFired
             && smgPlaying
             && recordedAk74Ready
-            && recordedAllReady;
+            && recordedAllReady
+            && recordedLeadReady;
         GD.Print(
             $"WEAPON_AUDIO_CHECK valid={valid} local={localPlayback} "
             + $"streams={streamCount}/{platforms.Length} "
@@ -156,6 +160,7 @@ public partial class FreightTerminalWorld
             + $"smg_tail_playing={smgTailPlaying} "
             + $"recorded_ak74={recordedAk74Ready} "
             + $"recorded_platforms={recordedPlatforms}/{platforms.Length} "
+            + $"recorded_lead={recordedLeadReady} "
             + $"reports={string.Join(',', reports)}");
         GD.Print($"WEAPON_AUDIO_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
