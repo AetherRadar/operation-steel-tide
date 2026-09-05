@@ -156,7 +156,7 @@ internal sealed class AuthoredOperatorAnimator
         _overrideRemaining = 0.0f;
         _hitCooldownRemaining = 0.0f;
         Play(weaponReadied ? "ready_idle" : "idle", 1.0f, immediate: true);
-        _visual.RefreshWeaponPose();
+        _visual.RefreshWeaponPose(weaponReadied ? "ready_idle" : "idle");
         ApplyGroundingCorrection(false);
     }
 
@@ -200,7 +200,7 @@ internal sealed class AuthoredOperatorAnimator
     private void AdvanceAndRefresh(float delta)
     {
         _player.Advance(Mathf.Max(0.0f, delta));
-        _visual.RefreshWeaponPose();
+        _visual.RefreshWeaponPose(_current);
     }
 
     private void ApplyGroundingCorrection(bool downed)

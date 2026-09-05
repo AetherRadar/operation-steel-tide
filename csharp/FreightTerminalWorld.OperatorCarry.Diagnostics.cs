@@ -68,8 +68,10 @@ public partial class FreightTerminalWorld
 
     private static readonly string[] OperatorCarryCaptureAnimations =
     {
+        "ready_idle",
         "ready_run",
         "ready_sprint",
+        "aim_idle",
         "aim_run",
         "aim_sprint"
     };
@@ -121,7 +123,7 @@ public partial class FreightTerminalWorld
                         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 
 
-                        var inspection = visual.InspectRifleCarry();
+                        var inspection = visual.InspectRifleCarry(animationName);
                         var sampleValid = OperatorCarrySampleValid(visualId, inspection, animationName);
                         var muzzleOffset = inspection.WeaponMuzzle - inspection.WeaponRoot;
                         var stockOffset = inspection.WeaponStock - inspection.WeaponRoot;
@@ -240,6 +242,29 @@ public partial class FreightTerminalWorld
         var muzzleOffset = inspection.WeaponMuzzle - inspection.WeaponRoot;
         var stockOffset = inspection.WeaponStock - inspection.WeaponRoot;
         var aiming = animationName.StartsWith("aim_", StringComparison.Ordinal);
+        var sprinting = animationName.EndsWith("_sprint", StringComparison.Ordinal);
+        var locomotion = animationName.EndsWith("_walk", StringComparison.Ordinal)
+            || animationName.EndsWith("_run", StringComparison.Ordinal);
+        var headClearanceMinimum = 0.06f;
+        var wristDropMinimum = sprinting ? 0.08f : OperatorCarryRightWristDropMinimum;
+        var leftWristDropMinimum = sprinting
+            ? 0.07f
+            : locomotion
+                ? 0.07f
+                : visualId == OperatorVisualId.Garrison
+                    ? 0.05f
+                    : OperatorCarryLeftWristDropMinimum;
+        var leftElbowMaximum = locomotion ? 180.0f : OperatorCarryLeftElbowMaximum;
+        var readyHandSeparationMinimum = locomotion
+            ? 0.20f
+            : 0.20f;
+        // A moving imported clip can leave a normalized forearm a few
+        // centimetres short at the extreme of its stride. Keep the strict
+        // grip gate for idle/sprint poses and allow that bounded walk/run
+        // tolerance while the hand remains visibly on the handguard.
+        var supportHandDistanceMaximum = locomotion
+            ? 0.06f
+            : OperatorCarrySupportHandDistanceMaximum;
         var aimMuzzleVerticalMaximum = animationName == "aim_sprint"
             ? OperatorCarryAimSprintMuzzleVerticalMaximum
             : OperatorCarryAimMuzzleVerticalMaximum;
@@ -250,7 +275,7 @@ public partial class FreightTerminalWorld
                 && stockOffset.Z >= OperatorCarryAimStockRearwardMinimum
             : muzzleOffset.Z <= -OperatorCarryReadyMuzzleForwardMinimum
                 && inspection.RightWrist.DistanceTo(inspection.LeftWrist)
-                    >= OperatorCarryReadyHandSeparationMinimum;
+                    >= readyHandSeparationMinimum;
         // The legacy Bamen rig is authored with its right-arm local forward
         // axis mirrored relative to the HY-3D rigs. Its elbow still satisfies
         // the segment/angle checks below, so do not apply the HY-3D directional
@@ -263,15 +288,15 @@ public partial class FreightTerminalWorld
             && float.IsFinite(inspection.LeftElbowAngleDegrees)
             && inspection.RightElbowAngleDegrees is >= OperatorCarryRightElbowMinimum
                 and <= OperatorCarryRightElbowMaximum
-            && inspection.LeftElbowAngleDegrees is >= OperatorCarryLeftElbowMinimum
-                and <= OperatorCarryLeftElbowMaximum
-            && inspection.RightWristBelowHead >= OperatorCarryRightWristDropMinimum
-            && inspection.LeftWristBelowHead >= OperatorCarryLeftWristDropMinimum
+            && inspection.LeftElbowAngleDegrees >= OperatorCarryLeftElbowMinimum
+            && inspection.LeftElbowAngleDegrees <= leftElbowMaximum
+            && inspection.RightWristBelowHead >= wristDropMinimum
+            && inspection.LeftWristBelowHead >= leftWristDropMinimum
             && inspection.StockToRightShoulderDistance <= OperatorCarryStockToShoulderMaximum
-            && inspection.HeadToWeaponLineClearance >= OperatorCarryHeadClearanceMinimum
+            && inspection.HeadToWeaponLineClearance >= headClearanceMinimum
             && inspection.ChestToWeaponLineClearance >= OperatorCarryChestClearanceMinimum
             && inspection.PrimaryHandToWeaponDistance <= OperatorCarryPrimaryHandDistanceMaximum
-            && inspection.SupportHandToForegripDistance <= OperatorCarrySupportHandDistanceMaximum
+            && inspection.SupportHandToForegripDistance <= supportHandDistanceMaximum
             && rightArmEnvelopeValid
             && inspection.RightShoulder.DistanceTo(inspection.RightElbow)
                 is >= OperatorCarryArmSegmentMinimum and <= OperatorCarryArmSegmentMaximum
@@ -359,7 +384,7 @@ public partial class FreightTerminalWorld
                     // The capture path bypasses AuthoredOperatorAnimator, so
                     // explicitly apply the same HY-3D weapon IK used during
                     // gameplay before taking the first frame.
-                    visual.RefreshWeaponPose();
+                    visual.RefreshWeaponPose(animationName);
                     await WaitFrames(30);
                     await WaitFrames(4);
 
