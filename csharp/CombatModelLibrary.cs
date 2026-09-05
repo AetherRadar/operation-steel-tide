@@ -825,6 +825,15 @@ internal sealed class AuthoredOperatorVisual
         EquipmentItem? bodyArmor,
         EquipmentItem? backpack)
     {
+        // HY3D operators ship with authored clothing, armor, and headgear in
+        // their production mesh.  The legacy steel_tide_operator paper-doll
+        // overlays use a different rig scale and become oversized floating
+        // blocks when attached to these characters, so keep the authored body
+        // intact for roster/deployment previews and runtime operators.
+        if (CombatModelLibrary.UsesHy3dOperator(VisualId))
+        {
+            return;
+        }
         ReplaceEquipmentVisual(ref _helmetVisual, HeadSocket, helmet, EquipmentSlot.Helmet);
         ReplaceEquipmentVisual(ref _bodyArmorVisual, VestSocket, bodyArmor, EquipmentSlot.BodyArmor);
         ReplaceEquipmentVisual(ref _backpackVisual, BackpackSocket, backpack, EquipmentSlot.Backpack);

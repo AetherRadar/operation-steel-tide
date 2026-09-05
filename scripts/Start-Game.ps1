@@ -1007,6 +1007,14 @@ function Invoke-OperationSteelTideLauncher {
             }
         }
 
+        $privateAssetSync = Join-Path $PSScriptRoot 'Sync-PrivateOperatorAssets.ps1'
+        if (Test-Path -LiteralPath $privateAssetSync -PathType Leaf) {
+            & $privateAssetSync -ProjectRoot $projectRoot
+            if ($LASTEXITCODE -ne 0) {
+                return $LASTEXITCODE
+            }
+        }
+
         $godot = Resolve-GodotExecutable
         if ([string]::IsNullOrWhiteSpace($godot)) {
             [Console]::Error.WriteLine(
