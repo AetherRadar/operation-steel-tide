@@ -1,9 +1,10 @@
 # Authored combat optics source
 
 `steel_tide_optics.blend` is the authoritative DCC source for the shared
-first-person micro, holo, and magnified optic housings. It is built entirely
-from finished CC0 Quaternius Ultimate Guns Pack source meshes already tracked
-in this repository.
+first-person micro, holo, and magnified optic housings. It starts from finished
+CC0 Quaternius Ultimate Guns Pack source meshes already tracked in this
+repository, then adds a machined Picatinny base, clamp feet, and small bevels
+so each sight seats naturally against a firearm rail.
 
 Rebuild with Blender 4.5 LTS or newer from the repository root:
 
@@ -50,7 +51,8 @@ The script fails before export unless all of the following remain true:
 - each selected glass-bearing source component has the expected 412-triangle
   topology;
 - all three runtime nodes contain nonempty, source-derived mesh geometry;
-- the runtime hierarchy contains no generated primitive mesh;
+- the rail base and clamp feet are authored and joined in Blender, with no
+  runtime-generated visible primitive mesh;
 - exactly 12 source glass triangles are removed per optic;
 - those triangles resolve into exactly two independent 8-vertex,
   6-face/6-triangle planes;
@@ -60,8 +62,8 @@ The script fails before export unless all of the following remain true:
   at or below 0.5 mm, and reticle-to-rear distance remains zero;
 - every centerline passes through the housing without a BVH hit;
 - the three silhouettes remain dimensionally distinct; and
-- the final total is three meshes, at least 2,200 vertices, and exactly 1,200
-  triangles.
+- the final total is three meshes, at least 2,200 vertices, and at least 1,200
+  triangles after the DCC bevel and rail-mount pass.
 
 Godot additionally requires the three geometry nodes, the three reticle anchor
 nodes, the six unique aperture-anchor nodes, six material surfaces, and

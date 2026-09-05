@@ -11,9 +11,10 @@
 The runtime optic set is a Blender-authored derivative of three finished scope
 components already tracked from the Quaternius Ultimate Guns Pack. The
 components are extracted from repository-local CC0 GLBs, reshaped in Blender,
-and exported as one Godot-ready GLB. No marketplace-restricted content, code
-primitive, CSG, generated box, or generated cylinder is included in the runtime
-hierarchy.
+then finished with a DCC-authored machined Picatinny base and clamp feet before
+export as one Godot-ready GLB. No marketplace-restricted content, code
+primitive, CSG, or runtime-generated visible geometry is included in the
+runtime hierarchy.
 
 ## Exact source mapping
 
@@ -34,6 +35,9 @@ source glass panes totaling 12 triangles. The reproducible Blender build:
 - maps the source `+X` barrel axis into the project's Blender `+Y` weapon axis;
 - applies DCC vertex deformation to produce distinct micro, wide holo, and
   long-tube silhouettes while retaining the authored source topology;
+- adds a low-profile rail base, two clamp feet, and small edge bevels in
+  Blender so the optic seats against the authored weapon rail contact on every
+  compatible firearm;
 - replaces source scalar materials with six named low-poly PBR housing/hardware
   materials;
 - removes both source glass panes instead of shipping an opaque or incorrectly
@@ -49,8 +53,9 @@ source glass panes totaling 12 triangles. The reproducible Blender build:
   Godot 4.6 makes imported glTF node names globally unique even when duplicate
   names have different parents.
 
-The final runtime asset contains three mesh nodes, 2,322 Blender vertices, and
-1,200 triangles. Every optic has 400 triangles and a genuinely open aperture.
+The final runtime asset contains three mesh nodes, 2,858 Blender vertices, and
+2,204 triangles. Every optic has a machined rail interface and a genuinely open
+aperture.
 The red gameplay dot is an effect owned by the player view model, not a glass
 or housing primitive in this asset.
 
@@ -76,11 +81,11 @@ survive without numeric suffixes.
 
 | File | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `assets/models/steel_tide_optics/steel_tide_optics.glb` | 80,356 | `F10CDBBA8ED896807EE5111EC4D5FF1256D94B6FA8EF3899783641D49472D010` |
-| `source_art/combat_optics/steel_tide_optics.blend` | 708,862 | `D4BA31BB2C793C3DB8393C9495A3F72C85430CC662EE664DE81C8E9BCB9EAC32` |
-| `scripts/blender/build_authored_optics.py` | 51,183 | `C203D7DE5B249D276B0A1642C56F0CE166F5DA3571F256A6430E57D4D9372A85` |
-| Ignored review `build/art-previews/steel_tide_optics.png` | 1,615,951 | `69CF3EE68D05F1F46A150857B120F32C5C22F8258F5D1562944D93CCFC490D6B` |
-| Ignored ADS review `build/art-previews/steel_tide_optics_ads.png` | 1,419,648 | `09801D4FE74A6DFB1444850D5995FAE12D9455DCFFD2DBC99D5D715EFD805287` |
+| `assets/models/steel_tide_optics/steel_tide_optics.glb` | 171,616 | `680A0063BB0D6DBDC900629D05CC342C0CBD614591FD119CE72567DD9893D413` |
+| `source_art/combat_optics/steel_tide_optics.blend` | 801,081 | `61F6F703B35AEE2A677E8E31C1D0E39AF6F2E80C81786AFF03AA640D872BF6A2` |
+| `scripts/blender/build_authored_optics.py` | 54,839 | `0592E842E2F14C43AE97B3DA7936029E43088C1ACC3BFF97951D063B11AE75C8` |
+| Ignored review `build/art-previews/steel_tide_optics.png` | 1,628,521 | `33ACF897D05E61AF6FF562FD74B60446106912AF7F70CDE2A44350BE6833E5E4` |
+| Ignored ADS review `build/art-previews/steel_tide_optics_ads.png` | 1,425,809 | `94BA85398F0E8C8BBE427A7B0D41E99BDAD4CAF46CE5EFE26DDB70D266025270` |
 
 The source geometry remains CC0 1.0 Universal. Project-authored runtime code is
 covered separately by the repository's MIT license; that license does not

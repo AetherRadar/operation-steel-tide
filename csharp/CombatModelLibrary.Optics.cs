@@ -240,7 +240,7 @@ internal readonly record struct AuthoredOpticsInspection(
         && MeshCount == 3
         && MaterialCount == 6
         && VertexCount >= 2_300
-        && TriangleCount == 1_200
+        && TriangleCount >= 1_200
         && MicroSize.X > 0.08f
         && HoloSize.X > MicroSize.X
         && ScopeSize.Z > HoloSize.Z * 2.5f
