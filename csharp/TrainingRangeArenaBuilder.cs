@@ -253,7 +253,10 @@ public sealed class TrainingRangeArenaBuilder
             root,
             "WeaponSelectionScreen",
             $"{FurnitureRoot}/computerScreen.glb",
-            new(-8.0f, 1.0f, 31.0f),
+            // The desk top is ~0.48 m high after its 1.25x authored scale.  The
+            // monitor's source mesh starts at y=0, so place its base on that top
+            // instead of leaving a half-metre floating screen.
+            new(-8.0f, 0.5f, 31.0f),
             Vector3.Zero,
             Vector3.One * 1.15f);
 
@@ -268,7 +271,9 @@ public sealed class TrainingRangeArenaBuilder
             root,
             "AmmunitionCrate",
             $"{FurnitureRoot}/cardboardBoxClosed.glb",
-            new(0.0f, 0.85f, 31.0f),
+            // The table top is ~0.39 m high; the closed crate has a y=0
+            // bottom, so its base should start directly on the tabletop.
+            new(0.0f, 0.4f, 31.0f),
             new(0.0f, 0.28f, 0.0f),
             Vector3.One * 1.1f);
 
@@ -283,7 +288,8 @@ public sealed class TrainingRangeArenaBuilder
             root,
             "BotControlScreen",
             $"{FurnitureRoot}/computerScreen.glb",
-            new(8.0f, 0.92f, 31.0f),
+            // The side table top is ~0.44 m high after scaling.
+            new(8.0f, 0.46f, 31.0f),
             Vector3.Zero,
             Vector3.One * 1.08f);
 
@@ -369,7 +375,11 @@ public sealed class TrainingRangeArenaBuilder
         {
             foreach (var x in columns)
             {
-                local.Add(new Vector3(x, 0.24f, z));
+                // Static targets do not run CharacterBody3D floor snapping.  Spawn their
+                // authored feet on the same asphalt plane as the player instead of using
+                // the capsule-centre height (0.24 m), which leaves a visible air gap under
+                // the shoes in the first-person firing-line view.
+                local.Add(new Vector3(x, 0.03f, z));
             }
         }
         var visuals = new[]

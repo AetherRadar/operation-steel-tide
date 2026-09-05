@@ -847,6 +847,11 @@ internal sealed class AuthoredOperatorVisual
         }
 
         var root = new Node3D { Name = $"Equipped{slot}Visual" };
+        // A few authored rigs keep their metre conversion on the skeleton and
+        // expose gear sockets with the inverse scale (typically 100x).  Child
+        // equipment must cancel that inherited scale or a normal helmet/pack
+        // becomes a giant floating prop in front of the operator.
+        root.Scale = InverseSocketScale(socket);
         socket.AddChild(root);
         if (TryAttachAuthoredEquipment(root, slot))
         {
@@ -879,13 +884,12 @@ internal sealed class AuthoredOperatorVisual
                 ?? throw new InvalidOperationException($"Authored equipment scene is missing {sourceNodeName}.");
             var copy = source.Duplicate() as Node3D
                 ?? throw new InvalidOperationException($"{sourceNodeName} could not be duplicated.");
-            var bounds = CombatModelLibrary.ComputeBounds(copy);
+            var bounds = CombatModelLibrary.ComputeLocalBounds(copy);
             if (bounds.MeshCount == 0 || bounds.Size.Y <= 0.01f)
             {
                 copy.Free();
                 throw new InvalidOperationException($"{sourceNodeName} has no usable bounds.");
             }
-            copy.Position -= bounds.Center;
             var targetHeight = slot switch
             {
                 EquipmentSlot.Helmet => 0.48f,
@@ -893,14 +897,20 @@ internal sealed class AuthoredOperatorVisual
                 EquipmentSlot.Backpack => 1.12f,
                 _ => bounds.Size.Y
             };
-            copy.Scale = Vector3.One * (targetHeight / bounds.Size.Y);
-            copy.Position = slot switch
+            var presentationScale = targetHeight / bounds.Size.Y;
+            copy.Scale = Vector3.One * presentationScale;
+            var socketOffset = slot switch
             {
                 EquipmentSlot.Helmet => new Vector3(0, 0.10f, 0),
                 EquipmentSlot.BodyArmor => new Vector3(0, -0.02f, 0),
                 EquipmentSlot.Backpack => new Vector3(0, 0.0f, 0.08f),
                 _ => Vector3.Zero
             };
+            // ComputeLocalBounds is in the duplicated node's own frame.  Keep
+            // the centering correction after scaling so the visible geometry's
+            // centre lands on the authored socket offset instead of the source
+            // scene's metre-space origin.
+            copy.Position = socketOffset - bounds.Center * presentationScale;
             root.AddChild(copy);
             return true;
         }
@@ -913,6 +923,27 @@ internal sealed class AuthoredOperatorVisual
         {
             sourceRoot?.Free();
         }
+    }
+
+    private static Vector3 InverseSocketScale(Node3D socket)
+    {
+        // ReplaceEquipmentVisual can run while the operator scene is still
+        // being assembled (before its root enters the SceneTree).  Reading
+        // GlobalTransform in that state emits !is_inside_tree errors and
+        // returns an unusable basis.  Accumulate the local scale chain instead;
+        // for the authored rigs in this project the transforms are axis-aligned
+        // and this is equivalent to the eventual global scale without requiring
+        // a live tree.
+        var scale = socket.Scale;
+        var ancestor = socket.GetParent();
+        while (ancestor is Node3D parent)
+        {
+            scale *= parent.Scale;
+            ancestor = parent.GetParent();
+        }
+        static float Inverse(float value)
+            => Mathf.Abs(value) <= 0.0001f ? 1.0f : 1.0f / value;
+        return new Vector3(Inverse(scale.X), Inverse(scale.Y), Inverse(scale.Z));
     }
 
     public void SetWeaponVisible(bool visible)
@@ -1009,8 +1040,28 @@ internal sealed class AuthoredOperatorVisual
         _weapon.Root.Scale = Vector3.One * (weaponScale / inheritedScale);
         if (readied && CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId))
         {
+            // Reparenting a weapon immediately after the visual enters the tree
+            // can happen before BoneAttachment3D receives its first skeleton
+            // update.  Assigning GlobalPosition against that stale attachment
+            // bakes the hand's world position into the child's local offset;
+            // the next animation frame then leaves the rifle ~0.7 m away from
+            // both hands (the roster fit probe catches this as a large, constant
+            // primary/support distance).  Force the attachment pose first and
+            // solve the tiny residual in the socket's local frame.  Keeping this
+            // local also makes subsequent animation updates follow the hand.
+            if (_skeleton.IsInsideTree())
+            {
+#pragma warning disable CS0618
+                _skeleton.ForceUpdateAllBoneTransforms();
+#pragma warning restore CS0618
+                if (socket is BoneAttachment3D attachment)
+                {
+                    attachment.OnSkeletonUpdate();
+                }
+            }
+
             var rightHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_rightHandBone);
-            _weapon.Root.GlobalPosition = rightHand.Origin;
+            _weapon.Root.Position = socket.GlobalTransform.AffineInverse() * rightHand.Origin;
         }
         if (dynamicHy3d && isHy3d)
         {
