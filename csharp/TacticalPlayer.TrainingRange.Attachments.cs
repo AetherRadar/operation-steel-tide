@@ -69,7 +69,7 @@ public partial class TacticalPlayer
                 && GameLocalization.IsChinese(Hud.CurrentLanguage);
             return chinese
                 ? "\u914d\u4ef6  //  Y\u7784\u5177  U\u67aa\u7ba1  I\u67aa\u53e3  O\u63e1\u628a  P\u67aa\u6258  L\u5f39\u5323"
-                : "ATTACHMENTS  //  Y OPTIC  U BARREL  I MUZZLE  O GRIP  P STOCK  L MAG";
+                : "ATTACHMENTS  //  Y OPTIC  U BARREL  I MUZZLE  O GRIP  P STOCK  L MAG  -/+ RESET TIME";
         }
     }
 

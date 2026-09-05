@@ -90,6 +90,7 @@ public partial class CombatHUD : CanvasLayer
     private Label _compassLabel = null!;
     private Label _phaseLabel = null!;
     private Label _alertLabel = null!;
+    private Label _trainingRangeStatsLabel = null!;
     private Label _radioLabel = null!;
     private Label _operationBanner = null!;
     private Control _interactionRoot = null!;
@@ -353,6 +354,12 @@ public partial class CombatHUD : CanvasLayer
         _enemiesLabel.SetAnchorsPreset(Control.LayoutPreset.TopRight);
         _enemiesLabel.Position = new Vector2(-165, 15);
         topStrip.AddChild(_enemiesLabel);
+        _trainingRangeStatsLabel = Label(string.Empty, 15, new Color(0.55f, 0.86f, 0.76f));
+        _trainingRangeStatsLabel.Position = new Vector2(30, 35);
+        _trainingRangeStatsLabel.Size = new Vector2(560, 22);
+        _trainingRangeStatsLabel.HorizontalAlignment = HorizontalAlignment.Left;
+        _trainingRangeStatsLabel.Visible = false;
+        topStrip.AddChild(_trainingRangeStatsLabel);
         _phaseLabel = Label("DEPLOYMENT  12   LOCAL", 14, new Color(0.3f, 0.88f, 0.7f));
         _phaseLabel.HorizontalAlignment = HorizontalAlignment.Center;
         _phaseLabel.SetAnchorsPreset(Control.LayoutPreset.CenterTop);
@@ -1527,6 +1534,27 @@ public partial class CombatHUD : CanvasLayer
             count == 0
                 ? new Color(0.32f, 0.92f, 0.7f)
                 : new Color(0.72f, 0.9f, 0.84f));
+    }
+
+    public void SetTrainingRangeStats(int kills, float elapsedSeconds, float respawnSeconds, int botType)
+    {
+        if (!IsInstanceValid(_trainingRangeStatsLabel))
+        {
+            return;
+        }
+        var totalSeconds = Mathf.Max(0, Mathf.FloorToInt(elapsedSeconds));
+        var minutes = totalSeconds / 60;
+        var seconds = totalSeconds % 60;
+        var behavior = botType switch
+        {
+            1 => Text("training_bot_patrol", "PATROL"),
+            2 => Text("training_bot_reactive", "REACTIVE"),
+            _ => Text("training_bot_static", "STATIC")
+        };
+        _trainingRangeStatsLabel.Text = GameLocalization.IsChinese(_language)
+            ? $"击倒 {kills:00}    时间 {minutes:00}:{seconds:00}    复位 {respawnSeconds:0.0}s    {behavior}"
+            : $"KILLS {kills:00}    TIME {minutes:00}:{seconds:00}    RESET {respawnSeconds:0.0}s    {behavior}";
+        _trainingRangeStatsLabel.Visible = true;
     }
 
     public void SetObjective(string value) => _objectiveLabel.Text = value;

@@ -29,9 +29,13 @@ public partial class FreightTerminalWorld
     private int _trainingRangeAmmoType;
     private int _trainingRangeAmmoLevel = 2;
     private float _trainingRangeInteractionCooldown;
+    private float _trainingRangeElapsedSeconds;
+    private float _trainingRangeRespawnDelaySeconds = 1.0f;
+    private bool _trainingRangeDecreaseHeld;
+    private bool _trainingRangeIncreaseHeld;
 
     private static readonly int[] TrainingRangeBotCountOptions = { 3, 6, 12, 24 };
-    private const float TrainingRangeRespawnDelaySeconds = 2.15f;
+    private const float TrainingRangeRespawnDelaySeconds = 1.0f;
 
     public bool IsTrainingRangeActive => _trainingRangeActive;
     public int TrainingRangeBotCount
@@ -113,6 +117,10 @@ public partial class FreightTerminalWorld
 
         _trainingRangeActive = true;
         _trainingRangeKills = 0;
+        _trainingRangeElapsedSeconds = 0.0f;
+        _trainingRangeRespawnDelaySeconds = TrainingRangeRespawnDelaySeconds;
+        _trainingRangeDecreaseHeld = false;
+        _trainingRangeIncreaseHeld = false;
         _demolitionMode = false;
         _missionEnded = false;
         _squadDeployed = true;
@@ -183,6 +191,7 @@ public partial class FreightTerminalWorld
             "TRAINING RANGE  //  LIVE FIRE"));
         _hud.SetMissionPhase("TRAINING_RANGE", 0.0f, false);
         _hud.SetTrainingRangeTargetCount(_enemiesRemaining);
+        _hud.SetTrainingRangeStats(_trainingRangeKills, _trainingRangeElapsedSeconds, _trainingRangeRespawnDelaySeconds, _trainingRangeBotType);
         _hud.SetObjective(GameLocalization.Get(
             "training_range_ready",
             _languageSetting,
@@ -389,6 +398,19 @@ public partial class FreightTerminalWorld
 
     private void UpdateTrainingRange(float delta)
     {
+        _trainingRangeElapsedSeconds += Mathf.Max(0.0f, delta);
+        var decreasePressed = Input.IsKeyPressed(Key.Minus);
+        var increasePressed = Input.IsKeyPressed(Key.Equal);
+        if (decreasePressed && !_trainingRangeDecreaseHeld)
+        {
+            _trainingRangeRespawnDelaySeconds = Mathf.Max(0.25f, _trainingRangeRespawnDelaySeconds - 0.25f);
+        }
+        if (increasePressed && !_trainingRangeIncreaseHeld)
+        {
+            _trainingRangeRespawnDelaySeconds = Mathf.Min(5.0f, _trainingRangeRespawnDelaySeconds + 0.25f);
+        }
+        _trainingRangeDecreaseHeld = decreasePressed;
+        _trainingRangeIncreaseHeld = increasePressed;
         _hud.KeepTrainingRangeOverlaysHidden();
         _player.RefillTrainingRangeAmmo();
         foreach (var slot in _trainingRangeBotSlots)
@@ -402,7 +424,7 @@ public partial class FreightTerminalWorld
                 if (!slot.RespawnPending)
                 {
                     slot.RespawnPending = true;
-                    slot.RespawnTimer = TrainingRangeRespawnDelaySeconds;
+                    slot.RespawnTimer = _trainingRangeRespawnDelaySeconds;
                 }
                 slot.RespawnTimer -= delta;
                 if (slot.RespawnTimer <= 0.0f)
@@ -424,7 +446,7 @@ public partial class FreightTerminalWorld
                     slot.RespawnPending = true;
                     slot.IsDowned = true;
                     slot.RespawnTimer = Mathf.Max(
-                        TrainingRangeRespawnDelaySeconds,
+                        _trainingRangeRespawnDelaySeconds,
                         slot.Profile.RespawnDelaySeconds);
                     bot.Visible = true;
                     // Preserve the body in the physics space while it is visibly
@@ -455,6 +477,7 @@ public partial class FreightTerminalWorld
         }
         _enemiesRemaining = TrainingRangeBotCount;
         _hud.SetTrainingRangeTargetCount(_enemiesRemaining);
+        _hud.SetTrainingRangeStats(_trainingRangeKills, _trainingRangeElapsedSeconds, _trainingRangeRespawnDelaySeconds, _trainingRangeBotType);
         _hud.SetAlert(0.0f, "TRAINING_RANGE");
     }
 
@@ -536,7 +559,7 @@ public partial class FreightTerminalWorld
         // EnemyOperator.Die; the visible authored downed pose makes the reset timer
         // readable instead of hiding the target and spawning an unrelated replacement.
         slot.RespawnTimer = Mathf.Max(
-            TrainingRangeRespawnDelaySeconds,
+            _trainingRangeRespawnDelaySeconds,
             slot.Profile.RespawnDelaySeconds);
         slot.RespawnPending = true;
         slot.IsDowned = true;

@@ -330,6 +330,10 @@ public partial class CombatHUD
         _operationBanner.Text = status;
         _operationBanner.Modulate = Colors.White;
         _operationBanner.Visible = true;
+        if (IsInstanceValid(_trainingRangeStatsLabel))
+        {
+            _trainingRangeStatsLabel.Visible = true;
+        }
     }
 
     public void HideTrainingRangeGameplay()
@@ -337,6 +341,10 @@ public partial class CombatHUD
         SetTrainingRangeGameplayInputEnabled(false);
         HideTrainingRangeSetup();
         _operationBanner.Visible = false;
+        if (IsInstanceValid(_trainingRangeStatsLabel))
+        {
+            _trainingRangeStatsLabel.Visible = false;
+        }
         if (IsInstanceValid(_medicalStatusRoot))
         {
             _medicalStatusRoot.Visible = true;
