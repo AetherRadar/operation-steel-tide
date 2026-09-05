@@ -149,7 +149,7 @@ func (s *Server) getProfile(w http.ResponseWriter, r *http.Request) {
 func (s *Server) putProfile(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(r.PathValue("id"))
 	var profile Profile
-	if err := decodeJSON(r, &profile); err != nil {
+	if err := decodeJSON(w, r, &profile); err != nil {
 		s.writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -169,7 +169,7 @@ func (s *Server) putProfile(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) startSession(w http.ResponseWriter, r *http.Request) {
 	var request StartRequest
-	if err := decodeJSON(r, &request); err != nil {
+	if err := decodeJSON(w, r, &request); err != nil {
 		s.writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -185,6 +185,10 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request) {
 	}
 	if request.Difficulty == "" {
 		request.Difficulty = "normal"
+	}
+	if !isValidDifficulty(request.Difficulty) {
+		s.writeError(w, http.StatusBadRequest, "difficulty must be normal, hard, or realistic")
+		return
 	}
 	now := time.Now().UTC()
 	session := Session{
@@ -205,11 +209,12 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) completeSession(w http.ResponseWriter, r *http.Request) {
 	var request CompleteRequest
-	if err := decodeJSON(r, &request); err != nil {
+	if err := decodeJSON(w, r, &request); err != nil {
 		s.writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	sessionID := r.PathValue("id")
+	request = clampCompleteRequest(request)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	session, ok := s.sessions[sessionID]
@@ -311,6 +316,7 @@ func (s *Server) saveLocked() error {
 	if s.dataPath == "" {
 		return nil
 	}
+	s.purgeExpiredSessionsLocked()
 	if err := os.MkdirAll(filepath.Dir(s.dataPath), 0o755); err != nil {
 		return err
 	}
@@ -326,8 +332,8 @@ func (s *Server) saveLocked() error {
 	return os.Rename(temporary, s.dataPath)
 }
 
-func decodeJSON(r *http.Request, target any) error {
-	decoder := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20))
+func decodeJSON(w http.ResponseWriter, r *http.Request, target any) error {
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
 		return fmt.Errorf("invalid JSON: %w", err)
@@ -352,6 +358,49 @@ func newID() string {
 		return fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(buffer)
+}
+
+func isValidDifficulty(difficulty string) bool {
+	return difficulty == "normal" || difficulty == "hard" || difficulty == "realistic"
+}
+
+// clampCompleteRequest constrains result values to reasonable bounds to
+// prevent reward manipulation from fabricated client submissions.
+func clampCompleteRequest(r CompleteRequest) CompleteRequest {
+	clampInt := func(v, lo, hi int) int {
+		if v < lo {
+			return lo
+		}
+		if v > hi {
+			return hi
+		}
+		return v
+	}
+	r.Kills = clampInt(r.Kills, 0, 200)
+	r.Headshots = clampInt(r.Headshots, 0, r.Kills)
+	r.ShotsFired = clampInt(r.ShotsFired, 0, 10000)
+	r.ShotsHit = clampInt(r.ShotsHit, 0, r.ShotsFired)
+	if r.DurationSeconds < 0 {
+		r.DurationSeconds = 0
+	}
+	if r.DurationSeconds > 7200 {
+		r.DurationSeconds = 7200
+	}
+	return r
+}
+
+// sessionTTL is the maximum age of a completed session before it is purged.
+const sessionTTL = 24 * time.Hour
+
+// purgeExpiredSessionsLocked removes completed sessions older than sessionTTL.
+// Must be called while s.mu is held.
+func (s *Server) purgeExpiredSessionsLocked() {
+	cutoff := time.Now().UTC().Add(-sessionTTL)
+	for id, session := range s.sessions {
+		if session.Status == "complete" && session.CompletedAt != nil && session.CompletedAt.Before(cutoff) {
+			delete(s.sessions, id)
+		}
+	}
 }
 
 func contains(values []string, target string) bool {

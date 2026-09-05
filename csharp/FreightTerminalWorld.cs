@@ -256,9 +256,10 @@ public partial class FreightTerminalWorld : Node3D
             ResidentialSupplyCache.ReleaseSharedResources();
             ResidentialSearchableFurniture.ReleaseSharedResources();
         }
-        catch
+        catch (Exception ex)
         {
             // Best-effort shutdown hygiene only.
+            GD.PrintErr($"[FreightTerminalWorld] _ExitTree cleanup error: {ex.Message}");
         }
     }
 
@@ -752,8 +753,9 @@ public partial class FreightTerminalWorld : Node3D
             glass.ShatterWithinRadius(position, radius * 1.18f, glassEffectBudget, out var effectsUsed);
             glassEffectBudget = Mathf.Max(0, glassEffectBudget - effectsUsed);
         }
-        foreach (var enemy in _enemies.ToArray())
+        for (var ei = _enemies.Count - 1; ei >= 0; ei--)
         {
+            var enemy = _enemies[ei];
             if (IsInstanceValid(enemy) && !enemy.IsDead)
             {
                 var distance = enemy.GlobalPosition.DistanceTo(position);
@@ -796,8 +798,9 @@ public partial class FreightTerminalWorld : Node3D
             }
         }
         DamageSquadFromExplosion(position, radius, maxDamage, source, blastEmitter);
-        foreach (var barrel in _barrels.ToArray())
+        for (var bi = _barrels.Count - 1; bi >= 0; bi--)
         {
+            var barrel = _barrels[bi];
             if (!IsInstanceValid(barrel)
                 || barrel.Exploded
                 || barrel.GlobalPosition.DistanceTo(position) >= radius * 0.65f)
@@ -1493,22 +1496,25 @@ public partial class FreightTerminalWorld : Node3D
         }
         return enemy;
     }
+    private readonly List<Node3D> _hostileTargetBuffer = new(32);
+
     /// <summary>All living combatants that are hostile to the given operator (player squad, other teams, NPCs).</summary>
-    public IEnumerable<Node3D> EnumerateHostileTargetsFor(EnemyOperator self)
+    public void CollectHostileTargetsFor(EnemyOperator self, List<Node3D> results)
     {
+        results.Clear();
         if (IsPlayerProtected() && !self.BypassesPlayerProtectionForDiagnostics)
         {
-            yield break;
+            return;
         }
         if (IsInstanceValid(_player) && !_player.IsDead)
         {
-            yield return _player;
+            results.Add(_player);
         }
         foreach (var mate in _squadMates)
         {
             if (IsInstanceValid(mate) && !mate.IsDowned && !mate.IsBodyBag)
             {
-                yield return mate;
+                results.Add(mate);
             }
         }
         foreach (var enemy in _enemies)
@@ -1519,9 +1525,16 @@ public partial class FreightTerminalWorld : Node3D
             }
             if (self.IsHostileTo(enemy))
             {
-                yield return enemy;
+                results.Add(enemy);
             }
         }
+    }
+
+    /// <summary>All living combatants that are hostile to the given operator (player squad, other teams, NPCs).</summary>
+    public IEnumerable<Node3D> EnumerateHostileTargetsFor(EnemyOperator self)
+    {
+        CollectHostileTargetsFor(self, _hostileTargetBuffer);
+        return _hostileTargetBuffer;
     }
 
     public Vector3? FindNearestLootPoint(Vector3 origin, float range)
@@ -1724,26 +1737,11 @@ public partial class FreightTerminalWorld : Node3D
     }
 
     /// <summary>
-    /// Production path: pull one weapon stack from a loot source and equip it on the operator.
-    /// Returns true when HasFireablePrimary becomes true via real loot removal (not diagnostics grant).
+    /// Shared loot source cleanup after a weapon has been removed. Refreshes
+    /// visual presentation, publishes network state, and retires empty pickups.
     /// </summary>
-    public bool TryEquipWeaponFromLootSource(EnemyOperator operatorNode, ILootSource source)
+    private void FinalizeLootSourceAfterWeaponRemoval(ILootSource source)
     {
-        if (operatorNode is null || source is null || !IsInstanceValid(operatorNode) || !source.IsSearchable)
-        {
-            return false;
-        }
-        if (source is IDeferredLootSource { ContentsResolved: false })
-        {
-            source.OnSearched();
-        }
-        var index = source.Loot.FindIndex(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null);
-        if (index < 0)
-        {
-            return false;
-        }
-        var weaponItem = source.Loot[index];
-        source.Loot.RemoveAt(index);
         RefreshGradedLootPickupPresentation(source);
         RefreshDroppedWeaponPickupPresentation(source);
         if (source is EnemyOperator corpse)
@@ -1754,6 +1752,39 @@ public partial class FreightTerminalWorld : Node3D
         PublishExtractionLootMutation(source);
         RetireEmptyGradedLootPickup(source);
         RetireEmptyDroppedWeaponPickup(source);
+    }
+
+    /// <summary>
+    /// Resolves deferred loot contents and finds the first weapon stack in the source.
+    /// Returns the index of the weapon item, or -1 if none found.
+    /// </summary>
+    private int ResolveDeferredAndFindWeapon(ILootSource source)
+    {
+        if (source is IDeferredLootSource { ContentsResolved: false })
+        {
+            source.OnSearched();
+        }
+        return source.Loot.FindIndex(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null);
+    }
+
+    /// <summary>
+    /// Production path: pull one weapon stack from a loot source and equip it on the operator.
+    /// Returns true when HasFireablePrimary becomes true via real loot removal (not diagnostics grant).
+    /// </summary>
+    public bool TryEquipWeaponFromLootSource(EnemyOperator operatorNode, ILootSource source)
+    {
+        if (operatorNode is null || source is null || !IsInstanceValid(operatorNode) || !source.IsSearchable)
+        {
+            return false;
+        }
+        var index = ResolveDeferredAndFindWeapon(source);
+        if (index < 0)
+        {
+            return false;
+        }
+        var weaponItem = source.Loot[index];
+        source.Loot.RemoveAt(index);
+        FinalizeLootSourceAfterWeaponRemoval(source);
         return operatorNode.EquipWeaponFromLoot(weaponItem.Weapon!);
     }
 
@@ -1791,16 +1822,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             source.Loot[index] = replacement;
         }
-        if (source is EnemyOperator enemy)
-        {
-            enemy.MarkCarriedWeaponRemoved();
-        }
-        RefreshGradedLootPickupPresentation(source);
-        RefreshDroppedWeaponPickupPresentation(source);
-        source.OnSearched();
-        PublishExtractionLootMutation(source);
-        RetireEmptyGradedLootPickup(source);
-        RetireEmptyDroppedWeaponPickup(source);
+        FinalizeLootSourceAfterWeaponRemoval(source);
         return true;
     }
 
@@ -1811,11 +1833,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             return false;
         }
-        if (source is IDeferredLootSource { ContentsResolved: false })
-        {
-            source.OnSearched();
-        }
-        var index = source.Loot.FindIndex(item => item.Kind == LootItemKind.Weapon && item.Weapon is not null);
+        var index = ResolveDeferredAndFindWeapon(source);
         if (index < 0)
         {
             return false;
@@ -1836,16 +1854,7 @@ public partial class FreightTerminalWorld : Node3D
             recoveredAmmoQuantity = source.Loot[ammoIndex].Quantity;
             source.Loot.RemoveAt(ammoIndex);
         }
-        RefreshGradedLootPickupPresentation(source);
-        RefreshDroppedWeaponPickupPresentation(source);
-        if (source is EnemyOperator corpse)
-        {
-            corpse.MarkCarriedWeaponRemoved();
-        }
-        source.OnSearched();
-        PublishExtractionLootMutation(source);
-        RetireEmptyGradedLootPickup(source);
-        RetireEmptyDroppedWeaponPickup(source);
+        FinalizeLootSourceAfterWeaponRemoval(source);
         return mate.EquipWeaponFromLoot(
             weaponItem.Weapon!,
             ammoGrade,
