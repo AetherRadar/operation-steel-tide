@@ -1434,7 +1434,10 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             }
         }
 
-        MovePlayer(dt);
+        if (!TryUpdateOrbitalComplexSwimming(dt))
+        {
+            MovePlayer(dt);
+        }
         var fieldSupplies = PushHudStats();
         Hud?.SetEquipment(
             fieldSupplies.ArmorPlates,

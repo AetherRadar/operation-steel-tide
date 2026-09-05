@@ -436,6 +436,36 @@ def build_hardscape_underground(groups, materials):
     # both approaches.  The lower pit has its own cross-bridge route.
     pit = G["rounded_rectangle"]((0.0, 34.0), 58.0, 58.0, 8.0, 8)
     panel("ReactorPitFloor", pit, -34.0, -32.0, black, groups["District_ReactorHall"], "DCC-authored reactor pit hardscape")
+    # A real blackwater layer sits above the lower pit floor. The lower route
+    # is intentionally broad enough to swim across, with a dry rim and bridge
+    # left visible so players can choose water, catwalk, or ramp traversal.
+    water = _material(materials, "StormWater")
+    pool = groups["District_ReactorHall"]
+    pool_outline = G["rounded_rectangle"]((0.0, 34.0), 50.0, 52.0, 7.0, 8)
+    panel(
+        "BlackwaterPoolSurface",
+        pool_outline,
+        -28.45,
+        -28.20,
+        water,
+        pool,
+        "DCC-authored blackwater swimming surface in the lower reactor pit",
+    )
+    pool_ring_outer = G["rounded_rectangle"]((0.0, 34.0), 58.0, 60.0, 8.0, 8)
+    pool_ring_inner = G["rounded_rectangle"]((0.0, 34.0), 51.5, 53.5, 7.2, 8)
+    ring(
+        "BlackwaterPoolRim",
+        pool_ring_outer,
+        pool_ring_inner,
+        -28.55,
+        -27.95,
+        black,
+        pool,
+    )
+    pool["landmark_id"] = "blackwater_pool"
+    pool["display_name"] = "BLACKWATER POOL // LOWER REACTOR PIT"
+    pool["gameplay_role"] = "swimmable lower-route shortcut beneath the Stormglass halo"
+    pool["art_direction"] = "oil-dark coolant water, concentric ripples, exposed dry rim"
     outer = G["rounded_rectangle"]((0.0, 34.0), 70.0, 70.0, 10.0, 8)
     inner = G["rounded_rectangle"]((0.0, 34.0), 61.0, 61.0, 8.0, 8)
     ring("ReactorPitRim", outer, inner, -18.0, -15.7, black, groups["District_ReactorHall"])
@@ -469,7 +499,15 @@ def build_hardscape_underground(groups, materials):
         for index, y in enumerate((-12.0, 34.0, 80.0), start=1):
             _ribbon(f"DetentionGalleryBridge_L{level}_{index}", [(-100.0, y), (-72.0, y)], 4.6, bottom, top, black, groups["District_ReactorHall"])
             _ribbon(f"DetentionGalleryBridge_R_L{level}_{index}", [(72.0, y), (100.0, y)], 4.6, bottom, top, black, groups["District_ReactorHall"])
-    _ribbon("BunkerPerimeterWalls", shell_outline, 3.0, -16.0, 22.0, black, static)
+    # The south wall is a tidal observation opening rather than a sealed box.
+    # The gameplay boundary remains authoritative in C#, while the authored
+    # aperture lets the sky and the distant water backdrop read from the
+    # intake route.  Side and north runs retain the pressure-shell silhouette.
+    _ribbon("BunkerPerimeterWest", [(-170.0, -100.0), (-170.0, 220.0)], 3.0, -16.0, 22.0, black, static)
+    _ribbon("BunkerPerimeterEast", [(170.0, 220.0), (170.0, -100.0)], 3.0, -16.0, 22.0, black, static)
+    _ribbon("BunkerPerimeterNorth", [(170.0, 220.0), (-170.0, 220.0)], 3.0, -16.0, 22.0, black, static)
+    _ribbon("BunkerPerimeterSouthWest", [(-170.0, -100.0), (-72.0, -100.0)], 3.0, -16.0, 22.0, black, static)
+    _ribbon("BunkerPerimeterSouthEast", [(72.0, -100.0), (170.0, -100.0)], 3.0, -16.0, 22.0, black, static)
     _ribbon("SouthPressureBulkhead", [(-150.0, -40.0), (-44.0, -40.0)], 2.3, -16.0, 22.0, black, groups["District_IntakeCauseway"])
     # The intake used to be one uninterrupted 190 m sightline from the south
     # deployment pocket to the reactor.  These authored-looking pressure
@@ -530,9 +568,9 @@ def build_hardscape_underground(groups, materials):
     # than an open courtyard.  Thin cross-members and repeated luminous
     # maintenance panels are intentionally subordinate to the imported halls
     # and dish, but remain visible from player height.
-    for index, x in enumerate((-144.0, -96.0, -48.0, 48.0, 96.0, 144.0), start=1):
+    for index, x in enumerate((-144.0, -96.0, 96.0, 144.0), start=1):
         _ribbon(f"CeilingCrossBeamX_{index:02d}", [(x, -96.0), (x, 216.0)], 0.72, 20.1, 21.6, black, static)
-    for index, y in enumerate((-86.0, -46.0, -6.0, 34.0, 74.0, 114.0, 154.0, 194.0), start=1):
+    for index, y in enumerate((-86.0, -46.0, 114.0, 154.0, 194.0), start=1):
         _ribbon(f"CeilingCrossBeamY_{index:02d}", [(-164.0, y), (164.0, y)], 0.72, 20.1, 21.6, black, static)
     light_material = materials["CeilingLight"]
     for index, (x, y, width) in enumerate(
@@ -618,7 +656,7 @@ def build_hero_landmarks_underground(groups, materials):
     halo_center = (0.0, 34.0)
     _loop_pipe("DetentionHaloOuterRail", halo_center, 78.0, -14.72, red, halo,
                tube_radius=0.48, segments=72, phase=math.radians(2.5))
-    _loop_pipe("DetentionHaloUpperRail", halo_center, 72.0, 8.5, white, halo,
+    _loop_pipe("DetentionHaloUpperRail", halo_center, 72.0, 8.5, black, halo,
                tube_radius=0.34, segments=72, phase=math.radians(2.5))
     _loop_pipe("DetentionHaloPoweredSeal", halo_center, 69.5, -14.35, cyan, halo_powered,
                tube_radius=0.22, segments=72, phase=math.radians(2.5))
@@ -636,7 +674,7 @@ def build_hero_landmarks_underground(groups, materials):
              (halo_center[0] + 67.8 * math.cos(angle), halo_center[1] + 67.8 * math.sin(angle), -5.0),
              (halo_center[0] + 63.8 * math.cos(angle), halo_center[1] + 63.8 * math.sin(angle), 8.2)],
             0.28 if index % 3 else 0.36,
-            red if index % 2 else white,
+            red if index % 2 else black,
             halo,
         )
     # Four radial security portals establish the ring's cardinal entrances;
@@ -648,7 +686,7 @@ def build_hero_landmarks_underground(groups, materials):
         )
         _arch_pipe(
             f"DetentionHaloPortal_{index:02d}", portal_center, 6.5,
-            -14.6, 10.5, orange if index in (1, 3) else white, halo,
+            -14.6, 10.5, orange if index in (1, 3) else black, halo,
             tube_radius=0.42, segments=24, phase=angle,
         )
     # Eight compact cell banks sit outside the halo.  Their trapezoid shells
@@ -1432,6 +1470,11 @@ def render_previews_underground(groups):
         ("central_landmark.png", (0.0, -20.0, -6.0), (0.0, 38.0, -8.0), 30.0, "Reactor pit, suspended telemetry dish, and cross-level bridges"),
         ("north_tide_gate_powered.png", (-32.0, 174.0, -8.0), (0.0, 205.0, -12.0), 34.0, "Launch silo, capsule bay, and powered recovery gate"),
         ("undertow_sump.png", (-112.0, -92.0, -8.5), (-112.0, -45.0, -6.5), 26.0, "Undertow Sump blackwater lift station and clear maintenance console bay"),
+        # Shoot across the lower pit from the west service gallery.  The
+        # earlier east-side camera sat behind the quarantine bulkhead and
+        # produced a nearly black frame; this angle keeps the waterline,
+        # dry rim, bridge and suspended halo in one readable composition.
+        ("blackwater_pool.png", (0.0, -72.0, 12.0), (0.0, 34.0, -22.0), 32.0, "Blackwater Pool swimming shortcut below the Stormglass detention halo"),
         # Approach the well through the central opening in the north-silo
         # bulkhead; a west-side camera would stare into the opaque bulkhead
         # and produce an apparently empty blue frame.
@@ -1525,11 +1568,12 @@ def postprocess_report():
         {"file": "previews/central_landmark.png", "description": "Reactor pit, suspended telemetry dish, and Cathode Well"},
         {"file": "previews/north_tide_gate_powered.png", "description": "Launch silo and powered recovery gate"},
         {"file": "previews/undertow_sump.png", "description": "Undertow Sump blackwater lift station and clear maintenance console bay"},
+        {"file": "previews/blackwater_pool.png", "description": "Blackwater Pool swimming shortcut below the Stormglass detention halo"},
         {"file": "previews/cathode_well.png", "description": "Cathode Well coolant cathedral and north-south bridge"},
         {"file": "previews/data_ossuary.png", "description": "Data Ossuary quarantine memory aisle and archive spires"},
     ]
     report["authored_changes"] = [
-        "Replaced open-air barrier with an enclosed 340 x 320 m subterranean recovery bunker",
+        "Retained the pressurized 340 x 320 m subterranean recovery bunker while opening a south tidal observation mouth to the outside sky",
         "Authored a real lower reactor pit at Godot Y -34, service deck at -16, and upper catwalk ring at -3",
         "Recomposed CC0 industrial halls into breaker, quarantine, coolant, launch-silo, and intake districts",
         "Suspended a scaled NASA dish inside the reactor hall and placed the fictional return capsule in a deep launch bay",
@@ -1538,6 +1582,7 @@ def postprocess_report():
         "Added the Data Ossuary quarantine memory aisle: twelve faceted archive spires, cyan seams, suspended halos, and three authored arch frames",
         "Reused seven previously uninstanced closed-shell Trey CC0 buildings to frame the new landmarks without runtime box-built architecture",
         "Added the UNDERTOW SUMP Blackwater Lift 03: teardrop intake mouth, paired DCC volutes, double siphon arch, tidal sight glass, and a preserved maintenance-console apron",
+        "Added the BLACKWATER POOL lower route: authored dark water surface, dry rim, runtime wave material, and a gated swim traversal volume below the Stormglass halo",
     ]
     report["validation"]["interior_enclosed"] = True
     report["validation"]["vertical_layers"] = 3

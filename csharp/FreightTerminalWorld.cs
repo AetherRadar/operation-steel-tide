@@ -3025,6 +3025,10 @@ public partial class FreightTerminalWorld : Node3D
         }
         RefreshLootView();
         RefreshResidentialLocalization();
+        if (IsOrbitalComplexRuntimeMapSelected)
+        {
+            RefreshOrbitalComplexLocalizedSignage();
+        }
         foreach (var drop in _aircraftSupplyDrops)
         {
             if (IsInstanceValid(drop))

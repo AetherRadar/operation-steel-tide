@@ -25,17 +25,17 @@
   "scene_audit": {
     "minimum_blender": [
       -170.0,
-      -100.00002,
+      -100.0,
       -34.0
     ],
     "maximum_blender": [
       170.0,
-      220.00002,
+      220.0,
       24.0
     ],
     "dimensions_blender": [
       340.0,
-      320.00003,
+      320.0,
       58.0
     ],
     "center_blender": [
@@ -45,7 +45,7 @@
     ],
     "map_dimensions_godot_xz": [
       340.0,
-      320.00003
+      320.0
     ],
     "map_center_godot": [
       0.0,
@@ -93,11 +93,11 @@
     }
   },
   "statistics_before_export": {
-    "mesh_nodes": 370,
-    "unique_meshes": 333,
-    "unique_triangles": 200632,
-    "instance_triangles": 307032,
-    "materials": 182,
+    "mesh_nodes": 371,
+    "unique_meshes": 334,
+    "unique_triangles": 201084,
+    "instance_triangles": 307484,
+    "materials": 183,
     "images": 35,
     "estimated_texture_memory_bytes": 138936320
   },
@@ -105,17 +105,17 @@
     "scene": {
       "minimum_blender": [
         -170.0,
-        -100.00002,
+        -100.0,
         -34.0
       ],
       "maximum_blender": [
         170.0,
-        220.00002,
+        220.0,
         24.0
       ],
       "dimensions_blender": [
         340.0,
-        320.00003,
+        320.0,
         58.0
       ],
       "center_blender": [
@@ -125,7 +125,7 @@
       ],
       "map_dimensions_godot_xz": [
         340.0,
-        320.00003
+        320.0
       ],
       "map_center_godot": [
         0.0,
@@ -173,32 +173,32 @@
       }
     },
     "statistics": {
-      "mesh_nodes": 369,
-      "unique_meshes": 332,
-      "unique_triangles": 200632,
-      "instance_triangles": 307032,
-      "materials": 42,
+      "mesh_nodes": 370,
+      "unique_meshes": 333,
+      "unique_triangles": 201084,
+      "instance_triangles": 307484,
+      "materials": 43,
       "images": 11,
       "estimated_texture_memory_bytes": 42205184
     }
   },
   "gltf_document": {
-    "gltf_nodes": 488,
-    "gltf_meshes": 332,
-    "gltf_primitives": 334,
-    "gltf_materials": 42,
+    "gltf_nodes": 489,
+    "gltf_meshes": 333,
+    "gltf_primitives": 335,
+    "gltf_materials": 43,
     "gltf_images": 11
   },
   "files": {
     "blend": {
       "path": "source_art/world/orbital_complex/orbital_complex.blend",
-      "bytes": 15640981,
-      "sha256": "B23E247853546156FA37BC72D50EABB02773F039FF75EDEBB0CF7F9084FDEE77"
+      "bytes": 15650414,
+      "sha256": "164382499678DB855795B2CD86BDE66EB5E0602C384E021880C69ECCA46BB3E4"
     },
     "glb": {
       "path": "assets/models/orbital_complex/orbital_complex.glb",
-      "bytes": 19997864,
-      "sha256": "2DBEBF74C662624F293072A00E5629332F3B2E0148A2F72486A62466FAEE1CF4",
+      "bytes": 20023204,
+      "sha256": "F5DFEC6DEB314842204A05661894EC4E331262709F43E53A00B9019D9D7494E8",
       "embedded": true
     }
   },
@@ -571,6 +571,10 @@
       "description": "Undertow Sump blackwater lift station and clear maintenance console bay"
     },
     {
+      "file": "previews/blackwater_pool.png",
+      "description": "Blackwater Pool swimming shortcut below the Stormglass detention halo"
+    },
+    {
       "file": "previews/cathode_well.png",
       "description": "Cathode Well coolant cathedral and north-south bridge"
     },
@@ -580,7 +584,7 @@
     }
   ],
   "authored_changes": [
-    "Replaced open-air barrier with an enclosed 340 x 320 m subterranean recovery bunker",
+    "Retained the pressurized 340 x 320 m subterranean recovery bunker while opening a south tidal observation mouth to the outside sky",
     "Authored a real lower reactor pit at Godot Y -34, service deck at -16, and upper catwalk ring at -3",
     "Recomposed CC0 industrial halls into breaker, quarantine, coolant, launch-silo, and intake districts",
     "Suspended a scaled NASA dish inside the reactor hall and placed the fictional return capsule in a deep launch bay",
@@ -588,7 +592,8 @@
     "Added the Cathode Well coolant cathedral: tapered pressure ribs, concentric service rings, a suspended coolant bundle, and a north-south maintenance bridge",
     "Added the Data Ossuary quarantine memory aisle: twelve faceted archive spires, cyan seams, suspended halos, and three authored arch frames",
     "Reused seven previously uninstanced closed-shell Trey CC0 buildings to frame the new landmarks without runtime box-built architecture",
-    "Added the UNDERTOW SUMP Blackwater Lift 03: teardrop intake mouth, paired DCC volutes, double siphon arch, tidal sight glass, and a preserved maintenance-console apron"
+    "Added the UNDERTOW SUMP Blackwater Lift 03: teardrop intake mouth, paired DCC volutes, double siphon arch, tidal sight glass, and a preserved maintenance-console apron",
+    "Added the BLACKWATER POOL lower route: authored dark water surface, dry rim, runtime wave material, and a gated swim traversal volume below the Stormglass halo"
   ],
   "validation": {
     "valid": true,

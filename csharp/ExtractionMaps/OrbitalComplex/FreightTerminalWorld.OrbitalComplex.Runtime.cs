@@ -139,6 +139,14 @@ public partial class FreightTerminalWorld
         _levelRoot.SetMeta("map_indoor", true);
         _levelRoot.SetMeta("map_width_m", OrbitalComplexMapDefinition.WidthMeters);
         _levelRoot.SetMeta("map_depth_m", OrbitalComplexMapDefinition.DepthMeters);
+        // The south pressure shell has a DCC-authored tidal observation gap.
+        // Keep the sea outside the playable boundary so it reads as an actual
+        // exterior world through the opening without covering the lower pit.
+        _levelRoot.AddChild(OceanBackdropFactory.Create(
+            new Vector3(0.0f, -15.68f, 142.0f), new Vector2(280.0f, 84.0f)));
+        _levelRoot.AddChild(OceanBackdropFactory.Create(
+            new Vector3(0.0f, -15.68f, -262.0f), new Vector2(280.0f, 84.0f)));
+        _levelRoot.SetMeta("falltide_exterior_world", "tidal_ocean_and_open_sky");
         AddChild(_levelRoot);
 
         if (validation.Valid)
@@ -157,6 +165,10 @@ public partial class FreightTerminalWorld
                 layout.SharedWorldSeed);
             _levelRoot.SetMeta("authored_scene_path", OrbitalComplexWorldAssembler.DefaultScenePath);
             _levelRoot.SetMeta("authored_scene_group", OrbitalComplexWorldAssembler.AuthoredSceneGroup);
+            if (!BuildOrbitalComplexRuntimeWaterPresentation())
+            {
+                throw new InvalidOperationException("MAP 03 authored blackwater surface is missing");
+            }
             BuildOrbitalComplexRuntimeLighting();
             BuildOrbitalComplexRuntimeAccess();
             BuildOrbitalComplexRuntimePresentationFX();
@@ -438,7 +450,8 @@ public partial class FreightTerminalWorld
         var diagnostic = Array.Exists(
             OS.GetCmdlineUserArgs(),
             argument => argument.StartsWith("--validate-orbital-", StringComparison.Ordinal)
-                || argument == "--capture-orbital-map");
+                || argument == "--capture-orbital-map"
+                || argument == "--capture-orbital-coast");
         var playerIndex = diagnostic
             ? 0
             : (int)(_rng.Randi() % (uint)layout.PlayerSpawnPads.Count);
@@ -633,30 +646,31 @@ public partial class FreightTerminalWorld
             return;
         }
 
-        // Keep the indoor shell from sampling the outdoor sky.  Authored fixtures provide
-        // local colour; this low-energy neutral fill preserves readable silhouettes at all
-        // four time-of-day selections and makes the bunker enclosure explicit.
+        // The open pressure courts and south-facing shaft must show the real
+        // outside world. Keep the authored time-of-day sky instead of a flat
+        // black background that makes every opening read like a sealed room.
         var style = TimeOfDayStyles.Style(timeOfDay);
-        _environmentRef.BackgroundMode = Godot.Environment.BGMode.Color;
-        _environmentRef.BackgroundColor = timeOfDay == DeploymentTimeOfDay.Night
-            ? new Color(0.004f, 0.008f, 0.012f)
-            : new Color(0.012f, 0.022f, 0.03f);
-        _environmentRef.AmbientLightSource = Godot.Environment.AmbientSource.Color;
+        _environmentRef.BackgroundMode = Godot.Environment.BGMode.Sky;
+        _environmentRef.AmbientLightSource = Godot.Environment.AmbientSource.Sky;
+        _environmentRef.ReflectedLightSource = Godot.Environment.ReflectionSource.Sky;
         _environmentRef.AmbientLightColor = new Color(0.30f, 0.43f, 0.52f);
-        // This is an enclosed facility, so the authored shell cannot receive the
-        // outdoor sky radiance that the other maps use.  Keep the blackout mood in
-        // the local fixtures and alarm colours, but retain enough neutral fill to
-        // read walls, cover, and player silhouettes at gameplay distance.
-        _environmentRef.AmbientLightEnergy = Mathf.Clamp(style.AmbientEnergy * 0.92f, 0.36f, 0.78f);
+        _environmentRef.AmbientLightSkyContribution = 0.62f;
+        _environmentRef.AmbientLightEnergy = Mathf.Clamp(style.AmbientEnergy * 0.92f, 0.36f, 0.84f);
         _environmentRef.TonemapMode = Godot.Environment.ToneMapper.Aces;
         _environmentRef.TonemapExposure = Mathf.Clamp(style.Exposure + 0.22f, 0.96f, 1.34f);
         _environmentRef.FogEnabled = true;
-        _environmentRef.FogLightColor = new Color(0.08f, 0.18f, 0.23f);
+        _environmentRef.FogLightColor = new Color(0.12f, 0.27f, 0.34f);
         _environmentRef.FogLightEnergy = 0.34f;
         _environmentRef.FogDensity = timeOfDay == DeploymentTimeOfDay.Night
             ? 0.0044f
             : 0.0032f;
+        _environmentRef.FogSkyAffect = 0.08f;
+        _environmentRef.Sky ??= new Sky();
+        _environmentRef.Sky.SkyMaterial = BuildDynamicSkyMaterial(timeOfDay);
+        _environmentRef.Sky.ProcessMode = Sky.ProcessModeEnum.Incremental;
+        _environmentRef.Sky.RadianceSize = Sky.RadianceSizeEnum.Size128;
         _levelRoot?.SetMeta("falltide_indoor_atmosphere", true);
+        _levelRoot?.SetMeta("falltide_open_sky", true);
         _levelRoot?.SetMeta("falltide_time_of_day", (int)timeOfDay);
     }
 

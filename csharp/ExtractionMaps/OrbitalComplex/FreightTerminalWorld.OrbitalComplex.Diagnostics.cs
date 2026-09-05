@@ -16,7 +16,8 @@ public partial class FreightTerminalWorld
         Gameplay,
         Spawns,
         Loading,
-        Atmosphere
+        Atmosphere,
+        Water
     }
 
     private readonly record struct OrbitalComplexDiagnosticSnapshot(
@@ -30,6 +31,7 @@ public partial class FreightTerminalWorld
         bool SpawnsReady,
         bool LoadingReady,
         bool AtmosphereReady,
+        bool WaterReady,
         int AuthoredMeshCount,
         int CollisionShapeCount,
         int ObjectiveAnchorCount,
@@ -60,6 +62,9 @@ public partial class FreightTerminalWorld
                 OrbitalComplexDiagnosticKind.Atmosphere => Selected
                     && SceneReady
                     && AtmosphereReady,
+                OrbitalComplexDiagnosticKind.Water => Selected
+                    && SceneReady
+                    && WaterReady,
                 _ => false
             };
     }
@@ -82,6 +87,44 @@ public partial class FreightTerminalWorld
     private async void ValidateOrbitalAtmosphere()
         => await RunOrbitalComplexDiagnostic(OrbitalComplexDiagnosticKind.Atmosphere);
 
+    private async void ValidateOrbitalWater()
+    {
+        await WaitFrames(8);
+        var snapshot = CaptureOrbitalComplexDiagnosticSnapshot();
+        var staticValid = snapshot.For(OrbitalComplexDiagnosticKind.Water);
+        var motionValid = false;
+        var rise = 0.0f;
+        var sink = 0.0f;
+        if (staticValid && IsInstanceValid(_player))
+        {
+            var originalPosition = _player.GlobalPosition;
+            _player.ProcessMode = ProcessModeEnum.Pausable;
+            _player.GlobalPosition = new Vector3(0.0f, -30.0f, -34.0f);
+            _player.PrepareOrbitalComplexSwimmingDiagnostics();
+            Input.ActionPress(GameInputActions.Jump);
+            await WaitFrames(12);
+            Input.ActionRelease(GameInputActions.Jump);
+            rise = _player.GlobalPosition.Y;
+            _player.Velocity = Vector3.Zero;
+            _player.SetOrbitalComplexSwimmingDiagnosticSink(true);
+            await WaitFrames(12);
+            _player.SetOrbitalComplexSwimmingDiagnosticSink(false);
+            sink = _player.GlobalPosition.Y;
+            motionValid = rise > -30.0f + 0.06f && sink < rise - 0.06f;
+            _player.GlobalPosition = originalPosition;
+            _player.Velocity = Vector3.Zero;
+        }
+        Input.ActionRelease(GameInputActions.Jump);
+        Input.ActionRelease(GameInputActions.Crouch);
+        var valid = staticValid && motionValid;
+        GD.Print(
+            $"ORBITAL_WATER_CHECK valid={valid} selected={snapshot.Selected} "
+            + $"static={staticValid} swim_rise={rise:0.00} swim_sink={sink:0.00} "
+            + $"water={snapshot.WaterReady} error={DiagnosticToken(snapshot.Error)}");
+        GD.Print($"ORBITAL_WATER_PASS valid={valid}");
+        GetTree().Quit(valid ? 0 : 2);
+    }
+
     private async Task RunOrbitalComplexDiagnostic(OrbitalComplexDiagnosticKind kind)
     {
         await WaitFrames(3);
@@ -95,6 +138,7 @@ public partial class FreightTerminalWorld
             + $"objectives={snapshot.ObjectivesReady} collision={snapshot.CollisionReady} "
             + $"routes={snapshot.RoutesReady}:{snapshot.TraversalLinkCount} "
             + $"spawns={snapshot.SpawnsReady} atmosphere={snapshot.AtmosphereReady} "
+            + $"water={snapshot.WaterReady} "
             + $"meshes={snapshot.AuthoredMeshCount} shapes={snapshot.CollisionShapeCount} "
             + $"anchors={snapshot.ObjectiveAnchorCount} error={DiagnosticToken(snapshot.Error)}");
         GD.Print($"ORBITAL_{label}_PASS valid={valid}");
@@ -106,6 +150,7 @@ public partial class FreightTerminalWorld
         if (!IsOrbitalComplexRuntimeMapSelected)
         {
             return new OrbitalComplexDiagnosticSnapshot(
+                false,
                 false,
                 false,
                 false,
@@ -132,6 +177,7 @@ public partial class FreightTerminalWorld
         {
             return new OrbitalComplexDiagnosticSnapshot(
                 true,
+                false,
                 false,
                 false,
                 false,
@@ -189,11 +235,24 @@ public partial class FreightTerminalWorld
             && string.IsNullOrEmpty(_orbitalComplexRuntimeLoadError)
             && sceneReady;
         var atmosphereReady = IsInstanceValid(_environmentRef)
-            && _environmentRef.BackgroundMode == Godot.Environment.BGMode.Color
-            && _environmentRef.AmbientLightSource == Godot.Environment.AmbientSource.Color
+            && _environmentRef.BackgroundMode == Godot.Environment.BGMode.Sky
+            && _environmentRef.AmbientLightSource == Godot.Environment.AmbientSource.Sky
+            && _environmentRef.Sky?.SkyMaterial is not null
+            && (_levelRoot?.GetMeta("falltide_open_sky", false).AsBool() ?? false)
             && (_levelRoot?.GetMeta("falltide_indoor_atmosphere", false).AsBool() ?? false)
             && (build?.PresentationNodes.ContainsKey("PowerZone_Blackout") ?? false)
             && (build?.PresentationNodes.ContainsKey("PowerZone_Powered") ?? false);
+        var pool = build?.AuthoredArtRoot.FindChild(
+            "BlackwaterPoolSurface*", recursive: true, owned: false) as MeshInstance3D;
+        var waterReady = sceneReady
+            && (_levelRoot?.GetMeta("falltide_blackwater_ready", false).AsBool() ?? false)
+            && (_levelRoot?.GetMeta("falltide_ocean_backdrop_count", 0).AsInt32() ?? 0) >= 2
+            && pool?.GetMeta("swimmable_water_surface", false).AsBool() == true
+            && pool.MaterialOverride is ShaderMaterial
+            && OrbitalComplexMapDefinition.IsInBlackwaterSwimVolume(
+                new Vector3(0.0f, -28.0f, -34.0f))
+            && !OrbitalComplexMapDefinition.IsInBlackwaterSwimVolume(
+                new Vector3(40.0f, -28.0f, -34.0f));
 
         return new OrbitalComplexDiagnosticSnapshot(
             true,
@@ -206,6 +265,7 @@ public partial class FreightTerminalWorld
             spawnsReady,
             loadingReady,
             atmosphereReady,
+            waterReady,
             authoredMeshes,
             collisionShapes,
             objectiveAnchors,
@@ -566,14 +626,14 @@ public partial class FreightTerminalWorld
         ApplyOrbitalComplexRuntimeObjectiveStage(2);
         if (IsInstanceValid(_environmentRef))
         {
-            _environmentRef.AmbientLightEnergy = Mathf.Max(
-                _environmentRef.AmbientLightEnergy,
-                0.72f);
-            _environmentRef.TonemapExposure = Mathf.Max(
-                _environmentRef.TonemapExposure,
-                1.24f);
+            _environmentRef.AmbientLightEnergy = 0.18f;
+            _environmentRef.TonemapExposure = 0.74f;
             _environmentRef.FogDensity = 0.0018f;
-            _environmentRef.FogLightEnergy = 0.46f;
+            _environmentRef.FogLightEnergy = 0.18f;
+        }
+        foreach (var light in _orbitalComplexRuntimeLights)
+        {
+            light.Visible = false;
         }
 
         var target = OrbitalComplexMapDefinition.StormglassArrayCenter + new Vector3(0.0f, 6.0f, 0.0f);
@@ -582,7 +642,7 @@ public partial class FreightTerminalWorld
             Name = "OrbitalComplexCaptureFill",
             GlobalPosition = target + new Vector3(12.0f, 18.0f, 18.0f),
             LightColor = new Color(0.42f, 0.72f, 1.0f),
-            LightEnergy = 11.0f,
+            LightEnergy = 1.8f,
             OmniRange = 82.0f,
             ShadowEnabled = false
         };
@@ -603,6 +663,37 @@ public partial class FreightTerminalWorld
         GD.Print(
             $"ORBITAL_CAPTURE valid=True path=orbital_complex_map_validation.png "
             + $"target={target} camera={camera.GlobalPosition} meshes={snapshot.AuthoredMeshCount}");
+        GetTree().Quit();
+    }
+
+    private async void CaptureOrbitalCoast()
+    {
+        await WaitFrames(8);
+        if (!OrbitalComplexRuntimeSceneReady)
+        {
+            GD.Print("ORBITAL_COAST_CAPTURE valid=False reason=authored_scene_not_ready");
+            GetTree().Quit(2);
+            return;
+        }
+
+        if (IsInstanceValid(_player))
+        {
+            _player.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        var camera = new Camera3D
+        {
+            Name = "OrbitalComplexCoastCaptureCamera",
+            Fov = 68.0f,
+            Near = 0.05f,
+            Far = 700.0f,
+            Position = new Vector3(0.0f, -7.4f, 42.0f)
+        };
+        AddChild(camera);
+        camera.LookAt(new Vector3(0.0f, -11.0f, 142.0f), Vector3.Up);
+        camera.MakeCurrent();
+        await WaitFrames(12);
+        SaveViewportImage("res://orbital_complex_coast_validation.png");
+        GD.Print("ORBITAL_COAST_CAPTURE valid=True path=orbital_complex_coast_validation.png");
         GetTree().Quit();
     }
 }

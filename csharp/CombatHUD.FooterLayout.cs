@@ -19,7 +19,7 @@ public partial class CombatHUD
     private const float BackpackHudWidth = 210.0f;
     private const float BackpackHudHeight = 52.0f;
     private const float SquadRosterLeft = 28.0f;
-    private const float SquadRosterTop = 286.0f;
+    private const float SquadRosterTop = 352.0f;
     private const float SquadRosterWidth = 250.0f;
     private const float SquadRosterHeight = 158.0f;
     private const float ClassSkillHudWidth = 430.0f;

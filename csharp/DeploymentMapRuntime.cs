@@ -55,8 +55,10 @@ public static class DeploymentMapRuntime
                     or "--validate-orbital-spawns"
                     or "--validate-orbital-loading"
                     or "--validate-orbital-atmosphere"
+                    or "--validate-orbital-water"
                     or "--validate-orbital-integration"
-                    or "--capture-orbital-map"))
+                    or "--capture-orbital-map"
+                    or "--capture-orbital-coast"))
         {
             SelectMap(DeploymentMapCatalog.OrbitalComplexId);
         }

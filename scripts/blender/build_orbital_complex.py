@@ -367,7 +367,11 @@ def make_pbr_texture_material(
 
 def build_materials() -> dict[str, bpy.types.Material]:
     materials = {
-        "StormWater": make_material("StormWater", (0.018, 0.082, 0.105, 1.0), 0.16, 0.38),
+        # Keep the underground pool visibly distinct from the black metal
+        # rim in offline previews.  The runtime shader still drives the
+        # animated surface in Godot, but this authored albedo preserves the
+        # water read in the source BLEND/GLB as well.
+        "StormWater": make_material("StormWater", (0.018, 0.105, 0.155, 1.0), 0.08, 0.14),
         "WetConcrete": make_pbr_texture_material(
             "WetConcrete", "concrete_floor", 0.06, (0.30, 0.34, 0.37, 1.0)
         ),
@@ -404,7 +408,43 @@ def build_materials() -> dict[str, bpy.types.Material]:
         "CapsuleCeramic": make_material("CapsuleCeramic", (0.36, 0.40, 0.39, 1.0), 0.66, 0.14),
         "CapsuleScorch": make_material("CapsuleScorch", (0.018, 0.014, 0.012, 1.0), 0.88, 0.04),
     }
-    materials["StormWater"].diffuse_color = (0.012, 0.058, 0.075, 1.0)
+    storm_water = materials["StormWater"]
+    storm_water.diffuse_color = (0.018, 0.105, 0.155, 1.0)
+    storm_water_principled = storm_water.node_tree.nodes.get("Principled BSDF")
+    if storm_water_principled is not None:
+        storm_water_principled.inputs["Base Color"].default_value = (0.018, 0.105, 0.155, 1.0)
+        storm_water_principled.inputs["Metallic"].default_value = 0.08
+        storm_water_principled.inputs["Roughness"].default_value = 0.11
+        coat_weight = storm_water_principled.inputs.get("Coat Weight")
+        coat_roughness = storm_water_principled.inputs.get("Coat Roughness")
+        if coat_weight is not None:
+            coat_weight.default_value = 0.42
+        if coat_roughness is not None:
+            coat_roughness.default_value = 0.09
+        # The pool is deliberately dark and legible at player distance. A
+        # low-contrast procedural breakup keeps it from reading as a blue
+        # decal without introducing emissive rings or arcade-like markers.
+        nodes = storm_water.node_tree.nodes
+        links = storm_water.node_tree.links
+        noise = nodes.new("ShaderNodeTexNoise")
+        noise.name = "StormWaterSurfaceNoise"
+        noise.inputs["Scale"].default_value = 0.22
+        noise.inputs["Detail"].default_value = 3.0
+        noise.inputs["Roughness"].default_value = 0.68
+        ramp = nodes.new("ShaderNodeValToRGB")
+        ramp.name = "StormWaterSurfaceColor"
+        ramp.color_ramp.elements[0].position = 0.22
+        ramp.color_ramp.elements[0].color = (0.008, 0.050, 0.075, 1.0)
+        ramp.color_ramp.elements[1].position = 0.78
+        ramp.color_ramp.elements[1].color = (0.028, 0.145, 0.19, 1.0)
+        bump = nodes.new("ShaderNodeBump")
+        bump.name = "StormWaterSurfaceBump"
+        bump.inputs["Strength"].default_value = 0.13
+        bump.inputs["Distance"].default_value = 0.08
+        links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
+        links.new(ramp.outputs["Color"], storm_water_principled.inputs["Base Color"])
+        links.new(noise.outputs["Fac"], bump.inputs["Height"])
+        links.new(bump.outputs["Normal"], storm_water_principled.inputs["Normal"])
     wet_concrete_principled = materials["WetConcrete"].node_tree.nodes.get("Principled BSDF")
     if wet_concrete_principled is not None:
         coat_weight = wet_concrete_principled.inputs.get("Coat Weight")

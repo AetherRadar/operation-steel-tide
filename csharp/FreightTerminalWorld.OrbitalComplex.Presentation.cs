@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace OperationSteelTide;
@@ -18,6 +19,52 @@ public partial class FreightTerminalWorld
     private Node3D? _orbitalComplexRuntimeTelemetryConsole;
     private float _orbitalComplexRuntimeTelemetryProgress;
     private bool _orbitalComplexRuntimeTelemetryUsed;
+
+    private void RefreshOrbitalComplexLocalizedSignage()
+    {
+        if (_orbitalComplexRuntimePresentationFxRoot is null)
+        {
+            return;
+        }
+
+        foreach (var node in GetTree().GetNodesInGroup("orbital_complex_zone_sign"))
+        {
+            if (node is not Label3D label)
+            {
+                continue;
+            }
+            (string Key, string English) = label.Name.ToString() switch
+            {
+                "FALLTIDE_SIGN_INTAKE" => ("falltide_sign_intake", "INTAKE CAUSEWAY  //  SOUTH LOCK"),
+                "FALLTIDE_SIGN_BREAKER" => ("falltide_sign_breaker", "BREAKER YARD  //  STORM GRID"),
+                "FALLTIDE_SIGN_ARCHIVE" => ("falltide_sign_archive", "QUARANTINE ARCHIVE  //  CLEAN ROOM"),
+                "FALLTIDE_SIGN_CORE" => ("falltide_sign_core", "STORMGLASS ARRAY  //  REACTOR RING"),
+                "FALLTIDE_SIGN_GATE" => ("falltide_sign_gate", "NORTH TIDE GATE  //  RECOVERY RAIL"),
+                _ => (string.Empty, label.Text)
+            };
+            if (!string.IsNullOrEmpty(Key))
+            {
+                label.Text = GameLocalization.Get(Key, _languageSetting, English);
+            }
+        }
+
+        var layout = OrbitalComplexRuntimeLayout;
+        foreach (var node in GetTree().GetNodesInGroup("orbital_complex_poi_label"))
+        {
+            if (node is not Label3D label
+                || !int.TryParse(label.Name.ToString().Replace("FALLTIDE_SIGN_POI_", string.Empty), out var index)
+                || index < 0
+                || index >= layout.MinimapLandmarks.Count)
+            {
+                continue;
+            }
+            var landmark = layout.MinimapLandmarks[index];
+            label.Text = GameLocalization.Get(
+                landmark.LocalizationKey,
+                _languageSetting,
+                landmark.EnglishName);
+        }
+    }
     private float _orbitalComplexRuntimePressureTime;
 
     private void BuildOrbitalComplexRuntimePresentationFX()
@@ -65,7 +112,8 @@ public partial class FreightTerminalWorld
                 Name = name,
                 Position = position,
                 Text = GameLocalization.Get(key, _languageSetting, english),
-                FontSize = 17,
+                FontSize = 22,
+                PixelSize = 0.012f,
                 OutlineSize = 7,
                 Modulate = color,
                 Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
@@ -75,6 +123,38 @@ public partial class FreightTerminalWorld
             };
             sign.AddToGroup("orbital_complex_zone_sign");
             _orbitalComplexRuntimePresentationFxRoot.AddChild(sign);
+        }
+
+        // The original pass only named the five headline rooms. Keep every
+        // authored minimap point legible in the world too, especially the
+        // lower dock and the two service loops that otherwise read as blank
+        // circulation space.
+        var layout = OrbitalComplexRuntimeLayout;
+        for (var index = 0; index < layout.MinimapLandmarks.Count; index++)
+        {
+            var landmark = layout.MinimapLandmarks[index];
+            var landmarkLabel = new Label3D
+            {
+                Name = $"FALLTIDE_SIGN_POI_{index:00}",
+                Position = landmark.Position + Vector3.Up * 2.65f,
+                Text = GameLocalization.Get(
+                    landmark.LocalizationKey,
+                    _languageSetting,
+                    landmark.EnglishName),
+                FontSize = 18,
+                PixelSize = 0.009f,
+                OutlineSize = 8,
+                Modulate = new Color(
+                    landmark.Color.R,
+                    landmark.Color.G,
+                    landmark.Color.B,
+                    0.94f),
+                Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+                VisibilityRangeEnd = 108.0f,
+                VisibilityRangeEndMargin = 14.0f
+            };
+            landmarkLabel.AddToGroup("orbital_complex_poi_label");
+            _orbitalComplexRuntimePresentationFxRoot.AddChild(landmarkLabel);
         }
     }
 

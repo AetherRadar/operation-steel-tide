@@ -20,7 +20,7 @@ public partial class CombatHUD
         _minimap = new TacticalMinimap
         {
             Position = new Vector2(28, 72),
-            Size = new Vector2(250, 202)
+            Size = new Vector2(340, 264)
         };
         root.AddChild(_minimap);
 

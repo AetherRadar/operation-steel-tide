@@ -357,28 +357,29 @@ are in `../../source_art/third_party/nasa_3d/{README.md,LICENSE_EVIDENCE.md}`.
 ### Reproducible output and indoor QA contract
 
 - Authoritative DCC source:
-  `../../source_art/world/orbital_complex/orbital_complex.blend` (15,521,550
-  bytes; SHA-256 `E288F6743444A27ADA414254DC06685EF223D36DE53EBFEDA959D306D3EB4EF2`).
+  `../../source_art/world/orbital_complex/orbital_complex.blend` (15,650,414
+  bytes; SHA-256 `164382499678DB855795B2CD86BDE66EB5E0602C384E021880C69ECCA46BB3E4`).
 - Reproducible builder:
   `../../scripts/blender/build_orbital_complex_underground.py`; it executes the
   shared provenance/import/export helpers from `build_orbital_complex.py` and
   must be run with Blender 4.5+.
-- Runtime output: `orbital_complex/orbital_complex.glb` (19,472,480 bytes;
-  SHA-256 `5031189E36A803B6EEBC1A91E6F0CB7AA23A14F23586AD9585A72D4B981F2E30`).
-  The binary is self-contained: 343 glTF nodes, 240 mesh resources, 242
-  primitives, 42 materials, 11 embedded images, and no external buffer or
+- Runtime output: `orbital_complex/orbital_complex.glb` (20,023,204 bytes;
+  SHA-256 `F5DFEC6DEB314842204A05661894EC4E331262709F43E53A00B9019D9D7494E8`).
+  The binary is self-contained: 489 glTF nodes, 333 mesh resources, 335
+  primitives, 43 materials, 11 embedded images, and no external buffer or
   image URI.
 - The exported root is `FalltideRecoveryArray` with `map_id=orbital_complex`,
   340 x 320 m horizontal bounds, Godot center `(0,0,-60)`, and vertical
-  envelope `Y=-34..24`. `BunkerCeiling` and `BunkerPerimeterWalls` are
-  required for the enclosed-room contract; `ReactorPitFloor`, the service
-  deck, and the upper ring provide three readable vertical layers.
+  envelope `Y=-34..24`. The side/north pressure shell and split ceiling panels
+  retain the enclosed-room contract while the south perimeter has a deliberate
+  tidal observation opening; `ReactorPitFloor`, the service deck, and the upper
+  ring provide three readable vertical layers.
 - Every build must pass the deterministic Blender scene audit and GLB
   round-trip audit (`valid`, `authored_major_geometry`, `roundtrip_import`,
   `embedded_runtime_asset`, `interior_enclosed`, and `vertical_layers=3`),
   preserve unique interactive nodes (`DishYaw`, `DishPitch`, gates, alarm and
   power groups), preserve all named POI/spawn/extraction anchors, and render
-  the seven representative previews under
+  the eight representative previews under
   `../../source_art/world/orbital_complex/previews/`.
 - Gameplay collision/navigation remains in Godot; the visible shell and
   imported authored modules are not silently replaced with runtime primitives.

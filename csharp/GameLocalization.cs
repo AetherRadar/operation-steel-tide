@@ -506,6 +506,8 @@ public static class GameLocalization
         Chinese["minimap_falltide_calibration_catwalk"] = "\u6821\u51c6\u6808\u9053";
         Chinese["minimap_falltide_west_service"] = "\u897f\u51b7\u5374\u96a7\u9053";
         Chinese["minimap_falltide_east_service"] = "\u4e1c\u51b7\u5374\u96a7\u9053";
+        Chinese["minimap_falltide_blackwater_pool"] = "\u9ed1\u6c34\u6c60";
+        Chinese["falltide_blackwater_swim"] = "\u9ed1\u6c34\u533a  //  \u7a7a\u683c\u4e0a\u6d6e  //  CTRL \u4e0b\u6f5c";
         ChineseObjectives["STABILIZE THE STORM-GRID BREAKERS"] = "\u7a33\u5b9a\u98ce\u66b4\u7535\u7f51\u65ad\u8def\u5668";
         ChineseObjectives["AUTHORIZE THE QUARANTINE RELEASE"] = "\u6388\u6743\u89e3\u9664\u68c0\u75ab\u5c01\u9501";
         Chinese["map_locked_short"] = "\u672a\u89e3\u9501";

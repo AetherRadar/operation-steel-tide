@@ -153,17 +153,21 @@ public partial class TacticalMinimap : Control
             DrawCircle(point, 3.4f, landmark.Accent);
             DrawCircle(point, 6.0f, new Color(landmark.Accent.R, landmark.Accent.G, landmark.Accent.B, 0.28f), false, 1.0f);
             var label = _localizedLandmarkLabels[index];
-            var labelWidth = Mathf.Clamp(label.Length * 6.2f, 24.0f, 76.0f);
+            var labelWidth = Mathf.Clamp(
+                ThemeDB.FallbackFont.GetStringSize(label, HorizontalAlignment.Left, -1, 12).X,
+                44.0f,
+                148.0f);
             var labelRect = PlaceLandmarkLabel(mapRect, point, labelWidth, index, _occupiedLabels);
             _occupiedLabels.Add(labelRect);
+            DrawRect(labelRect.Grow(2.0f), new Color(0.004f, 0.012f, 0.014f, 0.86f));
             DrawString(
                 ThemeDB.FallbackFont,
-                labelRect.Position + new Vector2(0, 9),
+                labelRect.Position + new Vector2(0, 11),
                 label,
                 HorizontalAlignment.Left,
-                76,
-                9,
-                new Color(0.77f, 0.85f, 0.82f));
+                labelRect.Size.X,
+                12,
+                new Color(0.92f, 0.98f, 0.94f));
         }
 
         if (_worldBossVisible)
@@ -204,13 +208,13 @@ public partial class TacticalMinimap : Control
         IReadOnlyList<Rect2> occupied)
     {
         Rect2 fallback = default;
-        for (var candidateIndex = 0; candidateIndex < 4; candidateIndex++)
+        for (var candidateIndex = 0; candidateIndex < 8; candidateIndex++)
         {
             var offset = LandmarkLabelOffset(width, index % 4, candidateIndex);
             var position = point + offset;
             position.X = Mathf.Clamp(position.X, mapRect.Position.X + 2.0f, mapRect.End.X - width - 2.0f);
-            position.Y = Mathf.Clamp(position.Y, mapRect.Position.Y + 2.0f, mapRect.End.Y - 12.0f);
-            var candidate = new Rect2(position, new Vector2(width, 11));
+            position.Y = Mathf.Clamp(position.Y, mapRect.Position.Y + 2.0f, mapRect.End.Y - 16.0f);
+            var candidate = new Rect2(position, new Vector2(width, 14));
             fallback = candidate;
             var intersects = false;
             foreach (var previous in occupied)
@@ -231,6 +235,16 @@ public partial class TacticalMinimap : Control
 
     private static Vector2 LandmarkLabelOffset(float width, int order, int candidateIndex)
     {
+        if (candidateIndex >= 4)
+        {
+            return candidateIndex switch
+            {
+                4 => new Vector2(-width * 0.5f, -28),
+                5 => new Vector2(-width * 0.5f, 21),
+                6 => new Vector2(10, -3),
+                _ => new Vector2(-width - 10, -3)
+            };
+        }
         var placement = order switch
         {
             0 => candidateIndex,

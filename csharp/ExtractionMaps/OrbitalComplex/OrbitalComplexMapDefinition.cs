@@ -25,6 +25,7 @@ public static class OrbitalComplexMapDefinition
     public const float CenterZ = -60.0f;
     public const float MinimumY = -34.0f;
     public const float MaximumY = 24.0f;
+    public const float BlackwaterSurfaceY = -28.25f;
 
     public static readonly Vector3 StormglassArrayCenter = new(0.0f, -15.6f, -34.0f);
     public static readonly Vector3 DryDockCenter = new(0.0f, -31.8f, -34.0f);
@@ -35,6 +36,27 @@ public static class OrbitalComplexMapDefinition
     public static readonly Vector3 CathodeWellCenter = new(0.0f, -15.6f, -126.0f);
     public static readonly Vector3 DataOssuaryCenter = new(133.0f, -15.6f, -126.0f);
     public static readonly Vector3 UndertowSumpCenter = new(-112.0f, -15.6f, 42.0f);
+
+    public static bool IsInBlackwaterSwimVolume(Vector3 position)
+        => IsInsideBlackwaterFootprint(position)
+            && position.Y >= -33.0f
+            && position.Y <= BlackwaterSurfaceY + 1.1f;
+
+    public static bool IsInsideBlackwaterFootprint(Vector3 position)
+    {
+        var localX = Mathf.Abs(position.X);
+        var localZ = Mathf.Abs(position.Z + 34.0f);
+        if (localX <= 25.0f && localZ <= 26.0f)
+        {
+            return true;
+        }
+
+        // Match the rounded DCC pool corners rather than treating the dry rim
+        // as an invisible rectangular swimming box.
+        var cornerX = Mathf.Max(0.0f, localX - 18.0f);
+        var cornerZ = Mathf.Max(0.0f, localZ - 19.0f);
+        return cornerX * cornerX + cornerZ * cornerZ <= 7.0f * 7.0f;
+    }
 
     public static OrbitalComplexMapLayout Build(ulong sharedWorldSeed)
     {
@@ -236,7 +258,8 @@ public static class OrbitalComplexMapDefinition
         Landmark("recovery_rail", new Vector3(0, -15.6f, -211), "minimap_extract", "RECOVERY RAIL", new(0.32f, 0.95f, 0.66f), OrbitalComplexVerticalLayer.ServiceDeck),
         Landmark("cathode_well", CathodeWellCenter, "minimap_falltide_cathode_well", "CATHODE WELL", new(0.18f, 0.88f, 0.94f), OrbitalComplexVerticalLayer.ServiceDeck),
         Landmark("data_ossuary", DataOssuaryCenter, "minimap_falltide_data_ossuary", "DATA OSSUARY", new(0.72f, 0.54f, 1.0f), OrbitalComplexVerticalLayer.ServiceDeck),
-        Landmark("undertow_sump", UndertowSumpCenter, "minimap_falltide_undertow_sump", "UNDERTOW SUMP", new(0.10f, 0.72f, 0.82f), OrbitalComplexVerticalLayer.ServiceDeck)
+        Landmark("undertow_sump", UndertowSumpCenter, "minimap_falltide_undertow_sump", "UNDERTOW SUMP", new(0.10f, 0.72f, 0.82f), OrbitalComplexVerticalLayer.ServiceDeck),
+        Landmark("blackwater_pool", new Vector3(0, -28.25f, -34), "minimap_falltide_blackwater_pool", "BLACKWATER POOL", new(0.10f, 0.50f, 0.64f), OrbitalComplexVerticalLayer.DryDock)
     };
 
     private static OrbitalComplexMinimapLandmark Landmark(
@@ -328,7 +351,14 @@ public static class OrbitalComplexMapDefinition
         Box("bunker_ceiling_north_west", new(-145, 24.5f, -205), new(50, 1, 30), Vector3.Zero, "ceiling"),
         Box("bunker_ceiling_north_east", new(145, 24.5f, -205), new(50, 1, 30), Vector3.Zero, "ceiling"),
         Box("reactor_pit_west_rim", new(-29, -17.5f, -34), new(4, 3.4f, 66), Vector3.Zero, "pit_rim"),
-        Box("reactor_pit_east_rim", new(29, -17.5f, -34), new(4, 3.4f, 66), Vector3.Zero, "pit_rim")
+        Box("reactor_pit_east_rim", new(29, -17.5f, -34), new(4, 3.4f, 66), Vector3.Zero, "pit_rim"),
+        // Dry rim around the lower blackwater pool.  The shallow step is high
+        // enough to stand on after rising, but leaves the central water volume
+        // open for the authored swimming shortcut.
+        Box("blackwater_rim_north", new(0, -28.25f, -62.0f), new(52, 0.6f, 4), Vector3.Zero, "blackwater_rim"),
+        Box("blackwater_rim_south", new(0, -28.25f, -6.0f), new(52, 0.6f, 4), Vector3.Zero, "blackwater_rim"),
+        Box("blackwater_rim_west", new(-27.0f, -28.25f, -34.0f), new(4, 0.6f, 52), Vector3.Zero, "blackwater_rim"),
+        Box("blackwater_rim_east", new(27.0f, -28.25f, -34.0f), new(4, 0.6f, 52), Vector3.Zero, "blackwater_rim")
     };
 
     private static OrbitalComplexCollisionBox Box(

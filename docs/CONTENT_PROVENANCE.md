@@ -94,6 +94,15 @@ Consequently, this repository must not be described as satisfying policies that 
 
 ### FALLTIDE source and indoor-QA notes
 
+The current MAP03 export also includes the south tidal observation opening and
+the authored blackwater pool/swim route. The current DCC source is
+`orbital_complex.blend` (15,650,414 bytes, SHA-256
+`164382499678DB855795B2CD86BDE66EB5E0602C384E021880C69ECCA46BB3E4`); the
+runtime GLB is 20,023,204 bytes with SHA-256
+`F5DFEC6DEB314842204A05661894EC4E331262709F43E53A00B9019D9D7494E8`.
+Current node counts and the full audit remain authoritative in
+`source_art/world/orbital_complex/build_report.json`.
+
 The underground composite keeps the following source-to-node mapping explicit.
 Only the two listed Majadroid container compositions are embedded in the
 current underground runtime; the package's crane and construction-materials
