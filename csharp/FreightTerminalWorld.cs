@@ -912,6 +912,7 @@ public partial class FreightTerminalWorld : Node3D
         _hud.BackpackUseRequested += UseBackpackItem;
         _hud.BackpackDropRequested += DropBackpackItemToGround;
         _hud.LootWeaponSlotRequested += EquipLootItemToWeaponSlot;
+        _hud.WeaponOpticDetachRequested += DetachWeaponOpticFromSlot;
         _hud.LootClosed += CloseLoot;
         _hud.InventoryToggleRequested += OnInventoryToggleRequested;
         _hud.OperationsQuickStartRequested += OnOperationsQuickStartRequested;
@@ -4420,6 +4421,18 @@ public partial class FreightTerminalWorld : Node3D
             && _player.Backpack.Any(item => item.Kind == LootItemKind.Weapon
                 && item.Weapon?.Platform == WeaponPlatform.M4A1
                 && item.Grade == originalWeaponGrade);
+        // Use a detachable secondary for the explicit empty-slot test. The
+        // preceding VSS sample intentionally exercises a fixed integrated
+        // scope, so it must remain a negative detach case.
+        _player.EquipFromLootToWeaponSlot(
+            new LootItem
+            {
+                Kind = LootItemKind.Weapon,
+                Weapon = WeaponCatalog.Build(WeaponPlatform.MP5A5, 1),
+                Grade = LootGrade.Rare
+            },
+            PlayerWeaponSlot.Secondary);
+        await WaitFrames(2);
         var primaryOpticBeforeAttachmentDrop = _player.PrimaryWeaponBuild?.Attachments
             .GetValueOrDefault(AttachmentSlot.Optic);
         var secondaryOpticDropRouted = _hud.DropLootOnWeaponSlotForDiagnostics(
@@ -4434,6 +4447,19 @@ public partial class FreightTerminalWorld : Node3D
             && secondaryOpticDropRouted
             && secondaryOpticAfterTargetedDrop == "optic_7x"
             && primaryOpticAfterTargetedDrop == primaryOpticBeforeAttachmentDrop;
+        var detachButtonReady = _hud.LootWeaponOpticDetachReadyForDiagnostics(
+            PlayerWeaponSlot.Secondary);
+        var fixedOpticDetachHidden = !_hud.LootWeaponOpticDetachReadyForDiagnostics(
+            PlayerWeaponSlot.Primary);
+        _hud.PressLootWeaponOpticDetachForDiagnostics(PlayerWeaponSlot.Secondary);
+        await WaitFrames(2);
+        var secondaryOpticDetached = detachButtonReady
+            && _player.SecondaryWeaponBuild?.Attachments.ContainsKey(AttachmentSlot.Optic) == false
+            && _player.Backpack.Any(item => item.Kind == LootItemKind.Attachment
+                && item.AttachmentId == "optic_7x"
+                && item.Grade == LootGrade.Epic)
+            && !_player.EquippedWeapon.Attachments.ContainsKey(AttachmentSlot.Optic)
+            && _player.AuthoredOpticPresentationValidForDiagnostics;
         var comparisonCards = _hud.LootComparisonCardCount;
         var comparisonDirections = _hud.LootComparisonHasUpgrade && _hud.LootComparisonHasDowngrade;
         var gradeColorsStable = _hud.LootGradeColorsConsistent;
@@ -4467,13 +4493,15 @@ public partial class FreightTerminalWorld : Node3D
             && attachmentGradeRoundTrip
             && primarySlotReplaced
             && secondaryAttachmentTargeted
+            && secondaryOpticDetached
+            && fixedOpticDetachHidden
             && knifeGradeRoundTrip
             && footerRuntimeSeparated
             && footerResponsive
             && footerInitiallyVisible
             && downedFooterSuppressed
             && downedFooterRestored;
-        GD.Print($"WEAPON_UI_CHECK valid={valid} knife={cycledToKnife} primary={cycledToPrimary} details={detailsOpened} platform={_player.EquippedWeapon.Platform} comparisons={comparisonCards} directions={comparisonDirections} rendered_all={renderedComparisonsComplete} attachment_comparison={attachmentComparisonRendered} grade_colors={gradeColorsStable} equipped_grade_styles={equippedGradeStylesStable} weapon_grade={weaponGradeRoundTrip} attachment_grade={attachmentGradeRoundTrip} targeted_primary={primarySlotReplaced} targeted_primary_stored={targetedPrimaryStored} targeted_primary_routed={primaryDropRouted} targeted_attachment={secondaryAttachmentTargeted} targeted_attachment_stored={targetedOpticStored} targeted_attachment_routed={secondaryOpticDropRouted} targeted_secondary_optic={secondaryOpticAfterTargetedDrop ?? "none"} targeted_primary_optic={primaryOpticAfterTargetedDrop ?? "none"} targeted_primary_optic_before={primaryOpticBeforeAttachmentDrop ?? "none"} knife_grade={knifeGradeRoundTrip} footer_runtime={footerRuntimeSeparated} footer_responsive={footerResponsive} footer_visible={footerInitiallyVisible} downed_suppressed={downedFooterSuppressed} downed_restored={downedFooterRestored} {_hud.FooterHudLayoutForDiagnostics}");
+        GD.Print($"WEAPON_UI_CHECK valid={valid} knife={cycledToKnife} primary={cycledToPrimary} details={detailsOpened} platform={_player.EquippedWeapon.Platform} comparisons={comparisonCards} directions={comparisonDirections} rendered_all={renderedComparisonsComplete} attachment_comparison={attachmentComparisonRendered} grade_colors={gradeColorsStable} equipped_grade_styles={equippedGradeStylesStable} weapon_grade={weaponGradeRoundTrip} attachment_grade={attachmentGradeRoundTrip} targeted_primary={primarySlotReplaced} targeted_primary_stored={targetedPrimaryStored} targeted_primary_routed={primaryDropRouted} targeted_attachment={secondaryAttachmentTargeted} targeted_attachment_stored={targetedOpticStored} targeted_attachment_routed={secondaryOpticDropRouted} targeted_secondary_optic={secondaryOpticAfterTargetedDrop ?? "none"} targeted_primary_optic={primaryOpticAfterTargetedDrop ?? "none"} targeted_primary_optic_before={primaryOpticBeforeAttachmentDrop ?? "none"} detach_button={detachButtonReady} detached={secondaryOpticDetached} fixed_detach_hidden={fixedOpticDetachHidden} knife_grade={knifeGradeRoundTrip} footer_runtime={footerRuntimeSeparated} footer_responsive={footerResponsive} footer_visible={footerInitiallyVisible} downed_suppressed={downedFooterSuppressed} downed_restored={downedFooterRestored} {_hud.FooterHudLayoutForDiagnostics}");
         GD.Print($"WEAPON_UI_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

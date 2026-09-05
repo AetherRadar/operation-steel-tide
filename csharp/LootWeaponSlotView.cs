@@ -11,6 +11,7 @@ public partial class LootWeaponSlotView : LootDropZone
 {
     private Label _caption = null!;
     private Button _detailsButton = null!;
+    private Button _detachOpticButton = null!;
     private InventoryModelPreview _preview = null!;
     private Label _weaponLabel = null!;
     private string _language = "en";
@@ -21,14 +22,22 @@ public partial class LootWeaponSlotView : LootDropZone
     private bool _configured;
 
     public event Action? DetailsRequested;
+    public event Action? OpticDetachRequested;
 
     public bool UiReady
         => IsInstanceValid(_caption)
         && IsInstanceValid(_detailsButton)
+        && IsInstanceValid(_detachOpticButton)
         && IsInstanceValid(_preview)
         && IsInstanceValid(_weaponLabel);
 
     public bool HasWeapon => _weapon is not null;
+    public bool CanDetachOptic
+        => _weapon is not null
+        && _weapon.Attachments.ContainsKey(AttachmentSlot.Optic)
+        && WeaponCatalog.CanDetachAttachment(_weapon.Platform, AttachmentSlot.Optic)
+        && IsInstanceValid(_detachOpticButton)
+        && _detachOpticButton.Visible;
     public WeaponPlatform? Platform => _weapon?.Platform;
     public string CaptionText => IsInstanceValid(_caption) ? _caption.Text : string.Empty;
     public bool EmptyCaptionHasNoGrade
@@ -55,9 +64,11 @@ public partial class LootWeaponSlotView : LootDropZone
         Target = LootDropTarget.PrimaryWeapon;
         _caption = GetNode<Label>("Margin/Content/Header/Caption");
         _detailsButton = GetNode<Button>("Margin/Content/Header/DetailsButton");
+        _detachOpticButton = GetNode<Button>("Margin/Content/Header/DetachOpticButton");
         _preview = GetNode<InventoryModelPreview>("Margin/Content/Preview");
         _weaponLabel = GetNode<Label>("Margin/Content/WeaponLabel");
         _detailsButton.Pressed += () => DetailsRequested?.Invoke();
+        _detachOpticButton.Pressed += () => OpticDetachRequested?.Invoke();
         ApplyPresentation();
     }
 
@@ -89,6 +100,14 @@ public partial class LootWeaponSlotView : LootDropZone
         }
     }
 
+    public void PressDetachOpticForDiagnostics()
+    {
+        if (IsInstanceValid(_detachOpticButton) && _detachOpticButton.Visible)
+        {
+            _detachOpticButton.EmitSignal(BaseButton.SignalName.Pressed);
+        }
+    }
+
     private void ApplyPresentation()
     {
         if (!UiReady)
@@ -98,6 +117,11 @@ public partial class LootWeaponSlotView : LootDropZone
 
         var slotName = SlotName();
         _detailsButton.TooltipText = GameLocalization.Get("weapon_details", _language, "WEAPON DETAILS");
+        _detachOpticButton.Text = GameLocalization.Get("detach_optic", _language, "DETACH");
+        _detachOpticButton.TooltipText = GameLocalization.Get(
+            "detach_optic",
+            _language,
+            "DETACH OPTIC TO BACKPACK");
         if (!_configured || _weapon is null)
         {
             var emptyColor = new Color(0.48f, 0.54f, 0.52f);
@@ -106,6 +130,7 @@ public partial class LootWeaponSlotView : LootDropZone
             _caption.AddThemeColorOverride("font_color", emptyColor);
             _preview.Visible = false;
             _detailsButton.Visible = false;
+            _detachOpticButton.Visible = false;
             _weaponLabel.Text = GameLocalization.Get("empty_slot", _language, "EMPTY SLOT");
             _weaponLabel.TooltipText = _weaponLabel.Text;
             return;
@@ -120,6 +145,8 @@ public partial class LootWeaponSlotView : LootDropZone
         _preview.Visible = true;
         _preview.Configure(InventoryPreviewKind.Rifle, weapon: _weapon);
         _detailsButton.Visible = true;
+        _detachOpticButton.Visible = _weapon.Attachments.ContainsKey(AttachmentSlot.Optic)
+            && WeaponCatalog.CanDetachAttachment(_weapon.Platform, AttachmentSlot.Optic);
         _weaponLabel.Text = GameLocalization.IsChinese(_language)
             ? $"{weaponName}  //  \u5f39\u5323 {stats.MagazineSize}"
             : $"{weaponName}  //  MAG {stats.MagazineSize}";

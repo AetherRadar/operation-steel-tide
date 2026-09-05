@@ -131,6 +131,9 @@ public static class GameLocalization
     static GameLocalization()
     {
         Chinese["part_incompatible"] = "\u8be5\u914d\u4ef6\u4e0e\u5f53\u524d\u6b66\u5668\u4e0d\u517c\u5bb9";
+        Chinese["part_removed"] = "\u6b66\u5668\u96f6\u4ef6\u5df2\u5378\u4e0b";
+        Chinese["detach_optic"] = "\u5378\u4e0b\u77a7\u5177";
+        Chinese["part_fixed"] = "\u4e00\u4f53\u5f0f\u77a7\u5177\u4e0d\u53ef\u62c6\u5378";
         Chinese["open_door"] = "\u5f00\u95e8";
         Chinese["close_door"] = "\u5173\u95e8";
         Chinese["door_moving"] = "\u95e8\u6b63\u5728\u79fb\u52a8";

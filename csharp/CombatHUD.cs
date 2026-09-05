@@ -20,6 +20,7 @@ public partial class CombatHUD : CanvasLayer
     [Signal] public delegate void BackpackUseRequestedEventHandler(string itemId);
     [Signal] public delegate void BackpackDropRequestedEventHandler(string itemId);
     [Signal] public delegate void LootWeaponSlotRequestedEventHandler(string itemId, int origin, int slot);
+    [Signal] public delegate void WeaponOpticDetachRequestedEventHandler(int slot);
     [Signal] public delegate void LootClosedEventHandler();
     [Signal] public delegate void WeaponSlotRequestedEventHandler(int slot);
     [Signal] public delegate void InventoryToggleRequestedEventHandler();
@@ -721,6 +722,9 @@ public partial class CombatHUD : CanvasLayer
         _lootWeaponRack.Size = new Vector2(184, 296);
         _lootWeaponRack.Dropped += HandleLootDrop;
         _lootWeaponRack.WeaponDetailsRequested += ShowLootWeaponDetails;
+        _lootWeaponRack.OpticDetachRequested += slot => EmitSignal(
+            SignalName.WeaponOpticDetachRequested,
+            (int)slot);
         panel.AddChild(_lootWeaponRack);
         _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(1610, 174), new Vector2(160, 88), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel, out _helmetPreview);
         _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(1610, 268), new Vector2(160, 96), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel, out _armorPreview);

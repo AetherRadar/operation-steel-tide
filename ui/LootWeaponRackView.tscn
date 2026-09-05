@@ -101,6 +101,18 @@ theme_override_styles/hover = SubResource("Style_detail_hover")
 theme_override_styles/pressed = SubResource("Style_detail_hover")
 text = "i"
 
+[node name="DetachOpticButton" type="Button" parent="Slots/PrimarySlot/Margin/Content/Header"]
+custom_minimum_size = Vector2(38, 20)
+layout_mode = 2
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_colors/font_color = Color(0.7, 0.84, 0.79, 1)
+theme_override_font_sizes/font_size = 9
+theme_override_styles/normal = SubResource("Style_detail")
+theme_override_styles/hover = SubResource("Style_detail_hover")
+theme_override_styles/pressed = SubResource("Style_detail_hover")
+text = "DETACH"
+
 [node name="Preview" type="SubViewportContainer" parent="Slots/PrimarySlot/Margin/Content"]
 custom_minimum_size = Vector2(172, 42)
 layout_mode = 2
@@ -158,6 +170,18 @@ theme_override_styles/hover = SubResource("Style_detail_hover")
 theme_override_styles/pressed = SubResource("Style_detail_hover")
 text = "i"
 
+[node name="DetachOpticButton" type="Button" parent="Slots/SecondarySlot/Margin/Content/Header"]
+custom_minimum_size = Vector2(38, 20)
+layout_mode = 2
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_colors/font_color = Color(0.7, 0.84, 0.79, 1)
+theme_override_font_sizes/font_size = 9
+theme_override_styles/normal = SubResource("Style_detail")
+theme_override_styles/hover = SubResource("Style_detail_hover")
+theme_override_styles/pressed = SubResource("Style_detail_hover")
+text = "DETACH"
+
 [node name="Preview" type="SubViewportContainer" parent="Slots/SecondarySlot/Margin/Content"]
 custom_minimum_size = Vector2(172, 42)
 layout_mode = 2
@@ -214,6 +238,18 @@ theme_override_styles/normal = SubResource("Style_detail")
 theme_override_styles/hover = SubResource("Style_detail_hover")
 theme_override_styles/pressed = SubResource("Style_detail_hover")
 text = "i"
+
+[node name="DetachOpticButton" type="Button" parent="Slots/SidearmSlot/Margin/Content/Header"]
+custom_minimum_size = Vector2(38, 20)
+layout_mode = 2
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_colors/font_color = Color(0.7, 0.84, 0.79, 1)
+theme_override_font_sizes/font_size = 9
+theme_override_styles/normal = SubResource("Style_detail")
+theme_override_styles/hover = SubResource("Style_detail_hover")
+theme_override_styles/pressed = SubResource("Style_detail_hover")
+text = "DETACH"
 
 [node name="Preview" type="SubViewportContainer" parent="Slots/SidearmSlot/Margin/Content"]
 custom_minimum_size = Vector2(172, 42)

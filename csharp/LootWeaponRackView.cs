@@ -28,6 +28,7 @@ public partial class LootWeaponRackView : Control
     private bool _configured;
 
     public event Action<string, LootDragOrigin, LootDropTarget>? Dropped;
+    public event Action<PlayerWeaponSlot>? OpticDetachRequested;
 
     public bool UiReady
         => IsInstanceValid(_primarySlot)
@@ -112,6 +113,14 @@ public partial class LootWeaponRackView : Control
         _ => string.Empty
     };
 
+    public bool CanDetachOpticForSlot(PlayerWeaponSlot slot) => slot switch
+    {
+        PlayerWeaponSlot.Primary => _primarySlot.CanDetachOptic,
+        PlayerWeaponSlot.Secondary => _secondarySlot.CanDetachOptic,
+        PlayerWeaponSlot.Sidearm => _sidearmSlot.CanDetachOptic,
+        _ => false
+    };
+
     public void PressDetailsForDiagnostics(PlayerWeaponSlot slot)
     {
         switch (slot)
@@ -128,6 +137,22 @@ public partial class LootWeaponRackView : Control
         }
     }
 
+    public void PressDetachOpticForDiagnostics(PlayerWeaponSlot slot)
+    {
+        switch (slot)
+        {
+            case PlayerWeaponSlot.Primary:
+                _primarySlot.PressDetachOpticForDiagnostics();
+                break;
+            case PlayerWeaponSlot.Secondary:
+                _secondarySlot.PressDetachOpticForDiagnostics();
+                break;
+            case PlayerWeaponSlot.Sidearm:
+                _sidearmSlot.PressDetachOpticForDiagnostics();
+                break;
+        }
+    }
+
     private void BindSlot(LootWeaponSlotView slotView, PlayerWeaponSlot slot)
     {
         slotView.Target = slot switch
@@ -138,6 +163,7 @@ public partial class LootWeaponRackView : Control
         };
         slotView.Dropped += (itemId, origin, target) => Dropped?.Invoke(itemId, origin, target);
         slotView.DetailsRequested += () => EmitSignal(SignalName.WeaponDetailsRequested, (int)slot);
+        slotView.OpticDetachRequested += () => OpticDetachRequested?.Invoke(slot);
     }
 
     public bool DropForDiagnostics(

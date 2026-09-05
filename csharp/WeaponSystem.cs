@@ -714,6 +714,15 @@ public static class WeaponCatalog
             || IsMagnifiedOptic(attachment.Id);
     }
 
+    /// <summary>
+    /// Returns whether an installed attachment can be removed into inventory.
+    /// Fixed-scope precision platforms keep their authored optic as part of the
+    /// weapon body, so their magnified optic selector is intentionally not a
+    /// detachable item even though it remains represented in the build data.
+    /// </summary>
+    public static bool CanDetachAttachment(WeaponPlatform platform, AttachmentSlot slot)
+        => slot != AttachmentSlot.Optic || !HasFixedIntegratedScope(platform);
+
     public static WeaponBuild NormalizeBuild(WeaponBuild source)
     {
         var normalized = source.Clone();

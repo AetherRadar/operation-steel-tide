@@ -28,11 +28,23 @@ public partial class CombatHUD
     public string LootWeaponCaptionForSlot(PlayerWeaponSlot slot)
         => IsInstanceValid(_lootWeaponRack) ? _lootWeaponRack.CaptionForSlot(slot) : string.Empty;
 
+    public bool LootWeaponOpticDetachReadyForDiagnostics(PlayerWeaponSlot slot)
+        => IsInstanceValid(_lootWeaponRack)
+        && _lootWeaponRack.CanDetachOpticForSlot(slot);
+
     public void PressLootWeaponDetailsForDiagnostics(PlayerWeaponSlot slot)
     {
         if (IsInstanceValid(_lootWeaponRack))
         {
             _lootWeaponRack.PressDetailsForDiagnostics(slot);
+        }
+    }
+
+    public void PressLootWeaponOpticDetachForDiagnostics(PlayerWeaponSlot slot)
+    {
+        if (IsInstanceValid(_lootWeaponRack))
+        {
+            _lootWeaponRack.PressDetachOpticForDiagnostics(slot);
         }
     }
 

@@ -166,6 +166,77 @@ public partial class TacticalPlayer
         return previous;
     }
 
+    /// <summary>
+    /// Removes the installed optic from a firearm and stores it as a distinct
+    /// backpack item. This is deliberately an explicit empty-slot operation;
+    /// swapping another optic still uses the existing drag/drop replacement
+    /// path. Fixed-scope platforms reject the operation because their scope is
+    /// authored as part of the weapon body.
+    /// </summary>
+    public bool TryDetachOpticToBackpack(PlayerWeaponSlot slot)
+    {
+        if (slot is not (PlayerWeaponSlot.Primary or PlayerWeaponSlot.Secondary or PlayerWeaponSlot.Sidearm))
+        {
+            return false;
+        }
+
+        var build = WeaponBuildForSlot(slot);
+        if (build is null
+            || !build.Attachments.TryGetValue(AttachmentSlot.Optic, out var opticId))
+        {
+            return false;
+        }
+
+        if (!WeaponCatalog.CanDetachAttachment(build.Platform, AttachmentSlot.Optic))
+        {
+            Hud?.ShowLocalizedMessage(
+                "part_fixed",
+                "INTEGRATED OPTIC CANNOT BE DETACHED",
+                new Color(1.0f, 0.48f, 0.28f));
+            return false;
+        }
+
+        if (Backpack.Count >= BackpackCapacity)
+        {
+            Hud?.ShowLocalizedMessage(
+                "backpack_full",
+                "BACKPACK FULL",
+                new Color(1.0f, 0.48f, 0.28f));
+            return false;
+        }
+
+        var grades = AttachmentGradesForSlot(slot);
+        var opticGrade = grades.GetValueOrDefault(AttachmentSlot.Optic, WeaponGradeForSlot(slot));
+        var detached = new LootItem
+        {
+            Kind = LootItemKind.Attachment,
+            AttachmentId = opticId,
+            Grade = opticGrade
+        };
+
+        if (!_knifeEquipped && _activeWeaponSlot == slot)
+        {
+            EquippedWeapon.Attachments.Remove(AttachmentSlot.Optic);
+            _equippedAttachmentGrades.Remove(AttachmentSlot.Optic);
+            StoreActiveFirearmState();
+            ApplyWeaponBuildVisuals();
+        }
+        else
+        {
+            build.Attachments.Remove(AttachmentSlot.Optic);
+            grades.Remove(AttachmentSlot.Optic);
+        }
+
+        Backpack.Add(detached);
+        Hud?.ShowLocalizedMessage(
+            "part_removed",
+            "WEAPON PART DETACHED",
+            new Color(0.42f, 0.9f, 0.72f));
+        Hud?.SetBackpackValuePlayer(this);
+        Hud?.SetMedicalInventory(this);
+        return true;
+    }
+
     private PlayerWeaponSlot EmptyLongGunSlot()
     {
         if (_primaryWeaponSlot is null || !HasFireablePrimary)
