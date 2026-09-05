@@ -25,7 +25,6 @@ public partial class InventoryModelPreview : SubViewportContainer
     private EquipmentItem? _helmet;
     private EquipmentItem? _bodyArmor;
     private EquipmentItem? _backpack;
-    private float _operatorMotionTime;
     private Vector3 _operatorBaseRotation;
     private SubViewport? _viewport;
     private Node3D? _modelRoot;
@@ -143,13 +142,10 @@ public partial class InventoryModelPreview : SubViewportContainer
             return;
         }
 
-        // Keep the authored paper-doll alive with a restrained look-around motion.
-        // The operator animation itself is intentionally frozen for a stable loadout
-        // shot; this adds head/body presence without affecting equipment alignment.
-        _operatorMotionTime += (float)delta;
-        var yaw = Mathf.Sin(_operatorMotionTime * 1.15f) * 0.035f;
-        var pitch = Mathf.Sin(_operatorMotionTime * 0.83f + 0.7f) * 0.012f;
-        _modelRoot!.Rotation = _operatorBaseRotation + new Vector3(pitch, yaw, 0.0f);
+        // Keep the loadout paper-doll in a neutral attention pose. The authored
+        // rest pose is held, so an animated root sway cannot make every operator
+        // look tilted in an otherwise static equipment screen.
+        _modelRoot!.Rotation = _operatorBaseRotation;
     }
 
     public override void _ExitTree()
@@ -266,7 +262,6 @@ public partial class InventoryModelPreview : SubViewportContainer
                     ? new Vector3(0, 168, 0)
                     : new Vector3(0, -9, 0);
                 _operatorBaseRotation = _modelRoot.Rotation;
-                _operatorMotionTime = 0.0f;
                 break;
         }
         RequestRender();

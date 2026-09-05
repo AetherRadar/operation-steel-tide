@@ -2132,9 +2132,10 @@ internal static partial class CombatModelLibrary
             if (asset.UsesQuaterniusRig)
             {
                 var animationPlayer = RequireAnimationPlayer(source);
-                animationPlayer.Play("idle");
-                animationPlayer.Seek(0.45, update: true);
-                animationPlayer.Pause();
+                // Inventory/deployment previews are product shots. Keep the
+                // authored rest pose so every operator stands squarely instead
+                // of freezing the weight-shifted idle animation.
+                animationPlayer.Stop();
 
                 if (weaponBuild is not null)
                 {

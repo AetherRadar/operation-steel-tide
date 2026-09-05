@@ -31,8 +31,8 @@ internal static class InventoryOperatorPreviewRecovery
                 }
 
                 // The backpack paper doll is a product shot, not a live actor.
-                // Use the authored runtime operator and freeze its idle clip
-                // before it enters the viewport.
+                // Use the authored runtime operator's neutral rest pose instead
+                // of freezing the weight-shifted idle clip in the viewport.
                 var visual = CombatModelLibrary.InstantiateOperator(
                     visualId,
                     weaponBuild: weaponBuild,
@@ -41,12 +41,6 @@ internal static class InventoryOperatorPreviewRecovery
                     bodyArmor: bodyArmor,
                     backpack: backpack);
                 visual.AnimationPlayer.Stop();
-                if (visual.AnimationPlayer.HasAnimation("idle"))
-                {
-                    visual.AnimationPlayer.Play("idle", customBlend: 0.0f, customSpeed: 1.0f, fromEnd: false);
-                    visual.AnimationPlayer.Seek(0.35, update: true);
-                    visual.AnimationPlayer.Pause();
-                }
                 // Runtime operators are authored feet-on-ground for the world.
                 // The paper doll is a centered product shot, so recenter the
                 // complete operator plus carried weapon before it enters the UI.

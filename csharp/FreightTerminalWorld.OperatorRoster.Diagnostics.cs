@@ -47,7 +47,7 @@ public partial class FreightTerminalWorld
             var animationCount = 0;
             var transitions = Array.Empty<string>();
             var rifleFits = Array.Empty<OperatorRifleFitInspection>();
-            var previewIdle = false;
+            var previewStatic = false;
             var previewWeapon = false;
             try
             {
@@ -76,8 +76,7 @@ public partial class FreightTerminalWorld
 
                 previewVisual = CombatModelLibrary.InstantiatePreviewOperator(visualId, rifle);
                 AddChild(previewVisual.Root);
-                previewIdle = CombatModelLibrary.RequireAnimationPlayer(previewVisual.Root)
-                    .AssignedAnimation == "idle";
+                previewStatic = !CombatModelLibrary.RequireAnimationPlayer(previewVisual.Root).IsPlaying();
                 previewWeapon = previewVisual.HasWeapon;
             }
             finally
@@ -110,13 +109,13 @@ public partial class FreightTerminalWorld
                 })
                 && rifleFits.Length == transitions.Length
                 && movementFits.All(valid => valid)
-                && previewIdle
+                && previewStatic
                 && previewWeapon;
             rosterModelsReady &= modelReady;
             visualReports.Add(
                 $"{role}:{visualId}:hy3d={usesHy3d}:ok={modelReady}:meshes={inspection.MeshCount}:materials={inspection.MaterialCount}:"
                 + $"vertices={inspection.VertexCount}:triangles={inspection.TriangleCount}:"
-                + $"animations={animationCount}:preview={previewIdle}/{previewWeapon}:"
+                + $"animations={animationCount}:preview_static={previewStatic}/{previewWeapon}:"
                 + $"fit={string.Join(',', movementFits)}:"
                 + $"primary={string.Join(',', rifleFits.Select(fit => fit.PrimaryHandDistance.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)))}:"
                 + $"support={string.Join(',', rifleFits.Select(fit => fit.SupportHandDistance.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)))}:"
