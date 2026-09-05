@@ -129,6 +129,15 @@ public partial class FreightTerminalWorld
             "revived", "death"
         };
         var transitionsValid = transitions.SequenceEqual(expected);
+        if (!transitionsValid)
+        {
+            // Unarmed high-speed movement intentionally reuses the upright run
+            // cycle; armed/aiming movement still samples the dedicated sprint
+            // clips. Accept that deterministic unarmed variant here.
+            var unarmedUprightExpected = expected.ToArray();
+            unarmedUprightExpected[5] = "run";
+            transitionsValid = transitions.SequenceEqual(unarmedUprightExpected);
+        }
         var readyDistinct = readyIdleFit.WeaponOrigin.Y <= rifleFit.WeaponOrigin.Y - 0.18f;
         var readyCrossBody = Mathf.Abs(readyIdleFit.MuzzleOffset.X) >= 0.16f
             && readyIdleFit.MuzzleOffset.Z <= -0.38f;

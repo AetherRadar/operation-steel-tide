@@ -117,8 +117,16 @@ internal sealed class AuthoredOperatorAnimator
         }
         else if (speed >= 4.5f)
         {
-            next = SelectWeaponPose(aiming, weaponReadied, "aim_sprint", "ready_sprint", "sprint");
-            playbackSpeed = Mathf.Clamp(speed / 5.2f, 0.78f, 1.35f);
+            // The unarmed sprint clip tucks the torso too far forward. Armed
+            // operators retain the authored sprint/aim-sprint silhouette so
+            // weapon handling remains consistent; unarmed operators accelerate
+            // the upright run cycle instead.
+            next = weaponReadied || aiming
+                ? SelectWeaponPose(aiming, weaponReadied, "aim_sprint", "ready_sprint", "sprint")
+                : "run";
+            playbackSpeed = weaponReadied || aiming
+                ? Mathf.Clamp(speed / 5.2f, 0.86f, 1.25f)
+                : Mathf.Clamp(speed / 3.6f, 0.9f, 1.3f);
         }
         else if (speed >= 2.75f)
         {
@@ -132,6 +140,7 @@ internal sealed class AuthoredOperatorAnimator
         }
         Play(next, playbackSpeed);
         AdvanceAndRefresh(delta);
+        ApplyGroundingCorrection(downed || dead);
     }
 
     private static string SelectWeaponPose(
@@ -148,6 +157,7 @@ internal sealed class AuthoredOperatorAnimator
         _hitCooldownRemaining = 0.0f;
         Play(weaponReadied ? "ready_idle" : "idle", 1.0f, immediate: true);
         _visual.RefreshWeaponPose();
+        ApplyGroundingCorrection(false);
     }
 
     public bool PlayHit()
@@ -191,5 +201,15 @@ internal sealed class AuthoredOperatorAnimator
     {
         _player.Advance(Mathf.Max(0.0f, delta));
         _visual.RefreshWeaponPose();
+    }
+
+    private void ApplyGroundingCorrection(bool downed)
+    {
+        // Downed/death clips are authored around a standing root.  Lower the
+        // visual to the actor's capsule base so the body rests on the ground
+        // instead of hovering above it.
+        _visual.Root.Position = downed
+            ? Vector3.Down * 0.46f
+            : Vector3.Zero;
     }
 }
