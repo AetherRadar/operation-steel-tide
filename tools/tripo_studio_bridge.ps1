@@ -127,6 +127,12 @@ function Invoke-Prepare {
     $stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmmss")
     $taskKey = "$stamp-$slug"
     $taskDirectory = Join-Path $taskRoot $taskKey
+    $suffix = 1
+    while (Test-Path -LiteralPath $taskDirectory) {
+        $taskKey = "$stamp-$slug-{0:D2}" -f $suffix
+        $taskDirectory = Join-Path $taskRoot $taskKey
+        $suffix++
+    }
     Ensure-Directory -Path $taskDirectory
 
     $referenceCopy = Join-Path $taskDirectory ("reference" + $extension)
