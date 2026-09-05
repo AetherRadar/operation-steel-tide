@@ -1229,6 +1229,25 @@ credit is retained as a courtesy. Jianghai Old City also reuses the unarmed
 MAGPIE, HERON, JACKAL, and VIPER variants as its four animated indoor
 residents; no additional third-party character files are introduced.
 
+## Tencent HY-3D private operator review outputs
+
+The local HY-3D operator variants are generated service outputs and are not
+currently cleared for public redistribution:
+
+- Service/source: Tencent HY-3D-3.1 and HY-3D-Rigging API responses
+- Documentation: https://cloud.tencent.com/document/product/1823/137181
+- Generation/acquisition date: 2026-09-04
+- Local review outputs: `hy3d_operators/{viper,heron,lynx,magpie,jackal}.glb`
+- Conversion: `scripts/blender/build_hy3d_operator.py`, using Tencent's
+  rigged FBX mesh and the CC0 Quaternius 25-action set
+- License/redistribution status: on 2026-09-05 the project owner reported
+  Tencent customer-support approval for use in this game. The outputs stay in
+  the user's private asset store and are ignored by Git. This local-use record
+  does not authorize public redistribution or relicensing of the raw meshes;
+  separate written redistribution terms are required before publication.
+- Credentials: never store the Tencent SecretId, token, or API key in this
+  repository, logs, or generated metadata.
+
 The Ultimate Guns Pack is distributed by Quaternius under CC0 1.0 Universal:
 
 - Official pack page: https://quaternius.com/packs/ultimategun.html

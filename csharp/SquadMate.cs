@@ -51,6 +51,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         HasFireablePrimary = false;
         _carriedWeaponRecovered = false;
         ResetRecoveredAmmo();
+        // This method is also used after the visual is already in the scene;
+        // stow the authored weapon immediately rather than waiting for the
+        // next physics animation tick to clear its two-hand IK state.
+        _authoredOperatorVisual?.SetWeaponReadied(false);
         if (IsInstanceValid(_weapon))
         {
             _weapon.Visible = false;
@@ -1162,6 +1166,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         IsDowned = true;
         ResetSustainmentForIncapacitation();
         Velocity = Vector3.Zero;
+        // Damage can arrive between this mate's physics frames.  Move the
+        // authored rifle to the back socket immediately so the downed pose
+        // never renders with the previous readied-hand attachment.
+        _authoredOperatorVisual?.SetWeaponReadied(false);
         OnCombatIncapacitated();
         if (!UsesAuthoredOperatorForDiagnostics)
         {
@@ -1242,6 +1250,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         ResetIncendiaryAvoidance();
         CommitAuthoritativeRemoteCombatState();
         Velocity = Vector3.Zero;
+        _authoredOperatorVisual?.SetWeaponReadied(false);
         CollisionLayer = 0;
         CollisionMask = 0;
         if (IsInstanceValid(_rig))

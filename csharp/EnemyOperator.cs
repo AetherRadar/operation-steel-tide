@@ -269,6 +269,10 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
     public void MarkCarriedWeaponRemoved()
     {
+        // Loot can be removed outside the actor's next physics tick.  Stow the
+        // authored weapon immediately so a cold-start/unloot transition does
+        // not keep solving invisible rifle IK against the hands.
+        _authoredOperatorVisual?.SetWeaponReadied(false);
         if (IsInstanceValid(_carriedWeaponRoot))
         {
             _carriedWeaponRoot.Visible = false;
@@ -2279,6 +2283,11 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         }
         if (UsesAuthoredOperatorForDiagnostics)
         {
+            // The normal animation loop will not run again once IsDead is set,
+            // so stow the weapon before starting the terminal clip.  Leaving
+            // the visual in its readied state also leaves the last arm IK pose
+            // attached to the death animation.
+            _authoredOperatorVisual.SetWeaponReadied(false);
             _authoredOperatorAnimator.Update(
                 0.0f,
                 0.0f,

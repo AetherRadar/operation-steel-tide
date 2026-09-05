@@ -625,7 +625,22 @@ internal sealed class AuthoredOperatorVisual
         -0.0994191f,
         -0.7585650f,
         0.0535996f);
+    private static Quaternion Hy3dReadiedWeaponRotationFor(OperatorVisualId visualId)
+        => visualId switch
+        {
+            OperatorVisualId.Heron => new Quaternion(0.9210141f, -0.1339542f, -0.3640152f, -0.0358069f),
+            OperatorVisualId.Lynx => new Quaternion(0.8804879f, -0.0810482f, -0.4655326f, -0.0380999f),
+            OperatorVisualId.Magpie => new Quaternion(0.8546273f, -0.0190107f, -0.5143517f, -0.0685067f),
+            OperatorVisualId.Jackal => new Quaternion(0.8585695f, -0.0547701f, -0.5087583f, 0.0319925f),
+            _ => new Quaternion(0.7124552f, 0.126017f, -0.6895026f, -0.0333694f)
+        };
     private readonly Skeleton3D _skeleton;
+    private readonly int _rightShoulderBone;
+    private readonly int _rightElbowBone;
+    private readonly int _rightHandBone;
+    private readonly int _leftShoulderBone;
+    private readonly int _leftElbowBone;
+    private readonly int _leftWristBone;
     private AuthoredWeaponVisual? _weapon;
     private bool _weaponReadied;
 
@@ -635,6 +650,12 @@ internal sealed class AuthoredOperatorVisual
         VisualId = visualId;
         AnimationPlayer = CombatModelLibrary.RequireAnimationPlayer(root);
         _skeleton = CombatModelLibrary.RequireSkeleton(root);
+        _rightShoulderBone = ResolveBoneIndex(_skeleton, "mixamorig:RightArm");
+        _rightElbowBone = ResolveBoneIndex(_skeleton, "mixamorig:RightForeArm");
+        _rightHandBone = ResolveBoneIndex(_skeleton, "mixamorig:RightHand");
+        _leftShoulderBone = ResolveBoneIndex(_skeleton, "mixamorig:LeftArm");
+        _leftElbowBone = ResolveBoneIndex(_skeleton, "mixamorig:LeftForeArm");
+        _leftWristBone = ResolveBoneIndex(_skeleton, "mixamorig:LeftHand");
         WeaponSocket = CreateBoneAttachment(_skeleton, "RuntimeWeaponSocket", "mixamorig:RightHand");
         BackWeaponSocket = CreateBoneAttachment(_skeleton, "RuntimeBackWeaponSocket", "mixamorig:Spine2");
         HeadSocket = CombatModelLibrary.RequireNode(root, "HeadSocket");
@@ -658,15 +679,18 @@ internal sealed class AuthoredOperatorVisual
 
     public OperatorRifleFitInspection InspectRifleFit()
     {
+        // AnimationPlayer seeks/advances do not call the gameplay animator.
+        // Refresh the Tencent socket here as well so editor captures and the
+        // deterministic roster probe inspect the same two-hand pose rendered
+        // in-game.
+        RefreshWeaponPose();
         var weapon = _weapon;
         if (weapon is null)
         {
             return default;
         }
-        var rightHandIndex = ResolveBoneIndex(_skeleton, "mixamorig:RightHand");
-        var leftHandIndex = ResolveBoneIndex(_skeleton, "mixamorig:LeftHand");
-        var rightHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(rightHandIndex);
-        var leftHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(leftHandIndex);
+        var rightHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_rightHandBone);
+        var leftHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_leftWristBone);
         var weaponOrigin = weapon.Root.GlobalPosition;
         var primaryHandOffset = weaponOrigin - rightHand.Origin;
         var primaryHandDistance = primaryHandOffset.Length();
@@ -700,6 +724,7 @@ internal sealed class AuthoredOperatorVisual
 
     public OperatorCarryInspection InspectRifleCarry()
     {
+        RefreshWeaponPose();
         var weapon = _weapon;
         if (weapon is null)
         {
@@ -811,7 +836,40 @@ internal sealed class AuthoredOperatorVisual
         ApplyWeaponSocketTransform(readied);
     }
 
-    private void ApplyWeaponSocketTransform(bool readied)
+    /// <summary>
+    /// Re-applies the HY-3D rifle socket after an animation sample.  The
+    /// imported clips use a hand roll that changes substantially between
+    /// ready/aim locomotion states, so one baked quaternion cannot keep both
+    /// hands on a rifle.  The socket is therefore solved in the actor frame
+    /// each sample and the left upper-arm chain is fitted to the foregrip.
+    /// </summary>
+    internal void RefreshWeaponPose()
+    {
+        var animation = AnimationPlayer.CurrentAnimation.ToString();
+        if (!_weaponReadied
+            || _weapon is null
+            || !GodotObject.IsInstanceValid(_weapon.Root)
+            || !CombatModelLibrary.UsesHy3dOperator(VisualId)
+            || (!string.IsNullOrEmpty(animation) && !IsTwoHandedReadyAnimation()))
+        {
+            return;
+        }
+
+#pragma warning disable CS0618
+        _skeleton.ClearBonesGlobalPoseOverride();
+        _skeleton.ForceUpdateAllBoneTransforms();
+#pragma warning restore CS0618
+        ApplyWeaponSocketTransform(readied: true, dynamicHy3d: true);
+    }
+
+    private bool IsTwoHandedReadyAnimation()
+    {
+        var animation = AnimationPlayer.CurrentAnimation.ToString();
+        return animation.StartsWith("ready_", StringComparison.Ordinal)
+            || animation.StartsWith("aim_", StringComparison.Ordinal);
+    }
+
+    private void ApplyWeaponSocketTransform(bool readied, bool dynamicHy3d = false)
     {
         if (_weapon is null)
         {
@@ -823,20 +881,275 @@ internal sealed class AuthoredOperatorVisual
             _weapon.Root.Reparent(socket, keepGlobalTransform: false);
         }
         _weapon.Root.Position = Vector3.Zero;
-        _weapon.Root.Quaternion = readied
-            ? CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId)
-                ? FemaleReadiedWeaponRotation
-                : ReadiedWeaponRotation
-            : Quaternion.Identity;
+        var isHy3d = readied && CombatModelLibrary.UsesHy3dOperator(VisualId);
+        if (dynamicHy3d && isHy3d)
+        {
+            // First put the trigger hand on a stable actor-frame target. The
+            // imported HY-3D clips have a different upper-body rest axis, so
+            // anchoring the rifle to their animated wrist leaves the weapon
+            // behind the chest and makes the support arm impossible to solve.
+            SolveHy3dRightArm();
+        }
+        else
+        {
+            _weapon.Root.Quaternion = readied
+                ? CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId)
+                    ? isHy3d
+                        ? Hy3dReadiedWeaponRotationFor(VisualId)
+                        : FemaleReadiedWeaponRotation
+                    : ReadiedWeaponRotation
+                : Quaternion.Identity;
+        }
         var socketRelativeToRoot = TransformRelativeToAncestor(socket, Root);
         var inheritedScale = Mathf.Max(0.0001f, socketRelativeToRoot.Basis.Scale.X);
-        _weapon.Root.Scale = Vector3.One * (FieldWeaponScale / inheritedScale);
+        // HY-3D's normalized bodies have a slightly shorter forearm span than
+        // the legacy Quaternius mannequin.  A 0.40 weapon scale keeps the
+        // foregrip inside the support arm's reachable arc while retaining the
+        // authored rifle silhouette and muzzle distance for both ready and aim.
+        var weaponScale = isHy3d ? 0.40f : FieldWeaponScale;
+        _weapon.Root.Scale = Vector3.One * (weaponScale / inheritedScale);
         if (readied && CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId))
         {
-            var rightHandIndex = ResolveBoneIndex(_skeleton, "mixamorig:RightHand");
-            var rightHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(rightHandIndex);
+            var rightHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_rightHandBone);
             _weapon.Root.GlobalPosition = rightHand.Origin;
         }
+        if (dynamicHy3d && isHy3d)
+        {
+            ApplyHy3dSocketBasis();
+            RetargetHy3dLeftArm(_weapon.Foregrip.GlobalPosition);
+        }
+    }
+
+    private void ApplyHy3dSocketBasis()
+    {
+        var actorBasis = Root.GlobalTransform.Basis.Orthonormalized();
+        // The M4A1 markers use the project frame (-Z down-range). Compensate
+        // the animated wrist in world space instead of applying a fixed local
+        // quaternion.  A BoneAttachment can carry a non-orthogonal FBX hand
+        // roll, so assigning the final global basis avoids leaking that roll
+        // into the muzzle elevation on aim clips.
+        // Bias the rifle a few degrees across the chest.  This is the same
+        // ergonomic cant used by the source tactical clips: it brings the
+        // foregrip into the opposite arm's natural reach without moving the
+        // trigger hand, while keeping muzzle lateral error inside the combat
+        // model envelope.
+        var carryBasis = (actorBasis * new Basis(Vector3.Up, Mathf.DegToRad(12.0f)))
+            .Orthonormalized();
+        var global = _weapon!.Root.GlobalTransform;
+        var globalScale = global.Basis.Scale;
+        global.Basis = carryBasis.Scaled(globalScale);
+        _weapon.Root.GlobalTransform = global;
+    }
+
+    private void SolveHy3dRightArm()
+    {
+        if (_rightShoulderBone < 0 || _rightElbowBone < 0 || _rightHandBone < 0)
+        {
+            return;
+        }
+
+        var actorBasis = Root.GlobalTransform.Basis.Orthonormalized();
+        var chest = BoneWorldPosition("mixamorig:Spine2");
+        // Keep the trigger hand just below and down-range of the sternum. The
+        // offset is expressed in the actor frame, so turning an operator does
+        // not change the stance. It also scales well across the five normalized
+        // HY-3D bodies (all are presented at 1.86 m).
+        var target = chest + actorBasis * new Vector3(0.02f, -0.12f, -0.11f);
+        var shoulder = BoneWorldPosition("mixamorig:RightArm");
+        var shoulderLocal = Root.GlobalTransform.AffineInverse() * shoulder;
+        var chestLocal = Root.GlobalTransform.AffineInverse() * chest;
+        float outwardSign = Mathf.Sign(shoulderLocal.X - chestLocal.X);
+        if (Mathf.IsZeroApprox(outwardSign))
+        {
+            outwardSign = 1.0f;
+        }
+        var pole = chest + actorBasis * new Vector3(1.20f * outwardSign, -0.10f, -0.25f);
+        SolveHy3dTwoBoneChain(
+            _rightShoulderBone,
+            _rightElbowBone,
+            _rightHandBone,
+            target,
+            pole);
+    }
+
+    private void SolveHy3dTwoBoneChain(
+        int shoulderBone,
+        int elbowBone,
+        int wristBone,
+        Vector3 targetGlobalPosition,
+        Vector3 poleGlobalPosition)
+    {
+        if (shoulderBone < 0 || elbowBone < 0 || wristBone < 0)
+        {
+            return;
+        }
+
+        var inverse = _skeleton.GlobalTransform.AffineInverse();
+        var target = inverse * targetGlobalPosition;
+        var pole = inverse * poleGlobalPosition;
+#pragma warning disable CS0618
+        var shoulder = _skeleton.GetBoneGlobalPoseNoOverride(shoulderBone);
+        var elbow = _skeleton.GetBoneGlobalPoseNoOverride(elbowBone);
+        var wrist = _skeleton.GetBoneGlobalPoseNoOverride(wristBone);
+        var proximal = elbow.Origin - shoulder.Origin;
+        var distal = wrist.Origin - elbow.Origin;
+        var proximalLength = proximal.Length();
+        var distalLength = distal.Length();
+        var shoulderToTarget = target - shoulder.Origin;
+        if (proximalLength <= 0.0001f
+            || distalLength <= 0.0001f
+            || shoulderToTarget.LengthSquared() <= 0.000001f)
+        {
+            return;
+        }
+
+        var direction = shoulderToTarget.Normalized();
+        var requestedDistance = shoulderToTarget.Length();
+        var allowStretch = shoulderBone == _leftShoulderBone;
+        var rawReach = proximalLength + distalLength;
+        var rawStretch = requestedDistance / Mathf.Max(0.0001f, rawReach);
+        var rawCosine = Mathf.Clamp(
+            (proximalLength * proximalLength
+                + distalLength * distalLength
+                - requestedDistance * requestedDistance)
+                / Mathf.Max(0.0001f, 2.0f * proximalLength * distalLength),
+            -1.0f,
+            1.0f);
+        var rawElbowAngle = Mathf.RadToDeg(Mathf.Acos(rawCosine));
+        // A few HY-3D bodies have a 3–7% shorter forearm span than the
+        // normalized rifle.  Let the presentation chain stretch a small,
+        // bounded amount instead of pulling the support hand off the
+        // foregrip.  The fallback target nudge below handles any pose that
+        // would require a visibly excessive stretch.
+        var useStretch = allowStretch
+            && (rawStretch > 1.0f || rawElbowAngle > 168.0f)
+            && rawStretch <= 1.12f;
+        var stretch = useStretch
+            ? Mathf.Max(1.0f, rawStretch) * 1.025f
+            : 1.0f;
+        var solvedProximalLength = proximalLength * stretch;
+        var solvedDistalLength = distalLength * stretch;
+        var solvedDistance = useStretch
+            ? requestedDistance
+            : Mathf.Clamp(
+                requestedDistance,
+                Mathf.Abs(proximalLength - distalLength) + 0.0001f,
+                proximalLength + distalLength - 0.0001f);
+        var projectedElbowDistance = (
+            solvedProximalLength * solvedProximalLength
+            - solvedDistalLength * solvedDistalLength
+            + solvedDistance * solvedDistance)
+            / (2.0f * solvedDistance);
+        var elbowHeight = Mathf.Sqrt(Mathf.Max(
+            0.0f,
+            solvedProximalLength * solvedProximalLength
+                - projectedElbowDistance * projectedElbowDistance));
+        var poleDirection = pole - shoulder.Origin;
+        poleDirection -= direction * poleDirection.Dot(direction);
+        if (poleDirection.LengthSquared() <= 0.000001f)
+        {
+            var fallbackPole = Mathf.Abs(direction.Dot(Vector3.Up)) < 0.85f
+                ? Vector3.Up
+                : Vector3.Right;
+            poleDirection = fallbackPole - direction * fallbackPole.Dot(direction);
+        }
+        poleDirection = poleDirection.Normalized();
+        var desiredElbow = shoulder.Origin
+            + direction * projectedElbowDistance
+            + poleDirection * elbowHeight;
+        var desiredWrist = shoulder.Origin + direction * solvedDistance;
+
+        var shoulderSwing = new Quaternion(
+            proximal.Normalized(),
+            (desiredElbow - shoulder.Origin).Normalized());
+        _skeleton.SetBoneGlobalPoseOverride(
+            shoulderBone,
+            new Transform3D(
+                (new Basis(shoulderSwing) * shoulder.Basis).Orthonormalized(),
+                shoulder.Origin),
+            1.0f,
+            persistent: true);
+        _skeleton.ForceUpdateBoneChildTransform(shoulderBone);
+
+        var solvedElbow = _skeleton.GetBoneGlobalPose(elbowBone);
+        var solvedWrist = _skeleton.GetBoneGlobalPose(wristBone);
+        var solvedDistal = solvedWrist.Origin - solvedElbow.Origin;
+        var desiredDistal = desiredWrist - (useStretch ? desiredElbow : solvedElbow.Origin);
+        if (solvedDistal.LengthSquared() > 0.000001f
+            && desiredDistal.LengthSquared() > 0.000001f)
+        {
+            var elbowSwing = new Quaternion(
+                solvedDistal.Normalized(),
+                desiredDistal.Normalized());
+            _skeleton.SetBoneGlobalPoseOverride(
+                elbowBone,
+                new Transform3D(
+                    (new Basis(elbowSwing) * solvedElbow.Basis).Orthonormalized(),
+                    useStretch ? desiredElbow : solvedElbow.Origin),
+                1.0f,
+                persistent: true);
+            _skeleton.ForceUpdateBoneChildTransform(elbowBone);
+        }
+
+        var finalWrist = _skeleton.GetBoneGlobalPose(wristBone);
+        _skeleton.SetBoneGlobalPoseOverride(
+            wristBone,
+            new Transform3D(
+                wrist.Basis.Orthonormalized(),
+                useStretch ? desiredWrist : finalWrist.Origin),
+            1.0f,
+            persistent: true);
+        _skeleton.ForceUpdateBoneChildTransform(wristBone);
+#pragma warning restore CS0618
+    }
+
+    private void RetargetHy3dLeftArm(Vector3 targetGlobalPosition)
+    {
+        if (_leftShoulderBone < 0 || _leftElbowBone < 0 || _leftWristBone < 0)
+        {
+            return;
+        }
+
+        var shoulder = BoneWorldPosition("mixamorig:LeftArm");
+        var elbow = BoneWorldPosition("mixamorig:LeftForeArm");
+        var wrist = BoneWorldPosition("mixamorig:LeftHand");
+        var upperLength = shoulder.DistanceTo(elbow);
+        var lowerLength = elbow.DistanceTo(wrist);
+        var targetDistance = shoulder.DistanceTo(targetGlobalPosition);
+        var maximumNaturalDistance = Mathf.Sqrt(Mathf.Max(
+            0.0f,
+            upperLength * upperLength
+                + lowerLength * lowerLength
+                - 2.0f * upperLength * lowerLength
+                    * Mathf.Cos(Mathf.DegToRad(168.0f))));
+        var targetShift = targetDistance > (upperLength + lowerLength) * 1.12f
+            ? Mathf.Clamp(
+                targetDistance - maximumNaturalDistance,
+                0.0f,
+                0.0295f)
+            : 0.0f;
+        if (targetShift > 0.0001f)
+        {
+            targetGlobalPosition += (shoulder - targetGlobalPosition).Normalized()
+                * targetShift;
+        }
+
+        var actorBasis = Root.GlobalTransform.Basis.Orthonormalized();
+        var chest = BoneWorldPosition("mixamorig:Spine2");
+        var shoulderLocal = Root.GlobalTransform.AffineInverse() * shoulder;
+        var chestLocal = Root.GlobalTransform.AffineInverse() * chest;
+        float outwardSign = Mathf.Sign(shoulderLocal.X - chestLocal.X);
+        if (Mathf.IsZeroApprox(outwardSign))
+        {
+            outwardSign = -1.0f;
+        }
+        var pole = chest + actorBasis * new Vector3(1.20f * outwardSign, -0.10f, -0.25f);
+        SolveHy3dTwoBoneChain(
+            _leftShoulderBone,
+            _leftElbowBone,
+            _leftWristBone,
+            targetGlobalPosition,
+            pole);
     }
 
     private static Transform3D TransformRelativeToAncestor(Node3D node, Node3D ancestor)

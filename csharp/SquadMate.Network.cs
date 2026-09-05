@@ -42,9 +42,18 @@ public partial class SquadMate
             return;
         }
         SetRemoteState(role, position, rotation, health, down || bodyBag);
+        var wasWeaponReadied = HasFireablePrimary && !IsDowned && !IsBodyBag;
         ReviveUsed = reviveUsed;
         IsBodyBag = bodyBag;
         HasFireablePrimary = hasWeapon;
+        var weaponReadied = hasWeapon && !down && !bodyBag;
+        if (wasWeaponReadied && !weaponReadied)
+        {
+            // A remote state packet can arrive between physics frames.  Stow
+            // immediately so a downed/unarmed authored mate never renders one
+            // frame with the previous ready-hand attachment.
+            _authoredOperatorVisual?.SetWeaponReadied(false);
+        }
         CollisionLayer = bodyBag ? 0u : 4u;
         CollisionMask = bodyBag
             ? 0u

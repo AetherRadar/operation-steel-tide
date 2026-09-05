@@ -9,9 +9,14 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private const float OperatorCarryRightElbowMinimum = 50.0f;
-    private const float OperatorCarryRightElbowMaximum = 100.0f;
-    private const float OperatorCarryLeftElbowMinimum = 95.0f;
-    private const float OperatorCarryLeftElbowMaximum = 170.0f;
+    // The Tencent bodies have authored upper-body clips with a wider elbow
+    // envelope than the legacy mannequin. These limits reject impossible
+    // bends while allowing natural sprint/aim poses.
+    private const float OperatorCarryRightElbowMaximum = 135.0f;
+    private const float OperatorCarryLeftElbowMinimum = 90.0f;
+    private const float OperatorCarryLeftElbowMaximum = 175.0f;
+    private const float OperatorCarryArmSegmentMinimum = 0.12f;
+    private const float OperatorCarryArmSegmentMaximum = 0.35f;
     private const float OperatorCarryRightWristDropMinimum = 0.10f;
     private const float OperatorCarryLeftWristDropMinimum = 0.15f;
     private const float OperatorCarryStockToShoulderMaximum = 0.42f;
@@ -25,8 +30,8 @@ public partial class FreightTerminalWorld
     private const float OperatorCarryAimSprintMuzzleVerticalMaximum = 0.22f;
     private const float OperatorCarryAimStockRearwardMinimum = 0.10f;
     private const float OperatorCarryReadyHandSeparationMinimum = 0.22f;
-    private const float OperatorCarryRightElbowForwardMinimum = 0.015f;
-    private const float OperatorCarryRightElbowOutwardMinimum = 0.030f;
+    private const float OperatorCarryRightElbowForwardMinimum = 0.0f;
+    private const float OperatorCarryRightElbowOutwardMinimum = -0.05f;
     private const float OperatorCarryRightWristForwardMinimum = 0.020f;
     private const float OperatorCarryWeaponRootForwardMinimum = 0.020f;
 
@@ -112,6 +117,7 @@ public partial class FreightTerminalWorld
                         visual.AnimationPlayer.Seek(animation.Length * phase, update: true);
                         visual.AnimationPlayer.Pause();
                         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
 
                         var inspection = visual.InspectRifleCarry();
                         var sampleValid = OperatorCarrySampleValid(inspection, animationName);
@@ -254,6 +260,14 @@ public partial class FreightTerminalWorld
             && inspection.SupportHandToForegripDistance <= OperatorCarrySupportHandDistanceMaximum
             && inspection.RightElbowForwardOfShoulder >= OperatorCarryRightElbowForwardMinimum
             && inspection.RightElbowOutwardOfShoulder >= OperatorCarryRightElbowOutwardMinimum
+            && inspection.RightShoulder.DistanceTo(inspection.RightElbow)
+                is >= OperatorCarryArmSegmentMinimum and <= OperatorCarryArmSegmentMaximum
+            && inspection.RightElbow.DistanceTo(inspection.RightWrist)
+                is >= OperatorCarryArmSegmentMinimum and <= OperatorCarryArmSegmentMaximum
+            && inspection.LeftShoulder.DistanceTo(inspection.LeftElbow)
+                is >= OperatorCarryArmSegmentMinimum and <= OperatorCarryArmSegmentMaximum
+            && inspection.LeftElbow.DistanceTo(inspection.LeftWrist)
+                is >= OperatorCarryArmSegmentMinimum and <= OperatorCarryArmSegmentMaximum
             && inspection.RightWristForwardOfChest >= OperatorCarryRightWristForwardMinimum
             && inspection.WeaponRootForwardOfChest >= OperatorCarryWeaponRootForwardMinimum
             && weaponDirectionValid;
@@ -329,6 +343,11 @@ public partial class FreightTerminalWorld
                     visual.AnimationPlayer.Play(animationName, 0.0);
                     visual.AnimationPlayer.Seek(animation.Length * 0.37f, update: true);
                     visual.AnimationPlayer.Pause();
+                    // The capture path bypasses AuthoredOperatorAnimator, so
+                    // explicitly apply the same HY-3D weapon IK used during
+                    // gameplay before taking the first frame.
+                    visual.RefreshWeaponPose();
+                    await WaitFrames(30);
                     await WaitFrames(4);
 
                     foreach (var view in views)

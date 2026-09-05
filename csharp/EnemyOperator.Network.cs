@@ -63,7 +63,17 @@ public partial class EnemyOperator
             CarriedWeapon = WeaponCatalog.Build((WeaponPlatform)state.WeaponPlatform, 0);
             RefreshShotAudio();
         }
+        var wasWeaponReadied = HasFireablePrimary && !IsDead;
         HasFireablePrimary = flags.HasFlag(ExtractionEnemyNetworkFlags.HasWeapon);
+        var weaponReadied = HasFireablePrimary
+            && !flags.HasFlag(ExtractionEnemyNetworkFlags.Dead);
+        if (wasWeaponReadied && !weaponReadied)
+        {
+            // Network proxies have physics animation disabled; clear the
+            // authored two-hand pose in the same packet that removes the
+            // weapon instead of waiting for a local animation tick.
+            _authoredOperatorVisual?.SetWeaponReadied(false);
+        }
         if (IsInstanceValid(_carriedWeaponRoot))
         {
             _carriedWeaponRoot.Visible = HasFireablePrimary

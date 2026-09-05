@@ -51,7 +51,7 @@ public partial class FreightTerminalWorld
             var previewWeapon = false;
             try
             {
-                var rifle = WeaponCatalog.Build(WeaponPlatform.AK74, 0);
+                var rifle = WeaponCatalog.Build(WeaponPlatform.M4A1, 0);
                 runtimeVisual = CombatModelLibrary.InstantiateOperator(visualId, rifle);
                 AddChild(runtimeVisual.Root);
                 var animator = new AuthoredOperatorAnimator(runtimeVisual);
@@ -94,10 +94,12 @@ public partial class FreightTerminalWorld
                         && fit.HandSeparation >= 0.22f
                         && fit.MuzzleOffset.Z <= -0.38f
                     : fit.Valid)).ToArray();
+            var usesHy3d = CombatModelLibrary.UsesHy3dOperator(visualId);
             var modelReady = inspection.Loaded
                 && inspection.RequiredNodes
-                && inspection.MeshCount >= 4
-                && inspection.MaterialCount >= 4
+                && (usesHy3d
+                    ? inspection.MeshCount >= 1 && inspection.MaterialCount >= 1
+                    : inspection.MeshCount >= 4 && inspection.MaterialCount >= 4)
                 && inspection.VertexCount >= 20_000
                 && inspection.TriangleCount is >= 40_000 and <= 105_000
                 && inspection.Size.Y > 0.5f
@@ -112,10 +114,15 @@ public partial class FreightTerminalWorld
                 && previewWeapon;
             rosterModelsReady &= modelReady;
             visualReports.Add(
-                $"{role}:{visualId}:ok={modelReady}:meshes={inspection.MeshCount}:materials={inspection.MaterialCount}:"
+                $"{role}:{visualId}:hy3d={usesHy3d}:ok={modelReady}:meshes={inspection.MeshCount}:materials={inspection.MaterialCount}:"
                 + $"vertices={inspection.VertexCount}:triangles={inspection.TriangleCount}:"
                 + $"animations={animationCount}:preview={previewIdle}/{previewWeapon}:"
-                + $"fit={string.Join(',', movementFits)}");
+                + $"fit={string.Join(',', movementFits)}:"
+                + $"primary={string.Join(',', rifleFits.Select(fit => fit.PrimaryHandDistance.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)))}:"
+                + $"support={string.Join(',', rifleFits.Select(fit => fit.SupportHandDistance.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)))}:"
+                + $"hands={string.Join(',', rifleFits.Select(fit => fit.HandSeparation.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)))}:"
+                + $"muzzle={string.Join(',', rifleFits.Select(fit => $"{fit.MuzzleOffset.X:F3}/{fit.MuzzleOffset.Y:F3}/{fit.MuzzleOffset.Z:F3}"))}:"
+                + $"stock={string.Join(',', rifleFits.Select(fit => $"{fit.StockOffset.X:F3}/{fit.StockOffset.Y:F3}/{fit.StockOffset.Z:F3}"))}");
         }
 
         var garrison = _enemies.Where(IsInstanceValid)

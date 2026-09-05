@@ -26,14 +26,22 @@ internal sealed class AuthoredOperatorAnimator
     };
 
     private readonly AnimationPlayer _player;
+    private readonly AuthoredOperatorVisual _visual;
     private string _current = string.Empty;
     private float _overrideRemaining;
     private float _hitCooldownRemaining;
 
     public AuthoredOperatorAnimator(AuthoredOperatorVisual visual)
     {
+        _visual = visual;
         _player = visual.AnimationPlayer;
         _player.ProcessMode = Node.ProcessModeEnum.Always;
+        // The owning actors select clips from their deterministic physics
+        // step.  Drive the mixer manually from that same call so the weapon
+        // solver can consume the pose sampled for this tick.  A built-in
+        // Physics callback runs after the CharacterBody3D parent (tree-order),
+        // which would leave RefreshWeaponPose one physics frame behind.
+        _player.CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual;
         foreach (var name in RequiredAnimations)
         {
             if (!_player.HasAnimation(name))
@@ -71,6 +79,7 @@ internal sealed class AuthoredOperatorAnimator
             _overrideRemaining = Mathf.Max(0.0f, _overrideRemaining - delta);
             if (_overrideRemaining > 0.0f)
             {
+                AdvanceAndRefresh(delta);
                 return;
             }
         }
@@ -122,6 +131,7 @@ internal sealed class AuthoredOperatorAnimator
             playbackSpeed = Mathf.Clamp(speed / 2.1f, 0.72f, 1.35f);
         }
         Play(next, playbackSpeed);
+        AdvanceAndRefresh(delta);
     }
 
     private static string SelectWeaponPose(
@@ -137,6 +147,7 @@ internal sealed class AuthoredOperatorAnimator
         _overrideRemaining = 0.0f;
         _hitCooldownRemaining = 0.0f;
         Play(weaponReadied ? "ready_idle" : "idle", 1.0f, immediate: true);
+        _visual.RefreshWeaponPose();
     }
 
     public bool PlayHit()
@@ -169,5 +180,16 @@ internal sealed class AuthoredOperatorAnimator
         _current = name;
         _player.SpeedScale = playbackSpeed;
         _player.Play(name, immediate ? 0.0 : 0.16);
+        // Play() queues the first key for the next mixer notification.  Apply
+        // that key now because the caller solves the weapon socket in the
+        // same physics step.  This also makes hit/revive overrides switch
+        // without displaying one frame of the previous locomotion pose.
+        _player.Advance(0.0);
+    }
+
+    private void AdvanceAndRefresh(float delta)
+    {
+        _player.Advance(Mathf.Max(0.0f, delta));
+        _visual.RefreshWeaponPose();
     }
 }
