@@ -331,7 +331,7 @@ public partial class FreightTerminalWorld
         bot.CollisionLayer = 2;
         bot.CollisionMask = 1 | BreakableGlassField.MovementCollisionLayer;
         FaceTrainingRangePlayer(bot);
-        bot.SetAuthoredCombatPoseForDiagnostics();
+        bot.PrepareTrainingRangeVisualForDiagnostics();
         bot.SetMeta("training_range_bot_mode", _trainingRangeBotType);
         if (_trainingRangeBotType == 2)
         {
@@ -344,7 +344,11 @@ public partial class FreightTerminalWorld
         else
         {
             // Static and patrol targets are driven by the deterministic range motor.
-            bot.ProcessMode = ProcessModeEnum.Disabled;
+            // Keep the CharacterBody3D in the scene's inherited process mode even
+            // when its script physics tick is disabled: Godot removes a disabled
+            // physics body from the space, so player raycasts would pass through
+            // every target and hit the ground behind it.
+            bot.ProcessMode = ProcessModeEnum.Inherit;
             bot.SetPhysicsProcess(false);
         }
         slot.Bot = bot;
@@ -404,7 +408,10 @@ public partial class FreightTerminalWorld
                         TrainingRangeRespawnDelaySeconds,
                         slot.Profile.RespawnDelaySeconds);
                     bot.Visible = true;
-                    bot.ProcessMode = ProcessModeEnum.Disabled;
+                    // Preserve the body in the physics space while it is visibly
+                    // downed; its collision layer/mask are zeroed below so shots
+                    // continue to the other lanes during the reset window.
+                    bot.ProcessMode = ProcessModeEnum.Inherit;
                     bot.SetPhysicsProcess(false);
                     bot.CollisionLayer = 0;
                     bot.CollisionMask = 0;
@@ -467,7 +474,9 @@ public partial class FreightTerminalWorld
         }
         else
         {
-            bot.ProcessMode = ProcessModeEnum.Disabled;
+            // See SpawnTrainingRangeBot: disabling the node itself unregisters the
+            // CharacterBody3D from physics.  Only the AI tick is paused here.
+            bot.ProcessMode = ProcessModeEnum.Inherit;
             bot.SetPhysicsProcess(false);
         }
         if (!_enemies.Contains(bot))
@@ -517,7 +526,10 @@ public partial class FreightTerminalWorld
         _enemiesRemaining = TrainingRangeBotCount;
         _hud.SetTrainingRangeTargetCount(_enemiesRemaining);
         enemy.Visible = true;
-        enemy.ProcessMode = ProcessModeEnum.Disabled;
+        // Keep the node registered with the scene tree while its collision layer is
+        // zeroed.  ProcessMode.Disabled unregisters the CharacterBody3D from physics
+        // and can leave the authored corpse unable to resume on the next cycle.
+        enemy.ProcessMode = ProcessModeEnum.Inherit;
         enemy.SetPhysicsProcess(false);
         enemy.CollisionLayer = 0;
         enemy.CollisionMask = 0;

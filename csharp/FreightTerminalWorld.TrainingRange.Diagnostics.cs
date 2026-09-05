@@ -70,6 +70,59 @@ public partial class FreightTerminalWorld
             && _player.ReserveAmmo >= 9999
             && _player.CurrentAmmoGrade == _player.TrainingRangeAmmoGrade;
 
+        // Exercise the same first-person ray and damage path used by a real click.
+        // The old check called TakeDamage directly, which could pass while a target
+        // was not actually hittable from the player's camera.  Park the player on
+        // the first lane, face down-range, and fire a few deterministic shots.
+        var fireTarget = _trainingRangeBotSlots.Count > 0
+            ? _trainingRangeBotSlots[0].Bot
+            : null;
+        var liveFireTargetId = fireTarget?.GetInstanceId() ?? 0UL;
+        var liveFireHealthBefore = fireTarget?.CurrentHealth ?? 0.0f;
+        var liveFireShot = false;
+        var liveFireProbeCollider = "none";
+        var liveFireProbeDistance = -1.0f;
+        var liveFireProbePosition = Vector3.Zero;
+        var liveFireCameraPosition = Vector3.Zero;
+        var liveFireCameraForward = Vector3.Zero;
+        if (fireTarget is not null && !fireTarget.IsDead)
+        {
+            _player.GlobalPosition = fireTarget.GlobalPosition + new Vector3(0.0f, 0.0f, 8.0f);
+            _player.Rotation = Vector3.Zero;
+            await WaitFrames(4);
+            var probeCamera = _player.GetNodeOrNull<Camera3D>("Head/CombatCamera");
+            if (probeCamera is not null)
+            {
+                var probeFrom = probeCamera.GlobalPosition;
+                var probeTo = probeFrom - probeCamera.GlobalBasis.Z * 100.0f;
+                liveFireCameraPosition = probeFrom;
+                liveFireCameraForward = -probeCamera.GlobalBasis.Z;
+                if (PhysicsRaycast.TryHit(
+                    GetWorld3D(),
+                    probeFrom,
+                    probeTo,
+                    _player.GetRid(),
+                    uint.MaxValue,
+                    out var probeHit))
+                {
+                    liveFireProbeCollider = probeHit.Collider?.GetType().Name ?? "null";
+                    liveFireProbeDistance = probeFrom.DistanceTo(probeHit.Position);
+                    liveFireProbePosition = probeHit.Position;
+                }
+            }
+            for (var shot = 0; shot < 6 && !fireTarget.IsDead; shot++)
+            {
+                liveFireShot |= _player.FireForDiagnostics();
+                await WaitFrames(2);
+            }
+        }
+        var liveFireHit = fireTarget is not null
+            && fireTarget.CurrentHealth < liveFireHealthBefore;
+        var liveFireDowned = fireTarget is not null
+            && fireTarget.IsDead
+            && _trainingRangeBotSlots.Count > 0
+            && _trainingRangeBotSlots[0].IsDowned;
+
         var stationsReady = arena is not null
             && arena.Stations.Count == 3
             && arena.IsStationInRange(arena.Stations[0].Position, TrainingRangeStationKind.Weapon)
@@ -104,6 +157,38 @@ public partial class FreightTerminalWorld
             && TrainingRangeBotCount == 12
             && TrainingRangeKills == 1;
 
+        // Prove the loop is repeatable: shoot the same target after its first reset,
+        // observe another visible downed state, then wait for the second stand-up.
+        var repeatFireShot = false;
+        var repeatFireHit = false;
+        var repeatFireDowned = false;
+        var repeatRevived = false;
+        var repeatReviveFrames = 0;
+        if (revivedTarget is not null && !revivedTarget.IsDead)
+        {
+            _player.GlobalPosition = revivedTarget.GlobalPosition + new Vector3(0.0f, 0.0f, 8.0f);
+            _player.Rotation = Vector3.Zero;
+            await WaitFrames(4);
+            var repeatHealthBefore = revivedTarget.CurrentHealth;
+            for (var shot = 0; shot < 6 && !revivedTarget.IsDead; shot++)
+            {
+                repeatFireShot |= _player.FireForDiagnostics();
+                await WaitFrames(2);
+            }
+            repeatFireHit = revivedTarget.CurrentHealth < repeatHealthBefore;
+            repeatFireDowned = revivedTarget.IsDead
+                && _trainingRangeBotSlots.Count > 0
+                && _trainingRangeBotSlots[0].IsDowned;
+            while (repeatReviveFrames < 720 && revivedTarget.IsDead)
+            {
+                await WaitFrames(1);
+                repeatReviveFrames++;
+            }
+            repeatRevived = !revivedTarget.IsDead
+                && TrainingRangeBotCount == 12
+                && TrainingRangeKills == 2;
+        }
+
         // Open and close the same panel through a station context.  This is the
         // interaction contract used by F in the actual arena, without synthesizing a
         // keyboard event in a headless validator.
@@ -128,11 +213,18 @@ public partial class FreightTerminalWorld
             && stationsReady
             && infiniteAmmo
             && weaponCycle
+            && liveFireShot
+            && liveFireHit
+            && liveFireDowned
             && downed
             && respawned
+            && repeatFireShot
+            && repeatFireHit
+            && repeatFireDowned
+            && repeatRevived
             && stationPanel
             && stationResume;
-        GD.Print($"TRAINING_RANGE_CHECK valid={valid} setup={setupReady} arena={arenaReady} selection={selectionReady} started={started} stations={stationsReady} infinite_ammo={infiniteAmmo} weapon_cycle={weaponCycle} target_hit={targetHit} downed={downed} respawned={respawned} revive_frames={reviveFrames} station_panel={stationPanel} station_resume={stationResume} target_id={targetId} bots={TrainingRangeBotCount} kills={TrainingRangeKills}");
+        GD.Print($"TRAINING_RANGE_CHECK valid={valid} setup={setupReady} arena={arenaReady} selection={selectionReady} started={started} stations={stationsReady} infinite_ammo={infiniteAmmo} weapon_cycle={weaponCycle} live_fire_shot={liveFireShot} live_fire_hit={liveFireHit} live_fire_downed={liveFireDowned} live_fire_target_id={liveFireTargetId} live_fire_probe={liveFireProbeCollider} live_fire_probe_distance={liveFireProbeDistance:0.00} live_fire_probe_position={liveFireProbePosition} live_fire_camera={liveFireCameraPosition} live_fire_forward={liveFireCameraForward} fire_target_position={fireTarget?.GlobalPosition ?? Vector3.Zero} target_hit={targetHit} downed={downed} respawned={respawned} revive_frames={reviveFrames} repeat_fire_shot={repeatFireShot} repeat_fire_hit={repeatFireHit} repeat_fire_downed={repeatFireDowned} repeat_revived={repeatRevived} repeat_revive_frames={repeatReviveFrames} station_panel={stationPanel} station_resume={stationResume} target_id={targetId} bots={TrainingRangeBotCount} kills={TrainingRangeKills}");
         GD.Print($"TRAINING_RANGE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
