@@ -29,12 +29,14 @@ public partial class LootItemIconControl : Control
     private LootItemKind _kind;
     private EquipmentSlot? _slot;
     private Color _accent;
+    private string _generatedIconKey = string.Empty;
 
-    public void Configure(LootItemKind kind, EquipmentSlot? slot, Color accent)
+    public void Configure(LootItemKind kind, EquipmentSlot? slot, Color accent, string generatedIconKey = "")
     {
         _kind = kind;
         _slot = slot;
         _accent = accent;
+        _generatedIconKey = generatedIconKey;
         QueueRedraw();
     }
 
@@ -46,6 +48,10 @@ public partial class LootItemIconControl : Control
 
     public override void _Draw()
     {
+        if (TryDrawGeneratedIcon())
+        {
+            return;
+        }
         var center = Size * 0.5f;
         var muted = _accent.Darkened(0.42f);
         switch (_kind)
@@ -107,6 +113,30 @@ public partial class LootItemIconControl : Control
                 DrawRect(new Rect2(center.X - 8, center.Y - 8, 16, 4), _accent);
                 break;
         }
+    }
+
+    private bool TryDrawGeneratedIcon()
+    {
+        if (string.IsNullOrWhiteSpace(_generatedIconKey) || Size.X < 2.0f || Size.Y < 2.0f)
+        {
+            return false;
+        }
+
+        if (!GeneratedInventoryArt.TryGetTextureRegion(_generatedIconKey, out var texture, out var source)
+            || texture is null
+            || source.Size.X <= 0.0f
+            || source.Size.Y <= 0.0f)
+        {
+            return false;
+        }
+
+        const float margin = 3.0f;
+        var available = new Vector2(Mathf.Max(1.0f, Size.X - margin * 2.0f), Mathf.Max(1.0f, Size.Y - margin * 2.0f));
+        var scale = Mathf.Min(available.X / source.Size.X, available.Y / source.Size.Y);
+        var drawSize = source.Size * scale;
+        var target = new Rect2((Size - drawSize) * 0.5f, drawSize);
+        DrawTextureRectRegion(texture, target, source, Colors.White, false);
+        return true;
     }
 }
 
@@ -171,7 +201,8 @@ public partial class LootDragCard : PanelContainer
         EquipmentItem? equipment = null,
         string detailAction = "DETAILS",
         bool compact = false,
-        IReadOnlyList<LootStatComparison>? comparisons = null)
+        IReadOnlyList<LootStatComparison>? comparisons = null,
+        string generatedIconKey = "")
     {
         ItemId = itemId;
         Origin = origin;
@@ -208,17 +239,17 @@ public partial class LootDragCard : PanelContainer
 
         if (compact)
         {
-            BuildCompactCard(title, detail, accent, itemKind, itemSlot, weapon, detailAction, comparisons);
+            BuildCompactCard(title, detail, accent, itemKind, itemSlot, weapon, detailAction, comparisons, generatedIconKey);
             return;
         }
         if (weapon is not null)
         {
-            BuildWeaponCard(title, detail, accent, weapon, detailAction, comparisons);
+            BuildWeaponCard(title, detail, accent, weapon, detailAction, comparisons, generatedIconKey);
             return;
         }
         if (equipment is not null)
         {
-            BuildEquipmentCard(title, detail, accent, equipment, comparisons);
+            BuildEquipmentCard(title, detail, accent, equipment, comparisons, generatedIconKey);
             return;
         }
 
@@ -229,7 +260,7 @@ public partial class LootDragCard : PanelContainer
         };
         AddChild(row);
         var icon = new LootItemIconControl { CustomMinimumSize = new Vector2(48, 52) };
-        icon.Configure(itemKind, itemSlot, accent);
+        icon.Configure(itemKind, itemSlot, accent, generatedIconKey);
         row.AddChild(icon);
         var text = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         row.AddChild(text);
@@ -263,7 +294,8 @@ public partial class LootDragCard : PanelContainer
         EquipmentSlot? itemSlot,
         WeaponBuild? weapon,
         string detailAction,
-        IReadOnlyList<LootStatComparison>? comparisons)
+        IReadOnlyList<LootStatComparison>? comparisons,
+        string generatedIconKey)
     {
         var row = new HBoxContainer
         {
@@ -275,7 +307,7 @@ public partial class LootDragCard : PanelContainer
         AddChild(row);
 
         var icon = new LootItemIconControl { CustomMinimumSize = new Vector2(40, 44) };
-        icon.Configure(itemKind, itemSlot, accent);
+        icon.Configure(itemKind, itemSlot, accent, generatedIconKey);
         row.AddChild(icon);
 
         var text = new VBoxContainer
@@ -345,7 +377,8 @@ public partial class LootDragCard : PanelContainer
         Color accent,
         WeaponBuild weapon,
         string detailAction,
-        IReadOnlyList<LootStatComparison>? comparisons)
+        IReadOnlyList<LootStatComparison>? comparisons,
+        string generatedIconKey)
     {
         var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         box.AddThemeConstantOverride("separation", 3);
@@ -373,10 +406,23 @@ public partial class LootDragCard : PanelContainer
         details.AddThemeColorOverride("font_color", accent);
         details.Pressed += () => DetailsRequested?.Invoke(weapon.Clone());
         header.AddChild(details);
-        var preview = new InventoryModelPreview { CustomMinimumSize = new Vector2(220, 48), SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        var preview = new InventoryModelPreview
+        {
+            CustomMinimumSize = new Vector2(220, 48),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            Modulate = new Color(1, 1, 1, 0)
+        };
         ModelPreviewForDiagnostics = preview;
         preview.Configure(InventoryPreviewKind.Rifle, weapon: weapon);
         box.AddChild(preview);
+        var generatedIcon = new LootItemIconControl
+        {
+            CustomMinimumSize = new Vector2(220, 72),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        generatedIcon.Configure(LootItemKind.Weapon, null, accent, generatedIconKey);
+        box.AddChild(generatedIcon);
         var detailLabel = new Label
         {
             Text = detail,
@@ -395,14 +441,16 @@ public partial class LootDragCard : PanelContainer
         string detail,
         Color accent,
         EquipmentItem equipment,
-        IReadOnlyList<LootStatComparison>? comparisons)
+        IReadOnlyList<LootStatComparison>? comparisons,
+        string generatedIconKey)
     {
         var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Pass, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         AddChild(row);
         var preview = new InventoryModelPreview
         {
             CustomMinimumSize = new Vector2(86, 78),
-            SizeFlagsVertical = SizeFlags.ExpandFill
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+            Modulate = new Color(1, 1, 1, 0)
         };
         ModelPreviewForDiagnostics = preview;
         preview.Configure(equipment.Definition.Slot switch
@@ -411,7 +459,23 @@ public partial class LootDragCard : PanelContainer
             EquipmentSlot.BodyArmor => InventoryPreviewKind.BodyArmor,
             _ => InventoryPreviewKind.Backpack
         }, equipment);
-        row.AddChild(preview);
+        var visual = new Control
+        {
+            CustomMinimumSize = new Vector2(86, 78),
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        preview.Position = Vector2.Zero;
+        preview.Size = new Vector2(86, 78);
+        visual.AddChild(preview);
+        var generatedIcon = new LootItemIconControl
+        {
+            Position = Vector2.Zero,
+            Size = new Vector2(86, 78),
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        generatedIcon.Configure(LootItemKind.Equipment, equipment.Definition.Slot, accent, generatedIconKey);
+        visual.AddChild(generatedIcon);
+        row.AddChild(visual);
         var text = new VBoxContainer
         {
             MouseFilter = MouseFilterEnum.Ignore,

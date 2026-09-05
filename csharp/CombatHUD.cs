@@ -137,6 +137,7 @@ public partial class CombatHUD : CanvasLayer
     private Label _weaponDetailPartsCaption = null!;
     private GridContainer _weaponDetailParts = null!;
     private InventoryModelPreview _weaponDetailPreview = null!;
+    private LootItemIconControl _weaponDetailGeneratedIcon = null!;
     private WeaponBuild? _detailedWeapon;
     private IReadOnlyList<LootItem>? _shownLoot;
     private TacticalPlayer? _shownPlayer;
@@ -830,7 +831,8 @@ public partial class CombatHUD : CanvasLayer
         preview = new InventoryModelPreview
         {
             CustomMinimumSize = new Vector2(62, 62),
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+            Modulate = new Color(1, 1, 1, 0)
         };
         preview.Configure(target switch
         {
@@ -838,7 +840,37 @@ public partial class CombatHUD : CanvasLayer
             LootDropTarget.BodyArmor => InventoryPreviewKind.BodyArmor,
             _ => InventoryPreviewKind.Backpack
         });
-        row.AddChild(preview);
+        var visual = new Control
+        {
+            CustomMinimumSize = new Vector2(62, 62),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
+        preview.Position = Vector2.Zero;
+        preview.Size = new Vector2(62, 62);
+        visual.AddChild(preview);
+        var generatedIcon = new LootItemIconControl
+        {
+            Position = Vector2.Zero,
+            Size = new Vector2(62, 62),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
+        generatedIcon.Configure(
+            LootItemKind.Equipment,
+            target switch
+            {
+                LootDropTarget.Helmet => EquipmentSlot.Helmet,
+                LootDropTarget.BodyArmor => EquipmentSlot.BodyArmor,
+                _ => EquipmentSlot.Backpack
+            },
+            accent,
+            target switch
+            {
+                LootDropTarget.Helmet => "helmet",
+                LootDropTarget.BodyArmor => "heavy_armor",
+                _ => "expedition_pack"
+            });
+        visual.AddChild(generatedIcon);
+        row.AddChild(visual);
         content = Label("", 11, new Color(0.78f, 0.86f, 0.83f));
         content.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         content.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
@@ -893,10 +925,19 @@ public partial class CombatHUD : CanvasLayer
         _weaponDetailPreview = new InventoryModelPreview
         {
             Position = new Vector2(20, 18),
-            Size = new Vector2(756, 112)
+            Size = new Vector2(756, 112),
+            Modulate = new Color(1, 1, 1, 0)
         };
         _weaponDetailPreview.Configure(InventoryPreviewKind.Rifle, weapon: WeaponCatalog.StarterWeapon());
         previewBand.AddChild(_weaponDetailPreview);
+        _weaponDetailGeneratedIcon = new LootItemIconControl
+        {
+            Position = new Vector2(20, 18),
+            Size = new Vector2(756, 112),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
+        _weaponDetailGeneratedIcon.Configure(LootItemKind.Weapon, null, new Color(0.38f, 0.82f, 0.7f), "ak47");
+        previewBand.AddChild(_weaponDetailGeneratedIcon);
 
         _weaponDetailStatsCaption = PositionedLabel("FINAL WEAPON STATS", 12, new Color(0.38f, 0.82f, 0.7f), 32, 242);
         _weaponDetailStatsCaption.Size = new Vector2(796, 20);
@@ -943,6 +984,7 @@ public partial class CombatHUD : CanvasLayer
         _weaponDetailStatsCaption.Text = Text("final_stats", "FINAL WEAPON STATS");
         _weaponDetailPartsCaption.Text = Text("fitted_parts", "FITTED COMPONENTS");
         _weaponDetailPreview.Configure(InventoryPreviewKind.Rifle, weapon: weapon);
+        _weaponDetailGeneratedIcon.Configure(LootItemKind.Weapon, null, new Color(0.38f, 0.82f, 0.7f), "ak47");
         _weaponDetailStats.Text = GameLocalization.IsChinese(_language)
             ? $"伤害 {stats.Damage:0}     有效射程 {stats.EffectiveRange:0}m     后坐 {stats.Recoil:0.00}     操控 {stats.Handling:0.00}\n射速 {60.0f / stats.FireInterval:0} 发/分     弹匣 {stats.MagazineSize}     枪声半径 {stats.SoundRadius:0}m"
             : $"DAMAGE {stats.Damage:0}     RANGE {stats.EffectiveRange:0}m     RECOIL {stats.Recoil:0.00}     HANDLING {stats.Handling:0.00}\nRATE {60.0f / stats.FireInterval:0} RPM     MAGAZINE {stats.MagazineSize}     REPORT RADIUS {stats.SoundRadius:0}m";
@@ -1199,11 +1241,67 @@ public partial class CombatHUD : CanvasLayer
             item.Equipment,
             Text("details", "DETAILS"),
             compact,
-            BuildLootComparisons(item));
+            BuildLootComparisons(item),
+            GeneratedLootIconKey(item));
         card.DetailsRequested += ShowWeaponDetails;
         card.Activated += (_, cardOrigin) => HandleLootCardActivated(item, cardOrigin, card);
         card.QuickActivated += quickCard => HandleLootCardQuickActivated(item, quickCard);
         return card;
+    }
+
+    private static string GeneratedLootIconKey(LootItem item)
+    {
+        return item.Kind switch
+        {
+            LootItemKind.Weapon => "ak47",
+            LootItemKind.KnifeSkin => "arctic_knife",
+            LootItemKind.Ammunition => "ammo_762",
+            LootItemKind.ArmorPlate => "armor_plate",
+            LootItemKind.Medical => item.MedicalKind switch
+            {
+                MedicalItemKind.Adrenaline => "adrenaline",
+                MedicalItemKind.FieldMedkit => "trauma_kit",
+                _ => "bandage"
+            },
+            LootItemKind.Valuable => item.ValuableKind switch
+            {
+                ValuableItemKind.AntiqueClock => "clock",
+                ValuableItemKind.GraphicsCard => "gpu",
+                _ => string.Empty
+            },
+            LootItemKind.Equipment when item.Equipment is not null => item.Equipment.Definition.Slot switch
+            {
+                EquipmentSlot.Helmet => "helmet",
+                EquipmentSlot.BodyArmor when item.Equipment.DefinitionId.Contains("patrol", StringComparison.OrdinalIgnoreCase) => "patrol_vest",
+                EquipmentSlot.BodyArmor => "heavy_armor",
+                _ => "expedition_pack"
+            },
+            LootItemKind.Attachment => AttachmentIconKey(item.AttachmentId),
+            _ => string.Empty
+        };
+    }
+
+    private static string AttachmentIconKey(string attachmentId)
+    {
+        if (attachmentId.Contains("optic", StringComparison.OrdinalIgnoreCase)
+            || attachmentId.Contains("scope", StringComparison.OrdinalIgnoreCase))
+        {
+            return "optic";
+        }
+        if (attachmentId.Contains("muzzle", StringComparison.OrdinalIgnoreCase)
+            || attachmentId.Contains("suppress", StringComparison.OrdinalIgnoreCase))
+        {
+            return "suppressor";
+        }
+        if (attachmentId.Contains("grip", StringComparison.OrdinalIgnoreCase))
+        {
+            return "foregrip";
+        }
+        if (attachmentId.Contains("mag", StringComparison.OrdinalIgnoreCase))
+        {
+            return "magazine";
+        }
+        return string.Empty;
     }
 
     private void HandleLootDrop(string itemId, LootDragOrigin origin, LootDropTarget target)

@@ -10,6 +10,9 @@ public partial class CombatHUD
     public bool LootPaperDollReady
         => IsInstanceValid(_lootOperatorPreview) && _lootOperatorPreview.Visible;
 
+    public bool GeneratedLootArtReadyForDiagnostics
+        => GeneratedInventoryArt.AllRequiredTexturesReadyForDiagnostics();
+
     public bool LootWeaponRackReady
         => IsInstanceValid(_lootWeaponRack)
         && _lootWeaponRack.UiReady
@@ -110,7 +113,8 @@ public partial class CombatHUD
         {
             Position = new Vector2(1388, 150),
             Size = new Vector2(220, 344),
-            MouseFilter = Control.MouseFilterEnum.Ignore
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            ClipContents = true
         };
         var frameStyle = new StyleBoxFlat
         {
@@ -126,10 +130,22 @@ public partial class CombatHUD
         {
             Position = new Vector2(4, 4),
             Size = new Vector2(212, 336),
-            MouseFilter = Control.MouseFilterEnum.Ignore
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Modulate = new Color(1, 1, 1, 0)
         };
         _lootOperatorPreview.Configure(InventoryPreviewKind.Operator);
         frame.AddChild(_lootOperatorPreview);
+
+        var generatedOperator = new TextureRect
+        {
+            Texture = GeneratedInventoryArt.Load(GeneratedInventoryArt.OperatorPath),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
+        generatedOperator.Position = new Vector2(-40, 4);
+        generatedOperator.Size = new Vector2(300, 300);
+        frame.AddChild(generatedOperator);
 
         var footer = new ColorRect
         {

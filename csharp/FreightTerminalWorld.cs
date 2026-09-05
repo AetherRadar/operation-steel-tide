@@ -4218,6 +4218,7 @@ public partial class FreightTerminalWorld : Node3D
         }
         await WaitFrames(4);
         var paperDollVisible = _hud.LootPaperDollReady;
+        var generatedLootArtReady = _hud.GeneratedLootArtReadyForDiagnostics;
         var backpackSlotSeparated = _hud.LootBackpackSlotSeparated;
         await ToSignal(GetTree().CreateTimer(0.2f), SceneTreeTimer.SignalName.Timeout);
         var previewCount = _hud.LootSourceModelPreviewCountForDiagnostics;
@@ -4272,12 +4273,13 @@ public partial class FreightTerminalWorld : Node3D
             && reopenedEmpty
             && !target.CarriedWeaponVisible
             && paperDollVisible
+            && generatedLootArtReady
             && backpackSlotSeparated
             && previewsFrozenBeforeResize
             && previewResizeRefreshTriggered
             && previewResizeStable
             && diagnosticResetClearedBackpack;
-        GD.Print($"CORPSE_LOOT_CHECK valid={valid} dead_before_reset={targetDeadBeforeReset} target_matched={targetMatched} body_bag_closed={bodyBagClosedVisualReady} body_bag_open={bodyBagOpenVisualReady} body_bag_flap_parts={bodyBagFlapParts} backpack_alive_hidden={backpackHiddenWhileAlive} backpack_closed={closedBackpackReady} search_concealed={contentsConcealedDuringSearch} first_open_ms={firstOpenMilliseconds} open={opened} backpack_open={openedBackpackReady} reset_cleared={diagnosticResetClearedBackpack} open_requests={backpackOpenRequests} open_blocked_dead={backpackOpenBlockedDead} open_blocked_visual={backpackOpenBlockedVisual} flap={backpackFlapRotation:0.000} reopened_empty={reopenedEmpty} weapon_visible={target.CarriedWeaponVisible} equipment={equipmentCount} items={target.Loot.Count} paper_doll={paperDollVisible} backpack_isolated={backpackSlotSeparated} preview_count={previewCount} preview_frozen={previewsFrozenBeforeResize} preview_resized={resizedPreviewCount} preview_refresh={previewResizeRefreshTriggered} preview_stable={previewResizeStable} equipped={_player.EquippedWeapon.Platform}");
+        GD.Print($"CORPSE_LOOT_CHECK valid={valid} dead_before_reset={targetDeadBeforeReset} target_matched={targetMatched} body_bag_closed={bodyBagClosedVisualReady} body_bag_open={bodyBagOpenVisualReady} body_bag_flap_parts={bodyBagFlapParts} backpack_alive_hidden={backpackHiddenWhileAlive} backpack_closed={closedBackpackReady} search_concealed={contentsConcealedDuringSearch} first_open_ms={firstOpenMilliseconds} open={opened} backpack_open={openedBackpackReady} reset_cleared={diagnosticResetClearedBackpack} open_requests={backpackOpenRequests} open_blocked_dead={backpackOpenBlockedDead} open_blocked_visual={backpackOpenBlockedVisual} flap={backpackFlapRotation:0.000} reopened_empty={reopenedEmpty} weapon_visible={target.CarriedWeaponVisible} equipment={equipmentCount} items={target.Loot.Count} paper_doll={paperDollVisible} generated_art={generatedLootArtReady} backpack_isolated={backpackSlotSeparated} preview_count={previewCount} preview_frozen={previewsFrozenBeforeResize} preview_resized={resizedPreviewCount} preview_refresh={previewResizeRefreshTriggered} preview_stable={previewResizeStable} equipped={_player.EquippedWeapon.Platform}");
         GD.Print($"CORPSE_LOOT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -6109,6 +6111,7 @@ public partial class FreightTerminalWorld : Node3D
         var tabUp = new InputEventKey { Pressed = false, PhysicalKeycode = Key.Tab };
         Input.ParseInputEvent(tabUp);
         var paperDollVisible = _hud.LootPaperDollReady;
+        var generatedLootArtReady = _hud.GeneratedLootArtReadyForDiagnostics;
         var backpackSlotSeparated = _hud.LootBackpackSlotSeparated;
         var expanded = _hud.LootBackpackPanelExpanded;
         var contentFits = _hud.LootBackpackContentFits;
@@ -6130,7 +6133,7 @@ public partial class FreightTerminalWorld : Node3D
             && _hud.LootActionMenuVisible
             && !_hud.LootActionMenuCanEquip
             && _hud.LootActionMenuItemId == menuCandidate!.Id;
-        var valid = opened && weaponsInBackpack == 0 && paperDollVisible && backpackSlotSeparated
+        var valid = opened && weaponsInBackpack == 0 && paperDollVisible && generatedLootArtReady && backpackSlotSeparated
             && expanded && contentFits && groundDropReady && groundDropInvisible && atCapacity
             && dropOnlyMenu
             && comparisonCards == comparableItems
@@ -6142,7 +6145,7 @@ public partial class FreightTerminalWorld : Node3D
             && helmetGradeRoundTrip
             && armorGradeRoundTrip
             && packGradeRoundTrip;
-        GD.Print($"BACKPACK_TAB_CHECK valid={valid} opened={opened} backpack_items={_player.Backpack.Count} capacity={_player.BackpackCapacity} full={atCapacity} weapons={weaponsInBackpack} unarmed={!_player.HasFireablePrimary} paper_doll={paperDollVisible} backpack_isolated={backpackSlotSeparated} expanded={expanded} content_fits={contentFits} ground_drop={groundDropReady} drop_invisible={groundDropInvisible} action_menu={itemMenuActivated}/{dropOnlyMenu} comparisons={comparisonCards}/{comparableItems} directions={comparisonDirections} rendered_all={renderedComparisonsComplete} grade_colors={gradeColorsStable} equipped_grade_styles={equippedGradeStylesStable} empty_primary_grade_hidden={emptyPrimaryGradeHidden} helmet_grade={helmetGradeRoundTrip} armor_grade={armorGradeRoundTrip} pack_grade={packGradeRoundTrip}");
+        GD.Print($"BACKPACK_TAB_CHECK valid={valid} opened={opened} backpack_items={_player.Backpack.Count} capacity={_player.BackpackCapacity} full={atCapacity} weapons={weaponsInBackpack} unarmed={!_player.HasFireablePrimary} paper_doll={paperDollVisible} generated_art={generatedLootArtReady} backpack_isolated={backpackSlotSeparated} expanded={expanded} content_fits={contentFits} ground_drop={groundDropReady} drop_invisible={groundDropInvisible} action_menu={itemMenuActivated}/{dropOnlyMenu} comparisons={comparisonCards}/{comparableItems} directions={comparisonDirections} rendered_all={renderedComparisonsComplete} grade_colors={gradeColorsStable} equipped_grade_styles={equippedGradeStylesStable} empty_primary_grade_hidden={emptyPrimaryGradeHidden} helmet_grade={helmetGradeRoundTrip} armor_grade={armorGradeRoundTrip} pack_grade={packGradeRoundTrip}");
         GD.Print($"BACKPACK_TAB_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
