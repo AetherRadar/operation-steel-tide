@@ -121,7 +121,7 @@ public partial class FreightTerminalWorld : Node3D
     private DirectionalLight3D _sunLight = null!;
     private DirectionalLight3D _fillLight = null!;
     private bool _nvgActive;
-    private string _missionPhase = "DEPLOYMENT";
+    private string _missionPhase = MissionPhaseNames.Deployment;
     private string _currentObjective = "DISABLE THE COMMUNICATIONS RELAY";
     private float _missionDetectionRange = 34.0f;
     private DeploymentThreatLevel _deploymentThreatLevel = DeploymentThreatLevel.Standard;
@@ -290,7 +290,7 @@ public partial class FreightTerminalWorld : Node3D
         if (IsInstanceValid(_extractionMarker))
         {
             _extractionMarker.RotateY((float)delta * 0.35f);
-            var baseScale = _missionPhase == "EXTRACTION" ? 1.12f : 0.94f;
+            var baseScale = _missionPhase == MissionPhaseNames.Extraction ? 1.12f : 0.94f;
             if (IsExtractionCountdownActive)
             {
                 baseScale = 1.24f;
@@ -411,7 +411,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
-        var enteredCombat = _missionPhase != "COMBAT" && phase == "COMBAT";
+        var enteredCombat = _missionPhase != MissionPhaseNames.Combat && phase == MissionPhaseNames.Combat;
         _missionPhase = phase;
         _missionRemaining = remaining;
         _missionOnline = online;
@@ -507,7 +507,7 @@ public partial class FreightTerminalWorld : Node3D
             return;
         }
         _missionDirector.ReportGunshot(origin, radius);
-        if (_missionPhase is "CONTACT" or "COMBAT" && !_reinforcementsDeployed)
+        if (MissionPhaseNames.IsHostilePhase(_missionPhase) && !_reinforcementsDeployed)
         {
             _threatLevel = Mathf.Min(_reinforcementThreshold, _threatLevel + 3.0f);
         }
@@ -2717,7 +2717,7 @@ public partial class FreightTerminalWorld : Node3D
 
     private void UpdateObjectiveInteraction(float delta)
     {
-        if (_missionEnded || _missionPhase == "DEPLOYMENT" || _objectiveStage >= _objectiveTerminals.Count)
+        if (_missionEnded || _missionPhase == MissionPhaseNames.Deployment || _objectiveStage >= _objectiveTerminals.Count)
         {
             _interactionProgress = 0.0f;
             _hud.SetInteraction(string.Empty, 0.0f, false);
@@ -2802,12 +2802,12 @@ public partial class FreightTerminalWorld : Node3D
         // Threat cools while the squad stays quiet, so stealth keeps the QRF asleep.
         if (!_reinforcementPending
             && !_reinforcementsDeployed
-            && _missionPhase is "INFILTRATION" or "CONTACT"
+            && (_missionPhase == MissionPhaseNames.Infiltration || _missionPhase == MissionPhaseNames.Contact)
             && _threatLevel > 0.0f)
         {
             _threatLevel = Mathf.Max(0.0f, _threatLevel - delta * 1.15f);
         }
-        if (_demolitionMode || _missionEnded || _reinforcementsDeployed || _missionPhase != "COMBAT")
+        if (_demolitionMode || _missionEnded || _reinforcementsDeployed || _missionPhase != MissionPhaseNames.Combat)
         {
             return;
         }
@@ -3057,7 +3057,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
-        _hud.SetObjective(_missionPhase == "DEPLOYMENT"
+        _hud.SetObjective(_missionPhase == MissionPhaseNames.Deployment
             ? GameLocalization.Get("deployment_objective", _languageSetting, "MOVE BEYOND THE DEPLOYMENT LINE")
             : GameLocalization.Objective(_currentObjective, _languageSetting));
     }
@@ -6676,7 +6676,7 @@ public partial class FreightTerminalWorld : Node3D
             _missionDirector.AdvanceObjective();
         }
         await WaitFrames(4);
-        var extractionUnlocked = _missionPhase == "EXTRACTION" && _extractionMarker.Visible;
+        var extractionUnlocked = _missionPhase == MissionPhaseNames.Extraction && _extractionMarker.Visible;
         _player.GlobalPosition = new Vector3(
             _extractionArea.GlobalPosition.X,
             0.2f,
@@ -6691,7 +6691,7 @@ public partial class FreightTerminalWorld : Node3D
         _extractionAircraft?.ForceBoardingReadyForValidation();
         UpdateExtractionSequence(CurrentExtractionCountdownDuration() + 0.2f);
         await WaitFrames(1);
-        var completed = _missionEnded && _missionPhase == "COMPLETE";
+        var completed = _missionEnded && _missionPhase == MissionPhaseNames.Complete;
         // Edge player pads → center extract is still a long run; beacon is always visible.
         var valid = districtsPresent == districtNames.Length
             && oceanBackdropPresent
