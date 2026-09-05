@@ -11,6 +11,7 @@ public partial class FreightTerminalWorld
     private Node3D _operationsOfficeScene = null!;
     private Camera3D _operationsOfficeCamera = null!;
     private OperationsOfficeBackdrop _operationsOfficeBackdrop = null!;
+    private OpeningMusicController _openingMusic = null!;
     private bool _operationsOfficeActive;
 
     public bool IsOperationsOfficeActive => _operationsOfficeActive;
@@ -31,6 +32,8 @@ public partial class FreightTerminalWorld
 
     private void BuildOperationsOffice()
     {
+        _openingMusic = new OpeningMusicController { Name = "OpeningMusic" };
+        AddChild(_openingMusic);
         const string scenePath = "res://scenes/OperationsOfficeBackdrop.tscn";
         var scene = GD.Load<PackedScene>(scenePath)
             ?? throw new InvalidOperationException($"Unable to load {scenePath}");
@@ -89,6 +92,7 @@ public partial class FreightTerminalWorld
     {
         _squadNetwork?.StopLanRoomBrowsing();
         _operationsOfficeActive = true;
+        _openingMusic.SetMenuActive(true);
         _player.UiLocked = true;
         _player.DisarmFireInput();
         _player.DisarmMovementInput();
@@ -108,6 +112,7 @@ public partial class FreightTerminalWorld
         _squadNetwork.StopLanRoomBrowsing();
         GetTree().Paused = false;
         _operationsOfficeActive = false;
+        _openingMusic.SetMenuActive(false);
         _operationsOfficeBackdrop.SetPresentationActive(false);
         _missionDirector.ProcessMode = ProcessModeEnum.Always;
         var playerCamera = _player.GetNodeOrNull<Camera3D>("Head/CombatCamera");
