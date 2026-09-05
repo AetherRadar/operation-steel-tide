@@ -69,6 +69,10 @@ public partial class TacticalPlayer
         }
         Hud?.SetAmmoTier(_trainingRangeAmmoGrade);
         PushHudStats();
+        // Weapon selection runs immediately before this method during deploy;
+        // emit the attachment legend last so the station's weapon-status toast
+        // cannot hide the controls the player needs in the live-fire lane.
+        ShowTrainingRangeAttachmentControls();
     }
 
     /// <summary>Reset selected ammo and all firearm reserves after a player reset.</summary>
