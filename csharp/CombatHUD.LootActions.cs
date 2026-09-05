@@ -74,6 +74,55 @@ public partial class CombatHUD
             capabilities.CanEquip);
     }
 
+    private void HandleLootCardQuickActivated(LootItem item, LootDragCard card)
+    {
+        var origin = card.Origin;
+        if (origin == LootDragOrigin.Source)
+        {
+            // Source cards retain the existing one-click transfer/equip policy;
+            // a double click should never bypass backpack capacity checks.
+            var action = LootSourceActivationAction.MoveToBackpack;
+            if (item.Kind == LootItemKind.Weapon
+                && item.Weapon is not null
+                && _shownPlayer is { } player)
+            {
+                action = LootInteractionPolicy.ResolveSourceActivation(
+                    item.Kind,
+                    WeaponCatalog.IsSidearm(item.Weapon.Platform),
+                    player.HasFireablePrimary,
+                    player.HasSecondaryWeapon,
+                    player.HasSidearmWeapon);
+            }
+            EmitSignal(
+                action == LootSourceActivationAction.EquipWeapon
+                    ? SignalName.LootEquipRequested
+                    : SignalName.LootTakeRequested,
+                item.Id);
+            return;
+        }
+
+        var backpackItem = _shownPlayer?.Backpack.Find(candidate => candidate.Id == item.Id);
+        if (backpackItem is null)
+        {
+            return;
+        }
+        var capabilities = LootInteractionPolicy.GetBackpackMenuCapabilities(backpackItem.Kind);
+        if (capabilities.CanEquip)
+        {
+            EmitSignal(SignalName.BackpackUseRequested, backpackItem.Id);
+        }
+        else if (backpackItem.Kind is LootItemKind.Medical or LootItemKind.ArmorPlate)
+        {
+            EmitSignal(SignalName.BackpackUseRequested, backpackItem.Id);
+        }
+        else
+        {
+            // Non-equipable stacks still get the contextual menu on a double
+            // click instead of silently consuming or discarding them.
+            HandleLootCardActivated(item, origin, card);
+        }
+    }
+
     private void DismissLootItemActionMenu()
     {
         if (IsInstanceValid(_lootItemActionMenu) && _lootItemActionMenu.Visible)

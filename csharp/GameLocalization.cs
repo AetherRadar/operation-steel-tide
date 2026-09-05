@@ -553,6 +553,12 @@ public static class GameLocalization
         Chinese["backpack_storage"] = "\u80cc\u5305\u50a8\u7269\u683c";
         Chinese["equip"] = "\u88c5\u5907";
         Chinese["drop_to_ground"] = "\u4e22\u5230\u5730\u9762";
+        Chinese["take_all"] = "\u5168\u90e8\u62ff\u53d6";
+        Chinese["sort_value"] = "\u6392\u5e8f\uff1a\u4f30\u503c";
+        Chinese["sort_grade"] = "\u6392\u5e8f\uff1a\u54c1\u8d28";
+        Chinese["sort_category"] = "\u6392\u5e8f\uff1a\u7c7b\u578b";
+        Chinese["sort_default"] = "\u6392\u5e8f\uff1a\u53d1\u73b0\u987a\u5e8f";
+        Chinese["loot_hint"] = "\u5355\u51fb\u7269\u54c1\u67e5\u770b\u64cd\u4f5c     \u62d6\u62fd\u79fb\u52a8     \u53cc\u51fb\u5feb\u901f\u88c5\u5907";
         Chinese["active_loadout"] = "\u5f53\u524d\u6574\u5907";
         Chinese["loot_complex_room"] = "\u5efa\u7b51\u5185\u8865\u7ed9";
         Chinese["loot_hangar_bay"] = "\u673a\u5e93\u5de5\u4f4d\u8865\u7ed9";

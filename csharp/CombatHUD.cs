@@ -122,6 +122,9 @@ public partial class CombatHUD : CanvasLayer
     private Label _lootSourceCaption = null!;
     private Label _backpackCaption = null!;
     private Button _lootCloseButton = null!;
+    private Button _lootSortButton = null!;
+    private Button _lootTakeAllButton = null!;
+    private Label _lootHint = null!;
     private Button _backpackHotkeyButton = null!;
     private Label _backpackHotkeyValue = null!;
     private InventoryModelPreview _helmetPreview = null!;
@@ -139,6 +142,7 @@ public partial class CombatHUD : CanvasLayer
     private TacticalPlayer? _shownPlayer;
     private string _shownLootName = string.Empty;
     private bool _shownSourceAvailable;
+    private int _lootSortMode;
     private string _lastFireMode = "AUTO";
     private Tween? _hitTween;
     private Tween? _damageTween;
@@ -683,6 +687,25 @@ public partial class CombatHUD : CanvasLayer
         _backpackCaption.Size = new Vector2(570, 26);
         panel.AddChild(_backpackCaption);
 
+        _lootTakeAllButton = Button("TAKE ALL", new Vector2(640, 88), new Vector2(112, 30));
+        _lootTakeAllButton.FocusMode = Control.FocusModeEnum.None;
+        _lootTakeAllButton.AddThemeFontSizeOverride("font_size", 11);
+        _lootTakeAllButton.TooltipText = "Move every visible item into the backpack";
+        _lootTakeAllButton.Pressed += TransferAllLootToBackpack;
+        panel.AddChild(_lootTakeAllButton);
+        _lootSortButton = Button("SORT: VALUE", new Vector2(758, 88), new Vector2(126, 30));
+        _lootSortButton.FocusMode = Control.FocusModeEnum.None;
+        _lootSortButton.AddThemeFontSizeOverride("font_size", 11);
+        _lootSortButton.TooltipText = "Cycle backpack order: value, grade, category, default";
+        _lootSortButton.Pressed += CycleLootSort;
+        panel.AddChild(_lootSortButton);
+        _lootHint = Label("CLICK ITEM  //  ACTIONS     DRAG  //  MOVE     DOUBLE-CLICK  //  QUICK EQUIP", 10, new Color(0.43f, 0.56f, 0.53f));
+        _lootHint.Position = new Vector2(940, 844);
+        _lootHint.Size = new Vector2(830, 20);
+        _lootHint.HorizontalAlignment = HorizontalAlignment.Right;
+        _lootHint.MouseFilter = Control.MouseFilterEnum.Ignore;
+        panel.AddChild(_lootHint);
+
         _lootSourceZone = new LootDropZone
         {
             Target = LootDropTarget.Source,
@@ -1048,7 +1071,8 @@ public partial class CombatHUD : CanvasLayer
             role: _shownPlayer.Role,
             helmet: _shownPlayer.EquippedHelmet,
             bodyArmor: _shownPlayer.EquippedBodyArmor,
-            backpack: _shownPlayer.EquippedBackpack);
+            backpack: _shownPlayer.EquippedBackpack,
+            staticLoadoutOperator: true);
         _lootOperatorCaption.Text = $"{OperatorRoles.RoleName(_shownPlayer.Role, _language)}  //  {Text("active_loadout", "ACTIVE LOADOUT")}";
 
         ClearRows(_lootSourceList);
@@ -1065,7 +1089,7 @@ public partial class CombatHUD : CanvasLayer
 
         ClearRows(_backpackList);
         _backpackList.Columns = 4;
-        foreach (var item in _shownPlayer.Backpack)
+        foreach (var item in OrderedBackpackItems(_shownPlayer.Backpack))
         {
             _backpackList.AddChild(BuildLootCard(item, LootDragOrigin.Backpack, compact: _shownSourceAvailable));
         }
@@ -1094,6 +1118,7 @@ public partial class CombatHUD : CanvasLayer
             ? $"背包总估值  {totalValue}  //  枪械/装备/弹药合计"
             : $"BACKPACK VALUE  {totalValue}  //  GUNS + GEAR + AMMO";
         UpdateBackpackHotkey(_shownPlayer);
+        UpdateLootToolbarPresentation();
     }
 
     public void UpdateBackpackHotkey(TacticalPlayer? player)
@@ -1177,6 +1202,7 @@ public partial class CombatHUD : CanvasLayer
             BuildLootComparisons(item));
         card.DetailsRequested += ShowWeaponDetails;
         card.Activated += (_, cardOrigin) => HandleLootCardActivated(item, cardOrigin, card);
+        card.QuickActivated += quickCard => HandleLootCardQuickActivated(item, quickCard);
         return card;
     }
 

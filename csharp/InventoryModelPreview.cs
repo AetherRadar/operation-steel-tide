@@ -21,6 +21,7 @@ public partial class InventoryModelPreview : SubViewportContainer
     private WeaponBuild? _weapon;
     private string _knifeSkinId = KnifeSkinCatalog.DefaultId;
     private OperatorRole _operatorRole = OperatorRole.Assault;
+    private bool _staticLoadoutOperator;
     private SubViewport? _viewport;
     private Node3D? _modelRoot;
     private Camera3D? _camera;
@@ -47,13 +48,15 @@ public partial class InventoryModelPreview : SubViewportContainer
         OperatorRole role = OperatorRole.Assault,
         EquipmentItem? helmet = null,
         EquipmentItem? bodyArmor = null,
-        EquipmentItem? backpack = null)
+        EquipmentItem? backpack = null,
+        bool staticLoadoutOperator = false)
     {
         _kind = kind;
         _equipment = equipment?.Clone();
         _weapon = weapon?.Clone();
         _knifeSkinId = knifeSkinId;
         _operatorRole = role;
+        _staticLoadoutOperator = staticLoadoutOperator;
         if (IsInsideTree())
         {
             RebuildModel();
@@ -233,9 +236,11 @@ public partial class InventoryModelPreview : SubViewportContainer
                 break;
             case InventoryPreviewKind.Operator:
                 BuildOperator(_modelRoot);
-                _camera.Size = 3.4f;
+                _camera.Size = _staticLoadoutOperator ? 2.65f : 3.4f;
                 _modelRoot.Position = Vector3.Zero;
-                _modelRoot.RotationDegrees = new Vector3(0, -9, 0);
+                _modelRoot.RotationDegrees = _staticLoadoutOperator
+                    ? new Vector3(0, 168, 0)
+                    : new Vector3(0, -9, 0);
                 break;
         }
         RequestRender();
@@ -300,7 +305,8 @@ public partial class InventoryModelPreview : SubViewportContainer
         InventoryOperatorPreviewRecovery.Build(
             root,
             OperatorRoles.Spec(_operatorRole).VisualId,
-            _weapon);
+            _weapon,
+            staticLoadout: _staticLoadoutOperator);
     }
 
     private void BuildRifle(Node3D root)
@@ -537,6 +543,11 @@ public partial class InventoryModelPreview : SubViewportContainer
 
     private void BuildBodyArmor(Node3D root)
     {
+        if (TryBuildAuthoredArmorCarrier(root))
+        {
+            return;
+        }
+
         var heavy = _equipment?.DefinitionId == "armor_heavy";
         var patrol = _equipment?.DefinitionId == "armor_patrol";
         if (patrol)
@@ -570,6 +581,11 @@ public partial class InventoryModelPreview : SubViewportContainer
 
     private void BuildBackpack(Node3D root)
     {
+        if (TryBuildAuthoredBackpack(root))
+        {
+            return;
+        }
+
         var heavy = _equipment?.DefinitionId == "pack_heavy";
         var patrol = _equipment?.DefinitionId == "pack_sling";
         if (patrol)
@@ -592,6 +608,68 @@ public partial class InventoryModelPreview : SubViewportContainer
         for (var buckle = -1; buckle <= 1; buckle += 2)
         {
             Box(root, new Vector3(0.11f, 0.09f, 0.08f), new Vector3(buckle * 0.22f, -0.31f, -0.47f), new Color(0.08f, 0.09f, 0.085f), 0.38f, 0.75f);
+        }
+    }
+
+    private static bool TryBuildAuthoredArmorCarrier(Node3D root)
+    {
+        try
+        {
+            var props = CombatModelLibrary.InstantiateFieldUseProps();
+            props.ArmorCarrier.Visible = true;
+            props.ArmorCarrierFlap.Visible = false;
+            props.Root.Scale = Vector3.One * 2.35f;
+            props.Root.Position = new Vector3(0.0f, -0.06f, 0.0f);
+            root.AddChild(props.Root);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            GD.PushWarning($"Authored armor carrier preview unavailable; using fallback: {exception.Message}");
+            return false;
+        }
+    }
+
+    private static bool TryBuildAuthoredBackpack(Node3D root)
+    {
+        Node3D? sourceRoot = null;
+        Node3D? backpackCopy = null;
+        try
+        {
+            var scene = GD.Load<PackedScene>(
+                "res://assets/models/steel_tide_operator/steel_tide_operator.glb")
+                ?? throw new InvalidOperationException("Authored equipment scene could not load.");
+            sourceRoot = scene.Instantiate<Node3D>();
+            var backpack = CombatModelLibrary.FindOptionalNode(sourceRoot, "Backpack")
+                ?? throw new InvalidOperationException("Authored equipment scene is missing Backpack geometry.");
+            backpackCopy = backpack.Duplicate() as Node3D
+                ?? throw new InvalidOperationException("Backpack geometry could not be duplicated.");
+            var bounds = CombatModelLibrary.ComputeBounds(backpackCopy);
+            if (bounds.MeshCount == 0 || bounds.Size.Y <= 0.01f)
+            {
+                throw new InvalidOperationException("Backpack geometry has no usable bounds.");
+            }
+
+            // Normalize the authored operator backpack into the compact preview
+            // frame while retaining all of its pouches, straps and rolled bedroll.
+            backpackCopy.Position -= bounds.Center;
+            backpackCopy.Scale = Vector3.One * (0.92f / bounds.Size.Y);
+            root.AddChild(backpackCopy);
+            backpackCopy = null;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            if (GodotObject.IsInstanceValid(backpackCopy))
+            {
+                backpackCopy!.Free();
+            }
+            GD.PushWarning($"Authored backpack preview unavailable; using fallback: {exception.Message}");
+            return false;
+        }
+        finally
+        {
+            sourceRoot?.Free();
         }
     }
 

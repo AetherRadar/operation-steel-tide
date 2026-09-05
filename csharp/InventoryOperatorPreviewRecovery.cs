@@ -15,11 +15,42 @@ internal static class InventoryOperatorPreviewRecovery
     public static bool Build(
         Node3D root,
         OperatorVisualId requestedVisual,
-        WeaponBuild? weaponBuild = null)
+        WeaponBuild? weaponBuild = null,
+        bool staticLoadout = false)
         => TryBuild(
             root,
             requestedVisual,
-            visualId => CombatModelLibrary.InstantiatePreviewOperator(visualId, weaponBuild).Root,
+            visualId =>
+            {
+                if (!staticLoadout)
+                {
+                    return CombatModelLibrary.InstantiatePreviewOperator(visualId, weaponBuild).Root;
+                }
+
+                // The backpack paper doll is a product shot, not a live actor.
+                // Use the authored runtime operator and freeze its idle clip
+                // before it enters the viewport.
+                var visual = CombatModelLibrary.InstantiateOperator(
+                    visualId,
+                    weaponBuild,
+                    attachDefaultWeapon: weaponBuild is not null);
+                visual.AnimationPlayer.Stop();
+                if (visual.AnimationPlayer.HasAnimation("idle"))
+                {
+                    visual.AnimationPlayer.Play("idle", customBlend: 0.0f, customSpeed: 1.0f, fromEnd: false);
+                    visual.AnimationPlayer.Seek(0.35, update: true);
+                    visual.AnimationPlayer.Pause();
+                }
+                // Runtime operators are authored feet-on-ground for the world.
+                // The paper doll is a centered product shot, so recenter the
+                // complete operator plus carried weapon before it enters the UI.
+                var staticBounds = CombatModelLibrary.ComputeBounds(visual.Root);
+                if (staticBounds.MeshCount > 0)
+                {
+                    visual.Root.Position -= staticBounds.Center;
+                }
+                return visual.Root;
+            },
             static message => GD.PushError(message)).Built;
 
     private static OperatorPreviewBuildResult TryBuild(

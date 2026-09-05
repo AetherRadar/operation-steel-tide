@@ -151,11 +151,13 @@ public partial class LootDragCard : PanelContainer
     }
 
     public event Action<string, LootDragOrigin>? Activated;
+    public event Action<LootDragCard>? QuickActivated;
     public event Action<WeaponBuild>? DetailsRequested;
 
     private readonly List<Label> _renderedComparisonLabels = new();
     private bool _leftPressed;
     private bool _dragging;
+    private bool _doubleClick;
 
     public void Configure(
         string itemId,
@@ -557,6 +559,19 @@ public partial class LootDragCard : PanelContainer
         {
             _leftPressed = true;
             _dragging = false;
+            _doubleClick = mouse.DoubleClick;
+            return;
+        }
+        if (_doubleClick)
+        {
+            _leftPressed = false;
+            _doubleClick = false;
+            _dragging = false;
+            if (new Rect2(Vector2.Zero, Size).HasPoint(mouse.Position))
+            {
+                QuickActivated?.Invoke(this);
+                AcceptEvent();
+            }
             return;
         }
         var activate = _leftPressed

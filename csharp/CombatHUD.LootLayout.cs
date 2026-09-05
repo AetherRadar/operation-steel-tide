@@ -108,8 +108,8 @@ public partial class CombatHUD
     {
         var frame = new Panel
         {
-            Position = new Vector2(1390, 170),
-            Size = new Vector2(210, 300),
+            Position = new Vector2(1388, 150),
+            Size = new Vector2(220, 344),
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         var frameStyle = new StyleBoxFlat
@@ -125,7 +125,7 @@ public partial class CombatHUD
         _lootOperatorPreview = new InventoryModelPreview
         {
             Position = new Vector2(4, 4),
-            Size = new Vector2(202, 292),
+            Size = new Vector2(212, 336),
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         _lootOperatorPreview.Configure(InventoryPreviewKind.Operator);
@@ -133,15 +133,15 @@ public partial class CombatHUD
 
         var footer = new ColorRect
         {
-            Position = new Vector2(1, 260),
-            Size = new Vector2(208, 39),
+            Position = new Vector2(1, 300),
+            Size = new Vector2(218, 43),
             Color = new Color(0.008f, 0.016f, 0.017f, 0.88f),
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         frame.AddChild(footer);
         _lootOperatorCaption = Label("ACTIVE LOADOUT", 11, new Color(0.47f, 0.9f, 0.76f));
-        _lootOperatorCaption.Position = new Vector2(10, 268);
-        _lootOperatorCaption.Size = new Vector2(190, 22);
+        _lootOperatorCaption.Position = new Vector2(10, 308);
+        _lootOperatorCaption.Size = new Vector2(200, 22);
         _lootOperatorCaption.HorizontalAlignment = HorizontalAlignment.Center;
         _lootOperatorCaption.ClipText = true;
         _lootOperatorCaption.MouseFilter = Control.MouseFilterEnum.Ignore;
