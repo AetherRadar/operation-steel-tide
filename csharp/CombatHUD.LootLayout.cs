@@ -136,17 +136,6 @@ public partial class CombatHUD
         _lootOperatorPreview.Configure(InventoryPreviewKind.Operator);
         frame.AddChild(_lootOperatorPreview);
 
-        var generatedOperator = new TextureRect
-        {
-            Texture = GeneratedInventoryArt.Load(GeneratedInventoryArt.OperatorPath),
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        };
-        generatedOperator.Position = new Vector2(-40, 4);
-        generatedOperator.Size = new Vector2(300, 300);
-        frame.AddChild(generatedOperator);
-
         var footer = new ColorRect
         {
             Position = new Vector2(1, 300),
