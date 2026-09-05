@@ -25,7 +25,7 @@
   "scene_audit": {
     "minimum_blender": [
       -170.0,
-      -100.0,
+      -99.99999,
       -34.0
     ],
     "maximum_blender": [
@@ -93,10 +93,10 @@
     }
   },
   "statistics_before_export": {
-    "mesh_nodes": 371,
-    "unique_meshes": 334,
-    "unique_triangles": 201084,
-    "instance_triangles": 307484,
+    "mesh_nodes": 479,
+    "unique_meshes": 442,
+    "unique_triangles": 203676,
+    "instance_triangles": 310076,
     "materials": 183,
     "images": 35,
     "estimated_texture_memory_bytes": 138936320
@@ -105,7 +105,7 @@
     "scene": {
       "minimum_blender": [
         -170.0,
-        -100.0,
+        -99.99999,
         -34.0
       ],
       "maximum_blender": [
@@ -173,32 +173,32 @@
       }
     },
     "statistics": {
-      "mesh_nodes": 370,
-      "unique_meshes": 333,
-      "unique_triangles": 201084,
-      "instance_triangles": 307484,
+      "mesh_nodes": 478,
+      "unique_meshes": 441,
+      "unique_triangles": 203676,
+      "instance_triangles": 310076,
       "materials": 43,
       "images": 11,
       "estimated_texture_memory_bytes": 42205184
     }
   },
   "gltf_document": {
-    "gltf_nodes": 489,
-    "gltf_meshes": 333,
-    "gltf_primitives": 335,
+    "gltf_nodes": 597,
+    "gltf_meshes": 441,
+    "gltf_primitives": 443,
     "gltf_materials": 43,
     "gltf_images": 11
   },
   "files": {
     "blend": {
       "path": "source_art/world/orbital_complex/orbital_complex.blend",
-      "bytes": 15650414,
-      "sha256": "164382499678DB855795B2CD86BDE66EB5E0602C384E021880C69ECCA46BB3E4"
+      "bytes": 15689980,
+      "sha256": "A2C9C20B5978A54C3A70D9DBF3A177AF3223E10EF637A028FD4259490AE3459C"
     },
     "glb": {
       "path": "assets/models/orbital_complex/orbital_complex.glb",
-      "bytes": 20023204,
-      "sha256": "F5DFEC6DEB314842204A05661894EC4E331262709F43E53A00B9019D9D7494E8",
+      "bytes": 20284932,
+      "sha256": "FDFA6F70F5BCF1AB7996A69C39BAFE6C38F52374C9AD9A573AB82E3D22DB49D4",
       "embedded": true
     }
   },

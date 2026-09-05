@@ -96,10 +96,10 @@ Consequently, this repository must not be described as satisfying policies that 
 
 The current MAP03 export also includes the south tidal observation opening and
 the authored blackwater pool/swim route. The current DCC source is
-`orbital_complex.blend` (15,650,414 bytes, SHA-256
-`164382499678DB855795B2CD86BDE66EB5E0602C384E021880C69ECCA46BB3E4`); the
-runtime GLB is 20,023,204 bytes with SHA-256
-`F5DFEC6DEB314842204A05661894EC4E331262709F43E53A00B9019D9D7494E8`.
+`orbital_complex.blend` (15,689,980 bytes, SHA-256
+`A2C9C20B5978A54C3A70D9DBF3A177AF3223E10EF637A028FD4259490AE3459C`); the
+runtime GLB is 20,284,932 bytes with SHA-256
+`FDFA6F70F5BCF1AB7996A69C39BAFE6C38F52374C9AD9A573AB82E3D22DB49D4`.
 Current node counts and the full audit remain authoritative in
 `source_art/world/orbital_complex/build_report.json`.
 

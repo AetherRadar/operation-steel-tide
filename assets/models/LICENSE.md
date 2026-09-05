@@ -357,15 +357,15 @@ are in `../../source_art/third_party/nasa_3d/{README.md,LICENSE_EVIDENCE.md}`.
 ### Reproducible output and indoor QA contract
 
 - Authoritative DCC source:
-  `../../source_art/world/orbital_complex/orbital_complex.blend` (15,650,414
-  bytes; SHA-256 `164382499678DB855795B2CD86BDE66EB5E0602C384E021880C69ECCA46BB3E4`).
+  `../../source_art/world/orbital_complex/orbital_complex.blend` (15,689,980
+  bytes; SHA-256 `A2C9C20B5978A54C3A70D9DBF3A177AF3223E10EF637A028FD4259490AE3459C`).
 - Reproducible builder:
   `../../scripts/blender/build_orbital_complex_underground.py`; it executes the
   shared provenance/import/export helpers from `build_orbital_complex.py` and
   must be run with Blender 4.5+.
-- Runtime output: `orbital_complex/orbital_complex.glb` (20,023,204 bytes;
-  SHA-256 `F5DFEC6DEB314842204A05661894EC4E331262709F43E53A00B9019D9D7494E8`).
-  The binary is self-contained: 489 glTF nodes, 333 mesh resources, 335
+- Runtime output: `orbital_complex/orbital_complex.glb` (20,284,932 bytes;
+  SHA-256 `FDFA6F70F5BCF1AB7996A69C39BAFE6C38F52374C9AD9A573AB82E3D22DB49D4`).
+  The binary is self-contained: 597 glTF nodes, 441 mesh resources, 443
   primitives, 43 materials, 11 embedded images, and no external buffer or
   image URI.
 - The exported root is `FalltideRecoveryArray` with `map_id=orbital_complex`,

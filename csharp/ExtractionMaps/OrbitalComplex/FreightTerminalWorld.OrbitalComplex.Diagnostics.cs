@@ -27,6 +27,7 @@ public partial class FreightTerminalWorld
         bool ExtractionReady,
         bool ObjectivesReady,
         bool CollisionReady,
+        bool WallCollisionReady,
         bool RoutesReady,
         bool SpawnsReady,
         bool LoadingReady,
@@ -136,6 +137,7 @@ public partial class FreightTerminalWorld
             + $"layout={snapshot.LayoutValid} scene={snapshot.SceneReady} "
             + $"loading={snapshot.LoadingReady} extraction={snapshot.ExtractionReady} "
             + $"objectives={snapshot.ObjectivesReady} collision={snapshot.CollisionReady} "
+            + $"walls={snapshot.WallCollisionReady} "
             + $"routes={snapshot.RoutesReady}:{snapshot.TraversalLinkCount} "
             + $"spawns={snapshot.SpawnsReady} atmosphere={snapshot.AtmosphereReady} "
             + $"water={snapshot.WaterReady} "
@@ -150,6 +152,7 @@ public partial class FreightTerminalWorld
         if (!IsOrbitalComplexRuntimeMapSelected)
         {
             return new OrbitalComplexDiagnosticSnapshot(
+                false,
                 false,
                 false,
                 false,
@@ -177,6 +180,7 @@ public partial class FreightTerminalWorld
         {
             return new OrbitalComplexDiagnosticSnapshot(
                 true,
+                false,
                 false,
                 false,
                 false,
@@ -216,6 +220,8 @@ public partial class FreightTerminalWorld
                 >= layout.CollisionBoxes.Count + layout.Ramps.Count + layout.PowerGates.Count
             && collisionShapes >= build.CollisionShapeCount
             && build.GameplayRoot.IsInGroup(OrbitalComplexWorldAssembler.GameplayCollisionGroup);
+        var wallCollisionReady = sceneReady && OrbitalComplexAuthoredWallsBlockRays();
+        collisionReady &= wallCollisionReady;
         var routesReady = _orbitalComplexRuntimeTraversalLinkCount
                 >= layout.PatrolRoutes.Count + layout.Ramps.Count
             && layout.RouteProbes.Count >= 12;
@@ -261,6 +267,7 @@ public partial class FreightTerminalWorld
             extractionReady,
             objectivesReady,
             collisionReady,
+            wallCollisionReady,
             routesReady,
             spawnsReady,
             loadingReady,
@@ -284,6 +291,43 @@ public partial class FreightTerminalWorld
             }
         }
         return count;
+    }
+
+    private bool OrbitalComplexAuthoredWallsBlockRays()
+    {
+        var space = GetWorld3D()?.DirectSpaceState;
+        if (space is null)
+        {
+            return false;
+        }
+
+        // These probes cross the DCC-authored west/east power bulkheads and
+        // the south intake vestibule wall at player height.  A floor-only
+        // collision pass can still report a healthy shape count, so these
+        // deterministic rays explicitly protect the wall contract.
+        return OrbitalComplexRayHitsStaticWall(
+                   space,
+                   new Vector3(-60.0f, -5.0f, 0.0f),
+                   new Vector3(-25.0f, -5.0f, 0.0f))
+            && OrbitalComplexRayHitsStaticWall(
+                space,
+                new Vector3(25.0f, -5.0f, 0.0f),
+                new Vector3(60.0f, -5.0f, 0.0f))
+            && OrbitalComplexRayHitsStaticWall(
+                space,
+                new Vector3(-25.0f, -10.0f, 73.0f),
+                new Vector3(-7.0f, -10.0f, 73.0f));
+    }
+
+    private static bool OrbitalComplexRayHitsStaticWall(
+        PhysicsDirectSpaceState3D space,
+        Vector3 from,
+        Vector3 to)
+    {
+        var query = PhysicsRayQueryParameters3D.Create(from, to, collisionMask: 1);
+        query.CollideWithAreas = false;
+        query.CollideWithBodies = true;
+        return space.IntersectRay(query).Count > 0;
     }
 
     private static int CountOrbitalComplexCollisionShapes(Node root, bool requireShape)

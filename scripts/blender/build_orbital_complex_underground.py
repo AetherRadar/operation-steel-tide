@@ -508,6 +508,189 @@ def build_hardscape_underground(groups, materials):
     _ribbon("BunkerPerimeterNorth", [(170.0, 220.0), (-170.0, 220.0)], 3.0, -16.0, 22.0, black, static)
     _ribbon("BunkerPerimeterSouthWest", [(-170.0, -100.0), (-72.0, -100.0)], 3.0, -16.0, 22.0, black, static)
     _ribbon("BunkerPerimeterSouthEast", [(72.0, -100.0), (170.0, -100.0)], 3.0, -16.0, 22.0, black, static)
+
+    # Break the giant perimeter planes into believable pressure-wall bays.
+    # The previous shell read as a single blue slab at player distance: no
+    # jambs, no maintenance rhythm, and no visual cue for where a corridor
+    # actually meets the wall.  These are authored DCC pilasters and service
+    # lintels, kept out of the central sightline but close enough to sell
+    # thickness and scale.  They also share the wall collision contract via
+    # the terrain_or_hardscape metadata emitted by _ribbon.
+    for side, x, direction in (
+        ("West", -166.5, 1.0),
+        ("East", 166.5, -1.0),
+    ):
+        for index, y in enumerate((-76.0, -38.0, 4.0, 46.0, 88.0, 130.0, 172.0, 208.0), start=1):
+            _ribbon(
+                f"{side}PressureBayPilaster_{index:02d}",
+                [(x, y), (x, y + 2.4)],
+                3.1,
+                -15.7,
+                21.3,
+                black,
+                static,
+            )
+            accent = _ribbon(
+                f"{side}PressureBayLintel_{index:02d}",
+                [(x + direction * 0.45, y - 0.8), (x + direction * 0.45, y + 3.2)],
+                0.48,
+                7.7,
+                8.35,
+                red,
+                static,
+            )
+            accent["geometry_role"] = "minor_prop"
+            panel = _ribbon(
+                f"{side}PressureBaySignal_{index:02d}",
+                [(x + direction * 0.52, y + 0.25), (x + direction * 0.52, y + 1.75)],
+                0.22,
+                -1.0,
+                4.2,
+                cyan,
+                static,
+            )
+            panel["geometry_role"] = "minor_prop"
+
+    for side, y, direction in (
+        ("North", 216.5, -1.0),
+        ("SouthWest", -96.5, 1.0),
+        ("SouthEast", -96.5, 1.0),
+    ):
+        x_values = (-144.0, -96.0, -48.0, 48.0, 96.0, 144.0)
+        if side == "SouthWest":
+            x_values = (-144.0, -112.0, -80.0)
+        elif side == "SouthEast":
+            x_values = (80.0, 112.0, 144.0)
+        for index, x in enumerate(x_values, start=1):
+            _ribbon(
+                f"{side}PressureBayPilaster_{index:02d}",
+                [(x, y), (x + 2.4, y)],
+                3.1,
+                -15.7,
+                21.3,
+                black,
+                static,
+            )
+            accent = _ribbon(
+                f"{side}PressureBayLintel_{index:02d}",
+                [(x - 0.8, y + direction * 0.45), (x + 3.2, y + direction * 0.45)],
+                0.48,
+                7.7,
+                8.35,
+                red,
+                static,
+            )
+            accent["geometry_role"] = "minor_prop"
+
+    # The south mouth is deliberately open to the sky and ocean, but it still
+    # needs a structural threshold.  Frame the aperture as a pressure-lock
+    # portal with two deep jambs, a high load-bearing beam, and a narrow cyan
+    # inspection trace.  The jambs are hardscape (and therefore collide); the
+    # colour inserts are minor props so they never create invisible blockers.
+    for side, x in (("West", -72.0), ("East", 72.0)):
+        _ribbon(
+            f"SouthTidalGateJamb_{side}",
+            [(x, -101.0), (x, -91.0)],
+            4.2,
+            -15.7,
+            21.2,
+            black,
+            static,
+        )
+        warning = _ribbon(
+            f"SouthTidalGateWarning_{side}",
+            [(x + (-1.2 if side == "West" else 1.2), -100.2), (x + (-1.2 if side == "West" else 1.2), -94.0)],
+            0.42,
+            5.0,
+            9.4,
+            red,
+            static,
+        )
+        warning["geometry_role"] = "minor_prop"
+    tidal_header = _ribbon(
+        "SouthTidalGateHeader",
+        [(-72.0, -100.0), (72.0, -100.0)],
+        4.2,
+        17.4,
+        21.2,
+        black,
+        static,
+    )
+    tidal_header["geometry_role"] = "minor_prop"
+    tidal_trace = _ribbon(
+        "SouthTidalGateInspectionTrace",
+        [(-67.0, -97.65), (67.0, -97.65)],
+        0.34,
+        15.9,
+        16.5,
+        cyan,
+        static,
+    )
+    tidal_trace["geometry_role"] = "minor_prop"
+
+    # Keep the two near-field perimeter faces from reading as unbroken blue
+    # slabs in the spawn camera.  These recessed-looking service ribs sit on
+    # the interior skin, repeat at human scale, and carry the same red/cyan
+    # language as the portal without becoming gameplay collision.
+    for side, x, direction in (("West", -168.35, 1.0), ("East", 168.35, -1.0)):
+        for index, y in enumerate((-98.0, -88.0, -78.0), start=1):
+            rib = _ribbon(
+                f"SouthPerimeterServiceRib_{side}_{index:02d}",
+                [(x, y), (x, y + 4.4)],
+                0.62,
+                -10.5,
+                12.5,
+                red,
+                static,
+            )
+            rib["geometry_role"] = "minor_prop"
+            trace = _ribbon(
+                f"SouthPerimeterServiceTrace_{side}_{index:02d}",
+                [(x + direction * 0.42, y + 0.35), (x + direction * 0.42, y + 2.1)],
+                0.18,
+                -1.5,
+                4.0,
+                cyan,
+                static,
+            )
+            trace["geometry_role"] = "minor_prop"
+
+    # The first-person intake vestibule is the wall surface seen immediately
+    # after deployment.  Add close-range jambs and service indicators to both
+    # returns so the opening reads as a designed pressure lock instead of two
+    # untextured planes.
+    for side, x, direction in (("West", -14.75, 1.0), ("East", 14.75, -1.0)):
+        for index, y in enumerate((-84.0, -74.0, -64.0), start=1):
+            _ribbon(
+                f"IntakeVestibuleJamb_{side}_{index:02d}",
+                [(x, y), (x, y + 1.6)],
+                1.05,
+                -15.5,
+                8.0,
+                black,
+                static,
+            )
+            light = _ribbon(
+                f"IntakeVestibuleSignal_{side}_{index:02d}",
+                [(x + direction * 0.62, y + 0.24), (x + direction * 0.62, y + 1.32)],
+                0.22,
+                -1.2,
+                4.0,
+                cyan,
+                static,
+            )
+            light["geometry_role"] = "minor_prop"
+            warning = _ribbon(
+                f"IntakeVestibuleWarning_{side}_{index:02d}",
+                [(x + direction * 0.64, y + 0.35), (x + direction * 0.64, y + 0.72)],
+                0.28,
+                4.65,
+                6.15,
+                orange,
+                static,
+            )
+            warning["geometry_role"] = "minor_prop"
+
     _ribbon("SouthPressureBulkhead", [(-150.0, -40.0), (-44.0, -40.0)], 2.3, -16.0, 22.0, black, groups["District_IntakeCauseway"])
     # The intake used to be one uninterrupted 190 m sightline from the south
     # deployment pocket to the reactor.  These authored-looking pressure

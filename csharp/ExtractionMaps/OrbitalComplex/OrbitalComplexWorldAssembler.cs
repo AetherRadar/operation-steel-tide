@@ -642,6 +642,25 @@ public sealed class OrbitalComplexWorldAssembler
                 "architecture_shell",
                 StringComparison.OrdinalIgnoreCase);
         }
+
+        // The underground builder also emits authored hardscape meshes for
+        // bulkheads, wall returns, perimeter panels, detention banks, and
+        // bridge decks.  They are not source-asset assemblies, so they do not
+        // carry dcc_assembly; treating them as visual-only was the hole that
+        // let characters walk through the new walls.  Keep the swimmable
+        // surface out of this contract: water movement owns its vertical
+        // solver and must not collide with the imported plane.
+        if (TryReadAuthoredMeta(spatial, "geometry_role", out var geometryRole)
+            && string.Equals(
+                geometryRole.AsString(),
+                "terrain_or_hardscape",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return !string.Equals(
+                spatial.Name.ToString(),
+                "BlackwaterPoolSurface",
+                StringComparison.OrdinalIgnoreCase);
+        }
         return (TryReadAuthoredMeta(spatial, "dcc_assembly", out var dccAssembly)
             && dccAssembly.AsBool())
             || AuthoredArchitectureAssemblyNames.Contains(spatial.Name.ToString());
