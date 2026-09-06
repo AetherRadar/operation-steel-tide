@@ -217,6 +217,15 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     private ILootSource? _lootHuntSource;
     private float _lootHuntCooldown;
     private float _doorWaitTimer;
+    // Navigation planning is comparatively expensive (physics probes + bounded A*).
+    // Keep the last directive for a short, deterministic slice so multiple mates do
+    // not all ask the world planner on the same physics frame. Emergency rescue uses
+    // a shorter slice to remain responsive while still avoiding duplicate queries.
+    private float _navigationQueryTimer;
+    private Vector3 _cachedNavigationDestination;
+    private SquadNavigationDirective _cachedNavigationDirective;
+    private bool _cachedNavigationEmergency;
+    private bool _hasCachedNavigationDirective;
     private ISquadCombatant? _reviveTarget;
     private float _revivePoseBlend;
     private Godot.Collections.Array<Rid>? _navigationProbeExclusions;
@@ -259,6 +268,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         IsDowned = false;
         Order = SquadOrder.Follow;
         _orderPosition = Position;
+        _navigationQueryTimer = Mathf.Clamp(slot * 0.018f, 0.0f, 0.06f);
+        _hasCachedNavigationDirective = false;
         InitializeSustainmentLoadout();
         if (IsInsideTree())
         {
@@ -304,6 +315,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
         Order = order;
         _orderPosition = order == SquadOrder.Follow ? GlobalPosition : position;
+        InvalidateNavigationDirectiveCache();
         if (IsInstanceValid(Main)
             && (order != SquadOrder.Follow || Main.IsDemolitionMode))
         {
@@ -311,6 +323,38 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         }
         OnSquadOrderChanged();
         UpdateLabel();
+    }
+
+    private SquadNavigationDirective ResolveNavigationDirectiveCached(
+        Vector3 destination,
+        bool emergency)
+    {
+        // A directive remains valid while the actor has moved less than one cell and
+        // its destination has not changed materially. This is long enough to spread
+        // planner work across mates, yet short enough for a moving target to react.
+        var reuseDistanceSquared = emergency ? 0.36f : 0.81f;
+        if (_hasCachedNavigationDirective
+            && _navigationQueryTimer > 0.0f
+            && _cachedNavigationEmergency == emergency
+            && _cachedNavigationDestination.DistanceSquaredTo(destination)
+                <= reuseDistanceSquared)
+        {
+            return _cachedNavigationDirective;
+        }
+
+        var directive = Main.ResolveSquadNavigationDestination(this, destination, emergency);
+        _cachedNavigationDestination = destination;
+        _cachedNavigationDirective = directive;
+        _cachedNavigationEmergency = emergency;
+        _hasCachedNavigationDirective = true;
+        _navigationQueryTimer = emergency ? 0.055f : 0.085f;
+        return directive;
+    }
+
+    private void InvalidateNavigationDirectiveCache()
+    {
+        _hasCachedNavigationDirective = false;
+        _navigationQueryTimer = 0.0f;
     }
 
     public void BoardExtractionSeat(Node3D seat)
@@ -401,11 +445,13 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         SetOrder(SquadOrder.Follow, GlobalPosition);
         Main?.ClearSquadNavigation(this);
         _reviveTarget = target;
+        InvalidateNavigationDirectiveCache();
     }
 
     public void EndSquadRevive()
     {
         _reviveTarget = null;
+        InvalidateNavigationDirectiveCache();
         ResetEmergencyGlassEgressPlan();
         CancelNavigationTraversal();
         _revivePoseBlend = 0.0f;
@@ -461,6 +507,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         _skillCooldown = Mathf.Max(0.0f, _skillCooldown - dt);
         _overdriveTime = Mathf.Max(0.0f, _overdriveTime - dt);
         _decisionTimer = Mathf.Max(0.0f, _decisionTimer - dt);
+        _navigationQueryTimer = Mathf.Max(0.0f, _navigationQueryTimer - dt);
         UpdateSustainmentTimers(dt);
         UpdateCombatTacticalTimers(dt);
 
@@ -597,12 +644,10 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             destination = ResolveTacticalDestination(destination, hostile, objectivePriority);
         }
         var holdFormation = ShouldHoldFollowFormation(destination, hostile, objectivePriority);
+        var navigationEmergency = reviveTargetNode is not null;
         var navigationDirective = holdFormation
             ? SquadNavigationDirective.Walk(GlobalPosition)
-            : Main.ResolveSquadNavigationDestination(
-                this,
-                destination,
-                emergency: reviveTargetNode is not null);
+            : ResolveNavigationDirectiveCached(destination, navigationEmergency);
         destination = navigationDirective.Target;
         if (Main.TryPrepareAiDoorTraversal(GlobalPosition, destination, out var doorWaiting)
             && doorWaiting)
