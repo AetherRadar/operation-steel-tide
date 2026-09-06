@@ -266,6 +266,7 @@ public partial class FreightTerminalWorld
             && _hud.TrainingRangeArmoryUiReady
             && _hud.TrainingRangeArmoryIntentSignalsConnected
             && GetTree().Paused;
+        var stationPreview = _hud.TrainingRangeArmoryPreviewRenderableForDiagnostics;
         // Keep the weapon selection unchanged, but alter ammo and target count so
         // APPLY has real work to do while the active platform remains AWM.
         _hud.SelectTrainingRangeBotCountForDiagnostics(6);
@@ -314,10 +315,11 @@ public partial class FreightTerminalWorld
             && repeatFireDowned
             && repeatRevived
             && stationPanel
+            && stationPreview
             && stationAttachmentPreserved
             && platformSwitchReset
             && stationResume;
-        GD.Print($"TRAINING_RANGE_CHECK valid={valid} setup={setupReady} arena={arenaReady} selection={selectionReady} started={started} stations={stationsReady} infinite_ammo={infiniteAmmo} weapon_cycle={weaponCycle} live_fire_shot={liveFireShot} live_fire_hit={liveFireHit} live_fire_downed={liveFireDowned} live_fire_target_id={liveFireTargetId} live_fire_probe={liveFireProbeCollider} live_fire_probe_distance={liveFireProbeDistance:0.00} live_fire_probe_position={liveFireProbePosition} live_fire_camera={liveFireCameraPosition} live_fire_forward={liveFireCameraForward} fire_target_position={fireTargetPositionForLog} target_hit={targetHit} downed={downed} respawned={respawned} revive_frames={reviveFrames} repeat_fire_shot={repeatFireShot} repeat_fire_hit={repeatFireHit} repeat_fire_downed={repeatFireDowned} repeat_revived={repeatRevived} repeat_revive_frames={repeatReviveFrames} station_panel={stationPanel} station_attachment_edit={attachmentEditApplied} station_attachment_preserved={stationAttachmentPreserved} platform_switch_reset={platformSwitchReset} station_resume={stationResume} target_id={targetId} bots={TrainingRangeBotCount} kills={TrainingRangeKills}");
+        GD.Print($"TRAINING_RANGE_CHECK valid={valid} setup={setupReady} arena={arenaReady} selection={selectionReady} started={started} stations={stationsReady} infinite_ammo={infiniteAmmo} weapon_cycle={weaponCycle} live_fire_shot={liveFireShot} live_fire_hit={liveFireHit} live_fire_downed={liveFireDowned} live_fire_target_id={liveFireTargetId} live_fire_probe={liveFireProbeCollider} live_fire_probe_distance={liveFireProbeDistance:0.00} live_fire_probe_position={liveFireProbePosition} live_fire_camera={liveFireCameraPosition} live_fire_forward={liveFireCameraForward} fire_target_position={fireTargetPositionForLog} target_hit={targetHit} downed={downed} respawned={respawned} revive_frames={reviveFrames} repeat_fire_shot={repeatFireShot} repeat_fire_hit={repeatFireHit} repeat_fire_downed={repeatFireDowned} repeat_revived={repeatRevived} repeat_revive_frames={repeatReviveFrames} station_panel={stationPanel} station_preview={stationPreview} station_attachment_edit={attachmentEditApplied} station_attachment_preserved={stationAttachmentPreserved} platform_switch_reset={platformSwitchReset} station_resume={stationResume} target_id={targetId} bots={TrainingRangeBotCount} kills={TrainingRangeKills}");
         GD.Print($"TRAINING_RANGE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }

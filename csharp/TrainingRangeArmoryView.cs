@@ -82,6 +82,9 @@ public partial class TrainingRangeArmoryView : ColorRect
 
     public WeaponPlatform SelectedPlatform => _workingBuild.Platform;
 
+    internal bool PreviewRenderableForDiagnostics
+        => UiReady && _preview.HasRenderableModelForDiagnostics;
+
     public bool UiReady
         => _ready
         && GodotObject.IsInstanceValid(_weaponList)

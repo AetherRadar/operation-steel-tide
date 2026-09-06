@@ -39,6 +39,10 @@ public partial class InventoryModelPreview : SubViewportContainer
     internal bool RenderTargetMatchesControlForDiagnostics
         => RenderTargetMatchesControl;
 
+    internal bool HasRenderableModelForDiagnostics
+        => IsInstanceValid(_modelRoot)
+            && CombatModelLibrary.ComputeBounds(_modelRoot!).MeshCount > 0;
+
     private bool RenderTargetMatchesControl
         => IsInstanceValid(_viewport)
             && Mathf.Abs(_viewport!.Size.X - Size.X) <= 1.0f
@@ -232,6 +236,7 @@ public partial class InventoryModelPreview : SubViewportContainer
                     ? 1.15f
                     : 2.75f;
                 _modelRoot.RotationDegrees = new Vector3(-8, 13, -2);
+                CenterRiflePreview();
                 break;
             case InventoryPreviewKind.Knife:
                 BuildKnife(_modelRoot);
@@ -265,6 +270,27 @@ public partial class InventoryModelPreview : SubViewportContainer
                 break;
         }
         RequestRender();
+    }
+
+    private void CenterRiflePreview()
+    {
+        if (_modelRoot is null || _camera is null)
+        {
+            return;
+        }
+
+        var bounds = CombatModelLibrary.ComputeBounds(_modelRoot);
+        if (bounds.MeshCount == 0)
+        {
+            return;
+        }
+
+        // Authored weapon scenes use different source pivots.  Center the
+        // imported bounds after applying the presentation rotation so a valid
+        // rifle cannot end up outside the orthographic preview camera.
+        _modelRoot.Position = -bounds.Center;
+        var verticalExtent = Mathf.Max(0.01f, bounds.Size.Y);
+        _camera.Size = Mathf.Max(_camera.Size, verticalExtent * 1.28f);
     }
 
     private void RequestRender()

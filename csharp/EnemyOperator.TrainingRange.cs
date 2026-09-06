@@ -183,7 +183,6 @@ public partial class EnemyOperator
         // The authored downed clip is already grounded in model space.  Applying a
         // fixed offset here made some operators float while others sank into the
         // lane; keep the visual root at the actor's measured floor origin.
-        _authoredOperatorVisual.Root.Position = Vector3.Zero;
         _authoredOperatorVisual.Root.Rotation = Vector3.Zero;
         if (IsInstanceValid(_bodyRoot))
         {

@@ -37,6 +37,9 @@ public partial class CombatHUD
         => IsInstanceValid(_trainingRangeArmoryView) && _trainingRangeArmoryView.UiReady;
     public bool TrainingRangeArmoryIntentSignalsConnected
         => IsInstanceValid(_trainingRangeArmoryView) && _trainingRangeArmoryView.IntentBindingsReady;
+    public bool TrainingRangeArmoryPreviewRenderableForDiagnostics
+        => IsInstanceValid(_trainingRangeArmoryView)
+        && _trainingRangeArmoryView.PreviewRenderableForDiagnostics;
     public bool TrainingRangeSetupSelectionContractReady
         => IsInstanceValid(_trainingRangeSetupView)
         && _trainingRangeSetupView.SelectionContractReady;
