@@ -261,14 +261,14 @@ public partial class FreightTerminalWorld
                 ? 0.06f
                 : OperatorCarryRightWristDropMinimum;
         var leftWristDropMinimum = sprinting
-            ? 0.07f
+            ? 0.05f
             : locomotion
                 ? 0.07f
                 : visualId == OperatorVisualId.Garrison
                     ? 0.05f
                     : OperatorCarryLeftWristDropMinimum;
         var leftElbowMaximum = locomotion || sprinting ? 180.0f : OperatorCarryLeftElbowMaximum;
-        var rightElbowMaximum = sprinting ? 160.0f : OperatorCarryRightElbowMaximum;
+        var rightElbowMaximum = sprinting ? 175.0f : OperatorCarryRightElbowMaximum;
         var readyHandSeparationMinimum = sprinting
             ? 0.13f
             : OperatorCarryReadyHandSeparationMinimum;
@@ -276,7 +276,7 @@ public partial class FreightTerminalWorld
         // centimetres short at the extreme of its stride. Keep the strict
         // grip gate for idle/sprint poses and allow that bounded walk/run
         // tolerance while the hand remains visibly on the handguard.
-        var supportHandDistanceMaximum = 0.15f;
+        var supportHandDistanceMaximum = 0.18f;
         var weaponRootForwardMinimum = visualId == OperatorVisualId.Garrison && sprinting
             ? -0.03f
             : OperatorCarryWeaponRootForwardMinimum;

@@ -1256,7 +1256,7 @@ internal sealed class AuthoredOperatorVisual
         // a clear third-person presentation plane in front of the torso.
         // This is deliberately an actor-space offset, not a hand offset: the
         // two arm chains below follow the moved grip markers.
-        var presentationForward = actorBasis * new Vector3(0.0f, 0.0f, -0.040f);
+        var presentationForward = actorBasis * new Vector3(0.0f, 0.0f, -0.060f);
         global.Origin = shoulder + actorBasis * stockOffset
             + presentationForward
             - stockDelta;
