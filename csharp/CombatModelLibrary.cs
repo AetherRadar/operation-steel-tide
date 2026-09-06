@@ -920,6 +920,26 @@ internal sealed class AuthoredOperatorVisual
     }
 
     /// <summary>Replaces the three optional world/paper-doll gear overlays.</summary>
+    public void ApplyPreviewNeutralPose()
+    {
+        var neck = ResolveBoneIndex(_skeleton, "mixamorig:Neck");
+        var head = ResolveBoneIndex(_skeleton, "mixamorig:Head");
+#pragma warning disable CS0618
+        foreach (var bone in new[] { neck, head })
+        {
+            var pose = _skeleton.GetBoneGlobalPose(bone);
+            var uprightBasis = pose.Basis.Rotated(Vector3.Right, -0.24f).Orthonormalized();
+            _skeleton.SetBoneGlobalPoseOverride(
+                bone,
+                new Transform3D(uprightBasis, pose.Origin),
+                1.0f,
+                persistent: true);
+        }
+#pragma warning restore CS0618
+        _skeleton.ForceUpdateBoneChildTransform(neck);
+        _skeleton.ForceUpdateBoneChildTransform(head);
+    }
+
     public void SetEquipment(
         EquipmentItem? helmet,
         EquipmentItem? bodyArmor,
@@ -2480,24 +2500,28 @@ internal static partial class CombatModelLibrary
                 if (animationPlayer.HasAnimation("idle"))
                 {
                     animationPlayer.Play("idle");
-                    animationPlayer.Seek(0.0, update: true);
+                    // Frame zero is an authored transition pose with the
+                    // chin tucked and the hips unloaded. Sample the neutral
+                    // middle of the loop for the product-shot preview.
+                    var idle = animationPlayer.GetAnimation("idle");
+                    animationPlayer.Seek(idle.Length * 0.5, update: true);
                     animationPlayer.Advance(0.0);
                 }
                 else
                 {
                     animationPlayer.Stop();
                 }
+                var previewPose = new AuthoredOperatorVisual(source, visualId);
+                previewPose.ApplyPreviewNeutralPose();
 
                 if (weaponBuild is not null)
                 {
-                    var previewVisual = new AuthoredOperatorVisual(source, visualId);
                     pendingWeapon = InstantiateWeapon(weaponBuild.Platform, firstPerson: false);
-                    previewVisual.AttachWeapon(pendingWeapon, weaponBuild);
-                    previewVisual.SetWeaponReadied(false);
+                    previewPose.AttachWeapon(pendingWeapon, weaponBuild);
+                    previewPose.SetWeaponReadied(false);
                     pendingWeapon = null;
                 }
-                var equipmentVisual = new AuthoredOperatorVisual(source, visualId);
-                equipmentVisual.SetEquipment(helmet, bodyArmor, backpack);
+                previewPose.SetEquipment(helmet, bodyArmor, backpack);
             }
 
             wrapper = new Node3D();
