@@ -23,7 +23,9 @@ public partial class FreightTerminalWorld
     private bool _trainingRangeActive;
     private Vector3 _trainingRangeOrigin;
     private int _trainingRangeKills;
-    private int _trainingRangeBotType;
+    // Patrol targets are the useful default for a live-fire lane; the setup
+    // panel still exposes fixed targets when a stationary silhouette is wanted.
+    private int _trainingRangeBotType = 1;
     private int _trainingRangeBotCount = 6;
     private int _trainingRangeWeaponIndex;
     private int _trainingRangeAmmoType;
