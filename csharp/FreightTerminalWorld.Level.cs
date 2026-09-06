@@ -68,19 +68,30 @@ public partial class FreightTerminalWorld
         var material = new StandardMaterial3D
         {
             AlbedoColor = baseColor,
-            AlbedoTexture = GD.Load<Texture2D>(root + "_diff_1k.jpg"),
             NormalEnabled = true,
-            NormalTexture = GD.Load<Texture2D>(root + "_normal_1k.jpg"),
             NormalScale = 0.75f,
             Roughness = roughness,
-            RoughnessTexture = GD.Load<Texture2D>(root + "_rough_1k.jpg"),
             Uv1Triplanar = true,
             Uv1WorldTriplanar = true,
             Uv1Scale = Vector3.One * 0.24f,
             TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic
         };
+        material.AlbedoTexture = LoadTextureIfAvailable(root + "_diff_1k.jpg");
+        material.NormalTexture = LoadTextureIfAvailable(root + "_normal_1k.jpg");
+        material.RoughnessTexture = LoadTextureIfAvailable(root + "_rough_1k.jpg");
         _materials[id] = material;
         return material;
+    }
+
+    private static Texture2D? LoadTextureIfAvailable(string path)
+    {
+        // During a fresh checkout Godot can enter the scene before its import
+        // scan has produced the compressed texture resource. Avoid emitting a
+        // loader error in that window; the material keeps its authored base
+        // color and picks up the texture on the next scene load.
+        return ResourceLoader.Exists(path, "Texture2D")
+            ? GD.Load<Texture2D>(path)
+            : null;
     }
 
     private StandardMaterial3D PaintedMetal(string id, Color tint)
