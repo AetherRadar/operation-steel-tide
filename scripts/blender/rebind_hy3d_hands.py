@@ -13,6 +13,17 @@ Usage::
 
     blender -b --python rebind_hy3d_hands.py -- \
         --input operator.clean.glb --output operator.hands.glb
+
+The output is the hand-rebound source.  Run the carry-action repair as a
+second, separate export so the source GLB is never overwritten::
+
+    blender -b --python repair_hy3d_operator_carry_actions.py -- \
+        operator.hands.glb operator.carried.glb
+
+The second pass replaces only carry finger rotations and upper-body carry
+tracks; it preserves the location/scale channels that the glTF importer needs
+for the child finger translations.  Keep both outputs in a private asset
+directory and point the Godot test project at ``operator.carried.glb``.
 """
 
 from __future__ import annotations
