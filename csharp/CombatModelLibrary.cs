@@ -616,9 +616,9 @@ internal sealed class AuthoredPreviewOperatorVisual
 
 internal sealed class AuthoredOperatorVisual
 {
-    private const float Hy3dSupportPalmContactOffset = 0.050f;
+    private const float Hy3dSupportPalmContactOffset = 0.060f;
     private const float Hy3dSupportHandVerticalOffset = -0.045f;
-    private const float Hy3dPrimaryPalmContactOffset = 0.020f;
+    private const float Hy3dPrimaryPalmContactOffset = 0.085f;
     private const float FieldWeaponScale = 0.42f;
     private static readonly Quaternion ReadiedWeaponRotation = new(
         -0.9934235f,
@@ -807,6 +807,7 @@ internal sealed class AuthoredOperatorVisual
         var rightShoulder = BoneWorldPosition("mixamorig:RightArm");
         var rightElbow = BoneWorldPosition("mixamorig:RightForeArm");
         var rightWrist = BoneWorldPosition("mixamorig:RightHand");
+        var rightPalm = PrimaryHandContactWorld(rightWrist);
         var leftShoulder = BoneWorldPosition("mixamorig:LeftArm");
         var leftElbow = BoneWorldPosition("mixamorig:LeftForeArm");
         var leftWrist = BoneWorldPosition("mixamorig:LeftHand");
@@ -833,13 +834,14 @@ internal sealed class AuthoredOperatorVisual
             RightElbowAngleDegrees: JointAngleDegrees(rightShoulder, rightElbow, rightWrist),
             LeftElbowAngleDegrees: JointAngleDegrees(leftShoulder, leftElbow, leftWrist),
             RightWristBelowHead: headBase.Y - rightWrist.Y,
+            RightPalmBelowHead: headBase.Y - rightPalm.Y,
             LeftWristBelowHead: headBase.Y - leftWrist.Y,
             StockToRightShoulderDistance: stock.DistanceTo(rightShoulder),
             HeadToWeaponLineClearance: DistanceToSegment(headBase, stock, muzzle),
             ChestToWeaponLineClearance: DistanceToSegment(chest, stock, muzzle),
             PrimaryHandToWeaponDistance: CombatModelLibrary.UsesHy3dOperator(VisualId)
                 && weapon.PrimaryGrip is { } primaryGrip
-                ? rightWrist.DistanceTo(PrimaryHandTargetWorld(primaryGrip))
+                ? rightPalm.DistanceTo(PrimaryPalmTargetWorld(primaryGrip))
                 : rightWrist.DistanceTo(weapon.PrimaryGrip?.GlobalPosition ?? weapon.Root.GlobalPosition),
             SupportHandToForegripDistance: SupportHandContactWorld(leftWrist).DistanceTo(
                 weapon.Foregrip.GlobalPosition),
@@ -862,19 +864,40 @@ internal sealed class AuthoredOperatorVisual
 
     private Vector3 PrimaryHandContactWorld(Vector3 wristOrigin)
     {
-        return wristOrigin;
+        if (!CombatModelLibrary.UsesHy3dOperator(VisualId) || _weapon is null)
+        {
+            return wristOrigin;
+        }
+
+        var weaponBasis = _weapon.Root.GlobalTransform.Basis.Orthonormalized();
+        var fingerDirection = (weaponBasis * new Vector3(0.0f, -1.0f, -0.25f)).Normalized();
+        return wristOrigin + fingerDirection * Hy3dPrimaryPalmContactOffset;
     }
 
     private Vector3 PrimaryHandTargetWorld(Node3D grip)
     {
         var weaponBasis = _weapon!.Root.GlobalTransform.Basis.Orthonormalized();
         var fingerDirection = (weaponBasis * new Vector3(0.0f, -1.0f, -0.25f)).Normalized();
-        // The hand bone is the wrist, not the centre of the palm. Bias it a
-        // small amount behind the pistol grip and let the fingers descend over
-        // the grip instead of stopping at its midpoint. The bounded HY-3D
-        // chain stretch keeps this authored palm contact reachable without
-        // feeding the weapon back through the wrist socket.
-        return grip.GlobalPosition - fingerDirection * Hy3dPrimaryPalmContactOffset;
+        // The hand bone is the wrist, not the centre of the palm. Bias it
+        // behind the pistol grip by the authored wrist-to-palm span so the
+        // palm, rather than the wrist cap, is the contact point.
+        var target = PrimaryPalmTargetWorld(grip) - fingerDirection * Hy3dPrimaryPalmContactOffset;
+        return target;
+    }
+
+    private Vector3 PrimaryPalmTargetWorld(Node3D grip)
+    {
+        var target = grip.GlobalPosition;
+        if (CombatModelLibrary.UsesHy3dOperator(VisualId))
+        {
+            // The shared M4A1 marker is kept at the legacy trigger reference
+            // for the Bamen rig. HY-3D's palm sits lower and farther toward
+            // the barrel than that marker, so move only its palm target in
+            // actor space; the wrist remains the solved endpoint behind it.
+            target += Root.GlobalTransform.Basis.Orthonormalized()
+                * new Vector3(0.0f, -0.02f, -0.06f);
+        }
+        return target;
     }
 
     private Vector3 SupportHandContactWorld(Vector3 wristOrigin)
@@ -1400,9 +1423,13 @@ internal sealed class AuthoredOperatorVisual
         // fingers. The pistol grip is primarily vertical below the receiver;
         // keep only a small rearward component so the palm wraps the grip
         // instead of pointing diagonally across the receiver.
-        var gripBasis = BuildCarryHandBasis(
+        var targetBasis = BuildCarryHandBasis(
             weaponBasis,
             new Vector3(0.0f, -1.0f, -0.25f));
+        var gripBasis = PreserveHandPalmRoll(
+            "mixamorig:RightHandIndex1",
+            hand,
+            targetBasis);
         _skeleton.SetBoneGlobalPoseOverride(
             _rightHandBone,
             new Transform3D(gripBasis, hand.Origin),
@@ -1425,9 +1452,13 @@ internal sealed class AuthoredOperatorVisual
         // authored rifle frame for its roll as well as its position so the
         // fingers wrap the foregrip instead of floating above the top rail.
 #pragma warning disable CS0618
-        var gripBasis = BuildCarryHandBasis(
+        var targetBasis = BuildCarryHandBasis(
             weaponBasis,
             new Vector3(0.0f, 0.0f, -1.0f));
+        var gripBasis = PreserveHandPalmRoll(
+            "mixamorig:LeftHandIndex1",
+            hand,
+            targetBasis);
         _skeleton.SetBoneGlobalPoseOverride(
             _leftWristBone,
             new Transform3D(gripBasis, hand.Origin),
@@ -1449,7 +1480,7 @@ internal sealed class AuthoredOperatorVisual
         // vertical grip instead of hovering over the receiver.
         var weaponBasis = _weapon.Root.GlobalTransform.Basis.Orthonormalized();
         return _weapon.Foregrip.GlobalPosition
-            + weaponBasis * new Vector3(0.0f, -0.045f, 0.0f);
+            + weaponBasis * new Vector3(0.0f, -0.045f, 0.040f);
     }
 
     private static Basis BuildCarryHandBasis(Basis weaponBasis, Vector3 localFingerDirection)
@@ -1458,6 +1489,31 @@ internal sealed class AuthoredOperatorVisual
         var palmWidth = (weaponBasis * Vector3.Right).Normalized();
         var palmDepth = palmWidth.Cross(fingerDirection).Normalized();
         return new Basis(palmWidth, fingerDirection, palmDepth).Orthonormalized();
+    }
+
+    private Basis PreserveHandPalmRoll(
+        string fingerBoneName,
+        Transform3D authoredHand,
+        Basis targetBasis)
+    {
+        var fingerBone = ResolveBoneIndex(_skeleton, fingerBoneName);
+        var authoredFinger = _skeleton.GetBoneGlobalPose(fingerBone).Origin - authoredHand.Origin;
+        var targetFinger = targetBasis * Vector3.Up;
+        if (authoredFinger.LengthSquared() <= 0.000001f
+            || targetFinger.LengthSquared() <= 0.000001f)
+        {
+            return targetBasis.Orthonormalized();
+        }
+
+        var fingerAlignment = new Quaternion(
+            authoredFinger.Normalized(),
+            targetFinger.Normalized());
+        // The imported HY-3D palm normal is a quarter turn away from the
+        // rifle's grip-facing side. Preserve the authored hand roll, then
+        // rotate that palm normal onto the grip so the finger chains close
+        // around the handle instead of hanging below it.
+        var palmRoll = new Quaternion(targetFinger.Normalized(), Mathf.DegToRad(90.0f));
+        return (new Basis(palmRoll * fingerAlignment) * authoredHand.Basis).Orthonormalized();
     }
 
     private void ApplyCarrySocketBasis()
@@ -1855,6 +1911,7 @@ internal readonly record struct OperatorCarryInspection(
     float RightElbowAngleDegrees,
     float LeftElbowAngleDegrees,
     float RightWristBelowHead,
+    float RightPalmBelowHead,
     float LeftWristBelowHead,
     float StockToRightShoulderDistance,
     float HeadToWeaponLineClearance,
@@ -1997,9 +2054,8 @@ internal static partial class CombatModelLibrary
             // The source M4A1 root is the receiver frame, not the firing
             // hand's contact point. Mark the centre of the short pistol grip
             // below and just behind the trigger.  In the imported weapon
-            // frame the grip is around Y=-0.16, Z=+0.05; placing this marker
-            // on the magazine well leaves the trigger hand visibly forward
-            // of the actual grip.
+            // frame uses the legacy trigger reference; HY-3D applies its
+            // palm-specific offset in PrimaryHandTargetWorld below.
             AddMarker(root, "PrimaryGrip", new Vector3(0.0f, -0.16f, 0.05f));
         }
         if (FindOptionalNode(root, "OpticRailContact") is null)

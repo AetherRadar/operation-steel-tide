@@ -305,7 +305,7 @@ public partial class FreightTerminalWorld
             && inspection.RightElbowAngleDegrees <= rightElbowMaximum
             && inspection.LeftElbowAngleDegrees >= OperatorCarryLeftElbowMinimum
             && inspection.LeftElbowAngleDegrees <= leftElbowMaximum
-            && inspection.RightWristBelowHead >= wristDropMinimum
+            && inspection.RightPalmBelowHead >= wristDropMinimum
             && inspection.LeftWristBelowHead >= leftWristDropMinimum
             && inspection.StockToRightShoulderDistance <= OperatorCarryStockToShoulderMaximum
             && inspection.HeadToWeaponLineClearance >= headClearanceMinimum
