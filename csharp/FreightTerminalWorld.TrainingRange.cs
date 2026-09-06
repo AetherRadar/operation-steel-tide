@@ -23,6 +23,7 @@ public partial class FreightTerminalWorld
     private bool _trainingRangeActive;
     private Vector3 _trainingRangeOrigin;
     private int _trainingRangeKills;
+    private int _trainingRangeResetCueCount;
     // Patrol targets are the useful default for a live-fire lane; the setup
     // panel still exposes fixed targets when a stationary silhouette is wanted.
     private int _trainingRangeBotType = 1;
@@ -36,6 +37,7 @@ public partial class FreightTerminalWorld
     private bool _trainingRangeDecreaseHeld;
     private bool _trainingRangeIncreaseHeld;
     private string?[] _trainingRangePendingAttachmentIds = new string?[6];
+    private readonly RandomNumberGenerator _trainingRangeSpawnRng = new();
 
     private static readonly int[] TrainingRangeBotCountOptions = { 3, 6, 12, 24 };
     private const float TrainingRangeRespawnDelaySeconds = 1.0f;
@@ -44,6 +46,7 @@ public partial class FreightTerminalWorld
     public int TrainingRangeBotCount
         => _trainingRangeBotSlots.Count(slot => IsInstanceValid(slot.Bot) && !slot.Bot!.IsDead);
     public int TrainingRangeKills => _trainingRangeKills;
+    public int TrainingRangeResetCueCount => _trainingRangeResetCueCount;
     public int TrainingRangeBotType => _trainingRangeBotType;
     public int TrainingRangeConfiguredBotCount => _trainingRangeBotCount;
     public int TrainingRangeConfiguredWeaponIndex => _trainingRangeWeaponIndex;
@@ -120,8 +123,10 @@ public partial class FreightTerminalWorld
 
         _trainingRangeActive = true;
         _trainingRangeKills = 0;
+        _trainingRangeResetCueCount = 0;
         _trainingRangeElapsedSeconds = 0.0f;
         _trainingRangeRespawnDelaySeconds = TrainingRangeRespawnDelaySeconds;
+        _trainingRangeSpawnRng.Seed = 0x535445454C544944UL;
         _trainingRangeDecreaseHeld = false;
         _trainingRangeIncreaseHeld = false;
         _demolitionMode = false;
@@ -441,32 +446,10 @@ public partial class FreightTerminalWorld
 
             if (bot.IsDead)
             {
-                // EnemyOperator emits Eliminated before its normal death tween is
-                // scheduled.  Re-assert the range-specific downed pose every frame
-                // so the target stays visibly knocked down until the reset timer
-                // expires, rather than briefly showing a mission corpse animation.
-                bot.SetTrainingRangeDownedPose(delta);
-                if (!slot.RespawnPending)
-                {
-                    slot.RespawnPending = true;
-                    slot.IsDowned = true;
-                    slot.RespawnTimer = Mathf.Max(
-                        _trainingRangeRespawnDelaySeconds,
-                        slot.Profile.RespawnDelaySeconds);
-                    bot.Visible = true;
-                    // Preserve the body in the physics space while it is visibly
-                    // downed; its collision layer/mask are zeroed below so shots
-                    // continue to the other lanes during the reset window.
-                    bot.ProcessMode = ProcessModeEnum.Inherit;
-                    bot.SetPhysicsProcess(false);
-                    bot.CollisionLayer = 0;
-                    bot.CollisionMask = 0;
-                }
-                slot.RespawnTimer -= delta;
-                if (slot.RespawnTimer <= 0.0f)
-                {
-                    ReviveTrainingRangeBot(slot);
-                }
+                // Eliminated is normally handled synchronously.  This is only a
+                // safety net for external diagnostics or a future damage source:
+                // never leave a dead target kneeling and invulnerable in the range.
+                RespawnTrainingRangeBotImmediately(slot, bot);
                 continue;
             }
 
@@ -542,6 +525,113 @@ public partial class FreightTerminalWorld
             bot.Name);
     }
 
+    private void RespawnTrainingRangeBotImmediately(TrainingRangeBotSlot slot, EnemyOperator bot)
+    {
+        var previous = bot.GlobalPosition;
+        slot.Spawn = ChooseTrainingRangeRespawnPosition(slot, previous);
+        slot.MotionPhase = _trainingRangeSpawnRng.RandfRange(0.0f, Mathf.Tau);
+        slot.RespawnPending = false;
+        slot.IsDowned = false;
+        slot.RespawnTimer = 0.0f;
+        bot.SuppressDeathAnimationForTrainingRange();
+        bot.ReviveForTrainingRange(slot.Spawn);
+        // ReviveForTrainingRange clears transient flags; keep the death callback
+        // from starting the mission corpse tween when Die() resumes after EmitSignal.
+        bot.SuppressDeathAnimationForTrainingRange();
+        FaceTrainingRangePlayer(bot);
+        bot.SetMeta("training_range_bot_mode", _trainingRangeBotType);
+        if (_trainingRangeBotType == 2)
+        {
+            bot.ProcessMode = ProcessModeEnum.Inherit;
+            bot.SetPhysicsProcess(true);
+            bot.SetAlerted(_player.GlobalPosition);
+        }
+        else
+        {
+            bot.ProcessMode = ProcessModeEnum.Inherit;
+            bot.SetPhysicsProcess(false);
+        }
+        bot.Visible = true;
+        if (!_enemies.Contains(bot))
+        {
+            _enemies.Add(bot);
+            InvalidateCombatTargetIndex();
+        }
+        slot.LastHealth = bot.CurrentHealth;
+    }
+
+    private Vector3 ChooseTrainingRangeRespawnPosition(
+        TrainingRangeBotSlot slot,
+        Vector3 previous)
+    {
+        var arena = _trainingRangeArena;
+        if (arena is null || arena.BotProfiles.Count == 0)
+        {
+            return previous;
+        }
+
+        var candidates = new List<Vector3>(arena.BotProfiles.Count);
+        foreach (var profile in arena.BotProfiles)
+        {
+            var candidate = profile.Position;
+            if (candidate.DistanceTo(previous) < 0.5f
+                || candidate.DistanceTo(_player.GlobalPosition) < 6.0f)
+            {
+                continue;
+            }
+            var occupied = false;
+            foreach (var other in _trainingRangeBotSlots)
+            {
+                if (ReferenceEquals(other, slot)
+                    || !IsInstanceValid(other.Bot)
+                    || other.Bot!.IsDead)
+                {
+                    continue;
+                }
+                if (other.Bot.GlobalPosition.DistanceTo(candidate) < 3.0f)
+                {
+                    occupied = true;
+                    break;
+                }
+            }
+            if (!occupied)
+            {
+                candidates.Add(candidate);
+            }
+        }
+
+        if (candidates.Count == 0)
+        {
+            foreach (var profile in arena.BotProfiles)
+            {
+                if (profile.Position.DistanceTo(previous) >= 0.5f)
+                {
+                    candidates.Add(profile.Position);
+                }
+            }
+        }
+        return candidates.Count == 0
+            ? previous
+            : candidates[_trainingRangeSpawnRng.RandiRange(0, candidates.Count - 1)];
+    }
+
+    private void PlayTrainingRangeTargetResetSound(Vector3 position)
+    {
+        var audio = new AudioStreamPlayer3D
+        {
+            Name = "TrainingRangeTargetResetAudio",
+            Stream = SoundLab.TrainingRangeTargetReset(),
+            VolumeDb = -2.0f,
+            MaxDistance = 52.0f,
+            UnitSize = 8.0f,
+            Position = position
+        };
+        AddChild(audio);
+        audio.Finished += audio.QueueFree;
+        audio.Play();
+        _trainingRangeResetCueCount++;
+    }
+
     private bool HandleTrainingRangeBotEliminated(EnemyOperator enemy)
     {
         if (!_trainingRangeActive)
@@ -560,35 +650,15 @@ public partial class FreightTerminalWorld
                 enemy.OperatorCallsign(_languageSetting),
                 GameLocalization.Get("you", _languageSetting, "YOU"));
         }
-        // Keep the defeated node in the lane. Its collision is already disabled by
-        // EnemyOperator.Die; the visible authored downed pose makes the reset timer
-        // readable instead of hiding the target and spawning an unrelated replacement.
-        // Schedule the same configured reset delay used by the normal update path.
-        // Setting this to zero made a rapid diagnostic burst kill/revive the same
-        // target several times and made the first downed state frame-rate dependent.
-        slot.RespawnTimer = Mathf.Max(
-            _trainingRangeRespawnDelaySeconds,
-            slot.Profile.RespawnDelaySeconds);
-        slot.RespawnPending = true;
-        slot.IsDowned = true;
-        _enemies.Remove(enemy);
-        _lootSources.Remove(enemy);
-        _enemiesRemaining = TrainingRangeBotCount;
-        _hud.SetTrainingRangeTargetCount(_enemiesRemaining);
-        enemy.Visible = true;
-        // Keep the node registered with the scene tree while its collision layer is
-        // zeroed.  ProcessMode.Disabled unregisters the CharacterBody3D from physics
-        // and can leave the authored corpse unable to resume on the next cycle.
-        enemy.ProcessMode = ProcessModeEnum.Inherit;
-        enemy.SetPhysicsProcess(false);
-        enemy.CollisionLayer = 0;
-        enemy.CollisionMask = 0;
         enemy.HideCorpseLootBackpackForTrainingRange();
-        // Die() emits Eliminated synchronously and otherwise starts the normal
-        // terminal death tween immediately after this callback returns.  Mark
-        // the target as a reusable range dummy before that happens.
-        enemy.SuppressDeathAnimationForTrainingRange();
-        enemy.SetTrainingRangeDownedPose();
+        RespawnTrainingRangeBotImmediately(slot, enemy);
+        PlayTrainingRangeTargetResetSound(slot.Spawn);
+        _hud.ShowLocalizedFormattedMessage(
+            "training_range_respawn",
+            "{0}  RESET",
+            new Color(0.36f, 0.95f, 0.68f),
+            enemy.Name);
+        _hud.SetTrainingRangeTargetCount(TrainingRangeBotCount);
         InvalidateCombatTargetIndex();
         return true;
     }

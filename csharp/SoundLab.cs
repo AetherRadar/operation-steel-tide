@@ -673,6 +673,24 @@ public static partial class SoundLab
         return MakeStream(samples, rate);
     }
 
+    /// <summary>Short two-tone signature used when a training target is reset.</summary>
+    public static AudioStreamWav TrainingRangeTargetReset()
+    {
+        const int rate = 22050;
+        const float duration = 0.24f;
+        var samples = new float[(int)(rate * duration)];
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var t = (float)i / rate;
+            var first = Mathf.Sin(Mathf.Tau * 640.0f * t) * Mathf.Exp(-t * 18.0f);
+            var secondTime = Mathf.Max(0.0f, t - 0.095f);
+            var second = Mathf.Sin(Mathf.Tau * 980.0f * secondTime) * Mathf.Exp(-secondTime * 22.0f);
+            var click = Mathf.Exp(-Mathf.Abs(t - 0.006f) * 180.0f) * 0.18f;
+            samples[i] = (first * 0.42f + second * 0.58f + click) * 0.72f;
+        }
+        return MakeStream(samples, rate);
+    }
+
     public static AudioStreamWav Footstep()
     {
         const int rate = 22050;

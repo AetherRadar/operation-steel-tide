@@ -153,21 +153,23 @@ public partial class FreightTerminalWorld
 
         var target = _trainingRangeBotSlots.Count > 0 ? _trainingRangeBotSlots[0].Bot : null;
         var targetId = target?.GetInstanceId() ?? 0UL;
+        var targetPositionBeforeReset = target?.GlobalPosition ?? Vector3.Zero;
         var targetHit = target is not null
             && target.TakeDamage(10000.0f, target.GlobalPosition + Vector3.Up * 1.4f, _player);
-        // The range intentionally resets targets on the next world tick. Capture
-        // the downed state before yielding, otherwise the immediate reset makes a
-        // correct one-shot knockdown look like a missed assertion.
+        // A lethal hit now resets the target synchronously.  The old downed pose
+        // made the dummy invulnerable for the reset window, so verify that the same
+        // node is immediately alive at a different safe lane and that the reset cue
+        // was emitted.
         var downed = targetHit
             && target is not null
-            && target.IsDead
+            && !target.IsDead
             && target.Visible
             && _trainingRangeBotSlots.Count > 0
-            && _trainingRangeBotSlots[0].IsDowned
-            && _trainingRangeBotSlots[0].RespawnPending;
+            && !_trainingRangeBotSlots[0].IsDowned
+            && !_trainingRangeBotSlots[0].RespawnPending;
         await WaitFrames(2);
         var reviveFrames = 0;
-        while (reviveFrames < 720
+        while (reviveFrames < 30
             && (target is not null && target.IsDead || TrainingRangeBotCount < 12))
         {
             await WaitFrames(1);
@@ -179,11 +181,13 @@ public partial class FreightTerminalWorld
             && revivedTarget is not null
             && revivedTarget.GetInstanceId() == targetId
             && !revivedTarget.IsDead
+            && revivedTarget.GlobalPosition.DistanceTo(targetPositionBeforeReset) > 0.5f
             && TrainingRangeBotCount == 12
-            && TrainingRangeKills >= 1;
+            && TrainingRangeKills >= 1
+            && TrainingRangeResetCueCount >= 1;
 
-        // Prove the loop is repeatable: shoot the same target after its first reset,
-        // observe another visible downed state, then wait for the second stand-up.
+        // Prove the loop is repeatable: shoot the same target after its first reset
+        // and require another immediate random reset.
         var repeatFireShot = false;
         var repeatFireHit = false;
         var repeatFireDowned = false;
@@ -214,17 +218,19 @@ public partial class FreightTerminalWorld
                 || _trainingRangeKills > repeatKillsBefore
                 || ReferenceEquals(revivedTarget.LastDamageAttacker, _player);
             repeatFireDowned = _trainingRangeKills > repeatKillsBefore
-                || (revivedTarget.IsDead
+                && !revivedTarget.IsDead
                 && _trainingRangeBotSlots.Count > 0
-                && _trainingRangeBotSlots[0].IsDowned);
-            while (repeatReviveFrames < 720 && revivedTarget.IsDead)
+                && !_trainingRangeBotSlots[0].IsDowned
+                && !_trainingRangeBotSlots[0].RespawnPending;
+            while (repeatReviveFrames < 30 && revivedTarget.IsDead)
             {
                 await WaitFrames(1);
                 repeatReviveFrames++;
             }
             repeatRevived = !revivedTarget.IsDead
                 && TrainingRangeBotCount == 12
-                && TrainingRangeKills > 1;
+                && TrainingRangeKills > 1
+                && TrainingRangeResetCueCount >= 2;
         }
 
         // Change every live range slot once, then apply a different station payload.
@@ -319,7 +325,7 @@ public partial class FreightTerminalWorld
             && stationAttachmentPreserved
             && platformSwitchReset
             && stationResume;
-        GD.Print($"TRAINING_RANGE_CHECK valid={valid} setup={setupReady} arena={arenaReady} selection={selectionReady} started={started} stations={stationsReady} infinite_ammo={infiniteAmmo} weapon_cycle={weaponCycle} live_fire_shot={liveFireShot} live_fire_hit={liveFireHit} live_fire_downed={liveFireDowned} live_fire_target_id={liveFireTargetId} live_fire_probe={liveFireProbeCollider} live_fire_probe_distance={liveFireProbeDistance:0.00} live_fire_probe_position={liveFireProbePosition} live_fire_camera={liveFireCameraPosition} live_fire_forward={liveFireCameraForward} fire_target_position={fireTargetPositionForLog} target_hit={targetHit} downed={downed} respawned={respawned} revive_frames={reviveFrames} repeat_fire_shot={repeatFireShot} repeat_fire_hit={repeatFireHit} repeat_fire_downed={repeatFireDowned} repeat_revived={repeatRevived} repeat_revive_frames={repeatReviveFrames} station_panel={stationPanel} station_preview={stationPreview} station_attachment_edit={attachmentEditApplied} station_attachment_preserved={stationAttachmentPreserved} platform_switch_reset={platformSwitchReset} station_resume={stationResume} target_id={targetId} bots={TrainingRangeBotCount} kills={TrainingRangeKills}");
+        GD.Print($"TRAINING_RANGE_CHECK valid={valid} setup={setupReady} arena={arenaReady} selection={selectionReady} started={started} stations={stationsReady} infinite_ammo={infiniteAmmo} weapon_cycle={weaponCycle} live_fire_shot={liveFireShot} live_fire_hit={liveFireHit} live_fire_downed={liveFireDowned} live_fire_target_id={liveFireTargetId} live_fire_probe={liveFireProbeCollider} live_fire_probe_distance={liveFireProbeDistance:0.00} live_fire_probe_position={liveFireProbePosition} live_fire_camera={liveFireCameraPosition} live_fire_forward={liveFireCameraForward} fire_target_position={fireTargetPositionForLog} target_hit={targetHit} immediate_reset={downed} respawned={respawned} revive_frames={reviveFrames} repeat_fire_shot={repeatFireShot} repeat_fire_hit={repeatFireHit} repeat_fire_reset={repeatFireDowned} repeat_revived={repeatRevived} repeat_revive_frames={repeatReviveFrames} reset_cues={TrainingRangeResetCueCount} station_panel={stationPanel} station_preview={stationPreview} station_attachment_edit={attachmentEditApplied} station_attachment_preserved={stationAttachmentPreserved} platform_switch_reset={platformSwitchReset} station_resume={stationResume} target_id={targetId} bots={TrainingRangeBotCount} kills={TrainingRangeKills}");
         GD.Print($"TRAINING_RANGE_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
