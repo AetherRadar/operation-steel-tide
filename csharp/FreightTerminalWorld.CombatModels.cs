@@ -20,6 +20,7 @@ public partial class FreightTerminalWorld
         var movementRifleFitValid = true;
         var count = 0;
         var actionCount = 0;
+        var fingerBoneCount = 0;
         try
         {
             visual = CombatModelLibrary.InstantiateOperator();
@@ -27,6 +28,7 @@ public partial class FreightTerminalWorld
             var animator = new AuthoredOperatorAnimator(visual);
             count = animator.AnimationCount;
             actionCount = animator.ActionAnimationCount;
+            fingerBoneCount = visual.FingerBoneCountForDiagnostics;
             void Sample(
                 float speed,
                 bool weaponReadied,
@@ -148,9 +150,11 @@ public partial class FreightTerminalWorld
         var readyForwardAligned = Mathf.Abs(readyIdleFit.MuzzleOffset.X) <= 0.16f
             && readyIdleFit.MuzzleOffset.Z <= -0.38f;
         var actionCoverage = actionCount >= 13 || actionCount == 0;
+        var fingerRigCoverage = fingerBoneCount >= 30;
         var valid = count >= 25
             && sockets
             && actionCoverage
+            && fingerRigCoverage
             && transitionsValid
             && rifleFit.Valid
             && movementRifleFitValid
@@ -169,6 +173,7 @@ public partial class FreightTerminalWorld
             + $"movement_rifle_fit={string.Join(',', movementRifleFits)} "
             + $"muzzle_offset={rifleFit.MuzzleOffset} stock_offset={rifleFit.StockOffset} "
             + $"action_count={actionCount} action_coverage={actionCoverage} "
+            + $"finger_bones={fingerBoneCount} finger_rig_coverage={fingerRigCoverage} "
             + $"transitions={string.Join('>', transitions)} expected={string.Join('>', expected)}");
         GD.Print($"OPERATOR_ANIMATIONS_PASS valid={valid}");
         visual?.Root.QueueFree();

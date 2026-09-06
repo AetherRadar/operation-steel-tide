@@ -11,6 +11,14 @@ locomotion, ready and aim weapon poses, shooting, reloading, melee, utility
 throwing, interaction, pickup, healing, jump, slide, hit, downed, revive, and
 death clips.
 
+The conversion also guarantees a 30-bone finger rig (three phalanges for each
+of five fingers on both hands). Finger chains are weighted to the authored palm
+mesh and receive per-action curl keys, so the right hand can close around the
+primary grip while the left hand supports the foregrip without the mitten mesh
+being swallowed by the rifle. Existing finger chains are preserved when the
+private source already contains them; wrist-only HY-3D responses receive the
+fallback chains during this Blender build.
+
 The generated files are intentionally ignored by Git and remain in the local
 private asset store. On 2026-09-05 the project owner reported confirmation
 from Tencent customer support permitting use of these outputs in this game.

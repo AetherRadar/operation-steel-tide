@@ -334,6 +334,117 @@ def author_downed_hold(armature: bpy.types.Object, death: bpy.types.Action) -> N
     armature.animation_data.action = death
     bpy.context.scene.frame_set(int(math.ceil(death.frame_range[1])))
     bpy.context.view_layer.update()
+
+
+FINGER_LAYOUT = {
+    "Thumb": (0.030, 0.018),
+    "Index": (0.016, 0.012),
+    "Middle": (0.000, 0.008),
+    "Ring": (-0.016, 0.004),
+    "Pinky": (-0.031, 0.000),
+}
+
+
+def author_finger_rig(armature: bpy.types.Object, meshes: list[bpy.types.Object]) -> None:
+    """Add usable phalanges to mitten-style presets and curl them around weapons.
+
+    The original Quaternius female meshes expose only a single hand joint. The
+    small authored chains below preserve that licensed mesh while splitting
+    the hand influence into five bendable contact bands. Existing Mixamo hands
+    already contain these chains, so the operation is idempotent for BAMEN.
+    """
+    required = "mixamorig:LeftHandThumb1"
+    if armature.data.bones.get(required) is None:
+        bpy.ops.object.mode_set(mode="EDIT")
+        for side_name, side in (("Left", 1.0), ("Right", -1.0)):
+            hand_name = f"mixamorig:{side_name}Hand"
+            hand = armature.data.edit_bones.get(hand_name)
+            if hand is None:
+                continue
+            for finger, (y_offset, z_offset) in FINGER_LAYOUT.items():
+                parent = hand
+                for segment in range(1, 4):
+                    name = f"mixamorig:{side_name}Hand{finger}{segment}"
+                    if armature.data.edit_bones.get(name) is not None:
+                        parent = armature.data.edit_bones[name]
+                        continue
+                    head = hand.tail.copy() if segment == 1 else parent.tail.copy()
+                    head += Vector((side * 0.008, y_offset, z_offset - (segment - 1) * 0.004))
+                    tail = head + Vector((side * (0.030 if finger == "Thumb" else 0.026), 0.0, -0.004))
+                    bone = armature.data.edit_bones.new(name)
+                    bone.head = head
+                    bone.tail = tail
+                    bone.parent = parent
+                    bone.use_connect = segment > 1
+                    parent = bone
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+    for mesh in meshes:
+        if mesh.type != "MESH" or len(mesh.vertex_groups) == 0:
+            continue
+        inverse = (armature.matrix_world.inverted() @ mesh.matrix_world)
+        for side_name, side in (("Left", 1.0), ("Right", -1.0)):
+            hand_name = f"mixamorig:{side_name}Hand"
+            hand = armature.data.bones.get(hand_name)
+            if hand is None:
+                continue
+            hand_x = hand.head_local.x
+            for finger, (y_offset, z_offset) in FINGER_LAYOUT.items():
+                for segment in range(1, 4):
+                    bone_name = f"mixamorig:{side_name}Hand{finger}{segment}"
+                    bone = armature.data.bones.get(bone_name)
+                    if bone is None or mesh.vertex_groups.get(bone_name) is not None:
+                        continue
+                    group = mesh.vertex_groups.new(name=bone_name)
+                    center = (bone.head_local + bone.tail_local) * 0.5
+                    for vertex in mesh.data.vertices:
+                        point = inverse @ vertex.co
+                        if side * (point.x - hand_x) < 0.0:
+                            continue
+                        distance = point.distance_to(center)
+                        if distance > 0.040:
+                            continue
+                        weight = max(0.0, min(0.72, 0.72 * (1.0 - distance / 0.040)))
+                        if weight <= 0.01:
+                            continue
+                        for existing in mesh.vertex_groups:
+                            if existing.index == group.index:
+                                continue
+                            try:
+                                current = existing.weight(vertex.index)
+                            except RuntimeError:
+                                continue
+                            if current > 0.0:
+                                existing.add([vertex.index], current * (1.0 - weight), "REPLACE")
+                        group.add([vertex.index], weight, "REPLACE")
+
+
+def author_finger_animation(armature: bpy.types.Object, actions: dict[str, bpy.types.Action]) -> None:
+    """Key curl at the actual hand joints for each gameplay action."""
+    for action_name, action in actions.items():
+        armature.animation_data_create()
+        armature.animation_data.action = action
+        start, end = [int(round(value)) for value in action.frame_range]
+        frames = sorted({start, start + max(1, (end - start) // 2), end})
+        armed = action_name.startswith(("ready_", "aim_")) or action_name in {
+            "shoot", "reload", "jump_start", "jump_loop", "jump_land", "slide_start", "slide_loop", "slide_exit",
+        }
+        curl = math.radians(58.0 if armed else 18.0)
+        if action_name in {"throw", "melee"}:
+            curl = math.radians(28.0)
+        for frame in frames:
+            bpy.context.scene.frame_set(frame)
+            for side_name, side in (("Left", 1.0), ("Right", -1.0)):
+                for finger in FINGER_LAYOUT:
+                    for segment in range(1, 4):
+                        bone = armature.pose.bones.get(f"mixamorig:{side_name}Hand{finger}{segment}")
+                        if bone is None:
+                            continue
+                        bone.rotation_mode = "XYZ"
+                        bone.rotation_euler.z = -side * curl * (1.0 if segment == 1 else 0.82)
+                        bone.keyframe_insert(data_path="rotation_euler", frame=frame, group=bone.name)
+        action["finger_rig"] = True
+    armature.animation_data.action = None
     pose = {
         bone.name: (bone.location.copy(), bone.rotation_quaternion.copy())
         for bone in armature.pose.bones
@@ -672,6 +783,9 @@ def main() -> None:
     for action in list(bpy.data.actions):
         bpy.data.actions.remove(action)
     reset_pose(target)
+    # Keep the licensed Quaternius hand chains when present and author the
+    # same five-finger fallback for older wrist-only source blends.
+    author_finger_rig(target, [target_mesh])
 
     ual1 = import_animation_library(UAL1_GLB, "ual1")
     ual2 = import_animation_library(UAL2_GLB, "ual2")
@@ -743,6 +857,11 @@ def main() -> None:
         "prone_idle",
     )
     author_downed_hold(target, generated["death"])
+    finger_actions = dict(generated)
+    downed_action = bpy.data.actions.get("downed")
+    if downed_action is not None:
+        finger_actions["downed"] = downed_action
+    author_finger_animation(target, finger_actions)
     reset_pose(target)
     cleanup_sources([ual1, ual2])
     right_hand = tuple(target.matrix_world @ target.data.bones["mixamorig:RightHand"].head_local)

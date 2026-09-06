@@ -702,6 +702,35 @@ internal sealed class AuthoredOperatorVisual
     public Color TeamColorForDiagnostics { get; private set; }
     public Color GearTintForDiagnostics { get; private set; }
     public int GearOverlayCountForDiagnostics { get; private set; }
+    public int FingerBoneCountForDiagnostics => CountFingerBones(_skeleton);
+
+    private static int CountFingerBones(Skeleton3D skeleton)
+    {
+        var count = 0;
+        foreach (var side in new[] { "Left", "Right" })
+        {
+            foreach (var finger in new[] { "Thumb", "Index", "Middle", "Ring", "Pinky" })
+            {
+                for (var segment = 1; segment <= 3; segment++)
+                {
+                    var found = false;
+                    foreach (var prefix in new[] { "", "mixamorig:" })
+                    {
+                        if (skeleton.FindBone($"{prefix}{side}Hand{finger}{segment}") >= 0)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found)
+                    {
+                        count++;
+                    }
+                }
+            }
+        }
+        return count;
+    }
 
     public OperatorRifleFitInspection InspectRifleFit(string? animationOverride = null)
     {

@@ -8,6 +8,7 @@ frames.  This is a Blender/DCC conversion step, not runtime primitive art.
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import sys
 from typing import Iterable
@@ -32,6 +33,80 @@ EXPECTED = {
     "shoot", "reload", "melee", "throw", "interact", "pickup", "heal",
     "jump_start", "jump_loop", "jump_land", "slide_start", "slide_loop", "slide_exit",
 }
+
+FINGER_NAMES = ("Thumb", "Index", "Middle", "Ring", "Pinky")
+
+
+def add_finger_rig(target: bpy.types.Object, mesh: bpy.types.Object) -> None:
+    """Add five weighted phalanx chains when the private rig has wrist-only hands."""
+    if target.data.bones.get("LeftHandIndex1") is not None:
+        return
+    bpy.ops.object.mode_set(mode="EDIT")
+    for side_name, side in (("Left", 1.0), ("Right", -1.0)):
+        hand = target.data.edit_bones.get(f"{side_name}Hand")
+        if hand is None:
+            continue
+        palm = (hand.tail - hand.head).normalized()
+        spread = palm.cross(Vector((0.0, 1.0, 0.0)))
+        if spread.length_squared < 1.0e-6:
+            spread = Vector((1.0, 0.0, 0.0))
+        spread.normalize()
+        for index, finger in enumerate(FINGER_NAMES):
+            lateral = (index - 2) * 0.012
+            for segment in range(1, 4):
+                name = f"{side_name}Hand{finger}{segment}"
+                parent = hand if segment == 1 else target.data.edit_bones.get(
+                    f"{side_name}Hand{finger}{segment - 1}")
+                head = hand.tail + spread * (lateral + (0.012 if finger == "Thumb" else 0.0))
+                if segment > 1 and parent is not None:
+                    head = parent.tail
+                bone = target.data.edit_bones.new(name)
+                bone.parent = parent
+                bone.head = head
+                bone.tail = head + palm * (0.028 if finger == "Thumb" else 0.024)
+                bone.use_connect = segment > 1
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    inverse = target.matrix_world.inverted() @ mesh.matrix_world
+    for side_name in ("Left", "Right"):
+        hand = target.data.bones.get(f"{side_name}Hand")
+        if hand is None:
+            continue
+        for finger in FINGER_NAMES:
+            for segment in range(1, 4):
+                bone_name = f"{side_name}Hand{finger}{segment}"
+                bone = target.data.bones.get(bone_name)
+                if bone is None:
+                    continue
+                group = mesh.vertex_groups.new(name=bone_name)
+                center = (bone.head_local + bone.tail_local) * 0.5
+                for vertex in mesh.data.vertices:
+                    point = inverse @ vertex.co
+                    distance = (point - center).length
+                    if distance <= 0.035:
+                        group.add([vertex.index], max(0.0, 0.42 * (1.0 - distance / 0.035)), "ADD")
+
+
+def author_finger_animation(target: bpy.types.Object, actions: list[bpy.types.Action]) -> None:
+    for action in actions:
+        target.animation_data_create()
+        target.animation_data.action = action
+        start, end = [int(round(value)) for value in action.frame_range]
+        armed = any(token in action.name for token in ("aim", "ready", "shoot", "reload"))
+        curl = math.radians(52.0 if armed else 16.0)
+        for frame in sorted({start, start + max(1, (end - start) // 2), end}):
+            bpy.context.scene.frame_set(frame)
+            for side_name, side in (("Left", 1.0), ("Right", -1.0)):
+                for finger in FINGER_NAMES:
+                    for segment in range(1, 4):
+                        bone = target.pose.bones.get(f"{side_name}Hand{finger}{segment}")
+                        if bone is None:
+                            continue
+                        bone.rotation_mode = "XYZ"
+                        bone.rotation_euler.z = -side * curl * (1.0 if segment == 1 else 0.8)
+                        bone.keyframe_insert(data_path="rotation_euler", frame=frame, group=bone.name)
+        action["finger_rig"] = True
+    target.animation_data.action = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -628,6 +703,7 @@ def main() -> None:
     target.select_set(True); bpy.context.view_layer.objects.active=target
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     bpy.context.view_layer.update()
+    add_finger_rig(target, mesh)
     target_reference = capture_basis_pose(target)
     display_pose = capture_display_pose(target)
     frame_transform = _frame_transform(source, target)
@@ -639,6 +715,7 @@ def main() -> None:
     for action in list(bpy.data.actions):
         if id(action) in source_ids: bpy.data.actions.remove(action)
     for action in generated: action.name=action.name.removeprefix("HY3D_")
+    author_finger_animation(target, generated)
     # Keep every clip discoverable by the glTF ACTIONS exporter.  Actions
     # authored directly through ``Action.fcurves`` otherwise have zero users
     # and Blender silently drops them from the exported GLB.
@@ -654,7 +731,10 @@ def main() -> None:
         if live is not None:
             bpy.data.objects.remove(live, do_unlink=True)
     triangles=reduce_mesh(mesh,cfg.triangles); limited_vertices=limit_vertex_influences(mesh)
-    right_hand_vertices = strong_weighted_vertices(mesh, "RightHand")
+    # Re-imported GLBs may have their four retained influences normalized below
+    # the FBX audit threshold; keep a lower deterministic gate for round-trip
+    # inputs while still rejecting a completely unweighted hand.
+    right_hand_vertices = strong_weighted_vertices(mesh, "RightHand", threshold=0.12)
     if right_hand_vertices == 0:
         raise RuntimeError("RightHand skin weights missing after embedded-prop cleanup")
     root,sockets=add_contract_nodes(target,mesh)
