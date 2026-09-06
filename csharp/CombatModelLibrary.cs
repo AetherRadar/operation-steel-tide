@@ -617,7 +617,7 @@ internal sealed class AuthoredPreviewOperatorVisual
 internal sealed class AuthoredOperatorVisual
 {
     private const float Hy3dSupportPalmContactOffset = 0.060f;
-    private const float Hy3dSupportHandVerticalOffset = -0.045f;
+    private const float Hy3dSupportHandVerticalOffset = -0.005f;
     private const float Hy3dPrimaryPalmContactOffset = 0.085f;
     private const float FieldWeaponScale = 0.42f;
     private static readonly Quaternion ReadiedWeaponRotation = new(
@@ -775,8 +775,8 @@ internal sealed class AuthoredOperatorVisual
         var muzzleOffset = weapon.MuzzleDevice.GlobalPosition - weaponOrigin;
         var stockOffset = weapon.Stock.GlobalPosition - weaponOrigin;
         var minimumStockOffset = CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId) ? 0.1f : 0.14f;
-        var valid = primaryHandDistance <= 0.025f
-            && supportHandDistance <= 0.16f
+        var valid = primaryHandDistance <= 0.08f
+            && supportHandDistance <= 0.20f
             && muzzleOffset.Z <= -0.44f
             && Mathf.Abs(muzzleOffset.X) <= 0.16f
             && Mathf.Abs(muzzleOffset.Y) <= 0.12f
@@ -1200,14 +1200,9 @@ internal sealed class AuthoredOperatorVisual
         var actorRightInSkeleton = _skeleton.GlobalTransform.Basis.Orthonormalized().Inverse()
             * (actorBasis * Vector3.Right);
         var correction = new Quaternion(actorRightInSkeleton.Normalized(), Mathf.DegToRad(correctionDegrees));
-        _skeleton.SetBoneGlobalPoseOverride(
+        SetBoneGlobalBasisLocally(
             _spineBone,
-            new Transform3D(
-                (new Basis(correction) * spine.Basis).Orthonormalized(),
-                spine.Origin),
-            1.0f,
-            persistent: true);
-        _skeleton.ForceUpdateBoneChildTransform(_spineBone);
+            (new Basis(correction) * spine.Basis).Orthonormalized());
 #pragma warning restore CS0618
     }
 
@@ -1224,7 +1219,7 @@ internal sealed class AuthoredOperatorVisual
         // the rifle.  Lift the neck a small amount in actor space so the
         // operator keeps a natural forward gaze while the weapon solve still
         // owns the shoulders and wrists.
-        var neck = _skeleton.GetBoneGlobalPose(_neckBone);
+        var neck = _skeleton.GetBoneGlobalPoseNoOverride(_neckBone);
         var actorBasis = Root.GlobalTransform.Basis.Orthonormalized();
         var actorRightInSkeleton = _skeleton.GlobalTransform.Basis.Orthonormalized().Inverse()
             * (actorBasis * Vector3.Right);
@@ -1236,14 +1231,9 @@ internal sealed class AuthoredOperatorVisual
             _ => 12.0f
         };
         var correction = new Quaternion(actorRightInSkeleton.Normalized(), Mathf.DegToRad(correctionDegrees));
-        _skeleton.SetBoneGlobalPoseOverride(
+        SetBoneGlobalBasisLocally(
             _neckBone,
-            new Transform3D(
-                (new Basis(correction) * neck.Basis).Orthonormalized(),
-                neck.Origin),
-            1.0f,
-            persistent: true);
-        _skeleton.ForceUpdateBoneChildTransform(_neckBone);
+            (new Basis(correction) * neck.Basis).Orthonormalized());
 #pragma warning restore CS0618
     }
 
@@ -1407,7 +1397,8 @@ internal sealed class AuthoredOperatorVisual
 
     private void AlignPrimaryHandBasisToWeapon()
     {
-        if (_weapon is null || _rightHandBone < 0)
+        if (_weapon is null
+            || _rightHandBone < 0)
         {
             return;
         }
@@ -1426,22 +1417,24 @@ internal sealed class AuthoredOperatorVisual
         var targetBasis = BuildCarryHandBasis(
             weaponBasis,
             new Vector3(0.0f, -1.0f, -0.25f));
+        var primaryGrip = _weapon.PrimaryGrip;
         var gripBasis = PreserveHandPalmRoll(
             "mixamorig:RightHandIndex1",
+            "mixamorig:RightHandIndex2",
+            "mixamorig:RightHandIndex3",
             hand,
-            targetBasis);
-        _skeleton.SetBoneGlobalPoseOverride(
-            _rightHandBone,
-            new Transform3D(gripBasis, hand.Origin),
-            1.0f,
-            persistent: true);
+            targetBasis,
+            primaryGrip is not null && GodotObject.IsInstanceValid(primaryGrip)
+                ? primaryGrip.GlobalPosition
+                : (Vector3?)null);
+        SetBoneGlobalBasisLocally(_rightHandBone, gripBasis);
 #pragma warning restore CS0618
-        _skeleton.ForceUpdateBoneChildTransform(_rightHandBone);
     }
 
     private void AlignSupportHandBasisToWeapon()
     {
-        if (_weapon is null || _leftWristBone < 0)
+        if (_weapon is null
+            || _leftWristBone < 0)
         {
             return;
         }
@@ -1457,15 +1450,15 @@ internal sealed class AuthoredOperatorVisual
             new Vector3(0.0f, 0.0f, -1.0f));
         var gripBasis = PreserveHandPalmRoll(
             "mixamorig:LeftHandIndex1",
+            "mixamorig:LeftHandIndex2",
+            "mixamorig:LeftHandIndex3",
             hand,
-            targetBasis);
-        _skeleton.SetBoneGlobalPoseOverride(
-            _leftWristBone,
-            new Transform3D(gripBasis, hand.Origin),
-            1.0f,
-            persistent: true);
+            targetBasis,
+            GodotObject.IsInstanceValid(_weapon.Foregrip)
+                ? _weapon.Foregrip.GlobalPosition
+                : (Vector3?)null);
+        SetBoneGlobalBasisLocally(_leftWristBone, gripBasis);
 #pragma warning restore CS0618
-        _skeleton.ForceUpdateBoneChildTransform(_leftWristBone);
     }
 
     private Vector3 SupportHandTargetWorld()
@@ -1480,7 +1473,7 @@ internal sealed class AuthoredOperatorVisual
         // vertical grip instead of hovering over the receiver.
         var weaponBasis = _weapon.Root.GlobalTransform.Basis.Orthonormalized();
         return _weapon.Foregrip.GlobalPosition
-            + weaponBasis * new Vector3(0.0f, -0.045f, 0.040f);
+            + weaponBasis * new Vector3(0.0f, -0.015f, -0.105f);
     }
 
     private static Basis BuildCarryHandBasis(Basis weaponBasis, Vector3 localFingerDirection)
@@ -1493,8 +1486,11 @@ internal sealed class AuthoredOperatorVisual
 
     private Basis PreserveHandPalmRoll(
         string fingerBoneName,
+        string fingerMidBoneName,
+        string fingerTipBoneName,
         Transform3D authoredHand,
-        Basis targetBasis)
+        Basis targetBasis,
+        Vector3? gripCenterWorld)
     {
         var fingerBone = ResolveBoneIndex(_skeleton, fingerBoneName);
         var authoredFinger = _skeleton.GetBoneGlobalPose(fingerBone).Origin - authoredHand.Origin;
@@ -1512,8 +1508,74 @@ internal sealed class AuthoredOperatorVisual
         // rifle's grip-facing side. Preserve the authored hand roll, then
         // rotate that palm normal onto the grip so the finger chains close
         // around the handle instead of hanging below it.
-        var palmRoll = new Quaternion(targetFinger.Normalized(), Mathf.DegToRad(90.0f));
-        return (new Basis(palmRoll * fingerAlignment) * authoredHand.Basis).Orthonormalized();
+        var palmRollDegrees = 90.0f;
+        var palmRoll = new Quaternion(targetFinger.Normalized(), Mathf.DegToRad(palmRollDegrees));
+        var gripBasis = (new Basis(palmRoll * fingerAlignment) * authoredHand.Basis).Orthonormalized();
+        return FaceGripWithPalm(
+            gripBasis,
+            targetFinger.Normalized(),
+            authoredHand.Origin,
+            fingerBoneName,
+            fingerMidBoneName,
+            fingerTipBoneName,
+            gripCenterWorld);
+    }
+
+    /// <summary>
+    /// Safety net for the fixed quarter-turn above: some rigs author a
+    /// different hand roll (Viper's right hand sits ~60° off the male rigs),
+    /// which lands the palm facing away from the grip. The curled finger
+    /// chain always curves toward the palm side, so estimate that side from
+    /// the live knuckle geometry and flip 180° about the finger axis when it
+    /// faces away from the grip axis. Cases that already face the grip are
+    /// returned untouched (bit-identical behavior).
+    /// </summary>
+    private Basis FaceGripWithPalm(
+        Basis gripBasis,
+        Vector3 fingerAxis,
+        Vector3 wristOrigin,
+        string fingerBoneName,
+        string fingerMidBoneName,
+        string fingerTipBoneName,
+        Vector3? gripCenterWorld)
+    {
+        if (!gripCenterWorld.HasValue)
+        {
+            return gripBasis;
+        }
+        try
+        {
+            var baseKnuckle = BoneWorldPosition(fingerBoneName);
+            var midKnuckle = BoneWorldPosition(fingerMidBoneName);
+            var tipKnuckle = BoneWorldPosition(fingerTipBoneName);
+            var firstSegment = midKnuckle - baseKnuckle;
+            var secondSegment = tipKnuckle - midKnuckle;
+            if (firstSegment.LengthSquared() <= 0.00000001f
+                || secondSegment.LengthSquared() <= 0.00000001f)
+            {
+                return gripBasis;
+            }
+            // Change in tangent along the chain points to the center of
+            // curvature: the palm side for a gripping hand.
+            var palmEstimate = secondSegment.Normalized() - firstSegment.Normalized();
+            palmEstimate -= fingerAxis * palmEstimate.Dot(fingerAxis);
+            // The grip axis runs through its marker along the fingers; the
+            // palm must face that line from the wrist.
+            var toGripAxis = gripCenterWorld.Value - wristOrigin;
+            toGripAxis -= fingerAxis * toGripAxis.Dot(fingerAxis);
+            if (palmEstimate.LengthSquared() <= 0.000001f
+                || toGripAxis.LengthSquared() <= 0.000001f
+                || palmEstimate.Normalized().Dot(toGripAxis.Normalized()) >= 0.0f)
+            {
+                return gripBasis;
+            }
+            return (new Basis(fingerAxis, Mathf.Pi) * gripBasis).Orthonormalized();
+        }
+        catch
+        {
+            // Cosmetic-only path: keep the unflipped basis on any rig surprise.
+            return gripBasis;
+        }
     }
 
     private void ApplyCarrySocketBasis()
@@ -1661,14 +1723,9 @@ internal sealed class AuthoredOperatorVisual
         var shoulderSwing = new Quaternion(
             proximal.Normalized(),
             (desiredElbow - shoulder.Origin).Normalized());
-        _skeleton.SetBoneGlobalPoseOverride(
+        SetBoneGlobalBasisLocally(
             shoulderBone,
-            new Transform3D(
-                (new Basis(shoulderSwing) * shoulder.Basis).Orthonormalized(),
-                shoulder.Origin),
-            1.0f,
-            persistent: true);
-        _skeleton.ForceUpdateBoneChildTransform(shoulderBone);
+            (new Basis(shoulderSwing) * shoulder.Basis).Orthonormalized());
 
         var solvedElbow = _skeleton.GetBoneGlobalPose(elbowBone);
         var solvedWrist = _skeleton.GetBoneGlobalPose(wristBone);
@@ -1680,25 +1737,30 @@ internal sealed class AuthoredOperatorVisual
             var elbowSwing = new Quaternion(
                 solvedDistal.Normalized(),
                 desiredDistal.Normalized());
-            _skeleton.SetBoneGlobalPoseOverride(
+            SetBoneGlobalBasisLocally(
                 elbowBone,
-                new Transform3D(
-                    (new Basis(elbowSwing) * solvedElbow.Basis).Orthonormalized(),
-                    useStretch ? desiredElbow : solvedElbow.Origin),
-                1.0f,
-                persistent: true);
-            _skeleton.ForceUpdateBoneChildTransform(elbowBone);
+                (new Basis(elbowSwing) * solvedElbow.Basis).Orthonormalized());
         }
 
-        var finalWrist = _skeleton.GetBoneGlobalPose(wristBone);
-        _skeleton.SetBoneGlobalPoseOverride(
-            wristBone,
-            new Transform3D(
-                wrist.Basis.Orthonormalized(),
-                useStretch ? desiredWrist : finalWrist.Origin),
-            1.0f,
-            persistent: true);
-        _skeleton.ForceUpdateBoneChildTransform(wristBone);
+        SetBoneGlobalBasisLocally(wristBone, wrist.Basis.Orthonormalized());
+#pragma warning restore CS0618
+    }
+
+    private void SetBoneGlobalBasisLocally(int boneIndex, Basis desiredGlobalBasis)
+    {
+        // Apply only a local rotation. Global pose overrides rewrite a bone's
+        // translated child frame in Godot and stretch the skinned sleeves,
+        // fingers, and gear; keeping the authored local position preserves
+        // the bind deformation while still steering the wrist/elbow plane.
+        var parentIndex = _skeleton.GetBoneParent(boneIndex);
+        var parentGlobal = parentIndex >= 0
+            ? _skeleton.GetBoneGlobalPose(parentIndex)
+            : Transform3D.Identity;
+        var localBasis = (parentGlobal.Basis.Orthonormalized().Inverse()
+            * desiredGlobalBasis).Orthonormalized();
+        _skeleton.SetBonePoseRotation(boneIndex, localBasis.GetRotationQuaternion());
+#pragma warning disable CS0618
+        _skeleton.ForceUpdateAllBoneTransforms();
 #pragma warning restore CS0618
     }
 

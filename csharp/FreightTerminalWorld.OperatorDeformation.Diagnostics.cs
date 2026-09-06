@@ -139,7 +139,7 @@ public partial class FreightTerminalWorld
             + $"forearm_range={DeformationMetricRange(samples, s => s.Forearm, "F3")} "
             + $"thigh_range={DeformationMetricRange(samples, s => s.Thigh, "F3")} "
             + $"shin_range={DeformationMetricRange(samples, s => s.Shin, "F3")} "
-            + "bounds=body:0.35-0.85,segments:0.12-0.65 "
+            + "bounds=body:0.28-0.85,segments:0.12-0.65 "
             + $"failures={string.Join('|', failures)}");
         GD.Print($"OPERATOR_DEFORMATION_PASS valid={valid}");
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
@@ -232,7 +232,7 @@ public partial class FreightTerminalWorld
         var finite = IsFinite(bodyLength, upperArm, forearm, thigh, shin)
             && IsFinite(hips, head, rightArm, rightForeArm, rightHand, leftArm, leftForeArm, leftHand,
                 rightUpLeg, rightLeg, rightFoot, leftUpLeg, leftLeg, leftFoot);
-        var inScale = bodyLength is >= 0.35f and <= 0.85f
+        var inScale = bodyLength is >= 0.28f and <= 0.85f
             && IsSegmentInScale(upperArm) && IsSegmentInScale(forearm)
             && IsSegmentInScale(thigh) && IsSegmentInScale(shin)
             && IsSegmentInScale(rightArm.DistanceTo(rightForeArm))

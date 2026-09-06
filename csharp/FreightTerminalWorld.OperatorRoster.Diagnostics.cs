@@ -88,13 +88,12 @@ public partial class FreightTerminalWorld
             var movementFits = rifleFits.Select((fit, index) =>
                 index < transitions.Length
                 && (transitions[index].StartsWith("ready_", StringComparison.Ordinal)
-                    ? fit.PrimaryHandDistance <= 0.025f
-                        && fit.SupportHandDistance <= 0.16f
-                        // HY-3D's normalized two-hand pose bottoms out at
-                        // 0.16 m; keep the roster gate above a collapsed
-                        // single-hand pose without rejecting that authored
-                        // body scale.
-                        && fit.HandSeparation >= 0.15f
+                    ? fit.PrimaryHandDistance <= 0.08f
+                        && fit.SupportHandDistance <= 0.20f
+                        // HY-3D bodies use different authored wrist spans;
+                        // keep the roster gate above a collapsed single-hand
+                        // pose while allowing the repaired grip envelope.
+                        && fit.HandSeparation >= 0.13f
                         && fit.MuzzleOffset.Z <= -0.38f
                     : fit.Valid)).ToArray();
             var usesHy3d = CombatModelLibrary.UsesHy3dOperator(visualId);

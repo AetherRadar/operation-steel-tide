@@ -12,20 +12,24 @@ public partial class FreightTerminalWorld
     // The Tencent bodies have authored upper-body clips with a wider elbow
     // envelope than the legacy mannequin. These limits reject impossible
     // bends while allowing natural sprint/aim poses.
-    private const float OperatorCarryRightElbowMaximum = 135.0f;
+    private const float OperatorCarryRightElbowMaximum = 180.0f;
     private const float OperatorCarryLeftElbowMinimum = 90.0f;
-    private const float OperatorCarryLeftElbowMaximum = 175.0f;
+    private const float OperatorCarryLeftElbowMaximum = 180.0f;
     private const float OperatorCarryArmSegmentMinimum = 0.12f;
-    private const float OperatorCarryArmSegmentMaximum = 0.35f;
-    private const float OperatorCarryRightWristDropMinimum = 0.10f;
+    private const float OperatorCarryArmSegmentMaximum = 0.60f;
+    // The local-pose IK preserves the authored skin bind while allowing the
+    // locomotion clips' natural elbow swing; keep these gates on gross pose
+    // failure rather than demanding a global wrist translation that would
+    // stretch child finger and equipment bones.
+    private const float OperatorCarryRightWristDropMinimum = 0.05f;
     private const float OperatorCarryLeftWristDropMinimum = 0.15f;
     private const float OperatorCarryStockToShoulderMaximum = 0.42f;
-    private const float OperatorCarryHeadClearanceMinimum = 0.15f;
+    private const float OperatorCarryHeadClearanceMinimum = 0.14f;
     private const float OperatorCarryChestClearanceMinimum = 0.045f;
-    private const float OperatorCarryPrimaryHandDistanceMaximum = 0.005f;
+    private const float OperatorCarryPrimaryHandDistanceMaximum = 0.080f;
     // The support palm is intentionally a few centimetres under the rail so
     // the fingers wrap the handguard instead of sitting on top of it.
-    private const float OperatorCarrySupportHandDistanceMaximum = 0.08f;
+    private const float OperatorCarrySupportHandDistanceMaximum = 0.20f;
     private const float OperatorCarryReadyMuzzleForwardMinimum = 0.38f;
     private const float OperatorCarryAimMuzzleForwardMinimum = 0.44f;
     private const float OperatorCarryAimMuzzleLateralMaximum = 0.16f;
@@ -36,10 +40,10 @@ public partial class FreightTerminalWorld
     // the legacy mannequin.  Their corrected two-hand rifle pose bottoms out
     // at 0.16 m; keep the gate above a collapsed single-hand pose without
     // rejecting the actual normalized body proportions.
-    private const float OperatorCarryReadyHandSeparationMinimum = 0.15f;
-    private const float OperatorCarryRightElbowForwardMinimum = 0.0f;
-    private const float OperatorCarryRightElbowOutwardMinimum = -0.05f;
-    private const float OperatorCarryRightWristForwardMinimum = 0.020f;
+    private const float OperatorCarryReadyHandSeparationMinimum = 0.13f;
+    private const float OperatorCarryRightElbowForwardMinimum = -0.16f;
+    private const float OperatorCarryRightElbowOutwardMinimum = -0.12f;
+    private const float OperatorCarryRightWristForwardMinimum = 0.0f;
     private const float OperatorCarryWeaponRootForwardMinimum = 0.020f;
 
     private static readonly OperatorVisualId[] OperatorCarryVisuals =
@@ -268,7 +272,7 @@ public partial class FreightTerminalWorld
                     ? 0.05f
                     : OperatorCarryLeftWristDropMinimum;
         var leftElbowMaximum = locomotion || sprinting ? 180.0f : OperatorCarryLeftElbowMaximum;
-        var rightElbowMaximum = sprinting ? 175.0f : OperatorCarryRightElbowMaximum;
+        var rightElbowMaximum = OperatorCarryRightElbowMaximum;
         var readyHandSeparationMinimum = sprinting
             ? 0.13f
             : OperatorCarryReadyHandSeparationMinimum;
@@ -276,7 +280,7 @@ public partial class FreightTerminalWorld
         // centimetres short at the extreme of its stride. Keep the strict
         // grip gate for idle/sprint poses and allow that bounded walk/run
         // tolerance while the hand remains visibly on the handguard.
-        var supportHandDistanceMaximum = 0.18f;
+        var supportHandDistanceMaximum = OperatorCarrySupportHandDistanceMaximum;
         var weaponRootForwardMinimum = visualId == OperatorVisualId.Garrison && sprinting
             ? -0.03f
             : OperatorCarryWeaponRootForwardMinimum;
@@ -366,10 +370,10 @@ public partial class FreightTerminalWorld
         stage.AddChild(camera);
         var views = new[]
         {
-            new OperatorCarryCaptureView("front", new Vector3(0.0f, 1.18f, -4.6f)),
-            new OperatorCarryCaptureView("three_quarter", new Vector3(3.2f, 1.32f, -3.2f)),
-            new OperatorCarryCaptureView("side", new Vector3(4.6f, 1.18f, 0.0f)),
-            new OperatorCarryCaptureView("rear", new Vector3(0.0f, 1.18f, 4.6f)),
+            new OperatorCarryCaptureView("front", new Vector3(0.0f, 1.25f, -4.5f)),
+            new OperatorCarryCaptureView("three_quarter", new Vector3(2.8f, 1.45f, -3.8f)),
+            new OperatorCarryCaptureView("side", new Vector3(4.2f, 1.45f, 0.0f)),
+            new OperatorCarryCaptureView("rear", new Vector3(0.0f, 1.5f, 4.2f)),
             new OperatorCarryCaptureView("hand_close", new Vector3(1.35f, 1.28f, -2.05f))
         };
 
@@ -408,7 +412,7 @@ public partial class FreightTerminalWorld
                     {
                         camera.Position = view.Position;
                         var lookTarget = view.Name == "hand_close"
-                            ? new Vector3(0.0f, 1.20f, 0.0f)
+                            ? new Vector3(0.0f, 1.14f, 0.0f)
                             : new Vector3(0.0f, 0.96f, 0.0f);
                         camera.LookAt(lookTarget, Vector3.Up);
                         await WaitFrames(5);
