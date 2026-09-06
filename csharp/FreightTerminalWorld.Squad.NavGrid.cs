@@ -54,7 +54,10 @@ public partial class FreightTerminalWorld
     };
 
     private readonly Dictionary<long, float> _squadNavCellSupport = new();
+    private readonly Dictionary<long, ulong> _squadNavNegativeSupportExpiry = new();
     private readonly Dictionary<(long Edge, int Bucket), (bool Clear, ulong ExpiresMsec)> _squadNavEdgeCache =
+        new();
+    private readonly Dictionary<ulong, (bool Open, bool TargetOpen, bool Animating, int MotionCount)> _squadNavDoorStates =
         new();
     private readonly Dictionary<ulong, SquadGridPathState> _squadGridPaths = new();
     private readonly CapsuleShape3D _squadNavClearanceShape = new()
@@ -65,6 +68,14 @@ public partial class FreightTerminalWorld
     private ulong _squadNavNextNormalPlanMilliseconds;
     private int _leaderRescueGridPlans;
     private bool _leaderRescueUsedGrid;
+    // Captures the concrete reason the most recent grid rescue plan was rejected.
+    // This is intentionally diagnostic-only; gameplay still follows the existing
+    // bounded planner and retry policy.
+    private string _lastSquadGridFailureReason = "none";
+    private int _squadGridFailureCount;
+
+    internal string SquadGridFailureReasonForDiagnostics => _lastSquadGridFailureReason;
+    internal int SquadGridFailureCountForDiagnostics => _squadGridFailureCount;
 
     private bool LeaderRescueUsedGridForDiagnostics => _leaderRescueUsedGrid;
     private int LeaderRescueGridPlansForDiagnostics => _leaderRescueGridPlans;
@@ -95,8 +106,10 @@ public partial class FreightTerminalWorld
         out SquadNavigationDirective directive)
     {
         directive = SquadNavigationDirective.Walk(destination);
+        _lastSquadGridFailureReason = "none";
         if (!IsInstanceValid(mate))
         {
+            _lastSquadGridFailureReason = "invalid_mate";
             return false;
         }
         var now = Time.GetTicksMsec();
@@ -115,6 +128,7 @@ public partial class FreightTerminalWorld
                 || state.Destination.DistanceSquaredTo(destination) > retryDistance * retryDistance;
             if (!requestChanged && now < state.NextPlanMilliseconds)
             {
+                _lastSquadGridFailureReason = "retry_backoff";
                 return false;
             }
             failedPlanAttempts = requestChanged ? 0 : state.FailedPlanAttempts;
@@ -167,6 +181,7 @@ public partial class FreightTerminalWorld
                 NextPlanMilliseconds = _squadNavNextNormalPlanMilliseconds,
                 NextShortcutCheckMilliseconds = now + SquadNavShortcutCheckIntervalMilliseconds
             };
+            _lastSquadGridFailureReason = "normal_plan_throttle";
             return false;
         }
         if (!emergency)
@@ -183,6 +198,12 @@ public partial class FreightTerminalWorld
         }
         if (!TryPlanSquadGridRoute(mate, destination, emergency, out var route))
         {
+            _squadGridFailureCount++;
+            if (string.IsNullOrEmpty(_lastSquadGridFailureReason)
+                || _lastSquadGridFailureReason == "none")
+            {
+                _lastSquadGridFailureReason = "no_walkable_route";
+            }
             var failures = failedPlanAttempts + 1;
             _squadGridPaths[id] = new SquadGridPathState
             {
@@ -196,6 +217,7 @@ public partial class FreightTerminalWorld
         }
         _squadTrailPaths.Remove(id);
         _squadGridPaths[id] = route;
+        _lastSquadGridFailureReason = "planned";
         route.NextShortcutCheckMilliseconds = now + SquadNavShortcutCheckIntervalMilliseconds;
         AdvanceSquadGridCursor(mate, route);
         if (route.Cursor >= route.Directives.Length)
@@ -232,6 +254,15 @@ public partial class FreightTerminalWorld
         out SquadGridPathState state)
     {
         state = new SquadGridPathState { Emergency = emergency, Destination = destination };
+        _lastSquadGridFailureReason = "planning";
+        // A revive only needs the rescuer within interaction range. Planning all
+        // the way to the casualty's capsule center makes the final grid cell look
+        // blocked (the downed body is still a valid physics body), which turns an
+        // otherwise reachable rescue into a failed A* request. Aim for a supported
+        // point just short of the casualty and let the access check finish the job.
+        var routeDestination = emergency
+            ? ResolveSquadRescueApproachPoint(mate, destination)
+            : destination;
         // One budget spans the direct route, layered connectors, and trail handoffs.
         // This prevents a single no-route request from multiplying the cap per segment.
         var expansionCap = emergency
@@ -242,16 +273,23 @@ public partial class FreightTerminalWorld
             emergency
                 ? SquadNavEmergencyPlanBudgetMilliseconds
                 : SquadNavFollowPlanBudgetMilliseconds);
-        var requiresFloorTransfer = Mathf.Abs(mate.GlobalPosition.Y - destination.Y)
+        var requiresFloorTransfer = Mathf.Abs(mate.GlobalPosition.Y - routeDestination.Y)
             > (emergency ? SquadNavGoalHeight : SquadNavSameBandHeight);
         if (!requiresFloorTransfer
-            && TryBuildSquadGridWaypoints(mate, destination, budget, out var direct))
+            && TryBuildSquadGridWaypoints(mate, routeDestination, budget, out var direct))
         {
             state.Directives = BuildSquadWalkDirectives(direct);
+            _lastSquadGridFailureReason = "direct";
             return true;
         }
+        if (!requiresFloorTransfer)
+        {
+            _lastSquadGridFailureReason = budget.IsExhausted
+                ? "direct_budget_exhausted"
+                : "direct_blocked";
+        }
         if (requiresFloorTransfer
-            && TryFindClosestSquadFloorTransferPortal(destination, out var floorPortal)
+            && TryFindClosestSquadFloorTransferPortal(routeDestination, out var floorPortal)
             && !budget.IsExhausted
             && TryPlanSquadLayeredRoute(
                 mate,
@@ -261,21 +299,35 @@ public partial class FreightTerminalWorld
                 out _))
         {
             state.Directives = floorTransfer;
+            _lastSquadGridFailureReason = "floor_transfer";
             return true;
+        }
+        if (requiresFloorTransfer && !budget.IsExhausted)
+        {
+            _lastSquadGridFailureReason = "floor_transfer_unavailable";
         }
         if (!budget.IsExhausted
             && TryPlanSquadLayeredRoute(
                 mate,
-                destination,
+                routeDestination,
                 budget,
                 out var layered,
                 out _))
         {
             state.Directives = layered;
+            _lastSquadGridFailureReason = "layered";
             return true;
+        }
+        if (budget.IsExhausted)
+        {
+            _lastSquadGridFailureReason = "budget_exhausted";
         }
         if (_squadLeaderTrail.Count == 0)
         {
+            if (!budget.IsExhausted)
+            {
+                _lastSquadGridFailureReason = "no_trail_for_handoff";
+            }
             return false;
         }
         foreach (var entryPoint in FindSquadGridTrailEntryCandidates(mate))
@@ -291,7 +343,12 @@ public partial class FreightTerminalWorld
             state.Directives = BuildSquadWalkDirectives(handoff);
             state.TrailHandoff = true;
             state.HandoffPoint = entryPoint;
+            _lastSquadGridFailureReason = "trail_handoff";
             return true;
+        }
+        if (!budget.IsExhausted)
+        {
+            _lastSquadGridFailureReason = "no_walkable_route";
         }
         return false;
     }
@@ -401,6 +458,24 @@ public partial class FreightTerminalWorld
             exclude,
             out waypoints,
             out _);
+    }
+
+    private static Vector3 ResolveSquadRescueApproachPoint(
+        SquadMate mate,
+        Vector3 casualtyPosition)
+    {
+        var awayFromCasualty = mate.GlobalPosition - casualtyPosition;
+        awayFromCasualty.Y = 0.0f;
+        if (awayFromCasualty.LengthSquared() < 0.01f)
+        {
+            awayFromCasualty = Vector3.Back;
+        }
+        else
+        {
+            awayFromCasualty = awayFromCasualty.Normalized();
+        }
+        const float approachDistance = 1.7f;
+        return casualtyPosition + awayFromCasualty * approachDistance;
     }
 
     private bool TryBuildSquadGridSegment(
@@ -873,8 +948,24 @@ public partial class FreightTerminalWorld
         var key = ((long)bucket << 21) | ((long)x * SquadNavPlanner.Height + z);
         if (_squadNavCellSupport.TryGetValue(key, out var cached))
         {
-            supportY = cached;
-            return !float.IsNaN(supportY);
+            if (float.IsNaN(cached))
+            {
+                var now = Time.GetTicksMsec();
+                if (_squadNavNegativeSupportExpiry.TryGetValue(key, out var expiry)
+                    && now < expiry)
+                {
+                    return false;
+                }
+                // Compatibility with stale negative entries and with dynamic
+                // blockers whose short negative TTL has elapsed.
+                _squadNavCellSupport.Remove(key);
+                _squadNavNegativeSupportExpiry.Remove(key);
+            }
+            else
+            {
+                supportY = cached;
+                return true;
+            }
         }
         var world = SquadNavCellToWorld(x, z, anchorY);
         if (TryProbeSquadNavigationSupport(
@@ -888,9 +979,20 @@ public partial class FreightTerminalWorld
         {
             supportY = sampledSupportY;
         }
+        if (float.IsNaN(supportY))
+        {
+            // A failed support probe is commonly caused by a transient blocker
+            // (for example a closed interactive door). Keep a short negative TTL
+            // to avoid hammering physics during one A* search, while allowing a
+            // door that opens to become walkable without waiting for a restart.
+            _squadNavCellSupport[key] = float.NaN;
+            _squadNavNegativeSupportExpiry[key] = Time.GetTicksMsec() + 500UL;
+            return false;
+        }
         if (_squadNavCellSupport.Count >= SquadNavCellCacheResetCapacity)
         {
             _squadNavCellSupport.Clear();
+            _squadNavNegativeSupportExpiry.Clear();
         }
         _squadNavCellSupport[key] = supportY;
         return !float.IsNaN(supportY);

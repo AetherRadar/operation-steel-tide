@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace OperationSteelTide;
@@ -188,6 +189,8 @@ public partial class FreightTerminalWorld
             ClearSquadNavigation(mate);
             return SquadNavigationDirective.Walk(destination);
         }
+
+        RefreshSquadNavigationDoorGeometry();
 
         if (_demolitionMode
             && _demolitionRoundActive
@@ -412,6 +415,50 @@ public partial class FreightTerminalWorld
             emergency,
             now,
             SquadNavigationDirective.Walk(mate.GlobalPosition));
+    }
+
+    private void RefreshSquadNavigationDoorGeometry()
+    {
+        if (_refineryDoors.Count == 0)
+        {
+            return;
+        }
+
+        var changed = false;
+        var seen = new HashSet<ulong>();
+        foreach (var door in _refineryDoors)
+        {
+            if (!IsInstanceValid(door))
+            {
+                continue;
+            }
+            var id = door.GetInstanceId();
+            seen.Add(id);
+            var state = (door.IsOpen, door.TargetOpen, door.IsAnimating, door.CompletedMotionCount);
+            if (!_squadNavDoorStates.TryGetValue(id, out var previous) || previous != state)
+            {
+                _squadNavDoorStates[id] = state;
+                changed = true;
+            }
+        }
+        foreach (var staleId in _squadNavDoorStates.Keys.Where(id => !seen.Contains(id)).ToArray())
+        {
+            _squadNavDoorStates.Remove(staleId);
+            changed = true;
+        }
+        if (!changed)
+        {
+            return;
+        }
+
+        // Door motion changes the walkable topology. Drop both positive and
+        // negative probe results so a cell rejected while closed is reconsidered
+        // immediately after the leaf finishes moving.
+        _squadNavCellSupport.Clear();
+        _squadNavEdgeCache.Clear();
+        _squadGridPaths.Clear();
+        _squadTrailPaths.Clear();
+        _squadNavigationDecisions.Clear();
     }
 
     private bool TryReuseSquadNavigationDecision(
