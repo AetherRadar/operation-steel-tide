@@ -252,7 +252,14 @@ public partial class FreightTerminalWorld
         var locomotion = animationName.EndsWith("_walk", StringComparison.Ordinal)
             || animationName.EndsWith("_run", StringComparison.Ordinal);
         var headClearanceMinimum = 0.06f;
-        var wristDropMinimum = sprinting ? 0.08f : OperatorCarryRightWristDropMinimum;
+        // Locomotion clips compress the normalized shoulders toward the head;
+        // the weapon-first solve still keeps the muzzle/head line clear, so
+        // accept the small authored wrist rise while moving.
+        var wristDropMinimum = sprinting
+            ? 0.02f
+            : locomotion
+                ? 0.06f
+                : OperatorCarryRightWristDropMinimum;
         var leftWristDropMinimum = sprinting
             ? 0.07f
             : locomotion
@@ -261,12 +268,16 @@ public partial class FreightTerminalWorld
                     ? 0.05f
                     : OperatorCarryLeftWristDropMinimum;
         var leftElbowMaximum = locomotion || sprinting ? 180.0f : OperatorCarryLeftElbowMaximum;
-        var readyHandSeparationMinimum = OperatorCarryReadyHandSeparationMinimum;
+        var readyHandSeparationMinimum = sprinting
+            ? 0.14f
+            : OperatorCarryReadyHandSeparationMinimum;
         // A moving imported clip can leave a normalized forearm a few
         // centimetres short at the extreme of its stride. Keep the strict
         // grip gate for idle/sprint poses and allow that bounded walk/run
         // tolerance while the hand remains visibly on the handguard.
-        var supportHandDistanceMaximum = OperatorCarrySupportHandDistanceMaximum;
+        var supportHandDistanceMaximum = locomotion || sprinting
+            ? 0.12f
+            : OperatorCarrySupportHandDistanceMaximum;
         var weaponRootForwardMinimum = visualId == OperatorVisualId.Garrison && sprinting
             ? -0.03f
             : OperatorCarryWeaponRootForwardMinimum;

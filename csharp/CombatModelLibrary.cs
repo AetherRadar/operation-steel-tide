@@ -614,6 +614,7 @@ internal sealed class AuthoredOperatorVisual
 {
     private const float Hy3dSupportPalmContactOffset = 0.050f;
     private const float Hy3dSupportHandVerticalOffset = -0.045f;
+    private const float Hy3dPrimaryPalmContactOffset = 0.020f;
     private const float FieldWeaponScale = 0.42f;
     private static readonly Quaternion ReadiedWeaponRotation = new(
         -0.9934235f,
@@ -646,6 +647,7 @@ internal sealed class AuthoredOperatorVisual
     private readonly int _leftShoulderBone;
     private readonly int _leftElbowBone;
     private readonly int _leftWristBone;
+    private readonly Node3D _carryWeaponAnchor;
     private AuthoredWeaponVisual? _weapon;
     private bool _weaponReadied;
     private Node3D? _helmetVisual;
@@ -665,6 +667,13 @@ internal sealed class AuthoredOperatorVisual
         _leftShoulderBone = ResolveBoneIndex(_skeleton, "mixamorig:LeftArm");
         _leftElbowBone = ResolveBoneIndex(_skeleton, "mixamorig:LeftForeArm");
         _leftWristBone = ResolveBoneIndex(_skeleton, "mixamorig:LeftHand");
+        // Ready weapons deliberately do not live under a hand BoneAttachment.
+        // The attachment/IK feedback loop was the source of the persistent
+        // chest and forearm intersections: moving the wrist moved the rifle,
+        // then the rifle moved the wrist again. Keep a neutral actor-space
+        // anchor for the deterministic weapon-first solve below.
+        _carryWeaponAnchor = new Node3D { Name = "RuntimeCarryWeaponAnchor" };
+        Root.AddChild(_carryWeaponAnchor);
         WeaponSocket = CreateBoneAttachment(_skeleton, "RuntimeWeaponSocket", "mixamorig:RightHand");
         if (CombatModelLibrary.UsesHy3dOperator(visualId)
             && CombatModelLibrary.FindOptionalNode(root, "WeaponSocket") is { } authoredWeaponSocket)
@@ -710,9 +719,15 @@ internal sealed class AuthoredOperatorVisual
         var leftHand = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_leftWristBone);
         var weaponOrigin = weapon.Root.GlobalPosition;
         var primaryGripPosition = weapon.PrimaryGrip?.GlobalPosition ?? weaponOrigin;
-        var primaryHandContact = PrimaryHandContactWorld(rightHand.Origin);
+        var primaryHandContact = CombatModelLibrary.UsesHy3dOperator(VisualId)
+            && weapon.PrimaryGrip is { } primaryGrip
+            ? PrimaryHandTargetWorld(primaryGrip)
+            : rightHand.Origin;
         var supportHandContact = SupportHandContactWorld(leftHand.Origin);
-        var primaryHandOffset = primaryGripPosition - primaryHandContact;
+        var primaryHandOffset = CombatModelLibrary.UsesHy3dOperator(VisualId)
+            && weapon.PrimaryGrip is { } hy3dPrimaryGrip
+            ? rightHand.Origin - PrimaryHandTargetWorld(hy3dPrimaryGrip)
+            : primaryGripPosition - primaryHandContact;
         var primaryHandDistance = primaryHandOffset.Length();
         var supportHandOffset = weapon.Foregrip.GlobalPosition - supportHandContact;
         var supportHandDistance = supportHandOffset.Length();
@@ -784,8 +799,10 @@ internal sealed class AuthoredOperatorVisual
             StockToRightShoulderDistance: stock.DistanceTo(rightShoulder),
             HeadToWeaponLineClearance: DistanceToSegment(headBase, stock, muzzle),
             ChestToWeaponLineClearance: DistanceToSegment(chest, stock, muzzle),
-            PrimaryHandToWeaponDistance: PrimaryHandContactWorld(rightWrist).DistanceTo(
-                weapon.PrimaryGrip?.GlobalPosition ?? weapon.Root.GlobalPosition),
+            PrimaryHandToWeaponDistance: CombatModelLibrary.UsesHy3dOperator(VisualId)
+                && weapon.PrimaryGrip is { } primaryGrip
+                ? rightWrist.DistanceTo(PrimaryHandTargetWorld(primaryGrip))
+                : rightWrist.DistanceTo(weapon.PrimaryGrip?.GlobalPosition ?? weapon.Root.GlobalPosition),
             SupportHandToForegripDistance: SupportHandContactWorld(leftWrist).DistanceTo(
                 weapon.Foregrip.GlobalPosition),
             SupportHandOffset: weapon.Foregrip.GlobalPosition - SupportHandContactWorld(leftWrist),
@@ -807,14 +824,19 @@ internal sealed class AuthoredOperatorVisual
 
     private Vector3 PrimaryHandContactWorld(Vector3 wristOrigin)
     {
-        if (CombatModelLibrary.UsesHy3dOperator(VisualId)
-            && GodotObject.IsInstanceValid(WeaponSocket)
-            && WeaponSocket.IsInsideTree())
-        {
-            return WeaponSocket.GlobalPosition;
-        }
-
         return wristOrigin;
+    }
+
+    private Vector3 PrimaryHandTargetWorld(Node3D grip)
+    {
+        var weaponBasis = _weapon!.Root.GlobalTransform.Basis.Orthonormalized();
+        var fingerDirection = (weaponBasis * new Vector3(0.0f, -1.0f, -0.25f)).Normalized();
+        // The hand bone is the wrist, not the centre of the palm. Bias it a
+        // small amount behind the pistol grip and let the fingers descend over
+        // the grip instead of stopping at its midpoint. The bounded HY-3D
+        // chain stretch keeps this authored palm contact reachable without
+        // feeding the weapon back through the wrist socket.
+        return grip.GlobalPosition - fingerDirection * Hy3dPrimaryPalmContactOffset;
     }
 
     private Vector3 SupportHandContactWorld(Vector3 wristOrigin)
@@ -1021,7 +1043,10 @@ internal sealed class AuthoredOperatorVisual
             return;
         }
         _weaponReadied = readied;
-        ApplyWeaponSocketTransform(readied);
+        ApplyWeaponSocketTransform(
+            readied,
+            dynamicCarry: readied && !WeaponCatalog.IsSidearm(weapon.Platform),
+            animationOverride: AnimationPlayer.CurrentAnimation.ToString());
     }
 
     /// <summary>
@@ -1117,22 +1142,18 @@ internal sealed class AuthoredOperatorVisual
         {
             return;
         }
-        var socket = readied ? WeaponSocket : BackWeaponSocket;
+        var isHy3d = readied && CombatModelLibrary.UsesHy3dOperator(VisualId);
+        var socket = readied
+            ? dynamicCarry && isHy3d
+                ? _carryWeaponAnchor
+                : WeaponSocket
+            : BackWeaponSocket;
         if (_weapon.Root.GetParent() != socket)
         {
             _weapon.Root.Reparent(socket, keepGlobalTransform: false);
         }
         _weapon.Root.Position = Vector3.Zero;
-        var isHy3d = readied && CombatModelLibrary.UsesHy3dOperator(VisualId);
-        if (dynamicCarry && isHy3d)
-        {
-            // First put the trigger hand on a stable actor-frame target. The
-            // imported HY-3D clips have a different upper-body rest axis, so
-            // anchoring the rifle to their animated wrist leaves the weapon
-            // behind the chest and makes the support arm impossible to solve.
-            SolveHy3dRightArm(animationOverride);
-        }
-        else
+        if (!(dynamicCarry && isHy3d))
         {
             _weapon.Root.Quaternion = readied
                 ? CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId)
@@ -1159,7 +1180,8 @@ internal sealed class AuthoredOperatorVisual
         // authored rifle silhouette and muzzle distance for both ready and aim.
         var weaponScale = isHy3d ? 0.40f : FieldWeaponScale;
         _weapon.Root.Scale = Vector3.One * (weaponScale / inheritedScale);
-        if (readied && CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId))
+        if (readied && CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId)
+            && !(dynamicCarry && isHy3d))
         {
             // Reparenting a weapon immediately after the visual enters the tree
             // can happen before BoneAttachment3D receives its first skeleton
@@ -1186,18 +1208,52 @@ internal sealed class AuthoredOperatorVisual
         }
         if (dynamicCarry)
         {
-            ApplyCarrySocketBasis();
-            AlignWeaponGripToPrimaryHand();
             if (isHy3d)
             {
+                // Solve the weapon from the shoulder/stock contact first. The
+                // two arm chains then follow its explicit grip markers. This
+                // one-way order is intentional: no hand BoneAttachment is
+                // allowed to move the rifle after the solve.
+                SolveIndependentCarryWeapon(animationOverride);
+                SolveHy3dRightArmToWeaponGrip();
                 AlignPrimaryHandBasisToWeapon();
-            }
-            if (isHy3d)
-            {
                 RetargetHy3dLeftArm(_weapon.Foregrip.GlobalPosition);
                 AlignSupportHandBasisToWeapon();
             }
+            else
+            {
+                ApplyCarrySocketBasis();
+                AlignWeaponGripToPrimaryHand();
+            }
         }
+    }
+
+    private void SolveIndependentCarryWeapon(string? animationOverride)
+    {
+        if (_weapon is null)
+        {
+            return;
+        }
+
+        ApplyCarrySocketBasis();
+        var actorBasis = Root.GlobalTransform.Basis.Orthonormalized();
+        var shoulder = BoneWorldPosition("mixamorig:RightArm");
+        var animation = animationOverride ?? AnimationPlayer.CurrentAnimation.ToString();
+        var aiming = animation.StartsWith("aim_", StringComparison.Ordinal);
+        var sprinting = animation.EndsWith("_sprint", StringComparison.Ordinal);
+        // The stock is the only body contact used to place the rifle. Keep it
+        // in the dominant shoulder pocket and move the receiver/barrel ahead
+        // of the chest; the hand IK below is derived from the resulting
+        // PrimaryGrip/Foregrip markers, never the other way around.
+        var stockOffset = aiming
+            ? new Vector3(0.0f, -0.160f, 0.020f)
+            : sprinting
+                ? new Vector3(0.0f, -0.245f, 0.035f)
+                : new Vector3(0.0f, -0.160f, 0.030f);
+        var global = _weapon.Root.GlobalTransform;
+        var stockDelta = _weapon.Stock.GlobalPosition - global.Origin;
+        global.Origin = shoulder + actorBasis * stockOffset - stockDelta;
+        _weapon.Root.GlobalTransform = global;
     }
 
     private void AlignWeaponGripToPrimaryHand()
@@ -1237,12 +1293,12 @@ internal sealed class AuthoredOperatorVisual
         // instead of presenting the back of the hand above the receiver.
 #pragma warning disable CS0618
         // HY-3D hand vertices run along local +Y from the wrist into the
-        // fingers.  The pistol grip slopes down and rearward from the
-        // receiver, so point that hand axis along the authored grip instead
-        // of laying the palm flat on the rifle's top rail.
+        // fingers. The pistol grip is primarily vertical below the receiver;
+        // keep only a small rearward component so the palm wraps the grip
+        // instead of pointing diagonally across the receiver.
         var gripBasis = BuildCarryHandBasis(
             weaponBasis,
-            new Vector3(0.0f, -0.60f, -0.80f));
+            new Vector3(0.0f, -1.0f, -0.25f));
         _skeleton.SetBoneGlobalPoseOverride(
             _rightHandBone,
             new Transform3D(gripBasis, hand.Origin),
@@ -1250,12 +1306,6 @@ internal sealed class AuthoredOperatorVisual
             persistent: true);
 #pragma warning restore CS0618
         _skeleton.ForceUpdateBoneChildTransform(_rightHandBone);
-        if (_weapon.Root.GetParent() is BoneAttachment3D attachment)
-        {
-            attachment.OnSkeletonUpdate();
-        }
-        ApplyCarrySocketBasis();
-        AlignWeaponGripToPrimaryHand();
     }
 
     private void AlignSupportHandBasisToWeapon()
@@ -1311,35 +1361,23 @@ internal sealed class AuthoredOperatorVisual
         _weapon.Root.GlobalTransform = global;
     }
 
-    private void SolveHy3dRightArm(string? animationOverride = null)
+    private void SolveHy3dRightArmToWeaponGrip()
     {
-        if (_rightShoulderBone < 0 || _rightElbowBone < 0 || _rightHandBone < 0)
+        if (_weapon?.PrimaryGrip is not { } grip
+            || !GodotObject.IsInstanceValid(grip)
+            || _rightShoulderBone < 0
+            || _rightElbowBone < 0
+            || _rightHandBone < 0)
         {
             return;
         }
 
         var actorBasis = Root.GlobalTransform.Basis.Orthonormalized();
         var chest = BoneWorldPosition("mixamorig:Spine2");
-        // A firing grip is shoulder-driven, not sternum-driven: the stock must
-        // sit in the dominant shoulder pocket while the trigger hand stays
-        // just forward of that pocket.  The old sternum target made every
-        // normalized body hug the rifle into the abdomen, which reads as a
-        // parade carry instead of an FPS ready-to-fire stance.  Keep the
-        // offsets in the actor frame so all five HY-3D operators share the
-        // same standard posture while preserving their authored silhouettes.
-        var animation = animationOverride ?? AnimationPlayer.CurrentAnimation.ToString();
-        var aiming = animation.StartsWith("aim_", StringComparison.Ordinal);
-        var sprinting = animation.EndsWith("_sprint", StringComparison.Ordinal);
-        var targetOffset = aiming
-            ? sprinting
-                // Sprint aim lowers the rifle a little to keep the optic out
-                // of the chin/helmet while the authored stride compresses.
-                ? new Vector3(0.04f, -0.13f, -0.18f)
-                : new Vector3(0.04f, -0.09f, -0.19f)
-            : sprinting
-                ? new Vector3(0.08f, -0.10f, -0.22f)
-                : new Vector3(0.08f, -0.05f, -0.20f);
-        var target = chest + actorBasis * targetOffset;
+        // The rifle has already been placed independently. Put the trigger
+        // wrist on its authored pistol-grip marker instead of solving to an
+        // approximate sternum offset and then moving the rifle to catch up.
+        var target = PrimaryHandTargetWorld(grip);
         var shoulder = BoneWorldPosition("mixamorig:RightArm");
         var shoulderLocal = Root.GlobalTransform.AffineInverse() * shoulder;
         var chestLocal = Root.GlobalTransform.AffineInverse() * chest;
@@ -1519,7 +1557,11 @@ internal sealed class AuthoredOperatorVisual
             ? Mathf.Clamp(
                 targetDistance - maximumNaturalDistance,
                 0.0f,
-                0.0295f)
+                // A locomotion clip can pull the support elbow several
+                // centimetres inward. Permit the bounded 12% presentation
+                // stretch to finish at the foregrip instead of leaving a
+                // visible hand-sized gap under the rail.
+                0.075f)
             : 0.0f;
         if (targetShift > 0.0001f)
         {
