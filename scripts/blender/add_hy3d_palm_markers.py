@@ -29,8 +29,51 @@ import bpy
 from mathutils import Vector
 
 SIDES = ("Left", "Right")
+FINGERS = ("Thumb", "Index", "Middle", "Ring", "Pinky")
+SEGMENTS = (1, 2, 3)
 MINIMUM_SAMPLES = 20
 MINIMUM_TOTAL_WEIGHT = 100.0
+MINIMUM_FINGER_SAMPLES = 8
+
+
+def _matches_canonical_name(name: str, canonical: str) -> bool:
+    return name == canonical or any(
+        name.endswith(separator + canonical) for separator in (":", "/", "|")
+    )
+
+
+def find_vertex_group(
+    mesh: bpy.types.Object, canonical: str
+) -> bpy.types.VertexGroup | None:
+    exact = mesh.vertex_groups.get(canonical)
+    if exact is not None:
+        return exact
+    candidates = [
+        group
+        for group in mesh.vertex_groups
+        if _matches_canonical_name(group.name, canonical)
+    ]
+    return min(candidates, key=lambda group: (len(group.name), group.name)) if candidates else None
+
+
+def is_helper_mesh(obj: bpy.types.Object) -> bool:
+    """Remove importer preview primitives while retaining all authored nodes."""
+
+    if obj.type != "MESH":
+        return False
+    lowered = obj.name.casefold()
+    if lowered == "cube" or lowered.startswith("cube."):
+        return len(obj.data.polygons) <= 128
+    return lowered == "icosphere" or lowered.startswith("icosphere.")
+
+
+def remove_helper_meshes() -> list[str]:
+    removed: list[str] = []
+    for obj in list(bpy.data.objects):
+        if is_helper_mesh(obj):
+            removed.append(obj.name)
+            bpy.data.objects.remove(obj, do_unlink=True)
+    return removed
 
 
 def parse_args() -> argparse.Namespace:
@@ -64,6 +107,48 @@ def find_visual_meshes() -> list[bpy.types.Object]:
     ]
 
 
+def _group_samples(
+    meshes: Iterable[bpy.types.Object],
+    canonical: str,
+    threshold: float = 0.0,
+) -> tuple[int, float]:
+    samples = 0
+    total = 0.0
+    for mesh in meshes:
+        group = find_vertex_group(mesh, canonical)
+        if group is None:
+            continue
+        for vertex in mesh.data.vertices:
+            for assignment in vertex.groups:
+                if assignment.group == group.index and assignment.weight > threshold:
+                    samples += 1
+                    total += assignment.weight
+    return samples, total
+
+
+def validate_hand_completeness(meshes: Iterable[bpy.types.Object]) -> None:
+    """Refuse palm markers for the damaged Magpie hand-patch experiments."""
+
+    meshes = list(meshes)
+    issues: list[str] = []
+    for side in SIDES:
+        hand = f"{side}Hand"
+        samples, total = _group_samples(meshes, hand, 0.05)
+        if samples < MINIMUM_SAMPLES or total < MINIMUM_TOTAL_WEIGHT:
+            issues.append(f"{hand}(samples={samples},weight={total:.3f})")
+        for finger in FINGERS:
+            for segment in SEGMENTS:
+                canonical = f"{side}Hand{finger}{segment}"
+                count, weight = _group_samples(meshes, canonical)
+                if count < MINIMUM_FINGER_SAMPLES:
+                    issues.append(f"{canonical}(samples={count},weight={weight:.3f})")
+    if issues:
+        raise RuntimeError(
+            "damaged/missing hand skin; refusing palm markers (Magpie requires "
+            "a different source): " + ", ".join(sorted(set(issues)))
+        )
+
+
 def group_centroid(
     meshes: Iterable[bpy.types.Object],
     group_name: str,
@@ -72,7 +157,7 @@ def group_centroid(
     points: list[Vector] = []
     weights: list[float] = []
     for mesh in meshes:
-        group = mesh.vertex_groups.get(group_name)
+        group = find_vertex_group(mesh, group_name)
         if group is None:
             continue
         evaluated = mesh.evaluated_get(depsgraph)
@@ -128,6 +213,11 @@ def add_bone_marker(
 
 
 def export_scene(output_path: str, armature: bpy.types.Object) -> None:
+    leftovers = [obj.name for obj in bpy.data.objects if is_helper_mesh(obj)]
+    if leftovers:
+        raise RuntimeError(
+            "helper meshes remain before export: " + ", ".join(sorted(leftovers))
+        )
     bpy.ops.object.select_all(action="SELECT")
     bpy.context.view_layer.objects.active = armature
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -161,9 +251,11 @@ def main() -> None:
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=input_path)
     armature = find_armature()
+    removed_helpers = remove_helper_meshes()
     meshes = find_visual_meshes()
     if not meshes:
         raise RuntimeError("input GLB has no visual mesh")
+    validate_hand_completeness(meshes)
 
     # Use the authored aim reference pose for the static local marker offset.
     action = next(
@@ -214,6 +306,7 @@ def main() -> None:
     print(
         "HY3D_PALM_MARKER_CHECK",
         f"sides={len(SIDES)}",
+        f"helpers_removed={len(removed_helpers)}",
         f"output={output_path}",
     )
     print("HY3D_PALM_MARKER_PASS valid=true")

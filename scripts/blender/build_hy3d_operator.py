@@ -17,6 +17,31 @@ import bpy
 import bmesh
 from mathutils import Matrix, Quaternion, Vector
 
+# Reuse the strict DCC hand pass when this conversion is run as a standalone
+# Blender script.  The fallback path below still supports raw rigs that have no
+# finger skin groups yet; once any labelled group exists, incomplete data is a
+# hard error instead of an implicit synthetic hand.
+try:
+    from rebind_hy3d_hands import (
+        build_segments as _build_hand_segments,
+        collect_chains as _collect_hand_chains,
+        rebind_mesh as _rebind_hand_mesh,
+        reposition_finger_bones as _reposition_hand_bones,
+    )
+except ImportError:
+    import importlib.util
+
+    _hand_module_path = os.path.join(os.path.dirname(__file__), "rebind_hy3d_hands.py")
+    _hand_spec = importlib.util.spec_from_file_location("_steel_tide_rebind_hands", _hand_module_path)
+    if _hand_spec is None or _hand_spec.loader is None:
+        raise
+    _hand_module = importlib.util.module_from_spec(_hand_spec)
+    _hand_spec.loader.exec_module(_hand_module)
+    _build_hand_segments = _hand_module.build_segments
+    _collect_hand_chains = _hand_module.collect_chains
+    _rebind_hand_mesh = _hand_module.rebind_mesh
+    _reposition_hand_bones = _hand_module.reposition_finger_bones
+
 MAP = {
     "Root": "root", "Hips": "Hips", "Spine": "Spine", "Spine1": "Spine1", "Spine2": "Spine2",
     "Neck": "Neck", "Head": "Head", "LeftShoulder": "LeftShoulder", "LeftArm": "LeftArm",
@@ -37,6 +62,79 @@ EXPECTED = {
 FINGER_NAMES = ("Thumb", "Index", "Middle", "Ring", "Pinky")
 
 
+def _canonical_object_name(name: str, canonical: str) -> bool:
+    return name == canonical or any(
+        name.endswith(separator + canonical) for separator in (":", "/", "|")
+    )
+
+
+def _resolve_data_bone(target: bpy.types.Object, canonical: str) -> bpy.types.Bone | None:
+    exact = target.data.bones.get(canonical)
+    if exact is not None:
+        return exact
+    candidates = [
+        bone for bone in target.data.bones if _canonical_object_name(bone.name, canonical)
+    ]
+    return min(candidates, key=lambda bone: (len(bone.name), bone.name)) if candidates else None
+
+
+def _resolve_edit_bone(target: bpy.types.Object, canonical: str) -> bpy.types.EditBone | None:
+    exact = target.data.edit_bones.get(canonical)
+    if exact is not None:
+        return exact
+    candidates = [
+        bone
+        for bone in target.data.edit_bones
+        if _canonical_object_name(bone.name, canonical)
+    ]
+    return min(candidates, key=lambda bone: (len(bone.name), bone.name)) if candidates else None
+
+
+def _resolve_pose_bone(target: bpy.types.Object, canonical: str) -> bpy.types.PoseBone | None:
+    exact = target.pose.bones.get(canonical)
+    if exact is not None:
+        return exact
+    candidates = [
+        bone
+        for bone in target.pose.bones
+        if _canonical_object_name(bone.name, canonical)
+    ]
+    return min(candidates, key=lambda bone: (len(bone.name), bone.name)) if candidates else None
+
+
+def _has_any_finger_groups(mesh: bpy.types.Object) -> bool:
+    return any(
+        _canonical_object_name(
+            group.name,
+            f"{side}Hand{finger}{segment}",
+        )
+        for group in mesh.vertex_groups
+        for side in ("Left", "Right")
+        for finger in FINGER_NAMES
+        for segment in range(1, 4)
+    )
+
+
+def _try_authored_finger_rebind(target: bpy.types.Object, mesh: bpy.types.Object) -> bool:
+    """Use labelled HY-3D skin as the source of truth when it exists."""
+
+    if not _has_any_finger_groups(mesh):
+        return False
+    # collect_chains() validates both hand totals and all 30 segment populations.
+    # A partial hand (notably every Magpie candidate) is a hard source error;
+    # never fall back to synthetic weights once a damaged labelled group exists.
+    chains = _collect_hand_chains(mesh)
+    _reposition_hand_bones(target, chains)
+    segments = _build_hand_segments(target, mesh, chains)
+    stats: dict[str, int] = {}
+    _rebind_hand_mesh(target, mesh, segments, radius=0.05, finger_share=0.85, stats=stats)
+    target["steel_tide_authored_finger_rebind"] = True
+    target["steel_tide_authored_finger_rebind_cleared"] = stats.get(
+        "cleared_assignments", 0
+    )
+    return True
+
+
 def add_finger_rig(target: bpy.types.Object, mesh: bpy.types.Object) -> None:
     """Ensure five phalanx chains exist and are actually bound to the hand mesh.
 
@@ -45,10 +143,10 @@ def add_finger_rig(target: bpy.types.Object, mesh: bpy.types.Object) -> None:
     authored curl animation had no visible effect.  Always run the weight pass;
     only create bones when the source rig really lacks them.
     """
-    if target.data.bones.get("LeftHandIndex1") is None:
+    if _resolve_data_bone(target, "LeftHandIndex1") is None:
         bpy.ops.object.mode_set(mode="EDIT")
         for side_name, side in (("Left", 1.0), ("Right", -1.0)):
-            hand = target.data.edit_bones.get(f"{side_name}Hand")
+            hand = _resolve_edit_bone(target, f"{side_name}Hand")
             if hand is None:
                 continue
             palm = (hand.tail - hand.head).normalized()
@@ -60,8 +158,13 @@ def add_finger_rig(target: bpy.types.Object, mesh: bpy.types.Object) -> None:
                 lateral = (index - 2) * 0.012
                 for segment in range(1, 4):
                     name = f"{side_name}Hand{finger}{segment}"
-                    parent = hand if segment == 1 else target.data.edit_bones.get(
-                        f"{side_name}Hand{finger}{segment - 1}")
+                    parent = (
+                        hand
+                        if segment == 1
+                        else _resolve_edit_bone(
+                            target, f"{side_name}Hand{finger}{segment - 1}"
+                        )
+                    )
                     head = hand.tail + spread * (lateral + (0.012 if finger == "Thumb" else 0.0))
                     if segment > 1 and parent is not None:
                         head = parent.tail
@@ -72,11 +175,18 @@ def add_finger_rig(target: bpy.types.Object, mesh: bpy.types.Object) -> None:
                     bone.use_connect = segment > 1
         bpy.ops.object.mode_set(mode="OBJECT")
 
+    # Existing labelled skin is authoritative.  This repositions every
+    # existing phalanx before weights are touched and removes remote/distal
+    # assignments through the shared strict DCC pass.  Missing groups use the
+    # legacy creation path below so raw FBX rigs remain importable.
+    if _try_authored_finger_rebind(target, mesh):
+        return
+
     inverse = target.matrix_world.inverted() @ mesh.matrix_world
     hand_offsets: dict[str, Vector] = {}
     for side_name in ("Left", "Right"):
         hand_group = mesh.vertex_groups.get(f"{side_name}Hand")
-        hand_bone = target.data.bones.get(f"{side_name}Hand")
+        hand_bone = _resolve_data_bone(target, f"{side_name}Hand")
         if hand_group is None or hand_bone is None:
             continue
         hand_vertices = [
@@ -93,13 +203,13 @@ def add_finger_rig(target: bpy.types.Object, mesh: bpy.types.Object) -> None:
                 - hand_bone.tail_local
             )
     for side_name in ("Left", "Right"):
-        hand = target.data.bones.get(f"{side_name}Hand")
+        hand = _resolve_data_bone(target, f"{side_name}Hand")
         if hand is None:
             continue
         for finger in FINGER_NAMES:
             for segment in range(1, 4):
                 bone_name = f"{side_name}Hand{finger}{segment}"
-                bone = target.data.bones.get(bone_name)
+                bone = _resolve_data_bone(target, bone_name)
                 if bone is None:
                     continue
                 group = mesh.vertex_groups.get(bone_name)
@@ -131,6 +241,26 @@ def author_finger_animation(target: bpy.types.Object, actions: list[bpy.types.Ac
         target.animation_data_create()
         target.animation_data.action = action
         start, end = [int(round(value)) for value in action.frame_range]
+        finger_names = {
+            f"{side}Hand{finger}{segment}"
+            for side in ("Left", "Right")
+            for finger in FINGER_NAMES
+            for segment in range(1, 4)
+        }
+        # The imported target actions often contain quaternion finger tracks.
+        # Mixing those with the authored Euler curl makes Blender export both
+        # rotation modes and lets the glTF exporter choose an arbitrary one.
+        # Remove only finger rotation channels (location/scale stay intact),
+        # then author one deterministic quaternion mode.
+        for curve in list(action.fcurves):
+            if not any(
+                f'pose.bones["{name}"]' in curve.data_path for name in finger_names
+            ):
+                continue
+            if curve.data_path.endswith("rotation_quaternion") or curve.data_path.endswith(
+                "rotation_euler"
+            ):
+                action.fcurves.remove(curve)
         armed = any(token in action.name for token in ("aim", "ready", "shoot", "reload"))
         curl = math.radians(52.0 if armed else 16.0)
         for frame in sorted({start, start + max(1, (end - start) // 2), end}):
@@ -138,12 +268,23 @@ def author_finger_animation(target: bpy.types.Object, actions: list[bpy.types.Ac
             for side_name, side in (("Left", 1.0), ("Right", -1.0)):
                 for finger in FINGER_NAMES:
                     for segment in range(1, 4):
-                        bone = target.pose.bones.get(f"{side_name}Hand{finger}{segment}")
+                        bone = _resolve_pose_bone(
+                            target, f"{side_name}Hand{finger}{segment}"
+                        )
                         if bone is None:
                             continue
-                        bone.rotation_mode = "XYZ"
-                        bone.rotation_euler.z = -side * curl * (1.0 if segment == 1 else 0.8)
-                        bone.keyframe_insert(data_path="rotation_euler", frame=frame, group=bone.name)
+                        bone.rotation_mode = "QUATERNION"
+                        base = bone.rotation_quaternion.copy()
+                        bend = Quaternion(
+                            (0.0, 0.0, 1.0),
+                            -side * curl * (1.0 if segment == 1 else 0.8),
+                        )
+                        bone.rotation_quaternion = base @ bend
+                        bone.keyframe_insert(
+                            data_path="rotation_quaternion",
+                            frame=frame,
+                            group=bone.name,
+                        )
         action["finger_rig"] = True
     target.animation_data.action = None
 
@@ -185,6 +326,29 @@ def visual_mesh(objects: Iterable[bpy.types.Object]) -> bpy.types.Object:
     if not meshes:
         raise RuntimeError("missing visual mesh")
     return max(meshes, key=lambda obj: len(obj.data.polygons))
+
+
+def is_helper_mesh(obj: bpy.types.Object, keep: Iterable[bpy.types.Object] = ()) -> bool:
+    """Identify Cube/Icosphere importer previews without deleting authored nodes."""
+
+    if obj.type != "MESH" or obj in set(keep):
+        return False
+    lowered = obj.name.casefold()
+    if lowered == "cube" or lowered.startswith("cube."):
+        return len(obj.data.polygons) <= 128
+    return lowered == "icosphere" or lowered.startswith("icosphere.")
+
+
+def remove_helper_meshes(keep: Iterable[bpy.types.Object] = ()) -> list[str]:
+    """Remove helper meshes from every collection while preserving empties/bones."""
+
+    keep_set = set(keep)
+    removed: list[str] = []
+    for obj in list(bpy.data.objects):
+        if is_helper_mesh(obj, keep_set):
+            removed.append(obj.name)
+            bpy.data.objects.remove(obj, do_unlink=True)
+    return removed
 
 
 def remove_embedded_weapon(mesh: bpy.types.Object, asset_name: str) -> int:
@@ -240,10 +404,11 @@ def remove_embedded_weapon(mesh: bpy.types.Object, asset_name: str) -> int:
                         dominant_groups.add(mesh.vertex_groups[group.group].name)
         spatial_weapon = (minimum.x < -0.40 and maximum.x < -0.34
                 and minimum.z > 0.42 and maximum.z < 0.98
-                and ("RightUpLeg" in dominant_groups or "RightHand" in dominant_groups))
+                and "RightUpLeg" in dominant_groups)
         # Do not use the RightHand group as a prop heuristic.  Magpie's real
-        # hand is a disconnected component in the HY-3D mesh too, so the old
-        # broad check deleted the actual hand along with the embedded rifle.
+        # hand is a disconnected component in the HY-3D mesh too; deleting
+        # every component with a RightHand influence removes the actual palm
+        # and finger skin along with the embedded rifle.
         if spatial_weapon:
             selected.add(root)
 
@@ -709,10 +874,14 @@ def add_contract_nodes(target: bpy.types.Object, mesh: bpy.types.Object) -> tupl
     # Iterate the datablock, not only the active scene collection: imported
     # glTF markers such as Quaternius' Icosphere can remain linked through a
     # nested collection and must not ship as visible gameplay geometry.
+    removed_helpers = remove_helper_meshes(keep=(mesh,))
     for obj in list(bpy.data.objects):
         if obj.type == "MESH" and obj != mesh:
             bpy.data.objects.remove(obj, do_unlink=True)
+    if any(is_helper_mesh(obj, keep=(mesh,)) for obj in bpy.data.objects):
+        raise RuntimeError("helper meshes remain after contract cleanup")
     target.name = "QuaterniusOperatorRig"; target.data.name = "QuaterniusOperatorRig"; mesh.name = "OperatorBody"
+    target["steel_tide_removed_helper_meshes"] = ",".join(sorted(removed_helpers))
     if mesh.parent != target:
         mesh.parent = target; mesh.parent_type = "OBJECT"
     root = bpy.data.objects.new("QuaterniusOperator", None); bpy.context.collection.objects.link(root); target.parent = root
@@ -731,6 +900,12 @@ def main() -> None:
     source.animation_data_create(); source.animation_data.action = None; bpy.context.scene.frame_set(0); bpy.context.view_layer.update()
     source_reference = capture_basis_pose(source)
     target_objects=import_asset(rigged_path); target=armature(target_objects); mesh=visual_mesh(target_objects)
+    rigged_role = os.path.basename(rigged_path).split(".", 1)[0].casefold()
+    if rigged_role.startswith("magpie") and not _has_any_finger_groups(mesh):
+        raise RuntimeError(
+            "damaged/missing hand skin; refusing Magpie build because no "
+            "complete finger source is available"
+        )
     removed_weapon_faces = remove_embedded_weapon(mesh, os.path.splitext(os.path.basename(source_path))[0])
     bpy.ops.object.select_all(action="DESELECT"); target.select_set(True); mesh.select_set(True); bpy.context.view_layer.objects.active=target
     # Canonicalize the FBX armature to metre-space before baking. Godot's
