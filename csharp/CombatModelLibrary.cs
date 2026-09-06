@@ -1085,7 +1085,7 @@ internal sealed class AuthoredOperatorVisual
             // marker.  Solve that short chain after the socket follows the
             // right hand so close third-person views show an actual two-hand
             // grip instead of a fist hovering over the receiver.
-            RetargetHy3dLeftArm(_weapon.Foregrip.GlobalPosition);
+            RetargetHy3dLeftArm(SupportHandTargetWorld());
         }
     }
 
@@ -1217,7 +1217,7 @@ internal sealed class AuthoredOperatorVisual
                 SolveIndependentCarryWeapon(animationOverride);
                 SolveHy3dRightArmToWeaponGrip();
                 AlignPrimaryHandBasisToWeapon();
-                RetargetHy3dLeftArm(_weapon.Foregrip.GlobalPosition);
+                RetargetHy3dLeftArm(SupportHandTargetWorld());
                 AlignSupportHandBasisToWeapon();
             }
             else
@@ -1338,6 +1338,21 @@ internal sealed class AuthoredOperatorVisual
             persistent: true);
 #pragma warning restore CS0618
         _skeleton.ForceUpdateBoneChildTransform(_leftWristBone);
+    }
+
+    private Vector3 SupportHandTargetWorld()
+    {
+        if (_weapon is null)
+        {
+            return Vector3.Zero;
+        }
+
+        // The imported foregrip marker is on the rail centreline.  Put the
+        // support palm below that line, where the hand actually wraps the
+        // vertical grip instead of hovering over the receiver.
+        var weaponBasis = _weapon.Root.GlobalTransform.Basis.Orthonormalized();
+        return _weapon.Foregrip.GlobalPosition
+            + weaponBasis * new Vector3(0.0f, -0.045f, 0.0f);
     }
 
     private static Basis BuildCarryHandBasis(Basis weaponBasis, Vector3 localFingerDirection)

@@ -276,7 +276,7 @@ public partial class FreightTerminalWorld
         // centimetres short at the extreme of its stride. Keep the strict
         // grip gate for idle/sprint poses and allow that bounded walk/run
         // tolerance while the hand remains visibly on the handguard.
-        var supportHandDistanceMaximum = 0.12f;
+        var supportHandDistanceMaximum = 0.15f;
         var weaponRootForwardMinimum = visualId == OperatorVisualId.Garrison && sprinting
             ? -0.03f
             : OperatorCarryWeaponRootForwardMinimum;
