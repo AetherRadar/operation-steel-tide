@@ -85,6 +85,7 @@ public partial class EnemyOperator
                 break;
         }
         _fireTimer = Mathf.Max(_fireTimer, 0.8f);
+        _authoredOperatorAnimator?.PlayAction("throw", 0.78f, 1.0f);
         return true;
     }
 }

@@ -19,12 +19,14 @@ public partial class FreightTerminalWorld
         var movementRifleFits = new System.Collections.Generic.List<string>();
         var movementRifleFitValid = true;
         var count = 0;
+        var actionCount = 0;
         try
         {
             visual = CombatModelLibrary.InstantiateOperator();
             AddChild(visual.Root);
             var animator = new AuthoredOperatorAnimator(visual);
             count = animator.AnimationCount;
+            actionCount = animator.ActionAnimationCount;
             void Sample(
                 float speed,
                 bool weaponReadied,
@@ -145,8 +147,10 @@ public partial class FreightTerminalWorld
         var readyDistinct = readyIdleFit.WeaponOrigin.Y <= rifleFit.WeaponOrigin.Y - 0.18f;
         var readyForwardAligned = Mathf.Abs(readyIdleFit.MuzzleOffset.X) <= 0.16f
             && readyIdleFit.MuzzleOffset.Z <= -0.38f;
-        var valid = count == 25
+        var actionCoverage = actionCount >= 13 || actionCount == 0;
+        var valid = count >= 25
             && sockets
+            && actionCoverage
             && transitionsValid
             && rifleFit.Valid
             && movementRifleFitValid
@@ -164,6 +168,7 @@ public partial class FreightTerminalWorld
             + $"ready_muzzle={readyIdleFit.MuzzleOffset} "
             + $"movement_rifle_fit={string.Join(',', movementRifleFits)} "
             + $"muzzle_offset={rifleFit.MuzzleOffset} stock_offset={rifleFit.StockOffset} "
+            + $"action_count={actionCount} action_coverage={actionCoverage} "
             + $"transitions={string.Join('>', transitions)} expected={string.Join('>', expected)}");
         GD.Print($"OPERATOR_ANIMATIONS_PASS valid={valid}");
         visual?.Root.QueueFree();

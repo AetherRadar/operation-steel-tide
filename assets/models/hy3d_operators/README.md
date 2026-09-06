@@ -3,10 +3,13 @@
 The local `.glb` files in this directory are generated from Tencent HY-3D and
 HY-3D-Rigging responses and converted in Blender by
 `scripts/blender/build_hy3d_operator.py`. The Tencent mesh supplies the
-realistic tactical appearance; the 25 gameplay actions come from the project's
+realistic tactical appearance; the 38 gameplay actions come from the project's
 CC0 Quaternius Universal Animation Library clips, retargeted and baked onto
 the Tencent skeleton. The conversion adds the six Steel Tide weapon/gear
-sockets and caps the delivered mesh at 60,000 triangles.
+sockets and caps the delivered mesh at 60,000 triangles. The action set covers
+locomotion, ready and aim weapon poses, shooting, reloading, melee, utility
+throwing, interaction, pickup, healing, jump, slide, hit, downed, revive, and
+death clips.
 
 The generated files are intentionally ignored by Git and remain in the local
 private asset store. On 2026-09-05 the project owner reported confirmation

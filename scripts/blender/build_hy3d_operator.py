@@ -29,6 +29,8 @@ EXPECTED = {
     "ready_run", "ready_sprint", "ready_crouch_idle", "ready_crouch_walk", "aim_walk", "aim_run",
     "aim_sprint", "aim_crouch_idle", "aim_crouch_walk", "prone_idle", "prone_crawl", "aim_idle",
     "hit", "death", "downed", "revive_kneel", "revived",
+    "shoot", "reload", "melee", "throw", "interact", "pickup", "heal",
+    "jump_start", "jump_loop", "jump_land", "slide_start", "slide_loop", "slide_exit",
 }
 
 

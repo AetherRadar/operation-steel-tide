@@ -16,6 +16,12 @@ internal sealed class AuthoredOperatorAnimator
         "revive_kneel", "revived"
     };
 
+    private static readonly string[] ActionAnimations =
+    {
+        "shoot", "reload", "melee", "throw", "interact", "pickup", "heal",
+        "jump_start", "jump_loop", "jump_land", "slide_start", "slide_loop", "slide_exit"
+    };
+
     private static readonly HashSet<string> LoopingAnimations = new(StringComparer.Ordinal)
     {
         "idle", "walk", "run", "sprint", "crouch_idle", "crouch_walk",
@@ -60,7 +66,24 @@ internal sealed class AuthoredOperatorAnimator
     }
 
     public string CurrentAnimation => _current;
-    public int AnimationCount => RequiredAnimations.Length;
+    public int AnimationCount => RequiredAnimations.Length + ActionAnimationCount;
+    public int BaseAnimationCount => RequiredAnimations.Length;
+    public int ActionAnimationCount
+    {
+        get
+        {
+            var count = 0;
+            foreach (var action in ActionAnimations)
+            {
+                if (HasAnimation(action))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+    }
+    public bool HasAnimation(string name) => _player.HasAnimation(name);
 
     public void Update(
         float delta,
@@ -71,7 +94,8 @@ internal sealed class AuthoredOperatorAnimator
         bool aiming,
         bool downed,
         bool reviving,
-        bool dead)
+        bool dead,
+        bool airborne = false)
     {
         _hitCooldownRemaining = Mathf.Max(0.0f, _hitCooldownRemaining - delta);
         if (_overrideRemaining > 0.0f && !dead && !downed)
@@ -98,6 +122,12 @@ internal sealed class AuthoredOperatorAnimator
         else if (reviving)
         {
             next = "revive_kneel";
+        }
+        else if (airborne)
+        {
+            next = HasAnimation("jump_loop")
+                ? "jump_loop"
+                : HasAnimation("jump_start") ? "jump_start" : "aim_idle";
         }
         else if (prone)
         {
@@ -171,17 +201,29 @@ internal sealed class AuthoredOperatorAnimator
         return true;
     }
 
+    public bool PlayAction(string name, float duration, float playbackSpeed = 1.0f)
+    {
+        if (!_player.HasAnimation(name))
+        {
+            return false;
+        }
+        _hitCooldownRemaining = 0.0f;
+        PlayOverride(name, Mathf.Max(0.08f, duration), playbackSpeed);
+        return true;
+    }
+
     public void PlayRevived()
         => PlayOverride("revived", 1.15f);
 
-    private void PlayOverride(string name, float duration)
+    private void PlayOverride(string name, float duration, float playbackSpeed = 1.0f)
     {
         _overrideRemaining = duration;
-        Play(name, 1.0f, immediate: true);
+        Play(name, playbackSpeed, immediate: true);
     }
 
     private void Play(string name, float playbackSpeed, bool immediate = false)
     {
+        name = ResolveAnimation(name);
         if (!immediate && _current == name)
         {
             _player.SpeedScale = playbackSpeed;
@@ -195,6 +237,23 @@ internal sealed class AuthoredOperatorAnimator
         // same physics step.  This also makes hit/revive overrides switch
         // without displaying one frame of the previous locomotion pose.
         _player.Advance(0.0);
+    }
+
+    private string ResolveAnimation(string name)
+    {
+        if (_player.HasAnimation(name))
+        {
+            return name;
+        }
+        return name switch
+        {
+            "jump_start" or "jump_loop" or "jump_land" => "aim_idle",
+            "slide_start" or "slide_loop" or "slide_exit" => "crouch_idle",
+            "shoot" => "aim_idle",
+            "reload" => "ready_idle",
+            "melee" or "throw" or "interact" or "pickup" or "heal" => "idle",
+            _ => "idle"
+        };
     }
 
     private void AdvanceAndRefresh(float delta)

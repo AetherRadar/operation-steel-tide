@@ -788,6 +788,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         var muzzlePos = IsInstanceValid(_muzzle) ? _muzzle.GlobalPosition : bodyOrigin;
         var shotOrigin = Ballistics.ResolveShotOrigin(GetWorld3D(), bodyOrigin, muzzlePos, GetRid());
         CombatShotsFired++;
+        _authoredOperatorAnimator?.PlayAction("shoot", 0.22f, 1.35f);
         PlayShotAudio();
         Main.NotifyAircraftOperatorAttack(this, GlobalPosition, stats.SoundRadius);
         var firedAmmoGrade = CommitFiredPrimaryRound();
@@ -848,6 +849,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             var spec = OperatorRoles.Spec(Role);
             var reloadBoost = Role == OperatorRole.Assault && _overdriveTime > 0.0f ? 0.78f : 1.0f;
             _reloadTimer = Mathf.Clamp(2.6f * spec.ReloadMultiplier * reloadBoost, 1.2f, 3.6f);
+            _authoredOperatorAnimator?.PlayAction("reload", _reloadTimer, 0.95f);
             _burstShotsRemaining = 0;
         }
         return firedAmmoGrade;

@@ -91,6 +91,7 @@ public partial class SquadMate
         }
         _burstShotsRemaining = 0;
         _weaponCooldown = Mathf.Max(_weaponCooldown, 0.8f);
+        _authoredOperatorAnimator?.PlayAction("throw", 0.78f, 1.0f);
         return true;
     }
 }

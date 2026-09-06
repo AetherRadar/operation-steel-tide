@@ -39,10 +39,18 @@ After subdivision, the build keeps the strongest four deform-bone influences
 per vertex and normalizes those weights before export; non-deforming selection
 and control groups are removed before export so they cannot become glTF skin joints.
 It retains the runtime root, rig, four
-character mesh nodes, equipment sockets, and 25-action animation contract while
+character mesh nodes, equipment sockets, and the complete 38-action animation
+contract while
 normalizing the shared humanoid rig and retargeting the separately recorded CC0
 Quaternius Universal Animation Library actions. No code-generated primitive
 geometry is used for these character visuals.
+
+The action contract covers `idle`, walk/run/sprint locomotion, crouch and prone
+movement, ready and aim weapon poses, `shoot`, `reload`, `melee`, `throw`,
+`interact`, `pickup`, `heal`, jump start/loop/land, slide start/loop/exit,
+`hit`, `downed`, `revive_kneel`, `revived`, and `death`. The added actions are
+retargeted and baked in Blender from the CC0 Universal Animation Library 1 and
+2 sources recorded in `assets/models/LICENSE.md`.
 
 Editable source files and the supplied license evidence are retained in
 `source_art/third_party/quaternius_modular_women/`. Rebuild all five GLBs with:

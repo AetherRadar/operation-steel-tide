@@ -120,7 +120,8 @@ public partial class EnemyOperator
                 || IsCombatAirborneAttack,
             downed: false,
             reviving: false,
-            IsDead);
+            IsDead,
+            airborne: !IsOnFloor());
     }
 
     private void AttachAuthoredOperatorVisual()

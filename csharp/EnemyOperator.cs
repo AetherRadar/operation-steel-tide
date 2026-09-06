@@ -2082,6 +2082,7 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private void BeginMuzzleFlash()
     {
         AttackShotsFired++;
+        _authoredOperatorAnimator?.PlayAction("shoot", 0.22f, 1.35f);
         HoldAuthoredAimAfterShot();
         Main?.NotifyAircraftOperatorAttack(this, GlobalPosition, CarriedWeapon.Stats().SoundRadius);
         _shotAudio.PitchScale = _rng.RandfRange(0.88f, 1.08f);

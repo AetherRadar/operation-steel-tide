@@ -75,6 +75,21 @@ ACTION_SOURCES = {
     "death": ("ual1", "Death01", False),
     "revive_kneel": ("ual1", "Fixing_Kneeling", True),
     "revived": ("ual2", "LayToIdle", False),
+    # Full third-person action coverage. These clips are CC0 Quaternius
+    # actions retargeted and baked onto the authored operator skeleton.
+    "shoot": ("ual1", "Pistol_Shoot", False),
+    "reload": ("ual1", "Pistol_Reload", False),
+    "melee": ("ual1", "Punch_Cross", False),
+    "throw": ("ual2", "OverhandThrow", False),
+    "interact": ("ual1", "Interact", False),
+    "pickup": ("ual1", "PickUp_Table", False),
+    "heal": ("ual2", "Consume", False),
+    "jump_start": ("ual1", "Jump_Start", False),
+    "jump_loop": ("ual1", "Jump_Loop", True),
+    "jump_land": ("ual1", "Jump_Land", False),
+    "slide_start": ("ual2", "Slide_Start", False),
+    "slide_loop": ("ual2", "Slide_Loop", True),
+    "slide_exit": ("ual2", "Slide_Exit", False),
 }
 
 
@@ -99,7 +114,7 @@ READY_LOCOMOTION_SOURCES = {
 LOOP_ACTIONS = {
     name for name, (_, _, loop) in ACTION_SOURCES.items() if loop
 } | set(AIM_LOCOMOTION_SOURCES) | set(READY_LOCOMOTION_SOURCES) | {
-    "ready_idle", "prone_idle", "prone_crawl", "downed"
+    "ready_idle", "prone_idle", "prone_crawl", "downed", "jump_loop", "slide_loop"
 }
 
 
