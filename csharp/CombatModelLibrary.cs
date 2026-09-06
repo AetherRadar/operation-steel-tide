@@ -2473,10 +2473,20 @@ internal static partial class CombatModelLibrary
             if (asset.UsesQuaterniusRig)
             {
                 var animationPlayer = RequireAnimationPlayer(source);
-                // Inventory/deployment previews are product shots. Keep the
-                // authored rest pose so every operator stands squarely instead
-                // of freezing the weight-shifted idle animation.
-                animationPlayer.Stop();
+                // Inventory/deployment previews use the first frame of the
+                // authored idle clip. The imported rest pose carries a
+                // weight-shifted hip tilt that reads as a crooked character
+                // in the straight-on loadout card.
+                if (animationPlayer.HasAnimation("idle"))
+                {
+                    animationPlayer.Play("idle");
+                    animationPlayer.Seek(0.0, update: true);
+                    animationPlayer.Advance(0.0);
+                }
+                else
+                {
+                    animationPlayer.Stop();
+                }
 
                 if (weaponBuild is not null)
                 {
