@@ -956,20 +956,55 @@ internal sealed class AuthoredOperatorVisual
     {
         var neck = ResolveBoneIndex(_skeleton, "mixamorig:Neck");
         var head = ResolveBoneIndex(_skeleton, "mixamorig:Head");
-#pragma warning disable CS0618
-        foreach (var bone in new[] { neck, head })
+        if (neck < 0 || head < 0)
         {
-            var pose = _skeleton.GetBoneGlobalPose(bone);
-            var uprightBasis = pose.Basis.Rotated(Vector3.Right, -0.12f).Orthonormalized();
-            _skeleton.SetBoneGlobalPoseOverride(
-                bone,
-                new Transform3D(uprightBasis, pose.Origin),
-                1.0f,
-                persistent: true);
+            return;
         }
-#pragma warning restore CS0618
+#pragma warning disable CS0618
+        // Keep the small forward pitch used by the neutral loadout pose, then
+        // remove each asset's independent neck roll.  HY-3D Viper's rest neck
+        // is about eight degrees off around the actor's forward axis; applying
+        // a fixed world correction would make the other operators worse.
+        var neckPose = _skeleton.GetBoneGlobalPose(neck);
+        var uprightNeckBasis = RemovePreviewHeadRoll(
+            neckPose.Basis.Rotated(Vector3.Right, -0.12f).Orthonormalized());
+        _skeleton.SetBoneGlobalPoseOverride(
+            neck,
+            new Transform3D(uprightNeckBasis, neckPose.Origin),
+            1.0f,
+            persistent: true);
         _skeleton.ForceUpdateBoneChildTransform(neck);
+
+        // Read the head after the neck override so the child's inherited roll is
+        // not overwritten by a stale pre-correction global pose.
+        var headPose = _skeleton.GetBoneGlobalPose(head);
+        var uprightHeadBasis = RemovePreviewHeadRoll(headPose.Basis);
+        _skeleton.SetBoneGlobalPoseOverride(
+            head,
+            new Transform3D(uprightHeadBasis, headPose.Origin),
+            1.0f,
+            persistent: true);
+#pragma warning restore CS0618
         _skeleton.ForceUpdateBoneChildTransform(head);
+    }
+
+    private static Basis RemovePreviewHeadRoll(Basis basis)
+    {
+        var up = basis.Y.Normalized();
+        if (up.LengthSquared() <= 0.0001f)
+        {
+            return basis.Orthonormalized();
+        }
+
+        // In skeleton space a positive Z rotation moves the up vector toward
+        // negative X.  Projecting onto the XY plane gives the actual roll while
+        // preserving the authored yaw and pitch of the gaze.
+        var roll = Mathf.Atan2(-up.X, up.Y);
+        if (Mathf.Abs(roll) < 0.0005f)
+        {
+            return basis.Orthonormalized();
+        }
+        return basis.Rotated(Vector3.Forward, roll).Orthonormalized();
     }
 
     public void SetEquipment(
