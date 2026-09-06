@@ -455,6 +455,7 @@ public partial class FreightTerminalWorld
         // negative probe results so a cell rejected while closed is reconsidered
         // immediately after the leaf finishes moving.
         _squadNavCellSupport.Clear();
+        _squadNavNegativeSupportExpiry.Clear();
         _squadNavEdgeCache.Clear();
         _squadGridPaths.Clear();
         _squadTrailPaths.Clear();
