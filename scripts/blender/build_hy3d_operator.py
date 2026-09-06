@@ -38,36 +38,60 @@ FINGER_NAMES = ("Thumb", "Index", "Middle", "Ring", "Pinky")
 
 
 def add_finger_rig(target: bpy.types.Object, mesh: bpy.types.Object) -> None:
-    """Add five weighted phalanx chains when the private rig has wrist-only hands."""
-    if target.data.bones.get("LeftHandIndex1") is not None:
-        return
-    bpy.ops.object.mode_set(mode="EDIT")
-    for side_name, side in (("Left", 1.0), ("Right", -1.0)):
-        hand = target.data.edit_bones.get(f"{side_name}Hand")
-        if hand is None:
-            continue
-        palm = (hand.tail - hand.head).normalized()
-        spread = palm.cross(Vector((0.0, 1.0, 0.0)))
-        if spread.length_squared < 1.0e-6:
-            spread = Vector((1.0, 0.0, 0.0))
-        spread.normalize()
-        for index, finger in enumerate(FINGER_NAMES):
-            lateral = (index - 2) * 0.012
-            for segment in range(1, 4):
-                name = f"{side_name}Hand{finger}{segment}"
-                parent = hand if segment == 1 else target.data.edit_bones.get(
-                    f"{side_name}Hand{finger}{segment - 1}")
-                head = hand.tail + spread * (lateral + (0.012 if finger == "Thumb" else 0.0))
-                if segment > 1 and parent is not None:
-                    head = parent.tail
-                bone = target.data.edit_bones.new(name)
-                bone.parent = parent
-                bone.head = head
-                bone.tail = head + palm * (0.028 if finger == "Thumb" else 0.024)
-                bone.use_connect = segment > 1
-    bpy.ops.object.mode_set(mode="OBJECT")
+    """Ensure five phalanx chains exist and are actually bound to the hand mesh.
+
+    Some HY-3D FBX files already contain the finger bones but leave them out of
+    the skin.  The old early return treated those bones as complete, so the
+    authored curl animation had no visible effect.  Always run the weight pass;
+    only create bones when the source rig really lacks them.
+    """
+    if target.data.bones.get("LeftHandIndex1") is None:
+        bpy.ops.object.mode_set(mode="EDIT")
+        for side_name, side in (("Left", 1.0), ("Right", -1.0)):
+            hand = target.data.edit_bones.get(f"{side_name}Hand")
+            if hand is None:
+                continue
+            palm = (hand.tail - hand.head).normalized()
+            spread = palm.cross(Vector((0.0, 1.0, 0.0)))
+            if spread.length_squared < 1.0e-6:
+                spread = Vector((1.0, 0.0, 0.0))
+            spread.normalize()
+            for index, finger in enumerate(FINGER_NAMES):
+                lateral = (index - 2) * 0.012
+                for segment in range(1, 4):
+                    name = f"{side_name}Hand{finger}{segment}"
+                    parent = hand if segment == 1 else target.data.edit_bones.get(
+                        f"{side_name}Hand{finger}{segment - 1}")
+                    head = hand.tail + spread * (lateral + (0.012 if finger == "Thumb" else 0.0))
+                    if segment > 1 and parent is not None:
+                        head = parent.tail
+                    bone = target.data.edit_bones.new(name)
+                    bone.parent = parent
+                    bone.head = head
+                    bone.tail = head + palm * (0.028 if finger == "Thumb" else 0.024)
+                    bone.use_connect = segment > 1
+        bpy.ops.object.mode_set(mode="OBJECT")
 
     inverse = target.matrix_world.inverted() @ mesh.matrix_world
+    hand_offsets: dict[str, Vector] = {}
+    for side_name in ("Left", "Right"):
+        hand_group = mesh.vertex_groups.get(f"{side_name}Hand")
+        hand_bone = target.data.bones.get(f"{side_name}Hand")
+        if hand_group is None or hand_bone is None:
+            continue
+        hand_vertices = [
+            inverse @ vertex.co
+            for vertex in mesh.data.vertices
+            if any(
+                assignment.group == hand_group.index and assignment.weight >= 0.2
+                for assignment in vertex.groups
+            )
+        ]
+        if hand_vertices:
+            hand_offsets[side_name] = (
+                sum(hand_vertices, Vector()) / len(hand_vertices)
+                - hand_bone.tail_local
+            )
     for side_name in ("Left", "Right"):
         hand = target.data.bones.get(f"{side_name}Hand")
         if hand is None:
@@ -78,13 +102,28 @@ def add_finger_rig(target: bpy.types.Object, mesh: bpy.types.Object) -> None:
                 bone = target.data.bones.get(bone_name)
                 if bone is None:
                     continue
-                group = mesh.vertex_groups.new(name=bone_name)
-                center = (bone.head_local + bone.tail_local) * 0.5
+                group = mesh.vertex_groups.get(bone_name)
+                if group is None:
+                    group = mesh.vertex_groups.new(name=bone_name)
+                offset = hand_offsets.get(side_name, Vector())
+                head = bone.head_local + offset
+                tail = bone.tail_local + offset
+                segment = tail - head
+                hand_group = mesh.vertex_groups.get(f"{side_name}Hand")
                 for vertex in mesh.data.vertices:
                     point = inverse @ vertex.co
-                    distance = (point - center).length
-                    if distance <= 0.035:
-                        group.add([vertex.index], max(0.0, 0.42 * (1.0 - distance / 0.035)), "ADD")
+                    segment_length_squared = segment.length_squared
+                    travel = 0.0 if segment_length_squared <= 1.0e-8 else max(
+                        0.0,
+                        min(1.0, (point - head).dot(segment) / segment_length_squared),
+                    )
+                    closest = head + segment * travel
+                    distance = (point - closest).length
+                    if distance <= 0.05:
+                        weight = max(0.08, 0.90 * (1.0 - distance / 0.05))
+                        group.add([vertex.index], weight, "REPLACE")
+                        if hand_group is not None:
+                            hand_group.add([vertex.index], 0.10, "REPLACE")
 
 
 def author_finger_animation(target: bpy.types.Object, actions: list[bpy.types.Action]) -> None:

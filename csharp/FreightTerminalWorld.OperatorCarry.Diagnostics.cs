@@ -369,7 +369,8 @@ public partial class FreightTerminalWorld
             new OperatorCarryCaptureView("front", new Vector3(0.0f, 1.18f, -4.6f)),
             new OperatorCarryCaptureView("three_quarter", new Vector3(3.2f, 1.32f, -3.2f)),
             new OperatorCarryCaptureView("side", new Vector3(4.6f, 1.18f, 0.0f)),
-            new OperatorCarryCaptureView("rear", new Vector3(0.0f, 1.18f, 4.6f))
+            new OperatorCarryCaptureView("rear", new Vector3(0.0f, 1.18f, 4.6f)),
+            new OperatorCarryCaptureView("hand_close", new Vector3(1.35f, 1.28f, -2.05f))
         };
 
         foreach (var visualId in OperatorCarryVisuals)
@@ -406,7 +407,10 @@ public partial class FreightTerminalWorld
                     foreach (var view in views)
                     {
                         camera.Position = view.Position;
-                        camera.LookAt(new Vector3(0.0f, 0.96f, 0.0f), Vector3.Up);
+                        var lookTarget = view.Name == "hand_close"
+                            ? new Vector3(0.0f, 1.20f, 0.0f)
+                            : new Vector3(0.0f, 0.96f, 0.0f);
+                        camera.LookAt(lookTarget, Vector3.Up);
                         await WaitFrames(5);
                         var visualName = visualId.ToString().ToLowerInvariant();
                         var path = $"user://operator_carry_{visualName}_{animationName}_{view.Name}.png";

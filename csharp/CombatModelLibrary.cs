@@ -645,6 +645,7 @@ internal sealed class AuthoredOperatorVisual
         };
     private readonly Skeleton3D _skeleton;
     private readonly int _spineBone;
+    private readonly int _neckBone;
     private readonly int _rightShoulderBone;
     private readonly int _rightElbowBone;
     private readonly int _rightHandBone;
@@ -665,6 +666,7 @@ internal sealed class AuthoredOperatorVisual
         AnimationPlayer = CombatModelLibrary.RequireAnimationPlayer(root);
         _skeleton = CombatModelLibrary.RequireSkeleton(root);
         _spineBone = ResolveBoneIndex(_skeleton, "mixamorig:Spine");
+        _neckBone = ResolveBoneIndex(_skeleton, "mixamorig:Neck");
         _rightShoulderBone = ResolveBoneIndex(_skeleton, "mixamorig:RightArm");
         _rightElbowBone = ResolveBoneIndex(_skeleton, "mixamorig:RightForeArm");
         _rightHandBone = ResolveBoneIndex(_skeleton, "mixamorig:RightHand");
@@ -1128,6 +1130,7 @@ internal sealed class AuthoredOperatorVisual
         _skeleton.ForceUpdateAllBoneTransforms();
 #pragma warning restore CS0618
         ApplyCarryTorsoCorrection(animation);
+        ApplyAimHeadCorrection(animation);
         var dynamicCarry = !WeaponCatalog.IsSidearm(_weapon.Platform);
         var dynamicHy3d = CombatModelLibrary.UsesHy3dOperator(VisualId);
         ApplyWeaponSocketTransform(
@@ -1171,7 +1174,9 @@ internal sealed class AuthoredOperatorVisual
         // the weapon/hand solve below follows the corrected shoulders.
         var spine = _skeleton.GetBoneGlobalPoseNoOverride(_spineBone);
         var actorBasis = Root.GlobalTransform.Basis.Orthonormalized();
-        var correction = new Quaternion(actorBasis * Vector3.Right, Mathf.DegToRad(correctionDegrees));
+        var actorRightInSkeleton = _skeleton.GlobalTransform.Basis.Orthonormalized().Inverse()
+            * (actorBasis * Vector3.Right);
+        var correction = new Quaternion(actorRightInSkeleton.Normalized(), Mathf.DegToRad(correctionDegrees));
         _skeleton.SetBoneGlobalPoseOverride(
             _spineBone,
             new Transform3D(
@@ -1180,6 +1185,42 @@ internal sealed class AuthoredOperatorVisual
             1.0f,
             persistent: true);
         _skeleton.ForceUpdateBoneChildTransform(_spineBone);
+#pragma warning restore CS0618
+    }
+
+    private void ApplyAimHeadCorrection(string animation)
+    {
+#pragma warning disable CS0618
+        if (!animation.StartsWith("aim_", StringComparison.Ordinal)
+            || _neckBone < 0)
+        {
+            return;
+        }
+
+        // The imported HY-3D aim clips pitch the whole neck chain down toward
+        // the rifle.  Lift the neck a small amount in actor space so the
+        // operator keeps a natural forward gaze while the weapon solve still
+        // owns the shoulders and wrists.
+        var neck = _skeleton.GetBoneGlobalPose(_neckBone);
+        var actorBasis = Root.GlobalTransform.Basis.Orthonormalized();
+        var actorRightInSkeleton = _skeleton.GlobalTransform.Basis.Orthonormalized().Inverse()
+            * (actorBasis * Vector3.Right);
+        var correctionDegrees = animation switch
+        {
+            "aim_sprint" => 24.0f,
+            "aim_run" => 18.0f,
+            "aim_walk" => 14.0f,
+            _ => 12.0f
+        };
+        var correction = new Quaternion(actorRightInSkeleton.Normalized(), Mathf.DegToRad(correctionDegrees));
+        _skeleton.SetBoneGlobalPoseOverride(
+            _neckBone,
+            new Transform3D(
+                (new Basis(correction) * neck.Basis).Orthonormalized(),
+                neck.Origin),
+            1.0f,
+            persistent: true);
+        _skeleton.ForceUpdateBoneChildTransform(_neckBone);
 #pragma warning restore CS0618
     }
 
@@ -1954,14 +1995,12 @@ internal static partial class CombatModelLibrary
         if (FindOptionalNode(root, "PrimaryGrip") is null)
         {
             // The source M4A1 root is the receiver frame, not the firing
-            // hand's contact point. Mark the authored pistol-grip centre so
-            // third-person sockets do not mistake the wrist for the receiver.
-            // The imported M4A1 frame runs down +Y, with +Z up.  The trigger
-            // hand belongs on the short pistol grip below the receiver (the
-            // body mesh occupies roughly Y=-0.14..0.09, Z=-0.17..-0.11), not
-            // on the rear sight/stock line.  The previous marker used the
-            // opposite Z sign and put the rifle through the operator's chest.
-            AddMarker(root, "PrimaryGrip", new Vector3(0.0f, -0.06f, -0.15f));
+            // hand's contact point. Mark the centre of the short pistol grip
+            // below and just behind the trigger.  In the imported weapon
+            // frame the grip is around Y=-0.16, Z=+0.05; placing this marker
+            // on the magazine well leaves the trigger hand visibly forward
+            // of the actual grip.
+            AddMarker(root, "PrimaryGrip", new Vector3(0.0f, -0.16f, 0.05f));
         }
         if (FindOptionalNode(root, "OpticRailContact") is null)
         {
