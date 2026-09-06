@@ -2188,6 +2188,10 @@ internal static partial class CombatModelLibrary
         var source = InstantiateRequired(
             asset.RuntimeScenePath,
             asset.RuntimeNodes);
+        if (asset.UsesQuaterniusRig && UsesHy3dOperator(visualId))
+        {
+            RemoveOperatorExportPlaceholders(source);
+        }
         var sourceBounds = asset.UsesQuaterniusRig ? ComputeBounds(source) : default;
         if (asset.UsesQuaterniusRig && (sourceBounds.MeshCount == 0 || sourceBounds.Size.Y <= 0.01f))
         {
@@ -2756,6 +2760,10 @@ internal static partial class CombatModelLibrary
             source = InstantiateRequired(
                 asset.PreviewScenePath,
                 asset.PreviewNodes);
+            if (asset.UsesQuaterniusRig && UsesHy3dOperator(visualId))
+            {
+                RemoveOperatorExportPlaceholders(source);
+            }
             buildObserver?.Invoke(PreviewOperatorBuildStage.SourceCreated, source, null);
             // Some HY-3D conversions bake a systematic sideways bias into the
             // rest pose (Viper's hips sit ~0.15 m off-axis). The deployment

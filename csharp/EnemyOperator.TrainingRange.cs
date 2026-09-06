@@ -52,6 +52,23 @@ public partial class EnemyOperator
         _authoredOperatorVisual.SetWeaponReadied(false);
         _authoredOperatorVisual.SetWeaponReadied(true);
         SetAuthoredCombatPoseForDiagnostics();
+        // Training silhouettes are unarmed targets.  Clear both the authored
+        // rifle socket and the fallback procedural weapon after the combat pose
+        // has been sampled; reactive targets may still move, but they never carry
+        // or fire a weapon in this venue.
+        ApplyColdStartUnarmed();
+        _authoredOperatorVisual.SetWeaponReadied(false);
+        _authoredOperatorVisual.SetWeaponVisible(false);
+        _authoredOperatorAnimator.Update(
+            0.0f,
+            0.0f,
+            weaponReadied: false,
+            prone: false,
+            crouched: false,
+            aiming: false,
+            downed: false,
+            reviving: false,
+            dead: false);
     }
 
     private void HideTrainingRangeEquipmentOverlays()

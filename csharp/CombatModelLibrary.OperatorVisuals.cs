@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace OperationSteelTide;
@@ -84,5 +85,26 @@ internal static partial class CombatModelLibrary
             _ => "viper"
         };
         return ResourceLoader.Exists($"{Hy3dOperatorRoot}/{slug}.glb");
+    }
+
+    /// <summary>
+    /// Remove Blender's default primitive exports from the HY-3D operator files.
+    /// They are not part of the authored character and render as bright white
+    /// cubes at the operator's feet when left in the runtime scene.
+    /// </summary>
+    private static void RemoveOperatorExportPlaceholders(Node root)
+    {
+        foreach (var child in root.GetChildren())
+        {
+            var isDefaultCube = child is MeshInstance3D
+                && child.Name.ToString().Contains("Cube", StringComparison.OrdinalIgnoreCase);
+            if (isDefaultCube)
+            {
+                root.RemoveChild(child);
+                child.Free();
+                continue;
+            }
+            RemoveOperatorExportPlaceholders(child);
+        }
     }
 }
