@@ -90,18 +90,10 @@ public partial class CombatHUD
             return;
         }
 
-        // Snapshot IDs before emitting signals: the world refreshes the source
-        // after each successful transfer, so enumerating the live List directly
-        // would skip items as it shrinks.
-        var itemIds = new List<string>(_shownLoot.Count);
-        foreach (var item in _shownLoot)
-        {
-            itemIds.Add(item.Id);
-        }
-        foreach (var itemId in itemIds)
-        {
-            EmitSignal(SignalName.LootTakeRequested, itemId);
-        }
+        // Let the world apply the whole transfer as one mutation. Emitting one
+        // signal per card used to rebuild every loot card and SubViewport after
+        // each item, which made a full backpack feel like a freeze.
+        EmitSignal(SignalName.LootTakeAllRequested);
     }
 
     private void UpdateLootToolbarPresentation()

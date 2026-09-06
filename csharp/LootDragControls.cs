@@ -406,23 +406,12 @@ public partial class LootDragCard : PanelContainer
         details.AddThemeColorOverride("font_color", accent);
         details.Pressed += () => DetailsRequested?.Invoke(weapon.Clone());
         header.AddChild(details);
-        var preview = new InventoryModelPreview
-        {
-            CustomMinimumSize = new Vector2(220, 48),
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-            Modulate = new Color(1, 1, 1, 0)
-        };
-        ModelPreviewForDiagnostics = preview;
-        preview.Configure(InventoryPreviewKind.Rifle, weapon: weapon);
-        preview.Position = Vector2.Zero;
-        preview.Size = new Vector2(220, 72);
         var visual = new Control
         {
             CustomMinimumSize = new Vector2(220, 72),
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             MouseFilter = MouseFilterEnum.Ignore
         };
-        visual.AddChild(preview);
         var generatedIcon = new LootItemIconControl
         {
             Position = Vector2.Zero,
@@ -455,27 +444,11 @@ public partial class LootDragCard : PanelContainer
     {
         var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Pass, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         AddChild(row);
-        var preview = new InventoryModelPreview
-        {
-            CustomMinimumSize = new Vector2(86, 78),
-            SizeFlagsVertical = SizeFlags.ExpandFill,
-            Modulate = new Color(1, 1, 1, 0)
-        };
-        ModelPreviewForDiagnostics = preview;
-        preview.Configure(equipment.Definition.Slot switch
-        {
-            EquipmentSlot.Helmet => InventoryPreviewKind.Helmet,
-            EquipmentSlot.BodyArmor => InventoryPreviewKind.BodyArmor,
-            _ => InventoryPreviewKind.Backpack
-        }, equipment);
         var visual = new Control
         {
             CustomMinimumSize = new Vector2(86, 78),
             MouseFilter = MouseFilterEnum.Ignore
         };
-        preview.Position = Vector2.Zero;
-        preview.Size = new Vector2(86, 78);
-        visual.AddChild(preview);
         var generatedIcon = new LootItemIconControl
         {
             Position = Vector2.Zero,

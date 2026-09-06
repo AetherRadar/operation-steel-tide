@@ -41,6 +41,11 @@ internal static class InventoryOperatorPreviewRecovery
                     bodyArmor: bodyArmor,
                     backpack: backpack);
                 visual.AnimationPlayer.Stop();
+                // The runtime operator path keeps its authored skeleton pose;
+                // the loadout paper doll still needs the same neutral head
+                // correction as the deployment preview or Viper's neck roll
+                // remains visible in the equipment screen.
+                visual.ApplyPreviewNeutralPose();
                 // Runtime operators are authored feet-on-ground for the world.
                 // The paper doll is a centered product shot, so recenter the
                 // complete operator plus carried weapon before it enters the UI.

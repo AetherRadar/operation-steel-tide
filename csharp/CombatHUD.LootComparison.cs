@@ -224,7 +224,10 @@ public partial class CombatHUD
                     return false;
                 }
             }
-            return found;
+            // Loot cards use the generated 2D inventory art.  A 3D preview is
+            // created only for the explicit details panel, so zero card
+            // previews is the expected fast path.
+            return !found;
         }
     }
 
@@ -241,7 +244,7 @@ public partial class CombatHUD
                     return false;
                 }
             }
-            return found;
+            return !found;
         }
     }
 

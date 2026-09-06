@@ -145,6 +145,7 @@ public partial class SquadMate
         }
         ReviveUsed = true;
         ResetIncendiaryAvoidance();
+        SnapDemolitionEliminationToGround();
         SetDemolitionEliminatedPose();
         SetPhysicsProcess(false);
         CollisionLayer = 0;
@@ -159,6 +160,36 @@ public partial class SquadMate
             }
         }
         UpdateLabel();
+    }
+
+    private void SnapDemolitionEliminationToGround()
+    {
+        if (!IsInsideTree() || !IsInstanceValid(_collider))
+        {
+            return;
+        }
+
+        var from = GlobalPosition + Vector3.Up * 0.5f;
+        var to = GlobalPosition + Vector3.Down * 5.0f;
+        if (!PhysicsRaycast.TryHit(GetWorld3D(), from, to, GetRid(), 1, out var hit)
+            || hit.Normal.Dot(Vector3.Up) < 0.65f)
+        {
+            return;
+        }
+
+        // CharacterBody3D's origin is at the capsule foot, while the collider
+        // itself is centered above it. Preserve that contract when the death
+        // pose disables physics so a teammate killed mid-jump cannot freeze in
+        // the air.
+        var footOffset = 0.0f;
+        if (_collider.Shape is CapsuleShape3D capsule)
+        {
+            footOffset = _collider.Position.Y - capsule.Height * 0.5f;
+        }
+        var groundedPosition = GlobalPosition;
+        groundedPosition.Y = hit.Position.Y - footOffset;
+        GlobalPosition = groundedPosition;
+        Velocity = Vector3.Zero;
     }
 
     public void ResetForDemolitionRound(Vector3 spawn)

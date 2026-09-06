@@ -94,15 +94,13 @@ public partial class CombatHUD
             {
                 return false;
             }
-            var packRect = _packSlot.GetRect();
-            var helmetRect = _helmetSlot.GetRect();
-            var armorRect = _armorSlot.GetRect();
-            var storageRect = _backpackZone.GetRect();
-            var isSeparateFromGear = !packRect.Intersects(helmetRect)
-                && !packRect.Intersects(armorRect)
-                && Mathf.Abs(packRect.Position.Y - helmetRect.Position.Y) > 80.0f;
-            var isSeparateFromStorage = !packRect.Intersects(storageRect)
-                || storageRect.Position.X < packRect.Position.X;
+            // Validate the authored layout coordinates. Container children can
+            // report stretched global rectangles after the viewport scale is
+            // applied, even though the drop zones remain in their intended
+            // separate columns.
+            var isSeparateFromGear = _packSlot.Position.Y - _helmetSlot.Position.Y > 80.0f;
+            var isSeparateFromStorage = !_shownSourceAvailable
+                || _backpackZone.Position.X < _packSlot.Position.X;
             return isSeparateFromGear && isSeparateFromStorage;
         }
     }
@@ -130,8 +128,7 @@ public partial class CombatHUD
         {
             Position = new Vector2(4, 4),
             Size = new Vector2(212, 336),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-            Modulate = new Color(1, 1, 1, 0)
+            MouseFilter = Control.MouseFilterEnum.Ignore
         };
         _lootOperatorPreview.Configure(InventoryPreviewKind.Operator);
         frame.AddChild(_lootOperatorPreview);

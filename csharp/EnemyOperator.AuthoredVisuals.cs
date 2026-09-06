@@ -140,6 +140,50 @@ public partial class EnemyOperator
                 helmet: EquippedHelmet,
                 bodyArmor: EquippedBodyArmor,
                 backpack: EquippedBackpack);
+        }
+        catch (Exception exception) when (OperatorVisual != OperatorVisualId.Garrison)
+        {
+            // A missing squad-specific GLB must never expose the procedural
+            // box-man that is built as the collision-safe bootstrap. Use the
+            // authored garrison body as a visual fallback while retaining the
+            // requested operator identity for AI/gameplay.
+            authoredOperator?.Root.QueueFree();
+            authoredOperator = null;
+            try
+            {
+                authoredOperator = CombatModelLibrary.InstantiateOperator(
+                    OperatorVisualId.Garrison,
+                    weaponBuild: HasFireablePrimary ? CarriedWeapon : null,
+                    attachDefaultWeapon: false,
+                    helmet: EquippedHelmet,
+                    bodyArmor: EquippedBodyArmor,
+                    backpack: EquippedBackpack);
+                GD.PushWarning(
+                    $"Authored enemy operator {OperatorVisual} unavailable; using authored Garrison fallback: {exception.Message}");
+            }
+            catch (Exception fallbackException)
+            {
+                authoredOperator?.Root.QueueFree();
+                GD.PushWarning(
+                    $"Authored enemy operator unavailable; retaining procedural visual: {exception.Message}; fallback: {fallbackException.Message}");
+                return;
+            }
+        }
+
+        catch (Exception exception)
+        {
+            authoredOperator?.Root.QueueFree();
+            GD.PushWarning($"Authored enemy operator unavailable; retaining procedural visual: {exception.Message}");
+            return;
+        }
+
+        if (authoredOperator is null)
+        {
+            return;
+        }
+
+        try
+        {
             _bodyRoot.AddChild(authoredOperator.Root);
             var authoredAnimator = new AuthoredOperatorAnimator(authoredOperator);
             _authoredOperatorVisual = authoredOperator;
@@ -147,7 +191,7 @@ public partial class EnemyOperator
         }
         catch (Exception exception)
         {
-            authoredOperator?.Root.QueueFree();
+            authoredOperator.Root.QueueFree();
             GD.PushWarning($"Authored enemy operator unavailable; retaining procedural visual: {exception.Message}");
             return;
         }

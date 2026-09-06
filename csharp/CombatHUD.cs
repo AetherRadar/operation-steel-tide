@@ -15,6 +15,7 @@ public partial class CombatHUD : CanvasLayer
     [Signal] public delegate void FullscreenChangedEventHandler(bool active);
     [Signal] public delegate void LanguageChangedEventHandler(string language);
     [Signal] public delegate void LootTakeRequestedEventHandler(string itemId);
+    [Signal] public delegate void LootTakeAllRequestedEventHandler();
     [Signal] public delegate void LootEquipRequestedEventHandler(string itemId);
     [Signal] public delegate void LootReturnRequestedEventHandler(string itemId);
     [Signal] public delegate void BackpackUseRequestedEventHandler(string itemId);

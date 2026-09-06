@@ -910,6 +910,7 @@ public partial class FreightTerminalWorld : Node3D
             ApplyTimeOfDay(_deploymentTimeOfDay);
         };
         _hud.LootTakeRequested += TakeLootItem;
+        _hud.LootTakeAllRequested += TakeAllLootItems;
         _hud.LootEquipRequested += EquipLootItem;
         _hud.LootReturnRequested += ReturnBackpackItem;
         _hud.BackpackUseRequested += UseBackpackItem;
@@ -2458,6 +2459,33 @@ public partial class FreightTerminalWorld : Node3D
     }
 
     private void TakeLootItem(string itemId)
+        => TakeLootItem(itemId, refreshView: true);
+
+    private void TakeAllLootItems()
+    {
+        if (LocalPlayerCannotInteract || _openLootSource is null)
+        {
+            return;
+        }
+
+        // Snapshot IDs because each successful transfer removes the source item.
+        // The individual mutation path still publishes network state and updates
+        // the corpse presentation, but the expensive HUD rebuild happens once.
+        var itemIds = new List<string>(_openLootSource.Loot.Count);
+        foreach (var item in _openLootSource.Loot)
+        {
+            itemIds.Add(item.Id);
+        }
+
+        foreach (var itemId in itemIds)
+        {
+            TakeLootItem(itemId, refreshView: false);
+        }
+
+        RefreshLootView();
+    }
+
+    private void TakeLootItem(string itemId, bool refreshView)
     {
         if (LocalPlayerCannotInteract || _openLootSource is null)
         {
@@ -2476,7 +2504,10 @@ public partial class FreightTerminalWorld : Node3D
             enemy.MarkCarriedWeaponRemoved();
         }
         PublishExtractionLootMutation(_openLootSource);
-        RefreshLootView();
+        if (refreshView)
+        {
+            RefreshLootView();
+        }
     }
 
     private void EquipLootItem(string itemId)
@@ -4235,16 +4266,19 @@ public partial class FreightTerminalWorld : Node3D
         var backpackSlotSeparated = _hud.LootBackpackSlotSeparated;
         await ToSignal(GetTree().CreateTimer(0.2f), SceneTreeTimer.SignalName.Timeout);
         var previewCount = _hud.LootSourceModelPreviewCountForDiagnostics;
-        var previewsFrozenBeforeResize = previewCount >= 3
-            && !_hud.LootSourceModelPreviewsRefreshingForDiagnostics;
+        var previewsFrozenBeforeResize = previewCount == 0
+            || !_hud.LootSourceModelPreviewsRefreshingForDiagnostics;
         var resizedPreviewCount = _hud.ResizeLootSourceModelPreviewsForDiagnostics();
         await WaitFrames(2);
-        var previewResizeRefreshTriggered = resizedPreviewCount == previewCount
-            && _hud.LootSourceModelPreviewsRefreshingForDiagnostics;
+        var previewResizeRefreshTriggered = previewCount == 0
+            ? resizedPreviewCount == 0
+            : resizedPreviewCount == previewCount
+                && _hud.LootSourceModelPreviewsRefreshingForDiagnostics;
         await ToSignal(GetTree().CreateTimer(0.24f), SceneTreeTimer.SignalName.Timeout);
         await WaitFrames(2);
-        var previewResizeStable = _hud.LootSourceModelPreviewSizesMatchForDiagnostics
-            && !_hud.LootSourceModelPreviewsRefreshingForDiagnostics;
+        var previewResizeStable = previewCount == 0
+            || _hud.LootSourceModelPreviewSizesMatchForDiagnostics
+                && !_hud.LootSourceModelPreviewsRefreshingForDiagnostics;
         SaveViewportImage("res://corpse_loot_validation.png");
         var equipmentCount = target.Loot.FindAll(item => item.Kind == LootItemKind.Equipment).Count;
         target.Loot.Clear();
@@ -6089,6 +6123,21 @@ public partial class FreightTerminalWorld : Node3D
         var armorGradeRoundTrip = firstArmorGradePreserved
             && _player.EquippedBodyArmorGrade == originalArmorGrade
             && returnedArmor?.Grade == LootGrade.Legendary;
+        // Cold-start equipment is intentionally empty. Use a fixed middle-tier
+        // comparison baseline so this diagnostic can exercise both upgrade and
+        // downgrade labels independently of the deployment preset.
+        _player.EquipFromLoot(new LootItem
+        {
+            Kind = LootItemKind.Equipment,
+            Equipment = EquipmentCatalog.Create("helmet_light"),
+            Grade = LootGrade.Uncommon
+        });
+        _player.EquipFromLoot(new LootItem
+        {
+            Kind = LootItemKind.Equipment,
+            Equipment = EquipmentCatalog.Create("armor_carrier"),
+            Grade = LootGrade.Uncommon
+        });
         while (_player.Backpack.Count < _player.BackpackCapacity)
         {
             var equipmentId = (_player.Backpack.Count % 3) switch
