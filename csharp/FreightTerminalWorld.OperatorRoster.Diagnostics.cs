@@ -90,7 +90,11 @@ public partial class FreightTerminalWorld
                 && (transitions[index].StartsWith("ready_", StringComparison.Ordinal)
                     ? fit.PrimaryHandDistance <= 0.025f
                         && fit.SupportHandDistance <= 0.16f
-                        && fit.HandSeparation >= 0.22f
+                        // HY-3D's normalized two-hand pose bottoms out at
+                        // 0.16 m; keep the roster gate above a collapsed
+                        // single-hand pose without rejecting that authored
+                        // body scale.
+                        && fit.HandSeparation >= 0.15f
                         && fit.MuzzleOffset.Z <= -0.38f
                     : fit.Valid)).ToArray();
             var usesHy3d = CombatModelLibrary.UsesHy3dOperator(visualId);

@@ -125,8 +125,10 @@ def remove_embedded_weapon(mesh: bpy.types.Object, asset_name: str) -> int:
         spatial_weapon = (minimum.x < -0.40 and maximum.x < -0.34
                 and minimum.z > 0.42 and maximum.z < 0.98
                 and ("RightUpLeg" in dominant_groups or "RightHand" in dominant_groups))
-        hand_prop = "RightHand" in dominant_groups and len(polygons) <= 2000
-        if spatial_weapon or hand_prop:
+        # Do not use the RightHand group as a prop heuristic.  Magpie's real
+        # hand is a disconnected component in the HY-3D mesh too, so the old
+        # broad check deleted the actual hand along with the embedded rifle.
+        if spatial_weapon:
             selected.add(root)
 
     if not selected:
@@ -142,6 +144,18 @@ def remove_embedded_weapon(mesh: bpy.types.Object, asset_name: str) -> int:
     edit_mesh.free()
     data.update()
     return len(faces_to_delete)
+
+
+def strong_weighted_vertices(mesh: bpy.types.Object, group_name: str, threshold: float = 0.25) -> int:
+    """Count vertices that retain a meaningful weight for a contract bone."""
+    group = mesh.vertex_groups.get(group_name)
+    if group is None:
+        return 0
+    return sum(
+        1
+        for vertex in mesh.data.vertices
+        if any(assignment.group == group.index and assignment.weight >= threshold for assignment in vertex.groups)
+    )
 
 
 def source_bone(source: bpy.types.Object, canonical: str) -> bpy.types.PoseBone | None:
@@ -637,12 +651,16 @@ def main() -> None:
         live = bpy.data.objects.get(source_name)
         if live is not None:
             bpy.data.objects.remove(live, do_unlink=True)
-    triangles=reduce_mesh(mesh,cfg.triangles); limited_vertices=limit_vertex_influences(mesh); root,sockets=add_contract_nodes(target,mesh)
+    triangles=reduce_mesh(mesh,cfg.triangles); limited_vertices=limit_vertex_influences(mesh)
+    right_hand_vertices = strong_weighted_vertices(mesh, "RightHand")
+    if right_hand_vertices == 0:
+        raise RuntimeError("RightHand skin weights missing after embedded-prop cleanup")
+    root,sockets=add_contract_nodes(target,mesh)
     root["steel_tide_asset_role"]="realistic_hy3d_operator"; root["mesh_source"]="Tencent HY-3D-3.1 + HY-3D-Rigging"; root["animation_source"]="Quaternius Universal Animation Library (CC0), rest-frame retarget"; root["triangle_count"]=triangles; root["animation_count"]=len(generated); root["removed_embedded_weapon_faces"]=removed_weapon_faces
     bpy.ops.object.select_all(action="DESELECT"); root.select_set(True); target.select_set(True); mesh.select_set(True); [obj.select_set(True) for obj in sockets]; bpy.context.view_layer.objects.active=root
     os.makedirs(os.path.dirname(output_path),exist_ok=True)
     bpy.ops.export_scene.gltf(filepath=output_path,export_format="GLB",use_selection=True,export_yup=True,export_apply=False,export_skins=True,export_animations=True,export_animation_mode="BROADCAST",export_nla_strips=False,export_def_bones=True,export_leaf_bone=False,export_materials="EXPORT",export_image_format="AUTO",export_texcoords=True,export_normals=True,export_tangents=False,export_all_influences=False)
-    print("HY3D_OPERATOR_CHECK",f"actions={len(generated)}",f"bones={len(target.data.bones)}",f"triangles={triangles}",f"sockets={len(sockets)}",f"limited_vertices={limited_vertices}",f"removed_embedded_weapon_faces={removed_weapon_faces}",f"output={output_path}"); print("HY3D_OPERATOR_PASS valid=true")
+    print("HY3D_OPERATOR_CHECK",f"actions={len(generated)}",f"bones={len(target.data.bones)}",f"triangles={triangles}",f"sockets={len(sockets)}",f"limited_vertices={limited_vertices}",f"right_hand_vertices={right_hand_vertices}",f"removed_embedded_weapon_faces={removed_weapon_faces}",f"output={output_path}"); print("HY3D_OPERATOR_PASS valid=true")
 
 
 if __name__ == "__main__": main()

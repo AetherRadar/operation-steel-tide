@@ -1236,9 +1236,16 @@ internal sealed class AuthoredOperatorVisual
         // the weapon's grip basis. This makes the palm wrap the pistol grip
         // instead of presenting the back of the hand above the receiver.
 #pragma warning disable CS0618
+        // HY-3D hand vertices run along local +Y from the wrist into the
+        // fingers.  The pistol grip slopes down and rearward from the
+        // receiver, so point that hand axis along the authored grip instead
+        // of laying the palm flat on the rifle's top rail.
+        var gripBasis = BuildCarryHandBasis(
+            weaponBasis,
+            new Vector3(0.0f, -0.60f, -0.80f));
         _skeleton.SetBoneGlobalPoseOverride(
             _rightHandBone,
-            new Transform3D(weaponBasis, hand.Origin),
+            new Transform3D(gripBasis, hand.Origin),
             1.0f,
             persistent: true);
 #pragma warning restore CS0618
@@ -1264,13 +1271,24 @@ internal sealed class AuthoredOperatorVisual
         // authored rifle frame for its roll as well as its position so the
         // fingers wrap the foregrip instead of floating above the top rail.
 #pragma warning disable CS0618
+        var gripBasis = BuildCarryHandBasis(
+            weaponBasis,
+            new Vector3(0.0f, 0.0f, -1.0f));
         _skeleton.SetBoneGlobalPoseOverride(
             _leftWristBone,
-            new Transform3D(weaponBasis, hand.Origin),
+            new Transform3D(gripBasis, hand.Origin),
             1.0f,
             persistent: true);
 #pragma warning restore CS0618
         _skeleton.ForceUpdateBoneChildTransform(_leftWristBone);
+    }
+
+    private static Basis BuildCarryHandBasis(Basis weaponBasis, Vector3 localFingerDirection)
+    {
+        var fingerDirection = (weaponBasis * localFingerDirection).Normalized();
+        var palmWidth = (weaponBasis * Vector3.Right).Normalized();
+        var palmDepth = palmWidth.Cross(fingerDirection).Normalized();
+        return new Basis(palmWidth, fingerDirection, palmDepth).Orthonormalized();
     }
 
     private void ApplyCarrySocketBasis()
@@ -1817,13 +1835,12 @@ internal static partial class CombatModelLibrary
             // The source M4A1 root is the receiver frame, not the firing
             // hand's contact point. Mark the authored pistol-grip centre so
             // third-person sockets do not mistake the wrist for the receiver.
-            // Match the authored first-person rifle anchor: the contact point
-            // is just below and slightly behind the receiver, at the centre of
-            // the pistol grip rather than on the magazine well.
-            // Godot's imported frame is +Y up and -Z down-range. The pistol
-            // grip is below and behind the receiver, at the authored mesh's
-            // actual grip centre rather than at the receiver origin.
-            AddMarker(root, "PrimaryGrip", new Vector3(0.0f, -0.25f, 0.22f));
+            // The imported M4A1 frame runs down +Y, with +Z up.  The trigger
+            // hand belongs on the short pistol grip below the receiver (the
+            // body mesh occupies roughly Y=-0.14..0.09, Z=-0.17..-0.11), not
+            // on the rear sight/stock line.  The previous marker used the
+            // opposite Z sign and put the rifle through the operator's chest.
+            AddMarker(root, "PrimaryGrip", new Vector3(0.0f, -0.06f, -0.15f));
         }
         if (FindOptionalNode(root, "OpticRailContact") is null)
         {

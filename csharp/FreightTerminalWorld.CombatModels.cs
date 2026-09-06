@@ -102,10 +102,14 @@ public partial class FreightTerminalWorld
                 visual.AnimationPlayer.Seek(time, update: true);
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
                 var movementFit = visual.InspectRifleFit();
+                // The normalized HY-3D body has a shorter forearm span than
+                // the legacy mannequin.  The same corrected two-hand pose is
+                // still clearly separated at 0.16 m, so keep the gate above
+                // a collapsed single-hand pose without rejecting that body.
                 var handsFit = movementFit.PrimaryHandDistance <= 0.025f
                     && movementFit.SupportHandDistance <= 0.16f
                     && (!animation.StartsWith("ready_", StringComparison.Ordinal)
-                        || movementFit.HandSeparation >= 0.22f);
+                        || movementFit.HandSeparation >= 0.15f);
                 movementRifleFitValid &= handsFit;
                 movementRifleFits.Add(
                     $"{animation}:{handsFit}:primary={movementFit.PrimaryHandDistance:F3}:"

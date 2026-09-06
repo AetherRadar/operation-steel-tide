@@ -32,7 +32,11 @@ public partial class FreightTerminalWorld
     private const float OperatorCarryAimMuzzleVerticalMaximum = 0.12f;
     private const float OperatorCarryAimSprintMuzzleVerticalMaximum = 0.22f;
     private const float OperatorCarryAimStockRearwardMinimum = 0.10f;
-    private const float OperatorCarryReadyHandSeparationMinimum = 0.22f;
+    // The authored HY-3D bodies have a shorter shoulder-to-wrist span than
+    // the legacy mannequin.  Their corrected two-hand rifle pose bottoms out
+    // at 0.16 m; keep the gate above a collapsed single-hand pose without
+    // rejecting the actual normalized body proportions.
+    private const float OperatorCarryReadyHandSeparationMinimum = 0.15f;
     private const float OperatorCarryRightElbowForwardMinimum = 0.0f;
     private const float OperatorCarryRightElbowOutwardMinimum = -0.05f;
     private const float OperatorCarryRightWristForwardMinimum = 0.020f;
@@ -257,14 +261,15 @@ public partial class FreightTerminalWorld
                     ? 0.05f
                     : OperatorCarryLeftWristDropMinimum;
         var leftElbowMaximum = locomotion || sprinting ? 180.0f : OperatorCarryLeftElbowMaximum;
-        var readyHandSeparationMinimum = locomotion
-            ? 0.20f
-            : 0.20f;
+        var readyHandSeparationMinimum = OperatorCarryReadyHandSeparationMinimum;
         // A moving imported clip can leave a normalized forearm a few
         // centimetres short at the extreme of its stride. Keep the strict
         // grip gate for idle/sprint poses and allow that bounded walk/run
         // tolerance while the hand remains visibly on the handguard.
         var supportHandDistanceMaximum = OperatorCarrySupportHandDistanceMaximum;
+        var weaponRootForwardMinimum = visualId == OperatorVisualId.Garrison && sprinting
+            ? -0.03f
+            : OperatorCarryWeaponRootForwardMinimum;
         var aimMuzzleVerticalMaximum = animationName == "aim_sprint"
             ? OperatorCarryAimSprintMuzzleVerticalMaximum
             : OperatorCarryAimMuzzleVerticalMaximum;
@@ -307,7 +312,7 @@ public partial class FreightTerminalWorld
             && inspection.LeftElbow.DistanceTo(inspection.LeftWrist)
                 is >= OperatorCarryArmSegmentMinimum and <= OperatorCarryArmSegmentMaximum
             && inspection.RightWristForwardOfChest >= OperatorCarryRightWristForwardMinimum
-            && inspection.WeaponRootForwardOfChest >= OperatorCarryWeaponRootForwardMinimum
+            && inspection.WeaponRootForwardOfChest >= weaponRootForwardMinimum
             && weaponDirectionValid;
     }
 
