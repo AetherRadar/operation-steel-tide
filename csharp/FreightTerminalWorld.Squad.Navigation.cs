@@ -376,6 +376,36 @@ public partial class FreightTerminalWorld
                 now,
                 SquadNavigationDirective.Walk(demolitionFrontier));
         }
+
+        // A committed rescue must keep closing the distance even when both the
+        // breadcrumb trail and bounded grid planner temporarily fail (for
+        // example while the leader trail is being rebuilt after the player
+        // goes down).  Returning a self-target here leaves the mate visibly
+        // frozen until the next retry window.  Advance a short, collision
+        // constrained segment toward the casualty instead; normal movement
+        // collision handling and the no-progress watchdog still trigger a
+        // replan when a wall genuinely blocks the segment.
+        if (emergency
+            && ReferenceEquals(_leaderReviver, mate))
+        {
+            var rescueOffset = destination - mate.GlobalPosition;
+            rescueOffset.Y = 0.0f;
+            var rescueDistance = rescueOffset.Length();
+            if (rescueDistance > 0.8f)
+            {
+                var rescueStep = Mathf.Min(2.6f, rescueDistance);
+                var rescueWaypoint = mate.GlobalPosition
+                    + rescueOffset / rescueDistance * rescueStep;
+                return CacheSquadNavigationDecision(
+                    mate,
+                    destination,
+                    emergency,
+                    now,
+                    SquadNavigationDirective.Walk(
+                        rescueWaypoint,
+                        steppedDirect: true));
+            }
+        }
         return CacheSquadNavigationDecision(
             mate,
             destination,
