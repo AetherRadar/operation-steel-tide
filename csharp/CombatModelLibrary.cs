@@ -928,7 +928,7 @@ internal sealed class AuthoredOperatorVisual
         foreach (var bone in new[] { neck, head })
         {
             var pose = _skeleton.GetBoneGlobalPose(bone);
-            var uprightBasis = pose.Basis.Rotated(Vector3.Right, -0.24f).Orthonormalized();
+            var uprightBasis = pose.Basis.Rotated(Vector3.Right, -0.12f).Orthonormalized();
             _skeleton.SetBoneGlobalPoseOverride(
                 bone,
                 new Transform3D(uprightBasis, pose.Origin),
@@ -2497,20 +2497,10 @@ internal static partial class CombatModelLibrary
                 // authored idle clip. The imported rest pose carries a
                 // weight-shifted hip tilt that reads as a crooked character
                 // in the straight-on loadout card.
-                if (animationPlayer.HasAnimation("idle"))
-                {
-                    animationPlayer.Play("idle");
-                    // Frame zero is an authored transition pose with the
-                    // chin tucked and the hips unloaded. Sample the neutral
-                    // middle of the loop for the product-shot preview.
-                    var idle = animationPlayer.GetAnimation("idle");
-                    animationPlayer.Seek(idle.Length * 0.5, update: true);
-                    animationPlayer.Advance(0.0);
-                }
-                else
-                {
-                    animationPlayer.Stop();
-                }
+                // Keep the authored standing skeleton for loadout cards.
+                // Playing idle here introduces a bent-knee weight shift that
+                // makes every operator look crouched in a product shot.
+                animationPlayer.Stop();
                 var previewPose = new AuthoredOperatorVisual(source, visualId);
                 previewPose.ApplyPreviewNeutralPose();
 
