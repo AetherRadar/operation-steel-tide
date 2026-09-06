@@ -252,6 +252,13 @@ def author_finger_animation(target: bpy.types.Object, actions: list[bpy.types.Ac
         # rotation modes and lets the glTF exporter choose an arbitrary one.
         # Remove only finger rotation channels (location/scale stay intact),
         # then author one deterministic quaternion mode.
+        bpy.context.scene.frame_set(start)
+        bpy.context.view_layer.update()
+        baseline: dict[str, Quaternion] = {}
+        for name in finger_names:
+            pose_bone = _resolve_pose_bone(target, name)
+            if pose_bone is not None:
+                baseline[pose_bone.name] = pose_bone.rotation_quaternion.copy()
         for curve in list(action.fcurves):
             if not any(
                 f'pose.bones["{name}"]' in curve.data_path for name in finger_names
@@ -274,7 +281,9 @@ def author_finger_animation(target: bpy.types.Object, actions: list[bpy.types.Ac
                         if bone is None:
                             continue
                         bone.rotation_mode = "QUATERNION"
-                        base = bone.rotation_quaternion.copy()
+                        base = baseline.get(bone.name)
+                        if base is None:
+                            base = bone.rotation_quaternion.copy()
                         bend = Quaternion(
                             (0.0, 0.0, 1.0),
                             -side * curl * (1.0 if segment == 1 else 0.8),
