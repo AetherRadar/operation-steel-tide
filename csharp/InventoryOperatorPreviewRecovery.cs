@@ -41,6 +41,18 @@ internal static class InventoryOperatorPreviewRecovery
                     bodyArmor: bodyArmor,
                     backpack: backpack);
                 visual.AnimationPlayer.Stop();
+                // The runtime operator is wrapped in a presentation node that
+                // carries its authored scale and facing. Correct that complete
+                // source transform before applying the neutral head pose so
+                // the paper doll is upright from boots through helmet.
+                var presentation = visual.Root.GetNodeOrNull<Node3D>("AnimatedOperatorPresentation");
+                var authoredSource = presentation is not null && presentation.GetChildCount() > 0
+                    ? presentation.GetChild(0) as Node3D
+                    : null;
+                if (authoredSource is not null)
+                {
+                    CombatModelLibrary.ApplyPreviewUprightCorrection(authoredSource);
+                }
                 // The runtime operator path keeps its authored skeleton pose;
                 // the loadout paper doll still needs the same neutral head
                 // correction as the deployment preview or Viper's neck roll

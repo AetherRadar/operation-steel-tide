@@ -2710,7 +2710,7 @@ internal static partial class CombatModelLibrary
     /// usable legs rig, or anything goes wrong (a leaning card is preferable
     /// to a missing one).
     /// </summary>
-    private static float ApplyPreviewUprightCorrection(Node3D source)
+    internal static float ApplyPreviewUprightCorrection(Node3D source)
     {
         try
         {
