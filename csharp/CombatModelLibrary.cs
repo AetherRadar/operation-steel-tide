@@ -1252,7 +1252,14 @@ internal sealed class AuthoredOperatorVisual
                 : new Vector3(0.0f, -0.160f, 0.030f);
         var global = _weapon.Root.GlobalTransform;
         var stockDelta = _weapon.Stock.GlobalPosition - global.Origin;
-        global.Origin = shoulder + actorBasis * stockOffset - stockDelta;
+        // Keep the stock near the shoulder, but place the receiver/barrel in
+        // a clear third-person presentation plane in front of the torso.
+        // This is deliberately an actor-space offset, not a hand offset: the
+        // two arm chains below follow the moved grip markers.
+        var presentationForward = actorBasis * new Vector3(0.0f, 0.0f, -0.040f);
+        global.Origin = shoulder + actorBasis * stockOffset
+            + presentationForward
+            - stockDelta;
         _weapon.Root.GlobalTransform = global;
     }
 
@@ -1428,7 +1435,8 @@ internal sealed class AuthoredOperatorVisual
 
         var direction = shoulderToTarget.Normalized();
         var requestedDistance = shoulderToTarget.Length();
-        var allowStretch = shoulderBone == _leftShoulderBone;
+        var allowStretch = CombatModelLibrary.UsesHy3dOperator(VisualId)
+            || shoulderBone == _leftShoulderBone;
         var rawReach = proximalLength + distalLength;
         var rawStretch = requestedDistance / Mathf.Max(0.0001f, rawReach);
         var rawCosine = Mathf.Clamp(
@@ -1561,7 +1569,7 @@ internal sealed class AuthoredOperatorVisual
                 // centimetres inward. Permit the bounded 12% presentation
                 // stretch to finish at the foregrip instead of leaving a
                 // visible hand-sized gap under the rail.
-                0.075f)
+                0.12f)
             : 0.0f;
         if (targetShift > 0.0001f)
         {

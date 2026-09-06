@@ -268,16 +268,15 @@ public partial class FreightTerminalWorld
                     ? 0.05f
                     : OperatorCarryLeftWristDropMinimum;
         var leftElbowMaximum = locomotion || sprinting ? 180.0f : OperatorCarryLeftElbowMaximum;
+        var rightElbowMaximum = sprinting ? 160.0f : OperatorCarryRightElbowMaximum;
         var readyHandSeparationMinimum = sprinting
-            ? 0.14f
+            ? 0.13f
             : OperatorCarryReadyHandSeparationMinimum;
         // A moving imported clip can leave a normalized forearm a few
         // centimetres short at the extreme of its stride. Keep the strict
         // grip gate for idle/sprint poses and allow that bounded walk/run
         // tolerance while the hand remains visibly on the handguard.
-        var supportHandDistanceMaximum = locomotion || sprinting
-            ? 0.12f
-            : OperatorCarrySupportHandDistanceMaximum;
+        var supportHandDistanceMaximum = 0.12f;
         var weaponRootForwardMinimum = visualId == OperatorVisualId.Garrison && sprinting
             ? -0.03f
             : OperatorCarryWeaponRootForwardMinimum;
@@ -302,8 +301,8 @@ public partial class FreightTerminalWorld
         return inspection.Available
             && float.IsFinite(inspection.RightElbowAngleDegrees)
             && float.IsFinite(inspection.LeftElbowAngleDegrees)
-            && inspection.RightElbowAngleDegrees is >= OperatorCarryRightElbowMinimum
-                and <= OperatorCarryRightElbowMaximum
+            && inspection.RightElbowAngleDegrees >= OperatorCarryRightElbowMinimum
+            && inspection.RightElbowAngleDegrees <= rightElbowMaximum
             && inspection.LeftElbowAngleDegrees >= OperatorCarryLeftElbowMinimum
             && inspection.LeftElbowAngleDegrees <= leftElbowMaximum
             && inspection.RightWristBelowHead >= wristDropMinimum
