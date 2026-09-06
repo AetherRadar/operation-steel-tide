@@ -272,6 +272,7 @@ public partial class FreightTerminalWorld
             && rivals.Select(enemy => enemy.AuthoredTeamColorForDiagnostics).Distinct().Count() >= 2;
         var previewFailureHandling = InventoryOperatorPreviewRecovery.InspectFailureHandlingForDiagnostics();
         var previewOwnership = CombatModelLibrary.InspectPreviewOperatorOwnershipForDiagnostics();
+        var previewUpright = CombatModelLibrary.InspectPreviewOperatorUprightForDiagnostics();
         var valid = weaponGeometry
             && platformGeometry.Values.All(value => value)
             && m4AttachmentConfiguration.Valid
@@ -293,7 +294,8 @@ public partial class FreightTerminalWorld
             && enemiesAuthored
             && factionAppearance
             && previewFailureHandling.Valid
-            && previewOwnership.Valid;
+            && previewOwnership.Valid
+            && previewUpright.Valid;
 
         GD.Print(
             $"AK47_MODEL_CHECK {FormatAk47ModelQuality(ak47ModelQuality)}");

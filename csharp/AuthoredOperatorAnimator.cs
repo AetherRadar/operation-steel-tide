@@ -75,7 +75,9 @@ internal sealed class AuthoredOperatorAnimator
             var count = 0;
             foreach (var action in ActionAnimations)
             {
-                if (HasAnimation(action))
+                if (HasAnimation(action)
+                    || action == "jump_loop" && HasAnimation("jump")
+                    || action == "slide_loop" && HasAnimation("slide"))
                 {
                     count++;
                 }
@@ -244,6 +246,14 @@ internal sealed class AuthoredOperatorAnimator
         if (_player.HasAnimation(name))
         {
             return name;
+        }
+        if (name is "jump_loop" && _player.HasAnimation("jump"))
+        {
+            return "jump";
+        }
+        if (name is "slide_loop" && _player.HasAnimation("slide"))
+        {
+            return "slide";
         }
         return name switch
         {

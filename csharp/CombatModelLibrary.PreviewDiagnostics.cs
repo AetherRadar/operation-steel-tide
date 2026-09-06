@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace OperationSteelTide;
@@ -144,5 +146,55 @@ internal static partial class CombatModelLibrary
 
     private sealed class PreviewOperatorDiagnosticException : Exception
     {
+    }
+
+    /// <summary>
+    /// Builds every operator preview and reports the upright roll applied to
+    /// each. Rolls beyond <see cref="PreviewUprightSanityMaximumRadians"/>
+    /// mean the asset needs pipeline attention instead of a bigger correction.
+    /// </summary>
+    internal static PreviewOperatorUprightInspection InspectPreviewOperatorUprightForDiagnostics()
+    {
+        var rolls = new Dictionary<OperatorVisualId, float>();
+        var allBuilt = true;
+        foreach (var visualId in new[]
+        {
+            OperatorVisualId.Garrison,
+            OperatorVisualId.Viper,
+            OperatorVisualId.Heron,
+            OperatorVisualId.Lynx,
+            OperatorVisualId.Magpie,
+            OperatorVisualId.Jackal,
+        })
+        {
+            AuthoredPreviewOperatorVisual? visual = null;
+            try
+            {
+                visual = InstantiatePreviewOperator(visualId);
+                rolls[visualId] = visual.UprightRollRadians;
+            }
+            catch
+            {
+                allBuilt = false;
+                rolls[visualId] = float.NaN;
+            }
+            finally
+            {
+                if (GodotObject.IsInstanceValid(visual?.Root))
+                {
+                    visual!.Root.Free();
+                }
+            }
+        }
+        return new PreviewOperatorUprightInspection(rolls, allBuilt);
+    }
+
+    internal readonly record struct PreviewOperatorUprightInspection(
+        Dictionary<OperatorVisualId, float> UprightRollRadiansByVisual,
+        bool AllBuilt)
+    {
+        public bool Valid => AllBuilt
+            && UprightRollRadiansByVisual.Values.All(
+                roll => !float.IsNaN(roll) && Mathf.Abs(roll) <= PreviewUprightSanityMaximumRadians);
     }
 }

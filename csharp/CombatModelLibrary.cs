@@ -598,16 +598,20 @@ internal sealed class AuthoredPreviewOperatorVisual
     public AuthoredPreviewOperatorVisual(
         Node3D root,
         OperatorVisualId visualId,
-        bool hasWeapon = false)
+        bool hasWeapon = false,
+        float uprightRollRadians = 0.0f)
     {
         Root = root;
         VisualId = visualId;
         HasWeapon = hasWeapon;
+        UprightRollRadians = uprightRollRadians;
     }
 
     public Node3D Root { get; }
     public OperatorVisualId VisualId { get; }
     public bool HasWeapon { get; }
+    /// <summary>Sideways roll applied to straighten a leaning rest pose (0 when untouched).</summary>
+    public float UprightRollRadians { get; }
 }
 
 internal sealed class AuthoredOperatorVisual
@@ -713,10 +717,13 @@ internal sealed class AuthoredOperatorVisual
             {
                 for (var segment = 1; segment <= 3; segment++)
                 {
+                    var suffix = $"{side}Hand{finger}{segment}";
                     var found = false;
-                    foreach (var prefix in new[] { "", "mixamorig:" })
+                    for (var boneIndex = 0; boneIndex < skeleton.GetBoneCount(); boneIndex++)
                     {
-                        if (skeleton.FindBone($"{prefix}{side}Hand{finger}{segment}") >= 0)
+                        var boneName = skeleton.GetBoneName(boneIndex).ToString();
+                        if (boneName.Equals(suffix, StringComparison.OrdinalIgnoreCase)
+                            || boneName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
                         {
                             found = true;
                             break;
@@ -2446,6 +2453,119 @@ internal static partial class CombatModelLibrary
         return marker;
     }
 
+    private static Transform3D TransformRelativeToAncestor(Node3D node, Node3D ancestor)
+    {
+        var result = node.Transform;
+        var parent = node.GetParent();
+        while (parent != ancestor)
+        {
+            if (parent is null)
+            {
+                throw new InvalidOperationException($"{node.Name} is not a descendant of {ancestor.Name}.");
+            }
+            if (parent is Node3D parent3D)
+            {
+                result = parent3D.Transform * result;
+            }
+            parent = parent.GetParent();
+        }
+        return result;
+    }
+
+    private static StringName? ResolveBoneName(Skeleton3D skeleton, string requestedName)
+    {
+        var suffix = requestedName[(requestedName.LastIndexOf(':') + 1)..];
+        for (var index = 0; index < skeleton.GetBoneCount(); index++)
+        {
+            var candidate = skeleton.GetBoneName(index);
+            var value = candidate.ToString();
+            if (string.Equals(value, requestedName, StringComparison.OrdinalIgnoreCase)
+                || value.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Hips sideways offset (metres, actor space) tolerated in a deployment
+    /// product shot. The HY-3D retarget bakes a systematic lateral bias into
+    /// some characters (Viper ≈ 0.15 m) while unaffected ones sit an order of
+    /// magnitude below this gate, so the margin survives pipeline rebuilds.
+    /// </summary>
+    private const float PreviewUprightHipsGateMetres = 0.08f;
+
+    /// <summary>Rolls below this angle are left alone to preserve authored stance.</summary>
+    private const float PreviewUprightMinimumRollRadians = 0.035f;
+
+    /// <summary>
+    /// Sanity bound for the upright correction. Anything larger means the
+    /// asset regressed in the pipeline and needs attention there instead.
+    /// </summary>
+    internal const float PreviewUprightSanityMaximumRadians = 0.30f;
+
+    /// <summary>
+    /// Rolls a leaning preview source upright around its feet. Measures the
+    /// feet-to-head line from skeleton rest poses (stable across retarget
+    /// rebuilds) and rotates about Z so the line stands vertical while the
+    /// stance stays planted; the caller recenters bounds afterwards. Returns
+    /// the applied roll, or 0 when the asset is already straight, has no
+    /// usable legs rig, or anything goes wrong (a leaning card is preferable
+    /// to a missing one).
+    /// </summary>
+    private static float ApplyPreviewUprightCorrection(Node3D source)
+    {
+        try
+        {
+            var skeleton = RequireSkeleton(source);
+            var hipsName = ResolveBoneName(skeleton, "Hips");
+            var headName = ResolveBoneName(skeleton, "mixamorig:Head");
+            var leftFootName = ResolveBoneName(skeleton, "mixamorig:LeftFoot");
+            var rightFootName = ResolveBoneName(skeleton, "mixamorig:RightFoot");
+            if (hipsName is null || headName is null || leftFootName is null || rightFootName is null)
+            {
+                return 0.0f;
+            }
+            var skeletonToSource = ReferenceEquals(skeleton, source)
+                ? Transform3D.Identity
+                : TransformRelativeToAncestor(skeleton, source);
+            Vector3 RestOriginInSource(StringName boneName)
+                => (skeletonToSource * skeleton.GetBoneGlobalRest(skeleton.FindBone(boneName))).Origin;
+            var hips = RestOriginInSource(hipsName);
+            if (Mathf.Abs(hips.X) < PreviewUprightHipsGateMetres)
+            {
+                return 0.0f;
+            }
+            var head = RestOriginInSource(headName);
+            var feetMid = (RestOriginInSource(leftFootName) + RestOriginInSource(rightFootName)) * 0.5f;
+            var span = head - feetMid;
+            if (span.Y <= 0.2f)
+            {
+                return 0.0f;
+            }
+            var roll = Mathf.Atan2(span.X, span.Y);
+            if (Mathf.Abs(roll) < PreviewUprightMinimumRollRadians)
+            {
+                return 0.0f;
+            }
+            // Rotate about the feet (not the origin) so the stance stays
+            // planted: T = pivot - R * pivot. The bounds recenter below
+            // absorbs the translation; only the pivot choice survives it.
+            var rollBasis = new Basis(new Quaternion(new Vector3(0.0f, 0.0f, 1.0f), roll));
+            var transform = source.Transform;
+            transform.Basis = rollBasis * transform.Basis;
+            transform.Origin += feetMid - rollBasis * feetMid;
+            source.Transform = transform;
+            return roll;
+        }
+        catch
+        {
+            // Cosmetic-only path: never fail a preview build over straightening.
+            return 0.0f;
+        }
+    }
+
     public static AuthoredPreviewOperatorVisual InstantiatePreviewOperator()
         => InstantiatePreviewOperator(OperatorVisualId.Garrison);
 
@@ -2480,6 +2600,14 @@ internal static partial class CombatModelLibrary
                 asset.PreviewScenePath,
                 asset.PreviewNodes);
             buildObserver?.Invoke(PreviewOperatorBuildStage.SourceCreated, source, null);
+            // Some HY-3D conversions bake a systematic sideways bias into the
+            // rest pose (Viper's hips sit ~0.15 m off-axis). The deployment
+            // card freezes that rest pose, so the operator reads as leaning.
+            // Roll the source upright before measuring bounds; gameplay clips
+            // override the pose every frame and are unaffected.
+            var uprightRollRadians = asset.UsesQuaterniusRig
+                ? ApplyPreviewUprightCorrection(source)
+                : 0.0f;
             var sourceBounds = asset.UsesQuaterniusRig
                 ? ComputeBounds(source)
                 : (MeshCount: 1, Size: PreviewOperatorSourceSize, Center: PreviewOperatorSourceCenter);
@@ -2489,7 +2617,10 @@ internal static partial class CombatModelLibrary
                     $"Operator preview {visualId} has no usable geometry bounds.");
             }
 
-            source.Position = -sourceBounds.Center;
+            // Shift (not set): preserves the feet-pivot translation left by
+            // the upright correction. Untouched assets start at the origin,
+            // so their behavior is unchanged.
+            source.Position -= sourceBounds.Center;
             if (asset.UsesQuaterniusRig)
             {
                 var animationPlayer = RequireAnimationPlayer(source);
@@ -2522,7 +2653,8 @@ internal static partial class CombatModelLibrary
             var visual = new AuthoredPreviewOperatorVisual(
                 wrapper,
                 visualId,
-                hasWeapon: asset.UsesQuaterniusRig && weaponBuild is not null);
+                hasWeapon: asset.UsesQuaterniusRig && weaponBuild is not null,
+                uprightRollRadians: uprightRollRadians);
             source = null;
             wrapper = null;
             return visual;
