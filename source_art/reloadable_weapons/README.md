@@ -6,8 +6,8 @@ P226, M1911, and GSh-18 runtime derivatives. Their 2026-08-29 DCC pass replaces
 marker-only reload motion with visible magazine/loading/action geometry while
 retaining finished third-party weapon art. `ak47_reloadable.blend` adapts
 taradavies' finished CC0 AK-47, adds a portable mechanism/socket hierarchy,
-packs two project-authored wood textures, and contains no source image with
-unknown provenance.
+performs a subtle hard-surface proportion pass, packs six project-authored PBR
+textures, and contains no source image with unknown provenance.
 
 Source and output rights are recorded in:
 
@@ -27,11 +27,14 @@ The project-authored textures, mechanism meshes, and builders are covered by
 the root MIT license; retained third-party art and combined outputs keep the
 source-license mapping above.
 
-The AK adaptation keeps the original fixed-stock/curved-magazine proportions,
-then applies a uniform `0.89` presentation pass around the firing-hand grip.
-The resulting FP and world exports measure about `1.40 m` overall; this avoids
-the former oversized `1.58 m` viewmodel while keeping the trigger hand, support
-hand, and reload sockets on the same authored surfaces.
+The AK adaptation keeps the original fixed-stock/curved-magazine silhouette,
+then applies a uniform `0.89` presentation pass around the firing-hand grip,
+slightly narrows the receiver, handguard, pistol grip, and magazine, and tapers
+the stock toward its butt. A weighted hard-surface normal pass preserves the
+source bevel highlights. The resulting FP and world exports measure about
+`1.40 m` overall; this avoids the former oversized `1.58 m` viewmodel while
+keeping the trigger hand, support hand, and reload sockets on the same authored
+surfaces.
 The runtime leaves the AK's authored iron sights exposed at tier 0; the shared
 external holo and magnified optics begin at higher tiers so the base silhouette
 is not obscured by a generic circular sight. Bare-iron ADS uses the authored
@@ -55,19 +58,20 @@ SHA-256 before opening it. It then produces:
 - `assets/models/steel_tide_ak74/ak47_reloadable_world.glb`;
 - `assets/models/steel_tide_ak74/ak47_studio_preview.png`;
 - `source_art/reloadable_weapons/ak47_reloadable.blend`; and
-- `source_art/reloadable_weapons/textures/ak47_laminated_wood_{base_color,roughness}.png`.
+- `source_art/reloadable_weapons/textures/ak47_{laminated_wood,blued_metal,bakelite_polymer}_{base_color,roughness}.png`.
 
 ## Source sanitation and materials
 
 The official `.blend` contains unpacked references to two unlicensed wood
 images and an external HDR. The build deletes every source material and image
 datablock before constructing the runtime asset. It never downloads or reads
-those missing dependencies. The replacement wood maps are generated from a
-fixed mathematical grain recipe; their pixels are project-authored. Five
-scalar metal/bakelite materials and one textured wood material provide the six
-runtime PBR materials.
+those missing dependencies. The replacement wood, blued-steel, and
+bakelite-polymer maps are generated from fixed mathematical grain, machining,
+scratch, and roughness recipes; their pixels are project-authored. Three
+textured steel materials, one textured bakelite material, one textured wood
+material, and one rubber material provide the six runtime PBR materials.
 
-The final source `.blend` packs both generated PNGs and stores their portable
+The final source `.blend` packs all six generated PNGs and stores their portable
 relative paths beneath `//textures/`. A post-save reopen rejects an absolute,
 unpacked, missing, empty, or unexpected image.
 
@@ -105,12 +109,13 @@ The script fails unless:
   source topology match the audited download;
 - no unlicensed source material or image survives;
 - the FP/world exports contain 97,372/24,488 unique triangles respectively,
-  11 mesh resources, six materials, and two embedded PNG textures;
+  11 mesh resources, six materials, six embedded PNG images, and ten glTF
+  texture samplers;
 - the magazine, charging handle, front/rear sights, optic adapter, muzzle, and
   ejection markers are present as non-empty, independent runtime nodes;
 - the optic marker resolves against the actual horizontal rail top, with a
   verified 0.000 mm marker-to-mesh gap in both detail levels; and
-- the saved `.blend` reopens with exactly two packed project textures and no
+- the saved `.blend` reopens with exactly six packed project textures and no
   absolute path.
 
 Godot's `--validate-combat-models` additionally checks both separate runtime

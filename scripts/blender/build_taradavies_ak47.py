@@ -42,6 +42,10 @@ TEXTURE_DIRECTORY = (
 )
 WOOD_BASE_COLOR = TEXTURE_DIRECTORY / "ak47_laminated_wood_base_color.png"
 WOOD_ROUGHNESS = TEXTURE_DIRECTORY / "ak47_laminated_wood_roughness.png"
+METAL_BASE_COLOR = TEXTURE_DIRECTORY / "ak47_blued_metal_base_color.png"
+METAL_ROUGHNESS = TEXTURE_DIRECTORY / "ak47_blued_metal_roughness.png"
+POLYMER_BASE_COLOR = TEXTURE_DIRECTORY / "ak47_bakelite_polymer_base_color.png"
+POLYMER_ROUGHNESS = TEXTURE_DIRECTORY / "ak47_bakelite_polymer_roughness.png"
 PREVIEW_PATH = OUTPUT_DIRECTORY / "ak47_studio_preview.png"
 
 SOURCE_URL = "https://opengameart.org/content/ak-47-1"
@@ -169,8 +173,12 @@ RUNTIME_NODE_NAMES = frozenset(RUNTIME_NODE_PARENTS)
 EXPECTED_RUNTIME_NODE_COUNT = 30
 EXPECTED_RUNTIME_MESH_COUNT = 11
 EXPECTED_RUNTIME_MATERIAL_COUNT = 6
-EXPECTED_RUNTIME_IMAGE_COUNT = 2
-EXPECTED_RUNTIME_TEXTURE_COUNT = 2
+EXPECTED_RUNTIME_IMAGE_COUNT = 6
+# glTF stores one sampler/texture entry per material binding even when several
+# materials share the same embedded image pair (three steel materials share
+# the metal maps), so the serialized texture table is larger than the image
+# table by design.
+EXPECTED_RUNTIME_TEXTURE_COUNT = 10
 EXPECTED_FP_TRIANGLE_COUNT = 97_372
 EXPECTED_WORLD_TRIANGLE_COUNT = 24_488
 
@@ -393,12 +401,100 @@ def generate_project_textures() -> None:
     write_texture("AK47WoodBaseColor", WOOD_BASE_COLOR, base, non_color=False)
     write_texture("AK47WoodRoughness", WOOD_ROUGHNESS, roughness, non_color=True)
 
+    # Project-owned firearm surface maps.  These are intentionally generated
+    # here rather than sampled from the CC0 source's missing image references:
+    # broad machining variation, fine handling scratches, and directional
+    # roughness keep the receiver from reading as a single flat black scalar in
+    # the game camera.  The same deterministic pair is shared by the three
+    # steel finishes; a separate bakelite pair gives the magazine its own
+    # slightly warm, worn polymer character.
+    broad_metal = np.sin(2.0 * pi * (uu * 3.6 + vv * 1.7))
+    fine_metal = np.sin(2.0 * pi * (uu * 97.0 + vv * 4.0))
+    machining = np.sin(2.0 * pi * (uu * 21.0 - vv * 0.75))
+    scratch_mask = np.clip((fine_metal - 0.84) * 5.5, 0.0, 1.0)
+    metal_luma = np.clip(
+        0.060
+        + broad_metal * 0.010
+        + machining * 0.004
+        + scratch_mask * 0.050,
+        0.028,
+        0.145,
+    )
+    metal_color = np.stack(
+        (metal_luma * 0.88, metal_luma * 0.98, metal_luma * 0.96),
+        axis=2,
+    )
+    metal_base = np.concatenate(
+        (metal_color, np.ones((size, size, 1), dtype=np.float32)),
+        axis=2,
+    )
+    metal_rough_value = np.clip(
+        0.47 + broad_metal * 0.055 + machining * 0.025 - scratch_mask * 0.12,
+        0.30,
+        0.64,
+    )
+    metal_roughness = np.stack(
+        (
+            metal_rough_value,
+            metal_rough_value,
+            metal_rough_value,
+            np.ones_like(metal_rough_value),
+        ),
+        axis=2,
+    )
+    write_texture("AK47BluedMetalBaseColor", METAL_BASE_COLOR, metal_base, non_color=False)
+    write_texture("AK47BluedMetalRoughness", METAL_ROUGHNESS, metal_roughness, non_color=True)
+
+    polymer_broad = np.sin(2.0 * pi * (uu * 2.0 + vv * 1.3))
+    polymer_fine = np.sin(2.0 * pi * (uu * 70.0 - vv * 3.0))
+    polymer_luma = np.clip(
+        0.052 + polymer_broad * 0.008 + polymer_fine * 0.003,
+        0.028,
+        0.078,
+    )
+    polymer_color = np.stack(
+        (polymer_luma * 1.18, polymer_luma * 0.56, polymer_luma * 0.30),
+        axis=2,
+    )
+    polymer_base = np.concatenate(
+        (polymer_color, np.ones((size, size, 1), dtype=np.float32)),
+        axis=2,
+    )
+    polymer_rough_value = np.clip(
+        0.58 + np.abs(polymer_fine) * 0.10 + polymer_broad * 0.035,
+        0.50,
+        0.76,
+    )
+    polymer_roughness = np.stack(
+        (
+            polymer_rough_value,
+            polymer_rough_value,
+            polymer_rough_value,
+            np.ones_like(polymer_rough_value),
+        ),
+        axis=2,
+    )
+    write_texture(
+        "AK47BakelitePolymerBaseColor",
+        POLYMER_BASE_COLOR,
+        polymer_base,
+        non_color=False,
+    )
+    write_texture(
+        "AK47BakelitePolymerRoughness",
+        POLYMER_ROUGHNESS,
+        polymer_roughness,
+        non_color=True,
+    )
+
 
 def scalar_material(
     name: str,
     color: tuple[float, float, float, float],
     metallic: float,
     roughness: float,
+    coat_weight: float = 0.0,
+    coat_roughness: float = 0.18,
 ) -> bpy.types.Material:
     material = bpy.data.materials.new(name)
     material.use_nodes = True
@@ -414,15 +510,24 @@ def scalar_material(
     principled.inputs["Base Color"].default_value = color
     principled.inputs["Metallic"].default_value = metallic
     principled.inputs["Roughness"].default_value = roughness
+    # Blender 4.5 exposes the clear-coat lobe as "Coat Weight".  It survives
+    # the glTF export and gives the blued receiver a restrained, machined
+    # highlight instead of the flat black read it had in the game view.
+    if "Coat Weight" in principled.inputs:
+        principled.inputs["Coat Weight"].default_value = coat_weight
+    if "Coat Roughness" in principled.inputs:
+        principled.inputs["Coat Roughness"].default_value = coat_roughness
     return material
 
 
 def wood_material() -> bpy.types.Material:
     material = scalar_material(
         "AK47LaminatedWoodPBR",
-        (0.095, 0.030, 0.010, 1.0),
+        (0.120, 0.039, 0.014, 1.0),
         0.0,
         0.60,
+        coat_weight=0.08,
+        coat_roughness=0.28,
     )
     color_image = bpy.data.images.load(str(WOOD_BASE_COLOR), check_existing=False)
     color_image.colorspace_settings.name = "sRGB"
@@ -445,36 +550,93 @@ def wood_material() -> bpy.types.Material:
     return material
 
 
+def textured_scalar_material(
+    name: str,
+    color: tuple[float, float, float, float],
+    metallic: float,
+    roughness: float,
+    base_path: Path,
+    roughness_path: Path,
+    coat_weight: float = 0.0,
+    coat_roughness: float = 0.18,
+) -> bpy.types.Material:
+    material = scalar_material(
+        name,
+        color,
+        metallic,
+        roughness,
+        coat_weight=coat_weight,
+        coat_roughness=coat_roughness,
+    )
+    color_image = bpy.data.images.load(str(base_path), check_existing=True)
+    color_image.colorspace_settings.name = "sRGB"
+    rough_image = bpy.data.images.load(str(roughness_path), check_existing=True)
+    rough_image.colorspace_settings.name = "Non-Color"
+    nodes = material.node_tree.nodes
+    links = material.node_tree.links
+    principled = nodes.get("Principled BSDF")
+    if principled is None:
+        raise RuntimeError(f"Material {name} has no Principled BSDF.")
+    color_node = nodes.new("ShaderNodeTexImage")
+    color_node.name = f"{name}BaseColorTexture"
+    color_node.image = color_image
+    rough_node = nodes.new("ShaderNodeTexImage")
+    rough_node.name = f"{name}RoughnessTexture"
+    rough_node.image = rough_image
+    links.new(color_node.outputs["Color"], principled.inputs["Base Color"])
+    links.new(rough_node.outputs["Color"], principled.inputs["Roughness"])
+    material["texture_author"] = "Operation Steel Tide project contributors"
+    material["texture_license"] = "MIT"
+    material["texture_build"] = "scripts/blender/build_taradavies_ak47.py"
+    return material
+
+
 def build_materials() -> dict[str, bpy.types.Material]:
     return {
         "wood": wood_material(),
-        "receiver": scalar_material(
+        "receiver": textured_scalar_material(
             "AK47BluedReceiverSteel",
-            (0.034, 0.041, 0.043, 1.0),
+            (0.064, 0.073, 0.071, 1.0),
             0.74,
-            0.46,
+            0.43,
+            METAL_BASE_COLOR,
+            METAL_ROUGHNESS,
+            coat_weight=0.16,
+            coat_roughness=0.20,
         ),
-        "phosphate": scalar_material(
+        "phosphate": textured_scalar_material(
             "AK47PhosphateSteel",
-            (0.050, 0.056, 0.055, 1.0),
+            (0.082, 0.089, 0.083, 1.0),
             0.62,
-            0.54,
+            0.50,
+            METAL_BASE_COLOR,
+            METAL_ROUGHNESS,
+            coat_weight=0.05,
+            coat_roughness=0.28,
         ),
-        "bolt": scalar_material(
+        "bolt": textured_scalar_material(
             "AK47WornBoltSteel",
-            (0.115, 0.128, 0.128, 1.0),
+            (0.175, 0.185, 0.178, 1.0),
             0.82,
             0.36,
+            METAL_BASE_COLOR,
+            METAL_ROUGHNESS,
+            coat_weight=0.10,
+            coat_roughness=0.16,
         ),
-        "magazine": scalar_material(
+        "magazine": textured_scalar_material(
             "AK47BakeliteMagazine",
-            (0.095, 0.028, 0.012, 1.0),
+            (0.062, 0.021, 0.010, 1.0),
             0.05,
-            0.56,
+            0.60,
+            POLYMER_BASE_COLOR,
+            POLYMER_ROUGHNESS,
+            coat_weight=0.04,
+            coat_roughness=0.30,
         ),
         "rubber": scalar_material(
             "AK47ButtpadRubber",
-            (0.012, 0.014, 0.013, 1.0),
+            (0.020, 0.022, 0.020, 1.0),
             0.0,
             0.82,
         ),
@@ -557,9 +719,55 @@ def apply_lod_and_normalize(level: int) -> None:
         bpy.ops.object.convert(target="MESH")
         obj.data.transform(NORMALIZATION @ obj.matrix_world)
         obj.matrix_world = Matrix.Identity(4)
+        # The source is a finished low-poly DCC asset, but its hard-surface
+        # panels were exported with uniformly smooth normals.  A weighted
+        # normal pass keeps the authored bevels readable in first person while
+        # preserving the mesh topology and the reload/socket contract.
+        weighted = obj.modifiers.new("AK47AuthoredWeightedNormals", "WEIGHTED_NORMAL")
+        weighted.keep_sharp = True
+        weighted.weight = 45
+        bpy.ops.object.modifier_apply(modifier=weighted.name)
         for polygon in obj.data.polygons:
             polygon.use_smooth = True
         obj.data.validate(clean_customdata=False)
+
+
+def reshape_authored_profile() -> None:
+    """Refine the CC0 mesh proportions without introducing primitives.
+
+    The source silhouette is retained, but the first-person presentation had a
+    slightly over-wide receiver, blocky stock butt and broad bakelite magazine.
+    These edits are vertex-level DCC adaptations around the existing authored
+    contact surfaces; all named mechanism markers remain in the same frame.
+    """
+
+    def scale_x(name: str, factor: float) -> None:
+        mesh = bpy.data.objects[name].data
+        for vertex in mesh.vertices:
+            vertex.co.x *= factor
+
+    def taper_stock() -> None:
+        mesh = bpy.data.objects["Cube"].data
+        receiver_end = 0.1152
+        butt_end = -0.2585
+        cheek_center = -0.0834
+        for vertex in mesh.vertices:
+            travel = max(0.0, min(1.0, (receiver_end - vertex.co.y) / (receiver_end - butt_end)))
+            # Keep the stock-to-receiver shoulder fixed and taper toward the
+            # butt, matching the laminated fixed-stock profile of a real AKM.
+            vertex.co.x *= 0.96 - 0.06 * travel
+            vertex.co.z = cheek_center + (vertex.co.z - cheek_center) * (1.0 - 0.07 * travel)
+
+    # Receiver and magazine width are the two largest visual exaggerations in
+    # the original source when viewed from the camera.  The reductions are
+    # deliberately subtle so hand and optic alignment does not drift.
+    for name in ("Cube.002", "Plane"):
+        scale_x(name, 0.92)
+    scale_x(MAGAZINE_SOURCE, 0.94)
+    scale_x("Cube.003", 0.95)
+    for name in ("Cube.008", "Cube.009"):
+        scale_x(name, 0.94)
+    taper_stock()
 
 
 def find_optic_rail_contact(adapter: bpy.types.Object) -> Vector:
@@ -666,6 +874,7 @@ def build_runtime_hierarchy(level: int) -> bpy.types.Object:
             assign_material(obj, materials["receiver"] if obj.name in {"Cube.002", "Plane"} else materials["phosphate"])
 
     apply_lod_and_normalize(level)
+    reshape_authored_profile()
 
     magazine_geometry = bpy.data.objects[MAGAZINE_SOURCE]
     magazine_geometry.name = "MagazineGeometry"
@@ -944,6 +1153,10 @@ def save_source() -> None:
     expected_textures = {
         WOOD_BASE_COLOR.resolve(),
         WOOD_ROUGHNESS.resolve(),
+        METAL_BASE_COLOR.resolve(),
+        METAL_ROUGHNESS.resolve(),
+        POLYMER_BASE_COLOR.resolve(),
+        POLYMER_ROUGHNESS.resolve(),
     }
     saved_textures: set[Path] = set()
     for image in bpy.data.images:
@@ -973,6 +1186,10 @@ def validate_saved_source() -> None:
     expected_paths = {
         f"//textures/{WOOD_BASE_COLOR.name}",
         f"//textures/{WOOD_ROUGHNESS.name}",
+        f"//textures/{METAL_BASE_COLOR.name}",
+        f"//textures/{METAL_ROUGHNESS.name}",
+        f"//textures/{POLYMER_BASE_COLOR.name}",
+        f"//textures/{POLYMER_ROUGHNESS.name}",
     }
     actual_paths = {
         image.filepath.replace("\\", "/")

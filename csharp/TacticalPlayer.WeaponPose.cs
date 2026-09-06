@@ -9,6 +9,14 @@ public partial class TacticalPlayer
         0.31f,
         -0.27f,
         -0.62f);
+    // The AK's longer fixed stock and heavier stamped receiver need a closer,
+    // slightly left-biased camera pose to read like the reference first-person
+    // silhouette.  Keeping this platform-specific avoids making compact SMGs
+    // and precision rifles look oversized.
+    private static readonly Vector3 Ak47HipWeaponPosition = new(
+        0.28f,
+        -0.20f,
+        -0.48f);
     private static readonly Vector3 PrecisionRifleHipWeaponPosition = new(
         0.30f,
         -0.29f,
@@ -36,8 +44,25 @@ public partial class TacticalPlayer
     private Vector3 _pendingViewmodelPositionImpulse;
     private Vector3 _pendingViewmodelRotationImpulse;
 
+    private void EnsureWeaponPresentationScale()
+    {
+        if (!IsInstanceValid(_weaponRoot))
+        {
+            return;
+        }
+
+        var target = EquippedWeapon.Platform == WeaponPlatform.AK74
+            ? 0.82f
+            : 0.68f;
+        if (Mathf.Abs(_weaponRoot.Scale.X - target) > 0.0001f)
+        {
+            _weaponRoot.Scale = Vector3.One * target;
+        }
+    }
+
     private Vector3 WeaponViewPositionTarget()
     {
+        EnsureWeaponPresentationScale();
         var target = _isAiming
             ? AimWeaponPosition()
             : WeaponCatalog.IsSidearm(EquippedWeapon.Platform)
@@ -70,6 +95,7 @@ public partial class TacticalPlayer
         => EquippedWeapon.Platform switch
         {
             WeaponPlatform.M4A1 or WeaponPlatform.M3A1 => HipWeaponPosition,
+            WeaponPlatform.AK74 => Ak47HipWeaponPosition,
             WeaponPlatform.M24 or WeaponPlatform.AXMC or WeaponPlatform.AWM
                 => PrecisionRifleHipWeaponPosition,
             _ => ImpactRifleHipWeaponPosition
