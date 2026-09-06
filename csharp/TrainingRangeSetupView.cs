@@ -55,12 +55,15 @@ public partial class TrainingRangeSetupView : ColorRect
     private Label _ammoTypeCaption = null!;
     private Label _ammoLevelCaption = null!;
     private Label _ammoHint = null!;
+    private Label _attachmentCaption = null!;
+    private Label _attachmentHint = null!;
     private OptionButton _botTypeSelect = null!;
     private OptionButton _botCountSelect = null!;
     private OptionButton _weaponSelect = null!;
     private OptionButton _ammoTypeSelect = null!;
     private OptionButton _ammoLevelSelect = null!;
     private readonly OptionButton[] _attachmentSelects = new OptionButton[6];
+    private readonly Label[] _attachmentSlotCaptions = new Label[6];
     private readonly AttachmentSlot[] _attachmentSlots =
     {
         AttachmentSlot.Optic, AttachmentSlot.Barrel, AttachmentSlot.Muzzle,
@@ -104,6 +107,9 @@ public partial class TrainingRangeSetupView : ColorRect
         && IsInstanceValid(_ammoTypeSelect)
         && IsInstanceValid(_ammoLevelSelect)
         && Array.TrueForAll(_attachmentSelects, b => GodotObject.IsInstanceValid(b))
+        && Array.TrueForAll(_attachmentSlotCaptions, b => GodotObject.IsInstanceValid(b))
+        && IsInstanceValid(_attachmentCaption)
+        && IsInstanceValid(_attachmentHint)
         && IsInstanceValid(_summary)
         && IsInstanceValid(_backButton)
         && IsInstanceValid(_exitButton)
@@ -186,6 +192,12 @@ public partial class TrainingRangeSetupView : ColorRect
         _ammoHint.Text = Text(
             "training_setup_ammo_hint",
             "AMMO AND UTILITY REFILL AUTOMATICALLY.");
+        _attachmentCaption.Text = Text(
+            "training_setup_attachment_caption",
+            "GUNSMITH // ATTACHMENTS");
+        _attachmentHint.Text = Text(
+            "training_setup_attachment_hint",
+            "SELECT A SLOT TO PREVIEW THE INSTALLED PART");
         _backButton.Text = Text("training_setup_back", "BACK");
         _exitButton.Text = Text("training_setup_exit", "RETURN TO OPERATIONS");
         _exitButton.Visible = _inGameplay;
@@ -203,6 +215,8 @@ public partial class TrainingRangeSetupView : ColorRect
         SetBotTypeText(chinese);
         SetBotCountText(chinese);
         SetWeaponText();
+        SetAttachmentSlotText(chinese);
+        RefreshAttachmentOptions();
         SetAmmoText(chinese);
         RefreshStationContext();
         RefreshSummary();
@@ -371,8 +385,12 @@ public partial class TrainingRangeSetupView : ColorRect
         _ammoTypeSelect = ammoPanel.GetNode<OptionButton>("AmmoTypeSelect");
         _ammoLevelSelect = ammoPanel.GetNode<OptionButton>("AmmoLevelSelect");
         var attachmentPanel = panel.GetNode<Control>("AttachmentPanel");
+        _attachmentCaption = attachmentPanel.GetNode<Label>("Caption");
+        _attachmentHint = attachmentPanel.GetNode<Label>("Hint");
         for (var i = 0; i < _attachmentSelects.Length; i++)
         {
+            _attachmentSlotCaptions[i] = attachmentPanel.GetNode<Label>(
+                _attachmentSlots[i].ToString() + "Caption");
             _attachmentSelects[i] = attachmentPanel.GetNode<OptionButton>(
                 _attachmentSlots[i].ToString() + "Select");
         }
@@ -488,7 +506,11 @@ public partial class TrainingRangeSetupView : ColorRect
             select.Clear();
             foreach (var id in AttachmentCandidates(platform, _attachmentSlots[i]))
             {
-                var label = id.Length == 0 ? (_attachmentSlots[i] == AttachmentSlot.Optic ? "IRON SIGHTS // NONE" : "NONE / REMOVE") : WeaponCatalog.Attachment(id).Name;
+                var label = id.Length == 0
+                    ? _attachmentSlots[i] == AttachmentSlot.Optic
+                        ? Text("training_setup_attachment_none_optic", "IRON SIGHTS // NONE")
+                        : Text("training_setup_attachment_none", "NONE / REMOVE")
+                    : DisplayAttachmentName(id);
                 select.AddItem(label);
                 select.SetItemMetadata(select.ItemCount - 1, id);
             }
@@ -496,6 +518,24 @@ public partial class TrainingRangeSetupView : ColorRect
             for (var j = 0; j < select.ItemCount; j++) if (select.GetItemMetadata(j).AsString() == previous) restored = j;
             select.Select(restored >= 0 ? restored : 0);
         }
+    }
+
+    private void SetAttachmentSlotText(bool chinese)
+    {
+        for (var index = 0; index < _attachmentSlots.Length; index++)
+        {
+            _attachmentSlotCaptions[index].Text = chinese
+                ? WeaponCatalog.SlotChinese(_attachmentSlots[index])
+                : _attachmentSlots[index].ToString().ToUpperInvariant();
+        }
+    }
+
+    private string DisplayAttachmentName(string id)
+    {
+        var definition = WeaponCatalog.Attachment(id);
+        return GameLocalization.IsChinese(_language)
+            ? definition.ChineseName
+            : definition.Name;
     }
 
     private static IEnumerable<string> AttachmentCandidates(WeaponPlatform platform, AttachmentSlot slot)

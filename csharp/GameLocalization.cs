@@ -653,6 +653,10 @@ public static class GameLocalization
         Chinese["training_setup_station_weapon"] = "\u67aa\u68b0\u5de5\u4f4d  //  \u9009\u62e9\u6b66\u5668";
         Chinese["training_setup_station_ammo"] = "\u5f39\u836f\u5b9e\u9a8c\u5ba4  //  \u9009\u62e9\u5f39\u79cd";
         Chinese["training_setup_station_bot"] = "Bot \u63a7\u5236  //  \u8bbe\u7f6e\u76ee\u6807";
+        Chinese["training_setup_attachment_caption"] = "\u67aa\u68b0\u914d\u4ef6";
+        Chinese["training_setup_attachment_hint"] = "\u9009\u62e9\u69fd\u4f4d\u67e5\u770b\u5df2\u5b89\u88c5\u914d\u4ef6";
+        Chinese["training_setup_attachment_none_optic"] = "\u673a\u68b0\u77c1\u5177 / \u65e0";
+        Chinese["training_setup_attachment_none"] = "\u65e0 / \u62c6\u5378";
         Chinese["training_armory_kicker"] = "\u5b9e\u5f39\u63a7\u5236  //  \u67aa\u68b0\u5de5\u574a";
         Chinese["training_armory_title"] = "\u6b66\u5668\u88c5\u5907\u53f0";
         Chinese["training_armory_subtitle"] = "\u9009\u62e9\u5e73\u53f0\u3001\u67e5\u770b\u5b9e\u4f53\u67aa\u6a21\uff0c\u5e76\u5728\u90e8\u7f72\u524d\u914d\u7f6e\u5168\u90e8\u914d\u4ef6\u69fd\u4f4d\u3002";
