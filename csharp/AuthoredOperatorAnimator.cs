@@ -147,7 +147,7 @@ internal sealed class AuthoredOperatorAnimator
         {
             next = SelectWeaponPose(aiming, weaponReadied, "aim_idle", "ready_idle", "idle");
         }
-        else if (speed >= 4.5f)
+        else if (speed >= 4.2f)
         {
             // The unarmed sprint clip tucks the torso too far forward. Armed
             // operators retain the authored sprint/aim-sprint silhouette so
@@ -156,19 +156,23 @@ internal sealed class AuthoredOperatorAnimator
             next = weaponReadied || aiming
                 ? SelectWeaponPose(aiming, weaponReadied, "aim_sprint", "ready_sprint", "sprint")
                 : "run";
+            // The authored sprint cycles are short in the imported GLB.  The
+            // previous scale left a 4.5–5.5 m/s operator visibly skating
+            // between footfalls, so keep the cycle close to the actual travel
+            // speed instead of letting the root move ahead of the feet.
             playbackSpeed = weaponReadied || aiming
-                ? Mathf.Clamp(speed / 5.2f, 0.86f, 1.25f)
-                : Mathf.Clamp(speed / 3.6f, 0.9f, 1.3f);
+                ? Mathf.Clamp(speed / 4.4f, 1.0f, 1.55f)
+                : Mathf.Clamp(speed / 3.2f, 1.0f, 1.65f);
         }
-        else if (speed >= 2.75f)
+        else if (speed >= 2.35f)
         {
             next = SelectWeaponPose(aiming, weaponReadied, "aim_run", "ready_run", "run");
-            playbackSpeed = Mathf.Clamp(speed / 3.6f, 0.78f, 1.35f);
+            playbackSpeed = Mathf.Clamp(speed / 2.8f, 0.95f, 1.65f);
         }
         else
         {
             next = SelectWeaponPose(aiming, weaponReadied, "aim_walk", "ready_walk", "walk");
-            playbackSpeed = Mathf.Clamp(speed / 2.1f, 0.72f, 1.35f);
+            playbackSpeed = Mathf.Clamp(speed / 1.9f, 0.78f, 1.45f);
         }
         Play(next, playbackSpeed);
         AdvanceAndRefresh(delta);
