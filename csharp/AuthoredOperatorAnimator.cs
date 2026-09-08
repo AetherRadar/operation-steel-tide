@@ -97,7 +97,8 @@ internal sealed class AuthoredOperatorAnimator
         bool downed,
         bool reviving,
         bool dead,
-        bool airborne = false)
+        bool airborne = false,
+        bool preferUprightLocomotion = false)
     {
         _hitCooldownRemaining = Mathf.Max(0.0f, _hitCooldownRemaining - delta);
         if (_overrideRemaining > 0.0f && !dead && !downed)
@@ -149,11 +150,13 @@ internal sealed class AuthoredOperatorAnimator
         }
         else if (speed >= 4.2f)
         {
-            // The unarmed sprint clip tucks the torso too far forward. Armed
-            // operators retain the authored sprint/aim-sprint silhouette so
-            // weapon handling remains consistent; unarmed operators accelerate
-            // the upright run cycle instead.
-            next = weaponReadied || aiming
+            // The armed ready/sprint clips use a low single-knee tactical
+            // silhouette. Squadmates keep their weapon available while moving,
+            // but use the upright run cycle so following the player does not
+            // look like a continuous kneel or revive pose.
+            next = preferUprightLocomotion
+                ? "run"
+                : weaponReadied || aiming
                 ? SelectWeaponPose(aiming, weaponReadied, "aim_sprint", "ready_sprint", "sprint")
                 : "run";
             // The authored sprint cycles are short in the imported GLB.  The
@@ -166,12 +169,16 @@ internal sealed class AuthoredOperatorAnimator
         }
         else if (speed >= 2.35f)
         {
-            next = SelectWeaponPose(aiming, weaponReadied, "aim_run", "ready_run", "run");
+            next = preferUprightLocomotion
+                ? "run"
+                : SelectWeaponPose(aiming, weaponReadied, "aim_run", "ready_run", "run");
             playbackSpeed = Mathf.Clamp(speed / 2.8f, 0.95f, 1.65f);
         }
         else
         {
-            next = SelectWeaponPose(aiming, weaponReadied, "aim_walk", "ready_walk", "walk");
+            next = preferUprightLocomotion
+                ? "walk"
+                : SelectWeaponPose(aiming, weaponReadied, "aim_walk", "ready_walk", "walk");
             playbackSpeed = Mathf.Clamp(speed / 1.9f, 0.78f, 1.45f);
         }
         Play(next, playbackSpeed);

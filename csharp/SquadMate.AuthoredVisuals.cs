@@ -54,7 +54,8 @@ public partial class SquadMate
             aiming,
             downed: false,
             reviving: false,
-            dead: false);
+            dead: false,
+            preferUprightLocomotion: true);
     }
 
     private void HoldAuthoredAimAfterShot()
@@ -134,7 +135,8 @@ public partial class SquadMate
             aiming: weaponReadied && (visibleTargetInRange || _authoredAimHoldRemaining > 0.0f),
             downed: IsDowned,
             reviving: _revivePoseBlend > 0.5f,
-            dead: false);
+            dead: false,
+            preferUprightLocomotion: true);
     }
 
     private void AttachAuthoredOperatorVisual()
