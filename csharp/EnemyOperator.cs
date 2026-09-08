@@ -1669,6 +1669,14 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
 
         if (!holdingCover)
         {
+            if (desired.LengthSquared() > 0.01f
+                && !IsProne
+                && IsCrouched)
+            {
+                // Crouch is a firing/cover posture. Once the operator leaves
+                // that lane, stand before selecting the normal run speed.
+                _ = TryStandForCombatMovement();
+            }
             var speed = SentryMode
                 ? 0.0f
                 : IsProne ? 1.1f : IsCrouched ? 1.85f : distance > 19.0f ? 5.2f : 2.4f;

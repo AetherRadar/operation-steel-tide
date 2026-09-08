@@ -136,7 +136,19 @@ public partial class EnemyOperator
             LookAt(GlobalPosition + direction, Vector3.Up);
         }
 
-        var movement = wantsMove ? direction * speed : Vector3.Zero;
+        var movementSpeed = speed;
+        if (wantsMove && !IsProne && IsCrouched && speed >= 2.35f)
+        {
+            // A covered operator may keep the crouch flag after leaving the
+            // firing lane. Stand before applying a pursuit/run speed so the
+            // visual pose and the locomotion speed agree. Keep the crouch
+            // only when the clearance probe correctly blocks standing.
+            if (!TryStandForCombatMovement())
+            {
+                movementSpeed = Mathf.Min(movementSpeed, 1.85f);
+            }
+        }
+        var movement = wantsMove ? direction * movementSpeed : Vector3.Zero;
         var velocity = Velocity;
         velocity.X = Mathf.MoveToward(velocity.X, movement.X, delta * 15.0f);
         velocity.Z = Mathf.MoveToward(velocity.Z, movement.Z, delta * 15.0f);
