@@ -70,6 +70,10 @@ FOREGRIP_ORIGIN = Vector((0.0, 0.58, -0.17))
 MUZZLE_ORIGIN = Vector((0.0, 1.205, 0.015))
 SUPPRESSOR_ORIGIN = Vector((0.0, 1.26, 0.015))
 OPTIC_ORIGIN = Vector((0.0, 0.25, 0.145))
+# The imported receiver origin is a trigger reference, not a hand contact.
+# Keep this marker on the visible pistol-grip shaft so runtime IK places the
+# dominant palm around the grip instead of inside the magazine well.
+PRIMARY_GRIP_ORIGIN = Vector((0.0, -0.245, -0.200))
 
 # Surface queries are expressed in each mechanism parent's Blender-local frame.
 # The far-left X seed selects the support-hand side of the real mesh, while Y/Z
@@ -98,8 +102,8 @@ ROUND_TRIP_TRANSFORM_TOLERANCE = 1.0e-6
 MINIMUM_APERTURE_AXIS_LENGTH = 0.05
 
 # Filled with reviewed deterministic outputs after the first complete build.
-OUTPUT_GLB_SHA256 = "BC34336E1B28F3E7EB8E8E5730142BCB934284F7B136CF53BD6D06C6D3D9D609"
-OUTPUT_GLB_BYTES = 5_302_128
+OUTPUT_GLB_SHA256 = "0443EA0E2A8382E73D06186195C09AA25A09940E35473EC7C9501D0A59D75F69"
+OUTPUT_GLB_BYTES = 5_302_320
 OUTPUT_PREVIEW_SHA256 = "CD5E58921A5BEA944548878C721E704C75B62C5882D846CAE5AA629DE0FA3A9F"
 OUTPUT_PREVIEW_BYTES = 1_023_330
 OUTPUT_ADS_PREVIEW_SHA256 = "30E19D7CBB7AED14305DF5F83FB97E77F04024AFC884A67ED4D7058C613286E1"
@@ -1276,6 +1280,10 @@ def build_runtime_asset() -> bpy.types.Object:
 
     foregrip = empty("Foregrip", root, FOREGRIP_ORIGIN)
     muzzle_device = empty("MuzzleDevice", root, MUZZLE_ORIGIN)
+    primary_grip = empty("PrimaryGrip", root, PRIMARY_GRIP_ORIGIN)
+    primary_grip["runtime_asset"] = True
+    primary_grip["derived_from_mesh"] = "M4A1Body_01_Base"
+    primary_grip["contact_role"] = "dominant_hand_palm"
     suppressor = empty("Suppressor", root, SUPPRESSOR_ORIGIN)
     optic_mount = empty("OpticMount", root, OPTIC_ORIGIN)
     for marker in (foregrip, muzzle_device, suppressor, optic_mount):
@@ -1876,6 +1884,7 @@ def main() -> None:
         "FrontIronSight",
         "Foregrip",
         "MuzzleDevice",
+        "PrimaryGrip",
         "Suppressor",
         "OpticMount",
         "MuzzleDeviceTip",
@@ -1893,6 +1902,17 @@ def main() -> None:
         "Suppressor": SUPPRESSOR_ORIGIN,
         "OpticMount": OPTIC_ORIGIN,
     }
+    primary_grip = bpy.data.objects["PrimaryGrip"]
+    if (
+        primary_grip.parent != root
+        or (primary_grip.location - PRIMARY_GRIP_ORIGIN).length > 1.0e-8
+    ):
+        raise RuntimeError(
+            "Runtime primary-grip marker contract changed: "
+            f"parent={primary_grip.parent.name if primary_grip.parent else None} "
+            f"location={tuple(primary_grip.location)} "
+            f"expected={tuple(PRIMARY_GRIP_ORIGIN)}"
+        )
     for name, expected_location in expected_attachment_locations.items():
         node = bpy.data.objects[name]
         if node.parent != root or (node.location - expected_location).length > 1.0e-8:

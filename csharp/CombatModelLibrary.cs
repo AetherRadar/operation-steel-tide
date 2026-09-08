@@ -787,7 +787,8 @@ internal sealed class AuthoredOperatorVisual
             ? rightHand.Origin - PrimaryHandTargetWorld(hy3dPrimaryGrip)
             : primaryGripPosition - primaryHandContact;
         var primaryHandDistance = primaryHandOffset.Length();
-        var supportHandOffset = weapon.Foregrip.GlobalPosition - supportHandContact;
+        var supportGrip = SupportHandGripWorld(weapon);
+        var supportHandOffset = supportGrip - supportHandContact;
         var supportHandDistance = supportHandOffset.Length();
         var supportHandTargetOffset = leftHand.Origin - rightHand.Origin;
         var handSeparation = supportHandTargetOffset.Length();
@@ -864,8 +865,8 @@ internal sealed class AuthoredOperatorVisual
                 ? rightPalm.DistanceTo(PrimaryPalmTargetWorld(primaryGrip))
                 : rightWrist.DistanceTo(weapon.PrimaryGrip?.GlobalPosition ?? weapon.Root.GlobalPosition),
             SupportHandToForegripDistance: SupportHandContactWorld(leftWrist).DistanceTo(
-                weapon.Foregrip.GlobalPosition),
-            SupportHandOffset: weapon.Foregrip.GlobalPosition - SupportHandContactWorld(leftWrist),
+                SupportHandGripWorld(weapon)),
+            SupportHandOffset: SupportHandGripWorld(weapon) - SupportHandContactWorld(leftWrist),
             weapon.Root.GlobalPosition,
             stock,
             muzzle,
@@ -902,6 +903,16 @@ internal sealed class AuthoredOperatorVisual
     private Vector3 PrimaryPalmTargetWorld(Node3D grip)
     {
         var target = grip.GlobalPosition;
+        if (CombatModelLibrary.UsesHy3dOperator(VisualId)
+            && VisualId == OperatorVisualId.Viper)
+        {
+            // The imported M4A1 trigger marker sits at the receiver centre.
+            // Viper's palm closes around the pistol grip a little farther
+            // rearward, so keep the hand on the grip geometry rather than the
+            // magazine well.
+            target += _weapon!.Root.GlobalTransform.Basis.Orthonormalized()
+                * new Vector3(0.0f, 0.0f, 0.055f);
+        }
         if (CombatModelLibrary.UsesHy3dOperator(VisualId)
             && !_hasAuthoredCarryPose)
         {
@@ -1494,11 +1505,12 @@ internal sealed class AuthoredOperatorVisual
         // in the dominant shoulder pocket and move the receiver/barrel ahead
         // of the chest; the hand IK below is derived from the resulting
         // PrimaryGrip/Foregrip markers, never the other way around.
+        var viperStockDrop = VisualId == OperatorVisualId.Viper ? -0.120f : -0.160f;
         var stockOffset = aiming
-            ? new Vector3(0.0f, -0.160f, 0.020f)
+            ? new Vector3(0.0f, viperStockDrop, 0.020f)
             : sprinting
                 ? new Vector3(0.0f, -0.245f, 0.035f)
-                : new Vector3(0.0f, -0.160f, 0.030f);
+                : new Vector3(0.0f, VisualId == OperatorVisualId.Viper ? -0.120f : -0.160f, 0.030f);
         var global = _weapon.Root.GlobalTransform;
         var stockDelta = _weapon.Stock.GlobalPosition - global.Origin;
         // Keep the stock near the shoulder, but place the receiver/barrel in
@@ -1509,7 +1521,10 @@ internal sealed class AuthoredOperatorVisual
         // armor is deeper than the legacy mannequin, so the old 6 cm
         // presentation offset let the magazine well visually sink into the
         // torso even when both palm contacts were valid.
-        var presentationForward = actorBasis * new Vector3(0.0f, 0.0f, -0.140f);
+        var presentationForwardDistance = VisualId == OperatorVisualId.Viper
+            ? -0.100f
+            : -0.060f;
+        var presentationForward = actorBasis * new Vector3(0.0f, 0.0f, presentationForwardDistance);
         global.Origin = shoulder + actorBasis * stockOffset
             + presentationForward
             - stockDelta;
@@ -1663,8 +1678,23 @@ internal sealed class AuthoredOperatorVisual
         // palm contact.  Keep the solver target on that marker; adding a
         // second rail offset here moves the palm past the weapon and makes
         // the diagnostic report a persistent support-hand gap.
-        return _weapon.Foregrip.GlobalPosition
+        return SupportHandGripWorld(_weapon)
             + weaponBasis * new Vector3(0.0f, -0.015f, 0.0f);
+    }
+
+    private Vector3 SupportHandGripWorld(AuthoredWeaponVisual weapon)
+    {
+        if (VisualId != OperatorVisualId.Viper)
+        {
+            return weapon.Foregrip.GlobalPosition;
+        }
+
+        // The Viper forearm reaches the rear half of the 20 cm foregrip. Keep
+        // the contact on that authored geometry instead of forcing the elbow
+        // past its natural length toward the marker centre.
+        return weapon.Foregrip.GlobalPosition
+            + weapon.Root.GlobalTransform.Basis.Orthonormalized()
+                * new Vector3(0.0f, 0.0f, 0.080f);
     }
 
     private static Basis BuildCarryHandBasis(Basis weaponBasis, Vector3 localFingerDirection)
