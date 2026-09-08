@@ -664,6 +664,7 @@ internal sealed class AuthoredOperatorVisual
     private readonly int _leftFootBone;
     private readonly int _leftIndexBone;
     private readonly int _leftPinkyBone;
+    private readonly float _standingFootClearance;
     private readonly Node3D? _rightPalmFrame;
     private readonly Node3D? _leftPalmFrame;
     private readonly bool _hasAuthoredCarryPose;
@@ -694,6 +695,7 @@ internal sealed class AuthoredOperatorVisual
         _leftFootBone = ResolveBoneIndex(_skeleton, "mixamorig:LeftFoot");
         _leftIndexBone = TryResolveBoneIndex(_skeleton, "mixamorig:LeftHandIndex1");
         _leftPinkyBone = TryResolveBoneIndex(_skeleton, "mixamorig:LeftHandPinky1");
+        _standingFootClearance = ComputeStandingFootClearance();
         _rightPalmFrame = CombatModelLibrary.FindOptionalNode(root, "RightPalmFrame");
         _leftPalmFrame = CombatModelLibrary.FindOptionalNode(root, "LeftPalmFrame");
         // Viper's private export contains the marker nodes, but its ready
@@ -740,7 +742,7 @@ internal sealed class AuthoredOperatorVisual
     public int GearOverlayCountForDiagnostics { get; private set; }
     public int FingerBoneCountForDiagnostics => CountFingerBones(_skeleton);
 
-    /// <summary>Visual-root translation that plants both ankle joints on the actor floor.</summary>
+    /// <summary>Visual-root translation that keeps the animated soles on the actor floor.</summary>
     internal float GroundingOffsetForCurrentPose
     {
         get
@@ -760,13 +762,39 @@ internal sealed class AuthoredOperatorVisual
                     * (skeletonTransform * _skeleton.GetBoneGlobalPose(_rightFootBone)).Origin;
                 var lowestFoot = Mathf.Min(left.Y, right.Y);
                 return float.IsFinite(lowestFoot)
-                    ? Mathf.Clamp(-lowestFoot - 0.035f, -0.5f, 0.5f)
+                    ? Mathf.Clamp(_standingFootClearance - lowestFoot, -0.5f, 0.5f)
                     : 0.0f;
             }
             catch
             {
                 return 0.0f;
             }
+        }
+    }
+
+    private float ComputeStandingFootClearance()
+    {
+        try
+        {
+            var skeletonToRoot = TransformRelativeToAncestor(_skeleton, Root);
+            var leftRest = (skeletonToRoot * _skeleton.GetBoneGlobalRest(_leftFootBone)).Origin;
+            var rightRest = (skeletonToRoot * _skeleton.GetBoneGlobalRest(_rightFootBone)).Origin;
+            var bounds = CombatModelLibrary.ComputeLocalBounds(Root);
+            if (bounds.MeshCount == 0 || !float.IsFinite(bounds.Size.Y))
+            {
+                return 0.14f;
+            }
+
+            var bodyFloor = bounds.Center.Y - bounds.Size.Y * 0.5f;
+            var restAnkle = Mathf.Min(leftRest.Y, rightRest.Y);
+            // Foot bones sit above the soles. Preserve that authored clearance
+            // while grounding a moving pose instead of sinking each operator
+            // by treating the ankle joint itself as the floor contact.
+            return Mathf.Clamp(restAnkle - bodyFloor, 0.04f, 0.30f);
+        }
+        catch
+        {
+            return 0.14f;
         }
     }
 

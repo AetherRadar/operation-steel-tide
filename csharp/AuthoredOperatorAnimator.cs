@@ -139,7 +139,13 @@ internal sealed class AuthoredOperatorAnimator
         }
         else if (crouched)
         {
-            next = moving
+            // A low cover posture is still valid while stationary, but do not
+            // carry its kneeling silhouette into AI travel. The game uses
+            // smooth movement for squad and hostile operators, so an upright
+            // carry idle keeps their eye line level with the player.
+            next = preferUprightLocomotion && moving
+                ? UprightLocomotionPose(aiming, weaponReadied)
+                : moving
                 ? SelectWeaponPose(aiming, weaponReadied, "aim_crouch_walk", "ready_crouch_walk", "crouch_walk")
                 : SelectWeaponPose(aiming, weaponReadied, "aim_crouch_idle", "ready_crouch_idle", "crouch_idle");
             playbackSpeed = moving ? Mathf.Clamp(speed / 2.4f, 0.72f, 1.4f) : 1.0f;
@@ -151,11 +157,11 @@ internal sealed class AuthoredOperatorAnimator
         else if (speed >= 4.2f)
         {
             // The armed ready/sprint clips use a low single-knee tactical
-            // silhouette. Squadmates keep their weapon available while moving,
-            // but use the upright run cycle so following the player does not
-            // look like a continuous kneel or revive pose.
+            // silhouette. AI operators keep their weapon available while
+            // moving, but use the upright carry idle so travel does not look
+            // like a continuous kneel or revive pose.
             next = preferUprightLocomotion
-                ? "run"
+                ? UprightLocomotionPose(aiming, weaponReadied)
                 : weaponReadied || aiming
                 ? SelectWeaponPose(aiming, weaponReadied, "aim_sprint", "ready_sprint", "sprint")
                 : "run";
@@ -170,14 +176,14 @@ internal sealed class AuthoredOperatorAnimator
         else if (speed >= 2.35f)
         {
             next = preferUprightLocomotion
-                ? "run"
+                ? UprightLocomotionPose(aiming, weaponReadied)
                 : SelectWeaponPose(aiming, weaponReadied, "aim_run", "ready_run", "run");
             playbackSpeed = Mathf.Clamp(speed / 2.8f, 0.95f, 1.65f);
         }
         else
         {
             next = preferUprightLocomotion
-                ? "walk"
+                ? UprightLocomotionPose(aiming, weaponReadied)
                 : SelectWeaponPose(aiming, weaponReadied, "aim_walk", "ready_walk", "walk");
             playbackSpeed = Mathf.Clamp(speed / 1.9f, 0.78f, 1.45f);
         }
@@ -193,6 +199,9 @@ internal sealed class AuthoredOperatorAnimator
         string readyPose,
         string unarmedPose)
         => aiming ? aimPose : weaponReadied ? readyPose : unarmedPose;
+
+    private static string UprightLocomotionPose(bool aiming, bool weaponReadied)
+        => aiming ? "aim_idle" : weaponReadied ? "ready_idle" : "idle";
 
     public void SetRestingPose(bool weaponReadied)
     {

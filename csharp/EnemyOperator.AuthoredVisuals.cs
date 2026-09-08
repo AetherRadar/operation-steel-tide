@@ -123,7 +123,8 @@ public partial class EnemyOperator
             downed: false,
             reviving: false,
             IsDead,
-            airborne: !IsOnFloor());
+            airborne: !IsOnFloor(),
+            preferUprightLocomotion: true);
     }
 
     private void AttachAuthoredOperatorVisual()
