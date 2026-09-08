@@ -655,11 +655,13 @@ internal sealed class AuthoredOperatorVisual
     private readonly int _rightShoulderBone;
     private readonly int _rightElbowBone;
     private readonly int _rightHandBone;
+    private readonly int _rightFootBone;
     private readonly int _rightIndexBone;
     private readonly int _rightPinkyBone;
     private readonly int _leftShoulderBone;
     private readonly int _leftElbowBone;
     private readonly int _leftWristBone;
+    private readonly int _leftFootBone;
     private readonly int _leftIndexBone;
     private readonly int _leftPinkyBone;
     private readonly Node3D? _rightPalmFrame;
@@ -683,11 +685,13 @@ internal sealed class AuthoredOperatorVisual
         _rightShoulderBone = ResolveBoneIndex(_skeleton, "mixamorig:RightArm");
         _rightElbowBone = ResolveBoneIndex(_skeleton, "mixamorig:RightForeArm");
         _rightHandBone = ResolveBoneIndex(_skeleton, "mixamorig:RightHand");
+        _rightFootBone = ResolveBoneIndex(_skeleton, "mixamorig:RightFoot");
         _rightIndexBone = TryResolveBoneIndex(_skeleton, "mixamorig:RightHandIndex1");
         _rightPinkyBone = TryResolveBoneIndex(_skeleton, "mixamorig:RightHandPinky1");
         _leftShoulderBone = ResolveBoneIndex(_skeleton, "mixamorig:LeftArm");
         _leftElbowBone = ResolveBoneIndex(_skeleton, "mixamorig:LeftForeArm");
         _leftWristBone = ResolveBoneIndex(_skeleton, "mixamorig:LeftHand");
+        _leftFootBone = ResolveBoneIndex(_skeleton, "mixamorig:LeftFoot");
         _leftIndexBone = TryResolveBoneIndex(_skeleton, "mixamorig:LeftHandIndex1");
         _leftPinkyBone = TryResolveBoneIndex(_skeleton, "mixamorig:LeftHandPinky1");
         _rightPalmFrame = CombatModelLibrary.FindOptionalNode(root, "RightPalmFrame");
@@ -735,6 +739,36 @@ internal sealed class AuthoredOperatorVisual
     public Color GearTintForDiagnostics { get; private set; }
     public int GearOverlayCountForDiagnostics { get; private set; }
     public int FingerBoneCountForDiagnostics => CountFingerBones(_skeleton);
+
+    /// <summary>Visual-root translation that plants both ankle joints on the actor floor.</summary>
+    internal float GroundingOffsetForCurrentPose
+    {
+        get
+        {
+            if (_leftFootBone < 0 || _rightFootBone < 0 || !GodotObject.IsInstanceValid(Root))
+            {
+                return 0.0f;
+            }
+
+            try
+            {
+                var rootInverse = Root.GlobalTransform.AffineInverse();
+                var skeletonTransform = _skeleton.GlobalTransform;
+                var left = rootInverse
+                    * (skeletonTransform * _skeleton.GetBoneGlobalPose(_leftFootBone)).Origin;
+                var right = rootInverse
+                    * (skeletonTransform * _skeleton.GetBoneGlobalPose(_rightFootBone)).Origin;
+                var lowestFoot = Mathf.Min(left.Y, right.Y);
+                return float.IsFinite(lowestFoot)
+                    ? Mathf.Clamp(-lowestFoot - 0.035f, -0.5f, 0.5f)
+                    : 0.0f;
+            }
+            catch
+            {
+                return 0.0f;
+            }
+        }
+    }
 
     private static int CountFingerBones(Skeleton3D skeleton)
     {
@@ -1189,9 +1223,13 @@ internal sealed class AuthoredOperatorVisual
             }
             var targetHeight = slot switch
             {
-                EquipmentSlot.Helmet => 0.48f,
-                EquipmentSlot.BodyArmor => 0.86f,
-                EquipmentSlot.Backpack => 1.12f,
+                // The source paper-doll meshes are authored for a larger
+                // mannequin. Scale them to the 1.86 m runtime operator so the
+                // backpack does not swallow the head and the helmet stays
+                // seated instead of reading as a floating block.
+                EquipmentSlot.Helmet => 0.36f,
+                EquipmentSlot.BodyArmor => 0.72f,
+                EquipmentSlot.Backpack => 0.82f,
                 _ => bounds.Size.Y
             };
             var presentationScale = targetHeight / bounds.Size.Y;

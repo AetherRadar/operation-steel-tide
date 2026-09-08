@@ -115,9 +115,11 @@ public partial class EnemyOperator
             weaponReadied,
             IsProne,
             IsCrouched,
-            visibleTargetInRange
+            // The armed aim clip drives both hands toward a rifle socket. Keep
+            // cold-start enemies in a natural idle pose until they have a gun.
+            weaponReadied && (visibleTargetInRange
                 || _authoredAimHoldRemaining > 0.0f
-                || IsCombatAirborneAttack,
+                || IsCombatAirborneAttack),
             downed: false,
             reviving: false,
             IsDead,

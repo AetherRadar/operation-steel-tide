@@ -277,8 +277,14 @@ internal sealed class AuthoredOperatorAnimator
         // Downed/death clips are authored around a standing root.  Lower the
         // visual to the actor's capsule base so the body rests on the ground
         // instead of hovering above it.
-        _visual.Root.Position = downed
-            ? Vector3.Down * 0.46f
-            : Vector3.Zero;
+        if (downed)
+        {
+            _visual.Root.Position = Vector3.Down * 0.46f;
+            return;
+        }
+
+        var position = _visual.Root.Position;
+        position.Y = _visual.GroundingOffsetForCurrentPose;
+        _visual.Root.Position = position;
     }
 }
