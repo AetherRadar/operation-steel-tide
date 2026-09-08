@@ -42,6 +42,18 @@ ARM_BONES = (
 )
 TORSO_BONES = ("Hips", "Head", "LeftShoulder", "RightShoulder")
 
+# The GLB files used by the game are authored in Blender's Z-up frame.  The
+# exporter converts this to Godot as ``x=x, y=z, z=-y``; consequently the
+# operator's forward direction is Blender -Y.  Do not derive the carry frame
+# from Head-Hips on every animation frame.  Several source clips contain a
+# small head/neck roll and that basis can cross its pole, mirroring the mapped
+# hands front-to-back.  Both the HY-3D and Quaternius files share this fixed
+# character frame, so a canonical frame is deterministic and survives clips
+# whose torso is animated.
+BLENDER_CHARACTER_RIGHT = Vector((1.0, 0.0, 0.0))
+BLENDER_CHARACTER_FORWARD = Vector((0.0, -1.0, 0.0))
+BLENDER_CHARACTER_UP = Vector((0.0, 0.0, 1.0))
+
 
 def parse_args() -> argparse.Namespace:
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
@@ -111,6 +123,36 @@ def action_map(actions: Iterable[bpy.types.Action]) -> dict[str, bpy.types.Actio
     return result
 
 
+def canonicalize_actions(
+    actions: Iterable[bpy.types.Action], *, rename_canonical: bool
+) -> set[bpy.types.Action]:
+    """Collapse importer-created ``name.001`` action duplicates.
+
+    Importing a GLB that was exported with a broadcast animation can create
+    two datablocks for every clip.  Keeping both makes the next GLB export
+    ambiguous: Blender may broadcast the unbaked sibling under the canonical
+    name, while Godot then selects that wrong clip.  Prefer an exact canonical
+    name, remove its suffixed siblings, and optionally rename a suffixed-only
+    group to the canonical name.  The source set is kept separate from the
+    target set, so source actions are never exported.
+    """
+
+    groups: dict[str, list[bpy.types.Action]] = {}
+    for action in actions:
+        groups.setdefault(action_base(action.name), []).append(action)
+    kept: set[bpy.types.Action] = set()
+    for base, candidates in groups.items():
+        candidates.sort(key=lambda item: (item.name != base, len(item.name), item.name))
+        keep = candidates[0]
+        for duplicate in candidates[1:]:
+            if duplicate.name in bpy.data.actions:
+                bpy.data.actions.remove(duplicate)
+        if rename_canonical and keep.name != base:
+            keep.name = base
+        kept.add(keep)
+    return kept
+
+
 def world_matrix(armature: bpy.types.Object, bone_name: str) -> Matrix:
     bone = resolve_pose_bone(armature, bone_name)
     if bone is None:
@@ -125,15 +167,62 @@ def torso_points(armature: bpy.types.Object) -> dict[str, Vector]:
     }
 
 
-def torso_basis(points: dict[str, Vector]) -> Matrix:
+def character_basis() -> Matrix:
+    """Return the fixed, right-handed Blender character frame.
+
+    ``forward`` is deliberately not used as the second column directly: the
+    ordered columns are right/backward/up, which keeps the matrix a proper
+    rotation (determinant +1).  With the canonical Blender axes this is the
+    identity matrix, while spelling the frame out here documents the GLB to
+    Godot convention and prevents a future sign regression.
+    """
+
+    backward = -BLENDER_CHARACTER_FORWARD
+    return Matrix(
+        (
+            BLENDER_CHARACTER_RIGHT,
+            backward,
+            BLENDER_CHARACTER_UP,
+        )
+    ).transposed()
+
+
+def pose_torso_basis(points: dict[str, Vector]) -> Matrix:
+    """Build a torso frame from one pose, then keep it fixed for that clip."""
+
     up = (points["Head"] - points["Hips"]).normalized()
     right = (points["LeftShoulder"] - points["RightShoulder"]).normalized()
     forward = right.cross(up)
     if forward.length_squared < 1.0e-8:
-        forward = Vector((0.0, -1.0, 0.0))
+        forward = BLENDER_CHARACTER_FORWARD.copy()
     forward.normalize()
     right = up.cross(forward).normalized()
-    return Matrix((right, forward, up)).transposed()
+    columns = (right, forward, up)
+
+    # Keep the handedness while choosing the sign combination closest to the
+    # authored world frame.  This removes the occasional front/back mirror
+    # caused by a nearly-collinear Head-Hips vector without changing the
+    # source character's stance orientation.
+    canonical = (
+        BLENDER_CHARACTER_RIGHT,
+        BLENDER_CHARACTER_FORWARD,
+        BLENDER_CHARACTER_UP,
+    )
+    best_columns = columns
+    best_score = -float("inf")
+    for signs in ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, -1.0), (-1.0, -1.0, 1.0)):
+        candidate = tuple(axis * sign for axis, sign in zip(columns, signs))
+        score = sum(axis.dot(reference) for axis, reference in zip(candidate, canonical))
+        if score > best_score:
+            best_score = score
+            best_columns = candidate
+    return Matrix(best_columns).transposed()
+
+
+def torso_basis(points: dict[str, Vector]) -> Matrix:
+    """Compatibility wrapper for callers that need a one-shot pose frame."""
+
+    return pose_torso_basis(points)
 
 
 def torso_transform(source: bpy.types.Object, target: bpy.types.Object) -> Matrix:
@@ -143,15 +232,29 @@ def torso_transform(source: bpy.types.Object, target: bpy.types.Object) -> Matri
 
 
 def torso_transform_points(
-    source_points: dict[str, Vector], target_points: dict[str, Vector]
+    source_points: dict[str, Vector],
+    target_points: dict[str, Vector],
+    source_basis: Matrix | None = None,
+    target_basis: Matrix | None = None,
+    source_height: float | None = None,
+    target_height: float | None = None,
 ) -> Matrix:
-    """Build the torso mapping from independently sampled source/target poses."""
+    """Build a stable similarity mapping between source and target frames.
 
-    source_basis = torso_basis(source_points)
-    target_basis = torso_basis(target_points)
-    rotation = target_basis @ source_basis.transposed()
-    source_height = max(1.0e-4, (source_points["Head"] - source_points["Hips"]).length)
-    target_height = (target_points["Head"] - target_points["Hips"]).length
+    ``source_basis`` and ``target_basis`` are sampled once from each clip's
+    neutral frame and then reused for every sample.  Passing them avoids
+    rebuilding a frame from a rolling head/neck pose.  Heights are likewise
+    optional fixed reference measurements; when omitted, the current sample
+    is used for backwards-compatible one-shot calls.
+    """
+
+    source_frame = source_basis if source_basis is not None else torso_basis(source_points)
+    target_frame = target_basis if target_basis is not None else torso_basis(target_points)
+    rotation = target_frame @ source_frame.transposed()
+    source_height = source_height or (source_points["Head"] - source_points["Hips"]).length
+    target_height = target_height or (target_points["Head"] - target_points["Hips"]).length
+    source_height = max(1.0e-4, source_height)
+    target_height = max(1.0e-4, target_height)
     scale = target_height / source_height
     result = rotation.to_4x4() @ Matrix.Diagonal((scale, scale, scale, 1.0))
     result.translation = target_points["Hips"] - rotation @ (
@@ -206,6 +309,60 @@ def _orthogonal_pole(direction: Vector, candidate: Vector, fallback: Vector) -> 
     if pole.length_squared < 1.0e-8:
         pole = Vector((1.0, 0.0, 0.0)) - direction * direction.x
     return pole.normalized()
+
+
+def hand_span_metrics(armature: bpy.types.Object) -> tuple[float, float, float, float]:
+    """Return span, forward, lateral and vertical components for both hands."""
+
+    left = world_matrix(armature, "LeftHand").translation
+    right = world_matrix(armature, "RightHand").translation
+    delta = left - right
+    return (
+        delta.length,
+        delta.dot(BLENDER_CHARACTER_FORWARD),
+        abs(delta.x),
+        abs(delta.z),
+    )
+
+
+def validate_hand_span(
+    action_name: str,
+    spans: list[float],
+    forwards: list[float],
+    laterals: list[float],
+    verticals: list[float],
+) -> None:
+    """Reject a bake that puts the support hand behind or far from the rifle.
+
+    The thresholds leave room for crouch and sprint clips while catching the
+    characteristic failure mode this tool is intended to prevent: a torso
+    basis sign flip that sends the support hand backward, or a scale mismatch
+    that leaves the two palms too far apart for the weapon grip markers.
+    """
+
+    if not spans:
+        raise RuntimeError(f"action {action_name} produced no hand samples")
+    min_span = min(spans)
+    max_span = max(spans)
+    min_forward = min(forwards)
+    dominant_failures = sum(
+        1
+        for forward, lateral, vertical in zip(forwards, laterals, verticals)
+        if forward < 0.02 or abs(forward) + 0.01 < max(lateral, vertical)
+    )
+    # A valid rifle carry has a compact two-palm span and the left hand lies
+    # toward Blender -Y (the GLTF/Godot forward-facing side).
+    if min_span < 0.18 or max_span > 0.38:
+        raise RuntimeError(
+            f"action {action_name} hand span out of range "
+            f"min={min_span:.4f} max={max_span:.4f}"
+        )
+    if dominant_failures > max(1, len(spans) // 10):
+        raise RuntimeError(
+            f"action {action_name} hand direction is not Blender -Y dominant "
+            f"bad_samples={dominant_failures}/{len(spans)} "
+            f"forward_min={min_forward:.4f}"
+        )
 
 
 def solve_two_bone(
@@ -296,7 +453,35 @@ def bake_action(
     curves: dict[tuple[str, int], bpy.types.FCurve] = {}
     if target_end < target_start:
         raise RuntimeError(f"empty target action {target_action.name}")
+
+    # Capture each clip's neutral torso once.  The source clips often start
+    # from a different shoulder/neck stance than the HY-3D rest skeleton, so
+    # the reference frame supplies the useful orientation while the
+    # canonical sign selection above prevents a head-roll mirror.  Reusing
+    # these frames for the whole clip is the important part: a per-frame
+    # Head-Hips basis can rotate the mapped carry pose behind the torso.
+    target.animation_data.action = evaluation_action
+    bpy.context.scene.frame_set(target_start)
+    bpy.context.view_layer.update()
+    target_reference_points = torso_points(target)
+    target_reference_basis = torso_basis(target_reference_points)
+    target_reference_height = (
+        target_reference_points["Head"] - target_reference_points["Hips"]
+    ).length
+    source.animation_data.action = source_action
+    bpy.context.scene.frame_set(source_start)
+    bpy.context.view_layer.update()
+    source_reference_points = torso_points(source)
+    source_reference_basis = torso_basis(source_reference_points)
+    source_reference_height = (
+        source_reference_points["Head"] - source_reference_points["Hips"]
+    ).length
+
     errors: list[float] = []
+    spans: list[float] = []
+    forwards: list[float] = []
+    laterals: list[float] = []
+    verticals: list[float] = []
     for frame in range(target_start, target_end + 1):
         source_frame = source_start
         if target_end > target_start:
@@ -326,7 +511,14 @@ def bake_action(
         target.animation_data.action = evaluation_action
         bpy.context.scene.frame_set(frame)
         bpy.context.view_layer.update()
-        transform = torso_transform_points(source_points, target_points)
+        transform = torso_transform_points(
+            source_points,
+            target_points,
+            source_basis=source_reference_basis,
+            target_basis=target_reference_basis,
+            source_height=source_reference_height,
+            target_height=target_reference_height,
+        )
         for side in SIDES:
             source_wrist = source_wrist_points[side]
             source_elbow = source_elbow_points[side]
@@ -345,6 +537,11 @@ def bake_action(
                 desired_pole,
             )
             errors.append(error)
+        span, forward, lateral, vertical = hand_span_metrics(target)
+        spans.append(span)
+        forwards.append(forward)
+        laterals.append(lateral)
+        verticals.append(vertical)
         for name in ARM_BONES:
             bone = resolve_pose_bone(target, name)
             if bone is not None:
@@ -354,12 +551,16 @@ def bake_action(
         curve.update()
         for point in curve.keyframe_points:
             point.interpolation = "LINEAR"
+    validate_hand_span(target_action.name, spans, forwards, laterals, verticals)
     target_action["steel_tide_carry_ik_baked"] = True
     target_action["steel_tide_carry_ik_frames"] = len(range(target_start, target_end + 1))
     target_action["steel_tide_carry_ik_max_error"] = max(errors) if errors else 0.0
     target_action["steel_tide_carry_ik_mean_error"] = (
         sum(errors) / len(errors) if errors else 0.0
     )
+    target_action["steel_tide_carry_hand_span_min"] = min(spans)
+    target_action["steel_tide_carry_hand_span_max"] = max(spans)
+    target_action["steel_tide_carry_hand_forward_min"] = min(forwards)
     bpy.data.actions.remove(evaluation_action)
     target.animation_data.action = target_action
     return (
@@ -448,10 +649,17 @@ def main() -> None:
     bpy.ops.wm.read_factory_settings(use_empty=True)
     target_objects = import_asset(input_path)
     target = armature_from(target_objects)
-    target_actions = set(bpy.data.actions)
+    # Clear any importer-selected action before collapsing duplicate clips;
+    # the bake below assigns each canonical action explicitly.
+    if target.animation_data is not None:
+        target.animation_data.action = None
+    target_actions = canonicalize_actions(
+        set(bpy.data.actions), rename_canonical=True
+    )
     source_objects = import_asset(source_path)
     source = armature_from(source_objects)
     source_actions = set(bpy.data.actions) - target_actions
+    source_actions = canonicalize_actions(source_actions, rename_canonical=False)
     target_by_base = action_map(target_actions)
     source_by_base = action_map(source_actions)
     requested = {

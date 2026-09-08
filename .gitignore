@@ -56,11 +56,18 @@ __pycache__/
 # authored runtime GLB remains self-contained.
 /assets/models/operations_office/operations_office_set_*.png
 
-# Tencent HY-3D generated character outputs remain local/private until their
-# commercial and redistribution terms are verified.
+# Intermediate Tencent HY-3D source and review exports remain local/private.
+# The project owner cleared these five converted delivery GLBs for repository
+# redistribution on 2026-09-08; their hashes and provenance are documented in
+# assets/models/hy3d_operators/README.md.
 /assets/models/hy3d_operators/*.glb
 /assets/models/hy3d_operators/*.png
 /assets/models/hy3d_operators/*.import
+!/assets/models/hy3d_operators/viper.glb
+!/assets/models/hy3d_operators/heron.glb
+!/assets/models/hy3d_operators/lynx.glb
+!/assets/models/hy3d_operators/magpie.glb
+!/assets/models/hy3d_operators/jackal.glb
 
 # The Godot glTF importer may extract temporary copies of images embedded in the
 # authored CC0 M4A1 GLB. The runtime model remains self-contained.

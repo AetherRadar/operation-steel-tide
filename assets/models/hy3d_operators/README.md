@@ -1,4 +1,4 @@
-# Tencent HY-3D operator outputs (private)
+# Tencent HY-3D operator outputs
 
 The local `.glb` files in this directory are generated from Tencent HY-3D and
 HY-3D-Rigging responses and converted in Blender by
@@ -19,13 +19,21 @@ being swallowed by the rifle. Existing finger chains are preserved when the
 private source already contains them; wrist-only HY-3D responses receive the
 fallback chains during this Blender build.
 
-The generated files are intentionally ignored by Git and remain in the local
-private asset store. On 2026-09-05 the project owner reported confirmation
-from Tencent customer support permitting use of these outputs in this game.
-That confirmation is recorded as a local-use permission only; it does not
-authorize publishing or redistributing the raw Tencent meshes from the public
-MIT repository. The source responses and rigged FBX files stay private.
-Credentials must never be committed.
+The project owner confirmed on 2026-09-08 that these five converted outputs
+may be redistributed with this repository. They remain generated service
+outputs and are not relicensed as MIT; the permission covers the delivered
+GLBs listed below. The original Tencent responses and rigged FBX files stay in
+the private asset store. Credentials must never be committed.
+
+Delivered files (all self-contained GLBs with embedded textures):
+
+| Role | File | Size | SHA-256 |
+| --- | --- | ---: | --- |
+| Viper | `viper.glb` | 21,801,880 bytes | `8198F1314658D7282F3B6AFF1BE95B30B47A22FD80AB1B5FDA6798EF761C1546` |
+| Heron | `heron.glb` | 22,652,672 bytes | `AD86823F01A50AFBE1CE23B45A89DF74BDA25A1DD22B69D146D0B465E5935427` |
+| Lynx | `lynx.glb` | 24,804,160 bytes | `A6927B982B8B8073A5D41266F53795A641CD18F80541630906B16BFFB9C16711` |
+| Magpie | `magpie.glb` | 21,659,412 bytes | `C9A7A2B9EC5EA2019C1F1015181BCA492018B9EE732684F9FEFB92248F3DE0D4` |
+| Jackal | `jackal.glb` | 23,986,088 bytes | `D527DD2005776FFA7C64016972E753AF2510C086957BA9984EB241A7965288F0` |
 
 Rebuild one role (Windows):
 

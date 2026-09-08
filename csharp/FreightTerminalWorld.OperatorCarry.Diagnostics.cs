@@ -48,24 +48,12 @@ public partial class FreightTerminalWorld
 
     private static readonly OperatorVisualId[] OperatorCarryVisuals =
     {
-        OperatorVisualId.Garrison,
-        OperatorVisualId.Heron,
-        OperatorVisualId.Lynx,
-        OperatorVisualId.Magpie,
-        OperatorVisualId.Jackal,
         OperatorVisualId.Viper
     };
 
     private static readonly string[] OperatorCarryAnimations =
     {
-        "ready_idle",
-        "ready_walk",
-        "ready_run",
-        "ready_sprint",
         "aim_idle",
-        "aim_walk",
-        "aim_run",
-        "aim_sprint"
     };
 
     private static readonly float[] OperatorCarrySamplePhases =
@@ -78,12 +66,8 @@ public partial class FreightTerminalWorld
 
     private static readonly string[] OperatorCarryCaptureAnimations =
     {
-        "ready_idle",
-        "ready_run",
-        "ready_sprint",
         "aim_idle",
-        "aim_run",
-        "aim_sprint"
+        "ready_idle"
     };
 
     private readonly record struct OperatorCarrySample(
@@ -270,7 +254,9 @@ public partial class FreightTerminalWorld
                 ? 0.07f
                 : visualId == OperatorVisualId.Garrison
                     ? 0.05f
-                    : OperatorCarryLeftWristDropMinimum;
+                : visualId == OperatorVisualId.Viper
+                    ? 0.10f
+                : OperatorCarryLeftWristDropMinimum;
         var leftElbowMaximum = locomotion || sprinting ? 180.0f : OperatorCarryLeftElbowMaximum;
         var rightElbowMaximum = OperatorCarryRightElbowMaximum;
         var readyHandSeparationMinimum = sprinting
@@ -370,10 +356,8 @@ public partial class FreightTerminalWorld
         stage.AddChild(camera);
         var views = new[]
         {
-            new OperatorCarryCaptureView("front", new Vector3(0.0f, 1.25f, -4.5f)),
-            new OperatorCarryCaptureView("three_quarter", new Vector3(2.8f, 1.45f, -3.8f)),
-            new OperatorCarryCaptureView("side", new Vector3(4.2f, 1.45f, 0.0f)),
-            new OperatorCarryCaptureView("rear", new Vector3(0.0f, 1.5f, 4.2f)),
+            new OperatorCarryCaptureView("front", new Vector3(0.0f, 1.35f, -3.0f)),
+            new OperatorCarryCaptureView("three_quarter", new Vector3(1.35f, 1.28f, -2.05f)),
             new OperatorCarryCaptureView("hand_close", new Vector3(1.35f, 1.28f, -2.05f))
         };
 

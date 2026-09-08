@@ -1230,10 +1230,11 @@ credit is retained as a courtesy. Jianghai Old City also reuses the unarmed
 MAGPIE, HERON, JACKAL, and VIPER variants as its four animated indoor
 residents; no additional third-party character files are introduced.
 
-## Tencent HY-3D private operator review outputs
+## Tencent HY-3D operator outputs
 
-The local HY-3D operator variants are generated service outputs and are not
-currently cleared for public redistribution:
+The five converted HY-3D operator variants below are cleared for repository
+redistribution by the project owner. They are generated service outputs and
+are not relicensed as MIT:
 
 - Service/source: Tencent HY-3D-3.1 and HY-3D-Rigging API responses
 - Documentation: https://cloud.tencent.com/document/product/1823/137181
@@ -1241,11 +1242,12 @@ currently cleared for public redistribution:
 - Local review outputs: `hy3d_operators/{viper,heron,lynx,magpie,jackal}.glb`
 - Conversion: `scripts/blender/build_hy3d_operator.py`, using Tencent's
   rigged FBX mesh and the CC0 Quaternius 25-action set
-- License/redistribution status: on 2026-09-05 the project owner reported
-  Tencent customer-support approval for use in this game. The outputs stay in
-  the user's private asset store and are ignored by Git. This local-use record
-  does not authorize public redistribution or relicensing of the raw meshes;
-  separate written redistribution terms are required before publication.
+- License/redistribution status: on 2026-09-08 the project owner confirmed
+  that the five converted delivery GLBs may be redistributed with this
+  repository. The original Tencent responses and rigged FBX files remain in
+  the user's private asset store; this permission does not relicense them as
+  MIT. Delivered-file hashes are recorded in
+  `assets/models/hy3d_operators/README.md`.
 - Credentials: never store the Tencent SecretId, token, or API key in this
   repository, logs, or generated metadata.
 
