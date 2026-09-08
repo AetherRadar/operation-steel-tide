@@ -2966,12 +2966,10 @@ public partial class FreightTerminalWorld
             return false;
         }
         _player.EjectFromVehicleIfAny();
-        var livingMate = _squadMates.Any(mate => IsInstanceValid(mate)
-            && !mate.IsDowned
-            && !mate.IsBodyBag
-            && !mate.IsExtractionPassenger);
-        // Second life already used, or nobody left to revive → hard fail path.
-        if (_player.ReviveUsed || !_squadDeployed || !livingMate)
+        // A first down always enters the downed state. A rescuer may be unavailable
+        // right now; the bleed-out timer handles that case after the full revive window.
+        // Only a player who has already been revived (the second down) skips this state.
+        if (_player.ReviveUsed || !_squadDeployed)
         {
             return false;
         }
