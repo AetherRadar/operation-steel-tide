@@ -97,6 +97,14 @@ public partial class CombatHUD : CanvasLayer
     private Control _interactionRoot = null!;
     private Label _interactionLabel = null!;
     private ProgressBar _interactionBar = null!;
+    // Interaction prompts are submitted from the world loop every frame. Keep
+    // the last presentation state so identical prompts do not trigger another
+    // Control/Label/ProgressBar property update (and an avoidable canvas redraw).
+    private bool _interactionPresentationInitialized;
+    private bool _interactionPresentationActive;
+    private bool _interactionPresentationBarVisible;
+    private string _interactionPresentationAction = string.Empty;
+    private float _interactionPresentationProgress = float.NaN;
     private Control _equipmentRoot = null!;
     private Label _equipmentLabel = null!;
     private ProgressBar _equipmentBar = null!;
@@ -1562,16 +1570,50 @@ public partial class CombatHUD : CanvasLayer
 
     public void SetInteraction(string action, float progress, bool active)
     {
-        _interactionRoot.Visible = active;
+        var barVisible = active && progress >= 0.0f;
+        var changed = !_interactionPresentationInitialized
+            || _interactionPresentationActive != active
+            || _interactionPresentationBarVisible != barVisible
+            || !string.Equals(_interactionPresentationAction, action, StringComparison.Ordinal)
+            || barVisible && !Mathf.IsEqualApprox(_interactionPresentationProgress, progress);
+
+        if (!changed
+            && _interactionRoot.Visible == active
+            && _interactionBar.Visible == barVisible)
+        {
+            return;
+        }
+
+        if (_interactionRoot.Visible != active)
+        {
+            _interactionRoot.Visible = active;
+        }
+        if (_interactionBar.Visible != barVisible)
+        {
+            _interactionBar.Visible = barVisible;
+        }
         if (active)
         {
-            _interactionLabel.Text = $"F   {action}";
-            _interactionBar.Visible = progress >= 0.0f;
-            if (_interactionBar.Visible)
+            if (!_interactionPresentationInitialized
+                || !_interactionPresentationActive
+                || !string.Equals(_interactionPresentationAction, action, StringComparison.Ordinal))
+            {
+                _interactionLabel.Text = $"F   {action}";
+            }
+            if (barVisible
+                && (!_interactionPresentationInitialized
+                    || !_interactionPresentationActive
+                    || !Mathf.IsEqualApprox(_interactionPresentationProgress, progress)))
             {
                 _interactionBar.Value = Mathf.Clamp(progress, 0.0f, 1.0f);
             }
         }
+
+        _interactionPresentationInitialized = true;
+        _interactionPresentationActive = active;
+        _interactionPresentationBarVisible = barVisible;
+        _interactionPresentationAction = action;
+        _interactionPresentationProgress = progress;
     }
 
     public void SetHeading(float degrees)

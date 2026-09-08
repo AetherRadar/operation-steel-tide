@@ -19,15 +19,6 @@ public partial class TacticalPlayer
     private const float AuthoredLargeSidearmArmPitchRadians = 0.45f;
     private const float AuthoredLargeSidearmAdsArmPresentationScale = 0.42f;
     private const float AuthoredLargeSidearmAdsArmPitchRadians = 0.82f;
-    private const float AnimatedScarReloadArmPresentationScale = 0.80f;
-    private const float AnimatedAwmReloadArmPresentationScale = 0.75f;
-    // Match the idle hand scale when the animated sidearm forearms take over.
-    // Only the articulated gloves, forearms, and short cuffs are rendered;
-    // the hidden shoulder chain still solves the real magazine contacts.
-    private const float AnimatedSidearmReloadArmPresentationScale = 0.64f;
-    private const float AnimatedSidearmReloadArmPitchRadians = 0.30f;
-    private const float AnimatedLargeSidearmReloadArmPresentationScale = 0.58f;
-    private const float AnimatedLargeSidearmReloadArmPitchRadians = 0.45f;
     private const float SidearmBottomScreenBandStartRatio = 0.96f;
     private const float MaxAuthoredPalmSurfaceGap = 0.018f;
     internal const float MaxServicePistolSupportArmCorrection = 0.03f;
@@ -50,11 +41,15 @@ public partial class TacticalPlayer
     // Anchors in authored M4A1 (weapon-root local) coordinates.
     private static readonly Vector3 RifleGripAnchor = new(0.0f, -0.15f, -0.05f);
     private static readonly Vector3 RifleForegripAnchor = new(0.0f, -0.17f, -0.58f);
-    private AuthoredGsh18Visual _authoredGsh18Weapon = null!;
-    private AuthoredDesertEagleVisual _authoredDesertEagleWeapon = null!;
     private bool _smg45LoadAttempted;
-    private bool _gsh18LoadAttempted;
-    private bool _desertEagleLoadAttempted;
+    private AuthoredWeaponVisual? _lastMechanismSyncWeapon;
+    private Transform3D _lastMechanismMagazineTransform;
+    private Transform3D _lastMechanismSpareMagazineTransform;
+    private Transform3D _lastMechanismChargingHandleTransform;
+    private bool _lastMechanismMagazineVisible;
+    private bool _lastMechanismSpareMagazineVisible;
+    private bool _lastMechanismChargingHandleVisible;
+    private bool _mechanismSyncCacheInitialized;
 
     internal bool UsesAuthoredPrimaryWeaponForDiagnostics
         => IsInstanceValid(_authoredPrimaryWeapon?.Root)
@@ -86,9 +81,6 @@ public partial class TacticalPlayer
                 && _authoredPrimaryWeapon.OpticMount.Visible == usesIntegratedOptic
                 && _authoredPrimaryWeapon.RearIronSight?.Visible == !hasOptic
                 && _authoredPrimaryWeapon.FrontIronSight?.Visible == !hasOptic;
-            var proceduralOpticsHidden = !_reflexSightModel.Visible
-                && !_holoSightModel.Visible
-                && !_scopeSightModel.Visible;
             var muzzleAligned = _muzzle.GlobalPosition.DistanceTo(
                 expectedMuzzleTip.GlobalPosition) <= 0.001f;
             var opticAligned = !hasOptic
@@ -101,7 +93,6 @@ public partial class TacticalPlayer
                 || (!usesIntegratedOptic
                     && AuthoredOpticPresentationValidForDiagnostics);
             return authoredVisibility
-                && proceduralOpticsHidden
                 && muzzleAligned
                 && opticAligned
                 && _authoredPrimaryWeapon.IntegratedM4OpticAxisValid;
@@ -715,27 +706,13 @@ public partial class TacticalPlayer
         var useAuthoredSmg = wantsAuthoredSmg;
         var useAuthoredPlatform = EquippedWeapon.Platform is not WeaponPlatform.M4A1
             and not WeaponPlatform.M3A1;
-        // GSh-18 and Desert Eagle now use the same reloadable authored-weapon
-        // adapter as every other platform so their DCC magazine and slide
-        // nodes participate in the real mechanism animation.
-        var useAuthoredGsh18 = false;
-        var wantsAuthoredDesertEagle = false;
-        var useAuthoredDesertEagle = false;
         if (EquippedWeapon.Platform != WeaponPlatform.M3A1)
         {
             EnsureAuthoredArmsForPlatform();
         }
-        if (useAuthoredGsh18)
-        {
-            EnsureAuthoredGsh18Weapon();
-        }
         if (useAuthoredSmg)
         {
             EnsureAuthoredFirstPersonSmg();
-        }
-        if (useAuthoredDesertEagle)
-        {
-            EnsureAuthoredDesertEagleWeapon();
         }
         if (useAuthoredPlatform)
         {
@@ -772,22 +749,6 @@ public partial class TacticalPlayer
         else
         {
             useAuthoredSmg = false;
-        }
-        if (IsInstanceValid(_authoredGsh18Weapon?.Root))
-        {
-            _authoredGsh18Weapon.Root.Visible = useAuthoredGsh18;
-        }
-        else
-        {
-            useAuthoredGsh18 = false;
-        }
-        if (IsInstanceValid(_authoredDesertEagleWeapon?.Root))
-        {
-            _authoredDesertEagleWeapon.Root.Visible = useAuthoredDesertEagle;
-        }
-        else
-        {
-            useAuthoredDesertEagle = false;
         }
         foreach (var pair in _authoredPlatformWeapons)
         {
@@ -826,14 +787,26 @@ public partial class TacticalPlayer
         _proceduralWeaponVisual.Visible = EquippedWeapon.Platform != WeaponPlatform.AK74
             && !useAuthoredM4
             && !useAuthoredSmg
-            && !useAuthoredGsh18
-            && !wantsAuthoredDesertEagle
             && !useAuthoredPlatform;
         ApplyProceduralHandPose();
     }
 
     private void ApplyProceduralHandPose()
     {
+        if (!_isReloading
+            && !IsFirearmQuickSlotSelected)
+        {
+            return;
+        }
+        if (!_isReloading
+            && IsInstanceValid(_proceduralWeaponVisual)
+            && IsInstanceValid(_proceduralFirstPersonArms)
+            && !_proceduralWeaponVisual.Visible
+            && !_proceduralFirstPersonArms.Visible)
+        {
+            return;
+        }
+
         if (!IsInstanceValid(_primaryHand)
             || !IsInstanceValid(_primaryForearm)
             || !IsInstanceValid(_supportHand)
@@ -903,7 +876,10 @@ public partial class TacticalPlayer
             authoredSmg.Root.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
             _weaponRoot.AddChild(authoredSmg.Root);
             _authoredFirstPersonSmg = authoredSmg;
-            _authoredFirstPersonSmg.SetReloadProgress(0.0f);
+            // The constructor samples the clip before the scene is parented;
+            // apply the rest pose once more after entering the live tree so the
+            // skeleton receives its initial transforms in the active scene.
+            _authoredFirstPersonSmg.SetReloadProgress(0.0f, forceRefresh: true);
             _authoredSmgWeaponBodyReadyTransformInWeaponRoot =
                 _weaponRoot.GlobalTransform.AffineInverse()
                 * _authoredFirstPersonSmg.WeaponBody.GlobalTransform;
@@ -1134,10 +1110,6 @@ public partial class TacticalPlayer
 
     private void UpdateAuthoredReloadSupportArm()
     {
-        if (UpdateAnimatedReloadArmsPresentation())
-        {
-            return;
-        }
         if (!_isReloading)
         {
             // ADS can change without rebuilding the authored weapon. Refresh the
@@ -1372,55 +1344,12 @@ public partial class TacticalPlayer
         }
     }
 
-    private void EnsureAuthoredDesertEagleWeapon()
-    {
-        if (_desertEagleLoadAttempted || IsInstanceValid(_authoredDesertEagleWeapon?.Root))
-        {
-            return;
-        }
-        _desertEagleLoadAttempted = true;
-        try
-        {
-            var authoredWeapon = CombatModelLibrary.InstantiateDesertEagle(firstPerson: true);
-            authoredWeapon.Root.Position = new Vector3(0.0f, -0.04f, -0.02f);
-            _weaponRoot.AddChild(authoredWeapon.Root);
-            _authoredDesertEagleWeapon = authoredWeapon;
-        }
-        catch (Exception exception)
-        {
-            GD.PushError($"Required authored Desert Eagle unavailable: {exception.Message}");
-        }
-    }
-
-    private void EnsureAuthoredGsh18Weapon()
-    {
-        if (_gsh18LoadAttempted || IsInstanceValid(_authoredGsh18Weapon?.Root))
-        {
-            return;
-        }
-        _gsh18LoadAttempted = true;
-        try
-        {
-            var authoredWeapon = CombatModelLibrary.InstantiateGsh18(firstPerson: true);
-            // Centre the compact source close to the service-pistol grip frame.
-            // The old -0.16 m offset pushed an already short slide much farther
-            // from the camera than the P226/M1911 and made it read as a toy.
-            authoredWeapon.Root.Position = new Vector3(0.0f, -0.04f, 0.03f);
-            _weaponRoot.AddChild(authoredWeapon.Root);
-            _authoredGsh18Weapon = authoredWeapon;
-        }
-        catch (Exception exception)
-        {
-            GD.PushWarning($"Authored GSh-18 unavailable; retaining procedural visual: {exception.Message}");
-        }
-    }
-
     private void SyncAuthoredPrimaryWeapon()
     {
         if (EquippedWeapon.Platform == WeaponPlatform.M4A1
             && IsInstanceValid(_authoredPrimaryWeapon?.Root))
         {
-            _authoredPrimaryWeapon.SyncMechanisms(_magazine, _spareMagazine, _chargingHandle);
+            SyncAuthoredMechanismsIfChanged(_authoredPrimaryWeapon);
             _muzzle.GlobalTransform = _authoredPrimaryWeapon.ActiveMuzzleTip.GlobalTransform;
             if (_authoredPrimaryWeapon.OpticMount.Visible && _opticRoot.Visible)
             {
@@ -1445,7 +1374,7 @@ public partial class TacticalPlayer
         {
             return;
         }
-        authoredWeapon.SyncMechanisms(_magazine, _spareMagazine, _chargingHandle);
+        SyncAuthoredMechanismsIfChanged(authoredWeapon);
         var hasOpticAttachment = EquippedWeapon.Attachments.TryGetValue(
             AttachmentSlot.Optic,
             out var opticId);
@@ -1493,6 +1422,37 @@ public partial class TacticalPlayer
             _opticRoot.GlobalPosition = authoredWeapon.OpticReticleAnchor.GlobalPosition;
             _opticReticle.Position = Vector3.Zero;
         }
+    }
+
+    private void SyncAuthoredMechanismsIfChanged(AuthoredWeaponVisual authoredWeapon)
+    {
+        var magazineTransform = _magazine.Transform;
+        var spareMagazineTransform = _spareMagazine.Transform;
+        var chargingHandleTransform = _chargingHandle.Transform;
+        var magazineVisible = _magazine.Visible;
+        var spareMagazineVisible = _spareMagazine.Visible;
+        var chargingHandleVisible = _chargingHandle.Visible;
+        if (_mechanismSyncCacheInitialized
+            && ReferenceEquals(_lastMechanismSyncWeapon, authoredWeapon)
+            && _lastMechanismMagazineTransform.IsEqualApprox(magazineTransform)
+            && _lastMechanismSpareMagazineTransform.IsEqualApprox(spareMagazineTransform)
+            && _lastMechanismChargingHandleTransform.IsEqualApprox(chargingHandleTransform)
+            && _lastMechanismMagazineVisible == magazineVisible
+            && _lastMechanismSpareMagazineVisible == spareMagazineVisible
+            && _lastMechanismChargingHandleVisible == chargingHandleVisible)
+        {
+            return;
+        }
+
+        authoredWeapon.SyncMechanisms(_magazine, _spareMagazine, _chargingHandle);
+        _lastMechanismSyncWeapon = authoredWeapon;
+        _lastMechanismMagazineTransform = magazineTransform;
+        _lastMechanismSpareMagazineTransform = spareMagazineTransform;
+        _lastMechanismChargingHandleTransform = chargingHandleTransform;
+        _lastMechanismMagazineVisible = magazineVisible;
+        _lastMechanismSpareMagazineVisible = spareMagazineVisible;
+        _lastMechanismChargingHandleVisible = chargingHandleVisible;
+        _mechanismSyncCacheInitialized = true;
     }
 }
 

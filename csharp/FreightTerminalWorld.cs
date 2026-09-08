@@ -1650,29 +1650,45 @@ public partial class FreightTerminalWorld : Node3D
 
     private bool HasClearPlayerLootInteractionLineOfSight(ILootSource source)
     {
-        if (!source.IsSearchable || !IsInstanceValid(source.LootNode) || !IsInstanceValid(_player))
+        if (!IsInstanceValid(source.LootNode)
+            || !source.IsSearchable
+            || !IsInstanceValid(_player))
         {
             return false;
         }
 
-        var exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
-        using var excludeBacking = exclude.AsDisposable();
+        var from = _player.GlobalPosition + Vector3.Up * 1.25f;
+        var playerRid = _player.GetRid();
         if (source.LootNode is CollisionObject3D collisionSource)
         {
-            exclude.Add(collisionSource.GetRid());
-        }
-
-        var from = _player.GlobalPosition + Vector3.Up * 1.25f;
-        foreach (var targetHeight in new[] { 0.28f, 0.72f, 1.16f })
-        {
-            if (!PhysicsRaycast.HasHit(
-                    GetWorld3D(),
-                    from,
-                    source.LootNode.GlobalPosition + Vector3.Up * targetHeight,
-                    exclude,
-                    1))
+            var sourceRid = collisionSource.GetRid();
+            foreach (var targetHeight in LootInteractionTargetHeights)
             {
-                return true;
+                if (!PhysicsRaycast.HasHit(
+                        GetWorld3D(),
+                        from,
+                        source.LootNode.GlobalPosition + Vector3.Up * targetHeight,
+                        playerRid,
+                        sourceRid,
+                        1))
+                {
+                    return true;
+                }
+            }
+        }
+        else
+        {
+            foreach (var targetHeight in LootInteractionTargetHeights)
+            {
+                if (!PhysicsRaycast.HasHit(
+                        GetWorld3D(),
+                        from,
+                        source.LootNode.GlobalPosition + Vector3.Up * targetHeight,
+                        playerRid,
+                        1))
+                {
+                    return true;
+                }
             }
         }
         return false;
@@ -2119,6 +2135,7 @@ public partial class FreightTerminalWorld : Node3D
     {
         if (LocalPlayerCannotInteract)
         {
+            InvalidateInteractionSelectionCaches();
             _lootSearchTarget = null;
             _interactionProgress = 0.0f;
             _player.SetSearchPose(false);
@@ -2220,14 +2237,17 @@ public partial class FreightTerminalWorld : Node3D
             return;
         }
 
+        var forceInteractionRefresh = Input.IsActionJustPressed(GameInputActions.Interact);
         var nearestCivilian = FindNearestAssistableCivilian(
             _player.GlobalPosition,
             2.85f,
-            out var nearestCivilianDistance);
+            out var nearestCivilianDistance,
+            forceInteractionRefresh);
         var nearest = FindNearestInteractiveLoot(
             _player.GlobalPosition,
             2.85f,
-            out var nearestDistance);
+            out var nearestDistance,
+            forceInteractionRefresh);
         if (TryHandleRefineryDoorInteraction(Mathf.Min(
                 nearestCivilianDistance,
                 nearestDistance)))
@@ -2240,7 +2260,9 @@ public partial class FreightTerminalWorld : Node3D
             _lootSearchTarget = null;
             _player.SetSearchPose(false);
             _hud.SetInteraction($"{nearestCivilian.AssistanceLabel(_languageSetting)}  //  F", -1.0f, true);
-            if (!_interactReleaseRequired && Input.IsActionJustPressed(GameInputActions.Interact))
+            if (!_interactReleaseRequired
+                && Input.IsActionJustPressed(GameInputActions.Interact)
+                && HasClearPlayerCivilianInteractionLineOfSight(nearestCivilian))
             {
                 _interactReleaseRequired = true;
                 nearestCivilian.TryProvideAssistance(_player);
@@ -2275,8 +2297,21 @@ public partial class FreightTerminalWorld : Node3D
                 _hud.SetInteraction($"{interaction}  //  {nearest.DisplayName(_languageSetting)}", _interactionProgress, true);
                 if (_interactionProgress >= 1.0f)
                 {
-                    _interactReleaseRequired = true;
-                    OpenLoot(nearest);
+                    if (IsLootInteractionTargetStillValid(nearest, 2.85f))
+                    {
+                        _interactReleaseRequired = true;
+                        OpenLoot(nearest);
+                    }
+                    else
+                    {
+                        // A cached prompt may outlive a moving player or a
+                        // newly closed door. Recheck before opening so the
+                        // cache can never turn into a through-wall pickup.
+                        InvalidateInteractionSelectionCaches();
+                        _lootSearchTarget = null;
+                        _interactionProgress = 0.0f;
+                        _player.SetSearchPose(false);
+                    }
                 }
             }
             else
@@ -2285,7 +2320,9 @@ public partial class FreightTerminalWorld : Node3D
                 _player.SetSearchPose(false);
                 var open = GameLocalization.Get("open_loot", _languageSetting, "OPEN");
                 _hud.SetInteraction($"{open}  //  {nearest.DisplayName(_languageSetting)}", -1.0f, true);
-                if (!_interactReleaseRequired && Input.IsActionJustPressed(GameInputActions.Interact))
+                if (!_interactReleaseRequired
+                    && Input.IsActionJustPressed(GameInputActions.Interact)
+                    && IsLootInteractionTargetStillValid(nearest, 2.85f))
                 {
                     _interactReleaseRequired = true;
                     OpenLoot(nearest);

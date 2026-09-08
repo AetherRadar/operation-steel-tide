@@ -262,9 +262,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private MeshInstance3D _trigger = null!;
     private MeshInstance3D _selector = null!;
     private Node3D _opticRoot = null!;
-    private Node3D _reflexSightModel = null!;
-    private Node3D _holoSightModel = null!;
-    private Node3D _scopeSightModel = null!;
     private MeshInstance3D _chargingHandle = null!;
     private Marker3D _ejectMarker = null!;
     private AudioStreamPlayer _gunAudio = null!;
@@ -560,16 +557,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         RadialSegments = 12
     };
 
-    private static CylinderMesh OpenCylinder(float radius, float height) => new()
-    {
-        TopRadius = radius,
-        BottomRadius = radius,
-        Height = height,
-        RadialSegments = 24,
-        CapTop = false,
-        CapBottom = false
-    };
-
     private static CapsuleMesh Capsule(float radius, float height) => new()
     {
         Radius = radius,
@@ -621,18 +608,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         var polymer = TacticalSurfaceLibrary.WeaponFinish(new Color(0.055f, 0.065f, 0.061f), 0.18f, 0.62f, 5.5f);
         var steel = TacticalSurfaceLibrary.WeaponFinish(new Color(0.09f, 0.105f, 0.1f), 0.92f, 0.2f, 3.5f);
         var tan = TacticalSurfaceLibrary.WeaponFinish(new Color(0.27f, 0.245f, 0.19f), 0.05f, 0.72f, 5.5f);
-        var glass = new StandardMaterial3D
-        {
-            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-            AlbedoColor = new Color(0.08f, 0.48f, 0.52f, 0.2f),
-            Metallic = 0.32f,
-            Roughness = 0.08f,
-            EmissionEnabled = true,
-            Emission = new Color(0.02f, 0.22f, 0.24f),
-            EmissionEnergyMultiplier = 0.38f
-        };
-
         _receiver = MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.13f, 0.15f, 0.46f)), Vector3.Zero, Vector3.Zero, black);
         BuildWeaponMechanismDetails(black, steel);
         _handguard = MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.15f, 0.12f, 0.4f)), new Vector3(0, 0.01f, -0.41f), Vector3.Zero, tan);
@@ -644,7 +619,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         MeshPart(_magazine, Box(new Vector3(0.095f, 0.028f, 0.15f)), new Vector3(0, -0.11f, 0), Vector3.Zero, steel);
         AddMagazineDetail(_magazine, steel);
         MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.14f, 0.045f, 0.64f)), new Vector3(0, 0.11f, -0.34f), Vector3.Zero, steel);
-        BuildReflexSight(black, glass);
+        BuildOpticAnchor();
         _foregrip = MeshPart(_proceduralWeaponVisual, Box(new Vector3(0.08f, 0.18f, 0.16f)), new Vector3(0, -0.17f, -0.58f), Vector3.Zero, polymer);
 
         var glove = GloveFabric(new Color(0.12f, 0.135f, 0.112f));
@@ -915,10 +890,8 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         return forearm;
     }
 
-    private void BuildReflexSight(Godot.Material housing, Godot.Material glass)
+    private void BuildOpticAnchor()
     {
-        var scopeHousing = (StandardMaterial3D)housing.Duplicate();
-        scopeHousing.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
         var sight = new Node3D
         {
             Name = "ReflexSight",
@@ -926,34 +899,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         };
         _opticRoot = sight;
         _weaponRoot.AddChild(sight);
-
-        _reflexSightModel = new Node3D { Name = "MicroReflex" };
-        sight.AddChild(_reflexSightModel);
-        MeshPart(_reflexSightModel, Box(new Vector3(0.16f, 0.035f, 0.15f)), new Vector3(0, -0.095f, 0.035f), Vector3.Zero, housing);
-        MeshPart(_reflexSightModel, Box(new Vector3(0.145f, 0.022f, 0.04f)), new Vector3(0, 0.062f, -0.025f), Vector3.Zero, housing);
-        MeshPart(_reflexSightModel, Box(new Vector3(0.022f, 0.125f, 0.04f)), new Vector3(-0.061f, 0.0f, -0.025f), Vector3.Zero, housing);
-        MeshPart(_reflexSightModel, Box(new Vector3(0.022f, 0.125f, 0.04f)), new Vector3(0.061f, 0.0f, -0.025f), Vector3.Zero, housing);
-        MeshPart(_reflexSightModel, new QuadMesh { Size = new Vector2(0.1f, 0.095f) }, new Vector3(0, 0, -0.048f), Vector3.Zero, glass);
-
-        _holoSightModel = new Node3D { Name = "HolographicSight", Visible = false };
-        sight.AddChild(_holoSightModel);
-        MeshPart(_holoSightModel, Box(new Vector3(0.2f, 0.055f, 0.2f)), new Vector3(0, -0.105f, 0.015f), Vector3.Zero, housing);
-        MeshPart(_holoSightModel, Box(new Vector3(0.19f, 0.03f, 0.055f)), new Vector3(0, 0.085f, -0.045f), Vector3.Zero, housing);
-        MeshPart(_holoSightModel, Box(new Vector3(0.035f, 0.17f, 0.055f)), new Vector3(-0.08f, -0.005f, -0.045f), Vector3.Zero, housing);
-        MeshPart(_holoSightModel, Box(new Vector3(0.035f, 0.17f, 0.055f)), new Vector3(0.08f, -0.005f, -0.045f), Vector3.Zero, housing);
-        MeshPart(_holoSightModel, new QuadMesh { Size = new Vector2(0.13f, 0.125f) }, new Vector3(0, 0.0f, -0.074f), Vector3.Zero, glass);
-
-        _scopeSightModel = new Node3D { Name = "CombatScope4x", Visible = false };
-        sight.AddChild(_scopeSightModel);
-        MeshPart(_scopeSightModel, OpenCylinder(0.064f, 0.34f), new Vector3(0, 0, -0.04f), new Vector3(Mathf.Pi / 2.0f, 0, 0), scopeHousing);
-        MeshPart(_scopeSightModel, OpenCylinder(0.078f, 0.085f), new Vector3(0, 0, -0.205f), new Vector3(Mathf.Pi / 2.0f, 0, 0), scopeHousing);
-        MeshPart(_scopeSightModel, OpenCylinder(0.071f, 0.055f), new Vector3(0, 0, 0.145f), new Vector3(Mathf.Pi / 2.0f, 0, 0), scopeHousing);
-        MeshPart(_scopeSightModel, Cylinder(0.059f, 0.003f), new Vector3(0, 0, -0.251f), new Vector3(Mathf.Pi / 2.0f, 0, 0), glass);
-        MeshPart(_scopeSightModel, Cylinder(0.053f, 0.003f), new Vector3(0, 0, 0.176f), new Vector3(Mathf.Pi / 2.0f, 0, 0), glass);
-        MeshPart(_scopeSightModel, Cylinder(0.026f, 0.052f), new Vector3(0, 0.079f, -0.055f), Vector3.Zero, scopeHousing);
-        MeshPart(_scopeSightModel, Cylinder(0.023f, 0.047f), new Vector3(0.079f, 0, -0.055f), new Vector3(0, 0, Mathf.Pi / 2.0f), scopeHousing);
-        MeshPart(_scopeSightModel, Box(new Vector3(0.045f, 0.085f, 0.055f)), new Vector3(-0.055f, -0.085f, -0.06f), Vector3.Zero, scopeHousing);
-        MeshPart(_scopeSightModel, Box(new Vector3(0.045f, 0.085f, 0.055f)), new Vector3(0.055f, -0.085f, -0.06f), Vector3.Zero, scopeHousing);
 
         var reticleMaterial = new StandardMaterial3D
         {
@@ -1126,11 +1071,6 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             0,
             OpticMountHeight(EquippedWeapon.Platform, opticId),
             -0.25f));
-        // Finished DCC assets own every visible sight housing. The retained
-        // legacy nodes are invisible compatibility scaffolding only.
-        _reflexSightModel.Visible = false;
-        _holoSightModel.Visible = false;
-        _scopeSightModel.Visible = false;
         var usesExternalAuthoredOptic = RefreshAuthoredOpticPresentation(
             opticId,
             usesIntegratedWeaponOptic);

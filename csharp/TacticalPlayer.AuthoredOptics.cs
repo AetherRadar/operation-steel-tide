@@ -74,9 +74,6 @@ public partial class TacticalPlayer
             var weaponOwnsAuthoredOptic = hasOptic
                 && WeaponUsesIntegratedOptic(EquippedWeapon.Platform, opticId);
             var externalExpected = hasOptic && !weaponOwnsAuthoredOptic;
-            var legacyHidden = !_reflexSightModel.Visible
-                && !_holoSightModel.Visible
-                && !_scopeSightModel.Visible;
             var reticleAligned = externalExpected
                 ? (_authoredOptics.ActiveReticleAnchor is { } reticleAnchor
                     && _opticReticle.GlobalPosition.DistanceTo(
@@ -97,8 +94,7 @@ public partial class TacticalPlayer
                     && _opticReticle.GlobalPosition.DistanceTo(
                         integratedVisual.OpticReticleAnchor.GlobalPosition) <= 0.001f;
             }
-            return legacyHidden
-                && _authoredOptics.PresentationMatches(opticId, externalExpected)
+            return _authoredOptics.PresentationMatches(opticId, externalExpected)
                 && reticleAligned
                 && integratedPresentationValid;
         }

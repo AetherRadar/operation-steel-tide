@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using Godot;
 
 namespace OperationSteelTide;
@@ -66,6 +65,12 @@ public partial class FreightTerminalWorld
     private readonly Dictionary<ulong, SquadCorridorQueryState> _squadCorridorQueries = new();
     private readonly Dictionary<ulong, SquadSupportQueryState> _squadSupportQueries = new();
     private readonly Dictionary<ulong, SquadNavigationDecisionState> _squadNavigationDecisions = new();
+    // Door topology is shared by every squad mate. Keep the one-frame scan state
+    // and its scratch collections on the world so a three-mate squad does not
+    // allocate a HashSet/array for each navigation query.
+    private readonly HashSet<ulong> _squadNavDoorSeenIds = new();
+    private readonly List<ulong> _squadNavDoorStaleIds = new();
+    private ulong _squadNavDoorGeometryLastPhysicsFrame = ulong.MaxValue;
     private bool _squadLeaderTrailInitialized;
     private Vector3 _squadLeaderTrailLastPosition;
     private int _squadLeaderTrailRevision;
@@ -419,13 +424,25 @@ public partial class FreightTerminalWorld
 
     private void RefreshSquadNavigationDoorGeometry()
     {
-        if (_refineryDoors.Count == 0)
+        // ResolveSquadNavigationDestination is reached once per active mate. Door
+        // state cannot change more than once per physics tick in the gameplay path,
+        // so share this snapshot across all those calls.
+        var physicsFrame = Engine.GetPhysicsFrames();
+        if (_squadNavDoorGeometryLastPhysicsFrame == physicsFrame)
+        {
+            return;
+        }
+        _squadNavDoorGeometryLastPhysicsFrame = physicsFrame;
+        // An emptied door list still needs one pass to retire the old states and
+        // invalidate paths built around the removed topology. Once both the list
+        // and state map are empty there is no work left for this frame.
+        if (_refineryDoors.Count == 0 && _squadNavDoorStates.Count == 0)
         {
             return;
         }
 
         var changed = false;
-        var seen = new HashSet<ulong>();
+        _squadNavDoorSeenIds.Clear();
         foreach (var door in _refineryDoors)
         {
             if (!IsInstanceValid(door))
@@ -433,7 +450,7 @@ public partial class FreightTerminalWorld
                 continue;
             }
             var id = door.GetInstanceId();
-            seen.Add(id);
+            _squadNavDoorSeenIds.Add(id);
             var state = (door.IsOpen, door.TargetOpen, door.IsAnimating, door.CompletedMotionCount);
             if (!_squadNavDoorStates.TryGetValue(id, out var previous) || previous != state)
             {
@@ -441,9 +458,17 @@ public partial class FreightTerminalWorld
                 changed = true;
             }
         }
-        foreach (var staleId in _squadNavDoorStates.Keys.Where(id => !seen.Contains(id)).ToArray())
+        _squadNavDoorStaleIds.Clear();
+        foreach (var pair in _squadNavDoorStates)
         {
-            _squadNavDoorStates.Remove(staleId);
+            if (!_squadNavDoorSeenIds.Contains(pair.Key))
+            {
+                _squadNavDoorStaleIds.Add(pair.Key);
+            }
+        }
+        for (var index = 0; index < _squadNavDoorStaleIds.Count; index++)
+        {
+            _squadNavDoorStates.Remove(_squadNavDoorStaleIds[index]);
             changed = true;
         }
         if (!changed)

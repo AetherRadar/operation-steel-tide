@@ -6,6 +6,7 @@ namespace OperationSteelTide;
 internal sealed class AuthoredFirstPersonSmgVisual
 {
     private const string ReloadAnimationName = "reload";
+    private float _lastReloadProgress = float.NaN;
     public AuthoredFirstPersonSmgVisual(Node3D root)
     {
         Root = root;
@@ -21,7 +22,7 @@ internal sealed class AuthoredFirstPersonSmgVisual
         {
             throw new InvalidOperationException("Authored SMG-45 is missing its reload animation rig.");
         }
-        SetReloadProgress(0.0f);
+        SetReloadProgress(0.0f, forceRefresh: true);
     }
 
     public Node3D Root { get; }
@@ -100,17 +101,30 @@ internal sealed class AuthoredFirstPersonSmgVisual
 
     public void SyncMechanisms()
     {
-        Magazine.Visible = true;
-        ChargingHandle.Visible = true;
+        if (!Magazine.Visible)
+        {
+            Magazine.Visible = true;
+        }
+        if (!ChargingHandle.Visible)
+        {
+            ChargingHandle.Visible = true;
+        }
     }
 
-    public void SetReloadProgress(float progress)
+    public void SetReloadProgress(float progress, bool forceRefresh = false)
     {
+        var normalized = Mathf.Clamp(progress, 0.0f, 1.0f);
+        if (!forceRefresh && Mathf.IsEqualApprox(_lastReloadProgress, normalized))
+        {
+            return;
+        }
+
         AnimationPlayer.Play(ReloadAnimationName, 0.0);
         AnimationPlayer.Seek(
-            ReloadAnimationDuration * Mathf.Clamp(progress, 0.0f, 1.0f),
+            ReloadAnimationDuration * normalized,
             update: true);
         AnimationPlayer.Pause();
+        _lastReloadProgress = normalized;
     }
 
     public FirstPersonSmgReloadInspection InspectReloadAnimation()
