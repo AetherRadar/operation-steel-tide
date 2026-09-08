@@ -56,7 +56,7 @@ public partial class TrainingRangeArmoryView
         {
             var slot = Slots[index];
             var installed = _workingBuild.Attachments.TryGetValue(slot, out var id) ? id : string.Empty;
-            _slotButtons[index].Text = $"{SlotName(slot)}\n{AttachmentName(installed)}";
+            _slotButtons[index].Text = $"{SlotName(slot)}\n{AttachmentName(slot, installed)}";
             _slotButtons[index].ButtonPressed = slot == _selectedAttachmentSlot;
         }
         _selectedSlot.Text = $"{SlotName(_selectedAttachmentSlot)}  //  {Text("training_armory_installed", "INSTALLED")}: "

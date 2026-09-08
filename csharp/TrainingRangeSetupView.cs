@@ -295,6 +295,7 @@ public partial class TrainingRangeSetupView : ColorRect
         var countIndex = Array.IndexOf(BotCounts, botCount);
         _botCountSelect.Select(countIndex >= 0 ? countIndex : 1);
         _weaponSelect.Select(Mathf.Clamp(weaponIndex, 0, RangeWeapons.Length - 1));
+        RefreshAttachmentOptions();
         _ammoTypeSelect.Select(Mathf.Clamp(ammoType, 0, 3));
         _ammoLevelSelect.Select(Mathf.Clamp(ammoLevel, 0, 3));
         RefreshSummary();
@@ -303,6 +304,7 @@ public partial class TrainingRangeSetupView : ColorRect
     public void SetAttachmentSelections(IReadOnlyList<string?> ids)
     {
         if (!UiReady || ids is null) return;
+        RefreshAttachmentOptions();
         for (var i = 0; i < _attachmentSelects.Length && i < ids.Count; i++)
         {
             var wanted = ids[i] ?? string.Empty;
@@ -328,7 +330,10 @@ public partial class TrainingRangeSetupView : ColorRect
     }
 
     public void SelectWeaponForDiagnostics(int index)
-        => _weaponSelect.Select(Mathf.Clamp(index, 0, RangeWeapons.Length - 1));
+    {
+        _weaponSelect.Select(Mathf.Clamp(index, 0, RangeWeapons.Length - 1));
+        _weaponSelect.EmitSignal(OptionButton.SignalName.ItemSelected, _weaponSelect.Selected);
+    }
 
     public void SelectAmmoForDiagnostics(int type, int level)
     {

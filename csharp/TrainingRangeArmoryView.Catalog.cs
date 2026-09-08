@@ -64,10 +64,13 @@ public partial class TrainingRangeArmoryView
         => _language == "zh" ? WeaponCatalog.SlotChinese(slot) : slot.ToString().ToUpperInvariant();
 
     private string AttachmentName(string id)
+        => AttachmentName(_selectedAttachmentSlot, id);
+
+    private string AttachmentName(AttachmentSlot slot, string id)
     {
         if (id.Length == 0)
         {
-            return _selectedAttachmentSlot == AttachmentSlot.Optic
+            return slot == AttachmentSlot.Optic
                 ? Text("training_armory_none", "IRON SIGHTS / NONE")
                 : Text("training_armory_none", "NONE / REMOVE");
         }

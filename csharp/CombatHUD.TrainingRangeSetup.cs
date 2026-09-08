@@ -263,6 +263,15 @@ public partial class CombatHUD
     public void SelectTrainingRangeAmmoForDiagnostics(int type, int level)
         => _trainingRangeSetupView?.SelectAmmoForDiagnostics(type, level);
 
+    public void SelectTrainingRangeArmoryWeaponForDiagnostics(int index)
+        => _trainingRangeArmoryView?.SelectWeaponForDiagnostics(index);
+
+    public void SelectTrainingRangeArmoryPartForDiagnostics(int slot, string attachmentId)
+    {
+        _trainingRangeArmoryView?.SelectSlotForDiagnostics(slot);
+        _trainingRangeArmoryView?.SelectAttachmentForDiagnostics(attachmentId);
+    }
+
     public override void _Input(InputEvent @event)
     {
         if (!_trainingRangeGameplayInputEnabled
