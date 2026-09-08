@@ -686,10 +686,11 @@ internal sealed class AuthoredOperatorVisual
         _leftPinkyBone = TryResolveBoneIndex(_skeleton, "mixamorig:LeftHandPinky1");
         _rightPalmFrame = CombatModelLibrary.FindOptionalNode(root, "RightPalmFrame");
         _leftPalmFrame = CombatModelLibrary.FindOptionalNode(root, "LeftPalmFrame");
-        // Viper's private export contains the marker nodes for review, but its
-        // carry clips are legacy wrist-only samples. Let the deterministic
-        // runtime IK solve that role's hands; the other HY-3D exports contain
-        // complete authored carry poses and keep their DCC arm frames.
+        // Viper's private export contains the marker nodes, but its ready
+        // clips still use the legacy wrist-only contract (the aim clips are
+        // Blender-baked for better starting poses). Let deterministic runtime
+        // IK solve that role's hands; the other HY-3D exports contain complete
+        // authored carry poses and keep their DCC arm frames.
         _hasAuthoredCarryPose = VisualId != OperatorVisualId.Viper
             && CombatModelLibrary.FindOptionalNode(root, "SteelTideAuthoredCarryPose") is not null;
         // Ready weapons deliberately do not live under a hand BoneAttachment.
@@ -1504,7 +1505,11 @@ internal sealed class AuthoredOperatorVisual
         // a clear third-person presentation plane in front of the torso.
         // This is deliberately an actor-space offset, not a hand offset: the
         // two arm chains below follow the moved grip markers.
-        var presentationForward = actorBasis * new Vector3(0.0f, 0.0f, -0.060f);
+        // Keep the receiver clearly in front of the vest.  The HY-3D chest
+        // armor is deeper than the legacy mannequin, so the old 6 cm
+        // presentation offset let the magazine well visually sink into the
+        // torso even when both palm contacts were valid.
+        var presentationForward = actorBasis * new Vector3(0.0f, 0.0f, -0.140f);
         global.Origin = shoulder + actorBasis * stockOffset
             + presentationForward
             - stockDelta;
