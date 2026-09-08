@@ -1,7 +1,16 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$forwardedGameArguments = [string[]]$args
+$forcePreparation = $false
+$forwardedGameArguments = [System.Collections.Generic.List[string]]::new()
+foreach ($argument in [string[]]$args) {
+    if ($argument -ceq '--force-prepare' -or $argument -ceq '--force-import') {
+        $forcePreparation = $true
+        continue
+    }
+    $forwardedGameArguments.Add($argument)
+}
+$forwardedGameArguments = $forwardedGameArguments.ToArray()
 
 function Get-CanonicalProjectPath {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -21,6 +30,126 @@ function Get-Sha256Hex {
     finally {
         $sha256.Dispose()
     }
+}
+
+function Test-CSharpAssemblyCurrent {
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectRoot,
+        [Parameter(Mandatory = $true)][string]$AssemblyPath,
+        [switch]$Force
+    )
+
+    if ($Force -or -not (Test-Path -LiteralPath $AssemblyPath -PathType Leaf)) {
+        return $false
+    }
+
+    $assembly = Get-Item -LiteralPath $AssemblyPath -ErrorAction Stop
+    $assemblyTime = $assembly.LastWriteTimeUtc
+    $sourceRoot = Join-Path $ProjectRoot 'csharp'
+    if (-not (Test-Path -LiteralPath $sourceRoot -PathType Container)) {
+        return $false
+    }
+
+    $sourceFiles = @(
+        Get-ChildItem -LiteralPath $sourceRoot -Filter '*.cs' -File -Recurse -ErrorAction Stop
+        Get-ChildItem -LiteralPath $ProjectRoot -Filter '*.csproj' -File -ErrorAction Stop
+        Get-ChildItem -LiteralPath $ProjectRoot -Filter '*.props' -File -ErrorAction SilentlyContinue
+        Get-ChildItem -LiteralPath $ProjectRoot -Filter '*.targets' -File -ErrorAction SilentlyContinue
+    )
+    foreach ($sourceFile in $sourceFiles) {
+        if ($sourceFile.LastWriteTimeUtc -gt $assemblyTime) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Test-GodotImportCurrent {
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectRoot,
+        [switch]$Force
+    )
+
+    if ($Force) {
+        return $false
+    }
+
+    $editorRoot = Join-Path $ProjectRoot '.godot\editor'
+    $importMarker = Get-ChildItem -LiteralPath $editorRoot -Filter 'filesystem_cache*' -File `
+        -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First 1
+    if ($null -eq $importMarker) {
+        return $false
+    }
+
+    $sourceFiles = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
+    $projectFile = Join-Path $ProjectRoot 'project.godot'
+    if (Test-Path -LiteralPath $projectFile -PathType Leaf) {
+        $sourceFiles.Add((Get-Item -LiteralPath $projectFile))
+    }
+    $assetRoot = Join-Path $ProjectRoot 'assets'
+    if (Test-Path -LiteralPath $assetRoot -PathType Container) {
+        foreach ($assetFile in (Get-ChildItem -LiteralPath $assetRoot -File -Recurse -ErrorAction Stop)) {
+            if ($assetFile.Extension.ToLowerInvariant() -notin @(
+                    '.glb', '.gltf', '.fbx', '.obj', '.png', '.jpg', '.jpeg', '.webp',
+                    '.wav', '.ogg', '.mp3', '.ttf', '.otf', '.svg', '.tres', '.tscn')) {
+                continue
+            }
+            $sourceFiles.Add($assetFile)
+        }
+    }
+    foreach ($pattern in @('*.tscn', '*.tres', '*.gd', '*.shader')) {
+        foreach ($sceneFile in (Get-ChildItem -LiteralPath $ProjectRoot -Filter $pattern -File `
+                    -ErrorAction SilentlyContinue)) {
+            $sourceFiles.Add($sceneFile)
+        }
+    }
+
+    foreach ($sourceFile in $sourceFiles) {
+        if ($sourceFile.LastWriteTimeUtc -gt $importMarker.LastWriteTimeUtc) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Get-BackendBuildMarkerPath {
+    param([Parameter(Mandatory = $true)][string]$ServerPath)
+
+    return "$ServerPath.fingerprint"
+}
+
+function Test-BackendBinaryCurrent {
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectRoot,
+        [Parameter(Mandatory = $true)][string]$ServerPath,
+        [Parameter(Mandatory = $true)][string]$ExpectedInstanceId,
+        [switch]$Force
+    )
+
+    if ($Force -or -not (Test-Path -LiteralPath $ServerPath -PathType Leaf)) {
+        return $false
+    }
+    $server = Get-Item -LiteralPath $ServerPath -ErrorAction Stop
+    $markerPath = Get-BackendBuildMarkerPath -ServerPath $ServerPath
+    if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+        $marker = (Get-Content -LiteralPath $markerPath -Raw -ErrorAction Stop).Trim()
+        return $marker -ceq $ExpectedInstanceId
+    }
+
+    $backendRoot = Join-Path $ProjectRoot 'backend'
+    $sourceFiles = @(
+        Get-ChildItem -LiteralPath $backendRoot -Filter '*.go' -File -Recurse -ErrorAction Stop
+        Get-ChildItem -LiteralPath $backendRoot -Filter 'go.mod' -File -ErrorAction SilentlyContinue
+        Get-ChildItem -LiteralPath $backendRoot -Filter 'go.sum' -File -ErrorAction SilentlyContinue
+    )
+    foreach ($sourceFile in $sourceFiles) {
+        if ($sourceFile.LastWriteTimeUtc -gt $server.LastWriteTimeUtc) {
+            return $false
+        }
+    }
+    return $true
 }
 
 function Get-ProjectPathHash {
@@ -964,7 +1093,10 @@ function Invoke-LauncherSelfTest {
 }
 
 function Invoke-OperationSteelTideLauncher {
-    param([string[]]$GameArguments)
+    param(
+        [string[]]$GameArguments,
+        [switch]$ForcePreparation
+    )
 
     $projectRoot = Get-CanonicalProjectPath -Path (Join-Path $PSScriptRoot '..')
     $preparationMutex = New-Object System.Threading.Mutex(
@@ -1007,14 +1139,6 @@ function Invoke-OperationSteelTideLauncher {
             }
         }
 
-        $privateAssetSync = Join-Path $PSScriptRoot 'Sync-PrivateOperatorAssets.ps1'
-        if (Test-Path -LiteralPath $privateAssetSync -PathType Leaf) {
-            & $privateAssetSync -ProjectRoot $projectRoot
-            if ($LASTEXITCODE -ne 0) {
-                return $LASTEXITCODE
-            }
-        }
-
         $godot = Resolve-GodotExecutable
         if ([string]::IsNullOrWhiteSpace($godot)) {
             [Console]::Error.WriteLine(
@@ -1051,7 +1175,17 @@ function Invoke-OperationSteelTideLauncher {
         Write-Host "  Import log:  $importLog"
         Write-Host "  Runtime log: $runtimeLog"
 
-        Write-Host 'Updating the C# game assembly...'
+        $assemblyPath = Join-Path $projectRoot '.godot\mono\temp\bin\Debug\OperationSteelTide.dll'
+        $assemblyCurrent = Test-CSharpAssemblyCurrent `
+            -ProjectRoot $projectRoot `
+            -AssemblyPath $assemblyPath `
+            -Force:$ForcePreparation
+        if ($assemblyCurrent) {
+            Write-Host 'C# game assembly is up to date; reusing the incremental build.'
+        }
+        else {
+            Write-Host 'Updating the C# game assembly...'
+        }
         $git = Get-Command 'git.exe' -CommandType Application -ErrorAction SilentlyContinue |
             Select-Object -First 1
         if ($null -ne $git) {
@@ -1060,36 +1194,46 @@ function Invoke-OperationSteelTideLauncher {
                 Write-Host "  Commit: $commit"
             }
         }
-        & $dotnet.Source build (Join-Path $projectRoot 'OperationSteelTide.csproj') --nologo --verbosity minimal |
-            Out-Host
-        $buildExitCode = $LASTEXITCODE
-        if ($buildExitCode -ne 0) {
-            [Console]::Error.WriteLine(
-                "The C# game assembly could not be updated (exit code $buildExitCode).")
-            return $buildExitCode
+        if (-not $assemblyCurrent) {
+            & $dotnet.Source build (Join-Path $projectRoot 'OperationSteelTide.csproj') --nologo --verbosity minimal |
+                Out-Host
+            $buildExitCode = $LASTEXITCODE
+            if ($buildExitCode -ne 0) {
+                [Console]::Error.WriteLine(
+                    "The C# game assembly could not be updated (exit code $buildExitCode).")
+                return $buildExitCode
+            }
         }
 
-        Write-Host 'Importing Godot resources...'
-        & $godot --headless --path $projectRoot --import --log-file $importLog | Out-Host
-        $importExitCode = $LASTEXITCODE
-        if ($importExitCode -ne 0) {
-            [Console]::Error.WriteLine(
-                "Godot resource import failed with exit code $importExitCode. See '$importLog'.")
-            return $importExitCode
+        $importCurrent = Test-GodotImportCurrent `
+            -ProjectRoot $projectRoot `
+            -Force:$ForcePreparation
+        if ($importCurrent) {
+            Write-Host 'Godot resource cache is current; skipping the headless import pass.'
         }
-        if (-not (Test-Path -LiteralPath $importLog -PathType Leaf)) {
-            [Console]::Error.WriteLine(
-                "Godot resource import did not create its expected log. See '$runLogDirectory'.")
-            return 1
-        }
-        $importErrors = @(Get-GodotTopLevelLogErrors -LogPath $importLog)
-        if ($importErrors.Count -gt 0) {
-            [Console]::Error.WriteLine(
-                "Godot reported $($importErrors.Count) resource import error(s). See '$importLog'.")
-            foreach ($importError in ($importErrors | Select-Object -First 10)) {
-                [Console]::Error.WriteLine("  $($importError.Line)")
+        else {
+            Write-Host 'Importing Godot resources...'
+            & $godot --headless --path $projectRoot --import --log-file $importLog | Out-Host
+            $importExitCode = $LASTEXITCODE
+            if ($importExitCode -ne 0) {
+                [Console]::Error.WriteLine(
+                    "Godot resource import failed with exit code $importExitCode. See '$importLog'.")
+                return $importExitCode
             }
-            return 1
+            if (-not (Test-Path -LiteralPath $importLog -PathType Leaf)) {
+                [Console]::Error.WriteLine(
+                    "Godot resource import did not create its expected log. See '$runLogDirectory'.")
+                return 1
+            }
+            $importErrors = @(Get-GodotTopLevelLogErrors -LogPath $importLog)
+            if ($importErrors.Count -gt 0) {
+                [Console]::Error.WriteLine(
+                    "Godot reported $($importErrors.Count) resource import error(s). See '$importLog'.")
+                foreach ($importError in ($importErrors | Select-Object -First 10)) {
+                    [Console]::Error.WriteLine("  $($importError.Line)")
+                }
+                return 1
+            }
         }
 
         $runningProjectInstances = @(Get-RunningGodotProcessesForProject `
@@ -1154,10 +1298,19 @@ function Invoke-OperationSteelTideLauncher {
                 }
             }
             else {
-                $serverUsable = $false
-                $go = Get-Command 'go.exe' -CommandType Application -ErrorAction SilentlyContinue |
-                    Select-Object -First 1
-                if ($null -ne $go) {
+                $serverUsable = Test-BackendBinaryCurrent `
+                    -ProjectRoot $projectRoot `
+                    -ServerPath $serverPath `
+                    -ExpectedInstanceId $backendInstanceId `
+                    -Force:$ForcePreparation
+                if ($serverUsable) {
+                    Write-Host 'Using the current cached Go mission service executable.'
+                }
+                else {
+                    $go = Get-Command 'go.exe' -CommandType Application -ErrorAction SilentlyContinue |
+                        Select-Object -First 1
+                }
+                if (-not $serverUsable -and $null -ne $go) {
                     Write-Host 'Building the Go mission service...'
                     $identityBeforeBuild = Get-BackendInstanceId -ProjectRoot $projectRoot
                     $goBuildExitCode = 1
@@ -1191,9 +1344,11 @@ function Invoke-OperationSteelTideLauncher {
                             Write-Host "Backend instance after source refresh: $identityAfterBuild"
                         }
                         $backendInstanceId = $identityAfterBuild
+                        Set-Content -LiteralPath (Get-BackendBuildMarkerPath -ServerPath $serverPath) `
+                            -Value $backendInstanceId -NoNewline -Encoding ascii
                     }
                 }
-                else {
+                elseif (-not $serverUsable) {
                     Write-Warning (
                         'Go is unavailable, so no local mission service can be built. ' +
                         'A pre-existing on-disk executable will not be started.')
@@ -1358,5 +1513,7 @@ if ($env:STEEL_TIDE_LAUNCHER_SELF_TEST -ceq '1') {
     exit $selfTestExitCode
 }
 
-$launcherExitCode = Invoke-OperationSteelTideLauncher -GameArguments $forwardedGameArguments
+$launcherExitCode = Invoke-OperationSteelTideLauncher `
+    -GameArguments $forwardedGameArguments `
+    -ForcePreparation:$forcePreparation
 exit $launcherExitCode
