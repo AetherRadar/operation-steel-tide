@@ -19,6 +19,12 @@ being swallowed by the rifle. Existing finger chains are preserved when the
 private source already contains them; wrist-only HY-3D responses receive the
 fallback chains during this Blender build.
 
+The delivered Viper also carries bone-parented `LeftPalmFrame`,
+`RightPalmFrame`, `LeftWristFrame`, `RightWristFrame`, shoulder frames,
+`ChestClearanceFrame`, and `HeadBaseFrame` landmarks. These are authored in the
+carry reference pose so Blender retargets and runtime diagnostics can measure
+human/weapon contacts directly.
+
 The project owner confirmed on 2026-09-08 that these five converted outputs
 may be redistributed with this repository. They remain generated service
 outputs and are not relicensed as MIT; the permission covers the delivered
@@ -29,7 +35,7 @@ Delivered files (all self-contained GLBs with embedded textures):
 
 | Role | File | Size | SHA-256 |
 | --- | --- | ---: | --- |
-| Viper | `viper.glb` | 21,861,500 bytes | `BB562921939F214A317988DD9978898599C059C3459147FB2CD0609808D13AD4` |
+| Viper | `viper.glb` | 21,864,596 bytes | `09A33AEC6EA83B52500ED90072DFE8AECE67E790A64EECD690B2EFDD054FA531` |
 | Heron | `heron.glb` | 22,652,672 bytes | `AD86823F01A50AFBE1CE23B45A89DF74BDA25A1DD22B69D146D0B465E5935427` |
 | Lynx | `lynx.glb` | 24,804,160 bytes | `A6927B982B8B8073A5D41266F53795A641CD18F80541630906B16BFFB9C16711` |
 | Magpie | `magpie.glb` | 21,659,412 bytes | `C9A7A2B9EC5EA2019C1F1015181BCA492018B9EE732684F9FEFB92248F3DE0D4` |

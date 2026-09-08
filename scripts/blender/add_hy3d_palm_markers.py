@@ -9,8 +9,10 @@ points without changing the source GLB or guessing an index-bone offset.
 
 The input and output must be separate files.  The source is never overwritten.
 Magpie-like damaged hand groups are rejected instead of receiving a misleading
-marker.  The output is intended for a private asset store; it contains the
-same source meshes and animations plus marker nodes.
+marker.  In addition to the two palm contacts, the output carries explicit
+wrist, shoulder, chest-clearance, and head-base frames.  Those frames make the
+human/weapon relationship inspectable in Blender and give future animation
+retargets stable anatomical landmarks instead of guessed offsets.
 
 Usage::
 
@@ -212,6 +214,24 @@ def add_bone_marker(
     return marker
 
 
+def add_pose_frame(
+    armature: bpy.types.Object,
+    name: str,
+    bone_name: str,
+    world_position: Vector,
+    role: str,
+) -> bpy.types.Object:
+    """Add a named anatomical frame that follows one authored bone."""
+
+    marker = add_bone_marker(armature, name, bone_name, world_position)
+    marker["steel_tide_anatomical_frame"] = True
+    marker["steel_tide_contact_role"] = role
+    # Keep the legacy palm flag false for non-palm landmarks so runtime code
+    # can distinguish contact sockets from inspection-only anatomy frames.
+    marker["steel_tide_palm_frame"] = False
+    return marker
+
+
 def export_scene(output_path: str, armature: bpy.types.Object) -> None:
     leftovers = [obj.name for obj in bpy.data.objects if is_helper_mesh(obj)]
     if leftovers:
@@ -290,6 +310,25 @@ def main() -> None:
             f"weight={total_weight:.3f}",
             f"offset=({offset.x:.5f},{offset.y:.5f},{offset.z:.5f})",
         )
+
+    # These frames are intentionally authored on the same carry reference pose
+    # as the palms.  They are visible in Blender's outliner and survive GLB
+    # export as bone-parented empties, making chest/stock and muzzle/line-of-
+    # sight clearance measurable without inferring anatomy from vertices.
+    anatomical_frames = (
+        ("RightWristFrame", "RightHand", "dominant_wrist"),
+        ("LeftWristFrame", "LeftHand", "support_wrist"),
+        ("RightShoulderFrame", "RightArm", "dominant_shoulder"),
+        ("LeftShoulderFrame", "LeftArm", "support_shoulder"),
+        ("ChestClearanceFrame", "Spine2", "rifle_chest_clearance"),
+        ("HeadBaseFrame", "Head", "head_base_clearance"),
+    )
+    for name, bone_name, role in anatomical_frames:
+        bone = find_bone(armature, bone_name)
+        if bone is None:
+            raise RuntimeError(f"missing anatomical frame bone: {bone_name}")
+        world_position = (armature.matrix_world @ bone.matrix).translation
+        add_pose_frame(armature, name, bone_name, world_position, role)
 
     # Keep the existing runtime feature gate explicit and bone-parented so the
     # marker survives glTF export and follows the right wrist animation.
