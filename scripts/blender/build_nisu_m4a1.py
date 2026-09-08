@@ -102,8 +102,8 @@ ROUND_TRIP_TRANSFORM_TOLERANCE = 1.0e-6
 MINIMUM_APERTURE_AXIS_LENGTH = 0.05
 
 # Filled with reviewed deterministic outputs after the first complete build.
-OUTPUT_GLB_SHA256 = "0443EA0E2A8382E73D06186195C09AA25A09940E35473EC7C9501D0A59D75F69"
-OUTPUT_GLB_BYTES = 5_302_320
+OUTPUT_GLB_SHA256 = "3C0FE733D6E298C94BE66ACCB5AB579317EEB027E349AF60F95C618610C0811C"
+OUTPUT_GLB_BYTES = 5_302_740
 OUTPUT_PREVIEW_SHA256 = "CD5E58921A5BEA944548878C721E704C75B62C5882D846CAE5AA629DE0FA3A9F"
 OUTPUT_PREVIEW_BYTES = 1_023_330
 OUTPUT_ADS_PREVIEW_SHA256 = "30E19D7CBB7AED14305DF5F83FB97E77F04024AFC884A67ED4D7058C613286E1"
@@ -1238,6 +1238,9 @@ def build_runtime_asset() -> bpy.types.Object:
         STOCK_ORIGIN,
     )
     stock_geometry["runtime_asset"] = True
+    stock_contact = empty("StockContact", stock, Vector((0.0, -0.22, -0.06)))
+    stock_contact["runtime_asset"] = True
+    stock_contact["contact_role"] = "shoulder_stock"
 
     rear_iron_sight = empty("RearIronSight", root, REAR_IRON_ORIGIN)
     rear_iron_sight["runtime_asset"] = True
@@ -1284,6 +1287,9 @@ def build_runtime_asset() -> bpy.types.Object:
     primary_grip["runtime_asset"] = True
     primary_grip["derived_from_mesh"] = "M4A1Body_01_Base"
     primary_grip["contact_role"] = "dominant_hand_palm"
+    foregrip_contact = empty("ForegripContact", foregrip, Vector((0.0, 0.0, 0.0)))
+    foregrip_contact["runtime_asset"] = True
+    foregrip_contact["contact_role"] = "support_hand_palm"
     suppressor = empty("Suppressor", root, SUPPRESSOR_ORIGIN)
     optic_mount = empty("OpticMount", root, OPTIC_ORIGIN)
     for marker in (foregrip, muzzle_device, suppressor, optic_mount):
@@ -1337,6 +1343,9 @@ def build_runtime_asset() -> bpy.types.Object:
         muzzle_device,
         muzzle_geometry,
     )
+    muzzle_contact = empty("MuzzleContact", muzzle_device, muzzle_tip.location)
+    muzzle_contact["runtime_asset"] = True
+    muzzle_contact["contact_role"] = "muzzle_clearance"
 
     suppressor_geometry = mesh_copy_from_faces(
         suppressor_source,
@@ -1885,6 +1894,9 @@ def main() -> None:
         "Foregrip",
         "MuzzleDevice",
         "PrimaryGrip",
+        "ForegripContact",
+        "MuzzleContact",
+        "StockContact",
         "Suppressor",
         "OpticMount",
         "MuzzleDeviceTip",
@@ -1913,6 +1925,17 @@ def main() -> None:
             f"location={tuple(primary_grip.location)} "
             f"expected={tuple(PRIMARY_GRIP_ORIGIN)}"
         )
+    for name, parent_name in (
+        ("ForegripContact", "Foregrip"),
+        ("MuzzleContact", "MuzzleDevice"),
+        ("StockContact", "Stock"),
+    ):
+        marker = bpy.data.objects[name]
+        parent = bpy.data.objects[parent_name]
+        if marker.parent != parent:
+            raise RuntimeError(
+                f"Runtime contact marker {name} must be a child of {parent_name}."
+            )
     for name, expected_location in expected_attachment_locations.items():
         node = bpy.data.objects[name]
         if node.parent != root or (node.location - expected_location).length > 1.0e-8:

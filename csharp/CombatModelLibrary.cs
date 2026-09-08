@@ -39,9 +39,12 @@ internal sealed class AuthoredWeaponVisual
         SpareMagazineGrip = CombatModelLibrary.FindOptionalNode(root, "SpareMagazineGrip");
         ChargingHandle = CombatModelLibrary.RequireNode(root, "ChargingHandle");
         Stock = CombatModelLibrary.RequireNode(root, "Stock");
+        StockContact = CombatModelLibrary.FindOptionalNode(root, "StockContact");
         Foregrip = CombatModelLibrary.RequireNode(root, "Foregrip");
+        ForegripContact = CombatModelLibrary.FindOptionalNode(root, "ForegripContact");
         PrimaryGrip = CombatModelLibrary.FindOptionalNode(root, "PrimaryGrip");
         MuzzleDevice = CombatModelLibrary.RequireNode(root, "MuzzleDevice");
+        MuzzleContact = CombatModelLibrary.FindOptionalNode(root, "MuzzleContact");
         Suppressor = CombatModelLibrary.RequireNode(root, "Suppressor");
         OpticMount = CombatModelLibrary.RequireNode(root, "OpticMount");
         RearIronSight = CombatModelLibrary.FindOptionalNode(root, "RearIronSight");
@@ -125,9 +128,12 @@ internal sealed class AuthoredWeaponVisual
         => SpareMagazine.Visible ? SpareMagazineGrip : MagazineGrip;
     public Node3D ChargingHandle { get; }
     public Node3D Stock { get; }
+    public Node3D? StockContact { get; }
     public Node3D Foregrip { get; }
+    public Node3D? ForegripContact { get; }
     public Node3D? PrimaryGrip { get; }
     public Node3D MuzzleDevice { get; }
+    public Node3D? MuzzleContact { get; }
     public Node3D Suppressor { get; }
     public Node3D OpticMount { get; }
     public Node3D? RearIronSight { get; }
@@ -793,8 +799,8 @@ internal sealed class AuthoredOperatorVisual
         var supportHandTargetOffset = leftHand.Origin - rightHand.Origin;
         var handSeparation = supportHandTargetOffset.Length();
         var primaryHandRotation = rightHand.Basis.Orthonormalized().GetRotationQuaternion();
-        var muzzleOffset = weapon.MuzzleDevice.GlobalPosition - weaponOrigin;
-        var stockOffset = weapon.Stock.GlobalPosition - weaponOrigin;
+        var muzzleOffset = (weapon.MuzzleContact ?? weapon.MuzzleDevice).GlobalPosition - weaponOrigin;
+        var stockOffset = (weapon.StockContact ?? weapon.Stock).GlobalPosition - weaponOrigin;
         var minimumStockOffset = CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId) ? 0.1f : 0.14f;
         var valid = primaryHandDistance <= 0.08f
             && supportHandDistance <= 0.20f
@@ -834,8 +840,8 @@ internal sealed class AuthoredOperatorVisual
         var leftWrist = BoneWorldPosition("mixamorig:LeftHand");
         var headBase = BoneWorldPosition("mixamorig:Head");
         var chest = BoneWorldPosition("mixamorig:Spine2");
-        var stock = weapon.Stock.GlobalPosition;
-        var muzzle = weapon.MuzzleDevice.GlobalPosition;
+        var stock = (weapon.StockContact ?? weapon.Stock).GlobalPosition;
+        var muzzle = (weapon.MuzzleContact ?? weapon.MuzzleDevice).GlobalPosition;
         var rootInverse = Root.GlobalTransform.AffineInverse();
         var rightShoulderLocal = rootInverse * rightShoulder;
         var rightElbowLocal = rootInverse * rightElbow;
@@ -1686,13 +1692,13 @@ internal sealed class AuthoredOperatorVisual
     {
         if (VisualId != OperatorVisualId.Viper)
         {
-            return weapon.Foregrip.GlobalPosition;
+            return (weapon.ForegripContact ?? weapon.Foregrip).GlobalPosition;
         }
 
         // The Viper forearm reaches the rear half of the 20 cm foregrip. Keep
         // the contact on that authored geometry instead of forcing the elbow
         // past its natural length toward the marker centre.
-        return weapon.Foregrip.GlobalPosition
+        return (weapon.ForegripContact ?? weapon.Foregrip).GlobalPosition
             + weapon.Root.GlobalTransform.Basis.Orthonormalized()
                 * new Vector3(0.0f, 0.0f, 0.080f);
     }
