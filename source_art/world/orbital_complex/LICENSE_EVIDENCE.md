@@ -69,18 +69,18 @@ all nine texture images as well as every mesh-source hash.
 ## Runtime artifact and DCC audit
 
 The authoritative editable source is
-`source_art/world/orbital_complex/orbital_complex.blend` (15,521,550 bytes;
+`source_art/world/orbital_complex/orbital_complex.blend` (15,689,980 bytes;
 SHA-256
-`E288F6743444A27ADA414254DC06685EF223D36DE53EBFEDA959D306D3EB4EF2`). The
+`A2C9C20B5978A54C3A70D9DBF3A177AF3223E10EF637A028FD4259490AE3459C`). The
 deterministic builder is
 `scripts/blender/build_orbital_complex_underground.py`, which reuses the
 provenance-aware import/material/export helpers in
 `scripts/blender/build_orbital_complex.py` and must be run with Blender 4.5+.
 
 The current self-contained runtime is
-`assets/models/orbital_complex/orbital_complex.glb` (19,472,480 bytes; SHA-256
-`5031189E36A803B6EEBC1A91E6F0CB7AA23A14F23586AD9585A72D4B981F2E30`). Its glTF
-document contains 343 nodes, 240 mesh resources, 242 primitives, 42 materials,
+`assets/models/orbital_complex/orbital_complex.glb` (20,284,932 bytes; SHA-256
+`FDFA6F70F5BCF1AB7996A69C39BAFE6C38F52374C9AD9A573AB82E3D22DB49D4`). Its glTF
+document contains 597 nodes, 441 mesh resources, 443 primitives, 43 materials,
 and 11 embedded images, with no external buffer or image URI. The source and
 round-trip audits report 340 x 320 m horizontal bounds centered at Godot
 `(0,0,-60)`, vertical envelope `Y=-34..24`, three visible vertical layers,

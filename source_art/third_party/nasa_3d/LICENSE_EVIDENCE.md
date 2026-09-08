@@ -22,7 +22,8 @@ copyright. The same guidelines require factual source acknowledgement, prohibit
 implying NASA endorsement, warn that separately identified third-party content
 is not covered, and impose separate restrictions on NASA identifiers and logos.
 
-This project therefore applies the following concrete controls:
+This project therefore treats the two source meshes as redistributable under
+the NASA media guidelines, subject to the following concrete controls:
 
 1. NASA is recorded factually as the source of the two raw meshes.
 2. The finished scene contains no NASA insignia, worm logotype, seal, mission
