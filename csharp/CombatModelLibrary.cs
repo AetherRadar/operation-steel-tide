@@ -1527,7 +1527,15 @@ internal sealed class AuthoredOperatorVisual
         Basis targetBasis,
         Vector3? gripCenterWorld)
     {
-        var fingerBone = ResolveBoneIndex(_skeleton, fingerBoneName);
+        // Finger helper chains are optional on legacy and some HY-3D exports.
+        // Their authored wrist frame is still valid, so do not turn a cosmetic
+        // palm-roll adjustment into a per-frame exception storm.
+        var resolvedFingerName = ResolveBoneName(_skeleton, fingerBoneName);
+        if (resolvedFingerName is null)
+        {
+            return targetBasis.Orthonormalized();
+        }
+        var fingerBone = _skeleton.FindBone(resolvedFingerName);
         var authoredFinger = _skeleton.GetBoneGlobalPose(fingerBone).Origin - authoredHand.Origin;
         var targetFinger = targetBasis * Vector3.Up;
         if (authoredFinger.LengthSquared() <= 0.000001f
