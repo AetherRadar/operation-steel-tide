@@ -325,11 +325,11 @@ public sealed class KnifeSkinDefinition
 
 public static class KnifeSkinCatalog
 {
-    public const string DefaultId = "knife_carbon";
+    public const string DefaultId = "knife_zhanma";
 
     private static readonly Dictionary<string, KnifeSkinDefinition> Definitions = new(StringComparer.OrdinalIgnoreCase)
     {
-        [DefaultId] = Skin(DefaultId, "Carbon Black", "knife_skin_carbon", MeleeWeaponStyle.TacticalKnife, new Color(0.09f, 0.12f, 0.115f), new Color(0.48f, 0.58f, 0.56f), new Color(0.025f, 0.035f, 0.032f), 2.55f, 62.0f),
+        ["knife_carbon"] = Skin("knife_carbon", "Carbon Black", "knife_skin_carbon", MeleeWeaponStyle.TacticalKnife, new Color(0.09f, 0.12f, 0.115f), new Color(0.48f, 0.58f, 0.56f), new Color(0.025f, 0.035f, 0.032f), 2.55f, 62.0f),
         ["knife_crimson"] = Skin("knife_crimson", "Crimson Circuit", "knife_skin_crimson", MeleeWeaponStyle.TacticalKnife, new Color(0.38f, 0.035f, 0.045f), new Color(1.0f, 0.24f, 0.16f), new Color(0.09f, 0.018f, 0.022f), 2.55f, 62.0f),
         ["knife_arctic"] = Skin("knife_arctic", "Arctic Glass", "knife_skin_arctic", MeleeWeaponStyle.TacticalKnife, new Color(0.22f, 0.58f, 0.72f), new Color(0.72f, 0.96f, 1.0f), new Color(0.055f, 0.13f, 0.17f), 2.55f, 62.0f),
         ["knife_hazard"] = Skin("knife_hazard", "Hazard Stripe", "knife_skin_hazard", MeleeWeaponStyle.TacticalKnife, new Color(0.72f, 0.52f, 0.04f), new Color(1.0f, 0.82f, 0.18f), new Color(0.08f, 0.075f, 0.025f), 2.55f, 62.0f),

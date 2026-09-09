@@ -65,7 +65,7 @@ public partial class FreightTerminalWorld
             _player.FaceWorldPointForDiagnostics(new Vector3(0.0f, 0.2f, -40.0f));
             await WaitFrames(4);
 
-            var tactical = KnifeSkinCatalog.Definition(KnifeSkinCatalog.DefaultId);
+            var tactical = KnifeSkinCatalog.Definition("knife_carbon");
             var zhanma = KnifeSkinCatalog.Definition("knife_zhanma");
             var tianxuan = KnifeSkinCatalog.Definition("knife_tianxuan");
             definitionsValid = ValidateMeleeDefinitions(tactical, zhanma, tianxuan);
