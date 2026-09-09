@@ -67,18 +67,18 @@ internal static class MeleeAttackCatalog
             [
                 Attack(
                     "zhanma_heavy_crosscut", 0.88f, 0.47f, 1.2f,
-                    new(0.55f, -0.4f, -0.36f), new(0.28f, 0.34f, 0.94f),
-                    new(-0.34f, 0.12f, -1.02f), new(0.78f, -1.12f, -0.84f),
+                    new(0.62f, -0.12f, -0.34f), new(1.0f, 0.65f, 1.35f),
+                    new(-0.42f, 0.16f, -1.0f), new(0.22f, -1.35f, -1.0f),
                     7, 2),
                 Attack(
                     "zhanma_rising_return", 0.82f, 0.44f, 1.08f,
-                    new(-0.38f, -0.18f, -0.72f), new(0.24f, -0.64f, -0.82f),
-                    new(0.42f, 0.02f, -0.94f), new(-0.54f, 0.94f, 0.7f),
+                    new(-0.42f, -0.02f, -0.7f), new(-0.8f, -0.4f, -1.25f),
+                    new(0.46f, 0.22f, -0.82f), new(-0.2f, 1.2f, 1.0f),
                     7, 2),
                 Attack(
                     "zhanma_overhead_breaker", 1.02f, 0.53f, 1.38f,
-                    new(0.04f, 0.18f, -0.3f), new(-1.02f, 0.02f, 0.08f),
-                    new(0.02f, -0.16f, -1.15f), new(1.12f, 0.02f, -0.02f),
+                    new(0.0f, 0.28f, -0.5f), new(-1.2f, 0.0f, 0.0f),
+                    new(0.0f, -0.35f, -1.1f), new(1.25f, 0.0f, 0.2f),
                     6, 3)
             ],
             [MeleeWeaponStyle.TianxuanDao] =
